@@ -1,51 +1,59 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Fri, 13 May 2016 11:59:16 +0800
-Subject: [RFC 2/3] drm/mediatek: add support for Mediatek SoC MT2701
-In-Reply-To: <1463053795-55455-3-git-send-email-yt.shen@mediatek.com>
-References: <1463053795-55455-1-git-send-email-yt.shen@mediatek.com>
- <1463053795-55455-3-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1463111956.12239.15.camel@mtksdaap41>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 12 May 2016 21:22:55 -0700
+Subject: arm build failures in -next due to 'sched/core: Add
+ switch_mm_irqs_off() and use it in the scheduler'
+Message-ID: <20160513042255.GA28453@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, YT:
+Hi Andy,
 
-On Thu, 2016-05-12 at 19:49 +0800, yt.shen at mediatek.com wrote:
-> From: YT Shen <yt.shen@mediatek.com>
-> 
-> This patch add support for the Mediatek MT2701 DISP subsystem.
-> There is only one OVL engine in MT2701, and we have shadow
-> register support here.
-> 
-> Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> ---
+I see various arm build failures in -next. One example is spitz_defconfig.
+Bisect points to commit 'sched/core: Add switch_mm_irqs_off() and use it
+in the scheduler'. Reverting the commit fixes the problem.
 
-> @@ -385,12 +422,16 @@ static void mtk_drm_crtc_atomic_begin(struct drm_crtc *crtc,
->  		mtk_crtc->event = state->base.event;
->  		state->base.event = NULL;
->  	}
-> +
-> +	if (priv->data->shadow_register)
-> +		mtk_disp_mutex_acquire(mtk_crtc->mutex);
->  }
->  
-> @@ -409,6 +450,11 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
->  	}
->  	if (pending_planes)
->  		mtk_crtc->pending_planes = true;
-> +
-> +	if (priv->data->shadow_register) {
-> +		mtk_crtc_ddp_config(crtc);
-> +		mtk_disp_mutex_release(mtk_crtc->mutex);
-> +	}
->  }
->  
+In file included from include/linux/mmu_context.h:4:0,
+                 from drivers/usb/gadget/legacy/inode.c:27:
+./arch/arm/include/asm/mmu_context.h:
+	In function 'finish_arch_post_lock_switch':
+./arch/arm/include/asm/mmu_context.h:88:3: error:
+	implicit declaration of function 'preempt_enable_no_resched'
 
-I think it's better to call mtk_disp_mutex_acquire() and
-mtk_disp_mutex_release() as near as possible to prevent mutex locked for
-a long time. All HW register access of this atomic setting is in
-mtk_crtc_ddp_config(), so it's better to move mtk_disp_mutex_acquire()
-just before mtk_crtc_ddp_config().
+This has been going on for a while, so maybe it has been reported already.
+If so, sorry for the noise.
 
-Regards,
-CK
+Bisect log is attached.
+
+Guenter
+
+---
+# bad: [dd1071fe27ec200ddc49a494e1275a8269248843] x86/rwsem: Save and restore all callee-clobbered regs in 32-bit ____down_write()
+# good: [44549e8f5eea4e0a41b487b63e616cb089922b99] Linux 4.6-rc7
+git bisect start 'HEAD' 'v4.6-rc7'
+# good: [b6cf27d48f370bf2d42888921632ae05340aaca9] Merge remote-tracking branch 'crypto/master'
+git bisect good b6cf27d48f370bf2d42888921632ae05340aaca9
+# bad: [607563e7793b7c4f3ab134dc200552a555ca5cb2] Merge remote-tracking branch 'tip/auto-latest'
+git bisect bad 607563e7793b7c4f3ab134dc200552a555ca5cb2
+# good: [05454bc3dd6d8c4cff684ea881d79db952030075] Merge remote-tracking branch 'block/for-next'
+git bisect good 05454bc3dd6d8c4cff684ea881d79db952030075
+# good: [3ed15da0d55d9147f6434fe57db60a5b4059cbfd] Merge remote-tracking branch 'spi/for-next'
+git bisect good 3ed15da0d55d9147f6434fe57db60a5b4059cbfd
+# good: [25ea4e608611c03ad9829a727f6cc198db952d06] Merge branch 'perf/core'
+git bisect good 25ea4e608611c03ad9829a727f6cc198db952d06
+# bad: [df9f17497431a073c33aea6994f3b5b53fd89806] manual merge of x86/asm
+git bisect bad df9f17497431a073c33aea6994f3b5b53fd89806
+# bad: [d10c98b20678fb22506d6c712d7a0af6885001a1] Merge branch 'timers/core'
+git bisect bad d10c98b20678fb22506d6c712d7a0af6885001a1
+# bad: [b52fad2db5d792d89975cebf2fe1646a7af28ed0] sched/fair: Update rq clock before updating nohz CPU load
+git bisect bad b52fad2db5d792d89975cebf2fe1646a7af28ed0
+# good: [1f41906a6fda1114debd3898668bd7ab6470ee41] sched/fair: Correctly handle nohz ticks CPU load accounting
+git bisect good 1f41906a6fda1114debd3898668bd7ab6470ee41
+# bad: [64b7aad5798478ffff52e110878ccaae4c3aaa34] Merge branch 'sched/urgent' into sched/core, to pick up fixes before applying new changes
+git bisect bad 64b7aad5798478ffff52e110878ccaae4c3aaa34
+# good: [8efd755ac2fe262d4c8d5c9bbe054bb67dae93da] mm/mmu_context, sched/core: Fix mmu_context.h assumption
+git bisect good 8efd755ac2fe262d4c8d5c9bbe054bb67dae93da
+# bad: [e1074888c326038340a1ada9129d679e661f2ea6] x86/mm: Build arch/x86/mm/tlb.c even on !SMP
+git bisect bad e1074888c326038340a1ada9129d679e661f2ea6
+# bad: [f98db6013c557c216da5038d9c52045be55cd039] sched/core: Add switch_mm_irqs_off() and use it in the scheduler
+git bisect bad f98db6013c557c216da5038d9c52045be55cd039
+# first bad commit: [f98db6013c557c216da5038d9c52045be55cd039] sched/core: Add switch_mm_irqs_off() and use it in the scheduler
