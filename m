@@ -1,62 +1,68 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 13 May 2016 19:59:20 +0800
-Subject: [PATCH 2/2] net: mv643xx_eth: use dma_wmb/rmb where appropriate
-In-Reply-To: <1463140760-7128-1-git-send-email-jszhang@marvell.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 May 2016 14:09:43 +0200
+Subject: [PATCH 1/2] net: mv643xx_eth: use {readl|writel}_relaxed instead
+ of readl/writel
+In-Reply-To: <1463140760-7128-2-git-send-email-jszhang@marvell.com>
 References: <1463140760-7128-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1463140760-7128-3-git-send-email-jszhang@marvell.com>
+ <1463140760-7128-2-git-send-email-jszhang@marvell.com>
+Message-ID: <3966837.tFk2PD8QFb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the mv643xx_eth driver to use the dma_rmb/wmb calls instead of
-the full barriers in order to improve performance.
+On Friday 13 May 2016 19:59:19 Jisheng Zhang wrote:
+>  /* port register accessors **************************************************/
+>  static inline u32 rdl(struct mv643xx_eth_private *mp, int offset)
+>  {
+> -	return readl(mp->shared->base + offset);
+> +	return readl_relaxed(mp->shared->base + offset);
+>  }
+>  
+>  static inline u32 rdlp(struct mv643xx_eth_private *mp, int offset)
+>  {
+> -	return readl(mp->base + offset);
+> +	return readl_relaxed(mp->base + offset);
+>  }
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/net/ethernet/marvell/mv643xx_eth.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+I'd recommend not changing these in general, but introducing new 'rdl_relaxed()'
+and 'rdlp_relaxed()' etc variants that you use in the code that actually
+is performance sensitive, but use the normal non-relaxed versions by
+default.
 
-diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
-index c6d8124..13b71e3 100644
---- a/drivers/net/ethernet/marvell/mv643xx_eth.c
-+++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
-@@ -536,7 +536,7 @@ static int rxq_process(struct rx_queue *rxq, int budget)
- 		cmd_sts = rx_desc->cmd_sts;
- 		if (cmd_sts & BUFFER_OWNED_BY_DMA)
- 			break;
--		rmb();
-+		dma_rmb();
- 
- 		skb = rxq->rx_skb[rxq->rx_curr_desc];
- 		rxq->rx_skb[rxq->rx_curr_desc] = NULL;
-@@ -647,9 +647,9 @@ static int rxq_refill(struct rx_queue *rxq, int budget)
- 						  DMA_FROM_DEVICE);
- 		rx_desc->buf_size = size;
- 		rxq->rx_skb[rx] = skb;
--		wmb();
-+		dma_wmb();
- 		rx_desc->cmd_sts = BUFFER_OWNED_BY_DMA | RX_ENABLE_INTERRUPT;
--		wmb();
-+		dma_wmb();
- 
- 		/*
- 		 * The hardware automatically prepends 2 bytes of
-@@ -889,7 +889,7 @@ static int txq_submit_tso(struct tx_queue *txq, struct sk_buff *skb,
- 	skb_tx_timestamp(skb);
- 
- 	/* ensure all other descriptors are written before first cmd_sts */
--	wmb();
-+	dma_wmb();
- 	first_tx_desc->cmd_sts = first_cmd_sts;
- 
- 	/* clear TX_END status */
-@@ -994,7 +994,7 @@ static int txq_submit_skb(struct tx_queue *txq, struct sk_buff *skb,
- 	skb_tx_timestamp(skb);
- 
- 	/* ensure all other descriptors are written before first cmd_sts */
--	wmb();
-+	dma_wmb();
- 	desc->cmd_sts = cmd_sts;
- 
- 	/* clear TX_END status */
--- 
-2.8.1
+Then add a comment to each use of the relaxed accessors on how you know
+that it's safe for that caller. This usually is just needed for the xmit()
+function and for the interrupt handler.
+  
+> @@ -2642,10 +2642,10 @@ mv643xx_eth_conf_mbus_windows(struct mv643xx_eth_shared_private *msp,
+>  	int i;
+>  
+>  	for (i = 0; i < 6; i++) {
+> -		writel(0, base + WINDOW_BASE(i));
+> -		writel(0, base + WINDOW_SIZE(i));
+> +		writel_relaxed(0, base + WINDOW_BASE(i));
+> +		writel_relaxed(0, base + WINDOW_SIZE(i));
+>  		if (i < 4)
+> -			writel(0, base + WINDOW_REMAP_HIGH(i));
+> +			writel_relaxed(0, base + WINDOW_REMAP_HIGH(i));
+>  	}
+>  
+>  	win_enable = 0x3f;
+
+Configuring the mbus for instance is clearly not an operation in which
+performance matters at all, so better not touch that.
+
+> @@ -2674,8 +2675,8 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
+>  	 * [21:8], or a 16-bit coal limit in bits [25,21:7] of the
+>  	 * SDMA config register.
+>  	 */
+> -	writel(0x02000000, msp->base + 0x0400 + SDMA_CONFIG);
+> -	if (readl(msp->base + 0x0400 + SDMA_CONFIG) & 0x02000000)
+> +	writel_relaxed(0x02000000, msp->base + 0x0400 + SDMA_CONFIG);
+> +	if (readl_relaxed(msp->base + 0x0400 + SDMA_CONFIG) & 0x02000000)
+>  		msp->extended_rx_coal_limit = 1;
+>  	else
+>  		msp->extended_rx_coal_limit = 0;
+
+
+This also seems to be configuration, rather than in the packet rx/tx hotpath.
+
+	Arnd
