@@ -1,28 +1,138 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 13 May 2016 12:41:32 +0200
-Subject: [PATCH] i2c: st: Implement bus clear
-In-Reply-To: <1462983719-342-1-git-send-email-peter.griffin@linaro.org>
-References: <1462983719-342-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160513104132.GG1778@katana>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 13 May 2016 11:44:38 +0100
+Subject: [PATCH v3 47/55] KVM: arm/arm64: vgic-new: Add userland GIC CPU
+ interface access
+In-Reply-To: <20160513075323.GF27623@cbox>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-48-git-send-email-andre.przywara@arm.com>
+ <20160512184740.GM27623@cbox> <5734D0F6.9090406@arm.com>
+ <20160513075323.GF27623@cbox>
+Message-ID: <5735B016.50207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 05:21:59PM +0100, Peter Griffin wrote:
-> From I2C specifications:
->       http://www.nxp.com/documents/user_manual/UM10204.pdf
-> 
-> Chapter 3.1.16, when the i2c device held the SDA line low, the master
-> should send 9 clocks pulses to try to recover.
-> 
-> Signed-off-by: Frederic Pillon <frederic.pillon@st.com>
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Hi,
 
-Applied to for-next, thanks! Please us PATCH V<n> next time.
+On 13/05/16 08:53, Christoffer Dall wrote:
+> On Thu, May 12, 2016 at 07:52:38PM +0100, Andre Przywara wrote:
+>> Hi,
+>>
+>> On 12/05/16 19:47, Christoffer Dall wrote:
+>>> On Fri, May 06, 2016 at 11:46:00AM +0100, Andre Przywara wrote:
+>>>> Using the VMCR accessors we provide access to GIC CPU interface state
+>>>> to userland by wiring it up to the existing userland interface.
+>>>> [Marc: move and make VMCR accessors static, streamline MMIO handlers]
+>>>
+>>> does this mean Marc did this and serves as credit or is it a lost
+>>> reminder?
+>>
+>> It was meant as credit. I thought that is the usual annotation for this?
+>>
+> 
+> I'm not sure if that's the usual way, I read it as a reminder, but it's
+> not too important.  Mostly wanting to make sure we're not forgetting
+> some todo item.
+> 
+>>>>
+>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>> Changelog v2 .. v3:
+>>>> - total rework, moving into vgic-mmio-v2.c
+>>>> - move vmcr accessor wrapper functions into this file
+>>>> - use the register description table for CPU i/f registers as well
+>>>> - add RAZ/WI handling for the active priority registers
+>>>> - streamline MMIO handler functions
+>>>>
+>>>>  virt/kvm/arm/vgic/vgic-kvm-device.c |   2 +-
+>>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c    | 104 ++++++++++++++++++++++++++++++++++++
+>>>>  virt/kvm/arm/vgic/vgic.h            |   2 +
+>>>>  3 files changed, 107 insertions(+), 1 deletion(-)
+>>>>
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>>>> index bb33af8..2122ff2 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+>>>> @@ -300,7 +300,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+>>>>  
+>>>>  	switch (attr->group) {
+>>>>  	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+>>>> -		ret = -EINVAL;
+>>>> +		ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, reg);
+>>>>  		break;
+>>>>  	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+>>>>  		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
+>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>> index c453e6f..0060539 100644
+>>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>> @@ -206,6 +206,84 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+>>>>  	}
+>>>>  }
+>>>>  
+>>>> +static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>>>> +{
+>>>> +	if (kvm_vgic_global_state.type == VGIC_V2)
+>>>> +		vgic_v2_set_vmcr(vcpu, vmcr);
+>>>> +	else
+>>>> +		vgic_v3_set_vmcr(vcpu, vmcr);
+>>>> +}
+>>>> +
+>>>> +static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
+>>>> +{
+>>>> +	if (kvm_vgic_global_state.type == VGIC_V2)
+>>>> +		vgic_v2_get_vmcr(vcpu, vmcr);
+>>>> +	else
+>>>> +		vgic_v3_get_vmcr(vcpu, vmcr);
+>>>> +}
+>>>> +
+>>>> +#define GICC_ARCH_VERSION_V2	0x2
+>>>> +
+>>>> +/* These are for userland accesses only, there is no guest-facing emulation. */
+>>>> +static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
+>>>> +					   gpa_t addr, unsigned int len)
+>>>> +{
+>>>> +	struct vgic_vmcr vmcr;
+>>>> +	u32 val;
+>>>> +
+>>>> +	vgic_get_vmcr(vcpu, &vmcr);
+>>>> +
+>>>> +	switch (addr & 0xff) {
+>>>> +	case GIC_CPU_CTRL:
+>>>> +		val = vmcr.ctlr;
+>>>> +		break;
+>>>> +	case GIC_CPU_PRIMASK:
+>>>> +		val = vmcr.pmr;
+>>>> +		break;
+>>>> +	case GIC_CPU_BINPOINT:
+>>>> +		val = vmcr.bpr;
+>>>> +		break;
+>>>> +	case GIC_CPU_ALIAS_BINPOINT:
+>>>> +		val = vmcr.abpr;
+>>>> +		break;
+>>>> +	case GIC_CPU_IDENT:
+>>>> +		val = ((PRODUCT_ID_KVM << 20) |
+>>>> +		       (GICC_ARCH_VERSION_V2 << 16) |
+>>>> +		       IMPLEMENTER_ARM);
+>>>> +		break;
+>>>> +	default:
+>>>> +		return 0;
+>>>> +	}
+>>>> +
+>>>> +	return extract_bytes(val, addr & 3, len);
+>>>
+>>> I don't think we allow anything than a full 32-bit aligned accesses
+>>> from userspace - we shouldn't at least.
+>>
+>> Indeed - I think userland was always 32-bit only. And since last night
+>> we even enforce this. So potentially there are more extract_bytes()
+>> calls that can go.
+>>
+> Right.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160513/6f945531/attachment.sig>
+So can I replace every call to extract_bytes() with just a "return val;"
+for every register that allows 32-bit accesses only?
+I think that's safe now, just checking ...
+
+Cheers,
+Andre.
