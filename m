@@ -1,64 +1,35 @@
-From: charanya@codeaurora.org (charanya at codeaurora.org)
-Date: Fri, 13 May 2016 14:48:27 +0530
-Subject: [PATCH] tty: serial: msm: Disable restoring Rx interrupts for DMA
- Mode
-In-Reply-To: <20160512050245.GD8453@hector.attlocal.net>
-References: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
- <20160512014126.GK3492@codeaurora.org>
- <20160512050245.GD8453@hector.attlocal.net>
-Message-ID: <5cce36b3c1d62816feffb4048f782b20@codeaurora.org>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Fri, 13 May 2016 11:22:11 +0200
+Subject: [PATCH] i2c: at91: change log when dma configuration fails
+Message-ID: <1463131331-6136-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-05-12 10:32, Andy Gross wrote:
-> On Wed, May 11, 2016 at 06:41:26PM -0700, Stephen Boyd wrote:
->> On 05/10, Abhishek Sahu wrote:
->> > From: Charanya <charanya@codeaurora.org>
->> 
->> Was it intentional to only have one name here?
->> 
->> >
->> > The Data loss was happening with current QCOM MSM serial driver during
->> > large file transfer due to simultaneous enabling of both UART and
->> > DMA interrupt. When UART operates in DMA mode, RXLEV (Rx FIFO over
->> > watermark) or RXSTALE (stale interrupts) should not be enabled,
->> > since these conditions will be handled by DMA controller itself.
->> > If these interrupts are enabled then normal UART ISR will read some
->> > bytes of data from Rx Buffer and DMA controller will not receive
->> > these bytes of data, which will cause data loss.
->> >
->> > Now this patch removed the code for enabling of RXLEV and RXSTALE
->> > interrupt in DMA Rx completion routine.
->> 
->> I'm lost, we keep both these irqs masked (well only if uartdm
->> version is 1.4 or greater) pretty much the entire time we're
->> using DMA for RX. msm_start_rx_dma() will mask them and then when
->> the callback completes we'll unmask them (the part that's deleted
->> in this patch), but then we'll go back and remask them almost
->> immediately because we call msm_start_rx_dma() from the dma
->> completion handler.
->> 
->> Can you clearly describe how this is actually fixing any
->> problems? What's the sequence of events that happens to cause
->> corruption?
->> 
->> This does raise the question though why we ever mask/unmask these
->> interrupts if we're always going to keep them masked while doing
->> DMA RX. Presumably if we can use DMA to RX, we can always use it
->> and set things up properly at startup time instead of later on.
-> 
-> Thats probably the right thing to do.  We shouldn't be 
-> masking/unmasking
-> the unused IRQs to begin with.
-Hi Stephen/Andy,
+When the DMA configuration fails, there is a log reporting that we can't
+use DMA and indicating the error number. When booting the kernel, it is
+annoying to see this error number. Moreover, people can think something
+is going wrong. It is not the case, it means that DMA can't be used but
+it doesn't prevent to use i2c.
 
-If both Tx and Rx are used simultaneously, restoring Rx interrupts in
-msm_complete_rx_dma could lead to RXSTALE interrupt being triggered, 
-when
-the ISR execution for TXLEV interrupt is completed, since msm_port->imr 
-is
-rewritten to UART_IMR in msm_uart_irq. Hence, we do not have to restore
-Rx interrupts since Rx is always in DMA mode once enabled.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/i2c/busses/i2c-at91.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Thanks.
-Charanya.
+diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
+index 921d32b..f2a7457 100644
+--- a/drivers/i2c/busses/i2c-at91.c
++++ b/drivers/i2c/busses/i2c-at91.c
+@@ -1013,7 +1013,9 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
+ 
+ error:
+ 	if (ret != -EPROBE_DEFER)
+-		dev_info(dev->dev, "can't use DMA, error %d\n", ret);
++		dev_info(dev->dev,
++			 "can't request DMA channels, continue without DMA support\n",
++			 ret);
+ 	if (dma->chan_rx)
+ 		dma_release_channel(dma->chan_rx);
+ 	if (dma->chan_tx)
+-- 
+2.5.0
