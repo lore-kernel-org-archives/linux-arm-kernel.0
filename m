@@ -1,25 +1,48 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 13 May 2016 15:26:37 -0700
-Subject: [PATCH 4/4] phy: rockchip-emmc: reindent the register definitions
-In-Reply-To: <1463092986-61777-4-git-send-email-briannorris@chromium.org>
-References: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
- <1463092986-61777-4-git-send-email-briannorris@chromium.org>
-Message-ID: <CAD=FV=XkJTrUD-+KBCoZkzyN9_XRH+uE=AjEiVvaNf5iad=jow@mail.gmail.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 13 May 2016 17:47:17 -0500
+Subject: QRTR merge conflict resolution (was: Re: linux-next: build
+ failure after merge of the net-next tree)
+In-Reply-To: <20160513221909.GC1256@tuxbot>
+References: <20160510112905.5bffcad8@canb.auug.org.au>
+ <20160510183934.GJ1256@tuxbot> <2606282.lG9qK7uBW0@wuerfel>
+ <20160513221909.GC1256@tuxbot>
+Message-ID: <CAPBZ5Qfa+b1LLgqpxfKGysY5jXVrzmBzhga=ZYtpdDAKC9hnTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, May 12, 2016 at 3:43 PM, Brian Norris <briannorris@chromium.org> wrote:
-> Some of the spacing was wrong (spaces instead of tabs), and due to
-> longer entries added later, the columns weren't aligned. Let's get
-> everything consistent.
+On 13 May 2016 at 17:19, Bjorn Andersson <bjorn.andersson@linaro.org> wrote:
+> On Fri 13 May 14:01 PDT 2016, Arnd Bergmann wrote:
 >
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> ---
->  drivers/phy/phy-rockchip-emmc.c | 76 ++++++++++++++++++++---------------------
->  1 file changed, 38 insertions(+), 38 deletions(-)
+>> On Tuesday 10 May 2016 11:39:34 Bjorn Andersson wrote:
+> [..]
+>> > I assume we could have the QRTR go through Andy and arm-soc, with
+>> > David's approval and this fix squashed in. But we're running rather late
+>> > in this cycle, perhaps we should just back the QRTR patches out and I
+>> > can respin and resend them after the merge window (for v4.8 instead)?
+>>
+>> I'd suggest you do a merge of next-next with the qcom/soc-2 branch that
+>> we have in arm-soc and resolve the conflict in the merge, then send
+>> a pull request with the merge to davem.
+>>
+>
+> Hi David,
+>
+> In case you missed this thread, linux-next highlighted an upcoming merge
+> conflict between the net-next and one of the branches included in the
+> arm-soc trees.
+>
+> I have prepared the merge of net-next and the conflicting tag from the
+> Qualcomm SOC, please include this in your pull towards Linus to avoid
+> the merge conflict.
+>
+> Regards,
+> Bjorn
+>
+> The following changes since commit ed7cbbce544856b20e5811de373cf92e92499771:
+>
+>   udp: Resolve NULL pointer dereference over flow-based vxlan device (2016-05-13 01:56:14 -0400)
 
-Sure, why not?
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+OK. The contents look good to me.
+
+Acked-by: Andy Gross <andy.gross@linaro.org>
