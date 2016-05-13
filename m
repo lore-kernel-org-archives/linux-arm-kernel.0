@@ -1,46 +1,76 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 May 2016 08:12:37 +0200
-Subject: [PATCH v3 4/6] ARM: dts: r8a7794: add Audio-DMAC support
-In-Reply-To: <25671875.9c5xSSzmjj@wasted.cogentembedded.com>
+Date: Fri, 13 May 2016 08:13:28 +0200
+Subject: [PATCH v3 5/6] ARM: dts: r8a7794: add sound support
+In-Reply-To: <38505966.asxJl6Sq91@wasted.cogentembedded.com>
 References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
- <25671875.9c5xSSzmjj@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdUqys5qFShjfTfBn8sK1xs=+q91QFnvmS59GK_PqTByNA@mail.gmail.com>
+ <38505966.asxJl6Sq91@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXdN+nf+_scyDA7yW2NgNiFhK8a1Vt1-uA+FEymoFiPNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Thu, May 12, 2016 at 10:47 PM, Sergei Shtylyov
+On Thu, May 12, 2016 at 10:49 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
 > --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
 > +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -295,6 +295,34 @@
->                 dma-channels = <15>;
+> @@ -1385,4 +1385,189 @@
+>                 #iommu-cells = <1>;
+>                 status = "disabled";
 >         };
->
-> +       audma0: dma-controller at ec700000 {
-> +               compatible = "renesas,dmac-r8a7794", "renesas,rcar-dmac";
-> +               reg = <0 0xec700000 0 0x10000>;
-> +               interrupts =    <GIC_SPI 346 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 320 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 321 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 322 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 323 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 324 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 325 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 326 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 327 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 328 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 329 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 330 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 331 IRQ_TYPE_LEVEL_HIGH
-> +                                GIC_SPI 332 IRQ_TYPE_LEVEL_HIGH>;
-> +               interrupt-names = "error",
-> +                                 "ch0", "ch1", "ch2", "ch3", "ch4", "ch5",
-> +                                 "ch6", "ch7", "ch8", "ch9", "ch10", "ch11",
-> +                                 "ch12";
-> +               clocks = <&mstp5_clks R8A7794_CLK_AUDIO_DMAC0>;
-> +               clock-names = "fck";
+> +
+> +       rcar_sound: sound at ec500000 {
+> +               /*
+> +                * #sound-dai-cells is required
+> +                *
+> +                * Single DAI : #sound-dai-cells = <0>;         <&rcar_sound>;
+> +                * Multi  DAI : #sound-dai-cells = <1>;         <&rcar_sound N>;
+> +                */
+> +               compatible = "renesas,rcar_sound-r8a7794",
+> +                            "renesas,rcar_sound-gen2";
+> +               reg =   <0 0xec500000 0 0x1000>, /* SCU */
+> +                       <0 0xec5a0000 0 0x100>,  /* ADG */
+> +                       <0 0xec540000 0 0x1000>, /* SSIU */
+> +                       <0 0xec541000 0 0x280>,  /* SSI */
+> +                       <0 0xec740000 0 0x200>;  /* Audio DMAC peri peri */
+> +               reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
+> +
+> +               clocks = <&mstp10_clks R8A7794_CLK_SSI_ALL>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI9>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI8>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI7>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI6>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI5>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI4>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI3>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI2>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI1>,
+> +                        <&mstp10_clks R8A7794_CLK_SSI0>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC9>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC8>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC7>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC6>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC5>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC4>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC3>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC2>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC1>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_SRC0>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_CTU0_MIX0>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_CTU1_MIX1>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_DVC0>,
+> +                        <&mstp10_clks R8A7794_CLK_SCU_DVC1>,
+> +                        <&audio_clka>, <&audio_clkb>, <&audio_clkc>,
+> +                        <&m2_clk>;
+> +               clock-names = "ssi-all",
+> +                             "ssi.9", "ssi.8", "ssi.7", "ssi.6", "ssi.5",
+> +                             "ssi.4", "ssi.3", "ssi.2", "ssi.1", "ssi.0",
+> +                             "src.9", "src.8", "src.7", "src.6", "src.5",
+> +                             "src.4", "src.3", "src.2", "src.1", "src.0",
+> +                             "ctu.0", "ctu.1",
+> +                             "mix.0", "mix.1",
+> +                             "dvc.0", "dvc.1",
+> +                             "clk_a", "clk_b", "clk_c", "clk_i";
 > +               power-domains = <&cpg_clocks>;
 
 In renesas-devel-20160509-v4.6-rc7, that should be
