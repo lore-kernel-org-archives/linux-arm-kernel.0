@@ -1,91 +1,98 @@
 From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 13 May 2016 16:52:57 -0700
-Subject: [PATCH v2 1/5] drivers: net: xgene: fix IPv4 forward crash
+Date: Fri, 13 May 2016 16:52:59 -0700
+Subject: [PATCH v2 3/5] drivers: net: xgene: fix ununiform latency across
+ queues
 In-Reply-To: <1463183581-30475-1-git-send-email-isubramanian@apm.com>
 References: <1463183581-30475-1-git-send-email-isubramanian@apm.com>
-Message-ID: <1463183581-30475-2-git-send-email-isubramanian@apm.com>
+Message-ID: <1463183581-30475-4-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the crash observed during IPv4 forward test by
-setting the drop field in the dbptr.
+This patch addresses ununiform latency across queues by adding
+more queues to match with, upto number of CPU cores.
+
+Also, number of interrupts are increased and the channel numbers
+are reordered.
 
 Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 Tested-by: Toan Le <toanle@apm.com>
 ---
- drivers/net/ethernet/apm/xgene/xgene_enet_cle.c | 11 ++++++-----
- drivers/net/ethernet/apm/xgene/xgene_enet_cle.h |  2 ++
- 2 files changed, 8 insertions(+), 5 deletions(-)
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 30 ++++++++++++++++++------
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  8 +++----
+ 2 files changed, 27 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
-index 6479288..472c0fb 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.c
-@@ -43,6 +43,7 @@ static void xgene_cle_idt_to_hw(u32 dstqid, u32 fpsel,
- static void xgene_cle_dbptr_to_hw(struct xgene_enet_pdata *pdata,
- 				  struct xgene_cle_dbptr *dbptr, u32 *buf)
- {
-+	buf[0] = SET_VAL(CLE_DROP, dbptr->drop);
- 	buf[4] = SET_VAL(CLE_FPSEL, dbptr->fpsel) |
- 		 SET_VAL(CLE_DSTQIDL, dbptr->dstqid);
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index ed90664..e75d1a9 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -1247,6 +1247,13 @@ static int xgene_enet_get_irqs(struct xgene_enet_pdata *pdata)
+ 	for (i = 0; i < max_irqs; i++) {
+ 		ret = platform_get_irq(pdev, i);
+ 		if (ret <= 0) {
++			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
++				max_irqs = i;
++				pdata->rxq_cnt = max_irqs / 2;
++				pdata->txq_cnt = max_irqs / 2;
++				pdata->cq_cnt = max_irqs / 2;
++				break;
++			}
+ 			dev_err(dev, "Unable to get ENET IRQ\n");
+ 			ret = ret ? : -ENXIO;
+ 			return ret;
+@@ -1450,19 +1457,28 @@ static void xgene_enet_setup_ops(struct xgene_enet_pdata *pdata)
+ 		pdata->port_ops = &xgene_xgport_ops;
+ 		pdata->cle_ops = &xgene_cle3in_ops;
+ 		pdata->rm = RM0;
+-		pdata->rxq_cnt = XGENE_NUM_RX_RING;
+-		pdata->txq_cnt = XGENE_NUM_TX_RING;
+-		pdata->cq_cnt = XGENE_NUM_TXC_RING;
++		if (!pdata->rxq_cnt) {
++			pdata->rxq_cnt = XGENE_NUM_RX_RING;
++			pdata->txq_cnt = XGENE_NUM_TX_RING;
++			pdata->cq_cnt = XGENE_NUM_TXC_RING;
++		}
+ 		break;
+ 	}
  
-@@ -412,7 +413,7 @@ static int xgene_enet_cle_init(struct xgene_enet_pdata *pdata)
- 			.branch = {
- 				{
- 					/* IPV4 */
--					.valid = 0,
-+					.valid = 1,
- 					.next_packet_pointer = 22,
- 					.jump_bw = JMP_FW,
- 					.jump_rel = JMP_ABS,
-@@ -420,7 +421,7 @@ static int xgene_enet_cle_init(struct xgene_enet_pdata *pdata)
- 					.next_node = PKT_PROT_NODE,
- 					.next_branch = 0,
- 					.data = 0x8,
--					.mask = 0xffff
-+					.mask = 0x0
- 				},
- 				{
- 					.valid = 0,
-@@ -456,7 +457,7 @@ static int xgene_enet_cle_init(struct xgene_enet_pdata *pdata)
- 					.next_node = RSS_IPV4_TCP_NODE,
- 					.next_branch = 0,
- 					.data = 0x0600,
--					.mask = 0xffff
-+					.mask = 0x00ff
- 				},
- 				{
- 					/* UDP */
-@@ -468,7 +469,7 @@ static int xgene_enet_cle_init(struct xgene_enet_pdata *pdata)
- 					.next_node = RSS_IPV4_UDP_NODE,
- 					.next_branch = 0,
- 					.data = 0x1100,
--					.mask = 0xffff
-+					.mask = 0x00ff
- 				},
- 				{
- 					.valid = 0,
-@@ -642,7 +643,7 @@ static int xgene_enet_cle_init(struct xgene_enet_pdata *pdata)
- 				{
- 					/* TCP DST Port */
- 					.valid = 0,
--					.next_packet_pointer = 256,
-+					.next_packet_pointer = 258,
- 					.jump_bw = JMP_FW,
- 					.jump_rel = JMP_ABS,
- 					.operation = EQT,
-diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
-index 13e829a..33c5f6b 100644
---- a/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
-+++ b/drivers/net/ethernet/apm/xgene/xgene_enet_cle.h
-@@ -83,6 +83,8 @@
- #define CLE_TYPE_POS		0
- #define CLE_TYPE_LEN		2
+ 	if (pdata->enet_id == XGENE_ENET1) {
+ 		switch (pdata->port_id) {
+ 		case 0:
+-			pdata->cpu_bufnum = START_CPU_BUFNUM_0;
+-			pdata->eth_bufnum = START_ETH_BUFNUM_0;
+-			pdata->bp_bufnum = START_BP_BUFNUM_0;
+-			pdata->ring_num = START_RING_NUM_0;
++			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
++				pdata->cpu_bufnum = X2_START_CPU_BUFNUM_0;
++				pdata->eth_bufnum = X2_START_ETH_BUFNUM_0;
++				pdata->bp_bufnum = X2_START_BP_BUFNUM_0;
++				pdata->ring_num = START_RING_NUM_0;
++			} else {
++				pdata->cpu_bufnum = START_CPU_BUFNUM_0;
++				pdata->eth_bufnum = START_ETH_BUFNUM_0;
++				pdata->bp_bufnum = START_BP_BUFNUM_0;
++				pdata->ring_num = START_RING_NUM_0;
++			}
+ 			break;
+ 		case 1:
+ 			if (pdata->phy_mode == PHY_INTERFACE_MODE_XGMII) {
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+index 0a2887b..cc40c30 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
+@@ -49,10 +49,10 @@
+ #define XGENE_ENET_MSS	1448
+ #define XGENE_MIN_ENET_FRAME_SIZE	60
  
-+#define CLE_DROP_POS		28
-+#define CLE_DROP_LEN		1
- #define CLE_DSTQIDL_POS		25
- #define CLE_DSTQIDL_LEN		7
- #define CLE_DSTQIDH_POS		0
+-#define XGENE_MAX_ENET_IRQ	8
+-#define XGENE_NUM_RX_RING	4
+-#define XGENE_NUM_TX_RING	4
+-#define XGENE_NUM_TXC_RING	4
++#define XGENE_MAX_ENET_IRQ	16
++#define XGENE_NUM_RX_RING	8
++#define XGENE_NUM_TX_RING	8
++#define XGENE_NUM_TXC_RING	8
+ 
+ #define START_CPU_BUFNUM_0	0
+ #define START_ETH_BUFNUM_0	2
 -- 
 1.9.1
