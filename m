@@ -1,32 +1,53 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 13 May 2016 14:48:15 -0700
-Subject: [PATCH v2 1/2] ARM64: dts: rockchip: add sdhci/emmc for rk3399
-In-Reply-To: <CAD=FV=UwtHu+DmJZqeWDQ8B9wMVdKODRignqDdZ4rknnmQru3g@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 13 May 2016 23:49:52 +0200
+Subject: [PATCH v2 2/2] ARM64: dts: rockchip: enable eMMC for rk3399 EVB
+In-Reply-To: <1463092552-60696-2-git-send-email-briannorris@chromium.org>
 References: <1463092552-60696-1-git-send-email-briannorris@chromium.org>
- <CAD=FV=UwtHu+DmJZqeWDQ8B9wMVdKODRignqDdZ4rknnmQru3g@mail.gmail.com>
-Message-ID: <20160513214815.GA109473@google.com>
+ <1463092552-60696-2-git-send-email-briannorris@chromium.org>
+Message-ID: <1537214.5jQgtQP16t@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 02:42:06PM -0700, Doug Anderson wrote:
-> On Thu, May 12, 2016 at 3:35 PM, Brian Norris <briannorris@chromium.org> wrote:
-> > +               emmc_phy: phy at f780 {
-> > +                       compatible = "rockchip,rk3399-emmc-phy";
-> > +                       reg = <0xf780 0x20>;
+Am Donnerstag, 12. Mai 2016, 15:35:52 schrieb Brian Norris:
+> Rockchip's rk3399 evaluation board has eMMC. Let's enable the
+> newly-added node.
 > 
-> This is slightly wrong.  It should be:
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
+> ---
+> v2:
 > 
-> reg = <0xf780 0x24>;
+>  * better commit description
 > 
-> The status register is at an offset of 0x20 and is 4 bytes big, so we
-> need room for it.
+>  arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts index
+> 1a3eb1482050..0b27d91084c4 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+> @@ -89,6 +89,18 @@
+>  	status = "okay";
+>  };
+> 
+> +&emmc_phy {
+> +	status = "okay";
+> +};
 
-Fixed.
+another thing I should've seen yesterday, emmc_phy should not be below the 
+&pwm nodes (aka alphabetically please)
 
-> After that is fixed, feel free to add my Reviewed-by tag.
 
-Done.
+Heiko
 
-Thanks for the review.
-
-Brian
+> +&sdhci {
+> +	bus-width = <8>;
+> +	mmc-hs400-1_8v;
+> +	mmc-hs400-enhanced-strobe;
+> +	non-removable;
+> +	status = "okay";
+> +};
+> +
+>  &uart2 {
+>  	status = "okay";
+>  };
