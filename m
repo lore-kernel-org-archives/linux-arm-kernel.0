@@ -1,57 +1,51 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 13 May 2016 16:00:10 +0200
-Subject: [RFC PATCH 1/3] reset: Add support for the Amlogic Meson GXBB Reset
- Controller
+Date: Fri, 13 May 2016 16:00:11 +0200
+Subject: [RFC PATCH 2/3] dt-bindings: reset: Add bindings for the Meson GXBB
+ Reset Controller
 In-Reply-To: <1463148012-25988-1-git-send-email-narmstrong@baylibre.com>
 References: <1463148012-25988-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1463148012-25988-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1463148012-25988-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the platform driver for the Amlogic Meson GXBB Reset
-Controller.
+Add DT bindings for the Meson GXBB SoC Reset Controller documentation and the
+associated include file.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- drivers/reset/Kconfig            |   6 ++
- drivers/reset/Makefile           |   1 +
- drivers/reset/reset-meson-gxbb.c | 160 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 167 insertions(+)
- create mode 100644 drivers/reset/reset-meson-gxbb.c
+ .../bindings/reset/amlogic,meson-gxbb-reset.txt    |  16 +++
+ .../dt-bindings/reset/amlogic,meson-gxbb-reset.h   | 160 +++++++++++++++++++++
+ 2 files changed, 176 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-gxbb-reset.txt
+ create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
 
-diff --git a/drivers/reset/Kconfig b/drivers/reset/Kconfig
-index df37212..4ac5c4d 100644
---- a/drivers/reset/Kconfig
-+++ b/drivers/reset/Kconfig
-@@ -12,5 +12,11 @@ menuconfig RESET_CONTROLLER
- 
- 	  If unsure, say no.
- 
-+config MESON_GXBB_RESET
-+	tristate "Amlogic Meson GXBB Reset Driver"
-+	depends on (ARCH_MESON && RESET_CONTROLLER)
-+	help
-+	  Build the Amlogic Meson GxBB reset driver.
-+
- source "drivers/reset/sti/Kconfig"
- source "drivers/reset/hisilicon/Kconfig"
-diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
-index a1fc8ed..5ff83a1 100644
---- a/drivers/reset/Makefile
-+++ b/drivers/reset/Makefile
-@@ -3,6 +3,7 @@ obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
- obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
- obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
- obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
-+obj-$(CONFIG_MESON_GXBB_RESET) += reset-meson-gxbb.o
- obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
- obj-$(CONFIG_ARCH_STI) += sti/
- obj-$(CONFIG_ARCH_HISI) += hisilicon/
-diff --git a/drivers/reset/reset-meson-gxbb.c b/drivers/reset/reset-meson-gxbb.c
+diff --git a/Documentation/devicetree/bindings/reset/amlogic,meson-gxbb-reset.txt b/Documentation/devicetree/bindings/reset/amlogic,meson-gxbb-reset.txt
 new file mode 100644
-index 0000000..798fdf9
+index 0000000..8761317
 --- /dev/null
-+++ b/drivers/reset/reset-meson-gxbb.c
++++ b/Documentation/devicetree/bindings/reset/amlogic,meson-gxbb-reset.txt
+@@ -0,0 +1,16 @@
++Amlogic Meson GXBB SoC Reset Controller
++=======================================
++
++Please also refer to reset.txt in this directory for common reset
++controller binding usage.
++
++Required properties:
++- compatible: Should be "amlogic,meson-gxbb-reset"
++- #reset-cells: 1, see below
++
++example:
++
++reset: reset-controller {
++	compatible = "amlogic,meson-gxbb-reset";
++	#reset-cells = <1>;
++};
+diff --git a/include/dt-bindings/reset/amlogic,meson-gxbb-reset.h b/include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
+new file mode 100644
+index 0000000..44e73b8
+--- /dev/null
++++ b/include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
 @@ -0,0 +1,160 @@
 +/*
 + * Copyright (c) 2016 BayLibre, Inc.
@@ -95,123 +89,123 @@ index 0000000..798fdf9
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+#include <linux/err.h>
-+#include <linux/module.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/reset-controller.h>
-+#include <linux/slab.h>
-+#include <linux/types.h>
 +
-+#define REG_COUNT	7
-+#define BITS_PER_REG	16
++#ifndef _DT_BINDINGS_AMLOGIC_MESON_GXBB_RESET_H
++#define _DT_BINDINGS_AMLOGIC_MESON_GXBB_RESET_H
 +
-+struct meson_gxbb_reset {
-+	void *reg_base;
-+	struct reset_controller_dev rcdev;
-+};
++#define RESET_VCBUS		0
++/*				1	*/
++/*				2	*/
++#define RESET_GIC		3
++#define RESET_CAPB3_DECODE	4
++#define RESET_NAND_CAPB3	5
++#define RESET_HDMITX_CAPB3	6
++#define RESET_MALI_CAPB3	7
++#define RESET_DOS_CAPB3		8
++#define RESET_SYS_CPU_CAPB3	9
++#define RESET_CBUS_CAPB3	10
++#define RESET_AHB_CNTL		11
++#define RESET_AHB_DATA		12
++#define RESET_VCBUS_CLK81	13
++#define RESET_MMC		14
++#define RESET_MIPI		15
++#define RESET_PARSER		16
++#define RESET_BLKMV		17
++#define RESET_ISA		18
++#define RESET_Ethernet		19
++#define RESET_SD_EMMC_A		20
++#define RESET_SD_EMMC_B		21
++#define RESET_SD_EMMC_C		22
++#define RESET_ROM_BOOT		23
++#define RESET_SYS_CPU_3_0	24
++#define RESET_SYS_CPU_CORE_3_0	25
++#define RESET_SYS_PLL_DIV	26
++#define RESET_SYS_CPU_AXI	27
++#define RESET_SYS_CPU_L2	28
++#define RESET_SYS_CPU_P		29
++#define RESET_SYS_CPU_MBIST	30
++/*				31	*/
++#define RESET_VD_RMEM		32
++#define RESET_AUDIN		33
++#define RESET_HDMI_TX		34
++/*				35	*/
++/*				36	*/
++/*				37	*/
++#define RESET_GE2D		38
++#define RESET_PARSER_REG	39
++#define RESET_PARSER_FETCH	40
++#define RESET_PARSER_CTL	41
++#define RESET_PARSER_TOP	42
++/*				43	*/
++/*				44	*/
++#define RESET_AO_CPU_RESET	45
++#define RESET_MALI		46
++#define RESET_HDMI_SYSTEM_RESET	47
++#define RESET_RING_OSCILLATOR	48
++#define RESET_SYS_CPU		49
++#define RESET_EFUSE		50
++#define RESET_SYS_CPU_BVCI	51
++#define RESET_AIFIFO		52
++#define RESET_TVFE		53
++#define RESET_AHB_BRIDGE_CNTL	54
++/*				55	*/
++#define RESET_AUDIO_DAC		56
++#define RESET_DEMUX_TOP		57
++#define RESET_DEMUX_DES		58
++#define RESET_DEMUX_S2P_0	59
++#define RESET_DEMUX_S2P_1	60
++#define RESET_DEMUX_RESET_0	61
++#define RESET_DEMUX_RESET_1	62
++#define RESET_DEMUX_RESET_2	63
++#define RESET_DDR_PLL		64
++#define RESET_MISC_PLL		65
++/*				66	*/
++/*				67	*/
++#define RESET_DVIN_RESET	68
++#define RESET_RDMA		69
++#define RESET_VENCI		70
++#define RESET_VENCP		71
++/*				72	*/
++#define RESET_VDAC		73
++#define RESET_RTC		74
++/*				75	*/
++#define RESET_VDI6		76
++#define RESET_VENCL		77
++#define RESET_I2C_MASTER_2	78
++#define RESET_I2C_MASTER_1	79
++#define RESET_PERIPHS_GENERAL	80
++#define RESET_PERIPHS_SPICC	81
++#define RESET_PERIPHS_SMART_CARD	82
++#define RESET_PERIPHS_SAR_ADC	83
++#define RESET_PERIPHS_I2C_MASTER_0	84
++#define RESET_SANA		85
++/*				86	*/
++#define RESET_PERIPHS_STREAM_INTERFACE	87
++#define RESET_PERIPHS_SDIO	88
++#define RESET_PERIPHS_UART_0	89
++#define RESET_PERIPHS_UART_1_2	90
++#define RESET_PERIPHS_ASYNC_0	91
++#define RESET_PERIPHS_ASYNC_1	92
++#define RESET_PERIPHS_SPI_0	93
++#define RESET_PERIPHS_SDHC	94
++#define RESET_UART_SLIP		95
++#define RESET_USB_DDR_0		96
++#define RESET_USB_DDR_1		97
++#define RESET_USB_DDR_2		98
++#define RESET_USB_DDR_3		99
++/*				100	*/
++#define RESET_DEVICE_MMC_ARB	101
++/*				102	*/
++#define RESET_VID_LOCK		103
++#define RESET_A9_DMC_PIPEL	104
++/*				105	*/
++/*				106	*/
++/*				107	*/
++/*				108	*/
++/*				109	*/
++/*				110	*/
++/*				111	*/
 +
-+static int meson_gxbb_reset_assert(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	struct meson_gxbb_reset *data =
-+		container_of(rcdev, struct meson_gxbb_reset, rcdev);
-+	unsigned int bank = id / BITS_PER_REG;
-+	unsigned int offset = id % BITS_PER_REG;
-+	void *reg_addr = data->reg_base + (bank << 2);
-+
-+	if (bank >= REG_COUNT)
-+		return -EINVAL;
-+
-+	writel(readl(reg_addr) | BIT(offset), reg_addr);
-+
-+	return 0;
-+}
-+
-+static int meson_gxbb_reset_deassert(struct reset_controller_dev *rcdev,
-+				unsigned long id)
-+{
-+	struct meson_gxbb_reset *data =
-+		container_of(rcdev, struct meson_gxbb_reset, rcdev);
-+	unsigned int bank = id / BITS_PER_REG;
-+	unsigned int offset = id % BITS_PER_REG;
-+	void *reg_addr = data->reg_base + (bank << 2);
-+
-+	if (bank >= REG_COUNT)
-+		return -EINVAL;
-+
-+	writel(readl(reg_addr) & ~BIT(offset), reg_addr);
-+
-+	return 0;
-+}
-+
-+static int meson_gxbb_reset_reset(struct reset_controller_dev *rcdev,
-+			      unsigned long id)
-+{
-+	int err;
-+
-+	err = meson_gxbb_reset_assert(rcdev, id);
-+	if (err)
-+		return err;
-+
-+	return meson_gxbb_reset_deassert(rcdev, id);
-+}
-+
-+static const struct reset_control_ops meson_gxbb_reset_ops = {
-+	.reset		= meson_gxbb_reset_reset,
-+	.assert		= meson_gxbb_reset_assert,
-+	.deassert	= meson_gxbb_reset_deassert,
-+};
-+
-+static const struct of_device_id meson_gxbb_reset_dt_ids[] = {
-+	 { .compatible = "amlogic,meson-gxbb-reset", },
-+	 { /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, meson_gxbb_reset_dt_ids);
-+
-+static int meson_gxbb_reset_probe(struct platform_device *pdev)
-+{
-+	struct meson_gxbb_reset *data;
-+	struct resource *res;
-+
-+	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-+	if (!data)
-+		return -ENOMEM;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	data->reg_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(data->reg_base))
-+		return PTR_ERR(data->reg_base);
-+
-+	platform_set_drvdata(pdev, data);
-+
-+	data->rcdev.owner = THIS_MODULE;
-+	data->rcdev.nr_resets = REG_COUNT * BITS_PER_REG;
-+	data->rcdev.ops = &meson_gxbb_reset_ops;
-+	data->rcdev.of_node = pdev->dev.of_node;
-+
-+	return reset_controller_register(&data->rcdev);
-+}
-+
-+static int meson_gxbb_reset_remove(struct platform_device *pdev)
-+{
-+	struct meson_gxbb_reset *data = platform_get_drvdata(pdev);
-+
-+	reset_controller_unregister(&data->rcdev);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver meson_gxbb_reset_driver = {
-+	.probe	= meson_gxbb_reset_probe,
-+	.remove	= meson_gxbb_reset_remove,
-+	.driver = {
-+		.name		= "meson_gxbb_reset",
-+		.of_match_table	= meson_gxbb_reset_dt_ids,
-+	},
-+};
-+
-+module_platform_driver(meson_gxbb_reset_driver);
++#endif
 -- 
 2.7.0
