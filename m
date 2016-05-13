@@ -1,60 +1,64 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 May 2016 10:15:07 +0100
-Subject: [PATCH] sched/core: don't include asm/mmu_context from drivers
-In-Reply-To: <CALCETrV_wgy0vpWiLYRJn1Q41C6adKKgbEOFthoAXiG601JPYQ@mail.gmail.com>
-References: <1461919995-21001-1-git-send-email-arnd@arndb.de>
- <20160429094218.61b26849@gandalf.local.home>
- <CALCETrV_wgy0vpWiLYRJn1Q41C6adKKgbEOFthoAXiG601JPYQ@mail.gmail.com>
-Message-ID: <20160513091506.GS19428@n2100.arm.linux.org.uk>
+From: charanya@codeaurora.org (charanya at codeaurora.org)
+Date: Fri, 13 May 2016 14:48:27 +0530
+Subject: [PATCH] tty: serial: msm: Disable restoring Rx interrupts for DMA
+ Mode
+In-Reply-To: <20160512050245.GD8453@hector.attlocal.net>
+References: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
+ <20160512014126.GK3492@codeaurora.org>
+ <20160512050245.GD8453@hector.attlocal.net>
+Message-ID: <5cce36b3c1d62816feffb4048f782b20@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 10:46:56PM -0700, Andy Lutomirski wrote:
-> On Fri, Apr 29, 2016 at 6:42 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
-> > On Fri, 29 Apr 2016 10:52:32 +0200
-> > Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> >> This reverts the earlier fix attempt and works around the problem
-> >> by including both linux/mmu_context.h and asm/mmu_context.h from
-> >> kernel/sched/core.c. This is not a good solution but seems less
-> >> hacky than the alternatives.
-> >
-> > What about simply not compiling finish_arch_post_lock_switch() when
-> > building modules?
-> >
-> > (untested, not compiled or anything)
-> >
-> > Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
-> > ---
-> > diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
-> > index fa5b42d44985..3f22d1b6bac8 100644
-> > --- a/arch/arm/include/asm/mmu_context.h
-> > +++ b/arch/arm/include/asm/mmu_context.h
-> > @@ -66,6 +66,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
-> >                 cpu_switch_mm(mm->pgd, mm);
-> >  }
-> >
-> > +#ifndef MODULE
-> >  #define finish_arch_post_lock_switch \
-> >         finish_arch_post_lock_switch
-> >  static inline void finish_arch_post_lock_switch(void)
-> > @@ -87,6 +88,7 @@ static inline void finish_arch_post_lock_switch(void)
-> >                 preempt_enable_no_resched();
-> >         }
-> >  }
-> > +#endif /* !MODULE */
-> >
-> >  #endif /* CONFIG_MMU */
-> >
+On 2016-05-12 10:32, Andy Gross wrote:
+> On Wed, May 11, 2016 at 06:41:26PM -0700, Stephen Boyd wrote:
+>> On 05/10, Abhishek Sahu wrote:
+>> > From: Charanya <charanya@codeaurora.org>
+>> 
+>> Was it intentional to only have one name here?
+>> 
+>> >
+>> > The Data loss was happening with current QCOM MSM serial driver during
+>> > large file transfer due to simultaneous enabling of both UART and
+>> > DMA interrupt. When UART operates in DMA mode, RXLEV (Rx FIFO over
+>> > watermark) or RXSTALE (stale interrupts) should not be enabled,
+>> > since these conditions will be handled by DMA controller itself.
+>> > If these interrupts are enabled then normal UART ISR will read some
+>> > bytes of data from Rx Buffer and DMA controller will not receive
+>> > these bytes of data, which will cause data loss.
+>> >
+>> > Now this patch removed the code for enabling of RXLEV and RXSTALE
+>> > interrupt in DMA Rx completion routine.
+>> 
+>> I'm lost, we keep both these irqs masked (well only if uartdm
+>> version is 1.4 or greater) pretty much the entire time we're
+>> using DMA for RX. msm_start_rx_dma() will mask them and then when
+>> the callback completes we'll unmask them (the part that's deleted
+>> in this patch), but then we'll go back and remask them almost
+>> immediately because we call msm_start_rx_dma() from the dma
+>> completion handler.
+>> 
+>> Can you clearly describe how this is actually fixing any
+>> problems? What's the sequence of events that happens to cause
+>> corruption?
+>> 
+>> This does raise the question though why we ever mask/unmask these
+>> interrupts if we're always going to keep them masked while doing
+>> DMA RX. Presumably if we can use DMA to RX, we can always use it
+>> and set things up properly at startup time instead of later on.
 > 
-> 
-> Can someone in arm land ack this so Ingo can apply it?
+> Thats probably the right thing to do.  We shouldn't be 
+> masking/unmasking
+> the unused IRQs to begin with.
+Hi Stephen/Andy,
 
-Sorry, I'm simply unable to read every message that comes in.
+If both Tx and Rx are used simultaneously, restoring Rx interrupts in
+msm_complete_rx_dma could lead to RXSTALE interrupt being triggered, 
+when
+the ISR execution for TXLEV interrupt is completed, since msm_port->imr 
+is
+rewritten to UART_IMR in msm_uart_irq. Hence, we do not have to restore
+Rx interrupts since Rx is always in DMA mode once enabled.
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks.
+Charanya.
