@@ -1,23 +1,28 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Fri, 13 May 2016 12:33:36 +0200
-Subject: imx-drm: regression due to commit 503fe87bd0a8 ("gpu: ipu-v3: Fix
- imx-ipuv3-crtc module autoloading")
-Message-ID: <20160513123336.6996dd89@ipc1.ka-ro>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 13 May 2016 12:41:32 +0200
+Subject: [PATCH] i2c: st: Implement bus clear
+In-Reply-To: <1462983719-342-1-git-send-email-peter.griffin@linaro.org>
+References: <1462983719-342-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160513104132.GG1778@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, May 11, 2016 at 05:21:59PM +0100, Peter Griffin wrote:
+> From I2C specifications:
+>       http://www.nxp.com/documents/user_manual/UM10204.pdf
+> 
+> Chapter 3.1.16, when the i2c device held the SDA line low, the master
+> should send 9 clocks pulses to try to recover.
+> 
+> Signed-off-by: Frederic Pillon <frederic.pillon@st.com>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
-the commit 503fe87bd0a8 ("gpu: ipu-v3: Fix imx-ipuv3-crtc module autoloading")
-indeed fixes the autoloading issue, but completely breaks the driver in
-non-modular mode (at least with the parallel-display driver I didn't
-yet check with the imx-ldb driver.
-Can anyone confirm that the imx-drm driver in current linux-next
-(next-20160512) works for them with any i.MX6 or i.MX53 board?
+Applied to for-next, thanks! Please us PATCH V<n> next time.
 
-I'm always very suspicious when seeing code moving of_node's from
-one device to another or assigning of_node's to platform devices that
-weren't instantiated via DT.
-
-
-Lothar Wa?mann
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160513/6f945531/attachment.sig>
