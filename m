@@ -1,25 +1,51 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 13 May 2016 16:50:57 -0700
-Subject: [Patch v5 6/8] firmware: qcom: scm: Add support for ARM64 SoCs
-In-Reply-To: <1463111221-6963-7-git-send-email-andy.gross@linaro.org>
-References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
- <1463111221-6963-7-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160513235057.GI1256@tuxbot>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Fri, 13 May 2016 16:52:56 -0700
+Subject: [PATCH v2 0/5] drivers: net: xgene: Bug fixes
+Message-ID: <1463183581-30475-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 12 May 20:46 PDT 2016, Andy Gross wrote:
+This patch set addresses the following bug fixes that were found during testing.
 
-> From: Kumar Gala <galak@codeaurora.org>
-> 
-> Add an implementation of the SCM interface that works on ARM64 SoCs.  This
-> is used by things like determine if we have HDCP support or not on the
-> system.
-> 
-> Signed-off-by: Kumar Gala <galak@codeaurora.org>
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+  1. IPv4 forward test crash
+    - drivers: net: xgene: fix IPv4 forward crash
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+  2. Sharing of irqs
+    - drivers: net: xgene: fix sharing of irqs
 
-Regards,
-Bjorn
+  3. Ununiform latency across queues
+    - drivers: net: xgene: fix ununiform latency across queues
+
+  4. Fix statistics counters race condition
+    - drivers: net: xgene: fix statistics counters race condition
+
+  5. Correcting register offset and field lengths
+    - drivers: net: xgene: fix register offset
+
+v2: Address review comments from v1
+- Defer TSO fix, and reposting all other patches from v1
+
+v1:
+- Initial version
+
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+---
+
+Iyappan Subramanian (5):
+  drivers: net: xgene: fix IPv4 forward crash
+  drivers: net: xgene: fix sharing of irqs
+  drivers: net: xgene: fix ununiform latency across queues
+  drivers: net: xgene: fix statistics counters race condition
+  drivers: net: xgene: fix register offset
+
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.c   | 11 ++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_cle.h   |  2 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 19 +++---
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  8 ++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 75 +++++++++++++++++------
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h  | 18 ++++--
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h |  2 +-
+ 7 files changed, 94 insertions(+), 41 deletions(-)
+
+-- 
+1.9.1
