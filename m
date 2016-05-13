@@ -1,15 +1,16 @@
 From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 13 May 2016 14:27:14 +0200
-Subject: [PATCH 1/3] dmaengine: at_xdmac: align descriptors on 64 bits
-In-Reply-To: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Fri, 13 May 2016 14:27:37 +0200
+Subject: [PATCH 2/3] dmaengine: at_xdmac: fix residue corruption
+In-Reply-To: <1463064854-6719-2-git-send-email-ludovic.desroches@atmel.com>
 References: <1463064854-6719-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <5735C822.7000503@atmel.com>
+ <1463064854-6719-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <5735C839.8070304@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Le 12/05/2016 16:54, Ludovic Desroches a ?crit :
-> Having descriptors aligned on 64 bits allows update CNDA and CUBC in an
-> atomic way.
+> An unexpected value of CUBC can lead to a corrupted residue. A more
+> complex sequence is needed to detect an inaccurate value for NCA or CUBC.
 > 
 > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 > Fixes: e1f7c9eee707 ("dmaengine: at_xdmac: creation of the atmel
@@ -19,31 +20,87 @@ Le 12/05/2016 16:54, Ludovic Desroches a ?crit :
 Reviewed-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
 > ---
->  drivers/dma/at_xdmac.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  drivers/dma/at_xdmac.c | 54 ++++++++++++++++++++++++++++++--------------------
+>  1 file changed, 32 insertions(+), 22 deletions(-)
 > 
 > diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-> index 8e304b1..ba9b0b7 100644
+> index ba9b0b7..b02494e 100644
 > --- a/drivers/dma/at_xdmac.c
 > +++ b/drivers/dma/at_xdmac.c
-> @@ -242,7 +242,7 @@ struct at_xdmac_lld {
->  	u32		mbr_dus;	/* Destination Microblock Stride Register */
->  };
+> @@ -1400,6 +1400,7 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+>  	u32			cur_nda, check_nda, cur_ubc, mask, value;
+>  	u8			dwidth = 0;
+>  	unsigned long		flags;
+> +	bool			initd;
 >  
+>  	ret = dma_cookie_status(chan, cookie, txstate);
+>  	if (ret == DMA_COMPLETE)
+> @@ -1435,34 +1436,43 @@ at_xdmac_tx_status(struct dma_chan *chan, dma_cookie_t cookie,
+>  	}
+>  
+>  	/*
+> -	 * When processing the residue, we need to read two registers but we
+> -	 * can't do it in an atomic way. AT_XDMAC_CNDA is used to find where
+> -	 * we stand in the descriptor list and AT_XDMAC_CUBC is used
+> -	 * to know how many data are remaining for the current descriptor.
+> -	 * Since the dma channel is not paused to not loose data, between the
+> -	 * AT_XDMAC_CNDA and AT_XDMAC_CUBC read, we may have change of
+> -	 * descriptor.
+> -	 * For that reason, after reading AT_XDMAC_CUBC, we check if we are
+> -	 * still using the same descriptor by reading a second time
+> -	 * AT_XDMAC_CNDA. If AT_XDMAC_CNDA has changed, it means we have to
+> -	 * read again AT_XDMAC_CUBC.
+> +	 * The easiest way to compute the residue should be to pause the DMA
+> +	 * but doing this can lead to miss some data as some devices don't
+> +	 * have FIFO.
+> +	 * We need to read several registers because:
+> +	 * - DMA is running therefore a descriptor change is possible while
+> +	 * reading these registers
+> +	 * - When the block transfer is done, the value of the CUBC register
+> +	 * is set to its initial value until the fetch of the next descriptor.
+> +	 * This value will corrupt the residue calculation so we have to skip
+> +	 * it.
+> +	 *
+> +	 * INITD --------                    ------------
+> +	 *              |____________________|
+> +	 *       _______________________  _______________
+> +	 * NDA       @desc2             \/   @desc3
+> +	 *       _______________________/\_______________
+> +	 *       __________  ___________  _______________
+> +	 * CUBC       0    \/ MAX desc1 \/  MAX desc2
+> +	 *       __________/\___________/\_______________
+> +	 *
+> +	 * Since descriptors are aligned on 64 bits, we can assume that
+> +	 * the update of NDA and CUBC is atomic.
+>  	 * Memory barriers are used to ensure the read order of the registers.
+> -	 * A max number of retries is set because unlikely it can never ends if
+> -	 * we are transferring a lot of data with small buffers.
+> +	 * A max number of retries is set because unlikely it could never ends.
+>  	 */
+> -	cur_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
+> -	rmb();
+> -	cur_ubc = at_xdmac_chan_read(atchan, AT_XDMAC_CUBC);
+>  	for (retry = 0; retry < AT_XDMAC_RESIDUE_MAX_RETRIES; retry++) {
+> -		rmb();
+>  		check_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
 > -
-> +/* 64-bit alignment needed to update CNDA and CUBC registers in an atomic way. */
->  struct at_xdmac_desc {
->  	struct at_xdmac_lld		lld;
->  	enum dma_transfer_direction	direction;
-> @@ -253,7 +253,7 @@ struct at_xdmac_desc {
->  	unsigned int			xfer_size;
->  	struct list_head		descs_list;
->  	struct list_head		xfer_node;
-> -};
-> +} __aligned(sizeof(u64));
+> -		if (likely(cur_nda == check_nda))
+> -			break;
+> -
+> -		cur_nda = check_nda;
+> +		rmb();
+> +		initd = !!(at_xdmac_chan_read(atchan, AT_XDMAC_CC) & AT_XDMAC_CC_INITD);
+>  		rmb();
+>  		cur_ubc = at_xdmac_chan_read(atchan, AT_XDMAC_CUBC);
+> +		rmb();
+> +		cur_nda = at_xdmac_chan_read(atchan, AT_XDMAC_CNDA) & 0xfffffffc;
+> +		rmb();
+> +
+> +		if ((check_nda == cur_nda) && initd)
+> +			break;
+>  	}
 >  
->  static inline void __iomem *at_xdmac_chan_reg_base(struct at_xdmac *atxdmac, unsigned int chan_nb)
->  {
+>  	if (unlikely(retry >= AT_XDMAC_RESIDUE_MAX_RETRIES)) {
 > 
 
 
