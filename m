@@ -1,21 +1,62 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 13 May 2016 19:59:18 +0800
-Subject: [PATCH 0/2] net: mv643xx_eth: improve performance
-Message-ID: <1463140760-7128-1-git-send-email-jszhang@marvell.com>
+Date: Fri, 13 May 2016 19:59:20 +0800
+Subject: [PATCH 2/2] net: mv643xx_eth: use dma_wmb/rmb where appropriate
+In-Reply-To: <1463140760-7128-1-git-send-email-jszhang@marvell.com>
+References: <1463140760-7128-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1463140760-7128-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is to improve the mv643xx_eth driver performance by using
-{readl|writel}_relaxed or appropriate memory barriers.
+Update the mv643xx_eth driver to use the dma_rmb/wmb calls instead of
+the full barriers in order to improve performance.
 
-Since I have no mv643xx_eth platforms, tests are appreciated!
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/net/ethernet/marvell/mv643xx_eth.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-Jisheng Zhang (2):
-  net: mv643xx_eth: use {readl|writel}_relaxed instead of readl/writel
-  net: mv643xx_eth: use dma_wmb/rmb where appropriate
-
- drivers/net/ethernet/marvell/mv643xx_eth.c | 43 +++++++++++++++---------------
- 1 file changed, 22 insertions(+), 21 deletions(-)
-
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index c6d8124..13b71e3 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -536,7 +536,7 @@ static int rxq_process(struct rx_queue *rxq, int budget)
+ 		cmd_sts = rx_desc->cmd_sts;
+ 		if (cmd_sts & BUFFER_OWNED_BY_DMA)
+ 			break;
+-		rmb();
++		dma_rmb();
+ 
+ 		skb = rxq->rx_skb[rxq->rx_curr_desc];
+ 		rxq->rx_skb[rxq->rx_curr_desc] = NULL;
+@@ -647,9 +647,9 @@ static int rxq_refill(struct rx_queue *rxq, int budget)
+ 						  DMA_FROM_DEVICE);
+ 		rx_desc->buf_size = size;
+ 		rxq->rx_skb[rx] = skb;
+-		wmb();
++		dma_wmb();
+ 		rx_desc->cmd_sts = BUFFER_OWNED_BY_DMA | RX_ENABLE_INTERRUPT;
+-		wmb();
++		dma_wmb();
+ 
+ 		/*
+ 		 * The hardware automatically prepends 2 bytes of
+@@ -889,7 +889,7 @@ static int txq_submit_tso(struct tx_queue *txq, struct sk_buff *skb,
+ 	skb_tx_timestamp(skb);
+ 
+ 	/* ensure all other descriptors are written before first cmd_sts */
+-	wmb();
++	dma_wmb();
+ 	first_tx_desc->cmd_sts = first_cmd_sts;
+ 
+ 	/* clear TX_END status */
+@@ -994,7 +994,7 @@ static int txq_submit_skb(struct tx_queue *txq, struct sk_buff *skb,
+ 	skb_tx_timestamp(skb);
+ 
+ 	/* ensure all other descriptors are written before first cmd_sts */
+-	wmb();
++	dma_wmb();
+ 	desc->cmd_sts = cmd_sts;
+ 
+ 	/* clear TX_END status */
 -- 
 2.8.1
