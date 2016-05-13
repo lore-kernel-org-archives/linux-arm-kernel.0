@@ -1,118 +1,81 @@
 From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 13 May 2016 08:19:54 +0800
-Subject: [PATCH 1/2] Revert "clk: rockchip: reset init state before mmc
- card initialization"
-In-Reply-To: <1463076197-15900-1-git-send-email-dianders@chromium.org>
-References: <1463076197-15900-1-git-send-email-dianders@chromium.org>
-Message-ID: <78aecdae-7b9b-d687-a8d3-44f476ddd73e@rock-chips.com>
+Date: Fri, 13 May 2016 08:42:29 +0800
+Subject: [PATCH v2 1/2] ARM64: dts: rockchip: add sdhci/emmc for rk3399
+In-Reply-To: <1463092552-60696-1-git-send-email-briannorris@chromium.org>
+References: <1463092552-60696-1-git-send-email-briannorris@chromium.org>
+Message-ID: <d0aaec3a-65a2-5d0f-b37b-e3f174afc0c8@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/5/13 2:03, Douglas Anderson wrote:
-> This reverts commit 7a03fe6f48f3 ("clk: rockchip: reset init state
-> before mmc card initialization").
+? 2016/5/13 6:35, Brian Norris ??:
+> Add description for the SDHCI v5.1 eMMC controller on rk3399. Fix it to
+> 200 MHz, to support all supported timing modes.
 >
-> Though not totally obvious from the commit message nor from the source
-> code, that commit appears to be trying to reset the "_drv" MMC clocks to
-> 90 degrees (note that the "_sample" MMC clocks have a shift of 0 so are
-> not touched).
+> Note that 'rockchip,rk3399-sdhci-5.1' is not documented; we presumably
+> have a compliant Arasan controller, but let's have a rockchip property
+> as the canonical backup/precautionary measure. Per Heiko's previous
+> suggestion, let's not clutter the arasan doc with it.
+>
+> Signed-off-by: Brian Norris <briannorris@chromium.org>
 
-Hrrr...my fault, anyway it should be reverted in case of new register
-layout in the future.
+Except for adding "rockchip,rk3399-sdhci-5.1", it looks nice and keeps
+consistent with our local kernel-4.4 tree.
 
-Have you found the difference of sample shift between rk3399 and former
-Socs?  Per Mobile Storage Host Controller section, it migrate from
-bit[1:0] to bit[2:1]...
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-Acutally there are three register layouts about sdmmc/sdio tuning
-stuff I found. Although just two types were upstreamed, it still
-caused difficulty. With your patch for dw_mmc to explictly assign
-dr_phase, we keep the phase policy better to be unstood and traced.
-
-Again sorry for commit 7a03fe6f48!
-
->
-> The major problem here is that it doesn't properly reset things.  The
-> phase is a two bit field and the commit only touches one of the two
-> bits.  Thus the commit had the following affect:
-> - phase   0  => phase  90
-> - phase  90  => phase  90
-> - phase 180  => phase 270
-> - phase 270  => phase 270
->
-> Things get even weirder if you happen to have a bootloader that was
-> actually using delay elements (should be no reason to, but you never
-> know), since those are additional bits that weren't touched by the
-> original patch.
->
-> This is unlikely to be what we actually want.  Checking on rk3288-veyron
-> devices, I can see that the bootloader leaves these clocks as:
-> - emmc:  phase 180
-> - sdmmc: phase 90
-> - sdio0: phase 90
->
-> Thus on rk3288-veyron devices the commit we're reverting had the effect
-> of changing the eMMC clock to phase 270.  This probably explains the
-> scattered reports I've heard of eMMC devices not working on some veyron
-> devices when using the upstream kernel.
->
-> The original commit was presumably made because previously the kernel
-> didn't touch the "_drv" phase at all and relied on whatever value was
-> there when the kernel started.  If someone was using a bootloader that
-> touched the "_drv" phase then, indeed, we should have code in the kernel
-> to fix that.  ...and also, to get ideal timings, we should also have the
-> kernel change the phase depending on the speed mode.  In fact, that's
-> the subject of a recent patch I posted at
-> <https://patchwork.kernel.org/patch/9075141/>.
->
-> Ideally, we should take both the patch posted to dw_mmc and this
-> revert.  Since those will likely go through different trees, here I
-> describe behavior with the combos:
->
-> 1. Just this revert: likely will fix rk3288-veyron eMMC on some devices
->    + other cases; might break someone with a strange bootloader that
->    sets the phase to 0 or one that uses delay elements (pretty
->    unpredicable what would happen in that case).
-> 2. Just dw_mmc patch: fixes everyone.  Effectly the dw_mmc patch will
->    totally override the broken patch and fix everything.
-> 3. Both patches: fixes everyone.  Once dw_mmc is initting properly then
->    any defaults from the clock code doesn't mattery.
->
-> Fixes: 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card initialization")
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 > ---
->  drivers/clk/rockchip/clk-mmc-phase.c | 11 -----------
->  1 file changed, 11 deletions(-)
+> v2:
 >
-> diff --git a/drivers/clk/rockchip/clk-mmc-phase.c b/drivers/clk/rockchip/clk-mmc-phase.c
-> index bc856f21f6b2..5b18265c2306 100644
-> --- a/drivers/clk/rockchip/clk-mmc-phase.c
-> +++ b/drivers/clk/rockchip/clk-mmc-phase.c
-> @@ -41,8 +41,6 @@ static unsigned long rockchip_mmc_recalc(struct clk_hw *hw,
->  #define ROCKCHIP_MMC_DEGREE_MASK 0x3
->  #define ROCKCHIP_MMC_DELAYNUM_OFFSET 2
->  #define ROCKCHIP_MMC_DELAYNUM_MASK (0xff << ROCKCHIP_MMC_DELAYNUM_OFFSET)
-> -#define ROCKCHIP_MMC_INIT_STATE_RESET 0x1
-> -#define ROCKCHIP_MMC_INIT_STATE_SHIFT 1
+>  * improved commit message
+>  * assign eMMC clock to 200 MHz
 >
->  #define PSECS_PER_SEC 1000000000000LL
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 25 ++++++++++++++++++++++++-
+>  1 file changed, 24 insertions(+), 1 deletion(-)
 >
-> @@ -162,15 +160,6 @@ struct clk *rockchip_clk_register_mmc(const char *name,
->  	mmc_clock->reg = reg;
->  	mmc_clock->shift = shift;
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 46f325a143b0..9980c2eab4e9 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -215,6 +215,19 @@
+>  		status = "disabled";
+>  	};
 >
-> -	/*
-> -	 * Assert init_state to soft reset the CLKGEN
-> -	 * for mmc tuning phase and degree
-> -	 */
-> -	if (mmc_clock->shift == ROCKCHIP_MMC_INIT_STATE_SHIFT)
-> -		writel(HIWORD_UPDATE(ROCKCHIP_MMC_INIT_STATE_RESET,
-> -				     ROCKCHIP_MMC_INIT_STATE_RESET,
-> -				     mmc_clock->shift), mmc_clock->reg);
-> -
->  	clk = clk_register(NULL, &mmc_clock->hw);
->  	if (IS_ERR(clk))
->  		kfree(mmc_clock);
+> +	sdhci: sdhci at fe330000 {
+> +		compatible = "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1";
+> +		reg = <0x0 0xfe330000 0x0 0x10000>;
+> +		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru SCLK_EMMC>, <&cru ACLK_EMMC>;
+> +		clock-names = "clk_xin", "clk_ahb";
+> +		assigned-clocks = <&cru SCLK_EMMC>;
+> +		assigned-clock-rates = <200000000>;
+> +		phys = <&emmc_phy>;
+> +		phy-names = "phy_arasan";
+> +		status = "disabled";
+> +	};
+> +
+>  	usb_host0_ehci: usb at fe380000 {
+>  		compatible = "generic-ehci";
+>  		reg = <0x0 0xfe380000 0x0 0x20000>;
+> @@ -481,8 +494,18 @@
+>  	};
+>
+>  	grf: syscon at ff770000 {
+> -		compatible = "rockchip,rk3399-grf", "syscon";
+> +		compatible = "rockchip,rk3399-grf", "syscon", "simple-mfd";
+>  		reg = <0x0 0xff770000 0x0 0x10000>;
+> +
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		emmc_phy: phy at f780 {
+> +			compatible = "rockchip,rk3399-emmc-phy";
+> +			reg = <0xf780 0x20>;
+> +			#phy-cells = <0>;
+> +			status = "disabled";
+> +		};
+>  	};
+>
+>  	watchdog at ff840000 {
 >
 
 
