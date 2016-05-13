@@ -1,174 +1,46 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 13 May 2016 16:28:44 +0100
-Subject: [PATCH v3] KVM: arm/arm64: Add VGICv3 save/restore API
- documentation
-In-Reply-To: <1463150637-6896-1-git-send-email-christoffer.dall@linaro.org>
-References: <1463150637-6896-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <CAFEAcA8fcxo18HhfboE5j=SC8TyrPXqmpsPNymM8zw4PhMTRDw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 May 2016 18:16:05 +0200
+Subject: [GIT PULL] ARM: SoC fixes for 4.6
+Message-ID: <2596349.2VGvIuv4pS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2016 at 15:43, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> Factor out the GICv3-specific documentation into a separate
-> documentation file.  Add description for how to access distributor,
-> redistributor, and CPU interface registers for GICv3 in this new file,
-> and add a group for accesing level triggered IRQ information for GICv3
-> as well.
->
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
-> Changes since v2:
->  - Changed distributor access to be 32-bits in size
->  - Clearly specified data type pointed to by addr field
->  - Specified exception behavior for STATUSR registers
->  - Added group for level-triggered IRQ status info
->  - Removed acks from Marc/Peter as content has changed
+The following changes since commit 44549e8f5eea4e0a41b487b63e616cb089922b99:
 
-Hi; I have one substantial point and a few typos to point out.
+  Linux 4.6-rc7 (2016-05-08 14:38:32 -0700)
 
->  Documentation/virtual/kvm/devices/arm-vgic-v3.txt | 176 ++++++++++++++++++++++
->  Documentation/virtual/kvm/devices/arm-vgic.txt    |  21 +--
->  2 files changed, 180 insertions(+), 17 deletions(-)
->  create mode 100644 Documentation/virtual/kvm/devices/arm-vgic-v3.txt
->
-> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-v3.txt b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> new file mode 100644
-> index 0000000..69201e8
-> --- /dev/null
-> +++ b/Documentation/virtual/kvm/devices/arm-vgic-v3.txt
-> @@ -0,0 +1,176 @@
-> +ARM Virtual Generic Interrupt Controller v3 and later (VGICv3)
-> +==============================================================
-> +
-> +
-> +Device types supported:
-> +  KVM_DEV_TYPE_ARM_VGIC_V3     ARM Generic Interrupt Controller v3.0
-> +
-> +Only one VGIC instance may be instantiated through this API.  The created VGIC
-> +will act as the VM interrupt controller, requiring emulated user-space devices
-> +to inject interrupts to the VGIC instead of directly to CPUs.  It is not
-> +possible to create both a GICv3 and GICv2 on the same VM.
-> +
-> +Creating a guest GICv3 device requires a host GICv3 as well.
-> +
-> +Groups:
-> +  KVM_DEV_ARM_VGIC_GRP_ADDR
-> +  Attributes:
-> +    KVM_VGIC_V3_ADDR_TYPE_DIST (rw, 64-bit)
-> +      Base address in the guest physical address space of the GICv3 distributor
-> +      register mappings. Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-> +      This address needs to be 64K aligned and the region covers 64 KByte.
-> +
-> +    KVM_VGIC_V3_ADDR_TYPE_REDIST (rw, 64-bit)
-> +      Base address in the guest physical address space of the GICv3
-> +      redistributor register mappings. There are two 64K pages for each
-> +      VCPU and all of the redistributor pages are contiguous.
-> +      Only valid for KVM_DEV_TYPE_ARM_VGIC_V3.
-> +      This address needs to be 64K aligned.
-> +
-> +
-> +  KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-> +  KVM_DEV_ARM_VGIC_GRP_REDIST_REGS
-> +  Attributes:
-> +    The attr field of kvm_device_attr encodes two values:
-> +    bits:     | 63   ....  32  |  31   ....    0 |
-> +    values:   |      mpidr     |      offset     |
-> +
-> +    All distributor regs are (rw, 32-bit) and kvm_device_attr.addr points to a
-> +    __u32 value.  64-bit registers must be accessed by separately accessing the
-> +    lower and higher word.
-> +
-> +    Writes to read-only registers can be ignored by the kernel.
+are available in the git repository at:
 
-Presumably "are ignored".
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 
-> +
-> +    KVM_DEV_ARM_VGIC_GRP_DIST_REGS accesses the main distributor registers.
-> +    KVM_DEV_ARM_VGIC_GRP_REDIST_REGS accesses the redistributor of the CPU
-> +    specified by the mpidr.
-> +
-> +    The offset is relative to the "[Re]Distributor base address" as defined
-> +    in the GICv3/4 specs.  Getting or setting such a register has the same
-> +    effect as reading or writing the register on real hardware (except for
-> +    GICD_STATUS and GICR_STATUSR, see blow), and the mpidr field is used to
+for you to fetch changes up to 8a934ccbf90959877beec27780469e85f1c3f101:
 
-"GICD_STATUSR". "below".
+  Merge tag 'at91-fixes2' of git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91 into fixes (2016-05-12 17:44:53 +0200)
 
-> +    specify which redistributor is accessed.  The mpidr is ignored for the
-> +    distributor.
-> +
-> +    The mpidr encoding is based on the affinity information in the
-> +    architecture defined MPIDR, and the field is encoded as follows:
-> +      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
-> +      |    Aff3    |    Aff2    |    Aff1    |    Aff0    |
-> +
-> +    Note that distributor fields are not banked, but return the same value
-> +    regardless of the mpidr used to access the register.
-> +
-> +    The GICD_STATUSR and GICR_STATUSR registers are architecturally defined such
-> +    that a write of a clear bit has no effect, whereas a write with a set bit
-> +    clears that value.  To allow userspace to freely set the values of these two
-> +    registers, setting the attributes with the register offsets for these two
-> +    registers simply sets the non-reserved bits to the value written.
-> +  Limitations:
-> +    - Priorities are not implemented, and registers are RAZ/WI
-> +  Errors:
-> +    -ENXIO: Getting or setting this register is not yet supported
-> +    -EBUSY: One or more VCPUs are running
-> +
-> +
-> +  KVM_DEV_ARM_VGIC_CPU_SYSREGS
-> +  Attributes:
-> +    The attr field of kvm_device_attr encodes two values:
-> +    bits:     | 63      ....       32 | 31  ....  16 | 15  ....  0 |
-> +    values:   |         mpidr         |      RES     |    instr    |
-> +
-> +    The mpidr field encodes the CPU ID based on the affinity information in the
-> +    architecture defined MPIDR, and the field is encoded as follows:
-> +      | 63 .... 56 | 55 .... 48 | 47 .... 40 | 39 .... 32 |
-> +      |    Aff3    |    Aff2    |    Aff1    |    Aff0   |
+----------------------------------------------------------------
+Three more bug fixes for ARM SoCs this week:
 
-ASCII art diagram missing a space after "Aff0" ?
+- The Atmel sama5d2 was registering the wrong NFC device type
+- On Atmel sam9x5, the power management controller had an incorrect
+  register area size
+- On ARM64 Allwinner machine was not secting the generic irqchip
+  code, causing build errors in some configurations
 
-> +
-> +  KVM_DEV_ARM_VGIC_GRP_LEVEL_INFO
-> +  Attributes:
-> +    The attr field of kvm_device_attr encodes the following values:
-> +    bits:     | 63      ....       32 | 31   ....    10 | 9  ....  0 |
-> +    values:   |         mpidr         |      info       |   vINTID   |
-> +
-> +    The vINTID specifies which set of IRQs is reported on.
-> +
-> +    The info field specifies which information userspace wants to get or set
-> +    using this interface.  Currently we support two different pieces of
-> +    information:
-> +
-> +      VGIC_LEVEL_INFO_LINE_LEVEL:
-> +        Get/Set the intput level of the IRQ line for a given IRQ.
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      Merge tag 'at91-fixes' of git://git.kernel.org/.../nferre/linux-at91 into fixes
+      Merge tag 'at91-fixes2' of git://git.kernel.org/.../nferre/linux-at91 into fixes
 
-"input"
+Boris Brezillon (1):
+      ARM: dts: at91: sam9x5: Fix the memory range assigned to the PMC
 
-> +       vINTID must be a multiple of 32.
-> +
-> +        kvm_device_attr.addr points to a __u32 value which will contain a
-> +       bitmap where a set bit means the interrupt level is asserted.
-> +
-> +       Bit[n] indicates the status for interrupt vINTID + n.
-> +
-> +
-> +      VGIC_LEVEL_INFO_SOFT_PENDING
-> +        Get/Set the latch state of a GIVEN level-triggered IRQ as manipulated by
+Suzuki K Poulose (1):
+      arm64/sunxi: 4.6-rc1: Add dependency on generic irq chip
 
-Why is "given" capitalised?
+Wenyou Yang (1):
+      ARM: dts: at91: sama5d2: use "atmel,sama5d3-nfc" compatible for nfc
 
-I would like this to simply get/set the latch state regardless of whether
-the interrupt is edge triggered or level triggered. (Obviously if the
-interrupt is edge triggered this is equivalent to accessing the
-ISPENDR/ICPENDR registers, but I don't want in userspace to have to
-manually look at whether each interrupt is edge or level in order to
-identify whether to use ISPENDR or this API, when in fact the state
-in the kernel is exactly the same. I just want a straightforward
-get/set accessor to the underlying state.)
-
-thanks
--- PMM
+ arch/arm/boot/dts/at91sam9x5.dtsi | 2 +-
+ arch/arm/boot/dts/sama5d2.dtsi    | 2 +-
+ arch/arm64/Kconfig.platforms      | 1 +
+ 3 files changed, 3 insertions(+), 2 deletions(-)
