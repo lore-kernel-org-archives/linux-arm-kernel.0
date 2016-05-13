@@ -1,66 +1,124 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 12 May 2016 22:46:53 -0500
-Subject: [Patch v5 0/8] Qualcomm SCM Rework
-Message-ID: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
+Date: Thu, 12 May 2016 22:46:56 -0500
+Subject: [Patch v5 3/8] firmware: qcom: scm: Use atomic SCM for cold boot
+In-Reply-To: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
+References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <1463111221-6963-4-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following set of patches does a bit of rework on the existing
-Qualcomm SCM firmware.  The first couple of patches deals with turning
-the current SCM into a platform driver.  The next couple are cleanups
-that make adding the 64 support a little easier.  I added in a patch to
-convert the scm-32 to use DMA streaming APIs.
+This patch changes the cold_set_boot_addr function to use atomic SCM
+calls.  cold_set_boot_addr required adding qcom_scm_call_atomic2 to
+support the two arguments going to the smc call.  Using atomic removes
+the need for memory allocation and instead places all arguments in
+registers.
 
-I took Kumar's 64 bit support patch and modified it to use the arm_smccc
-calls.  This simplified things quite a bit.
+Signed-off-by: Andy Gross <andy.gross@linaro.org>
+---
+ drivers/firmware/qcom_scm-32.c | 63 ++++++++++++++++++++++++++++++------------
+ 1 file changed, 45 insertions(+), 18 deletions(-)
 
-Lastly, there are a few DT patches to add the firmware node for a couple of the
-supported platforms.
-
-Changes from v4:
-  * Fix Documentation error
-  * Fix misc review comments
-
-Changes from v3:
-  * Added compatibles for the specific platforms requiring one clock.
-  * All other platforms will use the generic binding that requires 3 clocks.
-
-Changes from v2:
-  * Added use of streaming DMA APIs for scm-32.
-  * Changed DT binding to simplify compats.
-  * Removed Kconfig.platform change that selected QCOM_SCM for ARM64
-  * Fixed misc comments
-  * Changed init function to populate the device differently.
-  * Fixed missing of_node_put
-
-Changes from v1:
-  * Changed binding to reflect proper firmware node usage
-  * Added arch_initcall to populate the firmware device, if present
-  * Fixed various review comments
-  * Removed extraneous includes from SCM 64 file.
-
-
-Andy Gross (7):
-  dt/bindings: firmware: Add Qualcomm SCM binding
-  firmware: qcom: scm: Convert SCM to platform driver
-  firmware: qcom: scm: Use atomic SCM for cold boot
-  firmware: qcom: scm: Generalize shared error map
-  firmware: qcom: scm: Convert to streaming DMA APIS
-  dts: qcom: apq8084: Add SCM firmware node
-  arm64: dts: msm8916: Add SCM firmware node
-
-Kumar Gala (1):
-  firmware: qcom: scm: Add support for ARM64 SoCs
-
- .../devicetree/bindings/firmware/qcom,scm.txt      |  28 +++
- arch/arm/boot/dts/qcom-apq8084.dtsi                |   8 +
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |   8 +
- drivers/firmware/qcom_scm-32.c                     | 271 ++++++++-------------
- drivers/firmware/qcom_scm-64.c                     | 199 ++++++++++++++-
- drivers/firmware/qcom_scm.c                        | 171 ++++++++++++-
- drivers/firmware/qcom_scm.h                        |  31 ++-
- 7 files changed, 523 insertions(+), 193 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
-
+diff --git a/drivers/firmware/qcom_scm-32.c b/drivers/firmware/qcom_scm-32.c
+index 0883292..5be6a12 100644
+--- a/drivers/firmware/qcom_scm-32.c
++++ b/drivers/firmware/qcom_scm-32.c
+@@ -342,6 +342,41 @@ static s32 qcom_scm_call_atomic1(u32 svc, u32 cmd, u32 arg1)
+ 	return r0;
+ }
+ 
++/**
++ * qcom_scm_call_atomic2() - Send an atomic SCM command with two arguments
++ * @svc_id:	service identifier
++ * @cmd_id:	command identifier
++ * @arg1:	first argument
++ * @arg2:	second argument
++ *
++ * This shall only be used with commands that are guaranteed to be
++ * uninterruptable, atomic and SMP safe.
++ */
++static s32 qcom_scm_call_atomic2(u32 svc, u32 cmd, u32 arg1, u32 arg2)
++{
++	int context_id;
++
++	register u32 r0 asm("r0") = SCM_ATOMIC(svc, cmd, 2);
++	register u32 r1 asm("r1") = (u32)&context_id;
++	register u32 r2 asm("r2") = arg1;
++	register u32 r3 asm("r3") = arg2;
++
++	asm volatile(
++			__asmeq("%0", "r0")
++			__asmeq("%1", "r0")
++			__asmeq("%2", "r1")
++			__asmeq("%3", "r2")
++			__asmeq("%4", "r3")
++#ifdef REQUIRES_SEC
++			".arch_extension sec\n"
++#endif
++			"smc    #0      @ switch to secure world\n"
++			: "=r" (r0)
++			: "r" (r0), "r" (r1), "r" (r2), "r" (r3)
++			);
++	return r0;
++}
++
+ u32 qcom_scm_get_version(void)
+ {
+ 	int context_id;
+@@ -378,22 +413,6 @@ u32 qcom_scm_get_version(void)
+ }
+ EXPORT_SYMBOL(qcom_scm_get_version);
+ 
+-/*
+- * Set the cold/warm boot address for one of the CPU cores.
+- */
+-static int qcom_scm_set_boot_addr(u32 addr, int flags)
+-{
+-	struct {
+-		__le32 flags;
+-		__le32 addr;
+-	} cmd;
+-
+-	cmd.addr = cpu_to_le32(addr);
+-	cmd.flags = cpu_to_le32(flags);
+-	return qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR,
+-			&cmd, sizeof(cmd), NULL, 0);
+-}
+-
+ /**
+  * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
+  * @entry: Entry point function for the cpus
+@@ -423,7 +442,8 @@ int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
+ 			set_cpu_present(cpu, false);
+ 	}
+ 
+-	return qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
++	return qcom_scm_call_atomic2(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR,
++				    flags, virt_to_phys(entry));
+ }
+ 
+ /**
+@@ -439,6 +459,10 @@ int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
+ 	int ret;
+ 	int flags = 0;
+ 	int cpu;
++	struct {
++		__le32 flags;
++		__le32 addr;
++	} cmd;
+ 
+ 	/*
+ 	 * Reassign only if we are switching from hotplug entry point
+@@ -454,7 +478,10 @@ int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
+ 	if (!flags)
+ 		return 0;
+ 
+-	ret = qcom_scm_set_boot_addr(virt_to_phys(entry), flags);
++	cmd.addr = cpu_to_le32(virt_to_phys(entry));
++	cmd.flags = cpu_to_le32(flags);
++	ret = qcom_scm_call(QCOM_SCM_SVC_BOOT, QCOM_SCM_BOOT_ADDR,
++			    &cmd, sizeof(cmd), NULL, 0);
+ 	if (!ret) {
+ 		for_each_cpu(cpu, cpus)
+ 			qcom_scm_wb[cpu].entry = entry;
 -- 
 1.9.1
