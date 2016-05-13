@@ -1,45 +1,66 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Fri, 13 May 2016 11:19:13 +0800
-Subject: [PATCH 3/6] dt-bindings: mtu3: add devicetree bindings
-In-Reply-To: <CAL_JsqJKW_C-LtCchAMn5c_VHxBz6n3DBBRFn9hCXcaAbpZrUg@mail.gmail.com>
-References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
- <1462868614-20602-4-git-send-email-chunfeng.yun@mediatek.com>
- <20160511145409.GA23042@rob-hp-laptop>
- <1463037844.11651.118.camel@mhfsdcap03>
- <CAOGqxeUYEGKq5yhHbgcjPZtY06ZfDp2iCLZDqS3uyfCW523B4w@mail.gmail.com>
- <1463104820.11651.125.camel@mhfsdcap03>
- <CAL_JsqJKW_C-LtCchAMn5c_VHxBz6n3DBBRFn9hCXcaAbpZrUg@mail.gmail.com>
-Message-ID: <1463109553.11651.127.camel@mhfsdcap03>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 12 May 2016 22:46:53 -0500
+Subject: [Patch v5 0/8] Qualcomm SCM Rework
+Message-ID: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-05-12 at 22:09 -0500, Rob Herring wrote:
-> On Thu, May 12, 2016 at 9:00 PM, chunfeng yun <chunfeng.yun@mediatek.com> wrote:
-> > Hi,
-> >
-> > On Thu, 2016-05-12 at 19:02 -0400, Alan Cooper wrote:
-> >> On Thu, May 12, 2016 at 3:24 AM, chunfeng yun <chunfeng.yun@mediatek.com> wrote:
-> >> >> > + - mediatek,enable-manual-drd : supports manual dual-role switch by sysfs
-> >> >> > +   interface; only used when receptacle is TYPE-A and also wants to support
-> >> >> > +   dual-role mode.
-> >> >>
-> >> >> sysfs is a Linux detail that doesn't apply to the binding. Does the
-> >> >> property mean "the IP block supports or doesn't support switching"  or
-> >> >> "I want to enable switching feature". Only the former belongs in DT.
-> >> >>
-> >> > It is the former case, and has little relation with sysfs interface.
-> >> > I will modify it later, sorry for my unclear description.
-> >>
-> >> Could the property name be just "enable-manual-drd" instead of
-> >> "mediatek,enable-manual-drd"? I expect to have to add this
-> >> functionality to our USB driver in the near future.
-> >
-> > Do you mean provide some APIs to in common USB driver?
-> 
-> Probably, but first just put the property in a common binding doc.
-> 
-Ok, I modify it later
+The following set of patches does a bit of rework on the existing
+Qualcomm SCM firmware.  The first couple of patches deals with turning
+the current SCM into a platform driver.  The next couple are cleanups
+that make adding the 64 support a little easier.  I added in a patch to
+convert the scm-32 to use DMA streaming APIs.
 
-Thanks.
+I took Kumar's 64 bit support patch and modified it to use the arm_smccc
+calls.  This simplified things quite a bit.
 
-> Rob
+Lastly, there are a few DT patches to add the firmware node for a couple of the
+supported platforms.
+
+Changes from v4:
+  * Fix Documentation error
+  * Fix misc review comments
+
+Changes from v3:
+  * Added compatibles for the specific platforms requiring one clock.
+  * All other platforms will use the generic binding that requires 3 clocks.
+
+Changes from v2:
+  * Added use of streaming DMA APIs for scm-32.
+  * Changed DT binding to simplify compats.
+  * Removed Kconfig.platform change that selected QCOM_SCM for ARM64
+  * Fixed misc comments
+  * Changed init function to populate the device differently.
+  * Fixed missing of_node_put
+
+Changes from v1:
+  * Changed binding to reflect proper firmware node usage
+  * Added arch_initcall to populate the firmware device, if present
+  * Fixed various review comments
+  * Removed extraneous includes from SCM 64 file.
+
+
+Andy Gross (7):
+  dt/bindings: firmware: Add Qualcomm SCM binding
+  firmware: qcom: scm: Convert SCM to platform driver
+  firmware: qcom: scm: Use atomic SCM for cold boot
+  firmware: qcom: scm: Generalize shared error map
+  firmware: qcom: scm: Convert to streaming DMA APIS
+  dts: qcom: apq8084: Add SCM firmware node
+  arm64: dts: msm8916: Add SCM firmware node
+
+Kumar Gala (1):
+  firmware: qcom: scm: Add support for ARM64 SoCs
+
+ .../devicetree/bindings/firmware/qcom,scm.txt      |  28 +++
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |   8 +
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |   8 +
+ drivers/firmware/qcom_scm-32.c                     | 271 ++++++++-------------
+ drivers/firmware/qcom_scm-64.c                     | 199 ++++++++++++++-
+ drivers/firmware/qcom_scm.c                        | 171 ++++++++++++-
+ drivers/firmware/qcom_scm.h                        |  31 ++-
+ 7 files changed, 523 insertions(+), 193 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+
+-- 
+1.9.1
