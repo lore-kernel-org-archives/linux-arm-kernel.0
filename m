@@ -1,37 +1,84 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 13 May 2016 14:24:21 +0200
-Subject: [PATCH v2] i2c: at91: change log when dma configuration fails
-Message-ID: <1463142261-26321-1-git-send-email-ludovic.desroches@atmel.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 13 May 2016 20:19:55 +0800
+Subject: [PATCH 1/2] net: mv643xx_eth: use {readl|writel}_relaxed
+ instead of readl/writel
+In-Reply-To: <3966837.tFk2PD8QFb@wuerfel>
+References: <1463140760-7128-1-git-send-email-jszhang@marvell.com>
+ <1463140760-7128-2-git-send-email-jszhang@marvell.com>
+ <3966837.tFk2PD8QFb@wuerfel>
+Message-ID: <20160513201955.256e5169@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the DMA configuration fails, there is a log reporting that we can't
-use DMA and indicating the error number. When booting the kernel, it is
-annoying to see this error number. Moreover, people can think something
-is going wrong. It is not the case, it means that DMA can't be used but
-it doesn't prevent to use i2c.
+Dear Arnd,
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- drivers/i2c/busses/i2c-at91.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, 13 May 2016 14:09:43 +0200 Arnd Bergmann wrote:
 
-Changes:
-- v2:
-  - remove ret parameter
+> On Friday 13 May 2016 19:59:19 Jisheng Zhang wrote:
+> >  /* port register accessors **************************************************/
+> >  static inline u32 rdl(struct mv643xx_eth_private *mp, int offset)
+> >  {
+> > -	return readl(mp->shared->base + offset);
+> > +	return readl_relaxed(mp->shared->base + offset);
+> >  }
+> >  
+> >  static inline u32 rdlp(struct mv643xx_eth_private *mp, int offset)
+> >  {
+> > -	return readl(mp->base + offset);
+> > +	return readl_relaxed(mp->base + offset);
+> >  }  
+> 
+> I'd recommend not changing these in general, but introducing new 'rdl_relaxed()'
+> and 'rdlp_relaxed()' etc variants that you use in the code that actually
+> is performance sensitive, but use the normal non-relaxed versions by
+> default.
+> 
+> Then add a comment to each use of the relaxed accessors on how you know
+> that it's safe for that caller. This usually is just needed for the xmit()
+> function and for the interrupt handler.
 
-diff --git a/drivers/i2c/busses/i2c-at91.c b/drivers/i2c/busses/i2c-at91.c
-index 921d32b..6384d08 100644
---- a/drivers/i2c/busses/i2c-at91.c
-+++ b/drivers/i2c/busses/i2c-at91.c
-@@ -1013,7 +1013,7 @@ static int at91_twi_configure_dma(struct at91_twi_dev *dev, u32 phy_addr)
- 
- error:
- 	if (ret != -EPROBE_DEFER)
--		dev_info(dev->dev, "can't use DMA, error %d\n", ret);
-+		dev_info(dev->dev, "can't request DMA channels, continue without DMA support\n");
- 	if (dma->chan_rx)
- 		dma_release_channel(dma->chan_rx);
- 	if (dma->chan_tx)
--- 
-2.5.0
+Got your points and I do think it makes sense. But could we always use the
+relaxed version to save some LoCs, although I have no mv643xx_eth platform
+but I can confirm similar relaxed version changes in pxa168_eth is safe and
+this is what we do in product's kernel.
+
+Above is just my humble opinion, comments are welcome.
+
+Thanks,
+Jisheng
+
+>   
+> > @@ -2642,10 +2642,10 @@ mv643xx_eth_conf_mbus_windows(struct mv643xx_eth_shared_private *msp,
+> >  	int i;
+> >  
+> >  	for (i = 0; i < 6; i++) {
+> > -		writel(0, base + WINDOW_BASE(i));
+> > -		writel(0, base + WINDOW_SIZE(i));
+> > +		writel_relaxed(0, base + WINDOW_BASE(i));
+> > +		writel_relaxed(0, base + WINDOW_SIZE(i));
+> >  		if (i < 4)
+> > -			writel(0, base + WINDOW_REMAP_HIGH(i));
+> > +			writel_relaxed(0, base + WINDOW_REMAP_HIGH(i));
+> >  	}
+> >  
+> >  	win_enable = 0x3f;  
+> 
+> Configuring the mbus for instance is clearly not an operation in which
+> performance matters at all, so better not touch that.
+> 
+> > @@ -2674,8 +2675,8 @@ static void infer_hw_params(struct mv643xx_eth_shared_private *msp)
+> >  	 * [21:8], or a 16-bit coal limit in bits [25,21:7] of the
+> >  	 * SDMA config register.
+> >  	 */
+> > -	writel(0x02000000, msp->base + 0x0400 + SDMA_CONFIG);
+> > -	if (readl(msp->base + 0x0400 + SDMA_CONFIG) & 0x02000000)
+> > +	writel_relaxed(0x02000000, msp->base + 0x0400 + SDMA_CONFIG);
+> > +	if (readl_relaxed(msp->base + 0x0400 + SDMA_CONFIG) & 0x02000000)
+> >  		msp->extended_rx_coal_limit = 1;
+> >  	else
+> >  		msp->extended_rx_coal_limit = 0;  
+> 
+> 
+> This also seems to be configuration, rather than in the packet rx/tx hotpath.
+> 
+> 	Arnd
