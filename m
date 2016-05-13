@@ -1,96 +1,51 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Fri, 13 May 2016 13:51:15 +0300
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <20160513092802.GA13400@localhost.localdomain>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <20160512002000.GA30997@yury-N73SV>
- <20160512133533.GF11226@e104818-lin.cambridge.arm.com>
- <20160512134431.GB30205@yury-N73SV>
- <20160512140734.GG11226@e104818-lin.cambridge.arm.com>
- <20160512142457.GC30205@yury-N73SV>
- <20160512152805.GJ11226@e104818-lin.cambridge.arm.com>
- <57358C2B.1010106@huawei.com>
- <20160513092802.GA13400@localhost.localdomain>
-Message-ID: <20160513105115.GA16672@yury-N73SV>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 13 May 2016 13:58:44 +0300
+Subject: [PATCHv2 00/28] ARM: OMAP2+: hwmod module clock type support
+In-Reply-To: <20160512233935.GN3492@codeaurora.org>
+References: <1460632097-25727-1-git-send-email-t-kristo@ti.com>
+ <20160512233935.GN3492@codeaurora.org>
+Message-ID: <5735B364.9000504@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 09:28:03AM +0000, Catalin Marinas wrote:
-> 
-> The discussion is mainly around whether USER_DS for 32-bit compat apps
-> should be the same as USER_DS for native 32-bit apps. Even for native
-> 32-bit kernels, we don't use STACK_TOP as addr_limit. A read/write from
-> 0xffffffff would fail in both cases anyway. I think the LTP test doesn't
-> even try to access such memory but only to probe the range validity (I
-> haven't managed to build the latest LTP yet).
+On 13/05/16 02:39, Stephen Boyd wrote:
+> On 04/14, Tero Kristo wrote:
+>> Hi,
+>>
+>> v2 contains following changes in comparison to v1:
+>>
+>> - Patch ordering changed a bit, clk/ti, mach-omap2, dts patches are now
+>>    mostly grouped together, with the exception of the introduction of
+>>    clock helper API, which is needed by everything else. Please note
+>>    that the ordering must be preserved between mach-omap2/clk-driver/dts
+>>    to avoid boot problems.
+>> - Dropped hwmod data removal patches for now, this allows booting with
+>>    either new or old DTS data.
+>> - Fixed a typo in the hwmod clock driver timeout handling, the comparison
+>>    for timeout against ktime_us_delta was wrong causing too short
+>>    timeouts, this was apparent with cpuidle enabled on OMAP4
+>> - Added patch #6 to fetch hwmod main clock based on the hwmod name itself,
+>>    if found, ignore main_clk / clkctrl setup for the hwmod
+>> - Added patch #7 to fix issue in omap2 timer caused by patch #6, with
+>>    dynamic parsing of main clock, the hwmod must be setup before attempting
+>>    to access main_clk.
+>
+> What's the general design goal of this series? This cover letter
+> is more like a change and test log instead of an overall argument
+> for why the series should be merged so I'm left to piecing
+> together the commit text from the 28 different patches. I suspect
+> it's to get rid of DT_CLK macros and do something with hwmod in a
+> more generic way, but that's all I got.
 
-This fix lets me build it (on top of 7b3ef3b0b)
-Of course, it's not 'official'. :)
+Sorry I think this was lost someone along the series, and looking back I 
+did not explain it that well at any point either.
 
----
- testcases/kernel/syscalls/fstatat/fstatat01.c  | 1 +
- testcases/kernel/syscalls/preadv/preadv.h      | 1 +
- testcases/kernel/syscalls/pwritev/pwritev.h    | 1 +
- testcases/kernel/syscalls/request_key/Makefile | 2 +-
- 4 files changed, 4 insertions(+), 1 deletion(-)
+The major motivation of this series is to get rid of the hwmod database 
+from kernel eventually, Tony is working on an interconnect driver which 
+will provide most of the other functionality currently done by hwmod, 
+but he is going to depend on the clkctrl part being done with this 
+series. Another important aspect of the series is that hwmod clkctrl is 
+now done with proper clock nodes, which provides multiple benefits like 
+usecounting, better debugging capabilities, better hierarchy support etc.
 
-diff --git a/testcases/kernel/syscalls/fstatat/fstatat01.c b/testcases/kernel/syscalls/fstatat/fstatat01.c
-index 128f6dd..6e23c9e 100644
---- a/testcases/kernel/syscalls/fstatat/fstatat01.c
-+++ b/testcases/kernel/syscalls/fstatat/fstatat01.c
-@@ -59,6 +59,7 @@ static const char *filenames[TEST_CASES];
- static const int expected_errno[] = { 0, 0, ENOTDIR, EBADF, EINVAL, 0 };
- static const int flags[] = { 0, 0, 0, 0, 9999, 0 };
- 
-+#define HAVE_FSTATAT
- #if !defined(HAVE_FSTATAT)
- #if (__NR_fstatat64 > 0)
- int fstatat(int dirfd, const char *filename, struct stat64 *statbuf, int flags)
-diff --git a/testcases/kernel/syscalls/preadv/preadv.h b/testcases/kernel/syscalls/preadv/preadv.h
-index f3ac30d..b001389 100644
---- a/testcases/kernel/syscalls/preadv/preadv.h
-+++ b/testcases/kernel/syscalls/preadv/preadv.h
-@@ -21,6 +21,7 @@
- #include "config.h"
- #include "linux_syscall_numbers.h"
- 
-+#define HAVE_PREADV
- #if !defined(HAVE_PREADV)
- int preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
- {
-diff --git a/testcases/kernel/syscalls/pwritev/pwritev.h b/testcases/kernel/syscalls/pwritev/pwritev.h
-index ae9d999..2a4d188 100644
---- a/testcases/kernel/syscalls/pwritev/pwritev.h
-+++ b/testcases/kernel/syscalls/pwritev/pwritev.h
-@@ -21,6 +21,7 @@
- #include "config.h"
- #include "linux_syscall_numbers.h"
- 
-+#define HAVE_PWRITEV
- #if !defined(HAVE_PWRITEV)
- int pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
- {
-diff --git a/testcases/kernel/syscalls/request_key/Makefile b/testcases/kernel/syscalls/request_key/Makefile
-index 9add429..2e8a37c 100644
---- a/testcases/kernel/syscalls/request_key/Makefile
-+++ b/testcases/kernel/syscalls/request_key/Makefile
-@@ -19,6 +19,6 @@ top_srcdir		?= ../../../..
- 
- include $(top_srcdir)/include/mk/testcases.mk
- 
--LDLIBS		+= $(KEYUTILS_LIBS)
-+LDLIBS		+= $(lkeyutils)
- 
- include $(top_srcdir)/include/mk/generic_leaf_target.mk
--- 
-2.5.0
-
-
-> 
-> -- 
-> Catalin
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-Tero
