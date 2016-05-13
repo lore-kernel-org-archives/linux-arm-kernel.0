@@ -1,199 +1,134 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 13 May 2016 11:46:33 -0700
-Subject: [PATCH 2/4] phy: rockchip-emmc: configure frequency range and
- drive impedance
-In-Reply-To: <3695875b-09c3-cd80-3062-55d985e51f70@rock-chips.com>
-References: <1463092986-61777-1-git-send-email-briannorris@chromium.org>
- <1463092986-61777-2-git-send-email-briannorris@chromium.org>
- <3695875b-09c3-cd80-3062-55d985e51f70@rock-chips.com>
-Message-ID: <CAD=FV=UwocUy_bOUrJZB47taHWdV1KGkvi5CyZf74Y8cvGgVmw@mail.gmail.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 13 May 2016 15:07:41 -0400
+Subject: [PATCH v12 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
+ feature
+In-Reply-To: <57223593.1000503@arm.com>
+References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
+ <1461783185-9056-2-git-send-email-dave.long@linaro.org>
+ <57223593.1000503@arm.com>
+Message-ID: <573625FD.4020004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
-
-On Thu, May 12, 2016 at 6:02 PM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> Hi Brian,
+On 04/28/2016 12:08 PM, Marc Zyngier wrote:
+> On 27/04/16 19:52, David Long wrote:
+>> From: "David A. Long" <dave.long@linaro.org>
+>>
+>> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64.
 >
+> And clearly a lot more.
 >
-> On 2016/5/13 6:43, Brian Norris wrote:
 >>
->> From: Shawn Lin <shawn.lin@rock-chips.com>
->>
->> Signal integrity analysis has suggested we set these values. Do this in
->> power_on(), so that they get reconfigured after suspend/resume.
->>
->> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
->> Signed-off-by: Brian Norris <briannorris@chromium.org>
+>> Signed-off-by: David A. Long <dave.long@linaro.org>
 >> ---
->>  drivers/phy/phy-rockchip-emmc.c | 27 +++++++++++++++++++++++++++
->>  1 file changed, 27 insertions(+)
+>>   arch/arm64/Kconfig              |   1 +
+>>   arch/arm64/include/asm/ptrace.h |  33 ++++++++++-
+>>   arch/arm64/kernel/ptrace.c      | 118 ++++++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 151 insertions(+), 1 deletion(-)
 >>
->> diff --git a/drivers/phy/phy-rockchip-emmc.c
->> b/drivers/phy/phy-rockchip-emmc.c
->> index 48cbe691a889..5641dede32f6 100644
->> --- a/drivers/phy/phy-rockchip-emmc.c
->> +++ b/drivers/phy/phy-rockchip-emmc.c
->> @@ -56,6 +56,19 @@
->>  #define PHYCTRL_DLLRDY_SHIFT   0x5
->>  #define PHYCTRL_DLLRDY_DONE    0x1
->>  #define PHYCTRL_DLLRDY_GOING   0x0
->> +#define PHYCTRL_FREQSEL_200M   0x0
->> +#define PHYCTRL_FREQSEL_50M    0x1
->> +#define PHYCTRL_FREQSEL_100M   0x2
->> +#define PHYCTRL_FREQSEL_150M   0x3
->> +#define PHYCTRL_FREQSEL_MASK   0x3
->> +#define PHYCTRL_FREQSEL_SHIFT  0xc
->> +#define PHYCTRL_DR_MASK                0x7
->> +#define PHYCTRL_DR_SHIFT       0x4
->> +#define PHYCTRL_DR_50OHM       0x0
->> +#define PHYCTRL_DR_33OHM       0x1
->> +#define PHYCTRL_DR_66OHM       0x2
->> +#define PHYCTRL_DR_100OHM      0x3
->> +#define PHYCTRL_DR_40OHM       0x4
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 4f43622..8f662fd 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -80,6 +80,7 @@ config ARM64
+>>   	select HAVE_PERF_EVENTS
+>>   	select HAVE_PERF_REGS
+>>   	select HAVE_PERF_USER_STACK_DUMP
+>> +	select HAVE_REGS_AND_STACK_ACCESS_API
+>>   	select HAVE_RCU_TABLE_FREE
+>>   	select HAVE_SYSCALL_TRACEPOINTS
+>>   	select IOMMU_DMA if IOMMU_SUPPORT
+>> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
+>> index a307eb6..ee02637 100644
+>> --- a/arch/arm64/include/asm/ptrace.h
+>> +++ b/arch/arm64/include/asm/ptrace.h
+>> @@ -119,6 +119,8 @@ struct pt_regs {
+>>   	u64 syscallno;
+>>   };
 >>
->>  struct rockchip_emmc_phy {
->>         unsigned int    reg_offset;
->> @@ -154,6 +167,20 @@ static int rockchip_emmc_phy_power_on(struct phy
->> *phy)
->>         struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
->>         int ret = 0;
+>> +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
+>> +
+>>   #define arch_has_single_step()	(1)
 >>
->> +       /* DLL operation: 170 to 200 MHz */
+>>   #ifdef CONFIG_COMPAT
+>> @@ -147,6 +149,35 @@ struct pt_regs {
+>>   #define user_stack_pointer(regs) \
+>>   	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
+>>
+>> +extern int regs_query_register_offset(const char *name);
+>> +extern const char *regs_query_register_name(unsigned int offset);
+>> +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
+>> +extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
+>> +					       unsigned int n);
+>> +
+>> +/**
+>> + * regs_get_register() - get register value from its offset
+>> + * @regs:	   pt_regs from which register value is gotten
+>> + * @offset:    offset number of the register.
 >
+> Is it the offset? or the number?
 >
-> What is 170 here? Should we expose them to dt instead of hardcoding
-> them?
 
-This was probably my fault.  I did some searching and found
-<https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf>.
-It appears to be docs for a similar (but not identical) PHY.  We were
-looking at it to try to get more clarity on some bits that were hard
-to understand in the docs we had.
+I've removed "number" from the description.
 
-In that doc there appear to be 3 bits for selecting the DLL operation
-and they have ranges defined.  In Rockchip's PHY there are only 2
-bits.  Thus things don't map totally properly.
+>> + *
+>> + * regs_get_register returns the value of a register whose offset from @regs.
+>> + * The @offset is the offset of the register in struct pt_regs.
+>> + * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
+>> + */
+>> +static inline u64 regs_get_register(struct pt_regs *regs,
+>> +					      unsigned int offset)
+>> +{
+>> +	if (unlikely(offset > MAX_REG_OFFSET))
+>> +		return 0;
+>> +	return *(u64 *)((u64)regs + offset);
+>
+> So clearly it is the offset. But is 3 a valid value? I don't think so.
+> How about something slightly more type safe:
+>
+> 	u64 val = 0;
+>
+> 	WARN_ON(offset & 7);
+>
+> 	offset >>= 3;
+> 	switch (offset) {
+> 	case	0 ... 30:
+> 		val = regs->reg[offset];
+> 		break;
+> 	case	31:
+> 		val = regs->sp;
+> 		break;
+> 	case	32:
+> 		val = regs->pc;
+> 		break;
+> 	case	33:
+>   		val = regs->pstate;
+> 		break;
+> 	}
+>
+> 	return val;
+>
+> I'm pretty sure you could replace 31/32/33 with macros using offsetof().
+> The compiler may even optimize this to something similar to what you
+> already have.
+>
+> Thanks,
+>
+> 	M.
+>
 
-Anyway, comment should probably be removed.
+I'm not sure this makes sense to me since my best understanding of this 
+suite of functions makes the "offset" argument effectively an opaque 
+type with a value returned from looking up the register by name in a 
+compiled in table that reliably determines the offset within the pt_regs 
+structure (i.e.:  regs_query_register_offset() and 
+regs_query_register_name()).  Now this change introduces the assumption 
+that the gp registers start at the beginning of the structure, 
+presumably for the future use of someone hardcoding their own number for 
+"offset".
 
+Nonetheless in the interest of moving forward I currently have this 
+change sitting in my next patch set.
 
-I _think_ that this just needs to match the input clock rate of the
-eMMC, right?  So presumably the PHY should get a reference to the same
-clock that was given to the controller clock.  It can check the clock
-at probe time and then register a notifier to keep the in sync (if we
-expect the clock to change).
-
-IMHO adding all of that complexity seems like it could wait for a
-followup patch.  For now we can assume 200 MHz I think?
-
-
-> Per the commit msg, signal may vary from board to board, so I guess
-> 50ohm may not always be the best selection?
-
-Starting out with something sane like 50 ohms seems like it makes
-sense for now.  It's OK to start with a default for now to get things
-basically working and then add device tree support once we have a
-second user.
-
-
-When we're ready to make this more generic, IMHO we might consider
-having the PHY implement the pinctrl API and officially be a pin
-controller and we use those bindings.  We are controlling pins so
-using the pinctrl API seems like it might make sense?
-
-I _think_ that perhaps what we're specifying here is actually slew
-rate, but feel free to correct me if I'm wrong.  It looks as if "drive
-strength" is supposed to be specified in terms of mA and the docs I
-find show that we're actually controlling how fast the pins will
-toggle.
-
-I'm not 100% certain I know how the pinctrl bindings apply in this
-case (maybe Heiko has ideas, or maybe we should send a proposal to
-Linus W?), but from the bindings they look like they offer some
-flexibility.
-
-Maybe this would look like below (or maybe you need some extra sub-nodes)
-
-       sdhci: sdhci at fe330000 {
-               compatible = "rockchip,rk3399-sdhci-5.1", "arasan,sdhci-5.1";
-               reg = <0x0 0xfe330000 0x0 0x10000>;
-               interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-               clocks = <&cru SCLK_EMMC>, <&cru ACLK_EMMC>;
-               clock-names = "clk_xin", "clk_ahb";
-               assigned-clocks = <&cru SCLK_EMMC>;
-               assigned-clock-rates = <200000000>;
-               phys = <&emmc_phy>;
-               phy-names = "phy_arasan";
-               pinctrl-names = "default";
-               pinctrl-0 = <&pcfg_emmc_slew_rate_x1_00>;
-               status = "disabled";
-       };
-
-               emmc_phy: phy at f780 {
-                       compatible = "rockchip,rk3399-emmc-phy";
-                       reg = <0xf780 0x20>;
-                       #phy-cells = <0>;
-                       status = "disabled";
-
-                       pcfg_emmc_slew_rate_x1_00: pcfg-emmc-slew-rate-x1-00 {
-                               slew-rate = <100>;
-                       };
-                       pcfg_emmc_slew_rate_x1_50: pcfg-emmc-slew-rate-x1-50 {
-                               slew-rate = <150>;
-                       };
-                       pcfg_emmc_slew_rate_x0_75: pcfg-emmc-slew-rate-x0-75 {
-                               slew-rate = <75>;
-                       };
-                       pcfg_emmc_slew_rate_x0_50: pcfg-emmc-slew-rate-x0-50 {
-                               slew-rate = <50>;
-                       };
-                       pcfg_emmc_slew_rate_x1_20: pcfg-emmc-slew-rate-x1-20 {
-                               slew-rate = <120>;
-                       };
-                       pcfg_emmc_slew_rate_x1_20: pcfg-emmc-slew-rate-x1-20 {
-                               slew-rate = <120>;
-                       };
-           };
-
-The nice thing about using the pinctrl API is that:
-
-* It allows us to _also_ control pullups / pulldowns.  We probably
-want to control those also since some boards may use external pullups
-and others may want to use the internal ones.
-
-* If SDHCI needs to dynamically adjust things (like turning on pulls,
-adjusting drive strengths, etc) it can do it in a sane API.
-
-
-
-> Another thing I need to elaborate more here is that emmc phy only
-> supports 50/100/150/200Mhz. Presumably people love to use the highest
-> speed mode with its upper limiting frequency, but in case of some
-> special requirement or bad board design, they want to add max-frequency
-> in dts for emmc controller. In this case PHYCTRL_FREQSEL_XXXM should
-> meet the actual max-frequency, take 100M for example, otherwise
-> emmc_phy's  tuning block will use 200M to do some calculation but it
-> certainly should be 100M. This leads emmc_phy to choose the wrong
-> phase. Finally maybe you will see triggering re-tune easily or some
-> worse case of even tuning failure when probing card.
-
-Sounds like this should be handled as per above: make sure that the
-PHY has access to the clock and can check it's rate.
-
----
-
-So overall:
-
-* Should re-spin and remove the comment about 170 MHz.
-
-* I think this could land as-is other than the comment.
-
-* Long term someone (hopefully at Rockchip) should think about making
-the driver auto-adjust using the clock API.
-
-* Long term someone (hopefully at Rockchip) should think about trying
-to use the pinctrl API to allow adjusting drive strengths and pullups.
-
-
--Doug
+Thanks,
+-dl
