@@ -1,103 +1,60 @@
-From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
-Date: Fri, 13 May 2016 09:06:38 +0000
-Subject: [PATCH 3/3] mmc: core: support hs speed mode if hs200 mode fails
-In-Reply-To: <1461171092-30631-3-git-send-email-aisheng.dong@nxp.com>
-References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
- <1461171092-30631-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1463130397.3151.13.camel@toradex.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 May 2016 10:15:07 +0100
+Subject: [PATCH] sched/core: don't include asm/mmu_context from drivers
+In-Reply-To: <CALCETrV_wgy0vpWiLYRJn1Q41C6adKKgbEOFthoAXiG601JPYQ@mail.gmail.com>
+References: <1461919995-21001-1-git-send-email-arnd@arndb.de>
+ <20160429094218.61b26849@gandalf.local.home>
+ <CALCETrV_wgy0vpWiLYRJn1Q41C6adKKgbEOFthoAXiG601JPYQ@mail.gmail.com>
+Message-ID: <20160513091506.GS19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-04-21 at 00:51 +0800, Dong Aisheng wrote:
-> Currently if mmc_select_hs200 mode switch fails, MMC core
-> can only use legacy mode to run the card.
-> Let's retry HS speed mode if HS200 fails.
+On Thu, May 12, 2016 at 10:46:56PM -0700, Andy Lutomirski wrote:
+> On Fri, Apr 29, 2016 at 6:42 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> > On Fri, 29 Apr 2016 10:52:32 +0200
+> > Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> >> This reverts the earlier fix attempt and works around the problem
+> >> by including both linux/mmu_context.h and asm/mmu_context.h from
+> >> kernel/sched/core.c. This is not a good solution but seems less
+> >> hacky than the alternatives.
+> >
+> > What about simply not compiling finish_arch_post_lock_switch() when
+> > building modules?
+> >
+> > (untested, not compiled or anything)
+> >
+> > Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+> > ---
+> > diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+> > index fa5b42d44985..3f22d1b6bac8 100644
+> > --- a/arch/arm/include/asm/mmu_context.h
+> > +++ b/arch/arm/include/asm/mmu_context.h
+> > @@ -66,6 +66,7 @@ static inline void check_and_switch_context(struct mm_struct *mm,
+> >                 cpu_switch_mm(mm->pgd, mm);
+> >  }
+> >
+> > +#ifndef MODULE
+> >  #define finish_arch_post_lock_switch \
+> >         finish_arch_post_lock_switch
+> >  static inline void finish_arch_post_lock_switch(void)
+> > @@ -87,6 +88,7 @@ static inline void finish_arch_post_lock_switch(void)
+> >                 preempt_enable_no_resched();
+> >         }
+> >  }
+> > +#endif /* !MODULE */
+> >
+> >  #endif /* CONFIG_MMU */
+> >
 > 
-> Before the fix:
-> mmc0: mmc_select_hs200 failed, error -74
-> : switch to mmc0 failed
-> mmc0: new MMC card at address 0001
-> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
-> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
-> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
-> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
-> ?mmcblk0: p1 p2
 > 
-> After the fix:
-> mmc0: mmc_select_hs200 failed, error -74
-> mmc0: new DDR MMC card at address 0001
-> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
-> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
-> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
-> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
-> ?mmcblk0: p1 p2
-> 
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
-> ?drivers/mmc/core/mmc.c | 3 ++-
-> ?1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index 55c8201..b573dc7 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1315,7 +1315,8 @@ static int mmc_select_timing(struct mmc_card
-> *card)
-> ?
-> ?	if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200)
-> ?		err = mmc_select_hs200(card);
-> -	else if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS)
-> +
-> +	if (err && (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS))
-> ?		err = mmc_select_hs(card);
-> ?
-> ?	if (err && err != -EBADMSG)
+> Can someone in arm land ack this so Ingo can apply it?
 
+Sorry, I'm simply unable to read every message that comes in.
 
-This seems to break on TK1 where eMMC so far was detected as an 8-bit
-high speed MMC card. With this patch it reverts to detecting a 1-bit only
-MMC card! This has been observed both on a NVIDIA's Jetson TK1 as well as
-our new Toradex Apalis TK1?(CC Tegra mailing list,?Jon Hunter and?Lucas
-Stach as well). So far T30 is not affected as there we are still doing
-full HS200 with whatever issues that has.
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Before:
-[????3.726894] sdhci: Secure Digital Host Controller Interface driver
-[????3.733081] sdhci: Copyright(c) Pierre Ossman
-[????3.737462] sdhci-pltfm: SDHCI platform and OF driver helper
-[????3.753411] mmc0: Unknown controller version (3). You may experience
- problems.
-[????3.768345] mmc0: Invalid maximum block size, assuming 512 bytes
-[????3.814896] mmc0: SDHCI controller on 700b0600.sdhci [700b0600.sdhci]
- using ADMA 64-bit
-[????3.892088] mmc0: new high speed MMC card at address 0001
-[????3.899194] mmcblk0: mmc0:0001 SEM16G 14.7 GiB
-[????3.904217] mmcblk0boot0: mmc0:0001 SEM16G partition 1 4.00 MiB
-[????3.910645] mmcblk0boot1: mmc0:0001 SEM16G partition 2 4.00 MiB
-[????3.917119] mmcblk0rpmb: mmc0:0001 SEM16G partition 3 4.00 MiB
-[????3.926006]??mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9
-root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios?
-clock:??????????52000000 Hz
-actual clock:???51000000 Hz
-vdd:????????????21 (3.3 ~ 3.4 V)
-bus mode:???????2 (push-pull)
-chip select:????0 (don't care)
-power mode:?????2 (on)
-bus width:??????3 (8 bits)
-timing spec:????1 (mmc high-speed)
-signal voltage: 0 (3.30 V)
-driver type:????0 (driver type B)
-
-After:
-[????3.899918] mmc0: new MMC card at address 0001
-root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios?
-clock:??????????25000000 Hz
-actual clock:???24727273 Hz
-vdd:????????????21 (3.3 ~ 3.4 V)
-bus mode:???????2 (push-pull)
-chip select:????0 (don't care)
-power mode:?????2 (on)
-bus width:??????0 (1 bits)
-timing spec:????0 (legacy)
-signal voltage: 0 (3.30 V)
-driver type:????0 (driver type B)
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
