@@ -1,74 +1,78 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 13 May 2016 09:55:42 +0200
-Subject: [PATCH 02/23] ARM: dts: r8a73a4: Fix W=1 dtc warnings
+Date: Fri, 13 May 2016 09:55:51 +0200
+Subject: [PATCH 11/23] ARM: dts: armadillo800eva: Fix W=1 dtc warnings
 In-Reply-To: <1463126163-29423-1-git-send-email-geert+renesas@glider.be>
 References: <1463126163-29423-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1463126163-29423-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <1463126163-29423-12-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Warning (unit_address_vs_reg): Node /cache-controller at 0 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /cache-controller at 1 has a unit name, but no reg property
-
-Move the cache-controller nodes under the cpus node, and make their
-unit names and reg properties match the MPIDR values.
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+Warning (unit_address_vs_reg): Node /regulator at 0 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /regulator at 1 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /regulator at 2 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /i2c at 2 has a unit name, but no reg property
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 34 ++++++++++++++++++----------------
- 1 file changed, 18 insertions(+), 16 deletions(-)
+ arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index 6954912a37537939..357d29d2c04b4c08 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -31,6 +31,24 @@
- 			power-domains = <&pd_a2sl>;
- 			next-level-cache = <&L2_CA15>;
+diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+index 2c82dab2b6f45f9c..b3f0ac4b99bd5a3d 100644
+--- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
++++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+@@ -28,12 +28,12 @@
+ 		stdout-path = &scifa1;
+ 	};
+ 
+-	memory {
++	memory at 40000000 {
+ 		device_type = "memory";
+ 		reg = <0x40000000 0x20000000>;
+ 	};
+ 
+-	reg_3p3v: regulator at 0 {
++	reg_3p3v: regulator-3p3v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-3.3V";
+ 		regulator-min-microvolt = <3300000>;
+@@ -42,7 +42,7 @@
+ 		regulator-boot-on;
+ 	};
+ 
+-	vcc_sdhi0: regulator at 1 {
++	vcc_sdhi0: regulator-vcc-sdhi0 {
+ 		compatible = "regulator-fixed";
+ 
+ 		regulator-name = "SDHI0 Vcc";
+@@ -53,7 +53,7 @@
+ 		enable-active-high;
+ 	};
+ 
+-	vccq_sdhi0: regulator at 2 {
++	vccq_sdhi0: regulator-vccq-sdhi0 {
+ 		compatible = "regulator-gpio";
+ 
+ 		regulator-name = "SDHI0 VccQ";
+@@ -69,7 +69,7 @@
+ 		enable-active-high;
+ 	};
+ 
+-	reg_5p0v: regulator at 3 {
++	reg_5p0v: regulator-5p0v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-5.0V";
+ 		regulator-min-microvolt = <5000000>;
+@@ -127,7 +127,7 @@
  		};
-+
-+		L2_CA15: cache-controller at 0 {
-+			compatible = "cache";
-+			reg = <0>;
-+			clocks = <&cpg_clocks R8A73A4_CLK_Z>;
-+			power-domains = <&pd_a3sm>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+
-+		L2_CA7: cache-controller at 100 {
-+			compatible = "cache";
-+			reg = <100>;
-+			clocks = <&cpg_clocks R8A73A4_CLK_Z2>;
-+			power-domains = <&pd_a3km>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
  	};
  
- 	ptm {
-@@ -46,22 +64,6 @@
- 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
--	L2_CA15: cache-controller at 0 {
--		compatible = "cache";
--		clocks = <&cpg_clocks R8A73A4_CLK_Z>;
--		power-domains = <&pd_a3sm>;
--		cache-unified;
--		cache-level = <2>;
--	};
--
--	L2_CA7: cache-controller at 1 {
--		compatible = "cache";
--		clocks = <&cpg_clocks R8A73A4_CLK_Z2>;
--		power-domains = <&pd_a3km>;
--		cache-unified;
--		cache-level = <2>;
--	};
--
- 	dbsc1: memory-controller at e6790000 {
- 		compatible = "renesas,dbsc-r8a73a4";
- 		reg = <0 0xe6790000 0 0x10000>;
+-	i2c2: i2c at 2 {
++	i2c2: i2c2 {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		compatible = "i2c-gpio";
 -- 
 1.9.1
