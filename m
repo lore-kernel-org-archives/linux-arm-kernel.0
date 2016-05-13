@@ -1,47 +1,21 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 13 May 2016 12:23:00 +0530
-Subject: [RFC 0/9] IOMMU probe deferral support
-In-Reply-To: <f192d4a0-9e13-4ae2-d3da-058e2e092634@samsung.com>
-References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
- <f192d4a0-9e13-4ae2-d3da-058e2e092634@samsung.com>
-Message-ID: <000001d1ace4$1ac1e250$5045a6f0$@codeaurora.org>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Fri, 13 May 2016 12:33:28 +0530
+Subject: [PATCH v5 0/3] dmaengine: Add clock support for AXI DMAS
+Message-ID: <1463123011-4911-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+This patch series adds basic clock support for AXI DMAS
+This patch series is created on top of the dma-next branch.
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-
-> bounces at lists.infradead.org] On Behalf Of Marek Szyprowski
-> Sent: Thursday, May 12, 2016 6:23 PM
-> To: Sricharan R <sricharan@codeaurora.org>; will.deacon at arm.com;
-> robin.murphy at arm.com; joro at 8bytes.org; iommu at lists.linux-
-> foundation.org; linux-arm-kernel at lists.infradead.org;
-> laurent.pinchart at ideasonboard.com
-> Subject: Re: [RFC 0/9] IOMMU probe deferral support
-> 
-> Hello,
-> 
-> 
-> On 2016-04-25 17:58, Sricharan R wrote:
-> > This is mostly a repost of the probe deferral series from Laurent
-> > Pinchart [1]. Added a check to fix boot with ACPI.
-> > Adapted arm-smmu driver to work with deferred probing and added a new
-> > api for the below reason. This is based on the generic iommu binding
-> > series from Robin Murphy <robin.murphy@arm.com>.
-> 
-> Thanks for this patchset. I'm working on some serious rework in exynos
-> power domains and clocks support code and it turned out that I need this
-> feature to resolve probing order. It works fine on my internal tree, where
-> some iommu controllers cannot get their clocks early enough.
-> 
-> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> 
-   Thanks for testing. So the issue that I was facing also was the same
-where the iommu
-   controllers cannot get clocks early. So waiting for some suggestions if
-this is right/
-   or there is another way for doing this probe deferral?
+Kedareswara rao Appana (3):
+  dmaengine: vdma: Add config structure to differentiate dmas
+  Documentation: DT: vdma: Add clock support for dmas
+  dmaengine: vdma: Add clock support
 
-Regards,
- Sricharan
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |  15 +
+ drivers/dma/xilinx/xilinx_vdma.c                   | 307 ++++++++++++++++++---
+ 2 files changed, 289 insertions(+), 33 deletions(-)
+
+-- 
+2.1.1
