@@ -1,50 +1,103 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 May 2016 10:57:56 +0200
-Subject: [PATCH] serial: Make SERIAL_MPS2_UART depend on ARCH_MPS2
-In-Reply-To: <573591C6.1070106@arm.com>
-References: <1462906570-27684-1-git-send-email-geert+renesas@glider.be>
- <573591C6.1070106@arm.com>
-Message-ID: <CAMuHMdUCAyrK5hC+erph+6km8LL__3vd7Vr6SMo1N3FLN3zxHw@mail.gmail.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Fri, 13 May 2016 09:06:38 +0000
+Subject: [PATCH 3/3] mmc: core: support hs speed mode if hs200 mode fails
+In-Reply-To: <1461171092-30631-3-git-send-email-aisheng.dong@nxp.com>
+References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
+ <1461171092-30631-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1463130397.3151.13.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On Thu, 2016-04-21 at 00:51 +0800, Dong Aisheng wrote:
+> Currently if mmc_select_hs200 mode switch fails, MMC core
+> can only use legacy mode to run the card.
+> Let's retry HS speed mode if HS200 fails.
+> 
+> Before the fix:
+> mmc0: mmc_select_hs200 failed, error -74
+> : switch to mmc0 failed
+> mmc0: new MMC card at address 0001
+> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
+> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
+> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
+> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
+> ?mmcblk0: p1 p2
+> 
+> After the fix:
+> mmc0: mmc_select_hs200 failed, error -74
+> mmc0: new DDR MMC card at address 0001
+> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
+> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
+> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
+> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
+> ?mmcblk0: p1 p2
+> 
+> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+> ?drivers/mmc/core/mmc.c | 3 ++-
+> ?1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index 55c8201..b573dc7 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1315,7 +1315,8 @@ static int mmc_select_timing(struct mmc_card
+> *card)
+> ?
+> ?	if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200)
+> ?		err = mmc_select_hs200(card);
+> -	else if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS)
+> +
+> +	if (err && (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS))
+> ?		err = mmc_select_hs(card);
+> ?
+> ?	if (err && err != -EBADMSG)
 
-On Fri, May 13, 2016 at 10:35 AM, Vladimir Murzin
-<vladimir.murzin@arm.com> wrote:
-> On 10/05/16 19:56, Geert Uytterhoeven wrote:
->> Enabling support for the UART on the ARM MPS2 platform only make sense
->> when compiling for the ARM MPS2 platform, unless compile-testing.
->
-> What you said is true, but looking around (see SERIAL_STM32 for example)
-> I'm wondering what makes MPS2 so special flake?
 
-Nothing. SERIAL_STM32 should be fixed, too.
-I only fixed SERIAL_MPS2_UART, as it was a newly-introduced symbol.
+This seems to break on TK1 where eMMC so far was detected as an 8-bit
+high speed MMC card. With this patch it reverts to detecting a 1-bit only
+MMC card! This has been observed both on a NVIDIA's Jetson TK1 as well as
+our new Toradex Apalis TK1?(CC Tegra mailing list,?Jon Hunter and?Lucas
+Stach as well). So far T30 is not affected as there we are still doing
+full HS200 with whatever issues that has.
 
-> I was under impression that architecture/board specific guard must have
-> only if we have something like
->
-> #include <asm/xyz.h>
->
-> or
->
-> #include <mach/xyz.h>
->
-> which is not a case for device-tree driven MPS2 uart.
->
-> I have no idea what is practice for such things, so would be grateful to
-> get it known.
+Before:
+[????3.726894] sdhci: Secure Digital Host Controller Interface driver
+[????3.733081] sdhci: Copyright(c) Pierre Ossman
+[????3.737462] sdhci-pltfm: SDHCI platform and OF driver helper
+[????3.753411] mmc0: Unknown controller version (3). You may experience
+ problems.
+[????3.768345] mmc0: Invalid maximum block size, assuming 512 bytes
+[????3.814896] mmc0: SDHCI controller on 700b0600.sdhci [700b0600.sdhci]
+ using ADMA 64-bit
+[????3.892088] mmc0: new high speed MMC card at address 0001
+[????3.899194] mmcblk0: mmc0:0001 SEM16G 14.7 GiB
+[????3.904217] mmcblk0boot0: mmc0:0001 SEM16G partition 1 4.00 MiB
+[????3.910645] mmcblk0boot1: mmc0:0001 SEM16G partition 2 4.00 MiB
+[????3.917119] mmcblk0rpmb: mmc0:0001 SEM16G partition 3 4.00 MiB
+[????3.926006]??mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9
+root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios?
+clock:??????????52000000 Hz
+actual clock:???51000000 Hz
+vdd:????????????21 (3.3 ~ 3.4 V)
+bus mode:???????2 (push-pull)
+chip select:????0 (don't care)
+power mode:?????2 (on)
+bus width:??????3 (8 bits)
+timing spec:????1 (mmc high-speed)
+signal voltage: 0 (3.30 V)
+driver type:????0 (driver type B)
 
-That's why there's an "|| COMPILE_TEST" in the dependency.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+After:
+[????3.899918] mmc0: new MMC card at address 0001
+root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios?
+clock:??????????25000000 Hz
+actual clock:???24727273 Hz
+vdd:????????????21 (3.3 ~ 3.4 V)
+bus mode:???????2 (push-pull)
+chip select:????0 (don't care)
+power mode:?????2 (on)
+bus width:??????0 (1 bits)
+timing spec:????0 (legacy)
+signal voltage: 0 (3.30 V)
+driver type:????0 (driver type B)
