@@ -1,34 +1,46 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 14 May 2016 19:51:28 +0200
-Subject: [PATCH 2/3] mfd: axp20x: Extend axp22x_volatile_ranges
+Date: Sat, 14 May 2016 19:51:29 +0200
+Subject: [PATCH 3/3] mfd: axp20x: Add axp20x-usb-power-supply for axp22x pmics
 In-Reply-To: <1463248289-16456-1-git-send-email-hdegoede@redhat.com>
 References: <1463248289-16456-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1463248289-16456-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1463248289-16456-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The axp22x pmic has a bunch of volatile registers besides the interrupt
-ones, extend axp22x_volatile_ranges with these.
+Add axp20x-usb-power-supply for axp22x pmics.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/mfd/axp20x.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/mfd/axp20x.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index e4e3297..ca04361 100644
+index ca04361..d62209d 100644
 --- a/drivers/mfd/axp20x.c
 +++ b/drivers/mfd/axp20x.c
-@@ -93,7 +93,10 @@ static const struct regmap_range axp22x_writeable_ranges[] = {
+@@ -160,6 +160,11 @@ static struct resource axp20x_usb_power_supply_resources[] = {
+ 	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
  };
  
- static const struct regmap_range axp22x_volatile_ranges[] = {
-+	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
- 	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
-+	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
-+	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
++static struct resource axp22x_usb_power_supply_resources[] = {
++	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
++	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
++};
++
+ static struct resource axp22x_pek_resources[] = {
+ 	{
+ 		.name   = "PEK_DBR",
+@@ -527,6 +532,11 @@ static struct mfd_cell axp22x_cells[] = {
+ 		.resources		= axp22x_pek_resources,
+ 	}, {
+ 		.name			= "axp20x-regulator",
++	}, {
++		.name		= "axp20x-usb-power-supply",
++		.of_compatible	= "x-powers,axp202-usb-power-supply",
++		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
++		.resources	= axp22x_usb_power_supply_resources,
+ 	},
  };
  
- static const struct regmap_access_table axp22x_writeable_table = {
 -- 
 2.7.4
