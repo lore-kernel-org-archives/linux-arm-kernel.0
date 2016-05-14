@@ -1,93 +1,82 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Fri, 13 May 2016 18:41:44 -0700
-Subject: [PATCH v2 4/5] drivers: net: xgene: fix statistics counters
- race condition
-In-Reply-To: <1463183581-30475-5-git-send-email-isubramanian@apm.com>
-References: <1463183581-30475-1-git-send-email-isubramanian@apm.com>
- <1463183581-30475-5-git-send-email-isubramanian@apm.com>
-Message-ID: <1463190104.18194.3.camel@edumazet-glaptop3.roam.corp.google.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Sat, 14 May 2016 11:36:14 +0800
+Subject: [PATCH 2/2] clk: rockchip: fix incorrect parent for rk3399's
+ {c,g}pll_aclk_perihp_src
+In-Reply-To: <CAD=FV=XstYhqpStSGw5PObWvpsvd3Nwp_hfEE-56bpFoVUyu+g@mail.gmail.com>
+References: <1463164937-91089-1-git-send-email-briannorris@chromium.org>
+ <1463164937-91089-2-git-send-email-briannorris@chromium.org>
+ <CAD=FV=XstYhqpStSGw5PObWvpsvd3Nwp_hfEE-56bpFoVUyu+g@mail.gmail.com>
+Message-ID: <57369D2E.3030002@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2016-05-13 at 16:53 -0700, Iyappan Subramanian wrote:
-> This patch fixes the race condition on updating the statistics
-> counters by moving the counters to the ring structure.
-> 
+Hi Doug,
 
-...
+On 2016?05?14? 04:10, Doug Anderson wrote:
+> Hi,
+>
+> On Fri, May 13, 2016 at 11:42 AM, Brian Norris <briannorris@chromium.org> wrote:
+>> From: Xing Zheng <zhengxing@rock-chips.com>
+>>
+>> There was a typo, swapping 'c' <--> 'g'.
+>>
+>> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+>> Signed-off-by: Brian Norris <briannorris@chromium.org>
+>> ---
+>>   drivers/clk/rockchip/clk-rk3399.c | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+>> index 145756c4f3c8..9f86bfef70f7 100644
+>> --- a/drivers/clk/rockchip/clk-rk3399.c
+>> +++ b/drivers/clk/rockchip/clk-rk3399.c
+>> @@ -832,9 +832,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+>>                          RK3399_CLKGATE_CON(13), 1, GFLAGS),
+>>
+>>          /* perihp */
+>> -       GATE(0, "cpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
+>> +       GATE(0, "cpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
+>>                          RK3399_CLKGATE_CON(5), 0, GFLAGS),
+>> -       GATE(0, "gpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
+>> +       GATE(0, "gpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
+>>                          RK3399_CLKGATE_CON(5), 1, GFLAGS),
+>>          COMPOSITE(ACLK_PERIHP, "aclk_perihp", mux_aclk_perihp_p, CLK_IGNORE_UNUSED,
+>>                          RK3399_CLKSEL_CON(14), 7, 1, MFLAGS, 0, 5, DFLAGS,
+> Definitely there was a bug since this table itself was inconsistent.
+> ...and I _think_ this fix is correct, but I'll note that the TRM has
+> more inconsistency here.
+>
+> In the big clock table 'CRU Clock Architecture Diagram', I see:
+>    CLK 4 is CPLL
+>    CLK 5 is GPLL
+>    CLK 125 is aclk_perihp_cpll_src and has 4 (CPLL) as source, with
+> g5[0] as the bit
+>    CLK 126 is aclk_perihp_gpll_src and has 5 (GPLL) as source, with
+> g5[1] as the bit
+>
+> In the definition of CRU_CLKGATE_CON5:
+>    bit 0 shows aclk_perihp_gpll_src_en
+>    bit 1 shows aclk_perihp_cpll_src_en
+>
+>
+> Thus the table shows CPLL as gate5[0] and GPLL as gate5[1].  The
+> register definition shows the opposite.  I'll tend to believe the
+> table over the register definition, but I figured I'd bring it up
+> anyway.
+>
+>
+> Xing Zheng: can you confirm that the table is correct and ask
+> documentation folks to fix the register definition for
+> CRU_CLKGATE_CON5?
+Yes, previously, our IC & DOC partner confirmed that the definition of 
+CRU_CLKGATE_CON5 should be:
+   bit 0 shows aclk_perihp_cpll_src_en
+   bit 1 shows aclk_perihp_gpll_src_en
 
-> @@ -1127,12 +1127,31 @@ static struct rtnl_link_stats64 *xgene_enet_get_stats64(
->  {
->  	struct xgene_enet_pdata *pdata = netdev_priv(ndev);
->  	struct rtnl_link_stats64 *stats = &pdata->stats;
-> +	struct xgene_enet_desc_ring *ring;
-> +	int i;
-> +
-> +	memset(stats, 0, sizeof(struct rtnl_link_stats64));
+Sorry to the incorrect register definition, we will fix them and review 
+the TRM again.
 
-The memset() should already be done in the caller.
+Thanks.
 
-> +	for (i = 0; i < pdata->txq_cnt; i++) {
-> +		ring = pdata->tx_ring[i];
-> +		if (ring) {
-> +			stats->tx_packets += ring->tx_packets;
-> +			stats->tx_bytes += ring->tx_bytes;
-> +		}
-> +	}
->  
-> -	stats->rx_errors += stats->rx_length_errors +
-> -			    stats->rx_crc_errors +
-> -			    stats->rx_frame_errors +
-> -			    stats->rx_fifo_errors;
-
-
-Right, this piece was completely buggy.
-
-Not a race, but rx_errors was growing every time stats were fetched on
-this device.
-
-
-stats->rx_errors =   sum(...)    was probably the intent.
-
-
-
-> -	memcpy(storage, &pdata->stats, sizeof(struct rtnl_link_stats64));
-> +	for (i = 0; i < pdata->rxq_cnt; i++) {
-> +		ring = pdata->rx_ring[i];
-> +		if (ring) {
-> +			stats->rx_packets += ring->rx_packets;
-> +			stats->rx_bytes += ring->rx_bytes;
-> +			stats->rx_errors += ring->rx_length_errors +
-> +				ring->rx_crc_errors +
-> +				ring->rx_frame_errors +
-> +				ring->rx_fifo_errors;
-> +			stats->rx_dropped += ring->rx_dropped;
-> +		}
-> +	}
-> +	memcpy(storage, stats, sizeof(struct rtnl_link_stats64));
->  
->  	return storage;
->  }
-> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-> index cc40c30..092fbec 100644
-> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
-> @@ -121,6 +121,16 @@ struct xgene_enet_desc_ring {
->  		struct xgene_enet_raw_desc16 *raw_desc16;
->  	};
->  	__le64 *exp_bufs;
-> +	u64 tx_packets;
-> +	u64 tx_bytes;
-> +	u64 rx_packets;
-> +	u64 rx_bytes;
-> +	u64 rx_dropped;
-> +	u64 rx_errors;
-> +	u64 rx_length_errors;
-> +	u64 rx_crc_errors;
-> +	u64 rx_frame_errors;
-> +	u64 rx_fifo_errors;
-
-Note that there is still a race on 32bit arches.
-
-It seems this driver should really use "unsigned long" counters and
-provide standard ndo_get_stats()
+-- 
+- Xing Zheng
