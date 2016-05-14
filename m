@@ -1,10 +1,10 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Sat, 14 May 2016 17:09:47 +0200
+Date: Sat, 14 May 2016 17:11:20 +0200
 Subject: [RFC PATCH 0/3] Amlogic: GXBB: Add reset controller
 In-Reply-To: <1463148012-25988-1-git-send-email-narmstrong@baylibre.com> (Neil
  Armstrong's message of "Fri, 13 May 2016 16:00:09 +0200")
 References: <1463148012-25988-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m2h9e01xs4.fsf@baylibre.com>
+Message-ID: <m2eg941xpj.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
