@@ -1,26 +1,30 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 May 2016 19:01:23 +0200
-Subject: [PATCH v4 1/3] ARM64: dts: rockchip: make rk3399's grf a
- "simple-mfd"
-In-Reply-To: <1463177524-113856-1-git-send-email-briannorris@chromium.org>
-References: <1463177524-113856-1-git-send-email-briannorris@chromium.org>
-Message-ID: <2246118.hzaJHK3UnE@phil>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Sat, 14 May 2016 10:45:54 -0700
+Subject: [RFC PATCH 1/3] reset: Add support for the Amlogic Meson GXBB
+ Reset Controller
+In-Reply-To: <1463148012-25988-2-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Fri, 13 May 2016 16:00:10 +0200")
+References: <1463148012-25988-1-git-send-email-narmstrong@baylibre.com>
+ <1463148012-25988-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hzirsh6st.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 13. Mai 2016, 15:12:02 schrieb Brian Norris:
-> Per the examples in
-> Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt, we need the
-> grf node to be a simple-mfd in order to properly enumerate child devices
-> like our eMMC PHY.
-> 
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-applied all 3 for 4.8 with the received Reviews.
+> This patch adds the platform driver for the Amlogic Meson GXBB Reset
+> Controller.
+>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
-Please keep the arm64 lower-case and carry over already received 
-Acks/Reviews (Shawn and Doug on patch2 in v2).
+[...]
 
+> +struct meson_gxbb_reset {
+> +	void *reg_base;
 
-Thanks
-Heiko
+nit: along wit the readw/writel, this should be void __iomem *.
+
+> +	struct reset_controller_dev rcdev;
+> +};
+
+Kevin
