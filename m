@@ -1,81 +1,121 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 14 May 2016 14:45:04 +0200
-Subject: [PATCH v2 1/2] musb: sunxi: Add set_mode platform function
-Message-ID: <1463229905-26387-1-git-send-email-hdegoede@redhat.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sat, 14 May 2016 15:49:50 +0300
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <20160512131948.GA30205@yury-N73SV>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <2733875.IzutTZKHMc@wuerfel> <57347BD4.8010105@huawei.com>
+ <4521594.dSmlmmAdFg@wuerfel> <20160512131948.GA30205@yury-N73SV>
+Message-ID: <20160514124950.GA27841@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the mode handling to the platform_set_mode callback.
+On Thu, May 12, 2016 at 04:19:48PM +0300, Yury Norov wrote:
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--No changes
----
- drivers/usb/musb/sunxi.c | 30 +++++++++++++++++++-----------
- 1 file changed, 19 insertions(+), 11 deletions(-)
+[...]
 
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index fdab423..2c33d9b 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -264,15 +264,6 @@ static int sunxi_musb_init(struct musb *musb)
- 	if (ret)
- 		goto error_unregister_notifier;
+> > I think that's a good idea. The function used to be slightly different
+> > for each architecture, but now it seems we have a significant number
+> > of identical implementations that we could just merge them together
+> > into one.
+> > 
+> > sys_mmap_pgoff was originally introduced as the common implementation
+> > and it reduced the amount of duplication a lot, but as its units
+> > are based on PAGE_SIZE rather than hardwired 4096 bytes, it's
+> > not as useful.
+> > 
+> 
+> microblaze and mips (twice) are doing like this. And aarh32 as well,
+> in arch/arm64/kernel/entry32.S
+> 
+> In previous submissions it was a patch that shares aarch32 code to
+> ilp32. If we decided turn around again, I think, we'd pick up that patch.
+> 
+> The other option is to make this hack generic, as so many arches use it.
+
+Hi again,
+
+I picked up that old patch from Jan, and found that it doesn't delouse
+addr and length, which is wrong for ilp32. So now I think we'd pick
+Bamvor version.
+
+Jan's patch (rebased) is attached for reference.
+
+Yury.
+
+
+>From 02ad258662c40d457ac041634e67e1cbdbb800f3 Mon Sep 17 00:00:00 2001
+From: Jan Dakinevich <jan.dakinevich@gmail.com>
+Date: Tue, 3 Nov 2015 02:30:41 +0300
+Subject: ilp32: common 32-bit wrappers
+
+Signed-off-by: Jan Dakinevich <jan.dakinevich@gmail.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 9dfdf86..2319042 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -30,6 +30,7 @@ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   ../../arm/kernel/opcodes.o binfmt_elf32.o
+ arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
++arm64-obj-$(CONFIG_COMPAT)		+= entry32-common.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+diff --git a/arch/arm64/kernel/entry32-common.S b/arch/arm64/kernel/entry32-common.S
+new file mode 100644
+index 0000000..1a0abe3
+--- /dev/null
++++ b/arch/arm64/kernel/entry32-common.S
+@@ -0,0 +1,23 @@
++#include <linux/linkage.h>
++#include <linux/const.h>
++
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
++#include <asm/errno.h>
++#include <asm/page.h>
++
++/*
++ * Note: off_4k (w5) is always in units of 4K. If we can't do the
++ * requested offset because it is not page-aligned, we return -EINVAL.
++ */
++ENTRY(compat_sys_mmap2_wrapper)
++#if PAGE_SHIFT > 12
++	tst	w5, #~PAGE_MASK >> 12
++	b.ne	1f
++	lsr	w5, w5, #PAGE_SHIFT - 12
++#endif
++	b	sys_mmap_pgoff
++1:	mov	x0, #-EINVAL
++	ret
++ENDPROC(compat_sys_mmap2_wrapper)
++
+diff --git a/arch/arm64/kernel/entry32.S b/arch/arm64/kernel/entry32.S
+index f332d5d..58cb5b0 100644
+--- a/arch/arm64/kernel/entry32.S
++++ b/arch/arm64/kernel/entry32.S
+@@ -55,21 +55,6 @@ ENTRY(compat_sys_fstatfs64_wrapper)
+ ENDPROC(compat_sys_fstatfs64_wrapper)
  
--	if (musb->port_mode == MUSB_PORT_MODE_HOST) {
--		ret = phy_power_on(glue->phy);
--		if (ret)
--			goto error_phy_exit;
--		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
--		/* Stop musb work from turning vbus off again */
--		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
--	}
+ /*
+- * Note: off_4k (w5) is always in units of 4K. If we can't do the
+- * requested offset because it is not page-aligned, we return -EINVAL.
+- */
+-ENTRY(compat_sys_mmap2_wrapper)
+-#if PAGE_SHIFT > 12
+-	tst	w5, #~PAGE_MASK >> 12
+-	b.ne	1f
+-	lsr	w5, w5, #PAGE_SHIFT - 12
+-#endif
+-	b	sys_mmap_pgoff
+-1:	mov	x0, #-EINVAL
+-	ret
+-ENDPROC(compat_sys_mmap2_wrapper)
 -
- 	musb->isr = sunxi_musb_interrupt;
- 
- 	/* Stop the musb-core from doing runtime pm (not supported on sunxi) */
-@@ -280,8 +271,6 @@ static int sunxi_musb_init(struct musb *musb)
- 
- 	return 0;
- 
--error_phy_exit:
--	phy_exit(glue->phy);
- error_unregister_notifier:
- 	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
- 		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-@@ -323,6 +312,24 @@ static int sunxi_musb_exit(struct musb *musb)
- 	return 0;
- }
- 
-+static int sunxi_set_mode(struct musb *musb, u8 mode)
-+{
-+	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-+	int ret;
-+
-+	if (mode == MUSB_HOST) {
-+		ret = phy_power_on(glue->phy);
-+		if (ret)
-+			return ret;
-+
-+		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
-+		/* Stop musb work from turning vbus off again */
-+		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
-+	}
-+
-+	return 0;
-+}
-+
- static void sunxi_musb_enable(struct musb *musb)
- {
- 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-@@ -569,6 +576,7 @@ static const struct musb_platform_ops sunxi_musb_ops = {
- 	.exit		= sunxi_musb_exit,
- 	.enable		= sunxi_musb_enable,
- 	.disable	= sunxi_musb_disable,
-+	.set_mode	= sunxi_set_mode,
- 	.fifo_offset	= sunxi_musb_fifo_offset,
- 	.ep_offset	= sunxi_musb_ep_offset,
- 	.busctl_offset	= sunxi_musb_busctl_offset,
--- 
-2.7.4
+-/*
+  * Wrappers for AArch32 syscalls that either take 64-bit parameters
+  * in registers or that take 32-bit parameters which require sign
+  * extension.
