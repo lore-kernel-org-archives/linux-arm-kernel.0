@@ -1,244 +1,346 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 14 May 2016 11:50:50 +0200
-Subject: [RFC PATCH 2/7] ALSA: ac97: add an ac97 bus
-In-Reply-To: <s5hk2j38tmf.wl-tiwai@suse.de> (Takashi Iwai's message of "Mon,
- 09 May 2016 11:31:52 +0200")
-References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
- <1462050939-27940-3-git-send-email-robert.jarzmik@free.fr>
- <s5hk2j38tmf.wl-tiwai@suse.de>
-Message-ID: <87twi1hssl.fsf@belgarion.home>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Sat, 14 May 2016 15:50:31 +0530
+Subject: [PATCH] dmaengine: vdma: Add support for cyclic dma mode
+Message-ID: <1463221231-30374-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Takashi Iwai <tiwai@suse.de> writes:
+This patch adds support for AXI DMA cyclic dma mode.
+In cyclic mode, DMA fetches and processes the same
+BDs without interruption. The DMA continues to fetch and process
+until it is stopped or reset.
 
-> On Sat, 30 Apr 2016 23:15:34 +0200,
-> Robert Jarzmik wrote:
->> 
->> diff --git a/include/sound/ac97/codec.h b/include/sound/ac97/codec.h
->> new file mode 100644
->> index 000000000000..4b8b3e570892
->> --- /dev/null
->> +++ b/include/sound/ac97/codec.h
->> @@ -0,0 +1,98 @@
->> +/*
->> + *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
->> +#ifndef AC97_CODEC_H
->> +#define AC97_CODEC_H
->
-> Let's be careful about the choice of the guard.
-Ok, would _SND_AC97_CODEC_H be better ?
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+ drivers/dma/xilinx/xilinx_vdma.c | 179 +++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 174 insertions(+), 5 deletions(-)
 
->> +#define AC97_ID(vendor_id1, vendor_id2) \
->> +	(((vendor_id1 & 0xffff) << 16) | (vendor_id2 & 0xffff))
->> +#define AC97_DRIVER_ID(vendor_id1, vendor_id2, mask_id1, mask_id2, _data) \
->> +	{ .id = ((vendor_id1 & 0xffff) << 16) | (vendor_id2 & 0xffff), \
->> +	  .mask = ((mask_id1 & 0xffff) << 16) | (mask_id2 & 0xffff), \
->> +	  .data = _data }
->
-> Give parentheses around the macro arguments.
-Right, for RFC v2.
-
->> +struct ac97_codec_device {
->> +	struct device		dev;	/* Must stay first member */
->
-> This doesn't have to be the first element as long as you use container_of().
-Ah yes, that's a leftover from a former idea, I'll remove that comment.
-
-In the initial code I'd done "struct ac97_codec_device" was hidden from this
-file (ie. there was only a "struct ac97_codec_device;" statement), the body of
-the struct was contained in sound/ac97/ac97_core.h.
-
-The only provided macro to access the "struct device" inside "struct
-ac97_codec_device" was relying on this "trick" (that's a bit like in the
-video4linux area).
-
-Anyway, good point, I'll remove that.
-
->> +struct ac97_codec_driver {
->> +	struct device_driver	driver;
->> +	int			(*probe)(struct ac97_codec_device *);
->> +	int			(*remove)(struct ac97_codec_device *);
->> +	int			(*suspend)(struct ac97_codec_device *);
->> +	int			(*resume)(struct ac97_codec_device *);
->> +	void			(*shutdown)(struct ac97_codec_device *);
->> +	struct ac97_id		*id_table;
->
-> Missing const?
-Ah no, unfortunately not, or rather not yet.
-
-I tried that one, not very hard, but at least ac97_bus_match() with the pair
-"struct ac97_id *id = adrv->id_table" and "do { } while (++id->id);" is not
-possible AFAIK with a const.
-
-I will see if I can come up with something better for ac97_bus_match, such as
-array usage instead of pointer arithmetics.
-
->> +};
->> +
->> +int ac97_codec_driver_register(struct ac97_codec_driver *drv);
->> +void ac97_codec_driver_unregister(struct ac97_codec_driver *drv);
->> +
->> +static inline struct device *
->> +ac97_codec_dev2dev(const struct ac97_codec_device *adev)
->> +{
->> +	return (struct device *)(adev);
->
-> What's wrong with the simple &adev->dev ?  Cast looks scary.
-The same leftover than above, I'll change that for RFC v2.
-
->> +struct ac97_controller {
->> +	const struct ac97_controller_ops *ops;
->> +	struct list_head controllers;
->> +	struct device *dev;
->> +	int bus_idx;
->
-> What is this bus_idx for?
-Initially it was to distinguish 2 different AC97 controllers. In the current
-patchset state, it's not usefull anymore AFAICS.
-So let's remove it.
-
->> +	int bound_codecs;
-The same comment would apply here. I don't think that information is important
-anymore. I thought I would use that to prevent AC97 controler removal while
-codecs are still bound.
-
-In a second thought what would be better is to have get_device() called for each
-bound codec which will prevent ac97_digital_controller_unregister() to succeed
-(-EBUSY).
-
->> +	struct list_head codecs;
->> +};
->> +
->> +int ac97_digital_controller_register(const struct ac97_controller_ops *ops,
->> +				     struct device *dev);
->> +int ac97_digital_controller_unregister(const struct device *dev);
->> +
->> +#endif
->> diff --git a/sound/ac97/Kconfig b/sound/ac97/Kconfig
->> new file mode 100644
->> index 000000000000..fd2c2d031e62
->> --- /dev/null
->> +++ b/sound/ac97/Kconfig
->> @@ -0,0 +1,9 @@
->> +#
->> +# PCI configuration
->> +#
->  
-> Still only for PCI? :)
-Ouch ;) I'll amend that for RFC v2.
->
->> +
->> +config AC97
->> +	bool "AC97 bus"
->> +	help
->> +	   Say Y here if you want to have AC97 devices, which are sound oriented
->> +	   devices around an AC-Link.
->> diff --git a/sound/ac97/Makefile b/sound/ac97/Makefile
->> new file mode 100644
->> index 000000000000..5575909d46e2
->> --- /dev/null
->> +++ b/sound/ac97/Makefile
->> @@ -0,0 +1,5 @@
->> +#
->> +# make for AC97 bus drivers
->> +#
->> +
->> +obj-y	+= bus.o codec.o snd_ac97_compat.o
->
-> No possibility for modules?
-There should be, so I'll put that on my TODO list for RFC v2.
-
->> +static struct ac97_codec_device *
->> +ac97_codec_find(struct ac97_controller *ac97_ctrl, int codec_num)
->> +{
->> +	struct ac97_codec_device *codec;
->> +
->> +	list_for_each_entry(codec, &ac97_ctrl->codecs, list)
->> +		if (codec->num == codec_num)
->> +			return codec;
->> +
->> +	return NULL;
->> +}
->
-> It's a question whether we need to manage the codecs in the linked
-> list.  There can be at most 4 codecs, so it fits in an array well,
-> too.  Then some codes like this would be simpler. (And it'll even
-> reduce the footprint, too.)
-Agreed. For RFC v2.
-
->> +unsigned int ac97_bus_scan_one(struct ac97_controller *ac97,
->> +				      int codec_num)
->> +{
->> +	struct ac97_codec_device codec;
->> +	unsigned short vid1, vid2;
->> +	int ret;
->> +
->> +	codec.dev = *ac97->dev;
->> +	codec.num = codec_num;
->> +	ret = ac97->ops->read(&codec, AC97_VENDOR_ID1);
->> +	vid1 = (ret & 0xffff);
->> +	if (ret < 0)
->> +		return 0;
->
-> Hmm.  This looks pretty hackish and dangerous.
-You mean returning 0 even if the read failed, right ?
-A better prototype would probably be (for RFC v2):
-  int ac97_bus_scan_one(struct ac97_controller *ac97, int codec_num,
-                        unsigned int *vendor_id);
-
->> +static int ac97_bus_scan(struct ac97_controller *ac97_ctrl)
->> +{
->> +	int ret, i;
->> +	unsigned int vendor_id;
->> +
->> +	for (i = 0; i < AC97_BUS_MAX_CODECS; i++) {
->> +		if (ac97_codec_find(ac97_ctrl, i))
->> +			continue;
->> +		vendor_id = ac97_bus_scan_one(ac97_ctrl, i);
->> +		if (!vendor_id)
->> +			continue;
->> +
->> +		ret = ac97_codec_add(ac97_ctrl, i, vendor_id);
->> +		if (ret < 0)
->> +			return ret;
->
-> This is one of concerns: we don't know whether the device really
-> reacts well if you access to a non-existing slot.  At least, it'd be
-> safer to have the masks for the devices we already know the slots.
-
-Ah you mean upon ac97 controller registration, the
-ac97_digital_controller_register() should provide the information for each of
-the 4 slots :
- - does the controller enable this slot (default yes)
- - does the controller support auto-scan for this slot (default yes)
-   I'm not sure this "feature" is required, it looks a bit over-engineered.
-
-That could be a matter of 1 or 2 masks as input parameters to
-ac97_digital_controller_register().
-
->> +static int ac97_bus_reset(struct ac97_controller *ac97_ctrl)
->> +{
->> +	struct ac97_codec_device codec;
->> +
->> +	memset(&codec, 0, sizeof(codec));
->> +	codec.dev = *ac97_ctrl->dev;
->> +
->> +	ac97_ctrl->ops->reset(&codec);
->
-> So, this assumes that reset ops is mandatory?  Then document it at
-> least.
-Ok, for RFC v2.
-
-Thanks for your review and feedbacks Takashi, I'll work on both Mark and your
-comments in the next weeks.
-
-Cheers.
-
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index df91185..5a43409 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -157,6 +157,7 @@
+ /* AXI DMA Specific Masks/Bit fields */
+ #define XILINX_DMA_MAX_TRANS_LEN	GENMASK(22, 0)
+ #define XILINX_DMA_CR_COALESCE_MAX	GENMASK(23, 16)
++#define XILINX_DMA_CR_CYCLIC_BD_EN_MASK	BIT(4)
+ #define XILINX_DMA_CR_COALESCE_SHIFT	16
+ #define XILINX_DMA_BD_SOP		BIT(27)
+ #define XILINX_DMA_BD_EOP		BIT(26)
+@@ -278,11 +279,13 @@ struct xilinx_cdma_tx_segment {
+  * @async_tx: Async transaction descriptor
+  * @segments: TX segments list
+  * @node: Node in the channel descriptors list
++ * @cyclic: Check for cyclic transfers.
+  */
+ struct xilinx_dma_tx_descriptor {
+ 	struct dma_async_tx_descriptor async_tx;
+ 	struct list_head segments;
+ 	struct list_head node;
++	bool cyclic;
+ };
+ 
+ /**
+@@ -302,6 +305,7 @@ struct xilinx_dma_tx_descriptor {
+  * @direction: Transfer direction
+  * @num_frms: Number of frames
+  * @has_sg: Support scatter transfers
++ * @cyclic: Check for cyclic transfers.
+  * @genlock: Support genlock mode
+  * @err: Channel has errors
+  * @tasklet: Cleanup work after irq
+@@ -312,6 +316,7 @@ struct xilinx_dma_tx_descriptor {
+  * @desc_submitcount: Descriptor h/w submitted count
+  * @residue: Residue for AXI DMA
+  * @seg_v: Statically allocated segments base
++ * @cyclic_seg_v: Statically allocated segment base for cyclic transfers
+  * @start_transfer: Differentiate b/w DMA IP's transfer
+  */
+ struct xilinx_dma_chan {
+@@ -330,6 +335,7 @@ struct xilinx_dma_chan {
+ 	enum dma_transfer_direction direction;
+ 	int num_frms;
+ 	bool has_sg;
++	bool cyclic;
+ 	bool genlock;
+ 	bool err;
+ 	struct tasklet_struct tasklet;
+@@ -340,6 +346,7 @@ struct xilinx_dma_chan {
+ 	u32 desc_submitcount;
+ 	u32 residue;
+ 	struct xilinx_axidma_tx_segment *seg_v;
++	struct xilinx_axidma_tx_segment *cyclic_seg_v;
+ 	void (*start_transfer)(struct xilinx_dma_chan *chan);
+ };
+ 
+@@ -474,6 +481,7 @@ xilinx_vdma_alloc_tx_segment(struct xilinx_dma_chan *chan)
+ 	if (!segment)
+ 		return NULL;
+ 
++	memset(segment, 0, sizeof(*segment));
+ 	segment->phys = phys;
+ 
+ 	return segment;
+@@ -660,13 +668,37 @@ static void xilinx_dma_free_chan_resources(struct dma_chan *dchan)
+ 	dev_dbg(chan->dev, "Free all channel resources.\n");
+ 
+ 	xilinx_dma_free_descriptors(chan);
+-	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA)
++	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
++		xilinx_dma_free_tx_segment(chan, chan->cyclic_seg_v);
+ 		xilinx_dma_free_tx_segment(chan, chan->seg_v);
++	}
+ 	dma_pool_destroy(chan->desc_pool);
+ 	chan->desc_pool = NULL;
+ }
+ 
+ /**
++ * xilinx_dma_chan_handle_cyclic - Cyclic dma callback
++ * @chan: Driver specific dma channel
++ * @desc: dma transaction descriptor
++ * @flags: flags for spin lock
++ */
++static void xilinx_dma_chan_handle_cyclic(struct xilinx_dma_chan *chan,
++					  struct xilinx_dma_tx_descriptor *desc,
++					  unsigned long *flags)
++{
++	dma_async_tx_callback callback;
++	void *callback_param;
++
++	callback = desc->async_tx.callback;
++	callback_param = desc->async_tx.callback_param;
++	if (callback) {
++		spin_unlock_irqrestore(&chan->lock, *flags);
++		callback(callback_param);
++		spin_lock_irqsave(&chan->lock, *flags);
++	}
++}
++
++/**
+  * xilinx_dma_chan_desc_cleanup - Clean channel descriptors
+  * @chan: Driver specific DMA channel
+  */
+@@ -681,6 +713,11 @@ static void xilinx_dma_chan_desc_cleanup(struct xilinx_dma_chan *chan)
+ 		dma_async_tx_callback callback;
+ 		void *callback_param;
+ 
++		if (desc->cyclic) {
++			xilinx_dma_chan_handle_cyclic(chan, desc, &flags);
++			break;
++		}
++
+ 		/* Remove from the list of running transactions */
+ 		list_del(&desc->node);
+ 
+@@ -757,7 +794,7 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
+ 		return -ENOMEM;
+ 	}
+ 
+-	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA)
++	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
+ 		/*
+ 		 * For AXI DMA case after submitting a pending_list, keep
+ 		 * an extra segment allocated so that the "next descriptor"
+@@ -768,6 +805,15 @@ static int xilinx_dma_alloc_chan_resources(struct dma_chan *dchan)
+ 		 */
+ 		chan->seg_v = xilinx_axidma_alloc_tx_segment(chan);
+ 
++		/*
++		 * For cyclic DMA mode we need to program the tail Descriptor
++		 * register with a value which is not a part of the BD chain
++		 * so allocating a desc segment during channel allocation for
++		 * programming tail descriptor.
++		 */
++		chan->cyclic_seg_v = xilinx_axidma_alloc_tx_segment(chan);
++	}
++
+ 	dma_cookie_init(dchan);
+ 
+ 	if (chan->xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
+@@ -1157,8 +1203,12 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 
+ 	/* Start the transfer */
+ 	if (chan->has_sg) {
+-		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+-			       tail_segment->phys);
++		if (chan->cyclic)
++			dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
++				       chan->cyclic_seg_v->phys);
++		else
++			dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
++				       tail_segment->phys);
+ 	} else {
+ 		struct xilinx_axidma_tx_segment *segment;
+ 		struct xilinx_axidma_desc_hw *hw;
+@@ -1209,7 +1259,8 @@ static void xilinx_dma_complete_descriptor(struct xilinx_dma_chan *chan)
+ 
+ 	list_for_each_entry_safe(desc, next, &chan->active_list, node) {
+ 		list_del(&desc->node);
+-		dma_cookie_complete(&desc->async_tx);
++		if (!desc->cyclic)
++			dma_cookie_complete(&desc->async_tx);
+ 		list_add_tail(&desc->node, &chan->done_list);
+ 	}
+ }
+@@ -1397,6 +1448,11 @@ static dma_cookie_t xilinx_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+ 	unsigned long flags;
+ 	int err;
+ 
++	if (chan->cyclic) {
++		xilinx_dma_free_tx_descriptor(chan, desc);
++		return -EBUSY;
++	}
++
+ 	if (chan->err) {
+ 		/*
+ 		 * If reset fails, need to hard reset the system.
+@@ -1414,6 +1470,9 @@ static dma_cookie_t xilinx_dma_tx_submit(struct dma_async_tx_descriptor *tx)
+ 	/* Put this transaction onto the tail of the pending queue */
+ 	append_desc_queue(chan, desc);
+ 
++	if (desc->cyclic)
++		chan->cyclic = true;
++
+ 	spin_unlock_irqrestore(&chan->lock, flags);
+ 
+ 	return cookie;
+@@ -1669,12 +1728,112 @@ error:
+ }
+ 
+ /**
++ * xilinx_dma_prep_dma_cyclic - prepare descriptors for a DMA_SLAVE transaction
++ * @chan: DMA channel
++ * @sgl: scatterlist to transfer to/from
++ * @sg_len: number of entries in @scatterlist
++ * @direction: DMA direction
++ * @flags: transfer ack flags
++ */
++static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
++	struct dma_chan *dchan, dma_addr_t buf_addr, size_t buf_len,
++	size_t period_len, enum dma_transfer_direction direction,
++	unsigned long flags)
++{
++	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
++	struct xilinx_dma_tx_descriptor *desc;
++	struct xilinx_axidma_tx_segment *segment, *head_segment, *prev = NULL;
++	size_t copy, sg_used;
++	unsigned int num_periods;
++	int i;
++	u32 reg;
++
++	num_periods = buf_len / period_len;
++
++	if (!is_slave_direction(direction))
++		return NULL;
++
++	/* Allocate a transaction descriptor. */
++	desc = xilinx_dma_alloc_tx_descriptor(chan);
++	if (!desc)
++		return NULL;
++
++	chan->direction = direction;
++	dma_async_tx_descriptor_init(&desc->async_tx, &chan->common);
++	desc->async_tx.tx_submit = xilinx_dma_tx_submit;
++
++	for (i = 0; i < num_periods; ++i) {
++		sg_used = 0;
++
++		while (sg_used < period_len) {
++			struct xilinx_axidma_desc_hw *hw;
++
++			/* Get a free segment */
++			segment = xilinx_axidma_alloc_tx_segment(chan);
++			if (!segment)
++				goto error;
++
++			/*
++			 * Calculate the maximum number of bytes to transfer,
++			 * making sure it is less than the hw limit
++			 */
++			copy = min_t(size_t, period_len - sg_used,
++				     XILINX_DMA_MAX_TRANS_LEN);
++			hw = &segment->hw;
++			hw->buf_addr = buf_addr + sg_used + (period_len * i);
++			hw->control = copy;
++
++			if (prev)
++				prev->hw.next_desc = segment->phys;
++
++			prev = segment;
++			sg_used += copy;
++
++			/*
++			 * Insert the segment into the descriptor segments
++			 * list.
++			 */
++			list_add_tail(&segment->node, &desc->segments);
++		}
++	}
++
++	head_segment = list_first_entry(&desc->segments,
++				   struct xilinx_axidma_tx_segment, node);
++	desc->async_tx.phys = head_segment->phys;
++
++	desc->cyclic = true;
++	reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
++	reg |= XILINX_DMA_CR_CYCLIC_BD_EN_MASK;
++	dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
++
++	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
++	if (direction == DMA_MEM_TO_DEV) {
++		segment->hw.control |= XILINX_DMA_BD_SOP;
++		segment = list_last_entry(&desc->segments,
++					  struct xilinx_axidma_tx_segment,
++					  node);
++		segment->hw.control |= XILINX_DMA_BD_EOP;
++		segment->hw.next_desc = (u32) head_segment->phys;
++	}
++
++	return &desc->async_tx;
++
++error:
++	xilinx_dma_free_tx_descriptor(chan, desc);
++	return NULL;
++}
++
++/**
+  * xilinx_dma_terminate_all - Halt the channel and free descriptors
+  * @chan: Driver specific DMA Channel pointer
+  */
+ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
+ {
+ 	struct xilinx_dma_chan *chan = to_xilinx_chan(dchan);
++	u32 reg;
++
++	if (chan->cyclic)
++		xilinx_dma_chan_reset(chan);
+ 
+ 	/* Halt the DMA engine */
+ 	xilinx_dma_halt(chan);
+@@ -1682,6 +1841,13 @@ static int xilinx_dma_terminate_all(struct dma_chan *dchan)
+ 	/* Remove and free all of the descriptors in the lists */
+ 	xilinx_dma_free_descriptors(chan);
+ 
++	if (chan->cyclic) {
++		reg = dma_ctrl_read(chan, XILINX_DMA_REG_DMACR);
++		reg &= ~XILINX_DMA_CR_CYCLIC_BD_EN_MASK;
++		dma_ctrl_write(chan, XILINX_DMA_REG_DMACR, reg);
++		chan->cyclic = false;
++	}
++
+ 	return 0;
+ }
+ 
+@@ -2218,7 +2384,10 @@ static int xilinx_dma_probe(struct platform_device *pdev)
+ 	xdev->common.device_tx_status = xilinx_dma_tx_status;
+ 	xdev->common.device_issue_pending = xilinx_dma_issue_pending;
+ 	if (xdev->dma_config->dmatype == XDMA_TYPE_AXIDMA) {
++		dma_cap_set(DMA_CYCLIC, xdev->common.cap_mask);
+ 		xdev->common.device_prep_slave_sg = xilinx_dma_prep_slave_sg;
++		xdev->common.device_prep_dma_cyclic =
++					  xilinx_dma_prep_dma_cyclic;
+ 		/* Residue calculation is supported by only AXI DMA */
+ 		xdev->common.residue_granularity =
+ 					  DMA_RESIDUE_GRANULARITY_SEGMENT;
 -- 
-Robert
+2.1.2
