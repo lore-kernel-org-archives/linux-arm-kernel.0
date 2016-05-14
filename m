@@ -1,82 +1,43 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Sat, 14 May 2016 11:36:14 +0800
-Subject: [PATCH 2/2] clk: rockchip: fix incorrect parent for rk3399's
- {c,g}pll_aclk_perihp_src
-In-Reply-To: <CAD=FV=XstYhqpStSGw5PObWvpsvd3Nwp_hfEE-56bpFoVUyu+g@mail.gmail.com>
-References: <1463164937-91089-1-git-send-email-briannorris@chromium.org>
- <1463164937-91089-2-git-send-email-briannorris@chromium.org>
- <CAD=FV=XstYhqpStSGw5PObWvpsvd3Nwp_hfEE-56bpFoVUyu+g@mail.gmail.com>
-Message-ID: <57369D2E.3030002@rock-chips.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Sat, 14 May 2016 11:55:16 +0530
+Subject: [PATCH V18 0/3] dmaengine: add Qualcomm Technologies HIDMA driver
+In-Reply-To: <1462076728-14367-1-git-send-email-okaya@codeaurora.org>
+References: <1462076728-14367-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20160514062516.GL2274@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+On Sun, May 01, 2016 at 12:25:25AM -0400, Sinan Kaya wrote:
+> The Qualcomm Technologies HIDMA device has been designed
+> to support virtualization technology. The driver has been
+> divided into two to follow the hardware design.
+> 
+> 1. HIDMA Management driver
+> 2. HIDMA Channel driver
+> 
+> Each HIDMA HW consists of multiple channels. These channels
+> share some set of common parameters. These parameters are
+> initialized by the management driver during power up.
+> Same management driver is used for monitoring the execution
+> of the channels. Management driver can change the performance
+> behavior dynamically such as bandwidth allocation and
+> prioritization in the future.
+> 
+> The management driver is executed in host context and
+> is the main management entity for all channels provided by
+> the device.
+> 
+> ------------------------
+> What's new
+> ------------------------
+> - Get rid of hidma_ll_resume function
+> - Rename hidma_ll_pause to hidma_ll_disable
+> - Remove tx_status_list and attach the err_code and err_info to the TRE
+> - Create a hidma_handle_tre_completion function to make error path and
+>   success path common.
+> - More style corrections
 
-On 2016?05?14? 04:10, Doug Anderson wrote:
-> Hi,
->
-> On Fri, May 13, 2016 at 11:42 AM, Brian Norris <briannorris@chromium.org> wrote:
->> From: Xing Zheng <zhengxing@rock-chips.com>
->>
->> There was a typo, swapping 'c' <--> 'g'.
->>
->> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
->> Signed-off-by: Brian Norris <briannorris@chromium.org>
->> ---
->>   drivers/clk/rockchip/clk-rk3399.c | 4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
->> index 145756c4f3c8..9f86bfef70f7 100644
->> --- a/drivers/clk/rockchip/clk-rk3399.c
->> +++ b/drivers/clk/rockchip/clk-rk3399.c
->> @@ -832,9 +832,9 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
->>                          RK3399_CLKGATE_CON(13), 1, GFLAGS),
->>
->>          /* perihp */
->> -       GATE(0, "cpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
->> +       GATE(0, "cpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
->>                          RK3399_CLKGATE_CON(5), 0, GFLAGS),
->> -       GATE(0, "gpll_aclk_perihp_src", "cpll", CLK_IGNORE_UNUSED,
->> +       GATE(0, "gpll_aclk_perihp_src", "gpll", CLK_IGNORE_UNUSED,
->>                          RK3399_CLKGATE_CON(5), 1, GFLAGS),
->>          COMPOSITE(ACLK_PERIHP, "aclk_perihp", mux_aclk_perihp_p, CLK_IGNORE_UNUSED,
->>                          RK3399_CLKSEL_CON(14), 7, 1, MFLAGS, 0, 5, DFLAGS,
-> Definitely there was a bug since this table itself was inconsistent.
-> ...and I _think_ this fix is correct, but I'll note that the TRM has
-> more inconsistency here.
->
-> In the big clock table 'CRU Clock Architecture Diagram', I see:
->    CLK 4 is CPLL
->    CLK 5 is GPLL
->    CLK 125 is aclk_perihp_cpll_src and has 4 (CPLL) as source, with
-> g5[0] as the bit
->    CLK 126 is aclk_perihp_gpll_src and has 5 (GPLL) as source, with
-> g5[1] as the bit
->
-> In the definition of CRU_CLKGATE_CON5:
->    bit 0 shows aclk_perihp_gpll_src_en
->    bit 1 shows aclk_perihp_cpll_src_en
->
->
-> Thus the table shows CPLL as gate5[0] and GPLL as gate5[1].  The
-> register definition shows the opposite.  I'll tend to believe the
-> table over the register definition, but I figured I'd bring it up
-> anyway.
->
->
-> Xing Zheng: can you confirm that the table is correct and ask
-> documentation folks to fix the register definition for
-> CRU_CLKGATE_CON5?
-Yes, previously, our IC & DOC partner confirmed that the definition of 
-CRU_CLKGATE_CON5 should be:
-   bit 0 shows aclk_perihp_cpll_src_en
-   bit 1 shows aclk_perihp_gpll_src_en
-
-Sorry to the incorrect register definition, we will fix them and review 
-the TRM again.
-
-Thanks.
+Applied, thanks
 
 -- 
-- Xing Zheng
+~Vinod
