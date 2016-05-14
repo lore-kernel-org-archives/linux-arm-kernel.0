@@ -1,299 +1,98 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 14 May 2016 14:34:50 -0700
-Subject: [PATCH v2 2/2] watchdog: Add Aspeed watchdog driver
-In-Reply-To: <1463062631-16432-3-git-send-email-joel@jms.id.au>
-References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
- <1463062631-16432-1-git-send-email-joel@jms.id.au>
- <1463062631-16432-3-git-send-email-joel@jms.id.au>
-Message-ID: <573799FA.7090207@roeck-us.net>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sun, 15 May 2016 00:44:35 +0200
+Subject: Unclear BSD licensing (headers, MODULE_LICENSE, versions)
+Message-ID: <CACna6ryZS1Q8=kBMMePAE_A377OReaYJdx8azZBrqG2jG+eMJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2016 07:17 AM, Joel Stanley wrote:
-> Provides generic watchdog features as well as reboot support for the
-> Apeed SoC.
->
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
-> ---
->   drivers/watchdog/Kconfig      |  13 +++
->   drivers/watchdog/Makefile     |   1 +
->   drivers/watchdog/aspeed_wdt.c | 209 ++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 223 insertions(+)
->   create mode 100644 drivers/watchdog/aspeed_wdt.c
->
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index fb947655badd..4f0e2ded4785 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -661,6 +661,19 @@ config ATLAS7_WATCHDOG
->   	  To compile this driver as a module, choose M here: the
->   	  module will be called atlas7_wdt.
->
-> +config ASPEED_WATCHDOG
-> +	tristate "Aspeed watchdog support"
-> +	depends on ARCH_ASPEED || COMPILE_TEST
-> +	select WATCHDOG_CORE
-> +	help
-> +	  Say Y here to include support for the watchdog timer
-> +	  in Apseed BMC SoCs.
-> +
-> +	  This driver is required to reboot the SoC.
-> +
-> +	  To compile this driver as a module, choose M here: the
-> +	  module will be called aspeed_wdt.
-> +
->   # AVR32 Architecture
->
->   config AT32AP700X_WDT
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index feb6270fdbde..36855375e0ce 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -73,6 +73,7 @@ obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
->   obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
->   obj-$(CONFIG_BCM7038_WDT) += bcm7038_wdt.o
->   obj-$(CONFIG_ATLAS7_WATCHDOG) += atlas7_wdt.o
-> +obj-$(CONFIG_ASPEED_WATCHDOG) += aspeed_wdt.o
->
->   # AVR32 Architecture
->   obj-$(CONFIG_AT32AP700X_WDT) += at32ap700x_wdt.o
-> diff --git a/drivers/watchdog/aspeed_wdt.c b/drivers/watchdog/aspeed_wdt.c
-> new file mode 100644
-> index 000000000000..f7ae41ef4121
-> --- /dev/null
-> +++ b/drivers/watchdog/aspeed_wdt.c
-> @@ -0,0 +1,209 @@
-> +/*
-> + * Copyright 2016 IBM Corporation
-> + *
-> + * Joel Stanley <joel@jms.id.au>
-> + *
-> + * Based on the qcom-watchdog driver
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; either version
-> + * 2 of the License, or (at your option) any later version.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/watchdog.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/io.h>
-> +
-> +struct aspeed_wdt {
-> +	struct watchdog_device	wdd;
-> +	unsigned long		rate;
+Hi,
 
-I still don't see why you need this variable. Why not just use
-WDT_1MHZ_CLOCK directly ?
+I recently received a hint that it would be nice/expected to have DTS
+files licensed under BSD. I had no experience with BSD, so I started
+looking at this and the way kernel parts use it.
 
-> +	void __iomem		*base;
-> +	u32			ctrl;
-> +};
-> +
-> +static const struct of_device_id aspeed_wdt_of_table[] = {
-> +	{ .compatible = "aspeed,ast2400-wdt" },
-> +	{ .compatible = "aspeed,ast2500-wdt" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, aspeed_wdt_of_table);
-> +
-> +#define WDT_STATUS		0x00
-> +#define WDT_RELOAD_VALUE	0x04
-> +#define WDT_RESTART		0x08
-> +#define WDT_CTRL		0x0C
-> +#define   WDT_CTRL_RESET_MODE_SOC	(0x00 << 5)
-> +#define   WDT_CTRL_RESET_MODE_FULL_CHIP	(0x01 << 5)
-> +#define   WDT_CTRL_1MHZ_CLK		BIT(4)
-> +#define   WDT_CTRL_WDT_EXT		BIT(3)
-> +#define   WDT_CTRL_WDT_INTR		BIT(2)
-> +#define   WDT_CTRL_RESET_SYSTEM		BIT(1)
-> +#define   WDT_CTRL_ENABLE		BIT(0)
-> +
-> +#define WDT_RESTART_MAGIC	0x4755
-> +
-> +#define WDT_MIN_TIMEOUT		1
-> +/* 32 bits at 1MHz, in milliseconds */
-> +#define WDT_MAX_TIMEOUT_MS	4294967
-> +#define WDT_DEFAULT_TIMEOUT	30
-> +#define WDT_1MHZ_CLOCK		1000000
-> +
-> +static struct aspeed_wdt *to_aspeed_wdt(struct watchdog_device *wdd)
-> +{
-> +	return container_of(wdd, struct aspeed_wdt, wdd);
-> +}
-> +
-> +static void aspeed_wdt_enable(struct aspeed_wdt *wdt, int count)
-> +{
-> +	wdt->ctrl |= WDT_CTRL_ENABLE;
-> +
-> +	writel(0, wdt->base + WDT_CTRL);
-> +	writel(count, wdt->base + WDT_RELOAD_VALUE);
-> +	writel(WDT_RESTART_MAGIC, wdt->base + WDT_RESTART);
-> +	writel(wdt->ctrl, wdt->base + WDT_CTRL);
-> +}
-> +
-> +static int aspeed_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-> +
-> +	aspeed_wdt_enable(wdt, wdd->timeout * wdt->rate);
-> +
-> +	return 0;
-> +}
-> +
-> +static int aspeed_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-> +
-> +	wdt->ctrl &= ~WDT_CTRL_ENABLE;
-> +	writel(wdt->ctrl, wdt->base + WDT_CTRL);
-> +
-> +	return 0;
-> +}
-> +
-> +static int aspeed_wdt_ping(struct watchdog_device *wdd)
-> +{
-> +	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-> +
-> +	writel(WDT_RESTART_MAGIC, wdt->base + WDT_RESTART);
-> +
-> +	return 0;
-> +}
-> +
-> +static int aspeed_wdt_set_timeout(struct watchdog_device *wdd,
-> +				  unsigned int timeout)
-> +{
-> +	wdd->timeout = timeout;
-> +
-> +	return aspeed_wdt_start(wdd);
+Obviously Linux kernel is licensed under GPLv2, so all its code has to
+use GPLv2 compatible license. I found 3 BSD licenses in use by kernel
+code:
+1) BSD 3-clause license
+2) BSD 2-clause license
+3) Clear BSD license
 
-The watchdog can be stopped here (with WDIOC_SETOPTIONS/WDIOS_DISABLECARD).
-An implicit enable is not really a good idea; neither the infrastructure
-nor user space would in this case be aware that the watchdog is running.
+Unfortunately in many cases (of source files) I wasn't able to clearly
+determine used BSD license.
 
-> +}
-> +
-> +static int aspeed_wdt_restart(struct watchdog_device *wdd,
-> +			      unsigned long action, void *data)
-> +{
-> +	struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
-> +
-> +	aspeed_wdt_enable(wdt, 128 * wdt->rate / 1000);
-> +
+First of all, an accepted ident "Dual BSD/GPL" doesn't specify BSD
+version. All I can read in include/linux/module.h is "[GNU Public
+License v2 or BSD license choice]". It could mean any (of GPLv2
+compatible) BSD versions.
 
-Is that the smallest accepted value, or is there some other reason
-not to make it smaller ?
 
-It is also quite common to wait here to let the reset 'catch'
-before returning. This would ensure that the system doesn't trigger
-a lower priority reset.
+I guess ideally (in current situation) every file using "Dual BSD/GPL"
+should specify BSD license version in a header. However this isn't the
+case.
 
-> +	return 0;
-> +}
-> +
-> +static const struct watchdog_ops aspeed_wdt_ops = {
-> +	.start		= aspeed_wdt_start,
-> +	.stop		= aspeed_wdt_stop,
-> +	.ping		= aspeed_wdt_ping,
-> +	.set_timeout	= aspeed_wdt_set_timeout,
-> +	.restart	= aspeed_wdt_restart,
-> +	.owner		= THIS_MODULE,
-> +};
-> +
-> +static const struct watchdog_info aspeed_wdt_info = {
-> +	.options	= WDIOF_KEEPALIVEPING
-> +			| WDIOF_MAGICCLOSE
-> +			| WDIOF_SETTIMEOUT,
-> +	.identity	= KBUILD_MODNAME,
-> +};
-> +
-> +static int aspeed_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct aspeed_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	watchdog_unregister_device(&wdt->wdd);
-> +
-> +	return 0;
-> +}
-> +
-> +static int aspeed_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct aspeed_wdt *wdt;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	wdt->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(wdt->base))
-> +		return PTR_ERR(wdt->base);
-> +
-> +	/*
-> +	 * The ast2400 wdt can run at PCLK, or 1MHz. The ast2500 only
-> +	 * runs at 1MHz. We chose to always run at 1MHz, as there's no
-> +	 * good reason to have a faster watchdog counter.
-> +	 */
-> +	wdt->rate = WDT_1MHZ_CLOCK;
-> +	wdt->wdd.info = &aspeed_wdt_info;
-> +	wdt->wdd.ops = &aspeed_wdt_ops;
-> +	wdt->wdd.min_timeout = WDT_MIN_TIMEOUT;
-> +	wdt->wdd.max_hw_heartbeat_ms = WDT_MAX_TIMEOUT_MS;
-> +	wdt->wdd.parent = &pdev->dev;
-> +
-> +	wdt->wdd.timeout = WDT_DEFAULT_TIMEOUT;
-> +	watchdog_init_timeout(&wdt->wdd, 0, &pdev->dev);
-> +
-> +	/*
-> +	 * Control reset on a per-device basis to ensure the
-> +	 * host is not affected by a BMC reboot, so only reset
-> +	 * the SOC and not the full chip
-> +	 */
-> +	wdt->ctrl = WDT_CTRL_RESET_MODE_SOC |
-> +		WDT_CTRL_1MHZ_CLK |
-> +		WDT_CTRL_RESET_SYSTEM;
-> +
-> +	if (readl(wdt->base + WDT_CTRL) & WDT_CTRL_ENABLE)  {
-> +		aspeed_wdt_start(&wdt->wdd);
-> +		set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
-> +	}
-> +
-> +	ret = watchdog_register_device(&wdt->wdd);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "failed to register\n");
-> +		return ret;
-> +	}
-> +
-> +	dev_info(&pdev->dev, "rate %lu, max timeout %u, timeout %d\n",
-> +		 wdt->rate, wdt->wdd.max_timeout, wdt->wdd.timeout);
-> +
+1) Some "Dual BSD/GPL" sources mention GPL in a header forgetting about BSD.
+Can we treat such files as BSD-licensed at all? Few examples:
+arch/arm/mach-pxa/am300epd.c
+drivers/fmc/fmc-trivial.c
+drivers/net/ppp/ppp_deflate.c
+drivers/scsi/a100u2w.c
+drivers/xen/xen-scsiback.c
 
-'rate 1000000' doesn't seem very informative. All it does is to expose
-an implementation detail which no one really cares about. Even if you
-were to add 'Hz', I would argue that no one will even understand
-what it means without looking into the driver, but then it will be
-understood without the message.
+2) Some "Dual BSD/GPL" sources don't specify BSD version in a header.
+E.g. all you can find in a header is "All rights reserved. Licensed
+under dual BSD/GPL license.". Two examples:
+drivers/char/pcmcia/cm4000_cs.c
+drivers/char/pcmcia/cm4040_cs.c
 
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct platform_driver aspeed_watchdog_driver = {
-> +	.probe = aspeed_wdt_probe,
-> +	.remove = aspeed_wdt_remove,
-> +	.driver = {
-> +		.name = KBUILD_MODNAME,
-> +		.of_match_table = of_match_ptr(aspeed_wdt_of_table),
-> +	},
-> +};
-> +module_platform_driver(aspeed_watchdog_driver);
-> +
-> +MODULE_DESCRIPTION("Aspeed Watchdog Driver");
-> +MODULE_LICENSE("GPL");
->
+
+Another problem is text of BSD license
+
+1) Some BSD 2-clause licensed sources don't link to its content.
+
+In case of GPLv2 some sources simply mention this license and refer to
+COPYING. Few examples:
+a) drivers/bcma/main.c
+"Licensed under the GNU/GPL. See COPYING for details."
+b) drivers/block/umem.c
+"This driver is released to the public under the terms of the GNU
+GENERAL PUBLIC LICENSE version 2
+c) drivers/mfd/tps6507x.c
+"For licencing details see kernel-base/COPYING"
+
+I believe the same could be done for BSD 2-clause license, however
+there is no file that can be pointed. It results in some sources
+specifying 2-clause license in a header without really providing the
+content. Example:
+arch/arm/boot/dts/lpc4350.dtsi
+
+2) Some BSD 3-clause or Clear BSD licensed sources don't provide needed text
+
+Many templates of BSD 3-clause license I found contain <organization>
+that should be replaced by a proper organization/company. That makes
+me suspect we can't have a generic text of BSD 3-clause or Clear BSD
+in any shared file like COPYING. However there are sources that
+specify one of above licenses without providing or linking its text.
+Few examples:
+arch/blackfin/mach-bf609/include/mach/anomaly.h
+drivers/block/zram/zram_drv.c
+
+
+I'm wondering how we could improve this situation. I got 2 main ideas:
+
+1) Extend MODULE_LICENSE
+We could add new acceptable entries specifying BSD version. We could
+try to improve checkpatch.pl to look for a full license in a header
+(it seems to be required as it has to provide <organization>). Maybe
+we could figure out (with some lawyers?) how to treat sources using
+"Dual BSD/GPL" mentioning GPL only (without BSD) in their header.
+
+2) Get clear rules on how to write a header
+If you find extending MODULE_LICENSE a bad idea, maybe we can simply
+help people write proper headers. Explain the problem, provide
+examples, maybe add some check in checkpatch.pl.
+
+What do you think about this?
+
+-- 
+Rafa?
