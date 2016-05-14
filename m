@@ -1,223 +1,244 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Sat, 14 May 2016 14:37:45 +0530
-Subject: [PATCH V7 08/11] pci, acpi: Support for ACPI based generic PCI
- host controller
-In-Reply-To: <1462893601-8937-9-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-9-git-send-email-tn@semihalf.com>
-Message-ID: <CAKc_7PVz8rgCTqMVuR7g944nonSHExAhx5rNsjiP3J=9LfA99g@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 14 May 2016 11:50:50 +0200
+Subject: [RFC PATCH 2/7] ALSA: ac97: add an ac97 bus
+In-Reply-To: <s5hk2j38tmf.wl-tiwai@suse.de> (Takashi Iwai's message of "Mon,
+ 09 May 2016 11:31:52 +0200")
+References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
+ <1462050939-27940-3-git-send-email-robert.jarzmik@free.fr>
+ <s5hk2j38tmf.wl-tiwai@suse.de>
+Message-ID: <87twi1hssl.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 8:49 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> This patch is going to implement generic PCI host controller for
-> ACPI world, similar to what pci-host-generic.c driver does for DT world.
+Takashi Iwai <tiwai@suse.de> writes:
+
+> On Sat, 30 Apr 2016 23:15:34 +0200,
+> Robert Jarzmik wrote:
+>> 
+>> diff --git a/include/sound/ac97/codec.h b/include/sound/ac97/codec.h
+>> new file mode 100644
+>> index 000000000000..4b8b3e570892
+>> --- /dev/null
+>> +++ b/include/sound/ac97/codec.h
+>> @@ -0,0 +1,98 @@
+>> +/*
+>> + *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +#ifndef AC97_CODEC_H
+>> +#define AC97_CODEC_H
 >
-> All such drivers, which we have seen so far, were implemented within
-> arch/ directory since they had some arch assumptions (x86 and ia64).
-> However, they all are doing similar thing, so it makes sense to find
-> some common code and abstract it into the generic driver.
+> Let's be careful about the choice of the guard.
+Ok, would _SND_AC97_CODEC_H be better ?
+
+>> +#define AC97_ID(vendor_id1, vendor_id2) \
+>> +	(((vendor_id1 & 0xffff) << 16) | (vendor_id2 & 0xffff))
+>> +#define AC97_DRIVER_ID(vendor_id1, vendor_id2, mask_id1, mask_id2, _data) \
+>> +	{ .id = ((vendor_id1 & 0xffff) << 16) | (vendor_id2 & 0xffff), \
+>> +	  .mask = ((mask_id1 & 0xffff) << 16) | (mask_id2 & 0xffff), \
+>> +	  .data = _data }
 >
-> In order to handle PCI config space regions properly, we define new
-> MCFG interface which does sanity checks on MCFG table and keeps its
-> root pointer. User is able to lookup MCFG regions based on that root
-> pointer and specified domain:bus_start:bus_end touple. We are using
-> pci_mmcfg_late_init old prototype to avoid another function name.
+> Give parentheses around the macro arguments.
+Right, for RFC v2.
+
+>> +struct ac97_codec_device {
+>> +	struct device		dev;	/* Must stay first member */
 >
-> The implementation of pci_acpi_scan_root() looks up the MCFG entries
-> and sets up a new mapping (regions are not mapped until host controller ask
-> for it). Generic PCI functions are used for accessing config space.
-> Driver selects PCI_ECAM and uses functions from drivers/pci/ecam.h
-> to create and access ECAM mappings.
+> This doesn't have to be the first element as long as you use container_of().
+Ah yes, that's a leftover from a former idea, I'll remove that comment.
+
+In the initial code I'd done "struct ac97_codec_device" was hidden from this
+file (ie. there was only a "struct ac97_codec_device;" statement), the body of
+the struct was contained in sound/ac97/ac97_core.h.
+
+The only provided macro to access the "struct device" inside "struct
+ac97_codec_device" was relying on this "trick" (that's a bit like in the
+video4linux area).
+
+Anyway, good point, I'll remove that.
+
+>> +struct ac97_codec_driver {
+>> +	struct device_driver	driver;
+>> +	int			(*probe)(struct ac97_codec_device *);
+>> +	int			(*remove)(struct ac97_codec_device *);
+>> +	int			(*suspend)(struct ac97_codec_device *);
+>> +	int			(*resume)(struct ac97_codec_device *);
+>> +	void			(*shutdown)(struct ac97_codec_device *);
+>> +	struct ac97_id		*id_table;
 >
-> As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice
-> should be made on a per-architecture basis.
+> Missing const?
+Ah no, unfortunately not, or rather not yet.
 
-Looking thru the new code, I see a few issues, please see below
+I tried that one, not very hard, but at least ac97_bus_match() with the pair
+"struct ac97_id *id = adrv->id_table" and "do { } while (++id->id);" is not
+possible AFAIK with a const.
 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
->  drivers/acpi/Kconfig            |   8 +++
->  drivers/acpi/Makefile           |   1 +
->  drivers/acpi/pci_mcfg.c         |  97 ++++++++++++++++++++++++++
->  drivers/acpi/pci_root_generic.c | 149 ++++++++++++++++++++++++++++++++++++++++
->  drivers/pci/ecam.h              |   5 ++
->  include/linux/pci-acpi.h        |   5 ++
->  include/linux/pci.h             |   5 +-
->  7 files changed, 269 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/acpi/pci_mcfg.c
->  create mode 100644 drivers/acpi/pci_root_generic.c
+I will see if I can come up with something better for ac97_bus_match, such as
+array usage instead of pointer arithmetics.
+
+>> +};
+>> +
+>> +int ac97_codec_driver_register(struct ac97_codec_driver *drv);
+>> +void ac97_codec_driver_unregister(struct ac97_codec_driver *drv);
+>> +
+>> +static inline struct device *
+>> +ac97_codec_dev2dev(const struct ac97_codec_device *adev)
+>> +{
+>> +	return (struct device *)(adev);
 >
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index 183ffa3..44afc76 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -346,6 +346,14 @@ config ACPI_PCI_SLOT
->           i.e., segment/bus/device/function tuples, with physical slots in
->           the system.  If you are unsure, say N.
+> What's wrong with the simple &adev->dev ?  Cast looks scary.
+The same leftover than above, I'll change that for RFC v2.
+
+>> +struct ac97_controller {
+>> +	const struct ac97_controller_ops *ops;
+>> +	struct list_head controllers;
+>> +	struct device *dev;
+>> +	int bus_idx;
 >
-> +config ACPI_PCI_HOST_GENERIC
-> +       bool
-> +       select PCI_ECAM
-> +       help
-> +         Select this config option from the architecture Kconfig,
-> +         if it is preferred to enable ACPI PCI host controller driver which
-> +         has no arch-specific assumptions.
-> +
->  config X86_PM_TIMER
->         bool "Power Management Timer Support" if EXPERT
->         depends on X86
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 81e5cbc..627a2b7 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -40,6 +40,7 @@ acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
->  acpi-y                         += ec.o
->  acpi-$(CONFIG_ACPI_DOCK)       += dock.o
->  acpi-y                         += pci_root.o pci_link.o pci_irq.o
-> +obj-$(CONFIG_ACPI_PCI_HOST_GENERIC)    += pci_root_generic.o pci_mcfg.o
->  acpi-y                         += acpi_lpss.o acpi_apd.o
->  acpi-y                         += acpi_platform.o
->  acpi-y                         += acpi_pnp.o
-> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-> new file mode 100644
-> index 0000000..373d079
-> --- /dev/null
-> +++ b/drivers/acpi/pci_mcfg.c
-> @@ -0,0 +1,97 @@
-> +/*
-> + * Copyright (C) 2016 Broadcom
-> + *     Author: Jayachandran C <jchandra@broadcom.com>
-> + * Copyright (C) 2016 Semihalf
-> + *     Author: Tomasz Nowicki <tn@semihalf.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation (the "GPL").
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License version 2 (GPLv2) for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * version 2 (GPLv2) along with this source code.
-> + */
-> +#include <linux/kernel.h>
-> +#include <linux/pci.h>
-> +#include <linux/pci-acpi.h>
-> +
-> +#define PREFIX "ACPI: "
-> +
-> +/* Root pointer to the mapped MCFG table */
-> +static struct acpi_table_mcfg *mcfg_table;
-> +
-> +#define MCFG_ENTRIES(mcfg_ptr) (((mcfg_ptr)->header.length -           \
-> +                               sizeof(struct acpi_table_mcfg)) /       \
-> +                               sizeof(struct acpi_mcfg_allocation))
+> What is this bus_idx for?
+Initially it was to distinguish 2 different AC97 controllers. In the current
+patchset state, it's not usefull anymore AFAICS.
+So let's remove it.
 
-It would be better if you used static inline function here.
+>> +	int bound_codecs;
+The same comment would apply here. I don't think that information is important
+anymore. I thought I would use that to prevent AC97 controler removal while
+codecs are still bound.
 
-> +static phys_addr_t pci_mcfg_lookup_static(u16 seg, u8 bus_start, u8 bus_end)
-> +{
-> +       struct acpi_mcfg_allocation *mptr;
-> +       int i;
-> +
-> +       if (!mcfg_table) {
-> +               pr_err(PREFIX "MCFG table not available, lookup failed\n");
-> +               return -ENXIO;
-> +       }
-> +
-> +       mptr = (struct acpi_mcfg_allocation *) &mcfg_table[1];
-> +
-> +       /*
-> +        * We expect exact match, unless MCFG entry end bus covers more than
-> +        * specified by caller.
-> +        */
-> +       for (i = 0; i < MCFG_ENTRIES(mcfg_table); i++, mptr++) {
-> +               if (mptr->pci_segment == seg &&
-> +                   mptr->start_bus_number == bus_start &&
-> +                   mptr->end_bus_number >= bus_end) {
-> +                       return mptr->address;
-> +               }
-> +       }
+In a second thought what would be better is to have get_device() called for each
+bound codec which will prevent ac97_digital_controller_unregister() to succeed
+(-EBUSY).
 
-There is an issue here, the bus range is obtained if different
-ways. If the _CRS has it, this should be fine. But if it is _BBN-0xff
-or the default 0-0xff, then I would think taking the MCFG entry end
-would be better. This would require updating the bus resource end.
-
-Also (trivial), the braces are not needed.
-
-> +       return -ENXIO;
-> +}
-> +
-> +phys_addr_t pci_mcfg_lookup(struct acpi_device *device, u16 seg,
-> +                           struct resource *bus_res)
-> +{
-> +       phys_addr_t addr;
-> +
-> +       addr = acpi_pci_root_get_mcfg_addr(device->handle);
-> +       if (addr)
-> +               return addr;
-
-When you have address from _CBA, you are assuming that the
-bus range is also set correctly (from _CRS or as _BBN-0xff). Is
-this assumption correct?
-
-(this was discussed earlier)  you are doing the _CBA call again,
-I think cleaning up the _CBA, _BBN, _CRS and MCFG based
-ECAM area resources and defaults should be a different patch,
-which would need changes to pci_root.c. We should use
-root->mcfg_addr in this patchset.
-
-> +
-> +       return pci_mcfg_lookup_static(seg, bus_res->start, bus_res->end);
-
-There is no need to have a separate function for this, based on by
-above comment, you might need to change bus_res, so having it here
-would be better.
-
-> +}
-> +
-> +static __init int pci_mcfg_parse(struct acpi_table_header *header)
-> +{
-> +       struct acpi_table_mcfg *mcfg;
-> +       int n;
-> +
-> +       if (!header)
-> +               return -EINVAL;
-
-This is not needed, the handler is not called if header is NULL
-
-> +
-> +       mcfg = (struct acpi_table_mcfg *)header;
-> +       n = MCFG_ENTRIES(mcfg);
-> +       if (n <= 0 || n > 255) {
-> +               pr_err(PREFIX "MCFG has incorrect entries (%d).\n", n);
-> +               return -EINVAL;
-> +       }
+>> +	struct list_head codecs;
+>> +};
+>> +
+>> +int ac97_digital_controller_register(const struct ac97_controller_ops *ops,
+>> +				     struct device *dev);
+>> +int ac97_digital_controller_unregister(const struct device *dev);
+>> +
+>> +#endif
+>> diff --git a/sound/ac97/Kconfig b/sound/ac97/Kconfig
+>> new file mode 100644
+>> index 000000000000..fd2c2d031e62
+>> --- /dev/null
+>> +++ b/sound/ac97/Kconfig
+>> @@ -0,0 +1,9 @@
+>> +#
+>> +# PCI configuration
+>> +#
+>  
+> Still only for PCI? :)
+Ouch ;) I'll amend that for RFC v2.
 >
-> +       mcfg_table = mcfg;
+>> +
+>> +config AC97
+>> +	bool "AC97 bus"
+>> +	help
+>> +	   Say Y here if you want to have AC97 devices, which are sound oriented
+>> +	   devices around an AC-Link.
+>> diff --git a/sound/ac97/Makefile b/sound/ac97/Makefile
+>> new file mode 100644
+>> index 000000000000..5575909d46e2
+>> --- /dev/null
+>> +++ b/sound/ac97/Makefile
+>> @@ -0,0 +1,5 @@
+>> +#
+>> +# make for AC97 bus drivers
+>> +#
+>> +
+>> +obj-y	+= bus.o codec.o snd_ac97_compat.o
+>
+> No possibility for modules?
+There should be, so I'll put that on my TODO list for RFC v2.
 
-Saving a reference of ACPI mapping seems dangerous, acpi_parse_table
-calles early_acpi_os_unmap_memory() after calling handler, which does
-not do anything since acpi_gbl_permanent_mmap is set.
+>> +static struct ac97_codec_device *
+>> +ac97_codec_find(struct ac97_controller *ac97_ctrl, int codec_num)
+>> +{
+>> +	struct ac97_codec_device *codec;
+>> +
+>> +	list_for_each_entry(codec, &ac97_ctrl->codecs, list)
+>> +		if (codec->num == codec_num)
+>> +			return codec;
+>> +
+>> +	return NULL;
+>> +}
+>
+> It's a question whether we need to manage the codecs in the linked
+> list.  There can be at most 4 codecs, so it fits in an array well,
+> too.  Then some codes like this would be simpler. (And it'll even
+> reduce the footprint, too.)
+Agreed. For RFC v2.
 
-I would suggest copying the entries.
+>> +unsigned int ac97_bus_scan_one(struct ac97_controller *ac97,
+>> +				      int codec_num)
+>> +{
+>> +	struct ac97_codec_device codec;
+>> +	unsigned short vid1, vid2;
+>> +	int ret;
+>> +
+>> +	codec.dev = *ac97->dev;
+>> +	codec.num = codec_num;
+>> +	ret = ac97->ops->read(&codec, AC97_VENDOR_ID1);
+>> +	vid1 = (ret & 0xffff);
+>> +	if (ret < 0)
+>> +		return 0;
+>
+> Hmm.  This looks pretty hackish and dangerous.
+You mean returning 0 even if the read failed, right ?
+A better prototype would probably be (for RFC v2):
+  int ac97_bus_scan_one(struct ac97_controller *ac97, int codec_num,
+                        unsigned int *vendor_id);
 
-> +       pr_info(PREFIX "MCFG table loaded, %d entries detected\n", n);
-> +       return 0;
-> +}
-> +
-> +/* Interface called by ACPI - parse and save MCFG table */
-> +void __init pci_mmcfg_late_init(void)
-> +{
-> +       int err = acpi_table_parse(ACPI_SIG_MCFG, pci_mcfg_parse);
-> +       if (err)
-> +               pr_err(PREFIX "Failed to parse MCFG (%d)\n", err);
-> +}
+>> +static int ac97_bus_scan(struct ac97_controller *ac97_ctrl)
+>> +{
+>> +	int ret, i;
+>> +	unsigned int vendor_id;
+>> +
+>> +	for (i = 0; i < AC97_BUS_MAX_CODECS; i++) {
+>> +		if (ac97_codec_find(ac97_ctrl, i))
+>> +			continue;
+>> +		vendor_id = ac97_bus_scan_one(ac97_ctrl, i);
+>> +		if (!vendor_id)
+>> +			continue;
+>> +
+>> +		ret = ac97_codec_add(ac97_ctrl, i, vendor_id);
+>> +		if (ret < 0)
+>> +			return ret;
+>
+> This is one of concerns: we don't know whether the device really
+> reacts well if you access to a non-existing slot.  At least, it'd be
+> safer to have the masks for the devices we already know the slots.
 
+Ah you mean upon ac97 controller registration, the
+ac97_digital_controller_register() should provide the information for each of
+the 4 slots :
+ - does the controller enable this slot (default yes)
+ - does the controller support auto-scan for this slot (default yes)
+   I'm not sure this "feature" is required, it looks a bit over-engineered.
 
-JC.
+That could be a matter of 1 or 2 masks as input parameters to
+ac97_digital_controller_register().
+
+>> +static int ac97_bus_reset(struct ac97_controller *ac97_ctrl)
+>> +{
+>> +	struct ac97_codec_device codec;
+>> +
+>> +	memset(&codec, 0, sizeof(codec));
+>> +	codec.dev = *ac97_ctrl->dev;
+>> +
+>> +	ac97_ctrl->ops->reset(&codec);
+>
+> So, this assumes that reset ops is mandatory?  Then document it at
+> least.
+Ok, for RFC v2.
+
+Thanks for your review and feedbacks Takashi, I'll work on both Mark and your
+comments in the next weeks.
+
+Cheers.
+
+-- 
+Robert
