@@ -1,87 +1,223 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 14 May 2016 11:07:51 +0200
-Subject: [linux-sunxi] Re: [PATCH 2/2] musb: sunxi: Set state to
- A_WAIT_VRISE when enabling VBus
-In-Reply-To: <20160513183428.GA1665@uda0271908>
-References: <1463077869-13224-1-git-send-email-hdegoede@redhat.com>
- <1463077869-13224-2-git-send-email-hdegoede@redhat.com>
- <20160513183428.GA1665@uda0271908>
-Message-ID: <8765c9b5-1e40-2967-ac2c-da751b7d9019@redhat.com>
+From: jchandra@broadcom.com (Jayachandran C)
+Date: Sat, 14 May 2016 14:37:45 +0530
+Subject: [PATCH V7 08/11] pci, acpi: Support for ACPI based generic PCI
+ host controller
+In-Reply-To: <1462893601-8937-9-git-send-email-tn@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-9-git-send-email-tn@semihalf.com>
+Message-ID: <CAKc_7PVz8rgCTqMVuR7g944nonSHExAhx5rNsjiP3J=9LfA99g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 13-05-16 20:35, Bin Liu wrote:
-> Hi,
+On Tue, May 10, 2016 at 8:49 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
+> This patch is going to implement generic PCI host controller for
+> ACPI world, similar to what pci-host-generic.c driver does for DT world.
 >
-> On Thu, May 12, 2016 at 08:31:09PM +0200, Hans de Goede wrote:
->> When the board is powering attached usb devices via the otg port
->> sometimes / on some devices it takes slightly too long for the VBus
->> detection code in phy-sun4i-usb.c to signal that VBus is high after
->> enabling VBus and the musb hardware signals a MUSB_INTR_VBUSERROR
->> interrupt.
->>
->> This commit sets the otg state to A_WAIT_VRISE upon enabling Vbus
->> making musb_stage0_irq() ignore the first VBUSERR_RETRY_COUNT
->> VBUSERROR interrupts, fixing connection issues in these cases.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  drivers/usb/musb/sunxi.c | 8 +++++---
->>  1 file changed, 5 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
->> index 2c33d9b..2ee48fb 100644
->> --- a/drivers/usb/musb/sunxi.c
->> +++ b/drivers/usb/musb/sunxi.c
->> @@ -112,7 +112,7 @@ static void sunxi_musb_work(struct work_struct *work)
->>  		if (test_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags)) {
->>  			set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
->>  			musb->xceiv->otg->default_a = 1;
->> -			musb->xceiv->otg->state = OTG_STATE_A_IDLE;
->> +			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
->>  			MUSB_HST_MODE(musb);
->>  			devctl |= MUSB_DEVCTL_SESSION;
->>  		} else {
->> @@ -145,9 +145,10 @@ static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
->>  {
->>  	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
->>
->> -	if (is_on)
->> +	if (is_on) {
->>  		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
->> -	else
->> +		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
+> All such drivers, which we have seen so far, were implemented within
+> arch/ directory since they had some arch assumptions (x86 and ia64).
+> However, they all are doing similar thing, so it makes sense to find
+> some common code and abstract it into the generic driver.
 >
-> Why this has to be set in both sunxi_musb_work() and here? Only setting
-> it in the work is not efficient?
-
-Different code paths, sunxi_musb_work sets it when the id pin changes
-(gets pulled low), this function gets called by musb_core in response
-to a session-request interrupt.
-
-Regards,
-
-Hans
-
-
+> In order to handle PCI config space regions properly, we define new
+> MCFG interface which does sanity checks on MCFG table and keeps its
+> root pointer. User is able to lookup MCFG regions based on that root
+> pointer and specified domain:bus_start:bus_end touple. We are using
+> pci_mmcfg_late_init old prototype to avoid another function name.
 >
-> Regards,
-> -Bin.
+> The implementation of pci_acpi_scan_root() looks up the MCFG entries
+> and sets up a new mapping (regions are not mapped until host controller ask
+> for it). Generic PCI functions are used for accessing config space.
+> Driver selects PCI_ECAM and uses functions from drivers/pci/ecam.h
+> to create and access ECAM mappings.
 >
->> +	} else
->>  		clear_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
->>
->>  	schedule_work(&glue->work);
->> @@ -325,6 +326,7 @@ static int sunxi_set_mode(struct musb *musb, u8 mode)
->>  		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
->>  		/* Stop musb work from turning vbus off again */
->>  		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
->> +		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
->>  	}
->>
->>  	return 0;
->> --
->> 2.7.4
->>
+> As mentioned in Kconfig help section, ACPI_PCI_HOST_GENERIC choice
+> should be made on a per-architecture basis.
+
+Looking thru the new code, I see a few issues, please see below
+
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+>  drivers/acpi/Kconfig            |   8 +++
+>  drivers/acpi/Makefile           |   1 +
+>  drivers/acpi/pci_mcfg.c         |  97 ++++++++++++++++++++++++++
+>  drivers/acpi/pci_root_generic.c | 149 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/pci/ecam.h              |   5 ++
+>  include/linux/pci-acpi.h        |   5 ++
+>  include/linux/pci.h             |   5 +-
+>  7 files changed, 269 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/acpi/pci_mcfg.c
+>  create mode 100644 drivers/acpi/pci_root_generic.c
+>
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index 183ffa3..44afc76 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -346,6 +346,14 @@ config ACPI_PCI_SLOT
+>           i.e., segment/bus/device/function tuples, with physical slots in
+>           the system.  If you are unsure, say N.
+>
+> +config ACPI_PCI_HOST_GENERIC
+> +       bool
+> +       select PCI_ECAM
+> +       help
+> +         Select this config option from the architecture Kconfig,
+> +         if it is preferred to enable ACPI PCI host controller driver which
+> +         has no arch-specific assumptions.
+> +
+>  config X86_PM_TIMER
+>         bool "Power Management Timer Support" if EXPERT
+>         depends on X86
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 81e5cbc..627a2b7 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -40,6 +40,7 @@ acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
+>  acpi-y                         += ec.o
+>  acpi-$(CONFIG_ACPI_DOCK)       += dock.o
+>  acpi-y                         += pci_root.o pci_link.o pci_irq.o
+> +obj-$(CONFIG_ACPI_PCI_HOST_GENERIC)    += pci_root_generic.o pci_mcfg.o
+>  acpi-y                         += acpi_lpss.o acpi_apd.o
+>  acpi-y                         += acpi_platform.o
+>  acpi-y                         += acpi_pnp.o
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> new file mode 100644
+> index 0000000..373d079
+> --- /dev/null
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -0,0 +1,97 @@
+> +/*
+> + * Copyright (C) 2016 Broadcom
+> + *     Author: Jayachandran C <jchandra@broadcom.com>
+> + * Copyright (C) 2016 Semihalf
+> + *     Author: Tomasz Nowicki <tn@semihalf.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation (the "GPL").
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License version 2 (GPLv2) for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * version 2 (GPLv2) along with this source code.
+> + */
+> +#include <linux/kernel.h>
+> +#include <linux/pci.h>
+> +#include <linux/pci-acpi.h>
+> +
+> +#define PREFIX "ACPI: "
+> +
+> +/* Root pointer to the mapped MCFG table */
+> +static struct acpi_table_mcfg *mcfg_table;
+> +
+> +#define MCFG_ENTRIES(mcfg_ptr) (((mcfg_ptr)->header.length -           \
+> +                               sizeof(struct acpi_table_mcfg)) /       \
+> +                               sizeof(struct acpi_mcfg_allocation))
+
+It would be better if you used static inline function here.
+
+> +static phys_addr_t pci_mcfg_lookup_static(u16 seg, u8 bus_start, u8 bus_end)
+> +{
+> +       struct acpi_mcfg_allocation *mptr;
+> +       int i;
+> +
+> +       if (!mcfg_table) {
+> +               pr_err(PREFIX "MCFG table not available, lookup failed\n");
+> +               return -ENXIO;
+> +       }
+> +
+> +       mptr = (struct acpi_mcfg_allocation *) &mcfg_table[1];
+> +
+> +       /*
+> +        * We expect exact match, unless MCFG entry end bus covers more than
+> +        * specified by caller.
+> +        */
+> +       for (i = 0; i < MCFG_ENTRIES(mcfg_table); i++, mptr++) {
+> +               if (mptr->pci_segment == seg &&
+> +                   mptr->start_bus_number == bus_start &&
+> +                   mptr->end_bus_number >= bus_end) {
+> +                       return mptr->address;
+> +               }
+> +       }
+
+There is an issue here, the bus range is obtained if different
+ways. If the _CRS has it, this should be fine. But if it is _BBN-0xff
+or the default 0-0xff, then I would think taking the MCFG entry end
+would be better. This would require updating the bus resource end.
+
+Also (trivial), the braces are not needed.
+
+> +       return -ENXIO;
+> +}
+> +
+> +phys_addr_t pci_mcfg_lookup(struct acpi_device *device, u16 seg,
+> +                           struct resource *bus_res)
+> +{
+> +       phys_addr_t addr;
+> +
+> +       addr = acpi_pci_root_get_mcfg_addr(device->handle);
+> +       if (addr)
+> +               return addr;
+
+When you have address from _CBA, you are assuming that the
+bus range is also set correctly (from _CRS or as _BBN-0xff). Is
+this assumption correct?
+
+(this was discussed earlier)  you are doing the _CBA call again,
+I think cleaning up the _CBA, _BBN, _CRS and MCFG based
+ECAM area resources and defaults should be a different patch,
+which would need changes to pci_root.c. We should use
+root->mcfg_addr in this patchset.
+
+> +
+> +       return pci_mcfg_lookup_static(seg, bus_res->start, bus_res->end);
+
+There is no need to have a separate function for this, based on by
+above comment, you might need to change bus_res, so having it here
+would be better.
+
+> +}
+> +
+> +static __init int pci_mcfg_parse(struct acpi_table_header *header)
+> +{
+> +       struct acpi_table_mcfg *mcfg;
+> +       int n;
+> +
+> +       if (!header)
+> +               return -EINVAL;
+
+This is not needed, the handler is not called if header is NULL
+
+> +
+> +       mcfg = (struct acpi_table_mcfg *)header;
+> +       n = MCFG_ENTRIES(mcfg);
+> +       if (n <= 0 || n > 255) {
+> +               pr_err(PREFIX "MCFG has incorrect entries (%d).\n", n);
+> +               return -EINVAL;
+> +       }
+>
+> +       mcfg_table = mcfg;
+
+Saving a reference of ACPI mapping seems dangerous, acpi_parse_table
+calles early_acpi_os_unmap_memory() after calling handler, which does
+not do anything since acpi_gbl_permanent_mmap is set.
+
+I would suggest copying the entries.
+
+> +       pr_info(PREFIX "MCFG table loaded, %d entries detected\n", n);
+> +       return 0;
+> +}
+> +
+> +/* Interface called by ACPI - parse and save MCFG table */
+> +void __init pci_mmcfg_late_init(void)
+> +{
+> +       int err = acpi_table_parse(ACPI_SIG_MCFG, pci_mcfg_parse);
+> +       if (err)
+> +               pr_err(PREFIX "Failed to parse MCFG (%d)\n", err);
+> +}
+
+
+JC.
