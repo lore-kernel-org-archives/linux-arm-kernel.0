@@ -1,127 +1,96 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sat, 14 May 2016 19:57:30 +0200
-Subject: [PATCH 4/4] ARM: dts: sun8i-a?3-q8-tablet.dts: Add full otg support
-In-Reply-To: <1463248650-16611-1-git-send-email-hdegoede@redhat.com>
-References: <1463248650-16611-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1463248650-16611-4-git-send-email-hdegoede@redhat.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Sat, 14 May 2016 20:04:10 +0100
+Subject: [GIT PULL] EFI ARM Xen support
+Message-ID: <20160514190410.GA2283@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we've all the necessary bits in place we can enable
-full otg support on these tablets.
+Folks,
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- arch/arm/boot/dts/sun8i-a23-q8-tablet.dts | 15 ---------------
- arch/arm/boot/dts/sun8i-a33-q8-tablet.dts | 15 ---------------
- arch/arm/boot/dts/sun8i-q8-common.dtsi    | 31 +++++++++++++++++++++++++++++++
- 3 files changed, 31 insertions(+), 30 deletions(-)
+Please pull the following branch which contains support for Xen on ARM
+EFI platforms.
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-index 6062ea7..956320a 100644
---- a/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-+++ b/arch/arm/boot/dts/sun8i-a23-q8-tablet.dts
-@@ -48,18 +48,3 @@
- 	model = "Q8 A23 Tablet";
- 	compatible = "allwinner,q8-a23", "allwinner,sun8i-a23";
- };
--
--/*
-- * FIXME for now we only support host mode and rely on u-boot to have
-- * turned on Vbus which is controlled by the axp223 pmic on the board.
-- *
-- * Once we have axp223 support we should switch to fully supporting otg.
-- */
--&usb_otg {
--	dr_mode = "host";
--	status = "okay";
--};
--
--&usbphy {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
-index 44b3229..b0bc236 100644
---- a/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
-+++ b/arch/arm/boot/dts/sun8i-a33-q8-tablet.dts
-@@ -48,18 +48,3 @@
- 	model = "Q8 A33 Tablet";
- 	compatible = "allwinner,q8-a33", "allwinner,sun8i-a33";
- };
--
--/*
-- * FIXME for now we only support host mode and rely on u-boot to have
-- * turned on Vbus which is controlled by the axp223 pmic on the board.
-- *
-- * Once we have axp223 support we should switch to fully supporting otg.
-- */
--&usb_otg {
--	dr_mode = "host";
--	status = "okay";
--};
--
--&usbphy {
--	status = "okay";
--};
-diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 346a49d..2e2cbf5 100644
---- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-@@ -87,6 +87,13 @@
- 		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 	};
-+
-+	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
-+		allwinner,pins = "PH8";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
- };
- 
- &r_rsb {
-@@ -98,6 +105,7 @@
- 		interrupt-parent = <&nmi_intc>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
- 		eldoin-supply = <&reg_dcdc1>;
-+		x-powers,drivebus;
- 	};
- };
- 
-@@ -163,6 +171,11 @@
- 	regulator-name = "vcc-dram";
- };
- 
-+&reg_drivebus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
- &reg_rtc_ldo {
- 	regulator-name = "vcc-rtc";
- };
-@@ -176,3 +189,21 @@
- &simplefb_lcd {
- 	vcc-lcd-supply = <&reg_dc1sw>;
- };
-+
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
-+&usb_power_supply {
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&usb0_id_detect_pin>;
-+	usb0_id_det-gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
-+	usb0_vbus_power-supply = <&usb_power_supply>;
-+	usb0_vbus-supply = <&reg_drivebus>;
-+	status = "okay";
-+};
--- 
-2.7.4
+This merge includes a merge of Stefano's xen/linux-next branch to pull
+in the prerequisites required for Shannon's commit:
+
+  11ee5491e5ff ("Xen: EFI: Parse DT parameters for Xen specific UEFI")
+
+as it needs both the latest changes in the EFI 'next' branch (now
+tip/efi/core) and xen/linux-next.
+
+I have intentionally not included the individual patches as I would
+normally do in a pull request, so that commit history created by my
+merging of Stefano's branch is preserved, and so that there's no way
+to accidentally apply the patches individually.
+
+The following changes since commit 6c5450ef66816216e574885cf8d3ddb31ef77428:
+
+  efivarfs: Make efivarfs_file_ioctl() static (2016-05-07 07:06:13 +0200)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git efi/arm-xen
+
+for you to fetch changes up to 11ee5491e5ff519e0d3a7018eb21351cb6955a98:
+
+  Xen: EFI: Parse DT parameters for Xen specific UEFI (2016-05-14 19:31:01 +0100)
+
+----------------------------------------------------------------
+David Vrabel (1):
+      xen/gntdev: reduce copy batch size to 16
+
+Matt Fleming (1):
+      Merge branch 'xen/linux-next' into efi/arm-xen
+
+Shannon Zhao (16):
+      Xen: ACPI: Hide UART used by Xen
+      xen/grant-table: Move xlated_setup_gnttab_pages to common place
+      Xen: xlate: Use page_to_xen_pfn instead of page_to_pfn
+      arm/xen: Use xen_xlate_map_ballooned_pages to setup grant table
+      xen: memory : Add new XENMAPSPACE type XENMAPSPACE_dev_mmio
+      Xen: ARM: Add support for mapping platform device mmio
+      Xen: ARM: Add support for mapping AMBA device mmio
+      Xen: public/hvm: sync changes of HVM_PARAM_CALLBACK_VIA ABI from Xen
+      xen/hvm/params: Add a new delivery type for event-channel in HVM_PARAM_CALLBACK_IRQ
+      arm/xen: Get event-channel irq through HVM_PARAM when booting with ACPI
+      ARM: XEN: Move xen_early_init() before efi_init()
+      ARM: Xen: Document UEFI support on Xen ARM virtual platforms
+      XEN: EFI: Move x86 specific codes to architecture directory
+      ARM64: XEN: Add a function to initialize Xen specific UEFI runtime services
+      FDT: Add a helper to get the subnode by given name
+      Xen: EFI: Parse DT parameters for Xen specific UEFI
+
+Stefano Stabellini (1):
+      xen/x86: don't lose event interrupts
+
+ Documentation/devicetree/bindings/arm/xen.txt |  35 +++++
+ arch/arm/include/asm/xen/xen-ops.h            |   6 +
+ arch/arm/kernel/setup.c                       |   2 +-
+ arch/arm/xen/Makefile                         |   1 +
+ arch/arm/xen/efi.c                            |  40 ++++++
+ arch/arm/xen/enlighten.c                      | 125 ++++++++++++----
+ arch/arm64/include/asm/xen/xen-ops.h          |   6 +
+ arch/arm64/kernel/setup.c                     |   2 +-
+ arch/arm64/xen/Makefile                       |   1 +
+ arch/x86/xen/efi.c                            | 111 +++++++++++++++
+ arch/x86/xen/grant-table.c                    |  57 +-------
+ arch/x86/xen/time.c                           |   6 +-
+ drivers/acpi/scan.c                           |  74 ++++++++++
+ drivers/firmware/efi/arm-runtime.c            |   5 +
+ drivers/firmware/efi/efi.c                    |  81 ++++++++---
+ drivers/of/fdt.c                              |  13 ++
+ drivers/xen/Kconfig                           |   2 +-
+ drivers/xen/Makefile                          |   1 +
+ drivers/xen/arm-device.c                      | 196 ++++++++++++++++++++++++++
+ drivers/xen/efi.c                             | 173 +++++------------------
+ drivers/xen/gntdev.c                          |   2 +-
+ drivers/xen/xlate_mmu.c                       |  77 ++++++++++
+ include/linux/of_fdt.h                        |   2 +
+ include/xen/interface/hvm/params.h            |  40 +++++-
+ include/xen/interface/memory.h                |   1 +
+ include/xen/xen-ops.h                         |  32 +++--
+ 26 files changed, 840 insertions(+), 251 deletions(-)
+ create mode 100644 arch/arm/include/asm/xen/xen-ops.h
+ create mode 100644 arch/arm/xen/efi.c
+ create mode 100644 arch/arm64/include/asm/xen/xen-ops.h
+ create mode 100644 drivers/xen/arm-device.c
