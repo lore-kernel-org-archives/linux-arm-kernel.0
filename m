@@ -1,32 +1,51 @@
-From: pthomas8589@gmail.com (Paul Thomas)
-Date: Sat, 14 May 2016 15:11:21 -0400
-Subject: [PATCH v4 3/5] dmaengine: vdma: Add Support for Xilinx AXI Direct
- Memory Access Engine
-In-Reply-To: <C246CAC1457055469EF09E3A7AC4E11A4A5813F2@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1460006985-14805-1-git-send-email-appanad@xilinx.com>
- <1460006985-14805-4-git-send-email-appanad@xilinx.com>
- <CAD56B7fQWeDZDtKz2BgzpWSCMVdAGyUTBjUiuVnZ_8j51-SpoA@mail.gmail.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A5813F2@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <CAD56B7emtyPjHRXRoDPYORLCM5i5ZE5dW-B6rqkHpv7SF4KJrg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 14 May 2016 21:47:11 +0200
+Subject: QRTR merge conflict resolution (was: Re: linux-next: build
+ failure after merge of the net-next tree)
+In-Reply-To: <CAPBZ5Qfa+b1LLgqpxfKGysY5jXVrzmBzhga=ZYtpdDAKC9hnTQ@mail.gmail.com>
+References: <20160510112905.5bffcad8@canb.auug.org.au>
+ <20160513221909.GC1256@tuxbot>
+ <CAPBZ5Qfa+b1LLgqpxfKGysY5jXVrzmBzhga=ZYtpdDAKC9hnTQ@mail.gmail.com>
+Message-ID: <3145757.u11669EZop@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 12:36 AM, Appana Durga Kedareswara Rao
-<appana.durga.rao@xilinx.com> wrote:
-> Hi Paul,
->
->>
->> Nice Kedar!
->>
->> Is this getting applied? I would really like to see this get into the mainline.
->
-> This patch got applied to the dma-next branch...
-> Here @ http://git.kernel.org/cgit/linux/kernel/git/vkoul/slave-dma.git/log/?h=next
->
-> Thanks,
-> Kedar.
->
+On Friday 13 May 2016 17:47:17 Andy Gross wrote:
+> On 13 May 2016 at 17:19, Bjorn Andersson <bjorn.andersson@linaro.org> wrote:
+> > On Fri 13 May 14:01 PDT 2016, Arnd Bergmann wrote:
+> >
+> >> On Tuesday 10 May 2016 11:39:34 Bjorn Andersson wrote:
+> > [..]
+> >> > I assume we could have the QRTR go through Andy and arm-soc, with
+> >> > David's approval and this fix squashed in. But we're running rather late
+> >> > in this cycle, perhaps we should just back the QRTR patches out and I
+> >> > can respin and resend them after the merge window (for v4.8 instead)?
+> >>
+> >> I'd suggest you do a merge of next-next with the qcom/soc-2 branch that
+> >> we have in arm-soc and resolve the conflict in the merge, then send
+> >> a pull request with the merge to davem.
+> >>
+> >
+> > Hi David,
+> >
+> > In case you missed this thread, linux-next highlighted an upcoming merge
+> > conflict between the net-next and one of the branches included in the
+> > arm-soc trees.
+> >
+> > I have prepared the merge of net-next and the conflicting tag from the
+> > Qualcomm SOC, please include this in your pull towards Linus to avoid
+> > the merge conflict.
+> >
+> > Regards,
+> > Bjorn
+> >
+> > The following changes since commit ed7cbbce544856b20e5811de373cf92e92499771:
+> >
+> >   udp: Resolve NULL pointer dereference over flow-based vxlan device (2016-05-13 01:56:14 -0400)
+> 
+> 
+> OK. The contents look good to me.
+> 
+> Acked-by: Andy Gross <andy.gross@linaro.org>
 
-I see, thanks!
-
--Paul
+Acked-by: Arnd Bergmann <arnd@arndb.de>
