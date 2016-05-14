@@ -1,51 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 14 May 2016 21:47:11 +0200
-Subject: QRTR merge conflict resolution (was: Re: linux-next: build
- failure after merge of the net-next tree)
-In-Reply-To: <CAPBZ5Qfa+b1LLgqpxfKGysY5jXVrzmBzhga=ZYtpdDAKC9hnTQ@mail.gmail.com>
-References: <20160510112905.5bffcad8@canb.auug.org.au>
- <20160513221909.GC1256@tuxbot>
- <CAPBZ5Qfa+b1LLgqpxfKGysY5jXVrzmBzhga=ZYtpdDAKC9hnTQ@mail.gmail.com>
-Message-ID: <3145757.u11669EZop@wuerfel>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 14 May 2016 16:12:06 -0400 (EDT)
+Subject: [PATCH] arm64: bpf: jit JMP_JSET_{X,K}
+In-Reply-To: <20160513100307.GC13689@arm.com>
+References: <1463121478-18484-1-git-send-email-zlim.lnx@gmail.com>
+ <20160513095718.GB13689@arm.com> <20160513100307.GC13689@arm.com>
+Message-ID: <20160514.161206.373725987038622109.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 May 2016 17:47:17 Andy Gross wrote:
-> On 13 May 2016 at 17:19, Bjorn Andersson <bjorn.andersson@linaro.org> wrote:
-> > On Fri 13 May 14:01 PDT 2016, Arnd Bergmann wrote:
-> >
-> >> On Tuesday 10 May 2016 11:39:34 Bjorn Andersson wrote:
-> > [..]
-> >> > I assume we could have the QRTR go through Andy and arm-soc, with
-> >> > David's approval and this fix squashed in. But we're running rather late
-> >> > in this cycle, perhaps we should just back the QRTR patches out and I
-> >> > can respin and resend them after the merge window (for v4.8 instead)?
-> >>
-> >> I'd suggest you do a merge of next-next with the qcom/soc-2 branch that
-> >> we have in arm-soc and resolve the conflict in the merge, then send
-> >> a pull request with the merge to davem.
-> >>
-> >
-> > Hi David,
-> >
-> > In case you missed this thread, linux-next highlighted an upcoming merge
-> > conflict between the net-next and one of the branches included in the
-> > arm-soc trees.
-> >
-> > I have prepared the merge of net-next and the conflicting tag from the
-> > Qualcomm SOC, please include this in your pull towards Linus to avoid
-> > the merge conflict.
-> >
-> > Regards,
-> > Bjorn
-> >
-> > The following changes since commit ed7cbbce544856b20e5811de373cf92e92499771:
-> >
-> >   udp: Resolve NULL pointer dereference over flow-based vxlan device (2016-05-13 01:56:14 -0400)
-> 
-> 
-> OK. The contents look good to me.
-> 
-> Acked-by: Andy Gross <andy.gross@linaro.org>
+From: Will Deacon <will.deacon@arm.com>
+Date: Fri, 13 May 2016 11:03:07 +0100
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> On Fri, May 13, 2016 at 10:57:18AM +0100, Will Deacon wrote:
+>> On Thu, May 12, 2016 at 11:37:58PM -0700, Zi Shen Lim wrote:
+>> > Original implementation commit e54bcde3d69d ("arm64: eBPF JIT compiler")
+>> > had the relevant code paths, but due to an oversight always fail jiting.
+>> > 
+>> > As a result, we had been falling back to BPF interpreter whenever a BPF
+>> > program has JMP_JSET_{X,K} instructions.
+>> > 
+>> > With this fix, we confirm that the corresponding tests in lib/test_bpf
+>> > continue to pass, and also jited.
+>> > 
+>> > ...
+>> > [    2.784553] test_bpf: #30 JSET jited:1 188 192 197 PASS
+>> > [    2.791373] test_bpf: #31 tcpdump port 22 jited:1 325 677 625 PASS
+>> > [    2.808800] test_bpf: #32 tcpdump complex jited:1 323 731 991 PASS
+>> > ...
+>> > [    3.190759] test_bpf: #237 JMP_JSET_K: if (0x3 & 0x2) return 1 jited:1 110 PASS
+>> > [    3.192524] test_bpf: #238 JMP_JSET_K: if (0x3 & 0xffffffff) return 1 jited:1 98 PASS
+>> > [    3.211014] test_bpf: #249 JMP_JSET_X: if (0x3 & 0x2) return 1 jited:1 120 PASS
+>> > [    3.212973] test_bpf: #250 JMP_JSET_X: if (0x3 & 0xffffffff) return 1 jited:1 89 PASS
+>> > ...
+>> > 
+>> > Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+>> > Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+ ...
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> 
+> I'm assuming David will queue this?
+
+Yep I got this, applied, thanks.
