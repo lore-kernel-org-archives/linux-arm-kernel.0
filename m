@@ -1,27 +1,66 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 14 May 2016 13:57:12 +0200
-Subject: [PATCH] ARM64: dts: rockchip: assign default rates for core
- rk3399 clocks
-In-Reply-To: <1463172618-96001-1-git-send-email-briannorris@chromium.org>
-References: <1463172618-96001-1-git-send-email-briannorris@chromium.org>
-Message-ID: <25672526.OH6Oxq7zkd@phil>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 14 May 2016 14:45:05 +0200
+Subject: [PATCH v2 2/2] musb: sunxi: Set state to A_WAIT_VRISE when enabling
+ Vbus
+In-Reply-To: <1463229905-26387-1-git-send-email-hdegoede@redhat.com>
+References: <1463229905-26387-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1463229905-26387-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 13. Mai 2016, 13:50:18 schrieb Brian Norris:
-> From: Xing Zheng <zhengxing@rock-chips.com>
-> 
-> These clocks are all core clocks used by many blocks/peripherals, many
-> of whose drivers don't set their clock rates at all. Let's assign
-> reasonable default clock rates for these core clocks, so that these
-> peripherals get something reasonable by default, and also so that if
-> child devices want to select a clock rate themselves, their muxes have
-> some reasonable parent clock rates to branch off of (rather than just
-> the boot-time defaults).
-> 
-> This helps the eMMC PHY, for one, to get a reasonable ACLK rate.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+When the board is powering attached usb devices via the otg port
+sometimes / on some devices it takes slightly too long for the Vbus
+detection code in phy-sun4i-usb.c to signal that Vbus is high after
+enabling Vbus and the musb hardware signals a MUSB_INTR_VBUSERROR
+interrupt.
 
-applied for 4.8 with Doug's review-tag (after making the ARM64 lower-case)
+This commit sets the otg state to A_WAIT_VRISE upon enabling Vbus
+making musb_stage0_irq() ignore the first VBUSERR_RETRY_COUNT
+VBUSERROR interrupts, fixing connection issues in these cases.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Use curly-braces in both branches of if-else
+---
+ drivers/usb/musb/sunxi.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index 2c33d9b..e7d4617 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -112,7 +112,7 @@ static void sunxi_musb_work(struct work_struct *work)
+ 		if (test_bit(SUNXI_MUSB_FL_HOSTMODE, &glue->flags)) {
+ 			set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
+ 			musb->xceiv->otg->default_a = 1;
+-			musb->xceiv->otg->state = OTG_STATE_A_IDLE;
++			musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
+ 			MUSB_HST_MODE(musb);
+ 			devctl |= MUSB_DEVCTL_SESSION;
+ 		} else {
+@@ -145,10 +145,12 @@ static void sunxi_musb_set_vbus(struct musb *musb, int is_on)
+ {
+ 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+ 
+-	if (is_on)
++	if (is_on) {
+ 		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
+-	else
++		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
++	} else {
+ 		clear_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++	}
+ 
+ 	schedule_work(&glue->work);
+ }
+@@ -325,6 +327,7 @@ static int sunxi_set_mode(struct musb *musb, u8 mode)
+ 		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
+ 		/* Stop musb work from turning vbus off again */
+ 		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
++		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
+ 	}
+ 
+ 	return 0;
+-- 
+2.7.4
