@@ -1,34 +1,39 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 15 May 2016 22:13:54 +0200
-Subject: [PATCH v4 13/22] ARM: dts: exynos: Enable UART3 on Exynos5410
+Date: Sun, 15 May 2016 22:13:55 +0200
+Subject: [PATCH v4 14/22] ARM: dts: exynos: MCT is not an interrupt controller
+ and extend length of iomap
 In-Reply-To: <1463343243-26429-1-git-send-email-krzk@kernel.org>
 References: <1463343243-26429-1-git-send-email-krzk@kernel.org>
-Message-ID: <1463343243-26429-14-git-send-email-krzk@kernel.org>
+Message-ID: <1463343243-26429-15-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like other Exynos5 family SoCs, this one has four UARTs. Configure
-clocks for UART3 and enable it.
+Multi-Core Timer generates interrupts but it is not really an interrupt
+controller so remove the "interrupt-controller" and "interrupt-cells"
+properties. Additionally extend the length of mapped memory to cover all
+registers (last SFR is at 0x0A40).
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm/boot/dts/exynos5410.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5420.dtsi | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index c8f2e4881667..0edcd7022293 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -215,7 +215,8 @@
- };
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 4b16a9376a24..872dadf0f2d4 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -263,9 +263,7 @@
  
- &serial_3 {
--	status = "disabled";
-+	clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
-+	clock-names = "uart", "clk_uart_baud0";
- };
- 
- &sromc {
+ 		mct: mct at 101C0000 {
+ 			compatible = "samsung,exynos4210-mct";
+-			reg = <0x101C0000 0x800>;
+-			interrupt-controller;
+-			#interrupt-cells = <1>;
++			reg = <0x101C0000 0xB00>;
+ 			interrupt-parent = <&mct_map>;
+ 			interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>,
+ 					<8>, <9>, <10>, <11>;
 -- 
 2.5.0
