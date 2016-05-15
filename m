@@ -1,46 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 15 May 2016 20:51:12 +0200
-Subject: [PATCH 08/16] clk: sunxi-ng: Add M-factor clock support
-In-Reply-To: <20160511084633.29b56effa514996ffafd56ef@free.fr>
+Date: Sun, 15 May 2016 21:08:18 +0200
+Subject: [PATCH 13/16] clk: sunxi-ng: Add N-K-M Factor clock
+In-Reply-To: <20160511104556.037a2c17e3a6a0503a26fbf0@free.fr>
 References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-9-git-send-email-maxime.ripard@free-electrons.com>
- <20160511084633.29b56effa514996ffafd56ef@free.fr>
-Message-ID: <20160515185112.GB27618@lukather>
+ <1462737711-10017-14-git-send-email-maxime.ripard@free-electrons.com>
+ <20160511104556.037a2c17e3a6a0503a26fbf0@free.fr>
+Message-ID: <20160515190818.GD27618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 08:46:33AM +0200, Jean-Francois Moine wrote:
-> On Sun,  8 May 2016 22:01:43 +0200
+On Wed, May 11, 2016 at 10:45:56AM +0200, Jean-Francois Moine wrote:
+> On Sun,  8 May 2016 22:01:48 +0200
 > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> > Introduce support for clocks that divide by a linear factor.
+> > Introduce support for clocks that multiply and divide using two linear
+> > multipliers and one linear divider.
 > > 
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > > ---
-> >  drivers/clk/sunxi-ng/Makefile |   1 +
-> >  drivers/clk/sunxi-ng/ccu_m.c  | 135 ++++++++++++++++++++++++++++++++++++++++++
-> >  drivers/clk/sunxi-ng/ccu_m.h  | 101 +++++++++++++++++++++++++++++++
-> >  3 files changed, 237 insertions(+)
-> >  create mode 100644 drivers/clk/sunxi-ng/ccu_m.c
-> >  create mode 100644 drivers/clk/sunxi-ng/ccu_m.h
+> >  drivers/clk/sunxi-ng/Makefile  |   1 +
+> >  drivers/clk/sunxi-ng/ccu_nkm.c | 144 +++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/sunxi-ng/ccu_nkm.h |  42 ++++++++++++
+> >  3 files changed, 187 insertions(+)
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.c
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.h
 > > 
 > > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> > index a47a3bbdf285..f41de901c607 100644
+> > index fba64c7f4fcd..2bb8bc22e907 100644
 > > --- a/drivers/clk/sunxi-ng/Makefile
 > > +++ b/drivers/clk/sunxi-ng/Makefile
-> > @@ -4,5 +4,6 @@ obj-y += ccu_reset.o
-> >  obj-y += ccu_div_table.o
-> >  obj-y += ccu_fixed_factor.o
-> >  obj-y += ccu_gate.o
-> > +obj-y += ccu_m.o
+> > @@ -8,6 +8,7 @@ obj-y += ccu_m.o
+> >  obj-y += ccu_mp.o
 > >  obj-y += ccu_mux.o
+> >  obj-y += ccu_nk.o
+> > +obj-y += ccu_nkm.o
+> >  obj-y += ccu_nm.o
+> >  obj-y += ccu_p.o
 > >  obj-y += ccu_phase.o
-> > diff --git a/drivers/clk/sunxi-ng/ccu_m.c b/drivers/clk/sunxi-ng/ccu_m.c
+> > diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
 > > new file mode 100644
-> > index 000000000000..424eb6da0d5b
+> > index 000000000000..9019c7f6988c
 > > --- /dev/null
-> > +++ b/drivers/clk/sunxi-ng/ccu_m.c
-> > @@ -0,0 +1,135 @@
+> > +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
+> 	[snip]
+> > @@ -0,0 +1,144 @@
 > > +/*
 > > + * Copyright (C) 2016 Maxime Ripard
 > > + * Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -50,26 +53,48 @@ On Wed, May 11, 2016 at 08:46:33AM +0200, Jean-Francois Moine wrote:
 > > + * published by the Free Software Foundation; either version 2 of
 > > + * the License, or (at your option) any later version.
 > > + */
+> > +
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/rational.h>
+> > +
+> > +#include "ccu_gate.h"
+> > +#include "ccu_nkm.h"
+> > +
+> > +void ccu_nkm_find_best(unsigned long parent, unsigned long rate,
+> > +		       unsigned long max_n, unsigned long max_k, unsigned long max_m,
+> > +		       unsigned long *n, unsigned long *k, unsigned long *m)
+> 
+> Should be static
+> 
 > 	[snip]
-> > +static int ccu_m_set_rate(struct clk_hw *hw, unsigned long rate,
-> > +			  unsigned long parent_rate)
+> 
+> > +static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
+> > +			   unsigned long parent_rate)
 > > +{
-> > +	struct ccu_m *cm = hw_to_ccu_m(hw);
+> > +	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
+> > +	unsigned long n, k, m;
 > > +	unsigned long flags;
-> > +	unsigned int m;
 > > +	u32 reg;
 > > +
-> > +	ccu_m_find_best(parent_rate, rate, 1 << cm->m.width, &m);
+> > +	ccu_nkm_find_best(parent_rate, rate, 1 << nkm->n.width,
+> > +			  1 << nkm->k.width, 1 << nkm->m.width,
+> > +			  &n, &k, &m);
 > > +
-> > +	spin_lock_irqsave(cm->common.lock, flags);
+> > +	spin_lock_irqsave(nkm->common.lock, flags);
 > > +
-> > +	reg = readl(cm->common.base + cm->common.reg);
-> > +	reg &= ((1 << cm->m.width) - 1) << cm->m.shift;
+> > +	reg = readl(nkm->common.base + nkm->common.reg);
+> > +	reg &= ~GENMASK(nkm->n.width + nkm->n.shift, nkm->n.shift);
+> > +	reg &= ~GENMASK(nkm->k.width + nkm->k.shift, nkm->k.shift);
+> > +	reg &= ~GENMASK(nkm->m.width + nkm->m.shift, nkm->m.shift);
+> > +
+> > +	reg |= (n - 1) << nkm->m.shift;
+> > +	reg |= (k - 1) << nkm->m.shift;
+> > +	reg |= (m - 1) << nkm->m.shift;
 > 
-> Bug:
-> 	reg &= ~GENMASK(cm->m.width + cm->m.shift, cm->m.shift);
+> 	reg |= (n - 1) << nkm->n.shift;
+> 	reg |= (k - 1) << nkm->k.shift;
 
-Indeed, this one slipped in, thanks!
+Good catches, thanks!
 Maxime
 
 -- 
@@ -82,4 +107,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160515/4a3c02f5/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160515/2cefa15f/attachment.sig>
