@@ -1,100 +1,49 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 15 May 2016 21:08:18 +0200
-Subject: [PATCH 13/16] clk: sunxi-ng: Add N-K-M Factor clock
-In-Reply-To: <20160511104556.037a2c17e3a6a0503a26fbf0@free.fr>
+Date: Sun, 15 May 2016 21:18:32 +0200
+Subject: [PATCH 15/16] clk: sunxi-ng: Add H3 clocks
+In-Reply-To: <20160509093958.26e9549f8ce78888c0e9586a@free.fr>
 References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-14-git-send-email-maxime.ripard@free-electrons.com>
- <20160511104556.037a2c17e3a6a0503a26fbf0@free.fr>
-Message-ID: <20160515190818.GD27618@lukather>
+ <1462737711-10017-16-git-send-email-maxime.ripard@free-electrons.com>
+ <20160509093958.26e9549f8ce78888c0e9586a@free.fr>
+Message-ID: <20160515191832.GE27618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 10:45:56AM +0200, Jean-Francois Moine wrote:
-> On Sun,  8 May 2016 22:01:48 +0200
+On Mon, May 09, 2016 at 09:39:58AM +0200, Jean-Francois Moine wrote:
+> On Sun,  8 May 2016 22:01:50 +0200
 > Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 > 
-> > Introduce support for clocks that multiply and divide using two linear
-> > multipliers and one linear divider.
+> > Add the list of clocks and resets found in the H3 CCU.
 > > 
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > > ---
-> >  drivers/clk/sunxi-ng/Makefile  |   1 +
-> >  drivers/clk/sunxi-ng/ccu_nkm.c | 144 +++++++++++++++++++++++++++++++++++++++++
-> >  drivers/clk/sunxi-ng/ccu_nkm.h |  42 ++++++++++++
-> >  3 files changed, 187 insertions(+)
-> >  create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.c
-> >  create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.h
+> >  drivers/clk/sunxi-ng/Makefile        |   2 +
+> >  drivers/clk/sunxi-ng/ccu-sun8i-h3.c  | 757 +++++++++++++++++++++++++++++++++++
+> >  include/dt-bindings/clock/sun8i-h3.h | 162 ++++++++
+> >  include/dt-bindings/reset/sun8i-h3.h | 103 +++++
+> >  4 files changed, 1024 insertions(+)
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> >  create mode 100644 include/dt-bindings/clock/sun8i-h3.h
+> >  create mode 100644 include/dt-bindings/reset/sun8i-h3.h
 > > 
 > > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> > index fba64c7f4fcd..2bb8bc22e907 100644
+> > index c794f57b6fb1..67ff6a92f124 100644
 > > --- a/drivers/clk/sunxi-ng/Makefile
 > > +++ b/drivers/clk/sunxi-ng/Makefile
-> > @@ -8,6 +8,7 @@ obj-y += ccu_m.o
-> >  obj-y += ccu_mp.o
-> >  obj-y += ccu_mux.o
-> >  obj-y += ccu_nk.o
-> > +obj-y += ccu_nkm.o
+> > @@ -13,3 +13,5 @@ obj-y += ccu_nkmp.o
 > >  obj-y += ccu_nm.o
 > >  obj-y += ccu_p.o
 > >  obj-y += ccu_phase.o
-> > diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> > new file mode 100644
-> > index 000000000000..9019c7f6988c
-> > --- /dev/null
-> > +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-> 	[snip]
-> > @@ -0,0 +1,144 @@
-> > +/*
-> > + * Copyright (C) 2016 Maxime Ripard
-> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or
-> > + * modify it under the terms of the GNU General Public License as
-> > + * published by the Free Software Foundation; either version 2 of
-> > + * the License, or (at your option) any later version.
-> > + */
 > > +
-> > +#include <linux/clk-provider.h>
-> > +#include <linux/rational.h>
-> > +
-> > +#include "ccu_gate.h"
-> > +#include "ccu_nkm.h"
-> > +
-> > +void ccu_nkm_find_best(unsigned long parent, unsigned long rate,
-> > +		       unsigned long max_n, unsigned long max_k, unsigned long max_m,
-> > +		       unsigned long *n, unsigned long *k, unsigned long *m)
+> > +obj-y += ccu-sun8i-h3.o
 > 
-> Should be static
+> +obj-$(CONFIG_MACH_SUN8I) += ccu-sun8i-h3.o
 > 
-> 	[snip]
-> 
-> > +static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
-> > +			   unsigned long parent_rate)
-> > +{
-> > +	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-> > +	unsigned long n, k, m;
-> > +	unsigned long flags;
-> > +	u32 reg;
-> > +
-> > +	ccu_nkm_find_best(parent_rate, rate, 1 << nkm->n.width,
-> > +			  1 << nkm->k.width, 1 << nkm->m.width,
-> > +			  &n, &k, &m);
-> > +
-> > +	spin_lock_irqsave(nkm->common.lock, flags);
-> > +
-> > +	reg = readl(nkm->common.base + nkm->common.reg);
-> > +	reg &= ~GENMASK(nkm->n.width + nkm->n.shift, nkm->n.shift);
-> > +	reg &= ~GENMASK(nkm->k.width + nkm->k.shift, nkm->k.shift);
-> > +	reg &= ~GENMASK(nkm->m.width + nkm->m.shift, nkm->m.shift);
-> > +
-> > +	reg |= (n - 1) << nkm->m.shift;
-> > +	reg |= (k - 1) << nkm->m.shift;
-> > +	reg |= (m - 1) << nkm->m.shift;
-> 
-> 	reg |= (n - 1) << nkm->n.shift;
-> 	reg |= (k - 1) << nkm->k.shift;
+> should be better.
 
-Good catches, thanks!
+Indeed, changed.
+
+Thanks!
 Maxime
 
 -- 
@@ -107,4 +56,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160515/2cefa15f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160515/bfedb768/attachment-0001.sig>
