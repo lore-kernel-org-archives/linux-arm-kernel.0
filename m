@@ -1,49 +1,113 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sun, 15 May 2016 22:13:45 +0200
-Subject: [PATCH v4 04/22] ARM: dts: exynos: Re-order alphabetically Exynos5420
- SD0/SD1 pinctrl nodes
+Date: Sun, 15 May 2016 22:13:47 +0200
+Subject: [PATCH v4 06/22] ARM: dts: exynos: Configure Exynos5410 pinctrl for
+ eMMC and SD card
 In-Reply-To: <1463343243-26429-1-git-send-email-krzk@kernel.org>
 References: <1463343243-26429-1-git-send-email-krzk@kernel.org>
-Message-ID: <1463343243-26429-5-git-send-email-krzk@kernel.org>
+Message-ID: <1463343243-26429-7-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 'sd0_rclk' was put in the middle of SD1 nodes. Remove the confusion.
+Configure the pinctrl for MMC0 (eMMC) and MMC2 (microSD card).
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
- arch/arm/boot/dts/exynos5420-pinctrl.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-index 130563b2ca95..14beb7e07323 100644
---- a/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5420-pinctrl.dtsi
-@@ -193,17 +193,17 @@
- 		samsung,pin-drv = <3>;
+---
+
+Important changes since v2:
+1. Re-order the eMMC pins by pin-name, not by label.
+---
+ arch/arm/boot/dts/exynos5410-pinctrl.dtsi | 77 +++++++++++++++++++++++++++++++
+ 1 file changed, 77 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
+index f9aa6bb55464..ddacafa1e907 100644
+--- a/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
++++ b/arch/arm/boot/dts/exynos5410-pinctrl.dtsi
+@@ -277,6 +277,83 @@
+ 		interrupt-controller;
+ 		#interrupt-cells = <2>;
  	};
- 
--	sd1_clk: sd1-clk {
--		samsung,pins = "gpc1-0";
-+	sd0_rclk: sd0-rclk {
-+		samsung,pins = "gpc0-7";
- 		samsung,pin-function = <2>;
--		samsung,pin-pud = <0>;
-+		samsung,pin-pud = <1>;
- 		samsung,pin-drv = <3>;
- 	};
- 
--	sd0_rclk: sd0-rclk {
--		samsung,pins = "gpc0-7";
-+	sd1_clk: sd1-clk {
-+		samsung,pins = "gpc1-0";
- 		samsung,pin-function = <2>;
--		samsung,pin-pud = <1>;
++
++	sd0_clk: sd0-clk {
++		samsung,pins = "gpc0-0";
++		samsung,pin-function = <2>;
 +		samsung,pin-pud = <0>;
- 		samsung,pin-drv = <3>;
- 	};
++		samsung,pin-drv = <3>;
++	};
++
++	sd0_cmd: sd0-cmd {
++		samsung,pins = "gpc0-1";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd0_cd: sd0-cd {
++		samsung,pins = "gpc0-2";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd0_bus1: sd0-bus-width1 {
++		samsung,pins = "gpc0-3";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd0_bus4: sd0-bus-width4 {
++		samsung,pins = "gpc0-4", "gpc0-5", "gpc0-6";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd2_clk: sd2-clk {
++		samsung,pins = "gpc2-0";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd2_cmd: sd2-cmd {
++		samsung,pins = "gpc2-1";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <0>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd2_cd: sd2-cd {
++		samsung,pins = "gpc2-2";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd2_bus1: sd2-bus-width1 {
++		samsung,pins = "gpc2-3";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd2_bus4: sd2-bus-width4 {
++		samsung,pins = "gpc2-4", "gpc2-5", "gpc2-6";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
++
++	sd0_bus8: sd0-bus-width8 {
++		samsung,pins = "gpc3-0", "gpc3-1", "gpc3-2", "gpc3-3";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
+ };
  
+ &pinctrl_1 {
 -- 
 2.5.0
