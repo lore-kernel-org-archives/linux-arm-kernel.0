@@ -1,119 +1,85 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Mon, 16 May 2016 12:19:00 +0530
-Subject: [PATCH V4 6/7] iommu/msm: Use writel_relaxed and add a barrier
-In-Reply-To: <1463381341-30498-1-git-send-email-sricharan@codeaurora.org>
-References: <1463381341-30498-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1463381341-30498-7-git-send-email-sricharan@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 15 May 2016 20:51:12 +0200
+Subject: [PATCH 08/16] clk: sunxi-ng: Add M-factor clock support
+In-Reply-To: <20160511084633.29b56effa514996ffafd56ef@free.fr>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-9-git-send-email-maxime.ripard@free-electrons.com>
+ <20160511084633.29b56effa514996ffafd56ef@free.fr>
+Message-ID: <20160515185112.GB27618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While using the generic pagetable ops the tlb maintenance
-operation gets completed in the sync callback. So use writel_relaxed
-for all register access and add a mb() at appropriate places.
+On Wed, May 11, 2016 at 08:46:33AM +0200, Jean-Francois Moine wrote:
+> On Sun,  8 May 2016 22:01:43 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > Introduce support for clocks that divide by a linear factor.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi-ng/Makefile |   1 +
+> >  drivers/clk/sunxi-ng/ccu_m.c  | 135 ++++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/sunxi-ng/ccu_m.h  | 101 +++++++++++++++++++++++++++++++
+> >  3 files changed, 237 insertions(+)
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu_m.c
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu_m.h
+> > 
+> > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> > index a47a3bbdf285..f41de901c607 100644
+> > --- a/drivers/clk/sunxi-ng/Makefile
+> > +++ b/drivers/clk/sunxi-ng/Makefile
+> > @@ -4,5 +4,6 @@ obj-y += ccu_reset.o
+> >  obj-y += ccu_div_table.o
+> >  obj-y += ccu_fixed_factor.o
+> >  obj-y += ccu_gate.o
+> > +obj-y += ccu_m.o
+> >  obj-y += ccu_mux.o
+> >  obj-y += ccu_phase.o
+> > diff --git a/drivers/clk/sunxi-ng/ccu_m.c b/drivers/clk/sunxi-ng/ccu_m.c
+> > new file mode 100644
+> > index 000000000000..424eb6da0d5b
+> > --- /dev/null
+> > +++ b/drivers/clk/sunxi-ng/ccu_m.c
+> > @@ -0,0 +1,135 @@
+> > +/*
+> > + * Copyright (C) 2016 Maxime Ripard
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + */
+> 	[snip]
+> > +static int ccu_m_set_rate(struct clk_hw *hw, unsigned long rate,
+> > +			  unsigned long parent_rate)
+> > +{
+> > +	struct ccu_m *cm = hw_to_ccu_m(hw);
+> > +	unsigned long flags;
+> > +	unsigned int m;
+> > +	u32 reg;
+> > +
+> > +	ccu_m_find_best(parent_rate, rate, 1 << cm->m.width, &m);
+> > +
+> > +	spin_lock_irqsave(cm->common.lock, flags);
+> > +
+> > +	reg = readl(cm->common.base + cm->common.reg);
+> > +	reg &= ((1 << cm->m.width) - 1) << cm->m.shift;
+> 
+> Bug:
+> 	reg &= ~GENMASK(cm->m.width + cm->m.shift, cm->m.shift);
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- drivers/iommu/msm_iommu.c         | 11 ++++++++---
- drivers/iommu/msm_iommu_hw-8xxx.h |  7 ++++---
- 2 files changed, 12 insertions(+), 6 deletions(-)
+Indeed, this one slipped in, thanks!
+Maxime
 
-diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
-index f7b4c11..1240a5a 100644
---- a/drivers/iommu/msm_iommu.c
-+++ b/drivers/iommu/msm_iommu.c
-@@ -124,6 +124,7 @@ static void msm_iommu_reset(void __iomem *base, int ncb)
- 		SET_TLBLKCR(base, ctx, 0);
- 		SET_CONTEXTIDR(base, ctx, 0);
- 	}
-+	mb(); /* sync */
- }
- 
- static void __flush_iotlb(void *cookie)
-@@ -143,6 +144,7 @@ static void __flush_iotlb(void *cookie)
- 
- 		__disable_clocks(iommu);
- 	}
-+	mb(); /* sync */
- fail:
- 	return;
- }
-@@ -181,7 +183,7 @@ fail:
- 
- static void __flush_iotlb_sync(void *cookie)
- {
--	/* To avoid a null function pointer */
-+	mb(); /* sync */
- }
- 
- static const struct iommu_gather_ops msm_iommu_gather_ops = {
-@@ -235,6 +237,7 @@ static void config_mids(struct msm_iommu_dev *iommu,
- 		/* Set security bit override to be Non-secure */
- 		SET_NSCFG(iommu->base, mid, 3);
- 	}
-+	mb(); /* sync */
- }
- 
- static void __reset_context(void __iomem *base, int ctx)
-@@ -257,6 +260,7 @@ static void __reset_context(void __iomem *base, int ctx)
- 	SET_TLBFLPTER(base, ctx, 0);
- 	SET_TLBSLPTER(base, ctx, 0);
- 	SET_TLBLKCR(base, ctx, 0);
-+	mb(); /* sync */
- }
- 
- static void __program_context(void __iomem *base, int ctx,
-@@ -305,6 +309,7 @@ static void __program_context(void __iomem *base, int ctx,
- 
- 	/* Enable the MMU */
- 	SET_M(base, ctx, 1);
-+	mb(); /* sync */
- }
- 
- static struct iommu_domain *msm_iommu_domain_alloc(unsigned type)
-@@ -500,7 +505,7 @@ static phys_addr_t msm_iommu_iova_to_phys(struct iommu_domain *domain,
- 	/* Invalidate context TLB */
- 	SET_CTX_TLBIALL(iommu->base, master->num, 0);
- 	SET_V2PPR(iommu->base, master->num, va & V2Pxx_VA);
--
-+	mb(); /* sync */
- 	par = GET_PAR(iommu->base, master->num);
- 
- 	/* We are dealing with a supersection */
-@@ -714,7 +719,7 @@ static int msm_iommu_probe(struct platform_device *pdev)
- 	par = GET_PAR(iommu->base, 0);
- 	SET_V2PCFG(iommu->base, 0, 0);
- 	SET_M(iommu->base, 0, 0);
--
-+	mb(); /* sync */
- 	if (!par) {
- 		pr_err("Invalid PAR value detected\n");
- 		ret = -ENODEV;
-diff --git a/drivers/iommu/msm_iommu_hw-8xxx.h b/drivers/iommu/msm_iommu_hw-8xxx.h
-index 84ba5739..161036c 100644
---- a/drivers/iommu/msm_iommu_hw-8xxx.h
-+++ b/drivers/iommu/msm_iommu_hw-8xxx.h
-@@ -24,10 +24,10 @@
- #define GET_CTX_REG(reg, base, ctx) \
- 				(readl((base) + (reg) + ((ctx) << CTX_SHIFT)))
- 
--#define SET_GLOBAL_REG(reg, base, val)	writel((val), ((base) + (reg)))
-+#define SET_GLOBAL_REG(reg, base, val)	writel_relaxed((val), ((base) + (reg)))
- 
- #define SET_CTX_REG(reg, base, ctx, val) \
--			writel((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
-+		writel_relaxed((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
- 
- /* Wrappers for numbered registers */
- #define SET_GLOBAL_REG_N(b, n, r, v) SET_GLOBAL_REG(b, ((r) + (n << 2)), (v))
-@@ -48,7 +48,8 @@
- #define SET_FIELD(addr, mask, shift, v) \
- do { \
- 	int t = readl(addr); \
--	writel((t & ~((mask) << (shift))) + (((v) & (mask)) << (shift)), addr);\
-+	writel_relaxed((t & ~((mask) << (shift))) + \
-+		       (((v) & (mask)) << (shift)), addr);\
- } while (0)
- 
- 
 -- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160515/4a3c02f5/attachment.sig>
