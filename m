@@ -1,30 +1,33 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 May 2016 14:47:20 +0200
-Subject: [PATCH 20/20] ARM: sunxi: Enable VGA bridge
-In-Reply-To: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1463402840-17062-21-git-send-email-maxime.ripard@free-electrons.com>
+From: matt.evans@arm.com (Matt Evans)
+Date: Mon, 16 May 2016 13:54:56 +0100
+Subject: [PATCH] kvm: arm64: Fix EC field in inject_abt64
+Message-ID: <5739C320.6010602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the VGA bridge used on the A13-Olinuxino in the sunxi defconfig
+The EC field of the constructed ESR is conditionally modified by ORing in
+ESR_ELx_EC_DABT_LOW for a data abort.  However, ESR_ELx_EC_SHIFT is missing
+from this condition.
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Matt Evans <matt.evans@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: <stable@vger.kernel.org>
 ---
- arch/arm/configs/sunxi_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/kvm/inject_fault.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/sunxi_defconfig b/arch/arm/configs/sunxi_defconfig
-index 6a1447cf8feb..3676cc2db2eb 100644
---- a/arch/arm/configs/sunxi_defconfig
-+++ b/arch/arm/configs/sunxi_defconfig
-@@ -98,6 +98,7 @@ CONFIG_MEDIA_RC_SUPPORT=y
- CONFIG_RC_DEVICES=y
- CONFIG_IR_SUNXI=y
- CONFIG_DRM=y
-+CONFIG_DRM_DUMB_VGA=y
- CONFIG_DRM_SUN4I=y
- CONFIG_FB=y
- CONFIG_FB_SIMPLE=y
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index 4d1ac81..e9e0e6d 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -162,7 +162,7 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
+ 		esr |= (ESR_ELx_EC_IABT_CUR << ESR_ELx_EC_SHIFT);
+ 
+ 	if (!is_iabt)
+-		esr |= ESR_ELx_EC_DABT_LOW;
++		esr |= ESR_ELx_EC_DABT_LOW << ESR_ELx_EC_SHIFT;
+ 
+ 	vcpu_sys_reg(vcpu, ESR_EL1) = esr | ESR_ELx_FSC_EXTABT;
+ }
 -- 
-2.8.2
+1.9.1
