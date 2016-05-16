@@ -1,112 +1,64 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 16 May 2016 11:32:41 +0200
-Subject: [PATCH 3/3] mmc: core: support hs speed mode if hs200 mode fails
-In-Reply-To: <1463130397.3151.13.camel@toradex.com>
-References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
- <1461171092-30631-3-git-send-email-aisheng.dong@nxp.com>
- <1463130397.3151.13.camel@toradex.com>
-Message-ID: <CAPDyKFqyZRYbSoRMcJuMks+GMWAH9wDpusY+cvcH=GfVCNwSeg@mail.gmail.com>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 16 May 2016 17:28:10 +0800
+Subject: [PATCH v7 0/4] Mediatek MT2701 SCPSYS power domain support 
+Message-ID: <1463390894-32062-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 May 2016 at 11:06, Marcel Ziswiler <marcel.ziswiler@toradex.com> wrote:
-> On Thu, 2016-04-21 at 00:51 +0800, Dong Aisheng wrote:
->> Currently if mmc_select_hs200 mode switch fails, MMC core
->> can only use legacy mode to run the card.
->> Let's retry HS speed mode if HS200 fails.
->>
->> Before the fix:
->> mmc0: mmc_select_hs200 failed, error -74
->> : switch to mmc0 failed
->> mmc0: new MMC card at address 0001
->> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
->> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
->> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
->> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
->>  mmcblk0: p1 p2
->>
->> After the fix:
->> mmc0: mmc_select_hs200 failed, error -74
->> mmc0: new DDR MMC card at address 0001
->> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
->> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
->> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
->> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
->>  mmcblk0: p1 p2
->>
->> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> ---
->>  drivers/mmc/core/mmc.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->> index 55c8201..b573dc7 100644
->> --- a/drivers/mmc/core/mmc.c
->> +++ b/drivers/mmc/core/mmc.c
->> @@ -1315,7 +1315,8 @@ static int mmc_select_timing(struct mmc_card
->> *card)
->>
->>       if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200)
->>               err = mmc_select_hs200(card);
->> -     else if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS)
->> +
->> +     if (err && (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS))
->>               err = mmc_select_hs(card);
->>
->>       if (err && err != -EBADMSG)
->
->
-> This seems to break on TK1 where eMMC so far was detected as an 8-bit
-> high speed MMC card. With this patch it reverts to detecting a 1-bit only
-> MMC card! This has been observed both on a NVIDIA's Jetson TK1 as well as
-> our new Toradex Apalis TK1 (CC Tegra mailing list, Jon Hunter and Lucas
-> Stach as well). So far T30 is not affected as there we are still doing
-> full HS200 with whatever issues that has.
->
-> Before:
-> [    3.726894] sdhci: Secure Digital Host Controller Interface driver
-> [    3.733081] sdhci: Copyright(c) Pierre Ossman
-> [    3.737462] sdhci-pltfm: SDHCI platform and OF driver helper
-> [    3.753411] mmc0: Unknown controller version (3). You may experience
->  problems.
-> [    3.768345] mmc0: Invalid maximum block size, assuming 512 bytes
-> [    3.814896] mmc0: SDHCI controller on 700b0600.sdhci [700b0600.sdhci]
->  using ADMA 64-bit
-> [    3.892088] mmc0: new high speed MMC card at address 0001
-> [    3.899194] mmcblk0: mmc0:0001 SEM16G 14.7 GiB
-> [    3.904217] mmcblk0boot0: mmc0:0001 SEM16G partition 1 4.00 MiB
-> [    3.910645] mmcblk0boot1: mmc0:0001 SEM16G partition 2 4.00 MiB
-> [    3.917119] mmcblk0rpmb: mmc0:0001 SEM16G partition 3 4.00 MiB
-> [    3.926006]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9
-> root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios
-> clock:          52000000 Hz
-> actual clock:   51000000 Hz
-> vdd:            21 (3.3 ~ 3.4 V)
-> bus mode:       2 (push-pull)
-> chip select:    0 (don't care)
-> power mode:     2 (on)
-> bus width:      3 (8 bits)
-> timing spec:    1 (mmc high-speed)
-> signal voltage: 0 (3.30 V)
-> driver type:    0 (driver type B)
->
-> After:
-> [    3.899918] mmc0: new MMC card at address 0001
-> root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios
-> clock:          25000000 Hz
-> actual clock:   24727273 Hz
-> vdd:            21 (3.3 ~ 3.4 V)
-> bus mode:       2 (push-pull)
-> chip select:    0 (don't care)
-> power mode:     2 (on)
-> bus width:      0 (1 bits)
-> timing spec:    0 (legacy)
-> signal voltage: 0 (3.30 V)
-> driver type:    0 (driver type B)
->
+This series is based on v4.6-rc1 and adds scpsys power domain support
+for Mediatek MT2701.
 
-Thanks for testing and reporting. I have dropped this patch from my
-next branch for now.
+To share the code between MT2701 and MT8173, this patchset also refined
+original mtk-scpsys.c to separate common codes and platform codes, so
+that mtk-scpsys.c can support new SoCs more easily.
 
-Kind regards
-Uffe
+MT8173 and MT2701 scpsys init level are now subsys_init. Please refer to [1]
+to see discussion details.
+
+changes since v6:
+- Minor changes in the dt-binding document.
+
+changes since v5:
+- Rebase to v4.6-rc1.
+- Add dependent clocks for MFG, ISP, ETH and HIF power domains.
+- Add "ethif" as a dependent clock in scpsys dt-binding document.
+
+changes since v4:
+- Rebase to v4.5-rc4.
+- Remove mtk-scpsys.h and Merge its code into mtk-scpsys.c.
+- Add names for every controlling registers and bits.
+- Include dt-bindings headers at the beginning of mtk-scpsys.c.
+- Sort compatible string in dt-binding documents.
+
+changes since v3:
+- Implement MT8173 and MT2701 scpsys drivers in a signle file.
+- Remove naming of registers that can't be shared among SoCs.
+
+changes since v2:
+- Rebase to mbgg/linux-mediatek v4.4-next/soc [1].
+- Remove MTK_SCPSYS_MT8173 and MTK_SCPSYS_MT2701.
+- Modify scpsys dt-binding document to support MT2701.
+
+changes since v1:
+- Make MTK_SCPSYS in Kconfig invisible from users.
+- Add comments for changing scpsys init level to subsys_init.
+
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2015-December/003416.html
+
+James Liao (2):
+  soc: mediatek: Refine scpsys to support multiple platform
+  soc: mediatek: Init MT8173 scpsys driver earlier
+
+Shunli Wang (2):
+  soc: mediatek: Add MT2701 power dt-bindings
+  soc: mediatek: Add MT2701 scpsys driver
+
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |  13 +-
+ drivers/soc/mediatek/Kconfig                       |   2 +-
+ drivers/soc/mediatek/mtk-scpsys.c                  | 497 +++++++++++++++------
+ include/dt-bindings/power/mt2701-power.h           |  27 ++
+ 4 files changed, 388 insertions(+), 151 deletions(-)
+ create mode 100644 include/dt-bindings/power/mt2701-power.h
+
+--
+1.9.1
