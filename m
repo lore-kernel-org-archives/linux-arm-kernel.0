@@ -1,69 +1,74 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Mon, 16 May 2016 13:15:48 +0100
-Subject: Tegra baseline test results for v4.6
-Message-ID: <5739B9F4.1060400@nvidia.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 16 May 2016 14:47:11 +0200
+Subject: [PATCH 11/20] drm/sun4i: Convert to connector register helpers
+In-Reply-To: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1463402840-17062-12-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.6.
-Logs and other details at:
+Now that connector register helpers have been created, switch to them.
 
-    https://nvtb.github.io//linux/test_v4.6/20160515160102/
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 31 ++-----------------------------
+ 1 file changed, 2 insertions(+), 29 deletions(-)
 
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 4): tegra30-beaver
-    Pass: ( 3/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.6-rc7 (44549e8f5eea4e0a41b487b63e616cb089922b99)):
-   text     data      bss    total  kernel
-  +4103    -4096        0       +7  defconfig
-  +2247        0        0    +2247  multi_v7_defconfig
-  +1287        0        0    +1287  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.6-rc7 (44549e8f5eea4e0a41b487b63e616cb089922b99))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
-
---
-nvpublic
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index af62b24c39b1..257d2b4f3645 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -24,34 +24,6 @@
+ #include "sun4i_layer.h"
+ #include "sun4i_tcon.h"
+ 
+-static int sun4i_drv_connector_plug_all(struct drm_device *drm)
+-{
+-	struct drm_connector *connector, *failed;
+-	int ret;
+-
+-	mutex_lock(&drm->mode_config.mutex);
+-	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
+-		ret = drm_connector_register(connector);
+-		if (ret) {
+-			failed = connector;
+-			goto err;
+-		}
+-	}
+-	mutex_unlock(&drm->mode_config.mutex);
+-	return 0;
+-
+-err:
+-	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
+-		if (failed == connector)
+-			break;
+-
+-		drm_connector_unregister(connector);
+-	}
+-	mutex_unlock(&drm->mode_config.mutex);
+-
+-	return ret;
+-}
+-
+ static int sun4i_drv_enable_vblank(struct drm_device *drm, unsigned int pipe)
+ {
+ 	struct sun4i_drv *drv = drm->dev_private;
+@@ -206,7 +178,7 @@ static int sun4i_drv_bind(struct device *dev)
+ 	if (ret)
+ 		goto free_drm;
+ 
+-	ret = sun4i_drv_connector_plug_all(drm);
++	ret = drm_connector_register_all(drm);
+ 	if (ret)
+ 		goto unregister_drm;
+ 
+@@ -223,6 +195,7 @@ static void sun4i_drv_unbind(struct device *dev)
+ {
+ 	struct drm_device *drm = dev_get_drvdata(dev);
+ 
++	drm_connector_unregister_all(drm);
+ 	drm_dev_unregister(drm);
+ 	drm_kms_helper_poll_fini(drm);
+ 	sun4i_framebuffer_free(drm);
+-- 
+2.8.2
