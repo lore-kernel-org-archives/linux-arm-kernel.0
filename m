@@ -1,55 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 16 May 2016 10:16:24 +0200
-Subject: [PATCH 22/23] arm64: dts: r8a7795: Fix W=1 dtc warnings
-In-Reply-To: <1463126163-29423-23-git-send-email-geert+renesas@glider.be>
-References: <1463126163-29423-1-git-send-email-geert+renesas@glider.be>
- <1463126163-29423-23-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdV6QwYwWkNfnBZZZdJG7=19ip81kYRKB4MTKH_K857fKA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 16 May 2016 10:26:48 +0200
+Subject: [PATCH 2/2] ARM: dts: exynos: Enable CLKOUT on Exynos5410
+In-Reply-To: <1463387208-9277-1-git-send-email-k.kozlowski@samsung.com>
+References: <1463387208-9277-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1463387208-9277-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 9:56 AM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> @@ -69,20 +69,22 @@
->                         next-level-cache = <&L2_CA57>;
->                         enable-method = "psci";
->                 };
-> -       };
->
-> -       L2_CA57: cache-controller at 0 {
-> -               compatible = "cache";
-> -               power-domains = <&sysc R8A7795_PD_CA57_SCU>;
-> -               cache-unified;
-> -               cache-level = <2>;
-> -       };
-> +               L2_CA57: cache-controller at 0 {
-> +                       compatible = "cache";
-> +                       reg = <0>;
-> +                       power-domains = <&sysc R8A7795_PD_CA57_SCU>;
-> +                       cache-unified;
-> +                       cache-level = <2>;
-> +               };
->
-> -       L2_CA53: cache-controller at 1 {
-> -               compatible = "cache";
-> -               power-domains = <&sysc R8A7795_PD_CA53_SCU>;
-> -               cache-unified;
-> -               cache-level = <2>;
-> +               L2_CA53: cache-controller at 100 {
-> +                       compatible = "cache";
-> +                       reg = <100>;
+The CLKOUT (which control is provided by PMU) is necessary for some of
+the drivers using this as a clock, e.g. usb3503 USB HUB on Odroid XU
+board.
 
-Oops, <0x100>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/boot/dts/exynos5410.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index e9564ab5b5d3..f1effd3f03c4 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -70,6 +70,9 @@
+ 		pmu_system_controller: system-controller at 10040000 {
+ 			compatible = "samsung,exynos5410-pmu", "syscon";
+ 			reg = <0x10040000 0x5000>;
++			clock-names = "clkout16";
++			clocks = <&fin_pll>;
++			#clock-cells = <1>;
+ 		};
+ 
+ 		clock: clock-controller at 10010000 {
+-- 
+1.9.1
