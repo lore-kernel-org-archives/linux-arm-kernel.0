@@ -1,24 +1,24 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 May 2016 09:48:47 -0500
-Subject: [PATCH 2/8] Documentation: regulator: tps65218: Update examples
-In-Reply-To: <1462945691-904-3-git-send-email-j-keerthy@ti.com>
-References: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
- <1462945691-904-3-git-send-email-j-keerthy@ti.com>
-Message-ID: <20160516144847.GA26659@rob-hp-laptop>
+Date: Mon, 16 May 2016 09:52:57 -0500
+Subject: [PATCH v2 2/2] dt-bindings: Add Oxford Semiconductor OXNAS
+ pinctrl and gpio bindings
+In-Reply-To: <1462952062-5316-3-git-send-email-narmstrong@baylibre.com>
+References: <1462952062-5316-1-git-send-email-narmstrong@baylibre.com>
+ <1462952062-5316-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160516145257.GA31044@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 11:18:05AM +0530, Keerthy wrote:
-> This updates the device tree according to the preferred way of parsing
-> the nodes using the regulator framework.
+On Wed, May 11, 2016 at 09:34:22AM +0200, Neil Armstrong wrote:
+> Add pinctrl and gpio DT bindings for Oxford Semiconductor OXNAS SoC Family.
+> This version supports the ARM926EJ-S based OX810SE SoC with 34 IO pins.
 > 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->  .../devicetree/bindings/regulator/tps65218.txt     | 87 ++++++++++++++++++----
->  1 file changed, 71 insertions(+), 16 deletions(-)
-
-It wasn't exactly clear that the compatible string "added" here is 
-already used, so it looked like you were breaking compatibility at 
-first. Otherwise,
+>  .../devicetree/bindings/gpio/gpio_oxnas.txt        | 47 ++++++++++++++++++
+>  .../devicetree/bindings/pinctrl/oxnas,pinctrl.txt  | 57 ++++++++++++++++++++++
+>  2 files changed, 104 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio_oxnas.txt
+>  create mode 100644 Documentation/devicetree/bindings/pinctrl/oxnas,pinctrl.txt
 
 Acked-by: Rob Herring <robh@kernel.org>
