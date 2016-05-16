@@ -1,45 +1,67 @@
 From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 16 May 2016 09:17:32 +0200
-Subject: [PATCH] ZynqMP: Align gic ranges for 64k in device tree
-In-Reply-To: <1463053441-57572-1-git-send-email-agraf@suse.de>
-References: <1463053441-57572-1-git-send-email-agraf@suse.de>
-Message-ID: <5739740C.10901@xilinx.com>
+Date: Mon, 16 May 2016 09:26:08 +0200
+Subject: [PATCH v2] ARM64: zynqmp: Use 64bit size cell format
+Message-ID: <7dbe1a3398fb0dc2ab6ecaec7d5736c691db0f37.1463383564.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.5.2016 13:44, Alexander Graf wrote:
-> The GIC ranges in the zynqmp device tree are only 4kb aligned. Since
-> commit 12e14066f we automatically deal with aliases GIC regions though,
-> so we can map them transparently into guests even on 64kb page size
-> systems.
-> 
-> This patch makes use of that features and sets GICC and GICV to 64kb
-> aligned and sized regions.
-> 
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-> ---
->  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> index e595f22..38c4310 100644
-> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-> @@ -81,9 +81,9 @@
->  			compatible = "arm,gic-400", "arm,cortex-a15-gic";
->  			#interrupt-cells = <3>;
->  			reg = <0x0 0xf9010000 0x10000>,
-> -			      <0x0 0xf902f000 0x2000>,
-> +			      <0x0 0xf9020000 0x20000>,
->  			      <0x0 0xf9040000 0x20000>,
-> -			      <0x0 0xf906f000 0x2000>;
-> +			      <0x0 0xf9060000 0x20000>;
->  			interrupt-controller;
->  			interrupt-parent = <&gic>;
->  			interrupts = <1 9 0xf04>;
-> 
+Use 64bit size cell format instead of 32bit for memory
+description.
 
-Applied to zynqmp/dt with changed subject prefix ARM64: zynqmp:
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
 
-Thanks,
-Michal
+Changes in v2:
+- Use ranges for PS amba busses instead of changing them to
+  64 size cell
+
+ arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 2 +-
+ arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+index acb0527fdc4a..358089687a69 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
++++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
+@@ -29,7 +29,7 @@
+ 
+ 	memory {
+ 		device_type = "memory";
+-		reg = <0x0 0x0 0x40000000>;
++		reg = <0x0 0x0 0x0 0x40000000>;
+ 	};
+ };
+ 
+diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+index 38c43103d610..cb8f09cb03cf 100644
+--- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
++++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+@@ -14,7 +14,7 @@
+ / {
+ 	compatible = "xlnx,zynqmp";
+ 	#address-cells = <2>;
+-	#size-cells = <1>;
++	#size-cells = <2>;
+ 
+ 	cpus {
+ 		#address-cells = <1>;
+@@ -75,7 +75,7 @@
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
+ 		#size-cells = <1>;
+-		ranges;
++		ranges = <0 0 0 0 0xffffffff>;
+ 
+ 		gic: interrupt-controller at f9010000 {
+ 			compatible = "arm,gic-400", "arm,cortex-a15-gic";
+@@ -94,7 +94,7 @@
+ 		compatible = "simple-bus";
+ 		#address-cells = <2>;
+ 		#size-cells = <1>;
+-		ranges;
++		ranges = <0 0 0 0 0xffffffff>;
+ 
+ 		can0: can at ff060000 {
+ 			compatible = "xlnx,zynq-can-1.0";
+-- 
+1.9.1
