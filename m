@@ -1,35 +1,41 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 16 May 2016 09:43:24 -0700
-Subject: [PATCH-V2 5/5] ARM: multi_v7_defconfig: bcm2835: add
- bcm2835-thermal driver
-In-Reply-To: <1463145186-12906-6-git-send-email-kernel@martin.sperl.org>
-References: <1463145186-12906-1-git-send-email-kernel@martin.sperl.org>
- <1463145186-12906-6-git-send-email-kernel@martin.sperl.org>
-Message-ID: <5739F8AC.8080003@gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 May 2016 11:44:14 -0500
+Subject: [PATCH V4 2/7] documentation: iommu: Add bindings for
+ msm,iommu-v0 ip
+In-Reply-To: <1463381341-30498-3-git-send-email-sricharan@codeaurora.org>
+References: <1463381341-30498-1-git-send-email-sricharan@codeaurora.org>
+ <1463381341-30498-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160516164414.GA25899@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2016 06:13 AM, kernel at martin.sperl.org wrote:
-> From: Martin Sperl <kernel@martin.sperl.org>
+On Mon, May 16, 2016 at 12:18:56PM +0530, Sricharan R wrote:
+> The MSM IOMMU is an implementation compatible with the ARM VMSA short
+> descriptor page tables. It provides address translation for bus masters outside
+> of the CPU, each connected to the IOMMU through a port called micro-TLB.
+> Adding the DT bindings for the same.
 > 
-> Add the thermal driver to list of compiled modules in
-> multi_v7_defconfig.
-> 
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  arch/arm/configs/multi_v7_defconfig | 1 +
->  1 file changed, 1 insertion(+)
+>  .../devicetree/bindings/iommu/msm,iommu-v0.txt     | 64 ++++++++++++++++++++++
+>  1 file changed, 64 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
 > 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 2823490..5f0f5a3 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -422,6 +422,7 @@ CONFIG_CPU_THERMAL=y
->  CONFIG_ROCKCHIP_THERMAL=y
->  CONFIG_RCAR_THERMAL=y
->  CONFIG_ARMADA_THERMAL=y
-> +CONFIG_BCM2835_THERMAL=y
+> diff --git a/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt b/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+> new file mode 100644
+> index 0000000..b22c607
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+> @@ -0,0 +1,64 @@
+> +* QCOM IOMMU
+> +
+> +The MSM IOMMU is an implementation compatible with the ARM VMSA short
+> +descriptor page tables. It provides address translation for bus masters outside
+> +of the CPU, each connected to the IOMMU through a port called micro-TLB.
+> +
+> +Required Properties:
+> +
+> +  - compatible: Must contain "qcom,iommu-v0-apq8064".
 
-Does this need to be built into the kernel?
--- 
-Florian
+qcom,apq8064-iommu would be the preferred order and I think you can drop 
+the v0.
