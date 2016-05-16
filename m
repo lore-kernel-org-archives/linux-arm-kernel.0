@@ -1,152 +1,83 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:35 +0100
-Subject: [PATCH v4 47/56] KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
+Date: Mon, 16 May 2016 10:53:48 +0100
+Subject: [PATCH v4 03/56] KVM: arm/arm64: vgic: avoid map in
+ kvm_vgic_map_is_active()
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-48-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-61-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the GIC CPU interface is always virtualized by the hardware,
-we don't have CPU interface state information readily available in our
-emulation if userland wants to save or restore it.
-Fortunately the GIC hypervisor interface provides the VMCR register to
-access the required virtual CPU interface bits.
-Provide wrappers for GICv2 and GICv3 hosts to have access to this
-register.
+For getting the active state of a mapped IRQ, we actually only need
+the virtual IRQ number, not the pointer to the mapping entry.
+Pass the virtual IRQ number from the arch timer to the VGIC directly.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
-Changelog v2 .. v3:
-- remove exported v2/v3 selector functions (as per Marc's patch)
+Changelog v1 .. v2:
+- rewrap phys_active determination to fit in 80 characters
 
-Changelog v3 .. v4:
-- move struct vgic_vmcr into the VGIC's private header file
+ include/kvm/arm_vgic.h    | 2 +-
+ virt/kvm/arm/arch_timer.c | 6 ++----
+ virt/kvm/arm/vgic.c       | 6 +++---
+ 3 files changed, 6 insertions(+), 8 deletions(-)
 
- virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c | 22 ++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h    | 21 +++++++++++++++++++++
- 3 files changed, 72 insertions(+)
-
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index fb5e65c..d943059 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -174,3 +174,32 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
- {
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = 0;
- }
-+
-+void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
-+	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) &
-+		GICH_VMCR_ALIAS_BINPOINT_MASK;
-+	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) &
-+		GICH_VMCR_BINPOINT_MASK;
-+	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
-+		GICH_VMCR_PRIMASK_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
-+}
-+
-+void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
-+
-+	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
-+			GICH_VMCR_CTRL_SHIFT;
-+	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
-+			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
-+	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
-+			GICH_VMCR_BINPOINT_SHIFT;
-+	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
-+			GICH_VMCR_PRIMASK_SHIFT;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index fb547da..8548297 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -160,3 +160,25 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
- {
- 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr] = 0;
- }
-+
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr;
-+
-+	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
-+	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
-+	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
-+	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
-+
-+	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
-+}
-+
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
-+{
-+	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
-+
-+	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
-+	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
-+	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
-+	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index f826026..d2c1fd5 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -27,6 +27,13 @@
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index e22f015..9830232 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -348,7 +348,7 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+ 					   int virt_irq, int irq);
+ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
+-bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, struct irq_phys_map *map);
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
  
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index a9c6c1c..37f82c1 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -274,10 +274,8 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	* to ensure that hardware interrupts from the timer triggers a guest
+ 	* exit.
+ 	*/
+-	if (timer->irq.level || kvm_vgic_map_is_active(vcpu, timer->map))
+-		phys_active = true;
+-	else
+-		phys_active = false;
++	phys_active = timer->irq.level ||
++			kvm_vgic_map_is_active(vcpu, timer->map->virt_irq);
  
-+struct vgic_vmcr {
-+	u32	ctlr;
-+	u32	abpr;
-+	u32	bpr;
-+	u32	pmr;
-+};
-+
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
- bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
-@@ -40,6 +47,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
- int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
- int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 			 int offset, u32 *val);
-+void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
- 			     enum vgic_type);
- 
-@@ -49,6 +58,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
- void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
- void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
- #else
- static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
-@@ -72,6 +83,16 @@ static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
- {
+ 	/*
+ 	 * We want to avoid hitting the (re)distributor as much as
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 81c557c..2fd43a6 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1102,18 +1102,18 @@ static bool dist_active_irq(struct kvm_vcpu *vcpu)
+ 	return test_bit(vcpu->vcpu_id, dist->irq_active_on_cpu);
  }
  
-+static inline
-+void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+}
-+
-+static inline
-+void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+}
-+
- static inline int vgic_register_redist_iodevs(struct kvm *kvm,
- 					      gpa_t dist_base_address)
+-bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, struct irq_phys_map *map)
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
  {
+ 	int i;
+ 
+ 	for (i = 0; i < vcpu->arch.vgic_cpu.nr_lr; i++) {
+ 		struct vgic_lr vlr = vgic_get_lr(vcpu, i);
+ 
+-		if (vlr.irq == map->virt_irq && vlr.state & LR_STATE_ACTIVE)
++		if (vlr.irq == virt_irq && vlr.state & LR_STATE_ACTIVE)
+ 			return true;
+ 	}
+ 
+-	return vgic_irq_is_active(vcpu, map->virt_irq);
++	return vgic_irq_is_active(vcpu, virt_irq);
+ }
+ 
+ /*
 -- 
 2.8.2
