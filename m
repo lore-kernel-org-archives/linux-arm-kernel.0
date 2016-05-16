@@ -1,40 +1,51 @@
 From: hotran@apm.com (Hoan Tran)
-Date: Mon, 16 May 2016 09:17:25 -0700
-Subject: [PATCH 1/3] Documentation: dtb: xgene: Add hwmon dts binding
- documentation
+Date: Mon, 16 May 2016 09:17:27 -0700
+Subject: [PATCH 3/3] arm64: dts: apm: Add X-Gene SoC hwmon to device tree
 In-Reply-To: <1463415447-29903-1-git-send-email-hotran@apm.com>
 References: <1463415447-29903-1-git-send-email-hotran@apm.com>
-Message-ID: <1463415447-29903-2-git-send-email-hotran@apm.com>
+Message-ID: <1463415447-29903-4-git-send-email-hotran@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the APM X-Gene hwmon device tree node documentation.
+This patch adds DT node to enable hwmon driver for APM X-Gene SoC.
 
 Signed-off-by: Hoan Tran <hotran@apm.com>
 ---
- .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt          | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 5 +++++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi     | 5 +++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
-new file mode 100644
-index 0000000..49a482e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
-@@ -0,0 +1,14 @@
-+APM X-Gene hwmon driver
+diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+index a055a5d..672c0ce 100644
+--- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+@@ -472,6 +472,11 @@
+ 			mboxes = <&mailbox 0>;
+ 		};
+ 
++		hwmonslimpro {
++			compatible = "apm,xgene-slimpro-hwmon";
++			mboxes = <&mailbox 7>;
++		};
 +
-+Hwmon driver accesses sensors over the "SLIMpro" mailbox.
+ 		serial0: serial at 10600000 {
+ 			device_type = "serial";
+ 			compatible = "ns16550";
+diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+index ae4a173..7a59159 100644
+--- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
++++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+@@ -716,6 +716,11 @@
+ 			mboxes = <&mailbox 0>;
+ 		};
+ 
++		hwmonslimpro {
++			compatible = "apm,xgene-slimpro-hwmon";
++			mboxes = <&mailbox 7>;
++		};
 +
-+Required properties :
-+ - compatible : should be "apm,xgene-slimpro-hwmon"
-+ - mboxes : use the label reference for the mailbox as the first parameter.
-+	    The second parameter is the channel number.
-+
-+Example :
-+	hwmonslimpro {
-+		compatible = "apm,xgene-slimpro-hwmon";
-+		mboxes = <&mailbox 7>;
-+	};
+ 		serial0: serial at 1c020000 {
+ 			status = "disabled";
+ 			device_type = "serial";
 -- 
 1.9.1
