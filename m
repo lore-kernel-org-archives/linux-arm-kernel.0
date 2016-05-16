@@ -1,58 +1,69 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Mon, 16 May 2016 19:39:41 +0800
-Subject: [RFC 2/3] drm/mediatek: add support for Mediatek SoC MT2701
-In-Reply-To: <1463111956.12239.15.camel@mtksdaap41>
-References: <1463053795-55455-1-git-send-email-yt.shen@mediatek.com>
- <1463053795-55455-3-git-send-email-yt.shen@mediatek.com>
- <1463111956.12239.15.camel@mtksdaap41>
-Message-ID: <1463398781.13038.4.camel@mtksdaap41>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 16 May 2016 13:08:38 +0100
+Subject: Tegra baseline test results for v4.6-rc7
+Message-ID: <5739B846.8040106@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi CK,
-On Fri, 2016-05-13 at 11:59 +0800, CK Hu wrote:
-> Hi, YT:
-> 
-> On Thu, 2016-05-12 at 19:49 +0800, yt.shen at mediatek.com wrote:
-> > From: YT Shen <yt.shen@mediatek.com>
-> > 
-> > This patch add support for the Mediatek MT2701 DISP subsystem.
-> > There is only one OVL engine in MT2701, and we have shadow
-> > register support here.
-> > 
-> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > ---
-> 
-> > @@ -385,12 +422,16 @@ static void mtk_drm_crtc_atomic_begin(struct drm_crtc *crtc,
-> >  		mtk_crtc->event = state->base.event;
-> >  		state->base.event = NULL;
-> >  	}
-> > +
-> > +	if (priv->data->shadow_register)
-> > +		mtk_disp_mutex_acquire(mtk_crtc->mutex);
-> >  }
-> >  
-> > @@ -409,6 +450,11 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
-> >  	}
-> >  	if (pending_planes)
-> >  		mtk_crtc->pending_planes = true;
-> > +
-> > +	if (priv->data->shadow_register) {
-> > +		mtk_crtc_ddp_config(crtc);
-> > +		mtk_disp_mutex_release(mtk_crtc->mutex);
-> > +	}
-> >  }
-> >  
-> 
-> I think it's better to call mtk_disp_mutex_acquire() and
-> mtk_disp_mutex_release() as near as possible to prevent mutex locked for
-> a long time. All HW register access of this atomic setting is in
-> mtk_crtc_ddp_config(), so it's better to move mtk_disp_mutex_acquire()
-> just before mtk_crtc_ddp_config().
-> 
-> Regards,
-> CK
-I'll do this in the next version.  Thanks for the review.
+Here are some basic Tegra test results for Linux v4.6-rc7.
+Logs and other details at:
 
-Regards,
-yt.shen
+    https://nvtb.github.io//linux/test_v4.6-rc7/20160508150104/
+
+
+Test summary
+------------
+
+Build: zImage:
+    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
+
+Build: Image:
+    Pass: ( 1/ 1): defconfig
+
+Boot to userspace: defconfig:
+    Pass: ( 3/ 3): qemu-vexpress64, tegra132-norrin,
+		   tegra210-p2371-0000
+
+Boot to userspace: multi_v7_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+Boot to userspace: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+PM: System suspend: multi_v7_defconfig:
+    FAIL: ( 1/ 4): tegra30-beaver
+    Pass: ( 3/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice
+
+PM: System suspend: tegra_defconfig:
+    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
+		   tegra20-trimslice, tegra30-beaver
+
+
+vmlinux object size
+(delta in bytes from test_v4.6-rc6 (04974df8049fc4240d22759a91e035082ccd18b4)):
+   text     data      bss    total  kernel
+      0        0        0        0  defconfig
+   +332        0        0     +332  multi_v7_defconfig
+   +464        0        0     +464  tegra_defconfig
+
+
+Boot-time memory difference
+(delta in bytes from test_v4.6-rc6 (04974df8049fc4240d22759a91e035082ccd18b4))
+    avail    rsrvd     high    freed                board              kconfig                  dtb
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+
+--
+nvpublic
