@@ -1,67 +1,82 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:58 +0100
-Subject: [PATCH v4 13/56] KVM: arm/arm64: move GICv2 emulation defines into
- arm-gic-v3.h
+Date: Mon, 16 May 2016 10:53:47 +0100
+Subject: [PATCH v4 02/56] KVM: arm/arm64: vgic: avoid map in
+ kvm_vgic_inject_mapped_irq()
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-71-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-60-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As (some) GICv3 hosts can emulate a GICv2, some GICv2 specific masks
-for the list register definition also apply to GICv3 LRs.
-At the moment we have those definitions in the KVM VGICv3
-implementation, so let's move them into the GICv3 header file to
-have them automatically defined.
+When we want to inject a hardware mapped IRQ into a guest, we actually
+only need the virtual IRQ number from the irq_phys_map.
+So let's pass this number directly from the arch timer to the VGIC
+to avoid using the map as a parameter.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
- include/linux/irqchip/arm-gic-v3.h | 5 +++++
- virt/kvm/arm/vgic-v3.c             | 8 +-------
- 2 files changed, 6 insertions(+), 7 deletions(-)
+ include/kvm/arm_vgic.h    | 2 +-
+ virt/kvm/arm/arch_timer.c | 2 +-
+ virt/kvm/arm/vgic.c       | 6 +++---
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index d5d798b..ec938d1 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -276,6 +276,11 @@
- #define ICH_LR_PHYS_ID_SHIFT		32
- #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index be6037a..e22f015 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -342,7 +342,7 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+ 			bool level);
+ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+-			       struct irq_phys_map *map, bool level);
++			       unsigned int virt_irq, bool level);
+ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 409db33..a9c6c1c 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -177,7 +177,7 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level)
+ 	trace_kvm_timer_update_irq(vcpu->vcpu_id, timer->map->virt_irq,
+ 				   timer->irq.level);
+ 	ret = kvm_vgic_inject_mapped_irq(vcpu->kvm, vcpu->vcpu_id,
+-					 timer->map,
++					 timer->map->virt_irq,
+ 					 timer->irq.level);
+ 	WARN_ON(ret);
+ }
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index f6c6172..81c557c 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1666,7 +1666,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+  * kvm_vgic_inject_mapped_irq - Inject a physically mapped IRQ to the vgic
+  * @kvm:     The VM structure pointer
+  * @cpuid:   The CPU for PPIs
+- * @map:     Pointer to a irq_phys_map structure describing the mapping
++ * @virt_irq: The virtual IRQ to be injected
+  * @level:   Edge-triggered:  true:  to trigger the interrupt
+  *			      false: to ignore the call
+  *	     Level-sensitive  true:  raise the input signal
+@@ -1677,7 +1677,7 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int irq_num,
+  * being HIGH and 0 being LOW and all devices being active-HIGH.
+  */
+ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+-			       struct irq_phys_map *map, bool level)
++			       unsigned int virt_irq, bool level)
+ {
+ 	int ret;
  
-+/* These are for GICv2 emulation only */
-+#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
-+#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
-+#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
-+
- #define ICH_MISR_EOI			(1 << 0)
- #define ICH_MISR_U			(1 << 1)
+@@ -1685,7 +1685,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+ 	if (ret)
+ 		return ret;
  
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index c02a1b1..75b02fa 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -29,12 +29,6 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
+-	return vgic_update_irq_pending(kvm, cpuid, map->virt_irq, level);
++	return vgic_update_irq_pending(kvm, cpuid, virt_irq, level);
+ }
  
--/* These are for GICv2 emulation only */
--#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
--#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
--#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
--#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
--
- static u32 ich_vtr_el2;
- 
- static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -43,7 +37,7 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
- 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr];
- 
- 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
--		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
-+		lr_desc.irq = val & ICH_LR_VIRTUAL_ID_MASK;
- 	else
- 		lr_desc.irq = val & GICH_LR_VIRTUALID;
- 
+ static irqreturn_t vgic_maintenance_handler(int irq, void *data)
 -- 
 2.8.2
