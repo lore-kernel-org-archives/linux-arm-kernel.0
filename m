@@ -1,304 +1,199 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:04 +0100
-Subject: [PATCH v4 16/56] KVM: arm/arm64: vgic-new: Implement virtual IRQ
- injection
+Date: Mon, 16 May 2016 10:53:45 +0100
+Subject: [PATCH v4 00/56] KVM: arm/arm64: Rework virtual GIC emulation
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-17-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-58-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Hi,
 
-Provide a vgic_queue_irq_unlock() function which decides whether a
-given IRQ needs to be queued to a VCPU's ap_list.
-This should be called whenever an IRQ becomes pending or enabled,
-either as a result of userspace injection, from in-kernel emulated
-devices like the architected timer or from MMIO accesses to the
-distributor emulation.
-Also provides the necessary functions to allow userland to inject an
-IRQ to a guest.
-Since this is the first code that starts using our locking mechanism, we
-add some (hopefully) clear documentation of our locking strategy and
-requirements along with this patch.
+a new update for the new VGIC series.
+A lot of fixes this time: comments fixed, clarified and updated, some
+no longer needed code pieces from the old VGIC have been removed.
+The MMIO dispatching has been improved to allow only the access types
+that are mandatory in the spec, so 32-bit accesses only for most registers
+with some additionally accessible by byte or 64-bit accesses as well.
+This allows for some simplification in many handler functions.
+The vgic_queue_irq_unlock() function was reworked a bit and is now used
+by the set-active handler as well. The clear-active handler has been
+extended to basically halt the guest and make sure we clear the respective
+active bit in the LR (and not only in our structure). There is a new patch
+introducing the KVM core bits of this feature.
+Also we now detect when the redistributor and distributor regions overlap
+and complain about it.
+As this series is now based on kvmarm/next, we also gained the firmware
+independent probing feature, which is in turn also used in this series.
+This should enable ACPI machines.
+A more detailed changelog can be found in the respective patches.
 
-[Andre: refactor out vgic_queue_irq_unlock()]
+As this new VGIC emulation will probably become the default very shortly,
+please test it full steam on whatever setup you have access to.
+Any reports are warmly welcome.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
-Changelog RFC..v1:
-- add spinlock checks protected by CONFIG_DEBUG_SPINLOCK
-- add more comments to vgic_target_oracle
-- remove BUG_ON() if IRQ is neither edge or level
-- rename vgic_queue_irq() to vgic_queue_irq_unlock()
-- simplify initial check in vgic_queue_irq_unlock()
-- extend retry loop to ask the oracle again
-- minor comment fixes
+This series is now based on kvmarm/next, which will be merged shortly into
+Linus' kernel.
+A git tree containing this series can be found on linux-arm.org:
 
-Changelog v1 .. v2:
-- move most IRQ injection code into vgic_update_irq_pending()
+git://linux-arm.org/linux-ap.git	branch: vgic-new/v4
+http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/vgic-new/v4
 
-Changelog v3 .. v4:
-- simplify vgic_queue_irq_unlock() to allow reusage later
+Cheers,
+Andre.
 
- include/kvm/vgic/vgic.h  |   3 +
- virt/kvm/arm/vgic/vgic.c | 211 +++++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h |   1 +
- 3 files changed, 215 insertions(+)
+===========================
+This series is a joint effort to re-implement KVM's GIC emulation.
+Many patches as in here have been effectively authored by multiple
+people and authorship isn't clear in every case, especially since
+many of the patches have been stashed together or splitted apart in
+the process. So take the Author: tag with a grain of salt.
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 6ca0781..7b6ca90 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -181,6 +181,9 @@ struct vgic_cpu {
- 	u64 live_lrs;
- };
- 
-+int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			bool level);
-+
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	(false)
- #define vgic_ready(k)		((k)->arch.vgic.ready)
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index fb45537..62fede6 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -19,8 +19,31 @@
- 
- #include "vgic.h"
- 
-+#define CREATE_TRACE_POINTS
-+#include "../trace.h"
-+
-+#ifdef CONFIG_DEBUG_SPINLOCK
-+#define DEBUG_SPINLOCK_BUG_ON(p) BUG_ON(p)
-+#else
-+#define DEBUG_SPINLOCK_BUG_ON(p)
-+#endif
-+
- struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
- 
-+/*
-+ * Locking order is always:
-+ *   vgic_cpu->ap_list_lock
-+ *     vgic_irq->irq_lock
-+ *
-+ * (that is, always take the ap_list_lock before the struct vgic_irq lock).
-+ *
-+ * When taking more than one ap_list_lock at the same time, always take the
-+ * lowest numbered VCPU's ap_list_lock first, so:
-+ *   vcpuX->vcpu_id < vcpuY->vcpu_id:
-+ *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
-+ *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
-+ */
-+
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid)
- {
-@@ -39,3 +62,191 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 	WARN(1, "Looking up struct vgic_irq for reserved INTID");
- 	return NULL;
- }
-+
-+/**
-+ * kvm_vgic_target_oracle - compute the target vcpu for an irq
-+ *
-+ * @irq:	The irq to route. Must be already locked.
-+ *
-+ * Based on the current state of the interrupt (enabled, pending,
-+ * active, vcpu and target_vcpu), compute the next vcpu this should be
-+ * given to. Return NULL if this shouldn't be injected at all.
-+ *
-+ * Requires the IRQ lock to be held.
-+ */
-+static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
-+{
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-+
-+	/* If the interrupt is active, it must stay on the current vcpu */
-+	if (irq->active)
-+		return irq->vcpu;
-+
-+	/*
-+	 * If the IRQ is not active but enabled and pending, we should direct
-+	 * it to its configured target VCPU.
-+	 * If the distributor is disabled, pending interrupts shouldn't be
-+	 * forwarded.
-+	 */
-+	if (irq->enabled && irq->pending) {
-+		if (unlikely(irq->target_vcpu &&
-+			     !irq->target_vcpu->kvm->arch.vgic.enabled))
-+			return NULL;
-+
-+		return irq->target_vcpu;
-+	}
-+
-+	/* If neither active nor pending and enabled, then this IRQ should not
-+	 * be queued to any VCPU.
-+	 */
-+	return NULL;
-+}
-+
-+/*
-+ * Only valid injection if changing level for level-triggered IRQs or for a
-+ * rising edge.
-+ */
-+static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
-+{
-+	switch (irq->config) {
-+	case VGIC_CONFIG_LEVEL:
-+		return irq->line_level != level;
-+	case VGIC_CONFIG_EDGE:
-+		return level;
-+	}
-+
-+	return false;
-+}
-+
-+/*
-+ * Check whether an IRQ needs to (and can) be queued to a VCPU's ap list.
-+ * Do the queuing if necessary, taking the right locks in the right order.
-+ * Returns true when the IRQ was queued, false otherwise.
-+ *
-+ * Needs to be entered with the IRQ lock already held, but will return
-+ * with all locks dropped.
-+ */
-+bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
-+{
-+	struct kvm_vcpu *vcpu;
-+
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-+
-+retry:
-+	vcpu = vgic_target_oracle(irq);
-+	if (irq->vcpu || !vcpu) {
-+		/*
-+		 * If this IRQ is already on a VCPU's ap_list, then it
-+		 * cannot be moved or modified and there is no more work for
-+		 * us to do.
-+		 *
-+		 * Otherwise, if the irq is not pending and enabled, it does
-+		 * not need to be inserted into an ap_list and there is also
-+		 * no more work for us to do.
-+		 */
-+		spin_unlock(&irq->irq_lock);
-+		return false;
-+	}
-+
-+	/*
-+	 * We must unlock the irq lock to take the ap_list_lock where
-+	 * we are going to insert this new pending interrupt.
-+	 */
-+	spin_unlock(&irq->irq_lock);
-+
-+	/* someone can do stuff here, which we re-check below */
-+
-+	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+	spin_lock(&irq->irq_lock);
-+
-+	/*
-+	 * Did something change behind our backs?
-+	 *
-+	 * There are two cases:
-+	 * 1) The irq lost its pending state or was disabled behind our
-+	 *    backs and/or it was queued to another VCPU's ap_list.
-+	 *    Then drop the locks and return.
-+	 * 2) Someone changed the affinity on this irq behind our
-+	 *    backs and we are now holding the wrong ap_list_lock.
-+	 *    Then drop the locks and try the new VCPU.
-+	 */
-+
-+	if (unlikely(irq->vcpu || vcpu != vgic_target_oracle(irq))) {
-+		spin_unlock(&irq->irq_lock);
-+		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+
-+		spin_lock(&irq->irq_lock);
-+		goto retry;
-+	}
-+
-+	list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
-+	irq->vcpu = vcpu;
-+
-+	spin_unlock(&irq->irq_lock);
-+	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+
-+	kvm_vcpu_kick(vcpu);
-+
-+	return true;
-+}
-+
-+static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-+				   unsigned int intid, bool level,
-+				   bool mapped_irq)
-+{
-+	struct kvm_vcpu *vcpu;
-+	struct vgic_irq *irq;
-+	int ret;
-+
-+	trace_vgic_update_irq_pending(cpuid, intid, level);
-+
-+	vcpu = kvm_get_vcpu(kvm, cpuid);
-+	if (!vcpu && intid < VGIC_NR_PRIVATE_IRQS)
-+		return -EINVAL;
-+
-+	irq = vgic_get_irq(kvm, vcpu, intid);
-+	if (!irq)
-+		return -EINVAL;
-+
-+	if (irq->hw != mapped_irq)
-+		return -EINVAL;
-+
-+	spin_lock(&irq->irq_lock);
-+
-+	if (!vgic_validate_injection(irq, level)) {
-+		/* Nothing to see here, move along... */
-+		spin_unlock(&irq->irq_lock);
-+		return 0;
-+	}
-+
-+	if (irq->config == VGIC_CONFIG_LEVEL) {
-+		irq->line_level = level;
-+		irq->pending = level || irq->soft_pending;
-+	} else {
-+		irq->pending = true;
-+	}
-+
-+	vgic_queue_irq_unlock(kvm, irq);
-+
-+	return 0;
-+}
-+
-+/**
-+ * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-+ * @kvm:     The VM structure pointer
-+ * @cpuid:   The CPU for PPIs
-+ * @intid:   The INTID to inject a new state to.
-+ * @level:   Edge-triggered:  true:  to trigger the interrupt
-+ *			      false: to ignore the call
-+ *	     Level-sensitive  true:  raise the input signal
-+ *			      false: lower the input signal
-+ *
-+ * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-+ * level-sensitive interrupts.  You can think of the level parameter as 1
-+ * being HIGH and 0 being LOW and all devices being active-HIGH.
-+ */
-+int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			bool level)
-+{
-+	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 61b8d22..c625767 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -18,5 +18,6 @@
- 
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
-+bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
- 
- #endif
+While the current VGIC implementation is centered around providing
+efficient MMIO emulation, the hot path for most guests is actually
+the guest entry and exit, which currently is rather costly.
+Also the existing emulation has a global distributor lock, which
+quickly becomes a bottleneck once the number of VCPUs increases.
+Additionally the emulation was originally designed for GICv2, adding
+GICv3 ITS emulation support to this proved to be rather painful.
+Last, but not least the existing code became less and less
+maintainable, with many special cases handled explicitly.
+
+The new implementation is build around a struct vgic_irq data
+structure, which holds all information about a virtual interrupt.
+Interruts which should be injected are held in a per-VCPU list, this
+make the entry/exit path much more efficient. Also the new structure
+allows to have more fine grained locking - per IRQ and per VCPU -
+getting rid of the global distributor lock.
+As a result of the new design ITS emulation fits in more nicely, the
+respective code will be provided as a follow-up series.
+
+This series implements the same feature set as the existing emulation,
+as a goodie we now implement priorities correctly.
+To allow an easy transition with good test coverage, but still maintain
+stability, both implementations live side by side, selectable via a
+Kconfig option. The default is the new implementation.
+If this code proves to be reliable, we will later remove the current
+implementation with an extra patch set.
+
+Please have a look at the series, review it and give the code some
+serious testing (and possibly debugging). All feedback is appreciated.
+
+Cheers,
+Andre.
+
+Andre Przywara (29):
+  KVM: arm/arm64: vgic: streamline vgic_update_irq_pending() interface
+  KVM: arm/arm64: vgic: avoid map in kvm_vgic_inject_mapped_irq()
+  KVM: arm/arm64: vgic: avoid map in kvm_vgic_map_is_active()
+  KVM: arm/arm64: vgic: avoid map in kvm_vgic_unmap_phys_irq()
+  KVM: arm/arm64: arch_timer: Remove irq_phys_map
+  KVM: arm/arm64: vgic: Remove irq_phys_map from interface
+  KVM: arm/arm64: pmu: abstract access to number of SPIs
+  KVM: arm/arm64: move GICv2 emulation defines into arm-gic-v3.h
+  KVM: arm/arm64: vgic-new: Add GICv2 MMIO handling framework
+  KVM: arm/arm64: vgic-new: Add ENABLE registers handlers
+  KVM: arm/arm64: vgic-new: Add PENDING registers handlers
+  KVM: arm/arm64: vgic-new: Add ACTIVE registers handlers
+  KVM: arm/arm64: vgic-new: Add PRIORITY registers handlers
+  KVM: arm/arm64: vgic-new: Add CONFIG registers handlers
+  KVM: arm/arm64: vgic-new: Add TARGET registers handlers
+  KVM: arm/arm64: vgic-new: Add SGIR register handler
+  KVM: arm/arm64: vgic-new: Add SGIPENDR register handlers
+  KVM: arm/arm64: vgic-new: Add GICv3 MMIO handling framework
+  KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR, TYPER handlers
+  KVM: arm/arm64: vgic-new: Add GICv3 redistributor IIDR and TYPER
+    handler
+  KVM: arm/arm64: vgic-new: Add GICv3 IDREGS register handler
+  KVM: arm/arm64: vgic-new: Add GICv3 IROUTER register handlers
+  KVM: arm/arm64: vgic-new: Add GICv3 SGI system register trap handler
+  KVM: arm/arm64: vgic-new: Add userland access to VGIC dist registers
+  KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
+  KVM: arm/arm64: vgic-new: Add userland GIC CPU interface access
+  KVM: arm/arm64: vgic-new: Wire up irqfd injection
+  KVM: arm/arm64: vgic-new: implement mapped IRQ handling
+  KVM: arm/arm64: vgic-new: enable build
+
+Christoffer Dall (10):
+  KVM: arm/arm64: Remove the IRQ field from struct irq_phys_map
+  KVM: arm/arm64: Get rid of vgic_cpu->nr_lr
+  KVM: arm/arm64: Fix MMIO emulation data handling
+  KVM: arm/arm64: Export mmio_read/write_bus
+  KVM: arm/arm64: Provide functionality to pause and resume a guest
+  KVM: arm/arm64: vgic-new: Add data structure definitions
+  KVM: arm/arm64: vgic-new: Add acccessor to new struct vgic_irq
+    instance
+  KVM: arm/arm64: vgic-new: Implement virtual IRQ injection
+  KVM: arm/arm64: vgic-new: Add IRQ sorting
+  KVM: arm/arm64: vgic-new: Export register access interface
+
+Eric Auger (12):
+  KVM: arm/arm64: vgic-new: Implement kvm_vgic_vcpu_pending_irq
+  KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM device ops registration
+  KVM: arm/arm64: vgic-new: vgic_kvm_device:
+    KVM_DEV_ARM_VGIC_GRP_NR_IRQS
+  KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM_DEV_ARM_VGIC_GRP_CTRL
+  KVM: arm/arm64: vgic-new: vgic_kvm_device: implement kvm_vgic_addr
+  KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM_DEV_ARM_VGIC_GRP_ADDR
+  KVM: arm/arm64: vgic-new: vgic_kvm_device: access to VGIC registers
+  KVM: arm/arm64: vgic-new: vgic_init: implement kvm_vgic_hyp_init
+  KVM: arm/arm64: vgic-new: vgic_init: implement vgic_create
+  KVM: arm/arm64: vgic-new: vgic_init: implement vgic_init
+  KVM: arm/arm64: vgic-new: vgic_init: implement map_resources
+  KVM: arm/arm64: vgic-new: Add vgic_v2/v3_enable
+
+Marc Zyngier (5):
+  KVM: arm/arm64: vgic-new: Add IRQ sync/flush framework
+  KVM: arm/arm64: vgic-new: Add GICv2 world switch backend
+  KVM: arm/arm64: vgic-new: Add GICv3 world switch backend
+  KVM: arm/arm64: vgic-new: Add MMIO handling framework
+  KVM: arm/arm64: vgic-new: Add CTLR, TYPER and IIDR handlers
+
+ arch/arm/include/asm/kvm_host.h     |   4 +
+ arch/arm/include/asm/kvm_mmio.h     |   3 +
+ arch/arm/kvm/Kconfig                |   7 +
+ arch/arm/kvm/Makefile               |  11 +
+ arch/arm/kvm/arm.c                  |  25 +-
+ arch/arm/kvm/mmio.c                 |  24 +-
+ arch/arm64/include/asm/kvm_host.h   |   4 +
+ arch/arm64/include/asm/kvm_mmio.h   |   3 +
+ arch/arm64/kvm/Kconfig              |   7 +
+ arch/arm64/kvm/Makefile             |  12 +
+ include/kvm/arm_arch_timer.h        |   3 -
+ include/kvm/arm_vgic.h              |  20 +-
+ include/kvm/vgic/vgic.h             | 246 +++++++++++++++
+ include/linux/irqchip/arm-gic-v3.h  |   6 +
+ include/linux/irqchip/arm-gic.h     |   2 +
+ virt/kvm/arm/arch_timer.c           |  42 ++-
+ virt/kvm/arm/hyp/vgic-v2-sr.c       |  17 +-
+ virt/kvm/arm/pmu.c                  |  25 +-
+ virt/kvm/arm/vgic-v2.c              |   4 +-
+ virt/kvm/arm/vgic-v3.c              |   8 +-
+ virt/kvm/arm/vgic.c                 |  86 ++---
+ virt/kvm/arm/vgic/vgic-init.c       | 452 ++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-irqfd.c      |  52 +++
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 426 +++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    | 446 ++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c    | 451 ++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.c       | 499 +++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h       | 138 ++++++++
+ virt/kvm/arm/vgic/vgic-v2.c         | 352 +++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c         | 330 +++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.c            | 615 ++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h            | 131 ++++++++
+ 32 files changed, 4314 insertions(+), 137 deletions(-)
+ create mode 100644 include/kvm/vgic/vgic.h
+ create mode 100644 virt/kvm/arm/vgic/vgic-init.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-irqfd.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-kvm-device.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-mmio-v2.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-mmio-v3.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-mmio.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-mmio.h
+ create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
+ create mode 100644 virt/kvm/arm/vgic/vgic-v3.c
+ create mode 100644 virt/kvm/arm/vgic/vgic.c
+ create mode 100644 virt/kvm/arm/vgic/vgic.h
+
 -- 
 2.8.2
