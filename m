@@ -1,68 +1,96 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 16 May 2016 17:26:03 +0200
-Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
-In-Reply-To: <5739E416.6000501@semihalf.com>
-References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
- <CAOZdJXXtZq6uyE+5sseX7M_6Kq8wFG+37qd5TNSusKj=0gd8zA@mail.gmail.com>
- <5714BA5A.2040008@arm.com> <5739E416.6000501@semihalf.com>
-Message-ID: <5739E68B.2080907@semihalf.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 May 2016 08:36:00 -0700
+Subject: [PATCH] clk: ti: Add support for basic clk_set_rate for dm814x
+ and j5-eco ADPLL
+In-Reply-To: <20160515040028.GA20983@squirrel.local>
+References: <1463157653-9404-1-git-send-email-tony@atomide.com>
+ <20160515040028.GA20983@squirrel.local>
+Message-ID: <20160516153600.GK5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Matthijs van Duin <matthijsvanduin@gmail.com> [160514 21:02]:
+> On Fri, May 13, 2016 at 09:40:53AM -0700, Tony Lindgren wrote:
+> > +#define TI_ADPLL_DIV_N_MAX		GENMASK(7, 0)
+> > +#define TI_ADPLL_MULT_M_MAX		(GENMASK(11, 0) + 1)
+> 
+> These are PLL-type dependent, also the +1 is wrong since M isn't
+> off-by-one like N and N2 are.  (consistency? who needs that anyway?)
+> 
+> Here's what my own header says:
+> 
+> 			//		PLLS	PLLLJ
+> /*10*/	u16 prediv;	// aka N	0..127	0..255	(off by one)
+> /*12*/	u16 postdiv;	// aka M2	1..31	1..127  (but see note below)
+> /*14*/	u16 mult;	// aka M	2..2047	2..4095
+> /*16*/	u16 bypassdiv;	// aka N2	0..15	0..15	(off by one)
+> 
+> the "note below" referred to being:
+> 
+> // Using the fractional multiplier increases jitter (presumably more for PLLS
+> // than for PLLLJ) and imposes constraints on the multiplier:
+> //	PLLLJ:  mult < 4094
+> //	PLLS:	mult < 2046 && mult >= 20
+> // Other docs say mult > 100 is required for PLLS for max 2.5% period jitter.
 
+OK thanks for that info.
 
-On 16.05.2016 17:15, Tomasz Nowicki wrote:
-> On 18.04.2016 12:43, Robin Murphy wrote:
->> On 15/04/16 19:29, Timur Tabi wrote:
->>> On Thu, Apr 14, 2016 at 12:25 PM, Lorenzo Pieralisi
->>> <lorenzo.pieralisi@arm.com> wrote:
->>>> +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
->>>> +{
->>>> +       struct iommu_ops *iommu;
->>>> +
->>>> +       iommu = iort_iommu_configure(dev);
->>>> +
->>>> +       /*
->>>> +        * Assume dma valid range starts at 0 and covers the whole
->>>> +        * coherent_dma_mask.
->>>> +        */
->>>> +       arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
->>>> +                          attr == DEV_DMA_COHERENT);
->>>> +}
->>>
->>> I have a network driver that is impacted by this code, so thank you
->>> for posting this. (See
->>> https://www.mail-archive.com/netdev at vger.kernel.org/msg106249.html).
->>>
->>> One one SOC, the driver needs to set the mask to 32 bits.  On another
->>> SOC, it needs to set it to 64 bits.  On device tree, the driver will
->>> use dma-ranges.
->>
->> That's the wrong way to look at it - the driver isn't _using_
->> dma-ranges, you're merely relying on the OF code setting the _default_
->> DMA mask differently based on the property. If your driver is in the
->> minority of those which actually care about DMA masks, then it should be
->> calling dma_set_mask_and_coherent() appropriately and not relying on the
->> default.
->
-> I don't see the clear strategy for setting DMA mask as well.
->
-> Lets consider DT boot method example:
-> 1. SMMUv2 supports 48bit translation and 1:1 address map
-> dma-ranges = <0x0 0x0 0x0 0x0 0x00010000 0x0>;
-> and we are adding PCI device:
->
-> pci_device_add -> DMA_BIT_MASK(32) by default
->    pci_dma_configure
->      of_dma_configure -> reads dma-ranges and calculates 48bit DMA mask,
-> but it picks minimum, we stay with DMA_BIT_MASK(32)
->
-> now PCI dev turns out to be e1000e NIC:
-> e1000_probe
->    dma_set_mask_and_coherent -> tries to set DMA_BIT_MASK(64)
->      dma_set_mask -> there is no set_dma_mask ops for SMMUv2 so we let
+> > +	/* Ratio for integer multiplier M and pre-divider N */
+> > +	rational_best_approximation(rate, dcorate, TI_ADPLL_MULT_M_MAX,
+> > +				    TI_ADPLL_DIV_N_MAX, &m, &n);
+> 
+> I'm seeing all sorts of problems here...
+> 
+> "dcorate" is a rather misleading name since I would expect that to
+> refer to the rate of the dco, obviously, while in fact it's the input
+> clock adjusted to account for an implicit factor of 2 (or 8 if you
+> enable M4XEN, the utility of which I do not see).
+> 
+> It makes no sense to use rational_best_approximation on the integer
+> part and then calculate the fractional part separately.  Not only is the
+> calculation wrong, it's needlessly complicated.  You could just have
+> passed TI_ADPLL_MULT_M_MAX << 18 to rational_best_approximation and then
+> split m into integer and fractional part.
 
-Sorry, there is no .set_dma_mask ops for ARM64 (not SMMUv2)
+Hmm I guess I was trying to only change the integer part separately
+if possible but the code is not even doing that.. I guess there's no
+advantage to that and we have the the post divider to play with. I'll
+update the patch for what you're suggesting.
 
-Tomasz
+> The biggest problem however is that the best rational approximation does
+> not guarantee the refclk and dcoclk are within valid range.  This is
+> unlikely to be a problem for PLLS, but PLLLJ has quite narrow ranges:
+> 0.5-2.5 MHz for refclk and 0.5-2.0 GHz for dcoclk.
+
+Yeah that's a concern :) Some of this can be corrected by manually
+changing the multiplier and divider values, maybe not all cases
+though.
+
+Seems strange if we already don't have a decent piece of code to use
+here.. Anybody got code stashed away for the PLLS and PLLLJ set_rate
+handling?
+
+> I don't really have much time right now to spend on this, I suggest
+> checking previous threads on the 814x PLLs since I'm pretty sure the
+> complications/constraints for setting them have been discussed.
+
+OK sure, thanks a lot for your comments though!
+
+> > + *                                            Maybe we can
+> > + * make the SD_DIV_TARGET_MHZ configurable also?
+> 
+> What use would it have?  All docs I've ever seen say sddiv must be set
+> to ceil(dcoclk / 250_MHz) and none of the docs contain any background
+> information whatsoever on how this thing works, so there's no informed
+> way to choose an alternate value.
+> 
+> > +	if ((sd >= TI814X_ADPLLJ_MIN_SD_DIV) &&
+> > +	    (sd <= TI814X_ADPLLJ_MAX_SD_DIV)) {
+> 
+> always true due to the limited range permitted for dcoclk.
+
+OK in that case I'll update the comments to reflect that :)
+
+Regards,
+
+Tony
