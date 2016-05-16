@@ -1,159 +1,128 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:09 +0100
-Subject: [PATCH v4 24/56] KVM: arm/arm64: vgic-new: Add CTLR,
- TYPER and IIDR handlers
+Date: Mon, 16 May 2016 10:54:13 +0100
+Subject: [PATCH v4 28/56] KVM: arm/arm64: vgic-new: Add PRIORITY registers
+ handlers
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-82-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-86-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+The priority register handlers are shared between the v2 and v3
+emulation, so their implementation goes into vgic-mmio.c, to be
+easily referenced from the v3 emulation as well later.
+There is a corner case when we change the priority of a pending
+interrupt which we don't handle at the moment.
 
-Those three registers are v2 emulation specific, so their implementation
-lives entirely in vgic-mmio-v2.c. Also they are handled in one function,
-as their implementation is pretty simple.
-When the guest enables the distributor, we kick all VCPUs to get
-potentially pending interrupts serviced.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog RFC..v1:
-- kick VCPUs is the distributor gets enabled
-- improve comment
-
 Changelog v1 .. v2:
 - adapt to new MMIO framework
-- use switch() statements to improve readability
 
-Changelog v2 .. v3:
-- add vgic_kick_vcpus() implementation
-
-Changelog v3 .. v4;
+Changelog v3 .. v4:
 - specify accessor width
-- simplify CTLR write access
-- replace extract_bytes() with simple return
+- use IRQ number accessor macro
 
- include/linux/irqchip/arm-gic.h  |  1 +
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 46 +++++++++++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic.c         | 15 +++++++++++++
- virt/kvm/arm/vgic/vgic.h         |  4 ++++
- 4 files changed, 65 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
+ virt/kvm/arm/vgic/vgic-mmio.c    | 40 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    |  7 +++++++
+ virt/kvm/arm/vgic/vgic.h         |  2 ++
+ 4 files changed, 50 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index be0d26f..fd05185 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -33,6 +33,7 @@
- 
- #define GIC_DIST_CTRL			0x000
- #define GIC_DIST_CTR			0x004
-+#define GIC_DIST_IIDR			0x008
- #define GIC_DIST_IGROUP			0x080
- #define GIC_DIST_ENABLE_SET		0x100
- #define GIC_DIST_ENABLE_CLEAR		0x180
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index a3e31a9..d812c93 100644
+index 12e101b..d564a30 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -20,9 +20,53 @@
- #include "vgic.h"
- #include "vgic-mmio.h"
- 
-+static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
-+					    gpa_t addr, unsigned int len)
-+{
-+	u32 value;
-+
-+	switch (addr & 0x0c) {
-+	case GIC_DIST_CTRL:
-+		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
-+		break;
-+	case GIC_DIST_CTR:
-+		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-+		value = (value >> 5) - 1;
-+		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
-+		break;
-+	case GIC_DIST_IIDR:
-+		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+		break;
-+	default:
-+		return 0;
-+	}
-+
-+	return value;
-+}
-+
-+static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
-+				    gpa_t addr, unsigned int len,
-+				    unsigned long val)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	bool was_enabled = dist->enabled;
-+
-+	switch (addr & 0x0c) {
-+	case GIC_DIST_CTRL:
-+		dist->enabled = val & GICD_ENABLE;
-+		if (!was_enabled && dist->enabled)
-+			vgic_kick_vcpus(vcpu->kvm);
-+		break;
-+	case GIC_DIST_CTR:
-+	case GIC_DIST_IIDR:
-+		/* Nothing to do */
-+		return;
-+	}
-+}
-+
- static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 12,
-+		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+@@ -90,7 +90,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
  		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
- 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index bea8d3b..2a41028 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -544,3 +544,18 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
- 
- 	return pending;
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
++		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
+ 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 74d140e..5c8af05 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -237,6 +237,46 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 	}
  }
-+
-+void vgic_kick_vcpus(struct kvm *kvm)
+ 
++unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
++				      gpa_t addr, unsigned int len)
 +{
-+	struct kvm_vcpu *vcpu;
-+	int c;
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	int i;
++	u64 val = 0;
 +
-+	/*
-+	 * We've injected an interrupt, time to find out who deserves
-+	 * a good kick...
-+	 */
-+	kvm_for_each_vcpu(c, vcpu, kvm) {
-+		if (kvm_vgic_vcpu_pending_irq(vcpu))
-+			kvm_vcpu_kick(vcpu);
++	for (i = 0; i < len; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		val |= (u64)irq->priority << (i * 8);
++	}
++
++	return val;
++}
++
++/*
++ * We currently don't handle changing the priority of an interrupt that
++ * is already pending on a VCPU. If there is a need for this, we would
++ * need to make this VCPU exit and re-evaluate the priorities, potentially
++ * leading to this interrupt getting presented now to the guest (if it has
++ * been masked by the priority mask before).
++ */
++void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
++			      gpa_t addr, unsigned int len,
++			      unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	int i;
++
++	for (i = 0; i < len; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		spin_lock(&irq->irq_lock);
++		/* Narrow the priority range to what we actually support */
++		irq->priority = (val >> (i * 8)) & GENMASK(7, 8 - VGIC_PRI_BITS);
++		spin_unlock(&irq->irq_lock);
 +	}
 +}
++
+ static int match_region(const void *key, const void *elt)
+ {
+ 	const unsigned int offset = (unsigned long)key;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index dd96a71..6983922 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -117,6 +117,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 			     gpa_t addr, unsigned int len,
+ 			     unsigned long val);
+ 
++unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
++				      gpa_t addr, unsigned int len);
++
++void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
++			      gpa_t addr, unsigned int len,
++			      unsigned long val);
++
+ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+ 
+ #endif
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index fd9acaa..cf62015 100644
+index cf62015..e57f8d5 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -16,11 +16,15 @@
- #ifndef __KVM_ARM_VGIC_NEW_H__
- #define __KVM_ARM_VGIC_NEW_H__
+@@ -19,6 +19,8 @@
+ #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
+ #define IMPLEMENTER_ARM		0x43b
  
-+#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
-+#define IMPLEMENTER_ARM		0x43b
++#define VGIC_PRI_BITS		5
 +
  #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
  
  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
- bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
-+void vgic_kick_vcpus(struct kvm *kvm);
- 
- void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
- void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
 -- 
 2.8.2
