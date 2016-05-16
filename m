@@ -1,36 +1,45 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 15 May 2016 22:13:33 -0400
-Subject: [PATCH V5 0/6] vfio, platform: add ACPI support
-Message-ID: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
+Date: Sun, 15 May 2016 22:13:36 -0400
+Subject: [PATCH V5 3/6] vfio: platform: determine reset capability
+In-Reply-To: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
+References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1463364819-477-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The device tree code checks for the presence of a reset driver and calls
-the of_reset function pointer by looking up the reset driver as a module.
+Creating a new function to determine if this driver supports reset
+function or not. This is an attempt to abstract device tree calls
+from the rest of the code.
 
-ACPI defines _RST method to perform device level reset. After the _RST
-method is executed, the OS can resume using the device.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/vfio/platform/vfio_platform_common.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-This patch checks the presence of _RST method and calls the _RST
-method when reset is requested.
-
-Changes:
-1. No functional changes. Just divide the patches into subpatches for easy
-review.
-
-Sinan Kaya (6):
-  vfio: platform: rename reset function
-  vfio: platform: move reset call to a common function
-  vfio: platform: determine reset capability
-  vfio: platform: add support for ACPI probe
-  vfio: platform: call _RST method when using ACPI
-  vfio, platform: make reset driver a requirement by default
-
- drivers/vfio/platform/vfio_amba.c             |   5 +
- drivers/vfio/platform/vfio_platform.c         |   5 +
- drivers/vfio/platform/vfio_platform_common.c  | 170 +++++++++++++++++++++-----
- drivers/vfio/platform/vfio_platform_private.h |   8 +-
- 4 files changed, 153 insertions(+), 35 deletions(-)
-
+diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+index cb91dd3..25378bd 100644
+--- a/drivers/vfio/platform/vfio_platform_common.c
++++ b/drivers/vfio/platform/vfio_platform_common.c
+@@ -49,6 +49,11 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+ 	return reset_fn;
+ }
+ 
++static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
++{
++	return vdev->of_reset ? true : false;
++}
++
+ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+ {
+ 	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+@@ -215,7 +220,7 @@ static long vfio_platform_ioctl(void *device_data,
+ 		if (info.argsz < minsz)
+ 			return -EINVAL;
+ 
+-		if (vdev->of_reset)
++		if (vfio_platform_has_reset(vdev))
+ 			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
+ 		info.flags = vdev->flags;
+ 		info.num_regions = vdev->num_regions;
 -- 
 1.8.2.1
