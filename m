@@ -1,47 +1,30 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 16 May 2016 13:17:38 -0700
-Subject: [PATCH v10 0/8] add i2c driver supported for rk3399
-In-Reply-To: <1463407063-41218-1-git-send-email-david.wu@rock-chips.com>
-References: <1463407063-41218-1-git-send-email-david.wu@rock-chips.com>
-Message-ID: <CAD=FV=VqEpmODcnKOGb5P=Fu84c5pBOJXD9pfFMRc2aERfWmRg@mail.gmail.com>
+From: matija.glavinic-pecotic.ext@nokia.com (Matija Glavinic Pecotic)
+Date: Mon, 16 May 2016 22:29:59 +0200
+Subject: [PATCH] ARM: Fix A15 798181 errata initialization
+In-Reply-To: <20160516162757.GA29346@localhost.localdomain>
+References: <5734FA64.6040501@nokia.com>
+ <20160516162757.GA29346@localhost.localdomain>
+Message-ID: <573A2DC7.8080901@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/16/2016 06:27 PM, EXT Catalin Marinas wrote:
+> The errata documents haven't been updated yet but my reading of the
+> corresponding ARM support case is that the "REVIDR[9] set" case only
+> refers to r2p4. It should be a safe assumption for r3pX as well since
+> REVIDR[9] is an update to the previous REVIDR[4] ECO. Anyway, I asked
+> ARM support for clarification and get back to you.
 
-On Mon, May 16, 2016 at 6:57 AM, David Wu <david.wu@rock-chips.com> wrote:
-> There are three points differert from others:
->  - new method to caculate i2c timings for rk3399
->  - pclk and function clk are separated at rk3399
->  - add fast-plus mode supported for rk3399
->
-> David Wu (8):
->   i2c: rk3x: add documentation to fields in "struct rk3x_i2c"
->   i2c: rk3x: use struct "rk3x_i2c_calced_timings"
->   i2c: rk3x: Remove redundant rk3x_i2c_clean_ipd()
->   i2c: rk3x: Change SoC data to not use array
->   i2c: rk3x: Move spec timing data to "static const" structs
->   dt-bindings: i2c: rk3x: add support for rk3399
->   i2c: rk3x: add i2c support for rk3399 soc
->   i2c: rk3x: support fast-mode plus for rk3399
->
->  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |  16 +-
->  drivers/i2c/busses/i2c-rk3x.c                      | 498 +++++++++++++++++----
->  2 files changed, 434 insertions(+), 80 deletions(-)
+I see it possible for at least r3p3 as well since there revidr[4] is reserved. But yes, more clarification is for sure welcomed.
 
-I haven't put these on the scope or anything, but I have:
+BTW, I do not know which support case you refer to.
 
-* Tested that my i2c busses on rk3288-veyron still seem to work OK
-after these patches.
+> Please add the rXpY ranges and corresponding REVIDR combinations to the
+> comment above. It makes it easier to read the code later without having
+> to dig into the commit logs.
 
-* Tested that my i2c busses on an rk3399 board seem to work after
-these patches (plus device tree changes).
+Ok, will do.
 
-Thus, for the series:
+Thanks,
 
-Tested-by: Douglas Anderson <dianders@chromium.org>
-
-...possibly could leave off the Tested-by tag for the last in the
-series since I have no Fast Mode Plus devices to test against.  ;)
-
--Doug
+Matija
