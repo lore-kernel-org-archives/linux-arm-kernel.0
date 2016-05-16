@@ -1,20 +1,64 @@
 From: sricharan@codeaurora.org (Sricharan)
-Date: Mon, 16 May 2016 10:43:50 +0530
-Subject: [PATCH V2 0/2] drivers: i2c: qup: Some misc fixes
-In-Reply-To: <20160513114436.GH1778@katana>
+Date: Mon, 16 May 2016 10:49:04 +0530
+Subject: [PATCH V2 1/2] drivers: i2c: qup: Fix broken dma when
+ CONFIG_DEBUG_SG is enabled
+In-Reply-To: <20160513114716.GI1778@katana>
 References: <1462534274-28925-1-git-send-email-sricharan@codeaurora.org>
- <20160513114436.GH1778@katana>
-Message-ID: <000601d1af31$c07bc450$41734cf0$@codeaurora.org>
+ <1462534274-28925-2-git-send-email-sricharan@codeaurora.org>
+ <20160513114716.GI1778@katana>
+Message-ID: <000e01d1af32$7c05de40$74119ac0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
-
-> > One for fixing the bug with CONFIG_DEBUG_SG enabled and another to
-> > suspend the transfer for all errors instead of just for nack.
+> > With CONFIG_DEBUG_SG is enabled and when dma mode is used, below
+> dump
+> > is seen,
+> >
+> > ------------[ cut here ]------------
+> > kernel BUG at include/linux/scatterlist.h:140!
+> > Internal error: Oops - BUG: 0 [#1] PREEMPT SMP Modules linked in:
+> > CPU: 0 PID: 1 Comm: swapper/0 Not tainted 4.4.0-00459-g9f087b9-dirty
+> > #7 Hardware name: Qualcomm Technologies, Inc. APQ 8016 SBC (DT)
+> > task: ffffffc036868000 ti: ffffffc036870000 task.ti: ffffffc036870000
+> > PC is at qup_sg_set_buf.isra.13+0x138/0x154
+> > LR is at qup_sg_set_buf.isra.13+0x50/0x154 pc : [<ffffffc0005a0ed8>]
+> > lr : [<ffffffc0005a0df0>] pstate: 60000145 sp : ffffffc0368735c0
+> > x29: ffffffc0368735c0 x28: ffffffc036873752
+> > x27: ffffffc035233018 x26: ffffffc000c4e000
+> > x25: 0000000000000000 x24: 0000000000000004
+> > x23: 0000000000000000 x22: ffffffc035233668
+> > x21: ffffff80004e3000 x20: ffffffc0352e0018
+> > x19: 0000004000000000 x18: 0000000000000028
+> > x17: 0000000000000004 x16: ffffffc0017a39c8
+> > x15: 0000000000001cdf x14: ffffffc0019929d8
+> > x13: ffffffc0352e0018 x12: 0000000000000000
+> > x11: 0000000000000001 x10: 0000000000000001
+> > x9 : ffffffc0012b2d70 x8 : ffffff80004e3000
+> > x7 : 0000000000000018 x6 : 0000000030000000
+> > x5 : ffffffc00199f018 x4 : ffffffc035233018
+> > x3 : 0000000000000004 x2 : 00000000c0000000
+> > x1 : 0000000000000003 x0 : 0000000000000000
+> >
+> > Process swapper/0 (pid: 1, stack limit = 0xffffffc036870020)
+> > Stack: (0xffffffc0368735c0 to 0xffffffc036874000)
+> >
+> > Change allocation of sg buffers from dma_coherent memory to kzalloc to
+> > fix the issue.
 > 
-> You haven't stated what was changed in V2.
-    ah, sorry, will resend..
+> This description describes what you do. But not why it is the correct
+solution
+> to the OOPS. The OOPS  neither describes it. Please add some more
+> explanation.
+> 
+   Ok,will describe it more. The reason it oops is sg_set_bug expects that
+the
+   buf parameter passed in should be a from the lowmem and a valid
+pageframe.
+  This is not true for pages from dma_alloc_coherent which can be carveouts,
+hence
+  the check fails. Allocating buffers using kzalloc fixes the issue.
 
 Regards,
  Sricharan
+  
