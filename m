@@ -1,67 +1,94 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:21 +0100
-Subject: [PATCH v4 36/56] KVM: arm/arm64: vgic-new: Add GICv3 IDREGS register
- handler
+Date: Mon, 16 May 2016 10:54:22 +0100
+Subject: [PATCH v4 37/56] KVM: arm/arm64: vgic-new: Add GICv3 IROUTER register
+ handlers
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-94-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-95-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We implement the only one ID register that is required by the
-architecture, also this is the one that Linux actually checks.
+Since GICv3 supports much more than the 8 CPUs the GICv2 ITARGETSR
+register can handle, the new IROUTER register covers the whole range
+of possible target (V)CPUs by using the same MPIDR that the cores
+report themselves.
+In addition to translating this MPIDR into a vcpu pointer we store
+the originally written value as well. The architecture allows to
+write any values into the register, which must be read back as written.
+
+Since we don't support affinity level 3, we don't need to take care
+about the upper word of this 64-bit register, which simplifies the
+handling a bit.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
+Changelog RFC..v1:
+- fold in and simplify vgic_v3_irq_change_affinity
+
 Changelog v1 .. v2:
 - adapt to new MMIO framework
 
 Changelog v3 .. v4:
-- specify accessor width
+- move accessor width check into dispatcher
+- use IRQ number accessor macro
 
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 37 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 36 insertions(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index 28de16a..b893284 100644
+index b893284..7b9340b 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -96,6 +96,18 @@ static unsigned long vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
- 	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+@@ -75,6 +75,41 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
+ 	}
  }
  
-+static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
-+					      gpa_t addr, unsigned int len)
++static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
++					    gpa_t addr, unsigned int len)
 +{
-+	switch (addr & 0xffff) {
-+	case GICD_PIDR2:
-+		/* report a GICv3 compliant implementation */
-+		return 0x3b;
-+	}
++	int intid = VGIC_ADDR_TO_INTID(addr, 64);
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
 +
-+	return 0;
++	if (!irq)
++		return 0;
++
++	return extract_bytes(READ_ONCE(irq->mpidr), addr & 7, len);
 +}
 +
- /*
-  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
-  * redistributors, while SPIs are covered by registers in the distributor
-@@ -161,7 +173,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 64,
++static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val)
++{
++	int intid = VGIC_ADDR_TO_INTID(addr, 64);
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
++
++	if (!irq)
++		return;
++
++	/* The upper word is WI for us since we don't implement Aff3. */
++	if (addr & 4)
++		return;
++
++	spin_lock(&irq->irq_lock);
++
++	/* We only care about and preserve Aff0, Aff1 and Aff2. */
++	irq->mpidr = val & GENMASK(23, 0);
++	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, irq->mpidr);
++
++	spin_unlock(&irq->irq_lock);
++}
++
+ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+ 					      gpa_t addr, unsigned int len)
+ {
+@@ -170,7 +205,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 64,
++		vgic_mmio_read_irouter, vgic_mmio_write_irouter, 64,
  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
  	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 48,
-+		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
- 		VGIC_ACCESS_32bit),
- };
- 
-@@ -182,7 +194,7 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 48,
-+		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
- 		VGIC_ACCESS_32bit),
- };
- 
+ 		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
 -- 
 2.8.2
