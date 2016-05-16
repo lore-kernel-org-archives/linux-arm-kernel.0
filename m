@@ -1,22 +1,20 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 May 2016 00:05:18 +0800
-Subject: [PATCH 03/20] clk: sunxi: tcon-ch1: Do not return a negative
- error in get_parent
-In-Reply-To: <1463402840-17062-4-git-send-email-maxime.ripard@free-electrons.com>
-References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-4-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64GxTFnnx40Jy9Cz9e+c+T2j2QcbFznZ4-Lm-tdHFgcXg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 May 2016 11:09:55 -0500
+Subject: [Patch v5 1/8] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <1463111221-6963-2-git-send-email-andy.gross@linaro.org>
+References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
+ <1463111221-6963-2-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160516160955.GA8467@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2016 at 8:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> get_parent is supposed to return an unsigned 8 bit integer, so returning
-> -EINVAL is a bad idea.
->
-> Remove it.
->
-> Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Thu, May 12, 2016 at 10:46:54PM -0500, Andy Gross wrote:
+> This patch adds the device tree support for the Qualcomm SCM firmware.
+> 
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> ---
+>  .../devicetree/bindings/firmware/qcom,scm.txt      | 28 ++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Rob Herring <robh@kernel.org>
