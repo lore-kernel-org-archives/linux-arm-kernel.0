@@ -1,35 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 May 2016 14:47:08 +0200
-Subject: [PATCH 08/20] drm/sun4i: rgb: panel is an error pointer
+Date: Mon, 16 May 2016 14:47:03 +0200
+Subject: [PATCH 03/20] clk: sunxi: tcon-ch1: Do not return a negative error in
+ get_parent
 In-Reply-To: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1463402840-17062-9-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1463402840-17062-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In case of an error, our pointer to the drm_panel structure attached to our
-encoder will hold an error pointer, not a NULL pointer.
+get_parent is supposed to return an unsigned 8 bit integer, so returning
+-EINVAL is a bad idea.
 
-Make sure we check the right thing.
+Remove it.
 
-Fixes: 29e57fab97fc ("drm: sun4i: Add RGB output")
+Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/sunxi/clk-sun4i-tcon-ch1.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index 923f55039cb1..b46d2c15dc95 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -217,7 +217,7 @@ int sun4i_rgb_init(struct drm_device *drm)
- 	int ret;
+diff --git a/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
+index 98a4582de56a..248585238b1c 100644
+--- a/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
++++ b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
+@@ -85,9 +85,6 @@ static u8 tcon_ch1_get_parent(struct clk_hw *hw)
+ 	reg = readl(tclk->reg) >> TCON_CH1_SCLK2_MUX_SHIFT;
+ 	reg &= reg >> TCON_CH1_SCLK2_MUX_MASK;
  
- 	/* If we don't have a panel, there's no point in going on */
--	if (!tcon->panel)
-+	if (IS_ERR(tcon->panel))
- 		return -ENODEV;
+-	if (reg >= num_parents)
+-		return -EINVAL;
+-
+ 	return reg;
+ }
  
- 	rgb = devm_kzalloc(drm->dev, sizeof(*rgb), GFP_KERNEL);
 -- 
 2.8.2
