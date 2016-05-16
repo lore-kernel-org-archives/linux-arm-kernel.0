@@ -1,225 +1,76 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 May 2016 14:47:12 +0200
-Subject: [PATCH 12/20] drm/sun4i: Add bridge support
+Date: Mon, 16 May 2016 14:47:05 +0200
+Subject: [PATCH 05/20] drm/sun4i: request exact rates to our parents
 In-Reply-To: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1463402840-17062-13-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1463402840-17062-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Our RGB bus can be either connected to a bridge or a panel. While the panel
-support was already there, the bridge was not.
+Our pixel clock currently only tries to deal with the current parent rate.
 
-Fix that.
+While that works when the resolution is the same than the one already
+program, or when we can compute directly the rate from the current parent
+rate, it cannot work in most situation when we want to change the
+frequency, and we end up with an improper pixel clock rate, which obviously
+doesn't work as expected.
 
+Ask our parent for all the possible dividers if it can reach that
+frequency, and return the best parent rate to the clock framework so that
+we can use it.
+
+Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c  |  4 +--
- drivers/gpu/drm/sun4i/sun4i_rgb.c  | 56 +++++++++++++++++++++++++++-----------
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 48 ++++++++++++++++++++++++++++----
- drivers/gpu/drm/sun4i/sun4i_tcon.h |  1 +
- 4 files changed, 86 insertions(+), 23 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c | 30 ++++++++++++++++++++++++++++--
+ 1 file changed, 28 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index 257d2b4f3645..1f9e00db747d 100644
---- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -268,8 +268,8 @@ static int sun4i_drv_add_endpoints(struct device *dev,
- 		}
- 
- 		/*
--		 * If the node is our TCON, the first port is used for our
--		 * panel, and will not be part of the
-+		 * If the node is our TCON, the first port is used for
-+		 * panel or bridges, and will not be part of the
- 		 * component framework.
- 		 */
- 		if (sun4i_drv_node_is_tcon(node)) {
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index b46d2c15dc95..c3c611b08269 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -161,7 +161,12 @@ static void sun4i_rgb_encoder_enable(struct drm_encoder *encoder)
- 
- 	DRM_DEBUG_DRIVER("Enabling RGB output\n");
- 
--	drm_panel_enable(tcon->panel);
-+	if (!IS_ERR(tcon->panel))
-+		drm_panel_enable(tcon->panel);
-+
-+	if (!IS_ERR(tcon->bridge))
-+		drm_bridge_enable(tcon->bridge);
-+
- 	sun4i_tcon_channel_enable(tcon, 0);
- }
- 
-@@ -174,7 +179,12 @@ static void sun4i_rgb_encoder_disable(struct drm_encoder *encoder)
- 	DRM_DEBUG_DRIVER("Disabling RGB output\n");
- 
- 	sun4i_tcon_channel_disable(tcon, 0);
--	drm_panel_disable(tcon->panel);
-+
-+	if (!IS_ERR(tcon->bridge))
-+		drm_bridge_disable(tcon->bridge);
-+
-+	if (!IS_ERR(tcon->panel))
-+		drm_panel_disable(tcon->panel);
- }
- 
- static void sun4i_rgb_encoder_mode_set(struct drm_encoder *encoder,
-@@ -216,10 +226,6 @@ int sun4i_rgb_init(struct drm_device *drm)
- 	struct sun4i_rgb *rgb;
- 	int ret;
- 
--	/* If we don't have a panel, there's no point in going on */
--	if (IS_ERR(tcon->panel))
--		return -ENODEV;
--
- 	rgb = devm_kzalloc(drm->dev, sizeof(*rgb), GFP_KERNEL);
- 	if (!rgb)
- 		return -ENOMEM;
-@@ -240,19 +246,37 @@ int sun4i_rgb_init(struct drm_device *drm)
- 	/* The RGB encoder can only work with the TCON channel 0 */
- 	rgb->encoder.possible_crtcs = BIT(0);
- 
--	drm_connector_helper_add(&rgb->connector,
--				 &sun4i_rgb_con_helper_funcs);
--	ret = drm_connector_init(drm, &rgb->connector,
--				 &sun4i_rgb_con_funcs,
--				 DRM_MODE_CONNECTOR_Unknown);
--	if (ret) {
--		dev_err(drm->dev, "Couldn't initialise the rgb connector\n");
--		goto err_cleanup_connector;
-+	if (!IS_ERR(tcon->panel)) {
-+		drm_connector_helper_add(&rgb->connector,
-+					 &sun4i_rgb_con_helper_funcs);
-+		ret = drm_connector_init(drm, &rgb->connector,
-+					 &sun4i_rgb_con_funcs,
-+					 DRM_MODE_CONNECTOR_Unknown);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't initialise the rgb connector\n");
-+			goto err_cleanup_connector;
-+		}
-+
-+		drm_mode_connector_attach_encoder(&rgb->connector,
-+						  &rgb->encoder);
-+
-+		ret = drm_panel_attach(tcon->panel, &rgb->connector);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't attach our panel\n");
-+			goto err_cleanup_connector;
-+		}
- 	}
- 
--	drm_mode_connector_attach_encoder(&rgb->connector, &rgb->encoder);
-+	if (!IS_ERR(tcon->bridge)) {
-+		rgb->encoder.bridge = tcon->bridge;
-+		tcon->bridge->encoder = &rgb->encoder;
- 
--	drm_panel_attach(tcon->panel, &rgb->connector);
-+		ret = drm_bridge_attach(drm, tcon->bridge);
-+		if (ret) {
-+			dev_err(drm->dev, "Couldn't attach our bridge\n");
-+			goto err_cleanup_connector;
-+		}
-+	}
- 
- 	return 0;
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index eed6a9e8d9a6..4618d98913b4 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -432,6 +432,40 @@ static struct drm_panel *sun4i_tcon_find_panel(struct device_node *node)
- 	return of_drm_find_panel(remote) ?: ERR_PTR(-EPROBE_DEFER);
- }
- 
-+static struct drm_bridge *sun4i_tcon_find_bridge(struct device_node *node)
-+{
-+	struct device_node *port, *remote, *child;
-+	struct device_node *end_node = NULL;
-+
-+	/* Inputs are listed first, then outputs */
-+	port = of_graph_get_port_by_id(node, 1);
-+
-+	/*
-+	 * Our first output is the RGB interface where the panel will
-+	 * be connected.
-+	 */
-+	for_each_child_of_node(port, child) {
-+		u32 reg;
-+
-+		of_property_read_u32(child, "reg", &reg);
-+		if (reg == 0)
-+			end_node = child;
-+	}
-+
-+	if (!end_node) {
-+		DRM_DEBUG_DRIVER("Missing bridge endpoint\n");
-+		return ERR_PTR(-ENODEV);
-+	}
-+
-+	remote = of_graph_get_remote_port_parent(end_node);
-+	if (!remote) {
-+		DRM_DEBUG_DRIVER("Enable to parse remote node\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	return of_drm_find_bridge(remote) ?: ERR_PTR(-EPROBE_DEFER);
-+}
-+
- static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 			   void *data)
+diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+index 6c9c090a8006..1ddf6d7a7107 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
++++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+@@ -72,14 +72,40 @@ static unsigned long sun4i_dclk_recalc_rate(struct clk_hw *hw,
+ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				  unsigned long *parent_rate)
  {
-@@ -485,8 +519,9 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	}
+-	return *parent_rate / DIV_ROUND_CLOSEST(*parent_rate, rate);
++	unsigned long best_parent = 0;
++	u8 best_div = 1;
++	int i;
++
++	for (i = 6; i < 127; i++) {
++		unsigned long ideal = rate * i;
++		unsigned long rounded;
++
++		rounded = clk_hw_round_rate(clk_hw_get_parent(hw),
++					    ideal);
++
++		if (rounded == ideal) {
++			best_parent = rounded;
++			best_div = i;
++			goto out;
++		}
++
++		if ((rounded < ideal) && (rounded > best_parent)) {
++			best_parent = rounded;
++			best_div = i;
++		}
++	}
++
++out:
++	*parent_rate = best_parent;
++
++	return best_parent / best_div;
+ }
  
- 	tcon->panel = sun4i_tcon_find_panel(dev->of_node);
--	if (IS_ERR(tcon->panel)) {
--		dev_info(dev, "No panel found... RGB output disabled\n");
-+	tcon->bridge = sun4i_tcon_find_bridge(dev->of_node);
-+	if (IS_ERR(tcon->panel) && IS_ERR(tcon->bridge)) {
-+		dev_info(dev, "No panel or bridge found... RGB output disabled\n");
- 		return 0;
- 	}
- 
-@@ -515,19 +550,22 @@ static struct component_ops sun4i_tcon_ops = {
- static int sun4i_tcon_probe(struct platform_device *pdev)
+ static int sun4i_dclk_set_rate(struct clk_hw *hw, unsigned long rate,
+ 			       unsigned long parent_rate)
  {
- 	struct device_node *node = pdev->dev.of_node;
-+	struct drm_bridge *bridge;
- 	struct drm_panel *panel;
+ 	struct sun4i_dclk *dclk = hw_to_dclk(hw);
+-	int div = DIV_ROUND_CLOSEST(parent_rate, rate);
++	u8 div = parent_rate / rate;
  
- 	/*
--	 * The panel is not ready.
-+	 * Neither the bridge or the panel is ready.
- 	 * Defer the probe.
- 	 */
- 	panel = sun4i_tcon_find_panel(node);
-+	bridge = sun4i_tcon_find_bridge(node);
- 
- 	/*
- 	 * If we don't have a panel endpoint, just go on
- 	 */
--	if (PTR_ERR(panel) == -EPROBE_DEFER) {
--		DRM_DEBUG_DRIVER("Still waiting for our panel. Deferring...\n");
-+	if ((PTR_ERR(panel) == -EPROBE_DEFER) &&
-+	    (PTR_ERR(bridge) == -EPROBE_DEFER)) {
-+		DRM_DEBUG_DRIVER("Still waiting for our panel/bridge. Deferring...\n");
- 		return -EPROBE_DEFER;
- 	}
- 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 0e0b11db401b..31069027d7fb 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -162,6 +162,7 @@ struct sun4i_tcon {
- 	/* Platform adjustments */
- 	bool				has_mux;
- 
-+	struct drm_bridge		*bridge;
- 	struct drm_panel		*panel;
- };
- 
+ 	return regmap_update_bits(dclk->regmap, SUN4I_TCON0_DCLK_REG,
+ 				  GENMASK(6, 0), div);
 -- 
 2.8.2
