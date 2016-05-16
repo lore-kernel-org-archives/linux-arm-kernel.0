@@ -1,18 +1,16 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:13 +0100
-Subject: [PATCH v4 28/56] KVM: arm/arm64: vgic-new: Add PRIORITY registers
+Date: Mon, 16 May 2016 10:54:14 +0100
+Subject: [PATCH v4 29/56] KVM: arm/arm64: vgic-new: Add CONFIG registers
  handlers
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-86-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-87-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The priority register handlers are shared between the v2 and v3
+The config register handlers are shared between the v2 and v3
 emulation, so their implementation goes into vgic-mmio.c, to be
 easily referenced from the v3 emulation as well later.
-There is a corner case when we change the priority of a pending
-interrupt which we don't handle at the moment.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
@@ -22,70 +20,76 @@ Changelog v1 .. v2:
 Changelog v3 .. v4:
 - specify accessor width
 - use IRQ number accessor macro
+- replace extract_bytes() with simple return
 
  virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
- virt/kvm/arm/vgic/vgic-mmio.c    | 40 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    |  7 +++++++
- virt/kvm/arm/vgic/vgic.h         |  2 ++
- 4 files changed, 50 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio.c    | 46 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    |  7 ++++++
+ 3 files changed, 54 insertions(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 12e101b..d564a30 100644
+index d564a30..bb7389e 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -90,7 +90,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+@@ -96,7 +96,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+ 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 2,
++		vgic_mmio_read_config, vgic_mmio_write_config, 2,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 74d140e..5c8af05 100644
+index 5c8af05..5fe6896 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -237,6 +237,46 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+@@ -277,6 +277,52 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
  	}
  }
  
-+unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-+				      gpa_t addr, unsigned int len)
++unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
++	u32 value = 0;
 +	int i;
-+	u64 val = 0;
 +
-+	for (i = 0; i < len; i++) {
++	for (i = 0; i < len * 4; i++) {
 +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+		val |= (u64)irq->priority << (i * 8);
++		if (irq->config == VGIC_CONFIG_EDGE)
++			value |= (2U << (i * 2));
 +	}
 +
-+	return val;
++	return value;
 +}
 +
-+/*
-+ * We currently don't handle changing the priority of an interrupt that
-+ * is already pending on a VCPU. If there is a need for this, we would
-+ * need to make this VCPU exit and re-evaluate the priorities, potentially
-+ * leading to this interrupt getting presented now to the guest (if it has
-+ * been masked by the priority mask before).
-+ */
-+void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
++void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
++			    gpa_t addr, unsigned int len,
++			    unsigned long val)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
 +	int i;
 +
-+	for (i = 0; i < len; i++) {
++	for (i = 0; i < len * 4; i++) {
 +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
++		if (intid + i < 16)
++			continue;
++
++		/*
++		 * The spec says that interrupts must be disabled before
++		 * changing the configuration to avoid UNDEFINED behaviour.
++		 */
++
 +		spin_lock(&irq->irq_lock);
-+		/* Narrow the priority range to what we actually support */
-+		irq->priority = (val >> (i * 8)) & GENMASK(7, 8 - VGIC_PRI_BITS);
++		if (test_bit(i * 2 + 1, &val)) {
++			irq->config = VGIC_CONFIG_EDGE;
++		} else {
++			irq->config = VGIC_CONFIG_LEVEL;
++			irq->pending = irq->line_level | irq->soft_pending;
++		}
 +		spin_unlock(&irq->irq_lock);
 +	}
 +}
@@ -94,35 +98,22 @@ index 74d140e..5c8af05 100644
  {
  	const unsigned int offset = (unsigned long)key;
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index dd96a71..6983922 100644
+index 6983922..0bd0ece 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.h
 +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -117,6 +117,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
- 			     gpa_t addr, unsigned int len,
- 			     unsigned long val);
+@@ -124,6 +124,13 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+ 			      gpa_t addr, unsigned int len,
+ 			      unsigned long val);
  
-+unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-+				      gpa_t addr, unsigned int len);
++unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len);
 +
-+void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
++void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
++			    gpa_t addr, unsigned int len,
++			    unsigned long val);
 +
  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
  
  #endif
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index cf62015..e57f8d5 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,8 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
- 
-+#define VGIC_PRI_BITS		5
-+
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
- 
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
 -- 
 2.8.2
