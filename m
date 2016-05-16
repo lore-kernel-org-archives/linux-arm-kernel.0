@@ -1,41 +1,170 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Mon, 16 May 2016 00:29:14 +0000
-Subject: [PATCH 00/23] ARM/arm64: dts: renesas: Fix W=1 dtc warnings
-In-Reply-To: <1463126163-29423-1-git-send-email-geert+renesas@glider.be>
-References: <1463126163-29423-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <87wpmuetqv.wl%kuninori.morimoto.gx@renesas.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 16 May 2016 09:11:33 +0800
+Subject: [PATCH 1/2] arm64: dts: NS2: Add all of the UARTs
+In-Reply-To: <CAC3K-4oXcwR--879sCFR=MCG1Uman7DoGvaHLVXWr+0QH2WeJg@mail.gmail.com>
+References: <1463007369-13071-1-git-send-email-jonmason@broadcom.com>
+ <57341FCE.6050403@huawei.com>
+ <CAC3K-4qbkt3DCgd6qurNo3V+++x70bbFC--aunR0DbCTBvBNZg@mail.gmail.com>
+ <57353761.5020409@huawei.com>
+ <CAC3K-4oXcwR--879sCFR=MCG1Uman7DoGvaHLVXWr+0QH2WeJg@mail.gmail.com>
+Message-ID: <57391E45.8010209@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi Geert
 
-> This patch series fixes the new warnings related to Renesas arm32/arm64
-> DTSes that can be seen in -next using "make W=1 dtbs", courtesy of
-> commit b993734718c01064 ("scripts/dtc: Update to upstream version
-> 53bf130b1cdd") in Rob herring's for-next branch. They're all of the
-> form:
+On 2016/5/14 0:49, Jon Mason wrote:
 > 
->     Warning (unit_address_vs_reg): Node /cache-controller at 0 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /cache-controller has a reg or ranges property, but no unit name
->     Warning (unit_address_vs_reg): Node /clocks at e0110000/iic0_sclkdiv has a reg or ranges property, but no unit name
->     Warning (unit_address_vs_reg): Node /i2c at 2 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /keyboard/button at 1 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->     Warning (unit_address_vs_reg): Node /pfc at e0140200/serial at e1030000 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /regulator at 0 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 0 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,dvc/dvc at 0 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,mix/mix at 0 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 0 has a unit name, but no reg property
->     Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 0 has a unit name, but no reg property
-(snip)
-> Morimoto-san: If this is accepted, the examples in
-> Documentation/devicetree/bindings/sound/renesas,rsnd.txt should be
-> updated, too.
+> 
+> On Thu, May 12, 2016 at 10:09 PM, Kefeng Wang <wangkefeng.wang at huawei.com <mailto:wangkefeng.wang@huawei.com>> wrote:
+> 
+> 
+> 
+>     On 2016/5/12 22:46, Jon Mason wrote:
+>     >
+>     >
+>     > On Thu, May 12, 2016 at 2:16 AM, Kefeng Wang <wangkefeng.wang at huawei.com <mailto:wangkefeng.wang@huawei.com> <mailto:wangkefeng.wang at huawei.com <mailto:wangkefeng.wang@huawei.com>>> wrote:
+>     >
+>     >
+>     >
+>     >     On 2016/5/12 6:56, Jon Mason wrote:
+>     >     > Add all of the UARTs present on NS2 and enable them in the SVK device
+>     >     > tree file.  Also, do some magic to make sure that uart3 is discovered as
+>     >     > ttyS0 (as that is the console UART).
+>     >     >
+>     >     > Signed-off-by: Jon Mason <jonmason at broadcom.com <mailto:jonmason@broadcom.com> <mailto:jonmason at broadcom.com <mailto:jonmason@broadcom.com>>>
+>     >     > ---
+>     >     >  arch/arm64/boot/dts/broadcom/ns2-svk.dts | 16 ++++++++++++++++
+>     >     >  arch/arm64/boot/dts/broadcom/ns2.dtsi    | 30 ++++++++++++++++++++++++++++++
+>     >     >  2 files changed, 46 insertions(+)
+>     >     >
+>     >     > diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+>     >     > index 7cd3640..b062a44 100644
+>     >     > --- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+>     >     > +++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+>     >     > @@ -40,10 +40,14 @@
+>     >     >
+>     >     >       aliases {
+>     >     >               serial0 = &uart3;
+>     >     > +             serial1 = &uart0;
+>     >     > +             serial2 = &uart1;
+>     >     > +             serial3 = &uart2;
+>     >     >       };
+>     >     >
+>     >     >       chosen {
+>     >     >               stdout-path = "serial0:115200n8";
+>     >     > +             bootargs = "earlycon=uart8250,mmio32,0x66130000";
+>     >
+>     >     Hi Jon,
+>     >
+>     >     I submit a patch[1], with it, we can use earlycon without option to enable early console
+>     >     for "snps,dw-apb-uart", could you help me to test it, thanks.
+>     >
+>     >
+>     > Adding your change and removing the line above does not cause earlycon to work for me.  Is there any additional changes necessary for this to work?
+>     With my patch, the bootargs still need contain earlycon, but no need uart8250,mmio32,0x66130000;
+> 
+>     chosen {
+>             stdout-path = "serial0:115200n8";
+>             bootargs = "earlycon";
+>     }
+> 
+>     Hope it would work.
+> 
+> 
+> I can confirm that with your change and the change to the bootargs you describe above, it works as desired.  Was your change already accepted?
+> 
 
-Thanks. will do.
+Great, thanks a lot. it is still being reviewing for now and waiting for response for now.
 
-Best regards
----
-Kuninori Morimoto
+BRs,
+Kefeng
+
+> Thanks,
+> Jon
+>  
+> 
+> 
+>     BRs,
+>     Kefeng
+> 
+>     >
+>     > Thanks,
+>     > Jon
+>     >
+>     >
+>     >
+>     >     BRs,
+>     >     Kefeng
+>     >
+>     >
+>     >     [1] https://lkml.org/lkml/2016/5/11/34
+>     >
+>     >     >       };
+>     >     >
+>     >     >       memory {
+>     >     > @@ -68,6 +72,18 @@
+>     >     >       status = "ok";
+>     >     >  };
+>     >     >
+>     >     > +&uart0 {
+>     >     > +     status = "ok";
+>     >     > +};
+>     >     > +
+>     >     > +&uart1 {
+>     >     > +     status = "ok";
+>     >     > +};
+>     >     > +
+>     >     > +&uart2 {
+>     >     > +     status = "ok";
+>     >     > +};
+>     >     > +
+>     >     >  &uart3 {
+>     >     >       status = "ok";
+>     >     >  };
+>     >     > diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+>     >     > index 788ed8f..c77a9e8 100644
+>     >     > --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
+>     >     > +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+>     >     > @@ -357,6 +357,36 @@
+>     >     >                       status = "disabled";
+>     >     >               };
+>     >     >
+>     >     > +             uart0: serial at 66100000 {
+>     >     > +                     compatible = "snps,dw-apb-uart";
+>     >     > +                     reg = <0x66100000 0x100>;
+>     >     > +                     interrupts = <GIC_SPI 390 IRQ_TYPE_LEVEL_HIGH>;
+>     >     > +                     clocks = <&iprocslow>;
+>     >     > +                     reg-shift = <2>;
+>     >     > +                     reg-io-width = <4>;
+>     >     > +                     status = "disabled";
+>     >     > +             };
+>     >     > +
+>     >     > +             uart1: serial at 66110000 {
+>     >     > +                     compatible = "snps,dw-apb-uart";
+>     >     > +                     reg = <0x66110000 0x100>;
+>     >     > +                     interrupts = <GIC_SPI 391 IRQ_TYPE_LEVEL_HIGH>;
+>     >     > +                     clocks = <&iprocslow>;
+>     >     > +                     reg-shift = <2>;
+>     >     > +                     reg-io-width = <4>;
+>     >     > +                     status = "disabled";
+>     >     > +             };
+>     >     > +
+>     >     > +             uart2: serial at 66120000 {
+>     >     > +                     compatible = "snps,dw-apb-uart";
+>     >     > +                     reg = <0x66120000 0x100>;
+>     >     > +                     interrupts = <GIC_SPI 392 IRQ_TYPE_LEVEL_HIGH>;
+>     >     > +                     clocks = <&iprocslow>;
+>     >     > +                     reg-shift = <2>;
+>     >     > +                     reg-io-width = <4>;
+>     >     > +                     status = "disabled";
+>     >     > +             };
+>     >     > +
+>     >     >               uart3: serial at 66130000 {
+>     >     >                       compatible = "snps,dw-apb-uart";
+>     >     >                       reg = <0x66130000 0x100>;
+>     >     >
+>     >
+>     >
+> 
+> 
