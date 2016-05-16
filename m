@@ -1,43 +1,54 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 16 May 2016 10:55:03 +0530
-Subject: [PATCH] ARM: DRA7: hwmod: Remove QSPI address space entry from hwmod
-Message-ID: <1463376303-22267-1-git-send-email-vigneshr@ti.com>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 16 May 2016 07:40:56 +0200
+Subject: [RFC PATCH 2/7] ALSA: ac97: add an ac97 bus
+In-Reply-To: <87mvnrhux4.fsf@belgarion.home>
+References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
+ <1462050939-27940-3-git-send-email-robert.jarzmik@free.fr>
+ <s5hk2j38tmf.wl-tiwai@suse.de> <87twi1hssl.fsf@belgarion.home>
+ <s5hy47c7jvd.wl-tiwai@suse.de> <87mvnrhux4.fsf@belgarion.home>
+Message-ID: <s5hoa867e6v.wl-tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-QSPI address space information is passed from device tree. Therefore
-remove legacy way of passing address space via hwmod data.
+On Sun, 15 May 2016 23:29:27 +0200,
+Robert Jarzmik wrote:
+> 
+> Takashi Iwai <tiwai@suse.de> writes:
+> 
+> > On Sat, 14 May 2016 11:50:50 +0200,
+> > Robert Jarzmik wrote:
+> >> >> +unsigned int ac97_bus_scan_one(struct ac97_controller *ac97,
+> >> >> +				      int codec_num)
+> >> >> +{
+> >> >> +	struct ac97_codec_device codec;
+> >> >> +	unsigned short vid1, vid2;
+> >> >> +	int ret;
+> >> >> +
+> >> >> +	codec.dev = *ac97->dev;
+> >> >> +	codec.num = codec_num;
+> >> >> +	ret = ac97->ops->read(&codec, AC97_VENDOR_ID1);
+> >> >> +	vid1 = (ret & 0xffff);
+> >> >> +	if (ret < 0)
+> >> >> +		return 0;
+> >> >
+> >> > Hmm.  This looks pretty hackish and dangerous.
+> >> You mean returning 0 even if the read failed, right ?
+> >
+> > No, my concern is that it's creating a dummy codec object temporarily
+> > on the stack just by copying some fields and calling the ops with it.
+> > (And actually the current code may work wrongly because lack of
+> >  zero-clear of the object.)
+> Ah yes, I remember now, the on-stack generated device, indeed ugly.
+> 
+> > IMO, a cleaner way would be to define the ops passed with both
+> > controller and codec objects as arguments, and pass NULL codec here.
+> It's rather unusual to need both the device and its controller in bus
+> operations. I must admit I have no better idea so far, so I'll try that just to
+> see how it looks like, and let's see next ...
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 10 ----------
- 1 file changed, 10 deletions(-)
+Thinking of this again, I wonder now why we need to pass the codec
+object at all.  It's the read/write ops via ac97, so we just need the
+ac97_controller object and the address slot of the accessed codec?
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index d0e7e5259ec3..fac0a2044da4 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -3410,21 +3410,11 @@ static struct omap_hwmod_ocp_if dra7xx_l4_cfg__pciess2 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--static struct omap_hwmod_addr_space dra7xx_qspi_addrs[] = {
--	{
--		.pa_start	= 0x4b300000,
--		.pa_end		= 0x4b30007f,
--		.flags		= ADDR_TYPE_RT
--	},
--	{ }
--};
--
- /* l3_main_1 -> qspi */
- static struct omap_hwmod_ocp_if dra7xx_l3_main_1__qspi = {
- 	.master		= &dra7xx_l3_main_1_hwmod,
- 	.slave		= &dra7xx_qspi_hwmod,
- 	.clk		= "l3_iclk_div",
--	.addr		= dra7xx_qspi_addrs,
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
--- 
-2.8.2
+
+Takashi
