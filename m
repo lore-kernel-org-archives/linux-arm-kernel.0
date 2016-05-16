@@ -1,105 +1,97 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:54 +0100
-Subject: [PATCH v4 09/56] KVM: arm/arm64: Fix MMIO emulation data handling
+Date: Mon, 16 May 2016 10:53:56 +0100
+Subject: [PATCH v4 11/56] KVM: arm/arm64: pmu: abstract access to number of
+ SPIs
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-67-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-69-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Currently the PMU uses a member of the struct vgic_dist directly,
+which not only breaks abstraction, but will fail with the new VGIC.
+Abstract this access in the VGIC header file and refactor the validity
+check in the PMU code.
 
-When the kernel was handling a guest MMIO read access internally, we
-need to copy the emulation result into the run->mmio structure in order
-for the kvm_handle_mmio_return() function to pick it up and inject the
-	result back into the guest.
-
-Currently the only user of kvm_io_bus for ARM is the VGIC, which did
-this copying itself, so this was not causing issues so far.
-
-But with the upcoming new vgic implementation we need this done
-properly.
-
-Update the kvm_handle_mmio_return description and cleanup the code to
-only perform a single copying when needed.
-
-Code and commit message inspired by Andre Przywara.
-
-Reported-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/mmio.c | 14 +++++++-------
- virt/kvm/arm/vgic.c |  7 -------
- 2 files changed, 7 insertions(+), 14 deletions(-)
+Changelog v3 .. v4:
+- fix logic to allow PPIs again
+- refactor IRQ validity check
 
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 0f6600f..0158e9e 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -87,11 +87,10 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
+ include/kvm/arm_vgic.h |  2 ++
+ virt/kvm/arm/pmu.c     | 25 ++++++++++++++-----------
+ 2 files changed, 16 insertions(+), 11 deletions(-)
+
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 67a6637..ade7005 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -348,6 +348,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
++#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
++				 ((i) < (k)->arch.vgic.nr_irqs))
  
- /**
-  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
-+ *			     or in-kernel IO emulation
-+ *
-  * @vcpu: The VCPU pointer
-  * @run:  The VCPU run struct containing the mmio data
-- *
-- * This should only be called after returning from userspace for MMIO load
-- * emulation.
-  */
- int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
-@@ -206,18 +205,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	run->mmio.is_write	= is_write;
- 	run->mmio.phys_addr	= fault_ipa;
- 	run->mmio.len		= len;
--	if (is_write)
--		memcpy(run->mmio.data, data_buf, len);
- 
- 	if (!ret) {
- 		/* We handled the access successfully in the kernel. */
-+		if (!is_write)
-+			memcpy(run->mmio.data, data_buf, len);
- 		vcpu->stat.mmio_exit_kernel++;
- 		kvm_handle_mmio_return(vcpu, run);
- 		return 1;
--	} else {
--		vcpu->stat.mmio_exit_user++;
- 	}
- 
-+	if (is_write)
-+		memcpy(run->mmio.data, data_buf, len);
-+	vcpu->stat.mmio_exit_user++;
- 	run->exit_reason	= KVM_EXIT_MMIO;
+ int vgic_v2_probe(const struct gic_kvm_info *gic_kvm_info,
+ 		  const struct vgic_ops **ops,
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 575c7aa..a027569 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -436,7 +436,14 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
  	return 0;
  }
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index f76bb64..c3bfbb9 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -819,7 +819,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_io_device *iodev = container_of(this,
- 						    struct vgic_io_device, dev);
--	struct kvm_run *run = vcpu->run;
- 	const struct vgic_io_range *range;
- 	struct kvm_exit_mmio mmio;
- 	bool updated_state;
-@@ -848,12 +847,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 		updated_state = false;
- 	}
- 	spin_unlock(&dist->lock);
--	run->mmio.is_write	= is_write;
--	run->mmio.len		= len;
--	run->mmio.phys_addr	= addr;
--	memcpy(run->mmio.data, val, len);
--
--	kvm_handle_mmio_return(vcpu, run);
  
- 	if (updated_state)
- 		vgic_kick_vcpus(vcpu->kvm);
+-static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
++#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
++
++/*
++ * For one VM the interrupt type must be same for each vcpu.
++ * As a PPI, the interrupt number is the same for all vcpus,
++ * while as an SPI it must be a separate number per vcpu.
++ */
++static bool pmu_irq_is_valid(struct kvm *kvm, int irq)
+ {
+ 	int i;
+ 	struct kvm_vcpu *vcpu;
+@@ -445,7 +452,7 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+ 		if (!kvm_arm_pmu_irq_initialized(vcpu))
+ 			continue;
+ 
+-		if (is_ppi) {
++		if (irq_is_ppi(irq)) {
+ 			if (vcpu->arch.pmu.irq_num != irq)
+ 				return false;
+ 		} else {
+@@ -457,7 +464,6 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+ 	return true;
+ }
+ 
+-
+ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ {
+ 	switch (attr->attr) {
+@@ -471,14 +477,11 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ 		if (get_user(irq, uaddr))
+ 			return -EFAULT;
+ 
+-		/*
+-		 * The PMU overflow interrupt could be a PPI or SPI, but for one
+-		 * VM the interrupt type must be same for each vcpu. As a PPI,
+-		 * the interrupt number is the same for all vcpus, while as an
+-		 * SPI it must be a separate number per vcpu.
+-		 */
+-		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
+-		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
++		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
++		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
++			return -EINVAL;
++
++		if (!pmu_irq_is_valid(vcpu->kvm, irq))
+ 			return -EINVAL;
+ 
+ 		if (kvm_arm_pmu_irq_initialized(vcpu))
 -- 
 2.8.2
