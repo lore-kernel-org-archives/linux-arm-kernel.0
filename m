@@ -1,118 +1,103 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:00 +0100
-Subject: [PATCH v4 12/56] KVM: arm/arm64: Provide functionality to pause and
- resume a guest
+Date: Mon, 16 May 2016 10:52:58 +0100
+Subject: [PATCH v4 10/56] KVM: arm/arm64: Export mmio_read/write_bus
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-11-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-For some rare corner cases in our VGIC emulation later we have to stop
-the guest to make sure the VGIC state is consistent.
-Provide the necessary framework to pause and resume a guest.
+Rename mmio_{read,write}_bus to kvm_mmio_{read,write}_bus and export
+them out of mmio.c.
+This will be needed later for the new VGIC implementation.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |  4 ++++
- arch/arm/kvm/arm.c                | 25 +++++++++++++------------
- arch/arm64/include/asm/kvm_host.h |  4 ++++
- 3 files changed, 21 insertions(+), 12 deletions(-)
+ arch/arm/include/asm/kvm_mmio.h   |  3 +++
+ arch/arm/kvm/mmio.c               | 10 +++++-----
+ arch/arm64/include/asm/kvm_mmio.h |  3 +++
+ 3 files changed, 11 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 3850701..832be03 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -41,6 +41,8 @@
+diff --git a/arch/arm/include/asm/kvm_mmio.h b/arch/arm/include/asm/kvm_mmio.h
+index d8e90c8..f3a7de7 100644
+--- a/arch/arm/include/asm/kvm_mmio.h
++++ b/arch/arm/include/asm/kvm_mmio.h
+@@ -28,6 +28,9 @@ struct kvm_decode {
+ 	bool sign_extend;
+ };
  
- #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
- 
-+#define KVM_REQ_VCPU_EXIT	8
++void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data);
++unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len);
 +
- u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
-@@ -225,6 +227,8 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 phys_addr_t fault_ipa);
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 0158e9e..10f80a6 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -23,7 +23,7 @@
  
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-+void kvm_arm_halt_guest(struct kvm *kvm);
-+void kvm_arm_resume_guest(struct kvm *kvm);
+ #include "trace.h"
  
- int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
- unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index be4b639..3b4fd03 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -492,30 +492,31 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
- 	return vgic_initialized(kvm);
- }
- 
--static void kvm_arm_halt_guest(struct kvm *kvm) __maybe_unused;
--static void kvm_arm_resume_guest(struct kvm *kvm) __maybe_unused;
--
--static void kvm_arm_halt_guest(struct kvm *kvm)
-+void kvm_arm_halt_guest(struct kvm *kvm)
+-static void mmio_write_buf(char *buf, unsigned int len, unsigned long data)
++void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data)
  {
- 	int i;
- 	struct kvm_vcpu *vcpu;
- 
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		vcpu->arch.pause = true;
--	force_vm_exit(cpu_all_mask);
-+	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
-+}
-+
-+static void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
-+{
-+	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
-+
-+	vcpu->arch.pause = false;
-+	swake_up(wq);
+ 	void *datap = NULL;
+ 	union {
+@@ -55,7 +55,7 @@ static void mmio_write_buf(char *buf, unsigned int len, unsigned long data)
+ 	memcpy(buf, datap, len);
  }
  
--static void kvm_arm_resume_guest(struct kvm *kvm)
-+void kvm_arm_resume_guest(struct kvm *kvm)
+-static unsigned long mmio_read_buf(char *buf, unsigned int len)
++unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len)
  {
- 	int i;
- 	struct kvm_vcpu *vcpu;
+ 	unsigned long data = 0;
+ 	union {
+@@ -66,7 +66,7 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
  
--	kvm_for_each_vcpu(i, vcpu, kvm) {
--		struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
--
--		vcpu->arch.pause = false;
--		swake_up(wq);
--	}
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		kvm_arm_resume_vcpu(vcpu);
- }
+ 	switch (len) {
+ 	case 1:
+-		data = buf[0];
++		data = *(u8 *)buf;
+ 		break;
+ 	case 2:
+ 		memcpy(&tmp.hword, buf, len);
+@@ -103,7 +103,7 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		if (len > sizeof(unsigned long))
+ 			return -EINVAL;
  
- static void vcpu_sleep(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 4cd4196..fa94f91 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -44,6 +44,8 @@
+-		data = mmio_read_buf(run->mmio.data, len);
++		data = kvm_mmio_read_buf(run->mmio.data, len);
  
- #define KVM_VCPU_MAX_FEATURES 4
+ 		if (vcpu->arch.mmio_decode.sign_extend &&
+ 		    len < sizeof(unsigned long)) {
+@@ -189,7 +189,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 					       len);
  
-+#define KVM_REQ_VCPU_EXIT	8
+ 		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, len, fault_ipa, data);
+-		mmio_write_buf(data_buf, len, data);
++		kvm_mmio_write_buf(data_buf, len, data);
+ 
+ 		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, fault_ipa, len,
+ 				       data_buf);
+diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
+index fe612a9..75ea420 100644
+--- a/arch/arm64/include/asm/kvm_mmio.h
++++ b/arch/arm64/include/asm/kvm_mmio.h
+@@ -30,6 +30,9 @@ struct kvm_decode {
+ 	bool sign_extend;
+ };
+ 
++void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data);
++unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len);
 +
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
- int kvm_arch_dev_ioctl_check_extension(long ext);
-@@ -325,6 +327,8 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
- 
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
-+void kvm_arm_halt_guest(struct kvm *kvm);
-+void kvm_arm_resume_guest(struct kvm *kvm);
- 
- u64 __kvm_call_hyp(void *hypfn, ...);
- #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		 phys_addr_t fault_ipa);
 -- 
 2.8.2
