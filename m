@@ -1,68 +1,68 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 16 May 2016 23:21:41 +0800
-Subject: [PATCH 04/20] clk: sunxi: display: Add per-clock flags
-In-Reply-To: <1463402840-17062-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66-GzV=1wrJnHBObLVPVHPk87o0PaJtNyYasp2wFsZabw@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Mon, 16 May 2016 17:26:03 +0200
+Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
+In-Reply-To: <5739E416.6000501@semihalf.com>
+References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAOZdJXXtZq6uyE+5sseX7M_6Kq8wFG+37qd5TNSusKj=0gd8zA@mail.gmail.com>
+ <5714BA5A.2040008@arm.com> <5739E416.6000501@semihalf.com>
+Message-ID: <5739E68B.2080907@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Mon, May 16, 2016 at 8:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The TCON channel 0 clock that is the parent clock of our pixel clock is
-> expected to change its rate depending on the resolution we want to output
-> in our display engine.
->
-> However, since it's only a mux, the only way it can do that is by changing
-> its parents rate.
->
-> Allow to give flags in our display clocks description, and add the
-> CLK_SET_RATE_PARENT flag for the TCON channel 0 flag.
->
-> Fixes: a3b4956ee6d9 ("clk: sunxi: display: Add per-clock flags")
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-sun4i-display.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
-> index 445a7498d6df..9780fac6d029 100644
-> --- a/drivers/clk/sunxi/clk-sun4i-display.c
-> +++ b/drivers/clk/sunxi/clk-sun4i-display.c
-> @@ -33,6 +33,8 @@ struct sun4i_a10_display_clk_data {
->
->         u8      width_div;
->         u8      width_mux;
-> +
 
-Don't really need this separator, but I'm ok either way.
+On 16.05.2016 17:15, Tomasz Nowicki wrote:
+> On 18.04.2016 12:43, Robin Murphy wrote:
+>> On 15/04/16 19:29, Timur Tabi wrote:
+>>> On Thu, Apr 14, 2016 at 12:25 PM, Lorenzo Pieralisi
+>>> <lorenzo.pieralisi@arm.com> wrote:
+>>>> +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+>>>> +{
+>>>> +       struct iommu_ops *iommu;
+>>>> +
+>>>> +       iommu = iort_iommu_configure(dev);
+>>>> +
+>>>> +       /*
+>>>> +        * Assume dma valid range starts at 0 and covers the whole
+>>>> +        * coherent_dma_mask.
+>>>> +        */
+>>>> +       arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, iommu,
+>>>> +                          attr == DEV_DMA_COHERENT);
+>>>> +}
+>>>
+>>> I have a network driver that is impacted by this code, so thank you
+>>> for posting this. (See
+>>> https://www.mail-archive.com/netdev at vger.kernel.org/msg106249.html).
+>>>
+>>> One one SOC, the driver needs to set the mask to 32 bits.  On another
+>>> SOC, it needs to set it to 64 bits.  On device tree, the driver will
+>>> use dma-ranges.
+>>
+>> That's the wrong way to look at it - the driver isn't _using_
+>> dma-ranges, you're merely relying on the OF code setting the _default_
+>> DMA mask differently based on the property. If your driver is in the
+>> minority of those which actually care about DMA masks, then it should be
+>> calling dma_set_mask_and_coherent() appropriately and not relying on the
+>> default.
+>
+> I don't see the clear strategy for setting DMA mask as well.
+>
+> Lets consider DT boot method example:
+> 1. SMMUv2 supports 48bit translation and 1:1 address map
+> dma-ranges = <0x0 0x0 0x0 0x0 0x00010000 0x0>;
+> and we are adding PCI device:
+>
+> pci_device_add -> DMA_BIT_MASK(32) by default
+>    pci_dma_configure
+>      of_dma_configure -> reads dma-ranges and calculates 48bit DMA mask,
+> but it picks minimum, we stay with DMA_BIT_MASK(32)
+>
+> now PCI dev turns out to be e1000e NIC:
+> e1000_probe
+>    dma_set_mask_and_coherent -> tries to set DMA_BIT_MASK(64)
+>      dma_set_mask -> there is no set_dma_mask ops for SMMUv2 so we let
 
-> +       u32     flags;
->  };
->
->  struct reset_data {
-> @@ -166,7 +168,7 @@ static void __init sun4i_a10_display_init(struct device_node *node,
->                                      data->has_div ? &div->hw : NULL,
->                                      data->has_div ? &clk_divider_ops : NULL,
->                                      &gate->hw, &clk_gate_ops,
-> -                                    0);
-> +                                    data->flags);
->         if (IS_ERR(clk)) {
->                 pr_err("%s: Couldn't register the clock\n", clk_name);
->                 goto free_div;
-> @@ -232,6 +234,7 @@ static const struct sun4i_a10_display_clk_data sun4i_a10_tcon_ch0_data __initcon
->         .offset_rst     = 29,
->         .offset_mux     = 24,
->         .width_mux      = 2,
-> +       .flags          = CLK_SET_RATE_PARENT,
->  };
->
->  static void __init sun4i_a10_tcon_ch0_setup(struct device_node *node)
-> --
-> 2.8.2
->
+Sorry, there is no .set_dma_mask ops for ARM64 (not SMMUv2)
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Tomasz
