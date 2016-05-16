@@ -1,208 +1,45 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 16 May 2016 15:07:55 +0800
-Subject: [PATCH 1/3] power: axp20x_usb: Add support for usb power-supply
- on axp22x pmics
-In-Reply-To: <1463248289-16456-1-git-send-email-hdegoede@redhat.com>
-References: <1463248289-16456-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v67N7R5U_+dZ4ZO+VuGKo6wbVALnrMq3=Ceec8J122LiDA@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon, 16 May 2016 09:17:32 +0200
+Subject: [PATCH] ZynqMP: Align gic ranges for 64k in device tree
+In-Reply-To: <1463053441-57572-1-git-send-email-agraf@suse.de>
+References: <1463053441-57572-1-git-send-email-agraf@suse.de>
+Message-ID: <5739740C.10901@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Sun, May 15, 2016 at 1:51 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> The usb power-supply on the axp22x pmics is mostly identical to the
-> one on the axp20x pmics. One significant difference is that it cannot
-> measure / monitor the usb voltage / current.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On 12.5.2016 13:44, Alexander Graf wrote:
+> The GIC ranges in the zynqmp device tree are only 4kb aligned. Since
+> commit 12e14066f we automatically deal with aliases GIC regions though,
+> so we can map them transparently into guests even on 64kb page size
+> systems.
+> 
+> This patch makes use of that features and sets GICC and GICV to 64kb
+> aligned and sized regions.
+> 
+> Signed-off-by: Alexander Graf <agraf@suse.de>
 > ---
->  drivers/power/axp20x_usb_power.c | 99 +++++++++++++++++++++++++++++++---------
->  1 file changed, 77 insertions(+), 22 deletions(-)
->
-> diff --git a/drivers/power/axp20x_usb_power.c b/drivers/power/axp20x_usb_power.c
-> index 421a90b..b3c1d8e 100644
-> --- a/drivers/power/axp20x_usb_power.c
-> +++ b/drivers/power/axp20x_usb_power.c
-> @@ -42,6 +42,7 @@
->  #define AXP20X_VBUS_MON_VBUS_VALID     BIT(3)
->
->  struct axp20x_usb_power {
-> +       struct axp20x_dev *axp20x;
->         struct regmap *regmap;
->         struct power_supply *supply;
->  };
-> @@ -85,7 +86,15 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
->
->                 switch (v & AXP20X_VBUS_CLIMIT_MASK) {
->                 case AXP20X_VBUC_CLIMIT_100mA:
-> -                       val->intval = 100000;
-> +                       switch (power->axp20x->variant) {
-> +                       case AXP202_ID:
-> +                       case AXP209_ID:
-> +                               val->intval = 100000;
-> +                               break;
-> +                       default:
-> +                               val->intval = -1; /* No 100mA limit */
-> +                               break;
-> +                       }
+>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> index e595f22..38c4310 100644
+> --- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> +++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
+> @@ -81,9 +81,9 @@
+>  			compatible = "arm,gic-400", "arm,cortex-a15-gic";
+>  			#interrupt-cells = <3>;
+>  			reg = <0x0 0xf9010000 0x10000>,
+> -			      <0x0 0xf902f000 0x2000>,
+> +			      <0x0 0xf9020000 0x20000>,
+>  			      <0x0 0xf9040000 0x20000>,
+> -			      <0x0 0xf906f000 0x2000>;
+> +			      <0x0 0xf9060000 0x20000>;
+>  			interrupt-controller;
+>  			interrupt-parent = <&gic>;
+>  			interrupts = <1 9 0xf04>;
+> 
 
-Given this hardware actually has DT bindings, I'd prefer matching against the
-compatible string, and keeping the variant part in axp20x_usb_power. You could
-still use the AXPXXX_ID constants, but just the ones used in the bindings. This
-could potentially make adding support for newer PMICs easier by only needing a
-compatible DT entry.
+Applied to zynqmp/dt with changed subject prefix ARM64: zynqmp:
 
->                         break;
->                 case AXP20X_VBUC_CLIMIT_500mA:
->                         val->intval = 500000;
-> @@ -122,16 +131,23 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
->                         break;
->                 }
->
-> -               ret = regmap_read(power->regmap, AXP20X_USB_OTG_STATUS, &v);
-> -               if (ret)
-> -                       return ret;
-> +               val->intval = POWER_SUPPLY_HEALTH_GOOD;
->
-> -               if (!(v & AXP20X_USB_STATUS_VBUS_VALID)) {
-> -                       val->intval = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
-> +               switch (power->axp20x->variant) {
-> +               case AXP202_ID:
-> +               case AXP209_ID:
-> +                       ret = regmap_read(power->regmap,
-> +                                         AXP20X_USB_OTG_STATUS, &v);
-> +                       if (ret)
-> +                               return ret;
-> +
-> +                       if (!(v & AXP20X_USB_STATUS_VBUS_VALID))
-> +                               val->intval =
-> +                                       POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
-> +                       break;
-> +               default:
-
-It seems like you'd return only POWER_SUPPLY_HEALTH_GOOD for AXP22x, even if
-VBUS is actually disconnected.
-
->                         break;
->                 }
-> -
-> -               val->intval = POWER_SUPPLY_HEALTH_GOOD;
->                 break;
->         case POWER_SUPPLY_PROP_PRESENT:
->                 val->intval = !!(input & AXP20X_PWR_STATUS_VBUS_PRESENT);
-> @@ -156,6 +172,14 @@ static enum power_supply_property axp20x_usb_power_properties[] = {
->         POWER_SUPPLY_PROP_CURRENT_NOW,
->  };
->
-> +static enum power_supply_property axp22x_usb_power_properties[] = {
-> +       POWER_SUPPLY_PROP_HEALTH,
-> +       POWER_SUPPLY_PROP_PRESENT,
-> +       POWER_SUPPLY_PROP_ONLINE,
-> +       POWER_SUPPLY_PROP_VOLTAGE_MIN,
-> +       POWER_SUPPLY_PROP_CURRENT_MAX,
-> +};
-> +
->  static const struct power_supply_desc axp20x_usb_power_desc = {
->         .name = "axp20x-usb",
->         .type = POWER_SUPPLY_TYPE_USB,
-> @@ -164,13 +188,25 @@ static const struct power_supply_desc axp20x_usb_power_desc = {
->         .get_property = axp20x_usb_power_get_property,
->  };
->
-> +static const struct power_supply_desc axp22x_usb_power_desc = {
-> +       .name = "axp20x-usb",
-> +       .type = POWER_SUPPLY_TYPE_USB,
-> +       .properties = axp22x_usb_power_properties,
-> +       .num_properties = ARRAY_SIZE(axp22x_usb_power_properties),
-> +       .get_property = axp20x_usb_power_get_property,
-> +};
-> +
->  static int axp20x_usb_power_probe(struct platform_device *pdev)
->  {
->         struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
->         struct power_supply_config psy_cfg = {};
->         struct axp20x_usb_power *power;
-> -       static const char * const irq_names[] = { "VBUS_PLUGIN",
-> -               "VBUS_REMOVAL", "VBUS_VALID", "VBUS_NOT_VALID" };
-> +       static const char * const axp20x_irq_names[] = { "VBUS_PLUGIN",
-> +               "VBUS_REMOVAL", "VBUS_VALID", "VBUS_NOT_VALID", NULL };
-> +       static const char * const axp22x_irq_names[] = {
-> +               "VBUS_PLUGIN", "VBUS_REMOVAL", NULL };
-> +       static const char * const *irq_names;
-> +       const struct power_supply_desc *usb_power_desc;
->         int i, irq, ret;
->
->         if (!of_device_is_available(pdev->dev.of_node))
-> @@ -185,31 +221,50 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
->         if (!power)
->                 return -ENOMEM;
->
-> +       power->axp20x = axp20x;
->         power->regmap = axp20x->regmap;
->
-> -       /* Enable vbus valid checking */
-> -       ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
-> -                   AXP20X_VBUS_MON_VBUS_VALID, AXP20X_VBUS_MON_VBUS_VALID);
-> -       if (ret)
-> -               return ret;
-> +       switch (power->axp20x->variant) {
-> +       case AXP202_ID:
-> +       case AXP209_ID:
-> +               /* Enable vbus valid checking */
-> +               ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
-> +                                        AXP20X_VBUS_MON_VBUS_VALID,
-> +                                        AXP20X_VBUS_MON_VBUS_VALID);
-> +               if (ret)
-> +                       return ret;
->
-> -       /* Enable vbus voltage and current measurement */
-> -       ret = regmap_update_bits(power->regmap, AXP20X_ADC_EN1,
-> +               /* Enable vbus voltage and current measurement */
-> +               ret = regmap_update_bits(power->regmap, AXP20X_ADC_EN1,
->                         AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT,
->                         AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT);
-> -       if (ret)
-> -               return ret;
-> +               if (ret)
-> +                       return ret;
-> +
-> +               usb_power_desc = &axp20x_usb_power_desc;
-> +               irq_names = axp20x_irq_names;
-> +               break;
-> +       case AXP221_ID:
-> +       case AXP223_ID:
-> +               usb_power_desc = &axp22x_usb_power_desc;
-> +               irq_names = axp22x_irq_names;
-> +               break;
-> +       default:
-> +               dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
-> +                       axp20x->variant);
-> +               return -EINVAL;
-> +       }
-
-As mentioned above, I'd prefer using the compatible string.
-
-Regards
-ChenYu
-
->
->         psy_cfg.of_node = pdev->dev.of_node;
->         psy_cfg.drv_data = power;
->
-> -       power->supply = devm_power_supply_register(&pdev->dev,
-> -                                       &axp20x_usb_power_desc, &psy_cfg);
-> +       power->supply = devm_power_supply_register(&pdev->dev, usb_power_desc,
-> +                                                  &psy_cfg);
->         if (IS_ERR(power->supply))
->                 return PTR_ERR(power->supply);
->
->         /* Request irqs after registering, as irqs may trigger immediately */
-> -       for (i = 0; i < ARRAY_SIZE(irq_names); i++) {
-> +       for (i = 0; irq_names[i]; i++) {
->                 irq = platform_get_irq_byname(pdev, irq_names[i]);
->                 if (irq < 0) {
->                         dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
-> --
-> 2.7.4
->
+Thanks,
+Michal
