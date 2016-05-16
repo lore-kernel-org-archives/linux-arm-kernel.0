@@ -1,67 +1,28 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Mon, 16 May 2016 09:26:08 +0200
-Subject: [PATCH v2] ARM64: zynqmp: Use 64bit size cell format
-Message-ID: <7dbe1a3398fb0dc2ab6ecaec7d5736c691db0f37.1463383564.git.michal.simek@xilinx.com>
+From: jesper.nilsson@axis.com (Jesper Nilsson)
+Date: Mon, 16 May 2016 10:00:11 +0200
+Subject: [PATCH v4 06/18] cris: Remove unnecessary of_platform_populate
+ with default match table
+In-Reply-To: <1463054775-18170-7-git-send-email-wangkefeng.wang@huawei.com>
+References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1463054775-18170-7-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160516080011.GB24250@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use 64bit size cell format instead of 32bit for memory
-description.
+On Thu, May 12, 2016 at 08:06:03PM +0800, Kefeng Wang wrote:
+> After patch "of/platform: Add common method to populate default bus",
+> it is possible for arch code to remove unnecessary callers about the
+> of_platform_populate with default match table.
+> 
+> Cc: Mikael Starvik <starvik@axis.com>
 
-Signed-off-by: Michal Simek <michal.simek@xilinx.com>
----
+Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
 
-Changes in v2:
-- Use ranges for PS amba busses instead of changing them to
-  64 size cell
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  arch/cris/kernel/setup.c | 8 --------
+>  1 file changed, 8 deletions(-)
 
- arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts | 2 +-
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi      | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-index acb0527fdc4a..358089687a69 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp-ep108.dts
-@@ -29,7 +29,7 @@
- 
- 	memory {
- 		device_type = "memory";
--		reg = <0x0 0x0 0x40000000>;
-+		reg = <0x0 0x0 0x0 0x40000000>;
- 	};
- };
- 
-diff --git a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-index 38c43103d610..cb8f09cb03cf 100644
---- a/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-+++ b/arch/arm64/boot/dts/xilinx/zynqmp.dtsi
-@@ -14,7 +14,7 @@
- / {
- 	compatible = "xlnx,zynqmp";
- 	#address-cells = <2>;
--	#size-cells = <1>;
-+	#size-cells = <2>;
- 
- 	cpus {
- 		#address-cells = <1>;
-@@ -75,7 +75,7 @@
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
- 		#size-cells = <1>;
--		ranges;
-+		ranges = <0 0 0 0 0xffffffff>;
- 
- 		gic: interrupt-controller at f9010000 {
- 			compatible = "arm,gic-400", "arm,cortex-a15-gic";
-@@ -94,7 +94,7 @@
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
- 		#size-cells = <1>;
--		ranges;
-+		ranges = <0 0 0 0 0xffffffff>;
- 
- 		can0: can at ff060000 {
- 			compatible = "xlnx,zynq-can-1.0";
+/^JN - Jesper Nilsson
 -- 
-1.9.1
+               Jesper Nilsson -- jesper.nilsson at axis.com
