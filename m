@@ -1,41 +1,214 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Mon, 16 May 2016 22:34:14 +0300
-Subject: [PATCH v2 6/6] ARM: dts: n900: enable lirc-rx51 driver
-In-Reply-To: <1463427254-7728-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-References: <1463427254-7728-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
-Message-ID: <1463427254-7728-7-git-send-email-ivo.g.dimitrov.75@gmail.com>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Mon, 16 May 2016 13:09:31 -0700
+Subject: [PATCH] arm64: dts: rockchip: add i2c nodes for rk3399
+Message-ID: <1463429371-10950-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the needed DT data to enable IR TX driver
+From: David Wu <david.wu@rock-chips.com>
 
-Signed-off-by: Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com>
+We've got 9 (count em!) i2c controllers on rk3399, some of which are in
+the PMU power domain and some of which are normal peripherals.  Add them
+all to the main rk3399 dtsi file so future patches can turn them on in
+the board dts files.
+
+Note: by default we try to set the i2c clock rate to 200 MHz so that we
+can achieve good i2c functional clock rates.  200 MHz gives us the
+ability to make very close to 100 kHz / 400 kHz / 1 MHz rates.  If
+boards want to tune clock rates further they can always override.
+Possibly boards could want to tune this if:
+- they wanted to save an infinitesimal amount of power and they knew
+  their i2c bus was slow anyway.  Since we gate the functional clock
+  when the i2c bus is not active, power savings would only be while i2c
+  transfers were happening and probably won't be very big anyway.
+- they wanted to eek out a bit more speed by carefully tuning the source
+  clock to make divisions work out perfectly, accounting for the rise /
+  fall time measured on an actual board.
+
+Note also that we still request 200 MHz for the PMU i2c busses even
+though we expect that we won't make that exactly (currently PPLL is 676
+MHz which gives us 169 MHz).
+
+Signed-off-by: David Wu <david.wu@rock-chips.com>
+Signed-off-by: Jianqun Xu <jay.xu@rock-chips.com>
+[dianders: wrote desc; put in assigned-clocks; reordered nodes]
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
- arch/arm/boot/dts/omap3-n900.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+Note: this patch is based upon David Wu's patch series to add rk3399
+support to i2c-rk3x.c and shouldn't land until at least device tree
+bindings land.
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index b3c26a9..cb3878a 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -143,6 +143,18 @@
- 		io-channels = <&twl_madc 0>, <&twl_madc 4>, <&twl_madc 12>;
- 		io-channel-names = "temp", "bsi", "vbat";
- 	};
-+
-+	pwm9: dmtimer-pwm at 9 {
-+		compatible = "ti,omap-dmtimer-pwm";
-+		#pwm-cells = <3>;
-+		ti,timers = <&timer9>;
-+		ti,clock-source = <0x00>; /* timer_sys_ck */
-+	};
-+
-+	ir: n900-ir {
-+		compatible = "nokia,n900-ir";
-+		pwms = <&pwm9 0 26316 0>; /* 38000 Hz */
-+	};
- };
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 144 +++++++++++++++++++++++++++++++
+ 1 file changed, 144 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 46f325a143b0..753a91728b4c 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -54,6 +54,15 @@
+ 	#size-cells = <2>;
  
- &omap3_pmx_core {
+ 	aliases {
++		i2c0 = &i2c0;
++		i2c1 = &i2c1;
++		i2c2 = &i2c2;
++		i2c3 = &i2c3;
++		i2c4 = &i2c4;
++		i2c5 = &i2c5;
++		i2c6 = &i2c6;
++		i2c7 = &i2c7;
++		i2c8 = &i2c8;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		serial2 = &uart2;
+@@ -272,6 +281,96 @@
+ 		};
+ 	};
+ 
++	i2c1: i2c at ff110000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff110000 0x0 0x1000>;
++		assigned-clocks = <&cru SCLK_I2C1>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&cru SCLK_I2C1>, <&cru PCLK_I2C1>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c1_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c2: i2c at ff120000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff120000 0x0 0x1000>;
++		assigned-clocks = <&cru SCLK_I2C2>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&cru SCLK_I2C2>, <&cru PCLK_I2C2>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c2_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c3: i2c at ff130000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff130000 0x0 0x1000>;
++		assigned-clocks = <&cru SCLK_I2C3>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&cru SCLK_I2C3>, <&cru PCLK_I2C3>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c3_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c5: i2c at ff140000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff140000 0x0 0x1000>;
++		assigned-clocks = <&cru SCLK_I2C5>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&cru SCLK_I2C5>, <&cru PCLK_I2C5>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c5_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c6: i2c at ff150000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff150000 0x0 0x1000>;
++		assigned-clocks = <&cru SCLK_I2C6>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&cru SCLK_I2C6>, <&cru PCLK_I2C6>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c6_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c7: i2c at ff160000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff160000 0x0 0x1000>;
++		assigned-clocks = <&cru SCLK_I2C7>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&cru SCLK_I2C7>, <&cru PCLK_I2C7>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c7_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
+ 	uart0: serial at ff180000 {
+ 		compatible = "rockchip,rk3399-uart", "snps,dw-apb-uart";
+ 		reg = <0x0 0xff180000 0x0 0x100>;
+@@ -420,6 +519,51 @@
+ 		status = "disabled";
+ 	};
+ 
++	i2c0: i2c at ff3c0000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff3c0000 0x0 0x1000>;
++		assigned-clocks = <&pmucru SCLK_I2C0_PMU>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&pmucru SCLK_I2C0_PMU>, <&pmucru PCLK_I2C0_PMU>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c0_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c4: i2c at ff3d0000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff3d0000 0x0 0x1000>;
++		assigned-clocks = <&pmucru SCLK_I2C4_PMU>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&pmucru SCLK_I2C4_PMU>, <&pmucru PCLK_I2C4_PMU>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c4_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
++	i2c8: i2c at ff3e0000 {
++		compatible = "rockchip,rk3399-i2c";
++		reg = <0x0 0xff3e0000 0x0 0x1000>;
++		assigned-clocks = <&pmucru SCLK_I2C8_PMU>;
++		assigned-clock-rates = <200000000>;
++		clocks = <&pmucru SCLK_I2C8_PMU>, <&pmucru PCLK_I2C8_PMU>;
++		clock-names = "i2c", "pclk";
++		interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c8_xfer>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++	};
++
+ 	pwm0: pwm at ff420000 {
+ 		compatible = "rockchip,rk3399-pwm", "rockchip,rk3288-pwm";
+ 		reg = <0x0 0xff420000 0x0 0x10>;
 -- 
-1.9.1
+2.8.0.rc3.226.g39d4020
