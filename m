@@ -1,37 +1,24 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 16 May 2016 10:02:39 +0200
-Subject: [PATCH 02/16] clk: sunxi-ng: Add common infrastructure
-In-Reply-To: <20160515183122.GA27618@lukather>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-3-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v67XWt6tjG_xXWgGatTaiN5uYQb2_Q6bgixMDUkHfVHLHg@mail.gmail.com>
- <20160515183122.GA27618@lukather>
-Message-ID: <20160516100239.a93a238b0d458b38a3689a95@free.fr>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 16 May 2016 17:11:08 +0900
+Subject: [PATCHv4 0/4] Reference both DMA controllers
+In-Reply-To: <1463043285-14702-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1463043285-14702-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <20160516081108.GB4955@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 May 2016 20:31:22 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> > > +void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock)
-> > > +{
-> > > +       u32 reg;
-> > > +
-> > > +       if (!(common->features & CCU_FEATURE_LOCK))
-> > > +               return;
-> > > +
-> > > +       WARN_ON(readl_relaxed_poll_timeout(common->base + common->reg, reg,
-> > > +                                          !(reg & lock), 0, 500));
-> > 
-> >                                     no delay between reads? ^
+On Thu, May 12, 2016 at 10:54:41AM +0200, Niklas S?derlund wrote:
+> Hi,
 > 
-> Yes, I intended it to be a simple busy waiting loop since I don't
-> expect it to be very long. Do yu have any more data on how much time
-> it usually takes?
+> R-Car Gen2 have two DMA controllers, which are equivalent. However DMA
+> slaves were tied only to a single DMA controller in .dtsi. This series
+> add references to to both DMA controllers for all nodes that previously
+> only referenced one of them. It also adds dma references to the SDHI
+> nodes for r8a7794 which according to the datasheet should work but I
+> have not access to HW to verify.
+> 
+> Tested on Koelsch (r8a7791) by altering the compatible value of either
+> dmac0 or dmac1 and verifying that the DMA slaves pick the DMA controller
+> that is available.
 
-I have a Soc in which the rate of the audio clock is stable after a
-good second.
-
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Thanks, I have queued these up.
