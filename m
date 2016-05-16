@@ -1,79 +1,90 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:29 +0100
-Subject: [PATCH v4 41/56] KVM: arm/arm64: vgic-new: vgic_kvm_device:
- KVM_DEV_ARM_VGIC_GRP_CTRL
+Date: Mon, 16 May 2016 10:53:19 +0100
+Subject: [PATCH v4 31/56] KVM: arm/arm64: vgic-new: Add SGIR register handler
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-42-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-32-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+Triggering an IPI via this register is v2 specific, so the
+implementation lives entirely in vgic-mmio-v2.c.
 
-This patch implements the KVM_DEV_ARM_VGIC_GRP_CTRL group API
-featuring KVM_DEV_ARM_VGIC_CTRL_INIT attribute. The vgic_init
-function is not yet implemented though.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-kvm-device.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+Changelog RFC..v1:
+- silently return on illegal TargetListFilter value (=3)
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 05ff925..e153f12 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -23,6 +23,8 @@
- static int vgic_set_common_attr(struct kvm_device *dev,
- 				struct kvm_device_attr *attr)
- {
-+	int r;
+Changelog v1 .. v2:
+- adapt to new MMIO framework
+
+Changelog v3 .. v4:
+- specify accessor width
+
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 43 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index 52389ff..c884e9b 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -64,6 +64,47 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
+ 	}
+ }
+ 
++static void vgic_mmio_write_sgir(struct kvm_vcpu *source_vcpu,
++				 gpa_t addr, unsigned int len,
++				 unsigned long val)
++{
++	int nr_vcpus = atomic_read(&source_vcpu->kvm->online_vcpus);
++	int intid = val & 0xf;
++	int targets = (val >> 16) & 0xff;
++	int mode = (val >> 24) & 0x03;
++	int c;
++	struct kvm_vcpu *vcpu;
 +
- 	switch (attr->group) {
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-@@ -55,6 +57,16 @@ static int vgic_set_common_attr(struct kvm_device *dev,
- 
- 		return ret;
- 	}
-+	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_VGIC_CTRL_INIT:
-+			mutex_lock(&dev->kvm->lock);
-+			r = vgic_init(dev->kvm);
-+			mutex_unlock(&dev->kvm->lock);
-+			return r;
-+		}
++	switch (mode) {
++	case 0x0:		/* as specified by targets */
 +		break;
++	case 0x1:
++		targets = (1U << nr_vcpus) - 1;			/* all, ... */
++		targets &= ~(1U << source_vcpu->vcpu_id);	/* but self */
++		break;
++	case 0x2:		/* this very vCPU only */
++		targets = (1U << source_vcpu->vcpu_id);
++		break;
++	case 0x3:		/* reserved */
++		return;
 +	}
- 	}
- 
- 	return -ENXIO;
-@@ -131,6 +143,11 @@ static int vgic_v2_has_attr(struct kvm_device *dev,
- 	switch (attr->group) {
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
-+	case KVM_DEV_ARM_VGIC_GRP_CTRL:
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_VGIC_CTRL_INIT:
-+			return 0;
-+		}
- 	}
- 	return -ENXIO;
- }
-@@ -166,6 +183,11 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 	switch (attr->group) {
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
-+	case KVM_DEV_ARM_VGIC_GRP_CTRL:
-+		switch (attr->attr) {
-+		case KVM_DEV_ARM_VGIC_CTRL_INIT:
-+			return 0;
-+		}
- 	}
- 	return -ENXIO;
- }
++
++	kvm_for_each_vcpu(c, vcpu, source_vcpu->kvm) {
++		struct vgic_irq *irq;
++
++		if (!(targets & (1U << c)))
++			continue;
++
++		irq = vgic_get_irq(source_vcpu->kvm, vcpu, intid);
++
++		spin_lock(&irq->irq_lock);
++		irq->pending = true;
++		irq->source |= 1U << source_vcpu->vcpu_id;
++
++		vgic_queue_irq_unlock(source_vcpu->kvm, irq);
++	}
++}
++
+ static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
+ 					   gpa_t addr, unsigned int len)
+ {
+@@ -140,7 +181,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_config, vgic_mmio_write_config, 2,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
++		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
 -- 
 2.8.2
