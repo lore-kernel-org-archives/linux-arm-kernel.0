@@ -1,59 +1,112 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Mon, 16 May 2016 10:53:56 +0200
-Subject: [RFC PATCH 2/7] ALSA: ac97: add an ac97 bus
-In-Reply-To: <s5hoa867e6v.wl-tiwai@suse.de> (Takashi Iwai's message of "Mon,
- 16 May 2016 07:40:56 +0200")
-References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
- <1462050939-27940-3-git-send-email-robert.jarzmik@free.fr>
- <s5hk2j38tmf.wl-tiwai@suse.de> <87twi1hssl.fsf@belgarion.home>
- <s5hy47c7jvd.wl-tiwai@suse.de> <87mvnrhux4.fsf@belgarion.home>
- <s5hoa867e6v.wl-tiwai@suse.de>
-Message-ID: <87inyeidsr.fsf@belgarion.home>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 16 May 2016 11:32:41 +0200
+Subject: [PATCH 3/3] mmc: core: support hs speed mode if hs200 mode fails
+In-Reply-To: <1463130397.3151.13.camel@toradex.com>
+References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
+ <1461171092-30631-3-git-send-email-aisheng.dong@nxp.com>
+ <1463130397.3151.13.camel@toradex.com>
+Message-ID: <CAPDyKFqyZRYbSoRMcJuMks+GMWAH9wDpusY+cvcH=GfVCNwSeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Takashi Iwai <tiwai@suse.de> writes:
-
-> On Sun, 15 May 2016 23:29:27 +0200,
-> Robert Jarzmik wrote:
->> 
->> Takashi Iwai <tiwai@suse.de> writes:
->> 
->> > On Sat, 14 May 2016 11:50:50 +0200,
->> >
->> > No, my concern is that it's creating a dummy codec object temporarily
->> > on the stack just by copying some fields and calling the ops with it.
->> > (And actually the current code may work wrongly because lack of
->> >  zero-clear of the object.)
->> Ah yes, I remember now, the on-stack generated device, indeed ugly.
->> 
->> > IMO, a cleaner way would be to define the ops passed with both
->> > controller and codec objects as arguments, and pass NULL codec here.
->> It's rather unusual to need both the device and its controller in bus
->> operations. I must admit I have no better idea so far, so I'll try that just to
->> see how it looks like, and let's see next ...
+On 13 May 2016 at 11:06, Marcel Ziswiler <marcel.ziswiler@toradex.com> wrote:
+> On Thu, 2016-04-21 at 00:51 +0800, Dong Aisheng wrote:
+>> Currently if mmc_select_hs200 mode switch fails, MMC core
+>> can only use legacy mode to run the card.
+>> Let's retry HS speed mode if HS200 fails.
+>>
+>> Before the fix:
+>> mmc0: mmc_select_hs200 failed, error -74
+>> : switch to mmc0 failed
+>> mmc0: new MMC card at address 0001
+>> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
+>> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
+>> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
+>> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
+>>  mmcblk0: p1 p2
+>>
+>> After the fix:
+>> mmc0: mmc_select_hs200 failed, error -74
+>> mmc0: new DDR MMC card at address 0001
+>> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
+>> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
+>> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
+>> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
+>>  mmcblk0: p1 p2
+>>
+>> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+>> ---
+>>  drivers/mmc/core/mmc.c | 3 ++-
+>>  1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+>> index 55c8201..b573dc7 100644
+>> --- a/drivers/mmc/core/mmc.c
+>> +++ b/drivers/mmc/core/mmc.c
+>> @@ -1315,7 +1315,8 @@ static int mmc_select_timing(struct mmc_card
+>> *card)
+>>
+>>       if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200)
+>>               err = mmc_select_hs200(card);
+>> -     else if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS)
+>> +
+>> +     if (err && (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS))
+>>               err = mmc_select_hs(card);
+>>
+>>       if (err && err != -EBADMSG)
 >
-> Thinking of this again, I wonder now why we need to pass the codec
-> object at all.  It's the read/write ops via ac97, so we just need the
-> ac97_controller object and the address slot of the accessed codec?
-So far it would work. The only objection I would see is if in the future the bus
-operation needs a specialization which is ac97 codec dependent, such as a flag
-or a mask in ac97_codec_device structure.
+>
+> This seems to break on TK1 where eMMC so far was detected as an 8-bit
+> high speed MMC card. With this patch it reverts to detecting a 1-bit only
+> MMC card! This has been observed both on a NVIDIA's Jetson TK1 as well as
+> our new Toradex Apalis TK1 (CC Tegra mailing list, Jon Hunter and Lucas
+> Stach as well). So far T30 is not affected as there we are still doing
+> full HS200 with whatever issues that has.
+>
+> Before:
+> [    3.726894] sdhci: Secure Digital Host Controller Interface driver
+> [    3.733081] sdhci: Copyright(c) Pierre Ossman
+> [    3.737462] sdhci-pltfm: SDHCI platform and OF driver helper
+> [    3.753411] mmc0: Unknown controller version (3). You may experience
+>  problems.
+> [    3.768345] mmc0: Invalid maximum block size, assuming 512 bytes
+> [    3.814896] mmc0: SDHCI controller on 700b0600.sdhci [700b0600.sdhci]
+>  using ADMA 64-bit
+> [    3.892088] mmc0: new high speed MMC card at address 0001
+> [    3.899194] mmcblk0: mmc0:0001 SEM16G 14.7 GiB
+> [    3.904217] mmcblk0boot0: mmc0:0001 SEM16G partition 1 4.00 MiB
+> [    3.910645] mmcblk0boot1: mmc0:0001 SEM16G partition 2 4.00 MiB
+> [    3.917119] mmcblk0rpmb: mmc0:0001 SEM16G partition 3 4.00 MiB
+> [    3.926006]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9
+> root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios
+> clock:          52000000 Hz
+> actual clock:   51000000 Hz
+> vdd:            21 (3.3 ~ 3.4 V)
+> bus mode:       2 (push-pull)
+> chip select:    0 (don't care)
+> power mode:     2 (on)
+> bus width:      3 (8 bits)
+> timing spec:    1 (mmc high-speed)
+> signal voltage: 0 (3.30 V)
+> driver type:    0 (driver type B)
+>
+> After:
+> [    3.899918] mmc0: new MMC card at address 0001
+> root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios
+> clock:          25000000 Hz
+> actual clock:   24727273 Hz
+> vdd:            21 (3.3 ~ 3.4 V)
+> bus mode:       2 (push-pull)
+> chip select:    0 (don't care)
+> power mode:     2 (on)
+> bus width:      0 (1 bits)
+> timing spec:    0 (legacy)
+> signal voltage: 0 (3.30 V)
+> driver type:    0 (driver type B)
+>
 
-Even if I'd like to not have these in bus operations, the struct snd_ac97 had a
-need for a 'caps', 'ext_id', ... fields for example. Yet these could be
-contained in the ac97_codec_device structure and not exposed to bus operations.
+Thanks for testing and reporting. I have dropped this patch from my
+next branch for now.
 
-Another worry is the pattern (as an example) in atmel_ac97c_write() in
-sound/atmel/ac97.c, where the codec structure is used to get the controller
-through a container_of() type call. Yet passing the controller to bus operations
-takes care of this one.
-
->From a "purely API" point of view the couple (ac97_controller, ac97_slot_id) is
-what will route an ac97 bus operation, be that a read/write/reset/..., the
-remaining question is will it cover the cases we've not thought of ?
-
-Cheers.
-
--- 
-Robert
+Kind regards
+Uffe
