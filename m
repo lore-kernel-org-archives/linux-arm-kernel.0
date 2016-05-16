@@ -1,105 +1,105 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:03 +0100
-Subject: [PATCH v4 15/56] KVM: arm/arm64: vgic-new: Add acccessor to new
- struct vgic_irq instance
+Date: Mon, 16 May 2016 10:52:57 +0100
+Subject: [PATCH v4 09/56] KVM: arm/arm64: Fix MMIO emulation data handling
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-16-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-10-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-The new VGIC implementation centers around a struct vgic_irq instance
-per virtual IRQ.
-Provide a function to retrieve the right instance for a given IRQ
-number and (in case of private interrupts) the right VCPU.
+When the kernel was handling a guest MMIO read access internally, we
+need to copy the emulation result into the run->mmio structure in order
+for the kvm_handle_mmio_return() function to pick it up and inject the
+	result back into the guest.
 
+Currently the only user of kvm_io_bus for ARM is the VGIC, which did
+this copying itself, so this was not causing issues so far.
+
+But with the upcoming new vgic implementation we need this done
+properly.
+
+Update the kvm_handle_mmio_return description and cleanup the code to
+only perform a single copying when needed.
+
+Code and commit message inspired by Andre Przywara.
+
+Reported-by: Andre Przywara <andre.przywara@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic.c
- create mode 100644 virt/kvm/arm/vgic/vgic.h
+ arch/arm/kvm/mmio.c | 14 +++++++-------
+ virt/kvm/arm/vgic.c |  7 -------
+ 2 files changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-new file mode 100644
-index 0000000..fb45537
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 0f6600f..0158e9e 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -87,11 +87,10 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
+ 
+ /**
+  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
++ *			     or in-kernel IO emulation
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+
-+#include "vgic.h"
-+
-+struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-+
-+struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+			      u32 intid)
-+{
-+	/* SGIs and PPIs */
-+	if (intid <= VGIC_MAX_PRIVATE)
-+		return &vcpu->arch.vgic_cpu.private_irqs[intid];
-+
-+	/* SPIs */
-+	if (intid <= VGIC_MAX_SPI)
-+		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
-+
-+	/* LPIs are not yet covered */
-+	if (intid >= VGIC_MIN_LPI)
-+		return NULL;
-+
-+	WARN(1, "Looking up struct vgic_irq for reserved INTID");
-+	return NULL;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-new file mode 100644
-index 0000000..61b8d22
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __KVM_ARM_VGIC_NEW_H__
-+#define __KVM_ARM_VGIC_NEW_H__
-+
-+struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+			      u32 intid);
-+
-+#endif
+  * @vcpu: The VCPU pointer
+  * @run:  The VCPU run struct containing the mmio data
+- *
+- * This should only be called after returning from userspace for MMIO load
+- * emulation.
+  */
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+@@ -206,18 +205,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	run->mmio.is_write	= is_write;
+ 	run->mmio.phys_addr	= fault_ipa;
+ 	run->mmio.len		= len;
+-	if (is_write)
+-		memcpy(run->mmio.data, data_buf, len);
+ 
+ 	if (!ret) {
+ 		/* We handled the access successfully in the kernel. */
++		if (!is_write)
++			memcpy(run->mmio.data, data_buf, len);
+ 		vcpu->stat.mmio_exit_kernel++;
+ 		kvm_handle_mmio_return(vcpu, run);
+ 		return 1;
+-	} else {
+-		vcpu->stat.mmio_exit_user++;
+ 	}
+ 
++	if (is_write)
++		memcpy(run->mmio.data, data_buf, len);
++	vcpu->stat.mmio_exit_user++;
+ 	run->exit_reason	= KVM_EXIT_MMIO;
+ 	return 0;
+ }
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index f76bb64..c3bfbb9 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -819,7 +819,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_io_device *iodev = container_of(this,
+ 						    struct vgic_io_device, dev);
+-	struct kvm_run *run = vcpu->run;
+ 	const struct vgic_io_range *range;
+ 	struct kvm_exit_mmio mmio;
+ 	bool updated_state;
+@@ -848,12 +847,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 		updated_state = false;
+ 	}
+ 	spin_unlock(&dist->lock);
+-	run->mmio.is_write	= is_write;
+-	run->mmio.len		= len;
+-	run->mmio.phys_addr	= addr;
+-	memcpy(run->mmio.data, val, len);
+-
+-	kvm_handle_mmio_return(vcpu, run);
+ 
+ 	if (updated_state)
+ 		vgic_kick_vcpus(vcpu->kvm);
 -- 
 2.8.2
