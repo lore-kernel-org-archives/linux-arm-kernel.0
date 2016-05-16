@@ -1,62 +1,35 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 May 2016 14:47:02 +0200
-Subject: [PATCH 02/20] clk: multiplier: Prevent the multiplier from under /
- over flowing
+Date: Mon, 16 May 2016 14:47:01 +0200
+Subject: [PATCH 01/20] clk: fixed-factor: Pass clk rates change to the parent
 In-Reply-To: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1463402840-17062-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1463402840-17062-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current multiplier base clock implementation, if the
-CLK_SET_RATE_PARENT flag isn't set, the code will not make sure that the
-multiplier computed remains within the boundaries of our clock.
+A fixed factor clock, if it needs to change its rate, by definition do not
+have any choice but to modify its parent rate.
 
-This means that if the clock we want to reach is below the parent rate,
-or if the multiplier is above the maximum that we can reach, we will end up
-with a completely bogus one that the clock cannot achieve.
+Add the CLK_SET_RATE_PARENT flag to that clock so that it can happen
 
-Fixes: f2e0a53271a4 ("clk: Add a basic multiplier clock")
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/clk-multiplier.c | 20 +++++++++++++++++---
- 1 file changed, 17 insertions(+), 3 deletions(-)
+ drivers/clk/clk-fixed-factor.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/clk-multiplier.c b/drivers/clk/clk-multiplier.c
-index 9e449c7b751c..dc037c957acd 100644
---- a/drivers/clk/clk-multiplier.c
-+++ b/drivers/clk/clk-multiplier.c
-@@ -52,14 +52,28 @@ static unsigned long __bestmult(struct clk_hw *hw, unsigned long rate,
- 				unsigned long *best_parent_rate,
- 				u8 width, unsigned long flags)
- {
-+	struct clk_multiplier *mult = to_clk_multiplier(hw);
- 	unsigned long orig_parent_rate = *best_parent_rate;
- 	unsigned long parent_rate, current_rate, best_rate = ~0;
- 	unsigned int i, bestmult = 0;
-+	unsigned int maxmult = (1 << width) - 1;
-+
-+	if (!(clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT)) {
-+		bestmult = rate / orig_parent_rate;
-+
-+		/* Make sure we don't end up with a 0 multiplier */
-+		if ((bestmult == 0) &&
-+		    !(mult->flags & CLK_MULTIPLIER_ZERO_BYPASS))
-+			bestmult = 1;
+diff --git a/drivers/clk/clk-fixed-factor.c b/drivers/clk/clk-fixed-factor.c
+index 75cd6c792cb8..3363abd9b4ae 100644
+--- a/drivers/clk/clk-fixed-factor.c
++++ b/drivers/clk/clk-fixed-factor.c
+@@ -167,7 +167,8 @@ void __init of_fixed_factor_clk_setup(struct device_node *node)
+ 	of_property_read_string(node, "clock-output-names", &clk_name);
+ 	parent_name = of_clk_get_parent_name(node, 0);
  
--	if (!(clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT))
--		return rate / *best_parent_rate;
-+		/* Make sure we don't overflow the multiplier */
-+		if (bestmult > maxmult)
-+			bestmult = maxmult;
-+
-+		return bestmult;
-+	}
- 
--	for (i = 1; i < ((1 << width) - 1); i++) {
-+	for (i = 1; i < maxmult; i++) {
- 		if (rate == orig_parent_rate * i) {
- 			/*
- 			 * This is the best case for us if we have a
+-	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
++	clk = clk_register_fixed_factor(NULL, clk_name, parent_name,
++					CLK_SET_RATE_PARENT,
+ 					mult, div);
+ 	if (!IS_ERR(clk))
+ 		of_clk_add_provider(node, of_clk_src_simple_get, clk);
 -- 
 2.8.2
