@@ -1,474 +1,208 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 16 May 2016 15:02:13 +0800
-Subject: [PATCH 02/16] clk: sunxi-ng: Add common infrastructure
-In-Reply-To: <20160515183122.GA27618@lukather>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-3-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v67XWt6tjG_xXWgGatTaiN5uYQb2_Q6bgixMDUkHfVHLHg@mail.gmail.com>
- <20160515183122.GA27618@lukather>
-Message-ID: <CAGb2v64kgPOw3_fQDpZyBxW34s3QF6M4sfbgpMTduojb9FPhFQ@mail.gmail.com>
+Date: Mon, 16 May 2016 15:07:55 +0800
+Subject: [PATCH 1/3] power: axp20x_usb: Add support for usb power-supply
+ on axp22x pmics
+In-Reply-To: <1463248289-16456-1-git-send-email-hdegoede@redhat.com>
+References: <1463248289-16456-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v67N7R5U_+dZ4ZO+VuGKo6wbVALnrMq3=Ceec8J122LiDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2016 at 2:31 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Mon, May 09, 2016 at 06:01:45PM +0800, Chen-Yu Tsai wrote:
->> On Mon, May 9, 2016 at 4:01 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Start our new clock infrastructure by adding the registration code, common
->> > structure and common code.
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  drivers/clk/Makefile              |   1 +
->> >  drivers/clk/sunxi-ng/Makefile     |   2 +
->> >  drivers/clk/sunxi-ng/ccu_common.c | 108 ++++++++++++++++++++++++++++++++++++++
->> >  drivers/clk/sunxi-ng/ccu_common.h |  74 ++++++++++++++++++++++++++
->> >  drivers/clk/sunxi-ng/ccu_factor.h |  15 ++++++
->> >  drivers/clk/sunxi-ng/ccu_mux.h    |  20 +++++++
->> >  drivers/clk/sunxi-ng/ccu_reset.c  |  55 +++++++++++++++++++
->> >  drivers/clk/sunxi-ng/ccu_reset.h  |  40 ++++++++++++++
->> >  8 files changed, 315 insertions(+)
->> >  create mode 100644 drivers/clk/sunxi-ng/Makefile
->> >  create mode 100644 drivers/clk/sunxi-ng/ccu_common.c
->> >  create mode 100644 drivers/clk/sunxi-ng/ccu_common.h
->> >  create mode 100644 drivers/clk/sunxi-ng/ccu_factor.h
->> >  create mode 100644 drivers/clk/sunxi-ng/ccu_mux.h
->> >  create mode 100644 drivers/clk/sunxi-ng/ccu_reset.c
->> >  create mode 100644 drivers/clk/sunxi-ng/ccu_reset.h
->> >
->> > diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->> > index 4ef71a13ab37..83a93cd9e21d 100644
->> > --- a/drivers/clk/Makefile
->> > +++ b/drivers/clk/Makefile
->> > @@ -78,6 +78,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)            += socfpga/
->> >  obj-$(CONFIG_PLAT_SPEAR)               += spear/
->> >  obj-$(CONFIG_ARCH_STI)                 += st/
->> >  obj-$(CONFIG_ARCH_SUNXI)               += sunxi/
->> > +obj-$(CONFIG_ARCH_SUNXI)               += sunxi-ng/
->> >  obj-$(CONFIG_ARCH_TEGRA)               += tegra/
->> >  obj-y                                  += ti/
->> >  obj-$(CONFIG_ARCH_U8500)               += ux500/
->> > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
->> > new file mode 100644
->> > index 000000000000..bd3461b0f38c
->> > --- /dev/null
->> > +++ b/drivers/clk/sunxi-ng/Makefile
->> > @@ -0,0 +1,2 @@
->> > +obj-y += ccu_common.o
->> > +obj-y += ccu_reset.o
->> > diff --git a/drivers/clk/sunxi-ng/ccu_common.c b/drivers/clk/sunxi-ng/ccu_common.c
->> > new file mode 100644
->> > index 000000000000..1d9242566fbd
->> > --- /dev/null
->> > +++ b/drivers/clk/sunxi-ng/ccu_common.c
->> > @@ -0,0 +1,108 @@
->> > +/*
->> > + * Copyright 2016 Maxime Ripard
->> > + *
->> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License as published by
->> > + * the Free Software Foundation; either version 2 of the License, or
->> > + * (at your option) any later version.
->> > + *
->> > + * This program is distributed in the hope that it will be useful,
->> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + * GNU General Public License for more details.
->> > + */
->> > +
->> > +#include <linux/clk-provider.h>
->> > +#include <linux/iopoll.h>
->> > +#include <linux/of_address.h>
->> > +#include <linux/slab.h>
->> > +
->> > +#include "ccu_common.h"
->> > +#include "ccu_reset.h"
->> > +
->> > +static DEFINE_SPINLOCK(ccu_lock);
->> > +
->> > +void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock)
->> > +{
->> > +       u32 reg;
->> > +
->> > +       if (!(common->features & CCU_FEATURE_LOCK))
->> > +               return;
->> > +
->> > +       WARN_ON(readl_relaxed_poll_timeout(common->base + common->reg, reg,
->> > +                                          !(reg & lock), 0, 500));
->>
->>                                     no delay between reads? ^
->
-> Yes, I intended it to be a simple busy waiting loop since I don't
-> expect it to be very long. Do yu have any more data on how much time
-> it usually takes?
->
->>
->> > +int sunxi_ccu_probe(struct device_node *node,
->> > +                   const struct sunxi_ccu_desc *desc)
->> > +{
->> > +       struct ccu_common **cclks = desc->clks;
->> > +       size_t num_clks = desc->num_clks;
->> > +       struct clk_onecell_data *data;
->> > +       struct ccu_reset *reset;
->> > +       struct clk **clks;
->> > +       void __iomem *reg;
->> > +       int i, ret;
->> > +
->> > +       reg = of_iomap(node, 0);
->>
->> Why not of_io_request_and_map?
->
-> Because initially I still had some old clocks that were probing, which
-> was leading to some issues. This is obviously not the case anymore,
-> I'll switch to it.
->
->>
->> > +       if (IS_ERR(reg)) {
->>
->> And of_iomap returns NULL on error. This is for of_io_request_and_map.
->>
->> > +               pr_err("%s: Could not map the clock registers\n",
->> > +                      of_node_full_name(node));
->> > +               return PTR_ERR(reg);
->> > +       }
->> > +
->> > +       data = kzalloc(sizeof(*data), GFP_KERNEL);
->> > +       if (!data)
->> > +               return -ENOMEM;
->> > +
->> > +       clks = kcalloc(num_clks, sizeof(struct clk *), GFP_KERNEL);
->> > +       if (!clks)
->> > +               return -ENOMEM;
->> > +
->> > +       data->clks = clks;
->> > +       data->clk_num = num_clks;
->> > +
->> > +       for (i = 0; i < num_clks; i++) {
->> > +               struct ccu_common *cclk = cclks[i];
->> > +               struct clk *clk;
->> > +
->> > +               if (!cclk) {
->> > +                       cclk = ERR_PTR(-ENOENT);
->>
->> This seems redundant, unless you intended to use it elsewhere?
->
-> Yeah, that was supposed to be clks[i] = ERR_PTR(..);
->
-> I'll fix it.
->
->>
->> > +                       continue;
->> > +               }
->> > +
->> > +               cclk->base = reg;
->> > +               cclk->lock = &ccu_lock;
->> > +
->> > +               clk = clk_register(NULL, &cclk->hw);
->> > +               if (IS_ERR(clk))
->> > +                       continue;
->> > +
->> > +               clks[i] = clk;
->> > +       }
->> > +
->> > +       ret = of_clk_add_provider(node, of_clk_src_onecell_get, data);
->> > +       if (ret)
->> > +               goto err_clk_unreg;
->> > +
->> > +       reset = kzalloc(sizeof(*reset), GFP_KERNEL);
->> > +       reset->rcdev.of_node = node;
->> > +       reset->rcdev.ops = &ccu_reset_ops;
->> > +       reset->rcdev.owner = THIS_MODULE;
->> > +       reset->rcdev.nr_resets = desc->num_resets;
->> > +       reset->base = reg;
->> > +       reset->lock = &ccu_lock;
->> > +       reset->reset_map = desc->resets;
->> > +
->> > +       ret = reset_controller_register(&reset->rcdev);
->> > +       if (ret)
->> > +               goto err_of_clk_unreg;
->> > +
->> > +       return 0;
->> > +
->> > +err_of_clk_unreg:
->> > +err_clk_unreg:
->> > +       return ret;
->> > +}
->> > diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
->> > new file mode 100644
->> > index 000000000000..e8b477fcd320
->> > --- /dev/null
->> > +++ b/drivers/clk/sunxi-ng/ccu_common.h
->> > @@ -0,0 +1,74 @@
->> > +/*
->> > + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
->> > + *
->> > + * This software is licensed under the terms of the GNU General Public
->> > + * License version 2, as published by the Free Software Foundation, and
->> > + * may be copied, distributed, and modified under those terms.
->> > + *
->> > + * This program is distributed in the hope that it will be useful,
->> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + * GNU General Public License for more details.
->> > + */
->> > +
->> > +#ifndef _COMMON_H_
->> > +#define _COMMON_H_
->> > +
->> > +#include <linux/compiler.h>
->> > +#include <linux/clk-provider.h>
->> > +
->> > +#define CCU_FEATURE_GATE               BIT(0)
->> > +#define CCU_FEATURE_LOCK               BIT(1)
->>
->> *_PLL_LOCK would be clearer that this implements a PLL lock indicator.
->> Or maybe a comment.
->
-> I'll change it for PLL_LOCK
->
->>
->> > +#define CCU_FEATURE_FRACTIONAL         BIT(2)
->> > +#define CCU_FEATURE_VARIABLE_PREDIV    BIT(3)
->> > +#define CCU_FEATURE_FIXED_PREDIV       BIT(4)
->> > +#define CCU_FEATURE_FIXED_POSTDIV      BIT(5)
->> > +
->> > +struct device_node;
->> > +
->> > +#define SUNXI_HW_INIT(_name, _parent, _ops, _flags)                    \
->> > +       &(struct clk_init_data) {                                       \
->> > +               .flags          = _flags,                               \
->> > +               .name           = _name,                                \
->> > +               .parent_names   = (const char *[]) { _parent },         \
->> > +               .num_parents    = 1,                                    \
->> > +               .ops            = _ops,                                 \
->> > +       }
->> > +
->> > +#define SUNXI_HW_INIT_PARENTS(_name, _parents, _ops, _flags)           \
->> > +       &(struct clk_init_data) {                                       \
->> > +               .flags          = _flags,                               \
->> > +               .name           = _name,                                \
->> > +               .parent_names   = _parents,                             \
->> > +               .num_parents    = ARRAY_SIZE(_parents),                 \
->> > +               .ops            = _ops,                                 \
->> > +       }
->> > +
->> > +struct ccu_common {
->> > +       void __iomem    *base;
->> > +       unsigned long   reg;
->>
->> This seems quite large, considering the address space of the CCU,
->> and you using u16 or u32 for the same thing on the reset control side.
->
-> Indeed, what about u16?
+Hi,
 
-Either u16 or u32 will do. I suspect u16 will get bumped up to u32 due to
-alignment issues of the struct.
+On Sun, May 15, 2016 at 1:51 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> The usb power-supply on the axp22x pmics is mostly identical to the
+> one on the axp20x pmics. One significant difference is that it cannot
+> measure / monitor the usb voltage / current.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/power/axp20x_usb_power.c | 99 +++++++++++++++++++++++++++++++---------
+>  1 file changed, 77 insertions(+), 22 deletions(-)
+>
+> diff --git a/drivers/power/axp20x_usb_power.c b/drivers/power/axp20x_usb_power.c
+> index 421a90b..b3c1d8e 100644
+> --- a/drivers/power/axp20x_usb_power.c
+> +++ b/drivers/power/axp20x_usb_power.c
+> @@ -42,6 +42,7 @@
+>  #define AXP20X_VBUS_MON_VBUS_VALID     BIT(3)
+>
+>  struct axp20x_usb_power {
+> +       struct axp20x_dev *axp20x;
+>         struct regmap *regmap;
+>         struct power_supply *supply;
+>  };
+> @@ -85,7 +86,15 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
+>
+>                 switch (v & AXP20X_VBUS_CLIMIT_MASK) {
+>                 case AXP20X_VBUC_CLIMIT_100mA:
+> -                       val->intval = 100000;
+> +                       switch (power->axp20x->variant) {
+> +                       case AXP202_ID:
+> +                       case AXP209_ID:
+> +                               val->intval = 100000;
+> +                               break;
+> +                       default:
+> +                               val->intval = -1; /* No 100mA limit */
+> +                               break;
+> +                       }
 
+Given this hardware actually has DT bindings, I'd prefer matching against the
+compatible string, and keeping the variant part in axp20x_usb_power. You could
+still use the AXPXXX_ID constants, but just the ones used in the bindings. This
+could potentially make adding support for newer PMICs easier by only needing a
+compatible DT entry.
+
+>                         break;
+>                 case AXP20X_VBUC_CLIMIT_500mA:
+>                         val->intval = 500000;
+> @@ -122,16 +131,23 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
+>                         break;
+>                 }
+>
+> -               ret = regmap_read(power->regmap, AXP20X_USB_OTG_STATUS, &v);
+> -               if (ret)
+> -                       return ret;
+> +               val->intval = POWER_SUPPLY_HEALTH_GOOD;
+>
+> -               if (!(v & AXP20X_USB_STATUS_VBUS_VALID)) {
+> -                       val->intval = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+> +               switch (power->axp20x->variant) {
+> +               case AXP202_ID:
+> +               case AXP209_ID:
+> +                       ret = regmap_read(power->regmap,
+> +                                         AXP20X_USB_OTG_STATUS, &v);
+> +                       if (ret)
+> +                               return ret;
+> +
+> +                       if (!(v & AXP20X_USB_STATUS_VBUS_VALID))
+> +                               val->intval =
+> +                                       POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
+> +                       break;
+> +               default:
+
+It seems like you'd return only POWER_SUPPLY_HEALTH_GOOD for AXP22x, even if
+VBUS is actually disconnected.
+
+>                         break;
+>                 }
+> -
+> -               val->intval = POWER_SUPPLY_HEALTH_GOOD;
+>                 break;
+>         case POWER_SUPPLY_PROP_PRESENT:
+>                 val->intval = !!(input & AXP20X_PWR_STATUS_VBUS_PRESENT);
+> @@ -156,6 +172,14 @@ static enum power_supply_property axp20x_usb_power_properties[] = {
+>         POWER_SUPPLY_PROP_CURRENT_NOW,
+>  };
+>
+> +static enum power_supply_property axp22x_usb_power_properties[] = {
+> +       POWER_SUPPLY_PROP_HEALTH,
+> +       POWER_SUPPLY_PROP_PRESENT,
+> +       POWER_SUPPLY_PROP_ONLINE,
+> +       POWER_SUPPLY_PROP_VOLTAGE_MIN,
+> +       POWER_SUPPLY_PROP_CURRENT_MAX,
+> +};
+> +
+>  static const struct power_supply_desc axp20x_usb_power_desc = {
+>         .name = "axp20x-usb",
+>         .type = POWER_SUPPLY_TYPE_USB,
+> @@ -164,13 +188,25 @@ static const struct power_supply_desc axp20x_usb_power_desc = {
+>         .get_property = axp20x_usb_power_get_property,
+>  };
+>
+> +static const struct power_supply_desc axp22x_usb_power_desc = {
+> +       .name = "axp20x-usb",
+> +       .type = POWER_SUPPLY_TYPE_USB,
+> +       .properties = axp22x_usb_power_properties,
+> +       .num_properties = ARRAY_SIZE(axp22x_usb_power_properties),
+> +       .get_property = axp20x_usb_power_get_property,
+> +};
+> +
+>  static int axp20x_usb_power_probe(struct platform_device *pdev)
+>  {
+>         struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+>         struct power_supply_config psy_cfg = {};
+>         struct axp20x_usb_power *power;
+> -       static const char * const irq_names[] = { "VBUS_PLUGIN",
+> -               "VBUS_REMOVAL", "VBUS_VALID", "VBUS_NOT_VALID" };
+> +       static const char * const axp20x_irq_names[] = { "VBUS_PLUGIN",
+> +               "VBUS_REMOVAL", "VBUS_VALID", "VBUS_NOT_VALID", NULL };
+> +       static const char * const axp22x_irq_names[] = {
+> +               "VBUS_PLUGIN", "VBUS_REMOVAL", NULL };
+> +       static const char * const *irq_names;
+> +       const struct power_supply_desc *usb_power_desc;
+>         int i, irq, ret;
+>
+>         if (!of_device_is_available(pdev->dev.of_node))
+> @@ -185,31 +221,50 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
+>         if (!power)
+>                 return -ENOMEM;
+>
+> +       power->axp20x = axp20x;
+>         power->regmap = axp20x->regmap;
+>
+> -       /* Enable vbus valid checking */
+> -       ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
+> -                   AXP20X_VBUS_MON_VBUS_VALID, AXP20X_VBUS_MON_VBUS_VALID);
+> -       if (ret)
+> -               return ret;
+> +       switch (power->axp20x->variant) {
+> +       case AXP202_ID:
+> +       case AXP209_ID:
+> +               /* Enable vbus valid checking */
+> +               ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
+> +                                        AXP20X_VBUS_MON_VBUS_VALID,
+> +                                        AXP20X_VBUS_MON_VBUS_VALID);
+> +               if (ret)
+> +                       return ret;
+>
+> -       /* Enable vbus voltage and current measurement */
+> -       ret = regmap_update_bits(power->regmap, AXP20X_ADC_EN1,
+> +               /* Enable vbus voltage and current measurement */
+> +               ret = regmap_update_bits(power->regmap, AXP20X_ADC_EN1,
+>                         AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT,
+>                         AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT);
+> -       if (ret)
+> -               return ret;
+> +               if (ret)
+> +                       return ret;
+> +
+> +               usb_power_desc = &axp20x_usb_power_desc;
+> +               irq_names = axp20x_irq_names;
+> +               break;
+> +       case AXP221_ID:
+> +       case AXP223_ID:
+> +               usb_power_desc = &axp22x_usb_power_desc;
+> +               irq_names = axp22x_irq_names;
+> +               break;
+> +       default:
+> +               dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
+> +                       axp20x->variant);
+> +               return -EINVAL;
+> +       }
+
+As mentioned above, I'd prefer using the compatible string.
+
+Regards
 ChenYu
 
->>
->> > +
->> > +       unsigned long   features;
->> > +       spinlock_t      *lock;
->> > +       struct clk_hw   hw;
->> > +};
->> > +
->> > +static inline struct ccu_common *hw_to_ccu_common(struct clk_hw *hw)
->> > +{
->> > +       return container_of(hw, struct ccu_common, hw);
->> > +}
->> > +
->> > +struct sunxi_ccu_desc {
->> > +       struct ccu_common       **clks;
->> > +       unsigned long           num_clks;
->> > +
->> > +       struct ccu_reset_map    *resets;
->> > +       unsigned long           num_resets;
->> > +};
->> > +
->> > +void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock);
->> > +
->> > +int sunxi_ccu_probe(struct device_node *node,
->> > +                   const struct sunxi_ccu_desc *desc);
->> > +
->> > +#endif /* _COMMON_H_ */
->> > diff --git a/drivers/clk/sunxi-ng/ccu_factor.h b/drivers/clk/sunxi-ng/ccu_factor.h
->> > new file mode 100644
->> > index 000000000000..e7cc564aaea0
->> > --- /dev/null
->> > +++ b/drivers/clk/sunxi-ng/ccu_factor.h
->> > @@ -0,0 +1,15 @@
->> > +#ifndef _CLK_FACTOR_H_
->> > +#define _CLK_FACTOR_H_
->> > +
->> > +struct ccu_factor {
->> > +       u8      shift;
->> > +       u8      width;
->> > +};
->> > +
->> > +#define SUNXI_CLK_FACTOR(_shift, _width)       \
->> > +       {                                       \
->> > +               .shift  = _shift,               \
->> > +               .width  = _width,               \
->> > +       }
->> > +
->> > +#endif /* _CLK_FACTOR_H_ */
->> > diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
->> > new file mode 100644
->> > index 000000000000..17cedad4e433
->> > --- /dev/null
->> > +++ b/drivers/clk/sunxi-ng/ccu_mux.h
->>
->> As far as I can tell there are no users of this file within this patch or the
->> following patches before the mux clock support one. It'd be easier to understand
->> if this part was moved to the mux clock patch.
 >
-> Will do.
+>         psy_cfg.of_node = pdev->dev.of_node;
+>         psy_cfg.drv_data = power;
 >
->>
->> > @@ -0,0 +1,20 @@
->> > +#ifndef _CCU_MUX_H_
->> > +#define _CCU_MUX_H_
->> > +
->> > +#include "common.h"
->> > +
->> > +struct ccu_mux_internal {
->> > +       u8      shift;
->> > +       u8      width;
->> > +
->> > +       u8      *map;
->>
->> I assume map is a table?
->>
->> > +};
->> > +
->> > +#define SUNXI_CLK_MUX(_shift, _width, _map)    \
->> > +       {                                       \
->> > +               .map    = _map,                 \
->> > +               .shift  = _shift,               \
->> > +               .width  = _width,               \
->> > +       }
->> > +
->> > +#endif /* _CCU_MUX_H_ */
->> > diff --git a/drivers/clk/sunxi-ng/ccu_reset.c b/drivers/clk/sunxi-ng/ccu_reset.c
->> > new file mode 100644
->> > index 000000000000..6c31d48783a7
->> > --- /dev/null
->> > +++ b/drivers/clk/sunxi-ng/ccu_reset.c
->> > @@ -0,0 +1,55 @@
->> > +/*
->> > + * Copyright (C) 2016 Maxime Ripard
->> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
->> > + *
->> > + * This program is free software; you can redistribute it and/or
->> > + * modify it under the terms of the GNU General Public License as
->> > + * published by the Free Software Foundation; either version 2 of
->> > + * the License, or (at your option) any later version.
->> > + */
->> > +
->> > +#include <linux/io.h>
->> > +#include <linux/reset-controller.h>
->> > +
->> > +#include "ccu_reset.h"
->> > +
->> > +static int ccu_reset_assert(struct reset_controller_dev *rcdev,
->> > +                           unsigned long id)
->> > +{
->> > +       struct ccu_reset *ccu = rcdev_to_ccu_reset(rcdev);
->> > +       const struct ccu_reset_map *map = &ccu->reset_map[id];
->> > +       unsigned long flags;
->> > +       u32 reg;
->> > +
->> > +       spin_lock_irqsave(ccu->lock, flags);
->> > +
->> > +       reg = readl(ccu->base + map->reg);
->> > +       writel(reg & ~map->bit, ccu->base + map->reg);
->> > +
->> > +       spin_unlock_irqrestore(ccu->lock, flags);
->> > +
->> > +       return 0;
->> > +}
->> > +
->> > +static int ccu_reset_deassert(struct reset_controller_dev *rcdev,
->> > +                             unsigned long id)
->> > +{
->> > +       struct ccu_reset *ccu = rcdev_to_ccu_reset(rcdev);
->> > +       const struct ccu_reset_map *map = &ccu->reset_map[id];
->> > +       unsigned long flags;
->> > +       u32 reg;
->> > +
->> > +       spin_lock_irqsave(ccu->lock, flags);
->> > +
->> > +       reg = readl(ccu->base + map->reg);
->> > +       writel(reg | map->bit, ccu->base + map->reg);
->> > +
->> > +       spin_unlock_irqrestore(ccu->lock, flags);
->> > +
->> > +       return 0;
->> > +}
->> > +
->> > +const struct reset_control_ops ccu_reset_ops = {
->> > +       .assert         = ccu_reset_assert,
->> > +       .deassert       = ccu_reset_deassert,
->> > +};
->> > diff --git a/drivers/clk/sunxi-ng/ccu_reset.h b/drivers/clk/sunxi-ng/ccu_reset.h
->> > new file mode 100644
->> > index 000000000000..36a4679210bd
->> > --- /dev/null
->> > +++ b/drivers/clk/sunxi-ng/ccu_reset.h
->> > @@ -0,0 +1,40 @@
->> > +/*
->> > + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
->> > + *
->> > + * This software is licensed under the terms of the GNU General Public
->> > + * License version 2, as published by the Free Software Foundation, and
->> > + * may be copied, distributed, and modified under those terms.
->> > + *
->> > + * This program is distributed in the hope that it will be useful,
->> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> > + * GNU General Public License for more details.
->> > + */
->> > +
->> > +#ifndef _CCU_RESET_H_
->> > +#define _CCU_RESET_H_
->> > +
->> > +#include <linux/reset-controller.h>
->> > +
->> > +struct ccu_reset_map {
->> > +       u16     reg;
->> > +       u32     bit;
->> > +};
->> > +
->> > +
->> > +struct ccu_reset {
->> > +       void __iomem                    *base;
->> > +       struct ccu_reset_map            *reset_map;
->> > +       spinlock_t                      *lock;
->> > +
->> > +       struct reset_controller_dev     rcdev;
->> > +};
->> > +
->> > +static inline struct ccu_reset *rcdev_to_ccu_reset(struct reset_controller_dev *rcdev)
->> > +{
->> > +       return container_of(rcdev, struct ccu_reset, rcdev);
->> > +}
->> > +
->> > +extern const struct reset_control_ops ccu_reset_ops;
->> > +
->> > +#endif /* _CCU_RESET_H_ */
->>
->> The reset control code looks good.
+> -       power->supply = devm_power_supply_register(&pdev->dev,
+> -                                       &axp20x_usb_power_desc, &psy_cfg);
+> +       power->supply = devm_power_supply_register(&pdev->dev, usb_power_desc,
+> +                                                  &psy_cfg);
+>         if (IS_ERR(power->supply))
+>                 return PTR_ERR(power->supply);
 >
-> Thanks!
-> Maxime
->
+>         /* Request irqs after registering, as irqs may trigger immediately */
+> -       for (i = 0; i < ARRAY_SIZE(irq_names); i++) {
+> +       for (i = 0; irq_names[i]; i++) {
+>                 irq = platform_get_irq_byname(pdev, irq_names[i]);
+>                 if (irq < 0) {
+>                         dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
 > --
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> 2.7.4
+>
