@@ -1,128 +1,160 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:16 +0100
-Subject: [PATCH v4 28/56] KVM: arm/arm64: vgic-new: Add PRIORITY registers
- handlers
+Date: Mon, 16 May 2016 10:53:27 +0100
+Subject: [PATCH v4 39/56] KVM: arm/arm64: vgic-new: vgic_kvm_device: KVM
+ device ops registration
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-29-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-40-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The priority register handlers are shared between the v2 and v3
-emulation, so their implementation goes into vgic-mmio.c, to be
-easily referenced from the v3 emulation as well later.
-There is a corner case when we change the priority of a pending
-interrupt which we don't handle at the moment.
+From: Eric Auger <eric.auger@linaro.org>
 
+This patch introduces the skeleton for the KVM device operations
+associated to KVM_DEV_TYPE_ARM_VGIC_V2 and KVM_DEV_TYPE_ARM_VGIC_V3.
+
+At that stage kvm_vgic_create is stubbed.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog v1 .. v2:
-- adapt to new MMIO framework
+- rename vgic_kvm_device.c to vgic-kvm-device.c
 
-Changelog v3 .. v4:
-- specify accessor width
-- use IRQ number accessor macro
+Changelog v2 .. v3:
+- replace inclusion of vgic/vgic.h with arm_vgic.h
+- add kvm_register_vgic_device() prototype to this patch
 
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
- virt/kvm/arm/vgic/vgic-mmio.c    | 40 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    |  7 +++++++
- virt/kvm/arm/vgic/vgic.h         |  2 ++
- 4 files changed, 50 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 108 ++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h            |   2 +
+ 2 files changed, 110 insertions(+)
+ create mode 100644 virt/kvm/arm/vgic/vgic-kvm-device.c
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 12e101b..d564a30 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -90,7 +90,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 74d140e..5c8af05 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -237,6 +237,46 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
- 	}
- }
- 
-+unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-+				      gpa_t addr, unsigned int len)
-+{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
-+	int i;
-+	u64 val = 0;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		val |= (u64)irq->priority << (i * 8);
-+	}
-+
-+	return val;
-+}
-+
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+new file mode 100644
+index 0000000..ff332f3
+--- /dev/null
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -0,0 +1,108 @@
 +/*
-+ * We currently don't handle changing the priority of an interrupt that
-+ * is already pending on a VCPU. If there is a need for this, we would
-+ * need to make this VCPU exit and re-evaluate the priorities, potentially
-+ * leading to this interrupt getting presented now to the guest (if it has
-+ * been masked by the priority mask before).
++ * VGIC: KVM DEVICE API
++ *
++ * Copyright (C) 2015 ARM Ltd.
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + */
-+void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
++#include <linux/kvm_host.h>
++#include <kvm/arm_vgic.h>
++
++/* common helpers */
++
++static int vgic_create(struct kvm_device *dev, u32 type)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
-+	int i;
++	return kvm_vgic_create(dev->kvm, type);
++}
 +
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++static void vgic_destroy(struct kvm_device *dev)
++{
++	kfree(dev);
++}
 +
-+		spin_lock(&irq->irq_lock);
-+		/* Narrow the priority range to what we actually support */
-+		irq->priority = (val >> (i * 8)) & GENMASK(7, 8 - VGIC_PRI_BITS);
-+		spin_unlock(&irq->irq_lock);
++void kvm_register_vgic_device(unsigned long type)
++{
++	switch (type) {
++	case KVM_DEV_TYPE_ARM_VGIC_V2:
++		kvm_register_device_ops(&kvm_arm_vgic_v2_ops,
++					KVM_DEV_TYPE_ARM_VGIC_V2);
++		break;
++#ifdef CONFIG_KVM_ARM_VGIC_V3
++	case KVM_DEV_TYPE_ARM_VGIC_V3:
++		kvm_register_device_ops(&kvm_arm_vgic_v3_ops,
++					KVM_DEV_TYPE_ARM_VGIC_V3);
++		break;
++#endif
 +	}
 +}
 +
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index dd96a71..6983922 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -117,6 +117,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
- 			     gpa_t addr, unsigned int len,
- 			     unsigned long val);
- 
-+unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-+				      gpa_t addr, unsigned int len);
++/* V2 ops */
 +
-+void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
++static int vgic_v2_set_attr(struct kvm_device *dev,
++			    struct kvm_device_attr *attr)
++{
++	return -ENXIO;
++}
 +
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- #endif
++static int vgic_v2_get_attr(struct kvm_device *dev,
++			    struct kvm_device_attr *attr)
++{
++	return -ENXIO;
++}
++
++static int vgic_v2_has_attr(struct kvm_device *dev,
++			    struct kvm_device_attr *attr)
++{
++	return -ENXIO;
++}
++
++struct kvm_device_ops kvm_arm_vgic_v2_ops = {
++	.name = "kvm-arm-vgic-v2",
++	.create = vgic_create,
++	.destroy = vgic_destroy,
++	.set_attr = vgic_v2_set_attr,
++	.get_attr = vgic_v2_get_attr,
++	.has_attr = vgic_v2_has_attr,
++};
++
++/* V3 ops */
++
++#ifdef CONFIG_KVM_ARM_VGIC_V3
++
++static int vgic_v3_set_attr(struct kvm_device *dev,
++			    struct kvm_device_attr *attr)
++{
++	return -ENXIO;
++}
++
++static int vgic_v3_get_attr(struct kvm_device *dev,
++			    struct kvm_device_attr *attr)
++{
++	return -ENXIO;
++}
++
++static int vgic_v3_has_attr(struct kvm_device *dev,
++			    struct kvm_device_attr *attr)
++{
++	return -ENXIO;
++}
++
++struct kvm_device_ops kvm_arm_vgic_v3_ops = {
++	.name = "kvm-arm-vgic-v3",
++	.create = vgic_create,
++	.destroy = vgic_destroy,
++	.set_attr = vgic_v3_set_attr,
++	.get_attr = vgic_v3_get_attr,
++	.has_attr = vgic_v3_has_attr,
++};
++
++#endif /* CONFIG_KVM_ARM_VGIC_V3 */
++
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index cf62015..e57f8d5 100644
+index 44c6a1b..77b0ab3 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,8 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
+@@ -73,4 +73,6 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+ }
+ #endif
  
-+#define VGIC_PRI_BITS		5
++void kvm_register_vgic_device(unsigned long type);
 +
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
- 
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ #endif
 -- 
 2.8.2
