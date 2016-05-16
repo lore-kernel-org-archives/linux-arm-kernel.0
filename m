@@ -1,40 +1,38 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 16 May 2016 09:22:46 -0500
-Subject: Can not play audio with screen off
-In-Reply-To: <20160515193106.GA18685@amd>
-References: <20160515193106.GA18685@amd>
-Message-ID: <5739D7B6.7060102@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 16 May 2016 16:45:52 +0200
+Subject: [PATCH 1/1] devicetree: sunxi: Add OLinuXino Lime2 eMMC to the
+ Makefile
+In-Reply-To: <1463169436-6170-1-git-send-email-oliver@schinagl.nl>
+References: <1463169436-6170-1-git-send-email-oliver@schinagl.nl>
+Message-ID: <20160516144552.GH27618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/15/2016 02:31 PM, Pavel Machek wrote:
-> Hi!
+On Fri, May 13, 2016 at 09:57:16PM +0200, Olliver Schinagl wrote:
+> commit 27dd9af6bc000ab21fd ("ARM: dts: sunxi: Add a olinuxino-lime2-emmc")
+> added the new emmc equipped lime2 but forgot its Makefile.
 > 
-> I'm playing some more with N900, this time I'd like to use it as a
-> alarm clock...
+> This patch adds an entry to the Makefile.
 > 
-> And now I realized I can not, because system performance is so
-> horrible with screen off that mpg123 + pulseaudio skips horribly. This
-> is without tweaking serial parameters, so CPU is definitely not going
-> into the idle/off modes.
-> 
-> Loading CPU fixes the issue (I used cat /dev/zero > /dev/null).
-> 
-> Hmm. And it seems to work better if I ssh in and launch mpg123
-> remotely. Weird.
-> 
-> Kernel 4.5-rc0. Will try on different ones.
-> 
-> Any ideas? Is there interface to tell kernel that better performance
-> is needed for a while?
-> 
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 
-pm_qos cpu_dma_latency? Drivers will have to be properly instrumented
-with appropriate latency values -> this will control the depth in C
-states that the system will attempt. NOTE: it is a dual edged sword,
-bad configurations can result in none of the C-states being entered.
+Having the version of the patch would be nice too.
 
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Arnd, Kevin, Olof, could you apply that patch directly for 4.7?
+
+Thanks,
+Maxime
 
 -- 
-Regards,
-Nishanth Menon
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160516/4b9a8049/attachment.sig>
