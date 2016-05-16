@@ -1,199 +1,84 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Mon, 16 May 2016 16:09:53 -0700
-Subject: [PATCH net-next] bpf: arm64: remove callee-save registers use for tmp
- registers
-Message-ID: <1463440193-31934-1-git-send-email-yang.shi@linaro.org>
+From: alexey.klimov@arm.com (Alexey Klimov)
+Date: Tue, 17 May 2016 00:44:42 +0100
+Subject: [PATCH v5 0/1] ARM64: ACPI: Update documentation for latest
+ specification version
+In-Reply-To: <3b6d5be3-40ab-94dc-2590-8b2638cbdc15@redhat.com>
+Message-ID: <20160516234441.GA7425@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current implementation of ARM64 eBPF JIT, R23 and R24 are used for
-tmp registers, which are callee-saved registers. This leads to variable size
-of JIT prologue and epilogue. The latest blinding constant change prefers to
-constant size of prologue and epilogue. AAPCS reserves R9 ~ R15 for temp
-registers which not need to be saved/restored during function call. So, replace
-R23 and R24 to R10 and R11, and remove tmp_used flag.
+On Mon, May 2, 2016 at 09:19 PM, Al Stone wrote:
+> On 04/25/2016 03:21 PM, Al Stone wrote:
+> > The ACPI 6.1 specification was recently released at the end of January
+> > 2016, but the arm64 kernel documentation for the use of ACPI was written
+> > for the 5.1 version of the spec.  There were significant additions to the
+> > spec that had not yet been mentioned -- for example, the 6.0 mechanisms
+> > added to make it easier to define processors and low power idle states,
+> > as well as the 6.1 addition allowing regular interrupts (not just from
+> > GPIO) be used to signal ACPI general purpose events.
+> >
+> > This patch reflects going back through and examining the specs in detail
+> > and updating content appropriately.  Whilst there, a few odds and ends of
+> > typos were caught as well.  This brings the documentation up to date with
+> > ACPI 6.1 for arm64.
+> >
+> > Changes for v5:
+> >    -- Miscellaneous typos and corrections (Lorenzo Pieralisi)
+> >    -- Add linux-acpi@ ML to the distribution list (Alexey Klimov)
+> >    -- Corrections to CPPC information (Alexey Klimov)
+> >    -- ACK from Lorenzo Pieralisi
+> >    -- Updated bibliographic info (Al Stone)
+> >
+> > Changes for v4:
+> >    -- Clarify that IORT can sometimes be optional (Jon Masters).
+> >    -- Remove "Use as needed" descriptions of ACPI objects; they provide
+> >       no substantive information and doing so simplifies maintenance of
+> >       this document over time.  These have been replaced with a simpler
+> >       notice that states that unless otherwise noted, do what the ACPI
+> >       specification says is needed.
+> >    -- Corrected the _OSI object usage recommendation; it described kernel
+> >       behavior that does not exist (Al Stone).
+> >
+> > Changes for v3:
+> >    -- Clarify use of _LPI/_RDI (Vikas Sajjan)
+> >    -- Whitespace cleanup as pointed out by checkpatch
+> >
+> > Changes for v2:
+> >    -- Clean up white space (Harb Abdulhahmid)
+> >    -- Clarification on _CCA usage (Harb Abdulhamid)
+> >    -- IORT moved to required from recommended (Hanjun Guo)
+> >    -- Clarify IORT description (Hanjun Guo)
+> >
+> >
+> > Al Stone (1):
+> >   ARM64: ACPI: Update documentation for latest specification version
+> >
+> >  Documentation/arm64/acpi_object_usage.txt | 343 ++++++++++++++++--------------
+> >  Documentation/arm64/arm-acpi.txt          |  40 ++--
+> >  2 files changed, 213 insertions(+), 170 deletions(-)
+> >
+> 
+> Ping?  If there are no further comments, can this be pulled in through
+> either the documentation or arm64 tree?
+> 
+> Thanks.
 
-CC: Zi Shen Lim <zlim.lnx@gmail.com>
-CC: Daniel Borkmann <daniel@iogearbox.net>
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
-Apply on top of Daniel's blinding constant patchset.
+Hi Al,
+sorry for delay.
 
- arch/arm64/net/bpf_jit_comp.c | 32 ++++----------------------------
- 1 file changed, 4 insertions(+), 28 deletions(-)
+CPPC and PCC corrections look fine. Thanks.
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index d0d5190..ef3055a 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -51,9 +51,9 @@ static const int bpf2a64[] = {
- 	[BPF_REG_9] = A64_R(22),
- 	/* read-only frame pointer to access stack */
- 	[BPF_REG_FP] = A64_R(25),
--	/* temporary register for internal BPF JIT */
--	[TMP_REG_1] = A64_R(23),
--	[TMP_REG_2] = A64_R(24),
-+	/* temporary registers for internal BPF JIT */
-+	[TMP_REG_1] = A64_R(10),
-+	[TMP_REG_2] = A64_R(11),
- 	/* temporary register for blinding constants */
- 	[BPF_REG_AX] = A64_R(9),
- };
-@@ -61,7 +61,6 @@ static const int bpf2a64[] = {
- struct jit_ctx {
- 	const struct bpf_prog *prog;
- 	int idx;
--	int tmp_used;
- 	int epilogue_offset;
- 	int *offset;
- 	u32 *image;
-@@ -154,8 +153,6 @@ static void build_prologue(struct jit_ctx *ctx)
- 	const u8 r8 = bpf2a64[BPF_REG_8];
- 	const u8 r9 = bpf2a64[BPF_REG_9];
- 	const u8 fp = bpf2a64[BPF_REG_FP];
--	const u8 tmp1 = bpf2a64[TMP_REG_1];
--	const u8 tmp2 = bpf2a64[TMP_REG_2];
- 
- 	/*
- 	 * BPF prog stack layout
-@@ -189,8 +186,6 @@ static void build_prologue(struct jit_ctx *ctx)
- 	/* Save callee-saved register */
- 	emit(A64_PUSH(r6, r7, A64_SP), ctx);
- 	emit(A64_PUSH(r8, r9, A64_SP), ctx);
--	if (ctx->tmp_used)
--		emit(A64_PUSH(tmp1, tmp2, A64_SP), ctx);
- 
- 	/* Save fp (x25) and x26. SP requires 16 bytes alignment */
- 	emit(A64_PUSH(fp, A64_R(26), A64_SP), ctx);
-@@ -210,8 +205,6 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	const u8 r8 = bpf2a64[BPF_REG_8];
- 	const u8 r9 = bpf2a64[BPF_REG_9];
- 	const u8 fp = bpf2a64[BPF_REG_FP];
--	const u8 tmp1 = bpf2a64[TMP_REG_1];
--	const u8 tmp2 = bpf2a64[TMP_REG_2];
- 
- 	/* We're done with BPF stack */
- 	emit(A64_ADD_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
-@@ -220,8 +213,6 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	emit(A64_POP(fp, A64_R(26), A64_SP), ctx);
- 
- 	/* Restore callee-saved register */
--	if (ctx->tmp_used)
--		emit(A64_POP(tmp1, tmp2, A64_SP), ctx);
- 	emit(A64_POP(r8, r9, A64_SP), ctx);
- 	emit(A64_POP(r6, r7, A64_SP), ctx);
- 
-@@ -317,7 +308,6 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 			emit(A64_UDIV(is64, dst, dst, src), ctx);
- 			break;
- 		case BPF_MOD:
--			ctx->tmp_used = 1;
- 			emit(A64_UDIV(is64, tmp, dst, src), ctx);
- 			emit(A64_MUL(is64, tmp, tmp, src), ctx);
- 			emit(A64_SUB(is64, dst, dst, tmp), ctx);
-@@ -390,49 +380,41 @@ emit_bswap_uxt:
- 	/* dst = dst OP imm */
- 	case BPF_ALU | BPF_ADD | BPF_K:
- 	case BPF_ALU64 | BPF_ADD | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(is64, tmp, imm, ctx);
- 		emit(A64_ADD(is64, dst, dst, tmp), ctx);
- 		break;
- 	case BPF_ALU | BPF_SUB | BPF_K:
- 	case BPF_ALU64 | BPF_SUB | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(is64, tmp, imm, ctx);
- 		emit(A64_SUB(is64, dst, dst, tmp), ctx);
- 		break;
- 	case BPF_ALU | BPF_AND | BPF_K:
- 	case BPF_ALU64 | BPF_AND | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(is64, tmp, imm, ctx);
- 		emit(A64_AND(is64, dst, dst, tmp), ctx);
- 		break;
- 	case BPF_ALU | BPF_OR | BPF_K:
- 	case BPF_ALU64 | BPF_OR | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(is64, tmp, imm, ctx);
- 		emit(A64_ORR(is64, dst, dst, tmp), ctx);
- 		break;
- 	case BPF_ALU | BPF_XOR | BPF_K:
- 	case BPF_ALU64 | BPF_XOR | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(is64, tmp, imm, ctx);
- 		emit(A64_EOR(is64, dst, dst, tmp), ctx);
- 		break;
- 	case BPF_ALU | BPF_MUL | BPF_K:
- 	case BPF_ALU64 | BPF_MUL | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(is64, tmp, imm, ctx);
- 		emit(A64_MUL(is64, dst, dst, tmp), ctx);
- 		break;
- 	case BPF_ALU | BPF_DIV | BPF_K:
- 	case BPF_ALU64 | BPF_DIV | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(is64, tmp, imm, ctx);
- 		emit(A64_UDIV(is64, dst, dst, tmp), ctx);
- 		break;
- 	case BPF_ALU | BPF_MOD | BPF_K:
- 	case BPF_ALU64 | BPF_MOD | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(is64, tmp2, imm, ctx);
- 		emit(A64_UDIV(is64, tmp, dst, tmp2), ctx);
- 		emit(A64_MUL(is64, tmp, tmp, tmp2), ctx);
-@@ -503,12 +485,10 @@ emit_cond_jmp:
- 	case BPF_JMP | BPF_JNE | BPF_K:
- 	case BPF_JMP | BPF_JSGT | BPF_K:
- 	case BPF_JMP | BPF_JSGE | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(1, tmp, imm, ctx);
- 		emit(A64_CMP(1, dst, tmp), ctx);
- 		goto emit_cond_jmp;
- 	case BPF_JMP | BPF_JSET | BPF_K:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(1, tmp, imm, ctx);
- 		emit(A64_TST(1, dst, tmp), ctx);
- 		goto emit_cond_jmp;
-@@ -518,7 +498,6 @@ emit_cond_jmp:
- 		const u8 r0 = bpf2a64[BPF_REG_0];
- 		const u64 func = (u64)__bpf_call_base + imm;
- 
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i64(tmp, func, ctx);
- 		emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
- 		emit(A64_MOV(1, A64_FP, A64_SP), ctx);
-@@ -564,7 +543,6 @@ emit_cond_jmp:
- 	case BPF_LDX | BPF_MEM | BPF_H:
- 	case BPF_LDX | BPF_MEM | BPF_B:
- 	case BPF_LDX | BPF_MEM | BPF_DW:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(1, tmp, off, ctx);
- 		switch (BPF_SIZE(code)) {
- 		case BPF_W:
-@@ -588,7 +566,6 @@ emit_cond_jmp:
- 	case BPF_ST | BPF_MEM | BPF_B:
- 	case BPF_ST | BPF_MEM | BPF_DW:
- 		/* Load imm to a register then store it */
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(1, tmp2, off, ctx);
- 		emit_a64_mov_i(1, tmp, imm, ctx);
- 		switch (BPF_SIZE(code)) {
-@@ -612,7 +589,6 @@ emit_cond_jmp:
- 	case BPF_STX | BPF_MEM | BPF_H:
- 	case BPF_STX | BPF_MEM | BPF_B:
- 	case BPF_STX | BPF_MEM | BPF_DW:
--		ctx->tmp_used = 1;
- 		emit_a64_mov_i(1, tmp, off, ctx);
- 		switch (BPF_SIZE(code)) {
- 		case BPF_W:
-@@ -798,7 +774,7 @@ struct bpf_prog *bpf_int_jit_compile(struct bpf_prog *prog)
- 
- 	/* 1. Initial fake pass to compute ctx->idx. */
- 
--	/* Fake pass to fill in ctx->offset and ctx->tmp_used. */
-+	/* Fake pass to fill in ctx->offset. */
- 	if (build_body(&ctx)) {
- 		prog = orig_prog;
- 		goto out_off;
--- 
-2.0.2
+
+This comment is not to block your patch (maybe some to-do):
+I greped sources and your patch and I don't see description of _PSD object.
+This P-state dependancy object is optional but it's presense and correct data
+are extremely useful for CPPC and can potentially descrease number of performance
+changing requests.
+
+ACPI spec in section about CPPC tells that it may use _PSD (page 503 if I remember
+correctly) to specify domain belongings of CPUs.
+
+You may consider to add description of _PSD object later.
+
+Best regards,
+Alexey.
