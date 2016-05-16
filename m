@@ -1,42 +1,24 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Mon, 16 May 2016 20:17:45 +0200
-Subject: [PATCH-V2 5/5] ARM: multi_v7_defconfig: bcm2835: add
- bcm2835-thermal driver
-In-Reply-To: <5739F8AC.8080003@gmail.com>
-References: <1463145186-12906-1-git-send-email-kernel@martin.sperl.org>
- <1463145186-12906-6-git-send-email-kernel@martin.sperl.org>
- <5739F8AC.8080003@gmail.com>
-Message-ID: <40E50EF4-240B-4E40-8344-1F9042EC1473@martin.sperl.org>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 16 May 2016 11:48:44 -0700
+Subject: [PATCH omap v2 0/6] Fix OMAP uses of RCU from idle loop
+Message-ID: <20160516184844.GA20144@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello!
 
-> On 16.05.2016, at 18:43, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> 
-> On 05/13/2016 06:13 AM, kernel at martin.sperl.org wrote:
->> From: Martin Sperl <kernel@martin.sperl.org>
->> 
->> Add the thermal driver to list of compiled modules in
->> multi_v7_defconfig.
->> 
->> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->> ---
->> arch/arm/configs/multi_v7_defconfig | 1 +
->> 1 file changed, 1 insertion(+)
->> 
->> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
->> index 2823490..5f0f5a3 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@ -422,6 +422,7 @@ CONFIG_CPU_THERMAL=y
->> CONFIG_ROCKCHIP_THERMAL=y
->> CONFIG_RCAR_THERMAL=y
->> CONFIG_ARMADA_THERMAL=y
->> +CONFIG_BCM2835_THERMAL=y
-> 
-> Does this need to be built into the kernel?
-> 
-Not necessarily, but as most other drivers in this context
-are built in this one was added as such as well.
+The following series fixes a number of uses of RCU from the idle loop.
+These are all due to tracing, so the fix is simply to append _rcuidle
+to the event-tracing call.
 
-If the policy is different, then I can change it...
+Changes since v1: Fix commit-log subjects and add maintainers on CC.
+
+							Thanx, Paul
+
+------------------------------------------------------------------------
+
+ arch/arm/kernel/smp.c             |    2 +-
+ arch/arm/mach-omap2/powerdomain.c |    9 +++++----
+ drivers/base/power/runtime.c      |   14 +++++++-------
+ drivers/clk/clk.c                 |    8 ++++----
+ 4 files changed, 17 insertions(+), 16 deletions(-)
