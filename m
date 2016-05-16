@@ -1,368 +1,159 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:34 +0100
-Subject: [PATCH v4 49/56] KVM: arm/arm64: vgic-new: vgic_init: implement
- kvm_vgic_hyp_init
+Date: Mon, 16 May 2016 10:54:23 +0100
+Subject: [PATCH v4 38/56] KVM: arm/arm64: vgic-new: Add GICv3 SGI system
+ register trap handler
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-107-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-96-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+In contrast to GICv2 SGIs in a GICv3 implementation are not triggered
+by a MMIO write, but with a system register write. KVM knows about
+that register already, we just need to implement the handler and wire
+it up to the core KVM/ARM code.
 
-Implements kvm_vgic_hyp_init and vgic_probe function.
-This uses the new firmware independent VGIC probing to support both ACPI
-and DT based systems (code from Marc Zyngier).
-
-The vgic_global struct is enriched with new fields populated
-by those functions.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog v1 .. v2:
-- rename vgic_init.c to vgic-init.c
+Changelog RFC..v1:
+- add comment about SGI_AFFINITY_LEVEL macro
 
-Changelog v2 .. v3:
-- include kvm/arm_vgic.h instead of kvm/vgic/vgic.h
-- move ich_vtr_el2 variable into probe function
-
-Changelog v3 .. v4:
-- improve nr_lr determination in GICv2 probe
-- switching to firmware-independent probing
-
- include/kvm/vgic/vgic.h       |   1 +
- virt/kvm/arm/vgic/vgic-init.c | 123 ++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v2.c   |  64 ++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-v3.c   |  49 +++++++++++++++++
- virt/kvm/arm/vgic/vgic.h      |   9 ++++
- 5 files changed, 246 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic-init.c
+ include/kvm/vgic/vgic.h          |   8 +++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 106 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+)
 
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 3689b9b..393489f 100644
+index ff3f9c2..00e3dca 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -195,6 +195,7 @@ struct vgic_cpu {
- };
+@@ -209,6 +209,14 @@ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
  
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-+int kvm_vgic_hyp_init(void);
++#ifdef CONFIG_KVM_ARM_VGIC_V3
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
++#else
++static inline void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
++{
++}
++#endif
++
+ /**
+  * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+  *
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 7b9340b..63b8550 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -343,3 +343,109 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
  
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-new file mode 100644
-index 0000000..4523beb
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -0,0 +1,123 @@
+ 	return ret;
+ }
++
 +/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
++ * generation register ICC_SGI1R_EL1) with a given VCPU.
++ * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
++ * return -1.
 + */
-+
-+#include <linux/uaccess.h>
-+#include <linux/interrupt.h>
-+#include <linux/cpu.h>
-+#include <linux/kvm_host.h>
-+#include <kvm/arm_vgic.h>
-+#include <asm/kvm_mmu.h>
-+#include "vgic.h"
-+
-+/* GENERIC PROBE */
-+
-+static void vgic_init_maintenance_interrupt(void *info)
++static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
 +{
-+	enable_percpu_irq(kvm_vgic_global_state.maint_irq, 0);
-+}
-+
-+static int vgic_cpu_notify(struct notifier_block *self,
-+			   unsigned long action, void *cpu)
-+{
-+	switch (action) {
-+	case CPU_STARTING:
-+	case CPU_STARTING_FROZEN:
-+		vgic_init_maintenance_interrupt(NULL);
-+		break;
-+	case CPU_DYING:
-+	case CPU_DYING_FROZEN:
-+		disable_percpu_irq(kvm_vgic_global_state.maint_irq);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block vgic_cpu_nb = {
-+	.notifier_call = vgic_cpu_notify,
-+};
-+
-+static irqreturn_t vgic_maintenance_handler(int irq, void *data)
-+{
-+	/*
-+	 * We cannot rely on the vgic maintenance interrupt to be
-+	 * delivered synchronously. This means we can only use it to
-+	 * exit the VM, and we perform the handling of EOIed
-+	 * interrupts on the exit path (see vgic_process_maintenance).
-+	 */
-+	return IRQ_HANDLED;
-+}
-+
-+/**
-+ * kvm_vgic_hyp_init: populates the kvm_vgic_global_state variable
-+ * according to the host GIC model. Accordingly calls either
-+ * vgic_v2/v3_probe which registers the KVM_DEVICE that can be
-+ * instantiated by a guest later on .
-+ */
-+int kvm_vgic_hyp_init(void)
-+{
-+	const struct gic_kvm_info *gic_kvm_info;
-+	int ret;
-+
-+	gic_kvm_info = gic_get_kvm_info();
-+	if (!gic_kvm_info)
-+		return -ENODEV;
-+
-+	if (!gic_kvm_info->maint_irq) {
-+		kvm_err("No vgic maintenance irq\n");
-+		return -ENXIO;
-+	}
-+
-+	switch (gic_kvm_info->type) {
-+	case GIC_V2:
-+		ret = vgic_v2_probe(gic_kvm_info);
-+		break;
-+	case GIC_V3:
-+		ret = vgic_v3_probe(gic_kvm_info);
-+		break;
-+	default:
-+		ret = -ENODEV;
-+	};
-+
-+	if (ret)
-+		return ret;
-+
-+	kvm_vgic_global_state.maint_irq = gic_kvm_info->maint_irq;
-+	ret = request_percpu_irq(kvm_vgic_global_state.maint_irq,
-+				 vgic_maintenance_handler,
-+				 "vgic", kvm_get_running_vcpus());
-+	if (ret) {
-+		kvm_err("Cannot register interrupt %d\n",
-+			kvm_vgic_global_state.maint_irq);
-+		return ret;
-+	}
-+
-+	ret = __register_cpu_notifier(&vgic_cpu_nb);
-+	if (ret) {
-+		kvm_err("Cannot register vgic CPU notifier\n");
-+		goto out_free_irq;
-+	}
-+
-+	on_each_cpu(vgic_init_maintenance_interrupt, NULL, 1);
-+
-+	kvm_info("vgic interrupt IRQ%d\n", kvm_vgic_global_state.maint_irq);
-+	return 0;
-+
-+out_free_irq:
-+	free_percpu_irq(kvm_vgic_global_state.maint_irq,
-+			kvm_get_running_vcpus());
-+	return ret;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index d943059..09777c8 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -17,6 +17,8 @@
- #include <linux/irqchip/arm-gic.h>
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
-+#include <kvm/arm_vgic.h>
-+#include <asm/kvm_mmu.h>
- 
- #include "vgic.h"
- 
-@@ -203,3 +205,65 @@ void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
- 			GICH_VMCR_PRIMASK_SHIFT;
- }
-+
-+/**
-+ * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
-+ * @node:	pointer to the DT node
-+ *
-+ * Returns 0 if a GICv2 has been found, returns an error code otherwise
-+ */
-+int vgic_v2_probe(const struct gic_kvm_info *info)
-+{
-+	int ret;
-+	u32 vtr;
-+
-+	if (!info->vctrl.start) {
-+		kvm_err("GICH not present in the firmware table\n");
-+		return -ENXIO;
-+	}
-+
-+	if (!PAGE_ALIGNED(info->vcpu.start)) {
-+		kvm_err("GICV physical address 0x%llx not page aligned\n",
-+			(unsigned long long)info->vcpu.start);
-+		return -ENXIO;
-+	}
-+
-+	if (!PAGE_ALIGNED(resource_size(&info->vcpu))) {
-+		kvm_err("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-+			(unsigned long long)resource_size(&info->vcpu),
-+			PAGE_SIZE);
-+		return -ENXIO;
-+	}
-+
-+	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
-+						   resource_size(&info->vctrl));
-+	if (!kvm_vgic_global_state.vctrl_base) {
-+		kvm_err("Cannot ioremap GICH\n");
-+		return -ENOMEM;
-+	}
-+
-+	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
-+	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
-+
-+	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
-+				     kvm_vgic_global_state.vctrl_base +
-+					 resource_size(&info->vctrl),
-+				     info->vctrl.start);
-+
-+	if (ret) {
-+		kvm_err("Cannot map VCTRL into hyp\n");
-+		iounmap(kvm_vgic_global_state.vctrl_base);
-+		return ret;
-+	}
-+
-+	kvm_vgic_global_state.can_emulate_gicv2 = true;
-+	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
-+
-+	kvm_vgic_global_state.vcpu_base = info->vcpu.start;
-+	kvm_vgic_global_state.type = VGIC_V2;
-+	kvm_vgic_global_state.max_gic_vcpus = VGIC_V2_MAX_CPUS;
-+
-+	kvm_info("vgic-v2@%llx\n", info->vctrl.start);
-+
-+	return 0;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 8548297..de0e8e0 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -15,6 +15,9 @@
- #include <linux/irqchip/arm-gic-v3.h>
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
-+#include <kvm/arm_vgic.h>
-+#include <asm/kvm_mmu.h>
-+#include <asm/kvm_asm.h>
- 
- #include "vgic.h"
- 
-@@ -182,3 +185,49 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
- 	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
- }
-+
-+/**
-+ * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-+ * @node:	pointer to the DT node
-+ *
-+ * Returns 0 if a GICv3 has been found, returns an error code otherwise
-+ */
-+int vgic_v3_probe(const struct gic_kvm_info *info)
-+{
-+	u32 ich_vtr_el2 = kvm_call_hyp(__vgic_v3_get_ich_vtr_el2);
++	unsigned long affinity;
++	int level0;
 +
 +	/*
-+	 * The ListRegs field is 5 bits, but there is a architectural
-+	 * maximum of 16 list registers. Just ignore bit 4...
++	 * Split the current VCPU's MPIDR into affinity level 0 and the
++	 * rest as this is what we have to compare against.
 +	 */
-+	kvm_vgic_global_state.nr_lr = (ich_vtr_el2 & 0xf) + 1;
-+	kvm_vgic_global_state.can_emulate_gicv2 = false;
++	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
++	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
++	affinity &= ~MPIDR_LEVEL_MASK;
 +
-+	if (!info->vcpu.start) {
-+		kvm_info("GICv3: no GICV resource entry\n");
-+		kvm_vgic_global_state.vcpu_base = 0;
-+	} else if (!PAGE_ALIGNED(info->vcpu.start)) {
-+		pr_warn("GICV physical address 0x%llx not page aligned\n",
-+			(unsigned long long)info->vcpu.start);
-+		kvm_vgic_global_state.vcpu_base = 0;
-+	} else if (!PAGE_ALIGNED(resource_size(&info->vcpu))) {
-+		pr_warn("GICV size 0x%llx not a multiple of page size 0x%lx\n",
-+			(unsigned long long)resource_size(&info->vcpu),
-+			PAGE_SIZE);
-+		kvm_vgic_global_state.vcpu_base = 0;
-+	} else {
-+		kvm_vgic_global_state.vcpu_base = info->vcpu.start;
-+		kvm_vgic_global_state.can_emulate_gicv2 = true;
-+		kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
-+		kvm_info("vgic-v2@%llx\n", info->vcpu.start);
-+	}
-+	if (kvm_vgic_global_state.vcpu_base == 0)
-+		kvm_info("disabling GICv2 emulation\n");
-+	kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V3);
++	/* bail out if the upper three levels don't match */
++	if (sgi_aff != affinity)
++		return -1;
 +
-+	kvm_vgic_global_state.vctrl_base = NULL;
-+	kvm_vgic_global_state.type = VGIC_V3;
-+	kvm_vgic_global_state.max_gic_vcpus = VGIC_V3_MAX_CPUS;
++	/* Is this VCPU's bit set in the mask ? */
++	if (!(sgi_cpu_mask & BIT(level0)))
++		return -1;
 +
-+	return 0;
++	return level0;
 +}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index de9dc71..f4244b6 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -16,6 +16,8 @@
- #ifndef __KVM_ARM_VGIC_NEW_H__
- #define __KVM_ARM_VGIC_NEW_H__
- 
-+#include <linux/irqchip/arm-gic-common.h>
 +
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
- 
-@@ -51,6 +53,7 @@ int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 			  int offset, u32 *val);
- void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+int vgic_v2_probe(const struct gic_kvm_info *info);
- int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
- 			     enum vgic_type);
- 
-@@ -62,6 +65,7 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
- void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
-+int vgic_v3_probe(const struct gic_kvm_info *info);
- int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
- #else
- static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
-@@ -95,6 +99,11 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
- {
- }
- 
-+static inline int vgic_v3_probe(const struct gic_kvm_info *info)
++/*
++ * The ICC_SGI* registers encode the affinity differently from the MPIDR,
++ * so provide a wrapper to use the existing defines to isolate a certain
++ * affinity level.
++ */
++#define SGI_AFFINITY_LEVEL(reg, level) \
++	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
++	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
++
++/**
++ * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
++ * @vcpu: The VCPU requesting a SGI
++ * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
++ *
++ * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
++ * This will trap in sys_regs.c and call this function.
++ * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
++ * target processors as well as a bitmask of 16 Aff0 CPUs.
++ * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
++ * check for matching ones. If this bit is set, we signal all, but not the
++ * calling VCPU.
++ */
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
 +{
-+	return -ENODEV;
-+}
++	struct kvm *kvm = vcpu->kvm;
++	struct kvm_vcpu *c_vcpu;
++	u16 target_cpus;
++	u64 mpidr;
++	int sgi, c;
++	int vcpu_id = vcpu->vcpu_id;
++	bool broadcast;
 +
- static inline int vgic_register_redist_iodevs(struct kvm *kvm,
- 					      gpa_t dist_base_address)
- {
++	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
++	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
++	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
++	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
++
++	/*
++	 * We iterate over all VCPUs to find the MPIDRs matching the request.
++	 * If we have handled one CPU, we clear its bit to detect early
++	 * if we are already finished. This avoids iterating through all
++	 * VCPUs when most of the times we just signal a single VCPU.
++	 */
++	kvm_for_each_vcpu(c, c_vcpu, kvm) {
++		struct vgic_irq *irq;
++
++		/* Exit early if we have dealt with all requested CPUs */
++		if (!broadcast && target_cpus == 0)
++			break;
++
++		/* Don't signal the calling VCPU */
++		if (broadcast && c == vcpu_id)
++			continue;
++
++		if (!broadcast) {
++			int level0;
++
++			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
++			if (level0 == -1)
++				continue;
++
++			/* remove this matching VCPU from the mask */
++			target_cpus &= ~BIT(level0);
++		}
++
++		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
++
++		spin_lock(&irq->irq_lock);
++		irq->pending = true;
++
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
++	}
++}
 -- 
 2.8.2
