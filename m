@@ -1,97 +1,152 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:56 +0100
-Subject: [PATCH v4 11/56] KVM: arm/arm64: pmu: abstract access to number of
- SPIs
+Date: Mon, 16 May 2016 10:54:32 +0100
+Subject: [PATCH v4 47/56] KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-69-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-105-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the PMU uses a member of the struct vgic_dist directly,
-which not only breaks abstraction, but will fail with the new VGIC.
-Abstract this access in the VGIC header file and refactor the validity
-check in the PMU code.
+Since the GIC CPU interface is always virtualized by the hardware,
+we don't have CPU interface state information readily available in our
+emulation if userland wants to save or restore it.
+Fortunately the GIC hypervisor interface provides the VMCR register to
+access the required virtual CPU interface bits.
+Provide wrappers for GICv2 and GICv3 hosts to have access to this
+register.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
+Changelog v2 .. v3:
+- remove exported v2/v3 selector functions (as per Marc's patch)
+
 Changelog v3 .. v4:
-- fix logic to allow PPIs again
-- refactor IRQ validity check
+- move struct vgic_vmcr into the VGIC's private header file
 
- include/kvm/arm_vgic.h |  2 ++
- virt/kvm/arm/pmu.c     | 25 ++++++++++++++-----------
- 2 files changed, 16 insertions(+), 11 deletions(-)
+ virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c | 22 ++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h    | 21 +++++++++++++++++++++
+ 3 files changed, 72 insertions(+)
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 67a6637..ade7005 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -348,6 +348,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
- #define vgic_ready(k)		((k)->arch.vgic.ready)
-+#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
-+				 ((i) < (k)->arch.vgic.nr_irqs))
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index fb5e65c..d943059 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -174,3 +174,32 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
+ {
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = 0;
+ }
++
++void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++{
++	u32 vmcr;
++
++	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
++	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) &
++		GICH_VMCR_ALIAS_BINPOINT_MASK;
++	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) &
++		GICH_VMCR_BINPOINT_MASK;
++	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
++		GICH_VMCR_PRIMASK_MASK;
++
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
++}
++
++void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++{
++	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
++
++	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
++			GICH_VMCR_CTRL_SHIFT;
++	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
++			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
++	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
++			GICH_VMCR_BINPOINT_SHIFT;
++	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
++			GICH_VMCR_PRIMASK_SHIFT;
++}
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index fb547da..8548297 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -160,3 +160,25 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
+ {
+ 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr] = 0;
+ }
++
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++{
++	u32 vmcr;
++
++	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
++	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
++	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
++	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
++
++	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
++}
++
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++{
++	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
++
++	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
++	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
++	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
++	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
++}
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index f826026..d2c1fd5 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -27,6 +27,13 @@
  
- int vgic_v2_probe(const struct gic_kvm_info *gic_kvm_info,
- 		  const struct vgic_ops **ops,
-diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-index 575c7aa..a027569 100644
---- a/virt/kvm/arm/pmu.c
-+++ b/virt/kvm/arm/pmu.c
-@@ -436,7 +436,14 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
- 	return 0;
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ 
++struct vgic_vmcr {
++	u32	ctlr;
++	u32	abpr;
++	u32	bpr;
++	u32	pmr;
++};
++
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
+@@ -40,6 +47,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
+ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+ 			 int offset, u32 *val);
++void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
+ 			     enum vgic_type);
+ 
+@@ -49,6 +58,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
+ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+ #else
+ static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+@@ -72,6 +83,16 @@ static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+ {
  }
  
--static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
-+#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
++static inline
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++}
 +
-+/*
-+ * For one VM the interrupt type must be same for each vcpu.
-+ * As a PPI, the interrupt number is the same for all vcpus,
-+ * while as an SPI it must be a separate number per vcpu.
-+ */
-+static bool pmu_irq_is_valid(struct kvm *kvm, int irq)
- {
- 	int i;
- 	struct kvm_vcpu *vcpu;
-@@ -445,7 +452,7 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
- 		if (!kvm_arm_pmu_irq_initialized(vcpu))
- 			continue;
- 
--		if (is_ppi) {
-+		if (irq_is_ppi(irq)) {
- 			if (vcpu->arch.pmu.irq_num != irq)
- 				return false;
- 		} else {
-@@ -457,7 +464,6 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
- 	return true;
- }
- 
--
- int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
- {
- 	switch (attr->attr) {
-@@ -471,14 +477,11 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
- 		if (get_user(irq, uaddr))
- 			return -EFAULT;
- 
--		/*
--		 * The PMU overflow interrupt could be a PPI or SPI, but for one
--		 * VM the interrupt type must be same for each vcpu. As a PPI,
--		 * the interrupt number is the same for all vcpus, while as an
--		 * SPI it must be a separate number per vcpu.
--		 */
--		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
--		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
-+		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
-+		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
-+			return -EINVAL;
++static inline
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++}
 +
-+		if (!pmu_irq_is_valid(vcpu->kvm, irq))
- 			return -EINVAL;
- 
- 		if (kvm_arm_pmu_irq_initialized(vcpu))
+ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+ 					      gpa_t dist_base_address)
+ {
 -- 
 2.8.2
