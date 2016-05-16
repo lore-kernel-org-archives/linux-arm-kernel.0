@@ -1,99 +1,67 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:02 +0100
-Subject: [PATCH v4 17/56] KVM: arm/arm64: vgic-new: Add IRQ sorting
+Date: Mon, 16 May 2016 10:54:21 +0100
+Subject: [PATCH v4 36/56] KVM: arm/arm64: vgic-new: Add GICv3 IDREGS register
+ handler
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-75-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-94-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+We implement the only one ID register that is required by the
+architecture, also this is the one that Linux actually checks.
 
-Adds the sorting function to cover the case where you have more IRQs
-to consider than you have LRs. We now consider priorities.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 57 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+Changelog v1 .. v2:
+- adapt to new MMIO framework
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 62fede6..1bc8f92 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
-+#include <linux/list_sort.h>
- 
- #include "vgic.h"
- 
-@@ -103,6 +104,62 @@ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
+Changelog v3 .. v4:
+- specify accessor width
+
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 28de16a..b893284 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -96,6 +96,18 @@ static unsigned long vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
+ 	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
  }
  
++static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
++					      gpa_t addr, unsigned int len)
++{
++	switch (addr & 0xffff) {
++	case GICD_PIDR2:
++		/* report a GICv3 compliant implementation */
++		return 0x3b;
++	}
++
++	return 0;
++}
++
  /*
-+ * The order of items in the ap_lists defines how we'll pack things in LRs as
-+ * well, the first items in the list being the first things populated in the
-+ * LRs.
-+ *
-+ * A hard rule is that active interrupts can never be pushed out of the LRs
-+ * (and therefore take priority) since we cannot reliably trap on deactivation
-+ * of IRQs and therefore they have to be present in the LRs.
-+ *
-+ * Otherwise things should be sorted by the priority field and the GIC
-+ * hardware support will take care of preemption of priority groups etc.
-+ *
-+ * Return negative if "a" sorts before "b", 0 to preserve order, and positive
-+ * to sort "b" before "a".
-+ */
-+static int vgic_irq_cmp(void *priv, struct list_head *a, struct list_head *b)
-+{
-+	struct vgic_irq *irqa = container_of(a, struct vgic_irq, ap_list);
-+	struct vgic_irq *irqb = container_of(b, struct vgic_irq, ap_list);
-+	bool penda, pendb;
-+	int ret;
-+
-+	spin_lock(&irqa->irq_lock);
-+	spin_lock(&irqb->irq_lock);
-+
-+	if (irqa->active || irqb->active) {
-+		ret = (int)irqb->active - (int)irqa->active;
-+		goto out;
-+	}
-+
-+	penda = irqa->enabled && irqa->pending;
-+	pendb = irqb->enabled && irqb->pending;
-+
-+	if (!penda || !pendb) {
-+		ret = (int)pendb - (int)penda;
-+		goto out;
-+	}
-+
-+	/* Both pending and enabled, sort by priority */
-+	ret = irqa->priority - irqb->priority;
-+out:
-+	spin_unlock(&irqb->irq_lock);
-+	spin_unlock(&irqa->irq_lock);
-+	return ret;
-+}
-+
-+/* Must be called with the ap_list_lock held */
-+static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
-+
-+	list_sort(NULL, &vgic_cpu->ap_list_head, vgic_irq_cmp);
-+}
-+
-+/*
-  * Only valid injection if changing level for level-triggered IRQs or for a
-  * rising edge.
-  */
+  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+  * redistributors, while SPIs are covered by registers in the distributor
+@@ -161,7 +173,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 64,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 48,
++		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+ 		VGIC_ACCESS_32bit),
+ };
+ 
+@@ -182,7 +194,7 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 48,
++		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+ 		VGIC_ACCESS_32bit),
+ };
+ 
 -- 
 2.8.2
