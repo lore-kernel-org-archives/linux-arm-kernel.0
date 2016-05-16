@@ -1,74 +1,68 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 May 2016 14:47:11 +0200
-Subject: [PATCH 11/20] drm/sun4i: Convert to connector register helpers
+Date: Mon, 16 May 2016 14:47:10 +0200
+Subject: [PATCH 10/20] drm/sun4i: remove simplefb at probe
 In-Reply-To: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1463402840-17062-12-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1463402840-17062-11-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that connector register helpers have been created, switch to them.
+If simplefb was setup by our bootloader and enabled in the DT, we will have
+a first framebuffer loaded in our system.
 
+However, as soon as our DRM driver will load, it will reset the controller,
+initialise it and, if the framebuffer emulation is enabled, register a
+second framebuffer device.
+
+This is obviously pretty bad, since the first framebuffer will be some kind
+of a black hole, with memory still reserved that we can write to safely,
+but not displayed anywhere.
+
+Make sure we remove that framebuffer when we probe so we don't end up in
+that situation.
+
+Fixes: 9026e0d122ac ("drm: Add Allwinner A10 Display Engine support")
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_drv.c | 31 ++-----------------------------
- 1 file changed, 2 insertions(+), 29 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
 diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-index af62b24c39b1..257d2b4f3645 100644
+index 76e922bb60e5..af62b24c39b1 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-@@ -24,34 +24,6 @@
- #include "sun4i_layer.h"
- #include "sun4i_tcon.h"
+@@ -125,6 +125,22 @@ static struct drm_driver sun4i_drv_driver = {
+ 	.disable_vblank		= sun4i_drv_disable_vblank,
+ };
  
--static int sun4i_drv_connector_plug_all(struct drm_device *drm)
--{
--	struct drm_connector *connector, *failed;
--	int ret;
--
--	mutex_lock(&drm->mode_config.mutex);
--	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
--		ret = drm_connector_register(connector);
--		if (ret) {
--			failed = connector;
--			goto err;
--		}
--	}
--	mutex_unlock(&drm->mode_config.mutex);
--	return 0;
--
--err:
--	list_for_each_entry(connector, &drm->mode_config.connector_list, head) {
--		if (failed == connector)
--			break;
--
--		drm_connector_unregister(connector);
--	}
--	mutex_unlock(&drm->mode_config.mutex);
--
--	return ret;
--}
--
- static int sun4i_drv_enable_vblank(struct drm_device *drm, unsigned int pipe)
++static void sun4i_remove_framebuffers(void)
++{
++	struct apertures_struct *ap;
++
++	ap = alloc_apertures(1);
++	if (!ap)
++		return;
++
++	/* The framebuffer can be located anywhere in RAM */
++	ap->ranges[0].base = 0;
++	ap->ranges[0].size = ~0;
++
++	remove_conflicting_framebuffers(ap, "sun4i-drm-fb", false);
++	kfree(ap);
++}
++
+ static int sun4i_drv_bind(struct device *dev)
  {
- 	struct sun4i_drv *drv = drm->dev_private;
-@@ -206,7 +178,7 @@ static int sun4i_drv_bind(struct device *dev)
- 	if (ret)
- 		goto free_drm;
+ 	struct drm_device *drm;
+@@ -172,6 +188,9 @@ static int sun4i_drv_bind(struct device *dev)
+ 	}
+ 	drm->irq_enabled = true;
  
--	ret = sun4i_drv_connector_plug_all(drm);
-+	ret = drm_connector_register_all(drm);
- 	if (ret)
- 		goto unregister_drm;
- 
-@@ -223,6 +195,7 @@ static void sun4i_drv_unbind(struct device *dev)
- {
- 	struct drm_device *drm = dev_get_drvdata(dev);
- 
-+	drm_connector_unregister_all(drm);
- 	drm_dev_unregister(drm);
- 	drm_kms_helper_poll_fini(drm);
- 	sun4i_framebuffer_free(drm);
++	/* Remove early framebuffers (ie. simplefb) */
++	sun4i_remove_framebuffers();
++
+ 	/* Create our framebuffer */
+ 	drv->fbdev = sun4i_framebuffer_init(drm);
+ 	if (IS_ERR(drv->fbdev)) {
 -- 
 2.8.2
