@@ -1,79 +1,174 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:09 +0100
-Subject: [PATCH v4 21/56] KVM: arm/arm64: vgic-new: Implement
- kvm_vgic_vcpu_pending_irq
+Date: Mon, 16 May 2016 10:53:15 +0100
+Subject: [PATCH v4 27/56] KVM: arm/arm64: vgic-new: Add ACTIVE registers
+ handlers
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-22-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-28-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+The active register handlers are shared between the v2 and v3
+emulation, so their implementation goes into vgic-mmio.c, to be
+easily referenced from the v3 emulation as well later.
+Since activation/deactivation of an interrupt may happen entirely
+in the guest without it ever exiting, we need some extra logic to
+properly track the active state.
+Putting it on an ap_list on activation is similar to the normal case
+handled by vgic_queue_irq_unlock(), but differs in some details that
+make a separate implementation worthwhile.
 
-Tell KVM whether a particular VCPU has an IRQ that needs handling
-in the guest. This is used to decide whether a VCPU is runnable.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
 Changelog RFC..v1:
-- return false if distributor is disabled
-- add vgic_kick_vcpus() implementations
+- handling queueing in write handler
+- remove IRQ lock from read handler
 
-Changelog v2 .. v3:
-- remove vgic_kick_vcpus() implementation from this patch
+Changelog v1 .. v2:
+- adapt to new MMIO framework
 
- include/kvm/vgic/vgic.h  |  2 ++
- virt/kvm/arm/vgic/vgic.c | 25 +++++++++++++++++++++++++
- 2 files changed, 27 insertions(+)
+Changelog v3 .. v4:
+- specify accessor width
+- use IRQ number accessor macro
+- drop elaborate write_sactive handler and use new vgic_queue_irq_unlock()
+- properly emulate clear active by halting the guest (Christoffer)
+- replace extract_bytes() with simple return
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 9506267..f663288 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -184,6 +184,8 @@ struct vgic_cpu {
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
- 
-+int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
-+
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	(false)
- #define vgic_ready(k)		((k)->arch.vgic.ready)
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index eca3cd0..bea8d3b 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -519,3 +519,28 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
- 	vgic_flush_lr_state(vcpu);
- 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +-
+ virt/kvm/arm/vgic/vgic-mmio.c    | 82 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    | 10 +++++
+ 3 files changed, 94 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index c13a708..12e101b 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -84,10 +84,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_active, vgic_mmio_write_sactive, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index d8dc8f6..74d140e 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -155,6 +155,88 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+ 	}
  }
-+
-+int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+ 
++unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len)
 +{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	struct vgic_irq *irq;
-+	bool pending = false;
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	u32 value = 0;
++	int i;
 +
-+	if (!vcpu->kvm->arch.vgic.enabled)
-+		return false;
++	/* Loop over all IRQs affected by this read */
++	for (i = 0; i < len * 8; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+	spin_lock(&vgic_cpu->ap_list_lock);
-+
-+	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
-+		spin_lock(&irq->irq_lock);
-+		pending = irq->pending && irq->enabled;
-+		spin_unlock(&irq->irq_lock);
-+
-+		if (pending)
-+			break;
++		if (irq->active)
++			value |= (1U << i);
 +	}
 +
-+	spin_unlock(&vgic_cpu->ap_list_lock);
-+
-+	return pending;
++	return value;
 +}
++
++void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	int i;
++
++	kvm_arm_halt_guest(vcpu->kvm);
++	for_each_set_bit(i, &val, len * 8) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		spin_lock(&irq->irq_lock);
++		/*
++		 * If this virtual IRQ was written into a list register, we
++		 * have to make sure the CPU that runs the VCPU thread has
++		 * synced back LR state to the struct vgic_irq.  We can only
++		 * know this for sure, when either this irq is not assigned to
++		 * anyone's AP list anymore, or the VCPU thread is not
++		 * running on any CPUs.
++		 *
++		 * In the opposite case, we know the VCPU thread may be on its
++		 * way back from the guest and still has to sync back this
++		 * IRQ, so we release and re-acquire the spin_lock to let the
++		 * other thread sync back the IRQ.
++		 */
++		while (irq->vcpu && /* IRQ may have state in an LR somewhere */
++		       irq->vcpu->cpu != -1) /* VCPU thread is running */
++			cond_resched_lock(&irq->irq_lock);
++
++		irq->active = false;
++		spin_unlock(&irq->irq_lock);
++	}
++	kvm_arm_resume_guest(vcpu->kvm);
++}
++
++void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	int i;
++
++	for_each_set_bit(i, &val, len * 8) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		spin_lock(&irq->irq_lock);
++
++		/*
++		 * If the IRQ was already active or it was on a VCPU before
++		 * or there is no target VCPU assigned at the moment, then
++		 * just proceed.
++		 */
++		if (irq->active || irq->vcpu || !irq->target_vcpu) {
++			irq->active = true;
++
++			spin_unlock(&irq->irq_lock);
++			continue;
++		}
++
++		irq->active = true;
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
++	}
++}
++
+ static int match_region(const void *key, const void *elt)
+ {
+ 	const unsigned int offset = (unsigned long)key;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 01db98a..dd96a71 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -106,6 +106,16 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+ 			      gpa_t addr, unsigned int len,
+ 			      unsigned long val);
+ 
++unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len);
++
++void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
++
++void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
+ 
+ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+ 
 -- 
 2.8.2
