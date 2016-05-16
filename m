@@ -1,34 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 May 2016 10:04:40 -0500
-Subject: [PATCH 1/5] dt-bindings: Document the STM32 I2C bindings
-In-Reply-To: <1462980974-22091-2-git-send-email-cedric.madianga@gmail.com>
-References: <1462980974-22091-1-git-send-email-cedric.madianga@gmail.com>
- <1462980974-22091-2-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <20160516150440.GA6312@rob-hp-laptop>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 16 May 2016 17:06:50 +0200
+Subject: Can not play audio with screen off
+In-Reply-To: <5739D7B6.7060102@ti.com>
+References: <20160515193106.GA18685@amd>
+ <5739D7B6.7060102@ti.com>
+Message-ID: <20160516150650.GA14639@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 05:36:10PM +0200, M'boumba Cedric Madianga wrote:
-> This patch adds documentation of device tree bindings for the STM32 I2C
-> controller.
-> 
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> ---
->  .../devicetree/bindings/i2c/i2c-stm32.txt          | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-stm32.txt b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
-> new file mode 100644
-> index 0000000..73215c6
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
-> @@ -0,0 +1,33 @@
-> +* I2C controller embedded in STMicroelectronics STM32 I2C platform
-> +
-> +Required properties :
-> +- compatible : Must be "st,i2c-stm32f4"
+Hi!
 
-Normal order is st,stm32f4-i2c
+> > I'm playing some more with N900, this time I'd like to use it as a
+> > alarm clock...
+> > 
+> > And now I realized I can not, because system performance is so
+> > horrible with screen off that mpg123 + pulseaudio skips horribly. This
+> > is without tweaking serial parameters, so CPU is definitely not going
+> > into the idle/off modes.
+> > 
+> > Loading CPU fixes the issue (I used cat /dev/zero > /dev/null).
+> > 
+> > Hmm. And it seems to work better if I ssh in and launch mpg123
+> > remotely. Weird.
+> > 
+> > Kernel 4.5-rc0. Will try on different ones.
+> > 
+> > Any ideas? Is there interface to tell kernel that better performance
+> > is needed for a while?
 
-Rob
+> pm_qos cpu_dma_latency? Drivers will have to be properly instrumented
+> with appropriate latency values -> this will control the depth in C
+> states that the system will attempt. NOTE: it is a dual edged sword,
+> bad configurations can result in none of the C-states being entered.
+
+Ok, so far it looks like artefact of -rc0 kernel. Lets see if it
+reappers...
+
+Thanks,
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
