@@ -1,26 +1,27 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 16 May 2016 10:15:33 +0200
-Subject: [PATCH 05/23] ARM: dts: r8a7790: Fix W=1 dtc warnings
-In-Reply-To: <1463126163-29423-6-git-send-email-geert+renesas@glider.be>
+Date: Mon, 16 May 2016 10:15:52 +0200
+Subject: [PATCH 02/23] ARM: dts: r8a73a4: Fix W=1 dtc warnings
+In-Reply-To: <1463126163-29423-3-git-send-email-geert+renesas@glider.be>
 References: <1463126163-29423-1-git-send-email-geert+renesas@glider.be>
- <1463126163-29423-6-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAMuHMdXxNS309-wB3tsuBzps9vqYDvqq2bd=9H_XXemELvcFSA@mail.gmail.com>
+ <1463126163-29423-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAMuHMdVvQGgdfT+ddu7gun7awkm0P4C85cBJq6SZQxoY7ua4XQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, May 13, 2016 at 9:55 AM, Geert Uytterhoeven
 <geert+renesas@glider.be> wrote:
-> --- a/arch/arm/boot/dts/r8a7790.dtsi
-> +++ b/arch/arm/boot/dts/r8a7790.dtsi
-> @@ -127,6 +127,22 @@
->                         power-domains = <&sysc R8A7790_PD_CA7_CPU3>;
->                         next-level-cache = <&L2_CA7>;
+> --- a/arch/arm/boot/dts/r8a73a4.dtsi
+> +++ b/arch/arm/boot/dts/r8a73a4.dtsi
+> @@ -31,6 +31,24 @@
+>                         power-domains = <&pd_a2sl>;
+>                         next-level-cache = <&L2_CA15>;
 >                 };
 > +
 > +               L2_CA15: cache-controller at 0 {
 > +                       compatible = "cache";
 > +                       reg = <0>;
-> +                       power-domains = <&sysc R8A7790_PD_CA15_SCU>;
+> +                       clocks = <&cpg_clocks R8A73A4_CLK_Z>;
+> +                       power-domains = <&pd_a3sm>;
 > +                       cache-unified;
 > +                       cache-level = <2>;
 > +               };
