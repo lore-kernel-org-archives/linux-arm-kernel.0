@@ -1,105 +1,67 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:00 +0100
-Subject: [PATCH v4 15/56] KVM: arm/arm64: vgic-new: Add acccessor to new
- struct vgic_irq instance
+Date: Mon, 16 May 2016 10:53:01 +0100
+Subject: [PATCH v4 13/56] KVM: arm/arm64: move GICv2 emulation defines into
+ arm-gic-v3.h
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-73-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-14-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+As (some) GICv3 hosts can emulate a GICv2, some GICv2 specific masks
+for the list register definition also apply to GICv3 LRs.
+At the moment we have those definitions in the KVM VGICv3
+implementation, so let's move them into the GICv3 header file to
+have them automatically defined.
 
-The new VGIC implementation centers around a struct vgic_irq instance
-per virtual IRQ.
-Provide a function to retrieve the right instance for a given IRQ
-number and (in case of private interrupts) the right VCPU.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
- 2 files changed, 63 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic.c
- create mode 100644 virt/kvm/arm/vgic/vgic.h
+ include/linux/irqchip/arm-gic-v3.h | 5 +++++
+ virt/kvm/arm/vgic-v3.c             | 8 +-------
+ 2 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-new file mode 100644
-index 0000000..fb45537
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index d5d798b..ec938d1 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -276,6 +276,11 @@
+ #define ICH_LR_PHYS_ID_SHIFT		32
+ #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+ 
++/* These are for GICv2 emulation only */
++#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
++#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
++#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
 +
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+
-+#include "vgic.h"
-+
-+struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
-+
-+struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+			      u32 intid)
-+{
-+	/* SGIs and PPIs */
-+	if (intid <= VGIC_MAX_PRIVATE)
-+		return &vcpu->arch.vgic_cpu.private_irqs[intid];
-+
-+	/* SPIs */
-+	if (intid <= VGIC_MAX_SPI)
-+		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
-+
-+	/* LPIs are not yet covered */
-+	if (intid >= VGIC_MIN_LPI)
-+		return NULL;
-+
-+	WARN(1, "Looking up struct vgic_irq for reserved INTID");
-+	return NULL;
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-new file mode 100644
-index 0000000..61b8d22
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __KVM_ARM_VGIC_NEW_H__
-+#define __KVM_ARM_VGIC_NEW_H__
-+
-+struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
-+			      u32 intid);
-+
-+#endif
+ #define ICH_MISR_EOI			(1 << 0)
+ #define ICH_MISR_U			(1 << 1)
+ 
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index c02a1b1..75b02fa 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -29,12 +29,6 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmu.h>
+ 
+-/* These are for GICv2 emulation only */
+-#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+-#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+-#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
+-#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+-
+ static u32 ich_vtr_el2;
+ 
+ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+@@ -43,7 +37,7 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr];
+ 
+ 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+-		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
++		lr_desc.irq = val & ICH_LR_VIRTUAL_ID_MASK;
+ 	else
+ 		lr_desc.irq = val & GICH_LR_VIRTUALID;
+ 
 -- 
 2.8.2
