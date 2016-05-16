@@ -1,94 +1,142 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:22 +0100
-Subject: [PATCH v4 37/56] KVM: arm/arm64: vgic-new: Add GICv3 IROUTER register
+Date: Mon, 16 May 2016 10:54:10 +0100
+Subject: [PATCH v4 25/56] KVM: arm/arm64: vgic-new: Add ENABLE registers
  handlers
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-95-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-83-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since GICv3 supports much more than the 8 CPUs the GICv2 ITARGETSR
-register can handle, the new IROUTER register covers the whole range
-of possible target (V)CPUs by using the same MPIDR that the cores
-report themselves.
-In addition to translating this MPIDR into a vcpu pointer we store
-the originally written value as well. The architecture allows to
-write any values into the register, which must be read back as written.
-
-Since we don't support affinity level 3, we don't need to take care
-about the upper word of this 64-bit register, which simplifies the
-handling a bit.
+As the enable register handlers are shared between the v2 and v3
+emulation, their implementation goes into vgic-mmio.c, to be easily
+referenced from the v3 emulation as well later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
 Changelog RFC..v1:
-- fold in and simplify vgic_v3_irq_change_affinity
+- use lower bits of address to determine IRQ number
+- remove TODO, confirmed to be fine
 
 Changelog v1 .. v2:
 - adapt to new MMIO framework
 
 Changelog v3 .. v4:
-- move accessor width check into dispatcher
+- specify accessor width
 - use IRQ number accessor macro
+- replace extract_bytes() with simple return
 
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 37 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 36 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +--
+ virt/kvm/arm/vgic/vgic-mmio.c    | 56 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    | 11 ++++++++
+ 3 files changed, 69 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index b893284..7b9340b 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -75,6 +75,41 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
- 	}
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index d812c93..d5355b5 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -72,10 +72,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_enable, vgic_mmio_write_senable, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 1a97765..32ed8db 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -39,6 +39,62 @@ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 	/* Ignore */
  }
  
-+static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
-+					    gpa_t addr, unsigned int len)
++/*
++ * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
++ * of the enabled bit, so there is only one function for both here.
++ */
++unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len)
 +{
-+	int intid = VGIC_ADDR_TO_INTID(addr, 64);
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	u32 value = 0;
++	int i;
 +
-+	if (!irq)
-+		return 0;
++	/* Loop over all IRQs affected by this read */
++	for (i = 0; i < len * 8; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+	return extract_bytes(READ_ONCE(irq->mpidr), addr & 7, len);
++		if (irq->enabled)
++			value |= (1U << i);
++	}
++
++	return value;
 +}
 +
-+static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
-+				    gpa_t addr, unsigned int len,
-+				    unsigned long val)
++void vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
 +{
-+	int intid = VGIC_ADDR_TO_INTID(addr, 64);
-+	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	int i;
 +
-+	if (!irq)
-+		return;
++	for_each_set_bit(i, &val, len * 8) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+	/* The upper word is WI for us since we don't implement Aff3. */
-+	if (addr & 4)
-+		return;
-+
-+	spin_lock(&irq->irq_lock);
-+
-+	/* We only care about and preserve Aff0, Aff1 and Aff2. */
-+	irq->mpidr = val & GENMASK(23, 0);
-+	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, irq->mpidr);
-+
-+	spin_unlock(&irq->irq_lock);
++		spin_lock(&irq->irq_lock);
++		irq->enabled = true;
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
++	}
 +}
 +
- static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
- 					      gpa_t addr, unsigned int len)
++void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	int i;
++
++	for_each_set_bit(i, &val, len * 8) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		spin_lock(&irq->irq_lock);
++
++		irq->enabled = false;
++
++		spin_unlock(&irq->irq_lock);
++	}
++}
++
+ static int match_region(const void *key, const void *elt)
  {
-@@ -170,7 +205,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 64,
-+		vgic_mmio_read_irouter, vgic_mmio_write_irouter, 64,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
- 		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+ 	const unsigned int offset = (unsigned long)key;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 10404ac..66fd6fa 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -84,6 +84,17 @@ unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
+ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 			unsigned int len, unsigned long val);
+ 
++unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len);
++
++void vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
++
++void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
++
+ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+ 
+ #endif
 -- 
 2.8.2
