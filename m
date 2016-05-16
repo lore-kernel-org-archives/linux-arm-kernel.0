@@ -1,99 +1,183 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:05 +0100
-Subject: [PATCH v4 17/56] KVM: arm/arm64: vgic-new: Add IRQ sorting
+Date: Mon, 16 May 2016 10:52:53 +0100
+Subject: [PATCH v4 05/56] KVM: arm/arm64: Remove the IRQ field from struct
+ irq_phys_map
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-18-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-6-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Adds the sorting function to cover the case where you have more IRQs
-to consider than you have LRs. We now consider priorities.
+The communication of a Linux IRQ number from outside the VGIC to the
+vgic was a leftover from the day when the vgic code cared about how a
+particular device injects virtual interrupts mapped to a physical
+interrupt.
+
+We can safely remove this notion, leaving all physical IRQ handling to
+be done in the device driver (the arch timer in this case), which makes
+room for a saner API for the new VGIC.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Eric Auger <eric.auger@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 57 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+Changelog v1 .. v2:
+- update kerneldoc comments on kvm_vgic_map_phys_irq()
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 62fede6..1bc8f92 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -16,6 +16,7 @@
+Changelog v2 .. v3:
+- include <linux/irq.h>
+
+ include/kvm/arm_vgic.h    |  3 +--
+ virt/kvm/arm/arch_timer.c | 23 +++++++++++++++++++++--
+ virt/kvm/arm/vgic.c       | 28 ++++++----------------------
+ 3 files changed, 28 insertions(+), 26 deletions(-)
+
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index c7bb184..9ad7625 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -158,7 +158,6 @@ struct vgic_io_device {
+ struct irq_phys_map {
+ 	u32			virt_irq;
+ 	u32			phys_irq;
+-	u32			irq;
+ };
  
+ struct irq_phys_map_entry {
+@@ -346,7 +345,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+-					   int virt_irq, int irq);
++					   int virt_irq, int phys_irq);
+ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 962b442..e45895a 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -20,6 +20,7 @@
  #include <linux/kvm.h>
  #include <linux/kvm_host.h>
-+#include <linux/list_sort.h>
+ #include <linux/interrupt.h>
++#include <linux/irq.h>
  
- #include "vgic.h"
+ #include <clocksource/arm_arch_timer.h>
+ #include <asm/arch_timer.h>
+@@ -300,7 +301,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	if (timer->active_cleared_last && !phys_active)
+ 		return;
  
-@@ -103,6 +104,62 @@ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
- }
+-	ret = irq_set_irqchip_state(timer->map->irq,
++	ret = irq_set_irqchip_state(host_vtimer_irq,
+ 				    IRQCHIP_STATE_ACTIVE,
+ 				    phys_active);
+ 	WARN_ON(ret);
+@@ -333,6 +334,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct irq_phys_map *map;
++	struct irq_desc *desc;
++	struct irq_data *data;
++	int phys_irq;
  
- /*
-+ * The order of items in the ap_lists defines how we'll pack things in LRs as
-+ * well, the first items in the list being the first things populated in the
-+ * LRs.
-+ *
-+ * A hard rule is that active interrupts can never be pushed out of the LRs
-+ * (and therefore take priority) since we cannot reliably trap on deactivation
-+ * of IRQs and therefore they have to be present in the LRs.
-+ *
-+ * Otherwise things should be sorted by the priority field and the GIC
-+ * hardware support will take care of preemption of priority groups etc.
-+ *
-+ * Return negative if "a" sorts before "b", 0 to preserve order, and positive
-+ * to sort "b" before "a".
-+ */
-+static int vgic_irq_cmp(void *priv, struct list_head *a, struct list_head *b)
-+{
-+	struct vgic_irq *irqa = container_of(a, struct vgic_irq, ap_list);
-+	struct vgic_irq *irqb = container_of(b, struct vgic_irq, ap_list);
-+	bool penda, pendb;
-+	int ret;
-+
-+	spin_lock(&irqa->irq_lock);
-+	spin_lock(&irqb->irq_lock);
-+
-+	if (irqa->active || irqb->active) {
-+		ret = (int)irqb->active - (int)irqa->active;
-+		goto out;
+ 	/*
+ 	 * The vcpu timer irq number cannot be determined in
+@@ -352,10 +356,25 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	kvm_timer_update_state(vcpu);
+ 
+ 	/*
++	 * Find the physical IRQ number corresponding to the host_vtimer_irq
++	 */
++	desc = irq_to_desc(host_vtimer_irq);
++	if (!desc) {
++		kvm_err("%s: no interrupt descriptor\n", __func__);
++		return -EINVAL;
 +	}
 +
-+	penda = irqa->enabled && irqa->pending;
-+	pendb = irqb->enabled && irqb->pending;
++	data = irq_desc_get_irq_data(desc);
++	while (data->parent_data)
++		data = data->parent_data;
 +
-+	if (!penda || !pendb) {
-+		ret = (int)pendb - (int)penda;
-+		goto out;
-+	}
++	phys_irq = data->hwirq;
 +
-+	/* Both pending and enabled, sort by priority */
-+	ret = irqa->priority - irqb->priority;
-+out:
-+	spin_unlock(&irqb->irq_lock);
-+	spin_unlock(&irqa->irq_lock);
-+	return ret;
-+}
-+
-+/* Must be called with the ap_list_lock held */
-+static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
-+
-+	list_sort(NULL, &vgic_cpu->ap_list_head, vgic_irq_cmp);
-+}
-+
-+/*
-  * Only valid injection if changing level for level-triggered IRQs or for a
-  * rising edge.
++	/*
+ 	 * Tell the VGIC that the virtual interrupt is tied to a
+ 	 * physical interrupt. We do that once per VCPU.
+ 	 */
+-	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
++	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
+ 	if (WARN_ON(IS_ERR(map)))
+ 		return PTR_ERR(map);
+ 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 06abd59..a7e496a 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1711,38 +1711,24 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
+ /**
+  * kvm_vgic_map_phys_irq - map a virtual IRQ to a physical IRQ
+  * @vcpu: The VCPU pointer
+- * @virt_irq: The virtual irq number
+- * @irq: The Linux IRQ number
++ * @virt_irq: The virtual IRQ number for the guest
++ * @phys_irq: The hardware IRQ number of the host
+  *
+  * Establish a mapping between a guest visible irq (@virt_irq) and a
+- * Linux irq (@irq). On injection, @virt_irq will be associated with
+- * the physical interrupt represented by @irq. This mapping can be
++ * hardware irq (@phys_irq). On injection, @virt_irq will be associated with
++ * the physical interrupt represented by @phys_irq. This mapping can be
+  * established multiple times as long as the parameters are the same.
+  *
+  * Returns a valid pointer on success, and an error pointer otherwise
   */
+ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+-					   int virt_irq, int irq)
++					   int virt_irq, int phys_irq)
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
+ 	struct irq_phys_map *map;
+ 	struct irq_phys_map_entry *entry;
+-	struct irq_desc *desc;
+-	struct irq_data *data;
+-	int phys_irq;
+ 
+-	desc = irq_to_desc(irq);
+-	if (!desc) {
+-		kvm_err("%s: no interrupt descriptor\n", __func__);
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	data = irq_desc_get_irq_data(desc);
+-	while (data->parent_data)
+-		data = data->parent_data;
+-
+-	phys_irq = data->hwirq;
+ 
+ 	/* Create a new mapping */
+ 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+@@ -1755,8 +1741,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+ 	map = vgic_irq_map_search(vcpu, virt_irq);
+ 	if (map) {
+ 		/* Make sure this mapping matches */
+-		if (map->phys_irq != phys_irq	||
+-		    map->irq      != irq)
++		if (map->phys_irq != phys_irq)
+ 			map = ERR_PTR(-EINVAL);
+ 
+ 		/* Found an existing, valid mapping */
+@@ -1766,7 +1751,6 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+ 	map           = &entry->map;
+ 	map->virt_irq = virt_irq;
+ 	map->phys_irq = phys_irq;
+-	map->irq      = irq;
+ 
+ 	list_add_tail_rcu(&entry->entry, root);
+ 
 -- 
 2.8.2
