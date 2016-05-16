@@ -1,96 +1,148 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:14 +0100
-Subject: [PATCH v4 29/56] KVM: arm/arm64: vgic-new: Add CONFIG registers
+Date: Mon, 16 May 2016 10:54:12 +0100
+Subject: [PATCH v4 27/56] KVM: arm/arm64: vgic-new: Add ACTIVE registers
  handlers
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-87-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-85-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The config register handlers are shared between the v2 and v3
+The active register handlers are shared between the v2 and v3
 emulation, so their implementation goes into vgic-mmio.c, to be
 easily referenced from the v3 emulation as well later.
+Since activation/deactivation of an interrupt may happen entirely
+in the guest without it ever exiting, we need some extra logic to
+properly track the active state.
+Putting it on an ap_list on activation is similar to the normal case
+handled by vgic_queue_irq_unlock(), but differs in some details that
+make a separate implementation worthwhile.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
+Changelog RFC..v1:
+- handling queueing in write handler
+- remove IRQ lock from read handler
+
 Changelog v1 .. v2:
 - adapt to new MMIO framework
 
 Changelog v3 .. v4:
 - specify accessor width
 - use IRQ number accessor macro
+- drop elaborate write_sactive handler and use new vgic_queue_irq_unlock()
+- properly emulate clear active by halting the guest (Christoffer)
 - replace extract_bytes() with simple return
 
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
- virt/kvm/arm/vgic/vgic-mmio.c    | 46 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    |  7 ++++++
- 3 files changed, 54 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +-
+ virt/kvm/arm/vgic/vgic-mmio.c    | 82 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    | 10 +++++
+ 3 files changed, 94 insertions(+), 2 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index d564a30..bb7389e 100644
+index c13a708..12e101b 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -96,7 +96,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 2,
-+		vgic_mmio_read_config, vgic_mmio_write_config, 2,
+@@ -84,10 +84,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1,
  		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_active, vgic_mmio_write_sactive, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 5c8af05..5fe6896 100644
+index d8dc8f6..74d140e 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -277,6 +277,52 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+@@ -155,6 +155,88 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
  	}
  }
  
-+unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
 +				    gpa_t addr, unsigned int len)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
 +	u32 value = 0;
 +	int i;
 +
-+	for (i = 0; i < len * 4; i++) {
++	/* Loop over all IRQs affected by this read */
++	for (i = 0; i < len * 8; i++) {
 +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+		if (irq->config == VGIC_CONFIG_EDGE)
-+			value |= (2U << (i * 2));
++		if (irq->active)
++			value |= (1U << i);
 +	}
 +
 +	return value;
 +}
 +
-+void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-+			    gpa_t addr, unsigned int len,
-+			    unsigned long val)
++void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
 +	int i;
 +
-+	for (i = 0; i < len * 4; i++) {
++	kvm_arm_halt_guest(vcpu->kvm);
++	for_each_set_bit(i, &val, len * 8) {
 +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+		if (intid + i < 16)
-+			continue;
-+
++		spin_lock(&irq->irq_lock);
 +		/*
-+		 * The spec says that interrupts must be disabled before
-+		 * changing the configuration to avoid UNDEFINED behaviour.
++		 * If this virtual IRQ was written into a list register, we
++		 * have to make sure the CPU that runs the VCPU thread has
++		 * synced back LR state to the struct vgic_irq.  We can only
++		 * know this for sure, when either this irq is not assigned to
++		 * anyone's AP list anymore, or the VCPU thread is not
++		 * running on any CPUs.
++		 *
++		 * In the opposite case, we know the VCPU thread may be on its
++		 * way back from the guest and still has to sync back this
++		 * IRQ, so we release and re-acquire the spin_lock to let the
++		 * other thread sync back the IRQ.
 +		 */
++		while (irq->vcpu && /* IRQ may have state in an LR somewhere */
++		       irq->vcpu->cpu != -1) /* VCPU thread is running */
++			cond_resched_lock(&irq->irq_lock);
++
++		irq->active = false;
++		spin_unlock(&irq->irq_lock);
++	}
++	kvm_arm_resume_guest(vcpu->kvm);
++}
++
++void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	int i;
++
++	for_each_set_bit(i, &val, len * 8) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
 +		spin_lock(&irq->irq_lock);
-+		if (test_bit(i * 2 + 1, &val)) {
-+			irq->config = VGIC_CONFIG_EDGE;
-+		} else {
-+			irq->config = VGIC_CONFIG_LEVEL;
-+			irq->pending = irq->line_level | irq->soft_pending;
++
++		/*
++		 * If the IRQ was already active or it was on a VCPU before
++		 * or there is no target VCPU assigned at the moment, then
++		 * just proceed.
++		 */
++		if (irq->active || irq->vcpu || !irq->target_vcpu) {
++			irq->active = true;
++
++			spin_unlock(&irq->irq_lock);
++			continue;
 +		}
-+		spin_unlock(&irq->irq_lock);
++
++		irq->active = true;
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
 +	}
 +}
 +
@@ -98,22 +150,25 @@ index 5c8af05..5fe6896 100644
  {
  	const unsigned int offset = (unsigned long)key;
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 6983922..0bd0ece 100644
+index 01db98a..dd96a71 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.h
 +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -124,6 +124,13 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+@@ -106,6 +106,16 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
  			      gpa_t addr, unsigned int len,
  			      unsigned long val);
  
-+unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
 +				    gpa_t addr, unsigned int len);
 +
-+void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-+			    gpa_t addr, unsigned int len,
-+			    unsigned long val);
++void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
 +
++void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
+ 
  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
  
- #endif
 -- 
 2.8.2
