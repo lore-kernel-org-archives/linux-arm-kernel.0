@@ -1,89 +1,135 @@
 From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 16 May 2016 11:50:05 -0700
-Subject: [PATCH v2 omap 3/6] arm: Add _rcuidle tracepoints to allow
- clk_core_disable() use from idle
+Date: Mon, 16 May 2016 11:50:04 -0700
+Subject: [PATCH v2 omap 2/6] arm: Use _rcuidle for suspend/resume tracepoints
 In-Reply-To: <20160516184844.GA20144@linux.vnet.ibm.com>
 References: <20160516184844.GA20144@linux.vnet.ibm.com>
-Message-ID: <1463424608-20237-3-git-send-email-paulmck@linux.vnet.ibm.com>
+Message-ID: <1463424608-20237-2-git-send-email-paulmck@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds an _rcuidle suffix to a pair of trace events to
-prevent the following splat:
+Further testing with false negatives suppressed by commit 293e2421fe25
+("rcu: Remove superfluous versions of rcu_read_lock_sched_held()")
+identified a few more unprotected uses of RCU from the idle loop.
+Because RCU actively ignores idle-loop code (for energy-efficiency
+reasons, among other things), using RCU from the idle loop can result
+in too-short grace periods, in turn resulting in arbitrary misbehavior.
 
-> ===============================
-> [ INFO: suspicious RCU usage. ]
-> 4.6.0-rc5-next-20160426+ #1114 Not tainted
-> -------------------------------
-> include/trace/events/clk.h:59 suspicious rcu_dereference_check() usage!
->
-> other info that might help us debug this:
->
->
-> RCU used illegally from idle CPU!
-> rcu_scheduler_active = 1, debug_locks = 0
-> RCU used illegally from extended quiescent state!
-> 2 locks held by swapper/0/0:
->  #0:  (&oh->hwmod_key#30){......}, at: [<c0121b40>] omap_hwmod_idle+0x18/0x44
->  #1:  (enable_lock){......}, at: [<c0630998>] clk_enable_lock+0x18/0x124
->
-> stack backtrace:
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1114
-> Hardware name: Generic OMAP36xx (Flattened Device Tree)
-> [<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
-> [<c010c3a8>] (show_stack) from [<c047fd68>] (dump_stack+0xb0/0xe4)
-> [<c047fd68>] (dump_stack) from [<c0631618>] (clk_core_disable+0x17c/0x348)
-> [<c0631618>] (clk_core_disable) from [<c0632774>] (clk_disable+0x24/0x30)
-> [<c0632774>] (clk_disable) from [<c0120590>] (_disable_clocks+0x18/0x7c)
-> [<c0120590>] (_disable_clocks) from [<c0121680>] (_idle+0x12c/0x230)
-> [<c0121680>] (_idle) from [<c0121b4c>] (omap_hwmod_idle+0x24/0x44)
-> [<c0121b4c>] (omap_hwmod_idle) from [<c0122c24>] (omap_device_idle+0x3c/0x90)
-> [<c0122c24>] (omap_device_idle) from [<c052cc00>] (__rpm_callback+0x2c/0x60)
-> [<c052cc00>] (__rpm_callback) from [<c052cc54>] (rpm_callback+0x20/0x80)
-> [<c052cc54>] (rpm_callback) from [<c052d150>] (rpm_suspend+0x100/0x768)
-> [<c052d150>] (rpm_suspend) from [<c052ec58>] (__pm_runtime_suspend+0x64/0x84)
-> [<c052ec58>] (__pm_runtime_suspend) from [<c04bf25c>] (omap2_gpio_prepare_for_idle+0x5
-> c/0x70)
-> [<c04bf25c>] (omap2_gpio_prepare_for_idle) from [<c0125568>] (omap_sram_idle+0x140/0x2
-> 44)
-> [<c0125568>] (omap_sram_idle) from [<c01269dc>] (omap3_enter_idle_bm+0xfc/0x1ec)
-> [<c01269dc>] (omap3_enter_idle_bm) from [<c0601bdc>] (cpuidle_enter_state+0x80/0x3d4)
-> [<c0601bdc>] (cpuidle_enter_state) from [<c0183b08>] (cpu_startup_entry+0x198/0x3a0)
-> [<c0183b08>] (cpu_startup_entry) from [<c0b00c0c>] (start_kernel+0x354/0x3c8)
-> [<c0b00c0c>] (start_kernel) from [<8000807c>] (0x8000807c)
+The affected functions are smp_cross_call() and rpm_suspend().
+
+The resulting lockdep-RCU splats are as follows:
+
+------------------------------------------------------------------------
+
+===============================
+[ INFO: suspicious RCU usage. ]
+4.6.0-rc5-next-20160426+ #1112 Not tainted
+-------------------------------
+include/trace/events/ipi.h:35 suspicious rcu_dereference_check() usage!
+
+other info that might help us debug this:
+
+RCU used illegally from idle CPU!
+rcu_scheduler_active = 1, debug_locks = 0
+RCU used illegally from extended quiescent state!
+no locks held by swapper/0/0.
+
+stack backtrace:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1112
+Hardware name: Generic OMAP4 (Flattened Device Tree)
+[<c0110308>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
+[<c010c3a8>] (show_stack) from [<c047fec8>] (dump_stack+0xb0/0xe4)
+[<c047fec8>] (dump_stack) from [<c010dcfc>] (smp_cross_call+0xbc/0x188)
+[<c010dcfc>] (smp_cross_call) from [<c01c9e28>] (generic_exec_single+0x9c/0x15c)
+[<c01c9e28>] (generic_exec_single) from [<c01ca0a0>] (smp_call_function_single_async+0 x38/0x9c)
+[<c01ca0a0>] (smp_call_function_single_async) from [<c0603728>] (cpuidle_coupled_poke_others+0x8c/0xa8)
+[<c0603728>] (cpuidle_coupled_poke_others) from [<c0603c10>] (cpuidle_enter_state_coupled+0x26c/0x390)
+[<c0603c10>] (cpuidle_enter_state_coupled) from [<c0183c74>] (cpu_startup_entry+0x198/0x3a0)
+[<c0183c74>] (cpu_startup_entry) from [<c0b00c0c>] (start_kernel+0x354/0x3c8)
+[<c0b00c0c>] (start_kernel) from [<8000807c>] (0x8000807c)
+
+------------------------------------------------------------------------
+
+Warning from omap3
+===============================
+[ INFO: suspicious RCU usage. ]
+4.6.0-rc5-next-20160426+ #1112 Not tainted
+-------------------------------
+include/trace/events/rpm.h:63 suspicious rcu_dereference_check() usage!
+
+other info that might help us debug this:
+
+RCU used illegally from idle CPU!
+rcu_scheduler_active = 1, debug_locks = 0
+RCU used illegally from extended quiescent state!
+1 lock held by swapper/0/0:
+ #0:  (&(&dev->power.lock)->rlock){-.-...}, at: [<c052ee24>] __pm_runtime_suspend+0x54/0x84
+
+stack backtrace:
+CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1112
+Hardware name: Generic OMAP36xx (Flattened Device Tree)
+[<c0110308>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
+[<c010c3a8>] (show_stack) from [<c047fec8>] (dump_stack+0xb0/0xe4)
+[<c047fec8>] (dump_stack) from [<c052d7b4>] (rpm_suspend+0x604/0x7e4)
+[<c052d7b4>] (rpm_suspend) from [<c052ee34>] (__pm_runtime_suspend+0x64/0x84)
+[<c052ee34>] (__pm_runtime_suspend) from [<c04bf3bc>] (omap2_gpio_prepare_for_idle+0x5c/0x70)
+[<c04bf3bc>] (omap2_gpio_prepare_for_idle) from [<c01255e8>] (omap_sram_idle+0x140/0x244)
+[<c01255e8>] (omap_sram_idle) from [<c0126b48>] (omap3_enter_idle_bm+0xfc/0x1ec)
+[<c0126b48>] (omap3_enter_idle_bm) from [<c0601db8>] (cpuidle_enter_state+0x80/0x3d4)
+[<c0601db8>] (cpuidle_enter_state) from [<c0183c74>] (cpu_startup_entry+0x198/0x3a0)
+[<c0183c74>] (cpu_startup_entry) from [<c0b00c0c>] (start_kernel+0x354/0x3c8)
+[<c0b00c0c>] (start_kernel) from [<8000807c>] (0x8000807c)
+
+------------------------------------------------------------------------
 
 Reported-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Paul E. McKenney <paulmck@linux.vnet.ibm.com>
 Tested-by: Tony Lindgren <tony@atomide.com>
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Steven Rostedt <rostedt@goodmis.org>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Pavel Machek <pavel@ucw.cz>
 Cc: <linux-omap@vger.kernel.org>
 Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: <linux-clk@vger.kernel.org>
+Cc: <linux-pm@vger.kernel.org>
 ---
- drivers/clk/clk.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/kernel/smp.c        | 2 +-
+ drivers/base/power/runtime.c | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index fb74dc1f7520..4fa43c02d682 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -682,12 +682,12 @@ static void clk_core_disable(struct clk_core *core)
- 	if (--core->enable_count > 0)
- 		return;
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index baee70267f29..7afe48ae5d76 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -486,7 +486,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
  
--	trace_clk_disable(core);
-+	trace_clk_disable_rcuidle(core);
- 
- 	if (core->ops->disable)
- 		core->ops->disable(core->hw);
- 
--	trace_clk_disable_complete(core);
-+	trace_clk_disable_complete_rcuidle(core);
- 
- 	clk_core_disable(core->parent);
+ static void smp_cross_call(const struct cpumask *target, unsigned int ipinr)
+ {
+-	trace_ipi_raise(target, ipi_types[ipinr]);
++	trace_ipi_raise_rcuidle(target, ipi_types[ipinr]);
+ 	__smp_cross_call(target, ipinr);
  }
+ 
+diff --git a/drivers/base/power/runtime.c b/drivers/base/power/runtime.c
+index 4c7055009bd6..ad115568ce58 100644
+--- a/drivers/base/power/runtime.c
++++ b/drivers/base/power/runtime.c
+@@ -419,7 +419,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
+ 	struct device *parent = NULL;
+ 	int retval;
+ 
+-	trace_rpm_suspend(dev, rpmflags);
++	trace_rpm_suspend_rcuidle(dev, rpmflags);
+ 
+  repeat:
+ 	retval = rpm_check_suspend_allowed(dev);
+@@ -549,7 +549,7 @@ static int rpm_suspend(struct device *dev, int rpmflags)
+ 	}
+ 
+  out:
+-	trace_rpm_return_int(dev, _THIS_IP_, retval);
++	trace_rpm_return_int_rcuidle(dev, _THIS_IP_, retval);
+ 
+ 	return retval;
+ 
 -- 
 2.5.2
