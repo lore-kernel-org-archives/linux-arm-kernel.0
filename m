@@ -1,17 +1,34 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 16 May 2016 23:01:26 +0800
-Subject: [PATCH 19/20] ARM: sunxi: Enable sun4i DRM driver
-In-Reply-To: <1463402840-17062-20-git-send-email-maxime.ripard@free-electrons.com>
-References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-20-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64EGkfgqiZ=PYd-SZLOfnvkoEUDfB5bo__qca5sR5H0mQ@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 May 2016 10:04:40 -0500
+Subject: [PATCH 1/5] dt-bindings: Document the STM32 I2C bindings
+In-Reply-To: <1462980974-22091-2-git-send-email-cedric.madianga@gmail.com>
+References: <1462980974-22091-1-git-send-email-cedric.madianga@gmail.com>
+ <1462980974-22091-2-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20160516150440.GA6312@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2016 at 8:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Enable the new DRM driver in the sunxi default configuration
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Wed, May 11, 2016 at 05:36:10PM +0200, M'boumba Cedric Madianga wrote:
+> This patch adds documentation of device tree bindings for the STM32 I2C
+> controller.
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-stm32.txt          | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-stm32.txt b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+> new file mode 100644
+> index 0000000..73215c6
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
+> @@ -0,0 +1,33 @@
+> +* I2C controller embedded in STMicroelectronics STM32 I2C platform
+> +
+> +Required properties :
+> +- compatible : Must be "st,i2c-stm32f4"
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Normal order is st,stm32f4-i2c
+
+Rob
