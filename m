@@ -1,60 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 May 2016 22:15:09 +0200
-Subject: [PATCH 02/16] clk: sunxi-ng: Add common infrastructure
-In-Reply-To: <20160516100239.a93a238b0d458b38a3689a95@free.fr>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-3-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v67XWt6tjG_xXWgGatTaiN5uYQb2_Q6bgixMDUkHfVHLHg@mail.gmail.com>
- <20160515183122.GA27618@lukather>
- <20160516100239.a93a238b0d458b38a3689a95@free.fr>
-Message-ID: <20160516201509.GL27618@lukather>
+From: b-liu@ti.com (Bin Liu)
+Date: Mon, 16 May 2016 15:15:12 -0500
+Subject: [PATCH v2 2/2] musb: sunxi: Set state to A_WAIT_VRISE when
+ enabling Vbus
+In-Reply-To: <1463229905-26387-2-git-send-email-hdegoede@redhat.com>
+References: <1463229905-26387-1-git-send-email-hdegoede@redhat.com>
+ <1463229905-26387-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160516201512.GB9927@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Francois,
-
-On Mon, May 16, 2016 at 10:02:39AM +0200, Jean-Francois Moine wrote:
-> On Sun, 15 May 2016 20:31:22 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On Sat, May 14, 2016 at 02:45:05PM +0200, Hans de Goede wrote:
+> When the board is powering attached usb devices via the otg port
+> sometimes / on some devices it takes slightly too long for the Vbus
+> detection code in phy-sun4i-usb.c to signal that Vbus is high after
+> enabling Vbus and the musb hardware signals a MUSB_INTR_VBUSERROR
+> interrupt.
 > 
-> > > > +void ccu_helper_wait_for_lock(struct ccu_common *common, u32 lock)
-> > > > +{
-> > > > +       u32 reg;
-> > > > +
-> > > > +       if (!(common->features & CCU_FEATURE_LOCK))
-> > > > +               return;
-> > > > +
-> > > > +       WARN_ON(readl_relaxed_poll_timeout(common->base + common->reg, reg,
-> > > > +                                          !(reg & lock), 0, 500));
-> > > 
-> > >                                     no delay between reads? ^
-> > 
-> > Yes, I intended it to be a simple busy waiting loop since I don't
-> > expect it to be very long. Do yu have any more data on how much time
-> > it usually takes?
+> This commit sets the otg state to A_WAIT_VRISE upon enabling Vbus
+> making musb_stage0_irq() ignore the first VBUSERR_RETRY_COUNT
+> VBUSERROR interrupts, fixing connection issues in these cases.
 > 
-> I have a Soc in which the rate of the audio clock is stable after a
-> good second.
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-You mean before the clock is actually stable, or before the lock bit
-is cleared?
+Signed-off-by: Bin Liu <b-liu@ti.com>
 
-Which SoC is it? As far as I've seen, only the H3 allows to configure
-the stable time, and while by default it will take 16us, you can
-configure as high as 66ms (which is still way higher than the current
-limit).
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160516/c43f8041/attachment.sig>
+Regards,
+-Bin.
