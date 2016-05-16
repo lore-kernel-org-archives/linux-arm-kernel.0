@@ -1,27 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 May 2016 10:16:12 -0500
-Subject: [PATCH v2 3/6] docs: Document BCM23550 bindings
-In-Reply-To: <1463002582-6875-4-git-send-email-chris.brand@broadcom.com>
-References: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
- <1463002582-6875-4-git-send-email-chris.brand@broadcom.com>
-Message-ID: <20160516151612.GA7348@rob-hp-laptop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 16 May 2016 23:21:41 +0800
+Subject: [PATCH 04/20] clk: sunxi: display: Add per-clock flags
+In-Reply-To: <1463402840-17062-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1463402840-17062-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66-GzV=1wrJnHBObLVPVHPk87o0PaJtNyYasp2wFsZabw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 02:36:19PM -0700, Chris Brand wrote:
-> Add binding document for Broadcom BCM23550 SoC.
-> 
-> BCM23550 has a Cluster Dormant Control IP block that holds cores
-> in an idle state. Introduce a new CPU enable method in which the CDC is
-> accessed to bring the core online.
-> 
-> Signed-off-by: Chris Brand <chris.brand@broadcom.com>
-> ---
->  .../bindings/arm/bcm/brcm,bcm23550-cpu-method.txt  | 36 ++++++++++++++++++++++
->  .../devicetree/bindings/arm/bcm/brcm,bcm23550.txt  | 15 +++++++++
->  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->  3 files changed, 52 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550-cpu-method.txt
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,bcm23550.txt
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On Mon, May 16, 2016 at 8:47 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The TCON channel 0 clock that is the parent clock of our pixel clock is
+> expected to change its rate depending on the resolution we want to output
+> in our display engine.
+>
+> However, since it's only a mux, the only way it can do that is by changing
+> its parents rate.
+>
+> Allow to give flags in our display clocks description, and add the
+> CLK_SET_RATE_PARENT flag for the TCON channel 0 flag.
+>
+> Fixes: a3b4956ee6d9 ("clk: sunxi: display: Add per-clock flags")
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi/clk-sun4i-display.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+> index 445a7498d6df..9780fac6d029 100644
+> --- a/drivers/clk/sunxi/clk-sun4i-display.c
+> +++ b/drivers/clk/sunxi/clk-sun4i-display.c
+> @@ -33,6 +33,8 @@ struct sun4i_a10_display_clk_data {
+>
+>         u8      width_div;
+>         u8      width_mux;
+> +
+
+Don't really need this separator, but I'm ok either way.
+
+> +       u32     flags;
+>  };
+>
+>  struct reset_data {
+> @@ -166,7 +168,7 @@ static void __init sun4i_a10_display_init(struct device_node *node,
+>                                      data->has_div ? &div->hw : NULL,
+>                                      data->has_div ? &clk_divider_ops : NULL,
+>                                      &gate->hw, &clk_gate_ops,
+> -                                    0);
+> +                                    data->flags);
+>         if (IS_ERR(clk)) {
+>                 pr_err("%s: Couldn't register the clock\n", clk_name);
+>                 goto free_div;
+> @@ -232,6 +234,7 @@ static const struct sun4i_a10_display_clk_data sun4i_a10_tcon_ch0_data __initcon
+>         .offset_rst     = 29,
+>         .offset_mux     = 24,
+>         .width_mux      = 2,
+> +       .flags          = CLK_SET_RATE_PARENT,
+>  };
+>
+>  static void __init sun4i_a10_tcon_ch0_setup(struct device_node *node)
+> --
+> 2.8.2
+>
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
