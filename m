@@ -1,54 +1,35 @@
-From: tiwai@suse.de (Takashi Iwai)
-Date: Mon, 16 May 2016 07:40:56 +0200
-Subject: [RFC PATCH 2/7] ALSA: ac97: add an ac97 bus
-In-Reply-To: <87mvnrhux4.fsf@belgarion.home>
-References: <1462050939-27940-1-git-send-email-robert.jarzmik@free.fr>
- <1462050939-27940-3-git-send-email-robert.jarzmik@free.fr>
- <s5hk2j38tmf.wl-tiwai@suse.de> <87twi1hssl.fsf@belgarion.home>
- <s5hy47c7jvd.wl-tiwai@suse.de> <87mvnrhux4.fsf@belgarion.home>
-Message-ID: <s5hoa867e6v.wl-tiwai@suse.de>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Mon, 16 May 2016 11:29:25 +0530
+Subject: [PATCH V2 2/2] drivers: i2c: qup: Fix error handling
+In-Reply-To: <20160513115021.GK1778@katana>
+References: <1462534274-28925-1-git-send-email-sricharan@codeaurora.org>
+ <1462534274-28925-3-git-send-email-sricharan@codeaurora.org>
+ <20160513114823.GJ1778@katana> <20160513115021.GK1778@katana>
+Message-ID: <002201d1af38$1eb3e330$5c1ba990$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 15 May 2016 23:29:27 +0200,
-Robert Jarzmik wrote:
-> 
-> Takashi Iwai <tiwai@suse.de> writes:
-> 
-> > On Sat, 14 May 2016 11:50:50 +0200,
-> > Robert Jarzmik wrote:
-> >> >> +unsigned int ac97_bus_scan_one(struct ac97_controller *ac97,
-> >> >> +				      int codec_num)
-> >> >> +{
-> >> >> +	struct ac97_codec_device codec;
-> >> >> +	unsigned short vid1, vid2;
-> >> >> +	int ret;
-> >> >> +
-> >> >> +	codec.dev = *ac97->dev;
-> >> >> +	codec.num = codec_num;
-> >> >> +	ret = ac97->ops->read(&codec, AC97_VENDOR_ID1);
-> >> >> +	vid1 = (ret & 0xffff);
-> >> >> +	if (ret < 0)
-> >> >> +		return 0;
-> >> >
-> >> > Hmm.  This looks pretty hackish and dangerous.
-> >> You mean returning 0 even if the read failed, right ?
+Hi,
+> > > Among the bus errors reported from the QUP_MASTER_STATUS register
+> > > only NACK is considered and transfer gets suspended, while other
+> > > errors are ignored. Correct this and suspend the transfer for other
+> > > errors as well. This avoids unnessecary 'timeouts' which happens
+> > > when waiting for events that would never happen when there is
+> > > already an error condition on the bus.
+> > >
+> > > Signed-off-by: Sricharan R <sricharan@codeaurora.org>
+> > > Reviewed-by: Andy Gross <andy.gross@linaro.org>
 > >
-> > No, my concern is that it's creating a dummy codec object temporarily
-> > on the stack just by copying some fields and calling the ops with it.
-> > (And actually the current code may work wrongly because lack of
-> >  zero-clear of the object.)
-> Ah yes, I remember now, the on-stack generated device, indeed ugly.
+> > Please check Documentation/i2c/fault-codes for proper fault codes.
 > 
-> > IMO, a cleaner way would be to define the ops passed with both
-> > controller and codec objects as arguments, and pass NULL codec here.
-> It's rather unusual to need both the device and its controller in bus
-> operations. I must admit I have no better idea so far, so I'll try that just to
-> see how it looks like, and let's see next ...
+    Ok, Thanks for pointing this out. So, for NACK I think it is more
+appropriate to
+    return -ENXIO and -EIO for other errors. Will correct this.
 
-Thinking of this again, I wonder now why we need to pass the codec
-object at all.  It's the read/write ops via ac97, so we just need the
-ac97_controller object and the address slot of the accessed codec?
+> And while we are here: NACK is not an error but a valid response. Can you
+> remove the dev_err related to that? Otherwise tools like i2cdetect will
+> probably flood your log.
+  Ok, will correct this.
 
-
-Takashi
+Regards,
+ Sricharan         
