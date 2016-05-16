@@ -1,94 +1,79 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:31 +0100
-Subject: [PATCH v4 43/56] KVM: arm/arm64: vgic-new: vgic_kvm_device:
- KVM_DEV_ARM_VGIC_GRP_ADDR
+Date: Mon, 16 May 2016 10:53:09 +0100
+Subject: [PATCH v4 21/56] KVM: arm/arm64: vgic-new: Implement
+ kvm_vgic_vcpu_pending_irq
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-44-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-22-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@linaro.org>
 
-This patch implements the KVM_DEV_ARM_VGIC_GRP_ADDR group which
-enables to set the base address of GIC regions as seen by the guest.
+Tell KVM whether a particular VCPU has an IRQ that needs handling
+in the guest. This is used to decide whether a VCPU is runnable.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-kvm-device.c | 38 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+Changelog RFC..v1:
+- return false if distributor is disabled
+- add vgic_kick_vcpus() implementations
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 082829a..a709097 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -112,6 +112,17 @@ static int vgic_set_common_attr(struct kvm_device *dev,
- 	int r;
+Changelog v2 .. v3:
+- remove vgic_kick_vcpus() implementation from this patch
+
+ include/kvm/vgic/vgic.h  |  2 ++
+ virt/kvm/arm/vgic/vgic.c | 25 +++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 9506267..f663288 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -184,6 +184,8 @@ struct vgic_cpu {
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level);
  
- 	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 addr;
-+		unsigned long type = (unsigned long)attr->attr;
++int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
 +
-+		if (copy_from_user(&addr, uaddr, sizeof(addr)))
-+			return -EFAULT;
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(false)
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index eca3cd0..bea8d3b 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -519,3 +519,28 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	vgic_flush_lr_state(vcpu);
+ 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ }
 +
-+		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
-+		return (r == -ENODEV) ? -ENXIO : r;
++int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
++{
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	struct vgic_irq *irq;
++	bool pending = false;
++
++	if (!vcpu->kvm->arch.vgic.enabled)
++		return false;
++
++	spin_lock(&vgic_cpu->ap_list_lock);
++
++	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
++		spin_lock(&irq->irq_lock);
++		pending = irq->pending && irq->enabled;
++		spin_unlock(&irq->irq_lock);
++
++		if (pending)
++			break;
 +	}
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
- 		u32 val;
-@@ -164,6 +175,19 @@ static int vgic_get_common_attr(struct kvm_device *dev,
- 	int r = -ENXIO;
- 
- 	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 addr;
-+		unsigned long type = (unsigned long)attr->attr;
 +
-+		r = kvm_vgic_addr(dev->kvm, type, &addr, false);
-+		if (r)
-+			return (r == -ENODEV) ? -ENXIO : r;
++	spin_unlock(&vgic_cpu->ap_list_lock);
 +
-+		if (copy_to_user(uaddr, &addr, sizeof(addr)))
-+			return -EFAULT;
-+		break;
-+	}
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
- 
-@@ -227,6 +251,13 @@ static int vgic_v2_has_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
- 	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR:
-+		switch (attr->attr) {
-+		case KVM_VGIC_V2_ADDR_TYPE_DIST:
-+		case KVM_VGIC_V2_ADDR_TYPE_CPU:
-+			return 0;
-+		}
-+		break;
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
-@@ -267,6 +298,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
- 	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR:
-+		switch (attr->attr) {
-+		case KVM_VGIC_V3_ADDR_TYPE_DIST:
-+		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+			return 0;
-+		}
-+		break;
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
++	return pending;
++}
 -- 
 2.8.2
