@@ -1,161 +1,266 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:54:27 +0100
-Subject: [PATCH v4 42/56] KVM: arm/arm64: vgic-new: vgic_kvm_device: implement
- kvm_vgic_addr
-In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-100-git-send-email-andre.przywara@arm.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Mon, 16 May 2016 11:18:03 +0100 (BST)
+Subject: [PATCH v2] Xen: EFI: Parse DT parameters for Xen specific UEFI
+In-Reply-To: <20160513220923.GA5178@codeblueprint.co.uk>
+References: <1463055594-14980-1-git-send-email-zhaoshenglong@huawei.com>
+ <20160513220923.GA5178@codeblueprint.co.uk>
+Message-ID: <alpine.DEB.2.10.1605161117280.2494@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+On Fri, 13 May 2016, Matt Fleming wrote:
+> (Including more folks, quoting entire patch)
+> 
+> On Thu, 12 May, at 08:19:54PM, Shannon Zhao wrote:
+> > From: Shannon Zhao <shannon.zhao@linaro.org>
+> > 
+> > The EFI DT parameters for bare metal are located under /chosen node,
+> > while for Xen Dom0 they are located under /hyperviosr/uefi node. These
+> > parameters under /chosen and /hyperviosr/uefi are not expected to appear
+> > at the same time.
+> > Parse these EFI parameters and initialize EFI like the way for bare
+> > metal except the runtime services because the runtime services for Xen
+> > Dom0 are available through hypercalls and they are always enabled. So it
+> > sets the EFI_RUNTIME_SERVICES flag if it finds /hyperviosr/uefi node and
+> > bails out in arm_enable_runtime_services() when EFI_RUNTIME_SERVICES
+> > flag is set already.
+> > 
+> > CC: Matt Fleming <matt@codeblueprint.co.uk>
+> > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> > ---
+> > v2: rebase it on top of EFI and Xen next branch, add some comments to
+> > explain the codes. 
+> > ---
+> >  arch/arm/xen/enlighten.c           | 22 +++++++++++
+> >  drivers/firmware/efi/arm-runtime.c |  5 +++
+> >  drivers/firmware/efi/efi.c         | 81 ++++++++++++++++++++++++++++++--------
+> >  3 files changed, 92 insertions(+), 16 deletions(-)
+>  
+> This looks good to me. Thanks for all the work Shannon.
+> 
+> Stefan, OK, let's figure out how to deal with this.
+> 
+> What I've done is merge xen/linux-next into the 'efi/xen-arm' topic
+> branch and applied this patch here,
+> 
+>   https://git.kernel.org/cgit/linux/kernel/git/mfleming/efi.git/log/?h=efi/arm-xen
+> 
+> Yes, the merge includes some Xen patches that are not actually needed
+> for any of the EFI patches, but Linus has complained about picking
+> random commits of a tree to merge. At least this way this is all the
+> Xen linux-next material.
+> 
+> If you're OK with this, and assuming no one else has any preferred
+> methods, I'll send out a pull request to tip over the weekend.
 
-kvm_vgic_addr is used by the userspace to set the base address of
-the following register regions, as seen by the guest:
-- distributor(v2 and v3),
-- re-distributors (v3),
-- CPU interface (v2).
+I am OK with it. Thanks!
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Changelog v3 .. v4:
-- move overlap check to init time (cannot work with GICv3 here)
-- refactor remaining address sanity checks
 
- include/kvm/vgic/vgic.h             |  2 +
- virt/kvm/arm/vgic/vgic-kvm-device.c | 86 +++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h            |  3 ++
- 3 files changed, 91 insertions(+)
-
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 00e3dca..3689b9b 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -194,6 +194,8 @@ struct vgic_cpu {
- 	u64 live_lrs;
- };
- 
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-+
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
- 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index e153f12..082829a 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -16,10 +16,96 @@
- #include <linux/kvm_host.h>
- #include <kvm/arm_vgic.h>
- #include <linux/uaccess.h>
-+#include <asm/kvm_mmu.h>
- #include "vgic.h"
- 
- /* common helpers */
- 
-+static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
-+			     phys_addr_t addr, phys_addr_t alignment)
-+{
-+	if (addr & ~KVM_PHYS_MASK)
-+		return -E2BIG;
-+
-+	if (!IS_ALIGNED(addr, alignment))
-+		return -EINVAL;
-+
-+	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
-+		return -EEXIST;
-+
-+	return 0;
-+}
-+
-+/**
-+ * kvm_vgic_addr - set or get vgic VM base addresses
-+ * @kvm:   pointer to the vm struct
-+ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
-+ * @addr:  pointer to address value
-+ * @write: if true set the address in the VM address space, if false read the
-+ *          address
-+ *
-+ * Set or get the vgic base addresses for the distributor and the virtual CPU
-+ * interface in the VM physical address space.  These addresses are properties
-+ * of the emulated core/SoC and therefore user space initially knows this
-+ * information.
-+ * Check them for sanity (alignment, double assignment). We can't check for
-+ * overlapping regions in case of a virtual GICv3 here, since we don't know
-+ * the number of VCPUs yet, so we defer this check to map_resources().
-+ */
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
-+{
-+	int r = 0;
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	int type_needed;
-+	phys_addr_t *addr_ptr, alignment;
-+
-+	mutex_lock(&kvm->lock);
-+	switch (type) {
-+	case KVM_VGIC_V2_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		alignment = SZ_4K;
-+		break;
-+	case KVM_VGIC_V2_ADDR_TYPE_CPU:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_cpu_base;
-+		alignment = SZ_4K;
-+		break;
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
-+	case KVM_VGIC_V3_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		alignment = SZ_64K;
-+		break;
-+	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_redist_base;
-+		alignment = SZ_64K;
-+		break;
-+#endif
-+	default:
-+		r = -ENODEV;
-+		goto out;
-+	}
-+
-+	if (vgic->vgic_model != type_needed) {
-+		r = -ENODEV;
-+		goto out;
-+	}
-+
-+	if (write) {
-+		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
-+		if (!r)
-+			*addr_ptr = *addr;
-+	} else {
-+		*addr = *addr_ptr;
-+	}
-+
-+out:
-+	mutex_unlock(&kvm->lock);
-+	return r;
-+}
-+
- static int vgic_set_common_attr(struct kvm_device *dev,
- 				struct kvm_device_attr *attr)
- {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 77b0ab3..6abc9a3 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,9 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
- 
-+#define VGIC_ADDR_UNDEF		(-1)
-+#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
-+
- #define INTERRUPT_ID_BITS_SPIS	10
- #define VGIC_PRI_BITS		5
- 
--- 
-2.8.2
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index 13e3e9f..d4f36eb 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -15,7 +15,9 @@
+> >  #include <asm/paravirt.h>
+> >  #include <asm/xen/hypervisor.h>
+> >  #include <asm/xen/hypercall.h>
+> > +#include <asm/xen/xen-ops.h>
+> >  #include <asm/system_misc.h>
+> > +#include <asm/efi.h>
+> >  #include <linux/interrupt.h>
+> >  #include <linux/irqreturn.h>
+> >  #include <linux/module.h>
+> > @@ -261,6 +263,19 @@ static int __init fdt_find_hyper_node(unsigned long node, const char *uname,
+> >  	    !strncmp(hyper_node.prefix, s, strlen(hyper_node.prefix)))
+> >  		hyper_node.version = s + strlen(hyper_node.prefix);
+> >  
+> > +	/*
+> > +	 * Check if Xen supports EFI by checking whether there is the
+> > +	 * "/hypervisor/uefi" node in DT. If so, runtime services are available
+> > +	 * through proxy functions (e.g. in case of Xen dom0 EFI implementation
+> > +	 * they call special hypercall which executes relevant EFI functions)
+> > +	 * and that is why they are always enabled.
+> > +	 */
+> > +	if (IS_ENABLED(CONFIG_XEN_EFI)) {
+> > +		if ((of_get_flat_dt_subnode_by_name(node, "uefi") > 0) &&
+> > +		    !efi_runtime_disabled())
+> > +			set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+> > +	}
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > @@ -352,6 +367,13 @@ static int __init xen_guest_init(void)
+> >  		return -ENODEV;
+> >  	}
+> >  
+> > +	/*
+> > +	 * The fdt parsing codes have set EFI_RUNTIME_SERVICES if Xen EFI
+> > +	 * parameters are found. Force enable runtime services.
+> > +	 */
+> > +	if (efi_enabled(EFI_RUNTIME_SERVICES))
+> > +		xen_efi_runtime_setup();
+> > +
+> >  	shared_info_page = (struct shared_info *)get_zeroed_page(GFP_KERNEL);
+> >  
+> >  	if (!shared_info_page) {
+> > diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+> > index 17ccf0a..c394b81 100644
+> > --- a/drivers/firmware/efi/arm-runtime.c
+> > +++ b/drivers/firmware/efi/arm-runtime.c
+> > @@ -107,6 +107,11 @@ static int __init arm_enable_runtime_services(void)
+> >  		return 0;
+> >  	}
+> >  
+> > +	if (efi_enabled(EFI_RUNTIME_SERVICES)) {
+> > +		pr_info("EFI runtime services access via paravirt.\n");
+> > +		return 0;
+> > +	}
+> > +
+> >  	pr_info("Remapping and enabling EFI services.\n");
+> >  
+> >  	mapsize = efi.memmap.map_end - efi.memmap.map;
+> > diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+> > index 05509f3..1c6f9dd 100644
+> > --- a/drivers/firmware/efi/efi.c
+> > +++ b/drivers/firmware/efi/efi.c
+> > @@ -472,12 +472,14 @@ device_initcall(efi_load_efivars);
+> >  		FIELD_SIZEOF(struct efi_fdt_params, field) \
+> >  	}
+> >  
+> > -static __initdata struct {
+> > +struct params {
+> >  	const char name[32];
+> >  	const char propname[32];
+> >  	int offset;
+> >  	int size;
+> > -} dt_params[] = {
+> > +};
+> > +
+> > +static __initdata struct params fdt_params[] = {
+> >  	UEFI_PARAM("System Table", "linux,uefi-system-table", system_table),
+> >  	UEFI_PARAM("MemMap Address", "linux,uefi-mmap-start", mmap),
+> >  	UEFI_PARAM("MemMap Size", "linux,uefi-mmap-size", mmap_size),
+> > @@ -485,44 +487,91 @@ static __initdata struct {
+> >  	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+> >  };
+> >  
+> > +static __initdata struct params xen_fdt_params[] = {
+> > +	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
+> > +	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
+> > +	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
+> > +	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
+> > +	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
+> > +};
+> > +
+> > +#define EFI_FDT_PARAMS_SIZE	ARRAY_SIZE(fdt_params)
+> > +
+> > +static __initdata struct {
+> > +	const char *uname;
+> > +	const char *subnode;
+> > +	struct params *params;
+> > +} dt_params[] = {
+> > +	{ "hypervisor", "uefi", xen_fdt_params },
+> > +	{ "chosen", NULL, fdt_params },
+> > +};
+> > +
+> >  struct param_info {
+> >  	int found;
+> >  	void *params;
+> > +	const char *missing;
+> >  };
+> >  
+> > -static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+> > -				       int depth, void *data)
+> > +static int __init __find_uefi_params(unsigned long node,
+> > +				     struct param_info *info,
+> > +				     struct params *params)
+> >  {
+> > -	struct param_info *info = data;
+> >  	const void *prop;
+> >  	void *dest;
+> >  	u64 val;
+> >  	int i, len;
+> >  
+> > -	if (depth != 1 || strcmp(uname, "chosen") != 0)
+> > -		return 0;
+> > -
+> > -	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+> > -		prop = of_get_flat_dt_prop(node, dt_params[i].propname, &len);
+> > -		if (!prop)
+> > +	for (i = 0; i < EFI_FDT_PARAMS_SIZE; i++) {
+> > +		prop = of_get_flat_dt_prop(node, params[i].propname, &len);
+> > +		if (!prop) {
+> > +			info->missing = params[i].name;
+> >  			return 0;
+> > -		dest = info->params + dt_params[i].offset;
+> > +		}
+> > +
+> > +		dest = info->params + params[i].offset;
+> >  		info->found++;
+> >  
+> >  		val = of_read_number(prop, len / sizeof(u32));
+> >  
+> > -		if (dt_params[i].size == sizeof(u32))
+> > +		if (params[i].size == sizeof(u32))
+> >  			*(u32 *)dest = val;
+> >  		else
+> >  			*(u64 *)dest = val;
+> >  
+> >  		if (efi_enabled(EFI_DBG))
+> > -			pr_info("  %s: 0x%0*llx\n", dt_params[i].name,
+> > -				dt_params[i].size * 2, val);
+> > +			pr_info("  %s: 0x%0*llx\n", params[i].name,
+> > +				params[i].size * 2, val);
+> >  	}
+> > +
+> >  	return 1;
+> >  }
+> >  
+> > +static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+> > +				       int depth, void *data)
+> > +{
+> > +	struct param_info *info = data;
+> > +	int i;
+> > +
+> > +	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
+> > +		const char *subnode = dt_params[i].subnode;
+> > +
+> > +		if (depth != 1 || strcmp(uname, dt_params[i].uname) != 0) {
+> > +			info->missing = dt_params[i].params[0].name;
+> > +			continue;
+> > +		}
+> > +
+> > +		if (subnode) {
+> > +			node = of_get_flat_dt_subnode_by_name(node, subnode);
+> > +			if (node < 0)
+> > +				return 0;
+> > +		}
+> > +
+> > +		return __find_uefi_params(node, info, dt_params[i].params);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> >  int __init efi_get_fdt_params(struct efi_fdt_params *params)
+> >  {
+> >  	struct param_info info;
+> > @@ -538,7 +587,7 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params)
+> >  		pr_info("UEFI not found.\n");
+> >  	else if (!ret)
+> >  		pr_err("Can't find '%s' in device tree!\n",
+> > -		       dt_params[info.found].name);
+> > +		       info.missing);
+> >  
+> >  	return ret;
+> >  }
+> > -- 
+> > 2.0.4
+> > 
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
