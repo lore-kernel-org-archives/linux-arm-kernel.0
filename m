@@ -1,42 +1,57 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 16 May 2016 14:47:14 +0200
-Subject: [PATCH 14/20] ARM: sun5i: a13: Add LCD pins
+Date: Mon, 16 May 2016 14:47:07 +0200
+Subject: [PATCH 07/20] drm/sun4i: rgb: Validate the clock rate
 In-Reply-To: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1463402840-17062-15-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1463402840-17062-8-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RGB bus can be used in several configurations, one of which being the
-RGB666.
+Our pixel clock cannot reach a high enough rate for some rather high while
+common resolutions (like 1080p60).
 
-Add a pinctrl group for that case.
+Make sure we filter the resolutions we cannot reach in our mode_valid
+function.
 
+Fixes: 29e57fab97fc ("drm: sun4i: Add RGB output")
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun5i-a13.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_rgb.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 263d46dbc7e6..79b5d513c142 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -237,6 +237,16 @@
- &pio {
- 	compatible = "allwinner,sun5i-a13-pinctrl";
+diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+index ab6494818050..923f55039cb1 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
++++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
+@@ -54,8 +54,13 @@ static int sun4i_rgb_get_modes(struct drm_connector *connector)
+ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+ 				struct drm_display_mode *mode)
+ {
++	struct sun4i_rgb *rgb = drm_connector_to_sun4i_rgb(connector);
++	struct sun4i_drv *drv = rgb->drv;
++	struct sun4i_tcon *tcon = drv->tcon;
+ 	u32 hsync = mode->hsync_end - mode->hsync_start;
+ 	u32 vsync = mode->vsync_end - mode->vsync_start;
++	unsigned long rate = mode->crtc_clock * 1000;
++	long rounded_rate;
  
-+	lcd_rgb666_pins: lcd_rgb666 at 0 {
-+		allwinner,pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-+				 "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
-+				 "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
-+				 "PD24", "PD25", "PD26", "PD27";
-+		allwinner,function = "lcd0";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
+ 	DRM_DEBUG_DRIVER("Validating modes...\n");
+ 
+@@ -87,6 +92,15 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+ 
+ 	DRM_DEBUG_DRIVER("Vertical parameters OK\n");
+ 
++	rounded_rate = clk_round_rate(tcon->dclk, rate);
++	if (rounded_rate < rate)
++		return MODE_CLOCK_LOW;
 +
- 	uart1_pins_a: uart1 at 0 {
- 		allwinner,pins = "PE10", "PE11";
- 		allwinner,function = "uart1";
++	if (rounded_rate > rate)
++		return MODE_CLOCK_HIGH;
++
++	DRM_DEBUG_DRIVER("Clock rate OK\n");
++
+ 	return MODE_OK;
+ }
+ 
 -- 
 2.8.2
