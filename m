@@ -1,96 +1,183 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 16 May 2016 10:53:18 +0100
-Subject: [PATCH v4 30/56] KVM: arm/arm64: vgic-new: Add TARGET registers
- handlers
+Date: Mon, 16 May 2016 10:53:50 +0100
+Subject: [PATCH v4 05/56] KVM: arm/arm64: Remove the IRQ field from struct
+ irq_phys_map
 In-Reply-To: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
 References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463392481-26583-31-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463392481-26583-63-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The target register handlers are v2 emulation specific, so their
-implementation lives entirely in vgic-mmio-v2.c.
-We copy the old VGIC behaviour of assigning an IRQ to the first VCPU
-set in the target mask instead of making it possibly pending on
-multiple VCPUs.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
+The communication of a Linux IRQ number from outside the VGIC to the
+vgic was a leftover from the day when the vgic code cared about how a
+particular device injects virtual interrupts mapped to a physical
+interrupt.
+
+We can safely remove this notion, leaving all physical IRQ handling to
+be done in the device driver (the arch timer in this case), which makes
+room for a saner API for the new VGIC.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
-Changelog RFC..v1:
-- remove runtime VCPU determination from this v2-only register
-- fold in implementation of vgic_v2_irq_change_affinity()
-- replace ffs() with __ffs()
-
 Changelog v1 .. v2:
-- adapt to new MMIO framework
+- update kerneldoc comments on kvm_vgic_map_phys_irq()
 
-Changelog v3 .. v4:
-- specify accessor width
-- use IRQ number accessor macro
+Changelog v2 .. v3:
+- include <linux/irq.h>
 
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 43 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 42 insertions(+), 1 deletion(-)
+ include/kvm/arm_vgic.h    |  3 +--
+ virt/kvm/arm/arch_timer.c | 23 +++++++++++++++++++++--
+ virt/kvm/arm/vgic.c       | 28 ++++++----------------------
+ 3 files changed, 28 insertions(+), 26 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index bb7389e..52389ff 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -64,6 +64,47 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
- 	}
- }
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index c7bb184..9ad7625 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -158,7 +158,6 @@ struct vgic_io_device {
+ struct irq_phys_map {
+ 	u32			virt_irq;
+ 	u32			phys_irq;
+-	u32			irq;
+ };
  
-+static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
-+					   gpa_t addr, unsigned int len)
-+{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
-+	int i;
-+	u64 val = 0;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		val |= (u64)irq->targets << (i * 8);
+ struct irq_phys_map_entry {
+@@ -346,7 +345,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
+ void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+-					   int virt_irq, int irq);
++					   int virt_irq, int phys_irq);
+ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 962b442..e45895a 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -20,6 +20,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/interrupt.h>
++#include <linux/irq.h>
+ 
+ #include <clocksource/arm_arch_timer.h>
+ #include <asm/arch_timer.h>
+@@ -300,7 +301,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	if (timer->active_cleared_last && !phys_active)
+ 		return;
+ 
+-	ret = irq_set_irqchip_state(timer->map->irq,
++	ret = irq_set_irqchip_state(host_vtimer_irq,
+ 				    IRQCHIP_STATE_ACTIVE,
+ 				    phys_active);
+ 	WARN_ON(ret);
+@@ -333,6 +334,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct irq_phys_map *map;
++	struct irq_desc *desc;
++	struct irq_data *data;
++	int phys_irq;
+ 
+ 	/*
+ 	 * The vcpu timer irq number cannot be determined in
+@@ -352,10 +356,25 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	kvm_timer_update_state(vcpu);
+ 
+ 	/*
++	 * Find the physical IRQ number corresponding to the host_vtimer_irq
++	 */
++	desc = irq_to_desc(host_vtimer_irq);
++	if (!desc) {
++		kvm_err("%s: no interrupt descriptor\n", __func__);
++		return -EINVAL;
 +	}
 +
-+	return val;
-+}
++	data = irq_desc_get_irq_data(desc);
++	while (data->parent_data)
++		data = data->parent_data;
 +
-+static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
-+				   gpa_t addr, unsigned int len,
-+				   unsigned long val)
-+{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
-+	int i;
++	phys_irq = data->hwirq;
 +
-+	/* GICD_ITARGETSR[0-7] are read-only */
-+	if (intid < VGIC_NR_PRIVATE_IRQS)
-+		return;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid + i);
-+		int target;
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		irq->targets = (val >> (i * 8)) & 0xff;
-+		target = irq->targets ? __ffs(irq->targets) : 0;
-+		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
-+
-+		spin_unlock(&irq->irq_lock);
-+	}
-+}
-+
- static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
-@@ -93,7 +134,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		vgic_mmio_read_target, vgic_mmio_write_target, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
- 		vgic_mmio_read_config, vgic_mmio_write_config, 2,
++	/*
+ 	 * Tell the VGIC that the virtual interrupt is tied to a
+ 	 * physical interrupt. We do that once per VCPU.
+ 	 */
+-	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
++	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
+ 	if (WARN_ON(IS_ERR(map)))
+ 		return PTR_ERR(map);
+ 
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index 06abd59..a7e496a 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -1711,38 +1711,24 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
+ /**
+  * kvm_vgic_map_phys_irq - map a virtual IRQ to a physical IRQ
+  * @vcpu: The VCPU pointer
+- * @virt_irq: The virtual irq number
+- * @irq: The Linux IRQ number
++ * @virt_irq: The virtual IRQ number for the guest
++ * @phys_irq: The hardware IRQ number of the host
+  *
+  * Establish a mapping between a guest visible irq (@virt_irq) and a
+- * Linux irq (@irq). On injection, @virt_irq will be associated with
+- * the physical interrupt represented by @irq. This mapping can be
++ * hardware irq (@phys_irq). On injection, @virt_irq will be associated with
++ * the physical interrupt represented by @phys_irq. This mapping can be
+  * established multiple times as long as the parameters are the same.
+  *
+  * Returns a valid pointer on success, and an error pointer otherwise
+  */
+ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+-					   int virt_irq, int irq)
++					   int virt_irq, int phys_irq)
+ {
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
+ 	struct irq_phys_map *map;
+ 	struct irq_phys_map_entry *entry;
+-	struct irq_desc *desc;
+-	struct irq_data *data;
+-	int phys_irq;
+ 
+-	desc = irq_to_desc(irq);
+-	if (!desc) {
+-		kvm_err("%s: no interrupt descriptor\n", __func__);
+-		return ERR_PTR(-EINVAL);
+-	}
+-
+-	data = irq_desc_get_irq_data(desc);
+-	while (data->parent_data)
+-		data = data->parent_data;
+-
+-	phys_irq = data->hwirq;
+ 
+ 	/* Create a new mapping */
+ 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
+@@ -1755,8 +1741,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+ 	map = vgic_irq_map_search(vcpu, virt_irq);
+ 	if (map) {
+ 		/* Make sure this mapping matches */
+-		if (map->phys_irq != phys_irq	||
+-		    map->irq      != irq)
++		if (map->phys_irq != phys_irq)
+ 			map = ERR_PTR(-EINVAL);
+ 
+ 		/* Found an existing, valid mapping */
+@@ -1766,7 +1751,6 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
+ 	map           = &entry->map;
+ 	map->virt_irq = virt_irq;
+ 	map->phys_irq = phys_irq;
+-	map->irq      = irq;
+ 
+ 	list_add_tail_rcu(&entry->entry, root);
+ 
 -- 
 2.8.2
