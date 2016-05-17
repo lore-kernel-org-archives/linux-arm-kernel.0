@@ -1,62 +1,42 @@
-From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 17 May 2016 16:50:11 +0100
-Subject: [PATCH v4 49/56] KVM: arm/arm64: vgic-new: vgic_init: implement
- kvm_vgic_hyp_init
-In-Reply-To: <1463392481-26583-107-git-send-email-andre.przywara@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-107-git-send-email-andre.przywara@arm.com>
-Message-ID: <573B3DB3.80707@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 May 2016 23:56:06 +0800
+Subject: [PATCH 1/6] drm: sun4i: do cleanup if RGB output init fails
+In-Reply-To: <1463500571-28970-1-git-send-email-wens@csie.org>
+References: <1463500571-28970-1-git-send-email-wens@csie.org>
+Message-ID: <1463500571-28970-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
+sun4i_rgb_init() can fail, which results in TCON failing to bind.
+In this case we need to do cleanup, specificly unregistering the
+dotclock, which is regmap based, and the regmap is registered as
+part of the sun4i_tcon_bind().
 
-On 16/05/16 10:54, Andre Przywara wrote:
-> +
-> +/**
-> + * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
-> + * @node:	pointer to the DT node
+Failing to do so results in a NULL pointer reference when the CCF
+tries to turn off unused clocks.
 
-This needs to be updated to match the parameters of vgic_v2_probe.
+Fixes: 29e57fab97fc ("drm: sun4i: Add RGB output")
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-> + *
-> + * Returns 0 if a GICv2 has been found, returns an error code otherwise
-> + */
-> +int vgic_v2_probe(const struct gic_kvm_info *info)
-
-[...]
-
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 8548297..de0e8e0 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -15,6 +15,9 @@
->   #include <linux/irqchip/arm-gic-v3.h>
->   #include <linux/kvm.h>
->   #include <linux/kvm_host.h>
-> +#include <kvm/arm_vgic.h>
-> +#include <asm/kvm_mmu.h>
-> +#include <asm/kvm_asm.h>
->
->   #include "vgic.h"
->
-> @@ -182,3 +185,49 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
->   	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
->   	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
->   }
-> +
-> +/**
-> + * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
-> + * @node:	pointer to the DT node
-
-This needs to be updated to match the parameters of vgic_v3_probe.
-
-> + *
-> + * Returns 0 if a GICv3 has been found, returns an error code otherwise
-> + */
-> +int vgic_v3_probe(const struct gic_kvm_info *info)
-
-Regards,
-
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index 9f19b0e08560..dea673275356 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -490,7 +490,11 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 		return 0;
+ 	}
+ 
+-	return sun4i_rgb_init(drm);
++	ret = sun4i_rgb_init(drm);
++	if (ret < 0)
++		goto err_free_clocks;
++
++	return 0;
+ 
+ err_free_clocks:
+ 	sun4i_tcon_free_clocks(tcon);
 -- 
-Julien Grall
+2.8.1
