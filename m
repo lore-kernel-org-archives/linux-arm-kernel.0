@@ -1,44 +1,35 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 17 May 2016 17:10:12 +0800
-Subject: [PATCH v12 05/10] arm64: Kprobes with single stepping support
-In-Reply-To: <1461783185-9056-6-git-send-email-dave.long@linaro.org>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-6-git-send-email-dave.long@linaro.org>
-Message-ID: <20160517091009.GA5082@sha-win-210.asiapac.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 17 May 2016 11:12:32 +0200
+Subject: [PATCH] pwm: atmel-hlcdc: Fix default PWM polarity
+Message-ID: <1463476352-7485-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 02:53:00PM -0400, David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> +
-> +static bool __kprobes aarch64_insn_is_steppable(u32 insn)
+The PWM device exposed by the HLCDC IP is configured with an inverted
+polarity by default. Registering the PWM chip with the normal polarity
+was not a problem before commit 42e8992c58d4 ("pwm: Add core
+infrastructure to allow atomic updates") because the ->set_polarity()
+hook was called no matter the current polarity state, but this is no longer
+the case.
 
-Could we add more comment for this function? In the comment, we can tell
-that which type of instructions are steppable, which are not.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes: 42e8992c58d4 ("pwm: Add core infrastructure to allow atomic updates")
+---
+ drivers/pwm/pwm-atmel-hlcdc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> +{
-> +	if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
-> +		if (aarch64_insn_is_branch(insn) ||
-> +		    aarch64_insn_is_msr_imm(insn) ||
-> +		    aarch64_insn_is_msr_reg(insn) ||
-> +		    aarch64_insn_is_exception(insn))
-> +			return false;
-> +
-> +		if (aarch64_insn_is_mrs(insn))
-> +			return aarch64_insn_extract_system_reg(insn)
-> +			     != AARCH64_INSN_SPCLREG_DAIF;
-> +
-> +		if (aarch64_insn_is_hint(insn))
-> +			return aarch64_insn_is_nop(insn);
-> +
-> +		return true;
-> +	}
-> +
-> +	if (aarch64_insn_uses_literal(insn) ||
-> +	    aarch64_insn_is_exclusive(insn))
-> +		return false;
-> +
-> +	return true;
-
-Thanks
-Huang Shijie
+diff --git a/drivers/pwm/pwm-atmel-hlcdc.c b/drivers/pwm/pwm-atmel-hlcdc.c
+index f994c7e..14fc011 100644
+--- a/drivers/pwm/pwm-atmel-hlcdc.c
++++ b/drivers/pwm/pwm-atmel-hlcdc.c
+@@ -272,7 +272,7 @@ static int atmel_hlcdc_pwm_probe(struct platform_device *pdev)
+ 	chip->chip.of_pwm_n_cells = 3;
+ 	chip->chip.can_sleep = 1;
+ 
+-	ret = pwmchip_add(&chip->chip);
++	ret = pwmchip_add_with_polarity(&chip->chip, PWM_POLARITY_INVERSED);
+ 	if (ret) {
+ 		clk_disable_unprepare(hlcdc->periph_clk);
+ 		return ret;
+-- 
+2.7.4
