@@ -1,48 +1,46 @@
 From: marek@goldelico.com (Marek Belisko)
-Date: Tue, 17 May 2016 21:48:50 +0200
-Subject: [PATCH 4/5] ARM: dta: omap3-gta04: Define and use hmc5843 irq pin
+Date: Tue, 17 May 2016 21:48:48 +0200
+Subject: [PATCH 2/5] ARM: dts: omap3-gta04: Define and use bma180 irq pin
 In-Reply-To: <1463514531-7235-1-git-send-email-marek@goldelico.com>
 References: <1463514531-7235-1-git-send-email-marek@goldelico.com>
-Message-ID: <1463514531-7235-5-git-send-email-marek@goldelico.com>
+Message-ID: <1463514531-7235-3-git-send-email-marek@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: "H. Nikolaus Schaller" <hns@goldelico.com>
 
-Define pinmux and usage if irq pin.
+Add pinmux and usage of bma180 irq pin.
 
 Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 ---
- arch/arm/boot/dts/omap3-gta04.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/omap3-gta04.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index 094e5e1..55b6b88 100644
+index cef8b23..e0520cf 100644
 --- a/arch/arm/boot/dts/omap3-gta04.dtsi
 +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -262,6 +262,12 @@
- 			OMAP3_CORE1_IOPAD(0x20b8, PIN_INPUT_PULLUP | MUX_MODE4) /* gpio56 */
+@@ -250,6 +250,12 @@
+ 			OMAP3_CORE1_IOPAD(0x21c6, PIN_INPUT_PULLUP | MUX_MODE0) /* i2c3_sda.hdq */
  		>;
  	};
 +
-+	hmc5843_pins: pinmux_hmc5843_pins {
++	bma180_pins: pinmux_bma180_pins {
 +		pinctrl-single,pins = <
-+			OMAP3_CORE1_IOPAD(0x2134, PIN_INPUT_PULLUP | MUX_MODE4) /* gpio112 */
++			OMAP3_CORE1_IOPAD(0x213a, PIN_INPUT_PULLUP | MUX_MODE4) /* gpio115 */
 +		>;
 +	};
  };
  
  &omap3_pmx_core2 {
-@@ -389,6 +395,10 @@
- 	hmc5843 at 1e {
- 		compatible = "honeywell,hmc5883l";
- 		reg = <0x1e>;
+@@ -320,6 +326,8 @@
+ 	bma180 at 41 {
+ 		compatible = "bosch,bma180";
+ 		reg = <0x41>;
 +		pinctrl-names = "default";
-+		pinctrl-0 = <&hmc5843_pins>;
-+		interrupt-parent = <&gpio4>;
-+		interrupts = <16 IRQ_TYPE_EDGE_FALLING>;	/* gpio112 */
++		pintcrl-0 = <&bma180_pins>;
+ 		interrupt-parent = <&gpio4>;
+ 		interrupts = <19 IRQ_TYPE_LEVEL_HIGH>; /* GPIO_115 */
  	};
- 
- 	/* touchscreen */
 -- 
 2.5.0
