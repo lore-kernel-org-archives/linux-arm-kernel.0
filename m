@@ -1,96 +1,32 @@
-From: liudongdong3@huawei.com (Dongdong Liu)
-Date: Tue, 17 May 2016 11:11:41 +0800
-Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
-In-Reply-To: <1462893601-8937-8-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-8-git-send-email-tn@semihalf.com>
-Message-ID: <573A8BED.7030908@huawei.com>
+From: a0393675@ti.com (Keerthy)
+Date: Tue, 17 May 2016 08:52:06 +0530
+Subject: [PATCH 2/8] Documentation: regulator: tps65218: Update examples
+In-Reply-To: <20160516144847.GA26659@rob-hp-laptop>
+References: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
+ <1462945691-904-3-git-send-email-j-keerthy@ti.com>
+ <20160516144847.GA26659@rob-hp-laptop>
+Message-ID: <573A8E5E.2080809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz
 
-I used the patchset and added "PATCH V6 11/13 specic quirks", tested on HiSilicon D02 board but met the below problem.
 
-[    2.614115] [<ffffff80083b13bc>] hisi_pcie_init+0x6c/0x1ec
-[    2.619571] [<ffffff80083ab060>] pci_ecam_create+0x130/0x1ec
-[    2.625209] [<ffffff80083f3764>] pci_acpi_scan_root+0x160/0x218
-[    2.631096] [<ffffff80083d1f6c>] acpi_pci_root_add+0x36c/0x42c
-[    2.636897] [<ffffff80083ce36c>] acpi_bus_attach+0xe4/0x1a8
-[    2.642438] [<ffffff80083ce3d8>] acpi_bus_attach+0x150/0x1a8
-[    2.648066] [<ffffff80083ce3d8>] acpi_bus_attach+0x150/0x1a8
-[    2.653693] [<ffffff80083ce55c>] acpi_bus_scan+0x64/0x74
-[    2.658975] [<ffffff8008ae665c>] acpi_scan_init+0x5c/0x19c
-[    2.664429] [<ffffff8008ae6408>] acpi_init+0x280/0x2a4
-[    2.669538] [<ffffff80080829e8>] do_one_initcall+0x8c/0x19c
-[    2.675080] [<ffffff8008ac3af8>] kernel_init_freeable+0x14c/0x1ec
-[    2.681139] [<ffffff80087a8438>] kernel_init+0x10/0xfc
-[    2.686248] [<ffffff8008085e10>] ret_from_fork+0x10/0x40
-
-In hisi_pcie_init, I used "struct acpi_device *device = ACPI_COMPANION(dev);".
-I found the reason is V7 lack the below code. I added the below code, it worked ok.
-
-[PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge device companion assignment to core code.
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -564,6 +564,11 @@ static int acpi_pci_root_add(struct acpi_device *device,
-  		}
-  	}
-
-+	/*
-+	 * pci_create_root_bus() needs to detect the parent device type,
-+	 * so initialize its companion data accordingly.
-+	 */
-+	ACPI_COMPANION_SET(&device->dev, device);
-
-This code will be upstreamed with the "PATCH V6 11/13 specic quirks" in next time after the patchset is accepted.
-Right ?
-
-? 2016/5/10 23:19, Tomasz Nowicki ??:
-> This patch provides a way to set the ACPI companion in PCI code.
-> We define acpi_pci_set_companion() to set the ACPI companion pointer and
-> call it from PCI core code. The function is stub for now.
+On Monday 16 May 2016 08:18 PM, Rob Herring wrote:
+> On Wed, May 11, 2016 at 11:18:05AM +0530, Keerthy wrote:
+>> This updates the device tree according to the preferred way of parsing
+>> the nodes using the regulator framework.
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>   .../devicetree/bindings/regulator/tps65218.txt     | 87 ++++++++++++++++++----
+>>   1 file changed, 71 insertions(+), 16 deletions(-)
 >
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->   drivers/pci/probe.c      | 2 ++
->   include/linux/pci-acpi.h | 4 ++++
->   2 files changed, 6 insertions(+)
+> It wasn't exactly clear that the compatible string "added" here is
+> already used, so it looked like you were breaking compatibility at
+> first. Otherwise,
 >
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 8004f67..fb0b752 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -12,6 +12,7 @@
->   #include <linux/slab.h>
->   #include <linux/module.h>
->   #include <linux/cpumask.h>
-> +#include <linux/pci-acpi.h>
->   #include <linux/pci-aspm.h>
->   #include <linux/aer.h>
->   #include <linux/acpi.h>
-> @@ -2141,6 +2142,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->   	bridge->dev.parent = parent;
->   	bridge->dev.release = pci_release_host_bridge_dev;
->   	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
-> +	acpi_pci_set_companion(bridge);
->   	error = pcibios_root_bridge_prepare(bridge);
->   	if (error) {
->   		kfree(bridge);
-> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
-> index 09f9f02..1baa515 100644
-> --- a/include/linux/pci-acpi.h
-> +++ b/include/linux/pci-acpi.h
-> @@ -111,6 +111,10 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
->   static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
->   #endif	/* CONFIG_ACPI */
->
-> +static inline void acpi_pci_set_companion(struct pci_host_bridge *bridge)
-> +{
-> +}
-> +
->   static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus)
->   {
->   	return 0;
+> Acked-by: Rob Herring <robh@kernel.org>
+
+Thanks Rob.
+
 >
