@@ -1,93 +1,48 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 17 May 2016 12:35:33 +0200
-Subject: [PATCH] pwm: Fill pwm->args before calling pwm_request_from_chip()
-In-Reply-To: <1463481333-23438-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1463481333-23438-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1463481333-23438-2-git-send-email-boris.brezillon@free-electrons.com>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Tue, 17 May 2016 11:40:14 +0100
+Subject: [Xen-devel] [GIT PULL] EFI ARM Xen support
+In-Reply-To: <alpine.DEB.2.10.1605171109170.2494@sstabellini-ThinkPad-X260>
+References: <20160514190410.GA2283@codeblueprint.co.uk>
+ <alpine.DEB.2.10.1605171109170.2494@sstabellini-ThinkPad-X260>
+Message-ID: <573AF50E.9090206@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e39c0df1be5a ("pwm: Introduce the pwm_args concept"), moved the
-period and polarity initialization steps into pwm_request_device() (called
-by pwm_request_from_chip()) based on the pwm->args information.
-Make sure we fill pwm->args fields before calling pwm_request_from_chip().
+On 17/05/16 11:12, Stefano Stabellini wrote:
+> On Sat, 14 May 2016, Matt Fleming wrote:
+>> Folks,
+>>
+>> Please pull the following branch which contains support for Xen on ARM
+>> EFI platforms.
+>>
+>> This merge includes a merge of Stefano's xen/linux-next branch to pull
+>> in the prerequisites required for Shannon's commit:
+>>
+>>   11ee5491e5ff ("Xen: EFI: Parse DT parameters for Xen specific UEFI")
+>>
+>> as it needs both the latest changes in the EFI 'next' branch (now
+>> tip/efi/core) and xen/linux-next.
+>>
+>> I have intentionally not included the individual patches as I would
+>> normally do in a pull request, so that commit history created by my
+>> merging of Stefano's branch is preserved, and so that there's no way
+>> to accidentally apply the patches individually.
+>>
+>> The following changes since commit 6c5450ef66816216e574885cf8d3ddb31ef77428:
+>>
+>>   efivarfs: Make efivarfs_file_ioctl() static (2016-05-07 07:06:13 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git efi/arm-xen
+>>
+>> for you to fetch changes up to 11ee5491e5ff519e0d3a7018eb21351cb6955a98:
+>>
+>>   Xen: EFI: Parse DT parameters for Xen specific UEFI (2016-05-14 19:31:01 +0100)
+> 
+> Is this arrangement working for everybody, in particular the tip
+> maintainers?
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-by: Mika Penttil? <mika.penttila@nextfour.com>
-Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
----
-Mika,
+Yes.
 
-Can you test after applying this patch and let me know if it fixes your
-bug.
-
-Thanks,
-
-Boris
-
- drivers/pwm/core.c    | 12 ++++++------
- drivers/pwm/pwm-pxa.c |  4 ++--
- 2 files changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 427142d..3d2eeaa 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -143,10 +143,6 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	if (args->args[0] >= pc->npwm)
- 		return ERR_PTR(-EINVAL);
- 
--	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
--	if (IS_ERR(pwm))
--		return pwm;
--
- 	pwm->args.period = args->args[1];
- 
- 	if (args->args[2] & PWM_POLARITY_INVERTED)
-@@ -154,6 +150,10 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	else
- 		pwm->args.polarity = PWM_POLARITY_NORMAL;
- 
-+	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
-+	if (IS_ERR(pwm))
-+		return pwm;
-+
- 	return pwm;
- }
- EXPORT_SYMBOL_GPL(of_pwm_xlate_with_flags);
-@@ -169,12 +169,12 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	if (args->args[0] >= pc->npwm)
- 		return ERR_PTR(-EINVAL);
- 
-+	pwm->args.period = args->args[1];
-+
- 	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
- 	if (IS_ERR(pwm))
- 		return pwm;
- 
--	pwm->args.period = args->args[1];
--
- 	return pwm;
- }
- 
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-index 58b709f..c33bd42 100644
---- a/drivers/pwm/pwm-pxa.c
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -156,12 +156,12 @@ pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
- {
- 	struct pwm_device *pwm;
- 
-+	pwm->args.period = args->args[0];
-+
- 	pwm = pwm_request_from_chip(pc, 0, NULL);
- 	if (IS_ERR(pwm))
- 		return pwm;
- 
--	pwm->args.period = args->args[0];
--
- 	return pwm;
- }
- 
--- 
-2.7.4
+David
