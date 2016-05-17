@@ -1,337 +1,189 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 17 May 2016 11:48:08 +0200
-Subject: [PATCH 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <1462980974-22091-3-git-send-email-cedric.madianga@gmail.com>
-References: <1462980974-22091-1-git-send-email-cedric.madianga@gmail.com>
- <1462980974-22091-3-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <CALszF6A-jiCBtSO1RFDdgHKTKmsonRXFVs0x2zHha1LJ3UhwtQ@mail.gmail.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Tue, 17 May 2016 10:55:43 +0100
+Subject: [RFC 2/3] drm/mediatek: add support for Mediatek SoC MT2701
+In-Reply-To: <1463053795-55455-3-git-send-email-yt.shen@mediatek.com>
+References: <1463053795-55455-1-git-send-email-yt.shen@mediatek.com>
+ <1463053795-55455-3-git-send-email-yt.shen@mediatek.com>
+Message-ID: <CACvgo52qc4E=MAGLoCaUH+GZuyvPexHchZnvuv-fF8P23e_1Uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Cedric,
+Hi YT Shen,
 
-2016-05-11 17:36 GMT+02:00 M'boumba Cedric Madianga <cedric.madianga@gmail.com>:
-> This patch adds support for the STM32F4 I2C controller.
+On 12 May 2016 at 12:49,  <yt.shen@mediatek.com> wrote:
+> From: YT Shen <yt.shen@mediatek.com>
 >
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> This patch add support for the Mediatek MT2701 DISP subsystem.
+> There is only one OVL engine in MT2701, and we have shadow
+> register support here.
+>
+> Signed-off-by: YT Shen <yt.shen@mediatek.com>
 > ---
->  drivers/i2c/busses/Kconfig       |  10 +
->  drivers/i2c/busses/Makefile      |   1 +
->  drivers/i2c/busses/i2c-stm32f4.c | 872 +++++++++++++++++++++++++++++++++++++++
->  3 files changed, 883 insertions(+)
->  create mode 100644 drivers/i2c/busses/i2c-stm32f4.c
+>  drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |   49 ++++++---
+>  drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |   36 +++++--
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c     |   78 +++++++++-----
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |  151 ++++++++++++++++++++-------
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.h      |    2 +
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |   63 +++++++++--
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |   15 +++
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   72 +++++++++++--
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h      |    9 ++
+>  drivers/gpu/drm/mediatek/mtk_drm_gem.c      |    4 +
+>  10 files changed, 373 insertions(+), 106 deletions(-)
 >
-...
-> diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
-> new file mode 100644
-> index 0000000..4692213
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-stm32f4.c
-...
-> +enum stm32f4_i2c_speed {
-> +       STM32F4_I2C_SPEED_STANDARD, /* 100 kHz */
-> +       STM32F4_I2C_SPEED_FAST, /* 400 kHz */
-> +       STM32F4_I2C_SPEED_END,
+This patch does a bit too many things at once imho
+ - Renames existing macros
+ - Factors out helper functions - mtk_crtc_ddp_config and alike.
+ - Introduces *driver_data for existing hardware and uses it
+ - and adds support for the different hardware.
+
+I'm no expert in the area, but it feels like you want to split things
+roughly as per above.
+A rather serious mali note and some "this should be const" follow
+suggestions inline.
+
+
+>
+> +static struct mtk_ddp_comp_driver_data mt2701_ovl_driver_data = {
+> +       .ovl = {0x0040, 1 << 12, 0}
 > +};
 > +
-> +/**
-> + * struct stm32f4_i2c_timings - per-Mode tuning parameters
-> + * @rate: I2C bus rate
-> + * @duty: Fast mode duty cycle
-> + */
-> +struct stm32f4_i2c_timings {
-> +       u32 rate;
-> +       u32 duty;
-> +};
-...
-> +/**
-> + * struct stm32f4_i2c_dev - private data of the controller
-> + * @adap: I2C adapter for this controller
-> + * @dev: device for this controller
-> + * @base: virtual memory area
-> + * @complete: completion of I2C message
-> + * @irq_event: interrupt event line for the controller
-> + * @irq_error: interrupt error line for the controller
-> + * @clk: hw i2c clock
-> + * speed: I2C clock frequency of the controller. Standard or Fast only supported
-> + * @client: I2C transfer information
-> + * @busy: I2C transfer on-going
-> + * @rst: I2C reset line
-> + */
-> +struct stm32f4_i2c_dev {
-> +       struct i2c_adapter              adap;
-> +       struct device                   *dev;
-> +       void __iomem                    *base;
-> +       struct completion               complete;
-> +       int                             irq_event;
-> +       int                             irq_error;
-> +       struct clk                      *clk;
-> +       int                             speed;
-> +       struct stm32f4_i2c_client       client;
-> +       bool                            busy;
-> +       struct reset_control            *rst;
+> +static struct mtk_ddp_comp_driver_data mt8173_ovl_driver_data = {
+> +       .ovl = {0x0f40, 0, 1 << 12}
 > +};
 > +
-> +static struct stm32f4_i2c_timings i2c_timings[] = {
-> +       [STM32F4_I2C_SPEED_STANDARD] = {
-> +               .rate                   = 100000,
-> +               .duty                   = 0,
-> +       },
-> +       [STM32F4_I2C_SPEED_FAST] = {
-> +               .rate                   = 400000,
-> +               .duty                   = 0,
-> +       },
+These two should be const right ?
+
+
+>
+> +static struct mtk_ddp_comp_driver_data mt2701_rdma_driver_data = {
+> +       .rdma_fifo_pseudo_size = SZ_4K,
 > +};
-Is this table really needed?
-As duty value seems to always be 0, couldn't you just store the rate
-in the speed field?
+> +
+> +static struct mtk_ddp_comp_driver_data mt8173_rdma_driver_data = {
+> +       .rdma_fifo_pseudo_size = SZ_8K,
+> +};
+> +
+Same here.
 
 
-> +static void stm32f4_i2c_set_rise_time(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       u32 trise, freq, cr2;
+>
+> -#define MUTEX_MOD_DISP_OVL0            BIT(11)
+> -#define MUTEX_MOD_DISP_OVL1            BIT(12)
+> -#define MUTEX_MOD_DISP_RDMA0           BIT(13)
+> -#define MUTEX_MOD_DISP_RDMA1           BIT(14)
+> -#define MUTEX_MOD_DISP_RDMA2           BIT(15)
+> -#define MUTEX_MOD_DISP_WDMA0           BIT(16)
+> -#define MUTEX_MOD_DISP_WDMA1           BIT(17)
+> -#define MUTEX_MOD_DISP_COLOR0          BIT(18)
+> -#define MUTEX_MOD_DISP_COLOR1          BIT(19)
+> -#define MUTEX_MOD_DISP_AAL             BIT(20)
+> -#define MUTEX_MOD_DISP_GAMMA           BIT(21)
+> -#define MUTEX_MOD_DISP_UFOE            BIT(22)
+> -#define MUTEX_MOD_DISP_PWM0            BIT(23)
+> -#define MUTEX_MOD_DISP_PWM1            BIT(24)
+> -#define MUTEX_MOD_DISP_OD              BIT(25)
+> +#define MUTEX_MOD_MT8173_DISP_OVL0             BIT(11)
+> +#define MUTEX_MOD_MT8173_DISP_OVL1             BIT(12)
+> +#define MUTEX_MOD_MT8173_DISP_RDMA0            BIT(13)
+> +#define MUTEX_MOD_MT8173_DISP_RDMA1            BIT(14)
+> +#define MUTEX_MOD_MT8173_DISP_RDMA2            BIT(15)
+> +#define MUTEX_MOD_MT8173_DISP_WDMA0            BIT(16)
+> +#define MUTEX_MOD_MT8173_DISP_WDMA1            BIT(17)
+> +#define MUTEX_MOD_MT8173_DISP_COLOR0           BIT(18)
+> +#define MUTEX_MOD_MT8173_DISP_COLOR1           BIT(19)
+> +#define MUTEX_MOD_MT8173_DISP_AAL              BIT(20)
+> +#define MUTEX_MOD_MT8173_DISP_GAMMA            BIT(21)
+> +#define MUTEX_MOD_MT8173_DISP_UFOE             BIT(22)
+> +#define MUTEX_MOD_MT8173_DISP_PWM0             BIT(23)
+> +#define MUTEX_MOD_MT8173_DISP_PWM1             BIT(24)
+> +#define MUTEX_MOD_MT8173_DISP_OD               BIT(25)
 > +
-> +       cr2 = readl_relaxed(i2c_dev->base + STM32F4_I2C_CR2);
-> +       freq = cr2 & STM32F4_I2C_CR2_FREQ_MASK;
-> +
-> +       trise = readl_relaxed(i2c_dev->base + STM32F4_I2C_TRISE);
-> +       trise &= ~STM32F4_I2C_TRISE_TRISE_MASK;
-> +
-> +       if (i2c_dev->speed == STM32F4_I2C_SPEED_STANDARD)
-> +               trise |= STM32F4_I2C_TRISE_TRISE((freq + 1));
-> +       else
-> +               trise |= STM32F4_I2C_TRISE_TRISE((((freq * 300) / 1000) + 1));
-Or if you keep the timings struct, maybe the rise time should be part of it.
-Doing, that, you will avoid the if/else
-
-> +
-> +       writel_relaxed(trise, i2c_dev->base + STM32F4_I2C_TRISE);
-> +}
-> +
-> +static void stm32f4_i2c_set_speed_mode(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       struct stm32f4_i2c_timings *t = &i2c_timings[i2c_dev->speed];
-> +       u32 ccr, val, clk_rate;
-> +
-> +       ccr = readl_relaxed(i2c_dev->base + STM32F4_I2C_CCR);
-> +       ccr &= ~(STM32F4_I2C_CCR_FS | STM32F4_I2C_CCR_DUTY |
-> +                STM32F4_I2C_CCR_CCR_MASK);
-> +
-> +       clk_rate = clk_get_rate(i2c_dev->clk);
-> +
-> +       switch (i2c_dev->speed) {
-> +       case STM32F4_I2C_SPEED_STANDARD:
-> +               val = clk_rate / t->rate * 2;
-> +               if (val < STM32F4_I2C_MIN_CCR)
-> +                       ccr |= STM32F4_I2C_CCR_CCR(STM32F4_I2C_MIN_CCR);
-> +               else
-> +                       ccr |= STM32F4_I2C_CCR_CCR(val);
-> +               break;
-> +       case STM32F4_I2C_SPEED_FAST:
-> +               ccr |= STM32F4_I2C_CCR_FS;
-> +               if (t->duty) {
-> +                       ccr |= STM32F4_I2C_CCR_DUTY;
-> +                       ccr |= STM32F4_I2C_CCR_CCR(clk_rate / t->rate * 25);
-> +               } else {
-> +                       ccr |= STM32F4_I2C_CCR_CCR(clk_rate / t->rate * 3);
-> +               }
-Is it really useful since duty seems to always be 0?
-
-> +               break;
-> +       default:
-> +               dev_err(i2c_dev->dev, "I2C speed mode not supported\n");
-> +       }
-> +
-> +       writel_relaxed(ccr, i2c_dev->base + STM32F4_I2C_CCR);
-> +}
-> +
-> +static void stm32f4_i2c_set_filter(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       u32 filter;
-> +
-> +       /* Enable analog noise filter and disable digital noise filter */
-Maybe a stupid question, but is it always what we want?
-Are there some cases we would prefer to use the digital noise filter
-instead of the analog one?
-
-> +       filter = readl_relaxed(i2c_dev->base + STM32F4_I2C_FLTR);
-> +       filter &= ~(STM32F4_I2C_FLTR_ANOFF | STM32F4_I2C_FLTR_DNF_MASK);
-> +       writel_relaxed(filter, i2c_dev->base + STM32F4_I2C_FLTR);
-> +}
-> +
-> +/**
-> + * stm32f4_i2c_hw_config() - Prepare I2C block
-> + * @i2c_dev: Controller's private data
-> + */
-> +static void stm32f4_i2c_hw_config(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       void __iomem *reg = i2c_dev->base + STM32F4_I2C_CR1;
-> +
-> +       /* Disable I2C */
-> +       stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR1_PE);
-> +
-> +       stm32f4_i2c_set_periph_clk_freq(i2c_dev);
-> +
-> +       stm32f4_i2c_set_rise_time(i2c_dev);
-> +
-> +       stm32f4_i2c_set_speed_mode(i2c_dev);
-> +
-> +       stm32f4_i2c_set_filter(i2c_dev);
-> +
-> +       /* Enable I2C */
-> +       stm32f4_i2c_set_bits(reg, STM32F4_I2C_CR1_PE);
-> +}
-> +
-> +static int stm32f4_i2c_wait_free_bus(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       u32 status;
-> +       int ret;
-> +
-> +       ret = readl_relaxed_poll_timeout(i2c_dev->base + STM32F4_I2C_SR2,
-> +                                        status,
-> +                                        !(status & STM32F4_I2C_SR2_BUSY),
-> +                                        10, 1000);
-> +       if (ret) {
-> +               dev_err(i2c_dev->dev, "bus not free\n");
-> +               ret = -EBUSY;
-> +       }
-> +
-> +       return ret;
-> +}
-> +
-> +/**
-> + * stm32f4_i2c_write_ byte() - Write a byte in the data register
-> + * @i2c_dev: Controller's private data
-> + * @byte: Data to write in the register
-> + */
-> +static void stm32f4_i2c_write_byte(struct stm32f4_i2c_dev *i2c_dev, u8 byte)
-> +{
-> +       writel_relaxed(byte, i2c_dev->base + STM32F4_I2C_DR);
-> +}
-> +
-> +/**
-> + * stm32f4_i2c_write_msg() - Fill the data register in write mode
-> + * @i2c_dev: Controller's private data
-> + *
-> + * This function fills the data register with I2C transfer buffer
-> + */
-> +static void stm32f4_i2c_write_msg(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       struct stm32f4_i2c_client *c = &i2c_dev->client;
-> +
-> +       stm32f4_i2c_write_byte(i2c_dev, *c->buf++);
-> +       c->count--;
-> +}
-> +
-> +static void stm32f4_i2c_read_msg(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       struct stm32f4_i2c_client *c = &i2c_dev->client;
-> +       u32 rbuf;
-> +
-> +       rbuf = readl_relaxed(i2c_dev->base + STM32F4_I2C_DR);
-> +       *c->buf++ = (u8)rbuf & 0xff;
-> +       c->count--;
-> +}
-> +
-> +static void stm32f4_i2c_terminate_xfer(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       struct stm32f4_i2c_client *c = &i2c_dev->client;
-> +       void __iomem *reg = i2c_dev->base + STM32F4_I2C_CR2;
-> +
-> +       /* Disable all interrupts */
-> +       stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_IRQ_MASK);
-> +
-> +       /* Set STOP or REPSTART */
-> +       reg = i2c_dev->base + STM32F4_I2C_CR1;
-> +       if (c->stop)
-> +               stm32f4_i2c_set_bits(reg, STM32F4_I2C_CR1_STOP);
-> +       else
-> +               stm32f4_i2c_set_bits(reg, STM32F4_I2C_CR1_START);
-> +
-> +       complete(&i2c_dev->complete);
-> +}
-> +
-> +/**
-> + * stm32f4_i2c_handle_write() - Handle FIFO empty interrupt in case of write
-> + * @i2c_dev: Controller's private data
-> + */
-> +static void stm32f4_i2c_handle_write(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       struct stm32f4_i2c_client *c = &i2c_dev->client;
-> +       void __iomem *reg = i2c_dev->base + STM32F4_I2C_CR2;
-> +
-> +       if (c->count) {
-> +               stm32f4_i2c_write_msg(i2c_dev);
-> +               if (!c->count) {
-> +                       /* Disable BUF interrupt */
-> +                       stm32f4_i2c_clr_bits(reg, STM32F4_I2C_CR2_ITBUFEN);
-> +               }
-> +       } else {
-> +               stm32f4_i2c_terminate_xfer(i2c_dev);
-> +       }
-> +}
-> +
-> +/**
-> + * stm32f4_i2c_handle_tx_btf() - Handle byte transfer finished interrupt
-> + * in case of write
-> + * @i2c_dev: Controller's private data
-> + */
-> +static void stm32f4_i2c_handle_tx_btf(struct stm32f4_i2c_dev *i2c_dev)
-> +{
-> +       struct stm32f4_i2c_client *c = &i2c_dev->client;
-> +
-> +       if (c->count)
-> +               stm32f4_i2c_write_msg(i2c_dev);
-> +       else
-> +               stm32f4_i2c_terminate_xfer(i2c_dev);
-> +}
-The two functions above look very similar.
-Isn't there a way to factorize?
-
-> +
-> +/**
-> + * stm32f4_i2c_handle_read() - Handle FIFO enmpty interrupt in case of read
-s/enmpty/empty/
+> +#define MUTEX_MOD_MT2701_DISP_OVL              BIT(3)
+> +#define MUTEX_MOD_MT2701_DISP_WDMA             BIT(6)
+> +#define MUTEX_MOD_MT2701_DISP_COLOR            BIT(7)
+> +#define MUTEX_MOD_MT2701_DISP_BLS              BIT(9)
+> +#define MUTEX_MOD_MT2701_DISP_RDMA0            BIT(10)
+> +#define MUTEX_MOD_MT2701_DISP_RDMA1            BIT(12)
+>
+Even though the driver not does use a unique prefix/namespace for
+these macros (which it should imho), it's better to keep the hardware
+name/part first. Ideally the rename will be a separate patch.
 
 
-...
+> @@ -131,6 +153,32 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+>         [DDP_COMPONENT_WDMA1]   = { MTK_DISP_WDMA,      1, NULL },
+>  };
+>
+> +static struct mtk_ddp_comp_driver_data mt2701_color_driver_data = {
+> +       .color_offset = 0x0f00,
+> +};
 > +
-> +/**
-> + * stm32f4_i2c_xfer() - Transfer combined I2C message
-> + * @i2c_adap: Adapter pointer to the controller
-> + * @msgs: Pointer to data to be written.
-> + * @num: Number of messages to be executed
-> + */
-> +static int stm32f4_i2c_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[],
-> +                           int num)
-> +{
-> +       struct stm32f4_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
-> +       int ret, i;
+> +static struct mtk_ddp_comp_driver_data mt8173_color_driver_data = {
+> +       .color_offset = 0x0c00,
+> +};
 > +
-> +       i2c_dev->busy = true;
-> +
-> +       ret = clk_prepare_enable(i2c_dev->clk);
-> +       if (ret) {
-> +               dev_err(i2c_dev->dev, "Failed to prepare_enable clock\n");
-> +               return ret;
-> +       }
-> +
-> +       stm32f4_i2c_hw_config(i2c_dev);
-Maybe you could call this only at probe and resume time?
-You would save some register accesses.
+const again ? You can even tweak the *_get_driver_data helpers, to
+return const struct foo*, and resolve the odd warning that the
+compiler will give you.
 
-> +
-> +       for (i = 0; i < num && !ret; i++)
-> +               ret = stm32f4_i2c_xfer_msg(i2c_dev, &msgs[i], i == 0,
-> +                                          i == num - 1);
-> +
-> +       clk_disable_unprepare(i2c_dev->clk);
-> +
-> +       i2c_dev->busy = false;
-> +
-> +       return (ret < 0) ? ret : i;
-> +}
-> +
 
-Thanks!
-Maxime
+>  struct mtk_ddp_comp {
+>         struct clk *clk;
+>         void __iomem *regs;
+> @@ -82,6 +96,7 @@ struct mtk_ddp_comp {
+>         struct device *larb_dev;
+>         enum mtk_ddp_comp_id id;
+>         const struct mtk_ddp_comp_funcs *funcs;
+> +       struct mtk_ddp_comp_driver_data *data;
+const
+
+
+> +static struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
+> +       .main_path = mtk_ddp_main_2701,
+> +       .main_len = ARRAY_SIZE(mtk_ddp_main_2701),
+> +       .ext_path = mtk_ddp_ext_2701,
+> +       .ext_len = ARRAY_SIZE(mtk_ddp_ext_2701),
+> +       .shadow_register = true,
+> +};
+> +
+> +static struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+> +       .main_path = mtk_ddp_main_8173,
+> +       .main_len = ARRAY_SIZE(mtk_ddp_main_8173),
+> +       .ext_path = mtk_ddp_ext_8173,
+> +       .ext_len = ARRAY_SIZE(mtk_ddp_ext_8173),
+> +       .shadow_register = false,
+> +};
+> +
+const
+
+
+> @@ -40,6 +48,7 @@ struct mtk_drm_private {
+>         void __iomem *config_regs;
+>         struct device_node *comp_node[DDP_COMPONENT_ID_MAX];
+>         struct mtk_ddp_comp *ddp_comp[DDP_COMPONENT_ID_MAX];
+> +       struct mtk_mmsys_driver_data *data;
+const ?
+
+
+> @@ -108,6 +108,10 @@ int mtk_drm_gem_dumb_create(struct drm_file *file_priv, struct drm_device *dev,
+>         int ret;
+>
+>         args->pitch = DIV_ROUND_UP(args->width * args->bpp, 8);
+> +       /*
+> +       * align to 8 bytes since Mali requires it.
+> +       */
+> +       args->pitch = ALIGN(args->pitch, 8);
+Are you sure we need this, based on the line just above ?
+
+Iirc we had a chat earlier that upstream kernel code should not be
+tailoured for the needs to closed source userspace... seems like the
+comment got removed but the code remained. Philipp Zabel I believe you
+were the person who did the original upstreaming - can we remove this
+hack/workaround and keep it downstream until we have an open-source
+user that requires it ?
+
+Can we have a MAINTAINERS entry for this driver ?
+
+Thanks
+Emil
