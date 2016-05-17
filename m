@@ -1,92 +1,180 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 17 May 2016 14:19:17 +0200
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 17 May 2016 14:27:25 +0200
 Subject: [PATCH] pwm: atmel-hlcdc: Fix default PWM polarity
-In-Reply-To: <20160517140803.078e3f5e@bbrezillon>
+In-Reply-To: <20160517121917.GD26166@ulmo.ba.sec>
 References: <1463476352-7485-1-git-send-email-boris.brezillon@free-electrons.com>
  <20160517110005.GA26166@ulmo.ba.sec>
  <20160517140803.078e3f5e@bbrezillon>
-Message-ID: <20160517121917.GD26166@ulmo.ba.sec>
+ <20160517121917.GD26166@ulmo.ba.sec>
+Message-ID: <20160517142725.7f7c82b4@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2016 at 02:08:03PM +0200, Boris Brezillon wrote:
-> Hi Thierry,
-> 
-> On Tue, 17 May 2016 13:00:05 +0200
-> Thierry Reding <thierry.reding@gmail.com> wrote:
-> 
-> > On Tue, May 17, 2016 at 11:12:32AM +0200, Boris Brezillon wrote:
-> > > The PWM device exposed by the HLCDC IP is configured with an inverted
-> > > polarity by default. Registering the PWM chip with the normal polarity
-> > > was not a problem before commit 42e8992c58d4 ("pwm: Add core
-> > > infrastructure to allow atomic updates") because the ->set_polarity()
-> > > hook was called no matter the current polarity state, but this is no longer
-> > > the case.
+On Tue, 17 May 2016 14:19:17 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Tue, May 17, 2016 at 02:08:03PM +0200, Boris Brezillon wrote:
+> > Hi Thierry,
+> > 
+> > On Tue, 17 May 2016 13:00:05 +0200
+> > Thierry Reding <thierry.reding@gmail.com> wrote:
+> >   
+> > > On Tue, May 17, 2016 at 11:12:32AM +0200, Boris Brezillon wrote:  
+> > > > The PWM device exposed by the HLCDC IP is configured with an inverted
+> > > > polarity by default. Registering the PWM chip with the normal polarity
+> > > > was not a problem before commit 42e8992c58d4 ("pwm: Add core
+> > > > infrastructure to allow atomic updates") because the ->set_polarity()
+> > > > hook was called no matter the current polarity state, but this is no longer
+> > > > the case.
+> > > > 
+> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > > > Fixes: 42e8992c58d4 ("pwm: Add core infrastructure to allow atomic updates")    
 > > > 
-> > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > Fixes: 42e8992c58d4 ("pwm: Add core infrastructure to allow atomic updates")  
+> > > That's not technically correct, because it's the driver that has the
+> > > bug. The core change merely exposes it. How about if I sort this into
+> > > the pwm-atomic branch and reword the commit message accordingly? That
+> > > way things should all stay bisectible.
+> > > 
+> > > Then again, given the breakage caused by the pwm_args patch I suppose
+> > > it doesn't matter much because that's part of a stable branch that I
+> > > can't rebase.  
 > > 
-> > That's not technically correct, because it's the driver that has the
-> > bug. The core change merely exposes it. How about if I sort this into
-> > the pwm-atomic branch and reword the commit message accordingly? That
-> > way things should all stay bisectible.
+> > If I understood correctly, you plan to rebase your pwm-atomic branch to
+> > insert this commit before commit 42e8992c58d4 ("pwm: Add core
+> > infrastructure to allow atomic updates").
 > > 
-> > Then again, given the breakage caused by the pwm_args patch I suppose
-> > it doesn't matter much because that's part of a stable branch that I
-> > can't rebase.
+> > Could you consider taking the following commit (or something similar if
+> > you already have a fix) as the first commit of your pwm-atomic branch?
+> > 
+> > Sorry for the mess around the introduction of pwm_args and pwm_state
+> > (that's not an excuse, but I've reworked this series so many time that I
+> > forgot to check bisectibility on the last versions :-().
+> > 
+> > ---
+> > From ad73fa3a56c7320979425d64ab54c09b9d83d4cf Mon Sep 17 00:00:00 2001
+> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Date: Tue, 17 May 2016 13:55:02 +0200
+> > Subject: [PATCH] pwm: Fix pwm_apply_args() call sites
+> > 
+> > pwm_apply_args() is supposed to initialize a PWM device according to the
+> > arguments provided by the DT or the PWM lookup, but this function was
+> > called inside pwm_device_request(), which in turn was called before the
+> > core had a chance to initialize the pwm->args fields.
+> > 
+> > Fix that by calling pwm_apply_args directly in pwm_get() and of_pwm_get()
+> > after initializing pwm->args field.
+> > 
+> > This commit also fixes an invalid pointer dereference introduced by
+> > commit e39c0df1be5a ("pwm: Introduce the pwm_args concept").
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
+> > ---
+> >  drivers/pwm/core.c | 27 +++++++++++++++++----------
+> >  1 file changed, 17 insertions(+), 10 deletions(-)  
 > 
-> If I understood correctly, you plan to rebase your pwm-atomic branch to
-> insert this commit before commit 42e8992c58d4 ("pwm: Add core
-> infrastructure to allow atomic updates").
+> This looks good to me. However I can't easily apply this because git
+> gets confused by the existing headers. Also manually copying out the
+> patch yields patch corruption that I don't exactly know how to fix.
 > 
-> Could you consider taking the following commit (or something similar if
-> you already have a fix) as the first commit of your pwm-atomic branch?
-> 
-> Sorry for the mess around the introduction of pwm_args and pwm_state
-> (that's not an excuse, but I've reworked this series so many time that I
-> forgot to check bisectibility on the last versions :-().
-> 
-> ---
-> From ad73fa3a56c7320979425d64ab54c09b9d83d4cf Mon Sep 17 00:00:00 2001
-> From: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Date: Tue, 17 May 2016 13:55:02 +0200
-> Subject: [PATCH] pwm: Fix pwm_apply_args() call sites
-> 
-> pwm_apply_args() is supposed to initialize a PWM device according to the
-> arguments provided by the DT or the PWM lookup, but this function was
-> called inside pwm_device_request(), which in turn was called before the
-> core had a chance to initialize the pwm->args fields.
-> 
-> Fix that by calling pwm_apply_args directly in pwm_get() and of_pwm_get()
-> after initializing pwm->args field.
-> 
-> This commit also fixes an invalid pointer dereference introduced by
-> commit e39c0df1be5a ("pwm: Introduce the pwm_args concept").
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
-> ---
->  drivers/pwm/core.c | 27 +++++++++++++++++----------
->  1 file changed, 17 insertions(+), 10 deletions(-)
+> I think you can inline patches by using a scissor mark (--- >8 ---)
+> instead of the signature separator (---). Or you can attach the patch
+> with "Content-Disposition: inline".
 
-This looks good to me. However I can't easily apply this because git
-gets confused by the existing headers. Also manually copying out the
-patch yields patch corruption that I don't exactly know how to fix.
+Ok, it's my PEBKAC day. Here it is with the scissor mark. As mentioned
+on IRC, you'll also have to squash those changes [1] into 93c0d9b
+("pwm: Keep PWM state in sync with hardware state").
 
-I think you can inline patches by using a scissor mark (--- >8 ---)
-instead of the signature separator (---). Or you can attach the patch
-with "Content-Disposition: inline".
+> 
+> Rather than putting this into the pwm-atomic branch, I'll probably stick
+> it into the pwm-args branch on top of the existing patch. Technically
+> only the existing patch needs to be stable, so the branch can still
+> evolve.
 
-Rather than putting this into the pwm-atomic branch, I'll probably stick
-it into the pwm-args branch on top of the existing patch. Technically
-only the existing patch needs to be stable, so the branch can still
-evolve.
+Ok, great!
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160517/596c6957/attachment.sig>
+Thanks,
+
+Boris
+
+[1]http://code.bulix.org/egoo4y-98645
+
+--->8---
+>From ad73fa3a56c7320979425d64ab54c09b9d83d4cf Mon Sep 17 00:00:00 2001
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Date: Tue, 17 May 2016 13:55:02 +0200
+Subject: [PATCH] pwm: Fix pwm_apply_args() call sites
+
+pwm_apply_args() is supposed to initialize a PWM device according to the
+arguments provided by the DT or the PWM lookup, but this function was
+called inside pwm_device_request(), which in turn was called before the
+core had a chance to initialize the pwm->args fields.
+
+Fix that by calling pwm_apply_args directly in pwm_get() and of_pwm_get()
+after initializing pwm->args field.
+
+This commit also fixes an invalid pointer dereference introduced by
+commit e39c0df1be5a ("pwm: Introduce the pwm_args concept").
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
+---
+ drivers/pwm/core.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 680fbc7..22cf395 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -128,13 +128,6 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
+ 	set_bit(PWMF_REQUESTED, &pwm->flags);
+ 	pwm->label = label;
+ 
+-	/*
+-	 * FIXME: This should be removed once all PWM users properly make use
+-	 * of struct pwm_args to initialize the PWM device. As long as this is
+-	 * here, the PWM state and hardware state can get out of sync.
+-	 */
+-	pwm_apply_args(pwm);
+-
+ 	return 0;
+ }
+ 
+@@ -627,6 +620,13 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
+ 
+ 	pwm->label = con_id;
+ 
++	/*
++	 * FIXME: This should be removed once all PWM users properly make use
++	 * of struct pwm_args to initialize the PWM device. As long as this is
++	 * here, the PWM state and hardware state can get out of sync.
++	 */
++	pwm_apply_args(pwm);
++
+ put:
+ 	of_node_put(args.np);
+ 
+@@ -754,13 +754,20 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
+ 	if (!chip)
+ 		goto out;
+ 
+-	pwm->args.period = chosen->period;
+-	pwm->args.polarity = chosen->polarity;
+-
+ 	pwm = pwm_request_from_chip(chip, chosen->index, con_id ?: dev_id);
+ 	if (IS_ERR(pwm))
+ 		goto out;
+ 
++	pwm->args.period = chosen->period;
++	pwm->args.polarity = chosen->polarity;
++
++	/*
++	 * FIXME: This should be removed once all PWM users properly make use
++	 * of struct pwm_args to initialize the PWM device. As long as this is
++	 * here, the PWM state and hardware state can get out of sync.
++	 */
++	pwm_apply_args(pwm);
++
+ out:
+ 	mutex_unlock(&pwm_lookup_lock);
+ 	return pwm;
