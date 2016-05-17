@@ -1,39 +1,49 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Tue, 17 May 2016 16:16:30 -0400
-Subject: [PATCH 2/2] ARM: dts: TS-4800: add CAN support
-In-Reply-To: <1463516190-10606-1-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1463516190-10606-1-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <1463516190-10606-2-git-send-email-damien.riegel@savoirfairelinux.com>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Tue, 17 May 2016 13:21:13 -0700
+Subject: [PATCH 1/1] net: thunderx: avoid null pointer dereference
+In-Reply-To: <1463514038-9008-1-git-send-email-xypron.glpk@gmx.de>
+References: <1463514038-9008-1-git-send-email-xypron.glpk@gmx.de>
+Message-ID: <573B7D39.9050305@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables support for the CAN controller located in the FPGA.
+On 05/17/2016 12:40 PM, Heinrich Schuchardt wrote:
+> In function bgx_lmac_handler only use a member of
+> lmac after checking it is not null.
+>
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
----
- arch/arm/boot/dts/imx51-ts4800.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Were you seeing and actual OOPs, or is this only a theoretical problem 
+flagged by some sort of static code checker?
 
-diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
-index 2c89988..41be82e 100644
---- a/arch/arm/boot/dts/imx51-ts4800.dts
-+++ b/arch/arm/boot/dts/imx51-ts4800.dts
-@@ -149,6 +149,16 @@
- 		#size-cells = <1>;
- 		ranges = <0 0 0 0x1d000>;
- 
-+		can at 0,1a000 {
-+			compatible = "technologic,sja1000";
-+			reg = <0x1a000 0x00000100>;
-+			interrupt-parent = <&fpga_irqc>;
-+			interrupts = <1>;
-+			reg-io-width = <2>;
-+			nxp,tx-output-config = <0x06>;
-+			nxp,external-clock-frequency = <24000000>;
-+		};
-+
- 		fpga_irqc: fpga_irqc at 0,15000 {
- 			compatible = "technologic,ts4800-irqc";
- 			reg = <0x15000 0x1000>;
--- 
-2.5.0
+> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+
+In any event, it seems sane to make this change, so:
+
+Acked-by: David Daney <david.daney@cavium.com>
+
+
+> ---
+>   drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 4 +++-
+>   1 file changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> index d20539a..3ed2198 100644
+> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+> @@ -274,12 +274,14 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
+>   static void bgx_lmac_handler(struct net_device *netdev)
+>   {
+>   	struct lmac *lmac = container_of(netdev, struct lmac, netdev);
+> -	struct phy_device *phydev = lmac->phydev;
+> +	struct phy_device *phydev;
+>   	int link_changed = 0;
+>
+>   	if (!lmac)
+>   		return;
+>
+> +	phydev = lmac->phydev;
+> +
+>   	if (!phydev->link && lmac->last_link)
+>   		link_changed = -1;
+>
+>
