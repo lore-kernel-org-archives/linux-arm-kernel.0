@@ -1,125 +1,248 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 17 May 2016 14:08:03 +0200
-Subject: [PATCH] pwm: atmel-hlcdc: Fix default PWM polarity
-In-Reply-To: <20160517110005.GA26166@ulmo.ba.sec>
-References: <1463476352-7485-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160517110005.GA26166@ulmo.ba.sec>
-Message-ID: <20160517140803.078e3f5e@bbrezillon>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Tue, 17 May 2016 13:10:53 +0100
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <573B0A4D.4090704@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-On Tue, 17 May 2016 13:00:05 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
-
-> On Tue, May 17, 2016 at 11:12:32AM +0200, Boris Brezillon wrote:
-> > The PWM device exposed by the HLCDC IP is configured with an inverted
-> > polarity by default. Registering the PWM chip with the normal polarity
-> > was not a problem before commit 42e8992c58d4 ("pwm: Add core
-> > infrastructure to allow atomic updates") because the ->set_polarity()
-> > hook was called no matter the current polarity state, but this is no longer
-> > the case.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Fixes: 42e8992c58d4 ("pwm: Add core infrastructure to allow atomic updates")  
+On 05/04/16 23:08, Yury Norov wrote:
+> This version is rebased on kernel v4.6-rc2, and has fixes in signal subsystem.
+> It works with updated glibc [1] (though very draft), and tested with LTP.
 > 
-> That's not technically correct, because it's the driver that has the
-> bug. The core change merely exposes it. How about if I sort this into
-> the pwm-atomic branch and reword the commit message accordingly? That
-> way things should all stay bisectible.
+> It was tested on QEMU and ThunderX machines. No major difference found.
+> This is RFC because ILP32 is not tested in big-endian mode.
 > 
-> Then again, given the breakage caused by the pwm_args patch I suppose
-> it doesn't matter much because that's part of a stable branch that I
-> can't rebase.
+>  v3: https://lkml.org/lkml/2014/9/3/704
+>  v4: https://lkml.org/lkml/2015/4/13/691
+>  v5: https://lkml.org/lkml/2015/9/29/911
+> 
+>  v6:
+>  - time_t, __kenel_off_t and other types turned to be 32-bit
+>    for compatibility reasons (after v5 discussion);
 
-If I understood correctly, you plan to rebase your pwm-atomic branch to
-insert this commit before commit 42e8992c58d4 ("pwm: Add core
-infrastructure to allow atomic updates").
+i added libc-alpha to cc, the thread is at
+https://lkml.org/lkml/2016/4/5/872
+or http://thread.gmane.org/gmane.linux.kernel.cross-arch/31449
 
-Could you consider taking the following commit (or something similar if
-you already have a fix) as the first commit of your pwm-atomic branch?
+the kernel position seems to be that the aarch64 ilp32 syscall abi
+will follow regular 32bit abis (apart from signal context and ptrace
+related things and syscalls will take 64bit arguments).
 
-Sorry for the mess around the introduction of pwm_args and pwm_state
-(that's not an excuse, but I've reworked this series so many time that I
-forgot to check bisectibility on the last versions :-().
+i think the reasoning is that this allows legacy (non-64bit-safe)
+software to use this abi on aarch64 without trouble.
 
----
->From ad73fa3a56c7320979425d64ab54c09b9d83d4cf Mon Sep 17 00:00:00 2001
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
-Date: Tue, 17 May 2016 13:55:02 +0200
-Subject: [PATCH] pwm: Fix pwm_apply_args() call sites
+i think this design should be ok for glibc.
 
-pwm_apply_args() is supposed to initialize a PWM device according to the
-arguments provided by the DT or the PWM lookup, but this function was
-called inside pwm_device_request(), which in turn was called before the
-core had a chance to initialize the pwm->args fields.
+there are some interop issues between processes following different abis
+(e.g. shared mutexes, abi specific file formats, lib paths,..) which apply,
+but i assume it is no different from existing 32bit vs 64bit issues.
 
-Fix that by calling pwm_apply_args directly in pwm_get() and of_pwm_get()
-after initializing pwm->args field.
+the 32bit time_t and off_t are ugly and i wonder if 32bit __kernel_off_t
+is really necessary. (i don't see where that is changed: it is supposed
+to be __kernel_long_t which is 64bit).
 
-This commit also fixes an invalid pointer dereference introduced by
-commit e39c0df1be5a ("pwm: Introduce the pwm_args concept").
+i think even legacy software should be able to deal with 64bit off_t,
+so we could avoid having two sets of filesystem apis or is 64bit-only
+off_t more work to do in linux/glibc?
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
----
- drivers/pwm/core.c | 27 +++++++++++++++++----------
- 1 file changed, 17 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 680fbc7..22cf395 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -128,13 +128,6 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
- 	set_bit(PWMF_REQUESTED, &pwm->flags);
- 	pwm->label = label;
- 
--	/*
--	 * FIXME: This should be removed once all PWM users properly make use
--	 * of struct pwm_args to initialize the PWM device. As long as this is
--	 * here, the PWM state and hardware state can get out of sync.
--	 */
--	pwm_apply_args(pwm);
--
- 	return 0;
- }
- 
-@@ -627,6 +620,13 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
- 
- 	pwm->label = con_id;
- 
-+	/*
-+	 * FIXME: This should be removed once all PWM users properly make use
-+	 * of struct pwm_args to initialize the PWM device. As long as this is
-+	 * here, the PWM state and hardware state can get out of sync.
-+	 */
-+	pwm_apply_args(pwm);
-+
- put:
- 	of_node_put(args.np);
- 
-@@ -754,13 +754,20 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
- 	if (!chip)
- 		goto out;
- 
--	pwm->args.period = chosen->period;
--	pwm->args.polarity = chosen->polarity;
--
- 	pwm = pwm_request_from_chip(chip, chosen->index, con_id ?: dev_id);
- 	if (IS_ERR(pwm))
- 		goto out;
- 
-+	pwm->args.period = chosen->period;
-+	pwm->args.polarity = chosen->polarity;
-+
-+	/*
-+	 * FIXME: This should be removed once all PWM users properly make use
-+	 * of struct pwm_args to initialize the PWM device. As long as this is
-+	 * here, the PWM state and hardware state can get out of sync.
-+	 */
-+	pwm_apply_args(pwm);
-+
- out:
- 	mutex_unlock(&pwm_lookup_lock);
- 	return pwm;
+>  - related changes applied to ILP32 syscall table and handlers;
+>  - ILP32 VDSO code excluded. It's not mandatory, and caused questions
+>    during review process. We definitely make sure we will follow up
+>    with a VDSO later on because it is needed for performance reasons;
+>  - fixed build issues with different combinations of AARCH32 / ILP32
+>    enabling in config;
+>  - ILP32 TLS bug fixed;
+>  - entry32-common.S introduced to hold wrappers needed for both ILP32
+>    and AARCH32_EL0;
+>  - documentation updated according to latest changes;
+>  - rebased to the current head;
+>  - coding style re-checked;
+>  - ILP32 syscall table turned around.
+> 
+>    rfc3:
+>  - all structures and system calls are just like AARCH32 ones now. with 2
+>    exceptions: syscalls that take 64-bit parameter in 2 32-bit regosters
+>    are replaced with LP64 version; struct rt_sigframe is constructed both
+>    from LP64 and AARCH32 fields to be consistent with AARCH64 register set;
+>  - documentation rewritten accordingly;
+>  - common code for all 3 ABIs is moved to separated files for easy use,
+>    new headers and objects are introduced, incl: is_compat.h, thread_bits.h,
+>    signal_common.h, signal32_common.h.
+>  - ILP32 VDSO code restored, Nathans comments are addressed;
+>  - patch "arm64: ilp32: force IPC_64 in msgctl, shmctl, semctl" removed, as
+>    Arnd suggested general solution for IPC_64 problem.
+> 
+>    rfc4:
+>  - sys_ilp32.c syscall list is fixed according to comments;
+>  - binfmt_elf32.c and binfmt_ilp32.c are introduced to host the code handling
+>    corresponding formats;
+>  - statfs64, fstsatfs64 and mmap wrappers are removed;
+>  - rebased on v4.4-rc8 + http://www.spinics.net/lists/kernel/msg2151759.html
+> 
+>  rfc5:
+>  - addressed rfc4 comments;
+>  - turned s390 compat wrappers to be generic and applied it to arm64/ilp32.
+>    Heiko Carsten and Martin Schwidefsky added to CC as s390 maintainers.
+> 
+>  rfc6:
+>  - glibc follows new ABI, [1];
+>  - significant rework for signal subsystem (patches 21, 23) - struct ucontext
+>    is now corresponds user representation;
+>  - compat wrappers and 32-bit off_t patchsets are joined with this patchset,
+>    as for now ilp32 is the only user for them;
+>  - moved to kernel v4.6-rc2;
+>  - few minor bugfixes.
+> 
+> [1] https://github.com/norov/glibc/tree/new-api
+> 
+> Andrew Pinski (7):
+>   arm64: ensure the kernel is compiled for LP64
+>   arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+>   arm64: change some CONFIG_COMPAT over to use CONFIG_AARCH32_EL0
+>     instead
+>   arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
+>   arm64:ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
+>     it
+>   arm64: ilp32: introduce ilp32-specific handlers for sigframe and
+>     ucontext
+>   arm64:ilp32: add ARM64_ILP32 to Kconfig
+> 
+> Bamvor Jian Zhang (1):
+>   arm64: compat: change config dependences to aarch32
+> 
+> Philipp Tomsich (1):
+>   arm64:ilp32: add vdso-ilp32 and use for signal return
+> 
+> Yury Norov (16):
+>   all: syscall wrappers: add documentation
+>   all: introduce COMPAT_WRAPPER option and enable it for s390
+>   all: s390: move wrapper infrastructure to generic headers
+>   all: s390: move compat_wrappers.c from arch/s390/kernel to kernel/
+>   all: wrap needed syscalls in generic unistd
+>   compat ABI: use non-compat openat and open_by_handle_at variants
+>   32-bit ABI: introduce ARCH_32BIT_OFF_T config option
+>   arm64: ilp32: add documentation on the ILP32 ABI for ARM64
+>   thread: move thread bits accessors to separated file
+>   arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
+>   arm64: ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
+>   arm64: introduce binfmt_elf32.c
+>   arm64: ilp32: introduce binfmt_ilp32.c
+>   arm64: ptrace: handle ptrace_request differently for aarch32 and ilp32
+>   arm64: signal: share lp64 signal routines to ilp32
+>   arm64: signal32: move ilp32 and aarch32 common code to separated file
+> 
+>  Documentation/adding-syscalls.txt             |  32 +++
+>  Documentation/arm64/ilp32.txt                 |  13 ++
+>  arch/Kconfig                                  |   8 +
+>  arch/arc/Kconfig                              |   1 +
+>  arch/arm/Kconfig                              |   1 +
+>  arch/arm64/Kconfig                            |  17 +-
+>  arch/arm64/Makefile                           |   5 +
+>  arch/arm64/include/asm/compat.h               |  19 +-
+>  arch/arm64/include/asm/elf.h                  |  35 +---
+>  arch/arm64/include/asm/fpsimd.h               |   2 +-
+>  arch/arm64/include/asm/ftrace.h               |   2 +-
+>  arch/arm64/include/asm/hwcap.h                |   6 +-
+>  arch/arm64/include/asm/is_compat.h            |  84 ++++++++
+>  arch/arm64/include/asm/memory.h               |   3 +-
+>  arch/arm64/include/asm/processor.h            |  11 +-
+>  arch/arm64/include/asm/ptrace.h               |   2 +-
+>  arch/arm64/include/asm/signal32.h             |   6 +-
+>  arch/arm64/include/asm/signal32_common.h      |  25 +++
+>  arch/arm64/include/asm/signal_common.h        |  33 +++
+>  arch/arm64/include/asm/signal_ilp32.h         |  34 ++++
+>  arch/arm64/include/asm/syscall.h              |   2 +-
+>  arch/arm64/include/asm/thread_info.h          |   3 +-
+>  arch/arm64/include/asm/unistd.h               |  11 +-
+>  arch/arm64/include/asm/unistd32.h             |   2 +-
+>  arch/arm64/include/asm/vdso.h                 |   6 +
+>  arch/arm64/include/uapi/asm/bitsperlong.h     |   9 +-
+>  arch/arm64/kernel/Makefile                    |  12 +-
+>  arch/arm64/kernel/asm-offsets.c               |   2 +-
+>  arch/arm64/kernel/binfmt_elf32.c              |  33 +++
+>  arch/arm64/kernel/binfmt_ilp32.c              |  91 +++++++++
+>  arch/arm64/kernel/cpufeature.c                |   8 +-
+>  arch/arm64/kernel/cpuinfo.c                   |   4 +-
+>  arch/arm64/kernel/entry.S                     |  18 +-
+>  arch/arm64/kernel/entry_ilp32.S               |  23 +++
+>  arch/arm64/kernel/head.S                      |   2 +-
+>  arch/arm64/kernel/hw_breakpoint.c             |  10 +-
+>  arch/arm64/kernel/perf_regs.c                 |   2 +-
+>  arch/arm64/kernel/process.c                   |   7 +-
+>  arch/arm64/kernel/ptrace.c                    |  67 ++++++-
+>  arch/arm64/kernel/signal.c                    | 100 ++++++----
+>  arch/arm64/kernel/signal32.c                  |  85 --------
+>  arch/arm64/kernel/signal32_common.c           | 115 +++++++++++
+>  arch/arm64/kernel/signal_ilp32.c              | 192 ++++++++++++++++++
+>  arch/arm64/kernel/sys32.c                     |   1 +
+>  arch/arm64/kernel/sys_ilp32.c                 |  68 +++++++
+>  arch/arm64/kernel/traps.c                     |   5 +-
+>  arch/arm64/kernel/vdso-ilp32/.gitignore       |   2 +
+>  arch/arm64/kernel/vdso-ilp32/Makefile         |  72 +++++++
+>  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |  33 +++
+>  arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  95 +++++++++
+>  arch/arm64/kernel/vdso.c                      |  65 ++++--
+>  arch/blackfin/Kconfig                         |   1 +
+>  arch/cris/Kconfig                             |   1 +
+>  arch/frv/Kconfig                              |   1 +
+>  arch/h8300/Kconfig                            |   1 +
+>  arch/hexagon/Kconfig                          |   1 +
+>  arch/m32r/Kconfig                             |   1 +
+>  arch/m68k/Kconfig                             |   1 +
+>  arch/metag/Kconfig                            |   1 +
+>  arch/microblaze/Kconfig                       |   1 +
+>  arch/mips/Kconfig                             |   1 +
+>  arch/mn10300/Kconfig                          |   1 +
+>  arch/nios2/Kconfig                            |   1 +
+>  arch/openrisc/Kconfig                         |   1 +
+>  arch/parisc/Kconfig                           |   1 +
+>  arch/powerpc/Kconfig                          |   1 +
+>  arch/s390/Kconfig                             |   1 +
+>  arch/s390/include/asm/compat.h                |  17 +-
+>  arch/s390/kernel/Makefile                     |   2 +-
+>  arch/s390/kernel/compat_linux.c               |   4 +
+>  arch/s390/kernel/compat_wrapper.c             | 180 -----------------
+>  arch/score/Kconfig                            |   1 +
+>  arch/sh/Kconfig                               |   1 +
+>  arch/sparc/Kconfig                            |   1 +
+>  arch/tile/Kconfig                             |   1 +
+>  arch/tile/kernel/compat.c                     |   3 +
+>  arch/unicore32/Kconfig                        |   1 +
+>  arch/x86/Kconfig                              |   1 +
+>  arch/x86/um/Kconfig                           |   1 +
+>  arch/xtensa/Kconfig                           |   1 +
+>  drivers/clocksource/arm_arch_timer.c          |   2 +-
+>  include/linux/compat.h                        | 277 ++++++++++++++++++++++++++
+>  include/linux/fcntl.h                         |   2 +-
+>  include/linux/ptrace.h                        |   6 +
+>  include/linux/syscalls.h                      |  57 +-----
+>  include/linux/syscalls_structs.h              |  60 ++++++
+>  include/linux/thread_bits.h                   |  55 +++++
+>  include/linux/thread_info.h                   |  44 +---
+>  include/uapi/asm-generic/unistd.h             | 231 ++++++++++-----------
+>  kernel/Makefile                               |   1 +
+>  kernel/compat_wrapper.c                       | 175 ++++++++++++++++
+>  kernel/ptrace.c                               |  10 +-
+>  92 files changed, 1997 insertions(+), 637 deletions(-)
+>  create mode 100644 Documentation/arm64/ilp32.txt
+>  create mode 100644 arch/arm64/include/asm/is_compat.h
+>  create mode 100644 arch/arm64/include/asm/signal32_common.h
+>  create mode 100644 arch/arm64/include/asm/signal_common.h
+>  create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+>  create mode 100644 arch/arm64/kernel/binfmt_elf32.c
+>  create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+>  create mode 100644 arch/arm64/kernel/entry_ilp32.S
+>  create mode 100644 arch/arm64/kernel/signal32_common.c
+>  create mode 100644 arch/arm64/kernel/signal_ilp32.c
+>  create mode 100644 arch/arm64/kernel/sys_ilp32.c
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+>  create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+>  delete mode 100644 arch/s390/kernel/compat_wrapper.c
+>  create mode 100644 include/linux/syscalls_structs.h
+>  create mode 100644 include/linux/thread_bits.h
+>  create mode 100644 kernel/compat_wrapper.c
+> 
