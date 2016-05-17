@@ -1,31 +1,37 @@
-From: bluekvirus@gmail.com (Zhiyuan Liu)
-Date: Tue, 17 May 2016 12:41:11 -0700
-Subject: Regarding auto reset 4B back to 3B for spi-flash before reboot.
-Message-ID: <CANN9mDGhp++hHV_XituWwdCXr+7kjUenekKyBm89xX9i9O43Kg@mail.gmail.com>
+From: xypron.glpk@gmx.de (Heinrich Schuchardt)
+Date: Tue, 17 May 2016 21:40:38 +0200
+Subject: [PATCH 1/1] net: thunderx: avoid null pointer dereference
+Message-ID: <1463514038-9008-1-git-send-email-xypron.glpk@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike, Guys,
+In function bgx_lmac_handler only use a member of
+lmac after checking it is not null.
 
-I'm working on an embedded arm project for gateways and stuff, my
-board has an spi-flash which utilizes
+Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+---
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-mtd/devices/m25p80.c
-
-and it needs to reset with the exit 4B cmd before rebooting or else
-the bootrom on marvell 6820 dev board won't find it again without a
-hard reset (power cycling).
-
-Currently I have added a .shutdown to issue flash cmd directly to the
-chip for that but, I was just wondering if there is a better way of
-doing it? My goal is to just change the devicetree not the kernel
-drivers.
-
-Have you already designed a way of doing it that I'm not aware of? Or
-simply because the majority of the vendor flash chips don't need it?
-
-Again, I'm not planning to suggest any changes accordingly, just
-trying to learn from the better minds.
-
-Many thanks,
-Tim.
+diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+index d20539a..3ed2198 100644
+--- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
++++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
+@@ -274,12 +274,14 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
+ static void bgx_lmac_handler(struct net_device *netdev)
+ {
+ 	struct lmac *lmac = container_of(netdev, struct lmac, netdev);
+-	struct phy_device *phydev = lmac->phydev;
++	struct phy_device *phydev;
+ 	int link_changed = 0;
+ 
+ 	if (!lmac)
+ 		return;
+ 
++	phydev = lmac->phydev;
++
+ 	if (!phydev->link && lmac->last_link)
+ 		link_changed = -1;
+ 
+-- 
+2.1.4
