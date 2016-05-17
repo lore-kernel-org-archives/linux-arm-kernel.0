@@ -1,26 +1,42 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Tue, 17 May 2016 13:52:19 +0200
-Subject: [PATCH v2 net-next] bpf: arm64: remove callee-save registers
- use for tmp registers
-In-Reply-To: <1463441786-32224-1-git-send-email-yang.shi@linaro.org>
-References: <1463441786-32224-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <573B05F3.7000009@iogearbox.net>
+From: oneukum@suse.com (Oliver Neukum)
+Date: Tue, 17 May 2016 13:53:56 +0200
+Subject: [PSCI DISCUSS] How to implement standby and suspend-to-ram by PSCI
+In-Reply-To: <DB3PR04MB08125A628F5034749F8109D884730@DB3PR04MB0812.eurprd04.prod.outlook.com>
+References: <DB3PR04MB0812DAA98F71C30E8A8832E3847D0@DB3PR04MB0812.eurprd04.prod.outlook.com>
+ <572C9BF2.9010004@arm.com>
+ <DB3PR04MB08125A628F5034749F8109D884730@DB3PR04MB0812.eurprd04.prod.outlook.com>
+Message-ID: <1463486036.19237.9.camel@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2016 01:36 AM, Yang Shi wrote:
-> In the current implementation of ARM64 eBPF JIT, R23 and R24 are used for
-> tmp registers, which are callee-saved registers. This leads to variable size
-> of JIT prologue and epilogue. The latest blinding constant change prefers to
-> constant size of prologue and epilogue. AAPCS reserves R9 ~ R15 for temp
-> registers which not need to be saved/restored during function call. So, replace
-> R23 and R24 to R10 and R11, and remove tmp_used flag to save 2 instructions for
-> some jited BPF program.
->
-> CC: Daniel Borkmann <daniel@iogearbox.net>
-> Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+On Thu, 2016-05-12 at 09:42 +0000, Hongbo Zhang wrote:
+> On our platform we have some shallow states which maps to cpuidle
+> well, 
+> and we have two more deeper states:
+> 
+> Sleep state:
+> All cores are in WFI state,
+> Core cluster is in standby state, e.g. L2 cache is flushed then stops 
+> snooping,
+> Only those modules which are required to wake up the device still have
+> a 
+> running clock, other device modules in chip are clock gated.
+> 
+> Deep sleep state:
+> ARM cores and DDR controller are switched off,
+> DDR is in self-refresh mode,
+> VDD power to off domain IPs are removed, Only the blocks needed to 
+> detect wake up and sequence the chip out of deep sleep are on.
 
-LGTM, thanks!
+For the pm module of the core kernel a low power state is a sleep
+state if even one of three conditions is met:
 
-Acked-by: Daniel Borkmann <daniel@iogearbox.net>
+a) a device that can be used for input is not a source of wake ups
+b) tasks need to be frozen to enter it
+c) the display goes off, while it should be on
+
+Generally runtime PM is better if you can get the same results.
+Going to a system sleep state is a necessary evil.
+
+	Regards
+		Oliver
