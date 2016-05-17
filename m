@@ -1,50 +1,49 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 17 May 2016 09:43:18 +0200
-Subject: [PATCH] pinctrl: stm32: fix debugfs format string
-In-Reply-To: <1463147643-568615-1-git-send-email-arnd@arndb.de>
-References: <1463147643-568615-1-git-send-email-arnd@arndb.de>
-Message-ID: <573ACB96.6030808@st.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 17 May 2016 13:29:53 +0530
+Subject: [PATCH v4 12/18] arm: use of_platform_default_populate() to
+ populate
+In-Reply-To: <1463054775-18170-13-git-send-email-wangkefeng.wang@huawei.com>
+References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1463054775-18170-13-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <573ACF79.1090600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
-
-I have already send a fix for this on the mailing list on 12th may 
-([PATCH 0/2] pinctrl: stm32: .pin_config_dbg_show fixes).
-I don't know if Linus will merged it on his pinctrl branch.
-
-Sorry
-
-Patrice
-
-On 05/13/2016 03:53 PM, Arnd Bergmann wrote:
-> The newly added stm32_pconf_dbg_show function has an incorrect format
-> string that does not match the arguments, as reported by the gcc warning:
->
-> drivers/pinctrl/stm32/pinctrl-stm32.c: In function 'stm32_pconf_dbg_show':
-> drivers/pinctrl/stm32/pinctrl-stm32.c:797:17: error: too many arguments for format [-Werror=format-extra-args]
->
-> This changes the format string in a way that gets rid of the warning.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 3beed93c1617 ("pinctrl: stm32: Implement .pin_config_dbg_show()")
+On Thursday 12 May 2016 05:36 PM, Kefeng Wang wrote:
+> Use helper of_platform_default_populate() in linux/of_platform
+> when possible, instead of calling of_platform_populate() with
+> the default match table.
+> 
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Krzysztof Halasa <khalasa@piap.pl>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Roland Stigge <stigge@antcom.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Viresh Kumar <vireshk@kernel.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Rob Herring <robh@kernel.org>
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 > ---
-> I could not find a documentation for the debugfs format, so no
-> idea if this is the intended format.
-> ---
->   drivers/pinctrl/stm32/pinctrl-stm32.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
-> index e51c1cf5270b..4ffbe9551299 100644
-> --- a/drivers/pinctrl/stm32/pinctrl-stm32.c
-> +++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
-> @@ -794,7 +794,7 @@ static void stm32_pconf_dbg_show(struct pinctrl_dev *pctldev,
->   	case 2:
->   		drive = stm32_pconf_get_driving(bank, offset);
->   		speed = stm32_pconf_get_speed(bank, offset);
-> -		seq_printf(s, "%d - %s -%s", alt,
-> +		seq_printf(s, "%d - %s - %s - %s %s ", alt,
->   			   drive ? "open drain" : "push pull",
->   			   biasing[bias],
->   			   speeds[speed], "speed");
+
+> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
+> index c4b5808..da46dc7 100644
+> --- a/arch/arm/mach-davinci/da8xx-dt.c
+> +++ b/arch/arm/mach-davinci/da8xx-dt.c
+> @@ -54,8 +54,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
+>  
+>  static void __init da850_init_machine(void)
+>  {
+> -	of_platform_populate(NULL, of_default_bus_match_table,
+> -			     da850_auxdata_lookup, NULL);
+> +	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
+>  
+>  }
+
+The mach-davinci change is already queued for v4.7
+
+Thanks,
+Sekhar
