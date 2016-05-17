@@ -1,10 +1,10 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 May 2016 11:51:36 +0800
-Subject: [PATCH 08/20] drm/sun4i: rgb: panel is an error pointer
-In-Reply-To: <1463402840-17062-9-git-send-email-maxime.ripard@free-electrons.com>
+Date: Tue, 17 May 2016 11:52:10 +0800
+Subject: [PATCH 09/20] drm/sun4i: defer only if we didn't find our panel
+In-Reply-To: <1463402840-17062-10-git-send-email-maxime.ripard@free-electrons.com>
 References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-9-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v6485nF_e9GeANLsy2Rq1XOn4nV5wD_eWskTmL2ME316+w@mail.gmail.com>
+ <1463402840-17062-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v655q_w8s7Eg8xnpzdX9PDxSEhRLvMu3bNOd==U4APgg0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,39 +12,57 @@ Hi,
 
 On Mon, May 16, 2016 at 8:47 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> In case of an error, our pointer to the drm_panel structure attached to our
-> encoder will hold an error pointer, not a NULL pointer.
+> Our code currently defers our probe on any error, even if we were not
+> expecting to have one at all.
 >
-> Make sure we check the right thing.
+> Make sure we return -EPROBE_DEFER only when we were supposed to have a
+> panel, but it's not probed yet.
 >
 > Fixes: 29e57fab97fc ("drm: sun4i: Add RGB output")
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/gpu/drm/sun4i/sun4i_rgb.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/gpu/drm/sun4i/sun4i_tcon.c | 15 ++++++++-------
+>  1 file changed, 8 insertions(+), 7 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> index 923f55039cb1..b46d2c15dc95 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> @@ -217,7 +217,7 @@ int sun4i_rgb_init(struct drm_device *drm)
->         int ret;
+> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> index 9f19b0e08560..eed6a9e8d9a6 100644
+> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> @@ -429,7 +429,7 @@ static struct drm_panel *sun4i_tcon_find_panel(struct device_node *node)
+>                 return ERR_PTR(-EINVAL);
+>         }
 >
->         /* If we don't have a panel, there's no point in going on */
-> -       if (!tcon->panel)
-> +       if (IS_ERR(tcon->panel))
+> -       return of_drm_find_panel(remote);
+> +       return of_drm_find_panel(remote) ?: ERR_PTR(-EPROBE_DEFER);
 
-Without the next patch, tcon->panel could be the result of of_drm_find_panel(),
-which could be NULL.
+There's also a typo in the DRM_DEBUG_DRIVER call a few lines up. Could you
+fix it as well?
 
-Use IS_ERR_OR_NULL here, or reorder/squash the patches.
-
-Regards
 ChenYu
 
->                 return -ENODEV;
+>  }
 >
->         rgb = devm_kzalloc(drm->dev, sizeof(*rgb), GFP_KERNEL);
+>  static int sun4i_tcon_bind(struct device *dev, struct device *master,
+> @@ -522,12 +522,13 @@ static int sun4i_tcon_probe(struct platform_device *pdev)
+>          * Defer the probe.
+>          */
+>         panel = sun4i_tcon_find_panel(node);
+> -       if (IS_ERR(panel)) {
+> -               /*
+> -                * If we don't have a panel endpoint, just go on
+> -                */
+> -               if (PTR_ERR(panel) != -ENODEV)
+> -                       return -EPROBE_DEFER;
+> +
+> +       /*
+> +        * If we don't have a panel endpoint, just go on
+> +        */
+> +       if (PTR_ERR(panel) == -EPROBE_DEFER) {
+> +               DRM_DEBUG_DRIVER("Still waiting for our panel. Deferring...\n");
+> +               return -EPROBE_DEFER;
+>         }
+>
+>         return component_add(&pdev->dev, &sun4i_tcon_ops);
 > --
 > 2.8.2
 >
