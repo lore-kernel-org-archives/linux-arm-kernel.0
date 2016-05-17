@@ -1,67 +1,68 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 17 May 2016 15:44:47 +0200
-Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
-In-Reply-To: <573A8BED.7030908@huawei.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-8-git-send-email-tn@semihalf.com>
- <573A8BED.7030908@huawei.com>
-Message-ID: <573B204F.9040001@semihalf.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 May 2016 15:52:17 +0200
+Subject: [PATCH V4 6/7] iommu/msm: Use writel_relaxed and add a barrier
+In-Reply-To: <1463381341-30498-7-git-send-email-sricharan@codeaurora.org>
+References: <1463381341-30498-1-git-send-email-sricharan@codeaurora.org>
+ <1463381341-30498-7-git-send-email-sricharan@codeaurora.org>
+Message-ID: <3070591.xyl7SB8DB7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.05.2016 05:11, Dongdong Liu wrote:
-> Hi Tomasz
->
-> I used the patchset and added "PATCH V6 11/13 specic quirks", tested on
-> HiSilicon D02 board but met the below problem.
->
-> [    2.614115] [<ffffff80083b13bc>] hisi_pcie_init+0x6c/0x1ec
-> [    2.619571] [<ffffff80083ab060>] pci_ecam_create+0x130/0x1ec
-> [    2.625209] [<ffffff80083f3764>] pci_acpi_scan_root+0x160/0x218
-> [    2.631096] [<ffffff80083d1f6c>] acpi_pci_root_add+0x36c/0x42c
-> [    2.636897] [<ffffff80083ce36c>] acpi_bus_attach+0xe4/0x1a8
-> [    2.642438] [<ffffff80083ce3d8>] acpi_bus_attach+0x150/0x1a8
-> [    2.648066] [<ffffff80083ce3d8>] acpi_bus_attach+0x150/0x1a8
-> [    2.653693] [<ffffff80083ce55c>] acpi_bus_scan+0x64/0x74
-> [    2.658975] [<ffffff8008ae665c>] acpi_scan_init+0x5c/0x19c
-> [    2.664429] [<ffffff8008ae6408>] acpi_init+0x280/0x2a4
-> [    2.669538] [<ffffff80080829e8>] do_one_initcall+0x8c/0x19c
-> [    2.675080] [<ffffff8008ac3af8>] kernel_init_freeable+0x14c/0x1ec
-> [    2.681139] [<ffffff80087a8438>] kernel_init+0x10/0xfc
-> [    2.686248] [<ffffff8008085e10>] ret_from_fork+0x10/0x40
->
-> In hisi_pcie_init, I used "struct acpi_device *device =
-> ACPI_COMPANION(dev);".
-> I found the reason is V7 lack the below code. I added the below code, it
-> worked ok.
->
-> [PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge device
-> companion assignment to core code.
-> --- a/drivers/acpi/pci_root.c
-> +++ b/drivers/acpi/pci_root.c
-> @@ -564,6 +564,11 @@ static int acpi_pci_root_add(struct acpi_device
-> *device,
->           }
->       }
->
-> +    /*
-> +     * pci_create_root_bus() needs to detect the parent device type,
-> +     * so initialize its companion data accordingly.
-> +     */
-> +    ACPI_COMPANION_SET(&device->dev, device);
->
-> This code will be upstreamed with the "PATCH V6 11/13 specic quirks" in
-> next time after the patchset is accepted.
-> Right ?
+On Monday 16 May 2016 12:19:00 Sricharan R wrote:
+> diff --git a/drivers/iommu/msm_iommu.c b/drivers/iommu/msm_iommu.c
+> index f7b4c11..1240a5a 100644
+> --- a/drivers/iommu/msm_iommu.c
+> +++ b/drivers/iommu/msm_iommu.c
+> @@ -124,6 +124,7 @@ static void msm_iommu_reset(void __iomem *base, int ncb)
+>                 SET_TLBLKCR(base, ctx, 0);
+>                 SET_CONTEXTIDR(base, ctx, 0);
+>         }
+> +       mb(); /* sync */
+>  }
+>  
+>  static void __flush_iotlb(void *cookie)
+> @@ -143,6 +144,7 @@ static void __flush_iotlb(void *cookie)
+>  
+>                 __disable_clocks(iommu);
+>         }
+> +       mb(); /* sync */
+>  fail:
+>         return;
+>  }
 
-We had that patch in previous series to retrieve PCI domain nicely. But 
-that has bad implication to userspace. See:
-https://lkml.org/lkml/2016/5/9/918
+These comments are completely useless. What is the specific race
+that you are protecting against, and why are the implicit barriers
+not sufficient here? Please find a better way to document what
+is going on.
 
-I understand that:
-[PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge device 
-companion assignment to core code.
-helps to get firmware specific info in hisi_pcie_init but we need to 
-figure out something better for quirk handling too.
+> diff --git a/drivers/iommu/msm_iommu_hw-8xxx.h b/drivers/iommu/msm_iommu_hw-8xxx.h
+> index 84ba5739..161036c 100644
+> --- a/drivers/iommu/msm_iommu_hw-8xxx.h
+> +++ b/drivers/iommu/msm_iommu_hw-8xxx.h
+> @@ -24,10 +24,10 @@
+>  #define GET_CTX_REG(reg, base, ctx) \
+>                                 (readl((base) + (reg) + ((ctx) << CTX_SHIFT)))
+>  
+> -#define SET_GLOBAL_REG(reg, base, val) writel((val), ((base) + (reg)))
+> +#define SET_GLOBAL_REG(reg, base, val) writel_relaxed((val), ((base) + (reg)))
+>  
+>  #define SET_CTX_REG(reg, base, ctx, val) \
+> -                       writel((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
+> +               writel_relaxed((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
+>  
+>  /* Wrappers for numbered registers */
+>  #define SET_GLOBAL_REG_N(b, n, r, v) SET_GLOBAL_REG(b, ((r) + (n << 2)), (v))
+> @@ -48,7 +48,8 @@
+>  #define SET_FIELD(addr, mask, shift, v) \
+>  do { \
+>         int t = readl(addr); \
+> -       writel((t & ~((mask) << (shift))) + (((v) & (mask)) << (shift)), addr);\
+> +       writel_relaxed((t & ~((mask) << (shift))) + \
+> +                      (((v) & (mask)) << (shift)), addr);\
+>  } while (0)
 
-Tomasz
+No, please add a new macro for the relaxed accessors and then add comments
+in the places where those are used, to document why you can take shortcuts
+in those places.
+
+	Arnd
