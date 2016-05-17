@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2016 00:26:08 +0200
-Subject: [GIT PULL 7/7] ARM: SoC driver updates for v4.7
+Date: Wed, 18 May 2016 00:24:13 +0200
+Subject: [GIT PULL 5/7] ARM: 64-bit DT updates for v4.7
 In-Reply-To: <8749147.ztcb6kVhye@wuerfel>
 References: <8749147.ztcb6kVhye@wuerfel>
-Message-ID: <2633732.4xlcotETON@wuerfel>
+Message-ID: <2552078.Axrq2ryspa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,383 +13,388 @@ The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-dt64
 
-for you to fetch changes up to 5420f9fd159761b88978c312c3b350546f8615bb:
+for you to fetch changes up to 9910f5b199621aecfbdb0b63feb31ddd41fd63e2:
 
-  arm-ccn: Enable building as module (2016-05-09 16:36:03 +0200)
-
-----------------------------------------------------------------
-ARM: SoC driver updates for v4.7
-
-Driver updates for ARM SoCs, these contain various things that touch
-the drivers/ directory but got merged through arm-soc for practical
-reasons. For the most part, this is now related to power management
-controllers, which have not yet been abstracted into a separate
-subsystem, and typically require some code in drivers/soc or arch/arm
-to control the power domains.
-
-Another large chunk here is a rework of the NVIDIA Tegra USB3.0
-support, which was surprisingly tricky and took a long time to
-get done.
-
-Finally, reset controller handling as always gets merged through here
-as well.
+  Merge tag 'imx-dt64-4.7' of git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux into next/dt64 (2016-05-10 22:19:36 +0200)
 
 ----------------------------------------------------------------
-Andrew Bresticker (1):
-      clk: tegra: Add interface to enable hardware control of SATA/XUSB PLLs
+ARM: 64-bit DT updates for v4.7
 
-Andy Gross (1):
-      Merge tag 'qcom-soc-for-4.7' into soc-for-4.7-p2
+We continue ramping up platform support for 64-bit ARM machines,
+with 111 individual non-merge changesets touching 21 platforms.
 
-Arnd Bergmann (16):
-      Merge tag 'versatile-flash-for-arm-soc' of git://git.kernel.org/.../linusw/linux-integrator into next/drivers
-      Merge tag 'tegra-for-4.7-soc' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'arm-soc/for-4.7/drivers' of http://github.com/Broadcom/stblinux into next/drivers
-      Merge tag 'qcom-soc-for-4.7-2' of git://git.kernel.org/.../agross/linux into next/drivers
-      soc: brcmstb: select SOC_BUS
-      physmap_of: ensure versatile code is reachable
-      drivers: firmware: psci: make two helper functions inline
-      Merge tag 'renesas-rcar-sysc2-for-v4.7' of git://git.kernel.org/.../horms/renesas into next/drivers
-      Merge tag 'samsung-drivers-exynos-srom-4.7' of git://git.kernel.org/.../krzk/linux into next/drivers
-      Merge tag 'v4.7-rockchip-drivers-2' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
-      Merge tag 'tegra-for-4.7-phy' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.7-pci' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.7-xhci' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'tegra-for-4.7-genpd' of git://git.kernel.org/.../tegra/linux into next/drivers
-      Merge tag 'v4.6-next-soc' of https://github.com/mbgg/linux-mediatek into next/drivers
-      Merge tag 'reset-for-4.7-2' of git://git.pengutronix.de/git/pza/linux into next/drivers
+The LG1312 platform is completely new and is the first ARM
+platform by LG that we support in the mainline kernel. Two other
+SoCs got added that are updated versions of existing SoC
+families, so the port mainly consists of new dts files:
+- The Hisilicon Hip06/D03 is the latest server platform
+  from Huawei/Hisilicon, and follows the Hip05/D02 platform.
+- Rockchip RK3399 follows the 32-bit RK3288 that is popular
+  in low-end Chromebooks and the 64-bit RK3368 that is mainly
+  found in chinese Android TV boxes.
 
-Bjorn Andersson (8):
-      soc: qcom: smem_state: Add stubs for disabled smem_state
-      soc: qcom: smd: Introduce callback setter
-      soc: qcom: smd: Split discovery and state change work
-      soc: qcom: smd: Refactor channel open and close handling
-      soc: qcom: smd: Support multiple channels per sdev
-      soc: qcom: smd: Support opening additional channels
-      soc: qcom: smem: Use write-combine remap for SMEM
-      soc: qcom: smd: Make callback pass channel reference
+The 96Boards HiKey based on the Hisilicon Hi6220 (Kirin 620)
+gets a long-awaited overhaul with a lot of devices enabled in
+the DT, so it should be much more usable with a mainline kernel
+now. See also
+https://plus.google.com/111524780435806926688/posts/PeGb2VsNhJd
 
-Daniel Lezcano (1):
-      reset: Add missing function stub for device_reset
+A lot of work went into enabling new device drivers on existing
+machines, but we also have a couple of new commercially
+available machines:
 
-Elaine Zhang (8):
-      soc: rockchip: power-domain: make idle handling optional
-      soc: rockchip: power-domain: allow domains only handling idle requests
-      soc: rockchip: power-domain: add support for sub-power domains
-      dt-bindings: add power-domain header for RK3399 SoCs
-      dt-bindings: add binding for rk3399 power domains
-      soc: rockchip: power-domain: Modify power domain driver for rk3399
-      dt-bindings: modify document of Rockchip power domains
-      soc: rockchip: power-domain: support qos save and restore
+- Google Pixel C laptop based on Tegra210
+- Hardkernel Odroid C2 Based on Amlogic Meson GXBB (S905)
+- Geekbuying GeekBox based on Rockchip RK3368
 
-Florian Fainelli (2):
-      bus: brcmstb_gisb: Rework dependencies
-      soc: brcmstb: Unmap sun_top_ctrl_base on errors
+And finally, a couple of reference or development platforms
+that are not end-user platforms but are used for trying out
+the respective SoC platforms:
 
-Geert Uytterhoeven (24):
-      clk: renesas: mstp: Drop check for CONFIG_PM_GENERIC_DOMAINS_OF
-      clk: renesas: cpg-mssr: Drop check for CONFIG_PM_GENERIC_DOMAINS_OF
-      clk: renesas: mstp: Clarify cpg_mstp_{at,de}tach_dev() domain parameter
-      PM / Domains: Add DT bindings for the R-Car System Controller
-      soc: renesas: Add r8a7779 SYSC PM Domain Binding Definitions
-      soc: renesas: Add r8a7790 SYSC PM Domain Binding Definitions
-      soc: renesas: Add r8a7791 SYSC PM Domain Binding Definitions
-      soc: renesas: Add r8a7793 SYSC PM Domain Binding Definitions
-      soc: renesas: Add r8a7794 SYSC PM Domain Binding Definitions
-      soc: renesas: Add r8a7795 SYSC PM Domain Binding Definitions
-      clk: renesas: Provide Kconfig symbols for CPG/MSSR and CPG/MSTP support
-      clk: renesas: mstp: Provide dummy attach/detach_dev callbacks
-      clk: renesas: cpg-mssr: Export cpg_mssr_{at,de}tach_dev()
-      soc: renesas: Move pm-rcar to drivers/soc/renesas/rcar-sysc
-      soc: renesas: rcar-sysc: Improve rcar_sysc_power() debug info
-      soc: renesas: rcar-sysc: Add DT support for SYSC PM domains
-      soc: renesas: rcar-sysc: Make rcar_sysc_power_is_off() static
-      soc: renesas: rcar-sysc: Enable Clock Domain for I/O devices
-      soc: renesas: rcar-sysc: Add support for R-Car H1 power areas
-      soc: renesas: rcar-sysc: Add support for R-Car H2 power areas
-      soc: renesas: rcar-sysc: Add support for R-Car M2-W power areas
-      soc: renesas: rcar-sysc: Add support for R-Car M2-N power areas
-      soc: renesas: rcar-sysc: Add support for R-Car E2 power areas
-      soc: renesas: rcar-sysc: Add support for R-Car H3 power areas
+- Amlogic Meson GXBB P200 and P201 development systems
+- NXP Layerscape 1043A QDS development board
+- Hisilicon Hip06 D03 server board, as mentioned above
+- LG1312 Reference Design
+- RK3399 Evaluation Board
 
-Hans de Goede (3):
-      reset: Make [of_]reset_control_get[_foo] functions wrappers
-      reset: Share struct reset_control between reset_control_get calls
-      reset: Add support for shared reset controls
+----------------------------------------------------------------
+Alexandre Courbot (5):
+      dt-bindings: gk20a: Fix typo in compatible name
+      dt-bindings: gk20a: Document iommus property
+      dt-bindings: Add documentation for GM20B GPU
+      arm64: tegra: Add reference clock to GM20B on Tegra210
+      arm64: tegra: Add IOMMU node to GM20B on Tegra210
 
-Heiko Stuebner (1):
-      Merge branch 'v4.7-shared/pdids' into v4.7-armsoc/drivers
+Alim Akhtar (2):
+      arm64: dts: exynos: Add TMU node for exynos7
+      arm64: dts: Add nodes for pdma0 and pdma1 for exynos7
 
-Jisheng Zhang (2):
-      drivers: firmware: psci: drop duplicate const from psci_of_match
-      drivers: firmware: psci: make two helper functions static
+Andreas F?rber (9):
+      dt-bindings: Add vendor prefix for GeekBuying.com
+      arm64: dts: rockchip: Clean up gpio-keys nodes
+      ARM64: dts: amlogic: Clean up Vega S95 /memory nodes
+      arm64: dts: rockchip: Add rk3368 GeekBox dts
+      Documentation: devicetree: rockchip: Document rk3368-GeekBox
+      arm64: dts: marvell: clean up armada-7040-db
+      arm64: dts: marvell: rename armada-ap806 XOR nodes
+      arm64: dts: marvell: Clean up armada-3720-db
+      arm64: dts: marvell: Rename armada-37xx USB node
 
-Joachim Eastwood (1):
-      reset: lpc18xx: get rid of global variables for restart notifier
+Anup Patel (4):
+      arm64: dts: Add ARM PL330 DMA DT node for NS2
+      arm64: dts: Add maintenance interrupt for GIC in NS2 DT
+      arm64: dts: Move NS2 clock DT nodes to separate DT file
+      arm64: dts: Add ARM PL022 SPI DT nodes for NS2
 
-John Crispin (11):
-      soc: mediatek: PMIC wrap: don't duplicate the wrapper data
-      soc: mediatek: PMIC wrap: add wrapper callbacks for init_reg_clock
-      soc: mediatek: PMIC wrap: split SoC specific init into callback
-      soc: mediatek: PMIC wrap: WRAP_INT_EN needs a different bitmask for MT2701/7623
-      soc: mediatek: PMIC wrap: SPI_WRITE needs a different bitmask for MT2701/7623
-      soc: mediatek: PMIC wrap: move wdt_src into the pmic_wrapper_type struct
-      soc: mediatek: PMIC wrap: remove pwrap_is_mt8135() and pwrap_is_mt8173()
-      soc: mediatek: PMIC wrap: add a slave specific struct
-      soc: mediatek: PMIC wrap: add mt6323 slave support
-      soc: mediatek: PMIC wrap: add MT2701/7623 support
-      ARM: mediatek: enable gpt6 on boot up to make arch timer work on mt7623
+Arnd Bergmann (15):
+      Merge tag 'samsung-dt64-4.7' of git://git.kernel.org/.../krzk/linux into next/dt64
+      Merge tag 'tegra-for-4.7-arm64' of git://git.kernel.org/.../tegra/linux into next/dt64
+      Merge tag 'juno-for-v4.7/dt-updates' of git://git.kernel.org/.../sudeep.holla/linux into next/dt64
+      Merge tag 'hi6220-dt-for-4.7' of git://github.com/hisilicon/linux-hisi into next/dt64
+      Merge tag 'xgene-dts-for-v4.7-part1' of https://github.com/AppliedMicro/xgene-next into next/dt64
+      Merge tag 'arm-soc/for-4.7/devicetree-arm64' of http://github.com/Broadcom/stblinux into next/dt64
+      Merge tag 'renesas-arm64-dt2-for-v4.7' of git://git.kernel.org/.../horms/renesas into next/dt64
+      Merge tag 'hip0x-dt-for-4.7' of git://github.com/hisilicon/linux-hisi into next/dt64
+      Merge branch 'renesas/fixes-2' into next/dt64
+      Merge tag 'v4.7-rockchip-dts64-2' of git://git.kernel.org/.../mmind/linux-rockchip into next/dt64
+      Merge tag 'mvebu-dt64-4.7-1' of git://git.infradead.org/linux-mvebu into next/dt64
+      Merge tag 'tegra-for-4.7-gpio' of git://git.kernel.org/.../tegra/linux into next/dt64
+      Merge tag 'tegra-for-4.7-gm20b' of git://git.kernel.org/.../tegra/linux into next/dt64
+      Merge tag 'v4.6-next-dts64' of https://github.com/mbgg/linux-mediatek into next/dt64
+      Merge tag 'imx-dt64-4.7' of git://git.kernel.org/.../shawnguo/linux into next/dt64
 
-Jon Hunter (16):
-      soc/tegra: pmc: Add missing structure members to kernel-doc
-      soc/tegra: pmc: Fix sparse warning for tegra_pmc_init_tsense_reset()
-      soc/tegra: pmc: Remove debugfs entry on probe failure
-      soc/tegra: pmc: Remove non-existing power partitions for Tegra210
-      soc/tegra: pmc: Remove non-existing L2 partition for Tegra124
-      soc/tegra: pmc: Restore base address on probe failure
-      soc/tegra: pmc: Protect public functions from potential race conditions
-      soc/tegra: pmc: Change powergate and rail IDs to be an unsigned type
-      soc/tegra: pmc: Fix testing of powergate state
-      soc/tegra: pmc: Fix verification of valid partitions
-      soc/tegra: pmc: Remove additional check for a valid partition
-      soc/tegra: pmc: Ensure GPU partition can be toggled on/off by PMC
-      soc/tegra: pmc: Wait for powergate state to change
-      dt-bindings: Update NVIDIA PMC for Tegra
-      dt-bindings: Add power domain info for NVIDIA PMC
-      soc/tegra: pmc: Add generic PM domain support
+Brian Starkey (1):
+      arm64: dts: juno: Add external expansion bus to DT
 
-Justin Chen (1):
-      soc: brcmstb: add SoC driver to brcmstb
+Caesar Wang (3):
+      arm64: dts: rockchip: fix the incorrect otp-out pin on rk3368
+      arm64: dts: rockchip: Add rk3368 mailbox device nodes
+      arm64: dts: rockchip: move the rk3368 thermal data into rk3368.dtsi
 
-Krzysztof Kozlowski (1):
-      Merge tag 'samsung-dt-exynos-srom-fixup-4.7' into for-v4.7/drivers-memory-exynos-srom
+Chanho Min (1):
+      arm64: dts: Add dts files for LG Electronics's lg1312 SoC
 
-Lina Iyer (1):
-      drivers: qcom: spm: avoid module usage in non-modular SPM driver
+Chen Feng (1):
+      arm64: dts: hikey: Add hi655x pmic dts node
 
-Linus Walleij (4):
-      mtd: physmap_of: add a hook for Versatile write protection
-      mtd: augment the "arm,versatile-flash" bindings
-      ARM: versatile: move flash registration to the device tree
-      ARM: integrator: move flash registration to device tree
+Geert Uytterhoeven (3):
+      ARM: shmobile: timer: Fix preset_lpj leading to too short delays
+      arm64: dts: r8a7795: Don't disable referenced optional scif clock
+      arm64: dts: r8a7795: Don't disable referenced optional clocks
 
-Neil Armstrong (2):
-      reset: Add Oxford Semiconductor Reset Controller driver
-      dt-bindings: Add Oxford Semiconductor Reset Controller bindings
+Gregory CLEMENT (2):
+      arm64: dts: marvell: Use a SoC-specific compatible for xHCI on Armada37xx
+      arm64: dts: marvell: add XOR node for Armada 3700 SoC
 
-Olof Johansson (4):
-      Merge tag 'qcom-soc-for-4.7' of git://git.kernel.org/.../agross/linux into next/drivers
-      Merge tag 'reset-for-4.7' of git://git.pengutronix.de/git/pza/linux into next/drivers
-      Merge tag 'renesas-simple-pm-bus-for-v4.7' of git://git.kernel.org/.../horms/renesas into next/drivers
-      Merge tag 'v4.7-rockchip-drivers-1' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
+Guodong Xu (4):
+      arm64: dts: hikey: enable i2c0 and i2c1 for working with mezzanine boards
+      arm64: dts: hi6220: add pinctrl for uarts and enable them
+      arm64: dts: add LED nodes for hi6220-hikey
+      arm64: dts: add wifi nodes support for hi6220-hikey
 
-Pankaj Dubey (5):
-      ARM: dts: change SROM node compatible from generic to model specific
-      dt-bindings: EXYNOS: Add exynos-srom device tree binding
-      memory: Add support for Exynos SROM driver
-      MAINTAINERS: Add maintainers entry for drivers/memory/samsung
-      ARM: EXYNOS: Remove SROM related register settings from mach-exynos
+Heiko Stuebner (2):
+      clk: rockchip: fix checkpatch errors in rk3399 dt-binding header
+      Merge branch 'v4.7-shared/clkids' into v4.7-armsoc/dts64
 
-Pavel Fedin (1):
-      memory: samsung: exynos-srom: Add support for bank configuration
+Hou Zhiqiang (1):
+      Documentation: DT: Add entry for Freescale LS1043a-QDS board
 
-Shawn Lin (1):
-      soc: rockchip: power-domain: check the existing of regmap
+Jianqun Xu (3):
+      arm64: dts: rockchip: add core dtsi file for RK3399 SoCs
+      arm64: dts: rockchip: add dts file for RK3399 evaluation board
+      dt-bindings: document rockchip rk3399-evb board
+
+Jon Hunter (3):
+      arm64: tegra: Add support for Google Pixel C
+      arm64: tegra: Remove unused #power-domain-cells property
+      arm64: tegra: Add stdout-path for various boards
+
+Kefeng Wang (4):
+      arm64: dts: hip05: fix its node without msi-cells
+      arm64: dts: hip05: Add nor flash support
+      arm64: dts: Add initial dts for Hisilicon Hip06 D03 board
+      Documentation: arm64: Add Hisilicon Hip06 D03 dts binding
+
+Kevin Hilman (4):
+      ARM64: dts: amlogic: update serial aliases
+      Documentation: devicetree: amlogic: Document P20x and ODROID-C2 boards
+      ARM64: dts: amlogic: add Hardkernel ODROID-C2
+      ARM64: dts: amlogic: Add P200/P201 boards
+
+Laxman Dewangan (1):
+      arm64: tegra: Enable power and volume keys on Jetson TX1
+
+Leo Yan (8):
+      arm64: dts: Reserve memory regions for hi6220
+      arm64: dts: add sp804 timer node for Hi6220
+      arm64: dts: enable idle states for Hi6220
+      arm64: dts: add mailbox node for Hi6220
+      arm64: dts: add Hi6220's stub clock node
+      arm64: dts: register Hi6220's thermal sensor
+      arm64: dts: register Hi6220's thermal zone for power allocator
+      arm64: dts: Add L2 cache topology to Hi6220
+
+Liu Gang (2):
+      arm64: dts: ls1043a: Add compatible "fsl,qoriq-gpio" for ls1043a gpio nodes
+      arm64: dts: ls2080a: Add compatible "fsl,ls2080a-gpio" for ls2080a gpio nodes
+
+Luke Starrett (1):
+      arm64: dts: NS2 secondary core enablement via PSCI
+
+Masahiro Yamada (2):
+      arm64: dts: uniphier: use Daughter board on PH1-LD20 reference board
+      arm64: dts: uniphier: add reference clock node for PH1-LD20
+
+Olof Johansson (3):
+      Merge tag 'gxbb-dt64' of https://github.com/carlocaione/linux-meson into next/dt64
+      Merge tag 'renesas-arm64-cleanup-for-v4.7' of git://git.kernel.org/.../horms/renesas into next/dt64
+      Merge tag 'v4.7-rockchip-dts64-1' of git://git.kernel.org/.../mmind/linux-rockchip into next/dt64
+
+Phil Edworthy (2):
+      arm64: dts: r8a7795: Add PCIe nodes
+      arm64: dts: r8a7795: enable PCIe on Salvator-X
+
+Ramesh Shanmugasundaram (2):
+      arm64: dts: r8a7795: Add CAN external clock support
+      arm64: dts: r8a7795: Add CAN support
+
+Rameshwar Prasad Sahu (1):
+      arm64: dts: apm: Fix compatible string for X-Gene 2 SATA controller DTS node
+
+Rhyland Klein (3):
+      arm64: tegra: Add gpio-keys nodes for Smaug
+      arm64: tegra: Add pinmux for Smaug board
+      arm64: tegra: Enable cros-ec and charger on Smaug
+
+Sascha Hauer (1):
+      ARM64: dts: mt8173: Add thermal/auxadc device nodes
+
+Shaohui Xie (1):
+      arm64: dts: add LS1043a-QDS board support
+
+Shawn Lin (2):
+      arm64: dts: rockchip: remove broken-cd from emmc and sdio
+      dt-bindings: rockchip-dw-mshc: add description for rk3399
 
 Simon Horman (2):
-      bus: simple-pm-bus: Use ARCH_RENESAS
-      Merge tag 'clk-renesas-for-v4.7-tag2' of git://git.kernel.org/.../geert/renesas-drivers into rcar-sysc-for-v4.7
+      arm64: dts: salvator-x: use generic pinctrl properties
+      arm64: dts: r8a7795: Use USB3.0 fallback compatibility string
 
-Srinivas Kandagatla (2):
-      MAINTAINERS: add qcom i2c and spi drivers to list
-      MAINTAINERS: add qcom clocks to the maintainers list
+Sjoerd Simons (2):
+      ARM: dts: r8a7791: Don't disable referenced optional clocks
+      Revert "ARM: dts: porter: Enable SCIF_CLK frequency and pins"
 
-Suzuki K Poulose (1):
-      arm-ccn: Enable building as module
+Stephen Warren (2):
+      ARM: tegra: Fix naming in GPIO DT binding header
+      ARM: tegra: Add DT binding for Tegra186 GPIO controllers
 
-Thierry Reding (15):
-      Merge branch 'for-4.7/soc' into for-4.7/genpd
-      Merge branch 'for-4.7/clk' into for-4.7/phy
-      phy: core: Allow children node to be overridden
-      dt-bindings: phy: Add NVIDIA Tegra XUSB pad controller binding
-      dt-bindings: phy: tegra-xusb-padctl: Add Tegra210 support
-      phy: Add Tegra XUSB pad controller support
-      phy: tegra: Add Tegra210 support
-      Merge branch 'for-4.7/phy' into for-4.7/pci
-      dt-bindings: pci: tegra: Update for per-lane PHYs
-      PCI: tegra: Support per-lane PHYs
-      Merge branch 'for-4.7/phy' into for-4.7/xhci
-      dt-bindings: usb: Add NVIDIA Tegra XUSB controller binding
-      dt-bindings: usb: xhci-tegra: Add Tegra210 XUSB controller support
-      usb: xhci: Add NVIDIA Tegra XUSB controller driver
-      usb: xhci: tegra: Add Tegra210 support
+Stuart Yoder (2):
+      Documentation: fsl-mc: binding updates for MSIs, ranges, PHYs
+      arm64: dts: ls2080a: fsl-mc dt node updates
 
-Ulrich Hecht (1):
-      clk: renesas: r8a7795: add PWM clock
+Sudeep Holla (1):
+      arm64: tegra: Replace legacy *,wakeup property with wakeup-source
 
-Wolfram Sang (5):
-      clk: renesas: r8a7795: make SD clk definition specific for GEN3
-      clk: renesas: cpg-mssr: add generic support for read-only DIV6 clocks
-      clk: renesas: r8a7795: add OSC and RINT clocks
-      clk: renesas: r8a7795: add R clk
-      clk: renesas: r8a7795: add RWDT clock
+Thierry Reding (2):
+      arm64: tegra: Remove 0, prefix from unit-addresses
+      arm64: tegra: Fix copy/paste typo in several DTS includes
 
- .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |   92 +-
- .../bindings/memory-controllers/exynos-srom.txt    |   79 +
- .../devicetree/bindings/mtd/arm-versatile.txt      |   20 +-
- .../bindings/pci/nvidia,tegra20-pcie.txt           |  224 ++-
- .../bindings/phy/nvidia,tegra124-xusb-padctl.txt   |  733 +++++++
- .../pinctrl/nvidia,tegra124-xusb-padctl.txt        |    6 +
- .../bindings/power/renesas,rcar-sysc.txt           |   48 +
- .../devicetree/bindings/reset/oxnas,reset.txt      |   58 +
- .../bindings/soc/rockchip/power_domain.txt         |   47 +
- .../bindings/usb/nvidia,tegra124-xusb.txt          |  120 ++
- Documentation/phy.txt                              |   16 +-
- MAINTAINERS                                        |    8 +
- arch/arm/boot/dts/exynos4.dtsi                     |    4 +-
- arch/arm/boot/dts/exynos5.dtsi                     |    4 +-
- arch/arm/boot/dts/exynos5410-smdk5410.dts          |    2 +-
- arch/arm/boot/dts/exynos5410.dtsi                  |    4 +-
- arch/arm/boot/dts/integrator.dtsi                  |    3 +-
- arch/arm/boot/dts/versatile-ab.dts                 |    5 +-
- arch/arm/mach-bcm/Kconfig                          |    2 +-
- arch/arm/mach-exynos/Kconfig                       |    3 +
- arch/arm/mach-exynos/exynos.c                      |   17 -
- arch/arm/mach-exynos/include/mach/map.h            |    3 -
- arch/arm/mach-exynos/regs-srom.h                   |   53 -
- arch/arm/mach-exynos/suspend.c                     |   20 +-
- arch/arm/mach-integrator/integrator_ap.c           |   62 -
- arch/arm/mach-integrator/integrator_cp.c           |   51 -
- arch/arm/mach-mediatek/mediatek.c                  |    1 +
- arch/arm/mach-shmobile/Kconfig                     |   11 +-
- arch/arm/mach-shmobile/Makefile                    |    1 -
- arch/arm/mach-shmobile/pm-r8a7779.c                |    3 +-
- arch/arm/mach-shmobile/pm-rcar-gen2.c              |    2 +-
- arch/arm/mach-shmobile/pm-rcar.c                   |  164 --
- arch/arm/mach-shmobile/smp-r8a7779.c               |    2 +-
- arch/arm/mach-shmobile/smp-r8a7790.c               |    2 +-
- arch/arm/mach-tegra/platsmp.c                      |   16 +-
- arch/arm/mach-versatile/versatile_dt.c             |   47 -
- arch/arm/plat-samsung/include/plat/map-s5p.h       |    1 -
- drivers/bus/Kconfig                                |    5 +-
- drivers/bus/arm-ccn.c                              |    7 +-
- drivers/clk/Kconfig                                |    1 +
- drivers/clk/renesas/Kconfig                        |   16 +
- drivers/clk/renesas/Makefile                       |   26 +-
- drivers/clk/renesas/clk-mstp.c                     |    7 +-
- drivers/clk/renesas/r8a7795-cpg-mssr.c             |   34 +-
- drivers/clk/renesas/renesas-cpg-mssr.c             |   47 +-
- drivers/clk/renesas/renesas-cpg-mssr.h             |    6 +-
- drivers/clk/tegra/clk-tegra210.c                   |   58 +
- drivers/firmware/psci.c                            |    6 +-
- drivers/gpu/drm/tegra/drm.h                        |    2 +-
- drivers/memory/Kconfig                             |    1 +
- drivers/memory/Makefile                            |    1 +
- drivers/memory/samsung/Kconfig                     |   13 +
- drivers/memory/samsung/Makefile                    |    1 +
- drivers/memory/samsung/exynos-srom.c               |  231 +++
- drivers/memory/samsung/exynos-srom.h               |   51 +
- drivers/mtd/maps/Kconfig                           |   10 +
- drivers/mtd/maps/Makefile                          |    3 +
- drivers/mtd/maps/physmap_of.c                      |    6 +
- drivers/mtd/maps/physmap_of_versatile.c            |  255 +++
- drivers/mtd/maps/physmap_of_versatile.h            |   16 +
- drivers/pci/host/pci-tegra.c                       |  244 ++-
- drivers/phy/Kconfig                                |    2 +
- drivers/phy/Makefile                               |    2 +
- drivers/phy/phy-core.c                             |   50 +-
- drivers/phy/tegra/Kconfig                          |    8 +
- drivers/phy/tegra/Makefile                         |    6 +
- drivers/phy/tegra/xusb-tegra124.c                  | 1752 +++++++++++++++++
- drivers/phy/tegra/xusb-tegra210.c                  | 2045 ++++++++++++++++++++
- drivers/phy/tegra/xusb.c                           | 1021 ++++++++++
- drivers/phy/tegra/xusb.h                           |  421 ++++
- drivers/pinctrl/tegra/pinctrl-tegra-xusb.c         |   20 +-
- drivers/reset/Kconfig                              |    3 +
- drivers/reset/Makefile                             |    1 +
- drivers/reset/core.c                               |  217 ++-
- drivers/reset/reset-lpc18xx.c                      |   22 +-
- drivers/reset/reset-oxnas.c                        |  136 ++
- drivers/soc/Makefile                               |    3 +-
- drivers/soc/brcmstb/Kconfig                        |    1 +
- drivers/soc/brcmstb/common.c                       |   66 +
- drivers/soc/mediatek/mtk-pmic-wrap.c               |  544 ++++--
- drivers/soc/qcom/smd-rpm.c                         |    9 +-
- drivers/soc/qcom/smd.c                             |  247 ++-
- drivers/soc/qcom/smem.c                            |    3 +-
- drivers/soc/qcom/spm.c                             |    8 +-
- drivers/soc/qcom/wcnss_ctrl.c                      |    8 +-
- drivers/soc/renesas/Makefile                       |    7 +
- drivers/soc/renesas/r8a7779-sysc.c                 |   34 +
- drivers/soc/renesas/r8a7790-sysc.c                 |   48 +
- drivers/soc/renesas/r8a7791-sysc.c                 |   33 +
- drivers/soc/renesas/r8a7794-sysc.c                 |   33 +
- drivers/soc/renesas/r8a7795-sysc.c                 |   56 +
- drivers/soc/renesas/rcar-sysc.c                    |  401 ++++
- drivers/soc/renesas/rcar-sysc.h                    |   58 +
- drivers/soc/rockchip/pm_domains.c                  |  247 ++-
- drivers/soc/tegra/pmc.c                            |  613 +++++-
- drivers/usb/host/Kconfig                           |    9 +
- drivers/usb/host/Makefile                          |    1 +
- drivers/usb/host/xhci-tegra.c                      | 1331 +++++++++++++
- include/dt-bindings/power/r8a7779-sysc.h           |   27 +
- include/dt-bindings/power/r8a7790-sysc.h           |   34 +
- include/dt-bindings/power/r8a7791-sysc.h           |   26 +
- include/dt-bindings/power/r8a7793-sysc.h           |   28 +
- include/dt-bindings/power/r8a7794-sysc.h           |   26 +
- include/dt-bindings/power/r8a7795-sysc.h           |   42 +
- include/dt-bindings/power/rk3399-power.h           |   53 +
- include/linux/clk/renesas.h                        |   16 +-
- include/linux/clk/tegra.h                          |    5 +
- include/linux/phy/phy.h                            |   31 +-
- include/linux/phy/tegra/xusb.h                     |   30 +
- include/linux/psci.h                               |    2 -
- include/linux/reset-controller.h                   |    2 +
- include/linux/reset.h                              |  194 +-
- include/linux/soc/qcom/smd.h                       |   11 +-
- include/linux/soc/qcom/smem_state.h                |   35 +
- .../linux/soc/renesas/rcar-sysc.h                  |    9 +-
- include/soc/tegra/fuse.h                           |    1 +
- include/soc/tegra/pmc.h                            |   36 +-
- 117 files changed, 11999 insertions(+), 1056 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
- create mode 100644 Documentation/devicetree/bindings/phy/nvidia,tegra124-xusb-padctl.txt
- create mode 100644 Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
- create mode 100644 Documentation/devicetree/bindings/reset/oxnas,reset.txt
- create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
- delete mode 100644 arch/arm/mach-exynos/regs-srom.h
- delete mode 100644 arch/arm/mach-shmobile/pm-rcar.c
- create mode 100644 drivers/clk/renesas/Kconfig
- create mode 100644 drivers/memory/samsung/Kconfig
- create mode 100644 drivers/memory/samsung/Makefile
- create mode 100644 drivers/memory/samsung/exynos-srom.c
- create mode 100644 drivers/memory/samsung/exynos-srom.h
- create mode 100644 drivers/mtd/maps/physmap_of_versatile.c
- create mode 100644 drivers/mtd/maps/physmap_of_versatile.h
- create mode 100644 drivers/phy/tegra/Kconfig
- create mode 100644 drivers/phy/tegra/Makefile
- create mode 100644 drivers/phy/tegra/xusb-tegra124.c
- create mode 100644 drivers/phy/tegra/xusb-tegra210.c
- create mode 100644 drivers/phy/tegra/xusb.c
- create mode 100644 drivers/phy/tegra/xusb.h
- create mode 100644 drivers/reset/reset-oxnas.c
- create mode 100644 drivers/soc/renesas/Makefile
- create mode 100644 drivers/soc/renesas/r8a7779-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7790-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7791-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7794-sysc.c
- create mode 100644 drivers/soc/renesas/r8a7795-sysc.c
- create mode 100644 drivers/soc/renesas/rcar-sysc.c
- create mode 100644 drivers/soc/renesas/rcar-sysc.h
- create mode 100644 drivers/usb/host/xhci-tegra.c
- create mode 100644 include/dt-bindings/power/r8a7779-sysc.h
- create mode 100644 include/dt-bindings/power/r8a7790-sysc.h
- create mode 100644 include/dt-bindings/power/r8a7791-sysc.h
- create mode 100644 include/dt-bindings/power/r8a7793-sysc.h
- create mode 100644 include/dt-bindings/power/r8a7794-sysc.h
- create mode 100644 include/dt-bindings/power/r8a7795-sysc.h
- create mode 100644 include/dt-bindings/power/rk3399-power.h
- create mode 100644 include/linux/phy/tegra/xusb.h
- rename arch/arm/mach-shmobile/pm-rcar.h => include/linux/soc/renesas/rcar-sysc.h (60%)
+Thomas Petazzoni (6):
+      arm64: dts: marvell: add UART aliases and define stdout-path
+      arm64: dts: marvell: use new clock binding on Armada AP806
+      arm64: dts: marvell: improve SPI flash description on Armada 7040-DB
+      arm64: dts: marvell: use the proper I2C controller compatible string for 7K/8K
+      arm64: dts: marvell: initial DT description of Armada 7K/8K CP110 master
+      arm64: dts: marvell: enable several CP interfaces on Armada 7040-DB
+
+Wolfram Sang (1):
+      arm64: dts: salvator-x: populate EXTALR
+
+Xing Zheng (4):
+      clk: rockchip: add dt-binding header for rk3399
+      clk: rockchip: add general gpu soft-reset on rk3399
+      clk: rockchip: rename rga clock-id on rk3399
+      clk: rockchip: export some necessary rk3399 clock ids
+
+Xinwei Kong (2):
+      arm64: dts: add all hi6220 i2c nodes
+      arm64: dts: add dwmmc nodes for hi6220
+
+Yuan Yao (4):
+      Documentation: fsl: dspi: Add fsl,ls2080a-dspi compatible string
+      arm64: dts: ls2080a: update the DTS for QSPI and DSPI support
+      Documentation: fsl-quadspi: Add fsl,ls1043a-qspi compatible string
+      arm64: dts: ls1043a: add the DTS node for QSPI support
+
+Yunhui Cui (1):
+      arm64: dts: ls1043a-rdb: add the DTS for DSPI support
+
+Zhangfei Gao (1):
+      arm64: dts: Add hi6220 usb node
+
+Zhong Kaihua (3):
+      arm64: dts: Add Hi6220 gpio configuration nodes
+      arm64: dts: add Hi6220 pinctrl configuration nodes
+      arm64: dts: add Hi6220 spi configuration nodes
+
+dawei.chien at mediatek.com (1):
+      arm64: dts: mt8173: Add thermal zone node.
+
+ Documentation/devicetree/bindings/arm/amlogic.txt  |    3 +
+ Documentation/devicetree/bindings/arm/fsl.txt      |    4 +
+ .../bindings/arm/hisilicon/hisilicon.txt           |   20 +-
+ Documentation/devicetree/bindings/arm/rockchip.txt |   10 +-
+ .../bindings/gpio/nvidia,tegra186-gpio.txt         |  161 +++
+ .../devicetree/bindings/gpu/nvidia,gk20a.txt       |   37 +-
+ .../devicetree/bindings/misc/fsl,qoriq-mc.txt      |   81 +-
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |    1 +
+ .../devicetree/bindings/mtd/fsl-quadspi.txt        |    3 +-
+ .../devicetree/bindings/spi/spi-fsl-dspi.txt       |    5 +-
+ Documentation/devicetree/bindings/usb/usb-xhci.txt |    1 +
+ .../devicetree/bindings/vendor-prefixes.txt        |    1 +
+ arch/arm/boot/dts/r8a7791-koelsch.dts              |    1 +
+ arch/arm/boot/dts/r8a7791-porter.dts               |   14 +-
+ arch/arm/boot/dts/r8a7791.dtsi                     |    5 +-
+ arch/arm/mach-shmobile/timer.c                     |   28 +-
+ arch/arm64/boot/dts/Makefile                       |    1 +
+ arch/arm64/boot/dts/amlogic/Makefile               |    3 +
+ .../arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts |   69 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts    |   52 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts    |   52 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi   |   65 +
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-meta.dts  |    2 +-
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-pro.dts   |    2 +-
+ .../boot/dts/amlogic/meson-gxbb-vega-s95-telos.dts |    2 +-
+ .../boot/dts/amlogic/meson-gxbb-vega-s95.dtsi      |    4 +
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |    5 -
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi         |    6 +-
+ arch/arm64/boot/dts/arm/juno-base.dtsi             |   10 +
+ arch/arm64/boot/dts/broadcom/ns2-clock.dtsi        |  105 ++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |   45 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  155 +--
+ .../boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi   |   25 +
+ .../arm64/boot/dts/exynos/exynos7-trip-points.dtsi |   54 +
+ arch/arm64/boot/dts/exynos/exynos7.dtsi            |   49 +
+ arch/arm64/boot/dts/freescale/Makefile             |    3 +-
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts  |  181 +++
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts  |   13 +
+ arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |   22 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts  |    9 +-
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi     |  110 +-
+ arch/arm64/boot/dts/hisilicon/Makefile             |    4 +-
+ arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts     |  200 ++-
+ arch/arm64/boot/dts/hisilicon/hi6220.dtsi          |  623 +++++++++
+ arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi   |  705 ++++++++++
+ arch/arm64/boot/dts/hisilicon/hip05-d02.dts        |   34 +
+ arch/arm64/boot/dts/hisilicon/hip05.dtsi           |   10 +
+ arch/arm64/boot/dts/hisilicon/hip06-d03.dts        |   34 +
+ arch/arm64/boot/dts/hisilicon/hip06.dtsi           |  307 +++++
+ arch/arm64/boot/dts/lg/Makefile                    |    5 +
+ arch/arm64/boot/dts/lg/lg1312-ref.dts              |   36 +
+ arch/arm64/boot/dts/lg/lg1312.dtsi                 |  351 +++++
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     |   32 +-
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi       |    1 -
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   20 +-
+ arch/arm64/boot/dts/marvell/armada-7020.dtsi       |    1 +
+ arch/arm64/boot/dts/marvell/armada-7040-db.dts     |  108 +-
+ arch/arm64/boot/dts/marvell/armada-7040.dtsi       |    1 +
+ arch/arm64/boot/dts/marvell/armada-8020.dtsi       |    1 +
+ arch/arm64/boot/dts/marvell/armada-8040.dtsi       |    1 +
+ arch/arm64/boot/dts/marvell/armada-ap806-dual.dtsi |    1 -
+ arch/arm64/boot/dts/marvell/armada-ap806-quad.dtsi |    2 -
+ arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |   56 +-
+ .../boot/dts/marvell/armada-cp110-master.dtsi      |  228 ++++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   60 +
+ arch/arm64/boot/dts/nvidia/Makefile                |    1 +
+ arch/arm64/boot/dts/nvidia/tegra132-norrin.dts     |   55 +-
+ arch/arm64/boot/dts/nvidia/tegra132.dtsi           |  120 +-
+ arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi     |    8 +-
+ arch/arm64/boot/dts/nvidia/tegra210-p2530.dtsi     |   14 +-
+ arch/arm64/boot/dts/nvidia/tegra210-p2571.dts      |    2 +-
+ arch/arm64/boot/dts/nvidia/tegra210-p2595.dtsi     |    2 +-
+ arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi     |   30 +-
+ arch/arm64/boot/dts/nvidia/tegra210-smaug.dts      | 1424 ++++++++++++++++++++
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi           |  130 +-
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |   63 +-
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           |   98 +-
+ arch/arm64/boot/dts/rockchip/Makefile              |    2 +
+ arch/arm64/boot/dts/rockchip/rk3368-evb.dtsi       |    8 +-
+ arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts    |  319 +++++
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts        |    8 +-
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |   82 +-
+ .../{rk3368-thermal.dtsi => rk3399-evb.dts}        |  124 +-
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           | 1013 ++++++++++++++
+ .../boot/dts/socionext/uniphier-ph1-ld20-ref.dts   |    1 +
+ .../boot/dts/socionext/uniphier-ph1-ld20.dtsi      |    6 +
+ .../boot/dts/socionext/uniphier-ref-daughter.dtsi  |    1 +
+ include/dt-bindings/clock/rk3399-cru.h             |  755 +++++++++++
+ include/dt-bindings/gpio/tegra-gpio.h              |   68 +-
+ include/dt-bindings/gpio/tegra186-gpio.h           |   56 +
+ include/dt-bindings/pinctrl/hisi.h                 |   59 +
+ 91 files changed, 8132 insertions(+), 557 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/gpio/nvidia,tegra186-gpio.txt
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p200.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p201.dts
+ create mode 100644 arch/arm64/boot/dts/amlogic/meson-gxbb-p20x.dtsi
+ create mode 100644 arch/arm64/boot/dts/broadcom/ns2-clock.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-tmu-sensor-conf.dtsi
+ create mode 100644 arch/arm64/boot/dts/exynos/exynos7-trip-points.dtsi
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-qds.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hikey-pinctrl.dtsi
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip06-d03.dts
+ create mode 100644 arch/arm64/boot/dts/hisilicon/hip06.dtsi
+ create mode 100644 arch/arm64/boot/dts/lg/Makefile
+ create mode 100644 arch/arm64/boot/dts/lg/lg1312-ref.dts
+ create mode 100644 arch/arm64/boot/dts/lg/lg1312.dtsi
+ create mode 100644 arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
+ create mode 100644 arch/arm64/boot/dts/nvidia/tegra210-smaug.dts
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-geekbox.dts
+ rename arch/arm64/boot/dts/rockchip/{rk3368-thermal.dtsi => rk3399-evb.dts} (55%)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3399.dtsi
+ create mode 120000 arch/arm64/boot/dts/socionext/uniphier-ref-daughter.dtsi
+ create mode 100644 include/dt-bindings/clock/rk3399-cru.h
+ create mode 100644 include/dt-bindings/gpio/tegra186-gpio.h
+ create mode 100644 include/dt-bindings/pinctrl/hisi.h
