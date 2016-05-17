@@ -1,95 +1,87 @@
 From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Tue, 17 May 2016 15:06:02 +0300
-Subject: [PATCH 2/3] ACPI: table upgrade: move early_initrd_acpi_init() to
- header file
+Date: Tue, 17 May 2016 15:06:03 +0300
+Subject: [PATCH 3/3] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
 In-Reply-To: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
 References: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1463486765-31827-3-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move early_initrd_acpi_init() to header file so that
-it can be used with architectures other than X86
+From: Jon Masters <jcm@redhat.com>
 
+This patch adds support for ACPI_TABLE_UPGRADE for ARM64
+
+To access initrd image we need to move initialization
+of linear mapping a bit earlier.
+
+Signed-off-by: Jon Masters <jcm@redhat.com>
 Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
 ---
- arch/x86/kernel/setup.c | 7 -------
- drivers/acpi/tables.c   | 7 +++++--
- include/linux/acpi.h    | 4 ++--
- 3 files changed, 7 insertions(+), 11 deletions(-)
+ arch/arm64/kernel/setup.c |  6 ++++--
+ drivers/acpi/Kconfig      |  2 +-
+ drivers/acpi/tables.c     | 10 +++++++++-
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
-index c4e7b39..5ddbbfd 100644
---- a/arch/x86/kernel/setup.c
-+++ b/arch/x86/kernel/setup.c
-@@ -399,10 +399,6 @@ static void __init reserve_initrd(void)
- 	memblock_free(ramdisk_image, ramdisk_end - ramdisk_image);
- }
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index feab2ee..1d5e24f 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -261,11 +261,13 @@ void __init setup_arch(char **cmdline_p)
+ 	efi_init();
+ 	arm64_memblock_init();
  
--static void __init early_initrd_acpi_init(void)
--{
--	early_acpi_table_init((void *)initrd_start, initrd_end - initrd_start);
--}
- #else
- static void __init early_reserve_initrd(void)
- {
-@@ -410,9 +406,6 @@ static void __init early_reserve_initrd(void)
- static void __init reserve_initrd(void)
- {
- }
--static void __init early_initrd_acpi_init(void)
--{
--}
- #endif /* CONFIG_BLK_DEV_INITRD */
++	paging_init();
++
++	early_initrd_acpi_init();
++
+ 	/* Parse the ACPI tables for possible boot-time configuration */
+ 	acpi_boot_table_init();
  
- static void __init parse_setup_data(void)
+-	paging_init();
+-
+ 	if (acpi_disabled)
+ 		unflatten_device_tree();
+ 
+diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+index c204344..ec694c0 100644
+--- a/drivers/acpi/Kconfig
++++ b/drivers/acpi/Kconfig
+@@ -313,7 +313,7 @@ config ACPI_CUSTOM_DSDT
+ 
+ config ACPI_TABLE_UPGRADE
+ 	bool "Allow upgrading ACPI tables via initrd"
+-	depends on BLK_DEV_INITRD && X86
++	depends on BLK_DEV_INITRD && (X86 || ARM64)
+ 	default y
+ 	help
+ 	  This option provides functionality to upgrade arbitrary ACPI tables
 diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-index 449a649..82be84a 100644
+index 82be84a..c35034d8 100644
 --- a/drivers/acpi/tables.c
 +++ b/drivers/acpi/tables.c
-@@ -34,6 +34,7 @@
- #include <linux/bootmem.h>
- #include <linux/earlycpio.h>
- #include <linux/memblock.h>
-+#include <linux/initrd.h>
- #include "internal.h"
+@@ -482,6 +482,14 @@ static DECLARE_BITMAP(acpi_initrd_installed, NR_ACPI_INITRD_TABLES);
  
- #ifdef CONFIG_ACPI_CUSTOM_DSDT
-@@ -742,9 +743,11 @@ acpi_os_table_override(struct acpi_table_header *existing_table,
- 	return AE_OK;
- }
+ #define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
  
--void __init early_acpi_table_init(void *data, size_t size)
-+void __init early_initrd_acpi_init(void)
- {
--	acpi_table_initrd_init(data, size);
-+#ifdef CONFIG_BLK_DEV_INITRD
-+	acpi_table_initrd_init((void *)initrd_start, initrd_end - initrd_start);
++#if defined(CONFIG_X86)
++#define MAX_PHYS_ACPI_TABLES (max_low_pfn_mapped << PAGE_SHIFT)
++#elif defined(CONFIG_ARM64)
++#define MAX_PHYS_ACPI_TABLES PFN_PHYS(max_pfn)
++#else
++#error "MAX_PHYS_ACPI_TABLES is not defiend for this architecture"
 +#endif
- }
++
+ static void __init acpi_table_initrd_init(void *data, size_t size)
+ {
+ 	int sig, no, table_nr = 0, total_offset = 0;
+@@ -541,7 +549,7 @@ static void __init acpi_table_initrd_init(void *data, size_t size)
+ 		return;
  
- /*
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 288fac5..cb700c1 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -208,7 +208,7 @@ void acpi_boot_table_init (void);
- int acpi_mps_check (void);
- int acpi_numa_init (void);
- 
--void early_acpi_table_init(void *data, size_t size);
-+void early_initrd_acpi_init(void);
- int acpi_table_init (void);
- int acpi_table_parse(char *id, acpi_tbl_table_handler handler);
- int __init acpi_parse_entries(char *id, unsigned long table_size,
-@@ -588,7 +588,7 @@ static inline const char *acpi_dev_name(struct acpi_device *adev)
- 	return NULL;
- }
- 
--static inline void early_acpi_table_init(void *data, size_t size) { }
-+static inline void early_initrd_acpi_init(void) { }
- static inline void acpi_early_init(void) { }
- static inline void acpi_subsystem_init(void) { }
- 
+ 	acpi_tables_addr =
+-		memblock_find_in_range(0, max_low_pfn_mapped << PAGE_SHIFT,
++		memblock_find_in_range(0, MAX_PHYS_ACPI_TABLES,
+ 				       all_tables_size, PAGE_SIZE);
+ 	if (!acpi_tables_addr) {
+ 		WARN_ON(1);
 -- 
 2.8.2
