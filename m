@@ -1,49 +1,61 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 17 May 2016 13:21:13 -0700
-Subject: [PATCH 1/1] net: thunderx: avoid null pointer dereference
-In-Reply-To: <1463514038-9008-1-git-send-email-xypron.glpk@gmx.de>
-References: <1463514038-9008-1-git-send-email-xypron.glpk@gmx.de>
-Message-ID: <573B7D39.9050305@caviumnetworks.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Tue, 17 May 2016 16:36:06 -0400
+Subject: [PATCH v2 2/2] arm64/efi: esrt: add missing call to
+ efi_esrt_init()
+In-Reply-To: <56C385D3.3090308@codeaurora.org>
+References: <1455535953-5056-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1455535953-5056-3-git-send-email-ard.biesheuvel@linaro.org>
+ <56C385D3.3090308@codeaurora.org>
+Message-ID: <573B80B6.2010108@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2016 12:40 PM, Heinrich Schuchardt wrote:
-> In function bgx_lmac_handler only use a member of
-> lmac after checking it is not null.
->
+Hi Ard,
 
-Were you seeing and actual OOPs, or is this only a theoretical problem 
-flagged by some sort of static code checker?
+On 02/16/2016 03:25 PM, Baicar, Tyler wrote:
+> On 2/15/2016 4:32 AM, Ard Biesheuvel wrote:
+>> ESRT support is built by default for all architectures that define
+>> CONFIG_EFI. However, this support was not wired up yet for ARM/arm64,
+>> since efi_esrt_init() was never called. So add the missing call.
+>>
+>> Since efi_esrt_init() uses efi_mem_desc_lookup(), which in turn relies
+>> on efi.memmap having been assigned and populated completetely, add the
+>> missing assignments of efi.memmap and efi.memmap->nr_map.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>   drivers/firmware/efi/arm-init.c | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/drivers/firmware/efi/arm-init.c
+>> b/drivers/firmware/efi/arm-init.c
+>> index 9e15d571b53c..5c5e799bdb50 100644
+>> --- a/drivers/firmware/efi/arm-init.c
+>> +++ b/drivers/firmware/efi/arm-init.c
+>> @@ -197,10 +197,13 @@ void __init efi_init(void)
+>>       memmap.map_end = memmap.map + params.mmap_size;
+>>       memmap.desc_size = params.desc_size;
+>>       memmap.desc_version = params.desc_ver;
+>> +    memmap.nr_map = params.mmap_size / params.desc_size;
+>> +    efi.memmap = &memmap;
+>>         if (uefi_init() < 0)
+>>           return;
+>>   +    efi_esrt_init();
+> This call to efi_esrt_init() is failing because efi.flags does not have
+> EFI_MEMMAP set. This flag gets set at the end of reserve_regions(). I
+> tested moving the set_bit() call from reserve_regions() to just before
+> efi_esrt_init() and also tested moving efi_esrt_init() to just after
+> reserve_regions(). Both of these options worked.
+>>       reserve_regions();
+>>       early_memunmap(memmap.map, params.mmap_size);
+>>       memblock_mark_nomap(params.mmap & PAGE_MASK,
 
-> Signed-off-by: Heinrich Schuchardt <xypron.glpk@gmx.de>
+Do you expect to respin this patch in the near future?
 
-In any event, it seems sane to make this change, so:
+Thanks,
+Cov
 
-Acked-by: David Daney <david.daney@cavium.com>
-
-
-> ---
->   drivers/net/ethernet/cavium/thunder/thunder_bgx.c | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> index d20539a..3ed2198 100644
-> --- a/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> +++ b/drivers/net/ethernet/cavium/thunder/thunder_bgx.c
-> @@ -274,12 +274,14 @@ static void bgx_sgmii_change_link_state(struct lmac *lmac)
->   static void bgx_lmac_handler(struct net_device *netdev)
->   {
->   	struct lmac *lmac = container_of(netdev, struct lmac, netdev);
-> -	struct phy_device *phydev = lmac->phydev;
-> +	struct phy_device *phydev;
->   	int link_changed = 0;
->
->   	if (!lmac)
->   		return;
->
-> +	phydev = lmac->phydev;
-> +
->   	if (!phydev->link && lmac->last_link)
->   		link_changed = -1;
->
->
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
