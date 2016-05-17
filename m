@@ -1,180 +1,172 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 17 May 2016 14:27:25 +0200
-Subject: [PATCH] pwm: atmel-hlcdc: Fix default PWM polarity
-In-Reply-To: <20160517121917.GD26166@ulmo.ba.sec>
-References: <1463476352-7485-1-git-send-email-boris.brezillon@free-electrons.com>
- <20160517110005.GA26166@ulmo.ba.sec>
- <20160517140803.078e3f5e@bbrezillon>
- <20160517121917.GD26166@ulmo.ba.sec>
-Message-ID: <20160517142725.7f7c82b4@bbrezillon>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 17 May 2016 14:32:19 +0200
+Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
+In-Reply-To: <573AD142.6020107@semihalf.com>
+References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
+ <573AD142.6020107@semihalf.com>
+Message-ID: <573B0F53.109@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 May 2016 14:19:17 +0200
-Thierry Reding <thierry.reding@gmail.com> wrote:
 
-> On Tue, May 17, 2016 at 02:08:03PM +0200, Boris Brezillon wrote:
-> > Hi Thierry,
-> > 
-> > On Tue, 17 May 2016 13:00:05 +0200
-> > Thierry Reding <thierry.reding@gmail.com> wrote:
-> >   
-> > > On Tue, May 17, 2016 at 11:12:32AM +0200, Boris Brezillon wrote:  
-> > > > The PWM device exposed by the HLCDC IP is configured with an inverted
-> > > > polarity by default. Registering the PWM chip with the normal polarity
-> > > > was not a problem before commit 42e8992c58d4 ("pwm: Add core
-> > > > infrastructure to allow atomic updates") because the ->set_polarity()
-> > > > hook was called no matter the current polarity state, but this is no longer
-> > > > the case.
-> > > > 
-> > > > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > > > Fixes: 42e8992c58d4 ("pwm: Add core infrastructure to allow atomic updates")    
-> > > 
-> > > That's not technically correct, because it's the driver that has the
-> > > bug. The core change merely exposes it. How about if I sort this into
-> > > the pwm-atomic branch and reword the commit message accordingly? That
-> > > way things should all stay bisectible.
-> > > 
-> > > Then again, given the breakage caused by the pwm_args patch I suppose
-> > > it doesn't matter much because that's part of a stable branch that I
-> > > can't rebase.  
-> > 
-> > If I understood correctly, you plan to rebase your pwm-atomic branch to
-> > insert this commit before commit 42e8992c58d4 ("pwm: Add core
-> > infrastructure to allow atomic updates").
-> > 
-> > Could you consider taking the following commit (or something similar if
-> > you already have a fix) as the first commit of your pwm-atomic branch?
-> > 
-> > Sorry for the mess around the introduction of pwm_args and pwm_state
-> > (that's not an excuse, but I've reworked this series so many time that I
-> > forgot to check bisectibility on the last versions :-().
-> > 
-> > ---
-> > From ad73fa3a56c7320979425d64ab54c09b9d83d4cf Mon Sep 17 00:00:00 2001
-> > From: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Date: Tue, 17 May 2016 13:55:02 +0200
-> > Subject: [PATCH] pwm: Fix pwm_apply_args() call sites
-> > 
-> > pwm_apply_args() is supposed to initialize a PWM device according to the
-> > arguments provided by the DT or the PWM lookup, but this function was
-> > called inside pwm_device_request(), which in turn was called before the
-> > core had a chance to initialize the pwm->args fields.
-> > 
-> > Fix that by calling pwm_apply_args directly in pwm_get() and of_pwm_get()
-> > after initializing pwm->args field.
-> > 
-> > This commit also fixes an invalid pointer dereference introduced by
-> > commit e39c0df1be5a ("pwm: Introduce the pwm_args concept").
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
-> > ---
-> >  drivers/pwm/core.c | 27 +++++++++++++++++----------
-> >  1 file changed, 17 insertions(+), 10 deletions(-)  
-> 
-> This looks good to me. However I can't easily apply this because git
-> gets confused by the existing headers. Also manually copying out the
-> patch yields patch corruption that I don't exactly know how to fix.
-> 
-> I think you can inline patches by using a scissor mark (--- >8 ---)
-> instead of the signature separator (---). Or you can attach the patch
-> with "Content-Disposition: inline".
 
-Ok, it's my PEBKAC day. Here it is with the scissor mark. As mentioned
-on IRC, you'll also have to squash those changes [1] into 93c0d9b
-("pwm: Keep PWM state in sync with hardware state").
+On 17.05.2016 10:07, Tomasz Nowicki wrote:
+> Hi Lorenzo,
+>
+> On 14.04.2016 19:25, Lorenzo Pieralisi wrote:
+>> On DT based systems, the of_dma_configure() API implements DMA
+>> configuration
+>> for a given device. On ACPI systems an API equivalent to
+>> of_dma_configure()
+>> is missing which implies that it is currently not possible to set-up DMA
+>> operations for devices through the ACPI generic kernel layer.
+>>
+>> This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+>> calls, that carry out IOMMU configuration through IORT (on systems where
+>> it is present) and call arch_setup_dma_ops(...) with the retrieved
+>> parameters.
+>>
+>> The DMA range size passed to arch_setup_dma_ops() is sized according
+>> to the device coherent_dma_mask (starting at address 0x0), mirroring the
+>> DT probing path behaviour when a dma-ranges property is not provided
+>> for the device being probed; this changes the current
+>> arch_setup_dma_ops()
+>> call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+>> is a NOP on all architectures but ARM/ARM64 this patch does not change
+>> the current kernel behaviour on them.
+>>
+>> This patch updates ACPI and PCI core code to use the newly introduced
+>> acpi_dma_configure function, providing the same functionality
+>> as of_dma_configure on ARM systems and leaving behaviour unchanged
+>> for all other arches.
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Bjorn Helgaas <bhelgaas@google.com>
+>> Cc: Robin Murphy <robin.murphy@arm.com>
+>> Cc: Tomasz Nowicki <tn@semihalf.com>
+>> Cc: Joerg Roedel <joro@8bytes.org>
+>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>> ---
+>>   drivers/acpi/glue.c     |  4 +--
+>>   drivers/acpi/iort.c     | 85
+>> +++++++++++++++++++++++++++++++++++++++++++++++++
+>>   drivers/acpi/scan.c     | 29 +++++++++++++++++
+>>   drivers/pci/probe.c     |  3 +-
+>>   include/acpi/acpi_bus.h |  2 ++
+>>   include/linux/acpi.h    |  5 +++
+>>   include/linux/iort.h    |  9 ++++++
+>>   7 files changed, 133 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+>> index 5ea5dc2..f8d6564 100644
+>> --- a/drivers/acpi/glue.c
+>> +++ b/drivers/acpi/glue.c
+>> @@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct
+>> acpi_device *acpi_dev)
+>>
+>>       attr = acpi_get_dma_attr(acpi_dev);
+>>       if (attr != DEV_DMA_NOT_SUPPORTED)
+>> -        arch_setup_dma_ops(dev, 0, 0, NULL,
+>> -                   attr == DEV_DMA_COHERENT);
+>> +        acpi_dma_configure(dev, attr);
+>>
+>>       acpi_physnode_link_name(physical_node_name, node_id);
+>>       retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+>> @@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct
+>> acpi_device *acpi_dev)
+>>       return 0;
+>>
+>>    err:
+>> +    acpi_dma_deconfigure(dev);
+>>       ACPI_COMPANION_SET(dev, NULL);
+>>       put_device(dev);
+>>       put_device(&acpi_dev->dev);
+>> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
+>> index 2b5ce65..b1bb8fb 100644
+>> --- a/drivers/acpi/iort.c
+>> +++ b/drivers/acpi/iort.c
+>> @@ -72,6 +72,31 @@ int iort_iommu_set_node(struct iommu_ops *ops,
+>> struct acpi_iort_node *node,
+>>       return 0;
+>>   }
+>>
+>> +/**
+>> + * iort_iommu_get_node - Retrieve iort_iommu_node associated with an
+>> IORT node.
+>> + *
+>> + * @node: IORT table node to be looked-up
+>> + *
+>> + * Returns: iort_iommu_node pointer on success
+>> + *          NULL on failure
+>> + */
+>> +static struct iort_iommu_node *iort_iommu_get_node(struct
+>> acpi_iort_node *node)
+>> +{
+>> +    struct iort_iommu_node *iommu_node;
+>> +
+>> +    spin_lock(&iort_iommu_lock);
+>> +    list_for_each_entry(iommu_node, &iort_iommu_list, list) {
+>> +        if (iommu_node->node == node)
+>> +            goto found;
+>> +    }
+>> +
+>> +    iommu_node = NULL;
+>> +found:
+>> +    spin_unlock(&iort_iommu_lock);
+>> +
+>> +    return iommu_node;
+>> +}
+>> +
+>>   typedef acpi_status (*iort_find_node_callback)
+>>       (struct acpi_iort_node *node, void *context);
+>>
+>> @@ -405,6 +430,66 @@ iort_pci_get_domain(struct pci_dev *pdev, u32
+>> req_id)
+>>       return domain_handle;
+>>   }
+>>
+>> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
+>> +{
+>> +    u32 *rid = data;
+>> +
+>> +    *rid = alias;
+>> +    return 0;
+>> +}
+>> +
+>> +/**
+>> + * iort_iommu_configure - Set-up IOMMU configuration for a device.
+>> + *
+>> + * @dev: device that requires IOMMU set-up
+>> + *
+>> + * Returns: iommu_ops pointer on configuration success
+>> + *          NULL on configuration failure
+>> + */
+>> +struct iommu_ops *iort_iommu_configure(struct device *dev)
+>> +{
+>> +    struct acpi_iort_node *node, *parent;
+>> +    struct iommu_ops *ops = NULL;
+>> +    struct iommu_fwspec fwspec;
+>> +    struct iort_iommu_node *iommu_node;
+>> +    u32 rid = 0, devid = 0;
+>> +
+>> +    if (dev_is_pci(dev)) {
+>> +        struct pci_bus *bus = to_pci_dev(dev)->bus;
+>> +
+>> +        pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
+>> +                       &rid);
+>> +
+>> +        node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
+>> +                      iort_find_dev_callback, &bus->dev);
+>> +    } else
+>> +        node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
+>> +                      iort_find_dev_callback, dev);
+>
+> I think this will not work for finding host bridge stream ID. We still
+> need to use ACPI_IORT_NODE_PCI_ROOT_COMPLEX but 'dev' is not PCI device,
+> right?
 
-> 
-> Rather than putting this into the pwm-atomic branch, I'll probably stick
-> it into the pwm-args branch on top of the existing patch. Technically
-> only the existing patch needs to be stable, so the branch can still
-> evolve.
-
-Ok, great!
+After private conversation, I think this part is OK.
 
 Thanks,
-
-Boris
-
-[1]http://code.bulix.org/egoo4y-98645
-
---->8---
->From ad73fa3a56c7320979425d64ab54c09b9d83d4cf Mon Sep 17 00:00:00 2001
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
-Date: Tue, 17 May 2016 13:55:02 +0200
-Subject: [PATCH] pwm: Fix pwm_apply_args() call sites
-
-pwm_apply_args() is supposed to initialize a PWM device according to the
-arguments provided by the DT or the PWM lookup, but this function was
-called inside pwm_device_request(), which in turn was called before the
-core had a chance to initialize the pwm->args fields.
-
-Fix that by calling pwm_apply_args directly in pwm_get() and of_pwm_get()
-after initializing pwm->args field.
-
-This commit also fixes an invalid pointer dereference introduced by
-commit e39c0df1be5a ("pwm: Introduce the pwm_args concept").
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
----
- drivers/pwm/core.c | 27 +++++++++++++++++----------
- 1 file changed, 17 insertions(+), 10 deletions(-)
-
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index 680fbc7..22cf395 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -128,13 +128,6 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
- 	set_bit(PWMF_REQUESTED, &pwm->flags);
- 	pwm->label = label;
- 
--	/*
--	 * FIXME: This should be removed once all PWM users properly make use
--	 * of struct pwm_args to initialize the PWM device. As long as this is
--	 * here, the PWM state and hardware state can get out of sync.
--	 */
--	pwm_apply_args(pwm);
--
- 	return 0;
- }
- 
-@@ -627,6 +620,13 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
- 
- 	pwm->label = con_id;
- 
-+	/*
-+	 * FIXME: This should be removed once all PWM users properly make use
-+	 * of struct pwm_args to initialize the PWM device. As long as this is
-+	 * here, the PWM state and hardware state can get out of sync.
-+	 */
-+	pwm_apply_args(pwm);
-+
- put:
- 	of_node_put(args.np);
- 
-@@ -754,13 +754,20 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
- 	if (!chip)
- 		goto out;
- 
--	pwm->args.period = chosen->period;
--	pwm->args.polarity = chosen->polarity;
--
- 	pwm = pwm_request_from_chip(chip, chosen->index, con_id ?: dev_id);
- 	if (IS_ERR(pwm))
- 		goto out;
- 
-+	pwm->args.period = chosen->period;
-+	pwm->args.polarity = chosen->polarity;
-+
-+	/*
-+	 * FIXME: This should be removed once all PWM users properly make use
-+	 * of struct pwm_args to initialize the PWM device. As long as this is
-+	 * here, the PWM state and hardware state can get out of sync.
-+	 */
-+	pwm_apply_args(pwm);
-+
- out:
- 	mutex_unlock(&pwm_lookup_lock);
- 	return pwm;
+Tomasz
