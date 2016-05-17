@@ -1,28 +1,91 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 May 2016 11:24:27 +0100
-Subject: [PATCH v12 10/10] kprobes: Add arm64 case in kprobe example module
-In-Reply-To: <20160517095714.GA25167@sha-win-210.asiapac.arm.com>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-11-git-send-email-dave.long@linaro.org>
- <20160517095714.GA25167@sha-win-210.asiapac.arm.com>
-Message-ID: <20160517102427.GD8104@sirena.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 17 May 2016 12:35:32 +0200
+Subject: [PATCH] pwm: Fill pwm->args before calling pwm_request_from_chip()
+Message-ID: <1463481333-23438-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2016 at 05:57:33PM +0800, Huang Shijie wrote:
-> On Wed, Apr 27, 2016 at 02:53:05PM -0400, David Long wrote:
+Commit e39c0df1be5a ("pwm: Introduce the pwm_args concept"), moved the
+period and polarity initialization steps into pwm_request_device() (called
+by pwm_request_from_chip()) based on the pwm->args information.
+Make sure we fill pwm->args fields before calling pwm_request_from_chip().
 
-> > +#ifdef CONFIG_ARM64
-> > +	pr_info("pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Mika Penttil? <mika.penttila@nextfour.com>
+Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
+---
+Mika,
 
-> I think you miss the KERN_INFO here.
+Can you test after applying this patch and let me know if it fixes your
+bug.
 
-That's what pr_info() does over printk() - it adds the KERN_INFO more
-cleanly.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160517/07f2ea4b/attachment.sig>
+Thanks,
+
+Boris
+
+ drivers/pwm/core.c    | 12 ++++++------
+ drivers/pwm/pwm-pxa.c |  4 ++--
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 427142d..3d2eeaa 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -143,10 +143,6 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	if (args->args[0] >= pc->npwm)
+ 		return ERR_PTR(-EINVAL);
+ 
+-	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
+-	if (IS_ERR(pwm))
+-		return pwm;
+-
+ 	pwm->args.period = args->args[1];
+ 
+ 	if (args->args[2] & PWM_POLARITY_INVERTED)
+@@ -154,6 +150,10 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	else
+ 		pwm->args.polarity = PWM_POLARITY_NORMAL;
+ 
++	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
++	if (IS_ERR(pwm))
++		return pwm;
++
+ 	return pwm;
+ }
+ EXPORT_SYMBOL_GPL(of_pwm_xlate_with_flags);
+@@ -169,12 +169,12 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	if (args->args[0] >= pc->npwm)
+ 		return ERR_PTR(-EINVAL);
+ 
++	pwm->args.period = args->args[1];
++
+ 	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
+ 	if (IS_ERR(pwm))
+ 		return pwm;
+ 
+-	pwm->args.period = args->args[1];
+-
+ 	return pwm;
+ }
+ 
+diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+index 58b709f..c33bd42 100644
+--- a/drivers/pwm/pwm-pxa.c
++++ b/drivers/pwm/pwm-pxa.c
+@@ -156,12 +156,12 @@ pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+ {
+ 	struct pwm_device *pwm;
+ 
++	pwm->args.period = args->args[0];
++
+ 	pwm = pwm_request_from_chip(pc, 0, NULL);
+ 	if (IS_ERR(pwm))
+ 		return pwm;
+ 
+-	pwm->args.period = args->args[0];
+-
+ 	return pwm;
+ }
+ 
+-- 
+2.7.4
