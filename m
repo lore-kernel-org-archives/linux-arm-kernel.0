@@ -1,9 +1,9 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2016 00:24:54 +0200
-Subject: [GIT PULL 6/7] ARM: SoC defconfig updates for v4.7
+Date: Wed, 18 May 2016 00:26:08 +0200
+Subject: [GIT PULL 7/7] ARM: SoC driver updates for v4.7
 In-Reply-To: <8749147.ztcb6kVhye@wuerfel>
 References: <8749147.ztcb6kVhye@wuerfel>
-Message-ID: <2717085.7it4MHH99U@wuerfel>
+Message-ID: <2633732.4xlcotETON@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,189 +13,383 @@ The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
 
-for you to fetch changes up to 0ef659a30055e5ec914b51f5294789ea2a92b08c:
+for you to fetch changes up to 5420f9fd159761b88978c312c3b350546f8615bb:
 
-  ARM: aspeed: adapt defconfigs for new CONFIG_PRINTK_TIME (2016-05-11 14:11:13 +0200)
-
-----------------------------------------------------------------
-ARM: SoC defconfig updates for v4.7
-
-As usual, a bunch of commits, mostly adding drivers and other options to
-defconfigs.
-
-We are adding three new defconfig files for the newly added 32-bit
-machines (aspeed and mps2), the rest is mainly housekeeping.
-
-The changes outside of arch/arm/config/ are for a Kconfig symbol
-that got renamed.
+  arm-ccn: Enable building as module (2016-05-09 16:36:03 +0200)
 
 ----------------------------------------------------------------
-Arnd Bergmann (14):
-      Merge tag 'samsung-defconfig-4.7' of git://git.kernel.org/.../krzk/linux into next/defconfig
-      Merge tag 'mvebu-defconfig-4.7-1' of git://git.infradead.org/linux-mvebu into next/defconfig
-      Merge tag 'arm-soc/for-4.7/defconfig' of http://github.com/Broadcom/stblinux into next/defconfig
-      Merge tag 'keystone_config_for_4.7' of git://git.kernel.org/.../ssantosh/linux-keystone into next/defconfig
-      Merge tag 'renesas-pci-defconfig-for-v4.7' of git://git.kernel.org/.../horms/renesas into next/defconfig
-      Merge tag 'lpc32xx-defconfig-4.7' of git://github.com/vzapolskiy/linux-lpc32xx into next/defconfig
-      Merge tag 'omap-for-v4.7/defconfig-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/defconfig
-      Merge tag 'davinci-for-v4.7/defconfig' of git://git.kernel.org/.../nsekhar/linux-davinci into next/defconfig
-      Merge tag 'tegra-for-4.7-defconfig' of git://git.kernel.org/.../tegra/linux into next/defconfig
-      Merge tag 'imx-defconfig-4.7' of git://git.kernel.org/.../shawnguo/linux into next/defconfig
-      Merge tag 'ux500-defconfig-armsoc2' of git://git.kernel.org/.../linusw/linux-stericsson into next/defconfig
-      Merge tag 'aspeed-for-4.7-defconfig' of https://github.com/shenki/linux into next/defconfig
-      Merge tag 'at91-defconfig2' of git://git.kernel.org/.../nferre/linux-at91 into next/defconfig
-      ARM: aspeed: adapt defconfigs for new CONFIG_PRINTK_TIME
+ARM: SoC driver updates for v4.7
 
-Boris Brezillon (1):
-      ARM: multi_v7_defconfig: add HLCDC drivers as modules
+Driver updates for ARM SoCs, these contain various things that touch
+the drivers/ directory but got merged through arm-soc for practical
+reasons. For the most part, this is now related to power management
+controllers, which have not yet been abstracted into a separate
+subsystem, and typically require some code in drivers/soc or arch/arm
+to control the power domains.
 
-Eric Anholt (7):
-      ARM: multi_v7_defconfig: Add more BCM2835 support
-      ARM: multi_v7_defconfig: Switch BCM2835 to sdhci-iproc.c for MMC
-      ARM: multi_v7_defconfig: Build in DWC2 USB support
-      ARM: bcm2835: Switch BCM2835 to sdhci-iproc.c for MMC
-      ARM: bcm2835: Enable CONFIG_PM.
-      ARM: bcm2835: Enable the VC4 graphics driver in the defconfig
-      ARM: bcm2835: Enable NFS root support.
+Another large chunk here is a rework of the NVIDIA Tegra USB3.0
+support, which was surprisingly tricky and took a long time to
+get done.
 
-Florian Fainelli (1):
-      Merge tag 'bcm2835-defconfig-next-2016-04-20' into defconfig/next
+Finally, reset controller handling as always gets merged through here
+as well.
 
-Gary Bisson (3):
-      ARM: imx_v6_v7_defconfig: add FT5x06 and TSC2004 touch support
-      ARM: imx_v6_v7_defconfig: add CONFIG_I2C_MUX_GPIO
-      ARM: imx_v6_v7_defconfig: add CONFIG_RTC_DRV_M41T80
+----------------------------------------------------------------
+Andrew Bresticker (1):
+      clk: tegra: Add interface to enable hardware control of SATA/XUSB PLLs
 
-Heiko Stuebner (2):
-      ARM: multi_v7_defconfig: Enable Rockchip displayport phy
-      ARM: multi_v7_defconfig: Enable new Rockchip display-controller drivers
+Andy Gross (1):
+      Merge tag 'qcom-soc-for-4.7' into soc-for-4.7-p2
 
-Jan Luebbe (2):
-      ARM: multi_v5_defconfig: Enable support for MX21/MX27
-      ARM: multi_v5_defconfig: Enable recommended options for systemd
+Arnd Bergmann (16):
+      Merge tag 'versatile-flash-for-arm-soc' of git://git.kernel.org/.../linusw/linux-integrator into next/drivers
+      Merge tag 'tegra-for-4.7-soc' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'arm-soc/for-4.7/drivers' of http://github.com/Broadcom/stblinux into next/drivers
+      Merge tag 'qcom-soc-for-4.7-2' of git://git.kernel.org/.../agross/linux into next/drivers
+      soc: brcmstb: select SOC_BUS
+      physmap_of: ensure versatile code is reachable
+      drivers: firmware: psci: make two helper functions inline
+      Merge tag 'renesas-rcar-sysc2-for-v4.7' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'samsung-drivers-exynos-srom-4.7' of git://git.kernel.org/.../krzk/linux into next/drivers
+      Merge tag 'v4.7-rockchip-drivers-2' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
+      Merge tag 'tegra-for-4.7-phy' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'tegra-for-4.7-pci' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'tegra-for-4.7-xhci' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'tegra-for-4.7-genpd' of git://git.kernel.org/.../tegra/linux into next/drivers
+      Merge tag 'v4.6-next-soc' of https://github.com/mbgg/linux-mediatek into next/drivers
+      Merge tag 'reset-for-4.7-2' of git://git.pengutronix.de/git/pza/linux into next/drivers
 
-Javier Martinez Canillas (3):
-      ARM: exynos_defconfig: Enable CPUFreq governors as modules
-      ARM: multi_v7_defconfig: Enable CPUFreq governors as modules
-      ARM: omap2plus_defconfig: Fix warning due invalid RXKAD symbol value
+Bjorn Andersson (8):
+      soc: qcom: smem_state: Add stubs for disabled smem_state
+      soc: qcom: smd: Introduce callback setter
+      soc: qcom: smd: Split discovery and state change work
+      soc: qcom: smd: Refactor channel open and close handling
+      soc: qcom: smd: Support multiple channels per sdev
+      soc: qcom: smd: Support opening additional channels
+      soc: qcom: smem: Use write-combine remap for SMEM
+      soc: qcom: smd: Make callback pass channel reference
 
-Joel Stanley (2):
-      arm/configs/multi_v5: Add Aspeed ast2400
-      arm/configs: Add Aspeed defconfig
+Daniel Lezcano (1):
+      reset: Add missing function stub for device_reset
 
-Keerthy (1):
-      ARM: configs: keystone: Add CPU Hotplug related options
+Elaine Zhang (8):
+      soc: rockchip: power-domain: make idle handling optional
+      soc: rockchip: power-domain: allow domains only handling idle requests
+      soc: rockchip: power-domain: add support for sub-power domains
+      dt-bindings: add power-domain header for RK3399 SoCs
+      dt-bindings: add binding for rk3399 power domains
+      soc: rockchip: power-domain: Modify power domain driver for rk3399
+      dt-bindings: modify document of Rockchip power domains
+      soc: rockchip: power-domain: support qos save and restore
 
-Kevin Hilman (1):
-      ARM: davinci_all_defconfig: enable SPI and NOR as modules
+Florian Fainelli (2):
+      bus: brcmstb_gisb: Rework dependencies
+      soc: brcmstb: Unmap sun_top_ctrl_base on errors
+
+Geert Uytterhoeven (24):
+      clk: renesas: mstp: Drop check for CONFIG_PM_GENERIC_DOMAINS_OF
+      clk: renesas: cpg-mssr: Drop check for CONFIG_PM_GENERIC_DOMAINS_OF
+      clk: renesas: mstp: Clarify cpg_mstp_{at,de}tach_dev() domain parameter
+      PM / Domains: Add DT bindings for the R-Car System Controller
+      soc: renesas: Add r8a7779 SYSC PM Domain Binding Definitions
+      soc: renesas: Add r8a7790 SYSC PM Domain Binding Definitions
+      soc: renesas: Add r8a7791 SYSC PM Domain Binding Definitions
+      soc: renesas: Add r8a7793 SYSC PM Domain Binding Definitions
+      soc: renesas: Add r8a7794 SYSC PM Domain Binding Definitions
+      soc: renesas: Add r8a7795 SYSC PM Domain Binding Definitions
+      clk: renesas: Provide Kconfig symbols for CPG/MSSR and CPG/MSTP support
+      clk: renesas: mstp: Provide dummy attach/detach_dev callbacks
+      clk: renesas: cpg-mssr: Export cpg_mssr_{at,de}tach_dev()
+      soc: renesas: Move pm-rcar to drivers/soc/renesas/rcar-sysc
+      soc: renesas: rcar-sysc: Improve rcar_sysc_power() debug info
+      soc: renesas: rcar-sysc: Add DT support for SYSC PM domains
+      soc: renesas: rcar-sysc: Make rcar_sysc_power_is_off() static
+      soc: renesas: rcar-sysc: Enable Clock Domain for I/O devices
+      soc: renesas: rcar-sysc: Add support for R-Car H1 power areas
+      soc: renesas: rcar-sysc: Add support for R-Car H2 power areas
+      soc: renesas: rcar-sysc: Add support for R-Car M2-W power areas
+      soc: renesas: rcar-sysc: Add support for R-Car M2-N power areas
+      soc: renesas: rcar-sysc: Add support for R-Car E2 power areas
+      soc: renesas: rcar-sysc: Add support for R-Car H3 power areas
+
+Hans de Goede (3):
+      reset: Make [of_]reset_control_get[_foo] functions wrappers
+      reset: Share struct reset_control between reset_control_get calls
+      reset: Add support for shared reset controls
+
+Heiko Stuebner (1):
+      Merge branch 'v4.7-shared/pdids' into v4.7-armsoc/drivers
+
+Jisheng Zhang (2):
+      drivers: firmware: psci: drop duplicate const from psci_of_match
+      drivers: firmware: psci: make two helper functions static
+
+Joachim Eastwood (1):
+      reset: lpc18xx: get rid of global variables for restart notifier
+
+John Crispin (11):
+      soc: mediatek: PMIC wrap: don't duplicate the wrapper data
+      soc: mediatek: PMIC wrap: add wrapper callbacks for init_reg_clock
+      soc: mediatek: PMIC wrap: split SoC specific init into callback
+      soc: mediatek: PMIC wrap: WRAP_INT_EN needs a different bitmask for MT2701/7623
+      soc: mediatek: PMIC wrap: SPI_WRITE needs a different bitmask for MT2701/7623
+      soc: mediatek: PMIC wrap: move wdt_src into the pmic_wrapper_type struct
+      soc: mediatek: PMIC wrap: remove pwrap_is_mt8135() and pwrap_is_mt8173()
+      soc: mediatek: PMIC wrap: add a slave specific struct
+      soc: mediatek: PMIC wrap: add mt6323 slave support
+      soc: mediatek: PMIC wrap: add MT2701/7623 support
+      ARM: mediatek: enable gpt6 on boot up to make arch timer work on mt7623
+
+Jon Hunter (16):
+      soc/tegra: pmc: Add missing structure members to kernel-doc
+      soc/tegra: pmc: Fix sparse warning for tegra_pmc_init_tsense_reset()
+      soc/tegra: pmc: Remove debugfs entry on probe failure
+      soc/tegra: pmc: Remove non-existing power partitions for Tegra210
+      soc/tegra: pmc: Remove non-existing L2 partition for Tegra124
+      soc/tegra: pmc: Restore base address on probe failure
+      soc/tegra: pmc: Protect public functions from potential race conditions
+      soc/tegra: pmc: Change powergate and rail IDs to be an unsigned type
+      soc/tegra: pmc: Fix testing of powergate state
+      soc/tegra: pmc: Fix verification of valid partitions
+      soc/tegra: pmc: Remove additional check for a valid partition
+      soc/tegra: pmc: Ensure GPU partition can be toggled on/off by PMC
+      soc/tegra: pmc: Wait for powergate state to change
+      dt-bindings: Update NVIDIA PMC for Tegra
+      dt-bindings: Add power domain info for NVIDIA PMC
+      soc/tegra: pmc: Add generic PM domain support
+
+Justin Chen (1):
+      soc: brcmstb: add SoC driver to brcmstb
 
 Krzysztof Kozlowski (1):
-      ARM: exynos_defconfig: Enable Trats2 audio codec, touchscreen and sensors
+      Merge tag 'samsung-dt-exynos-srom-fixup-4.7' into for-v4.7/drivers-memory-exynos-srom
 
-Lee Jones (5):
-      ARM: multi_v7_defconfig: Enable ST's PWM driver
-      ARM: multi_v7_defconfig: Enable ST's Power Reset driver
-      ARM: multi_v7_defconfig: Enable support for PWM Regulators
-      ARM: multi_v7_defconfig: Enable ST's HW Random Number Generator
-      ARM: multi_v7_defconfig: Remove unused Kconfig option MACH_UX500_DT
+Lina Iyer (1):
+      drivers: qcom: spm: avoid module usage in non-modular SPM driver
 
-Linus Walleij (2):
-      ARM: u8500_defconfig: remove staging from defconfig
-      ARM: u8500_defconfig: update sensor config
+Linus Walleij (4):
+      mtd: physmap_of: add a hook for Versatile write protection
+      mtd: augment the "arm,versatile-flash" bindings
+      ARM: versatile: move flash registration to the device tree
+      ARM: integrator: move flash registration to device tree
 
-Lokesh Vutla (1):
-      ARM: omap2plus_defconfig: Enable GPIO_TPIC2810
+Neil Armstrong (2):
+      reset: Add Oxford Semiconductor Reset Controller driver
+      dt-bindings: Add Oxford Semiconductor Reset Controller bindings
 
-Marcel Ziswiler (2):
-      ARM: imx_v6_v7_defconfig: add CONFIG_I2C_GPIO
-      ARM: imx_v6_v7_defconfig: add CONFIG_MICREL_PHY
+Olof Johansson (4):
+      Merge tag 'qcom-soc-for-4.7' of git://git.kernel.org/.../agross/linux into next/drivers
+      Merge tag 'reset-for-4.7' of git://git.pengutronix.de/git/pza/linux into next/drivers
+      Merge tag 'renesas-simple-pm-bus-for-v4.7' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'v4.7-rockchip-drivers-1' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
 
-Marek Vasut (1):
-      ARM: at91: sama5: Update defconfig
+Pankaj Dubey (5):
+      ARM: dts: change SROM node compatible from generic to model specific
+      dt-bindings: EXYNOS: Add exynos-srom device tree binding
+      memory: Add support for Exynos SROM driver
+      MAINTAINERS: Add maintainers entry for drivers/memory/samsung
+      ARM: EXYNOS: Remove SROM related register settings from mach-exynos
 
-Masahiro Yamada (1):
-      ARM: multi_v7_defconfig: enable Denali NAND controller
+Pavel Fedin (1):
+      memory: samsung: exynos-srom: Add support for bank configuration
 
-Nicolas Ferre (8):
-      ARM: at91/defconfig: add the HDMA controller to sama5_defconfig
-      ARM: at91/defconfig: add HLCDC driver to sama5_defconfig
-      ARM: at91/defconfig: add PDMIC driver to sama5_defconfig
-      ARM: multi_v7_defconfig: add Atmel watchdog timers
-      ARM: multi_v7_defconfig: add Atmel ISI (Image Sensor Interface) driver
-      ARM: multi_v7_defconfig: add the Atmel Audio microphone interface PDMIC
-      ARM: multi_v7_defconfig: add the Atmel sama5d2-compatible ADC driver
-      ARM: at91/defconfig: sama5: add CONFIG_FHANDLE
+Shawn Lin (1):
+      soc: rockchip: power-domain: check the existing of regmap
 
-Nishanth Menon (1):
-      ARM: omap2plus_defconfig: Enable DP83867 support
+Simon Horman (2):
+      bus: simple-pm-bus: Use ARCH_RENESAS
+      Merge tag 'clk-renesas-for-v4.7-tag2' of git://git.kernel.org/.../geert/renesas-drivers into rcar-sysc-for-v4.7
 
-Olof Johansson (2):
-      Merge tag 'renesas-defconfig-for-v4.7' of git://git.kernel.org/.../horms/renesas into next/defconfig
-      Merge tag 'sti-defconfig-for-v4.7-1' of git://git.kernel.org/.../mcoquelin/sti into next/defconfig
+Srinivas Kandagatla (2):
+      MAINTAINERS: add qcom i2c and spi drivers to list
+      MAINTAINERS: add qcom clocks to the maintainers list
 
-Romain Perier (3):
-      ARM: mvebu_v7_defconfig: Enabling the new Marvell's cryptographic engine driver
-      ARM: multi_v7_defconfig: Enabling the new Marvell's cryptographic engine driver
-      ARM: mvebu_v5_defconfig: Switching to the new Marvell's cryptographic engine driver
+Suzuki K Poulose (1):
+      arm-ccn: Enable building as module
 
-Sekhar Nori (2):
-      ARM: davinci_all_defconfig: enable GPIO_SYSFS
-      ARM: davinci_all_defconfig: support systemd
+Thierry Reding (15):
+      Merge branch 'for-4.7/soc' into for-4.7/genpd
+      Merge branch 'for-4.7/clk' into for-4.7/phy
+      phy: core: Allow children node to be overridden
+      dt-bindings: phy: Add NVIDIA Tegra XUSB pad controller binding
+      dt-bindings: phy: tegra-xusb-padctl: Add Tegra210 support
+      phy: Add Tegra XUSB pad controller support
+      phy: tegra: Add Tegra210 support
+      Merge branch 'for-4.7/phy' into for-4.7/pci
+      dt-bindings: pci: tegra: Update for per-lane PHYs
+      PCI: tegra: Support per-lane PHYs
+      Merge branch 'for-4.7/phy' into for-4.7/xhci
+      dt-bindings: usb: Add NVIDIA Tegra XUSB controller binding
+      dt-bindings: usb: xhci-tegra: Add Tegra210 XUSB controller support
+      usb: xhci: Add NVIDIA Tegra XUSB controller driver
+      usb: xhci: tegra: Add Tegra210 support
 
-Simon Horman (1):
-      PCI: rcar-pcie: Remove Gen2 designation from Kconfig
+Ulrich Hecht (1):
+      clk: renesas: r8a7795: add PWM clock
 
-Thierry Reding (2):
-      ARM: tegra: Enable XUSB controller in defconfig
-      ARM: multi_v7: Enable Tegra XUSB controller in defconfig
+Wolfram Sang (5):
+      clk: renesas: r8a7795: make SD clk definition specific for GEN3
+      clk: renesas: cpg-mssr: add generic support for read-only DIV6 clocks
+      clk: renesas: r8a7795: add OSC and RINT clocks
+      clk: renesas: r8a7795: add R clk
+      clk: renesas: r8a7795: add RWDT clock
 
-Thomas Petazzoni (1):
-      MAINTAINERS: attach arch/arm/configs/mvebu_*_defconfig to relevant maintainers
-
-Tony Lindgren (3):
-      ARM: omap2plus_defconfig: Update with make savedefconfig
-      ARM: omap2plus_defconfig: Enable twl6030 USB phy as loadable module
-      ARM: omap2plus_defconfig: Enable PWM and ir-rx51 as loadable modules
-
-Vladimir Murzin (1):
-      ARM: configs: add MPS2 defconfig
-
-Vladimir Zapolskiy (2):
-      ARM: LPC32xx: defconfig update
-      ARM: LPC32xx: add PL175 memory controller driver to defconfig
-
-Wolfram Sang (2):
-      ARM: multi_v7_defconfig: enable I2C demultiplexer and slave eeprom
-      ARM: shmobile: defconfig: enable I2C demultiplexer and slave eeprom
-
-Yegor Yefremov (1):
-      ARM: omap2plus_defconfig: Enable MDIO Bus/PHY emulation support
-
- MAINTAINERS                            |   2 +-
- arch/arm/configs/aspeed_g4_defconfig   |  86 ++++++++++++++++++++++++++
- arch/arm/configs/aspeed_g5_defconfig   |  88 ++++++++++++++++++++++++++
- arch/arm/configs/bcm2835_defconfig     |  11 ++--
- arch/arm/configs/davinci_all_defconfig |   7 ++-
- arch/arm/configs/exynos_defconfig      |  11 ++++
- arch/arm/configs/imx_v6_v7_defconfig   |   6 ++
- arch/arm/configs/keystone_defconfig    |   2 +
- arch/arm/configs/lpc32xx_defconfig     |  29 ++++-----
- arch/arm/configs/mps2_defconfig        | 109 +++++++++++++++++++++++++++++++++
- arch/arm/configs/multi_v5_defconfig    |  29 +++++++--
- arch/arm/configs/multi_v7_defconfig    |  37 +++++++++--
- arch/arm/configs/mvebu_v5_defconfig    |   2 +-
- arch/arm/configs/mvebu_v7_defconfig    |   1 +
- arch/arm/configs/omap2plus_defconfig   |  66 +++++++++-----------
- arch/arm/configs/sama5_defconfig       |  13 +++-
- arch/arm/configs/shmobile_defconfig    |   5 +-
- arch/arm/configs/tegra_defconfig       |   2 +
- arch/arm/configs/u8500_defconfig       |   5 +-
- arch/arm64/configs/defconfig           |   2 +-
- drivers/pci/host/Kconfig               |   4 +-
- drivers/pci/host/Makefile              |   2 +-
- 22 files changed, 437 insertions(+), 82 deletions(-)
- create mode 100644 arch/arm/configs/aspeed_g4_defconfig
- create mode 100644 arch/arm/configs/aspeed_g5_defconfig
- create mode 100644 arch/arm/configs/mps2_defconfig
+ .../bindings/arm/tegra/nvidia,tegra20-pmc.txt      |   92 +-
+ .../bindings/memory-controllers/exynos-srom.txt    |   79 +
+ .../devicetree/bindings/mtd/arm-versatile.txt      |   20 +-
+ .../bindings/pci/nvidia,tegra20-pcie.txt           |  224 ++-
+ .../bindings/phy/nvidia,tegra124-xusb-padctl.txt   |  733 +++++++
+ .../pinctrl/nvidia,tegra124-xusb-padctl.txt        |    6 +
+ .../bindings/power/renesas,rcar-sysc.txt           |   48 +
+ .../devicetree/bindings/reset/oxnas,reset.txt      |   58 +
+ .../bindings/soc/rockchip/power_domain.txt         |   47 +
+ .../bindings/usb/nvidia,tegra124-xusb.txt          |  120 ++
+ Documentation/phy.txt                              |   16 +-
+ MAINTAINERS                                        |    8 +
+ arch/arm/boot/dts/exynos4.dtsi                     |    4 +-
+ arch/arm/boot/dts/exynos5.dtsi                     |    4 +-
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          |    2 +-
+ arch/arm/boot/dts/exynos5410.dtsi                  |    4 +-
+ arch/arm/boot/dts/integrator.dtsi                  |    3 +-
+ arch/arm/boot/dts/versatile-ab.dts                 |    5 +-
+ arch/arm/mach-bcm/Kconfig                          |    2 +-
+ arch/arm/mach-exynos/Kconfig                       |    3 +
+ arch/arm/mach-exynos/exynos.c                      |   17 -
+ arch/arm/mach-exynos/include/mach/map.h            |    3 -
+ arch/arm/mach-exynos/regs-srom.h                   |   53 -
+ arch/arm/mach-exynos/suspend.c                     |   20 +-
+ arch/arm/mach-integrator/integrator_ap.c           |   62 -
+ arch/arm/mach-integrator/integrator_cp.c           |   51 -
+ arch/arm/mach-mediatek/mediatek.c                  |    1 +
+ arch/arm/mach-shmobile/Kconfig                     |   11 +-
+ arch/arm/mach-shmobile/Makefile                    |    1 -
+ arch/arm/mach-shmobile/pm-r8a7779.c                |    3 +-
+ arch/arm/mach-shmobile/pm-rcar-gen2.c              |    2 +-
+ arch/arm/mach-shmobile/pm-rcar.c                   |  164 --
+ arch/arm/mach-shmobile/smp-r8a7779.c               |    2 +-
+ arch/arm/mach-shmobile/smp-r8a7790.c               |    2 +-
+ arch/arm/mach-tegra/platsmp.c                      |   16 +-
+ arch/arm/mach-versatile/versatile_dt.c             |   47 -
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |    1 -
+ drivers/bus/Kconfig                                |    5 +-
+ drivers/bus/arm-ccn.c                              |    7 +-
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/renesas/Kconfig                        |   16 +
+ drivers/clk/renesas/Makefile                       |   26 +-
+ drivers/clk/renesas/clk-mstp.c                     |    7 +-
+ drivers/clk/renesas/r8a7795-cpg-mssr.c             |   34 +-
+ drivers/clk/renesas/renesas-cpg-mssr.c             |   47 +-
+ drivers/clk/renesas/renesas-cpg-mssr.h             |    6 +-
+ drivers/clk/tegra/clk-tegra210.c                   |   58 +
+ drivers/firmware/psci.c                            |    6 +-
+ drivers/gpu/drm/tegra/drm.h                        |    2 +-
+ drivers/memory/Kconfig                             |    1 +
+ drivers/memory/Makefile                            |    1 +
+ drivers/memory/samsung/Kconfig                     |   13 +
+ drivers/memory/samsung/Makefile                    |    1 +
+ drivers/memory/samsung/exynos-srom.c               |  231 +++
+ drivers/memory/samsung/exynos-srom.h               |   51 +
+ drivers/mtd/maps/Kconfig                           |   10 +
+ drivers/mtd/maps/Makefile                          |    3 +
+ drivers/mtd/maps/physmap_of.c                      |    6 +
+ drivers/mtd/maps/physmap_of_versatile.c            |  255 +++
+ drivers/mtd/maps/physmap_of_versatile.h            |   16 +
+ drivers/pci/host/pci-tegra.c                       |  244 ++-
+ drivers/phy/Kconfig                                |    2 +
+ drivers/phy/Makefile                               |    2 +
+ drivers/phy/phy-core.c                             |   50 +-
+ drivers/phy/tegra/Kconfig                          |    8 +
+ drivers/phy/tegra/Makefile                         |    6 +
+ drivers/phy/tegra/xusb-tegra124.c                  | 1752 +++++++++++++++++
+ drivers/phy/tegra/xusb-tegra210.c                  | 2045 ++++++++++++++++++++
+ drivers/phy/tegra/xusb.c                           | 1021 ++++++++++
+ drivers/phy/tegra/xusb.h                           |  421 ++++
+ drivers/pinctrl/tegra/pinctrl-tegra-xusb.c         |   20 +-
+ drivers/reset/Kconfig                              |    3 +
+ drivers/reset/Makefile                             |    1 +
+ drivers/reset/core.c                               |  217 ++-
+ drivers/reset/reset-lpc18xx.c                      |   22 +-
+ drivers/reset/reset-oxnas.c                        |  136 ++
+ drivers/soc/Makefile                               |    3 +-
+ drivers/soc/brcmstb/Kconfig                        |    1 +
+ drivers/soc/brcmstb/common.c                       |   66 +
+ drivers/soc/mediatek/mtk-pmic-wrap.c               |  544 ++++--
+ drivers/soc/qcom/smd-rpm.c                         |    9 +-
+ drivers/soc/qcom/smd.c                             |  247 ++-
+ drivers/soc/qcom/smem.c                            |    3 +-
+ drivers/soc/qcom/spm.c                             |    8 +-
+ drivers/soc/qcom/wcnss_ctrl.c                      |    8 +-
+ drivers/soc/renesas/Makefile                       |    7 +
+ drivers/soc/renesas/r8a7779-sysc.c                 |   34 +
+ drivers/soc/renesas/r8a7790-sysc.c                 |   48 +
+ drivers/soc/renesas/r8a7791-sysc.c                 |   33 +
+ drivers/soc/renesas/r8a7794-sysc.c                 |   33 +
+ drivers/soc/renesas/r8a7795-sysc.c                 |   56 +
+ drivers/soc/renesas/rcar-sysc.c                    |  401 ++++
+ drivers/soc/renesas/rcar-sysc.h                    |   58 +
+ drivers/soc/rockchip/pm_domains.c                  |  247 ++-
+ drivers/soc/tegra/pmc.c                            |  613 +++++-
+ drivers/usb/host/Kconfig                           |    9 +
+ drivers/usb/host/Makefile                          |    1 +
+ drivers/usb/host/xhci-tegra.c                      | 1331 +++++++++++++
+ include/dt-bindings/power/r8a7779-sysc.h           |   27 +
+ include/dt-bindings/power/r8a7790-sysc.h           |   34 +
+ include/dt-bindings/power/r8a7791-sysc.h           |   26 +
+ include/dt-bindings/power/r8a7793-sysc.h           |   28 +
+ include/dt-bindings/power/r8a7794-sysc.h           |   26 +
+ include/dt-bindings/power/r8a7795-sysc.h           |   42 +
+ include/dt-bindings/power/rk3399-power.h           |   53 +
+ include/linux/clk/renesas.h                        |   16 +-
+ include/linux/clk/tegra.h                          |    5 +
+ include/linux/phy/phy.h                            |   31 +-
+ include/linux/phy/tegra/xusb.h                     |   30 +
+ include/linux/psci.h                               |    2 -
+ include/linux/reset-controller.h                   |    2 +
+ include/linux/reset.h                              |  194 +-
+ include/linux/soc/qcom/smd.h                       |   11 +-
+ include/linux/soc/qcom/smem_state.h                |   35 +
+ .../linux/soc/renesas/rcar-sysc.h                  |    9 +-
+ include/soc/tegra/fuse.h                           |    1 +
+ include/soc/tegra/pmc.h                            |   36 +-
+ 117 files changed, 11999 insertions(+), 1056 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/exynos-srom.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/nvidia,tegra124-xusb-padctl.txt
+ create mode 100644 Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
+ create mode 100644 Documentation/devicetree/bindings/reset/oxnas,reset.txt
+ create mode 100644 Documentation/devicetree/bindings/usb/nvidia,tegra124-xusb.txt
+ delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+ delete mode 100644 arch/arm/mach-shmobile/pm-rcar.c
+ create mode 100644 drivers/clk/renesas/Kconfig
+ create mode 100644 drivers/memory/samsung/Kconfig
+ create mode 100644 drivers/memory/samsung/Makefile
+ create mode 100644 drivers/memory/samsung/exynos-srom.c
+ create mode 100644 drivers/memory/samsung/exynos-srom.h
+ create mode 100644 drivers/mtd/maps/physmap_of_versatile.c
+ create mode 100644 drivers/mtd/maps/physmap_of_versatile.h
+ create mode 100644 drivers/phy/tegra/Kconfig
+ create mode 100644 drivers/phy/tegra/Makefile
+ create mode 100644 drivers/phy/tegra/xusb-tegra124.c
+ create mode 100644 drivers/phy/tegra/xusb-tegra210.c
+ create mode 100644 drivers/phy/tegra/xusb.c
+ create mode 100644 drivers/phy/tegra/xusb.h
+ create mode 100644 drivers/reset/reset-oxnas.c
+ create mode 100644 drivers/soc/renesas/Makefile
+ create mode 100644 drivers/soc/renesas/r8a7779-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7790-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7791-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7794-sysc.c
+ create mode 100644 drivers/soc/renesas/r8a7795-sysc.c
+ create mode 100644 drivers/soc/renesas/rcar-sysc.c
+ create mode 100644 drivers/soc/renesas/rcar-sysc.h
+ create mode 100644 drivers/usb/host/xhci-tegra.c
+ create mode 100644 include/dt-bindings/power/r8a7779-sysc.h
+ create mode 100644 include/dt-bindings/power/r8a7790-sysc.h
+ create mode 100644 include/dt-bindings/power/r8a7791-sysc.h
+ create mode 100644 include/dt-bindings/power/r8a7793-sysc.h
+ create mode 100644 include/dt-bindings/power/r8a7794-sysc.h
+ create mode 100644 include/dt-bindings/power/r8a7795-sysc.h
+ create mode 100644 include/dt-bindings/power/rk3399-power.h
+ create mode 100644 include/linux/phy/tegra/xusb.h
+ rename arch/arm/mach-shmobile/pm-rcar.h => include/linux/soc/renesas/rcar-sysc.h (60%)
