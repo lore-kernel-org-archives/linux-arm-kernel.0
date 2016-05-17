@@ -1,59 +1,50 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 17 May 2016 09:26:14 +0200
-Subject: [PATCH] clk: samsung: Suppress unbinding to prevent theoretical
- attacks
-Message-ID: <1463469974-13340-1-git-send-email-k.kozlowski@samsung.com>
+From: patrice.chotard@st.com (Patrice Chotard)
+Date: Tue, 17 May 2016 09:43:18 +0200
+Subject: [PATCH] pinctrl: stm32: fix debugfs format string
+In-Reply-To: <1463147643-568615-1-git-send-email-arnd@arndb.de>
+References: <1463147643-568615-1-git-send-email-arnd@arndb.de>
+Message-ID: <573ACB96.6030808@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although unbinding a driver requires root privileges but it still might
-be used theoretically in certain attacks (by triggering NULL pointer
-exception or memory corruption if driver does not provide proper remove
-callbacks or core does not handle it).
+Hi Arnd
 
-Samsung clock drivers are essential for system operation so their
-removal is not expected. More over, the Exynos3250 ISP clock driver does
-not implement remove() driver callback and it is not buildable as
-modules.
+I have already send a fix for this on the mailing list on 12th may 
+([PATCH 0/2] pinctrl: stm32: .pin_config_dbg_show fixes).
+I don't know if Linus will merged it on his pinctrl branch.
 
-Suppress the unbind interface for Exynos3250 ISP and S3C2410 DCLK clock
-drivers.
+Sorry
 
-Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/clk/samsung/clk-exynos3250.c   | 1 +
- drivers/clk/samsung/clk-s3c2410-dclk.c | 5 +++--
- 2 files changed, 4 insertions(+), 2 deletions(-)
+Patrice
 
-diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
-index 16575ee874cb..dc4d493e61c2 100644
---- a/drivers/clk/samsung/clk-exynos3250.c
-+++ b/drivers/clk/samsung/clk-exynos3250.c
-@@ -1087,6 +1087,7 @@ static const struct of_device_id exynos3250_cmu_isp_of_match[] = {
- static struct platform_driver exynos3250_cmu_isp_driver = {
- 	.driver = {
- 		.name = "exynos3250-cmu-isp",
-+		.suppress_bind_attrs = true,
- 		.of_match_table = exynos3250_cmu_isp_of_match,
- 	},
- };
-diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
-index ec6fb14d951c..ae9a595c72d0 100644
---- a/drivers/clk/samsung/clk-s3c2410-dclk.c
-+++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
-@@ -428,8 +428,9 @@ MODULE_DEVICE_TABLE(platform, s3c24xx_dclk_driver_ids);
- 
- static struct platform_driver s3c24xx_dclk_driver = {
- 	.driver = {
--		.name		= "s3c24xx-dclk",
--		.pm		= &s3c24xx_dclk_pm_ops,
-+		.name			= "s3c24xx-dclk",
-+		.pm			= &s3c24xx_dclk_pm_ops,
-+		.suppress_bind_attrs	= true,
- 	},
- 	.probe = s3c24xx_dclk_probe,
- 	.remove = s3c24xx_dclk_remove,
--- 
-1.9.1
+On 05/13/2016 03:53 PM, Arnd Bergmann wrote:
+> The newly added stm32_pconf_dbg_show function has an incorrect format
+> string that does not match the arguments, as reported by the gcc warning:
+>
+> drivers/pinctrl/stm32/pinctrl-stm32.c: In function 'stm32_pconf_dbg_show':
+> drivers/pinctrl/stm32/pinctrl-stm32.c:797:17: error: too many arguments for format [-Werror=format-extra-args]
+>
+> This changes the format string in a way that gets rid of the warning.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 3beed93c1617 ("pinctrl: stm32: Implement .pin_config_dbg_show()")
+> ---
+> I could not find a documentation for the debugfs format, so no
+> idea if this is the intended format.
+> ---
+>   drivers/pinctrl/stm32/pinctrl-stm32.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
+> index e51c1cf5270b..4ffbe9551299 100644
+> --- a/drivers/pinctrl/stm32/pinctrl-stm32.c
+> +++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
+> @@ -794,7 +794,7 @@ static void stm32_pconf_dbg_show(struct pinctrl_dev *pctldev,
+>   	case 2:
+>   		drive = stm32_pconf_get_driving(bank, offset);
+>   		speed = stm32_pconf_get_speed(bank, offset);
+> -		seq_printf(s, "%d - %s -%s", alt,
+> +		seq_printf(s, "%d - %s - %s - %s %s ", alt,
+>   			   drive ? "open drain" : "push pull",
+>   			   biasing[bias],
+>   			   speeds[speed], "speed");
