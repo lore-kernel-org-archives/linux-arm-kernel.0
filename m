@@ -1,126 +1,96 @@
-From: chunfeng.yun@mediatek.com (chunfeng yun)
-Date: Tue, 17 May 2016 10:00:06 +0800
-Subject: [PATCH] usb: xhci-mtk: fixup mouse wakeup failure during system
- suspend
-In-Reply-To: <87mvo6dojx.fsf@intel.com>
-References: <1461204293-18243-1-git-send-email-chunfeng.yun@mediatek.com>
- <1462261458.11651.7.camel@mhfsdcap03> <87vb2vfujq.fsf@intel.com>
- <1462266591.11651.34.camel@mhfsdcap03> <87mvo7fpuc.fsf@intel.com>
- <1462324873.11651.57.camel@mhfsdcap03> <871t5ifdxk.fsf@intel.com>
- <1462359261.11651.69.camel@mhfsdcap03> <87mvo6dojx.fsf@intel.com>
-Message-ID: <1463450406.11651.134.camel@mhfsdcap03>
+From: liudongdong3@huawei.com (Dongdong Liu)
+Date: Tue, 17 May 2016 11:11:41 +0800
+Subject: [PATCH V7 07/11] pci, acpi: Handle ACPI companion assignment.
+In-Reply-To: <1462893601-8937-8-git-send-email-tn@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <1462893601-8937-8-git-send-email-tn@semihalf.com>
+Message-ID: <573A8BED.7030908@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-05-04 at 14:56 +0300, Felipe Balbi wrote:
-> Hi,
-> 
-> chunfeng yun <chunfeng.yun@mediatek.com> writes:
-> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
-> >> > On Tue, 2016-05-03 at 12:33 +0300, Felipe Balbi wrote:
-> >> >> Hi,
-> >> >> 
-> >> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
-> >> >> >> chunfeng yun <chunfeng.yun@mediatek.com> writes:
-> >> >> >> > On Thu, 2016-04-21 at 10:04 +0800, Chunfeng Yun wrote:
-> >> >> >> >> Click mouse after xhci suspend completion but before system suspend
-> >> >> >> >> completion, system will not be waken up by mouse if the duration of
-> >> >> >> >> them is larger than 20ms which is the device UFP's resume signaling
-> >> >> >> 
-> >> >> >> what is "them" here ? The duration of what is longer than 20ms ?
-> >> >> > They are "xhci suspend completion" and "system suspend completion";
-> >> >> >
-> >> >> > It's time duration
-> >> >> 
-> >> >> okay. So if xhci suspend takes longer than 20ms your SPM doesn't see a
-> >> >> wakeup ?
-> >> > It is not the time of xhci suspend consumed, but is the time of duration
-> >> > from xhci suspend completion to system suspend completion(after BOOT-CPU
-> >> > is turned off, SPM will be enabled to receive wakeup event)
-> >> 
-> >> Okay, so SPM will be the entity actually handling wakeups, right ? I'm
-> >> assuming something like this happens:
-> >> 
-> >> echo mem > /sys/power/state
-> >>  /* start suspending devices */
-> >>   xhci_suspend()
-> >>  /* all devices suspended */
-> >>  enable_spm()
-> >> 
-> >> so, if a mouse button is pressed after xhci_suspend() returns but before
-> >> enable_spm() runs, then we're gonna miss that event, am I right ?
-> > Yes, you are right.
-> >> 
-> >> I can't think of any way to sort this out. Let's ask on linux-pm (I've
-> >> added linux-pm to Cc list)
-> > Thanks
-> >> 
-> >> >> >> >> lasted. Another reason is that the SPM is not enabled before system
-> >> >> >> 
-> >> >> >> what's SPM ?
-> >> >> > It is System Power Management which is powered off when system is
-> >> >> > running in normal mode, and is powered on when system enters suspend
-> >> >> > mode. It is used to wakeup system when some wakeup sources, such as
-> >> >> > bluetooth or powerkey etc, tigger wakeup event.
-> >> >> 
-> >> >> okay, thanks
-> >> >> 
-> >> >> >> >> suspend compeltion, this causes SPM also not notice the resume signal.
-> >> >> >>            ^^^^^^^^^^
-> >> >> >>            completion
-> >> >> >> 
-> >> >> >> >> So in order to reduce the duration less than 20ms, make use of
-> >> >> >> >> syscore's suspend/resume interface.
-> >> >> >> 
-> >> >> >> no, this is the wrong approach
-> >> >> > But it seems only one workable approach from software side
-> >> >> 
-> >> >> I wouldn't say that. It seems to me SPM should be enabled earlier.
-> >> > Yes, but normally SPM should be enabled after all CPUS are turned off,
-> >> > so it's difficult to do that, I mean enable SPM before turning off CPUS
-> >> 
-> >> is it a requirement that SPM should be enabled only after all CPUs are
-> >> turned off ? If that's the case, then any device in the system might
-> >> have missed wakeups. This doesn't seem like a good design to me; unless
-> >> I'm missing something...
-> > Yes, it's a requirement.
-> >
-> > If the wakeup source is level trigger, and will keep it until SPM notice
-> > it. Although USB wakeup is level trigger, but it just last at most 20ms
-> > and clear itself automatically.
-> 
-> who's clearing USB wakeup after 20ms ? Sure, it's a requirement by the
-> USB spec that host should drive reset for *at least* 20ms, but I don't
-> remember the exact wordings WRT remote wakeup
-> 
-> /me reads
-> 
-> Okay, here it is, section 7.1.7.7 of USB 2.0 Spec states:
-> 
-> 	"The remote wakeup device must hold the resume signaling for at
->         least 1 ms but for no more than 15 ms (TDRSMUP). At the end of
->         this period, the device stops driving the bus (puts its drivers
->         into the high-impedance state and does not drive the bus to the
->         J state)."
-> 
-> IOW, the mouse is not at fault here. Remote wakeup can last anywhere
-> between 1ms and 15ms. If your system can't cope with it, then I'd say
-> it's a problem with your system and you shouldn't allow XHCI to go to
-> such deep power states until SPM is enabled.
-Yes
+Hi Tomasz
 
-> 
-> I really tried finding the correct piece of code which does this for PCI
-> devices, but basically it's treated as an IRQ and as long as
-> enable_irq_wake() or the sysfs file is set to true, then PME gets
-> enabled (hopefully PCI folks can confirm this statement).
-> 
-> Very recently Tony Lindgren added proper handling of wakeup signals as
-> IRQs for non-PCI systems too (see 4990d4fe327b PM / Wakeirq: Add
-> automated device wake IRQ handling), wonder if you could treat SPM
-> similarly.
-We can't make use of device's interrupt as wake IRQ, because there is no
-IRQ when xHCI enters suspend mode.
+I used the patchset and added "PATCH V6 11/13 specic quirks", tested on HiSilicon D02 board but met the below problem.
 
-Thanks
-> 
+[    2.614115] [<ffffff80083b13bc>] hisi_pcie_init+0x6c/0x1ec
+[    2.619571] [<ffffff80083ab060>] pci_ecam_create+0x130/0x1ec
+[    2.625209] [<ffffff80083f3764>] pci_acpi_scan_root+0x160/0x218
+[    2.631096] [<ffffff80083d1f6c>] acpi_pci_root_add+0x36c/0x42c
+[    2.636897] [<ffffff80083ce36c>] acpi_bus_attach+0xe4/0x1a8
+[    2.642438] [<ffffff80083ce3d8>] acpi_bus_attach+0x150/0x1a8
+[    2.648066] [<ffffff80083ce3d8>] acpi_bus_attach+0x150/0x1a8
+[    2.653693] [<ffffff80083ce55c>] acpi_bus_scan+0x64/0x74
+[    2.658975] [<ffffff8008ae665c>] acpi_scan_init+0x5c/0x19c
+[    2.664429] [<ffffff8008ae6408>] acpi_init+0x280/0x2a4
+[    2.669538] [<ffffff80080829e8>] do_one_initcall+0x8c/0x19c
+[    2.675080] [<ffffff8008ac3af8>] kernel_init_freeable+0x14c/0x1ec
+[    2.681139] [<ffffff80087a8438>] kernel_init+0x10/0xfc
+[    2.686248] [<ffffff8008085e10>] ret_from_fork+0x10/0x40
+
+In hisi_pcie_init, I used "struct acpi_device *device = ACPI_COMPANION(dev);".
+I found the reason is V7 lack the below code. I added the below code, it worked ok.
+
+[PATCH V6 01/13] pci, acpi, x86, ia64: Move ACPI host bridge device companion assignment to core code.
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -564,6 +564,11 @@ static int acpi_pci_root_add(struct acpi_device *device,
+  		}
+  	}
+
++	/*
++	 * pci_create_root_bus() needs to detect the parent device type,
++	 * so initialize its companion data accordingly.
++	 */
++	ACPI_COMPANION_SET(&device->dev, device);
+
+This code will be upstreamed with the "PATCH V6 11/13 specic quirks" in next time after the patchset is accepted.
+Right ?
+
+? 2016/5/10 23:19, Tomasz Nowicki ??:
+> This patch provides a way to set the ACPI companion in PCI code.
+> We define acpi_pci_set_companion() to set the ACPI companion pointer and
+> call it from PCI core code. The function is stub for now.
+>
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>   drivers/pci/probe.c      | 2 ++
+>   include/linux/pci-acpi.h | 4 ++++
+>   2 files changed, 6 insertions(+)
+>
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 8004f67..fb0b752 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -12,6 +12,7 @@
+>   #include <linux/slab.h>
+>   #include <linux/module.h>
+>   #include <linux/cpumask.h>
+> +#include <linux/pci-acpi.h>
+>   #include <linux/pci-aspm.h>
+>   #include <linux/aer.h>
+>   #include <linux/acpi.h>
+> @@ -2141,6 +2142,7 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+>   	bridge->dev.parent = parent;
+>   	bridge->dev.release = pci_release_host_bridge_dev;
+>   	dev_set_name(&bridge->dev, "pci%04x:%02x", pci_domain_nr(b), bus);
+> +	acpi_pci_set_companion(bridge);
+>   	error = pcibios_root_bridge_prepare(bridge);
+>   	if (error) {
+>   		kfree(bridge);
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index 09f9f02..1baa515 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -111,6 +111,10 @@ static inline void acpi_pci_add_bus(struct pci_bus *bus) { }
+>   static inline void acpi_pci_remove_bus(struct pci_bus *bus) { }
+>   #endif	/* CONFIG_ACPI */
+>
+> +static inline void acpi_pci_set_companion(struct pci_host_bridge *bridge)
+> +{
+> +}
+> +
+>   static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus)
+>   {
+>   	return 0;
+>
