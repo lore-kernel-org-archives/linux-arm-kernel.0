@@ -1,87 +1,125 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Tue, 17 May 2016 15:06:03 +0300
-Subject: [PATCH 3/3] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
-In-Reply-To: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 17 May 2016 14:08:03 +0200
+Subject: [PATCH] pwm: atmel-hlcdc: Fix default PWM polarity
+In-Reply-To: <20160517110005.GA26166@ulmo.ba.sec>
+References: <1463476352-7485-1-git-send-email-boris.brezillon@free-electrons.com>
+ <20160517110005.GA26166@ulmo.ba.sec>
+Message-ID: <20160517140803.078e3f5e@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Masters <jcm@redhat.com>
+Hi Thierry,
 
-This patch adds support for ACPI_TABLE_UPGRADE for ARM64
+On Tue, 17 May 2016 13:00:05 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-To access initrd image we need to move initialization
-of linear mapping a bit earlier.
+> On Tue, May 17, 2016 at 11:12:32AM +0200, Boris Brezillon wrote:
+> > The PWM device exposed by the HLCDC IP is configured with an inverted
+> > polarity by default. Registering the PWM chip with the normal polarity
+> > was not a problem before commit 42e8992c58d4 ("pwm: Add core
+> > infrastructure to allow atomic updates") because the ->set_polarity()
+> > hook was called no matter the current polarity state, but this is no longer
+> > the case.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > Fixes: 42e8992c58d4 ("pwm: Add core infrastructure to allow atomic updates")  
+> 
+> That's not technically correct, because it's the driver that has the
+> bug. The core change merely exposes it. How about if I sort this into
+> the pwm-atomic branch and reword the commit message accordingly? That
+> way things should all stay bisectible.
+> 
+> Then again, given the breakage caused by the pwm_args patch I suppose
+> it doesn't matter much because that's part of a stable branch that I
+> can't rebase.
 
-Signed-off-by: Jon Masters <jcm@redhat.com>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+If I understood correctly, you plan to rebase your pwm-atomic branch to
+insert this commit before commit 42e8992c58d4 ("pwm: Add core
+infrastructure to allow atomic updates").
+
+Could you consider taking the following commit (or something similar if
+you already have a fix) as the first commit of your pwm-atomic branch?
+
+Sorry for the mess around the introduction of pwm_args and pwm_state
+(that's not an excuse, but I've reworked this series so many time that I
+forgot to check bisectibility on the last versions :-().
+
 ---
- arch/arm64/kernel/setup.c |  6 ++++--
- drivers/acpi/Kconfig      |  2 +-
- drivers/acpi/tables.c     | 10 +++++++++-
- 3 files changed, 14 insertions(+), 4 deletions(-)
+>From ad73fa3a56c7320979425d64ab54c09b9d83d4cf Mon Sep 17 00:00:00 2001
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
+Date: Tue, 17 May 2016 13:55:02 +0200
+Subject: [PATCH] pwm: Fix pwm_apply_args() call sites
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index feab2ee..1d5e24f 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -261,11 +261,13 @@ void __init setup_arch(char **cmdline_p)
- 	efi_init();
- 	arm64_memblock_init();
+pwm_apply_args() is supposed to initialize a PWM device according to the
+arguments provided by the DT or the PWM lookup, but this function was
+called inside pwm_device_request(), which in turn was called before the
+core had a chance to initialize the pwm->args fields.
+
+Fix that by calling pwm_apply_args directly in pwm_get() and of_pwm_get()
+after initializing pwm->args field.
+
+This commit also fixes an invalid pointer dereference introduced by
+commit e39c0df1be5a ("pwm: Introduce the pwm_args concept").
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes: e39c0df1be5a ("pwm: Introduce the pwm_args concept")
+---
+ drivers/pwm/core.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 680fbc7..22cf395 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -128,13 +128,6 @@ static int pwm_device_request(struct pwm_device *pwm, const char *label)
+ 	set_bit(PWMF_REQUESTED, &pwm->flags);
+ 	pwm->label = label;
  
-+	paging_init();
-+
-+	early_initrd_acpi_init();
-+
- 	/* Parse the ACPI tables for possible boot-time configuration */
- 	acpi_boot_table_init();
- 
--	paging_init();
+-	/*
+-	 * FIXME: This should be removed once all PWM users properly make use
+-	 * of struct pwm_args to initialize the PWM device. As long as this is
+-	 * here, the PWM state and hardware state can get out of sync.
+-	 */
+-	pwm_apply_args(pwm);
 -
- 	if (acpi_disabled)
- 		unflatten_device_tree();
+ 	return 0;
+ }
  
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index c204344..ec694c0 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -313,7 +313,7 @@ config ACPI_CUSTOM_DSDT
+@@ -627,6 +620,13 @@ struct pwm_device *of_pwm_get(struct device_node *np, const char *con_id)
  
- config ACPI_TABLE_UPGRADE
- 	bool "Allow upgrading ACPI tables via initrd"
--	depends on BLK_DEV_INITRD && X86
-+	depends on BLK_DEV_INITRD && (X86 || ARM64)
- 	default y
- 	help
- 	  This option provides functionality to upgrade arbitrary ACPI tables
-diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-index 82be84a..c35034d8 100644
---- a/drivers/acpi/tables.c
-+++ b/drivers/acpi/tables.c
-@@ -482,6 +482,14 @@ static DECLARE_BITMAP(acpi_initrd_installed, NR_ACPI_INITRD_TABLES);
+ 	pwm->label = con_id;
  
- #define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
- 
-+#if defined(CONFIG_X86)
-+#define MAX_PHYS_ACPI_TABLES (max_low_pfn_mapped << PAGE_SHIFT)
-+#elif defined(CONFIG_ARM64)
-+#define MAX_PHYS_ACPI_TABLES PFN_PHYS(max_pfn)
-+#else
-+#error "MAX_PHYS_ACPI_TABLES is not defiend for this architecture"
-+#endif
++	/*
++	 * FIXME: This should be removed once all PWM users properly make use
++	 * of struct pwm_args to initialize the PWM device. As long as this is
++	 * here, the PWM state and hardware state can get out of sync.
++	 */
++	pwm_apply_args(pwm);
 +
- static void __init acpi_table_initrd_init(void *data, size_t size)
- {
- 	int sig, no, table_nr = 0, total_offset = 0;
-@@ -541,7 +549,7 @@ static void __init acpi_table_initrd_init(void *data, size_t size)
- 		return;
+ put:
+ 	of_node_put(args.np);
  
- 	acpi_tables_addr =
--		memblock_find_in_range(0, max_low_pfn_mapped << PAGE_SHIFT,
-+		memblock_find_in_range(0, MAX_PHYS_ACPI_TABLES,
- 				       all_tables_size, PAGE_SIZE);
- 	if (!acpi_tables_addr) {
- 		WARN_ON(1);
--- 
-2.8.2
+@@ -754,13 +754,20 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
+ 	if (!chip)
+ 		goto out;
+ 
+-	pwm->args.period = chosen->period;
+-	pwm->args.polarity = chosen->polarity;
+-
+ 	pwm = pwm_request_from_chip(chip, chosen->index, con_id ?: dev_id);
+ 	if (IS_ERR(pwm))
+ 		goto out;
+ 
++	pwm->args.period = chosen->period;
++	pwm->args.polarity = chosen->polarity;
++
++	/*
++	 * FIXME: This should be removed once all PWM users properly make use
++	 * of struct pwm_args to initialize the PWM device. As long as this is
++	 * here, the PWM state and hardware state can get out of sync.
++	 */
++	pwm_apply_args(pwm);
++
+ out:
+ 	mutex_unlock(&pwm_lookup_lock);
+ 	return pwm;
