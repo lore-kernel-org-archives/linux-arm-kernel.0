@@ -1,42 +1,59 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Tue, 17 May 2016 09:21:31 +0200
-Subject: [PATCH 1/5] dt-bindings: Document the STM32 I2C bindings
-In-Reply-To: <20160516150440.GA6312@rob-hp-laptop>
-References: <1462980974-22091-1-git-send-email-cedric.madianga@gmail.com>
- <1462980974-22091-2-git-send-email-cedric.madianga@gmail.com>
- <20160516150440.GA6312@rob-hp-laptop>
-Message-ID: <CAOAejn3VJX4ZZZ9nXN+YOs_s-sXBOnGkvRXhZwP3undVnDjXMA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 17 May 2016 09:26:14 +0200
+Subject: [PATCH] clk: samsung: Suppress unbinding to prevent theoretical
+ attacks
+Message-ID: <1463469974-13340-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hi,
+Although unbinding a driver requires root privileges but it still might
+be used theoretically in certain attacks (by triggering NULL pointer
+exception or memory corruption if driver does not provide proper remove
+callbacks or core does not handle it).
 
-2016-05-16 17:04 GMT+02:00 Rob Herring <robh@kernel.org>:
-> On Wed, May 11, 2016 at 05:36:10PM +0200, M'boumba Cedric Madianga wrote:
->> This patch adds documentation of device tree bindings for the STM32 I2C
->> controller.
->>
->> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->> ---
->>  .../devicetree/bindings/i2c/i2c-stm32.txt          | 33 ++++++++++++++++++++++
->>  1 file changed, 33 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-stm32.txt b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
->> new file mode 100644
->> index 0000000..73215c6
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-stm32.txt
->> @@ -0,0 +1,33 @@
->> +* I2C controller embedded in STMicroelectronics STM32 I2C platform
->> +
->> +Required properties :
->> +- compatible : Must be "st,i2c-stm32f4"
->
-> Normal order is st,stm32f4-i2c
-Ok Thanks, I will correct it in the V2.
+Samsung clock drivers are essential for system operation so their
+removal is not expected. More over, the Exynos3250 ISP clock driver does
+not implement remove() driver callback and it is not buildable as
+modules.
 
->
-> Rob
+Suppress the unbind interface for Exynos3250 ISP and S3C2410 DCLK clock
+drivers.
 
-Cedric
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos3250.c   | 1 +
+ drivers/clk/samsung/clk-s3c2410-dclk.c | 5 +++--
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/samsung/clk-exynos3250.c b/drivers/clk/samsung/clk-exynos3250.c
+index 16575ee874cb..dc4d493e61c2 100644
+--- a/drivers/clk/samsung/clk-exynos3250.c
++++ b/drivers/clk/samsung/clk-exynos3250.c
+@@ -1087,6 +1087,7 @@ static const struct of_device_id exynos3250_cmu_isp_of_match[] = {
+ static struct platform_driver exynos3250_cmu_isp_driver = {
+ 	.driver = {
+ 		.name = "exynos3250-cmu-isp",
++		.suppress_bind_attrs = true,
+ 		.of_match_table = exynos3250_cmu_isp_of_match,
+ 	},
+ };
+diff --git a/drivers/clk/samsung/clk-s3c2410-dclk.c b/drivers/clk/samsung/clk-s3c2410-dclk.c
+index ec6fb14d951c..ae9a595c72d0 100644
+--- a/drivers/clk/samsung/clk-s3c2410-dclk.c
++++ b/drivers/clk/samsung/clk-s3c2410-dclk.c
+@@ -428,8 +428,9 @@ MODULE_DEVICE_TABLE(platform, s3c24xx_dclk_driver_ids);
+ 
+ static struct platform_driver s3c24xx_dclk_driver = {
+ 	.driver = {
+-		.name		= "s3c24xx-dclk",
+-		.pm		= &s3c24xx_dclk_pm_ops,
++		.name			= "s3c24xx-dclk",
++		.pm			= &s3c24xx_dclk_pm_ops,
++		.suppress_bind_attrs	= true,
+ 	},
+ 	.probe = s3c24xx_dclk_probe,
+ 	.remove = s3c24xx_dclk_remove,
+-- 
+1.9.1
