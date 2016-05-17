@@ -1,46 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2016 00:43:58 +0200
-Subject: [GIT PULL] SoCFPGA DTS updates for v4.7, part3
-In-Reply-To: <1462891391-13876-1-git-send-email-dinguyen@kernel.org>
-References: <1462891391-13876-1-git-send-email-dinguyen@kernel.org>
-Message-ID: <2600031.fLUcj7Vapa@wuerfel>
+Date: Wed, 18 May 2016 00:45:51 +0200
+Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <mvm1t50ad0j.fsf@hawking.suse.de>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <alpine.DEB.2.20.1605171542340.24255@digraph.polyomino.org.uk>
+ <mvm1t50ad0j.fsf@hawking.suse.de>
+Message-ID: <4095406.jADDlVRiDg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 May 2016 09:43:11 Dinh Nguyen wrote:
-> If not too late, please pull in this patch for v4.7.
+On Tuesday 17 May 2016 18:02:36 Andreas Schwab wrote:
+> Joseph Myers <joseph@codesourcery.com> writes:
 > 
-> Thanks,
-> Dinh
+> > On Tue, 17 May 2016, Arnd Bergmann wrote:
+> >
+> >> I think it has become easier to override now and we just need to
+> >> update sysdeps/unix/sysv/linux/generic/bits/typesizes.h to set
+> >> 
+> >> #define __INO64_T_TYPE          __UQUAD_TYPE
+> >> #define __OFF64_T_TYPE          __UQUAD_TYPE
+> >> #define __OFF_T_MATCHES_OFF64_T        1
+> >> #define __INO_T_MATCHES_INO64_T        1
+> >> 
+> >> for new architectures (obviously not the ones that already use the
+> >> 32-bit types). I haven't tries this, so there may be other things
+> >> that are required.
+> >
+> > I think more than that would be needed to get struct stat to match and get 
+> > things aliased for that (which is presumably desirable).
 > 
-> The following changes since commit 02da2d72174c61988eb4456b53f405e3ebdebce4:
-> 
->   Linux 4.6-rc5 (2016-04-24 16:17:05 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_for_next_v4.7_dts_part_3
-> 
-> for you to fetch changes up to fca689561e8170ad954b982b9ce2160a06d9435e:
-> 
->   ARM: dts: socfpga: add ethernet alias on Arria10 (2016-05-03 09:25:21 -0500)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA DTS update for v4.7, part 3
-> - Add ethernet alias on Arria10
-> 
+> Looking at sysdeps/unix/sysv/linux/generic/bits/stat.h, there is at
+> least blkcnt_t that differs between stat and stat64.  And you probably
+> want to alias statfs and statfs64 as well, ie. fs{blk,fil}cnt_t.
 
-I was going to put this into the next/late branch that already has some other
-changes, but in the end I decided to drop it because it is based on
-a later -rc release than the other branches, and doesn't seem obvious
-or important enough.
-
-Just a clarification about the contents of the patch, you write:
-
-    Without having an ethernet alias, ethernet will have a random MAC address,
-    versus take an address that was provided from the bootloader.
-
-Why is the alias needed to get the right MAC address? How does the
-bootloader pass it?
+Makes sense. Indeed that is a bit more work than I hoped, in particular
+if we have to audit the uses of __WORDSIZE as well.
 
 	Arnd
