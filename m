@@ -1,49 +1,107 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Tue, 17 May 2016 17:57:33 +0800
-Subject: [PATCH v12 10/10] kprobes: Add arm64 case in kprobe example module
-In-Reply-To: <1461783185-9056-11-git-send-email-dave.long@linaro.org>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-11-git-send-email-dave.long@linaro.org>
-Message-ID: <20160517095714.GA25167@sha-win-210.asiapac.arm.com>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 17 May 2016 11:12:40 +0100 (BST)
+Subject: [GIT PULL] EFI ARM Xen support
+In-Reply-To: <20160514190410.GA2283@codeblueprint.co.uk>
+References: <20160514190410.GA2283@codeblueprint.co.uk>
+Message-ID: <alpine.DEB.2.10.1605171109170.2494@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 27, 2016 at 02:53:05PM -0400, David Long wrote:
-> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+On Sat, 14 May 2016, Matt Fleming wrote:
+> Folks,
 > 
-> Add info prints in sample kprobe handlers for ARM64
+> Please pull the following branch which contains support for Xen on ARM
+> EFI platforms.
 > 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> ---
->  samples/kprobes/kprobe_example.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
+> This merge includes a merge of Stefano's xen/linux-next branch to pull
+> in the prerequisites required for Shannon's commit:
 > 
-> diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
-> index 727eb21..0c72b8a 100644
-> --- a/samples/kprobes/kprobe_example.c
-> +++ b/samples/kprobes/kprobe_example.c
-> @@ -42,6 +42,10 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
->  			" ex1 = 0x%lx\n",
->  		p->addr, regs->pc, regs->ex1);
->  #endif
-> +#ifdef CONFIG_ARM64
-> +	pr_info("pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
+>   11ee5491e5ff ("Xen: EFI: Parse DT parameters for Xen specific UEFI")
+> 
+> as it needs both the latest changes in the EFI 'next' branch (now
+> tip/efi/core) and xen/linux-next.
+> 
+> I have intentionally not included the individual patches as I would
+> normally do in a pull request, so that commit history created by my
+> merging of Stefano's branch is preserved, and so that there's no way
+> to accidentally apply the patches individually.
+> 
+> The following changes since commit 6c5450ef66816216e574885cf8d3ddb31ef77428:
+> 
+>   efivarfs: Make efivarfs_file_ioctl() static (2016-05-07 07:06:13 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git efi/arm-xen
+> 
+> for you to fetch changes up to 11ee5491e5ff519e0d3a7018eb21351cb6955a98:
+> 
+>   Xen: EFI: Parse DT parameters for Xen specific UEFI (2016-05-14 19:31:01 +0100)
 
-I think you miss the KERN_INFO here.
+Is this arrangement working for everybody, in particular the tip
+maintainers?
 
-> +		p->addr, (long)regs->pc);
-> +#endif
->  
->  	/* A dump_stack() here will give a stack backtrace */
->  	return 0;
-> @@ -67,6 +71,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
->  	printk(KERN_INFO "post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
->  		p->addr, regs->ex1);
->  #endif
-> +#ifdef CONFIG_ARM64
-> +	pr_info("post_handler: p->addr = 0x%p, pc = 0x%lx\n",
-ditto.
-> +		p->addr, (long)regs->pc);
-> +#endif
-thanks
-Huang Shijie
+I am asking because I didn't receive any replies to this or to
+http://marc.info/?l=linux-kernel&m=146317737928595&w=2.
+
+
+
+> David Vrabel (1):
+>       xen/gntdev: reduce copy batch size to 16
+> 
+> Matt Fleming (1):
+>       Merge branch 'xen/linux-next' into efi/arm-xen
+> 
+> Shannon Zhao (16):
+>       Xen: ACPI: Hide UART used by Xen
+>       xen/grant-table: Move xlated_setup_gnttab_pages to common place
+>       Xen: xlate: Use page_to_xen_pfn instead of page_to_pfn
+>       arm/xen: Use xen_xlate_map_ballooned_pages to setup grant table
+>       xen: memory : Add new XENMAPSPACE type XENMAPSPACE_dev_mmio
+>       Xen: ARM: Add support for mapping platform device mmio
+>       Xen: ARM: Add support for mapping AMBA device mmio
+>       Xen: public/hvm: sync changes of HVM_PARAM_CALLBACK_VIA ABI from Xen
+>       xen/hvm/params: Add a new delivery type for event-channel in HVM_PARAM_CALLBACK_IRQ
+>       arm/xen: Get event-channel irq through HVM_PARAM when booting with ACPI
+>       ARM: XEN: Move xen_early_init() before efi_init()
+>       ARM: Xen: Document UEFI support on Xen ARM virtual platforms
+>       XEN: EFI: Move x86 specific codes to architecture directory
+>       ARM64: XEN: Add a function to initialize Xen specific UEFI runtime services
+>       FDT: Add a helper to get the subnode by given name
+>       Xen: EFI: Parse DT parameters for Xen specific UEFI
+> 
+> Stefano Stabellini (1):
+>       xen/x86: don't lose event interrupts
+> 
+>  Documentation/devicetree/bindings/arm/xen.txt |  35 +++++
+>  arch/arm/include/asm/xen/xen-ops.h            |   6 +
+>  arch/arm/kernel/setup.c                       |   2 +-
+>  arch/arm/xen/Makefile                         |   1 +
+>  arch/arm/xen/efi.c                            |  40 ++++++
+>  arch/arm/xen/enlighten.c                      | 125 ++++++++++++----
+>  arch/arm64/include/asm/xen/xen-ops.h          |   6 +
+>  arch/arm64/kernel/setup.c                     |   2 +-
+>  arch/arm64/xen/Makefile                       |   1 +
+>  arch/x86/xen/efi.c                            | 111 +++++++++++++++
+>  arch/x86/xen/grant-table.c                    |  57 +-------
+>  arch/x86/xen/time.c                           |   6 +-
+>  drivers/acpi/scan.c                           |  74 ++++++++++
+>  drivers/firmware/efi/arm-runtime.c            |   5 +
+>  drivers/firmware/efi/efi.c                    |  81 ++++++++---
+>  drivers/of/fdt.c                              |  13 ++
+>  drivers/xen/Kconfig                           |   2 +-
+>  drivers/xen/Makefile                          |   1 +
+>  drivers/xen/arm-device.c                      | 196 ++++++++++++++++++++++++++
+>  drivers/xen/efi.c                             | 173 +++++------------------
+>  drivers/xen/gntdev.c                          |   2 +-
+>  drivers/xen/xlate_mmu.c                       |  77 ++++++++++
+>  include/linux/of_fdt.h                        |   2 +
+>  include/xen/interface/hvm/params.h            |  40 +++++-
+>  include/xen/interface/memory.h                |   1 +
+>  include/xen/xen-ops.h                         |  32 +++--
+>  26 files changed, 840 insertions(+), 251 deletions(-)
+>  create mode 100644 arch/arm/include/asm/xen/xen-ops.h
+>  create mode 100644 arch/arm/xen/efi.c
+>  create mode 100644 arch/arm64/include/asm/xen/xen-ops.h
+>  create mode 100644 drivers/xen/arm-device.c
+> 
