@@ -1,30 +1,62 @@
-From: joseph@codesourcery.com (Joseph Myers)
-Date: Tue, 17 May 2016 15:45:11 +0000
-Subject: [RFC6 PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <4173531.IRSphtVpg9@wuerfel>
-References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
- <573B0A4D.4090704@arm.com> <4173531.IRSphtVpg9@wuerfel>
-Message-ID: <alpine.DEB.2.20.1605171542340.24255@digraph.polyomino.org.uk>
+From: julien.grall@arm.com (Julien Grall)
+Date: Tue, 17 May 2016 16:50:11 +0100
+Subject: [PATCH v4 49/56] KVM: arm/arm64: vgic-new: vgic_init: implement
+ kvm_vgic_hyp_init
+In-Reply-To: <1463392481-26583-107-git-send-email-andre.przywara@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-107-git-send-email-andre.przywara@arm.com>
+Message-ID: <573B3DB3.80707@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 May 2016, Arnd Bergmann wrote:
+Hi Andre,
 
-> I think it has become easier to override now and we just need to
-> update sysdeps/unix/sysv/linux/generic/bits/typesizes.h to set
-> 
-> #define __INO64_T_TYPE          __UQUAD_TYPE
-> #define __OFF64_T_TYPE          __UQUAD_TYPE
-> #define __OFF_T_MATCHES_OFF64_T        1
-> #define __INO_T_MATCHES_INO64_T        1
-> 
-> for new architectures (obviously not the ones that already use the
-> 32-bit types). I haven't tries this, so there may be other things
-> that are required.
+On 16/05/16 10:54, Andre Przywara wrote:
+> +
+> +/**
+> + * vgic_v2_probe - probe for a GICv2 compatible interrupt controller in DT
+> + * @node:	pointer to the DT node
 
-I think more than that would be needed to get struct stat to match and get 
-things aliased for that (which is presumably desirable).
+This needs to be updated to match the parameters of vgic_v2_probe.
+
+> + *
+> + * Returns 0 if a GICv2 has been found, returns an error code otherwise
+> + */
+> +int vgic_v2_probe(const struct gic_kvm_info *info)
+
+[...]
+
+> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+> index 8548297..de0e8e0 100644
+> --- a/virt/kvm/arm/vgic/vgic-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-v3.c
+> @@ -15,6 +15,9 @@
+>   #include <linux/irqchip/arm-gic-v3.h>
+>   #include <linux/kvm.h>
+>   #include <linux/kvm_host.h>
+> +#include <kvm/arm_vgic.h>
+> +#include <asm/kvm_mmu.h>
+> +#include <asm/kvm_asm.h>
+>
+>   #include "vgic.h"
+>
+> @@ -182,3 +185,49 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
+>   	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
+>   	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
+>   }
+> +
+> +/**
+> + * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+> + * @node:	pointer to the DT node
+
+This needs to be updated to match the parameters of vgic_v3_probe.
+
+> + *
+> + * Returns 0 if a GICv3 has been found, returns an error code otherwise
+> + */
+> +int vgic_v3_probe(const struct gic_kvm_info *info)
+
+Regards,
 
 -- 
-Joseph S. Myers
-joseph at codesourcery.com
+Julien Grall
