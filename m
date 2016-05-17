@@ -1,7 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 17 May 2016 12:35:32 +0200
+Date: Tue, 17 May 2016 12:35:33 +0200
 Subject: [PATCH] pwm: Fill pwm->args before calling pwm_request_from_chip()
-Message-ID: <1463481333-23438-1-git-send-email-boris.brezillon@free-electrons.com>
+In-Reply-To: <1463481333-23438-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1463481333-23438-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1463481333-23438-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
