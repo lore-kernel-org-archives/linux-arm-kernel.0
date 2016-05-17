@@ -1,95 +1,101 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2016 00:20:26 +0200
-Subject: [GIT PULL 1/7] ARM: SoC cleanups and fixes for v4.7
-In-Reply-To: <8749147.ztcb6kVhye@wuerfel>
-References: <8749147.ztcb6kVhye@wuerfel>
-Message-ID: <3000366.nhqNxgKrjJ@wuerfel>
+Date: Wed, 18 May 2016 00:07:24 +0200
+Subject: [GIT PULL 0/7] ARM: SoC changes for 4.7
+Message-ID: <8749147.ztcb6kVhye@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit bf16200689118d19de1b8d2a3c314fc21f5dc7bb:
+Hi Linus,
 
-  Linux 4.6-rc3 (2016-04-10 17:58:30 -0700)
+These are the first seven pull requests for arm-soc this time, there is
+one small follow-up coming once the dependencies for that have landed
+in your tree.
 
-are available in the git repository at:
+Things remain relatively calm for us. We merged 122 pull requests with
+822 patches, plus 35 individual patches, which is less than what we used
+to have. We are shifting even more towards changing only dts files,
+for the most part adding new functionality on existing boards, and adding
+new machines, as shown clearly by the dirstat:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-cleanups-fixes
+   3.4% Documentation/devicetree/bindings/
+  56.3% arch/arm/boot/dts/
+   0.7% arch/arm/configs/
+   0.0% arch/arm/mach-aspeed/
+   0.2% arch/arm/mach-at91/
+   0.0% arch/arm/mach-bcm/
+   0.5% arch/arm/mach-davinci/
+   0.0% arch/arm/mach-dove/
+   0.1% arch/arm/mach-exynos/
+   0.0% arch/arm/mach-imx/
+   0.1% arch/arm/mach-integrator/
+   0.1% arch/arm/mach-lpc32xx/
+   0.0% arch/arm/mach-mediatek/
+   0.0% arch/arm/mach-mv78xx0/
+   1.3% arch/arm/mach-omap2/
+   0.0% arch/arm/mach-orion5x/
+   0.0% arch/arm/mach-oxnas/
+   0.0% arch/arm/mach-realview/
+   0.0% arch/arm/mach-rockchip/
+   0.3% arch/arm/mach-shmobile/
+   0.0% arch/arm/mach-sti/
+   0.0% arch/arm/mach-tegra/
+   0.0% arch/arm/mach-uniphier/
+   0.0% arch/arm/mach-versatile/
+   0.0% arch/arm/mach-vexpress/
+   0.0% arch/arm/plat-samsung/
+   0.9% arch/arm/
+  13.1% arch/arm64/boot/dts/
+   0.0% arch/arm64/configs/
+   0.0% arch/arm64/
+   0.0% drivers/bus/
+   0.9% drivers/clk/
+   0.0% drivers/firmware/
+   0.0% drivers/gpu/drm/tegra/
+   0.0% drivers/gpu/drm/vc4/
+   0.0% drivers/irqchip/
+   0.4% drivers/memory/samsung/
+   0.0% drivers/memory/
+   0.4% drivers/mtd/maps/
+   0.0% drivers/of/
+   0.3% drivers/pci/host/
+   9.2% drivers/phy/tegra/
+   0.1% drivers/phy/
+   0.0% drivers/pinctrl/tegra/
+   0.6% drivers/reset/
+   0.1% drivers/soc/brcmstb/
+   1.0% drivers/soc/mediatek/
+   0.4% drivers/soc/qcom/
+   1.2% drivers/soc/renesas/
+   0.4% drivers/soc/rockchip/
+   0.7% drivers/soc/tegra/
+ 730 files changed, 47909 insertions(+), 7916 deletions(-)
 
-for you to fetch changes up to 2e629ebc24d463ffb6c17b15daf908e6f968a1de:
+My feeling is that the number of dts changes remain constant, but
+everything else gets less every time, and that's good.
 
-  Merge branches 'next/cleanup' and 'next/fixes-non-critical' into next/cleanups-fixes (2016-05-17 15:06:31 +0200)
+One part that sticks out this time in the dirstat this time is the
+NVIDIA rework for the USB PHY, which had complex interdependencies so
+we are merging all the subsystem specific change through arm-soc.
 
-----------------------------------------------------------------
-ARM: SoC cleanups and fixes for v4.7
+I currently don't see any conflicts against other trees, or between
+our branches.
 
-Traditionally we've had two separate branches for cleanups and non-critical
-bug fixes, but both of these got smaller with each release and the differences
-are rather unclear now, so it seems more appropriate to have a combined
-branch.
+The most active individual developers (15 patches or more) out of the 165 people
+that contributed this time were:
 
-The most notably change is for OMAP, which gets a small rework to simplify
-handling of the AUXDATA mechanism used on machines that are not completely
-DT based yet, along with other work that is used as preparation for dropping
-the legacy board files.
+     51 Geert Uytterhoeven
+     42 Simon Horman
+     23 Heiko Stuebner
+     22 Hans de Goede
+     21 Jon Hunter
+     21 Chanwoo Choi
+     20 Thierry Reding
+     17 Vladimir Zapolskiy
+     17 Linus Walleij
+     17 Krzysztof Kozlowski
+     16 Lee Jones
+     15 Srinivas Kandagatla
+     15 Roger Quadros
+     15 Fabio Estevam
 
-----------------------------------------------------------------
-Arnd Bergmann (7):
-      ARM: realview: hide unused 'pmu_device' object
-      Merge tag 'davinci-for-v4.7/cleanup' of git://git.kernel.org/.../nsekhar/linux-davinci into next/cleanup
-      ARM: debug: remove extraneous DEBUG_HI3716_UART option
-      Merge tag 'samsung-fixes-non-critical-4.7' of git://git.kernel.org/.../krzk/linux into next/fixes-non-critical
-      Merge tag 'omap-for-v4.7/legacy-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes-non-critical
-      Merge tag 'omap-for-v4.7/auxdata-signed' of git://git.kernel.org/.../tmlind/linux-omap into next/fixes-non-critical
-      Merge branches 'next/cleanup' and 'next/fixes-non-critical' into next/cleanups-fixes
-
-David Lechner (3):
-      ARM: davinci: simplify call to of populate
-      ARM: davinci: remove unused DA8XX_NUM_UARTS
-      ARM: davinci: use IRQCHIP_DECLARE for cp_intc
-
-Javier Martinez Canillas (1):
-      ARM: dts: exynos: Add MFC memory banks for Peach boards
-
-Krzysztof Kozlowski (1):
-      ARM: EXYNOS: Properly skip unitialized parent clock in power domain on
-
-Linus Walleij (1):
-      soc: versatile: dynamically detect RealView HBI numbers
-
-Marek Szyprowski (2):
-      ARM: dts: exynos: Fix regulator name to avoid forbidden character on exynos4210-trats
-      ARM: dts: exynos: Add interrupt line to MAX8997 PMIC on exynos4210-trats
-
-Olof Johansson (2):
-      Merge tag 'versatile-cleanup-1' of git://git.kernel.org/.../linusw/linux-integrator into next/cleanup
-      Merge tag 'v4.7-rockchip-soc32-1' of git://git.kernel.org/.../mmind/linux-rockchip into next/cleanup
-
-Peter Griffin (1):
-      ARM: rockchip: Fix use of plain integer as NULL pointer
-
-Petr Kulhavy (1):
-      ARM: DaVinci USB: removed deprecated properties from MUSB config
-
-Tony Lindgren (4):
-      of/platform: Allow secondary compatible match in of_dev_lookup
-      ARM: OMAP2+: Simplify auxdata by using the generic match
-      ARM: OMAP2+: Add more functions to pwm pdata for ir-rx51
-      ARM: OMAP2+: n900 needs MMC slot names for legacy user space
-
- arch/arm/Kconfig.debug                         |  8 ----
- arch/arm/boot/dts/exynos4210-trats.dts         |  4 +-
- arch/arm/boot/dts/exynos5420-peach-pit.dts     |  5 +++
- arch/arm/boot/dts/exynos5800-peach-pi.dts      |  5 +++
- arch/arm/mach-davinci/cp_intc.c                |  3 ++
- arch/arm/mach-davinci/da8xx-dt.c               | 17 +-------
- arch/arm/mach-davinci/usb.c                    | 16 --------
- arch/arm/mach-exynos/pm_domains.c              |  2 +-
- arch/arm/mach-omap2/board-rx51-peripherals.c   | 35 +++++++++++++++-
- arch/arm/mach-omap2/pdata-quirks.c             | 57 ++++++++++++++++++--------
- arch/arm/mach-realview/realview_pbx.c          |  2 +
- arch/arm/mach-rockchip/platsmp.c               |  2 +-
- drivers/of/platform.c                          | 28 ++++++++++---
- drivers/soc/versatile/soc-realview.c           | 19 ++-------
- include/linux/platform_data/media/ir-rx51.h    |  1 +
- include/linux/platform_data/pwm_omap_dmtimer.h | 21 ++++++++++
- 16 files changed, 144 insertions(+), 81 deletions(-)
+	Arnd
