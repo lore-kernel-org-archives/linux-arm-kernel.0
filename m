@@ -1,172 +1,119 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 17 May 2016 14:32:19 +0200
-Subject: [RFC PATCH 09/11] drivers: acpi: implement acpi_dma_configure
-In-Reply-To: <573AD142.6020107@semihalf.com>
-References: <1460654743-7896-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1460654743-7896-10-git-send-email-lorenzo.pieralisi@arm.com>
- <573AD142.6020107@semihalf.com>
-Message-ID: <573B0F53.109@semihalf.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 May 2016 13:46:29 +0100
+Subject: [PATCH 3/3] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+In-Reply-To: <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
+References: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <20160517124629.GE14955@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 17, 2016 at 03:06:03PM +0300, Aleksey Makarov wrote:
+> From: Jon Masters <jcm@redhat.com>
+> 
+> This patch adds support for ACPI_TABLE_UPGRADE for ARM64
 
+This feels like a tool to paper over problems rather than solve them.
 
-On 17.05.2016 10:07, Tomasz Nowicki wrote:
-> Hi Lorenzo,
->
-> On 14.04.2016 19:25, Lorenzo Pieralisi wrote:
->> On DT based systems, the of_dma_configure() API implements DMA
->> configuration
->> for a given device. On ACPI systems an API equivalent to
->> of_dma_configure()
->> is missing which implies that it is currently not possible to set-up DMA
->> operations for devices through the ACPI generic kernel layer.
->>
->> This patch fills the gap by introducing acpi_dma_configure/deconfigure()
->> calls, that carry out IOMMU configuration through IORT (on systems where
->> it is present) and call arch_setup_dma_ops(...) with the retrieved
->> parameters.
->>
->> The DMA range size passed to arch_setup_dma_ops() is sized according
->> to the device coherent_dma_mask (starting at address 0x0), mirroring the
->> DT probing path behaviour when a dma-ranges property is not provided
->> for the device being probed; this changes the current
->> arch_setup_dma_ops()
->> call parameters in the ACPI probing case, but since arch_setup_dma_ops()
->> is a NOP on all architectures but ARM/ARM64 this patch does not change
->> the current kernel behaviour on them.
->>
->> This patch updates ACPI and PCI core code to use the newly introduced
->> acpi_dma_configure function, providing the same functionality
->> as of_dma_configure on ARM systems and leaving behaviour unchanged
->> for all other arches.
->>
->> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->> Cc: Bjorn Helgaas <bhelgaas@google.com>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> Cc: Tomasz Nowicki <tn@semihalf.com>
->> Cc: Joerg Roedel <joro@8bytes.org>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->> ---
->>   drivers/acpi/glue.c     |  4 +--
->>   drivers/acpi/iort.c     | 85
->> +++++++++++++++++++++++++++++++++++++++++++++++++
->>   drivers/acpi/scan.c     | 29 +++++++++++++++++
->>   drivers/pci/probe.c     |  3 +-
->>   include/acpi/acpi_bus.h |  2 ++
->>   include/linux/acpi.h    |  5 +++
->>   include/linux/iort.h    |  9 ++++++
->>   7 files changed, 133 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
->> index 5ea5dc2..f8d6564 100644
->> --- a/drivers/acpi/glue.c
->> +++ b/drivers/acpi/glue.c
->> @@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct
->> acpi_device *acpi_dev)
->>
->>       attr = acpi_get_dma_attr(acpi_dev);
->>       if (attr != DEV_DMA_NOT_SUPPORTED)
->> -        arch_setup_dma_ops(dev, 0, 0, NULL,
->> -                   attr == DEV_DMA_COHERENT);
->> +        acpi_dma_configure(dev, attr);
->>
->>       acpi_physnode_link_name(physical_node_name, node_id);
->>       retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
->> @@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct
->> acpi_device *acpi_dev)
->>       return 0;
->>
->>    err:
->> +    acpi_dma_deconfigure(dev);
->>       ACPI_COMPANION_SET(dev, NULL);
->>       put_device(dev);
->>       put_device(&acpi_dev->dev);
->> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
->> index 2b5ce65..b1bb8fb 100644
->> --- a/drivers/acpi/iort.c
->> +++ b/drivers/acpi/iort.c
->> @@ -72,6 +72,31 @@ int iort_iommu_set_node(struct iommu_ops *ops,
->> struct acpi_iort_node *node,
->>       return 0;
->>   }
->>
->> +/**
->> + * iort_iommu_get_node - Retrieve iort_iommu_node associated with an
->> IORT node.
->> + *
->> + * @node: IORT table node to be looked-up
->> + *
->> + * Returns: iort_iommu_node pointer on success
->> + *          NULL on failure
->> + */
->> +static struct iort_iommu_node *iort_iommu_get_node(struct
->> acpi_iort_node *node)
->> +{
->> +    struct iort_iommu_node *iommu_node;
->> +
->> +    spin_lock(&iort_iommu_lock);
->> +    list_for_each_entry(iommu_node, &iort_iommu_list, list) {
->> +        if (iommu_node->node == node)
->> +            goto found;
->> +    }
->> +
->> +    iommu_node = NULL;
->> +found:
->> +    spin_unlock(&iort_iommu_lock);
->> +
->> +    return iommu_node;
->> +}
->> +
->>   typedef acpi_status (*iort_find_node_callback)
->>       (struct acpi_iort_node *node, void *context);
->>
->> @@ -405,6 +430,66 @@ iort_pci_get_domain(struct pci_dev *pdev, u32
->> req_id)
->>       return domain_handle;
->>   }
->>
->> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
->> +{
->> +    u32 *rid = data;
->> +
->> +    *rid = alias;
->> +    return 0;
->> +}
->> +
->> +/**
->> + * iort_iommu_configure - Set-up IOMMU configuration for a device.
->> + *
->> + * @dev: device that requires IOMMU set-up
->> + *
->> + * Returns: iommu_ops pointer on configuration success
->> + *          NULL on configuration failure
->> + */
->> +struct iommu_ops *iort_iommu_configure(struct device *dev)
->> +{
->> +    struct acpi_iort_node *node, *parent;
->> +    struct iommu_ops *ops = NULL;
->> +    struct iommu_fwspec fwspec;
->> +    struct iort_iommu_node *iommu_node;
->> +    u32 rid = 0, devid = 0;
->> +
->> +    if (dev_is_pci(dev)) {
->> +        struct pci_bus *bus = to_pci_dev(dev)->bus;
->> +
->> +        pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
->> +                       &rid);
->> +
->> +        node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
->> +                      iort_find_dev_callback, &bus->dev);
->> +    } else
->> +        node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
->> +                      iort_find_dev_callback, dev);
->
-> I think this will not work for finding host bridge stream ID. We still
-> need to use ACPI_IORT_NODE_PCI_ROOT_COMPLEX but 'dev' is not PCI device,
-> right?
+If vendors are shipping horrendously broken tables today, clearly no
+software has ever really supported them. So why add workarounds?
 
-After private conversation, I think this part is OK.
+Why is this necessary? Is there a particular case for this, or is this
+just for parity with x86?
+
+IMO it would be better to put pressure on vendors to fix their FW and
+provide sensible OS-agnostic update mechanisms.
+
+> To access initrd image we need to move initialization
+> of linear mapping a bit earlier.
+> 
+> Signed-off-by: Jon Masters <jcm@redhat.com>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  arch/arm64/kernel/setup.c |  6 ++++--
+>  drivers/acpi/Kconfig      |  2 +-
+>  drivers/acpi/tables.c     | 10 +++++++++-
+>  3 files changed, 14 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index feab2ee..1d5e24f 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -261,11 +261,13 @@ void __init setup_arch(char **cmdline_p)
+>  	efi_init();
+>  	arm64_memblock_init();
+>  
+> +	paging_init();
+> +
+> +	early_initrd_acpi_init();
+
+Do we actually need full paging up here?
+
+Why can we not use fixmap based copying as we do for the other cases
+prior to paging_init?
+
+> +
+>  	/* Parse the ACPI tables for possible boot-time configuration */
+>  	acpi_boot_table_init();
+>  
+> -	paging_init();
+> -
+>  	if (acpi_disabled)
+>  		unflatten_device_tree();
+>  
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index c204344..ec694c0 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -313,7 +313,7 @@ config ACPI_CUSTOM_DSDT
+>  
+>  config ACPI_TABLE_UPGRADE
+>  	bool "Allow upgrading ACPI tables via initrd"
+> -	depends on BLK_DEV_INITRD && X86
+> +	depends on BLK_DEV_INITRD && (X86 || ARM64)
+>  	default y
+>  	help
+
+Perhaps ARCH_HAS_ACPI_TABLE_UPGRADE?
+
+>  	  This option provides functionality to upgrade arbitrary ACPI tables
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> index 82be84a..c35034d8 100644
+> --- a/drivers/acpi/tables.c
+> +++ b/drivers/acpi/tables.c
+> @@ -482,6 +482,14 @@ static DECLARE_BITMAP(acpi_initrd_installed, NR_ACPI_INITRD_TABLES);
+>  
+>  #define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
+>  
+> +#if defined(CONFIG_X86)
+> +#define MAX_PHYS_ACPI_TABLES (max_low_pfn_mapped << PAGE_SHIFT)
+> +#elif defined(CONFIG_ARM64)
+> +#define MAX_PHYS_ACPI_TABLES PFN_PHYS(max_pfn)
+> +#else
+> +#error "MAX_PHYS_ACPI_TABLES is not defiend for this architecture"
+> +#endif
+
+s/defiend/defined/
+
+This should be defined in an arch-specific header if it is actually
+arch-specific.
 
 Thanks,
-Tomasz
+Mark.
+
+> +
+>  static void __init acpi_table_initrd_init(void *data, size_t size)
+>  {
+>  	int sig, no, table_nr = 0, total_offset = 0;
+> @@ -541,7 +549,7 @@ static void __init acpi_table_initrd_init(void *data, size_t size)
+>  		return;
+>  
+>  	acpi_tables_addr =
+> -		memblock_find_in_range(0, max_low_pfn_mapped << PAGE_SHIFT,
+> +		memblock_find_in_range(0, MAX_PHYS_ACPI_TABLES,
+>  				       all_tables_size, PAGE_SIZE);
+>  	if (!acpi_tables_addr) {
+>  		WARN_ON(1);
+> -- 
+> 2.8.2
+> 
