@@ -1,83 +1,44 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 17 May 2016 18:07:53 +0900
-Subject: [PATCH v15 00/20] arm64 kexec kernel patches v15
-In-Reply-To: <573AD11E.1030301@arm.com>
-References: <cover.1457977401.git.geoff@infradead.org>
- <20160401015947.GA3835@dhcp-128-65.nay.redhat.com>
- <1459535954.20121.3.camel@infradead.org>
- <20160517054216.GA12543@dhcp-128-65.nay.redhat.com>
- <573AD11E.1030301@arm.com>
-Message-ID: <20160517090602.GA31879@linaro.org>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Tue, 17 May 2016 17:10:12 +0800
+Subject: [PATCH v12 05/10] arm64: Kprobes with single stepping support
+In-Reply-To: <1461783185-9056-6-git-send-email-dave.long@linaro.org>
+References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
+ <1461783185-9056-6-git-send-email-dave.long@linaro.org>
+Message-ID: <20160517091009.GA5082@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc, Dave
+On Wed, Apr 27, 2016 at 02:53:00PM -0400, David Long wrote:
+> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> +
+> +static bool __kprobes aarch64_insn_is_steppable(u32 insn)
 
-On Tue, May 17, 2016 at 09:06:54AM +0100, Marc Zyngier wrote:
-> Hi Dave,
-> 
-> On 17/05/16 06:42, Dave Young wrote:
-> > Marc, it has been discussed for long time, I think kdump code can be
-> > logically splitted from this series so that we can get the kexec
-> > done first? 
-> 
-> The basis for kexec are already on their way to mainline, as part of the
-> hibernate series that James has put together.
-> 
-> I'd expect someone to:
-> 
-> 1) rebase the remaining kexec/kdump patches based on the current
-> arm64/for-next/core,
+Could we add more comment for this function? In the comment, we can tell
+that which type of instructions are steppable, which are not.
 
-Done. At the time of last week.
-The only issue that I have now is a support for KASLR, but this is not
-a kernel issue, but tool's. I'm now talking with Dave Anderson (RedHat)
-about how we should fix it.
+> +{
+> +	if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
+> +		if (aarch64_insn_is_branch(insn) ||
+> +		    aarch64_insn_is_msr_imm(insn) ||
+> +		    aarch64_insn_is_msr_reg(insn) ||
+> +		    aarch64_insn_is_exception(insn))
+> +			return false;
+> +
+> +		if (aarch64_insn_is_mrs(insn))
+> +			return aarch64_insn_extract_system_reg(insn)
+> +			     != AARCH64_INSN_SPCLREG_DAIF;
+> +
+> +		if (aarch64_insn_is_hint(insn))
+> +			return aarch64_insn_is_nop(insn);
+> +
+> +		return true;
+> +	}
+> +
+> +	if (aarch64_insn_uses_literal(insn) ||
+> +	    aarch64_insn_is_exclusive(insn))
+> +		return false;
+> +
+> +	return true;
 
-> 2) post these patches when -rc1 gets cut in two weeks from now,
-
-Yes, we are planning to do so.
-
-> 3) address the review comments in a timely manner,
-
-I'd like to expect the code to be reviewed in a timely manner, too.
-In v4.6, we have not got any comments (nor ack's) on kexec/kdump-specific
-part of patches. If this happens again, it will make the turnaround of our
-re-spinning even longer.
-
-> 4) update the series once a week so that we see some actual progress
-
-Yes if we have updates.
-
-> If this happens, I can't see any reason why this code wouldn't get
-> merged. But keeping kexec and kdump together is not what has prevented
-> the code from getting merged until now.
-
-Yeah, agree.
-
-Thanks,
--Takahiro AKASHI
-
-> 
-> Thanks,
-> 
-> 	M.
-> > 
-> > On 04/01/16 at 11:39am, Geoff Levand wrote:
-> >> Hi,
-> >>
-> >> On Fri, 2016-04-01 at 09:59 +0800, Dave Young wrote:
-> >>> Geoff, for easier to review maybe you can send kexec patches first
-> >>> then AKASHI Takahiro
-> >>> can send the kdump patches as a standalone patchset?
-> >>
-> >> Marc Zyngier specifically asked for an integrated set
-> >> of patches for easier review.  I will keep it that way
-> >> for now.
-> >>
-> >> -Geoff
-> > 
-> 
-> 
-> -- 
-> Jazz is not dead. It just smells funny...
+Thanks
+Huang Shijie
