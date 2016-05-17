@@ -1,128 +1,121 @@
-From: ritesh.list@gmail.com (Ritesh Harjani)
-Date: Tue, 17 May 2016 10:01:54 +0530
-Subject: [PATCH 09/23] mmc: sdhci: fix incorrect get data interrupt during
- no data transfer
-In-Reply-To: <573184F3.50201@intel.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-10-git-send-email-aisheng.dong@nxp.com>
- <573184F3.50201@intel.com>
-Message-ID: <CALk7dXpDXS2R0RJ9KNTaMFxBC+VVvrJ+U1X5Z_kZJNxwxrC6iQ@mail.gmail.com>
+From: erin.lo@mediatek.com (Erin Lo)
+Date: Tue, 17 May 2016 13:05:01 +0800
+Subject: [PATCH v8 0/10] Add clock support for Mediatek MT2701
+Message-ID: <1463461511-25019-1-git-send-email-erin.lo@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 12:21 PM, Adrian Hunter <adrian.hunter@intel.com> wrote:
-> On 15/04/16 20:29, Dong Aisheng wrote:
->> Current code will report the wrong data interrupt got when no
->> data operation in progress assumed by getting !host->data in
->> sdhci_data_irq().
->>
->> For a data command handling process, the driver will call
->> sdhci_finish_data() and clear host->data in case any data error,
->> then card finish_tasklet will do the rest controller reset work.
->>
->> Before the tasklet got run, however, controllers may report the
->> TC(Transfer Complete) interrupt (SDHCI_INT_DATA_END) a bit later
->> than data CRC error and data end bit error interrupts for single
->> block transfer or the last block of multiblock transfer.
+This series is based on clk-next, add clock and reset controller support
+for Mediatek MT2701.
 
-What if the controller generates Transfer complete interrupt bit more slower
-and the tasklet do get a chance to run. In that case even host->mrq
-will become NULL.
-Actually if that happens it's even more worse since the driver may
-start issuing other commands to controller.
+This series also refined makefile and Kconfig to support configurable
+multiple SoC clock support.
 
-Are we covering that case here? Do you think that this case is possible?
+There some code borrowed from [2] in clk-mtk.h, and may need to resolve
+conflicts while merging these two series.
 
+changes since v7:
+- Rebase to clk-next.
+- Implement subsystem clocks in seperated files.
+- Replace critical clock enabling with CLK_IS_CRITICAL flag.
+- Reduce most clock registrations in CLK_OF_DECLARE().
+- Remove __init and __initconst from most init fucntions and data,
+  and replace driver registration with platform_driver_register().
+- Replace some common function or variable names with unique names.
+- Use real clock for UARTs.
 
->>
->> Controller usually detects and generates data CRC/end bit error
->> interrupts once one block on the bus is transferred completely.
->> For single block transfer, since there's only one bock to transfer,
->> the controller will report transfer complete interrupt as well,
->> but until the data in controller FIFO has been successfully
->> transferred to memory. The time gap of TC and CRC interrupt depends on
->> the system busy state at that point and memory bus access speed.
->>
->> So it is possible when TC interrupt generated, host->data is already
->> equal to NULL due to cleared by former CRC/Data End Bit error which
->> is reasonable.
->>
->> Thus we DO NOT report the weird data interrupt event for this case.
->>
->> Else we may easily see warning below during SD3.0 card manually tuning
->> process (calling mmc_send_tuning() which is a single block transfer)
->> mmc0: Got data interrupt 0x00000002 even though no data operation was in progress
->>
->> The detailed command log is as follows:
->> [ 1657.920983] mmc0: starting CMD19 arg 00000000 flags 00000035
->> [ 1657.921009] mmc0:     blksz 64 blocks 1 flags 00000200 tsac 150 ms nsac 0
->> [ 1657.921085] sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00200001
->> [ 1657.921112] sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000002
->> [ 1657.921131] mmc0: Got data interrupt 0x00000002 even though no data operation was in progress.
->> [ 1657.929761] sdhci: =========== REGISTER DUMP (mmc0)===========
->> [ 1657.929780] sdhci: Sys addr: 0x3d5d6380 | Version:  0x00000002
->> [ 1657.929796] sdhci: Blk size: 0x00000040 | Blk cnt:  0x00000001
->> [ 1657.929814] sdhci: Argument: 0x00000000 | Trn mode: 0x00000013
->> [ 1657.929831] sdhci: Present:  0x01fd8008 | Host ctl: 0x00000023
->> [ 1657.929847] sdhci: Power:    0x00000002 | Blk gap:  0x00000080
->> [ 1657.929863] sdhci: Wake-up:  0x00000008 | Clock:    0x0000000f
->> [ 1657.929879] sdhci: Timeout:  0x0000000f | Int stat: 0x00000000
->> [ 1657.929896] sdhci: Int enab: 0x107f008b | Sig enab: 0x107f008b
->> [ 1657.929914] sdhci: AC12 err: 0x00000000 | Slot int: 0x00000003
->> [ 1657.929932] sdhci: Caps:     0x07eb0000 | Caps_1:   0x00002007
->> [ 1657.929949] sdhci: Cmd:      0x0000133a | Max curr: 0x00ffffff
->> [ 1657.929965] sdhci: Host ctl2: 0x000000c8
->> [ 1657.929981] sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x8f042208
->> [ 1657.929995] sdhci: ===========================================
->> [ 1657.930156] mmc0: req done (CMD19): 0: 00000900 00000000 00000000 00000000
->> [ 1657.930179] mmc0:     0 bytes transferred: -84
->>
->> It shows we first have a data CRC error interrupt then a data transfer
->> complete interrupt.
->> Then we got the !host->data case in sdhci_data_irq().
->>
->> CC: stable <stable@vger.kernel.org>
->> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> ---
->>  drivers/mmc/host/sdhci.c | 11 +++++++++++
->>  1 file changed, 11 insertions(+)
->>
->> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
->> index 40e3551..2eb0e34 100644
->> --- a/drivers/mmc/host/sdhci.c
->> +++ b/drivers/mmc/host/sdhci.c
->> @@ -2325,6 +2325,17 @@ static void sdhci_data_irq(struct sdhci_host *host, u32 intmask)
->>                       }
->>               }
->>
->> +             /*
->> +              * The "data complete" interrupt is possible to happen a bit
->> +              * later than CRC error and data end bit error interrupts
->> +              * separately for single block transfer or the last block of
->> +              * multiblock transfer. For this case, we DO NOT report the
->> +              * weird data interrupt event.
->> +              */
->> +             if ((intmask & SDHCI_INT_DATA_END) &&
->> +                 (host->mrq && host->mrq->data && host->mrq->data->error))
->> +                     return;
->
-> This could be generalized a bit more i.e. what about:
->
->                 /*
->                  * After an error and before the the data circuit is reset in
->                  * sdhci_tasklet_finish, we could get more interrupts, but we
->                  * already have an error, so ignore them.
->                  */
->                 if (host->mrq && host->mrq->data && host->mrq->data->error)
->                         return;
->
->> +
->>               pr_err("%s: Got data interrupt 0x%08x even though no data operation was in progress.\n",
->>                      mmc_hostname(host->mmc), (unsigned)intmask);
->>               sdhci_dumpregs(host);
->>
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+changes since v6:
+- Rebase to v4.6-rc1.
+- Register subsystem clocks in probe() instead of CLK_OF_DECLARE().
+- Add clocks that referred by subsystem clocks.
+- Fix clk_data size of apmixedsys.
+- Add config options for each subsystem clock provider.
+
+changes since v5:
+- Rebase to v4.5-rc1 and [1].
+- Enable critical clocks for MT2701
+- Refine dt-binding documents, add reset controller support for hifsys.
+
+changes since v4:
+- Rebase to v4.5-rc1.
+- Remove CLK_SET_RATE_PARENT from divider flags.
+- Add img_jpgdec_smi clock.
+- Move clk/mediatek/Kconfig into menu section in clk/Kconfig.
+
+changes since v3:
+- Change the parent of mm_mdp_bls_26m from clk26m to pwm_sel.
+
+changes since v2:
+- Fix ethsys definition.
+- Replace read-modify-write with regmap_update_bits() in clock operations.
+- Move mt2701-resets.h to include/dt-bindings/reset/.
+- Add hifsys reset patch from John Crispin.
+
+changes since v1:
+- Document MT2701 compatible strings.
+
+[1] https://patchwork.kernel.org/patch/8147901/
+[2] http://www.spinics.net/lists/dri-devel/msg106726.html
+
+Erin Lo (1):
+  arm: dts: mt2701: Use real clock for UARTs
+
+James Liao (5):
+  clk: fix initial state of critical clock's parents
+  clk: mediatek: remove __init from clk registration functions
+  clk: mediatek: Refine the makefile to support multiple clock drivers
+  dt-bindings: ARM: Mediatek: Document bindings for MT2701
+  arm: dts: mt2701: Add clock controller device nodes
+
+Shunli Wang (4):
+  clk: mediatek: Add dt-bindings for MT2701 clocks
+  clk: mediatek: Add MT2701 clock support
+  reset: mediatek: Add MT2701 reset controller dt-binding file
+  reset: mediatek: Add MT2701 reset driver
+
+ .../bindings/arm/mediatek/mediatek,apmixedsys.txt  |    3 +-
+ .../bindings/arm/mediatek/mediatek,bdpsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,ethsys.txt      |   22 +
+ .../bindings/arm/mediatek/mediatek,hifsys.txt      |   24 +
+ .../bindings/arm/mediatek/mediatek,imgsys.txt      |    3 +-
+ .../bindings/arm/mediatek/mediatek,infracfg.txt    |    3 +-
+ .../bindings/arm/mediatek/mediatek,mmsys.txt       |    3 +-
+ .../bindings/arm/mediatek/mediatek,pericfg.txt     |    3 +-
+ .../bindings/arm/mediatek/mediatek,topckgen.txt    |    3 +-
+ .../bindings/arm/mediatek/mediatek,vdecsys.txt     |    3 +-
+ arch/arm/boot/dts/mt2701.dtsi                      |   50 +-
+ drivers/clk/Kconfig                                |    1 +
+ drivers/clk/clk.c                                  |    9 +-
+ drivers/clk/mediatek/Kconfig                       |   73 ++
+ drivers/clk/mediatek/Makefile                      |   13 +-
+ drivers/clk/mediatek/clk-gate.c                    |   54 +-
+ drivers/clk/mediatek/clk-gate.h                    |    2 +
+ drivers/clk/mediatek/clk-mt2701-bdp.c              |  140 +++
+ drivers/clk/mediatek/clk-mt2701-eth.c              |   82 ++
+ drivers/clk/mediatek/clk-mt2701-hif.c              |   81 ++
+ drivers/clk/mediatek/clk-mt2701-img.c              |   82 ++
+ drivers/clk/mediatek/clk-mt2701-mm.c               |  125 +++
+ drivers/clk/mediatek/clk-mt2701-vdec.c             |   93 ++
+ drivers/clk/mediatek/clk-mt2701.c                  | 1037 ++++++++++++++++++++
+ drivers/clk/mediatek/clk-mtk.c                     |   52 +-
+ drivers/clk/mediatek/clk-mtk.h                     |   52 +-
+ drivers/clk/mediatek/clk-pll.c                     |    3 +-
+ include/dt-bindings/clock/mt2701-clk.h             |  486 +++++++++
+ include/dt-bindings/reset/mt2701-resets.h          |   83 ++
+ 29 files changed, 2578 insertions(+), 29 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,bdpsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/mediatek/mediatek,hifsys.txt
+ create mode 100644 drivers/clk/mediatek/Kconfig
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-bdp.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-eth.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-hif.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-img.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-mm.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701-vdec.c
+ create mode 100644 drivers/clk/mediatek/clk-mt2701.c
+ create mode 100644 include/dt-bindings/clock/mt2701-clk.h
+ create mode 100644 include/dt-bindings/reset/mt2701-resets.h
+
+--
+1.9.1
