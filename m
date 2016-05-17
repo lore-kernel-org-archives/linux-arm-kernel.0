@@ -1,125 +1,67 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Tue, 17 May 2016 07:44:36 +0200
-Subject: [linux-sunxi] Re: [PATCH 4/9] spi: sun4i: add DMA support
-In-Reply-To: <20150820185850.GQ12027@sirena.org.uk>
-References: <cover.1440080122.git.hramrach@gmail.com>
- <ccf776869b0d7fe2c78bcc41d6cd1896bf732296.1440080122.git.hramrach@gmail.com>
- <20150820185850.GQ12027@sirena.org.uk>
-Message-ID: <CAOMqctQPUDm3XDf_YAVubzq2op=j6Qs6R4hjjCaa=ELoeHzjhQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 17 May 2016 08:02:06 +0200
+Subject: [PATCH] pinctrl: samsung: Suppress unbinding to prevent theoretical
+ attacks
+Message-ID: <1463464926-17482-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 August 2015 at 16:56, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+Although unbinding a pinctrl driver requires root privileges but it
+still might be used theoretically in certain attacks (by triggering NULL
+pointer exception or memory corruption).
 
->> +             /* Enable Dedicated DMA requests */
->> +             reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
->> +             reg |= SUN4I_CTL_DMAMC_DEDICATED;
->> +             sun4i_spi_write(sspi, SUN4I_CTL_REG, reg);
->> +             sun4i_spi_write(sspi, SUN4I_DMA_CTL_REG, trigger);
->> +     } else {
->> +             dev_dbg(&sspi->master->dev, "Using PIO mode for transfer\n");
->> +
->> +             /* Disable DMA requests */
->> +             reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
->> +             sun4i_spi_write(sspi, SUN4I_CTL_REG,
->> +                             reg & ~SUN4I_CTL_DMAMC_DEDICATED);
->> +             sun4i_spi_write(sspi, SUN4I_DMA_CTL_REG, 0);
->> +
->> +             /* Fill the TX FIFO */
->> +             /* Filling the fifo fully causes timeout for some reason
->> +              * at least on spi2 on a10s */
->> +             sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH - 1);
->> +     }
->> +
->>       /* Start the transfer */
->>       reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
->>       sun4i_spi_write(sspi, SUN4I_CTL_REG, reg | SUN4I_CTL_XCH);
->> @@ -303,7 +363,12 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->>               goto out;
->>       }
->>
->> -     sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
->> +     if (sun4i_spi_can_dma(master, spi, tfr) && desc_rx) {
->> +             /* The receive transfer should be the last one to finish */
->> +             dma_wait_for_async_tx(desc_rx);
->
-> Nope, this is only meant for async_tx. You should register a callback
-> in your transfer that will mark the completion structure as completed,
-> and then drain the FIFO only if not using DMA.
+Samsung pincontrol drivers are essential for system operation so their
+removal is not expected. They do not implement remove() driver callback
+and they are not buildable as modules.
 
-What exactly is wrong with this?
+Suppression of the unbinding will prevent triggering NULL pointer
+exception like this (Odroid XU3):
 
-I did not observe data corruption. Passing desc_rx to
-dma_wait_for_async_tx looks odd on closer inspection, though. Will
-look through some other spi driver code.
+  $ echo 13400000.pinctrl > /sys/bus/platform/drivers/samsung-pinctrl/unbind
+  $ cat /sys/kernel/debug/gpio
 
->> -     init_completion(&sspi->done);
->> +     master->dma_tx = dma_request_slave_channel_reason(&pdev->dev, "tx");
->> +     if (IS_ERR(master->dma_tx)) {
->> +             dev_err(&pdev->dev, "Unable to acquire DMA channel TX\n");
->> +             ret = PTR_ERR(master->dma_tx);
->> +             goto err_free_master;
->> +     }
->> +
->> +     dma_sconfig.direction = DMA_MEM_TO_DEV;
->> +     dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->> +     dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->> +     dma_sconfig.dst_addr = res->start + SUN4I_TXDATA_REG;
->> +     dma_sconfig.src_maxburst = 1;
->> +     dma_sconfig.dst_maxburst = 1;
->> +
->> +     ret = dmaengine_slave_config(master->dma_tx, &dma_sconfig);
->> +     if (ret) {
->> +             dev_err(&pdev->dev, "Unable to configure TX DMA slave\n");
->> +             goto err_tx_dma_release;
->> +     }
->> +
->> +     master->dma_rx = dma_request_slave_channel_reason(&pdev->dev, "rx");
->> +     if (IS_ERR(master->dma_rx)) {
->> +             dev_err(&pdev->dev, "Unable to acquire DMA channel RX\n");
->> +             ret = PTR_ERR(master->dma_rx);
->> +             goto err_tx_dma_release;
->> +     }
->> +
->> +     dma_sconfig.direction = DMA_DEV_TO_MEM;
->> +     dma_sconfig.src_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->> +     dma_sconfig.dst_addr_width = DMA_SLAVE_BUSWIDTH_1_BYTE;
->> +     dma_sconfig.src_addr = res->start + SUN4I_RXDATA_REG;
->> +     dma_sconfig.src_maxburst = 1;
->> +     dma_sconfig.dst_maxburst = 1;
->
-> We can't use a higher bust size?
+  Unable to handle kernel NULL pointer dereference at virtual address 00000c44
+  pgd = ec41c000
+  [00000c44] *pgd=6d448835, *pte=00000000, *ppte=00000000
+  Internal error: Oops: 17 [#1] PREEMPT SMP ARM
+    (samsung_gpio_get) from [<c034f9a0>] (gpiolib_seq_show+0x1b0/0x26c)
+    (gpiolib_seq_show) from [<c01fb8c0>] (seq_read+0x304/0x4b8)
+    (seq_read) from [<c02dbc78>] (full_proxy_read+0x4c/0x64)
+    (full_proxy_read) from [<c01d9fb0>] (__vfs_read+0x2c/0x110)
+    (__vfs_read) from [<c01db400>] (vfs_read+0x8c/0x110)
+    (vfs_read) from [<c01db4c4>] (SyS_read+0x40/0x8c)
+    (SyS_read) from [<c01078c0>] (ret_fast_syscall+0x0/0x3c)
 
-Who actually does?
+Suggested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ drivers/pinctrl/samsung/pinctrl-exynos5440.c | 1 +
+ drivers/pinctrl/samsung/pinctrl-samsung.c    | 1 +
+ 2 files changed, 2 insertions(+)
 
-It accomplishes the transfer with burst size of 1 so that's good enough.
-
-Researching alignment requirements and other oddities of Chinese
-controllers when larger burst size is used can be topic for another
-patch.
-
-
-On 20 August 2015 at 20:58, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Aug 20, 2015 at 02:19:46PM -0000, Emilio L?pez wrote:
->
->> -     sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
->> +     if (sun4i_spi_can_dma(master, spi, tfr) && desc_rx) {
->> +             /* The receive transfer should be the last one to finish */
->> +             dma_wait_for_async_tx(desc_rx);
->
-> What if it's a transmit only transfer?  We'll fall over to this...
->
->> +     } else {
->> +             sun4i_spi_drain_fifo(sspi, SUN4I_FIFO_DEPTH);
->> +     }
->
-> ...which manually reads data from the FIFO which doesn't seem like what
-... which should be empty since RX is not enabled.
-> we want, won't it conflict with the DMA?
-It does not seem to conflict in practice.
-
-
-Thanks
-
-Michal
+diff --git a/drivers/pinctrl/samsung/pinctrl-exynos5440.c b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+index fb71fc3e5aa0..3000df80709f 100644
+--- a/drivers/pinctrl/samsung/pinctrl-exynos5440.c
++++ b/drivers/pinctrl/samsung/pinctrl-exynos5440.c
+@@ -998,6 +998,7 @@ static struct platform_driver exynos5440_pinctrl_driver = {
+ 	.driver = {
+ 		.name	= "exynos5440-pinctrl",
+ 		.of_match_table = exynos5440_pinctrl_dt_match,
++		.suppress_bind_attrs = true,
+ 	},
+ };
+ 
+diff --git a/drivers/pinctrl/samsung/pinctrl-samsung.c b/drivers/pinctrl/samsung/pinctrl-samsung.c
+index ed0b70881e19..513fe6b23248 100644
+--- a/drivers/pinctrl/samsung/pinctrl-samsung.c
++++ b/drivers/pinctrl/samsung/pinctrl-samsung.c
+@@ -1274,6 +1274,7 @@ static struct platform_driver samsung_pinctrl_driver = {
+ 	.driver = {
+ 		.name	= "samsung-pinctrl",
+ 		.of_match_table = samsung_pinctrl_dt_match,
++		.suppress_bind_attrs = true,
+ 	},
+ };
+ 
+-- 
+1.9.1
