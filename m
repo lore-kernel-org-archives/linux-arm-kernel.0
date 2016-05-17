@@ -1,42 +1,38 @@
-From: oneukum@suse.com (Oliver Neukum)
-Date: Tue, 17 May 2016 13:53:56 +0200
-Subject: [PSCI DISCUSS] How to implement standby and suspend-to-ram by PSCI
-In-Reply-To: <DB3PR04MB08125A628F5034749F8109D884730@DB3PR04MB0812.eurprd04.prod.outlook.com>
-References: <DB3PR04MB0812DAA98F71C30E8A8832E3847D0@DB3PR04MB0812.eurprd04.prod.outlook.com>
- <572C9BF2.9010004@arm.com>
- <DB3PR04MB08125A628F5034749F8109D884730@DB3PR04MB0812.eurprd04.prod.outlook.com>
-Message-ID: <1463486036.19237.9.camel@suse.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Tue, 17 May 2016 15:06:00 +0300
+Subject: [PATCH 0/3] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+Message-ID: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-05-12 at 09:42 +0000, Hongbo Zhang wrote:
-> On our platform we have some shallow states which maps to cpuidle
-> well, 
-> and we have two more deeper states:
-> 
-> Sleep state:
-> All cores are in WFI state,
-> Core cluster is in standby state, e.g. L2 cache is flushed then stops 
-> snooping,
-> Only those modules which are required to wake up the device still have
-> a 
-> running clock, other device modules in chip are clock gated.
-> 
-> Deep sleep state:
-> ARM cores and DDR controller are switched off,
-> DDR is in self-refresh mode,
-> VDD power to off domain IPs are removed, Only the blocks needed to 
-> detect wake up and sequence the chip out of deep sleep are on.
+This patchset adds support for ACPI_TABLE_UPGRADE for ARM64
 
-For the pm module of the core kernel a low power state is a sleep
-state if even one of three conditions is met:
+It refactors the code introduced by the patches by Lv Zheng [1], fixes access to
+the destination of new ACPI tables as suggested by Mark Rutland [2] and enables
+the feature for ARM64
 
-a) a device that can be used for input is not a source of wake ups
-b) tasks need to be frozen to enter it
-c) the display goes off, while it should be on
+It was first sent by Jon Masters [3] to linaro-acpi in December 2015
 
-Generally runtime PM is better if you can get the same results.
-Going to a system sleep state is a necessary evil.
+Tested on QEMU (arm64 and x86) and ThunderX
+Should be applied to next-20160517
 
-	Regards
-		Oliver
+[1] https://lkml.kernel.org/g/cover.1460340514.git.lv.zheng at intel.com
+[2] https://lists.linaro.org/pipermail/linaro-acpi/2015-December/006101.html
+[3] https://lists.linaro.org/pipermail/linaro-acpi/2015-December/006099.html
+
+Aleksey Makarov (2):
+  ACPI: table upgrade: use cacheable map for tables
+  ACPI: table upgrade: move early_initrd_acpi_init() to header file
+
+Jon Masters (1):
+  ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+
+ arch/arm64/kernel/setup.c |  6 ++++--
+ arch/x86/kernel/setup.c   |  7 -------
+ drivers/acpi/Kconfig      |  2 +-
+ drivers/acpi/tables.c     | 21 ++++++++++++++++-----
+ include/linux/acpi.h      |  4 ++--
+ 5 files changed, 23 insertions(+), 17 deletions(-)
+
+-- 
+2.8.2
