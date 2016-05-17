@@ -1,49 +1,69 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 17 May 2016 13:29:53 +0530
-Subject: [PATCH v4 12/18] arm: use of_platform_default_populate() to
- populate
-In-Reply-To: <1463054775-18170-13-git-send-email-wangkefeng.wang@huawei.com>
-References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
- <1463054775-18170-13-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <573ACF79.1090600@ti.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Tue, 17 May 2016 10:06:22 +0200
+Subject: [PATCH 2/2] ARM: dts: igep0020: Add SD card write-protect pin.
+In-Reply-To: <20160513123718.GA2841@localhost.localdomain>
+References: <1462568554-7868-1-git-send-email-enric.balletbo@collabora.com>
+ <1462568554-7868-2-git-send-email-enric.balletbo@collabora.com>
+ <20160513123718.GA2841@localhost.localdomain>
+Message-ID: <CAFqH_535Zd8etbAjrSq_fj73p9cJFzqOqbcbH3UcnpfjNy7efw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 May 2016 05:36 PM, Kefeng Wang wrote:
-> Use helper of_platform_default_populate() in linux/of_platform
-> when possible, instead of calling of_platform_populate() with
-> the default match table.
-> 
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Krzysztof Halasa <khalasa@piap.pl>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Roland Stigge <stigge@antcom.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Viresh Kumar <vireshk@kernel.org>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Rob Herring <robh@kernel.org>
-> Cc: Michal Simek <michal.simek@xilinx.com>
-> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> ---
+Hi Ladislav,
 
-> diff --git a/arch/arm/mach-davinci/da8xx-dt.c b/arch/arm/mach-davinci/da8xx-dt.c
-> index c4b5808..da46dc7 100644
-> --- a/arch/arm/mach-davinci/da8xx-dt.c
-> +++ b/arch/arm/mach-davinci/da8xx-dt.c
-> @@ -54,8 +54,7 @@ static struct of_dev_auxdata da850_auxdata_lookup[] __initdata = {
->  
->  static void __init da850_init_machine(void)
->  {
-> -	of_platform_populate(NULL, of_default_bus_match_table,
-> -			     da850_auxdata_lookup, NULL);
-> +	of_platform_default_populate(NULL, da850_auxdata_lookup, NULL);
->  
->  }
+2016-05-13 14:37 GMT+02:00 Ladislav Michl <ladis@linux-mips.org>:
+> Hi Enric!
+>
+> On Fri, May 06, 2016 at 11:02:34PM +0200, Enric Balletbo i Serra wrote:
+>> A host device that supports write protection should refuse to write to
+>> an SD card that is designated read-only when write-protect is set. This
+>> is an optional feature of the SD specification.
+>
+> Does it ever work on any IGEPv2? I have similar patch in my repo and there
+> is no difference when enabling write protection on SD card. Also schemantics
+> shows GPIO29 constantly pulled up with a resistor. Is there any board
+> revision with working WP? I'm just curious as patch is of course correct.
+>
 
-The mach-davinci change is already queued for v4.7
+Note that the microSD formats do not support a write protection
+switch, a host device that supports write protection should refuse to
+write to an SD card that is designated read-only in this way, which is
+an optional feature of the SD specification. As far as I know there is
+only a use case for the IGEPv2, the TP close to the SD card can be
+used as a write-protection switch, this is not an usual use case and
+of course, this needs some wiring, but it's a feature used by someone.
 
-Thanks,
-Sekhar
+> Best regards,
+>         ladis
+>
+>> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+>> ---
+>>  arch/arm/boot/dts/omap3-igep0020-common.dtsi | 11 +++++++++++
+>>  1 file changed, 11 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/omap3-igep0020-common.dtsi b/arch/arm/boot/dts/omap3-igep0020-common.dtsi
+>> index d6f839c..b697106 100644
+>> --- a/arch/arm/boot/dts/omap3-igep0020-common.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-igep0020-common.dtsi
+>> @@ -194,6 +194,12 @@
+>>                       OMAP3630_CORE2_IOPAD(0x25f8, PIN_OUTPUT | MUX_MODE4) /* etk_d14.gpio_28 */
+>>               >;
+>>       };
+>> +
+>> +     mmc1_wp_pins: pinmux_mmc1_cd_pins {
+>> +             pinctrl-single,pins = <
+>> +                     OMAP3630_CORE2_IOPAD(0x25fa, PIN_INPUT | MUX_MODE4)   /* etk_d15.gpio_29 */
+>> +             >;
+>> +     };
+>>  };
+>>
+>>  &i2c3 {
+>> @@ -250,3 +256,8 @@
+>>               };
+>>       };
+>>  };
+>> +
+>> +&mmc1 {
+>> +     pinctrl-0 = <&mmc1_pins &mmc1_wp_pins>;
+>> +     wp-gpios = <&gpio1 29 GPIO_ACTIVE_LOW>; /* gpio_29 */
+>> +};
