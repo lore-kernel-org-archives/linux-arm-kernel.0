@@ -1,32 +1,17 @@
-From: a0393675@ti.com (Keerthy)
-Date: Tue, 17 May 2016 08:52:06 +0530
-Subject: [PATCH 2/8] Documentation: regulator: tps65218: Update examples
-In-Reply-To: <20160516144847.GA26659@rob-hp-laptop>
-References: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
- <1462945691-904-3-git-send-email-j-keerthy@ti.com>
- <20160516144847.GA26659@rob-hp-laptop>
-Message-ID: <573A8E5E.2080809@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 May 2016 11:36:27 +0800
+Subject: [PATCH 17/20] ARM: multi_v7: Enable sun4i DRM driver
+In-Reply-To: <1463402840-17062-18-git-send-email-maxime.ripard@free-electrons.com>
+References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1463402840-17062-18-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67_wpUiVVP9C2k040GDqe03JCAw_N2i+0QsAasHE11wfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Monday 16 May 2016 08:18 PM, Rob Herring wrote:
-> On Wed, May 11, 2016 at 11:18:05AM +0530, Keerthy wrote:
->> This updates the device tree according to the preferred way of parsing
->> the nodes using the regulator framework.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>   .../devicetree/bindings/regulator/tps65218.txt     | 87 ++++++++++++++++++----
->>   1 file changed, 71 insertions(+), 16 deletions(-)
+On Mon, May 16, 2016 at 8:47 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Enable the new DRM driver in the multi_v7 defconfig
 >
-> It wasn't exactly clear that the compatible string "added" here is
-> already used, so it looked like you were breaking compatibility at
-> first. Otherwise,
->
-> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Thanks Rob.
-
->
+Acked-by: Chen-Yu Tsai <wens@csie.org>
