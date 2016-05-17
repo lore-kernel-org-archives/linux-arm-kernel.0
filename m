@@ -1,100 +1,70 @@
-From: marcus.folkesson@gmail.com (Marcus Folkesson)
-Date: Tue, 17 May 2016 20:33:40 +0200
-Subject: [PATCH] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160517181927.GA28741@amd>
-References: <20160517181927.GA28741@amd>
-Message-ID: <20160517183340.GA10358@gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 17 May 2016 22:05:26 +0300
+Subject: [PATCH 20/25] arm64:ilp32: add sys_ilp32.c and a separate table
+ (in entry.S) to use it
+In-Reply-To: <20160516170605.GB19290@e104818-lin.cambridge.arm.com>
+References: <1459894127-17698-1-git-send-email-ynorov@caviumnetworks.com>
+ <1459894127-17698-21-git-send-email-ynorov@caviumnetworks.com>
+ <20160514150352.GA30533@yury-N73SV>
+ <20160516170605.GB19290@e104818-lin.cambridge.arm.com>
+Message-ID: <20160517190526.GA3731@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Mon, May 16, 2016 at 06:06:05PM +0100, Catalin Marinas wrote:
+> On Sat, May 14, 2016 at 06:03:52PM +0300, Yury Norov wrote:
+> > +SYSCALL_DEFINE6(mmap2, unsigned long, addr, unsigned long, len,
+> > +       unsigned long, prot, unsigned long, flags, unsigned long, fd,
+> > +       unsigned long, pgoff)
+> 
+> To avoid the types confusion we could add __SC_WRAP to mmap2 in unistd.h
+> and use COMPAT_SYSCALL_DEFINE6 here (together with compat_ptr_t etc.).
+> 
+> > +{
+> > +       if (pgoff & (~PAGE_MASK >> 12))
+> > +               return -EINVAL;
+> > +
+> > +       return sys_mmap_pgoff((compat_uptr_t) addr, (compat_size_t) len,
+> > +		       (int) prot, (int) flags, (int) fd,
+> > +		       pgoff >> (PAGE_SHIFT-12));
+> 
+> Then we wouldn't need the explicit casting here.
 
-On Tue, May 17, 2016 at 08:19:27PM +0200, Pavel Machek wrote:
-> +static int ad5820_set_ctrl(struct v4l2_ctrl *ctrl)
-> +{
-> +	struct ad5820_device *coil =
-> +		container_of(ctrl->handler, struct ad5820_device, ctrls);
-> +	u32 code;
-> +	int r = 0;
-> +
-> +	switch (ctrl->id) {
-> +	case V4L2_CID_FOCUS_ABSOLUTE:
-> +		coil->focus_absolute = ctrl->val;
-> +		return ad5820_update_hw(coil);
-> +
-> +	case V4L2_CID_FOCUS_AD5820_RAMP_TIME:
-> +		code = RAMP_US_TO_CODE(ctrl->val);
-> +		ctrl->val = CODE_TO_RAMP_US(code);
-> +		coil->focus_ramp_time = ctrl->val;
-> +		break;
-> +
-> +	case V4L2_CID_FOCUS_AD5820_RAMP_MODE:
-> +		coil->focus_ramp_mode = ctrl->val;
-> +		break;
-> +	}
-> +
-> +	return r;
+See below
 
-Just return 0 instead, r is not used.
+> 
+> > +}
+> > +
+> > +COMPAT_SYSCALL_DEFINE4(pread64, unsigned int, fd, compat_uptr_t __user *, ubuf,
+> > +		       compat_size_t, count, off_t, offset)
+> > +{
+> > +	return sys_pread64(fd, (char *) ubuf, count, offset);
+> > +}
+> > +
+> > +COMPAT_SYSCALL_DEFINE4(pwrite64, unsigned int, fd, compat_uptr_t __user *, ubuf,
+> > +		       compat_size_t, count, off_t, offset)
+> > +{
+> > +	return sys_pwrite64(fd, (char *) ubuf, count, offset);
+> 
+> Nitpick: no space between cast type and variable name: (char *)ubuf, ...
 
-> +static int ad5820_registered(struct v4l2_subdev *subdev)
-> +{
-> +	static const int CHECK_VALUE = 0x3FF0;
+I think it's really a matter of taste. I prefer to have a space, and
+there's no solid rule in coding style.
 
-CHECK_VALUE is not used?
+And there are 13032 insertions of my version vs 35030 of yours:
+~/work/linux$ git grep ' \*)[a-zA-Z]'|wc -l
+35030
+~/work/linux$ git grep ' \*) [a-zA-Z]'|wc -l
+13032
 
-> +static int ad5820_probe(struct i2c_client *client,
-> +			const struct i2c_device_id *devid)
-> +{
-> +	struct ad5820_device *coil;
-> +	int ret = 0;
-> +
-> +	coil = kzalloc(sizeof(*coil), GFP_KERNEL);
-> +	if (coil == NULL)
-> +		return -ENOMEM;
-> +
-> +	mutex_init(&coil->power_lock);
-> +
-> +	v4l2_i2c_subdev_init(&coil->subdev, client, &ad5820_ops);
-> +	coil->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-> +	coil->subdev.internal_ops = &ad5820_internal_ops;
-> +	strcpy(coil->subdev.name, "ad5820 focus");
-> +
-> +	ret = media_entity_pads_init(&coil->subdev.entity, 0, NULL);
-> +	if (ret < 0) {
-> +		kfree(coil);
-> +		return ret;
-> +	}
-> +
-> +	ret = v4l2_async_register_subdev(&coil->subdev);
-> +	if (ret < 0)
+Of course, I will change it if you insist.
 
-Do we need to call media_entity_cleanup() here?
+> We can also make these functions static as they are not used outside
+> this file.
 
-> +static int __init ad5820_init(void)
-> +{
-> +	int rval;
-> +
-> +	rval = i2c_add_driver(&ad5820_i2c_driver);
-> +	if (rval)
-> +		printk(KERN_INFO "%s: failed registering " AD5820_NAME "\n",
-> +		       __func__);
-> +
-> +	return rval;
-> +}
-> +
-> +static void __exit ad5820_exit(void)
-> +{
-> +	i2c_del_driver(&ad5820_i2c_driver);
-> +}
-> +
-> +
-> +module_init(ad5820_init);
-> +module_exit(ad5820_exit);
+If it's OK, we can use just compat_sys_xxx() instead of
+COMPAT_SYSCALL_DEFINEx(xxx), and for mmap2 we'll not need to change 
+_SYSCALL to _SC_WRAP in unistd.h that way.
 
-
-Use module_i2c_driver() instead.
-
-
-Cheers
-Marcus Folkesson
+> > -- 
+> Catalin
