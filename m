@@ -1,119 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 May 2016 13:46:29 +0100
-Subject: [PATCH 3/3] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
-In-Reply-To: <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
-References: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
- <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <20160517124629.GE14955@leverpostej>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Tue, 17 May 2016 13:57:24 +0100 (BST)
+Subject: [Xen-devel] [GIT PULL] EFI ARM Xen support
+In-Reply-To: <573AF50E.9090206@citrix.com>
+References: <20160514190410.GA2283@codeblueprint.co.uk>
+ <alpine.DEB.2.10.1605171109170.2494@sstabellini-ThinkPad-X260>
+ <573AF50E.9090206@citrix.com>
+Message-ID: <alpine.DEB.2.10.1605171153070.2494@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2016 at 03:06:03PM +0300, Aleksey Makarov wrote:
-> From: Jon Masters <jcm@redhat.com>
+On Tue, 17 May 2016, David Vrabel wrote:
+> On 17/05/16 11:12, Stefano Stabellini wrote:
+> > On Sat, 14 May 2016, Matt Fleming wrote:
+> >> Folks,
+> >>
+> >> Please pull the following branch which contains support for Xen on ARM
+> >> EFI platforms.
+> >>
+> >> This merge includes a merge of Stefano's xen/linux-next branch to pull
+> >> in the prerequisites required for Shannon's commit:
+> >>
+> >>   11ee5491e5ff ("Xen: EFI: Parse DT parameters for Xen specific UEFI")
+> >>
+> >> as it needs both the latest changes in the EFI 'next' branch (now
+> >> tip/efi/core) and xen/linux-next.
+> >>
+> >> I have intentionally not included the individual patches as I would
+> >> normally do in a pull request, so that commit history created by my
+> >> merging of Stefano's branch is preserved, and so that there's no way
+> >> to accidentally apply the patches individually.
+> >>
+> >> The following changes since commit 6c5450ef66816216e574885cf8d3ddb31ef77428:
+> >>
+> >>   efivarfs: Make efivarfs_file_ioctl() static (2016-05-07 07:06:13 +0200)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git efi/arm-xen
+> >>
+> >> for you to fetch changes up to 11ee5491e5ff519e0d3a7018eb21351cb6955a98:
+> >>
+> >>   Xen: EFI: Parse DT parameters for Xen specific UEFI (2016-05-14 19:31:01 +0100)
+> > 
+> > Is this arrangement working for everybody, in particular the tip
+> > maintainers?
 > 
-> This patch adds support for ACPI_TABLE_UPGRADE for ARM64
+> Yes.
 
-This feels like a tool to paper over problems rather than solve them.
-
-If vendors are shipping horrendously broken tables today, clearly no
-software has ever really supported them. So why add workarounds?
-
-Why is this necessary? Is there a particular case for this, or is this
-just for parity with x86?
-
-IMO it would be better to put pressure on vendors to fix their FW and
-provide sensible OS-agnostic update mechanisms.
-
-> To access initrd image we need to move initialization
-> of linear mapping a bit earlier.
-> 
-> Signed-off-by: Jon Masters <jcm@redhat.com>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-> ---
->  arch/arm64/kernel/setup.c |  6 ++++--
->  drivers/acpi/Kconfig      |  2 +-
->  drivers/acpi/tables.c     | 10 +++++++++-
->  3 files changed, 14 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index feab2ee..1d5e24f 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -261,11 +261,13 @@ void __init setup_arch(char **cmdline_p)
->  	efi_init();
->  	arm64_memblock_init();
->  
-> +	paging_init();
-> +
-> +	early_initrd_acpi_init();
-
-Do we actually need full paging up here?
-
-Why can we not use fixmap based copying as we do for the other cases
-prior to paging_init?
-
-> +
->  	/* Parse the ACPI tables for possible boot-time configuration */
->  	acpi_boot_table_init();
->  
-> -	paging_init();
-> -
->  	if (acpi_disabled)
->  		unflatten_device_tree();
->  
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index c204344..ec694c0 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -313,7 +313,7 @@ config ACPI_CUSTOM_DSDT
->  
->  config ACPI_TABLE_UPGRADE
->  	bool "Allow upgrading ACPI tables via initrd"
-> -	depends on BLK_DEV_INITRD && X86
-> +	depends on BLK_DEV_INITRD && (X86 || ARM64)
->  	default y
->  	help
-
-Perhaps ARCH_HAS_ACPI_TABLE_UPGRADE?
-
->  	  This option provides functionality to upgrade arbitrary ACPI tables
-> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
-> index 82be84a..c35034d8 100644
-> --- a/drivers/acpi/tables.c
-> +++ b/drivers/acpi/tables.c
-> @@ -482,6 +482,14 @@ static DECLARE_BITMAP(acpi_initrd_installed, NR_ACPI_INITRD_TABLES);
->  
->  #define MAP_CHUNK_SIZE   (NR_FIX_BTMAPS << PAGE_SHIFT)
->  
-> +#if defined(CONFIG_X86)
-> +#define MAX_PHYS_ACPI_TABLES (max_low_pfn_mapped << PAGE_SHIFT)
-> +#elif defined(CONFIG_ARM64)
-> +#define MAX_PHYS_ACPI_TABLES PFN_PHYS(max_pfn)
-> +#else
-> +#error "MAX_PHYS_ACPI_TABLES is not defiend for this architecture"
-> +#endif
-
-s/defiend/defined/
-
-This should be defined in an arch-specific header if it is actually
-arch-specific.
-
-Thanks,
-Mark.
-
-> +
->  static void __init acpi_table_initrd_init(void *data, size_t size)
->  {
->  	int sig, no, table_nr = 0, total_offset = 0;
-> @@ -541,7 +549,7 @@ static void __init acpi_table_initrd_init(void *data, size_t size)
->  		return;
->  
->  	acpi_tables_addr =
-> -		memblock_find_in_range(0, max_low_pfn_mapped << PAGE_SHIFT,
-> +		memblock_find_in_range(0, MAX_PHYS_ACPI_TABLES,
->  				       all_tables_size, PAGE_SIZE);
->  	if (!acpi_tables_addr) {
->  		WARN_ON(1);
-> -- 
-> 2.8.2
-> 
+I meant the x86 tip maintainers (Thomas, Peter and Ingo).
