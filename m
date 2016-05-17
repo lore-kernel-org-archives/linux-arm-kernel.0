@@ -1,23 +1,67 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Tue, 17 May 2016 10:54:45 -0400
-Subject: [PATCHv6 3/8] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <1462812247-3414-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1462812247-3414-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <20160517145445.GE4074@char.us.oracle.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 17 May 2016 17:15:33 +0200
+Subject: [PATCH] ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all SoCs
+Message-ID: <1463498133-23918-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->  
-> -In some circumstances dma_map_single() and dma_map_page() will fail to create
-> -a mapping. A driver can check for these errors by testing the returned
-> -DMA address with dma_mapping_error(). A non-zero return value means the mapping
-> -could not be created and the driver should take appropriate action (e.g.
-> -reduce current DMA mapping usage or delay and try again later).
-> +In some circumstances dma_map_single(), dma_map_page() and dma_map_resource()
-> +will fail to create a mapping. A driver can check for these errors by testing
-> +the returned DMA address with dma_mapping_error(). A non-zero return value
-> +means the mapping could not be created and the driver should take appropriate
-> +action (e.g. reduce current DMA mapping usage or delay and try again later).
+Currently the different SoCs in the R-Car Gen2 family use different
+types of on-chip RAM for the jump stub:
+  - R-Car H2 uses Media RAM,
+  - R-Car M2-W uses another type of optional On-chip RAM, as it doesn't
+    have Media RAM,
+  - R-Car M2-N uses Inter Connect RAM in Magnus Damm's "ARM: shmobile:
+    r8a7793 boot address update".
 
-This looks like it belongs to another patch?
+As all R-Car Gen2 SoCs have 4 KiB of Inter Connect RAM, consolidate the
+code by always using that.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+Tested on r8a7790/lager and r8a7791/koelsch.
+---
+ arch/arm/mach-shmobile/pm-rcar-gen2.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+index 691ac166a277c03f..61361dac6068210a 100644
+--- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+@@ -26,8 +26,7 @@
+ #define CA7RESCNT	0x0044
+ 
+ /* On-chip RAM */
+-#define MERAM		0xe8080000
+-#define RAM		0xe6300000
++#define ICRAM1		0xe63c0000	/* Inter Connect RAM1 (4 KiB) */
+ 
+ /* SYSC */
+ #define SYSCIER 0x0c
+@@ -58,7 +57,7 @@ void __init rcar_gen2_pm_init(void)
+ 	struct device_node *np, *cpus;
+ 	bool has_a7 = false;
+ 	bool has_a15 = false;
+-	phys_addr_t boot_vector_addr = 0;
++	phys_addr_t boot_vector_addr = ICRAM1;
+ 	u32 syscier = 0;
+ 
+ 	if (once++)
+@@ -75,14 +74,10 @@ void __init rcar_gen2_pm_init(void)
+ 			has_a7 = true;
+ 	}
+ 
+-	if (of_machine_is_compatible("renesas,r8a7790")) {
+-		boot_vector_addr = MERAM;
++	if (of_machine_is_compatible("renesas,r8a7790"))
+ 		syscier = 0x013111ef;
+-
+-	} else if (of_machine_is_compatible("renesas,r8a7791")) {
+-		boot_vector_addr = RAM;
++	else if (of_machine_is_compatible("renesas,r8a7791"))
+ 		syscier = 0x00111003;
+-	}
+ 
+ 	/* RAM for jump stub, because BAR requires 256KB aligned address */
+ 	p = ioremap_nocache(boot_vector_addr, shmobile_boot_size);
+-- 
+1.9.1
