@@ -1,31 +1,26 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 17 May 2016 12:48:53 -0400
-Subject: [PATCH 3/3] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
-In-Reply-To: <f0bf43ef-0be5-484c-5066-ab1929105b82@redhat.com>
-References: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
- <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
- <20160517124629.GE14955@leverpostej>
- <f0bf43ef-0be5-484c-5066-ab1929105b82@redhat.com>
-Message-ID: <b0933a59-239d-536f-4f63-a65e469f62a1@redhat.com>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 17 May 2016 14:03:46 -0400 (EDT)
+Subject: [PATCH v2 net-next] bpf: arm64: remove callee-save registers
+ use for tmp registers
+In-Reply-To: <1463441786-32224-1-git-send-email-yang.shi@linaro.org>
+References: <1463441786-32224-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20160517.140346.1420108193136786648.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2016 12:44 PM, Jon Masters wrote:
+From: Yang Shi <yang.shi@linaro.org>
+Date: Mon, 16 May 2016 16:36:26 -0700
 
-> 1). During development of a platform, it is much easier to debug
-> problems with tables if you can test replacement ones without having to
-> respin the firmware. In the server world, you usually don't have the
-> firmware source code, so to get it respun could be days-weeks even if
-> you are working with the authors closely. We have practically used this
-> feature on a number of platforms already and it will continue.
+> In the current implementation of ARM64 eBPF JIT, R23 and R24 are used for
+> tmp registers, which are callee-saved registers. This leads to variable size
+> of JIT prologue and epilogue. The latest blinding constant change prefers to
+> constant size of prologue and epilogue. AAPCS reserves R9 ~ R15 for temp
+> registers which not need to be saved/restored during function call. So, replace
+> R23 and R24 to R10 and R11, and remove tmp_used flag to save 2 instructions for
+> some jited BPF program.
+> 
+> CC: Daniel Borkmann <daniel@iogearbox.net>
+> Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
 
-For example, on one platform we were unable to fully boot RHEL(SA) due
-to a bug in one of the ACPI tables. But I was able to boot the system to
-a ramdisk containing a uuencode library and then write out the content
-of the tables over the serial port, then decompile/patch/recompile, and
-override replacement tables on the system. Then we beat the vendor up
-with the fixes and the official firmware was corrected.
-
-
--- 
-Computer Architect | Sent from my Fedora powered laptop
+Applied.
