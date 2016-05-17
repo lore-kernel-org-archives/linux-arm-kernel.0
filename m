@@ -1,54 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 May 2016 23:56:10 +0800
-Subject: [PATCH 5/6] ARM: dts: sun5i: q8-common: Enable audio codec
-In-Reply-To: <1463500571-28970-1-git-send-email-wens@csie.org>
-References: <1463500571-28970-1-git-send-email-wens@csie.org>
-Message-ID: <1463500571-28970-6-git-send-email-wens@csie.org>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 17 May 2016 17:56:44 +0200
+Subject: CONFIG_ZBOOT_ROM_TEXT and CONFIG_ZBOOT_ROM_BSS in defconfig
+Message-ID: <573B3F3C.80800@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Q8 tablets use the audio codec to provide audio output via a
-headphone jack or a small mono speaker. A GPIO output is used to
-control speaker amp.
+Hello,
 
-The tablets may or may not have an internal microphone.
+When reviewing my platform's defconfig, these two entries jumped out:
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun5i-q8-common.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+CONFIG_ZBOOT_ROM_TEXT=0x0
+CONFIG_ZBOOT_ROM_BSS=0x0
 
-diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-index 8fc1b6110fb8..5b065fd542f0 100644
---- a/arch/arm/boot/dts/sun5i-q8-common.dtsi
-+++ b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-@@ -61,6 +61,13 @@
- 	};
- };
- 
-+&codec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&codec_pa_pin>;
-+	allwinner,pa-gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>; /* PG10 */
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	cpu-supply = <&reg_dcdc2>;
- };
-@@ -100,6 +107,13 @@
- };
- 
- &pio {
-+	codec_pa_pin: codec_pa_pin at 0 {
-+		allwinner,pins = "PG10";
-+		allwinner,function = "gpio_out";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
- 	mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
- 		allwinner,pins = "PG0";
- 		allwinner,function = "gpio_in";
--- 
-2.8.1
+I found it odd that they would appear in the defconfig, since I don't
+care about them, and left them at their default value -- as most
+platforms seem to do:
+
+$ git grep CONFIG_ZBOOT_ROM_TEXT=0x0 arch/arm/configs | wc -l
+83
+
+# Compressed boot loader in ROM.  Yes, we really want to ask about
+# TEXT and BSS so we preserve their values in the config files.
+config ZBOOT_ROM_TEXT
+	hex "Compressed ROM boot loader base address"
+	default "0"
+
+It seems 'make savedefconfig' doesn't consider 0 and 0x0 to be equivalent.
+
+I can submit a patch changing the default from 0 to 0x0, i.e.
+no functional change. The two entries would then disappear
+from defconfigs.
+
+Arnd didn't seem to like the idea. How do others feel?
+
+Regards.
