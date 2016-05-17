@@ -1,75 +1,54 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 May 2016 23:56:11 +0800
-Subject: [PATCH 6/6] ARM: dts: sun5i: q8-common: Enable display pipeline and
- LCD display
+Date: Tue, 17 May 2016 23:56:10 +0800
+Subject: [PATCH 5/6] ARM: dts: sun5i: q8-common: Enable audio codec
 In-Reply-To: <1463500571-28970-1-git-send-email-wens@csie.org>
 References: <1463500571-28970-1-git-send-email-wens@csie.org>
-Message-ID: <1463500571-28970-7-git-send-email-wens@csie.org>
+Message-ID: <1463500571-28970-6-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Q8 form factor A13 tablets have a 7" LCD panel. Unfortunately we
-don't know the exact model of the panel. Just pick a panel with
-display timings close to what we know.
+The Q8 tablets use the audio codec to provide audio output via a
+headphone jack or a small mono speaker. A GPIO output is used to
+control speaker amp.
+
+The tablets may or may not have an internal microphone.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun5i-q8-common.dtsi | 36 ++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/sun5i-q8-common.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun5i-q8-common.dtsi b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-index 5b065fd542f0..a5de28d12b16 100644
+index 8fc1b6110fb8..5b065fd542f0 100644
 --- a/arch/arm/boot/dts/sun5i-q8-common.dtsi
 +++ b/arch/arm/boot/dts/sun5i-q8-common.dtsi
-@@ -59,6 +59,29 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
+@@ -61,6 +61,13 @@
  	};
-+
-+	panel: panel {
-+		compatible = "urt,umsh-8596md-t", "simple-panel";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		port at 0 {
-+			reg = <0>;
-+			/* TODO: lcd panel uses axp gpio0 as enable pin */
-+			backlight = <&backlight>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			panel_input: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&tcon0_out_lcd>;
-+			};
-+		};
-+	};
-+};
-+
-+&be0 {
-+	status = "okay";
  };
  
- &codec {
-@@ -179,6 +202,19 @@
- 	status = "okay";
- };
- 
-+&tcon0 {
++&codec {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_rgb666_pins>;
++	pinctrl-0 = <&codec_pa_pin>;
++	allwinner,pa-gpios = <&pio 6 10 GPIO_ACTIVE_HIGH>; /* PG10 */
 +	status = "okay";
 +};
 +
-+&tcon0_out {
-+	tcon0_out_lcd: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&panel_input>;
+ &cpu0 {
+ 	cpu-supply = <&reg_dcdc2>;
+ };
+@@ -100,6 +107,13 @@
+ };
+ 
+ &pio {
++	codec_pa_pin: codec_pa_pin at 0 {
++		allwinner,pins = "PG10";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
 +	};
-+};
 +
- &uart1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart1_pins_b>;
+ 	mmc0_cd_pin_q8: mmc0_cd_pin at 0 {
+ 		allwinner,pins = "PG0";
+ 		allwinner,function = "gpio_in";
 -- 
 2.8.1
