@@ -1,70 +1,53 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 17 May 2016 13:04:38 +0200
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 17 May 2016 13:11:47 +0200
 Subject: [PATCH] pwm: Fill pwm->args before calling pwm_request_from_chip()
-In-Reply-To: <1463481333-23438-2-git-send-email-boris.brezillon@free-electrons.com>
+In-Reply-To: <20160517110438.GB26166@ulmo.ba.sec>
 References: <1463481333-23438-1-git-send-email-boris.brezillon@free-electrons.com>
  <1463481333-23438-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160517110438.GB26166@ulmo.ba.sec>
+ <20160517110438.GB26166@ulmo.ba.sec>
+Message-ID: <20160517131147.7f505f2b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2016 at 12:35:33PM +0200, Boris Brezillon wrote:
-[...]
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> index 427142d..3d2eeaa 100644
-> --- a/drivers/pwm/core.c
-> +++ b/drivers/pwm/core.c
-> @@ -143,10 +143,6 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
->  	if (args->args[0] >= pc->npwm)
->  		return ERR_PTR(-EINVAL);
->  
-> -	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
-> -	if (IS_ERR(pwm))
-> -		return pwm;
-> -
->  	pwm->args.period = args->args[1];
->  
->  	if (args->args[2] & PWM_POLARITY_INVERTED)
-> @@ -154,6 +150,10 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
->  	else
->  		pwm->args.polarity = PWM_POLARITY_NORMAL;
->  
-> +	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
-> +	if (IS_ERR(pwm))
-> +		return pwm;
-> +
+On Tue, 17 May 2016 13:04:38 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
 
-Can't do that, because now you're dereferencing an uninitialized
-pointer.
+> On Tue, May 17, 2016 at 12:35:33PM +0200, Boris Brezillon wrote:
+> [...]
+> > diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> > index 427142d..3d2eeaa 100644
+> > --- a/drivers/pwm/core.c
+> > +++ b/drivers/pwm/core.c
+> > @@ -143,10 +143,6 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
+> >  	if (args->args[0] >= pc->npwm)
+> >  		return ERR_PTR(-EINVAL);
+> >  
+> > -	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
+> > -	if (IS_ERR(pwm))
+> > -		return pwm;
+> > -
+> >  	pwm->args.period = args->args[1];
+> >  
+> >  	if (args->args[2] & PWM_POLARITY_INVERTED)
+> > @@ -154,6 +150,10 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
+> >  	else
+> >  		pwm->args.polarity = PWM_POLARITY_NORMAL;
+> >  
+> > +	pwm = pwm_request_from_chip(pc, args->args[0], NULL);
+> > +	if (IS_ERR(pwm))
+> > +		return pwm;
+> > +  
+> 
+> Can't do that, because now you're dereferencing an uninitialized
+> pointer.
 
->  	return pwm;
->  }
->  EXPORT_SYMBOL_GPL(of_pwm_xlate_with_flags);
-> @@ -169,12 +169,12 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
->  	if (args->args[0] >= pc->npwm)
->  		return ERR_PTR(-EINVAL);
->  
-> +	pwm->args.period = args->args[1];
+Yes, forget this patch, it's not needed anyway since all PWM users are
+now directly calling pwm_apply_args() after requesting the PWM. The bad
+news is I broke bisectibilty :-(.
 
-Same here.
+Still does not explain the bug reported by Mika.
 
-> diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-> index 58b709f..c33bd42 100644
-> --- a/drivers/pwm/pwm-pxa.c
-> +++ b/drivers/pwm/pwm-pxa.c
-> @@ -156,12 +156,12 @@ pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
->  {
->  	struct pwm_device *pwm;
->  
-> +	pwm->args.period = args->args[0];
-
-And here.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160517/13bee631/attachment-0001.sig>
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
