@@ -1,144 +1,83 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 May 2016 08:18:44 +0200
-Subject: [PATCH v2 2/5] arm64: efi: apply strict permissons for UEFI
- Runtime Services regions
-In-Reply-To: <573BB9FE.7050008@codeaurora.org>
-References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
- <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
- <573BB9FE.7050008@codeaurora.org>
-Message-ID: <CAKv+Gu-Tam+QiXc_f0e+x8hNc4rxP_-59NdaCHkF9h=4Rd+XeA@mail.gmail.com>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 18 May 2016 16:20:58 +0930
+Subject: [PATCH v2 2/2] watchdog: Add Aspeed watchdog driver
+In-Reply-To: <573799FA.7090207@roeck-us.net>
+References: <1462797277-14969-1-git-send-email-joel@jms.id.au>
+ <1463062631-16432-1-git-send-email-joel@jms.id.au>
+ <1463062631-16432-3-git-send-email-joel@jms.id.au>
+ <573799FA.7090207@roeck-us.net>
+Message-ID: <CACPK8XedReKGdEjb=b0ik=wKpCOPCjqFpDGjU-WtNH-sEzzeLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2016 at 02:40, Shanker Donthineni <shankerd@codeaurora.org> wrote:
-> Hi Ard,
+On Sun, May 15, 2016 at 7:04 AM, Guenter Roeck <linux@roeck-us.net> wrote:
+>> +
+>> +struct aspeed_wdt {
+>> +       struct watchdog_device  wdd;
+>> +       unsigned long           rate;
 >
-> This patch causing the kernel boot fail using the UEFI firmware on
-> Qualcomm Technologies QDF2XXX server platforms.
->
-> +       /* RW- */
-> +       if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
-> +               return pgprot_val(PAGE_KERNEL);
-> +
->
-> Changing above condition from 'or' to 'and' fixed the problem.Are we
-> missing something here or intentionally implemented this logic?
+> I still don't see why you need this variable. Why not just use
+> WDT_1MHZ_CLOCK directly ?
 
-The logic is sound, I think. If you need execute permissions on a
-non-code region with the XP bit set, there is something wrong in the
-firmware, unless you are hitting this case for an MMIO region perhaps?
-Could you share the kernel log with efi=debug enabled?
+Yes, I can. It's left over from when the driver ran the device from pclk.
 
-> At least
-> we need some pr_warn here if UEFI firmware passes EFI_RUNTIME_SEVRICE_CODE
-> region that has an attribute EFI_MEMORY_XP.
+>> +static int aspeed_wdt_set_timeout(struct watchdog_device *wdd,
+>> +                                 unsigned int timeout)
+>> +{
+>> +       wdd->timeout = timeout;
+>> +
+>> +       return aspeed_wdt_start(wdd);
 >
+> The watchdog can be stopped here (with WDIOC_SETOPTIONS/WDIOS_DISABLECARD).
+> An implicit enable is not really a good idea; neither the infrastructure
+> nor user space would in this case be aware that the watchdog is running.
 
-No. DXE_RUNTIME_DRIVER modules are implemented as PE/COFF binaries,
-which are covered completely by EfiRuntimeServicesCode regions.
-However, a PE/COFF image consists of .text and .data sections, which
-require different permissions, so PE/COFF binaries are represented by
-several memory map entries in the memory attributes table, all of
-which have a code type, but differ in the permission bits.
+Okay, good to know. The documentation does not mention this.
 
->
->
-> On 03/30/2016 11:38 AM, Ard Biesheuvel wrote:
->> Recent UEFI versions expose permission attributes for runtime services
->> memory regions, either in the UEFI memory map or in the separate memory
->> attributes table. This allows the kernel to map these regions with
->> stricter permissions, rather than the RWX permissions that are used by
->> default. So wire this up in our mapping routine.
->>
->> Note that in the absence of permission attributes, we still only map
->> regions of type EFI_RUNTIME_SERVICE_CODE with the executable bit set.
->> Also, we base the mapping attributes of EFI_MEMORY_MAPPED_IO on the
->> type directly rather than on the absence of the EFI_MEMORY_WB attribute.
->> This is more correct, but is also required for compatibility with the
->> upcoming support for the Memory Attributes Table, which only carries
->> permission attributes, not memory type attributes.
->>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/kernel/efi.c | 54 +++++++++++++++-----
->>  1 file changed, 40 insertions(+), 14 deletions(-)
->>
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index b6abc852f2a1..33a6da160a50 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -17,22 +17,48 @@
->>
->>  #include <asm/efi.h>
->>
->> -int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t
->> *md)
->> +/*
->> + * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
->> + * executable, everything else can be mapped with the XN bits
->> + * set. Also take the new (optional) RO/XP bits into account.
->> + */
->> +static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
->>  {
->> -     pteval_t prot_val;
->> +     u64 attr = md->attribute;
->> +     u32 type = md->type;
->>
->> -     /*
->> -      * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
->> -      * executable, everything else can be mapped with the XN bits
->> -      * set.
->> -      */
->> -     if ((md->attribute & EFI_MEMORY_WB) == 0)
->> -             prot_val = PROT_DEVICE_nGnRE;
->> -     else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
->> -              !PAGE_ALIGNED(md->phys_addr))
->> -             prot_val = pgprot_val(PAGE_KERNEL_EXEC);
->> -     else
->> -             prot_val = pgprot_val(PAGE_KERNEL);
->> +     if (type == EFI_MEMORY_MAPPED_IO)
->> +             return PROT_DEVICE_nGnRE;
->> +
->> +     if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
->> +                   "UEFI Runtime regions are not aligned to 64 KB --
->> buggy firmware?"))
->> +             /*
->> +              * If the region is not aligned to the page size of the
->> OS, we
->> +              * can not use strict permissions, since that would also
->> affect
->> +              * the mapping attributes of the adjacent regions.
->> +              */
->> +             return pgprot_val(PAGE_KERNEL_EXEC);
->> +
->> +     /* R-- */
->> +     if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
->> +         (EFI_MEMORY_XP | EFI_MEMORY_RO))
->> +             return pgprot_val(PAGE_KERNEL_RO);
->> +
->> +     /* R-X */
->> +     if (attr & EFI_MEMORY_RO)
->> +             return pgprot_val(PAGE_KERNEL_ROX);
->> +
->> +     /* RW- */
->> +     if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
->> +             return pgprot_val(PAGE_KERNEL);
->> +
->> +     /* RWX */
->> +     return pgprot_val(PAGE_KERNEL_EXEC);
+I will change it to write the value but not change the running state.
+
 >> +}
 >> +
->> +int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t
->> *md)
+>> +static int aspeed_wdt_restart(struct watchdog_device *wdd,
+>> +                             unsigned long action, void *data)
 >> +{
->> +     pteval_t prot_val = create_mapping_protection(md);
->>
->>       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
->>                          md->num_pages << EFI_PAGE_SHIFT,
+>> +       struct aspeed_wdt *wdt = to_aspeed_wdt(wdd);
+>> +
+>> +       aspeed_wdt_enable(wdt, 128 * wdt->rate / 1000);
+>> +
 >
-> --
-> Shanker Donthineni
-> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
 >
+> Is that the smallest accepted value, or is there some other reason
+> not to make it smaller ?
+
+It's what the vendor BSP was using, and it's what we've been using
+since I wrote this code (which happens to be one year ago today!).
+
+>
+> It is also quite common to wait here to let the reset 'catch'
+> before returning. This would ensure that the system doesn't trigger
+> a lower priority reset.
+
+Okay. I will add a mdelay(1000) here.
+
+>> +       ret = watchdog_register_device(&wdt->wdd);
+>> +       if (ret) {
+>> +               dev_err(&pdev->dev, "failed to register\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       dev_info(&pdev->dev, "rate %lu, max timeout %u, timeout %d\n",
+>> +                wdt->rate, wdt->wdd.max_timeout, wdt->wdd.timeout);
+>> +
+>
+> 'rate 1000000' doesn't seem very informative. All it does is to expose
+> an implementation detail which no one really cares about. Even if you
+> were to add 'Hz', I would argue that no one will even understand
+> what it means without looking into the driver, but then it will be
+> understood without the message.
+
+Okay. I will remove the dev_info all together.
+
+Cheers,
+
+Joel
