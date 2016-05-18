@@ -1,127 +1,43 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Wed, 18 May 2016 13:04:26 +0900
-Subject: [PATCH v12 05/10] arm64: Kprobes with single stepping support
-In-Reply-To: <57349AE2.3060507@arm.com>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-6-git-send-email-dave.long@linaro.org>
- <57349AE2.3060507@arm.com>
-Message-ID: <20160518130426.9f8b409c97a8b98ac230a232@kernel.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 17 May 2016 21:09:43 -0700
+Subject: QRTR merge conflict resolution
+In-Reply-To: <20160518104320.23ae8557@canb.auug.org.au>
+References: <20160510183934.GJ1256@tuxbot> <2606282.lG9qK7uBW0@wuerfel>
+ <20160513221909.GC1256@tuxbot>
+ <20160517.141154.1511755950068252376.davem@davemloft.net>
+ <20160518104320.23ae8557@canb.auug.org.au>
+Message-ID: <20160518040943.GO1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 May 2016 16:01:54 +0100
-James Morse <james.morse@arm.com> wrote:
+On Tue 17 May 17:43 PDT 2016, Stephen Rothwell wrote:
 
-> Hi David, Sandeepa,
+> Hi David,
 > 
-> On 27/04/16 19:53, David Long wrote:
-> > From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> On Tue, 17 May 2016 14:11:54 -0400 (EDT) David Miller <davem@davemloft.net> wrote:
+> >
+> > From: Bjorn Andersson <bjorn.andersson@linaro.org>
+> > Date: Fri, 13 May 2016 15:19:09 -0700
+> > 
+> > > I have prepared the merge of net-next and the conflicting tag from the
+> > > Qualcomm SOC, please include this in your pull towards Linus to avoid
+> > > the merge conflict.  
+> > 
+> > Pulled, thanks.
 > 
-> > diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> > new file mode 100644
-> > index 0000000..dfa1b1f
-> > --- /dev/null
-> > +++ b/arch/arm64/kernel/kprobes.c
-> > @@ -0,0 +1,520 @@
-> > +/*
-> > + * arch/arm64/kernel/kprobes.c
-> > + *
-> > + * Kprobes support for ARM64
-> > + *
-> > + * Copyright (C) 2013 Linaro Limited.
-> > + * Author: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> > + * General Public License for more details.
-> > + *
-> > + */
-> > +#include <linux/kernel.h>
-> > +#include <linux/kprobes.h>
-> > +#include <linux/module.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/stop_machine.h>
-> > +#include <linux/stringify.h>
-> > +#include <asm/traps.h>
-> > +#include <asm/ptrace.h>
-> > +#include <asm/cacheflush.h>
-> > +#include <asm/debug-monitors.h>
-> > +#include <asm/system_misc.h>
-> > +#include <asm/insn.h>
-> > +#include <asm/uaccess.h>
-> > +
-> > +#include "kprobes-arm64.h"
-> > +
-> > +#define MIN_STACK_SIZE(addr)	min((unsigned long)MAX_STACK_SIZE,	\
-> > +	(unsigned long)current_thread_info() + THREAD_START_SP - (addr))
+> Except in the merge resolution, the 2 new functions added to
+> include/linux/soc/qcom/smd.h (qcom_smd_get_drvdata and
+> qcom_smd_set_drvdata) were not marked "static inline" :-(
 > 
-> What if we probe something called on the irq stack?
-> This needs the on_irq_stack() checks too, the start/end can be found from the
-> per-cpu irq_stack value.
-> 
-> [ ... ]
-> 
-> > +int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
-> > +{
-> > +	struct jprobe *jp = container_of(p, struct jprobe, kp);
-> > +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> > +	long stack_ptr = kernel_stack_pointer(regs);
-> > +
-> > +	kcb->jprobe_saved_regs = *regs;
-> > +	memcpy(kcb->jprobes_stack, (void *)stack_ptr,
-> > +	       MIN_STACK_SIZE(stack_ptr));
-> 
-> I wonder if we need this stack save/restore?
-> 
-> The comment next to the equivalent code for x86 says:
-> > gcc assumes that the callee owns the argument space and could overwrite it,
-> > e.g. tailcall optimization. So, to be absolutely safe we also save and
-> > restore enough stack bytes to cover the argument area.
-> 
-> On arm64 the first eight arguments are passed in registers, so we might not need
-> this stack copy. (sparc and powerpc work like this too, their versions of this
-> function don't copy chunks of the stack).
 
-Hmm, maybe sparc and powerpc implementation should also be fixed...
+How silly of me to miss that, sorry about that.
 
-> ... then I went looking for functions with >8 arguments...
-> 
-> Looking at the arm64 defconfig dwarf debug data, there are 71 of these that
-> don't get inlined, picking at random:
-> > rockchip_clk_register_pll() has 13
-> > fib_dump_info() has 11
-> > vma_merge() has 10
-> > vring_create_virtqueue() has 10
-> etc...
-> 
-> So we do need this stack copying, so that we can probe these function without
-> risking the arguments being modified.
-> 
-> It may be worth including a comment to the effect that this stack save/restore
-> is needed for functions that pass >8 arguments where the pre-handler may change
-> these values on the stack.
+I didn't spot this in my compile testing either, because this is the
+only driver in the tree including that file that doesn't depend on
+QCOM_SMD.
 
-Indeed, commenting on this code can help us to understand the reason why.
+As there is no immediate problem with moving forward I suggest that I'll
+fix this, through arm-soc, once the code has landed.
 
-Thank you!
-
-> 
-> 
-> > +	preempt_enable_no_resched();
-> > +	return 1;
-> > +}
-> > +
-> 
-> 
-> Thanks,
-> 
-> James
-
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+Regards,
+Bjorn
