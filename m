@@ -1,126 +1,31 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue, 17 May 2016 19:40:30 -0500
-Subject: [PATCH v2 2/5] arm64: efi: apply strict permissons for UEFI
- Runtime Services regions
-In-Reply-To: <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
-References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
- <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <573BB9FE.7050008@codeaurora.org>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Wed, 18 May 2016 10:43:20 +1000
+Subject: QRTR merge conflict resolution
+In-Reply-To: <20160517.141154.1511755950068252376.davem@davemloft.net>
+References: <20160510183934.GJ1256@tuxbot> <2606282.lG9qK7uBW0@wuerfel>
+ <20160513221909.GC1256@tuxbot>
+ <20160517.141154.1511755950068252376.davem@davemloft.net>
+Message-ID: <20160518104320.23ae8557@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+Hi David,
 
-This patch causing the kernel boot fail using the UEFI firmware on
-Qualcomm Technologies QDF2XXX server platforms.
-
-+	/* RW- */
-+	if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
-+		return pgprot_val(PAGE_KERNEL);
-+
-
-Changing above condition from 'or' to 'and' fixed the problem.Are we
-missing something here or intentionally implemented this logic? At least
-we need some pr_warn here if UEFI firmware passes EFI_RUNTIME_SEVRICE_CODE
-region that has an attribute EFI_MEMORY_XP.
-
-
-
-On 03/30/2016 11:38 AM, Ard Biesheuvel wrote:
-> Recent UEFI versions expose permission attributes for runtime services
-> memory regions, either in the UEFI memory map or in the separate memory
-> attributes table. This allows the kernel to map these regions with
-> stricter permissions, rather than the RWX permissions that are used by
-> default. So wire this up in our mapping routine.
+On Tue, 17 May 2016 14:11:54 -0400 (EDT) David Miller <davem@davemloft.net> wrote:
 >
-> Note that in the absence of permission attributes, we still only map
-> regions of type EFI_RUNTIME_SERVICE_CODE with the executable bit set.
-> Also, we base the mapping attributes of EFI_MEMORY_MAPPED_IO on the
-> type directly rather than on the absence of the EFI_MEMORY_WB attribute.
-> This is more correct, but is also required for compatibility with the
-> upcoming support for the Memory Attributes Table, which only carries
-> permission attributes, not memory type attributes.
->
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/efi.c | 54 +++++++++++++++-----
->  1 file changed, 40 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index b6abc852f2a1..33a6da160a50 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -17,22 +17,48 @@
->  
->  #include <asm/efi.h>
->  
-> -int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t
-> *md)
-> +/*
-> + * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
-> + * executable, everything else can be mapped with the XN bits
-> + * set. Also take the new (optional) RO/XP bits into account.
-> + */
-> +static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
->  {
-> -	pteval_t prot_val;
-> +	u64 attr = md->attribute;
-> +	u32 type = md->type;
->  
-> -	/*
-> -	 * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
-> -	 * executable, everything else can be mapped with the XN bits
-> -	 * set.
-> -	 */
-> -	if ((md->attribute & EFI_MEMORY_WB) == 0)
-> -		prot_val = PROT_DEVICE_nGnRE;
-> -	else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
-> -		 !PAGE_ALIGNED(md->phys_addr))
-> -		prot_val = pgprot_val(PAGE_KERNEL_EXEC);
-> -	else
-> -		prot_val = pgprot_val(PAGE_KERNEL);
-> +	if (type == EFI_MEMORY_MAPPED_IO)
-> +		return PROT_DEVICE_nGnRE;
-> +
-> +	if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
-> +		      "UEFI Runtime regions are not aligned to 64 KB --
-> buggy firmware?"))
-> +		/*
-> +		 * If the region is not aligned to the page size of the
-> OS, we
-> +		 * can not use strict permissions, since that would also
-> affect
-> +		 * the mapping attributes of the adjacent regions.
-> +		 */
-> +		return pgprot_val(PAGE_KERNEL_EXEC);
-> +
-> +	/* R-- */
-> +	if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
-> +	    (EFI_MEMORY_XP | EFI_MEMORY_RO))
-> +		return pgprot_val(PAGE_KERNEL_RO);
-> +
-> +	/* R-X */
-> +	if (attr & EFI_MEMORY_RO)
-> +		return pgprot_val(PAGE_KERNEL_ROX);
-> +
-> +	/* RW- */
-> +	if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
-> +		return pgprot_val(PAGE_KERNEL);
-> +
-> +	/* RWX */
-> +	return pgprot_val(PAGE_KERNEL_EXEC);
-> +}
-> +
-> +int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t
-> *md)
-> +{
-> +	pteval_t prot_val = create_mapping_protection(md);
->  
->  	create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
->  			   md->num_pages << EFI_PAGE_SHIFT,
+> From: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Date: Fri, 13 May 2016 15:19:09 -0700
+> 
+> > I have prepared the merge of net-next and the conflicting tag from the
+> > Qualcomm SOC, please include this in your pull towards Linus to avoid
+> > the merge conflict.  
+> 
+> Pulled, thanks.
+
+Except in the merge resolution, the 2 new functions added to
+include/linux/soc/qcom/smd.h (qcom_smd_get_drvdata and
+qcom_smd_set_drvdata) were not marked "static inline" :-(
 
 -- 
-Shanker Donthineni
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+Cheers,
+Stephen Rothwell
