@@ -1,29 +1,28 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Wed, 18 May 2016 11:56:38 -0700
-Subject: [PATCH omap v2 0/6] Fix OMAP uses of RCU from idle loop
-In-Reply-To: <573C7E6F.90001@roeck-us.net>
-References: <20160516184844.GA20144@linux.vnet.ibm.com>
- <573C7E6F.90001@roeck-us.net>
-Message-ID: <20160518185638.GD3528@linux.vnet.ibm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 18 May 2016 14:59:25 -0400
+Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
+In-Reply-To: <1463576010-115428-1-git-send-email-agraf@suse.de>
+References: <1463576010-115428-1-git-send-email-agraf@suse.de>
+Message-ID: <573CBB8D.4020409@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 07:38:39AM -0700, Guenter Roeck wrote:
-> On 05/16/2016 11:48 AM, Paul E. McKenney wrote:
-> >Hello!
-> >
-> >The following series fixes a number of uses of RCU from the idle loop.
-> >These are all due to tracing, so the fix is simply to append _rcuidle
-> >to the event-tracing call.
-> >
-> >Changes since v1: Fix commit-log subjects and add maintainers on CC.
-> >
+On 5/18/2016 8:53 AM, Alexander Graf wrote:
+> ---
 > 
-> For the series, on top of mainline (which now experiences the problem fixed
-> by this series):
-> 
-> Tested-by: Guenter Roeck <linux@roeck-us.net>
+> This patch may conflict with another patch titled "swiotlb: prefix dma_to_phys
+> and phys_to_dma functions" which is in flight, but hasn't seen an update since
+> March.
 
-Applied, thank you!  And fixed the line-wrapping while I was at it.  ;-)
+Thanks for the heads up. Due to missing API in DMA API, I couldn't make progress
+with the series.
 
-							Thanx, Paul
+I need dma_map_resource API to get merged. After that one of the drivers
+that actually uses dma_to_phys need to be changed to use dma_map_resource. 
+
+Then the rest of the series can come.
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
