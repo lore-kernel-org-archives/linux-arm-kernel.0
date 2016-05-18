@@ -1,53 +1,63 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2016 18:07:31 +0200
-Subject: [PATCH 3/5] drm: mediatek: fixup drm_gem_object_lookup API change
+Date: Wed, 18 May 2016 18:07:32 +0200
+Subject: [PATCH 4/5] drm: exynos: mark pm functions as __maybe_unused
 In-Reply-To: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
 References: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
-Message-ID: <1463587653-3035181-4-git-send-email-arnd@arndb.de>
+Message-ID: <1463587653-3035181-5-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The drm_gem_object_lookup() function prototype changed while this
-driver was added, so it fails to build now:
+The rework of the exynos DRM clock handling introduced
+warnings for configurations that have CONFIG_PM disabled:
 
-drivers/gpu/drm/mediatek/mtk_drm_gem.c: In function 'mtk_drm_gem_dumb_map_offset':
-drivers/gpu/drm/mediatek/mtk_drm_gem.c:142:30: error: passing argument 1 of 'drm_gem_object_lookup' from incompatible pointer type [-Werror=incompatible-pointer-types]
-  obj = drm_gem_object_lookup(dev, file_priv, handle);
+drivers/gpu/drm/exynos/exynos_hdmi.c:736:13: error: 'hdmi_clk_disable_gates' defined but not used [-Werror=unused-function]
+ static void hdmi_clk_disable_gates(struct hdmi_context *hdata)
+             ^~~~~~~~~~~~~~~~~~~~~~
+drivers/gpu/drm/exynos/exynos_hdmi.c:717:12: error: 'hdmi_clk_enable_gates' defined but not used [-Werror=unused-function]
+ static int hdmi_clk_enable_gates(struct hdmi_context *hdata)
 
-This fixes the new caller as well.
+The problem is that the PM functions themselves are inside of
+an #ifdef, but some functions they call are not.
+
+This patch removes the #ifdef and instead marks the PM functions
+as __maybe_unused, which is a more reliable way to get it right.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a8ad0bd84f98 ("drm: Remove unused drm_device from drm_gem_object_lookup()")
+Fixes: 9be7e9898444 ("drm/exynos/hdmi: clock code re-factoring")
 ---
- drivers/gpu/drm/mediatek/mtk_drm_fb.c  | 2 +-
- drivers/gpu/drm/mediatek/mtk_drm_gem.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/gpu/drm/exynos/exynos_hdmi.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-index 33d30c19f35f..147df85399ab 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-@@ -138,7 +138,7 @@ struct drm_framebuffer *mtk_drm_mode_fb_create(struct drm_device *dev,
- 	if (drm_format_num_planes(cmd->pixel_format) != 1)
- 		return ERR_PTR(-EINVAL);
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 58de5a430508..ea4b2b7d7ad7 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -1934,8 +1934,7 @@ static int hdmi_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
--	gem = drm_gem_object_lookup(dev, file, cmd->handles[0]);
-+	gem = drm_gem_object_lookup(file, cmd->handles[0]);
- 	if (!gem)
- 		return ERR_PTR(-ENOENT);
+-#ifdef CONFIG_PM
+-static int exynos_hdmi_suspend(struct device *dev)
++static int __maybe_unused exynos_hdmi_suspend(struct device *dev)
+ {
+ 	struct hdmi_context *hdata = dev_get_drvdata(dev);
  
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.c b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-index a773bfaea913..fa2ec0cd00e8 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-@@ -139,7 +139,7 @@ int mtk_drm_gem_dumb_map_offset(struct drm_file *file_priv,
- 	struct drm_gem_object *obj;
+@@ -1944,7 +1943,7 @@ static int exynos_hdmi_suspend(struct device *dev)
+ 	return 0;
+ }
+ 
+-static int exynos_hdmi_resume(struct device *dev)
++static int __maybe_unused exynos_hdmi_resume(struct device *dev)
+ {
+ 	struct hdmi_context *hdata = dev_get_drvdata(dev);
  	int ret;
+@@ -1955,7 +1954,6 @@ static int exynos_hdmi_resume(struct device *dev)
  
--	obj = drm_gem_object_lookup(dev, file_priv, handle);
-+	obj = drm_gem_object_lookup(file_priv, handle);
- 	if (!obj) {
- 		DRM_ERROR("failed to lookup gem object.\n");
- 		return -EINVAL;
+ 	return 0;
+ }
+-#endif
+ 
+ static const struct dev_pm_ops exynos_hdmi_pm_ops = {
+ 	SET_RUNTIME_PM_OPS(exynos_hdmi_suspend, exynos_hdmi_resume, NULL)
 -- 
 2.7.0
