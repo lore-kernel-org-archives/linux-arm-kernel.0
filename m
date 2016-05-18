@@ -1,102 +1,27 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 18 May 2016 12:27:17 +0200
-Subject: [PATCH v4 11/56] KVM: arm/arm64: pmu: abstract access to number
- of SPIs
-In-Reply-To: <1463392481-26583-12-git-send-email-andre.przywara@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-12-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160518102717.GB3827@cbox>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 18 May 2016 11:43:41 +0100
+Subject: [PATCH v3 08/55] KVM: arm/arm64: Get rid of vgic_cpu->nr_lr
+In-Reply-To: <1462531568-9799-9-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <573C475D.30005@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2016 at 10:52:59AM +0100, Andre Przywara wrote:
-> Currently the PMU uses a member of the struct vgic_dist directly,
-> which not only breaks abstraction, but will fail with the new VGIC.
-> Abstract this access in the VGIC header file and refactor the validity
-> check in the PMU code.
+On 06/05/16 11:45, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
+> The number of list registers is a property of the underlying system, not
+> of emulated VGIC CPU interface.
+> 
+> As we are about to move this variable to global state in the new vgic
+> for clarity, move it from the legacy implementation as well to make the
+> merge of the new code easier.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog v3 .. v4:
-> - fix logic to allow PPIs again
-> - refactor IRQ validity check
-> 
->  include/kvm/arm_vgic.h |  2 ++
->  virt/kvm/arm/pmu.c     | 25 ++++++++++++++-----------
->  2 files changed, 16 insertions(+), 11 deletions(-)
-> 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 67a6637..ade7005 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -348,6 +348,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
->  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
->  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
->  #define vgic_ready(k)		((k)->arch.vgic.ready)
-> +#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
-> +				 ((i) < (k)->arch.vgic.nr_irqs))
->  
->  int vgic_v2_probe(const struct gic_kvm_info *gic_kvm_info,
->  		  const struct vgic_ops **ops,
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> index 575c7aa..a027569 100644
-> --- a/virt/kvm/arm/pmu.c
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -436,7 +436,14 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
->  	return 0;
->  }
->  
-> -static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
-> +#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
-> +
-> +/*
-> + * For one VM the interrupt type must be same for each vcpu.
-> + * As a PPI, the interrupt number is the same for all vcpus,
-> + * while as an SPI it must be a separate number per vcpu.
-> + */
-> +static bool pmu_irq_is_valid(struct kvm *kvm, int irq)
->  {
->  	int i;
->  	struct kvm_vcpu *vcpu;
-> @@ -445,7 +452,7 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
->  		if (!kvm_arm_pmu_irq_initialized(vcpu))
->  			continue;
->  
-> -		if (is_ppi) {
-> +		if (irq_is_ppi(irq)) {
->  			if (vcpu->arch.pmu.irq_num != irq)
->  				return false;
->  		} else {
-> @@ -457,7 +464,6 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
->  	return true;
->  }
->  
-> -
->  int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
->  {
->  	switch (attr->attr) {
-> @@ -471,14 +477,11 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
->  		if (get_user(irq, uaddr))
->  			return -EFAULT;
->  
-> -		/*
-> -		 * The PMU overflow interrupt could be a PPI or SPI, but for one
-> -		 * VM the interrupt type must be same for each vcpu. As a PPI,
-> -		 * the interrupt number is the same for all vcpus, while as an
-> -		 * SPI it must be a separate number per vcpu.
-> -		 */
-> -		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
-> -		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
-> +		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
-> +		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
-> +			return -EINVAL;
-> +
-> +		if (!pmu_irq_is_valid(vcpu->kvm, irq))
->  			return -EINVAL;
->  
->  		if (kvm_arm_pmu_irq_initialized(vcpu))
-> -- 
-> 2.8.2
-> 
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+Thanks,
+Andre.
