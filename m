@@ -1,59 +1,37 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 18 May 2016 20:06:37 +0200
-Subject: [PATCH v4 22/56] KVM: arm/arm64: vgic-new: Add MMIO handling
- framework
-In-Reply-To: <573C9081.6080500@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-23-git-send-email-andre.przywara@arm.com>
- <20160518123115.GE3827@cbox> <573C9081.6080500@arm.com>
-Message-ID: <20160518180637.GO6666@cbox>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 18 May 2016 14:54:25 -0400 (EDT)
+Subject: [PATCH] usb: echi-hcd: Add register access check in shutdown
+In-Reply-To: <573CAD1A.4090805@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1605181449390.1981-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 04:55:45PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> ....
-> 
-> >> +
-> >> +/* generate a mask that covers 1024 interrupts with <b> bits per IRQ */
-> >> +#define VGIC_ADDR_IRQ_MASK(b) GENMASK_ULL(ilog2(b) + ilog2(1024) - \
-> >> +					  ilog2(BITS_PER_BYTE) - 1, 0)
-> >> +#define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
-> >> +					64 / (bits) / 8)
-> > 
-> > In the comment we end up adding here, can we also describe why
-> > (addr & <magic mask>) * <magic 64> / (bits) / <BITS_PER_BYTE OR BYTES_PER_ULL>
-> > gives us what we need, because I don't get it.
-> 
-> The reason is: we deal with 8 bits per byte, but have
-> bits-per-interrupts values bigger than 8. Doing the maths in floating
-> point arithmetic would work fine:
-> 
-> (float)(addr & mask) * (8.0 / bits_per_IRQ)
-> 
-> So would this comment make sense?
-> 
-> /*
->  * Since we can have more than 8 bits per interrupt, we can't use
->  * "8 / bpi" as a multiplicand directly, so we use a
->  * fixed-point-arithmetic version of it tailored to cover at most 64
->  * bits per IRQ.
->  */
-> 
+On Wed, 18 May 2016, Srinivas Kandagatla wrote:
 
-Something like this certainly helps, here's another version which is
-easier for me to understand, but you can take your pick:
+> On 18/05/16 15:56, Alan Stern wrote:
+> > This doesn't seem like the right place.  What you really should do is
+> > skip calling ehci_silence_controller() if the hardware isn't
+> > accessible.  That's where the hardware gets touched, not in
+> > ehci_shutdown().
+> 
+> Just tried this suggestion, this would not work as well, Its not just 
+> the hardware registers, which are of concern here, but also the rest of 
+> the things like ehci->hrtimer pointer which are allocated or initialized 
+> as part of ehci_setup().
+> 
+> Either the msm controller driver is not correct or we should have a way 
+> to stop calling ehci_shutdown() if there was no ehci_setup() done yet.
+> 
+> Any suggestions?
 
- /*
-  * (addr & mask) gives us the byte offset for the INT ID, so we want to
-  * divide this with 'bytes per irq' to get the INT ID, which is given
-  * by '(bits) / 8'.  But we do this with fixed-point-arithmetic and
-  * take advantage of the fact that division by a fraction equals
-  * multiplication with the inverted fraction, and scale up both the
-  * numerator and denominator with 8 to support at most 64 bits per IRQ:
-  */
+Yes, you're right.
 
-At least I think we all agree that the approach works by now.
+Since you're concerned about more than just accessing the hardware 
+registers, HW_ACCESSIBLE isn't the right thing to test.  You need 
+something that gets set in ehci_setup() and nowhere else.
 
--Christoffer
+One possibility is ehci->sbrn.  If that is equal to 0 then ehci_setup() 
+hasn't run, so ehci->shutdown() can simply return.  Be sure to put a 
+comment in the code explaining the reason for doing this.
+
+Alan Stern
