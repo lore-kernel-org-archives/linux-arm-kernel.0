@@ -1,63 +1,50 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2016 18:07:32 +0200
-Subject: [PATCH 4/5] drm: exynos: mark pm functions as __maybe_unused
+Date: Wed, 18 May 2016 18:07:29 +0200
+Subject: [PATCH 1/5] headers_check: don't warn about c++ guards
 In-Reply-To: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
 References: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
-Message-ID: <1463587653-3035181-5-git-send-email-arnd@arndb.de>
+Message-ID: <1463587653-3035181-2-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rework of the exynos DRM clock handling introduced
-warnings for configurations that have CONFIG_PM disabled:
+A recent addition to the DRM tree for 4.7 added 'extern "C"' guards
+for c++ to all the DRM headers, and that now causes warnings
+in 'make headers_check':
 
-drivers/gpu/drm/exynos/exynos_hdmi.c:736:13: error: 'hdmi_clk_disable_gates' defined but not used [-Werror=unused-function]
- static void hdmi_clk_disable_gates(struct hdmi_context *hdata)
-             ^~~~~~~~~~~~~~~~~~~~~~
-drivers/gpu/drm/exynos/exynos_hdmi.c:717:12: error: 'hdmi_clk_enable_gates' defined but not used [-Werror=unused-function]
- static int hdmi_clk_enable_gates(struct hdmi_context *hdata)
+usr/include/drm/amdgpu_drm.h:38: userspace cannot reference function or variable defined in the kernel
+usr/include/drm/drm.h:63: userspace cannot reference function or variable defined in the kernel
+usr/include/drm/drm.h:699: userspace cannot reference function or variable defined in the kernel
+usr/include/drm/drm_fourcc.h:30: userspace cannot reference function or variable defined in the kernel
+usr/include/drm/drm_mode.h:33: userspace cannot reference function or variable defined in the kernel
+usr/include/drm/drm_sarea.h:38: userspace cannot reference function or variable defined in the kernel
+usr/include/drm/exynos_drm.h:21: userspace cannot reference function or variable defined in the kernel
+usr/include/drm/i810_drm.h:7: userspace cannot reference function or variable defined in the kernel
 
-The problem is that the PM functions themselves are inside of
-an #ifdef, but some functions they call are not.
-
-This patch removes the #ifdef and instead marks the PM functions
-as __maybe_unused, which is a more reliable way to get it right.
+This changes the headers_check.pl script to not warn about this.
+I'm listing the merge commit as introducing the problem, because
+there are several patches in this branch that each do this for
+one file.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 9be7e9898444 ("drm/exynos/hdmi: clock code re-factoring")
+Fixes: 7c10ddf87472 ("Merge branch 'drm-uapi-extern-c-fixes' of https://github.com/evelikov/linux into drm-next")
 ---
- drivers/gpu/drm/exynos/exynos_hdmi.c | 6 ++----
- 1 file changed, 2 insertions(+), 4 deletions(-)
+ scripts/headers_check.pl | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 58de5a430508..ea4b2b7d7ad7 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -1934,8 +1934,7 @@ static int hdmi_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM
--static int exynos_hdmi_suspend(struct device *dev)
-+static int __maybe_unused exynos_hdmi_suspend(struct device *dev)
- {
- 	struct hdmi_context *hdata = dev_get_drvdata(dev);
- 
-@@ -1944,7 +1943,7 @@ static int exynos_hdmi_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int exynos_hdmi_resume(struct device *dev)
-+static int __maybe_unused exynos_hdmi_resume(struct device *dev)
- {
- 	struct hdmi_context *hdata = dev_get_drvdata(dev);
- 	int ret;
-@@ -1955,7 +1954,6 @@ static int exynos_hdmi_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif
- 
- static const struct dev_pm_ops exynos_hdmi_pm_ops = {
- 	SET_RUNTIME_PM_OPS(exynos_hdmi_suspend, exynos_hdmi_resume, NULL)
+diff --git a/scripts/headers_check.pl b/scripts/headers_check.pl
+index 62320f93e903..8b2da054cdc3 100755
+--- a/scripts/headers_check.pl
++++ b/scripts/headers_check.pl
+@@ -69,6 +69,10 @@ sub check_declarations
+ 	if ($line =~ m/^void seqbuf_dump\(void\);/) {
+ 		return;
+ 	}
++	# drm headers are being C++ friendly
++	if ($line =~ m/^extern "C"/) {
++		return;
++	}
+ 	if ($line =~ m/^(\s*extern|unsigned|char|short|int|long|void)\b/) {
+ 		printf STDERR "$filename:$lineno: " .
+ 			      "userspace cannot reference function or " .
 -- 
 2.7.0
