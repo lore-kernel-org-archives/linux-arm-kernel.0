@@ -1,117 +1,110 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 18 May 2016 16:46:36 +0300
-Subject: [PATCH 14/14] ASoC: omap-mcpdm: Add support for pdmclk clock handling
-In-Reply-To: <1463579196-5484-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1463579196-5484-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1463579196-5484-15-git-send-email-peter.ujfalusi@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 15:49:23 +0200
+Subject: [PATCH v4 37/56] KVM: arm/arm64: vgic-new: Add GICv3 IROUTER
+ register handlers
+In-Reply-To: <1463392481-26583-38-git-send-email-andre.przywara@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-38-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160518134923.GK3827@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-McPDM module receives it's functional clock from external source. This
-clock is the pdmclk provided by the twl6040 audio IC. If the clock is not
-available all register accesses to McPDM fails and the module is not
-operational.
+On Mon, May 16, 2016 at 10:53:25AM +0100, Andre Przywara wrote:
+> Since GICv3 supports much more than the 8 CPUs the GICv2 ITARGETSR
+> register can handle, the new IROUTER register covers the whole range
+> of possible target (V)CPUs by using the same MPIDR that the cores
+> report themselves.
+> In addition to translating this MPIDR into a vcpu pointer we store
+> the originally written value as well. The architecture allows to
+> write any values into the register, which must be read back as written.
+> 
+> Since we don't support affinity level 3, we don't need to take care
+> about the upper word of this 64-bit register, which simplifies the
+> handling a bit.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog RFC..v1:
+> - fold in and simplify vgic_v3_irq_change_affinity
+> 
+> Changelog v1 .. v2:
+> - adapt to new MMIO framework
+> 
+> Changelog v3 .. v4:
+> - move accessor width check into dispatcher
+> - use IRQ number accessor macro
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 37 ++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 36 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index b893284..7b9340b 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -75,6 +75,41 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
+> +					    gpa_t addr, unsigned int len)
+> +{
+> +	int intid = VGIC_ADDR_TO_INTID(addr, 64);
+> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
+> +
+> +	if (!irq)
+> +		return 0;
+> +
+> +	return extract_bytes(READ_ONCE(irq->mpidr), addr & 7, len);
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- Documentation/devicetree/bindings/sound/omap-mcpdm.txt | 10 ++++++++++
- sound/soc/omap/omap-mcpdm.c                            | 17 +++++++++++++++++
- 2 files changed, 27 insertions(+)
+So for this to work for accesses to the upper word, we rely on this only
+ever running on AArch64 where an unsigned long is 64 bits and the call
+to extract_bytes converts the u32 irq->mpidr to 64 bit unsigned long?
 
-diff --git a/Documentation/devicetree/bindings/sound/omap-mcpdm.txt b/Documentation/devicetree/bindings/sound/omap-mcpdm.txt
-index 0741dff048dd..6f6c2f8e908d 100644
---- a/Documentation/devicetree/bindings/sound/omap-mcpdm.txt
-+++ b/Documentation/devicetree/bindings/sound/omap-mcpdm.txt
-@@ -8,6 +8,8 @@ Required properties:
- - interrupts: Interrupt number for McPDM
- - interrupt-parent: The parent interrupt controller
- - ti,hwmods: Name of the hwmod associated to the McPDM
-+- clocks:  phandle for the pdmclk provider, likely <&twl6040>
-+- clock-names: Must be "pdmclk"
- 
- Example:
- 
-@@ -19,3 +21,11 @@ mcpdm: mcpdm at 40132000 {
- 	interrupt-parent = <&gic>;
- 	ti,hwmods = "mcpdm";
- };
-+
-+In board DTS file the pdmclk needs to be added:
-+
-+&mcpdm {
-+	clocks = <&twl6040>;
-+	clock-names = "pdmclk";
-+	status = "okay";
-+};
-diff --git a/sound/soc/omap/omap-mcpdm.c b/sound/soc/omap/omap-mcpdm.c
-index 74d6e6fdcfd0..e7cdc51fd806 100644
---- a/sound/soc/omap/omap-mcpdm.c
-+++ b/sound/soc/omap/omap-mcpdm.c
-@@ -31,6 +31,7 @@
- #include <linux/err.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/clk.h>
- #include <linux/slab.h>
- #include <linux/pm_runtime.h>
- #include <linux/of_device.h>
-@@ -54,6 +55,7 @@ struct omap_mcpdm {
- 	unsigned long phys_base;
- 	void __iomem *io_base;
- 	int irq;
-+	struct clk *pdmclk;
- 
- 	struct mutex mutex;
- 
-@@ -388,6 +390,7 @@ static int omap_mcpdm_probe(struct snd_soc_dai *dai)
- 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
- 	int ret;
- 
-+	clk_prepare_enable(mcpdm->pdmclk);
- 	pm_runtime_enable(mcpdm->dev);
- 
- 	/* Disable lines while request is ongoing */
-@@ -422,6 +425,7 @@ static int omap_mcpdm_remove(struct snd_soc_dai *dai)
- 
- 	pm_runtime_disable(mcpdm->dev);
- 
-+	clk_disable_unprepare(mcpdm->pdmclk);
- 	return 0;
- }
- 
-@@ -441,6 +445,8 @@ static int omap_mcpdm_suspend(struct snd_soc_dai *dai)
- 		mcpdm->pm_active_count++;
- 	}
- 
-+	clk_disable_unprepare(mcpdm->pdmclk);
-+
- 	return 0;
- }
- 
-@@ -448,6 +454,8 @@ static int omap_mcpdm_resume(struct snd_soc_dai *dai)
- {
- 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
- 
-+	clk_prepare_enable(mcpdm->pdmclk);
-+
- 	if (mcpdm->pm_active_count) {
- 		while (mcpdm->pm_active_count--)
- 			pm_runtime_get_sync(mcpdm->dev);
-@@ -541,6 +549,15 @@ static int asoc_mcpdm_probe(struct platform_device *pdev)
- 
- 	mcpdm->dev = &pdev->dev;
- 
-+	mcpdm->pdmclk = devm_clk_get(&pdev->dev, "pdmclk");
-+	if (IS_ERR(mcpdm->pdmclk)) {
-+		if (PTR_ERR(mcpdm->pdmclk) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_warn(&pdev->dev, "Error getting pdmclk (%ld)!\n",
-+			 PTR_ERR(mcpdm->pdmclk));
-+		mcpdm->pdmclk = NULL;
-+	}
-+
- 	ret =  devm_snd_soc_register_component(&pdev->dev,
- 					       &omap_mcpdm_component,
- 					       &omap_mcpdm_dai, 1);
--- 
-2.8.2
+Feels a bit weird, but I suppose this always works:
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+> +}
+> +
+> +static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
+> +				    gpa_t addr, unsigned int len,
+> +				    unsigned long val)
+> +{
+> +	int intid = VGIC_ADDR_TO_INTID(addr, 64);
+> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
+> +
+> +	if (!irq)
+> +		return;
+> +
+> +	/* The upper word is WI for us since we don't implement Aff3. */
+> +	if (addr & 4)
+> +		return;
+> +
+> +	spin_lock(&irq->irq_lock);
+> +
+> +	/* We only care about and preserve Aff0, Aff1 and Aff2. */
+> +	irq->mpidr = val & GENMASK(23, 0);
+> +	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, irq->mpidr);
+> +
+> +	spin_unlock(&irq->irq_lock);
+> +}
+> +
+>  static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+>  					      gpa_t addr, unsigned int len)
+>  {
+> @@ -170,7 +205,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 64,
+> +		vgic_mmio_read_irouter, vgic_mmio_write_irouter, 64,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
+>  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+> -- 
+> 2.8.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
