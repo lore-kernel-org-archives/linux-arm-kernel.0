@@ -1,33 +1,40 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Wed, 18 May 2016 09:53:48 +0100
-Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
- ESRT table in memory
-In-Reply-To: <CAKv+Gu_ekP+44FJjR7BY_MFqx2jQgc6Tk9W4SBL__ttdvQ55VQ@mail.gmail.com>
-References: <20160218132824.GE2651@codeblueprint.co.uk>
- <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
- <20160218134324.GG2651@codeblueprint.co.uk>
- <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
- <20160218141544.GH2651@codeblueprint.co.uk>
- <20160218191624.GA1515@redhat.com>
- <20160226144114.GA7475@codeblueprint.co.uk>
- <20160301233040.GA31476@codeblueprint.co.uk>
- <20160304062524.GA19010@dhcp-128-65.nay.redhat.com>
- <CAKv+Gu_ekP+44FJjR7BY_MFqx2jQgc6Tk9W4SBL__ttdvQ55VQ@mail.gmail.com>
-Message-ID: <20160518085348.GG21993@codeblueprint.co.uk>
+From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
+Date: Wed, 18 May 2016 11:12:43 +0200
+Subject: imx-drm: regression due to commit 503fe87bd0a8 ("gpu: ipu-v3:
+ Fix imx-ipuv3-crtc module autoloading")
+In-Reply-To: <1463137452.3544.5.camel@pengutronix.de>
+References: <20160513123336.6996dd89@ipc1.ka-ro>
+ <1463137452.3544.5.camel@pengutronix.de>
+Message-ID: <20160518111243.111b8e9c@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 May, at 10:36:33AM, Ard Biesheuvel wrote:
+Hi,
+
+On Fri, 13 May 2016 13:04:12 +0200 Philipp Zabel wrote:
+> Hi Lothar,
 > 
-> So what is the status here? I know Sai is working on x86 support for
-> the memory attributes table, so it would make sense settle this matter
-> as well.
+> Am Freitag, den 13.05.2016, 12:33 +0200 schrieb Lothar Wa?mann:
+> > Hi,
+> > 
+> > the commit 503fe87bd0a8 ("gpu: ipu-v3: Fix imx-ipuv3-crtc module autoloading")
+> > indeed fixes the autoloading issue, but completely breaks the driver in
+> > non-modular mode (at least with the parallel-display driver I didn't
+> > yet check with the imx-ldb driver.
+> > Can anyone confirm that the imx-drm driver in current linux-next
+> > (next-20160512) works for them with any i.MX6 or i.MX53 board?
+> 
+> I have sent a patch: https://patchwork.kernel.org/patch/9081661/
+> that I'd appreciate your input on.
+> 
+This patch works for the parallel-display driver but not for imx-ldb
+(I didn't test the TV or HDMI drivers). It works when the DRM driver is
+built as modules, but when it is non-modular I get a framebuffer
+device which is useable from userspace, but no output on the LVDS
+interface.
 
-This got stuck behind some other work, sorry about that.
+When reverting 503fe87bd0a8346ba9d8b7f49115dcd0a4185226 instead of
+applying the above patch, the builtin driver works normally.
 
-Some of this was just merged by Linus (getting rid of the global
-memmap and switching everyone over to efi.memmap), a large chunk
-remains however.
 
-I should be able to get those patches mailed out once the merge window
-closes.
+Lothar Wa?mann
