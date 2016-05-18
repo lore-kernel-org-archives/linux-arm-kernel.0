@@ -1,255 +1,144 @@
-From: nab@linux-iscsi.org (Nicholas A. Bellinger)
-Date: Tue, 17 May 2016 22:53:45 -0700
-Subject: [PATCH] Fix for hang of Ordered task in TCM
-In-Reply-To: <1463177741-4385-1-git-send-email-mikecyr@linux.vnet.ibm.com>
-References: <1463177741-4385-1-git-send-email-mikecyr@linux.vnet.ibm.com>
-Message-ID: <1463550825.22249.17.camel@haakon3.risingtidesystems.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 May 2016 08:18:44 +0200
+Subject: [PATCH v2 2/5] arm64: efi: apply strict permissons for UEFI
+ Runtime Services regions
+In-Reply-To: <573BB9FE.7050008@codeaurora.org>
+References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
+ <573BB9FE.7050008@codeaurora.org>
+Message-ID: <CAKv+Gu-Tam+QiXc_f0e+x8hNc4rxP_-59NdaCHkF9h=4Rd+XeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
-
-On Fri, 2016-05-13 at 17:15 -0500, Michael Cyr wrote:
-> If a command with a Simple task attribute is failed due to a Unit
-> Attention, then a subsequent command with an Ordered task attribute will
-> hang forever.  The reason for this is that the Unit Attention status is
-> checked for in target_setup_cmd_from_cdb, before the call to
-> target_execute_cmd, which calls target_handle_task_attr, which in turn
-> increments dev->simple_cmds.  However, transport_generic_request_failure
-> still calls transport_complete_task_attr, which will decrement
-> dev->simple_cmds.  In this case, simple_cmds is now -1.  So when a
-> command with the Ordered task attribute is sent, target_handle_task_attr
-> sees that dev->simple_cmds is not 0, so it decides it can't execute the
-> command until all the (nonexistent) Simple commands have completed.
-> 
-
-Thanks for reporting this bug.  Comments below.
-
-> The solution I've implemented is to move target_scsi3_ua_check, as well as
-> target_alua_state_check and target_check_reservation, into
-> target_execute_cmd, after the call to target_handle_task_attr.  I believe
-> this is actually the correct way this should be handled.  According to
-> SAM-4 r14, under section 5.14:
-> 
-> "h) if a command other than INQUIRY, REPORT LUNS, REQUEST SENSE, or NOTIFY
-> DATA TRANSFER DEVICE enters the enabled command state while a unit
-> attention condition exists for the SCSI initiator port associated with
-> the I_T nexus on which the command was received, the device server shall
-> terminate the command with a CHECK CONDITION status. The device server
-> shall provide sense data that reports a unit attention condition for the
-> SCSI initiator port that sent the command on the I_T nexus."
-> 
-> But according to section 8.5 and 8.6, a command which is not yet executed
-> because of the presence of other tasks in the task set (i.e., one for
-> which target_handle_task_attr returns true) would not enter the enabled
-> command state; it would be in the dormant command state.
-> target_execute_cmd would get called when a command entered the enabled
-> command state, and thus that is the appropriate place to check for Unit
-> Attenion.  Similarly, though not quite as explicit, section 5.3.3 tells
-> us that a Reservation Conflict status has a lower precedence than a Unit
-> Attention, and so this would also seem to be the appropriate place to
-> call target_check_reservation.  I'm less sure about
-> target_alua_state_check, since I'm not very familiar with ALUA.
-> 
-> Signed-off-by: Michael Cyr <mikecyr@linux.vnet.ibm.com>
-> ---
->  drivers/target/target_core_transport.c | 41 ++++++++++++++++++++--------------
->  1 file changed, 24 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/target/target_core_transport.c b/drivers/target/target_core_transport.c
-> index 6c089af..2ee5502 100644
-> --- a/drivers/target/target_core_transport.c
-> +++ b/drivers/target/target_core_transport.c
-> @@ -1303,23 +1303,6 @@ target_setup_cmd_from_cdb(struct se_cmd *cmd, unsigned char *cdb)
->  
->  	trace_target_sequencer_start(cmd);
->  
-> -	/*
-> -	 * Check for an existing UNIT ATTENTION condition
-> -	 */
-> -	ret = target_scsi3_ua_check(cmd);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = target_alua_state_check(cmd);
-> -	if (ret)
-> -		return ret;
-> -
-> -	ret = target_check_reservation(cmd);
-> -	if (ret) {
-> -		cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
-> -		return ret;
-> -	}
-> -
->  	ret = dev->transport->parse_cdb(cmd);
->  	if (ret == TCM_UNSUPPORTED_SCSI_OPCODE)
->  		pr_warn_ratelimited("%s/%s: Unsupported SCSI Opcode 0x%02x, sending CHECK_CONDITION.\n",
-> @@ -1865,6 +1848,8 @@ static int __transport_check_aborted_status(struct se_cmd *, int);
->  
->  void target_execute_cmd(struct se_cmd *cmd)
->  {
-> +	sense_reason_t ret;
+On 18 May 2016 at 02:40, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+> Hi Ard,
+>
+> This patch causing the kernel boot fail using the UEFI firmware on
+> Qualcomm Technologies QDF2XXX server platforms.
+>
+> +       /* RW- */
+> +       if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
+> +               return pgprot_val(PAGE_KERNEL);
 > +
->  	/*
->  	 * Determine if frontend context caller is requesting the stopping of
->  	 * this command for frontend exceptions.
-> @@ -1899,6 +1884,28 @@ void target_execute_cmd(struct se_cmd *cmd)
->  		return;
->  	}
->  
-> +	/*
-> +	 * Check for an existing UNIT ATTENTION condition
-> +	 */
-> +	ret = target_scsi3_ua_check(cmd);
-> +	if (ret) {
-> +		transport_generic_request_failure(cmd, ret);
-> +		return;
-> +	}
-> +
-> +	ret = target_alua_state_check(cmd);
-> +	if (ret) {
-> +		transport_generic_request_failure(cmd, ret);
-> +		return;
-> +	}
-> +
-> +	ret = target_check_reservation(cmd);
-> +	if (ret) {
-> +		cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
-> +		transport_generic_request_failure(cmd, ret);
-> +		return;
-> +	}
-> +
->  	__target_execute_cmd(cmd);
->  }
->  EXPORT_SYMBOL(target_execute_cmd);
+>
+> Changing above condition from 'or' to 'and' fixed the problem.Are we
+> missing something here or intentionally implemented this logic?
 
-So AFAICT for delayed commands, the above patch ends up skipping these
-three checks subsequently when doing __target_execute_cmd() directly
-from target_restart_delayed_cmds(), no..?
+The logic is sound, I think. If you need execute permissions on a
+non-code region with the XP bit set, there is something wrong in the
+firmware, unless you are hitting this case for an MMIO region perhaps?
+Could you share the kernel log with efi=debug enabled?
 
-After pondering this some more, what about moving these checks into
-__target_execute_cmd() to handle both target_core_transport.c cases
-instead..?
+> At least
+> we need some pr_warn here if UEFI firmware passes EFI_RUNTIME_SEVRICE_CODE
+> region that has an attribute EFI_MEMORY_XP.
+>
 
-We'll also need a parameter for internal COMPARE_AND_WRITE usage
-within compare_and_write_callback(), to bypass checks upon secondary
-->execute_cmd() WRITE payload submission after READ + COMPARE has
-completed successfully.
+No. DXE_RUNTIME_DRIVER modules are implemented as PE/COFF binaries,
+which are covered completely by EfiRuntimeServicesCode regions.
+However, a PE/COFF image consists of .text and .data sections, which
+require different permissions, so PE/COFF binaries are represented by
+several memory map entries in the memory attributes table, all of
+which have a code type, but differ in the permission bits.
 
-WDYT..?
-
-diff --git a/drivers/target/target_core_internal.h b/drivers/target/target_core_internal.h
-index fc91e85..e2c970a 100644
---- a/drivers/target/target_core_internal.h
-+++ b/drivers/target/target_core_internal.h
-@@ -146,6 +146,7 @@ sense_reason_t	target_cmd_size_check(struct se_cmd *cmd, unsigned int size);
- void	target_qf_do_work(struct work_struct *work);
- bool	target_check_wce(struct se_device *dev);
- bool	target_check_fua(struct se_device *dev);
-+void	__target_execute_cmd(struct se_cmd *, bool);
- 
- /* target_core_stat.c */
- void	target_stat_setup_dev_default_groups(struct se_device *);
-diff --git a/drivers/target/target_core_sbc.c b/drivers/target/target_core_sbc.c
-index a9057aa..04f616b 100644
---- a/drivers/target/target_core_sbc.c
-+++ b/drivers/target/target_core_sbc.c
-@@ -602,7 +602,7 @@ static sense_reason_t compare_and_write_callback(struct se_cmd *cmd, bool succes
- 	cmd->transport_state |= CMD_T_ACTIVE|CMD_T_BUSY|CMD_T_SENT;
- 	spin_unlock_irq(&cmd->t_state_lock);
- 
--	__target_execute_cmd(cmd);
-+	__target_execute_cmd(cmd, false);
- 
- 	kfree(buf);
- 	return ret;
-diff --git a/drivers/target/target_core_transport.c b/drivers/target/target_core_transport.c
-index 6c089af..f3e93dd 100644
---- a/drivers/target/target_core_transport.c
-+++ b/drivers/target/target_core_transport.c
-@@ -1761,20 +1761,45 @@ queue_full:
- }
- EXPORT_SYMBOL(transport_generic_request_failure);
- 
--void __target_execute_cmd(struct se_cmd *cmd)
-+void __target_execute_cmd(struct se_cmd *cmd, bool do_checks)
- {
- 	sense_reason_t ret;
- 
--	if (cmd->execute_cmd) {
--		ret = cmd->execute_cmd(cmd);
--		if (ret) {
--			spin_lock_irq(&cmd->t_state_lock);
--			cmd->transport_state &= ~(CMD_T_BUSY|CMD_T_SENT);
--			spin_unlock_irq(&cmd->t_state_lock);
-+	if (!cmd->execute_cmd) {
-+		ret = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
-+		goto err;
-+	}
-+	if (do_checks) {
-+		/*
-+		 * Check for an existing UNIT ATTENTION condition after
-+		 * target_handle_task_attr() has done SAM task attr
-+		 * checking, and possibly have already defered execution
-+		 * out to target_restart_delayed_cmds() context.
-+		 */
-+		ret = target_scsi3_ua_check(cmd);
-+		if (ret)
-+			goto err;
- 
--			transport_generic_request_failure(cmd, ret);
-+		ret = target_alua_state_check(cmd);
-+		if (ret)
-+			goto err;
-+
-+		ret = target_check_reservation(cmd);
-+		if (ret) {
-+			cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
-+			goto err;
- 		}
- 	}
-+
-+	ret = cmd->execute_cmd(cmd);
-+	if (!ret)
-+		return;
-+err:
-+	spin_lock_irq(&cmd->t_state_lock);
-+	cmd->transport_state &= ~(CMD_T_BUSY|CMD_T_SENT);
-+	spin_unlock_irq(&cmd->t_state_lock);
-+
-+	transport_generic_request_failure(cmd, ret);
- }
- 
- static int target_write_prot_action(struct se_cmd *cmd)
-@@ -1899,7 +1924,7 @@ void target_execute_cmd(struct se_cmd *cmd)
- 		return;
- 	}
- 
--	__target_execute_cmd(cmd);
-+	__target_execute_cmd(cmd, true);
- }
- EXPORT_SYMBOL(target_execute_cmd);
- 
-@@ -1923,7 +1948,7 @@ static void target_restart_delayed_cmds(struct se_device *dev)
- 		list_del(&cmd->se_delayed_node);
- 		spin_unlock(&dev->delayed_cmd_lock);
- 
--		__target_execute_cmd(cmd);
-+		__target_execute_cmd(cmd, true);
- 
- 		if (cmd->sam_task_attr == TCM_ORDERED_TAG)
- 			break;
-diff --git a/include/target/target_core_fabric.h b/include/target/target_core_fabric.h
-index ec79da3..334f107 100644
---- a/include/target/target_core_fabric.h
-+++ b/include/target/target_core_fabric.h
-@@ -163,7 +163,6 @@ int	core_tmr_alloc_req(struct se_cmd *, void *, u8, gfp_t);
- void	core_tmr_release_req(struct se_tmr_req *);
- int	transport_generic_handle_tmr(struct se_cmd *);
- void	transport_generic_request_failure(struct se_cmd *, sense_reason_t);
--void	__target_execute_cmd(struct se_cmd *);
- int	transport_lookup_tmr_lun(struct se_cmd *, u64);
- void	core_allocate_nexus_loss_ua(struct se_node_acl *acl);
- 
--- 
-1.9.1
+>
+>
+> On 03/30/2016 11:38 AM, Ard Biesheuvel wrote:
+>> Recent UEFI versions expose permission attributes for runtime services
+>> memory regions, either in the UEFI memory map or in the separate memory
+>> attributes table. This allows the kernel to map these regions with
+>> stricter permissions, rather than the RWX permissions that are used by
+>> default. So wire this up in our mapping routine.
+>>
+>> Note that in the absence of permission attributes, we still only map
+>> regions of type EFI_RUNTIME_SERVICE_CODE with the executable bit set.
+>> Also, we base the mapping attributes of EFI_MEMORY_MAPPED_IO on the
+>> type directly rather than on the absence of the EFI_MEMORY_WB attribute.
+>> This is more correct, but is also required for compatibility with the
+>> upcoming support for the Memory Attributes Table, which only carries
+>> permission attributes, not memory type attributes.
+>>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> ---
+>>  arch/arm64/kernel/efi.c | 54 +++++++++++++++-----
+>>  1 file changed, 40 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> index b6abc852f2a1..33a6da160a50 100644
+>> --- a/arch/arm64/kernel/efi.c
+>> +++ b/arch/arm64/kernel/efi.c
+>> @@ -17,22 +17,48 @@
+>>
+>>  #include <asm/efi.h>
+>>
+>> -int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t
+>> *md)
+>> +/*
+>> + * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
+>> + * executable, everything else can be mapped with the XN bits
+>> + * set. Also take the new (optional) RO/XP bits into account.
+>> + */
+>> +static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
+>>  {
+>> -     pteval_t prot_val;
+>> +     u64 attr = md->attribute;
+>> +     u32 type = md->type;
+>>
+>> -     /*
+>> -      * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
+>> -      * executable, everything else can be mapped with the XN bits
+>> -      * set.
+>> -      */
+>> -     if ((md->attribute & EFI_MEMORY_WB) == 0)
+>> -             prot_val = PROT_DEVICE_nGnRE;
+>> -     else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+>> -              !PAGE_ALIGNED(md->phys_addr))
+>> -             prot_val = pgprot_val(PAGE_KERNEL_EXEC);
+>> -     else
+>> -             prot_val = pgprot_val(PAGE_KERNEL);
+>> +     if (type == EFI_MEMORY_MAPPED_IO)
+>> +             return PROT_DEVICE_nGnRE;
+>> +
+>> +     if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
+>> +                   "UEFI Runtime regions are not aligned to 64 KB --
+>> buggy firmware?"))
+>> +             /*
+>> +              * If the region is not aligned to the page size of the
+>> OS, we
+>> +              * can not use strict permissions, since that would also
+>> affect
+>> +              * the mapping attributes of the adjacent regions.
+>> +              */
+>> +             return pgprot_val(PAGE_KERNEL_EXEC);
+>> +
+>> +     /* R-- */
+>> +     if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
+>> +         (EFI_MEMORY_XP | EFI_MEMORY_RO))
+>> +             return pgprot_val(PAGE_KERNEL_RO);
+>> +
+>> +     /* R-X */
+>> +     if (attr & EFI_MEMORY_RO)
+>> +             return pgprot_val(PAGE_KERNEL_ROX);
+>> +
+>> +     /* RW- */
+>> +     if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
+>> +             return pgprot_val(PAGE_KERNEL);
+>> +
+>> +     /* RWX */
+>> +     return pgprot_val(PAGE_KERNEL_EXEC);
+>> +}
+>> +
+>> +int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t
+>> *md)
+>> +{
+>> +     pteval_t prot_val = create_mapping_protection(md);
+>>
+>>       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+>>                          md->num_pages << EFI_PAGE_SHIFT,
+>
+> --
+> Shanker Donthineni
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+>
