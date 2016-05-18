@@ -1,24 +1,131 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Wed, 18 May 2016 13:17:29 +0530
-Subject: [PATCH v2 0/4] dmaengine: vdma: AXI DMA's enhancments
-Message-ID: <1463557653-1687-1-git-send-email-appanad@xilinx.com>
+Date: Wed, 18 May 2016 13:17:33 +0530
+Subject: [PATCH v2 4/4] dmaengine: vdma: Add 64 bit addressing support for the
+ axi cdma
+In-Reply-To: <1463557653-1687-1-git-send-email-appanad@xilinx.com>
+References: <1463557653-1687-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1463557653-1687-5-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series does the following
----> Add support for cyclic DMA mode for the AXI DMA IP.
----> use dma_poll_zalloc instead of dma_pool_alloc.
----> Add 64-bit addressing support for AXI DMA IP.
----> Add 64-bit addressing support for AXI CDMA IP.
+The AXI CDMA is a soft ip, which can be programmed to support
+32 bit addressing or greater than 32 bit addressing.
 
-Kedareswara rao Appana (4):
-  dmaengine: vdma: Add support for cyclic dma mode
-  dmaengine: vdma: Use dma_pool_zalloc
-  dmaengine: vdma: Add 64 bit addressing support for the axi dma
-  dmaengine: vdma: Add 64 bit addressing support for the axi cdma
+When the AXI CDMA ip is configured for 32 bit address space
+in simple dma mode the source/destination buffer address is
+specified by a single register(18h for Source buffer address and
+20h for Destination buffer address). When configured in SG mode
+the current descriptor and tail descriptor are specified by a
+Single register(08h for curdesc 10h for tail desc).
 
- drivers/dma/xilinx/xilinx_vdma.c | 293 ++++++++++++++++++++++++++++++++++-----
- 1 file changed, 260 insertions(+), 33 deletions(-)
+When the  AXI CDMA core is configured for an address space greater
+than 32 then each buffer address or descriptor address is specified by
+a combination of two registers.
 
+The first register specifies the LSB 32 bits of address,
+while the next register specifies the MSB 32 bits of address.
+
+For example, 08h will specify the LSB 32 bits while 0Ch will
+specify the MSB 32 bits of the first start address.
+So we need to program two registers at a time.
+
+This patch adds the 64 bit addressing support to the axicdma
+IP in the driver.
+
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes for v2:
+--> New patch.
+
+ drivers/dma/xilinx/xilinx_vdma.c | 44 +++++++++++++++++++++++++++++-----------
+ 1 file changed, 32 insertions(+), 12 deletions(-)
+
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index 9c15451..18360ff 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -220,21 +220,21 @@ struct xilinx_axidma_desc_hw {
+ /**
+  * struct xilinx_cdma_desc_hw - Hardware Descriptor
+  * @next_desc: Next Descriptor Pointer @0x00
+- * @pad1: Reserved @0x04
++ * @next_descmsb: Next Descriptor Pointer MSB @0x04
+  * @src_addr: Source address @0x08
+- * @pad2: Reserved @0x0C
++ * @src_addrmsb: Source address MSB @0x0C
+  * @dest_addr: Destination address @0x10
+- * @pad3: Reserved @0x14
++ * @dest_addrmsb: Destination address MSB @0x14
+  * @control: Control field @0x18
+  * @status: Status field @0x1C
+  */
+ struct xilinx_cdma_desc_hw {
+ 	u32 next_desc;
+-	u32 pad1;
++	u32 next_desc_msb;
+ 	u32 src_addr;
+-	u32 pad2;
++	u32 src_addr_msb;
+ 	u32 dest_addr;
+-	u32 pad3;
++	u32 dest_addr_msb;
+ 	u32 control;
+ 	u32 status;
+ } __aligned(64);
+@@ -1114,12 +1114,20 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
+ 	}
+ 
+ 	if (chan->has_sg) {
+-		dma_ctrl_write(chan, XILINX_DMA_REG_CURDESC,
+-			   head_desc->async_tx.phys);
++		if (chan->ext_addr)
++			dma_writeq(chan, XILINX_DMA_REG_CURDESC,
++				   head_desc->async_tx.phys);
++		else
++			dma_ctrl_write(chan, XILINX_DMA_REG_CURDESC,
++				       head_desc->async_tx.phys);
+ 
+ 		/* Update tail ptr register which will start the transfer */
+-		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+-			       tail_segment->phys);
++		if (chan->ext_addr)
++			dma_writeq(chan, XILINX_DMA_REG_TAILDESC,
++				   tail_segment->phys);
++		else
++			dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
++				       tail_segment->phys);
+ 	} else {
+ 		/* In simple mode */
+ 		struct xilinx_cdma_tx_segment *segment;
+@@ -1131,8 +1139,16 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
+ 
+ 		hw = &segment->hw;
+ 
+-		dma_ctrl_write(chan, XILINX_CDMA_REG_SRCADDR, hw->src_addr);
+-		dma_ctrl_write(chan, XILINX_CDMA_REG_DSTADDR, hw->dest_addr);
++		if (chan->ext_addr) {
++			dma_writeq(chan, XILINX_CDMA_REG_SRCADDR, hw->src_addr);
++			dma_writeq(chan, XILINX_CDMA_REG_DSTADDR,
++				   hw->dest_addr);
++		} else {
++			dma_ctrl_write(chan, XILINX_CDMA_REG_SRCADDR,
++				       hw->src_addr);
++			dma_ctrl_write(chan, XILINX_CDMA_REG_DSTADDR,
++				       hw->dest_addr);
++		}
+ 
+ 		/* Start the transfer */
+ 		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
+@@ -1622,6 +1638,10 @@ xilinx_cdma_prep_memcpy(struct dma_chan *dchan, dma_addr_t dma_dst,
+ 	hw->control = len;
+ 	hw->src_addr = dma_src;
+ 	hw->dest_addr = dma_dst;
++	if (chan->ext_addr) {
++		hw->src_addr_msb = upper_32_bits(dma_src);
++		hw->dest_addr_msb = upper_32_bits(dma_dst);
++	}
+ 
+ 	/* Fill the previous next descriptor with current */
+ 	prev = list_last_entry(&desc->segments,
 -- 
 2.1.2
