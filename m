@@ -1,42 +1,102 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 18 May 2016 13:24:44 +0300
-Subject: [RFC PATCH 2/3] mmc: host: omap_hsmmc: Enable ADMA2
-In-Reply-To: <1463561115-31798-3-git-send-email-kishon@ti.com>
-References: <1463561115-31798-1-git-send-email-kishon@ti.com>
- <1463561115-31798-3-git-send-email-kishon@ti.com>
-Message-ID: <b66f678a-be74-d5f7-f2ef-93b5c9f29b92@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 12:27:17 +0200
+Subject: [PATCH v4 11/56] KVM: arm/arm64: pmu: abstract access to number
+ of SPIs
+In-Reply-To: <1463392481-26583-12-git-send-email-andre.przywara@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-12-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160518102717.GB3827@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/16 11:45, Kishon Vijay Abraham I wrote:
-> omap hsmmc host controller has ADMA2 feature. Enable it here
-> for better read and write throughput. Add a new dt binding
-> "ti,use_adma" to enable ADMA2.
+On Mon, May 16, 2016 at 10:52:59AM +0100, Andre Przywara wrote:
+> Currently the PMU uses a member of the struct vgic_dist directly,
+> which not only breaks abstraction, but will fail with the new VGIC.
+> Abstract this access in the VGIC header file and refactor the validity
+> check in the PMU code.
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 > ---
->  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |    1 +
->  drivers/mmc/host/omap_hsmmc.c                      |  320 ++++++++++++++++----
->  include/linux/platform_data/hsmmc-omap.h           |    1 +
->  3 files changed, 256 insertions(+), 66 deletions(-)
+> Changelog v3 .. v4:
+> - fix logic to allow PPIs again
+> - refactor IRQ validity check
 > 
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> index 74166a0..eb5ceec2 100644
-> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -28,6 +28,7 @@ specifier is required.
->  dma-names: List of DMA request names. These strings correspond
->  1:1 with the DMA specifiers listed in dmas. The string naming is
->  to be "rx" and "tx" for RX and TX DMA requests, respectively.
-> +ti,use_adma: enable adma2 feature
+>  include/kvm/arm_vgic.h |  2 ++
+>  virt/kvm/arm/pmu.c     | 25 ++++++++++++++-----------
+>  2 files changed, 16 insertions(+), 11 deletions(-)
+> 
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 67a6637..ade7005 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -348,6 +348,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+>  #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+>  #define vgic_ready(k)		((k)->arch.vgic.ready)
+> +#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
+> +				 ((i) < (k)->arch.vgic.nr_irqs))
+>  
+>  int vgic_v2_probe(const struct gic_kvm_info *gic_kvm_info,
+>  		  const struct vgic_ops **ops,
+> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+> index 575c7aa..a027569 100644
+> --- a/virt/kvm/arm/pmu.c
+> +++ b/virt/kvm/arm/pmu.c
+> @@ -436,7 +436,14 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+>  	return 0;
+>  }
+>  
+> -static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+> +#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
+> +
+> +/*
+> + * For one VM the interrupt type must be same for each vcpu.
+> + * As a PPI, the interrupt number is the same for all vcpus,
+> + * while as an SPI it must be a separate number per vcpu.
+> + */
+> +static bool pmu_irq_is_valid(struct kvm *kvm, int irq)
+>  {
+>  	int i;
+>  	struct kvm_vcpu *vcpu;
+> @@ -445,7 +452,7 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+>  		if (!kvm_arm_pmu_irq_initialized(vcpu))
+>  			continue;
+>  
+> -		if (is_ppi) {
+> +		if (irq_is_ppi(irq)) {
+>  			if (vcpu->arch.pmu.irq_num != irq)
+>  				return false;
+>  		} else {
+> @@ -457,7 +464,6 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+>  	return true;
+>  }
+>  
+> -
+>  int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+>  {
+>  	switch (attr->attr) {
+> @@ -471,14 +477,11 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+>  		if (get_user(irq, uaddr))
+>  			return -EFAULT;
+>  
+> -		/*
+> -		 * The PMU overflow interrupt could be a PPI or SPI, but for one
+> -		 * VM the interrupt type must be same for each vcpu. As a PPI,
+> -		 * the interrupt number is the same for all vcpus, while as an
+> -		 * SPI it must be a separate number per vcpu.
+> -		 */
+> -		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
+> -		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
+> +		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
+> +		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
+> +			return -EINVAL;
+> +
+> +		if (!pmu_irq_is_valid(vcpu->kvm, irq))
+>  			return -EINVAL;
+>  
+>  		if (kvm_arm_pmu_irq_initialized(vcpu))
+> -- 
+> 2.8.2
+> 
 
-Do we have use case when you want to fall back to generic DMA instead of aDMA2?
-IMHO if the driver supports aDMA2, it is going to use it instead of the
-generic s/eDMA.
-What I mean is:
-the driver implements the aDMA2 support.
-if the IP has support for aDMA2, then it is going to use it, otherwise it will
-use the generic DMA.
-
--- 
-P?ter
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
