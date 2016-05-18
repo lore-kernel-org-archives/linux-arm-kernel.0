@@ -1,58 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 18 May 2016 21:59:29 +0200
-Subject: [PATCH 02/16] clk: sunxi-ng: Add common infrastructure
-In-Reply-To: <20160517085427.f2f3aa0c66686f8f5f6318ff@free.fr>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-3-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v67XWt6tjG_xXWgGatTaiN5uYQb2_Q6bgixMDUkHfVHLHg@mail.gmail.com>
- <20160515183122.GA27618@lukather>
- <20160516100239.a93a238b0d458b38a3689a95@free.fr>
- <20160516201509.GL27618@lukather>
- <20160517085427.f2f3aa0c66686f8f5f6318ff@free.fr>
-Message-ID: <20160518195929.GS27618@lukather>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 18 May 2016 22:12:51 +0200
+Subject: 4.5-rc0 regression: GPRS breaks after very short while
+In-Reply-To: <20160518141624.GA8025@earth>
+References: <20160518074924.GA20652@amd>
+ <20160518141624.GA8025@earth>
+Message-ID: <20160518201251.GA22015@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2016 at 08:54:27AM +0200, Jean-Francois Moine wrote:
-> On Mon, 16 May 2016 22:15:09 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > > > Yes, I intended it to be a simple busy waiting loop since I don't
-> > > > expect it to be very long. Do yu have any more data on how much time
-> > > > it usually takes?
-> > > 
-> > > I have a Soc in which the rate of the audio clock is stable after a
-> > > good second.
+Hi!
+
+> On Wed, May 18, 2016 at 09:49:24AM +0200, Pavel Machek wrote:
+> > I was afraid another GSM chip desoldered itself in N900, but no, it
+> > seems to be software this time.
 > > 
-> > You mean before the clock is actually stable, or before the lock bit
-> > is cleared?
+> > In 4.4, GPRS is rock solid, can survive overnight ping.
 > > 
-> > Which SoC is it? As far as I've seen, only the H3 allows to configure
-> > the stable time, and while by default it will take 16us, you can
-> > configure as high as 66ms (which is still way higher than the current
-> > limit).
+> > In 4.5-rc0 and v4.6, modem fails when I use gprs for like a
+> > minute. Phone is not usable.
 > 
-> Hi Maxime,
+> I only send three modem related changes for v4.5:
 > 
-> Well, it is not a SoC, but an external chip, the SI5351 (in the Dove
-> Cubox). There is no lock bit, but as it is used for audio, and as I did
-> not set any delay at streaming start time, I can hear when the clock is
-> stable.
+> https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/commit/?h=hsi-for-4.5&id=525e1abc6b5a7d8bd9006de1da6e99722305ea2b
+> HSI: omap_ssi: fix handling ida_simple_get result
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/commit/?h=hsi-for-4.5&id=6bf6ded3008a407ccab5ad72eb59ab71b97cc290
+> HSI: omap_ssi_port: fix handling of_get_named_gpio result
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/commit/?h=hsi-for-4.5&id=403c5c0650816375527a6feecfb255d9b494dda3
+> HSI: Remove struct hsi_client private fields from kernel-doc
+> 
+> The last one only changes a comment, so not relevant, the other
+> two fix error handling during initialization and are most likely
+> also not the problem. Can you try to bisect the problem?
 
-Ok. So I guess we set it high enough to cover the maximum we know for
-know (65ms), and we can always rise that up later if needed.
+It will not be fun, but I guess it is doable. But before I start it
+would be good to know -- does it work for you?
 
-Thanks!
-Maxime
-
+Thanks and best regards,
+									Pavel
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160518/a06a27a8/attachment.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
