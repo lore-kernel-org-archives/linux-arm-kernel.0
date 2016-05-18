@@ -1,65 +1,84 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 18 May 2016 18:06:04 +0100
-Subject: [PATCH] usb: echi-hcd: Add register access check in shutdown
-In-Reply-To: <Pine.LNX.4.44L0.1605181211120.1981-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1605181211120.1981-100000@iolanthe.rowland.org>
-Message-ID: <573CA0FC.4010700@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 19:08:49 +0200
+Subject: [PATCH v4 22/56] KVM: arm/arm64: vgic-new: Add MMIO handling
+ framework
+In-Reply-To: <573C9C7F.9020209@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-23-git-send-email-andre.przywara@arm.com>
+ <573B1DB0.7030901@arm.com> <20160518122521.GD3827@cbox>
+ <573C9C7F.9020209@arm.com>
+Message-ID: <20160518170849.GN6666@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 18, 2016 at 05:46:55PM +0100, Andre Przywara wrote:
+> Hi,
+> 
+> >>> +
+> >>> +/* generate a mask that covers 1024 interrupts with <b> bits per IRQ */
+> >>
+> >> Hmmm. I'd appreciate some additional comments, specially when it comes
+> >> to the various restrictions. May I'd suggest something like:
+> >>
+> >> /*
+> >>  * Generate a mask that covers the number of bytes required to address
+> >>  * up to 1024 interrupts, each represented by <b> bits. This assumes
+> >>  * that <b> is a power of two.
+> >>  *
+> >>  * ilog2(b) + ilog2(1024) is the number of bits required to bit-address
+> >>  * 1024 interrupts, each represented by b bits. Minus ilog2(8) converts
+> >>  * this to a byte address.
+> > 
+> > So I'm guessting this is a rewrite of ilog2( (b * 1024) / 8), but I'm
+> > stupid enough to not understand our use of logarithms here.  Can someone
+> > remind me whatever I forgot at CS 101?
+> 
+> I guess it was more me not seeing the wood for the trees here:
+> Indeed doing the multiplication first and then calling ilog2 seems to
+> make more sense. Also I was thinking: Isn't
+> "GENMASK_ULL(ilog2(n) - 1, 0)" the same as "n - 1"?
 
+if there's no integer rounding taking place with ilog2 (iow. n is a
+power of 2) then yes, I believe it is.
 
-On 18/05/16 17:15, Alan Stern wrote:
-> On Wed, 18 May 2016, Srinivas Kandagatla wrote:
->
->> On 18/05/16 15:56, Alan Stern wrote:
->>> On Wed, 18 May 2016, Srinivas Kandagatla wrote:
->>>
->>>> This patch adds a check in ehci_shutdown(), to make sure
->>>> that the register access is available before accessing registers.
->>>>
->>>> The use case is simple, for boards like DB410c where the usb host
->>>> or device functionality is decided based on the micro-usb cable
->>>> presence. If the board boots up with micro-usb connected and the
->>>> host driver is probed, but the ehci_setup() has not been done yet,
->>>> then a system shutdown would trigger below NULL pointer exception
->>>> without this patch.
->>>
->>> How can that happen?  While the host driver is probed, the probing
->>> thread holds the device lock.  But the system shutdown routine acquires
->>> the device lock before invoking the ->shutdown callback.  Therefore the
->>> two things cannot happen concurrently.
->>
->> No, I did not mean them happening concurrently, I mean that the host
->> driver is up, however ehci_setup() is not done yet.
->
-> I don't understand.  ehci_setup() is called as part of the probe
-> procedure.  How can the host driver be up if ehci_setup() is not done
-> yet?
->
-Yes, this is true in ehci-msm driver, The driver does not add usb host 
-by default in probe when phy is otg capable.
+> 
+> So can't we just write:
+> 
+> #define VGIC_ADDR_IRQ_MASK(bpi) (((bpi) * 1024 / 8) - 1)
 
-The usb host is added dynamically by the msm_otg driver depending on the 
-the micro USB cable plug/un-plug events via extcon.
+that certianly all of the sudden feels intuitive.
 
-> Are you saying that when the system is plugged into the "B" end of an
-> OTG cable, ehci_setup() doesn't get called at all?
->
-Yes, for echi-msm driver, not sure about other host controller drivers.
+> 
+> Proven by enumeration - over the values we use ;-)
+> 
+> I'd keep the first paragraph of Marc's comment above then, but we can
+> avoid mentioning Advanced Maths textbooks about binary logarithmic ;-)
+> 
 
-> And would the same thing happen if the system started out as the host
-> but then used HNP to change into the peripheral?
-I don't think so, As the ehci->regs get populated once we enter the 
-ehci_setup(), so ehci_halt() will never get chance to dereference null 
-in this case.
+Haha, you saved my day with that comment.  I feel slightly less idiotic
+now, yes, let's call it advanced quantum math or something instead of CS
+101 :)
 
-Fault occurs only if the driver did not enter into host mode and system 
-reboot/shutdown is requested.
+-Christoffer
 
---srini
-
-
->
-> Alan Stern
->
+> 
+> >>  */
+> >>
+> >>> +#define VGIC_ADDR_IRQ_MASK(b) GENMASK_ULL(ilog2(b) + ilog2(1024) - \
+> >>> +					  ilog2(BITS_PER_BYTE) - 1, 0)
+> >>
+> >> /*
+> >>  * Convert a base address into a base interrupt (each interrupt
+> >>  * represented by <bits> bits. This assumes that <bits> is a power
+> >>  * of two, that <addr> both part of a memory region aligned on a
+> > 
+> > did you mean '<addr> *is* both part of' ?
+> > 
+> >>  * <b> bits boundary, and itself aligned on that same boundary
+> >>  * (for regions that describe an interrupt with more than a single
+> >>  * byte of data).
+> >>  */
+> >>
+> > 
+> > In any case, thanks for the commentary, I was faily lost here.
+> > 
