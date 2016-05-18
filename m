@@ -1,34 +1,43 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 18 May 2016 16:34:12 +0200
-Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
-In-Reply-To: <20160518142620.GA22354@localhost.localdomain>
-References: <1463576010-115428-1-git-send-email-agraf@suse.de>
- <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
- <573C72DD.6010400@suse.de> <20160518142620.GA22354@localhost.localdomain>
-Message-ID: <573C7D64.5040206@suse.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 18 May 2016 16:35:13 +0200
+Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
+In-Reply-To: <20160512122500.11411882@erd979>
+References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
+ <20160425115758.GA4874@lukather>
+ <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
+ <20160428092608.GE17159@lukather> <5723755D.9060108@ti.com>
+ <20160509090615.6272f8ca@erd979>
+ <CACRpkdbZmL9Cqp-ubzyxd7fWUFOVsS1DCxsfG02kSpbWu_rbZQ@mail.gmail.com>
+ <20160509161728.3aee1134@erd979>
+ <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
+ <20160512122500.11411882@erd979>
+Message-ID: <CACRpkdYwtwosdCE_F5SEH9uwZRdJkAi-seL+nUrMFZ+w_esuVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2016 04:26 PM, Catalin Marinas wrote:
-> On Wed, May 18, 2016 at 03:49:17PM +0200, Alexander Graf wrote:
->> On 05/18/2016 03:27 PM, Catalin Marinas wrote:
->>> On Wed, May 18, 2016 at 02:53:30PM +0200, Alexander Graf wrote:
->>>> On arm64, all SoCs we supported so far either have an IOMMU or have bus
->>>> addresses equal to CPU addresses.
->>>>
->>>> However, with the Raspberry Pi 3 coming up, this is no longer true. To
->>>> allow DMA to work with an AArch64 kernel on those devices, let's allow
->>>> devices to have DMA offsets again.
->>>>
->>>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>> We were aware about this issue but we've been waiting for an actual use
->>> case. I'll queue this for 4.8 (given that RPi3 is not supported by the
->>> arm64 kernel, I don't see the rush to merge it earlier).
->> Sure, works for me. That way Eric can try to push the other few bits
->> necessary to run an arm64 kernel on the RPi3 towards 4.8 as well :).
-> As long as the firmware is PSCI capable ;)
+On Thu, May 12, 2016 at 12:25 PM, Robin van der Gracht
+<robin@protonic.nl> wrote:
 
-So spin tables won't work for you? IIRC we don't own EL3 on there.
+> First half is completed. I've added myself as maintainer for the
+> driver I've posted recently (HT16K33 LED CONTROLLER DRIVER).
 
+Good!
 
-Alex
+> According to MAINTAINERS, Miguel maintains:
+>  - CFAG12864B LCD DRIVER
+>  - CFAG12864BFB LCD FRAMEBUFFER DRIVER
+>  - KS0108 LCD CONTROLLER DRIVER
+>  - AUXILIARY DISPLAY DRIVERS
+>
+> AFAIK, I should not be judge in Miguels case.
+
+If patches come in for these drivers and Miguel still seem to be fallen
+off the face of the earth I think you should ACK/merge patches for
+these too, but deal with it when it happens.
+
+> @linus: I'll send my patches to Greg if you agree on this.
+
+We are in agreement.
+
+Yours,
+Linus Walleij
