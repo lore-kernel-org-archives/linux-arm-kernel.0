@@ -1,25 +1,51 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 18 May 2016 07:38:39 -0700
-Subject: [PATCH omap v2 0/6] Fix OMAP uses of RCU from idle loop
-In-Reply-To: <20160516184844.GA20144@linux.vnet.ibm.com>
-References: <20160516184844.GA20144@linux.vnet.ibm.com>
-Message-ID: <573C7E6F.90001@roeck-us.net>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 18 May 2016 22:41:50 +0800
+Subject: [PATCH] arm64: dts: rockchip: fixes the gic400 2nd region size for
+ rk3368
+Message-ID: <1463582510-29156-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2016 11:48 AM, Paul E. McKenney wrote:
-> Hello!
->
-> The following series fixes a number of uses of RCU from the idle loop.
-> These are all due to tracing, so the fix is simply to append _rcuidle
-> to the event-tracing call.
->
-> Changes since v1: Fix commit-log subjects and add maintainers on CC.
->
+The 2nd additional region is the GIC virtual cpu interface register
+base and size.
 
-For the series, on top of mainline (which now experiences the problem fixed
-by this series):
+As the gic400 of rk3368 says, the cpu interface register map as below
 
-Tested-by: Guenter Roeck <linux@roeck-us.net>
+:
 
-Guenter
+-0x0000 GICC_CTRL
+.
+.
+.
+-0x00fc GICC_IIDR
+-0x1000 GICC_IDR
+
+Obviously, the region size should be greater than 0x1000.
+So we should make sure to include the GICC_IDR since the kernel will access
+it in some cases.
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-rockchip at lists.infradead.org
+
+---
+
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index 8b4a7c9..080203e 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -670,7 +670,7 @@
+ 		#address-cells = <0>;
+ 
+ 		reg = <0x0 0xffb71000 0x0 0x1000>,
+-		      <0x0 0xffb72000 0x0 0x1000>,
++		      <0x0 0xffb72000 0x0 0x2000>,
+ 		      <0x0 0xffb74000 0x0 0x2000>,
+ 		      <0x0 0xffb76000 0x0 0x2000>;
+ 		interrupts = <GIC_PPI 9
+-- 
+2.7.4
