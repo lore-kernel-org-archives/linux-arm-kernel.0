@@ -1,61 +1,120 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 18 May 2016 09:12:20 -0500
-Subject: [RFC PATCH 1/3] asm-generic: io: Add exec versions of ioremap
-In-Reply-To: <20160512163759.GW5783@n2100.arm.linux.org.uk>
-References: <1462830111-28172-1-git-send-email-d-gerlach@ti.com>
- <1462830111-28172-2-git-send-email-d-gerlach@ti.com>
- <20160512163759.GW5783@n2100.arm.linux.org.uk>
-Message-ID: <573C7844.5030107@ti.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 18 May 2016 15:12:27 +0100
+Subject: [PATCH] usb: echi-hcd: Add register access check in shutdown
+Message-ID: <1463580747-20868-1-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 05/12/2016 11:37 AM, Russell King - ARM Linux wrote:
-> On Mon, May 09, 2016 at 04:41:49PM -0500, Dave Gerlach wrote:
->> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
->> index 66a978d05958..c6eef3c98074 100644
->> --- a/arch/arm/mm/ioremap.c
->> +++ b/arch/arm/mm/ioremap.c
->> @@ -400,6 +400,20 @@ EXPORT_SYMBOL(ioremap_wc);
->>    * clocks that would affect normal memory for example. Please see
->>    * CONFIG_GENERIC_ALLOCATOR for allocating external memory.
->>    */
->> +void __iomem *ioremap_exec(resource_size_t res_cookie, size_t size)
->> +{
->> +	return arch_ioremap_caller(res_cookie, size, MT_MEMORY_RWX,
->> +				   __builtin_return_address(0));
->> +}
->> +EXPORT_SYMBOL(ioremap_exec);
->> +
->> +void __iomem *ioremap_exec_nocache(resource_size_t res_cookie, size_t size)
->> +{
->> +	return arch_ioremap_caller(res_cookie, size, MT_MEMORY_RWX_NONCACHED,
->> +				   __builtin_return_address(0));
->> +}
->> +EXPORT_SYMBOL(ioremap_exec_nocache);
->
-> I think these should be called memremap_exec() and similar.  Please
-> see the description of memremap() in kernel/memremap.c.  If you're
-> going to be executing code, the region must not have I/O side effects
-> and according to the new definition of memremap() vs ioremap(), the
-> memremap() interfaces fit better.
->
-> Please also get these reviewed by Dan Williams who provided the
-> memremap() API.
+This patch adds a check in ehci_shutdown(), to make sure
+that the register access is available before accessing registers.
 
-Ok thank you for the pointer. I agree, the memremap API looks like a 
-better fit for this. I think it likely makes the most sense to still add 
-these ioremap_exec and ioremap_exec_nocache and then call them through 
-the memremap API based on new flags. This will fit into the current use 
-model for memremap as it currently uses all of the other ioremap calls 
-internally, and doing it how I just described will let this code evolve 
-along with memremap.
+The use case is simple, for boards like DB410c where the usb host
+or device functionality is decided based on the micro-usb cable
+presence. If the board boots up with micro-usb connected and the
+host driver is probed, but the ehci_setup() has not been done yet,
+then a system shutdown would trigger below NULL pointer exception
+without this patch.
 
-I will put v2 together this way and send it out.
+Unable to handle kernel NULL pointer dereference at virtual address
+00000008
 
-Regards,
-Dave
+pgd = ffffffc034581000
+[00000008] *pgd=0000000000000000, *pud=0000000000000000
+CPU: 2 PID: 1957 Comm: reboot Not tainted 4.6.0+ #99
+task: ffffffc034bc0000 ti: ffffffc0345cc000 task.ti: ffffffc0345cc000
+PC is at ehci_halt+0x54/0x108
+LR is at ehci_halt+0x38/0x108
+pc : [<ffffff800869837c>] lr : [<ffffff8008698360>] pstate: a00001c5
+sp : ffffffc0345cfc60
+x29: ffffffc0345cfc60 x28: ffffffc0345cc000
+x27: ffffff8008a4d000 x26: 000000000000008e
+x25: ffffff8008d86cb0 x24: ffffff800908b040
+x23: ffffffc036068870 x22: ffffff8009d0a000
+x21: ffffffc03512a410 x20: ffffffc03512a410
+x19: ffffffc03512a338 x18: 00000000000065ba
+x17: ffffff8009b16b80 x16: 0000000000000003
+x15: 00000000000065b9 x14: 00000000000065b6
+x13: 0000000000000000 x12: 0000000000000000
+x11: 000000000000003d x10: ffffffc0345cf9e0
+x9 : 0000000000000001 x8 : ffffffc0345cc000
+x7 : ffffff8008698360 x6 : 0000000000000000
+x5 : 0000000000000080 x4 : 0000000000000001
+x3 : 0000000000000000 x2 : 0000000000000000
+x1 : 0000000000000008 x0 : ffffffc034bc0000
 
->
-> Thanks.
->
+Process reboot (pid: 1957, stack limit = 0xffffffc0345cc020)
+Stack: (0xffffffc0345cfc60 to 0xffffffc0345d0000)
+fc60: ffffffc0345cfc90 ffffff8008698448 ffffffc03512a338 ffffffc03512a338
+fc80: ffffffc03512a410 ffffff8008a3bbfc ffffffc0345cfcc0 ffffff8008698548
+fca0: ffffffc03512a338 ffffffc03512a000 ffffffc03512a410 ffffff8009d0a000
+fcc0: ffffffc0345cfcf0 ffffff800865d2bc ffffffc036068828 ffffffc036068810
+fce0: ffffffc036003810 ffffff800853f43c ffffffc0345cfd00 ffffff800854338c
+fd00: ffffffc0345cfd10 ffffff800853f45c ffffffc0345cfd60 ffffff80080e0f48
+fd20: 0000000000000000 0000000001234567 ffffff8008f8c000 ffffff8008f8c060
+fd40: 0000000000000000 0000000000000015 0000000000000120 ffffff80080e0f30
+fd60: ffffffc0345cfd70 ffffff80080e1020 ffffffc0345cfd90 ffffff80080e12fc
+fd80: 0000000000000000 0000000001234567 0000000000000000 ffffff8008085e70
+fda0: 0000000000000000 0000005592905000 ffffffffffffffff 0000007f79daf1cc
+fdc0: 0000000000000000 0000000000000000 0000007ffcbb1198 000000000000000a
+fde0: 00000055928d3f58 0000000000000001 ffffffc034900000 00000000fffffffe
+fe00: ffffffc034900000 0000007f79da902c ffffffc0345cfe40 ffffff800820af38
+fe20: 0000000000000000 0000007ffcbb1078 ffffffffffffffff ffffff80081e9b38
+fe40: ffffffc0345cfe60 ffffff80081eb410 ffffffc0345cfe60 ffffff80081eb444
+fe60: ffffffc0345cfec0 ffffff80081ec4f4 0000000000000000 0000007ffcbb1078
+fe80: ffffffffffffffff 0000000000000015 ffffffc0345cfec0 0000007ffcbb1078
+fea0: 0000000000000002 000000000000000a ffffffffffffffff 0000000000000000
+fec0: 0000000000000000 ffffff8008085e70 fffffffffee1dead 0000000028121969
+fee0: 0000000001234567 0000000000000000 ffffffffffffffff 8080800000800000
+ff00: 0000800000808080 0000007ffcbb10f0 000000000000008e fefeff54918cb8c7
+ff20: 7f7f7f7fffffffff 0101010101010101 0000000000000010 0000000000000000
+ff40: 0000000000000000 0000007f79e33588 0000005592905eb8 0000007f79daf1b0
+ff60: 0000007ffcbb1340 0000005592906000 0000005592905000 0000005592906000
+ff80: 0000005592907000 0000000000000002 0000007ffcbb1d98 0000005592906000
+ffa0: 00000055928d2000 0000000000000000 0000000000000000 0000007ffcbb1aa0
+ffc0: 00000055928b819c 0000007ffcbb1aa0 0000007f79daf1cc 0000000000000000
+ffe0: fffffffffee1dead 000000000000008e 05ef555057155555 d555544d55d775d3
+Call trace:
+Exception stack(0xffffffc0345cfaa0 to 0xffffffc0345cfbc0)
+Set corner to 6
+faa0: ffffffc03512a338 ffffffc03512a410 ffffffc0345cfc60 ffffff800869837c
+fac0: ffffff8008114210 0000000100000001 ffffff8009ce1b20 ffffff8009ce5f20
+fae0: ffffffc0345cfb80 ffffff80081145a8 ffffffc0345cfc10 ffffff800810b924
+fb00: ffffffc0345cc000 00000000000001c0 ffffffc03512a410 ffffff8009d0a000
+fb20: ffffffc036068870 ffffff800908b040 ffffff8008d86cb0 000000000000008e
+fb40: ffffffc034bc0000 0000000000000008 0000000000000000 0000000000000000
+fb60: 0000000000000001 0000000000000080 0000000000000000 ffffff8008698360
+fb80: ffffffc0345cc000 0000000000000001 ffffffc0345cf9e0 000000000000003d
+fba0: 0000000000000000 0000000000000000 00000000000065b6 00000000000065b9
+[<ffffff800869837c>] ehci_halt+0x54/0x108
+[<ffffff8008698448>] ehci_silence_controller+0x18/0xcc
+[<ffffff8008698548>] ehci_shutdown+0x4c/0x64
+[<ffffff800865d2bc>] usb_hcd_platform_shutdown+0x1c/0x24
+[<ffffff800854338c>] platform_drv_shutdown+0x20/0x28
+[<ffffff800853f45c>] device_shutdown+0xf4/0x1b0
+[<ffffff80080e0f48>] kernel_restart_prepare+0x34/0x3c
+[<ffffff80080e1020>] kernel_restart+0x14/0x74
+[<ffffff80080e12fc>] SyS_reboot+0x110/0x21c
+[<ffffff8008085e70>] el0_svc_naked+0x24/0x28
+Code: 53001c42 350000a2 d5033e9f 91002021 (b9000022)
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/usb/host/ehci-hcd.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
+index ae1b6e6..43e57ba 100644
+--- a/drivers/usb/host/ehci-hcd.c
++++ b/drivers/usb/host/ehci-hcd.c
+@@ -368,6 +368,9 @@ static void ehci_shutdown(struct usb_hcd *hcd)
+ {
+ 	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
+ 
++	if (!HCD_HW_ACCESSIBLE(hcd))
++		return;
++
+ 	spin_lock_irq(&ehci->lock);
+ 	ehci->shutdown = true;
+ 	ehci->rh_state = EHCI_RH_STOPPING;
+-- 
+2.7.4
