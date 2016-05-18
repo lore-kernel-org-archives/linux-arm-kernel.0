@@ -1,54 +1,73 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Wed, 18 May 2016 16:56:18 +0200
-Subject: [PATCH v2 0/4] Add Amlogic secure monitor driver
-Message-ID: <1463583382-15614-1-git-send-email-carlo@caione.org>
+Date: Wed, 18 May 2016 16:56:20 +0200
+Subject: [PATCH v2 2/4] soc: dt-bindings: Add secure monitor header file for
+ GXBB
+In-Reply-To: <1463583382-15614-1-git-send-email-carlo@caione.org>
+References: <1463583382-15614-1-git-send-email-carlo@caione.org>
+Message-ID: <1463583382-15614-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-In the Amlogic SoCs the secure monitor calls are used for a lot of reasons:
-interact with the NVMEM (efuses), check the reboot reason, set USB boot, ...
+This patch adds the header file describing all the SMC function
+identifiers for the Amlogic Meson GXBB SoC.
 
-This driver defines a generic interface towards the secure monitor that can be
-used by more specialized drivers to interact with the secure monitor itself
-without worrying about bounce buffers managing.
-
-Changelog:
-
-v2:
-  * All the SMC function identifiers are now in a SoC-specific header file to
-    be included by the DTS files so the SMC commands are now defined in the DT
-    instead to be hardcoded into the driver
-  * Patchset is no longer an RFC
-  * Better error management and boundary checking
-  * s/unsigned int/u32/
-  * SMC call not only on CPU 0
-  * Fix memory leaking
-  * s/amlogic/meson/ in the directory names
-
-Carlo Caione (4):
-  soc: Amlogic: Add secure monitor driver
-  soc: dt-bindings: Add secure monitor header file for GXBB
-  ARM64: dts: amlogic: gxbb: Enable secure monitor
-  documentation: Add secure monitor binding documentation
-
- .../devicetree/bindings/soc/meson/meson_sm.txt     |  45 ++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   7 +
- drivers/soc/Kconfig                                |   1 +
- drivers/soc/Makefile                               |   1 +
- drivers/soc/meson/Kconfig                          |   8 ++
- drivers/soc/meson/Makefile                         |   1 +
- drivers/soc/meson/meson_sm.c                       | 155 +++++++++++++++++++++
- include/dt-bindings/soc/meson-gxbb-sm.h            |  44 ++++++
- include/linux/soc/meson/meson_sm.h                 |  22 +++
- 9 files changed, 284 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/meson/meson_sm.txt
- create mode 100644 drivers/soc/meson/Kconfig
- create mode 100644 drivers/soc/meson/Makefile
- create mode 100644 drivers/soc/meson/meson_sm.c
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ include/dt-bindings/soc/meson-gxbb-sm.h | 44 +++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
  create mode 100644 include/dt-bindings/soc/meson-gxbb-sm.h
- create mode 100644 include/linux/soc/meson/meson_sm.h
 
+diff --git a/include/dt-bindings/soc/meson-gxbb-sm.h b/include/dt-bindings/soc/meson-gxbb-sm.h
+new file mode 100644
+index 0000000..b7d02df
+--- /dev/null
++++ b/include/dt-bindings/soc/meson-gxbb-sm.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2016 Endless Mobile, Inc.
++ * Author: Carlo Caione <carlo@endlessm.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef _MESON_SM_GXBB_H_
++#define _MESON_SM_GXBB_H_
++
++#define SM_GET_SHARE_MEM_INPUT_BASE		0x82000020
++#define SM_GET_SHARE_MEM_OUTPUT_BASE		0x82000021
++#define SM_GET_REBOOT_REASON			0x82000022
++#define SM_GET_SHARE_STORAGE_IN_BASE		0x82000023
++#define SM_GET_SHARE_STORAGE_OUT_BASE		0x82000024
++#define SM_GET_SHARE_STORAGE_BLOCK_BASE		0x82000025
++#define SM_GET_SHARE_STORAGE_MESSAGE_BASE	0x82000026
++#define SM_GET_SHARE_STORAGE_BLOCK_SIZE		0x82000027
++#define SM_EFUSE_READ				0x82000030
++#define SM_EFUSE_WRITE				0x82000031
++#define SM_EFUSE_WRITE_PATTERN			0x82000032
++#define SM_EFUSE_USER_MAX			0x82000033
++#define SM_JTAG_ON				0x82000040
++#define SM_JTAG_OFF				0x82000041
++#define SM_SET_USB_BOOT_FUNC			0x82000043
++#define SM_SECURITY_KEY_QUERY			0x82000060
++#define SM_SECURITY_KEY_READ			0x82000061
++#define SM_SECURITY_KEY_WRITE			0x82000062
++#define SM_SECURITY_KEY_TELL			0x82000063
++#define SM_SECURITY_KEY_VERIFY			0x82000064
++#define SM_SECURITY_KEY_STATUS			0x82000065
++#define SM_SECURITY_KEY_NOTIFY			0x82000066
++#define SM_SECURITY_KEY_LIST			0x82000067
++#define SM_SECURITY_KEY_REMOVE			0x82000068
++#define SM_DEBUG_EFUSE_WRITE_PATTERN		0x820000F0
++#define SM_DEBUG_EFUSE_READ_PATTERN		0x820000F1
++#define SM_AML_DATA_PROCESS			0x820000FF
++
++#endif /* _MESON_SM_GXBB_H_ */
 -- 
 2.7.4
