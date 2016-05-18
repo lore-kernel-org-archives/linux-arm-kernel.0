@@ -1,38 +1,25 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 18 May 2016 15:36:38 +0100
-Subject: [PATCH v3 0/2] nvmem: remove regmap dependency
-In-Reply-To: <573C7C69.1050301@i2se.com>
-References: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
- <573C7C69.1050301@i2se.com>
-Message-ID: <573C7DF6.6020105@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 18 May 2016 07:38:39 -0700
+Subject: [PATCH omap v2 0/6] Fix OMAP uses of RCU from idle loop
+In-Reply-To: <20160516184844.GA20144@linux.vnet.ibm.com>
+References: <20160516184844.GA20144@linux.vnet.ibm.com>
+Message-ID: <573C7E6F.90001@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 18/05/16 15:30, Stefan Wahren wrote:
-> Hi Srinivas,
+On 05/16/2016 11:48 AM, Paul E. McKenney wrote:
+> Hello!
 >
-> Am 02.05.2016 um 20:36 schrieb Srinivas Kandagatla:
->> Hi Greg,
->>
->> This is v3 patchset for the leftover 2 patches for nvmem regmap
->> removal series [1]. These patches are based on char-misc tree.
->>
->> nvmem uses regmap_raw_read/write apis to read/write data from providers,
->> With recent patch 922a9f936e40 ("regmap: mmio: Convert to regmap_bus
->> and fix accessor usage") nvmem providers based on regmap-mmio stopped
->> working, as nvmem core was using raw accessors.
->> This issue can be fixed temporarly by moving to other regmap apis,
->> but we might hit same issue in future, and regmap looks like an
->> overdo for nvmem. Moving to interfaces based on read/write callbacks
->> from providers would be more robust.
+> The following series fixes a number of uses of RCU from the idle loop.
+> These are all due to tracing, so the fix is simply to append _rcuidle
+> to the event-tracing call.
 >
-> i noticed that Documentation/nvmem/nvmem.txt also needs a fix after
-> removing regmap dependency.
+> Changes since v1: Fix commit-log subjects and add maintainers on CC.
+>
 
-Thanks Stefan for reporting this, I will send a patch to fix that too.
+For the series, on top of mainline (which now experiences the problem fixed
+by this series):
 
---srini
->
->
+Tested-by: Guenter Roeck <linux@roeck-us.net>
+
+Guenter
