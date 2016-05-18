@@ -1,120 +1,49 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 18 May 2016 18:30:25 -0500
-Subject: [PATCH 1/2] Documentation: dt: add bindings for ti-cpufreq
-In-Reply-To: <cover.1463609497.git.d-gerlach@ti.com>
-References: <cover.1463609497.git.d-gerlach@ti.com>
-Message-ID: <f17fbc8acb1e903b9f175f49fe29563b83132faf.1463609497.git.d-gerlach@ti.com>
+Date: Wed, 18 May 2016 18:30:24 -0500
+Subject: [PATCH 0/2] cpufreq: Introduce TI CPUFreq/OPP Driver
+Message-ID: <cover.1463609497.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree bindings document for the TI CPUFreq/OPP driver
-on AM33xx and AM43xx SoCs. The operating-points-v2 binding allows us
-to provide an opp-supported-hw property for each OPP to define when
-it is available. This driver is responsible for reading and parsing
-registers to determine which OPPs can be selectively enabled based
-on the specific SoC in use by matching against the opp-supported-hw
-data.
+Hi,
+This series introduces the ti-cpufreq driver which parses SoC data and
+provides opp-supported-hw data to the OPP core in order to enable the
+proper OPPs for the silicon in use. It still relies on the cpufreq-dt
+driver to actually provide cpufreq and creates the "cpufreq-dt" platform
+driver after it probes as the sti-cpufreq driver does.
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- .../devicetree/bindings/cpufreq/ti-cpufreq.txt     | 89 ++++++++++++++++++++++
- 1 file changed, 89 insertions(+)
+This series will add support for am335x, am437x, dra7xx, and am57xx
+platforms, otherwise other TI devices will rely on the recently introduced
+cpufreq-dt-platdev code [1] to create the cpufreq-dt device. This means
+that the aforementioned platforms do *not* need to be added to
+cpufreq-dt-platdev. DTS patches for the above platforms are being sent in
+a separate series right after this one. Even without merging the DTS series,
+this series will not break backwards compatibility for those platforms above
+that already have operating-points v1 tables as the ti-cpufreq driver
+fails through and creates the cpufreq-dt platform device if no
+operating-points-v2 table is found.
+
+This series is based on linux-next next-20160517 tag, it depends on [2] which
+drops the default creation of the cpufreq-dt device from omap platform code,
+otherwise we'd end up with a duplicate because this driver creates it also.
+
+Regards,
+Dave
+
+[1] http://permalink.gmane.org/gmane.linux.power-management.general/73887
+[2] http://permalink.gmane.org/gmane.linux.power-management.general/75215
+
+Dave Gerlach (2):
+  Documentation: dt: add bindings for ti-cpufreq
+  cpufreq: ti: Add cpufreq driver to determine available OPPs at runtime
+
+ .../devicetree/bindings/cpufreq/ti-cpufreq.txt     |  89 ++++++++
+ drivers/cpufreq/Kconfig.arm                        |  11 +
+ drivers/cpufreq/Makefile                           |   1 +
+ drivers/cpufreq/ti-cpufreq.c                       | 254 +++++++++++++++++++++
+ 4 files changed, 355 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
+ create mode 100644 drivers/cpufreq/ti-cpufreq.c
 
-diff --git a/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-new file mode 100644
-index 000000000000..f719b2df2a1f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/cpufreq/ti-cpufreq.txt
-@@ -0,0 +1,89 @@
-+Bindings for TI's CPUFreq driver
-+================================
-+
-+The ti-cpufreq driver works with the operating-points-v2 binding described
-+at [../opp/opp.txt] to make sure the proper OPPs for a platform get enabled
-+and then creates a "cpufreq-dt" platform device to leverage the cpufreq-dt
-+driver described in [cpufreq-dt.txt].
-+
-+Certain TI SoCs, like those in the am335x, am437x, am57xx, and dra7xx
-+families support different OPPs depending on the silicon variant in use.
-+The ti-cpufreq driver uses the revision and an efuse value from the SoC to
-+provide the OPP framework with supported hardware information. This is used
-+to determine which OPPs from the operating-points-v2 table get enabled. In
-+order to maintain backwards compatilibity if this information is not present
-+the "cpufreq-dt" platform device is still created to attempt to find an
-+operating-points (v1) table, otherwise no OPPs will be available because
-+safe OPPs cannot be determined.
-+
-+Required properties:
-+--------------------
-+In 'cpus' nodes:
-+- operating-points-v2: Phandle to the operating-points-v2 table to use
-+- ti,syscon-efuse: Syscon phandle, offset to efuse register, efuse register
-+		   mask, and efuse register shift to get the relevant bits
-+		   that describe OPP availability
-+- ti,syscon-rev: Syscon and offset used to look up revision value on SoC
-+
-+In 'operating-points-v2' table:
-+- opp-supported-hw: Two bitfields indicating:
-+	1. Which revision of the SoC the OPP is supported by
-+	2. Which eFuse bits indicate this OPP is available
-+
-+	A bitwise and is performed against these values and if any bit
-+	matches, the OPP gets enabled.
-+
-+NOTE: Without the above, platform-device for "cpufreq-dt" is still created
-+      but no determination of which OPPs should be available is done, but this
-+      allows for use of a v1 operating-points table.
-+
-+Example:
-+--------
-+
-+/* From arch/arm/boot/dts/am4372.dtsi */
-+cpus {
-+	cpu: cpu at 0 {
-+		...
-+
-+		operating-points-v2 = <&cpu0_opp_table>;
-+
-+		ti,syscon-efuse = <&scm_conf 0x610 0x3f 0>;
-+		ti,syscon-rev = <&scm_conf 0x600>;
-+
-+		...
-+	};
-+};
-+
-+cpu0_opp_table: opp_table0 {
-+	compatible = "operating-points-v2";
-+	opp50 at 300000000 {
-+		opp-hz = /bits/ 64 <300000000>;
-+		opp-microvolt = <950000>;
-+		opp-supported-hw = <0xFF 0x01>;
-+		opp-suspend;
-+	};
-+
-+	opp100 at 600000000 {
-+		opp-hz = /bits/ 64 <600000000>;
-+		opp-microvolt = <1100000>;
-+		opp-supported-hw = <0xFF 0x04>;
-+	};
-+
-+	opp120 at 720000000 {
-+		opp-hz = /bits/ 64 <720000000>;
-+		opp-microvolt = <1200000>;
-+		opp-supported-hw = <0xFF 0x08>;
-+	};
-+
-+	oppturbo at 800000000 {
-+		opp-hz = /bits/ 64 <800000000>;
-+		opp-microvolt = <1260000>;
-+		opp-supported-hw = <0xFF 0x10>;
-+	};
-+
-+	oppnitro at 1000000000 {
-+		opp-hz = /bits/ 64 <1000000000>;
-+		opp-microvolt = <1325000>;
-+		opp-supported-hw = <0xFF 0x20>;
-+	};
-+};
 -- 
 2.7.3
