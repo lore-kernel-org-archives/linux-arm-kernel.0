@@ -1,49 +1,46 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 18 May 2016 10:56:39 -0400 (EDT)
-Subject: [PATCH] usb: echi-hcd: Add register access check in shutdown
-In-Reply-To: <1463580747-20868-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1605181044460.1981-100000@iolanthe.rowland.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 18 May 2016 16:56:21 +0200
+Subject: [PATCH v2 3/4] ARM64: dts: amlogic: gxbb: Enable secure monitor
+In-Reply-To: <1463583382-15614-1-git-send-email-carlo@caione.org>
+References: <1463583382-15614-1-git-send-email-carlo@caione.org>
+Message-ID: <1463583382-15614-4-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 May 2016, Srinivas Kandagatla wrote:
+From: Carlo Caione <carlo@endlessm.com>
 
-> This patch adds a check in ehci_shutdown(), to make sure
-> that the register access is available before accessing registers.
-> 
-> The use case is simple, for boards like DB410c where the usb host
-> or device functionality is decided based on the micro-usb cable
-> presence. If the board boots up with micro-usb connected and the
-> host driver is probed, but the ehci_setup() has not been done yet,
-> then a system shutdown would trigger below NULL pointer exception
-> without this patch.
+Add the secure monitor node in the Amlogic Meson GXBB DTSI file to
+enable it.
 
-How can that happen?  While the host driver is probed, the probing
-thread holds the device lock.  But the system shutdown routine acquires
-the device lock before invoking the ->shutdown callback.  Therefore the 
-two things cannot happen concurrently.
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> Unable to handle kernel NULL pointer dereference at virtual address
-> 00000008
-
-...
-
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -368,6 +368,9 @@ static void ehci_shutdown(struct usb_hcd *hcd)
->  {
->  	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
->  
-> +	if (!HCD_HW_ACCESSIBLE(hcd))
-> +		return;
-> +
->  	spin_lock_irq(&ehci->lock);
->  	ehci->shutdown = true;
->  	ehci->rh_state = EHCI_RH_STOPPING;
-
-This doesn't seem like the right place.  What you really should do is
-skip calling ehci_silence_controller() if the hardware isn't
-accessible.  That's where the hardware gets touched, not in
-ehci_shutdown().
-
-Alan Stern
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index 76b3b6d..003e298 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -44,6 +44,7 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/gpio/meson-gxbb-gpio.h>
++#include <dt-bindings/soc/meson-gxbb-sm.h>
+ 
+ / {
+ 	compatible = "amlogic,meson-gxbb";
+@@ -98,6 +99,12 @@
+ 		method = "smc";
+ 	};
+ 
++	sm {
++		compatible = "amlogic,meson-sm";
++		amlogic,sm_cmd_input_base = <SM_GET_SHARE_MEM_INPUT_BASE>;
++		amlogic,sm_cmd_output_base = <SM_GET_SHARE_MEM_OUTPUT_BASE>;
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <GIC_PPI 13
+-- 
+2.7.4
