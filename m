@@ -1,75 +1,82 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Wed, 18 May 2016 18:05:24 +0200
-Subject: [PATCH 0/5] drm: fixes for merge-window regressions
-In-Reply-To: <1463579106-400827-1-git-send-email-arnd@arndb.de>
-References: <1463579106-400827-1-git-send-email-arnd@arndb.de>
-Message-ID: <20160518160524.GI27098@phenom.ffwll.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 May 2016 18:07:33 +0200
+Subject: [PATCH 5/5] drm: remove unused dev variables
+In-Reply-To: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
+References: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
+Message-ID: <1463587653-3035181-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 03:45:01PM +0200, Arnd Bergmann wrote:
-> A couple of new warnings and build errors appeared through the DRM
-> tree in linux-next after the merge window opened. The first patch
-> here is for scripts/headers_check.pl, but as the bug is only
-> present in drm-next at the moment, it would be good to add all
-> five patches to that tree before they make it into mainline.
-> 
-> It's likely that some of these have already been fixed since
-> this morning's linux-next, so just ignore the ones are no
-> longer needed.
-> 
-> Arnd Bergmann (5):
->   headers_check: don't warn about c++ guards
->   drm: mediatek: add CONFIG_OF dependency
->   drm: mediatek: fixup drm_gem_object_lookup API change
->   drm: exynos: mark pm functions as __maybe_unused
->   drm: remove unused dev variables
+After drm_gem_object_lookup() was changed along with all its callers,
+we have several drivers that have unused variables:
 
-None of the actual patches seems to have made it onto dri-devel. Stuck
-somewhere?
--Daniel
+drm/armada/armada_crtc.c: In function 'armada_drm_crtc_cursor_set':
+drm/armada/armada_crtc.c:900:21: error: unused variable 'dev' [-Werror=unused-variable]
+drm/nouveau/nouveau_gem.c: In function 'validate_init':
+drm/nouveau/nouveau_gem.c:371:21: error: unused variable 'dev' [-Werror=unused-variable]
+drm/nouveau/nv50_display.c: In function 'nv50_crtc_cursor_set':
+drm/nouveau/nv50_display.c:1308:21: error: unused variable 'dev' [-Werror=unused-variable]
+drm/radeon/radeon_cs.c: In function 'radeon_cs_parser_relocs':
+drm/radeon/radeon_cs.c:77:21: error: unused variable 'ddev' [-Werror=unused-variable]
 
-> 
->  drivers/gpu/drm/armada/armada_crtc.c   | 1 -
->  drivers/gpu/drm/exynos/exynos_hdmi.c   | 6 ++----
->  drivers/gpu/drm/mediatek/Kconfig       | 1 +
->  drivers/gpu/drm/mediatek/mtk_drm_fb.c  | 2 +-
->  drivers/gpu/drm/mediatek/mtk_drm_gem.c | 2 +-
->  drivers/gpu/drm/nouveau/nouveau_gem.c  | 1 -
->  drivers/gpu/drm/nouveau/nv50_display.c | 1 -
->  drivers/gpu/drm/radeon/radeon_cs.c     | 1 -
->  scripts/headers_check.pl               | 4 ++++
->  9 files changed, 9 insertions(+), 10 deletions(-)
-> 
-> 
-> Cc: Russell King <rmk+kernel@armlinux.org.uk>
-> Cc: Inki Dae <inki.dae@samsung.com>
-> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
-> Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: Matthias Brugger <matthias.bgg@gmail.com>
-> Cc: Ben Skeggs <bskeggs@redhat.com>
-> Cc: Alex Deucher <alexander.deucher@amd.com>
-> Cc: "Christian K?nig" <christian.koenig@amd.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-mediatek at lists.infradead.org
-> Cc: nouveau at lists.freedesktop.org
-> 
-> -- 
-> 2.7.0
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+This fixes all the instances I found with ARM randconfig builds so far.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: a8ad0bd84f98 ("drm: Remove unused drm_device from drm_gem_object_lookup()")
+---
+ drivers/gpu/drm/armada/armada_crtc.c   | 1 -
+ drivers/gpu/drm/nouveau/nouveau_gem.c  | 1 -
+ drivers/gpu/drm/nouveau/nv50_display.c | 1 -
+ drivers/gpu/drm/radeon/radeon_cs.c     | 1 -
+ 4 files changed, 4 deletions(-)
+
+diff --git a/drivers/gpu/drm/armada/armada_crtc.c b/drivers/gpu/drm/armada/armada_crtc.c
+index a9b7e0f36513..3130aa8bcdd0 100644
+--- a/drivers/gpu/drm/armada/armada_crtc.c
++++ b/drivers/gpu/drm/armada/armada_crtc.c
+@@ -897,7 +897,6 @@ static void cursor_update(void *data)
+ static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
+ 	struct drm_file *file, uint32_t handle, uint32_t w, uint32_t h)
+ {
+-	struct drm_device *dev = crtc->dev;
+ 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
+ 	struct armada_gem_object *obj = NULL;
+ 	int ret;
+diff --git a/drivers/gpu/drm/nouveau/nouveau_gem.c b/drivers/gpu/drm/nouveau/nouveau_gem.c
+index 445a9e2fb91a..a030e218adf7 100644
+--- a/drivers/gpu/drm/nouveau/nouveau_gem.c
++++ b/drivers/gpu/drm/nouveau/nouveau_gem.c
+@@ -368,7 +368,6 @@ validate_init(struct nouveau_channel *chan, struct drm_file *file_priv,
+ 	      int nr_buffers, struct validate_op *op)
+ {
+ 	struct nouveau_cli *cli = nouveau_cli(file_priv);
+-	struct drm_device *dev = chan->drm->dev;
+ 	int trycnt = 0;
+ 	int ret, i;
+ 	struct nouveau_bo *res_bo = NULL;
+diff --git a/drivers/gpu/drm/nouveau/nv50_display.c b/drivers/gpu/drm/nouveau/nv50_display.c
+index 47761a92926e..ec2e67eb8980 100644
+--- a/drivers/gpu/drm/nouveau/nv50_display.c
++++ b/drivers/gpu/drm/nouveau/nv50_display.c
+@@ -1305,7 +1305,6 @@ nv50_crtc_cursor_set(struct drm_crtc *crtc, struct drm_file *file_priv,
+ 		     uint32_t handle, uint32_t width, uint32_t height)
+ {
+ 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
+-	struct drm_device *dev = crtc->dev;
+ 	struct drm_gem_object *gem = NULL;
+ 	struct nouveau_bo *nvbo = NULL;
+ 	int ret = 0;
+diff --git a/drivers/gpu/drm/radeon/radeon_cs.c b/drivers/gpu/drm/radeon/radeon_cs.c
+index 271652963fa1..510ea371dacc 100644
+--- a/drivers/gpu/drm/radeon/radeon_cs.c
++++ b/drivers/gpu/drm/radeon/radeon_cs.c
+@@ -74,7 +74,6 @@ static void radeon_cs_buckets_get_list(struct radeon_cs_buckets *b,
+ 
+ static int radeon_cs_parser_relocs(struct radeon_cs_parser *p)
+ {
+-	struct drm_device *ddev = p->rdev->ddev;
+ 	struct radeon_cs_chunk *chunk;
+ 	struct radeon_cs_buckets buckets;
+ 	unsigned i;
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+2.7.0
