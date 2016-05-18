@@ -1,182 +1,143 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Wed, 18 May 2016 08:06:34 -0500
-Subject: [PATCH v2 2/5] arm64: efi: apply strict permissons for UEFI
- Runtime Services regions
-In-Reply-To: <CAKv+Gu-Tam+QiXc_f0e+x8hNc4rxP_-59NdaCHkF9h=4Rd+XeA@mail.gmail.com>
-References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
- <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
- <573BB9FE.7050008@codeaurora.org>
- <CAKv+Gu-Tam+QiXc_f0e+x8hNc4rxP_-59NdaCHkF9h=4Rd+XeA@mail.gmail.com>
-Message-ID: <573C68DA.8080009@codeaurora.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 15:08:18 +0200
+Subject: [PATCH v4 29/56] KVM: arm/arm64: vgic-new: Add CONFIG registers
+ handlers
+In-Reply-To: <1463392481-26583-30-git-send-email-andre.przywara@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-30-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160518130818.GH3827@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Mon, May 16, 2016 at 10:53:17AM +0100, Andre Przywara wrote:
+> The config register handlers are shared between the v2 and v3
+> emulation, so their implementation goes into vgic-mmio.c, to be
+> easily referenced from the v3 emulation as well later.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog v1 .. v2:
+> - adapt to new MMIO framework
+> 
+> Changelog v3 .. v4:
+> - specify accessor width
+> - use IRQ number accessor macro
+> - replace extract_bytes() with simple return
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 46 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h    |  7 ++++++
+>  3 files changed, 54 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index d564a30..bb7389e 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -96,7 +96,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 2,
+> +		vgic_mmio_read_config, vgic_mmio_write_config, 2,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index 5c8af05..5fe6896 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -277,6 +277,52 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
+> +				    gpa_t addr, unsigned int len)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
+> +	u32 value = 0;
+> +	int i;
+> +
+> +	for (i = 0; i < len * 4; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (irq->config == VGIC_CONFIG_EDGE)
+> +			value |= (2U << (i * 2));
+> +	}
+> +
+> +	return value;
+> +}
+> +
+> +void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+> +			    gpa_t addr, unsigned int len,
+> +			    unsigned long val)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
+> +	int i;
+> +
+> +	for (i = 0; i < len * 4; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (intid + i < 16)
+> +			continue;
 
-We are not using the permission attribute table and all the Runtime
-Data/Code regions are marked with 'XP' bit. Do you think something
-wrong in our UEFI implementation or Linux has to map RuntimeCode
-regions with executable permission always irrespective of an attribute
-flag EFI_MEMORY_XP?
+from my last round of commenting:
 
-[    0.000000] efi: Processing EFI memory map:
-[    0.000000] efi:   0x000000100000-0x00000010ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-[    0.000000] efi:   0x00003b830000-0x00003b83ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-[    0.000000] efi:   0x00003c000000-0x00003fffffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-[    0.000000] efi:   0x000000100000-0x00000010ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-[    0.000000] efi:   0x00003b830000-0x00003b83ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-[    0.000000] efi:   0x00003c000000-0x00003fffffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-[    0.000000] efi:   0x004000820000-0x00400085ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x004003080000-0x00400308ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047f9960000-0x0047f997ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fa9c0000-0x0047fa9cffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047faa30000-0x0047faa3ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fab90000-0x0047fab9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047faba0000-0x0047fabaffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fab90000-0x0047fab9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047faba0000-0x0047fabaffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fabb0000-0x0047fabbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fabc0000-0x0047fad9ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fada0000-0x0047fae2ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047faf50000-0x0047faf7ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fafa0000-0x0047fafbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047faf50000-0x0047faf7ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fafa0000-0x0047fafbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fff90000-0x0047fff9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-[    0.000000] efi:   0x0047fffb0000-0x0047fffdffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+s/16/VGIC_NR_SGIS/
 
+It's implementation defined if software can program the configuration of
+PPIs, and since our timer code relies on its virtual PPI always being
+level triggered, I think we should change the above to
+VGIC_NR_PRIVATE_IRQS and then if someone ever needs a configurable
+virtual PPI, we can add that later.
 
-On 05/18/2016 01:18 AM, Ard Biesheuvel wrote:
-> On 18 May 2016 at 02:40, Shanker Donthineni <shankerd@codeaurora.org> wrote:
->> Hi Ard,
->>
->> This patch causing the kernel boot fail using the UEFI firmware on
->> Qualcomm Technologies QDF2XXX server platforms.
->>
->> +       /* RW- */
->> +       if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
->> +               return pgprot_val(PAGE_KERNEL);
->> +
->>
->> Changing above condition from 'or' to 'and' fixed the problem.Are we
->> missing something here or intentionally implemented this logic?
-> The logic is sound, I think. If you need execute permissions on a
-> non-code region with the XP bit set, there is something wrong in the
-> firmware, unless you are hitting this case for an MMIO region perhaps?
-> Could you share the kernel log with efi=debug enabled?
->
->> At least
->> we need some pr_warn here if UEFI firmware passes EFI_RUNTIME_SEVRICE_CODE
->> region that has an attribute EFI_MEMORY_XP.
->>
-> No. DXE_RUNTIME_DRIVER modules are implemented as PE/COFF binaries,
-> which are covered completely by EfiRuntimeServicesCode regions.
-> However, a PE/COFF image consists of .text and .data sections, which
-> require different permissions, so PE/COFF binaries are represented by
-> several memory map entries in the memory attributes table, all of
-> which have a code type, but differ in the permission bits.
->
->>
->> On 03/30/2016 11:38 AM, Ard Biesheuvel wrote:
->>> Recent UEFI versions expose permission attributes for runtime services
->>> memory regions, either in the UEFI memory map or in the separate memory
->>> attributes table. This allows the kernel to map these regions with
->>> stricter permissions, rather than the RWX permissions that are used by
->>> default. So wire this up in our mapping routine.
->>>
->>> Note that in the absence of permission attributes, we still only map
->>> regions of type EFI_RUNTIME_SERVICE_CODE with the executable bit set.
->>> Also, we base the mapping attributes of EFI_MEMORY_MAPPED_IO on the
->>> type directly rather than on the absence of the EFI_MEMORY_WB attribute.
->>> This is more correct, but is also required for compatibility with the
->>> upcoming support for the Memory Attributes Table, which only carries
->>> permission attributes, not memory type attributes.
->>>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>> ---
->>>  arch/arm64/kernel/efi.c | 54 +++++++++++++++-----
->>>  1 file changed, 40 insertions(+), 14 deletions(-)
->>>
->>> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->>> index b6abc852f2a1..33a6da160a50 100644
->>> --- a/arch/arm64/kernel/efi.c
->>> +++ b/arch/arm64/kernel/efi.c
->>> @@ -17,22 +17,48 @@
->>>
->>>  #include <asm/efi.h>
->>>
->>> -int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t
->>> *md)
->>> +/*
->>> + * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
->>> + * executable, everything else can be mapped with the XN bits
->>> + * set. Also take the new (optional) RO/XP bits into account.
->>> + */
->>> +static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
->>>  {
->>> -     pteval_t prot_val;
->>> +     u64 attr = md->attribute;
->>> +     u32 type = md->type;
->>>
->>> -     /*
->>> -      * Only regions of type EFI_RUNTIME_SERVICES_CODE need to be
->>> -      * executable, everything else can be mapped with the XN bits
->>> -      * set.
->>> -      */
->>> -     if ((md->attribute & EFI_MEMORY_WB) == 0)
->>> -             prot_val = PROT_DEVICE_nGnRE;
->>> -     else if (md->type == EFI_RUNTIME_SERVICES_CODE ||
->>> -              !PAGE_ALIGNED(md->phys_addr))
->>> -             prot_val = pgprot_val(PAGE_KERNEL_EXEC);
->>> -     else
->>> -             prot_val = pgprot_val(PAGE_KERNEL);
->>> +     if (type == EFI_MEMORY_MAPPED_IO)
->>> +             return PROT_DEVICE_nGnRE;
->>> +
->>> +     if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
->>> +                   "UEFI Runtime regions are not aligned to 64 KB --
->>> buggy firmware?"))
->>> +             /*
->>> +              * If the region is not aligned to the page size of the
->>> OS, we
->>> +              * can not use strict permissions, since that would also
->>> affect
->>> +              * the mapping attributes of the adjacent regions.
->>> +              */
->>> +             return pgprot_val(PAGE_KERNEL_EXEC);
->>> +
->>> +     /* R-- */
->>> +     if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
->>> +         (EFI_MEMORY_XP | EFI_MEMORY_RO))
->>> +             return pgprot_val(PAGE_KERNEL_RO);
->>> +
->>> +     /* R-X */
->>> +     if (attr & EFI_MEMORY_RO)
->>> +             return pgprot_val(PAGE_KERNEL_ROX);
->>> +
->>> +     /* RW- */
->>> +     if (attr & EFI_MEMORY_XP || type != EFI_RUNTIME_SERVICES_CODE)
->>> +             return pgprot_val(PAGE_KERNEL);
->>> +
->>> +     /* RWX */
->>> +     return pgprot_val(PAGE_KERNEL_EXEC);
->>> +}
->>> +
->>> +int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t
->>> *md)
->>> +{
->>> +     pteval_t prot_val = create_mapping_protection(md);
->>>
->>>       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
->>>                          md->num_pages << EFI_PAGE_SHIFT,
->> --
->> Shanker Donthineni
->> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
->> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
->>
+> +
+> +		/*
+> +		 * The spec says that interrupts must be disabled before
+> +		 * changing the configuration to avoid UNDEFINED behaviour.
+> +		 */
 
--- 
-Shanker Donthineni
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+I'm still not sure what the benefit of having this comment here is?
+
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		if (test_bit(i * 2 + 1, &val)) {
+> +			irq->config = VGIC_CONFIG_EDGE;
+> +		} else {
+> +			irq->config = VGIC_CONFIG_LEVEL;
+> +			irq->pending = irq->line_level | irq->soft_pending;
+> +		}
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +}
+> +
+>  static int match_region(const void *key, const void *elt)
+>  {
+>  	const unsigned int offset = (unsigned long)key;
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+> index 6983922..0bd0ece 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.h
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
+> @@ -124,6 +124,13 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
+>  			      gpa_t addr, unsigned int len,
+>  			      unsigned long val);
+>  
+> +unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
+> +				    gpa_t addr, unsigned int len);
+> +
+> +void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
+> +			    gpa_t addr, unsigned int len,
+> +			    unsigned long val);
+> +
+>  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+>  
+>  #endif
+> -- 
+> 2.8.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks,
+-Christoffer
