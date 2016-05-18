@@ -1,40 +1,136 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 17 May 2016 17:47:34 -0700
-Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
- errors
-In-Reply-To: <CAD=FV=WFAZqAsXOqunt0fxw87M-FruwUrxuzW0MJsG6UvfSjzA@mail.gmail.com>
-References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
- <5502CA4E.9060401@samsung.com>
- <CAD=FV=VX3ix-j4y95W1q8b-aVuVEN+4xsd8WLx2xcE7KPNJwRw@mail.gmail.com>
- <5506707D.40708@samsung.com> <55189F04.8000404@samsung.com>
- <CAD=FV=WFAZqAsXOqunt0fxw87M-FruwUrxuzW0MJsG6UvfSjzA@mail.gmail.com>
-Message-ID: <CAD=FV=UJGcwa_biSCGhD=kS-T+fppCniBFfOHb5ohnwSwSwMMA@mail.gmail.com>
+From: lv.zheng@intel.com (Zheng, Lv)
+Date: Wed, 18 May 2016 01:08:06 +0000
+Subject: [PATCH 2/3] ACPI: table upgrade: move early_initrd_acpi_init()
+ to header file
+In-Reply-To: <1463486765-31827-3-git-send-email-aleksey.makarov@linaro.org>
+References: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463486765-31827-3-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1AE640813FDE7649BE1B193DEA596E883BBA2DBF@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jaehoon,
+Hi,
 
-On Mon, Mar 30, 2015 at 8:47 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Jaehoon,
->
-> On Sun, Mar 29, 2015 at 5:55 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->> Dear Doug,
->>
->> I'm considering to control HLE error..So holding this patch.
->> If this is absolutely necessary patch, let me know, plz.
->>
->> Best Regards,
->> Jaehoon Chung
->
-> Sounds OK.  I have certainly applied this locally and the driver isn't
-> robust against insertions / removals without it, but once the card is
-> inserted things are OK so it's probably not urgent that it be applied
-> upstream.  Hopefully we can figure out a better solution...
+> From: Aleksey Makarov [mailto:aleksey.makarov at linaro.org]
+> Subject: [PATCH 2/3] ACPI: table upgrade: move early_initrd_acpi_init() to
+> header file
+> 
+> Move early_initrd_acpi_init() to header file so that
+> it can be used with architectures other than X86
+[Lv Zheng] 
+The patch looks OK to me.
+Except 2 possible improvements.
+You can feel free to add Acked-by: Lv Zheng <lv.zheng@intel.com>
 
-I'm now testing a nice new rebased kernel and I'm hitting this again.
+> 
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> ---
+>  arch/x86/kernel/setup.c | 7 -------
+>  drivers/acpi/tables.c   | 7 +++++--
+>  include/linux/acpi.h    | 4 ++--
+>  3 files changed, 7 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/x86/kernel/setup.c b/arch/x86/kernel/setup.c
+> index c4e7b39..5ddbbfd 100644
+> --- a/arch/x86/kernel/setup.c
+> +++ b/arch/x86/kernel/setup.c
+> @@ -399,10 +399,6 @@ static void __init reserve_initrd(void)
+>  	memblock_free(ramdisk_image, ramdisk_end - ramdisk_image);
+>  }
+> 
+> -static void __init early_initrd_acpi_init(void)
+> -{
+> -	early_acpi_table_init((void *)initrd_start, initrd_end - initrd_start);
+> -}
+>  #else
+>  static void __init early_reserve_initrd(void)
+>  {
+> @@ -410,9 +406,6 @@ static void __init early_reserve_initrd(void)
+>  static void __init reserve_initrd(void)
+>  {
+>  }
+> -static void __init early_initrd_acpi_init(void)
+> -{
+> -}
+>  #endif /* CONFIG_BLK_DEV_INITRD */
+> 
+>  static void __init parse_setup_data(void)
+> diff --git a/drivers/acpi/tables.c b/drivers/acpi/tables.c
+> index 449a649..82be84a 100644
+> --- a/drivers/acpi/tables.c
+> +++ b/drivers/acpi/tables.c
+> @@ -34,6 +34,7 @@
+>  #include <linux/bootmem.h>
+>  #include <linux/earlycpio.h>
+>  #include <linux/memblock.h>
+> +#include <linux/initrd.h>
+>  #include "internal.h"
+> 
+>  #ifdef CONFIG_ACPI_CUSTOM_DSDT
+> @@ -742,9 +743,11 @@ acpi_os_table_override(struct acpi_table_header
+> *existing_table,
+>  	return AE_OK;
+>  }
+> 
+> -void __init early_acpi_table_init(void *data, size_t size)
+> +void __init early_initrd_acpi_init(void)
+>  {
+> -	acpi_table_initrd_init(data, size);
+> +#ifdef CONFIG_BLK_DEV_INITRD
+> +	acpi_table_initrd_init((void *)initrd_start, initrd_end - initrd_start);
+> +#endif
+>  }
+[Lv Zheng] 
+Please avoid to make #ifdef appearing in a function body.
+You may consider a way to maintain #ifdef CONFIG_xxx at function boundary.
+The point is:
+#ifdef should be maintained at the function boundary, this is an implicit (maybe explicit in Documentation) programming rule in Linux.
+This helps to split the "functionality" and the "dependency" to make the code cleaner and easier to follow.
 
-Of course I'll just pick my same patch to my new kernel tree, but
-since it's been a year and nobody has done anything better, would you
-consider landing my patch?  It is certainly better than nothing.
+For this case, you may:
+#ifdef CONFIG_BLK_DEV_INTRD
+#define ACPI_TABLE_INITRD_DATA	(initrd_start)
+#define ACPI_TABLE_INITRD_SIZE	(initrd_end - initrd_start)
+#else
+#define ACPI_TABLE_INITRD_DATA	NULL
+#define ACPI_TABLE_INITRD_SIZE	0
+#endif
 
--Doug
+Or you can:
+Use initrd_start, inird_end directly in acpi_table_initrd_init, and delete its arguments.
+By doing so, you are able to achieve in-function #ifdef elimination by providing a stub for acpi_table_initrd_init().
+
+> 
+>  /*
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 288fac5..cb700c1 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -208,7 +208,7 @@ void acpi_boot_table_init (void);
+>  int acpi_mps_check (void);
+>  int acpi_numa_init (void);
+> 
+> -void early_acpi_table_init(void *data, size_t size);
+> +void early_initrd_acpi_init(void);
+>  int acpi_table_init (void);
+>  int acpi_table_parse(char *id, acpi_tbl_table_handler handler);
+>  int __init acpi_parse_entries(char *id, unsigned long table_size,
+> @@ -588,7 +588,7 @@ static inline const char *acpi_dev_name(struct
+> acpi_device *adev)
+>  	return NULL;
+>  }
+> 
+> -static inline void early_acpi_table_init(void *data, size_t size) { }
+> +static inline void early_initrd_acpi_init(void) { }
+>  static inline void acpi_early_init(void) { }
+>  static inline void acpi_subsystem_init(void) { }
+> 
+[Lv Zheng] 
+You can rename early_initrd_acpi_init to early_acpi_table_init.
+We'd prefer not to export "initrd" awareness from acpi.h.
+
+Thanks and best regards
+-Lv
+
+> --
+> 2.8.2
