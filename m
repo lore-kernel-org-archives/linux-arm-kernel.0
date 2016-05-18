@@ -1,62 +1,123 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 18 May 2016 18:36:26 -0500
-Subject: [PATCH 1/8] ARM: dts: am335x: Update MPU regulator range for TI boards
+Date: Wed, 18 May 2016 18:36:32 -0500
+Subject: [PATCH 7/8] ARM: dts: dra7: Move cpus node to parent dts for dra74x
+ and dra72x
 In-Reply-To: <cover.1463606963.git.d-gerlach@ti.com>
 References: <cover.1463606963.git.d-gerlach@ti.com>
-Message-ID: <8df50393ed0b2caf3f29408ad378ea16d94464db.1463606963.git.d-gerlach@ti.com>
+Message-ID: <282afe5e02c165dfd6d5de7d7480a8854cfe16a8.1463606963.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we are moving to OPPv2 bindings and able to add 1GHz OPP for
-MPU, let's update the max MPU voltage range to align with the maximum
-possible value allowed in the operating-points table, which is max
-target voltage of 132500 uV + 2%.
+Nearly all of the information in the cpus node, especially for cpu0, is
+the same between dra74x and dra72x so move the common information to
+the parent dra7.dtsi to avoid duplication of data.
 
 Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
 ---
- arch/arm/boot/dts/am335x-bone-common.dtsi | 2 +-
- arch/arm/boot/dts/am335x-evm.dts          | 2 +-
- arch/arm/boot/dts/am335x-evmsk.dts        | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi   | 27 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/dra72x.dtsi | 16 ----------------
+ arch/arm/boot/dts/dra74x.dtsi | 24 ------------------------
+ 3 files changed, 27 insertions(+), 40 deletions(-)
 
-diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
-index 0cc150b87b86..13133f3587b8 100644
---- a/arch/arm/boot/dts/am335x-bone-common.dtsi
-+++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
-@@ -318,7 +318,7 @@
- 			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
- 			regulator-name = "vdd_mpu";
- 			regulator-min-microvolt = <925000>;
--			regulator-max-microvolt = <1325000>;
-+			regulator-max-microvolt = <1351500>;
- 			regulator-boot-on;
- 			regulator-always-on;
- 		};
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 516673bb023d..5d28712ad253 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -640,7 +640,7 @@
- 			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
- 			regulator-name = "vdd_mpu";
- 			regulator-min-microvolt = <912500>;
--			regulator-max-microvolt = <1312500>;
-+			regulator-max-microvolt = <1351500>;
- 			regulator-boot-on;
- 			regulator-always-on;
- 		};
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 282fe1b37095..09308d66645b 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -560,7 +560,7 @@
- 			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
- 			regulator-name = "vdd_mpu";
- 			regulator-min-microvolt = <912500>;
--			regulator-max-microvolt = <1312500>;
-+			regulator-max-microvolt = <1351500>;
- 			regulator-boot-on;
- 			regulator-always-on;
- 		};
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 406f6ff21d7f..104b62657163 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -73,6 +73,33 @@
+ 		interrupt-parent = <&gic>;
+ 	};
+ 
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a15";
++			reg = <0>;
++
++			operating-points = <
++				/* kHz    uV */
++				1000000	1060000
++				1176000	1160000
++				>;
++
++			clocks = <&dpll_mpu_ck>;
++			clock-names = "cpu";
++
++			clock-latency = <300000>; /* From omap-cpufreq driver */
++
++			/* cooling options */
++			cooling-min-level = <0>;
++			cooling-max-level = <2>;
++			#cooling-cells = <2>; /* min followed by max */
++		};
++	};
++
+ 	/*
+ 	 * The soc node represents the soc top level view. It is used for IPs
+ 	 * that are not memory mapped in the MPU view or for the MPU itself.
+diff --git a/arch/arm/boot/dts/dra72x.dtsi b/arch/arm/boot/dts/dra72x.dtsi
+index 70a217050a4c..67107605fb4c 100644
+--- a/arch/arm/boot/dts/dra72x.dtsi
++++ b/arch/arm/boot/dts/dra72x.dtsi
+@@ -12,22 +12,6 @@
+ / {
+ 	compatible = "ti,dra722", "ti,dra72", "ti,dra7";
+ 
+-	cpus {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		cpu0: cpu at 0 {
+-			device_type = "cpu";
+-			compatible = "arm,cortex-a15";
+-			reg = <0>;
+-
+-			/* cooling options */
+-			cooling-min-level = <0>;
+-			cooling-max-level = <2>;
+-			#cooling-cells = <2>; /* min followed by max */
+-		};
+-	};
+-
+ 	pmu {
+ 		compatible = "arm,cortex-a15-pmu";
+ 		interrupt-parent = <&wakeupgen>;
+diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+index 4220eeffc65a..0c31db3a8919 100644
+--- a/arch/arm/boot/dts/dra74x.dtsi
++++ b/arch/arm/boot/dts/dra74x.dtsi
+@@ -13,30 +13,6 @@
+ 	compatible = "ti,dra742", "ti,dra74", "ti,dra7";
+ 
+ 	cpus {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		cpu0: cpu at 0 {
+-			device_type = "cpu";
+-			compatible = "arm,cortex-a15";
+-			reg = <0>;
+-
+-			operating-points = <
+-				/* kHz    uV */
+-				1000000	1060000
+-				1176000	1160000
+-				>;
+-
+-			clocks = <&dpll_mpu_ck>;
+-			clock-names = "cpu";
+-
+-			clock-latency = <300000>; /* From omap-cpufreq driver */
+-
+-			/* cooling options */
+-			cooling-min-level = <0>;
+-			cooling-max-level = <2>;
+-			#cooling-cells = <2>; /* min followed by max */
+-		};
+ 		cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a15";
 -- 
 2.7.3
