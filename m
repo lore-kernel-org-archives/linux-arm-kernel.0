@@ -1,43 +1,109 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Wed, 18 May 2016 16:16:25 +0200
-Subject: 4.5-rc0 regression: GPRS breaks after very short while
-In-Reply-To: <20160518074924.GA20652@amd>
-References: <20160518074924.GA20652@amd>
-Message-ID: <20160518141624.GA8025@earth>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 18 May 2016 15:18:13 +0100
+Subject: [PATCH v3 10/55] KVM: arm/arm64: Export mmio_read/write_bus
+In-Reply-To: <1462531568-9799-11-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <573C79A5.6080008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On Wed, May 18, 2016 at 09:49:24AM +0200, Pavel Machek wrote:
-> I was afraid another GSM chip desoldered itself in N900, but no, it
-> seems to be software this time.
+On 06/05/16 11:45, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
 > 
-> In 4.4, GPRS is rock solid, can survive overnight ping.
+> Rename mmio_{read,write}_bus to kvm_mmio_{read,write}_bus and export
+> them out of mmio.c.
+> This will be needed later for the new VGIC implementation.
 > 
-> In 4.5-rc0 and v4.6, modem fails when I use gprs for like a
-> minute. Phone is not usable.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-I only send three modem related changes for v4.5:
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/commit/?h=hsi-for-4.5&id=525e1abc6b5a7d8bd9006de1da6e99722305ea2b
-HSI: omap_ssi: fix handling ida_simple_get result
+Thanks,
+Andre.
 
-https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/commit/?h=hsi-for-4.5&id=6bf6ded3008a407ccab5ad72eb59ab71b97cc290
-HSI: omap_ssi_port: fix handling of_get_named_gpio result
-
-https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/commit/?h=hsi-for-4.5&id=403c5c0650816375527a6feecfb255d9b494dda3
-HSI: Remove struct hsi_client private fields from kernel-doc
-
-The last one only changes a comment, so not relevant, the other
-two fix error handling during initialization and are most likely
-also not the problem. Can you try to bisect the problem?
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160518/bf6ba04e/attachment.sig>
+> ---
+>  arch/arm/include/asm/kvm_mmio.h   |  3 +++
+>  arch/arm/kvm/mmio.c               | 10 +++++-----
+>  arch/arm64/include/asm/kvm_mmio.h |  3 +++
+>  3 files changed, 11 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/kvm_mmio.h b/arch/arm/include/asm/kvm_mmio.h
+> index d8e90c8..f3a7de7 100644
+> --- a/arch/arm/include/asm/kvm_mmio.h
+> +++ b/arch/arm/include/asm/kvm_mmio.h
+> @@ -28,6 +28,9 @@ struct kvm_decode {
+>  	bool sign_extend;
+>  };
+>  
+> +void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data);
+> +unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len);
+> +
+>  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		 phys_addr_t fault_ipa);
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 0158e9e..10f80a6 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -23,7 +23,7 @@
+>  
+>  #include "trace.h"
+>  
+> -static void mmio_write_buf(char *buf, unsigned int len, unsigned long data)
+> +void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data)
+>  {
+>  	void *datap = NULL;
+>  	union {
+> @@ -55,7 +55,7 @@ static void mmio_write_buf(char *buf, unsigned int len, unsigned long data)
+>  	memcpy(buf, datap, len);
+>  }
+>  
+> -static unsigned long mmio_read_buf(char *buf, unsigned int len)
+> +unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len)
+>  {
+>  	unsigned long data = 0;
+>  	union {
+> @@ -66,7 +66,7 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
+>  
+>  	switch (len) {
+>  	case 1:
+> -		data = buf[0];
+> +		data = *(u8 *)buf;
+>  		break;
+>  	case 2:
+>  		memcpy(&tmp.hword, buf, len);
+> @@ -103,7 +103,7 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		if (len > sizeof(unsigned long))
+>  			return -EINVAL;
+>  
+> -		data = mmio_read_buf(run->mmio.data, len);
+> +		data = kvm_mmio_read_buf(run->mmio.data, len);
+>  
+>  		if (vcpu->arch.mmio_decode.sign_extend &&
+>  		    len < sizeof(unsigned long)) {
+> @@ -189,7 +189,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  					       len);
+>  
+>  		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, len, fault_ipa, data);
+> -		mmio_write_buf(data_buf, len, data);
+> +		kvm_mmio_write_buf(data_buf, len, data);
+>  
+>  		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, fault_ipa, len,
+>  				       data_buf);
+> diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
+> index fe612a9..75ea420 100644
+> --- a/arch/arm64/include/asm/kvm_mmio.h
+> +++ b/arch/arm64/include/asm/kvm_mmio.h
+> @@ -30,6 +30,9 @@ struct kvm_decode {
+>  	bool sign_extend;
+>  };
+>  
+> +void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data);
+> +unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len);
+> +
+>  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		 phys_addr_t fault_ipa);
+> 
