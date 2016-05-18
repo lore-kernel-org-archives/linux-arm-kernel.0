@@ -1,85 +1,36 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 May 2016 18:35:18 -0500
-Subject: [PATCH v2 4/4] documentation: Add secure monitor binding
- documentation
-In-Reply-To: <1463583382-15614-5-git-send-email-carlo@caione.org>
-References: <1463583382-15614-1-git-send-email-carlo@caione.org>
- <1463583382-15614-5-git-send-email-carlo@caione.org>
-Message-ID: <20160518233518.GA11027@rob-hp-laptop>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 18 May 2016 18:36:31 -0500
+Subject: [PATCH 6/8] ARM: dts: dra7: Add dt node for the syscon control module
+ wkup
+In-Reply-To: <cover.1463606963.git.d-gerlach@ti.com>
+References: <cover.1463606963.git.d-gerlach@ti.com>
+Message-ID: <fb1b7f4b3f645decec4d3da1a71b204d4b8345fc.1463606963.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 04:56:22PM +0200, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
-> 
-> Add the binding documentation for the Amlogic secure monitor driver.
-> 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  .../devicetree/bindings/soc/meson/meson_sm.txt     | 45 ++++++++++++++++++++++
->  1 file changed, 45 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/soc/meson/meson_sm.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/soc/meson/meson_sm.txt b/Documentation/devicetree/bindings/soc/meson/meson_sm.txt
-> new file mode 100644
-> index 0000000..f59c732
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/soc/meson/meson_sm.txt
+Create a system control module node for the control module portion that
+resides under l4_wkup.
 
-bindings/firmware/
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/boot/dts/dra7.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-> @@ -0,0 +1,45 @@
-> +* Amlogic Secure Monitor
-> +
-> +In the Amlogic SoCs the Secure Monitor code is used to provide access to the
-> +NVMEM, enable JTAG, set USB boot, etc...
-> +
-> +Required properties for the secure monitor node:
-> +- compatible: Should be "amlogic,meson-sm"
-> +- amlogic,sm_cmd_input_base: SMC32 function identifier to read the physical
-> +                             address of the input buffer
-> +- amlogic,sm_cmd_output_base: SMC32 function identifier to read the physical
-> +                              address of the output buffer
-
-Use '-' rather than '_'.
-
-> +
-> +Example:
-> +
-> +	#include <dt-bindings/soc/meson-gxbb-sm.h>
-> +
-> +	...
-> +
-> +	sm {
-
-Put this under a /firmware node.
-
-> +		compatible = "amlogic,meson-sm";
-> +		amlogic,sm_cmd_input_base = <SM_GET_SHARE_MEM_INPUT_BASE>;
-> +		amlogic,sm_cmd_output_base = <SM_GET_SHARE_MEM_OUTPUT_BASE>;
-> +	};
-> +
-> +Node of a device using the secure monitor must have a custom property to
-> +specify the SMC32 function the driver is going to use. The values of all the
-> +SMC function identifiers are listed in a SoC-specific header file:
-> +
-> +"include/dt-bindings/soc/meson-gxbb-sm.h" - for the Meson GXBB secure monitor.
-> +
-> +Example of the node using the secure monitor:
-> +
-> +	#include <dt-bindings/soc/meson-gxbb-sm.h>
-> +
-> +	...
-> +
-> +	efuse: efuse {
-> +		compatible = "amlogic,meson-gxbb-efuse";
-> +		amlogic,sm_cmd_read_efuse = <SM_EFUSE_READ>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		...
-> +	};
-> +
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index 3a8f3976f6f9..406f6ff21d7f 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -233,6 +233,11 @@
+ 				prm_clockdomains: clockdomains {
+ 				};
+ 			};
++
++			scm_wkup: scm_conf at c000 {
++				compatible = "syscon";
++				reg = <0xc000 0x1000>;
++			};
+ 		};
+ 
+ 		axi at 0 {
+-- 
+2.7.3
