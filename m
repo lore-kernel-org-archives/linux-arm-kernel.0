@@ -1,42 +1,31 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 18 May 2016 12:15:44 -0400 (EDT)
-Subject: [PATCH] usb: echi-hcd: Add register access check in shutdown
-In-Reply-To: <573C8B40.1040503@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1605181211120.1981-100000@iolanthe.rowland.org>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 18 May 2016 18:16:05 +0200
+Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
+In-Reply-To: <3270693.WrXnxabe9J@wuerfel>
+References: <1463576010-115428-1-git-send-email-agraf@suse.de>
+ <20160518151958.GH22378@e104818-lin.cambridge.arm.com>
+ <573C8B55.3030805@suse.de> <3270693.WrXnxabe9J@wuerfel>
+Message-ID: <573C9545.9050909@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 May 2016, Srinivas Kandagatla wrote:
+On 05/18/2016 06:08 PM, Arnd Bergmann wrote:
+> On Wednesday 18 May 2016 17:33:41 Alexander Graf wrote:
+>>>> IIRC we don't own EL3 on there.
+>>> Then how do you switch to AArch64?
+>> You write into config.txt that you want to boot into AArch64 EL2 and the
+>> raspberry pi firmware takes care of the rest.
+>>
+>>
+> Have you tried telling the firmware that you'd like to boot into AArch64 EL3? ;-)
 
-> On 18/05/16 15:56, Alan Stern wrote:
-> > On Wed, 18 May 2016, Srinivas Kandagatla wrote:
-> >
-> >> This patch adds a check in ehci_shutdown(), to make sure
-> >> that the register access is available before accessing registers.
-> >>
-> >> The use case is simple, for boards like DB410c where the usb host
-> >> or device functionality is decided based on the micro-usb cable
-> >> presence. If the board boots up with micro-usb connected and the
-> >> host driver is probed, but the ehci_setup() has not been done yet,
-> >> then a system shutdown would trigger below NULL pointer exception
-> >> without this patch.
-> >
-> > How can that happen?  While the host driver is probed, the probing
-> > thread holds the device lock.  But the system shutdown routine acquires
-> > the device lock before invoking the ->shutdown callback.  Therefore the
-> > two things cannot happen concurrently.
-> 
-> No, I did not mean them happening concurrently, I mean that the host 
-> driver is up, however ehci_setup() is not done yet.
+Yes, but then you don't get any SMP initialization (so we'd have to redo 
+that in U-Boot, or port ATF) and you lose the usual workflow on defining 
+how the hat device tree overlays work.
 
-I don't understand.  ehci_setup() is called as part of the probe 
-procedure.  How can the host driver be up if ehci_setup() is not done 
-yet?
+Overall, I think it's an interesting goal and you're more than happy to 
+be my guest, but I think that spin tables are good enough for the device 
+for now :). At least we'd be able to move people away from 32bit code.
 
-Are you saying that when the system is plugged into the "B" end of an 
-OTG cable, ehci_setup() doesn't get called at all?
 
-And would the same thing happen if the system started out as the host
-but then used HNP to change into the peripheral?
-
-Alan Stern
+Alex
