@@ -1,47 +1,61 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 18 May 2016 17:33:41 +0200
-Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
-In-Reply-To: <20160518151958.GH22378@e104818-lin.cambridge.arm.com>
-References: <1463576010-115428-1-git-send-email-agraf@suse.de>
- <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
- <573C72DD.6010400@suse.de> <20160518142620.GA22354@localhost.localdomain>
- <573C7D64.5040206@suse.de>
- <20160518151958.GH22378@e104818-lin.cambridge.arm.com>
-Message-ID: <573C8B55.3030805@suse.de>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Wed, 18 May 2016 15:40:24 +0000
+Subject: [PATCH-V2 0/6] ARM: memory: bcm: add sdram driver
+Message-ID: <1463586030-2778-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2016 05:19 PM, Catalin Marinas wrote:
-> On Wed, May 18, 2016 at 04:34:12PM +0200, Alexander Graf wrote:
->> On 05/18/2016 04:26 PM, Catalin Marinas wrote:
->>> On Wed, May 18, 2016 at 03:49:17PM +0200, Alexander Graf wrote:
->>>> On 05/18/2016 03:27 PM, Catalin Marinas wrote:
->>>>> On Wed, May 18, 2016 at 02:53:30PM +0200, Alexander Graf wrote:
->>>>>> On arm64, all SoCs we supported so far either have an IOMMU or have bus
->>>>>> addresses equal to CPU addresses.
->>>>>>
->>>>>> However, with the Raspberry Pi 3 coming up, this is no longer true. To
->>>>>> allow DMA to work with an AArch64 kernel on those devices, let's allow
->>>>>> devices to have DMA offsets again.
->>>>>>
->>>>>> Signed-off-by: Alexander Graf <agraf@suse.de>
->>>>> We were aware about this issue but we've been waiting for an actual use
->>>>> case. I'll queue this for 4.8 (given that RPi3 is not supported by the
->>>>> arm64 kernel, I don't see the rush to merge it earlier).
->>>> Sure, works for me. That way Eric can try to push the other few bits
->>>> necessary to run an arm64 kernel on the RPi3 towards 4.8 as well :).
->>> As long as the firmware is PSCI capable ;)
->> So spin tables won't work for you?
-> They only work for booting, not cpuidle or hotplug.
+From: Martin Sperl <kernel@martin.sperl.org>
 
-Well, booting is a good step forward I'd say :).
+Add a sdram driver for the bcm2835 SOC.
 
->
->> IIRC we don't own EL3 on there.
-> Then how do you switch to AArch64?
+This is needed (especially) as there are 2 clocks that are needed
+by the SDram related HW block, which - right now are not claimed.
 
-You write into config.txt that you want to boot into AArch64 EL2 and the 
-raspberry pi firmware takes care of the rest.
+Without this driver there is a possibility that one of these
+clocks (sdram (for low-voltage modes) or pll_core) or one of their
+parents does get disabled when the clocks or PLLs are actually
+needed.
 
+In the current form of this driver there is still no absolute
+certainty that such a situation can not happen under all
+cirumstances, but it reduces the likleyhood that this happens.
 
-Alex
+To avoid this situation a patch-set will be needed that moves
+bcm2835-clk and bcm2835-sdram to earlier stages during the
+boot process.
+
+The driver also claims the 3 necessary register ranges
+to fully control the sdram (SDRAM, APHY, DPHY).
+
+But for some reasons these registers are not accessible and
+read as 0.
+
+It is still unclear if this is a general feature of the SOC
+or if this is configured by the binary-blob firmware.
+
+That is why this patchset includes an optional patch
+(patch 6: memory: bcm2835: expose register ranges via debugfs)
+that exposes these register sets via debugfs.
+
+Martin Sperl (6):
+  dt: bindings: add bcm2835-memory-controller documentation
+  memory: bcm2835: add bcm2835-memory controller
+  ARM: dts: bcm2835: add the bcm2835-sdram-controller to the dt
+  ARM: bcm2835_defconfig: add bcm2835-sdram controller
+  ARM: multi_v7_defconfig: bcm2835: add bcm2835-sdram driver
+  memory: bcm2835: expose register ranges via debugfs
+
+ .../memory-controllers/brcm,bcm2835-sdram.txt      |  30 ++
+ arch/arm/boot/dts/bcm283x.dtsi                     |  11 +
+ arch/arm/configs/bcm2835_defconfig                 |   1 +
+ arch/arm/configs/multi_v7_defconfig                |   1 +
+ drivers/memory/Kconfig                             |   7 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/bcm2835-sdram.c                     | 464 +++++++++++++++++++++
+ 7 files changed, 515 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/brcm,bcm2835-sdram.txt
+ create mode 100644 drivers/memory/bcm2835-sdram.c
+
+--
+2.1.4
