@@ -1,44 +1,75 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 18 May 2016 16:55:45 +0100
-Subject: [PATCH v4 22/56] KVM: arm/arm64: vgic-new: Add MMIO handling
- framework
-In-Reply-To: <20160518123115.GE3827@cbox>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-23-git-send-email-andre.przywara@arm.com>
- <20160518123115.GE3827@cbox>
-Message-ID: <573C9081.6080500@arm.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Wed, 18 May 2016 18:05:24 +0200
+Subject: [PATCH 0/5] drm: fixes for merge-window regressions
+In-Reply-To: <1463579106-400827-1-git-send-email-arnd@arndb.de>
+References: <1463579106-400827-1-git-send-email-arnd@arndb.de>
+Message-ID: <20160518160524.GI27098@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-....
-
->> +
->> +/* generate a mask that covers 1024 interrupts with <b> bits per IRQ */
->> +#define VGIC_ADDR_IRQ_MASK(b) GENMASK_ULL(ilog2(b) + ilog2(1024) - \
->> +					  ilog2(BITS_PER_BYTE) - 1, 0)
->> +#define VGIC_ADDR_TO_INTID(addr, bits)  (((addr) & VGIC_ADDR_IRQ_MASK(bits)) * \
->> +					64 / (bits) / 8)
+On Wed, May 18, 2016 at 03:45:01PM +0200, Arnd Bergmann wrote:
+> A couple of new warnings and build errors appeared through the DRM
+> tree in linux-next after the merge window opened. The first patch
+> here is for scripts/headers_check.pl, but as the bug is only
+> present in drm-next at the moment, it would be good to add all
+> five patches to that tree before they make it into mainline.
 > 
-> In the comment we end up adding here, can we also describe why
-> (addr & <magic mask>) * <magic 64> / (bits) / <BITS_PER_BYTE OR BYTES_PER_ULL>
-> gives us what we need, because I don't get it.
+> It's likely that some of these have already been fixed since
+> this morning's linux-next, so just ignore the ones are no
+> longer needed.
+> 
+> Arnd Bergmann (5):
+>   headers_check: don't warn about c++ guards
+>   drm: mediatek: add CONFIG_OF dependency
+>   drm: mediatek: fixup drm_gem_object_lookup API change
+>   drm: exynos: mark pm functions as __maybe_unused
+>   drm: remove unused dev variables
 
-The reason is: we deal with 8 bits per byte, but have
-bits-per-interrupts values bigger than 8. Doing the maths in floating
-point arithmetic would work fine:
+None of the actual patches seems to have made it onto dri-devel. Stuck
+somewhere?
+-Daniel
 
-(float)(addr & mask) * (8.0 / bits_per_IRQ)
+> 
+>  drivers/gpu/drm/armada/armada_crtc.c   | 1 -
+>  drivers/gpu/drm/exynos/exynos_hdmi.c   | 6 ++----
+>  drivers/gpu/drm/mediatek/Kconfig       | 1 +
+>  drivers/gpu/drm/mediatek/mtk_drm_fb.c  | 2 +-
+>  drivers/gpu/drm/mediatek/mtk_drm_gem.c | 2 +-
+>  drivers/gpu/drm/nouveau/nouveau_gem.c  | 1 -
+>  drivers/gpu/drm/nouveau/nv50_display.c | 1 -
+>  drivers/gpu/drm/radeon/radeon_cs.c     | 1 -
+>  scripts/headers_check.pl               | 4 ++++
+>  9 files changed, 9 insertions(+), 10 deletions(-)
+> 
+> 
+> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+> Cc: Inki Dae <inki.dae@samsung.com>
+> Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+> Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: Matthias Brugger <matthias.bgg@gmail.com>
+> Cc: Ben Skeggs <bskeggs@redhat.com>
+> Cc: Alex Deucher <alexander.deucher@amd.com>
+> Cc: "Christian K?nig" <christian.koenig@amd.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: dri-devel at lists.freedesktop.org
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-mediatek at lists.infradead.org
+> Cc: nouveau at lists.freedesktop.org
+> 
+> -- 
+> 2.7.0
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
-So would this comment make sense?
-
-/*
- * Since we can have more than 8 bits per interrupt, we can't use
- * "8 / bpi" as a multiplicand directly, so we use a
- * fixed-point-arithmetic version of it tailored to cover at most 64
- * bits per IRQ.
- */
-
-Cheers,
-Andre.
+-- 
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
