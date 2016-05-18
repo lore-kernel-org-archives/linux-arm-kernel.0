@@ -1,66 +1,183 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 18 May 2016 23:20:31 +0930
-Subject: [PATCH v2 1/2] doc/devicetree: Add Aspeed VIC bindings
-In-Reply-To: <CAL_JsqJDGmvDxm1kN1w6NQZs0JLeA-V=X_BWi=VOaMTwftLn-w@mail.gmail.com>
-References: <462797239-14765-1-git-send-email-joel@jms.id.au>
- <1462802317-27086-1-git-send-email-joel@jms.id.au>
- <1462802317-27086-2-git-send-email-joel@jms.id.au>
- <20160511143313.GA7426@rob-hp-laptop>
- <1463014882.20290.203.camel@kernel.crashing.org>
- <CAL_JsqJDGmvDxm1kN1w6NQZs0JLeA-V=X_BWi=VOaMTwftLn-w@mail.gmail.com>
-Message-ID: <CACPK8Xe6TDdV3dC=gizXLxLjUziDFhsupUbXSuYsn6bcrAxahQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 15:53:45 +0200
+Subject: [PATCH v4 38/56] KVM: arm/arm64: vgic-new: Add GICv3 SGI system
+ register trap handler
+In-Reply-To: <1463392481-26583-39-git-send-email-andre.przywara@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-39-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160518135345.GM3827@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 2:50 AM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, May 11, 2016 at 8:01 PM, Benjamin Herrenschmidt
-> <benh@kernel.crashing.org> wrote:
->> On Wed, 2016-05-11 at 09:33 -0500, Rob Herring wrote:
->>> > +- interrupt-controller : Identifies the node as an interrupt controller
->>> > +- #interrupt-cells : Specifies the number of cells needed to encode an
->>> > +  interrupt source. The value shall be 1.
->>>
->>> No need for level vs. edge flags?
->>
->> That's an open question. Most interrupts are fixed. A handful of GPIOs
->> can be configured either way. For now I am relying on uboot setting up
->> the right config for them and I read it back at boot time, but we could
->> make it part of the binding I suppose.
->
-> It is almost standard to just use 2 cells here even if reserved for
-> future use. Especially since the IP block seems to have registers to
-> control that.
+On Mon, May 16, 2016 at 10:53:26AM +0100, Andre Przywara wrote:
+> In contrast to GICv2 SGIs in a GICv3 implementation are not triggered
+> by a MMIO write, but with a system register write. KVM knows about
+> that register already, we just need to implement the handler and wire
+> it up to the core KVM/ARM code.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog RFC..v1:
+> - add comment about SGI_AFFINITY_LEVEL macro
+> 
+>  include/kvm/vgic/vgic.h          |   8 +++
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 106 +++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 114 insertions(+)
+> 
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index ff3f9c2..00e3dca 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -209,6 +209,14 @@ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+>  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+>  void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
+>  
+> +#ifdef CONFIG_KVM_ARM_VGIC_V3
+> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
+> +#else
+> +static inline void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+> +{
+> +}
+> +#endif
+> +
+>  /**
+>   * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+>   *
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index 7b9340b..63b8550 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -343,3 +343,109 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+>  
+>  	return ret;
+>  }
+> +
+> +/*
+> + * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
+> + * generation register ICC_SGI1R_EL1) with a given VCPU.
+> + * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
+> + * return -1.
+> + */
+> +static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
+> +{
+> +	unsigned long affinity;
+> +	int level0;
+> +
+> +	/*
+> +	 * Split the current VCPU's MPIDR into affinity level 0 and the
+> +	 * rest as this is what we have to compare against.
+> +	 */
+> +	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
+> +	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
+> +	affinity &= ~MPIDR_LEVEL_MASK;
+> +
+> +	/* bail out if the upper three levels don't match */
+> +	if (sgi_aff != affinity)
+> +		return -1;
+> +
+> +	/* Is this VCPU's bit set in the mask ? */
+> +	if (!(sgi_cpu_mask & BIT(level0)))
+> +		return -1;
+> +
+> +	return level0;
+> +}
+> +
+> +/*
+> + * The ICC_SGI* registers encode the affinity differently from the MPIDR,
+> + * so provide a wrapper to use the existing defines to isolate a certain
+> + * affinity level.
+> + */
+> +#define SGI_AFFINITY_LEVEL(reg, level) \
+> +	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
+> +	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
+> +
 
-Yep, makes sense. I've added this to the bindings document.
+Do we still prefer this over the following (untested) ?:
 
-I was trying to use the second cell in our driver:
+static inline u64 decode_sgi_affinity(u64 reg)
+{
+	u64 aff1, aff2, aff3;
 
-  static struct irq_domain_ops avic_dom_ops = {
-          .map = avic_map,
-         .xlate = irq_domain_xlate_twocell,
-  };
+	aff1 = (reg & ICC_SGI1R_AFFINITY_1_MASK) >> ICC_SGI1R_AFFINITY_1_SHIFT;
+	aff2 = (reg & ICC_SGI1R_AFFINITY_2_MASK) >> ICC_SGI1R_AFFINITY_2_SHIFT;
+	aff3 = (reg & ICC_SGI1R_AFFINITY_3_MASK) >> ICC_SGI1R_AFFINITY_3_SHIFT;
 
- So we have irq_domain_xlate_twocell to parse the device tree and
-grabs the type property from the second cell.
+	return (aff1 << MPIDR_LEVEL_SHIFT(1)) |
+		(aff2 << MPIDR_LEVEL_SHIFT(2)) |
+		(aff3 << MPIDR_LEVEL_SHIFT(3));
+}
 
-In avic_map we set the irq handler:
 
-         if (vic->edge_sources[sidx] & sbit) {
-                 /* TODO: Check aginst type from dt and warn if not edge */
-                 irq_set_chip_and_handler(irq, &avic_chip, handle_edge_irq);
-         } else {
-                 /* TODO: Check aginst type from dt and warn if not level */
-                 irq_set_chip_and_handler(irq, &avic_chip, handle_level_irq);
-         }
-
-However, we don't have the type here, so we can't use it to check that
-we're setting the correct edge/level callback (or use it to set the
-register in the future if we want to use the device tree to override
-the bootloader settings).
-
-I had a look at some other drivers and they don't seem to use the dt
-property when mapping the irq. What am I missing here?
-
-Cheers,
-
-Joel
+> +/**
+> + * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
+> + * @vcpu: The VCPU requesting a SGI
+> + * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
+> + *
+> + * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
+> + * This will trap in sys_regs.c and call this function.
+> + * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
+> + * target processors as well as a bitmask of 16 Aff0 CPUs.
+> + * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
+> + * check for matching ones. If this bit is set, we signal all, but not the
+> + * calling VCPU.
+> + */
+> +void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
+> +{
+> +	struct kvm *kvm = vcpu->kvm;
+> +	struct kvm_vcpu *c_vcpu;
+> +	u16 target_cpus;
+> +	u64 mpidr;
+> +	int sgi, c;
+> +	int vcpu_id = vcpu->vcpu_id;
+> +	bool broadcast;
+> +
+> +	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
+> +	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
+> +	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
+> +	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
+> +	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
+> +	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
+> +
+> +	/*
+> +	 * We iterate over all VCPUs to find the MPIDRs matching the request.
+> +	 * If we have handled one CPU, we clear its bit to detect early
+> +	 * if we are already finished. This avoids iterating through all
+> +	 * VCPUs when most of the times we just signal a single VCPU.
+> +	 */
+> +	kvm_for_each_vcpu(c, c_vcpu, kvm) {
+> +		struct vgic_irq *irq;
+> +
+> +		/* Exit early if we have dealt with all requested CPUs */
+> +		if (!broadcast && target_cpus == 0)
+> +			break;
+> +
+> +		/* Don't signal the calling VCPU */
+> +		if (broadcast && c == vcpu_id)
+> +			continue;
+> +
+> +		if (!broadcast) {
+> +			int level0;
+> +
+> +			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
+> +			if (level0 == -1)
+> +				continue;
+> +
+> +			/* remove this matching VCPU from the mask */
+> +			target_cpus &= ~BIT(level0);
+> +		}
+> +
+> +		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		irq->pending = true;
+> +
+> +		vgic_queue_irq_unlock(vcpu->kvm, irq);
+> +	}
+> +}
+> -- 
+> 2.8.2
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe kvm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
