@@ -1,36 +1,67 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 18 May 2016 17:24:51 +0200
-Subject: [PATCH v2 omap 3/6] arm: Add _rcuidle tracepoints to allow
- clk_core_disable() use from idle
-In-Reply-To: <1463424608-20237-3-git-send-email-paulmck@linux.vnet.ibm.com>
-References: <20160516184844.GA20144@linux.vnet.ibm.com>
- <1463424608-20237-3-git-send-email-paulmck@linux.vnet.ibm.com>
-Message-ID: <573C8943.6090104@free.fr>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 18 May 2016 16:33:20 +0100
+Subject: [PATCH] usb: echi-hcd: Add register access check in shutdown
+In-Reply-To: <Pine.LNX.4.44L0.1605181044460.1981-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1605181044460.1981-100000@iolanthe.rowland.org>
+Message-ID: <573C8B40.1040503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/05/2016 20:50, Paul E. McKenney wrote:
 
->> stack backtrace:
->> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.6.0-rc5-next-20160426+ #1114
->> Hardware name: Generic OMAP36xx (Flattened Device Tree)
->> [<c0110290>] (unwind_backtrace) from [<c010c3a8>] (show_stack+0x10/0x14)
->> [<c010c3a8>] (show_stack) from [<c047fd68>] (dump_stack+0xb0/0xe4)
->> [<c047fd68>] (dump_stack) from [<c0631618>] (clk_core_disable+0x17c/0x348)
->> [<c0631618>] (clk_core_disable) from [<c0632774>] (clk_disable+0x24/0x30)
->> [<c0632774>] (clk_disable) from [<c0120590>] (_disable_clocks+0x18/0x7c)
->> [<c0120590>] (_disable_clocks) from [<c0121680>] (_idle+0x12c/0x230)
->> [<c0121680>] (_idle) from [<c0121b4c>] (omap_hwmod_idle+0x24/0x44)
->> [<c0121b4c>] (omap_hwmod_idle) from [<c0122c24>] (omap_device_idle+0x3c/0x90)
->> [<c0122c24>] (omap_device_idle) from [<c052cc00>] (__rpm_callback+0x2c/0x60)
->> [<c052cc00>] (__rpm_callback) from [<c052cc54>] (rpm_callback+0x20/0x80)
->> [<c052cc54>] (rpm_callback) from [<c052d150>] (rpm_suspend+0x100/0x768)
->> [<c052d150>] (rpm_suspend) from [<c052ec58>] (__pm_runtime_suspend+0x64/0x84)
->> [<c052ec58>] (__pm_runtime_suspend) from [<c04bf25c>] (omap2_gpio_prepare_for_idle+0x5
->> c/0x70)
->> [<c04bf25c>] (omap2_gpio_prepare_for_idle) from [<c0125568>] (omap_sram_idle+0x140/0x2
->> 44)
 
-Wouldn't the stack trace look better without the word wrap?  :-)
+On 18/05/16 15:56, Alan Stern wrote:
+> On Wed, 18 May 2016, Srinivas Kandagatla wrote:
+>
+>> This patch adds a check in ehci_shutdown(), to make sure
+>> that the register access is available before accessing registers.
+>>
+>> The use case is simple, for boards like DB410c where the usb host
+>> or device functionality is decided based on the micro-usb cable
+>> presence. If the board boots up with micro-usb connected and the
+>> host driver is probed, but the ehci_setup() has not been done yet,
+>> then a system shutdown would trigger below NULL pointer exception
+>> without this patch.
+>
+> How can that happen?  While the host driver is probed, the probing
+> thread holds the device lock.  But the system shutdown routine acquires
+> the device lock before invoking the ->shutdown callback.  Therefore the
+> two things cannot happen concurrently.
 
-Regards.
+No, I did not mean them happening concurrently, I mean that the host 
+driver is up, however ehci_setup() is not done yet.
+
+Will change the comments if its misleading the reader.
+
+>
+>> Unable to handle kernel NULL pointer dereference at virtual address
+>> 00000008
+>
+> ...
+>
+>> --- a/drivers/usb/host/ehci-hcd.c
+>> +++ b/drivers/usb/host/ehci-hcd.c
+>> @@ -368,6 +368,9 @@ static void ehci_shutdown(struct usb_hcd *hcd)
+>>   {
+>>   	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
+>>
+>> +	if (!HCD_HW_ACCESSIBLE(hcd))
+>> +		return;
+>> +
+>>   	spin_lock_irq(&ehci->lock);
+>>   	ehci->shutdown = true;
+>>   	ehci->rh_state = EHCI_RH_STOPPING;
+>
+> This doesn't seem like the right place.  What you really should do is
+> skip calling ehci_silence_controller() if the hardware isn't
+> accessible.  That's where the hardware gets touched, not in
+> ehci_shutdown().
+Yep , that should work as well.
+
+Will send a v2 patch.
+
+thanks,
+srini
+
+>
+> Alan Stern
+>
