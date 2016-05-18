@@ -1,40 +1,52 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Wed, 18 May 2016 21:20:29 +0100
-Subject: [PATCH 1/5] headers_check: don't warn about c++ guards
-In-Reply-To: <1463587653-3035181-2-git-send-email-arnd@arndb.de>
-References: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
- <1463587653-3035181-2-git-send-email-arnd@arndb.de>
-Message-ID: <CACvgo51FkfzzhFjYKyyHfxb-DyZeheQP2oZG-tWf1-EiBakp2w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 May 2016 22:25:03 +0200
+Subject: [RFC PATCH 1/3] asm-generic: io: Add exec versions of ioremap
+In-Reply-To: <20160518175102.GX5783@n2100.arm.linux.org.uk>
+References: <1462830111-28172-1-git-send-email-d-gerlach@ti.com>
+ <573C7844.5030107@ti.com> <20160518175102.GX5783@n2100.arm.linux.org.uk>
+Message-ID: <3861017.ZJOlWYvEFT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2016 at 17:07, Arnd Bergmann <arnd@arndb.de> wrote:
-> A recent addition to the DRM tree for 4.7 added 'extern "C"' guards
-> for c++ to all the DRM headers, and that now causes warnings
-> in 'make headers_check':
->
-> usr/include/drm/amdgpu_drm.h:38: userspace cannot reference function or variable defined in the kernel
-> usr/include/drm/drm.h:63: userspace cannot reference function or variable defined in the kernel
-> usr/include/drm/drm.h:699: userspace cannot reference function or variable defined in the kernel
-> usr/include/drm/drm_fourcc.h:30: userspace cannot reference function or variable defined in the kernel
-> usr/include/drm/drm_mode.h:33: userspace cannot reference function or variable defined in the kernel
-> usr/include/drm/drm_sarea.h:38: userspace cannot reference function or variable defined in the kernel
-> usr/include/drm/exynos_drm.h:21: userspace cannot reference function or variable defined in the kernel
-> usr/include/drm/i810_drm.h:7: userspace cannot reference function or variable defined in the kernel
->
-> This changes the headers_check.pl script to not warn about this.
-> I'm listing the merge commit as introducing the problem, because
-> there are several patches in this branch that each do this for
-> one file.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 7c10ddf87472 ("Merge branch 'drm-uapi-extern-c-fixes' of https://github.com/evelikov/linux into drm-next")
-Reviewed-by: Emil Velikov <emil.l.velikov@gmail.com>
+On Wednesday 18 May 2016 18:51:02 Russell King - ARM Linux wrote:
+> On Wed, May 18, 2016 at 09:12:20AM -0500, Dave Gerlach wrote:
+> > Ok thank you for the pointer. I agree, the memremap API looks like a better
+> > fit for this. I think it likely makes the most sense to still add these
+> > ioremap_exec and ioremap_exec_nocache and then call them through the
+> > memremap API based on new flags. This will fit into the current use model
+> > for memremap as it currently uses all of the other ioremap calls internally,
+> > and doing it how I just described will let this code evolve along with
+> > memremap.
+> 
+> I would _really_ prefer not to do that.  Why?  Because IO memory does
+> not have the required properties to be executable.  IO memory is normally
+> memory which has side effects - and by side effects, I mean reading it
+> can provoke hardware to perform some action.  You don't want to be
+> executing from such memory.
+> 
+> So, in my mind, ioremap_exec makes absolutely no sense, and having it
+> gives people a new interface to abuse - and abuse they will.
 
-Thanks Arnd !
+Agreed, calling it ioremap when it is really memremap makes no sense.
 
-As Dave mentioned - the best solution would be to have the hunks
-generated on the fly. Sadly Perl and me don't go hand in hand so if
-you're interested I'll be really grateful.
+I also see another problem in the asm-generic portion:
 
--Emil
++#ifndef ARCH_HAS_IOREMAP_EXEC
++#define ioremap_exec ioremap
++#define ioremap_exec_nocache ioremap_nocache
++#endif
+
+The ARM version of ioremap_exec() that gets added in this patch is cached
+(like memremap()), but then the asm-generic version is not? This is
+even more confusing, it should at least do roughly the same thing across
+architectures.
+
+There should also be some documentation about what the expected behavior is, e.g.:
+
+- is memremap_exec() by default cached or not? (I assume it would
+  be like memremap())
+- If we have an interface that does explicit uncached executable mapping,
+  what about architectures on which this is not possible? Should they
+  fall back to cached or non-executable, or cause a link error?  
+
+	Arnd
