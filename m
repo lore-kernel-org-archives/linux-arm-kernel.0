@@ -1,43 +1,71 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 17 May 2016 21:09:43 -0700
-Subject: QRTR merge conflict resolution
-In-Reply-To: <20160518104320.23ae8557@canb.auug.org.au>
-References: <20160510183934.GJ1256@tuxbot> <2606282.lG9qK7uBW0@wuerfel>
- <20160513221909.GC1256@tuxbot>
- <20160517.141154.1511755950068252376.davem@davemloft.net>
- <20160518104320.23ae8557@canb.auug.org.au>
-Message-ID: <20160518040943.GO1256@tuxbot>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 17 May 2016 21:12:16 -0700
+Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
+ errors
+In-Reply-To: <573BCC8D.5090606@kernel-upstream.org>
+References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
+ <5502CA4E.9060401@samsung.com>
+ <CAD=FV=VX3ix-j4y95W1q8b-aVuVEN+4xsd8WLx2xcE7KPNJwRw@mail.gmail.com>
+ <5506707D.40708@samsung.com> <55189F04.8000404@samsung.com>
+ <CAD=FV=WFAZqAsXOqunt0fxw87M-FruwUrxuzW0MJsG6UvfSjzA@mail.gmail.com>
+ <CAD=FV=UJGcwa_biSCGhD=kS-T+fppCniBFfOHb5ohnwSwSwMMA@mail.gmail.com>
+ <573BCC8D.5090606@kernel-upstream.org>
+Message-ID: <CAD=FV=VneQR3wurjezBkRhtQiH+q-FfhDN8=Ym=XqtZpVmsdUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 17 May 17:43 PDT 2016, Stephen Rothwell wrote:
+Hi,
 
-> Hi David,
-> 
-> On Tue, 17 May 2016 14:11:54 -0400 (EDT) David Miller <davem@davemloft.net> wrote:
-> >
-> > From: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > Date: Fri, 13 May 2016 15:19:09 -0700
-> > 
-> > > I have prepared the merge of net-next and the conflicting tag from the
-> > > Qualcomm SOC, please include this in your pull towards Linus to avoid
-> > > the merge conflict.  
-> > 
-> > Pulled, thanks.
-> 
-> Except in the merge resolution, the 2 new functions added to
-> include/linux/soc/qcom/smd.h (qcom_smd_get_drvdata and
-> qcom_smd_set_drvdata) were not marked "static inline" :-(
-> 
+On Tue, May 17, 2016 at 6:59 PM, Shawn Lin
+<shawn.lin@kernel-upstream.org> wrote:
+> Could you try this patch to see if you can still find HLE?
+>
+> @@ -2356,12 +2356,22 @@ static void dw_mci_cmd_interrupt(struct dw_mci
+> *host, u32 status)
+>  static void dw_mci_handle_cd(struct dw_mci *host)
+>  {
+>         int i;
+> +       int present;
+>
+>         for (i = 0; i < host->num_slots; i++) {
+>                 struct dw_mci_slot *slot = host->slot[i];
+>
+>                 if (!slot)
+>                         continue;
+>
+> +               present = !(mci_readl(slot->host, CDETECT) & (1 <<
+> slot->id));
+> +               if (present)
+> +                       set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+> +               else
+> +                       clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
 
-How silly of me to miss that, sorry about that.
+No, because we don't use the builtin card detect on veyron.  ;)
 
-I didn't spot this in my compile testing either, because this is the
-only driver in the tree including that file that doesn't depend on
-QCOM_SMD.
+We use GPIO card detect because we didn't like the way JTAG and SD
+interacted.  Also on rk3288 the builtin card detect line had the wrong
+voltage domain (you couldn't detect a card when the IO lines were
+powered off).  The builtin card detect line is always driven low on
+veyron.
 
-As there is no immediate problem with moving forward I suggest that I'll
-fix this, through arm-soc, once the code has landed.
 
-Regards,
-Bjorn
+I'm nearly certain that the root cause of my HLE errors is actually
+related to the same problem addressed by the commit 7c5209c315ea
+("mmc: core: Increase delay for voltage to stabilize from 3.3V to
+1.8V").  I think that on minnie we're still on the hairy edge and
+sometimes the line doesn't transition fast enough.
+
+It appears that increasing this to 30ms avoids the HLE errors.
+
+I _think_ I can actually fully fix this properly by temporarily
+engaging the internal pull-ups while the voltage switch is happening.
+This will bleed away the voltage just a little bit faster (since lines
+are driven low here).  I'll try to confirm that.
+
+
+In any case, it seems like we should take this patch since (without
+this patch) the failure case when you get HLE errors is that the
+interrupt controller fires over and over again (with no printouts) and
+your system stalls with no error messages.
+
+-Doug
