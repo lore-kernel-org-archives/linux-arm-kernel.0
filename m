@@ -1,61 +1,67 @@
 From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Wed, 18 May 2016 15:40:24 +0000
-Subject: [PATCH-V2 0/6] ARM: memory: bcm: add sdram driver
-Message-ID: <1463586030-2778-1-git-send-email-kernel@martin.sperl.org>
+Date: Wed, 18 May 2016 15:40:25 +0000
+Subject: [PATCH-V2 1/6] dt: bindings: add bcm2835-memory-controller
+ documentation
+In-Reply-To: <1463586030-2778-1-git-send-email-kernel@martin.sperl.org>
+References: <1463586030-2778-1-git-send-email-kernel@martin.sperl.org>
+Message-ID: <1463586030-2778-2-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Martin Sperl <kernel@martin.sperl.org>
 
-Add a sdram driver for the bcm2835 SOC.
+Add memory controller dt-binding documentation for the
+bcm2835 soc.
 
-This is needed (especially) as there are 2 clocks that are needed
-by the SDram related HW block, which - right now are not claimed.
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
 
-Without this driver there is a possibility that one of these
-clocks (sdram (for low-voltage modes) or pll_core) or one of their
-parents does get disabled when the clocks or PLLs are actually
-needed.
-
-In the current form of this driver there is still no absolute
-certainty that such a situation can not happen under all
-cirumstances, but it reduces the likleyhood that this happens.
-
-To avoid this situation a patch-set will be needed that moves
-bcm2835-clk and bcm2835-sdram to earlier stages during the
-boot process.
-
-The driver also claims the 3 necessary register ranges
-to fully control the sdram (SDRAM, APHY, DPHY).
-
-But for some reasons these registers are not accessible and
-read as 0.
-
-It is still unclear if this is a general feature of the SOC
-or if this is configured by the binary-blob firmware.
-
-That is why this patchset includes an optional patch
-(patch 6: memory: bcm2835: expose register ranges via debugfs)
-that exposes these register sets via debugfs.
-
-Martin Sperl (6):
-  dt: bindings: add bcm2835-memory-controller documentation
-  memory: bcm2835: add bcm2835-memory controller
-  ARM: dts: bcm2835: add the bcm2835-sdram-controller to the dt
-  ARM: bcm2835_defconfig: add bcm2835-sdram controller
-  ARM: multi_v7_defconfig: bcm2835: add bcm2835-sdram driver
-  memory: bcm2835: expose register ranges via debugfs
-
- .../memory-controllers/brcm,bcm2835-sdram.txt      |  30 ++
- arch/arm/boot/dts/bcm283x.dtsi                     |  11 +
- arch/arm/configs/bcm2835_defconfig                 |   1 +
- arch/arm/configs/multi_v7_defconfig                |   1 +
- drivers/memory/Kconfig                             |   7 +
- drivers/memory/Makefile                            |   1 +
- drivers/memory/bcm2835-sdram.c                     | 464 +++++++++++++++++++++
- 7 files changed, 515 insertions(+)
+Changelog:
+  V2 -> V3: added additional clock
+	      (for the Controller internal PLL)
+	    added clock-names
+	    added additional register ranges for the
+	      SDRAM Adress and Data PHY
+	    added reg-names
+---
+ .../memory-controllers/brcm,bcm2835-sdram.txt      | 30 ++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/memory-controllers/brcm,bcm2835-sdram.txt
- create mode 100644 drivers/memory/bcm2835-sdram.c
 
---
+diff --git a/Documentation/devicetree/bindings/memory-controllers/brcm,bcm2835-sdram.txt b/Documentation/devicetree/bindings/memory-controllers/brcm,bcm2835-sdram.txt
+new file mode 100644
+index 0000000..5c4182f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/brcm,bcm2835-sdram.txt
+@@ -0,0 +1,30 @@
++Binding for SDRAM driver for BCM2835 SoCs.
++
++Required parameters:
++-------------------
++
++compatible : 	should be: "brcm,bcm2835-sdram"
++reg :		Address range of the register-set:
++		  * SD
++		  * APHY_CSR
++		  * DPHY_CSR
++reg-names :	Names of the register ranges:
++		  "sdram", "aphy_csr", "dphy_csr"
++clocks : 	Phandle of the clocks used by the sdram
++		  * low voltage clock
++		  * pll parent clock
++clock-names:	Names of the clocks:
++		  "low-voltage", "pll-parent"
++
++Example:
++
++memory-conroller at 7ee00000 {
++	compatible = "brcm,bcm2835-sdram";
++	reg = <0x7ee00000 0x18c>,
++	      <0x7ee06000 0x94>,
++	      <0x7ee07000 0x808>;
++	reg-names = "sdram", "aphy_csr", "dphy_csr";
++	clocks = <&clocks BCM2835_CLOCK_SDRAM>,
++		 <&clocks BCM2835_PLLD_CORE>;
++	clock-names = "low-voltage", "pll-parent";
++};
+-- 
 2.1.4
