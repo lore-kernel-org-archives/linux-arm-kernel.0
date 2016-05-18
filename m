@@ -1,27 +1,139 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 May 2016 14:27:41 +0100
-Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
-In-Reply-To: <1463576010-115428-1-git-send-email-agraf@suse.de>
-References: <1463576010-115428-1-git-send-email-agraf@suse.de>
-Message-ID: <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 18 May 2016 14:31:18 +0100
+Subject: [PATCH v4 32/56] KVM: arm/arm64: vgic-new: Add SGIPENDR register
+ handlers
+In-Reply-To: <20160518131449.GI3827@cbox>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-33-git-send-email-andre.przywara@arm.com>
+ <20160518131449.GI3827@cbox>
+Message-ID: <573C6EA6.90803@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 02:53:30PM +0200, Alexander Graf wrote:
-> On arm64, all SoCs we supported so far either have an IOMMU or have bus
-> addresses equal to CPU addresses.
+Hi,
+
+On 18/05/16 14:14, Christoffer Dall wrote:
+> On Mon, May 16, 2016 at 10:53:20AM +0100, Andre Przywara wrote:
+>> As this register is v2 specific, its implementation lives entirely
+>> in vgic-mmio-v2.c.
+>> This register allows setting the source mask of an IPI.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> ---
+>> Changelog RFC..v1:
+>> - remove IRQ lock from read handler
+>> - update pending bit on setting the first / clearing the last bit
+>> - queue virtual IRQ if necessary
+>>
+>> Changelog v1 .. v2:
+>> - adapt to new MMIO framework
+>>
+>> Changelog v3 .. v4:
+>> - specify accessor width
+>>
+>>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++--
+>>  1 file changed, 60 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> index c884e9b..3925d4c 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>> @@ -146,6 +146,64 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+>>  	}
+>>  }
+>>  
+>> +static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
+>> +					    gpa_t addr, unsigned int len)
+>> +{
+>> +	u32 intid = addr & 0x0f;
 > 
-> However, with the Raspberry Pi 3 coming up, this is no longer true. To
-> allow DMA to work with an AArch64 kernel on those devices, let's allow
-> devices to have DMA offsets again.
+> is there a reason why we cannot use the magic macro here?
+
+I wasn't sure about this, because it's not covering all 1024 interrupts,
+but just SGIs, so it's always fixed to 16 interrupts ? 8 bits. The
+default mask would be too big in this case.
+I guess it would work anyway because this region is limited to 16 bytes
+in our description, so we could use this here anyway to make it more
+aligned with the other handlers, maybe adding a comment about the
+difference?
+
+Cheers,
+Andre.
+
 > 
-> Signed-off-by: Alexander Graf <agraf@suse.de>
-
-We were aware about this issue but we've been waiting for an actual use
-case. I'll queue this for 4.8 (given that RPi3 is not supported by the
-arm64 kernel, I don't see the rush to merge it earlier).
-
-Thanks.
-
--- 
-Catalin
+>> +	int i;
+>> +	u64 val = 0;
+>> +
+>> +	for (i = 0; i < len; i++) {
+>> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+>> +
+>> +		val |= (u64)irq->source << (i * 8);
+>> +	}
+>> +	return val;
+>> +}
+>> +
+>> +static void vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
+>> +				     gpa_t addr, unsigned int len,
+>> +				     unsigned long val)
+>> +{
+>> +	u32 intid = addr & 0x0f;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < len; i++) {
+>> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+>> +
+>> +		spin_lock(&irq->irq_lock);
+>> +
+>> +		irq->source &= ~((val >> (i * 8)) & 0xff);
+>> +		if (!irq->source)
+>> +			irq->pending = false;
+>> +
+>> +		spin_unlock(&irq->irq_lock);
+>> +	}
+>> +}
+>> +
+>> +static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+>> +				     gpa_t addr, unsigned int len,
+>> +				     unsigned long val)
+>> +{
+>> +	u32 intid = addr & 0x0f;
+>> +	int i;
+>> +
+>> +	for (i = 0; i < len; i++) {
+>> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+>> +
+>> +		spin_lock(&irq->irq_lock);
+>> +
+>> +		irq->source |= (val >> (i * 8)) & 0xff;
+>> +
+>> +		if (irq->source) {
+>> +			irq->pending = true;
+>> +			vgic_queue_irq_unlock(vcpu->kvm, irq);
+>> +		} else {
+>> +			spin_unlock(&irq->irq_lock);
+>> +		}
+>> +	}
+>> +}
+>> +
+>>  static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+>>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+>> @@ -184,10 +242,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>>  		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
+>>  		VGIC_ACCESS_32bit),
+>>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
+>> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
+>> +		vgic_mmio_read_sgipend, vgic_mmio_write_sgipendc, 16,
+>>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+>>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
+>> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
+>> +		vgic_mmio_read_sgipend, vgic_mmio_write_sgipends, 16,
+>>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+>>  };
+>>  
+>> -- 
+>> 2.8.2
+>>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> 
