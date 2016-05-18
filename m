@@ -1,43 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 May 2016 16:35:13 +0200
-Subject: [GIT PULL] move ARM LCD display driver to auxdisplay
-In-Reply-To: <20160512122500.11411882@erd979>
-References: <CACRpkdbyO0axd5ergYZcXO302f2fFAPKrSNevkvreP1kRjm-vw@mail.gmail.com>
- <20160425115758.GA4874@lukather>
- <CACRpkdb=s5onVa7qND9nFUtYPw5H-Hdr7Ja5o3=-9+wxghHekQ@mail.gmail.com>
- <20160428092608.GE17159@lukather> <5723755D.9060108@ti.com>
- <20160509090615.6272f8ca@erd979>
- <CACRpkdbZmL9Cqp-ubzyxd7fWUFOVsS1DCxsfG02kSpbWu_rbZQ@mail.gmail.com>
- <20160509161728.3aee1134@erd979>
- <CACRpkdZwPVMx-dXVkfVwFN0juzVuyvShV7yDWbUFSXOPE=uUrw@mail.gmail.com>
- <20160512122500.11411882@erd979>
-Message-ID: <CACRpkdYwtwosdCE_F5SEH9uwZRdJkAi-seL+nUrMFZ+w_esuVQ@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Wed, 18 May 2016 15:36:38 +0100
+Subject: [PATCH v3 0/2] nvmem: remove regmap dependency
+In-Reply-To: <573C7C69.1050301@i2se.com>
+References: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <573C7C69.1050301@i2se.com>
+Message-ID: <573C7DF6.6020105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 12:25 PM, Robin van der Gracht
-<robin@protonic.nl> wrote:
 
-> First half is completed. I've added myself as maintainer for the
-> driver I've posted recently (HT16K33 LED CONTROLLER DRIVER).
 
-Good!
-
-> According to MAINTAINERS, Miguel maintains:
->  - CFAG12864B LCD DRIVER
->  - CFAG12864BFB LCD FRAMEBUFFER DRIVER
->  - KS0108 LCD CONTROLLER DRIVER
->  - AUXILIARY DISPLAY DRIVERS
+On 18/05/16 15:30, Stefan Wahren wrote:
+> Hi Srinivas,
 >
-> AFAIK, I should not be judge in Miguels case.
+> Am 02.05.2016 um 20:36 schrieb Srinivas Kandagatla:
+>> Hi Greg,
+>>
+>> This is v3 patchset for the leftover 2 patches for nvmem regmap
+>> removal series [1]. These patches are based on char-misc tree.
+>>
+>> nvmem uses regmap_raw_read/write apis to read/write data from providers,
+>> With recent patch 922a9f936e40 ("regmap: mmio: Convert to regmap_bus
+>> and fix accessor usage") nvmem providers based on regmap-mmio stopped
+>> working, as nvmem core was using raw accessors.
+>> This issue can be fixed temporarly by moving to other regmap apis,
+>> but we might hit same issue in future, and regmap looks like an
+>> overdo for nvmem. Moving to interfaces based on read/write callbacks
+>> from providers would be more robust.
+>
+> i noticed that Documentation/nvmem/nvmem.txt also needs a fix after
+> removing regmap dependency.
 
-If patches come in for these drivers and Miguel still seem to be fallen
-off the face of the earth I think you should ACK/merge patches for
-these too, but deal with it when it happens.
+Thanks Stefan for reporting this, I will send a patch to fix that too.
 
-> @linus: I'll send my patches to Greg if you agree on this.
-
-We are in agreement.
-
-Yours,
-Linus Walleij
+--srini
+>
+>
