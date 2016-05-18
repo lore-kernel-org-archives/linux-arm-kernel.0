@@ -1,84 +1,58 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 18 May 2016 19:08:49 +0200
-Subject: [PATCH v4 22/56] KVM: arm/arm64: vgic-new: Add MMIO handling
- framework
-In-Reply-To: <573C9C7F.9020209@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-23-git-send-email-andre.przywara@arm.com>
- <573B1DB0.7030901@arm.com> <20160518122521.GD3827@cbox>
- <573C9C7F.9020209@arm.com>
-Message-ID: <20160518170849.GN6666@cbox>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed, 18 May 2016 12:08:57 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.7, part3
+In-Reply-To: <2600031.fLUcj7Vapa@wuerfel>
+References: <1462891391-13876-1-git-send-email-dinguyen@kernel.org>
+ <2600031.fLUcj7Vapa@wuerfel>
+Message-ID: <573CA1A9.9020809@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 05:46:55PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> >>> +
-> >>> +/* generate a mask that covers 1024 interrupts with <b> bits per IRQ */
-> >>
-> >> Hmmm. I'd appreciate some additional comments, specially when it comes
-> >> to the various restrictions. May I'd suggest something like:
-> >>
-> >> /*
-> >>  * Generate a mask that covers the number of bytes required to address
-> >>  * up to 1024 interrupts, each represented by <b> bits. This assumes
-> >>  * that <b> is a power of two.
-> >>  *
-> >>  * ilog2(b) + ilog2(1024) is the number of bits required to bit-address
-> >>  * 1024 interrupts, each represented by b bits. Minus ilog2(8) converts
-> >>  * this to a byte address.
-> > 
-> > So I'm guessting this is a rewrite of ilog2( (b * 1024) / 8), but I'm
-> > stupid enough to not understand our use of logarithms here.  Can someone
-> > remind me whatever I forgot at CS 101?
-> 
-> I guess it was more me not seeing the wood for the trees here:
-> Indeed doing the multiplication first and then calling ilog2 seems to
-> make more sense. Also I was thinking: Isn't
-> "GENMASK_ULL(ilog2(n) - 1, 0)" the same as "n - 1"?
 
-if there's no integer rounding taking place with ilog2 (iow. n is a
-power of 2) then yes, I believe it is.
 
+On 05/17/2016 05:43 PM, Arnd Bergmann wrote:
+> On Tuesday 10 May 2016 09:43:11 Dinh Nguyen wrote:
+>> If not too late, please pull in this patch for v4.7.
+>>
+>> Thanks,
+>> Dinh
+>>
+>> The following changes since commit 02da2d72174c61988eb4456b53f405e3ebdebce4:
+>>
+>>   Linux 4.6-rc5 (2016-04-24 16:17:05 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_for_next_v4.7_dts_part_3
+>>
+>> for you to fetch changes up to fca689561e8170ad954b982b9ce2160a06d9435e:
+>>
+>>   ARM: dts: socfpga: add ethernet alias on Arria10 (2016-05-03 09:25:21 -0500)
+>>
+>> ----------------------------------------------------------------
+>> SoCFPGA DTS update for v4.7, part 3
+>> - Add ethernet alias on Arria10
+>>
 > 
-> So can't we just write:
-> 
-> #define VGIC_ADDR_IRQ_MASK(bpi) (((bpi) * 1024 / 8) - 1)
-
-that certianly all of the sudden feels intuitive.
-
-> 
-> Proven by enumeration - over the values we use ;-)
-> 
-> I'd keep the first paragraph of Marc's comment above then, but we can
-> avoid mentioning Advanced Maths textbooks about binary logarithmic ;-)
+> I was going to put this into the next/late branch that already has some other
+> changes, but in the end I decided to drop it because it is based on
+> a later -rc release than the other branches, and doesn't seem obvious
+> or important enough.
 > 
 
-Haha, you saved my day with that comment.  I feel slightly less idiotic
-now, yes, let's call it advanced quantum math or something instead of CS
-101 :)
+That's fine. I can queue it for v4.8.
 
--Christoffer
-
+> Just a clarification about the contents of the patch, you write:
 > 
-> >>  */
-> >>
-> >>> +#define VGIC_ADDR_IRQ_MASK(b) GENMASK_ULL(ilog2(b) + ilog2(1024) - \
-> >>> +					  ilog2(BITS_PER_BYTE) - 1, 0)
-> >>
-> >> /*
-> >>  * Convert a base address into a base interrupt (each interrupt
-> >>  * represented by <bits> bits. This assumes that <bits> is a power
-> >>  * of two, that <addr> both part of a memory region aligned on a
-> > 
-> > did you mean '<addr> *is* both part of' ?
-> > 
-> >>  * <b> bits boundary, and itself aligned on that same boundary
-> >>  * (for regions that describe an interrupt with more than a single
-> >>  * byte of data).
-> >>  */
-> >>
-> > 
-> > In any case, thanks for the commentary, I was faily lost here.
-> > 
+>     Without having an ethernet alias, ethernet will have a random MAC address,
+>     versus take an address that was provided from the bootloader.
+> 
+> Why is the alias needed to get the right MAC address? How does the
+> bootloader pass it?
+> 
+
+For example, if U-Boot's ethaddr environment is set, the MAC address
+gets populated in the mac-address property of the node with "ethernet"
+alias.
+
+Dinh
