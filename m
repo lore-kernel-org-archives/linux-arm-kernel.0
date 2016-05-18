@@ -1,59 +1,41 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 18 May 2016 11:08:53 +0900
-Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
- errors
-In-Reply-To: <CAD=FV=UJGcwa_biSCGhD=kS-T+fppCniBFfOHb5ohnwSwSwMMA@mail.gmail.com>
-References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
- <5502CA4E.9060401@samsung.com>
- <CAD=FV=VX3ix-j4y95W1q8b-aVuVEN+4xsd8WLx2xcE7KPNJwRw@mail.gmail.com>
- <5506707D.40708@samsung.com> <55189F04.8000404@samsung.com>
- <CAD=FV=WFAZqAsXOqunt0fxw87M-FruwUrxuzW0MJsG6UvfSjzA@mail.gmail.com>
- <CAD=FV=UJGcwa_biSCGhD=kS-T+fppCniBFfOHb5ohnwSwSwMMA@mail.gmail.com>
-Message-ID: <573BCEB5.8020905@samsung.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Wed, 18 May 2016 10:09:17 +0800
+Subject: [PATCH v15 00/20] arm64 kexec kernel patches v15
+In-Reply-To: <573AD11E.1030301@arm.com>
+References: <cover.1457977401.git.geoff@infradead.org>
+ <20160401015947.GA3835@dhcp-128-65.nay.redhat.com>
+ <1459535954.20121.3.camel@infradead.org>
+ <20160517054216.GA12543@dhcp-128-65.nay.redhat.com>
+ <573AD11E.1030301@arm.com>
+Message-ID: <20160518020917.GB3073@dhcp-128-65.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2016 09:47 AM, Doug Anderson wrote:
-> Jaehoon,
-> 
-> On Mon, Mar 30, 2015 at 8:47 AM, Doug Anderson <dianders@chromium.org> wrote:
->> Jaehoon,
->>
->> On Sun, Mar 29, 2015 at 5:55 PM, Jaehoon Chung <jh80.chung@samsung.com> wrote:
->>> Dear Doug,
->>>
->>> I'm considering to control HLE error..So holding this patch.
->>> If this is absolutely necessary patch, let me know, plz.
->>>
->>> Best Regards,
->>> Jaehoon Chung
->>
->> Sounds OK.  I have certainly applied this locally and the driver isn't
->> robust against insertions / removals without it, but once the card is
->> inserted things are OK so it's probably not urgent that it be applied
->> upstream.  Hopefully we can figure out a better solution...
-> 
-> I'm now testing a nice new rebased kernel and I'm hitting this again.
-> 
-> Of course I'll just pick my same patch to my new kernel tree, but
-> since it's been a year and nobody has done anything better, would you
-> consider landing my patch?  It is certainly better than nothing.
+Hi Marc
 
-Sure, it's right.
-I think that main reason of HLE is wait_prvdata_complete. (I'm guessing..)
-On other hands, dwmmc controller is handling something wrong. (I found that HLE is occurred the similar case.)
-After find the main solution, it's not bad that your patch is applied on dwmmc controller.
-
-Ulf have sent PR for next..So if we needs to apply this, i will apply on fix.
-
-Best Regards,
-Jaehoon Chung
-
+On 05/17/16 at 09:06am, Marc Zyngier wrote:
+> Hi Dave,
 > 
-> -Doug
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> On 17/05/16 06:42, Dave Young wrote:
+> > Marc, it has been discussed for long time, I think kdump code can be
+> > logically splitted from this series so that we can get the kexec
+> > done first? 
 > 
+> The basis for kexec are already on their way to mainline, as part of the
+> hibernate series that James has put together.
 > 
+> I'd expect someone to:
+> 
+> 1) rebase the remaining kexec/kdump patches based on the current
+> arm64/for-next/core,
+> 2) post these patches when -rc1 gets cut in two weeks from now,
+> 3) address the review comments in a timely manner,
+> 4) update the series once a week so that we see some actual progress
+> 
+> If this happens, I can't see any reason why this code wouldn't get
+> merged. But keeping kexec and kdump together is not what has prevented
+> the code from getting merged until now.
+
+Cool, thanks a lot for the clarification about the situation.
+
+Dave
