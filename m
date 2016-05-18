@@ -1,65 +1,53 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 18 May 2016 15:50:22 +0200
-Subject: [PATCH v4 32/56] KVM: arm/arm64: vgic-new: Add SGIPENDR register
- handlers
-In-Reply-To: <573C6EA6.90803@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-33-git-send-email-andre.przywara@arm.com>
- <20160518131449.GI3827@cbox> <573C6EA6.90803@arm.com>
-Message-ID: <20160518135022.GL3827@cbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 May 2016 15:50:02 +0200
+Subject: [PATCH] arm64: Allow for different DMA and CPU bus offsets
+In-Reply-To: <20160518134554.GF22378@e104818-lin.cambridge.arm.com>
+References: <1463563981-69722-1-git-send-email-agraf@suse.de>
+ <12218676.p29ELivsix@wuerfel>
+ <20160518134554.GF22378@e104818-lin.cambridge.arm.com>
+Message-ID: <30915363.3kcXpGGcy5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 02:31:18PM +0100, Andre Przywara wrote:
-> Hi,
-> 
-> On 18/05/16 14:14, Christoffer Dall wrote:
-> > On Mon, May 16, 2016 at 10:53:20AM +0100, Andre Przywara wrote:
-> >> As this register is v2 specific, its implementation lives entirely
-> >> in vgic-mmio-v2.c.
-> >> This register allows setting the source mask of an IPI.
-> >>
-> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >> ---
-> >> Changelog RFC..v1:
-> >> - remove IRQ lock from read handler
-> >> - update pending bit on setting the first / clearing the last bit
-> >> - queue virtual IRQ if necessary
-> >>
-> >> Changelog v1 .. v2:
-> >> - adapt to new MMIO framework
-> >>
-> >> Changelog v3 .. v4:
-> >> - specify accessor width
-> >>
-> >>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++--
-> >>  1 file changed, 60 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> >> index c884e9b..3925d4c 100644
-> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> >> @@ -146,6 +146,64 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
-> >>  	}
-> >>  }
-> >>  
-> >> +static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
-> >> +					    gpa_t addr, unsigned int len)
-> >> +{
-> >> +	u32 intid = addr & 0x0f;
+On Wednesday 18 May 2016 14:45:55 Catalin Marinas wrote:
+> On Wed, May 18, 2016 at 12:52:28PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 18 May 2016 11:33:01 Alexander Graf wrote:
+> > > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+> > > index ba437f0..67bf8e1 100644
+> > > --- a/arch/arm64/include/asm/dma-mapping.h
+> > > +++ b/arch/arm64/include/asm/dma-mapping.h
+> > > @@ -66,12 +66,16 @@ static inline bool is_device_dma_coherent(struct device *dev)
+> > >  
+> > >  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
+> > >  {
+> > > -       return (dma_addr_t)paddr;
+> > > +       dma_addr_t dev_addr = (dma_addr_t)paddr;
+> > > +
+> > > +       return dev_addr - (dma_addr_t)__pfn_to_phys(dev->dma_pfn_offset);
+> > >  }
+> > >  
+> > >  static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
+> > >  {
+> > > -       return (phys_addr_t)dev_addr;
+> > > +       phys_addr_t paddr = (phys_addr_t)dev_addr;
+> > > +
+> > > +       return paddr + __pfn_to_phys(dev->dma_pfn_offset);
+> > >  }
+> > >  
 > > 
-> > is there a reason why we cannot use the magic macro here?
+> > The patch looks ok overall, but I think it's better to use an open-coded
+> > shift instead of __pfn_to_phys/__pfn_to_phys here: those helpers convert
+> > between actual page frame numbers and addresses, which may not always
+> > be a 1:1 relationship, e.g. if someone wants to work around the crazy
+> > "Principles of ARM Memory Maps White Paper" layout.
 > 
-> I wasn't sure about this, because it's not covering all 1024 interrupts,
-> but just SGIs, so it's always fixed to 16 interrupts ? 8 bits. The
-> default mask would be too big in this case.
-> I guess it would work anyway because this region is limited to 16 bytes
-> in our description, so we could use this here anyway to make it more
-> aligned with the other handlers, maybe adding a comment about the
-> difference?
+> Nitpick: Even better to use the PFN_PHYS() macro as it matches the
+> PFN_DOWN() in of_dma_configure(). I can fix it up when applying.
 > 
-meh, either way works for me actually, whatever you prefer.
+> 
 
-Thanks,
--Christoffer
+I'd probably avoid that for the same reason as avoiding __pfn_to_phys.
+In practice all three methods do the same thing for now, and if someone
+wanted to change one, they'd also have to audit all the existing users.
+
+	Arnd
