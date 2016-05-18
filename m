@@ -1,54 +1,122 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 May 2016 15:08:32 +0200
-Subject: [PATCH v2 2/5] arm64: efi: apply strict permissons for UEFI
- Runtime Services regions
-In-Reply-To: <573C68DA.8080009@codeaurora.org>
-References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
- <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
- <573BB9FE.7050008@codeaurora.org>
- <CAKv+Gu-Tam+QiXc_f0e+x8hNc4rxP_-59NdaCHkF9h=4Rd+XeA@mail.gmail.com>
- <573C68DA.8080009@codeaurora.org>
-Message-ID: <CAKv+Gu9G60h66jaAOe754w7tKEdgF9NUDbkXgqNEEqKkG=LDzQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 15:14:49 +0200
+Subject: [PATCH v4 32/56] KVM: arm/arm64: vgic-new: Add SGIPENDR register
+ handlers
+In-Reply-To: <1463392481-26583-33-git-send-email-andre.przywara@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-33-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160518131449.GI3827@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2016 at 15:06, Shanker Donthineni <shankerd@codeaurora.org> wrote:
-> Hi Ard,
->
-> We are not using the permission attribute table and all the Runtime
-> Data/Code regions are marked with 'XP' bit. Do you think something
-> wrong in our UEFI implementation or Linux has to map RuntimeCode
-> regions with executable permission always irrespective of an attribute
-> flag EFI_MEMORY_XP?
->
-> [    0.000000] efi: Processing EFI memory map:
-> [    0.000000] efi:   0x000000100000-0x00000010ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x00003b830000-0x00003b83ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x00003c000000-0x00003fffffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x000000100000-0x00000010ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x00003b830000-0x00003b83ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x00003c000000-0x00003fffffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x004000820000-0x00400085ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x004003080000-0x00400308ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047f9960000-0x0047f997ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fa9c0000-0x0047fa9cffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047faa30000-0x0047faa3ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fab90000-0x0047fab9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047faba0000-0x0047fabaffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fab90000-0x0047fab9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047faba0000-0x0047fabaffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fabb0000-0x0047fabbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fabc0000-0x0047fad9ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fada0000-0x0047fae2ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047faf50000-0x0047faf7ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fafa0000-0x0047fafbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047faf50000-0x0047faf7ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fafa0000-0x0047fafbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fff90000-0x0047fff9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] efi:   0x0047fffb0000-0x0047fffdffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
->
+On Mon, May 16, 2016 at 10:53:20AM +0100, Andre Przywara wrote:
+> As this register is v2 specific, its implementation lives entirely
+> in vgic-mmio-v2.c.
+> This register allows setting the source mask of an IPI.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+> Changelog RFC..v1:
+> - remove IRQ lock from read handler
+> - update pending bit on setting the first / clearing the last bit
+> - queue virtual IRQ if necessary
+> 
+> Changelog v1 .. v2:
+> - adapt to new MMIO framework
+> 
+> Changelog v3 .. v4:
+> - specify accessor width
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 60 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index c884e9b..3925d4c 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -146,6 +146,64 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
+> +					    gpa_t addr, unsigned int len)
+> +{
+> +	u32 intid = addr & 0x0f;
 
-This memory map looks utterly broken. Assuming you are using
-Tianocore, does it work when setting
-gEfiMdeModulePkgTokenSpaceGuid.PcdPropertiesTableEnable to FALSE in
-your platform?
+is there a reason why we cannot use the magic macro here?
+
+> +	int i;
+> +	u64 val = 0;
+> +
+> +	for (i = 0; i < len; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		val |= (u64)irq->source << (i * 8);
+> +	}
+> +	return val;
+> +}
+> +
+> +static void vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len,
+> +				     unsigned long val)
+> +{
+> +	u32 intid = addr & 0x0f;
+> +	int i;
+> +
+> +	for (i = 0; i < len; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +
+> +		irq->source &= ~((val >> (i * 8)) & 0xff);
+> +		if (!irq->source)
+> +			irq->pending = false;
+> +
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +}
+> +
+> +static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len,
+> +				     unsigned long val)
+> +{
+> +	u32 intid = addr & 0x0f;
+> +	int i;
+> +
+> +	for (i = 0; i < len; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +
+> +		irq->source |= (val >> (i * 8)) & 0xff;
+> +
+> +		if (irq->source) {
+> +			irq->pending = true;
+> +			vgic_queue_irq_unlock(vcpu->kvm, irq);
+> +		} else {
+> +			spin_unlock(&irq->irq_lock);
+> +		}
+> +	}
+> +}
+> +
+>  static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+> @@ -184,10 +242,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
+> +		vgic_mmio_read_sgipend, vgic_mmio_write_sgipendc, 16,
+>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
+> +		vgic_mmio_read_sgipend, vgic_mmio_write_sgipends, 16,
+>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+>  };
+>  
+> -- 
+> 2.8.2
+> 
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
