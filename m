@@ -1,250 +1,106 @@
-From: davidm@egauge.net (David Mosberger-Tang)
-Date: Wed, 18 May 2016 15:06:04 -0600
-Subject: [PATCH] drivers: nvmem: atmel-secumod: New driver for Atmel Secumod
- nvram
-In-Reply-To: <20160518164259.GA28954@rob-hp-laptop>
-References: <20160518164259.GA28954@rob-hp-laptop>
-Message-ID: <1463605564-14397-1-git-send-email-davidm@egauge.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 18 May 2016 23:20:18 +0200
+Subject: [PATCH 15/16] clk: sunxi-ng: Add H3 clocks
+In-Reply-To: <20160516154739.d87e0a9891a7fb5fed051a89@free.fr>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-16-git-send-email-maxime.ripard@free-electrons.com>
+ <20160516154739.d87e0a9891a7fb5fed051a89@free.fr>
+Message-ID: <20160518212018.GT27618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: David Mosberger <davidm@egauge.net>
----
- .../devicetree/bindings/nvmem/atmel-secumod.txt    |  47 +++++++
- drivers/nvmem/Kconfig                              |   7 +
- drivers/nvmem/Makefile                             |   2 +
- drivers/nvmem/atmel-secumod.c                      | 143 +++++++++++++++++++++
- 4 files changed, 199 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/nvmem/atmel-secumod.txt
- create mode 100644 drivers/nvmem/atmel-secumod.c
+Hi,
 
-diff --git a/Documentation/devicetree/bindings/nvmem/atmel-secumod.txt b/Documentation/devicetree/bindings/nvmem/atmel-secumod.txt
-new file mode 100644
-index 0000000..d65cad5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/nvmem/atmel-secumod.txt
-@@ -0,0 +1,47 @@
-+= Atmel Secumod device tree bindings =
-+
-+This binding is intended to represent Atmel's Secumod which is found
-+in SAMA5D2 and perhaps others.
-+
-+Required properties:
-+- compatible: should be "atmel,sama5d2-secumod"
-+- reg: Should contain RAM location and length, followed
-+       by register location and length of the Secumod controller.
-+
-+= Data cells =
-+Are child nodes of secumod, bindings of which as described in
-+bindings/nvmem/nvmem.txt
-+
-+Example:
-+
-+    secumod at fc040000 {
-+            compatible = "atmel,sama5d2-secumod";
-+            reg = <0xf8044000 0x1420>, <0xfc040000 0x4000>;
-+            reg-names = "SECURAM", "SECUMOD";
-+            status = "okay";
-+
-+            #address-cells = <1>;
-+            #size-cells = <1>;
-+            ranges;
-+
-+            secram-auto-erasable at 0 {
-+                    reg = <0x0000 0x1000>;
-+            };
-+            secram at 1000 {
-+                    reg = <0x1000 0x400>;
-+            };
-+            ram at 1400 {
-+                    reg = <0x1400 0x20>;
-+            };
-+    };
-+
-+= Data consumers =
-+Are device nodes which consume nvmem data cells.
-+
-+For example:
-+
-+	ram {
-+		...
-+		nvmem-cells = <&ram>;
-+		nvmem-cell-names = "RAM";
-+	};
-diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-index 3041d48..88b21e3 100644
---- a/drivers/nvmem/Kconfig
-+++ b/drivers/nvmem/Kconfig
-@@ -101,4 +101,11 @@ config NVMEM_VF610_OCOTP
- 	  This driver can also be build as a module. If so, the module will
- 	  be called nvmem-vf610-ocotp.
- 
-+config NVMEM_ATMEL_SECUMOD
-+       tristate "Atmel Secure Module driver"
-+       depends on ARCH_AT91
-+       help
-+         Select this to get support for the secure module (SECUMOD) built
-+	 into the SAMA5D2 chips.
-+
- endif
-diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-index 45ab1ae..9cbd950 100644
---- a/drivers/nvmem/Makefile
-+++ b/drivers/nvmem/Makefile
-@@ -22,3 +22,5 @@ obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
- nvmem_sunxi_sid-y		:= sunxi_sid.o
- obj-$(CONFIG_NVMEM_VF610_OCOTP)	+= nvmem-vf610-ocotp.o
- nvmem-vf610-ocotp-y		:= vf610-ocotp.o
-+obj-$(CONFIG_NVMEM_ATMEL_SECUMOD)	+= nvmem-atmel-secumod.o
-+nvmem-atmel-secumod-y		:= atmel-secumod.o
-diff --git a/drivers/nvmem/atmel-secumod.c b/drivers/nvmem/atmel-secumod.c
-new file mode 100644
-index 0000000..fc5a96b
---- /dev/null
-+++ b/drivers/nvmem/atmel-secumod.c
-@@ -0,0 +1,143 @@
-+/*
-+ * Driver for SAMA5D2 secure module (SECUMOD).
-+ *
-+ * Copyright (C) 2016 eGauge Systems LLC
-+ *
-+ * David Mosberger <davidm@egauge.net>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/delay.h>
-+#include <linux/io.h>
-+#include <linux/module.h>
-+#include <linux/nvmem-provider.h>
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+
-+static int
-+secumod_reg_read(void *context, unsigned int reg, void *_val, size_t bytes)
-+{
-+	void __iomem *base = context;
-+	u32 *val = _val;
-+	int i = 0, words = bytes / 4;
-+
-+	while (words--)
-+		*val++ = readl(base + reg + (i++ * 4));
-+
-+	return 0;
-+}
-+
-+static int
-+secumod_reg_write(void *context, unsigned int reg, void *_val, size_t bytes)
-+{
-+	void __iomem *base = context;
-+	u32 *val = _val;
-+	int i = 0, words = bytes / 4;
-+
-+	while (words--)
-+		writel(*val++, base + reg + (i++ * 4));
-+
-+	return 0;
-+}
-+
-+static struct nvmem_config econfig = {
-+	.name = "secumod",
-+	.owner = THIS_MODULE,
-+	.stride = 4,
-+	.word_size = 1,
-+	.reg_read = secumod_reg_read,
-+	.reg_write = secumod_reg_write,
-+};
-+
-+/*
-+ * Security-module register definitions:
-+ */
-+#define SECUMOD_RAMRDY	0x0014
-+
-+/*
-+ * Since the secure module may need to automatically erase some of the
-+ * RAM, it may take a while for it to be ready.  As far as I know,
-+ * it's not documented how long this might take in the worst-case.
-+ */
-+static void
-+secumod_wait_ready (void *regs)
-+{
-+	unsigned long start, stop;
-+
-+	start = jiffies;
-+	while (!(readl(regs + SECUMOD_RAMRDY) & 1))
-+		msleep_interruptible(1);
-+	stop = jiffies;
-+	if (stop != start)
-+		pr_info("nvmem-atmel-secumod: it took %u msec for SECUMOD "
-+			"to become ready...\n", jiffies_to_msecs(stop - start));
-+	else
-+		pr_info("nvmem-atmel-secumod: ready\n");
-+}
-+
-+static int secumod_remove(struct platform_device *pdev)
-+{
-+	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-+
-+	return nvmem_unregister(nvmem);
-+}
-+
-+static int secumod_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	struct nvmem_device *nvmem;
-+	void __iomem *base;
-+
-+	/*
-+	 * Map controller address temporarily so we can ensure that
-+	 * the hardware is ready:
-+	 */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	base = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	secumod_wait_ready(base);
-+	devm_iounmap(dev, base);
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	base = devm_ioremap_resource(dev, res);
-+
-+	if (IS_ERR(base))
-+		return PTR_ERR(base);
-+
-+	econfig.size = resource_size(res);
-+	econfig.dev = dev;
-+	econfig.priv = base;
-+
-+	nvmem = nvmem_register(&econfig);
-+	if (IS_ERR(nvmem))
-+		return PTR_ERR(nvmem);
-+
-+	platform_set_drvdata(pdev, nvmem);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id secumod_of_match[] = {
-+	{ .compatible = "atmel,sama5d2-secumod",},
-+	{/* sentinel */},
-+};
-+MODULE_DEVICE_TABLE(of, secumod_of_match);
-+
-+static struct platform_driver secumod_driver = {
-+	.probe = secumod_probe,
-+	.remove = secumod_remove,
-+	.driver = {
-+		.name = "atmel,sama5d2-secumod",
-+		.of_match_table = secumod_of_match,
-+	},
-+};
-+module_platform_driver(secumod_driver);
-+MODULE_AUTHOR("David Mosberger <davidm@egauge.net>");
-+MODULE_DESCRIPTION("Atmel Secumod driver");
-+MODULE_LICENSE("GPL v2");
+On Mon, May 16, 2016 at 03:47:39PM +0200, Jean-Francois Moine wrote:
+> On Sun,  8 May 2016 22:01:50 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > Add the list of clocks and resets found in the H3 CCU.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi-ng/Makefile        |   2 +
+> >  drivers/clk/sunxi-ng/ccu-sun8i-h3.c  | 757 +++++++++++++++++++++++++++++++++++
+> >  include/dt-bindings/clock/sun8i-h3.h | 162 ++++++++
+> >  include/dt-bindings/reset/sun8i-h3.h | 103 +++++
+> >  4 files changed, 1024 insertions(+)
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> >  create mode 100644 include/dt-bindings/clock/sun8i-h3.h
+> >  create mode 100644 include/dt-bindings/reset/sun8i-h3.h
+> > 
+> > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> > index c794f57b6fb1..67ff6a92f124 100644
+> > --- a/drivers/clk/sunxi-ng/Makefile
+> > +++ b/drivers/clk/sunxi-ng/Makefile
+> > @@ -13,3 +13,5 @@ obj-y += ccu_nkmp.o
+> >  obj-y += ccu_nm.o
+> >  obj-y += ccu_p.o
+> >  obj-y += ccu_phase.o
+> > +
+> > +obj-y += ccu-sun8i-h3.o
+> > diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-h3.c b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> > new file mode 100644
+> > index 000000000000..5ce699e95c32
+> > --- /dev/null
+> > +++ b/drivers/clk/sunxi-ng/ccu-sun8i-h3.c
+> > @@ -0,0 +1,757 @@
+> 	[snip]
+> > +static struct ccu_nm pll_audio_base_clk = {
+> > +	.enable		= BIT(31),
+> > +	.lock		= BIT(28),
+> > +
+> > +	.m		= SUNXI_CLK_FACTOR(0, 5),
+> > +	.n		= SUNXI_CLK_FACTOR(8, 7),
+> > +
+> > +	.common		= {
+> > +		.reg		= 0x008,
+> > +		.features	= CCU_FEATURE_GATE | CCU_FEATURE_LOCK,
+> > +		.hw.init	= SUNXI_HW_INIT("pll-audio-base",
+> > +						"osc24M",
+> > +						&ccu_nm_ops,
+> > +						0),
+> > +	},
+> > +};
+> > +
+> > +static SUNXI_CCU_M(pll_audio_clk, "pll-audio", "pll-audio-base",
+> > +		   0x008, 16, 4, 0);
+> > +
+> > +static SUNXI_CCU_FIXED_FACTOR(pll_audio_2x_clk, "pll-audio-2x",
+> > +			      "pll-audio-base", 2, 1, 0);
+> > +static SUNXI_CCU_FIXED_FACTOR(pll_audio_4x_clk, "pll-audio-4x",
+> > +			      "pll-audio-base", 1, 1, 0);
+> > +static SUNXI_CCU_FIXED_FACTOR(pll_audio_8x_clk, "pll-audio-8x",
+> > +			      "pll-audio-base", 1, 2, 0);
+> > +
+> 	[snip]
+> 
+> The pll-audio-{2,4,8}x clocks lack the CLK_SET_RATE_PARENT.
+> 
+> Also, in my implementation of the sound on HDMI, I set pll-audio as the
+> parent of the i2s2 clock. Then, as the pll-audio clock is defined here,
+> setting its rate is always wrong (only 'M' is changed, and with a bad
+> value - BTW, DIV_ROUND_UP would be welcome in ccu_m_find_best()).
+> 
+> As the pre-divider 'M' is set to 4 by default, there is no need to
+> change it. Then, audio works fine for me with:
+> 
+> static SUNXI_CCU_FIXED_FACTOR(pll_audio, "pll-audio",
+> 			      "pll-audio-base", 4, 1,
+> 				CLK_SET_RATE_PARENT);
+
+OK. I just changed it, we can always change it later if needs be.
+
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160518/197395b9/attachment.sig>
