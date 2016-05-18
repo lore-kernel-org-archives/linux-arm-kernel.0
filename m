@@ -1,89 +1,68 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Wed, 18 May 2016 09:21:03 +1000
-Subject: [linux-sunxi] Re: PATH[1/3] ARM: axp20x_usb_power.c add device
- tree configuration options for REG 30H: VBUS-IPSOUT
-In-Reply-To: <35a39bdc-1304-403d-b56a-a45bb8debf5e@googlegroups.com>
-References: <0f58d2b3-f3d3-45a3-a307-e54df26c1ab1@googlegroups.com>
- <671c7471-b63a-40cc-989f-6b20f00571ee@googlegroups.com>
- <35a39bdc-1304-403d-b56a-a45bb8debf5e@googlegroups.com>
-Message-ID: <CAGRGNgX7A3bx9Dam2j1ovdf4s8L9GTi3DM4zMeyu0x3b0wwCgA@mail.gmail.com>
+From: simran.rai@broadcom.com (Simran Rai)
+Date: Tue, 17 May 2016 17:01:06 -0700
+Subject: [PATCH v7 0/3] ASoC: cygnus: Add audio support for Broadcom Cygnus SoC
+Message-ID: <1463529669-25022-1-git-send-email-simran.rai@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ene,
+Hi,
 
-On Wed, May 18, 2016 at 3:50 AM, Ene Alexandru <ene.alexandru@gmail.com> wrote:
-> the documentation is updated to describe how to convert actual values to the
-> provided parameters
->
-> ---
-> diff -uprN -X linux-sunxi-original/Documentation/dontdiff
-> linux-sunxi-original/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-> linux-sunxi/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-> ---
-> linux-sunxi-original/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-> 2016-05-09 16:48:46.000000000 +0200
-> +++
-> linux-sunxi/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-> 2016-05-11 13:05:58.995873267 +0200
-> @@ -5,6 +5,26 @@ Required Properties:
->  This node is a subnode of the axp20x PMIC.
-> +The following 3 parameters are configurable from the device-tree:
-> +          - vhold-enable
-> +                      - bit 6 of register REG 30H: VBUS-IPSOUT Power Path
-> Management
+This patchset contains audio support for Broadcom's Cygnus SoC.
+It contains DT bindings and core audio driver. The audio driver supports
+both capture and playback of Audio PCM samples over I2S/TDM interface and
+provides playback support over SPDIF interface.
 
-I don't think it's necessary to go into this much detail here.
+This patchset is derived from a previously submitted patchset:
+http://lkml.iu.edu/hypermail/linux/kernel/1503.3/05434.html
 
-> +                      - available values are:
-> +                                  - 0x00 : VBUS VHOLD voltage limiting
-> control disabled
-> +                                  - 0x01 : VBUS VHOLD voltage limiting
-> control enabled
+This patchset has been tested on Cygnus wireless audio bcm958305K board.
+It is based on v4.6-rc1 and is available from github:
 
-If these are the only options available, why not make this property a boolean?
+repo: https://github.com/Broadcom/cygnus-linux/tree/cygnus-sound-v7
 
-> +          - vhold-set
-> +                      - bits <5-3> of register REG 30H: VBUS-IPSOUT Power
-> Path Management
-> +                      - available values are from 0x00 to 0x07
-> +                      - VHOLD = [4000000 + ( vhold-set & 0x07 ) * 100000]
-> in uV
+Changes from v6:
+- DT bindings acknowledged by Rob Herring
+Changes from v5:
+- Fix code style, e.g. change "if" statements to "switch" statements
+- Fix SPDIF output enable register field
+- Set BUFFER_PAIR_ENABLE for both mono, stereo and TDM modes
+- Reflect PCM bit formats for SPDIF, SSP and TDM as supported by
+hardware
+Changes from v4:
+- Fix power suspend function and add power resume function
+- Move clock initialization code from audio driver to clock framework
+Changes from v3:
+- Fix the subject lines to match the style for the subsystem
+Changes from v2:
+- Split patchset 2/2 from v2 into patchsets 2/3 and 3/3.
+- Remove SND_SOC_CYGNUS_DIAG. Diagnostics can be performed using
+standard kernel trace infrastructure.
+- Fix interrupt handler. Acknowledge only those interrupts that are
+handledby ISR.
+- Modify configure_vco() and the pll_macro_entry() struct to make it
+better readable. The functionality did not change.
+- Remove casts on macros
+- Remove surround sound channel grouping from the driver.
+Changes from v1:
+- Address code review comments. Fix print format of type size_t and
+pointer.
 
-What does this actually do? Is this the lower limit on the voltage? Is
-this the voltage it'll try to maintain?
+Simran Rai (3):
+  ASoC: cygnus: Add DT bindings for Broadcom Cygnus audio
+  ASoC: cygnus: Add Cygnus audio DAI driver
+  ASoC: cygnus: Add Cygnus audio DMA driver
 
-> +          - ibus-limit
-> +                      - bits <1-0> of register REG 30H: VBUS-IPSOUT Power
-> Path Management
-> +                      - available values are :
-> +                                  - 0x00 : 900000uA
-> +                                  - 0x01 : 500000uA
-> +                                  - 0x02 : 100000uA
-> +                                  - 0x03 : unlimited
-
-Again, what does this actually do? It looks like the current limit?
-
-> +
-> +
-
-Extra blank line.
-
-> Example:
->  axp209: pmic at 34 {
-> @@ -30,5 +50,8 @@ axp209: pmic at 34 {
->             usb-power-supply: usb-power-supply {
->                        compatible = "x-powers,axp202-usb-power-supply";
-> +                      vhold-enable = <0x01>;
-> +                      vhold-set = <0x04>;
-> +                      ibus-limit = <0x01>;
->            };
-> };
-
-Thanks,
+ .../bindings/sound/brcm,cygnus-audio.txt           |   67 +
+ sound/soc/bcm/Kconfig                              |    9 +
+ sound/soc/bcm/Makefile                             |    5 +
+ sound/soc/bcm/cygnus-pcm.c                         |  861 +++++++++++
+ sound/soc/bcm/cygnus-ssp.c                         | 1529 ++++++++++++++++++++
+ sound/soc/bcm/cygnus-ssp.h                         |  139 ++
+ 6 files changed, 2610 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+ create mode 100644 sound/soc/bcm/cygnus-pcm.c
+ create mode 100644 sound/soc/bcm/cygnus-ssp.c
+ create mode 100644 sound/soc/bcm/cygnus-ssp.h
 
 -- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+1.9.1
