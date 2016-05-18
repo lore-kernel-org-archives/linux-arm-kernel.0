@@ -1,70 +1,58 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 18 May 2016 11:33:01 +0200
-Subject: [PATCH] arm64: Allow for different DMA and CPU bus offsets
-Message-ID: <1463563981-69722-1-git-send-email-agraf@suse.de>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Wed, 18 May 2016 11:49:44 +0200
+Subject: [RESEND PATCH v6 0/6] Add Ethernet support on STM32F429
+In-Reply-To: <2535270.dCFPoM2olB@wuerfel>
+References: <1462789899-13153-1-git-send-email-alexandre.torgue@gmail.com>
+ <20160517.122527.1937360418899371800.davem@davemloft.net>
+ <CALszF6AE7jkRX3sSNm=PCvEmkmZM-Sv5LxFSj7J3vMbvi8M5Cg@mail.gmail.com>
+ <2535270.dCFPoM2olB@wuerfel>
+Message-ID: <CALszF6AP52EAN68qH8Pup9uxqTnhoT8wigiKaZzgHns3m+NCgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, all SoCs we supported so far either have an IOMMU or have bus
-addresses equal to CPU addresses.
+2016-05-18 11:31 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 18 May 2016 09:48:53 Maxime Coquelin wrote:
+>> 2016-05-17 18:25 GMT+02:00 David Miller <davem@davemloft.net>:
+>> > From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>> > Date: Tue, 17 May 2016 11:20:16 +0200
+>> >
+>> >> Hi David,
+>> >>
+>> >> 2016-05-09 21:06 GMT+02:00 David Miller <davem@davemloft.net>:
+>> >>> From: Alexandre TORGUE <alexandre.torgue@gmail.com>
+>> >>> Date: Mon,  9 May 2016 12:31:33 +0200
+>> >>>
+>> >>>> STM32F429 Chip embeds a Synopsys 3.50a MAC IP.
+>> >>>> This series:
+>> >>>>  -enhance current stmmac driver to control it (code already
+>> >>>> available) and adds basic glue for STM32F429 chip.
+>> >>>>  -Enable basic Net config in kernel.
+>> >>>
+>> >>> I assume this will go via the ARM tree, for the networking bits:
+>> >> I would expect patches 1, 2 & 3 to got via your tree, to avoid conflicts.
+>> >
+>> > I don't think putting them all via the ARM tree is going to create much
+>> > in the way of conflicts, and right now during the merge window offloading
+>> > that work from me would really help my backlog a lot.
+>>
+>> Ok, I understand this is not the best time to pick it.
+>>
+>> Arnd, Olof & Kevin, would you accept to pick the series in your tree?
+>>
+>
+> It's too late for v4.7 for us too, please pick up the arch/arm patches
+> in your normal stm32 tree and send them to us along with any other changes
+> you may have, and resend the driver by itself to netdev time after the
+> merge window.
+>
+> The binding document can go either way, with the dts changes or with
+> the driver. I see no dependencies between the patches, so we just need
+> to land them all in v4.8.
 
-However, with the Raspberry Pi 3 coming up, this is no longer true. To
-allow DMA to work with an AArch64 kernel on those devices, let's allow
-devices to have DMA offsets again.
+Ok, this is good for me.
+No problem to wait for v4.8.
+I will take the arch/arm patches, and David the drivers/net/ ones once
+v4.7-rc1 is out.
 
-Signed-off-by: Alexander Graf <agraf@suse.de>
-
----
-
-This patch may conflict with another patch titled "swiotlb: prefix dma_to_phys
-and phys_to_dma functions" which is in flight, but hasn't seen an update since
-March.
-
-Since this patch is very small and isolated to arm64, I'd prefer to keep them
-separate rather than combine them. So if the other patch gets accepted first,
-I'm happy to rebase this patch on top of a topic branch that would address the
-rename.
----
- arch/arm64/include/asm/dma-mapping.h | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index ba437f0..67bf8e1 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -66,12 +66,16 @@ static inline bool is_device_dma_coherent(struct device *dev)
- 
- static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
- {
--	return (dma_addr_t)paddr;
-+	dma_addr_t dev_addr = (dma_addr_t)paddr;
-+
-+	return dev_addr - (dma_addr_t)__pfn_to_phys(dev->dma_pfn_offset);
- }
- 
- static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
- {
--	return (phys_addr_t)dev_addr;
-+	phys_addr_t paddr = (phys_addr_t)dev_addr;
-+
-+	return paddr + __pfn_to_phys(dev->dma_pfn_offset);
- }
- 
- static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-@@ -86,5 +90,14 @@ static inline void dma_mark_clean(void *addr, size_t size)
- {
- }
- 
-+/* Override for dma_max_pfn() */
-+static inline unsigned long dma_max_pfn(struct device *dev)
-+{
-+	dma_addr_t dma_max = (dma_addr_t)*dev->dma_mask;
-+
-+	return (ulong)__phys_to_pfn(dma_to_phys(dev, dma_max));
-+}
-+#define dma_max_pfn(dev) dma_max_pfn(dev)
-+
- #endif	/* __KERNEL__ */
- #endif	/* __ASM_DMA_MAPPING_H */
--- 
-1.8.5.6
+Thanks for your time,
+Maxime
