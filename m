@@ -1,109 +1,50 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 18 May 2016 17:14:43 +0800
-Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
- errors
-In-Reply-To: <CAD=FV=VneQR3wurjezBkRhtQiH+q-FfhDN8=Ym=XqtZpVmsdUw@mail.gmail.com>
-References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
- <5502CA4E.9060401@samsung.com>
- <CAD=FV=VX3ix-j4y95W1q8b-aVuVEN+4xsd8WLx2xcE7KPNJwRw@mail.gmail.com>
- <5506707D.40708@samsung.com> <55189F04.8000404@samsung.com>
- <CAD=FV=WFAZqAsXOqunt0fxw87M-FruwUrxuzW0MJsG6UvfSjzA@mail.gmail.com>
- <CAD=FV=UJGcwa_biSCGhD=kS-T+fppCniBFfOHb5ohnwSwSwMMA@mail.gmail.com>
- <573BCC8D.5090606@kernel-upstream.org>
- <CAD=FV=VneQR3wurjezBkRhtQiH+q-FfhDN8=Ym=XqtZpVmsdUw@mail.gmail.com>
-Message-ID: <573C3283.1040606@rock-chips.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 May 2016 11:31:17 +0200
+Subject: [RESEND PATCH v6 0/6] Add Ethernet support on STM32F429
+In-Reply-To: <CALszF6AE7jkRX3sSNm=PCvEmkmZM-Sv5LxFSj7J3vMbvi8M5Cg@mail.gmail.com>
+References: <1462789899-13153-1-git-send-email-alexandre.torgue@gmail.com>
+ <20160517.122527.1937360418899371800.davem@davemloft.net>
+ <CALszF6AE7jkRX3sSNm=PCvEmkmZM-Sv5LxFSj7J3vMbvi8M5Cg@mail.gmail.com>
+Message-ID: <2535270.dCFPoM2olB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Wednesday 18 May 2016 09:48:53 Maxime Coquelin wrote:
+> 2016-05-17 18:25 GMT+02:00 David Miller <davem@davemloft.net>:
+> > From: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> > Date: Tue, 17 May 2016 11:20:16 +0200
+> >
+> >> Hi David,
+> >>
+> >> 2016-05-09 21:06 GMT+02:00 David Miller <davem@davemloft.net>:
+> >>> From: Alexandre TORGUE <alexandre.torgue@gmail.com>
+> >>> Date: Mon,  9 May 2016 12:31:33 +0200
+> >>>
+> >>>> STM32F429 Chip embeds a Synopsys 3.50a MAC IP.
+> >>>> This series:
+> >>>>  -enhance current stmmac driver to control it (code already
+> >>>> available) and adds basic glue for STM32F429 chip.
+> >>>>  -Enable basic Net config in kernel.
+> >>>
+> >>> I assume this will go via the ARM tree, for the networking bits:
+> >> I would expect patches 1, 2 & 3 to got via your tree, to avoid conflicts.
+> >
+> > I don't think putting them all via the ARM tree is going to create much
+> > in the way of conflicts, and right now during the merge window offloading
+> > that work from me would really help my backlog a lot.
+> 
+> Ok, I understand this is not the best time to pick it.
+> 
+> Arnd, Olof & Kevin, would you accept to pick the series in your tree?
+> 
 
-On 2016-5-18 12:12, Doug Anderson wrote:
-> Hi,
->
-> On Tue, May 17, 2016 at 6:59 PM, Shawn Lin
-> <shawn.lin@kernel-upstream.org> wrote:
->> Could you try this patch to see if you can still find HLE?
->>
->> @@ -2356,12 +2356,22 @@ static void dw_mci_cmd_interrupt(struct dw_mci
->> *host, u32 status)
->>   static void dw_mci_handle_cd(struct dw_mci *host)
->>   {
->>          int i;
->> +       int present;
->>
->>          for (i = 0; i < host->num_slots; i++) {
->>                  struct dw_mci_slot *slot = host->slot[i];
->>
->>                  if (!slot)
->>                          continue;
->>
->> +               present = !(mci_readl(slot->host, CDETECT) & (1 <<
->> slot->id));
->> +               if (present)
->> +                       set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
->> +               else
->> +                       clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
->
-> No, because we don't use the builtin card detect on veyron.  ;)
->
-> We use GPIO card detect because we didn't like the way JTAG and SD
-> interacted.  Also on rk3288 the builtin card detect line had the wrong
-> voltage domain (you couldn't detect a card when the IO lines were
-> powered off).  The builtin card detect line is always driven low on
-> veyron.
+It's too late for v4.7 for us too, please pick up the arch/arm patches
+in your normal stm32 tree and send them to us along with any other changes
+you may have, and resend the driver by itself to netdev time after the
+merge window.
 
-Okay, I see.
+The binding document can go either way, with the dts changes or with
+the driver. I see no dependencies between the patches, so we just need
+to land them all in v4.8.
 
->
->
-> I'm nearly certain that the root cause of my HLE errors is actually
-> related to the same problem addressed by the commit 7c5209c315ea
-> ("mmc: core: Increase delay for voltage to stabilize from 3.3V to
-> 1.8V").  I think that on minnie we're still on the hairy edge and
-> sometimes the line doesn't transition fast enough.
-
-Things are not so simple from your details.
-
-I was not enabling SD3.0 support, then I also found HLE sometimes.
-So it seems commit 7c5209c315ea does not contibute to this phenomenon.
-
-The scenario looks like:
-remove sd-card -> mmc_sd_detect -> send status(CMD13) ->power_off ->
-set_ios -> setup_bus -> disabled clk , then HLE irq storm coming
-
- From the code of dw_mci_prepare_command:
-SDMMC_CMD_PRV_DAT_WAIT will not be used for CMD13, so we don't
-wait_busy here, then cmd code is loding into queue of dw_mmc but
-still failing send out because it's in busy?
-
-With my patch, things go well:
-remove sd-card -> clear bit of DW_MMC_CARD_PRESENT  -> send
-status(CMD13) return directly -> power_off -> set_ios -> setup_bus -> 
-disable clk
-
-So why should we allow inquiry of card status if we sure the card is
-removed? I mean no any further cmds should be delivered.
-
-And another question: should we wait busy for cmd13?
-
->
-> It appears that increasing this to 30ms avoids the HLE errors.
->
-> I _think_ I can actually fully fix this properly by temporarily
-> engaging the internal pull-ups while the voltage switch is happening.
-> This will bleed away the voltage just a little bit faster (since lines
-> are driven low here).  I'll try to confirm that.
->
->
-> In any case, it seems like we should take this patch since (without
-> this patch) the failure case when you get HLE errors is that the
-> interrupt controller fires over and over again (with no printouts) and
-> your system stalls with no error messages.
-
-Sure, at least we need to address this irq storm...
-
->
-> -Doug
->
->
->
+	Arnd
