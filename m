@@ -1,120 +1,316 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Wed, 18 May 2016 15:12:27 +0100
-Subject: [PATCH] usb: echi-hcd: Add register access check in shutdown
-Message-ID: <1463580747-20868-1-git-send-email-srinivas.kandagatla@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 16:14:27 +0200
+Subject: [PATCH v4 16/56] KVM: arm/arm64: vgic-new: Implement virtual IRQ
+ injection
+In-Reply-To: <1463392481-26583-17-git-send-email-andre.przywara@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-17-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160518141427.GA6666@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds a check in ehci_shutdown(), to make sure
-that the register access is available before accessing registers.
+On Mon, May 16, 2016 at 10:53:04AM +0100, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> Provide a vgic_queue_irq_unlock() function which decides whether a
+> given IRQ needs to be queued to a VCPU's ap_list.
+> This should be called whenever an IRQ becomes pending or enabled,
+> either as a result of userspace injection, from in-kernel emulated
+> devices like the architected timer or from MMIO accesses to the
+> distributor emulation.
+> Also provides the necessary functions to allow userland to inject an
+> IRQ to a guest.
+> Since this is the first code that starts using our locking mechanism, we
+> add some (hopefully) clear documentation of our locking strategy and
+> requirements along with this patch.
+> 
+> [Andre: refactor out vgic_queue_irq_unlock()]
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog RFC..v1:
+> - add spinlock checks protected by CONFIG_DEBUG_SPINLOCK
+> - add more comments to vgic_target_oracle
+> - remove BUG_ON() if IRQ is neither edge or level
+> - rename vgic_queue_irq() to vgic_queue_irq_unlock()
+> - simplify initial check in vgic_queue_irq_unlock()
+> - extend retry loop to ask the oracle again
+> - minor comment fixes
+> 
+> Changelog v1 .. v2:
+> - move most IRQ injection code into vgic_update_irq_pending()
+> 
+> Changelog v3 .. v4:
+> - simplify vgic_queue_irq_unlock() to allow reusage later
+> 
+>  include/kvm/vgic/vgic.h  |   3 +
+>  virt/kvm/arm/vgic/vgic.c | 211 +++++++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h |   1 +
+>  3 files changed, 215 insertions(+)
+> 
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index 6ca0781..7b6ca90 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -181,6 +181,9 @@ struct vgic_cpu {
+>  	u64 live_lrs;
+>  };
+>  
+> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+> +			bool level);
+> +
+>  #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+>  #define vgic_initialized(k)	(false)
+>  #define vgic_ready(k)		((k)->arch.vgic.ready)
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index fb45537..62fede6 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -19,8 +19,31 @@
+>  
+>  #include "vgic.h"
+>  
+> +#define CREATE_TRACE_POINTS
+> +#include "../trace.h"
+> +
+> +#ifdef CONFIG_DEBUG_SPINLOCK
+> +#define DEBUG_SPINLOCK_BUG_ON(p) BUG_ON(p)
+> +#else
+> +#define DEBUG_SPINLOCK_BUG_ON(p)
+> +#endif
+> +
+>  struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
+>  
+> +/*
+> + * Locking order is always:
+> + *   vgic_cpu->ap_list_lock
+> + *     vgic_irq->irq_lock
+> + *
+> + * (that is, always take the ap_list_lock before the struct vgic_irq lock).
+> + *
+> + * When taking more than one ap_list_lock at the same time, always take the
+> + * lowest numbered VCPU's ap_list_lock first, so:
+> + *   vcpuX->vcpu_id < vcpuY->vcpu_id:
+> + *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
+> + *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
+> + */
+> +
+>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  			      u32 intid)
+>  {
+> @@ -39,3 +62,191 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  	WARN(1, "Looking up struct vgic_irq for reserved INTID");
+>  	return NULL;
+>  }
+> +
+> +/**
+> + * kvm_vgic_target_oracle - compute the target vcpu for an irq
+> + *
+> + * @irq:	The irq to route. Must be already locked.
+> + *
+> + * Based on the current state of the interrupt (enabled, pending,
+> + * active, vcpu and target_vcpu), compute the next vcpu this should be
+> + * given to. Return NULL if this shouldn't be injected at all.
+> + *
+> + * Requires the IRQ lock to be held.
+> + */
+> +static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
+> +{
+> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+> +
+> +	/* If the interrupt is active, it must stay on the current vcpu */
+> +	if (irq->active)
+> +		return irq->vcpu;
+> +
+> +	/*
+> +	 * If the IRQ is not active but enabled and pending, we should direct
+> +	 * it to its configured target VCPU.
+> +	 * If the distributor is disabled, pending interrupts shouldn't be
+> +	 * forwarded.
+> +	 */
+> +	if (irq->enabled && irq->pending) {
+> +		if (unlikely(irq->target_vcpu &&
+> +			     !irq->target_vcpu->kvm->arch.vgic.enabled))
+> +			return NULL;
+> +
+> +		return irq->target_vcpu;
+> +	}
+> +
+> +	/* If neither active nor pending and enabled, then this IRQ should not
+> +	 * be queued to any VCPU.
+> +	 */
+> +	return NULL;
+> +}
+> +
+> +/*
+> + * Only valid injection if changing level for level-triggered IRQs or for a
+> + * rising edge.
+> + */
+> +static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
+> +{
+> +	switch (irq->config) {
+> +	case VGIC_CONFIG_LEVEL:
+> +		return irq->line_level != level;
+> +	case VGIC_CONFIG_EDGE:
+> +		return level;
+> +	}
+> +
+> +	return false;
+> +}
+> +
+> +/*
+> + * Check whether an IRQ needs to (and can) be queued to a VCPU's ap list.
+> + * Do the queuing if necessary, taking the right locks in the right order.
+> + * Returns true when the IRQ was queued, false otherwise.
+> + *
+> + * Needs to be entered with the IRQ lock already held, but will return
+> + * with all locks dropped.
+> + */
+> +bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
+> +{
+> +	struct kvm_vcpu *vcpu;
+> +
+> +	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
+> +
+> +retry:
+> +	vcpu = vgic_target_oracle(irq);
+> +	if (irq->vcpu || !vcpu) {
+> +		/*
+> +		 * If this IRQ is already on a VCPU's ap_list, then it
+> +		 * cannot be moved or modified and there is no more work for
+> +		 * us to do.
+> +		 *
+> +		 * Otherwise, if the irq is not pending and enabled, it does
+> +		 * not need to be inserted into an ap_list and there is also
+> +		 * no more work for us to do.
+> +		 */
+> +		spin_unlock(&irq->irq_lock);
+> +		return false;
+> +	}
+> +
+> +	/*
+> +	 * We must unlock the irq lock to take the ap_list_lock where
+> +	 * we are going to insert this new pending interrupt.
+> +	 */
+> +	spin_unlock(&irq->irq_lock);
+> +
+> +	/* someone can do stuff here, which we re-check below */
+> +
+> +	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> +	spin_lock(&irq->irq_lock);
+> +
+> +	/*
+> +	 * Did something change behind our backs?
+> +	 *
+> +	 * There are two cases:
+> +	 * 1) The irq lost its pending state or was disabled behind our
+> +	 *    backs and/or it was queued to another VCPU's ap_list.
+> +	 *    Then drop the locks and return.
+> +	 * 2) Someone changed the affinity on this irq behind our
+> +	 *    backs and we are now holding the wrong ap_list_lock.
+> +	 *    Then drop the locks and try the new VCPU.
 
-The use case is simple, for boards like DB410c where the usb host
-or device functionality is decided based on the micro-usb cable
-presence. If the board boots up with micro-usb connected and the
-host driver is probed, but the ehci_setup() has not been done yet,
-then a system shutdown would trigger below NULL pointer exception
-without this patch.
+nit: get rid of the 'Then drop the locks and return' from clause (1) and
+write, 'In both cases, drop the locks and retry' as a separate paragraph
+in the end.
 
-Unable to handle kernel NULL pointer dereference at virtual address
-00000008
+> +	 */
+> +
+> +	if (unlikely(irq->vcpu || vcpu != vgic_target_oracle(irq))) {
+> +		spin_unlock(&irq->irq_lock);
+> +		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		goto retry;
+> +	}
+> +
+> +	list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
+> +	irq->vcpu = vcpu;
+> +
+> +	spin_unlock(&irq->irq_lock);
+> +	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+> +
+> +	kvm_vcpu_kick(vcpu);
+> +
+> +	return true;
+> +}
+> +
+> +static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
+> +				   unsigned int intid, bool level,
+> +				   bool mapped_irq)
+> +{
+> +	struct kvm_vcpu *vcpu;
+> +	struct vgic_irq *irq;
+> +	int ret;
+> +
+> +	trace_vgic_update_irq_pending(cpuid, intid, level);
+> +
+> +	vcpu = kvm_get_vcpu(kvm, cpuid);
+> +	if (!vcpu && intid < VGIC_NR_PRIVATE_IRQS)
+> +		return -EINVAL;
+> +
+> +	irq = vgic_get_irq(kvm, vcpu, intid);
+> +	if (!irq)
+> +		return -EINVAL;
+> +
+> +	if (irq->hw != mapped_irq)
+> +		return -EINVAL;
+> +
+> +	spin_lock(&irq->irq_lock);
+> +
+> +	if (!vgic_validate_injection(irq, level)) {
+> +		/* Nothing to see here, move along... */
+> +		spin_unlock(&irq->irq_lock);
+> +		return 0;
+> +	}
+> +
+> +	if (irq->config == VGIC_CONFIG_LEVEL) {
+> +		irq->line_level = level;
+> +		irq->pending = level || irq->soft_pending;
+> +	} else {
+> +		irq->pending = true;
+> +	}
+> +
+> +	vgic_queue_irq_unlock(kvm, irq);
+> +
+> +	return 0;
+> +}
+> +
+> +/**
+> + * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
+> + * @kvm:     The VM structure pointer
+> + * @cpuid:   The CPU for PPIs
+> + * @intid:   The INTID to inject a new state to.
+> + * @level:   Edge-triggered:  true:  to trigger the interrupt
+> + *			      false: to ignore the call
+> + *	     Level-sensitive  true:  raise the input signal
+> + *			      false: lower the input signal
+> + *
+> + * The VGIC is not concerned with devices being active-LOW or active-HIGH for
+> + * level-sensitive interrupts.  You can think of the level parameter as 1
+> + * being HIGH and 0 being LOW and all devices being active-HIGH.
+> + */
+> +int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+> +			bool level)
+> +{
+> +	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 61b8d22..c625767 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -18,5 +18,6 @@
+>  
+>  struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+>  			      u32 intid);
+> +bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
+>  
+>  #endif
+> -- 
+> 2.8.2
+> 
 
-pgd = ffffffc034581000
-[00000008] *pgd=0000000000000000, *pud=0000000000000000
-CPU: 2 PID: 1957 Comm: reboot Not tainted 4.6.0+ #99
-task: ffffffc034bc0000 ti: ffffffc0345cc000 task.ti: ffffffc0345cc000
-PC is at ehci_halt+0x54/0x108
-LR is at ehci_halt+0x38/0x108
-pc : [<ffffff800869837c>] lr : [<ffffff8008698360>] pstate: a00001c5
-sp : ffffffc0345cfc60
-x29: ffffffc0345cfc60 x28: ffffffc0345cc000
-x27: ffffff8008a4d000 x26: 000000000000008e
-x25: ffffff8008d86cb0 x24: ffffff800908b040
-x23: ffffffc036068870 x22: ffffff8009d0a000
-x21: ffffffc03512a410 x20: ffffffc03512a410
-x19: ffffffc03512a338 x18: 00000000000065ba
-x17: ffffff8009b16b80 x16: 0000000000000003
-x15: 00000000000065b9 x14: 00000000000065b6
-x13: 0000000000000000 x12: 0000000000000000
-x11: 000000000000003d x10: ffffffc0345cf9e0
-x9 : 0000000000000001 x8 : ffffffc0345cc000
-x7 : ffffff8008698360 x6 : 0000000000000000
-x5 : 0000000000000080 x4 : 0000000000000001
-x3 : 0000000000000000 x2 : 0000000000000000
-x1 : 0000000000000008 x0 : ffffffc034bc0000
+Besides the comment nit:
 
-Process reboot (pid: 1957, stack limit = 0xffffffc0345cc020)
-Stack: (0xffffffc0345cfc60 to 0xffffffc0345d0000)
-fc60: ffffffc0345cfc90 ffffff8008698448 ffffffc03512a338 ffffffc03512a338
-fc80: ffffffc03512a410 ffffff8008a3bbfc ffffffc0345cfcc0 ffffff8008698548
-fca0: ffffffc03512a338 ffffffc03512a000 ffffffc03512a410 ffffff8009d0a000
-fcc0: ffffffc0345cfcf0 ffffff800865d2bc ffffffc036068828 ffffffc036068810
-fce0: ffffffc036003810 ffffff800853f43c ffffffc0345cfd00 ffffff800854338c
-fd00: ffffffc0345cfd10 ffffff800853f45c ffffffc0345cfd60 ffffff80080e0f48
-fd20: 0000000000000000 0000000001234567 ffffff8008f8c000 ffffff8008f8c060
-fd40: 0000000000000000 0000000000000015 0000000000000120 ffffff80080e0f30
-fd60: ffffffc0345cfd70 ffffff80080e1020 ffffffc0345cfd90 ffffff80080e12fc
-fd80: 0000000000000000 0000000001234567 0000000000000000 ffffff8008085e70
-fda0: 0000000000000000 0000005592905000 ffffffffffffffff 0000007f79daf1cc
-fdc0: 0000000000000000 0000000000000000 0000007ffcbb1198 000000000000000a
-fde0: 00000055928d3f58 0000000000000001 ffffffc034900000 00000000fffffffe
-fe00: ffffffc034900000 0000007f79da902c ffffffc0345cfe40 ffffff800820af38
-fe20: 0000000000000000 0000007ffcbb1078 ffffffffffffffff ffffff80081e9b38
-fe40: ffffffc0345cfe60 ffffff80081eb410 ffffffc0345cfe60 ffffff80081eb444
-fe60: ffffffc0345cfec0 ffffff80081ec4f4 0000000000000000 0000007ffcbb1078
-fe80: ffffffffffffffff 0000000000000015 ffffffc0345cfec0 0000007ffcbb1078
-fea0: 0000000000000002 000000000000000a ffffffffffffffff 0000000000000000
-fec0: 0000000000000000 ffffff8008085e70 fffffffffee1dead 0000000028121969
-fee0: 0000000001234567 0000000000000000 ffffffffffffffff 8080800000800000
-ff00: 0000800000808080 0000007ffcbb10f0 000000000000008e fefeff54918cb8c7
-ff20: 7f7f7f7fffffffff 0101010101010101 0000000000000010 0000000000000000
-ff40: 0000000000000000 0000007f79e33588 0000005592905eb8 0000007f79daf1b0
-ff60: 0000007ffcbb1340 0000005592906000 0000005592905000 0000005592906000
-ff80: 0000005592907000 0000000000000002 0000007ffcbb1d98 0000005592906000
-ffa0: 00000055928d2000 0000000000000000 0000000000000000 0000007ffcbb1aa0
-ffc0: 00000055928b819c 0000007ffcbb1aa0 0000007f79daf1cc 0000000000000000
-ffe0: fffffffffee1dead 000000000000008e 05ef555057155555 d555544d55d775d3
-Call trace:
-Exception stack(0xffffffc0345cfaa0 to 0xffffffc0345cfbc0)
-Set corner to 6
-faa0: ffffffc03512a338 ffffffc03512a410 ffffffc0345cfc60 ffffff800869837c
-fac0: ffffff8008114210 0000000100000001 ffffff8009ce1b20 ffffff8009ce5f20
-fae0: ffffffc0345cfb80 ffffff80081145a8 ffffffc0345cfc10 ffffff800810b924
-fb00: ffffffc0345cc000 00000000000001c0 ffffffc03512a410 ffffff8009d0a000
-fb20: ffffffc036068870 ffffff800908b040 ffffff8008d86cb0 000000000000008e
-fb40: ffffffc034bc0000 0000000000000008 0000000000000000 0000000000000000
-fb60: 0000000000000001 0000000000000080 0000000000000000 ffffff8008698360
-fb80: ffffffc0345cc000 0000000000000001 ffffffc0345cf9e0 000000000000003d
-fba0: 0000000000000000 0000000000000000 00000000000065b6 00000000000065b9
-[<ffffff800869837c>] ehci_halt+0x54/0x108
-[<ffffff8008698448>] ehci_silence_controller+0x18/0xcc
-[<ffffff8008698548>] ehci_shutdown+0x4c/0x64
-[<ffffff800865d2bc>] usb_hcd_platform_shutdown+0x1c/0x24
-[<ffffff800854338c>] platform_drv_shutdown+0x20/0x28
-[<ffffff800853f45c>] device_shutdown+0xf4/0x1b0
-[<ffffff80080e0f48>] kernel_restart_prepare+0x34/0x3c
-[<ffffff80080e1020>] kernel_restart+0x14/0x74
-[<ffffff80080e12fc>] SyS_reboot+0x110/0x21c
-[<ffffff8008085e70>] el0_svc_naked+0x24/0x28
-Code: 53001c42 350000a2 d5033e9f 91002021 (b9000022)
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/usb/host/ehci-hcd.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-index ae1b6e6..43e57ba 100644
---- a/drivers/usb/host/ehci-hcd.c
-+++ b/drivers/usb/host/ehci-hcd.c
-@@ -368,6 +368,9 @@ static void ehci_shutdown(struct usb_hcd *hcd)
- {
- 	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
- 
-+	if (!HCD_HW_ACCESSIBLE(hcd))
-+		return;
-+
- 	spin_lock_irq(&ehci->lock);
- 	ehci->shutdown = true;
- 	ehci->rh_state = EHCI_RH_STOPPING;
--- 
-2.7.4
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
