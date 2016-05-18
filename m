@@ -1,72 +1,39 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 18 May 2016 16:56:22 +0200
-Subject: [PATCH v2 4/4] documentation: Add secure monitor binding documentation
-In-Reply-To: <1463583382-15614-1-git-send-email-carlo@caione.org>
-References: <1463583382-15614-1-git-send-email-carlo@caione.org>
-Message-ID: <1463583382-15614-5-git-send-email-carlo@caione.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 18 May 2016 17:01:22 +0200
+Subject: [PATCH] ARM: samsung: improve static dma_mask definition
+In-Reply-To: <1463042333-281444-1-git-send-email-arnd@arndb.de>
+References: <1463042333-281444-1-git-send-email-arnd@arndb.de>
+Message-ID: <573C83C2.5090203@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On 05/12/2016 10:38 AM, Arnd Bergmann wrote:
+> When no DMA master devices are part of the kernel configuration,
+> we get a warning about the unused dma mask definition:
+> 
+> arch/arm/plat-samsung/devs.c:71:12: error: 'samsung_device_dma_mask' defined but not used [-Werror=unused-variable]
+>  static u64 samsung_device_dma_mask = DMA_BIT_MASK(32);
+> 
+> We could simply mark this as __maybe_unused to shut up that warning,
+> but a nicer solution seems to be to have a separate mask for each
+> device. The advantage is that a driver that happens to call
+> dma_set_mask() on one device doesn't implicitly change the mask
+> for the other devices as well. This is more of a theoretical
+> problem, as obviously nothing does it for the devices in this
+> file (or they would have always been broken), but it feels
+> cleaner that way.
+> 
+> The definition works by creating an array in place so we can take
+> the address of it and let the compiler generate a hidden symbol
+> for it at compile time.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  arch/arm/plat-samsung/devs.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-Add the binding documentation for the Amlogic secure monitor driver.
+Thanks, although does not look as critical fix but less warnings makes
+spotting right issues faster so applied for v4.7.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- .../devicetree/bindings/soc/meson/meson_sm.txt     | 45 ++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/soc/meson/meson_sm.txt
-
-diff --git a/Documentation/devicetree/bindings/soc/meson/meson_sm.txt b/Documentation/devicetree/bindings/soc/meson/meson_sm.txt
-new file mode 100644
-index 0000000..f59c732
---- /dev/null
-+++ b/Documentation/devicetree/bindings/soc/meson/meson_sm.txt
-@@ -0,0 +1,45 @@
-+* Amlogic Secure Monitor
-+
-+In the Amlogic SoCs the Secure Monitor code is used to provide access to the
-+NVMEM, enable JTAG, set USB boot, etc...
-+
-+Required properties for the secure monitor node:
-+- compatible: Should be "amlogic,meson-sm"
-+- amlogic,sm_cmd_input_base: SMC32 function identifier to read the physical
-+                             address of the input buffer
-+- amlogic,sm_cmd_output_base: SMC32 function identifier to read the physical
-+                              address of the output buffer
-+
-+Example:
-+
-+	#include <dt-bindings/soc/meson-gxbb-sm.h>
-+
-+	...
-+
-+	sm {
-+		compatible = "amlogic,meson-sm";
-+		amlogic,sm_cmd_input_base = <SM_GET_SHARE_MEM_INPUT_BASE>;
-+		amlogic,sm_cmd_output_base = <SM_GET_SHARE_MEM_OUTPUT_BASE>;
-+	};
-+
-+Node of a device using the secure monitor must have a custom property to
-+specify the SMC32 function the driver is going to use. The values of all the
-+SMC function identifiers are listed in a SoC-specific header file:
-+
-+"include/dt-bindings/soc/meson-gxbb-sm.h" - for the Meson GXBB secure monitor.
-+
-+Example of the node using the secure monitor:
-+
-+	#include <dt-bindings/soc/meson-gxbb-sm.h>
-+
-+	...
-+
-+	efuse: efuse {
-+		compatible = "amlogic,meson-gxbb-efuse";
-+		amlogic,sm_cmd_read_efuse = <SM_EFUSE_READ>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		...
-+	};
-+
--- 
-2.7.4
+Best regards,
+Krzysztof
