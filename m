@@ -1,40 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2016 12:52:28 +0200
-Subject: [PATCH] arm64: Allow for different DMA and CPU bus offsets
-In-Reply-To: <1463563981-69722-1-git-send-email-agraf@suse.de>
-References: <1463563981-69722-1-git-send-email-agraf@suse.de>
-Message-ID: <12218676.p29ELivsix@wuerfel>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 18 May 2016 12:02:07 +0100
+Subject: [PATCH v3 09/55] KVM: arm/arm64: Fix MMIO emulation data handling
+In-Reply-To: <1462531568-9799-10-git-send-email-andre.przywara@arm.com>
+References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
+ <1462531568-9799-10-git-send-email-andre.przywara@arm.com>
+Message-ID: <573C4BAF.5030008@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 May 2016 11:33:01 Alexander Graf wrote:
-> diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> index ba437f0..67bf8e1 100644
-> --- a/arch/arm64/include/asm/dma-mapping.h
-> +++ b/arch/arm64/include/asm/dma-mapping.h
-> @@ -66,12 +66,16 @@ static inline bool is_device_dma_coherent(struct device *dev)
->  
->  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
->  {
-> -       return (dma_addr_t)paddr;
-> +       dma_addr_t dev_addr = (dma_addr_t)paddr;
-> +
-> +       return dev_addr - (dma_addr_t)__pfn_to_phys(dev->dma_pfn_offset);
->  }
->  
->  static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
->  {
-> -       return (phys_addr_t)dev_addr;
-> +       phys_addr_t paddr = (phys_addr_t)dev_addr;
-> +
-> +       return paddr + __pfn_to_phys(dev->dma_pfn_offset);
->  }
->  
+On 06/05/16 11:45, Andre Przywara wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> When the kernel was handling a guest MMIO read access internally, we
+> need to copy the emulation result into the run->mmio structure in order
+> for the kvm_handle_mmio_return() function to pick it up and inject the
+> 	result back into the guest.
+> 
+> Currently the only user of kvm_io_bus for ARM is the VGIC, which did
+> this copying itself, so this was not causing issues so far.
+> 
+> But with the upcoming new vgic implementation we need this done
+> properly.
+> 
+> Update the kvm_handle_mmio_return description and cleanup the code to
+> only perform a single copying when needed.
+> 
+> Code and commit message inspired by Andre Przywara.
+> 
+> Reported-by: Andre Przywara <andre.przywara@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
-The patch looks ok overall, but I think it's better to use an open-coded
-shift instead of __pfn_to_phys/__pfn_to_phys here: those helpers convert
-between actual page frame numbers and addresses, which may not always
-be a 1:1 relationship, e.g. if someone wants to work around the crazy
-"Principles of ARM Memory Maps White Paper" layout.
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 
-	Arnd
+Thanks,
+Andre.
