@@ -1,53 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2016 15:50:02 +0200
-Subject: [PATCH] arm64: Allow for different DMA and CPU bus offsets
-In-Reply-To: <20160518134554.GF22378@e104818-lin.cambridge.arm.com>
-References: <1463563981-69722-1-git-send-email-agraf@suse.de>
- <12218676.p29ELivsix@wuerfel>
- <20160518134554.GF22378@e104818-lin.cambridge.arm.com>
-Message-ID: <30915363.3kcXpGGcy5@wuerfel>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 18 May 2016 23:20:31 +0930
+Subject: [PATCH v2 1/2] doc/devicetree: Add Aspeed VIC bindings
+In-Reply-To: <CAL_JsqJDGmvDxm1kN1w6NQZs0JLeA-V=X_BWi=VOaMTwftLn-w@mail.gmail.com>
+References: <462797239-14765-1-git-send-email-joel@jms.id.au>
+ <1462802317-27086-1-git-send-email-joel@jms.id.au>
+ <1462802317-27086-2-git-send-email-joel@jms.id.au>
+ <20160511143313.GA7426@rob-hp-laptop>
+ <1463014882.20290.203.camel@kernel.crashing.org>
+ <CAL_JsqJDGmvDxm1kN1w6NQZs0JLeA-V=X_BWi=VOaMTwftLn-w@mail.gmail.com>
+Message-ID: <CACPK8Xe6TDdV3dC=gizXLxLjUziDFhsupUbXSuYsn6bcrAxahQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 May 2016 14:45:55 Catalin Marinas wrote:
-> On Wed, May 18, 2016 at 12:52:28PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 18 May 2016 11:33:01 Alexander Graf wrote:
-> > > diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-> > > index ba437f0..67bf8e1 100644
-> > > --- a/arch/arm64/include/asm/dma-mapping.h
-> > > +++ b/arch/arm64/include/asm/dma-mapping.h
-> > > @@ -66,12 +66,16 @@ static inline bool is_device_dma_coherent(struct device *dev)
-> > >  
-> > >  static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
-> > >  {
-> > > -       return (dma_addr_t)paddr;
-> > > +       dma_addr_t dev_addr = (dma_addr_t)paddr;
-> > > +
-> > > +       return dev_addr - (dma_addr_t)__pfn_to_phys(dev->dma_pfn_offset);
-> > >  }
-> > >  
-> > >  static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
-> > >  {
-> > > -       return (phys_addr_t)dev_addr;
-> > > +       phys_addr_t paddr = (phys_addr_t)dev_addr;
-> > > +
-> > > +       return paddr + __pfn_to_phys(dev->dma_pfn_offset);
-> > >  }
-> > >  
-> > 
-> > The patch looks ok overall, but I think it's better to use an open-coded
-> > shift instead of __pfn_to_phys/__pfn_to_phys here: those helpers convert
-> > between actual page frame numbers and addresses, which may not always
-> > be a 1:1 relationship, e.g. if someone wants to work around the crazy
-> > "Principles of ARM Memory Maps White Paper" layout.
-> 
-> Nitpick: Even better to use the PFN_PHYS() macro as it matches the
-> PFN_DOWN() in of_dma_configure(). I can fix it up when applying.
-> 
-> 
+On Fri, May 13, 2016 at 2:50 AM, Rob Herring <robh@kernel.org> wrote:
+> On Wed, May 11, 2016 at 8:01 PM, Benjamin Herrenschmidt
+> <benh@kernel.crashing.org> wrote:
+>> On Wed, 2016-05-11 at 09:33 -0500, Rob Herring wrote:
+>>> > +- interrupt-controller : Identifies the node as an interrupt controller
+>>> > +- #interrupt-cells : Specifies the number of cells needed to encode an
+>>> > +  interrupt source. The value shall be 1.
+>>>
+>>> No need for level vs. edge flags?
+>>
+>> That's an open question. Most interrupts are fixed. A handful of GPIOs
+>> can be configured either way. For now I am relying on uboot setting up
+>> the right config for them and I read it back at boot time, but we could
+>> make it part of the binding I suppose.
+>
+> It is almost standard to just use 2 cells here even if reserved for
+> future use. Especially since the IP block seems to have registers to
+> control that.
 
-I'd probably avoid that for the same reason as avoiding __pfn_to_phys.
-In practice all three methods do the same thing for now, and if someone
-wanted to change one, they'd also have to audit all the existing users.
+Yep, makes sense. I've added this to the bindings document.
 
-	Arnd
+I was trying to use the second cell in our driver:
+
+  static struct irq_domain_ops avic_dom_ops = {
+          .map = avic_map,
+         .xlate = irq_domain_xlate_twocell,
+  };
+
+ So we have irq_domain_xlate_twocell to parse the device tree and
+grabs the type property from the second cell.
+
+In avic_map we set the irq handler:
+
+         if (vic->edge_sources[sidx] & sbit) {
+                 /* TODO: Check aginst type from dt and warn if not edge */
+                 irq_set_chip_and_handler(irq, &avic_chip, handle_edge_irq);
+         } else {
+                 /* TODO: Check aginst type from dt and warn if not level */
+                 irq_set_chip_and_handler(irq, &avic_chip, handle_level_irq);
+         }
+
+However, we don't have the type here, so we can't use it to check that
+we're setting the correct edge/level callback (or use it to set the
+register in the future if we want to use the device tree to override
+the bootloader settings).
+
+I had a look at some other drivers and they don't seem to use the dt
+property when mapping the irq. What am I missing here?
+
+Cheers,
+
+Joel
