@@ -1,139 +1,57 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 18 May 2016 14:31:18 +0100
-Subject: [PATCH v4 32/56] KVM: arm/arm64: vgic-new: Add SGIPENDR register
- handlers
-In-Reply-To: <20160518131449.GI3827@cbox>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-33-git-send-email-andre.przywara@arm.com>
- <20160518131449.GI3827@cbox>
-Message-ID: <573C6EA6.90803@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 May 2016 15:45:01 +0200
+Subject: [PATCH 0/5] drm: fixes for merge-window regressions
+Message-ID: <1463579106-400827-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+A couple of new warnings and build errors appeared through the DRM
+tree in linux-next after the merge window opened. The first patch
+here is for scripts/headers_check.pl, but as the bug is only
+present in drm-next at the moment, it would be good to add all
+five patches to that tree before they make it into mainline.
 
-On 18/05/16 14:14, Christoffer Dall wrote:
-> On Mon, May 16, 2016 at 10:53:20AM +0100, Andre Przywara wrote:
->> As this register is v2 specific, its implementation lives entirely
->> in vgic-mmio-v2.c.
->> This register allows setting the source mask of an IPI.
->>
->> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->> ---
->> Changelog RFC..v1:
->> - remove IRQ lock from read handler
->> - update pending bit on setting the first / clearing the last bit
->> - queue virtual IRQ if necessary
->>
->> Changelog v1 .. v2:
->> - adapt to new MMIO framework
->>
->> Changelog v3 .. v4:
->> - specify accessor width
->>
->>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++--
->>  1 file changed, 60 insertions(+), 2 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> index c884e9b..3925d4c 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->> @@ -146,6 +146,64 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
->>  	}
->>  }
->>  
->> +static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
->> +					    gpa_t addr, unsigned int len)
->> +{
->> +	u32 intid = addr & 0x0f;
-> 
-> is there a reason why we cannot use the magic macro here?
+It's likely that some of these have already been fixed since
+this morning's linux-next, so just ignore the ones are no
+longer needed.
 
-I wasn't sure about this, because it's not covering all 1024 interrupts,
-but just SGIs, so it's always fixed to 16 interrupts ? 8 bits. The
-default mask would be too big in this case.
-I guess it would work anyway because this region is limited to 16 bytes
-in our description, so we could use this here anyway to make it more
-aligned with the other handlers, maybe adding a comment about the
-difference?
+Arnd Bergmann (5):
+  headers_check: don't warn about c++ guards
+  drm: mediatek: add CONFIG_OF dependency
+  drm: mediatek: fixup drm_gem_object_lookup API change
+  drm: exynos: mark pm functions as __maybe_unused
+  drm: remove unused dev variables
 
-Cheers,
-Andre.
+ drivers/gpu/drm/armada/armada_crtc.c   | 1 -
+ drivers/gpu/drm/exynos/exynos_hdmi.c   | 6 ++----
+ drivers/gpu/drm/mediatek/Kconfig       | 1 +
+ drivers/gpu/drm/mediatek/mtk_drm_fb.c  | 2 +-
+ drivers/gpu/drm/mediatek/mtk_drm_gem.c | 2 +-
+ drivers/gpu/drm/nouveau/nouveau_gem.c  | 1 -
+ drivers/gpu/drm/nouveau/nv50_display.c | 1 -
+ drivers/gpu/drm/radeon/radeon_cs.c     | 1 -
+ scripts/headers_check.pl               | 4 ++++
+ 9 files changed, 9 insertions(+), 10 deletions(-)
 
-> 
->> +	int i;
->> +	u64 val = 0;
->> +
->> +	for (i = 0; i < len; i++) {
->> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +		val |= (u64)irq->source << (i * 8);
->> +	}
->> +	return val;
->> +}
->> +
->> +static void vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
->> +				     gpa_t addr, unsigned int len,
->> +				     unsigned long val)
->> +{
->> +	u32 intid = addr & 0x0f;
->> +	int i;
->> +
->> +	for (i = 0; i < len; i++) {
->> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +		spin_lock(&irq->irq_lock);
->> +
->> +		irq->source &= ~((val >> (i * 8)) & 0xff);
->> +		if (!irq->source)
->> +			irq->pending = false;
->> +
->> +		spin_unlock(&irq->irq_lock);
->> +	}
->> +}
->> +
->> +static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
->> +				     gpa_t addr, unsigned int len,
->> +				     unsigned long val)
->> +{
->> +	u32 intid = addr & 0x0f;
->> +	int i;
->> +
->> +	for (i = 0; i < len; i++) {
->> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
->> +
->> +		spin_lock(&irq->irq_lock);
->> +
->> +		irq->source |= (val >> (i * 8)) & 0xff;
->> +
->> +		if (irq->source) {
->> +			irq->pending = true;
->> +			vgic_queue_irq_unlock(vcpu->kvm, irq);
->> +		} else {
->> +			spin_unlock(&irq->irq_lock);
->> +		}
->> +	}
->> +}
->> +
->>  static const struct vgic_register_region vgic_v2_dist_registers[] = {
->>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
->>  		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
->> @@ -184,10 +242,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
->>  		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
->>  		VGIC_ACCESS_32bit),
->>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
->> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
->> +		vgic_mmio_read_sgipend, vgic_mmio_write_sgipendc, 16,
->>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
->>  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
->> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
->> +		vgic_mmio_read_sgipend, vgic_mmio_write_sgipends, 16,
->>  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
->>  };
->>  
->> -- 
->> 2.8.2
->>
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> 
+
+Cc: Russell King <rmk+kernel@armlinux.org.uk>
+Cc: Inki Dae <inki.dae@samsung.com>
+Cc: Joonyoung Shim <jy0922.shim@samsung.com>
+Cc: Seung-Woo Kim <sw0312.kim@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Matthias Brugger <matthias.bgg@gmail.com>
+Cc: Ben Skeggs <bskeggs@redhat.com>
+Cc: Alex Deucher <alexander.deucher@amd.com>
+Cc: "Christian K?nig" <christian.koenig@amd.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: dri-devel at lists.freedesktop.org
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-mediatek at lists.infradead.org
+Cc: nouveau at lists.freedesktop.org
+
+-- 
+2.7.0
