@@ -1,110 +1,29 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 18 May 2016 15:49:23 +0200
-Subject: [PATCH v4 37/56] KVM: arm/arm64: vgic-new: Add GICv3 IROUTER
- register handlers
-In-Reply-To: <1463392481-26583-38-git-send-email-andre.przywara@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-38-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160518134923.GK3827@cbox>
+From: agraf@suse.de (Alexander Graf)
+Date: Wed, 18 May 2016 15:49:17 +0200
+Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
+In-Reply-To: <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
+References: <1463576010-115428-1-git-send-email-agraf@suse.de>
+ <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
+Message-ID: <573C72DD.6010400@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2016 at 10:53:25AM +0100, Andre Przywara wrote:
-> Since GICv3 supports much more than the 8 CPUs the GICv2 ITARGETSR
-> register can handle, the new IROUTER register covers the whole range
-> of possible target (V)CPUs by using the same MPIDR that the cores
-> report themselves.
-> In addition to translating this MPIDR into a vcpu pointer we store
-> the originally written value as well. The architecture allows to
-> write any values into the register, which must be read back as written.
-> 
-> Since we don't support affinity level 3, we don't need to take care
-> about the upper word of this 64-bit register, which simplifies the
-> handling a bit.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog RFC..v1:
-> - fold in and simplify vgic_v3_irq_change_affinity
-> 
-> Changelog v1 .. v2:
-> - adapt to new MMIO framework
-> 
-> Changelog v3 .. v4:
-> - move accessor width check into dispatcher
-> - use IRQ number accessor macro
-> 
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 37 ++++++++++++++++++++++++++++++++++++-
->  1 file changed, 36 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index b893284..7b9340b 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -75,6 +75,41 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> +static unsigned long vgic_mmio_read_irouter(struct kvm_vcpu *vcpu,
-> +					    gpa_t addr, unsigned int len)
-> +{
-> +	int intid = VGIC_ADDR_TO_INTID(addr, 64);
-> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
-> +
-> +	if (!irq)
-> +		return 0;
-> +
-> +	return extract_bytes(READ_ONCE(irq->mpidr), addr & 7, len);
+On 05/18/2016 03:27 PM, Catalin Marinas wrote:
+> On Wed, May 18, 2016 at 02:53:30PM +0200, Alexander Graf wrote:
+>> On arm64, all SoCs we supported so far either have an IOMMU or have bus
+>> addresses equal to CPU addresses.
+>>
+>> However, with the Raspberry Pi 3 coming up, this is no longer true. To
+>> allow DMA to work with an AArch64 kernel on those devices, let's allow
+>> devices to have DMA offsets again.
+>>
+>> Signed-off-by: Alexander Graf <agraf@suse.de>
+> We were aware about this issue but we've been waiting for an actual use
+> case. I'll queue this for 4.8 (given that RPi3 is not supported by the
+> arm64 kernel, I don't see the rush to merge it earlier).
 
-So for this to work for accesses to the upper word, we rely on this only
-ever running on AArch64 where an unsigned long is 64 bits and the call
-to extract_bytes converts the u32 irq->mpidr to 64 bit unsigned long?
+Sure, works for me. That way Eric can try to push the other few bits 
+necessary to run an arm64 kernel on the RPi3 towards 4.8 as well :).
 
-Feels a bit weird, but I suppose this always works:
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-> +}
-> +
-> +static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
-> +				    gpa_t addr, unsigned int len,
-> +				    unsigned long val)
-> +{
-> +	int intid = VGIC_ADDR_TO_INTID(addr, 64);
-> +	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid);
-> +
-> +	if (!irq)
-> +		return;
-> +
-> +	/* The upper word is WI for us since we don't implement Aff3. */
-> +	if (addr & 4)
-> +		return;
-> +
-> +	spin_lock(&irq->irq_lock);
-> +
-> +	/* We only care about and preserve Aff0, Aff1 and Aff2. */
-> +	irq->mpidr = val & GENMASK(23, 0);
-> +	irq->target_vcpu = kvm_mpidr_to_vcpu(vcpu->kvm, irq->mpidr);
-> +
-> +	spin_unlock(&irq->irq_lock);
-> +}
-> +
->  static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
->  					      gpa_t addr, unsigned int len)
->  {
-> @@ -170,7 +205,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
->  		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
->  		VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IROUTER,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 64,
-> +		vgic_mmio_read_irouter, vgic_mmio_write_irouter, 64,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
->  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
-> -- 
-> 2.8.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Alex
