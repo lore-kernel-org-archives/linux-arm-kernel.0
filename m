@@ -1,46 +1,133 @@
 From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 18 May 2016 18:36:25 -0500
-Subject: [PATCH 0/8] ARM: dts: Add operating-points-v2 tables for TI platforms
-Message-ID: <cover.1463606963.git.d-gerlach@ti.com>
+Date: Wed, 18 May 2016 18:36:27 -0500
+Subject: [PATCH 2/8] ARM: dts: am33xx: Move to operating-points-v2 table and
+ ti-cpufreq driver
+In-Reply-To: <cover.1463606963.git.d-gerlach@ti.com>
+References: <cover.1463606963.git.d-gerlach@ti.com>
+Message-ID: <f30e0313514cdbb9c3b0a83bbb96f05f2e179775.1463606963.git.d-gerlach@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-This series adds operating-points-v2 tables for am335x, am437x, dra7xx,
-and am57xx based platforms along with some support patches so that we
-can enable more OPPs for the CPU on these platforms.
+Drop the operating-points table present in am33xx.dtsi and add an
+operating-points-v2 table with all OPPs available for all silicon
+revisions along with necessary data for use by ti-cpufreq to selectively
+enable the appropriate OPPs at runtime. Also, drop the voltage-tolerance
+value and provide voltages for each OPP using the <target min max>
+format instead.
 
-These patches rely on the ti-cpufreq series sent here [1] and provide
-opp-supported-hw data for each OPP so that only the appropriate OPPs
-for a specific piece of silicon get enabled.
+Information from AM335x Data Manual, SPRS717i, Revised December 2015,
+Table 5-7.
 
-Regards,
-Dave
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/boot/dts/am33xx.dtsi | 88 ++++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 75 insertions(+), 13 deletions(-)
 
-[1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1147940.html
-
-Dave Gerlach (8):
-  ARM: dts: am335x: Update MPU regulator range for TI boards
-  ARM: dts: am33xx: Move to operating-points-v2 table and ti-cpufreq
-    driver
-  ARM: dts: am335x-boneblack: Enable 1GHz OPP for cpu
-  ARM: dts: am4372: Add operating-points-v2 table
-  ARM: dts: am437x-gp-evm: Hook dcdc2 as the cpu0-supply
-  ARM: dts: dra7: Add dt node for the syscon control module wkup
-  ARM: dts: dra7: Move cpus node to parent dts for dra74x and dra72x
-  ARM: dts: dra7: Move to operating-points-v2 table
-
- arch/arm/boot/dts/am335x-bone-common.dtsi |  2 +-
- arch/arm/boot/dts/am335x-boneblack.dts    | 11 ++++
- arch/arm/boot/dts/am335x-evm.dts          |  2 +-
- arch/arm/boot/dts/am335x-evmsk.dts        |  2 +-
- arch/arm/boot/dts/am33xx.dtsi             | 88 ++++++++++++++++++++++++++-----
- arch/arm/boot/dts/am4372.dtsi             | 39 ++++++++++++++
- arch/arm/boot/dts/am437x-gp-evm.dts       |  4 ++
- arch/arm/boot/dts/dra7.dtsi               | 48 +++++++++++++++++
- arch/arm/boot/dts/dra72x.dtsi             | 16 ------
- arch/arm/boot/dts/dra74x.dtsi             | 25 +--------
- 10 files changed, 181 insertions(+), 56 deletions(-)
-
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 52be48bbd2dd..df1106f89ff2 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -45,19 +45,9 @@
+ 			device_type = "cpu";
+ 			reg = <0>;
+ 
+-			/*
+-			 * To consider voltage drop between PMIC and SoC,
+-			 * tolerance value is reduced to 2% from 4% and
+-			 * voltage value is increased as a precaution.
+-			 */
+-			operating-points = <
+-				/* kHz    uV */
+-				720000  1285000
+-				600000  1225000
+-				500000  1125000
+-				275000  1125000
+-			>;
+-			voltage-tolerance = <2>; /* 2 percentage */
++			operating-points-v2 = <&cpu0_opp_table>;
++			ti,syscon-efuse = <&scm_conf 0x7fc 0x1fff 0>;
++			ti,syscon-rev = <&scm_conf 0x600>;
+ 
+ 			clocks = <&dpll_mpu_ck>;
+ 			clock-names = "cpu";
+@@ -66,6 +56,78 @@
+ 		};
+ 	};
+ 
++	cpu0_opp_table: opp_table0 {
++		compatible = "operating-points-v2";
++
++		/*
++		 * The three following nodes are marked with opp-suspend
++		 * because the can not be enabled simultaneously on a
++		 * single SoC.
++		 */
++		opp50 at 300000000 {
++			opp-hz = /bits/ 64 <300000000>;
++			opp-microvolt = <950000 931000 969000>;
++			opp-supported-hw = <0x06 0x0010>;
++			opp-suspend;
++		};
++
++		opp100 at 275000000 {
++			opp-hz = /bits/ 64 <275000000>;
++			opp-microvolt = <1100000 1078000 1122000>;
++			opp-supported-hw = <0x01 0x00FF>;
++			opp-suspend;
++		};
++
++		opp100 at 300000000 {
++			opp-hz = /bits/ 64 <300000000>;
++			opp-microvolt = <1100000 1078000 1122000>;
++			opp-supported-hw = <0x06 0x0020>;
++			opp-suspend;
++		};
++
++		opp100 at 500000000 {
++			opp-hz = /bits/ 64 <500000000>;
++			opp-microvolt = <1100000 1078000 1122000>;
++			opp-supported-hw = <0x01 0xFFFF>;
++		};
++
++		opp100 at 600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <1100000 1078000 1122000>;
++			opp-supported-hw = <0x06 0x0040>;
++		};
++
++		opp120 at 600000000 {
++			opp-hz = /bits/ 64 <600000000>;
++			opp-microvolt = <1200000 1176000 1224000>;
++			opp-supported-hw = <0x01 0xFFFF>;
++		};
++
++		opp120 at 720000000 {
++			opp-hz = /bits/ 64 <720000000>;
++			opp-microvolt = <1200000 1176000 1224000>;
++			opp-supported-hw = <0x06 0x0080>;
++		};
++
++		oppturbo at 720000000 {
++			opp-hz = /bits/ 64 <720000000>;
++			opp-microvolt = <1260000 1234800 1285200>;
++			opp-supported-hw = <0x01 0xFFFF>;
++		};
++
++		oppturbo at 800000000 {
++			opp-hz = /bits/ 64 <800000000>;
++			opp-microvolt = <1260000 1234800 1285200>;
++			opp-supported-hw = <0x06 0x0100>;
++		};
++
++		oppnitro at 1000000000 {
++			opp-hz = /bits/ 64 <1000000000>;
++			opp-microvolt = <1325000 1298500 1351500>;
++			opp-supported-hw = <0x04 0x0200>;
++		};
++	};
++
+ 	pmu {
+ 		compatible = "arm,cortex-a8-pmu";
+ 		interrupts = <3>;
 -- 
 2.7.3
