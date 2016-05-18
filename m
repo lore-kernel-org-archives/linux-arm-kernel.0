@@ -1,51 +1,49 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 18 May 2016 22:41:50 +0800
-Subject: [PATCH] arm64: dts: rockchip: fixes the gic400 2nd region size for
- rk3368
-Message-ID: <1463582510-29156-1-git-send-email-wxt@rock-chips.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 18 May 2016 10:56:39 -0400 (EDT)
+Subject: [PATCH] usb: echi-hcd: Add register access check in shutdown
+In-Reply-To: <1463580747-20868-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1605181044460.1981-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 2nd additional region is the GIC virtual cpu interface register
-base and size.
+On Wed, 18 May 2016, Srinivas Kandagatla wrote:
 
-As the gic400 of rk3368 says, the cpu interface register map as below
+> This patch adds a check in ehci_shutdown(), to make sure
+> that the register access is available before accessing registers.
+> 
+> The use case is simple, for boards like DB410c where the usb host
+> or device functionality is decided based on the micro-usb cable
+> presence. If the board boots up with micro-usb connected and the
+> host driver is probed, but the ehci_setup() has not been done yet,
+> then a system shutdown would trigger below NULL pointer exception
+> without this patch.
 
-:
+How can that happen?  While the host driver is probed, the probing
+thread holds the device lock.  But the system shutdown routine acquires
+the device lock before invoking the ->shutdown callback.  Therefore the 
+two things cannot happen concurrently.
 
--0x0000 GICC_CTRL
-.
-.
-.
--0x00fc GICC_IIDR
--0x1000 GICC_IDR
+> Unable to handle kernel NULL pointer dereference at virtual address
+> 00000008
 
-Obviously, the region size should be greater than 0x1000.
-So we should make sure to include the GICC_IDR since the kernel will access
-it in some cases.
+...
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-rockchip at lists.infradead.org
+> --- a/drivers/usb/host/ehci-hcd.c
+> +++ b/drivers/usb/host/ehci-hcd.c
+> @@ -368,6 +368,9 @@ static void ehci_shutdown(struct usb_hcd *hcd)
+>  {
+>  	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
+>  
+> +	if (!HCD_HW_ACCESSIBLE(hcd))
+> +		return;
+> +
+>  	spin_lock_irq(&ehci->lock);
+>  	ehci->shutdown = true;
+>  	ehci->rh_state = EHCI_RH_STOPPING;
 
----
+This doesn't seem like the right place.  What you really should do is
+skip calling ehci_silence_controller() if the hardware isn't
+accessible.  That's where the hardware gets touched, not in
+ehci_shutdown().
 
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index 8b4a7c9..080203e 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -670,7 +670,7 @@
- 		#address-cells = <0>;
- 
- 		reg = <0x0 0xffb71000 0x0 0x1000>,
--		      <0x0 0xffb72000 0x0 0x1000>,
-+		      <0x0 0xffb72000 0x0 0x2000>,
- 		      <0x0 0xffb74000 0x0 0x2000>,
- 		      <0x0 0xffb76000 0x0 0x2000>;
- 		interrupts = <GIC_PPI 9
--- 
-2.7.4
+Alan Stern
