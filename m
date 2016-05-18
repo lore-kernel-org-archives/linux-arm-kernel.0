@@ -1,39 +1,114 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 18 May 2016 10:30:17 +0200
-Subject: CONFIG_ZBOOT_ROM_TEXT and CONFIG_ZBOOT_ROM_BSS in defconfig
-In-Reply-To: <573B3F3C.80800@free.fr>
-References: <573B3F3C.80800@free.fr>
-Message-ID: <573C2819.3090109@free.fr>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 18 May 2016 10:30:48 +0200
+Subject: [PATCH] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160517183340.GA10358@gmail.com>
+References: <20160517181927.GA28741@amd>
+ <20160517183340.GA10358@gmail.com>
+Message-ID: <20160518083048.GA30870@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/05/2016 17:56, Mason wrote:
+Hi!
 
-> I can submit a patch changing the default from 0 to 0x0, i.e.
-> no functional change. The two entries would then disappear
-> from defconfigs.
+...
+> Use module_i2c_driver() instead.
 
-Specifically, this is what I meant:
+Thanks for all the comments, I've fixed it up like this, will post new
+version soon.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 70764838dfcc..6831c46a3672 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1823,7 +1823,7 @@ config DEPRECATED_PARAM_STRUCT
- # TEXT and BSS so we preserve their values in the config files.
- config ZBOOT_ROM_TEXT
- 	hex "Compressed ROM boot loader base address"
--	default "0"
-+	default 0x0
- 	help
- 	  The physical address at which the ROM-able zImage is to be
- 	  placed in the target.  Platforms which normally make use of
-@@ -1834,7 +1834,7 @@ config ZBOOT_ROM_TEXT
+Best regards,
+								Pavel
+
+commit 97a793fb20be29e7ed217c007e8bf857f9854968
+Author: Pavel <pavel@ucw.cz>
+Date:   Wed May 18 10:22:06 2016 +0200
+
+    Cleanups, as suggested by Marcus Folkesson
+
+diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
+index b71cc11..7725829 100644
+--- a/drivers/media/i2c/ad5820.c
++++ b/drivers/media/i2c/ad5820.c
+@@ -147,7 +147,6 @@ static int ad5820_set_ctrl(struct v4l2_ctrl *ctrl)
+ 	struct ad5820_device *coil =
+ 		container_of(ctrl->handler, struct ad5820_device, ctrls);
+ 	u32 code;
+-	int r = 0;
  
- config ZBOOT_ROM_BSS
- 	hex "Compressed ROM boot loader BSS address"
--	default "0"
-+	default 0x0
- 	help
- 	  The base address of an area of read/write memory in the target
- 	  for the ROM-able zImage which must be available while the
+ 	switch (ctrl->id) {
+ 	case V4L2_CID_FOCUS_ABSOLUTE:
+@@ -165,7 +164,7 @@ static int ad5820_set_ctrl(struct v4l2_ctrl *ctrl)
+ 		break;
+ 	}
+ 
+-	return r;
++	return 0;
+ }
+ 
+ static const struct v4l2_ctrl_ops ad5820_ctrl_ops = {
+@@ -245,8 +244,6 @@ static int ad5820_init_controls(struct ad5820_device *coil)
+  */
+ static int ad5820_registered(struct v4l2_subdev *subdev)
+ {
+-	static const int CHECK_VALUE = 0x3FF0;
+-
+ 	struct ad5820_device *coil = to_ad5820_device(subdev);
+ 	struct i2c_client *client = v4l2_get_subdevdata(subdev);
+ 
+@@ -364,16 +361,19 @@ static int ad5820_probe(struct i2c_client *client,
+ 	strcpy(coil->subdev.name, "ad5820 focus");
+ 
+ 	ret = media_entity_pads_init(&coil->subdev.entity, 0, NULL);
+-	if (ret < 0) {
+-		kfree(coil);
+-		return ret;
+-	}
++	if (ret < 0)
++		goto free;
+ 
+ 	ret = v4l2_async_register_subdev(&coil->subdev);
+ 	if (ret < 0)
+-		kfree(coil);
++		goto cleanup;
+ 
+ 	return ret;
++cleanup:
++	media_entity_cleanup(&coil->subdev.entity);
++free:
++	kfree(coil);
++	return ret;
+ }
+ 
+ static int __exit ad5820_remove(struct i2c_client *client)
+@@ -409,26 +409,7 @@ static struct i2c_driver ad5820_i2c_driver = {
+ 	.id_table	= ad5820_id_table,
+ };
+ 
+-static int __init ad5820_init(void)
+-{
+-	int rval;
+-
+-	rval = i2c_add_driver(&ad5820_i2c_driver);
+-	if (rval)
+-		printk(KERN_INFO "%s: failed registering " AD5820_NAME "\n",
+-		       __func__);
+-
+-	return rval;
+-}
+-
+-static void __exit ad5820_exit(void)
+-{
+-	i2c_del_driver(&ad5820_i2c_driver);
+-}
+-
+-
+-module_init(ad5820_init);
+-module_exit(ad5820_exit);
++module_i2c_driver(ad5820_i2c_driver);
+ 
+ MODULE_AUTHOR("Tuukka Toivonen");
+ MODULE_DESCRIPTION("AD5820 camera lens driver");
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
