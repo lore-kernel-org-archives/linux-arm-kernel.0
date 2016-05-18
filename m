@@ -1,138 +1,183 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 May 2016 18:05:22 -0500
-Subject: [PATCH v2 2/2] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
-In-Reply-To: <1463557590-29318-3-git-send-email-songjun.wu@atmel.com>
-References: <1463557590-29318-1-git-send-email-songjun.wu@atmel.com>
- <1463557590-29318-3-git-send-email-songjun.wu@atmel.com>
-Message-ID: <20160518230522.GA3198@rob-hp-laptop>
+Date: Wed, 18 May 2016 18:29:25 -0500
+Subject: [PATCH] ARM: at91: Add DT support for Olimex SAM9-L9260 board.
+In-Reply-To: <1463574766-15568-1-git-send-email-raashidmuhammed@zilogic.com>
+References: <1463574766-15568-1-git-send-email-raashidmuhammed@zilogic.com>
+Message-ID: <20160518232925.GA6545@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 03:46:29PM +0800, Songjun Wu wrote:
-> DT binding documentation for ISC driver.
+On Wed, May 18, 2016 at 06:02:46PM +0530, Raashid Muhammed wrote:
+> From: Raashid Muhammed <raashidmuhammed@zilogic.com>
 > 
-> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+> sam9-l9260 is a low cost board designed by Olimex.
+> 
+> More infomation is available at:
+> https://www.olimex.com/Products/ARM/Atmel/SAM9-L9260/
+> 
+> Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
+> Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
 > ---
+>  .../devicetree/bindings/arm/olimex-at91.txt        |   6 ++
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/sam9-l9260.dts                   | 108 +++++++++++++++++++++
+>  3 files changed, 115 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/olimex-at91.txt
+>  create mode 100644 arch/arm/boot/dts/sam9-l9260.dts
 > 
-> Changes in v2:
-> - Remove the unit address of the endpoint.
-> - Add the unit address to the clock node.
-> - Avoid using underscores in node names.
-> - Drop the "0x" in the unit address of the i2c node.
-> - Modify the description of "atmel,sensor-preferred".
-> - Add the description for the ISC internal clock.
-> 
->  .../devicetree/bindings/media/atmel-isc.txt        | 100 +++++++++++++++++++++
->  1 file changed, 100 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
+> diff --git a/Documentation/devicetree/bindings/arm/olimex-at91.txt b/Documentation/devicetree/bindings/arm/olimex-at91.txt
 > new file mode 100644
-> index 0000000..9e65395
+> index 0000000..0587d63
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
-> @@ -0,0 +1,100 @@
-> +Atmel Image Sensor Controller (ISC)
-> +----------------------------------------------
-> +
-> +Required properties for ISC:
-> +- compatible
-> +	Must be "atmel,sama5d2-isc"
-> +- reg
-> +	Physical base address and length of the registers set for the device;
-> +- interrupts
-> +	Should contain IRQ line for the ISC;
-> +- clocks
-> +	List of clock specifiers, corresponding to entries in
-> +	the clock-names property;
-> +	Please refer to clock-bindings.txt.
-> +- clock-names
-> +	Required elements: "hclock", "ispck".
-> +- pinctrl-names, pinctrl-0
-> +	Please refer to pinctrl-bindings.txt.
-> +- clk-in-isc
-> +	ISC internal clock node, it includes two clock nodes,
-> +	isc-ispck and isc-mck.
+> +++ b/Documentation/devicetree/bindings/arm/olimex-at91.txt
+> @@ -0,0 +1,6 @@
+> +Olimex AT91 Device Tree Bindings
+> +--------------------------------
 
-And you need to describe each of these nodes and the properties they 
-have. But more on this below...
-
-> +- atmel,sensor-preferred
-> +	ISC may convert the raw format to the specified format when the sensor
-> +	outputs the raw format, and the sensor may output the specified format
-> +	directly. If sensor is preferred to output the specified format
-> +	directly, the value should be 1 (1-preferred, 0-not).
-> +	The default value is 1.
-
-I don't think this belongs in DT. It sounds more like a configuration 
-and userspace decision. It is still not clear what you mean by 
-"specified format".
+There's not an existing at91 or olimex file this would fit into? We 
+don't need 1 file per board.
 
 > +
-> +ISC supports a single port node with parallel bus. It should contain one
-> +'port' child node with child 'endpoint' node. Please refer to the bindings
-> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +SAM9-L9260 Board
+> +Required root node properties:
+> +    - compatible = "olimex,sam9-l9260", "atmel,at91sam9260";
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 95c1923..ae3b50f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -19,6 +19,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+> 	usb_a9260.dtb \
+> 	at91sam9261ek.dtb \
+> 	at91sam9263ek.dtb \
+> +	sam9-l9260.dtb \
+> 	tny_a9263.dtb \
+> 	usb_a9263.dtb \
+> 	at91-foxg20.dtb \
+> diff --git a/arch/arm/boot/dts/sam9-l9260.dts b/arch/arm/boot/dts/sam9-l9260.dts
+> new file mode 100644
+> index 0000000..3ddf7af
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sam9-l9260.dts
+> @@ -0,0 +1,108 @@
+> +/*
+> + * sam9-l9260.dts - Device Tree file for Olimex SAM9-L9260 board
+> + *
+> + *  Copyright (C) 2016 Raashid Muhammed <raashidmuhammed@zilogic.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +#include "at91sam9260.dtsi"
 > +
-> +Required properties for the ISC internal clocks:
-> +- #address-cells
-> +	should be 1 (reg is used to encode clk id).
-> +- #size-cells
-> +	should be 0 (reg is used to encode clk id).
-> +- name
-> +	device tree node describing a ISC internal clock.
-> +	* #clock-cells: from common clock binding; should be set to 0.
-> +	* reg: clock id, there are two values,
-> +	       <0> is ISP clock, <1> is master clock.
-> +	* clocks: shall be the isc internal clock source phandles.
-> +		  e.g. clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
+> +/ {
+> +	model = "Olimex sam9-l9260";
+> +	compatible = "olimex,sam9-l9260", "atmel,at91sam9260", "atmel,at91sam9";
 > +
-> +Example:
-> +isc: isc at f0008000 {
-> +	compatible = "atmel,sama5d2-isc";
-> +	reg = <0xf0008000 0x4000>;
-> +	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-> +	clocks = <&isc_clk>, <&isc_ispck>;
-> +	clock-names = "hclock", "ispck";
-> +	atmel,sensor-preferred = <1>;
+> +	chosen {
+> +		bootargs = "mem=64M console=ttyS0,115200 root=/dev/mtdblock5 rw rootfstype=ubifs";
+
+use stdout-path instead of console on the command line. Actually, you 
+should then drop the rest of the bootargs. They are all user specific.
+
+> +	 };
 > +
-> +	port {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+> +	 memory {
+> +		reg = <0x20000000 0x4000000>;
+> +	 };
 > +
-> +		isc_0: endpoint {
-> +			remote-endpoint = <&ov7740_0>;
-> +			hsync-active = <1>;
-> +			vsync-active = <0>;
-> +			pclk-sample = <1>;
-> +		};
-> +	};
-> +
-> +	clk-in-isc {
-
-Is this really separate from the rest of the isc block. It would be 
-much more simple to define all the input clocks at the parent and then 
-reference these 2 clocks with <&isc 0> and <&isc 1>.
-
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		isc_ispck: isc-ispck at 0 {
-
-These would need a compatible string otherwise.
-
-> +			#clock-cells = <0>;
-> +			reg = <0>;
-
-Are 0 and 1 meaningful in terms of the hardware description?
-
-> +			clocks = <&isc_clk>, <&iscck>;
+> +	 clocks {
+> +		slow_xtal {
+> +			clock-frequency = <32768>;
 > +		};
 > +
-> +		isc_mck: isc-mck at 1 {
-> +			#clock-cells = <0>;
-> +			reg = <1>;
-> +			clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
+> +		main_xtal {
+> +			clock-frequency = <18432000>;
 > +		};
+> +	 };
+> +
+> +	 ahb {
+> +		apb {
+> +			dbgu: serial at fffff200 {
+> +				status = "okay";
+> +			 };
+> +
+> +			macb0: ethernet at fffc4000 {
+> +				phy-mode = "mii";
+> +				status = "okay";
+> +			 };
+> +
+> +			spi0: spi at fffc8000 {
+> +				status = "okay";
+> +				cs-gpios = <&pioC 11 0>, <0>, <0>, <0>;
+> +				mtd_dataflash at 0 {
+> +					compatible = "atmel,at45", "atmel,dataflash";
+> +					spi-max-frequency = <15000000>;
+> +					reg = <0>;
+> +				};
+> +			};
+> +
+> +			mmc0: mmc at fffa8000 {
+> +				pinctrl-0 = <
+> +					&pinctrl_board_mmc0
+> +					&pinctrl_mmc0_clk
+> +					&pinctrl_mmc0_slot1_cmd_dat0
+> +					&pinctrl_mmc0_slot1_dat1_3>;
+> +				status = "okay";
+> +				slot at 1 {
+> +					reg = <1>;
+> +					bus-width = <4>;
+> +					cd-gpios = <&pioC 8 GPIO_ACTIVE_HIGH>;
+> +					wp-gpios = <&pioC 4 GPIO_ACTIVE_HIGH>;
+> +				};
+> +			};
+> +
+> +			pinctrl at fffff400 {
+> +				mmc0 {
+> +					pinctrl_board_mmc0: mmc0-board {
+> +						atmel,pins =
+> +							<AT91_PIOC 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH	/* PC08 gpio CD pin pull up and deglitch */
+> +							 AT91_PIOC 4 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;	/* PC04 gpio WP pin pull up */
+> +					};
+> +				};
+> +			};
+> +
+> +
+> +		 };
+> +
+> +		 usb0: ohci at 00500000 {
+
+Drop the leading 0. You'll need to fixup the base dts.
+
+> +		       status = "okay";
+> +		 };
+> +
+> +		 nand0: nand at 40000000 {
+> +		       nand-bus-width = <8>;
+> +		       nand-ecc-mode = "soft";
+> +		       nand-on-flash-bbt = <1>;
+> +		       status = "okay";
+> +		 };
+> +	 };
+> +
+> +	 i2c at 0 {
+> +		status = "okay";
+> +	 };
+> +
+> +	 leds {
+> +		compatible = "gpio-leds";
+> +
+> +		b0 {
+> +			label = "b0";
+> +			gpios = <&pioA 6 GPIO_ACTIVE_HIGH>;
+> +			linux,default-trigger = "heartbeat";
+> +		};
+> +
 > +	};
 > +};
+> --
+> 2.1.4
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
