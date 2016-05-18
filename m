@@ -1,24 +1,85 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 May 2016 18:31:41 -0500
-Subject: [PATCH 14/14] ASoC: omap-mcpdm: Add support for pdmclk clock
- handling
-In-Reply-To: <1463579196-5484-15-git-send-email-peter.ujfalusi@ti.com>
-References: <1463579196-5484-1-git-send-email-peter.ujfalusi@ti.com>
- <1463579196-5484-15-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20160518233141.GA10395@rob-hp-laptop>
+Date: Wed, 18 May 2016 18:35:18 -0500
+Subject: [PATCH v2 4/4] documentation: Add secure monitor binding
+ documentation
+In-Reply-To: <1463583382-15614-5-git-send-email-carlo@caione.org>
+References: <1463583382-15614-1-git-send-email-carlo@caione.org>
+ <1463583382-15614-5-git-send-email-carlo@caione.org>
+Message-ID: <20160518233518.GA11027@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 04:46:36PM +0300, Peter Ujfalusi wrote:
-> McPDM module receives it's functional clock from external source. This
-> clock is the pdmclk provided by the twl6040 audio IC. If the clock is not
-> available all register accesses to McPDM fails and the module is not
-> operational.
+On Wed, May 18, 2016 at 04:56:22PM +0200, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 > 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Add the binding documentation for the Amlogic secure monitor driver.
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
 > ---
->  Documentation/devicetree/bindings/sound/omap-mcpdm.txt | 10 ++++++++++
->  sound/soc/omap/omap-mcpdm.c                            | 17 +++++++++++++++++
->  2 files changed, 27 insertions(+)
+>  .../devicetree/bindings/soc/meson/meson_sm.txt     | 45 ++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/meson/meson_sm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/meson/meson_sm.txt b/Documentation/devicetree/bindings/soc/meson/meson_sm.txt
+> new file mode 100644
+> index 0000000..f59c732
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/meson/meson_sm.txt
 
-Acked-by: Rob Herring <robh@kernel.org>
+bindings/firmware/
+
+> @@ -0,0 +1,45 @@
+> +* Amlogic Secure Monitor
+> +
+> +In the Amlogic SoCs the Secure Monitor code is used to provide access to the
+> +NVMEM, enable JTAG, set USB boot, etc...
+> +
+> +Required properties for the secure monitor node:
+> +- compatible: Should be "amlogic,meson-sm"
+> +- amlogic,sm_cmd_input_base: SMC32 function identifier to read the physical
+> +                             address of the input buffer
+> +- amlogic,sm_cmd_output_base: SMC32 function identifier to read the physical
+> +                              address of the output buffer
+
+Use '-' rather than '_'.
+
+> +
+> +Example:
+> +
+> +	#include <dt-bindings/soc/meson-gxbb-sm.h>
+> +
+> +	...
+> +
+> +	sm {
+
+Put this under a /firmware node.
+
+> +		compatible = "amlogic,meson-sm";
+> +		amlogic,sm_cmd_input_base = <SM_GET_SHARE_MEM_INPUT_BASE>;
+> +		amlogic,sm_cmd_output_base = <SM_GET_SHARE_MEM_OUTPUT_BASE>;
+> +	};
+> +
+> +Node of a device using the secure monitor must have a custom property to
+> +specify the SMC32 function the driver is going to use. The values of all the
+> +SMC function identifiers are listed in a SoC-specific header file:
+> +
+> +"include/dt-bindings/soc/meson-gxbb-sm.h" - for the Meson GXBB secure monitor.
+> +
+> +Example of the node using the secure monitor:
+> +
+> +	#include <dt-bindings/soc/meson-gxbb-sm.h>
+> +
+> +	...
+> +
+> +	efuse: efuse {
+> +		compatible = "amlogic,meson-gxbb-efuse";
+> +		amlogic,sm_cmd_read_efuse = <SM_EFUSE_READ>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		...
+> +	};
+> +
+> -- 
+> 2.7.4
+> 
