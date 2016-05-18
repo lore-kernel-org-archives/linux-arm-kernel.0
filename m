@@ -1,143 +1,54 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 18 May 2016 15:08:18 +0200
-Subject: [PATCH v4 29/56] KVM: arm/arm64: vgic-new: Add CONFIG registers
- handlers
-In-Reply-To: <1463392481-26583-30-git-send-email-andre.przywara@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-30-git-send-email-andre.przywara@arm.com>
-Message-ID: <20160518130818.GH3827@cbox>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 18 May 2016 15:08:32 +0200
+Subject: [PATCH v2 2/5] arm64: efi: apply strict permissons for UEFI
+ Runtime Services regions
+In-Reply-To: <573C68DA.8080009@codeaurora.org>
+References: <1459355933-13529-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1459355933-13529-3-git-send-email-ard.biesheuvel@linaro.org>
+ <573BB9FE.7050008@codeaurora.org>
+ <CAKv+Gu-Tam+QiXc_f0e+x8hNc4rxP_-59NdaCHkF9h=4Rd+XeA@mail.gmail.com>
+ <573C68DA.8080009@codeaurora.org>
+Message-ID: <CAKv+Gu9G60h66jaAOe754w7tKEdgF9NUDbkXgqNEEqKkG=LDzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2016 at 10:53:17AM +0100, Andre Przywara wrote:
-> The config register handlers are shared between the v2 and v3
-> emulation, so their implementation goes into vgic-mmio.c, to be
-> easily referenced from the v3 emulation as well later.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
-> Changelog v1 .. v2:
-> - adapt to new MMIO framework
-> 
-> Changelog v3 .. v4:
-> - specify accessor width
-> - use IRQ number accessor macro
-> - replace extract_bytes() with simple return
-> 
->  virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
->  virt/kvm/arm/vgic/vgic-mmio.c    | 46 ++++++++++++++++++++++++++++++++++++++++
->  virt/kvm/arm/vgic/vgic-mmio.h    |  7 ++++++
->  3 files changed, 54 insertions(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> index d564a30..bb7389e 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-> @@ -96,7 +96,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
->  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
->  		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
->  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 2,
-> +		vgic_mmio_read_config, vgic_mmio_write_config, 2,
->  		VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
->  		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index 5c8af05..5fe6896 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -277,6 +277,52 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
->  	}
->  }
->  
-> +unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
-> +				    gpa_t addr, unsigned int len)
-> +{
-> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
-> +	u32 value = 0;
-> +	int i;
-> +
-> +	for (i = 0; i < len * 4; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		if (irq->config == VGIC_CONFIG_EDGE)
-> +			value |= (2U << (i * 2));
-> +	}
-> +
-> +	return value;
-> +}
-> +
-> +void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-> +			    gpa_t addr, unsigned int len,
-> +			    unsigned long val)
-> +{
-> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
-> +	int i;
-> +
-> +	for (i = 0; i < len * 4; i++) {
-> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-> +
-> +		if (intid + i < 16)
-> +			continue;
+On 18 May 2016 at 15:06, Shanker Donthineni <shankerd@codeaurora.org> wrote:
+> Hi Ard,
+>
+> We are not using the permission attribute table and all the Runtime
+> Data/Code regions are marked with 'XP' bit. Do you think something
+> wrong in our UEFI implementation or Linux has to map RuntimeCode
+> regions with executable permission always irrespective of an attribute
+> flag EFI_MEMORY_XP?
+>
+> [    0.000000] efi: Processing EFI memory map:
+> [    0.000000] efi:   0x000000100000-0x00000010ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+> [    0.000000] efi:   0x00003b830000-0x00003b83ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+> [    0.000000] efi:   0x00003c000000-0x00003fffffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+> [    0.000000] efi:   0x000000100000-0x00000010ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+> [    0.000000] efi:   0x00003b830000-0x00003b83ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+> [    0.000000] efi:   0x00003c000000-0x00003fffffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+> [    0.000000] efi:   0x004000820000-0x00400085ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x004003080000-0x00400308ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047f9960000-0x0047f997ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fa9c0000-0x0047fa9cffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047faa30000-0x0047faa3ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fab90000-0x0047fab9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047faba0000-0x0047fabaffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fab90000-0x0047fab9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047faba0000-0x0047fabaffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fabb0000-0x0047fabbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fabc0000-0x0047fad9ffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fada0000-0x0047fae2ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047faf50000-0x0047faf7ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fafa0000-0x0047fafbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047faf50000-0x0047faf7ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fafa0000-0x0047fafbffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fff90000-0x0047fff9ffff [Runtime Code       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0047fffb0000-0x0047fffdffff [Runtime Data       |RUN|  |  |XP|  |  |  |   |WB|WT|WC|UC]*
+>
 
-from my last round of commenting:
-
-s/16/VGIC_NR_SGIS/
-
-It's implementation defined if software can program the configuration of
-PPIs, and since our timer code relies on its virtual PPI always being
-level triggered, I think we should change the above to
-VGIC_NR_PRIVATE_IRQS and then if someone ever needs a configurable
-virtual PPI, we can add that later.
-
-> +
-> +		/*
-> +		 * The spec says that interrupts must be disabled before
-> +		 * changing the configuration to avoid UNDEFINED behaviour.
-> +		 */
-
-I'm still not sure what the benefit of having this comment here is?
-
-> +
-> +		spin_lock(&irq->irq_lock);
-> +		if (test_bit(i * 2 + 1, &val)) {
-> +			irq->config = VGIC_CONFIG_EDGE;
-> +		} else {
-> +			irq->config = VGIC_CONFIG_LEVEL;
-> +			irq->pending = irq->line_level | irq->soft_pending;
-> +		}
-> +		spin_unlock(&irq->irq_lock);
-> +	}
-> +}
-> +
->  static int match_region(const void *key, const void *elt)
->  {
->  	const unsigned int offset = (unsigned long)key;
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-> index 6983922..0bd0ece 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.h
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-> @@ -124,6 +124,13 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
->  			      gpa_t addr, unsigned int len,
->  			      unsigned long val);
->  
-> +unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
-> +				    gpa_t addr, unsigned int len);
-> +
-> +void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-> +			    gpa_t addr, unsigned int len,
-> +			    unsigned long val);
-> +
->  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
->  
->  #endif
-> -- 
-> 2.8.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
-Thanks,
--Christoffer
+This memory map looks utterly broken. Assuming you are using
+Tianocore, does it work when setting
+gEfiMdeModulePkgTokenSpaceGuid.PcdPropertiesTableEnable to FALSE in
+your platform?
