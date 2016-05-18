@@ -1,10 +1,10 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Wed, 18 May 2016 10:41:31 +0200
-Subject: [PATCH 10/11] ARM: DT: STi: STiH407: clock configuration to address
+Date: Wed, 18 May 2016 10:41:32 +0200
+Subject: [PATCH 11/11] ARM: DT: STi: STiH410: clock configuration to address
  720p and 1080p
 In-Reply-To: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1463560892-7209-11-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1463560892-7209-12-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,14 +14,14 @@ to address 720p and 1080p HDMI resolution.
 Signed-off-by: Vincent Abriou <vincent.abriou@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- arch/arm/boot/dts/stih407.dtsi | 16 +++++++++++++---
+ arch/arm/boot/dts/stih410.dtsi | 16 +++++++++++++---
  1 file changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407.dtsi b/arch/arm/boot/dts/stih407.dtsi
-index d60f0d8..291ffac 100644
---- a/arch/arm/boot/dts/stih407.dtsi
-+++ b/arch/arm/boot/dts/stih407.dtsi
-@@ -16,7 +16,10 @@
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index 18ed1ad..7eec729 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -103,7 +103,10 @@
  			#size-cells = <1>;
  
  			assigned-clocks	= <&clk_s_d2_quadfs 0>,
@@ -33,7 +33,7 @@ index d60f0d8..291ffac 100644
  					  <&clk_s_d2_flexgen CLK_PIX_MAIN_DISP>,
  					  <&clk_s_d2_flexgen CLK_PIX_AUX_DISP>,
  					  <&clk_s_d2_flexgen CLK_PIX_GDP1>,
-@@ -26,14 +29,21 @@
+@@ -113,14 +116,21 @@
  
  			assigned-clock-parents = <0>,
  						 <0>,
