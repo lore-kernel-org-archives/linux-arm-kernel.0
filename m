@@ -1,10 +1,9 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 18 May 2016 16:46:28 +0300
-Subject: [PATCH 06/14] ARM: dts: omap5-board-common: Add pdmclk binding for
- audio
+Date: Wed, 18 May 2016 16:46:30 +0300
+Subject: [PATCH 08/14] ARM: dts: omap4-sdp: Add pdmclk binding for audio
 In-Reply-To: <1463579196-5484-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1463579196-5484-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1463579196-5484-7-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1463579196-5484-9-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,14 +12,14 @@ functional clock.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/omap5-board-common.dtsi | 5 +++++
+ arch/arm/boot/dts/omap4-sdp.dts | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap5-board-common.dtsi b/arch/arm/boot/dts/omap5-board-common.dtsi
-index 19efaa079797..63d0352d068d 100644
---- a/arch/arm/boot/dts/omap5-board-common.dtsi
-+++ b/arch/arm/boot/dts/omap5-board-common.dtsi
-@@ -637,6 +637,7 @@
+diff --git a/arch/arm/boot/dts/omap4-sdp.dts b/arch/arm/boot/dts/omap4-sdp.dts
+index aae513265dc2..7e6cd2d8ed5d 100644
+--- a/arch/arm/boot/dts/omap4-sdp.dts
++++ b/arch/arm/boot/dts/omap4-sdp.dts
+@@ -367,6 +367,7 @@
  
  	twl6040: twl at 4b {
  		compatible = "ti,twl6040";
@@ -28,7 +27,7 @@ index 19efaa079797..63d0352d068d 100644
  		reg = <0x4b>;
  
  		pinctrl-names = "default";
-@@ -658,6 +659,10 @@
+@@ -620,6 +621,10 @@
  &mcpdm {
  	pinctrl-names = "default";
  	pinctrl-0 = <&mcpdm_pins>;
