@@ -1,114 +1,33 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 18 May 2016 14:15:15 +0530
-Subject: [RFC PATCH 3/3] ARM: dts: dra7/omap4/omap5: Enable ADMA2
-In-Reply-To: <1463561115-31798-1-git-send-email-kishon@ti.com>
-References: <1463561115-31798-1-git-send-email-kishon@ti.com>
-Message-ID: <1463561115-31798-4-git-send-email-kishon@ti.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Wed, 18 May 2016 09:53:48 +0100
+Subject: [PATCH v2 1/2] efi: esrt: use memremap not ioremap to access
+ ESRT table in memory
+In-Reply-To: <CAKv+Gu_ekP+44FJjR7BY_MFqx2jQgc6Tk9W4SBL__ttdvQ55VQ@mail.gmail.com>
+References: <20160218132824.GE2651@codeblueprint.co.uk>
+ <CAKv+Gu-s1pzYBzuDG-Z7s3gyo8dPOfeidZQ+rim-uAWZCBcKQQ@mail.gmail.com>
+ <20160218134324.GG2651@codeblueprint.co.uk>
+ <CAKv+Gu875r9RkDC723kNsG4XC0eSE9RPPmSFZrD0sx0QxS+V4g@mail.gmail.com>
+ <20160218141544.GH2651@codeblueprint.co.uk>
+ <20160218191624.GA1515@redhat.com>
+ <20160226144114.GA7475@codeblueprint.co.uk>
+ <20160301233040.GA31476@codeblueprint.co.uk>
+ <20160304062524.GA19010@dhcp-128-65.nay.redhat.com>
+ <CAKv+Gu_ekP+44FJjR7BY_MFqx2jQgc6Tk9W4SBL__ttdvQ55VQ@mail.gmail.com>
+Message-ID: <20160518085348.GG21993@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that ADMA2 support is added in omap hsmmc controller driver,
-enable ADMA2 for all the mmc instances that has ADMA2 support in
-DRA7, OMAP4 and OMAP5 SoCs.
+On Wed, 18 May, at 10:36:33AM, Ard Biesheuvel wrote:
+> 
+> So what is the status here? I know Sai is working on x86 support for
+> the memory attributes table, so it would make sense settle this matter
+> as well.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi  |    4 ++++
- arch/arm/boot/dts/omap4.dtsi |    2 ++
- arch/arm/boot/dts/omap5.dtsi |    4 ++++
- 3 files changed, 10 insertions(+)
+This got stuck behind some other work, sorry about that.
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 13ac882..a63df6b 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -883,6 +883,7 @@
- 			ti,hwmods = "mmc1";
- 			ti,dual-volt;
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma_xbar 61>, <&sdma_xbar 62>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
-@@ -895,6 +896,7 @@
- 			interrupts = <GIC_SPI 81 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc2";
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma_xbar 47>, <&sdma_xbar 48>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
-@@ -906,6 +908,7 @@
- 			interrupts = <GIC_SPI 89 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc3";
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma_xbar 77>, <&sdma_xbar 78>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
-@@ -917,6 +920,7 @@
- 			interrupts = <GIC_SPI 91 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc4";
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma_xbar 57>, <&sdma_xbar 58>;
- 			dma-names = "tx", "rx";
- 			status = "disabled";
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 421fe9f..23c78b4 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -513,6 +513,7 @@
- 			ti,hwmods = "mmc1";
- 			ti,dual-volt;
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma 61>, <&sdma 62>;
- 			dma-names = "tx", "rx";
- 			pbias-supply = <&pbias_mmc_reg>;
-@@ -524,6 +525,7 @@
- 			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc2";
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma 47>, <&sdma 48>;
- 			dma-names = "tx", "rx";
- 		};
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 120b6b8..3bf113b 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -566,6 +566,7 @@
- 			ti,hwmods = "mmc1";
- 			ti,dual-volt;
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma 61>, <&sdma 62>;
- 			dma-names = "tx", "rx";
- 			pbias-supply = <&pbias_mmc_reg>;
-@@ -577,6 +578,7 @@
- 			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc2";
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma 47>, <&sdma 48>;
- 			dma-names = "tx", "rx";
- 		};
-@@ -587,6 +589,7 @@
- 			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc3";
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma 77>, <&sdma 78>;
- 			dma-names = "tx", "rx";
- 		};
-@@ -597,6 +600,7 @@
- 			interrupts = <GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>;
- 			ti,hwmods = "mmc4";
- 			ti,needs-special-reset;
-+			ti,use_adma;
- 			dmas = <&sdma 57>, <&sdma 58>;
- 			dma-names = "tx", "rx";
- 		};
--- 
-1.7.9.5
+Some of this was just merged by Linus (getting rid of the global
+memmap and switching everyone over to efi.memmap), a large chunk
+remains however.
+
+I should be able to get those patches mailed out once the merge window
+closes.
