@@ -1,109 +1,74 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 18 May 2016 15:18:13 +0100
-Subject: [PATCH v3 10/55] KVM: arm/arm64: Export mmio_read/write_bus
-In-Reply-To: <1462531568-9799-11-git-send-email-andre.przywara@arm.com>
-References: <1462531568-9799-1-git-send-email-andre.przywara@arm.com>
- <1462531568-9799-11-git-send-email-andre.przywara@arm.com>
-Message-ID: <573C79A5.6080008@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 May 2016 16:17:36 +0200
+Subject: [PATCH] ARM: exynos: don't select keyboard driver
+Message-ID: <1463581102-1007639-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/16 11:45, Andre Przywara wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> Rename mmio_{read,write}_bus to kvm_mmio_{read,write}_bus and export
-> them out of mmio.c.
-> This will be needed later for the new VGIC implementation.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+The samsung-keypad driver is implicitly selected by ARCH_EXYNOS4 (why?),
+but this fails if CONFIG_INPUT is a loadable module:
 
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+drivers/input/built-in.o: In function `samsung_keypad_remove':
+drivers/input/keyboard/samsung-keypad.c:461: undefined reference to `input_unregister_device'
+drivers/input/built-in.o: In function `samsung_keypad_irq':
+drivers/input/keyboard/samsung-keypad.c:137: undefined reference to `input_event'
+drivers/input/built-in.o: In function `samsung_keypad_irq':
+include/linux/input.h:389: undefined reference to `input_event'
+drivers/input/built-in.o: In function `samsung_keypad_probe':
+drivers/input/keyboard/samsung-keypad.c:358: undefined reference to `devm_input_allocate_device'
+drivers/input/built-in.o:(.debug_addr+0x34): undefined reference to `input_set_capability'
 
-Thanks,
-Andre.
+This removes the 'select' as suggested by Krzysztof Kozlowski and
+instead enables the driver from the defconfig files.
 
-> ---
->  arch/arm/include/asm/kvm_mmio.h   |  3 +++
->  arch/arm/kvm/mmio.c               | 10 +++++-----
->  arch/arm64/include/asm/kvm_mmio.h |  3 +++
->  3 files changed, 11 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmio.h b/arch/arm/include/asm/kvm_mmio.h
-> index d8e90c8..f3a7de7 100644
-> --- a/arch/arm/include/asm/kvm_mmio.h
-> +++ b/arch/arm/include/asm/kvm_mmio.h
-> @@ -28,6 +28,9 @@ struct kvm_decode {
->  	bool sign_extend;
->  };
->  
-> +void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data);
-> +unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len);
-> +
->  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
->  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		 phys_addr_t fault_ipa);
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 0158e9e..10f80a6 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -23,7 +23,7 @@
->  
->  #include "trace.h"
->  
-> -static void mmio_write_buf(char *buf, unsigned int len, unsigned long data)
-> +void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data)
->  {
->  	void *datap = NULL;
->  	union {
-> @@ -55,7 +55,7 @@ static void mmio_write_buf(char *buf, unsigned int len, unsigned long data)
->  	memcpy(buf, datap, len);
->  }
->  
-> -static unsigned long mmio_read_buf(char *buf, unsigned int len)
-> +unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len)
->  {
->  	unsigned long data = 0;
->  	union {
-> @@ -66,7 +66,7 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
->  
->  	switch (len) {
->  	case 1:
-> -		data = buf[0];
-> +		data = *(u8 *)buf;
->  		break;
->  	case 2:
->  		memcpy(&tmp.hword, buf, len);
-> @@ -103,7 +103,7 @@ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		if (len > sizeof(unsigned long))
->  			return -EINVAL;
->  
-> -		data = mmio_read_buf(run->mmio.data, len);
-> +		data = kvm_mmio_read_buf(run->mmio.data, len);
->  
->  		if (vcpu->arch.mmio_decode.sign_extend &&
->  		    len < sizeof(unsigned long)) {
-> @@ -189,7 +189,7 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  					       len);
->  
->  		trace_kvm_mmio(KVM_TRACE_MMIO_WRITE, len, fault_ipa, data);
-> -		mmio_write_buf(data_buf, len, data);
-> +		kvm_mmio_write_buf(data_buf, len, data);
->  
->  		ret = kvm_io_bus_write(vcpu, KVM_MMIO_BUS, fault_ipa, len,
->  				       data_buf);
-> diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
-> index fe612a9..75ea420 100644
-> --- a/arch/arm64/include/asm/kvm_mmio.h
-> +++ b/arch/arm64/include/asm/kvm_mmio.h
-> @@ -30,6 +30,9 @@ struct kvm_decode {
->  	bool sign_extend;
->  };
->  
-> +void kvm_mmio_write_buf(void *buf, unsigned int len, unsigned long data);
-> +unsigned long kvm_mmio_read_buf(const void *buf, unsigned int len);
-> +
->  int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run);
->  int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		 phys_addr_t fault_ipa);
-> 
+The problem does not happen on mainline kernels, as we don't normally
+build built-in input drivers when CONFIG_INPUT=m, but I am experimenting
+with a patch to change this, and the samsung keypad driver showed up
+as one example that was silently broken before.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Link: https://lkml.org/lkml/2016/2/14/55
+---
+ arch/arm/configs/exynos_defconfig   | 1 +
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ arch/arm/mach-exynos/Kconfig        | 1 -
+ 3 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index a8cf295724c5..1124a51e0d16 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -82,6 +82,7 @@ CONFIG_TOUCHSCREEN_MMS114=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_MAX77693_HAPTIC=y
+ CONFIG_INPUT_MAX8997_HAPTIC=y
++CONFIG_KEYBOARD_SAMSUNG=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_SAMSUNG=y
+ CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index f7e0d49b515a..a9bb659cdbbb 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -264,6 +264,7 @@ CONFIG_KEYBOARD_TEGRA=y
+ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_KEYBOARD_ST_KEYSCAN=y
+ CONFIG_KEYBOARD_CROS_EC=m
++CONFIG_KEYBOARD_SAMSUNG=m
+ CONFIG_MOUSE_PS2_ELANTECH=y
+ CONFIG_MOUSE_CYAPA=m
+ CONFIG_MOUSE_ELAN_I2C=y
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index dc9b6fb103c6..8ce964ddb4e3 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -61,7 +61,6 @@ config ARCH_EXYNOS4
+ 	select CLKSRC_SAMSUNG_PWM if CPU_EXYNOS4210
+ 	select CPU_EXYNOS4210
+ 	select GIC_NON_BANKED
+-	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
+ 	select MIGHT_HAVE_CACHE_L2X0
+ 	help
+ 	  Samsung EXYNOS4 (Cortex-A9) SoC based systems
+-- 
+2.7.0
