@@ -1,74 +1,186 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 18 May 2016 14:53:30 +0200
-Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
-Message-ID: <1463576010-115428-1-git-send-email-agraf@suse.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 15:01:39 +0200
+Subject: [PATCH v4 27/56] KVM: arm/arm64: vgic-new: Add ACTIVE registers
+ handlers
+In-Reply-To: <1463392481-26583-28-git-send-email-andre.przywara@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-28-git-send-email-andre.przywara@arm.com>
+Message-ID: <20160518130139.GG3827@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On arm64, all SoCs we supported so far either have an IOMMU or have bus
-addresses equal to CPU addresses.
+On Mon, May 16, 2016 at 10:53:15AM +0100, Andre Przywara wrote:
+> The active register handlers are shared between the v2 and v3
+> emulation, so their implementation goes into vgic-mmio.c, to be
+> easily referenced from the v3 emulation as well later.
+> Since activation/deactivation of an interrupt may happen entirely
+> in the guest without it ever exiting, we need some extra logic to
+> properly track the active state.
 
-However, with the Raspberry Pi 3 coming up, this is no longer true. To
-allow DMA to work with an AArch64 kernel on those devices, let's allow
-devices to have DMA offsets again.
+-- cut --
 
-Signed-off-by: Alexander Graf <agraf@suse.de>
+> Putting it on an ap_list on activation is similar to the normal case
+> handled by vgic_queue_irq_unlock(), but differs in some details that
+> make a separate implementation worthwhile.
 
----
+-- cut --
 
-This patch may conflict with another patch titled "swiotlb: prefix dma_to_phys
-and phys_to_dma functions" which is in flight, but hasn't seen an update since
-March.
+this bit is no longer correct.
 
-Since this patch is very small and isolated to arm64, I'd prefer to keep them
-separate rather than combine them. So if the other patch gets accepted first,
-I'm happy to rebase this patch on top of a topic branch that would address the
-rename.
 
-v1 -> v2:
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+> Changelog RFC..v1:
+> - handling queueing in write handler
+> - remove IRQ lock from read handler
+> 
+> Changelog v1 .. v2:
+> - adapt to new MMIO framework
+> 
+> Changelog v3 .. v4:
+> - specify accessor width
+> - use IRQ number accessor macro
+> - drop elaborate write_sactive handler and use new vgic_queue_irq_unlock()
+> - properly emulate clear active by halting the guest (Christoffer)
+> - replace extract_bytes() with simple return
+> 
+>  virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +-
+>  virt/kvm/arm/vgic/vgic-mmio.c    | 82 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic-mmio.h    | 10 +++++
+>  3 files changed, 94 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> index c13a708..12e101b 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> @@ -84,10 +84,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+>  		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
+> +		vgic_mmio_read_active, vgic_mmio_write_sactive, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
+> +		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
+>  		VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+>  		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index d8dc8f6..74d140e 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -155,6 +155,88 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+>  	}
+>  }
+>  
+> +unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+> +				    gpa_t addr, unsigned int len)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> +	u32 value = 0;
+> +	int i;
+> +
+> +	/* Loop over all IRQs affected by this read */
+> +	for (i = 0; i < len * 8; i++) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		if (irq->active)
+> +			value |= (1U << i);
+> +	}
+> +
+> +	return value;
+> +}
+> +
+> +void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+> +			     gpa_t addr, unsigned int len,
+> +			     unsigned long val)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> +	int i;
+> +
+> +	kvm_arm_halt_guest(vcpu->kvm);
+> +	for_each_set_bit(i, &val, len * 8) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +		/*
+> +		 * If this virtual IRQ was written into a list register, we
+> +		 * have to make sure the CPU that runs the VCPU thread has
+> +		 * synced back LR state to the struct vgic_irq.  We can only
+> +		 * know this for sure, when either this irq is not assigned to
+> +		 * anyone's AP list anymore, or the VCPU thread is not
+> +		 * running on any CPUs.
+> +		 *
+> +		 * In the opposite case, we know the VCPU thread may be on its
+> +		 * way back from the guest and still has to sync back this
+> +		 * IRQ, so we release and re-acquire the spin_lock to let the
+> +		 * other thread sync back the IRQ.
+> +		 */
+> +		while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+> +		       irq->vcpu->cpu != -1) /* VCPU thread is running */
+> +			cond_resched_lock(&irq->irq_lock);
+> +
+> +		irq->active = false;
+> +		spin_unlock(&irq->irq_lock);
+> +	}
+> +	kvm_arm_resume_guest(vcpu->kvm);
+> +}
+> +
+> +void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+> +			     gpa_t addr, unsigned int len,
+> +			     unsigned long val)
+> +{
+> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+> +	int i;
+> +
+> +	for_each_set_bit(i, &val, len * 8) {
+> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+> +
+> +		spin_lock(&irq->irq_lock);
+> +
+> +		/*
+> +		 * If the IRQ was already active or it was on a VCPU before
+> +		 * or there is no target VCPU assigned at the moment, then
+> +		 * just proceed.
+> +		 */
+> +		if (irq->active || irq->vcpu || !irq->target_vcpu) {
 
-  - Use PAGE_SHIFT explicitly rather than __pfn_to_phys and __phys_to_pfn
----
- arch/arm64/include/asm/dma-mapping.h | 17 +++++++++++++++--
- 1 file changed, 15 insertions(+), 2 deletions(-)
+why is it that we don't care if this IRQ is on a LR, for example being
+just pending and not active, and we thereby loose this active state when
+the vcpu syncs back the state?
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index ba437f0..c14e9cd 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -66,12 +66,16 @@ static inline bool is_device_dma_coherent(struct device *dev)
+We care for the case where we clear the active state, but not when we
+set it.  Perhaps we discussed this in the past, but now I've forgotten,
+so that should at least be documented somehow.
+
+> +			irq->active = true;
+> +
+> +			spin_unlock(&irq->irq_lock);
+> +			continue;
+> +		}
+> +
+> +		irq->active = true;
+> +		vgic_queue_irq_unlock(vcpu->kvm, irq);
+
+this won't work just yet, but I think all that's needed to make it work
+is this patchlet:
+
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index c22f7e2..27204f22 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -81,7 +81,7 @@ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
  
- static inline dma_addr_t phys_to_dma(struct device *dev, phys_addr_t paddr)
- {
--	return (dma_addr_t)paddr;
-+	dma_addr_t dev_addr = (dma_addr_t)paddr;
-+
-+	return dev_addr - ((dma_addr_t)dev->dma_pfn_offset << PAGE_SHIFT);
- }
+ 	/* If the interrupt is active, it must stay on the current vcpu */
+ 	if (irq->active)
+-		return irq->vcpu;
++		return irq->vcpu ? : irq->target_vcpu;
  
- static inline phys_addr_t dma_to_phys(struct device *dev, dma_addr_t dev_addr)
- {
--	return (phys_addr_t)dev_addr;
-+	phys_addr_t paddr = (phys_addr_t)dev_addr;
-+
-+	return paddr + ((phys_addr_t)dev->dma_pfn_offset << PAGE_SHIFT);
- }
- 
- static inline bool dma_capable(struct device *dev, dma_addr_t addr, size_t size)
-@@ -86,5 +90,14 @@ static inline void dma_mark_clean(void *addr, size_t size)
- {
- }
- 
-+/* Override for dma_max_pfn() */
-+static inline unsigned long dma_max_pfn(struct device *dev)
-+{
-+	dma_addr_t dma_max = (dma_addr_t)*dev->dma_mask;
-+
-+	return (ulong)dma_to_phys(dev, dma_max) >> PAGE_SHIFT;
-+}
-+#define dma_max_pfn(dev) dma_max_pfn(dev)
-+
- #endif	/* __KERNEL__ */
- #endif	/* __ASM_DMA_MAPPING_H */
--- 
-1.8.5.6
+ 	/*
+ 	 * If the IRQ is not active but enabled and pending, we should direct
+
+
+Thanks,
+-Christoffer
