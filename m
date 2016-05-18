@@ -1,29 +1,65 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Wed, 18 May 2016 15:49:17 +0200
-Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
-In-Reply-To: <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
-References: <1463576010-115428-1-git-send-email-agraf@suse.de>
- <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
-Message-ID: <573C72DD.6010400@suse.de>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 18 May 2016 15:50:22 +0200
+Subject: [PATCH v4 32/56] KVM: arm/arm64: vgic-new: Add SGIPENDR register
+ handlers
+In-Reply-To: <573C6EA6.90803@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-33-git-send-email-andre.przywara@arm.com>
+ <20160518131449.GI3827@cbox> <573C6EA6.90803@arm.com>
+Message-ID: <20160518135022.GL3827@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2016 03:27 PM, Catalin Marinas wrote:
-> On Wed, May 18, 2016 at 02:53:30PM +0200, Alexander Graf wrote:
->> On arm64, all SoCs we supported so far either have an IOMMU or have bus
->> addresses equal to CPU addresses.
->>
->> However, with the Raspberry Pi 3 coming up, this is no longer true. To
->> allow DMA to work with an AArch64 kernel on those devices, let's allow
->> devices to have DMA offsets again.
->>
->> Signed-off-by: Alexander Graf <agraf@suse.de>
-> We were aware about this issue but we've been waiting for an actual use
-> case. I'll queue this for 4.8 (given that RPi3 is not supported by the
-> arm64 kernel, I don't see the rush to merge it earlier).
+On Wed, May 18, 2016 at 02:31:18PM +0100, Andre Przywara wrote:
+> Hi,
+> 
+> On 18/05/16 14:14, Christoffer Dall wrote:
+> > On Mon, May 16, 2016 at 10:53:20AM +0100, Andre Przywara wrote:
+> >> As this register is v2 specific, its implementation lives entirely
+> >> in vgic-mmio-v2.c.
+> >> This register allows setting the source mask of an IPI.
+> >>
+> >> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> ---
+> >> Changelog RFC..v1:
+> >> - remove IRQ lock from read handler
+> >> - update pending bit on setting the first / clearing the last bit
+> >> - queue virtual IRQ if necessary
+> >>
+> >> Changelog v1 .. v2:
+> >> - adapt to new MMIO framework
+> >>
+> >> Changelog v3 .. v4:
+> >> - specify accessor width
+> >>
+> >>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++--
+> >>  1 file changed, 60 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> index c884e9b..3925d4c 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+> >> @@ -146,6 +146,64 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+> >>  	}
+> >>  }
+> >>  
+> >> +static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
+> >> +					    gpa_t addr, unsigned int len)
+> >> +{
+> >> +	u32 intid = addr & 0x0f;
+> > 
+> > is there a reason why we cannot use the magic macro here?
+> 
+> I wasn't sure about this, because it's not covering all 1024 interrupts,
+> but just SGIs, so it's always fixed to 16 interrupts ? 8 bits. The
+> default mask would be too big in this case.
+> I guess it would work anyway because this region is limited to 16 bytes
+> in our description, so we could use this here anyway to make it more
+> aligned with the other handlers, maybe adding a comment about the
+> difference?
+> 
+meh, either way works for me actually, whatever you prefer.
 
-Sure, works for me. That way Eric can try to push the other few bits 
-necessary to run an arm64 kernel on the RPi3 towards 4.8 as well :).
-
-
-Alex
+Thanks,
+-Christoffer
