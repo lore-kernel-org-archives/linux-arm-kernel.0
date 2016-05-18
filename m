@@ -1,43 +1,138 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Wed, 18 May 2016 16:04:32 -0700
-Subject: [PATCH INTERNAL v2 1/3] Documentation: dt: Add Broadcom iproc pwm
- controller binding
-In-Reply-To: <20160518221546.GA32596@rob-hp-laptop>
-References: <1463554441-47982-1-git-send-email-yendapally.reddy@broadcom.com>
- <1463554441-47982-2-git-send-email-yendapally.reddy@broadcom.com>
- <20160518221546.GA32596@rob-hp-laptop>
-Message-ID: <573CF500.5070708@broadcom.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 18 May 2016 18:05:22 -0500
+Subject: [PATCH v2 2/2] [media] atmel-isc: DT binding for Image Sensor
+ Controller driver
+In-Reply-To: <1463557590-29318-3-git-send-email-songjun.wu@atmel.com>
+References: <1463557590-29318-1-git-send-email-songjun.wu@atmel.com>
+ <1463557590-29318-3-git-send-email-songjun.wu@atmel.com>
+Message-ID: <20160518230522.GA3198@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Wed, May 18, 2016 at 03:46:29PM +0800, Songjun Wu wrote:
+> DT binding documentation for ISC driver.
+> 
+> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+> ---
+> 
+> Changes in v2:
+> - Remove the unit address of the endpoint.
+> - Add the unit address to the clock node.
+> - Avoid using underscores in node names.
+> - Drop the "0x" in the unit address of the i2c node.
+> - Modify the description of "atmel,sensor-preferred".
+> - Add the description for the ISC internal clock.
+> 
+>  .../devicetree/bindings/media/atmel-isc.txt        | 100 +++++++++++++++++++++
+>  1 file changed, 100 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
+> new file mode 100644
+> index 0000000..9e65395
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
+> @@ -0,0 +1,100 @@
+> +Atmel Image Sensor Controller (ISC)
+> +----------------------------------------------
+> +
+> +Required properties for ISC:
+> +- compatible
+> +	Must be "atmel,sama5d2-isc"
+> +- reg
+> +	Physical base address and length of the registers set for the device;
+> +- interrupts
+> +	Should contain IRQ line for the ISC;
+> +- clocks
+> +	List of clock specifiers, corresponding to entries in
+> +	the clock-names property;
+> +	Please refer to clock-bindings.txt.
+> +- clock-names
+> +	Required elements: "hclock", "ispck".
+> +- pinctrl-names, pinctrl-0
+> +	Please refer to pinctrl-bindings.txt.
+> +- clk-in-isc
+> +	ISC internal clock node, it includes two clock nodes,
+> +	isc-ispck and isc-mck.
 
-On 16-05-18 03:15 PM, Rob Herring wrote:
-> Am I supposed to ignore since this is "internal"?
-The "INTERNAL" was supposed to be removed after internal review before 
-sending out to the public mailing list.
+And you need to describe each of these nodes and the properties they 
+have. But more on this below...
 
-Also, Yendapally's git email config was not setup properly so some are 
-tagging the patchset as spam.
+> +- atmel,sensor-preferred
+> +	ISC may convert the raw format to the specified format when the sensor
+> +	outputs the raw format, and the sensor may output the specified format
+> +	directly. If sensor is preferred to output the specified format
+> +	directly, the value should be 1 (1-preferred, 0-not).
+> +	The default value is 1.
 
-Other than that, everything is fine with the PATCH sent out to the open 
-source community :)
+I don't think this belongs in DT. It sounds more like a configuration 
+and userspace decision. It is still not clear what you mean by 
+"specified format".
 
-I'm sure Yendapally will send out an updated version with those items 
-corrected (and can add your Acked-by now).
+> +
+> +ISC supports a single port node with parallel bus. It should contain one
+> +'port' child node with child 'endpoint' node. Please refer to the bindings
+> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +Required properties for the ISC internal clocks:
+> +- #address-cells
+> +	should be 1 (reg is used to encode clk id).
+> +- #size-cells
+> +	should be 0 (reg is used to encode clk id).
+> +- name
+> +	device tree node describing a ISC internal clock.
+> +	* #clock-cells: from common clock binding; should be set to 0.
+> +	* reg: clock id, there are two values,
+> +	       <0> is ISP clock, <1> is master clock.
+> +	* clocks: shall be the isc internal clock source phandles.
+> +		  e.g. clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
+> +
+> +Example:
+> +isc: isc at f0008000 {
+> +	compatible = "atmel,sama5d2-isc";
+> +	reg = <0xf0008000 0x4000>;
+> +	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
+> +	clocks = <&isc_clk>, <&isc_ispck>;
+> +	clock-names = "hclock", "ispck";
+> +	atmel,sensor-preferred = <1>;
+> +
+> +	port {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		isc_0: endpoint {
+> +			remote-endpoint = <&ov7740_0>;
+> +			hsync-active = <1>;
+> +			vsync-active = <0>;
+> +			pclk-sample = <1>;
+> +		};
+> +	};
+> +
+> +	clk-in-isc {
 
-Thanks,
-  Scott
+Is this really separate from the rest of the isc block. It would be 
+much more simple to define all the input clocks at the parent and then 
+reference these 2 clocks with <&isc 0> and <&isc 1>.
 
->
-> On Wed, May 18, 2016 at 02:53:59AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
->> Add a binding for Broadcom iproc pwm controller
->>
->> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
->> ---
->>   .../devicetree/bindings/pwm/brcm,iproc-pwm.txt      | 21 +++++++++++++++++++++
->>   1 file changed, 21 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/pwm/brcm,iproc-pwm.txt
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		isc_ispck: isc-ispck at 0 {
+
+These would need a compatible string otherwise.
+
+> +			#clock-cells = <0>;
+> +			reg = <0>;
+
+Are 0 and 1 meaningful in terms of the hardware description?
+
+> +			clocks = <&isc_clk>, <&iscck>;
+> +		};
+> +
+> +		isc_mck: isc-mck at 1 {
+> +			#clock-cells = <0>;
+> +			reg = <1>;
+> +			clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
+> +		};
+> +	};
+> +};
