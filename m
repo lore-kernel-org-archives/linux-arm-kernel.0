@@ -1,95 +1,160 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:07:44 +0100
-Subject: [PATCH v5 05/57] KVM: arm/arm64: Remove the IRQ field from struct
- irq_phys_map
+Date: Thu, 19 May 2016 19:07:47 +0100
+Subject: [PATCH v5 08/57] KVM: arm/arm64: Move timer IRQ map to latest
+ possible time
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-9-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-The communication of a Linux IRQ number from outside the VGIC to the
-vgic was a leftover from the day when the vgic code cared about how a
-particular device injects virtual interrupts mapped to a physical
-interrupt.
+We are about to modify the VGIC to allocate all data structures
+dynamically and store mapped IRQ information on a per-IRQ struct, which
+is indeed allocated dynamically at init time.
 
-We can safely remove this notion, leaving all physical IRQ handling to
-be done in the device driver (the arch timer in this case), which makes
-room for a saner API for the new VGIC.
+Therefore, we cannot record the mapped IRQ info from the timer at timer
+reset time like it's done now, because VCPU reset happens before timer
+init.
+
+A possible later time to do this is on the first run of a per VCPU, it
+just requires us to move the enable state to be a per-VCPU state and do
+the lookup of the physical IRQ number when we are about to run the VCPU.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
-Changelog v1 .. v2:
-- update kerneldoc comments on kvm_vgic_map_phys_irq()
+ arch/arm/kvm/arm.c           |  6 ++--
+ include/kvm/arm_arch_timer.h |  8 +++---
+ virt/kvm/arm/arch_timer.c    | 66 +++++++++++++++++++++++++-------------------
+ virt/kvm/arm/hyp/timer-sr.c  |  5 ++--
+ 4 files changed, 47 insertions(+), 38 deletions(-)
 
-Changelog v2 .. v3:
-- include <linux/irq.h>
-
- include/kvm/arm_vgic.h    |  3 +--
- virt/kvm/arm/arch_timer.c | 23 +++++++++++++++++++++--
- virt/kvm/arm/vgic.c       | 28 ++++++----------------------
- 3 files changed, 28 insertions(+), 26 deletions(-)
-
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index c7bb184..9ad7625 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -158,7 +158,6 @@ struct vgic_io_device {
- struct irq_phys_map {
- 	u32			virt_irq;
- 	u32			phys_irq;
--	u32			irq;
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index be4b639..ceb9345 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -459,7 +459,7 @@ static void update_vttbr(struct kvm *kvm)
+ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm *kvm = vcpu->kvm;
+-	int ret;
++	int ret = 0;
+ 
+ 	if (likely(vcpu->arch.has_run_once))
+ 		return 0;
+@@ -482,9 +482,9 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
+ 	 * interrupts from the virtual timer with a userspace gic.
+ 	 */
+ 	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
+-		kvm_timer_enable(kvm);
++		ret = kvm_timer_enable(vcpu);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ bool kvm_arch_intc_initialized(struct kvm *kvm)
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index a47b7de..dda39d8 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -24,9 +24,6 @@
+ #include <linux/workqueue.h>
+ 
+ struct arch_timer_kvm {
+-	/* Is the timer enabled */
+-	bool			enabled;
+-
+ 	/* Virtual offset */
+ 	cycle_t			cntvoff;
+ };
+@@ -55,10 +52,13 @@ struct arch_timer_cpu {
+ 
+ 	/* Active IRQ state caching */
+ 	bool				active_cleared_last;
++
++	/* Is the timer enabled */
++	bool			enabled;
  };
  
- struct irq_phys_map_entry {
-@@ -346,7 +345,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
- void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
--					   int virt_irq, int irq);
-+					   int virt_irq, int phys_irq);
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
- bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
- 
+ int kvm_timer_hyp_init(void);
+-void kvm_timer_enable(struct kvm *kvm);
++int kvm_timer_enable(struct kvm_vcpu *vcpu);
+ void kvm_timer_init(struct kvm *kvm);
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 			 const struct kvm_irq_level *irq);
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 962b442..e45895a 100644
+index 3232105..e2d5b6f 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -20,6 +20,7 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
+@@ -197,7 +197,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 	 * because the guest would never see the interrupt.  Instead wait
+ 	 * until we call this function from kvm_timer_flush_hwstate.
+ 	 */
+-	if (!vgic_initialized(vcpu->kvm))
++	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
+ 		return -ENODEV;
  
- #include <clocksource/arm_arch_timer.h>
- #include <asm/arch_timer.h>
-@@ -300,7 +301,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	if (timer->active_cleared_last && !phys_active)
- 		return;
- 
--	ret = irq_set_irqchip_state(timer->map->irq,
-+	ret = irq_set_irqchip_state(host_vtimer_irq,
- 				    IRQCHIP_STATE_ACTIVE,
- 				    phys_active);
- 	WARN_ON(ret);
-@@ -333,6 +334,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
+@@ -333,9 +333,6 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 			 const struct kvm_irq_level *irq)
  {
  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct irq_phys_map *map;
-+	struct irq_desc *desc;
-+	struct irq_data *data;
-+	int phys_irq;
+-	struct irq_desc *desc;
+-	struct irq_data *data;
+-	int phys_irq;
  
  	/*
  	 * The vcpu timer irq number cannot be determined in
-@@ -352,10 +356,25 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+@@ -354,26 +351,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+ 	timer->cntv_ctl = 0;
  	kvm_timer_update_state(vcpu);
  
- 	/*
+-	/*
+-	 * Find the physical IRQ number corresponding to the host_vtimer_irq
+-	 */
+-	desc = irq_to_desc(host_vtimer_irq);
+-	if (!desc) {
+-		kvm_err("%s: no interrupt descriptor\n", __func__);
+-		return -EINVAL;
+-	}
+-
+-	data = irq_desc_get_irq_data(desc);
+-	while (data->parent_data)
+-		data = data->parent_data;
+-
+-	phys_irq = data->hwirq;
+-
+-	/*
+-	 * Tell the VGIC that the virtual interrupt is tied to a
+-	 * physical interrupt. We do that once per VCPU.
+-	 */
+-	return kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
++	return 0;
+ }
+ 
+ void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
+@@ -501,10 +479,40 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	kvm_vgic_unmap_phys_irq(vcpu, timer->irq.irq);
+ }
+ 
+-void kvm_timer_enable(struct kvm *kvm)
++int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ {
+-	if (kvm->arch.timer.enabled)
+-		return;
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++	struct irq_desc *desc;
++	struct irq_data *data;
++	int phys_irq;
++	int ret;
++
++	if (timer->enabled)
++		return 0;
++
++	/*
 +	 * Find the physical IRQ number corresponding to the host_vtimer_irq
 +	 */
 +	desc = irq_to_desc(host_vtimer_irq);
@@ -105,79 +170,52 @@ index 962b442..e45895a 100644
 +	phys_irq = data->hwirq;
 +
 +	/*
- 	 * Tell the VGIC that the virtual interrupt is tied to a
- 	 * physical interrupt. We do that once per VCPU.
++	 * Tell the VGIC that the virtual interrupt is tied to a
++	 * physical interrupt. We do that once per VCPU.
++	 */
++	ret = kvm_vgic_map_phys_irq(vcpu, timer->irq.irq, phys_irq);
++	if (ret)
++		return ret;
++
+ 
+ 	/*
+ 	 * There is a potential race here between VCPUs starting for the first
+@@ -515,7 +523,9 @@ void kvm_timer_enable(struct kvm *kvm)
+ 	 * the arch timers are enabled.
  	 */
--	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
-+	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
- 	if (WARN_ON(IS_ERR(map)))
- 		return PTR_ERR(map);
+ 	if (timecounter && wqueue)
+-		kvm->arch.timer.enabled = 1;
++		timer->enabled = 1;
++
++	return 0;
+ }
  
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 06abd59..a7e496a 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1711,38 +1711,24 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
- /**
-  * kvm_vgic_map_phys_irq - map a virtual IRQ to a physical IRQ
-  * @vcpu: The VCPU pointer
-- * @virt_irq: The virtual irq number
-- * @irq: The Linux IRQ number
-+ * @virt_irq: The virtual IRQ number for the guest
-+ * @phys_irq: The hardware IRQ number of the host
-  *
-  * Establish a mapping between a guest visible irq (@virt_irq) and a
-- * Linux irq (@irq). On injection, @virt_irq will be associated with
-- * the physical interrupt represented by @irq. This mapping can be
-+ * hardware irq (@phys_irq). On injection, @virt_irq will be associated with
-+ * the physical interrupt represented by @phys_irq. This mapping can be
-  * established multiple times as long as the parameters are the same.
-  *
-  * Returns a valid pointer on success, and an error pointer otherwise
-  */
- struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
--					   int virt_irq, int irq)
-+					   int virt_irq, int phys_irq)
+ void kvm_timer_init(struct kvm *kvm)
+diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+index ea00d69..798866a 100644
+--- a/virt/kvm/arm/hyp/timer-sr.c
++++ b/virt/kvm/arm/hyp/timer-sr.c
+@@ -24,11 +24,10 @@
+ /* vcpu is already in the HYP VA space */
+ void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
  {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
- 	struct irq_phys_map *map;
- 	struct irq_phys_map_entry *entry;
--	struct irq_desc *desc;
--	struct irq_data *data;
--	int phys_irq;
+-	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	u64 val;
  
--	desc = irq_to_desc(irq);
--	if (!desc) {
--		kvm_err("%s: no interrupt descriptor\n", __func__);
--		return ERR_PTR(-EINVAL);
--	}
--
--	data = irq_desc_get_irq_data(desc);
--	while (data->parent_data)
--		data = data->parent_data;
--
--	phys_irq = data->hwirq;
+-	if (kvm->arch.timer.enabled) {
++	if (timer->enabled) {
+ 		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
+ 		timer->cntv_cval = read_sysreg_el0(cntv_cval);
+ 	}
+@@ -60,7 +59,7 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
+ 	val |= CNTHCTL_EL1PCTEN;
+ 	write_sysreg(val, cnthctl_el2);
  
- 	/* Create a new mapping */
- 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-@@ -1755,8 +1741,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
- 	map = vgic_irq_map_search(vcpu, virt_irq);
- 	if (map) {
- 		/* Make sure this mapping matches */
--		if (map->phys_irq != phys_irq	||
--		    map->irq      != irq)
-+		if (map->phys_irq != phys_irq)
- 			map = ERR_PTR(-EINVAL);
- 
- 		/* Found an existing, valid mapping */
-@@ -1766,7 +1751,6 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
- 	map           = &entry->map;
- 	map->virt_irq = virt_irq;
- 	map->phys_irq = phys_irq;
--	map->irq      = irq;
- 
- 	list_add_tail_rcu(&entry->entry, root);
- 
+-	if (kvm->arch.timer.enabled) {
++	if (timer->enabled) {
+ 		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
+ 		write_sysreg_el0(timer->cntv_cval, cntv_cval);
+ 		isb();
 -- 
 2.8.2
