@@ -1,129 +1,118 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:08 +0100
-Subject: [PATCH v5 29/57] KVM: arm/arm64: vgic-new: Add PRIORITY registers
- handlers
+Date: Thu, 19 May 2016 19:07:52 +0100
+Subject: [PATCH v5 13/57] KVM: arm/arm64: Provide functionality to pause and
+ resume a guest
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-30-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-14-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The priority register handlers are shared between the v2 and v3
-emulation, so their implementation goes into vgic-mmio.c, to be
-easily referenced from the v3 emulation as well later.
-There is a corner case when we change the priority of a pending
-interrupt which we don't handle at the moment.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
+For some rare corner cases in our VGIC emulation later we have to stop
+the guest to make sure the VGIC state is consistent.
+Provide the necessary framework to pause and resume a guest.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Changelog v1 .. v2:
-- adapt to new MMIO framework
+ arch/arm/include/asm/kvm_host.h   |  4 ++++
+ arch/arm/kvm/arm.c                | 25 +++++++++++++------------
+ arch/arm64/include/asm/kvm_host.h |  4 ++++
+ 3 files changed, 21 insertions(+), 12 deletions(-)
 
-Changelog v3 .. v4:
-- specify accessor width
-- use IRQ number accessor macro
-
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
- virt/kvm/arm/vgic/vgic-mmio.c    | 40 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    |  7 +++++++
- virt/kvm/arm/vgic/vgic.h         |  2 ++
- 4 files changed, 50 insertions(+), 1 deletion(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 12e101b..d564a30 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -90,7 +90,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 79a4622..6f4e05b 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -236,6 +236,46 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
- 	}
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 3850701..832be03 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -41,6 +41,8 @@
+ 
+ #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
+ 
++#define KVM_REQ_VCPU_EXIT	8
++
+ u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+@@ -225,6 +227,8 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
+ 
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+ struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
++void kvm_arm_halt_guest(struct kvm *kvm);
++void kvm_arm_resume_guest(struct kvm *kvm);
+ 
+ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
+ unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index ceb9345..e89329d 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -492,30 +492,31 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
+ 	return vgic_initialized(kvm);
  }
  
-+unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-+				      gpa_t addr, unsigned int len)
-+{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
-+	int i;
-+	u64 val = 0;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		val |= (u64)irq->priority << (i * 8);
-+	}
-+
-+	return val;
-+}
-+
-+/*
-+ * We currently don't handle changing the priority of an interrupt that
-+ * is already pending on a VCPU. If there is a need for this, we would
-+ * need to make this VCPU exit and re-evaluate the priorities, potentially
-+ * leading to this interrupt getting presented now to the guest (if it has
-+ * been masked by the priority mask before).
-+ */
-+void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
-+{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
-+	int i;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+		/* Narrow the priority range to what we actually support */
-+		irq->priority = (val >> (i * 8)) & GENMASK(7, 8 - VGIC_PRI_BITS);
-+		spin_unlock(&irq->irq_lock);
-+	}
-+}
-+
- static int match_region(const void *key, const void *elt)
+-static void kvm_arm_halt_guest(struct kvm *kvm) __maybe_unused;
+-static void kvm_arm_resume_guest(struct kvm *kvm) __maybe_unused;
+-
+-static void kvm_arm_halt_guest(struct kvm *kvm)
++void kvm_arm_halt_guest(struct kvm *kvm)
  {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 90146c7..62ecec0 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -129,6 +129,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
- 			     gpa_t addr, unsigned int len,
- 			     unsigned long val);
+ 	int i;
+ 	struct kvm_vcpu *vcpu;
  
-+unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-+				      gpa_t addr, unsigned int len);
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		vcpu->arch.pause = true;
+-	force_vm_exit(cpu_all_mask);
++	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
++}
 +
-+void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
++static void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
++{
++	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
 +
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
++	vcpu->arch.pause = false;
++	swake_up(wq);
+ }
  
- #endif
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index cf62015..e57f8d5 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,8 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
+-static void kvm_arm_resume_guest(struct kvm *kvm)
++void kvm_arm_resume_guest(struct kvm *kvm)
+ {
+ 	int i;
+ 	struct kvm_vcpu *vcpu;
  
-+#define VGIC_PRI_BITS		5
+-	kvm_for_each_vcpu(i, vcpu, kvm) {
+-		struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+-
+-		vcpu->arch.pause = false;
+-		swake_up(wq);
+-	}
++	kvm_for_each_vcpu(i, vcpu, kvm)
++		kvm_arm_resume_vcpu(vcpu);
+ }
+ 
+ static void vcpu_sleep(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 4cd4196..fa94f91 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -44,6 +44,8 @@
+ 
+ #define KVM_VCPU_MAX_FEATURES 4
+ 
++#define KVM_REQ_VCPU_EXIT	8
 +
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ int kvm_arch_dev_ioctl_check_extension(long ext);
+@@ -325,6 +327,8 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
  
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
++void kvm_arm_halt_guest(struct kvm *kvm);
++void kvm_arm_resume_guest(struct kvm *kvm);
+ 
+ u64 __kvm_call_hyp(void *hypfn, ...);
+ #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
 -- 
 2.8.2
