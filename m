@@ -1,56 +1,98 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Thu, 19 May 2016 18:53:09 +0200
-Subject: [PATCH v3] mmc: dw_mmc: rockchip: Set the drive phase properly
-In-Reply-To: <2865073.LogD6IIKLp@phil>
-References: <1463077910-25914-1-git-send-email-dianders@chromium.org>
- <2865073.LogD6IIKLp@phil>
-Message-ID: <CAFqH_52KqPXM_AjC8qKrVvH2hSvqtiBjmN28SZgJgoWVCe0pmg@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 19 May 2016 18:54:40 +0200
+Subject: [PATCH/RFC 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
+ support
+In-Reply-To: <1463629845-7115-2-git-send-email-horms+renesas@verge.net.au>
+References: <1463629845-7115-1-git-send-email-horms+renesas@verge.net.au>
+ <1463629845-7115-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdV0tvAPvCQ3NjXVar6fykOwWzGs9fzks-0eEqk8-ZsTKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-05-13 0:52 GMT+02:00 Heiko Stuebner <heiko@sntech.de>:
-> Am Donnerstag, 12. Mai 2016, 11:31:50 schrieb Douglas Anderson:
->
-> [...]
->
->> In commit 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card
->> initialization") we actually started setting this explicitly in the
->> kernel, but that commit wasn't quite right and also wasn't quite
->> enough.  See <https://patchwork.kernel.org/patch/9085311/> for some
->> details.
->>
->> Let's explicitly set this phase in dw_mmc.
->
-> [...]
->
->> Fixes: 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card
->> initialization") Signed-off-by: Douglas Anderson <dianders@chromium.org>
->> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
->
-> I've tested this patch together with the two clock patches linked above on a
-> rk3288-firefly and a rk3288-veyron-jerry. On the firefly tuning still does not
-> work (probably really some regulator issue) and on veyron tuning still works
-> as expected, so
->
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
->
-> Doug's explanations both in the commit message and the code look sane to me,
-> but I don't feel confident enough in my understanding of the matter to
-> transform that into a Reviewed-by tag.
->
->
+Hi Simon,
 
-I've tested this patch on rock2 square inserting some uSD cards and
-seeing that they still enumerate properly, also I booted from a uSD
-card.
-Note that in current state UHS is not supported so the tuning is not
-executed. Enable UHS on rock2 requires some work, I'll try to look at
-it but meanwhile I can say that doesn't break current state, so
+On Thu, May 19, 2016 at 5:50 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Basic support for the Gen 3 R-Car M3-W SoC.
+>
+> Based on work for the r8a7795 and r8a7796 SoCs by
+> Takeshi Kihara, Dirk Behme and Geert Uytterhoeven.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Thanks for your patch!
 
-> Heiko
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> @@ -0,0 +1,120 @@
+> +/*
+> + * Device Tree Source for the r8a7796 SoC
+> + *
+> + * Copyright (C) 2016 Renesas Electronics Corp.
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +#include <dt-bindings/clock/r8a7796-cpg-mssr.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +
+> +/ {
+> +       compatible = "renesas,r8a7796";
+> +       #address-cells = <2>;
+> +       #size-cells = <2>;
+> +
+> +       psci {
+> +               compatible = "arm,psci-1.0";
+> +               method = "smc";
+> +       };
+> +
+> +       cpus {
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +
+> +               /* 1 core only at this point */
+> +               a57_0: cpu at 0 {
+> +                       compatible = "arm,cortex-a57", "arm,armv8";
+> +                       reg = <0x0>;
+> +                       device_type = "cpu";
+> +                       next-level-cache = <&L2_CA57>;
+> +                       enable-method = "psci";
+> +               };
+> +       };
+> +
+> +       L2_CA57: cache-controller at 0 {
+> +               compatible = "cache";
+
+With W=1:
+
+Warning (unit_address_vs_reg): Node /cache-controller at 0 has a unit
+name, but no reg property
+
+> +               cache-unified;
+> +               cache-level = <2>;
+> +       };
+
+Please add the missing "reg = <0>;>, and move this node under the cpus node
+so he reg property matches #address-cells/#size-cells.
+
+> +       /* External SCIF clock - to be overridden by boards that provide it */
+> +       scif_clk: scif {
+> +               compatible = "fixed-clock";
+> +               #clock-cells = <0>;
+> +               clock-frequency = <0>;
+> +               status = "disabled";
+
+Please drop the disabled status.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
