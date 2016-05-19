@@ -1,94 +1,103 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:25 +0100
-Subject: [PATCH v5 46/57] KVM: arm/arm64: vgic-new: Export register access
- interface
+Date: Thu, 19 May 2016 19:08:26 +0100
+Subject: [PATCH v5 47/57] KVM: arm/arm64: vgic-new: Add userland access to
+ VGIC dist registers
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-47-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-48-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Userland may want to save and restore the state of the in-kernel VGIC,
+so we provide the code which takes a userland request and translate
+that into calls to our MMIO framework.
 
-Userland can access the emulated GIC to save and restore its state
-for initialization or migration purposes.
-The kvm_io_bus API requires an absolute gpa, which does not fit the
-KVM_DEV_ARM_VGIC_GRP_DIST_REGS user API, that only provides relative
-offsets. So we provide a wrapper to plug into our MMIO framework and
-find the respective register handler.
+>From Christoffer:
+When accessing the VGIC state from userspace we really don't want a VCPU
+to be messing with the state at the same time, and the API specifies
+that we should return -EBUSY if any VCPUs are running.
+Check and prevent VCPUs from running by grabbing their mutexes, one by
+one, and error out if we fail.
+(Note: This could potentially be simplified to just do a simple check
+and see if any VCPUs are running, and return -EBUSY then, without
+enforcing the locking throughout the duration of the uaccess, if we
+think that taking/releasing all these mutexes for every single GIC
+register access is too heavyweight.)
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Changelog v1 .. v2:
-- adapt to new MMIO framework
-- handle endianess explicitly
+Changelog v4 .. v5:
+- add check to avoid running VCPUs on userland access
 
-Changelog v2 .. v3:
-- wrap accessor function for easier reusage later
-- moved from earlier in the series
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 55 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 54 insertions(+), 1 deletion(-)
 
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 36 ++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h         |  2 ++
- 2 files changed, 38 insertions(+)
-
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 7189690..a255122 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -296,3 +296,39 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
- 
- 	return -ENXIO;
- }
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 78621283..9ee27cb 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -238,7 +238,60 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+ 				 struct kvm_device_attr *attr,
+ 				 u32 *reg, bool is_write)
+ {
+-	return -ENXIO;
++	gpa_t addr;
++	int cpuid, ret, c;
++	struct kvm_vcpu *vcpu, *tmp_vcpu;
++	int vcpu_lock_idx = -1;
 +
-+/*
-+ * When userland tries to access the VGIC register handlers, we need to
-+ * create a usable struct vgic_io_device to be passed to the handlers and we
-+ * have to set up a buffer similar to what would have happened if a guest MMIO
-+ * access occurred, including doing endian conversions on BE systems.
-+ */
-+static int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
-+			bool is_write, int offset, u32 *val)
-+{
-+	unsigned int len = 4;
-+	u8 buf[4];
-+	int ret;
++	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
++		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
++	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
++	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
 +
-+	if (is_write) {
-+		vgic_data_host_to_mmio_bus(buf, len, *val);
-+		ret = kvm_io_gic_ops.write(vcpu, &dev->dev, offset, len, buf);
-+	} else {
-+		ret = kvm_io_gic_ops.read(vcpu, &dev->dev, offset, len, buf);
-+		if (!ret)
-+			*val = vgic_data_mmio_bus_to_host(buf, len);
++	mutex_lock(&dev->kvm->lock);
++
++	ret = vgic_init(dev->kvm);
++	if (ret)
++		goto out;
++
++	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
++		ret = -EINVAL;
++		goto out;
 +	}
 +
++	/*
++	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
++	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
++	 * that no other VCPUs are run and fiddle with the vgic state while we
++	 * access it.
++	 */
++	ret = -EBUSY;
++	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm) {
++		if (!mutex_trylock(&tmp_vcpu->mutex))
++			goto out;
++		vcpu_lock_idx = c;
++	}
++
++	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
++		ret = -EINVAL;
++		break;
++	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
++		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
++		break;
++	default:
++		ret = -EINVAL;
++		break;
++	}
++
++out:
++	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
++		tmp_vcpu = kvm_get_vcpu(dev->kvm, vcpu_lock_idx);
++		mutex_unlock(&tmp_vcpu->mutex);
++	}
++
++	mutex_unlock(&dev->kvm->lock);
 +	return ret;
-+}
-+
-+int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+			 int offset, u32 *val)
-+{
-+	struct vgic_io_device dev = {
-+		.regions = vgic_v2_dist_registers,
-+		.nr_regions = ARRAY_SIZE(vgic_v2_dist_registers),
-+	};
-+
-+	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index a264c5f..f826026 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -38,6 +38,8 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
- void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
- int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
-+int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+			 int offset, u32 *val);
- int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
- 			     enum vgic_type);
+ }
  
+ /* V2 ops */
 -- 
 2.8.2
