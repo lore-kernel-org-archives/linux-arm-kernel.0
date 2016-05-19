@@ -1,52 +1,65 @@
-From: kristofer.s.martinez@gmail.com (Martinez Kristofer)
-Date: Thu, 19 May 2016 18:14:54 +0800
-Subject: [PATCH] arm64: cpuinfo: add AArch64 & elf platform for app
- compatibility
-In-Reply-To: <1463625873-60016-1-git-send-email-saberlily.xia@hisilicon.com>
-References: <1463625873-60016-1-git-send-email-saberlily.xia@hisilicon.com>
-Message-ID: <CABtop_ED5ASg-0O-6QE5LXeN_t8rwYWWgExM_1GCnstP7RZ-7g@mail.gmail.com>
+From: hongbo.zhang@nxp.com (Hongbo Zhang)
+Date: Thu, 19 May 2016 10:27:41 +0000
+Subject: [PSCI DISCUSS] How to implement standby and suspend-to-ram by PSCI
+In-Reply-To: <1463486036.19237.9.camel@suse.com>
+References: <DB3PR04MB0812DAA98F71C30E8A8832E3847D0@DB3PR04MB0812.eurprd04.prod.outlook.com>
+ <572C9BF2.9010004@arm.com>
+ <DB3PR04MB08125A628F5034749F8109D884730@DB3PR04MB0812.eurprd04.prod.outlook.com>
+ <1463486036.19237.9.camel@suse.com>
+Message-ID: <AM3PR04MB0805D7F5375413C154DFB981844A0@AM3PR04MB0805.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2016 at 10:44 AM, x00195127 <saberlily.xia@hisilicon.com> wrote:
-> we find that some apps will read cpuinfo when start up,
-> they need the string  as follows:
-> "Processor       : AArch64 Processor rev 0 (aarch64)"
->
-> Then thay could load the corresponding libs. But now
-> arm64 platform's cpuinfo don't has this now, so
-> we need add this.
->
-> Signed-off-by: Qing Xia <saberlily.xia@hisilicon.com>
-> ---
->  arch/arm64/kernel/cpuinfo.c | 3 +++
->  1 file changed, 3 insertions(+)
->
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index 3808470..c3527ad 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -114,6 +114,9 @@ static int c_show(struct seq_file *m, void *v)
->                  * online processors, looking for lines beginning with
->                  * "processor".  Give glibc what it expects.
->                  */
-> +               seq_printf(m, "Processor\t: AArch64 Processor rev %d (%s)\n",
-> +                               read_cpuid_id() & 15, ELF_PLATFORM);
 
-Nit: read_cpuid_id() & 0xf, ELF_PLATFORM);
-What're those apps will need this string to startup?
 
-M.K.
+> -----Original Message-----
+> From: Oliver Neukum [mailto:oneukum at suse.com]
+> Sent: Tuesday, May 17, 2016 7:54 PM
+> To: Hongbo Zhang <hongbo.zhang@nxp.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>; linux-pm at vger.kernel.org;
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>; Marc Zyngier
+> <marc.zyngier@arm.com>; Jan Kiszka <jan.kiszka@siemens.com>; Mark
+> Rutland <mark.rutland@arm.com>; Daniel Lezcano
+> <daniel.lezcano@linaro.org>; Chen-Yu Tsai <wens@csie.org>; Hans de Goede
+> <hdegoede@redhat.com>; Frank Li <Frank.Li@freescale.com>; Peng Fan
+> <Peng.Fan@freescale.com>; Tom Warren <twarren@nvidia.com>; Vincent
+> Guittot <vincent.guittot@linaro.org>; jszhang at marvell.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PSCI DISCUSS] How to implement standby and suspend-to-ram by
+> PSCI
+> 
+> On Thu, 2016-05-12 at 09:42 +0000, Hongbo Zhang wrote:
+> > On our platform we have some shallow states which maps to cpuidle
+> > well,
+> > and we have two more deeper states:
+> >
+> > Sleep state:
+> > All cores are in WFI state,
+> > Core cluster is in standby state, e.g. L2 cache is flushed then stops
+> > snooping,
+> > Only those modules which are required to wake up the device still have
+> > a
+> > running clock, other device modules in chip are clock gated.
+> >
+> > Deep sleep state:
+> > ARM cores and DDR controller are switched off,
+> > DDR is in self-refresh mode,
+> > VDD power to off domain IPs are removed, Only the blocks needed to
+> > detect wake up and sequence the chip out of deep sleep are on.
+> 
+> For the pm module of the core kernel a low power state is a sleep
+> state if even one of three conditions is met:
+> 
+> a) a device that can be used for input is not a source of wake ups
+> b) tasks need to be frozen to enter it
+> c) the display goes off, while it should be on
+> 
+> Generally runtime PM is better if you can get the same results.
+> Going to a system sleep state is a necessary evil.
+> 
+> 	Regards
+> 		Oliver
+> 
+As I just explained in previous reply, many devices in our Soc cannot be physically clock or power gated, all the non-wakeup devices can only be gated off at same time by a PM module, so runtime PM doesn't fit for us well.
 
-> +
->                 seq_printf(m, "processor\t: %d\n", i);
->
->                 seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
-> --
-> 1.8.3.2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks for your advice. 
