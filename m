@@ -1,38 +1,53 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 19 May 2016 18:20:17 -0500
-Subject: [PATCH] ARM: OMAP2: Enable Errata 430973 for OMAP3
-Message-ID: <1463700017-18527-1-git-send-email-nm@ti.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 20 May 2016 07:56:20 +0800
+Subject: [PATCH v2 1/3] spi/rockchip: add rk3036/rk3228/rk3368 SoCs for spi
+ document
+Message-ID: <1463702182-5188-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Erratum 430973 similar to commit 5c86c5339c56 ("ARM:
-omap2plus_defconfig: Enable ARM erratum 430973 for omap3") - Since
-multiple defconfigs can exist from various points of view (multi_v7,
-omap2plus etc.. it is always better to enable the erratum from the
-Kconfig selection point of view so that downstream kernels dont have
-to rediscover this all over again.
+We had supported the rk3036/rk3066/rk3188/rk3228/rk3288/rk3368/rk3399
+family SoCs in linux kernel.
 
-Reported-by: Grygorii Strashko <grygorii.strashko@ti.com>
-Signed-off-by: Nishanth Menon <nm@ti.com>
+Let's add the other SoCs, in order to a better understanding from the
+rockchip spi document.
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-rockchip at lists.infradead.org
+
 ---
 
-Note: If this approach is fine, we should probably search and fixup
-errata enablement we have done directly in omap2plus_defconfig.
+Changes in v2:
+- Drop the fallbacks, As Heiko comments on https://patchwork.kernel.org/patch/9127881/
+- update commit
 
- arch/arm/mach-omap2/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/spi/spi-rockchip.txt | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 415a0bd0cda6..e0c796060fa2 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -17,6 +17,7 @@ config ARCH_OMAP3
- 	select PM_OPP if PM
- 	select PM if CPU_IDLE
- 	select SOC_HAS_OMAP2_SDRC
-+	select ARM_ERRATA_430973
+diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+index 1b14d69..d2ca153 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+@@ -6,10 +6,13 @@ and display controllers using the SPI communication interface.
+ Required Properties:
  
- config ARCH_OMAP4
- 	bool "TI OMAP4"
+ - compatible: should be one of the following.
+-    "rockchip,rk3066-spi" for rk3066.
+-    "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
+-    "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
+-    "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
++    "rockchip,rk3036-spi" for rk3036 SoCS.
++    "rockchip,rk3066-spi" for rk3066 SoCs.
++    "rockchip,rk3188-spi" for rk3188 SoCs.
++    "rockchip,rk3228-spi" for rk3228 SoCS.
++    "rockchip,rk3288-spi" for rk3288 SoCs.
++    "rockchip,rk3368-spi" for rk3368 SoCs.
++    "rockchip,rk3399-spi" for rk3399 SoCs.
+ - reg: physical base address of the controller and length of memory mapped
+        region.
+ - interrupts: The interrupt number to the cpu. The interrupt specifier format
 -- 
-2.8.0
+2.7.4
