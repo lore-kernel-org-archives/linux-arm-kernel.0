@@ -1,48 +1,96 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Thu, 19 May 2016 10:22:48 -0400
-Subject: [PATCHv6 3/8] dma-mapping: add dma_{map,unmap}_resource
-In-Reply-To: <20160519112926.GO29375@bigcity.dyn.berto.se>
-References: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1462812247-3414-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160517145445.GE4074@char.us.oracle.com>
- <20160519112926.GO29375@bigcity.dyn.berto.se>
-Message-ID: <20160519142248.GB21691@localhost.localdomain>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 19 May 2016 15:29:07 +0100
+Subject: [PATCH] ARM: tegra: beaver: allow SD card voltage to be changed
+In-Reply-To: <20160513172704.GA498@ulmo.ba.sec>
+References: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
+ <1463124331.2459.0.camel@lynxeye.de> <20160513172704.GA498@ulmo.ba.sec>
+Message-ID: <573DCDB3.80202@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2016 at 01:29:26PM +0200, Niklas S?derlund wrote:
-> Hi Konrad,
-> 
-> Thanks for your feedback.
-> 
-> On 2016-05-17 10:54:45 -0400, Konrad Rzeszutek Wilk wrote:
-> > >  
-> > > -In some circumstances dma_map_single() and dma_map_page() will fail to create
-> > > -a mapping. A driver can check for these errors by testing the returned
-> > > -DMA address with dma_mapping_error(). A non-zero return value means the mapping
-> > > -could not be created and the driver should take appropriate action (e.g.
-> > > -reduce current DMA mapping usage or delay and try again later).
-> > > +In some circumstances dma_map_single(), dma_map_page() and dma_map_resource()
-> > > +will fail to create a mapping. A driver can check for these errors by testing
-> > > +the returned DMA address with dma_mapping_error(). A non-zero return value
-> > > +means the mapping could not be created and the driver should take appropriate
-> > > +action (e.g. reduce current DMA mapping usage or delay and try again later).
-> > 
-> > This looks like it belongs to another patch?
-> 
-> No it is correct (at least intended to be in this patch). All it really 
-> do is inject dma_map_resource() (which is added in this patch) as one of 
-> the calls which return dma_addr_t should be checked for error using 
-> dma_mapping_error().  But yes the change effect all lines in the 
-> paragraph due to line wrapping.
-> 
-> Hum or maybe I'm misunderstanding your question.
 
-I totally missed the 'dma_map_resource' in there and just read
-'dma_mapping_error'!
-
-<sigh> Thanks.
+On 13/05/16 18:27, Thierry Reding wrote:
+> * PGP Signed by an unknown key
 > 
-> -- 
-> Regards,
-> Niklas S?derlund
+> On Fri, May 13, 2016 at 09:25:31AM +0200, Lucas Stach wrote:
+>> Am Montag, den 29.02.2016, 22:01 +0100 schrieb Lucas Stach:
+>>> This allows to switch the card signal voltage level to 1.8V,
+>>> which is needed for any ultra high speed modes to work.
+>>>
+>>> Signed-off-by: Lucas Stach <dev@lynxeye.de>
+>>> ---
+>>> This needs the SDMMC memcomp pad calibration patches I just
+>>> sent out to be applied, otherwise the card voltage change will
+>>> fail with a message in the kernel log and a fall back to
+>>> high speed operation.
+>>
+>> The patches this one depends on have been applied for some time now.
+>> Please pick up this patch.
+> 
+> My understanding is that UHS modes currently cause problems on Beaver.
+> What I don't understand about that is how it will even try those modes
+> if the voltage regulator can't be set to 1.8 V? Shouldn't that actively
+> prevent those modes from even being attempted?
+
+Looking at the sdhci code, if the regulator is missing then we still
+attempt to place the controller is 1.8V mode ...
+
+ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+                                              struct mmc_ios *ios)
+ {
+
+ ...
+
+         case MMC_SIGNAL_VOLTAGE_180:
+                 if (!IS_ERR(mmc->supply.vqmmc)) {
+                         ret = regulator_set_voltage(mmc->supply.vqmmc,
+                                         1700000, 1950000);
+                         if (ret) {
+                                 pr_warn("%s: Switching to 1.8V signalling voltage failed\n",
+                                         mmc_hostname(mmc));
+                                 return -EIO;
+                         }
+                 }
+
+                 /*
+                  * Enable 1.8V Signal Enable in the Host Control2
+                  * register
+                  */
+                 ctrl |= SDHCI_CTRL_VDD_180;
+                 sdhci_writew(host, ctrl, SDHCI_HOST_CONTROL2);
+ 
+                 /* Some controller need to do more when switching */
+                 if (host->ops->voltage_switch)
+                         host->ops->voltage_switch(host);
+ 
+                 /* 1.8V regulator output should be stable within 5 ms */
+                 ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+                 if (ctrl & SDHCI_CTRL_VDD_180)
+                         return 0;
+ 
+                 pr_warn("%s: 1.8V regulator output did not became stable\n",
+                         mmc_hostname(mmc));
+ 
+                 return -EAGAIN;
+
+Ideally, the above *should* fail if the regulator is missing. However, what
+I have found, is that in my case, even though the regulator is missing, the
+above succeeds and the host thinks we are operating at 1.8V even though we
+are still at 3.3V! It seems that this does not happen with all SD cards that
+support UHS. 
+
+This patch resolves the problems I am seeing on beaver with SD card
+initialisation failing. I am surprised this is not causing problems for
+others?
+
+That said, looking at the schematics for the board, this patch looks
+correct to me and we should apply this and mark for stable as this
+appears to be broken for sometime. Note that even before Lucas' changes
+in the SD card init we will try to switch to 1.8V if the cards supports
+it and the controller is greater or equal to sdhci v3.
+
+Cheers
+Jon
+
+-- 
+nvpublic
