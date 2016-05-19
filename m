@@ -1,152 +1,132 @@
-From: austinwc@codeaurora.org (Austin Christ)
-Date: Thu, 19 May 2016 15:44:28 -0600
-Subject: [PATCH v3 2/2] i2c: qup: support SMBus block read
-In-Reply-To: <1463694268-9473-1-git-send-email-austinwc@codeaurora.org>
-References: <1463694268-9473-1-git-send-email-austinwc@codeaurora.org>
-Message-ID: <1463694268-9473-2-git-send-email-austinwc@codeaurora.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 19 May 2016 17:52:33 -0400
+Subject: [PATCH] ARM: dts: exynos: Remove unneded always-on for regulators on
+ Peach boards
+Message-ID: <1463694753-7259-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Naveen Kaje <nkaje@codeaurora.org>
+The regulator always-on property should only be used for regulators
+that either can't be disabled or the drivers for the client devices
+are not enabling the regulator and so being disabled due to unused.
 
-I2C QUP driver relies on SMBus emulation support from the framework.
-To handle SMBus block reads, the driver should check I2C_M_RECV_LEN
-flag and should read the first byte received as the message length.
+There are some max77802 regulators in the Peach Pit and Pi boards
+that are always-on but shouldn't since they are enabled by drivers:
 
-The driver configures the QUP hardware to read one byte. Once the
-message length is known from this byte, the QUP hardware is configured
-to read the rest.
+BUCK5 is max77802 inl1 supply
+BUCK7 is max77802 inl{2,10} supply
+BUCK9 is max77802 inl{3,4,5,7} supply
+BUCK10 is mmc1 vqmmc supply
+LDO9 is adc vdd supply
 
-Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
-Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+This patch removes the always-on property for these regulators.
+
+Some regulators should remain always-on even when they are used as
+input supplies, because these regulators are also used by other
+components that are not described in the DT, for example:
+
+LDO10 is hdmi vdd_osc supply but it's also used as input supply for
+the Exynos5420 temperature sensor.
+
+LDO8 is hdmi vdd and vdd_pll supply but it's also used as supply for
+the Exynos5420 Display port.
+
+BUCK2 and BUCK6 are the vdd supplies for the EAGLE and KFC clusters.
+
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- drivers/i2c/busses/i2c-qup.c | 68 ++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 65 insertions(+), 3 deletions(-)
 
-Changes:
-- v3:
- - clean up redundant checks
- - use constant instead of variable for smbus length field
-- v2:
- - rework the smbus block read and break into separate function
+ arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 -----
+ arch/arm/boot/dts/exynos5800-peach-pi.dts  | 5 -----
+ 2 files changed, 10 deletions(-)
 
-diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index ea6ca5f..9fbed83 100644
---- a/drivers/i2c/busses/i2c-qup.c
-+++ b/drivers/i2c/busses/i2c-qup.c
-@@ -517,6 +517,33 @@ static int qup_i2c_get_data_len(struct qup_i2c_dev *qup)
- 	return data_len;
- }
- 
-+static bool qup_i2c_check_msg_len(struct i2c_msg *msg)
-+{
-+	return ((msg->flags & I2C_M_RD) && (msg->flags & I2C_M_RECV_LEN));
-+}
-+
-+static int qup_i2c_set_tags_smb(u16 addr, u8 *tags, struct qup_i2c_dev *qup,
-+			struct i2c_msg *msg)
-+{
-+	int len = 0;
-+
-+	if (msg->len > 1) {
-+		tags[len++] = QUP_TAG_V2_DATARD_STOP;
-+		tags[len++] = qup_i2c_get_data_len(qup) - 1;
-+	} else {
-+		tags[len++] = QUP_TAG_V2_START;
-+		tags[len++] = addr & 0xff;
-+
-+		if (msg->flags & I2C_M_TEN)
-+			tags[len++] = addr >> 8;
-+
-+		tags[len++] = QUP_TAG_V2_DATARD;
-+		/* Read 1 byte indicating the length of the SMBus message */
-+		tags[len++] = 1;
-+	}
-+	return len;
-+}
-+
- static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
- 			    struct i2c_msg *msg,  int is_dma)
- {
-@@ -526,6 +553,10 @@ static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
- 
- 	int last = (qup->blk.pos == (qup->blk.count - 1)) && (qup->is_last);
- 
-+	/* Handle tags for SMBus block read */
-+	if (qup_i2c_check_msg_len(msg))
-+		return qup_i2c_set_tags_smb(addr, tags, qup, msg);
-+
- 	if (qup->blk.pos == 0) {
- 		tags[len++] = QUP_TAG_V2_START;
- 		tags[len++] = addr & 0xff;
-@@ -1065,9 +1096,17 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
- 				struct i2c_msg *msg)
- {
- 	u32 val;
--	int idx, pos = 0, ret = 0, total;
-+	int idx, pos = 0, ret = 0, total, msg_offset = 0;
- 
-+	/*
-+	 * If the message length is already read in
-+	 * the first byte of the buffer, account for
-+	 * that by setting the offset
-+	 */
-+	if (qup_i2c_check_msg_len(msg) && (msg->len > 1))
-+		msg_offset = 1;
- 	total = qup_i2c_get_data_len(qup);
-+	total -= msg_offset;
- 
- 	/* 2 extra bytes for read tags */
- 	while (pos < (total + 2)) {
-@@ -1087,8 +1126,8 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
- 
- 			if (pos >= (total + 2))
- 				goto out;
--
--			msg->buf[qup->pos++] = val & 0xff;
-+			msg->buf[qup->pos + msg_offset] = val & 0xff;
-+			qup->pos++;
- 		}
- 	}
- 
-@@ -1128,6 +1167,24 @@ static int qup_i2c_read_one_v2(struct qup_i2c_dev *qup, struct i2c_msg *msg)
- 			goto err;
- 
- 		qup->blk.pos++;
-+
-+		/* Handle SMBus block read length */
-+		if (qup_i2c_check_msg_len(msg) && (msg->len == 1)) {
-+			if (msg->buf[0] > I2C_SMBUS_BLOCK_MAX) {
-+				ret = -EPROTO;
-+				goto err;
-+			}
-+			msg->len += msg->buf[0];
-+			qup->pos = 0;
-+			qup_i2c_set_read_mode_v2(qup, msg->len);
-+			ret = qup_i2c_issue_xfer_v2(qup, msg);
-+			if (ret)
-+				goto err;
-+			ret = qup_i2c_wait_for_complete(qup, msg);
-+			if (ret)
-+				goto err;
-+			qup_i2c_set_blk_data(qup, msg);
-+		}
- 	} while (qup->blk.pos < qup->blk.count);
- 
- err:
-@@ -1210,6 +1267,11 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
- 			goto out;
- 		}
- 
-+		if (qup_i2c_check_msg_len(&msgs[idx])) {
-+			ret = -EOPNOTSUPP;
-+			goto out;
-+		}
-+
- 		if (msgs[idx].flags & I2C_M_RD)
- 			ret = qup_i2c_read_one(qup, &msgs[idx]);
- 		else
+diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+index f9d2e4f1a0e0..c1247402cb17 100644
+--- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
++++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+@@ -278,7 +278,6 @@
+ 				regulator-name = "vdd_1v2";
+ 				regulator-min-microvolt = <1200000>;
+ 				regulator-max-microvolt = <1200000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+ 					regulator-off-in-suspend;
+@@ -301,7 +300,6 @@
+ 				regulator-name = "vdd_1v35";
+ 				regulator-min-microvolt = <1350000>;
+ 				regulator-max-microvolt = <1350000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+@@ -323,7 +321,6 @@
+ 				regulator-name = "vdd_2v";
+ 				regulator-min-microvolt = <2000000>;
+ 				regulator-max-microvolt = <2000000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+@@ -334,7 +331,6 @@
+ 				regulator-name = "vdd_1v8";
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <1800000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+@@ -419,7 +415,6 @@
+ 				regulator-name = "vdd_ldo9";
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <1800000>;
+-				regulator-always-on;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+ 					regulator-mode = <MAX77802_OPMODE_LP>;
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 62ceb89e073f..af1c9b9a63f9 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -278,7 +278,6 @@
+ 				regulator-name = "vdd_1v2";
+ 				regulator-min-microvolt = <1200000>;
+ 				regulator-max-microvolt = <1200000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+ 					regulator-off-in-suspend;
+@@ -301,7 +300,6 @@
+ 				regulator-name = "vdd_1v35";
+ 				regulator-min-microvolt = <1350000>;
+ 				regulator-max-microvolt = <1350000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+@@ -323,7 +321,6 @@
+ 				regulator-name = "vdd_2v";
+ 				regulator-min-microvolt = <2000000>;
+ 				regulator-max-microvolt = <2000000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+@@ -334,7 +331,6 @@
+ 				regulator-name = "vdd_1v8";
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <1800000>;
+-				regulator-always-on;
+ 				regulator-boot-on;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+@@ -419,7 +415,6 @@
+ 				regulator-name = "vdd_ldo9";
+ 				regulator-min-microvolt = <1800000>;
+ 				regulator-max-microvolt = <1800000>;
+-				regulator-always-on;
+ 				regulator-state-mem {
+ 					regulator-on-in-suspend;
+ 					regulator-mode = <MAX77802_OPMODE_LP>;
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+2.5.5
