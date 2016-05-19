@@ -1,94 +1,67 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:23 +0100
-Subject: [PATCH v5 44/57] KVM: arm/arm64: vgic-new: vgic_kvm_device:
- KVM_DEV_ARM_VGIC_GRP_ADDR
+Date: Thu, 19 May 2016 19:07:53 +0100
+Subject: [PATCH v5 14/57] KVM: arm/arm64: move GICv2 emulation defines into
+ arm-gic-v3.h
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-45-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-15-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+As (some) GICv3 hosts can emulate a GICv2, some GICv2 specific masks
+for the list register definition also apply to GICv3 LRs.
+At the moment we have those definitions in the KVM VGICv3
+implementation, so let's move them into the GICv3 header file to
+have them automatically defined.
 
-This patch implements the KVM_DEV_ARM_VGIC_GRP_ADDR group which
-enables to set the base address of GIC regions as seen by the guest.
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-kvm-device.c | 38 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ include/linux/irqchip/arm-gic-v3.h | 5 +++++
+ virt/kvm/arm/vgic-v3.c             | 8 +-------
+ 2 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 082829a..a709097 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -112,6 +112,17 @@ static int vgic_set_common_attr(struct kvm_device *dev,
- 	int r;
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index d5d798b..ec938d1 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -276,6 +276,11 @@
+ #define ICH_LR_PHYS_ID_SHIFT		32
+ #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
  
- 	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 addr;
-+		unsigned long type = (unsigned long)attr->attr;
++/* These are for GICv2 emulation only */
++#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
++#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
++#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
 +
-+		if (copy_from_user(&addr, uaddr, sizeof(addr)))
-+			return -EFAULT;
-+
-+		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
-+		return (r == -ENODEV) ? -ENXIO : r;
-+	}
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
- 		u32 val;
-@@ -164,6 +175,19 @@ static int vgic_get_common_attr(struct kvm_device *dev,
- 	int r = -ENXIO;
+ #define ICH_MISR_EOI			(1 << 0)
+ #define ICH_MISR_U			(1 << 1)
  
- 	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
-+		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
-+		u64 addr;
-+		unsigned long type = (unsigned long)attr->attr;
-+
-+		r = kvm_vgic_addr(dev->kvm, type, &addr, false);
-+		if (r)
-+			return (r == -ENODEV) ? -ENXIO : r;
-+
-+		if (copy_to_user(uaddr, &addr, sizeof(addr)))
-+			return -EFAULT;
-+		break;
-+	}
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
- 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
+index c02a1b1..75b02fa 100644
+--- a/virt/kvm/arm/vgic-v3.c
++++ b/virt/kvm/arm/vgic-v3.c
+@@ -29,12 +29,6 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_mmu.h>
  
-@@ -227,6 +251,13 @@ static int vgic_v2_has_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
- 	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR:
-+		switch (attr->attr) {
-+		case KVM_VGIC_V2_ADDR_TYPE_DIST:
-+		case KVM_VGIC_V2_ADDR_TYPE_CPU:
-+			return 0;
-+		}
-+		break;
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
-@@ -267,6 +298,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
- 	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_ADDR:
-+		switch (attr->attr) {
-+		case KVM_VGIC_V3_ADDR_TYPE_DIST:
-+		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+			return 0;
-+		}
-+		break;
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+-/* These are for GICv2 emulation only */
+-#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
+-#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
+-#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
+-#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
+-
+ static u32 ich_vtr_el2;
+ 
+ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+@@ -43,7 +37,7 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
+ 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr];
+ 
+ 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
+-		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
++		lr_desc.irq = val & ICH_LR_VIRTUAL_ID_MASK;
+ 	else
+ 		lr_desc.irq = val & GICH_LR_VIRTUALID;
+ 
 -- 
 2.8.2
