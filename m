@@ -1,52 +1,79 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 19 May 2016 10:06:53 -0400 (EDT)
-Subject: [PATCH] usb: echi-hcd: Add ehci_setup check before echi_shutdown
-In-Reply-To: <1463652776-30456-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1605191005590.1565-100000@iolanthe.rowland.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 19 May 2016 16:09:54 +0200
+Subject: [PATCH v4 32/56] KVM: arm/arm64: vgic-new: Add SGIPENDR register
+ handlers
+In-Reply-To: <d2a62bb3-791a-b6d2-a41b-faa671f5e3f6@arm.com>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-33-git-send-email-andre.przywara@arm.com>
+ <20160518131449.GI3827@cbox> <573C6EA6.90803@arm.com>
+ <20160518135022.GL3827@cbox>
+ <d2a62bb3-791a-b6d2-a41b-faa671f5e3f6@arm.com>
+Message-ID: <CAMJs5B-BbbKBH0Kkd-eu8=fdCQfxmYEhkPh+UcXZ0hemeCksLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 May 2016, Srinivas Kandagatla wrote:
+On Thu, May 19, 2016 at 3:25 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> Hi,
+>
+> On 18/05/16 14:50, Christoffer Dall wrote:
+>> On Wed, May 18, 2016 at 02:31:18PM +0100, Andre Przywara wrote:
+>>> Hi,
+>>>
+>>> On 18/05/16 14:14, Christoffer Dall wrote:
+>>>> On Mon, May 16, 2016 at 10:53:20AM +0100, Andre Przywara wrote:
+>>>>> As this register is v2 specific, its implementation lives entirely
+>>>>> in vgic-mmio-v2.c.
+>>>>> This register allows setting the source mask of an IPI.
+>>>>>
+>>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>>> ---
+>>>>> Changelog RFC..v1:
+>>>>> - remove IRQ lock from read handler
+>>>>> - update pending bit on setting the first / clearing the last bit
+>>>>> - queue virtual IRQ if necessary
+>>>>>
+>>>>> Changelog v1 .. v2:
+>>>>> - adapt to new MMIO framework
+>>>>>
+>>>>> Changelog v3 .. v4:
+>>>>> - specify accessor width
+>>>>>
+>>>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++--
+>>>>>  1 file changed, 60 insertions(+), 2 deletions(-)
+>>>>>
+>>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>> index c884e9b..3925d4c 100644
+>>>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+>>>>> @@ -146,6 +146,64 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+>>>>>    }
+>>>>>  }
+>>>>>
+>>>>> +static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
+>>>>> +                                      gpa_t addr, unsigned int len)
+>>>>> +{
+>>>>> +  u32 intid = addr & 0x0f;
+>>>>
+>>>> is there a reason why we cannot use the magic macro here?
+>>>
+>>> I wasn't sure about this, because it's not covering all 1024 interrupts,
+>>> but just SGIs, so it's always fixed to 16 interrupts ? 8 bits. The
+>>> default mask would be too big in this case.
+>>> I guess it would work anyway because this region is limited to 16 bytes
+>>> in our description, so we could use this here anyway to make it more
+>>> aligned with the other handlers, maybe adding a comment about the
+>>> difference?
+>>>
+>> meh, either way works for me actually, whatever you prefer.
+>
+> So for the records: we can't use the macro here, since it relies on
+> masking and thus a certain alignment, which the SGIPENDR registers do
+> not have (being mapped to 0xF10 and 0xF20, respectively). So the
+> calculated intid would be much higher than the number of actually
+> allocated interrupts - with all the consequences ;-)
+>
+Ah, yeah, didn't see that one coming.  Sorry for making you spend half
+a day to give me an answer to a seemingly innocent question.
 
-> This patch protects system from crashing at shutdown in
-> cases where usb host is not added yet from OTG controller driver.
-> As ehci_setup() not done yet, so stop accessing registers or
-> variables initialized as part of ehci_setup().
-> 
-> The use case is simple, for boards like DB410c where the usb host
-> or device functionality is decided based on the micro-usb cable
-> presence. If the board boots up with micro-usb connected, the
-> OTG driver like echi-msm would not add the usb host by default.
-> However a system shutdown would go and access registers and
-> uninitialized variables, resulting in below crash.
-
-...
-
-> Fixes 4bb3cad7125b ("usb: host: ehci-msm: Register usb shutdown function")
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  drivers/usb/host/ehci-hcd.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
-> 
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> index ae1b6e6..a962b89 100644
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -368,6 +368,15 @@ static void ehci_shutdown(struct usb_hcd *hcd)
->  {
->  	struct ehci_hcd	*ehci = hcd_to_ehci(hcd);
->  
-> +	/**
-> +	 * Protect the system from crashing at system shutdown in cases where
-> +	 * usb host is not added yet from OTG controller driver.
-> +	 * As ehci_setup() not done yet, so stop accessing registers or
-> +	 * variables initialized in ehci_setup()
-> +	 */
-> +	if (!ehci->sbrn)
-> +		return;
-> +
->  	spin_lock_irq(&ehci->lock);
->  	ehci->shutdown = true;
->  	ehci->rh_state = EHCI_RH_STOPPING;
-
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+-Christoffer
