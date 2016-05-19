@@ -1,293 +1,160 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:07:59 +0100
-Subject: [PATCH v5 20/57] KVM: arm/arm64: vgic-new: Add GICv2 world switch
- backend
+Date: Thu, 19 May 2016 19:08:04 +0100
+Subject: [PATCH v5 25/57] KVM: arm/arm64: vgic-new: Add CTLR,
+ TYPER and IIDR handlers
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-21-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-26-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-Processing maintenance interrupts and accessing the list registers
-are dependent on the host's GIC version.
-Introduce vgic-v2.c to contain GICv2 specific functions.
-Implement the GICv2 specific code for syncing the emulation state
-into the VGIC registers.
+Those three registers are v2 emulation specific, so their implementation
+lives entirely in vgic-mmio-v2.c. Also they are handled in one function,
+as their implementation is pretty simple.
+When the guest enables the distributor, we kick all VCPUs to get
+potentially pending interrupts serviced.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 Changelog RFC..v1:
-- remove explicit LR_STATE clearing on maintenance interrupt handling
-- improve documentation for vgic_v2_populate_lr()
-- remove WARN_ON on non-edge IRQs in maintenance interrupts
-- simplify multi-CPU source SGI handling
+- kick VCPUs is the distributor gets enabled
+- improve comment
 
 Changelog v1 .. v2:
-- inject the IRQ priority into the list register
+- adapt to new MMIO framework
+- use switch() statements to improve readability
 
 Changelog v2 .. v3:
-- cleanup diff containing rebase artifacts
+- add vgic_kick_vcpus() implementation
 
-Changelog v3 .. v4:
-- remove ELRSR bit set during process_maintenance()
+Changelog v3 .. v4;
+- specify accessor width
+- simplify CTLR write access
+- replace extract_bytes() with simple return
 
- include/linux/irqchip/arm-gic.h |   1 +
- virt/kvm/arm/vgic/vgic-v2.c     | 176 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.c        |   6 ++
- virt/kvm/arm/vgic/vgic.h        |   6 ++
- 4 files changed, 189 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic-v2.c
+ include/linux/irqchip/arm-gic.h  |  1 +
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 46 +++++++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.c         | 15 +++++++++++++
+ virt/kvm/arm/vgic/vgic.h         |  4 ++++
+ 4 files changed, 65 insertions(+), 1 deletion(-)
 
 diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 9c94026..be0d26f 100644
+index be0d26f..fd05185 100644
 --- a/include/linux/irqchip/arm-gic.h
 +++ b/include/linux/irqchip/arm-gic.h
-@@ -76,6 +76,7 @@
- #define GICH_LR_VIRTUALID		(0x3ff << 0)
- #define GICH_LR_PHYSID_CPUID_SHIFT	(10)
- #define GICH_LR_PHYSID_CPUID		(0x3ff << GICH_LR_PHYSID_CPUID_SHIFT)
-+#define GICH_LR_PRIORITY_SHIFT		23
- #define GICH_LR_STATE			(3 << 28)
- #define GICH_LR_PENDING_BIT		(1 << 28)
- #define GICH_LR_ACTIVE_BIT		(1 << 29)
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-new file mode 100644
-index 0000000..fb5e65c
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -0,0 +1,176 @@
-+/*
-+ * Copyright (C) 2015, 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+
-+#include "vgic.h"
-+
-+/*
-+ * Call this function to convert a u64 value to an unsigned long * bitmask
-+ * in a way that works on both 32-bit and 64-bit LE and BE platforms.
-+ *
-+ * Warning: Calling this function may modify *val.
-+ */
-+static unsigned long *u64_to_bitmask(u64 *val)
+@@ -33,6 +33,7 @@
+ 
+ #define GIC_DIST_CTRL			0x000
+ #define GIC_DIST_CTR			0x004
++#define GIC_DIST_IIDR			0x008
+ #define GIC_DIST_IGROUP			0x080
+ #define GIC_DIST_ENABLE_SET		0x100
+ #define GIC_DIST_ENABLE_CLEAR		0x180
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index a3e31a9..d812c93 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -20,9 +20,53 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
+ 
++static unsigned long vgic_mmio_read_v2_misc(struct kvm_vcpu *vcpu,
++					    gpa_t addr, unsigned int len)
 +{
-+#if defined(CONFIG_CPU_BIG_ENDIAN) && BITS_PER_LONG == 32
-+	*val = (*val >> 32) | (*val << 32);
-+#endif
-+	return (unsigned long *)val;
-+}
++	u32 value;
 +
-+void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-+
-+	if (cpuif->vgic_misr & GICH_MISR_EOI) {
-+		u64 eisr = cpuif->vgic_eisr;
-+		unsigned long *eisr_bmap = u64_to_bitmask(&eisr);
-+		int lr;
-+
-+		for_each_set_bit(lr, eisr_bmap, kvm_vgic_global_state.nr_lr) {
-+			u32 intid = cpuif->vgic_lr[lr] & GICH_LR_VIRTUALID;
-+
-+			WARN_ON(cpuif->vgic_lr[lr] & GICH_LR_STATE);
-+
-+			kvm_notify_acked_irq(vcpu->kvm, 0,
-+					     intid - VGIC_NR_PRIVATE_IRQS);
-+		}
++	switch (addr & 0x0c) {
++	case GIC_DIST_CTRL:
++		value = vcpu->kvm->arch.vgic.enabled ? GICD_ENABLE : 0;
++		break;
++	case GIC_DIST_CTR:
++		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++		value = (value >> 5) - 1;
++		value |= (atomic_read(&vcpu->kvm->online_vcpus) - 1) << 5;
++		break;
++	case GIC_DIST_IIDR:
++		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++		break;
++	default:
++		return 0;
 +	}
 +
-+	/* check and disable underflow maintenance IRQ */
-+	cpuif->vgic_hcr &= ~GICH_HCR_UIE;
-+
-+	/*
-+	 * In the next iterations of the vcpu loop, if we sync the
-+	 * vgic state after flushing it, but before entering the guest
-+	 * (this happens for pending signals and vmid rollovers), then
-+	 * make sure we don't pick up any old maintenance interrupts
-+	 * here.
-+	 */
-+	cpuif->vgic_eisr = 0;
++	return value;
 +}
 +
-+void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
++static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val)
 +{
-+	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	bool was_enabled = dist->enabled;
 +
-+	cpuif->vgic_hcr |= GICH_HCR_UIE;
-+}
-+
-+/*
-+ * transfer the content of the LRs back into the corresponding ap_list:
-+ * - active bit is transferred as is
-+ * - pending bit is
-+ *   - transferred as is in case of edge sensitive IRQs
-+ *   - set to the line-level (resample time) for level sensitive IRQs
-+ */
-+void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
-+{
-+	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
-+	int lr;
-+
-+	for (lr = 0; lr < vcpu->arch.vgic_cpu.used_lrs; lr++) {
-+		u32 val = cpuif->vgic_lr[lr];
-+		u32 intid = val & GICH_LR_VIRTUALID;
-+		struct vgic_irq *irq;
-+
-+		irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		/* Always preserve the active bit */
-+		irq->active = !!(val & GICH_LR_ACTIVE_BIT);
-+
-+		/* Edge is the only case where we preserve the pending bit */
-+		if (irq->config == VGIC_CONFIG_EDGE &&
-+		    (val & GICH_LR_PENDING_BIT)) {
-+			irq->pending = true;
-+
-+			if (vgic_irq_is_sgi(intid)) {
-+				u32 cpuid = val & GICH_LR_PHYSID_CPUID;
-+
-+				cpuid >>= GICH_LR_PHYSID_CPUID_SHIFT;
-+				irq->source |= (1 << cpuid);
-+			}
-+		}
-+
-+		/* Clear soft pending state when level IRQs have been acked */
-+		if (irq->config == VGIC_CONFIG_LEVEL &&
-+		    !(val & GICH_LR_PENDING_BIT)) {
-+			irq->soft_pending = false;
-+			irq->pending = irq->line_level;
-+		}
-+
-+		spin_unlock(&irq->irq_lock);
++	switch (addr & 0x0c) {
++	case GIC_DIST_CTRL:
++		dist->enabled = val & GICD_ENABLE;
++		if (!was_enabled && dist->enabled)
++			vgic_kick_vcpus(vcpu->kvm);
++		break;
++	case GIC_DIST_CTR:
++	case GIC_DIST_IIDR:
++		/* Nothing to do */
++		return;
 +	}
 +}
 +
-+/*
-+ * Populates the particular LR with the state of a given IRQ:
-+ * - for an edge sensitive IRQ the pending state is cleared in struct vgic_irq
-+ * - for a level sensitive IRQ the pending state value is unchanged;
-+ *   it is dictated directly by the input level
-+ *
-+ * If @irq describes an SGI with multiple sources, we choose the
-+ * lowest-numbered source VCPU and clear that bit in the source bitmap.
-+ *
-+ * The irq_lock must be held by the caller.
-+ */
-+void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr)
-+{
-+	u32 val = irq->intid;
-+
-+	if (irq->pending) {
-+		val |= GICH_LR_PENDING_BIT;
-+
-+		if (irq->config == VGIC_CONFIG_EDGE)
-+			irq->pending = false;
-+
-+		if (vgic_irq_is_sgi(irq->intid)) {
-+			u32 src = ffs(irq->source);
-+
-+			BUG_ON(!src);
-+			val |= (src - 1) << GICH_LR_PHYSID_CPUID_SHIFT;
-+			irq->source &= ~(1 << (src - 1));
-+			if (irq->source)
-+				irq->pending = true;
-+		}
-+	}
-+
-+	if (irq->active)
-+		val |= GICH_LR_ACTIVE_BIT;
-+
-+	if (irq->hw) {
-+		val |= GICH_LR_HW;
-+		val |= irq->hwintid << GICH_LR_PHYSID_CPUID_SHIFT;
-+	} else {
-+		if (irq->config == VGIC_CONFIG_LEVEL)
-+			val |= GICH_LR_EOI;
-+	}
-+
-+	/* The GICv2 LR only holds five bits of priority. */
-+	val |= (irq->priority >> 3) << GICH_LR_PRIORITY_SHIFT;
-+
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = val;
-+}
-+
-+void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
-+{
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = 0;
-+}
+ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 12,
++		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
+ 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
 diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 2e048a4..7a9e25d 100644
+index 48fdaf3..067c56e 100644
 --- a/virt/kvm/arm/vgic/vgic.c
 +++ b/virt/kvm/arm/vgic/vgic.c
-@@ -400,10 +400,12 @@ retry:
+@@ -545,3 +545,18 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
  
- static inline void vgic_process_maintenance_interrupt(struct kvm_vcpu *vcpu)
- {
-+	vgic_v2_process_maintenance(vcpu);
+ 	return pending;
  }
- 
- static inline void vgic_fold_lr_state(struct kvm_vcpu *vcpu)
- {
-+	vgic_v2_fold_lr_state(vcpu);
- }
- 
- /* Requires the irq_lock to be held. */
-@@ -411,14 +413,18 @@ static inline void vgic_populate_lr(struct kvm_vcpu *vcpu,
- 				    struct vgic_irq *irq, int lr)
- {
- 	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
 +
-+	vgic_v2_populate_lr(vcpu, irq, lr);
- }
- 
- static inline void vgic_clear_lr(struct kvm_vcpu *vcpu, int lr)
- {
-+	vgic_v2_clear_lr(vcpu, lr);
- }
- 
- static inline void vgic_set_underflow(struct kvm_vcpu *vcpu)
- {
-+	vgic_v2_set_underflow(vcpu);
- }
- 
- /* Requires the ap_list_lock to be held. */
++void vgic_kick_vcpus(struct kvm *kvm)
++{
++	struct kvm_vcpu *vcpu;
++	int c;
++
++	/*
++	 * We've injected an interrupt, time to find out who deserves
++	 * a good kick...
++	 */
++	kvm_for_each_vcpu(c, vcpu, kvm) {
++		if (kvm_vgic_vcpu_pending_irq(vcpu))
++			kvm_vcpu_kick(vcpu);
++	}
++}
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 29b96b9..0db490e 100644
+index fd9acaa..cf62015 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -22,4 +22,10 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+@@ -16,11 +16,15 @@
+ #ifndef __KVM_ARM_VGIC_NEW_H__
+ #define __KVM_ARM_VGIC_NEW_H__
+ 
++#define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
++#define IMPLEMENTER_ARM		0x43b
++
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ 
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
  			      u32 intid);
  bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
++void vgic_kick_vcpus(struct kvm *kvm);
  
-+void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
-+void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
-+void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
-+void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
-+void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
-+
- #endif
+ void vgic_v2_process_maintenance(struct kvm_vcpu *vcpu);
+ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
 -- 
 2.8.2
