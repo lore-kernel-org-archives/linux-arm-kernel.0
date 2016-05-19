@@ -1,46 +1,40 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 20 May 2016 07:56:21 +0800
-Subject: [PATCH v2 2/3] spi/rockchip: add the rk3036/rk3228/rk3368 to match
- for driver
+Date: Fri, 20 May 2016 07:56:22 +0800
+Subject: [PATCH v2 3/3] ARM: dts: rockchip: fixes the spi compatible for rk3036
 In-Reply-To: <1463702182-5188-1-git-send-email-wxt@rock-chips.com>
 References: <1463702182-5188-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1463702182-5188-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <1463702182-5188-3-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In gerenal, the "rockchip,rockchip-spi" string will match the dts
-that's great in spi driver. After all the most of rockchip SoCs ar
-same spi controller.
+That's seem the incorrect string to match the spi driver.
 
-Then, we should keep the old style to match the dts various.
+Fixes commit f629fcfab2cd
+("ARM: dts: rockchip: support the spi for rk3036")
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Cc: Mark Brown <broonie@kernel.org>
 Cc: Heiko Stuebner <heiko@sntech.de>
 Cc: linux-rockchip at lists.infradead.org
+
 ---
 
 Changes in v2: None
 
- drivers/spi/spi-rockchip.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/rk3036.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index 6c6c001..dd08b68 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -893,9 +893,12 @@ static const struct dev_pm_ops rockchip_spi_pm = {
- };
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+index d0f4bb7..a30700a 100644
+--- a/arch/arm/boot/dts/rk3036.dtsi
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -431,7 +431,7 @@
+ 	};
  
- static const struct of_device_id rockchip_spi_dt_match[] = {
-+	{ .compatible = "rockchip,rk3036-spi", },
- 	{ .compatible = "rockchip,rk3066-spi", },
- 	{ .compatible = "rockchip,rk3188-spi", },
-+	{ .compatible = "rockchip,rk3228-spi", },
- 	{ .compatible = "rockchip,rk3288-spi", },
-+	{ .compatible = "rockchip,rk3368-spi", },
- 	{ .compatible = "rockchip,rk3399-spi", },
- 	{ },
- };
+ 	spi: spi at 20074000 {
+-		compatible = "rockchip,rockchip-spi";
++		compatible = "rockchip,rk3036-spi";
+ 		reg = <0x20074000 0x1000>;
+ 		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+ 		clocks =<&cru PCLK_SPI>, <&cru SCLK_SPI>;
 -- 
 2.7.4
