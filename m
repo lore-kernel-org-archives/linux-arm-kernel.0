@@ -1,44 +1,32 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 19 May 2016 15:16:47 -0500
-Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
-In-Reply-To: <573E1982.7090402@linaro.org>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
- <573E1982.7090402@linaro.org>
-Message-ID: <CAPBZ5QcF4tKYLxAw1bsNv2Ma=JutRRvta9kiYMHM0XKoXni5SA@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 19 May 2016 15:21:48 -0500
+Subject: [PATCH v2 2/2] i2c: qup: support SMBus block read
+In-Reply-To: <757c18e2-562a-9f43-0fb6-ab3e7ac3af88@codeaurora.org>
+References: <1463006736-24652-1-git-send-email-nkaje@codeaurora.org>
+ <1463006736-24652-2-git-send-email-nkaje@codeaurora.org>
+ <000d01d1b0d3$d70e1f30$852a5d90$@codeaurora.org>
+ <757c18e2-562a-9f43-0fb6-ab3e7ac3af88@codeaurora.org>
+Message-ID: <573E205C.9080701@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2016 at 14:52, Stanimir Varbanov <stanimir.varbanov@linaro.org> wrote:
-> Hi Andy,
->
-> On 05/19/2016 08:00 AM, Andy Gross wrote:
->> This patch adds the qcom,idle-state-spc compatible to the SPC idle
->> state.  This compatible indicates that the state is one which supports
->> freeze.
->>
->> Signed-off-by: Andy Gross <andy.gross@linaro.org>
->> ---
->>  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
->> index 208af00..032e411 100644
->> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
->> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
->> @@ -104,7 +104,7 @@
->>
->>               idle-states {
->
-> Is this change depends on some another patchset, I cannot find
-> idle-states dt node on mainline nor linux-next ?
+Naveen Kaje wrote:
+>>>
+>>> +        tags[len++] = QUP_TAG_V2_DATARD;
+>>> +        /* 0 implies 256 bytes */
+>>> +        if (data_len == QUP_READ_LIMIT)
+>>> +            tags[len++] = 0;
+>>> +        else
+>>> +            tags[len++] = data_len;
+>>> +    }
+>>         Even data_len will always be '1' right ?
+> Yes, but here preferably we use a variable than a number without a context.
 
-The cover letter gives a link to the patchset that contains the basis
-for the changes.  You can also check out my posted branch which merges
-in a part of those changes.
+Actually, I would say the opposite.  I would rather see a constant with 
+a comment explaining it, than a variable that we know will always 
+contain only one number.
 
-The link to the specific patch is:
-http://www.spinics.net/lists/linux-arm-msm/msg19675.html
-
-or you can look at this:
-https://git.linaro.org/people/andy.gross/linux-pm.git/shortlog/refs/heads/for-pramod
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
+Forum, a Linux Foundation collaborative project.
