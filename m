@@ -1,43 +1,85 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 19 May 2016 16:20:50 -0500
-Subject: [PATCH] usb: echi-hcd: Add ehci_setup check before echi_shutdown
-In-Reply-To: <1463652776-30456-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1463652776-30456-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <CAPBZ5QcMiMEv1n=WU6aW2PGNsSPZJR42iZge_VUX4aWZ-KKzbw@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Thu, 19 May 2016 23:22:07 +0200
+Subject: [PATCH v2 0/5] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+In-Reply-To: <1463674518-22477-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1463674518-22477-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAJZ5v0is7c833aQkRm-D+TwLM+eUYeKEAdLOOdrEdT-hrC_M1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2016 at 05:12, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-
-<snip>
-
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -368,6 +368,15 @@ static void ehci_shutdown(struct usb_hcd *hcd)
->  {
->         struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+On Thu, May 19, 2016 at 6:15 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> This patchset adds support for ACPI_TABLE_UPGRADE for ARM64
 >
-> +       /**
-> +        * Protect the system from crashing at system shutdown in cases where
-> +        * usb host is not added yet from OTG controller driver.
-> +        * As ehci_setup() not done yet, so stop accessing registers or
-> +        * variables initialized in ehci_setup()
-> +        */
-> +       if (!ehci->sbrn)
-> +               return;
-> +
->         spin_lock_irq(&ehci->lock);
->         ehci->shutdown = true;
->         ehci->rh_state = EHCI_RH_STOPPING;
+> These patches help with:
+>
+> 1). During development of a platform, it is much easier to debug
+> problems with tables if you can test replacement ones without having to
+> respin the firmware. In the server world, you usually don't have the
+> firmware source code, so to get it respun could be days-weeks even if
+> you are working with the authors closely. We have practically used this
+> feature on a number of platforms already and it will continue.
+>
+> 2). They empower (advanced) users and developers to work around problems
+> that they find on platforms. Sure, we want firmware to always be fixed
+> and working well, but it is better if folks have the tools.
+>
+> It's also required for parity with x86 functionality on servers as Redhat
+> use that method in their tooling.
+>
+> The patchset refactors the code introduced by the patches by Lv Zheng [1],
+> fixes access to the destination of new ACPI tables as suggested
+> by Mark Rutland [2] and enables the feature for ARM64
+>
+> It was first sent by Jon Masters [3] to linaro-acpi in December 2015
+>
+> Tested on QEMU (arm64 and x86) and ThunderX
+> Should be applied to next-20160519
+>
+> v2:
+> - add Acked-by: Lv Zheng <lv.zheng@intel.com>
+> - replace the original patch "ACPI: table upgrade: move early_initrd_acpi_init()
+>   to header file" with the patch "ACPI: table upgrade: refactor function
+>   definitions".  This new patch is just the original one rewritten following the
+>   suggestion by Lv Zheng to use initrd_start, inird_end directly in
+>   acpi_table_initrd_init().  It simplifies things noticeably.
+> - add Jon's explanations to the cover of the patchset and my explanations
+>   to "ACPI: ARM64: support for ACPI_TABLE_UPGRADE"
+> - introduce ARCH_HAS_ACPI_TABLE_UPGRADE in a separate patch (Mark Rutland)
+> - move arch-specific definition to an arch-specific header in a separate patch
+>   (Mark Rutland)
+>
+> v1:
+> https://lkml.kernel.org/g/1463486765-31827-1-git-send-email-aleksey.makarov at linaro.org
+>
+> [1] https://lkml.kernel.org/g/cover.1460340514.git.lv.zheng at intel.com
+> [2] https://lists.linaro.org/pipermail/linaro-acpi/2015-December/006101.html
+> [3] https://lists.linaro.org/pipermail/linaro-acpi/2015-December/006099.html
+>
+> Aleksey Makarov (4):
+>   ACPI: table upgrade: use cacheable map for tables
+>   ACPI: table upgrade: refactor function definitions
+>   ACPI: table upgrade: move arch-specific symbol to asm/acpi.h
+>   ACPI: table upgrade: introduce ARCH_HAS_ACPI_TABLE_UPGRADE
+>
+> Jon Masters (1):
+>   ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+>
+>  arch/arm64/Kconfig            |  1 +
+>  arch/arm64/include/asm/acpi.h |  2 ++
+>  arch/arm64/kernel/setup.c     |  6 ++++--
+>  arch/x86/Kconfig              |  1 +
+>  arch/x86/include/asm/acpi.h   |  2 ++
+>  arch/x86/kernel/setup.c       |  9 +--------
+>  drivers/acpi/Kconfig          |  5 ++++-
+>  drivers/acpi/tables.c         | 23 +++++++++--------------
+>  include/linux/acpi.h          |  8 ++++++--
+>  9 files changed, 30 insertions(+), 27 deletions(-)
 
+I'm fine with the series.
 
-Should we also not check this in ehci_suspend and ehci_resume?  If I
-do suspend/resume, it crashes in a similar manner.  I know this goes
-beyond the problem scope of the patch.  Perhaps I should send in an
-additional patch with the code?
+I can queue up patches [1-4/5] for 4.8, but I'll need an ACK from the
+ARM64 maintainers for the [5/5].
 
-Are there any other places in the ehci-hcd where this needs to be checked?
-
-Regards,
-
-Andy
+Thanks,
+Rafael
