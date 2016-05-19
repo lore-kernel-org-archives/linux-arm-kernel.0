@@ -1,84 +1,161 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:33 +0100
-Subject: [PATCH v5 54/57] KVM: arm/arm64: vgic-new: Add vgic_v2/v3_enable
+Date: Thu, 19 May 2016 19:08:22 +0100
+Subject: [PATCH v5 43/57] KVM: arm/arm64: vgic-new: vgic_kvm_device: implement
+ kvm_vgic_addr
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-55-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-44-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@linaro.org>
 
-Enable the VGIC operation by properly initialising the registers
-in the hypervisor GIC interface.
+kvm_vgic_addr is used by the userspace to set the base address of
+the following register regions, as seen by the guest:
+- distributor(v2 and v3),
+- re-distributors (v3),
+- CPU interface (v2).
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-v2.c | 11 ++++++++++-
- virt/kvm/arm/vgic/vgic-v3.c | 23 ++++++++++++++++++++++-
- 2 files changed, 32 insertions(+), 2 deletions(-)
+Changelog v3 .. v4:
+- move overlap check to init time (cannot work with GICv3 here)
+- refactor remaining address sanity checks
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 1fe031b..8ad42c2 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -206,9 +206,18 @@ void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 			GICH_VMCR_PRIMASK_SHIFT;
- }
+ include/kvm/vgic/vgic.h             |  2 +
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 86 +++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h            |  3 ++
+ 3 files changed, 91 insertions(+)
+
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 00e3dca..3689b9b 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -194,6 +194,8 @@ struct vgic_cpu {
+ 	u64 live_lrs;
+ };
  
--/* not yet implemented */
- void vgic_v2_enable(struct kvm_vcpu *vcpu)
++int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
++
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level);
+ 
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index e153f12..082829a 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -16,10 +16,96 @@
+ #include <linux/kvm_host.h>
+ #include <kvm/arm_vgic.h>
+ #include <linux/uaccess.h>
++#include <asm/kvm_mmu.h>
+ #include "vgic.h"
+ 
+ /* common helpers */
+ 
++static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
++			     phys_addr_t addr, phys_addr_t alignment)
++{
++	if (addr & ~KVM_PHYS_MASK)
++		return -E2BIG;
++
++	if (!IS_ALIGNED(addr, alignment))
++		return -EINVAL;
++
++	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
++		return -EEXIST;
++
++	return 0;
++}
++
++/**
++ * kvm_vgic_addr - set or get vgic VM base addresses
++ * @kvm:   pointer to the vm struct
++ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
++ * @addr:  pointer to address value
++ * @write: if true set the address in the VM address space, if false read the
++ *          address
++ *
++ * Set or get the vgic base addresses for the distributor and the virtual CPU
++ * interface in the VM physical address space.  These addresses are properties
++ * of the emulated core/SoC and therefore user space initially knows this
++ * information.
++ * Check them for sanity (alignment, double assignment). We can't check for
++ * overlapping regions in case of a virtual GICv3 here, since we don't know
++ * the number of VCPUs yet, so we defer this check to map_resources().
++ */
++int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
++{
++	int r = 0;
++	struct vgic_dist *vgic = &kvm->arch.vgic;
++	int type_needed;
++	phys_addr_t *addr_ptr, alignment;
++
++	mutex_lock(&kvm->lock);
++	switch (type) {
++	case KVM_VGIC_V2_ADDR_TYPE_DIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_dist_base;
++		alignment = SZ_4K;
++		break;
++	case KVM_VGIC_V2_ADDR_TYPE_CPU:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
++		addr_ptr = &vgic->vgic_cpu_base;
++		alignment = SZ_4K;
++		break;
++#ifdef CONFIG_KVM_ARM_VGIC_V3
++	case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_dist_base;
++		alignment = SZ_64K;
++		break;
++	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
++		addr_ptr = &vgic->vgic_redist_base;
++		alignment = SZ_64K;
++		break;
++#endif
++	default:
++		r = -ENODEV;
++		goto out;
++	}
++
++	if (vgic->vgic_model != type_needed) {
++		r = -ENODEV;
++		goto out;
++	}
++
++	if (write) {
++		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
++		if (!r)
++			*addr_ptr = *addr;
++	} else {
++		*addr = *addr_ptr;
++	}
++
++out:
++	mutex_unlock(&kvm->lock);
++	return r;
++}
++
+ static int vgic_set_common_attr(struct kvm_device *dev,
+ 				struct kvm_device_attr *attr)
  {
-+	/*
-+	 * By forcing VMCR to zero, the GIC will restore the binary
-+	 * points to their reset values. Anything else resets to zero
-+	 * anyway.
-+	 */
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr = ~0;
-+
-+	/* Get the show on the road... */
-+	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
- }
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 77b0ab3..6abc9a3 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -19,6 +19,9 @@
+ #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
+ #define IMPLEMENTER_ARM		0x43b
  
- /* check for overlapping regions and for regions crossing the end of memory */
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 637ff2b..336a461 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -186,9 +186,30 @@ void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
- 	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
- }
++#define VGIC_ADDR_UNDEF		(-1)
++#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
++
+ #define INTERRUPT_ID_BITS_SPIS	10
+ #define VGIC_PRI_BITS		5
  
--/* not yet implemented */
- void vgic_v3_enable(struct kvm_vcpu *vcpu)
- {
-+	struct vgic_v3_cpu_if *vgic_v3 = &vcpu->arch.vgic_cpu.vgic_v3;
-+
-+	/*
-+	 * By forcing VMCR to zero, the GIC will restore the binary
-+	 * points to their reset values. Anything else resets to zero
-+	 * anyway.
-+	 */
-+	vgic_v3->vgic_vmcr = 0;
-+	vgic_v3->vgic_elrsr = ~0;
-+
-+	/*
-+	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
-+	 * way, so we force SRE to 1 to demonstrate this to the guest.
-+	 * This goes with the spec allowing the value to be RAO/WI.
-+	 */
-+	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
-+		vgic_v3->vgic_sre = ICC_SRE_EL1_SRE;
-+	else
-+		vgic_v3->vgic_sre = 0;
-+
-+	/* Get the show on the road... */
-+	vgic_v3->vgic_hcr = ICH_HCR_EN;
- }
- 
- /* check for overlapping regions and for regions crossing the end of memory */
 -- 
 2.8.2
