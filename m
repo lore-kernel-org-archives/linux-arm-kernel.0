@@ -1,56 +1,92 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 May 2016 15:29:14 +0200
-Subject: [PATCH] ARM: lpc32xx: fix NR_IRQS confict
-In-Reply-To: <1463659769.14963.4.camel@localhost>
-References: <1463646968-1047336-1-git-send-email-arnd@arndb.de>
- <573D8F92.3010902@mleia.com> <1463659769.14963.4.camel@localhost>
-Message-ID: <3344142.lW8euGrkl5@wuerfel>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Thu, 19 May 2016 19:02:38 +0530
+Subject: [PATCH v5 0/2] Introducing Exynos ChipId driver
+In-Reply-To: <CAJKOXPdteY4DH_QpCztbnuY6Njhxb4nvKt14gOundwGdHyb+cQ@mail.gmail.com>
+References: <1418285264-21763-1-git-send-email-pankaj.dubey@samsung.com>
+ <CAJKOXPdteY4DH_QpCztbnuY6Njhxb4nvKt14gOundwGdHyb+cQ@mail.gmail.com>
+Message-ID: <CAGcde9HN7AWge=b10OJ5Xn71GJUOJoxs8DJpoxWG=Jqp7yCg3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 May 2016 08:09:29 Sylvain Lemieux wrote:
-> Hi Arnd,
-> 
-> On Thu, 2016-05-19 at 13:04 +0300, Vladimir Zapolskiy wrote:
-> > Hi Arnd,
-> > 
-> > On 19.05.2016 11:35, Arnd Bergmann wrote:
-> > > With the change to sparse IRQs, the lpc32xx platform gets a warning about
-> > > conflicting macros:
-> > > 
-> > > In file included from arch/arm/mach-lpc32xx/irq.c:31:0:
-> > > arch/arm/mach-lpc32xx/include/mach/irqs.h:115:0: warning: "NR_IRQS" redefined
-> > >  #define NR_IRQS    96
-> > > arch/arm/include/asm/irq.h:9:0: note: this is the location of the previous definition
-> > >  #define NR_IRQS NR_IRQS_LEGACY
-> > > 
-> > > In the irq controller driver, we surely need the local number instead of
-> > > the generic NR_IRQS definition, so I'm renaming that one to LPC32XX_NR_IRQS.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > Fixes: 8cb17b5ed017 ("irqchip: Add LPC32xx interrupt controller driver")
-> > 
-> > I think that the entire removal of arch/arm/mach-lpc32xx/irq.c is the proper fix,
-> > since it is a dead code now - http://www.spinics.net/lists/arm-kernel/msg499976.html
-> > 
-> > I believe you can apply that change and add Fixes: tag.
+Hi Krzysztof,
 
-Ok, I've applied that on the next/late branch for arm-soc now, and one patch
-on top that removes the NR_IRQS definition from mach/irqs.h
+On 16 May 2016 at 18:52, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+>
+> On Thu, Dec 11, 2014 at 9:07 AM, Pankaj Dubey <pankaj.dubey@samsung.com> wrote:
+> > This patch series introduces Exynos Chipid platform driver.
+> > Each Exynos SoC has ChipID block which can give information about SoC's
+> > product Id and revision number.
+> > At the same time it reduces dependency of mach-exynos files from plat-samsung,
+> > by removing samsung_rev API, similar API is introduced in chipid driver itself
+> > to get revision number and product id.
+> >
+> > This patch series is based on Kukjin Kim's for-next having SHA_ID:
+> > 9db7d78aca2c7fbc19a26ce2ef01c805dc010c72
+> >
+> > It can also be cleanly applied on latest (next-20141209) linux-next.
+> >
+> > This has been tested against both tree on Exynos3250 and Exynos5250 (SMDK) board.
+> >
+> > Revision 4 and it's discussion can be found here
+> >  - https://lkml.org/lkml/2014/12/3/115
+> >
+> > Changes since v4:
+> >  - Removed custom sysfs entries as they were not providing any new information
+> >    as pointed out by Arnd.
+> >  - Removed functions exporting product_id and revision, instead we will export
+> >    exynos_chipid_info structure. It will be helpfull when we need to provide more
+> >    fields of chipid outside of chipid, as commented by Yadwinder
+> >  - Converted all funcions as __init.
+> >
+> > Change since v3:
+> >  - This patch set contains 5/6 and 6/6 patch from v3 series.
+> >  - Made EXYNOS_CHIPID config option non-user selectable,
+> >    as suggested by Tomasz Figa.
+> >  - Made uniform macro for EXYNOS4/5_SOC_MASK as EXYNOS_SOC_MASK as
+> >    suggested by Tomasz Figa.
+> >  - Made local variables static in chipid driver.
+> >  - Added existing SoC's product id's.
+> >  - Added platform driver support.
+> >
+> > Changes since v2:
+> >  - Reorganized patches as suggested by Tomasz Figa.
+> >  - Addressed review comments of Tomasz Figa in i2c-s3c2410.c file.
+> >
+> > Changes since v1:
+> >  - Added patch to move i2c interrupt re-configuration code from exynos.c
+> >    to i2c driver, as suggested by Arnd.
+> >  - After above patch only user of SYS_I2C_CFG register is pm.c so moving
+> >    save/restore of this register also into i2c driver.
+> >  - Spiltted up exynos4 and exynos5 machine descriptors to get rid from
+> >    soc_is_exynos4/exynos5 kind of macros, as suggested by Arnd.
+> >  - Changed location of chipid driver to "drivers/soc".
+> >  - Added drivers/base/soc.c provided infrastructure to make SoC specific
+> >    information avaible to user space via sysfs entry, as suggested by Arnd.
+> >
+> >
+> > Pankaj Dubey (2):
+> >   soc: samsung: add exynos chipid driver support
+> >   ARM: EXYNOS: refactoring of mach-exynos to enable chipid driver
+>
+> Hi,
+>
+> This is quite old patchset and apparently was not merged. I quickly
+> looked at previous discussions (for previous versions) and it seems
+> all review feedback was addressed.
+>
+> Any other obstacles?
+>
+> Pankaj, maybe you could respin this (after merge window)?
 
-> I also submitted a patch that remove this warning at the source
-> (GPIO driver broken to_irq support), until the GPIO driver update is
-> done.
-> 
-> Please refer to this link:
-> http://thread.gmane.org/gmane.linux.kernel.gpio/16837
+Thanks for looking into this.
+Infact I also wanted to respin this patchset. Will do it soon.
 
-This is in another subsystem, so I'm not applying this to arm-soc, but
-the warning should be gone with my one-line change to remove NR_IRQS
-anyway.
-
-Linus, if you want to put it in the gpio tree for v4.7, feel free to
-add my Acked-by: Arnd Bergmann <arnd@arndb.de>, otherwise I guess it's
-enough to have this in v4.8.
-
-	Arnd
+Thanks,
+Pankaj Dubey
+>
+> Best regards,
+> Krzysztof
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
