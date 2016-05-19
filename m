@@ -1,161 +1,120 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:22 +0100
-Subject: [PATCH v5 43/57] KVM: arm/arm64: vgic-new: vgic_kvm_device: implement
- kvm_vgic_addr
+Date: Thu, 19 May 2016 19:08:35 +0100
+Subject: [PATCH v5 56/57] KVM: arm/arm64: vgic-new: implement mapped IRQ
+ handling
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-44-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-57-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+As we now store the mapped hardware IRQ number in our vgic_irq struct,
+we no longer need the irq_phys_map for the new VGIC.
+Implement the hardware IRQ mapping on top of the reworked arch timer
+interface.
 
-kvm_vgic_addr is used by the userspace to set the base address of
-the following register regions, as seen by the guest:
-- distributor(v2 and v3),
-- re-distributors (v3),
-- CPU interface (v2).
-
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Changelog v3 .. v4:
-- move overlap check to init time (cannot work with GICv3 here)
-- refactor remaining address sanity checks
+Changelog RFC..v1:
+- adapt to new arch_timer mapped IRQ interface
+- implement inject_mapped_irq() as a macro (since it is identical to
+  the "un-mapped" IRQ implementation)
 
- include/kvm/vgic/vgic.h             |  2 +
- virt/kvm/arm/vgic/vgic-kvm-device.c | 86 +++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h            |  3 ++
- 3 files changed, 91 insertions(+)
+Changelog v1 .. v2:
+- replace inject_mapped_irq() macro with a separate implementation,
+  which only allows mapped IRQs to be injected via this interface
+
+Changelog v4 .. v5:
+- avoid accessing uninitialized spinlock on kvm_vgic_unmap_phys_irq
+
+ include/kvm/vgic/vgic.h  |  5 +++++
+ virt/kvm/arm/vgic/vgic.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 58 insertions(+)
 
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 00e3dca..3689b9b 100644
+index 17b2a73..3fbd175 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -194,6 +194,8 @@ struct vgic_cpu {
- 	u64 live_lrs;
- };
+@@ -206,6 +206,11 @@ int kvm_vgic_hyp_init(void);
  
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-+
  int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
  			bool level);
++int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
++			       bool level);
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
  
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index e153f12..082829a 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -16,10 +16,96 @@
- #include <linux/kvm_host.h>
- #include <kvm/arm_vgic.h>
- #include <linux/uaccess.h>
-+#include <asm/kvm_mmu.h>
- #include "vgic.h"
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
  
- /* common helpers */
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 6b892a4..fc74367 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -312,6 +312,47 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
+ }
  
-+static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
-+			     phys_addr_t addr, phys_addr_t alignment)
++int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid, unsigned int intid,
++			       bool level)
 +{
-+	if (addr & ~KVM_PHYS_MASK)
-+		return -E2BIG;
++	return vgic_update_irq_pending(kvm, cpuid, intid, level, true);
++}
 +
-+	if (!IS_ALIGNED(addr, alignment))
-+		return -EINVAL;
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
 +
-+	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
-+		return -EEXIST;
++	BUG_ON(!irq);
++
++	spin_lock(&irq->irq_lock);
++
++	irq->hw = true;
++	irq->hwintid = phys_irq;
++
++	spin_unlock(&irq->irq_lock);
 +
 +	return 0;
 +}
 +
-+/**
-+ * kvm_vgic_addr - set or get vgic VM base addresses
-+ * @kvm:   pointer to the vm struct
-+ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
-+ * @addr:  pointer to address value
-+ * @write: if true set the address in the VM address space, if false read the
-+ *          address
-+ *
-+ * Set or get the vgic base addresses for the distributor and the virtual CPU
-+ * interface in the VM physical address space.  These addresses are properties
-+ * of the emulated core/SoC and therefore user space initially knows this
-+ * information.
-+ * Check them for sanity (alignment, double assignment). We can't check for
-+ * overlapping regions in case of a virtual GICv3 here, since we don't know
-+ * the number of VCPUs yet, so we defer this check to map_resources().
-+ */
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
 +{
-+	int r = 0;
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	int type_needed;
-+	phys_addr_t *addr_ptr, alignment;
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
 +
-+	mutex_lock(&kvm->lock);
-+	switch (type) {
-+	case KVM_VGIC_V2_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		alignment = SZ_4K;
-+		break;
-+	case KVM_VGIC_V2_ADDR_TYPE_CPU:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_cpu_base;
-+		alignment = SZ_4K;
-+		break;
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
-+	case KVM_VGIC_V3_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		alignment = SZ_64K;
-+		break;
-+	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_redist_base;
-+		alignment = SZ_64K;
-+		break;
-+#endif
-+	default:
-+		r = -ENODEV;
-+		goto out;
-+	}
++	BUG_ON(!irq);
 +
-+	if (vgic->vgic_model != type_needed) {
-+		r = -ENODEV;
-+		goto out;
-+	}
++	if (!vgic_initialized(vcpu->kvm))
++		return -EAGAIN;
 +
-+	if (write) {
-+		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
-+		if (!r)
-+			*addr_ptr = *addr;
-+	} else {
-+		*addr = *addr_ptr;
-+	}
++	spin_lock(&irq->irq_lock);
 +
-+out:
-+	mutex_unlock(&kvm->lock);
-+	return r;
++	irq->hw = false;
++	irq->hwintid = 0;
++
++	spin_unlock(&irq->irq_lock);
++
++	return 0;
 +}
 +
- static int vgic_set_common_attr(struct kvm_device *dev,
- 				struct kvm_device_attr *attr)
- {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 77b0ab3..6abc9a3 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,9 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
- 
-+#define VGIC_ADDR_UNDEF		(-1)
-+#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
+ /**
+  * vgic_prune_ap_list - Remove non-relevant interrupts from the list
+  *
+@@ -564,3 +605,15 @@ void vgic_kick_vcpus(struct kvm *kvm)
+ 			kvm_vcpu_kick(vcpu);
+ 	}
+ }
 +
- #define INTERRUPT_ID_BITS_SPIS	10
- #define VGIC_PRI_BITS		5
- 
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	bool map_is_active;
++
++	spin_lock(&irq->irq_lock);
++	map_is_active = irq->hw && irq->active;
++	spin_unlock(&irq->irq_lock);
++
++	return map_is_active;
++}
 -- 
 2.8.2
