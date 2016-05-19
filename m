@@ -1,40 +1,31 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Thu, 19 May 2016 22:52:34 +0300
-Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
-In-Reply-To: <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
-Message-ID: <573E1982.7090402@linaro.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Thu, 19 May 2016 21:54:59 +0200
+Subject: [GIT PULL 0/7] ARM: SoC changes for 4.7
+In-Reply-To: <8749147.ztcb6kVhye@wuerfel> (Arnd Bergmann's message of "Wed, 18
+ May 2016 00:07:24 +0200")
+References: <8749147.ztcb6kVhye@wuerfel>
+Message-ID: <87eg8xj018.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andy,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-On 05/19/2016 08:00 AM, Andy Gross wrote:
-> This patch adds the qcom,idle-state-spc compatible to the SPC idle
-> state.  This compatible indicates that the state is one which supports
-> freeze.
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index 208af00..032e411 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -104,7 +104,7 @@
->  
->  		idle-states {
+.. zip ... removed Linux and lkml as this is pxa specific.
 
-Is this change depends on some another patchset, I cannot find
-idle-states dt node on mainline nor linux-next ?
+> Hi Linus,
+>
+> These are the first seven pull requests for arm-soc this time, there is
+> one small follow-up coming once the dependencies for that have landed
+> in your tree.
+I was wondering if my pull requests will be part of this follow-up ?
+I'm speaking of :
+ - https://patchwork.ozlabs.org/patch/617118/
+ - https://patchwork.ozlabs.org/patch/617119/ 
 
->  			CPU_SPC: spc {
-> -				compatible = "arm,idle-state";
-> +				compatible = "qcom,idle-state-spc", "arm,idle-state";
->  				arm,psci-suspend-param = <0x40000002>;
->  				entry-latency-us = <130>;
->  				exit-latency-us = <150>;
-> 
+Even if from my persespective passing this cycle doesn't matter much, I don't
+know if this matters to Stephen as CLK_IS_ROOT will remain one more cycle.
+
+Cheers.
+
+--
+Robert
