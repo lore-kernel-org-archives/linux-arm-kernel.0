@@ -1,79 +1,48 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 19 May 2016 16:09:54 +0200
-Subject: [PATCH v4 32/56] KVM: arm/arm64: vgic-new: Add SGIPENDR register
- handlers
-In-Reply-To: <d2a62bb3-791a-b6d2-a41b-faa671f5e3f6@arm.com>
-References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
- <1463392481-26583-33-git-send-email-andre.przywara@arm.com>
- <20160518131449.GI3827@cbox> <573C6EA6.90803@arm.com>
- <20160518135022.GL3827@cbox>
- <d2a62bb3-791a-b6d2-a41b-faa671f5e3f6@arm.com>
-Message-ID: <CAMJs5B-BbbKBH0Kkd-eu8=fdCQfxmYEhkPh+UcXZ0hemeCksLg@mail.gmail.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Thu, 19 May 2016 10:22:48 -0400
+Subject: [PATCHv6 3/8] dma-mapping: add dma_{map,unmap}_resource
+In-Reply-To: <20160519112926.GO29375@bigcity.dyn.berto.se>
+References: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1462812247-3414-4-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <20160517145445.GE4074@char.us.oracle.com>
+ <20160519112926.GO29375@bigcity.dyn.berto.se>
+Message-ID: <20160519142248.GB21691@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2016 at 3:25 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> Hi,
->
-> On 18/05/16 14:50, Christoffer Dall wrote:
->> On Wed, May 18, 2016 at 02:31:18PM +0100, Andre Przywara wrote:
->>> Hi,
->>>
->>> On 18/05/16 14:14, Christoffer Dall wrote:
->>>> On Mon, May 16, 2016 at 10:53:20AM +0100, Andre Przywara wrote:
->>>>> As this register is v2 specific, its implementation lives entirely
->>>>> in vgic-mmio-v2.c.
->>>>> This register allows setting the source mask of an IPI.
->>>>>
->>>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
->>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>> ---
->>>>> Changelog RFC..v1:
->>>>> - remove IRQ lock from read handler
->>>>> - update pending bit on setting the first / clearing the last bit
->>>>> - queue virtual IRQ if necessary
->>>>>
->>>>> Changelog v1 .. v2:
->>>>> - adapt to new MMIO framework
->>>>>
->>>>> Changelog v3 .. v4:
->>>>> - specify accessor width
->>>>>
->>>>>  virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++--
->>>>>  1 file changed, 60 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>>> index c884e9b..3925d4c 100644
->>>>> --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>>> +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
->>>>> @@ -146,6 +146,64 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
->>>>>    }
->>>>>  }
->>>>>
->>>>> +static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
->>>>> +                                      gpa_t addr, unsigned int len)
->>>>> +{
->>>>> +  u32 intid = addr & 0x0f;
->>>>
->>>> is there a reason why we cannot use the magic macro here?
->>>
->>> I wasn't sure about this, because it's not covering all 1024 interrupts,
->>> but just SGIs, so it's always fixed to 16 interrupts ? 8 bits. The
->>> default mask would be too big in this case.
->>> I guess it would work anyway because this region is limited to 16 bytes
->>> in our description, so we could use this here anyway to make it more
->>> aligned with the other handlers, maybe adding a comment about the
->>> difference?
->>>
->> meh, either way works for me actually, whatever you prefer.
->
-> So for the records: we can't use the macro here, since it relies on
-> masking and thus a certain alignment, which the SGIPENDR registers do
-> not have (being mapped to 0xF10 and 0xF20, respectively). So the
-> calculated intid would be much higher than the number of actually
-> allocated interrupts - with all the consequences ;-)
->
-Ah, yeah, didn't see that one coming.  Sorry for making you spend half
-a day to give me an answer to a seemingly innocent question.
+On Thu, May 19, 2016 at 01:29:26PM +0200, Niklas S?derlund wrote:
+> Hi Konrad,
+> 
+> Thanks for your feedback.
+> 
+> On 2016-05-17 10:54:45 -0400, Konrad Rzeszutek Wilk wrote:
+> > >  
+> > > -In some circumstances dma_map_single() and dma_map_page() will fail to create
+> > > -a mapping. A driver can check for these errors by testing the returned
+> > > -DMA address with dma_mapping_error(). A non-zero return value means the mapping
+> > > -could not be created and the driver should take appropriate action (e.g.
+> > > -reduce current DMA mapping usage or delay and try again later).
+> > > +In some circumstances dma_map_single(), dma_map_page() and dma_map_resource()
+> > > +will fail to create a mapping. A driver can check for these errors by testing
+> > > +the returned DMA address with dma_mapping_error(). A non-zero return value
+> > > +means the mapping could not be created and the driver should take appropriate
+> > > +action (e.g. reduce current DMA mapping usage or delay and try again later).
+> > 
+> > This looks like it belongs to another patch?
+> 
+> No it is correct (at least intended to be in this patch). All it really 
+> do is inject dma_map_resource() (which is added in this patch) as one of 
+> the calls which return dma_addr_t should be checked for error using 
+> dma_mapping_error().  But yes the change effect all lines in the 
+> paragraph due to line wrapping.
+> 
+> Hum or maybe I'm misunderstanding your question.
 
--Christoffer
+I totally missed the 'dma_map_resource' in there and just read
+'dma_mapping_error'!
+
+<sigh> Thanks.
+> 
+> -- 
+> Regards,
+> Niklas S?derlund
