@@ -1,35 +1,119 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Thu, 19 May 2016 13:04:02 +0300
-Subject: [PATCH] ARM: lpc32xx: fix NR_IRQS confict
-In-Reply-To: <1463646968-1047336-1-git-send-email-arnd@arndb.de>
-References: <1463646968-1047336-1-git-send-email-arnd@arndb.de>
-Message-ID: <573D8F92.3010902@mleia.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 19 May 2016 11:12:55 +0100
+Subject: [PATCH v4 27/56] KVM: arm/arm64: vgic-new: Add ACTIVE registers
+ handlers
+In-Reply-To: <20160518130139.GG3827@cbox>
+References: <1463392481-26583-1-git-send-email-andre.przywara@arm.com>
+ <1463392481-26583-28-git-send-email-andre.przywara@arm.com>
+ <20160518130139.GG3827@cbox>
+Message-ID: <92adb318-35e3-81f0-5d5c-73d1728a4e82@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Marc,
 
-On 19.05.2016 11:35, Arnd Bergmann wrote:
-> With the change to sparse IRQs, the lpc32xx platform gets a warning about
-> conflicting macros:
+can you have a quick look below?
+
+On 18/05/16 14:01, Christoffer Dall wrote:
+>> +
+>> +void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+>> +			     gpa_t addr, unsigned int len,
+>> +			     unsigned long val)
+>> +{
+>> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+>> +	int i;
+>> +
+>> +	kvm_arm_halt_guest(vcpu->kvm);
+>> +	for_each_set_bit(i, &val, len * 8) {
+>> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+>> +
+>> +		spin_lock(&irq->irq_lock);
+>> +		/*
+>> +		 * If this virtual IRQ was written into a list register, we
+>> +		 * have to make sure the CPU that runs the VCPU thread has
+>> +		 * synced back LR state to the struct vgic_irq.  We can only
+>> +		 * know this for sure, when either this irq is not assigned to
+>> +		 * anyone's AP list anymore, or the VCPU thread is not
+>> +		 * running on any CPUs.
+>> +		 *
+>> +		 * In the opposite case, we know the VCPU thread may be on its
+>> +		 * way back from the guest and still has to sync back this
+>> +		 * IRQ, so we release and re-acquire the spin_lock to let the
+>> +		 * other thread sync back the IRQ.
+>> +		 */
+>> +		while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+>> +		       irq->vcpu->cpu != -1) /* VCPU thread is running */
+>> +			cond_resched_lock(&irq->irq_lock);
+>> +
+>> +		irq->active = false;
+>> +		spin_unlock(&irq->irq_lock);
+>> +	}
+>> +	kvm_arm_resume_guest(vcpu->kvm);
+>> +}
+>> +
+>> +void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+>> +			     gpa_t addr, unsigned int len,
+>> +			     unsigned long val)
+>> +{
+>> +	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+>> +	int i;
+>> +
+>> +	for_each_set_bit(i, &val, len * 8) {
+>> +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+>> +
+>> +		spin_lock(&irq->irq_lock);
+>> +
+>> +		/*
+>> +		 * If the IRQ was already active or it was on a VCPU before
+>> +		 * or there is no target VCPU assigned at the moment, then
+>> +		 * just proceed.
+>> +		 */
+>> +		if (irq->active || irq->vcpu || !irq->target_vcpu) {
 > 
-> In file included from arch/arm/mach-lpc32xx/irq.c:31:0:
-> arch/arm/mach-lpc32xx/include/mach/irqs.h:115:0: warning: "NR_IRQS" redefined
->  #define NR_IRQS    96
-> arch/arm/include/asm/irq.h:9:0: note: this is the location of the previous definition
->  #define NR_IRQS NR_IRQS_LEGACY
+> why is it that we don't care if this IRQ is on a LR, for example being
+> just pending and not active, and we thereby loose this active state when
+> the vcpu syncs back the state?
+
+Mmmh, good question. I don't remember anymore why this irq->vcpu check
+was added.
+Marc, can you confirm that this is OK to be removed?
+I think it's an optimization anyway.
+
+Thanks,
+Andre,
+
 > 
-> In the irq controller driver, we surely need the local number instead of
-> the generic NR_IRQS definition, so I'm renaming that one to LPC32XX_NR_IRQS.
+> We care for the case where we clear the active state, but not when we
+> set it.  Perhaps we discussed this in the past, but now I've forgotten,
+> so that should at least be documented somehow.
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 8cb17b5ed017 ("irqchip: Add LPC32xx interrupt controller driver")
-
-I think that the entire removal of arch/arm/mach-lpc32xx/irq.c is the proper fix,
-since it is a dead code now - http://www.spinics.net/lists/arm-kernel/msg499976.html
-
-I believe you can apply that change and add Fixes: tag.
-
---
-With best wishes,
-Vladimir
+>> +			irq->active = true;
+>> +
+>> +			spin_unlock(&irq->irq_lock);
+>> +			continue;
+>> +		}
+>> +
+>> +		irq->active = true;
+>> +		vgic_queue_irq_unlock(vcpu->kvm, irq);
+> 
+> this won't work just yet, but I think all that's needed to make it work
+> is this patchlet:
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index c22f7e2..27204f22 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -81,7 +81,7 @@ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
+>  
+>  	/* If the interrupt is active, it must stay on the current vcpu */
+>  	if (irq->active)
+> -		return irq->vcpu;
+> +		return irq->vcpu ? : irq->target_vcpu;
+>  
+>  	/*
+>  	 * If the IRQ is not active but enabled and pending, we should direct
+> 
+> 
+> Thanks,
+> -Christoffer
+> 
