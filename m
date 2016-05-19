@@ -1,65 +1,200 @@
-From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
-Date: Thu, 19 May 2016 13:21:22 +0200
-Subject: [PATCHv6 2/8] dma-debug: add support for resource mappings
-In-Reply-To: <20160517145002.GD4074@char.us.oracle.com>
-References: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <1462812247-3414-3-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160517145002.GD4074@char.us.oracle.com>
-Message-ID: <20160519112122.GN29375@bigcity.dyn.berto.se>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 19 May 2016 13:25:14 +0200
+Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
+ encoder
+In-Reply-To: <1463648641-6931-2-git-send-email-vigneshr@ti.com>
+References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
+ <1463648641-6931-2-git-send-email-vigneshr@ti.com>
+Message-ID: <573DA29A.1080609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Konrad,
-
-Thanks for your feedback.
-
-On 2016-05-17 10:50:02 -0400, Konrad Rzeszutek Wilk wrote:
-> > +void debug_dma_map_resource(struct device *dev, phys_addr_t addr, size_t size,
-> > +			    int direction, dma_addr_t dma_addr)
-> > +{
-> > +	struct dma_debug_entry *entry;
-> > +
-> > +	if (unlikely(dma_debug_disabled()))
-> > +		return;
-> > +
-> > +	entry = dma_entry_alloc();
-> > +	if (!entry)
-> > +		return;
-> > +
-> > +	entry->type		= dma_debug_resource;
-> > +	entry->dev		= dev;
-> > +	entry->pfn		= __phys_to_pfn(addr);
-> > +	entry->offset		= addr - PHYS_PFN(entry->pfn);
+On 05/19/2016 11:04 AM, Vignesh R wrote:
+> There are rotary-encoders where GPIO lines reflect the actual position
+> of the rotary encoder dial. For example, if dial points to 9, then four
+> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
+> Add support for such rotary-encoder.
+> The driver relies on rotary-encoder,absolute-encoder DT property to
+> detect such encoders.
+> Since, GPIO IRQs are not necessary to work with
+> such encoders, optional polling mode support is added using
+> input_poll_dev skeleton. This is can be used by enabling
+> CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT.
 > 
-> Is that right? 
-
-You are correct that should be:
-
-   entry->offset = addr - PFN_PHYS(entry->pfn);
-
-Or even better:
-
-   entry->offset = addr - __pfn_to_phys(entry->pfn);
-
-I will address this and resend late next week, still hoping for some 
-more feedback.
-
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  .../devicetree/bindings/input/rotary-encoder.txt   |   4 +
+>  Documentation/input/rotary-encoder.txt             |   9 ++
+>  drivers/input/misc/Kconfig                         |  11 ++
+>  drivers/input/misc/rotary_encoder.c                | 165 ++++++++++++++++-----
+>  4 files changed, 155 insertions(+), 34 deletions(-)
 > 
-> __phys_to_pfn(addr) is PHYS_PFN(addr), so what you get here is
-> 
-> addr - PHYS_PFN(PHYS_PFN(addr)) ?
-> 
-> 
-> > +	entry->size		= size;
-> > +	entry->dev_addr		= dma_addr;
-> > +	entry->direction	= direction;
-> > +	entry->map_err_type	= MAP_ERR_NOT_CHECKED;
-> > +
-> > +	add_dma_entry(entry);
-> > +}
-> > +EXPORT_SYMBOL(debug_dma_map_resource);
-> > +
+> diff --git a/Documentation/devicetree/bindings/input/rotary-encoder.txt b/Documentation/devicetree/bindings/input/rotary-encoder.txt
+> index 6c9f0c8a846c..9c928dbd1500 100644
+> --- a/Documentation/devicetree/bindings/input/rotary-encoder.txt
+> +++ b/Documentation/devicetree/bindings/input/rotary-encoder.txt
+> @@ -12,6 +12,10 @@ Optional properties:
+>  - rotary-encoder,relative-axis: register a relative axis rather than an
+>    absolute one. Relative axis will only generate +1/-1 events on the input
+>    device, hence no steps need to be passed.
+> +- rotary-encoder,absolute-encoder: support encoders where GPIO lines
+> +  reflect the actual position of the rotary encoder dial. For example,
+> +  if dial points to 9, then four GPIO lines read HLLH(1001b = 9).
+> +  In this case, rotary-encoder,steps-per-period needed not be defined.
+>  - rotary-encoder,rollover: Automatic rollove when the rotary value becomes
+>    greater than the specified steps or smaller than 0. For absolute axis only.
+>  - rotary-encoder,steps-per-period: Number of steps (stable states) per period.
+> diff --git a/Documentation/input/rotary-encoder.txt b/Documentation/input/rotary-encoder.txt
+> index 46a74f0c551a..dc76092f5618 100644
+> --- a/Documentation/input/rotary-encoder.txt
+> +++ b/Documentation/input/rotary-encoder.txt
+> @@ -36,6 +36,15 @@ The phase diagram of these two outputs look like this:
+>                  |<>|
+>  	          one step (quarter-period mode)
+>  
+> +
+> +In some encoders, the value pointed by rotary encoders switch is directly
+> +reflected by status of the GPIOs connecting rotary encoder to CPU. For
+> +example, if rotary encoder dial points to 9, then the four GPIOs
+> +conncting rotary encoder will read HLLH(1001b = 9). Such encoders are
+> +supported by defining devictree binding "rotary-encoder,absolute-encoder".
+> +These encoders are also supported without need for event(IRQ) generation
+> +using Input subsytem's polling mode support.
+> +
+>  For more information, please see
+>  	https://en.wikipedia.org/wiki/Rotary_encoder
+>  
+> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> index 1f2337abcf2f..81805f9a534c 100644
+> --- a/drivers/input/misc/Kconfig
+> +++ b/drivers/input/misc/Kconfig
+> @@ -566,6 +566,17 @@ config INPUT_GPIO_ROTARY_ENCODER
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called rotary_encoder.
+>  
+> +config INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
+> +	bool "Polling mode support for rotary encoder"
+> +	depends on INPUT_GPIO_ROTARY_ENCODER
+> +	select INPUT_POLLDEV
+> +	help
+> +	  Say Y here to enable polling mode support for rotary encoders
+> +	  connected to GPIO lines that do have interrupt capability and
+> +	  report rotary encoder position as absolute value over GPIO
+> +	  lines. Check file: Documentation/input/rotary-encoder.txt for
+> +	  more information.
+> +
+>  config INPUT_RB532_BUTTON
+>  	tristate "Mikrotik Routerboard 532 button interface"
+>  	depends on MIKROTIK_RB532
+> diff --git a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
+> index c7fc8d4fb080..8f60289fb6cd 100644
+> --- a/drivers/input/misc/rotary_encoder.c
+> +++ b/drivers/input/misc/rotary_encoder.c
+> @@ -25,24 +25,29 @@
+>  #include <linux/of.h>
+>  #include <linux/pm.h>
+>  #include <linux/property.h>
+> +#include <linux/input-polldev.h>
+>  
+>  #define DRV_NAME "rotary-encoder"
+>  
+>  struct rotary_encoder {
+>  	struct input_dev *input;
+> -
+> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
 
--- 
-Regards,
-Niklas S?derlund
+Ifdefs look dirty.
+
+> +	struct input_polled_dev *poll_dev;
+> +#endif
+>  	struct mutex access_mutex;
+>  
+>  	u32 steps;
+>  	u32 axis;
+>  	bool relative_axis;
+>  	bool rollover;
+> +	bool absolute_encoder;
+>  
+>  	unsigned int pos;
+>  
+>  	struct gpio_descs *gpios;
+> +	struct device *dev;
+>  
+> -	unsigned int *irq;
+> +	int *irq;
+>  
+>  	bool armed;
+>  	signed char dir;	/* 1 - clockwise, -1 - CCW */
+> @@ -67,6 +72,21 @@ static unsigned int rotary_encoder_get_state(struct rotary_encoder *encoder)
+>  	return ret & 3;
+>  }
+>  
+> +static unsigned int rotary_encoder_get_gpios_state(struct rotary_encoder
+> +						   *encoder)
+> +{
+> +	int i;
+> +	unsigned int ret = 0;
+> +
+> +	for (i = 0; i < encoder->gpios->ndescs; ++i) {
+> +		int val = gpiod_get_value_cansleep(encoder->gpios->desc[i]);
+> +
+> +		ret = ret << 1 | val;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  static void rotary_encoder_report_event(struct rotary_encoder *encoder)
+>  {
+>  	if (encoder->relative_axis) {
+> @@ -178,6 +198,72 @@ out:
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static void rotary_encoder_setup_input_params(struct rotary_encoder  *encoder)
+> +{
+> +	struct input_dev *input = encoder->input;
+> +	struct platform_device *pdev = to_platform_device(encoder->dev);
+> +
+> +	input->name = pdev->name;
+> +	input->id.bustype = BUS_HOST;
+> +	input->dev.parent = encoder->dev;
+> +
+> +	if (encoder->relative_axis)
+> +		input_set_capability(input, EV_REL, encoder->axis);
+> +	else
+> +		input_set_abs_params(input,
+> +				     encoder->axis, 0, encoder->steps, 0, 1);
+> +}
+> +
+> +static irqreturn_t rotary_absolute_encoder_irq(int irq, void *dev_id)
+> +{
+> +	struct rotary_encoder *encoder = dev_id;
+> +	unsigned int state;
+> +
+> +	mutex_lock(&encoder->access_mutex);
+> +
+> +	state = rotary_encoder_get_gpios_state(encoder);
+> +	if (state != encoder->last_stable) {
+> +		input_report_abs(encoder->input, encoder->axis, state);
+> +		input_sync(encoder->input);
+> +		encoder->last_stable = state;
+> +	}
+> +
+> +	mutex_lock(&encoder->access_mutex);
+
+1. Double mutex_lock()? Oh, that is weird. Please document it at least
+in form of lockdep annotations.
+
+2. Maybe that should be unlock? Did you test this code?
+
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
+
+Same here and later in the code, ifdefs look dirty.
+
+Best regards,
+Krzysztof
