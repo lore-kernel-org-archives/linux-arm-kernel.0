@@ -1,42 +1,43 @@
-From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
-Date: Thu, 19 May 2016 18:11:04 +0300
-Subject: [PATCH v3 3/8] arm64: add io{read,write}64be accessors
-In-Reply-To: <1463670405-1059-1-git-send-email-horia.geanta@nxp.com>
-References: <1463670405-1059-1-git-send-email-horia.geanta@nxp.com>
-Message-ID: <1463670664-2856-1-git-send-email-horia.geanta@nxp.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu, 19 May 2016 23:47:02 +0800
+Subject: [PATCH 1/3] spi/rockchip: add rk3036/rk3228/rk3368 socs for spi
+ document
+Message-ID: <1463672824-15367-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow device drivers to consistently use io{read,write}XXbe
-also for 64-bit accesses.
+We had supported the rk3036/rk3066/rk3188/rk3228/rk3288/rk3368/rk3399
+family SoCs in linux kernel.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Alex Porosanu <alexandru.porosanu@nxp.com>
-Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+Let's add the other SoCs, in order to a better understanding from the
+rockchip spi document.
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Brown <broonie@kernel.org>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: linux-rockchip at lists.infradead.org
 ---
- arch/arm64/include/asm/io.h | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 44be1e03ed65..9b6e408cfa51 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
- #define iounmap				__iounmap
+ Documentation/devicetree/bindings/spi/spi-rockchip.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+index 1b14d69..305b542 100644
+--- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
++++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+@@ -6,9 +6,12 @@ and display controllers using the SPI communication interface.
+ Required Properties:
  
- /*
-- * io{read,write}{16,32}be() macros
-+ * io{read,write}{16,32,64}be() macros
-  */
- #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
- #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
-+#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
- 
- #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
- #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
-+#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
- 
- /*
-  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+ - compatible: should be one of the following.
++    "rockchip,rk3036-spi" for rk3036.
+     "rockchip,rk3066-spi" for rk3066.
+     "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
++    "rockchip,rk3228-spi", "rockchip,rk3066-spi" for rk3228.
+     "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
++    "rockchip,rk3368-spi", "rockchip,rk3066-spi" for rk3368.
+     "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
+ - reg: physical base address of the controller and length of memory mapped
+        region.
 -- 
-2.4.4
+2.7.4
