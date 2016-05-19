@@ -1,72 +1,145 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 19 May 2016 19:41:29 +0200
-Subject: [PATCH v3 3/6] ARM: dts: r8a7794: add MSTP10 clocks
-In-Reply-To: <f0700315-af43-b208-cd91-8ca510bf5da9@cogentembedded.com>
-References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
- <3321354.LNTkVAhXvF@wasted.cogentembedded.com>
- <CAMuHMdVjrVFpEZPukWiLQK473R+7CTqVHc1jj8fktAD9RpH_sw@mail.gmail.com>
- <f0700315-af43-b208-cd91-8ca510bf5da9@cogentembedded.com>
-Message-ID: <CAMuHMdWSfx_Q9xopidpLCbwHhuPKwfokiUXYPpHxf3B2tC+-dw@mail.gmail.com>
+From: matija.glavinic-pecotic.ext@nokia.com (Matija Glavinic Pecotic)
+Date: Thu, 19 May 2016 19:41:28 +0200
+Subject: [PATCH v2] ARM Fix A15 798181 errata initialization
+Message-ID: <573DFAC8.2070805@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2016 at 7:37 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
->>> --- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
->>> +++ renesas/include/dt-bindings/clock/r8a7794-clock.h
->>> @@ -109,6 +109,34 @@
->>>  #define R8A7794_CLK_I2C1               30
->>>  #define R8A7794_CLK_I2C0               31
->>>
->>> +/* MSTP10 */
->>> +#define R8A7794_CLK_SSI_ALL            5
->>> +#define R8A7794_CLK_SSI9               6
->>> +#define R8A7794_CLK_SSI8               7
->>> +#define R8A7794_CLK_SSI7               8
->>> +#define R8A7794_CLK_SSI6               9
->>> +#define R8A7794_CLK_SSI5               10
->>> +#define R8A7794_CLK_SSI4               11
->>> +#define R8A7794_CLK_SSI3               12
->>> +#define R8A7794_CLK_SSI2               13
->>> +#define R8A7794_CLK_SSI1               14
->>> +#define R8A7794_CLK_SSI0               15
->>> +#define R8A7794_CLK_SCU_ALL            17
->>> +#define R8A7794_CLK_SCU_DVC1           18
->>> +#define R8A7794_CLK_SCU_DVC0           19
->>> +#define R8A7794_CLK_SCU_CTU1_MIX1      20
->>> +#define R8A7794_CLK_SCU_CTU0_MIX0      21
->>> +#define R8A7794_CLK_SCU_SRC9           22
->>> +#define R8A7794_CLK_SCU_SRC8           23
->>> +#define R8A7794_CLK_SCU_SRC7           24
->>
->>
->> R-Car E2 does not have SRC7, SRC8, SRC9, ...
->>
->>> +#define R8A7794_CLK_SCU_SRC6           25
->>> +#define R8A7794_CLK_SCU_SRC5           26
->>> +#define R8A7794_CLK_SCU_SRC4           27
->>> +#define R8A7794_CLK_SCU_SRC3           28
->>> +#define R8A7794_CLK_SCU_SRC2           29
->>> +#define R8A7794_CLK_SCU_SRC1           30
->>> +#define R8A7794_CLK_SCU_SRC0           31
->>
->>
->> ... and SRC0.
->
->
->    Yet table 7A.12 in the rev1.02 manual lists them all. Your manual
-> doesn't?
+Current errata initialization doesn't take properly revision and REVIDR
+into account. Depending on the core revision, revidr bits should not be
+taken into account. Errata misleadingly declares r3p3 to be error-free,
+but this is not the case. Include rp3p3 in errata initialization.
 
-I thought you were aware of this, cfr. your "[PATCH] rcar: src: skip
-disabled-SRC nodes"?
+Here are possible fixes defined in revidr register for r2 and r3 [1,2]:
 
-Gr{oetje,eeting}s,
+r0p0-r2p1: No fixes applied
 
-                        Geert
+r2p2,r2p3:
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+REVIDR[4]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+REVIDR[9]: Not defined
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+r2p4,r3p0,r3p1,r3p2:
+
+REVIDR[4]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+REVIDR[9]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+	   - This is an update to a previously released ECO.
+
+r3p3:
+
+REVIDR[4]: Reserved
+REVIDR[9]: 798181 Moving a virtual page that is being accessed by
+	   an active process can lead to unexpected behavior
+	   - This is an update to a previously released ECO.
+
+And here is proposed handling from the same document:
+
+* In r3p2 and earlier versions with REVIDR[4]= 0,the full workaround is
+  required.
+* In r3p2 and earlier versions with REVIDR[4]=1, REVIDR[9]=0, only the
+  portion of the workaround up to the end of step 6 is required.
+* In r3p2 and earlier versions with REVIDR[4]=1, REVIDR[9]=1, no
+  workaround is required.
+* In r3p3, if REVIDR[9]=0, only the portion of the workaround up
+  to the end of step 6 is required.
+* In r3p3, if REVIDR[9]=1, no workaround is required.
+
+These imply following:
+
+REVIDR[9] set -> No WA
+REVIDR[4] set, REVIDR[9] cleared -> Partial WA
+Both cleared -> Full WA
+
+Where certain bits should and should not be taken into account
+depending on whether they are defined for the revision.
+
+Although not explicitly mentioned in the errata note, REVIDR[9] set,
+with REVIDR[4] cleared is valid combination which requires no WA. This
+is confirmed by ARM support and errata will be updated.
+
+[1] ARM CortexTM-A15 MPCore - NEON
+    Product revision r3
+    Software Developers Errata Notice
+    ARM-EPM-028093 v20.0 Released
+
+[2] ARM CortexTM-A15 MPCore - NEON
+    Product Revision r2
+    Software Developers Errata Notice
+    ARM-EPM-028090 v19.3 Released
+
+Signed-off-by: Matija Glavinic Pecotic <matija.glavinic-pecotic.ext@nokia.com>
+Reviewed-by: Alexander Sverdlin <alexander.sverdlin@nokia.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+Changes in v2: Explicitly comment versions, fixes and handling
+
+ arch/arm/kernel/smp_tlb.c | 44 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 40 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/kernel/smp_tlb.c b/arch/arm/kernel/smp_tlb.c
+index 2e72be4..22313cb 100644
+--- a/arch/arm/kernel/smp_tlb.c
++++ b/arch/arm/kernel/smp_tlb.c
+@@ -93,17 +93,53 @@ void erratum_a15_798181_init(void)
+ 	unsigned int revidr = read_cpuid(CPUID_REVIDR);
+ 
+ 	/* Brahma-B15 r0p0..r0p2 affected
+-	 * Cortex-A15 r0p0..r3p2 w/o ECO fix affected */
+-	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2)
++	 * Cortex-A15 r0p0..r3p3 w/o ECO fix affected
++	 * Fixes applied to A15 with respect to the revision and revidr are:
++	 *
++	 * r0p0-r2p1: No fixes applied
++	 * r2p2,r2p3:
++	 *	REVIDR[4]: 798181 Moving a virtual page that is being accessed
++	 *		   by an active process can lead to unexpected behavior
++	 *	REVIDR[9]: Not defined
++	 * r2p4,r3p0,r3p1,r3p2:
++	 *	REVIDR[4]: 798181 Moving a virtual page that is being accessed
++	 *		   by an active process can lead to unexpected behavior
++	 *	REVIDR[9]: 798181 Moving a virtual page that is being accessed
++	 *		   by an active process can lead to unexpected behavior
++	 *		   - This is an update to a previously released ECO.
++	 * r3p3:
++	 *	REVIDR[4]: Reserved
++	 *	REVIDR[9]: 798181 Moving a virtual page that is being accessed
++	 *		   by an active process can lead to unexpected behavior
++	 *		   - This is an update to a previously released ECO.
++	 *
++	 * Handling:
++	 *	REVIDR[9] set -> No WA
++	 *	REVIDR[4] set, REVIDR[9] cleared -> Partial WA
++	 *	Both cleared -> Full WA
++	 */
++	if ((midr & 0xff0ffff0) == 0x420f00f0 && midr <= 0x420f00f2) {
+ 		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
+-	else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr <= 0x413fc0f2 &&
+-		 (revidr & 0x210) != 0x210) {
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x412fc0f2) {
++		erratum_a15_798181_handler = erratum_a15_798181_broadcast;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x412fc0f4) {
+ 		if (revidr & 0x10)
+ 			erratum_a15_798181_handler =
+ 				erratum_a15_798181_partial;
+ 		else
+ 			erratum_a15_798181_handler =
+ 				erratum_a15_798181_broadcast;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x413fc0f3) {
++		if ((revidr & 0x210) == 0)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_broadcast;
++		else if (revidr & 0x10)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_partial;
++	} else if ((midr & 0xff0ffff0) == 0x410fc0f0 && midr < 0x414fc0f0) {
++		if ((revidr & 0x200) == 0)
++			erratum_a15_798181_handler =
++				erratum_a15_798181_partial;
+ 	}
+ }
+ #endif
+-- 
+2.1.4
