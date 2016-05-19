@@ -1,26 +1,36 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 19 May 2016 15:49:36 -0500
-Subject: [PATCH] usb: echi-hcd: Add ehci_setup check before echi_shutdown
-In-Reply-To: <1463652776-30456-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1463652776-30456-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <CAPBZ5QeK62Bs4Kh4UfQS=cmiGceb6gZcTSgOzncXL3f=ypZ3Gg@mail.gmail.com>
+From: nkaje@codeaurora.org (Naveen Kaje)
+Date: Thu, 19 May 2016 15:16:49 -0600
+Subject: [PATCH v2 2/2] i2c: qup: support SMBus block read
+In-Reply-To: <573E205C.9080701@codeaurora.org>
+References: <1463006736-24652-1-git-send-email-nkaje@codeaurora.org>
+ <1463006736-24652-2-git-send-email-nkaje@codeaurora.org>
+ <000d01d1b0d3$d70e1f30$852a5d90$@codeaurora.org>
+ <757c18e2-562a-9f43-0fb6-ab3e7ac3af88@codeaurora.org>
+ <573E205C.9080701@codeaurora.org>
+Message-ID: <1d96dfb6-9f0e-14ee-7f75-4c20fd98b183@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2016 at 05:12, Srinivas Kandagatla
-<srinivas.kandagatla@linaro.org> wrote:
-> This patch protects system from crashing at shutdown in
-> cases where usb host is not added yet from OTG controller driver.
-> As ehci_setup() not done yet, so stop accessing registers or
-> variables initialized as part of ehci_setup().
+Hi Timur, Sricharan,
+
+On 5/19/2016 2:21 PM, Timur Tabi wrote:
+> Naveen Kaje wrote:
+>>>>
+>>>> +        tags[len++] = QUP_TAG_V2_DATARD;
+>>>> +        /* 0 implies 256 bytes */
+>>>> +        if (data_len == QUP_READ_LIMIT)
+>>>> +            tags[len++] = 0;
+>>>> +        else
+>>>> +            tags[len++] = data_len;
+>>>> +    }
+>>>         Even data_len will always be '1' right ?
+>> Yes, but here preferably we use a variable than a number without a 
+>> context.
 >
-> The use case is simple, for boards like DB410c where the usb host
-> or device functionality is decided based on the micro-usb cable
-> presence. If the board boots up with micro-usb connected, the
-> OTG driver like echi-msm would not add the usb host by default.
-> However a system shutdown would go and access registers and
-> uninitialized variables, resulting in below crash.
-
-Works great.
-
-Tested-by: Andy Gross <andy.gross@linaro.org>
+> Actually, I would say the opposite.  I would rather see a constant 
+> with a comment explaining it, than a variable that we know will always 
+> contain only one number.
+>
+Ok, got it. Will be fixed in V3.
+Thanks,
+Naveen
