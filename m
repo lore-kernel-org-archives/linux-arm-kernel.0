@@ -1,118 +1,68 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:07:52 +0100
-Subject: [PATCH v5 13/57] KVM: arm/arm64: Provide functionality to pause and
- resume a guest
+Date: Thu, 19 May 2016 19:08:16 +0100
+Subject: [PATCH v5 37/57] KVM: arm/arm64: vgic-new: Add GICv3 IDREGS register
+ handler
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-14-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-38-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+We implement the only one ID register that is required by the
+architecture, also this is the one that Linux actually checks.
 
-For some rare corner cases in our VGIC emulation later we have to stop
-the guest to make sure the VGIC state is consistent.
-Provide the necessary framework to pause and resume a guest.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_host.h   |  4 ++++
- arch/arm/kvm/arm.c                | 25 +++++++++++++------------
- arch/arm64/include/asm/kvm_host.h |  4 ++++
- 3 files changed, 21 insertions(+), 12 deletions(-)
+Changelog v1 .. v2:
+- adapt to new MMIO framework
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 3850701..832be03 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -41,6 +41,8 @@
- 
- #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
- 
-+#define KVM_REQ_VCPU_EXIT	8
-+
- u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
-@@ -225,6 +227,8 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
- 
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
-+void kvm_arm_halt_guest(struct kvm *kvm);
-+void kvm_arm_resume_guest(struct kvm *kvm);
- 
- int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
- unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index ceb9345..e89329d 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -492,30 +492,31 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
- 	return vgic_initialized(kvm);
+Changelog v3 .. v4:
+- specify accessor width
+
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 16942e8..abf0d8d 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -96,6 +96,18 @@ static unsigned long vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
+ 	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
  }
  
--static void kvm_arm_halt_guest(struct kvm *kvm) __maybe_unused;
--static void kvm_arm_resume_guest(struct kvm *kvm) __maybe_unused;
--
--static void kvm_arm_halt_guest(struct kvm *kvm)
-+void kvm_arm_halt_guest(struct kvm *kvm)
- {
- 	int i;
- 	struct kvm_vcpu *vcpu;
- 
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		vcpu->arch.pause = true;
--	force_vm_exit(cpu_all_mask);
-+	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
++static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
++					      gpa_t addr, unsigned int len)
++{
++	switch (addr & 0xffff) {
++	case GICD_PIDR2:
++		/* report a GICv3 compliant implementation */
++		return 0x3b;
++	}
++
++	return 0;
 +}
 +
-+static void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
-+{
-+	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
-+
-+	vcpu->arch.pause = false;
-+	swake_up(wq);
- }
+ /*
+  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+  * redistributors, while SPIs are covered by registers in the distributor
+@@ -161,7 +173,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 64,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GICD_IDREGS,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 48,
++		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+ 		VGIC_ACCESS_32bit),
+ };
  
--static void kvm_arm_resume_guest(struct kvm *kvm)
-+void kvm_arm_resume_guest(struct kvm *kvm)
- {
- 	int i;
- 	struct kvm_vcpu *vcpu;
+@@ -182,7 +194,7 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 48,
++		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+ 		VGIC_ACCESS_32bit),
+ };
  
--	kvm_for_each_vcpu(i, vcpu, kvm) {
--		struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
--
--		vcpu->arch.pause = false;
--		swake_up(wq);
--	}
-+	kvm_for_each_vcpu(i, vcpu, kvm)
-+		kvm_arm_resume_vcpu(vcpu);
- }
- 
- static void vcpu_sleep(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 4cd4196..fa94f91 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -44,6 +44,8 @@
- 
- #define KVM_VCPU_MAX_FEATURES 4
- 
-+#define KVM_REQ_VCPU_EXIT	8
-+
- int __attribute_const__ kvm_target_cpu(void);
- int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
- int kvm_arch_dev_ioctl_check_extension(long ext);
-@@ -325,6 +327,8 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
- 
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
- struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
-+void kvm_arm_halt_guest(struct kvm *kvm);
-+void kvm_arm_resume_guest(struct kvm *kvm);
- 
- u64 __kvm_call_hyp(void *hypfn, ...);
- #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
 -- 
 2.8.2
