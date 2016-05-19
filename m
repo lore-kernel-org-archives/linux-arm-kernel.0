@@ -1,31 +1,24 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu, 19 May 2016 10:11:21 +0530
-Subject: [PATCH 2/8] ARM: dts: am33xx: Move to operating-points-v2 table
- and ti-cpufreq driver
-In-Reply-To: <f30e0313514cdbb9c3b0a83bbb96f05f2e179775.1463606963.git.d-gerlach@ti.com>
+Date: Thu, 19 May 2016 10:17:44 +0530
+Subject: [PATCH 0/8] ARM: dts: Add operating-points-v2 tables for TI
+ platforms
+In-Reply-To: <cover.1463606963.git.d-gerlach@ti.com>
 References: <cover.1463606963.git.d-gerlach@ti.com>
- <f30e0313514cdbb9c3b0a83bbb96f05f2e179775.1463606963.git.d-gerlach@ti.com>
-Message-ID: <20160519044121.GD32001@vireshk-i7>
+Message-ID: <20160519044744.GE32001@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 18-05-16, 18:36, Dave Gerlach wrote:
-> +	cpu0_opp_table: opp_table0 {
-> +		compatible = "operating-points-v2";
-> +
-> +		/*
-> +		 * The three following nodes are marked with opp-suspend
-> +		 * because the can not be enabled simultaneously on a
-> +		 * single SoC.
-> +		 */
-> +		opp50 at 300000000 {
-> +			opp-hz = /bits/ 64 <300000000>;
-> +			opp-microvolt = <950000 931000 969000>;
-> +			opp-supported-hw = <0x06 0x0010>;
+> Hi,
+> This series adds operating-points-v2 tables for am335x, am437x, dra7xx,
+> and am57xx based platforms along with some support patches so that we
+> can enable more OPPs for the CPU on these platforms.
+> 
+> These patches rely on the ti-cpufreq series sent here [1] and provide
+> opp-supported-hw data for each OPP so that only the appropriate OPPs
+> for a specific piece of silicon get enabled.
 
-Is there any place in either of the patchsets you have sent, that details the
-usage of the above two values? I mean which defines, what is 0x6 and what is
-0x1 ?
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
 -- 
 viresh
