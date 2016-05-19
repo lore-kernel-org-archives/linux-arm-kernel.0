@@ -1,58 +1,34 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 19 May 2016 16:56:30 +0200
-Subject: [PATCH 3/5] drm: mediatek: fixup drm_gem_object_lookup API change
-In-Reply-To: <1463587653-3035181-4-git-send-email-arnd@arndb.de>
-References: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
- <1463587653-3035181-4-git-send-email-arnd@arndb.de>
-Message-ID: <573DD41E.3050506@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 19 May 2016 07:57:46 -0700
+Subject: [RFC PATCH 2/3] mmc: host: omap_hsmmc: Enable ADMA2
+In-Reply-To: <0d463add-9fa5-a768-2ba6-34c4126c7817@ti.com>
+References: <1463561115-31798-1-git-send-email-kishon@ti.com>
+ <1463561115-31798-3-git-send-email-kishon@ti.com>
+ <b66f678a-be74-d5f7-f2ef-93b5c9f29b92@ti.com>
+ <20160518193028.GT5995@atomide.com>
+ <0d463add-9fa5-a768-2ba6-34c4126c7817@ti.com>
+Message-ID: <20160519145745.GU5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160519 01:10]:
+> On 05/18/2016 10:30 PM, Tony Lindgren wrote:
+> > Ideally the adma support would be a separate loadable module,
+> > similar how the cppi41dma is a child of the OTG controller.
+> 
+> The Master DMA is part of the hsmmc IP block. If the same ADMA module is
+> present on other IPs it might be beneficial to have a helper library to handle
+> it (allocating the descriptor pool, wrinting, updating descriptors, etc).
 
+OK. Yeah if it's part of the MMC controller it makes no sense to
+separate it. So then the conecrns are using alternate DMA
+implementations and keeping PM runtime working :)
 
-On 18/05/16 18:07, Arnd Bergmann wrote:
-> The drm_gem_object_lookup() function prototype changed while this
-> driver was added, so it fails to build now:
->
-> drivers/gpu/drm/mediatek/mtk_drm_gem.c: In function 'mtk_drm_gem_dumb_map_offset':
-> drivers/gpu/drm/mediatek/mtk_drm_gem.c:142:30: error: passing argument 1 of 'drm_gem_object_lookup' from incompatible pointer type [-Werror=incompatible-pointer-types]
->    obj = drm_gem_object_lookup(dev, file_priv, handle);
->
-> This fixes the new caller as well.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: a8ad0bd84f98 ("drm: Remove unused drm_device from drm_gem_object_lookup()")
-> ---
->   drivers/gpu/drm/mediatek/mtk_drm_fb.c  | 2 +-
->   drivers/gpu/drm/mediatek/mtk_drm_gem.c | 2 +-
->   2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_fb.c b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> index 33d30c19f35f..147df85399ab 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_fb.c
-> @@ -138,7 +138,7 @@ struct drm_framebuffer *mtk_drm_mode_fb_create(struct drm_device *dev,
->   	if (drm_format_num_planes(cmd->pixel_format) != 1)
->   		return ERR_PTR(-EINVAL);
->
-> -	gem = drm_gem_object_lookup(dev, file, cmd->handles[0]);
-> +	gem = drm_gem_object_lookup(file, cmd->handles[0]);
->   	if (!gem)
->   		return ERR_PTR(-ENOENT);
->
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_gem.c b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-> index a773bfaea913..fa2ec0cd00e8 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_gem.c
-> @@ -139,7 +139,7 @@ int mtk_drm_gem_dumb_map_offset(struct drm_file *file_priv,
->   	struct drm_gem_object *obj;
->   	int ret;
->
-> -	obj = drm_gem_object_lookup(dev, file_priv, handle);
-> +	obj = drm_gem_object_lookup(file_priv, handle);
->   	if (!obj) {
->   		DRM_ERROR("failed to lookup gem object.\n");
->   		return -EINVAL;
->
+BTW, Felipe mentioned that the best thing to do in the long run would
+be to set up sdhci-omap.c operating in ADMA mode.
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+Felipe, care to summarize what you had in mind?
+
+Regards,
+
+Tony
