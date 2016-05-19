@@ -1,146 +1,56 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 19 May 2016 18:44:19 +0200
-Subject: [PATCH v3 3/6] ARM: dts: r8a7794: add MSTP10 clocks
-In-Reply-To: <3321354.LNTkVAhXvF@wasted.cogentembedded.com>
-References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
- <3321354.LNTkVAhXvF@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdVjrVFpEZPukWiLQK473R+7CTqVHc1jj8fktAD9RpH_sw@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Thu, 19 May 2016 18:53:09 +0200
+Subject: [PATCH v3] mmc: dw_mmc: rockchip: Set the drive phase properly
+In-Reply-To: <2865073.LogD6IIKLp@phil>
+References: <1463077910-25914-1-git-send-email-dianders@chromium.org>
+ <2865073.LogD6IIKLp@phil>
+Message-ID: <CAFqH_52KqPXM_AjC8qKrVvH2hSvqtiBjmN28SZgJgoWVCe0pmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2016 at 10:46 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Add MSTP10 clocks to the R8A7794 device tree.
+2016-05-13 0:52 GMT+02:00 Heiko Stuebner <heiko@sntech.de>:
+> Am Donnerstag, 12. Mai 2016, 11:31:50 schrieb Douglas Anderson:
 >
-> This patch is based on the commit ee9141522dcf ("ARM: shmobile: r8a7791:
-> add MSTP10 support on DTSI").
+> [...]
 >
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>> In commit 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card
+>> initialization") we actually started setting this explicitly in the
+>> kernel, but that commit wasn't quite right and also wasn't quite
+>> enough.  See <https://patchwork.kernel.org/patch/9085311/> for some
+>> details.
+>>
+>> Let's explicitly set this phase in dw_mmc.
 >
-> ---
-> Changes in version 3:
-> - refreshed the patch.
+> [...]
 >
-> Changes in version 2:
-> - fixed the SoC model in the change log;
-> - added "the" article to the change log.
+>> Fixes: 7a03fe6f48f3 ("clk: rockchip: reset init state before mmc card
+>> initialization") Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
 >
->  arch/arm/boot/dts/r8a7794.dtsi            |   53 ++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/r8a7794-clock.h |   28 +++++++++++++++
->  2 files changed, 81 insertions(+)
+> I've tested this patch together with the two clock patches linked above on a
+> rk3288-firefly and a rk3288-veyron-jerry. On the firefly tuning still does not
+> work (probably really some regulator issue) and on veyron tuning still works
+> as expected, so
 >
-> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
-> ===================================================================
-> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
-> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
-> @@ -1235,6 +1235,59 @@
->                                 "gpio1", "gpio0", "rcan1", "rcan0", "qspi_mod",
->                                 "i2c5", "i2c4", "i2c3", "i2c2", "i2c1", "i2c0";
->                 };
-> +               mstp10_clks: mstp10_clks at e6150998 {
-> +                       compatible = "renesas,r8a7794-mstp-clocks",
-> +                                    "renesas,cpg-mstp-clocks";
-> +                       reg = <0 0xe6150998 0 4>, <0 0xe61509a8 0 4>;
-> +                       clocks = <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
-> +                                <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
-> +                                <&p_clk>, <&p_clk>, <&p_clk>, <&p_clk>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>,
-> +                                <&mstp10_clks R8A7794_CLK_SCU_ALL>;
-> +                       #clock-cells = <1>;
-> +                       clock-indices = <R8A7794_CLK_SSI_ALL
-> +                                        R8A7794_CLK_SSI9 R8A7794_CLK_SSI8
-> +                                        R8A7794_CLK_SSI7 R8A7794_CLK_SSI6
-> +                                        R8A7794_CLK_SSI5 R8A7794_CLK_SSI4
-> +                                        R8A7794_CLK_SSI3 R8A7794_CLK_SSI2
-> +                                        R8A7794_CLK_SSI1 R8A7794_CLK_SSI0
-> +                                        R8A7794_CLK_SCU_ALL
-> +                                        R8A7794_CLK_SCU_DVC1
-> +                                        R8A7794_CLK_SCU_DVC0
-> +                                        R8A7794_CLK_SCU_CTU1_MIX1
-> +                                        R8A7794_CLK_SCU_CTU0_MIX0
-> +                                        R8A7794_CLK_SCU_SRC9
-> +                                        R8A7794_CLK_SCU_SRC8
-> +                                        R8A7794_CLK_SCU_SRC7
-> +                                        R8A7794_CLK_SCU_SRC6
-> +                                        R8A7794_CLK_SCU_SRC5
-> +                                        R8A7794_CLK_SCU_SRC4
-> +                                        R8A7794_CLK_SCU_SRC3
-> +                                        R8A7794_CLK_SCU_SRC2
-> +                                        R8A7794_CLK_SCU_SRC1
-> +                                        R8A7794_CLK_SCU_SRC0>;
-> +                       clock-output-names = "ssi-all", "ssi9", "ssi8", "ssi7",
-> +                                            "ssi6", "ssi5", "ssi4", "ssi3",
-> +                                            "ssi2", "ssi1", "ssi0",
-> +                                            "scu-all", "scu-dvc1", "scu-dvc0",
-> +                                            "scu-ctu1-mix1", "scu-ctu0-mix0",
-> +                                            "scu-src9", "scu-src8", "scu-src7",
-> +                                            "scu-src6", "scu-src5", "scu-src4",
-> +                                            "scu-src3", "scu-src2", "scu-src1",
-> +                                            "scu-src0";
-> +               };
->                 mstp11_clks: mstp11_clks at e615099c {
->                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->                         reg = <0 0xe615099c 0 4>, <0 0xe61509ac 0 4>;
-> Index: renesas/include/dt-bindings/clock/r8a7794-clock.h
-> ===================================================================
-> --- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
-> +++ renesas/include/dt-bindings/clock/r8a7794-clock.h
-> @@ -109,6 +109,34 @@
->  #define R8A7794_CLK_I2C1               30
->  #define R8A7794_CLK_I2C0               31
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
 >
-> +/* MSTP10 */
-> +#define R8A7794_CLK_SSI_ALL            5
-> +#define R8A7794_CLK_SSI9               6
-> +#define R8A7794_CLK_SSI8               7
-> +#define R8A7794_CLK_SSI7               8
-> +#define R8A7794_CLK_SSI6               9
-> +#define R8A7794_CLK_SSI5               10
-> +#define R8A7794_CLK_SSI4               11
-> +#define R8A7794_CLK_SSI3               12
-> +#define R8A7794_CLK_SSI2               13
-> +#define R8A7794_CLK_SSI1               14
-> +#define R8A7794_CLK_SSI0               15
-> +#define R8A7794_CLK_SCU_ALL            17
-> +#define R8A7794_CLK_SCU_DVC1           18
-> +#define R8A7794_CLK_SCU_DVC0           19
-> +#define R8A7794_CLK_SCU_CTU1_MIX1      20
-> +#define R8A7794_CLK_SCU_CTU0_MIX0      21
-> +#define R8A7794_CLK_SCU_SRC9           22
-> +#define R8A7794_CLK_SCU_SRC8           23
-> +#define R8A7794_CLK_SCU_SRC7           24
+> Doug's explanations both in the commit message and the code look sane to me,
+> but I don't feel confident enough in my understanding of the matter to
+> transform that into a Reviewed-by tag.
+>
+>
 
-R-Car E2 does not have SRC7, SRC8, SRC9, ...
+I've tested this patch on rock2 square inserting some uSD cards and
+seeing that they still enumerate properly, also I booted from a uSD
+card.
+Note that in current state UHS is not supported so the tuning is not
+executed. Enable UHS on rock2 requires some work, I'll try to look at
+it but meanwhile I can say that doesn't break current state, so
 
-> +#define R8A7794_CLK_SCU_SRC6           25
-> +#define R8A7794_CLK_SCU_SRC5           26
-> +#define R8A7794_CLK_SCU_SRC4           27
-> +#define R8A7794_CLK_SCU_SRC3           28
-> +#define R8A7794_CLK_SCU_SRC2           29
-> +#define R8A7794_CLK_SCU_SRC1           30
-> +#define R8A7794_CLK_SCU_SRC0           31
+Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 
-... and SRC0.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+> Heiko
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
