@@ -1,79 +1,83 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 19 May 2016 11:44:23 +0100
-Subject: [PATCH v3] KVM: arm/arm64: Add VGICv3 save/restore API
- documentation
-In-Reply-To: <20160518170349.GL6666@cbox>
-References: <1463150637-6896-1-git-send-email-christoffer.dall@linaro.org>
- <CAFEAcA8fcxo18HhfboE5j=SC8TyrPXqmpsPNymM8zw4PhMTRDw@mail.gmail.com>
- <20160518170349.GL6666@cbox>
-Message-ID: <CAFEAcA_RATH6-6PuqevNWw=X=C+_hphhspu6_u=hcpeeRfLtpg@mail.gmail.com>
+From: harninder.rai@nxp.com (Harninder Rai)
+Date: Thu, 19 May 2016 10:48:41 +0000
+Subject: Help needed with kexec on arm64
+References: <DB5PR04MB168845795D86B4CE5BA5656FE68B0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <1458230896.3391.18.camel@infradead.org>
+ <CAB5YjtBEO=efjhcFdVOaZqG13qK3uzCbS5SFym5hhw-n+_QLhw@mail.gmail.com>
+ <DB5PR04MB1688A6D4385B76DAFF71D364E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
+ <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
+ <DB5PR04MB168874758924173BBD5CC037E69D0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <20160405052341.GA19476@linaro.org>
+Message-ID: <DB5PR04MB16885BC6F5EA7A328A5C36A4E64A0@DB5PR04MB1688.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 May 2016 at 18:03, Christoffer Dall <christoffer.dall@linaro.org> wrote:
-> On Fri, May 13, 2016 at 04:28:44PM +0100, Peter Maydell wrote:
->> I would like this to simply get/set the latch state regardless of whether
->> the interrupt is edge triggered or level triggered. (Obviously if the
->> interrupt is edge triggered this is equivalent to accessing the
->> ISPENDR/ICPENDR registers, but I don't want in userspace to have to
->> manually look at whether each interrupt is edge or level in order to
->> identify whether to use ISPENDR or this API, when in fact the state
->> in the kernel is exactly the same. I just want a straightforward
->> get/set accessor to the underlying state.)
+Hello Takahiro Akashi,
 
-> I think my reservations against this come from the fact that we're
-> getting farther and farther away from anything that looks like
-> software's interface to the GIC hardware as specified by the
-> architecture, and it was kind of the motivation for our choice of API
-> here in the first place to try to stay close to that.
->
-> That being said, what we're designing an API for here is a different
-> case that for what the software view of the hardware via registers has
-> been designed for, so potentially it's ok to deviate from that.
+Do you have any further suggestions?
 
-Yes; our two deviations are just the two awkward points where the
-register view of the hardware doesn't provide complete access to
-the internal state.
+Regards
+Harry++
 
-> How about we special-case the SPENDR region, and make CPENDR region
-> RAZ/WI, and the SPENDR region then reflects the latch state exclusively.
-> Or is this more confusing than just having a separate 'fake' region?
-
-I don't have a preference either way here.
-
-> Do you have a suggestion in mind for wording/naming of the 'latch state'
-> that makes sense for software people who have access to the GIC manual,
-> but doesn't necessarily understand how the hardware would be built and
-> why 'latch state' logically has clear semantics... ?
-
-This is a bit tricky because the spec leaves you to deduce how things
-work and doesn't provide much terminology to work with either. Here's
-an attempt at an explanation, which is a bit long-winded but I can't
-see any way to be more concise:
-
-This returns the value of the latched pending state for the interrupts.
-This is identical to the value read from ISPENDR for an edge triggered
-interrupt, but may differ for level triggered interrupts. For edge
-triggered interrupts, once an interrupt becomes pending (whether because
-of an edge detected on the input line or because of a guest write to
-ISPENDR) this state is "latched", and only cleared when either the
-interrupt is activated or when the guest writes to ICPENDR. A
-level triggered interrupt may be pending either because the level input
-is held high by a device, or because of a guest write to the ISPENDR
-register. Only ISPENDR writes are latched: if the device lowers the line
-level then the interrupt is no longer pending unless the guest also
-wrote to ISPENDR, and conversely writes to ICPENDR or activations of the
-interrupt do not clear the pending status if the line level is still
-being held high. (These rules are documented in the GICv3 specification
-descriptions of the ICPENDR and ISPENDR registers.)
-For a level triggered interrupt the value returned here is that of the
-latch which is set by ISPENDR and cleared by ICPENDR or interrupt
-activation, whereas the value read from ISPENDR is the logical OR of
-the latch value and the input line level. Raw access to the latch state
-is provided to userspace so that it can save and restore the entire GIC
-internal state (which is defined by the combination of the current input
-line level and the latch state, and cannot be deduced from purely the
-line level and the value of the ISPENDR registers).
-
-thanks
--- PMM
+> -----Original Message-----
+> From: Harninder Rai
+> Sent: Tuesday, May 10, 2016 6:02 PM
+> To: 'AKASHI Takahiro'
+> Cc: Geoff Levand; linux-arm-kernel at lists.infradead.org
+> Subject: RE: Help needed with kexec on arm64
+> 
+> >
+> > This means that there is no enough space left at this point.
+> > I guess that you are using too big initramfs against 64MB of total memory.
+> > Just increase the memory size for crash dump kernel.
+> >
+> > -Takahiro AKASHI
+> 
+> Hello Takahiro Akashi,
+> 
+> I used a smaller initramfs (as you suggested) and my crash kernel has moved
+> further but it again dumped with the following log messages. Any further
+> pointers?
+> Does this mean that there isn't enough memory to save the core file or
+> something? Because the error mostly are related to OOM killer process
+> 
+> [    8.833434] Freeing unused kernel memory: 748K (ffff800000a3a000 -
+> ffff800000af5000)
+> [    8.848924] init: Console is alive
+> [    8.856866] mmc0: new high speed SDHC card at address b368
+> [    8.868239] mmcblk0: mmc0:b368 SDC   3.75 GiB
+> [    8.873913]  mmcblk0: p1
+> [    9.855930] init: - preinit -
+> Press the [f] key and hit [enter] to enter failsafe mode Press the [1], [2],
+> [3] or [4] key and hit [enter] to select the debug level
+> [   12.896779] procd: - early -
+> [   12.977417] kworker/u16:0 invoked oom-killer: gfp_mask=0x27000c0,
+> order=2, oom_score_adj=0
+> [   12.994568] CPU: 0 PID: 6 Comm: kworker/u16:0 Not tainted 4.5.0-rc6-
+> 00038-gae2804a-dirty #5
+> [   13.002950] Hardware name: Freescale Layerscape 2085a RDB Board (DT)
+> [   13.009333] Workqueue: events_unbound call_usermodehelper_exec_work
+> [   13.015623] Call trace:
+> [   13.018076] [<ffff800000089760>] dump_backtrace+0x0/0x1ac
+> [   13.023492] [<ffff800000089920>] show_stack+0x14/0x1c
+> [   13.028560] [<ffff80000032c1d4>] dump_stack+0x8c/0xb0
+> [   13.033627] [<ffff8000001aebdc>] dump_header.isra.7+0x4c/0x18c
+> [   13.039480] [<ffff800000152130>] oom_kill_process+0x26c/0x45c
+> [   13.045243] [<ffff800000152688>] out_of_memory+0x2e0/0x32c
+> [   13.050745] [<ffff800000156c68>] __alloc_pages_nodemask+0x83c/0x848
+> [   13.057031] [<ffff800000156f78>] alloc_kmem_pages_node+0x30/0xa8
+> [   13.063058] [<ffff8000000b776c>]
+> copy_process.isra.42.part.43+0x128/0x1488
+> [   13.069955] [<ffff8000000b8c4c>] _do_fork+0xcc/0x338
+> [   13.074934] [<ffff8000000b8f04>] kernel_thread+0x34/0x3c
+> [   13.080261] [<ffff8000000cb8e0>] call_usermodehelper_exec_work+0x2c/0xd8
+> [   13.086984] [<ffff8000000ce4b0>] process_one_work+0x134/0x2f4
+> [   13.092747] [<ffff8000000ce6c8>] worker_thread+0x58/0x43c
+> [   13.098162] [<ffff8000000d3f88>] kthread+0xd8/0xec
+> [   13.102967] [<ffff800000085cd0>] ret_from_fork+0x10/0x40
+> [   13.261745] Mem-Info:
+> 
+> Thanks and Regards
+> Harry++
