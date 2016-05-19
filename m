@@ -1,72 +1,117 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Thu, 19 May 2016 19:49:13 +0800
-Subject: [PATCH v2 0/5] MT2701 iommu support
-Message-ID: <1463658558-567-1-git-send-email-honghui.zhang@mediatek.com>
+Date: Thu, 19 May 2016 19:49:18 +0800
+Subject: [PATCH 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
+In-Reply-To: <1463658558-567-1-git-send-email-honghui.zhang@mediatek.com>
+References: <1463658558-567-1-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1463658558-567-6-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-  Mediatek's m4u(Multimedia Memory Management Unit) and SMI(Smart
-Multimedia Interface)have two generations HW. They basically sharing the
-same hardware block diagram, but have some difference as below:
+Add the dtsi node of iommu and smi for mt2701.
 
-  Generation one m4u only supports one layer, flat pagetable addressing,
-and only supports 4K size page mapping. While generation two m4u supports 2
-levels of pagetable which uses the ARM short-descriptor translation table
-format for address translation.
-They have slight different register base and register offset.
-They have very different HW ports defines.
+Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+---
+ arch/arm/boot/dts/mt2701.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
-  Generaion one SMI has additional "async" clock which transform the smi
-clock into emi clock domain, this clock should be prepared and enabled for
-SMI generation one HW.
-The register which control the iommu need to translation the address or not
-for a particular port is located at smi ao base(smi always on register
-base) for generation one SMI HW, but located at each larb's register base
-for generation two HW.
-
-This patch set add mt2701 iommu support, it's based on 4.6-rc1 and James
-Liao's "Add clock support for Mediatek MT2701 v8[1]" and "Mediatek MT2701
-SCPSYS power domain support v7[2]" patch.
-
-v2:
--Fix syntax errors in dt-bindings.
--Use dma_alloc/free_coherent to allocate pagetable memory and reduce the
- streaming DMA stuff.
--Make the mtk_iommu_ops.pgsize_bitmap as ~0UL << MT2701_IOMMU_PAGE_SHIFT.
--Use macro instead of variable to indicate the pagetable size.
--Change some macro name from MTK_XXX to MT2701_XXX.
-
-v1: http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005301.html
--initial version
-
-[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005439.html
-[2] http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005429.html
-
-Honghui Zhang (5):
-  dt-bindings: mediatek: add descriptions for mediatek mt2701 iommu and
-    smi
-  iommu/mediatek: move the common struct into header file
-  memory/mediatek: add support for mt2701
-  iommu/mediatek: add support for mtk iommu generation one HW
-  ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
-
- .../devicetree/bindings/iommu/mediatek,iommu.txt   |  13 +-
- .../memory-controllers/mediatek,smi-common.txt     |  21 +-
- .../memory-controllers/mediatek,smi-larb.txt       |   4 +-
- arch/arm/boot/dts/mt2701.dtsi                      |  51 ++
- drivers/iommu/Kconfig                              |  19 +
- drivers/iommu/Makefile                             |   1 +
- drivers/iommu/mtk_iommu.c                          |  62 +-
- drivers/iommu/mtk_iommu.h                          |  93 +++
- drivers/iommu/mtk_iommu_v1.c                       | 742 +++++++++++++++++++++
- drivers/memory/mtk-smi.c                           | 168 ++++-
- include/dt-bindings/memory/mt2701-larb-port.h      |  85 +++
- 11 files changed, 1171 insertions(+), 88 deletions(-)
- create mode 100644 drivers/iommu/mtk_iommu.h
- create mode 100644 drivers/iommu/mtk_iommu_v1.c
- create mode 100644 include/dt-bindings/memory/mt2701-larb-port.h
-
+diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+index 42d5a37..363de0d 100644
+--- a/arch/arm/boot/dts/mt2701.dtsi
++++ b/arch/arm/boot/dts/mt2701.dtsi
+@@ -16,6 +16,7 @@
+ #include <dt-bindings/power/mt2701-power.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/memory/mt2701-larb-port.h>
+ #include "skeleton64.dtsi"
+ #include "mt2701-pinfunc.h"
+ 
+@@ -160,6 +161,16 @@
+ 		clock-names = "system-clk", "rtc-clk";
+ 	};
+ 
++	smi_common: smi at 1000c000 {
++		compatible = "mediatek,mt2701-smi-common";
++		reg = <0 0x1000c000 0 0x1000>;
++		clocks = <&infracfg CLK_INFRA_SMI>,
++			 <&mmsys CLK_MM_SMI_COMMON>,
++			 <&infracfg CLK_INFRA_SMI>;
++		clock-names = "apb", "smi", "async";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
++	};
++
+ 	sysirq: interrupt-controller at 10200100 {
+ 		compatible = "mediatek,mt2701-sysirq",
+ 			     "mediatek,mt6577-sysirq";
+@@ -169,6 +180,16 @@
+ 		reg = <0 0x10200100 0 0x1c>;
+ 	};
+ 
++	iommu: mmsys_iommu at 10205000 {
++		compatible = "mediatek,mt2701-m4u";
++		reg = <0 0x10205000 0 0x1000>;
++		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&infracfg CLK_INFRA_M4U>;
++		clock-names = "bclk";
++		mediatek,larbs = <&larb0 &larb1 &larb2>;
++		#iommu-cells = <1>;
++	};
++
+ 	apmixedsys: syscon at 10209000 {
+ 		compatible = "mediatek,mt2701-apmixedsys", "syscon";
+ 		reg = <0 0x10209000 0 0x1000>;
+@@ -234,6 +255,16 @@
+ 		status = "disabled";
+ 	};
+ 
++	larb0: larb at 14010000 {
++		compatible = "mediatek,mt2701-smi-larb";
++		reg = <0 0x14010000 0 0x1000>;
++		mediatek,smi = <&smi_common>;
++		clocks = <&mmsys CLK_MM_SMI_LARB0>,
++			 <&mmsys CLK_MM_SMI_LARB0>;
++		clock-names = "apb", "smi";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
++	};
++
+ 	imgsys: syscon at 15000000 {
+ 		compatible = "mediatek,mt2701-imgsys", "syscon";
+ 		reg = <0 0x15000000 0 0x1000>;
+@@ -241,6 +272,16 @@
+ 		status = "disabled";
+ 	};
+ 
++	larb2: larb at 15001000 {
++		compatible = "mediatek,mt2701-smi-larb";
++		reg = <0 0x15001000 0 0x1000>;
++		mediatek,smi = <&smi_common>;
++		clocks = <&imgsys CLK_IMG_SMI_COMM>,
++			 <&imgsys CLK_IMG_SMI_COMM>;
++		clock-names = "apb", "smi";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
++	};
++
+ 	vdecsys: syscon at 16000000 {
+ 		compatible = "mediatek,mt2701-vdecsys", "syscon";
+ 		reg = <0 0x16000000 0 0x1000>;
+@@ -248,6 +289,16 @@
+ 		status = "disabled";
+ 	};
+ 
++	larb1: larb at 16010000 {
++		compatible = "mediatek,mt2701-smi-larb";
++		reg = <0 0x16010000 0 0x1000>;
++		mediatek,smi = <&smi_common>;
++		clocks = <&vdecsys CLK_VDEC_CKGEN>,
++			 <&vdecsys CLK_VDEC_LARB>;
++		clock-names = "apb", "smi";
++		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
++	};
++
+ 	hifsys: syscon at 1a000000 {
+ 		compatible = "mediatek,mt2701-hifsys", "syscon";
+ 		reg = <0 0x1a000000 0 0x1000>;
 -- 
 1.8.1.1.dirty
