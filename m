@@ -1,29 +1,39 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Thu, 19 May 2016 09:08:08 +0900
-Subject: [RESEND PATCH] arm64: defconfig: Enable Cadence MACB/GEM support
-Message-ID: <1463616488-5168-1-git-send-email-chanho.min@lge.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 19 May 2016 09:45:33 +0800
+Subject: [PATCH] serial: 8250_early: Add earlycon support for Synopsys
+ DesignWare ABP UART
+In-Reply-To: <1462946761-11982-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1462946761-11982-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <573D1ABD.5020908@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the cadence MACB/GEM support that is needed
-by lg1312 SoC.
++Cc Jon and arm-kernel mailist
 
-Signed-off-by: Chanho Min <chanho.min@lge.com>
----
- arch/arm64/configs/defconfig |    1 +
- 1 file changed, 1 insertion(+)
+Any comments, thanks.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 14dbe27..ed11cb6 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -105,6 +105,7 @@ CONFIG_TUN=y
- CONFIG_VIRTIO_NET=y
- CONFIG_AMD_XGBE=y
- CONFIG_NET_XGENE=y
-+CONFIG_MACB=y
- CONFIG_E1000E=y
- CONFIG_IGB=y
- CONFIG_IGBVF=y
--- 
-1.7.9.5
+Kefeng
+
+On 2016/5/11 14:06, Kefeng Wang wrote:
+> Some board like Hisilicon D02 uses Synopsys DesignWare ABP UART, declare an
+> OF early console for it, so early console device can be enabled with comand
+> line "earlycon"(without option) via the "stdout-path" property in device-tree.
+> 
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>  drivers/tty/serial/8250/8250_early.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
+> index 8d08ff5..85a12f0 100644
+> --- a/drivers/tty/serial/8250/8250_early.c
+> +++ b/drivers/tty/serial/8250/8250_early.c
+> @@ -150,6 +150,7 @@ EARLYCON_DECLARE(uart, early_serial8250_setup);
+>  OF_EARLYCON_DECLARE(ns16550, "ns16550", early_serial8250_setup);
+>  OF_EARLYCON_DECLARE(ns16550a, "ns16550a", early_serial8250_setup);
+>  OF_EARLYCON_DECLARE(uart, "nvidia,tegra20-uart", early_serial8250_setup);
+> +OF_EARLYCON_DECLARE(uart, "snps,dw-apb-uart", early_serial8250_setup);
+>  
+>  #ifdef CONFIG_SERIAL_8250_OMAP
+>  
+> 
