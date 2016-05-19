@@ -1,29 +1,23 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 19 May 2016 18:58:11 +0200
-Subject: [PATCH/RFC 2/3] arm64: dts: salvator-x: add Salvator-X board on
- R8A7796 SoC
-In-Reply-To: <1463629845-7115-3-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 19 May 2016 19:07:00 +0200
+Subject: [PATCH/RFC 3/3] arm64: defconfig: enable Renesas R8A7796 SoC
+In-Reply-To: <1463629845-7115-4-git-send-email-horms+renesas@verge.net.au>
 References: <1463629845-7115-1-git-send-email-horms+renesas@verge.net.au>
- <1463629845-7115-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVTMvDsmO1g=FNwpkvx_56guHk_V6Katj8e3qOdyQsjeQ@mail.gmail.com>
+ <1463629845-7115-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWQ8LPZsOYUH5E6WkjOHoUHkqpTUMz4xd5k=ovi1XH0ow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, May 19, 2016 at 5:50 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-> @@ -0,0 +1,45 @@
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>
+> This patch enables the Renesas R8A7796 SoC in the arm64 defconfig.
+>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-> +       chosen {
-> +               bootargs = "ignore_loglevel";
-
-Perhaps you want this to be consistent with the other Renesas boards?
-
-git grep bootargs -- $(git grep -l renesas, -- arch/arm*/*dts)
-
-> +               stdout-path = "serial0:115200n8";
-> +       };
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Gr{oetje,eeting}s,
 
