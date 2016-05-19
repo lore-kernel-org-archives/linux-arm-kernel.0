@@ -1,56 +1,259 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 19 May 2016 13:50:40 +0100
-Subject: [PATCH] arm64: cpuinfo: add AArch64 & elf platform for app
- compatibility
-In-Reply-To: <573D9E40.4000705@hisilicon.com>
-References: <1463625873-60016-1-git-send-email-saberlily.xia@hisilicon.com>
- <20160519104925.GL22378@e104818-lin.cambridge.arm.com>
- <573D9E40.4000705@hisilicon.com>
-Message-ID: <20160519125039.GN22378@e104818-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 19 May 2016 14:54:22 +0200
+Subject: [PATCH] ARM: dts: at91: add at91sam9260ek board DT
+Message-ID: <1463662462-921-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2016 at 07:06:40PM +0800, Xiaqing (A) wrote:
-> 
-> 
-> ? 2016/5/19 18:49, Catalin Marinas ??:
-> >On Thu, May 19, 2016 at 10:44:33AM +0800, x00195127 wrote:
-> >>we find that some apps will read cpuinfo when start up,
-> >>they need the string  as follows:
-> >>"Processor       : AArch64 Processor rev 0 (aarch64)"
-> >>
-> >>Then thay could load the corresponding libs. But now
-> >>arm64 platform's cpuinfo don't has this now, so
-> >>we need add this.
-> >
-> >I have the same question as Martinez: what are those apps? If they are
-> >64-bit apps, they can always assume AArch64 processor.
-> 
-> Those are 32-bit apps, and those apps are very popular in our country.
+Add Device Tree source file for at91sam9260ek board. This official Atmel
+Evaluation Kit is designed around a SoC based on a ARM 926 core the
+at91sam9260.
 
-32-bit apps checking for "AArch64" is a really silly idea. What do they
-do with this information?
+The board is also added to the dts Makefile.
 
-I'm rather inclined to merge this patch:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi,
 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 3808470486f3..623d7d291dd6 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -127,7 +127,8 @@ static int c_show(struct seq_file *m, void *v)
- 		 * software which does already (at least for 32-bit).
- 		 */
- 		seq_puts(m, "Features\t:");
--		if (personality(current->personality) == PER_LINUX32) {
-+		if (is_compat_task() ||
-+		    personality(current->personality) == PER_LINUX32) {
- #ifdef CONFIG_COMPAT
- 			for (j = 0; compat_hwcap_str[j]; j++)
- 				if (compat_elf_hwcap & (1 << j))
+This DTS file was sitting in my kernel tree for a long time... So, revived and
+updated, here it is as I'm sure it can be useful. Even if the board itself is
+pretty old.
 
-As discussed here:
+Bye,
 
-http://article.gmane.org/gmane.linux.kernel/2209217
+ arch/arm/boot/dts/Makefile          |   1 +
+ arch/arm/boot/dts/at91sam9260ek.dts | 211 ++++++++++++++++++++++++++++++++++++
+ 2 files changed, 212 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91sam9260ek.dts
 
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8f9f1c2ac96b..6893415a53a3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -17,6 +17,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+ 	evk-pro3.dtb \
+ 	tny_a9260.dtb \
+ 	usb_a9260.dtb \
++	at91sam9260ek.dtb \
+ 	at91sam9261ek.dtb \
+ 	at91sam9263ek.dtb \
+ 	tny_a9263.dtb \
+diff --git a/arch/arm/boot/dts/at91sam9260ek.dts b/arch/arm/boot/dts/at91sam9260ek.dts
+new file mode 100644
+index 000000000000..43875d18808f
+--- /dev/null
++++ b/arch/arm/boot/dts/at91sam9260ek.dts
+@@ -0,0 +1,211 @@
++/*
++ * Device Tree file for Atmel at91sam9260 Evaluation Kit
++ *
++ *  Copyright (C) 2016 Atmel,
++ *		  2016 Nicolas Ferre <nicolas.ferre@atmel.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++#include "at91sam9260.dtsi"
++
++/ {
++	model = "Atmel at91sam9260ek";
++	compatible = "atmel,at91sam9260ek", "atmel,at91sam9260", "atmel,at91sam9";
++
++	chosen {
++		stdout-path = &dbgu;
++	};
++
++	memory {
++		reg = <0x20000000 0x4000000>;
++	};
++
++	clocks {
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <18432000>;
++		};
++	};
++
++	ahb {
++		apb {
++			usb1: gadget at fffa4000 {
++				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
++				status = "okay";
++			};
++
++			mmc0: mmc at fffa8000 {
++				pinctrl-0 = <
++					&pinctrl_board_mmc0_slot1
++					&pinctrl_mmc0_clk
++					&pinctrl_mmc0_slot1_cmd_dat0
++					&pinctrl_mmc0_slot1_dat1_3>;
++				status = "okay";
++				slot at 1 {
++					reg = <1>;
++					bus-width = <4>;
++					cd-gpios = <&pioC 9 GPIO_ACTIVE_HIGH>;
++				};
++			};
++
++			usart0: serial at fffb0000 {
++				pinctrl-0 =
++					<&pinctrl_usart0
++					 &pinctrl_usart0_rts
++					 &pinctrl_usart0_cts
++					 &pinctrl_usart0_dtr_dsr
++					 &pinctrl_usart0_dcd
++					 &pinctrl_usart0_ri>;
++				status = "okay";
++			};
++
++			usart1: serial at fffb4000 {
++				status = "okay";
++			};
++
++			ssc0: ssc at fffbc000 {
++				status = "okay";
++				pinctrl-0 = <&pinctrl_ssc0_tx>;
++			};
++
++			macb0: ethernet at fffc4000 {
++				phy-mode = "rmii";
++				status = "okay";
++			};
++
++			spi0: spi at fffc8000 {
++				cs-gpios = <0>, <&pioC 11 0>, <0>, <0>;
++				mtd_dataflash at 0 {
++					compatible = "atmel,at45", "atmel,dataflash";
++					spi-max-frequency = <50000000>;
++					reg = <1>;
++				};
++			};
++
++			dbgu: serial at fffff200 {
++				status = "okay";
++			};
++
++			pinctrl at fffff400 {
++				board {
++					pinctrl_board_mmc0_slot1: mmc0_slot1-board {
++						atmel,pins =
++							<AT91_PIOC 9 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
++					};
++				};
++			};
++
++			shdwc at fffffd10 {
++				atmel,wakeup-counter = <10>;
++				atmel,wakeup-rtt-timer;
++			};
++
++			rtc at fffffd20 {
++				atmel,rtt-rtc-time-reg = <&gpbr 0x0>;
++				status = "okay";
++			};
++
++			watchdog at fffffd40 {
++				status = "okay";
++			};
++
++			gpbr: syscon at fffffd50 {
++				status = "okay";
++			};
++		};
++
++		usb0: ohci at 00500000 {
++			num-ports = <2>;
++			status = "okay";
++		};
++
++		nand0: nand at 40000000 {
++			nand-bus-width = <8>;
++			nand-ecc-mode = "soft";
++			nand-on-flash-bbt;
++			status = "okay";
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		btn3 {
++			label = "Button 3";
++			gpios = <&pioA 30 GPIO_ACTIVE_LOW>;
++			linux,code = <0x103>;
++			gpio-key,wakeup;
++		};
++
++		btn4 {
++			label = "Button 4";
++			gpios = <&pioA 31 GPIO_ACTIVE_LOW>;
++			linux,code = <0x104>;
++			gpio-key,wakeup;
++		};
++	};
++
++	i2c at 0 {
++		status = "okay";
++
++		24c512 at 50 {
++			compatible = "24c512";
++			reg = <0x50>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		ds1 {
++			label = "ds1";
++			gpios = <&pioA 9 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		ds5 {
++			label = "ds5";
++			gpios = <&pioA 6 GPIO_ACTIVE_LOW>;
++		};
++	};
++};
 -- 
-Catalin
+2.1.3
