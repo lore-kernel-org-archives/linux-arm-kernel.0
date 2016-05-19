@@ -1,38 +1,50 @@
-From: oneukum@suse.com (Oliver Neukum)
-Date: Thu, 19 May 2016 14:01:01 +0200
-Subject: [PSCI DISCUSS] How to implement standby and suspend-to-ram by PSCI
-In-Reply-To: <AM3PR04MB0805D7F5375413C154DFB981844A0@AM3PR04MB0805.eurprd04.prod.outlook.com>
-References: <DB3PR04MB0812DAA98F71C30E8A8832E3847D0@DB3PR04MB0812.eurprd04.prod.outlook.com>
- <572C9BF2.9010004@arm.com>
- <DB3PR04MB08125A628F5034749F8109D884730@DB3PR04MB0812.eurprd04.prod.outlook.com>
- <1463486036.19237.9.camel@suse.com>
- <AM3PR04MB0805D7F5375413C154DFB981844A0@AM3PR04MB0805.eurprd04.prod.outlook.com>
-Message-ID: <1463659261.14323.3.camel@suse.com>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Thu, 19 May 2016 08:09:29 -0400
+Subject: [PATCH] ARM: lpc32xx: fix NR_IRQS confict
+In-Reply-To: <573D8F92.3010902@mleia.com>
+References: <1463646968-1047336-1-git-send-email-arnd@arndb.de>
+ <573D8F92.3010902@mleia.com>
+Message-ID: <1463659769.14963.4.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-05-19 at 10:27 +0000, Hongbo Zhang wrote:
-> > For the pm module of the core kernel a low power state is a sleep
-> > state if even one of three conditions is met:
+Hi Arnd,
+
+On Thu, 2016-05-19 at 13:04 +0300, Vladimir Zapolskiy wrote:
+> Hi Arnd,
+> 
+> On 19.05.2016 11:35, Arnd Bergmann wrote:
+> > With the change to sparse IRQs, the lpc32xx platform gets a warning about
+> > conflicting macros:
 > > 
-> > a) a device that can be used for input is not a source of wake ups
-> > b) tasks need to be frozen to enter it
-> > c) the display goes off, while it should be on
+> > In file included from arch/arm/mach-lpc32xx/irq.c:31:0:
+> > arch/arm/mach-lpc32xx/include/mach/irqs.h:115:0: warning: "NR_IRQS" redefined
+> >  #define NR_IRQS    96
+> > arch/arm/include/asm/irq.h:9:0: note: this is the location of the previous definition
+> >  #define NR_IRQS NR_IRQS_LEGACY
 > > 
-> > Generally runtime PM is better if you can get the same results.
-> > Going to a system sleep state is a necessary evil.
+> > In the irq controller driver, we surely need the local number instead of
+> > the generic NR_IRQS definition, so I'm renaming that one to LPC32XX_NR_IRQS.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: 8cb17b5ed017 ("irqchip: Add LPC32xx interrupt controller driver")
+> 
+> I think that the entire removal of arch/arm/mach-lpc32xx/irq.c is the proper fix,
+> since it is a dead code now - http://www.spinics.net/lists/arm-kernel/msg499976.html
+> 
+> I believe you can apply that change and add Fixes: tag.
+> 
+
+I also submitted a patch that remove this warning at the source
+(GPIO driver broken to_irq support), until the GPIO driver update is
+done.
+
+Please refer to this link:
+http://thread.gmane.org/gmane.linux.kernel.gpio/16837
 
 
-> As I just explained in previous reply, many devices in our Soc cannot
-> be physically clock or power gated, all the non-wakeup devices can
-> only be gated off at same time by a PM module, so runtime PM doesn't
-> fit for us well.
+Sylvain
 
-You are looking for a contradiction where none is to be found. We have
-PM domains which allow you to model common clocks and gates. You simply
-use the driver core and it will use the common gate when every device is
-idle. Obviously this is also true when the system is suspended. But not
-necessarily only when the system is suspended.
-
-	Regards
-		Oliver
+> --
+> With best wishes,
+> Vladimir
