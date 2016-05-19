@@ -1,74 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 19 May 2016 20:30:12 +0300
-Subject: [PATCH v3 2/6] ARM: dts: r8a7794: add MSTP5 clocks
-In-Reply-To: <CAMuHMdXaUNwOTQ7827+iTTfuRne_Z1F=-qgxu2cs07==AeqzCA@mail.gmail.com>
-References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
- <1576909.nm8MtQ2Ln5@wasted.cogentembedded.com>
- <CAMuHMdXaUNwOTQ7827+iTTfuRne_Z1F=-qgxu2cs07==AeqzCA@mail.gmail.com>
-Message-ID: <23a35d91-7ba3-be23-c8ee-5a056e6a627b@cogentembedded.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 19 May 2016 20:35:29 +0300
+Subject: Regression: next-20160518: Clk? on BeagleBoard-X15
+In-Reply-To: <20160519165719.GW5995@atomide.com>
+References: <573DDFE6.8010209@ti.com> <20160519165719.GW5995@atomide.com>
+Message-ID: <573DF961.4070705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2016 07:25 PM, Geert Uytterhoeven wrote:
-
->> Add some MSTP5 clocks to the R8A7794 device tree.
+On 19/05/16 19:57, Tony Lindgren wrote:
+> * Nishanth Menon <nm@ti.com> [160519 08:48]:
+>> I have'nt bisected yet, but the platform seems to have booted on
+>> next-20160517
+>> https://github.com/nmenon/kernel-test-logs/blob/next-20160517/omap2plus_defconfig/am57xx-evm.txt
 >>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->> Changes in version 3:
->> - refreshed the patch.
->>
->> Changes in version 2:
->> - added "the" article to the change log.
->>
->>  arch/arm/boot/dts/r8a7794.dtsi            |    9 +++++++++
->>  include/dt-bindings/clock/r8a7794-clock.h |    1 +
->>  2 files changed, 10 insertions(+)
->>
->> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
->> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
->> @@ -1172,6 +1172,15 @@
->>                         clock-indices = <R8A7794_CLK_IRQC>;
->>                         clock-output-names = "irqc";
->>                 };
->> +               mstp5_clks: mstp5_clks at e6150144 {
->> +                       compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->> +                       reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
->> +                       clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
->> +                       #clock-cells = <1>;
->> +                       clock-indices = <R8A7794_CLK_AUDIO_DMAC0
->> +                                        R8A7794_CLK_THERMAL R8A7794_CLK_PWM>;
->> +                       clock-output-names = "audmac0", "thermal", "pwm";
->
-> R-Car E2 does not have the thermal module.
+>> https://github.com/nmenon/kernel-test-logs/blob/next-20160518/omap2plus_defconfig/am57xx-evm.txt
+> 
+> Seems to be commit ac78f9bdcf38 ("drivers/of: Fix depth when
+> unflattening devicetree").
+> 
+> Rob, you need to start playing golf or something between -rc6 and
+> the end of the merge window or something :)
 
-    My "R-Car Series, 2nd Generation User?s Manual: Hardware, Rev.1.02 Oct 
-2014" says it does. What's your source?
+I'm not sure if it's related, but I'm seeing this on omap4 panda, next-20160519:
 
->> +               };
->>                 mstp7_clks: mstp7_clks at e615014c {
->>                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
->>                         reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
->> Index: renesas/include/dt-bindings/clock/r8a7794-clock.h
->> ===================================================================
->> --- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
->> +++ renesas/include/dt-bindings/clock/r8a7794-clock.h
->> @@ -67,6 +67,7 @@
->>  #define R8A7794_CLK_IRQC               7
->>
->>  /* MSTP5 */
->> +#define R8A7794_CLK_AUDIO_DMAC0                2
->>  #define R8A7794_CLK_THERMAL            22
->
-> Hence R8A7794_CLK_THERMAL should be removed.
+[    0.000000] Unable to handle kernel paging request at virtual address af6ec820
+...
+[    0.000000] [<c071ced4>] (unflatten_dt_nodes) from [<c071d5a4>] (__unflatten_device_tree+0xe8/0x254)
+[    0.000000]  r10:c0de3140 r9:ef6b44a4 r8:c15b77c0 r7:00000000 r6:cffee000 r5:00038358
+[    0.000000]  r4:c0de00c0
+[    0.000000] [<c071d4bc>] (__unflatten_device_tree) from [<c0c4a050>] (unflatten_device_tree+0x28/0x40)
+[    0.000000]  r9:0000000c r8:c0d07ca8 r7:c159f4f4 r6:c0d520f8 r5:c0c5984c r4:c0c491a0
+[    0.000000] [<c0c4a028>] (unflatten_device_tree) from [<c0c04754>] (setup_arch+0x770/0xbb4)
+[    0.000000]  r5:c0c5984c r4:c0d02908
+[    0.000000] [<c0c03fe4>] (setup_arch) from [<c0c009c8>] (start_kernel+0x50/0x3c4)
+[    0.000000]  r10:00000000 r9:412fc09a r8:8000406a r7:c0d02900 r6:c0c5ba44 r5:c0d029ac
+[    0.000000]  r4:c0de3214
+[    0.000000] [<c0c00978>] (start_kernel) from [<8000807c>] (0x8000807c)
+[    0.000000]  r10:00000000 r9:412fc09a r8:8000406a r7:c0d07de8 r6:c0c5ba44 r5:c0d029ac
+[    0.000000]  r4:c0de3214
 
-    Well, remove it then. ;-)
+ Tomi
 
->>  #define R8A7794_CLK_PWM                        23
->
-> Gr{oetje,eeting}s,
-
-MBR, Sergei
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160519/b70f5f89/attachment.sig>
