@@ -1,61 +1,42 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 19 May 2016 15:31:31 +0100
-Subject: [PATCH] ARM: tegra: beaver: allow SD card voltage to be changed
-In-Reply-To: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
-References: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
-Message-ID: <573DCE43.70906@nvidia.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 19 May 2016 16:55:53 +0200
+Subject: [PATCH 2/5] drm: mediatek: add CONFIG_OF dependency
+In-Reply-To: <1463587653-3035181-3-git-send-email-arnd@arndb.de>
+References: <1463587653-3035181-1-git-send-email-arnd@arndb.de>
+ <1463587653-3035181-3-git-send-email-arnd@arndb.de>
+Message-ID: <573DD3F9.5010702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 29/02/16 21:01, Lucas Stach wrote:
-> This allows to switch the card signal voltage level to 1.8V,
-> which is needed for any ultra high speed modes to work.
-> 
-> Signed-off-by: Lucas Stach <dev@lynxeye.de>
+
+On 18/05/16 18:07, Arnd Bergmann wrote:
+> The mediatek DRM driver can be configured for compile testing with
+> CONFIG_OF disabled, but then fails to link:
+>
+> drivers/gpu/built-in.o: In function `mtk_drm_bind':
+> analogix_dp_reg.c:(.text+0x52888): undefined reference to `of_find_device_by_node'
+> analogix_dp_reg.c:(.text+0x52930): undefined reference to `of_find_device_by_node'
+>
+> This adds an explicit Kconfig dependency.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
-> This needs the SDMMC memcomp pad calibration patches I just
-> sent out to be applied, otherwise the card voltage change will
-> fail with a message in the kernel log and a fall back to
-> high speed operation.
-> ---
->  arch/arm/boot/dts/tegra30-beaver.dts | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
-> index 1daed40..6b237f2 100644
-> --- a/arch/arm/boot/dts/tegra30-beaver.dts
-> +++ b/arch/arm/boot/dts/tegra30-beaver.dts
-> @@ -1848,7 +1848,7 @@
->  
->  				ldo5_reg: ldo5 {
->  					regulator-name = "vddio_sdmmc,avdd_vdac";
+>   drivers/gpu/drm/mediatek/Kconfig | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/gpu/drm/mediatek/Kconfig b/drivers/gpu/drm/mediatek/Kconfig
+> index 545973f6b743..67183e26971d 100644
+> --- a/drivers/gpu/drm/mediatek/Kconfig
+> +++ b/drivers/gpu/drm/mediatek/Kconfig
+> @@ -3,6 +3,7 @@ config DRM_MEDIATEK
+>   	depends on DRM
+>   	depends on ARCH_MEDIATEK || (ARM && COMPILE_TEST)
+>   	depends on COMMON_CLK
+> +	depends on OF
+>   	select DRM_GEM_CMA_HELPER
+>   	select DRM_KMS_HELPER
+>   	select DRM_MIPI_DSI
+>
 
-Stephen, looking at the schematics, I don't see that this is connected
-to the avdd_vdac (which appears to be unconnected) and so I am wondering
-if this name should be just "vddio_sdmmc"?
-
-> -					regulator-min-microvolt = <3300000>;
-> +					regulator-min-microvolt = <1800000>;
->  					regulator-max-microvolt = <3300000>;
->  					regulator-always-on;
->  				};
-> @@ -1919,6 +1919,7 @@
->  
->  	sdhci at 78000000 {
->  		status = "okay";
-> +		vqmmc-supply = <&ldo5_reg>;
->  		cd-gpios = <&gpio TEGRA_GPIO(I, 5) GPIO_ACTIVE_LOW>;
->  		wp-gpios = <&gpio TEGRA_GPIO(T, 3) GPIO_ACTIVE_HIGH>;
->  		power-gpios = <&gpio TEGRA_GPIO(D, 7) GPIO_ACTIVE_HIGH>;
-> 
-
-Otherwise ...
-
-Acked-by: Jon Hunter <jonathanh@nvidia.com>
-
-Cheers
-Jon
-
--- 
-nvpublic
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
