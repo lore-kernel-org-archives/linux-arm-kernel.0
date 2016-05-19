@@ -1,156 +1,105 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:20 +0100
-Subject: [PATCH v5 41/57] KVM: arm/arm64: vgic-new: vgic_kvm_device:
- KVM_DEV_ARM_VGIC_GRP_NR_IRQS
+Date: Thu, 19 May 2016 19:07:55 +0100
+Subject: [PATCH v5 16/57] KVM: arm/arm64: vgic-new: Add acccessor to new
+ struct vgic_irq instance
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-42-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-17-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-This patch implements the KVM_DEV_ARM_VGIC_GRP_NR_IRQS group. This
-modality is supported by both VGIC V2 and V3 KVM device as will be
-other groups, hence the introduction of common helpers.
+The new VGIC implementation centers around a struct vgic_irq instance
+per virtual IRQ.
+Provide a function to retrieve the right instance for a given IRQ
+number and (in case of private interrupts) the right VCPU.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-kvm-device.c | 83 +++++++++++++++++++++++++++++++++++--
- 1 file changed, 79 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic.c | 41 +++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h | 22 ++++++++++++++++++++++
+ 2 files changed, 63 insertions(+)
+ create mode 100644 virt/kvm/arm/vgic/vgic.c
+ create mode 100644 virt/kvm/arm/vgic/vgic.h
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index ff332f3..05ff925 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -15,9 +15,69 @@
-  */
- #include <linux/kvm_host.h>
- #include <kvm/arm_vgic.h>
-+#include <linux/uaccess.h>
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+new file mode 100644
+index 0000000..fb45537
+--- /dev/null
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -0,0 +1,41 @@
++/*
++ * Copyright (C) 2015, 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++
 +#include "vgic.h"
- 
- /* common helpers */
- 
-+static int vgic_set_common_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
++
++struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
++
++struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
++			      u32 intid)
 +{
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 val;
-+		int ret = 0;
++	/* SGIs and PPIs */
++	if (intid <= VGIC_MAX_PRIVATE)
++		return &vcpu->arch.vgic_cpu.private_irqs[intid];
 +
-+		if (get_user(val, uaddr))
-+			return -EFAULT;
++	/* SPIs */
++	if (intid <= VGIC_MAX_SPI)
++		return &kvm->arch.vgic.spis[intid - VGIC_NR_PRIVATE_IRQS];
 +
-+		/*
-+		 * We require:
-+		 * - at least 32 SPIs on top of the 16 SGIs and 16 PPIs
-+		 * - at most 1024 interrupts
-+		 * - a multiple of 32 interrupts
-+		 */
-+		if (val < (VGIC_NR_PRIVATE_IRQS + 32) ||
-+		    val > VGIC_MAX_RESERVED ||
-+		    (val & 31))
-+			return -EINVAL;
++	/* LPIs are not yet covered */
++	if (intid >= VGIC_MIN_LPI)
++		return NULL;
 +
-+		mutex_lock(&dev->kvm->lock);
-+
-+		if (vgic_ready(dev->kvm) || dev->kvm->arch.vgic.nr_spis)
-+			ret = -EBUSY;
-+		else
-+			dev->kvm->arch.vgic.nr_spis =
-+				val - VGIC_NR_PRIVATE_IRQS;
-+
-+		mutex_unlock(&dev->kvm->lock);
-+
-+		return ret;
-+	}
-+	}
-+
-+	return -ENXIO;
++	WARN(1, "Looking up struct vgic_irq for reserved INTID");
++	return NULL;
 +}
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+new file mode 100644
+index 0000000..61b8d22
+--- /dev/null
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -0,0 +1,22 @@
++/*
++ * Copyright (C) 2015, 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __KVM_ARM_VGIC_NEW_H__
++#define __KVM_ARM_VGIC_NEW_H__
 +
-+static int vgic_get_common_attr(struct kvm_device *dev,
-+				struct kvm_device_attr *attr)
-+{
-+	int r = -ENXIO;
++struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
++			      u32 intid);
 +
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+
-+		r = put_user(dev->kvm->arch.vgic.nr_spis +
-+			     VGIC_NR_PRIVATE_IRQS, uaddr);
-+		break;
-+	}
-+	}
-+
-+	return r;
-+}
-+
- static int vgic_create(struct kvm_device *dev, u32 type)
- {
- 	return kvm_vgic_create(dev->kvm, type);
-@@ -49,18 +109,29 @@ void kvm_register_vgic_device(unsigned long type)
- static int vgic_v2_set_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	int ret;
-+
-+	ret = vgic_set_common_attr(dev, attr);
-+	return ret;
-+
- }
- 
- static int vgic_v2_get_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	int ret;
-+
-+	ret = vgic_get_common_attr(dev, attr);
-+	return ret;
- }
- 
- static int vgic_v2_has_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-+		return 0;
-+	}
- 	return -ENXIO;
- }
- 
-@@ -80,18 +151,22 @@ struct kvm_device_ops kvm_arm_vgic_v2_ops = {
- static int vgic_v3_set_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	return vgic_set_common_attr(dev, attr);
- }
- 
- static int vgic_v3_get_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
--	return -ENXIO;
-+	return vgic_get_common_attr(dev, attr);
- }
- 
- static int vgic_v3_has_attr(struct kvm_device *dev,
- 			    struct kvm_device_attr *attr)
- {
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
-+		return 0;
-+	}
- 	return -ENXIO;
- }
- 
++#endif
 -- 
 2.8.2
