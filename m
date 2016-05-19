@@ -1,103 +1,44 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:26 +0100
-Subject: [PATCH v5 47/57] KVM: arm/arm64: vgic-new: Add userland access to
- VGIC dist registers
-In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-48-git-send-email-andre.przywara@arm.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu, 19 May 2016 13:18:48 -0500
+Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+Message-ID: <573E0388.7030203@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Userland may want to save and restore the state of the in-kernel VGIC,
-so we provide the code which takes a userland request and translate
-that into calls to our MMIO framework.
+On 05/10/2016 10:19 AM, Tomasz Nowicki wrote:
+>  From the functionality point of view this series may be split into the
+> following logic parts:
+> 1. New ECAM API and update for users of the pci-host-common API
+> 2. Necessary fixes as the preparation for using driver on ARM64.
+> 3. Use new MCFG interface and implement generic ACPI based PCI host controller driver.
+> 4. Enable above driver on ARM64
 
->From Christoffer:
-When accessing the VGIC state from userspace we really don't want a VCPU
-to be messing with the state at the same time, and the API specifies
-that we should return -EBUSY if any VCPUs are running.
-Check and prevent VCPUs from running by grabbing their mutexes, one by
-one, and error out if we fail.
-(Note: This could potentially be simplified to just do a simple check
-and see if any VCPUs are running, and return -EBUSY then, without
-enforcing the locking throughout the duration of the uaccess, if we
-think that taking/releasing all these mutexes for every single GIC
-register access is too heavyweight.)
+Thomasz,
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Changelog v4 .. v5:
-- add check to avoid running VCPUs on userland access
+Unless i'm doing something wrong, this patch causes a build break if 
+NUMA is enabled in a 4.6+ kernel.
 
- virt/kvm/arm/vgic/vgic-kvm-device.c | 55 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 54 insertions(+), 1 deletion(-)
+Thanks,
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 78621283..9ee27cb 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -238,7 +238,60 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
- 				 struct kvm_device_attr *attr,
- 				 u32 *reg, bool is_write)
- {
--	return -ENXIO;
-+	gpa_t addr;
-+	int cpuid, ret, c;
-+	struct kvm_vcpu *vcpu, *tmp_vcpu;
-+	int vcpu_lock_idx = -1;
-+
-+	cpuid = (attr->attr & KVM_DEV_ARM_VGIC_CPUID_MASK) >>
-+		 KVM_DEV_ARM_VGIC_CPUID_SHIFT;
-+	vcpu = kvm_get_vcpu(dev->kvm, cpuid);
-+	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-+
-+	mutex_lock(&dev->kvm->lock);
-+
-+	ret = vgic_init(dev->kvm);
-+	if (ret)
-+		goto out;
-+
-+	if (cpuid >= atomic_read(&dev->kvm->online_vcpus)) {
-+		ret = -EINVAL;
-+		goto out;
-+	}
-+
-+	/*
-+	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
-+	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
-+	 * that no other VCPUs are run and fiddle with the vgic state while we
-+	 * access it.
-+	 */
-+	ret = -EBUSY;
-+	kvm_for_each_vcpu(c, tmp_vcpu, dev->kvm) {
-+		if (!mutex_trylock(&tmp_vcpu->mutex))
-+			goto out;
-+		vcpu_lock_idx = c;
-+	}
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
-+		ret = -EINVAL;
-+		break;
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
-+		break;
-+	default:
-+		ret = -EINVAL;
-+		break;
-+	}
-+
-+out:
-+	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
-+		tmp_vcpu = kvm_get_vcpu(dev->kvm, vcpu_lock_idx);
-+		mutex_unlock(&tmp_vcpu->mutex);
-+	}
-+
-+	mutex_unlock(&dev->kvm->lock);
-+	return ret;
- }
- 
- /* V2 ops */
--- 
-2.8.2
+
+
+drivers/built-in.o: In function `pci_device_add':
+/home/jlinton/linux-main/drivers/pci/probe.c:1744: undefined reference 
+to `pcibus_to_node'
+drivers/built-in.o: In function `pci_create_root_bus':
+/home/jlinton/linux-main/drivers/pci/probe.c:2163: undefined reference 
+to `pcibus_to_node'
+drivers/built-in.o: In function `cpulistaffinity_show':
+/home/jlinton/linux-main/drivers/pci/pci-sysfs.c:123: undefined 
+reference to `pcibus_to_node'
+/home/jlinton/linux-main/drivers/pci/pci-sysfs.c:123: undefined 
+reference to `pcibus_to_node'
+drivers/built-in.o: In function `cpuaffinity_show':
+/home/jlinton/linux-main/drivers/pci/pci-sysfs.c:114: undefined 
+reference to `pcibus_to_node'
+drivers/built-in.o:/home/jlinton/linux-main/drivers/pci/pci-sysfs.c:114: 
+more undefined references to `pcibus_to_node' follow
+Makefile:937: recipe for target 'vmlinux' failed
