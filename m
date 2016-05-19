@@ -1,34 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 19 May 2016 07:57:46 -0700
-Subject: [RFC PATCH 2/3] mmc: host: omap_hsmmc: Enable ADMA2
-In-Reply-To: <0d463add-9fa5-a768-2ba6-34c4126c7817@ti.com>
-References: <1463561115-31798-1-git-send-email-kishon@ti.com>
- <1463561115-31798-3-git-send-email-kishon@ti.com>
- <b66f678a-be74-d5f7-f2ef-93b5c9f29b92@ti.com>
- <20160518193028.GT5995@atomide.com>
- <0d463add-9fa5-a768-2ba6-34c4126c7817@ti.com>
-Message-ID: <20160519145745.GU5995@atomide.com>
+From: horia.geanta@nxp.com (=?UTF-8?q?Horia=20Geant=C4=83?=)
+Date: Thu, 19 May 2016 18:11:04 +0300
+Subject: [PATCH v3 3/8] arm64: add io{read,write}64be accessors
+In-Reply-To: <1463670405-1059-1-git-send-email-horia.geanta@nxp.com>
+References: <1463670405-1059-1-git-send-email-horia.geanta@nxp.com>
+Message-ID: <1463670664-2856-1-git-send-email-horia.geanta@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [160519 01:10]:
-> On 05/18/2016 10:30 PM, Tony Lindgren wrote:
-> > Ideally the adma support would be a separate loadable module,
-> > similar how the cppi41dma is a child of the OTG controller.
-> 
-> The Master DMA is part of the hsmmc IP block. If the same ADMA module is
-> present on other IPs it might be beneficial to have a helper library to handle
-> it (allocating the descriptor pool, wrinting, updating descriptors, etc).
+This will allow device drivers to consistently use io{read,write}XXbe
+also for 64-bit accesses.
 
-OK. Yeah if it's part of the MMC controller it makes no sense to
-separate it. So then the conecrns are using alternate DMA
-implementations and keeping PM runtime working :)
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Alex Porosanu <alexandru.porosanu@nxp.com>
+Signed-off-by: Horia Geant? <horia.geanta@nxp.com>
+---
+ arch/arm64/include/asm/io.h | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-BTW, Felipe mentioned that the best thing to do in the long run would
-be to set up sdhci-omap.c operating in ADMA mode.
-
-Felipe, care to summarize what you had in mind?
-
-Regards,
-
-Tony
+diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
+index 44be1e03ed65..9b6e408cfa51 100644
+--- a/arch/arm64/include/asm/io.h
++++ b/arch/arm64/include/asm/io.h
+@@ -174,13 +174,15 @@ extern void __iomem *ioremap_cache(phys_addr_t phys_addr, size_t size);
+ #define iounmap				__iounmap
+ 
+ /*
+- * io{read,write}{16,32}be() macros
++ * io{read,write}{16,32,64}be() macros
+  */
+ #define ioread16be(p)		({ __u16 __v = be16_to_cpu((__force __be16)__raw_readw(p)); __iormb(); __v; })
+ #define ioread32be(p)		({ __u32 __v = be32_to_cpu((__force __be32)__raw_readl(p)); __iormb(); __v; })
++#define ioread64be(p)		({ __u64 __v = be64_to_cpu((__force __be64)__raw_readq(p)); __iormb(); __v; })
+ 
+ #define iowrite16be(v,p)	({ __iowmb(); __raw_writew((__force __u16)cpu_to_be16(v), p); })
+ #define iowrite32be(v,p)	({ __iowmb(); __raw_writel((__force __u32)cpu_to_be32(v), p); })
++#define iowrite64be(v,p)	({ __iowmb(); __raw_writeq((__force __u64)cpu_to_be64(v), p); })
+ 
+ /*
+  * Convert a physical pointer to a virtual kernel pointer for /dev/mem
+-- 
+2.4.4
