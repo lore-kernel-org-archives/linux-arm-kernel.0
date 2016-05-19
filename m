@@ -1,53 +1,52 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Thu, 19 May 2016 20:03:09 +0900
-Subject: Help needed with kexec on arm64
-In-Reply-To: <DB5PR04MB1688C3F122091109E6BD9B68E6740@DB5PR04MB1688.eurprd04.prod.outlook.com>
-References: <CAB5YjtBEO=efjhcFdVOaZqG13qK3uzCbS5SFym5hhw-n+_QLhw@mail.gmail.com>
- <DB5PR04MB1688A6D4385B76DAFF71D364E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
- <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
- <DB5PR04MB168874758924173BBD5CC037E69D0@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160405052341.GA19476@linaro.org>
- <DB5PR04MB1688F09062B2A5ECACCA4D80E6710@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160511005334.GA8417@linaro.org>
- <DB5PR04MB1688C3F122091109E6BD9B68E6740@DB5PR04MB1688.eurprd04.prod.outlook.com>
-Message-ID: <20160519110307.GA4941@linaro.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 19 May 2016 12:04:45 +0100
+Subject: [PATCH] arm64: cpuinfo: add AArch64 & elf platform for app
+ compatibility
+In-Reply-To: <1463625873-60016-1-git-send-email-saberlily.xia@hisilicon.com>
+References: <1463625873-60016-1-git-send-email-saberlily.xia@hisilicon.com>
+Message-ID: <573D9DCD.8020308@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 12:45:04PM +0000, Harninder Rai wrote:
-> Hello Takahiro Akashi,
-> 
-> > 
-> > Apparently lack of memory is a cause of OOM killer, but the core file has
-> > nothing to do with this issue.
-> > I think that you don't have enough memory for the system yet.
-> > 
-> > -Takahiro AKASHI
-> 
-> 
-> I moved to SD card based rootfs for booting the crash kernel but when I try to load the dump kernel, I get the following message
-> Is there limitation with kexec that the crash kernel cannot be booted from anything apart from RAM?
+On 19/05/16 03:44, x00195127 wrote:
+> we find that some apps will read cpuinfo when start up,
+> they need the string  as follows:
+> "Processor       : AArch64 Processor rev 0 (aarch64)"
+>
+> Then thay could load the corresponding libs. But now
+> arm64 platform's cpuinfo don't has this now, so
+> we need add this.
+>
+> Signed-off-by: Qing Xia <saberlily.xia@hisilicon.com>
+> ---
+>   arch/arm64/kernel/cpuinfo.c | 3 +++
+>   1 file changed, 3 insertions(+)
+>
+> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> index 3808470..c3527ad 100644
+> --- a/arch/arm64/kernel/cpuinfo.c
+> +++ b/arch/arm64/kernel/cpuinfo.c
+> @@ -114,6 +114,9 @@ static int c_show(struct seq_file *m, void *v)
+>   		 * online processors, looking for lines beginning with
+>   		 * "processor".  Give glibc what it expects.
+>   		 */
+> +		seq_printf(m, "Processor\t: AArch64 Processor rev %d (%s)\n",
+> +				read_cpuid_id() & 15, ELF_PLATFORM);
 
-I don't know what you did here exactly, but I don't think that
-there is such a limitation.
+The pre-3.19 behaviour printed this once - now you're printing it for 
+every CPU in the system, but all with the same revision of whichever 
+core this happens to be running on, which is unjustifiably incorrect.
 
-> kexec -p ./vmlinux --initrd=./ramdisk_ls1012_openwrt.cpio.gz --append='console=ttyS1,115200 root=/dev/mmcblk0p1 earlycon=uart8250,mmio,0x21c0600ramdisk_size=0x2000000 default_hugepagesz=2m hugepagesz=2m hugepages=256 crashkernel=64M at 2240M memblock=debug'
-> Memory for crashkernel is not reserved
+Furthermore, this string provides virtually no useful information anyway 
+- the majority of code running on AArch64 already knows that by virtue 
+of the fact that *it's running at all*, and for scripts/interpreted 
+code/etc. there are already appropriate mechanisms for discovering the 
+platform (e.g. uname).
 
-This message is a hint. You have got the same one before, right?
-Please check /proc/iomem and a dmesg log from the first kernel
-with memblock=debug.
+Robin.
 
--Takahiro AKASHI
-
-> Please reserve memory by passing"crashkernel=X at Y" parameter to kernel
-> Then try to loading kdump kernel
-> 
-> Regards
-> Harry++
-
--- 
-Thanks,
--Takahiro AKASHI
+> +
+>   		seq_printf(m, "processor\t: %d\n", i);
+>
+>   		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+>
