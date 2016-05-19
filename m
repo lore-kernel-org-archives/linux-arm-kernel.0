@@ -1,67 +1,81 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 19 May 2016 11:02:56 -0500
-Subject: [GIT PULL 0/7] ARM: SoC changes for 4.7
-In-Reply-To: <8749147.ztcb6kVhye@wuerfel>
-References: <8749147.ztcb6kVhye@wuerfel>
-Message-ID: <CAL_JsqKcVN-KcJnBhqoMpoBjJk4KiPgbWXzA1FR+vh5_bL6oYg@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 20 May 2016 00:04:07 +0800
+Subject: [PATCH 1/3] spi/rockchip: add rk3036/rk3228/rk3368 socs for spi
+ document
+In-Reply-To: <3685935.dKdIbE8hXb@phil>
+References: <1463672824-15367-1-git-send-email-wxt@rock-chips.com>
+ <3685935.dKdIbE8hXb@phil>
+Message-ID: <573DE3F7.6070300@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2016 at 5:07 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Hi Linus,
+
+
+? 2016?05?19? 23:51, Heiko Stuebner ??:
+> Am Donnerstag, 19. Mai 2016, 23:47:02 schrieb Caesar Wang:
+>> We had supported the rk3036/rk3066/rk3188/rk3228/rk3288/rk3368/rk3399
+>> family SoCs in linux kernel.
+>>
+>> Let's add the other SoCs, in order to a better understanding from the
+>> rockchip spi document.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Mark Brown <broonie@kernel.org>
+>> Cc: Heiko Stuebner <heiko@sntech.de>
+>> Cc: linux-rockchip at lists.infradead.org
+>> ---
+>>
+>>   Documentation/devicetree/bindings/spi/spi-rockchip.txt | 3 +++
+>>   1 file changed, 3 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+>> b/Documentation/devicetree/bindings/spi/spi-rockchip.txt index
+>> 1b14d69..305b542 100644
+>> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+>> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+>> @@ -6,9 +6,12 @@ and display controllers using the SPI communication
+>> interface. Required Properties:
+>>
+>>   - compatible: should be one of the following.
+>> +    "rockchip,rk3036-spi" for rk3036.
+> shouldn't the rk3036 also get the rk3066 fallback. Looking at the driver
+> part (patch2) the rk3036 still is the same IP as for every other soc in
+> here.
+
+Yep, the same IP.
+
+Do you think we should keep the below style?
+
+1)
+"rockchip,rk3036-spi", "rockchip,rk3066-spi" for rk3036.
+  "rockchip,rk3066-spi" for rk3066.
+  "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
+...
+
+or
+2)
+  "rockchip,rk3066-spi" for rk3066.
+"rockchip,rk3036-spi", "rockchip,rk3066-spi" for rk3036.
+  "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188
+..
+
+or
+3)
+"rockchip, rockchip-spi" for rk3036 rk3066.......
+
+Think about the 1) will be googd select.
+
+-Caesar
+
+>>       "rockchip,rk3066-spi" for rk3066.
+>>       "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
+>> +    "rockchip,rk3228-spi", "rockchip,rk3066-spi" for rk3228.
+>>       "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
+>> +    "rockchip,rk3368-spi", "rockchip,rk3066-spi" for rk3368.
+>>       "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
+>>   - reg: physical base address of the controller and length of memory
+>> mapped region.
 >
-> These are the first seven pull requests for arm-soc this time, there is
-> one small follow-up coming once the dependencies for that have landed
-> in your tree.
 >
-> Things remain relatively calm for us. We merged 122 pull requests with
-> 822 patches, plus 35 individual patches, which is less than what we used
-> to have. We are shifting even more towards changing only dts files,
-> for the most part adding new functionality on existing boards, and adding
-> new machines, as shown clearly by the dirstat:
-
-[...]
-
->  730 files changed, 47909 insertions(+), 7916 deletions(-)
 >
-> My feeling is that the number of dts changes remain constant, but
-> everything else gets less every time, and that's good.
-
-I happen have a script... (I run it every time people complain about DT).
-
-Here's the diffstat of mach-* and plat-* since merging DT support:
-
-v3.0: 833 files changed, 10945 insertions(+), 37476 deletions(-)
-v3.1: 955 files changed, 17796 insertions(+), 20300 deletions(-)
-v3.2: 1507 files changed, 32960 insertions(+), 33392 deletions(-)
-v3.3: 1301 files changed, 27725 insertions(+), 18941 deletions(-)
-v3.4: 1324 files changed, 27079 insertions(+), 21500 deletions(-)
-v3.5: 975 files changed, 32340 insertions(+), 46663 deletions(-)
-v3.6: 648 files changed, 16121 insertions(+), 13161 deletions(-)
-v3.7: 1389 files changed, 23739 insertions(+), 61097 deletions(-)
-v3.8: 1066 files changed, 32812 insertions(+), 40821 deletions(-)
-v3.9: 1031 files changed, 10051 insertions(+), 33399 deletions(-)
-v3.10: 831 files changed, 15049 insertions(+), 27333 deletions(-)
-v3.11: 675 files changed, 18519 insertions(+), 30012 deletions(-)
-v3.12: 474 files changed, 12575 insertions(+), 25120 deletions(-)
-v3.13: 491 files changed, 11088 insertions(+), 13375 deletions(-)
-v3.14: 408 files changed, 5586 insertions(+), 12691 deletions(-)
-v3.15: 538 files changed, 7809 insertions(+), 9337 deletions(-)
-v3.16: 499 files changed, 6528 insertions(+), 10252 deletions(-)
-v3.17: 596 files changed, 6274 insertions(+), 36824 deletions(-)
-v3.18: 333 files changed, 3111 insertions(+), 6905 deletions(-)
-v3.19: 435 files changed, 6180 insertions(+), 32402 deletions(-)
-v4.0: 265 files changed, 4081 insertions(+), 14119 deletions(-)
-v4.1: 362 files changed, 4286 insertions(+), 24876 deletions(-)
-v4.2: 292 files changed, 3115 insertions(+), 11567 deletions(-)
-v4.3: 306 files changed, 3223 insertions(+), 14510 deletions(-)
-v4.4: 160 files changed, 2014 insertions(+), 4893 deletions(-)
-v4.5: 531 files changed, 3839 insertions(+), 4398 deletions(-)
-v4.6: 211 files changed, 1417 insertions(+), 4320 deletions(-)
-
-Once this goes to 0, we can move the dts files out of the kernel and
-make you maintainer. ;)
-
-The dts files' numbers do look pretty constant.
-
-Rob
