@@ -1,36 +1,43 @@
-From: nkaje@codeaurora.org (Naveen Kaje)
-Date: Thu, 19 May 2016 15:16:49 -0600
-Subject: [PATCH v2 2/2] i2c: qup: support SMBus block read
-In-Reply-To: <573E205C.9080701@codeaurora.org>
-References: <1463006736-24652-1-git-send-email-nkaje@codeaurora.org>
- <1463006736-24652-2-git-send-email-nkaje@codeaurora.org>
- <000d01d1b0d3$d70e1f30$852a5d90$@codeaurora.org>
- <757c18e2-562a-9f43-0fb6-ab3e7ac3af88@codeaurora.org>
- <573E205C.9080701@codeaurora.org>
-Message-ID: <1d96dfb6-9f0e-14ee-7f75-4c20fd98b183@codeaurora.org>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 19 May 2016 16:20:50 -0500
+Subject: [PATCH] usb: echi-hcd: Add ehci_setup check before echi_shutdown
+In-Reply-To: <1463652776-30456-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1463652776-30456-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <CAPBZ5QcMiMEv1n=WU6aW2PGNsSPZJR42iZge_VUX4aWZ-KKzbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Timur, Sricharan,
+On 19 May 2016 at 05:12, Srinivas Kandagatla
+<srinivas.kandagatla@linaro.org> wrote:
 
-On 5/19/2016 2:21 PM, Timur Tabi wrote:
-> Naveen Kaje wrote:
->>>>
->>>> +        tags[len++] = QUP_TAG_V2_DATARD;
->>>> +        /* 0 implies 256 bytes */
->>>> +        if (data_len == QUP_READ_LIMIT)
->>>> +            tags[len++] = 0;
->>>> +        else
->>>> +            tags[len++] = data_len;
->>>> +    }
->>>         Even data_len will always be '1' right ?
->> Yes, but here preferably we use a variable than a number without a 
->> context.
+<snip>
+
+> +++ b/drivers/usb/host/ehci-hcd.c
+> @@ -368,6 +368,15 @@ static void ehci_shutdown(struct usb_hcd *hcd)
+>  {
+>         struct ehci_hcd *ehci = hcd_to_ehci(hcd);
 >
-> Actually, I would say the opposite.  I would rather see a constant 
-> with a comment explaining it, than a variable that we know will always 
-> contain only one number.
->
-Ok, got it. Will be fixed in V3.
-Thanks,
-Naveen
+> +       /**
+> +        * Protect the system from crashing at system shutdown in cases where
+> +        * usb host is not added yet from OTG controller driver.
+> +        * As ehci_setup() not done yet, so stop accessing registers or
+> +        * variables initialized in ehci_setup()
+> +        */
+> +       if (!ehci->sbrn)
+> +               return;
+> +
+>         spin_lock_irq(&ehci->lock);
+>         ehci->shutdown = true;
+>         ehci->rh_state = EHCI_RH_STOPPING;
+
+
+Should we also not check this in ehci_suspend and ehci_resume?  If I
+do suspend/resume, it crashes in a similar manner.  I know this goes
+beyond the problem scope of the patch.  Perhaps I should send in an
+additional patch with the code?
+
+Are there any other places in the ehci-hcd where this needs to be checked?
+
+Regards,
+
+Andy
