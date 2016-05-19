@@ -1,134 +1,135 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:36 +0100
-Subject: [PATCH v5 57/57] KVM: arm/arm64: vgic-new: enable build
+Date: Thu, 19 May 2016 19:08:30 +0100
+Subject: [PATCH v5 51/57] KVM: arm/arm64: vgic-new: vgic_init: implement
+ vgic_create
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-58-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-52-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the new VGIC implementation has reached feature parity with
-the old one, add the new files to the build system and add a Kconfig
-option to switch between the two versions.
-We set the default to the new version to get maximum test coverage,
-in case people experience problems they can switch back to the old
-behaviour if needed.
+From: Eric Auger <eric.auger@linaro.org>
 
+This patch implements kvm_vgic_create, which is called on the
+KVM_CREATE_IRQCHIP VM ioctl (GICv2 only) or via KVM_CREATE_DEVICE.
+
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
-Changelog v1 .. v2:
-- adjust the changed filenames in the Makefiles
-- add vgic-mmio-v2.c and vgic-mmio-v3.c to the Makefiles
+Changelog v3 .. v4:
+- fix comment
 
- arch/arm/kvm/Kconfig          |  7 +++++++
- arch/arm/kvm/Makefile         | 11 +++++++++++
- arch/arm64/kvm/Kconfig        |  7 +++++++
- arch/arm64/kvm/Makefile       | 12 ++++++++++++
- virt/kvm/arm/hyp/vgic-v2-sr.c |  5 +++++
- 5 files changed, 42 insertions(+)
+ include/kvm/vgic/vgic.h       |  1 +
+ virt/kvm/arm/vgic/vgic-init.c | 84 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 85 insertions(+)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 95a0005..02abfff 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -46,6 +46,13 @@ config KVM_ARM_HOST
- 	---help---
- 	  Provides host support for ARM processors.
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 393489f..0634d89 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -195,6 +195,7 @@ struct vgic_cpu {
+ };
  
-+config KVM_NEW_VGIC
-+	bool "New VGIC implementation"
-+	depends on KVM
-+	default y
-+	---help---
-+	  uses the new VGIC implementation
+ int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
++int kvm_vgic_create(struct kvm *kvm, u32 type);
+ int kvm_vgic_hyp_init(void);
+ 
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 4523beb..15d5428 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -22,6 +22,90 @@
+ #include <asm/kvm_mmu.h>
+ #include "vgic.h"
+ 
++/* CREATION */
 +
- source drivers/vhost/Kconfig
- 
- endif # VIRTUALIZATION
-diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-index eb1bf43..a596b58 100644
---- a/arch/arm/kvm/Makefile
-+++ b/arch/arm/kvm/Makefile
-@@ -21,7 +21,18 @@ obj-$(CONFIG_KVM_ARM_HOST) += hyp/
- obj-y += kvm-arm.o init.o interrupts.o
- obj-y += arm.o handle_exit.o guest.o mmu.o emulate.o reset.o
- obj-y += coproc.o coproc_a15.o coproc_a7.o mmio.o psci.o perf.o
++/**
++ * kvm_vgic_create: triggered by the instantiation of the VGIC device by
++ * user space, either through the legacy KVM_CREATE_IRQCHIP ioctl (v2 only)
++ * or through the generic KVM_CREATE_DEVICE API ioctl.
++ * irqchip_in_kernel() tells you if this function succeeded or not.
++ */
++int kvm_vgic_create(struct kvm *kvm, u32 type)
++{
++	int i, vcpu_lock_idx = -1, ret;
++	struct kvm_vcpu *vcpu;
 +
-+ifeq ($(CONFIG_KVM_NEW_VGIC),y)
-+obj-y += $(KVM)/arm/vgic/vgic.o
-+obj-y += $(KVM)/arm/vgic/vgic-init.o
-+obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
-+obj-y += $(KVM)/arm/vgic/vgic-v2.o
-+obj-y += $(KVM)/arm/vgic/vgic-mmio.o
-+obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
-+obj-y += $(KVM)/arm/vgic/vgic-kvm-device.o
-+else
- obj-y += $(KVM)/arm/vgic.o
- obj-y += $(KVM)/arm/vgic-v2.o
- obj-y += $(KVM)/arm/vgic-v2-emul.o
-+endif
- obj-y += $(KVM)/arm/arch_timer.o
-diff --git a/arch/arm64/kvm/Kconfig b/arch/arm64/kvm/Kconfig
-index aa2e34e..c4f26ef 100644
---- a/arch/arm64/kvm/Kconfig
-+++ b/arch/arm64/kvm/Kconfig
-@@ -54,6 +54,13 @@ config KVM_ARM_PMU
- 	  Adds support for a virtual Performance Monitoring Unit (PMU) in
- 	  virtual machines.
- 
-+config KVM_NEW_VGIC
-+	bool "New VGIC implementation"
-+	depends on KVM
-+	default y
-+        ---help---
-+          uses the new VGIC implementation
++	mutex_lock(&kvm->lock);
 +
- source drivers/vhost/Kconfig
++	if (irqchip_in_kernel(kvm)) {
++		ret = -EEXIST;
++		goto out;
++	}
++
++	/*
++	 * This function is also called by the KVM_CREATE_IRQCHIP handler,
++	 * which had no chance yet to check the availability of the GICv2
++	 * emulation. So check this here again. KVM_CREATE_DEVICE does
++	 * the proper checks already.
++	 */
++	if (type == KVM_DEV_TYPE_ARM_VGIC_V2 &&
++		!kvm_vgic_global_state.can_emulate_gicv2) {
++		ret = -ENODEV;
++		goto out;
++	}
++
++	/*
++	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
++	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
++	 * that no other VCPUs are run while we create the vgic.
++	 */
++	ret = -EBUSY;
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		if (!mutex_trylock(&vcpu->mutex))
++			goto out_unlock;
++		vcpu_lock_idx = i;
++	}
++
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		if (vcpu->arch.has_run_once)
++			goto out_unlock;
++	}
++	ret = 0;
++
++	if (type == KVM_DEV_TYPE_ARM_VGIC_V2)
++		kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
++	else
++		kvm->arch.max_vcpus = VGIC_V3_MAX_CPUS;
++
++	if (atomic_read(&kvm->online_vcpus) > kvm->arch.max_vcpus) {
++		ret = -E2BIG;
++		goto out_unlock;
++	}
++
++	kvm->arch.vgic.in_kernel = true;
++	kvm->arch.vgic.vgic_model = type;
++
++	/*
++	 * kvm_vgic_global_state.vctrl_base is set on vgic probe (kvm_arch_init)
++	 * it is stored in distributor struct for asm save/restore purpose
++	 */
++	kvm->arch.vgic.vctrl_base = kvm_vgic_global_state.vctrl_base;
++
++	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
++	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
++	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
++
++out_unlock:
++	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
++		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
++		mutex_unlock(&vcpu->mutex);
++	}
++
++out:
++	mutex_unlock(&kvm->lock);
++	return ret;
++}
++
+ /* GENERIC PROBE */
  
- endif # VIRTUALIZATION
-diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-index 122cff4..a7a958c 100644
---- a/arch/arm64/kvm/Makefile
-+++ b/arch/arm64/kvm/Makefile
-@@ -20,10 +20,22 @@ kvm-$(CONFIG_KVM_ARM_HOST) += emulate.o inject_fault.o regmap.o
- kvm-$(CONFIG_KVM_ARM_HOST) += hyp.o hyp-init.o handle_exit.o
- kvm-$(CONFIG_KVM_ARM_HOST) += guest.o debug.o reset.o sys_regs.o sys_regs_generic_v8.o
- 
-+ifeq ($(CONFIG_KVM_NEW_VGIC),y)
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-irqfd.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
-+kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
-+else
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2-emul.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
-+endif
- kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
- kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index caac41f..a3f12b3 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -21,7 +21,12 @@
- 
- #include <asm/kvm_hyp.h>
- 
-+#ifdef CONFIG_KVM_NEW_VGIC
-+extern struct vgic_global kvm_vgic_global_state;
-+#define vgic_v2_params kvm_vgic_global_state
-+#else
- extern struct vgic_params vgic_v2_params;
-+#endif
- 
- static void __hyp_text save_maint_int_state(struct kvm_vcpu *vcpu,
- 					    void __iomem *base)
+ static void vgic_init_maintenance_interrupt(void *info)
 -- 
 2.8.2
