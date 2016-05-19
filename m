@@ -1,101 +1,77 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 19 May 2016 18:20:58 +0200
-Subject: [PATCH 1/3] spi/rockchip: add rk3036/rk3228/rk3368 socs for spi
- document
-In-Reply-To: <573DE3F7.6070300@rock-chips.com>
-References: <1463672824-15367-1-git-send-email-wxt@rock-chips.com>
- <3685935.dKdIbE8hXb@phil> <573DE3F7.6070300@rock-chips.com>
-Message-ID: <3828505.WBLtTjjB7h@phil>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 19 May 2016 18:25:02 +0200
+Subject: [PATCH v3 2/6] ARM: dts: r8a7794: add MSTP5 clocks
+In-Reply-To: <1576909.nm8MtQ2Ln5@wasted.cogentembedded.com>
+References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
+ <1576909.nm8MtQ2Ln5@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXaUNwOTQ7827+iTTfuRne_Z1F=-qgxu2cs07==AeqzCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 20. Mai 2016, 00:04:07 schrieb Caesar Wang:
-> ? 2016?05?19? 23:51, Heiko Stuebner ??:
-> > Am Donnerstag, 19. Mai 2016, 23:47:02 schrieb Caesar Wang:
-> >> We had supported the rk3036/rk3066/rk3188/rk3228/rk3288/rk3368/rk3399
-> >> family SoCs in linux kernel.
-> >> 
-> >> Let's add the other SoCs, in order to a better understanding from the
-> >> rockchip spi document.
-> >> 
-> >> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> >> Cc: Rob Herring <robh+dt@kernel.org>
-> >> Cc: Mark Brown <broonie@kernel.org>
-> >> Cc: Heiko Stuebner <heiko@sntech.de>
-> >> Cc: linux-rockchip at lists.infradead.org
-> >> ---
-> >> 
-> >>   Documentation/devicetree/bindings/spi/spi-rockchip.txt | 3 +++
-> >>   1 file changed, 3 insertions(+)
-> >> 
-> >> diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >> b/Documentation/devicetree/bindings/spi/spi-rockchip.txt index
-> >> 1b14d69..305b542 100644
-> >> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
-> >> @@ -6,9 +6,12 @@ and display controllers using the SPI communication
-> >> 
-> >> interface. Required Properties:
-> >>   - compatible: should be one of the following.
-> >> 
-> >> +    "rockchip,rk3036-spi" for rk3036.
-> > 
-> > shouldn't the rk3036 also get the rk3066 fallback. Looking at the driver
-> > part (patch2) the rk3036 still is the same IP as for every other soc in
-> > here.
-> 
-> Yep, the same IP.
-> 
-> Do you think we should keep the below style?
-> 
-> 1)
-> "rockchip,rk3036-spi", "rockchip,rk3066-spi" for rk3036.
->   "rockchip,rk3066-spi" for rk3066.
->   "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
-> ...
-> 
-> or
-> 2)
->   "rockchip,rk3066-spi" for rk3066.
-> "rockchip,rk3036-spi", "rockchip,rk3066-spi" for rk3036.
->   "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188
-> ..
-> 
-> or
-> 3)
-> "rockchip, rockchip-spi" for rk3036 rk3066.......
-> 
-> Think about the 1) will be googd select.
+Hi Sergei,
 
-or
-(4) drop the fallbacks. We match against each compatible all the time 
-anyway, so you could also simply do
+On Thu, May 12, 2016 at 10:45 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add some MSTP5 clocks to the R8A7794 device tree.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> ---
+> Changes in version 3:
+> - refreshed the patch.
+>
+> Changes in version 2:
+> - added "the" article to the change log.
+>
+>  arch/arm/boot/dts/r8a7794.dtsi            |    9 +++++++++
+>  include/dt-bindings/clock/r8a7794-clock.h |    1 +
+>  2 files changed, 10 insertions(+)
+>
+> Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+> @@ -1172,6 +1172,15 @@
+>                         clock-indices = <R8A7794_CLK_IRQC>;
+>                         clock-output-names = "irqc";
+>                 };
+> +               mstp5_clks: mstp5_clks at e6150144 {
+> +                       compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+> +                       reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+> +                       clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
+> +                       #clock-cells = <1>;
+> +                       clock-indices = <R8A7794_CLK_AUDIO_DMAC0
+> +                                        R8A7794_CLK_THERMAL R8A7794_CLK_PWM>;
+> +                       clock-output-names = "audmac0", "thermal", "pwm";
 
-  "rockchip,rk3036-spi" for rk3036
-  "rockchip,rk3066-spi" for rk3066
-  "rockchip,rk3188-spi" for rk3188
+R-Car E2 does not have the thermal module.
 
-Maybe leave the fallbacks for existing socs, and just add the new ones 
-without the fallbacks.
+> +               };
+>                 mstp7_clks: mstp7_clks at e615014c {
+>                         compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+>                         reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+> Index: renesas/include/dt-bindings/clock/r8a7794-clock.h
+> ===================================================================
+> --- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
+> +++ renesas/include/dt-bindings/clock/r8a7794-clock.h
+> @@ -67,6 +67,7 @@
+>  #define R8A7794_CLK_IRQC               7
+>
+>  /* MSTP5 */
+> +#define R8A7794_CLK_AUDIO_DMAC0                2
+>  #define R8A7794_CLK_THERMAL            22
 
-rockchip,rockchip-spi is not future proof ... i.e. in some future soc 
-somebody might want to exchange the IP block against a different one, so 
-being specific saves us from hassle then :-)
+Hence R8A7794_CLK_THERMAL should be removed.
 
+>  #define R8A7794_CLK_PWM                        23
 
-Heiko
+Gr{oetje,eeting}s,
 
-> >>       "rockchip,rk3066-spi" for rk3066.
-> >>       "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
-> >> 
-> >> +    "rockchip,rk3228-spi", "rockchip,rk3066-spi" for rk3228.
-> >> 
-> >>       "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
-> >> 
-> >> +    "rockchip,rk3368-spi", "rockchip,rk3066-spi" for rk3368.
-> >> 
-> >>       "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
-> >>   
-> >>   - reg: physical base address of the controller and length of memory
-> >> 
-> >> mapped region.
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
