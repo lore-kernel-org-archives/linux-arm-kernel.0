@@ -1,172 +1,92 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:08:24 +0100
-Subject: [PATCH v5 45/57] KVM: arm/arm64: vgic-new: vgic_kvm_device: access to
- VGIC registers
+Date: Thu, 19 May 2016 19:08:25 +0100
+Subject: [PATCH v5 46/57] KVM: arm/arm64: vgic-new: Export register access
+ interface
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-46-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-47-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-This patch implements the switches for KVM_DEV_ARM_VGIC_GRP_DIST_REGS
-and KVM_DEV_ARM_VGIC_GRP_CPU_REGS API which allows the userspace to
-access VGIC registers.
+Userland can access the emulated GIC to save and restore its state
+for initialization or migration purposes.
+The kvm_io_bus API requires an absolute gpa, which does not fit the
+KVM_DEV_ARM_VGIC_GRP_DIST_REGS user API, that only provides relative
+offsets. So we provide a wrapper to plug into our MMIO framework and
+find the respective register handler.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 ---
-Changelog v3 .. v4:
-- check for proper alignment on userland GIC accesses
+Changelog v1 .. v2:
+- adapt to new MMIO framework
+- handle endianess explicitly
 
- virt/kvm/arm/vgic/vgic-kvm-device.c | 53 +++++++++++++++++++++++++++++++++++--
- virt/kvm/arm/vgic/vgic-mmio-v2.c    | 38 ++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h            |  1 +
- 3 files changed, 90 insertions(+), 2 deletions(-)
+Changelog v2 .. v3:
+- wrap accessor function for easier reusage later
+- moved from earlier in the series
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index a709097..78621283 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -226,6 +226,21 @@ void kvm_register_vgic_device(unsigned long type)
- 	}
- }
- 
-+/** vgic_attr_regs_access: allows user space to read/write VGIC registers
-+ *
-+ * @dev: kvm device handle
-+ * @attr: kvm device attribute
-+ * @reg: address the value is read or written
-+ * @is_write: write flag
-+ *
-+ */
-+static int vgic_attr_regs_access(struct kvm_device *dev,
-+				 struct kvm_device_attr *attr,
-+				 u32 *reg, bool is_write)
-+{
-+	return -ENXIO;
-+}
-+
- /* V2 ops */
- 
- static int vgic_v2_set_attr(struct kvm_device *dev,
-@@ -234,8 +249,23 @@ static int vgic_v2_set_attr(struct kvm_device *dev,
- 	int ret;
- 
- 	ret = vgic_set_common_attr(dev, attr);
--	return ret;
-+	if (ret != -ENXIO)
-+		return ret;
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 reg;
-+
-+		if (get_user(reg, uaddr))
-+			return -EFAULT;
- 
-+		return vgic_attr_regs_access(dev, attr, &reg, true);
-+	}
-+	}
-+
-+	return -ENXIO;
- }
- 
- static int vgic_v2_get_attr(struct kvm_device *dev,
-@@ -244,7 +274,23 @@ static int vgic_v2_get_attr(struct kvm_device *dev,
- 	int ret;
- 
- 	ret = vgic_get_common_attr(dev, attr);
--	return ret;
-+	if (ret != -ENXIO)
-+		return ret;
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS: {
-+		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
-+		u32 reg = 0;
-+
-+		ret = vgic_attr_regs_access(dev, attr, &reg, false);
-+		if (ret)
-+			return ret;
-+		return put_user(reg, uaddr);
-+	}
-+	}
-+
-+	return -ENXIO;
- }
- 
- static int vgic_v2_has_attr(struct kvm_device *dev,
-@@ -258,6 +304,9 @@ static int vgic_v2_has_attr(struct kvm_device *dev,
- 			return 0;
- 		}
- 		break;
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
-+		return vgic_v2_has_attr_regs(dev, attr);
- 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
- 		return 0;
- 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 36 ++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h         |  2 ++
+ 2 files changed, 38 insertions(+)
+
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 3925d4c..7189690 100644
+index 7189690..a255122 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -258,3 +258,41 @@ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev)
+@@ -296,3 +296,39 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
  
- 	return SZ_4K;
+ 	return -ENXIO;
  }
 +
-+int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
++/*
++ * When userland tries to access the VGIC register handlers, we need to
++ * create a usable struct vgic_io_device to be passed to the handlers and we
++ * have to set up a buffer similar to what would have happened if a guest MMIO
++ * access occurred, including doing endian conversions on BE systems.
++ */
++static int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
++			bool is_write, int offset, u32 *val)
 +{
-+	int nr_irqs = dev->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
-+	const struct vgic_register_region *regions;
-+	gpa_t addr;
-+	int nr_regions, i, len;
++	unsigned int len = 4;
++	u8 buf[4];
++	int ret;
 +
-+	addr = attr->attr & KVM_DEV_ARM_VGIC_OFFSET_MASK;
-+
-+	switch (attr->group) {
-+	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
-+		regions = vgic_v2_dist_registers;
-+		nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
-+		break;
-+	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
-+		return -ENXIO;		/* TODO: describe CPU i/f regs also */
-+	default:
-+		return -ENXIO;
++	if (is_write) {
++		vgic_data_host_to_mmio_bus(buf, len, *val);
++		ret = kvm_io_gic_ops.write(vcpu, &dev->dev, offset, len, buf);
++	} else {
++		ret = kvm_io_gic_ops.read(vcpu, &dev->dev, offset, len, buf);
++		if (!ret)
++			*val = vgic_data_mmio_bus_to_host(buf, len);
 +	}
 +
-+	/* We only support aligned 32-bit accesses. */
-+	if (addr & 3)
-+		return -ENXIO;
++	return ret;
++}
 +
-+	for (i = 0; i < nr_regions; i++) {
-+		if (regions[i].bits_per_irq)
-+			len = (regions[i].bits_per_irq * nr_irqs) / 8;
-+		else
-+			len = regions[i].len;
++int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
++			 int offset, u32 *val)
++{
++	struct vgic_io_device dev = {
++		.regions = vgic_v2_dist_registers,
++		.nr_regions = ARRAY_SIZE(vgic_v2_dist_registers),
++	};
 +
-+		if (regions[i].reg_offset <= addr &&
-+		    regions[i].reg_offset + len > addr)
-+			return 0;
-+	}
-+
-+	return -ENXIO;
++	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
 +}
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 6abc9a3..a264c5f 100644
+index a264c5f..f826026 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -37,6 +37,7 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
- void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+@@ -38,6 +38,8 @@ void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
  void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
  void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
-+int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
++int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
++			 int offset, u32 *val);
  int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
  			     enum vgic_type);
  
