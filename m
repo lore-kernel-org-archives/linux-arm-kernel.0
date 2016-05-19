@@ -1,51 +1,101 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Thu, 19 May 2016 19:15:15 +0300
-Subject: [PATCH v2 4/5] ACPI: table upgrade: introduce
- ARCH_HAS_ACPI_TABLE_UPGRADE
-In-Reply-To: <1463674518-22477-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1463674518-22477-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1463674518-22477-5-git-send-email-aleksey.makarov@linaro.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 19 May 2016 18:20:58 +0200
+Subject: [PATCH 1/3] spi/rockchip: add rk3036/rk3228/rk3368 socs for spi
+ document
+In-Reply-To: <573DE3F7.6070300@rock-chips.com>
+References: <1463672824-15367-1-git-send-email-wxt@rock-chips.com>
+ <3685935.dKdIbE8hXb@phil> <573DE3F7.6070300@rock-chips.com>
+Message-ID: <3828505.WBLtTjjB7h@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We want to use the table upgrade feature in ARM64.
-Introduce a new configuration option that allows that.
+Am Freitag, 20. Mai 2016, 00:04:07 schrieb Caesar Wang:
+> ? 2016?05?19? 23:51, Heiko Stuebner ??:
+> > Am Donnerstag, 19. Mai 2016, 23:47:02 schrieb Caesar Wang:
+> >> We had supported the rk3036/rk3066/rk3188/rk3228/rk3288/rk3368/rk3399
+> >> family SoCs in linux kernel.
+> >> 
+> >> Let's add the other SoCs, in order to a better understanding from the
+> >> rockchip spi document.
+> >> 
+> >> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> >> Cc: Rob Herring <robh+dt@kernel.org>
+> >> Cc: Mark Brown <broonie@kernel.org>
+> >> Cc: Heiko Stuebner <heiko@sntech.de>
+> >> Cc: linux-rockchip at lists.infradead.org
+> >> ---
+> >> 
+> >>   Documentation/devicetree/bindings/spi/spi-rockchip.txt | 3 +++
+> >>   1 file changed, 3 insertions(+)
+> >> 
+> >> diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> >> b/Documentation/devicetree/bindings/spi/spi-rockchip.txt index
+> >> 1b14d69..305b542 100644
+> >> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> >> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
+> >> @@ -6,9 +6,12 @@ and display controllers using the SPI communication
+> >> 
+> >> interface. Required Properties:
+> >>   - compatible: should be one of the following.
+> >> 
+> >> +    "rockchip,rk3036-spi" for rk3036.
+> > 
+> > shouldn't the rk3036 also get the rk3066 fallback. Looking at the driver
+> > part (patch2) the rk3036 still is the same IP as for every other soc in
+> > here.
+> 
+> Yep, the same IP.
+> 
+> Do you think we should keep the below style?
+> 
+> 1)
+> "rockchip,rk3036-spi", "rockchip,rk3066-spi" for rk3036.
+>   "rockchip,rk3066-spi" for rk3066.
+>   "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
+> ...
+> 
+> or
+> 2)
+>   "rockchip,rk3066-spi" for rk3066.
+> "rockchip,rk3036-spi", "rockchip,rk3066-spi" for rk3036.
+>   "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188
+> ..
+> 
+> or
+> 3)
+> "rockchip, rockchip-spi" for rk3036 rk3066.......
+> 
+> Think about the 1) will be googd select.
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
- arch/x86/Kconfig     | 1 +
- drivers/acpi/Kconfig | 5 ++++-
- 2 files changed, 5 insertions(+), 1 deletion(-)
+or
+(4) drop the fallbacks. We match against each compatible all the time 
+anyway, so you could also simply do
 
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index 48ac290..f60fd27 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -22,6 +22,7 @@ config X86
- 	select ANON_INODES
- 	select ARCH_CLOCKSOURCE_DATA
- 	select ARCH_DISCARD_MEMBLOCK
-+	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_DEBUG_STRICT_USER_COPY_CHECKS
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index c204344..083da18 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -311,9 +311,12 @@ config ACPI_CUSTOM_DSDT
- 	bool
- 	default ACPI_CUSTOM_DSDT_FILE != ""
- 
-+config ARCH_HAS_ACPI_TABLE_UPGRADE
-+	def_bool n
-+
- config ACPI_TABLE_UPGRADE
- 	bool "Allow upgrading ACPI tables via initrd"
--	depends on BLK_DEV_INITRD && X86
-+	depends on BLK_DEV_INITRD && ARCH_HAS_ACPI_TABLE_UPGRADE
- 	default y
- 	help
- 	  This option provides functionality to upgrade arbitrary ACPI tables
--- 
-2.8.2
+  "rockchip,rk3036-spi" for rk3036
+  "rockchip,rk3066-spi" for rk3066
+  "rockchip,rk3188-spi" for rk3188
+
+Maybe leave the fallbacks for existing socs, and just add the new ones 
+without the fallbacks.
+
+rockchip,rockchip-spi is not future proof ... i.e. in some future soc 
+somebody might want to exchange the IP block against a different one, so 
+being specific saves us from hassle then :-)
+
+
+Heiko
+
+> >>       "rockchip,rk3066-spi" for rk3066.
+> >>       "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
+> >> 
+> >> +    "rockchip,rk3228-spi", "rockchip,rk3066-spi" for rk3228.
+> >> 
+> >>       "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
+> >> 
+> >> +    "rockchip,rk3368-spi", "rockchip,rk3066-spi" for rk3368.
+> >> 
+> >>       "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
+> >>   
+> >>   - reg: physical base address of the controller and length of memory
+> >> 
+> >> mapped region.
