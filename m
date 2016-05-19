@@ -1,67 +1,129 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:07:53 +0100
-Subject: [PATCH v5 14/57] KVM: arm/arm64: move GICv2 emulation defines into
- arm-gic-v3.h
+Date: Thu, 19 May 2016 19:08:08 +0100
+Subject: [PATCH v5 29/57] KVM: arm/arm64: vgic-new: Add PRIORITY registers
+ handlers
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-15-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-30-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As (some) GICv3 hosts can emulate a GICv2, some GICv2 specific masks
-for the list register definition also apply to GICv3 LRs.
-At the moment we have those definitions in the KVM VGICv3
-implementation, so let's move them into the GICv3 header file to
-have them automatically defined.
+The priority register handlers are shared between the v2 and v3
+emulation, so their implementation goes into vgic-mmio.c, to be
+easily referenced from the v3 emulation as well later.
+There is a corner case when we change the priority of a pending
+interrupt which we don't handle at the moment.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/linux/irqchip/arm-gic-v3.h | 5 +++++
- virt/kvm/arm/vgic-v3.c             | 8 +-------
- 2 files changed, 6 insertions(+), 7 deletions(-)
+Changelog v1 .. v2:
+- adapt to new MMIO framework
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index d5d798b..ec938d1 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -276,6 +276,11 @@
- #define ICH_LR_PHYS_ID_SHIFT		32
- #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+Changelog v3 .. v4:
+- specify accessor width
+- use IRQ number accessor macro
+
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
+ virt/kvm/arm/vgic/vgic-mmio.c    | 40 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    |  7 +++++++
+ virt/kvm/arm/vgic/vgic.h         |  2 ++
+ 4 files changed, 50 insertions(+), 1 deletion(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index 12e101b..d564a30 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -90,7 +90,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
++		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
+ 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 79a4622..6f4e05b 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -236,6 +236,46 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 	}
+ }
  
-+/* These are for GICv2 emulation only */
-+#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
-+#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
-+#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
++unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
++				      gpa_t addr, unsigned int len)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	int i;
++	u64 val = 0;
 +
- #define ICH_MISR_EOI			(1 << 0)
- #define ICH_MISR_U			(1 << 1)
++	for (i = 0; i < len; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		val |= (u64)irq->priority << (i * 8);
++	}
++
++	return val;
++}
++
++/*
++ * We currently don't handle changing the priority of an interrupt that
++ * is already pending on a VCPU. If there is a need for this, we would
++ * need to make this VCPU exit and re-evaluate the priorities, potentially
++ * leading to this interrupt getting presented now to the guest (if it has
++ * been masked by the priority mask before).
++ */
++void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
++			      gpa_t addr, unsigned int len,
++			      unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
++	int i;
++
++	for (i = 0; i < len; i++) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++
++		spin_lock(&irq->irq_lock);
++		/* Narrow the priority range to what we actually support */
++		irq->priority = (val >> (i * 8)) & GENMASK(7, 8 - VGIC_PRI_BITS);
++		spin_unlock(&irq->irq_lock);
++	}
++}
++
+ static int match_region(const void *key, const void *elt)
+ {
+ 	const unsigned int offset = (unsigned long)key;
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
+index 90146c7..62ecec0 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.h
++++ b/virt/kvm/arm/vgic/vgic-mmio.h
+@@ -129,6 +129,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 			     gpa_t addr, unsigned int len,
+ 			     unsigned long val);
  
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index c02a1b1..75b02fa 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -29,12 +29,6 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
++unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
++				      gpa_t addr, unsigned int len);
++
++void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
++			      gpa_t addr, unsigned int len,
++			      unsigned long val);
++
+ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
  
--/* These are for GICv2 emulation only */
--#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
--#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
--#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
--#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
--
- static u32 ich_vtr_el2;
+ #endif
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index cf62015..e57f8d5 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -19,6 +19,8 @@
+ #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
+ #define IMPLEMENTER_ARM		0x43b
  
- static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -43,7 +37,7 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
- 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr];
++#define VGIC_PRI_BITS		5
++
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
  
- 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
--		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
-+		lr_desc.irq = val & ICH_LR_VIRTUAL_ID_MASK;
- 	else
- 		lr_desc.irq = val & GICH_LR_VIRTUALID;
- 
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
 -- 
 2.8.2
