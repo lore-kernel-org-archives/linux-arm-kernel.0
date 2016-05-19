@@ -1,306 +1,268 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:07:56 +0100
-Subject: [PATCH v5 17/57] KVM: arm/arm64: vgic-new: Implement virtual IRQ
- injection
+Date: Thu, 19 May 2016 19:07:54 +0100
+Subject: [PATCH v5 15/57] KVM: arm/arm64: vgic-new: Add data structure
+ definitions
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-18-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-16-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Provide a vgic_queue_irq_unlock() function which decides whether a
-given IRQ needs to be queued to a VCPU's ap_list.
-This should be called whenever an IRQ becomes pending or enabled,
-either as a result of userspace injection, from in-kernel emulated
-devices like the architected timer or from MMIO accesses to the
-distributor emulation.
-Also provides the necessary functions to allow userland to inject an
-IRQ to a guest.
-Since this is the first code that starts using our locking mechanism, we
-add some (hopefully) clear documentation of our locking strategy and
-requirements along with this patch.
+Add a new header file for the new and improved GIC implementation.
+The big change is that we now have a struct vgic_irq per IRQ instead
+of spreading all the information over various bitmaps.
+
+We include this new header conditionally from within the old header
+file for the time being to avoid touching all the users.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-Changelog RFC..v1:
-- add spinlock checks protected by CONFIG_DEBUG_SPINLOCK
-- add more comments to vgic_target_oracle
-- remove BUG_ON() if IRQ is neither edge or level
-- rename vgic_queue_irq() to vgic_queue_irq_unlock()
-- simplify initial check in vgic_queue_irq_unlock()
-- extend retry loop to ask the oracle again
-- minor comment fixes
+Changelog RFC .. v1:
+- adapt to 4.6-rc (adding live_lrs member)
+- elaborate on ap_list usage
 
 Changelog v1 .. v2:
-- move most IRQ injection code into vgic_update_irq_pending()
+- change data type of dist->enabled to bool
 
 Changelog v3 .. v4:
-- simplify vgic_queue_irq_unlock() to allow reusage later
+- fix comment typos
 
-Changelog v4 .. v5:
-- return target_vcpu if active, but not on a VCPU
-- fix comments about retrying after mismatch
+ include/kvm/arm_vgic.h  |   5 ++
+ include/kvm/vgic/vgic.h | 201 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 206 insertions(+)
+ create mode 100644 include/kvm/vgic/vgic.h
 
- include/kvm/vgic/vgic.h  |   3 +
- virt/kvm/arm/vgic/vgic.c | 211 +++++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h |   1 +
- 3 files changed, 215 insertions(+)
-
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 6ca0781..7b6ca90 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -181,6 +181,9 @@ struct vgic_cpu {
- 	u64 live_lrs;
- };
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index ade7005..da0a5248 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -19,6 +19,10 @@
+ #ifndef __ASM_ARM_KVM_VGIC_H
+ #define __ASM_ARM_KVM_VGIC_H
  
-+int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			bool level);
-+
- #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
- #define vgic_initialized(k)	(false)
- #define vgic_ready(k)		((k)->arch.vgic.ready)
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index fb45537..ada1d02 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -19,8 +19,31 @@
- 
- #include "vgic.h"
- 
-+#define CREATE_TRACE_POINTS
-+#include "../trace.h"
-+
-+#ifdef CONFIG_DEBUG_SPINLOCK
-+#define DEBUG_SPINLOCK_BUG_ON(p) BUG_ON(p)
++#ifdef CONFIG_KVM_NEW_VGIC
++#include <kvm/vgic/vgic.h>
 +#else
-+#define DEBUG_SPINLOCK_BUG_ON(p)
-+#endif
 +
- struct vgic_global __section(.hyp.text) kvm_vgic_global_state;
- 
-+/*
-+ * Locking order is always:
-+ *   vgic_cpu->ap_list_lock
-+ *     vgic_irq->irq_lock
-+ *
-+ * (that is, always take the ap_list_lock before the struct vgic_irq lock).
-+ *
-+ * When taking more than one ap_list_lock at the same time, always take the
-+ * lowest numbered VCPU's ap_list_lock first, so:
-+ *   vcpuX->vcpu_id < vcpuY->vcpu_id:
-+ *     spin_lock(vcpuX->arch.vgic_cpu.ap_list_lock);
-+ *     spin_lock(vcpuY->arch.vgic_cpu.ap_list_lock);
-+ */
-+
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid)
- {
-@@ -39,3 +62,191 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 	WARN(1, "Looking up struct vgic_irq for reserved INTID");
- 	return NULL;
+ #include <linux/kernel.h>
+ #include <linux/kvm.h>
+ #include <linux/irqreturn.h>
+@@ -367,4 +371,5 @@ static inline int vgic_v3_probe(const struct gic_kvm_info *gic_kvm_info,
  }
-+
-+/**
-+ * kvm_vgic_target_oracle - compute the target vcpu for an irq
-+ *
-+ * @irq:	The irq to route. Must be already locked.
-+ *
-+ * Based on the current state of the interrupt (enabled, pending,
-+ * active, vcpu and target_vcpu), compute the next vcpu this should be
-+ * given to. Return NULL if this shouldn't be injected at all.
-+ *
-+ * Requires the IRQ lock to be held.
-+ */
-+static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
-+{
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-+
-+	/* If the interrupt is active, it must stay on the current vcpu */
-+	if (irq->active)
-+		return irq->vcpu ? : irq->target_vcpu;
-+
-+	/*
-+	 * If the IRQ is not active but enabled and pending, we should direct
-+	 * it to its configured target VCPU.
-+	 * If the distributor is disabled, pending interrupts shouldn't be
-+	 * forwarded.
-+	 */
-+	if (irq->enabled && irq->pending) {
-+		if (unlikely(irq->target_vcpu &&
-+			     !irq->target_vcpu->kvm->arch.vgic.enabled))
-+			return NULL;
-+
-+		return irq->target_vcpu;
-+	}
-+
-+	/* If neither active nor pending and enabled, then this IRQ should not
-+	 * be queued to any VCPU.
-+	 */
-+	return NULL;
-+}
-+
-+/*
-+ * Only valid injection if changing level for level-triggered IRQs or for a
-+ * rising edge.
-+ */
-+static bool vgic_validate_injection(struct vgic_irq *irq, bool level)
-+{
-+	switch (irq->config) {
-+	case VGIC_CONFIG_LEVEL:
-+		return irq->line_level != level;
-+	case VGIC_CONFIG_EDGE:
-+		return level;
-+	}
-+
-+	return false;
-+}
-+
-+/*
-+ * Check whether an IRQ needs to (and can) be queued to a VCPU's ap list.
-+ * Do the queuing if necessary, taking the right locks in the right order.
-+ * Returns true when the IRQ was queued, false otherwise.
-+ *
-+ * Needs to be entered with the IRQ lock already held, but will return
-+ * with all locks dropped.
-+ */
-+bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq)
-+{
-+	struct kvm_vcpu *vcpu;
-+
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&irq->irq_lock));
-+
-+retry:
-+	vcpu = vgic_target_oracle(irq);
-+	if (irq->vcpu || !vcpu) {
-+		/*
-+		 * If this IRQ is already on a VCPU's ap_list, then it
-+		 * cannot be moved or modified and there is no more work for
-+		 * us to do.
-+		 *
-+		 * Otherwise, if the irq is not pending and enabled, it does
-+		 * not need to be inserted into an ap_list and there is also
-+		 * no more work for us to do.
-+		 */
-+		spin_unlock(&irq->irq_lock);
-+		return false;
-+	}
-+
-+	/*
-+	 * We must unlock the irq lock to take the ap_list_lock where
-+	 * we are going to insert this new pending interrupt.
-+	 */
-+	spin_unlock(&irq->irq_lock);
-+
-+	/* someone can do stuff here, which we re-check below */
-+
-+	spin_lock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+	spin_lock(&irq->irq_lock);
-+
-+	/*
-+	 * Did something change behind our backs?
-+	 *
-+	 * There are two cases:
-+	 * 1) The irq lost its pending state or was disabled behind our
-+	 *    backs and/or it was queued to another VCPU's ap_list.
-+	 * 2) Someone changed the affinity on this irq behind our
-+	 *    backs and we are now holding the wrong ap_list_lock.
-+	 *
-+	 * In both cases, drop the locks and retry.
-+	 */
-+
-+	if (unlikely(irq->vcpu || vcpu != vgic_target_oracle(irq))) {
-+		spin_unlock(&irq->irq_lock);
-+		spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+
-+		spin_lock(&irq->irq_lock);
-+		goto retry;
-+	}
-+
-+	list_add_tail(&irq->ap_list, &vcpu->arch.vgic_cpu.ap_list_head);
-+	irq->vcpu = vcpu;
-+
-+	spin_unlock(&irq->irq_lock);
-+	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
-+
-+	kvm_vcpu_kick(vcpu);
-+
-+	return true;
-+}
-+
-+static int vgic_update_irq_pending(struct kvm *kvm, int cpuid,
-+				   unsigned int intid, bool level,
-+				   bool mapped_irq)
-+{
-+	struct kvm_vcpu *vcpu;
-+	struct vgic_irq *irq;
-+	int ret;
-+
-+	trace_vgic_update_irq_pending(cpuid, intid, level);
-+
-+	vcpu = kvm_get_vcpu(kvm, cpuid);
-+	if (!vcpu && intid < VGIC_NR_PRIVATE_IRQS)
-+		return -EINVAL;
-+
-+	irq = vgic_get_irq(kvm, vcpu, intid);
-+	if (!irq)
-+		return -EINVAL;
-+
-+	if (irq->hw != mapped_irq)
-+		return -EINVAL;
-+
-+	spin_lock(&irq->irq_lock);
-+
-+	if (!vgic_validate_injection(irq, level)) {
-+		/* Nothing to see here, move along... */
-+		spin_unlock(&irq->irq_lock);
-+		return 0;
-+	}
-+
-+	if (irq->config == VGIC_CONFIG_LEVEL) {
-+		irq->line_level = level;
-+		irq->pending = level || irq->soft_pending;
-+	} else {
-+		irq->pending = true;
-+	}
-+
-+	vgic_queue_irq_unlock(kvm, irq);
-+
-+	return 0;
-+}
-+
-+/**
-+ * kvm_vgic_inject_irq - Inject an IRQ from a device to the vgic
-+ * @kvm:     The VM structure pointer
-+ * @cpuid:   The CPU for PPIs
-+ * @intid:   The INTID to inject a new state to.
-+ * @level:   Edge-triggered:  true:  to trigger the interrupt
-+ *			      false: to ignore the call
-+ *	     Level-sensitive  true:  raise the input signal
-+ *			      false: lower the input signal
-+ *
-+ * The VGIC is not concerned with devices being active-LOW or active-HIGH for
-+ * level-sensitive interrupts.  You can think of the level parameter as 1
-+ * being HIGH and 0 being LOW and all devices being active-HIGH.
-+ */
-+int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-+			bool level)
-+{
-+	return vgic_update_irq_pending(kvm, cpuid, intid, level, false);
-+}
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 61b8d22..c625767 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -18,5 +18,6 @@
- 
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
-+bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
- 
  #endif
+ 
++#endif	/* old VGIC include */
+ #endif
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+new file mode 100644
+index 0000000..6ca0781
+--- /dev/null
++++ b/include/kvm/vgic/vgic.h
+@@ -0,0 +1,201 @@
++/*
++ * Copyright (C) 2015, 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_ARM_KVM_VGIC_VGIC_H
++#define __ASM_ARM_KVM_VGIC_VGIC_H
++
++#include <linux/kernel.h>
++#include <linux/kvm.h>
++#include <linux/irqreturn.h>
++#include <linux/spinlock.h>
++#include <linux/types.h>
++#include <kvm/iodev.h>
++
++#define VGIC_V3_MAX_CPUS	255
++#define VGIC_V2_MAX_CPUS	8
++#define VGIC_NR_IRQS_LEGACY     256
++#define VGIC_NR_SGIS		16
++#define VGIC_NR_PPIS		16
++#define VGIC_NR_PRIVATE_IRQS	(VGIC_NR_SGIS + VGIC_NR_PPIS)
++#define VGIC_MAX_PRIVATE	(VGIC_NR_PRIVATE_IRQS - 1)
++#define VGIC_MAX_SPI		1019
++#define VGIC_MAX_RESERVED	1023
++#define VGIC_MIN_LPI		8192
++
++enum vgic_type {
++	VGIC_V2,		/* Good ol' GICv2 */
++	VGIC_V3,		/* New fancy GICv3 */
++};
++
++/* same for all guests, as depending only on the _host's_ GIC model */
++struct vgic_global {
++	/* type of the host GIC */
++	enum vgic_type		type;
++
++	/* Physical address of vgic virtual cpu interface */
++	phys_addr_t		vcpu_base;
++
++	/* virtual control interface mapping */
++	void __iomem		*vctrl_base;
++
++	/* Number of implemented list registers */
++	int			nr_lr;
++
++	/* Maintenance IRQ number */
++	unsigned int		maint_irq;
++
++	/* maximum number of VCPUs allowed (GICv2 limits us to 8) */
++	int			max_gic_vcpus;
++
++	/* Only needed for the legacy KVM_CREATE_IRQCHIP */
++	bool			can_emulate_gicv2;
++};
++
++extern struct vgic_global kvm_vgic_global_state;
++
++#define VGIC_V2_MAX_LRS		(1 << 6)
++#define VGIC_V3_MAX_LRS		16
++#define VGIC_V3_LR_INDEX(lr)	(VGIC_V3_MAX_LRS - 1 - lr)
++
++enum vgic_irq_config {
++	VGIC_CONFIG_EDGE = 0,
++	VGIC_CONFIG_LEVEL
++};
++
++struct vgic_irq {
++	spinlock_t irq_lock;		/* Protects the content of the struct */
++	struct list_head ap_list;
++
++	struct kvm_vcpu *vcpu;		/* SGIs and PPIs: The VCPU
++					 * SPIs and LPIs: The VCPU whose ap_list
++					 * this is queued on.
++					 */
++
++	struct kvm_vcpu *target_vcpu;	/* The VCPU that this interrupt should
++					 * be sent to, as a result of the
++					 * targets reg (v2) or the
++					 * affinity reg (v3).
++					 */
++
++	u32 intid;			/* Guest visible INTID */
++	bool pending;
++	bool line_level;		/* Level only */
++	bool soft_pending;		/* Level only */
++	bool active;			/* not used for LPIs */
++	bool enabled;
++	bool hw;			/* Tied to HW IRQ */
++	u32 hwintid;			/* HW INTID number */
++	union {
++		u8 targets;			/* GICv2 target VCPUs mask */
++		u32 mpidr;			/* GICv3 target VCPU */
++	};
++	u8 source;			/* GICv2 SGIs only */
++	u8 priority;
++	enum vgic_irq_config config;	/* Level or edge */
++};
++
++struct vgic_dist {
++	bool			in_kernel;
++	bool			ready;
++
++	/* vGIC model the kernel emulates for the guest (GICv2 or GICv3) */
++	u32			vgic_model;
++
++	int			nr_spis;
++
++	/* TODO: Consider moving to global state */
++	/* Virtual control interface mapping */
++	void __iomem		*vctrl_base;
++
++	/* base addresses in guest physical address space: */
++	gpa_t			vgic_dist_base;		/* distributor */
++	union {
++		/* either a GICv2 CPU interface */
++		gpa_t			vgic_cpu_base;
++		/* or a number of GICv3 redistributor regions */
++		gpa_t			vgic_redist_base;
++	};
++
++	/* distributor enabled */
++	bool			enabled;
++
++	struct vgic_irq		*spis;
++};
++
++struct vgic_v2_cpu_if {
++	u32		vgic_hcr;
++	u32		vgic_vmcr;
++	u32		vgic_misr;	/* Saved only */
++	u64		vgic_eisr;	/* Saved only */
++	u64		vgic_elrsr;	/* Saved only */
++	u32		vgic_apr;
++	u32		vgic_lr[VGIC_V2_MAX_LRS];
++};
++
++struct vgic_v3_cpu_if {
++#ifdef CONFIG_KVM_ARM_VGIC_V3
++	u32		vgic_hcr;
++	u32		vgic_vmcr;
++	u32		vgic_sre;	/* Restored only, change ignored */
++	u32		vgic_misr;	/* Saved only */
++	u32		vgic_eisr;	/* Saved only */
++	u32		vgic_elrsr;	/* Saved only */
++	u32		vgic_ap0r[4];
++	u32		vgic_ap1r[4];
++	u64		vgic_lr[VGIC_V3_MAX_LRS];
++#endif
++};
++
++struct vgic_cpu {
++	/* CPU vif control registers for world switch */
++	union {
++		struct vgic_v2_cpu_if	vgic_v2;
++		struct vgic_v3_cpu_if	vgic_v3;
++	};
++
++	unsigned int used_lrs;
++	struct vgic_irq private_irqs[VGIC_NR_PRIVATE_IRQS];
++
++	spinlock_t ap_list_lock;	/* Protects the ap_list */
++
++	/*
++	 * List of IRQs that this VCPU should consider because they are either
++	 * Active or Pending (hence the name; AP list), or because they recently
++	 * were one of the two and need to be migrated off this list to another
++	 * VCPU.
++	 */
++	struct list_head ap_list_head;
++
++	u64 live_lrs;
++};
++
++#define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
++#define vgic_initialized(k)	(false)
++#define vgic_ready(k)		((k)->arch.vgic.ready)
++#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
++			((i) < (k)->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS))
++
++/**
++ * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
++ *
++ * The host's GIC naturally limits the maximum amount of VCPUs a guest
++ * can use.
++ */
++static inline int kvm_vgic_get_max_vcpus(void)
++{
++	return kvm_vgic_global_state.max_gic_vcpus;
++}
++
++#endif /* __ASM_ARM_KVM_VGIC_VGIC_H */
 -- 
 2.8.2
