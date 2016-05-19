@@ -1,102 +1,79 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 19 May 2016 19:07:57 +0100
-Subject: [PATCH v5 18/57] KVM: arm/arm64: vgic-new: Add IRQ sorting
+Date: Thu, 19 May 2016 19:08:01 +0100
+Subject: [PATCH v5 22/57] KVM: arm/arm64: vgic-new: Implement
+ kvm_vgic_vcpu_pending_irq
 In-Reply-To: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
 References: <1463681316-23039-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1463681316-23039-19-git-send-email-andre.przywara@arm.com>
+Message-ID: <1463681316-23039-23-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Eric Auger <eric.auger@linaro.org>
 
-Adds the sorting function to cover the case where you have more IRQs
-to consider than you have LRs. We now consider priorities.
+Tell KVM whether a particular VCPU has an IRQ that needs handling
+in the guest. This is used to decide whether a VCPU is runnable.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
-Changelog v4 .. v5:
-- add nested spin lock annotation
+Changelog RFC..v1:
+- return false if distributor is disabled
+- add vgic_kick_vcpus() implementations
 
- virt/kvm/arm/vgic/vgic.c | 57 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 57 insertions(+)
+Changelog v2 .. v3:
+- remove vgic_kick_vcpus() implementation from this patch
 
+ include/kvm/vgic/vgic.h  |  2 ++
+ virt/kvm/arm/vgic/vgic.c | 25 +++++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index 9506267..f663288 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -184,6 +184,8 @@ struct vgic_cpu {
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level);
+ 
++int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
++
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(false)
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
 diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index ada1d02..bce17de 100644
+index 719cef0..48fdaf3 100644
 --- a/virt/kvm/arm/vgic/vgic.c
 +++ b/virt/kvm/arm/vgic/vgic.c
-@@ -16,6 +16,7 @@
- 
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
-+#include <linux/list_sort.h>
- 
- #include "vgic.h"
- 
-@@ -103,6 +104,62 @@ static struct kvm_vcpu *vgic_target_oracle(struct vgic_irq *irq)
+@@ -520,3 +520,28 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	vgic_flush_lr_state(vcpu);
+ 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
  }
- 
- /*
-+ * The order of items in the ap_lists defines how we'll pack things in LRs as
-+ * well, the first items in the list being the first things populated in the
-+ * LRs.
-+ *
-+ * A hard rule is that active interrupts can never be pushed out of the LRs
-+ * (and therefore take priority) since we cannot reliably trap on deactivation
-+ * of IRQs and therefore they have to be present in the LRs.
-+ *
-+ * Otherwise things should be sorted by the priority field and the GIC
-+ * hardware support will take care of preemption of priority groups etc.
-+ *
-+ * Return negative if "a" sorts before "b", 0 to preserve order, and positive
-+ * to sort "b" before "a".
-+ */
-+static int vgic_irq_cmp(void *priv, struct list_head *a, struct list_head *b)
-+{
-+	struct vgic_irq *irqa = container_of(a, struct vgic_irq, ap_list);
-+	struct vgic_irq *irqb = container_of(b, struct vgic_irq, ap_list);
-+	bool penda, pendb;
-+	int ret;
 +
-+	spin_lock(&irqa->irq_lock);
-+	spin_lock_nested(&irqb->irq_lock, SINGLE_DEPTH_NESTING);
-+
-+	if (irqa->active || irqb->active) {
-+		ret = (int)irqb->active - (int)irqa->active;
-+		goto out;
-+	}
-+
-+	penda = irqa->enabled && irqa->pending;
-+	pendb = irqb->enabled && irqb->pending;
-+
-+	if (!penda || !pendb) {
-+		ret = (int)pendb - (int)penda;
-+		goto out;
-+	}
-+
-+	/* Both pending and enabled, sort by priority */
-+	ret = irqa->priority - irqb->priority;
-+out:
-+	spin_unlock(&irqb->irq_lock);
-+	spin_unlock(&irqa->irq_lock);
-+	return ret;
-+}
-+
-+/* Must be called with the ap_list_lock held */
-+static void vgic_sort_ap_list(struct kvm_vcpu *vcpu)
++int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
 +{
 +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	struct vgic_irq *irq;
++	bool pending = false;
 +
-+	DEBUG_SPINLOCK_BUG_ON(!spin_is_locked(&vgic_cpu->ap_list_lock));
++	if (!vcpu->kvm->arch.vgic.enabled)
++		return false;
 +
-+	list_sort(NULL, &vgic_cpu->ap_list_head, vgic_irq_cmp);
++	spin_lock(&vgic_cpu->ap_list_lock);
++
++	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
++		spin_lock(&irq->irq_lock);
++		pending = irq->pending && irq->enabled;
++		spin_unlock(&irq->irq_lock);
++
++		if (pending)
++			break;
++	}
++
++	spin_unlock(&vgic_cpu->ap_list_lock);
++
++	return pending;
 +}
-+
-+/*
-  * Only valid injection if changing level for level-triggered IRQs or for a
-  * rising edge.
-  */
 -- 
 2.8.2
