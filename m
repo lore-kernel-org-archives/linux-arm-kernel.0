@@ -1,142 +1,72 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 19 May 2016 17:14:15 +0530
-Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
- encoder
-In-Reply-To: <573DA29A.1080609@samsung.com>
-References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
- <1463648641-6931-2-git-send-email-vigneshr@ti.com>
- <573DA29A.1080609@samsung.com>
-Message-ID: <573DA70F.70206@ti.com>
+From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
+Date: Thu, 19 May 2016 19:49:13 +0800
+Subject: [PATCH v2 0/5] MT2701 iommu support
+Message-ID: <1463658558-567-1-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-On 05/19/2016 04:55 PM, Krzysztof Kozlowski wrote:
-[...]
-> On 05/19/2016 11:04 AM, Vignesh R wrote:
->> diff --git a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
->> index c7fc8d4fb080..8f60289fb6cd 100644
->> --- a/drivers/input/misc/rotary_encoder.c
->> +++ b/drivers/input/misc/rotary_encoder.c
->> @@ -25,24 +25,29 @@
->>  #include <linux/of.h>
->>  #include <linux/pm.h>
->>  #include <linux/property.h>
->> +#include <linux/input-polldev.h>
->>  
->>  #define DRV_NAME "rotary-encoder"
->>  
->>  struct rotary_encoder {
->>  	struct input_dev *input;
->> -
->> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
-> 
-> Ifdefs look dirty.
+  Mediatek's m4u(Multimedia Memory Management Unit) and SMI(Smart
+Multimedia Interface)have two generations HW. They basically sharing the
+same hardware block diagram, but have some difference as below:
 
-I will drop this.
+  Generation one m4u only supports one layer, flat pagetable addressing,
+and only supports 4K size page mapping. While generation two m4u supports 2
+levels of pagetable which uses the ARM short-descriptor translation table
+format for address translation.
+They have slight different register base and register offset.
+They have very different HW ports defines.
 
-> 
->> +	struct input_polled_dev *poll_dev;
->> +#endif
->>  	struct mutex access_mutex;
->>  
->>  	u32 steps;
->>  	u32 axis;
->>  	bool relative_axis;
->>  	bool rollover;
->> +	bool absolute_encoder;
->>  
->>  	unsigned int pos;
->>  
->>  	struct gpio_descs *gpios;
->> +	struct device *dev;
->>  
->> -	unsigned int *irq;
->> +	int *irq;
->>  
->>  	bool armed;
->>  	signed char dir;	/* 1 - clockwise, -1 - CCW */
->> @@ -67,6 +72,21 @@ static unsigned int rotary_encoder_get_state(struct rotary_encoder *encoder)
->>  	return ret & 3;
->>  }
->>  
->> +static unsigned int rotary_encoder_get_gpios_state(struct rotary_encoder
->> +						   *encoder)
->> +{
->> +	int i;
->> +	unsigned int ret = 0;
->> +
->> +	for (i = 0; i < encoder->gpios->ndescs; ++i) {
->> +		int val = gpiod_get_value_cansleep(encoder->gpios->desc[i]);
->> +
->> +		ret = ret << 1 | val;
->> +	}
->> +
->> +	return ret;
->> +}
->> +
->>  static void rotary_encoder_report_event(struct rotary_encoder *encoder)
->>  {
->>  	if (encoder->relative_axis) {
->> @@ -178,6 +198,72 @@ out:
->>  	return IRQ_HANDLED;
->>  }
->>  
->> +static void rotary_encoder_setup_input_params(struct rotary_encoder  *encoder)
->> +{
->> +	struct input_dev *input = encoder->input;
->> +	struct platform_device *pdev = to_platform_device(encoder->dev);
->> +
->> +	input->name = pdev->name;
->> +	input->id.bustype = BUS_HOST;
->> +	input->dev.parent = encoder->dev;
->> +
->> +	if (encoder->relative_axis)
->> +		input_set_capability(input, EV_REL, encoder->axis);
->> +	else
->> +		input_set_abs_params(input,
->> +				     encoder->axis, 0, encoder->steps, 0, 1);
->> +}
->> +
->> +static irqreturn_t rotary_absolute_encoder_irq(int irq, void *dev_id)
->> +{
->> +	struct rotary_encoder *encoder = dev_id;
->> +	unsigned int state;
->> +
->> +	mutex_lock(&encoder->access_mutex);
->> +
->> +	state = rotary_encoder_get_gpios_state(encoder);
->> +	if (state != encoder->last_stable) {
->> +		input_report_abs(encoder->input, encoder->axis, state);
->> +		input_sync(encoder->input);
->> +		encoder->last_stable = state;
->> +	}
->> +
->> +	mutex_lock(&encoder->access_mutex);
-> 
-> 1. Double mutex_lock()? Oh, that is weird. Please document it at least
-> in form of lockdep annotations.
-> 
-> 2. Maybe that should be unlock? Did you test this code?
-> 
+  Generaion one SMI has additional "async" clock which transform the smi
+clock into emi clock domain, this clock should be prepared and enabled for
+SMI generation one HW.
+The register which control the iommu need to translation the address or not
+for a particular port is located at smi ao base(smi always on register
+base) for generation one SMI HW, but located at each larb's register base
+for generation two HW.
 
-Sorry... this should have been unlock.
-I dont have a h/w with rotary-encoder hooked to IRQ line. It would be
-much appreciated if someone with rotary-encoder hooked up to h/w IRQ
-line test this patch.
+This patch set add mt2701 iommu support, it's based on 4.6-rc1 and James
+Liao's "Add clock support for Mediatek MT2701 v8[1]" and "Mediatek MT2701
+SCPSYS power domain support v7[2]" patch.
 
->> +
->> +	return IRQ_HANDLED;
->> +}
->> +
->> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
-> 
-> Same here and later in the code, ifdefs look dirty.
+v2:
+-Fix syntax errors in dt-bindings.
+-Use dma_alloc/free_coherent to allocate pagetable memory and reduce the
+ streaming DMA stuff.
+-Make the mtk_iommu_ops.pgsize_bitmap as ~0UL << MT2701_IOMMU_PAGE_SHIFT.
+-Use macro instead of variable to indicate the pagetable size.
+-Change some macro name from MTK_XXX to MT2701_XXX.
 
-Ok, I will remove #ifdefs and directly select INPUT_POLLDEV when
-INPUT_GPIO_ROTARY_ENCODER is selected.
+v1: http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005301.html
+-initial version
+
+[1] http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005439.html
+[2] http://lists.infradead.org/pipermail/linux-mediatek/2016-May/005429.html
+
+Honghui Zhang (5):
+  dt-bindings: mediatek: add descriptions for mediatek mt2701 iommu and
+    smi
+  iommu/mediatek: move the common struct into header file
+  memory/mediatek: add support for mt2701
+  iommu/mediatek: add support for mtk iommu generation one HW
+  ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
+
+ .../devicetree/bindings/iommu/mediatek,iommu.txt   |  13 +-
+ .../memory-controllers/mediatek,smi-common.txt     |  21 +-
+ .../memory-controllers/mediatek,smi-larb.txt       |   4 +-
+ arch/arm/boot/dts/mt2701.dtsi                      |  51 ++
+ drivers/iommu/Kconfig                              |  19 +
+ drivers/iommu/Makefile                             |   1 +
+ drivers/iommu/mtk_iommu.c                          |  62 +-
+ drivers/iommu/mtk_iommu.h                          |  93 +++
+ drivers/iommu/mtk_iommu_v1.c                       | 742 +++++++++++++++++++++
+ drivers/memory/mtk-smi.c                           | 168 ++++-
+ include/dt-bindings/memory/mt2701-larb-port.h      |  85 +++
+ 11 files changed, 1171 insertions(+), 88 deletions(-)
+ create mode 100644 drivers/iommu/mtk_iommu.h
+ create mode 100644 drivers/iommu/mtk_iommu_v1.c
+ create mode 100644 include/dt-bindings/memory/mt2701-larb-port.h
 
 -- 
-Regards
-Vignesh
+1.8.1.1.dirty
