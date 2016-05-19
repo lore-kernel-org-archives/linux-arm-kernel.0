@@ -1,81 +1,44 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 20 May 2016 00:04:07 +0800
-Subject: [PATCH 1/3] spi/rockchip: add rk3036/rk3228/rk3368 socs for spi
- document
-In-Reply-To: <3685935.dKdIbE8hXb@phil>
-References: <1463672824-15367-1-git-send-email-wxt@rock-chips.com>
- <3685935.dKdIbE8hXb@phil>
-Message-ID: <573DE3F7.6070300@rock-chips.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 19 May 2016 10:12:35 -0600
+Subject: [PATCH] ARM: tegra: beaver: allow SD card voltage to be changed
+In-Reply-To: <573DCE43.70906@nvidia.com>
+References: <1456779678-20173-1-git-send-email-dev@lynxeye.de>
+ <573DCE43.70906@nvidia.com>
+Message-ID: <573DE5F3.2060406@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2016?05?19? 23:51, Heiko Stuebner ??:
-> Am Donnerstag, 19. Mai 2016, 23:47:02 schrieb Caesar Wang:
->> We had supported the rk3036/rk3066/rk3188/rk3228/rk3288/rk3368/rk3399
->> family SoCs in linux kernel.
+On 05/19/2016 08:31 AM, Jon Hunter wrote:
+>
+> On 29/02/16 21:01, Lucas Stach wrote:
+>> This allows to switch the card signal voltage level to 1.8V,
+>> which is needed for any ultra high speed modes to work.
 >>
->> Let's add the other SoCs, in order to a better understanding from the
->> rockchip spi document.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Mark Brown <broonie@kernel.org>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Cc: linux-rockchip at lists.infradead.org
+>> Signed-off-by: Lucas Stach <dev@lynxeye.de>
 >> ---
+>> This needs the SDMMC memcomp pad calibration patches I just
+>> sent out to be applied, otherwise the card voltage change will
+>> fail with a message in the kernel log and a fall back to
+>> high speed operation.
+>> ---
+>>   arch/arm/boot/dts/tegra30-beaver.dts | 3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
 >>
->>   Documentation/devicetree/bindings/spi/spi-rockchip.txt | 3 +++
->>   1 file changed, 3 insertions(+)
+>> diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
+>> index 1daed40..6b237f2 100644
+>> --- a/arch/arm/boot/dts/tegra30-beaver.dts
+>> +++ b/arch/arm/boot/dts/tegra30-beaver.dts
+>> @@ -1848,7 +1848,7 @@
 >>
->> diff --git a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
->> b/Documentation/devicetree/bindings/spi/spi-rockchip.txt index
->> 1b14d69..305b542 100644
->> --- a/Documentation/devicetree/bindings/spi/spi-rockchip.txt
->> +++ b/Documentation/devicetree/bindings/spi/spi-rockchip.txt
->> @@ -6,9 +6,12 @@ and display controllers using the SPI communication
->> interface. Required Properties:
->>
->>   - compatible: should be one of the following.
->> +    "rockchip,rk3036-spi" for rk3036.
-> shouldn't the rk3036 also get the rk3066 fallback. Looking at the driver
-> part (patch2) the rk3036 still is the same IP as for every other soc in
-> here.
-
-Yep, the same IP.
-
-Do you think we should keep the below style?
-
-1)
-"rockchip,rk3036-spi", "rockchip,rk3066-spi" for rk3036.
-  "rockchip,rk3066-spi" for rk3066.
-  "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
-...
-
-or
-2)
-  "rockchip,rk3066-spi" for rk3066.
-"rockchip,rk3036-spi", "rockchip,rk3066-spi" for rk3036.
-  "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188
-..
-
-or
-3)
-"rockchip, rockchip-spi" for rk3036 rk3066.......
-
-Think about the 1) will be googd select.
-
--Caesar
-
->>       "rockchip,rk3066-spi" for rk3066.
->>       "rockchip,rk3188-spi", "rockchip,rk3066-spi" for rk3188.
->> +    "rockchip,rk3228-spi", "rockchip,rk3066-spi" for rk3228.
->>       "rockchip,rk3288-spi", "rockchip,rk3066-spi" for rk3288.
->> +    "rockchip,rk3368-spi", "rockchip,rk3066-spi" for rk3368.
->>       "rockchip,rk3399-spi", "rockchip,rk3066-spi" for rk3399.
->>   - reg: physical base address of the controller and length of memory
->> mapped region.
+>>   				ldo5_reg: ldo5 {
+>>   					regulator-name = "vddio_sdmmc,avdd_vdac";
 >
->
->
+> Stephen, looking at the schematics, I don't see that this is connected
+> to the avdd_vdac (which appears to be unconnected) and so I am wondering
+> if this name should be just "vddio_sdmmc"?
+
+Yes, I don't know where avdd_vdac came from; it doesn't appear connected 
+on any Beaver (or even Cardhu, from which it was probably derived) 
+schematic that I have.
+
+CC += Bryan in case he has any recollection since he wrote this DT.
