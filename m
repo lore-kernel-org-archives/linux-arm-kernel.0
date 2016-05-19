@@ -1,28 +1,65 @@
-From: saberlily.xia@hisilicon.com (Xiaqing (A))
-Date: Thu, 19 May 2016 19:06:40 +0800
-Subject: [PATCH] arm64: cpuinfo: add AArch64 & elf platform for app
- compatibility
-In-Reply-To: <20160519104925.GL22378@e104818-lin.cambridge.arm.com>
-References: <1463625873-60016-1-git-send-email-saberlily.xia@hisilicon.com>
- <20160519104925.GL22378@e104818-lin.cambridge.arm.com>
-Message-ID: <573D9E40.4000705@hisilicon.com>
+From: niklas.soderlund@ragnatech.se (Niklas =?iso-8859-1?Q?S=F6derlund?=)
+Date: Thu, 19 May 2016 13:21:22 +0200
+Subject: [PATCHv6 2/8] dma-debug: add support for resource mappings
+In-Reply-To: <20160517145002.GD4074@char.us.oracle.com>
+References: <1462812247-3414-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <1462812247-3414-3-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <20160517145002.GD4074@char.us.oracle.com>
+Message-ID: <20160519112122.GN29375@bigcity.dyn.berto.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Konrad,
 
+Thanks for your feedback.
 
-? 2016/5/19 18:49, Catalin Marinas ??:
-> On Thu, May 19, 2016 at 10:44:33AM +0800, x00195127 wrote:
->> we find that some apps will read cpuinfo when start up,
->> they need the string  as follows:
->> "Processor       : AArch64 Processor rev 0 (aarch64)"
->>
->> Then thay could load the corresponding libs. But now
->> arm64 platform's cpuinfo don't has this now, so
->> we need add this.
->
-> I have the same question as Martinez: what are those apps? If they are
-> 64-bit apps, they can always assume AArch64 processor.
->
+On 2016-05-17 10:50:02 -0400, Konrad Rzeszutek Wilk wrote:
+> > +void debug_dma_map_resource(struct device *dev, phys_addr_t addr, size_t size,
+> > +			    int direction, dma_addr_t dma_addr)
+> > +{
+> > +	struct dma_debug_entry *entry;
+> > +
+> > +	if (unlikely(dma_debug_disabled()))
+> > +		return;
+> > +
+> > +	entry = dma_entry_alloc();
+> > +	if (!entry)
+> > +		return;
+> > +
+> > +	entry->type		= dma_debug_resource;
+> > +	entry->dev		= dev;
+> > +	entry->pfn		= __phys_to_pfn(addr);
+> > +	entry->offset		= addr - PHYS_PFN(entry->pfn);
+> 
+> Is that right? 
 
-Those are 32-bit apps, and those apps are very popular in our country.
+You are correct that should be:
+
+   entry->offset = addr - PFN_PHYS(entry->pfn);
+
+Or even better:
+
+   entry->offset = addr - __pfn_to_phys(entry->pfn);
+
+I will address this and resend late next week, still hoping for some 
+more feedback.
+
+> 
+> __phys_to_pfn(addr) is PHYS_PFN(addr), so what you get here is
+> 
+> addr - PHYS_PFN(PHYS_PFN(addr)) ?
+> 
+> 
+> > +	entry->size		= size;
+> > +	entry->dev_addr		= dma_addr;
+> > +	entry->direction	= direction;
+> > +	entry->map_err_type	= MAP_ERR_NOT_CHECKED;
+> > +
+> > +	add_dma_entry(entry);
+> > +}
+> > +EXPORT_SYMBOL(debug_dma_map_resource);
+> > +
+
+-- 
+Regards,
+Niklas S?derlund
