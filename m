@@ -1,163 +1,104 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 20 May 2016 08:11:27 +0000
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <CAKv+Gu8fdeJ9OvRSmtu9zyvcjK3O-4WU=jG=6-7t4xZwvV8d2g@mail.gmail.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
- <57331290.7070104@semihalf.com>
- <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
- <CAKv+Gu8fdeJ9OvRSmtu9zyvcjK3O-4WU=jG=6-7t4xZwvV8d2g@mail.gmail.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1EDAF540@lhreml503-mbs>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Fri, 20 May 2016 10:14:50 +0200
+Subject: 4.5.0 on sun7i-a20-olinuxino-lime2: libphy: PHY stmmac-0:ffffffff
+ not found (regression from rc7)
+In-Reply-To: <573EC33D.2010209@arm.com>
+References: <56E9413D.9010902@a20.net> <56E945FF.6080005@arm.com>
+ <56E94CF4.2060607@arm.com> <56E95B57.1090100@suse.de>
+ <56E9776F.3070102@a20.net> <56E99B0C.2070609@arm.com>
+ <56E9F2B8.1030605@a20.net> <20160317075202.16b14ed6@arm.com>
+ <CAHsu+b-t_r93XKLJTUcin6xjhOrFVn3_60vwHkbRt3iHK28CbA@mail.gmail.com>
+ <573EC33D.2010209@arm.com>
+Message-ID: <573EC77A.2000800@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard, Jon
+Hello
 
-> -----Original Message-----
-> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
-> Sent: 20 May 2016 08:38
-> To: Jon Masters
-> Cc: Tomasz Nowicki; Gabriele Paoloni; helgaas at kernel.org; arnd at arndb.de;
-> will.deacon at arm.com; catalin.marinas at arm.com; rafael at kernel.org;
-> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
-> jchandra at broadcom.com; linaro-acpi at lists.linaro.org; linux-
-> pci at vger.kernel.org; dhdang at apm.com; Liviu.Dudau at arm.com;
-> ddaney at caviumnetworks.com; jeremy.linton at arm.com; linux-
-> kernel at vger.kernel.org; linux-acpi at vger.kernel.org;
-> robert.richter at caviumnetworks.com; Suravee.Suthikulpanit at amd.com;
-> msalter at redhat.com; Wangyijing; mw at semihalf.com;
-> andrea.gallo at linaro.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V7 00/11] Support for generic ACPI based PCI host
-> controller
-> 
-> On 20 May 2016 at 06:41, Jon Masters <jcm@redhat.com> wrote:
-> > Hi Tomasz, all,
-> >
-> > On 05/11/2016 07:08 AM, Tomasz Nowicki wrote:
-> >
-> >> On 11.05.2016 12:41, Gabriele Paoloni wrote:
-> >
-> >>>> v6 -> v7
-> >>>> - drop quirks handling
-> >>>
-> >>> Maybe I missed something in the v6 discussion thread; when was it
-> >>> decided to drop quirk handling?
-> >>
-> >> I had such requests in previous series.
-> >
-> > A quick note on quirk handling. This, I believe, applies post-merge
-> of
-> > the base infrastructure, which I realize will likely not have quirks.
-> >
-> > We've some "gen1" ARMv8 server platforms where we end up doing quirks
-> > (for things like forcing 32-bit config space accessors and the like)
-> due
-> > to people repurposing existing embedded PCIe IP blocks or using them
-> for
-> > the first time (especially in servers), and those being involved in
-> the
-> > design not necessarily seeing this problem ahead of time, or not
-> > realizing that it would be an issue for servers. In the early days of
-> > ARM server designs 3-4 years ago, many of us had never really played
-> > with ECAM or realized how modern topologies are built.
-> >
-> > Anyway. We missed this one in our SBSA requirements. They say (words
-> to
-> > the effect of) "thou shalt do PCIe the way it is done on servers" but
-> > they aren't prescriptive, and they don't tell people how that
-> actually
-> > is in reality. That is being fixed. A lot of things are happening
-> behind
-> > the scenes - especially with third party IP block providers (all of
-> whom
-> > myself and others are speaking with directly about this) - to ensure
-> > that the next wave of designs won't repeat these mistakes. We don't
-> have
-> > a time machine, but we can contain this from becoming an ongoing mess
-> > for upstream, and we will do so. It won't be a zoo.
-> >
-> > Various proposals have arisen for how to handle quirks in the longer
-> > term, including elaborate frameworks and tables to describe them
-> > generically. I would like to caution against such approaches,
-> especially
-> > in the case that they deviate from practice on x86, or prior to being
-> > standardized fully with other Operating System vendors. I don't
-> expect
-> > there to be too many more than the existing initial set of quirks we
-> > have seen posted. A number of "future" server SoCs have already been
-> > fixed prior to silicon, and new design starts are being warned not to
-> > make this a problem for us to have to clean up later.
-> >
-> > So, I would like to suggest that the eventual framework mirror the
-> > existing approach on x86 systems (matching DMI, etc.) and not be made
-> > into some kind of generic, utopia. This is a case where we want there
-> to
-> > be pain involved (and upstream patches required) when people screw up,
-> > so that they have a level of pain in response to ever making this
-> > mistake in the future. If we try to create too grand a generic scheme
-> > and make it too easy to handle this kind of situation beyond the
-> small
-> > number of existing offenders, we undermine efforts to force vendors
-> to
-> > ensure that their IP blocks are compliant going forward.
-> >
-> 
-> I understand that there is a desire from the RedHat side to mimic x86
-> as closely as possible, but I never saw any technical justification
-> for that. DMI contains strings that are visible to userland, and you
-> effectively lock those down to certain values just so that the kernel
-> can distinguish a broken PCIe root complex from a working one. Linux
-> on x86 had no choice, since the overwhelming majority of existing
-> hardware misrepresented itself as generic, and DMI was the only thing
-> available to actually distinguish these broken implementations from
-> one another. This does not mean we should allow and/or encourage this
-> first gen hardware to misrepresent non-compliant hardware as compliant
-> as well.
-> 
-> Since you are talking to all the people involved, how about you
-> convince them to put something in the ACPI tables that allows the
-> kernel to distinguish those non-standard PCIe implementations from
-> hardware that is really generic? This way, we can sidestep the quirks
-> debate entirely, since it will simply be a different device as far as
-> the kernel is concerned. This is no worse than a quirk from a
-> practical point of view, since an older OS will be equally unable to
-> run on newer hardware, but it is arguably more true to the standards
-> compliance you tend to preach about, especially since this small pool
-> of third party IP could potentially be identified directly rather than
-> based on some divination of the SoC we may or may not be running on. I
-> am also convinced that adding support for an additional HID() to the
-> ACPI ECAM driver with some special config space handling wired in is
-> an easier sell upstream than making the same ugly mess x86 has had to
-> make because they did not have any choice to begin with.
+On 5/20/2016 9:56 AM, Marc Zyngier wrote:
+> On 20/05/16 06:44, Andre Heider wrote:
+>> Giuseppe, Alexandre, et al.,
+>>
+>> On Thu, Mar 17, 2016 at 8:52 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> On Thu, 17 Mar 2016 00:56:40 +0100
+>>> Bert Lindner <bert@a20.net> wrote:
+>>>> On 2016-03-16 18:42, Marc Zyngier wrote:
+>>>>> On 16/03/16 15:10, Bert Lindner wrote:
+>>>>>> On 2016-03-16 14:10, Andreas F?rber wrote:
+>>>>>>> Am 16.03.2016 um 13:09 schrieb Robin Murphy:
+>>>>>>>> On 16/03/16 11:39, Marc Zyngier wrote:
+>>>>>>>>> On 16/03/16 11:19, Bert Lindner wrote:
+>> ...
+>>>>>>>>>> For the board sun7i-a20-olinuxino-lime2, there seems to be a problem
+>>>>>>>>>> with the eth0 PHY in mainline kernel 4.5.0 that developed since
+>>>>>>>>>> 4.5.0-rc7. Ethernet does not work, although eth0 is reported:
+>> ...
+>>>>>>>>>> [    9.767125] NET: Registered protocol family 10
+>>>>>>>>>> [   10.357405] libphy: PHY stmmac-0:ffffffff not found
+>>>>>>>>>> [   10.362382] eth0: Could not attach to PHY
+>>>>>>>>>> [   10.366557] stmmac_open: Cannot attach to PHY (error: -19)
+>> ...
+>>>>>>> v4 fixes for 4.5 are here:
+>>>>>>>
+>>>>>>> https://patchwork.ozlabs.org/patch/598195/ (revert)
+>>>>>>> https://patchwork.ozlabs.org/patch/598196/
+>> ...
+>>>>> Good to know, thanks. Could you also give the potential fix a go (as
+>>>>> mentioned by Andreas)? Just to make sure that whatever gets merged next
+>>>>> will actually fix the issue.
+>>>>
+>>>> Yes sure, it took a while because I had to travel. Confirmed, the
+>>>> v4-for-4.5 fix works well for me, on sun7i-a20-olinuxino-lime2:
+>>>>
+>>>> root at lime2-079f:~# cat /proc/version
+>>>> Linux version 4.5.0-598195-598196-v4 (root at lime2-079f) (gcc version
+>>>> 4.9.1 (Ubuntu/Linaro 4.9.1-16ubuntu6) ) #1 SMP Wed Mar 16 16:44:22 UTC 2016
+>>>>
+>>>> dmesg:
+>>>> [    8.245273] NET: Registered protocol family 10
+>>>> [    9.297406]  RX IPC Checksum Offload disabled
+>>>> [    9.297460]  No MAC Management Counters available
+>>>> [    9.297951] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+>>>> [   16.285658] sun7i-dwmac 1c50000.ethernet eth0: Link is Up -
+>>>> 1Gbps/Full - flow control rx/tx
+>>>> [   16.285798] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+>>>>
+>>>> The board is connected to my laptop rather than to a switch, so that
+>>>> might be where the flow control message comes from (not sure). Anyway
+>>>> ethernet works.
+>>>
+>>> Cool, many thanks for taking the time to test and report.
+>>>
+>>> Hopefully Giuseppe will get this merged quickly enough in mainline, and
+>>> it should then trickle into a 4.5-stable release (cc-ing stable on
+>>> these patches would probably be a good idea, BTW).
+>>
+>> stmmac is broken on at least Lime2, BananaPi and Cubieboard2 since
+>> v4.5 [0], including all five stable releases :(
+>
+> All the A20 platforms are dead, actually.
+>
+>> The v4.5 patches quoted above are already +4 weeks old, could we
+>> please get them into stable?
+>
+> For that, the maintainer would have needed to CC stable, which he
+> didn't. I'd expect someone who cares to send these patches to stable.
+> It'd be better if the maintainer would do it himself though.
 
-In our case (HiSilicon Hip05/Hip06) we are using the Designware IP
-that unfortunately is non-ECAM for the RC config space.
+sure, I can send the patches to stable (sorry if I missed to add
+stable ML on CC).
 
-A possible ACPI table solution was discussed already in this thread
+Andre, I have not clear if the train of patches actually fix the
+issue or if you need my support to fix something else. In that case
+I need some input for debugging (e.g. kernel log).
 
-https://lkml.org/lkml/2016/3/14/722
+let me know, is it enough to re-send the patches only?
 
-where <<Name (_CID, "PNP0C02")  // Motherboard reserved resource>>
-is used to specify an Host Controller specific resource.
-It looks to me that this can be an approach that can accommodate
-different vendors/scenarios and Bjorn seemed to be quite ok with
-it.
+Regards
+Peppe
 
-It comes without saying that for future HW releases we all should
-make an effort to deliver fully ECAM compliant controllers.
-
-What's your view about this approach?
-
-Thanks
-
-Gab
-
-> 
-> If we do need a quirks handling mechanism, I still don't see how the
-> x86 situation extrapolates to ARM. ACPI offers plenty of ways for a
-> SoC vendor to identify the make and particular revision, and quirks
-> could be keyed off of that.
-> 
-> --
-> Ard.
+>
+> Thanks,
+>
+> 	M.
+>
