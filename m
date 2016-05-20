@@ -1,104 +1,65 @@
-From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
-Date: Fri, 20 May 2016 10:14:50 +0200
-Subject: 4.5.0 on sun7i-a20-olinuxino-lime2: libphy: PHY stmmac-0:ffffffff
- not found (regression from rc7)
-In-Reply-To: <573EC33D.2010209@arm.com>
-References: <56E9413D.9010902@a20.net> <56E945FF.6080005@arm.com>
- <56E94CF4.2060607@arm.com> <56E95B57.1090100@suse.de>
- <56E9776F.3070102@a20.net> <56E99B0C.2070609@arm.com>
- <56E9F2B8.1030605@a20.net> <20160317075202.16b14ed6@arm.com>
- <CAHsu+b-t_r93XKLJTUcin6xjhOrFVn3_60vwHkbRt3iHK28CbA@mail.gmail.com>
- <573EC33D.2010209@arm.com>
-Message-ID: <573EC77A.2000800@st.com>
+From: hongbo.zhang@nxp.com (Hongbo Zhang)
+Date: Fri, 20 May 2016 08:23:36 +0000
+Subject: [PSCI DISCUSS] How to implement standby and suspend-to-ram by PSCI
+In-Reply-To: <1463659261.14323.3.camel@suse.com>
+References: <DB3PR04MB0812DAA98F71C30E8A8832E3847D0@DB3PR04MB0812.eurprd04.prod.outlook.com>
+ <572C9BF2.9010004@arm.com>
+ <DB3PR04MB08125A628F5034749F8109D884730@DB3PR04MB0812.eurprd04.prod.outlook.com>
+ <1463486036.19237.9.camel@suse.com>
+ <AM3PR04MB0805D7F5375413C154DFB981844A0@AM3PR04MB0805.eurprd04.prod.outlook.com>
+ <1463659261.14323.3.camel@suse.com>
+Message-ID: <DB3PR04MB0812AAD69AEE789DB577C2D2844B0@DB3PR04MB0812.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
 
-On 5/20/2016 9:56 AM, Marc Zyngier wrote:
-> On 20/05/16 06:44, Andre Heider wrote:
->> Giuseppe, Alexandre, et al.,
->>
->> On Thu, Mar 17, 2016 at 8:52 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->>> On Thu, 17 Mar 2016 00:56:40 +0100
->>> Bert Lindner <bert@a20.net> wrote:
->>>> On 2016-03-16 18:42, Marc Zyngier wrote:
->>>>> On 16/03/16 15:10, Bert Lindner wrote:
->>>>>> On 2016-03-16 14:10, Andreas F?rber wrote:
->>>>>>> Am 16.03.2016 um 13:09 schrieb Robin Murphy:
->>>>>>>> On 16/03/16 11:39, Marc Zyngier wrote:
->>>>>>>>> On 16/03/16 11:19, Bert Lindner wrote:
->> ...
->>>>>>>>>> For the board sun7i-a20-olinuxino-lime2, there seems to be a problem
->>>>>>>>>> with the eth0 PHY in mainline kernel 4.5.0 that developed since
->>>>>>>>>> 4.5.0-rc7. Ethernet does not work, although eth0 is reported:
->> ...
->>>>>>>>>> [    9.767125] NET: Registered protocol family 10
->>>>>>>>>> [   10.357405] libphy: PHY stmmac-0:ffffffff not found
->>>>>>>>>> [   10.362382] eth0: Could not attach to PHY
->>>>>>>>>> [   10.366557] stmmac_open: Cannot attach to PHY (error: -19)
->> ...
->>>>>>> v4 fixes for 4.5 are here:
->>>>>>>
->>>>>>> https://patchwork.ozlabs.org/patch/598195/ (revert)
->>>>>>> https://patchwork.ozlabs.org/patch/598196/
->> ...
->>>>> Good to know, thanks. Could you also give the potential fix a go (as
->>>>> mentioned by Andreas)? Just to make sure that whatever gets merged next
->>>>> will actually fix the issue.
->>>>
->>>> Yes sure, it took a while because I had to travel. Confirmed, the
->>>> v4-for-4.5 fix works well for me, on sun7i-a20-olinuxino-lime2:
->>>>
->>>> root at lime2-079f:~# cat /proc/version
->>>> Linux version 4.5.0-598195-598196-v4 (root at lime2-079f) (gcc version
->>>> 4.9.1 (Ubuntu/Linaro 4.9.1-16ubuntu6) ) #1 SMP Wed Mar 16 16:44:22 UTC 2016
->>>>
->>>> dmesg:
->>>> [    8.245273] NET: Registered protocol family 10
->>>> [    9.297406]  RX IPC Checksum Offload disabled
->>>> [    9.297460]  No MAC Management Counters available
->>>> [    9.297951] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
->>>> [   16.285658] sun7i-dwmac 1c50000.ethernet eth0: Link is Up -
->>>> 1Gbps/Full - flow control rx/tx
->>>> [   16.285798] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
->>>>
->>>> The board is connected to my laptop rather than to a switch, so that
->>>> might be where the flow control message comes from (not sure). Anyway
->>>> ethernet works.
->>>
->>> Cool, many thanks for taking the time to test and report.
->>>
->>> Hopefully Giuseppe will get this merged quickly enough in mainline, and
->>> it should then trickle into a 4.5-stable release (cc-ing stable on
->>> these patches would probably be a good idea, BTW).
->>
->> stmmac is broken on at least Lime2, BananaPi and Cubieboard2 since
->> v4.5 [0], including all five stable releases :(
->
-> All the A20 platforms are dead, actually.
->
->> The v4.5 patches quoted above are already +4 weeks old, could we
->> please get them into stable?
->
-> For that, the maintainer would have needed to CC stable, which he
-> didn't. I'd expect someone who cares to send these patches to stable.
-> It'd be better if the maintainer would do it himself though.
 
-sure, I can send the patches to stable (sorry if I missed to add
-stable ML on CC).
+> -----Original Message-----
+> From: Oliver Neukum [mailto:oneukum at suse.com]
+> Sent: Thursday, May 19, 2016 8:01 PM
+> To: Hongbo Zhang <hongbo.zhang@nxp.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>; linux-pm at vger.kernel.org;
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>; Marc Zyngier
+> <marc.zyngier@arm.com>; Jan Kiszka <jan.kiszka@siemens.com>; Mark
+> Rutland <mark.rutland@arm.com>; Daniel Lezcano
+> <daniel.lezcano@linaro.org>; Chen-Yu Tsai <wens@csie.org>; Hans de Goede
+> <hdegoede@redhat.com>; Frank Li <Frank.Li@freescale.com>; Peng Fan
+> <Peng.Fan@freescale.com>; Tom Warren <twarren@nvidia.com>; Vincent
+> Guittot <vincent.guittot@linaro.org>; jszhang at marvell.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PSCI DISCUSS] How to implement standby and suspend-to-ram by
+> PSCI
+> 
+> On Thu, 2016-05-19 at 10:27 +0000, Hongbo Zhang wrote:
+> > > For the pm module of the core kernel a low power state is a sleep
+> > > state if even one of three conditions is met:
+> > >
+> > > a) a device that can be used for input is not a source of wake ups
+> > > b) tasks need to be frozen to enter it
+> > > c) the display goes off, while it should be on
+> > >
+> > > Generally runtime PM is better if you can get the same results.
+> > > Going to a system sleep state is a necessary evil.
+> 
+> 
+> > As I just explained in previous reply, many devices in our Soc cannot
+> > be physically clock or power gated, all the non-wakeup devices can
+> > only be gated off at same time by a PM module, so runtime PM doesn't
+> > fit for us well.
+> 
+> You are looking for a contradiction where none is to be found. We have
+> PM domains which allow you to model common clocks and gates. You simply
+> use the driver core and it will use the common gate when every device is
+> idle. Obviously this is also true when the system is suspended. But not
+> necessarily only when the system is suspended.
+> 
+> 	Regards
+> 		Oliver
+> 
 
-Andre, I have not clear if the train of patches actually fix the
-issue or if you need my support to fix something else. In that case
-I need some input for debugging (e.g. kernel log).
+Understand.
+Well, currently our situation is that we've already implemented our sleep/deep sleep mode (mapping to kernel terms standby/suspend to ram), and now while transferring to PSCI we meet such a problem.
+If runtime PM is used, many device driver's developers have to be involved to offer their runtime callbacks, a lot of efforts needed in whole system level. But yes, runtime PM has its own advantages, will consider to apply it in the coming SOCs.
+Thanks for advice.
 
-let me know, is it enough to re-send the patches only?
-
-Regards
-Peppe
-
->
-> Thanks,
->
-> 	M.
->
+Hongbo Zhang @ NXP
