@@ -1,83 +1,94 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 20 May 2016 21:04:57 +0800
-Subject: [PATCH v2 3/3] ARM: dts: rockchip: fixes the spi compatible for
- rk3036
-In-Reply-To: <573F099F.1020603@rock-chips.com>
-References: <1463702182-5188-1-git-send-email-wxt@rock-chips.com>
- <1463702182-5188-3-git-send-email-wxt@rock-chips.com>
- <8f662b3b-e359-efdf-72e5-c4f862dd1cf6@kernel-upstream.org>
- <573F099F.1020603@rock-chips.com>
-Message-ID: <e538d784-2860-04e9-1e8c-45c8769561f9@rock-chips.com>
+From: aleksey.makarov@linaro.org (Aleksey Makarov)
+Date: Fri, 20 May 2016 16:03:20 +0300
+Subject: [PATCH v8 1/4] of/serial: move earlycon early_param handling to serial
+In-Reply-To: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <1463749405-11640-2-git-send-email-aleksey.makarov@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/5/20 20:57, Caesar Wang ??:
->
-> ? 2016?05?20? 20:35, Shawn Lin ??:
->> ? 2016/5/20 7:56, Caesar Wang ??:
->>> That's seem the incorrect string to match the spi driver.
->>>
->>
->> Will it break the backward compatibility for some dtb if not
->> falling back to "rockchip,rockchip-spi" ?
->
-> The rk3036 shouldn't work if you read the driver/spi/spi-rockchip.c.
-> since the "rockchip,rockchip-spi" is *not* exist in linux kernel.
->
+From: Leif Lindholm <leif.lindholm@linaro.org>
 
-okay, so that means we take "rockchip,rockchip-spi" from local branch
-by mistake?
+We have multiple "earlycon" early_param handlers - merge the DT one into
+the main earlycon one.  It's a cleanup that also will be useful
+to defer setting up DT console until ACPI/DT decision is made.
 
-> ..
->  static const struct of_device_id rockchip_spi_dt_match[] = {
->     { .compatible = "rockchip,rk3066-spi", },
->     { .compatible = "rockchip,rk3188-spi", },
->     { .compatible = "rockchip,rk3288-spi", },
->     { .compatible = "rockchip,rk3399-spi", },
->     { },
-> }
-> ..
->
->
-> -Caesar
->
->>
->>> Fixes commit f629fcfab2cd
->>> ("ARM: dts: rockchip: support the spi for rk3036")
->>>
->>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>> Cc: Heiko Stuebner <heiko@sntech.de>
->>> Cc: linux-rockchip at lists.infradead.org
->>>
->>> ---
->>>
->>> Changes in v2: None
->>>
->>>  arch/arm/boot/dts/rk3036.dtsi | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/rk3036.dtsi
->>> b/arch/arm/boot/dts/rk3036.dtsi
->>> index d0f4bb7..a30700a 100644
->>> --- a/arch/arm/boot/dts/rk3036.dtsi
->>> +++ b/arch/arm/boot/dts/rk3036.dtsi
->>> @@ -431,7 +431,7 @@
->>>      };
->>>
->>>      spi: spi at 20074000 {
->>> -        compatible = "rockchip,rockchip-spi";
->>> +        compatible = "rockchip,rk3036-spi";
->>>          reg = <0x20074000 0x1000>;
->>>          interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
->>>          clocks =<&cru PCLK_SPI>, <&cru SCLK_SPI>;
->>>
->>
->>
->>
->>
->
+Rename the exported function to avoid clashing with the function from
+arch/microblaze/kernel/prom.c
 
+Signed-off-by: Leif Lindholm <leif.lindholm@linaro.org>
+Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ drivers/of/fdt.c              | 11 +----------
+ drivers/tty/serial/earlycon.c |  2 +-
+ include/linux/of_fdt.h        |  2 ++
+ 3 files changed, 4 insertions(+), 11 deletions(-)
 
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index e7a8caa..56da2a9 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -906,7 +906,7 @@ static inline void early_init_dt_check_for_initrd(unsigned long node)
+ 
+ #ifdef CONFIG_SERIAL_EARLYCON
+ 
+-static int __init early_init_dt_scan_chosen_serial(void)
++int __init early_init_dt_scan_chosen_stdout(void)
+ {
+ 	int offset;
+ 	const char *p, *q, *options = NULL;
+@@ -950,15 +950,6 @@ static int __init early_init_dt_scan_chosen_serial(void)
+ 	}
+ 	return -ENODEV;
+ }
+-
+-static int __init setup_of_earlycon(char *buf)
+-{
+-	if (buf)
+-		return 0;
+-
+-	return early_init_dt_scan_chosen_serial();
+-}
+-early_param("earlycon", setup_of_earlycon);
+ #endif
+ 
+ /**
+diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+index 067783f..7aae655 100644
+--- a/drivers/tty/serial/earlycon.c
++++ b/drivers/tty/serial/earlycon.c
+@@ -209,7 +209,7 @@ static int __init param_setup_earlycon(char *buf)
+ 	 * don't generate a warning from parse_early_params() in that case
+ 	 */
+ 	if (!buf || !buf[0])
+-		return 0;
++		return early_init_dt_scan_chosen_stdout();
+ 
+ 	err = setup_earlycon(buf);
+ 	if (err == -ENOENT || err == -EALREADY)
+diff --git a/include/linux/of_fdt.h b/include/linux/of_fdt.h
+index 26c3302..2f69d4c 100644
+--- a/include/linux/of_fdt.h
++++ b/include/linux/of_fdt.h
+@@ -66,6 +66,7 @@ extern int early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ 				     int depth, void *data);
+ extern int early_init_dt_scan_memory(unsigned long node, const char *uname,
+ 				     int depth, void *data);
++extern int early_init_dt_scan_chosen_stdout(void);
+ extern void early_init_fdt_scan_reserved_mem(void);
+ extern void early_init_fdt_reserve_self(void);
+ extern void early_init_dt_add_memory_arch(u64 base, u64 size);
+@@ -94,6 +95,7 @@ extern void early_get_first_memblock_info(void *, phys_addr_t *);
+ extern u64 of_flat_dt_translate_address(unsigned long node);
+ extern void of_fdt_limit_memory(int limit);
+ #else /* CONFIG_OF_FLATTREE */
++static inline int early_init_dt_scan_chosen_stdout(void) { return -ENODEV; }
+ static inline void early_init_fdt_scan_reserved_mem(void) {}
+ static inline void early_init_fdt_reserve_self(void) {}
+ static inline const char *of_flat_dt_get_machine_name(void) { return NULL; }
 -- 
-Best Regards
-Shawn Lin
+2.8.2
