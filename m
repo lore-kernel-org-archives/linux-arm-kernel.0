@@ -1,35 +1,44 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 20 May 2016 06:12:59 +0200
-Subject: 4.5-rc0 regression: GPRS breaks after very short while
-In-Reply-To: <20160518201251.GA22015@amd>
-References: <20160518074924.GA20652@amd> <20160518141624.GA8025@earth>
- <20160518201251.GA22015@amd>
-Message-ID: <20160520041258.GB22076@earth>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 20 May 2016 13:14:46 +0900
+Subject: [PATCH/RFC 2/3] arm64: dts: salvator-x: add Salvator-X board on
+ R8A7796 SoC
+In-Reply-To: <CAMuHMdVTMvDsmO1g=FNwpkvx_56guHk_V6Katj8e3qOdyQsjeQ@mail.gmail.com>
+References: <1463629845-7115-1-git-send-email-horms+renesas@verge.net.au>
+ <1463629845-7115-3-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVTMvDsmO1g=FNwpkvx_56guHk_V6Katj8e3qOdyQsjeQ@mail.gmail.com>
+Message-ID: <20160520041445.GC25184@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 18, 2016 at 10:12:51PM +0200, Pavel Machek wrote:
-> > The last one only changes a comment, so not relevant, the other
-> > two fix error handling during initialization and are most likely
-> > also not the problem. Can you try to bisect the problem?
+On Thu, May 19, 2016 at 06:58:11PM +0200, Geert Uytterhoeven wrote:
+> On Thu, May 19, 2016 at 5:50 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+> > @@ -0,0 +1,45 @@
 > 
-> It will not be fun, but I guess it is doable. But before I start it
-> would be good to know -- does it work for you?
+> > +       chosen {
+> > +               bootargs = "ignore_loglevel";
+> 
+> Perhaps you want this to be consistent with the other Renesas boards?
+> 
+> git grep bootargs -- $(git grep -l renesas, -- arch/arm*/*dts)
 
-I currently don't have a second SIM card with network access for my
-dev phone, so I usually only test without gprs connection. As a
-result I don't really know if longer data connection would work.
+I omitted "rw root=/dev/nfs ip=dhcp" which I believe should be added
+when the board gets network and thus NFS-root support.
 
-Also I'm quite busy until next weekend with other stuff. If you did
-not find anything until then, I will do some testing/debugging.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160520/e1685193/attachment.sig>
+> 
+> > +               stdout-path = "serial0:115200n8";
+> > +       };
+> 
+> Gr{oetje,eeting}s,
+> 
+>                         Geert
+> 
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> 
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> 
