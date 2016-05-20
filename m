@@ -1,95 +1,76 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Fri, 20 May 2016 16:03:23 +0300
-Subject: [PATCH v8 4/4] serial: pl011: add console matching function
-In-Reply-To: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
-References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
-Message-ID: <1463749405-11640-5-git-send-email-aleksey.makarov@linaro.org>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 20 May 2016 21:09:55 +0800
+Subject: [PATCH v2 3/3] ARM: dts: rockchip: fixes the spi compatible for
+ rk3036
+In-Reply-To: <28155403.nCsUkeXQB1@phil>
+References: <1463702182-5188-1-git-send-email-wxt@rock-chips.com>
+ <1463702182-5188-3-git-send-email-wxt@rock-chips.com>
+ <8f662b3b-e359-efdf-72e5-c4f862dd1cf6@kernel-upstream.org>
+ <28155403.nCsUkeXQB1@phil>
+Message-ID: <3c1e174e-035b-78ae-b045-fe89990826da@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds function pl011_console_match() that implements
-method match of struct console.  It allows to match consoles against
-data specified in a string, for example taken from command line or
-compiled by ACPI SPCR table handler.
+On 2016/5/20 20:58, Heiko Stuebner wrote:
+> Am Freitag, 20. Mai 2016, 20:35:53 schrieb Shawn Lin:
+>> ? 2016/5/20 7:56, Caesar Wang ??:
+>>> That's seem the incorrect string to match the spi driver.
+>>
+>> Will it break the backward compatibility for some dtb if not
+>> falling back to "rockchip,rockchip-spi" ?
+>
+> in what dtb did you see "rockchip,rockchip-spi"?
 
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
----
- drivers/tty/serial/amba-pl011.c | 56 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+I'm not 100% sure, but I remember we toke this name on local
+branch for rk3036 when we were developing this Soc.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index a2aa655..388edc8 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2288,12 +2288,68 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 	return uart_set_options(&uap->port, co, baud, parity, bits, flow);
- }
- 
-+/**
-+ *	pl011_console_match - non-standard console matching
-+ *	@co:	  registering console
-+ *	@name:	  name from console command line
-+ *	@idx:	  index from console command line
-+ *	@options: ptr to option string from console command line
-+ *
-+ *	Only attempts to match console command lines of the form:
-+ *	    console=pl011,mmio|mmio32,<addr>[,<options>]
-+ *	    console=pl011,0x<addr>[,<options>]
-+ *	This form is used to register an initial earlycon boot console and
-+ *	replace it with the amba_console at pl011 driver init.
-+ *
-+ *	Performs console setup for a match (as required by interface)
-+ *	If no <options> are specified, then assume the h/w is already setup.
-+ *
-+ *	Returns 0 if console matches; otherwise non-zero to use default matching
-+ */
-+static int __init pl011_console_match(struct console *co, char *name, int idx,
-+				      char *options)
-+{
-+	char match[] = "pl011";	/* pl011-specific earlycon name */
-+	unsigned char iotype;
-+	unsigned long addr;
-+	int i;
-+
-+	if (strncmp(name, match, 5) != 0)
-+		return -ENODEV;
-+
-+	if (uart_parse_earlycon(options, &iotype, &addr, &options))
-+		return -ENODEV;
-+
-+	/* try to match the port specified on the command line */
-+	for (i = 0; i < ARRAY_SIZE(amba_ports); i++) {
-+		struct uart_port *port;
-+
-+		if (!amba_ports[i])
-+			continue;
-+
-+		port = &amba_ports[i]->port;
-+
-+		if (iotype != UPIO_MEM && iotype != UPIO_MEM32)
-+			continue;
-+
-+		if (port->mapbase != addr)
-+			continue;
-+
-+		co->index = i;
-+		port->cons = co;
-+		return pl011_console_setup(co, options);
-+	}
-+
-+	return -ENODEV;
-+}
-+
- static struct uart_driver amba_reg;
- static struct console amba_console = {
- 	.name		= "ttyAMA",
- 	.write		= pl011_console_write,
- 	.device		= uart_console_device,
- 	.setup		= pl011_console_setup,
-+	.match		= pl011_console_match,
- 	.flags		= CON_PRINTBUFFER,
- 	.index		= -1,
- 	.data		= &amba_reg,
+> I.e. it isn't part of any current _mainline_ devicetree files.
+>
+
+Caesar, Could you check our develop-3.10 branch to see if it does
+exist?
+
+Anyway, "rockchip,rockchip-spi" isn't a part of mainline dt property.
+
+
+>
+> Heiko
+>
+>>
+>>> Fixes commit f629fcfab2cd
+>>> ("ARM: dts: rockchip: support the spi for rk3036")
+>>>
+>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>> Cc: Heiko Stuebner <heiko@sntech.de>
+>>> Cc: linux-rockchip at lists.infradead.org
+>>>
+>>> ---
+>>>
+>>> Changes in v2: None
+>>>
+>>>  arch/arm/boot/dts/rk3036.dtsi | 2 +-
+>>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/rk3036.dtsi
+>>> b/arch/arm/boot/dts/rk3036.dtsi index d0f4bb7..a30700a 100644
+>>> --- a/arch/arm/boot/dts/rk3036.dtsi
+>>> +++ b/arch/arm/boot/dts/rk3036.dtsi
+>>> @@ -431,7 +431,7 @@
+>>>
+>>>  	};
+>>>  	
+>>>  	spi: spi at 20074000 {
+>>>
+>>> -		compatible = "rockchip,rockchip-spi";
+>>> +		compatible = "rockchip,rk3036-spi";
+>>>
+>>>  		reg = <0x20074000 0x1000>;
+>>>  		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+>>>  		clocks =<&cru PCLK_SPI>, <&cru SCLK_SPI>;
+>
+>
+
+
 -- 
-2.8.2
+Best Regards
+Shawn Lin
