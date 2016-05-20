@@ -1,96 +1,61 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 20 May 2016 10:55:15 +0100
-Subject: [PATCH] arm64: cpuinfo: add AArch64 & elf platform for app
- compatibility
-In-Reply-To: <573E8300.7060106@hisilicon.com>
-References: <1463625873-60016-1-git-send-email-saberlily.xia@hisilicon.com>
- <20160519104925.GL22378@e104818-lin.cambridge.arm.com>
- <573D9E40.4000705@hisilicon.com>
- <20160519125039.GN22378@e104818-lin.cambridge.arm.com>
- <20160519131832.GO22378@e104818-lin.cambridge.arm.com>
- <573E8300.7060106@hisilicon.com>
-Message-ID: <20160520095515.GC11974@e104818-lin.cambridge.arm.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri, 20 May 2016 12:04:37 +0200
+Subject: [PATCH 1/3] reset: Add support for the Amlogic Meson GXBB Reset
+ Controller
+In-Reply-To: <573ED483.10101@baylibre.com>
+References: <1463732875-23141-1-git-send-email-narmstrong@baylibre.com>
+ <1463732875-23141-2-git-send-email-narmstrong@baylibre.com>
+ <20160520090448.GA19888@mephisto> <573ED483.10101@baylibre.com>
+Message-ID: <20160520100437.GA21213@mephisto>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 11:22:40AM +0800, Xiaqing (A) wrote:
-> ? 2016/5/19 21:18, Catalin Marinas ??:
-> >diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> >index 3808470486f3..6bda9d30a769 100644
-> >--- a/arch/arm64/kernel/cpuinfo.c
-> >+++ b/arch/arm64/kernel/cpuinfo.c
-> >@@ -22,6 +22,7 @@
-> >
-> >  #include <linux/bitops.h>
-> >  #include <linux/bug.h>
-> >+#include <linux/elf.h>
-> >  #include <linux/init.h>
-> >  #include <linux/kernel.h>
-> >  #include <linux/personality.h>
-> >@@ -104,6 +105,8 @@ static const char *const compat_hwcap2_str[] = {
-> >  static int c_show(struct seq_file *m, void *v)
-> >  {
-> >  	int i, j;
-> >+	bool compat = is_compat_task() ||
-> >+		personality(current->personality) == PER_LINUX32;
-> >
-> >  	for_each_online_cpu(i) {
-> >  		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
-> >@@ -115,6 +118,9 @@ static int c_show(struct seq_file *m, void *v)
-> >  		 * "processor".  Give glibc what it expects.
-> >  		 */
-> >  		seq_printf(m, "processor\t: %d\n", i);
-> >+		if (compat)
-> >+			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
-> >+				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
-> >
-> >  		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
-> >  			   loops_per_jiffy / (500000UL/HZ),
-> >@@ -127,7 +133,7 @@ static int c_show(struct seq_file *m, void *v)
-> >  		 * software which does already (at least for 32-bit).
-> >  		 */
-> >  		seq_puts(m, "Features\t:");
-> >-		if (personality(current->personality) == PER_LINUX32) {
-> >+		if (compat) {
-> >  #ifdef CONFIG_COMPAT
-> >  			for (j = 0; compat_hwcap_str[j]; j++)
-> >  				if (compat_elf_hwcap & (1 << j))
-> >------------------8<---------------------
-> >
-> >With the above, a compat task or a native one with PER_LINUX32
-> >personality would get:
-> >
-> >processor       : 0
-> >model name      : ARMv8 Processor rev 0 (v8l)
-> >BogoMIPS        : 100.00
-> >Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt lpae evtstrm aes pmull sha1 sha2 crc32
-> >CPU implementer : 0x41
-> >CPU architecture: 8
-> >CPU variant     : 0x0
-> >CPU part        : 0xd03
-> >CPU revision    : 0
+On 20/05/16 11:10, Neil Armstrong wrote:
+> On 05/20/2016 11:04 AM, Carlo Caione wrote:
+> > On 20/05/16 10:27, Neil Armstrong wrote:
+> >> This patch adds the platform driver for the Amlogic Meson GXBB Reset
+> >> Controller.
+> >>
+> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> >> ---
+> >>  drivers/reset/Kconfig            |   6 ++
+> >>  drivers/reset/Makefile           |   1 +
+> >>  drivers/reset/reset-meson-gxbb.c | 129 +++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 136 insertions(+)
+> >>  create mode 100644 drivers/reset/reset-meson-gxbb.c
+> > 
+> > Do we really need to be that specific (-gxbb)? This driver looks generic
+> > and simple enough to be used for several Amlogic families. You are
+> > already differentiating between them with the include file defining the
+> > reset indexes for the SoC.
 > 
-> I have tested with your patch, the app still can not start up at all.
+> This is a good question, do the S805 have similar registers ? Same count and width ?
+> I no, it should need a rework to add a data structure per-SoC.
+
+According to the datasheet on S805 we have 7 registers with 16 reset
+bits per register.
+
+[...]
+> > 
+> > [...]
+> >> +static struct platform_driver meson_gxbb_reset_driver = {
+> >> +	.probe	= meson_gxbb_reset_probe,
+> >> +	.remove	= meson_gxbb_reset_remove,
+> >> +	.driver = {
+> >> +		.name		= "meson_gxbb_reset",
+> >> +		.of_match_table	= meson_gxbb_reset_dt_ids,
+> >> +	},
+> >> +};
+> >> +
+> >> +module_platform_driver(meson_gxbb_reset_driver);
+> > 
+> > No MODULE_AUTHOR, MODULE_LICENSE, etc... ?
 > 
-> I'm sorry I didn't explan this exactly before, those apps are 32-bit android
-> apps(com.tencent.pao etc.). They want to get the information as
->   "*D m3e : GetCPUType:AArch64 Processor rev 0 (aarch64)*"
-> and I'm sure the process is forked by zygote not zygote64 in android M.
+> What is the MODULE_LICENCE format for dual licensing ?
 
-So, these 32-bit applications would never run on an arm32 kernel
-(because with my patch, compat /proc/cpuinfo is the same as the native
-arm32 kernel)? How did they get into this situation?
+Dual BSD/GPL ?
 
-I recall from some past discussions with Google on this aspect that
-there are indeed applications parsing /proc/cpuinfo but the 32-bit
-zygote would set PER_LINUX32 so that child processes would inherit it
-and always get the compat /proc/cpuinfo. I don't follow the Android
-developments, so I can't tell whether this personality setting is in
-place.
-
-While we did change the /proc/cpuinfo 64-bit format slightly in 3.19, I
-find it insane that there are 32-bit applications relying on always
-running under a 64-bit kernel.
+Cheers,
 
 -- 
-Catalin
+Carlo Caione
