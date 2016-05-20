@@ -1,60 +1,77 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 20 May 2016 14:18:03 +0200
-Subject: [PATCH 1/3] reset: Add support for the Amlogic Meson GXBB Reset
- Controller
-In-Reply-To: <1463736478.4322.31.camel@pengutronix.de>
+Date: Fri, 20 May 2016 14:18:52 +0200
+Subject: [PATCH 2/3] dt-bindings: reset: Add bindings for the Meson GXBB
+ Reset Controller
+In-Reply-To: <20160520090859.GB19888@mephisto>
 References: <1463732875-23141-1-git-send-email-narmstrong@baylibre.com>
- <1463732875-23141-2-git-send-email-narmstrong@baylibre.com>
- <1463736478.4322.31.camel@pengutronix.de>
-Message-ID: <573F007B.6030502@baylibre.com>
+ <1463732875-23141-3-git-send-email-narmstrong@baylibre.com>
+ <20160520084646.GB16732@mephisto> <573ED01C.2070800@baylibre.com>
+ <20160520090859.GB19888@mephisto>
+Message-ID: <573F00AC.6040304@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philipp,
+On 05/20/2016 11:08 AM, Carlo Caione wrote:
+> On 20/05/16 10:51, Neil Armstrong wrote:
+>> On 05/20/2016 10:46 AM, Carlo Caione wrote:
+>>> On 20/05/16 10:27, Neil Armstrong wrote:
+>>>> Add DT bindings for the Meson GXBB SoC Reset Controller documentation and the
+>>>> associated include file.
+>>>
+>>> [...]
+>>>
+>>>> +#define RESET_I2C_MASTER_2	142
+>>>> +#define RESET_I2C_MASTER_1	143
+>>>> +/*				144-159	*/
+>>>> +/*	RESET5				*/
+>>>> +/*				160-191	*/
+>>>> +/*	RESET6				*/
+>>>> +#define RESET_PERIPHS_GENERAL	192
+>>>> +#define RESET_PERIPHS_SPICC	193
+>>>> +#define RESET_PERIPHS_SMART_CARD	194
+>>>> +#define RESET_PERIPHS_SAR_ADC	195
+>>>> +#define RESET_PERIPHS_I2C_MASTER_0	196
+>>>> +#define RESET_SANA		197
+>>>> +/*				198	*/
+>>>> +#define RESET_PERIPHS_STREAM_INTERFACE	199
+>>>> +#define RESET_PERIPHS_SDIO	200
+>>>> +#define RESET_PERIPHS_UART_0	201
+>>>> +#define RESET_PERIPHS_UART_1_2	202
+>>>> +#define RESET_PERIPHS_ASYNC_0	203
+>>>> +#define RESET_PERIPHS_ASYNC_1	204
+>>>> +#define RESET_PERIPHS_SPI_0	205
+>>>> +#define RESET_PERIPHS_SDHC	206
+>>>> +#define RESET_UART_SLIP		207
+>>>> +/*				208-223	*/
+>>>> +/*	RESET7				*/
+>>>> +#define RESET_USB_DDR_0		224
+>>>> +#define RESET_USB_DDR_1		225
+>>>> +#define RESET_USB_DDR_2		226
+>>>> +#define RESET_USB_DDR_3		227
+>>>> +/*				228	*/
+>>>> +#define RESET_DEVICE_MMC_ARB	229
+>>>> +/*				230	*/
+>>>> +#define RESET_VID_LOCK		231
+>>>> +#define RESET_A9_DMC_PIPEL	232
+>>>> +/*				233-255	*/
+>>>> +
+>>>> +#endif
+>>>
+>>> Indentation looks really messy. Can you just shift the numbers to the
+>>> right so that they are on the same column?
+>>>
+>> Hi Carlo,
+>>
+>> The patch format makes it very messy, not as in the original format :
+>> https://github.com/superna9999/linux/blob/6163f8742454bb7ff962956b4e286d110ec0fb79/include/dt-bindings/reset/amlogic%2Cmeson-gxbb-reset.h
+> 
+> https://raw.githubusercontent.com/superna9999/linux/6163f8742454bb7ff962956b4e286d110ec0fb79/include/dt-bindings/reset/amlogic%2Cmeson-gxbb-reset.h
+> 
+> yes, but 192 -> 200 are not nicely indented to me :)
+> 
 
-On 05/20/2016 11:27 AM, Philipp Zabel wrote:
-> Hi Neil,
-> 
-> Am Freitag, den 20.05.2016, 10:27 +0200 schrieb Neil Armstrong:
->> +config MESON_GXBB_RESET
->> +	tristate "Amlogic Meson GXBB Reset Driver"
->> +	depends on (ARCH_MESON && RESET_CONTROLLER)
-> 
-> With the "reset: fix Kconfig menu to include reset drivers in sub-menu"
-> patch [1] applied this is wrapped in "if RESET_CONTROLLER ... endif", so
-> no need to depend on RESET_CONTROLLER.
-> Is there a reason to have this configurable at all, though?
-> 
-> [1] https://patchwork.kernel.org/patch/9000591/
-> 
-> Or drop CONFIG_MESON_GXBB_RESET and use CONFIG_ARCH_MESON directly.
+Aw, you got me !
 
-No strong reason, I will switch to CONFIG_ARCH_MESON.
-
-> [...]
-> 
-> With the "reset: add devm_reset_controller_register API" patch [2]
-> applied you can use devm_reset_controller_register() here and remove the
-> meson_gxbb_reset_remove() function below.
-> 
-> [2] https://patchwork.kernel.org/patch/8988471/
-> 
->> +}
->> +
->> +static int meson_gxbb_reset_remove(struct platform_device *pdev)
->> +{
->> +	struct meson_gxbb_reset *data = platform_get_drvdata(pdev);
->> +
->> +	reset_controller_unregister(&data->rcdev);
->> +
->> +	return 0;
->> +}
-> 
-> Could be removed, then.
-> 
-> regards
-> Philipp
-
-It will be for sure !
+I will add a shift and add a separate meson8b version of this file.
 
 Neil
