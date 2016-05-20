@@ -1,30 +1,96 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Fri, 20 May 2016 15:55:29 -0500
-Subject: [PATCH v2 1/2] musb: sunxi: Add set_mode platform function
-In-Reply-To: <20160516201059.GA9927@uda0271908>
-References: <1463229905-26387-2-git-send-email-hdegoede@redhat.com>
- <1463229905-26387-1-git-send-email-hdegoede@redhat.com>
- <20160516201059.GA9927@uda0271908>
-Message-ID: <20160520205529.GB7475@uda0271908>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Fri, 20 May 2016 23:20:59 +0200
+Subject: Crash after 'reboot' due to 9be4fd2c7723a
+In-Reply-To: <CAOMZO5D_-3St-jqzMLzFHRn3dXXoSZGn4APSK4F63qCP3X=FfA@mail.gmail.com>
+References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
+ <CAOMZO5D_-3St-jqzMLzFHRn3dXXoSZGn4APSK4F63qCP3X=FfA@mail.gmail.com>
+Message-ID: <4080948.V5DMHR9bsk@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, May 16, 2016 at 03:11:34PM -0500, Bin Liu wrote:
-> On Sat, May 14, 2016 at 02:45:04PM +0200, Hans de Goede wrote:
-> > Move the mode handling to the platform_set_mode callback.
-> > 
-> > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Friday, May 20, 2016 03:32:43 PM Fabio Estevam wrote:
+> On Fri, May 20, 2016 at 3:05 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> > Rafael,
+> >
+> > Running the 'reboot' command works fine on a 4.5 kernel running on a
+> > mx6ul platform (ARM single core SoC), but it crashes on 4.6.
+> >
+> > Running bisect I got 9be4fd2c7723a3057b0b39676 ("cpufreq: governor:
+> > Replace timers with utilization update callbacks") as the first bad
+> > commit.
+> >
+> > Below is the output crash log.
+> >
+> > Not sure if this issue is related to the problem reported by Guenter here:
+> > http://lkml.iu.edu/hypermail/linux/kernel/1602.1/06075.html
+> >
+> > Any ideas?
 > 
-> Signed-off-by: Bin Liu <b-liu@ti.com>
+> If I rebuilt a kernel with SMP=n then the reboot command works as expected.
 
-I revised the subject prefix to "usb: musb: sunxi: ..." for both
-patches.
+Does it work if you boot with maxcpus=1 or nosmp in the kernel command line?
 
-Regards,
--Bin.
+Also, please try if the appended patch makes any difference.
 
-> 
-> Regards,
-> -Bin.
+---
+ drivers/base/core.c       |    3 +++
+ drivers/cpufreq/cpufreq.c |   11 -----------
+ 2 files changed, 3 insertions(+), 11 deletions(-)
+
+Index: linux-pm/drivers/cpufreq/cpufreq.c
+===================================================================
+--- linux-pm.orig/drivers/cpufreq/cpufreq.c
++++ linux-pm/drivers/cpufreq/cpufreq.c
+@@ -27,7 +27,6 @@
+ #include <linux/mutex.h>
+ #include <linux/slab.h>
+ #include <linux/suspend.h>
+-#include <linux/syscore_ops.h>
+ #include <linux/tick.h>
+ #include <trace/events/power.h>
+ 
+@@ -2556,14 +2555,6 @@ int cpufreq_unregister_driver(struct cpu
+ }
+ EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
+ 
+-/*
+- * Stop cpufreq at shutdown to make sure it isn't holding any locks
+- * or mutexes when secondary CPUs are halted.
+- */
+-static struct syscore_ops cpufreq_syscore_ops = {
+-	.shutdown = cpufreq_suspend,
+-};
+-
+ struct kobject *cpufreq_global_kobject;
+ EXPORT_SYMBOL(cpufreq_global_kobject);
+ 
+@@ -2575,8 +2566,6 @@ static int __init cpufreq_core_init(void
+ 	cpufreq_global_kobject = kobject_create_and_add("cpufreq", &cpu_subsys.dev_root->kobj);
+ 	BUG_ON(!cpufreq_global_kobject);
+ 
+-	register_syscore_ops(&cpufreq_syscore_ops);
+-
+ 	return 0;
+ }
+ core_initcall(cpufreq_core_init);
+Index: linux-pm/drivers/base/core.c
+===================================================================
+--- linux-pm.orig/drivers/base/core.c
++++ linux-pm/drivers/base/core.c
+@@ -10,6 +10,7 @@
+  *
+  */
+ 
++#include <linux/cpufreq.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
+ #include <linux/fwnode.h>
+@@ -2042,6 +2043,8 @@ void device_shutdown(void)
+ {
+ 	struct device *dev, *parent;
+ 
++	cpufreq_suspend();
++
+ 	spin_lock(&devices_kset->list_lock);
+ 	/*
+ 	 * Walk the devices list backward, shutting down each in turn.
