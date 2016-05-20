@@ -1,60 +1,48 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 20 May 2016 10:33:56 -0500
-Subject: [PATCH] usb: echi-hcd: Add ehci_setup check before echi_shutdown
-In-Reply-To: <Pine.LNX.4.44L0.1605201026060.1938-100000@iolanthe.rowland.org>
-References: <CAPBZ5QcMiMEv1n=WU6aW2PGNsSPZJR42iZge_VUX4aWZ-KKzbw@mail.gmail.com>
- <Pine.LNX.4.44L0.1605201026060.1938-100000@iolanthe.rowland.org>
-Message-ID: <CAPBZ5Qf6VtfGrfx1LaR5d9gL3zcBCZ_MeUpxX+E6dpi1HP+QpQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 20 May 2016 18:38:49 +0300
+Subject: [PATCH v2 11/23] ARM: dts: armadillo800eva: Fix W=1 dtc warnings
+In-Reply-To: <1463728214-13838-12-git-send-email-geert+renesas@glider.be>
+References: <1463728214-13838-1-git-send-email-geert+renesas@glider.be>
+ <1463728214-13838-12-git-send-email-geert+renesas@glider.be>
+Message-ID: <e0a1fbc1-ac95-2c79-65ed-d0328679bb8a@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 May 2016 at 09:31, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 19 May 2016, Andy Gross wrote:
->
->> On 19 May 2016 at 05:12, Srinivas Kandagatla
->> <srinivas.kandagatla@linaro.org> wrote:
->>
->> <snip>
->>
->> > +++ b/drivers/usb/host/ehci-hcd.c
->> > @@ -368,6 +368,15 @@ static void ehci_shutdown(struct usb_hcd *hcd)
->> >  {
->> >         struct ehci_hcd *ehci = hcd_to_ehci(hcd);
->> >
->> > +       /**
->> > +        * Protect the system from crashing at system shutdown in cases where
->> > +        * usb host is not added yet from OTG controller driver.
->> > +        * As ehci_setup() not done yet, so stop accessing registers or
->> > +        * variables initialized in ehci_setup()
->> > +        */
->> > +       if (!ehci->sbrn)
->> > +               return;
->> > +
->> >         spin_lock_irq(&ehci->lock);
->> >         ehci->shutdown = true;
->> >         ehci->rh_state = EHCI_RH_STOPPING;
->>
->>
->> Should we also not check this in ehci_suspend and ehci_resume?  If I
->> do suspend/resume, it crashes in a similar manner.  I know this goes
->> beyond the problem scope of the patch.  Perhaps I should send in an
->> additional patch with the code?
->>
->> Are there any other places in the ehci-hcd where this needs to be checked?
->
-> Really, this is an indication that the problem lies not in ehci-hcd but
-> rather in the platform glue code.  The platform code allows itself to
-> be registered as the driver of the controller device but does not
-> initialize the ehci-hcd parts.
->
-> Neither ehci_suspend nor ehci_resume is called directly by the driver
-> core; the calls all have to pass through the glue code.  So maybe the
-> glue layer needs to be careful about invoking these routines in
-> ehci-hcd before ehci-hcd has been initialized.
+Hello.
 
-That's a good point.  Perhaps all of this should be in the glue,
-including the shutdown case.
+On 05/20/2016 10:10 AM, Geert Uytterhoeven wrote:
 
-Regards,
+> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+> Warning (unit_address_vs_reg): Node /regulator at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /regulator at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /regulator at 2 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /i2c at 2 has a unit name, but no reg property
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v2:
+>   - No changes.
+> ---
+>  arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+> index 2c82dab2b6f45f9c..b3f0ac4b99bd5a3d 100644
+> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+[...]
+> @@ -127,7 +127,7 @@
+>  		};
+>  	};
+>
+> -	i2c2: i2c at 2 {
+> +	i2c2: i2c2 {
 
-Andy
+    Not "i2c-2" as in the other patches?
+
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  		compatible = "i2c-gpio";
+
+MBR, Sergei
