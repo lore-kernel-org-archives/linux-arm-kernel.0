@@ -1,131 +1,132 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Fri, 20 May 2016 18:27:33 +0800
-Subject: [patch V3] lib: GCD: add binary GCD algorithm
-In-Reply-To: <1461843824-19853-1-git-send-email-zengzhaoxiu@163.com>
-Message-ID: <201605201833.ecqQBWwU%fengguang.wu@intel.com>
+From: a.heider@gmail.com (Andre Heider)
+Date: Fri, 20 May 2016 12:30:30 +0200
+Subject: 4.5.0 on sun7i-a20-olinuxino-lime2: libphy: PHY stmmac-0:ffffffff
+ not found (regression from rc7)
+In-Reply-To: <573EC77A.2000800@st.com>
+References: <56E9413D.9010902@a20.net> <56E945FF.6080005@arm.com>
+ <56E94CF4.2060607@arm.com> <56E95B57.1090100@suse.de>
+ <56E9776F.3070102@a20.net> <56E99B0C.2070609@arm.com>
+ <56E9F2B8.1030605@a20.net> <20160317075202.16b14ed6@arm.com>
+ <CAHsu+b-t_r93XKLJTUcin6xjhOrFVn3_60vwHkbRt3iHK28CbA@mail.gmail.com>
+ <573EC33D.2010209@arm.com> <573EC77A.2000800@st.com>
+Message-ID: <CAHsu+b9BrqBLdCpsPpetc_4_EaFVGBdDHtoeeCqqzsCG3Wpsig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-[auto build test ERROR on v4.6-rc5]
-[cannot apply to next-20160519]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+On Fri, May 20, 2016 at 10:14 AM, Giuseppe CAVALLARO
+<peppe.cavallaro@st.com> wrote:
+> On 5/20/2016 9:56 AM, Marc Zyngier wrote:
+>>
+>> On 20/05/16 06:44, Andre Heider wrote:
+>>>
+>>> Giuseppe, Alexandre, et al.,
+>>>
+>>> On Thu, Mar 17, 2016 at 8:52 AM, Marc Zyngier <marc.zyngier@arm.com>
+>>> wrote:
+>>>>
+>>>> On Thu, 17 Mar 2016 00:56:40 +0100
+>>>> Bert Lindner <bert@a20.net> wrote:
+>>>>>
+>>>>> On 2016-03-16 18:42, Marc Zyngier wrote:
+>>>>>>
+>>>>>> On 16/03/16 15:10, Bert Lindner wrote:
+>>>>>>>
+>>>>>>> On 2016-03-16 14:10, Andreas F?rber wrote:
+>>>>>>>>
+>>>>>>>> Am 16.03.2016 um 13:09 schrieb Robin Murphy:
+>>>>>>>>>
+>>>>>>>>> On 16/03/16 11:39, Marc Zyngier wrote:
+>>>>>>>>>>
+>>>>>>>>>> On 16/03/16 11:19, Bert Lindner wrote:
+>>>
+>>> ...
+>>>>>>>>>>>
+>>>>>>>>>>> For the board sun7i-a20-olinuxino-lime2, there seems to be a
+>>>>>>>>>>> problem
+>>>>>>>>>>> with the eth0 PHY in mainline kernel 4.5.0 that developed since
+>>>>>>>>>>> 4.5.0-rc7. Ethernet does not work, although eth0 is reported:
+>>>
+>>> ...
+>>>>>>>>>>>
+>>>>>>>>>>> [    9.767125] NET: Registered protocol family 10
+>>>>>>>>>>> [   10.357405] libphy: PHY stmmac-0:ffffffff not found
+>>>>>>>>>>> [   10.362382] eth0: Could not attach to PHY
+>>>>>>>>>>> [   10.366557] stmmac_open: Cannot attach to PHY (error: -19)
+>>>
+>>> ...
+>>>>>>>>
+>>>>>>>> v4 fixes for 4.5 are here:
+>>>>>>>>
+>>>>>>>> https://patchwork.ozlabs.org/patch/598195/ (revert)
+>>>>>>>> https://patchwork.ozlabs.org/patch/598196/
+>>>
+>>> ...
+>>>>>>
+>>>>>> Good to know, thanks. Could you also give the potential fix a go (as
+>>>>>> mentioned by Andreas)? Just to make sure that whatever gets merged
+>>>>>> next
+>>>>>> will actually fix the issue.
+>>>>>
+>>>>>
+>>>>> Yes sure, it took a while because I had to travel. Confirmed, the
+>>>>> v4-for-4.5 fix works well for me, on sun7i-a20-olinuxino-lime2:
+>>>>>
+>>>>> root at lime2-079f:~# cat /proc/version
+>>>>> Linux version 4.5.0-598195-598196-v4 (root at lime2-079f) (gcc version
+>>>>> 4.9.1 (Ubuntu/Linaro 4.9.1-16ubuntu6) ) #1 SMP Wed Mar 16 16:44:22 UTC
+>>>>> 2016
+>>>>>
+>>>>> dmesg:
+>>>>> [    8.245273] NET: Registered protocol family 10
+>>>>> [    9.297406]  RX IPC Checksum Offload disabled
+>>>>> [    9.297460]  No MAC Management Counters available
+>>>>> [    9.297951] IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready
+>>>>> [   16.285658] sun7i-dwmac 1c50000.ethernet eth0: Link is Up -
+>>>>> 1Gbps/Full - flow control rx/tx
+>>>>> [   16.285798] IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
+>>>>>
+>>>>> The board is connected to my laptop rather than to a switch, so that
+>>>>> might be where the flow control message comes from (not sure). Anyway
+>>>>> ethernet works.
+>>>>
+>>>>
+>>>> Cool, many thanks for taking the time to test and report.
+>>>>
+>>>> Hopefully Giuseppe will get this merged quickly enough in mainline, and
+>>>> it should then trickle into a 4.5-stable release (cc-ing stable on
+>>>> these patches would probably be a good idea, BTW).
+>>>
+>>>
+>>> stmmac is broken on at least Lime2, BananaPi and Cubieboard2 since
+>>> v4.5 [0], including all five stable releases :(
+>>
+>>
+>> All the A20 platforms are dead, actually.
+>>
+>>> The v4.5 patches quoted above are already +4 weeks old, could we
+>>> please get them into stable?
+>>
+>>
+>> For that, the maintainer would have needed to CC stable, which he
+>> didn't. I'd expect someone who cares to send these patches to stable.
+>> It'd be better if the maintainer would do it himself though.
+>
+>
+> sure, I can send the patches to stable (sorry if I missed to add
+> stable ML on CC).
+>
+> Andre, I have not clear if the train of patches actually fix the
+> issue or if you need my support to fix something else. In that case
+> I need some input for debugging (e.g. kernel log).
 
-url:    https://github.com/0day-ci/linux/commits/zengzhaoxiu-163-com/lib-GCD-add-binary-GCD-algorithm/20160428-195527
-config: mips-jz4740 (attached as .config)
-compiler: mips-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
+Bert already confirmed that those two patches fixes stmmac on his
+Lime2, so I assume that it fixes the issue for all A20 platforms.
 
-Note: the linux-review/zengzhaoxiu-163-com/lib-GCD-add-binary-GCD-algorithm/20160428-195527 HEAD 35e1a24e8fc3a5308b053ed3c744f02ec2a76820 builds fine.
-      It only hurts bisectibility.
+> let me know, is it enough to re-send the patches only?
 
-All errors (new ones prefixed by >>):
+Just a resend with cc:stable :)
 
-   In file included from arch/mips/include/asm/bitops.h:21:0,
-                    from include/linux/bitops.h:36,
-                    from include/linux/kernel.h:10,
-                    from include/asm-generic/bug.h:13,
-                    from arch/mips/include/asm/bug.h:41,
-                    from include/linux/bug.h:4,
-                    from include/linux/page-flags.h:9,
-                    from kernel/bounds.c:9:
-   arch/mips/include/asm/cpu-features.h:205:28: warning: "cpu_data" is not defined [-Wundef]
-    # define cpu_has_mips32r6 (cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
-                               ^
-   arch/mips/include/asm/cpu-features.h:241:5: note: in expansion of macro 'cpu_has_mips32r6'
-        cpu_has_mips32r6 | cpu_has_mips64r1 | \
-        ^
-   arch/mips/include/asm/cpu-features.h:289:25: note: in expansion of macro 'cpu_has_mips_r'
-    #define cpu_has_clo_clz cpu_has_mips_r
-                            ^
-   arch/mips/include/asm/cpu-features.h:291:6: note: in expansion of macro 'cpu_has_clo_clz'
-    #if !cpu_has_clo_clz
-         ^
->> arch/mips/include/asm/cpu-features.h:205:36: error: token "[" is not valid in preprocessor expressions
-    # define cpu_has_mips32r6 (cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
-                                       ^
-   arch/mips/include/asm/cpu-features.h:241:5: note: in expansion of macro 'cpu_has_mips32r6'
-        cpu_has_mips32r6 | cpu_has_mips64r1 | \
-        ^
-   arch/mips/include/asm/cpu-features.h:289:25: note: in expansion of macro 'cpu_has_mips_r'
-    #define cpu_has_clo_clz cpu_has_mips_r
-                            ^
-   arch/mips/include/asm/cpu-features.h:291:6: note: in expansion of macro 'cpu_has_clo_clz'
-    #if !cpu_has_clo_clz
-         ^
-   make[2]: *** [kernel/bounds.s] Error 1
-   make[2]: Target '__build' not remade because of errors.
-   make[1]: *** [prepare0] Error 2
-   make[1]: Target 'prepare' not remade because of errors.
-   make: *** [sub-make] Error 2
-
-vim +205 arch/mips/include/asm/cpu-features.h
-
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  199  # define cpu_has_mips32r1	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R1)
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  200  #endif
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  201  #ifndef cpu_has_mips32r2
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  202  # define cpu_has_mips32r2	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R2)
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  203  #endif
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  204  #ifndef cpu_has_mips32r6
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13 @205  # define cpu_has_mips32r6	(cpu_data[0].isa_level & MIPS_CPU_ISA_M32R6)
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  206  #endif
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  207  #ifndef cpu_has_mips64r1
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  208  # define cpu_has_mips64r1	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R1)
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  209  #endif
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  210  #ifndef cpu_has_mips64r2
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  211  # define cpu_has_mips64r2	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R2)
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  212  #endif
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  213  #ifndef cpu_has_mips64r6
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  214  # define cpu_has_mips64r6	(cpu_data[0].isa_level & MIPS_CPU_ISA_M64R6)
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  215  #endif
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  216  
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  217  /*
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  218   * Shortcuts ...
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  219   */
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  220  #define cpu_has_mips_2_3_4_5	(cpu_has_mips_2 | cpu_has_mips_3_4_5)
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  221  #define cpu_has_mips_3_4_5	(cpu_has_mips_3 | cpu_has_mips_4_5)
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  222  #define cpu_has_mips_4_5	(cpu_has_mips_4 | cpu_has_mips_5)
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  223  
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  224  #define cpu_has_mips_2_3_4_5_r	(cpu_has_mips_2 | cpu_has_mips_3_4_5_r)
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  225  #define cpu_has_mips_3_4_5_r	(cpu_has_mips_3 | cpu_has_mips_4_5_r)
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  226  #define cpu_has_mips_4_5_r	(cpu_has_mips_4 | cpu_has_mips_5_r)
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  227  #define cpu_has_mips_5_r	(cpu_has_mips_5 | cpu_has_mips_r)
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  228  
-2d83fea7 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  229  #define cpu_has_mips_3_4_5_64_r2_r6					\
-2d83fea7 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  230  				(cpu_has_mips_3 | cpu_has_mips_4_5_64_r2_r6)
-2d83fea7 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  231  #define cpu_has_mips_4_5_64_r2_r6					\
-2d83fea7 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  232  				(cpu_has_mips_4_5 | cpu_has_mips64r1 |	\
-2d83fea7 arch/mips/include/asm/cpu-features.h Maciej W. Rozycki 2015-04-03  233  				 cpu_has_mips_r2 | cpu_has_mips_r6)
-08a07904 arch/mips/include/asm/cpu-features.h Ralf Baechle      2014-04-19  234  
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  235  #define cpu_has_mips32	(cpu_has_mips32r1 | cpu_has_mips32r2 | cpu_has_mips32r6)
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  236  #define cpu_has_mips64	(cpu_has_mips64r1 | cpu_has_mips64r2 | cpu_has_mips64r6)
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  237  #define cpu_has_mips_r1 (cpu_has_mips32r1 | cpu_has_mips64r1)
-0401572a include/asm-mips/cpu-features.h      Ralf Baechle      2005-12-09  238  #define cpu_has_mips_r2 (cpu_has_mips32r2 | cpu_has_mips64r2)
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  239  #define cpu_has_mips_r6	(cpu_has_mips32r6 | cpu_has_mips64r6)
-c46b302b arch/mips/include/asm/cpu-features.h Ralf Baechle      2008-10-28  240  #define cpu_has_mips_r	(cpu_has_mips32r1 | cpu_has_mips32r2 | \
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13 @241  			 cpu_has_mips32r6 | cpu_has_mips64r1 | \
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  242  			 cpu_has_mips64r2 | cpu_has_mips64r6)
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  243  
-34c56fc1 arch/mips/include/asm/cpu-features.h Leonid Yegoshin   2014-11-13  244  /* MIPSR2 and MIPSR6 have a lot of similarities */
-
-:::::: The code at line 205 was first introduced by commit
-:::::: 34c56fc1c167facc375d927687df0a3891d164ac MIPS: asm: cpu: Add MIPSR6 ISA definitions
-
-:::::: TO: Leonid Yegoshin <Leonid.Yegoshin@imgtec.com>
-:::::: CC: Markos Chandras <markos.chandras@imgtec.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 18282 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160520/95fd2492/attachment-0001.obj>
+Thanks!
+Andre
