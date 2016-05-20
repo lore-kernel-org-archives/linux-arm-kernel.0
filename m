@@ -1,47 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 20 May 2016 08:49:35 +0200
-Subject: [PATCH/RFC 2/3] arm64: dts: salvator-x: add Salvator-X board on
- R8A7796 SoC
-In-Reply-To: <20160520041445.GC25184@verge.net.au>
-References: <1463629845-7115-1-git-send-email-horms+renesas@verge.net.au>
- <1463629845-7115-3-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdVTMvDsmO1g=FNwpkvx_56guHk_V6Katj8e3qOdyQsjeQ@mail.gmail.com>
- <20160520041445.GC25184@verge.net.au>
-Message-ID: <CAMuHMdXTrLiu5e1Ki6UXmJ1WJ1fWLFYOrmjGNfmRM9Goeha-vA@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Fri, 20 May 2016 09:10:00 +0200
+Subject: [PATCH v2 09/23] ARM: dts: sh73a0: Fix W=1 dtc warnings
+In-Reply-To: <1463728214-13838-1-git-send-email-geert+renesas@glider.be>
+References: <1463728214-13838-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1463728214-13838-10-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Warning (unit_address_vs_reg): Node /cache-controller has a reg or ranges property, but no unit name
 
-On Fri, May 20, 2016 at 6:14 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, May 19, 2016 at 06:58:11PM +0200, Geert Uytterhoeven wrote:
->> On Thu, May 19, 2016 at 5:50 AM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
->> > --- /dev/null
->> > +++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
->> > @@ -0,0 +1,45 @@
->>
->> > +       chosen {
->> > +               bootargs = "ignore_loglevel";
->>
->> Perhaps you want this to be consistent with the other Renesas boards?
->>
->> git grep bootargs -- $(git grep -l renesas, -- arch/arm*/*dts)
->
-> I omitted "rw root=/dev/nfs ip=dhcp" which I believe should be added
-> when the board gets network and thus NFS-root support.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - No changes.
+---
+ arch/arm/boot/dts/sh73a0.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Fair enough.
-
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/sh73a0.dtsi b/arch/arm/boot/dts/sh73a0.dtsi
+index c4f434cdec60f075..032fe2f14b16998f 100644
+--- a/arch/arm/boot/dts/sh73a0.dtsi
++++ b/arch/arm/boot/dts/sh73a0.dtsi
+@@ -55,7 +55,7 @@
+ 		      <0xf0000100 0x100>;
+ 	};
+ 
+-	L2: cache-controller {
++	L2: cache-controller at f0100000 {
+ 		compatible = "arm,pl310-cache";
+ 		reg = <0xf0100000 0x1000>;
+ 		interrupts = <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>;
+-- 
+1.9.1
