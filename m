@@ -1,168 +1,165 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 20 May 2016 12:07:32 -0700
-Subject: [PATCH 7/7] ARM: Remove bcm_defconfig
-In-Reply-To: <1463771252-12805-1-git-send-email-f.fainelli@gmail.com>
-References: <1463771252-12805-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1463771252-12805-8-git-send-email-f.fainelli@gmail.com>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Fri, 20 May 2016 15:13:07 -0400
+Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
+ registers
+Message-ID: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have everything we need in multi_v7_defconfig that exists in
-bcm_defconfig, so get rid of that file to reduce the maintenance burden.
+L2 registers are accessed using a select register and data
+register pair. To prevent multiple concurrent writes to the
+select register by independent drivers, the write to the
+select register and the associated access of the data register
+are protected with a lock. All drivers accessing the L2
+registers use the set and get functions provided by
+l2-accessors to ensure correct reads and writes to L2 registers.
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
 ---
- arch/arm/configs/bcm_defconfig | 142 -----------------------------------------
- 1 file changed, 142 deletions(-)
- delete mode 100644 arch/arm/configs/bcm_defconfig
+ drivers/soc/qcom/Kconfig              |  9 +++++
+ drivers/soc/qcom/Makefile             |  1 +
+ drivers/soc/qcom/l2-accessors.c       | 66 +++++++++++++++++++++++++++++++++++
+ include/linux/soc/qcom/l2-accessors.h | 27 ++++++++++++++
+ 4 files changed, 103 insertions(+)
+ create mode 100644 drivers/soc/qcom/l2-accessors.c
+ create mode 100644 include/linux/soc/qcom/l2-accessors.h
 
-diff --git a/arch/arm/configs/bcm_defconfig b/arch/arm/configs/bcm_defconfig
-deleted file mode 100644
-index 7117662bab2e..000000000000
---- a/arch/arm/configs/bcm_defconfig
-+++ /dev/null
-@@ -1,142 +0,0 @@
--# CONFIG_LOCALVERSION_AUTO is not set
--# CONFIG_SWAP is not set
--CONFIG_SYSVIPC=y
--CONFIG_NO_HZ=y
--CONFIG_HIGH_RES_TIMERS=y
--CONFIG_BSD_PROCESS_ACCT=y
--CONFIG_BSD_PROCESS_ACCT_V3=y
--CONFIG_IKCONFIG=y
--CONFIG_IKCONFIG_PROC=y
--CONFIG_LOG_BUF_SHIFT=19
--CONFIG_CGROUPS=y
--CONFIG_CGROUP_FREEZER=y
--CONFIG_CGROUP_DEVICE=y
--CONFIG_CGROUP_CPUACCT=y
--CONFIG_RESOURCE_COUNTERS=y
--CONFIG_CGROUP_SCHED=y
--CONFIG_BLK_CGROUP=y
--CONFIG_NAMESPACES=y
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_SYSCTL_SYSCALL=y
--CONFIG_EMBEDDED=y
--# CONFIG_COMPAT_BRK is not set
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--# CONFIG_BLK_DEV_BSG is not set
--CONFIG_PARTITION_ADVANCED=y
--CONFIG_ARCH_BCM=y
--CONFIG_ARCH_BCM_21664=y
--CONFIG_ARCH_BCM_281XX=y
--CONFIG_ARM_THUMBEE=y
--CONFIG_SMP=y
--CONFIG_PREEMPT=y
--CONFIG_AEABI=y
--# CONFIG_COMPACTION is not set
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=ttyS0,115200n8 mem=128M"
--CONFIG_CPU_IDLE=y
--CONFIG_VFP=y
--CONFIG_NEON=y
--# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
--CONFIG_PM=y
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_PACKET_DIAG=y
--CONFIG_UNIX=y
--CONFIG_UNIX_DIAG=y
--CONFIG_NET_KEY=y
--CONFIG_INET=y
--CONFIG_IP_MULTICAST=y
--CONFIG_SYN_COOKIES=y
--CONFIG_TCP_MD5SIG=y
--CONFIG_IPV6=y
--CONFIG_DEVTMPFS=y
--CONFIG_DEVTMPFS_MOUNT=y
--CONFIG_PROC_DEVICETREE=y
--# CONFIG_BLK_DEV is not set
--CONFIG_SCSI=y
--CONFIG_BLK_DEV_SD=y
--CONFIG_CHR_DEV_SG=y
--CONFIG_SCSI_MULTI_LUN=y
--CONFIG_SCSI_SCAN_ASYNC=y
--CONFIG_INPUT_FF_MEMLESS=y
--CONFIG_INPUT_JOYDEV=y
--CONFIG_INPUT_EVDEV=y
--# CONFIG_KEYBOARD_ATKBD is not set
--# CONFIG_INPUT_MOUSE is not set
--CONFIG_INPUT_TOUCHSCREEN=y
--CONFIG_INPUT_MISC=y
--CONFIG_INPUT_UINPUT=y
--# CONFIG_SERIO is not set
--# CONFIG_LEGACY_PTYS is not set
--CONFIG_SERIAL_8250=y
--CONFIG_SERIAL_8250_CONSOLE=y
--CONFIG_SERIAL_8250_EXTENDED=y
--CONFIG_SERIAL_8250_MANY_PORTS=y
--CONFIG_SERIAL_8250_SHARE_IRQ=y
--CONFIG_SERIAL_8250_RSA=y
--CONFIG_SERIAL_8250_DW=y
--CONFIG_HW_RANDOM=y
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--# CONFIG_HWMON is not set
--CONFIG_MFD_BCM590XX=y
--CONFIG_REGULATOR=y
--CONFIG_REGULATOR_FIXED_VOLTAGE=y
--CONFIG_REGULATOR_USERSPACE_CONSUMER=y
--CONFIG_REGULATOR_BCM590XX=y
--
--CONFIG_VIDEO_OUTPUT_CONTROL=y
--CONFIG_FB=y
--CONFIG_BACKLIGHT_LCD_SUPPORT=y
--CONFIG_LCD_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_CLASS_DEVICE=y
--CONFIG_BACKLIGHT_PWM=y
--# CONFIG_USB_SUPPORT is not set
--CONFIG_MMC=y
--CONFIG_MMC_BLOCK_MINORS=32
--CONFIG_MMC_TEST=y
--CONFIG_MMC_SDHCI=y
--CONFIG_MMC_SDHCI_PLTFM=y
--CONFIG_MMC_SDHCI_BCM_KONA=y
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
--CONFIG_LEDS_TRIGGERS=y
--CONFIG_LEDS_TRIGGER_TIMER=y
--CONFIG_LEDS_TRIGGER_HEARTBEAT=y
--CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
--CONFIG_PWM=y
--CONFIG_PWM_BCM_KONA=y
--CONFIG_EXT4_FS=y
--CONFIG_EXT4_FS_POSIX_ACL=y
--CONFIG_EXT4_FS_SECURITY=y
--CONFIG_AUTOFS4_FS=y
--CONFIG_FUSE_FS=y
--CONFIG_MSDOS_FS=y
--CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
--CONFIG_TMPFS_POSIX_ACL=y
--CONFIG_CONFIGFS_FS=y
--# CONFIG_MISC_FILESYSTEMS is not set
--CONFIG_NLS_CODEPAGE_437=y
--CONFIG_NLS_ISO8859_1=y
--CONFIG_PRINTK_TIME=y
--CONFIG_DEBUG_INFO=y
--CONFIG_DEBUG_FS=y
--CONFIG_MAGIC_SYSRQ=y
--CONFIG_DETECT_HUNG_TASK=y
--CONFIG_DEFAULT_HUNG_TASK_TIMEOUT=110
--CONFIG_BOOTPARAM_HUNG_TASK_PANIC=y
--# CONFIG_FTRACE is not set
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
--CONFIG_CRC_CCITT=y
--CONFIG_CRC_T10DIF=y
--CONFIG_CRC_ITU_T=y
--CONFIG_CRC7=y
--CONFIG_XZ_DEC=y
--CONFIG_AVERAGE=y
--CONFIG_PINCTRL_BCM281XX=y
--CONFIG_WATCHDOG=y
--CONFIG_BCM_KONA_WDT=y
--CONFIG_BCM_KONA_WDT_DEBUG=y
+diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
+index 461b387..c8498cd 100644
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -10,6 +10,15 @@ config QCOM_GSBI
+           functions for connecting the underlying serial UART, SPI, and I2C
+           devices to the output pins.
+ 
++config QCOM_L2_ACCESSORS
++	bool "Qualcomm Technologies L2-cache accessors"
++	depends on ARCH_QCOM
++	help
++	  Say y here to enable support for the Qualcomm Technologies
++	  L2 accessors.
++	  Provides support for accessing registers in the L2 cache
++	  for Qualcomm Technologies chips.
++
+ config QCOM_PM
+ 	bool "Qualcomm Power Management"
+ 	depends on ARCH_QCOM && !ARM64
+diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+index fdd664e..6ef29b9 100644
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -1,4 +1,5 @@
+ obj-$(CONFIG_QCOM_GSBI)	+=	qcom_gsbi.o
++obj-$(CONFIG_QCOM_L2_ACCESSORS) += l2-accessors.o
+ obj-$(CONFIG_QCOM_PM)	+=	spm.o
+ obj-$(CONFIG_QCOM_SMD) +=	smd.o
+ obj-$(CONFIG_QCOM_SMD_RPM)	+= smd-rpm.o
+diff --git a/drivers/soc/qcom/l2-accessors.c b/drivers/soc/qcom/l2-accessors.c
+new file mode 100644
+index 0000000..fbb69bd
+--- /dev/null
++++ b/drivers/soc/qcom/l2-accessors.c
+@@ -0,0 +1,66 @@
++/*
++ * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/spinlock.h>
++#include <linux/module.h>
++#include <linux/soc/qcom/l2-accessors.h>
++#include <asm/cputype.h>
++#include <asm/sysreg.h>
++
++#define	L2CPUSRSELR_EL1	S3_3_c15_c0_6
++#define	L2CPUSRDR_EL1	S3_3_c15_c0_7
++
++static DEFINE_RAW_SPINLOCK(l2_access_lock);
++
++/**
++ * set_l2_indirect_reg: write value to an L2 register
++ * @reg: Address of L2 register.
++ * @value: Value to be written to register.
++ *
++ * Use architecturally required barriers for ordering between system register
++ * accesses
++ */
++void set_l2_indirect_reg(u64 reg, u64 val)
++{
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2_access_lock, flags);
++	write_sysreg(reg, L2CPUSRSELR_EL1);
++	isb();
++	write_sysreg(val, L2CPUSRDR_EL1);
++	isb();
++	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
++}
++EXPORT_SYMBOL(set_l2_indirect_reg);
++
++/**
++ * get_l2_indirect_reg: read an L2 register value
++ * @reg: Address of L2 register.
++ *
++ * Use architecturally required barriers for ordering between system register
++ * accesses
++ */
++u64 get_l2_indirect_reg(u64 reg)
++{
++	u64 val;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2_access_lock, flags);
++	write_sysreg(reg, L2CPUSRSELR_EL1);
++	isb();
++	val = read_sysreg(L2CPUSRDR_EL1);
++	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
++
++	return val;
++}
++EXPORT_SYMBOL(get_l2_indirect_reg);
+diff --git a/include/linux/soc/qcom/l2-accessors.h b/include/linux/soc/qcom/l2-accessors.h
+new file mode 100644
+index 0000000..563c114
+--- /dev/null
++++ b/include/linux/soc/qcom/l2-accessors.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __QCOM_L2_ACCESSORS_H
++#define __QCOM_L2_ACCESSORS_H
++
++#ifdef CONFIG_QCOM_L2_ACCESSORS
++void set_l2_indirect_reg(u64 reg_addr, u64 val);
++u64 get_l2_indirect_reg(u64 reg_addr);
++#else
++static inline void set_l2_indirect_reg(u64 reg_addr, u64 val) {}
++static inline u64 get_l2_indirect_reg(u64 reg_addr)
++{
++	return 0;
++}
++#endif
++#endif
 -- 
-2.7.4
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
