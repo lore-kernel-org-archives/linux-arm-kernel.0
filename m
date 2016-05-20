@@ -1,76 +1,124 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Fri, 20 May 2016 00:41:28 -0400
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <57331290.7070104@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
- <57331290.7070104@semihalf.com>
-Message-ID: <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
+From: dave.long@linaro.org (David Long)
+Date: Fri, 20 May 2016 01:16:33 -0400
+Subject: [PATCH v12 05/10] arm64: Kprobes with single stepping support
+In-Reply-To: <57349AE2.3060507@arm.com>
+References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
+ <1461783185-9056-6-git-send-email-dave.long@linaro.org>
+ <57349AE2.3060507@arm.com>
+Message-ID: <573E9DB1.4070109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz, all,
+On 05/12/2016 11:01 AM, James Morse wrote:
+> Hi David, Sandeepa,
+>
+> On 27/04/16 19:53, David Long wrote:
+>> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+>
+>> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+>> new file mode 100644
+>> index 0000000..dfa1b1f
+>> --- /dev/null
+>> +++ b/arch/arm64/kernel/kprobes.c
+>> @@ -0,0 +1,520 @@
+>> +/*
+>> + * arch/arm64/kernel/kprobes.c
+>> + *
+>> + * Kprobes support for ARM64
+>> + *
+>> + * Copyright (C) 2013 Linaro Limited.
+>> + * Author: Sandeepa Prabhu <sandeepa.prabhu@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>> + * General Public License for more details.
+>> + *
+>> + */
+>> +#include <linux/kernel.h>
+>> +#include <linux/kprobes.h>
+>> +#include <linux/module.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/stop_machine.h>
+>> +#include <linux/stringify.h>
+>> +#include <asm/traps.h>
+>> +#include <asm/ptrace.h>
+>> +#include <asm/cacheflush.h>
+>> +#include <asm/debug-monitors.h>
+>> +#include <asm/system_misc.h>
+>> +#include <asm/insn.h>
+>> +#include <asm/uaccess.h>
+>> +
+>> +#include "kprobes-arm64.h"
+>> +
+>> +#define MIN_STACK_SIZE(addr)	min((unsigned long)MAX_STACK_SIZE,	\
+>> +	(unsigned long)current_thread_info() + THREAD_START_SP - (addr))
+>
+> What if we probe something called on the irq stack?
+> This needs the on_irq_stack() checks too, the start/end can be found from the
+> per-cpu irq_stack value.
+>
+> [ ... ]
+>
 
-On 05/11/2016 07:08 AM, Tomasz Nowicki wrote:
+OK.
 
-> On 11.05.2016 12:41, Gabriele Paoloni wrote:
+>> +int __kprobes setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
+>> +{
+>> +	struct jprobe *jp = container_of(p, struct jprobe, kp);
+>> +	struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
+>> +	long stack_ptr = kernel_stack_pointer(regs);
+>> +
+>> +	kcb->jprobe_saved_regs = *regs;
+>> +	memcpy(kcb->jprobes_stack, (void *)stack_ptr,
+>> +	       MIN_STACK_SIZE(stack_ptr));
+>
+> I wonder if we need this stack save/restore?
+>
+> The comment next to the equivalent code for x86 says:
+>> gcc assumes that the callee owns the argument space and could overwrite it,
+>> e.g. tailcall optimization. So, to be absolutely safe we also save and
+>> restore enough stack bytes to cover the argument area.
+>
+> On arm64 the first eight arguments are passed in registers, so we might not need
+> this stack copy. (sparc and powerpc work like this too, their versions of this
+> function don't copy chunks of the stack).
+>
+> ... then I went looking for functions with >8 arguments...
+>
+> Looking at the arm64 defconfig dwarf debug data, there are 71 of these that
+> don't get inlined, picking at random:
+>> rockchip_clk_register_pll() has 13
+>> fib_dump_info() has 11
+>> vma_merge() has 10
+>> vring_create_virtqueue() has 10
+> etc...
+>
+> So we do need this stack copying, so that we can probe these function without
+> risking the arguments being modified.
+>
+> It may be worth including a comment to the effect that this stack save/restore
+> is needed for functions that pass >8 arguments where the pre-handler may change
+> these values on the stack.
+>
+>
 
->>> v6 -> v7
->>> - drop quirks handling
->>
->> Maybe I missed something in the v6 discussion thread; when was it
->> decided to drop quirk handling?
-> 
-> I had such requests in previous series.
+I can add a comment.
 
-A quick note on quirk handling. This, I believe, applies post-merge of
-the base infrastructure, which I realize will likely not have quirks.
+>> +	preempt_enable_no_resched();
+>> +	return 1;
+>> +}
+>> +
+>
+>
+> Thanks,
+>
+> James
+>
 
-We've some "gen1" ARMv8 server platforms where we end up doing quirks
-(for things like forcing 32-bit config space accessors and the like) due
-to people repurposing existing embedded PCIe IP blocks or using them for
-the first time (especially in servers), and those being involved in the
-design not necessarily seeing this problem ahead of time, or not
-realizing that it would be an issue for servers. In the early days of
-ARM server designs 3-4 years ago, many of us had never really played
-with ECAM or realized how modern topologies are built.
-
-Anyway. We missed this one in our SBSA requirements. They say (words to
-the effect of) "thou shalt do PCIe the way it is done on servers" but
-they aren't prescriptive, and they don't tell people how that actually
-is in reality. That is being fixed. A lot of things are happening behind
-the scenes - especially with third party IP block providers (all of whom
-myself and others are speaking with directly about this) - to ensure
-that the next wave of designs won't repeat these mistakes. We don't have
-a time machine, but we can contain this from becoming an ongoing mess
-for upstream, and we will do so. It won't be a zoo.
-
-Various proposals have arisen for how to handle quirks in the longer
-term, including elaborate frameworks and tables to describe them
-generically. I would like to caution against such approaches, especially
-in the case that they deviate from practice on x86, or prior to being
-standardized fully with other Operating System vendors. I don't expect
-there to be too many more than the existing initial set of quirks we
-have seen posted. A number of "future" server SoCs have already been
-fixed prior to silicon, and new design starts are being warned not to
-make this a problem for us to have to clean up later.
-
-So, I would like to suggest that the eventual framework mirror the
-existing approach on x86 systems (matching DMI, etc.) and not be made
-into some kind of generic, utopia. This is a case where we want there to
-be pain involved (and upstream patches required) when people screw up,
-so that they have a level of pain in response to ever making this
-mistake in the future. If we try to create too grand a generic scheme
-and make it too easy to handle this kind of situation beyond the small
-number of existing offenders, we undermine efforts to force vendors to
-ensure that their IP blocks are compliant going forward.
-
-Side note: if you're a third party IP vendor and we didn't already speak
-about this one, drop me a line, and let's collaborate also on your test
-frameworks to make sure you're covered as well.
-
-Jon.
-
--- 
-Computer Architect | Sent from my Fedora powered laptop
+Thanks,
+-dl
