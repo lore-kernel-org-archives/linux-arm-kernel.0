@@ -1,76 +1,127 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 20 May 2016 21:09:55 +0800
-Subject: [PATCH v2 3/3] ARM: dts: rockchip: fixes the spi compatible for
- rk3036
-In-Reply-To: <28155403.nCsUkeXQB1@phil>
-References: <1463702182-5188-1-git-send-email-wxt@rock-chips.com>
- <1463702182-5188-3-git-send-email-wxt@rock-chips.com>
- <8f662b3b-e359-efdf-72e5-c4f862dd1cf6@kernel-upstream.org>
- <28155403.nCsUkeXQB1@phil>
-Message-ID: <3c1e174e-035b-78ae-b045-fe89990826da@rock-chips.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Fri, 20 May 2016 15:30:27 +0200
+Subject: [PATCH] KVM: arm/arm64: vgic-new: Synchronize changes to active state
+Message-ID: <1463751027-17517-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/5/20 20:58, Heiko Stuebner wrote:
-> Am Freitag, 20. Mai 2016, 20:35:53 schrieb Shawn Lin:
->> ? 2016/5/20 7:56, Caesar Wang ??:
->>> That's seem the incorrect string to match the spi driver.
->>
->> Will it break the backward compatibility for some dtb if not
->> falling back to "rockchip,rockchip-spi" ?
->
-> in what dtb did you see "rockchip,rockchip-spi"?
+When modifying the active state of an interrupt via the MMIO interface,
+we should ensure that the write has the intended effect.
 
-I'm not 100% sure, but I remember we toke this name on local
-branch for rk3036 when we were developing this Soc.
+If a guest sets an interrupt to active, but that interrupt is already
+flushed into a list register on a running VCPU, then that VCPU will
+write the active state back into the struct vgic_irq upon returning from
+the guest and syncing its state.  This is a non-benign race, because the
+guest can observe that an interrupt is not active, and it can have a
+reasonable expectations that other VCPUs will not ack any IRQs, and then
+set the state to active, and expect it to stay that way.  Currently we
+are not honoring this case.
 
-> I.e. it isn't part of any current _mainline_ devicetree files.
->
+Thefore, change both the SACTIVE and CACTIVE mmio handlers to stop the
+world, change the irq state, potentially queue the irq if we're setting
+it to active, and then continue.
 
-Caesar, Could you check our develop-3.10 branch to see if it does
-exist?
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic/vgic-mmio.c | 69 ++++++++++++++++++++-----------------------
+ 1 file changed, 32 insertions(+), 37 deletions(-)
 
-Anyway, "rockchip,rockchip-spi" isn't a part of mainline dt property.
-
-
->
-> Heiko
->
->>
->>> Fixes commit f629fcfab2cd
->>> ("ARM: dts: rockchip: support the spi for rk3036")
->>>
->>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>> Cc: Heiko Stuebner <heiko@sntech.de>
->>> Cc: linux-rockchip at lists.infradead.org
->>>
->>> ---
->>>
->>> Changes in v2: None
->>>
->>>  arch/arm/boot/dts/rk3036.dtsi | 2 +-
->>>  1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/boot/dts/rk3036.dtsi
->>> b/arch/arm/boot/dts/rk3036.dtsi index d0f4bb7..a30700a 100644
->>> --- a/arch/arm/boot/dts/rk3036.dtsi
->>> +++ b/arch/arm/boot/dts/rk3036.dtsi
->>> @@ -431,7 +431,7 @@
->>>
->>>  	};
->>>  	
->>>  	spi: spi at 20074000 {
->>>
->>> -		compatible = "rockchip,rockchip-spi";
->>> +		compatible = "rockchip,rk3036-spi";
->>>
->>>  		reg = <0x20074000 0x1000>;
->>>  		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
->>>  		clocks =<&cru PCLK_SPI>, <&cru SCLK_SPI>;
->
->
-
-
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 4ef3571..90b0dc4 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -173,6 +173,34 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+ 	return value;
+ }
+ 
++static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
++				    bool new_active_state)
++{
++	spin_lock(&irq->irq_lock);
++	/*
++	 * If this virtual IRQ was written into a list register, we
++	 * have to make sure the CPU that runs the VCPU thread has
++	 * synced back LR state to the struct vgic_irq.  We can only
++	 * know this for sure, when either this irq is not assigned to
++	 * anyone's AP list anymore, or the VCPU thread is not
++	 * running on any CPUs.
++	 *
++	 * In the opposite case, we know the VCPU thread may be on its
++	 * way back from the guest and still has to sync back this
++	 * IRQ, so we release and re-acquire the spin_lock to let the
++	 * other thread sync back the IRQ.
++	 */
++	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
++	       irq->vcpu->cpu != -1) /* VCPU thread is running */
++		cond_resched_lock(&irq->irq_lock);
++
++	irq->active = new_active_state;
++	if (new_active_state)
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
++	else
++		spin_unlock(&irq->irq_lock);
++}
++
+ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+ 			     gpa_t addr, unsigned int len,
+ 			     unsigned long val)
+@@ -183,27 +211,7 @@ void vgic_mmio_write_cactive(struct kvm_vcpu *vcpu,
+ 	kvm_arm_halt_guest(vcpu->kvm);
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+-
+-		spin_lock(&irq->irq_lock);
+-		/*
+-		 * If this virtual IRQ was written into a list register, we
+-		 * have to make sure the CPU that runs the VCPU thread has
+-		 * synced back LR state to the struct vgic_irq.  We can only
+-		 * know this for sure, when either this irq is not assigned to
+-		 * anyone's AP list anymore, or the VCPU thread is not
+-		 * running on any CPUs.
+-		 *
+-		 * In the opposite case, we know the VCPU thread may be on its
+-		 * way back from the guest and still has to sync back this
+-		 * IRQ, so we release and re-acquire the spin_lock to let the
+-		 * other thread sync back the IRQ.
+-		 */
+-		while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+-		       irq->vcpu->cpu != -1) /* VCPU thread is running */
+-			cond_resched_lock(&irq->irq_lock);
+-
+-		irq->active = false;
+-		spin_unlock(&irq->irq_lock);
++		vgic_mmio_change_active(vcpu, irq, false);
+ 	}
+ 	kvm_arm_resume_guest(vcpu->kvm);
+ }
+@@ -215,25 +223,12 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+ 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
+ 	int i;
+ 
++	kvm_arm_halt_guest(vcpu->kvm);
+ 	for_each_set_bit(i, &val, len * 8) {
+ 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+-
+-		spin_lock(&irq->irq_lock);
+-
+-		/*
+-		 * If the IRQ was already active or there is no target VCPU
+-		 * assigned at the moment, then just proceed.
+-		 */
+-		if (irq->active || !irq->target_vcpu) {
+-			irq->active = true;
+-
+-			spin_unlock(&irq->irq_lock);
+-			continue;
+-		}
+-
+-		irq->active = true;
+-		vgic_queue_irq_unlock(vcpu->kvm, irq);
++		vgic_mmio_change_active(vcpu, irq, true);
+ 	}
++	kvm_arm_resume_guest(vcpu->kvm);
+ }
+ 
+ unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
 -- 
-Best Regards
-Shawn Lin
+2.1.2.330.g565301e.dirty
