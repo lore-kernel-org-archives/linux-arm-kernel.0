@@ -1,52 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 May 2016 14:20:52 +0200
-Subject: [PATCH V5 6/7] iommu/msm: Use writel_relaxed and add a barrier
-In-Reply-To: <3164695.VzCnHHyi7r@wuerfel>
-References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
- <1463741694-1735-7-git-send-email-sricharan@codeaurora.org>
- <3164695.VzCnHHyi7r@wuerfel>
-Message-ID: <2864715.kytdDZX8IX@wuerfel>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 20 May 2016 14:21:37 +0200
+Subject: [PATCH] reset: oxnas: Use devm register API and get rid of platform
+ remove
+Message-ID: <1463746897-24813-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 May 2016 13:44:10 Arnd Bergmann wrote:
-> >  #define GET_CTX_REG(reg, base, ctx) \
-> >                               (readl((base) + (reg) + ((ctx) << CTX_SHIFT)))
-> >  
-> > -#define SET_GLOBAL_REG(reg, base, val)       writel((val), ((base) + (reg)))
-> > +/*
-> > + * The writes to the global/context registers needs to be synced only after
-> > + * all the configuration writes are done. So use relaxed accessors and
-> > + * a barrier at the end.
-> > + */
-> > +#define SET_GLOBAL_REG_RELAXED(reg, base, val) \
-> > +                            writel_relaxed((val), ((base) + (reg)))
-> >  
-> > -#define SET_CTX_REG(reg, base, ctx, val) \
-> > -                     writel((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
-> > +#define SET_CTX_REG_RELAXED(reg, base, ctx, val) \
-> > +             writel_relaxed((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
-> 
-> Please add the relaxed accessors first in a separate patch, and then
-> change over one user at a time before you remove the non-relaxed ones.
-> 
-> It's hard to believe that all users are actually performance critical,
-> so start with the ones that gain the most performance. As commented above,
-> some of the conversions seem particularly fishy and it's likely that
-> a slow reset() function should not be fixed by making reset() faster
-> but by calling it less often.
+Use the brand new devm_reset_controller_register() API to get rid of
+the platform driver remove callback.
 
-One more thing, please also convert them into inline functions when you modify
-them, and use normal names such as
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/reset/reset-oxnas.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-static inline void msm_iommu_write(struct msm_iommu_dev *iommu, unsigned int reg, u32 val)
-{
-	writel(val, iommu->base + reg);
-}
+Hi Philip,
 
-static inline void msm_iommu_context_write(struct msm_iommu_ctx_dev *ctx, unsigned int reg, u32 val)
-{
-	writel(val, ctx->iommu->base + ctx << CTX_SHIFT + reg, val);
-}
+This patch is based on your reset/next tree after the new
+devm_reset_controller_register() was merged.
 
-	Arnd
+I hope it could be merged for 4.7.
+
+Thanks,
+Neil
+
+diff --git a/drivers/reset/reset-oxnas.c b/drivers/reset/reset-oxnas.c
+index c60fb2d..9449805 100644
+--- a/drivers/reset/reset-oxnas.c
++++ b/drivers/reset/reset-oxnas.c
+@@ -112,21 +112,11 @@ static int oxnas_reset_probe(struct platform_device *pdev)
+ 	data->rcdev.ops = &oxnas_reset_ops;
+ 	data->rcdev.of_node = pdev->dev.of_node;
+ 
+-	return reset_controller_register(&data->rcdev);
+-}
+-
+-static int oxnas_reset_remove(struct platform_device *pdev)
+-{
+-	struct oxnas_reset *data = platform_get_drvdata(pdev);
+-
+-	reset_controller_unregister(&data->rcdev);
+-
+-	return 0;
++	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
+ }
+ 
+ static struct platform_driver oxnas_reset_driver = {
+ 	.probe	= oxnas_reset_probe,
+-	.remove	= oxnas_reset_remove,
+ 	.driver = {
+ 		.name		= "oxnas-reset",
+ 		.of_match_table	= oxnas_reset_dt_ids,
+-- 
+1.9.1
