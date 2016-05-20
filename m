@@ -1,325 +1,139 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 20 May 2016 09:34:04 -0700
-Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
- encoder
-In-Reply-To: <1463648641-6931-2-git-send-email-vigneshr@ti.com>
-References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
- <1463648641-6931-2-git-send-email-vigneshr@ti.com>
-Message-ID: <20160520163404.GC14951@dtor-ws>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 20 May 2016 15:05:55 -0300
+Subject: Crash after 'reboot' due to 9be4fd2c7723a
+Message-ID: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
-> There are rotary-encoders where GPIO lines reflect the actual position
-> of the rotary encoder dial. For example, if dial points to 9, then four
-> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
-> Add support for such rotary-encoder.
-> The driver relies on rotary-encoder,absolute-encoder DT property to
-> detect such encoders.
-> Since, GPIO IRQs are not necessary to work with
-> such encoders, optional polling mode support is added using
-> input_poll_dev skeleton. This is can be used by enabling
-> CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT.
+Rafael,
 
-Does this really belong to a rotary encoder and not a new driver that
-simply translates gpio-encoded value into ABS* event?
+Running the 'reboot' command works fine on a 4.5 kernel running on a
+mx6ul platform (ARM single core SoC), but it crashes on 4.6.
 
-> 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
->  .../devicetree/bindings/input/rotary-encoder.txt   |   4 +
->  Documentation/input/rotary-encoder.txt             |   9 ++
->  drivers/input/misc/Kconfig                         |  11 ++
->  drivers/input/misc/rotary_encoder.c                | 165 ++++++++++++++++-----
->  4 files changed, 155 insertions(+), 34 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/input/rotary-encoder.txt b/Documentation/devicetree/bindings/input/rotary-encoder.txt
-> index 6c9f0c8a846c..9c928dbd1500 100644
-> --- a/Documentation/devicetree/bindings/input/rotary-encoder.txt
-> +++ b/Documentation/devicetree/bindings/input/rotary-encoder.txt
-> @@ -12,6 +12,10 @@ Optional properties:
->  - rotary-encoder,relative-axis: register a relative axis rather than an
->    absolute one. Relative axis will only generate +1/-1 events on the input
->    device, hence no steps need to be passed.
-> +- rotary-encoder,absolute-encoder: support encoders where GPIO lines
-> +  reflect the actual position of the rotary encoder dial. For example,
-> +  if dial points to 9, then four GPIO lines read HLLH(1001b = 9).
-> +  In this case, rotary-encoder,steps-per-period needed not be defined.
->  - rotary-encoder,rollover: Automatic rollove when the rotary value becomes
->    greater than the specified steps or smaller than 0. For absolute axis only.
->  - rotary-encoder,steps-per-period: Number of steps (stable states) per period.
-> diff --git a/Documentation/input/rotary-encoder.txt b/Documentation/input/rotary-encoder.txt
-> index 46a74f0c551a..dc76092f5618 100644
-> --- a/Documentation/input/rotary-encoder.txt
-> +++ b/Documentation/input/rotary-encoder.txt
-> @@ -36,6 +36,15 @@ The phase diagram of these two outputs look like this:
->                  |<>|
->  	          one step (quarter-period mode)
->  
-> +
-> +In some encoders, the value pointed by rotary encoders switch is directly
-> +reflected by status of the GPIOs connecting rotary encoder to CPU. For
-> +example, if rotary encoder dial points to 9, then the four GPIOs
-> +conncting rotary encoder will read HLLH(1001b = 9). Such encoders are
-> +supported by defining devictree binding "rotary-encoder,absolute-encoder".
-> +These encoders are also supported without need for event(IRQ) generation
-> +using Input subsytem's polling mode support.
-> +
->  For more information, please see
->  	https://en.wikipedia.org/wiki/Rotary_encoder
->  
-> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
-> index 1f2337abcf2f..81805f9a534c 100644
-> --- a/drivers/input/misc/Kconfig
-> +++ b/drivers/input/misc/Kconfig
-> @@ -566,6 +566,17 @@ config INPUT_GPIO_ROTARY_ENCODER
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called rotary_encoder.
->  
-> +config INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
-> +	bool "Polling mode support for rotary encoder"
-> +	depends on INPUT_GPIO_ROTARY_ENCODER
-> +	select INPUT_POLLDEV
-> +	help
-> +	  Say Y here to enable polling mode support for rotary encoders
-> +	  connected to GPIO lines that do have interrupt capability and
-> +	  report rotary encoder position as absolute value over GPIO
-> +	  lines. Check file: Documentation/input/rotary-encoder.txt for
-> +	  more information.
-> +
->  config INPUT_RB532_BUTTON
->  	tristate "Mikrotik Routerboard 532 button interface"
->  	depends on MIKROTIK_RB532
-> diff --git a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
-> index c7fc8d4fb080..8f60289fb6cd 100644
-> --- a/drivers/input/misc/rotary_encoder.c
-> +++ b/drivers/input/misc/rotary_encoder.c
-> @@ -25,24 +25,29 @@
->  #include <linux/of.h>
->  #include <linux/pm.h>
->  #include <linux/property.h>
-> +#include <linux/input-polldev.h>
->  
->  #define DRV_NAME "rotary-encoder"
->  
->  struct rotary_encoder {
->  	struct input_dev *input;
-> -
-> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
-> +	struct input_polled_dev *poll_dev;
-> +#endif
->  	struct mutex access_mutex;
->  
->  	u32 steps;
->  	u32 axis;
->  	bool relative_axis;
->  	bool rollover;
-> +	bool absolute_encoder;
->  
->  	unsigned int pos;
->  
->  	struct gpio_descs *gpios;
-> +	struct device *dev;
->  
-> -	unsigned int *irq;
-> +	int *irq;
->  
->  	bool armed;
->  	signed char dir;	/* 1 - clockwise, -1 - CCW */
-> @@ -67,6 +72,21 @@ static unsigned int rotary_encoder_get_state(struct rotary_encoder *encoder)
->  	return ret & 3;
->  }
->  
-> +static unsigned int rotary_encoder_get_gpios_state(struct rotary_encoder
-> +						   *encoder)
-> +{
-> +	int i;
-> +	unsigned int ret = 0;
-> +
-> +	for (i = 0; i < encoder->gpios->ndescs; ++i) {
-> +		int val = gpiod_get_value_cansleep(encoder->gpios->desc[i]);
-> +
-> +		ret = ret << 1 | val;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
->  static void rotary_encoder_report_event(struct rotary_encoder *encoder)
->  {
->  	if (encoder->relative_axis) {
-> @@ -178,6 +198,72 @@ out:
->  	return IRQ_HANDLED;
->  }
->  
-> +static void rotary_encoder_setup_input_params(struct rotary_encoder  *encoder)
-> +{
-> +	struct input_dev *input = encoder->input;
-> +	struct platform_device *pdev = to_platform_device(encoder->dev);
-> +
-> +	input->name = pdev->name;
-> +	input->id.bustype = BUS_HOST;
-> +	input->dev.parent = encoder->dev;
-> +
-> +	if (encoder->relative_axis)
-> +		input_set_capability(input, EV_REL, encoder->axis);
-> +	else
-> +		input_set_abs_params(input,
-> +				     encoder->axis, 0, encoder->steps, 0, 1);
-> +}
-> +
-> +static irqreturn_t rotary_absolute_encoder_irq(int irq, void *dev_id)
-> +{
-> +	struct rotary_encoder *encoder = dev_id;
-> +	unsigned int state;
-> +
-> +	mutex_lock(&encoder->access_mutex);
-> +
-> +	state = rotary_encoder_get_gpios_state(encoder);
-> +	if (state != encoder->last_stable) {
-> +		input_report_abs(encoder->input, encoder->axis, state);
-> +		input_sync(encoder->input);
-> +		encoder->last_stable = state;
-> +	}
-> +
-> +	mutex_lock(&encoder->access_mutex);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
-> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
-> +static void rotary_encoder_poll_gpios(struct input_polled_dev *poll_dev)
-> +{
-> +	struct rotary_encoder *encoder = poll_dev->private;
-> +	unsigned int state = rotary_encoder_get_gpios_state(encoder);
-> +
-> +	if (state != encoder->last_stable) {
-> +		input_report_abs(encoder->input, encoder->axis, state);
-> +		input_sync(encoder->input);
-> +		encoder->last_stable = state;
-> +	}
-> +}
-> +
-> +static int rotary_encoder_register_poll_device(struct rotary_encoder
-> +		*encoder)
-> +{
-> +	struct input_polled_dev *poll_dev =
-> +		devm_input_allocate_polled_device(encoder->dev);
-> +
-> +	if (!poll_dev)
-> +		return -ENOMEM;
-> +	poll_dev->private = encoder;
-> +	poll_dev->poll = rotary_encoder_poll_gpios;
-> +	encoder->input = poll_dev->input;
-> +	rotary_encoder_setup_input_params(encoder);
-> +	encoder->poll_dev = poll_dev;
-> +
-> +	return input_register_polled_device(poll_dev);
-> +}
-> +#endif
-> +
->  static int rotary_encoder_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
-> @@ -227,38 +313,32 @@ static int rotary_encoder_probe(struct platform_device *pdev)
->  		return -EINVAL;
->  	}
->  
-> -	input = devm_input_allocate_device(dev);
-> -	if (!input)
-> -		return -ENOMEM;
-> -
-> -	encoder->input = input;
-> -
-> -	input->name = pdev->name;
-> -	input->id.bustype = BUS_HOST;
-> -	input->dev.parent = dev;
-> -
-> -	if (encoder->relative_axis)
-> -		input_set_capability(input, EV_REL, encoder->axis);
-> -	else
-> -		input_set_abs_params(input,
-> -				     encoder->axis, 0, encoder->steps, 0, 1);
-> -
-> -	switch (steps_per_period >> (encoder->gpios->ndescs - 2)) {
-> -	case 4:
-> -		handler = &rotary_encoder_quarter_period_irq;
-> -		encoder->last_stable = rotary_encoder_get_state(encoder);
-> -		break;
-> -	case 2:
-> -		handler = &rotary_encoder_half_period_irq;
-> -		encoder->last_stable = rotary_encoder_get_state(encoder);
-> -		break;
-> -	case 1:
-> -		handler = &rotary_encoder_irq;
-> -		break;
-> -	default:
-> -		dev_err(dev, "'%d' is not a valid steps-per-period value\n",
-> -			steps_per_period);
-> -		return -EINVAL;
-> +	encoder->dev = dev;
-> +	encoder->absolute_encoder =
-> +		device_property_read_bool(dev,
-> +					  "rotary-encoder,absolute-encoder");
-> +	if (encoder->absolute_encoder) {
-> +		handler = rotary_absolute_encoder_irq;
-> +	} else {
-> +		switch (steps_per_period >> (encoder->gpios->ndescs - 2)) {
-> +		case 4:
-> +			handler = &rotary_encoder_quarter_period_irq;
-> +			encoder->last_stable =
-> +				rotary_encoder_get_state(encoder);
-> +			break;
-> +		case 2:
-> +			handler = &rotary_encoder_half_period_irq;
-> +			encoder->last_stable =
-> +				rotary_encoder_get_state(encoder);
-> +			break;
-> +		case 1:
-> +			handler = &rotary_encoder_irq;
-> +			break;
-> +		default:
-> +			dev_err(dev, "'%d' is not a valid steps-per-period value\n",
-> +				steps_per_period);
-> +			return -EINVAL;
-> +		}
->  	}
->  
->  	encoder->irq =
-> @@ -271,6 +351,18 @@ static int rotary_encoder_probe(struct platform_device *pdev)
->  	for (i = 0; i < encoder->gpios->ndescs; ++i) {
->  		encoder->irq[i] = gpiod_to_irq(encoder->gpios->desc[i]);
->  
-> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
-> +		if (encoder->irq[i] < 0 && encoder->absolute_encoder) {
-> +			dev_info(dev, "Using poll mode\n");
-> +			err = rotary_encoder_register_poll_device(encoder);
-> +			if (err) {
-> +				dev_err(dev, "failed to register poll dev\n");
-> +				return err;
-> +			}
-> +			platform_set_drvdata(pdev, encoder);
-> +			return 0;
-> +		}
-> +#endif
->  		err = devm_request_threaded_irq(dev, encoder->irq[i],
->  				NULL, handler,
->  				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
-> @@ -283,6 +375,11 @@ static int rotary_encoder_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	input = devm_input_allocate_device(dev);
-> +	if (!input)
-> +		return -ENOMEM;
-> +	encoder->input = input;
-> +	rotary_encoder_setup_input_params(encoder);
->  	err = input_register_device(input);
->  	if (err) {
->  		dev_err(dev, "failed to register input device\n");
-> -- 
-> 2.8.2
-> 
+Running bisect I got 9be4fd2c7723a3057b0b39676 ("cpufreq: governor:
+Replace timers with utilization update callbacks") as the first bad
+commit.
 
--- 
-Dmitry
+Below is the output crash log.
+
+Not sure if this issue is related to the problem reported by Guenter here:
+http://lkml.iu.edu/hypermail/linux/kernel/1602.1/06075.html
+
+Any ideas?
+
+Thanks,
+
+Fabio Estevam
+
+
+[ 3857.373588] INFO: rcu_sched detected stalls on CPUs/tasks:
+[ 3857.379155]  (detected by 0, t=2602 jiffies, g=1880, c=1879, q=29)
+[ 3857.385406] All QSes seen, last rcu_sched kthread activity 2602
+(355736-353134), jiffies_till_next_fqs=1, root ->qsmask 0x0
+[ 3857.396562] init            R running      0   864      1 0x00000002
+[ 3857.402999] Backtrace:
+[ 3857.405532] [<c010b6e8>] (dump_backtrace) from [<c010b884>]
+(show_stack+0x18/0x1c)
+[ 3857.413125]  r6:c0d6c6d6 r5:00000001 r4:ddd9c800 r3:00000000
+[ 3857.418941] [<c010b86c>] (show_stack) from [<c014fc3c>]
+(sched_show_task+0x124/0x234)
+[ 3857.426820] [<c014fb18>] (sched_show_task) from [<c0185e24>]
+(rcu_check_callbacks+0x844/0x894)
+[ 3857.435452]  r6:c0c76b40 r5:c0d14b80 r4:debd0b40
+[ 3857.440189] [<c01855e0>] (rcu_check_callbacks) from [<c018884c>]
+(update_process_times+0x38/0x64)
+[ 3857.449081]  r10:c0d21e1c r9:debcdd10 r8:c019a230 r7:dde7bd50
+r6:debce048 r5:00000000
+[ 3857.457067]  r4:ddd9c800
+[ 3857.459665] [<c0188814>] (update_process_times) from [<c019a174>]
+(tick_sched_handle+0x50/0x54)
+[ 3857.468386]  r5:00000382 r4:1c92d15d
+[ 3857.472048] [<c019a124>] (tick_sched_handle) from [<c019a290>]
+(tick_sched_timer+0x60/0xa8)
+[ 3857.480443] [<c019a230>] (tick_sched_timer) from [<c018915c>]
+(__hrtimer_run_queues+0xc0/0x1c8)
+[ 3857.489162]  r7:debcdd80 r6:debcdd00 r5:debcdd8c r4:debce048
+[ 3857.494969] [<c018909c>] (__hrtimer_run_queues) from [<c018998c>]
+(hrtimer_interrupt+0xc8/0x22c)
+[ 3857.503774]  r10:debcddd8 r9:debcddb8 r8:debcddf8 r7:debcdd00
+r6:debcdd40 r5:00000003
+[ 3857.511758]  r4:ffffffff
+[ 3857.514354] [<c01898c4>] (hrtimer_interrupt) from [<c067d994>]
+(mxc_timer_interrupt+0x3c/0x44)
+[ 3857.522985]  r10:c0d6c710 r9:e0805000 r8:de41d000 r7:00000010
+r6:00000000 r5:00000000
+[ 3857.530969]  r4:de402440
+[ 3857.533568] [<c067d958>] (mxc_timer_interrupt) from [<c0177acc>]
+(handle_irq_event_percpu+0x64/0x168)
+[ 3857.542809]  r4:de402500 r3:c067d958
+[ 3857.546482] [<c0177a68>] (handle_irq_event_percpu) from
+[<c0177c10>] (handle_irq_event+0x40/0x64)
+[ 3857.555374]  r10:de406000 r9:e0805000 r8:00000001 r7:00000000
+r6:c0d10330 r5:de41d060
+[ 3857.563358]  r4:de41d000
+[ 3857.565956] [<c0177bd0>] (handle_irq_event) from [<c017b120>]
+(handle_fasteoi_irq+0xd4/0x1ac)
+[ 3857.574502]  r6:c0d10330 r5:de41d060 r4:de41d000 r3:00000000
+[ 3857.580305] [<c017b04c>] (handle_fasteoi_irq) from [<c017726c>]
+(generic_handle_irq+0x20/0x30)
+[ 3857.588937]  r7:00000000 r6:c0c746ec r5:c0d02b10 r4:00000010
+[ 3857.594743] [<c017724c>] (generic_handle_irq) from [<c01773b0>]
+(__handle_domain_irq+0x6c/0xe4)
+[ 3857.603485] [<c0177344>] (__handle_domain_irq) from [<c01015d8>]
+(gic_handle_irq+0x4c/0x9c)
+[ 3857.611857]  r10:000003eb r8:c0d22000 r7:c0d02c58 r6:dde7bd50
+r5:e080400c r4:e0804000
+[ 3857.619858] [<c010158c>] (gic_handle_irq) from [<c010c4b8>]
+(__irq_svc+0x58/0x78)
+[ 3857.627367] Exception stack(0xdde7bd50 to 0xdde7bd98)
+[ 3857.632450] bd40:                                     ddce911c
+00000001 00000000 00000003
+[ 3857.640664] bd60: ddce911c c0d02a48 ddcea000 ddce90c0 c0108044
+dde7a000 00000000 dde7bdb4
+[ 3857.648875] bd80: dde7bdb8 dde7bda0 c064ad44 c01b247c 20000013 ffffffff
+[ 3857.655509]  r10:00000000 r9:dde7a000 r8:c0108044 r7:dde7bd84
+r6:ffffffff r5:20000013
+[ 3857.663494]  r4:c01b247c r3:ddd9c800
+[ 3857.667167] [<c01b2448>] (irq_work_sync) from [<c064ad44>]
+(cpufreq_governor_dbs+0x170/0x580)
+[ 3857.675713]  r4:00000004 r3:00000001
+[ 3857.679384] [<c064abd4>] (cpufreq_governor_dbs) from [<c06480e4>]
+(cpufreq_governor+0x64/0x120)
+[ 3857.688103]  r10:00000000 r9:dde7a000 r8:c0108044 r7:c1556f80
+r6:00000002 r5:ddcea000
+[ 3857.696088]  r4:c0d4c5dc
+[ 3857.698684] [<c0648080>] (cpufreq_governor) from [<c06493c4>]
+(cpufreq_suspend+0x70/0x128)
+[ 3857.706967]  r6:c0d4c328 r5:ddcea0dc r4:ddcea000 r3:ddd9c800
+[ 3857.712777] [<c0649354>] (cpufreq_suspend) from [<c04da71c>]
+(syscore_shutdown+0x4c/0x80)
+[ 3857.720976]  r8:c0108044 r7:00000000 r6:c0d6e020 r5:c0d315a8
+r4:c0d4c2fc r3:00000000
+[ 3857.728895] [<c04da6d0>] (syscore_shutdown) from [<c0147aa8>]
+(kernel_restart+0x1c/0x58)
+[ 3857.737007]  r6:c0d13074 r5:4321fedc r4:00000000 r3:de434900
+[ 3857.742805] [<c0147a8c>] (kernel_restart) from [<c0147cc4>]
+(SyS_reboot+0x18c/0x1e4)
+[ 3857.750569]  r4:01234567 r3:01234567
+[ 3857.754234] [<c0147b38>] (SyS_reboot) from [<c0107ea0>]
+(ret_fast_syscall+0x0/0x1c)
+[ 3857.761910]  r7:00000058 r6:00000000 r5:00000000 r4:00000000
+[ 3857.767707] rcu_sched kthread starved for 2602 jiffies! g1880 c1879
+f0x2 RCU_GP_WAIT_FQS(3) ->state=0x0
+[ 3857.777123] rcu_sched       R running      0     7      2 0x00000000
+[ 3857.783558] Backtrace:
+[ 3857.786076] [<c08f488c>] (__schedule) from [<c08f50d8>] (schedule+0x3c/0xa0)
+[ 3857.793148]  r10:00000001 r9:00000003 r8:c0d02100 r7:0005636f
+r6:debcd4c0 r5:debcd4c0
+[ 3857.801133]  r4:de487e9c
+[ 3857.803728] [<c08f509c>] (schedule) from [<c08f941c>]
+(schedule_timeout+0x138/0x1cc)
+[ 3857.811509] [<c08f92e4>] (schedule_timeout) from [<c0184bf0>]
+(rcu_gp_kthread+0x3b0/0x894)
+[ 3857.819794]  r8:00000000 r7:000002b8 r6:00000001 r5:c0d14e10 r4:c0d14b80
+[ 3857.826667] [<c0184840>] (rcu_gp_kthread) from [<c0144e7c>]
+(kthread+0xd8/0xf4)
+[ 3857.833997]  r7:c0184840
+[ 3857.836593] [<c0144da4>] (kthread) from [<c0107f30>]
+(ret_from_fork+0x14/0x24)
+[ 3857.843836]  r7:00000000 r6:00000000 r5:c0144da4 r4:de435040
