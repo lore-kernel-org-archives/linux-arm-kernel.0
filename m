@@ -1,56 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 20 May 2016 14:58:27 +0200
-Subject: [PATCH v2 3/3] ARM: dts: rockchip: fixes the spi compatible for
- rk3036
-In-Reply-To: <8f662b3b-e359-efdf-72e5-c4f862dd1cf6@kernel-upstream.org>
-References: <1463702182-5188-1-git-send-email-wxt@rock-chips.com>
- <1463702182-5188-3-git-send-email-wxt@rock-chips.com>
- <8f662b3b-e359-efdf-72e5-c4f862dd1cf6@kernel-upstream.org>
-Message-ID: <28155403.nCsUkeXQB1@phil>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 20 May 2016 15:02:23 +0200
+Subject: [PATCH] reset: oxnas: Use devm register API and get rid of
+ platform remove
+In-Reply-To: <1463746897-24813-1-git-send-email-narmstrong@baylibre.com>
+References: <1463746897-24813-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1463749343.4322.38.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 20. Mai 2016, 20:35:53 schrieb Shawn Lin:
-> ? 2016/5/20 7:56, Caesar Wang ??:
-> > That's seem the incorrect string to match the spi driver.
+Hi Neil,
+
+Am Freitag, den 20.05.2016, 14:21 +0200 schrieb Neil Armstrong:
+> Use the brand new devm_reset_controller_register() API to get rid of
+> the platform driver remove callback.
 > 
-> Will it break the backward compatibility for some dtb if not
-> falling back to "rockchip,rockchip-spi" ?
-
-in what dtb did you see "rockchip,rockchip-spi"?
-I.e. it isn't part of any current _mainline_ devicetree files.
-
-
-Heiko
-
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/reset/reset-oxnas.c | 12 +-----------
+>  1 file changed, 1 insertion(+), 11 deletions(-)
 > 
-> > Fixes commit f629fcfab2cd
-> > ("ARM: dts: rockchip: support the spi for rk3036")
-> > 
-> > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> > Cc: Heiko Stuebner <heiko@sntech.de>
-> > Cc: linux-rockchip at lists.infradead.org
-> > 
-> > ---
-> > 
-> > Changes in v2: None
-> > 
-> >  arch/arm/boot/dts/rk3036.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/boot/dts/rk3036.dtsi
-> > b/arch/arm/boot/dts/rk3036.dtsi index d0f4bb7..a30700a 100644
-> > --- a/arch/arm/boot/dts/rk3036.dtsi
-> > +++ b/arch/arm/boot/dts/rk3036.dtsi
-> > @@ -431,7 +431,7 @@
-> > 
-> >  	};
-> >  	
-> >  	spi: spi at 20074000 {
-> > 
-> > -		compatible = "rockchip,rockchip-spi";
-> > +		compatible = "rockchip,rk3036-spi";
-> > 
-> >  		reg = <0x20074000 0x1000>;
-> >  		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-> >  		clocks =<&cru PCLK_SPI>, <&cru SCLK_SPI>;
+> Hi Philip,
+> 
+> This patch is based on your reset/next tree after the new
+> devm_reset_controller_register() was merged.
+
+Applied, thank you.
+
+> I hope it could be merged for 4.7.
+
+I'll submit the branch for 4.8 after 4.7-rc1 is released.
+
+regards
+Philipp
