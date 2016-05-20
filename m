@@ -1,64 +1,35 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Fri, 20 May 2016 09:10:14 +0200
-Subject: [PATCH v2 23/23] arm64: dts: salvator-x: Fix W=1 dtc warnings
-In-Reply-To: <1463728214-13838-1-git-send-email-geert+renesas@glider.be>
-References: <1463728214-13838-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1463728214-13838-24-git-send-email-geert+renesas@glider.be>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri, 20 May 2016 07:23:15 +0000
+Subject: [PATCH 0/2] ARM: bcm2835: probe clock and sdram driver early
+Message-ID: <1463728997-8241-1-git-send-email-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Warning (unit_address_vs_reg): Node /regulator at 1 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /regulator at 2 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /regulator at 4 has a unit name, but no reg property
+From: Martin Sperl <kernel@martin.sperl.org>
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
-v2:
-  - No changes.
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+Probe the clock and sdram driver early during the boot process.
+This is done to minimize the risk that the PLLD_CORE0 or PLLD
+clocks get disabled by another driver.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 84082922edb219ab..98f02631a0f0c66c 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -62,7 +62,7 @@
- 		clock-frequency = <24576000>;
- 	};
- 
--	vcc_sdhi0: regulator at 1 {
-+	vcc_sdhi0: regulator-vcc-sdhi0 {
- 		compatible = "regulator-fixed";
- 
- 		regulator-name = "SDHI0 Vcc";
-@@ -73,7 +73,7 @@
- 		enable-active-high;
- 	};
- 
--	vccq_sdhi0: regulator at 2 {
-+	vccq_sdhi0: regulator-vccq-sdhi0 {
- 		compatible = "regulator-gpio";
- 
- 		regulator-name = "SDHI0 VccQ";
-@@ -86,7 +86,7 @@
- 			  1800000 0>;
- 	};
- 
--	vcc_sdhi3: regulator at 3 {
-+	vcc_sdhi3: regulator-vcc-sdhi3 {
- 		compatible = "regulator-fixed";
- 
- 		regulator-name = "SDHI3 Vcc";
-@@ -97,7 +97,7 @@
- 		enable-active-high;
- 	};
- 
--	vccq_sdhi3: regulator at 4 {
-+	vccq_sdhi3: regulator-vccq-sdhi3 {
- 		compatible = "regulator-gpio";
- 
- 		regulator-name = "SDHI3 VccQ";
--- 
-1.9.1
+Such a situation results in the SDRAM stopping to work, which
+we can trigger easily with current kernels when there are only a
+few clocks enabled.
+
+Right now both drivers are registered with core_initcall.
+I am unsure if there is any link-ordering that could
+impact us - if such is the case we will need to move the
+priorities of one of the drivers slightly. Recommendations?
+
+Note that this patchset requires the sdram memory driver patch
+to be applied first.
+
+Martin Sperl (2):
+  clk: bcm2835: register clocks early
+  memory: bcm2835: enable driver early in the boot process
+
+ drivers/clk/bcm/clk-bcm2835.c  | 18 +++++++++++++++---
+ drivers/memory/bcm2835-sdram.c | 10 +++++++++-
+ 2 files changed, 24 insertions(+), 4 deletions(-)
+
+--
+2.1.4
