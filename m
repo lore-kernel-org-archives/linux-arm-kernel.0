@@ -1,32 +1,30 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 20 May 2016 16:24:54 +0530
-Subject: [PATCH V5 7/7] iommu/msm: Remove driver BROKEN
-In-Reply-To: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
-References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1463741694-1735-8-git-send-email-sricharan@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Fri, 20 May 2016 16:48:26 +0530
+Subject: [PATCH V4 6/7] iommu/msm: Use writel_relaxed and add a barrier
+References: <1463381341-30498-1-git-send-email-sricharan@codeaurora.org>
+ <3070591.xyl7SB8DB7@wuerfel> <002c01d1b0fd$e4f3c350$aedb49f0$@codeaurora.org>
+ <2638968.1a16UdaY62@wuerfel>
+Message-ID: <001301d1b289$58e56f70$0ab04e50$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the driver is DT adapted, bus_set_iommu gets called only
-when on compatible matching. So the driver should not break multiplatform
-builds now. So remove the BROKEN config.
+Hi Arnd,
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
- drivers/iommu/Kconfig | 1 -
- 1 file changed, 1 deletion(-)
+>>
+>>If you need the barrier after the write, it probably was already faulty
+>>before, because writel only implies a barrier before the store, not
+>>after. Of course all the barriers likely made the whole process so
+>>slow that you never hit that race in the end.
+>
+>ya, it could have worked in this way and i never saw a race issue before this.
+>The only reason for changing this was to optimise out the additonal barriers
+>that were happening. I do not see any issue now as well, only that the writes would
+>be faster.
+>
+ I reposted a patch here [1] with comments, i had to delete the
+old accessors though as it became unused now.
 
-diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-index 761be35..f3d9fd0 100644
---- a/drivers/iommu/Kconfig
-+++ b/drivers/iommu/Kconfig
-@@ -90,7 +90,6 @@ config MSM_IOMMU
- 	bool "MSM IOMMU Support"
- 	depends on ARM
- 	depends on ARCH_MSM8X60 || ARCH_MSM8960 || COMPILE_TEST
--	depends on BROKEN
- 	select IOMMU_API
- 	select IOMMU_IO_PGTABLE_ARMV7S
- 	help
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+http://www.spinics.net/lists/arm-kernel/msg505448.html
+
+Regards,
+ Sricharan
