@@ -1,57 +1,96 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 20 May 2016 11:54:58 +0200
-Subject: [PATCH] ARM: dts: exynos: Remove unneded always-on for regulators
- on Peach boards
-In-Reply-To: <1463694753-7259-1-git-send-email-javier@osg.samsung.com>
-References: <1463694753-7259-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <573EDEF2.8020903@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 20 May 2016 10:55:15 +0100
+Subject: [PATCH] arm64: cpuinfo: add AArch64 & elf platform for app
+ compatibility
+In-Reply-To: <573E8300.7060106@hisilicon.com>
+References: <1463625873-60016-1-git-send-email-saberlily.xia@hisilicon.com>
+ <20160519104925.GL22378@e104818-lin.cambridge.arm.com>
+ <573D9E40.4000705@hisilicon.com>
+ <20160519125039.GN22378@e104818-lin.cambridge.arm.com>
+ <20160519131832.GO22378@e104818-lin.cambridge.arm.com>
+ <573E8300.7060106@hisilicon.com>
+Message-ID: <20160520095515.GC11974@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2016 11:52 PM, Javier Martinez Canillas wrote:
-> The regulator always-on property should only be used for regulators
-> that either can't be disabled or the drivers for the client devices
-> are not enabling the regulator and so being disabled due to unused.
+On Fri, May 20, 2016 at 11:22:40AM +0800, Xiaqing (A) wrote:
+> ? 2016/5/19 21:18, Catalin Marinas ??:
+> >diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> >index 3808470486f3..6bda9d30a769 100644
+> >--- a/arch/arm64/kernel/cpuinfo.c
+> >+++ b/arch/arm64/kernel/cpuinfo.c
+> >@@ -22,6 +22,7 @@
+> >
+> >  #include <linux/bitops.h>
+> >  #include <linux/bug.h>
+> >+#include <linux/elf.h>
+> >  #include <linux/init.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/personality.h>
+> >@@ -104,6 +105,8 @@ static const char *const compat_hwcap2_str[] = {
+> >  static int c_show(struct seq_file *m, void *v)
+> >  {
+> >  	int i, j;
+> >+	bool compat = is_compat_task() ||
+> >+		personality(current->personality) == PER_LINUX32;
+> >
+> >  	for_each_online_cpu(i) {
+> >  		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
+> >@@ -115,6 +118,9 @@ static int c_show(struct seq_file *m, void *v)
+> >  		 * "processor".  Give glibc what it expects.
+> >  		 */
+> >  		seq_printf(m, "processor\t: %d\n", i);
+> >+		if (compat)
+> >+			seq_printf(m, "model name\t: ARMv8 Processor rev %d (%s)\n",
+> >+				   MIDR_REVISION(midr), COMPAT_ELF_PLATFORM);
+> >
+> >  		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
+> >  			   loops_per_jiffy / (500000UL/HZ),
+> >@@ -127,7 +133,7 @@ static int c_show(struct seq_file *m, void *v)
+> >  		 * software which does already (at least for 32-bit).
+> >  		 */
+> >  		seq_puts(m, "Features\t:");
+> >-		if (personality(current->personality) == PER_LINUX32) {
+> >+		if (compat) {
+> >  #ifdef CONFIG_COMPAT
+> >  			for (j = 0; compat_hwcap_str[j]; j++)
+> >  				if (compat_elf_hwcap & (1 << j))
+> >------------------8<---------------------
+> >
+> >With the above, a compat task or a native one with PER_LINUX32
+> >personality would get:
+> >
+> >processor       : 0
+> >model name      : ARMv8 Processor rev 0 (v8l)
+> >BogoMIPS        : 100.00
+> >Features        : half thumb fastmult vfp edsp neon vfpv3 tls vfpv4 idiva idivt lpae evtstrm aes pmull sha1 sha2 crc32
+> >CPU implementer : 0x41
+> >CPU architecture: 8
+> >CPU variant     : 0x0
+> >CPU part        : 0xd03
+> >CPU revision    : 0
 > 
-> There are some max77802 regulators in the Peach Pit and Pi boards
-> that are always-on but shouldn't since they are enabled by drivers:
+> I have tested with your patch, the app still can not start up at all.
 > 
-> BUCK5 is max77802 inl1 supply
-> BUCK7 is max77802 inl{2,10} supply
-> BUCK9 is max77802 inl{3,4,5,7} supply
-> BUCK10 is mmc1 vqmmc supply
-> LDO9 is adc vdd supply
-> 
-> This patch removes the always-on property for these regulators.
-> 
-> Some regulators should remain always-on even when they are used as
-> input supplies, because these regulators are also used by other
-> components that are not described in the DT, for example:
-> 
-> LDO10 is hdmi vdd_osc supply but it's also used as input supply for
-> the Exynos5420 temperature sensor.
+> I'm sorry I didn't explan this exactly before, those apps are 32-bit android
+> apps(com.tencent.pao etc.). They want to get the information as
+>   "*D m3e : GetCPUType:AArch64 Processor rev 0 (aarch64)*"
+> and I'm sure the process is forked by zygote not zygote64 in android M.
 
-I don't have the schematics, so just guessing: by temperature sensor do
-you mean the tmu_cpu* node (supplying power to VDD_TS01/23/4)?
+So, these 32-bit applications would never run on an arm32 kernel
+(because with my patch, compat /proc/cpuinfo is the same as the native
+arm32 kernel)? How did they get into this situation?
 
-If yes then you can also change it, like on Odroid XU boards.
+I recall from some past discussions with Google on this aspect that
+there are indeed applications parsing /proc/cpuinfo but the 32-bit
+zygote would set PER_LINUX32 so that child processes would inherit it
+and always get the compat /proc/cpuinfo. I don't follow the Android
+developments, so I can't tell whether this personality setting is in
+place.
 
-> 
-> LDO8 is hdmi vdd and vdd_pll supply but it's also used as supply for
-> the Exynos5420 Display port.
-> 
-> BUCK2 and BUCK6 are the vdd supplies for the EAGLE and KFC clusters.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 -----
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 5 -----
->  2 files changed, 10 deletions(-)
+While we did change the /proc/cpuinfo 64-bit format slightly in 3.19, I
+find it insane that there are 32-bit applications relying on always
+running under a 64-bit kernel.
 
-Anyway,
-
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
-Best regards,
-Krzysztof
+-- 
+Catalin
