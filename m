@@ -1,37 +1,19 @@
-From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Fri, 20 May 2016 14:05:52 -0400
-Subject: [PATCH v2 3/3] ARM: dts: NSP: Add PWM Support to DT
-In-Reply-To: <1463767552-30670-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1463767552-30670-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <1463767552-30670-4-git-send-email-yendapally.reddy@broadcom.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 20 May 2016 11:11:20 -0700
+Subject: [PATCH] arm64: vulcan: enable GPIOLIB in Kconfig
+In-Reply-To: <1461819767-17539-1-git-send-email-kamlakant.patel@broadcom.com>
+References: <1461819767-17539-1-git-send-email-kamlakant.patel@broadcom.com>
+Message-ID: <573F5348.6040907@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PWM support to the device tree for the Broadcom Northstar Plus SoC.
+On 04/27/2016 10:02 PM, kamlakant.patel at broadcom.com wrote:
+> From: Kamlakant Patel <kamlakant.patel@broadcom.com>
+> 
+> Add select GPIOLIB in Kconfig for Broadcom Vulcan ARM64 GPIO driver.
+> 
+> Signed-off-by: Kamlakant Patel <kamlakant.patel@broadcom.com>
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
-
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index def9e78..f9c8341 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -206,6 +206,14 @@
- 			brcm,nand-has-wp;
- 		};
- 
-+		pwm: pwm at 31000 {
-+			compatible = "brcm,iproc-pwm";
-+			reg = <0x31000 0x28>;
-+			clocks = <&osc>;
-+			#pwm-cells = <3>;
-+			status = "disabled";
-+		};
-+
- 		ccbtimer0: timer at 34000 {
- 			compatible = "arm,sp804";
- 			reg = <0x34000 0x1000>;
+Applied to soc-arm64/next, thanks!
 -- 
-2.1.0
+Florian
