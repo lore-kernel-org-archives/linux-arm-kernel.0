@@ -1,41 +1,26 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 20 May 2016 23:19:52 +0200
-Subject: [PATCH] arm64: dts: rockchip: fixes the gic400 2nd region size
- for rk3368
-In-Reply-To: <1463582510-29156-1-git-send-email-wxt@rock-chips.com>
-References: <1463582510-29156-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <2773450.t8WTDyMWXy@phil>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 20 May 2016 18:37:38 -0300
+Subject: Crash after 'reboot' due to 9be4fd2c7723a
+In-Reply-To: <4080948.V5DMHR9bsk@vostro.rjw.lan>
+References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
+ <CAOMZO5D_-3St-jqzMLzFHRn3dXXoSZGn4APSK4F63qCP3X=FfA@mail.gmail.com>
+ <4080948.V5DMHR9bsk@vostro.rjw.lan>
+Message-ID: <CAOMZO5Di3s36=B_52g=S+sWjpdNQ2GozDjeT=3n0B5jNM9z8tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Caesar,
+Hi Rafael,
 
-Am Mittwoch, 18. Mai 2016, 22:41:50 schrieb Caesar Wang:
-> The 2nd additional region is the GIC virtual cpu interface register
-> base and size.
-> 
-> As the gic400 of rk3368 says, the cpu interface register map as below
-> 
-> 
-> 
-> -0x0000 GICC_CTRL
-> .
-> .
-> .
-> -0x00fc GICC_IIDR
-> -0x1000 GICC_IDR
-> 
-> Obviously, the region size should be greater than 0x1000.
-> So we should make sure to include the GICC_IDR since the kernel will
-> access it in some cases.
-> 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-rockchip at lists.infradead.org
+On Fri, May 20, 2016 at 6:20 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
 
-applied to a fixes branch for 4.7 with Shawn's review-tag.
+>> If I rebuilt a kernel with SMP=n then the reboot command works as expected.
+>
+> Does it work if you boot with maxcpus=1 or nosmp in the kernel command line?
 
+No, it does not help.
 
-Thanks for catching this
-Heiko
+> Also, please try if the appended patch makes any difference.
+
+I tried it, and the console shows "Requesting system reboot" and stays
+there forever. No more messages after that and the system does not
+reboot.
