@@ -1,80 +1,60 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Fri, 20 May 2016 11:13:41 -0400
-Subject: [PATCH] ARM: dts: exynos: Remove unneded always-on for regulators
- on Peach boards
-In-Reply-To: <573EDEF2.8020903@samsung.com>
-References: <1463694753-7259-1-git-send-email-javier@osg.samsung.com>
- <573EDEF2.8020903@samsung.com>
-Message-ID: <66cd7fed-c281-0645-0a60-5e1300419642@osg.samsung.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 20 May 2016 10:33:56 -0500
+Subject: [PATCH] usb: echi-hcd: Add ehci_setup check before echi_shutdown
+In-Reply-To: <Pine.LNX.4.44L0.1605201026060.1938-100000@iolanthe.rowland.org>
+References: <CAPBZ5QcMiMEv1n=WU6aW2PGNsSPZJR42iZge_VUX4aWZ-KKzbw@mail.gmail.com>
+ <Pine.LNX.4.44L0.1605201026060.1938-100000@iolanthe.rowland.org>
+Message-ID: <CAPBZ5Qf6VtfGrfx1LaR5d9gL3zcBCZ_MeUpxX+E6dpi1HP+QpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-Thanks a lot for the feedback.
-
-On 05/20/2016 05:54 AM, Krzysztof Kozlowski wrote:
-> On 05/19/2016 11:52 PM, Javier Martinez Canillas wrote:
->> The regulator always-on property should only be used for regulators
->> that either can't be disabled or the drivers for the client devices
->> are not enabling the regulator and so being disabled due to unused.
->>
->> There are some max77802 regulators in the Peach Pit and Pi boards
->> that are always-on but shouldn't since they are enabled by drivers:
->>
->> BUCK5 is max77802 inl1 supply
->> BUCK7 is max77802 inl{2,10} supply
->> BUCK9 is max77802 inl{3,4,5,7} supply
->> BUCK10 is mmc1 vqmmc supply
->> LDO9 is adc vdd supply
->>
->> This patch removes the always-on property for these regulators.
->>
->> Some regulators should remain always-on even when they are used as
->> input supplies, because these regulators are also used by other
->> components that are not described in the DT, for example:
->>
->> LDO10 is hdmi vdd_osc supply but it's also used as input supply for
->> the Exynos5420 temperature sensor.
-> 
-> I don't have the schematics, so just guessing: by temperature sensor do
-> you mean the tmu_cpu* node (supplying power to VDD_TS01/23/4)?
+On 20 May 2016 at 09:31, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 19 May 2016, Andy Gross wrote:
 >
-
-Yes, I meant that the LDO10 regulator supplies 1v8 to VDD18_TS{01,23,4}.
- 
-> If yes then you can also change it, like on Odroid XU boards.
+>> On 19 May 2016 at 05:12, Srinivas Kandagatla
+>> <srinivas.kandagatla@linaro.org> wrote:
+>>
+>> <snip>
+>>
+>> > +++ b/drivers/usb/host/ehci-hcd.c
+>> > @@ -368,6 +368,15 @@ static void ehci_shutdown(struct usb_hcd *hcd)
+>> >  {
+>> >         struct ehci_hcd *ehci = hcd_to_ehci(hcd);
+>> >
+>> > +       /**
+>> > +        * Protect the system from crashing at system shutdown in cases where
+>> > +        * usb host is not added yet from OTG controller driver.
+>> > +        * As ehci_setup() not done yet, so stop accessing registers or
+>> > +        * variables initialized in ehci_setup()
+>> > +        */
+>> > +       if (!ehci->sbrn)
+>> > +               return;
+>> > +
+>> >         spin_lock_irq(&ehci->lock);
+>> >         ehci->shutdown = true;
+>> >         ehci->rh_state = EHCI_RH_STOPPING;
+>>
+>>
+>> Should we also not check this in ehci_suspend and ehci_resume?  If I
+>> do suspend/resume, it crashes in a similar manner.  I know this goes
+>> beyond the problem scope of the patch.  Perhaps I should send in an
+>> additional patch with the code?
+>>
+>> Are there any other places in the ehci-hcd where this needs to be checked?
 >
-
-Indeed, I think that should be a separate patch though. I'll do it
-next week since I don't have access to the machine today to test.
- 
->>
->> LDO8 is hdmi vdd and vdd_pll supply but it's also used as supply for
->> the Exynos5420 Display port.
->>
->> BUCK2 and BUCK6 are the vdd supplies for the EAGLE and KFC clusters.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> ---
->>
->>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 -----
->>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 5 -----
->>  2 files changed, 10 deletions(-)
-> 
-> Anyway,
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Really, this is an indication that the problem lies not in ehci-hcd but
+> rather in the platform glue code.  The platform code allows itself to
+> be registered as the driver of the controller device but does not
+> initialize the ehci-hcd parts.
 >
+> Neither ehci_suspend nor ehci_resume is called directly by the driver
+> core; the calls all have to pass through the glue code.  So maybe the
+> glue layer needs to be careful about invoking these routines in
+> ehci-hcd before ehci-hcd has been initialized.
 
-Thanks!
- 
-> Best regards,
-> Krzysztof
-> --
+That's a good point.  Perhaps all of this should be in the glue,
+including the shutdown case.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Regards,
+
+Andy
