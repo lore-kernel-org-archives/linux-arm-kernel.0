@@ -1,96 +1,45 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 20 May 2016 23:20:59 +0200
-Subject: Crash after 'reboot' due to 9be4fd2c7723a
-In-Reply-To: <CAOMZO5D_-3St-jqzMLzFHRn3dXXoSZGn4APSK4F63qCP3X=FfA@mail.gmail.com>
-References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
- <CAOMZO5D_-3St-jqzMLzFHRn3dXXoSZGn4APSK4F63qCP3X=FfA@mail.gmail.com>
-Message-ID: <4080948.V5DMHR9bsk@vostro.rjw.lan>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 20 May 2016 14:19:24 -0700
+Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
+ registers
+In-Reply-To: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
+References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
+Message-ID: <573F7F5C.1050100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, May 20, 2016 03:32:43 PM Fabio Estevam wrote:
-> On Fri, May 20, 2016 at 3:05 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > Rafael,
-> >
-> > Running the 'reboot' command works fine on a 4.5 kernel running on a
-> > mx6ul platform (ARM single core SoC), but it crashes on 4.6.
-> >
-> > Running bisect I got 9be4fd2c7723a3057b0b39676 ("cpufreq: governor:
-> > Replace timers with utilization update callbacks") as the first bad
-> > commit.
-> >
-> > Below is the output crash log.
-> >
-> > Not sure if this issue is related to the problem reported by Guenter here:
-> > http://lkml.iu.edu/hypermail/linux/kernel/1602.1/06075.html
-> >
-> > Any ideas?
-> 
-> If I rebuilt a kernel with SMP=n then the reboot command works as expected.
+On 05/20/2016 12:13 PM, Neil Leeder wrote:
+> diff --git a/drivers/soc/qcom/l2-accessors.c b/drivers/soc/qcom/l2-accessors.c
+> new file mode 100644
+> index 0000000..fbb69bd
+> --- /dev/null
+> +++ b/drivers/soc/qcom/l2-accessors.c
+> @@ -0,0 +1,66 @@
+> +/*
+> + * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/spinlock.h>
+> +#include <linux/module.h>
 
-Does it work if you boot with maxcpus=1 or nosmp in the kernel command line?
+export.h instead?
 
-Also, please try if the appended patch makes any difference.
+> +#include <linux/soc/qcom/l2-accessors.h>
+> +#include <asm/cputype.h>
+> +#include <asm/sysreg.h>
 
----
- drivers/base/core.c       |    3 +++
- drivers/cpufreq/cpufreq.c |   11 -----------
- 2 files changed, 3 insertions(+), 11 deletions(-)
+Is there a patch to add sysreg.h to arch/arm? It would be nice to use
+one l2 accessor API on arm64 and arm.
 
-Index: linux-pm/drivers/cpufreq/cpufreq.c
-===================================================================
---- linux-pm.orig/drivers/cpufreq/cpufreq.c
-+++ linux-pm/drivers/cpufreq/cpufreq.c
-@@ -27,7 +27,6 @@
- #include <linux/mutex.h>
- #include <linux/slab.h>
- #include <linux/suspend.h>
--#include <linux/syscore_ops.h>
- #include <linux/tick.h>
- #include <trace/events/power.h>
- 
-@@ -2556,14 +2555,6 @@ int cpufreq_unregister_driver(struct cpu
- }
- EXPORT_SYMBOL_GPL(cpufreq_unregister_driver);
- 
--/*
-- * Stop cpufreq at shutdown to make sure it isn't holding any locks
-- * or mutexes when secondary CPUs are halted.
-- */
--static struct syscore_ops cpufreq_syscore_ops = {
--	.shutdown = cpufreq_suspend,
--};
--
- struct kobject *cpufreq_global_kobject;
- EXPORT_SYMBOL(cpufreq_global_kobject);
- 
-@@ -2575,8 +2566,6 @@ static int __init cpufreq_core_init(void
- 	cpufreq_global_kobject = kobject_create_and_add("cpufreq", &cpu_subsys.dev_root->kobj);
- 	BUG_ON(!cpufreq_global_kobject);
- 
--	register_syscore_ops(&cpufreq_syscore_ops);
--
- 	return 0;
- }
- core_initcall(cpufreq_core_init);
-Index: linux-pm/drivers/base/core.c
-===================================================================
---- linux-pm.orig/drivers/base/core.c
-+++ linux-pm/drivers/base/core.c
-@@ -10,6 +10,7 @@
-  *
-  */
- 
-+#include <linux/cpufreq.h>
- #include <linux/device.h>
- #include <linux/err.h>
- #include <linux/fwnode.h>
-@@ -2042,6 +2043,8 @@ void device_shutdown(void)
- {
- 	struct device *dev, *parent;
- 
-+	cpufreq_suspend();
-+
- 	spin_lock(&devices_kset->list_lock);
- 	/*
- 	 * Walk the devices list backward, shutting down each in turn.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
