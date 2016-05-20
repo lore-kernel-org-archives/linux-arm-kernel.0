@@ -1,72 +1,76 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 20 May 2016 13:30:10 +0900
-Subject: [PATCH v3] gpio: UniPhier: add driver for UniPhier GPIO controller
-In-Reply-To: <CAK7LNAQH+Ge61+MJo2rLmjCBJRnYviT3LyCo0nrOPRQL+RtK2g@mail.gmail.com>
-References: <1436841787-7734-1-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdYaAMw5U3pctf96j0QpY2Qf+e=LX740F0okCmVU6pXkhA@mail.gmail.com>
- <CAK7LNAQ+_ynWT944fPZsHCzMBLtfNu5AnppzaOxNgPSBTvj_tw@mail.gmail.com>
- <CACRpkdZK41P-1JQsL6RiywqFEUj6=g5xJMKy86wDdp6BxLJNzQ@mail.gmail.com>
- <CAK7LNASd9z99RBmUgLVEM1WuLNSzGFM8qzrHwDf58tgGDy2SAw@mail.gmail.com>
- <CACRpkdbBfidn_otxzSV-8HMv2AuD-htUbcRHZ8n9CHAUO=TB9w@mail.gmail.com>
- <CAK7LNAQH+Ge61+MJo2rLmjCBJRnYviT3LyCo0nrOPRQL+RtK2g@mail.gmail.com>
-Message-ID: <CAK7LNAQcfrvuG6fD+gN2Ojq4wzCSNa=qpr5kh2QSFJZMCA2UaQ@mail.gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 20 May 2016 00:41:28 -0400
+Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <57331290.7070104@semihalf.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
+ <57331290.7070104@semihalf.com>
+Message-ID: <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Tomasz, all,
 
+On 05/11/2016 07:08 AM, Tomasz Nowicki wrote:
 
-2015-07-16 16:48 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> Hi Linus,
+> On 11.05.2016 12:41, Gabriele Paoloni wrote:
 
->
-> OK, I will do it in v4.
+>>> v6 -> v7
+>>> - drop quirks handling
+>>
+>> Maybe I missed something in the v6 discussion thread; when was it
+>> decided to drop quirk handling?
+> 
+> I had such requests in previous series.
 
+A quick note on quirk handling. This, I believe, applies post-merge of
+the base infrastructure, which I realize will likely not have quirks.
 
-I has been away from my GPIO driver upstreaming
-for a long time for some reason.
+We've some "gen1" ARMv8 server platforms where we end up doing quirks
+(for things like forcing 32-bit config space accessors and the like) due
+to people repurposing existing embedded PCIe IP blocks or using them for
+the first time (especially in servers), and those being involved in the
+design not necessarily seeing this problem ahead of time, or not
+realizing that it would be an issue for servers. In the early days of
+ARM server designs 3-4 years ago, many of us had never really played
+with ECAM or realized how modern topologies are built.
 
-I sent v3 ten months ago.
-http://patchwork.ozlabs.org/patch/494860/
+Anyway. We missed this one in our SBSA requirements. They say (words to
+the effect of) "thou shalt do PCIe the way it is done on servers" but
+they aren't prescriptive, and they don't tell people how that actually
+is in reality. That is being fixed. A lot of things are happening behind
+the scenes - especially with third party IP block providers (all of whom
+myself and others are speaking with directly about this) - to ensure
+that the next wave of designs won't repeat these mistakes. We don't have
+a time machine, but we can contain this from becoming an ongoing mess
+for upstream, and we will do so. It won't be a zoo.
 
+Various proposals have arisen for how to handle quirks in the longer
+term, including elaborate frameworks and tables to describe them
+generically. I would like to caution against such approaches, especially
+in the case that they deviate from practice on x86, or prior to being
+standardized fully with other Operating System vendors. I don't expect
+there to be too many more than the existing initial set of quirks we
+have seen posted. A number of "future" server SoCs have already been
+fixed prior to silicon, and new design starts are being warned not to
+make this a problem for us to have to clean up later.
 
-In the meantime, there have been various updates
-in the GPIO frame-work.
+So, I would like to suggest that the eventual framework mirror the
+existing approach on x86 systems (matching DMI, etc.) and not be made
+into some kind of generic, utopia. This is a case where we want there to
+be pain involved (and upstream patches required) when people screw up,
+so that they have a level of pain in response to ever making this
+mistake in the future. If we try to create too grand a generic scheme
+and make it too easy to handle this kind of situation beyond the small
+number of existing offenders, we undermine efforts to force vendors to
+ensure that their IP blocks are compliant going forward.
 
-So, I'd like to know the recommended driver coding style
-based on 4.7-rc1.
+Side note: if you're a third party IP vendor and we didn't already speak
+about this one, drop me a line, and let's collaborate also on your test
+frameworks to make sure you're covered as well.
 
-
-Diving into the git-log so far, I came up the following list:
-
-[1] The "dev" member of gpiochip was renamed to "parent"
-
-[2] The most recommended register function is now
-    devm_gpiochip_add_data()
-
-[3] Pass the driver private data to the
-    3rd argument of devm_gpiochip_add_data().
-
-[4] Do not use container_of() to covert
-    from gpiochip to driver private data.
-    Instead, gpiochip_get_data() should be used.
-
-    (I used of_mm_gpio_chip in v3,
-     but I needed to use container_of() to
-     convert from gpiochip to of_mm_gpio_chip.
-     I am wondering if you are happy with it or not.)
-
-[5] gpiochip.owner is being deprecated.
-    So, platform drivers need not set
-     "gpiochip.owner =  THIS_MODULE".
-
-
-Correct?
-Is there anything else missing?
-
-Any advice is appreciated.
-
+Jon.
 
 -- 
-Best Regards
-Masahiro Yamada
+Computer Architect | Sent from my Fedora powered laptop
