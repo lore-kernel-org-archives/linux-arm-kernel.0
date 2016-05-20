@@ -1,170 +1,80 @@
-From: yt.shen@mediatek.com (yt.shen at mediatek.com)
-Date: Fri, 20 May 2016 23:05:36 +0800
-Subject: [RFC v2 5/5] arm: dts: mt2701: Add display subsystem related nodes
- for MT2701
-In-Reply-To: <1463756736-46573-1-git-send-email-yt.shen@mediatek.com>
-References: <1463756736-46573-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1463756736-46573-6-git-send-email-yt.shen@mediatek.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 20 May 2016 11:13:41 -0400
+Subject: [PATCH] ARM: dts: exynos: Remove unneded always-on for regulators
+ on Peach boards
+In-Reply-To: <573EDEF2.8020903@samsung.com>
+References: <1463694753-7259-1-git-send-email-javier@osg.samsung.com>
+ <573EDEF2.8020903@samsung.com>
+Message-ID: <66cd7fed-c281-0645-0a60-5e1300419642@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: YT Shen <yt.shen@mediatek.com>
+Hello Krzysztof,
 
-This patch adds the device nodes for the DISP function blocks for MT2701
+Thanks a lot for the feedback.
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
----
- arch/arm/boot/dts/mt2701.dtsi |  117 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 117 insertions(+)
+On 05/20/2016 05:54 AM, Krzysztof Kozlowski wrote:
+> On 05/19/2016 11:52 PM, Javier Martinez Canillas wrote:
+>> The regulator always-on property should only be used for regulators
+>> that either can't be disabled or the drivers for the client devices
+>> are not enabling the regulator and so being disabled due to unused.
+>>
+>> There are some max77802 regulators in the Peach Pit and Pi boards
+>> that are always-on but shouldn't since they are enabled by drivers:
+>>
+>> BUCK5 is max77802 inl1 supply
+>> BUCK7 is max77802 inl{2,10} supply
+>> BUCK9 is max77802 inl{3,4,5,7} supply
+>> BUCK10 is mmc1 vqmmc supply
+>> LDO9 is adc vdd supply
+>>
+>> This patch removes the always-on property for these regulators.
+>>
+>> Some regulators should remain always-on even when they are used as
+>> input supplies, because these regulators are also used by other
+>> components that are not described in the DT, for example:
+>>
+>> LDO10 is hdmi vdd_osc supply but it's also used as input supply for
+>> the Exynos5420 temperature sensor.
+> 
+> I don't have the schematics, so just guessing: by temperature sensor do
+> you mean the tmu_cpu* node (supplying power to VDD_TS01/23/4)?
+>
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 363de0d..0beef2a 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -24,6 +24,13 @@
- 	compatible = "mediatek,mt2701";
- 	interrupt-parent = <&sysirq>;
+Yes, I meant that the LDO10 regulator supplies 1v8 to VDD18_TS{01,23,4}.
  
-+	aliases {
-+		rdma0 = &rdma0;
-+		rdma1 = &rdma1;
-+		dpi0 = &dpi0;
-+		dpi1 = &dpi1;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -171,6 +178,14 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
+> If yes then you can also change it, like on Odroid XU boards.
+>
+
+Indeed, I think that should be a separate patch though. I'll do it
+next week since I don't have access to the machine today to test.
  
-+	mipi_tx0: mipi-dphy at 10010000 {
-+		compatible = "mediatek,mt2701-mipi-tx";
-+		reg = <0 0x10010000 0 0x90>;
-+		clocks = <&clk26m>;
-+		clock-output-names = "mipi_tx0_pll";
-+		status = "disabled";
-+	};
-+
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -255,6 +270,79 @@
- 		status = "disabled";
- 	};
+>>
+>> LDO8 is hdmi vdd and vdd_pll supply but it's also used as supply for
+>> the Exynos5420 Display port.
+>>
+>> BUCK2 and BUCK6 are the vdd supplies for the EAGLE and KFC clusters.
+>>
+>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> ---
+>>
+>>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 5 -----
+>>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 5 -----
+>>  2 files changed, 10 deletions(-)
+> 
+> Anyway,
+> 
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
+
+Thanks!
  
-+	ovl at 14007000 {
-+		compatible = "mediatek,mt2701-disp-ovl";
-+		reg = <0 0x14007000 0 0x1000>;
-+		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_OVL>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	rdma0: rdma at 14008000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14008000 0 0x1000>;
-+		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	wdma at 14009000 {
-+		compatible = "mediatek,mt2701-disp-wdma";
-+		reg = <0 0x14009000 0 0x1000>;
-+		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_WDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	bls at 1400a000 {
-+		compatible = "mediatek,mt2701-disp-bls";
-+		reg = <0 0x1400a000 0 0x1000>;
-+		interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_BLS>;
-+	};
-+
-+	color at 1400b000 {
-+		compatible = "mediatek,mt2701-disp-color";
-+		reg = <0 0x1400b000 0 0x1000>;
-+		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_COLOR>;
-+	};
-+
-+	dsi0: dsi at 1400c000 {
-+		compatible = "mediatek,mt2701-dsi";
-+		reg = <0 0x1400c000 0 0x1000>;
-+		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DSI_ENGINE>, <&mmsys CLK_MM_DSI_DIG>,
-+			 <&mipi_tx0>;
-+		clock-names = "engine", "digital", "hs";
-+		phys = <&mipi_tx0>;
-+		phy-names = "dphy";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	dpi0: dpi at 1400d000 {
-+		compatible = "mediatek,mt2701-dpi";
-+		reg = <0 0x1400d000 0 0x1000>;
-+		interrupts = <GIC_SPI 158 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DPI_DIGL>,
-+			 <&mmsys CLK_MM_DPI_ENGINE>;
-+		clock-names = "clk_dpi_digl",
-+			      "clk_dpi_engine";
-+		status = "disabled";
-+	};
-+
-+	mutex: mutex at 1400e000 {
-+		compatible = "mediatek,mt2701-disp-mutex";
-+		reg = <0 0x1400e000 0 0x1000>;
-+		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_MUTEX_32K>;
-+	};
-+
- 	larb0: larb at 14010000 {
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x14010000 0 0x1000>;
-@@ -265,6 +353,35 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	rdma1: rdma at 14012000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14012000 0 0x1000>;
-+		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	ufoe at 14013000 {
-+		compatible = "mediatek,mt2701-disp-ufoe";
-+		reg = <0 0x14013000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_DISP_UFOE>;
-+	};
-+
-+	dpi1: dpi at 14014000 {
-+		compatible = "mediatek,mt2701-dpi";
-+		reg = <0 0x14014000 0 0x1000>;
-+		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DPI1_DIGL>,
-+			 <&mmsys CLK_MM_DPI1_ENGINE>,
-+			 <&topckgen CLK_TOP_DPI1_SEL>,
-+			 <&topckgen CLK_TOP_TVDPLL>,
-+			 <&topckgen CLK_TOP_TVDPLL_D2>,
-+			 <&topckgen CLK_TOP_TVDPLL_D4>;
-+		clock-names = "pixel", "engine", "sel","div1","div2","div4";
-+		status = "disabled";
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
+> Best regards,
+> Krzysztof
+> --
+
+Best regards,
 -- 
-1.7.9.5
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
