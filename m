@@ -1,29 +1,28 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 20 May 2016 12:07:25 -0700
-Subject: [PATCH 0/7] ARM: multi_v7_defconfig: Add more Broadcom SoCs
-Message-ID: <1463771252-12805-1-git-send-email-f.fainelli@gmail.com>
+Date: Fri, 20 May 2016 12:07:30 -0700
+Subject: [PATCH 5/7] ARM: multi_v7_defconfig: Enable Broadcom STB PWM
+In-Reply-To: <1463771252-12805-1-git-send-email-f.fainelli@gmail.com>
+References: <1463771252-12805-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1463771252-12805-6-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enables more fundamental drivers which are useful for
-Broadcom BCM63xx and BCM7xxx SoCs.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-The last patch remove bcm_defconfig which is causing a whole lot of confusiong
-at best and is completely out of sync now.
-
-Florian Fainelli (7):
-  ARM: multi_v7_defconfig: Enable BCM63xx
-  ARM: multi_v7_defconfig: Enable BRCMSTB networking
-  ARM: multi_v7_defconfig: Enable BRCMSTB AHCI
-  ARM: multi_v7_defconfig: Enable BCM7038 Watchdog
-  ARM: multi_v7_defconfig: Enable Broadcom STB PWM
-  ARM: multi_v7_defconfig: Enable Broadcom Kona watchdog
-  ARM: Remove bcm_defconfig
-
- arch/arm/configs/bcm_defconfig      | 142 ------------------------------------
- arch/arm/configs/multi_v7_defconfig |  13 ++++
- 2 files changed, 13 insertions(+), 142 deletions(-)
- delete mode 100644 arch/arm/configs/bcm_defconfig
-
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 13e5af6334ac..b59081bda51b 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -816,6 +816,7 @@ CONFIG_PWM_VT8500=y
+ CONFIG_PHY_HIX5HD2_SATA=y
+ CONFIG_PWM_STI=y
+ CONFIG_PWM_BCM2835=y
++CONFIG_PWM_BRCMSTB=m
+ CONFIG_OMAP_USB2=y
+ CONFIG_TI_PIPE3=y
+ CONFIG_PHY_BERLIN_USB=y
 -- 
 2.7.4
