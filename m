@@ -1,42 +1,52 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 20 May 2016 14:20:25 +0200
-Subject: [PATCH 1/3] reset: Add support for the Amlogic Meson GXBB Reset
- Controller
-In-Reply-To: <20160520100437.GA21213@mephisto>
-References: <1463732875-23141-1-git-send-email-narmstrong@baylibre.com>
- <1463732875-23141-2-git-send-email-narmstrong@baylibre.com>
- <20160520090448.GA19888@mephisto> <573ED483.10101@baylibre.com>
- <20160520100437.GA21213@mephisto>
-Message-ID: <573F0109.9080302@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 20 May 2016 14:20:52 +0200
+Subject: [PATCH V5 6/7] iommu/msm: Use writel_relaxed and add a barrier
+In-Reply-To: <3164695.VzCnHHyi7r@wuerfel>
+References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
+ <1463741694-1735-7-git-send-email-sricharan@codeaurora.org>
+ <3164695.VzCnHHyi7r@wuerfel>
+Message-ID: <2864715.kytdDZX8IX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2016 12:04 PM, Carlo Caione wrote:
-> On 20/05/16 11:10, Neil Armstrong wrote:
->> On 05/20/2016 11:04 AM, Carlo Caione wrote:
->>> On 20/05/16 10:27, Neil Armstrong wrote:
->>>> This patch adds the platform driver for the Amlogic Meson GXBB Reset
->>>> Controller.
->>>>
->>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>>> ---
->>>>  drivers/reset/Kconfig            |   6 ++
->>>>  drivers/reset/Makefile           |   1 +
->>>>  drivers/reset/reset-meson-gxbb.c | 129 +++++++++++++++++++++++++++++++++++++++
->>>>  3 files changed, 136 insertions(+)
->>>>  create mode 100644 drivers/reset/reset-meson-gxbb.c
->>>
->>> Do we really need to be that specific (-gxbb)? This driver looks generic
->>> and simple enough to be used for several Amlogic families. You are
->>> already differentiating between them with the include file defining the
->>> reset indexes for the SoC.
->>
->> This is a good question, do the S805 have similar registers ? Same count and width ?
->> I no, it should need a rework to add a data structure per-SoC.
+On Friday 20 May 2016 13:44:10 Arnd Bergmann wrote:
+> >  #define GET_CTX_REG(reg, base, ctx) \
+> >                               (readl((base) + (reg) + ((ctx) << CTX_SHIFT)))
+> >  
+> > -#define SET_GLOBAL_REG(reg, base, val)       writel((val), ((base) + (reg)))
+> > +/*
+> > + * The writes to the global/context registers needs to be synced only after
+> > + * all the configuration writes are done. So use relaxed accessors and
+> > + * a barrier at the end.
+> > + */
+> > +#define SET_GLOBAL_REG_RELAXED(reg, base, val) \
+> > +                            writel_relaxed((val), ((base) + (reg)))
+> >  
+> > -#define SET_CTX_REG(reg, base, ctx, val) \
+> > -                     writel((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
+> > +#define SET_CTX_REG_RELAXED(reg, base, ctx, val) \
+> > +             writel_relaxed((val), ((base) + (reg) + ((ctx) << CTX_SHIFT)))
 > 
-> According to the datasheet on S805 we have 7 registers with 16 reset
-> bits per register.
+> Please add the relaxed accessors first in a separate patch, and then
+> change over one user at a time before you remove the non-relaxed ones.
+> 
+> It's hard to believe that all users are actually performance critical,
+> so start with the ones that gain the most performance. As commented above,
+> some of the conversions seem particularly fishy and it's likely that
+> a slow reset() function should not be fixed by making reset() faster
+> but by calling it less often.
 
-It will fit, I made the change to be generic. Do you know if the meson8 and previous meson6 has these registers ?
+One more thing, please also convert them into inline functions when you modify
+them, and use normal names such as
 
-Neil
+static inline void msm_iommu_write(struct msm_iommu_dev *iommu, unsigned int reg, u32 val)
+{
+	writel(val, iommu->base + reg);
+}
+
+static inline void msm_iommu_context_write(struct msm_iommu_ctx_dev *ctx, unsigned int reg, u32 val)
+{
+	writel(val, ctx->iommu->base + ctx << CTX_SHIFT + reg, val);
+}
+
+	Arnd
