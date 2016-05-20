@@ -1,52 +1,64 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 20 May 2016 20:40:46 +0800
-Subject: [stericsson:earlydebug 1/1] init/main.c:490: undefined reference to
- `printascii'
-Message-ID: <201605202044.auhsCGs8%fengguang.wu@intel.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 20 May 2016 20:55:56 +0800
+Subject: [PATCH] arm64: dts: rockchip: fixes the gic400 2nd region size
+ for rk3368
+In-Reply-To: <1463582510-29156-1-git-send-email-wxt@rock-chips.com>
+References: <1463582510-29156-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <61133267-f903-b580-7737-b77610392cde@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
-head:   7a0e86123c84ec8853d7c6ae248e911a04a81bb4
-commit: 7a0e86123c84ec8853d7c6ae248e911a04a81bb4 [1/1] uglyhack printascii
-config: alpha-defconfig (attached as .config)
-compiler: alpha-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 7a0e86123c84ec8853d7c6ae248e911a04a81bb4
-        # save the attached .config to linux build tree
-        make.cross ARCH=alpha 
+? 2016/5/18 22:41, Caesar Wang ??:
+> The 2nd additional region is the GIC virtual cpu interface register
+> base and size.
+>
+> As the gic400 of rk3368 says, the cpu interface register map as below
+>
+> :
+>
+> -0x0000 GICC_CTRL
+> .
+> .
+> .
+> -0x00fc GICC_IIDR
+> -0x1000 GICC_IDR
+>
+> Obviously, the region size should be greater than 0x1000.
+> So we should make sure to include the GICC_IDR since the kernel will access
+> it in some cases.
+>
 
-Note: the stericsson/earlydebug HEAD 7a0e86123c84ec8853d7c6ae248e911a04a81bb4 builds fine.
-      It only hurts bisectibility.
+yes, address range for GICC_* should be from 0x2000 to 0x3fff according
+to gic400 memory map Table 3-1.
 
-All errors (new ones prefixed by >>):
+Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
 
-   init/built-in.o: In function `start_kernel':
->> init/main.c:490: undefined reference to `printascii'
->> init/main.c:490: undefined reference to `printascii'
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
+>
+> ---
+>
+>  arch/arm64/boot/dts/rockchip/rk3368.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> index 8b4a7c9..080203e 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+> @@ -670,7 +670,7 @@
+>  		#address-cells = <0>;
+>
+>  		reg = <0x0 0xffb71000 0x0 0x1000>,
+> -		      <0x0 0xffb72000 0x0 0x1000>,
+> +		      <0x0 0xffb72000 0x0 0x2000>,
+>  		      <0x0 0xffb74000 0x0 0x2000>,
+>  		      <0x0 0xffb76000 0x0 0x2000>;
+>  		interrupts = <GIC_PPI 9
+>
 
-vim +490 init/main.c
 
-   484		set_task_stack_end_magic(&init_task);
-   485		smp_setup_processor_id();
-   486		debug_objects_early_init();
-   487	
-   488		{
-   489		  extern void printascii(char *);
- > 490		  printascii("start_kernel\n");
-   491		}
-   492		/*
-   493		 * Set up the the initial canary ASAP:
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 11941 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160520/e4f54856/attachment.obj>
+-- 
+Best Regards
+Shawn Lin
