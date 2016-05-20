@@ -1,45 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 20 May 2016 14:19:24 -0700
-Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
- registers
-In-Reply-To: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
-References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
-Message-ID: <573F7F5C.1050100@codeaurora.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 20 May 2016 23:19:52 +0200
+Subject: [PATCH] arm64: dts: rockchip: fixes the gic400 2nd region size
+ for rk3368
+In-Reply-To: <1463582510-29156-1-git-send-email-wxt@rock-chips.com>
+References: <1463582510-29156-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <2773450.t8WTDyMWXy@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2016 12:13 PM, Neil Leeder wrote:
-> diff --git a/drivers/soc/qcom/l2-accessors.c b/drivers/soc/qcom/l2-accessors.c
-> new file mode 100644
-> index 0000000..fbb69bd
-> --- /dev/null
-> +++ b/drivers/soc/qcom/l2-accessors.c
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/spinlock.h>
-> +#include <linux/module.h>
+Hi Caesar,
 
-export.h instead?
+Am Mittwoch, 18. Mai 2016, 22:41:50 schrieb Caesar Wang:
+> The 2nd additional region is the GIC virtual cpu interface register
+> base and size.
+> 
+> As the gic400 of rk3368 says, the cpu interface register map as below
+> 
+> 
+> 
+> -0x0000 GICC_CTRL
+> .
+> .
+> .
+> -0x00fc GICC_IIDR
+> -0x1000 GICC_IDR
+> 
+> Obviously, the region size should be greater than 0x1000.
+> So we should make sure to include the GICC_IDR since the kernel will
+> access it in some cases.
+> 
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-rockchip at lists.infradead.org
 
-> +#include <linux/soc/qcom/l2-accessors.h>
-> +#include <asm/cputype.h>
-> +#include <asm/sysreg.h>
+applied to a fixes branch for 4.7 with Shawn's review-tag.
 
-Is there a patch to add sysreg.h to arch/arm? It would be nice to use
-one l2 accessor API on arm64 and arm.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks for catching this
+Heiko
