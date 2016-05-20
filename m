@@ -1,61 +1,91 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 20 May 2016 12:04:37 +0200
-Subject: [PATCH 1/3] reset: Add support for the Amlogic Meson GXBB Reset
- Controller
-In-Reply-To: <573ED483.10101@baylibre.com>
-References: <1463732875-23141-1-git-send-email-narmstrong@baylibre.com>
- <1463732875-23141-2-git-send-email-narmstrong@baylibre.com>
- <20160520090448.GA19888@mephisto> <573ED483.10101@baylibre.com>
-Message-ID: <20160520100437.GA21213@mephisto>
+From: maitysanchayan@gmail.com (Sanchayan Maity)
+Date: Fri, 20 May 2016 15:32:01 +0530
+Subject: [PATCH v3 0/4] Implement SoC driver for Vybrid
+Message-ID: <cover.1463737502.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/05/16 11:10, Neil Armstrong wrote:
-> On 05/20/2016 11:04 AM, Carlo Caione wrote:
-> > On 20/05/16 10:27, Neil Armstrong wrote:
-> >> This patch adds the platform driver for the Amlogic Meson GXBB Reset
-> >> Controller.
-> >>
-> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> >> ---
-> >>  drivers/reset/Kconfig            |   6 ++
-> >>  drivers/reset/Makefile           |   1 +
-> >>  drivers/reset/reset-meson-gxbb.c | 129 +++++++++++++++++++++++++++++++++++++++
-> >>  3 files changed, 136 insertions(+)
-> >>  create mode 100644 drivers/reset/reset-meson-gxbb.c
-> > 
-> > Do we really need to be that specific (-gxbb)? This driver looks generic
-> > and simple enough to be used for several Amlogic families. You are
-> > already differentiating between them with the include file defining the
-> > reset indexes for the SoC.
-> 
-> This is a good question, do the S805 have similar registers ? Same count and width ?
-> I no, it should need a rework to add a data structure per-SoC.
+Hello,
 
-According to the datasheet on S805 we have 7 registers with 16 reset
-bits per register.
+This third patch series is rebased on top of shawn's for-next branch
+and tested on Colibri Vybrid VF50 and VF61 modules.
 
-[...]
-> > 
-> > [...]
-> >> +static struct platform_driver meson_gxbb_reset_driver = {
-> >> +	.probe	= meson_gxbb_reset_probe,
-> >> +	.remove	= meson_gxbb_reset_remove,
-> >> +	.driver = {
-> >> +		.name		= "meson_gxbb_reset",
-> >> +		.of_match_table	= meson_gxbb_reset_dt_ids,
-> >> +	},
-> >> +};
-> >> +
-> >> +module_platform_driver(meson_gxbb_reset_driver);
-> > 
-> > No MODULE_AUTHOR, MODULE_LICENSE, etc... ?
-> 
-> What is the MODULE_LICENCE format for dual licensing ?
+This patchset implements SoC bus support for Freescale Vybrid platform,
+implementing the following
+https://www.kernel.org/doc/Documentation/ABI/testing/sysfs-devices-soc
 
-Dual BSD/GPL ?
+This a reworked version of an older patchset series posted in June 2015
+which was at v5 then [1]. Since the NVMEM framework was then getting
+introduced, we decided that first a NVMEM driver for OCOTP peripheral
+being in place would be better.
 
-Cheers,
+Compared to the older revisions, this driver now relies on NVMEM
+consumer API using the NVMEM based vf610_ocotp driver which has
+already been in mainline for a while now.
+
+One point on which we were not sure here is whether we really should
+introduce a new Kconfig symbol as being introduced here. While we
+could just enable it when SOC_VF610 is selected, this however would
+introduce circular dependencies.
+
+Feedback is most welcome.
+
+@Rob Herring
+Does this patchset address the concerns you had?
+
+Changes since v2:
+1. Remove syscon_regmap_read_from_offset function and use the
+available syscon functions
+2. Remove fsl,vf610-soc-bus and related bindings at SoC node
+level and introduce a fsl,vf610-soc node which is used by the
+driver to bind and has all the required phandles plus the NVMEM
+consumer handles.
+3. Fix memory leak. of_node_put was not called for returned node
+of of_parse_phandle and memory allocated by nvmem_cell_read was
+not freed explicitly in return error paths.
+
+Changes since v1:
+Add device tree binding documentation.
+
+2016: v2 patchset
+https://lkml.org/lkml/2016/5/2/69
+
+2016: v1 patchset
+https://lkml.org/lkml/2016/3/11/132
+
+[1] Older v5:
+http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
+Even earlier versions:
+Version 4 of the patchset can be found here
+https://lkml.org/lkml/2015/5/26/199
+Version 3 of the patchset can be found here
+http://www.spinics.net/lists/arm-kernel/msg420847.html
+Version 2 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80654.html
+Version 1 of the patchset can be found here
+http://www.spinics.net/lists/devicetree/msg80257.html
+The RFC version can be found here
+https://lkml.org/lkml/2015/5/11/13
+
+Regards,
+Sanchayan.
+
+Sanchayan Maity (4):
+  ARM: dts: vfxxx: Add device tree node for OCOTP
+  ARM: dts: vfxxx: Add On-Chip ROM node for Vybrid
+  ARM: dts: vfxxx: Add device tree node required by Vybrid SoC driver
+  soc: Add SoC driver for Freescale Vybrid platform
+
+ .../bindings/arm/freescale/fsl,vf610-soc.txt       |  20 +++
+ arch/arm/boot/dts/vfxxx.dtsi                       |  29 +++
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/fsl/Kconfig                            |  10 ++
+ drivers/soc/fsl/Makefile                           |   1 +
+ drivers/soc/fsl/soc-vf610.c                        | 198 +++++++++++++++++++++
+ 6 files changed, 259 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+ create mode 100644 drivers/soc/fsl/Kconfig
+ create mode 100644 drivers/soc/fsl/soc-vf610.c
 
 -- 
-Carlo Caione
+2.8.2
