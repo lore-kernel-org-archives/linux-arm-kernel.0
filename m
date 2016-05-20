@@ -1,51 +1,106 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Fri, 20 May 2016 07:23:17 +0000
-Subject: [PATCH 2/2] memory: bcm2835: enable driver early in the boot process
-In-Reply-To: <1463728997-8241-1-git-send-email-kernel@martin.sperl.org>
-References: <1463728997-8241-1-git-send-email-kernel@martin.sperl.org>
-Message-ID: <1463728997-8241-3-git-send-email-kernel@martin.sperl.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 20 May 2016 09:37:59 +0200
+Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
+References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
+ <57331290.7070104@semihalf.com>
+ <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
+Message-ID: <CAKv+Gu8fdeJ9OvRSmtu9zyvcjK3O-4WU=jG=6-7t4xZwvV8d2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+On 20 May 2016 at 06:41, Jon Masters <jcm@redhat.com> wrote:
+> Hi Tomasz, all,
+>
+> On 05/11/2016 07:08 AM, Tomasz Nowicki wrote:
+>
+>> On 11.05.2016 12:41, Gabriele Paoloni wrote:
+>
+>>>> v6 -> v7
+>>>> - drop quirks handling
+>>>
+>>> Maybe I missed something in the v6 discussion thread; when was it
+>>> decided to drop quirk handling?
+>>
+>> I had such requests in previous series.
+>
+> A quick note on quirk handling. This, I believe, applies post-merge of
+> the base infrastructure, which I realize will likely not have quirks.
+>
+> We've some "gen1" ARMv8 server platforms where we end up doing quirks
+> (for things like forcing 32-bit config space accessors and the like) due
+> to people repurposing existing embedded PCIe IP blocks or using them for
+> the first time (especially in servers), and those being involved in the
+> design not necessarily seeing this problem ahead of time, or not
+> realizing that it would be an issue for servers. In the early days of
+> ARM server designs 3-4 years ago, many of us had never really played
+> with ECAM or realized how modern topologies are built.
+>
+> Anyway. We missed this one in our SBSA requirements. They say (words to
+> the effect of) "thou shalt do PCIe the way it is done on servers" but
+> they aren't prescriptive, and they don't tell people how that actually
+> is in reality. That is being fixed. A lot of things are happening behind
+> the scenes - especially with third party IP block providers (all of whom
+> myself and others are speaking with directly about this) - to ensure
+> that the next wave of designs won't repeat these mistakes. We don't have
+> a time machine, but we can contain this from becoming an ongoing mess
+> for upstream, and we will do so. It won't be a zoo.
+>
+> Various proposals have arisen for how to handle quirks in the longer
+> term, including elaborate frameworks and tables to describe them
+> generically. I would like to caution against such approaches, especially
+> in the case that they deviate from practice on x86, or prior to being
+> standardized fully with other Operating System vendors. I don't expect
+> there to be too many more than the existing initial set of quirks we
+> have seen posted. A number of "future" server SoCs have already been
+> fixed prior to silicon, and new design starts are being warned not to
+> make this a problem for us to have to clean up later.
+>
+> So, I would like to suggest that the eventual framework mirror the
+> existing approach on x86 systems (matching DMI, etc.) and not be made
+> into some kind of generic, utopia. This is a case where we want there to
+> be pain involved (and upstream patches required) when people screw up,
+> so that they have a level of pain in response to ever making this
+> mistake in the future. If we try to create too grand a generic scheme
+> and make it too easy to handle this kind of situation beyond the small
+> number of existing offenders, we undermine efforts to force vendors to
+> ensure that their IP blocks are compliant going forward.
+>
 
-Enable the critical sdram-clocks early during the boot process,
-so that these clocks (and their PLLs) can not get disabled
-when a different driver disables its clocks again because
-it failed to probe propperly (maybe deferred).
+I understand that there is a desire from the RedHat side to mimic x86
+as closely as possible, but I never saw any technical justification
+for that. DMI contains strings that are visible to userland, and you
+effectively lock those down to certain values just so that the kernel
+can distinguish a broken PCIe root complex from a working one. Linux
+on x86 had no choice, since the overwhelming majority of existing
+hardware misrepresented itself as generic, and DMI was the only thing
+available to actually distinguish these broken implementations from
+one another. This does not mean we should allow and/or encourage this
+first gen hardware to misrepresent non-compliant hardware as compliant
+as well.
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- drivers/memory/bcm2835-sdram.c | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+Since you are talking to all the people involved, how about you
+convince them to put something in the ACPI tables that allows the
+kernel to distinguish those non-standard PCIe implementations from
+hardware that is really generic? This way, we can sidestep the quirks
+debate entirely, since it will simply be a different device as far as
+the kernel is concerned. This is no worse than a quirk from a
+practical point of view, since an older OS will be equally unable to
+run on newer hardware, but it is arguably more true to the standards
+compliance you tend to preach about, especially since this small pool
+of third party IP could potentially be identified directly rather than
+based on some divination of the SoC we may or may not be running on. I
+am also convinced that adding support for an additional HID() to the
+ACPI ECAM driver with some special config space handling wired in is
+an easier sell upstream than making the same ugly mess x86 has had to
+make because they did not have any choice to begin with.
 
-diff --git a/drivers/memory/bcm2835-sdram.c b/drivers/memory/bcm2835-sdram.c
-index 9d8cce2..7b6406d 100644
---- a/drivers/memory/bcm2835-sdram.c
-+++ b/drivers/memory/bcm2835-sdram.c
-@@ -431,6 +431,9 @@ static int bcm2835_sdram_probe(struct platform_device *pdev)
- 	/* setup debugfs */
- 	bcm2835_sdram_debugfs(pdev);
- 
-+	/* note that we have registered sdram */
-+	dev_dbg(&pdev->dev, "registered sdram\n");
-+
- 	return 0;
- }
- 
-@@ -457,7 +460,12 @@ static struct platform_driver bcm2835_sdram_driver = {
- 		.of_match_table = bcm2835_sdram_of_match_table,
- 	},
- };
--module_platform_driver(bcm2835_sdram_driver);
-+
-+static int __init __bcm2835_sdram_driver_init(void)
-+{
-+	return platform_driver_register(&bcm2835_sdram_driver);
-+}
-+core_initcall_sync(__bcm2835_sdram_driver_init);
- 
- MODULE_AUTHOR("Martin Sperl");
- MODULE_DESCRIPTION("sdram driver for bcm2835 chip");
+If we do need a quirks handling mechanism, I still don't see how the
+x86 situation extrapolates to ARM. ACPI offers plenty of ways for a
+SoC vendor to identify the make and particular revision, and quirks
+could be keyed off of that.
+
 -- 
-2.1.4
+Ard.
