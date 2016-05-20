@@ -1,56 +1,84 @@
-From: dave.long@linaro.org (David Long)
-Date: Fri, 20 May 2016 00:18:03 -0400
-Subject: [PATCH v12 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
- feature
-In-Reply-To: <20160517091446.GB5082@sha-win-210.asiapac.arm.com>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-2-git-send-email-dave.long@linaro.org>
- <20160517091446.GB5082@sha-win-210.asiapac.arm.com>
-Message-ID: <573E8FFB.3000107@linaro.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 20 May 2016 13:20:27 +0900
+Subject: [PATCH v3 2/6] ARM: dts: r8a7794: add MSTP5 clocks
+In-Reply-To: <23a35d91-7ba3-be23-c8ee-5a056e6a627b@cogentembedded.com>
+References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
+ <1576909.nm8MtQ2Ln5@wasted.cogentembedded.com>
+ <CAMuHMdXaUNwOTQ7827+iTTfuRne_Z1F=-qgxu2cs07==AeqzCA@mail.gmail.com>
+ <23a35d91-7ba3-be23-c8ee-5a056e6a627b@cogentembedded.com>
+Message-ID: <20160520042027.GD25184@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2016 05:14 AM, Huang Shijie wrote:
-> On Wed, Apr 27, 2016 at 02:52:56PM -0400, David Long wrote:
->> From: "David A. Long" <dave.long@linaro.org>
->> +/**
->> + * regs_within_kernel_stack() - check the address in the stack
->> + * @regs:      pt_regs which contains kernel stack pointer.
->> + * @addr:      address which is checked.
->> + *
->> + * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
->> + * If @addr is within the kernel stack, it returns true. If not, returns false.
->> + */
->> +bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
->> +{
->> +	return ((addr & ~(THREAD_SIZE - 1))  ==
->> +		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1))) ||
->> +		on_irq_stack(addr, raw_smp_processor_id());
->> +}
->> +
->> +/**
->> + * regs_get_kernel_stack_nth() - get Nth entry of the stack
->> + * @regs:	pt_regs which contains kernel stack pointer.
->> + * @n:		stack entry number.
->> + *
->> + * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
->> + * is specified by @regs. If the @n th entry is NOT in the kernel stack,
->> + * this returns 0.
->> + */_
->> +unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
->> +{
->> +	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
->> +
->> +	addr += n;
->> +	if (regs_within_kernel_stack(regs, (unsigned long)addr))
-> If the @addr fall in the interrupt stack, the regs_within_kernel_stack()
-> will return true. But Is it what we want?
->
+On Thu, May 19, 2016 at 08:30:12PM +0300, Sergei Shtylyov wrote:
+> On 05/19/2016 07:25 PM, Geert Uytterhoeven wrote:
+> 
+> >>Add some MSTP5 clocks to the R8A7794 device tree.
+> >>
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>
+> >>---
+> >>Changes in version 3:
+> >>- refreshed the patch.
+> >>
+> >>Changes in version 2:
+> >>- added "the" article to the change log.
+> >>
+> >> arch/arm/boot/dts/r8a7794.dtsi            |    9 +++++++++
+> >> include/dt-bindings/clock/r8a7794-clock.h |    1 +
+> >> 2 files changed, 10 insertions(+)
+> >>
+> >>Index: renesas/arch/arm/boot/dts/r8a7794.dtsi
+> >>===================================================================
+> >>--- renesas.orig/arch/arm/boot/dts/r8a7794.dtsi
+> >>+++ renesas/arch/arm/boot/dts/r8a7794.dtsi
+> >>@@ -1172,6 +1172,15 @@
+> >>                        clock-indices = <R8A7794_CLK_IRQC>;
+> >>                        clock-output-names = "irqc";
+> >>                };
+> >>+               mstp5_clks: mstp5_clks at e6150144 {
+> >>+                       compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+> >>+                       reg = <0 0xe6150144 0 4>, <0 0xe615003c 0 4>;
+> >>+                       clocks = <&hp_clk>, <&extal_clk>, <&p_clk>;
+> >>+                       #clock-cells = <1>;
+> >>+                       clock-indices = <R8A7794_CLK_AUDIO_DMAC0
+> >>+                                        R8A7794_CLK_THERMAL R8A7794_CLK_PWM>;
+> >>+                       clock-output-names = "audmac0", "thermal", "pwm";
+> >
+> >R-Car E2 does not have the thermal module.
+> 
+>    My "R-Car Series, 2nd Generation User?s Manual: Hardware, Rev.1.02 Oct
+> 2014" says it does. What's your source?
 
-Yes, I think it is.  The function is used in regs_get_kernel_stack_nth() 
-to make sure the data being asked for (based on the pt_regs saved stack 
-pointer) is actually on the stack, whether it's "kernel" stack or "irq" 
-stack.
+Please see chapter 80 of v2.00.
+I have also confirmed with the hw team that the thermal sensor is not present.
 
-Thanks,
--dl
+FWIW until recently I was also going off the older documentation in this
+regards and the absence of the thermal block was a bit of a revelation to
+me.
+
+> >>+               };
+> >>                mstp7_clks: mstp7_clks at e615014c {
+> >>                        compatible = "renesas,r8a7794-mstp-clocks", "renesas,cpg-mstp-clocks";
+> >>                        reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+> >>Index: renesas/include/dt-bindings/clock/r8a7794-clock.h
+> >>===================================================================
+> >>--- renesas.orig/include/dt-bindings/clock/r8a7794-clock.h
+> >>+++ renesas/include/dt-bindings/clock/r8a7794-clock.h
+> >>@@ -67,6 +67,7 @@
+> >> #define R8A7794_CLK_IRQC               7
+> >>
+> >> /* MSTP5 */
+> >>+#define R8A7794_CLK_AUDIO_DMAC0                2
+> >> #define R8A7794_CLK_THERMAL            22
+> >
+> >Hence R8A7794_CLK_THERMAL should be removed.
+> 
+>    Well, remove it then. ;-)
+> 
+> >> #define R8A7794_CLK_PWM                        23
+> >
+> >Gr{oetje,eeting}s,
+> 
+> MBR, Sergei
+> 
