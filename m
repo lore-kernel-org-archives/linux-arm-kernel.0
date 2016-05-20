@@ -1,34 +1,45 @@
 From: maitysanchayan@gmail.com (Sanchayan Maity)
-Date: Fri, 20 May 2016 15:32:03 +0530
-Subject: [PATCH v3 2/4] ARM: dts: vfxxx: Add On-Chip ROM node for Vybrid
+Date: Fri, 20 May 2016 15:32:02 +0530
+Subject: [PATCH v3 1/4] ARM: dts: vfxxx: Add device tree node for OCOTP
 In-Reply-To: <cover.1463737502.git.maitysanchayan@gmail.com>
 References: <cover.1463737502.git.maitysanchayan@gmail.com>
-Message-ID: <f81f11d720b0f3f871a7203bde5af4d4b6f2f4fa.1463737502.git.maitysanchayan@gmail.com>
+Message-ID: <b8b03694c72f27cebf607da003ebf459d9c08f8b.1463737502.git.maitysanchayan@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a device tree node for the On-Chip ROM on Vybrid.
+Add device tree node for the OCOTP peripheral on Vybrid.
 
 Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
 ---
- arch/arm/boot/dts/vfxxx.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/vfxxx.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm/boot/dts/vfxxx.dtsi b/arch/arm/boot/dts/vfxxx.dtsi
-index 0e34d44..6c5222e 100644
+index 2c13ec6..0e34d44 100644
 --- a/arch/arm/boot/dts/vfxxx.dtsi
 +++ b/arch/arm/boot/dts/vfxxx.dtsi
-@@ -91,6 +91,11 @@
- 		interrupt-parent = <&mscm_ir>;
- 		ranges;
+@@ -520,6 +520,22 @@
+ 				status = "disabled";
+ 			};
  
-+		ocrom: ocrom at 00000000 {
-+			compatible = "fsl,vf610-ocrom", "syscon";
-+			reg = <0x00000000 0x18000>;
-+		};
++			ocotp at 400a5000 {
++				compatible = "fsl,vf610-ocotp";
++				#address-cells = <1>;
++				#size-cells = <1>;
++				reg = <0x400a5000 0xCF0>;
++				clocks = <&clks VF610_CLK_OCOTP>;
 +
- 		aips0: aips-bus at 40000000 {
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
++				ocotp_cfg0: cfg0 at 410 {
++					reg = <0x410 0x4>;
++				};
++
++				ocotp_cfg1: cfg1 at 420 {
++					reg = <0x420 0x4>;
++				};
++			};
++
+ 			snvs0: snvs at 400a7000 {
+ 			    compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
+ 				reg = <0x400a7000 0x2000>;
 -- 
 2.8.2
