@@ -1,46 +1,52 @@
-From: shawn.lin@kernel-upstream.org (Shawn Lin)
-Date: Fri, 20 May 2016 20:35:53 +0800
-Subject: [PATCH v2 3/3] ARM: dts: rockchip: fixes the spi compatible for
- rk3036
-In-Reply-To: <1463702182-5188-3-git-send-email-wxt@rock-chips.com>
-References: <1463702182-5188-1-git-send-email-wxt@rock-chips.com>
- <1463702182-5188-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <8f662b3b-e359-efdf-72e5-c4f862dd1cf6@kernel-upstream.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Fri, 20 May 2016 20:40:46 +0800
+Subject: [stericsson:earlydebug 1/1] init/main.c:490: undefined reference to
+ `printascii'
+Message-ID: <201605202044.auhsCGs8%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/5/20 7:56, Caesar Wang ??:
-> That's seem the incorrect string to match the spi driver.
->
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
+head:   7a0e86123c84ec8853d7c6ae248e911a04a81bb4
+commit: 7a0e86123c84ec8853d7c6ae248e911a04a81bb4 [1/1] uglyhack printascii
+config: alpha-defconfig (attached as .config)
+compiler: alpha-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 7a0e86123c84ec8853d7c6ae248e911a04a81bb4
+        # save the attached .config to linux build tree
+        make.cross ARCH=alpha 
 
-Will it break the backward compatibility for some dtb if not
-falling back to "rockchip,rockchip-spi" ?
+Note: the stericsson/earlydebug HEAD 7a0e86123c84ec8853d7c6ae248e911a04a81bb4 builds fine.
+      It only hurts bisectibility.
 
-> Fixes commit f629fcfab2cd
-> ("ARM: dts: rockchip: support the spi for rk3036")
->
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Cc: linux-rockchip at lists.infradead.org
->
-> ---
->
-> Changes in v2: None
->
->  arch/arm/boot/dts/rk3036.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
-> index d0f4bb7..a30700a 100644
-> --- a/arch/arm/boot/dts/rk3036.dtsi
-> +++ b/arch/arm/boot/dts/rk3036.dtsi
-> @@ -431,7 +431,7 @@
->  	};
->
->  	spi: spi at 20074000 {
-> -		compatible = "rockchip,rockchip-spi";
-> +		compatible = "rockchip,rk3036-spi";
->  		reg = <0x20074000 0x1000>;
->  		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
->  		clocks =<&cru PCLK_SPI>, <&cru SCLK_SPI>;
->
+All errors (new ones prefixed by >>):
+
+   init/built-in.o: In function `start_kernel':
+>> init/main.c:490: undefined reference to `printascii'
+>> init/main.c:490: undefined reference to `printascii'
+
+vim +490 init/main.c
+
+   484		set_task_stack_end_magic(&init_task);
+   485		smp_setup_processor_id();
+   486		debug_objects_early_init();
+   487	
+   488		{
+   489		  extern void printascii(char *);
+ > 490		  printascii("start_kernel\n");
+   491		}
+   492		/*
+   493		 * Set up the the initial canary ASAP:
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 11941 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160520/e4f54856/attachment.obj>
