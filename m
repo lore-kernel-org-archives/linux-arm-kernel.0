@@ -1,26 +1,23 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 20 May 2016 18:37:38 -0300
-Subject: Crash after 'reboot' due to 9be4fd2c7723a
-In-Reply-To: <4080948.V5DMHR9bsk@vostro.rjw.lan>
-References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
- <CAOMZO5D_-3St-jqzMLzFHRn3dXXoSZGn4APSK4F63qCP3X=FfA@mail.gmail.com>
- <4080948.V5DMHR9bsk@vostro.rjw.lan>
-Message-ID: <CAOMZO5Di3s36=B_52g=S+sWjpdNQ2GozDjeT=3n0B5jNM9z8tA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 20 May 2016 16:44:07 -0500
+Subject: [PATCH 1/2] gpio: pca953x: Add support for TI PCA9536
+In-Reply-To: <1463640450-16762-2-git-send-email-vigneshr@ti.com>
+References: <1463640450-16762-1-git-send-email-vigneshr@ti.com>
+ <1463640450-16762-2-git-send-email-vigneshr@ti.com>
+Message-ID: <20160520214407.GA18432@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+On Thu, May 19, 2016 at 12:17:29PM +0530, Vignesh R wrote:
+> TI PCA9536 is 4-Bit I2C GPIO expander without interrupt support[1].
+> Add support for the same.
+> 
+> [1] TRM: http://www.ti.com/lit/ds/symlink/pca9536.pdf
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  Documentation/devicetree/bindings/gpio/gpio-pca953x.txt | 1 +
+>  drivers/gpio/gpio-pca953x.c                             | 1 +
+>  2 files changed, 2 insertions(+)
 
-On Fri, May 20, 2016 at 6:20 PM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-
->> If I rebuilt a kernel with SMP=n then the reboot command works as expected.
->
-> Does it work if you boot with maxcpus=1 or nosmp in the kernel command line?
-
-No, it does not help.
-
-> Also, please try if the appended patch makes any difference.
-
-I tried it, and the console shows "Requesting system reboot" and stays
-there forever. No more messages after that and the system does not
-reboot.
+Acked-by: Rob Herring <robh@kernel.org>
