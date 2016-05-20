@@ -1,121 +1,264 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Fri, 20 May 2016 13:37:52 -0700
-Subject: [PATCH] soc: Move brcmstb to bcm/brcmstb
-In-Reply-To: <1463769495-10072-1-git-send-email-f.fainelli@gmail.com>
-References: <1463769495-10072-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <573F75A0.5090206@broadcom.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Fri, 20 May 2016 22:42:55 +0200
+Subject: [PATCH v8 2/4] ACPI: parse SPCR and enable matching console
+In-Reply-To: <1463749405-11640-3-git-send-email-aleksey.makarov@linaro.org>
+References: <1463749405-11640-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463749405-11640-3-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <CAJZ5v0hdoLTfjrD8+WxSoxM48dqbZK2KwY_h+63kHKHKgO=JFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-Looks good.
-
-On 16-05-20 11:38 AM, Florian Fainelli wrote:
-> Unify the different Broadcom SoCs directory and have everybody live
-> under drivers/soc/bcm/*.
+On Fri, May 20, 2016 at 3:03 PM, Aleksey Makarov
+<aleksey.makarov@linaro.org> wrote:
+> 'ARM Server Base Boot Requiremets' [1] mentions SPCR (Serial Port
+> Console Redirection Table) [2] as a mandatory ACPI table that
+> specifies the configuration of serial console.
 >
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-Acked-by: Scott Branden <scott.branden@broadcom.com>
+> Defer initialization of DT earlycon until ACPI/DT decision is made.
+>
+> Parse the ACPI SPCR table, setup earlycon if required,
+> enable specified console.
+>
+> Thanks to Peter Hurley for explaining how this should work.
+>
+> [1] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.den0044a/index.html
+> [2] https://msdn.microsoft.com/en-us/library/windows/hardware/dn639132(v=vs.85).aspx
+>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
+> Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+> Tested-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+for the ACPI part.
+
 > ---
->   drivers/soc/Kconfig                     |  1 -
->   drivers/soc/Makefile                    |  1 -
->   drivers/soc/bcm/Kconfig                 | 15 +++++++++++++++
->   drivers/soc/bcm/Makefile                |  1 +
->   drivers/soc/{ => bcm}/brcmstb/Makefile  |  0
->   drivers/soc/{ => bcm}/brcmstb/biuctrl.c |  0
->   drivers/soc/{ => bcm}/brcmstb/common.c  |  0
->   drivers/soc/brcmstb/Kconfig             | 10 ----------
->   8 files changed, 16 insertions(+), 12 deletions(-)
->   rename drivers/soc/{ => bcm}/brcmstb/Makefile (100%)
->   rename drivers/soc/{ => bcm}/brcmstb/biuctrl.c (100%)
->   rename drivers/soc/{ => bcm}/brcmstb/common.c (100%)
->   delete mode 100644 drivers/soc/brcmstb/Kconfig
+>  drivers/acpi/Kconfig          |   3 ++
+>  drivers/acpi/Makefile         |   1 +
+>  drivers/acpi/spcr.c           | 111 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/tty/serial/earlycon.c |  19 +++++++-
+>  include/linux/acpi.h          |   6 +++
+>  include/linux/serial_core.h   |   6 +++
+>  6 files changed, 144 insertions(+), 2 deletions(-)
+>  create mode 100644 drivers/acpi/spcr.c
 >
-> diff --git a/drivers/soc/Kconfig b/drivers/soc/Kconfig
-> index cb58ef0d9b2c..91d5c05d395f 100644
-> --- a/drivers/soc/Kconfig
-> +++ b/drivers/soc/Kconfig
-> @@ -1,7 +1,6 @@
->   menu "SOC (System On Chip) specific Drivers"
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index c204344..c8c02f1 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -77,6 +77,9 @@ config ACPI_DEBUGGER_USER
 >
->   source "drivers/soc/bcm/Kconfig"
-> -source "drivers/soc/brcmstb/Kconfig"
->   source "drivers/soc/fsl/qe/Kconfig"
->   source "drivers/soc/mediatek/Kconfig"
->   source "drivers/soc/qcom/Kconfig"
-> diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-> index 380230f03874..b75e3bd0a01e 100644
-> --- a/drivers/soc/Makefile
-> +++ b/drivers/soc/Makefile
-> @@ -3,7 +3,6 @@
->   #
+>  endif
 >
->   obj-y				+= bcm/
-> -obj-$(CONFIG_SOC_BRCMSTB)	+= brcmstb/
->   obj-$(CONFIG_ARCH_DOVE)		+= dove/
->   obj-$(CONFIG_MACH_DOVE)		+= dove/
->   obj-y				+= fsl/
-> diff --git a/drivers/soc/bcm/Kconfig b/drivers/soc/bcm/Kconfig
-> index 3066edea184d..97156aeed286 100644
-> --- a/drivers/soc/bcm/Kconfig
-> +++ b/drivers/soc/bcm/Kconfig
-> @@ -1,3 +1,5 @@
-> +menu "Broadcom SoC drivers"
+> +config ACPI_SPCR_TABLE
+> +       bool
 > +
->   config RASPBERRYPI_POWER
->   	bool "Raspberry Pi power domain driver"
->   	depends on ARCH_BCM2835 || COMPILE_TEST
-> @@ -7,3 +9,16 @@ config RASPBERRYPI_POWER
->   	help
->   	  This enables support for the RPi power domains which can be enabled
->   	  or disabled via the RPi firmware.
-> +
-> +config SOC_BRCMSTB
-> +	bool "Broadcom STB SoC drivers"
-> +	depends on ARM
-> +	select SOC_BUS
-> +	help
-> +	  Enables drivers for the Broadcom Set-Top Box (STB) series of chips.
-> +	  This option alone enables only some support code, while the drivers
-> +	  can be enabled individually within this menu.
-> +
-> +	  If unsure, say N.
-> +
-> +endmenu
-> diff --git a/drivers/soc/bcm/Makefile b/drivers/soc/bcm/Makefile
-> index 63aa3eb23087..dc4fced72d21 100644
-> --- a/drivers/soc/bcm/Makefile
-> +++ b/drivers/soc/bcm/Makefile
-> @@ -1 +1,2 @@
->   obj-$(CONFIG_RASPBERRYPI_POWER)	+= raspberrypi-power.o
-> +obj-$(CONFIG_SOC_BRCMSTB)	+= brcmstb/
-> diff --git a/drivers/soc/brcmstb/Makefile b/drivers/soc/bcm/brcmstb/Makefile
-> similarity index 100%
-> rename from drivers/soc/brcmstb/Makefile
-> rename to drivers/soc/bcm/brcmstb/Makefile
-> diff --git a/drivers/soc/brcmstb/biuctrl.c b/drivers/soc/bcm/brcmstb/biuctrl.c
-> similarity index 100%
-> rename from drivers/soc/brcmstb/biuctrl.c
-> rename to drivers/soc/bcm/brcmstb/biuctrl.c
-> diff --git a/drivers/soc/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
-> similarity index 100%
-> rename from drivers/soc/brcmstb/common.c
-> rename to drivers/soc/bcm/brcmstb/common.c
-> diff --git a/drivers/soc/brcmstb/Kconfig b/drivers/soc/brcmstb/Kconfig
-> deleted file mode 100644
-> index 7fec3b4c80a1..000000000000
-> --- a/drivers/soc/brcmstb/Kconfig
-> +++ /dev/null
-> @@ -1,10 +0,0 @@
-> -menuconfig SOC_BRCMSTB
-> -	bool "Broadcom STB SoC drivers"
-> -	depends on ARM
-> -	select SOC_BUS
-> -	help
-> -	  Enables drivers for the Broadcom Set-Top Box (STB) series of chips.
-> -	  This option alone enables only some support code, while the drivers
-> -	  can be enabled individually within this menu.
-> -
-> -	  If unsure, say N.
+>  config ACPI_SLEEP
+>         bool
+>         depends on SUSPEND || HIBERNATION
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 8b08e20..d0dc940 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -82,6 +82,7 @@ obj-$(CONFIG_ACPI_EC_DEBUGFS) += ec_sys.o
+>  obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
+>  obj-$(CONFIG_ACPI_BGRT)                += bgrt.o
+>  obj-$(CONFIG_ACPI_CPPC_LIB)    += cppc_acpi.o
+> +obj-$(CONFIG_ACPI_SPCR_TABLE)  += spcr.o
+>  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
 >
+>  # processor has its own "processor." module_param namespace
+> diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
+> new file mode 100644
+> index 0000000..f4cfc5c
+> --- /dev/null
+> +++ b/drivers/acpi/spcr.c
+> @@ -0,0 +1,111 @@
+> +/*
+> + * Copyright (c) 2012, Intel Corporation
+> + * Copyright (c) 2015, Red Hat, Inc.
+> + * Copyright (c) 2015, 2016 Linaro Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#define pr_fmt(fmt) "ACPI: SPCR: " fmt
+> +
+> +#include <linux/acpi.h>
+> +#include <linux/console.h>
+> +#include <linux/kernel.h>
+> +#include <linux/serial_core.h>
+> +
+> +/**
+> + * parse_spcr() - parse ACPI SPCR table and add preferred console
+> + *
+> + * @earlycon: set up earlycon for the console specified by the table
+> + *
+> + * For the architectures with support for ACPI, CONFIG_ACPI_SPCR_TABLE may be
+> + * defined to parse ACPI SPCR table.  As a result of the parsing preferred
+> + * console is registered and if @earlycon is true, earlycon is set up.
+> + *
+> + * When CONFIG_ACPI_SPCR_TABLE is defined, this function should be called
+> + * from arch inintialization code as soon as the DT/ACPI decision is made.
+> + *
+> + */
+> +int __init parse_spcr(bool earlycon)
+> +{
+> +       static char opts[64];
+> +       struct acpi_table_spcr *table;
+> +       acpi_size table_size;
+> +       acpi_status status;
+> +       char *uart;
+> +       char *iotype;
+> +       int baud_rate;
+> +       int err;
+> +
+> +       if (acpi_disabled)
+> +               return -ENODEV;
+> +
+> +       status = acpi_get_table_with_size(ACPI_SIG_SPCR, 0,
+> +                                         (struct acpi_table_header **)&table,
+> +                                         &table_size);
+> +
+> +       if (ACPI_FAILURE(status))
+> +               return -ENOENT;
+> +
+> +       if (table->header.revision < 2) {
+> +               err = -ENOENT;
+> +               pr_err("wrong table version\n");
+> +               goto done;
+> +       }
+> +
+> +       iotype = table->serial_port.space_id == ACPI_ADR_SPACE_SYSTEM_MEMORY ?
+> +                       "mmio" : "io";
+> +
+> +       switch (table->interface_type) {
+> +       case ACPI_DBG2_ARM_SBSA_32BIT:
+> +               iotype = "mmio32";
+> +               /* fall through */
+> +       case ACPI_DBG2_ARM_PL011:
+> +       case ACPI_DBG2_ARM_SBSA_GENERIC:
+> +       case ACPI_DBG2_BCM2835:
+> +               uart = "pl011";
+> +               break;
+> +       case ACPI_DBG2_16550_COMPATIBLE:
+> +       case ACPI_DBG2_16550_SUBSET:
+> +               uart = "uart";
+> +               break;
+> +       default:
+> +               err = -ENOENT;
+> +               goto done;
+> +       }
+> +
+> +       switch (table->baud_rate) {
+> +       case 3:
+> +               baud_rate = 9600;
+> +               break;
+> +       case 4:
+> +               baud_rate = 19200;
+> +               break;
+> +       case 6:
+> +               baud_rate = 57600;
+> +               break;
+> +       case 7:
+> +               baud_rate = 115200;
+> +               break;
+> +       default:
+> +               err = -ENOENT;
+> +               goto done;
+> +       }
+> +
+> +       snprintf(opts, sizeof(opts), "%s,%s,0x%llx,%d", uart, iotype,
+> +                table->serial_port.address, baud_rate);
+> +
+> +       pr_info("console: %s", opts);
+> +
+> +       if (earlycon)
+> +               setup_earlycon(opts);
+> +
+> +       err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
+> +
+> +done:
+> +       early_acpi_os_unmap_memory((void __iomem *)table, table_size);
+> +       return err;
+> +}
+> diff --git a/drivers/tty/serial/earlycon.c b/drivers/tty/serial/earlycon.c
+> index 7aae655..ea00b9f 100644
+> --- a/drivers/tty/serial/earlycon.c
+> +++ b/drivers/tty/serial/earlycon.c
+> @@ -21,6 +21,7 @@
+>  #include <linux/sizes.h>
+>  #include <linux/of.h>
+>  #include <linux/of_fdt.h>
+> +#include <linux/acpi.h>
+>
+>  #ifdef CONFIG_FIX_EARLYCON_MEM
+>  #include <asm/fixmap.h>
+> @@ -199,6 +200,14 @@ int __init setup_earlycon(char *buf)
+>         return -ENOENT;
+>  }
+>
+> +/*
+> + * When CONFIG_ACPI_SPCR_TABLE is defined, "earlycon" without parameters in
+> + * command line does not start DT earlycon immediately, instead it defers
+> + * starting it until DT/ACPI decision is made.  At that time if ACPI is enabled
+> + * call parse_spcr(), else call early_init_dt_scan_chosen_stdout()
+> + */
+> +bool earlycon_init_is_deferred __initdata;
+> +
+>  /* early_param wrapper for setup_earlycon() */
+>  static int __init param_setup_earlycon(char *buf)
+>  {
+> @@ -208,8 +217,14 @@ static int __init param_setup_earlycon(char *buf)
+>          * Just 'earlycon' is a valid param for devicetree earlycons;
+>          * don't generate a warning from parse_early_params() in that case
+>          */
+> -       if (!buf || !buf[0])
+> -               return early_init_dt_scan_chosen_stdout();
+> +       if (!buf || !buf[0]) {
+> +               if (IS_ENABLED(CONFIG_ACPI_SPCR_TABLE)) {
+> +                       earlycon_init_is_deferred = true;
+> +                       return 0;
+> +               } else {
+> +                       return early_init_dt_scan_chosen_stdout();
+> +               }
+> +       }
+>
+>         err = setup_earlycon(buf);
+>         if (err == -ENOENT || err == -EALREADY)
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 288fac5..1de43be 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -997,4 +997,10 @@ static inline struct fwnode_handle *acpi_get_next_subnode(struct device *dev,
+>  #define acpi_probe_device_table(t)     ({ int __r = 0; __r;})
+>  #endif
+>
+> +#ifdef CONFIG_ACPI_SPCR_TABLE
+> +int parse_spcr(bool earlycon);
+> +#else
+> +static inline int parse_spcr(bool earlycon) { return 0; }
+> +#endif
+> +
+>  #endif /*_LINUX_ACPI_H*/
+> diff --git a/include/linux/serial_core.h b/include/linux/serial_core.h
+> index a3d7c0d..60b6143 100644
+> --- a/include/linux/serial_core.h
+> +++ b/include/linux/serial_core.h
+> @@ -366,6 +366,12 @@ extern int of_setup_earlycon(const struct earlycon_id *match,
+>                              unsigned long node,
+>                              const char *options);
+>
+> +#ifdef CONFIG_SERIAL_EARLYCON
+> +extern bool earlycon_init_is_deferred __initdata;
+> +#else
+> +static const bool earlycon_init_is_deferred;
+> +#endif
+> +
+>  struct uart_port *uart_get_console(struct uart_port *ports, int nr,
+>                                    struct console *c);
+>  int uart_parse_earlycon(char *p, unsigned char *iotype, unsigned long *addr,
+> --
