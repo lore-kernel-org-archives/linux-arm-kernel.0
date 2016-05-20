@@ -1,75 +1,325 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 20 May 2016 11:09:00 -0500
-Subject: [PATCH] usb: echi-hcd: Add ehci_setup check before echi_shutdown
-In-Reply-To: <Pine.LNX.4.44L0.1605201156220.1938-100000@iolanthe.rowland.org>
-References: <CAPBZ5Qf6VtfGrfx1LaR5d9gL3zcBCZ_MeUpxX+E6dpi1HP+QpQ@mail.gmail.com>
- <Pine.LNX.4.44L0.1605201156220.1938-100000@iolanthe.rowland.org>
-Message-ID: <CAPBZ5Qe3EbTKSihugJ-b8HwvPyQtPXFXVyaeBjY0takuzn+d4A@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 20 May 2016 09:34:04 -0700
+Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
+ encoder
+In-Reply-To: <1463648641-6931-2-git-send-email-vigneshr@ti.com>
+References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
+ <1463648641-6931-2-git-send-email-vigneshr@ti.com>
+Message-ID: <20160520163404.GC14951@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 May 2016 at 10:57, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Fri, 20 May 2016, Andy Gross wrote:
->
->> On 20 May 2016 at 09:31, Alan Stern <stern@rowland.harvard.edu> wrote:
->> > On Thu, 19 May 2016, Andy Gross wrote:
->> >
->> >> On 19 May 2016 at 05:12, Srinivas Kandagatla
->> >> <srinivas.kandagatla@linaro.org> wrote:
->> >>
->> >> <snip>
->> >>
->> >> > +++ b/drivers/usb/host/ehci-hcd.c
->> >> > @@ -368,6 +368,15 @@ static void ehci_shutdown(struct usb_hcd *hcd)
->> >> >  {
->> >> >         struct ehci_hcd *ehci = hcd_to_ehci(hcd);
->> >> >
->> >> > +       /**
->> >> > +        * Protect the system from crashing at system shutdown in cases where
->> >> > +        * usb host is not added yet from OTG controller driver.
->> >> > +        * As ehci_setup() not done yet, so stop accessing registers or
->> >> > +        * variables initialized in ehci_setup()
->> >> > +        */
->> >> > +       if (!ehci->sbrn)
->> >> > +               return;
->> >> > +
->> >> >         spin_lock_irq(&ehci->lock);
->> >> >         ehci->shutdown = true;
->> >> >         ehci->rh_state = EHCI_RH_STOPPING;
->> >>
->> >>
->> >> Should we also not check this in ehci_suspend and ehci_resume?  If I
->> >> do suspend/resume, it crashes in a similar manner.  I know this goes
->> >> beyond the problem scope of the patch.  Perhaps I should send in an
->> >> additional patch with the code?
->> >>
->> >> Are there any other places in the ehci-hcd where this needs to be checked?
->> >
->> > Really, this is an indication that the problem lies not in ehci-hcd but
->> > rather in the platform glue code.  The platform code allows itself to
->> > be registered as the driver of the controller device but does not
->> > initialize the ehci-hcd parts.
->> >
->> > Neither ehci_suspend nor ehci_resume is called directly by the driver
->> > core; the calls all have to pass through the glue code.  So maybe the
->> > glue layer needs to be careful about invoking these routines in
->> > ehci-hcd before ehci-hcd has been initialized.
->>
->> That's a good point.  Perhaps all of this should be in the glue,
->> including the shutdown case.
->
-> Many of the platform glue files set usb_hcd_platform_shutdown() as
-> their shutdown callback, which makes it impossible for them to include
-> a controller-specific test.
+On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
+> There are rotary-encoders where GPIO lines reflect the actual position
+> of the rotary encoder dial. For example, if dial points to 9, then four
+> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
+> Add support for such rotary-encoder.
+> The driver relies on rotary-encoder,absolute-encoder DT property to
+> detect such encoders.
+> Since, GPIO IRQs are not necessary to work with
+> such encoders, optional polling mode support is added using
+> input_poll_dev skeleton. This is can be used by enabling
+> CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT.
 
-Yes, I just found this out for myself.  So in that specific case, it
-makes sense to have the check within the ehci-hcd.  Whereas in the
-glue driver, the suspend/resume use direct calls to
-ehci_suspend/resume.
+Does this really belong to a rotary encoder and not a new driver that
+simply translates gpio-encoded value into ABS* event?
 
-I'll send along a ehci-msm patch to address the issues i see with
-suspend/resume.
+> 
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>  .../devicetree/bindings/input/rotary-encoder.txt   |   4 +
+>  Documentation/input/rotary-encoder.txt             |   9 ++
+>  drivers/input/misc/Kconfig                         |  11 ++
+>  drivers/input/misc/rotary_encoder.c                | 165 ++++++++++++++++-----
+>  4 files changed, 155 insertions(+), 34 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/input/rotary-encoder.txt b/Documentation/devicetree/bindings/input/rotary-encoder.txt
+> index 6c9f0c8a846c..9c928dbd1500 100644
+> --- a/Documentation/devicetree/bindings/input/rotary-encoder.txt
+> +++ b/Documentation/devicetree/bindings/input/rotary-encoder.txt
+> @@ -12,6 +12,10 @@ Optional properties:
+>  - rotary-encoder,relative-axis: register a relative axis rather than an
+>    absolute one. Relative axis will only generate +1/-1 events on the input
+>    device, hence no steps need to be passed.
+> +- rotary-encoder,absolute-encoder: support encoders where GPIO lines
+> +  reflect the actual position of the rotary encoder dial. For example,
+> +  if dial points to 9, then four GPIO lines read HLLH(1001b = 9).
+> +  In this case, rotary-encoder,steps-per-period needed not be defined.
+>  - rotary-encoder,rollover: Automatic rollove when the rotary value becomes
+>    greater than the specified steps or smaller than 0. For absolute axis only.
+>  - rotary-encoder,steps-per-period: Number of steps (stable states) per period.
+> diff --git a/Documentation/input/rotary-encoder.txt b/Documentation/input/rotary-encoder.txt
+> index 46a74f0c551a..dc76092f5618 100644
+> --- a/Documentation/input/rotary-encoder.txt
+> +++ b/Documentation/input/rotary-encoder.txt
+> @@ -36,6 +36,15 @@ The phase diagram of these two outputs look like this:
+>                  |<>|
+>  	          one step (quarter-period mode)
+>  
+> +
+> +In some encoders, the value pointed by rotary encoders switch is directly
+> +reflected by status of the GPIOs connecting rotary encoder to CPU. For
+> +example, if rotary encoder dial points to 9, then the four GPIOs
+> +conncting rotary encoder will read HLLH(1001b = 9). Such encoders are
+> +supported by defining devictree binding "rotary-encoder,absolute-encoder".
+> +These encoders are also supported without need for event(IRQ) generation
+> +using Input subsytem's polling mode support.
+> +
+>  For more information, please see
+>  	https://en.wikipedia.org/wiki/Rotary_encoder
+>  
+> diff --git a/drivers/input/misc/Kconfig b/drivers/input/misc/Kconfig
+> index 1f2337abcf2f..81805f9a534c 100644
+> --- a/drivers/input/misc/Kconfig
+> +++ b/drivers/input/misc/Kconfig
+> @@ -566,6 +566,17 @@ config INPUT_GPIO_ROTARY_ENCODER
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called rotary_encoder.
+>  
+> +config INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
+> +	bool "Polling mode support for rotary encoder"
+> +	depends on INPUT_GPIO_ROTARY_ENCODER
+> +	select INPUT_POLLDEV
+> +	help
+> +	  Say Y here to enable polling mode support for rotary encoders
+> +	  connected to GPIO lines that do have interrupt capability and
+> +	  report rotary encoder position as absolute value over GPIO
+> +	  lines. Check file: Documentation/input/rotary-encoder.txt for
+> +	  more information.
+> +
+>  config INPUT_RB532_BUTTON
+>  	tristate "Mikrotik Routerboard 532 button interface"
+>  	depends on MIKROTIK_RB532
+> diff --git a/drivers/input/misc/rotary_encoder.c b/drivers/input/misc/rotary_encoder.c
+> index c7fc8d4fb080..8f60289fb6cd 100644
+> --- a/drivers/input/misc/rotary_encoder.c
+> +++ b/drivers/input/misc/rotary_encoder.c
+> @@ -25,24 +25,29 @@
+>  #include <linux/of.h>
+>  #include <linux/pm.h>
+>  #include <linux/property.h>
+> +#include <linux/input-polldev.h>
+>  
+>  #define DRV_NAME "rotary-encoder"
+>  
+>  struct rotary_encoder {
+>  	struct input_dev *input;
+> -
+> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
+> +	struct input_polled_dev *poll_dev;
+> +#endif
+>  	struct mutex access_mutex;
+>  
+>  	u32 steps;
+>  	u32 axis;
+>  	bool relative_axis;
+>  	bool rollover;
+> +	bool absolute_encoder;
+>  
+>  	unsigned int pos;
+>  
+>  	struct gpio_descs *gpios;
+> +	struct device *dev;
+>  
+> -	unsigned int *irq;
+> +	int *irq;
+>  
+>  	bool armed;
+>  	signed char dir;	/* 1 - clockwise, -1 - CCW */
+> @@ -67,6 +72,21 @@ static unsigned int rotary_encoder_get_state(struct rotary_encoder *encoder)
+>  	return ret & 3;
+>  }
+>  
+> +static unsigned int rotary_encoder_get_gpios_state(struct rotary_encoder
+> +						   *encoder)
+> +{
+> +	int i;
+> +	unsigned int ret = 0;
+> +
+> +	for (i = 0; i < encoder->gpios->ndescs; ++i) {
+> +		int val = gpiod_get_value_cansleep(encoder->gpios->desc[i]);
+> +
+> +		ret = ret << 1 | val;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  static void rotary_encoder_report_event(struct rotary_encoder *encoder)
+>  {
+>  	if (encoder->relative_axis) {
+> @@ -178,6 +198,72 @@ out:
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static void rotary_encoder_setup_input_params(struct rotary_encoder  *encoder)
+> +{
+> +	struct input_dev *input = encoder->input;
+> +	struct platform_device *pdev = to_platform_device(encoder->dev);
+> +
+> +	input->name = pdev->name;
+> +	input->id.bustype = BUS_HOST;
+> +	input->dev.parent = encoder->dev;
+> +
+> +	if (encoder->relative_axis)
+> +		input_set_capability(input, EV_REL, encoder->axis);
+> +	else
+> +		input_set_abs_params(input,
+> +				     encoder->axis, 0, encoder->steps, 0, 1);
+> +}
+> +
+> +static irqreturn_t rotary_absolute_encoder_irq(int irq, void *dev_id)
+> +{
+> +	struct rotary_encoder *encoder = dev_id;
+> +	unsigned int state;
+> +
+> +	mutex_lock(&encoder->access_mutex);
+> +
+> +	state = rotary_encoder_get_gpios_state(encoder);
+> +	if (state != encoder->last_stable) {
+> +		input_report_abs(encoder->input, encoder->axis, state);
+> +		input_sync(encoder->input);
+> +		encoder->last_stable = state;
+> +	}
+> +
+> +	mutex_lock(&encoder->access_mutex);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
+> +static void rotary_encoder_poll_gpios(struct input_polled_dev *poll_dev)
+> +{
+> +	struct rotary_encoder *encoder = poll_dev->private;
+> +	unsigned int state = rotary_encoder_get_gpios_state(encoder);
+> +
+> +	if (state != encoder->last_stable) {
+> +		input_report_abs(encoder->input, encoder->axis, state);
+> +		input_sync(encoder->input);
+> +		encoder->last_stable = state;
+> +	}
+> +}
+> +
+> +static int rotary_encoder_register_poll_device(struct rotary_encoder
+> +		*encoder)
+> +{
+> +	struct input_polled_dev *poll_dev =
+> +		devm_input_allocate_polled_device(encoder->dev);
+> +
+> +	if (!poll_dev)
+> +		return -ENOMEM;
+> +	poll_dev->private = encoder;
+> +	poll_dev->poll = rotary_encoder_poll_gpios;
+> +	encoder->input = poll_dev->input;
+> +	rotary_encoder_setup_input_params(encoder);
+> +	encoder->poll_dev = poll_dev;
+> +
+> +	return input_register_polled_device(poll_dev);
+> +}
+> +#endif
+> +
+>  static int rotary_encoder_probe(struct platform_device *pdev)
+>  {
+>  	struct device *dev = &pdev->dev;
+> @@ -227,38 +313,32 @@ static int rotary_encoder_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	input = devm_input_allocate_device(dev);
+> -	if (!input)
+> -		return -ENOMEM;
+> -
+> -	encoder->input = input;
+> -
+> -	input->name = pdev->name;
+> -	input->id.bustype = BUS_HOST;
+> -	input->dev.parent = dev;
+> -
+> -	if (encoder->relative_axis)
+> -		input_set_capability(input, EV_REL, encoder->axis);
+> -	else
+> -		input_set_abs_params(input,
+> -				     encoder->axis, 0, encoder->steps, 0, 1);
+> -
+> -	switch (steps_per_period >> (encoder->gpios->ndescs - 2)) {
+> -	case 4:
+> -		handler = &rotary_encoder_quarter_period_irq;
+> -		encoder->last_stable = rotary_encoder_get_state(encoder);
+> -		break;
+> -	case 2:
+> -		handler = &rotary_encoder_half_period_irq;
+> -		encoder->last_stable = rotary_encoder_get_state(encoder);
+> -		break;
+> -	case 1:
+> -		handler = &rotary_encoder_irq;
+> -		break;
+> -	default:
+> -		dev_err(dev, "'%d' is not a valid steps-per-period value\n",
+> -			steps_per_period);
+> -		return -EINVAL;
+> +	encoder->dev = dev;
+> +	encoder->absolute_encoder =
+> +		device_property_read_bool(dev,
+> +					  "rotary-encoder,absolute-encoder");
+> +	if (encoder->absolute_encoder) {
+> +		handler = rotary_absolute_encoder_irq;
+> +	} else {
+> +		switch (steps_per_period >> (encoder->gpios->ndescs - 2)) {
+> +		case 4:
+> +			handler = &rotary_encoder_quarter_period_irq;
+> +			encoder->last_stable =
+> +				rotary_encoder_get_state(encoder);
+> +			break;
+> +		case 2:
+> +			handler = &rotary_encoder_half_period_irq;
+> +			encoder->last_stable =
+> +				rotary_encoder_get_state(encoder);
+> +			break;
+> +		case 1:
+> +			handler = &rotary_encoder_irq;
+> +			break;
+> +		default:
+> +			dev_err(dev, "'%d' is not a valid steps-per-period value\n",
+> +				steps_per_period);
+> +			return -EINVAL;
+> +		}
+>  	}
+>  
+>  	encoder->irq =
+> @@ -271,6 +351,18 @@ static int rotary_encoder_probe(struct platform_device *pdev)
+>  	for (i = 0; i < encoder->gpios->ndescs; ++i) {
+>  		encoder->irq[i] = gpiod_to_irq(encoder->gpios->desc[i]);
+>  
+> +#ifdef CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT
+> +		if (encoder->irq[i] < 0 && encoder->absolute_encoder) {
+> +			dev_info(dev, "Using poll mode\n");
+> +			err = rotary_encoder_register_poll_device(encoder);
+> +			if (err) {
+> +				dev_err(dev, "failed to register poll dev\n");
+> +				return err;
+> +			}
+> +			platform_set_drvdata(pdev, encoder);
+> +			return 0;
+> +		}
+> +#endif
+>  		err = devm_request_threaded_irq(dev, encoder->irq[i],
+>  				NULL, handler,
+>  				IRQF_TRIGGER_RISING | IRQF_TRIGGER_FALLING |
+> @@ -283,6 +375,11 @@ static int rotary_encoder_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> +	input = devm_input_allocate_device(dev);
+> +	if (!input)
+> +		return -ENOMEM;
+> +	encoder->input = input;
+> +	rotary_encoder_setup_input_params(encoder);
+>  	err = input_register_device(input);
+>  	if (err) {
+>  		dev_err(dev, "failed to register input device\n");
+> -- 
+> 2.8.2
+> 
 
-Thanks!
-
-Andy
+-- 
+Dmitry
