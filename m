@@ -1,48 +1,47 @@
-From: pramod.gurav@linaro.org (Pramod Gurav)
-Date: Fri, 20 May 2016 11:39:33 +0530
-Subject: [PATCH 0/5] Qualcomm Suspend to Idle Support
-In-Reply-To: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <CANYu_0u7Q-iTDB17mmfByPULXgzqjnSQ1w_7qUg-ms9OBkdmGw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 20 May 2016 08:49:35 +0200
+Subject: [PATCH/RFC 2/3] arm64: dts: salvator-x: add Salvator-X board on
+ R8A7796 SoC
+In-Reply-To: <20160520041445.GC25184@verge.net.au>
+References: <1463629845-7115-1-git-send-email-horms+renesas@verge.net.au>
+ <1463629845-7115-3-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdVTMvDsmO1g=FNwpkvx_56guHk_V6Katj8e3qOdyQsjeQ@mail.gmail.com>
+ <20160520041445.GC25184@verge.net.au>
+Message-ID: <CAMuHMdXTrLiu5e1Ki6UXmJ1WJ1fWLFYOrmjGNfmRM9Goeha-vA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19 May 2016 at 10:30, Andy Gross <andy.gross@linaro.org> wrote:
-> This set of patches adds suspend to idle support for the Qualcomm APQ8084
-> and MSM8916 platforms.  The patches add a minimal set of suspend ops and
-> init functions to properly configure the enter_freeze function.
->
-> This patch set is based on the work done in the following:
-> [RFC v3 00/12] PM: SoC idle support using PM domains
-> http://comments.gmane.org/gmane.linux.ports.arm.msm/17966
->
-> The relevant prerequisites are the PSCI enablement DT patches.  PSCI based
-> firmware is also required for the MSM8916 to work properly.
->
-> Andy Gross (5):
->   soc: qcom: Add suspend to idle support
->   arm: defconfig: Add Qualcomm Suspend options
->   arm64: dts: msm8916: Add spc compat tag
+Hi Simon,
 
-Tested this series on DB410C. So for these three patches:
+On Fri, May 20, 2016 at 6:14 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, May 19, 2016 at 06:58:11PM +0200, Geert Uytterhoeven wrote:
+>> On Thu, May 19, 2016 at 5:50 AM, Simon Horman
+>> <horms+renesas@verge.net.au> wrote:
+>> > --- /dev/null
+>> > +++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+>> > @@ -0,0 +1,45 @@
+>>
+>> > +       chosen {
+>> > +               bootargs = "ignore_loglevel";
+>>
+>> Perhaps you want this to be consistent with the other Renesas boards?
+>>
+>> git grep bootargs -- $(git grep -l renesas, -- arch/arm*/*dts)
+>
+> I omitted "rw root=/dev/nfs ip=dhcp" which I believe should be added
+> when the board gets network and thus NFS-root support.
 
-Tested-by: Pramod Gurav <pramod.gurav@linaro.org>
+Fair enough.
 
->   ARM: dts: qcom: Remove size elements from pmic reg
->   ARM: dts: qcom: pma8084: Add pwrkey entry
->
->  arch/arm/boot/dts/qcom-pma8084.dtsi   | 20 ++++++---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi |  2 +-
->  arch/arm64/configs/defconfig          |  2 +
->  drivers/soc/qcom/Makefile             |  1 +
->  drivers/soc/qcom/suspend.c            | 77 +++++++++++++++++++++++++++++++++++
->  5 files changed, 95 insertions(+), 7 deletions(-)
->  create mode 100644 drivers/soc/qcom/suspend.c
->
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
