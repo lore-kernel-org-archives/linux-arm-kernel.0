@@ -1,27 +1,36 @@
 From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sat, 21 May 2016 13:49:24 +0200
-Subject: [PATCH 0098/1529] Fix typo
-Message-ID: <20160521114924.4453-1-andrea.gelmini@gelma.net>
+Date: Sat, 21 May 2016 13:50:13 +0200
+Subject: [PATCH 0105/1529] Fix typo
+Message-ID: <20160521115013.4816-1-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
 ---
- arch/arm/mach-imx/pm-imx5.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-omap2/mux34xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-imx/pm-imx5.c b/arch/arm/mach-imx/pm-imx5.c
-index 868781f..0d75e5f 100644
---- a/arch/arm/mach-imx/pm-imx5.c
-+++ b/arch/arm/mach-imx/pm-imx5.c
-@@ -51,7 +51,7 @@
-  * This is also the lowest power state possible without affecting
-  * non-cpu parts of the system.  For these reasons, imx5 should default
-  * to always using this state for cpu idling.  The PM_SUSPEND_STANDBY also
-- * uses this state and needs to take no action when registers remain confgiured
-+ * uses this state and needs to take no action when registers remain configured
-  * for this state.
+diff --git a/arch/arm/mach-omap2/mux34xx.c b/arch/arm/mach-omap2/mux34xx.c
+index be271f1..393e687 100644
+--- a/arch/arm/mach-omap2/mux34xx.c
++++ b/arch/arm/mach-omap2/mux34xx.c
+@@ -1266,7 +1266,7 @@ static struct omap_ball __initdata omap3_cus_ball[] = {
+ #endif
+ 
+ /*
+- * Signals different on CBB package comapared to superset
++ * Signals different on CBB package compared to superset
   */
- #define IMX5_DEFAULT_CPU_IDLE_STATE WAIT_UNCLOCKED_POWER_OFF
+ #if defined(CONFIG_OMAP_MUX) && defined(CONFIG_OMAP_PACKAGE_CBB)
+ static struct omap_mux __initdata omap3_cbb_subset[] = {
+@@ -1597,7 +1597,7 @@ static struct omap_ball __initdata omap3_cbb_ball[] = {
+ #endif
+ 
+ /*
+- * Signals different on 36XX CBP package comapared to 34XX CBC package
++ * Signals different on 36XX CBP package compared to 34XX CBC package
+  */
+ #if defined(CONFIG_OMAP_MUX) && defined(CONFIG_OMAP_PACKAGE_CBP)
+ static struct omap_mux __initdata omap36xx_cbp_subset[] = {
 -- 
 2.8.2.534.g1f66975
