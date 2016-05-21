@@ -1,27 +1,27 @@
 From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sat, 21 May 2016 13:51:36 +0200
-Subject: [PATCH 0118/1529] Fix typo
-Message-ID: <20160521115136.5547-1-andrea.gelmini@gelma.net>
+Date: Sat, 21 May 2016 13:51:43 +0200
+Subject: [PATCH 0119/1529] Fix typo
+Message-ID: <20160521115143.5598-1-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
 ---
- arch/arm/mach-s3c24xx/mach-n30.c | 2 +-
+ arch/arm/mach-s3c24xx/mach-osiris-dvs.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-s3c24xx/mach-n30.c b/arch/arm/mach-s3c24xx/mach-n30.c
-index 171c1f1..070a0d0 100644
---- a/arch/arm/mach-s3c24xx/mach-n30.c
-+++ b/arch/arm/mach-s3c24xx/mach-n30.c
-@@ -522,7 +522,7 @@ static void __init n30_hwinit(void)
- 	 *
- 	 * The pull ups for H6/H7 are enabled on N30 but not on the
- 	 * N35/PiN.  I suppose is useful for a budget model of the N30
--	 * with no bluetooh.  It doesn't hurt to have the pull ups
-+	 * with no bluetooth.  It doesn't hurt to have the pull ups
- 	 * enabled on the N35, so leave them enabled for all models.
- 	 */
- 	__raw_writel(0x0028aaaa, S3C2410_GPHCON);
+diff --git a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+index ce2db23..262ab07 100644
+--- a/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
++++ b/arch/arm/mach-s3c24xx/mach-osiris-dvs.c
+@@ -143,7 +143,7 @@ static int osiris_dvs_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
+-/* the CONFIG_PM block is so small, it isn't worth actaully compiling it
++/* the CONFIG_PM block is so small, it isn't worth actually compiling it
+  * out if the configuration isn't set. */
+ 
+ static int osiris_dvs_suspend(struct device *dev)
 -- 
 2.8.2.534.g1f66975
