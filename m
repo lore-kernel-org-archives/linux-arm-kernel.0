@@ -1,36 +1,27 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Sat, 21 May 2016 15:00:38 +0300
-Subject: [PATCH 0108/1529] Fix typo
-In-Reply-To: <20160521115032.4966-1-andrea.gelmini@gelma.net>
-References: <20160521115032.4966-1-andrea.gelmini@gelma.net>
-Message-ID: <57404DE6.7040506@gmail.com>
+From: andrea.gelmini@gelma.net (Andrea Gelmini)
+Date: Sat, 21 May 2016 13:53:00 +0200
+Subject: [PATCH 0128/1529] Fix typo
+Message-ID: <20160521115300.6081-1-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+---
+ arch/arm/probes/kprobes/opt-arm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-On 21.05.2016 14:50, Andrea Gelmini wrote:
-> Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
-> ---
->   arch/arm/mach-omap2/sdrc.h | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/sdrc.h b/arch/arm/mach-omap2/sdrc.h
-> index 645a2a4..f115006 100644
-> --- a/arch/arm/mach-omap2/sdrc.h
-> +++ b/arch/arm/mach-omap2/sdrc.h
-> @@ -175,8 +175,8 @@ u32 omap2xxx_sdrc_reprogram(u32 level, u32 force);
->    * don't adjust it down as your clock period increases the refresh interval
->    * will not be met. Setting all parameters for complete worst case may work,
->    * but may cut memory performance by 2x. Due to errata the DLLs need to be
-> - * unlocked and their value needs run time calibration.	A dynamic call is
-> - * need for that as no single right value exists acorss production samples.
-> + * unlocked and their value needs run time calibration. A dynamic call is
-> + * need for that as no single right value exists across production samples.
-
-needed?
-
->    *
->    * Only the FULL speed values are given. Current code is such that rate
->    * changes must be made at DPLLoutx2. The actual value adjustment for low
->
+diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
+index bcdecc2..b165881 100644
+--- a/arch/arm/probes/kprobes/opt-arm.c
++++ b/arch/arm/probes/kprobes/opt-arm.c
+@@ -320,7 +320,7 @@ void __kprobes arch_optimize_kprobes(struct list_head *oplist)
+ 
+ 		/*
+ 		 * Make it a conditional branch if replaced insn
+-		 * is consitional
++		 * is conditional
+ 		 */
+ 		insn = (__mem_to_opcode_arm(
+ 			  op->optinsn.copied_insn[0]) & 0xf0000000) |
+-- 
+2.8.2.534.g1f66975
