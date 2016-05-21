@@ -1,27 +1,27 @@
 From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sat, 21 May 2016 13:50:07 +0200
-Subject: [PATCH 0104/1529] Fix typo
-Message-ID: <20160521115007.4767-1-andrea.gelmini@gelma.net>
+Date: Sat, 21 May 2016 13:51:36 +0200
+Subject: [PATCH 0118/1529] Fix typo
+Message-ID: <20160521115136.5547-1-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
 ---
- arch/arm/mach-omap2/cm3xxx.c | 2 +-
+ arch/arm/mach-s3c24xx/mach-n30.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/cm3xxx.c b/arch/arm/mach-omap2/cm3xxx.c
-index 187fa43..d91ae82 100644
---- a/arch/arm/mach-omap2/cm3xxx.c
-+++ b/arch/arm/mach-omap2/cm3xxx.c
-@@ -649,7 +649,7 @@ void omap3_cm_save_scratchpad_contents(u32 *ptr)
- 	/*
- 	 * As per erratum i671, ROM code does not respect the PER DPLL
- 	 * programming scheme if CM_AUTOIDLE_PLL..AUTO_PERIPH_DPLL == 1.
--	 * Then,  in anycase, clear these bits to avoid extra latencies.
-+	 * Then,  in any case, clear these bits to avoid extra latencies.
+diff --git a/arch/arm/mach-s3c24xx/mach-n30.c b/arch/arm/mach-s3c24xx/mach-n30.c
+index 171c1f1..070a0d0 100644
+--- a/arch/arm/mach-s3c24xx/mach-n30.c
++++ b/arch/arm/mach-s3c24xx/mach-n30.c
+@@ -522,7 +522,7 @@ static void __init n30_hwinit(void)
+ 	 *
+ 	 * The pull ups for H6/H7 are enabled on N30 but not on the
+ 	 * N35/PiN.  I suppose is useful for a budget model of the N30
+-	 * with no bluetooh.  It doesn't hurt to have the pull ups
++	 * with no bluetooth.  It doesn't hurt to have the pull ups
+ 	 * enabled on the N35, so leave them enabled for all models.
  	 */
- 	*ptr++ = omap2_cm_read_mod_reg(PLL_MOD, CM_AUTOIDLE) &
- 		~OMAP3430_AUTO_PERIPH_DPLL_MASK;
+ 	__raw_writel(0x0028aaaa, S3C2410_GPHCON);
 -- 
 2.8.2.534.g1f66975
