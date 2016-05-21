@@ -1,21 +1,35 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 21 May 2016 15:55:06 +0200
-Subject: [PATCH v2 4/5] arm64: dts: rockchip: make rk3368 grf syscons
- simple-mfds as well
-In-Reply-To: <1459432126-6395-5-git-send-email-heiko@sntech.de>
-References: <1459432126-6395-1-git-send-email-heiko@sntech.de>
- <1459432126-6395-5-git-send-email-heiko@sntech.de>
-Message-ID: <2597247.kfueRAYi3v@phil>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Sat, 21 May 2016 15:09:12 +0100 (BST)
+Subject: [PATCH 0129/1529] Fix typo
+In-Reply-To: <alpine.DEB.2.10.1605211418190.2958@sstabellini-ThinkPad-X260>
+References: <20160521115307.6132-1-andrea.gelmini@gelma.net>
+ <alpine.DEB.2.10.1605211418190.2958@sstabellini-ThinkPad-X260>
+Message-ID: <alpine.DEB.2.10.1605211508460.2958@sstabellini-ThinkPad-X260>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 31. M?rz 2016, 15:48:45 schrieb Heiko Stuebner:
-> The general register files do contain a lot of separate functions and
-> while some really are only registers with a lot of different 1-bit
-> settings, there are also a lot of them containing some bigger function
-> blocks. To be able to define these as sub-devices, make them simple-mfds.
+On Sat, 21 May 2016, Stefano Stabellini wrote:
+> On Sat, 21 May 2016, Andrea Gelmini wrote:
+> > Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+> > ---
+> >  arch/arm/xen/mm.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+> > index c5f9a9e..483da5e 100644
+> > --- a/arch/arm/xen/mm.c
+> > +++ b/arch/arm/xen/mm.c
+> > @@ -150,7 +150,7 @@ bool xen_arch_need_swiotlb(struct device *dev,
+> >  	 *	- The Linux page refers to foreign memory
+> >  	 *	- The device doesn't support coherent DMA request
+> >  	 *
+> > -	 * The Linux page may be spanned acrros multiple Xen page, although
+> > +	 * The Linux page may be spanned across multiple Xen page, although
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: David Wu <david.wu@rock-chips.com>
+> Since you are at it, please also fix the lacking plural. It should be:
+> 
+> The Linux page may be spanned across multiple Xen pages, although
 
-applied for 4.8
+But given that this is patch 129 of 1529:
+
+Acked-by: Stefano Stabellini <sstabellini@kernel.org>
