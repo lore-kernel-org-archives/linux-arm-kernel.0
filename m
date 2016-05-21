@@ -1,27 +1,27 @@
 From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sat, 21 May 2016 13:47:27 +0200
-Subject: [PATCH 0081/1529] Fix typo
-Message-ID: <20160521114727.3496-1-andrea.gelmini@gelma.net>
+Date: Sat, 21 May 2016 13:47:36 +0200
+Subject: [PATCH 0082/1529] Fix typo
+Message-ID: <20160521114736.3553-1-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
 ---
- arch/arm/common/scoop.c | 2 +-
+ arch/arm/include/asm/fncpy.h | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/common/scoop.c b/arch/arm/common/scoop.c
-index 9ba45ad..5e24e06 100644
---- a/arch/arm/common/scoop.c
-+++ b/arch/arm/common/scoop.c
-@@ -27,7 +27,7 @@
-    is used which is setup by the platform code.
+diff --git a/arch/arm/include/asm/fncpy.h b/arch/arm/include/asm/fncpy.h
+index de53547..88f9c36 100644
+--- a/arch/arm/include/asm/fncpy.h
++++ b/arch/arm/include/asm/fncpy.h
+@@ -49,7 +49,7 @@
+  * copied_f(args);
+  *
+  * The size of the function to be copied can't be determined from C:
+- * this must be determined by other means, such as adding assmbler directives
++ * this must be determined by other means, such as adding assembler directives
+  * in the file where f is defined.
+  */
  
-    This file is never modular so this symbol is always
--   accessile to the board support files.
-+   accessible to the board support files.
- */
- struct scoop_pcmcia_config *platform_scoop_config;
- EXPORT_SYMBOL(platform_scoop_config);
 -- 
 2.8.2.534.g1f66975
