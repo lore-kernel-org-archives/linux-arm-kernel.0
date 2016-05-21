@@ -1,46 +1,44 @@
-From: trini@konsulko.com (Tom Rini)
-Date: Fri, 20 May 2016 21:41:59 -0400
-Subject: [U-Boot] Sharing code between Linux and bootloader (U-boot) ?
-In-Reply-To: <573F1F07.6040202@laposte.net>
-References: <573F1F07.6040202@laposte.net>
-Message-ID: <20160521014159.GK7650@bill-the-cat>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 20 May 2016 22:11:37 -0400
+Subject: [PATCH] ARM: exynos: don't select keyboard driver
+In-Reply-To: <1463581102-1007639-1-git-send-email-arnd@arndb.de>
+References: <1463581102-1007639-1-git-send-email-arnd@arndb.de>
+Message-ID: <b20eb044-f575-9504-2446-ca74df9d1724@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 04:28:23PM +0200, Sebastian Frias wrote:
+Hello Arnd,
 
-> Hi,
+On 05/18/2016 10:17 AM, Arnd Bergmann wrote:
+> The samsung-keypad driver is implicitly selected by ARCH_EXYNOS4 (why?),
+> but this fails if CONFIG_INPUT is a loadable module:
 > 
-> Some bootloaders (like U-boot) support several HW devices: serial,
-> network, NAND, USB, etc. most of which are also supported by Linux.
+> drivers/input/built-in.o: In function `samsung_keypad_remove':
+> drivers/input/keyboard/samsung-keypad.c:461: undefined reference to `input_unregister_device'
+> drivers/input/built-in.o: In function `samsung_keypad_irq':
+> drivers/input/keyboard/samsung-keypad.c:137: undefined reference to `input_event'
+> drivers/input/built-in.o: In function `samsung_keypad_irq':
+> include/linux/input.h:389: undefined reference to `input_event'
+> drivers/input/built-in.o: In function `samsung_keypad_probe':
+> drivers/input/keyboard/samsung-keypad.c:358: undefined reference to `devm_input_allocate_device'
+> drivers/input/built-in.o:(.debug_addr+0x34): undefined reference to `input_set_capability'
 > 
-> So the question is: is code shared? I mean, I understand that the
-> drivers need to talk to the appropriate API, and such API could be
-> different between Linux and U-boot.
-> But putting that aside, would it be naive to imagine that some "core"
-> functionality could be shared? Or would that part be so small it is
-> not worth the effort?
+> This removes the 'select' as suggested by Krzysztof Kozlowski and
+> instead enables the driver from the defconfig files.
 > 
-> Since many companies use both, U-boot and Linux, I would figure they
-> try their best to optimize engineering resources and share code,
-> right?
-> In that case, I also wonder how do they share DT descriptions that
-> right now are being stored in the Linux kernel tree.
+> The problem does not happen on mainline kernels, as we don't normally
+> build built-in input drivers when CONFIG_INPUT=m, but I am experimenting
+> with a patch to change this, and the samsung keypad driver showed up
+> as one example that was silently broken before.
 > 
-> We'd like to share code/DT for obvious reasons, what would you guys
-> suggest?
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Link: https://lkml.org/lkml/2016/2/14/55
+> ---
 
-So, in all cases, Linux is always the primary.  In some cases in U-Boot
-we port drivers over (NAND is a good example here).  In other cases,
-things are similar enough that it's having done it in one place it's
-easy enough to do it again in the other.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
+Best regards,
 -- 
-Tom
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160520/085f7137/attachment.sig>
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
