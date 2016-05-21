@@ -1,38 +1,39 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 21 May 2016 14:14:27 +0200
-Subject: [PATCH 0114/1529] Fix typo
-In-Reply-To: <20160521115109.5318-1-andrea.gelmini@gelma.net>
-References: <20160521115109.5318-1-andrea.gelmini@gelma.net>
-Message-ID: <1785036.RoNATgRSre@phil>
+From: andrea.gelmini@gelma.net (Andrea Gelmini)
+Date: Sat, 21 May 2016 12:21:57 +0000
+Subject: [PATCH 0085/1529] Fix typo
+In-Reply-To: <20160521115556.GV19428@n2100.arm.linux.org.uk>
+References: <20160521114759.3760-1-andrea.gelmini@gelma.net>
+ <20160521115556.GV19428@n2100.arm.linux.org.uk>
+Message-ID: <20160521122157.GA6289@li61-168.members.linode.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrea,
-
-Am Samstag, 21. Mai 2016, 13:51:09 schrieb Andrea Gelmini:
-> Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
-
-A series of 1529 patches? That's a bit extreme.
-
-Also in future please use a sane subject line and additionally see comment 
-below making the patch not valid.
-
-> ---
->  arch/arm/mach-rockchip/pm.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Sat, May 21, 2016 at 12:55:56PM +0100, Russell King - ARM Linux wrote:
+> On Sat, May 21, 2016 at 01:47:59PM +0200, Andrea Gelmini wrote:
+> > Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+> > ---
+> >  arch/arm/include/asm/ucontext.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/include/asm/ucontext.h b/arch/arm/include/asm/ucontext.h
+> > index 14749ae..b4d2d0f 100644
+> > --- a/arch/arm/include/asm/ucontext.h
+> > +++ b/arch/arm/include/asm/ucontext.h
+> > @@ -8,7 +8,7 @@
+> >   * ucontext now has room for all registers which need to be saved and
+> >   * restored.  Coprocessor registers are stored in uc_regspace.  Each
+> >   * coprocessor's saved state should start with a documented 32-bit magic
+> > - * number, followed by a 32-bit word giving the coproccesor's saved size.
+> > + * number, followed by a 32-bit word giving the coprocessor saved size.
 > 
-> diff --git a/arch/arm/mach-rockchip/pm.c b/arch/arm/mach-rockchip/pm.c
-> index bee8c80..309d672 100644
-> --- a/arch/arm/mach-rockchip/pm.c
-> +++ b/arch/arm/mach-rockchip/pm.c
-> @@ -280,7 +280,7 @@ static int rk3288_suspend_init(struct device_node *np)
-> 
->  	rk3288_config_bootdata();
-> 
-> -	/* copy resume code and data to bootsram */
-> +	/* copy resume code and data to bootram */
+> The original is fine, and I'd say is more correct.
 
-this is _not_ a typo, it is sram not regular ram
+My point was about the spelling: coproccesor (double C, single S).
 
->  	memcpy(rk3288_bootram_base, rockchip_slp_cpu_resume,
->  	       rk3288_bootram_sz);
+I don't resend a new version of the patch.
+My interest is notify it, don't care to have commit in kernel for such
+little thing.
+I guess is easier if you fix it with next batch of your patches.
+
+Bye,
+Andrea
