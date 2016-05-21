@@ -1,27 +1,27 @@
 From: andrea.gelmini@gelma.net (Andrea Gelmini)
-Date: Sat, 21 May 2016 13:53:00 +0200
-Subject: [PATCH 0128/1529] Fix typo
-Message-ID: <20160521115300.6081-1-andrea.gelmini@gelma.net>
+Date: Sat, 21 May 2016 13:53:07 +0200
+Subject: [PATCH 0129/1529] Fix typo
+Message-ID: <20160521115307.6132-1-andrea.gelmini@gelma.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
 ---
- arch/arm/probes/kprobes/opt-arm.c | 2 +-
+ arch/arm/xen/mm.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/probes/kprobes/opt-arm.c b/arch/arm/probes/kprobes/opt-arm.c
-index bcdecc2..b165881 100644
---- a/arch/arm/probes/kprobes/opt-arm.c
-+++ b/arch/arm/probes/kprobes/opt-arm.c
-@@ -320,7 +320,7 @@ void __kprobes arch_optimize_kprobes(struct list_head *oplist)
- 
- 		/*
- 		 * Make it a conditional branch if replaced insn
--		 * is consitional
-+		 * is conditional
- 		 */
- 		insn = (__mem_to_opcode_arm(
- 			  op->optinsn.copied_insn[0]) & 0xf0000000) |
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index c5f9a9e..483da5e 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -150,7 +150,7 @@ bool xen_arch_need_swiotlb(struct device *dev,
+ 	 *	- The Linux page refers to foreign memory
+ 	 *	- The device doesn't support coherent DMA request
+ 	 *
+-	 * The Linux page may be spanned acrros multiple Xen page, although
++	 * The Linux page may be spanned across multiple Xen page, although
+ 	 * it's not possible to have a mix of local and foreign Xen page.
+ 	 * Furthermore, range_straddles_page_boundary is already checking
+ 	 * if buffer is physically contiguous in the host RAM.
 -- 
 2.8.2.534.g1f66975
