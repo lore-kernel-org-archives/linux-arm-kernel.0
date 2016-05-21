@@ -1,35 +1,54 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Sat, 21 May 2016 15:09:12 +0100 (BST)
-Subject: [PATCH 0129/1529] Fix typo
-In-Reply-To: <alpine.DEB.2.10.1605211418190.2958@sstabellini-ThinkPad-X260>
-References: <20160521115307.6132-1-andrea.gelmini@gelma.net>
- <alpine.DEB.2.10.1605211418190.2958@sstabellini-ThinkPad-X260>
-Message-ID: <alpine.DEB.2.10.1605211508460.2958@sstabellini-ThinkPad-X260>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 21 May 2016 22:46:38 +0800
+Subject: [arm-platforms:kvm-arm64/vgic-fixes-4.7 5/6]
+ arch/arm64/kvm/sys_regs.c:144:3: error: 'struct sys_reg_params' has no
+ member named 'retval'
+Message-ID: <201605212236.l8y8YZJr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 21 May 2016, Stefano Stabellini wrote:
-> On Sat, 21 May 2016, Andrea Gelmini wrote:
-> > Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
-> > ---
-> >  arch/arm/xen/mm.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
-> > index c5f9a9e..483da5e 100644
-> > --- a/arch/arm/xen/mm.c
-> > +++ b/arch/arm/xen/mm.c
-> > @@ -150,7 +150,7 @@ bool xen_arch_need_swiotlb(struct device *dev,
-> >  	 *	- The Linux page refers to foreign memory
-> >  	 *	- The device doesn't support coherent DMA request
-> >  	 *
-> > -	 * The Linux page may be spanned acrros multiple Xen page, although
-> > +	 * The Linux page may be spanned across multiple Xen page, although
-> 
-> Since you are at it, please also fix the lacking plural. It should be:
-> 
-> The Linux page may be spanned across multiple Xen pages, although
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vgic-fixes-4.7
+head:   1ff896af0190c4244ceab0658407da5095b40076
+commit: 3320e0e2679738f8f46310412410786f379ad095 [5/6] arm64: KVM: Make ICC_SRE_EL1 access return the configured SRE value
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 3320e0e2679738f8f46310412410786f379ad095
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-But given that this is patch 129 of 1529:
+Note: the arm-platforms/kvm-arm64/vgic-fixes-4.7 HEAD 1ff896af0190c4244ceab0658407da5095b40076 builds fine.
+      It only hurts bisectibility.
 
-Acked-by: Stefano Stabellini <sstabellini@kernel.org>
+All errors (new ones prefixed by >>):
+
+   arch/arm64/kvm/sys_regs.c: In function 'access_gic_sre':
+>> arch/arm64/kvm/sys_regs.c:144:3: error: 'struct sys_reg_params' has no member named 'retval'
+     p->retval = vcpu->arch.vgic_cpu.vgic_v3.vgic_sre;
+      ^
+
+vim +144 arch/arm64/kvm/sys_regs.c
+
+   138				   struct sys_reg_params *p,
+   139				   const struct sys_reg_desc *r)
+   140	{
+   141		if (p->is_write)
+   142			return ignore_write(vcpu, p);
+   143	
+ > 144		p->retval = vcpu->arch.vgic_cpu.vgic_v3.vgic_sre;
+   145		return true;
+   146	}
+   147	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 22498 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160521/cb12f761/attachment-0001.obj>
