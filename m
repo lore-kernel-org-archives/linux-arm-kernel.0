@@ -1,147 +1,161 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Sun, 22 May 2016 18:59:26 +0200
-Subject: sunxi spi clock problem
-In-Reply-To: <CAOMqctRS6sEcQ9sy7dqX_TH4gsRiywCN1nUJiQtXAa7NtoboOw@mail.gmail.com>
-References: <CAOMqctQKNWz3mYPMModLTZ-hj38GxHqa3mBmDhbfTZz0zJ-CUw@mail.gmail.com>
- <CAGb2v64gYov-tKENkeu0Mf+-qev49JnmR-Q94YvOMHwHti3djQ@mail.gmail.com>
- <CAOMqctRS6sEcQ9sy7dqX_TH4gsRiywCN1nUJiQtXAa7NtoboOw@mail.gmail.com>
-Message-ID: <CAOMqctSt613dRA5=Ss=rA8-8L+vHJ9YK_m4SMdqV7DxTymXxNQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 22 May 2016 21:20:58 +0200
+Subject: [PATCH 05/16] clk: sunxi-ng: Add mux clock support
+In-Reply-To: <CAGb2v66FShuDB_YH37x+VymjrpD+Q9OA2D=b3=MyaLkfFySvmQ@mail.gmail.com>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66FShuDB_YH37x+VymjrpD+Q9OA2D=b3=MyaLkfFySvmQ@mail.gmail.com>
+Message-ID: <20160522192058.GY27618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 May 2016 at 18:41, Michal Suchanek <hramrach@gmail.com> wrote:
-> Hello,
->
-> The debugfs output shows that spi2 is reparented under pll5 and the
-> pll5 frequency remains unchanged.
->
-> The request to get a 2GHz clock for spi is fulfilled on best-effort
-> basis by giving the 864MHz pll5 clock which should theoretically
-> result in 432MHz SPI clock.
->
-> On 22 May 2016 at 16:58, Chen-Yu Tsai <wens@csie.org> wrote:
->> Hi,
->>
->> On Sun, May 22, 2016 at 10:18 PM, Michal Suchanek <hramrach@gmail.com> wrote:
->>> Hello,
->>>
->>> I tried running a spidev test program on linux 4.6 and I uncovered a
->>> problem with the sunxi clk framework.
->>>
->>> Basically the system would lock up after running the test program.
->>>
->>> Digging deeper I found that it locks up with commit
->>> [47284e3e0f3c427c93f8583549b6c938e8a18015] spi: sun4i: allow transfers
->>> to set transmission speed
->>>
->>> This exposes a problem with the test program. I try to set the SPI
->>> sped to 1MHz but at other place the speed is multiplied by 1000 to
->>> save typing zeros so the actual requested speed is 1GHz. This commit
->>> probably allows that request to propagate leading to the observed
->>> system lockup.
->>>
->>> Given the parents OSC24M, pll6 and pll5 one of pll6 and pll5 is
->>> probably set up at 2GHz (or both in turn because due to some rounding
->>> neither goes fully up to 2GHz resulting in 864000000 SPI clock). Then
->>> the system locks up.
->>
->> IIRC the mod clock does not propagate rate changes up the tree.
->> But some output from the debugfs would be helpful. See below.
->>
->>>
->>> I can limit the speed in the SPI driver which is rated at 100MHz in
->>> SoC manual (giving 200MHz pll) but the clk driver should probably
->>> limit the clock setting to sane speeds itself.
->>>
->>> I am not familiar with the sunxi-clk code and it has unfortunately no
->>> debug prints which would show what is programmed to what speed.
->>
->> You can use /sys/kernel/debug/clk/clk_summary, provided you have
->> debugfs built in and mounted.
->
-> root at a10s:~/spidisp# ./spitest -d -s 1000000 /dev/spidev2.0
-> Debug mode.
-> /dev/spidev2.0: spi mode 0x0, 8 bits per word, 1000000000 Hz max
-> Sending 00
->    clock                         enable_cnt  prepare_cnt        rate
-> accuracy   phase
-> ----------------------------------------------------------------------------------------
->  osc32k                                   0            0       32768
->        0 0
->  osc24M                                   6            6    24000000
->        0 0
->     ir0                                   0            0    24000000
->        0 0
->     spi2                                  0            0    24000000
->        0 0
->     spi1                                  0            0    24000000
->        0 0
->     spi0                                  0            0    24000000
->        0 0
-> ...
-> spi_master spi2: spi2.0: timeout transferring 1 bytes at 1000000000Hz for
-> 100(100)ms
-> spidev spi2.0: SPI transfer failed: -110
-> spi_master spi2: failed to transfer one message from queue
-> ...
->     pll5                                  1            1   864000000
->        0 0
->        pll5_other                         0            0   864000000
->        0 0
->        pll5_ddr                           1            1   432000000
->        0 0
-> ...
-> xfer: Connection timed out
-> buffer size: 1, result -110
-> buffer size: 1, result -110, Connection timed out
-> Sending
->    clock                         enable_cnt  prepare_cnt        rate
-> accuracy   phase
-> ----------------------------------------------------------------------------------------
->  osc32k                                   0            0       32768
->        0 0
->  osc24M                                   6            6    24000000
->        0 0
->     ir0                                   0            0    24000000
->        0 0
->     spi1                                  0            0    24000000
->        0 0
->     spi0                                  0            0    24000000
->        0 0
->     ss                                    0            0    24000000
->        0 0
-> ...
->     pll5                                  1            1   864000000
->        0 0
->        pll5_other                         0            0   864000000
->        0 0
->           spi2                            0            0   864000000
->        0 0
->        pll5_ddr                           1            1   432000000
->        0 0
-> ...
-> maximum buffer size: 0
-> Sending 9f 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
-> ...
->     pll5                                  1            1   864000000
->        0 0
->        pll5_other                         0            0   864000000
->        0 0
->           spi2                            0            0   864000000
->        0 0
->        pll5_ddr                           1            1   432000000
->        0 0
->     pll4                                  0            0   384000000
->        0 0
->     pll2-prediv                           0
->
-> The system locks up here before finishing the output from debugfs and
-> actually starting the transfer printed above.
->
+Hi,
 
-Actually the serial console speed is limited so the system might be
-doing something else already while transferring this debug output.
+On Sun, May 22, 2016 at 12:18:26AM +0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> On Mon, May 9, 2016 at 4:01 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Some clocks in the Allwinner SoCs clocks unit are just muxes.
+> >
+> > However, those muxes might also be found in some other complicated clocks
+> > that would benefit from the code in there to deal with "advanced" features,
+> > like pre-dividers.
+> >
+> > Introduce a set of helpers to reduce the code duplication in such cases.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi-ng/Makefile  |   1 +
+> >  drivers/clk/sunxi-ng/ccu_mux.c | 187 +++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/sunxi-ng/ccu_mux.h |  80 +++++++++++++++++-
+> >  3 files changed, 264 insertions(+), 4 deletions(-)
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu_mux.c
+> >
+> > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> > index fc01127b3b45..aa5c411ff8ea 100644
+> > --- a/drivers/clk/sunxi-ng/Makefile
+> > +++ b/drivers/clk/sunxi-ng/Makefile
+> > @@ -3,3 +3,4 @@ obj-y += ccu_reset.o
+> >
+> >  obj-y += ccu_fixed_factor.o
+> >  obj-y += ccu_gate.o
+> > +obj-y += ccu_mux.o
+> > diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+> > new file mode 100644
+> > index 000000000000..cb54a8931de3
+> > --- /dev/null
+> > +++ b/drivers/clk/sunxi-ng/ccu_mux.c
+> > @@ -0,0 +1,187 @@
+> > +/*
+> > + * Copyright (C) 2016 Maxime Ripard
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/clk-provider.h>
+> > +
+> > +#include "ccu_gate.h"
+> > +#include "ccu_mux.h"
+> > +
+> > +void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
+> > +                                            struct ccu_mux_internal *cm,
+> > +                                            int parent_index,
+> > +                                            unsigned long *parent_rate)
+> > +{
+> > +       u8 prediv = 1;
+> > +       u32 reg;
+> > +
+> > +       if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
+> > +             (common->features & CCU_FEATURE_VARIABLE_PREDIV)))
+> > +               return;
+> > +
+> > +       reg = readl(common->base + common->reg);
+> > +       if (parent_index < 0) {
+> > +               parent_index = reg >> cm->shift;
+> > +               parent_index &= (1 << cm->width) - 1;
+> > +       }
+> > +
+> > +       if (common->features & CCU_FEATURE_FIXED_PREDIV)
+> > +               if (parent_index == cm->fixed_prediv.index)
+> > +                       prediv = cm->fixed_prediv.div;
+> > +
+> > +       if (common->features & CCU_FEATURE_VARIABLE_PREDIV)
+> > +               if (parent_index == cm->variable_prediv.index) {
+> > +                       u8 div;
+> > +
+> > +                       div = reg >> cm->variable_prediv.shift;
+> > +                       div &= (1 << cm->variable_prediv.width) - 1;
+> > +                       prediv = div + 1;
+> > +               }
+> > +
+> > +       *parent_rate = *parent_rate / prediv;
+> > +}
+> > +
+> > +int ccu_mux_helper_determine_rate(struct ccu_common *common,
+> > +                                 struct ccu_mux_internal *cm,
+> > +                                 struct clk_rate_request *req,
+> > +                                 unsigned long (*round)(struct ccu_mux_internal *,
+> > +                                                        unsigned long,
+> > +                                                        unsigned long,
+> > +                                                        void *),
+> > +                                 void *data)
+> > +{
+> > +       unsigned long best_parent_rate = 0, best_rate = 0;
+> > +       struct clk_hw *best_parent, *hw = &common->hw;
+> > +       unsigned int i;
+> > +
+> > +       for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
+> > +               unsigned long tmp_rate, parent_rate;
+> > +               struct clk_hw *parent;
+> > +
+> > +               parent = clk_hw_get_parent_by_index(hw, i);
+> > +               if (!parent)
+> > +                       continue;
+> > +
+> > +               parent_rate = clk_hw_get_rate(parent);
+> 
+> Using clk-mux.c as a reference, you should honor CLK_SET_RATE_PARENT here.
+> 
+> > +               ccu_mux_helper_adjust_parent_for_prediv(common, cm, i,
+> > +                                                       &parent_rate);
+> 
+> ccu_mux_helper_adjust_parent_for_prediv can modify parent_rate. You
+> should probably save a copy...
+> 
+> > +
+> > +               tmp_rate = round(cm, clk_hw_get_rate(parent), req->rate, data);
+> > +               if (tmp_rate == req->rate) {
+> > +                       best_parent = parent;
+> > +                       best_parent_rate = parent_rate;
+> 
+> ... to assign to best_parent_rate. The returned best_parent_rate is used
+> to change the parent clock rate. This happens if CLK_SET_RATE_PARENT is set.
+> The CCF doesn't know about our predivs, so you should pass back the original
+> rate, not the one after the prediv.
+>
+> I suppose you didn't run into problems as CLK_SET_RATE_PARENT was not used
+> anywhere?
 
-Thanks
+Probably, yes. You do have a good point, but I'm a bit unconfident
+merging some code that hasn't been tested, and will probably end up
+broken anyway. This is always something that we can add later.
 
-Michal
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160522/43ff552c/attachment.sig>
