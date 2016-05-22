@@ -1,40 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 22 May 2016 21:22:19 +0200
-Subject: [PATCH 08/16] clk: sunxi-ng: Add M-factor clock support
-In-Reply-To: <CAGb2v67wqsLR9QoMihSS6dkqqtyed=HqyBMJEp4adNm_xF-26Q@mail.gmail.com>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-9-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v67wqsLR9QoMihSS6dkqqtyed=HqyBMJEp4adNm_xF-26Q@mail.gmail.com>
-Message-ID: <20160522192219.GZ27618@lukather>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 22 May 2016 22:16:15 +0200
+Subject: [PATCH 0096/1529] Fix typo
+In-Reply-To: <20160521114912.4331-1-andrea.gelmini@gelma.net>
+References: <20160521114912.4331-1-andrea.gelmini@gelma.net>
+Message-ID: <20160522201615.GD23704@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 22, 2016 at 01:09:09AM +0800, Chen-Yu Tsai wrote:
-> Hi,
-> 
-> On Mon, May 9, 2016 at 4:01 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Introduce support for clocks that divide by a linear factor.
-> 
-> I think we can have just one implementation for single divide factor
-> (either P or M)
-> clocks, using the CCF divider helpers. Even the divider table clock
-> could be merged
-> in.
+Hello Andrea,
 
-This is a good point, I'll merge the drivers.
+On Sat, May 21, 2016 at 01:49:12PM +0200, Andrea Gelmini wrote:
+> Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+> ---
+>  arch/arm/mach-imx/hardware.h | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
+> index d737f95..026441c 100644
+> --- a/arch/arm/mach-imx/hardware.h
+> +++ b/arch/arm/mach-imx/hardware.h
+> @@ -121,7 +121,7 @@
+>  	.type = _type,							\
+>  }
+>  
+> -/* There's a off-by-one betweem the gpio bank number and the gpiochip */
+> +/* There's a off-by-one between the gpio bank number and the gpiochip */
 
-Thanks!
-Maxime
+maybe fix s/a/an/ in the same go? And I'd suggest to squash your patches
+by directory (here: arch/arm/mach-imx or even arch/arm/mach-*) and add a
+commit log that could for example mention the tool you used to find and
+fix these typos.
+
+Best regards
+Uwe
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160522/0aa79e59/attachment.sig>
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
