@@ -1,193 +1,232 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 May 2016 10:28:24 +0900
-Subject: [PATCH v2 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC support
-In-Reply-To: <1463966906-15129-1-git-send-email-horms+renesas@verge.net.au>
-References: <1463966906-15129-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1463966906-15129-2-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 23 May 2016 10:28:23 +0900
+Subject: [PATCH v2 0/3] arm64: Add Renesas R8A7796 SoC support
+Message-ID: <1463966906-15129-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basic support for the Gen 3 R-Car M3-W SoC.
+Hi,
 
-Based on work for the r8a7795 and r8a7796 SoCs by
-Takeshi Kihara, Dirk Behme and Geert Uytterhoeven.
+this short series aims to add basic support for the
+Gen 3 R-Car M3-W (r8a7796) SoC.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-v2
-* As suggested by Geert Uytterhoeven
-  - Move L2_CA57 node under cpus node and include reg property
-  - Omit status = "disabled" from scif_clk node
----
+It has few bells and whistles but is sufficient to bring up
+an r8a7795/salvator-x. I have provided a boot-log at the bottom
+of this email in case it is of interest.
+
+
+Dependency:
+
+"[PATCH 0/4] clk: renesas: cpg-mssr: Add support for R-Car M3-W"
+
+
+Availability:
+
+In order to aid review this series, its dependency (above)
+and the related patch "serial: sh-sci: Document SoC specific bindings for
+r8a7796", which has been posted separately, are available at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git topic/r8a7796-v2
+
+To be entirely clear, at the time of writing I have _not_ queued up this
+series for mainline.
+
+
+Changes since v1:
+* Move L2_CA57 node under cpus node and include reg property
+* Omit status = "disabled" from scif_clk node
+* Accumulate Ack and Reviewed-by tags
+
+
+Simon Horman (1):
+  arm64: dts: r8a7796: Add Renesas R8A7796 SoC support
+
+Takeshi Kihara (2):
+  arm64: dts: salvator-x: add Salvator-X board on R8A7796 SoC
+  arm64: defconfig: enable Renesas R8A7796 SoC
+
  Documentation/devicetree/bindings/arm/shmobile.txt |   4 +
  arch/arm64/Kconfig.platforms                       |   6 ++
+ arch/arm64/boot/dts/renesas/Makefile               |   1 +
+ arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts |  45 ++++++++
  arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 120 +++++++++++++++++++++
- 3 files changed, 130 insertions(+)
+ arch/arm64/configs/defconfig                       |   1 +
+ 6 files changed, 177 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
  create mode 100644 arch/arm64/boot/dts/renesas/r8a7796.dtsi
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 9cf67e48f222..d5ed554830d7 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -29,6 +29,8 @@ SoCs:
-     compatible = "renesas,r8a7794"
-   - R-Car H3 (R8A77950)
-     compatible = "renesas,r8a7795"
-+  - R-Car M3-W (R8A77960)
-+    compatible = "renesas,r8a7796"
- 
- 
- Boards:
-@@ -61,5 +63,7 @@ Boards:
-     compatible = "renesas,porter", "renesas,r8a7791"
-   - Salvator-X (RTP0RC7795SIPB0010S)
-     compatible = "renesas,salvator-x", "renesas,r8a7795";
-+  - Salvator-X
-+    compatible = "renesas,salvator-x", "renesas,r8a7796";
-   - SILK (RTP0RC7794LCB00011S)
-     compatible = "renesas,silk", "renesas,r8a7794"
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index efa77c146415..16d8d26839ea 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -114,6 +114,12 @@ config ARCH_R8A7795
- 	help
- 	  This enables support for the Renesas R-Car H3 SoC.
- 
-+config ARCH_R8A7796
-+	bool "Renesas R-Car M3-W SoC Platform"
-+	depends on ARCH_RENESAS
-+	help
-+	  This enables support for the Renesas R-Car M3-W SoC.
-+
- config ARCH_STRATIX10
- 	bool "Altera's Stratix 10 SoCFPGA Family"
- 	help
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-new file mode 100644
-index 000000000000..43d42a55119c
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -0,0 +1,120 @@
-+/*
-+ * Device Tree Source for the r8a7796 SoC
-+ *
-+ * Copyright (C) 2016 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+#include <dt-bindings/clock/r8a7796-cpg-mssr.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "renesas,r8a7796";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	psci {
-+		compatible = "arm,psci-1.0";
-+		method = "smc";
-+	};
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		/* 1 core only at this point */
-+		a57_0: cpu at 0 {
-+			compatible = "arm,cortex-a57", "arm,armv8";
-+			reg = <0x0>;
-+			device_type = "cpu";
-+			next-level-cache = <&L2_CA57>;
-+			enable-method = "psci";
-+		};
-+
-+		L2_CA57: cache-controller at 0 {
-+			compatible = "cache";
-+			reg = <0>;
-+			cache-unified;
-+			cache-level = <2>;
-+		};
-+	};
-+
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	extalr_clk: extalr {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External SCIF clock - to be overridden by boards that provide it */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at 0xf1010000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			#address-cells = <0>;
-+			interrupt-controller;
-+			reg = <0x0 0xf1010000 0 0x1000>,
-+			      <0x0 0xf1020000 0 0x20000>,
-+			      <0x0 0xf1040000 0 0x20000>,
-+			      <0x0 0xf1060000 0 0x20000>;
-+			interrupts = <GIC_PPI 9
-+					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		timer {
-+			compatible = "arm,armv8-timer";
-+			interrupts = <GIC_PPI 13
-+					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14
-+					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11
-+					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10
-+					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
-+		};
-+
-+		cpg: clock-controller at e6150000 {
-+			compatible = "renesas,r8a7796-cpg-mssr";
-+			reg = <0 0xe6150000 0 0x1000>;
-+			clocks = <&extal_clk>, <&extalr_clk>;
-+			clock-names = "extal", "extalr";
-+			#clock-cells = <2>;
-+			#power-domain-cells = <0>;
-+		};
-+
-+		scif2: serial at e6e88000 {
-+			compatible = "renesas,scif-r8a7796",
-+				     "renesas,rcar-gen3-scif", "renesas,scif";
-+			reg = <0 0xe6e88000 0 64>;
-+			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 310>,
-+				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			power-domains = <&cpg>;
-+			status = "disabled";
-+		};
-+	};
-+};
--- 
-2.1.4
+
+Boot Log:
+
+The following boot log was generated by booting this patch set,
+in its form in the topic/r8a7796 branch. It was compiled using
+the ARM64 defconfig with initrd enabled to provide a working userspace.
+
+
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 4.6.0-rc1+ (horms at ayumi.isobedori.kobe.vergenet.net) (gcc version 4.8.5 (Linaro GCC 4.8-2015.06) ) #147 SMP PREEMPT Mon May 23 10:16:34 JST 2016
+[    0.000000] Boot CPU: AArch64 Processor [411fd073]
+[    0.000000] debug: ignoring loglevel setting.
+[    0.000000] efi: Getting EFI parameters from FDT:
+[    0.000000] efi: UEFI not found.
+[    0.000000] cma: Reserved 16 MiB at 0x00000000bf000000
+[    0.000000] On node 0 totalpages: 1015808
+[    0.000000]   DMA zone: 7680 pages used for memmap
+[    0.000000]   DMA zone: 0 pages reserved
+[    0.000000]   DMA zone: 491520 pages, LIFO batch:31
+[    0.000000]   Normal zone: 8192 pages used for memmap
+[    0.000000]   Normal zone: 524288 pages, LIFO batch:31
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: PSCIv1.0 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+[    0.000000] psci: Trusted OS migration not required
+[    0.000000] percpu: Embedded 20 pages/cpu @ffffffc63ffad000 s43008 r8192 d30720 u81920
+[    0.000000] pcpu-alloc: s43008 r8192 d30720 u81920 alloc=20*4096
+[    0.000000] pcpu-alloc: [0] 0 
+[    0.000000] Detected PIPT I-cache on CPU0
+[    0.000000] Built 1 zonelists in Zone order, mobility grouping on.  Total pages: 999936
+[    0.000000] Kernel command line: ignore_loglevel rw root=/dev/nfs ip=dhcp nfsroot=10.3.3.135:/srv/nfs/salvator-x-arm64
+[    0.000000] PID hash table entries: 4096 (order: 3, 32768 bytes)
+[    0.000000] Dentry cache hash table entries: 524288 (order: 10, 4194304 bytes)
+[    0.000000] Inode-cache hash table entries: 262144 (order: 9, 2097152 bytes)
+[    0.000000] software IO TLB [mem 0xbafff000-0xbefff000] (64MB) mapped at [ffffffc07afff000-ffffffc07effefff]
+[    0.000000] Memory: 3896020K/4063232K available (6796K kernel code, 619K rwdata, 2880K rodata, 2256K init, 241K bss, 150828K reserved, 16384K cma-reserved)
+[    0.000000] Virtual kernel memory layout:
+[    0.000000]     modules : 0xffffff8000000000 - 0xffffff8008000000   (   128 MB)
+[    0.000000]     vmalloc : 0xffffff8008000000 - 0xffffffbdbfff0000   (   246 GB)
+[    0.000000]       .text : 0xffffff8008080000 - 0xffffff8008721000   (  6788 KB)
+[    0.000000]     .rodata : 0xffffff8008721000 - 0xffffff80089f5000   (  2896 KB)
+[    0.000000]       .init : 0xffffff80089f5000 - 0xffffff8008c29000   (  2256 KB)
+[    0.000000]       .data : 0xffffff8008c29000 - 0xffffff8008cc3e00   (   620 KB)
+[    0.000000]     vmemmap : 0xffffffbdc0000000 - 0xffffffbfc0000000   (     8 GB maximum)
+[    0.000000]               0xffffffbdc0200000 - 0xffffffbdd9000000   (   398 MB actual)
+[    0.000000]     fixed   : 0xffffffbffe7fd000 - 0xffffffbffec00000   (  4108 KB)
+[    0.000000]     PCI I/O : 0xffffffbffee00000 - 0xffffffbfffe00000   (    16 MB)
+[    0.000000]     memory  : 0xffffffc008000000 - 0xffffffc640000000   ( 25472 MB)
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] Preemptible hierarchical RCU implementation.
+[    0.000000]  Build-time adjustment of leaf fanout to 64.
+[    0.000000]  RCU restricting CPUs from NR_CPUS=64 to nr_cpu_ids=1.
+[    0.000000] RCU: Adjusting geometry for rcu_fanout_leaf=64, nr_cpu_ids=1
+[    0.000000] NR_IRQS:64 nr_irqs:64 0
+[    0.000000] Architected cp15 timer(s) running at 8.33MHz (virt).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x1ec02923e, max_idle_ns: 440795202125 ns
+[    0.000003] sched_clock: 56 bits at 8MHz, resolution 120ns, wraps every 2199023255496ns
+[    0.000076] Console: colour dummy device 80x25
+[    0.000378] console [tty0] enabled
+[    0.000400] Calibrating delay loop (skipped), value calculated using timer frequency.. 16.66 BogoMIPS (lpj=33333)
+[    0.000418] pid_max: default: 32768 minimum: 301
+[    0.000460] Security Framework initialized
+[    0.000495] Mount-cache hash table entries: 8192 (order: 4, 65536 bytes)
+[    0.000506] Mountpoint-cache hash table entries: 8192 (order: 4, 65536 bytes)
+[    0.001210] ASID allocator initialised with 65536 entries
+[    0.001734] EFI services will not be available.
+[    0.001842] Brought up 1 CPUs
+[    0.001852] SMP: Total of 1 processors activated.
+[    0.001866] CPU: All CPU(s) started at EL1
+[    0.002633] devtmpfs: initialized
+[    0.003209] DMI not present or invalid.
+[    0.003405] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    0.003784] pinctrl core: initialized pinctrl subsystem
+[    0.004583] NET: Registered protocol family 16
+[    0.016073] cpuidle: using governor menu
+[    0.016219] vdso: 2 pages (1 code @ ffffff8008727000, 1 data @ ffffff8008c30000)
+[    0.016260] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.016757] DMA: preallocated 256 KiB pool for atomic allocations
+[    0.016913] Serial: AMBA PL011 UART driver
+[    0.037039] HugeTLB registered 2 MB page size, pre-allocated 0 pages
+[    0.048850] vgaarb: loaded
+[    0.049050] SCSI subsystem initialized
+[    0.052301] libata version 3.00 loaded.
+[    0.052495] usbcore: registered new interface driver usbfs
+[    0.052532] usbcore: registered new interface driver hub
+[    0.052568] usbcore: registered new device driver usb
+[    0.052650] pps_core: LinuxPPS API ver. 1 registered
+[    0.052659] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+[    0.052683] PTP clock support registered
+[    0.052760] dmi: Firmware registration failed.
+[    0.053053] Advanced Linux Sound Architecture Driver Initialized.
+[    0.054018] clocksource: Switched to clocksource arch_sys_counter
+[    0.054161] VFS: Disk quotas dquot_6.6.0
+[    0.054205] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.064167] NET: Registered protocol family 2
+[    0.064575] TCP established hash table entries: 32768 (order: 6, 262144 bytes)
+[    0.064691] TCP bind hash table entries: 32768 (order: 7, 524288 bytes)
+[    0.065136] TCP: Hash tables configured (established 32768 bind 32768)
+[    0.065242] UDP hash table entries: 2048 (order: 4, 65536 bytes)
+[    0.065275] UDP-Lite hash table entries: 2048 (order: 4, 65536 bytes)
+[    0.065440] NET: Registered protocol family 1
+[    0.065886] RPC: Registered named UNIX socket transport module.
+[    0.065904] RPC: Registered udp transport module.
+[    0.065911] RPC: Registered tcp transport module.
+[    0.065918] RPC: Registered tcp NFSv4.1 backchannel transport module.
+[    0.065946] PCI: CLS 0 bytes, default 128
+[    0.112788] kvm [1]: HYP mode not available
+[    0.114548] futex hash table entries: 256 (order: 3, 32768 bytes)
+[    0.114628] audit: initializing netlink subsys (disabled)
+[    0.114674] audit: type=2000 audit(0.111:1): initialized
+[    0.119392] workingset: timestamp_bits=44 max_order=20 bucket_order=0
+[    0.128860] squashfs: version 4.0 (2009/01/31) Phillip Lougher
+[    0.130513] NFS: Registering the id_resolver key type
+[    0.130559] Key type id_resolver registered
+[    0.130567] Key type id_legacy registered
+[    0.130774] fuse init (API version 7.24)
+[    0.131222] 9p: Installing v9fs 9p2000 file system support
+[    0.132858] io scheduler noop registered
+[    0.133031] io scheduler cfq registered (default)
+[    0.135826] xenfs: not registering filesystem on non-xen platform
+[    0.141149] Serial: 8250/16550 driver, 4 ports, IRQ sharing disabled
+[    0.143084] SuperH (H)SCI(F) driver initialized
+[    0.143265] e6e88000.serial: ttySC0 at MMIO 0xe6e88000 (irq = 6, base_baud = 0) is a scif
+[    0.812694] console [ttySC0] enabled
+[    0.816631] msm_serial: driver initialized
+[    0.848929] loop: module loaded
+[    0.853563] tun: Universal TUN/TAP device driver, 1.6
+[    0.859288] tun: (C) 1999-2004 Max Krasnyansky <maxk@qualcomm.com>
+[    0.865887] e1000e: Intel(R) PRO/1000 Network Driver - 3.2.6-k
+[    0.871853] e1000e: Copyright(c) 1999 - 2015 Intel Corporation.
+[    0.878013] igb: Intel(R) Gigabit Ethernet Network Driver - version 5.3.0-k
+[    0.885054] igb: Copyright (c) 2007-2014 Intel Corporation.
+[    0.890695] igbvf: Intel(R) Gigabit Virtual Function Network Driver - version 2.0.2-k
+[    0.898560] igbvf: Copyright (c) 2009 - 2012 Intel Corporation.
+[    0.904542] sky2: driver version 1.30
+[    0.908582] VFIO - User Level meta-driver version: 0.3
+[    0.916099] ehci_hcd: USB 2.0 'Enhanced' Host Controller (EHCI) Driver
+[    0.922849] ehci-pci: EHCI PCI platform driver
+[    0.927400] ehci-platform: EHCI generic platform driver
+[    0.932833] ehci-msm: Qualcomm On-Chip EHCI Host Controller
+[    0.938493] ohci_hcd: USB 1.1 'Open' Host Controller (OHCI) Driver
+[    0.944738] ohci-pci: OHCI PCI platform driver
+[    0.949248] ohci-platform: OHCI generic platform driver
+[    0.954723] usbcore: registered new interface driver usb-storage
+[    0.961487] mousedev: PS/2 mouse device common for all mice
+[    0.967788] i2c /dev entries driver
+[    0.972228] sdhci: Secure Digital Host Controller Interface driver
+[    0.978839] sdhci: Copyright(c) Pierre Ossman
+[    0.983343] Synopsys Designware Multimedia Card Interface Driver
+[    0.989639] sdhci-pltfm: SDHCI platform and OF driver helper
+[    0.995574] ledtrig-cpu: registered to indicate activity on CPUs
+[    1.002270] usbcore: registered new interface driver usbhid
+[    1.008128] usbhid: USB HID core driver
+[    1.013169] NET: Registered protocol family 17
+[    1.018115] 9pnet: Installing 9P2000 support
+[    1.022521] Key type dns_resolver registered
+[    1.027443] registered taskstats version 1
+[    1.031986] hctosys: unable to open rtc device (rtc0)
+[   13.085570] ALSA device list:
+[   13.088549]   No soundcards found.
+[   13.093446] Freeing unused kernel memory: 2256K (ffffff80089f5000 - ffffff8008c29000)
+
+
+boot (Linux 4.6.0-rc1+, BusyBox v1.16.0.git, kexec-tools 2.0.1-git)
+/ # cat /proc/interrupts 
+           CPU0       
+  3:        252     GIC-0  27 Edge      arch_timer
+  6:         75     GIC-0 196 Level     e6e88000.serial:mux
+IPI0:         0       Rescheduling interrupts
+IPI1:         0       Function call interrupts
+IPI2:         0       CPU stop interrupts
+IPI3:         0       Timer broadcast interrupts
+IPI4:         0       IRQ work interrupts
+IPI5:         0       CPU wake-up interrupts
+Err:          0
