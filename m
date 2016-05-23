@@ -1,58 +1,43 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 23 May 2016 13:01:27 +0200
-Subject: [PATCH 4/3] iommu/exynos: Prepare for deferred probe support
-In-Reply-To: <1463995809-26862-1-git-send-email-m.szyprowski@samsung.com>
-References: <1463995809-26862-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1464001287-12748-1-git-send-email-m.szyprowski@samsung.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 May 2016 12:09:40 +0100
+Subject: [PATCH] arm: Enable interrupts before calling schedule()
+In-Reply-To: <20160523105420.GE4892@e104818-lin.cambridge.arm.com>
+References: <alpine.DEB.2.11.1605201740320.3639@nanos>
+ <20160523105420.GE4892@e104818-lin.cambridge.arm.com>
+Message-ID: <20160523110940.GX19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register iommu_ops at the end of successful probe instead of doing that
-unconditionally. This makes Exynos IOMMU driver ready for deferred probe
-caused by not-yet-available clocks.
+On Mon, May 23, 2016 at 11:54:20AM +0100, Catalin Marinas wrote:
+> We may have the same bug on arm64 (arch/arm64/kernel/entry.S). Is there
+> a more fundamental problem with calling schedule() with IRQs off? The
+> __schedule() function disables the IRQs shortly after it is entered.
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
-I'm sorry for the confussing patch number. This patch got lost while
-rebasing, but it should belong to the "Exynos IOMMU: improve clock
-management" patchset.
+schedule() does other stuff before entering __schedule() though, such
+as calling into the block layer.  This code may have the expectation
+that interrupts are enabled.
 
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
----
- drivers/iommu/exynos-iommu.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+However, having interrupts enabled in this path (which I'd argue is
+special in respect of the "thou shalt not enter schedule() with IRQs
+off" rule) opens up the possibility to call into schedule() with the
+need_resched flag cleared:
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index e0b834375f17..633e6d023c0d 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -581,6 +581,8 @@ static void sysmmu_tlb_invalidate_entry(struct sysmmu_drvdata *data,
- 	spin_unlock_irqrestore(&data->lock, flags);
- }
- 
-+static struct iommu_ops exynos_iommu_ops;
-+
- static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- {
- 	int irq, ret;
-@@ -654,6 +656,8 @@ static int __init exynos_sysmmu_probe(struct platform_device *pdev)
- 
- 	pm_runtime_enable(dev);
- 
-+	of_iommu_set_ops(dev->of_node, &exynos_iommu_ops);
-+
- 	return 0;
- }
- 
-@@ -1347,7 +1351,6 @@ static int __init exynos_iommu_of_setup(struct device_node *np)
- 	if (!dma_dev)
- 		dma_dev = &pdev->dev;
- 
--	of_iommu_set_ops(np, &exynos_iommu_ops);
- 	return 0;
- }
- 
+- need_resched was set when returning to userspace, we enter
+  do_work_pending().
+- do_work_pending() enables IRQs, and an IRQ was pending.
+- IRQ is processed, and during that kernel preemption happens, clearing
+  this thread's need_resched flag.
+- we return to this thread, and now we will enter schedule() with
+  need_resched clear.
+
+Whether that matters or not is a different question - and I guess
+is a question for scheduler people.
+
+The likelyhood of this happening depends on the IRQ load, but the
+requirements are quite simple: need_resched set while returning to
+userspace with a pending IRQ.
+
 -- 
-1.9.2
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
