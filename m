@@ -1,58 +1,38 @@
 From: henryc.chen@mediatek.com (Henry Chen)
-Date: Mon, 23 May 2016 15:13:29 +0800
-Subject: [PATCH v2 1/3] regulator: DT: Add DT property for operation mode
- configuration
-In-Reply-To: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
-References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
+Date: Mon, 23 May 2016 15:13:28 +0800
+Subject: Add support for regulator operation mode of mt6397
+Message-ID: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some regulators support their operating mode to be changed by consumers for
-module specific purpose. Add a DT property to support this.
+Some regulators support different operating modes, but there is no suitable
+property that can pass the opeation mode constraints on runtime at present.
 
-Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
----
- Documentation/devicetree/bindings/regulator/regulator.txt |  5 +++++
- include/dt-bindings/regulator/regulator.h                 | 14 ++++++++++++++
- 2 files changed, 19 insertions(+)
+This series making the change to specify supported modes as a devicetree list.
+Consumers can change or get the regulator operation mode by regulator_set_mode
+/regulator_get_mode and define the support operating mode on devicetree.
+
+There is a requirement from SVS driver. SVS calibartion requires that the
+regulator be in its low-noise (pwm mode) state at boot, but at all other times
+it can be normal mode for power saving.
+http://www.spinics.net/lists/devicetree/msg111204.html
+
+Changes in v2:
+- Separate patch for binding document changes.
+- Create a header to define operation mode on dt-bindings.
+- Remove the property "regulator-supported-modes".
+
+Henry Chen (3):
+  regulator: DT: Add DT property for operation mode configuration
+  regulator: of: Add support for parsing operation mode
+  regulator: mt6397: Add buck change mode regulator interface for mt6397
+
+ .../devicetree/bindings/regulator/regulator.txt    |  5 ++
+ drivers/regulator/mt6397-regulator.c               | 89 +++++++++++++++++++---
+ drivers/regulator/of_regulator.c                   | 15 +++-
+ include/dt-bindings/regulator/regulator.h          | 14 ++++
+ 4 files changed, 113 insertions(+), 10 deletions(-)
  create mode 100644 include/dt-bindings/regulator/regulator.h
 
-diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
-index ecfc593..e505d0b 100644
---- a/Documentation/devicetree/bindings/regulator/regulator.txt
-+++ b/Documentation/devicetree/bindings/regulator/regulator.txt
-@@ -49,6 +49,11 @@ Optional properties:
- 	0: Disable active discharge.
- 	1: Enable active discharge.
- 	Absence of this property will leave configuration to default.
-+- regulator-supported-modes: Regulators can run in a variety of different
-+  operating modes depending on output load. This allows further system power
-+  savings by selecting the best (and most efficient) regulator mode for a
-+  desired load. The definition for each of these operation is defined at
-+  include/dt-bindings/regulator/regulator.h
- 
- Deprecated properties:
- - regulator-compatible: If a regulator chip contains multiple
-diff --git a/include/dt-bindings/regulator/regulator.h b/include/dt-bindings/regulator/regulator.h
-new file mode 100644
-index 0000000..2ed1dfd
---- /dev/null
-+++ b/include/dt-bindings/regulator/regulator.h
-@@ -0,0 +1,14 @@
-+/*
-+ * This header provides constants for binding regulator.
-+ */
-+
-+#ifndef _DT_BINDINGS_REGULATOR_REGULATOR_H
-+#define _DT_BINDINGS_REGULATOR_REGULATOR_H
-+
-+/* Regulator operating modes */
-+#define REGULATOR_OPERATION_MODE_FAST			0x0
-+#define REGULATOR_OPERATION_MODE_NORMAL			0x1
-+#define REGULATOR_OPERATION_MODE_IDLE			0x2
-+#define REGULATOR_OPERATION_MODE_STANDBY		0x3
-+
-+#endif
 -- 
 1.8.1.1.dirty
