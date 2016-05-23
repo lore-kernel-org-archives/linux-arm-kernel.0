@@ -1,134 +1,55 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 23 May 2016 15:18:19 +0200
-Subject: [PATCH V5 4/6] vfio: platform: add support for ACPI probe
-In-Reply-To: <1463364819-477-5-git-send-email-okaya@codeaurora.org>
-References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
- <1463364819-477-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <5743031B.5000208@linaro.org>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Mon, 23 May 2016 15:22:27 +0200
+Subject: [U-Boot] Sharing code between Linux and bootloader (U-boot) ?
+In-Reply-To: <20160521014159.GK7650@bill-the-cat>
+References: <573F1F07.6040202@laposte.net> <20160521014159.GK7650@bill-the-cat>
+Message-ID: <57430413.2020704@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2016 04:13 AM, Sinan Kaya wrote:
-> The code is using the compatible DT string to associate a reset driver
-> with the actual device itself. The compatible string does not exist on
-> ACPI based systems. HID is the unique identifier for a device driver
-> instead.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/vfio/platform/vfio_platform_common.c  | 58 ++++++++++++++++++++++++---
->  drivers/vfio/platform/vfio_platform_private.h |  1 +
->  2 files changed, 54 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index 25378bd..d859d3b 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -13,6 +13,7 @@
->   */
->  
->  #include <linux/device.h>
-> +#include <linux/acpi.h>
->  #include <linux/iommu.h>
->  #include <linux/module.h>
->  #include <linux/mutex.h>
-> @@ -49,6 +50,37 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
->  	return reset_fn;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
-> +			     struct device *dev)
-should be static
-> +{
-> +	struct acpi_device *adev = ACPI_COMPANION(dev);
-> +
-> +	if (acpi_disabled)
-> +		return -ENODEV;
-> +
-> +	if (!adev) {
-> +		pr_err("VFIO: ACPI companion device not found for %s\n",
-> +			vdev->name);
-> +		return -ENODEV;
-> +	}
-> +
-> +	vdev->acpihid = acpi_device_hid(adev);
-> +	if (!vdev->acpihid) {
-> +		pr_err("VFIO: cannot find ACPI HID for %s\n",
-> +		       vdev->name);
-> +		return -ENODEV;
-> +	}
-> +	return 0;
-> +}
-> +#else
-> +int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
-> +			     struct device *dev)
-static inline?
-> +{
-> +	return -EINVAL;
-nit: -ENOENT ?
-> +}
-> +#endif
-> +
->  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
->  {
->  	return vdev->of_reset ? true : false;
-> @@ -548,6 +580,21 @@ static const struct vfio_device_ops vfio_platform_ops = {
->  	.mmap		= vfio_platform_mmap,
->  };
->  
-> +int vfio_platform_of_probe(struct vfio_platform_device *vdev,
-> +			   struct device *dev)
-> +{
-> +	int ret;
-> +
-> +	ret = device_property_read_string(dev, "compatible",
-> +					  &vdev->compat);
-> +	if (ret) {
-> +		pr_err("VFIO: cannot retrieve compat for %s\n",
-> +			vdev->name);
-> +		return ret;
-> +	}
-> +	return 0;
-nit: can be simplified by returning ret in any case.
+Hi Tom,
 
-Best Regards
-
-Eric
-
-> +}
-> +
->  int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->  			       struct device *dev)
->  {
-> @@ -557,11 +604,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->  	if (!vdev)
->  		return -EINVAL;
->  
-> -	ret = device_property_read_string(dev, "compatible", &vdev->compat);
-> -	if (ret) {
-> -		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
-> -		return -EINVAL;
-> -	}
-> +	ret = vfio_platform_acpi_probe(vdev, dev);
-> +	if (ret)
-> +		ret = vfio_platform_of_probe(vdev, dev);
-> +
-> +	if (ret)
-> +		return ret;
->  
->  	vdev->device = dev;
->  
-> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-> index 71ed7d1..ba9e4f8 100644
-> --- a/drivers/vfio/platform/vfio_platform_private.h
-> +++ b/drivers/vfio/platform/vfio_platform_private.h
-> @@ -58,6 +58,7 @@ struct vfio_platform_device {
->  	struct mutex			igate;
->  	struct module			*parent_module;
->  	const char			*compat;
-> +	const char			*acpihid;
->  	struct module			*reset_module;
->  	struct device			*device;
->  
+On 05/21/2016 03:41 AM, Tom Rini wrote:
+> On Fri, May 20, 2016 at 04:28:23PM +0200, Sebastian Frias wrote:
 > 
+>> Hi,
+>>
+>> Some bootloaders (like U-boot) support several HW devices: serial,
+>> network, NAND, USB, etc. most of which are also supported by Linux.
+>>
+>> So the question is: is code shared? I mean, I understand that the
+>> drivers need to talk to the appropriate API, and such API could be
+>> different between Linux and U-boot.
+>> But putting that aside, would it be naive to imagine that some "core"
+>> functionality could be shared? Or would that part be so small it is
+>> not worth the effort?
+>>
+>> Since many companies use both, U-boot and Linux, I would figure they
+>> try their best to optimize engineering resources and share code,
+>> right?
+>> In that case, I also wonder how do they share DT descriptions that
+>> right now are being stored in the Linux kernel tree.
+>>
+>> We'd like to share code/DT for obvious reasons, what would you guys
+>> suggest?
+> 
+> So, in all cases, Linux is always the primary.  
+
+For drivers and DT?
+
+>In some cases in U-Boot
+> we port drivers over (NAND is a good example here). 
+
+>From your message, I get that first you write the driver for Linux and then port to U-boot, is that right?
+I would have thought that the opposite way could be easier, since the U-boot driver could be simpler (maybe no DMA) w.r.t the one in Linux.
+
+> In other cases,
+> things are similar enough that it's having done it in one place it's
+> easy enough to do it again in the other.
+> 
+
+So, basically people just do it again, duplicating code?
+
+Best regards,
+
+Sebastian
