@@ -1,71 +1,122 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 May 2016 15:41:42 +0100
-Subject: [PATCH 3/7] KVM: arm/arm64: vgic-v2: Always resample level
- interrupts
-In-Reply-To: <20160523141937.GA9625@lvm>
-References: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
- <1464007023-11736-4-git-send-email-marc.zyngier@arm.com>
- <20160523141937.GA9625@lvm>
-Message-ID: <574316A6.8030305@arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 23 May 2016 16:41:52 +0200
+Subject: [PATCH V5 5/6] vfio: platform: call _RST method when using ACPI
+In-Reply-To: <1463364819-477-6-git-send-email-okaya@codeaurora.org>
+References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
+ <1463364819-477-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <574316B0.5080306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/16 15:19, Christoffer Dall wrote:
-> On Mon, May 23, 2016 at 01:36:59PM +0100, Marc Zyngier wrote:
->> When reading back from the list registers, we need to perform
->> two actions for level interrupts:
->> 1) clear the soft-pending bit if the interrupt is not pending
->>    anymore *in the list register*
->> 2) resample the line level and propagate it to the pending state
->>
->> But these two actions linked, and we should *always* resample
+On 05/16/2016 04:13 AM, Sinan Kaya wrote:
+> The device tree code checks for the presence of a reset driver and calls
+> the of_reset function pointer by looking up the reset driver as a module.
 > 
-> were linked?
-
-Indeed.
-
+> ACPI defines _RST method to perform device level reset. After the _RST
+> method is executed, the OS can resume using the device.
 > 
->> the line level, no matter what state is in the list register.
->> Otherwise, we may end-up injecting spurious interrupts that
->> have been already retired.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-v2.c | 11 +++++++----
->>  1 file changed, 7 insertions(+), 4 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
->> index 8ad42c2..f659af0 100644
->> --- a/virt/kvm/arm/vgic/vgic-v2.c
->> +++ b/virt/kvm/arm/vgic/vgic-v2.c
->> @@ -112,10 +112,13 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
->>  			}
->>  		}
->>  
->> -		/* Clear soft pending state when level IRQs have been acked */
->> -		if (irq->config == VGIC_CONFIG_LEVEL &&
->> -		    !(val & GICH_LR_PENDING_BIT)) {
->> -			irq->soft_pending = false;
->> +		/*
->> +		 * Clear soft pending state when level irqs have been acked.
->> +		 * Always resample the line level.
->> +		 */
->> +		if (irq->config == VGIC_CONFIG_LEVEL) {
->> +			if (!(val & GICH_LR_PENDING_BIT))
->> +				irq->soft_pending = false;
->>  			irq->pending = irq->line_level;
+> This patch checks the presence of _RST method and calls the _RST
+> method when reset is requested.
 > 
-> shouldn't this context line then be:
-> 	irq->pending = irq->line_level || irq->soft_pending;  ??
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/vfio/platform/vfio_platform_common.c | 44 ++++++++++++++++++++++++++++
+>  1 file changed, 44 insertions(+)
+> 
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index d859d3b..095d5b7 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -73,21 +73,59 @@ int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+>  	}
+>  	return 0;
+>  }
+> +
+> +static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
+> +{
+> +	struct device *dev = vdev->device;
+> +	acpi_handle handle = ACPI_HANDLE(dev);
+> +	acpi_status acpi_ret;
+> +	unsigned long long val;
+> +
+> +	acpi_ret = acpi_evaluate_integer(handle, "_RST", NULL, &val);
+> +	if (ACPI_FAILURE(acpi_ret))
+> +		return -EINVAL;
+> +
+> +	return 0;
+> +}
+> +
+> +static bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+> +{
+> +	struct device *dev = vdev->device;
+> +	acpi_handle handle = ACPI_HANDLE(dev);
+> +
+> +	return acpi_has_method(handle, "_RST");
+> +}
+>  #else
+>  int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+>  			     struct device *dev)
+>  {
+>  	return -EINVAL;
+>  }
+> +
+> +static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev)
+> +{
+nit: inline
+> +	return -EINVAL;
+> +}
+> +
+> +static bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+nit: inline
 
-Yes, you're right. The only case we discard the soft-pending bit is when
-we know for sure that the interrupt has transitioned from pending to active.
+Besides Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
-I'll update the two patches and repost once the rest of the series has
-been reviewed.
+It is not explictly written in the ACPI spec that _RST is expected to
+stop DMA transfers and IRQs although this may be implicit in the notion
+of "function level reset ". May be worth adding this info in the commit msg?
 
-Thanks,
+Best Regards
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Eric
+> +{
+> +	return false;
+> +}
+>  #endif
+>  
+>  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (vdev->acpihid)
+> +		return vfio_platform_acpi_has_reset(vdev);
+> +
+>  	return vdev->of_reset ? true : false;
+>  }
+>  
+>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (vdev->acpihid)
+> +		return;
+> +
+>  	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+>  						    &vdev->reset_module);
+>  	if (!vdev->of_reset) {
+> @@ -99,6 +137,9 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  
+>  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (vdev->acpihid)
+> +		return;
+> +
+>  	if (vdev->of_reset)
+>  		module_put(vdev->reset_module);
+>  }
+> @@ -177,6 +218,9 @@ static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
+>  		dev_info(vdev->device, "reset\n");
+>  		vdev->of_reset(vdev);
+>  		return 0;
+> +	} else if (vdev->acpihid) {
+> +		dev_info(vdev->device, "reset\n");
+> +		return vfio_platform_acpi_call_reset(vdev);
+>  	}
+>  
+>  	dev_warn(vdev->device, "no reset function found!\n");
+> 
