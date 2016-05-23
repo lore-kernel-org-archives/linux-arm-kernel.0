@@ -1,117 +1,169 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Tue, 24 May 2016 01:15:07 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <9b24c4b30f424407902589fcc4598ec5@rwthex-w2-a.rwth-ad.de>
-References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
- <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
- <9b24c4b30f424407902589fcc4598ec5@rwthex-w2-a.rwth-ad.de>
-Message-ID: <2d1541bdd75c48a593f0e180c411cd4b@rwthex-s1-b.rwth-ad.de>
+From: bryantly@linux.vnet.ibm.com (Bryant G Ly)
+Date: Mon, 23 May 2016 19:17:35 -0400
+Subject: [PATCH] Fix for hang of Ordered task in TCM
+In-Reply-To: <1463550825.22249.17.camel@haakon3.risingtidesystems.com>
+References: <1463177741-4385-1-git-send-email-mikecyr@linux.vnet.ibm.com>
+ <1463550825.22249.17.camel@haakon3.risingtidesystems.com>
+Message-ID: <20160523191735.Horde.6wmWQ7EiiPavHDD7pNfVtQ1@ltc.linux.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefan,
 
-On 05/23/2016 10:56 PM, Stefan Wahren wrote:
-> Hi Christopher,
-> 
->> christopher.spinrath at rwth-aachen.de hat am 23. Mai 2016 um 00:47 geschrieben:
->>
->>
->> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
->>
->> The CompuLab Utilite Pro is a miniature fanless desktop pc based on
->> the i.MX6 Quad powered cm-fx6 module. It features two serial ports,
->> USB OTG, 4x USB, analog audio and S/PDIF, 2x Gb Ethernet, HDMI and
->> DVI ports, an on-board 32GB SSD, a mmc slot, and on-board wifi/bt.
->>
->> Add initial support for it including USB, Ethernet (both ports), sata
->> and HDMI support.
->>
->> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
->> ---
->>  arch/arm/boot/dts/Makefile              |   1 +
->>  arch/arm/boot/dts/imx6q-utilite-pro.dts | 128
->> ++++++++++++++++++++++++++++++++
->>  2 files changed, 129 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/imx6q-utilite-pro.dts
->>
->> ...
->> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts
->> b/arch/arm/boot/dts/imx6q-utilite-pro.dts
->> new file mode 100644
->> index 0000000..bcd8e0d
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
->> @@ -0,0 +1,128 @@
->> +/*
->> + * Copyright 2016 Christopher Spinrath
->> + * Copyright 2013 CompuLab Ltd.
->> + *
->> + * Based on the GPLv2 licensed devicetree distributed with the vendor
->> + * kernel for the Utilite Pro:
->> + *	Copyright 2013 CompuLab Ltd.
->> + *	Author: Valentin Raevsky <valentin@compulab.co.il>
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
->> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
->> + */
->> +
->> ...
->> +
->> +		pinctrl_uart2: uart2grp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
->> +				MX6QDL_PAD_GPIO_8__UART2_RX_DATA 0x1b0b1
->> +				MX6QDL_PAD_SD4_DAT5__UART2_RTS_B 0x1b0b1
->> +				MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
->> +			>;
->> +		};
->> +	};
->> +};
->> +
->> +&pcie {
->> +	pcie at 0,0 {
->> +		reg = <0x000000 0 0 0 0>;
->> +		#address-cells = <3>;
->> +		#size-cells = <2>;
->> +
->> +		/* non-removable i211 ethernet card */
->> +		eth1: intel,i211 at pcie0,0 {
->> +			reg = <0x010000 0 0 0 0>;
->> +		};
->> +	};
->> +};
->> +
->> +&uart2 {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_uart2>;
->> +	fsl,uart-has-rtscts;
-> 
-> this property is deprecated so please use the generic one:
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=1006ed7e1b258dac3e85c9fafe9d38b6020c917f
-> 
+Quoting "Nicholas A. Bellinger" <nab@linux-iscsi.org>:
 
-Thanks for pointing that out. I will switch to the generic property.
+<SNIP>
+>
+> So AFAICT for delayed commands, the above patch ends up skipping these
+> three checks subsequently when doing __target_execute_cmd() directly
+> from target_restart_delayed_cmds(), no..?
+>
+> After pondering this some more, what about moving these checks into
+> __target_execute_cmd() to handle both target_core_transport.c cases
+> instead..?
+>
+> We'll also need a parameter for internal COMPARE_AND_WRITE usage
+> within compare_and_write_callback(), to bypass checks upon secondary
+> ->execute_cmd() WRITE payload submission after READ + COMPARE has
+> completed successfully.
+>
+> WDYT..?
+>
+> diff --git a/drivers/target/target_core_internal.h  
+> b/drivers/target/target_core_internal.h
+> index fc91e85..e2c970a 100644
+> --- a/drivers/target/target_core_internal.h
+> +++ b/drivers/target/target_core_internal.h
+> @@ -146,6 +146,7 @@ sense_reason_t	target_cmd_size_check(struct  
+> se_cmd *cmd, unsigned int size);
+>  void	target_qf_do_work(struct work_struct *work);
+>  bool	target_check_wce(struct se_device *dev);
+>  bool	target_check_fua(struct se_device *dev);
+> +void	__target_execute_cmd(struct se_cmd *, bool);
+>
+>  /* target_core_stat.c */
+>  void	target_stat_setup_dev_default_groups(struct se_device *);
+> diff --git a/drivers/target/target_core_sbc.c  
+> b/drivers/target/target_core_sbc.c
+> index a9057aa..04f616b 100644
+> --- a/drivers/target/target_core_sbc.c
+> +++ b/drivers/target/target_core_sbc.c
+> @@ -602,7 +602,7 @@ static sense_reason_t  
+> compare_and_write_callback(struct se_cmd *cmd, bool succes
+>  	cmd->transport_state |= CMD_T_ACTIVE|CMD_T_BUSY|CMD_T_SENT;
+>  	spin_unlock_irq(&cmd->t_state_lock);
+>
+> -	__target_execute_cmd(cmd);
+> +	__target_execute_cmd(cmd, false);
+>
+>  	kfree(buf);
+>  	return ret;
+> diff --git a/drivers/target/target_core_transport.c  
+> b/drivers/target/target_core_transport.c
+> index 6c089af..f3e93dd 100644
+> --- a/drivers/target/target_core_transport.c
+> +++ b/drivers/target/target_core_transport.c
+> @@ -1761,20 +1761,45 @@ queue_full:
+>  }
+>  EXPORT_SYMBOL(transport_generic_request_failure);
+>
+> -void __target_execute_cmd(struct se_cmd *cmd)
+> +void __target_execute_cmd(struct se_cmd *cmd, bool do_checks)
+>  {
+>  	sense_reason_t ret;
+>
+> -	if (cmd->execute_cmd) {
+> -		ret = cmd->execute_cmd(cmd);
+> -		if (ret) {
+> -			spin_lock_irq(&cmd->t_state_lock);
+> -			cmd->transport_state &= ~(CMD_T_BUSY|CMD_T_SENT);
+> -			spin_unlock_irq(&cmd->t_state_lock);
+> +	if (!cmd->execute_cmd) {
+> +		ret = TCM_LOGICAL_UNIT_COMMUNICATION_FAILURE;
+> +		goto err;
+> +	}
+> +	if (do_checks) {
+> +		/*
+> +		 * Check for an existing UNIT ATTENTION condition after
+> +		 * target_handle_task_attr() has done SAM task attr
+> +		 * checking, and possibly have already defered execution
+> +		 * out to target_restart_delayed_cmds() context.
+> +		 */
+> +		ret = target_scsi3_ua_check(cmd);
+> +		if (ret)
+> +			goto err;
+>
+> -			transport_generic_request_failure(cmd, ret);
+> +		ret = target_alua_state_check(cmd);
+> +		if (ret)
+> +			goto err;
+> +
+> +		ret = target_check_reservation(cmd);
+> +		if (ret) {
+> +			cmd->scsi_status = SAM_STAT_RESERVATION_CONFLICT;
+> +			goto err;
+>  		}
+>  	}
+> +
+> +	ret = cmd->execute_cmd(cmd);
+> +	if (!ret)
+> +		return;
+> +err:
+> +	spin_lock_irq(&cmd->t_state_lock);
+> +	cmd->transport_state &= ~(CMD_T_BUSY|CMD_T_SENT);
+> +	spin_unlock_irq(&cmd->t_state_lock);
+> +
+> +	transport_generic_request_failure(cmd, ret);
+>  }
+>
+>  static int target_write_prot_action(struct se_cmd *cmd)
+> @@ -1899,7 +1924,7 @@ void target_execute_cmd(struct se_cmd *cmd)
+>  		return;
+>  	}
+>
+> -	__target_execute_cmd(cmd);
+> +	__target_execute_cmd(cmd, true);
+>  }
+>  EXPORT_SYMBOL(target_execute_cmd);
+>
+> @@ -1923,7 +1948,7 @@ static void target_restart_delayed_cmds(struct  
+> se_device *dev)
+>  		list_del(&cmd->se_delayed_node);
+>  		spin_unlock(&dev->delayed_cmd_lock);
+>
+> -		__target_execute_cmd(cmd);
+> +		__target_execute_cmd(cmd, true);
+>
+>  		if (cmd->sam_task_attr == TCM_ORDERED_TAG)
+>  			break;
+> diff --git a/include/target/target_core_fabric.h  
+> b/include/target/target_core_fabric.h
+> index ec79da3..334f107 100644
+> --- a/include/target/target_core_fabric.h
+> +++ b/include/target/target_core_fabric.h
+> @@ -163,7 +163,6 @@ int	core_tmr_alloc_req(struct se_cmd *, void *,  
+> u8, gfp_t);
+>  void	core_tmr_release_req(struct se_tmr_req *);
+>  int	transport_generic_handle_tmr(struct se_cmd *);
+>  void	transport_generic_request_failure(struct se_cmd *, sense_reason_t);
+> -void	__target_execute_cmd(struct se_cmd *);
+>  int	transport_lookup_tmr_lun(struct se_cmd *, u64);
+>  void	core_allocate_nexus_loss_ua(struct se_node_acl *acl);
+>
 
-Cheers,
-Christopher
+Looks good to me. Nick just to let you know I've been working with  
+Mike on VSCSI
+Target Fabric and we need this patch in kernel 4.4 do you know of the  
+process in
+getting that there?
 
-> Stefan
-> 
->> +	dma-names = "rx", "tx";
->> +	dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
->> +	status = "okay";
->> +};
->> -- 
->> 2.8.2
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks
+
+-Bryant
+
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe target-devel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
