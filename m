@@ -1,38 +1,170 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 23 May 2016 15:42:21 +0800
-Subject: [PATCH] arm64: tegra: Fix CPU compatible string for Tegra132
-Message-ID: <20160523074221.7135-1-josephl@nvidia.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 23 May 2016 09:44:55 +0200
+Subject: [PATCH v9 2/2] memory: atmel-ebi: add DT bindings documentation
+In-Reply-To: <1463989495-13787-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1463989495-13787-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1463989495-13787-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per commit f634da375fc96 ("Documentation: DT bindings: add nvidia,
-tegra132-denver compatible string"), fixing the CPU compatible string for
-Tegra132 to match the binding document currently.
+The EBI (External Bus Interface) is used to access external peripherals
+(NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+Each device is assigned a CS line and an address range and can have its
+own configuration (timings, access mode, bus width, ...).
+This driver provides a generic DT binding to configure a device according
+to its requirements.
+For specific device controllers (like the NAND one) the SMC timings
+should be configured by the controller driver through the matrix and smc
+syscon regmaps.
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/boot/dts/nvidia/tegra132.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ .../bindings/memory-controllers/atmel,ebi.txt      | 136 +++++++++++++++++++++
+ 1 file changed, 136 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra132.dtsi b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
-index 2013f8916084..7b1cdc029de3 100644
---- a/arch/arm64/boot/dts/nvidia/tegra132.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
-@@ -964,13 +964,13 @@
- 
- 		cpu at 0 {
- 			device_type = "cpu";
--			compatible = "nvidia,denver", "arm,armv8";
-+			compatible = "nvidia,tegra132-denver", "arm,armv8";
- 			reg = <0>;
- 		};
- 
- 		cpu at 1 {
- 			device_type = "cpu";
--			compatible = "nvidia,denver", "arm,armv8";
-+			compatible = "nvidia,tegra132-denver", "arm,armv8";
- 			reg = <1>;
- 		};
- 	};
+diff --git a/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+new file mode 100644
+index 0000000..9bb5f57
+--- /dev/null
++++ b/Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+@@ -0,0 +1,136 @@
++* Device tree bindings for Atmel EBI
++
++The External Bus Interface (EBI) controller is a bus where you can connect
++asynchronous (NAND, NOR, SRAM, ....) and synchronous memories (SDR/DDR SDRAMs).
++The EBI provides a glue-less interface to asynchronous memories through the SMC
++(Static Memory Controller).
++
++Required properties:
++
++- compatible:		"atmel,at91sam9260-ebi"
++			"atmel,at91sam9261-ebi"
++			"atmel,at91sam9263-ebi0"
++			"atmel,at91sam9263-ebi1"
++			"atmel,at91sam9rl-ebi"
++			"atmel,at91sam9g45-ebi"
++			"atmel,at91sam9x5-ebi"
++			"atmel,sama5d3-ebi"
++
++- reg:			Contains offset/length value for EBI memory mapping.
++			This property might contain several entries if the EBI
++			memory range is not contiguous
++
++- #address-cells:	Must be 2.
++			The first cell encodes the CS.
++			The second cell encode the offset into the CS memory
++			range.
++
++- #size-cells:		Must be set to 1.
++
++- ranges:		Encodes CS to memory region association.
++
++- clocks:		Clock feeding the EBI controller.
++			See clock-bindings.txt
++
++Children device nodes are representing device connected to the EBI bus.
++
++Required device node properties:
++
++- reg:			Contains the chip-select id, the offset and the length
++			of the memory region requested by the device.
++
++EBI bus configuration will be defined directly in the device subnode.
++
++Optional EBI/SMC properties:
++
++- atmel,smc-bus-width:		width of the asynchronous device's data bus
++				8, 16 or 32.
++				Default to 8 when undefined.
++
++- atmel,smc-byte-access-type	"write" or "select" (see Atmel datasheet).
++				Default to "select" when undefined.
++
++- atmel,smc-read-mode		"nrd" or "ncs".
++				Default to "ncs" when undefined.
++
++- atmel,smc-write-mode		"nwe" or "ncs".
++				Default to "ncs" when undefined.
++
++- atmel,smc-exnw-mode		"disabled", "frozen" or "ready".
++				Default to "disabled" when undefined.
++
++- atmel,smc-page-mode		enable page mode if present. The provided value
++				defines the page size (supported values: 4, 8,
++				16 and 32).
++
++- atmel,smc-tdf-mode:		"normal" or "optimized". When set to
++				"optimized" the data float time is optimized
++				depending on the next device being accessed
++				(next device setup time is subtracted to the
++				current device data float time).
++				Default to "normal" when undefined.
++
++If at least one atmel,smc- property is defined the following SMC timing
++properties become mandatory. In the other hand, if none of the atmel,smc-
++properties are specified, we assume that the EBI bus configuration will be
++handled by the sub-device driver, and none of those properties should be
++defined.
++
++All the timings are expressed in nanoseconds (see Atmel datasheet for a full
++description).
++
++- atmel,smc-ncs-rd-setup-ns
++- atmel,smc-nrd-setup-ns
++- atmel,smc-ncs-wr-setup-ns
++- atmel,smc-nwe-setup-ns
++- atmel,smc-ncs-rd-pulse-ns
++- atmel,smc-nrd-pulse-ns
++- atmel,smc-ncs-wr-pulse-ns
++- atmel,smc-nwe-pulse-ns
++- atmel,smc-nwe-cycle-ns
++- atmel,smc-nrd-cycle-ns
++- atmel,smc-tdf-ns
++
++Example:
++
++	ebi: ebi at 10000000 {
++		compatible = "atmel,sama5d3-ebi";
++		#address-cells = <2>;
++		#size-cells = <1>;
++		atmel,smc = <&hsmc>;
++		atmel,matrix = <&matrix>;
++		reg = <0x10000000 0x10000000
++		       0x40000000 0x30000000>;
++		ranges = <0x0 0x0 0x10000000 0x10000000
++			  0x1 0x0 0x40000000 0x10000000
++			  0x2 0x0 0x50000000 0x10000000
++			  0x3 0x0 0x60000000 0x10000000>;
++		clocks = <&mck>;
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_ebi_addr>;
++
++		nor: flash at 0,0 {
++			compatible = "cfi-flash";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x0 0x0 0x1000000>;
++			bank-width = <2>;
++
++			atmel,smc-read-mode = "nrd";
++			atmel,smc-write-mode = "nwe";
++			atmel,smc-bus-width = <16>;
++			atmel,smc-ncs-rd-setup-ns = <0>;
++			atmel,smc-ncs-wr-setup-ns = <0>;
++			atmel,smc-nwe-setup-ns = <8>;
++			atmel,smc-nrd-setup-ns = <16>;
++			atmel,smc-ncs-rd-pulse-ns = <84>;
++			atmel,smc-ncs-wr-pulse-ns = <84>;
++			atmel,smc-nrd-pulse-ns = <76>;
++			atmel,smc-nwe-pulse-ns = <76>;
++			atmel,smc-nrd-cycle-ns = <107>;
++			atmel,smc-nwe-cycle-ns = <84>;
++			atmel,smc-tdf-ns = <16>;
++		};
++	};
++
 -- 
-2.8.3
+2.7.4
