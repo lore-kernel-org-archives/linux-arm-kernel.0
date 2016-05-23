@@ -1,63 +1,227 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 23 May 2016 18:26:25 -0400
-Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
- registers
-In-Reply-To: <f49d58ed-38b4-6284-11c2-8708d8443b14@codeaurora.org>
-References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
- <20160523172527.GK4976@leverpostej>
- <f49d58ed-38b4-6284-11c2-8708d8443b14@codeaurora.org>
-Message-ID: <57438391.7090405@codeaurora.org>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Tue, 24 May 2016 00:37:28 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6q: extend support for the cm-fx6
+In-Reply-To: <1c18d1b1f80b47cab2d06b1167407ae8@rwthex-s2-a.rwth-ad.de>
+References: <709d6b3d522f4fcb8112830e0426dbb3@rwthex-s1-b.rwth-ad.de>
+ <1c18d1b1f80b47cab2d06b1167407ae8@rwthex-s2-a.rwth-ad.de>
+Message-ID: <b8378072-b645-ebf1-c4c5-26bed85a97ae@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2016 02:22 PM, Neil Leeder wrote:
-> 
-> On 5/23/2016 01:25 PM, Mark Rutland wrote:
->> On Fri, May 20, 2016 at 03:13:07PM -0400, Neil Leeder wrote:
->>> L2 registers are accessed using a select register and data
->>> register pair. To prevent multiple concurrent writes to the
->>> select register by independent drivers, the write to the
->>> select register and the associated access of the data register
->>> are protected with a lock. All drivers accessing the L2
->>> registers use the set and get functions provided by
->>> l2-accessors to ensure correct reads and writes to L2 registers.
->>
->> What will this be used for? (i.e. which drivers want to touch the L2
->> registers?).
->>
->> Generally we expect FW to configure the caches and interconnect
->> appropriately.
-> 
-> The primary use is in the L2 PMU driver, which will be posted shortly.
-> 
->>
->>> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
->>> ---
->>>  drivers/soc/qcom/Kconfig              |  9 +++++
->>>  drivers/soc/qcom/Makefile             |  1 +
->>>  drivers/soc/qcom/l2-accessors.c       | 66 +++++++++++++++++++++++++++++++++++
->>>  include/linux/soc/qcom/l2-accessors.h | 27 ++++++++++++++
->>>  4 files changed, 103 insertions(+)
->>>  create mode 100644 drivers/soc/qcom/l2-accessors.c
->>>  create mode 100644 include/linux/soc/qcom/l2-accessors.h
->>
->> These are awfully generic file names (and function names). Which SoCs
->> does this apply to?
->>
->> It would be good to give these more specific names.
-> 
-> It's under soc/qcom, and dependent on ARCH_QCOM and (in v2) also on ARM64. It applies to all QCOM ARM64 SoCs.
-> Given that it can only be used in a QCOM driver, and the include path has qcom in it, I'd
-> prefer not to add redundancy by adding another qcom in there.
+Hi Lucas,
 
-They ended up calling the pinctrl file qcom/pinctrl/qdf2xxx.c.
+Thanks for your review!
 
-http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8f1338cd80648adf5434798f5393ad7c55d10848
+On 05/23/2016 11:03 AM, Lucas Stach wrote:
+> Am Montag, den 23.05.2016, 00:47 +0200 schrieb
+> christopher.spinrath at rwth-aachen.de:
+>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>>
+>> The cm-fx6 module has an on-board spi-flash chip for its firmware, an
+>> eeprom (containing e.g. the mac address of the on-board Ethernet),
+>> a sata port, a pcie controller, an USB hub, and an USB otg port.
+>> Enable support for them. In addition, enable syscon poweroff support.
+>>
+>> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>> ---
+>>  arch/arm/boot/dts/imx6q-cm-fx6.dts | 136 +++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 136 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+>> index 99b46f8..f4fc22e 100644
+>> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
+>> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+>> @@ -31,6 +31,61 @@
+>>  			linux,default-trigger = "heartbeat";
+>>  		};
+>>  	};
+>> +
+>> +	regulators {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +
+> 
+> Please remove this regulator pseudo-bus. It doesn't exist in hardware.
+> The regulators are direct children of the module.
+> 
 
-Regards,
-Cov
+OK, I will remove it. I added it because it seems to be common (e.g.
+sabrelite and wandboard use it).
 
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>> +		reg_usb_otg_vbus: usb_otg_vbus {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "usb_otg_vbus";
+>> +			regulator-min-microvolt = <5000000>;
+>> +			regulator-max-microvolt = <5000000>;
+>> +			gpio = <&gpio3 22 0>;
+>> +			enable-active-high;
+>> +		};
+>> +
+>> +		reg_usb_h1_vbus: usb_h1_vbus {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "usb_h1_vbus";
+>> +			regulator-min-microvolt = <5000000>;
+>> +			regulator-max-microvolt = <5000000>;
+>> +			gpio = <&gpio7 8 0>;
+>> +			enable-active-high;
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&ecspi1 {
+>> +	fsl,spi-num-chipselects = <2>;
+>> +	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_ecspi1>;
+>> +	status = "okay";
+>> +
+>> +	flash: m25p80 at 0 {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		compatible = "st,m25p", "jedec,spi-nor";
+>> +		spi-max-frequency = <20000000>;
+>> +		reg = <0>;
+>> +
+>> +		partition at 0 {
+>> +			label = "uboot";
+>> +			reg = <0x0 0xc0000>;
+>> +		};
+>> +
+>> +		partition at c0000 {
+>> +			label = "uboot environment";
+>> +			reg = <0xc0000 0x40000>;
+>> +		};
+>> +
+>> +		partition at 100000 {
+>> +			label = "reserved";
+>> +			reg = <0x100000 0x100000>;
+>> +		};
+> 
+> Partition layouts don't belong in the upstream DT, as it a device
+> configuration thing. Please kep them in the bootloader/firmware and make
+> this one pass the partition layout to the kernel.
+> 
+OK, removed (although I do not like to patch the firmware/uboot).
+
+>> +	};
+>>  };
+>>  
+>>  &fec {
+>> @@ -46,8 +101,31 @@
+>>  	status = "okay";
+>>  };
+>>  
+>> +&i2c3 {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_i2c3>;
+>> +	status = "okay";
+>> +	clock-frequency = <100000>;
+>> +
+>> +	eeprom at 50 {
+>> +		compatible = "at24,24c02";
+>> +		reg = <0x50>;
+>> +		pagesize = <16>;
+>> +	};
+>> +};
+>> +
+>>  &iomuxc {
+>>  	imx6q-cm-fx6 {
+>> +		pinctrl_ecspi1: ecspi1grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		 0x100b1
+>> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		 0x100b1
+>> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		 0x100b1
+>> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x100b1
+>> +				MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x100b1
+>> +			>;
+>> +		};
+>> +
+>>  		pinctrl_enet: enetgrp {
+>>  			fsl,pins = <
+>>  				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+>> @@ -91,17 +169,75 @@
+>>  			>;
+>>  		};
+>>  
+>> +		pinctrl_i2c3: i2c3grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_GPIO_3__I2C3_SCL 0x4001b8b1
+>> +				MX6QDL_PAD_GPIO_6__I2C3_SDA 0x4001b8b1
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_pcie: pciegrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000
+>> +				MX6QDL_PAD_EIM_CS1__GPIO2_IO24 0x80000000
+>> +			>;
+>> +		};
+>> +
+>>  		pinctrl_uart4: uart4grp {
+>>  			fsl,pins = <
+>>  				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
+>>  				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
+>>  			>;
+>>  		};
+>> +
+>> +		pinctrl_usbh1: usbh1grp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_SD3_RST__GPIO7_IO08 0x80000000
+>> +			>;
+>> +		};
+>> +
+>> +		pinctrl_usbotg: usbotggrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
+>> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x80000000
+>> +			>;
+>> +		};
+>>  	};
+>>  };
+>>  
+>> +&pcie {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_pcie>;
+>> +	reset-gpio = <&gpio1 26 0>;
+>> +	power-on-gpio = <&gpio2 24 0>;
+> 
+> There is no power-on-gpio in the upstream binding.
+> 
+
+uh, this one slipped through my clean up. Removed.
+
+>> +	status = "okay";
+>> +};
+>> +
+>> +&sata {
+>> +	status = "okay";
+>> +};
+>> +
+>> +&snvs_poweroff {
+>> +	status = "okay";
+>> +};
+>> +
+>>  &uart4 {
+>>  	pinctrl-names = "default";
+>>  	pinctrl-0 = <&pinctrl_uart4>;
+>>  	status = "okay";
+>>  };
+>> +
+>> +&usbotg {
+>> +	vbus-supply = <&reg_usb_otg_vbus>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usbotg>;
+>> +	dr_mode = "otg";
+>> +	status = "okay";
+>> +};
+>> +
+>> +&usbh1 {
+>> +	vbus-supply = <&reg_usb_h1_vbus>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_usbh1>;
+>> +	status = "okay";
+>> +};
+
+Cheers,
+Christopher
