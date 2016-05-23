@@ -1,61 +1,183 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Mon, 23 May 2016 11:52:01 +0530
-Subject: [RFC PATCH 2/3] mmc: host: omap_hsmmc: Enable ADMA2
-In-Reply-To: <87shxdlws6.fsf@linux.intel.com>
-References: <1463561115-31798-1-git-send-email-kishon@ti.com>
- <1463561115-31798-3-git-send-email-kishon@ti.com>
- <b66f678a-be74-d5f7-f2ef-93b5c9f29b92@ti.com>
- <20160518193028.GT5995@atomide.com>
- <0d463add-9fa5-a768-2ba6-34c4126c7817@ti.com>
- <20160519145745.GU5995@atomide.com> <87shxdlws6.fsf@linux.intel.com>
-Message-ID: <5742A189.4060803@ti.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Mon, 23 May 2016 14:32:59 +0800
+Subject: [PATCH 1/2] drm/rockchip: vop: Do check if an update is pending
+ during disable
+In-Reply-To: <CAAObsKBXxb8ZS3CqLy4qsDRWLvT=w2ACANCcDLE5B47nRKtvBw@mail.gmail.com>
+References: <1459937686-9142-1-git-send-email-tomeu.vizoso@collabora.com>
+ <5707043D.6060706@rock-chips.com>
+ <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
+ <570AFAC2.8080907@rock-chips.com>
+ <CAAObsKCmPZBaSudVJy8BPThhoZw8VVqxicqsmc8diApajD57nA@mail.gmail.com>
+ <CAAObsKBXxb8ZS3CqLy4qsDRWLvT=w2ACANCcDLE5B47nRKtvBw@mail.gmail.com>
+Message-ID: <5742A41B.8030308@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
-
-On Friday 20 May 2016 12:06 AM, Felipe Balbi wrote:
-> 
-> Hi,
-> 
-> Tony Lindgren <tony@atomide.com> writes:
->> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160519 01:10]:
->>> On 05/18/2016 10:30 PM, Tony Lindgren wrote:
->>>> Ideally the adma support would be a separate loadable module,
->>>> similar how the cppi41dma is a child of the OTG controller.
+On 2016?05?05? 17:34, Tomeu Vizoso wrote:
+> On 20 April 2016 at 16:23, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+>> On 11 April 2016 at 03:15, Mark yao <mark.yao@rock-chips.com> wrote:
+>>> On 2016?04?08? 18:54, Tomeu Vizoso wrote:
+>>>> On 8 April 2016 at 03:07, Mark yao <mark.yao@rock-chips.com> wrote:
+>>>>> On 2016?04?06? 18:14, Tomeu Vizoso wrote:
+>>>>>
+>>>>> When a plane is being disabled but it's still enabled, do check if the
+>>>>> previous update has been completed by reading yrgb_mst back.
+>>>>>
+>>>>> Otherwise, pending pageflips would remain pending after a CRTC is
+>>>>> disabled.
+>>>>>
+>>>>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>>>>> ---
+>>>>>    drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 5 +++--
+>>>>>    1 file changed, 3 insertions(+), 2 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>>> b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>>> index a9b1e8b5ac85..f46b1fd1887b 100644
+>>>>> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>>> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+>>>>> @@ -1064,8 +1064,9 @@ static bool vop_win_pending_is_complete(struct
+>>>>> vop_win
+>>>>> *vop_win)
+>>>>>     struct vop_plane_state *state = to_vop_plane_state(plane->state);
+>>>>>     dma_addr_t yrgb_mst;
+>>>>>
+>>>>> - if (!state->enable)
+>>>>> - return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
+>>>>> + if (!state->enable &&
+>>>>> +    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
+>>>>> + return true;
+>>>>>
+>>>>>
+>>>>> It is wrong, the patch would cause a bug.
+>>>>>
+>>>>> when state->enable is 0, check yrgb_mst == state->yrgb_mst always be
+>>>>> true,
+>>>>> because state->yrgb_mst not update on plane disabled funtion, that would
+>>>>> cause iommu crash.
+>>>> Sorry, but I don't understand where's the bug and what could cause
+>>>> that crash. What the existing code was doing is saying that a pageflip
+>>>> event is still pending if we have told the plane to disable but for
+>>>> some reason it hasn't yet.
+>>>>
+>>>> With this modification, if we read back that it's already disabled, we
+>>>> return true as before. But if we read back that it isn't disabled yet,
+>>>> then we still check the fb pointers and compare them.
+>>>>
+>>>> The iommu mapping is removed when the _CRTC_ is disabled, and what
+>>>> this series does is to wait for the pending pageflip to finish before
+>>>> conitnuing with CRTC disablement.
 >>>
->>> The Master DMA is part of the hsmmc IP block. If the same ADMA module is
->>> present on other IPs it might be beneficial to have a helper library to handle
->>> it (allocating the descriptor pool, wrinting, updating descriptors, etc).
+>>> the iommu mapping will unmap after plane disabled, we need sure that the
+>>> plane really disabled before unmap, if not, the unmap may call before plane
+>>> really disable, vop may access unmap address, then would get iommu page
+>>> fault.
+>> Sorry, but I still don't see the error condition that you are
+>> describing. AFAICS, the unmap will happen after the last pageflip has
+>> completed.
 >>
->> OK. Yeah if it's part of the MMC controller it makes no sense to
->> separate it. So then the conecrns are using alternate DMA
->> implementations and keeping PM runtime working :)
+>>>>> About pending pageflips would remain pending, can you  describe more info
+>>>>> about it? I think those pending pageflips should be ignore when CRTC is
+>>>>> disabled.
+>>>> Well, right now in rockchip-drm pending pageflips won't be ignored
+>>>> when a CRTC is disabled, but will be delivered when it's re-enabled.
+>>>>
+>>>> If they would be to be ignored (understanding that as dropped), that
+>>>> would require modifications to clients so they keep track of which fbs
+>>>> were used in a particular crtc and destroy them when the crtc is
+>>>> disabled, but that would be incorrect when using the i915 DRM driver
+>>>> (I also assume others do the same). Given that the pageflip ioctl
+>>>> isn't driver-specific, I think there cannot be such a difference in
+>>>> behavior between drivers.
+>>>>
+>>>> With the current behavior (pending pageflip events being delayed until
+>>>> the CRTC is enabled again), compositors and other clients will be
+>>>> holding on to the fb in the pending pageflip until an arbitrary point
+>>>> in the future that may not ever come. To me that sounds like a serious
+>>>> modification of the assumptions on fb lifecycle that might not be
+>>>> warranted.
+>>>>
+>>>> So in summary, even if I haven't found any explicit documentation on
+>>>> this, I think the ABI is that any pending pageflips are to be
+>>>> delivered when that CRTC is being disabled and not later.
+>>>
+>>> on drivers/gpu/drm/rockchip/rockchip_drm_fb.c
+>>>
+>>> drm_atomic_helper_commit_planes(dev, state, true);
+>>> rockchip_atomic_wait_for_complete(dev, state);
+>>>
+>>> We set active_only = true, I think planes can only update when crtc is
+>>> active. and rockchip_atomic_wait_for_complete only wait when crtc is active.
+>> That's fine, but if a pageflip is pending when the client requests the
+>> CRTC to be disabled, we need to wait for the event to be emitted
+>> before we actually disable the HW.
+> Hi Mark,
+>
+> could you tell me if you agree that there's a bug that needs to be
+> solved, and if so, what do you think we should do about it?
+Hi Tomeu
+
+Sorry for reply late.
+I don't agree the changes:
+
+- if (!state->enable)
+- return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
++ if (!state->enable &&
++    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
++ return true;
+
+This changes actually would lead a bug.
+when we disable a plane, the vop_win_pending_is_complete would always 
+return true, That is not allowed, would cause fb free too early.
+
+Does this patch is needed for "[PATCH 2/2] drm/rockchip: vop: Wait for 
+pending events when disabling a CRTC"
+
+Thanks.
+
+> Thanks,
+>
+> Tomeu
+>
+>> Regards,
 >>
->> BTW, Felipe mentioned that the best thing to do in the long run would
->> be to set up sdhci-omap.c operating in ADMA mode.
+>> Tomeu
 >>
->> Felipe, care to summarize what you had in mind?
-> 
-> yeah, just write a new sdhci-omap.c to start moving away from
-> omap-hsmmc.c, just like it was done for 8250-omap.
-> 
-> At the beginning, it could be just the bare minimum to get it working
-> and slowly move over stuff like pm runtime, dmaengine, PIO. Move more
-> platforms over to that driver and, eventually, get rid of omap-hsmmc.c
-> altogether.
-> 
-> That way, development can be focussed on generic layers (SDHCI) to which
-> OMAP MMC controller is compliant (apart from the VERSION register
-> quirk).
+>>> Thanks.
+>>>
+>>>> Thanks,
+>>>>
+>>>> Tomeu
+>>>>
+>>>>> Thanks.
+>>>>>
+>>>>>
+>>>>>     yrgb_mst = VOP_WIN_GET_YRGBADDR(vop_win->vop, vop_win->data);
+>>>>>
+>>>>>
+>>>>>
+>>>>> --
+>>>>> ?ark Yao
+>>>>>
+>>>>>
+>>>>> _______________________________________________
+>>>>> dri-devel mailing list
+>>>>> dri-devel at lists.freedesktop.org
+>>>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>>>>>
+>>>>
+>>>
+>>> --
+>>> ?ark Yao
+>>>
+>>>
+>>> _______________________________________________
+>>> dri-devel mailing list
+>>> dri-devel at lists.freedesktop.org
+>>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+>
 
-About an year back, when I tried using SDHCI for OMAP I ran into issues and was
-not able to get it working. IIRC SDHCI_PRESENT_STATE (or OMAP_HSMMC_PSTATE) was
-not showing the correct state for card present and is unable to raise an
-interrupt when a card is inserted. I didn't debug this further.
 
-It also kept me wondering why gpio interrupt was always used for card detect
-instead of using mmci_sdcd line of the controller.
-
-Thanks
-Kishon
+-- 
+?ark Yao
