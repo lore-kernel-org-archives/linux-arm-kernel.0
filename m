@@ -1,52 +1,28 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 May 2016 13:37:01 +0100
-Subject: [PATCH 5/7] arm64: KVM: Make ICC_SRE_EL1 access return the configured
- SRE value
-In-Reply-To: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
-References: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1464007023-11736-6-git-send-email-marc.zyngier@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Mon, 23 May 2016 14:44:02 +0200
+Subject: [PATCH] arm: Enable interrupts before calling schedule()
+In-Reply-To: <alpine.DEB.2.11.1605201740320.3639@nanos>
+References: <alpine.DEB.2.11.1605201740320.3639@nanos>
+Message-ID: <20160523124402.GJ15728@worktop.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we trap ICC_SRE_EL1, we handle it as RAZ/WI. It would be
-more correct to actual make it RO, and return the configured
-value when read.
+On Fri, May 20, 2016 at 05:42:17PM +0200, Thomas Gleixner wrote:
+> do_work_pending() calls schedule() with interrupts disabled, which is just
+> wrong. Fix it.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kvm/sys_regs.c | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
+Thomas; lockdep cannot currently catch this. It doesn't do IRQ state
+validation other than ensuring the state matches with the hardware.
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 7bbe3ff..a57d650 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -134,6 +134,17 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
- 	return true;
- }
- 
-+static bool access_gic_sre(struct kvm_vcpu *vcpu,
-+			   struct sys_reg_params *p,
-+			   const struct sys_reg_desc *r)
-+{
-+	if (p->is_write)
-+		return ignore_write(vcpu, p);
-+
-+	p->regval = vcpu->arch.vgic_cpu.vgic_v3.vgic_sre;
-+	return true;
-+}
-+
- static bool trap_raz_wi(struct kvm_vcpu *vcpu,
- 			struct sys_reg_params *p,
- 			const struct sys_reg_desc *r)
-@@ -958,7 +969,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_gic_sgi },
- 	/* ICC_SRE_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
--	  trap_raz_wi },
-+	  access_gic_sre },
- 
- 	/* CONTEXTIDR_EL1 */
- 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
--- 
-2.1.4
+So things like:
+
+	local_irq_disable();
+	local_irq_disable();
+	local_irq_save();
+	local_irq_enable();
+
+(and 'obviously' suspect sequence of IRQ events)
+
+Are _fine_ by it. The only time it will yell is if flipping IRQ state
+ends up marking an actual held lock with ENABLED_HARDIRQ while it
+already had USED_IN_HARDIRQ.
