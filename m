@@ -1,69 +1,43 @@
-From: henryc.chen@mediatek.com (Henry Chen)
-Date: Mon, 23 May 2016 17:15:24 +0800
-Subject: [PATCH] soc: mtk-pmic-wrap: avoid integer overflow warning
-In-Reply-To: <1463086904-2493288-1-git-send-email-arnd@arndb.de>
-References: <1463086904-2493288-1-git-send-email-arnd@arndb.de>
-Message-ID: <1463994924.18442.1.camel@mtksdaap41>
+From: vigneshr@ti.com (R, Vignesh)
+Date: Mon, 23 May 2016 14:48:59 +0530
+Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
+ encoder
+In-Reply-To: <20160520163404.GC14951@dtor-ws>
+References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
+ <1463648641-6931-2-git-send-email-vigneshr@ti.com>
+ <20160520163404.GC14951@dtor-ws>
+Message-ID: <5742CB03.8010805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Thanks to the patch.
 
-On Thu, 2016-05-12 at 23:01 +0200, Arnd Bergmann wrote:
-> On ARM64, the mtk-pmic-wrap driver causes a harmless warning:
+On 5/20/2016 10:04 PM, Dmitry Torokhov wrote:
+> On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
+>> There are rotary-encoders where GPIO lines reflect the actual position
+>> of the rotary encoder dial. For example, if dial points to 9, then four
+>> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
+>> Add support for such rotary-encoder.
+>> The driver relies on rotary-encoder,absolute-encoder DT property to
+>> detect such encoders.
+>> Since, GPIO IRQs are not necessary to work with
+>> such encoders, optional polling mode support is added using
+>> input_poll_dev skeleton. This is can be used by enabling
+>> CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT.
 > 
-> mtk-pmic-wrap.c:1062:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-> mtk-pmic-wrap.c:1074:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-> mtk-pmic-wrap.c:1086:16: warning: large integer implicitly truncated to unsigned type [-Woverflow]
->   .int_en_all = ~(BIT(31) | BIT(1)),
+> Does this really belong to a rotary encoder and not a new driver that
+> simply translates gpio-encoded value into ABS* event?
 > 
-> The problem is that the result of the BIT() macro is an 'unsigned long',
-> so taking the bitwise NOT operation of that results in an integer
-> with the upper 32 bits all set and that cannot be assigned to a
-> 'u32' variable without loss of information.
-> 
-> This is harmless because we were never interested in the upper bits
-> here anyway, so we can shut up the warning by adding a simple cast
-> to 'u32'.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Acked-by: Henry Chen <henryc.chen@mediatek.com>
+Currently rotary encoder driver only supports incremental/step counting
+rotary devices. However, the device that is there on am335x-ice is an
+absolute encoder but, IMO, nevertheless a kind of rotary encoder. The
+only difference is that there is no need to count steps and the absolute
+position value is always available as binary encoded state of connected
+GPIOs.
+The hardware on am335x-ice is a mechanical rotary encoder switch
+connected over 4 GPIOs. It is same as binary encoder described at [1]
+(except there are 4 GPIO lines), so this lead me to add support in
+rotary-encoder.
 
-> ---
->  drivers/soc/mediatek/mtk-pmic-wrap.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-pmic-wrap.c b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> index 3c3e56df526e..a003ba26ca6e 100644
-> --- a/drivers/soc/mediatek/mtk-pmic-wrap.c
-> +++ b/drivers/soc/mediatek/mtk-pmic-wrap.c
-> @@ -1059,7 +1059,7 @@ static const struct pmic_wrapper_type pwrap_mt2701 = {
->  	.regs = mt2701_regs,
->  	.type = PWRAP_MT2701,
->  	.arb_en_all = 0x3f,
-> -	.int_en_all = ~(BIT(31) | BIT(2)),
-> +	.int_en_all = ~(u32)(BIT(31) | BIT(2)),
->  	.spi_w = PWRAP_MAN_CMD_SPI_WRITE_NEW,
->  	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
->  	.has_bridge = 0,
-> @@ -1071,7 +1071,7 @@ static struct pmic_wrapper_type pwrap_mt8135 = {
->  	.regs = mt8135_regs,
->  	.type = PWRAP_MT8135,
->  	.arb_en_all = 0x1ff,
-> -	.int_en_all = ~(BIT(31) | BIT(1)),
-> +	.int_en_all = ~(u32)(BIT(31) | BIT(1)),
->  	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
->  	.wdt_src = PWRAP_WDT_SRC_MASK_ALL,
->  	.has_bridge = 1,
-> @@ -1083,7 +1083,7 @@ static struct pmic_wrapper_type pwrap_mt8173 = {
->  	.regs = mt8173_regs,
->  	.type = PWRAP_MT8173,
->  	.arb_en_all = 0x3f,
-> -	.int_en_all = ~(BIT(31) | BIT(1)),
-> +	.int_en_all = ~(u32)(BIT(31) | BIT(1)),
->  	.spi_w = PWRAP_MAN_CMD_SPI_WRITE,
->  	.wdt_src = PWRAP_WDT_SRC_MASK_NO_STAUPD,
->  	.has_bridge = 0,
+[1]https://en.wikipedia.org/wiki/Rotary_encoder#Standard_binary_encoding
