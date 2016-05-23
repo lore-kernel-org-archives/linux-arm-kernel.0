@@ -1,81 +1,47 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Mon, 23 May 2016 10:18:54 +0300
-Subject: [RFC PATCH 2/3] mmc: host: omap_hsmmc: Enable ADMA2
-In-Reply-To: <5742A189.4060803@ti.com>
-References: <1463561115-31798-1-git-send-email-kishon@ti.com>
- <1463561115-31798-3-git-send-email-kishon@ti.com>
- <b66f678a-be74-d5f7-f2ef-93b5c9f29b92@ti.com>
- <20160518193028.GT5995@atomide.com>
- <0d463add-9fa5-a768-2ba6-34c4126c7817@ti.com>
- <20160519145745.GU5995@atomide.com> <87shxdlws6.fsf@linux.intel.com>
- <5742A189.4060803@ti.com>
-Message-ID: <874m9pgs2p.fsf@linux.intel.com>
+From: henryc.chen@mediatek.com (Henry Chen)
+Date: Mon, 23 May 2016 15:30:16 +0800
+Subject: [PATCH] regulator: mt6397: Constify struct regulator_ops
+Message-ID: <1463988616-18803-1-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Consitify the structure of regulator operations.
 
-Hi Kishon,
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+ drivers/regulator/mt6397-regulator.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-Kishon Vijay Abraham I <kishon@ti.com> writes:
-> Hi Felipe,
->
-> On Friday 20 May 2016 12:06 AM, Felipe Balbi wrote:
->> 
->> Hi,
->> 
->> Tony Lindgren <tony@atomide.com> writes:
->>> * Peter Ujfalusi <peter.ujfalusi@ti.com> [160519 01:10]:
->>>> On 05/18/2016 10:30 PM, Tony Lindgren wrote:
->>>>> Ideally the adma support would be a separate loadable module,
->>>>> similar how the cppi41dma is a child of the OTG controller.
->>>>
->>>> The Master DMA is part of the hsmmc IP block. If the same ADMA module is
->>>> present on other IPs it might be beneficial to have a helper library to handle
->>>> it (allocating the descriptor pool, wrinting, updating descriptors, etc).
->>>
->>> OK. Yeah if it's part of the MMC controller it makes no sense to
->>> separate it. So then the conecrns are using alternate DMA
->>> implementations and keeping PM runtime working :)
->>>
->>> BTW, Felipe mentioned that the best thing to do in the long run would
->>> be to set up sdhci-omap.c operating in ADMA mode.
->>>
->>> Felipe, care to summarize what you had in mind?
->> 
->> yeah, just write a new sdhci-omap.c to start moving away from
->> omap-hsmmc.c, just like it was done for 8250-omap.
->> 
->> At the beginning, it could be just the bare minimum to get it working
->> and slowly move over stuff like pm runtime, dmaengine, PIO. Move more
->> platforms over to that driver and, eventually, get rid of omap-hsmmc.c
->> altogether.
->> 
->> That way, development can be focussed on generic layers (SDHCI) to which
->> OMAP MMC controller is compliant (apart from the VERSION register
->> quirk).
->
-> About an year back, when I tried using SDHCI for OMAP I ran into
-> issues and was not able to get it working. IIRC SDHCI_PRESENT_STATE
-> (or OMAP_HSMMC_PSTATE) was not showing the correct state for card
-> present and is unable to raise an interrupt when a card is inserted. I
-> didn't debug this further.
-
-I'd say this is a bug in hsmmc. I remember seeing some bits in some
-TI-specific register (before SDHCI address space starts) which can be
-used to keep parts of SDHCI powered on exactly so normal WP and CD pins
-work as expected.
-
-In any case, adding support for GPIO-based card detect to generic SDHCI
-shouldn't be too difficult :-)
-
-> It also kept me wondering why gpio interrupt was always used for card
-> detect instead of using mmci_sdcd line of the controller.
-
-Probably a really, really old bug which nobody ever debugged properly ;-)
-
-ps: you don't need that ADMA2 DT property, btw. There's a bit in another
-register which you can check if $this controller was configured with
-ADMA2 support or not. IIRC, OMAP5's TRM describes them.
-
+diff --git a/drivers/regulator/mt6397-regulator.c b/drivers/regulator/mt6397-regulator.c
+index 17a5b6c..1c45abb 100644
+--- a/drivers/regulator/mt6397-regulator.c
++++ b/drivers/regulator/mt6397-regulator.c
+@@ -160,7 +160,7 @@ static int mt6397_get_status(struct regulator_dev *rdev)
+ 	return (regval & info->qi) ? REGULATOR_STATUS_ON : REGULATOR_STATUS_OFF;
+ }
+ 
+-static struct regulator_ops mt6397_volt_range_ops = {
++static const struct regulator_ops mt6397_volt_range_ops = {
+ 	.list_voltage = regulator_list_voltage_linear_range,
+ 	.map_voltage = regulator_map_voltage_linear_range,
+ 	.set_voltage_sel = regulator_set_voltage_sel_regmap,
+@@ -172,7 +172,7 @@ static struct regulator_ops mt6397_volt_range_ops = {
+ 	.get_status = mt6397_get_status,
+ };
+ 
+-static struct regulator_ops mt6397_volt_table_ops = {
++static const struct regulator_ops mt6397_volt_table_ops = {
+ 	.list_voltage = regulator_list_voltage_table,
+ 	.map_voltage = regulator_map_voltage_iterate,
+ 	.set_voltage_sel = regulator_set_voltage_sel_regmap,
+@@ -184,7 +184,7 @@ static struct regulator_ops mt6397_volt_table_ops = {
+ 	.get_status = mt6397_get_status,
+ };
+ 
+-static struct regulator_ops mt6397_volt_fixed_ops = {
++static const struct regulator_ops mt6397_volt_fixed_ops = {
+ 	.list_voltage = regulator_list_voltage_linear,
+ 	.enable = regulator_enable_regmap,
+ 	.disable = regulator_disable_regmap,
 -- 
-balbi
+1.8.1.1.dirty
