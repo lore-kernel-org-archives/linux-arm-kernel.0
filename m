@@ -1,74 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 May 2016 11:47:04 +0100
-Subject: [PATCH v2 1/3] regulator: DT: Add DT property for operation mode
- configuration
-In-Reply-To: <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
-References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
- <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
-Message-ID: <20160523104703.GB26992@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 23 May 2016 11:54:20 +0100
+Subject: [PATCH] arm: Enable interrupts before calling schedule()
+In-Reply-To: <alpine.DEB.2.11.1605201740320.3639@nanos>
+References: <alpine.DEB.2.11.1605201740320.3639@nanos>
+Message-ID: <20160523105420.GE4892@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 03:13:29PM +0800, Henry Chen wrote:
-> Some regulators support their operating mode to be changed by consumers for
-> module specific purpose. Add a DT property to support this.
+Hi Thomas,
+
+On Fri, May 20, 2016 at 05:42:17PM +0200, Thomas Gleixner wrote:
+> do_work_pending() calls schedule() with interrupts disabled, which is just
+> wrong. Fix it.
 > 
-> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
 > ---
->  Documentation/devicetree/bindings/regulator/regulator.txt |  5 +++++
->  include/dt-bindings/regulator/regulator.h                 | 14 ++++++++++++++
->  2 files changed, 19 insertions(+)
->  create mode 100644 include/dt-bindings/regulator/regulator.h
+>  arch/arm/kernel/signal.c |    1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
-> index ecfc593..e505d0b 100644
-> --- a/Documentation/devicetree/bindings/regulator/regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
-> @@ -49,6 +49,11 @@ Optional properties:
->  	0: Disable active discharge.
->  	1: Enable active discharge.
->  	Absence of this property will leave configuration to default.
-> +- regulator-supported-modes: Regulators can run in a variety of different
-> +  operating modes depending on output load. This allows further system power
-> +  savings by selecting the best (and most efficient) regulator mode for a
-> +  desired load. The definition for each of these operation is defined at
-> +  include/dt-bindings/regulator/regulator.h
+> --- a/arch/arm/kernel/signal.c
+> +++ b/arch/arm/kernel/signal.c
+> @@ -573,6 +573,7 @@ do_work_pending(struct pt_regs *regs, un
+>  	trace_hardirqs_off();
+>  	do {
+>  		if (likely(thread_flags & _TIF_NEED_RESCHED)) {
+> +			local_irq_enable();
+>  			schedule();
+>  		} else {
+>  			if (unlikely(!user_mode(regs)))
 
-This doesen't tell me for the property is formatted.
+We may have the same bug on arm64 (arch/arm64/kernel/entry.S). Is there
+a more fundamental problem with calling schedule() with IRQs off? The
+__schedule() function disables the IRQs shortly after it is entered.
 
-Is it a list? A mask?
+To silence IRQ trace warnings on arm64, we merged commit db3899a6477a
+("arm64: Add trace_hardirqs_off annotation in ret_to_user"). But we were
+also debating whether enabling the IRQs before calling schedule() in
+arch/arm64/kernel/entry.S would make more sense. It looks like we need
+to revisit this patch:
 
->  
->  Deprecated properties:
->  - regulator-compatible: If a regulator chip contains multiple
-> diff --git a/include/dt-bindings/regulator/regulator.h b/include/dt-bindings/regulator/regulator.h
-> new file mode 100644
-> index 0000000..2ed1dfd
-> --- /dev/null
-> +++ b/include/dt-bindings/regulator/regulator.h
-> @@ -0,0 +1,14 @@
-> +/*
-> + * This header provides constants for binding regulator.
-> + */
-> +
-> +#ifndef _DT_BINDINGS_REGULATOR_REGULATOR_H
-> +#define _DT_BINDINGS_REGULATOR_REGULATOR_H
-> +
-> +/* Regulator operating modes */
-> +#define REGULATOR_OPERATION_MODE_FAST			0x0
-> +#define REGULATOR_OPERATION_MODE_NORMAL			0x1
-> +#define REGULATOR_OPERATION_MODE_IDLE			0x2
-> +#define REGULATOR_OPERATION_MODE_STANDBY		0x3
+https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/commit/?h=arm64/entry-deasm&id=d244472af6e88c55603dc1ba342fae4e85cde31c
 
-These sound like they're tied to linux internal details (e.g. the
-implementation of idle and/or suspend).
+Thanks.
 
-What do each of these actually mean?
-
-Mark.
-
-> +
-> +#endif
-> -- 
-> 1.8.1.1.dirty
-> 
+-- 
+Catalin
