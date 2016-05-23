@@ -1,56 +1,282 @@
-From: nleeder@codeaurora.org (Neil Leeder)
-Date: Mon, 23 May 2016 11:43:15 -0400
-Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
- registers
-In-Reply-To: <573F7F5C.1050100@codeaurora.org>
-References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
- <573F7F5C.1050100@codeaurora.org>
-Message-ID: <4ad1d1b2-f0eb-3780-21e7-9dd1b23d6934@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 23 May 2016 22:36:04 +0800
+Subject: [PATCH 14/16] clk: sunxi-ng: Add N-K-M-P factor clock
+In-Reply-To: <1462737711-10017-15-git-send-email-maxime.ripard@free-electrons.com>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-15-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66b7jXrAs0rBrcHWskQQPqrhRVzY6OmCSoGZg2tfDJrDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+On Mon, May 9, 2016 at 4:01 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Introduce support for clocks that use a combination of two linear
+> multipliers (N and K factors), one linear divider (M) and one power of two
+> divider (P).
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi-ng/Makefile   |   1 +
+>  drivers/clk/sunxi-ng/ccu_nkmp.c | 157 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu_nkmp.h |  43 +++++++++++
+>  3 files changed, 201 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_nkmp.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_nkmp.h
+>
+> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> index 2bb8bc22e907..c794f57b6fb1 100644
+> --- a/drivers/clk/sunxi-ng/Makefile
+> +++ b/drivers/clk/sunxi-ng/Makefile
+> @@ -9,6 +9,7 @@ obj-y += ccu_mp.o
+>  obj-y += ccu_mux.o
+>  obj-y += ccu_nk.o
+>  obj-y += ccu_nkm.o
+> +obj-y += ccu_nkmp.o
+>  obj-y += ccu_nm.o
+>  obj-y += ccu_p.o
+>  obj-y += ccu_phase.o
+> diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+> new file mode 100644
+> index 000000000000..b7da00773cd6
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+> @@ -0,0 +1,157 @@
+> +/*
+> + * Copyright (C) 2016 Maxime Ripard
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/rational.h>
+> +
+> +#include "ccu_gate.h"
+> +#include "ccu_nkmp.h"
+> +
+> +void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
+> +                       unsigned long max_n, unsigned long max_k,
+> +                       unsigned long max_m, unsigned long max_p,
+> +                       unsigned long *n, unsigned long *k,
+> +                       unsigned long *m, unsigned long *p)
+
+We definitely should just pass struct ccu_nkmp* here.
+
+> +{
+> +       unsigned long best_rate = 0;
+> +       unsigned long best_n = 0, best_k = 0, best_m = 0, best_p = 0;
+> +       unsigned long _n, _k, _m, _p;
+> +
+> +       for (_k = 1; _k <= max_k; _k++) {
+> +               for (_p = 0; _p <= max_p; _p++) {
+> +                       unsigned long tmp_rate;
+> +
+> +                       rational_best_approximation(rate / _k, parent << _p,
+
+I think you mean "parent >> _p" ?
+
+In general we might lose some precision if parent is too small or _p is
+too large. But the only place we see this type of clock is the CPU PLL,
+and parent (24 MHz) are divisible by all the possible values of P.
+
+This brings up another issue: P does not go all the way up to (1 << width - 1).
+A register value of 3, or P = 8 is not valid, and it's not restricted in
+the driver. This is not true for all the SoCs though.
+
+The manual also says P should only be used when rate < 288 MHz. Moving
+P to the outer loop, and maybe adding a short circuit exit when the rate
+matches exactly would help.
+
+> +                                                   max_n, max_m, &_n, &_m);
+> +
+> +                       tmp_rate = (parent * _n * _k >> _p) / _m;
+> +
+> +                       if (tmp_rate > rate)
+> +                               continue;
+> +
+> +                       if ((rate - tmp_rate) < (rate - best_rate)) {
+> +                               best_rate = tmp_rate;
+> +                               best_n = _n;
+> +                               best_k = _k;
+> +                               best_m = _m;
+> +                               best_p = _p;
+> +                       }
+> +               }
+> +       }
+> +
+> +       *n = best_n;
+> +       *k = best_k;
+> +       *m = best_m;
+> +       *p = best_p;
+> +}
+> +
+> +static void ccu_nkmp_disable(struct clk_hw *hw)
+> +{
+> +       struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+> +
+> +       return ccu_gate_helper_disable(&nkmp->common, nkmp->enable);
+> +}
+> +
+> +static int ccu_nkmp_enable(struct clk_hw *hw)
+> +{
+> +       struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+> +
+> +       return ccu_gate_helper_enable(&nkmp->common, nkmp->enable);
+> +}
+> +
+> +static int ccu_nkmp_is_enabled(struct clk_hw *hw)
+> +{
+> +       struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+> +
+> +       return ccu_gate_helper_is_enabled(&nkmp->common, nkmp->enable);
+> +}
+> +
+> +static unsigned long ccu_nkmp_recalc_rate(struct clk_hw *hw,
+> +                                       unsigned long parent_rate)
+> +{
+> +       struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+> +       unsigned long n, m, k, p;
+> +       u32 reg;
+> +
+> +       reg = readl(nkmp->common.base + nkmp->common.reg);
+> +
+> +       n = reg >> nkmp->n.shift;
+> +       n &= (1 << nkmp->n.width) - 1;
+> +
+> +       k = reg >> nkmp->k.shift;
+> +       k &= (1 << nkmp->k.width) - 1;
+> +
+> +       m = reg >> nkmp->m.shift;
+> +       m &= (1 << nkmp->m.width) - 1;
+> +
+> +       p = reg >> nkmp->p.shift;
+> +       p &= (1 << nkmp->p.width) - 1;
+> +
+> +       return (parent_rate * (n + 1) * (k + 1) >> p) / (m + 1);
+> +}
+> +
+> +static long ccu_nkmp_round_rate(struct clk_hw *hw, unsigned long rate,
+> +                             unsigned long *parent_rate)
+> +{
+> +       struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+> +       unsigned long n, k, m, p;
+> +
+> +       ccu_nkmp_find_best(*parent_rate, rate,
+> +                          1 << nkmp->n.width, 1 << nkmp->k.width,
+> +                          1 << nkmp->m.width, (1 << nkmp->p.width) - 1,
+> +                          &n, &k, &m, &p);
+> +
+> +       return (*parent_rate * n * k >> p) / m;
+> +}
+> +
+> +static int ccu_nkmp_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                          unsigned long parent_rate)
+> +{
+> +       struct ccu_nkmp *nkmp = hw_to_ccu_nkmp(hw);
+> +       unsigned long n, k, m, p;
+> +       unsigned long flags;
+> +       u32 reg;
+> +
+> +       ccu_nkmp_find_best(parent_rate, rate,
+> +                          1 << nkmp->n.width, 1 << nkmp->k.width,
+> +                          1 << nkmp->m.width, (1 << nkmp->p.width) - 1,
+> +                          &n, &k, &m, &p);
+> +
+> +       spin_lock_irqsave(nkmp->common.lock, flags);
+> +
+> +       reg = readl(nkmp->common.base + nkmp->common.reg);
+> +       reg &= ~GENMASK(nkmp->n.width + nkmp->n.shift, nkmp->n.shift);
+> +       reg &= ~GENMASK(nkmp->k.width + nkmp->k.shift, nkmp->k.shift);
+> +       reg &= ~GENMASK(nkmp->m.width + nkmp->m.shift, nkmp->m.shift);
+> +       reg &= ~GENMASK(nkmp->p.width + nkmp->p.shift, nkmp->p.shift);
+
+GENMASK(width + shift - 1, shift)
+
+> +
+> +       reg |= (n - 1) << nkmp->m.shift;
+> +       reg |= (k - 1) << nkmp->m.shift;
+> +       reg |= (m - 1) << nkmp->m.shift;
+> +       reg |= p << nkmp->p.shift;
+> +
+> +       writel(reg, nkmp->common.base + nkmp->common.reg);
+> +
+> +       spin_unlock_irqrestore(nkmp->common.lock, flags);
+> +
+> +       ccu_helper_wait_for_lock(&nkmp->common, nkmp->lock);
+> +
+> +       return 0;
+> +}
+> +
+> +const struct clk_ops ccu_nkmp_ops = {
+> +       .disable        = ccu_nkmp_disable,
+> +       .enable         = ccu_nkmp_enable,
+> +       .is_enabled     = ccu_nkmp_is_enabled,
+> +
+> +       .recalc_rate    = ccu_nkmp_recalc_rate,
+> +       .round_rate     = ccu_nkmp_round_rate,
+> +       .set_rate       = ccu_nkmp_set_rate,
+> +};
+> diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.h b/drivers/clk/sunxi-ng/ccu_nkmp.h
+> new file mode 100644
+> index 000000000000..8a91f2c837a4
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_nkmp.h
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _CCU_NKMP_H_
+> +#define _CCU_NKMP_H_
+> +
+> +#include <linux/clk-provider.h>
+> +
+> +#include "ccu_factor.h"
+> +#include "ccu_common.h"
+> +
+> +struct ccu_nkmp {
+> +       u32                     enable;
+> +       u32                     lock;
+> +
+> +       struct ccu_factor       n;
+> +       struct ccu_factor       k;
+> +       struct ccu_factor       m;
+> +       struct ccu_factor       p;
+> +
+> +       struct ccu_common       common;
+> +};
+> +
+> +static inline struct ccu_nkmp *hw_to_ccu_nkmp(struct clk_hw *hw)
+> +{
+> +       struct ccu_common *common = hw_to_ccu_common(hw);
+> +
+> +       return container_of(common, struct ccu_nkmp, common);
+> +}
+> +
+> +extern const struct clk_ops ccu_nkmp_ops;
+
+Macro please. :)
 
 
-On 5/20/2016 05:19 PM, Stephen Boyd wrote:
-> On 05/20/2016 12:13 PM, Neil Leeder wrote:
->> diff --git a/drivers/soc/qcom/l2-accessors.c b/drivers/soc/qcom/l2-accessors.c
->> new file mode 100644
->> index 0000000..fbb69bd
->> --- /dev/null
->> +++ b/drivers/soc/qcom/l2-accessors.c
->> @@ -0,0 +1,66 @@
->> +/*
->> + * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
->> +#include <linux/spinlock.h>
->> +#include <linux/module.h>
-> 
-> export.h instead?
+Regards
+ChenYu
 
-OK, will address in v2
-
-> 
->> +#include <linux/soc/qcom/l2-accessors.h>
->> +#include <asm/cputype.h>
->> +#include <asm/sysreg.h>
-> 
-> Is there a patch to add sysreg.h to arch/arm? It would be nice to use
-> one l2 accessor API on arm64 and arm.
-> 
-
-Sounds like a good thing for the next person who submits a krait L2 patch to consider.
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+> +
+> +#endif /* _CCU_NKMP_H_ */
+> --
+> 2.8.2
+>
