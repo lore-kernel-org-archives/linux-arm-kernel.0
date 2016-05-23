@@ -1,26 +1,61 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 May 2016 16:04:06 -0500
-Subject: [PATCH 2/3] dt-bindings: reset: Add bindings for the Meson GXBB
- Reset Controller
-In-Reply-To: <1463732875-23141-3-git-send-email-narmstrong@baylibre.com>
-References: <1463732875-23141-1-git-send-email-narmstrong@baylibre.com>
- <1463732875-23141-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20160523210406.GA26743@rob-hp-laptop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 May 2016 22:07:38 +0100
+Subject: Crash after 'reboot' due to 9be4fd2c7723a
+In-Reply-To: <CAOMZO5Cbue9L2JGA0kv7nTZ=78oKDhNu6WLRUmcsSuLHscDVUQ@mail.gmail.com>
+References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
+ <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
+ <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
+ <2148724.oQlEHos3jS@vostro.rjw.lan>
+ <20160523182807.GY19428@n2100.arm.linux.org.uk>
+ <CAJZ5v0ipPVsZmu+RVfrPChA7banMGFNsfMt=if0V3XfVdstRNQ@mail.gmail.com>
+ <CAJZ5v0j0VbyHNT_ZmThsdQfRWzf7SG65A8-bPxoAUxZJgR96og@mail.gmail.com>
+ <CAOMZO5Cbue9L2JGA0kv7nTZ=78oKDhNu6WLRUmcsSuLHscDVUQ@mail.gmail.com>
+Message-ID: <20160523210738.GZ19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 10:27:54AM +0200, Neil Armstrong wrote:
-> Add DT bindings for the Meson GXBB SoC Reset Controller documentation and the
-> associated include file.
+On Mon, May 23, 2016 at 05:59:37PM -0300, Fabio Estevam wrote:
+> On Mon, May 23, 2016 at 5:23 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> > For one, if that platform is not capable of raising interrupts for IRQ
+> > works, I'm not sure why arch_irq_work_has_interrupt() returns true on
+> > it.
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  .../bindings/reset/amlogic,meson-gxbb-reset.txt    |  18 ++
->  .../dt-bindings/reset/amlogic,meson-gxbb-reset.h   | 199 +++++++++++++++++++++
->  2 files changed, 217 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-gxbb-reset.txt
->  create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
+> It returns true because the kernel was built with CONFIG_SMP=y.
+> 
+> On ARM we have:
+> 
+> static inline bool arch_irq_work_has_interrupt(void)
+> {
+>     return is_smp();
+> }
+> 
+> and then:
+> 
+> static inline bool is_smp(void)
+> {
+> #ifndef CONFIG_SMP
+>     return false;
+> #elif defined(CONFIG_SMP_ON_UP)
+>     extern unsigned int smp_on_up;
+>     return !!smp_on_up;
+> #else
+>     return true;
+> #endif
+> }
+> 
+> So if CONFIG_SMP=y,  is_smp() returns 1.
+> 
+> As I mentioned before, the reboot problem does not happen with CONFIG_SMP=n.
 
-Other than the whitespace comments,
+Read the code again.  There's three states:
 
-Acked-by: Rob Herring <robh@kernel.org>
+1. CONFIG_SMP=n - it always returns false.
+2. CONFIG_SMP=y, CONFIG_SMP_ON_UP=n - it always returns true.  Such a
+   kernel can _only_ be run on SMP capable systems.
+3. CONFIG_SMP=y, CONFIG_SMP_ON_UP=y - it returns depending on whether
+   we detect that the CPU is SMP capable.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
