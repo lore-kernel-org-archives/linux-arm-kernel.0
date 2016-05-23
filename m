@@ -1,50 +1,47 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 23 May 2016 13:58:05 -0700
-Subject: [PATCH v3 1/4] firmware: Amlogic: Add secure monitor driver
-In-Reply-To: <1464021024-29380-2-git-send-email-carlo@caione.org> (Carlo
- Caione's message of "Mon, 23 May 2016 18:30:21 +0200")
-References: <1464021024-29380-1-git-send-email-carlo@caione.org>
- <1464021024-29380-2-git-send-email-carlo@caione.org>
-Message-ID: <m2posco5k2.fsf@baylibre.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 23 May 2016 17:59:37 -0300
+Subject: Crash after 'reboot' due to 9be4fd2c7723a
+In-Reply-To: <CAJZ5v0j0VbyHNT_ZmThsdQfRWzf7SG65A8-bPxoAUxZJgR96og@mail.gmail.com>
+References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
+ <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
+ <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
+ <2148724.oQlEHos3jS@vostro.rjw.lan>
+ <20160523182807.GY19428@n2100.arm.linux.org.uk>
+ <CAJZ5v0ipPVsZmu+RVfrPChA7banMGFNsfMt=if0V3XfVdstRNQ@mail.gmail.com>
+ <CAJZ5v0j0VbyHNT_ZmThsdQfRWzf7SG65A8-bPxoAUxZJgR96og@mail.gmail.com>
+Message-ID: <CAOMZO5Cbue9L2JGA0kv7nTZ=78oKDhNu6WLRUmcsSuLHscDVUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Carlo Caione <carlo@caione.org> writes:
+On Mon, May 23, 2016 at 5:23 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
 
-> From: Carlo Caione <carlo@endlessm.com>
->
-> Introduce a driver to provide calls into secure monitor mode.
->
-> In the Amlogic SoCs these calls are used for multiple reasons: access to
-> NVMEM, set USB boot, enable JTAG, etc...
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> For one, if that platform is not capable of raising interrupts for IRQ
+> works, I'm not sure why arch_irq_work_has_interrupt() returns true on
+> it.
 
-[...]
+It returns true because the kernel was built with CONFIG_SMP=y.
 
-> +static int meson_sm_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct meson_sm_firmware *fw;
-> +	u32 sm_phy_in_base, sm_phy_out_base;
-> +	int cmd_in, cmd_out;
-> +
-> +	fw = devm_kzalloc(&pdev->dev, sizeof(*fw), GFP_KERNEL);
-> +	if (!fw)
-> +		return -ENOMEM;
-> +
-> +	fw->dev = &pdev->dev;
-> +
-> +	if (of_property_read_u32(np, "amlogic,sm-cmd-input-base", &cmd_in))
-> +		return -EINVAL;
-> +
-> +	if (of_property_read_u32(np, "amlogic,sm-cmd-output-base", &cmd_out))
-> +		return -EINVAL;
-> +
-> +	sm_phy_in_base = meson_sm_call(cmd_in, 0, 0, 0, 0, 0);
+On ARM we have:
 
-Should there be any error checking here?  Do we have any info on the
-return values here in case of error, or in case of missing firmware,
-etc.
+static inline bool arch_irq_work_has_interrupt(void)
+{
+    return is_smp();
+}
 
-Kevin
+and then:
+
+static inline bool is_smp(void)
+{
+#ifndef CONFIG_SMP
+    return false;
+#elif defined(CONFIG_SMP_ON_UP)
+    extern unsigned int smp_on_up;
+    return !!smp_on_up;
+#else
+    return true;
+#endif
+}
+
+So if CONFIG_SMP=y,  is_smp() returns 1.
+
+As I mentioned before, the reboot problem does not happen with CONFIG_SMP=n.
