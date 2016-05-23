@@ -1,99 +1,68 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 23 May 2016 21:11:21 +0800
-Subject: [PATCH 2/3] arm64: dts: rockchip: add eDP device node for rk3399
+Date: Mon, 23 May 2016 21:11:30 +0800
+Subject: [PATCH 3/3] arm64: dts: rockchip: add backlight support for rk3399
+ evb board
 In-Reply-To: <1464009056-32158-1-git-send-email-ykk@rock-chips.com>
 References: <1464009056-32158-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1464009081-32268-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1464009090-32322-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 52 ++++++++++++++++++++++++++++++++
- 1 file changed, 52 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 40 +++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 54e5c25..be322db 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -557,6 +557,11 @@
- 		vopl_out: port {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-+
-+			vopl_out_edp: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&edp_in_vopl>;
-+			};
- 		};
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+index 1a3eb14..31d9e27 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
+@@ -75,6 +75,46 @@
+ 		regulator-always-on;
+ 		regulator-boot-on;
  	};
- 
-@@ -583,6 +588,11 @@
- 		vopb_out: port {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
 +
-+			vopb_out_edp: endpoint at 0 {
-+				reg = <0>;
-+				remote-endpoint = <&edp_in_vopb>;
-+			};
- 		};
- 	};
- 
-@@ -595,6 +605,41 @@
- 		status = "disabled";
- 	};
- 
-+	edp: edp at ff970000 {
-+		compatible = "rockchip,rk3399-edp";
-+		reg = <0x0 0xff970000 0x0 0x8000>;
-+		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru PCLK_EDP>, <&cru PCLK_EDP_CTRL>;
-+		clock-names = "dp", "pclk";
-+		resets = <&cru SRST_P_EDP_CTRL>;
-+		reset-names = "dp";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&edp_hpd>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			edp_in: port at 0 {
-+				reg = <0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				edp_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_edp>;
-+				};
-+
-+				edp_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_edp>;
-+				};
-+			};
-+		};
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm0 0 25000 0>;
++		brightness-levels = <
++			  0   1   2   3   4   5   6   7
++			  8   9  10  11  12  13  14  15
++			 16  17  18  19  20  21  22  23
++			 24  25  26  27  28  29  30  31
++			 32  33  34  35  36  37  38  39
++			 40  41  42  43  44  45  46  47
++			 48  49  50  51  52  53  54  55
++			 56  57  58  59  60  61  62  63
++			 64  65  66  67  68  69  70  71
++			 72  73  74  75  76  77  78  79
++			 80  81  82  83  84  85  86  87
++			 88  89  90  91  92  93  94  95
++			 96  97  98  99 100 101 102 103
++			104 105 106 107 108 109 110 111
++			112 113 114 115 116 117 118 119
++			120 121 122 123 124 125 126 127
++			128 129 130 131 132 133 134 135
++			136 137 138 139 140 141 142 143
++			144 145 146 147 148 149 150 151
++			152 153 154 155 156 157 158 159
++			160 161 162 163 164 165 166 167
++			168 169 170 171 172 173 174 175
++			176 177 178 179 180 181 182 183
++			184 185 186 187 188 189 190 191
++			192 193 194 195 196 197 198 199
++			200 201 202 203 204 205 206 207
++			208 209 210 211 212 213 214 215
++			216 217 218 219 220 221 222 223
++			224 225 226 227 228 229 230 231
++			232 233 234 235 236 237 238 239
++			240 241 242 243 244 245 246 247
++			248 249 250 251 252 253 254 255>;
++		default-brightness-level = <200>;
++		enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
 +	};
-+
- 	display_subsystem: display-subsystem {
- 		compatible = "rockchip,display-subsystem";
- 		ports = <&vopl_out>, <&vopb_out>;
-@@ -1067,5 +1112,12 @@
- 					<1 14 RK_FUNC_1 &pcfg_pull_none>;
- 			};
- 		};
-+
-+		edp {
-+			edp_hpd: edp-hpd {
-+				rockchip,pins =
-+					<4 23 RK_FUNC_2 &pcfg_pull_none>;
-+			};
-+		};
- 	};
  };
+ 
+ &pwm0 {
 -- 
 1.9.1
