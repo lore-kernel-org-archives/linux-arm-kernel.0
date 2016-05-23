@@ -1,146 +1,209 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 23 May 2016 09:50:56 +0100
-Subject: [PATCH] drivers: nvmem: atmel-secumod: New driver for Atmel
- Secumod nvram
-In-Reply-To: <1463605564-14397-1-git-send-email-davidm@egauge.net>
-References: <20160518164259.GA28954@rob-hp-laptop>
- <1463605564-14397-1-git-send-email-davidm@egauge.net>
-Message-ID: <5742C470.9080708@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 23 May 2016 11:03:11 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6q: extend support for the cm-fx6
+In-Reply-To: <709d6b3d522f4fcb8112830e0426dbb3@rwthex-s1-b.rwth-ad.de>
+References: <709d6b3d522f4fcb8112830e0426dbb3@rwthex-s1-b.rwth-ad.de>
+Message-ID: <1463994191.2370.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the patch,
-Few minors comments below.
-
-On 18/05/16 22:06, David Mosberger-Tang wrote:
-> Signed-off-by: David Mosberger <davidm@egauge.net>
+Am Montag, den 23.05.2016, 00:47 +0200 schrieb
+christopher.spinrath at rwth-aachen.de:
+> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> 
+> The cm-fx6 module has an on-board spi-flash chip for its firmware, an
+> eeprom (containing e.g. the mac address of the on-board Ethernet),
+> a sata port, a pcie controller, an USB hub, and an USB otg port.
+> Enable support for them. In addition, enable syscon poweroff support.
+> 
+> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 > ---
->   .../devicetree/bindings/nvmem/atmel-secumod.txt    |  47 +++++++
->   drivers/nvmem/Kconfig                              |   7 +
->   drivers/nvmem/Makefile                             |   2 +
->   drivers/nvmem/atmel-secumod.c                      | 143 +++++++++++++++++++++
->   4 files changed, 199 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/nvmem/atmel-secumod.txt
->   create mode 100644 drivers/nvmem/atmel-secumod.c
->
-> diff --git a/Documentation/devicetree/bindings/nvmem/atmel-secumod.txt b/Documentation/devicetree/bindings/nvmem/atmel-secumod.txt
-> new file mode 100644
-> index 0000000..d65cad5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/nvmem/atmel-secumod.txt
-> @@ -0,0 +1,47 @@
-> += Atmel Secumod device tree bindings =
+>  arch/arm/boot/dts/imx6q-cm-fx6.dts | 136 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 136 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> index 99b46f8..f4fc22e 100644
+> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> @@ -31,6 +31,61 @@
+>  			linux,default-trigger = "heartbeat";
+>  		};
+>  	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 > +
 
-Can you split the dt-bindings into separate patch.
+Please remove this regulator pseudo-bus. It doesn't exist in hardware.
+The regulators are direct children of the module.
 
-> +This binding is intended to represent Atmel's Secumod which is found
-> +in SAMA5D2 and perhaps others.
+> +		reg_usb_otg_vbus: usb_otg_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio3 22 0>;
+> +			enable-active-high;
+> +		};
 > +
-> +Required properties:
-> +- compatible: should be "atmel,sama5d2-secumod"
-> +- reg: Should contain RAM location and length, followed
-> +       by register location and length of the Secumod controller.
-> +
-> += Data cells =
-> +Are child nodes of secumod, bindings of which as described in
-> +bindings/nvmem/nvmem.txt
-> +
-> +Example:
-> +
-> +    secumod at fc040000 {
-> +            compatible = "atmel,sama5d2-secumod";
-> +            reg = <0xf8044000 0x1420>, <0xfc040000 0x4000>;
-> +            reg-names = "SECURAM", "SECUMOD";
-> +            status = "okay";
-> +
-> +            #address-cells = <1>;
-> +            #size-cells = <1>;
-> +            ranges;
-> +
-> +            secram-auto-erasable at 0 {
-> +                    reg = <0x0000 0x1000>;
-> +            };
-> +            secram at 1000 {
-> +                    reg = <0x1000 0x400>;
-> +            };
-> +            ram at 1400 {
-> +                    reg = <0x1400 0x20>;
-> +            };
-> +    };
-> +
-> += Data consumers =
-> +Are device nodes which consume nvmem data cells.
-> +
-> +For example:
-> +
-> +	ram {
-> +		...
-> +		nvmem-cells = <&ram>;
-> +		nvmem-cell-names = "RAM";
+> +		reg_usb_h1_vbus: usb_h1_vbus {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb_h1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			gpio = <&gpio7 8 0>;
+> +			enable-active-high;
+> +		};
 > +	};
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> index 3041d48..88b21e3 100644
-> --- a/drivers/nvmem/Kconfig
-> +++ b/drivers/nvmem/Kconfig
-> @@ -101,4 +101,11 @@ config NVMEM_VF610_OCOTP
->   	  This driver can also be build as a module. If so, the module will
->   	  be called nvmem-vf610-ocotp.
->
-> +config NVMEM_ATMEL_SECUMOD
-> +       tristate "Atmel Secure Module driver"
-> +       depends on ARCH_AT91
-
-COMPILE_TEST ?
-Also please add
-depends on HAS_IOMEM
-
-> +       help
-> +         Select this to get support for the secure module (SECUMOD) built
-> +	 into the SAMA5D2 chips.
+> +};
 > +
->   endif
-...
-
-> index 0000000..fc5a96b
-> --- /dev/null
-> +++ b/drivers/nvmem/atmel-secumod.c
-
-...
+> +&ecspi1 {
+> +	fsl,spi-num-chipselects = <2>;
+> +	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1>;
+> +	status = "okay";
 > +
-> +/*
-> + * Security-module register definitions:
-> + */
-> +#define SECUMOD_RAMRDY	0x0014
+> +	flash: m25p80 at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "st,m25p", "jedec,spi-nor";
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
 > +
-> +/*
-> + * Since the secure module may need to automatically erase some of the
-> + * RAM, it may take a while for it to be ready.  As far as I know,
-> + * it's not documented how long this might take in the worst-case.
-> + */
-> +static void
-> +secumod_wait_ready (void *regs)
-> +{
-> +	unsigned long start, stop;
+> +		partition at 0 {
+> +			label = "uboot";
+> +			reg = <0x0 0xc0000>;
+> +		};
 > +
-> +	start = jiffies;
-> +	while (!(readl(regs + SECUMOD_RAMRDY) & 1))
-> +		msleep_interruptible(1);
-
-Worst case would be the system loop here forever, Can we add worst case 
-timeout for this, and get out of this loop.
-
-> +	stop = jiffies;
-> +	if (stop != start)
-> +		pr_info("nvmem-atmel-secumod: it took %u msec for SECUMOD "
-> +			"to become ready...\n", jiffies_to_msecs(stop - start));
-> +	else
-> +		pr_info("nvmem-atmel-secumod: ready\n");
-I dont see any use of this prints, We should probably remove these and 
-add just a one dev_dbg.
-
-> +}
+> +		partition at c0000 {
+> +			label = "uboot environment";
+> +			reg = <0xc0000 0x40000>;
+> +		};
 > +
-...
-thanks,
-srini
+> +		partition at 100000 {
+> +			label = "reserved";
+> +			reg = <0x100000 0x100000>;
+> +		};
+
+Partition layouts don't belong in the upstream DT, as it a device
+configuration thing. Please kep them in the bootloader/firmware and make
+this one pass the partition layout to the kernel.
+
+> +	};
+>  };
+>  
+>  &fec {
+> @@ -46,8 +101,31 @@
+>  	status = "okay";
+>  };
+>  
+> +&i2c3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c3>;
+> +	status = "okay";
+> +	clock-frequency = <100000>;
+> +
+> +	eeprom at 50 {
+> +		compatible = "at24,24c02";
+> +		reg = <0x50>;
+> +		pagesize = <16>;
+> +	};
+> +};
+> +
+>  &iomuxc {
+>  	imx6q-cm-fx6 {
+> +		pinctrl_ecspi1: ecspi1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK		 0x100b1
+> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO		 0x100b1
+> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI		 0x100b1
+> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30		0x100b1
+> +				MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x100b1
+> +			>;
+> +		};
+> +
+>  		pinctrl_enet: enetgrp {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+> @@ -91,17 +169,75 @@
+>  			>;
+>  		};
+>  
+> +		pinctrl_i2c3: i2c3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_3__I2C3_SCL 0x4001b8b1
+> +				MX6QDL_PAD_GPIO_6__I2C3_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pcie: pciegrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000
+> +				MX6QDL_PAD_EIM_CS1__GPIO2_IO24 0x80000000
+> +			>;
+> +		};
+> +
+>  		pinctrl_uart4: uart4grp {
+>  			fsl,pins = <
+>  				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
+>  				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
+>  			>;
+>  		};
+> +
+> +		pinctrl_usbh1: usbh1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_RST__GPIO7_IO08 0x80000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_usbotg: usbotggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
+> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22 0x80000000
+> +			>;
+> +		};
+>  	};
+>  };
+>  
+> +&pcie {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pcie>;
+> +	reset-gpio = <&gpio1 26 0>;
+> +	power-on-gpio = <&gpio2 24 0>;
+
+There is no power-on-gpio in the upstream binding.
+
+> +	status = "okay";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +};
+> +
+> +&snvs_poweroff {
+> +	status = "okay";
+> +};
+> +
+>  &uart4 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_uart4>;
+>  	status = "okay";
+>  };
+> +
+> +&usbotg {
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg>;
+> +	dr_mode = "otg";
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	vbus-supply = <&reg_usb_h1_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbh1>;
+> +	status = "okay";
+> +};
