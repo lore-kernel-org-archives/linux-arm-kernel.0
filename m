@@ -1,23 +1,107 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 23 May 2016 13:47:26 -0700
-Subject: [PATCH 1/3] dt-bindings: add used but undocumented rockchip grf
- compatible values
-In-Reply-To: <1464015539-19521-2-git-send-email-heiko@sntech.de>
-References: <1464015539-19521-1-git-send-email-heiko@sntech.de>
- <1464015539-19521-2-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=Vss6kx1Rpmi5iYGCfNBfRPU3pX4-2SysjSmhwVM_uGyA@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Mon, 23 May 2016 22:56:02 +0200 (CEST)
+Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
+In-Reply-To: <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
+References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
+ <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
+Message-ID: <190621859.107797.9eb91969-99a2-4cb3-babf-7e80dfe80a5e.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Hi Christopher,
 
-On Mon, May 23, 2016 at 7:58 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> There are some more General Register Files used in devicetree files
-> already, but as of now undocumented in the binding document, fix that.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> christopher.spinrath at rwth-aachen.de hat am 23. Mai 2016 um 00:47 geschrieben:
+> 
+> 
+> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> 
+> The CompuLab Utilite Pro is a miniature fanless desktop pc based on
+> the i.MX6 Quad powered cm-fx6 module. It features two serial ports,
+> USB OTG, 4x USB, analog audio and S/PDIF, 2x Gb Ethernet, HDMI and
+> DVI ports, an on-board 32GB SSD, a mmc slot, and on-board wifi/bt.
+> 
+> Add initial support for it including USB, Ethernet (both ports), sata
+> and HDMI support.
+> 
+> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 > ---
->  Documentation/devicetree/bindings/soc/rockchip/grf.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/boot/dts/Makefile              |   1 +
+>  arch/arm/boot/dts/imx6q-utilite-pro.dts | 128
+> ++++++++++++++++++++++++++++++++
+>  2 files changed, 129 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-utilite-pro.dts
+> 
+> ...
+> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> new file mode 100644
+> index 0000000..bcd8e0d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+> @@ -0,0 +1,128 @@
+> +/*
+> + * Copyright 2016 Christopher Spinrath
+> + * Copyright 2013 CompuLab Ltd.
+> + *
+> + * Based on the GPLv2 licensed devicetree distributed with the vendor
+> + * kernel for the Utilite Pro:
+> + *	Copyright 2013 CompuLab Ltd.
+> + *	Author: Valentin Raevsky <valentin@compulab.co.il>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> ...
+> +
+> +		pinctrl_uart2: uart2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
+> +				MX6QDL_PAD_GPIO_8__UART2_RX_DATA 0x1b0b1
+> +				MX6QDL_PAD_SD4_DAT5__UART2_RTS_B 0x1b0b1
+> +				MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&pcie {
+> +	pcie at 0,0 {
+> +		reg = <0x000000 0 0 0 0>;
+> +		#address-cells = <3>;
+> +		#size-cells = <2>;
+> +
+> +		/* non-removable i211 ethernet card */
+> +		eth1: intel,i211 at pcie0,0 {
+> +			reg = <0x010000 0 0 0 0>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	fsl,uart-has-rtscts;
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+this property is deprecated so please use the generic one:
+
+https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=1006ed7e1b258dac3e85c9fafe9d38b6020c917f
+
+Stefan
+
+> +	dma-names = "rx", "tx";
+> +	dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
+> +	status = "okay";
+> +};
+> -- 
+> 2.8.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
