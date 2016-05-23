@@ -1,64 +1,114 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 23 May 2016 18:59:31 +0200
-Subject: [PATCH v3 4/4] documentation: Add secure monitor binding
- documentation
-In-Reply-To: <20160523163815.GE4976@leverpostej>
-References: <1464021024-29380-1-git-send-email-carlo@caione.org>
- <1464021024-29380-5-git-send-email-carlo@caione.org>
- <20160523163815.GE4976@leverpostej>
-Message-ID: <20160523165931.GA31299@mephisto>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 23 May 2016 19:01:29 +0200
+Subject: [PATCH 07/16] clk: sunxi-ng: Add phase clock support
+In-Reply-To: <CAGb2v661dvdPKj9DWL7LWGgiDCEk7G-a_7jv5gb+KBMoWbR8Lg@mail.gmail.com>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-8-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v661dvdPKj9DWL7LWGgiDCEk7G-a_7jv5gb+KBMoWbR8Lg@mail.gmail.com>
+Message-ID: <20160523170129.GB27618@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/16 17:38, Mark Rutland wrote:
-> Hi,
+Hi,
+
+On Sun, May 22, 2016 at 12:43:48AM +0800, Chen-Yu Tsai wrote:
+> > +static int ccu_phase_set_phase(struct clk_hw *hw, int degrees)
+> > +{
+> > +       struct ccu_phase *phase = hw_to_ccu_phase(hw);
+> > +       struct clk_hw *parent, *pparent;
+> > +       unsigned int parent_rate, pparent_rate;
 > 
-> Minor nit, but please put the binding earlier in the series than the
-> code implementing it, as per
-> Documentation/devicetree/bindings/submitting-patches.txt
+> grandparent(_rate) would be easier to understand.
+
+Ack.
+
 > 
-> This makes it possible to review a series in a linear fashion.
-
-I'll do. Thanks for the pointer.
-
-[...]
+> > +       unsigned long flags;
+> > +       u32 reg;
+> > +       u8 delay;
 > > +
-> > +Required properties for the secure monitor node:
-> > +- compatible: Should be "amlogic,meson-sm"
-> > +- amlogic,sm-cmd-input-base: SMC32 function identifier to read the physical
-> > +                             address of the input buffer
-> > +- amlogic,sm-cmd-output-base: SMC32 function identifier to read the physical
-> > +                              address of the output buffer
+> > +       /* Get our parent clock, it's the one that can adjust its rate */
+> > +       parent = clk_hw_get_parent(hw);
+> > +       if (!parent)
+> > +               return -EINVAL;
+> > +
+> > +       /* And its rate */
+> > +       parent_rate = clk_hw_get_rate(parent);
+> > +       if (!parent_rate)
+> > +               return -EINVAL;
+> > +
+> > +       /* Now, get our parent's parent (most likely some PLL) */
+> > +       pparent = clk_hw_get_parent(parent);
+> > +       if (!pparent)
+> > +               return -EINVAL;
+> > +
+> > +       /* And its rate */
+> > +       pparent_rate = clk_hw_get_rate(pparent);
+> > +       if (!pparent_rate)
+> > +               return -EINVAL;
+> > +
+> > +       if (degrees != 180) {
+> > +               u16 step, parent_div;
+> > +
+> > +               /* Get our parent divider */
+> > +               parent_div = pparent_rate / parent_rate;
+> > +
+> > +               /*
+> > +                * We can only outphase the clocks by multiple of the
+> > +                * PLL's period.
+> > +                *
+> > +                * Since our parent clock is only a divider, and the
+> > +                * formula to get the outphasing in degrees is deg =
+> > +                * 360 * delta / period
+> > +                *
+> > +                * If we simplify this formula, we can see that the
+> > +                * only thing that we're concerned about is the number
+> > +                * of period we want to outphase our clock from, and
+> > +                * the divider set by our parent clock.
+> > +                */
+> > +               step = DIV_ROUND_CLOSEST(360, parent_div);
+> > +               delay = DIV_ROUND_CLOSEST(degrees, step);
 > 
-> Do the IDs for these actually differ per board?
-
-I expect these to differ per SoC (GXBB in this case), not per board. The
-driver is generic enough to be (hopefully) used for several SoCs just
-changing the related header file that defines the SCM commands.
-
-> Are some functions simply not implemented on some boards?
-
-I don't think this is possible.
-
-[...]
-> > +
-> > +Example of the node using the secure monitor:
-> > +
-> > +	#include <dt-bindings/firmware/meson-gxbb-sm.h>
-> > +
-> > +	...
-> > +
-> > +	efuse: efuse {
-> > +		compatible = "amlogic,meson-gxbb-efuse";
-> > +		secure-monitor = <&sm>;
-> > +		amlogic,sm-cmd-read-efuse = <SM_EFUSE_READ>;
-> > +		amlogic,sm-cmd-max-efuse = <SM_EFUSE_USER_MAX>;
+> Doesn't this mean some delay values are impossible to set?
 > 
-> Likewise for these?
+> For instance, for PLL = 600 MHz and this clock = 50 MHz, div would be 12,
+> and a step would be 30 degrees. This means we can't ask for a delay of 6,
+> which is 180 degrees.
+> 
+> For PLL = 600 MHz, clock = 100 MHz, div would be 6, and a step is 60
+> degrees. Therefor we can't ask for a delay of 3.
 
-AFAIK the secure monitor code and related commands are SoC specific.
+You don't ask for a delay, you ask for an outphasing in degrees. In
+the hardware, in the register 0 means an outphasing of 180 degrees
+(and this has been confirmed by Allwinner a while back). In the two
+cases you point out, we would have two ways of achieving the same
+thing, we prefer one over another, but I don't see how it's
+problematic.
 
-Thanks,
+It's also a direct copy of the current code we have, which didn't
+raise any objection, or had any known bugs.
+
+> > +struct ccu_phase {
+> > +       u8                      shift;
+> > +       u8                      width;
+> 
+> Not sure why you used struct ccu_factor in the divider table clock,
+> but separate fields directly in ccu_phase here.
+
+Because this is not meant for the same thing. ccu_factor is probably
+going to go away anyway because of the dividers consolidation.
+
+Thanks!
+Maxime
 
 -- 
-Carlo Caione
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160523/2ae847cb/attachment-0001.sig>
