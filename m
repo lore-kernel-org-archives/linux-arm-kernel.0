@@ -1,150 +1,97 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 23 May 2016 14:52:05 +0200
-Subject: [PATCH V5 1/6] vfio: platform: rename reset function
-In-Reply-To: <1463364819-477-2-git-send-email-okaya@codeaurora.org>
+Date: Mon, 23 May 2016 15:02:17 +0200
+Subject: [PATCH V5 2/6] vfio: platform: move reset call to a common
+ function
+In-Reply-To: <1463364819-477-3-git-send-email-okaya@codeaurora.org>
 References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
- <1463364819-477-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <5742FCF5.5060007@linaro.org>
+ <1463364819-477-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <5742FF59.6090108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan
+Hi Sinan,
 On 05/16/2016 04:13 AM, Sinan Kaya wrote:
-> Renaming the reset function to of_reset as it is only used
-> by the device tree based platforms.
+> The reset call sequence seems to replicate itself multiple times
+> across the file. Grouping them together for maintenance reasons.
 > 
 > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  drivers/vfio/platform/vfio_platform_common.c  | 30 +++++++++++++--------------
->  drivers/vfio/platform/vfio_platform_private.h |  6 +++---
->  2 files changed, 18 insertions(+), 18 deletions(-)
+>  drivers/vfio/platform/vfio_platform_common.c | 31 ++++++++++++++--------------
+>  1 file changed, 15 insertions(+), 16 deletions(-)
 > 
 > diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index e65b142..08fd7c2 100644
+> index 08fd7c2..cb91dd3 100644
 > --- a/drivers/vfio/platform/vfio_platform_common.c
 > +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -41,7 +41,7 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
->  		if (!strcmp(iter->compat, compat) &&
->  			try_module_get(iter->owner)) {
->  			*module = iter->owner;
-> -			reset_fn = iter->reset;
-> +			reset_fn = iter->of_reset;
->  			break;
->  		}
->  	}
-> @@ -51,18 +51,18 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
->  
->  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
->  {
-> -	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-> -						&vdev->reset_module);
-> -	if (!vdev->reset) {
-> +	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
-> +						    &vdev->reset_module);
-> +	if (!vdev->of_reset) {
->  		request_module("vfio-reset:%s", vdev->compat);
-> -		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-> -							 &vdev->reset_module);
-> +		vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
-> +							&vdev->reset_module);
->  	}
+> @@ -134,6 +134,18 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
+>  	kfree(vdev->regions);
 >  }
 >  
->  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
->  {
-> -	if (vdev->reset)
-> +	if (vdev->of_reset)
->  		module_put(vdev->reset_module);
->  }
->  
-> @@ -141,9 +141,9 @@ static void vfio_platform_release(void *device_data)
->  	mutex_lock(&driver_lock);
->  
->  	if (!(--vdev->refcnt)) {
-> -		if (vdev->reset) {
-> +		if (vdev->of_reset) {
->  			dev_info(vdev->device, "reset\n");
-> -			vdev->reset(vdev);
-> +			vdev->of_reset(vdev);
->  		} else {
->  			dev_warn(vdev->device, "no reset function found!\n");
->  		}
-> @@ -175,9 +175,9 @@ static int vfio_platform_open(void *device_data)
->  		if (ret)
->  			goto err_irq;
->  
-> -		if (vdev->reset) {
-> +		if (vdev->of_reset) {
->  			dev_info(vdev->device, "reset\n");
-> -			vdev->reset(vdev);
-> +			vdev->of_reset(vdev);
->  		} else {
->  			dev_warn(vdev->device, "no reset function found!\n");
->  		}
-> @@ -213,7 +213,7 @@ static long vfio_platform_ioctl(void *device_data,
->  		if (info.argsz < minsz)
->  			return -EINVAL;
->  
-> -		if (vdev->reset)
-> +		if (vdev->of_reset)
->  			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
->  		info.flags = vdev->flags;
->  		info.num_regions = vdev->num_regions;
-> @@ -312,8 +312,8 @@ static long vfio_platform_ioctl(void *device_data,
->  		return ret;
->  
->  	} else if (cmd == VFIO_DEVICE_RESET) {
-> -		if (vdev->reset)
-> -			return vdev->reset(vdev);
-> +		if (vdev->of_reset)
-> +			return vdev->of_reset(vdev);
->  		else
->  			return -EINVAL;
->  	}
-> @@ -611,7 +611,7 @@ void vfio_platform_unregister_reset(const char *compat,
->  
->  	mutex_lock(&driver_lock);
->  	list_for_each_entry_safe(iter, temp, &reset_list, link) {
-> -		if (!strcmp(iter->compat, compat) && (iter->reset == fn)) {
-> +		if (!strcmp(iter->compat, compat) && (iter->of_reset == fn)) {
->  			list_del(&iter->link);
->  			break;
->  		}
-> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-> index 42816dd..71ed7d1 100644
-> --- a/drivers/vfio/platform/vfio_platform_private.h
-> +++ b/drivers/vfio/platform/vfio_platform_private.h
-> @@ -71,7 +71,7 @@ struct vfio_platform_device {
->  	struct resource*
->  		(*get_resource)(struct vfio_platform_device *vdev, int i);
->  	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
-> -	int	(*reset)(struct vfio_platform_device *vdev);
-> +	int	(*of_reset)(struct vfio_platform_device *vdev);
->  };
->  
->  typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
-> @@ -80,7 +80,7 @@ struct vfio_platform_reset_node {
->  	struct list_head link;
->  	char *compat;
->  	struct module *owner;
-> -	vfio_platform_reset_fn_t reset;
-> +	vfio_platform_reset_fn_t of_reset;
->  };
->  
->  extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
-> @@ -103,7 +103,7 @@ extern void vfio_platform_unregister_reset(const char *compat,
->  static struct vfio_platform_reset_node __reset ## _node = {	\
->  	.owner = THIS_MODULE,					\
->  	.compat = __compat,					\
-> -	.reset = __reset,					\
-> +	.of_reset = __reset,					\
->  };								\
->  __vfio_platform_register_reset(&__reset ## _node)
->  
-> 
+> +static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
+> +{
+> +	if (vdev->of_reset) {
+> +		dev_info(vdev->device, "reset\n");
+> +		vdev->of_reset(vdev);
+> +		return 0;
+you should return vdev->of_reset(vdev) to keep the existing
+VFIO_DEVICE_RESET ioctl behavior
 
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
+Once fixed, Reviewed-by: Eric Auger <eric.auger@linaro.org>
+
+Besides, but this goes beyond the scope of your series, maybe we should
+reconsider in the future what happens in case the reset fails on
+open/release.
 
 Best Regards
 
 Eric
+> +	}
+> +
+> +	dev_warn(vdev->device, "no reset function found!\n");
+> +	return -EINVAL;
+> +}
+> +
+>  static void vfio_platform_release(void *device_data)
+>  {
+>  	struct vfio_platform_device *vdev = device_data;
+> @@ -141,12 +153,7 @@ static void vfio_platform_release(void *device_data)
+>  	mutex_lock(&driver_lock);
+>  
+>  	if (!(--vdev->refcnt)) {
+> -		if (vdev->of_reset) {
+> -			dev_info(vdev->device, "reset\n");
+> -			vdev->of_reset(vdev);
+> -		} else {
+> -			dev_warn(vdev->device, "no reset function found!\n");
+> -		}
+> +		vfio_platform_call_reset(vdev);
+>  		vfio_platform_regions_cleanup(vdev);
+>  		vfio_platform_irq_cleanup(vdev);
+>  	}
+> @@ -175,12 +182,7 @@ static int vfio_platform_open(void *device_data)
+>  		if (ret)
+>  			goto err_irq;
+>  
+> -		if (vdev->of_reset) {
+> -			dev_info(vdev->device, "reset\n");
+> -			vdev->of_reset(vdev);
+> -		} else {
+> -			dev_warn(vdev->device, "no reset function found!\n");
+> -		}
+> +		vfio_platform_call_reset(vdev);
+>  	}
+>  
+>  	vdev->refcnt++;
+> @@ -312,10 +314,7 @@ static long vfio_platform_ioctl(void *device_data,
+>  		return ret;
+>  
+>  	} else if (cmd == VFIO_DEVICE_RESET) {
+> -		if (vdev->of_reset)
+> -			return vdev->of_reset(vdev);
+> -		else
+> -			return -EINVAL;
+> +		return vfio_platform_call_reset(vdev);
+>  	}
+>  
+>  	return -ENOTTY;
+> 
