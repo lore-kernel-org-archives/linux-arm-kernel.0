@@ -1,42 +1,61 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 23 May 2016 15:59:12 +0200
-Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
-In-Reply-To: <20160523145315.38eacf07@bbrezillon>
-References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
- <20160125110921.GA4027@piout.net>
- <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
- <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
- <20160131113409.GI20165@piout.net>
- <20160523140424.7ded3893@bbrezillon>
- <20160523145315.38eacf07@bbrezillon>
-Message-ID: <20160523135912.GA2580@piout.net>
+From: damien.thebault@vitec.com (=?utf-8?B?RGFtaWVuIFRow6liYXVsdA==?=)
+Date: Mon, 23 May 2016 14:07:49 +0000
+Subject: armada thermal issues with negative temperatures
+Message-ID: <1464012466.1329.361.camel@vitec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/2016 at 14:53:15 +0200, Boris Brezillon wrote :
-> > Well, I think we're reaching this point right now: I have to implement
-> > "freeze" mode (entering a deep sleep mode by cutting all power domains
-> > except VDDBU), and in order to do that I need to access BUREGs which
-> > are part of the secu-sram you're trying to expose here.
-> > 
-> > Two comments on the nvmem approach:
-> > 1/ first of all it's not really a non-volative memory: if you loose
-> > VDDBU you also loose the whole SRAM content.
-> > 2/ I need to be able to reserve the BUREG region (at least part of it)
-> > for in kernel usage (need to store the SDRAM address I should jump to
-> > when exiting freeze mode).
-> 
-> Forget this aspect. As Alexandre pointed out, the nvmem framework
-> provides an in-kernel API, so reserving space for the "freeze" mode
-> implementation is doable. But need to use the securam for advanced
-> stuff (like executing code from there) then the SRAM driver approach is
-> more future-proof IMO.
-> 
+Hello,
 
-Yeah, in case we want to use the SRAM to actually run some code, we will
-need the sram driver.
+I've been using an armada 370 SoC, and the thermal driver is reporting
+erroneous values at negative temperatures.
+
+After looking at what happened, in the armada_get_temp() function,
+after applying shift and mask, we get the following values around 0?C:
+- 315 (just above 0)
+- 316 (just below 0)
+
+If the code after /* Get formula coeficients */ is executed with those
+two values, the first one gives the proper value of 216, but the second
+one gives 310160 instead of the proper value of -506.
+
+To have the proper final value, a signed division must be performed,
+which will only be done if both operands are signed according to the C
+standard, otherwise an unsigned division is done, which will provide
+wrong results.
+
+As the current coefficients are just fitting in unsigned long values,
+the best fix I could find was to just cast each operand to (signed)
+long.
+
+With this fix, the temperature is the proper one, even for negative
+values.
+
+Best Regards
+---
+?drivers/thermal/armada_thermal.c | 4 ++--
+?1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/thermal/armada_thermal.c
+b/drivers/thermal/armada_thermal.c
+index ae75328..ad8b88c 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -177,9 +177,9 @@ static int armada_get_temp(struct
+thermal_zone_device *thermal,
+?	div = priv->data->coef_div;
+?
+?	if (priv->data->inverted)
+-		*temp = ((m * reg) - b) / div;
++		*temp = (long)((m * reg) - b) / (long)div;
+?	else
+-		*temp = (b - (m * reg)) / div;
++		*temp = (long)(b - (m * reg)) / (long)div;
+?	return 0;
+?}
+?
+--?
+2.8.2
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Damien Th?bault
