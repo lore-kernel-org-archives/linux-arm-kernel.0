@@ -1,28 +1,63 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 May 2016 19:25:28 -0300
-Subject: Crash after 'reboot' due to 9be4fd2c7723a
-In-Reply-To: <20160523220514.GB19428@n2100.arm.linux.org.uk>
-References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
- <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
- <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
- <2148724.oQlEHos3jS@vostro.rjw.lan>
- <20160523182807.GY19428@n2100.arm.linux.org.uk>
- <CAJZ5v0ipPVsZmu+RVfrPChA7banMGFNsfMt=if0V3XfVdstRNQ@mail.gmail.com>
- <CAJZ5v0j0VbyHNT_ZmThsdQfRWzf7SG65A8-bPxoAUxZJgR96og@mail.gmail.com>
- <CAOMZO5Cbue9L2JGA0kv7nTZ=78oKDhNu6WLRUmcsSuLHscDVUQ@mail.gmail.com>
- <20160523210738.GZ19428@n2100.arm.linux.org.uk>
- <CAOMZO5DjjgNk+uHyH7Avvfrt_TNPaZ+SUtHzON5fPU=25_gKOg@mail.gmail.com>
- <20160523220514.GB19428@n2100.arm.linux.org.uk>
-Message-ID: <CAOMZO5D8-GF-0MDExM=2si1yNcqwO07pNWUkjRz0uuzkdYka_Q@mail.gmail.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Mon, 23 May 2016 18:26:25 -0400
+Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
+ registers
+In-Reply-To: <f49d58ed-38b4-6284-11c2-8708d8443b14@codeaurora.org>
+References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
+ <20160523172527.GK4976@leverpostej>
+ <f49d58ed-38b4-6284-11c2-8708d8443b14@codeaurora.org>
+Message-ID: <57438391.7090405@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 7:05 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
+On 05/23/2016 02:22 PM, Neil Leeder wrote:
+> 
+> On 5/23/2016 01:25 PM, Mark Rutland wrote:
+>> On Fri, May 20, 2016 at 03:13:07PM -0400, Neil Leeder wrote:
+>>> L2 registers are accessed using a select register and data
+>>> register pair. To prevent multiple concurrent writes to the
+>>> select register by independent drivers, the write to the
+>>> select register and the associated access of the data register
+>>> are protected with a lock. All drivers accessing the L2
+>>> registers use the set and get functions provided by
+>>> l2-accessors to ensure correct reads and writes to L2 registers.
+>>
+>> What will this be used for? (i.e. which drivers want to touch the L2
+>> registers?).
+>>
+>> Generally we expect FW to configure the caches and interconnect
+>> appropriately.
+> 
+> The primary use is in the L2 PMU driver, which will be posted shortly.
+> 
+>>
+>>> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+>>> ---
+>>>  drivers/soc/qcom/Kconfig              |  9 +++++
+>>>  drivers/soc/qcom/Makefile             |  1 +
+>>>  drivers/soc/qcom/l2-accessors.c       | 66 +++++++++++++++++++++++++++++++++++
+>>>  include/linux/soc/qcom/l2-accessors.h | 27 ++++++++++++++
+>>>  4 files changed, 103 insertions(+)
+>>>  create mode 100644 drivers/soc/qcom/l2-accessors.c
+>>>  create mode 100644 include/linux/soc/qcom/l2-accessors.h
+>>
+>> These are awfully generic file names (and function names). Which SoCs
+>> does this apply to?
+>>
+>> It would be good to give these more specific names.
+> 
+> It's under soc/qcom, and dependent on ARCH_QCOM and (in v2) also on ARM64. It applies to all QCOM ARM64 SoCs.
+> Given that it can only be used in a QCOM driver, and the include path has qcom in it, I'd
+> prefer not to add redundancy by adding another qcom in there.
 
-> I don't think so, unless you specifically turn off CONFIG_SMP_ON_UP.
-> It defaults to 'y', so imx_v6_v7_defconfig should result in this being
-> 'y'.
+They ended up calling the pinctrl file qcom/pinctrl/qdf2xxx.c.
 
-Sorry, you are right: option 3 (CONFIG_SMP=y and CONFIG_SMP_ON_UP=y)
-is the default one with imx_v6_v7_defconfig.
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=8f1338cd80648adf5434798f5393ad7c55d10848
+
+Regards,
+Cov
+
+-- 
+Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
