@@ -1,43 +1,30 @@
-From: vigneshr@ti.com (R, Vignesh)
-Date: Mon, 23 May 2016 14:48:59 +0530
-Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
- encoder
-In-Reply-To: <20160520163404.GC14951@dtor-ws>
-References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
- <1463648641-6931-2-git-send-email-vigneshr@ti.com>
- <20160520163404.GC14951@dtor-ws>
-Message-ID: <5742CB03.8010805@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 23 May 2016 11:30:06 +0200
+Subject: [PATCH 0/3] Exynos IOMMU: improve clock management
+Message-ID: <1463995809-26862-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello,
+
+This patch series improves clock management in Exynos IOMMU driver, so
+the driver will be ready for potential deferred probe caused by
+not-yet-available clocks. Such case doesn't happen with current kernel,
+but it may happen with the planned rework on clocks and power domain
+code.
+
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
 
 
-On 5/20/2016 10:04 PM, Dmitry Torokhov wrote:
-> On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
->> There are rotary-encoders where GPIO lines reflect the actual position
->> of the rotary encoder dial. For example, if dial points to 9, then four
->> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
->> Add support for such rotary-encoder.
->> The driver relies on rotary-encoder,absolute-encoder DT property to
->> detect such encoders.
->> Since, GPIO IRQs are not necessary to work with
->> such encoders, optional polling mode support is added using
->> input_poll_dev skeleton. This is can be used by enabling
->> CONFIG_INPUT_GPIO_ROTARY_ENCODER_POLL_MODE_SUPPORT.
-> 
-> Does this really belong to a rotary encoder and not a new driver that
-> simply translates gpio-encoded value into ABS* event?
-> 
+Marek Szyprowski (3):
+  iommu/exynos: Return proper errors from getting clocks
+  iommu/exynos: Fix master clock management for inactive SYSMMU
+  iommu/exynos: Prepare clocks when needed, not in driver probe
 
-Currently rotary encoder driver only supports incremental/step counting
-rotary devices. However, the device that is there on am335x-ice is an
-absolute encoder but, IMO, nevertheless a kind of rotary encoder. The
-only difference is that there is no need to count steps and the absolute
-position value is always available as binary encoded state of connected
-GPIOs.
-The hardware on am335x-ice is a mechanical rotary encoder switch
-connected over 4 GPIOs. It is same as binary encoder described at [1]
-(except there are 4 GPIO lines), so this lead me to add support in
-rotary-encoder.
+ drivers/iommu/exynos-iommu.c | 95 ++++++++++++++++++++------------------------
+ 1 file changed, 42 insertions(+), 53 deletions(-)
 
-[1]https://en.wikipedia.org/wiki/Rotary_encoder#Standard_binary_encoding
+-- 
+1.9.2
