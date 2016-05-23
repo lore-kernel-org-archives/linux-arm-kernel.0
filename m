@@ -1,38 +1,56 @@
 From: henryc.chen@mediatek.com (Henry Chen)
-Date: Mon, 23 May 2016 15:13:28 +0800
-Subject: Add support for regulator operation mode of mt6397
-Message-ID: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
+Date: Mon, 23 May 2016 15:13:30 +0800
+Subject: [PATCH v2 2/3] regulator: of: Add support for parsing operation mode
+In-Reply-To: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
+References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <1463987611-32139-3-git-send-email-henryc.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some regulators support different operating modes, but there is no suitable
-property that can pass the opeation mode constraints on runtime at present.
+Some regulators support their operating mode to be changed by consumers for
+module specific purpose.
 
-This series making the change to specify supported modes as a devicetree list.
-Consumers can change or get the regulator operation mode by regulator_set_mode
-/regulator_get_mode and define the support operating mode on devicetree.
+This patch adds support to parse those properties and fill the regulator
+constraints so the regulator core can call the regualtor_set_mode to change
+the modes.
 
-There is a requirement from SVS driver. SVS calibartion requires that the
-regulator be in its low-noise (pwm mode) state at boot, but at all other times
-it can be normal mode for power saving.
-http://www.spinics.net/lists/devicetree/msg111204.html
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+---
+ drivers/regulator/of_regulator.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-Changes in v2:
-- Separate patch for binding document changes.
-- Create a header to define operation mode on dt-bindings.
-- Remove the property "regulator-supported-modes".
-
-Henry Chen (3):
-  regulator: DT: Add DT property for operation mode configuration
-  regulator: of: Add support for parsing operation mode
-  regulator: mt6397: Add buck change mode regulator interface for mt6397
-
- .../devicetree/bindings/regulator/regulator.txt    |  5 ++
- drivers/regulator/mt6397-regulator.c               | 89 +++++++++++++++++++---
- drivers/regulator/of_regulator.c                   | 15 +++-
- include/dt-bindings/regulator/regulator.h          | 14 ++++
- 4 files changed, 113 insertions(+), 10 deletions(-)
- create mode 100644 include/dt-bindings/regulator/regulator.h
-
+diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
+index 6b0aa80..7f8d82e 100644
+--- a/drivers/regulator/of_regulator.c
++++ b/drivers/regulator/of_regulator.c
+@@ -31,7 +31,7 @@ static void of_get_regulation_constraints(struct device_node *np,
+ 	struct regulation_constraints *constraints = &(*init_data)->constraints;
+ 	struct regulator_state *suspend_state;
+ 	struct device_node *suspend_np;
+-	int ret, i;
++	int ret, i, cnt;
+ 	u32 pval;
+ 
+ 	constraints->name = of_get_property(np, "regulator-name", NULL);
+@@ -167,6 +167,19 @@ static void of_get_regulation_constraints(struct device_node *np,
+ 		suspend_state = NULL;
+ 		suspend_np = NULL;
+ 	}
++	cnt = of_property_count_elems_of_size(np,
++					      "regulator-supported-modes",
++					      sizeof(u32));
++	if (cnt > 0)
++		constraints->valid_ops_mask |= REGULATOR_CHANGE_MODE;
++
++	for (i = 0; i < cnt; i++) {
++		u32 mode;
++
++		of_property_read_u32_index(np, "regulator-supported-modes",
++					   i, &mode);
++		constraints->valid_modes_mask |= (1 << mode);
++	}
+ }
+ 
+ /**
 -- 
 1.8.1.1.dirty
