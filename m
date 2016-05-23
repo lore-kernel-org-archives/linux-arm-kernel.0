@@ -1,28 +1,63 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 23 May 2016 14:44:02 +0200
-Subject: [PATCH] arm: Enable interrupts before calling schedule()
-In-Reply-To: <alpine.DEB.2.11.1605201740320.3639@nanos>
-References: <alpine.DEB.2.11.1605201740320.3639@nanos>
-Message-ID: <20160523124402.GJ15728@worktop.ger.corp.intel.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 23 May 2016 14:52:20 +0200
+Subject: [PATCH v2 11/23] ARM: dts: armadillo800eva: Fix W=1 dtc warnings
+In-Reply-To: <e0a1fbc1-ac95-2c79-65ed-d0328679bb8a@cogentembedded.com>
+References: <1463728214-13838-1-git-send-email-geert+renesas@glider.be>
+ <1463728214-13838-12-git-send-email-geert+renesas@glider.be>
+ <e0a1fbc1-ac95-2c79-65ed-d0328679bb8a@cogentembedded.com>
+Message-ID: <CAMuHMdXPhMToHhZggdKo=i65nS_mQT1o44YBd_Lz-B2Td3Jm9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 05:42:17PM +0200, Thomas Gleixner wrote:
-> do_work_pending() calls schedule() with interrupts disabled, which is just
-> wrong. Fix it.
+On Fri, May 20, 2016 at 5:38 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 05/20/2016 10:10 AM, Geert Uytterhoeven wrote:
+>> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+>> Warning (unit_address_vs_reg): Node /regulator at 0 has a unit name, but no reg property
+>> Warning (unit_address_vs_reg): Node /regulator at 1 has a unit name, but no reg property
+>> Warning (unit_address_vs_reg): Node /regulator at 2 has a unit name, but no reg property
+>> Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
+>> Warning (unit_address_vs_reg): Node /i2c at 2 has a unit name, but no reg property
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> v2:
+>>   - No changes.
+>> ---
+>>  arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 12 ++++++------
+>>  1 file changed, 6 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+>> b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+>> index 2c82dab2b6f45f9c..b3f0ac4b99bd5a3d 100644
+>> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+>> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+>
+> [...]
+>>
+>> @@ -127,7 +127,7 @@
+>>                 };
+>>         };
+>>
+>> -       i2c2: i2c at 2 {
+>> +       i2c2: i2c2 {
+>
+>    Not "i2c-2" as in the other patches?
 
-Thomas; lockdep cannot currently catch this. It doesn't do IRQ state
-validation other than ensuring the state matches with the hardware.
+Oops... Thanks for noticing!
 
-So things like:
+Simon: Do you want me to repost the whole series once again, or
+can you fix this up while applying?
 
-	local_irq_disable();
-	local_irq_disable();
-	local_irq_save();
-	local_irq_enable();
+Thanks!
 
-(and 'obviously' suspect sequence of IRQ events)
+Gr{oetje,eeting}s,
 
-Are _fine_ by it. The only time it will yell is if flipping IRQ state
-ends up marking an actual held lock with ENABLED_HARDIRQ while it
-already had USED_IN_HARDIRQ.
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
