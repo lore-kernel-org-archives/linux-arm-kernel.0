@@ -1,50 +1,74 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 23 May 2016 12:39:33 +0200
-Subject: [PATCH] pinctrl: mediatek: fix dual-edge code defect
-In-Reply-To: <1463815419-11719-1-git-send-email-hongkun.cao@mediatek.com>
-References: <1463815419-11719-1-git-send-email-hongkun.cao@mediatek.com>
-Message-ID: <5742DDE5.7050701@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 23 May 2016 11:47:04 +0100
+Subject: [PATCH v2 1/3] regulator: DT: Add DT property for operation mode
+ configuration
+In-Reply-To: <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
+References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
+ <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <20160523104703.GB26992@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 21/05/16 09:23, hongkun.cao at mediatek.com wrote:
-> From: "hongkun.cao" <hongkun.cao@mediatek.com>
->
-> When a dual-edge irq is triggered, an incorrect irq will be reported on
-> condition that the external signal is not stable and this incorrect irq
-> has been registered.
-> Correct the register offset.
->
-
-I'm not sure what you want to say. From what I can see the without this 
-fix, the the wrong IRQ will be cleared and raised. Is this what you are 
-addressing?
-
-If so:
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
-
-> Signed-off-by: hongkun.cao <hongkun.cao@mediatek.com>
+On Mon, May 23, 2016 at 03:13:29PM +0800, Henry Chen wrote:
+> Some regulators support their operating mode to be changed by consumers for
+> module specific purpose. Add a DT property to support this.
+> 
+> Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
 > ---
->   drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    5 +++--
->   1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index 2bbe6f7..92ae49f 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -1255,9 +1255,10 @@ static void mtk_eint_irq_handler(struct irq_desc *desc)
->   	const struct mtk_desc_pin *pin;
->
->   	chained_irq_enter(chip, desc);
-> -	for (eint_num = 0; eint_num < pctl->devdata->ap_num; eint_num += 32) {
-> +	for (eint_num = 0;
-> +	     eint_num < pctl->devdata->ap_num;
-> +	     eint_num += 32, reg += 4) {
->   		status = readl(reg);
-> -		reg += 4;
->   		while (status) {
->   			offset = __ffs(status);
->   			index = eint_num + offset;
->
+>  Documentation/devicetree/bindings/regulator/regulator.txt |  5 +++++
+>  include/dt-bindings/regulator/regulator.h                 | 14 ++++++++++++++
+>  2 files changed, 19 insertions(+)
+>  create mode 100644 include/dt-bindings/regulator/regulator.h
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/regulator.txt b/Documentation/devicetree/bindings/regulator/regulator.txt
+> index ecfc593..e505d0b 100644
+> --- a/Documentation/devicetree/bindings/regulator/regulator.txt
+> +++ b/Documentation/devicetree/bindings/regulator/regulator.txt
+> @@ -49,6 +49,11 @@ Optional properties:
+>  	0: Disable active discharge.
+>  	1: Enable active discharge.
+>  	Absence of this property will leave configuration to default.
+> +- regulator-supported-modes: Regulators can run in a variety of different
+> +  operating modes depending on output load. This allows further system power
+> +  savings by selecting the best (and most efficient) regulator mode for a
+> +  desired load. The definition for each of these operation is defined at
+> +  include/dt-bindings/regulator/regulator.h
+
+This doesen't tell me for the property is formatted.
+
+Is it a list? A mask?
+
+>  
+>  Deprecated properties:
+>  - regulator-compatible: If a regulator chip contains multiple
+> diff --git a/include/dt-bindings/regulator/regulator.h b/include/dt-bindings/regulator/regulator.h
+> new file mode 100644
+> index 0000000..2ed1dfd
+> --- /dev/null
+> +++ b/include/dt-bindings/regulator/regulator.h
+> @@ -0,0 +1,14 @@
+> +/*
+> + * This header provides constants for binding regulator.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_REGULATOR_REGULATOR_H
+> +#define _DT_BINDINGS_REGULATOR_REGULATOR_H
+> +
+> +/* Regulator operating modes */
+> +#define REGULATOR_OPERATION_MODE_FAST			0x0
+> +#define REGULATOR_OPERATION_MODE_NORMAL			0x1
+> +#define REGULATOR_OPERATION_MODE_IDLE			0x2
+> +#define REGULATOR_OPERATION_MODE_STANDBY		0x3
+
+These sound like they're tied to linux internal details (e.g. the
+implementation of idle and/or suspend).
+
+What do each of these actually mean?
+
+Mark.
+
+> +
+> +#endif
+> -- 
+> 1.8.1.1.dirty
+> 
