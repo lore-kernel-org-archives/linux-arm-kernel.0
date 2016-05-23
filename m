@@ -1,42 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 May 2016 13:36:58 +0100
-Subject: [PATCH 2/7] KVM: arm/arm64: vgic-v3: Clear all dirty LRs
+Date: Mon, 23 May 2016 13:36:59 +0100
+Subject: [PATCH 3/7] KVM: arm/arm64: vgic-v2: Always resample level interrupts
 In-Reply-To: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
 References: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1464007023-11736-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1464007023-11736-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+When reading back from the list registers, we need to perform
+two actions for level interrupts:
+1) clear the soft-pending bit if the interrupt is not pending
+   anymore *in the list register*
+2) resample the line level and propagate it to the pending state
 
-When saving the state of the list registers, it is critical to
-reset them zero, as we could otherwise leave unexpected EOI
-interrupts pending for virtual level interrupts.
+But these two actions linked, and we should *always* resample
+the line level, no matter what state is in the list register.
+Otherwise, we may end-up injecting spurious interrupts that
+have been already retired.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/vgic-v3-sr.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic-v2.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index fff7cd4..3129df9 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -190,12 +190,11 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 			if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
- 				continue;
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 8ad42c2..f659af0 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -112,10 +112,13 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 			}
+ 		}
  
--			if (cpu_if->vgic_elrsr & (1 << i)) {
-+			if (cpu_if->vgic_elrsr & (1 << i))
- 				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
--				continue;
--			}
-+			else
-+				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
- 
--			cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
- 			__gic_v3_set_lr(0, i);
+-		/* Clear soft pending state when level IRQs have been acked */
+-		if (irq->config == VGIC_CONFIG_LEVEL &&
+-		    !(val & GICH_LR_PENDING_BIT)) {
+-			irq->soft_pending = false;
++		/*
++		 * Clear soft pending state when level irqs have been acked.
++		 * Always resample the line level.
++		 */
++		if (irq->config == VGIC_CONFIG_LEVEL) {
++			if (!(val & GICH_LR_PENDING_BIT))
++				irq->soft_pending = false;
+ 			irq->pending = irq->line_level;
  		}
  
 -- 
