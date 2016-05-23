@@ -1,79 +1,47 @@
-From: vigneshr@ti.com (R, Vignesh)
-Date: Mon, 23 May 2016 16:48:40 +0530
-Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
- encoder
-In-Reply-To: <20160522102606.GB23704@pengutronix.de>
-References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
- <1463648641-6931-2-git-send-email-vigneshr@ti.com>
- <20160522102606.GB23704@pengutronix.de>
-Message-ID: <5742E710.9@ti.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 23 May 2016 12:28:56 +0100
+Subject: [PATCH v2 1/3] regulator: DT: Add DT property for operation mode
+ configuration
+In-Reply-To: <20160523104703.GB26992@leverpostej>
+References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
+ <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
+ <20160523104703.GB26992@leverpostej>
+Message-ID: <20160523112856.GR8206@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 23, 2016 at 11:47:04AM +0100, Mark Rutland wrote:
 
+> > +/* Regulator operating modes */
+> > +#define REGULATOR_OPERATION_MODE_FAST			0x0
+> > +#define REGULATOR_OPERATION_MODE_NORMAL			0x1
+> > +#define REGULATOR_OPERATION_MODE_IDLE			0x2
+> > +#define REGULATOR_OPERATION_MODE_STANDBY		0x3
 
-On 5/22/2016 3:56 PM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
->> There are rotary-encoders where GPIO lines reflect the actual position
->> of the rotary encoder dial. For example, if dial points to 9, then four
->> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
->> Add support for such rotary-encoder.
->> The driver relies on rotary-encoder,absolute-encoder DT property to
->> detect such encoders.
->> Since, GPIO IRQs are not necessary to work with
->> such encoders, optional polling mode support is added using
-> 
-> I don't understand this. It's necessary in the same way as with the
-> already supported devices. I.e. you want to trigger an irq when the
-> encoder is moved and then check for it's position in the handler.
-> 
+> These sound like they're tied to linux internal details (e.g. the
+> implementation of idle and/or suspend).
 
-Unlike already supported device, there is no need to count steps or
-determine the direction of rotation. Hence, IRQ is not a requirement,
-periodically polling the gpio lines is more than sufficient. With
-absolute encoder, you are able to determine the current position at any
-time just by looking at the gpio inputs.
-Suppose we poll device at t=0ms and see gpio values are LLLH(1), if we
-again poll device at t=500ms(which is what input_poll_dev helps to do)
-and see that gpio values is LLHH(3), then we know that rotary encoder
-has changed to 3. This can be done w/o IRQ for absolute encoders.
+> What do each of these actually mean?
 
->> diff --git a/Documentation/devicetree/bindings/input/rotary-encoder.txt b/Documentation/devicetree/bindings/input/rotary-encoder.txt
->> index 6c9f0c8a846c..9c928dbd1500 100644
->> --- a/Documentation/devicetree/bindings/input/rotary-encoder.txt
->> +++ b/Documentation/devicetree/bindings/input/rotary-encoder.txt
->> @@ -12,6 +12,10 @@ Optional properties:
->>  - rotary-encoder,relative-axis: register a relative axis rather than an
->>    absolute one. Relative axis will only generate +1/-1 events on the input
->>    device, hence no steps need to be passed.
->> +- rotary-encoder,absolute-encoder: support encoders where GPIO lines
->> +  reflect the actual position of the rotary encoder dial. For example,
->> +  if dial points to 9, then four GPIO lines read HLLH(1001b = 9).
->> +  In this case, rotary-encoder,steps-per-period needed not be defined.
-> 
-> IMHO this is wrong, I'd formalize this device as:
-> 
-> 	{
-> 		compatible = "rotary-encoder";
-> 		gpios = <&gpio 19 1>, <&gpio 20 0>, <...>, <...>;
-> 		rotary-encoder,encoding = "binary";
-> 		rotary-encoder,steps = <16>;
-> 		rotary-encoder,steps-per-period = <16>;
+They are not really at all general and I'm fairly sure I've provided the
+same feedback repeatedly on earlier versions of the patch set.  They are
+not entirely based on Linux internal details (or at least the Linux
+internal details tend to flow from the hardware) - broadly fast is
+forced PWM, normal is default, idle is LDO mode and standby is a lower
+quality LDO mode - but how this translates into anything that a consumer
+could actually use is unclear since the supported output loads and
+quality of regulation can vary wildy.  It's also somewhat implementation
+dependent what a given regulator does (and it's always possible that
+some regulators may have more modes to control or differing definitions
+in the hardware).
 
-The above bindings essential means quarter_period device. I would not
-like to bother with all the logic in rotary_encoder_quarter_period_irq()
-when we can know encoder->pos by directly reading state of gpio lines.
-
-> 		rotary-encoder,rollover;
-> 	}
-> 
-> and support this with a v4 of
-> 
-> 	http://thread.gmane.org/gmane.linux.kernel.input/48892
-> 
->
-
-IMHO, there needs to be separate IRQ handler for absolute encoders so
-that the driver logic is greatly simplified.
+Henry, *please* look at how the existing mode support in the bindings is
+done and consider how a consumer would use this given that it doesn't
+know anything about the regulator...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160523/45c856a7/attachment.sig>
