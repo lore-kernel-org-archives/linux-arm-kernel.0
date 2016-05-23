@@ -1,46 +1,62 @@
 From: hs.liao@mediatek.com (HS Liao)
-Date: Mon, 23 May 2016 20:23:06 +0800
-Subject: [PATCH v7 0/4] Mediatek MT8173 CMDQ support
-Message-ID: <1464006190-344-1-git-send-email-hs.liao@mediatek.com>
+Date: Mon, 23 May 2016 20:23:07 +0800
+Subject: [PATCH v7 1/4] dt-bindings: soc: Add documentation for the MediaTek
+ GCE unit
+In-Reply-To: <1464006190-344-1-git-send-email-hs.liao@mediatek.com>
+References: <1464006190-344-1-git-send-email-hs.liao@mediatek.com>
+Message-ID: <1464006190-344-2-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This adds documentation for the MediaTek Global Command Engine (GCE) unit
+found in MT8173 SoCs.
 
-Hi,
-
-This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
-to help read/write registers with critical time limitation, such as
-updating display configuration during the vblank. It controls Global
-Command Engine (GCE) hardware to achieve this requirement.
-
-These patches have a build dependency on top of v4.6-rc1.
-
-Changes since v6:
- - remove task waiting list
- - remove cmdq_command
- - use kzalloc/kfree instead of kmem_cache
- - use u64* instead of u32* if suitable
- - shrink some code
-
-Best regards,
-HS Liao
-
-HS Liao (4):
-  dt-bindings: soc: Add documentation for the MediaTek GCE unit
-  CMDQ: Mediatek CMDQ driver
-  arm64: dts: mt8173: Add GCE node
-  CMDQ: suspend/resume protection
-
- .../devicetree/bindings/soc/mediatek/gce.txt       |   34 +
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |    8 +
- drivers/soc/mediatek/Kconfig                       |   10 +
- drivers/soc/mediatek/Makefile                      |    1 +
- drivers/soc/mediatek/mtk-cmdq.c                    | 1062 ++++++++++++++++++++
- include/soc/mediatek/cmdq.h                        |  197 ++++
- 6 files changed, 1312 insertions(+)
+Signed-off-by: HS Liao <hs.liao@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/soc/mediatek/gce.txt       | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
- create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
- create mode 100644 include/soc/mediatek/cmdq.h
 
+diff --git a/Documentation/devicetree/bindings/soc/mediatek/gce.txt b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+new file mode 100644
+index 0000000..eff07e2
+--- /dev/null
++++ b/Documentation/devicetree/bindings/soc/mediatek/gce.txt
+@@ -0,0 +1,34 @@
++MediaTek GCE
++===============
++
++The Global Command Engine (GCE) is used to help read/write registers with
++critical time limitation, such as updating display configuration during the
++vblank. The GCE can be used to implement the Command Queue (CMDQ) driver.
++
++Required properties:
++- compatible: Must be "mediatek,mt8173-gce"
++- reg: Address range of the GCE unit
++- interrupts: The interrupt signal from the GCE block
++- clock: Clocks according to the common clock binding
++- clock-names: Must be "gce" to stand for GCE clock
++
++Required properties for a client device:
++- mediatek,gce: Should point to the respective GCE block
++
++Example:
++
++	gce: gce at 10212000 {
++		compatible = "mediatek,mt8173-gce";
++		reg = <0 0x10212000 0 0x1000>;
++		interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
++		clocks = <&infracfg CLK_INFRA_GCE>;
++		clock-names = "gce";
++	};
++
++Example for a client device:
++
++	mmsys: clock-controller at 14000000 {
++		compatible = "mediatek,mt8173-mmsys";
++		mediatek,gce = <&gce>;
++		...
++	};
 -- 
 1.9.1
