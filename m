@@ -1,63 +1,104 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 23 May 2016 14:52:20 +0200
-Subject: [PATCH v2 11/23] ARM: dts: armadillo800eva: Fix W=1 dtc warnings
-In-Reply-To: <e0a1fbc1-ac95-2c79-65ed-d0328679bb8a@cogentembedded.com>
-References: <1463728214-13838-1-git-send-email-geert+renesas@glider.be>
- <1463728214-13838-12-git-send-email-geert+renesas@glider.be>
- <e0a1fbc1-ac95-2c79-65ed-d0328679bb8a@cogentembedded.com>
-Message-ID: <CAMuHMdXPhMToHhZggdKo=i65nS_mQT1o44YBd_Lz-B2Td3Jm9Q@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 23 May 2016 14:53:15 +0200
+Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
+In-Reply-To: <20160523140424.7ded3893@bbrezillon>
+References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
+ <20160125110921.GA4027@piout.net>
+ <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
+ <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
+ <20160131113409.GI20165@piout.net>
+ <20160523140424.7ded3893@bbrezillon>
+Message-ID: <20160523145315.38eacf07@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 5:38 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 05/20/2016 10:10 AM, Geert Uytterhoeven wrote:
->> Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
->> Warning (unit_address_vs_reg): Node /regulator at 0 has a unit name, but no reg property
->> Warning (unit_address_vs_reg): Node /regulator at 1 has a unit name, but no reg property
->> Warning (unit_address_vs_reg): Node /regulator at 2 has a unit name, but no reg property
->> Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
->> Warning (unit_address_vs_reg): Node /i2c at 2 has a unit name, but no reg property
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> v2:
->>   - No changes.
->> ---
->>  arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 12 ++++++------
->>  1 file changed, 6 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
->> b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
->> index 2c82dab2b6f45f9c..b3f0ac4b99bd5a3d 100644
->> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
->> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
->
-> [...]
->>
->> @@ -127,7 +127,7 @@
->>                 };
->>         };
->>
->> -       i2c2: i2c at 2 {
->> +       i2c2: i2c2 {
->
->    Not "i2c-2" as in the other patches?
+On Mon, 23 May 2016 14:04:24 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Oops... Thanks for noticing!
+> Hi David,
+> 
+> Sorry for the late review (I know you've posted new versions but I want
+> to comment on this one).
+> 
+> On Sun, 31 Jan 2016 12:34:09 +0100
+> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+> 
+> > On 29/01/2016 at 11:13:05 +1100, Finn Thain wrote :  
+> > > 
+> > > On Mon, 25 Jan 2016, David Mosberger wrote:
+> > >     
+> > > > On Mon, Jan 25, 2016 at 4:09 AM, Alexandre Belloni 
+> > > > <alexandre.belloni@free-electrons.com> wrote:
+> > > >     
+> > > > > I know this does more than that but I think those thre sections should 
+> > > > > be registered using the nvmem framework. The sysfs file creation and 
+> > > > > accesses then comes for free.    
+> > > > 
+> > > > I think Finn's patches would have to go in for that first, since the 
+> > > > existing nvram code is a mess. Even with Finn's patches in, I think it 
+> > > > could go either way.    
+> > > 
+> > > I think Alexandre is speaking of the nvmem subsystem (not nvram).
+> > > Documentation/devicetree/bindings/nvmem
+> > > Documentation/nvmem
+> > > drivers/nvmem
+> > >     
+> > 
+> > absolutely.
+> >   
+> > > > I'm not exactly sure how some of the features of the security module 
+> > > > would be used: key management, auto erasing, there is a strange "backup 
+> > > > mode" vs "normal mode" which is not well documented, etc.  So I think it 
+> > > > may well end up being sufficiently different to warrant a separate 
+> > > > driver.    
+> > > 
+> > > nvmem is not a subsystem I am familiar with, so it's not immediately clear 
+> > > to me what your driver would look like if re-written that way.
+> > > 
+> > > Maybe it would become simpler. But if you did end up needing a separate 
+> > > misc driver as well, maybe use of the nvmem framework would actually 
+> > > increase complexity.
+> > > 
+> > > It would depend on your requirements. But I would focus on the actual 
+> > > requirement rather than uncertain future possibilities.
+> > >     
+> > > >     
+> > > > > Another idea is also to expose it using a genpool so it can be 
+> > > > > accessed as sram from inside the kernel.    
+> > > > 
+> > > > That may be a fine idea, but as far as our application is concerned, we 
+> > > > need user-level access to the battery-backed RAM.    
+> > > 
+> > > Right. I don't see how adding a memory allocator would help either.
+> > >     
+> > 
+> > While the immediate need is to use that sram from userspace, I think
+> > this is valuable to already think that at some point we will need to be
+> > able to partition and access that sram from the kernel.
+> > 
+> > 
+> >   
+> 
+> Well, I think we're reaching this point right now: I have to implement
+> "freeze" mode (entering a deep sleep mode by cutting all power domains
+> except VDDBU), and in order to do that I need to access BUREGs which
+> are part of the secu-sram you're trying to expose here.
+> 
+> Two comments on the nvmem approach:
+> 1/ first of all it's not really a non-volative memory: if you loose
+> VDDBU you also loose the whole SRAM content.
+> 2/ I need to be able to reserve the BUREG region (at least part of it)
+> for in kernel usage (need to store the SDRAM address I should jump to
+> when exiting freeze mode).
 
-Simon: Do you want me to repost the whole series once again, or
-can you fix this up while applying?
+Forget this aspect. As Alexandre pointed out, the nvmem framework
+provides an in-kernel API, so reserving space for the "freeze" mode
+implementation is doable. But need to use the securam for advanced
+stuff (like executing code from there) then the SRAM driver approach is
+more future-proof IMO.
 
-Thanks!
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
