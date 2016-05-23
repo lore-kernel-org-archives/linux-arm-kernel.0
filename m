@@ -1,104 +1,150 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 23 May 2016 14:53:15 +0200
-Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
-In-Reply-To: <20160523140424.7ded3893@bbrezillon>
-References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
- <20160125110921.GA4027@piout.net>
- <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
- <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
- <20160131113409.GI20165@piout.net>
- <20160523140424.7ded3893@bbrezillon>
-Message-ID: <20160523145315.38eacf07@bbrezillon>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 23 May 2016 14:52:05 +0200
+Subject: [PATCH V5 1/6] vfio: platform: rename reset function
+In-Reply-To: <1463364819-477-2-git-send-email-okaya@codeaurora.org>
+References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
+ <1463364819-477-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <5742FCF5.5060007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 May 2016 14:04:24 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Hi Sinan
+On 05/16/2016 04:13 AM, Sinan Kaya wrote:
+> Renaming the reset function to of_reset as it is only used
+> by the device tree based platforms.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/vfio/platform/vfio_platform_common.c  | 30 +++++++++++++--------------
+>  drivers/vfio/platform/vfio_platform_private.h |  6 +++---
+>  2 files changed, 18 insertions(+), 18 deletions(-)
+> 
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index e65b142..08fd7c2 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -41,7 +41,7 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+>  		if (!strcmp(iter->compat, compat) &&
+>  			try_module_get(iter->owner)) {
+>  			*module = iter->owner;
+> -			reset_fn = iter->reset;
+> +			reset_fn = iter->of_reset;
+>  			break;
+>  		}
+>  	}
+> @@ -51,18 +51,18 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+>  
+>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  {
+> -	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+> -						&vdev->reset_module);
+> -	if (!vdev->reset) {
+> +	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+> +						    &vdev->reset_module);
+> +	if (!vdev->of_reset) {
+>  		request_module("vfio-reset:%s", vdev->compat);
+> -		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
+> -							 &vdev->reset_module);
+> +		vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+> +							&vdev->reset_module);
+>  	}
+>  }
+>  
+>  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+>  {
+> -	if (vdev->reset)
+> +	if (vdev->of_reset)
+>  		module_put(vdev->reset_module);
+>  }
+>  
+> @@ -141,9 +141,9 @@ static void vfio_platform_release(void *device_data)
+>  	mutex_lock(&driver_lock);
+>  
+>  	if (!(--vdev->refcnt)) {
+> -		if (vdev->reset) {
+> +		if (vdev->of_reset) {
+>  			dev_info(vdev->device, "reset\n");
+> -			vdev->reset(vdev);
+> +			vdev->of_reset(vdev);
+>  		} else {
+>  			dev_warn(vdev->device, "no reset function found!\n");
+>  		}
+> @@ -175,9 +175,9 @@ static int vfio_platform_open(void *device_data)
+>  		if (ret)
+>  			goto err_irq;
+>  
+> -		if (vdev->reset) {
+> +		if (vdev->of_reset) {
+>  			dev_info(vdev->device, "reset\n");
+> -			vdev->reset(vdev);
+> +			vdev->of_reset(vdev);
+>  		} else {
+>  			dev_warn(vdev->device, "no reset function found!\n");
+>  		}
+> @@ -213,7 +213,7 @@ static long vfio_platform_ioctl(void *device_data,
+>  		if (info.argsz < minsz)
+>  			return -EINVAL;
+>  
+> -		if (vdev->reset)
+> +		if (vdev->of_reset)
+>  			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
+>  		info.flags = vdev->flags;
+>  		info.num_regions = vdev->num_regions;
+> @@ -312,8 +312,8 @@ static long vfio_platform_ioctl(void *device_data,
+>  		return ret;
+>  
+>  	} else if (cmd == VFIO_DEVICE_RESET) {
+> -		if (vdev->reset)
+> -			return vdev->reset(vdev);
+> +		if (vdev->of_reset)
+> +			return vdev->of_reset(vdev);
+>  		else
+>  			return -EINVAL;
+>  	}
+> @@ -611,7 +611,7 @@ void vfio_platform_unregister_reset(const char *compat,
+>  
+>  	mutex_lock(&driver_lock);
+>  	list_for_each_entry_safe(iter, temp, &reset_list, link) {
+> -		if (!strcmp(iter->compat, compat) && (iter->reset == fn)) {
+> +		if (!strcmp(iter->compat, compat) && (iter->of_reset == fn)) {
+>  			list_del(&iter->link);
+>  			break;
+>  		}
+> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+> index 42816dd..71ed7d1 100644
+> --- a/drivers/vfio/platform/vfio_platform_private.h
+> +++ b/drivers/vfio/platform/vfio_platform_private.h
+> @@ -71,7 +71,7 @@ struct vfio_platform_device {
+>  	struct resource*
+>  		(*get_resource)(struct vfio_platform_device *vdev, int i);
+>  	int	(*get_irq)(struct vfio_platform_device *vdev, int i);
+> -	int	(*reset)(struct vfio_platform_device *vdev);
+> +	int	(*of_reset)(struct vfio_platform_device *vdev);
+>  };
+>  
+>  typedef int (*vfio_platform_reset_fn_t)(struct vfio_platform_device *vdev);
+> @@ -80,7 +80,7 @@ struct vfio_platform_reset_node {
+>  	struct list_head link;
+>  	char *compat;
+>  	struct module *owner;
+> -	vfio_platform_reset_fn_t reset;
+> +	vfio_platform_reset_fn_t of_reset;
+>  };
+>  
+>  extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+> @@ -103,7 +103,7 @@ extern void vfio_platform_unregister_reset(const char *compat,
+>  static struct vfio_platform_reset_node __reset ## _node = {	\
+>  	.owner = THIS_MODULE,					\
+>  	.compat = __compat,					\
+> -	.reset = __reset,					\
+> +	.of_reset = __reset,					\
+>  };								\
+>  __vfio_platform_register_reset(&__reset ## _node)
+>  
+> 
 
-> Hi David,
-> 
-> Sorry for the late review (I know you've posted new versions but I want
-> to comment on this one).
-> 
-> On Sun, 31 Jan 2016 12:34:09 +0100
-> Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
-> 
-> > On 29/01/2016 at 11:13:05 +1100, Finn Thain wrote :  
-> > > 
-> > > On Mon, 25 Jan 2016, David Mosberger wrote:
-> > >     
-> > > > On Mon, Jan 25, 2016 at 4:09 AM, Alexandre Belloni 
-> > > > <alexandre.belloni@free-electrons.com> wrote:
-> > > >     
-> > > > > I know this does more than that but I think those thre sections should 
-> > > > > be registered using the nvmem framework. The sysfs file creation and 
-> > > > > accesses then comes for free.    
-> > > > 
-> > > > I think Finn's patches would have to go in for that first, since the 
-> > > > existing nvram code is a mess. Even with Finn's patches in, I think it 
-> > > > could go either way.    
-> > > 
-> > > I think Alexandre is speaking of the nvmem subsystem (not nvram).
-> > > Documentation/devicetree/bindings/nvmem
-> > > Documentation/nvmem
-> > > drivers/nvmem
-> > >     
-> > 
-> > absolutely.
-> >   
-> > > > I'm not exactly sure how some of the features of the security module 
-> > > > would be used: key management, auto erasing, there is a strange "backup 
-> > > > mode" vs "normal mode" which is not well documented, etc.  So I think it 
-> > > > may well end up being sufficiently different to warrant a separate 
-> > > > driver.    
-> > > 
-> > > nvmem is not a subsystem I am familiar with, so it's not immediately clear 
-> > > to me what your driver would look like if re-written that way.
-> > > 
-> > > Maybe it would become simpler. But if you did end up needing a separate 
-> > > misc driver as well, maybe use of the nvmem framework would actually 
-> > > increase complexity.
-> > > 
-> > > It would depend on your requirements. But I would focus on the actual 
-> > > requirement rather than uncertain future possibilities.
-> > >     
-> > > >     
-> > > > > Another idea is also to expose it using a genpool so it can be 
-> > > > > accessed as sram from inside the kernel.    
-> > > > 
-> > > > That may be a fine idea, but as far as our application is concerned, we 
-> > > > need user-level access to the battery-backed RAM.    
-> > > 
-> > > Right. I don't see how adding a memory allocator would help either.
-> > >     
-> > 
-> > While the immediate need is to use that sram from userspace, I think
-> > this is valuable to already think that at some point we will need to be
-> > able to partition and access that sram from the kernel.
-> > 
-> > 
-> >   
-> 
-> Well, I think we're reaching this point right now: I have to implement
-> "freeze" mode (entering a deep sleep mode by cutting all power domains
-> except VDDBU), and in order to do that I need to access BUREGs which
-> are part of the secu-sram you're trying to expose here.
-> 
-> Two comments on the nvmem approach:
-> 1/ first of all it's not really a non-volative memory: if you loose
-> VDDBU you also loose the whole SRAM content.
-> 2/ I need to be able to reserve the BUREG region (at least part of it)
-> for in kernel usage (need to store the SDRAM address I should jump to
-> when exiting freeze mode).
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
-Forget this aspect. As Alexandre pointed out, the nvmem framework
-provides an in-kernel API, so reserving space for the "freeze" mode
-implementation is doable. But need to use the securam for advanced
-stuff (like executing code from there) then the SRAM driver approach is
-more future-proof IMO.
+Best Regards
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Eric
