@@ -1,24 +1,27 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 23 May 2016 08:36:19 -0700
-Subject: [PATCH 0/2 (linux-stable-4.5.y)] net: stmmac: MDIO fixes
-In-Reply-To: <1464009463-23654-1-git-send-email-peppe.cavallaro@st.com>
-References: <1464009463-23654-1-git-send-email-peppe.cavallaro@st.com>
-Message-ID: <20160523153619.GA30179@kroah.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 May 2016 10:41:38 -0500
+Subject: [PATCH v2 1/5] dt-bindings: mediatek: add descriptions for
+ mediatek mt2701 iommu and smi
+In-Reply-To: <1463658558-567-2-git-send-email-honghui.zhang@mediatek.com>
+References: <1463658558-567-1-git-send-email-honghui.zhang@mediatek.com>
+ <1463658558-567-2-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <20160523154138.GA31426@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 03:17:41PM +0200, Giuseppe Cavallaro wrote:
-> These patches port some recent fixes for linux-4.5.y stable branch.
-> They fix the MDIO settings trying to cover the all possible scenario
-> when the stmmac is connected to a real transceiver or a switch.
+On Thu, May 19, 2016 at 07:49:14PM +0800, honghui.zhang at mediatek.com wrote:
+> From: Honghui Zhang <honghui.zhang@mediatek.com>
 > 
-> These patches are needed for Kernel 4.5 where Lime2, BananaPi and Cubieboard2
-> show problems when use the stmmac:
+> This patch defines the local arbitor port IDs for mediatek SoC MT2701 and
+> add descriptions of binding for mediatek generation one iommu and smi.
 > 
-> https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=823493
+> Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
+> ---
+>  .../devicetree/bindings/iommu/mediatek,iommu.txt   | 13 +++-
+>  .../memory-controllers/mediatek,smi-common.txt     | 21 +++++-
+>  .../memory-controllers/mediatek,smi-larb.txt       |  4 +-
+>  include/dt-bindings/memory/mt2701-larb-port.h      | 85 ++++++++++++++++++++++
+>  4 files changed, 115 insertions(+), 8 deletions(-)
+>  create mode 100644 include/dt-bindings/memory/mt2701-larb-port.h
 
-What are the git commit id for these patches in Linus's tree?
-
-thanks,
-
-greg k-h
+Acked-by: Rob Herring <robh@kernel.org>
