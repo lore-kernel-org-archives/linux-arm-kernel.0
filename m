@@ -1,180 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 May 2016 18:25:27 +0100
-Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
- registers
-In-Reply-To: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
-References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
-Message-ID: <20160523172527.GK4976@leverpostej>
+From: austinwc@codeaurora.org (Christ, Austin)
+Date: Mon, 23 May 2016 11:45:51 -0600
+Subject: [PATCH v2 2/2] i2c: qup: support SMBus block read
+In-Reply-To: <000501d1b271$fef3bc90$fcdb35b0$@codeaurora.org>
+References: <1463006736-24652-1-git-send-email-nkaje@codeaurora.org>
+ <1463006736-24652-2-git-send-email-nkaje@codeaurora.org>
+ <000d01d1b0d3$d70e1f30$852a5d90$@codeaurora.org>
+ <757c18e2-562a-9f43-0fb6-ab3e7ac3af88@codeaurora.org>
+ <000501d1b271$fef3bc90$fcdb35b0$@codeaurora.org>
+Message-ID: <4ca84ab1-f558-25b1-2fa5-dbcf9e8cc2e7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 03:13:07PM -0400, Neil Leeder wrote:
-> L2 registers are accessed using a select register and data
-> register pair. To prevent multiple concurrent writes to the
-> select register by independent drivers, the write to the
-> select register and the associated access of the data register
-> are protected with a lock. All drivers accessing the L2
-> registers use the set and get functions provided by
-> l2-accessors to ensure correct reads and writes to L2 registers.
 
-What will this be used for? (i.e. which drivers want to touch the L2
-registers?).
 
-Generally we expect FW to configure the caches and interconnect
-appropriately.
-
-> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
-> ---
->  drivers/soc/qcom/Kconfig              |  9 +++++
->  drivers/soc/qcom/Makefile             |  1 +
->  drivers/soc/qcom/l2-accessors.c       | 66 +++++++++++++++++++++++++++++++++++
->  include/linux/soc/qcom/l2-accessors.h | 27 ++++++++++++++
->  4 files changed, 103 insertions(+)
->  create mode 100644 drivers/soc/qcom/l2-accessors.c
->  create mode 100644 include/linux/soc/qcom/l2-accessors.h
-
-These are awfully generic file names (and function names). Which SoCs
-does this apply to?
-
-It would be good to give these more specific names.
-
-> diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-> index 461b387..c8498cd 100644
-> --- a/drivers/soc/qcom/Kconfig
-> +++ b/drivers/soc/qcom/Kconfig
-> @@ -10,6 +10,15 @@ config QCOM_GSBI
->            functions for connecting the underlying serial UART, SPI, and I2C
->            devices to the output pins.
->  
-> +config QCOM_L2_ACCESSORS
-> +	bool "Qualcomm Technologies L2-cache accessors"
-> +	depends on ARCH_QCOM
-> +	help
-> +	  Say y here to enable support for the Qualcomm Technologies
-> +	  L2 accessors.
-> +	  Provides support for accessing registers in the L2 cache
-> +	  for Qualcomm Technologies chips.
-> +
->  config QCOM_PM
->  	bool "Qualcomm Power Management"
->  	depends on ARCH_QCOM && !ARM64
-> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-> index fdd664e..6ef29b9 100644
-> --- a/drivers/soc/qcom/Makefile
-> +++ b/drivers/soc/qcom/Makefile
-> @@ -1,4 +1,5 @@
->  obj-$(CONFIG_QCOM_GSBI)	+=	qcom_gsbi.o
-> +obj-$(CONFIG_QCOM_L2_ACCESSORS) += l2-accessors.o
->  obj-$(CONFIG_QCOM_PM)	+=	spm.o
->  obj-$(CONFIG_QCOM_SMD) +=	smd.o
->  obj-$(CONFIG_QCOM_SMD_RPM)	+= smd-rpm.o
-> diff --git a/drivers/soc/qcom/l2-accessors.c b/drivers/soc/qcom/l2-accessors.c
-> new file mode 100644
-> index 0000000..fbb69bd
-> --- /dev/null
-> +++ b/drivers/soc/qcom/l2-accessors.c
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/spinlock.h>
-> +#include <linux/module.h>
-> +#include <linux/soc/qcom/l2-accessors.h>
-> +#include <asm/cputype.h>
-> +#include <asm/sysreg.h>
-> +
-> +#define	L2CPUSRSELR_EL1	S3_3_c15_c0_6
-> +#define	L2CPUSRDR_EL1	S3_3_c15_c0_7
-> +
-> +static DEFINE_RAW_SPINLOCK(l2_access_lock);
-> +
-> +/**
-> + * set_l2_indirect_reg: write value to an L2 register
-> + * @reg: Address of L2 register.
-> + * @value: Value to be written to register.
-> + *
-> + * Use architecturally required barriers for ordering between system register
-> + * accesses
-> + */
-> +void set_l2_indirect_reg(u64 reg, u64 val)
-> +{
-> +	unsigned long flags;
-> +
-> +	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> +	write_sysreg(reg, L2CPUSRSELR_EL1);
-> +	isb();
-> +	write_sysreg(val, L2CPUSRDR_EL1);
-> +	isb();
-> +	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> +}
-> +EXPORT_SYMBOL(set_l2_indirect_reg);
-> +
-> +/**
-> + * get_l2_indirect_reg: read an L2 register value
-> + * @reg: Address of L2 register.
-> + *
-> + * Use architecturally required barriers for ordering between system register
-> + * accesses
-> + */
-> +u64 get_l2_indirect_reg(u64 reg)
-> +{
-> +	u64 val;
-> +	unsigned long flags;
-> +
-> +	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> +	write_sysreg(reg, L2CPUSRSELR_EL1);
-> +	isb();
-> +	val = read_sysreg(L2CPUSRDR_EL1);
-> +	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> +
-> +	return val;
-> +}
-> +EXPORT_SYMBOL(get_l2_indirect_reg);
-> diff --git a/include/linux/soc/qcom/l2-accessors.h b/include/linux/soc/qcom/l2-accessors.h
-> new file mode 100644
-> index 0000000..563c114
-> --- /dev/null
-> +++ b/include/linux/soc/qcom/l2-accessors.h
-> @@ -0,0 +1,27 @@
-> +/*
-> + * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-
-> +#ifndef __QCOM_L2_ACCESSORS_H
-> +#define __QCOM_L2_ACCESSORS_H
-> +
-> +#ifdef CONFIG_QCOM_L2_ACCESSORS
-> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
-> +u64 get_l2_indirect_reg(u64 reg_addr);
-> +#else
-> +static inline void set_l2_indirect_reg(u64 reg_addr, u64 val) {}
-> +static inline u64 get_l2_indirect_reg(u64 reg_addr)
-> +{
-> +	return 0;
-> +}
-
-Surely it would be better to error out on any unintentional use of these
-at build time?
+On 5/20/2016 2:31 AM, Sricharan wrote:
+> Hi,
+>
+> <snip..>
+>>>> @@ -1128,6 +1173,22 @@ static int qup_i2c_read_one_v2(struct
+>>>> qup_i2c_dev *qup, struct i2c_msg *msg)
+>>>>    			goto err;
+>>>>
+>>>>    		qup->blk.pos++;
+>>>> +
+>>>> +		/* Handle SMBus block read length */
+>>>> +		if (qup_i2c_check_msg_len(msg) && (msg->len == 1)) {
+>>>> +			if (msg->buf[0] > I2C_SMBUS_BLOCK_MAX) {
+>>>> +				ret = -EPROTO;
+>>>> +				goto err;
+>>>> +			}
+>>>> +			msg->len += msg->buf[0];
+>>>> +			qup->pos = 0;
+>>>> +			qup_i2c_set_read_mode_v2(qup, msg->len);
+>>>> +			qup_i2c_issue_xfer_v2(qup, msg);
+>>>> +			ret = qup_i2c_wait_for_complete(qup, msg);
+>>>> +			if (ret)
+>>>> +				goto err;
+>>> 		Is the issue_xfer_v2 needed inside this here ?
+>> No, qup_i2c_issue_xfer_v2 is needed so that we read rest of the data
+>> that is indicated by the length we read earlier.
+> So qup_i2c_issue_xfer_v2 writes the tags and there is one already in the loop above this
+>   check. So if you just do qup_i2c_set_read_mode_v2 and qup_i2c_set_blk_data inside this
+>   check, will not be enough ?
+>
+> Regards,
+>   Sricharan
+>
+In testing, removing the call to qup_i2c_issue_xfer_v2() within the 
+conditional statement for SMBus length causes failures. That transfer 
+request is needed to read that block of data.
 
 Thanks,
-Mark.
+Austin
