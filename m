@@ -1,40 +1,41 @@
 From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Mon, 23 May 2016 12:20:47 -0400
-Subject: [PATCH 0/4] hw rng support for NSP SoC
-Message-ID: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
+Date: Mon, 23 May 2016 12:20:48 -0400
+Subject: [PATCH 1/4] dt-bindings: rng: Northstar Plus SoC rng bindings
+In-Reply-To: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
+References: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <1464020451-16520-2-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset contains the hw random number generator support for the
-Broadcom's NSP SoC. The block is similar to the block available in
-bcm2835 with different default interrupt mask value. Due to lack of
-documentation, I cannot confirm the interrupt mask register details
-in bcm2835. In an effort to not break the existing functionality of
-bcm2835, I used a different compatible string to mask the interrupt
-for NSP SoC. Please let me know. Also supported providing requested
-number of random numbers instead of static size of four bytes.
+Document the bindings used by Northstar Plus(NSP) SoC random number
+generator.
 
-The first patch contains the documentation changes and the second patch
-contains the support for rng available in NSP SoC. The third patch
-contains the device tree changes for NSP SoC. The fourth patch contains
-the support for reading requested number of random numbers.
+Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+---
+ Documentation/devicetree/bindings/rng/brcm,bcm2835.txt | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
 
-This patch set has been tested on NSP bcm958625HR board.
-This patch set is based on v4.6.0-rc1 and is available from github
-repo: https://github.com/Broadcom/cygnus-linux.git
-branch: nsp-rng-v1
-
-Yendapally Reddy Dhananjaya Reddy (4):
-  dt-bindings: rng: Northstar Plus SoC rng bindings
-  hwrng: bcm2835: Support Broadcom NSP SoC rng
-  ARM: dts: nsp: Add rng device tree entry
-  hwrng: bcm2835: Read as much data as available
-
- .../devicetree/bindings/rng/brcm,bcm2835.txt       |  7 +++-
- arch/arm/boot/dts/bcm-nsp.dtsi                     |  5 +++
- drivers/char/hw_random/Kconfig                     |  2 +-
- drivers/char/hw_random/bcm2835-rng.c               | 46 +++++++++++++++++++---
- 4 files changed, 52 insertions(+), 8 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt b/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
+index 07ccdaa..aa304d4 100644
+--- a/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
++++ b/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
+@@ -2,7 +2,7 @@ BCM2835 Random number generator
+ 
+ Required properties:
+ 
+-- compatible : should be "brcm,bcm2835-rng"
++- compatible : should be "brcm,bcm2835-rng"  or "brcm,bcm-nsp-rng"
+ - reg : Specifies base physical address and size of the registers.
+ 
+ Example:
+@@ -11,3 +11,8 @@ rng {
+         compatible = "brcm,bcm2835-rng";
+         reg = <0x7e104000 0x10>;
+ };
++
++rng at 18033000 {
++	compatible = "brcm,bcm-nsp-rng";
++	reg = <0x18033000 0x14>;
++};
 -- 
 2.1.0
