@@ -1,81 +1,82 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 May 2016 14:49:12 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
-References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
- <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
-Message-ID: <CAOMZO5C5goJUdHKB9a=eOv9TKDkJWxnkWWb-G7E5Kvceg6sZVg@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 23 May 2016 18:50:54 +0100
+Subject: Applied "regulator: mt6397: Constify struct regulator_ops" to the
+ regulator tree
+In-Reply-To: <1463988616-18803-1-git-send-email-henryc.chen@mediatek.com>
+Message-ID: <E1b4u0E-0006j4-3g@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 22, 2016 at 7:47 PM,  <christopher.spinrath@rwth-aachen.de> wrote:
+The patch
 
-> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-> new file mode 100644
-> index 0000000..bcd8e0d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-> @@ -0,0 +1,128 @@
-> +/*
-> + * Copyright 2016 Christopher Spinrath
-> + * Copyright 2013 CompuLab Ltd.
-> + *
-> + * Based on the GPLv2 licensed devicetree distributed with the vendor
-> + * kernel for the Utilite Pro:
-> + *     Copyright 2013 CompuLab Ltd.
-> + *     Author: Valentin Raevsky <valentin@compulab.co.il>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
+   regulator: mt6397: Constify struct regulator_ops
 
-Can you make this dual GPL/X11 license?
+has been applied to the regulator tree at
 
-For reference take a look at:
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/imx6sl-warp.dts?id=refs/tags/v4.6
+   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
 
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-> +       gpio-keys {
-> +               compatible = "gpio-keys";
-> +               power {
-> +                       label = "Power Button";
-> +                       gpios = <&gpio1 29 1>;
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Better to use a label like:
-gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-> +&iomuxc {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_hog>;
-> +
-> +       hog {
-> +               pinctrl_hog: hoggrp {
-> +                       fsl,pins = <
-> +                               /* power button */
-> +                               MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x80000000
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
-Better to avoid 0x80000000. Replace it with the real iomux value
-instead so that you don't need to rely on the bootloader
-configuration.
+Thanks,
+Mark
 
-> +
-> +       imx6q-utilite-pro {
-> +               pinctrl_i2c1: i2c1grp {
-> +                       fsl,pins = <
-> +                               MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
-> +                               MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
-> +                       >;
-> +               };
+>From 7e3fc9960169ec5eab0ec6810fa24518ea3f3608 Mon Sep 17 00:00:00 2001
+From: Henry Chen <henryc.chen@mediatek.com>
+Date: Mon, 23 May 2016 15:30:16 +0800
+Subject: [PATCH] regulator: mt6397: Constify struct regulator_ops
 
-You should better remove one level of indentation. Check this commit
-for reference:
-https://git.kernel.org/cgit/linux/kernel/git/shawnguo/linux.git/commit/arch/arm/boot/dts/imx6q-tbs2910.dts?h=for-next&id=aa7871b53bc3c36b4adefe67f728143e2deeec93
+Consitify the structure of regulator operations.
 
-> +&uart2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart2>;
-> +       fsl,uart-has-rtscts;
-> +       dma-names = "rx", "tx";
-> +       dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
+Signed-off-by: Henry Chen <henryc.chen@mediatek.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/regulator/mt6397-regulator.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-No need to add the dma nodes as they are already present in imx6qdl.dtsi.
+diff --git a/drivers/regulator/mt6397-regulator.c b/drivers/regulator/mt6397-regulator.c
+index 17a5b6c2d6a9..1c45abb94409 100644
+--- a/drivers/regulator/mt6397-regulator.c
++++ b/drivers/regulator/mt6397-regulator.c
+@@ -160,7 +160,7 @@ static int mt6397_get_status(struct regulator_dev *rdev)
+ 	return (regval & info->qi) ? REGULATOR_STATUS_ON : REGULATOR_STATUS_OFF;
+ }
+ 
+-static struct regulator_ops mt6397_volt_range_ops = {
++static const struct regulator_ops mt6397_volt_range_ops = {
+ 	.list_voltage = regulator_list_voltage_linear_range,
+ 	.map_voltage = regulator_map_voltage_linear_range,
+ 	.set_voltage_sel = regulator_set_voltage_sel_regmap,
+@@ -172,7 +172,7 @@ static struct regulator_ops mt6397_volt_range_ops = {
+ 	.get_status = mt6397_get_status,
+ };
+ 
+-static struct regulator_ops mt6397_volt_table_ops = {
++static const struct regulator_ops mt6397_volt_table_ops = {
+ 	.list_voltage = regulator_list_voltage_table,
+ 	.map_voltage = regulator_map_voltage_iterate,
+ 	.set_voltage_sel = regulator_set_voltage_sel_regmap,
+@@ -184,7 +184,7 @@ static struct regulator_ops mt6397_volt_table_ops = {
+ 	.get_status = mt6397_get_status,
+ };
+ 
+-static struct regulator_ops mt6397_volt_fixed_ops = {
++static const struct regulator_ops mt6397_volt_fixed_ops = {
+ 	.list_voltage = regulator_list_voltage_linear,
+ 	.enable = regulator_enable_regmap,
+ 	.disable = regulator_disable_regmap,
+-- 
+2.8.1
