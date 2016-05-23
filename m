@@ -1,51 +1,68 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 May 2016 15:30:44 -0500
-Subject: [PATCH 1/3] Documentation: dtb: xgene: Add hwmon dts binding
- documentation
-In-Reply-To: <1463415447-29903-2-git-send-email-hotran@apm.com>
-References: <1463415447-29903-1-git-send-email-hotran@apm.com>
- <1463415447-29903-2-git-send-email-hotran@apm.com>
-Message-ID: <20160523203044.GA17450@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 23 May 2016 22:35:49 +0200
+Subject: [PATCH] hwrng: stm32 - fix build warning
+In-Reply-To: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
+References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
+Message-ID: <6297051.TAxtzW5OIB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2016 at 09:17:25AM -0700, Hoan Tran wrote:
-> This patch adds the APM X-Gene hwmon device tree node documentation.
+On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
+> We have been getting build warning about:
+> drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
+> drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
+> 					uninitialized in this function
 > 
-> Signed-off-by: Hoan Tran <hotran@apm.com>
+> On checking the code it turns out that sr can never be used
+> uninitialized as sr is getting initialized in the while loop and while
+> loop will always execute as the minimum value of max can be 32.
+> So just initialize sr to 0 while declaring it to silence the compiler.
+> 
+> Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
 > ---
->  .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt          | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+
+I notice that you are using a really old compiler. While this warning
+seems to be valid in the sense that the compiler should figure out that
+the variable might be used uninitialized, please update your toolchain
+before reporting other such problems, as gcc-4.6 had a lot more false
+positives that newer ones (5.x or 6.x) have.
+
 > 
-> diff --git a/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
-> new file mode 100644
-> index 0000000..49a482e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
-> @@ -0,0 +1,14 @@
-> +APM X-Gene hwmon driver
-> +
-> +Hwmon driver accesses sensors over the "SLIMpro" mailbox.
-
-DT bindings describe h/w, not driver data. I'm not sure this belongs in 
-DT and perhaps the devices for the mailbox should be created by the 
-mailbox driver.
-
-> +
-> +Required properties :
-> + - compatible : should be "apm,xgene-slimpro-hwmon"
-> + - mboxes : use the label reference for the mailbox as the first parameter.
-> +	    The second parameter is the channel number.
-
-When do you expect this to be different mailbox numbers? 
-
-> +
-> +Example :
-> +	hwmonslimpro {
-> +		compatible = "apm,xgene-slimpro-hwmon";
-> +		mboxes = <&mailbox 7>;
-> +	};
-> -- 
-> 1.9.1
+> build log at:
+> https://travis-ci.org/sudipm-mukherjee/parport/jobs/132180906
 > 
+>  drivers/char/hw_random/stm32-rng.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
+> index 92a8106..0533370 100644
+> --- a/drivers/char/hw_random/stm32-rng.c
+> +++ b/drivers/char/hw_random/stm32-rng.c
+> @@ -52,7 +52,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+>  {
+>  	struct stm32_rng_private *priv =
+>  	    container_of(rng, struct stm32_rng_private, rng);
+> -	u32 sr;
+> +	u32 sr = 0;
+>  	int retval = 0;
+>  
+>  	pm_runtime_get_sync((struct device *) priv->rng.priv);
+
+Does this work as well?
+
+diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
+index 92a810648bd0..5c836b0afa40 100644
+--- a/drivers/char/hw_random/stm32-rng.c
++++ b/drivers/char/hw_random/stm32-rng.c
+@@ -79,7 +79,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+ 		max -= sizeof(u32);
+ 	}
+ 
+-	if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
++	if (WARN_ONCE(retval > 0 && (sr & (RNG_SR_SEIS | RNG_SR_CEIS)),
+ 		      "bad RNG status - %x\n", sr))
+ 		writel_relaxed(0, priv->base + RNG_SR);
+ 
+I think it would be nicer to not add a bogus initialization.
+
+	Arnd
