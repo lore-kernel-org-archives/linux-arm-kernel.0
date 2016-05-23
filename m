@@ -1,78 +1,73 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon, 23 May 2016 18:30:24 +0200
-Subject: [PATCH v3 4/4] documentation: Add secure monitor binding documentation
+Date: Mon, 23 May 2016 18:30:22 +0200
+Subject: [PATCH v3 2/4] firmware: dt-bindings: Add secure monitor header file
+ for GXBB
 In-Reply-To: <1464021024-29380-1-git-send-email-carlo@caione.org>
 References: <1464021024-29380-1-git-send-email-carlo@caione.org>
-Message-ID: <1464021024-29380-5-git-send-email-carlo@caione.org>
+Message-ID: <1464021024-29380-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-Add the binding documentation for the Amlogic secure monitor driver.
+This patch adds the header file describing all the SMC function
+identifiers for the Amlogic Meson GXBB SoC.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- .../bindings/firmware/meson/meson_sm.txt           | 51 ++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+ include/dt-bindings/firmware/meson-gxbb-sm.h | 44 ++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 include/dt-bindings/firmware/meson-gxbb-sm.h
 
-diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+diff --git a/include/dt-bindings/firmware/meson-gxbb-sm.h b/include/dt-bindings/firmware/meson-gxbb-sm.h
 new file mode 100644
-index 0000000..2b71716
+index 0000000..b7d02df
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-@@ -0,0 +1,51 @@
-+* Amlogic Secure Monitor
++++ b/include/dt-bindings/firmware/meson-gxbb-sm.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2016 Endless Mobile, Inc.
++ * Author: Carlo Caione <carlo@endlessm.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program. If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+In the Amlogic SoCs the Secure Monitor code is used to provide access to the
-+NVMEM, enable JTAG, set USB boot, etc...
++#ifndef _MESON_SM_GXBB_H_
++#define _MESON_SM_GXBB_H_
 +
-+Required properties for the secure monitor node:
-+- compatible: Should be "amlogic,meson-sm"
-+- amlogic,sm-cmd-input-base: SMC32 function identifier to read the physical
-+                             address of the input buffer
-+- amlogic,sm-cmd-output-base: SMC32 function identifier to read the physical
-+                              address of the output buffer
++#define SM_GET_SHARE_MEM_INPUT_BASE		0x82000020
++#define SM_GET_SHARE_MEM_OUTPUT_BASE		0x82000021
++#define SM_GET_REBOOT_REASON			0x82000022
++#define SM_GET_SHARE_STORAGE_IN_BASE		0x82000023
++#define SM_GET_SHARE_STORAGE_OUT_BASE		0x82000024
++#define SM_GET_SHARE_STORAGE_BLOCK_BASE		0x82000025
++#define SM_GET_SHARE_STORAGE_MESSAGE_BASE	0x82000026
++#define SM_GET_SHARE_STORAGE_BLOCK_SIZE		0x82000027
++#define SM_EFUSE_READ				0x82000030
++#define SM_EFUSE_WRITE				0x82000031
++#define SM_EFUSE_WRITE_PATTERN			0x82000032
++#define SM_EFUSE_USER_MAX			0x82000033
++#define SM_JTAG_ON				0x82000040
++#define SM_JTAG_OFF				0x82000041
++#define SM_SET_USB_BOOT_FUNC			0x82000043
++#define SM_SECURITY_KEY_QUERY			0x82000060
++#define SM_SECURITY_KEY_READ			0x82000061
++#define SM_SECURITY_KEY_WRITE			0x82000062
++#define SM_SECURITY_KEY_TELL			0x82000063
++#define SM_SECURITY_KEY_VERIFY			0x82000064
++#define SM_SECURITY_KEY_STATUS			0x82000065
++#define SM_SECURITY_KEY_NOTIFY			0x82000066
++#define SM_SECURITY_KEY_LIST			0x82000067
++#define SM_SECURITY_KEY_REMOVE			0x82000068
++#define SM_DEBUG_EFUSE_WRITE_PATTERN		0x820000F0
++#define SM_DEBUG_EFUSE_READ_PATTERN		0x820000F1
++#define SM_AML_DATA_PROCESS			0x820000FF
 +
-+Example:
-+
-+	#include <dt-bindings/firmware/meson-gxbb-sm.h>
-+
-+	...
-+
-+	firmware {
-+		compatible = "simple-bus";
-+
-+		sm: secure-monitor {
-+			compatible = "amlogic,meson-sm";
-+			amlogic,sm-cmd-input-base = <SM_GET_SHARE_MEM_INPUT_BASE>;
-+			amlogic,sm-cmd-output-base = <SM_GET_SHARE_MEM_OUTPUT_BASE>;
-+		};
-+	};
-+
-+Node of a device using the secure monitor must have a custom property to
-+specify the SMC32 function the driver is going to use. The values of all the
-+SMC function identifiers are listed in a SoC-specific header file:
-+
-+"include/dt-bindings/firmware/meson-gxbb-sm.h" - for the Meson GXBB secure monitor.
-+
-+Example of the node using the secure monitor:
-+
-+	#include <dt-bindings/firmware/meson-gxbb-sm.h>
-+
-+	...
-+
-+	efuse: efuse {
-+		compatible = "amlogic,meson-gxbb-efuse";
-+		secure-monitor = <&sm>;
-+		amlogic,sm-cmd-read-efuse = <SM_EFUSE_READ>;
-+		amlogic,sm-cmd-max-efuse = <SM_EFUSE_USER_MAX>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		...
-+	};
-+
++#endif /* _MESON_SM_GXBB_H_ */
 -- 
 2.7.4
