@@ -1,68 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 May 2016 22:35:49 +0200
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
-Message-ID: <6297051.TAxtzW5OIB@wuerfel>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 23 May 2016 13:46:00 -0700
+Subject: [PATCH 2/3] soc: rockchip: add driver handling grf setup
+In-Reply-To: <1464015539-19521-3-git-send-email-heiko@sntech.de>
+References: <1464015539-19521-1-git-send-email-heiko@sntech.de>
+ <1464015539-19521-3-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=VbrhpyQ8Y+5qnYHmkSvq12im2tZtpgnryGeEdc7mci9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
-> We have been getting build warning about:
-> drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
-> drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
-> 					uninitialized in this function
-> 
-> On checking the code it turns out that sr can never be used
-> uninitialized as sr is getting initialized in the while loop and while
-> loop will always execute as the minimum value of max can be 32.
-> So just initialize sr to 0 while declaring it to silence the compiler.
-> 
-> Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
-> ---
+Heiko,
 
-I notice that you are using a really old compiler. While this warning
-seems to be valid in the sense that the compiler should figure out that
-the variable might be used uninitialized, please update your toolchain
-before reporting other such problems, as gcc-4.6 had a lot more false
-positives that newer ones (5.x or 6.x) have.
+On Mon, May 23, 2016 at 7:58 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> +struct rockchip_grf_info {
+> +       const struct rockchip_grf_value *values;
+> +       int num_values;
+> +};
+> +
+> +#define RK3036_GRF_SOC_CON0            0x140
+> +
+> +static const struct rockchip_grf_value rk3036_defaults[] = {
 
-> 
-> build log at:
-> https://travis-ci.org/sudipm-mukherjee/parport/jobs/132180906
-> 
->  drivers/char/hw_random/stm32-rng.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-> index 92a8106..0533370 100644
-> --- a/drivers/char/hw_random/stm32-rng.c
-> +++ b/drivers/char/hw_random/stm32-rng.c
-> @@ -52,7 +52,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
->  {
->  	struct stm32_rng_private *priv =
->  	    container_of(rng, struct stm32_rng_private, rng);
-> -	u32 sr;
-> +	u32 sr = 0;
->  	int retval = 0;
->  
->  	pm_runtime_get_sync((struct device *) priv->rng.priv);
+Worth saving the little bit of space by marking several of these
+structures as __initconst ?
 
-Does this work as well?
 
-diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-index 92a810648bd0..5c836b0afa40 100644
---- a/drivers/char/hw_random/stm32-rng.c
-+++ b/drivers/char/hw_random/stm32-rng.c
-@@ -79,7 +79,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
- 		max -= sizeof(u32);
- 	}
- 
--	if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
-+	if (WARN_ONCE(retval > 0 && (sr & (RNG_SR_SEIS | RNG_SR_CEIS)),
- 		      "bad RNG status - %x\n", sr))
- 		writel_relaxed(0, priv->base + RNG_SR);
- 
-I think it would be nicer to not add a bogus initialization.
+> +#define RK3399_GRF_SOC_CON7            0xe21c
+> +
+> +static const struct rockchip_grf_value rk3399_defaults[] = {
+> +       { "jtag switching", RK3399_GRF_SOC_CON7, HIWORD_UPDATE(0, 1, 12) },
+> +
+> +};
 
-	Arnd
+nit: extra blank line in rk3399_defaults?
+
+
+> +static int rockchip_grf_probe(struct platform_device *pdev)
+> +{
+> +       const struct rockchip_grf_info *grf_info;
+> +       const struct of_device_id *match;
+> +       struct device *dev = &pdev->dev;
+> +       struct regmap *grf;
+> +       int i;
+> +
+> +       if (!dev->of_node)
+> +               return -ENODEV;
+> +
+> +       match = of_match_device(rockchip_grf_dt_match, dev);
+> +       if (!match || !match->data) {
+> +               dev_err(dev, "missing grf data\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       grf_info = match->data;
+> +
+> +       grf = syscon_node_to_regmap(dev->of_node);
+> +       if (IS_ERR(grf)) {
+> +               dev_err(dev, "rockchip: could not get grf syscon\n");
+> +               return PTR_ERR(grf);
+> +       }
+> +
+> +       for (i = 0; i < grf_info->num_values; i++) {
+> +               const struct rockchip_grf_value *val = &grf_info->values[i];
+> +
+> +               dev_dbg(dev, "adjusting %s in 0x%x to 0x%x\n",
+
+optional-nitty-nit saves a character: s/0x%x/%#x/
+
+...or even force to 4 hex digits: %#6x
+
+> +                       val->desc, val->reg, val->val);
+> +               regmap_write(grf, val->reg, val->val);
+
+Dunno if we care, but regmap_write() does return an error.  Presumably
+it might return an error here if you somehow specified an offset that
+was outside of the range for the GRF?
+
+
+-Doug
