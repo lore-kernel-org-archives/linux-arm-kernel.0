@@ -1,216 +1,116 @@
-From: peppe.cavallaro@st.com (Giuseppe Cavallaro)
-Date: Mon, 23 May 2016 15:17:43 +0200
-Subject: [PATCH 2/2 (linux-stable-4.5.y)] stmmac: fix MDIO settings
-In-Reply-To: <1464009463-23654-1-git-send-email-peppe.cavallaro@st.com>
-References: <1464009463-23654-1-git-send-email-peppe.cavallaro@st.com>
-Message-ID: <1464009463-23654-3-git-send-email-peppe.cavallaro@st.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 23 May 2016 21:26:48 +0800
+Subject: [PATCH 1/3] arm64: dts: rockchip: add VOP and VOP iommu node for
+ rk3399
+In-Reply-To: <2088899.KxOSoPueyv@phil>
+References: <1464009056-32158-1-git-send-email-ykk@rock-chips.com>
+ <1464009070-32215-1-git-send-email-ykk@rock-chips.com>
+ <2088899.KxOSoPueyv@phil>
+Message-ID: <57430518.6090708@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initially the phy_bus_name was added to manipulate the
-driver name but it was recently just used to manage the
-fixed-link and then to take some decision at run-time.
-So the patch uses the is_pseudo_fixed_link and removes
-the phy_bus_name variable not necessary anymore.
 
-The driver can manage the mdio registration by using phy-handle,
-dwmac-mdio and own parameter e.g. snps,phy-addr.
-This patch takes care about all these possible configurations
-and fixes the mdio registration in case of there is a real
-transceiver or a switch (that needs to be managed by using
-fixed-link).
+On 05/23/2016 09:18 PM, Heiko Stuebner wrote:
+> Am Montag, 23. Mai 2016, 21:11:10 schrieb Yakir Yang:
+>> From: Mark Yao <mark.yao@rock-chips.com>
+> Please always at least provide some minimal patch description. Something
+> like
+>
+> --- 8< ---
+> Add the core display-subsystem node and the two display controllers
+> available on the rk3399
+> --- 8< ---
+>
+> applies to the other two patches as well.
+Okay  ;)
+>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> one Signed-off-by from Yakir to much ;-)
+Done
+> Otherwise all 3 look good, but we need to of course wait for the code-parts
+> to be in place.
+Thanks,
 
-Signed-off-by: Giuseppe Cavallaro <peppe.cavallaro@st.com>
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
-Tested-by: Frank Sch?fer <fschaefer.oss@googlemail.com>
-Cc: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-Cc: Dinh Nguyen <dinh.linux@gmail.com>
-Cc: David S. Miller <davem@davemloft.net>
-Cc: Phil Reid <preid@electromag.com.au>
----
- drivers/net/ethernet/stmicro/stmmac/stmmac_main.c  | 11 +--
- drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c  | 19 +----
- .../net/ethernet/stmicro/stmmac/stmmac_platform.c  | 84 +++++++++++++++++-----
- 3 files changed, 70 insertions(+), 44 deletions(-)
-
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-index c21015b..389d7d0 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_main.c
-@@ -271,7 +271,6 @@ static void stmmac_eee_ctrl_timer(unsigned long arg)
-  */
- bool stmmac_eee_init(struct stmmac_priv *priv)
- {
--	char *phy_bus_name = priv->plat->phy_bus_name;
- 	unsigned long flags;
- 	bool ret = false;
- 
-@@ -283,7 +282,7 @@ bool stmmac_eee_init(struct stmmac_priv *priv)
- 		goto out;
- 
- 	/* Never init EEE in case of a switch is attached */
--	if (phy_bus_name && (!strcmp(phy_bus_name, "fixed")))
-+	if (priv->phydev->is_pseudo_fixed_link)
- 		goto out;
- 
- 	/* MAC core supports the EEE feature. */
-@@ -820,12 +819,8 @@ static int stmmac_init_phy(struct net_device *dev)
- 		phydev = of_phy_connect(dev, priv->plat->phy_node,
- 					&stmmac_adjust_link, 0, interface);
- 	} else {
--		if (priv->plat->phy_bus_name)
--			snprintf(bus_id, MII_BUS_ID_SIZE, "%s-%x",
--				 priv->plat->phy_bus_name, priv->plat->bus_id);
--		else
--			snprintf(bus_id, MII_BUS_ID_SIZE, "stmmac-%x",
--				 priv->plat->bus_id);
-+		snprintf(bus_id, MII_BUS_ID_SIZE, "stmmac-%x",
-+			 priv->plat->bus_id);
- 
- 		snprintf(phy_id_fmt, MII_BUS_ID_SIZE + 3, PHY_ID_FMT, bus_id,
- 			 priv->plat->phy_addr);
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c
-index 0faf163..3f5512f 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_mdio.c
-@@ -198,29 +198,12 @@ int stmmac_mdio_register(struct net_device *ndev)
- 	struct mii_bus *new_bus;
- 	struct stmmac_priv *priv = netdev_priv(ndev);
- 	struct stmmac_mdio_bus_data *mdio_bus_data = priv->plat->mdio_bus_data;
-+	struct device_node *mdio_node = priv->plat->mdio_node;
- 	int addr, found;
--	struct device_node *mdio_node = NULL;
--	struct device_node *child_node = NULL;
- 
- 	if (!mdio_bus_data)
- 		return 0;
- 
--	if (IS_ENABLED(CONFIG_OF)) {
--		for_each_child_of_node(priv->device->of_node, child_node) {
--			if (of_device_is_compatible(child_node,
--						    "snps,dwmac-mdio")) {
--				mdio_node = child_node;
--				break;
--			}
--		}
--
--		if (mdio_node) {
--			netdev_dbg(ndev, "FOUND MDIO subnode\n");
--		} else {
--			netdev_warn(ndev, "No MDIO subnode found\n");
--		}
--	}
--
- 	new_bus = mdiobus_alloc();
- 	if (new_bus == NULL)
- 		return -ENOMEM;
-diff --git a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-index 6a52fa1..190fb6d 100644
---- a/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/stmmac_platform.c
-@@ -96,6 +96,69 @@ static int dwmac1000_validate_ucast_entries(int ucast_entries)
- }
- 
- /**
-+ * stmmac_dt_phy - parse device-tree driver parameters to allocate PHY resources
-+ * @plat: driver data platform structure
-+ * @np: device tree node
-+ * @dev: device pointer
-+ * Description:
-+ * The mdio bus will be allocated in case of a phy transceiver is on board;
-+ * it will be NULL if the fixed-link is configured.
-+ * If there is the "snps,dwmac-mdio" sub-node the mdio will be allocated
-+ * in any case (for DSA, mdio must be registered even if fixed-link).
-+ * The table below sums the supported configurations:
-+ *	-------------------------------
-+ *	snps,phy-addr	|     Y
-+ *	-------------------------------
-+ *	phy-handle	|     Y
-+ *	-------------------------------
-+ *	fixed-link	|     N
-+ *	-------------------------------
-+ *	snps,dwmac-mdio	|
-+ *	  even if	|     Y
-+ *	fixed-link	|
-+ *	-------------------------------
-+ *
-+ * It returns 0 in case of success otherwise -ENODEV.
-+ */
-+static int stmmac_dt_phy(struct plat_stmmacenet_data *plat,
-+			 struct device_node *np, struct device *dev)
-+{
-+	bool mdio = true;
-+
-+	/* If phy-handle property is passed from DT, use it as the PHY */
-+	plat->phy_node = of_parse_phandle(np, "phy-handle", 0);
-+	if (plat->phy_node)
-+		dev_dbg(dev, "Found phy-handle subnode\n");
-+
-+	/* If phy-handle is not specified, check if we have a fixed-phy */
-+	if (!plat->phy_node && of_phy_is_fixed_link(np)) {
-+		if ((of_phy_register_fixed_link(np) < 0))
-+			return -ENODEV;
-+
-+		dev_dbg(dev, "Found fixed-link subnode\n");
-+		plat->phy_node = of_node_get(np);
-+		mdio = false;
-+	}
-+
-+	/* If snps,dwmac-mdio is passed from DT, always register the MDIO */
-+	for_each_child_of_node(np, plat->mdio_node) {
-+		if (of_device_is_compatible(plat->mdio_node, "snps,dwmac-mdio"))
-+			break;
-+	}
-+
-+	if (plat->mdio_node) {
-+		dev_dbg(dev, "Found MDIO subnode\n");
-+		mdio = true;
-+	}
-+
-+	if (mdio)
-+		plat->mdio_bus_data =
-+			devm_kzalloc(dev, sizeof(struct stmmac_mdio_bus_data),
-+				     GFP_KERNEL);
-+	return 0;
-+}
-+
-+/**
-  * stmmac_probe_config_dt - parse device-tree driver parameters
-  * @pdev: platform_device structure
-  * @plat: driver data platform structure
-@@ -129,30 +192,15 @@ stmmac_probe_config_dt(struct platform_device *pdev, const char **mac)
- 	/* Default to phy auto-detection */
- 	plat->phy_addr = -1;
- 
--	/* If we find a phy-handle property, use it as the PHY */
--	plat->phy_node = of_parse_phandle(np, "phy-handle", 0);
--
--	/* If phy-handle is not specified, check if we have a fixed-phy */
--	if (!plat->phy_node && of_phy_is_fixed_link(np)) {
--		if ((of_phy_register_fixed_link(np) < 0))
--			return ERR_PTR(-ENODEV);
--
--		plat->phy_node = of_node_get(np);
--	}
--
- 	/* "snps,phy-addr" is not a standard property. Mark it as deprecated
- 	 * and warn of its use. Remove this when phy node support is added.
- 	 */
- 	if (of_property_read_u32(np, "snps,phy-addr", &plat->phy_addr) == 0)
- 		dev_warn(&pdev->dev, "snps,phy-addr property is deprecated\n");
- 
--	if ((plat->phy_node && !of_phy_is_fixed_link(np)) || plat->phy_bus_name)
--		plat->mdio_bus_data = NULL;
--	else
--		plat->mdio_bus_data =
--			devm_kzalloc(&pdev->dev,
--				     sizeof(struct stmmac_mdio_bus_data),
--				     GFP_KERNEL);
-+	/* To Configure PHY by using all device-tree supported properties */
-+	if (stmmac_dt_phy(plat, np, &pdev->dev))
-+		return ERR_PTR(-ENODEV);
- 
- 	of_property_read_u32(np, "tx-fifo-depth", &plat->tx_fifo_size);
- 
--- 
-2.7.4
+- Yakir
+>
+> Heiko
+>
+>> ---
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi | 58
+>> ++++++++++++++++++++++++++++++++ 1 file changed, 58 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 46f325a..54e5c25 100644
+>> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+>> @@ -543,6 +543,64 @@
+>>   		status = "disabled";
+>>   	};
+>>
+>> +	vopl: vop at ff8f0000 {
+>> +		compatible = "rockchip,rk3399-vop-lit";
+>> +		reg = <0x0 0xff8f0000 0x0 0x3efc>;
+>> +		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
+>> +		clocks = <&cru ACLK_VOP1>, <&cru DCLK_VOP1>, <&cru HCLK_VOP1>;
+>> +		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
+>> +		resets = <&cru SRST_A_VOP1>, <&cru SRST_H_VOP1>, <&cru SRST_D_VOP1>;
+>> +		reset-names = "axi", "ahb", "dclk";
+>> +		iommus = <&vopl_mmu>;
+>> +		status = "disabled";
+>> +
+>> +		vopl_out: port {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>> +	};
+>> +
+>> +	vopl_mmu: iommu at ff8f3f00 {
+>> +		compatible = "rockchip,iommu";
+>> +		reg = <0x0 0xff8f3f00 0x0 0x100>;
+>> +		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>;
+>> +		interrupt-names = "vopl_mmu";
+>> +		#iommu-cells = <0>;
+>> +		status = "disabled";
+>> +	};
+>> +
+>> +	vopb: vop at ff900000 {
+>> +		compatible = "rockchip,rk3399-vop-big";
+>> +		reg = <0x0 0xff900000 0x0 0x3efc>;
+>> +		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+>> +		clocks = <&cru ACLK_VOP0>, <&cru DCLK_VOP0>, <&cru HCLK_VOP0>;
+>> +		clock-names = "aclk_vop", "dclk_vop", "hclk_vop";
+>> +		resets = <&cru SRST_A_VOP0>, <&cru SRST_H_VOP0>, <&cru SRST_D_VOP0>;
+>> +		reset-names = "axi", "ahb", "dclk";
+>> +		iommus = <&vopb_mmu>;
+>> +		status = "disabled";
+>> +
+>> +		vopb_out: port {
+>> +			#address-cells = <1>;
+>> +			#size-cells = <0>;
+>> +		};
+>> +	};
+>> +
+>> +	vopb_mmu: iommu at ff903f00 {
+>> +		compatible = "rockchip,iommu";
+>> +		reg = <0x0 0xff903f00 0x0 0x100>;
+>> +		interrupts = <GIC_SPI 118 IRQ_TYPE_LEVEL_HIGH>;
+>> +		interrupt-names = "vopb_mmu";
+>> +		#iommu-cells = <0>;
+>> +		status = "disabled";
+>> +	};
+>> +
+>> +	display_subsystem: display-subsystem {
+>> +		compatible = "rockchip,display-subsystem";
+>> +		ports = <&vopl_out>, <&vopb_out>;
+>> +		status = "disabled";
+>> +	};
+>> +
+>>   	pinctrl: pinctrl {
+>>   		compatible = "rockchip,rk3399-pinctrl";
+>>   		rockchip,grf = <&grf>;
+>
+>
+>
