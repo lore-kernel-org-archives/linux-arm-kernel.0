@@ -1,66 +1,112 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Mon, 23 May 2016 15:32:39 +0800
-Subject: [PATCH v2 0/5] Thermal: Support for hardware-tracked trip points
-In-Reply-To: <1462268013-14992-1-git-send-email-wxt@rock-chips.com>
-References: <1462268013-14992-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <5742B217.4080405@gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Mon, 23 May 2016 09:41:32 +0200
+Subject: [PATCHv3] support for AD5820 camera auto-focus coil
+In-Reply-To: <574049EF.2090208@gmail.com>
+References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
+ <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com>
+Message-ID: <20160523074132.GD29844@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eduardo & 'Zhang Rui'
+On Saturday 21 May 2016 14:43:43 Ivaylo Dimitrov wrote:
+> >diff --git a/include/media/ad5820.h b/include/media/ad5820.h
+> >new file mode 100644
+> >index 0000000..f5a1565
+> >--- /dev/null
+> >+++ b/include/media/ad5820.h
+> >@@ -0,0 +1,70 @@
+> >+/*
+> >+ * include/media/ad5820.h
+> >+ *
+> >+ * Copyright (C) 2008 Nokia Corporation
+> >+ * Copyright (C) 2007 Texas Instruments
+> >+ *
+> >+ * Contact: Tuukka Toivonen <tuukka.o.toivonen@nokia.com>
+> >+ *          Sakari Ailus <sakari.ailus@nokia.com>
+> >+ *
+> >+ * Based on af_d88.c by Texas Instruments.
+> >+ *
+> >+ * This program is free software; you can redistribute it and/or
+> >+ * modify it under the terms of the GNU General Public License
+> >+ * version 2 as published by the Free Software Foundation.
+> >+ *
+> >+ * This program is distributed in the hope that it will be useful, but
+> >+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+> >+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> >+ * General Public License for more details.
+> >+ *
+> >+ * You should have received a copy of the GNU General Public License
+> >+ * along with this program; if not, write to the Free Software
+> >+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+> >+ * 02110-1301 USA
+> >+ */
+> >+
+> >+#ifndef AD5820_H
+> >+#define AD5820_H
+> >+
+> >+#include <linux/i2c.h>
+> >+#include <linux/mutex.h>
+> >+#include <linux/videodev2.h>
+> >+
+> >+#include <media/v4l2-ctrls.h>
+> >+#include <media/v4l2-subdev.h>
+> >+
+> >+struct regulator;
+> >+
+> >+#define AD5820_NAME		"ad5820"
+> >+#define AD5820_I2C_ADDR		(0x18 >> 1)
 
-Do we have the chance to merge this series patches for next kernel?
-I had picked them up in my github, and tested for a period of time with 
-rockchip inside kernel.
+Maybe write I2C address is more readable form? What is reason such
+bit shift format?
 
-Let me know if someone have some suggestions or against opinios.
-Thanks,
+> >+/* Register definitions */
+> >+#define AD5820_POWER_DOWN		(1 << 15)
+> >+#define AD5820_DAC_SHIFT		4
+> 
+> Do those defines really belong here? Isn't it better if they are moved to
+> ad5820.c?
 
--Caesar
-On 2016?05?03? 17:33, Caesar Wang wrote:
-> The history patches come from Mikko and Sascha.
-> http://thread.gmane.org/gmane.linux.power-management.general/59451
->
-> Now, I pick them up to continue upstream.
-> Nevermind!
->
-> This series history patches:
-> v1: https://lkml.org/lkml/2016/4/24/227
->
-> This series adds support for hardware trip points. It picks up earlier
-> work from Mikko Perttunen. Mikko implemented hardware trip points as part
-> of the device tree support. It was suggested back then to move the
-> functionality to the thermal core instead of putting more code into the
-> device tree support. This series does exactly that.
->
-> This series patches rebase the conflicts.
-> Note that the hardware-tracked trip points are very well tested currently.
->
-> Verified and tested on https://github.com/Caesar-github/rockchip/tree/wip/fixes-thermal-0503
-> That's based on linux-kernel 20160502.
-> .Linux version 4.6.0-rc6-next-20160502-08922-g860ed34 (wxt at nb)
->
->
-> Changes in v2:
-> - update the sysfs-api.txt for set_trips
-> - add the commit in patch[v2 2/5].
-> - Update the commit for patch[v2 4/5].
->
-> Caesar Wang (1):
->    thermal: rockchip: add the set_trips function
->
-> Sascha Hauer (4):
->    thermal: Add support for hardware-tracked trip points
->    thermal: of: implement .set_trips for device tree thermal zones
->    thermal: streamline get_trend callbacks
->    thermal: bang-bang governor: act on lower trip boundary
->
->   Documentation/thermal/sysfs-api.txt                |  7 +++
->   drivers/thermal/gov_bang_bang.c                    |  2 +-
->   drivers/thermal/of-thermal.c                       | 23 +++++-----
->   drivers/thermal/rockchip_thermal.c                 | 39 ++++++++++++++++
->   drivers/thermal/thermal_core.c                     | 52 ++++++++++++++++++++++
->   drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 25 ++++-------
->   include/linux/thermal.h                            |  9 +++-
->   7 files changed, 128 insertions(+), 29 deletions(-)
->
+For me it looks like this is private for ad5820.c.
+
+> >+#define AD5820_RAMP_MODE_LINEAR		(0 << 3)
+> >+#define AD5820_RAMP_MODE_64_16		(1 << 3)
+> >+
+> >+struct ad5820_platform_data {
+> >+	int (*set_xshutdown)(struct v4l2_subdev *subdev, int set);
+> >+};
+
+This is for legacy board code support right? We need DT support for N900
+as legacy board code is going to be deleted.
+
+> >+#define to_ad5820_device(sd)	container_of(sd, struct ad5820_device, subdev)
+> >+
+> >+struct ad5820_device {
+> >+	struct v4l2_subdev subdev;
+> >+	struct ad5820_platform_data *platform_data;
+> >+	struct regulator *vana;
+> >+
+> >+	struct v4l2_ctrl_handler ctrls;
+> >+	u32 focus_absolute;
+> >+	u32 focus_ramp_time;
+> >+	u32 focus_ramp_mode;
+> >+
+> >+	struct mutex power_lock;
+> >+	int power_count;
+> >+
+> >+	int standby : 1;
+> >+};
+> >+
+> 
+> The same for struct ad5820_device, is it really part of the public API?
+
+Yes, this is also private for ad5820.c
+
+> >+#endif /* AD5820_H */
+> >
+> >
+> >
+
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
