@@ -1,7 +1,7 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2016 23:05:14 +0100
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 23 May 2016 19:25:28 -0300
 Subject: Crash after 'reboot' due to 9be4fd2c7723a
-In-Reply-To: <CAOMZO5DjjgNk+uHyH7Avvfrt_TNPaZ+SUtHzON5fPU=25_gKOg@mail.gmail.com>
+In-Reply-To: <20160523220514.GB19428@n2100.arm.linux.org.uk>
 References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
  <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
  <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
@@ -12,38 +12,17 @@ References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
  <CAOMZO5Cbue9L2JGA0kv7nTZ=78oKDhNu6WLRUmcsSuLHscDVUQ@mail.gmail.com>
  <20160523210738.GZ19428@n2100.arm.linux.org.uk>
  <CAOMZO5DjjgNk+uHyH7Avvfrt_TNPaZ+SUtHzON5fPU=25_gKOg@mail.gmail.com>
-Message-ID: <20160523220514.GB19428@n2100.arm.linux.org.uk>
+ <20160523220514.GB19428@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5D8-GF-0MDExM=2si1yNcqwO07pNWUkjRz0uuzkdYka_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 06:38:31PM -0300, Fabio Estevam wrote:
-> On Mon, May 23, 2016 at 6:07 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> 
-> > Read the code again.  There's three states:
-> >
-> > 1. CONFIG_SMP=n - it always returns false.
-> > 2. CONFIG_SMP=y, CONFIG_SMP_ON_UP=n - it always returns true.  Such a
-> >    kernel can _only_ be run on SMP capable systems.
-> > 3. CONFIG_SMP=y, CONFIG_SMP_ON_UP=y - it returns depending on whether
-> >    we detect that the CPU is SMP capable.
-> 
-> Yes, I meant that on imx6ul we have option 2 above with imx_v6_v7_defconfig.
+On Mon, May 23, 2016 at 7:05 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
 
-I don't think so, unless you specifically turn off CONFIG_SMP_ON_UP.
-It defaults to 'y', so imx_v6_v7_defconfig should result in this being
-'y'.
+> I don't think so, unless you specifically turn off CONFIG_SMP_ON_UP.
+> It defaults to 'y', so imx_v6_v7_defconfig should result in this being
+> 'y'.
 
-> Also tested option 3 and is_smp() returns true as well.
-
-So that means the MPIDR register is telling the kernel...
-
-* The boot CPU has multiprocessor extensions.
-* The boot CPU is not part of a uniprocessor system.
-
-> I will try to see why GIC on this SoC cannot work in SMP.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Sorry, you are right: option 3 (CONFIG_SMP=y and CONFIG_SMP_ON_UP=y)
+is the default one with imx_v6_v7_defconfig.
