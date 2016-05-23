@@ -1,107 +1,50 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Mon, 23 May 2016 22:56:02 +0200 (CEST)
-Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
-References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
- <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
-Message-ID: <190621859.107797.9eb91969-99a2-4cb3-babf-7e80dfe80a5e.open-xchange@email.1und1.de>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 23 May 2016 13:58:05 -0700
+Subject: [PATCH v3 1/4] firmware: Amlogic: Add secure monitor driver
+In-Reply-To: <1464021024-29380-2-git-send-email-carlo@caione.org> (Carlo
+ Caione's message of "Mon, 23 May 2016 18:30:21 +0200")
+References: <1464021024-29380-1-git-send-email-carlo@caione.org>
+ <1464021024-29380-2-git-send-email-carlo@caione.org>
+Message-ID: <m2posco5k2.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
+Carlo Caione <carlo@caione.org> writes:
 
-> christopher.spinrath at rwth-aachen.de hat am 23. Mai 2016 um 00:47 geschrieben:
-> 
-> 
-> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-> 
-> The CompuLab Utilite Pro is a miniature fanless desktop pc based on
-> the i.MX6 Quad powered cm-fx6 module. It features two serial ports,
-> USB OTG, 4x USB, analog audio and S/PDIF, 2x Gb Ethernet, HDMI and
-> DVI ports, an on-board 32GB SSD, a mmc slot, and on-board wifi/bt.
-> 
-> Add initial support for it including USB, Ethernet (both ports), sata
-> and HDMI support.
-> 
-> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-> ---
->  arch/arm/boot/dts/Makefile              |   1 +
->  arch/arm/boot/dts/imx6q-utilite-pro.dts | 128
-> ++++++++++++++++++++++++++++++++
->  2 files changed, 129 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-utilite-pro.dts
-> 
-> ...
-> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts
-> b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-> new file mode 100644
-> index 0000000..bcd8e0d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-> @@ -0,0 +1,128 @@
-> +/*
-> + * Copyright 2016 Christopher Spinrath
-> + * Copyright 2013 CompuLab Ltd.
-> + *
-> + * Based on the GPLv2 licensed devicetree distributed with the vendor
-> + * kernel for the Utilite Pro:
-> + *	Copyright 2013 CompuLab Ltd.
-> + *	Author: Valentin Raevsky <valentin@compulab.co.il>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + */
-> +
-> ...
-> +
-> +		pinctrl_uart2: uart2grp {
-> +			fsl,pins = <
-> +				MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
-> +				MX6QDL_PAD_GPIO_8__UART2_RX_DATA 0x1b0b1
-> +				MX6QDL_PAD_SD4_DAT5__UART2_RTS_B 0x1b0b1
-> +				MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
-> +			>;
-> +		};
-> +	};
-> +};
-> +
-> +&pcie {
-> +	pcie at 0,0 {
-> +		reg = <0x000000 0 0 0 0>;
-> +		#address-cells = <3>;
-> +		#size-cells = <2>;
-> +
-> +		/* non-removable i211 ethernet card */
-> +		eth1: intel,i211 at pcie0,0 {
-> +			reg = <0x010000 0 0 0 0>;
-> +		};
-> +	};
-> +};
-> +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	fsl,uart-has-rtscts;
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> Introduce a driver to provide calls into secure monitor mode.
+>
+> In the Amlogic SoCs these calls are used for multiple reasons: access to
+> NVMEM, set USB boot, enable JTAG, etc...
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
 
-this property is deprecated so please use the generic one:
+[...]
 
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/commit/?id=1006ed7e1b258dac3e85c9fafe9d38b6020c917f
+> +static int meson_sm_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct meson_sm_firmware *fw;
+> +	u32 sm_phy_in_base, sm_phy_out_base;
+> +	int cmd_in, cmd_out;
+> +
+> +	fw = devm_kzalloc(&pdev->dev, sizeof(*fw), GFP_KERNEL);
+> +	if (!fw)
+> +		return -ENOMEM;
+> +
+> +	fw->dev = &pdev->dev;
+> +
+> +	if (of_property_read_u32(np, "amlogic,sm-cmd-input-base", &cmd_in))
+> +		return -EINVAL;
+> +
+> +	if (of_property_read_u32(np, "amlogic,sm-cmd-output-base", &cmd_out))
+> +		return -EINVAL;
+> +
+> +	sm_phy_in_base = meson_sm_call(cmd_in, 0, 0, 0, 0, 0);
 
-Stefan
+Should there be any error checking here?  Do we have any info on the
+return values here in case of error, or in case of missing firmware,
+etc.
 
-> +	dma-names = "rx", "tx";
-> +	dmas = <&sdma 27 4 0>, <&sdma 28 4 0>;
-> +	status = "okay";
-> +};
-> -- 
-> 2.8.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Kevin
