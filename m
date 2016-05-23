@@ -1,24 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 May 2016 16:23:13 -0500
-Subject: [PATCH V5 2/7] documentation: iommu: Add bindings for
- msm,iommu-v0 ip
-In-Reply-To: <1463741694-1735-3-git-send-email-sricharan@codeaurora.org>
-References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
- <1463741694-1735-3-git-send-email-sricharan@codeaurora.org>
-Message-ID: <20160523212313.GA4647@rob-hp-laptop>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 23 May 2016 18:38:31 -0300
+Subject: Crash after 'reboot' due to 9be4fd2c7723a
+In-Reply-To: <20160523210738.GZ19428@n2100.arm.linux.org.uk>
+References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
+ <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
+ <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
+ <2148724.oQlEHos3jS@vostro.rjw.lan>
+ <20160523182807.GY19428@n2100.arm.linux.org.uk>
+ <CAJZ5v0ipPVsZmu+RVfrPChA7banMGFNsfMt=if0V3XfVdstRNQ@mail.gmail.com>
+ <CAJZ5v0j0VbyHNT_ZmThsdQfRWzf7SG65A8-bPxoAUxZJgR96og@mail.gmail.com>
+ <CAOMZO5Cbue9L2JGA0kv7nTZ=78oKDhNu6WLRUmcsSuLHscDVUQ@mail.gmail.com>
+ <20160523210738.GZ19428@n2100.arm.linux.org.uk>
+Message-ID: <CAOMZO5DjjgNk+uHyH7Avvfrt_TNPaZ+SUtHzON5fPU=25_gKOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 04:24:49PM +0530, Sricharan R wrote:
-> The MSM IOMMU is an implementation compatible with the ARM VMSA short
-> descriptor page tables. It provides address translation for bus masters outside
-> of the CPU, each connected to the IOMMU through a port called micro-TLB.
-> Adding the DT bindings for the same.
-> 
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->  .../devicetree/bindings/iommu/msm,iommu-v0.txt     | 64 ++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iommu/msm,iommu-v0.txt
+On Mon, May 23, 2016 at 6:07 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> Read the code again.  There's three states:
+>
+> 1. CONFIG_SMP=n - it always returns false.
+> 2. CONFIG_SMP=y, CONFIG_SMP_ON_UP=n - it always returns true.  Such a
+>    kernel can _only_ be run on SMP capable systems.
+> 3. CONFIG_SMP=y, CONFIG_SMP_ON_UP=y - it returns depending on whether
+>    we detect that the CPU is SMP capable.
+
+Yes, I meant that on imx6ul we have option 2 above with imx_v6_v7_defconfig.
+
+Also tested option 3 and is_smp() returns true as well.
+
+I will try to see why GIC on this SoC cannot work in SMP.
