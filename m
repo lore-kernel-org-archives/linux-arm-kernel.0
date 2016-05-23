@@ -1,51 +1,56 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2016 19:28:07 +0100
-Subject: Crash after 'reboot' due to 9be4fd2c7723a
-In-Reply-To: <2148724.oQlEHos3jS@vostro.rjw.lan>
-References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
- <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
- <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
- <2148724.oQlEHos3jS@vostro.rjw.lan>
-Message-ID: <20160523182807.GY19428@n2100.arm.linux.org.uk>
+From: jcm@redhat.com (Jon Masters)
+Date: Mon, 23 May 2016 14:29:06 -0400
+Subject: [PATCH 3/3] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+In-Reply-To: <20160523175632.GA16456@red-moon>
+References: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
+ <20160517124629.GE14955@leverpostej>
+ <f0bf43ef-0be5-484c-5066-ab1929105b82@redhat.com>
+ <b0933a59-239d-536f-4f63-a65e469f62a1@redhat.com>
+ <20160523175632.GA16456@red-moon>
+Message-ID: <401c89a2-5dde-a4ae-6791-ccab7b4d366f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 21, 2016 at 02:56:20AM +0200, Rafael J. Wysocki wrote:
-> The root of the problem seems to be arch_irq_work_raise() and specifically
-> the __smp_cross_call function that appears to have problems.
+On 05/23/2016 01:56 PM, Lorenzo Pieralisi wrote:
+> On Tue, May 17, 2016 at 12:48:53PM -0400, Jon Masters wrote:
+>> On 05/17/2016 12:44 PM, Jon Masters wrote:
+>>
+>>> 1). During development of a platform, it is much easier to debug
+>>> problems with tables if you can test replacement ones without having to
+>>> respin the firmware. In the server world, you usually don't have the
+>>> firmware source code, so to get it respun could be days-weeks even if
+>>> you are working with the authors closely. We have practically used this
+>>> feature on a number of platforms already and it will continue.
+>>
+>> For example, on one platform we were unable to fully boot RHEL(SA) due
+>> to a bug in one of the ACPI tables. But I was able to boot the system to
+>> a ramdisk containing a uuencode library and then write out the content
+>> of the tables over the serial port, then decompile/patch/recompile, and
+>> override replacement tables on the system. Then we beat the vendor up
+>> with the fixes and the official firmware was corrected.
+> 
+> Can you explain to me please why you can't do it with GRUB ?
 
-We've been through this before.  The bottom line is that on ARM, there
-is major wide-spread understanding that we want to be able to run a
-kernel compiled for SMP on uniprocessor hardware.
+It's doable with GRUB (if you rebuild GRUB modules to include it)
 
-This is something that's been going for years, and has worked fine for
-years.
+> I am using mainline GRUB and its acpi command all the time to update
+> static ACPI tables for testing new features (ie IORT) and it works
+> just fine for me (and you can still override the DSDT, which is
+> likely to be the main source of bugs, through the CONFIG_ACPI_CUSTOM_DSDT
+> config option, that works on ARM in mainline with no changes required).
+> 
+> I just want to understand if there is really a compelling reason
+> for adding this stuff when we can easily implement its features
+> through something that is usable today without any kernel changes.
 
-Now, someone has introduced this irq work stuff.  Great.  But they
-haven't considered that people want to be able to run a SMP kernel
-on UP hardware which _may_ have no hardware present which is capable
-of raising IPIs.
+We're looking for x86 feature parity in the base platform. Every time
+there's a gratuitous differentiation it's a waste of time for folks
+trying to figure out what is different on an ARM system. So if we
+completely remove the ACPI override feature from the kernel and make
+everyone use GRUB instead, then fine, but ARM shouldn't be special.
 
-I don't know what the situation is with the platform concerned here,
-I don't know whether it uses the GIC (presumably, because it doesn't
-NULL-pointer ref on calling smp_cross_call(), it is using the GIC.)
-If so, the GIC isn't delivering the IPI because the IPI hardware is
-missing.
-
-Now, whether we could detect whether the GIC is IPI capable, I've
-no idea, I don't have such a platform I could run tests on.  People
-don't give me hardware anymore now that arm-soc is split off from
-core ARM maintanence - it all goes into Linaro build farms.  So I'm
-powerless to help here.
-
-My attitude towards this is that it's a core kernel problem: the
-core kernel is assuming that it can raise IPIs even on non-SMP
-capable hardware.  Much non-SMP hardware doesn't have that ability.
-While folk can try to push it into arch code, my feeling is that it
-really needs to have a generic solution, even if it's some generic
-solution that architectures in this situation can plug into.
+Jon.
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Computer Architect | Sent from my Fedora powered laptop
