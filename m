@@ -1,105 +1,77 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 23 May 2016 17:38:15 +0100
-Subject: [PATCH v3 4/4] documentation: Add secure monitor binding
- documentation
-In-Reply-To: <1464021024-29380-5-git-send-email-carlo@caione.org>
-References: <1464021024-29380-1-git-send-email-carlo@caione.org>
- <1464021024-29380-5-git-send-email-carlo@caione.org>
-Message-ID: <20160523163815.GE4976@leverpostej>
+Date: Mon, 23 May 2016 17:49:10 +0100
+Subject: [PATCH 3/3] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+In-Reply-To: <f0bf43ef-0be5-484c-5066-ab1929105b82@redhat.com>
+References: <1463486765-31827-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463486765-31827-4-git-send-email-aleksey.makarov@linaro.org>
+ <20160517124629.GE14955@leverpostej>
+ <f0bf43ef-0be5-484c-5066-ab1929105b82@redhat.com>
+Message-ID: <20160523164909.GF4976@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Minor nit, but please put the binding earlier in the series than the
-code implementing it, as per
-Documentation/devicetree/bindings/submitting-patches.txt
-
-This makes it possible to review a series in a linear fashion.
-
-On Mon, May 23, 2016 at 06:30:24PM +0200, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
+On Tue, May 17, 2016 at 12:44:02PM -0400, Jon Masters wrote:
+> Hi Mark,
 > 
-> Add the binding documentation for the Amlogic secure monitor driver.
+> On 05/17/2016 08:46 AM, Mark Rutland wrote:
+> > On Tue, May 17, 2016 at 03:06:03PM +0300, Aleksey Makarov wrote:
+> >> From: Jon Masters <jcm@redhat.com>
+> >>
+> >> This patch adds support for ACPI_TABLE_UPGRADE for ARM64
+> > 
+> > This feels like a tool to paper over problems rather than solve them.
 > 
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->  .../bindings/firmware/meson/meson_sm.txt           | 51 ++++++++++++++++++++++
->  1 file changed, 51 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+> Generally, it's an arrow in the quiver used to triage problems, and then
+> solve them by getting firmware updates made.
+
+Ok. The feature is _hideously_ misnamed for that purpose, however.
+
+> > If vendors are shipping horrendously broken tables today, clearly no
+> > software has ever really supported them. So why add workarounds?
 > 
-> diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-> new file mode 100644
-> index 0000000..2b71716
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
-> @@ -0,0 +1,51 @@
-> +* Amlogic Secure Monitor
-> +
-> +In the Amlogic SoCs the Secure Monitor code is used to provide access to the
-> +NVMEM, enable JTAG, set USB boot, etc...
-> +
-> +Required properties for the secure monitor node:
-> +- compatible: Should be "amlogic,meson-sm"
-> +- amlogic,sm-cmd-input-base: SMC32 function identifier to read the physical
-> +                             address of the input buffer
-> +- amlogic,sm-cmd-output-base: SMC32 function identifier to read the physical
-> +                              address of the output buffer
+> That's not (always) the case. These patches help with:
+> 
+> 1). During development of a platform, it is much easier to debug
+> problems with tables if you can test replacement ones without having to
+> respin the firmware. In the server world, you usually don't have the
+> firmware source code, so to get it respun could be days-weeks even if
+> you are working with the authors closely. We have practically used this
+> feature on a number of platforms already and it will continue.
 
-Do the IDs for these actually differ per board?
+I was under the impression that that was already possible with GRUB
+today (though I see below this may not be the case).
 
-Are some functions simply not implemented on some boards?
+> 2). They empower (advanced) users and developers to work around problems
+> that they find on platforms. Sure, we want firmware to always be fixed
+> and working well, but it is better if folks have the tools.
+> 
+> > Why is this necessary? Is there a particular case for this, or is this
+> > just for parity with x86?
+> 
+> The use cases are as above. It's also required for parity with x86
+> functionality on servers.
 
-> +
-> +Example:
-> +
-> +	#include <dt-bindings/firmware/meson-gxbb-sm.h>
-> +
-> +	...
-> +
-> +	firmware {
-> +		compatible = "simple-bus";
-> +
-> +		sm: secure-monitor {
-> +			compatible = "amlogic,meson-sm";
-> +			amlogic,sm-cmd-input-base = <SM_GET_SHARE_MEM_INPUT_BASE>;
-> +			amlogic,sm-cmd-output-base = <SM_GET_SHARE_MEM_OUTPUT_BASE>;
-> +		};
-> +	};
-> +
-> +Node of a device using the secure monitor must have a custom property to
-> +specify the SMC32 function the driver is going to use. The values of all the
-> +SMC function identifiers are listed in a SoC-specific header file:
-> +
-> +"include/dt-bindings/firmware/meson-gxbb-sm.h" - for the Meson GXBB secure monitor.
-> +
-> +Example of the node using the secure monitor:
-> +
-> +	#include <dt-bindings/firmware/meson-gxbb-sm.h>
-> +
-> +	...
-> +
-> +	efuse: efuse {
-> +		compatible = "amlogic,meson-gxbb-efuse";
-> +		secure-monitor = <&sm>;
-> +		amlogic,sm-cmd-read-efuse = <SM_EFUSE_READ>;
-> +		amlogic,sm-cmd-max-efuse = <SM_EFUSE_USER_MAX>;
+Parity for case 1 above, or is this used in other scenarios on x86
+today?
 
-Likewise for these?
+> > IMO it would be better to put pressure on vendors to fix their FW and
+> > provide sensible OS-agnostic update mechanisms.
+> 
+> It's easier to put pressure on them after we know what the problems are.
+> I agree that alternative update mechanisms are also good. We also have
+> the ability (but it is not implemented on ARM) in GRUB2 to override ACPI
+> tables, BUT it's kinda atrophied on all arches and requires that you
+> rebuild GRUB with an additional module.
 
+This feels like something that could/should be rectified.
+
+> The reality is that by incorporating this feature we are able to
+> provide the same capability that already exists on x86 systems for
+> ACPI table triage.
+
+To be clear, I do not disagree that this feature can be useful for that
+case. I am just concerned that this is easily abused, and the
+description implies a more general set of use cases than we would like.
+
+Thanks,
 Mark.
-
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +
-> +		...
-> +	};
-> +
-> -- 
-> 2.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
