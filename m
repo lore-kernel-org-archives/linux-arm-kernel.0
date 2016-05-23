@@ -1,69 +1,59 @@
-From: jchandra@broadcom.com (Jayachandran C)
-Date: Mon, 23 May 2016 13:58:36 +0530
-Subject: [PATCH V7 04/11] pci: Add new function to unmap IO resources.
-In-Reply-To: <1462893601-8937-5-git-send-email-tn@semihalf.com>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <1462893601-8937-5-git-send-email-tn@semihalf.com>
-Message-ID: <CAKc_7PVYyGNY3fv_w0c+epBP+WyJB8DtnA6f_E-P6Cz2jqbpgA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 23 May 2016 10:37:55 +0200
+Subject: [RFC 8/9] drivers: of: call iommu_bus_add_dev after
+ iommu_configure_ops
+In-Reply-To: <1461599894-1969-9-git-send-email-sricharan@codeaurora.org>
+References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+ <1461599894-1969-9-git-send-email-sricharan@codeaurora.org>
+Message-ID: <898fef51-39a0-09af-4eb9-9a6581ffbe77@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 8:49 PM, Tomasz Nowicki <tn@semihalf.com> wrote:
-> It is very useful to release I/O resources so that the same I/O resources
-> can be allocated again (pci_remap_iospace), like in PCI hotplug removal
-> scenario. Therefore this patch implements new pci_unmap_iospace call which
-> unmaps I/O space as the symmetry to pci_remap_iospace.
+Hello,
+
+
+On 2016-04-25 17:58, Sricharan R wrote:
+> Now that the device's iommu ops are configured at probe time,
+> the device has to be added to the iommu late.
 >
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  drivers/pci/pci.c   | 24 ++++++++++++++++++++++++
->  include/linux/pci.h |  1 +
->  2 files changed, 25 insertions(+)
+>   drivers/of/device.c | 4 ++++
+>   1 file changed, 4 insertions(+)
 >
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index bc0c914..ff97a0b 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -25,6 +25,7 @@
->  #include <linux/device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pci_hotplug.h>
-> +#include <linux/vmalloc.h>
->  #include <asm/setup.h>
->  #include <linux/aer.h>
->  #include "pci.h"
-> @@ -3167,6 +3168,29 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
->  #endif
->  }
->
-> +/**
-> + *     pci_unmap_iospace - Unmap the memory mapped I/O space
-> + *     @res: resource to be unmapped
-> + *
-> + *     Unmap the CPU virtual address @res from virtual address space.
-> + *     Only architectures that have memory mapped IO functions defined
-> + *     (and the PCI_IOBASE value defined) should call this function.
-> + */
-> +void  pci_unmap_iospace(struct resource *res)
-> +{
-> +#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-> +       unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 57a5f2d..722115c 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -6,6 +6,7 @@
+>   #include <linux/of_iommu.h>
+>   #include <linux/dma-mapping.h>
+>   #include <linux/init.h>
+> +#include <linux/iommu.h>
+>   #include <linux/module.h>
+>   #include <linux/mod_devicetable.h>
+>   #include <linux/slab.h>
+> @@ -154,6 +155,9 @@ int of_dma_configure_ops(struct device *dev, struct device_node *np)
+>   	dev_dbg(dev, "device is%sbehind an iommu\n",
+>   		iommu ? " " : " not ");
+>   
+> +	if (iommu)
+> +		iommu_bus_add_dev(dev);
 > +
-> +       unmap_kernel_range(vaddr, resource_size(res));
-> +#else
-> +       /*
-> +        * This architecture does not have memory mapped I/O space,
-> +        * so this function should never be called.
-> +        */
-> +       WARN_ONCE(1, "This architecture does not support memory mapped I/O\n");
-> +#endif
-> +}
 
-WARN is not needed here, since we would have already done it in
-pci_remap_iospace.
+This causes build break when IOMMU subsystem is not enabled:
 
-Ideally, we should undo the pci_register_io_range as well, but
-re-registering the same range seems to be fine.
+drivers/of/device.c: In function 'of_dma_configure_ops':
+drivers/of/device.c:159:3: error: implicit declaration of function 
+'iommu_bus_add_dev' [-Werror=implicit-function-declaration]
+    iommu_bus_add_dev(dev);
+    ^
 
-JC.
+>   	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
+>   
+>   	return 0;
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
