@@ -1,101 +1,51 @@
-From: nleeder@codeaurora.org (Neil Leeder)
-Date: Mon, 23 May 2016 14:22:59 -0400
-Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
- registers
-In-Reply-To: <20160523172527.GK4976@leverpostej>
-References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
- <20160523172527.GK4976@leverpostej>
-Message-ID: <f49d58ed-38b4-6284-11c2-8708d8443b14@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 May 2016 19:28:07 +0100
+Subject: Crash after 'reboot' due to 9be4fd2c7723a
+In-Reply-To: <2148724.oQlEHos3jS@vostro.rjw.lan>
+References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
+ <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
+ <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
+ <2148724.oQlEHos3jS@vostro.rjw.lan>
+Message-ID: <20160523182807.GY19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sat, May 21, 2016 at 02:56:20AM +0200, Rafael J. Wysocki wrote:
+> The root of the problem seems to be arch_irq_work_raise() and specifically
+> the __smp_cross_call function that appears to have problems.
 
-On 5/23/2016 01:25 PM, Mark Rutland wrote:
-> On Fri, May 20, 2016 at 03:13:07PM -0400, Neil Leeder wrote:
->> L2 registers are accessed using a select register and data
->> register pair. To prevent multiple concurrent writes to the
->> select register by independent drivers, the write to the
->> select register and the associated access of the data register
->> are protected with a lock. All drivers accessing the L2
->> registers use the set and get functions provided by
->> l2-accessors to ensure correct reads and writes to L2 registers.
-> 
-> What will this be used for? (i.e. which drivers want to touch the L2
-> registers?).
-> 
-> Generally we expect FW to configure the caches and interconnect
-> appropriately.
+We've been through this before.  The bottom line is that on ARM, there
+is major wide-spread understanding that we want to be able to run a
+kernel compiled for SMP on uniprocessor hardware.
 
-The primary use is in the L2 PMU driver, which will be posted shortly.
+This is something that's been going for years, and has worked fine for
+years.
 
-> 
->> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
->> ---
->>  drivers/soc/qcom/Kconfig              |  9 +++++
->>  drivers/soc/qcom/Makefile             |  1 +
->>  drivers/soc/qcom/l2-accessors.c       | 66 +++++++++++++++++++++++++++++++++++
->>  include/linux/soc/qcom/l2-accessors.h | 27 ++++++++++++++
->>  4 files changed, 103 insertions(+)
->>  create mode 100644 drivers/soc/qcom/l2-accessors.c
->>  create mode 100644 include/linux/soc/qcom/l2-accessors.h
-> 
-> These are awfully generic file names (and function names). Which SoCs
-> does this apply to?
-> 
-> It would be good to give these more specific names.
+Now, someone has introduced this irq work stuff.  Great.  But they
+haven't considered that people want to be able to run a SMP kernel
+on UP hardware which _may_ have no hardware present which is capable
+of raising IPIs.
 
-It's under soc/qcom, and dependent on ARCH_QCOM and (in v2) also on ARM64. It applies to all QCOM ARM64 SoCs.
-Given that it can only be used in a QCOM driver, and the include path has qcom in it, I'd
-prefer not to add redundancy by adding another qcom in there.
+I don't know what the situation is with the platform concerned here,
+I don't know whether it uses the GIC (presumably, because it doesn't
+NULL-pointer ref on calling smp_cross_call(), it is using the GIC.)
+If so, the GIC isn't delivering the IPI because the IPI hardware is
+missing.
 
->> diff --git a/include/linux/soc/qcom/l2-accessors.h b/include/linux/soc/qcom/l2-accessors.h
->> new file mode 100644
->> index 0000000..563c114
->> --- /dev/null
->> +++ b/include/linux/soc/qcom/l2-accessors.h
->> @@ -0,0 +1,27 @@
->> +/*
->> + * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 and
->> + * only version 2 as published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
->> + * GNU General Public License for more details.
->> + */
->> +
-> 
->> +#ifndef __QCOM_L2_ACCESSORS_H
->> +#define __QCOM_L2_ACCESSORS_H
->> +
->> +#ifdef CONFIG_QCOM_L2_ACCESSORS
->> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
->> +u64 get_l2_indirect_reg(u64 reg_addr);
->> +#else
->> +static inline void set_l2_indirect_reg(u64 reg_addr, u64 val) {}
->> +static inline u64 get_l2_indirect_reg(u64 reg_addr)
->> +{
->> +	return 0;
->> +}
-> 
-> Surely it would be better to error out on any unintentional use of these
-> at build time?
+Now, whether we could detect whether the GIC is IPI capable, I've
+no idea, I don't have such a platform I could run tests on.  People
+don't give me hardware anymore now that arm-soc is split off from
+core ARM maintanence - it all goes into Linaro build farms.  So I'm
+powerless to help here.
 
-This allows building code which is common to ARM SoCs and QCOM SoCs without having to ifdef out the
-QCOM-specific pieces.
-
-> 
-> Thanks,
-> Mark.
-> 
-
-Thanks,
-Neil
+My attitude towards this is that it's a core kernel problem: the
+core kernel is assuming that it can raise IPIs even on non-SMP
+capable hardware.  Much non-SMP hardware doesn't have that ability.
+While folk can try to push it into arch code, my feeling is that it
+really needs to have a generic solution, even if it's some generic
+solution that architectures in this situation can plug into.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
