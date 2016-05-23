@@ -1,97 +1,26 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Mon, 23 May 2016 15:02:17 +0200
-Subject: [PATCH V5 2/6] vfio: platform: move reset call to a common
- function
-In-Reply-To: <1463364819-477-3-git-send-email-okaya@codeaurora.org>
-References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
- <1463364819-477-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <5742FF59.6090108@linaro.org>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 23 May 2016 21:10:56 +0800
+Subject: [PATCH 0/3] Add the eDP/VOP device node for rk3399
+Message-ID: <1464009056-32158-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
-On 05/16/2016 04:13 AM, Sinan Kaya wrote:
-> The reset call sequence seems to replicate itself multiple times
-> across the file. Grouping them together for maintenance reasons.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/vfio/platform/vfio_platform_common.c | 31 ++++++++++++++--------------
->  1 file changed, 15 insertions(+), 16 deletions(-)
-> 
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index 08fd7c2..cb91dd3 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -134,6 +134,18 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
->  	kfree(vdev->regions);
->  }
->  
-> +static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
-> +{
-> +	if (vdev->of_reset) {
-> +		dev_info(vdev->device, "reset\n");
-> +		vdev->of_reset(vdev);
-> +		return 0;
-you should return vdev->of_reset(vdev) to keep the existing
-VFIO_DEVICE_RESET ioctl behavior
+This thread is rely on Mark's VOP thread[1] and Yakir's eDP thread[2].
 
-Once fixed, Reviewed-by: Eric Auger <eric.auger@linaro.org>
+[1]: https://lkml.org/lkml/2016/4/20/36
+[2]: https://patchwork.freedesktop.org/patch/83406/
 
-Besides, but this goes beyond the scope of your series, maybe we should
-reconsider in the future what happens in case the reset fails on
-open/release.
 
-Best Regards
+Mark Yao (1):
+  arm64: dts: rockchip: add VOP and VOP iommu node for rk3399
 
-Eric
-> +	}
-> +
-> +	dev_warn(vdev->device, "no reset function found!\n");
-> +	return -EINVAL;
-> +}
-> +
->  static void vfio_platform_release(void *device_data)
->  {
->  	struct vfio_platform_device *vdev = device_data;
-> @@ -141,12 +153,7 @@ static void vfio_platform_release(void *device_data)
->  	mutex_lock(&driver_lock);
->  
->  	if (!(--vdev->refcnt)) {
-> -		if (vdev->of_reset) {
-> -			dev_info(vdev->device, "reset\n");
-> -			vdev->of_reset(vdev);
-> -		} else {
-> -			dev_warn(vdev->device, "no reset function found!\n");
-> -		}
-> +		vfio_platform_call_reset(vdev);
->  		vfio_platform_regions_cleanup(vdev);
->  		vfio_platform_irq_cleanup(vdev);
->  	}
-> @@ -175,12 +182,7 @@ static int vfio_platform_open(void *device_data)
->  		if (ret)
->  			goto err_irq;
->  
-> -		if (vdev->of_reset) {
-> -			dev_info(vdev->device, "reset\n");
-> -			vdev->of_reset(vdev);
-> -		} else {
-> -			dev_warn(vdev->device, "no reset function found!\n");
-> -		}
-> +		vfio_platform_call_reset(vdev);
->  	}
->  
->  	vdev->refcnt++;
-> @@ -312,10 +314,7 @@ static long vfio_platform_ioctl(void *device_data,
->  		return ret;
->  
->  	} else if (cmd == VFIO_DEVICE_RESET) {
-> -		if (vdev->of_reset)
-> -			return vdev->of_reset(vdev);
-> -		else
-> -			return -EINVAL;
-> +		return vfio_platform_call_reset(vdev);
->  	}
->  
->  	return -ENOTTY;
-> 
+Yakir Yang (2):
+  arm64: dts: rockchip: add eDP device node for rk3399
+  arm64: dts: rockchip: add backlight support for rk3399 evb board
+
+ arch/arm64/boot/dts/rockchip/rk3399-evb.dts |  40 ++++++++++
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi    | 110 ++++++++++++++++++++++++++++
+ 2 files changed, 150 insertions(+)
+
+-- 
+1.9.1
