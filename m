@@ -1,20 +1,49 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 May 2016 16:39:37 -0500
-Subject: [PATCH 1/4] dt-bindings: rng: Northstar Plus SoC rng bindings
-In-Reply-To: <1464020451-16520-2-git-send-email-yendapally.reddy@broadcom.com>
-References: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
- <1464020451-16520-2-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <20160523213937.GA13580@rob-hp-laptop>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 May 2016 23:05:14 +0100
+Subject: Crash after 'reboot' due to 9be4fd2c7723a
+In-Reply-To: <CAOMZO5DjjgNk+uHyH7Avvfrt_TNPaZ+SUtHzON5fPU=25_gKOg@mail.gmail.com>
+References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
+ <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
+ <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
+ <2148724.oQlEHos3jS@vostro.rjw.lan>
+ <20160523182807.GY19428@n2100.arm.linux.org.uk>
+ <CAJZ5v0ipPVsZmu+RVfrPChA7banMGFNsfMt=if0V3XfVdstRNQ@mail.gmail.com>
+ <CAJZ5v0j0VbyHNT_ZmThsdQfRWzf7SG65A8-bPxoAUxZJgR96og@mail.gmail.com>
+ <CAOMZO5Cbue9L2JGA0kv7nTZ=78oKDhNu6WLRUmcsSuLHscDVUQ@mail.gmail.com>
+ <20160523210738.GZ19428@n2100.arm.linux.org.uk>
+ <CAOMZO5DjjgNk+uHyH7Avvfrt_TNPaZ+SUtHzON5fPU=25_gKOg@mail.gmail.com>
+Message-ID: <20160523220514.GB19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 12:20:48PM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
-> Document the bindings used by Northstar Plus(NSP) SoC random number
-> generator.
+On Mon, May 23, 2016 at 06:38:31PM -0300, Fabio Estevam wrote:
+> On Mon, May 23, 2016 at 6:07 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
 > 
-> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-> ---
->  Documentation/devicetree/bindings/rng/brcm,bcm2835.txt | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+> > Read the code again.  There's three states:
+> >
+> > 1. CONFIG_SMP=n - it always returns false.
+> > 2. CONFIG_SMP=y, CONFIG_SMP_ON_UP=n - it always returns true.  Such a
+> >    kernel can _only_ be run on SMP capable systems.
+> > 3. CONFIG_SMP=y, CONFIG_SMP_ON_UP=y - it returns depending on whether
+> >    we detect that the CPU is SMP capable.
+> 
+> Yes, I meant that on imx6ul we have option 2 above with imx_v6_v7_defconfig.
 
-Acked-by: Rob Herring <robh@kernel.org>
+I don't think so, unless you specifically turn off CONFIG_SMP_ON_UP.
+It defaults to 'y', so imx_v6_v7_defconfig should result in this being
+'y'.
+
+> Also tested option 3 and is_smp() returns true as well.
+
+So that means the MPIDR register is telling the kernel...
+
+* The boot CPU has multiprocessor extensions.
+* The boot CPU is not part of a uniprocessor system.
+
+> I will try to see why GIC on this SoC cannot work in SMP.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
