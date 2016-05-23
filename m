@@ -1,21 +1,20 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 23 May 2016 16:38:34 -0500
-Subject: [PATCH 1/3] dt-bindings: add used but undocumented rockchip grf
- compatible values
-In-Reply-To: <1464015539-19521-2-git-send-email-heiko@sntech.de>
-References: <1464015539-19521-1-git-send-email-heiko@sntech.de>
- <1464015539-19521-2-git-send-email-heiko@sntech.de>
-Message-ID: <20160523213834.GA12860@rob-hp-laptop>
+Date: Mon, 23 May 2016 16:39:37 -0500
+Subject: [PATCH 1/4] dt-bindings: rng: Northstar Plus SoC rng bindings
+In-Reply-To: <1464020451-16520-2-git-send-email-yendapally.reddy@broadcom.com>
+References: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1464020451-16520-2-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <20160523213937.GA13580@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 04:58:57PM +0200, Heiko Stuebner wrote:
-> There are some more General Register Files used in devicetree files
-> already, but as of now undocumented in the binding document, fix that.
+On Mon, May 23, 2016 at 12:20:48PM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
+> Document the bindings used by Northstar Plus(NSP) SoC random number
+> generator.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
 > ---
->  Documentation/devicetree/bindings/soc/rockchip/grf.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+>  Documentation/devicetree/bindings/rng/brcm,bcm2835.txt | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 
 Acked-by: Rob Herring <robh@kernel.org>
