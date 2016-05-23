@@ -1,70 +1,316 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 23 May 2016 21:33:42 +0800
-Subject: [PATCH 3/3] arm64: dts: rockchip: add backlight support for rk3399
- evb board
-In-Reply-To: <1464010400-10903-1-git-send-email-ykk@rock-chips.com>
-References: <1464010400-10903-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1464010422-11067-1-git-send-email-ykk@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 23 May 2016 21:45:16 +0800
+Subject: [PATCH 10/16] clk: sunxi-ng: Add M-P factor clock support
+In-Reply-To: <1462737711-10017-11-git-send-email-maxime.ripard@free-electrons.com>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-11-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v67F3UvSCYDTxeLkCJL3FzmcpkogM4RAQgDseXMJDv7bUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add backlight node for evb board, perpare for panel device node.
+Hi,
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 40 +++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+On Mon, May 9, 2016 at 4:01 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Introduce support for the clocks that combine a linear divider and a
+> power-of-two based one.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-index 1a3eb14..31d9e27 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -75,6 +75,46 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm0 0 25000 0>;
-+		brightness-levels = <
-+			  0   1   2   3   4   5   6   7
-+			  8   9  10  11  12  13  14  15
-+			 16  17  18  19  20  21  22  23
-+			 24  25  26  27  28  29  30  31
-+			 32  33  34  35  36  37  38  39
-+			 40  41  42  43  44  45  46  47
-+			 48  49  50  51  52  53  54  55
-+			 56  57  58  59  60  61  62  63
-+			 64  65  66  67  68  69  70  71
-+			 72  73  74  75  76  77  78  79
-+			 80  81  82  83  84  85  86  87
-+			 88  89  90  91  92  93  94  95
-+			 96  97  98  99 100 101 102 103
-+			104 105 106 107 108 109 110 111
-+			112 113 114 115 116 117 118 119
-+			120 121 122 123 124 125 126 127
-+			128 129 130 131 132 133 134 135
-+			136 137 138 139 140 141 142 143
-+			144 145 146 147 148 149 150 151
-+			152 153 154 155 156 157 158 159
-+			160 161 162 163 164 165 166 167
-+			168 169 170 171 172 173 174 175
-+			176 177 178 179 180 181 182 183
-+			184 185 186 187 188 189 190 191
-+			192 193 194 195 196 197 198 199
-+			200 201 202 203 204 205 206 207
-+			208 209 210 211 212 213 214 215
-+			216 217 218 219 220 221 222 223
-+			224 225 226 227 228 229 230 231
-+			232 233 234 235 236 237 238 239
-+			240 241 242 243 244 245 246 247
-+			248 249 250 251 252 253 254 255>;
-+		default-brightness-level = <200>;
-+		enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
-+	};
- };
- 
- &pwm0 {
--- 
-1.9.1
+A description or formula in the source code (for those of us that forget)
+would be nice. :)
+
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi-ng/Makefile |   1 +
+>  drivers/clk/sunxi-ng/ccu_mp.c | 158 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu_mp.h |  79 +++++++++++++++++++++
+>  3 files changed, 238 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_mp.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_mp.h
+>
+> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> index 063c50f35ad4..09fce7467784 100644
+> --- a/drivers/clk/sunxi-ng/Makefile
+> +++ b/drivers/clk/sunxi-ng/Makefile
+> @@ -5,6 +5,7 @@ obj-y += ccu_div_table.o
+>  obj-y += ccu_fixed_factor.o
+>  obj-y += ccu_gate.o
+>  obj-y += ccu_m.o
+> +obj-y += ccu_mp.o
+>  obj-y += ccu_mux.o
+>  obj-y += ccu_p.o
+>  obj-y += ccu_phase.o
+> diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+> new file mode 100644
+> index 000000000000..7181188deba7
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_mp.c
+> @@ -0,0 +1,158 @@
+> +/*
+> + * Copyright (C) 2016 Maxime Ripard
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +
+> +#include "ccu_gate.h"
+> +#include "ccu_mp.h"
+> +
+> +static void ccu_mp_find_best(unsigned long parent, unsigned long rate,
+> +                            unsigned int max_m, unsigned int max_p,
+> +                            unsigned int *m, unsigned int *p)
+> +{
+> +       unsigned long best_rate = 0;
+> +       unsigned int best_m = 0, best_p = 0;
+> +       unsigned int _m, _p;
+> +
+> +       for (_p = 0; _p <= max_p; _p++) {
+> +               for (_m = 1; _m <= max_m; _m++) {
+> +                       unsigned long tmp_rate = (parent >> _p) / _m;
+> +
+> +                       if (tmp_rate > rate)
+> +                               continue;
+> +
+> +                       if ((rate - tmp_rate) < (rate - best_rate)) {
+> +                               best_rate = tmp_rate;
+> +                               best_m = _m;
+> +                               best_p = _p;
+> +                       }
+> +               }
+> +       }
+> +
+> +       *m = best_m;
+> +       *p = best_p;
+> +}
+> +
+> +static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+> +                                      unsigned long parent_rate,
+> +                                      unsigned long rate,
+> +                                      void *data)
+> +{
+> +       struct ccu_mp *cmp = data;
+> +       unsigned int m, p;
+> +
+> +       ccu_mp_find_best(parent_rate, rate,
+> +                        1 << cmp->m.width, (1 << cmp->p.width) - 1,
+> +                        &m, &p);
+> +
+> +       return (parent_rate >> p) / m;
+> +}
+> +
+> +static void ccu_mp_disable(struct clk_hw *hw)
+> +{
+> +       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+> +
+> +       return ccu_gate_helper_disable(&cmp->common, cmp->enable);
+> +}
+> +
+> +static int ccu_mp_enable(struct clk_hw *hw)
+> +{
+> +       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+> +
+> +       return ccu_gate_helper_enable(&cmp->common, cmp->enable);
+> +}
+> +
+> +static int ccu_mp_is_enabled(struct clk_hw *hw)
+> +{
+> +       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+> +
+> +       return ccu_gate_helper_is_enabled(&cmp->common, cmp->enable);
+> +}
+> +
+> +static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
+> +                                       unsigned long parent_rate)
+> +{
+> +       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+> +       unsigned int m, p;
+> +       u32 reg;
+> +
+> +       reg = readl(cmp->common.base + cmp->common.reg);
+> +
+> +       m = reg >> cmp->m.shift;
+> +       m &= (1 << cmp->m.width) - 1;
+> +
+> +       p = reg >> cmp->p.shift;
+> +       p &= (1 << cmp->p.width) - 1;
+> +
+> +       return (parent_rate >> p) / (m + 1);
+> +}
+> +
+> +static int ccu_mp_determine_rate(struct clk_hw *hw,
+> +                                struct clk_rate_request *req)
+> +{
+> +       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+> +
+> +       return ccu_mux_helper_determine_rate(&cmp->common, &cmp->mux,
+> +                                            req, ccu_mp_round_rate, cmp);
+> +}
+> +
+> +static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+> +                          unsigned long parent_rate)
+> +{
+> +       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+> +       unsigned long flags;
+> +       unsigned int m, p;
+> +       u32 reg;
+> +
+> +       ccu_mp_find_best(parent_rate, rate,
+> +                        1 << cmp->m.width, (1 << cmp->p.width) - 1,
+> +                        &m, &p);
+> +
+> +
+> +       spin_lock_irqsave(cmp->common.lock, flags);
+> +
+> +       reg = readl(cmp->common.base + cmp->common.reg);
+> +       reg &= ~GENMASK(cmp->m.width + cmp->m.shift, cmp->m.shift);
+> +       reg &= ~GENMASK(cmp->p.width + cmp->p.shift, cmp->p.shift);
+
+width + shift - 1 ? IIRC GENMASK is inclusive at both ends.
+
+> +
+> +       writel(reg | (p << cmp->p.shift) | ((m - 1) << cmp->m.shift),
+> +              cmp->common.base + cmp->common.reg);
+> +
+> +       spin_unlock_irqrestore(cmp->common.lock, flags);
+> +
+> +       return 0;
+> +}
+> +
+> +static u8 ccu_mp_get_parent(struct clk_hw *hw)
+> +{
+> +       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+> +
+> +       return ccu_mux_helper_get_parent(&cmp->common, &cmp->mux);
+> +}
+> +
+> +static int ccu_mp_set_parent(struct clk_hw *hw, u8 index)
+> +{
+> +       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+> +
+> +       return ccu_mux_helper_set_parent(&cmp->common, &cmp->mux, index);
+> +}
+> +
+> +const struct clk_ops ccu_mp_ops = {
+> +       .disable        = ccu_mp_disable,
+> +       .enable         = ccu_mp_enable,
+> +       .is_enabled     = ccu_mp_is_enabled,
+> +
+> +       .get_parent     = ccu_mp_get_parent,
+> +       .set_parent     = ccu_mp_set_parent,
+> +
+> +       .determine_rate = ccu_mp_determine_rate,
+> +       .recalc_rate    = ccu_mp_recalc_rate,
+> +       .set_rate       = ccu_mp_set_rate,
+> +};
+> diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
+> new file mode 100644
+> index 000000000000..95da9c46cd4f
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_mp.h
+> @@ -0,0 +1,79 @@
+> +/*
+> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef _CCU_MP_H_
+> +#define _CCU_MP_H_
+> +
+> +#include <linux/clk-provider.h>
+> +
+> +#include "ccu_common.h"
+> +#include "ccu_factor.h"
+> +#include "ccu_mux.h"
+> +
+> +struct ccu_mp {
+> +       u32                     enable;
+> +
+> +       struct ccu_factor       m;
+> +       struct ccu_factor       p;
+> +       struct ccu_mux_internal mux;
+> +       struct ccu_common       common;
+> +};
+> +
+> +#define SUNXI_CCU_MP_WITH_MUX(_struct, _name, _parents, _reg,          \
+> +                             _mshift, _mwidth,                         \
+> +                             _pshift, _pwidth,                         \
+> +                             _muxshift, _muxwidth,                     \
+> +                             _flags)                                   \
+> +       struct ccu_mp _struct = {                                       \
+> +               .m      = SUNXI_CLK_FACTOR(_mshift, _mwidth),           \
+> +               .p      = SUNXI_CLK_FACTOR(_pshift, _pwidth),           \
+> +               .mux    = SUNXI_CLK_MUX(_muxshift, _muxwidth),          \
+> +               .common = {                                             \
+> +                       .reg            = _reg,                         \
+> +                       .hw.init        = SUNXI_HW_INIT_PARENTS(_name,  \
+> +                                                               _parents, \
+> +                                                               &ccu_mp_ops, \
+> +                                                               _flags), \
+> +               }                                                       \
+> +       }
+
+Use the latter to simplify this one?
+
+> +
+> +#define SUNXI_CCU_MP_WITH_MUX_GATE(_struct, _name, _parents, _reg,     \
+
+We could merge _struct with _name ...
+
+> +                                  _mshift, _mwidth,                    \
+> +                                  _pshift, _pwidth,                    \
+> +                                  _muxshift, _muxwidth,                \
+> +                                  _gate, _flags)                       \
+> +       struct ccu_mp _struct = {                                       \
+
+and have struct ccu_mp _name##_clk = {
+
+> +               .enable = _gate,                                        \
+> +               .m      = SUNXI_CLK_FACTOR(_mshift, _mwidth),           \
+> +               .p      = SUNXI_CLK_FACTOR(_pshift, _pwidth),           \
+> +               .mux    = SUNXI_CLK_MUX(_muxshift, _muxwidth),          \
+> +               .common = {                                             \
+> +                       .reg            = _reg,                         \
+> +                       .features       = CCU_FEATURE_GATE,             \
+> +                       .hw.init        = SUNXI_HW_INIT_PARENTS(_name,  \
+
+and                                                               #_name, \
+
+to try to squeeze the users each on a single line. It's a just minor
+thing though.
+
+
+Regards
+ChenYu
+
+> +                                                               _parents, \
+> +                                                               &ccu_mp_ops, \
+> +                                                               _flags), \
+> +               }                                                       \
+> +       }
+> +
+> +static inline struct ccu_mp *hw_to_ccu_mp(struct clk_hw *hw)
+> +{
+> +       struct ccu_common *common = hw_to_ccu_common(hw);
+> +
+> +       return container_of(common, struct ccu_mp, common);
+> +}
+> +
+> +extern const struct clk_ops ccu_mp_ops;
+> +
+> +#endif /* _CCU_MP_H_ */
+> --
+> 2.8.2
+>
