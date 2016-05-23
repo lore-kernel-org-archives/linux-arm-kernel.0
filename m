@@ -1,252 +1,57 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 23 May 2016 22:10:16 +0800
-Subject: [PATCH 13/16] clk: sunxi-ng: Add N-K-M Factor clock
-In-Reply-To: <1462737711-10017-14-git-send-email-maxime.ripard@free-electrons.com>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-14-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v679v3AW5OC129ShjxU9fUK7xQEZvUzLf2qQHFGiU2AhMQ@mail.gmail.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 23 May 2016 16:19:37 +0200
+Subject: [PATCH 3/7] KVM: arm/arm64: vgic-v2: Always resample level
+ interrupts
+In-Reply-To: <1464007023-11736-4-git-send-email-marc.zyngier@arm.com>
+References: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
+ <1464007023-11736-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160523141937.GA9625@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, May 23, 2016 at 01:36:59PM +0100, Marc Zyngier wrote:
+> When reading back from the list registers, we need to perform
+> two actions for level interrupts:
+> 1) clear the soft-pending bit if the interrupt is not pending
+>    anymore *in the list register*
+> 2) resample the line level and propagate it to the pending state
+> 
+> But these two actions linked, and we should *always* resample
 
-On Mon, May 9, 2016 at 4:01 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Introduce support for clocks that multiply and divide using two linear
-> multipliers and one linear divider.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+were linked?
+
+> the line level, no matter what state is in the list register.
+> Otherwise, we may end-up injecting spurious interrupts that
+> have been already retired.
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  drivers/clk/sunxi-ng/Makefile  |   1 +
->  drivers/clk/sunxi-ng/ccu_nkm.c | 144 +++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu_nkm.h |  42 ++++++++++++
->  3 files changed, 187 insertions(+)
->  create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.h
->
-> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index fba64c7f4fcd..2bb8bc22e907 100644
-> --- a/drivers/clk/sunxi-ng/Makefile
-> +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -8,6 +8,7 @@ obj-y += ccu_m.o
->  obj-y += ccu_mp.o
->  obj-y += ccu_mux.o
->  obj-y += ccu_nk.o
-> +obj-y += ccu_nkm.o
->  obj-y += ccu_nm.o
->  obj-y += ccu_p.o
->  obj-y += ccu_phase.o
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
-> new file mode 100644
-> index 000000000000..9019c7f6988c
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-> @@ -0,0 +1,144 @@
-> +/*
-> + * Copyright (C) 2016 Maxime Ripard
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/rational.h>
-> +
-> +#include "ccu_gate.h"
-> +#include "ccu_nkm.h"
-> +
-> +void ccu_nkm_find_best(unsigned long parent, unsigned long rate,
-> +                      unsigned long max_n, unsigned long max_k, unsigned long max_m,
-> +                      unsigned long *n, unsigned long *k, unsigned long *m)
+>  virt/kvm/arm/vgic/vgic-v2.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+> index 8ad42c2..f659af0 100644
+> --- a/virt/kvm/arm/vgic/vgic-v2.c
+> +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> @@ -112,10 +112,13 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+>  			}
+>  		}
+>  
+> -		/* Clear soft pending state when level IRQs have been acked */
+> -		if (irq->config == VGIC_CONFIG_LEVEL &&
+> -		    !(val & GICH_LR_PENDING_BIT)) {
+> -			irq->soft_pending = false;
+> +		/*
+> +		 * Clear soft pending state when level irqs have been acked.
+> +		 * Always resample the line level.
+> +		 */
+> +		if (irq->config == VGIC_CONFIG_LEVEL) {
+> +			if (!(val & GICH_LR_PENDING_BIT))
+> +				irq->soft_pending = false;
+>  			irq->pending = irq->line_level;
 
-Would it be easier to just pass struct ccu_nkm* here?
+shouldn't this context line then be:
+	irq->pending = irq->line_level || irq->soft_pending;  ??
 
-> +{
-> +       unsigned long best_rate = 0;
-> +       unsigned long best_n = 0, best_k = 0, best_m = 0;
-> +       unsigned long _n, _k, _m;
-> +
-> +       for (_k = 1; _k <= max_k; _k++) {
-> +               unsigned long tmp_rate;
-> +
-> +               rational_best_approximation(rate / _k, parent,
-> +                                           max_n, max_m, &_n, &_m);
-> +
-> +               tmp_rate = parent * _n * _k / _m;
-> +
-> +               if (tmp_rate > rate)
-> +                       continue;
-> +
-> +               if ((rate - tmp_rate) < (rate - best_rate)) {
-> +                       best_rate = tmp_rate;
-> +                       best_n = _n;
-> +                       best_k = _k;
-> +                       best_m = _m;
-> +               }
-> +       }
-> +
-> +       *n = best_n;
-> +       *k = best_k;
-> +       *m = best_m;
-> +}
-> +
-> +static void ccu_nkm_disable(struct clk_hw *hw)
-> +{
-> +       struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-> +
-> +       return ccu_gate_helper_disable(&nkm->common, nkm->enable);
-> +}
-> +
-> +static int ccu_nkm_enable(struct clk_hw *hw)
-> +{
-> +       struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-> +
-> +       return ccu_gate_helper_enable(&nkm->common, nkm->enable);
-> +}
-> +
-> +static int ccu_nkm_is_enabled(struct clk_hw *hw)
-> +{
-> +       struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-> +
-> +       return ccu_gate_helper_is_enabled(&nkm->common, nkm->enable);
-> +}
-> +
-> +static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
-> +                                       unsigned long parent_rate)
-> +{
-> +       struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-> +       unsigned long n, m, k;
-> +       u32 reg;
-> +
-> +       reg = readl(nkm->common.base + nkm->common.reg);
-> +
-> +       n = reg >> nkm->n.shift;
-> +       n &= (1 << nkm->n.width) - 1;
-> +
-> +       k = reg >> nkm->k.shift;
-> +       k &= (1 << nkm->k.width) - 1;
-> +
-> +       m = reg >> nkm->m.shift;
-> +       m &= (1 << nkm->m.width) - 1;
-> +
-> +       return parent_rate * (n + 1) * (k + 1) / (m + 1);
-> +}
-> +
-> +static long ccu_nkm_round_rate(struct clk_hw *hw, unsigned long rate,
-> +                             unsigned long *parent_rate)
-> +{
-> +       struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-> +       unsigned long n, k, m;
-> +
-> +       ccu_nkm_find_best(*parent_rate, rate, 1 << nkm->n.width,
-> +                         1 << nkm->k.width, 1 << nkm->m.width,
-> +                         &n, &k, &m);
-> +
-> +       return *parent_rate * n * k / m;
-> +}
-> +
-> +static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
-> +                          unsigned long parent_rate)
-> +{
-> +       struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-> +       unsigned long n, k, m;
-> +       unsigned long flags;
-> +       u32 reg;
-> +
-> +       ccu_nkm_find_best(parent_rate, rate, 1 << nkm->n.width,
-> +                         1 << nkm->k.width, 1 << nkm->m.width,
-> +                         &n, &k, &m);
-> +
-> +       spin_lock_irqsave(nkm->common.lock, flags);
-> +
-> +       reg = readl(nkm->common.base + nkm->common.reg);
-> +       reg &= ~GENMASK(nkm->n.width + nkm->n.shift, nkm->n.shift);
-> +       reg &= ~GENMASK(nkm->k.width + nkm->k.shift, nkm->k.shift);
-> +       reg &= ~GENMASK(nkm->m.width + nkm->m.shift, nkm->m.shift);
-
-GENMASK(width + shift - 1, shift)
-
-> +
-> +       reg |= (n - 1) << nkm->m.shift;
-> +       reg |= (k - 1) << nkm->m.shift;
-> +       reg |= (m - 1) << nkm->m.shift;
-> +
-> +       writel(reg, nkm->common.base + nkm->common.reg);
-> +
-> +       spin_unlock_irqrestore(nkm->common.lock, flags);
-> +
-> +       ccu_helper_wait_for_lock(&nkm->common, nkm->lock);
-> +
-> +       return 0;
-> +}
-> +
-> +const struct clk_ops ccu_nkm_ops = {
-> +       .disable        = ccu_nkm_disable,
-> +       .enable         = ccu_nkm_enable,
-> +       .is_enabled     = ccu_nkm_is_enabled,
-> +
-> +       .recalc_rate    = ccu_nkm_recalc_rate,
-> +       .round_rate     = ccu_nkm_round_rate,
-> +       .set_rate       = ccu_nkm_set_rate,
-> +};
-> diff --git a/drivers/clk/sunxi-ng/ccu_nkm.h b/drivers/clk/sunxi-ng/ccu_nkm.h
-> new file mode 100644
-> index 000000000000..1301e9f08305
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu_nkm.h
-> @@ -0,0 +1,42 @@
-> +/*
-> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef _CCU_NKM_H_
-> +#define _CCU_NKM_H_
-> +
-> +#include <linux/clk-provider.h>
-> +
-> +#include "ccu_factor.h"
-> +#include "ccu_common.h"
-> +
-> +struct ccu_nkm {
-> +       u32                     enable;
-> +       u32                     lock;
-> +
-> +       struct ccu_factor       n;
-> +       struct ccu_factor       k;
-> +       struct ccu_factor       m;
-> +
-> +       struct ccu_common       common;
-> +};
-> +
-> +static inline struct ccu_nkm *hw_to_ccu_nkm(struct clk_hw *hw)
-> +{
-> +       struct ccu_common *common = hw_to_ccu_common(hw);
-> +
-> +       return container_of(common, struct ccu_nkm, common);
-> +}
-> +
-> +extern const struct clk_ops ccu_nkm_ops;
-
-No macro? I like the macros as they give the actual driver a more table-like
-look.
-
-Regards
-ChenYu
-
-> +
-> +#endif /* _CCU_NKM_H_ */
-> --
-> 2.8.2
->
+Thanks,
+-Christoffer
