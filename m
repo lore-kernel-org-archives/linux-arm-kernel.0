@@ -1,97 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 23 May 2016 10:28:25 +0900
-Subject: [PATCH v2 2/3] arm64: dts: salvator-x: add Salvator-X board on
- R8A7796 SoC
+Date: Mon, 23 May 2016 10:28:26 +0900
+Subject: [PATCH v2 3/3] arm64: defconfig: enable Renesas R8A7796 SoC
 In-Reply-To: <1463966906-15129-1-git-send-email-horms+renesas@verge.net.au>
 References: <1463966906-15129-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1463966906-15129-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1463966906-15129-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-This patch adds initial board support for R8A7796 Salvator-X.
+This patch enables the Renesas R8A7796 SoC in the arm64 defconfig.
 
 Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
---
-v2 [Simon Horman]
-* Added Reviewed-by tag from Geert Uytterhoeven
-
-v1 [Simon Horman]
-* Drop use of pfc, that can be added once pfc support is present in mainline
-* Set size of memory (bank 0) to 2GiB instead of 1GiB
-* Omit scif0
-* Add scif_clk, from patch by Hiromitsu Yamasaki
-
-v0 [Takeshi Kihara]
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/Makefile               |  1 +
- arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts | 45 ++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
+v2 [Simon Horman]
+* Added Acked-by tag from Geert Uytterhoeven
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index 9ce1890a650e..17139f7003a6 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb
-+dtb-$(CONFIG_ARCH_R8A7796) += r8a7796-salvator-x.dtb
- 
- always		:= $(dtb-y)
- clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-new file mode 100644
-index 000000000000..9c52613fb88c
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a7796-salvator-x.dts
-@@ -0,0 +1,45 @@
-+/*
-+ * Device Tree Source for the Salvator-X board
-+ *
-+ * Copyright (C) 2016 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7796.dtsi"
-+
-+/ {
-+	model = "Renesas Salvator-X board based on r8a7796";
-+	compatible = "renesas,salvator-x", "renesas,r8a7796";
-+
-+	aliases {
-+		serial0 = &scif2;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 48000000 {
-+		device_type = "memory";
-+		/* first 128MB is reserved for secure area. */
-+		reg = <0x0 0x48000000 0x0 0x78000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <16666666>;
-+};
-+
-+&scif2 {
-+	status = "okay";
-+};
-+
-+&scif_clk {
-+	clock-frequency = <14745600>;
-+	status = "okay";
-+};
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index f70505186820..0d37fa5a59aa 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -44,6 +44,7 @@ CONFIG_ARCH_ROCKCHIP=y
+ CONFIG_ARCH_SEATTLE=y
+ CONFIG_ARCH_RENESAS=y
+ CONFIG_ARCH_R8A7795=y
++CONFIG_ARCH_R8A7796=y
+ CONFIG_ARCH_STRATIX10=y
+ CONFIG_ARCH_TEGRA=y
+ CONFIG_ARCH_SPRD=y
 -- 
 2.1.4
