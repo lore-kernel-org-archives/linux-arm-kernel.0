@@ -1,114 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 23 May 2016 19:01:29 +0200
-Subject: [PATCH 07/16] clk: sunxi-ng: Add phase clock support
-In-Reply-To: <CAGb2v661dvdPKj9DWL7LWGgiDCEk7G-a_7jv5gb+KBMoWbR8Lg@mail.gmail.com>
-References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
- <1462737711-10017-8-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v661dvdPKj9DWL7LWGgiDCEk7G-a_7jv5gb+KBMoWbR8Lg@mail.gmail.com>
-Message-ID: <20160523170129.GB27618@lukather>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 23 May 2016 10:04:16 -0700
+Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
+ registers
+In-Reply-To: <4ad1d1b2-f0eb-3780-21e7-9dd1b23d6934@codeaurora.org>
+References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
+ <573F7F5C.1050100@codeaurora.org>
+ <4ad1d1b2-f0eb-3780-21e7-9dd1b23d6934@codeaurora.org>
+Message-ID: <57433810.6000400@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/23/2016 08:43 AM, Neil Leeder wrote:
+>
+> On 5/20/2016 05:19 PM, Stephen Boyd wrote:
+>
+>>
+>> Is there a patch to add sysreg.h to arch/arm? It would be nice to use
+>> one l2 accessor API on arm64 and arm.
+>>
+> Sounds like a good thing for the next person who submits a krait L2 patch to consider.
+>
 
-On Sun, May 22, 2016 at 12:43:48AM +0800, Chen-Yu Tsai wrote:
-> > +static int ccu_phase_set_phase(struct clk_hw *hw, int degrees)
-> > +{
-> > +       struct ccu_phase *phase = hw_to_ccu_phase(hw);
-> > +       struct clk_hw *parent, *pparent;
-> > +       unsigned int parent_rate, pparent_rate;
-> 
-> grandparent(_rate) would be easier to understand.
-
-Ack.
-
-> 
-> > +       unsigned long flags;
-> > +       u32 reg;
-> > +       u8 delay;
-> > +
-> > +       /* Get our parent clock, it's the one that can adjust its rate */
-> > +       parent = clk_hw_get_parent(hw);
-> > +       if (!parent)
-> > +               return -EINVAL;
-> > +
-> > +       /* And its rate */
-> > +       parent_rate = clk_hw_get_rate(parent);
-> > +       if (!parent_rate)
-> > +               return -EINVAL;
-> > +
-> > +       /* Now, get our parent's parent (most likely some PLL) */
-> > +       pparent = clk_hw_get_parent(parent);
-> > +       if (!pparent)
-> > +               return -EINVAL;
-> > +
-> > +       /* And its rate */
-> > +       pparent_rate = clk_hw_get_rate(pparent);
-> > +       if (!pparent_rate)
-> > +               return -EINVAL;
-> > +
-> > +       if (degrees != 180) {
-> > +               u16 step, parent_div;
-> > +
-> > +               /* Get our parent divider */
-> > +               parent_div = pparent_rate / parent_rate;
-> > +
-> > +               /*
-> > +                * We can only outphase the clocks by multiple of the
-> > +                * PLL's period.
-> > +                *
-> > +                * Since our parent clock is only a divider, and the
-> > +                * formula to get the outphasing in degrees is deg =
-> > +                * 360 * delta / period
-> > +                *
-> > +                * If we simplify this formula, we can see that the
-> > +                * only thing that we're concerned about is the number
-> > +                * of period we want to outphase our clock from, and
-> > +                * the divider set by our parent clock.
-> > +                */
-> > +               step = DIV_ROUND_CLOSEST(360, parent_div);
-> > +               delay = DIV_ROUND_CLOSEST(degrees, step);
-> 
-> Doesn't this mean some delay values are impossible to set?
-> 
-> For instance, for PLL = 600 MHz and this clock = 50 MHz, div would be 12,
-> and a step would be 30 degrees. This means we can't ask for a delay of 6,
-> which is 180 degrees.
-> 
-> For PLL = 600 MHz, clock = 100 MHz, div would be 6, and a step is 60
-> degrees. Therefor we can't ask for a delay of 3.
-
-You don't ask for a delay, you ask for an outphasing in degrees. In
-the hardware, in the register 0 means an outphasing of 180 degrees
-(and this has been confirmed by Allwinner a while back). In the two
-cases you point out, we would have two ways of achieving the same
-thing, we prefer one over another, but I don't see how it's
-problematic.
-
-It's also a direct copy of the current code we have, which didn't
-raise any objection, or had any known bugs.
-
-> > +struct ccu_phase {
-> > +       u8                      shift;
-> > +       u8                      width;
-> 
-> Not sure why you used struct ccu_factor in the divider table clock,
-> but separate fields directly in ccu_phase here.
-
-Because this is not meant for the same thing. ccu_factor is probably
-going to go away anyway because of the dividers consolidation.
-
-Thanks!
-Maxime
+Heh, ok. If it isn't supported in this patch then we need to make the
+config depend on ARM64 so that this doesn't fail to compile on ARM.
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160523/2ae847cb/attachment-0001.sig>
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
