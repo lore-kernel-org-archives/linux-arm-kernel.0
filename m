@@ -1,68 +1,49 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon, 23 May 2016 21:11:30 +0800
-Subject: [PATCH 3/3] arm64: dts: rockchip: add backlight support for rk3399
- evb board
-In-Reply-To: <1464009056-32158-1-git-send-email-ykk@rock-chips.com>
-References: <1464009056-32158-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1464009090-32322-1-git-send-email-ykk@rock-chips.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Mon, 23 May 2016 15:16:39 +0200
+Subject: [PATCH V5 3/6] vfio: platform: determine reset capability
+In-Reply-To: <1463364819-477-4-git-send-email-okaya@codeaurora.org>
+References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
+ <1463364819-477-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <574302B7.7010605@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- arch/arm64/boot/dts/rockchip/rk3399-evb.dts | 40 +++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+On 05/16/2016 04:13 AM, Sinan Kaya wrote:
+> Creating a new function to determine if this driver supports reset
+> function or not. This is an attempt to abstract device tree calls
+> from the rest of the code.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/vfio/platform/vfio_platform_common.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index cb91dd3..25378bd 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -49,6 +49,11 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
+>  	return reset_fn;
+>  }
+>  
+> +static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
+> +{
+> +	return vdev->of_reset ? true : false;
+> +}
+> +
+>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  {
+>  	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+> @@ -215,7 +220,7 @@ static long vfio_platform_ioctl(void *device_data,
+>  		if (info.argsz < minsz)
+>  			return -EINVAL;
+>  
+> -		if (vdev->of_reset)
+> +		if (vfio_platform_has_reset(vdev))
+>  			vdev->flags |= VFIO_DEVICE_FLAGS_RESET;
+>  		info.flags = vdev->flags;
+>  		info.num_regions = vdev->num_regions;
+> 
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-index 1a3eb14..31d9e27 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3399-evb.dts
-@@ -75,6 +75,46 @@
- 		regulator-always-on;
- 		regulator-boot-on;
- 	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm0 0 25000 0>;
-+		brightness-levels = <
-+			  0   1   2   3   4   5   6   7
-+			  8   9  10  11  12  13  14  15
-+			 16  17  18  19  20  21  22  23
-+			 24  25  26  27  28  29  30  31
-+			 32  33  34  35  36  37  38  39
-+			 40  41  42  43  44  45  46  47
-+			 48  49  50  51  52  53  54  55
-+			 56  57  58  59  60  61  62  63
-+			 64  65  66  67  68  69  70  71
-+			 72  73  74  75  76  77  78  79
-+			 80  81  82  83  84  85  86  87
-+			 88  89  90  91  92  93  94  95
-+			 96  97  98  99 100 101 102 103
-+			104 105 106 107 108 109 110 111
-+			112 113 114 115 116 117 118 119
-+			120 121 122 123 124 125 126 127
-+			128 129 130 131 132 133 134 135
-+			136 137 138 139 140 141 142 143
-+			144 145 146 147 148 149 150 151
-+			152 153 154 155 156 157 158 159
-+			160 161 162 163 164 165 166 167
-+			168 169 170 171 172 173 174 175
-+			176 177 178 179 180 181 182 183
-+			184 185 186 187 188 189 190 191
-+			192 193 194 195 196 197 198 199
-+			200 201 202 203 204 205 206 207
-+			208 209 210 211 212 213 214 215
-+			216 217 218 219 220 221 222 223
-+			224 225 226 227 228 229 230 231
-+			232 233 234 235 236 237 238 239
-+			240 241 242 243 244 245 246 247
-+			248 249 250 251 252 253 254 255>;
-+		default-brightness-level = <200>;
-+		enable-gpios = <&gpio1 13 GPIO_ACTIVE_HIGH>;
-+	};
- };
- 
- &pwm0 {
--- 
-1.9.1
+Eric
