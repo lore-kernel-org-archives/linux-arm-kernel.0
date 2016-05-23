@@ -1,48 +1,62 @@
-From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
-Date: Mon, 23 May 2016 12:20:51 -0400
-Subject: [PATCH 4/4] hwrng: bcm2835: Read as much data as available
-In-Reply-To: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
-References: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <1464020451-16520-5-git-send-email-yendapally.reddy@broadcom.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 23 May 2016 18:30:20 +0200
+Subject: [PATCH v3 0/4] Add Amlogic secure monitor driver
+Message-ID: <1464021024-29380-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Read the requested number of data from the fifo
+From: Carlo Caione <carlo@endlessm.com>
 
-Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
----
- drivers/char/hw_random/bcm2835-rng.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+In the Amlogic SoCs the secure monitor calls are used for a lot of reasons:
+interact with the NVMEM (efuses), check the reboot reason, set USB boot, ...
 
-diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
-index b1e8b78..9bbdc07 100644
---- a/drivers/char/hw_random/bcm2835-rng.c
-+++ b/drivers/char/hw_random/bcm2835-rng.c
-@@ -43,6 +43,8 @@ static int bcm2835_rng_read(struct hwrng *rng, void *buf, size_t max,
- 			       bool wait)
- {
- 	void __iomem *rng_base = (void __iomem *)rng->priv;
-+	u32 max_words = max/sizeof(u32);
-+	u32 num_words, count;
- 
- 	while ((__raw_readl(rng_base + RNG_STATUS) >> 24) == 0) {
- 		if (!wait)
-@@ -50,8 +52,14 @@ static int bcm2835_rng_read(struct hwrng *rng, void *buf, size_t max,
- 		cpu_relax();
- 	}
- 
--	*(u32 *)buf = __raw_readl(rng_base + RNG_DATA);
--	return sizeof(u32);
-+	num_words = (readl(rng_base + RNG_STATUS) >> 24);
-+	if (num_words > max_words)
-+		num_words = max_words;
-+
-+	for (count = 0; count < num_words; count++)
-+		((u32 *)buf)[count] = readl(rng_base + RNG_DATA);
-+
-+	return (num_words * sizeof(u32));
- }
- 
- static struct hwrng bcm2835_rng_ops = {
+This driver defines a generic interface towards the secure monitor that can be
+used by more specialized drivers to interact with the secure monitor itself
+without worrying about bounce buffers managing.
+
+Changelog:
+
+v3:
+  * Moved driver to drivers/firmware
+  * Added EXPORT_SYMBOL macros
+  * Changed '_' in '-'
+  * Introduced 'struct meson_sm_firmware' and 'meson_sm_get_fw()' to be used by
+    drivers using the secure-monitor to enforce probe ordering
+
+v2:
+  * All the SMC function identifiers are now in a SoC-specific header file to
+    be included by the DTS files so the SMC commands are now defined in the DT
+    instead to be hardcoded into the driver
+  * Patchset is no longer an RFC
+  * Better error management and boundary checking
+  * s/unsigned int/u32/
+  * SMC call not only on CPU 0
+  * Fix memory leaking
+  * s/amlogic/meson/ in the directory names
+
+
+Carlo Caione (4):
+  firmware: Amlogic: Add secure monitor driver
+  firmware: dt-bindings: Add secure monitor header file for GXBB
+  ARM64: dts: amlogic: gxbb: Enable secure monitor
+  documentation: Add secure monitor binding documentation
+
+ .../bindings/firmware/meson/meson_sm.txt           |  51 ++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  11 ++
+ drivers/firmware/Kconfig                           |   1 +
+ drivers/firmware/Makefile                          |   1 +
+ drivers/firmware/meson/Kconfig                     |   8 +
+ drivers/firmware/meson/Makefile                    |   1 +
+ drivers/firmware/meson/meson_sm.c                  | 179 +++++++++++++++++++++
+ include/dt-bindings/firmware/meson-gxbb-sm.h       |  44 +++++
+ include/linux/firmware/meson/meson_sm.h            |  38 +++++
+ 9 files changed, 334 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+ create mode 100644 drivers/firmware/meson/Kconfig
+ create mode 100644 drivers/firmware/meson/Makefile
+ create mode 100644 drivers/firmware/meson/meson_sm.c
+ create mode 100644 include/dt-bindings/firmware/meson-gxbb-sm.h
+ create mode 100644 include/linux/firmware/meson/meson_sm.h
+
 -- 
-2.1.0
+2.7.4
