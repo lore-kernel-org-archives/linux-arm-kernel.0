@@ -1,25 +1,41 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 23 May 2016 14:13:29 -0300
-Subject: Crash after 'reboot' due to 9be4fd2c7723a
-In-Reply-To: <CAJZ5v0i3h9Jepcxq5xZd1juCWxgOhT1-NBhV9zUXGz4A_j=XeA@mail.gmail.com>
-References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
- <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
- <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
- <2148724.oQlEHos3jS@vostro.rjw.lan>
- <CAOMZO5BBXmXAJayo8YpX4eV-_rTtAoDvjf91CUhWnLV8A0mx0g@mail.gmail.com>
- <CAOMZO5DjgXuYiuOrUdbap3x2PVyUXbp2V1VGnU=2THRSM8Hfow@mail.gmail.com>
- <CAJZ5v0i3h9Jepcxq5xZd1juCWxgOhT1-NBhV9zUXGz4A_j=XeA@mail.gmail.com>
-Message-ID: <CAOMZO5Cry5WNnMZ+WYRJNt0i8WHBXViZwijWHaYeJ=GACaWcLA@mail.gmail.com>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Mon, 23 May 2016 18:14:08 +0530
+Subject: [PATCH] hwrng: stm32 - fix build warning
+Message-ID: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2016 at 10:31 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+We have been getting build warning about:
+drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
+drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
+					uninitialized in this function
 
-> The patch is just a workaround for a problem in the arch code showing
-> up on your platform, though.
+On checking the code it turns out that sr can never be used
+uninitialized as sr is getting initialized in the while loop and while
+loop will always execute as the minimum value of max can be 32.
+So just initialize sr to 0 while declaring it to silence the compiler.
 
-Not sure where the problem in the arch code is located though.
+Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
+---
 
-Ping, Shawn, Sascha, any ideas?
+build log at:
+https://travis-ci.org/sudipm-mukherjee/parport/jobs/132180906
 
-Thanks
+ drivers/char/hw_random/stm32-rng.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
+index 92a8106..0533370 100644
+--- a/drivers/char/hw_random/stm32-rng.c
++++ b/drivers/char/hw_random/stm32-rng.c
+@@ -52,7 +52,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+ {
+ 	struct stm32_rng_private *priv =
+ 	    container_of(rng, struct stm32_rng_private, rng);
+-	u32 sr;
++	u32 sr = 0;
+ 	int retval = 0;
+ 
+ 	pm_runtime_get_sync((struct device *) priv->rng.priv);
+-- 
+1.9.1
