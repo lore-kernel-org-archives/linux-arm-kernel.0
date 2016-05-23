@@ -1,138 +1,103 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Mon, 23 May 2016 13:43:58 +0200
-Subject: [PATCH v2 1/4] soc: Amlogic: Add secure monitor driver
-In-Reply-To: <5742EBC4.3050704@gmail.com>
-References: <1463583382-15614-1-git-send-email-carlo@caione.org>
- <1463583382-15614-2-git-send-email-carlo@caione.org>
- <5742EBC4.3050704@gmail.com>
-Message-ID: <20160523114358.GC17269@mephisto>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 23 May 2016 14:04:24 +0200
+Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
+In-Reply-To: <20160131113409.GI20165@piout.net>
+References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
+ <20160125110921.GA4027@piout.net>
+ <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
+ <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
+ <20160131113409.GI20165@piout.net>
+Message-ID: <20160523140424.7ded3893@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/16 13:38, Matthias Brugger wrote:
+Hi David,
+
+Sorry for the late review (I know you've posted new versions but I want
+to comment on this one).
+
+On Sun, 31 Jan 2016 12:34:09 +0100
+Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+
+> On 29/01/2016 at 11:13:05 +1100, Finn Thain wrote :
+> > 
+> > On Mon, 25 Jan 2016, David Mosberger wrote:
+> >   
+> > > On Mon, Jan 25, 2016 at 4:09 AM, Alexandre Belloni 
+> > > <alexandre.belloni@free-electrons.com> wrote:
+> > >   
+> > > > I know this does more than that but I think those thre sections should 
+> > > > be registered using the nvmem framework. The sysfs file creation and 
+> > > > accesses then comes for free.  
+> > > 
+> > > I think Finn's patches would have to go in for that first, since the 
+> > > existing nvram code is a mess. Even with Finn's patches in, I think it 
+> > > could go either way.  
+> > 
+> > I think Alexandre is speaking of the nvmem subsystem (not nvram).
+> > Documentation/devicetree/bindings/nvmem
+> > Documentation/nvmem
+> > drivers/nvmem
+> >   
+> 
+> absolutely.
+> 
+> > > I'm not exactly sure how some of the features of the security module 
+> > > would be used: key management, auto erasing, there is a strange "backup 
+> > > mode" vs "normal mode" which is not well documented, etc.  So I think it 
+> > > may well end up being sufficiently different to warrant a separate 
+> > > driver.  
+> > 
+> > nvmem is not a subsystem I am familiar with, so it's not immediately clear 
+> > to me what your driver would look like if re-written that way.
+> > 
+> > Maybe it would become simpler. But if you did end up needing a separate 
+> > misc driver as well, maybe use of the nvmem framework would actually 
+> > increase complexity.
+> > 
+> > It would depend on your requirements. But I would focus on the actual 
+> > requirement rather than uncertain future possibilities.
+> >   
+> > >   
+> > > > Another idea is also to expose it using a genpool so it can be 
+> > > > accessed as sram from inside the kernel.  
+> > > 
+> > > That may be a fine idea, but as far as our application is concerned, we 
+> > > need user-level access to the battery-backed RAM.  
+> > 
+> > Right. I don't see how adding a memory allocator would help either.
+> >   
+> 
+> While the immediate need is to use that sram from userspace, I think
+> this is valuable to already think that at some point we will need to be
+> able to partition and access that sram from the kernel.
+> 
+> 
 > 
 
-[...]
-> >+#include <stdarg.h>
-> >+#include <asm/cacheflush.h>
-> >+#include <asm/compiler.h>
-> >+#include <linux/arm-smccc.h>
-> >+#include <linux/io.h>
-> >+#include <linux/ioport.h>
-> >+#include <linux/module.h>
-> >+#include <linux/platform_device.h>
-> >+#include <linux/of.h>
-> >+#include <linux/smp.h>
-> >+
-> >+#include <linux/soc/meson/meson_sm.h>
-> >+
-> >+#define SM_MEM_SIZE	0x1000
-> >+
-> >+/*
-> >+ * To read from / write to the secure monitor we use two bounce buffers. The
-> >+ * physical addresses of the two buffers are obtained by querying the secure
-> >+ * monitor itself.
-> >+ */
-> >+
-> >+static u32 sm_phy_in_base;
-> >+static u32 sm_phy_out_base;
-> 
-> You can put this two variable in meson_sm_probe, right?
+Well, I think we're reaching this point right now: I have to implement
+"freeze" mode (entering a deep sleep mode by cutting all power domains
+except VDDBU), and in order to do that I need to access BUREGs which
+are part of the secu-sram you're trying to expose here.
 
-Yeah, actually no need to be there.
+Two comments on the nvmem approach:
+1/ first of all it's not really a non-volative memory: if you loose
+VDDBU you also loose the whole SRAM content.
+2/ I need to be able to reserve the BUREG region (at least part of it)
+for in kernel usage (need to store the SDRAM address I should jump to
+when exiting freeze mode).
 
-> >+
-> >+static void __iomem *sm_sharemem_in_base;
-> >+static void __iomem *sm_sharemem_out_base;
-> >+
-> >+struct meson_sm_data {
-> >+	u32 cmd;
-> >+	u32 arg0;
-> >+	u32 arg1;
-> >+	u32 arg2;
-> >+	u32 arg3;
-> >+	u32 arg4;
-> >+	u32 ret;
-> >+};
-> >+
-> >+static void __meson_sm_call(void *info)
-> >+{
-> >+	struct meson_sm_data *data = info;
-> >+	struct arm_smccc_res res;
-> >+
-> >+	arm_smccc_smc(data->cmd,
-> >+		      data->arg0, data->arg1, data->arg2,
-> >+		      data->arg3, data->arg4, 0, 0, &res);
-> >+	data->ret = res.a0;
-> >+}
-> >+
-> >+u32 meson_sm_call(u32 cmd, u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-> 
-> Can the function be static or will it be called from another driver?
+For those reason I think using the SRAM driver (drivers/misc/sram.c) is
+a better approach. This driver both provides a sysfs interface (just
+add the "export" property on the SRAM region you want to export to
+user-space through sysfs), and a genpool provider (which I need to
+reserve part of the SRAM for my "freeze" mode implementation).
 
-It _can_ be called from another driver. It depends on the SMC used, so
-better making it available.
+Best Regards,
 
-> 
-> >+{
-> >+	struct meson_sm_data data;
-> >+
-> >+	data.cmd = cmd;
-> >+	data.arg0 = arg0;
-> >+	data.arg1 = arg1;
-> >+	data.arg2 = arg2;
-> >+	data.arg3 = arg3;
-> >+	data.arg4 = arg4;
-> >+	data.ret = 0;
-> >+
-> >+	__meson_sm_call(&data);
-> >+
-> >+	return data.ret;
-> >+}
-> >+
-> >+u32 meson_sm_call_read(void *buffer, u32 cmd, u32 arg0, u32 arg1,
-> >+		       u32 arg2, u32 arg3, u32 arg4)
-> >+{
-> >+	u32 size;
-> >+
-> >+	size = meson_sm_call(cmd, arg0, arg1, arg2, arg3, arg4);
-> >+
-> >+	if (!size || size > SM_MEM_SIZE)
-> >+		return -EINVAL;
-> >+
-> >+	memcpy(buffer, sm_sharemem_out_base, size);
-> >+	return size;
-> >+}
-> 
-> This function will be needed to be exported to be callable from modules.
-
-Fix in v3.
-
-> >+
-> >+u32 meson_sm_call_write(void *buffer, unsigned int b_size, u32 cmd, u32 arg0,
-> >+			u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-> >+{
-> >+	u32 size;
-> >+
-> >+	if (b_size > SM_MEM_SIZE)
-> >+		return -EINVAL;
-> >+
-> >+	memcpy(sm_sharemem_in_base, buffer, b_size);
-> >+
-> >+	size = meson_sm_call(cmd, arg0, arg1, arg2, arg3, arg4);
-> >+
-> >+	if (!size)
-> >+		return -EINVAL;
-> >+
-> >+	return size;
-> >+}
-> >+
-> 
-> Same here.
-
-Thanks.
-
-Cheers,
+Boris
 
 -- 
-Carlo Caione
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
