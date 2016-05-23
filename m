@@ -1,58 +1,70 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2016 22:11:14 +0100
-Subject: Crash after 'reboot' due to 9be4fd2c7723a
-In-Reply-To: <CAJZ5v0jO++9d7bpXAg9Zs5GOPPZvg6E+OY3avDmNdor8EDxn4w@mail.gmail.com>
-References: <CAOMZO5A62LgnyT0sQw5N-xeHaD0nSGTjAFxUx=_6OpUm02robA@mail.gmail.com>
- <CAJZ5v0hX1dZ+79-KCyumf57o02WKivxcRLJ1Zi8akrqu_2CZEQ@mail.gmail.com>
- <CAOMZO5CD08cX0yDBZTdFV+iwgr__fjSaaWvgjimotr5L1yrbaQ@mail.gmail.com>
- <2148724.oQlEHos3jS@vostro.rjw.lan>
- <20160523182807.GY19428@n2100.arm.linux.org.uk>
- <CAJZ5v0ipPVsZmu+RVfrPChA7banMGFNsfMt=if0V3XfVdstRNQ@mail.gmail.com>
- <CAJZ5v0j0VbyHNT_ZmThsdQfRWzf7SG65A8-bPxoAUxZJgR96og@mail.gmail.com>
- <CAOMZO5Cbue9L2JGA0kv7nTZ=78oKDhNu6WLRUmcsSuLHscDVUQ@mail.gmail.com>
- <CAJZ5v0jO++9d7bpXAg9Zs5GOPPZvg6E+OY3avDmNdor8EDxn4w@mail.gmail.com>
-Message-ID: <20160523211114.GA19428@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 23 May 2016 16:18:13 -0500
+Subject: [PATCH v3 4/4] soc: Add SoC driver for Freescale Vybrid platform
+In-Reply-To: <ffef165d05f71a1b19437171d8fdb4bc78f6b1e3.1463737502.git.maitysanchayan@gmail.com>
+References: <cover.1463737502.git.maitysanchayan@gmail.com>
+ <ffef165d05f71a1b19437171d8fdb4bc78f6b1e3.1463737502.git.maitysanchayan@gmail.com>
+Message-ID: <20160523211813.GA30237@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 11:03:01PM +0200, Rafael J. Wysocki wrote:
-> On Mon, May 23, 2016 at 10:59 PM, Fabio Estevam <festevam@gmail.com> wrote:
-> > On ARM we have:
-> >
-> > static inline bool arch_irq_work_has_interrupt(void)
-> > {
-> >     return is_smp();
-> > }
-> >
-> > and then:
-> >
-> > static inline bool is_smp(void)
-> > {
-> > #ifndef CONFIG_SMP
-> >     return false;
-> > #elif defined(CONFIG_SMP_ON_UP)
-> >     extern unsigned int smp_on_up;
-> >     return !!smp_on_up;
-> > #else
-> >     return true;
-> > #endif
-> > }
-> >
-> > So if CONFIG_SMP=y,  is_smp() returns 1.
-> >
-> > As I mentioned before, the reboot problem does not happen with CONFIG_SMP=n.
+On Fri, May 20, 2016 at 03:32:05PM +0530, Sanchayan Maity wrote:
+> This adds a SoC driver to be used by Freescale Vybrid SoC's.
+> Driver utilises syscon and nvmem consumer API's to get the
+> various register values needed and expose the SoC specific
+> properties via sysfs.
 > 
-> First, why don't the other ARM UP platforms have this problem when SMP
-> kernels are run on them?
+> A sample output from Colibri Vybrid VF61 is below:
 > 
-> Second, quite evidently, the platform says "I can raise interrupts for
-> IRQ works", but then it doesn't do that.  That doesn't seem
-> particularly consistent to me ...
+> root at colibri-vf:~# cd /sys/bus/soc/devices/soc0
+> root at colibri-vf:/sys/bus/soc/devices/soc0# ls
+> family     machine    power      revision   soc_id     subsystem  uevent
+> root at colibri-vf:/sys/bus/soc/devices/soc0# cat family
+> Freescale Vybrid VF610
+> root at colibri-vf:/sys/bus/soc/devices/soc0# cat machine
+> Freescale Vybrid
+> root at colibri-vf:/sys/bus/soc/devices/soc0# cat revision
+> 00000013
+> root at colibri-vf:/sys/bus/soc/devices/soc0# cat soc_id
+> df6472a6130f29d4
+> 
+> Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> ---
+>  .../bindings/arm/freescale/fsl,vf610-soc.txt       |  20 +++
+>  drivers/soc/Kconfig                                |   1 +
+>  drivers/soc/fsl/Kconfig                            |  10 ++
+>  drivers/soc/fsl/Makefile                           |   1 +
+>  drivers/soc/fsl/soc-vf610.c                        | 198 +++++++++++++++++++++
+>  5 files changed, 230 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>  create mode 100644 drivers/soc/fsl/Kconfig
+>  create mode 100644 drivers/soc/fsl/soc-vf610.c
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+> new file mode 100644
+> index 0000000..338905d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+> @@ -0,0 +1,20 @@
+> +Vybrid System-on-Chip
+> +---------------------
+> +
+> +Required properties:
+> +
+> +- compatible: "fsl,vf610-soc"
+> +- rom-revision: phandle to the on-chip ROM node
+> +- mscm: phandle to the MSCM CPU configuration node
+> +- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+> +- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
 
-Maybe someone has implemented a SoC which has a CPU capable of SMP
-but the GIC isn't...  I'm just guessing again.
+I still have similar concerns as the discussion on the last version. 
+This version only proves that you aren't describing h/w, but rather just 
+a collection of data that some driver wants.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+A driver can just as easily look-up all the nodes directly that these 
+phandles point to.
+
+And as long as we have inconsistent use of soc_device, I don't want to 
+see any compatible strings related to it.
+
+Rob
