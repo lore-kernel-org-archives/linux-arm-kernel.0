@@ -1,103 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 23 May 2016 14:04:24 +0200
-Subject: [PATCH] misc: atmel-secumod: Driver for Atmel "security module".
-In-Reply-To: <20160131113409.GI20165@piout.net>
-References: <1453348655-31182-1-git-send-email-davidm@egauge.net>
- <20160125110921.GA4027@piout.net>
- <CALnQHM13cGnoma_3erb0oCnRD0sYGGNF1E1cgzCJHrEXbvJpRQ@mail.gmail.com>
- <alpine.LNX.2.00.1601291055520.23683@nippy.intranet>
- <20160131113409.GI20165@piout.net>
-Message-ID: <20160523140424.7ded3893@bbrezillon>
+From: hs.liao@mediatek.com (HS Liao)
+Date: Mon, 23 May 2016 20:23:06 +0800
+Subject: [PATCH v7 0/4] Mediatek MT8173 CMDQ support
+Message-ID: <1464006190-344-1-git-send-email-hs.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
 
-Sorry for the late review (I know you've posted new versions but I want
-to comment on this one).
+Hi,
 
-On Sun, 31 Jan 2016 12:34:09 +0100
-Alexandre Belloni <alexandre.belloni@free-electrons.com> wrote:
+This is Mediatek MT8173 Command Queue(CMDQ) driver. The CMDQ is used
+to help read/write registers with critical time limitation, such as
+updating display configuration during the vblank. It controls Global
+Command Engine (GCE) hardware to achieve this requirement.
 
-> On 29/01/2016 at 11:13:05 +1100, Finn Thain wrote :
-> > 
-> > On Mon, 25 Jan 2016, David Mosberger wrote:
-> >   
-> > > On Mon, Jan 25, 2016 at 4:09 AM, Alexandre Belloni 
-> > > <alexandre.belloni@free-electrons.com> wrote:
-> > >   
-> > > > I know this does more than that but I think those thre sections should 
-> > > > be registered using the nvmem framework. The sysfs file creation and 
-> > > > accesses then comes for free.  
-> > > 
-> > > I think Finn's patches would have to go in for that first, since the 
-> > > existing nvram code is a mess. Even with Finn's patches in, I think it 
-> > > could go either way.  
-> > 
-> > I think Alexandre is speaking of the nvmem subsystem (not nvram).
-> > Documentation/devicetree/bindings/nvmem
-> > Documentation/nvmem
-> > drivers/nvmem
-> >   
-> 
-> absolutely.
-> 
-> > > I'm not exactly sure how some of the features of the security module 
-> > > would be used: key management, auto erasing, there is a strange "backup 
-> > > mode" vs "normal mode" which is not well documented, etc.  So I think it 
-> > > may well end up being sufficiently different to warrant a separate 
-> > > driver.  
-> > 
-> > nvmem is not a subsystem I am familiar with, so it's not immediately clear 
-> > to me what your driver would look like if re-written that way.
-> > 
-> > Maybe it would become simpler. But if you did end up needing a separate 
-> > misc driver as well, maybe use of the nvmem framework would actually 
-> > increase complexity.
-> > 
-> > It would depend on your requirements. But I would focus on the actual 
-> > requirement rather than uncertain future possibilities.
-> >   
-> > >   
-> > > > Another idea is also to expose it using a genpool so it can be 
-> > > > accessed as sram from inside the kernel.  
-> > > 
-> > > That may be a fine idea, but as far as our application is concerned, we 
-> > > need user-level access to the battery-backed RAM.  
-> > 
-> > Right. I don't see how adding a memory allocator would help either.
-> >   
-> 
-> While the immediate need is to use that sram from userspace, I think
-> this is valuable to already think that at some point we will need to be
-> able to partition and access that sram from the kernel.
-> 
-> 
-> 
+These patches have a build dependency on top of v4.6-rc1.
 
-Well, I think we're reaching this point right now: I have to implement
-"freeze" mode (entering a deep sleep mode by cutting all power domains
-except VDDBU), and in order to do that I need to access BUREGs which
-are part of the secu-sram you're trying to expose here.
+Changes since v6:
+ - remove task waiting list
+ - remove cmdq_command
+ - use kzalloc/kfree instead of kmem_cache
+ - use u64* instead of u32* if suitable
+ - shrink some code
 
-Two comments on the nvmem approach:
-1/ first of all it's not really a non-volative memory: if you loose
-VDDBU you also loose the whole SRAM content.
-2/ I need to be able to reserve the BUREG region (at least part of it)
-for in kernel usage (need to store the SDRAM address I should jump to
-when exiting freeze mode).
+Best regards,
+HS Liao
 
-For those reason I think using the SRAM driver (drivers/misc/sram.c) is
-a better approach. This driver both provides a sysfs interface (just
-add the "export" property on the SRAM region you want to export to
-user-space through sysfs), and a genpool provider (which I need to
-reserve part of the SRAM for my "freeze" mode implementation).
+HS Liao (4):
+  dt-bindings: soc: Add documentation for the MediaTek GCE unit
+  CMDQ: Mediatek CMDQ driver
+  arm64: dts: mt8173: Add GCE node
+  CMDQ: suspend/resume protection
 
-Best Regards,
-
-Boris
+ .../devicetree/bindings/soc/mediatek/gce.txt       |   34 +
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |    8 +
+ drivers/soc/mediatek/Kconfig                       |   10 +
+ drivers/soc/mediatek/Makefile                      |    1 +
+ drivers/soc/mediatek/mtk-cmdq.c                    | 1062 ++++++++++++++++++++
+ include/soc/mediatek/cmdq.h                        |  197 ++++
+ 6 files changed, 1312 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/soc/mediatek/gce.txt
+ create mode 100644 drivers/soc/mediatek/mtk-cmdq.c
+ create mode 100644 include/soc/mediatek/cmdq.h
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+1.9.1
