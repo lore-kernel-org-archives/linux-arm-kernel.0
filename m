@@ -1,48 +1,34 @@
-From: khiem.nguyen.xt@rvc.renesas.com (Khiem Nguyen)
-Date: Tue, 24 May 2016 14:29:28 +0700
-Subject: [PATCH v2 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
- support
-In-Reply-To: <CAMuHMdV+atFKJjxcH7RkBCdabsBqk5Y3TTHCPN+sprDaM1xj_w@mail.gmail.com>
-References: <1463966906-15129-1-git-send-email-horms+renesas@verge.net.au>
- <1463966906-15129-2-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXsu=O13rLysob1Xp+5vWcp7gq6byCffR-6hGc+W-837A@mail.gmail.com>
- <5742B66C.7080102@rvc.renesas.com>
- <CAMuHMdV+atFKJjxcH7RkBCdabsBqk5Y3TTHCPN+sprDaM1xj_w@mail.gmail.com>
-Message-ID: <574402D8.6030400@rvc.renesas.com>
+From: daniel@fooishbar.org (Daniel Stone)
+Date: Tue, 24 May 2016 09:34:50 +0200
+Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending
+ flip event v5
+In-Reply-To: <1464074857-5515-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1464074761-5194-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1464074857-5515-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <CAPj87rPfakpstxmK3rodunVp2aX-gkLqoqQJ+gfoazaH0ej29g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
-
-On 5/24/2016 1:35 PM, Geert Uytterhoeven wrote:
-> Hi Khiem,
+On 24 May 2016 at 09:27, Tomeu Vizoso <tomeu.vizoso@collabora.com> wrote:
+> As per the docs, atomic_commit should return -EBUSY "if an asycnhronous
+> updated is requested and there is an earlier updated pending".
 >
-> On Mon, May 23, 2016 at 9:51 AM, Khiem Nguyen
-> <khiem.nguyen.xt@rvc.renesas.com> wrote:
->> Using 1.0 will open Suspend-to-RAM support if secure firmware supports that
->> feature.
->> However, we might need additional work in drivers to support suspend/resume
->> handlers.
->> So, I suggest that we keep using 0.2 until Suspend-to-RAM feature is
->> confirmed in r8a7795/r8a7796.
+> v2: Use the status of the workqueue instead of vop->event, and don't add
+> a superfluous wait on the workqueue.
 >
-> Note that we do have suspend/resume support on R-Car Gen2, albeit some
-> drivers may lack code to save/restore state when their devices are powered
-> down, as R-Car Gen2 doesn't have power domains for devices.
+> v3: Drop work_busy, as there's a sizeable delay when the worker
+> finishes, which introduces a race in which the client has already
+> received the last flip event but the next page flip ioctl will still
+> return -EBUSY because work_busy returns outdated information.
 >
-> So I'd expect everything to work fine, as long as no R-Car Gen3-specific
-> drivers or devices residing in multimedia power domains are involved.
+> v4: Hold dev->event_lock while checking the VOP's event field as
+> suggested by Daniel Stone.
+>
+> v5: Only block if there's outstanding work if it's a blocking call.
+>
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 
-In my test environment using latest integration branch in 
-renesas-drivers (v4.6), it failed to resume due to operation inside 
-rcar_du_pm_resume().
-Probably, it should be fixed soon.
+Reviewed-by: Daniel Stone <daniels@collabora.com>
 
-FYI, your secure firmware will have Suspend-to-RAM support if below log 
-is output.
-    psci: PSCIv1.0 detected in firmware.
-
-Thanks.
-
-Best regards,
-KHIEM Nguyen
+Cheers,
+Daniel
