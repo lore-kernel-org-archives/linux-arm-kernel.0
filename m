@@ -1,38 +1,115 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Tue, 24 May 2016 09:29:29 -0700
-Subject: [PATCH 3/3] ARM: configs: keystone: Enable PINCTRL_SINGLE Config
-In-Reply-To: <5743D0FD.5070804@ti.com>
-References: <1464006547-19569-1-git-send-email-j-keerthy@ti.com>
- <1464006547-19569-4-git-send-email-j-keerthy@ti.com>
- <5743CC80.4070404@ti.com> <5743D0FD.5070804@ti.com>
-Message-ID: <6325832e-24d2-43c7-09b4-a73b6549ee2c@oracle.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 24 May 2016 12:09:41 -0500
+Subject: [PATCH v3 4/4] soc: Add SoC driver for Freescale Vybrid platform
+In-Reply-To: <20160524041447.GA2884@Sanchayan-Arch.localdomain>
+References: <cover.1463737502.git.maitysanchayan@gmail.com>
+ <ffef165d05f71a1b19437171d8fdb4bc78f6b1e3.1463737502.git.maitysanchayan@gmail.com>
+ <20160523211813.GA30237@rob-hp-laptop>
+ <20160524041447.GA2884@Sanchayan-Arch.localdomain>
+Message-ID: <CAL_JsqKCwy=aXveTfnaQuZ5b3Ld9nzABgPfdPm1JX3CBuvzG+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Keerthy,
+On Mon, May 23, 2016 at 11:14 PM,  <maitysanchayan@gmail.com> wrote:
+> Hello Rob,
+>
+> On 16-05-23 16:18:13, Rob Herring wrote:
+>> On Fri, May 20, 2016 at 03:32:05PM +0530, Sanchayan Maity wrote:
+>> > This adds a SoC driver to be used by Freescale Vybrid SoC's.
+>> > Driver utilises syscon and nvmem consumer API's to get the
+>> > various register values needed and expose the SoC specific
+>> > properties via sysfs.
+>> >
+>> > A sample output from Colibri Vybrid VF61 is below:
+>> >
+>> > root at colibri-vf:~# cd /sys/bus/soc/devices/soc0
+>> > root at colibri-vf:/sys/bus/soc/devices/soc0# ls
+>> > family     machine    power      revision   soc_id     subsystem  uevent
+>> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat family
+>> > Freescale Vybrid VF610
+>> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat machine
+>> > Freescale Vybrid
+>> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat revision
+>> > 00000013
+>> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat soc_id
+>> > df6472a6130f29d4
+>> >
+>> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+>> > ---
+>> >  .../bindings/arm/freescale/fsl,vf610-soc.txt       |  20 +++
+>> >  drivers/soc/Kconfig                                |   1 +
+>> >  drivers/soc/fsl/Kconfig                            |  10 ++
+>> >  drivers/soc/fsl/Makefile                           |   1 +
+>> >  drivers/soc/fsl/soc-vf610.c                        | 198 +++++++++++++++++++++
+>> >  5 files changed, 230 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>> >  create mode 100644 drivers/soc/fsl/Kconfig
+>> >  create mode 100644 drivers/soc/fsl/soc-vf610.c
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>> > new file mode 100644
+>> > index 0000000..338905d
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+>> > @@ -0,0 +1,20 @@
+>> > +Vybrid System-on-Chip
+>> > +---------------------
+>> > +
+>> > +Required properties:
+>> > +
+>> > +- compatible: "fsl,vf610-soc"
+>> > +- rom-revision: phandle to the on-chip ROM node
+>> > +- mscm: phandle to the MSCM CPU configuration node
+>> > +- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+>> > +- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+>>
+>> I still have similar concerns as the discussion on the last version.
+>> This version only proves that you aren't describing h/w, but rather just
+>> a collection of data that some driver wants.
+>>
+>> A driver can just as easily look-up all the nodes directly that these
+>> phandles point to.
+>
+> Agreed, that we can look up all the nodes directly that these phandles
+> refer to but I would still need a DT entry to bind to. While I could
+> bind to existing nodes like mscm cpucfg but that doesn't seem right.
+>
+> The very first approach that we had taken was to integrate this functionality
+> in mach-vf610.c code under mach-imx
+> http://www.spinics.net/lists/devicetree/msg80654.html
 
-On 5/23/2016 8:56 PM, Keerthy wrote:
->
->
-> On Tuesday 24 May 2016 09:07 AM, Lokesh Vutla wrote:
->>
->>
->> On Monday 23 May 2016 05:59 PM, Keerthy wrote:
->>> keystone-k2l devices use pinmux and are compliant with PINCTRL_SINGLE.
->>> Hence enable the config option.
->>>
->>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>
->> A similar patch[1] is already posted.
->>
->> [1]https://patchwork.kernel.org/patch/8958091/
->
-> Ah I had not seen them. If they are already reviewed and closer to be
-> merged then Patch 2 and Patch 3 of this series can be dropped.
->
-Once the 4.7-rc2 is out, please rebase these floating patches
-against it and post a consolidated patches. I will line them
-up for 4.8
+Yes, everyone wants to move all platform devices in the kernel to a
+corresponding DT node. The result is often making up nodes to do this.
+It's the same thing with cpufreq.
 
-Regards,
-Santosh
+> and then it was recommended to migrate this to drivers/soc where we did use
+> phandles or direct look up via compatible strings
+
+The location in the tree is an orthogonal issue. You could move it and
+use of_machine_is_compatible without any DT change.
+
+The primary issue I have here is how do we bind soc_bus to DT in a
+consistent way. Sorry, but vybrid specific patches alone are never
+going to solve that issue.
+
+> http://www.spinics.net/lists/arm-kernel/msg420847.html
+>
+> and
+>
+> http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
+>
+> There hasn't been a consensus since v1.
+
+I actually prefer your previous version binding soc_bus to the root
+bus node to this version. I think that is closer to the right
+direction. After all, pretty much everything is an SOC and every SOC
+has an SOC bus. Pretty much every SOC and board have revisions and may
+need to expose that revision info as well. We have to do this
+consistently which means having a default implementation for
+simple-bus that is not opt-in.
+
+Alternatively, we should just deprecate soc_bus and come up a
+different solution. Either way, I think we have a half implemented
+solution currently.
+
+Rob
