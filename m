@@ -1,145 +1,110 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 24 May 2016 16:36:45 +0100
-Subject: [PATCH v2 4/5] iommu/mediatek: add support for mtk iommu
- generation one HW
-In-Reply-To: <1464083839.30939.54.camel@mtksdaap41>
-References: <1463658558-567-1-git-send-email-honghui.zhang@mediatek.com>
- <1463658558-567-5-git-send-email-honghui.zhang@mediatek.com>
- <57435AA1.3090602@arm.com> <1464083839.30939.54.camel@mtksdaap41>
-Message-ID: <5744750D.9080006@arm.com>
+Date: Tue, 24 May 2016 16:45:17 +0100
+Subject: [RFC 5/9] drivers: platform: Configure dma operations at probe
+ time
+In-Reply-To: <1461599894-1969-6-git-send-email-sricharan@codeaurora.org>
+References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+ <1461599894-1969-6-git-send-email-sricharan@codeaurora.org>
+Message-ID: <5744770D.9090303@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/16 10:57, Honghui Zhang wrote:
-[...]
->>> @@ -48,6 +48,9 @@ struct mtk_iommu_domain {
->>>    	struct io_pgtable_ops		*iop;
->>>
->>>    	struct iommu_domain		domain;
->>> +	void				*pgt_va;
->>> +	dma_addr_t			pgt_pa;
->>> +	void				*cookie;
->>
->> These are going to be mutually exclusive with the cfg and iop members,
->> which implies it might be a good idea to use a union and not waste
->> space. Or better, just forward-declare struct mtk_iommu_domain here and
->> leave separate definitions private to each driver. The void *cookie is
->> also an unnecessary level of abstraction, I think.
->>
+On 25/04/16 16:58, Sricharan R wrote:
+> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 >
-> Do you mean declare struct mtk_iommu_domain here, and implement a new
-> struct in mtk_iommu_v1.c like
-> struct mtk_iommu_domain_v1 {
-> 	struct mtk_iommu_domain	domain;
-> 	u32			*pgt_va;
-> 	dma_addr_t		pgt_pa;
-> 	mtk_iommu_data		*data;
-> };
-> If this is acceptable I would implement it in the next version.
-
-Pretty much, except they both want to be called struct mtk_iommu_domain, 
-so that a *declaration* for the sake of the m4u_dom member of struct 
-mtk_iommu_data in the header file can remain common to both drivers - it 
-then just picks up whichever private *definition* from the .c file being 
-compiled.
-
->>>    };
->>>
->>>    struct mtk_iommu_data {
->>> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
->>> new file mode 100644
->>> index 0000000..55023e1
->>> --- /dev/null
->>> +++ b/drivers/iommu/mtk_iommu_v1.c
->>> @@ -0,0 +1,742 @@
->>> +/*
->>> + * Copyright (c) 2015-2016 MediaTek Inc.
->>> + * Author: Yong Wu <yong.wu@mediatek.com>
->>
->> Nit: is that in the sense that this patch should also have Yong's
->> signed-off-by on it, or in that it's your work derived from his version
->> in mtk_iommu.c?
+> Configuring DMA ops at probe time will allow deferring device probe when
+> the IOMMU isn't available yet.
 >
-> I write this driver based on Yong's version of mtk_iommu.c, should I add
-> his signed-off-by for this patch? Or should I put a comment about this?
-> Thanks.
-
-OK, in that case I think the appropriate attribution would be along the 
-lines of "Author: Honghui Zhang, based on mtk_iommu.c by Yong Wu" (if in 
-doubt, grepping for "Based on" gives a feel for how this is commonly 
-done). If the work that comprises this patch itself (i.e. the copying 
-and modification of the existing code) is all yours then your sign-off 
-alone is fine.
-
-[...]
->>> +static int mtk_iommu_add_device(struct device *dev)
->>> +{
->>> +	struct iommu_group *group;
->>> +	struct device_node *np;
->>> +	struct of_phandle_args iommu_spec;
->>> +	int idx = 0;
->>> +
->>> +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
->>> +				   "#iommu-cells", idx,
->>> +				   &iommu_spec)) {
->>
->> Hang on, this doesn't seem right - why do you need to reimplement all
->> this instead of using IOMMU_OF_DECLARE()?
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> ---
+>   drivers/base/platform.c | 13 +++++++++++++
+>   drivers/of/platform.c   |  7 +++----
+>   2 files changed, 16 insertions(+), 4 deletions(-)
 >
-> All the clients of mtk generation one iommu share the same iommu domain,
-> as a matter of fact, mtk generation one iommu only support one iommu
-> domain. ALl the clients share the same iova address and use the same
-> pagetable. That means all iommu clients needed to be attached to the
-> same dma_iommu_mapping.
-
-Ugh, right - I'd forgotten that the arch/arm DMA mapping code doesn't 
-respect IOMMU groups or default domains at all. That's the real root 
-cause of the issue here.
-
-> If use IOMMU_OF_DELCARE, we need to call of_iommu_set_ops to set the
-> iommu_ops, I do not want the iommu_ops be set since it would cause iommu
-> client device in different dma_iommu_mapping.
+> diff --git a/drivers/base/platform.c b/drivers/base/platform.c
+> index f437afa..17e64a4 100644
+> --- a/drivers/base/platform.c
+> +++ b/drivers/base/platform.c
+> @@ -557,6 +557,12 @@ static int platform_drv_probe(struct device *_dev)
+>   	if (ret < 0)
+>   		return ret;
 >
-> When an iommu client device has been created, the following sequence is
-> called.
+> +	if (of_have_populated_dt()) {
+> +		ret = of_dma_configure_ops(_dev, _dev->of_node);
+> +		if (ret < 0)
+> +			goto done;
+> +	}
+> +
+>   	ret = dev_pm_domain_attach(_dev, true);
+>   	if (ret != -EPROBE_DEFER) {
+>   		if (drv->probe) {
+> @@ -569,6 +575,11 @@ static int platform_drv_probe(struct device *_dev)
+>   		}
+>   	}
 >
-> of_platform_device_create
-> 	->of_dma_config
-> 		->arch_setup_dma_ops
-> 			->arch_setup_iommu_dma_ops
-> In this function of arch_setup_iommu_dma_ops would create a new
-> dma_iommu_mapping for each iommu client device and then attach the
-> device to this new dma_iommu_mapping. Since all the iommu clients share
-> the very same pagetable, this will not workable for our HW.
-> I could not release the dma_iommu_mapping in attach_device since the
-> to_dma_iommu_mapping was set after device_attached.
-> Any suggest for this?
-
-On a second look, you're doing more or less the same thing that the 
-Renesas IPMMU driver currently does, so it's probably OK as a workaround 
-for now. Fixing the arch/arm code is part of the bigger ongoing problem 
-of sorting out IOMMU probing and DMA configuration, and it doesn't seem 
-fair to force that on you for the sake of one driver ;)
-
-[...]
->>> +static int __maybe_unused mtk_iommu_resume(struct device *dev)
->>> +{
->>> +	struct mtk_iommu_data *data = dev_get_drvdata(dev);
->>> +	struct mtk_iommu_suspend_reg *reg = &data->reg;
->>> +	void __iomem *base = data->base;
->>> +
->>> +	writel_relaxed(data->m4u_dom->pgt_pa, base + REG_MMU_PT_BASE_ADDR);
->>
->> Hmm, this looks like the only case where m4u_dom actually seems
->> necessary - I'm pretty sure all the others could be fairly easily
->> reworked to not use it (I might try having a quick hack at the existing
->> M4U driver to see) - at which point we could just explicitly
->> save/restore the base register here and get rid of m4u_dom entirely.
+> +	if (of_have_populated_dt()) {
+> +		if (ret)
+> +			of_dma_deconfigure(_dev);
+> +	}
+> +done:
+>   	if (drv->prevent_deferred_probe && ret == -EPROBE_DEFER) {
+>   		dev_warn(_dev, "probe deferral not supported\n");
+>   		ret = -ENXIO;
+> @@ -591,6 +602,8 @@ static int platform_drv_remove(struct device *_dev)
+>   	if (drv->remove)
+>   		ret = drv->remove(dev);
+>   	dev_pm_domain_detach(_dev, true);
+> +	if (of_have_populated_dt())
+> +		of_dma_deconfigure(_dev);
 >
-> Let me take a while to think about this.
+>   	return ret;
+>   }
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 17ee8d5..12bbc8e1 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -180,11 +180,9 @@ static struct platform_device *of_platform_device_create_pdata(
+>   	dev->dev.bus = &platform_bus_type;
+>   	dev->dev.platform_data = platform_data;
+>   	of_dma_configure_masks(&dev->dev, dev->dev.of_node);
+> -	of_dma_configure_ops(&dev->dev, dev->dev.of_node);
+>   	of_msi_configure(&dev->dev, dev->dev.of_node);
+>
+>   	if (of_device_add(dev) != 0) {
+> -		of_dma_deconfigure(&dev->dev);
+>   		platform_device_put(dev);
+>   		goto err_clear_flag;
+>   	}
+> @@ -481,11 +479,12 @@ static int of_platform_device_destroy(struct device *dev, void *data)
+>   	if (dev->bus == &platform_bus_type)
+>   		platform_device_unregister(to_platform_device(dev));
+>   #ifdef CONFIG_ARM_AMBA
+> -	else if (dev->bus == &amba_bustype)
+> +	else if (dev->bus == &amba_bustype) {
+>   		amba_device_unregister(to_amba_device(dev));
+> +		of_dma_deconfigure(dev);
+> +	}
 
-That was true in the context of arm64, but you're right that the current 
-state of the 32-bit code does make m4u_dom more necessary, so I guess we 
-may as well leave it as-is for now.
+Note that we definitely need this to happen properly on other buses, 
+too. I had something for the AMBA bus back when I last looked at 
+this[0], but since then we now have PCI devices going through the 
+of_dma_configure() path as well (hence 226d89cbb242).
+
+There's also now some initial ACPI code in flight[1], so it's probably 
+about time to take another closer look at how this can be properly 
+generalised, but I'm not necessarily averse to starting with a 
+DT-focused solution that gets at least half way, then building on top of 
+that.
 
 Robin.
+
+[0]:http://www.linux-arm.org/git?p=linux-rm.git;a=commitdiff;h=1f38b62b05e17ccbfcc68e4229c69fee74922e2a
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/13046
+
+>   #endif
+>
+> -	of_dma_deconfigure(dev);
+>   	of_node_clear_flag(dev->of_node, OF_POPULATED);
+>   	of_node_clear_flag(dev->of_node, OF_POPULATED_BUS);
+>   	return 0;
+>
