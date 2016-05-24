@@ -1,70 +1,37 @@
-From: rob.rice@broadcom.com (Rob Rice)
-Date: Tue, 24 May 2016 14:07:30 -0400
-Subject: [PATCH 3/3] arm64: dts: Add Broadcom Northstar2 device tree entries
- for PDC driver.
-In-Reply-To: <1464113250-15629-1-git-send-email-rob.rice@broadcom.com>
-References: <1464113250-15629-1-git-send-email-rob.rice@broadcom.com>
-Message-ID: <1464113250-15629-4-git-send-email-rob.rice@broadcom.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 24 May 2016 11:29:00 -0700
+Subject: [PATCH 0/7] pinctrl: meson: Add a bunch more pins
+In-Reply-To: <CACRpkdY9oGZLt431NwTaFmZk98O8n3ZnMA1odhYZtcH7P1p=Jg@mail.gmail.com>
+ (Linus Walleij's message of "Tue, 24 May 2016 11:23:37 +0200")
+References: <1462544486-9516-1-git-send-email-khilman@baylibre.com>
+ <CACRpkdY9oGZLt431NwTaFmZk98O8n3ZnMA1odhYZtcH7P1p=Jg@mail.gmail.com>
+Message-ID: <m260u3ia37.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Rice <rrice@broadcom.com>
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Add Broadcom Northstar2 SoC device tree entries for PDC driver.
+> On Fri, May 6, 2016 at 4:21 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>
+>> Add support for several more devices, both in the EE domain and in the
+>> AO domain.  Also, add the pins to the corresponding DTS files.
+>>
+>> Tested on odroid-c2 and Amlogic P200 boards, and verified with working
+>> ethernet.
+>>
+>> Depends on the initial GXBB pinctrl support from Carlo[1].  Also
+>> available in my git tree[2] with all the dependencies included.
+>
+> These don't apply anomore sadly, Kevin can you rebase on
+> Torvalds' HEAD and resend, and include Carlo's ACK on them
+> so I can merge them in the next kernel cycle?
 
-Signed-off-by: Rob Rice <rob.rice@broadcom.com>
-Reviewed-by: Ray Jui <ray.jui@broadcom.com>
-Reviewed-by: Scott Branden <scott.branden@broadcom.com>
----
- arch/arm64/boot/dts/broadcom/ns2.dtsi | 36 +++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+Looking closer, these have dependencies on the DT changes that you've
+suggested we take through arm-soc, so it would be cleaner if I take
+these with your ack through the amlogic tree.
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index ec68ec1..ba12702 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -191,6 +191,42 @@
- 
- 		#include "ns2-clock.dtsi"
- 
-+		pdc0: iproc-pdc0 at 612c0000 {
-+			compatible = "brcm,iproc-pdc-mbox";
-+			reg = <0x612c0000 0x445>;  /* PDC FS0 regs */
-+			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+			#mbox-cells = <1>;
-+			brcm,rx-status-len = <32>;
-+			brcm,use-bcm-hdr;
-+		};
-+
-+		pdc1: iproc-pdc1 at 612e0000 {
-+			compatible = "brcm,iproc-pdc-mbox";
-+			reg = <0x612e0000 0x445>;  /* PDC FS1 regs */
-+			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
-+			#mbox-cells = <1>;
-+			brcm,rx-status-len = <32>;
-+			brcm,use-bcm-hdr;
-+		};
-+
-+		pdc2: iproc-pdc2 at 61300000 {
-+			compatible = "brcm,iproc-pdc-mbox";
-+			reg = <0x61300000 0x445>;  /* PDC FS2 regs */
-+			interrupts = <GIC_SPI 191 IRQ_TYPE_LEVEL_HIGH>;
-+			#mbox-cells = <1>;
-+			brcm,rx-status-len = <32>;
-+			brcm,use-bcm-hdr;
-+		};
-+
-+		pdc3: iproc-pdc3 at 61320000 {
-+			compatible = "brcm,iproc-pdc-mbox";
-+			reg = <0x61320000 0x445>;  /* PDC FS3 regs */
-+			interrupts = <GIC_SPI 193 IRQ_TYPE_LEVEL_HIGH>;
-+			#mbox-cells = <1>;
-+			brcm,rx-status-len = <32>;
-+			brcm,use-bcm-hdr;
-+		};
-+
- 		dma0: dma at 61360000 {
- 			compatible = "arm,pl330", "arm,primecell";
- 			reg = <0x61360000 0x1000>;
--- 
-2.1.0
+Since it's a brand new driver, I don't expect there to be conflicts.
+
+Does that work for you?
+
+Kevin
