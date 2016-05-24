@@ -1,132 +1,82 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:46 +0200
-Subject: [PULL 52/59] KVM: arm/arm64: vgic-new: vgic_init: implement
- vgic_create
+Date: Tue, 24 May 2016 11:09:50 +0200
+Subject: [PULL 56/59] KVM: arm/arm64: vgic-new: Wire up irqfd injection
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-53-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-57-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@linaro.org>
+From: Andre Przywara <andre.przywara@arm.com>
 
-This patch implements the vgic_creation function which is
-called on CREATE_IRQCHIP VM IOCTL (v2 only) or KVM_CREATE_DEVICE
+Connect to the new VGIC to the irqfd framework, so that we can
+inject IRQs.
+GSI routing and MSI routing is not yet implemented.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/vgic/vgic.h       |  1 +
- virt/kvm/arm/vgic/vgic-init.c | 84 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 85 insertions(+)
+ virt/kvm/arm/vgic/vgic-irqfd.c | 52 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
+ create mode 100644 virt/kvm/arm/vgic/vgic-irqfd.c
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 393489f..0634d89 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -195,6 +195,7 @@ struct vgic_cpu {
- };
- 
- int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-+int kvm_vgic_create(struct kvm *kvm, u32 type);
- int kvm_vgic_hyp_init(void);
- 
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 4523beb..15d5428 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -22,6 +22,90 @@
- #include <asm/kvm_mmu.h>
- #include "vgic.h"
- 
-+/* CREATION */
-+
-+/**
-+ * kvm_vgic_create: triggered by the instantiation of the VGIC device by
-+ * user space, either through the legacy KVM_CREATE_IRQCHIP ioctl (v2 only)
-+ * or through the generic KVM_CREATE_DEVICE API ioctl.
-+ * irqchip_in_kernel() tells you if this function succeeded or not.
+diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
+new file mode 100644
+index 0000000..c675513
+--- /dev/null
++++ b/virt/kvm/arm/vgic/vgic-irqfd.c
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (C) 2015, 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+int kvm_vgic_create(struct kvm *kvm, u32 type)
++
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <trace/events/kvm.h>
++
++int kvm_irq_map_gsi(struct kvm *kvm,
++		    struct kvm_kernel_irq_routing_entry *entries,
++		    int gsi)
 +{
-+	int i, vcpu_lock_idx = -1, ret;
-+	struct kvm_vcpu *vcpu;
-+
-+	mutex_lock(&kvm->lock);
-+
-+	if (irqchip_in_kernel(kvm)) {
-+		ret = -EEXIST;
-+		goto out;
-+	}
-+
-+	/*
-+	 * This function is also called by the KVM_CREATE_IRQCHIP handler,
-+	 * which had no chance yet to check the availability of the GICv2
-+	 * emulation. So check this here again. KVM_CREATE_DEVICE does
-+	 * the proper checks already.
-+	 */
-+	if (type == KVM_DEV_TYPE_ARM_VGIC_V2 &&
-+		!kvm_vgic_global_state.can_emulate_gicv2) {
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+
-+	/*
-+	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
-+	 * vcpu->mutex.  By grabbing the vcpu->mutex of all VCPUs we ensure
-+	 * that no other VCPUs are run while we create the vgic.
-+	 */
-+	ret = -EBUSY;
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		if (!mutex_trylock(&vcpu->mutex))
-+			goto out_unlock;
-+		vcpu_lock_idx = i;
-+	}
-+
-+	kvm_for_each_vcpu(i, vcpu, kvm) {
-+		if (vcpu->arch.has_run_once)
-+			goto out_unlock;
-+	}
-+	ret = 0;
-+
-+	if (type == KVM_DEV_TYPE_ARM_VGIC_V2)
-+		kvm->arch.max_vcpus = VGIC_V2_MAX_CPUS;
-+	else
-+		kvm->arch.max_vcpus = VGIC_V3_MAX_CPUS;
-+
-+	if (atomic_read(&kvm->online_vcpus) > kvm->arch.max_vcpus) {
-+		ret = -E2BIG;
-+		goto out_unlock;
-+	}
-+
-+	kvm->arch.vgic.in_kernel = true;
-+	kvm->arch.vgic.vgic_model = type;
-+
-+	/*
-+	 * kvm_vgic_global_state.vctrl_base is set on vgic probe (kvm_arch_init)
-+	 * it is stored in distributor struct for asm save/restore purpose
-+	 */
-+	kvm->arch.vgic.vctrl_base = kvm_vgic_global_state.vctrl_base;
-+
-+	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
-+	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
-+	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
-+
-+out_unlock:
-+	for (; vcpu_lock_idx >= 0; vcpu_lock_idx--) {
-+		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
-+		mutex_unlock(&vcpu->mutex);
-+	}
-+
-+out:
-+	mutex_unlock(&kvm->lock);
-+	return ret;
++	return 0;
 +}
 +
- /* GENERIC PROBE */
- 
- static void vgic_init_maintenance_interrupt(void *info)
++int kvm_irq_map_chip_pin(struct kvm *kvm, unsigned int irqchip,
++			 unsigned int pin)
++{
++	return pin;
++}
++
++int kvm_set_irq(struct kvm *kvm, int irq_source_id,
++		u32 irq, int level, bool line_status)
++{
++	unsigned int spi = irq + VGIC_NR_PRIVATE_IRQS;
++
++	trace_kvm_set_irq(irq, level, irq_source_id);
++
++	BUG_ON(!vgic_initialized(kvm));
++
++	return kvm_vgic_inject_irq(kvm, 0, spi, level);
++}
++
++/* MSI not implemented yet */
++int kvm_set_msi(struct kvm_kernel_irq_routing_entry *e,
++		struct kvm *kvm, int irq_source_id,
++		int level, bool line_status)
++{
++	return 0;
++}
 -- 
 2.1.2.330.g565301e.dirty
