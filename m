@@ -1,31 +1,114 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 23 May 2016 19:14:09 -0700
-Subject: [PATCH 2/4] hwrng: bcm2835: Support Broadcom NSP SoC rng
-In-Reply-To: <1464020451-16520-3-git-send-email-yendapally.reddy@broadcom.com>
-References: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
- <1464020451-16520-3-git-send-email-yendapally.reddy@broadcom.com>
-Message-ID: <87oa7w2oem.fsf@eliezer.anholt.net>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 23 May 2016 22:14:59 -0400
+Subject: [PATCH V5 2/6] vfio: platform: move reset call to a common
+ function
+In-Reply-To: <5742FF59.6090108@linaro.org>
+References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
+ <1463364819-477-3-git-send-email-okaya@codeaurora.org>
+ <5742FF59.6090108@linaro.org>
+Message-ID: <5743B923.4090307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-writes:
+On 5/23/2016 9:02 AM, Eric Auger wrote:
+> Hi Sinan,
+> On 05/16/2016 04:13 AM, Sinan Kaya wrote:
+>> The reset call sequence seems to replicate itself multiple times
+>> across the file. Grouping them together for maintenance reasons.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> ---
+>>  drivers/vfio/platform/vfio_platform_common.c | 31 ++++++++++++++--------------
+>>  1 file changed, 15 insertions(+), 16 deletions(-)
+>>
+>> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+>> index 08fd7c2..cb91dd3 100644
+>> --- a/drivers/vfio/platform/vfio_platform_common.c
+>> +++ b/drivers/vfio/platform/vfio_platform_common.c
+>> @@ -134,6 +134,18 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
+>>  	kfree(vdev->regions);
+>>  }
+>>  
+>> +static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
+>> +{
+>> +	if (vdev->of_reset) {
+>> +		dev_info(vdev->device, "reset\n");
+>> +		vdev->of_reset(vdev);
+>> +		return 0;
+> you should return vdev->of_reset(vdev) to keep the existing
+> VFIO_DEVICE_RESET ioctl behavior
 
-> This supports the random number generator available in NSP SoC.
-> Masks the rng interrupt for NSP.
+will do.
 
-The interrupt reg is also present on the 2835.  I would prefer for
-simplicity if you also initialized the register to the same value on the
-Pi, even though the firmware has presumably been setting it for us
-already.
+> 
+> Once fixed, Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> 
+thanks.
 
-However, this patch is still correct and I'm fine with it, so it's:
+> Besides, but this goes beyond the scope of your series, maybe we should
+> reconsider in the future what happens in case the reset fails on
+> open/release.
+> 
 
-Acked-by: Eric Anholt <eric@anholt.net>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160523/b46b26ff/attachment-0001.sig>
+I like giving an error immediately to be honest on open. 
+
+> Best Regards
+> 
+> Eric
+>> +	}
+>> +
+>> +	dev_warn(vdev->device, "no reset function found!\n");
+>> +	return -EINVAL;
+>> +}
+>> +
+>>  static void vfio_platform_release(void *device_data)
+>>  {
+>>  	struct vfio_platform_device *vdev = device_data;
+>> @@ -141,12 +153,7 @@ static void vfio_platform_release(void *device_data)
+>>  	mutex_lock(&driver_lock);
+>>  
+>>  	if (!(--vdev->refcnt)) {
+>> -		if (vdev->of_reset) {
+>> -			dev_info(vdev->device, "reset\n");
+>> -			vdev->of_reset(vdev);
+>> -		} else {
+>> -			dev_warn(vdev->device, "no reset function found!\n");
+>> -		}
+>> +		vfio_platform_call_reset(vdev);
+>>  		vfio_platform_regions_cleanup(vdev);
+>>  		vfio_platform_irq_cleanup(vdev);
+>>  	}
+>> @@ -175,12 +182,7 @@ static int vfio_platform_open(void *device_data)
+>>  		if (ret)
+>>  			goto err_irq;
+>>  
+>> -		if (vdev->of_reset) {
+>> -			dev_info(vdev->device, "reset\n");
+>> -			vdev->of_reset(vdev);
+>> -		} else {
+>> -			dev_warn(vdev->device, "no reset function found!\n");
+>> -		}
+>> +		vfio_platform_call_reset(vdev);
+>>  	}
+>>  
+>>  	vdev->refcnt++;
+>> @@ -312,10 +314,7 @@ static long vfio_platform_ioctl(void *device_data,
+>>  		return ret;
+>>  
+>>  	} else if (cmd == VFIO_DEVICE_RESET) {
+>> -		if (vdev->of_reset)
+>> -			return vdev->of_reset(vdev);
+>> -		else
+>> -			return -EINVAL;
+>> +		return vfio_platform_call_reset(vdev);
+>>  	}
+>>  
+>>  	return -ENOTTY;
+>>
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
