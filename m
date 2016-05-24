@@ -1,171 +1,149 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:19 +0200
-Subject: [PULL 25/59] KVM: arm/arm64: vgic-new: Add GICv2 MMIO handling
- framework
+Date: Tue, 24 May 2016 11:09:43 +0200
+Subject: [PULL 49/59] KVM: arm/arm64: vgic-new: Add GICH_VMCR accessors
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-26-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-50-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-Create vgic-mmio-v2.c to describe GICv2 emulation specific handlers
-using the initializer macros provided by the VGIC MMIO framework.
-Provide a function to register the GICv2 distributor registers to
-the kvm_io_bus framework.
-The actual handler functions are still stubs in this patch.
+Since the GIC CPU interface is always virtualized by the hardware,
+we don't have CPU interface state information readily available in our
+emulation if userland wants to save or restore it.
+Fortunately the GIC hypervisor interface provides the VMCR register to
+access the required virtual CPU interface bits.
+Provide wrappers for GICv2 and GICv3 hosts to have access to this
+register.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 76 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.c    | 26 ++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    |  2 ++
- virt/kvm/arm/vgic/vgic.h         |  2 ++
- 4 files changed, 106 insertions(+)
- create mode 100644 virt/kvm/arm/vgic/vgic-mmio-v2.c
+ virt/kvm/arm/vgic/vgic-v2.c | 29 +++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-v3.c | 22 ++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.h    | 21 +++++++++++++++++++++
+ 3 files changed, 72 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-new file mode 100644
-index 0000000..a3e31a9
---- /dev/null
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -0,0 +1,76 @@
-+/*
-+ * VGICv2 MMIO handling functions
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index fb5e65c..d943059 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -174,3 +174,32 @@ void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr)
+ {
+ 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = 0;
+ }
 +
-+#include <linux/irqchip/arm-gic.h>
-+#include <linux/kvm.h>
-+#include <linux/kvm_host.h>
-+#include <kvm/iodev.h>
-+#include <kvm/arm_vgic.h>
-+
-+#include "vgic.h"
-+#include "vgic-mmio.h"
-+
-+static const struct vgic_register_region vgic_v2_dist_registers[] = {
-+	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 12,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_IGROUP,
-+		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_CLEAR,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
-+	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 2,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
-+		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
-+	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
-+		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
-+};
-+
-+unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev)
++void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
 +{
-+	dev->regions = vgic_v2_dist_registers;
-+	dev->nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
++	u32 vmcr;
 +
-+	kvm_iodevice_init(&dev->dev, &kvm_io_gic_ops);
++	vmcr  = (vmcrp->ctlr << GICH_VMCR_CTRL_SHIFT) & GICH_VMCR_CTRL_MASK;
++	vmcr |= (vmcrp->abpr << GICH_VMCR_ALIAS_BINPOINT_SHIFT) &
++		GICH_VMCR_ALIAS_BINPOINT_MASK;
++	vmcr |= (vmcrp->bpr << GICH_VMCR_BINPOINT_SHIFT) &
++		GICH_VMCR_BINPOINT_MASK;
++	vmcr |= (vmcrp->pmr << GICH_VMCR_PRIMASK_SHIFT) &
++		GICH_VMCR_PRIMASK_MASK;
 +
-+	return SZ_4K;
++	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = vmcr;
 +}
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 012b82b..1a97765 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -182,3 +182,29 @@ struct kvm_io_device_ops kvm_io_gic_ops = {
- 	.read = dispatch_mmio_read,
- 	.write = dispatch_mmio_write,
- };
 +
-+int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
-+			     enum vgic_type type)
++void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
 +{
-+	struct vgic_io_device *io_device = &kvm->arch.vgic.dist_iodev;
-+	int ret = 0;
-+	unsigned int len;
++	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr;
 +
-+	switch (type) {
-+	case VGIC_V2:
-+		len = vgic_v2_init_dist_iodev(io_device);
-+		break;
-+	default:
-+		BUG_ON(1);
-+	}
-+
-+	io_device->base_addr = dist_base_address;
-+	io_device->redist_vcpu = NULL;
-+
-+	mutex_lock(&kvm->slots_lock);
-+	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, dist_base_address,
-+				      len, &io_device->dev);
-+	mutex_unlock(&kvm->slots_lock);
-+
-+	return ret;
++	vmcrp->ctlr = (vmcr & GICH_VMCR_CTRL_MASK) >>
++			GICH_VMCR_CTRL_SHIFT;
++	vmcrp->abpr = (vmcr & GICH_VMCR_ALIAS_BINPOINT_MASK) >>
++			GICH_VMCR_ALIAS_BINPOINT_SHIFT;
++	vmcrp->bpr  = (vmcr & GICH_VMCR_BINPOINT_MASK) >>
++			GICH_VMCR_BINPOINT_SHIFT;
++	vmcrp->pmr  = (vmcr & GICH_VMCR_PRIMASK_MASK) >>
++			GICH_VMCR_PRIMASK_SHIFT;
 +}
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 3023ecf..5b928d4 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -96,4 +96,6 @@ unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
- void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
- 			unsigned int len, unsigned long val);
- 
-+unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index fb547da..8548297 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -160,3 +160,25 @@ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr)
+ {
+ 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr] = 0;
+ }
 +
- #endif
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++{
++	u32 vmcr;
++
++	vmcr  = (vmcrp->ctlr << ICH_VMCR_CTLR_SHIFT) & ICH_VMCR_CTLR_MASK;
++	vmcr |= (vmcrp->abpr << ICH_VMCR_BPR1_SHIFT) & ICH_VMCR_BPR1_MASK;
++	vmcr |= (vmcrp->bpr << ICH_VMCR_BPR0_SHIFT) & ICH_VMCR_BPR0_MASK;
++	vmcr |= (vmcrp->pmr << ICH_VMCR_PMR_SHIFT) & ICH_VMCR_PMR_MASK;
++
++	vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr = vmcr;
++}
++
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcrp)
++{
++	u32 vmcr = vcpu->arch.vgic_cpu.vgic_v3.vgic_vmcr;
++
++	vmcrp->ctlr = (vmcr & ICH_VMCR_CTLR_MASK) >> ICH_VMCR_CTLR_SHIFT;
++	vmcrp->abpr = (vmcr & ICH_VMCR_BPR1_MASK) >> ICH_VMCR_BPR1_SHIFT;
++	vmcrp->bpr  = (vmcr & ICH_VMCR_BPR0_MASK) >> ICH_VMCR_BPR0_SHIFT;
++	vmcrp->pmr  = (vmcr & ICH_VMCR_PMR_MASK) >> ICH_VMCR_PMR_SHIFT;
++}
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 81b1a20..fd9acaa 100644
+index f826026..d2c1fd5 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -27,6 +27,8 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu);
- void vgic_v2_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
- void vgic_v2_clear_lr(struct kvm_vcpu *vcpu, int lr);
- void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
-+int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
-+			     enum vgic_type);
+@@ -27,6 +27,13 @@
  
- #ifdef CONFIG_KVM_ARM_VGIC_V3
- void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu);
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+ 
++struct vgic_vmcr {
++	u32	ctlr;
++	u32	abpr;
++	u32	bpr;
++	u32	pmr;
++};
++
+ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ 			      u32 intid);
+ bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq);
+@@ -40,6 +47,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
+ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+ 			 int offset, u32 *val);
++void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
+ 			     enum vgic_type);
+ 
+@@ -49,6 +58,8 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu);
+ void vgic_v3_populate_lr(struct kvm_vcpu *vcpu, struct vgic_irq *irq, int lr);
+ void vgic_v3_clear_lr(struct kvm_vcpu *vcpu, int lr);
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu);
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
+ #else
+ static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+@@ -72,6 +83,16 @@ static inline void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+ {
+ }
+ 
++static inline
++void vgic_v3_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++}
++
++static inline
++void vgic_v3_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++}
++
+ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
+ 					      gpa_t dist_base_address)
+ {
 -- 
 2.1.2.330.g565301e.dirty
