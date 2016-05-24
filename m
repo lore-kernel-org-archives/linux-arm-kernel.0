@@ -1,244 +1,183 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 23 May 2016 18:39:18 -0500
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1EDB35A5@lhreml503-mbs>
-References: <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
- <57331290.7070104@semihalf.com>
- <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
- <CAKv+Gu8fdeJ9OvRSmtu9zyvcjK3O-4WU=jG=6-7t4xZwvV8d2g@mail.gmail.com>
- <95b1d06e-f9c5-39f3-1003-f536b65eef60@redhat.com>
- <CAKv+Gu-_xp_t_Ze3Pw_-82-fmy=tCy-h=4FbP98eLbuXVk2hHQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EDAF6AC@lhreml503-mbs>
- <CAKv+Gu_zpoFsDr7e8zPCDKPpRdKDVH+vnC0nfvmGaJ7xcP3Zng@mail.gmail.com>
- <20160523105655.GA22902@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EDB35A5@lhreml503-mbs>
-Message-ID: <20160523233918.GA32555@localhost>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 24 May 2016 03:04:29 +0300
+Subject: [PATCH v6 00/21] ILP32 for ARM64
+Message-ID: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 03:16:01PM +0000, Gabriele Paoloni wrote:
-> Hi Lorenzo
-> 
-> > -----Original Message-----
-> > From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
-> > Sent: 23 May 2016 11:57
-> > To: Ard Biesheuvel
-> > Cc: Gabriele Paoloni; Jon Masters; Tomasz Nowicki; helgaas at kernel.org;
-> > arnd at arndb.de; will.deacon at arm.com; catalin.marinas at arm.com;
-> > rafael at kernel.org; hanjun.guo at linaro.org; okaya at codeaurora.org;
-> > jchandra at broadcom.com; linaro-acpi at lists.linaro.org; linux-
-> > pci at vger.kernel.org; dhdang at apm.com; Liviu.Dudau at arm.com;
-> > ddaney at caviumnetworks.com; jeremy.linton at arm.com; linux-
-> > kernel at vger.kernel.org; linux-acpi at vger.kernel.org;
-> > robert.richter at caviumnetworks.com; Suravee.Suthikulpanit at amd.com;
-> > msalter at redhat.com; Wangyijing; mw at semihalf.com;
-> > andrea.gallo at linaro.org; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH V7 00/11] Support for generic ACPI based PCI host
-> > controller
-> > 
-> > On Fri, May 20, 2016 at 11:14:03AM +0200, Ard Biesheuvel wrote:
-> > > On 20 May 2016 at 10:40, Gabriele Paoloni
-> > <gabriele.paoloni@huawei.com> wrote:
-> > > > Hi Ard
-> > > >
-> > > >> -----Original Message-----
-> > > >> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
-> > > [...]
-> > > >>
-> > > >> Is the PCIe root complex so special that you cannot simply
-> > describe an
-> > > >> implementation that is not PNP0408 compatible as something else,
-> > under
-> > > >> its own unique HID? If everybody is onboard with using ACPI, how
-> > is
-> > > >> this any different from describing other parts of the platform
-> > > >> topology? Even if the SBSA mandates generic PCI, they already
-> > deviated
-> > > >> from that when they built the hardware, so pretending that it is a
-> > > >> PNP0408 with quirks really does not buy us anything.
-> > > >
-> > > > From my understanding we want to avoid this as this would allow
-> > each
-> > > > vendor to come up with his own code and it would be much more
-> > effort
-> > > > for the PCI maintainer to rework the PCI framework to accommodate
-> > X86
-> > > > and "all" ARM64 Host Controllers...
-> > > >
-> > > > I guess this approach is too risky and we want to avoid this.
-> > Through
-> > > > standardization we can more easily maintain the code and scale it
-> > to
-> > > > multiple SoCs...
-> > > >
-> > > > So this is my understanding; maybe Jon, Tomasz or Lorenzo can give
-> > > > a bit more explanation...
-> > > >
-> > >
-> > > OK, so that boils down to recommending to vendors to represent known
-> > > non-compliant hardware as compliant, just so that we don't have to
-> > > change the code to support additional flavors of ECAM ? It's fine to
-> > > be pragmatic, but that sucks.
-> > >
-> > > We keep confusing the x86 case with the ARM case here: for x86, they
-> > > needed to deal with broken hardware *after* the fact, and all they
-> > > could do is find /some/ distinguishing feature in order to guess
-> > which
-> > > exact hardware they might be running on. For arm64, it is the
-> > opposite
-> > > case. We are currently in a position where we can demand vendors to
-> > > comply with the standards they endorsed themselves, and (ab)using
-> > ACPI
-> > > + DMI as a de facto platform description rather than plain ACPI makes
-> > > me think the DT crowd were actually right from the beginning. It
-> > > *directly* violates the standardization principle, since it requires
-> > a
-> > > priori knowledge inside the OS that a certain 'generic' device must
-> > be
-> > > driven in a special way.
-> > >
-> > > So can anyone comment on the feasibility of adding support for
-> > devices
-> > > with vendor specific HIDs (and no generic CIDs) to the current ACPI
-> > > ECAM driver in Linux?
+This series enables aarch64 with ilp32 mode, and as supporting work,
+introduces compat wrappers based on s390 solution, and also introduces
+ARCH_32BIT_OFF_T configuration option that is enabled for existing
+32-bit architectures but disabled for new arches (so 64-bit off_t is 
+is used by new userspace).
 
-I don't think of ECAM support itself as a "driver".  It's just a
-service available to drivers, similar to OF resource parsing.
+This version is based on kernel v4.6.
+It works with glibc-2.23, and tested with LTP.
 
-Per PCI Firmware r3.2, sec 4.1.5, "PNP0A03" means a PCI/PCI-X/PCIe
-host bridge.  "PNP0A08" means a PCI-X Mode 2 or PCIe bridge that
-supports extended config space.  It doesn't specify how we access that
-config space, so I think hardware with non-standard ECAM should still
-have PNP0A03 and PNP0A08 in _CID or _HID.
+It was tested on QEMU and ThunderX machines. No major differences found.
 
-"ECAM" as used in the specs (PCIe r3.0, sec 7.2.2, and PCI Firmware
-r3.2, sec 4.1) means:
+This is not RFC anymore, because ILP32 is now tested in big-endian mode;
+signals, vDSO and other subsystems are tested, and look working
 
-  (a) a memory-mapped model for config space access, and
-  (b) a specific mapping of address bits to bus/device/function/
-      register
+ v3: https://lkml.org/lkml/2014/9/3/704
+ v4: https://lkml.org/lkml/2015/4/13/691
+ v5: https://lkml.org/lkml/2015/9/29/911
+ v6: ABI reworked significantly;
+    - syscall input arguments are deloused with compat wrappers;
+    - vDSO is now working for both BE and LE;
+    - signal subsystem is reworked to handle signal context properly;
+    - binfmt_elf is reworked, and now most of places where execution mode
+      should be detected, are handled statically;
+    - many other less-important fixes.
 
-MCFG and _CBA assume both (a) and (b), so I think a device with
-non-standard ECAM mappings should not be described in MCFG or _CBA.
+ILP32 glibc branch is available here:
+https://github.com/norov/glibc/tree/ilp32-2.23
 
-If a bridge has ECAM with non-standard mappings, I think either a
-vendor-specific _HID or a device-specific method, e.g., _DSM, could
-communicate that.
+It is tested with this series with no major downsides. I will send it to 
+glibc-alpha soon, after final revise. Please review and comment it as well.
 
-Jon, I agree that we should avoid describing non-standardized hardware
-in Linux-specific ways.  Is there a mechanism in use already?  How
-does Windows handle this?  DMI is a poor long-term solution because it
-requires ongoing maintenance for new platforms, but I think it's OK
-for getting started with platforms already shipping.
+Andrew Pinski (6):
+  arm64: ensure the kernel is compiled for LP64
+  arm64: rename COMPAT to AARCH32_EL0 in Kconfig
+  arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
+  arm64: ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
+    it
+  arm64: ilp32: introduce ilp32-specific handlers for sigframe and
+    ucontext
+  arm64:ilp32: add ARM64_ILP32 to Kconfig
 
-A _DSM has the advantage that once it is defined and supported, OEMs
-can ship new platforms without requiring a new quirk or a new _HID to
-be added to a driver.
+Philipp Tomsich (1):
+  arm64:ilp32: add vdso-ilp32 and use for signal return
 
-There would still be the problem of config access before the namespace
-is available, i.e., the MCFG use case.  I don't know how important
-that is.  Defining an MCFG extension seems like the most obvious
-solution.
+Yury Norov (15):
+  all: introduce COMPAT_WRAPPER option and enable it for s390
+  all: s390: move wrapper infrastructure to generic headers
+  all: s390: move compat_wrappers.c from arch/s390/kernel to kernel/
+  all: wrap needed syscalls in generic unistd
+  compat ABI: use non-compat openat and open_by_handle_at variants
+  32-bit ABI: introduce ARCH_32BIT_OFF_T config option
+  arm64: ilp32: add documentation on the ILP32 ABI for ARM64
+  thread: move thread bits accessors to separated file
+  arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
+  arm64: ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
+  arm64: introduce binfmt_elf32.c
+  arm64: ilp32: introduce binfmt_ilp32.c
+  arm64: ptrace: handle ptrace_request differently for aarch32 and ilp32
+  arm64: signal: share lp64 signal routines to ilp32
+  arm64: signal32: move ilp32 and aarch32 common code to separated file
 
-If we only expect a few non-standard devices, maybe it's enough to
-have DMI quirks to statically set up ECAM and just live with the
-inconvenience of requiring a kernel change for every new non-standard
-device.
+ Documentation/arm64/ilp32.txt                 |  25 +++
+ arch/Kconfig                                  |   8 +
+ arch/arc/Kconfig                              |   1 +
+ arch/arm/Kconfig                              |   1 +
+ arch/arm64/Kconfig                            |  20 +-
+ arch/arm64/Makefile                           |   5 +
+ arch/arm64/include/asm/compat.h               |  19 +-
+ arch/arm64/include/asm/elf.h                  |  35 +---
+ arch/arm64/include/asm/fpsimd.h               |   2 +-
+ arch/arm64/include/asm/ftrace.h               |   2 +-
+ arch/arm64/include/asm/hwcap.h                |   6 +-
+ arch/arm64/include/asm/is_compat.h            |  84 ++++++++
+ arch/arm64/include/asm/memory.h               |   3 +-
+ arch/arm64/include/asm/processor.h            |  11 +-
+ arch/arm64/include/asm/ptrace.h               |   2 +-
+ arch/arm64/include/asm/signal32.h             |   6 +-
+ arch/arm64/include/asm/signal32_common.h      |  25 +++
+ arch/arm64/include/asm/signal_common.h        |  33 +++
+ arch/arm64/include/asm/signal_ilp32.h         |  34 ++++
+ arch/arm64/include/asm/syscall.h              |   2 +-
+ arch/arm64/include/asm/thread_info.h          |   4 +-
+ arch/arm64/include/asm/unistd.h               |  11 +-
+ arch/arm64/include/asm/unistd32.h             |   2 +-
+ arch/arm64/include/asm/vdso.h                 |   6 +
+ arch/arm64/include/uapi/asm/bitsperlong.h     |   9 +-
+ arch/arm64/kernel/Makefile                    |  14 +-
+ arch/arm64/kernel/asm-offsets.c               |   9 +-
+ arch/arm64/kernel/binfmt_elf32.c              |  33 +++
+ arch/arm64/kernel/binfmt_ilp32.c              |  91 +++++++++
+ arch/arm64/kernel/cpufeature.c                |   8 +-
+ arch/arm64/kernel/cpuinfo.c                   |   4 +-
+ arch/arm64/kernel/entry.S                     |  16 +-
+ arch/arm64/kernel/entry_ilp32.S               |  23 +++
+ arch/arm64/kernel/head.S                      |   2 +-
+ arch/arm64/kernel/hw_breakpoint.c             |  10 +-
+ arch/arm64/kernel/perf_regs.c                 |   2 +-
+ arch/arm64/kernel/process.c                   |   7 +-
+ arch/arm64/kernel/ptrace.c                    |  67 ++++++-
+ arch/arm64/kernel/signal.c                    | 100 ++++++----
+ arch/arm64/kernel/signal32.c                  |  85 --------
+ arch/arm64/kernel/signal32_common.c           | 115 +++++++++++
+ arch/arm64/kernel/signal_ilp32.c              | 192 ++++++++++++++++++
+ arch/arm64/kernel/sys32.c                     |   1 +
+ arch/arm64/kernel/sys_ilp32.c                 |  86 ++++++++
+ arch/arm64/kernel/traps.c                     |   5 +-
+ arch/arm64/kernel/vdso-ilp32/.gitignore       |   2 +
+ arch/arm64/kernel/vdso-ilp32/Makefile         |  74 +++++++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S     |  33 +++
+ arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S |  95 +++++++++
+ arch/arm64/kernel/vdso.c                      |  65 ++++--
+ arch/arm64/kernel/vdso/gettimeofday.S         |  20 +-
+ arch/blackfin/Kconfig                         |   1 +
+ arch/cris/Kconfig                             |   1 +
+ arch/frv/Kconfig                              |   1 +
+ arch/h8300/Kconfig                            |   1 +
+ arch/hexagon/Kconfig                          |   1 +
+ arch/m32r/Kconfig                             |   1 +
+ arch/m68k/Kconfig                             |   1 +
+ arch/metag/Kconfig                            |   1 +
+ arch/microblaze/Kconfig                       |   1 +
+ arch/mips/Kconfig                             |   1 +
+ arch/mn10300/Kconfig                          |   1 +
+ arch/nios2/Kconfig                            |   1 +
+ arch/openrisc/Kconfig                         |   1 +
+ arch/parisc/Kconfig                           |   1 +
+ arch/powerpc/Kconfig                          |   1 +
+ arch/s390/Kconfig                             |   1 +
+ arch/s390/include/asm/compat.h                |  17 +-
+ arch/s390/kernel/Makefile                     |   2 +-
+ arch/s390/kernel/compat_linux.c               |   4 +
+ arch/s390/kernel/compat_wrapper.c             | 180 -----------------
+ arch/score/Kconfig                            |   1 +
+ arch/sh/Kconfig                               |   1 +
+ arch/sparc/Kconfig                            |   1 +
+ arch/tile/Kconfig                             |   1 +
+ arch/tile/kernel/compat.c                     |   3 +
+ arch/unicore32/Kconfig                        |   1 +
+ arch/x86/Kconfig                              |   1 +
+ arch/x86/um/Kconfig                           |   1 +
+ arch/xtensa/Kconfig                           |   1 +
+ drivers/clocksource/arm_arch_timer.c          |   2 +-
+ include/linux/compat.h                        | 277 ++++++++++++++++++++++++++
+ include/linux/fcntl.h                         |   2 +-
+ include/linux/ptrace.h                        |   6 +
+ include/linux/syscalls.h                      |  57 +-----
+ include/linux/syscalls_structs.h              |  60 ++++++
+ include/linux/thread_bits.h                   |  55 +++++
+ include/linux/thread_info.h                   |  44 +---
+ include/uapi/asm-generic/unistd.h             | 231 ++++++++++-----------
+ kernel/Makefile                               |   1 +
+ kernel/compat_wrapper.c                       | 175 ++++++++++++++++
+ kernel/ptrace.c                               |  10 +-
+ 92 files changed, 2024 insertions(+), 641 deletions(-)
+ create mode 100644 Documentation/arm64/ilp32.txt
+ create mode 100644 arch/arm64/include/asm/is_compat.h
+ create mode 100644 arch/arm64/include/asm/signal32_common.h
+ create mode 100644 arch/arm64/include/asm/signal_common.h
+ create mode 100644 arch/arm64/include/asm/signal_ilp32.h
+ create mode 100644 arch/arm64/kernel/binfmt_elf32.c
+ create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+ create mode 100644 arch/arm64/kernel/entry_ilp32.S
+ create mode 100644 arch/arm64/kernel/signal32_common.c
+ create mode 100644 arch/arm64/kernel/signal_ilp32.c
+ create mode 100644 arch/arm64/kernel/sys_ilp32.c
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/.gitignore
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/Makefile
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.S
+ create mode 100644 arch/arm64/kernel/vdso-ilp32/vdso-ilp32.lds.S
+ delete mode 100644 arch/s390/kernel/compat_wrapper.c
+ create mode 100644 include/linux/syscalls_structs.h
+ create mode 100644 include/linux/thread_bits.h
+ create mode 100644 kernel/compat_wrapper.c
 
-> > Host bridges in ACPI are handled through PNP0A08/PNP0A03 ids, and
-> > most of the arch specific code is handled in the respective arch
-> > directories (X86 and IA64, even though IA64 does not rely on ECAM/MCFG
-> > for
-> > PCI ops), it is not a driver per-se, PNP0A08/PNP0A03 are detected
-> > through
-> > ACPI scan handlers and the respective arch code (ie pci_acpi_scan_root)
-> > sets-up resources AND config space on an arch specific basis.
-> > 
-> > X86 deals with that with code in arch/x86 that sets-up the pci_raw_ops
-> > on a platform specific basis (and it is not nice, but it works because
-> > as you all know the number of platforms in X86 world is contained).
-> > 
-> > Will this happen for ARM64 in arch/arm64 based on vendor specific
-> > HIDs ?
-> > 
-> > No.
-> > 
-> > So given the current state of play (we were requested to move the
-> > arch/arm64 specific ACPI PCI bits to arch/arm64), we would end up
-> > with arch/arm64 code requiring code in /drivers to set-up pci_ops
-> > in a platform specific way, it is horrible, if feasible at all.
-> > 
-> > The only way this can be implemented is by pretending that the
-> > ACPI/PCI arch/arm64 implementation is generic code (that's what this
-> > series does), move it to /drivers (where it is in this series), and
-> > implement _DSD vendor specific bindings (per HID) to set-up the pci
-> > operations; whether this solution should go upstream, given that it
-> > is just a short-term solution for early platforms bugs, it is another
-> > story and my personal answer is no.
-
-It seems like there should be a way to look for a _DSM before we call
-acpi_pci_root_get_mcfg_addr() to look for _CBA.
-
-Currently we call acpi_pci_root_get_mcfg_addr() (to read _CBA) from
-the generic acpi_pci_root_add(), but the result (root->mcfg_addr) is
-only used in x86-specific code.  I think it would be nicer if the
-lookup and the use were together.  Then it would be easier to override
-it because the mapping assumptions would all be in one place.
-
-> I think it shouldn't be too bad to move quirk handling mechanism to
-> arch/arm64. Effectively we would not move platform specific code into
-> arch/arm64 but just the mechanism checking if there is any quirk that
-> is defined.
-> 
-> i.e.:
-> 
-> extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
-> extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
-> 
-> static struct pci_ecam_ops *pci_acpi_get_ops(struct acpi_pci_root *root)
-> {
->         int bus_num = root->secondary.start;
->         int domain = root->segment;
->         struct pci_cfg_fixup *f;
-> 
->         /*
->          * Match against platform specific quirks and return corresponding
->          * CAM ops.
->          *
->          * First match against PCI topology <domain:bus> then use DMI or
->          * custom match handler.
->          */
->         for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
->                 if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
->                     (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
->                     (f->system ? dmi_check_system(f->system) : 1) &&
->                     (f->match ? f->match(f, root) : 1))
->                         return f->ops;
->         }
->         /* No quirks, use ECAM */
->         return &pci_generic_ecam_ops;
-> }
-> 
-> Such quirks will be defined anyway in drivers/pci/host/ in the vendor
-> specific quirk implementations.
-> 
-> e.g. in HiSilicon case we would have
-> 
-> DECLARE_ACPI_MCFG_FIXUP(NULL, hisi_pcie_match, &hisi_pcie_ecam_ops,
-> 			PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
-> 
-> in "drivers/pci/host/pcie-hisi-acpi.c "
-> 
-> Thanks
-> 
-> Gab
-
-Sorry Gab, I guess I was really responding to earlier messages :)
-
-I don't really have much to say here, except that it doesn't seem
-right to have an MCFG that describes a non-standard ECAM mapping.
-I suppose there's already firmware in the field that does that,
-though?
-
-Bjorn
+-- 
+2.5.0
