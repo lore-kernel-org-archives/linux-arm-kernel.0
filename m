@@ -1,35 +1,45 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 24 May 2016 18:55:42 +0100
-Subject: [PATCH 3/3] openrisc: Remove orphaned __addr_ok() definition
-In-Reply-To: <4656e09e40e832b2690fb0280975c70a541fb7ef.1464111462.git.robin.murphy@arm.com>
-References: <4656e09e40e832b2690fb0280975c70a541fb7ef.1464111462.git.robin.murphy@arm.com>
-Message-ID: <2d34650818ced1b3c362dfc75d087b70c0f7edef.1464111462.git.robin.murphy@arm.com>
+From: rob.rice@broadcom.com (Rob Rice)
+Date: Tue, 24 May 2016 14:07:27 -0400
+Subject: [PATCH 0/3] Add Broadcom PDC mailbox driver
+Message-ID: <1464113250-15629-1-git-send-email-rob.rice@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit b48b2c3e5043 ("openrisc: use generic strnlen_user()
-function"), the definition of __addr_ok() has been languishing unused;
-eradicate the sucker.
+From: Rob Rice <rrice@broadcom.com>
 
-CC: Jonas Bonn <jonas@southpole.se>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
- arch/openrisc/include/asm/uaccess.h | 3 ---
- 1 file changed, 3 deletions(-)
+The Broadcom PDC mailbox driver is a ring manager for the Broadcom
+Secure Processing Unit (SPU) kernel driver and other mailbox clients.
+The PDC driver registers with the Linux mailbox framework a mailbox
+controller, once for each PDC instance. Ring 0 for each PDC is registered as
+a mailbox channel. The PDC driver uses interrupts to determine when ring
+transfers to and from an offload engine are complete. The PDC driver uses
+threaded IRQs so that response messages are handled outside of interrupt
+context.
 
-diff --git a/arch/openrisc/include/asm/uaccess.h b/arch/openrisc/include/asm/uaccess.h
-index a6bd07ca3d6c..74bcb34c6d0b 100644
---- a/arch/openrisc/include/asm/uaccess.h
-+++ b/arch/openrisc/include/asm/uaccess.h
-@@ -59,9 +59,6 @@
-  */
- #define __range_ok(addr, size) (size <= get_fs() && addr <= (get_fs()-size))
- 
--/* Ensure that addr is below task's addr_limit */
--#define __addr_ok(addr) ((unsigned long) addr < get_fs())
--
- #define access_ok(type, addr, size) \
- 	__range_ok((unsigned long)addr, (unsigned long)size)
- 
+Rob Rice (3):
+  dt-bindings: add bindings documentation for PDC driver.
+  mailbox: Add Broadcom PDC mailbox driver
+  arm64: dts: Add Broadcom Northstar2 device tree entries for PDC
+    driver.
+
+ .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       |   23 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |   36 +
+ drivers/mailbox/Kconfig                            |    9 +
+ drivers/mailbox/Makefile                           |    2 +
+ drivers/mailbox/mailbox-pdc/Makefile               |    8 +
+ drivers/mailbox/mailbox-pdc/pdc.c                  | 1181 ++++++++++++++++++++
+ drivers/mailbox/mailbox-pdc/pdc.h                  |  303 +++++
+ drivers/mailbox/mailbox-pdc/pdc_debug.c            |  101 ++
+ drivers/mailbox/mailbox-pdc/pdc_debug.h            |   24 +
+ include/linux/mailbox/brcm-message.h               |   56 +
+ 10 files changed, 1743 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+ create mode 100644 drivers/mailbox/mailbox-pdc/Makefile
+ create mode 100644 drivers/mailbox/mailbox-pdc/pdc.c
+ create mode 100644 drivers/mailbox/mailbox-pdc/pdc.h
+ create mode 100644 drivers/mailbox/mailbox-pdc/pdc_debug.c
+ create mode 100644 drivers/mailbox/mailbox-pdc/pdc_debug.h
+ create mode 100644 include/linux/mailbox/brcm-message.h
+
 -- 
-2.8.1.dirty
+2.1.0
