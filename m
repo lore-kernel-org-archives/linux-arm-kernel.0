@@ -1,117 +1,145 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 May 2016 16:12:35 +0100
-Subject: [PATCH 1/1] arm64: fix flush_cache_range
-In-Reply-To: <574446B9.8040105@huawei.com>
-References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
- <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
-Message-ID: <20160524151235.GA11605@leverpostej>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 24 May 2016 16:36:45 +0100
+Subject: [PATCH v2 4/5] iommu/mediatek: add support for mtk iommu
+ generation one HW
+In-Reply-To: <1464083839.30939.54.camel@mtksdaap41>
+References: <1463658558-567-1-git-send-email-honghui.zhang@mediatek.com>
+ <1463658558-567-5-git-send-email-honghui.zhang@mediatek.com>
+ <57435AA1.3090602@arm.com> <1464083839.30939.54.camel@mtksdaap41>
+Message-ID: <5744750D.9080006@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2016 at 08:19:05PM +0800, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2016/5/24 19:37, Mark Rutland wrote:
-> > On Tue, May 24, 2016 at 07:16:37PM +0800, Zhen Lei wrote:
-> >> When we ran mprotect04(a test case in LTP) infinitely, it would always
-> >> failed after a few seconds. The case can be described briefly that: copy
-> >> a empty function from code area into a new memory area(created by mmap),
-> >> then call mprotect to change the protection to PROT_EXEC. The syscall
-> >> sys_mprotect will finally invoke flush_cache_range, but this function
-> >> currently only invalid icache, the operation of flush dcache is missed.
-> > 
-> > In the LTP code I see powerpc-specific D-cache / I-cache synchronisation
-> > (i.e. d-cache cleaning followed by I-cache invalidation), so there
-> > appears to be some expectation of userspace maintenance. Hoever, there
-> > is no such ARM-specific I-cache maintenance.
-> But I see some other platforms have D-cache maintenance, like: arch/nios2/mm/cacheflush.c
-> And according to the name of flush_cache_range, it should do this, I judged. Otherwise,
-> mprotect04 will be failed on more platforms, it's easy to discover.
+On 24/05/16 10:57, Honghui Zhang wrote:
+[...]
+>>> @@ -48,6 +48,9 @@ struct mtk_iommu_domain {
+>>>    	struct io_pgtable_ops		*iop;
+>>>
+>>>    	struct iommu_domain		domain;
+>>> +	void				*pgt_va;
+>>> +	dma_addr_t			pgt_pa;
+>>> +	void				*cookie;
+>>
+>> These are going to be mutually exclusive with the cfg and iop members,
+>> which implies it might be a good idea to use a union and not waste
+>> space. Or better, just forward-declare struct mtk_iommu_domain here and
+>> leave separate definitions private to each driver. The void *cookie is
+>> also an unnecessary level of abstraction, I think.
+>>
+>
+> Do you mean declare struct mtk_iommu_domain here, and implement a new
+> struct in mtk_iommu_v1.c like
+> struct mtk_iommu_domain_v1 {
+> 	struct mtk_iommu_domain	domain;
+> 	u32			*pgt_va;
+> 	dma_addr_t		pgt_pa;
+> 	mtk_iommu_data		*data;
+> };
+> If this is acceptable I would implement it in the next version.
 
->From my experience with the LTP, it's likely that the test was written
-and tested on very few architectures and kernel configurations, and has
-seen very little testing on others.
+Pretty much, except they both want to be called struct mtk_iommu_domain, 
+so that a *declaration* for the sake of the m4u_dom member of struct 
+mtk_iommu_data in the header file can remain common to both drivers - it 
+then just picks up whichever private *definition* from the .c file being 
+compiled.
 
-> Only PPC have specific cache synchronization, maybe it meets some
-> hardware limitation. 
+>>>    };
+>>>
+>>>    struct mtk_iommu_data {
+>>> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
+>>> new file mode 100644
+>>> index 0000000..55023e1
+>>> --- /dev/null
+>>> +++ b/drivers/iommu/mtk_iommu_v1.c
+>>> @@ -0,0 +1,742 @@
+>>> +/*
+>>> + * Copyright (c) 2015-2016 MediaTek Inc.
+>>> + * Author: Yong Wu <yong.wu@mediatek.com>
+>>
+>> Nit: is that in the sense that this patch should also have Yong's
+>> signed-off-by on it, or in that it's your work derived from his version
+>> in mtk_iommu.c?
+>
+> I write this driver based on Yong's version of mtk_iommu.c, should I add
+> his signed-off-by for this patch? Or should I put a comment about this?
+> Thanks.
 
-Per [1] that "hardware limitation" is  simply the presence of a Harvard
-cache architecture, similar to that of ARM.
+OK, in that case I think the appropriate attribution would be along the 
+lines of "Author: Honghui Zhang, based on mtk_iommu.c by Yong Wu" (if in 
+doubt, grepping for "Based on" gives a feel for how this is commonly 
+done). If the work that comprises this patch itself (i.e. the copying 
+and modification of the existing code) is all yours then your sign-off 
+alone is fine.
 
-> It's impossible a programmer fixed a common bug on only one platform
-> but leave others unchanged.
+[...]
+>>> +static int mtk_iommu_add_device(struct device *dev)
+>>> +{
+>>> +	struct iommu_group *group;
+>>> +	struct device_node *np;
+>>> +	struct of_phandle_args iommu_spec;
+>>> +	int idx = 0;
+>>> +
+>>> +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
+>>> +				   "#iommu-cells", idx,
+>>> +				   &iommu_spec)) {
+>>
+>> Hang on, this doesn't seem right - why do you need to reimplement all
+>> this instead of using IOMMU_OF_DECLARE()?
+>
+> All the clients of mtk generation one iommu share the same iommu domain,
+> as a matter of fact, mtk generation one iommu only support one iommu
+> domain. ALl the clients share the same iova address and use the same
+> pagetable. That means all iommu clients needed to be attached to the
+> same dma_iommu_mapping.
 
-The common problem here is I-cache coherency, but that must be managed
-in an architecture-specific way. The patch for PPC [1] added
-PPC-specific assembly to achieve that, and hence doesn't apply to other
-platforms.
+Ugh, right - I'd forgotten that the arch/arm DMA mapping code doesn't 
+respect IOMMU groups or default domains at all. That's the real root 
+cause of the issue here.
 
-Jumping back to the problem at hand:
+> If use IOMMU_OF_DELCARE, we need to call of_iommu_set_ops to set the
+> iommu_ops, I do not want the iommu_ops be set since it would cause iommu
+> client device in different dma_iommu_mapping.
+>
+> When an iommu client device has been created, the following sequence is
+> called.
+>
+> of_platform_device_create
+> 	->of_dma_config
+> 		->arch_setup_dma_ops
+> 			->arch_setup_iommu_dma_ops
+> In this function of arch_setup_iommu_dma_ops would create a new
+> dma_iommu_mapping for each iommu client device and then attach the
+> device to this new dma_iommu_mapping. Since all the iommu clients share
+> the very same pagetable, this will not workable for our HW.
+> I could not release the dma_iommu_mapping in attach_device since the
+> to_dma_iommu_mapping was set after device_attached.
+> Any suggest for this?
 
-It looks like we inherited this from ARM, which has done this for all
-executable mappings since commit  6060e8df517847bf ("ARM: I-cache: flush
-executable mappings in flush_cache_range()"). The commit message refers
-to a4db94d, which doesn't seem to exist, and I assume is
-115b22474eb1905d ("ARM: 5794/1: Flush the D-cache during
-copy_user_highpage()") which happened to get rebased at some point.
+On a second look, you're doing more or less the same thing that the 
+Renesas IPMMU driver currently does, so it's probably OK as a workaround 
+for now. Fixing the arch/arm code is part of the bigger ongoing problem 
+of sorting out IOMMU probing and DMA configuration, and it doesn't seem 
+fair to force that on you for the sake of one driver ;)
 
-That all implies that the icache maintenance is only intended to ensure
-that CoW does not result in unexpected incoherency. Which in turn
-implies that flipping permissions with mprotect is not expected to
-synchronise the D and I caches.
+[...]
+>>> +static int __maybe_unused mtk_iommu_resume(struct device *dev)
+>>> +{
+>>> +	struct mtk_iommu_data *data = dev_get_drvdata(dev);
+>>> +	struct mtk_iommu_suspend_reg *reg = &data->reg;
+>>> +	void __iomem *base = data->base;
+>>> +
+>>> +	writel_relaxed(data->m4u_dom->pgt_pa, base + REG_MMU_PT_BASE_ADDR);
+>>
+>> Hmm, this looks like the only case where m4u_dom actually seems
+>> necessary - I'm pretty sure all the others could be fairly easily
+>> reworked to not use it (I might try having a quick hack at the existing
+>> M4U driver to see) - at which point we could just explicitly
+>> save/restore the base register here and get rid of m4u_dom entirely.
+>
+> Let me take a while to think about this.
 
-Russell, does that analysis make sense to you?
+That was true in the context of arm64, but you're right that the current 
+state of the 32-bit code does make m4u_dom more necessary, so I guess we 
+may as well leave it as-is for now.
 
-Ben, Paul, Michael, I take it that the LTP commit for PPC [1] is as
-expected? i.e. you similarly do not expect flipping execute permission
-with mprotect to imply that the kernel must synchronise the D & I
-caches?
-
-Thanks,
-Mark.
-
-> > It looks like the test may be missing I-cache maintenance regardless of
-> > the semantics of mprotect in this case.
-> > 
-> > I have not yet devled into flush_cache_range and how it is called.
-> 
-> SYSCALL_DEFINE3(mprotect ---> mprotect_fixup ---> change_protection ---> change_protection_range --> flush_cache_range
-> 
-> > 
-> > Thanks,
-> > Mark.
-> > 
-> >> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> >> ---
-> >>  arch/arm64/mm/flush.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
-> >> index dbd12ea..eda4124 100644
-> >> --- a/arch/arm64/mm/flush.c
-> >> +++ b/arch/arm64/mm/flush.c
-> >> @@ -31,7 +31,7 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
-> >>  		       unsigned long end)
-> >>  {
-> >>  	if (vma->vm_flags & VM_EXEC)
-> >> -		__flush_icache_all();
-> >> +		flush_icache_range(start, end);
-> >>  }
-> >>
-> >>  static void sync_icache_aliases(void *kaddr, unsigned long len)
-> >> --
-> >> 2.5.0
-> >>
-> >>
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >>
-> > 
-> > .
-> > 
-> 
-
-[1] https://github.com/linux-test-project/ltp/commit/cf9a0800cd0d71c8c471adc5631216f995ab7e02
+Robin.
