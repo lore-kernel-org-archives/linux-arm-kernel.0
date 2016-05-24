@@ -1,101 +1,162 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 24 May 2016 10:39:26 +0530
-Subject: [RFC PATCH 1/2] Input: rotary-encoder- Add support for absolute
- encoder
-In-Reply-To: <20160523131808.GN23704@pengutronix.de>
-References: <1463648641-6931-1-git-send-email-vigneshr@ti.com>
- <1463648641-6931-2-git-send-email-vigneshr@ti.com>
- <20160522102606.GB23704@pengutronix.de> <5742E710.9@ti.com>
- <20160523131808.GN23704@pengutronix.de>
-Message-ID: <5743E206.2050602@ti.com>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Tue, 24 May 2016 10:51:08 +0530
+Subject: [PATCH v3] Axi-usb: Add support for 64-bit addressing.
+Message-ID: <1464067268-35299-1-git-send-email-navam@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch updates the driver to support 64-bit DMA addressing.
 
-On 05/23/2016 06:48 PM, Uwe Kleine-K?nig wrote:
-> Hello,
-> 
-> On Mon, May 23, 2016 at 04:48:40PM +0530, R, Vignesh wrote:
->> On 5/22/2016 3:56 PM, Uwe Kleine-K?nig wrote:
->>> Hello,
->>>
->>> On Thu, May 19, 2016 at 02:34:00PM +0530, Vignesh R wrote:
->>>> There are rotary-encoders where GPIO lines reflect the actual position
->>>> of the rotary encoder dial. For example, if dial points to 9, then four
->>>> GPIO lines connected to the rotary encoder will read HLLH(1001b = 9).
->>>> Add support for such rotary-encoder.
->>>> The driver relies on rotary-encoder,absolute-encoder DT property to
->>>> detect such encoders.
->>>> Since, GPIO IRQs are not necessary to work with
->>>> such encoders, optional polling mode support is added using
->>>
->>> I don't understand this. It's necessary in the same way as with the
->>> already supported devices. I.e. you want to trigger an irq when the
->>> encoder is moved and then check for it's position in the handler.
->>>
->>
->> Unlike already supported device, there is no need to count steps or
->> determine the direction of rotation. Hence, IRQ is not a requirement,
->> periodically polling the gpio lines is more than sufficient. With
->> absolute encoder, you are able to determine the current position at any
->> time just by looking at the gpio inputs.
-> 
-> The timing might not be that critical, but there is no reason to operate
-> this device without irqs, is there?
+Signed-off-by: Nava kishore Manne <navam@xilinx.com>
+---
+Changes for v3:
+                -Added new compatable string for 5.00 IP version as suggested by
+                 Arnd Bergmann.
+                -Used write_fn() insted of lo_hi_writeq() as suggested by
+                 Arnd Bergmann.
 
-No, I am not against the use of IRQs. In fact, my patches add support
-for both IRQ based(default) and polling based operation(optional). If
-rotary-encoder does not have interrupt capable gpio lines connected to
-it (like am335x-ice) then one can make use of the polling mode support.
+Changes for v2:
+                -Added dma-ranges property in device tree as suggested by Arnd Bergmann.
+                -Modified the driver code based on the xlnx,addrwidth.
 
-> 
->> Suppose we poll device at t=0ms and see gpio values are LLLH(1), if we
->> again poll device at t=500ms(which is what input_poll_dev helps to do)
->> and see that gpio values is LLHH(3), then we know that rotary encoder
->> has changed to 3. This can be done w/o IRQ for absolute encoders.
->>
->>>> diff --git a/Documentation/devicetree/bindings/input/rotary-encoder.txt b/Documentation/devicetree/bindings/input/rotary-encoder.txt
->>>> index 6c9f0c8a846c..9c928dbd1500 100644
->>>> --- a/Documentation/devicetree/bindings/input/rotary-encoder.txt
->>>> +++ b/Documentation/devicetree/bindings/input/rotary-encoder.txt
->>>> @@ -12,6 +12,10 @@ Optional properties:
->>>>  - rotary-encoder,relative-axis: register a relative axis rather than an
->>>>    absolute one. Relative axis will only generate +1/-1 events on the input
->>>>    device, hence no steps need to be passed.
->>>> +- rotary-encoder,absolute-encoder: support encoders where GPIO lines
->>>> +  reflect the actual position of the rotary encoder dial. For example,
->>>> +  if dial points to 9, then four GPIO lines read HLLH(1001b = 9).
->>>> +  In this case, rotary-encoder,steps-per-period needed not be defined.
->>>
->>> IMHO this is wrong, I'd formalize this device as:
->>>
->>> 	{
->>> 		compatible = "rotary-encoder";
->>> 		gpios = <&gpio 19 1>, <&gpio 20 0>, <...>, <...>;
->>> 		rotary-encoder,encoding = "binary";
->>> 		rotary-encoder,steps = <16>;
->>> 		rotary-encoder,steps-per-period = <16>;
->>
->> The above bindings essential means quarter_period device. I would not
->> like to bother with all the logic in rotary_encoder_quarter_period_irq()
->> when we can know encoder->pos by directly reading state of gpio lines.
-> 
-> OK, we have code that is more complex than it needs to be for your
-> device. But your device is a special case of the supported devices, so
-> I'd say don't bother that there is more logic in the driver than you
-> need and be lucky.
-> 
+ .../devicetree/bindings/usb/udc-xilinx.txt         | 21 +++++----
+ drivers/usb/gadget/udc/udc-xilinx.c                | 53 ++++++++++++++++++++--
+ 2 files changed, 63 insertions(+), 11 deletions(-)
 
-More complexity is just a overhead. Since, encoder can be turned at a
-rate faster than handling of IRQs (rotary_encoder_quarter_period_irq()
-is threaded IRQ hence, priority is not close to real time), some states
-can be missed. rotary_encoder_quarter_period_irq() is not robust in this
-case, reading gpios directly is more suitable option. I see similar
-views expressed in previously[1]
-
-[1]http://lists.infradead.org/pipermail/linux-arm-kernel/2015-December/391196.html
-
+diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+index 47b4e39..09df757 100644
+--- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
++++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+@@ -1,18 +1,23 @@
+ Xilinx USB2 device controller
+ 
+ Required properties:
+-- compatible		: Should be "xlnx,usb2-device-4.00.a"
++- compatible		: Should be "xlnx,usb2-device-4.00.a" or
++			  "xlnx,usb2-device-5.00"
+ - reg			: Physical base address and size of the USB2
+ 			  device registers map.
+ - interrupts		: Should contain single irq line of USB2 device
+ 			  controller
+ - xlnx,has-builtin-dma	: if DMA is included
++- dma-ranges		: Should be as the following
++			  <child-bus-address, parent-bus-address, length>
++- xlnx,addrwidth	: Should be the dma addressing size in bits(ex: 64 bits)
+ 
+ Example:
+- 		axi-usb2-device at 42e00000 {
+-                        compatible = "xlnx,usb2-device-4.00.a";
+-                        interrupts = <0x0 0x39 0x1>;
+-                        reg = <0x42e00000 0x10000>;
+-                        xlnx,has-builtin-dma;
+-                };
+-
++		axi-usb2-device at 42e00000 {
++			compatible = "xlnx,usb2-device-4.00.a";
++			interrupts = <0x0 0x39 0x1>;
++			reg = <0x42e00000 0x10000>;
++			dma-ranges = <0x00000000 0x00000000 0x40000000>;
++			xlnx,has-builtin-dma;
++			xlnx,addrwidth = <0x40>;
++		};
+diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
+index 1cbb0ac..112a6f3 100644
+--- a/drivers/usb/gadget/udc/udc-xilinx.c
++++ b/drivers/usb/gadget/udc/udc-xilinx.c
+@@ -47,6 +47,15 @@
+ #define XUSB_DMA_LENGTH_OFFSET		0x0210	/* DMA Length Register */
+ #define XUSB_DMA_STATUS_OFFSET		0x0214	/* DMA Status Register */
+ 
++/* DMA source Address Reg for LSB */
++#define XUSB_DMA_DSAR_ADDR_OFFSET_LSB   0x0308
++/* DMA source Address Reg for MSB */
++#define XUSB_DMA_DSAR_ADDR_OFFSET_MSB   0x030C
++/* DMA destination Addr Reg LSB */
++#define XUSB_DMA_DDAR_ADDR_OFFSET_LSB   0x0310
++/* DMA destination Addr Reg MSB */
++#define XUSB_DMA_DDAR_ADDR_OFFSET_MSB   0x0314
++
+ /* Endpoint Configuration Space offsets */
+ #define XUSB_EP_CFGSTATUS_OFFSET	0x00	/* Endpoint Config Status  */
+ #define XUSB_EP_BUF0COUNT_OFFSET	0x08	/* Buffer 0 Count */
+@@ -193,7 +202,7 @@ struct xusb_udc {
+ 	void __iomem *addr;
+ 	spinlock_t lock;
+ 	bool dma_enabled;
+-
++	u32 dma_addrwidth;
+ 	unsigned int (*read_fn)(void __iomem *);
+ 	void (*write_fn)(void __iomem *, u32, u32);
+ };
+@@ -214,6 +223,20 @@ static const struct usb_endpoint_descriptor config_bulk_out_desc = {
+ 	.wMaxPacketSize		= cpu_to_le16(EP0_MAX_PACKET),
+ };
+ 
++/**
++ * xudc_write64 - write 64bit value to device registers
++ * @addr: base addr of device registers
++ * @offset: register offset
++ * @val: data to be written
++ **/
++static void xudc_write64(struct xusb_ep *ep, u32 offset, u64 val)
++{
++	struct xusb_udc *udc = ep->udc;
++
++	udc->write_fn(udc->addr, offset, lower_32_bits(val));
++	udc->write_fn(udc->addr, offset+0x04, upper_32_bits(val));
++}
++
+ /**
+  * xudc_write32 - little endian write to device registers
+  * @addr: base addr of device registers
+@@ -330,8 +353,13 @@ static int xudc_start_dma(struct xusb_ep *ep, dma_addr_t src,
+ 	 * destination registers and then set the length
+ 	 * into the DMA length register.
+ 	 */
+-	udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
+-	udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
++	if (udc->dma_addrwidth > 32) {
++		xudc_write64(ep, XUSB_DMA_DSAR_ADDR_OFFSET_LSB, src);
++		xudc_write64(ep, XUSB_DMA_DDAR_ADDR_OFFSET_LSB, dst);
++	} else {
++		udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
++		udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
++	}
+ 	udc->write_fn(udc->addr, XUSB_DMA_LENGTH_OFFSET, length);
+ 
+ 	/*
+@@ -2097,6 +2125,24 @@ static int xudc_probe(struct platform_device *pdev)
+ 
+ 	udc->dma_enabled = of_property_read_bool(np, "xlnx,has-builtin-dma");
+ 
++	if (of_device_is_compatible(np, "xlnx,usb2-device-5.00")) {
++		ret = of_property_read_u32(np, "xlnx,addrwidth",
++						&udc->dma_addrwidth);
++		if (ret < 0)
++			dev_warn(&pdev->dev,
++				"missing xlnx,addrwidth property\n");
++	} else {
++		udc->dma_addrwidth = 32;
++	}
++
++	/* Set the dma mask bits */
++	ret = dma_set_mask_and_coherent(&pdev->dev,
++					DMA_BIT_MASK(udc->dma_addrwidth));
++	if (ret < 0) {
++		dev_dbg(&pdev->dev, "no usable DMA configuration");
++		goto fail;
++	}
++
+ 	/* Setup gadget structure */
+ 	udc->gadget.ops = &xusb_udc_ops;
+ 	udc->gadget.max_speed = USB_SPEED_HIGH;
+@@ -2168,6 +2214,7 @@ static int xudc_remove(struct platform_device *pdev)
+ /* Match table for of_platform binding */
+ static const struct of_device_id usb_of_match[] = {
+ 	{ .compatible = "xlnx,usb2-device-4.00.a", },
++	{ .compatible = "xlnx,usb2-device-5.00", },
+ 	{ /* end of list */ },
+ };
+ MODULE_DEVICE_TABLE(of, usb_of_match);
 -- 
-Regards
-Vignesh
+2.8.3.394.g3916adf
