@@ -1,46 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 24 May 2016 12:57:10 +0200
-Subject: [PATCH] gpio: lpc32xx: disable broken to_irq support
-In-Reply-To: <1462988400-21738-1-git-send-email-slemieux.tyco@gmail.com>
-References: <1462988400-21738-1-git-send-email-slemieux.tyco@gmail.com>
-Message-ID: <CACRpkdZuT-NQJSQAK6RMdGUqiMTo3d31uGoXqgSS1cCyGzy5ow@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 24 May 2016 12:57:56 +0200
+Subject: [PATCH] hwrng: stm32 - fix build warning
+In-Reply-To: <56bb8ec4-fe7e-ec09-adc3-ec7eea2d7ddd@linaro.org>
+References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <6297051.TAxtzW5OIB@wuerfel>
+ <CALszF6AxXY0LK5fToFg3095+gz6xcZz8KHaYqc=o39vjpBYDmA@mail.gmail.com>
+ <12548318.auB4PSA3KC@wuerfel>
+ <CALszF6BPPA=tezMLhmdC4YFwmH1tGhDxCNDZNwGp1cTDWP7Fmg@mail.gmail.com>
+ <56bb8ec4-fe7e-ec09-adc3-ec7eea2d7ddd@linaro.org>
+Message-ID: <CALszF6AmE3yzJL_Wn8nVa3hmTb8eHOoNbvyAh5GiiB2r4PHiyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 7:40 PM, Sylvain Lemieux
-<slemieux.tyco@gmail.com> wrote:
-
-> From: Sylvain Lemieux <slemieux@tycoint.com>
+2016-05-24 12:09 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
+> On 24/05/16 09:50, Maxime Coquelin wrote:
+>>
+>> diff --git a/drivers/char/hw_random/stm32-rng.c
+>> b/drivers/char/hw_random/stm32-rng.c
+>> index 92a810648bd0..2a0fc90e4dc3 100644
+>> --- a/drivers/char/hw_random/stm32-rng.c
+>> +++ b/drivers/char/hw_random/stm32-rng.c
+>> @@ -68,6 +68,10 @@ static int stm32_rng_read(struct hwrng *rng, void
+>> *data, size_t max, bool wait)
+>>                         } while (!sr && --timeout);
+>>                 }
+>>
+>> +               if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
+>> +                               "bad RNG status - %x\n", sr))
+>> +                       writel_relaxed(0, priv->base + RNG_SR);
+>> +
+>>                 /* If error detected or data not ready... */
+>>                 if (sr != RNG_SR_DRDY)
+>>                         break;
 >
-> The "to_irq" functionality is broken inside this driver since commit
-> 76ba59f8366f ("genirq: Add irq_domain-aware core IRQ handler").
 >
-> The addition of the new lpc32xx irqchip driver in 4.7, fixed the
-> lpc32xx platform interrupt issue.
->
-> When switching to the new lpc32xx irqchip driver, a warning appear
-> in the lpc32xx gpio driver: warning: "NR_IRQS" redefined.
->
-> To remove this warning (temporary solution), this patch
-> disables the broken "to_irq" mapping functionality support.
->
-> Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> Minor quibble but I might prefer that the error handling/recovery actually
+> be put on the error path itself (included in the if (sr != RNG_SR_DRDY) ).
+Yes, it would be better.
 
-Patch applied for fixes with Vladimir's ACK.
-
-> * The final solution is to replace the existing lpc32xx gpio driver.
->   This work is currently in progress; refer to the following URL:
->   http://thread.gmane.org/gmane.linux.drivers.devicetree/144696
-
-Hm, I see that the ambition was to merge the new irqchip
-driver and the new GPIO driver in the same merge window.
-Sorry if I was being too lazy/picky/whatever about the patch(es)
-I guess I didn't quite get the scope of this change. :(
-
-I should say that as long as we can agree that the new code
-makes the kernel as a whole a better place, I am happy to
-merge it. Sometimes also I need to zoom out from the GPIO
-and pin control subsystem(s) and see the big picture.
-
-Yours,
-Linus Walleij
+Regards,
+Maxime
