@@ -1,104 +1,199 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:05 +0200
-Subject: [PULL 11/59] KVM: arm/arm64: Fix MMIO emulation data handling
+Date: Tue, 24 May 2016 11:09:44 +0200
+Subject: [PULL 50/59] KVM: arm/arm64: vgic-new: Add userland GIC CPU interface
+ access
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-12-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-51-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel was handling a guest MMIO read access internally, we
-need to copy the emulation result into the run->mmio structure in order
-for the kvm_handle_mmio_return() function to pick it up and inject the
-	result back into the guest.
+From: Andre Przywara <andre.przywara@arm.com>
 
-Currently the only user of kvm_io_bus for ARM is the VGIC, which did
-this copying itself, so this was not causing issues so far.
+Using the VMCR accessors we provide access to GIC CPU interface state
+to userland by wiring it up to the existing userland interface.
+[Marc: move and make VMCR accessors static, streamline MMIO handlers]
 
-But with the upcoming new vgic implementation we need this done
-properly.
-
-Update the kvm_handle_mmio_return description and cleanup the code to
-only perform a single copying when needed.
-
-Code and commit message inspired by Andre Przywara.
-
-Reported-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/kvm/mmio.c | 14 +++++++-------
- virt/kvm/arm/vgic.c |  7 -------
- 2 files changed, 7 insertions(+), 14 deletions(-)
+ virt/kvm/arm/vgic/vgic-kvm-device.c |   2 +-
+ virt/kvm/arm/vgic/vgic-mmio-v2.c    | 114 +++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.h            |   2 +
+ 3 files changed, 116 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-index 0f6600f..0158e9e 100644
---- a/arch/arm/kvm/mmio.c
-+++ b/arch/arm/kvm/mmio.c
-@@ -87,11 +87,10 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 9ee27cb..0130c4b 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -274,7 +274,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
  
- /**
-  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
-+ *			     or in-kernel IO emulation
-+ *
-  * @vcpu: The VCPU pointer
-  * @run:  The VCPU run struct containing the mmio data
-- *
-- * This should only be called after returning from userspace for MMIO load
-- * emulation.
-  */
- int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
- {
-@@ -206,18 +205,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 	run->mmio.is_write	= is_write;
- 	run->mmio.phys_addr	= fault_ipa;
- 	run->mmio.len		= len;
--	if (is_write)
--		memcpy(run->mmio.data, data_buf, len);
- 
- 	if (!ret) {
- 		/* We handled the access successfully in the kernel. */
-+		if (!is_write)
-+			memcpy(run->mmio.data, data_buf, len);
- 		vcpu->stat.mmio_exit_kernel++;
- 		kvm_handle_mmio_return(vcpu, run);
- 		return 1;
--	} else {
--		vcpu->stat.mmio_exit_user++;
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+-		ret = -EINVAL;
++		ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, reg);
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
+ 		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+index a255122..a213936 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
+@@ -204,6 +204,84 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
  	}
- 
-+	if (is_write)
-+		memcpy(run->mmio.data, data_buf, len);
-+	vcpu->stat.mmio_exit_user++;
- 	run->exit_reason	= KVM_EXIT_MMIO;
- 	return 0;
  }
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index f76bb64..c3bfbb9 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -819,7 +819,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct vgic_io_device *iodev = container_of(this,
- 						    struct vgic_io_device, dev);
--	struct kvm_run *run = vcpu->run;
- 	const struct vgic_io_range *range;
- 	struct kvm_exit_mmio mmio;
- 	bool updated_state;
-@@ -848,12 +847,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
- 		updated_state = false;
- 	}
- 	spin_unlock(&dist->lock);
--	run->mmio.is_write	= is_write;
--	run->mmio.len		= len;
--	run->mmio.phys_addr	= addr;
--	memcpy(run->mmio.data, val, len);
--
--	kvm_handle_mmio_return(vcpu, run);
  
- 	if (updated_state)
- 		vgic_kick_vcpus(vcpu->kvm);
++static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++	if (kvm_vgic_global_state.type == VGIC_V2)
++		vgic_v2_set_vmcr(vcpu, vmcr);
++	else
++		vgic_v3_set_vmcr(vcpu, vmcr);
++}
++
++static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
++{
++	if (kvm_vgic_global_state.type == VGIC_V2)
++		vgic_v2_get_vmcr(vcpu, vmcr);
++	else
++		vgic_v3_get_vmcr(vcpu, vmcr);
++}
++
++#define GICC_ARCH_VERSION_V2	0x2
++
++/* These are for userland accesses only, there is no guest-facing emulation. */
++static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
++					   gpa_t addr, unsigned int len)
++{
++	struct vgic_vmcr vmcr;
++	u32 val;
++
++	vgic_get_vmcr(vcpu, &vmcr);
++
++	switch (addr & 0xff) {
++	case GIC_CPU_CTRL:
++		val = vmcr.ctlr;
++		break;
++	case GIC_CPU_PRIMASK:
++		val = vmcr.pmr;
++		break;
++	case GIC_CPU_BINPOINT:
++		val = vmcr.bpr;
++		break;
++	case GIC_CPU_ALIAS_BINPOINT:
++		val = vmcr.abpr;
++		break;
++	case GIC_CPU_IDENT:
++		val = ((PRODUCT_ID_KVM << 20) |
++		       (GICC_ARCH_VERSION_V2 << 16) |
++		       IMPLEMENTER_ARM);
++		break;
++	default:
++		return 0;
++	}
++
++	return val;
++}
++
++static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
++				   gpa_t addr, unsigned int len,
++				   unsigned long val)
++{
++	struct vgic_vmcr vmcr;
++
++	vgic_get_vmcr(vcpu, &vmcr);
++
++	switch (addr & 0xff) {
++	case GIC_CPU_CTRL:
++		vmcr.ctlr = val;
++		break;
++	case GIC_CPU_PRIMASK:
++		vmcr.pmr = val;
++		break;
++	case GIC_CPU_BINPOINT:
++		vmcr.bpr = val;
++		break;
++	case GIC_CPU_ALIAS_BINPOINT:
++		vmcr.abpr = val;
++		break;
++	}
++
++	vgic_set_vmcr(vcpu, &vmcr);
++}
++
+ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+@@ -249,6 +327,27 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ };
+ 
++static const struct vgic_register_region vgic_v2_cpu_registers[] = {
++	REGISTER_DESC_WITH_LENGTH(GIC_CPU_CTRL,
++		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GIC_CPU_PRIMASK,
++		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GIC_CPU_BINPOINT,
++		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GIC_CPU_ALIAS_BINPOINT,
++		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GIC_CPU_ACTIVEPRIO,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GIC_CPU_IDENT,
++		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
++		VGIC_ACCESS_32bit),
++};
++
+ unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev)
+ {
+ 	dev->regions = vgic_v2_dist_registers;
+@@ -274,7 +373,9 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
+ 		nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
+ 		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
+-		return -ENXIO;		/* TODO: describe CPU i/f regs also */
++		regions = vgic_v2_cpu_registers;
++		nr_regions = ARRAY_SIZE(vgic_v2_cpu_registers);
++		break;
+ 	default:
+ 		return -ENXIO;
+ 	}
+@@ -322,6 +423,17 @@ static int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
+ 	return ret;
+ }
+ 
++int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
++			  int offset, u32 *val)
++{
++	struct vgic_io_device dev = {
++		.regions = vgic_v2_cpu_registers,
++		.nr_regions = ARRAY_SIZE(vgic_v2_cpu_registers),
++	};
++
++	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
++}
++
+ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+ 			 int offset, u32 *val)
+ {
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index d2c1fd5..de9dc71 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -47,6 +47,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
+ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
+ int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
+ 			 int offset, u32 *val);
++int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
++			  int offset, u32 *val);
+ void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
+ int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
 -- 
 2.1.2.330.g565301e.dirty
