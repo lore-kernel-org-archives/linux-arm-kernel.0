@@ -1,55 +1,72 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 24 May 2016 16:59:28 +0100
-Subject: [RFC 8/9] drivers: of: call iommu_bus_add_dev after
- iommu_configure_ops
-In-Reply-To: <1461599894-1969-9-git-send-email-sricharan@codeaurora.org>
-References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
- <1461599894-1969-9-git-send-email-sricharan@codeaurora.org>
-Message-ID: <57447A60.4060805@arm.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Tue, 24 May 2016 18:05:46 +0200
+Subject: [PATCH 1/2] drm/exynos: g2d: Add support for old S5Pv210 type
+In-Reply-To: <57445E16.90301@samsung.com>
+References: <1464096493-13378-1-git-send-email-k.kozlowski@samsung.com>
+ <57445BE5.7060702@math.uni-bielefeld.de> <57445E16.90301@samsung.com>
+Message-ID: <57447BDA.2000004@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/04/16 16:58, Sricharan R wrote:
-> Now that the device's iommu ops are configured at probe time,
-> the device has to be added to the iommu late.
->
-> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
-> ---
->   drivers/of/device.c | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> index 57a5f2d..722115c 100644
-> --- a/drivers/of/device.c
-> +++ b/drivers/of/device.c
-> @@ -6,6 +6,7 @@
->   #include <linux/of_iommu.h>
->   #include <linux/dma-mapping.h>
->   #include <linux/init.h>
-> +#include <linux/iommu.h>
->   #include <linux/module.h>
->   #include <linux/mod_devicetable.h>
->   #include <linux/slab.h>
-> @@ -154,6 +155,9 @@ int of_dma_configure_ops(struct device *dev, struct device_node *np)
->   	dev_dbg(dev, "device is%sbehind an iommu\n",
->   		iommu ? " " : " not ");
->
-> +	if (iommu)
-> +		iommu_bus_add_dev(dev);
+Hello Krzysztof,
 
-This (in conjunction with the previous patch) seems unnecessarily 
-convoluted - if of_iommu_configure() has found some iommu_ops for a 
-device, why not just call .add_device() directly there and then? There 
-are already systems that could warrant having two different IOMMU 
-drivers active simultaneously (but thankfully don't _need_ to), so 
-trying to escape from per-bus IOMMU ops makes more sense than 
-entrenching the horrible notion of "the" IOMMU on "the" platform bus any 
-further.
 
-Robin.
+Krzysztof Kozlowski wrote:
+> On 05/24/2016 03:49 PM, Tobias Jakobi wrote:
+>> Hello Krzysztof,
+>>
+>> are you sure that these are the only differences. Because AFAIK there
+>> are quite a few more:
+>> - DMA submission of commands
+>> - blend mode / rounding
+>> - solid fill
+>> - YCrCb support
+>> - and probably more
+>>
+>> One would need to add least split the command list parser into a v3 and
+>> v41 version to accomodate for the differences. In fact userspace/libdrm
+>> would need to know which hw type it currently uses, but you currently
+>> always return 4.1 in the corresponding ioctl.
+> 
+> Eh, so probably my patch does not cover fully the support for v3 G2D. I
+> looked mostly at the differences between v3 and v4 in the s5p-g2d driver
+> itself. However you are right that this might be not sufficient because
+> exynos-g2d moved forward and is different than s5p-g2d.
+> 
+>> Krzysztof Kozlowski wrote:
+>>> The non-DRM s5p-g2d driver supports two versions of G2D: v3.0 on
+>>> S5Pv210 and v4.x on Exynos 4x12 (or newer). The driver for 3.0 device
+>>> version is doing two things differently:
+>>> 1. Before starting the render process, it invalidates caches (pattern,
+>>>    source buffer and mask buffer). Cache control is not present on v4.x
+>>>    device.
+>>> 2. Scalling is done through StretchEn command (in BITBLT_COMMAND_REG
+>>>    register) instead of SRC_SCALE_CTRL_REG as in v4.x. However the
+>>>    exynos_drm_g2d driver does not implement the scalling so this
+>>>    difference can be eliminated.
+>> Huh? Where did you get this from? Scaling works with the DRM driver.
+> 
+> I was looking for the usage of scaling reg (as there is no scaling
+> command). How the scaling is implemented then?
+Like you said above the drivers work completly different. The DRM one
+receives a command list that is constructed by userspace (libdrm
+mostly), copies it to a contiguous buffer and passes the memory address
+of that buffer to the engine which then works on it. Of course
+everything is slightly more complex.
 
-> +
->   	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
->
->   	return 0;
->
+You don't see any reference to scaling in the driver because the scaling
+regs don't need any kind of specific validation.
+
+If you want to know how the command list is constructed, the best way is
+to look into libdrm. The Exynos specific tests actually cover scaling.
+
+
+With best wishes,
+Tobias
+
+
+> Thanks for feedback!
+> 
+> Best regards,
+> Krzysztof
+> 
