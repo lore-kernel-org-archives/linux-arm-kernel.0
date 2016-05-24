@@ -1,105 +1,82 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:28 +0200
-Subject: [PULL 34/59] KVM: arm/arm64: vgic-new: Add SGIPENDR register handlers
+Date: Tue, 24 May 2016 11:09:31 +0200
+Subject: [PULL 37/59] KVM: arm/arm64: vgic-new: Add GICv3 redistributor IIDR
+ and TYPER handler
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-35-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-38-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-As this register is v2 specific, its implementation lives entirely
-in vgic-mmio-v2.c.
-This register allows setting the source mask of an IPI.
+The redistributor TYPER tells the OS about the associated MPIDR,
+also the LAST bit is crucial to determine the number of redistributors.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v2.c | 62 ++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 60 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 32 ++++++++++++++++++++++++++++++--
+ 1 file changed, 30 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index c884e9b..3925d4c 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -146,6 +146,64 @@ static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index bd062b8..64edd23 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -22,6 +22,13 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
+ 
++/* extract @num bytes at @offset bytes offset in data */
++static unsigned long extract_bytes(unsigned long data, unsigned int offset,
++				   unsigned int num)
++{
++	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
++}
++
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
+ {
+@@ -68,6 +75,27 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
  	}
  }
  
-+static unsigned long vgic_mmio_read_sgipend(struct kvm_vcpu *vcpu,
-+					    gpa_t addr, unsigned int len)
++static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
++					      gpa_t addr, unsigned int len)
 +{
-+	u32 intid = addr & 0x0f;
-+	int i;
-+	u64 val = 0;
++	unsigned long mpidr = kvm_vcpu_get_mpidr_aff(vcpu);
++	int target_vcpu_id = vcpu->vcpu_id;
++	u64 value;
 +
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++	value = (mpidr & GENMASK(23, 0)) << 32;
++	value |= ((target_vcpu_id & 0xffff) << 8);
++	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
++		value |= GICR_TYPER_LAST;
 +
-+		val |= (u64)irq->source << (i * 8);
-+	}
-+	return val;
++	return extract_bytes(value, addr & 7, len);
 +}
 +
-+static void vgic_mmio_write_sgipendc(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len,
-+				     unsigned long val)
++static unsigned long vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
++					     gpa_t addr, unsigned int len)
 +{
-+	u32 intid = addr & 0x0f;
-+	int i;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		irq->source &= ~((val >> (i * 8)) & 0xff);
-+		if (!irq->source)
-+			irq->pending = false;
-+
-+		spin_unlock(&irq->irq_lock);
-+	}
++	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
 +}
 +
-+static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len,
-+				     unsigned long val)
-+{
-+	u32 intid = addr & 0x0f;
-+	int i;
-+
-+	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		irq->source |= (val >> (i * 8)) & 0xff;
-+
-+		if (irq->source) {
-+			irq->pending = true;
-+			vgic_queue_irq_unlock(vcpu->kvm, irq);
-+		} else {
-+			spin_unlock(&irq->irq_lock);
-+		}
-+	}
-+}
-+
- static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
-@@ -184,10 +242,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_raz, vgic_mmio_write_sgir, 4,
+ /*
+  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+  * redistributors, while SPIs are covered by registers in the distributor
+@@ -142,10 +170,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
  		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_CLEAR,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
-+		vgic_mmio_read_sgipend, vgic_mmio_write_sgipendc, 16,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SGI_PENDING_SET,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
-+		vgic_mmio_read_sgipend, vgic_mmio_write_sgipends, 16,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- };
- 
+ 	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
++		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
++		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
+ 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
 -- 
 2.1.2.330.g565301e.dirty
