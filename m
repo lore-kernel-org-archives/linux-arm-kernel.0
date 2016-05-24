@@ -1,219 +1,116 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:03 +0200
-Subject: [PULL 09/59] KVM: arm/arm64: Move timer IRQ map to latest possible
- time
+Date: Tue, 24 May 2016 11:09:08 +0200
+Subject: [PULL 14/59] KVM: arm/arm64: Provide functionality to pause and
+ resume a guest
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-10-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-15-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We are about to modify the VGIC to allocate all data structures
-dynamically and store mapped IRQ information on a per-IRQ struct, which
-is indeed allocated dynamically at init time.
-
-Therefore, we cannot record the mapped IRQ info from the timer at timer
-reset time like it's done now, because VCPU reset happens before timer
-init.
-
-A possible later time to do this is on the first run of a per VCPU, it
-just requires us to move the enable state to be a per-VCPU state and do
-the lookup of the physical IRQ number when we are about to run the VCPU.
+For some rare corner cases in our VGIC emulation later we have to stop
+the guest to make sure the VGIC state is consistent.
+Provide the necessary framework to pause and resume a guest.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- arch/arm/kvm/arm.c           |  6 ++--
- include/kvm/arm_arch_timer.h |  8 +++---
- virt/kvm/arm/arch_timer.c    | 66 +++++++++++++++++++++++++-------------------
- virt/kvm/arm/hyp/timer-sr.c  |  5 ++--
- 4 files changed, 47 insertions(+), 38 deletions(-)
+ arch/arm/include/asm/kvm_host.h   |  4 ++++
+ arch/arm/kvm/arm.c                | 25 +++++++++++++------------
+ arch/arm64/include/asm/kvm_host.h |  4 ++++
+ 3 files changed, 21 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 3850701..832be03 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -41,6 +41,8 @@
+ 
+ #define KVM_MAX_VCPUS VGIC_V2_MAX_CPUS
+ 
++#define KVM_REQ_VCPU_EXIT	8
++
+ u32 *kvm_vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num, u32 mode);
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+@@ -225,6 +227,8 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
+ 
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+ struct kvm_vcpu __percpu **kvm_get_running_vcpus(void);
++void kvm_arm_halt_guest(struct kvm *kvm);
++void kvm_arm_resume_guest(struct kvm *kvm);
+ 
+ int kvm_arm_copy_coproc_indices(struct kvm_vcpu *vcpu, u64 __user *uindices);
+ unsigned long kvm_arm_num_coproc_regs(struct kvm_vcpu *vcpu);
 diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index be4b639..ceb9345 100644
+index ceb9345..e89329d 100644
 --- a/arch/arm/kvm/arm.c
 +++ b/arch/arm/kvm/arm.c
-@@ -459,7 +459,7 @@ static void update_vttbr(struct kvm *kvm)
- static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- {
- 	struct kvm *kvm = vcpu->kvm;
--	int ret;
-+	int ret = 0;
- 
- 	if (likely(vcpu->arch.has_run_once))
- 		return 0;
-@@ -482,9 +482,9 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
- 	 * interrupts from the virtual timer with a userspace gic.
- 	 */
- 	if (irqchip_in_kernel(kvm) && vgic_initialized(kvm))
--		kvm_timer_enable(kvm);
-+		ret = kvm_timer_enable(vcpu);
- 
--	return 0;
-+	return ret;
+@@ -492,30 +492,31 @@ bool kvm_arch_intc_initialized(struct kvm *kvm)
+ 	return vgic_initialized(kvm);
  }
  
- bool kvm_arch_intc_initialized(struct kvm *kvm)
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index a47b7de..dda39d8 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -24,9 +24,6 @@
- #include <linux/workqueue.h>
- 
- struct arch_timer_kvm {
--	/* Is the timer enabled */
--	bool			enabled;
+-static void kvm_arm_halt_guest(struct kvm *kvm) __maybe_unused;
+-static void kvm_arm_resume_guest(struct kvm *kvm) __maybe_unused;
 -
- 	/* Virtual offset */
- 	cycle_t			cntvoff;
- };
-@@ -55,10 +52,13 @@ struct arch_timer_cpu {
- 
- 	/* Active IRQ state caching */
- 	bool				active_cleared_last;
-+
-+	/* Is the timer enabled */
-+	bool			enabled;
- };
- 
- int kvm_timer_hyp_init(void);
--void kvm_timer_enable(struct kvm *kvm);
-+int kvm_timer_enable(struct kvm_vcpu *vcpu);
- void kvm_timer_init(struct kvm *kvm);
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 			 const struct kvm_irq_level *irq);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 3232105..e2d5b6f 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -197,7 +197,7 @@ static int kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	 * because the guest would never see the interrupt.  Instead wait
- 	 * until we call this function from kvm_timer_flush_hwstate.
- 	 */
--	if (!vgic_initialized(vcpu->kvm))
-+	if (!vgic_initialized(vcpu->kvm) || !timer->enabled)
- 		return -ENODEV;
- 
- 	if (kvm_timer_should_fire(vcpu) != timer->irq.level)
-@@ -333,9 +333,6 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 			 const struct kvm_irq_level *irq)
+-static void kvm_arm_halt_guest(struct kvm *kvm)
++void kvm_arm_halt_guest(struct kvm *kvm)
  {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
--	struct irq_desc *desc;
--	struct irq_data *data;
--	int phys_irq;
+ 	int i;
+ 	struct kvm_vcpu *vcpu;
  
- 	/*
- 	 * The vcpu timer irq number cannot be determined in
-@@ -354,26 +351,7 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	timer->cntv_ctl = 0;
- 	kvm_timer_update_state(vcpu);
+ 	kvm_for_each_vcpu(i, vcpu, kvm)
+ 		vcpu->arch.pause = true;
+-	force_vm_exit(cpu_all_mask);
++	kvm_make_all_cpus_request(kvm, KVM_REQ_VCPU_EXIT);
++}
++
++static void kvm_arm_resume_vcpu(struct kvm_vcpu *vcpu)
++{
++	struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
++
++	vcpu->arch.pause = false;
++	swake_up(wq);
+ }
  
--	/*
--	 * Find the physical IRQ number corresponding to the host_vtimer_irq
--	 */
--	desc = irq_to_desc(host_vtimer_irq);
--	if (!desc) {
--		kvm_err("%s: no interrupt descriptor\n", __func__);
--		return -EINVAL;
+-static void kvm_arm_resume_guest(struct kvm *kvm)
++void kvm_arm_resume_guest(struct kvm *kvm)
+ {
+ 	int i;
+ 	struct kvm_vcpu *vcpu;
+ 
+-	kvm_for_each_vcpu(i, vcpu, kvm) {
+-		struct swait_queue_head *wq = kvm_arch_vcpu_wq(vcpu);
+-
+-		vcpu->arch.pause = false;
+-		swake_up(wq);
 -	}
--
--	data = irq_desc_get_irq_data(desc);
--	while (data->parent_data)
--		data = data->parent_data;
--
--	phys_irq = data->hwirq;
--
--	/*
--	 * Tell the VGIC that the virtual interrupt is tied to a
--	 * physical interrupt. We do that once per VCPU.
--	 */
--	return kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
-+	return 0;
++	kvm_for_each_vcpu(i, vcpu, kvm)
++		kvm_arm_resume_vcpu(vcpu);
  }
  
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu)
-@@ -501,10 +479,40 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
- 	kvm_vgic_unmap_phys_irq(vcpu, timer->irq.irq);
- }
+ static void vcpu_sleep(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 4cd4196..fa94f91 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -44,6 +44,8 @@
  
--void kvm_timer_enable(struct kvm *kvm)
-+int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
--	if (kvm->arch.timer.enabled)
--		return;
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+	struct irq_desc *desc;
-+	struct irq_data *data;
-+	int phys_irq;
-+	int ret;
-+
-+	if (timer->enabled)
-+		return 0;
-+
-+	/*
-+	 * Find the physical IRQ number corresponding to the host_vtimer_irq
-+	 */
-+	desc = irq_to_desc(host_vtimer_irq);
-+	if (!desc) {
-+		kvm_err("%s: no interrupt descriptor\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	data = irq_desc_get_irq_data(desc);
-+	while (data->parent_data)
-+		data = data->parent_data;
-+
-+	phys_irq = data->hwirq;
-+
-+	/*
-+	 * Tell the VGIC that the virtual interrupt is tied to a
-+	 * physical interrupt. We do that once per VCPU.
-+	 */
-+	ret = kvm_vgic_map_phys_irq(vcpu, timer->irq.irq, phys_irq);
-+	if (ret)
-+		return ret;
-+
+ #define KVM_VCPU_MAX_FEATURES 4
  
- 	/*
- 	 * There is a potential race here between VCPUs starting for the first
-@@ -515,7 +523,9 @@ void kvm_timer_enable(struct kvm *kvm)
- 	 * the arch timers are enabled.
- 	 */
- 	if (timecounter && wqueue)
--		kvm->arch.timer.enabled = 1;
-+		timer->enabled = 1;
++#define KVM_REQ_VCPU_EXIT	8
 +
-+	return 0;
- }
+ int __attribute_const__ kvm_target_cpu(void);
+ int kvm_reset_vcpu(struct kvm_vcpu *vcpu);
+ int kvm_arch_dev_ioctl_check_extension(long ext);
+@@ -325,6 +327,8 @@ static inline void kvm_arch_mmu_notifier_invalidate_page(struct kvm *kvm,
  
- void kvm_timer_init(struct kvm *kvm)
-diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-index ea00d69..798866a 100644
---- a/virt/kvm/arm/hyp/timer-sr.c
-+++ b/virt/kvm/arm/hyp/timer-sr.c
-@@ -24,11 +24,10 @@
- /* vcpu is already in the HYP VA space */
- void __hyp_text __timer_save_state(struct kvm_vcpu *vcpu)
- {
--	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	u64 val;
+ struct kvm_vcpu *kvm_arm_get_running_vcpu(void);
+ struct kvm_vcpu * __percpu *kvm_get_running_vcpus(void);
++void kvm_arm_halt_guest(struct kvm *kvm);
++void kvm_arm_resume_guest(struct kvm *kvm);
  
--	if (kvm->arch.timer.enabled) {
-+	if (timer->enabled) {
- 		timer->cntv_ctl = read_sysreg_el0(cntv_ctl);
- 		timer->cntv_cval = read_sysreg_el0(cntv_cval);
- 	}
-@@ -60,7 +59,7 @@ void __hyp_text __timer_restore_state(struct kvm_vcpu *vcpu)
- 	val |= CNTHCTL_EL1PCTEN;
- 	write_sysreg(val, cnthctl_el2);
- 
--	if (kvm->arch.timer.enabled) {
-+	if (timer->enabled) {
- 		write_sysreg(kvm->arch.timer.cntvoff, cntvoff_el2);
- 		write_sysreg_el0(timer->cntv_cval, cntv_cval);
- 		isb();
+ u64 __kvm_call_hyp(void *hypfn, ...);
+ #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
 -- 
 2.1.2.330.g565301e.dirty
