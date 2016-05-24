@@ -1,52 +1,36 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:24 +0200
-Subject: [PULL 30/59] KVM: arm/arm64: vgic-new: Add PRIORITY registers handlers
+Date: Tue, 24 May 2016 11:09:26 +0200
+Subject: [PULL 32/59] KVM: arm/arm64: vgic-new: Add TARGET registers handlers
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-31-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-33-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-The priority register handlers are shared between the v2 and v3
-emulation, so their implementation goes into vgic-mmio.c, to be
-easily referenced from the v3 emulation as well later.
-There is a corner case when we change the priority of a pending
-interrupt which we don't handle at the moment.
+The target register handlers are v2 emulation specific, so their
+implementation lives entirely in vgic-mmio-v2.c.
+We copy the old VGIC behaviour of assigning an IRQ to the first VCPU
+set in the target mask instead of making it possibly pending on
+multiple VCPUs.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
- virt/kvm/arm/vgic/vgic-mmio.c    | 40 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    |  7 +++++++
- virt/kvm/arm/vgic/vgic.h         |  2 ++
- 4 files changed, 50 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c | 43 +++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 42 insertions(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index 12e101b..d564a30 100644
+index bb7389e..52389ff 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -90,7 +90,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_active, vgic_mmio_write_cactive, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PRI,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 79a4622..6f4e05b 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -236,6 +236,46 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
+@@ -64,6 +64,47 @@ static void vgic_mmio_write_v2_misc(struct kvm_vcpu *vcpu,
  	}
  }
  
-+unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-+				      gpa_t addr, unsigned int len)
++static unsigned long vgic_mmio_read_target(struct kvm_vcpu *vcpu,
++					   gpa_t addr, unsigned int len)
 +{
 +	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
 +	int i;
@@ -55,69 +39,48 @@ index 79a4622..6f4e05b 100644
 +	for (i = 0; i < len; i++) {
 +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+		val |= (u64)irq->priority << (i * 8);
++		val |= (u64)irq->targets << (i * 8);
 +	}
 +
 +	return val;
 +}
 +
-+/*
-+ * We currently don't handle changing the priority of an interrupt that
-+ * is already pending on a VCPU. If there is a need for this, we would
-+ * need to make this VCPU exit and re-evaluate the priorities, potentially
-+ * leading to this interrupt getting presented now to the guest (if it has
-+ * been masked by the priority mask before).
-+ */
-+void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
++static void vgic_mmio_write_target(struct kvm_vcpu *vcpu,
++				   gpa_t addr, unsigned int len,
++				   unsigned long val)
 +{
 +	u32 intid = VGIC_ADDR_TO_INTID(addr, 8);
 +	int i;
 +
++	/* GICD_ITARGETSR[0-7] are read-only */
++	if (intid < VGIC_NR_PRIVATE_IRQS)
++		return;
++
 +	for (i = 0; i < len; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, NULL, intid + i);
++		int target;
 +
 +		spin_lock(&irq->irq_lock);
-+		/* Narrow the priority range to what we actually support */
-+		irq->priority = (val >> (i * 8)) & GENMASK(7, 8 - VGIC_PRI_BITS);
++
++		irq->targets = (val >> (i * 8)) & 0xff;
++		target = irq->targets ? __ffs(irq->targets) : 0;
++		irq->target_vcpu = kvm_get_vcpu(vcpu->kvm, target);
++
 +		spin_unlock(&irq->irq_lock);
 +	}
 +}
 +
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 50b4464..7e73f10 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -129,6 +129,13 @@ void vgic_mmio_write_sactive(struct kvm_vcpu *vcpu,
- 			     gpa_t addr, unsigned int len,
- 			     unsigned long val);
- 
-+unsigned long vgic_mmio_read_priority(struct kvm_vcpu *vcpu,
-+				      gpa_t addr, unsigned int len);
-+
-+void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
- 
- #endif
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index cf62015..e57f8d5 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,8 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
- 
-+#define VGIC_PRI_BITS		5
-+
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
- 
- struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
+ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
+ 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
+@@ -93,7 +134,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_priority, vgic_mmio_write_priority, 8,
+ 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_TARGET,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
++		vgic_mmio_read_target, vgic_mmio_write_target, 8,
+ 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
+ 		vgic_mmio_read_config, vgic_mmio_write_config, 2,
 -- 
 2.1.2.330.g565301e.dirty
