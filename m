@@ -1,27 +1,74 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Tue, 24 May 2016 14:04:21 +0200
-Subject: [PATCH v2] pinctrl: stm32: factorize
- stm32_pconf_input/output_get()
-In-Reply-To: <1464091063-22341-2-git-send-email-patrice.chotard@st.com>
-References: <1464091063-22341-1-git-send-email-patrice.chotard@st.com>
- <1464091063-22341-2-git-send-email-patrice.chotard@st.com>
-Message-ID: <57444345.9030107@st.com>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Tue, 24 May 2016 20:19:05 +0800
+Subject: [PATCH 1/1] arm64: fix flush_cache_range
+In-Reply-To: <20160524113727.GD25374@leverpostej>
+References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160524113727.GD25374@leverpostej>
+Message-ID: <574446B9.8040105@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 05/24/2016 01:57 PM, patrice.chotard at st.com wrote:
-> From: Patrice Chotard<patrice.chotard@st.com>
->
-> As these 2 functions code are 95% similar, factorize them.
->
-> Signed-off-by: Patrice Chotard<patrice.chotard@st.com>
-> ---
->   drivers/pinctrl/stm32/pinctrl-stm32.c | 31 ++++++++++---------------------
->   1 file changed, 10 insertions(+), 21 deletions(-)
+On 2016/5/24 19:37, Mark Rutland wrote:
+> On Tue, May 24, 2016 at 07:16:37PM +0800, Zhen Lei wrote:
+>> When we ran mprotect04(a test case in LTP) infinitely, it would always
+>> failed after a few seconds. The case can be described briefly that: copy
+>> a empty function from code area into a new memory area(created by mmap),
+>> then call mprotect to change the protection to PROT_EXEC. The syscall
+>> sys_mprotect will finally invoke flush_cache_range, but this function
+>> currently only invalid icache, the operation of flush dcache is missed.
+> 
+> In the LTP code I see powerpc-specific D-cache / I-cache synchronisation
+> (i.e. d-cache cleaning followed by I-cache invalidation), so there
+> appears to be some expectation of userspace maintenance. Hoever, there
+> is no such ARM-specific I-cache maintenance.
+But I see some other platforms have D-cache maintenance, like: arch/nios2/mm/cacheflush.c
+And according to the name of flush_cache_range, it should do this, I judged. Otherwise,
+mprotect04 will be failed on more platforms, it's easy to discover. Only PPC have specific
+cache synchronization, maybe it meets some hardware limitation. It's impossible a programmer
+fixed a common bug on only one platform but leave others unchanged.
 
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+> 
+> It looks like the test may be missing I-cache maintenance regardless of
+> the semantics of mprotect in this case.
+> 
+> I have not yet devled into flush_cache_range and how it is called.
 
-Thanks!
-Maxime
+SYSCALL_DEFINE3(mprotect ---> mprotect_fixup ---> change_protection ---> change_protection_range --> flush_cache_range
+
+> 
+> Thanks,
+> Mark.
+> 
+>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> ---
+>>  arch/arm64/mm/flush.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+>> index dbd12ea..eda4124 100644
+>> --- a/arch/arm64/mm/flush.c
+>> +++ b/arch/arm64/mm/flush.c
+>> @@ -31,7 +31,7 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
+>>  		       unsigned long end)
+>>  {
+>>  	if (vma->vm_flags & VM_EXEC)
+>> -		__flush_icache_all();
+>> +		flush_icache_range(start, end);
+>>  }
+>>
+>>  static void sync_icache_aliases(void *kaddr, unsigned long len)
+>> --
+>> 2.5.0
+>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
+> .
+> 
