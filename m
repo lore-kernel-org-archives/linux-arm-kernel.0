@@ -1,52 +1,26 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 24 May 2016 11:20:11 +0200
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <6044541.yeLQbYg2Jv@wuerfel>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
- <12548318.auB4PSA3KC@wuerfel>
- <CALszF6BPPA=tezMLhmdC4YFwmH1tGhDxCNDZNwGp1cTDWP7Fmg@mail.gmail.com>
- <6044541.yeLQbYg2Jv@wuerfel>
-Message-ID: <CALszF6BAFgoccC6fmkdnwQxwHmQ35oLcor6v9yOLyVeXrt-KGA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 May 2016 11:23:37 +0200
+Subject: [PATCH 0/7] pinctrl: meson: Add a bunch more pins
+In-Reply-To: <1462544486-9516-1-git-send-email-khilman@baylibre.com>
+References: <1462544486-9516-1-git-send-email-khilman@baylibre.com>
+Message-ID: <CACRpkdY9oGZLt431NwTaFmZk98O8n3ZnMA1odhYZtcH7P1p=Jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-05-24 10:58 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday, May 24, 2016 10:50:17 AM CEST Maxime Coquelin wrote:
->> diff --git a/drivers/char/hw_random/stm32-rng.c
->> b/drivers/char/hw_random/stm32-rng.c
->> index 92a810648bd0..2a0fc90e4dc3 100644
->> --- a/drivers/char/hw_random/stm32-rng.c
->> +++ b/drivers/char/hw_random/stm32-rng.c
->> @@ -68,6 +68,10 @@ static int stm32_rng_read(struct hwrng *rng, void
->> *data, size_t max, bool wait)
->>                         } while (!sr && --timeout);
->>                 }
->>
->> +               if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
->> +                               "bad RNG status - %x\n", sr))
->> +                       writel_relaxed(0, priv->base + RNG_SR);
->> +
->>                 /* If error detected or data not ready... */
->>                 if (sr != RNG_SR_DRDY)
->>                         break;
->> @@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void
->> *data, size_t max, bool wait)
->>                 max -= sizeof(u32);
->>         }
->>
->> -       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
->> -                     "bad RNG status - %x\n", sr))
->> -               writel_relaxed(0, priv->base + RNG_SR);
->> -
->>         pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
->>         pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
->>
->> Thanks,
->>
+On Fri, May 6, 2016 at 4:21 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+
+> Add support for several more devices, both in the EE domain and in the
+> AO domain.  Also, add the pins to the corresponding DTS files.
 >
-> Yes, that looks good to me.
+> Tested on odroid-c2 and Amlogic P200 boards, and verified with working
+> ethernet.
+>
+> Depends on the initial GXBB pinctrl support from Carlo[1].  Also
+> available in my git tree[2] with all the dependencies included.
 
-Thanks!
-Sudip, do you want to send the patch, or I manage to do it?
+These don't apply anomore sadly, Kevin can you rebase on
+Torvalds' HEAD and resend, and include Carlo's ACK on them
+so I can merge them in the next kernel cycle?
 
-Maxime
+Yours,
+Linus Walleij
