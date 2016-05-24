@@ -1,133 +1,29 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 24 May 2016 03:04:42 +0300
-Subject: [PATCH 13/23] arm64: introduce is_a32_task and is_a32_thread (for
- AArch32 compat)
+Date: Tue, 24 May 2016 03:04:49 +0300
+Subject: [PATCH 20/23] arm64: signal32: move ilp32 and aarch32 common code to
+ separated file
 In-Reply-To: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1464048292-30136-14-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1464048292-30136-21-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on patch of Andrew Pinski.
-
-This patch introduces is_a32_compat_task and is_a32_thread so it is
-easier to say this is a a32 specific thread or a generic compat thread/task.
-Corresponding functions are located in <asm/is_compat.h> to avoid mess in
-headers.
-
-Some files include both <linux/compat.h> and <asm/compat.h>,
-and this is wrong because <linux/compat.h> has <asm/compat.h> already
-included. It was fixed too.
-
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- arch/arm64/include/asm/compat.h      | 19 ++----------
- arch/arm64/include/asm/elf.h         | 10 +++----
- arch/arm64/include/asm/ftrace.h      |  2 +-
- arch/arm64/include/asm/is_compat.h   | 58 ++++++++++++++++++++++++++++++++++++
- arch/arm64/include/asm/memory.h      |  3 +-
- arch/arm64/include/asm/processor.h   |  5 ++--
- arch/arm64/include/asm/syscall.h     |  2 +-
- arch/arm64/include/asm/thread_info.h |  2 +-
- arch/arm64/kernel/hw_breakpoint.c    | 10 +++----
- arch/arm64/kernel/perf_regs.c        |  2 +-
- arch/arm64/kernel/process.c          |  7 ++---
- arch/arm64/kernel/ptrace.c           | 11 ++++---
- arch/arm64/kernel/signal.c           |  4 +--
- arch/arm64/kernel/traps.c            |  3 +-
- 14 files changed, 91 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm64/include/asm/is_compat.h
+ arch/arm64/include/asm/signal32_common.h |  25 +++++++
+ arch/arm64/kernel/Makefile               |   1 +
+ arch/arm64/kernel/signal32.c             |  85 -----------------------
+ arch/arm64/kernel/signal32_common.c      | 115 +++++++++++++++++++++++++++++++
+ 4 files changed, 141 insertions(+), 85 deletions(-)
+ create mode 100644 arch/arm64/include/asm/signal32_common.h
+ create mode 100644 arch/arm64/kernel/signal32_common.c
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index eb8432b..df2f72d 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -24,6 +24,8 @@
- #include <linux/types.h>
- #include <linux/sched.h>
- 
-+#include <asm/is_compat.h>
-+
- #define COMPAT_USER_HZ		100
- #ifdef __AARCH64EB__
- #define COMPAT_UTS_MACHINE	"armv8b\0\0"
-@@ -298,23 +300,6 @@ struct compat_shmid64_ds {
- 	compat_ulong_t __unused5;
- };
- 
--static inline int is_compat_task(void)
--{
--	return test_thread_flag(TIF_32BIT);
--}
--
--static inline int is_compat_thread(struct thread_info *thread)
--{
--	return test_ti_thread_flag(thread, TIF_32BIT);
--}
--
--#else /* !CONFIG_COMPAT */
--
--static inline int is_compat_thread(struct thread_info *thread)
--{
--	return 0;
--}
--
- #endif /* CONFIG_COMPAT */
- #endif /* __KERNEL__ */
- #endif /* __ASM_COMPAT_H */
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 24ed037..b5437c5 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -16,6 +16,10 @@
- #ifndef __ASM_ELF_H
- #define __ASM_ELF_H
- 
-+#ifndef __ASSEMBLY__
-+#include <linux/compat.h>
-+#endif
-+
- #include <asm/hwcap.h>
- 
- /*
-@@ -152,13 +156,9 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
- 				       int uses_interp);
- 
- /* 1GB of VA */
--#ifdef CONFIG_COMPAT
--#define STACK_RND_MASK			(test_thread_flag(TIF_32BIT) ? \
-+#define STACK_RND_MASK			(is_compat_task() ? \
- 						0x7ff >> (PAGE_SHIFT - 12) : \
- 						0x3ffff >> (PAGE_SHIFT - 12))
--#else
--#define STACK_RND_MASK			(0x3ffff >> (PAGE_SHIFT - 12))
--#endif
- 
- #ifdef CONFIG_COMPAT
- 
-diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-index caa955f..0feb28a 100644
---- a/arch/arm64/include/asm/ftrace.h
-+++ b/arch/arm64/include/asm/ftrace.h
-@@ -54,7 +54,7 @@ static inline unsigned long ftrace_call_adjust(unsigned long addr)
- #define ARCH_TRACE_IGNORE_COMPAT_SYSCALLS
- static inline bool arch_trace_is_compat_syscall(struct pt_regs *regs)
- {
--	return is_compat_task();
-+	return is_a32_compat_task();
- }
- #endif /* ifndef __ASSEMBLY__ */
- 
-diff --git a/arch/arm64/include/asm/is_compat.h b/arch/arm64/include/asm/is_compat.h
+diff --git a/arch/arm64/include/asm/signal32_common.h b/arch/arm64/include/asm/signal32_common.h
 new file mode 100644
-index 0000000..6139b5a
+index 0000000..b4f2099
 --- /dev/null
-+++ b/arch/arm64/include/asm/is_compat.h
-@@ -0,0 +1,58 @@
++++ b/arch/arm64/include/asm/signal32_common.h
+@@ -0,0 +1,25 @@
 +/*
 + * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License version 2 as
@@ -141,322 +37,246 @@ index 0000000..6139b5a
 + * You should have received a copy of the GNU General Public License
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+
-+#ifndef __ASM_IS_COMPAT_H
-+#define __ASM_IS_COMPAT_H
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/thread_bits.h>
-+
-+#ifdef CONFIG_AARCH32_EL0
-+
-+static inline int is_a32_compat_task(void)
-+{
-+	return test_thread_flag(TIF_32BIT);
-+}
-+
-+static inline int is_a32_compat_thread(struct thread_info *thread)
-+{
-+	return test_ti_thread_flag(thread, TIF_32BIT);
-+}
-+
-+#else
-+
-+static inline int is_a32_compat_task(void)
-+
-+{
-+	return 0;
-+}
-+
-+static inline int is_a32_compat_thread(struct thread_info *thread)
-+{
-+	return 0;
-+}
-+
-+#endif /* CONFIG_AARCH32_EL0 */
++#ifndef __ASM_SIGNAL32_COMMON_H
++#define __ASM_SIGNAL32_COMMON_H
 +
 +#ifdef CONFIG_COMPAT
 +
-+static inline int is_compat_task(void)
-+{
-+	return is_a32_compat_task();
-+}
++int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from);
++int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from);
 +
-+#endif /* CONFIG_COMPAT */
++#endif /* CONFIG_COMPAT*/
 +
-+#endif /* !__ASSEMBLY__ */
-+#endif /* __ASM_IS_COMPAT_H */
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 12f8a00..a66a0f7 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -26,6 +26,7 @@
- #include <linux/types.h>
- #include <asm/bug.h>
- #include <asm/sizes.h>
-+#include <asm/is_compat.h>
- 
- /*
-  * Allow for constants defined here to be used from assembly code
-@@ -61,7 +62,7 @@
- 
- #ifdef CONFIG_COMPAT
- #define TASK_SIZE_32		UL(0x100000000)
--#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
-+#define TASK_SIZE		(is_compat_task() ?		\
- 				TASK_SIZE_32 : TASK_SIZE_64)
- #define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
- 				TASK_SIZE_32 : TASK_SIZE_64)
-diff --git a/arch/arm64/include/asm/processor.h b/arch/arm64/include/asm/processor.h
-index 5bbdbb4..1eccf47 100644
---- a/arch/arm64/include/asm/processor.h
-+++ b/arch/arm64/include/asm/processor.h
-@@ -30,6 +30,7 @@
- #include <linux/string.h>
- 
- #include <asm/alternative.h>
-+#include <asm/is_compat.h>
- #include <asm/fpsimd.h>
- #include <asm/hw_breakpoint.h>
- #include <asm/lse.h>
-@@ -41,7 +42,7 @@
- #define STACK_TOP_MAX		TASK_SIZE_64
- #ifdef CONFIG_COMPAT
- #define AARCH32_VECTORS_BASE	0xffff0000
--#define STACK_TOP		(test_thread_flag(TIF_32BIT) ? \
-+#define STACK_TOP		(is_compat_task() ? \
- 				AARCH32_VECTORS_BASE : STACK_TOP_MAX)
- #else
- #define STACK_TOP		STACK_TOP_MAX
-@@ -94,7 +95,7 @@ struct thread_struct {
- #define task_user_tls(t)						\
- ({									\
- 	unsigned long *__tls;						\
--	if (is_compat_thread(task_thread_info(t)))			\
-+	if (is_a32_compat_thread(task_thread_info(t)))			\
- 		__tls = &(t)->thread.tp2_value;				\
- 	else								\
- 		__tls = &(t)->thread.tp_value;				\
-diff --git a/arch/arm64/include/asm/syscall.h b/arch/arm64/include/asm/syscall.h
-index 709a574..ce09641 100644
---- a/arch/arm64/include/asm/syscall.h
-+++ b/arch/arm64/include/asm/syscall.h
-@@ -113,7 +113,7 @@ static inline void syscall_set_arguments(struct task_struct *task,
-  */
- static inline int syscall_get_arch(void)
- {
--	if (is_compat_task())
-+	if (is_a32_compat_task())
- 		return AUDIT_ARCH_ARM;
- 
- 	return AUDIT_ARCH_AARCH64;
-diff --git a/arch/arm64/include/asm/thread_info.h b/arch/arm64/include/asm/thread_info.h
-index abd64bd..4daa559 100644
---- a/arch/arm64/include/asm/thread_info.h
-+++ b/arch/arm64/include/asm/thread_info.h
-@@ -118,7 +118,7 @@ static inline struct thread_info *current_thread_info(void)
- #define TIF_FREEZE		19
- #define TIF_RESTORE_SIGMASK	20
- #define TIF_SINGLESTEP		21
--#define TIF_32BIT		22	/* 32bit process */
-+#define TIF_32BIT		22	/* AARCH32 process */
- 
- #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
- #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
-diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-index b45c95d..baa1eba 100644
---- a/arch/arm64/kernel/hw_breakpoint.c
-+++ b/arch/arm64/kernel/hw_breakpoint.c
-@@ -164,7 +164,7 @@ enum hw_breakpoint_ops {
- 	HW_BREAKPOINT_RESTORE
- };
- 
--static int is_compat_bp(struct perf_event *bp)
-+static int is_a32_compat_bp(struct perf_event *bp)
- {
- 	struct task_struct *tsk = bp->hw.target;
- 
-@@ -175,7 +175,7 @@ static int is_compat_bp(struct perf_event *bp)
- 	 * deprecated behaviour if we use unaligned watchpoints in
- 	 * AArch64 state.
- 	 */
--	return tsk && is_compat_thread(task_thread_info(tsk));
-+	return tsk && is_a32_compat_thread(task_thread_info(tsk));
++#endif /* __ASM_SIGNAL32_COMMON_H */
++
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 7aa65ea..3ed55eb 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -29,6 +29,7 @@ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o		\
+ 					   ../../arm/kernel/opcodes.o binfmt_elf32.o
+ arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o sys_ilp32.o
++arm64-obj-$(CONFIG_COMPAT)		+= signal32_common.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index b7063de..b103af3 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -125,91 +125,6 @@ static inline int get_sigset_t(sigset_t *set,
+ 	return 0;
  }
  
- /**
-@@ -435,7 +435,7 @@ static int arch_build_bp_info(struct perf_event *bp)
- 	 * Watchpoints can be of length 1, 2, 4 or 8 bytes.
- 	 */
- 	if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE) {
--		if (is_compat_bp(bp)) {
-+		if (is_a32_compat_bp(bp)) {
- 			if (info->ctrl.len != ARM_BREAKPOINT_LEN_2 &&
- 			    info->ctrl.len != ARM_BREAKPOINT_LEN_4)
- 				return -EINVAL;
-@@ -492,7 +492,7 @@ int arch_validate_hwbkpt_settings(struct perf_event *bp)
- 	 * AArch32 tasks expect some simple alignment fixups, so emulate
- 	 * that here.
- 	 */
--	if (is_compat_bp(bp)) {
-+	if (is_a32_compat_bp(bp)) {
- 		if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
- 			alignment_mask = 0x7;
- 		else
-@@ -679,7 +679,7 @@ static int watchpoint_handler(unsigned long addr, unsigned int esr,
- 
- 		info = counter_arch_bp(wp);
- 		/* AArch32 watchpoints are either 4 or 8 bytes aligned. */
--		if (is_compat_task()) {
-+		if (is_a32_compat_task()) {
- 			if (info->ctrl.len == ARM_BREAKPOINT_LEN_8)
- 				alignment_mask = 0x7;
- 			else
-diff --git a/arch/arm64/kernel/perf_regs.c b/arch/arm64/kernel/perf_regs.c
-index 3f62b35..a79058f 100644
---- a/arch/arm64/kernel/perf_regs.c
-+++ b/arch/arm64/kernel/perf_regs.c
-@@ -45,7 +45,7 @@ int perf_reg_validate(u64 mask)
- 
- u64 perf_reg_abi(struct task_struct *task)
- {
--	if (is_compat_thread(task_thread_info(task)))
-+	if (is_a32_compat_thread(task_thread_info(task)))
- 		return PERF_SAMPLE_REGS_ABI_32;
- 	else
- 		return PERF_SAMPLE_REGS_ABI_64;
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 8062482..746f2d3 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -47,7 +47,6 @@
- #include <trace/events/power.h>
- 
- #include <asm/alternative.h>
--#include <asm/compat.h>
- #include <asm/cacheflush.h>
- #include <asm/fpsimd.h>
- #include <asm/mmu_context.h>
-@@ -211,7 +210,7 @@ static void tls_thread_flush(void)
- {
- 	asm ("msr tpidr_el0, xzr");
- 
--	if (is_compat_task()) {
-+	if (is_a32_compat_task()) {
- 		current->thread.tp_value = 0;
- 
- 		/*
-@@ -263,7 +262,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 		asm("mrs %0, tpidr_el0" : "=r" (*task_user_tls(p)));
- 
- 		if (stack_start) {
--			if (is_compat_thread(task_thread_info(p)))
-+			if (is_a32_compat_thread(task_thread_info(p)))
- 				childregs->compat_sp = stack_start;
- 			/* 16-byte aligned stack mandatory on AArch64 */
- 			else if (stack_start & 15)
-@@ -303,7 +302,7 @@ static void tls_thread_switch(struct task_struct *next)
- 	*task_user_tls(current) = tpidr;
- 
- 	tpidr = *task_user_tls(next);
--	tpidrro = is_compat_thread(task_thread_info(next)) ?
-+	tpidrro = is_a32_compat_thread(task_thread_info(next)) ?
- 		  next->thread.tp_value : 0;
- 
- 	asm(
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index aa79e81..38a09338 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -38,7 +38,6 @@
- #include <linux/tracehook.h>
- #include <linux/elf.h>
- 
--#include <asm/compat.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
- #include <asm/syscall.h>
-@@ -85,7 +84,7 @@ static void ptrace_hbptriggered(struct perf_event *bp,
- #ifdef CONFIG_AARCH32_EL0
- 	int i;
- 
--	if (!is_compat_task())
-+	if (!is_a32_compat_task())
- 		goto send_sig;
- 
- 	for (i = 0; i < ARM_MAX_BRP; ++i) {
-@@ -1203,9 +1202,9 @@ const struct user_regset_view *task_user_regset_view(struct task_struct *task)
- 	 * 32-bit children use an extended user_aarch32_ptrace_view to allow
- 	 * access to the TLS register.
- 	 */
--	if (is_compat_task())
-+	if (is_a32_compat_task())
- 		return &user_aarch32_view;
--	else if (is_compat_thread(task_thread_info(task)))
-+	else if (is_a32_compat_thread(task_thread_info(task)))
- 		return &user_aarch32_ptrace_view;
- #endif
- 	return &user_aarch64_view;
-@@ -1232,7 +1231,7 @@ static void tracehook_report_syscall(struct pt_regs *regs,
- 	 * A scratch register (ip(r12) on AArch32, x7 on AArch64) is
- 	 * used to denote syscall entry/exit:
- 	 */
--	regno = (is_compat_task() ? 12 : 7);
-+	regno = (is_a32_compat_task() ? 12 : 7);
- 	saved_reg = regs->regs[regno];
- 	regs->regs[regno] = dir;
- 
-@@ -1343,7 +1342,7 @@ int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task)
- 	if (!test_tsk_thread_flag(task, TIF_SINGLESTEP))
- 		regs->pstate &= ~DBG_SPSR_SS;
- 
--	if (is_compat_thread(task_thread_info(task)))
-+	if (is_a32_compat_thread(task_thread_info(task)))
- 		return valid_compat_regs(regs);
- 	else
- 		return valid_native_regs(regs);
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index a8eafdb..be02f65 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -276,7 +276,7 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
- 
- static void setup_restart_syscall(struct pt_regs *regs)
- {
--	if (is_compat_task())
-+	if (is_a32_compat_task())
- 		compat_setup_restart_syscall(regs);
- 	else
- 		regs->regs[8] = __NR_restart_syscall;
-@@ -295,7 +295,7 @@ static void handle_signal(struct ksignal *ksig, struct pt_regs *regs)
- 	/*
- 	 * Set up the stack frame
- 	 */
--	if (is_compat_task()) {
-+	if (is_a32_compat_task()) {
- 		if (ksig->ka.sa.sa_flags & SA_SIGINFO)
- 			ret = compat_setup_rt_frame(usig, ksig, oldset, regs);
- 		else
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 85461e8..515444a 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/bug.h>
+-int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+-{
+-	int err;
+-
+-	if (!access_ok(VERIFY_WRITE, to, sizeof(*to)))
+-		return -EFAULT;
+-
+-	/* If you change siginfo_t structure, please be sure
+-	 * this code is fixed accordingly.
+-	 * It should never copy any pad contained in the structure
+-	 * to avoid security leaks, but must copy the generic
+-	 * 3 ints plus the relevant union member.
+-	 * This routine must convert siginfo from 64bit to 32bit as well
+-	 * at the same time.
+-	 */
+-	err = __put_user(from->si_signo, &to->si_signo);
+-	err |= __put_user(from->si_errno, &to->si_errno);
+-	err |= __put_user((short)from->si_code, &to->si_code);
+-	if (from->si_code < 0)
+-		err |= __copy_to_user(&to->_sifields._pad, &from->_sifields._pad,
+-				      SI_PAD_SIZE);
+-	else switch (from->si_code & __SI_MASK) {
+-	case __SI_KILL:
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		break;
+-	case __SI_TIMER:
+-		 err |= __put_user(from->si_tid, &to->si_tid);
+-		 err |= __put_user(from->si_overrun, &to->si_overrun);
+-		 err |= __put_user(from->si_int, &to->si_int);
+-		break;
+-	case __SI_POLL:
+-		err |= __put_user(from->si_band, &to->si_band);
+-		err |= __put_user(from->si_fd, &to->si_fd);
+-		break;
+-	case __SI_FAULT:
+-		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
+-				  &to->si_addr);
+-#ifdef BUS_MCEERR_AO
+-		/*
+-		 * Other callers might not initialize the si_lsb field,
+-		 * so check explicitly for the right codes here.
+-		 */
+-		if (from->si_signo == SIGBUS &&
+-		    (from->si_code == BUS_MCEERR_AR || from->si_code == BUS_MCEERR_AO))
+-			err |= __put_user(from->si_addr_lsb, &to->si_addr_lsb);
+-#endif
+-		break;
+-	case __SI_CHLD:
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		err |= __put_user(from->si_status, &to->si_status);
+-		err |= __put_user(from->si_utime, &to->si_utime);
+-		err |= __put_user(from->si_stime, &to->si_stime);
+-		break;
+-	case __SI_RT: /* This is not generated by the kernel as of now. */
+-	case __SI_MESGQ: /* But this is */
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		err |= __put_user(from->si_int, &to->si_int);
+-		break;
+-	case __SI_SYS:
+-		err |= __put_user((compat_uptr_t)(unsigned long)
+-				from->si_call_addr, &to->si_call_addr);
+-		err |= __put_user(from->si_syscall, &to->si_syscall);
+-		err |= __put_user(from->si_arch, &to->si_arch);
+-		break;
+-	default: /* this is just in case for now ... */
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		break;
+-	}
+-	return err;
+-}
+-
+-int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
+-{
+-	if (copy_from_user(to, from, __ARCH_SI_PREAMBLE_SIZE) ||
+-	    copy_from_user(to->_sifields._pad,
+-			   from->_sifields._pad, SI_PAD_SIZE))
+-		return -EFAULT;
+-
+-	return 0;
+-}
+-
+ /*
+  * VFP save/restore code.
+  *
+diff --git a/arch/arm64/kernel/signal32_common.c b/arch/arm64/kernel/signal32_common.c
+new file mode 100644
+index 0000000..8fbb609
+--- /dev/null
++++ b/arch/arm64/kernel/signal32_common.c
+@@ -0,0 +1,115 @@
++/*
++ * Based on arch/arm/kernel/signal.c
++ *
++ * Copyright (C) 1995-2009 Russell King
++ * Copyright (C) 2012 ARM Ltd.
++ * Modified by Will Deacon <will.deacon@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
 +#include <linux/compat.h>
- #include <linux/signal.h>
- #include <linux/personality.h>
- #include <linux/kallsyms.h>
-@@ -411,7 +412,7 @@ asmlinkage long do_ni_syscall(struct pt_regs *regs)
- {
- #ifdef CONFIG_AARCH32_EL0
- 	long ret;
--	if (is_compat_task()) {
-+	if (is_a32_compat_task()) {
- 		ret = compat_arm_syscall(regs);
- 		if (ret != -ENOSYS)
- 			return ret;
++#include <linux/signal.h>
++#include <linux/ratelimit.h>
++
++#include <asm/esr.h>
++#include <asm/fpsimd.h>
++#include <asm/signal32_common.h>
++#include <asm/uaccess.h>
++#include <asm/unistd.h>
++
++int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
++{
++	int err;
++
++	if (!access_ok(VERIFY_WRITE, to, sizeof(*to)))
++		return -EFAULT;
++
++	/* If you change siginfo_t structure, please be sure
++	 * this code is fixed accordingly.
++	 * It should never copy any pad contained in the structure
++	 * to avoid security leaks, but must copy the generic
++	 * 3 ints plus the relevant union member.
++	 * This routine must convert siginfo from 64bit to 32bit as well
++	 * at the same time.
++	 */
++	err = __put_user(from->si_signo, &to->si_signo);
++	err |= __put_user(from->si_errno, &to->si_errno);
++	err |= __put_user((short)from->si_code, &to->si_code);
++	if (from->si_code < 0)
++		err |= __copy_to_user(&to->_sifields._pad, &from->_sifields._pad,
++				      SI_PAD_SIZE);
++	else switch (from->si_code & __SI_MASK) {
++	case __SI_KILL:
++		err |= __put_user(from->si_pid, &to->si_pid);
++		err |= __put_user(from->si_uid, &to->si_uid);
++		break;
++	case __SI_TIMER:
++		 err |= __put_user(from->si_tid, &to->si_tid);
++		 err |= __put_user(from->si_overrun, &to->si_overrun);
++		 err |= __put_user(from->si_int, &to->si_int);
++		break;
++	case __SI_POLL:
++		err |= __put_user(from->si_band, &to->si_band);
++		err |= __put_user(from->si_fd, &to->si_fd);
++		break;
++	case __SI_FAULT:
++		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
++				  &to->si_addr);
++#ifdef BUS_MCEERR_AO
++		/*
++		 * Other callers might not initialize the si_lsb field,
++		 * so check explicitly for the right codes here.
++		 */
++		if (from->si_signo == SIGBUS &&
++		    (from->si_code == BUS_MCEERR_AR || from->si_code == BUS_MCEERR_AO))
++			err |= __put_user(from->si_addr_lsb, &to->si_addr_lsb);
++#endif
++		break;
++	case __SI_CHLD:
++		err |= __put_user(from->si_pid, &to->si_pid);
++		err |= __put_user(from->si_uid, &to->si_uid);
++		err |= __put_user(from->si_status, &to->si_status);
++		err |= __put_user(from->si_utime, &to->si_utime);
++		err |= __put_user(from->si_stime, &to->si_stime);
++		break;
++	case __SI_RT: /* This is not generated by the kernel as of now. */
++	case __SI_MESGQ: /* But this is */
++		err |= __put_user(from->si_pid, &to->si_pid);
++		err |= __put_user(from->si_uid, &to->si_uid);
++		err |= __put_user(from->si_int, &to->si_int);
++		break;
++	case __SI_SYS:
++		err |= __put_user((compat_uptr_t)(unsigned long)
++				from->si_call_addr, &to->si_call_addr);
++		err |= __put_user(from->si_syscall, &to->si_syscall);
++		err |= __put_user(from->si_arch, &to->si_arch);
++		break;
++	default: /* this is just in case for now ... */
++		err |= __put_user(from->si_pid, &to->si_pid);
++		err |= __put_user(from->si_uid, &to->si_uid);
++		break;
++	}
++	return err;
++}
++
++int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
++{
++	if (copy_from_user(to, from, __ARCH_SI_PREAMBLE_SIZE) ||
++	    copy_from_user(to->_sifields._pad,
++			   from->_sifields._pad, SI_PAD_SIZE))
++		return -EFAULT;
++
++	return 0;
++}
++
 -- 
 2.5.0
