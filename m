@@ -1,69 +1,121 @@
-From: nab@linux-iscsi.org (Nicholas A. Bellinger)
-Date: Mon, 23 May 2016 22:31:44 -0700
-Subject: [PATCH] Fix for hang of Ordered task in TCM
-In-Reply-To: <82ddb84d-1a3c-f7ad-3f91-0a9506317bdf@linux.vnet.ibm.com>
-References: <1463177741-4385-1-git-send-email-mikecyr@linux.vnet.ibm.com>
- <1463550825.22249.17.camel@haakon3.risingtidesystems.com>
- <82ddb84d-1a3c-f7ad-3f91-0a9506317bdf@linux.vnet.ibm.com>
-Message-ID: <1464067904.22249.53.camel@haakon3.risingtidesystems.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Tue, 24 May 2016 07:30:17 +0200
+Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
+ support
+In-Reply-To: <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
+References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
+ <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-05-18 at 14:35 -0500, Michael Cyr wrote:
-> On 5/18/16 12:53 AM, Nicholas A. Bellinger wrote:
-> > Hi Michael,
-> >
-> > On Fri, 2016-05-13 at 17:15 -0500, Michael Cyr wrote:
-> >> If a command with a Simple task attribute is failed due to a Unit
-> >> Attention, then a subsequent command with an Ordered task attribute will
-> >> hang forever.  The reason for this is that the Unit Attention status is
-> >> checked for in target_setup_cmd_from_cdb, before the call to
-> >> target_execute_cmd, which calls target_handle_task_attr, which in turn
-> >> increments dev->simple_cmds.  However, transport_generic_request_failure
-> >> still calls transport_complete_task_attr, which will decrement
-> >> dev->simple_cmds.  In this case, simple_cmds is now -1.  So when a
-> >> command with the Ordered task attribute is sent, target_handle_task_attr
-> >> sees that dev->simple_cmds is not 0, so it decides it can't execute the
-> >> command until all the (nonexistent) Simple commands have completed.
-> >>
-> > Thanks for reporting this bug.  Comments below.
+Hi Simon,
 
-<SNIP>
-
-> > So AFAICT for delayed commands, the above patch ends up skipping these
-> > three checks subsequently when doing __target_execute_cmd() directly
-> > from target_restart_delayed_cmds(), no..?
-> >
-> > After pondering this some more, what about moving these checks into
-> > __target_execute_cmd() to handle both target_core_transport.c cases
-> > instead..?
->>
-> You're right, __target_execute_cmd is clearly the right place for the 
-> checks.
+On 24.05.2016 03:54, Simon Horman wrote:
+> Basic support for the Gen 3 R-Car M3-W SoC.
 >
-> > We'll also need a parameter for internal COMPARE_AND_WRITE usage
-> > within compare_and_write_callback(), to bypass checks upon secondary
-> > ->execute_cmd() WRITE payload submission after READ + COMPARE has
-> > completed successfully.
->>
-> I'm still learning about the target code, and I was unaware of 
-> COMPARE_AND_WRITE.  Thanks for pointing this out to me.  You're right 
-> here too, we need to make sure we only make the tests when the Compare 
-> and Write is first executed (to do the read), and not later when the 
-> write is done.
-> >
-> > WDYT..?
->>
-> You've covered all the places that call __target_execute_cmd, so I think 
-> it's good.
+> Based on work for the r8a7795 and r8a7796 SoCs by
+> Takeshi Kihara, Dirk Behme and Geert Uytterhoeven.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v3
+> * As suggested by Geert Uytterhoeven:
+>   - Drop 0x from unit address of gic
+> * As suggested by Khiem Nguyen:
+>   - Use psci-0.2
+> * Added Reviewed-by tag from Geert Uytterhoeven
+>
+> v2
+> * As suggested by Geert Uytterhoeven:
+>   - Move L2_CA57 node under cpus node and include reg property
+>   - Omit status = "disabled" from scif_clk node
+> ---
+>  Documentation/devicetree/bindings/arm/shmobile.txt |   4 +
+>  arch/arm64/Kconfig.platforms                       |   6 ++
+>  arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 120 +++++++++++++++++++++
+>  3 files changed, 130 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/renesas/r8a7796.dtsi
+>
+> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+> index 9cf67e48f222..d5ed554830d7 100644
+> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> @@ -29,6 +29,8 @@ SoCs:
+>      compatible = "renesas,r8a7794"
+>    - R-Car H3 (R8A77950)
+>      compatible = "renesas,r8a7795"
+> +  - R-Car M3-W (R8A77960)
+> +    compatible = "renesas,r8a7796"
+>
+>
+>  Boards:
+> @@ -61,5 +63,7 @@ Boards:
+>      compatible = "renesas,porter", "renesas,r8a7791"
+>    - Salvator-X (RTP0RC7795SIPB0010S)
+>      compatible = "renesas,salvator-x", "renesas,r8a7795";
+> +  - Salvator-X
+> +    compatible = "renesas,salvator-x", "renesas,r8a7796";
+>    - SILK (RTP0RC7794LCB00011S)
+>      compatible = "renesas,silk", "renesas,r8a7794"
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index efa77c146415..16d8d26839ea 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -114,6 +114,12 @@ config ARCH_R8A7795
+>  	help
+>  	  This enables support for the Renesas R-Car H3 SoC.
+>
+> +config ARCH_R8A7796
+> +	bool "Renesas R-Car M3-W SoC Platform"
+> +	depends on ARCH_RENESAS
+> +	help
+> +	  This enables support for the Renesas R-Car M3-W SoC.
+> +
+>  config ARCH_STRATIX10
+>  	bool "Altera's Stratix 10 SoCFPGA Family"
+>  	help
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> new file mode 100644
+> index 000000000000..178debf68318
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> @@ -0,0 +1,120 @@
+> +/*
+> + * Device Tree Source for the r8a7796 SoC
+> + *
+> + * Copyright (C) 2016 Renesas Electronics Corp.
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +#include <dt-bindings/clock/r8a7796-cpg-mssr.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
 
-Thanks for the feedback.
 
-Given the nature of the change, it needs some more Reviewed-by +
-Tested-By (across different drivers) ahead of pushing this patch into
-mainline.
+With Renesas R-Car3 we will get a whole family of SoCs. I.e. different 
+computing power (e.g. different number of Cores) with more or less 
+similar peripherals.
 
-So for the moment it's in target-pending/queue as a post v4.7-rc1 item
-here:
+I would think that we want to reflect this in the device tree, too. 
+Therefore I think what we want is a hierarchy of device trees. Similar 
+what's done with other SoC families (compare e.g. i.MX6).
 
-https://git.kernel.org/cgit/linux/kernel/git/nab/target-pending.git/commit/?h=queue&id=0c141c33b667b6538e38b87db87232523bcd4f5b
+E.g. we want an initial rcar3.dtsi, which contains all common parts of 
+all R-Car3 SoCs. E.g. one CA57 core, the SCIF where its common etc.
+
+Then you will have the r8a779x.dtsi which includes the rcar3.dtsi and 
+extends it for SoC specific parts. Which then will be included by the 
+board device trees, as already done, now.
+
+Or in other words: As soon as you have similar parts in the 
+r8a779x.dtsi's, it's time to think about moving the parts one hierarchy 
+level up into the rcar3.dtsi. Else you will end up in a maintenance hell 
+once you have to change/fix anything.
+
+Best regards
+
+Dirk
