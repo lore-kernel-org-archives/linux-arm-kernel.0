@@ -1,43 +1,49 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 24 May 2016 09:37:04 +0200
-Subject: [PATCH v2 11/23] ARM: dts: armadillo800eva: Fix W=1 dtc warnings
-In-Reply-To: <20160524003356.GB2477@verge.net.au>
-References: <1463728214-13838-1-git-send-email-geert+renesas@glider.be>
- <1463728214-13838-12-git-send-email-geert+renesas@glider.be>
- <e0a1fbc1-ac95-2c79-65ed-d0328679bb8a@cogentembedded.com>
- <CAMuHMdXPhMToHhZggdKo=i65nS_mQT1o44YBd_Lz-B2Td3Jm9Q@mail.gmail.com>
- <20160524001309.GA2477@verge.net.au>
- <20160524003356.GB2477@verge.net.au>
-Message-ID: <CAMuHMdW8a3jOibXmMxv34RF+cZ7aE5x_fRzAQW4qVb_RB=6sCw@mail.gmail.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Tue, 24 May 2016 09:40:26 +0200
+Subject: [PATCH 00/11] Clock improvement for video playback
+In-Reply-To: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
+References: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <5744056A.7020606@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hello Gabriel,
 
-On Tue, May 24, 2016 at 2:33 AM, Simon Horman <horms@verge.net.au> wrote:
->> > >> --- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
->> > >> +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
+Tested with success on stih407 family platforms
 
-> I have queued this up with the above hunk changed to the following.
-> Please check the resulting patch and let me know if I've messed things up
-> somehow.
->
-> @@ -127,7 +127,7 @@
->                 };
->         };
->
-> -       i2c2: i2c at 2 {
-> +       i2c2: i2c-2 {
+Reviewed-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Tested-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 
-Thanks, looks fine.
+Regards
+Arnaud
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+On 05/18/2016 10:41 AM, Gabriel Fernandez wrote:
+> This serie allows to increase video resolutions and make audio
+> adjustment during a video playback.
+> 
+> Gabriel Fernandez (11):
+>   drivers: clk: st: Add fs660c32 synthesizer algorithm
+>   drivers: clk: st: Add clock propagation for audio clocks
+>   drivers: clk: st: Handle clkgenD2 clk synchronous mode
+>   ARM: DT: STiH407: Add compatibility string on clkgend0 for audio
+>     clocks
+>   ARM: DT: STiH410: Add compatibility string on clkgend0 for audio
+>     clocks
+>   ARM: DT: STiH418: Add compatibility string on clkgend0 for audio
+>     clocks
+>   ARM: DT: STiH407: Enable synchronous clock mode on clkgend2
+>   ARM: DT: STiH410: Enable synchronous clock mode on clkgend2
+>   ARM: DT: STiH418: Enable synchronous clock mode on clkgend2
+>   ARM: DT: STi: STiH407: clock configuration to address 720p and 1080p
+>   ARM: DT: STi: STiH410: clock configuration to address 720p and 1080p
+> 
+>  .../devicetree/bindings/clock/st/st,flexgen.txt    |   3 +
+>  arch/arm/boot/dts/stih407-clock.dtsi               |   4 +-
+>  arch/arm/boot/dts/stih407.dtsi                     |  16 ++-
+>  arch/arm/boot/dts/stih410-clock.dtsi               |   4 +-
+>  arch/arm/boot/dts/stih410.dtsi                     |  16 ++-
+>  arch/arm/boot/dts/stih418-clock.dtsi               |   4 +-
+>  drivers/clk/st/clk-flexgen.c                       |  61 +++++++-
+>  drivers/clk/st/clkgen-fsyn.c                       | 159 +++++++++++++++------
+>  8 files changed, 211 insertions(+), 56 deletions(-)
+> 
