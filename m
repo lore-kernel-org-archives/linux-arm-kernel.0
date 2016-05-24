@@ -1,115 +1,125 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 24 May 2016 12:09:41 -0500
-Subject: [PATCH v3 4/4] soc: Add SoC driver for Freescale Vybrid platform
-In-Reply-To: <20160524041447.GA2884@Sanchayan-Arch.localdomain>
-References: <cover.1463737502.git.maitysanchayan@gmail.com>
- <ffef165d05f71a1b19437171d8fdb4bc78f6b1e3.1463737502.git.maitysanchayan@gmail.com>
- <20160523211813.GA30237@rob-hp-laptop>
- <20160524041447.GA2884@Sanchayan-Arch.localdomain>
-Message-ID: <CAL_JsqKCwy=aXveTfnaQuZ5b3Ld9nzABgPfdPm1JX3CBuvzG+Q@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 24 May 2016 18:24:23 +0100
+Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
+ controller
+In-Reply-To: <20160523233918.GA32555@localhost>
+References: <57331290.7070104@semihalf.com>
+ <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
+ <CAKv+Gu8fdeJ9OvRSmtu9zyvcjK3O-4WU=jG=6-7t4xZwvV8d2g@mail.gmail.com>
+ <95b1d06e-f9c5-39f3-1003-f536b65eef60@redhat.com>
+ <CAKv+Gu-_xp_t_Ze3Pw_-82-fmy=tCy-h=4FbP98eLbuXVk2hHQ@mail.gmail.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EDAF6AC@lhreml503-mbs>
+ <CAKv+Gu_zpoFsDr7e8zPCDKPpRdKDVH+vnC0nfvmGaJ7xcP3Zng@mail.gmail.com>
+ <20160523105655.GA22902@red-moon>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1EDB35A5@lhreml503-mbs>
+ <20160523233918.GA32555@localhost>
+Message-ID: <20160524172423.GA15855@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 11:14 PM,  <maitysanchayan@gmail.com> wrote:
-> Hello Rob,
->
-> On 16-05-23 16:18:13, Rob Herring wrote:
->> On Fri, May 20, 2016 at 03:32:05PM +0530, Sanchayan Maity wrote:
->> > This adds a SoC driver to be used by Freescale Vybrid SoC's.
->> > Driver utilises syscon and nvmem consumer API's to get the
->> > various register values needed and expose the SoC specific
->> > properties via sysfs.
->> >
->> > A sample output from Colibri Vybrid VF61 is below:
->> >
->> > root at colibri-vf:~# cd /sys/bus/soc/devices/soc0
->> > root at colibri-vf:/sys/bus/soc/devices/soc0# ls
->> > family     machine    power      revision   soc_id     subsystem  uevent
->> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat family
->> > Freescale Vybrid VF610
->> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat machine
->> > Freescale Vybrid
->> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat revision
->> > 00000013
->> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat soc_id
->> > df6472a6130f29d4
->> >
->> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
->> > ---
->> >  .../bindings/arm/freescale/fsl,vf610-soc.txt       |  20 +++
->> >  drivers/soc/Kconfig                                |   1 +
->> >  drivers/soc/fsl/Kconfig                            |  10 ++
->> >  drivers/soc/fsl/Makefile                           |   1 +
->> >  drivers/soc/fsl/soc-vf610.c                        | 198 +++++++++++++++++++++
->> >  5 files changed, 230 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
->> >  create mode 100644 drivers/soc/fsl/Kconfig
->> >  create mode 100644 drivers/soc/fsl/soc-vf610.c
->> >
->> > diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
->> > new file mode 100644
->> > index 0000000..338905d
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
->> > @@ -0,0 +1,20 @@
->> > +Vybrid System-on-Chip
->> > +---------------------
->> > +
->> > +Required properties:
->> > +
->> > +- compatible: "fsl,vf610-soc"
->> > +- rom-revision: phandle to the on-chip ROM node
->> > +- mscm: phandle to the MSCM CPU configuration node
->> > +- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
->> > +- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
->>
->> I still have similar concerns as the discussion on the last version.
->> This version only proves that you aren't describing h/w, but rather just
->> a collection of data that some driver wants.
->>
->> A driver can just as easily look-up all the nodes directly that these
->> phandles point to.
->
-> Agreed, that we can look up all the nodes directly that these phandles
-> refer to but I would still need a DT entry to bind to. While I could
-> bind to existing nodes like mscm cpucfg but that doesn't seem right.
->
-> The very first approach that we had taken was to integrate this functionality
-> in mach-vf610.c code under mach-imx
-> http://www.spinics.net/lists/devicetree/msg80654.html
+Hi Bjorn,
 
-Yes, everyone wants to move all platform devices in the kernel to a
-corresponding DT node. The result is often making up nodes to do this.
-It's the same thing with cpufreq.
+On Mon, May 23, 2016 at 06:39:18PM -0500, Bjorn Helgaas wrote:
 
-> and then it was recommended to migrate this to drivers/soc where we did use
-> phandles or direct look up via compatible strings
+[...]
 
-The location in the tree is an orthogonal issue. You could move it and
-use of_machine_is_compatible without any DT change.
+> On Mon, May 23, 2016 at 03:16:01PM +0000, Gabriele Paoloni wrote:
+> I don't think of ECAM support itself as a "driver".  It's just a
+> service available to drivers, similar to OF resource parsing.
+> 
+> Per PCI Firmware r3.2, sec 4.1.5, "PNP0A03" means a PCI/PCI-X/PCIe
+> host bridge.  "PNP0A08" means a PCI-X Mode 2 or PCIe bridge that
+> supports extended config space.  It doesn't specify how we access that
+> config space, so I think hardware with non-standard ECAM should still
+> have PNP0A03 and PNP0A08 in _CID or _HID.
+> 
+> "ECAM" as used in the specs (PCIe r3.0, sec 7.2.2, and PCI Firmware
+> r3.2, sec 4.1) means:
+> 
+>   (a) a memory-mapped model for config space access, and
+>   (b) a specific mapping of address bits to bus/device/function/
+>       register
+> 
+> MCFG and _CBA assume both (a) and (b), so I think a device with
+> non-standard ECAM mappings should not be described in MCFG or _CBA.
+> 
+> If a bridge has ECAM with non-standard mappings, I think either a
+> vendor-specific _HID or a device-specific method, e.g., _DSM, could
+> communicate that.
+> 
+> Jon, I agree that we should avoid describing non-standardized hardware
+> in Linux-specific ways.  Is there a mechanism in use already?  How
+> does Windows handle this?  DMI is a poor long-term solution because it
+> requires ongoing maintenance for new platforms, but I think it's OK
+> for getting started with platforms already shipping.
+> 
+> A _DSM has the advantage that once it is defined and supported, OEMs
+> can ship new platforms without requiring a new quirk or a new _HID to
+> be added to a driver.
+> 
+> There would still be the problem of config access before the namespace
+> is available, i.e., the MCFG use case.  I don't know how important
+> that is.  Defining an MCFG extension seems like the most obvious
+> solution.
 
-The primary issue I have here is how do we bind soc_bus to DT in a
-consistent way. Sorry, but vybrid specific patches alone are never
-going to solve that issue.
+Your summary above is a perfect representation of the situation.
 
-> http://www.spinics.net/lists/arm-kernel/msg420847.html
->
-> and
->
-> http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
->
-> There hasn't been a consensus since v1.
+We had an opportunity to sync-up on the current status of ACPI PCI
+for ARM64 (and talked about a way forward for this series, which
+includes quirks handling), let me summarize it here for everyone
+involved so that we can agree on a way forward.
 
-I actually prefer your previous version binding soc_bus to the root
-bus node to this version. I think that is closer to the right
-direction. After all, pretty much everything is an SOC and every SOC
-has an SOC bus. Pretty much every SOC and board have revisions and may
-need to expose that revision info as well. We have to do this
-consistently which means having a default implementation for
-simple-bus that is not opt-in.
+1) ACPI PCI support for PNP0A03/PNP0A08 host bridges on top of MCFG
+   ECAM for config space is basically ready (Tomasz and JC addressed
+   Rafael's concerns in relation to ARM64 specific code, and managed
+   to find a way to allocate domain numbers in preparation for Arnd
+   pci_create_root_bus() clean-up, v8 to be posted shortly and should
+   be final). This provides support for de-facto ACPI/PCI ECAM base
+   standard for ARM64 (with a clean-split between generic code and ARM64
+   bits, where ARM64, like X86 and IA64, manages in arch code IO space and
+   PCI resources, to be further consolidated in the near future).
+   I do not think anyone can complain about the generality of what we
+   achieved, for systems that are PCI standard (yes, PCI STANDARD) this
+   would just be sufficient.
+2) In a real world (1) is not enough. Some ARM64 platforms, not entirely
+   ECAM compliant, already shipped with the corresponding firmware that
+   we can't update. HW has ECAM quirks and to work around it in the kernel
+   we put forward many solutions to the problem, it is time we found a
+   solution (when, of course, (1) is completed and upstream).
+   Using the MCFG table OEMID matching floated around in this thread
+   would work fine for most of the platforms (and cross-OS) that have
+   shipped with HW ECAM quirks, so I think that's the starting point for
+   our solution and that's how we can sort this out, _today_.
 
-Alternatively, we should just deprecate soc_bus and come up a
-different solution. Either way, I think we have a half implemented
-solution currently.
+   The solution is a trivial look-up table:
+   MCFG OEMID <-> PCI config space ops
 
-Rob
+3) (2) does not just work on some platforms (and we can't predict the
+   future either - actually I can, it is three letters, ECAM), simply
+   because MCFG OEMID matching does not provide a way to attach further
+   data to the MCFG (eg if config space for, say, bus 0 domain 0, is not
+   ECAM compliant, the config region can't be handled and must not be
+   handled through a corresponding MCFG region.
+   That's the problem Gabriele is facing and wants to solve through
+   something like:
+
+   https://lkml.org/lkml/2016/3/9/91
+
+   in the respective ACPI tables-bindings. It may be an idea worth
+   pursuing, it does not solve (2) simply because that FW has shipped,
+   we can't patch it any longer.
+
+Hence to finally support ACPI PCI on ARM64 I suggest we carry out the
+following steps, in order:
+
+- Let's complete/merge (1), that's fundamental to this whole thread
+- On top of (1) we apply a quirking mechanism based on (2) that allows
+  us to boot mainline with boxes shipping today with no FW update required.
+- We devise a way to handle quirks that is more generic than (2) so that
+  can we can accomodate further platforms that can't rely on (2) but
+  have more leeway in terms of FW updates.
+
+I hope that's a reasonable plan, Tomasz's v8 series coming to kick it off.
+
+Thank you,
+Lorenzo
