@@ -1,89 +1,104 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:25 +0200
-Subject: [PULL 31/59] KVM: arm/arm64: vgic-new: Add CONFIG registers handlers
+Date: Tue, 24 May 2016 11:09:21 +0200
+Subject: [PULL 27/59] KVM: arm/arm64: vgic-new: Add ENABLE registers handlers
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-32-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-28-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-The config register handlers are shared between the v2 and v3
-emulation, so their implementation goes into vgic-mmio.c, to be
-easily referenced from the v3 emulation as well later.
+As the enable register handlers are shared between the v2 and v3
+emulation, their implementation goes into vgic-mmio.c, to be easily
+referenced from the v3 emulation as well later.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  2 +-
- virt/kvm/arm/vgic/vgic-mmio.c    | 47 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    |  7 ++++++
- 3 files changed, 55 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +--
+ virt/kvm/arm/vgic/vgic-mmio.c    | 56 ++++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio.h    | 11 ++++++++
+ 3 files changed, 69 insertions(+), 2 deletions(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index d564a30..bb7389e 100644
+index d812c93..d5355b5 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -96,7 +96,7 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_CONFIG,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 2,
-+		vgic_mmio_read_config, vgic_mmio_write_config, 2,
+@@ -72,10 +72,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
+ 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
  		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_SOFTINT,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_SET,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_enable, vgic_mmio_write_senable, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ENABLE_CLEAR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
++		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
+ 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 6f4e05b..9de80be 100644
+index 1a97765..32ed8db 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.c
 +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -276,6 +276,53 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
- 	}
+@@ -39,6 +39,62 @@ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 	/* Ignore */
  }
  
-+unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++/*
++ * Read accesses to both GICD_ICENABLER and GICD_ISENABLER return the value
++ * of the enabled bit, so there is only one function for both here.
++ */
++unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
 +				    gpa_t addr, unsigned int len)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
 +	u32 value = 0;
 +	int i;
 +
-+	for (i = 0; i < len * 4; i++) {
++	/* Loop over all IRQs affected by this read */
++	for (i = 0; i < len * 8; i++) {
 +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+		if (irq->config == VGIC_CONFIG_EDGE)
-+			value |= (2U << (i * 2));
++		if (irq->enabled)
++			value |= (1U << i);
 +	}
 +
 +	return value;
 +}
 +
-+void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-+			    gpa_t addr, unsigned int len,
-+			    unsigned long val)
++void vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 2);
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
 +	int i;
 +
-+	for (i = 0; i < len * 4; i++) {
++	for_each_set_bit(i, &val, len * 8) {
 +		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
-+		/*
-+		 * The configuration cannot be changed for SGIs in general,
-+		 * for PPIs this is IMPLEMENTATION DEFINED. The arch timer
-+		 * code relies on PPIs being level triggered, so we also
-+		 * make them read-only here.
-+		 */
-+		if (intid + i < VGIC_NR_PRIVATE_IRQS)
-+			continue;
++		spin_lock(&irq->irq_lock);
++		irq->enabled = true;
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
++	}
++}
++
++void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val)
++{
++	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
++	int i;
++
++	for_each_set_bit(i, &val, len * 8) {
++		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
 +
 +		spin_lock(&irq->irq_lock);
-+		if (test_bit(i * 2 + 1, &val)) {
-+			irq->config = VGIC_CONFIG_EDGE;
-+		} else {
-+			irq->config = VGIC_CONFIG_LEVEL;
-+			irq->pending = irq->line_level | irq->soft_pending;
-+		}
++
++		irq->enabled = false;
++
 +		spin_unlock(&irq->irq_lock);
 +	}
 +}
@@ -92,19 +107,23 @@ index 6f4e05b..9de80be 100644
  {
  	const unsigned int offset = (unsigned long)key;
 diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 7e73f10..d1348ac 100644
+index 5b928d4..57e19fe 100644
 --- a/virt/kvm/arm/vgic/vgic-mmio.h
 +++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -136,6 +136,13 @@ void vgic_mmio_write_priority(struct kvm_vcpu *vcpu,
- 			      gpa_t addr, unsigned int len,
- 			      unsigned long val);
+@@ -96,6 +96,17 @@ unsigned long vgic_mmio_read_rao(struct kvm_vcpu *vcpu,
+ void vgic_mmio_write_wi(struct kvm_vcpu *vcpu, gpa_t addr,
+ 			unsigned int len, unsigned long val);
  
-+unsigned long vgic_mmio_read_config(struct kvm_vcpu *vcpu,
++unsigned long vgic_mmio_read_enable(struct kvm_vcpu *vcpu,
 +				    gpa_t addr, unsigned int len);
 +
-+void vgic_mmio_write_config(struct kvm_vcpu *vcpu,
-+			    gpa_t addr, unsigned int len,
-+			    unsigned long val);
++void vgic_mmio_write_senable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
++
++void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
++			     gpa_t addr, unsigned int len,
++			     unsigned long val);
 +
  unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
  
