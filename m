@@ -1,140 +1,102 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:22 +0200
-Subject: [PULL 28/59] KVM: arm/arm64: vgic-new: Add PENDING registers handlers
+Date: Tue, 24 May 2016 11:09:30 +0200
+Subject: [PULL 36/59] KVM: arm/arm64: vgic-new: Add GICv3 CTLR, IIDR,
+ TYPER handlers
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-29-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-37-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-The pending register handlers are shared between the v2 and v3
-emulation, so their implementation goes into vgic-mmio.c, to be easily
-referenced from the v3 emulation as well later.
-For level triggered interrupts the real line level is unaffected by
-this write, so we keep this state separate and combine it with the
-device's level to get the actual pending state.
+As in the GICv2 emulation we handle those three registers in one
+function.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v2.c |  4 +--
- virt/kvm/arm/vgic/vgic-mmio.c    | 60 ++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic-mmio.h    | 12 ++++++++
- 3 files changed, 74 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 48 +++++++++++++++++++++++++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.h         |  1 +
+ 2 files changed, 48 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index d5355b5..c13a708 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -78,10 +78,10 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		vgic_mmio_read_enable, vgic_mmio_write_cenable, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_SET,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-+		vgic_mmio_read_pending, vgic_mmio_write_spending, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_PENDING_CLEAR,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-+		vgic_mmio_read_pending, vgic_mmio_write_cpending, 1,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_BITS_PER_IRQ(GIC_DIST_ACTIVE_SET,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 1,
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 32ed8db..d8dc8f6 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -95,6 +95,66 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
- 	}
- }
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 83a6654..bd062b8 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -22,6 +22,52 @@
+ #include "vgic.h"
+ #include "vgic-mmio.h"
  
-+unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len)
++static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
++					    gpa_t addr, unsigned int len)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
 +	u32 value = 0;
-+	int i;
 +
-+	/* Loop over all IRQs affected by this read */
-+	for (i = 0; i < len * 8; i++) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		if (irq->pending)
-+			value |= (1U << i);
++	switch (addr & 0x0c) {
++	case GICD_CTLR:
++		if (vcpu->kvm->arch.vgic.enabled)
++			value |= GICD_CTLR_ENABLE_SS_G1;
++		value |= GICD_CTLR_ARE_NS | GICD_CTLR_DS;
++		break;
++	case GICD_TYPER:
++		value = vcpu->kvm->arch.vgic.nr_spis + VGIC_NR_PRIVATE_IRQS;
++		value = (value >> 5) - 1;
++		value |= (INTERRUPT_ID_BITS_SPIS - 1) << 19;
++		break;
++	case GICD_IIDR:
++		value = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
++		break;
++	default:
++		return 0;
 +	}
 +
 +	return value;
 +}
 +
-+void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
++static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
++				    gpa_t addr, unsigned int len,
++				    unsigned long val)
 +{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
-+	int i;
++	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
++	bool was_enabled = dist->enabled;
 +
-+	for_each_set_bit(i, &val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
++	switch (addr & 0x0c) {
++	case GICD_CTLR:
++		dist->enabled = val & GICD_CTLR_ENABLE_SS_G1;
 +
-+		spin_lock(&irq->irq_lock);
-+		irq->pending = true;
-+		if (irq->config == VGIC_CONFIG_LEVEL)
-+			irq->soft_pending = true;
-+
-+		vgic_queue_irq_unlock(vcpu->kvm, irq);
++		if (!was_enabled && dist->enabled)
++			vgic_kick_vcpus(vcpu->kvm);
++		break;
++	case GICD_TYPER:
++	case GICD_IIDR:
++		return;
 +	}
 +}
 +
-+void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val)
-+{
-+	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
-+	int i;
-+
-+	for_each_set_bit(i, &val, len * 8) {
-+		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
-+
-+		spin_lock(&irq->irq_lock);
-+
-+		if (irq->config == VGIC_CONFIG_LEVEL) {
-+			irq->soft_pending = false;
-+			irq->pending = irq->line_level;
-+		} else {
-+			irq->pending = false;
-+		}
-+
-+		spin_unlock(&irq->irq_lock);
-+	}
-+}
-+
- static int match_region(const void *key, const void *elt)
- {
- 	const unsigned int offset = (unsigned long)key;
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.h b/virt/kvm/arm/vgic/vgic-mmio.h
-index 57e19fe..97ee703 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.h
-+++ b/virt/kvm/arm/vgic/vgic-mmio.h
-@@ -107,6 +107,18 @@ void vgic_mmio_write_cenable(struct kvm_vcpu *vcpu,
- 			     gpa_t addr, unsigned int len,
- 			     unsigned long val);
+ /*
+  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+  * redistributors, while SPIs are covered by registers in the distributor
+@@ -48,7 +94,7 @@
  
-+unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
-+				     gpa_t addr, unsigned int len);
-+
-+void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
-+
-+void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
-+			      gpa_t addr, unsigned int len,
-+			      unsigned long val);
-+
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev);
+ static const struct vgic_register_region vgic_v3_dist_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GICD_CTLR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
++		vgic_mmio_read_v3_misc, vgic_mmio_write_v3_misc, 16,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_BITS_PER_IRQ_SHARED(GICD_IGROUPR,
+ 		vgic_mmio_read_rao, vgic_mmio_write_wi, 1,
+diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+index 6742b11..44c6a1b 100644
+--- a/virt/kvm/arm/vgic/vgic.h
++++ b/virt/kvm/arm/vgic/vgic.h
+@@ -19,6 +19,7 @@
+ #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
+ #define IMPLEMENTER_ARM		0x43b
  
- #endif
++#define INTERRUPT_ID_BITS_SPIS	10
+ #define VGIC_PRI_BITS		5
+ 
+ #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
 -- 
 2.1.2.330.g565301e.dirty
