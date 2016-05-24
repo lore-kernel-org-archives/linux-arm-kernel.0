@@ -1,361 +1,500 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Tue, 24 May 2016 17:16:50 +0800
-Subject: [PATCH v7 4/4] CMDQ: suspend/resume protection
-In-Reply-To: <1464006190-344-5-git-send-email-hs.liao@mediatek.com>
-References: <1464006190-344-1-git-send-email-hs.liao@mediatek.com>
- <1464006190-344-5-git-send-email-hs.liao@mediatek.com>
-Message-ID: <1464081410.30351.20.camel@mtksdaap41>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 24 May 2016 11:17:46 +0200
+Subject: [PATCHv4] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160524090433.GA1277@amd>
+References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
+ <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
+Message-ID: <20160524091746.GA14536@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-05-23 at 20:23 +0800, HS Liao wrote:
-> Add suspend/resume protection mechanism to prevent active task(s) in
-> suspend.
-> 
-> Signed-off-by: HS Liao <hs.liao@mediatek.com>
-> ---
->  drivers/soc/mediatek/mtk-cmdq.c | 174 ++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 166 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/soc/mediatek/mtk-cmdq.c b/drivers/soc/mediatek/mtk-cmdq.c
-> index f8c5d02..1a51cfb 100644
-> --- a/drivers/soc/mediatek/mtk-cmdq.c
-> +++ b/drivers/soc/mediatek/mtk-cmdq.c
-> @@ -39,6 +39,7 @@
->  #define CMDQ_CLK_NAME			"gce"
->  
->  #define CMDQ_CURR_IRQ_STATUS		0x010
-> +#define CMDQ_CURR_LOADED_THR		0x018
->  #define CMDQ_THR_SLOT_CYCLES		0x030
->  
->  #define CMDQ_THR_BASE			0x100
-> @@ -125,6 +126,7 @@ enum cmdq_code {
->  
->  enum cmdq_task_state {
->  	TASK_STATE_BUSY,	/* task running on a thread */
-> +	TASK_STATE_KILLED,	/* task process being killed */
->  	TASK_STATE_ERROR,	/* task execution error */
->  	TASK_STATE_DONE,	/* task finished */
->  };
-> @@ -161,8 +163,12 @@ struct cmdq {
->  	u32			irq;
->  	struct workqueue_struct	*task_release_wq;
->  	struct cmdq_thread	thread[CMDQ_THR_MAX_COUNT];
-> -	spinlock_t		exec_lock;	/* for exec task */
-> +	atomic_t		thread_usage;
-> +	struct mutex		task_mutex;	/* for task */
-> +	spinlock_t		exec_lock;	/* for exec */
->  	struct clk		*clock;
-> +	bool			suspending;
-> +	bool			suspended;
->  };
->  
->  struct cmdq_subsys {
-> @@ -196,15 +202,27 @@ static int cmdq_eng_get_thread(u64 flag)
->  		return CMDQ_THR_DISP_MISC_IDX;
->  }
->  
-> -static void cmdq_task_release(struct cmdq_task *task)
-> +static void cmdq_task_release_unlocked(struct cmdq_task *task)
->  {
->  	struct cmdq *cmdq = task->cmdq;
->  
-> +	/* This func should be inside cmdq->task_mutex mutex */
-> +	lockdep_assert_held(&cmdq->task_mutex);
-> +
->  	dma_free_coherent(cmdq->dev, task->command_size, task->va_base,
->  			  task->mva_base);
->  	kfree(task);
->  }
->  
-> +static void cmdq_task_release(struct cmdq_task *task)
-> +{
-> +	struct cmdq *cmdq = task->cmdq;
-> +
-> +	mutex_lock(&cmdq->task_mutex);
-> +	cmdq_task_release_unlocked(task);
-> +	mutex_unlock(&cmdq->task_mutex);
-> +}
-> +
->  static struct cmdq_task *cmdq_task_acquire(struct cmdq_rec *rec,
->  					   struct cmdq_task_cb cb)
->  {
-> @@ -576,6 +594,12 @@ static int cmdq_task_wait_and_release(struct cmdq_task *task)
->  		dev_dbg(dev, "timeout!\n");
->  
->  	spin_lock_irqsave(&cmdq->exec_lock, flags);
-> +
-> +	if (cmdq->suspending && task->task_state == TASK_STATE_KILLED) {
-> +		spin_unlock_irqrestore(&cmdq->exec_lock, flags);
-> +		return 0;
-> +	}
-> +
->  	if (task->task_state != TASK_STATE_DONE)
->  		err = cmdq_task_handle_error_result(task);
->  	if (list_empty(&thread->task_busy_list))
-> @@ -584,7 +608,9 @@ static int cmdq_task_wait_and_release(struct cmdq_task *task)
->  
->  	/* release regardless of success or not */
->  	clk_disable_unprepare(cmdq->clock);
-> -	cmdq_task_release(task);
-> +	atomic_dec(&cmdq->thread_usage);
-> +	if (!(task->cmdq->suspending && task->task_state == TASK_STATE_KILLED))
-> +		cmdq_task_release(task);
->  
->  	return err;
->  }
-> @@ -597,12 +623,28 @@ static void cmdq_task_wait_release_work(struct work_struct *work_item)
->  	cmdq_task_wait_and_release(task);
->  }
->  
-> -static void cmdq_task_wait_release_schedule(struct cmdq_task *task)
-> +static void cmdq_task_wait_release_schedule(struct cmdq *cmdq,
-> +					    struct cmdq_task *task)
->  {
-> -	struct cmdq *cmdq = task->cmdq;
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&cmdq->exec_lock, flags);
-> +
-> +	if (cmdq->suspending || cmdq->suspended) {
-> +		/*
-> +		 * This means system is suspened between
-> +		 * cmdq_task_submit_async() and
-> +		 * cmdq_task_wait_release_schedule(), so return immediately.
-> +		 * This task should be forced to remove by suspend flow.
-> +		 */
-> +		spin_unlock_irqrestore(&cmdq->exec_lock, flags);
-> +		return;
-> +	}
->  
->  	INIT_WORK(&task->release_work, cmdq_task_wait_release_work);
->  	queue_work(cmdq->task_release_wq, &task->release_work);
-> +
-> +	spin_unlock_irqrestore(&cmdq->exec_lock, flags);
->  }
->  
->  static int cmdq_rec_realloc_cmd_buffer(struct cmdq_rec *rec, size_t size)
-> @@ -766,18 +808,31 @@ static int _cmdq_rec_flush(struct cmdq_rec *rec, struct cmdq_task **task_out,
->  	struct cmdq_thread *thread;
->  	int err;
->  
-> +	mutex_lock(&cmdq->task_mutex);
-> +	if (rec->cmdq->suspending || rec->cmdq->suspended) {
-> +		dev_err(rec->cmdq->dev,
-> +			"%s is called after suspending\n", __func__);
-> +		mutex_unlock(&cmdq->task_mutex);
-> +		return -EPERM;
-> +	}
-> +
->  	err = cmdq_rec_finalize(rec);
-> -	if (err < 0)
-> +	if (err < 0) {
-> +		mutex_unlock(&cmdq->task_mutex);
->  		return err;
-> +	}
->  
->  	task_cb.cb = cb;
->  	task_cb.data = data;
->  	*task_out = cmdq_task_acquire(rec, task_cb);
-> -	if (!(*task_out))
-> +	if (!(*task_out)) {
-> +		mutex_unlock(&cmdq->task_mutex);
->  		return -EFAULT;
-> +	}
->  
->  	thread = &cmdq->thread[cmdq_eng_get_thread((*task_out)->engine_flag)];
->  	cmdq_task_exec(*task_out, thread);
-> +	mutex_unlock(&cmdq->task_mutex);
->  	return 0;
->  }
->  
-> @@ -802,7 +857,13 @@ int cmdq_rec_flush_async(struct cmdq_rec *rec, cmdq_async_flush_cb cb,
->  	err = _cmdq_rec_flush(rec, &task, cb, data);
->  	if (err < 0)
->  		return err;
-> -	cmdq_task_wait_release_schedule(task);
-> +
-> +	/*
-> +	 * Task could be released in suspend flow,
-> +	 * so we have to pass cmdq as parameter.
-> +	 */
-> +	cmdq_task_wait_release_schedule(rec->cmdq, task);
-> +
->  	return 0;
->  }
->  EXPORT_SYMBOL(cmdq_rec_flush_async);
-> @@ -814,6 +875,95 @@ void cmdq_rec_destroy(struct cmdq_rec *rec)
->  }
->  EXPORT_SYMBOL(cmdq_rec_destroy);
->  
-> +static int cmdq_suspend(struct device *dev)
-> +{
-> +	struct cmdq *cmdq = dev_get_drvdata(dev);
-> +	u32 exec_threads;
-> +	int ref_count;
-> +	unsigned long flags;
-> +	struct cmdq_thread *thread;
-> +	struct cmdq_task *task, *tmp;
-> +	int i;
-> +
-> +	/* lock to prevent new tasks */
-> +	mutex_lock(&cmdq->task_mutex);
-> +	cmdq->suspending = true;
-> +
-> +	exec_threads = readl(cmdq->base + CMDQ_CURR_LOADED_THR);
-> +	ref_count = atomic_read(&cmdq->thread_usage);
-> +	if (ref_count <= 0 && !(exec_threads & CMDQ_THR_EXECUTING))
-> +		goto exit;
-> +
-> +	dev_err(dev, "suspend: kill running, tasks.\n");
-> +	dev_err(dev, "threads: 0x%08x, ref:%d\n", exec_threads, ref_count);
-> +
-> +	/*
-> +	 * We need to ensure the system is ready to suspend,
-> +	 * so kill all running CMDQ tasks and release HW engines.
-> +	 */
-> +
-> +	/* remove all active tasks from thread and disable thread */
-> +	for (i = 0; i < ARRAY_SIZE(cmdq->thread); i++) {
-> +		thread = &cmdq->thread[i];
-> +
-> +		if (list_empty(&thread->task_busy_list))
-> +			continue;
-> +
-> +		/* prevent clk disable in release flow */
-> +		clk_prepare_enable(cmdq->clock);
-> +		cmdq_thread_suspend(cmdq, thread);
-> +
-> +		list_for_each_entry_safe(task, tmp, &thread->task_busy_list,
-> +					 list_entry) {
-> +			bool already_done = false;
-> +
-> +			spin_lock_irqsave(&cmdq->exec_lock, flags);
-> +			if (task->task_state == TASK_STATE_BUSY) {
-> +				/* still wait_event */
-> +				list_del(&task->list_entry);
-> +				task->task_state = TASK_STATE_KILLED;
-> +			} else {
-> +				/* almost finish its work */
-> +				already_done = true;
-> +			}
-> +			spin_unlock_irqrestore(&cmdq->exec_lock, flags);
-> +
-> +			/*
-> +			 * TASK_STATE_KILLED will unlock
-> +			 * wait_event_timeout in cmdq_task_wait_and_release(),
-> +			 * so flush_work to wait auto release flow.
-> +			 *
-> +			 * We don't know processes running order,
-> +			 * so call cmdq_task_release_unlocked() here to
-> +			 * prevent releasing task before flush_work, and
-> +			 * also to prevent deadlock of task_mutex.
-> +			 */
-> +			if (!already_done) {
-> +				flush_work(&task->release_work);
-> +				cmdq_task_release_unlocked(task);
-> +			}
-> +		}
-> +
-> +		cmdq_thread_resume(thread);
-> +		cmdq_thread_disable(cmdq, &cmdq->thread[i]);
-> +		clk_disable_unprepare(cmdq->clock);
-> +	}
+This adds support for AD5820 autofocus coil, found for example in
+Nokia N900 smartphone.
 
-It's cmdq client's bug if there are some tasks have not been executed
-while cmdq is suspending. I think cmdq can simply wait these tasks to be
-done or timeout rather than killing them because it's unnecessary to
-speed up anything in error state. Just wait for cmdq client to fix this
-bug.
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-This 'for loop' can be simply replace by:
+---
+v2: simple cleanups, fix error paths, simplify probe
+v3: more cleanups, remove printk, add include
+v4: remove header file.
 
-flush_workqueue(cmdq->task_release_wq);
+diff --git a/drivers/media/i2c/Kconfig b/drivers/media/i2c/Kconfig
+index 993dc50..77313a1 100644
+--- a/drivers/media/i2c/Kconfig
++++ b/drivers/media/i2c/Kconfig
+@@ -279,6 +279,13 @@ config VIDEO_ML86V7667
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called ml86v7667.
+ 
++config VIDEO_AD5820
++	tristate "AD5820 lens voice coil support"
++	depends on I2C && VIDEO_V4L2 && MEDIA_CONTROLLER
++	---help---
++	  This is a driver for the AD5820 camera lens voice coil.
++	  It is used for example in Nokia N900 (RX-51).
++
+ config VIDEO_SAA7110
+ 	tristate "Philips SAA7110 video decoder"
+ 	depends on VIDEO_V4L2 && I2C
+diff --git a/drivers/media/i2c/Makefile b/drivers/media/i2c/Makefile
+index 94f2c99..34434ae 100644
+--- a/drivers/media/i2c/Makefile
++++ b/drivers/media/i2c/Makefile
+@@ -19,6 +20,7 @@ obj-$(CONFIG_VIDEO_SAA717X) += saa717x.o
+ obj-$(CONFIG_VIDEO_SAA7127) += saa7127.o
+ obj-$(CONFIG_VIDEO_SAA7185) += saa7185.o
+ obj-$(CONFIG_VIDEO_SAA6752HS) += saa6752hs.o
++obj-$(CONFIG_VIDEO_AD5820)  += ad5820.o
+ obj-$(CONFIG_VIDEO_ADV7170) += adv7170.o
+ obj-$(CONFIG_VIDEO_ADV7175) += adv7175.o
+ obj-$(CONFIG_VIDEO_ADV7180) += adv7180.o
+diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
+new file mode 100644
+index 0000000..f956bd3
+--- /dev/null
++++ b/drivers/media/i2c/ad5820.c
+@@ -0,0 +1,438 @@
++/*
++ * drivers/media/i2c/ad5820.c
++ *
++ * AD5820 DAC driver for camera voice coil focus.
++ *
++ * Copyright (C) 2008 Nokia Corporation
++ * Copyright (C) 2007 Texas Instruments
++ * Copyright (C) 2016 Pavel Machek <pavel@ucw.cz>
++ *
++ * Contact: Tuukka Toivonen
++ *          Sakari Ailus
++ *
++ * Based on af_d88.c by Texas Instruments.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/errno.h>
++#include <linux/i2c.h>
++#include <linux/kernel.h>
++#include <linux/regulator/consumer.h>
++
++#include <media/v4l2-device.h>
++#include <media/v4l2-ctrls.h>
++#include <media/v4l2-subdev.h>
++
++#define AD5820_NAME		"ad5820"
++
++/* Register definitions */
++#define AD5820_POWER_DOWN		(1 << 15)
++#define AD5820_DAC_SHIFT		4
++#define AD5820_RAMP_MODE_LINEAR		(0 << 3)
++#define AD5820_RAMP_MODE_64_16		(1 << 3)
++
++#define CODE_TO_RAMP_US(s)	((s) == 0 ? 0 : (1 << ((s) - 1)) * 50)
++#define RAMP_US_TO_CODE(c)	fls(((c) + ((c)>>1)) / 50)
++
++#define to_ad5820_device(sd)	container_of(sd, struct ad5820_device, subdev)
++
++struct ad5820_device {
++	struct v4l2_subdev subdev;
++	struct ad5820_platform_data *platform_data;
++	struct regulator *vana;
++
++	struct v4l2_ctrl_handler ctrls;
++	u32 focus_absolute;
++	u32 focus_ramp_time;
++	u32 focus_ramp_mode;
++
++	struct mutex power_lock;
++	int power_count;
++
++	int standby : 1;
++};
++
++/**
++ * @brief I2C write using i2c_transfer().
++ * @param coil - the driver data structure
++ * @param data - register value to be written
++ * @returns nonnegative on success, negative if failed
++ */
++static int ad5820_write(struct ad5820_device *coil, u16 data)
++{
++	struct i2c_client *client = v4l2_get_subdevdata(&coil->subdev);
++	struct i2c_msg msg;
++	int r;
++
++	if (!client->adapter)
++		return -ENODEV;
++
++	data = cpu_to_be16(data);
++	msg.addr  = client->addr;
++	msg.flags = 0;
++	msg.len   = 2;
++	msg.buf   = (u8 *)&data;
++
++	r = i2c_transfer(client->adapter, &msg, 1);
++	if (r < 0) {
++		dev_err(&client->dev, "write failed, error %d\n", r);
++		return r;
++	}
++
++	return 0;
++}
++
++/*
++ * Calculate status word and write it to the device based on current
++ * values of V4L2 controls. It is assumed that the stored V4L2 control
++ * values are properly limited and rounded.
++ */
++static int ad5820_update_hw(struct ad5820_device *coil)
++{
++	u16 status;
++
++	status = RAMP_US_TO_CODE(coil->focus_ramp_time);
++	status |= coil->focus_ramp_mode
++		? AD5820_RAMP_MODE_64_16 : AD5820_RAMP_MODE_LINEAR;
++	status |= coil->focus_absolute << AD5820_DAC_SHIFT;
++
++	if (coil->standby)
++		status |= AD5820_POWER_DOWN;
++
++	return ad5820_write(coil, status);
++}
++
++/*
++ * Power handling
++ */
++static int ad5820_power_off(struct ad5820_device *coil, int standby)
++{
++	int ret = 0;
++
++	/*
++	 * Go to standby first as real power off my be denied by the hardware
++	 * (single power line control for both coil and sensor).
++	 */
++	if (standby) {
++		coil->standby = 1;
++		ret = ad5820_update_hw(coil);
++	}
++
++	ret |= regulator_disable(coil->vana);
++
++	return ret;
++}
++
++static int ad5820_power_on(struct ad5820_device *coil, int restore)
++{
++	int ret;
++
++	ret = regulator_enable(coil->vana);
++	if (ret < 0)
++		return ret;
++
++	if (restore) {
++		/* Restore the hardware settings. */
++		coil->standby = 0;
++		ret = ad5820_update_hw(coil);
++		if (ret)
++			goto fail;
++	}
++	return 0;
++
++fail:
++	coil->standby = 1;
++	regulator_disable(coil->vana);
++
++	return ret;
++}
++
++/*
++ * V4L2 controls
++ */
++static int ad5820_set_ctrl(struct v4l2_ctrl *ctrl)
++{
++	struct ad5820_device *coil =
++		container_of(ctrl->handler, struct ad5820_device, ctrls);
++	u32 code;
++
++	switch (ctrl->id) {
++	case V4L2_CID_FOCUS_ABSOLUTE:
++		coil->focus_absolute = ctrl->val;
++		return ad5820_update_hw(coil);
++
++	case V4L2_CID_FOCUS_AD5820_RAMP_TIME:
++		code = RAMP_US_TO_CODE(ctrl->val);
++		ctrl->val = CODE_TO_RAMP_US(code);
++		coil->focus_ramp_time = ctrl->val;
++		break;
++
++	case V4L2_CID_FOCUS_AD5820_RAMP_MODE:
++		coil->focus_ramp_mode = ctrl->val;
++		break;
++	}
++
++	return 0;
++}
++
++static const struct v4l2_ctrl_ops ad5820_ctrl_ops = {
++	.s_ctrl = ad5820_set_ctrl,
++};
++
++static const char * const ad5820_focus_menu[] = {
++	"Linear ramp",
++	"64/16 ramp",
++};
++
++static const struct v4l2_ctrl_config ad5820_ctrls[] = {
++	{
++		.ops		= &ad5820_ctrl_ops,
++		.id		= V4L2_CID_FOCUS_AD5820_RAMP_TIME,
++		.type		= V4L2_CTRL_TYPE_INTEGER,
++		.name		= "Focus ramping time [us]",
++		.min		= 0,
++		.max		= 3200,
++		.step		= 50,
++		.def		= 0,
++		.flags		= 0,
++	},
++	{
++		.ops		= &ad5820_ctrl_ops,
++		.id		= V4L2_CID_FOCUS_AD5820_RAMP_MODE,
++		.type		= V4L2_CTRL_TYPE_MENU,
++		.name		= "Focus ramping mode",
++		.min		= 0,
++		.max		= ARRAY_SIZE(ad5820_focus_menu),
++		.step		= 0,
++		.def		= 0,
++		.flags		= 0,
++		.qmenu		= ad5820_focus_menu,
++	},
++};
++
++
++static int ad5820_init_controls(struct ad5820_device *coil)
++{
++	unsigned int i;
++
++	v4l2_ctrl_handler_init(&coil->ctrls, ARRAY_SIZE(ad5820_ctrls) + 1);
++
++	/*
++	 * V4L2_CID_FOCUS_ABSOLUTE
++	 *
++	 * Minimum current is 0 mA, maximum is 100 mA. Thus, 1 code is
++	 * equivalent to 100/1023 = 0.0978 mA. Nevertheless, we do not use [mA]
++	 * for focus position, because it is meaningless for user. Meaningful
++	 * would be to use focus distance or even its inverse, but since the
++	 * driver doesn't have sufficiently knowledge to do the conversion, we
++	 * will just use abstract codes here. In any case, smaller value = focus
++	 * position farther from camera. The default zero value means focus at
++	 * infinity, and also least current consumption.
++	 */
++	v4l2_ctrl_new_std(&coil->ctrls, &ad5820_ctrl_ops,
++			  V4L2_CID_FOCUS_ABSOLUTE, 0, 1023, 1, 0);
++
++	/* V4L2_CID_TEST_PATTERN and V4L2_CID_MODE_* */
++	for (i = 0; i < ARRAY_SIZE(ad5820_ctrls); ++i)
++		v4l2_ctrl_new_custom(&coil->ctrls, &ad5820_ctrls[i], NULL);
++
++	if (coil->ctrls.error)
++		return coil->ctrls.error;
++
++	coil->focus_absolute = 0;
++	coil->focus_ramp_time = 0;
++	coil->focus_ramp_mode = 0;
++
++	coil->subdev.ctrl_handler = &coil->ctrls;
++
++	return 0;
++}
++
++/*
++ * V4L2 subdev operations
++ */
++static int ad5820_registered(struct v4l2_subdev *subdev)
++{
++	struct ad5820_device *coil = to_ad5820_device(subdev);
++	struct i2c_client *client = v4l2_get_subdevdata(subdev);
++
++	coil->vana = regulator_get(&client->dev, "VANA");
++	if (IS_ERR(coil->vana)) {
++		dev_err(&client->dev, "could not get regulator for vana\n");
++		return -ENODEV;
++	}
++
++	return ad5820_init_controls(coil);
++}
++
++static int
++ad5820_set_power(struct v4l2_subdev *subdev, int on)
++{
++	struct ad5820_device *coil = to_ad5820_device(subdev);
++	int ret = 0;
++
++	mutex_lock(&coil->power_lock);
++
++	/*
++	 * If the power count is modified from 0 to != 0 or from != 0 to 0,
++	 * update the power state.
++	 */
++	if (coil->power_count == !on) {
++		ret = on ? ad5820_power_on(coil, 1) : ad5820_power_off(coil, 1);
++		if (ret < 0)
++			goto done;
++	}
++
++	/* Update the power count. */
++	coil->power_count += on ? 1 : -1;
++	WARN_ON(coil->power_count < 0);
++
++done:
++	mutex_unlock(&coil->power_lock);
++	return ret;
++}
++
++static int ad5820_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
++{
++	return ad5820_set_power(sd, 1);
++}
++
++static int ad5820_close(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
++{
++	return ad5820_set_power(sd, 0);
++}
++
++static const struct v4l2_subdev_core_ops ad5820_core_ops = {
++	.s_power = ad5820_set_power,
++};
++
++static const struct v4l2_subdev_ops ad5820_ops = {
++	.core = &ad5820_core_ops,
++};
++
++static const struct v4l2_subdev_internal_ops ad5820_internal_ops = {
++	.registered = ad5820_registered,
++	.open = ad5820_open,
++	.close = ad5820_close,
++};
++
++/*
++ * I2C driver
++ */
++#ifdef CONFIG_PM
++
++static int ad5820_suspend(struct device *dev)
++{
++	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
++	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
++	struct ad5820_device *coil = to_ad5820_device(subdev);
++
++	if (!coil->power_count)
++		return 0;
++
++	return ad5820_power_off(coil, 0);
++}
++
++static int ad5820_resume(struct device *dev)
++{
++	struct i2c_client *client = container_of(dev, struct i2c_client, dev);
++	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
++	struct ad5820_device *coil = to_ad5820_device(subdev);
++
++	if (!coil->power_count)
++		return 0;
++
++	return ad5820_power_on(coil, 1);
++}
++
++#else
++
++#define ad5820_suspend	NULL
++#define ad5820_resume	NULL
++
++#endif /* CONFIG_PM */
++
++static int ad5820_probe(struct i2c_client *client,
++			const struct i2c_device_id *devid)
++{
++	struct ad5820_device *coil;
++	int ret = 0;
++
++	coil = kzalloc(sizeof(*coil), GFP_KERNEL);
++	if (!coil)
++		return -ENOMEM;
++
++	mutex_init(&coil->power_lock);
++
++	v4l2_i2c_subdev_init(&coil->subdev, client, &ad5820_ops);
++	coil->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
++	coil->subdev.internal_ops = &ad5820_internal_ops;
++	strcpy(coil->subdev.name, "ad5820 focus");
++
++	ret = media_entity_pads_init(&coil->subdev.entity, 0, NULL);
++	if (ret < 0)
++		goto free;
++
++	ret = v4l2_async_register_subdev(&coil->subdev);
++	if (ret < 0)
++		goto cleanup;
++
++	return ret;
++
++cleanup:
++	media_entity_cleanup(&coil->subdev.entity);
++
++free:
++	kfree(coil);
++
++	return ret;
++}
++
++static int __exit ad5820_remove(struct i2c_client *client)
++{
++	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
++	struct ad5820_device *coil = to_ad5820_device(subdev);
++
++	v4l2_device_unregister_subdev(&coil->subdev);
++	v4l2_ctrl_handler_free(&coil->ctrls);
++	media_entity_cleanup(&coil->subdev.entity);
++	if (coil->vana)
++		regulator_put(coil->vana);
++
++	kfree(coil);
++
++	return 0;
++}
++
++static const struct i2c_device_id ad5820_id_table[] = {
++	{ AD5820_NAME, 0 },
++	{ }
++};
++MODULE_DEVICE_TABLE(i2c, ad5820_id_table);
++
++static SIMPLE_DEV_PM_OPS(ad5820_pm, ad5820_suspend, ad5820_resume);
++
++static struct i2c_driver ad5820_i2c_driver = {
++	.driver		= {
++		.name	= AD5820_NAME,
++		.pm	= &ad5820_pm,
++	},
++	.probe		= ad5820_probe,
++	.remove		= __exit_p(ad5820_remove),
++	.id_table	= ad5820_id_table,
++};
++
++module_i2c_driver(ad5820_i2c_driver);
++
++MODULE_AUTHOR("Tuukka Toivonen");
++MODULE_DESCRIPTION("AD5820 camera lens driver");
++MODULE_LICENSE("GPL");
 
-But this does not wait for task which is created by cmdq_rec_flush().
-One solution for this is to re-write cmdq_rec_flush() as below:
 
-struct cmdq_flush_completion {
-	struct completion cmplt;
-	bool err;
-};
-
-static int cmdq_rec_flush_cb(struct cmdq_cb_data data)
-{
-	struct cmdq_flush_completion *cmplt = data.data;
-
-	cmplt->err = data.err;
-	complete(&cmplt->cmplt);
-
-	return 0;
-}
-
-int cmdq_rec_flush(struct cmdq_rec *rec)
-{
-	int err;
-	struct cmdq_flush_completion cmplt;
-
-	init_completion(&cmplt.cmplt);
-	err = cmdq_rec_flush_async(rec, cmdq_rec_flush_cb, &cmplt);
-	if (err < 0)
-		return err;
-	wait_for_completion(&cmplt.cmplt);
-	return cmplt.err ? -EFAULT : 0;
-}
-
-
-> +
-> +exit:
-> +	cmdq->suspended = true;
-> +	cmdq->suspending = false;
-> +	mutex_unlock(&cmdq->task_mutex);
-> +	return 0; /* ALWAYS allow suspend */
-> +}
-> +
-> +static int cmdq_resume(struct device *dev)
-> +{
-> +	struct cmdq *cmdq = dev_get_drvdata(dev);
-> +
-> +	cmdq->suspended = false;
-> +	return 0;
-> +}
-> +
->  static int cmdq_remove(struct platform_device *pdev)
->  {
->  	struct cmdq *cmdq = platform_get_drvdata(pdev);
-> @@ -852,6 +1002,7 @@ static int cmdq_probe(struct platform_device *pdev)
->  	dev_dbg(dev, "cmdq device: addr:0x%p, va:0x%p, irq:%d\n",
->  		dev, cmdq->base, cmdq->irq);
->  
-> +	mutex_init(&cmdq->task_mutex);
->  	spin_lock_init(&cmdq->exec_lock);
->  	cmdq->task_release_wq = alloc_ordered_workqueue(
->  			"%s", WQ_MEM_RECLAIM | WQ_HIGHPRI,
-> @@ -879,6 +1030,7 @@ static int cmdq_probe(struct platform_device *pdev)
->  		err = PTR_ERR(cmdq->clock);
->  		goto fail;
->  	}
-> +
->  	return 0;
->  
->  fail:
-> @@ -886,6 +1038,11 @@ fail:
->  	return err;
->  }
->  
-> +static const struct dev_pm_ops cmdq_pm_ops = {
-> +	.suspend = cmdq_suspend,
-> +	.resume = cmdq_resume,
-> +};
-> +
->  static const struct of_device_id cmdq_of_ids[] = {
->  	{.compatible = "mediatek,mt8173-gce",},
->  	{}
-> @@ -897,6 +1054,7 @@ static struct platform_driver cmdq_drv = {
->  	.driver = {
->  		.name = CMDQ_DRIVER_DEVICE_NAME,
->  		.owner = THIS_MODULE,
-> +		.pm = &cmdq_pm_ops,
->  		.of_match_table = cmdq_of_ids,
->  	}
->  };
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
