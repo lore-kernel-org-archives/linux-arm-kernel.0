@@ -1,23 +1,60 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Mon, 23 May 2016 20:08:27 -0700
-Subject: [PATCH v2 0/5] Thermal: Support for hardware-tracked trip points
-In-Reply-To: <5742B217.4080405@gmail.com>
-References: <1462268013-14992-1-git-send-email-wxt@rock-chips.com>
- <5742B217.4080405@gmail.com>
-Message-ID: <20160524030825.GA3489@localhost.localdomain>
+From: hongkun.cao@mediatek.com (hongkun.cao)
+Date: Tue, 24 May 2016 11:10:54 +0800
+Subject: [PATCH] pinctrl: mediatek: fix dual-edge code defect
+In-Reply-To: <5742DDE5.7050701@gmail.com>
+References: <1463815419-11719-1-git-send-email-hongkun.cao@mediatek.com>
+ <5742DDE5.7050701@gmail.com>
+Message-ID: <1464059454.27362.16.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 03:32:39PM +0800, Caesar Wang wrote:
-> Hello Eduardo & 'Zhang Rui'
+On Mon, 2016-05-23 at 12:39 +0200, Matthias Brugger wrote:
 > 
-> Do we have the chance to merge this series patches for next kernel?
-> I had picked them up in my github, and tested for a period of time with
-> rockchip inside kernel.
+> On 21/05/16 09:23, hongkun.cao at mediatek.com wrote:
+> > From: "hongkun.cao" <hongkun.cao@mediatek.com>
+> >
+> > When a dual-edge irq is triggered, an incorrect irq will be reported on
+> > condition that the external signal is not stable and this incorrect irq
+> > has been registered.
+> > Correct the register offset.
+> >
 > 
-> Let me know if someone have some suggestions or against opinios.
-> Thanks,
+> I'm not sure what you want to say. From what I can see the without this 
+> fix, the the wrong IRQ will be cleared and raised. Is this what you are 
+> addressing?
+> 
+> If so:
 
-I will have a look after after the current merge window.
+Hi, Matthias,
+Thanks for your comments.
+Yes, you are right.
+Suppose there are two irqs registered in our system with special
+relationship, One hardware irq  number is 17 with both edge trigger, and
+the other hardware irq number is 49(17+32),then hardware irq 49 may be
+reported unexpectedly if hardware irq 17 occurred.
 
-Thanks.
+> Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+> 
+> > Signed-off-by: hongkun.cao <hongkun.cao@mediatek.com>
+> > ---
+> >   drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    5 +++--
+> >   1 file changed, 3 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > index 2bbe6f7..92ae49f 100644
+> > --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+> > @@ -1255,9 +1255,10 @@ static void mtk_eint_irq_handler(struct irq_desc *desc)
+> >   	const struct mtk_desc_pin *pin;
+> >
+> >   	chained_irq_enter(chip, desc);
+> > -	for (eint_num = 0; eint_num < pctl->devdata->ap_num; eint_num += 32) {
+> > +	for (eint_num = 0;
+> > +	     eint_num < pctl->devdata->ap_num;
+> > +	     eint_num += 32, reg += 4) {
+> >   		status = readl(reg);
+> > -		reg += 4;
+> >   		while (status) {
+> >   			offset = __ffs(status);
+> >   			index = eint_num + offset;
+> >
