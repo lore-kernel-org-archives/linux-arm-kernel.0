@@ -1,74 +1,58 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 24 May 2016 11:03:20 +0200
-Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending
- flip event v5
-In-Reply-To: <1885816.5oayNdNrp7@phil>
-References: <1464074761-5194-1-git-send-email-tomeu.vizoso@collabora.com>
- <20160524083050.GQ27098@phenom.ffwll.local>
- <20160524083749.GR27098@phenom.ffwll.local>
- <1885816.5oayNdNrp7@phil>
-Message-ID: <20160524090320.GS27098@phenom.ffwll.local>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 24 May 2016 11:04:33 +0200
+Subject: [PATCHv3] support for AD5820 camera auto-focus coil
+In-Reply-To: <574049EF.2090208@gmail.com>
+References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
+ <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com>
+Message-ID: <20160524090433.GA1277@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2016 at 10:41:30AM +0200, Heiko Stuebner wrote:
-> Am Dienstag, 24. Mai 2016, 10:37:49 schrieb Daniel Vetter:
-> > On Tue, May 24, 2016 at 10:30:50AM +0200, Daniel Vetter wrote:
-> > > On Tue, May 24, 2016 at 10:28:42AM +0200, Heiko Stuebner wrote:
-> > > > Hi Tomeu,
-> > > > 
-> > > > Patch subject: please put the version into the brackets, so [PATCH v5]
-> > > > as it shouldn't be part of the commit log.
-> > > > 
-> > > > Am Dienstag, 24. Mai 2016, 09:27:37 schrieb Tomeu Vizoso:
-> > > > > As per the docs, atomic_commit should return -EBUSY "if an
-> > > > > asycnhronous
-> > > > > updated is requested and there is an earlier updated pending".
-> > > > > 
-> > > > > v2: Use the status of the workqueue instead of vop->event, and don't
-> > > > > add
-> > > > > a superfluous wait on the workqueue.
-> > > > > 
-> > > > > v3: Drop work_busy, as there's a sizeable delay when the worker
-> > > > > finishes, which introduces a race in which the client has already
-> > > > > received the last flip event but the next page flip ioctl will still
-> > > > > return -EBUSY because work_busy returns outdated information.
-> > > > > 
-> > > > > v4: Hold dev->event_lock while checking the VOP's event field as
-> > > > > suggested by Daniel Stone.
-> > > > > 
-> > > > > v5: Only block if there's outstanding work if it's a blocking call.
-> > > > 
-> > > > similarly, please put the changelog below the "---" and above the
-> > > > diffstat.> 
-> > > drm culture is to keep it above, since it's kinda useful sometimes when
-> > > later on trying to reconstruct wtf was discussed and why a patch was
-> > > merged.
-> > 
-> > Maybe needs a bit more context: The only stuff you raised in your review
-> > is tiny style nits of pretty much utter irrelevance. No substantial and
-> > material feedback anywehere, and in my opinion in such a case either fix
-> > up the nits when applying (when you feel really strongly about perfect
-> > patches), or just merge as-is.
-> > 
-> > But sending out content-less bikesheds like these just adds noise and
-> > helps no-one. I think at least some spelling stuff is the minimal bar (but
-> > then just include your r-b tag), but personally I don't even care about
-> > that so much, as long as it's still legible.
+Hi!
+
+> >+static int ad5820_registered(struct v4l2_subdev *subdev)
+> >+{
+> >+	struct ad5820_device *coil = to_ad5820_device(subdev);
+> >+	struct i2c_client *client = v4l2_get_subdevdata(subdev);
+> >+
+> >+	coil->vana = regulator_get(&client->dev, "VANA");
 > 
-> ok, will keep that (both mails) in mind for future stuff.
+> devm_regulator_get()?
 
-And to clarify, review of patches is very much appreciated, but to be
-effective it should be top down. First assess whether it's a good idea,
-then whether the implementation makes sense, then go down into style
-naming and details like that. And it's important to tell the submitter
-where they are in that process, too. More in-depth writeup of a good
-review approach:
+I'd rather avoid devm_ here. Driver is simple enough to allow it.
 
-http://sarah.thesharps.us/2014/09/01/the-gentle-art-of-patch-review/
+> >+#define AD5820_RAMP_MODE_LINEAR		(0 << 3)
+> >+#define AD5820_RAMP_MODE_64_16		(1 << 3)
+> >+
+> >+struct ad5820_platform_data {
+> >+	int (*set_xshutdown)(struct v4l2_subdev *subdev, int set);
+> >+};
+> >+
+> >+#define to_ad5820_device(sd)	container_of(sd, struct ad5820_device, subdev)
+> >+
+> >+struct ad5820_device {
+> >+	struct v4l2_subdev subdev;
+> >+	struct ad5820_platform_data *platform_data;
+> >+	struct regulator *vana;
+> >+
+> >+	struct v4l2_ctrl_handler ctrls;
+> >+	u32 focus_absolute;
+> >+	u32 focus_ramp_time;
+> >+	u32 focus_ramp_mode;
+> >+
+> >+	struct mutex power_lock;
+> >+	int power_count;
+> >+
+> >+	int standby : 1;
+> >+};
+> >+
+> 
+> The same for struct ad5820_device, is it really part of the public API?
 
-Cheers, Daniel
+Let me check what can be done with it.
+									Pavel
+
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
