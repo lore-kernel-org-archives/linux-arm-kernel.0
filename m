@@ -1,36 +1,55 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 24 May 2016 09:51:22 -0600
-Subject: [PATCH 0011/1529] Fix typo
-In-Reply-To: <20160521113648.31841-1-andrea.gelmini@gelma.net>
-References: <20160521113648.31841-1-andrea.gelmini@gelma.net>
-Message-ID: <CANLsYkxtvYmHRsisjO2DyW85yF3EQ+Jy6Gx4AZ+pkzt7cZM8-Q@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 24 May 2016 16:59:28 +0100
+Subject: [RFC 8/9] drivers: of: call iommu_bus_add_dev after
+ iommu_configure_ops
+In-Reply-To: <1461599894-1969-9-git-send-email-sricharan@codeaurora.org>
+References: <1461599894-1969-1-git-send-email-sricharan@codeaurora.org>
+ <1461599894-1969-9-git-send-email-sricharan@codeaurora.org>
+Message-ID: <57447A60.4060805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 May 2016 at 05:36, Andrea Gelmini <andrea.gelmini@gelma.net> wrote:
-> Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+On 25/04/16 16:58, Sricharan R wrote:
+> Now that the device's iommu ops are configured at probe time,
+> the device has to be added to the iommu late.
+>
+> Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 > ---
->  Documentation/devicetree/bindings/arm/coresight.txt | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>   drivers/of/device.c | 4 ++++
+>   1 file changed, 4 insertions(+)
 >
-> diff --git a/Documentation/devicetree/bindings/arm/coresight.txt b/Documentation/devicetree/bindings/arm/coresight.txt
-> index 93147c0c..a846d4b 100644
-> --- a/Documentation/devicetree/bindings/arm/coresight.txt
-> +++ b/Documentation/devicetree/bindings/arm/coresight.txt
-> @@ -6,7 +6,7 @@ SoCs tracing needs. These trace components can generally be classified as
->  sinks, links and sources. Trace data produced by one or more sources flows
->  through the intermediate links connecting the source to the currently selected
->  sink. Each CoreSight component device should use these properties to describe
-> -its hardware characteristcs.
-> +its hardware characteristics.
-
-Thank you for that.
-
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
+> diff --git a/drivers/of/device.c b/drivers/of/device.c
+> index 57a5f2d..722115c 100644
+> --- a/drivers/of/device.c
+> +++ b/drivers/of/device.c
+> @@ -6,6 +6,7 @@
+>   #include <linux/of_iommu.h>
+>   #include <linux/dma-mapping.h>
+>   #include <linux/init.h>
+> +#include <linux/iommu.h>
+>   #include <linux/module.h>
+>   #include <linux/mod_devicetable.h>
+>   #include <linux/slab.h>
+> @@ -154,6 +155,9 @@ int of_dma_configure_ops(struct device *dev, struct device_node *np)
+>   	dev_dbg(dev, "device is%sbehind an iommu\n",
+>   		iommu ? " " : " not ");
 >
->  * Required properties for all components *except* non-configurable replicators:
+> +	if (iommu)
+> +		iommu_bus_add_dev(dev);
+
+This (in conjunction with the previous patch) seems unnecessarily 
+convoluted - if of_iommu_configure() has found some iommu_ops for a 
+device, why not just call .add_device() directly there and then? There 
+are already systems that could warrant having two different IOMMU 
+drivers active simultaneously (but thankfully don't _need_ to), so 
+trying to escape from per-bus IOMMU ops makes more sense than 
+entrenching the horrible notion of "the" IOMMU on "the" platform bus any 
+further.
+
+Robin.
+
+> +
+>   	arch_setup_dma_ops(dev, dma_addr, size, iommu, coherent);
 >
-> --
-> 2.8.2.534.g1f66975
+>   	return 0;
 >
