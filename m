@@ -1,47 +1,51 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 24 May 2016 03:04:40 +0300
-Subject: [PATCH 11/23] arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and
- LP64
+Date: Tue, 24 May 2016 03:04:37 +0300
+Subject: [PATCH 08/23] arm64: ilp32: add documentation on the ILP32 ABI for
+ ARM64
 In-Reply-To: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1464048292-30136-12-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1464048292-30136-9-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+Based on Andrew Pinski's patch-series.
 
-Define __BITS_PER_LONG depending on the ABI used (i.e. check whether
-__ILP32__ or __LP64__ is defined).  This is necessary for glibc to
-determine the appropriate type definitions for the system call interface.
-
-Signed-off-by: Andrew Pinski <apinski@cavium.com>
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 ---
- arch/arm64/include/uapi/asm/bitsperlong.h | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ Documentation/arm64/ilp32.txt | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+ create mode 100644 Documentation/arm64/ilp32.txt
 
-diff --git a/arch/arm64/include/uapi/asm/bitsperlong.h b/arch/arm64/include/uapi/asm/bitsperlong.h
-index fce9c29..4265243 100644
---- a/arch/arm64/include/uapi/asm/bitsperlong.h
-+++ b/arch/arm64/include/uapi/asm/bitsperlong.h
-@@ -16,7 +16,14 @@
- #ifndef __ASM_BITSPERLONG_H
- #define __ASM_BITSPERLONG_H
- 
--#define __BITS_PER_LONG 64
-+#if defined(__LP64__)
-+/* Assuming __LP64__ will be defined for native ELF64's and not for ILP32. */
-+#  define __BITS_PER_LONG 64
-+#elif defined(__ILP32__)
-+#  define __BITS_PER_LONG 32
-+#else
-+#  error "Neither LP64 nor ILP32: unsupported ABI in asm/bitsperlong.h"
-+#endif
- 
- #include <asm-generic/bitsperlong.h>
- 
+diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
+new file mode 100644
+index 0000000..8e74d67
+--- /dev/null
++++ b/Documentation/arm64/ilp32.txt
+@@ -0,0 +1,25 @@
++ILP32 AARCH64 SYSCALL ABI
++=========================
++
++This document describes the ILP32 syscall ABI and where it differs
++from the generic compat linux syscall interface.
++
++Syscalls which normally would pass 64bit values as two arguments;
++now pass the 64bit value as one argument. Next syscalls are affected:
++fadvise64_64,
++fallocate,
++ftruncate,
++lookup_dcookie,
++pread64,
++pwrite64,
++readahead,
++shmat,
++sync_file_range,
++truncate,
++lseek,
++mmap
++
++struct rt_sigframe is redefined and contains struct compat_siginfo,
++as compat syscalls expects, and struct ilp32_sigframe, to handle
++AARCH64 register set and 32-bit userspace register representation.
++
 -- 
 2.5.0
