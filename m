@@ -1,45 +1,95 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 24 May 2016 15:35:40 -0700
-Subject: [PATCH v7 10/15] acpi, numa: remove unneeded acpi_numa=1
+Date: Tue, 24 May 2016 15:35:43 -0700
+Subject: [PATCH v7 13/15] ACPI / processor: Add acpi_map_madt_entry().
 In-Reply-To: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1464129345-18985-11-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1464129345-18985-14-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+From: David Daney <david.daney@cavium.com>
 
-acpi_numa is default to 0, it's set to -1 when disable acpi numa or
-when a bad SRAT is parsed, and it's only consumed in srat_disabled()
-(compare it with 0) to continue parse the SRAT or not, so we don't
-need to set acpi_numa to 1 when we get a valid SRAT entry.
+Follow-on arm64 ACPI/NUMA patches need to map MADT entries very early
+(before kmalloc is usable).
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
+Add acpi_map_madt_entry() which, indirectly, uses
+early_memremap()/early_memunmap() to access the table and parse out
+the mpidr.  The existing implementation of map_madt_entry() is
+modified to take a pointer to the MADT as a parameter and the callers
+adjusted.
+
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- arch/x86/mm/srat.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/acpi/processor_core.c | 26 ++++++++++++++++++++++----
+ include/acpi/processor.h      |  1 +
+ 2 files changed, 23 insertions(+), 4 deletions(-)
 
-diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
-index 4217071f..30460f5 100644
---- a/arch/x86/mm/srat.c
-+++ b/arch/x86/mm/srat.c
-@@ -59,7 +59,6 @@ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
- 	}
- 	set_apicid_to_node(apic_id, node);
- 	node_set(node, numa_nodes_parsed);
--	acpi_numa = 1;
- 	printk(KERN_INFO "SRAT: PXM %u -> APIC 0x%04x -> Node %u\n",
- 	       pxm, apic_id, node);
+diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+index 33a38d6..9125d7d 100644
+--- a/drivers/acpi/processor_core.c
++++ b/drivers/acpi/processor_core.c
+@@ -108,13 +108,12 @@ static int map_gicc_mpidr(struct acpi_subtable_header *entry,
+ 	return -EINVAL;
  }
-@@ -101,7 +100,6 @@ acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa)
  
- 	set_apicid_to_node(apic_id, node);
- 	node_set(node, numa_nodes_parsed);
--	acpi_numa = 1;
- 	printk(KERN_INFO "SRAT: PXM %u -> APIC 0x%02x -> Node %u\n",
- 	       pxm, apic_id, node);
+-static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
++static phys_cpuid_t map_madt_entry(struct acpi_table_madt *madt,
++				   int type, u32 acpi_id)
+ {
+ 	unsigned long madt_end, entry;
+ 	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;	/* CPU hardware ID */
+-	struct acpi_table_madt *madt;
+ 
+-	madt = get_madt_table();
+ 	if (!madt)
+ 		return phys_id;
+ 
+@@ -145,6 +144,25 @@ static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
+ 	return phys_id;
  }
+ 
++phys_cpuid_t __init acpi_map_madt_entry(u32 acpi_id)
++{
++	struct acpi_table_madt *madt = NULL;
++	acpi_size tbl_size;
++	phys_cpuid_t rv;
++
++	acpi_get_table_with_size(ACPI_SIG_MADT, 0,
++				 (struct acpi_table_header **)&madt,
++				 &tbl_size);
++	if (!madt)
++		return PHYS_CPUID_INVALID;
++
++	rv = map_madt_entry(madt, 1, acpi_id);
++
++	early_acpi_os_unmap_memory(madt, tbl_size);
++
++	return rv;
++}
++
+ static phys_cpuid_t map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
+ {
+ 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
+@@ -185,7 +203,7 @@ phys_cpuid_t acpi_get_phys_id(acpi_handle handle, int type, u32 acpi_id)
+ 
+ 	phys_id = map_mat_entry(handle, type, acpi_id);
+ 	if (invalid_phys_cpuid(phys_id))
+-		phys_id = map_madt_entry(type, acpi_id);
++		phys_id = map_madt_entry(get_madt_table(), type, acpi_id);
+ 
+ 	return phys_id;
+ }
+diff --git a/include/acpi/processor.h b/include/acpi/processor.h
+index 6f1805d..f473e66 100644
+--- a/include/acpi/processor.h
++++ b/include/acpi/processor.h
+@@ -309,6 +309,7 @@ static inline int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
+ 
+ /* in processor_core.c */
+ phys_cpuid_t acpi_get_phys_id(acpi_handle, int type, u32 acpi_id);
++phys_cpuid_t acpi_map_madt_entry(u32 acpi_id);
+ int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id);
+ int acpi_get_cpuid(acpi_handle, int type, u32 acpi_id);
+ 
 -- 
 1.7.11.7
