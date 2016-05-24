@@ -1,112 +1,58 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 24 May 2016 12:23:26 +0100
-Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
- registers
-In-Reply-To: <f49d58ed-38b4-6284-11c2-8708d8443b14@codeaurora.org>
-References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
- <20160523172527.GK4976@leverpostej>
- <f49d58ed-38b4-6284-11c2-8708d8443b14@codeaurora.org>
-Message-ID: <20160524112326.GC25374@leverpostej>
+Date: Tue, 24 May 2016 12:37:27 +0100
+Subject: [PATCH 1/1] arm64: fix flush_cache_range
+In-Reply-To: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160524113727.GD25374@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 02:22:59PM -0400, Neil Leeder wrote:
-> 
-> On 5/23/2016 01:25 PM, Mark Rutland wrote:
-> > On Fri, May 20, 2016 at 03:13:07PM -0400, Neil Leeder wrote:
-> >> L2 registers are accessed using a select register and data
-> >> register pair. To prevent multiple concurrent writes to the
-> >> select register by independent drivers, the write to the
-> >> select register and the associated access of the data register
-> >> are protected with a lock. All drivers accessing the L2
-> >> registers use the set and get functions provided by
-> >> l2-accessors to ensure correct reads and writes to L2 registers.
-> > 
-> > What will this be used for? (i.e. which drivers want to touch the L2
-> > registers?).
-> > 
-> > Generally we expect FW to configure the caches and interconnect
-> > appropriately.
-> 
-> The primary use is in the L2 PMU driver, which will be posted shortly.
+On Tue, May 24, 2016 at 07:16:37PM +0800, Zhen Lei wrote:
+> When we ran mprotect04(a test case in LTP) infinitely, it would always
+> failed after a few seconds. The case can be described briefly that: copy
+> a empty function from code area into a new memory area(created by mmap),
+> then call mprotect to change the protection to PROT_EXEC. The syscall
+> sys_mprotect will finally invoke flush_cache_range, but this function
+> currently only invalid icache, the operation of flush dcache is missed.
 
-Ok.
+In the LTP code I see powerpc-specific D-cache / I-cache synchronisation
+(i.e. d-cache cleaning followed by I-cache invalidation), so there
+appears to be some expectation of userspace maintenance. Hoever, there
+is no such ARM-specific I-cache maintenance.
 
-> >> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
-> >> ---
-> >>  drivers/soc/qcom/Kconfig              |  9 +++++
-> >>  drivers/soc/qcom/Makefile             |  1 +
-> >>  drivers/soc/qcom/l2-accessors.c       | 66 +++++++++++++++++++++++++++++++++++
-> >>  include/linux/soc/qcom/l2-accessors.h | 27 ++++++++++++++
-> >>  4 files changed, 103 insertions(+)
-> >>  create mode 100644 drivers/soc/qcom/l2-accessors.c
-> >>  create mode 100644 include/linux/soc/qcom/l2-accessors.h
-> > 
-> > These are awfully generic file names (and function names). Which SoCs
-> > does this apply to?
-> > 
-> > It would be good to give these more specific names.
-> 
-> It's under soc/qcom, and dependent on ARCH_QCOM and (in v2) also on ARM64. It applies to all QCOM ARM64 SoCs.
+It looks like the test may be missing I-cache maintenance regardless of
+the semantics of mprotect in this case.
 
-Per Christopher's comment, it sounds like this applies to QDF24xx.
-
-Given that the code uses IMPLEMENTATION DEFINED system registers, I
-presume that this does not apply to MSM8916 which uses Cortex-A53, for
-example (though perhaps it does, and I am mistaken).
-
-> Given that it can only be used in a QCOM driver, and the include path has qcom in it, I'd
-> prefer not to add redundancy by adding another qcom in there.
-
-I'm not asking for another "qcom", but simply the SoC variant or family
-(e.g. "qdf24xx" would be fine).
-
-> >> diff --git a/include/linux/soc/qcom/l2-accessors.h b/include/linux/soc/qcom/l2-accessors.h
-> >> new file mode 100644
-> >> index 0000000..563c114
-> >> --- /dev/null
-> >> +++ b/include/linux/soc/qcom/l2-accessors.h
-> >> @@ -0,0 +1,27 @@
-> >> +/*
-> >> + * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 and
-> >> + * only version 2 as published by the Free Software Foundation.
-> >> + *
-> >> + * This program is distributed in the hope that it will be useful,
-> >> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> >> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> >> + * GNU General Public License for more details.
-> >> + */
-> >> +
-> > 
-> >> +#ifndef __QCOM_L2_ACCESSORS_H
-> >> +#define __QCOM_L2_ACCESSORS_H
-> >> +
-> >> +#ifdef CONFIG_QCOM_L2_ACCESSORS
-> >> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
-> >> +u64 get_l2_indirect_reg(u64 reg_addr);
-> >> +#else
-> >> +static inline void set_l2_indirect_reg(u64 reg_addr, u64 val) {}
-> >> +static inline u64 get_l2_indirect_reg(u64 reg_addr)
-> >> +{
-> >> +	return 0;
-> >> +}
-> > 
-> > Surely it would be better to error out on any unintentional use of these
-> > at build time?
-> 
-> This allows building code which is common to ARM SoCs and QCOM SoCs without having to ifdef out the
-> QCOM-specific pieces.
-
-These shouldn't appear in generic code.
-
-Other than the L2 PMU driver (which presumably depends on or selects
-CONFIG_QCOM_L2_ACCESSORS), what code would you have to ifdef?
-
-I don't have a major concern on this, I just don't see where it should
-matter.
+I have not yet devled into flush_cache_range and how it is called.
 
 Thanks,
 Mark.
+
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  arch/arm64/mm/flush.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+> index dbd12ea..eda4124 100644
+> --- a/arch/arm64/mm/flush.c
+> +++ b/arch/arm64/mm/flush.c
+> @@ -31,7 +31,7 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
+>  		       unsigned long end)
+>  {
+>  	if (vma->vm_flags & VM_EXEC)
+> -		__flush_icache_all();
+> +		flush_icache_range(start, end);
+>  }
+> 
+>  static void sync_icache_aliases(void *kaddr, unsigned long len)
+> --
+> 2.5.0
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
