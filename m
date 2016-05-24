@@ -1,137 +1,78 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 24 May 2016 10:50:17 +0200
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <12548318.auB4PSA3KC@wuerfel>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
- <6297051.TAxtzW5OIB@wuerfel>
- <CALszF6AxXY0LK5fToFg3095+gz6xcZz8KHaYqc=o39vjpBYDmA@mail.gmail.com>
- <12548318.auB4PSA3KC@wuerfel>
-Message-ID: <CALszF6BPPA=tezMLhmdC4YFwmH1tGhDxCNDZNwGp1cTDWP7Fmg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 May 2016 10:50:37 +0200
+Subject: [PATCH v3] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <1464067268-35299-1-git-send-email-navam@xilinx.com>
+References: <1464067268-35299-1-git-send-email-navam@xilinx.com>
+Message-ID: <14123451.MsNvJvqaJX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-05-24 10:32 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday, May 24, 2016 9:59:41 AM CEST Maxime Coquelin wrote:
->> 2016-05-23 22:35 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->> > On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
->> >> diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
->> >> index 92a8106..0533370 100644
->> >> --- a/drivers/char/hw_random/stm32-rng.c
->> >> +++ b/drivers/char/hw_random/stm32-rng.c
->> >> @@ -52,7 +52,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
->> >>  {
->> >>       struct stm32_rng_private *priv =
->> >>           container_of(rng, struct stm32_rng_private, rng);
->> >> -     u32 sr;
->> >> +     u32 sr = 0;
->> >>       int retval = 0;
->> >>
->> >>       pm_runtime_get_sync((struct device *) priv->rng.priv);
->> >
->> > Does this work as well?
->> >
->> > diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
->> > index 92a810648bd0..5c836b0afa40 100644
->> > --- a/drivers/char/hw_random/stm32-rng.c
->> > +++ b/drivers/char/hw_random/stm32-rng.c
->> > @@ -79,7 +79,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
->> >                 max -= sizeof(u32);
->> >         }
->> >
->> > -       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
->> > +       if (WARN_ONCE(retval > 0 && (sr & (RNG_SR_SEIS | RNG_SR_CEIS)),
->> >                       "bad RNG status - %x\n", sr))
->> >                 writel_relaxed(0, priv->base + RNG_SR);
->> >
->> > I think it would be nicer to not add a bogus initialization.
->> Hmm, no sure this nicer.
->> The while loop can break before retval is incremented when sr value is
->> not expected (sr != RNG_SR_DRDY).
->> In that case, we certainly want to print sr value.
->
-> Ah, you are right.
->
->> Maybe the better way is just to initialize sr with status register content?
->
->>        pm_runtime_get_sync((struct device *) priv->rng.priv);
->>
->>+       sr = readl_relaxed(priv->base + RNG_SR);
->>        while (max > sizeof(u32)) {
->>-               sr = readl_relaxed(priv->base + RNG_SR);
->>                if (!sr && wait) {
->>                        unsigned int timeout = RNG_TIMEOUT;
->
->
-> I think that introduces a bug: you really want to read the status
-> register on each loop iteration.
-Actually, I read the status again at the end of the loop.
-But my implementation isn't good anyway, because I read the status
-register one time more every time.
+On Tuesday, May 24, 2016 10:51:08 AM CEST Nava kishore Manne wrote:
+> diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> index 47b4e39..09df757 100644
+> --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
+> @@ -1,18 +1,23 @@
+>  Xilinx USB2 device controller
+>  
+>  Required properties:
+> -- compatible		: Should be "xlnx,usb2-device-4.00.a"
+> +- compatible		: Should be "xlnx,usb2-device-4.00.a" or
+> +			  "xlnx,usb2-device-5.00"
+>  - reg			: Physical base address and size of the USB2
+>  			  device registers map.
+>  - interrupts		: Should contain single irq line of USB2 device
+>  			  controller
+>  - xlnx,has-builtin-dma	: if DMA is included
+> +- dma-ranges		: Should be as the following
+> +			  <child-bus-address, parent-bus-address, length>
 
->
-> How about moving the error handling into the loop itself?
-That would be better, indeed, but there is one problem with your below proposal:
->
->         Arnd
->
->
-> diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-> index 92a810648bd0..fceacd809462 100644
-> --- a/drivers/char/hw_random/stm32-rng.c
-> +++ b/drivers/char/hw_random/stm32-rng.c
-> @@ -59,6 +59,10 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
->
->         while (max > sizeof(u32)) {
->                 sr = readl_relaxed(priv->base + RNG_SR);
-> +               if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
-> +                             "bad RNG status - %x\n", sr))
-> +                       writel_relaxed(0, priv->base + RNG_SR);
+A USB host should not have any children that are DMA capable, I think, so this
+property doesn't make sense here. It should be part of the parent bus.
+
+> +- xlnx,addrwidth	: Should be the dma addressing size in bits(ex: 64 bits)
+
+I'm still unconvinced about the property definition here. What are the possible
+options for the IP block? I don't think I ever saw a reply from you to my earlier
+questions.
+
+> @@ -214,6 +223,20 @@ static const struct usb_endpoint_descriptor config_bulk_out_desc = {
+>  	.wMaxPacketSize		= cpu_to_le16(EP0_MAX_PACKET),
+>  };
+>  
+> +/**
+> + * xudc_write64 - write 64bit value to device registers
+> + * @addr: base addr of device registers
+> + * @offset: register offset
+> + * @val: data to be written
+> + **/
+> +static void xudc_write64(struct xusb_ep *ep, u32 offset, u64 val)
+> +{
+> +	struct xusb_udc *udc = ep->udc;
 > +
-The error handling should be moved after the last status register read.
+> +	udc->write_fn(udc->addr, offset, lower_32_bits(val));
+> +	udc->write_fn(udc->addr, offset+0x04, upper_32_bits(val));
+> +}
+> +
+>  /**
+>   * xudc_write32 - little endian write to device registers
+>   * @addr: base addr of device registers
+> @@ -330,8 +353,13 @@ static int xudc_start_dma(struct xusb_ep *ep, dma_addr_t src,
+>  	 * destination registers and then set the length
+>  	 * into the DMA length register.
+>  	 */
+> -	udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
+> -	udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
+> +	if (udc->dma_addrwidth > 32) {
+> +		xudc_write64(ep, XUSB_DMA_DSAR_ADDR_OFFSET_LSB, src);
+> +		xudc_write64(ep, XUSB_DMA_DDAR_ADDR_OFFSET_LSB, dst);
+> +	} else {
+> +		udc->write_fn(udc->addr, XUSB_DMA_DSAR_ADDR_OFFSET, src);
+> +		udc->write_fn(udc->addr, XUSB_DMA_DDAR_ADDR_OFFSET, dst);
+> +	}
+>  	udc->write_fn(udc->addr, XUSB_DMA_LENGTH_OFFSET, length);
+>  
 
->                 if (!sr && wait) {
->                         unsigned int timeout = RNG_TIMEOUT;
->
-> @@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
->                 max -= sizeof(u32);
->         }
->
-> -       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
-> -                     "bad RNG status - %x\n", sr))
-> -               writel_relaxed(0, priv->base + RNG_SR);
-> -
->         pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
->         pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
+This looks good.
 
-
-diff --git a/drivers/char/hw_random/stm32-rng.c
-b/drivers/char/hw_random/stm32-rng.c
-index 92a810648bd0..2a0fc90e4dc3 100644
---- a/drivers/char/hw_random/stm32-rng.c
-+++ b/drivers/char/hw_random/stm32-rng.c
-@@ -68,6 +68,10 @@ static int stm32_rng_read(struct hwrng *rng, void
-*data, size_t max, bool wait)
-                        } while (!sr && --timeout);
-                }
-
-+               if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
-+                               "bad RNG status - %x\n", sr))
-+                       writel_relaxed(0, priv->base + RNG_SR);
-+
-                /* If error detected or data not ready... */
-                if (sr != RNG_SR_DRDY)
-                        break;
-@@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void
-*data, size_t max, bool wait)
-                max -= sizeof(u32);
-        }
-
--       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
--                     "bad RNG status - %x\n", sr))
--               writel_relaxed(0, priv->base + RNG_SR);
--
-        pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
-        pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
-
-Thanks,
-Maxime
+	Arnd
