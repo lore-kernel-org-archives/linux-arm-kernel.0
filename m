@@ -1,95 +1,64 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 24 May 2016 15:35:43 -0700
-Subject: [PATCH v7 13/15] ACPI / processor: Add acpi_map_madt_entry().
+Date: Tue, 24 May 2016 15:35:42 -0700
+Subject: [PATCH v7 12/15] acpi, numa,
+ srat: Improve SRAT error detection and add messages.
 In-Reply-To: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1464129345-18985-14-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1464129345-18985-13-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-Follow-on arm64 ACPI/NUMA patches need to map MADT entries very early
-(before kmalloc is usable).
+Loosely based on code from Robert Richter and Hanjun Guo.
 
-Add acpi_map_madt_entry() which, indirectly, uses
-early_memremap()/early_memunmap() to access the table and parse out
-the mpidr.  The existing implementation of map_madt_entry() is
-modified to take a pointer to the MADT as a parameter and the callers
-adjusted.
+Improve out of range node detection as well as allow for Larger SRAT
+entities.
+
+Add printing of nice messages.
 
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/acpi/processor_core.c | 26 ++++++++++++++++++++++----
- include/acpi/processor.h      |  1 +
- 2 files changed, 23 insertions(+), 4 deletions(-)
+ drivers/acpi/numa.c | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-index 33a38d6..9125d7d 100644
---- a/drivers/acpi/processor_core.c
-+++ b/drivers/acpi/processor_core.c
-@@ -108,13 +108,12 @@ static int map_gicc_mpidr(struct acpi_subtable_header *entry,
- 	return -EINVAL;
- }
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index 811f90a..fad6d28 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -252,8 +252,11 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
  
--static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
-+static phys_cpuid_t map_madt_entry(struct acpi_table_madt *madt,
-+				   int type, u32 acpi_id)
- {
- 	unsigned long madt_end, entry;
- 	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;	/* CPU hardware ID */
--	struct acpi_table_madt *madt;
+ 	if (srat_disabled())
+ 		goto out_err;
+-	if (ma->header.length != sizeof(struct acpi_srat_mem_affinity))
++	if (ma->header.length < sizeof(struct acpi_srat_mem_affinity)) {
++		pr_err("SRAT: Unexpected header length: %d\n",
++		       ma->header.length);
+ 		goto out_err_bad_srat;
++	}
+ 	if ((ma->flags & ACPI_SRAT_MEM_ENABLED) == 0)
+ 		goto out_err;
+ 	hotpluggable = ma->flags & ACPI_SRAT_MEM_HOT_PLUGGABLE;
+@@ -267,13 +270,17 @@ acpi_numa_memory_affinity_init(struct acpi_srat_mem_affinity *ma)
+ 		pxm &= 0xff;
  
--	madt = get_madt_table();
- 	if (!madt)
- 		return phys_id;
+ 	node = acpi_map_pxm_to_node(pxm);
+-	if (node < 0) {
+-		printk(KERN_ERR "SRAT: Too many proximity domains.\n");
++	if (node == NUMA_NO_NODE || node >= MAX_NUMNODES) {
++		pr_err("SRAT: Too many proximity domains.\n");
+ 		goto out_err_bad_srat;
+ 	}
  
-@@ -145,6 +144,25 @@ static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
- 	return phys_id;
- }
+-	if (numa_add_memblk(node, start, end) < 0)
++	if (numa_add_memblk(node, start, end) < 0) {
++		pr_err("SRAT: Failed to add memblk to node %u [mem %#010Lx-%#010Lx]\n",
++		       node, (unsigned long long) start,
++		       (unsigned long long) end - 1);
+ 		goto out_err_bad_srat;
++	}
  
-+phys_cpuid_t __init acpi_map_madt_entry(u32 acpi_id)
-+{
-+	struct acpi_table_madt *madt = NULL;
-+	acpi_size tbl_size;
-+	phys_cpuid_t rv;
-+
-+	acpi_get_table_with_size(ACPI_SIG_MADT, 0,
-+				 (struct acpi_table_header **)&madt,
-+				 &tbl_size);
-+	if (!madt)
-+		return PHYS_CPUID_INVALID;
-+
-+	rv = map_madt_entry(madt, 1, acpi_id);
-+
-+	early_acpi_os_unmap_memory(madt, tbl_size);
-+
-+	return rv;
-+}
-+
- static phys_cpuid_t map_mat_entry(acpi_handle handle, int type, u32 acpi_id)
- {
- 	struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-@@ -185,7 +203,7 @@ phys_cpuid_t acpi_get_phys_id(acpi_handle handle, int type, u32 acpi_id)
- 
- 	phys_id = map_mat_entry(handle, type, acpi_id);
- 	if (invalid_phys_cpuid(phys_id))
--		phys_id = map_madt_entry(type, acpi_id);
-+		phys_id = map_madt_entry(get_madt_table(), type, acpi_id);
- 
- 	return phys_id;
- }
-diff --git a/include/acpi/processor.h b/include/acpi/processor.h
-index 6f1805d..f473e66 100644
---- a/include/acpi/processor.h
-+++ b/include/acpi/processor.h
-@@ -309,6 +309,7 @@ static inline int acpi_processor_get_bios_limit(int cpu, unsigned int *limit)
- 
- /* in processor_core.c */
- phys_cpuid_t acpi_get_phys_id(acpi_handle, int type, u32 acpi_id);
-+phys_cpuid_t acpi_map_madt_entry(u32 acpi_id);
- int acpi_map_cpuid(phys_cpuid_t phys_id, u32 acpi_id);
- int acpi_get_cpuid(acpi_handle, int type, u32 acpi_id);
+ 	node_set(node, numa_nodes_parsed);
  
 -- 
 1.7.11.7
