@@ -1,32 +1,31 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Tue, 24 May 2016 11:12:29 -0500
-Subject: [PATCH] ARM: OMAP2+: Select OMAP_INTERCONNECT for SOC_AM43XX
-Message-ID: <4af329be31b140a7cd71351cf8f2d2006194e42b.1464105749.git.d-gerlach@ti.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Tue, 24 May 2016 09:14:28 -0700
+Subject: [PATCH 0/7] pinctrl: meson: Add a bunch more pins
+In-Reply-To: <CACRpkdY9oGZLt431NwTaFmZk98O8n3ZnMA1odhYZtcH7P1p=Jg@mail.gmail.com>
+ (Linus Walleij's message of "Tue, 24 May 2016 11:23:37 +0200")
+References: <1462544486-9516-1-git-send-email-khilman@baylibre.com>
+ <CACRpkdY9oGZLt431NwTaFmZk98O8n3ZnMA1odhYZtcH7P1p=Jg@mail.gmail.com>
+Message-ID: <m2eg8rigbf.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AM43XX SoCs make use of the omap_l3_noc driver so explicitly select
-OMAP_INTERCONNECT in the Kconfig for SOC_AM43XX to ensure it always gets
-enabled for AM43XX only builds.
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
-Based on next-20160524.
+> On Fri, May 6, 2016 at 4:21 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>
+>> Add support for several more devices, both in the EE domain and in the
+>> AO domain.  Also, add the pins to the corresponding DTS files.
+>>
+>> Tested on odroid-c2 and Amlogic P200 boards, and verified with working
+>> ethernet.
+>>
+>> Depends on the initial GXBB pinctrl support from Carlo[1].  Also
+>> available in my git tree[2] with all the dependencies included.
+>
+> These don't apply anomore sadly, Kevin can you rebase on
+> Torvalds' HEAD and resend, and include Carlo's ACK on them
+> so I can merge them in the next kernel cycle?
 
- arch/arm/mach-omap2/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Coming right up...
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 415a0bd0cda6..efbc4649a3c5 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -69,6 +69,7 @@ config SOC_AM43XX
- 	select HAVE_ARM_TWD
- 	select ARM_ERRATA_754322
- 	select ARM_ERRATA_775420
-+	select OMAP_INTERCONNECT
- 
- config SOC_DRA7XX
- 	bool "TI DRA7XX"
--- 
-2.7.3
+Kevin
