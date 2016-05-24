@@ -1,65 +1,96 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 24 May 2016 10:30:50 +0200
-Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending
- flip event v5
-In-Reply-To: <7363560.k3ytHeYgtM@phil>
-References: <1464074761-5194-1-git-send-email-tomeu.vizoso@collabora.com>
- <1464074857-5515-1-git-send-email-tomeu.vizoso@collabora.com>
- <7363560.k3ytHeYgtM@phil>
-Message-ID: <20160524083050.GQ27098@phenom.ffwll.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 May 2016 10:32:34 +0200
+Subject: [PATCH] hwrng: stm32 - fix build warning
+In-Reply-To: <CALszF6AxXY0LK5fToFg3095+gz6xcZz8KHaYqc=o39vjpBYDmA@mail.gmail.com>
+References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <6297051.TAxtzW5OIB@wuerfel>
+ <CALszF6AxXY0LK5fToFg3095+gz6xcZz8KHaYqc=o39vjpBYDmA@mail.gmail.com>
+Message-ID: <12548318.auB4PSA3KC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2016 at 10:28:42AM +0200, Heiko Stuebner wrote:
-> Hi Tomeu,
-> 
-> Patch subject: please put the version into the brackets, so [PATCH v5] as it 
-> shouldn't be part of the commit log.
-> 
-> Am Dienstag, 24. Mai 2016, 09:27:37 schrieb Tomeu Vizoso:
-> > As per the docs, atomic_commit should return -EBUSY "if an asycnhronous
-> > updated is requested and there is an earlier updated pending".
-> 
-> > v2: Use the status of the workqueue instead of vop->event, and don't add
-> > a superfluous wait on the workqueue.
-> > 
-> > v3: Drop work_busy, as there's a sizeable delay when the worker
-> > finishes, which introduces a race in which the client has already
-> > received the last flip event but the next page flip ioctl will still
-> > return -EBUSY because work_busy returns outdated information.
-> > 
-> > v4: Hold dev->event_lock while checking the VOP's event field as
-> > suggested by Daniel Stone.
-> > 
-> > v5: Only block if there's outstanding work if it's a blocking call.
-> 
-> similarly, please put the changelog below the "---" and above the diffstat.
+On Tuesday, May 24, 2016 9:59:41 AM CEST Maxime Coquelin wrote:
+> 2016-05-23 22:35 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+> > On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
+> >> diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
+> >> index 92a8106..0533370 100644
+> >> --- a/drivers/char/hw_random/stm32-rng.c
+> >> +++ b/drivers/char/hw_random/stm32-rng.c
+> >> @@ -52,7 +52,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+> >>  {
+> >>       struct stm32_rng_private *priv =
+> >>           container_of(rng, struct stm32_rng_private, rng);
+> >> -     u32 sr;
+> >> +     u32 sr = 0;
+> >>       int retval = 0;
+> >>
+> >>       pm_runtime_get_sync((struct device *) priv->rng.priv);
+> >
+> > Does this work as well?
+> >
+> > diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
+> > index 92a810648bd0..5c836b0afa40 100644
+> > --- a/drivers/char/hw_random/stm32-rng.c
+> > +++ b/drivers/char/hw_random/stm32-rng.c
+> > @@ -79,7 +79,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+> >                 max -= sizeof(u32);
+> >         }
+> >
+> > -       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
+> > +       if (WARN_ONCE(retval > 0 && (sr & (RNG_SR_SEIS | RNG_SR_CEIS)),
+> >                       "bad RNG status - %x\n", sr))
+> >                 writel_relaxed(0, priv->base + RNG_SR);
+> >
+> > I think it would be nicer to not add a bogus initialization.
+> Hmm, no sure this nicer.
+> The while loop can break before retval is incremented when sr value is
+> not expected (sr != RNG_SR_DRDY).
+> In that case, we certainly want to print sr value.
 
-drm culture is to keep it above, since it's kinda useful sometimes when
-later on trying to reconstruct wtf was discussed and why a patch was
-merged.
--Daniel
+Ah, you are right.
 
-> 
-> 
-> > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> > ---
-> 
-> aka here.
-> 
-> >  drivers/gpu/drm/rockchip/rockchip_drm_drv.h |  1 +
-> >  drivers/gpu/drm/rockchip/rockchip_drm_fb.c  | 25
-> > ++++++++++++++++++++++--- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 
-> > 6 ++++++
-> >  3 files changed, 29 insertions(+), 3 deletions(-)
-> 
-> Heiko
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+> Maybe the better way is just to initialize sr with status register content?
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+>        pm_runtime_get_sync((struct device *) priv->rng.priv);
+>
+>+       sr = readl_relaxed(priv->base + RNG_SR);
+>        while (max > sizeof(u32)) {
+>-               sr = readl_relaxed(priv->base + RNG_SR);
+>                if (!sr && wait) {
+>                        unsigned int timeout = RNG_TIMEOUT;
+
+
+I think that introduces a bug: you really want to read the status
+register on each loop iteration.
+
+How about moving the error handling into the loop itself?
+
+	Arnd
+
+
+diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
+index 92a810648bd0..fceacd809462 100644
+--- a/drivers/char/hw_random/stm32-rng.c
++++ b/drivers/char/hw_random/stm32-rng.c
+@@ -59,6 +59,10 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+ 
+ 	while (max > sizeof(u32)) {
+ 		sr = readl_relaxed(priv->base + RNG_SR);
++		if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
++			      "bad RNG status - %x\n", sr))
++			writel_relaxed(0, priv->base + RNG_SR);
++
+ 		if (!sr && wait) {
+ 			unsigned int timeout = RNG_TIMEOUT;
+ 
+@@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+ 		max -= sizeof(u32);
+ 	}
+ 
+-	if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
+-		      "bad RNG status - %x\n", sr))
+-		writel_relaxed(0, priv->base + RNG_SR);
+-
+ 	pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
+ 	pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
+ 
