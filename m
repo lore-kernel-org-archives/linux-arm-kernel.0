@@ -1,41 +1,44 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 24 May 2016 08:35:13 +0200
-Subject: [PATCH v2 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
- support
-In-Reply-To: <5742B66C.7080102@rvc.renesas.com>
-References: <1463966906-15129-1-git-send-email-horms+renesas@verge.net.au>
- <1463966906-15129-2-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXsu=O13rLysob1Xp+5vWcp7gq6byCffR-6hGc+W-837A@mail.gmail.com>
- <5742B66C.7080102@rvc.renesas.com>
-Message-ID: <CAMuHMdV+atFKJjxcH7RkBCdabsBqk5Y3TTHCPN+sprDaM1xj_w@mail.gmail.com>
+From: peppe.cavallaro@st.com (Giuseppe CAVALLARO)
+Date: Tue, 24 May 2016 09:08:47 +0200
+Subject: [PATCH 0/2 (linux-stable-4.5.y)] net: stmmac: MDIO fixes
+In-Reply-To: <20160523153619.GA30179@kroah.com>
+References: <1464009463-23654-1-git-send-email-peppe.cavallaro@st.com>
+ <20160523153619.GA30179@kroah.com>
+Message-ID: <5743FDFF.9000704@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Khiem,
+On 5/23/2016 5:36 PM, Greg KH wrote:
+> On Mon, May 23, 2016 at 03:17:41PM +0200, Giuseppe Cavallaro wrote:
+>> These patches port some recent fixes for linux-4.5.y stable branch.
+>> They fix the MDIO settings trying to cover the all possible scenario
+>> when the stmmac is connected to a real transceiver or a switch.
+>>
+>> These patches are needed for Kernel 4.5 where Lime2, BananaPi and Cubieboard2
+>> show problems when use the stmmac:
+>>
+>> https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=823493
+>
+> What are the git commit id for these patches in Linus's tree?
 
-On Mon, May 23, 2016 at 9:51 AM, Khiem Nguyen
-<khiem.nguyen.xt@rvc.renesas.com> wrote:
-> Using 1.0 will open Suspend-to-RAM support if secure firmware supports that
-> feature.
-> However, we might need additional work in drivers to support suspend/resume
-> handlers.
-> So, I suggest that we keep using 0.2 until Suspend-to-RAM feature is
-> confirmed in r8a7795/r8a7796.
+Commits are:
 
-Note that we do have suspend/resume support on R-Car Gen2, albeit some
-drivers may lack code to save/restore state when their devices are powered
-down, as R-Car Gen2 doesn't have power domains for devices.
+stmmac: fix MDIO settings
 
-So I'd expect everything to work fine, as long as no R-Car Gen3-specific
-drivers or devices residing in multimedia power domains are involved.
+    a7657f128c279ae5796ab2ca7d04a7819f4259f0
 
-Gr{oetje,eeting}s,
+and
 
-                        Geert
+Revert "stmmac: Fix 'eth0: No PHY found' regression"
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+    d7e944c8ddc0983640a9a32868fb217485d12ca2
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards
+Peppe
+
+>
+> thanks,
+>
+> greg k-h
+>
+>
