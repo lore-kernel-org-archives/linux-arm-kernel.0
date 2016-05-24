@@ -1,65 +1,96 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Tue, 24 May 2016 00:20:55 -0400
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <20160523105655.GA22902@red-moon>
-References: <1462893601-8937-1-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
- <57331290.7070104@semihalf.com>
- <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
- <CAKv+Gu8fdeJ9OvRSmtu9zyvcjK3O-4WU=jG=6-7t4xZwvV8d2g@mail.gmail.com>
- <95b1d06e-f9c5-39f3-1003-f536b65eef60@redhat.com>
- <CAKv+Gu-_xp_t_Ze3Pw_-82-fmy=tCy-h=4FbP98eLbuXVk2hHQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EDAF6AC@lhreml503-mbs>
- <CAKv+Gu_zpoFsDr7e8zPCDKPpRdKDVH+vnC0nfvmGaJ7xcP3Zng@mail.gmail.com>
- <20160523105655.GA22902@red-moon>
-Message-ID: <f9c8b16b-3027-d90d-c0d1-6afcd45c1e0f@redhat.com>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Tue, 24 May 2016 09:44:47 +0530
+Subject: [PATCH v3 4/4] soc: Add SoC driver for Freescale Vybrid platform
+In-Reply-To: <20160523211813.GA30237@rob-hp-laptop>
+References: <cover.1463737502.git.maitysanchayan@gmail.com>
+ <ffef165d05f71a1b19437171d8fdb4bc78f6b1e3.1463737502.git.maitysanchayan@gmail.com>
+ <20160523211813.GA30237@rob-hp-laptop>
+Message-ID: <20160524041447.GA2884@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/2016 06:56 AM, Lorenzo Pieralisi wrote:
+Hello Rob,
 
-> The only way this can be implemented is by pretending that the
-> ACPI/PCI arch/arm64 implementation is generic code (that's what this
-> series does), move it to /drivers (where it is in this series), and
-> implement _DSD vendor specific bindings (per HID) to set-up the pci
-> operations; whether this solution should go upstream, given that it
-> is just a short-term solution for early platforms bugs, it is another
-> story and my personal answer is no.
+On 16-05-23 16:18:13, Rob Herring wrote:
+> On Fri, May 20, 2016 at 03:32:05PM +0530, Sanchayan Maity wrote:
+> > This adds a SoC driver to be used by Freescale Vybrid SoC's.
+> > Driver utilises syscon and nvmem consumer API's to get the
+> > various register values needed and expose the SoC specific
+> > properties via sysfs.
+> > 
+> > A sample output from Colibri Vybrid VF61 is below:
+> > 
+> > root at colibri-vf:~# cd /sys/bus/soc/devices/soc0
+> > root at colibri-vf:/sys/bus/soc/devices/soc0# ls
+> > family     machine    power      revision   soc_id     subsystem  uevent
+> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat family
+> > Freescale Vybrid VF610
+> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat machine
+> > Freescale Vybrid
+> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat revision
+> > 00000013
+> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat soc_id
+> > df6472a6130f29d4
+> > 
+> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
+> > ---
+> >  .../bindings/arm/freescale/fsl,vf610-soc.txt       |  20 +++
+> >  drivers/soc/Kconfig                                |   1 +
+> >  drivers/soc/fsl/Kconfig                            |  10 ++
+> >  drivers/soc/fsl/Makefile                           |   1 +
+> >  drivers/soc/fsl/soc-vf610.c                        | 198 +++++++++++++++++++++
+> >  5 files changed, 230 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+> >  create mode 100644 drivers/soc/fsl/Kconfig
+> >  create mode 100644 drivers/soc/fsl/soc-vf610.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+> > new file mode 100644
+> > index 0000000..338905d
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
+> > @@ -0,0 +1,20 @@
+> > +Vybrid System-on-Chip
+> > +---------------------
+> > +
+> > +Required properties:
+> > +
+> > +- compatible: "fsl,vf610-soc"
+> > +- rom-revision: phandle to the on-chip ROM node
+> > +- mscm: phandle to the MSCM CPU configuration node
+> > +- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+> > +- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+> 
+> I still have similar concerns as the discussion on the last version. 
+> This version only proves that you aren't describing h/w, but rather just 
+> a collection of data that some driver wants.
+> 
+> A driver can just as easily look-up all the nodes directly that these 
+> phandles point to.
 
-Just for completeness, let me also followup to this one.
+Agreed, that we can look up all the nodes directly that these phandles
+refer to but I would still need a DT entry to bind to. While I could
+bind to existing nodes like mscm cpucfg but that doesn't seem right.
 
-We have real, shipping, systems in the field based on ARMv8. For
-example, HPE Moonshot ProLiant m400. Not everyone loves the first
-generation of anything (Applied get a lot of stick, but the reality is
-that someone had to go first, and whoever that was was going to learn
-all of the lessons that others don't need to) but it is out there and we
-need an upstream kernel solution that includes support for that.
+The very first approach that we had taken was to integrate this functionality
+in mach-vf610.c code under mach-imx
+http://www.spinics.net/lists/devicetree/msg80654.html
 
-In the server world, we (speaking as a major distro vendor here) are not
-going to entertain a situation in which non-upstream patches are needed
-to even boot a platform. That simply won't do. We need to separate out
-the issue of getting the core in place from the quirks, but then we need
-quirks that include support for all early ARMv8 platforms that are out
-there today. If we can't get to a point where a Moonshot[0] cartridge
-boots out of the box with an upstream kernel, let's just give up and do
-something else instead :) (joke)
+and then it was recommended to migrate this to drivers/soc where we did use
+phandles or direct look up via compatible strings
 
-Jon.
+http://www.spinics.net/lists/arm-kernel/msg420847.html
 
-[0] HPE have been *amazingly* patient with this stuff. They've reworked
-the firmware when someone (cough) pointed out that the early stuff
-they'd been fed was not built according to the standards (U-Boot). They
-have *really good* UEFI and ACPI enabled firmware that is running
-RHEL(SA) great. But that's not good enough. We don't ship a distro with
-hacks. We ship a distro derived from upstream code (although we might
-have to backport a lot of stuff later). There's wiggle room, but there
-is not wiggle room for core platforms. On ARM, users and developers
-*will* be able to take an upstream kernel and boot it on their RHEL
-install. And they *will* be able to reproduce problems against upstream,
-and help develop against upstream, and further the upstream first
-mentality in the ARM ecosystem. There will not be "oh well, it runs RHEL
-so that's good enough for the early generation...".
+and
 
--- 
-Computer Architect | Sent from my Fedora powered laptop
+http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
+
+There hasn't been a consensus since v1.
+
+> 
+> And as long as we have inconsistent use of soc_device, I don't want to 
+> see any compatible strings related to it.
+> 
+
+Regards,
+Sanchayan.
