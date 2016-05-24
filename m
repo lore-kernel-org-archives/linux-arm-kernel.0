@@ -1,277 +1,201 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Mon, 23 May 2016 21:48:26 -0400 (EDT)
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <426907D3-FBE7-458F-AB94-F64489AB0337@redhat.com>
-References: <EE11001F9E5DDD47B7634E2F8A612F2E1ED8DF51@lhreml503-mbs>
- <57331290.7070104@semihalf.com>
- <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
- <CAKv+Gu8fdeJ9OvRSmtu9zyvcjK3O-4WU=jG=6-7t4xZwvV8d2g@mail.gmail.com>
- <95b1d06e-f9c5-39f3-1003-f536b65eef60@redhat.com>
- <CAKv+Gu-_xp_t_Ze3Pw_-82-fmy=tCy-h=4FbP98eLbuXVk2hHQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EDAF6AC@lhreml503-mbs>
- <CAKv+Gu_zpoFsDr7e8zPCDKPpRdKDVH+vnC0nfvmGaJ7xcP3Zng@mail.gmail.com>
- <20160523105655.GA22902@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EDB35A5@lhreml503-mbs>
- <20160523233918.GA32555@localhost>
- <426907D3-FBE7-458F-AB94-F64489AB0337@redhat.com>
-Message-ID: <7D3F6BBE-A810-489F-A257-AD305B21A288@redhat.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Tue, 24 May 2016 10:54:38 +0900
+Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC support
+In-Reply-To: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
+References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Additional: I would like to thank Ard for suggesting this approach. It turns out (apparently) that Mark Salter's initial X-Gene quirks internal to RH did it this way as well. You great minds think alike. If this works for folks then I hope it leads to upstream kernel support in F25 (we have a bunch of Moonshot hardware we would like to deeply in Fedora but can't without the PCIe network...). I rant only because I care :)
+Basic support for the Gen 3 R-Car M3-W SoC.
 
-Jon.
+Based on work for the r8a7795 and r8a7796 SoCs by
+Takeshi Kihara, Dirk Behme and Geert Uytterhoeven.
 
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v3
+* As suggested by Geert Uytterhoeven:
+  - Drop 0x from unit address of gic
+* As suggested by Khiem Nguyen:
+  - Use psci-0.2
+* Added Reviewed-by tag from Geert Uytterhoeven
+
+v2
+* As suggested by Geert Uytterhoeven:
+  - Move L2_CA57 node under cpus node and include reg property
+  - Omit status = "disabled" from scif_clk node
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt |   4 +
+ arch/arm64/Kconfig.platforms                       |   6 ++
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 120 +++++++++++++++++++++
+ 3 files changed, 130 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7796.dtsi
+
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 9cf67e48f222..d5ed554830d7 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -29,6 +29,8 @@ SoCs:
+     compatible = "renesas,r8a7794"
+   - R-Car H3 (R8A77950)
+     compatible = "renesas,r8a7795"
++  - R-Car M3-W (R8A77960)
++    compatible = "renesas,r8a7796"
+ 
+ 
+ Boards:
+@@ -61,5 +63,7 @@ Boards:
+     compatible = "renesas,porter", "renesas,r8a7791"
+   - Salvator-X (RTP0RC7795SIPB0010S)
+     compatible = "renesas,salvator-x", "renesas,r8a7795";
++  - Salvator-X
++    compatible = "renesas,salvator-x", "renesas,r8a7796";
+   - SILK (RTP0RC7794LCB00011S)
+     compatible = "renesas,silk", "renesas,r8a7794"
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index efa77c146415..16d8d26839ea 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -114,6 +114,12 @@ config ARCH_R8A7795
+ 	help
+ 	  This enables support for the Renesas R-Car H3 SoC.
+ 
++config ARCH_R8A7796
++	bool "Renesas R-Car M3-W SoC Platform"
++	depends on ARCH_RENESAS
++	help
++	  This enables support for the Renesas R-Car M3-W SoC.
++
+ config ARCH_STRATIX10
+ 	bool "Altera's Stratix 10 SoCFPGA Family"
+ 	help
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+new file mode 100644
+index 000000000000..178debf68318
+--- /dev/null
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -0,0 +1,120 @@
++/*
++ * Device Tree Source for the r8a7796 SoC
++ *
++ * Copyright (C) 2016 Renesas Electronics Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++#include <dt-bindings/clock/r8a7796-cpg-mssr.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/ {
++	compatible = "renesas,r8a7796";
++	#address-cells = <2>;
++	#size-cells = <2>;
++
++	psci {
++		compatible = "arm,psci-0.2";
++		method = "smc";
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		/* 1 core only at this point */
++		a57_0: cpu at 0 {
++			compatible = "arm,cortex-a57", "arm,armv8";
++			reg = <0x0>;
++			device_type = "cpu";
++			next-level-cache = <&L2_CA57>;
++			enable-method = "psci";
++		};
++
++		L2_CA57: cache-controller at 0 {
++			compatible = "cache";
++			reg = <0>;
++			cache-unified;
++			cache-level = <2>;
++		};
++	};
++
++	extal_clk: extal {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board */
++		clock-frequency = <0>;
++	};
++
++	extalr_clk: extalr {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board */
++		clock-frequency = <0>;
++	};
++
++	/* External SCIF clock - to be overridden by boards that provide it */
++	scif_clk: scif {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		interrupt-parent = <&gic>;
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++
++		gic: interrupt-controller at f1010000 {
++			compatible = "arm,gic-400";
++			#interrupt-cells = <3>;
++			#address-cells = <0>;
++			interrupt-controller;
++			reg = <0x0 0xf1010000 0 0x1000>,
++			      <0x0 0xf1020000 0 0x20000>,
++			      <0x0 0xf1040000 0 0x20000>,
++			      <0x0 0xf1060000 0 0x20000>;
++			interrupts = <GIC_PPI 9
++					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
++		};
++
++		timer {
++			compatible = "arm,armv8-timer";
++			interrupts = <GIC_PPI 13
++					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 14
++					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 11
++					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>,
++				     <GIC_PPI 10
++					(GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_LOW)>;
++		};
++
++		cpg: clock-controller at e6150000 {
++			compatible = "renesas,r8a7796-cpg-mssr";
++			reg = <0 0xe6150000 0 0x1000>;
++			clocks = <&extal_clk>, <&extalr_clk>;
++			clock-names = "extal", "extalr";
++			#clock-cells = <2>;
++			#power-domain-cells = <0>;
++		};
++
++		scif2: serial at e6e88000 {
++			compatible = "renesas,scif-r8a7796",
++				     "renesas,rcar-gen3-scif", "renesas,scif";
++			reg = <0 0xe6e88000 0 64>;
++			interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 310>,
++				 <&cpg CPG_CORE R8A7796_CLK_S3D1>,
++				 <&scif_clk>;
++			clock-names = "fck", "brg_int", "scif_clk";
++			power-domains = <&cpg>;
++			status = "disabled";
++		};
++	};
++};
 -- 
-Computer Architect | Sent from my 64-bit #ARM Powered phone
-
-> On May 23, 2016, at 21:11, Jon Masters <jcm@redhat.com> wrote:
-> 
-> Bjorn,
-> 
-> Out walking so sorry about top posting. Quick reply though:
-> 
-> 1. I checked with the Windows team. They usually avoid quirks entirely but when it has happened, it has been done via the MCFG/FADT not DSDT.
-> 
-> 2. They would be ok if we were to key off the OEM  name and revision for the IP in the MCFG table.
-> 
-> 3. I have already verified existing shipping ARMv8 systems provide enough unique data in that entry, and have asked that vendors guarantee to rev it in future IP (which I will verify on models pre tapeout and certainly in early firmware builds). One vendor has a platform that isn't public yet that uses a non-public name in the MCFG but I spoke with them on Friday and they will shortly update their firmware so that a quirk could be posted.
-> 
-> 4. I have requested (and Linaro are investigating) that Linaro (with ARM's assistance) begin to drive a separate thread around upstreaming (independent of this core effort) quirks that use the OEM fields in the MCFG as a more scalable approach than one per platform via DMI.
-> 
-> 5. I will drive a clarification to the SBBR that does not encourage or endorse quirks but does merely reinforce that data must be unique in such tables. I am driving a separate series of conversations with vendors to ensure that this is the case on all future platforms - though just generally, there is no more high end top shelf "Xeon class" silicon needing common quirks in the pipeline.
-> 
-> More later.
-> 
-> Jon.
-> 
-> -- 
-> Computer Architect | Sent from my 64-bit #ARM Powered phone
-> 
->>> On May 23, 2016, at 19:39, Bjorn Helgaas <helgaas@kernel.org> wrote:
->>> 
->>> On Mon, May 23, 2016 at 03:16:01PM +0000, Gabriele Paoloni wrote:
->>> Hi Lorenzo
->>> 
->>>> -----Original Message-----
->>>> From: Lorenzo Pieralisi [mailto:lorenzo.pieralisi at arm.com]
->>>> Sent: 23 May 2016 11:57
->>>> To: Ard Biesheuvel
->>>> Cc: Gabriele Paoloni; Jon Masters; Tomasz Nowicki; helgaas at kernel.org;
->>>> arnd at arndb.de; will.deacon at arm.com; catalin.marinas at arm.com;
->>>> rafael at kernel.org; hanjun.guo at linaro.org; okaya at codeaurora.org;
->>>> jchandra at broadcom.com; linaro-acpi at lists.linaro.org; linux-
->>>> pci at vger.kernel.org; dhdang at apm.com; Liviu.Dudau at arm.com;
->>>> ddaney at caviumnetworks.com; jeremy.linton at arm.com; linux-
->>>> kernel at vger.kernel.org; linux-acpi at vger.kernel.org;
->>>> robert.richter at caviumnetworks.com; Suravee.Suthikulpanit at amd.com;
->>>> msalter at redhat.com; Wangyijing; mw at semihalf.com;
->>>> andrea.gallo at linaro.org; linux-arm-kernel at lists.infradead.org
->>>> Subject: Re: [PATCH V7 00/11] Support for generic ACPI based PCI host
->>>> controller
->>>> 
->>>>> On Fri, May 20, 2016 at 11:14:03AM +0200, Ard Biesheuvel wrote:
->>>>> On 20 May 2016 at 10:40, Gabriele Paoloni
->>>> <gabriele.paoloni@huawei.com> wrote:
->>>>>> Hi Ard
->>>>>> 
->>>>>>> -----Original Message-----
->>>>>>> From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
->>>>> [...]
->>>>>>> 
->>>>>>> Is the PCIe root complex so special that you cannot simply
->>>> describe an
->>>>>>> implementation that is not PNP0408 compatible as something else,
->>>> under
->>>>>>> its own unique HID? If everybody is onboard with using ACPI, how
->>>> is
->>>>>>> this any different from describing other parts of the platform
->>>>>>> topology? Even if the SBSA mandates generic PCI, they already
->>>> deviated
->>>>>>> from that when they built the hardware, so pretending that it is a
->>>>>>> PNP0408 with quirks really does not buy us anything.
->>>>>> 
->>>>>> From my understanding we want to avoid this as this would allow
->>>> each
->>>>>> vendor to come up with his own code and it would be much more
->>>> effort
->>>>>> for the PCI maintainer to rework the PCI framework to accommodate
->>>> X86
->>>>>> and "all" ARM64 Host Controllers...
->>>>>> 
->>>>>> I guess this approach is too risky and we want to avoid this.
->>>> Through
->>>>>> standardization we can more easily maintain the code and scale it
->>>> to
->>>>>> multiple SoCs...
->>>>>> 
->>>>>> So this is my understanding; maybe Jon, Tomasz or Lorenzo can give
->>>>>> a bit more explanation...
->>>>> 
->>>>> OK, so that boils down to recommending to vendors to represent known
->>>>> non-compliant hardware as compliant, just so that we don't have to
->>>>> change the code to support additional flavors of ECAM ? It's fine to
->>>>> be pragmatic, but that sucks.
->>>>> 
->>>>> We keep confusing the x86 case with the ARM case here: for x86, they
->>>>> needed to deal with broken hardware *after* the fact, and all they
->>>>> could do is find /some/ distinguishing feature in order to guess
->>>> which
->>>>> exact hardware they might be running on. For arm64, it is the
->>>> opposite
->>>>> case. We are currently in a position where we can demand vendors to
->>>>> comply with the standards they endorsed themselves, and (ab)using
->>>> ACPI
->>>>> + DMI as a de facto platform description rather than plain ACPI makes
->>>>> me think the DT crowd were actually right from the beginning. It
->>>>> *directly* violates the standardization principle, since it requires
->>>> a
->>>>> priori knowledge inside the OS that a certain 'generic' device must
->>>> be
->>>>> driven in a special way.
->>>>> 
->>>>> So can anyone comment on the feasibility of adding support for
->>>> devices
->>>>> with vendor specific HIDs (and no generic CIDs) to the current ACPI
->>>>> ECAM driver in Linux?
->> 
->> I don't think of ECAM support itself as a "driver".  It's just a
->> service available to drivers, similar to OF resource parsing.
->> 
->> Per PCI Firmware r3.2, sec 4.1.5, "PNP0A03" means a PCI/PCI-X/PCIe
->> host bridge.  "PNP0A08" means a PCI-X Mode 2 or PCIe bridge that
->> supports extended config space.  It doesn't specify how we access that
->> config space, so I think hardware with non-standard ECAM should still
->> have PNP0A03 and PNP0A08 in _CID or _HID.
->> 
->> "ECAM" as used in the specs (PCIe r3.0, sec 7.2.2, and PCI Firmware
->> r3.2, sec 4.1) means:
->> 
->> (a) a memory-mapped model for config space access, and
->> (b) a specific mapping of address bits to bus/device/function/
->>     register
->> 
->> MCFG and _CBA assume both (a) and (b), so I think a device with
->> non-standard ECAM mappings should not be described in MCFG or _CBA.
->> 
->> If a bridge has ECAM with non-standard mappings, I think either a
->> vendor-specific _HID or a device-specific method, e.g., _DSM, could
->> communicate that.
->> 
->> Jon, I agree that we should avoid describing non-standardized hardware
->> in Linux-specific ways.  Is there a mechanism in use already?  How
->> does Windows handle this?  DMI is a poor long-term solution because it
->> requires ongoing maintenance for new platforms, but I think it's OK
->> for getting started with platforms already shipping.
->> 
->> A _DSM has the advantage that once it is defined and supported, OEMs
->> can ship new platforms without requiring a new quirk or a new _HID to
->> be added to a driver.
->> 
->> There would still be the problem of config access before the namespace
->> is available, i.e., the MCFG use case.  I don't know how important
->> that is.  Defining an MCFG extension seems like the most obvious
->> solution.
->> 
->> If we only expect a few non-standard devices, maybe it's enough to
->> have DMI quirks to statically set up ECAM and just live with the
->> inconvenience of requiring a kernel change for every new non-standard
->> device.
->> 
->>>> Host bridges in ACPI are handled through PNP0A08/PNP0A03 ids, and
->>>> most of the arch specific code is handled in the respective arch
->>>> directories (X86 and IA64, even though IA64 does not rely on ECAM/MCFG
->>>> for
->>>> PCI ops), it is not a driver per-se, PNP0A08/PNP0A03 are detected
->>>> through
->>>> ACPI scan handlers and the respective arch code (ie pci_acpi_scan_root)
->>>> sets-up resources AND config space on an arch specific basis.
->>>> 
->>>> X86 deals with that with code in arch/x86 that sets-up the pci_raw_ops
->>>> on a platform specific basis (and it is not nice, but it works because
->>>> as you all know the number of platforms in X86 world is contained).
->>>> 
->>>> Will this happen for ARM64 in arch/arm64 based on vendor specific
->>>> HIDs ?
->>>> 
->>>> No.
->>>> 
->>>> So given the current state of play (we were requested to move the
->>>> arch/arm64 specific ACPI PCI bits to arch/arm64), we would end up
->>>> with arch/arm64 code requiring code in /drivers to set-up pci_ops
->>>> in a platform specific way, it is horrible, if feasible at all.
->>>> 
->>>> The only way this can be implemented is by pretending that the
->>>> ACPI/PCI arch/arm64 implementation is generic code (that's what this
->>>> series does), move it to /drivers (where it is in this series), and
->>>> implement _DSD vendor specific bindings (per HID) to set-up the pci
->>>> operations; whether this solution should go upstream, given that it
->>>> is just a short-term solution for early platforms bugs, it is another
->>>> story and my personal answer is no.
->> 
->> It seems like there should be a way to look for a _DSM before we call
->> acpi_pci_root_get_mcfg_addr() to look for _CBA.
->> 
->> Currently we call acpi_pci_root_get_mcfg_addr() (to read _CBA) from
->> the generic acpi_pci_root_add(), but the result (root->mcfg_addr) is
->> only used in x86-specific code.  I think it would be nicer if the
->> lookup and the use were together.  Then it would be easier to override
->> it because the mapping assumptions would all be in one place.
->> 
->>> I think it shouldn't be too bad to move quirk handling mechanism to
->>> arch/arm64. Effectively we would not move platform specific code into
->>> arch/arm64 but just the mechanism checking if there is any quirk that
->>> is defined.
->>> 
->>> i.e.:
->>> 
->>> extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
->>> extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
->>> 
->>> static struct pci_ecam_ops *pci_acpi_get_ops(struct acpi_pci_root *root)
->>> {
->>>       int bus_num = root->secondary.start;
->>>       int domain = root->segment;
->>>       struct pci_cfg_fixup *f;
->>> 
->>>       /*
->>>        * Match against platform specific quirks and return corresponding
->>>        * CAM ops.
->>>        *
->>>        * First match against PCI topology <domain:bus> then use DMI or
->>>        * custom match handler.
->>>        */
->>>       for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
->>>               if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
->>>                   (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
->>>                   (f->system ? dmi_check_system(f->system) : 1) &&
->>>                   (f->match ? f->match(f, root) : 1))
->>>                       return f->ops;
->>>       }
->>>       /* No quirks, use ECAM */
->>>       return &pci_generic_ecam_ops;
->>> }
->>> 
->>> Such quirks will be defined anyway in drivers/pci/host/ in the vendor
->>> specific quirk implementations.
->>> 
->>> e.g. in HiSilicon case we would have
->>> 
->>> DECLARE_ACPI_MCFG_FIXUP(NULL, hisi_pcie_match, &hisi_pcie_ecam_ops,
->>>           PCI_MCFG_DOMAIN_ANY, PCI_MCFG_BUS_ANY);
->>> 
->>> in "drivers/pci/host/pcie-hisi-acpi.c "
->>> 
->>> Thanks
->>> 
->>> Gab
->> 
->> Sorry Gab, I guess I was really responding to earlier messages :)
->> 
->> I don't really have much to say here, except that it doesn't seem
->> right to have an MCFG that describes a non-standard ECAM mapping.
->> I suppose there's already firmware in the field that does that,
->> though?
->> 
->> Bjorn
+2.1.4
