@@ -1,61 +1,93 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 24 May 2016 15:07:52 +0200
-Subject: [PATCH 2/3] soc: rockchip: add driver handling grf setup
-In-Reply-To: <6a6e87ee-688d-90a3-2407-22847bd80971@rock-chips.com>
-References: <1464015539-19521-1-git-send-email-heiko@sntech.de>
- <1464015539-19521-3-git-send-email-heiko@sntech.de>
- <6a6e87ee-688d-90a3-2407-22847bd80971@rock-chips.com>
-Message-ID: <7631878.OiMWPcBrqd@phil>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 24 May 2016 15:18:38 +0200
+Subject: [PATCH 7/7] arm64: KVM: vgic-v3: Relax synchronization when SRE==1
+In-Reply-To: <574450DB.5010409@arm.com>
+References: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
+ <1464007023-11736-8-git-send-email-marc.zyngier@arm.com>
+ <20160524125233.GG3582@cbox> <574450DB.5010409@arm.com>
+Message-ID: <20160524131838.GH3582@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 24. Mai 2016, 10:22:09 schrieb Shawn Lin:
-> Hi Heiko,
-> 
-> On 2016/5/23 22:58, Heiko Stuebner wrote:
-> > The General Register Files are an area of registers containing a lot
-> > of single-bit settings for numerous components as well full components
-> > like usbphy control. Therefore all used components are accessed
-> > via the syscon provided by the grf nodes or from the sub-devices
-> > created through the simple-mfd created from the grf node.
+On Tue, May 24, 2016 at 02:02:19PM +0100, Marc Zyngier wrote:
+> On 24/05/16 13:52, Christoffer Dall wrote:
+> > On Mon, May 23, 2016 at 01:37:03PM +0100, Marc Zyngier wrote:
+> >> The GICv3 backend of the vgic is quite barrier heavy, in order
+> >> to ensure synchronization of the system registers and the
+> >> memory mapped view for a potential GICv2 guest.
+> >>
+> >> But when the guest is using a GICv3 model, there is absolutely
+> >> no need to execute all these heavy barriers, and it is actually
+> >> beneficial to avoid them altogether.
+> >>
+> >> This patch makes the synchonization conditional, and ensures
+> >> that we do not change the EL1 SRE settings if we do not need to.
+> >>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 23 ++++++++++++++++-------
+> >>  1 file changed, 16 insertions(+), 7 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> >> index 40c3b4c..5f8f80b 100644
+> >> --- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> >> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
+> >> @@ -169,7 +169,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+> >>  	 * Make sure stores to the GIC via the memory mapped interface
+> >>  	 * are now visible to the system register interface.
+> >>  	 */
+> >> -	dsb(st);
+> >> +	if (!cpu_if->vgic_sre)
+> >> +		dsb(st);
+> >>  
+> >>  	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
+> >>  
+> >> @@ -235,8 +236,12 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+> >>  
+> >>  	val = read_gicreg(ICC_SRE_EL2);
+> >>  	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
+> >> -	isb(); /* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+> >> -	write_gicreg(1, ICC_SRE_EL1);
+> >> +
+> >> +	if (!cpu_if->vgic_sre) {
+> >> +		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+> >> +		isb();
+> >> +		write_gicreg(1, ICC_SRE_EL1);
 > > 
-> > Some settings are not used by anything but will need to be set up
-> > according to expectations on the kernel side.
-> > 
-> > Best example is the force_jtag setting, which defaults to on and
-> > results in the soc switching the pin-outputs between jtag and sdmmc
-> > automatically depending on the card-detect status. This conflicts
-> > heavily with how the dw_mmc driver expects to do its work and also
-> > with the clock-controller, which has most likely deactivated the
-> > jtag clock due to it being unused.
+> > why the change in behavior to only write 1 to the register when
+> > (!cpu_if->vgic_sre) ?
 > 
-> I agree we should disable force_jtag for real product. But on my local
-> branch we add a callback to parse a tag from cmdline. Sometime it's
-> useful for debugging in case of we need to setup JTAG for reproducing
-> and comfirming serious issue in which state the CPU cannot reponse to
-> any console input or FIQ-debug triggering.
->
-> Should we need it for upstream as you move all related code in this
-> new driver?  I'm not sure.
+> If we're on a GICv3 host and emulating a GICv3 guest, then we never
+> changed the SRE mode (i.e. it is still set to 1). The only case we
+> change it is when we when have a GICv2 guest (i.e. when vgic_sre is zero).
+> 
+> So there is no need to restore the host configuration unless we actually
+> changed it...
+> 
+> > 
+> >> +	}
+> >>  }
+> >>  
+> >>  void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+> >> @@ -255,8 +260,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+> >>  	 * been actually programmed with the value we want before
+> >>  	 * starting to mess with the rest of the GIC.
+> >>  	 */
+> >> -	write_gicreg(cpu_if->vgic_sre, ICC_SRE_EL1);
+> >> -	isb();
+> >> +	if (!cpu_if->vgic_sre) {
+> >> +		write_gicreg(0, ICC_SRE_EL1);
+> >> +		isb();
+> >> +	}
+> 
+> ... here.
+> 
+> Does it make sense? I could also split this as part of another patch if
+> you think that's clearer.
 
-This driver really _should not_ become a catchall for settings stuff.
-I.e. the jtag/sdmmc switch handles the automatic switching done inside the 
-soc based on the card-detect state. Which confuses the dw_mmc driver.
+No makes totally sense, I just didn't see it because I'm GICed these
+days.
 
-If I'm reading that correctly in the TRM, jtag on Rockchip SoCs is part of 
-the coresight infrastructure - in the DAP block.
-There are generic drivers + devicetree bindings for (I think most) coresight 
-blocks existing now, but I haven't found anything related to the DAP itself.
+Thanks for the explanation, and:
 
-In theory I'd think real handling of jtag pins/clocks should be done 
-somewhere in that area and and if jtag is to be used,it could then be set up 
-using in-kernel mechanics, like disabling sdmmc that claims the shared pins 
-and enabling the jtag pinctrl and clocks.
-
-This could even be doable at runtime via devicetree overlays.
-
-
-Most likely way out of scope for now, but that is where I would imagine this 
-stuff to be.
-
-Heiko
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
