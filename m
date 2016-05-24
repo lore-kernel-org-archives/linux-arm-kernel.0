@@ -1,157 +1,94 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:38 +0200
-Subject: [PULL 44/59] KVM: arm/arm64: vgic-new: vgic_kvm_device: implement
- kvm_vgic_addr
+Date: Tue, 24 May 2016 11:09:39 +0200
+Subject: [PULL 45/59] KVM: arm/arm64: vgic-new: vgic_kvm_device:
+ KVM_DEV_ARM_VGIC_GRP_ADDR
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-45-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-46-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Auger <eric.auger@linaro.org>
 
-kvm_vgic_addr is used by the userspace to set the base address of
-the following register regions, as seen by the guest:
-- distributor(v2 and v3),
-- re-distributors (v3),
-- CPU interface (v2).
+This patch implements the KVM_DEV_ARM_VGIC_GRP_ADDR group which
+enables to set the base address of GIC regions as seen by the guest.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/vgic/vgic.h             |  2 +
- virt/kvm/arm/vgic/vgic-kvm-device.c | 86 +++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h            |  3 ++
- 3 files changed, 91 insertions(+)
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 38 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 00e3dca..3689b9b 100644
---- a/include/kvm/vgic/vgic.h
-+++ b/include/kvm/vgic/vgic.h
-@@ -194,6 +194,8 @@ struct vgic_cpu {
- 	u64 live_lrs;
- };
- 
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-+
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level);
- 
 diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index e153f12..082829a 100644
+index 082829a..a709097 100644
 --- a/virt/kvm/arm/vgic/vgic-kvm-device.c
 +++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -16,10 +16,96 @@
- #include <linux/kvm_host.h>
- #include <kvm/arm_vgic.h>
- #include <linux/uaccess.h>
-+#include <asm/kvm_mmu.h>
- #include "vgic.h"
+@@ -112,6 +112,17 @@ static int vgic_set_common_attr(struct kvm_device *dev,
+ 	int r;
  
- /* common helpers */
+ 	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 addr;
++		unsigned long type = (unsigned long)attr->attr;
++
++		if (copy_from_user(&addr, uaddr, sizeof(addr)))
++			return -EFAULT;
++
++		r = kvm_vgic_addr(dev->kvm, type, &addr, true);
++		return (r == -ENODEV) ? -ENXIO : r;
++	}
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 		u32 val;
+@@ -164,6 +175,19 @@ static int vgic_get_common_attr(struct kvm_device *dev,
+ 	int r = -ENXIO;
  
-+static int vgic_check_ioaddr(struct kvm *kvm, phys_addr_t *ioaddr,
-+			     phys_addr_t addr, phys_addr_t alignment)
-+{
-+	if (addr & ~KVM_PHYS_MASK)
-+		return -E2BIG;
+ 	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR: {
++		u64 __user *uaddr = (u64 __user *)(long)attr->addr;
++		u64 addr;
++		unsigned long type = (unsigned long)attr->attr;
 +
-+	if (!IS_ALIGNED(addr, alignment))
-+		return -EINVAL;
++		r = kvm_vgic_addr(dev->kvm, type, &addr, false);
++		if (r)
++			return (r == -ENODEV) ? -ENXIO : r;
 +
-+	if (!IS_VGIC_ADDR_UNDEF(*ioaddr))
-+		return -EEXIST;
-+
-+	return 0;
-+}
-+
-+/**
-+ * kvm_vgic_addr - set or get vgic VM base addresses
-+ * @kvm:   pointer to the vm struct
-+ * @type:  the VGIC addr type, one of KVM_VGIC_V[23]_ADDR_TYPE_XXX
-+ * @addr:  pointer to address value
-+ * @write: if true set the address in the VM address space, if false read the
-+ *          address
-+ *
-+ * Set or get the vgic base addresses for the distributor and the virtual CPU
-+ * interface in the VM physical address space.  These addresses are properties
-+ * of the emulated core/SoC and therefore user space initially knows this
-+ * information.
-+ * Check them for sanity (alignment, double assignment). We can't check for
-+ * overlapping regions in case of a virtual GICv3 here, since we don't know
-+ * the number of VCPUs yet, so we defer this check to map_resources().
-+ */
-+int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write)
-+{
-+	int r = 0;
-+	struct vgic_dist *vgic = &kvm->arch.vgic;
-+	int type_needed;
-+	phys_addr_t *addr_ptr, alignment;
-+
-+	mutex_lock(&kvm->lock);
-+	switch (type) {
-+	case KVM_VGIC_V2_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		alignment = SZ_4K;
++		if (copy_to_user(uaddr, &addr, sizeof(addr)))
++			return -EFAULT;
 +		break;
-+	case KVM_VGIC_V2_ADDR_TYPE_CPU:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V2;
-+		addr_ptr = &vgic->vgic_cpu_base;
-+		alignment = SZ_4K;
-+		break;
-+#ifdef CONFIG_KVM_ARM_VGIC_V3
-+	case KVM_VGIC_V3_ADDR_TYPE_DIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_dist_base;
-+		alignment = SZ_64K;
-+		break;
-+	case KVM_VGIC_V3_ADDR_TYPE_REDIST:
-+		type_needed = KVM_DEV_TYPE_ARM_VGIC_V3;
-+		addr_ptr = &vgic->vgic_redist_base;
-+		alignment = SZ_64K;
-+		break;
-+#endif
-+	default:
-+		r = -ENODEV;
-+		goto out;
 +	}
-+
-+	if (vgic->vgic_model != type_needed) {
-+		r = -ENODEV;
-+		goto out;
-+	}
-+
-+	if (write) {
-+		r = vgic_check_ioaddr(kvm, addr_ptr, *addr, alignment);
-+		if (!r)
-+			*addr_ptr = *addr;
-+	} else {
-+		*addr = *addr_ptr;
-+	}
-+
-+out:
-+	mutex_unlock(&kvm->lock);
-+	return r;
-+}
-+
- static int vgic_set_common_attr(struct kvm_device *dev,
- 				struct kvm_device_attr *attr)
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+ 
+@@ -227,6 +251,13 @@ static int vgic_v2_has_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
  {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 77b0ab3..6abc9a3 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -19,6 +19,9 @@
- #define PRODUCT_ID_KVM		0x4b	/* ASCII code K */
- #define IMPLEMENTER_ARM		0x43b
- 
-+#define VGIC_ADDR_UNDEF		(-1)
-+#define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
-+
- #define INTERRUPT_ID_BITS_SPIS	10
- #define VGIC_PRI_BITS		5
- 
+ 	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR:
++		switch (attr->attr) {
++		case KVM_VGIC_V2_ADDR_TYPE_DIST:
++		case KVM_VGIC_V2_ADDR_TYPE_CPU:
++			return 0;
++		}
++		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
+ 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
+@@ -267,6 +298,13 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 			    struct kvm_device_attr *attr)
+ {
+ 	switch (attr->group) {
++	case KVM_DEV_ARM_VGIC_GRP_ADDR:
++		switch (attr->attr) {
++		case KVM_VGIC_V3_ADDR_TYPE_DIST:
++		case KVM_VGIC_V3_ADDR_TYPE_REDIST:
++			return 0;
++		}
++		break;
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
+ 	case KVM_DEV_ARM_VGIC_GRP_CTRL:
 -- 
 2.1.2.330.g565301e.dirty
