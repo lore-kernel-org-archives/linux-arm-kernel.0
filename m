@@ -1,89 +1,57 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 24 May 2016 14:02:19 +0100
-Subject: [PATCH 7/7] arm64: KVM: vgic-v3: Relax synchronization when SRE==1
-In-Reply-To: <20160524125233.GG3582@cbox>
-References: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
- <1464007023-11736-8-git-send-email-marc.zyngier@arm.com>
- <20160524125233.GG3582@cbox>
-Message-ID: <574450DB.5010409@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 May 2016 14:02:56 +0100
+Subject: [PATCH 1/1] arm64: fix flush_cache_range
+In-Reply-To: <574446B9.8040105@huawei.com>
+References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
+Message-ID: <20160524130255.GU4892@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/16 13:52, Christoffer Dall wrote:
-> On Mon, May 23, 2016 at 01:37:03PM +0100, Marc Zyngier wrote:
->> The GICv3 backend of the vgic is quite barrier heavy, in order
->> to ensure synchronization of the system registers and the
->> memory mapped view for a potential GICv2 guest.
->>
->> But when the guest is using a GICv3 model, there is absolutely
->> no need to execute all these heavy barriers, and it is actually
->> beneficial to avoid them altogether.
->>
->> This patch makes the synchonization conditional, and ensures
->> that we do not change the EL1 SRE settings if we do not need to.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp/vgic-v3-sr.c | 23 ++++++++++++++++-------
->>  1 file changed, 16 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
->> index 40c3b4c..5f8f80b 100644
->> --- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
->> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
->> @@ -169,7 +169,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->>  	 * Make sure stores to the GIC via the memory mapped interface
->>  	 * are now visible to the system register interface.
->>  	 */
->> -	dsb(st);
->> +	if (!cpu_if->vgic_sre)
->> +		dsb(st);
->>  
->>  	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
->>  
->> @@ -235,8 +236,12 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->>  
->>  	val = read_gicreg(ICC_SRE_EL2);
->>  	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
->> -	isb(); /* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
->> -	write_gicreg(1, ICC_SRE_EL1);
->> +
->> +	if (!cpu_if->vgic_sre) {
->> +		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
->> +		isb();
->> +		write_gicreg(1, ICC_SRE_EL1);
+On Tue, May 24, 2016 at 08:19:05PM +0800, Leizhen (ThunderTown) wrote:
+> On 2016/5/24 19:37, Mark Rutland wrote:
+> > On Tue, May 24, 2016 at 07:16:37PM +0800, Zhen Lei wrote:
+> >> When we ran mprotect04(a test case in LTP) infinitely, it would always
+> >> failed after a few seconds. The case can be described briefly that: copy
+> >> a empty function from code area into a new memory area(created by mmap),
+> >> then call mprotect to change the protection to PROT_EXEC. The syscall
+> >> sys_mprotect will finally invoke flush_cache_range, but this function
+> >> currently only invalid icache, the operation of flush dcache is missed.
+> > 
+> > In the LTP code I see powerpc-specific D-cache / I-cache synchronisation
+> > (i.e. d-cache cleaning followed by I-cache invalidation), so there
+> > appears to be some expectation of userspace maintenance. Hoever, there
+> > is no such ARM-specific I-cache maintenance.
 > 
-> why the change in behavior to only write 1 to the register when
-> (!cpu_if->vgic_sre) ?
+> But I see some other platforms have D-cache maintenance, like: arch/nios2/mm/cacheflush.c
+> And according to the name of flush_cache_range, it should do this, I judged. Otherwise,
+> mprotect04 will be failed on more platforms, it's easy to discover. Only PPC have specific
+> cache synchronization, maybe it meets some hardware limitation. It's impossible a programmer
+> fixed a common bug on only one platform but leave others unchanged.
 
-If we're on a GICv3 host and emulating a GICv3 guest, then we never
-changed the SRE mode (i.e. it is still set to 1). The only case we
-change it is when we when have a GICv2 guest (i.e. when vgic_sre is zero).
+flush_cache_range() is primarily used on VIVT caches before changing the
+mapping and should not really be implemented on arm64. I don't recall
+why we still have the I-cache invalidation, possibly for the ASID-tagged
+VIVT I-cache case, though we should have a specific check for this.
 
-So there is no need to restore the host configuration unless we actually
-changed it...
+There are some other cases where flush_cache_range() is called and no
+D-cache maintenance is necessary on arm64, so I don't want to penalise
+them by implementing flush_cache_range().
 
+> > It looks like the test may be missing I-cache maintenance regardless of
+> > the semantics of mprotect in this case.
+> > 
+> > I have not yet devled into flush_cache_range and how it is called.
 > 
->> +	}
->>  }
->>  
->>  void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->> @@ -255,8 +260,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->>  	 * been actually programmed with the value we want before
->>  	 * starting to mess with the rest of the GIC.
->>  	 */
->> -	write_gicreg(cpu_if->vgic_sre, ICC_SRE_EL1);
->> -	isb();
->> +	if (!cpu_if->vgic_sre) {
->> +		write_gicreg(0, ICC_SRE_EL1);
->> +		isb();
->> +	}
+> SYSCALL_DEFINE3(mprotect ---> mprotect_fixup ---> change_protection ---> change_protection_range --> flush_cache_range
 
-... here.
+The change_protection() shouldn't need to flush the caches in
+flush_cache_range(). The change_pte_range() function eventually ends up
+calling set_pte_at() which calls __sync_icache_dcache() if the mapping
+is executable.
 
-Does it make sense? I could also split this as part of another patch if
-you think that's clearer.
+Can you be more specific about the kernel version you are using, its
+configuration?
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
