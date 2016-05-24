@@ -1,175 +1,94 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:00 +0200
-Subject: [PULL 06/59] KVM: arm/arm64: Remove the IRQ field from struct
- irq_phys_map
+Date: Tue, 24 May 2016 11:09:07 +0200
+Subject: [PULL 13/59] KVM: arm/arm64: pmu: abstract access to number of SPIs
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-7-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-14-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The communication of a Linux IRQ number from outside the VGIC to the
-vgic was a leftover from the day when the vgic code cared about how a
-particular device injects virtual interrupts mapped to a physical
-interrupt.
+From: Andre Przywara <andre.przywara@arm.com>
 
-We can safely remove this notion, leaving all physical IRQ handling to
-be done in the device driver (the arch timer in this case), which makes
-room for a saner API for the new VGIC.
+Currently the PMU uses a member of the struct vgic_dist directly,
+which not only breaks abstraction, but will fail with the new VGIC.
+Abstract this access in the VGIC header file and refactor the validity
+check in the PMU code.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Reviewed-by: Eric Auger <eric.auger@linaro.org>
 ---
- include/kvm/arm_vgic.h    |  3 +--
- virt/kvm/arm/arch_timer.c | 23 +++++++++++++++++++++--
- virt/kvm/arm/vgic.c       | 28 ++++++----------------------
- 3 files changed, 28 insertions(+), 26 deletions(-)
+ include/kvm/arm_vgic.h |  2 ++
+ virt/kvm/arm/pmu.c     | 25 ++++++++++++++-----------
+ 2 files changed, 16 insertions(+), 11 deletions(-)
 
 diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index c7bb184..9ad7625 100644
+index 67a6637..ade7005 100644
 --- a/include/kvm/arm_vgic.h
 +++ b/include/kvm/arm_vgic.h
-@@ -158,7 +158,6 @@ struct vgic_io_device {
- struct irq_phys_map {
- 	u32			virt_irq;
- 	u32			phys_irq;
--	u32			irq;
- };
+@@ -348,6 +348,8 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ #define irqchip_in_kernel(k)	(!!((k)->arch.vgic.in_kernel))
+ #define vgic_initialized(k)	(!!((k)->arch.vgic.nr_cpus))
+ #define vgic_ready(k)		((k)->arch.vgic.ready)
++#define vgic_valid_spi(k, i)	(((i) >= VGIC_NR_PRIVATE_IRQS) && \
++				 ((i) < (k)->arch.vgic.nr_irqs))
  
- struct irq_phys_map_entry {
-@@ -346,7 +345,7 @@ int kvm_vgic_inject_mapped_irq(struct kvm *kvm, int cpuid,
- void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
- int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
- struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
--					   int virt_irq, int irq);
-+					   int virt_irq, int phys_irq);
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
- bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+ int vgic_v2_probe(const struct gic_kvm_info *gic_kvm_info,
+ 		  const struct vgic_ops **ops,
+diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+index 575c7aa..a027569 100644
+--- a/virt/kvm/arm/pmu.c
++++ b/virt/kvm/arm/pmu.c
+@@ -436,7 +436,14 @@ static int kvm_arm_pmu_v3_init(struct kvm_vcpu *vcpu)
+ 	return 0;
+ }
  
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 962b442..e45895a 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -20,6 +20,7 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
-+#include <linux/irq.h>
- 
- #include <clocksource/arm_arch_timer.h>
- #include <asm/arch_timer.h>
-@@ -300,7 +301,7 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 	if (timer->active_cleared_last && !phys_active)
- 		return;
- 
--	ret = irq_set_irqchip_state(timer->map->irq,
-+	ret = irq_set_irqchip_state(host_vtimer_irq,
- 				    IRQCHIP_STATE_ACTIVE,
- 				    phys_active);
- 	WARN_ON(ret);
-@@ -333,6 +334,9 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
+-static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
++#define irq_is_ppi(irq) ((irq) >= VGIC_NR_SGIS && (irq) < VGIC_NR_PRIVATE_IRQS)
++
++/*
++ * For one VM the interrupt type must be same for each vcpu.
++ * As a PPI, the interrupt number is the same for all vcpus,
++ * while as an SPI it must be a separate number per vcpu.
++ */
++static bool pmu_irq_is_valid(struct kvm *kvm, int irq)
  {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct irq_phys_map *map;
-+	struct irq_desc *desc;
-+	struct irq_data *data;
-+	int phys_irq;
+ 	int i;
+ 	struct kvm_vcpu *vcpu;
+@@ -445,7 +452,7 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+ 		if (!kvm_arm_pmu_irq_initialized(vcpu))
+ 			continue;
  
- 	/*
- 	 * The vcpu timer irq number cannot be determined in
-@@ -352,10 +356,25 @@ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu,
- 	kvm_timer_update_state(vcpu);
+-		if (is_ppi) {
++		if (irq_is_ppi(irq)) {
+ 			if (vcpu->arch.pmu.irq_num != irq)
+ 				return false;
+ 		} else {
+@@ -457,7 +464,6 @@ static bool irq_is_valid(struct kvm *kvm, int irq, bool is_ppi)
+ 	return true;
+ }
  
- 	/*
-+	 * Find the physical IRQ number corresponding to the host_vtimer_irq
-+	 */
-+	desc = irq_to_desc(host_vtimer_irq);
-+	if (!desc) {
-+		kvm_err("%s: no interrupt descriptor\n", __func__);
-+		return -EINVAL;
-+	}
-+
-+	data = irq_desc_get_irq_data(desc);
-+	while (data->parent_data)
-+		data = data->parent_data;
-+
-+	phys_irq = data->hwirq;
-+
-+	/*
- 	 * Tell the VGIC that the virtual interrupt is tied to a
- 	 * physical interrupt. We do that once per VCPU.
- 	 */
--	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, host_vtimer_irq);
-+	map = kvm_vgic_map_phys_irq(vcpu, irq->irq, phys_irq);
- 	if (WARN_ON(IS_ERR(map)))
- 		return PTR_ERR(map);
- 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 06abd59..a7e496a 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1711,38 +1711,24 @@ static struct list_head *vgic_get_irq_phys_map_list(struct kvm_vcpu *vcpu,
- /**
-  * kvm_vgic_map_phys_irq - map a virtual IRQ to a physical IRQ
-  * @vcpu: The VCPU pointer
-- * @virt_irq: The virtual irq number
-- * @irq: The Linux IRQ number
-+ * @virt_irq: The virtual IRQ number for the guest
-+ * @phys_irq: The hardware IRQ number of the host
-  *
-  * Establish a mapping between a guest visible irq (@virt_irq) and a
-- * Linux irq (@irq). On injection, @virt_irq will be associated with
-- * the physical interrupt represented by @irq. This mapping can be
-+ * hardware irq (@phys_irq). On injection, @virt_irq will be associated with
-+ * the physical interrupt represented by @phys_irq. This mapping can be
-  * established multiple times as long as the parameters are the same.
-  *
-  * Returns a valid pointer on success, and an error pointer otherwise
-  */
- struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
--					   int virt_irq, int irq)
-+					   int virt_irq, int phys_irq)
+-
+ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
  {
- 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
- 	struct list_head *root = vgic_get_irq_phys_map_list(vcpu, virt_irq);
- 	struct irq_phys_map *map;
- 	struct irq_phys_map_entry *entry;
--	struct irq_desc *desc;
--	struct irq_data *data;
--	int phys_irq;
+ 	switch (attr->attr) {
+@@ -471,14 +477,11 @@ int kvm_arm_pmu_v3_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr)
+ 		if (get_user(irq, uaddr))
+ 			return -EFAULT;
  
--	desc = irq_to_desc(irq);
--	if (!desc) {
--		kvm_err("%s: no interrupt descriptor\n", __func__);
--		return ERR_PTR(-EINVAL);
--	}
--
--	data = irq_desc_get_irq_data(desc);
--	while (data->parent_data)
--		data = data->parent_data;
--
--	phys_irq = data->hwirq;
+-		/*
+-		 * The PMU overflow interrupt could be a PPI or SPI, but for one
+-		 * VM the interrupt type must be same for each vcpu. As a PPI,
+-		 * the interrupt number is the same for all vcpus, while as an
+-		 * SPI it must be a separate number per vcpu.
+-		 */
+-		if (irq < VGIC_NR_SGIS || irq >= vcpu->kvm->arch.vgic.nr_irqs ||
+-		    !irq_is_valid(vcpu->kvm, irq, irq < VGIC_NR_PRIVATE_IRQS))
++		/* The PMU overflow interrupt can be a PPI or a valid SPI. */
++		if (!(irq_is_ppi(irq) || vgic_valid_spi(vcpu->kvm, irq)))
++			return -EINVAL;
++
++		if (!pmu_irq_is_valid(vcpu->kvm, irq))
+ 			return -EINVAL;
  
- 	/* Create a new mapping */
- 	entry = kzalloc(sizeof(*entry), GFP_KERNEL);
-@@ -1755,8 +1741,7 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
- 	map = vgic_irq_map_search(vcpu, virt_irq);
- 	if (map) {
- 		/* Make sure this mapping matches */
--		if (map->phys_irq != phys_irq	||
--		    map->irq      != irq)
-+		if (map->phys_irq != phys_irq)
- 			map = ERR_PTR(-EINVAL);
- 
- 		/* Found an existing, valid mapping */
-@@ -1766,7 +1751,6 @@ struct irq_phys_map *kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu,
- 	map           = &entry->map;
- 	map->virt_irq = virt_irq;
- 	map->phys_irq = phys_irq;
--	map->irq      = irq;
- 
- 	list_add_tail_rcu(&entry->entry, root);
- 
+ 		if (kvm_arm_pmu_irq_initialized(vcpu))
 -- 
 2.1.2.330.g565301e.dirty
