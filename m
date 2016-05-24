@@ -1,96 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 May 2016 10:32:34 +0200
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <CALszF6AxXY0LK5fToFg3095+gz6xcZz8KHaYqc=o39vjpBYDmA@mail.gmail.com>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
- <6297051.TAxtzW5OIB@wuerfel>
- <CALszF6AxXY0LK5fToFg3095+gz6xcZz8KHaYqc=o39vjpBYDmA@mail.gmail.com>
-Message-ID: <12548318.auB4PSA3KC@wuerfel>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 24 May 2016 09:35:19 +0100
+Subject: [PATCH 2/4] ARM: dma-mapping: Constify attrs passed to internal
+ functions
+In-Reply-To: <1464071290-15948-3-git-send-email-k.kozlowski@samsung.com>
+References: <1464071290-15948-1-git-send-email-k.kozlowski@samsung.com>
+ <1464071290-15948-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160524083519.GC19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 24, 2016 9:59:41 AM CEST Maxime Coquelin wrote:
-> 2016-05-23 22:35 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> > On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
-> >> diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-> >> index 92a8106..0533370 100644
-> >> --- a/drivers/char/hw_random/stm32-rng.c
-> >> +++ b/drivers/char/hw_random/stm32-rng.c
-> >> @@ -52,7 +52,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
-> >>  {
-> >>       struct stm32_rng_private *priv =
-> >>           container_of(rng, struct stm32_rng_private, rng);
-> >> -     u32 sr;
-> >> +     u32 sr = 0;
-> >>       int retval = 0;
-> >>
-> >>       pm_runtime_get_sync((struct device *) priv->rng.priv);
-> >
-> > Does this work as well?
-> >
-> > diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-> > index 92a810648bd0..5c836b0afa40 100644
-> > --- a/drivers/char/hw_random/stm32-rng.c
-> > +++ b/drivers/char/hw_random/stm32-rng.c
-> > @@ -79,7 +79,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
-> >                 max -= sizeof(u32);
-> >         }
-> >
-> > -       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
-> > +       if (WARN_ONCE(retval > 0 && (sr & (RNG_SR_SEIS | RNG_SR_CEIS)),
-> >                       "bad RNG status - %x\n", sr))
-> >                 writel_relaxed(0, priv->base + RNG_SR);
-> >
-> > I think it would be nicer to not add a bogus initialization.
-> Hmm, no sure this nicer.
-> The while loop can break before retval is incremented when sr value is
-> not expected (sr != RNG_SR_DRDY).
-> In that case, we certainly want to print sr value.
+On Tue, May 24, 2016 at 08:28:08AM +0200, Krzysztof Kozlowski wrote:
+> Some of the non-exported functions do not modify passed dma_attrs so the
+> pointer can point to const data.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Ah, you are right.
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-> Maybe the better way is just to initialize sr with status register content?
+Thanks.
 
->        pm_runtime_get_sync((struct device *) priv->rng.priv);
->
->+       sr = readl_relaxed(priv->base + RNG_SR);
->        while (max > sizeof(u32)) {
->-               sr = readl_relaxed(priv->base + RNG_SR);
->                if (!sr && wait) {
->                        unsigned int timeout = RNG_TIMEOUT;
-
-
-I think that introduces a bug: you really want to read the status
-register on each loop iteration.
-
-How about moving the error handling into the loop itself?
-
-	Arnd
-
-
-diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-index 92a810648bd0..fceacd809462 100644
---- a/drivers/char/hw_random/stm32-rng.c
-+++ b/drivers/char/hw_random/stm32-rng.c
-@@ -59,6 +59,10 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
- 
- 	while (max > sizeof(u32)) {
- 		sr = readl_relaxed(priv->base + RNG_SR);
-+		if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
-+			      "bad RNG status - %x\n", sr))
-+			writel_relaxed(0, priv->base + RNG_SR);
-+
- 		if (!sr && wait) {
- 			unsigned int timeout = RNG_TIMEOUT;
- 
-@@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
- 		max -= sizeof(u32);
- 	}
- 
--	if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
--		      "bad RNG status - %x\n", sr))
--		writel_relaxed(0, priv->base + RNG_SR);
--
- 	pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
- 	pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
- 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
