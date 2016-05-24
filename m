@@ -1,52 +1,129 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 May 2016 22:03:32 +0200
-Subject: [GIT PULL] ARM: SoC fixes for v4.7
-Message-ID: <6880123.QJWf7jilUK@wuerfel>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 24 May 2016 22:20:59 +0200
+Subject: [PATCHv3] support for AD5820 camera auto-focus coil
+In-Reply-To: <57441BF8.60606@gmail.com>
+References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
+ <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
+ <57441BF8.60606@gmail.com>
+Message-ID: <20160524202059.GB18536@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4a5219edcdae52bfb5eea0dfc2a7bd575961dad7:
+Hi!
 
-  Merge tag 'armsoc-drivers' of git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc (2016-05-18 13:14:02 -0700)
+> >>devm_regulator_get()?
+> >
+> >I'd rather avoid devm_ here. Driver is simple enough to allow it.
+> >
+> 
+> Now thinking about it, what would happen here if regulator_get() returns
+> -EPROBE_DEFER? Wouldn't it be better to move regulator_get to the probe()
+> function, something like:
 
-are available in the git repository at:
+Ok, I can do it.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-fixes
+Oh, and don't try to complain about newlines before returns. It looks
+better this way.
 
-for you to fetch changes up to 09564b7d84d753e4aa1198017b5a5e86c7b0539f:
+> static int ad5820_probe(struct i2c_client *client,
+> 			const struct i2c_device_id *devid)
+> {
+> 	struct ad5820_device *coil;
+> 	int ret = 0;
+> 
+> 	coil = devm_kzalloc(sizeof(*coil), GFP_KERNEL);
+> 	if (coil == NULL)
+> 		return -ENOMEM;
+> 
+> 	coil->vana = devm_regulator_get(&client->dev, NULL);
+> 	if (IS_ERR(coil->vana)) {
+> 		ret = PTR_ERR(coil->vana);
+> 		if (ret != -EPROBE_DEFER)
+> 			dev_err(&client->dev, "could not get regulator for vana\n");
+> 		return ret;
+> 	}
+> 
+> 	mutex_init(&coil->power_lock);
+> ...
+> 
+> with the appropriate changes to remove() because of the devm API
+> 			usage.
 
-  ARM: lpc32xx: fix NR_IRQS confict (2016-05-24 19:32:46 +0000)
+Something like this?
 
-----------------------------------------------------------------
-ARM: SoC fixes for 4.7
+diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
+index f956bd3..f871366 100644
+--- a/drivers/media/i2c/ad5820.c
++++ b/drivers/media/i2c/ad5820.c
+@@ -8,7 +8,7 @@
+  * Copyright (C) 2016 Pavel Machek <pavel@ucw.cz>
+  *
+  * Contact: Tuukka Toivonen
+- *          Sakari Ailus
++ *	    Sakari Ailus
+  *
+  * Based on af_d88.c by Texas Instruments.
+  *
+@@ -263,13 +263,6 @@ static int ad5820_init_controls(struct ad5820_device *coil)
+ static int ad5820_registered(struct v4l2_subdev *subdev)
+ {
+ 	struct ad5820_device *coil = to_ad5820_device(subdev);
+-	struct i2c_client *client = v4l2_get_subdevdata(subdev);
+-
+-	coil->vana = regulator_get(&client->dev, "VANA");
+-	if (IS_ERR(coil->vana)) {
+-		dev_err(&client->dev, "could not get regulator for vana\n");
+-		return -ENODEV;
+-	}
+ 
+ 	return ad5820_init_controls(coil);
+ }
+@@ -367,10 +360,18 @@ static int ad5820_probe(struct i2c_client *client,
+ 	struct ad5820_device *coil;
+ 	int ret = 0;
+ 
+-	coil = kzalloc(sizeof(*coil), GFP_KERNEL);
++	coil = devm_kzalloc(sizeof(*coil), GFP_KERNEL);
+ 	if (!coil)
+ 		return -ENOMEM;
+ 
++	coil->vana = devm_regulator_get(&client->dev, NULL);
++	if (IS_ERR(coil->vana)) {
++		ret = PTR_ERR(coil->vana);
++		if (ret != -EPROBE_DEFER)
++			dev_err(&client->dev, "could not get regulator for vana\n");
++		return ret;
++	}
++	
+ 	mutex_init(&coil->power_lock);
+ 
+ 	v4l2_i2c_subdev_init(&coil->subdev, client, &ad5820_ops);
+@@ -390,10 +391,6 @@ static int ad5820_probe(struct i2c_client *client,
+ 
+ cleanup:
+ 	media_entity_cleanup(&coil->subdev.entity);
+-
+-free:
+-	kfree(coil);
+-
+ 	return ret;
+ }
+ 
+@@ -405,11 +402,6 @@ static int __exit ad5820_remove(struct i2c_client *client)
+ 	v4l2_device_unregister_subdev(&coil->subdev);
+ 	v4l2_ctrl_handler_free(&coil->ctrls);
+ 	media_entity_cleanup(&coil->subdev.entity);
+-	if (coil->vana)
+-		regulator_put(coil->vana);
+-
+-	kfree(coil);
+-
+ 	return 0;
+ }
+ 
 
-This is a first set of bug fixes on top of what was merged for 4.7.
-Two patches for lpc32xx address a harmless build warning that was
-just introduced, one patch for the mediatek soc driver fixes a warning
-for arm64, and the pxa changes are minor cleanups that should have
-been part of the original pull requests but that I forgot to apply
-to the cleanup-fixes branch earlier.
 
-----------------------------------------------------------------
-Arnd Bergmann (3):
-      soc: mtk-pmic-wrap: avoid integer overflow warning
-      Merge tag 'pxa-for-4.7' of https://github.com/rjarzmik/linux into fixes
-      ARM: lpc32xx: fix NR_IRQS confict
-
-Robert Jarzmik (1):
-      ARM: pxa: activate pinctrl for device-tree machines
-
-Stephen Boyd (1):
-      ARM: pxa: Remove CLK_IS_ROOT
-
-Vladimir Zapolskiy (1):
-      ARM: lpc32xx: remove legacy irq controller driver
-
- arch/arm/mach-lpc32xx/Makefile            |   2 +-
- arch/arm/mach-lpc32xx/include/mach/irqs.h |   2 +-
- arch/arm/mach-lpc32xx/irq.c               | 477 ------------------------------
- arch/arm/mach-pxa/Kconfig                 |   2 +
- arch/arm/mach-pxa/eseries.c               |   2 +-
- drivers/soc/mediatek/mtk-pmic-wrap.c      |   6 +-
- 6 files changed, 8 insertions(+), 483 deletions(-)
- delete mode 100644 arch/arm/mach-lpc32xx/irq.c
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
