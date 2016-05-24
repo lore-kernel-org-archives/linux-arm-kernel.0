@@ -1,82 +1,79 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:31 +0200
-Subject: [PULL 37/59] KVM: arm/arm64: vgic-new: Add GICv3 redistributor IIDR
- and TYPER handler
+Date: Tue, 24 May 2016 11:09:37 +0200
+Subject: [PULL 43/59] KVM: arm/arm64: vgic-new: vgic_kvm_device:
+ KVM_DEV_ARM_VGIC_GRP_CTRL
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-38-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-44-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+From: Eric Auger <eric.auger@linaro.org>
 
-The redistributor TYPER tells the OS about the associated MPIDR,
-also the LAST bit is crucial to determine the number of redistributors.
+This patch implements the KVM_DEV_ARM_VGIC_GRP_CTRL group API
+featuring KVM_DEV_ARM_VGIC_CTRL_INIT attribute. The vgic_init
+function is not yet implemented though.
 
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-mmio-v3.c | 32 ++++++++++++++++++++++++++++++--
- 1 file changed, 30 insertions(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-kvm-device.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-index bd062b8..64edd23 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-@@ -22,6 +22,13 @@
- #include "vgic.h"
- #include "vgic-mmio.h"
- 
-+/* extract @num bytes at @offset bytes offset in data */
-+static unsigned long extract_bytes(unsigned long data, unsigned int offset,
-+				   unsigned int num)
-+{
-+	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
-+}
-+
- static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
- 					    gpa_t addr, unsigned int len)
+diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
+index 05ff925..e153f12 100644
+--- a/virt/kvm/arm/vgic/vgic-kvm-device.c
++++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
+@@ -23,6 +23,8 @@
+ static int vgic_set_common_attr(struct kvm_device *dev,
+ 				struct kvm_device_attr *attr)
  {
-@@ -68,6 +75,27 @@ static void vgic_mmio_write_v3_misc(struct kvm_vcpu *vcpu,
- 	}
- }
++	int r;
++
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS: {
+ 		u32 __user *uaddr = (u32 __user *)(long)attr->addr;
+@@ -55,6 +57,16 @@ static int vgic_set_common_attr(struct kvm_device *dev,
  
-+static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
-+					      gpa_t addr, unsigned int len)
-+{
-+	unsigned long mpidr = kvm_vcpu_get_mpidr_aff(vcpu);
-+	int target_vcpu_id = vcpu->vcpu_id;
-+	u64 value;
-+
-+	value = (mpidr & GENMASK(23, 0)) << 32;
-+	value |= ((target_vcpu_id & 0xffff) << 8);
-+	if (target_vcpu_id == atomic_read(&vcpu->kvm->online_vcpus) - 1)
-+		value |= GICR_TYPER_LAST;
-+
-+	return extract_bytes(value, addr & 7, len);
-+}
-+
-+static unsigned long vgic_mmio_read_v3r_iidr(struct kvm_vcpu *vcpu,
-+					     gpa_t addr, unsigned int len)
-+{
-+	return (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
-+}
-+
- /*
-  * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
-  * redistributors, while SPIs are covered by registers in the distributor
-@@ -142,10 +170,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
-+		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
- 		VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_TYPER,
--		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-+		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
- 		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
- 	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
- 		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+ 		return ret;
+ 	}
++	case KVM_DEV_ARM_VGIC_GRP_CTRL: {
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_CTRL_INIT:
++			mutex_lock(&dev->kvm->lock);
++			r = vgic_init(dev->kvm);
++			mutex_unlock(&dev->kvm->lock);
++			return r;
++		}
++		break;
++	}
+ 	}
+ 
+ 	return -ENXIO;
+@@ -131,6 +143,11 @@ static int vgic_v2_has_attr(struct kvm_device *dev,
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
++	case KVM_DEV_ARM_VGIC_GRP_CTRL:
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_CTRL_INIT:
++			return 0;
++		}
+ 	}
+ 	return -ENXIO;
+ }
+@@ -166,6 +183,11 @@ static int vgic_v3_has_attr(struct kvm_device *dev,
+ 	switch (attr->group) {
+ 	case KVM_DEV_ARM_VGIC_GRP_NR_IRQS:
+ 		return 0;
++	case KVM_DEV_ARM_VGIC_GRP_CTRL:
++		switch (attr->attr) {
++		case KVM_DEV_ARM_VGIC_CTRL_INIT:
++			return 0;
++		}
+ 	}
+ 	return -ENXIO;
+ }
 -- 
 2.1.2.330.g565301e.dirty
