@@ -1,89 +1,58 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 14:52:33 +0200
-Subject: [PATCH 7/7] arm64: KVM: vgic-v3: Relax synchronization when SRE==1
-In-Reply-To: <1464007023-11736-8-git-send-email-marc.zyngier@arm.com>
-References: <1464007023-11736-1-git-send-email-marc.zyngier@arm.com>
- <1464007023-11736-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160524125233.GG3582@cbox>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Tue, 24 May 2016 08:54:04 -0400
+Subject: [PATCH] gpio: lpc32xx: disable broken to_irq support
+In-Reply-To: <CACRpkdZuT-NQJSQAK6RMdGUqiMTo3d31uGoXqgSS1cCyGzy5ow@mail.gmail.com>
+References: <1462988400-21738-1-git-send-email-slemieux.tyco@gmail.com>
+ <CACRpkdZuT-NQJSQAK6RMdGUqiMTo3d31uGoXqgSS1cCyGzy5ow@mail.gmail.com>
+Message-ID: <1464094444.27117.7.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 01:37:03PM +0100, Marc Zyngier wrote:
-> The GICv3 backend of the vgic is quite barrier heavy, in order
-> to ensure synchronization of the system registers and the
-> memory mapped view for a potential GICv2 guest.
-> 
-> But when the guest is using a GICv3 model, there is absolutely
-> no need to execute all these heavy barriers, and it is actually
-> beneficial to avoid them altogether.
-> 
-> This patch makes the synchonization conditional, and ensures
-> that we do not change the EL1 SRE settings if we do not need to.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kvm/hyp/vgic-v3-sr.c | 23 ++++++++++++++++-------
->  1 file changed, 16 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> index 40c3b4c..5f8f80b 100644
-> --- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> +++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-> @@ -169,7 +169,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  	 * Make sure stores to the GIC via the memory mapped interface
->  	 * are now visible to the system register interface.
->  	 */
-> -	dsb(st);
-> +	if (!cpu_if->vgic_sre)
-> +		dsb(st);
->  
->  	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
->  
-> @@ -235,8 +236,12 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  
->  	val = read_gicreg(ICC_SRE_EL2);
->  	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
-> -	isb(); /* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
-> -	write_gicreg(1, ICC_SRE_EL1);
-> +
-> +	if (!cpu_if->vgic_sre) {
-> +		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
-> +		isb();
-> +		write_gicreg(1, ICC_SRE_EL1);
+Hi Linus,
 
-why the change in behavior to only write 1 to the register when
-(!cpu_if->vgic_sre) ?
-
-> +	}
->  }
->  
->  void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
-> @@ -255,8 +260,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->  	 * been actually programmed with the value we want before
->  	 * starting to mess with the rest of the GIC.
->  	 */
-> -	write_gicreg(cpu_if->vgic_sre, ICC_SRE_EL1);
-> -	isb();
-> +	if (!cpu_if->vgic_sre) {
-> +		write_gicreg(0, ICC_SRE_EL1);
-> +		isb();
-> +	}
->  
->  	val = read_gicreg(ICH_VTR_EL2);
->  	max_lr_idx = vtr_to_max_lr_idx(val);
-> @@ -305,8 +312,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->  	 * (re)distributors. This ensure the guest will read the
->  	 * correct values from the memory-mapped interface.
->  	 */
-> -	isb();
-> -	dsb(sy);
-> +	if (!cpu_if->vgic_sre) {
-> +		isb();
-> +		dsb(sy);
-> +	}
->  	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
->  
->  	/*
-> -- 
-> 2.1.4
+On Tue, 2016-05-24 at 12:57 +0200, Linus Walleij wrote:
+> On Wed, May 11, 2016 at 7:40 PM, Sylvain Lemieux
+> <slemieux.tyco@gmail.com> wrote:
 > 
+> > From: Sylvain Lemieux <slemieux@tycoint.com>
+> >
+> > The "to_irq" functionality is broken inside this driver since commit
+> > 76ba59f8366f ("genirq: Add irq_domain-aware core IRQ handler").
+> >
+> > The addition of the new lpc32xx irqchip driver in 4.7, fixed the
+> > lpc32xx platform interrupt issue.
+> >
+> > When switching to the new lpc32xx irqchip driver, a warning appear
+> > in the lpc32xx gpio driver: warning: "NR_IRQS" redefined.
+> >
+> > To remove this warning (temporary solution), this patch
+> > disables the broken "to_irq" mapping functionality support.
+> >
+> > Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+> 
+> Patch applied for fixes with Vladimir's ACK.
+> 
+> > * The final solution is to replace the existing lpc32xx gpio driver.
+> >   This work is currently in progress; refer to the following URL:
+> >   http://thread.gmane.org/gmane.linux.drivers.devicetree/144696
+> 
+> Hm, I see that the ambition was to merge the new irqchip
+> driver and the new GPIO driver in the same merge window.
+> Sorry if I was being too lazy/picky/whatever about the patch(es)
+> I guess I didn't quite get the scope of this change. :(
+> 
+The new LPC32xx GPIO driver can go in a separate merge window; 
+another version of the patchset is required.
+
+For 4.7, the goal was to remove the broken dependency in the 
+existing driver.
+
+> I should say that as long as we can agree that the new code
+> makes the kernel as a whole a better place, I am happy to
+> merge it. Sometimes also I need to zoom out from the GPIO
+> and pin control subsystem(s) and see the big picture.
+> 
+> Yours,
+> Linus Walleij
+
+Sylvain Lemieux
