@@ -1,42 +1,42 @@
 From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Tue, 24 May 2016 09:06:16 +0530
-Subject: [PATCH 2/3] arm: mach-keystone: Enable PINCTRL config
-In-Reply-To: <1464006547-19569-3-git-send-email-j-keerthy@ti.com>
+Date: Tue, 24 May 2016 09:07:36 +0530
+Subject: [PATCH 3/3] ARM: configs: keystone: Enable PINCTRL_SINGLE Config
+In-Reply-To: <1464006547-19569-4-git-send-email-j-keerthy@ti.com>
 References: <1464006547-19569-1-git-send-email-j-keerthy@ti.com>
- <1464006547-19569-3-git-send-email-j-keerthy@ti.com>
-Message-ID: <5743CC30.6010009@ti.com>
+ <1464006547-19569-4-git-send-email-j-keerthy@ti.com>
+Message-ID: <5743CC80.4070404@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 On Monday 23 May 2016 05:59 PM, Keerthy wrote:
-> keystone-k2l uses pinmux and is compliant with PINCTRL_SINGLE
-> which depends on PINCTRL. Hence enable PINCTRL.
+> keystone-k2l devices use pinmux and are compliant with PINCTRL_SINGLE.
+> Hence enable the config option.
 > 
 > Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
->  arch/arm/mach-keystone/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-> index ea955f6db..7a432ee 100644
-> --- a/arch/arm/mach-keystone/Kconfig
-> +++ b/arch/arm/mach-keystone/Kconfig
-> @@ -11,6 +11,7 @@ config ARCH_KEYSTONE
->  	select ZONE_DMA if ARM_LPAE
->  	select MIGHT_HAVE_PCI
->  	select PCI_DOMAINS if PCI
-> +	select PINCTRL
 
-I guess a similar patch[1] is already posted
+A similar patch[1] is already posted.
 
-[1] https://patchwork.kernel.org/patch/8958081/
+[1]https://patchwork.kernel.org/patch/8958091/
 
 Thanks and regards,
 Lokesh
 
->  	help
->  	  Support for boards based on the Texas Instruments Keystone family of
->  	  SoCs.
+> ---
+>  arch/arm/configs/keystone_defconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+> index faba04d..71b42e6 100644
+> --- a/arch/arm/configs/keystone_defconfig
+> +++ b/arch/arm/configs/keystone_defconfig
+> @@ -144,6 +144,7 @@ CONFIG_I2C_DAVINCI=y
+>  CONFIG_SPI=y
+>  CONFIG_SPI_DAVINCI=y
+>  CONFIG_SPI_SPIDEV=y
+> +CONFIG_PINCTRL_SINGLE=y
+>  CONFIG_GPIOLIB=y
+>  CONFIG_GPIO_SYSFS=y
+>  CONFIG_GPIO_DAVINCI=y
 > 
