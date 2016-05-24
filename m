@@ -1,105 +1,86 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 24 May 2016 09:59:41 +0200
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <6297051.TAxtzW5OIB@wuerfel>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
- <6297051.TAxtzW5OIB@wuerfel>
-Message-ID: <CALszF6AxXY0LK5fToFg3095+gz6xcZz8KHaYqc=o39vjpBYDmA@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 24 May 2016 10:03:28 +0200
+Subject: [PATCH v3 4/4] documentation: Add secure monitor binding
+ documentation
+In-Reply-To: <20160523171159.GH4976@leverpostej>
+References: <1464021024-29380-1-git-send-email-carlo@caione.org>
+ <1464021024-29380-5-git-send-email-carlo@caione.org>
+ <20160523163815.GE4976@leverpostej>
+ <20160523165931.GA31299@mephisto>
+ <20160523171159.GH4976@leverpostej>
+Message-ID: <20160524080328.GA18935@mephisto>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-05-23 22:35 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
-> On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
->> We have been getting build warning about:
->> drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
->> drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
->>                                       uninitialized in this function
->>
->> On checking the code it turns out that sr can never be used
->> uninitialized as sr is getting initialized in the while loop and while
->> loop will always execute as the minimum value of max can be 32.
->> So just initialize sr to 0 while declaring it to silence the compiler.
->>
->> Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
->> ---
->
-> I notice that you are using a really old compiler. While this warning
-> seems to be valid in the sense that the compiler should figure out that
-> the variable might be used uninitialized, please update your toolchain
-> before reporting other such problems, as gcc-4.6 had a lot more false
-> positives that newer ones (5.x or 6.x) have.
->
->>
->> build log at:
->> https://travis-ci.org/sudipm-mukherjee/parport/jobs/132180906
->>
->>  drivers/char/hw_random/stm32-rng.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
->> index 92a8106..0533370 100644
->> --- a/drivers/char/hw_random/stm32-rng.c
->> +++ b/drivers/char/hw_random/stm32-rng.c
->> @@ -52,7 +52,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
->>  {
->>       struct stm32_rng_private *priv =
->>           container_of(rng, struct stm32_rng_private, rng);
->> -     u32 sr;
->> +     u32 sr = 0;
->>       int retval = 0;
->>
->>       pm_runtime_get_sync((struct device *) priv->rng.priv);
->
-> Does this work as well?
->
-> diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-> index 92a810648bd0..5c836b0afa40 100644
-> --- a/drivers/char/hw_random/stm32-rng.c
-> +++ b/drivers/char/hw_random/stm32-rng.c
-> @@ -79,7 +79,7 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
->                 max -= sizeof(u32);
->         }
->
-> -       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
-> +       if (WARN_ONCE(retval > 0 && (sr & (RNG_SR_SEIS | RNG_SR_CEIS)),
->                       "bad RNG status - %x\n", sr))
->                 writel_relaxed(0, priv->base + RNG_SR);
->
-> I think it would be nicer to not add a bogus initialization.
-Hmm, no sure this nicer.
-The while loop can break before retval is incremented when sr value is
-not expected (sr != RNG_SR_DRDY).
-In that case, we certainly want to print sr value.
+On 23/05/16 18:11, Mark Rutland wrote:
+> On Mon, May 23, 2016 at 06:59:31PM +0200, Carlo Caione wrote:
+> > On 23/05/16 17:38, Mark Rutland wrote:
+> > > > +Required properties for the secure monitor node:
+> > > > +- compatible: Should be "amlogic,meson-sm"
+> > > > +- amlogic,sm-cmd-input-base: SMC32 function identifier to read the physical
+> > > > +                             address of the input buffer
+> > > > +- amlogic,sm-cmd-output-base: SMC32 function identifier to read the physical
+> > > > +                              address of the output buffer
+> > > 
+> > > Do the IDs for these actually differ per board?
+> > 
+> > I expect these to differ per SoC (GXBB in this case), not per board. The
+> > driver is generic enough to be (hopefully) used for several SoCs just
+> > changing the related header file that defines the SCM commands.
+> > 
+> > > Are some functions simply not implemented on some boards?
+> > 
+> > I don't think this is possible.
+> 
+> Given that, I think it may be better to just have a
+> "amlogic,meson-gxbb-sm" compatible string, and derive the set of
+> functions and associated IDs from that.
 
-Maybe the better way is just to initialize sr with status register content?
+I can reference a specific SMC function using an index in the DT, the
+same index for all the SoCs. The index is then associated to the actual
+SoC-specific command ID in the driver according to the compatible string
+used for the secure-monitor node.
 
-diff --git a/drivers/char/hw_random/stm32-rng.c
-b/drivers/char/hw_random/stm32-rng.c
-index 92a810648bd0..07a6659d0fe6 100644
---- a/drivers/char/hw_random/stm32-rng.c
-+++ b/drivers/char/hw_random/stm32-rng.c
-@@ -57,8 +57,8 @@ static int stm32_rng_read(struct hwrng *rng, void
-*data, size_t max, bool wait)
+Something like:
 
-        pm_runtime_get_sync((struct device *) priv->rng.priv);
+  // Not SoC-specific
+  #include <dt-bindings/firmware/meson.h>
 
-+       sr = readl_relaxed(priv->base + RNG_SR);
-        while (max > sizeof(u32)) {
--               sr = readl_relaxed(priv->base + RNG_SR);
-                if (!sr && wait) {
-                        unsigned int timeout = RNG_TIMEOUT;
+  sm: sm {
+  	compatible = "amlogic,meson-gxbb-sm";
+  };
+  
+  efuse {
+  	compatible = "amlogic,meson-gxbb-efuse";
+  	secure-monitor = <&sm>;
+  	amlogic,cmd-read-efuse = <READ_EFUSE>;
+  	...
+  };
 
-@@ -77,6 +77,8 @@ static int stm32_rng_read(struct hwrng *rng, void
-*data, size_t max, bool wait)
-                retval += sizeof(u32);
-                data += sizeof(u32);
-                max -= sizeof(u32);
-+
-+               sr = readl_relaxed(priv->base + RNG_SR);
-        }
+Is this any better?
 
-        if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
+At this point I wonder if it makes sense having the driver-specific
+function IDs (like 'amlogic,cmd-read-efuse' above) defined in the DT.
 
+> That is, unless you know that future revisions have functions with the
+> exact same semantics but differing IDs.
 
-Regards,
-Maxime
+This is most probably the case.
+
+Also the driver exports really generic functions to access the
+secure-monitor on purpose, so that the driver using it can define the
+semantic of the SMC call. I really would like to avoid fixing the
+semantic in the SM driver itself since we will end up with: different
+semantics for each SMC call and for each SoC.
+
+> Regardless, it would make sense to have a GXBB-specific compatible
+> string prepended to the list. That way in the future we can handle
+> anything specific to the GXBB variant of the secure monitor if
+> necessary.
+
+Agree on this.
+
+Cheers,
+
+-- 
+Carlo Caione
