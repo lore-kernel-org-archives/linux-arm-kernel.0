@@ -1,69 +1,129 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 24 May 2016 15:35:37 -0700
-Subject: [PATCH v7 07/15] arm64, numa: Cleanup NUMA disabled messages.
+Date: Tue, 24 May 2016 15:35:39 -0700
+Subject: [PATCH v7 09/15] acpi,
+ numa: move bad_srat() and srat_disabled() to drivers/acpi/numa.c
 In-Reply-To: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1464129345-18985-8-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1464129345-18985-10-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: David Daney <david.daney@cavium.com>
 
-As noted by Dennis Chen, we don't want to print "No NUMA configuration
-found" if NUMA was forced off from the command line.
+bad_srat() and srat_disabled() are shared by x86 and follow-on arm64
+patches.  Move them to drivers/acpi/numa.c in preparation for arm64
+support.
 
-Change the type of numa_off to bool, and clean up printing code.
-Print "NUMA disabled" if forced off on command line and "No NUMA
-configuration found" if there was no firmware NUMA information.
-
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+[david.daney at cavium.com moved definitions to drivers/acpi/numa.c]
 Signed-off-by: David Daney <david.daney@cavium.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/mm/numa.c | 11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ arch/x86/include/asm/acpi.h |  1 -
+ arch/x86/mm/numa.c          |  2 +-
+ arch/x86/mm/srat.c          | 13 -------------
+ drivers/acpi/numa.c         | 12 ++++++++++++
+ include/acpi/acpi_numa.h    |  4 ++++
+ 5 files changed, 17 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index 6cb03f9..1def1de 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -29,7 +29,7 @@ static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
+diff --git a/arch/x86/include/asm/acpi.h b/arch/x86/include/asm/acpi.h
+index 94c18eb..65f1e95 100644
+--- a/arch/x86/include/asm/acpi.h
++++ b/arch/x86/include/asm/acpi.h
+@@ -145,7 +145,6 @@ static inline void disable_acpi(void) { }
+ #define ARCH_HAS_POWER_INIT	1
  
- static int numa_distance_cnt;
- static u8 *numa_distance;
--static int numa_off;
-+static bool numa_off;
+ #ifdef CONFIG_ACPI_NUMA
+-extern int acpi_numa;
+ extern int x86_acpi_numa_init(void);
+ #endif /* CONFIG_ACPI_NUMA */
  
- static __init int numa_parse_early_param(char *opt)
+diff --git a/arch/x86/mm/numa.c b/arch/x86/mm/numa.c
+index 9c086c5..968ac02 100644
+--- a/arch/x86/mm/numa.c
++++ b/arch/x86/mm/numa.c
+@@ -1,4 +1,5 @@
+ /* Common code for 32 and 64-bit NUMA */
++#include <linux/acpi.h>
+ #include <linux/kernel.h>
+ #include <linux/mm.h>
+ #include <linux/string.h>
+@@ -15,7 +16,6 @@
+ #include <asm/e820.h>
+ #include <asm/proto.h>
+ #include <asm/dma.h>
+-#include <asm/acpi.h>
+ #include <asm/amd_nb.h>
+ 
+ #include "numa_internal.h"
+diff --git a/arch/x86/mm/srat.c b/arch/x86/mm/srat.c
+index 9e2a833..4217071f 100644
+--- a/arch/x86/mm/srat.c
++++ b/arch/x86/mm/srat.c
+@@ -24,19 +24,6 @@
+ #include <asm/apic.h>
+ #include <asm/uv/uv.h>
+ 
+-int acpi_numa __initdata;
+-
+-static __init void bad_srat(void)
+-{
+-	printk(KERN_ERR "SRAT: SRAT not used.\n");
+-	acpi_numa = -1;
+-}
+-
+-static __init inline int srat_disabled(void)
+-{
+-	return acpi_numa < 0;
+-}
+-
+ /* Callback for Proximity Domain -> x2APIC mapping */
+ void __init
+ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index 7e0649d..af0c8d5 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -40,6 +40,7 @@ static int node_to_pxm_map[MAX_NUMNODES]
+ 			= { [0 ... MAX_NUMNODES - 1] = PXM_INVAL };
+ 
+ unsigned char acpi_srat_revision __initdata;
++int acpi_numa __initdata;
+ 
+ int pxm_to_node(int pxm)
  {
-@@ -37,7 +37,7 @@ static __init int numa_parse_early_param(char *opt)
- 		return -EINVAL;
- 	if (!strncmp(opt, "off", 3)) {
- 		pr_info("%s\n", "NUMA turned off");
--		numa_off = 1;
-+		numa_off = true;
- 	}
- 	return 0;
- }
-@@ -362,7 +362,10 @@ static int __init dummy_numa_init(void)
- 	int ret;
- 	struct memblock_region *mblk;
- 
--	pr_info("%s\n", "No NUMA configuration found");
-+	if (numa_off)
-+		pr_info("NUMA disabled\n"); /* Forced off on command line. */
-+	else
-+		pr_info("No NUMA configuration found\n");
- 	pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
- 	       0LLU, PFN_PHYS(max_pfn) - 1);
- 
-@@ -375,7 +378,7 @@ static int __init dummy_numa_init(void)
- 		return ret;
- 	}
- 
--	numa_off = 1;
-+	numa_off = true;
- 	return 0;
+@@ -197,6 +198,17 @@ static int __init slit_valid(struct acpi_table_slit *slit)
+ 	return 1;
  }
  
++void __init bad_srat(void)
++{
++	pr_err("SRAT: SRAT not used.\n");
++	acpi_numa = -1;
++}
++
++int __init srat_disabled(void)
++{
++	return acpi_numa < 0;
++}
++
+ #if defined(CONFIG_X86) || defined(CONFIG_ARM64)
+ /*
+  * Callback for SLIT parsing.  pxm_to_node() returns NUMA_NO_NODE for
+diff --git a/include/acpi/acpi_numa.h b/include/acpi/acpi_numa.h
+index 94a37cd..d4b7294 100644
+--- a/include/acpi/acpi_numa.h
++++ b/include/acpi/acpi_numa.h
+@@ -15,6 +15,10 @@ extern int pxm_to_node(int);
+ extern int node_to_pxm(int);
+ extern int acpi_map_pxm_to_node(int);
+ extern unsigned char acpi_srat_revision;
++extern int acpi_numa __initdata;
++
++extern void bad_srat(void);
++extern int srat_disabled(void);
+ 
+ #endif				/* CONFIG_ACPI_NUMA */
+ #endif				/* __ACP_NUMA_H */
 -- 
 1.7.11.7
