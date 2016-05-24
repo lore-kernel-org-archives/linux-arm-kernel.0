@@ -1,30 +1,34 @@
-From: patrice.chotard@st.com (Patrice Chotard)
-Date: Tue, 24 May 2016 13:12:24 +0200
-Subject: [PATCH 0/2] pinctrl: stm32: .pin_config_dbg_show fixes
-In-Reply-To: <CACRpkdb5NedA9wTyW1yfvpCMXxHYbG5a3Q+V-E2kK6yu=esGTg@mail.gmail.com>
-References: <1463064395-4669-1-git-send-email-patrice.chotard@st.com>
- <CACRpkdb5NedA9wTyW1yfvpCMXxHYbG5a3Q+V-E2kK6yu=esGTg@mail.gmail.com>
-Message-ID: <57443718.2030604@st.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Tue, 24 May 2016 19:16:37 +0800
+Subject: [PATCH 1/1] arm64: fix flush_cache_range
+Message-ID: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When we ran mprotect04(a test case in LTP) infinitely, it would always
+failed after a few seconds. The case can be described briefly that: copy
+a empty function from code area into a new memory area(created by mmap),
+then call mprotect to change the protection to PROT_EXEC. The syscall
+sys_mprotect will finally invoke flush_cache_range, but this function
+currently only invalid icache, the operation of flush dcache is missed.
 
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ arch/arm64/mm/flush.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-On 05/24/2016 01:04 PM, Linus Walleij wrote:
-> On Thu, May 12, 2016 at 4:46 PM,  <patrice.chotard@st.com> wrote:
->
->> From: Patrice Chotard <patrice.chotard@st.com>
->>
->> Patrice Chotard (2):
->>    pinctrl: stm32: fix warning
->>    pinctrl: stm32: factorize stm32_pconf_input/output_get()
-> Patrice, can you rebase these two on top of Torvalds' fix and
-> resend?
-Hi Linus
+diff --git a/arch/arm64/mm/flush.c b/arch/arm64/mm/flush.c
+index dbd12ea..eda4124 100644
+--- a/arch/arm64/mm/flush.c
++++ b/arch/arm64/mm/flush.c
+@@ -31,7 +31,7 @@ void flush_cache_range(struct vm_area_struct *vma, unsigned long start,
+ 		       unsigned long end)
+ {
+ 	if (vma->vm_flags & VM_EXEC)
+-		__flush_icache_all();
++		flush_icache_range(start, end);
+ }
 
-Sure
-
-Patrice
->
-> Yours,
-> Linus Walleij
+ static void sync_icache_aliases(void *kaddr, unsigned long len)
+--
+2.5.0
