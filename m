@@ -1,45 +1,114 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 24 May 2016 21:49:03 +0200
-Subject: Can not play audio with screen off
-In-Reply-To: <20160516150650.GA14639@amd>
-References: <20160515193106.GA18685@amd> <5739D7B6.7060102@ti.com>
- <20160516150650.GA14639@amd>
-Message-ID: <20160524194544.GA18011@amd>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Tue, 24 May 2016 15:54:50 -0400
+Subject: [PATCH] soc: qcom: provide mechanism for drivers to access L2
+ registers
+In-Reply-To: <20160524112326.GC25374@leverpostej>
+References: <1463771587-7438-1-git-send-email-nleeder@codeaurora.org>
+ <20160523172527.GK4976@leverpostej>
+ <f49d58ed-38b4-6284-11c2-8708d8443b14@codeaurora.org>
+ <20160524112326.GC25374@leverpostej>
+Message-ID: <e0173486-896e-4897-702a-ccd1c1f6c609@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-> > > I'm playing some more with N900, this time I'd like to use it as a
-> > > alarm clock...
-> > > 
-> > > And now I realized I can not, because system performance is so
-> > > horrible with screen off that mpg123 + pulseaudio skips horribly. This
-> > > is without tweaking serial parameters, so CPU is definitely not going
-> > > into the idle/off modes.
-> > > 
-> > > Loading CPU fixes the issue (I used cat /dev/zero > /dev/null).
-> > > 
-> > > Hmm. And it seems to work better if I ssh in and launch mpg123
-> > > remotely. Weird.
-> > > 
-> > > Kernel 4.5-rc0. Will try on different ones.
-> > > 
-> > > Any ideas? Is there interface to tell kernel that better performance
-> > > is needed for a while?
+
+On 5/24/2016 07:23 AM, Mark Rutland wrote:
+> On Mon, May 23, 2016 at 02:22:59PM -0400, Neil Leeder wrote:
+>>
+>> On 5/23/2016 01:25 PM, Mark Rutland wrote:
+>>> On Fri, May 20, 2016 at 03:13:07PM -0400, Neil Leeder wrote:
+
+>>>> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+>>>> ---
+>>>>  drivers/soc/qcom/Kconfig              |  9 +++++
+>>>>  drivers/soc/qcom/Makefile             |  1 +
+>>>>  drivers/soc/qcom/l2-accessors.c       | 66 +++++++++++++++++++++++++++++++++++
+>>>>  include/linux/soc/qcom/l2-accessors.h | 27 ++++++++++++++
+>>>>  4 files changed, 103 insertions(+)
+>>>>  create mode 100644 drivers/soc/qcom/l2-accessors.c
+>>>>  create mode 100644 include/linux/soc/qcom/l2-accessors.h
+>>>
+>>> These are awfully generic file names (and function names). Which SoCs
+>>> does this apply to?
+>>>
+>>> It would be good to give these more specific names.
+>>
+>> It's under soc/qcom, and dependent on ARCH_QCOM and (in v2) also on ARM64. It applies to all QCOM ARM64 SoCs.
 > 
-> > pm_qos cpu_dma_latency? Drivers will have to be properly instrumented
-> > with appropriate latency values -> this will control the depth in C
-> > states that the system will attempt. NOTE: it is a dual edged sword,
-> > bad configurations can result in none of the C-states being entered.
+> Per Christopher's comment, it sounds like this applies to QDF24xx.
 > 
-> Ok, so far it looks like artefact of -rc0 kernel. Lets see if it
-> reappers...
+> Given that the code uses IMPLEMENTATION DEFINED system registers, I
+> presume that this does not apply to MSM8916 which uses Cortex-A53, for
+> example (though perhaps it does, and I am mistaken).
+> 
+>> Given that it can only be used in a QCOM driver, and the include path has qcom in it, I'd
+>> prefer not to add redundancy by adding another qcom in there.
+> 
+> I'm not asking for another "qcom", but simply the SoC variant or family
+> (e.g. "qdf24xx" would be fine).
+> 
 
-Hmm. So it happens in vanilla 4.4, too... let me see if it happens in
-v4.6.
+It applies to all ARMv8 SoCs with QCOM processors in them. So QDF24xx and mobile 820, but not SoCs
+with ARM processors in them such as MSM8916. So neither msm_ nor qdf_ are accurate prefixes. As Timur
+pointed out, the majority of source files in drivers/soc/qcom don't have any prefix, which is a
+reason why I didn't include one.
 
-									Pavel
+>>>> diff --git a/include/linux/soc/qcom/l2-accessors.h b/include/linux/soc/qcom/l2-accessors.h
+>>>> new file mode 100644
+>>>> index 0000000..563c114
+>>>> --- /dev/null
+>>>> +++ b/include/linux/soc/qcom/l2-accessors.h
+>>>> @@ -0,0 +1,27 @@
+>>>> +/*
+>>>> + * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
+>>>> + *
+>>>> + * This program is free software; you can redistribute it and/or modify
+>>>> + * it under the terms of the GNU General Public License version 2 and
+>>>> + * only version 2 as published by the Free Software Foundation.
+>>>> + *
+>>>> + * This program is distributed in the hope that it will be useful,
+>>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>>> + * GNU General Public License for more details.
+>>>> + */
+>>>> +
+>>>
+>>>> +#ifndef __QCOM_L2_ACCESSORS_H
+>>>> +#define __QCOM_L2_ACCESSORS_H
+>>>> +
+>>>> +#ifdef CONFIG_QCOM_L2_ACCESSORS
+>>>> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
+>>>> +u64 get_l2_indirect_reg(u64 reg_addr);
+>>>> +#else
+>>>> +static inline void set_l2_indirect_reg(u64 reg_addr, u64 val) {}
+>>>> +static inline u64 get_l2_indirect_reg(u64 reg_addr)
+>>>> +{
+>>>> +	return 0;
+>>>> +}
+>>>
+>>> Surely it would be better to error out on any unintentional use of these
+>>> at build time?
+>>
+>> This allows building code which is common to ARM SoCs and QCOM SoCs without having to ifdef out the
+>> QCOM-specific pieces.
+> 
+> These shouldn't appear in generic code.
+> 
+> Other than the L2 PMU driver (which presumably depends on or selects
+> CONFIG_QCOM_L2_ACCESSORS), what code would you have to ifdef?
+> 
+> I don't have a major concern on this, I just don't see where it should
+> matter.
+
+Ok, I agree, I will remove this. Thanks.
+
+> 
+> Thanks,
+> Mark.
+> 
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
