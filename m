@@ -1,8 +1,10 @@
 From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 24 May 2016 09:26:01 +0200
+Date: Tue, 24 May 2016 09:27:37 +0200
 Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending flip
- event v4
-Message-ID: <1464074761-5194-1-git-send-email-tomeu.vizoso@collabora.com>
+ event v5
+In-Reply-To: <1464074761-5194-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1464074761-5194-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <1464074857-5515-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
