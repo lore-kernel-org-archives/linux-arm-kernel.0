@@ -1,199 +1,159 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:44 +0200
-Subject: [PULL 50/59] KVM: arm/arm64: vgic-new: Add userland GIC CPU interface
- access
+Date: Tue, 24 May 2016 11:09:34 +0200
+Subject: [PULL 40/59] KVM: arm/arm64: vgic-new: Add GICv3 SGI system register
+ trap handler
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-51-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-41-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andre Przywara <andre.przywara@arm.com>
 
-Using the VMCR accessors we provide access to GIC CPU interface state
-to userland by wiring it up to the existing userland interface.
-[Marc: move and make VMCR accessors static, streamline MMIO handlers]
+In contrast to GICv2 SGIs in a GICv3 implementation are not triggered
+by a MMIO write, but with a system register write. KVM knows about
+that register already, we just need to implement the handler and wire
+it up to the core KVM/ARM code.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-kvm-device.c |   2 +-
- virt/kvm/arm/vgic/vgic-mmio-v2.c    | 114 +++++++++++++++++++++++++++++++++++-
- virt/kvm/arm/vgic/vgic.h            |   2 +
- 3 files changed, 116 insertions(+), 2 deletions(-)
+ include/kvm/vgic/vgic.h          |   8 +++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c | 106 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 114 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-kvm-device.c b/virt/kvm/arm/vgic/vgic-kvm-device.c
-index 9ee27cb..0130c4b 100644
---- a/virt/kvm/arm/vgic/vgic-kvm-device.c
-+++ b/virt/kvm/arm/vgic/vgic-kvm-device.c
-@@ -274,7 +274,7 @@ static int vgic_attr_regs_access(struct kvm_device *dev,
+diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+index ff3f9c2..00e3dca 100644
+--- a/include/kvm/vgic/vgic.h
++++ b/include/kvm/vgic/vgic.h
+@@ -209,6 +209,14 @@ bool kvm_vcpu_has_pending_irqs(struct kvm_vcpu *vcpu);
+ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu);
+ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu);
  
- 	switch (attr->group) {
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
--		ret = -EINVAL;
-+		ret = vgic_v2_cpuif_uaccess(vcpu, is_write, addr, reg);
- 		break;
- 	case KVM_DEV_ARM_VGIC_GRP_DIST_REGS:
- 		ret = vgic_v2_dist_uaccess(vcpu, is_write, addr, reg);
-diff --git a/virt/kvm/arm/vgic/vgic-mmio-v2.c b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-index a255122..a213936 100644
---- a/virt/kvm/arm/vgic/vgic-mmio-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio-v2.c
-@@ -204,6 +204,84 @@ static void vgic_mmio_write_sgipends(struct kvm_vcpu *vcpu,
- 	}
- }
++#ifdef CONFIG_KVM_ARM_VGIC_V3
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg);
++#else
++static inline void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
++{
++}
++#endif
++
+ /**
+  * kvm_vgic_get_max_vcpus - Get the maximum number of VCPUs allowed by HW
+  *
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 4dcef9e..a0c515a 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -347,3 +347,109 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
  
-+static void vgic_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_set_vmcr(vcpu, vmcr);
-+	else
-+		vgic_v3_set_vmcr(vcpu, vmcr);
-+}
-+
-+static void vgic_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr)
-+{
-+	if (kvm_vgic_global_state.type == VGIC_V2)
-+		vgic_v2_get_vmcr(vcpu, vmcr);
-+	else
-+		vgic_v3_get_vmcr(vcpu, vmcr);
-+}
-+
-+#define GICC_ARCH_VERSION_V2	0x2
-+
-+/* These are for userland accesses only, there is no guest-facing emulation. */
-+static unsigned long vgic_mmio_read_vcpuif(struct kvm_vcpu *vcpu,
-+					   gpa_t addr, unsigned int len)
-+{
-+	struct vgic_vmcr vmcr;
-+	u32 val;
-+
-+	vgic_get_vmcr(vcpu, &vmcr);
-+
-+	switch (addr & 0xff) {
-+	case GIC_CPU_CTRL:
-+		val = vmcr.ctlr;
-+		break;
-+	case GIC_CPU_PRIMASK:
-+		val = vmcr.pmr;
-+		break;
-+	case GIC_CPU_BINPOINT:
-+		val = vmcr.bpr;
-+		break;
-+	case GIC_CPU_ALIAS_BINPOINT:
-+		val = vmcr.abpr;
-+		break;
-+	case GIC_CPU_IDENT:
-+		val = ((PRODUCT_ID_KVM << 20) |
-+		       (GICC_ARCH_VERSION_V2 << 16) |
-+		       IMPLEMENTER_ARM);
-+		break;
-+	default:
-+		return 0;
-+	}
-+
-+	return val;
-+}
-+
-+static void vgic_mmio_write_vcpuif(struct kvm_vcpu *vcpu,
-+				   gpa_t addr, unsigned int len,
-+				   unsigned long val)
-+{
-+	struct vgic_vmcr vmcr;
-+
-+	vgic_get_vmcr(vcpu, &vmcr);
-+
-+	switch (addr & 0xff) {
-+	case GIC_CPU_CTRL:
-+		vmcr.ctlr = val;
-+		break;
-+	case GIC_CPU_PRIMASK:
-+		vmcr.pmr = val;
-+		break;
-+	case GIC_CPU_BINPOINT:
-+		vmcr.bpr = val;
-+		break;
-+	case GIC_CPU_ALIAS_BINPOINT:
-+		vmcr.abpr = val;
-+		break;
-+	}
-+
-+	vgic_set_vmcr(vcpu, &vmcr);
-+}
-+
- static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 	REGISTER_DESC_WITH_LENGTH(GIC_DIST_CTRL,
- 		vgic_mmio_read_v2_misc, vgic_mmio_write_v2_misc, 12,
-@@ -249,6 +327,27 @@ static const struct vgic_register_region vgic_v2_dist_registers[] = {
- 		VGIC_ACCESS_32bit | VGIC_ACCESS_8bit),
- };
- 
-+static const struct vgic_register_region vgic_v2_cpu_registers[] = {
-+	REGISTER_DESC_WITH_LENGTH(GIC_CPU_CTRL,
-+		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH(GIC_CPU_PRIMASK,
-+		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH(GIC_CPU_BINPOINT,
-+		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH(GIC_CPU_ALIAS_BINPOINT,
-+		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH(GIC_CPU_ACTIVEPRIO,
-+		vgic_mmio_read_raz, vgic_mmio_write_wi, 16,
-+		VGIC_ACCESS_32bit),
-+	REGISTER_DESC_WITH_LENGTH(GIC_CPU_IDENT,
-+		vgic_mmio_read_vcpuif, vgic_mmio_write_vcpuif, 4,
-+		VGIC_ACCESS_32bit),
-+};
-+
- unsigned int vgic_v2_init_dist_iodev(struct vgic_io_device *dev)
- {
- 	dev->regions = vgic_v2_dist_registers;
-@@ -274,7 +373,9 @@ int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr)
- 		nr_regions = ARRAY_SIZE(vgic_v2_dist_registers);
- 		break;
- 	case KVM_DEV_ARM_VGIC_GRP_CPU_REGS:
--		return -ENXIO;		/* TODO: describe CPU i/f regs also */
-+		regions = vgic_v2_cpu_registers;
-+		nr_regions = ARRAY_SIZE(vgic_v2_cpu_registers);
-+		break;
- 	default:
- 		return -ENXIO;
- 	}
-@@ -322,6 +423,17 @@ static int vgic_uaccess(struct kvm_vcpu *vcpu, struct vgic_io_device *dev,
  	return ret;
  }
- 
-+int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+			  int offset, u32 *val)
-+{
-+	struct vgic_io_device dev = {
-+		.regions = vgic_v2_cpu_registers,
-+		.nr_regions = ARRAY_SIZE(vgic_v2_cpu_registers),
-+	};
 +
-+	return vgic_uaccess(vcpu, &dev, is_write, offset, val);
++/*
++ * Compare a given affinity (level 1-3 and a level 0 mask, from the SGI
++ * generation register ICC_SGI1R_EL1) with a given VCPU.
++ * If the VCPU's MPIDR matches, return the level0 affinity, otherwise
++ * return -1.
++ */
++static int match_mpidr(u64 sgi_aff, u16 sgi_cpu_mask, struct kvm_vcpu *vcpu)
++{
++	unsigned long affinity;
++	int level0;
++
++	/*
++	 * Split the current VCPU's MPIDR into affinity level 0 and the
++	 * rest as this is what we have to compare against.
++	 */
++	affinity = kvm_vcpu_get_mpidr_aff(vcpu);
++	level0 = MPIDR_AFFINITY_LEVEL(affinity, 0);
++	affinity &= ~MPIDR_LEVEL_MASK;
++
++	/* bail out if the upper three levels don't match */
++	if (sgi_aff != affinity)
++		return -1;
++
++	/* Is this VCPU's bit set in the mask ? */
++	if (!(sgi_cpu_mask & BIT(level0)))
++		return -1;
++
++	return level0;
 +}
 +
- int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 			 int offset, u32 *val)
- {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index d2c1fd5..de9dc71 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -47,6 +47,8 @@ void vgic_v2_set_underflow(struct kvm_vcpu *vcpu);
- int vgic_v2_has_attr_regs(struct kvm_device *dev, struct kvm_device_attr *attr);
- int vgic_v2_dist_uaccess(struct kvm_vcpu *vcpu, bool is_write,
- 			 int offset, u32 *val);
-+int vgic_v2_cpuif_uaccess(struct kvm_vcpu *vcpu, bool is_write,
-+			  int offset, u32 *val);
- void vgic_v2_set_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- void vgic_v2_get_vmcr(struct kvm_vcpu *vcpu, struct vgic_vmcr *vmcr);
- int vgic_register_dist_iodev(struct kvm *kvm, gpa_t dist_base_address,
++/*
++ * The ICC_SGI* registers encode the affinity differently from the MPIDR,
++ * so provide a wrapper to use the existing defines to isolate a certain
++ * affinity level.
++ */
++#define SGI_AFFINITY_LEVEL(reg, level) \
++	((((reg) & ICC_SGI1R_AFFINITY_## level ##_MASK) \
++	>> ICC_SGI1R_AFFINITY_## level ##_SHIFT) << MPIDR_LEVEL_SHIFT(level))
++
++/**
++ * vgic_v3_dispatch_sgi - handle SGI requests from VCPUs
++ * @vcpu: The VCPU requesting a SGI
++ * @reg: The value written into the ICC_SGI1R_EL1 register by that VCPU
++ *
++ * With GICv3 (and ARE=1) CPUs trigger SGIs by writing to a system register.
++ * This will trap in sys_regs.c and call this function.
++ * This ICC_SGI1R_EL1 register contains the upper three affinity levels of the
++ * target processors as well as a bitmask of 16 Aff0 CPUs.
++ * If the interrupt routing mode bit is not set, we iterate over all VCPUs to
++ * check for matching ones. If this bit is set, we signal all, but not the
++ * calling VCPU.
++ */
++void vgic_v3_dispatch_sgi(struct kvm_vcpu *vcpu, u64 reg)
++{
++	struct kvm *kvm = vcpu->kvm;
++	struct kvm_vcpu *c_vcpu;
++	u16 target_cpus;
++	u64 mpidr;
++	int sgi, c;
++	int vcpu_id = vcpu->vcpu_id;
++	bool broadcast;
++
++	sgi = (reg & ICC_SGI1R_SGI_ID_MASK) >> ICC_SGI1R_SGI_ID_SHIFT;
++	broadcast = reg & BIT(ICC_SGI1R_IRQ_ROUTING_MODE_BIT);
++	target_cpus = (reg & ICC_SGI1R_TARGET_LIST_MASK) >> ICC_SGI1R_TARGET_LIST_SHIFT;
++	mpidr = SGI_AFFINITY_LEVEL(reg, 3);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 2);
++	mpidr |= SGI_AFFINITY_LEVEL(reg, 1);
++
++	/*
++	 * We iterate over all VCPUs to find the MPIDRs matching the request.
++	 * If we have handled one CPU, we clear its bit to detect early
++	 * if we are already finished. This avoids iterating through all
++	 * VCPUs when most of the times we just signal a single VCPU.
++	 */
++	kvm_for_each_vcpu(c, c_vcpu, kvm) {
++		struct vgic_irq *irq;
++
++		/* Exit early if we have dealt with all requested CPUs */
++		if (!broadcast && target_cpus == 0)
++			break;
++
++		/* Don't signal the calling VCPU */
++		if (broadcast && c == vcpu_id)
++			continue;
++
++		if (!broadcast) {
++			int level0;
++
++			level0 = match_mpidr(mpidr, target_cpus, c_vcpu);
++			if (level0 == -1)
++				continue;
++
++			/* remove this matching VCPU from the mask */
++			target_cpus &= ~BIT(level0);
++		}
++
++		irq = vgic_get_irq(vcpu->kvm, c_vcpu, sgi);
++
++		spin_lock(&irq->irq_lock);
++		irq->pending = true;
++
++		vgic_queue_irq_unlock(vcpu->kvm, irq);
++	}
++}
 -- 
 2.1.2.330.g565301e.dirty
