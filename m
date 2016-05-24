@@ -1,42 +1,26 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 24 May 2016 12:57:56 +0200
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <56bb8ec4-fe7e-ec09-adc3-ec7eea2d7ddd@linaro.org>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
- <6297051.TAxtzW5OIB@wuerfel>
- <CALszF6AxXY0LK5fToFg3095+gz6xcZz8KHaYqc=o39vjpBYDmA@mail.gmail.com>
- <12548318.auB4PSA3KC@wuerfel>
- <CALszF6BPPA=tezMLhmdC4YFwmH1tGhDxCNDZNwGp1cTDWP7Fmg@mail.gmail.com>
- <56bb8ec4-fe7e-ec09-adc3-ec7eea2d7ddd@linaro.org>
-Message-ID: <CALszF6AmE3yzJL_Wn8nVa3hmTb8eHOoNbvyAh5GiiB2r4PHiyA@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 24 May 2016 12:58:57 +0200
+Subject: [PATCH 6/6] pinctrl: mt8173: set GPIO16 to usb iddig mode
+In-Reply-To: <1463021701.25171.5.camel@mussux00>
+References: <1462868614-20602-1-git-send-email-chunfeng.yun@mediatek.com>
+ <1462868614-20602-7-git-send-email-chunfeng.yun@mediatek.com>
+ <CACRpkdaeD5mk7LXEWnE0=Xute8-JA-fa4tVt4fYhujEXeq2+9w@mail.gmail.com>
+ <1462991546.11623.3.camel@mussux00>
+ <1463017282.11651.82.camel@mhfsdcap03>
+ <1463018942.1608.5.camel@mussux00>
+ <1463021701.25171.5.camel@mussux00>
+Message-ID: <CACRpkdZe6iLPC7EHnq0UZGsULP3-WDGtXkTdEcwHdihtAZQaRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-05-24 12:09 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
-> On 24/05/16 09:50, Maxime Coquelin wrote:
->>
->> diff --git a/drivers/char/hw_random/stm32-rng.c
->> b/drivers/char/hw_random/stm32-rng.c
->> index 92a810648bd0..2a0fc90e4dc3 100644
->> --- a/drivers/char/hw_random/stm32-rng.c
->> +++ b/drivers/char/hw_random/stm32-rng.c
->> @@ -68,6 +68,10 @@ static int stm32_rng_read(struct hwrng *rng, void
->> *data, size_t max, bool wait)
->>                         } while (!sr && --timeout);
->>                 }
->>
->> +               if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
->> +                               "bad RNG status - %x\n", sr))
->> +                       writel_relaxed(0, priv->base + RNG_SR);
->> +
->>                 /* If error detected or data not ready... */
->>                 if (sr != RNG_SR_DRDY)
->>                         break;
->
->
-> Minor quibble but I might prefer that the error handling/recovery actually
-> be put on the error path itself (included in the if (sr != RNG_SR_DRDY) ).
-Yes, it would be better.
+On Thu, May 12, 2016 at 4:55 AM, Hongzhou Yang
+<hongzhou.yang@mediatek.com> wrote:
 
-Regards,
-Maxime
+> We find there are some other pins still have the same problem, so please
+> hold on it. Sorry for so much noise.
+
+It's OK. Get me a big patch fixing it all when you're combed through
+things and we can apply it for fixes/stable.
+
+Yours,
+Linus Walleij
