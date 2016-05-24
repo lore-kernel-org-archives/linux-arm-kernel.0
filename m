@@ -1,45 +1,54 @@
 From: rob.rice@broadcom.com (Rob Rice)
-Date: Tue, 24 May 2016 14:07:27 -0400
-Subject: [PATCH 0/3] Add Broadcom PDC mailbox driver
-Message-ID: <1464113250-15629-1-git-send-email-rob.rice@broadcom.com>
+Date: Tue, 24 May 2016 14:07:28 -0400
+Subject: [PATCH 1/3] dt-bindings: add bindings documentation for PDC driver.
+In-Reply-To: <1464113250-15629-1-git-send-email-rob.rice@broadcom.com>
+References: <1464113250-15629-1-git-send-email-rob.rice@broadcom.com>
+Message-ID: <1464113250-15629-2-git-send-email-rob.rice@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Rice <rrice@broadcom.com>
 
-The Broadcom PDC mailbox driver is a ring manager for the Broadcom
-Secure Processing Unit (SPU) kernel driver and other mailbox clients.
-The PDC driver registers with the Linux mailbox framework a mailbox
-controller, once for each PDC instance. Ring 0 for each PDC is registered as
-a mailbox channel. The PDC driver uses interrupts to determine when ring
-transfers to and from an offload engine are complete. The PDC driver uses
-threaded IRQs so that response messages are handled outside of interrupt
-context.
+Add the device tree binding documentation for the PDC hardware
+in Broadcom iProc SoCs.
 
-Rob Rice (3):
-  dt-bindings: add bindings documentation for PDC driver.
-  mailbox: Add Broadcom PDC mailbox driver
-  arm64: dts: Add Broadcom Northstar2 device tree entries for PDC
-    driver.
-
- .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       |   23 +
- arch/arm64/boot/dts/broadcom/ns2.dtsi              |   36 +
- drivers/mailbox/Kconfig                            |    9 +
- drivers/mailbox/Makefile                           |    2 +
- drivers/mailbox/mailbox-pdc/Makefile               |    8 +
- drivers/mailbox/mailbox-pdc/pdc.c                  | 1181 ++++++++++++++++++++
- drivers/mailbox/mailbox-pdc/pdc.h                  |  303 +++++
- drivers/mailbox/mailbox-pdc/pdc_debug.c            |  101 ++
- drivers/mailbox/mailbox-pdc/pdc_debug.h            |   24 +
- include/linux/mailbox/brcm-message.h               |   56 +
- 10 files changed, 1743 insertions(+)
+Signed-off-by: Rob Rice <rob.rice@broadcom.com>
+Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+Reviewed-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+---
+ .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
- create mode 100644 drivers/mailbox/mailbox-pdc/Makefile
- create mode 100644 drivers/mailbox/mailbox-pdc/pdc.c
- create mode 100644 drivers/mailbox/mailbox-pdc/pdc.h
- create mode 100644 drivers/mailbox/mailbox-pdc/pdc_debug.c
- create mode 100644 drivers/mailbox/mailbox-pdc/pdc_debug.h
- create mode 100644 include/linux/mailbox/brcm-message.h
 
+diff --git a/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+new file mode 100644
+index 0000000..411ccf4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
+@@ -0,0 +1,23 @@
++The PDC driver manages data transfer to and from various offload engines
++on some Broadcom SoCs. An SoC may have multiple PDC hardware blocks. There is
++one device tree entry per block.
++
++Required properties:
++- compatible : Should be "brcm,iproc-pdc-mbox".
++- reg: Should contain PDC registers location and length.
++- interrupts: Should contain the IRQ line for the PDC.
++- #mbox-cells: 1
++- brcm,rx-status-len: Length of metadata preceding received frames, in bytes.
++
++Optional properties:
++- brcm,use-bcm-hdr:  present if a BCM header precedes each frame.
++
++Example:
++	pdc0: iproc-pdc0 at 0x612c0000 {
++		compatible = "brcm,iproc-pdc-mbox";
++		reg = <0 0x612c0000 0 0x445>;  /* PDC FS0 regs */
++		interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++		#mbox-cells = <1>;   /* one cell per mailbox channel */
++		brcm,rx-status-len = <32>;
++		brcm,use-bcm-hdr;
++	};
 -- 
 2.1.0
