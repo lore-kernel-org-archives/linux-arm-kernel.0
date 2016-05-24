@@ -1,66 +1,31 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Tue, 24 May 2016 10:09:41 +0800
-Subject: [PATCH 3/3] ARM: rockchip: drop rk3288 jtag/mmc switch handling
-In-Reply-To: <1464015539-19521-4-git-send-email-heiko@sntech.de>
-References: <1464015539-19521-1-git-send-email-heiko@sntech.de>
- <1464015539-19521-4-git-send-email-heiko@sntech.de>
-Message-ID: <feee590b-e9a9-7c36-cf99-9dd1cb229eb7@rock-chips.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 23 May 2016 19:14:09 -0700
+Subject: [PATCH 2/4] hwrng: bcm2835: Support Broadcom NSP SoC rng
+In-Reply-To: <1464020451-16520-3-git-send-email-yendapally.reddy@broadcom.com>
+References: <1464020451-16520-1-git-send-email-yendapally.reddy@broadcom.com>
+ <1464020451-16520-3-git-send-email-yendapally.reddy@broadcom.com>
+Message-ID: <87oa7w2oem.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/5/23 22:58, Heiko Stuebner ??:
-> We moved that functionality to a more generic place where it can also
-> be used for other socs, so drop it from architecture code.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
+writes:
 
-It looks good to drop this Soc related setting from
-architecture code.
+> This supports the random number generator available in NSP SoC.
+> Masks the rng interrupt for NSP.
 
-Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
+The interrupt reg is also present on the 2835.  I would prefer for
+simplicity if you also initialized the register to the same value on the
+Pi, even though the firmware has presumably been setting it for us
+already.
 
-> ---
->  arch/arm/mach-rockchip/rockchip.c | 12 ------------
->  1 file changed, 12 deletions(-)
->
-> diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-> index beb71da..e7b2aa7 100644
-> --- a/arch/arm/mach-rockchip/rockchip.c
-> +++ b/arch/arm/mach-rockchip/rockchip.c
-> @@ -29,13 +29,11 @@
->  #include "core.h"
->  #include "pm.h"
->
-> -#define RK3288_GRF_SOC_CON0 0x244
->  #define RK3288_TIMER6_7_PHYS 0xff810000
->
->  static void __init rockchip_timer_init(void)
->  {
->  	if (of_machine_is_compatible("rockchip,rk3288")) {
-> -		struct regmap *grf;
->  		void __iomem *reg_base;
->
->  		/*
-> @@ -54,16 +52,6 @@ static void __init rockchip_timer_init(void)
->  		} else {
->  			pr_err("rockchip: could not map timer7 registers\n");
->  		}
-> -
-> -		/*
-> -		 * Disable auto jtag/sdmmc switching that causes issues
-> -		 * with the mmc controllers making them unreliable
-> -		 */
-> -		grf = syscon_regmap_lookup_by_compatible("rockchip,rk3288-grf");
-> -		if (!IS_ERR(grf))
-> -			regmap_write(grf, RK3288_GRF_SOC_CON0, 0x10000000);
-> -		else
-> -			pr_err("rockchip: could not get grf syscon\n");
->  	}
->
->  	of_clk_init(NULL);
->
+However, this patch is still correct and I'm fine with it, so it's:
 
-
--- 
-Best Regards
-Shawn Lin
+Acked-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160523/b46b26ff/attachment-0001.sig>
