@@ -1,69 +1,104 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 24 May 2016 11:09:09 +0200
-Subject: [PULL 15/59] KVM: arm/arm64: move GICv2 emulation defines into
- arm-gic-v3.h
+Date: Tue, 24 May 2016 11:09:05 +0200
+Subject: [PULL 11/59] KVM: arm/arm64: Fix MMIO emulation data handling
 In-Reply-To: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464080993-10884-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464080993-10884-16-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464080993-10884-12-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
+When the kernel was handling a guest MMIO read access internally, we
+need to copy the emulation result into the run->mmio structure in order
+for the kvm_handle_mmio_return() function to pick it up and inject the
+	result back into the guest.
 
-As (some) GICv3 hosts can emulate a GICv2, some GICv2 specific masks
-for the list register definition also apply to GICv3 LRs.
-At the moment we have those definitions in the KVM VGICv3
-implementation, so let's move them into the GICv3 header file to
-have them automatically defined.
+Currently the only user of kvm_io_bus for ARM is the VGIC, which did
+this copying itself, so this was not causing issues so far.
 
+But with the upcoming new vgic implementation we need this done
+properly.
+
+Update the kvm_handle_mmio_return description and cleanup the code to
+only perform a single copying when needed.
+
+Code and commit message inspired by Andre Przywara.
+
+Reported-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/linux/irqchip/arm-gic-v3.h | 5 +++++
- virt/kvm/arm/vgic-v3.c             | 8 +-------
- 2 files changed, 6 insertions(+), 7 deletions(-)
+ arch/arm/kvm/mmio.c | 14 +++++++-------
+ virt/kvm/arm/vgic.c |  7 -------
+ 2 files changed, 7 insertions(+), 14 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index d5d798b..ec938d1 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -276,6 +276,11 @@
- #define ICH_LR_PHYS_ID_SHIFT		32
- #define ICH_LR_PHYS_ID_MASK		(0x3ffULL << ICH_LR_PHYS_ID_SHIFT)
+diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+index 0f6600f..0158e9e 100644
+--- a/arch/arm/kvm/mmio.c
++++ b/arch/arm/kvm/mmio.c
+@@ -87,11 +87,10 @@ static unsigned long mmio_read_buf(char *buf, unsigned int len)
  
-+/* These are for GICv2 emulation only */
-+#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
-+#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
-+#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
-+
- #define ICH_MISR_EOI			(1 << 0)
- #define ICH_MISR_U			(1 << 1)
+ /**
+  * kvm_handle_mmio_return -- Handle MMIO loads after user space emulation
++ *			     or in-kernel IO emulation
++ *
+  * @vcpu: The VCPU pointer
+  * @run:  The VCPU run struct containing the mmio data
+- *
+- * This should only be called after returning from userspace for MMIO load
+- * emulation.
+  */
+ int kvm_handle_mmio_return(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ {
+@@ -206,18 +205,19 @@ int io_mem_abort(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	run->mmio.is_write	= is_write;
+ 	run->mmio.phys_addr	= fault_ipa;
+ 	run->mmio.len		= len;
+-	if (is_write)
+-		memcpy(run->mmio.data, data_buf, len);
  
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index c02a1b1..75b02fa 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -29,12 +29,6 @@
- #include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
+ 	if (!ret) {
+ 		/* We handled the access successfully in the kernel. */
++		if (!is_write)
++			memcpy(run->mmio.data, data_buf, len);
+ 		vcpu->stat.mmio_exit_kernel++;
+ 		kvm_handle_mmio_return(vcpu, run);
+ 		return 1;
+-	} else {
+-		vcpu->stat.mmio_exit_user++;
+ 	}
  
--/* These are for GICv2 emulation only */
--#define GICH_LR_VIRTUALID		(0x3ffUL << 0)
--#define GICH_LR_PHYSID_CPUID_SHIFT	(10)
--#define GICH_LR_PHYSID_CPUID		(7UL << GICH_LR_PHYSID_CPUID_SHIFT)
--#define ICH_LR_VIRTUALID_MASK		(BIT_ULL(32) - 1)
++	if (is_write)
++		memcpy(run->mmio.data, data_buf, len);
++	vcpu->stat.mmio_exit_user++;
+ 	run->exit_reason	= KVM_EXIT_MMIO;
+ 	return 0;
+ }
+diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
+index f76bb64..c3bfbb9 100644
+--- a/virt/kvm/arm/vgic.c
++++ b/virt/kvm/arm/vgic.c
+@@ -819,7 +819,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+ 	struct vgic_io_device *iodev = container_of(this,
+ 						    struct vgic_io_device, dev);
+-	struct kvm_run *run = vcpu->run;
+ 	const struct vgic_io_range *range;
+ 	struct kvm_exit_mmio mmio;
+ 	bool updated_state;
+@@ -848,12 +847,6 @@ static int vgic_handle_mmio_access(struct kvm_vcpu *vcpu,
+ 		updated_state = false;
+ 	}
+ 	spin_unlock(&dist->lock);
+-	run->mmio.is_write	= is_write;
+-	run->mmio.len		= len;
+-	run->mmio.phys_addr	= addr;
+-	memcpy(run->mmio.data, val, len);
 -
- static u32 ich_vtr_el2;
+-	kvm_handle_mmio_return(vcpu, run);
  
- static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
-@@ -43,7 +37,7 @@ static struct vgic_lr vgic_v3_get_lr(const struct kvm_vcpu *vcpu, int lr)
- 	u64 val = vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[lr];
- 
- 	if (vcpu->kvm->arch.vgic.vgic_model == KVM_DEV_TYPE_ARM_VGIC_V3)
--		lr_desc.irq = val & ICH_LR_VIRTUALID_MASK;
-+		lr_desc.irq = val & ICH_LR_VIRTUAL_ID_MASK;
- 	else
- 		lr_desc.irq = val & GICH_LR_VIRTUALID;
- 
+ 	if (updated_state)
+ 		vgic_kick_vcpus(vcpu->kvm);
 -- 
 2.1.2.330.g565301e.dirty
