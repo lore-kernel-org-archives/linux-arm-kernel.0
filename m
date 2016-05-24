@@ -1,147 +1,143 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Tue, 24 May 2016 15:19:17 +0200
-Subject: [PATCH 3/3] clk: samsung: exynos5433: add CPU clocks configuration
- data and instantiate CPU clocks
-In-Reply-To: <1464095957-25851-1-git-send-email-b.zolnierkie@samsung.com>
-References: <1464095957-25851-1-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <1464095957-25851-4-git-send-email-b.zolnierkie@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 24 May 2016 15:28:12 +0200
+Subject: [PATCH 1/2] drm/exynos: g2d: Add support for old S5Pv210 type
+Message-ID: <1464096493-13378-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the CPU clocks configuration data and instantiate the CPU clocks
-type for Exynos5433.
+The non-DRM s5p-g2d driver supports two versions of G2D: v3.0 on
+S5Pv210 and v4.x on Exynos 4x12 (or newer). The driver for 3.0 device
+version is doing two things differently:
+1. Before starting the render process, it invalidates caches (pattern,
+   source buffer and mask buffer). Cache control is not present on v4.x
+   device.
+2. Scalling is done through StretchEn command (in BITBLT_COMMAND_REG
+   register) instead of SRC_SCALE_CTRL_REG as in v4.x. However the
+   exynos_drm_g2d driver does not implement the scalling so this
+   difference can be eliminated.
 
-Cc: Kukjin Kim <kgene@kernel.org>
-CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+After adding support for v3.0 to exynos_drm_g2d driver, the old driver
+can be removed.
+
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Kamil Debski <k.debski@samsung.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos5433.c | 72 ++++++++++++++++++++++++++++++++----
- 1 file changed, 64 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_g2d.c | 37 +++++++++++++++++++++++++++++++--
+ drivers/gpu/drm/exynos/exynos_drm_g2d.h |  7 +++++++
+ 2 files changed, 42 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
-index 6dd81ed..9ff6160 100644
---- a/drivers/clk/samsung/clk-exynos5433.c
-+++ b/drivers/clk/samsung/clk-exynos5433.c
-@@ -16,6 +16,7 @@
- #include <dt-bindings/clock/exynos5433.h>
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.c b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+index 493552368295..44d8b28e9d98 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_g2d.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.c
+@@ -19,6 +19,7 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/dma-attrs.h>
+ #include <linux/of.h>
++#include <linux/of_device.h>
  
- #include "clk.h"
-+#include "clk-cpu.h"
- #include "clk-pll.h"
+ #include <drm/drmP.h>
+ #include <drm/exynos_drm.h>
+@@ -38,6 +39,7 @@
+ #define G2D_SOFT_RESET			0x0000
+ #define G2D_INTEN			0x0004
+ #define G2D_INTC_PEND			0x000C
++#define G2D_CACHECTL			0x0018 /* S5PV210 specific */
+ #define G2D_DMA_SFR_BASE_ADDR		0x0080
+ #define G2D_DMA_COMMAND			0x0084
+ #define G2D_DMA_STATUS			0x008C
+@@ -78,6 +80,11 @@
+ #define G2D_INTP_GCMD_FIN		(1 << 1)
+ #define G2D_INTP_SCMD_FIN		(1 << 0)
  
- /*
-@@ -3509,7 +3510,8 @@ static struct samsung_pll_clock apollo_pll_clks[] __initdata = {
- static struct samsung_mux_clock apollo_mux_clks[] __initdata = {
- 	/* MUX_SEL_APOLLO0 */
- 	MUX_F(CLK_MOUT_APOLLO_PLL, "mout_apollo_pll", mout_apollo_pll_p,
--			MUX_SEL_APOLLO0, 0, 1, CLK_SET_RATE_PARENT, 0),
-+			MUX_SEL_APOLLO0, 0, 1, CLK_SET_RATE_PARENT |
-+			CLK_RECALC_NEW_RATES, 0),
++/* G2D_CACHECTL, S5PV210 specific */
++#define G2D_CACHECTL_PATCACHE		(BIT(2))
++#define G2D_CACHECTL_SRCBUFFER		(BIT(1))
++#define G2D_CACHECTL_MASKBUFFER		(BIT(0))
++
+ /* G2D_DMA_COMMAND */
+ #define G2D_DMA_HALT			(1 << 2)
+ #define G2D_DMA_CONTINUE		(1 << 1)
+@@ -245,6 +252,7 @@ struct g2d_data {
  
- 	/* MUX_SEL_APOLLO1 */
- 	MUX(CLK_MOUT_BUS_PLL_APOLLO_USER, "mout_bus_pll_apollo_user",
-@@ -3590,9 +3592,27 @@ static struct samsung_gate_clock apollo_gate_clks[] __initdata = {
- 			ENABLE_SCLK_APOLLO, 3, CLK_IGNORE_UNUSED, 0),
- 	GATE(CLK_SCLK_HPM_APOLLO, "sclk_hpm_apollo", "div_sclk_hpm_apollo",
- 			ENABLE_SCLK_APOLLO, 1, CLK_IGNORE_UNUSED, 0),
--	GATE(CLK_SCLK_APOLLO, "sclk_apollo", "div_apollo2",
--			ENABLE_SCLK_APOLLO, 0,
--			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+};
-+
-+#define E5433_APOLLO_DIV0(cntclk, pclk_dbg, atclk, pclk, aclk) \
-+		(((cntclk) << 24) | ((pclk_dbg) << 20) | ((atclk) << 16) | \
-+		 ((pclk) << 12) | ((aclk) << 8))
-+
-+#define E5433_APOLLO_DIV1(hpm, copy) \
-+		(((hpm) << 4) | ((copy) << 0))
-+
-+static const struct exynos_cpuclk_cfg_data exynos5433_apolloclk_d[] __initconst = {
-+	{ 1300000, E5433_APOLLO_DIV0(3, 7, 7, 7, 2), E5433_APOLLO_DIV1(7, 1), },
-+	{ 1200000, E5433_APOLLO_DIV0(3, 7, 7, 7, 2), E5433_APOLLO_DIV1(7, 1), },
-+	{ 1100000, E5433_APOLLO_DIV0(3, 7, 7, 7, 2), E5433_APOLLO_DIV1(7, 1), },
-+	{ 1000000, E5433_APOLLO_DIV0(3, 7, 7, 7, 2), E5433_APOLLO_DIV1(7, 1), },
-+	{  900000, E5433_APOLLO_DIV0(3, 7, 7, 7, 2), E5433_APOLLO_DIV1(7, 1), },
-+	{  800000, E5433_APOLLO_DIV0(3, 7, 7, 7, 2), E5433_APOLLO_DIV1(7, 1), },
-+	{  700000, E5433_APOLLO_DIV0(3, 7, 7, 7, 2), E5433_APOLLO_DIV1(7, 1), },
-+	{  600000, E5433_APOLLO_DIV0(3, 7, 7, 7, 1), E5433_APOLLO_DIV1(7, 1), },
-+	{  500000, E5433_APOLLO_DIV0(3, 7, 7, 7, 1), E5433_APOLLO_DIV1(7, 1), },
-+	{  400000, E5433_APOLLO_DIV0(3, 7, 7, 7, 1), E5433_APOLLO_DIV1(7, 1), },
-+	{  0 },
+ 	unsigned long			current_pool;
+ 	unsigned long			max_pool;
++	enum exynos_drm_g2d_type	type;
  };
  
- static void __init exynos5433_cmu_apollo_init(struct device_node *np)
-@@ -3620,6 +3640,12 @@ static void __init exynos5433_cmu_apollo_init(struct device_node *np)
- 				 ARRAY_SIZE(apollo_div_clks));
- 	samsung_clk_register_gate(ctx, apollo_gate_clks,
- 				  ARRAY_SIZE(apollo_gate_clks));
-+
-+	exynos_register_cpu_clock(ctx, CLK_SCLK_APOLLO, "apolloclk",
-+		mout_apollo_p[0], mout_apollo_p[1], 0x200,
-+		exynos5433_apolloclk_d, ARRAY_SIZE(exynos5433_apolloclk_d),
-+		CLK_CPU_HAS_E5433_REGS_LAYOUT);
-+
- 	samsung_clk_sleep_init(reg_base, apollo_clk_regs,
- 			       ARRAY_SIZE(apollo_clk_regs));
+ static int g2d_init_cmdlist(struct g2d_data *g2d)
+@@ -1125,6 +1133,13 @@ int exynos_g2d_set_cmdlist_ioctl(struct drm_device *drm_dev, void *data,
+ 	cmdlist->data[cmdlist->last++] = G2D_SRC_BASE_ADDR;
+ 	cmdlist->data[cmdlist->last++] = 0;
  
-@@ -3707,7 +3733,8 @@ static struct samsung_pll_clock atlas_pll_clks[] __initdata = {
- static struct samsung_mux_clock atlas_mux_clks[] __initdata = {
- 	/* MUX_SEL_ATLAS0 */
- 	MUX_F(CLK_MOUT_ATLAS_PLL, "mout_atlas_pll", mout_atlas_pll_p,
--			MUX_SEL_ATLAS0, 0, 1, CLK_SET_RATE_PARENT, 0),
-+			MUX_SEL_ATLAS0, 0, 1, CLK_SET_RATE_PARENT |
-+			CLK_RECALC_NEW_RATES, 0),
++	if (g2d->type == EXYNOS_DRM_G2D_TYPE_3X) {
++		cmdlist->data[cmdlist->last++] = G2D_CACHECTL;
++		cmdlist->data[cmdlist->last++] = G2D_CACHECTL_PATCACHE |
++						 G2D_CACHECTL_SRCBUFFER |
++						 G2D_CACHECTL_MASKBUFFER;
++	}
++
+ 	/*
+ 	 * 'LIST_HOLD' command should be set to the DMA_HOLD_CMD_REG
+ 	 * and GCF bit should be set to INTEN register if user wants
+@@ -1369,10 +1384,20 @@ static int g2d_probe(struct platform_device *pdev)
+ 	struct exynos_drm_subdrv *subdrv;
+ 	int ret;
  
- 	/* MUX_SEL_ATLAS1 */
- 	MUX(CLK_MOUT_BUS_PLL_ATLAS_USER, "mout_bus_pll_atlas_user",
-@@ -3814,9 +3841,32 @@ static struct samsung_gate_clock atlas_gate_clks[] __initdata = {
- 			ENABLE_SCLK_ATLAS, 2, CLK_IGNORE_UNUSED, 0),
- 	GATE(CLK_ATCLK, "atclk", "div_atclk_atlas",
- 			ENABLE_SCLK_ATLAS, 1, CLK_IGNORE_UNUSED, 0),
--	GATE(CLK_SCLK_ATLAS, "sclk_atlas", "div_atlas2",
--			ENABLE_SCLK_ATLAS, 0,
--			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
-+};
++	/* Sanity check, we can be instatiated only from DT */
++	if (!dev->of_node)
++		return -EINVAL;
 +
-+#define E5433_ATLAS_DIV0(cntclk, pclk_dbg, atclk, pclk, aclk) \
-+		(((cntclk) << 24) | ((pclk_dbg) << 20) | ((atclk) << 16) | \
-+		 ((pclk) << 12) | ((aclk) << 8))
+ 	g2d = devm_kzalloc(dev, sizeof(*g2d), GFP_KERNEL);
+ 	if (!g2d)
+ 		return -ENOMEM;
+ 
++	g2d->type = (enum exynos_drm_g2d_type)of_device_get_match_data(dev);
++	if (g2d->type == EXYNOS_DRM_G2D_TYPE_UNKNOWN) {
++		dev_err(dev, "failed to get type of device\n");
++		return -EINVAL;
++	}
 +
-+#define E5433_ATLAS_DIV1(hpm, copy) \
-+		(((hpm) << 4) | ((copy) << 0))
-+
-+static const struct exynos_cpuclk_cfg_data exynos5433_atlasclk_d[] __initconst = {
-+	{ 1900000, E5433_ATLAS_DIV0(7, 7, 7, 7, 4), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1800000, E5433_ATLAS_DIV0(7, 7, 7, 7, 4), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1700000, E5433_ATLAS_DIV0(7, 7, 7, 7, 4), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1600000, E5433_ATLAS_DIV0(7, 7, 7, 7, 4), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1500000, E5433_ATLAS_DIV0(7, 7, 7, 7, 3), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1400000, E5433_ATLAS_DIV0(7, 7, 7, 7, 3), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1300000, E5433_ATLAS_DIV0(7, 7, 7, 7, 3), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1200000, E5433_ATLAS_DIV0(7, 7, 7, 7, 3), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1100000, E5433_ATLAS_DIV0(7, 7, 7, 7, 3), E5433_ATLAS_DIV1(7, 1), },
-+	{ 1000000, E5433_ATLAS_DIV0(7, 7, 7, 7, 3), E5433_ATLAS_DIV1(7, 1), },
-+	{  900000, E5433_ATLAS_DIV0(7, 7, 7, 7, 2), E5433_ATLAS_DIV1(7, 1), },
-+	{  800000, E5433_ATLAS_DIV0(7, 7, 7, 7, 2), E5433_ATLAS_DIV1(7, 1), },
-+	{  700000, E5433_ATLAS_DIV0(7, 7, 7, 7, 2), E5433_ATLAS_DIV1(7, 1), },
-+	{  600000, E5433_ATLAS_DIV0(7, 7, 7, 7, 2), E5433_ATLAS_DIV1(7, 1), },
-+	{  500000, E5433_ATLAS_DIV0(7, 7, 7, 7, 2), E5433_ATLAS_DIV1(7, 1), },
-+	{  0 },
+ 	g2d->runqueue_slab = kmem_cache_create("g2d_runqueue_slab",
+ 			sizeof(struct g2d_runqueue_node), 0, 0, NULL);
+ 	if (!g2d->runqueue_slab)
+@@ -1535,8 +1560,16 @@ static const struct dev_pm_ops g2d_pm_ops = {
  };
  
- static void __init exynos5433_cmu_atlas_init(struct device_node *np)
-@@ -3844,6 +3894,12 @@ static void __init exynos5433_cmu_atlas_init(struct device_node *np)
- 				 ARRAY_SIZE(atlas_div_clks));
- 	samsung_clk_register_gate(ctx, atlas_gate_clks,
- 				  ARRAY_SIZE(atlas_gate_clks));
-+
-+	exynos_register_cpu_clock(ctx, CLK_SCLK_ATLAS, "atlasclk",
-+		mout_atlas_p[0], mout_atlas_p[1], 0x200,
-+		exynos5433_atlasclk_d, ARRAY_SIZE(exynos5433_atlasclk_d),
-+		CLK_CPU_HAS_E5433_REGS_LAYOUT);
-+
- 	samsung_clk_sleep_init(reg_base, atlas_clk_regs,
- 			       ARRAY_SIZE(atlas_clk_regs));
+ static const struct of_device_id exynos_g2d_match[] = {
+-	{ .compatible = "samsung,exynos5250-g2d" },
+-	{ .compatible = "samsung,exynos4212-g2d" },
++	{
++		.compatible = "samsung,exynos5250-g2d",
++		.data = (void *)EXYNOS_DRM_G2D_TYPE_4X,
++	}, {
++		.compatible = "samsung,exynos4212-g2d",
++		.data = (void *)EXYNOS_DRM_G2D_TYPE_4X,
++	}, {
++		.compatible = "samsung,s5pv210-g2d",
++		.data = (void *)EXYNOS_DRM_G2D_TYPE_3X,
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, exynos_g2d_match);
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_g2d.h b/drivers/gpu/drm/exynos/exynos_drm_g2d.h
+index 1a9c7ca8c15b..84ec8aff6f0a 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_g2d.h
++++ b/drivers/gpu/drm/exynos/exynos_drm_g2d.h
+@@ -7,6 +7,13 @@
+  * published by the Free Software Foundationr
+  */
  
++enum exynos_drm_g2d_type {
++	EXYNOS_DRM_G2D_TYPE_UNKNOWN,
++
++	EXYNOS_DRM_G2D_TYPE_3X,
++	EXYNOS_DRM_G2D_TYPE_4X,
++};
++
+ #ifdef CONFIG_DRM_EXYNOS_G2D
+ extern int exynos_g2d_get_ver_ioctl(struct drm_device *dev, void *data,
+ 				    struct drm_file *file_priv);
 -- 
 1.9.1
