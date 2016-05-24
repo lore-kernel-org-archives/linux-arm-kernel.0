@@ -1,44 +1,35 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 24 May 2016 18:55:40 +0100
-Subject: [PATCH 1/3] arm64: Remove orphaned __addr_ok() definition
-Message-ID: <4656e09e40e832b2690fb0280975c70a541fb7ef.1464111462.git.robin.murphy@arm.com>
+Date: Tue, 24 May 2016 18:55:42 +0100
+Subject: [PATCH 3/3] openrisc: Remove orphaned __addr_ok() definition
+In-Reply-To: <4656e09e40e832b2690fb0280975c70a541fb7ef.1464111462.git.robin.murphy@arm.com>
+References: <4656e09e40e832b2690fb0280975c70a541fb7ef.1464111462.git.robin.murphy@arm.com>
+Message-ID: <2d34650818ced1b3c362dfc75d087b70c0f7edef.1464111462.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit 12a0ef7b0ac3 ("arm64: use generic strnlen_user and
-strncpy_from_user functions"), the definition of __addr_ok() has been
-languishing unused; eradicate the sucker.
+Since commit b48b2c3e5043 ("openrisc: use generic strnlen_user()
+function"), the definition of __addr_ok() has been languishing unused;
+eradicate the sucker.
 
-CC: Will Deacon <will.deacon@arm.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: Jonas Bonn <jonas@southpole.se>
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm64/include/asm/uaccess.h | 13 -------------
- 1 file changed, 13 deletions(-)
+ arch/openrisc/include/asm/uaccess.h | 3 ---
+ 1 file changed, 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 0685d74572af..9e397a542756 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -81,19 +81,6 @@ static inline void set_fs(mm_segment_t fs)
- #define segment_eq(a, b)	((a) == (b))
+diff --git a/arch/openrisc/include/asm/uaccess.h b/arch/openrisc/include/asm/uaccess.h
+index a6bd07ca3d6c..74bcb34c6d0b 100644
+--- a/arch/openrisc/include/asm/uaccess.h
++++ b/arch/openrisc/include/asm/uaccess.h
+@@ -59,9 +59,6 @@
+  */
+ #define __range_ok(addr, size) (size <= get_fs() && addr <= (get_fs()-size))
  
- /*
-- * Return 1 if addr < current->addr_limit, 0 otherwise.
-- */
--#define __addr_ok(addr)							\
--({									\
--	unsigned long flag;						\
--	asm("cmp %1, %0; cset %0, lo"					\
--		: "=&r" (flag)						\
--		: "r" (addr), "0" (current_thread_info()->addr_limit)	\
--		: "cc");						\
--	flag;								\
--})
+-/* Ensure that addr is below task's addr_limit */
+-#define __addr_ok(addr) ((unsigned long) addr < get_fs())
 -
--/*
-  * Test whether a block of memory is a valid user space address.
-  * Returns 1 if the range is valid, 0 otherwise.
-  *
+ #define access_ok(type, addr, size) \
+ 	__range_ok((unsigned long)addr, (unsigned long)size)
+ 
 -- 
 2.8.1.dirty
