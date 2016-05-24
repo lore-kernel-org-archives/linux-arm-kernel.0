@@ -1,25 +1,59 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 24 May 2016 09:35:19 +0100
-Subject: [PATCH 2/4] ARM: dma-mapping: Constify attrs passed to internal
- functions
-In-Reply-To: <1464071290-15948-3-git-send-email-k.kozlowski@samsung.com>
-References: <1464071290-15948-1-git-send-email-k.kozlowski@samsung.com>
- <1464071290-15948-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160524083519.GC19428@n2100.arm.linux.org.uk>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 24 May 2016 10:37:49 +0200
+Subject: [PATCH] drm/rockchip: Return -EBUSY if there's already a pending
+ flip event v5
+In-Reply-To: <20160524083050.GQ27098@phenom.ffwll.local>
+References: <1464074761-5194-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1464074857-5515-1-git-send-email-tomeu.vizoso@collabora.com>
+ <7363560.k3ytHeYgtM@phil>
+ <20160524083050.GQ27098@phenom.ffwll.local>
+Message-ID: <20160524083749.GR27098@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2016 at 08:28:08AM +0200, Krzysztof Kozlowski wrote:
-> Some of the non-exported functions do not modify passed dma_attrs so the
-> pointer can point to const data.
+On Tue, May 24, 2016 at 10:30:50AM +0200, Daniel Vetter wrote:
+> On Tue, May 24, 2016 at 10:28:42AM +0200, Heiko Stuebner wrote:
+> > Hi Tomeu,
+> > 
+> > Patch subject: please put the version into the brackets, so [PATCH v5] as it 
+> > shouldn't be part of the commit log.
+> > 
+> > Am Dienstag, 24. Mai 2016, 09:27:37 schrieb Tomeu Vizoso:
+> > > As per the docs, atomic_commit should return -EBUSY "if an asycnhronous
+> > > updated is requested and there is an earlier updated pending".
+> > 
+> > > v2: Use the status of the workqueue instead of vop->event, and don't add
+> > > a superfluous wait on the workqueue.
+> > > 
+> > > v3: Drop work_busy, as there's a sizeable delay when the worker
+> > > finishes, which introduces a race in which the client has already
+> > > received the last flip event but the next page flip ioctl will still
+> > > return -EBUSY because work_busy returns outdated information.
+> > > 
+> > > v4: Hold dev->event_lock while checking the VOP's event field as
+> > > suggested by Daniel Stone.
+> > > 
+> > > v5: Only block if there's outstanding work if it's a blocking call.
+> > 
+> > similarly, please put the changelog below the "---" and above the diffstat.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> drm culture is to keep it above, since it's kinda useful sometimes when
+> later on trying to reconstruct wtf was discussed and why a patch was
+> merged.
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+Maybe needs a bit more context: The only stuff you raised in your review
+is tiny style nits of pretty much utter irrelevance. No substantial and
+material feedback anywehere, and in my opinion in such a case either fix
+up the nits when applying (when you feel really strongly about perfect
+patches), or just merge as-is.
 
-Thanks.
+But sending out content-less bikesheds like these just adds noise and
+helps no-one. I think at least some spelling stuff is the minimal bar (but
+then just include your r-b tag), but personally I don't even care about
+that so much, as long as it's still legible.
 
+Thanks, Daniel
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
