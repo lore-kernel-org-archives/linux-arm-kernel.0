@@ -1,54 +1,104 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 25 May 2016 10:45:55 -0500
-Subject: [RFC PATCH 1/3] asm-generic: io: Add exec versions of ioremap
-In-Reply-To: <20160518205758.GY5783@n2100.arm.linux.org.uk>
-References: <1462830111-28172-1-git-send-email-d-gerlach@ti.com>
- <573C7844.5030107@ti.com> <20160518175102.GX5783@n2100.arm.linux.org.uk>
- <3861017.ZJOlWYvEFT@wuerfel> <20160518205758.GY5783@n2100.arm.linux.org.uk>
-Message-ID: <5745C8B3.2050609@ti.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 25 May 2016 16:55:39 +0100
+Subject: [PATCH v4 01/12] KVM: extend struct kvm_msi to hold a 32-bit
+ device ID
+In-Reply-To: <20160403091508.GA5261@cbox>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-2-git-send-email-andre.przywara@arm.com>
+ <20160403091508.GA5261@cbox>
+Message-ID: <e520a5a8-b259-27f3-f33c-f87e008f1c6f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2016 03:57 PM, Russell King - ARM Linux wrote:
-> On Wed, May 18, 2016 at 10:25:03PM +0200, Arnd Bergmann wrote:
->> The ARM version of ioremap_exec() that gets added in this patch is cached
->> (like memremap()), but then the asm-generic version is not? This is
->> even more confusing, it should at least do roughly the same thing across
->> architectures.
+Hi Christoffer,
+
+On 03/04/16 10:15, Christoffer Dall wrote:
+> On Sat, Mar 26, 2016 at 02:13:59AM +0000, Andre Przywara wrote:
+>> The ARM GICv3 ITS MSI controller requires a device ID to be able to
+>> assign the proper interrupt vector. On real hardware, this ID is
+>> sampled from the bus. To be able to emulate an ITS controller, extend
+>> the KVM MSI interface to let userspace provide such a device ID. For
+>> PCI devices, the device ID is simply the 16-bit bus-device-function
+>> triplet, which should be easily available to the userland tool.
 >>
->> There should also be some documentation about what the expected behavior is, e.g.:
+>> Also there is a new KVM capability which advertises whether the
+>> current VM requires a device ID to be set along with the MSI data.
+>> This flag is still reported as not available everywhere, later we will
+>> enable it when ITS emulation is used.
 >>
->> - is memremap_exec() by default cached or not? (I assume it would
->>    be like memremap())
->> - If we have an interface that does explicit uncached executable mapping,
->>    what about architectures on which this is not possible? Should they
->>    fall back to cached or non-executable, or cause a link error?
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+>> ---
+>>  Documentation/virtual/kvm/api.txt | 12 ++++++++++--
+>>  include/uapi/linux/kvm.h          |  5 ++++-
+>>  2 files changed, 14 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>> index cb2ef0b..8f7351d 100644
+>> --- a/Documentation/virtual/kvm/api.txt
+>> +++ b/Documentation/virtual/kvm/api.txt
+>> @@ -2163,10 +2163,18 @@ struct kvm_msi {
+>>  	__u32 address_hi;
+>>  	__u32 data;
+>>  	__u32 flags;
+>> -	__u8  pad[16];
+>> +	__u32 devid;
+> 
+> Are we imposing any unfortunate restrictions for other architectures by
+> using a u32 over a u64 for the device ID?
 
-Yes by default memremap_exec is cached, I do plan to add more explicit 
-documentation.
+Mmmh, good point. I guess not only for other architectures, but also for
+the future in general.
 
-Well, I dont think that memremap_exec will be called directly but rather 
-using a flag with memremap as arch_memremap_wb is now, to keep the 
-memremap API unified, so a link error will prevent this. Also, the 
-function may be present in code but not actually used in all cases, the 
-example that comes to mind is the drivers/misc/sram.c code where other 
-runtime options are perfectly valid for determining how to map memory 
-even on architectures that can't memremap_exec_nocache.
+Are there any objections against increasing this to a u64?
 
-I think that a remap that can't deliver what you have asked for should 
-return NULL here because if you are requesting executable, noncached 
-memory you presumably will try to execute from it and fail, so the 
-mapping should fail as it isn't actually valid if it can't do what you want.
+Cheers,
+Andre.
 
->
-> Another important point is whether atomic instructions / kernel locks
-> can be located within the mapped memory.
->
-
-At this point I'd imagine most of the users of this would be copying 
-small chunks of relocatable code (likely written in assembly) that would 
-handle low-level tasks without the need for atomic instructions/locks, 
-but is this something we should explicitly forbid in documentation?
-
-Regards,
-Dave
+>> +	__u8  pad[12];
+>>  };
+>>  
+>> -No flags are defined so far. The corresponding field must be 0.
+>> +flags: KVM_MSI_VALID_DEVID: devid contains a valid value
+>> +devid: If KVM_MSI_VALID_DEVID is set, contains a unique device identifier
+>> +       for the device that wrote the MSI message.
+>> +       For PCI, this is usually a BFD identifier in the lower 16 bits.
+>> +
+>> +The per-VM KVM_CAP_MSI_DEVID capability advertises the need to provide
+>> +the device ID. If this capability is not set, userland cannot rely on
+>> +the kernel to allow the KVM_MSI_VALID_DEVID flag being set.
+>>  
+>>  
+>>  4.71 KVM_CREATE_PIT2
+>> diff --git a/include/uapi/linux/kvm.h b/include/uapi/linux/kvm.h
+>> index 50f44a2..6a02871 100644
+>> --- a/include/uapi/linux/kvm.h
+>> +++ b/include/uapi/linux/kvm.h
+>> @@ -852,6 +852,7 @@ struct kvm_ppc_smmu_info {
+>>  #define KVM_CAP_S390_RI 124
+>>  #define KVM_CAP_ARM_PMU_V3 125
+>>  #define KVM_CAP_VCPU_ATTRIBUTES 126
+>> +#define KVM_CAP_MSI_DEVID 127
+>>  
+>>  #ifdef KVM_CAP_IRQ_ROUTING
+>>  
+>> @@ -1010,12 +1011,14 @@ struct kvm_one_reg {
+>>  	__u64 addr;
+>>  };
+>>  
+>> +#define KVM_MSI_VALID_DEVID	(1U << 0)
+>>  struct kvm_msi {
+>>  	__u32 address_lo;
+>>  	__u32 address_hi;
+>>  	__u32 data;
+>>  	__u32 flags;
+>> -	__u8  pad[16];
+>> +	__u32 devid;
+>> +	__u8  pad[12];
+>>  };
+>>  
+>>  struct kvm_arm_device_addr {
+>> -- 
+>> 2.7.3
+>>
+> 
