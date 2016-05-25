@@ -1,32 +1,69 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 25 May 2016 23:03:27 +0300
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <20160525.123017.1597296248000772613.davem@davemloft.net>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-2-git-send-email-ynorov@caviumnetworks.com>
- <20160525.123017.1597296248000772613.davem@davemloft.net>
-Message-ID: <20160525200327.GA22395@yury-N73SV>
+From: carlo@caione.org (Carlo Caione)
+Date: Wed, 25 May 2016 22:18:30 +0200
+Subject: [PATCH v4 2/3] documentation: Add secure monitor binding documentation
+In-Reply-To: <1464207511-11786-1-git-send-email-carlo@caione.org>
+References: <1464207511-11786-1-git-send-email-carlo@caione.org>
+Message-ID: <1464207511-11786-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 12:30:17PM -0700, David Miller wrote:
-> From: Yury Norov <ynorov@caviumnetworks.com>
-> Date: Tue, 24 May 2016 03:04:30 +0300
-> 
-> > +To clear that top halves, automatic wrappers are introduced. They clear all
-> > +required registers before passing control to regular syscall handler.
-> 
-> Why have one of these for every single compat system call, rather than
-> simply clearing the top half of all of these registers unconditionally
-> in the 32-bit system call trap before the system call is invoked?
-> 
-> That's what we do on sparc64.
-> 
-> And with that, you only need wrappers for the case where there needs
-> to be proper sign extention of a 32-bit signed argument.
+From: Carlo Caione <carlo@endlessm.com>
 
-It was discussed as one of possible solutions. The downside of it is
-that we cannot pass 64-bit types (like off_t) in single register.
-The other downside is that we clear top halves for every single
-syscall, and it looks excessive. So, from spark64 and s390 approaches
-we choosed second.
+Add the binding documentation for the Amlogic secure monitor driver.
+
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ .../bindings/firmware/meson/meson_sm.txt           | 42 ++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+
+diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+new file mode 100644
+index 0000000..896758d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+@@ -0,0 +1,42 @@
++* Amlogic Secure Monitor
++
++In the Amlogic SoCs the Secure Monitor code is used to provide access to the
++NVMEM, enable JTAG, set USB boot, etc...
++
++Required properties for the secure monitor node:
++- compatible: Should be "amlogic,meson-gxbb-sm"
++
++Example:
++
++	#include <dt-bindings/firmware/meson-sm.h>
++
++	...
++
++	firmware {
++		compatible = "simple-bus";
++
++		sm: secure-monitor {
++			compatible = "amlogic,meson-gxbb-sm";
++		};
++	};
++
++Node of a device using the secure monitor must have a custom property to
++specify the SMC32 function ID the driver is going to use.
++
++Example of the node using the secure monitor:
++
++	#include <dt-bindings/firmware/meson-sm.h>
++
++	...
++
++	efuse: efuse {
++		compatible = "amlogic,meson-gxbb-efuse";
++		secure-monitor = <&sm>;
++		amlogic,sm-cmd-read-efuse = <SM_EFUSE_READ>;
++		amlogic,sm-cmd-max-efuse = <SM_EFUSE_USER_MAX>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		...
++	};
++
+-- 
+2.7.4
