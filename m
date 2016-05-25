@@ -1,41 +1,55 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 25 May 2016 11:51:47 +0530
-Subject: [PATCH kexec-tools 06/32] kdump: print mmap() offset in hex
-In-Reply-To: <E1axXSQ-0004hT-54@e0050434b2927.dyn.arm.linux.org.uk>
-References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
- <E1axXSQ-0004hT-54@e0050434b2927.dyn.arm.linux.org.uk>
-Message-ID: <CAHB_GurzXYbK5Nx7LT9TdXGbHF3ufGEfYMW68Y-9vSrefqBhjA@mail.gmail.com>
+From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
+Date: Wed, 25 May 2016 07:30:09 +0530
+Subject: [PATCH] hwrng: stm32 - fix build warning
+In-Reply-To: <CALszF6BAFgoccC6fmkdnwQxwHmQ35oLcor6v9yOLyVeXrt-KGA@mail.gmail.com>
+References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>	<12548318.auB4PSA3KC@wuerfel>	<CALszF6BPPA=tezMLhmdC4YFwmH1tGhDxCNDZNwGp1cTDWP7Fmg@mail.gmail.com>	<6044541.yeLQbYg2Jv@wuerfel>
+ <CALszF6BAFgoccC6fmkdnwQxwHmQ35oLcor6v9yOLyVeXrt-KGA@mail.gmail.com>
+Message-ID: <57450729.3000609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 3, 2016 at 3:51 PM, Russell King <rmk@arm.linux.org.uk> wrote:
-> When mmap() fails, printing a large decimal number is mostly
-> meaningless - it's not obvious what it means.  Printing a hex number
-> is more obvious, because we can see whether it's over 32-bit, or not
-> page aligned.
+On Tuesday 24 May 2016 02:50 PM, Maxime Coquelin wrote:
+> 2016-05-24 10:58 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
+>> On Tuesday, May 24, 2016 10:50:17 AM CEST Maxime Coquelin wrote:
+>>> diff --git a/drivers/char/hw_random/stm32-rng.c
+>>> b/drivers/char/hw_random/stm32-rng.c
+>>> index 92a810648bd0..2a0fc90e4dc3 100644
+>>> --- a/drivers/char/hw_random/stm32-rng.c
+>>> +++ b/drivers/char/hw_random/stm32-rng.c
+>>> @@ -68,6 +68,10 @@ static int stm32_rng_read(struct hwrng *rng, void
+>>> *data, size_t max, bool wait)
+>>>                          } while (!sr && --timeout);
+>>>                  }
+>>>
+>>> +               if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
+>>> +                               "bad RNG status - %x\n", sr))
+>>> +                       writel_relaxed(0, priv->base + RNG_SR);
+>>> +
+>>>                  /* If error detected or data not ready... */
+>>>                  if (sr != RNG_SR_DRDY)
+>>>                          break;
+>>> @@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void
+>>> *data, size_t max, bool wait)
+>>>                  max -= sizeof(u32);
+>>>          }
+>>>
+>>> -       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
+>>> -                     "bad RNG status - %x\n", sr))
+>>> -               writel_relaxed(0, priv->base + RNG_SR);
+>>> -
+>>>          pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
+>>>          pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
+>>>
+>>> Thanks,
+>>>
+>>
+>> Yes, that looks good to me.
 >
-> Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+> Thanks!
+> Sudip, do you want to send the patch, or I manage to do it?
 
-Looks good to me.
-Reviewed-by: Pratyush Anand <panand@redhat.com>
+Maybe you should send it, i have not done anything in reaching its final 
+form.
 
-> ---
->  kdump/kdump.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/kdump/kdump.c b/kdump/kdump.c
-> index 34d2149..f34727f 100644
-> --- a/kdump/kdump.c
-> +++ b/kdump/kdump.c
-> @@ -37,7 +37,7 @@ static void *map_addr(int fd, unsigned long size, off_t offset)
->
->         result = mmap(0, len, PROT_READ, MAP_SHARED, fd, offset - map_offset);
->         if (result == MAP_FAILED) {
-> -               fprintf(stderr, "Cannot mmap " DEV_MEM " offset: %llu size: %lu: %s\n",
-> +               fprintf(stderr, "Cannot mmap " DEV_MEM " offset: %#llx size: %lu: %s\n",
->                         (unsigned long long)offset, size, strerror(errno));
->                 exit(5);
->         }
-> --
-> 1.9.1
->
+Regards
+Sudip
