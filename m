@@ -1,64 +1,53 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Wed, 25 May 2016 22:19:29 +0530
-Subject: [PATCH V5 6/7] iommu/msm: Use writel_relaxed and add a barrier
-In-Reply-To: <7715835.BXgVNoY5UO@wuerfel>
-References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
- <14302911.qQPb4UMJ8d@wuerfel>
- <004c01d1b688$0f6379c0$2e2a6d40$@codeaurora.org> <7715835.BXgVNoY5UO@wuerfel>
-Message-ID: <000901d1b6a5$6dcd5f90$49681eb0$@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 May 2016 12:09:12 -0500
+Subject: [PATCH 1/3] Documentation: dtb: xgene: Add hwmon dts binding
+ documentation
+In-Reply-To: <CAFHUOYyYt8pE6sggezCR=TFcsimcjakbYmcWFtpLyQ3Et_gZaA@mail.gmail.com>
+References: <1463415447-29903-1-git-send-email-hotran@apm.com>
+ <1463415447-29903-2-git-send-email-hotran@apm.com>
+ <20160523203044.GA17450@rob-hp-laptop>
+ <CAFHUOYyYt8pE6sggezCR=TFcsimcjakbYmcWFtpLyQ3Et_gZaA@mail.gmail.com>
+Message-ID: <20160525170912.GA24382@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Mon, May 23, 2016 at 06:01:14PM -0700, Hoan Tran wrote:
+> Hi Rob,
+> 
+> Thanks for your review !
+> 
+> On Mon, May 23, 2016 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
+> >
+> > On Mon, May 16, 2016 at 09:17:25AM -0700, Hoan Tran wrote:
+> > > This patch adds the APM X-Gene hwmon device tree node documentation.
+> > >
+> > > Signed-off-by: Hoan Tran <hotran@apm.com>
+> > > ---
+> > >  .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt          | 14 ++++++++++++++
+> > >  1 file changed, 14 insertions(+)
+> > >  create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+> > >
+> > > diff --git a/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+> > > new file mode 100644
+> > > index 0000000..49a482e
+> > > --- /dev/null
+> > > +++ b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+> > > @@ -0,0 +1,14 @@
+> > > +APM X-Gene hwmon driver
+> > > +
+> > > +Hwmon driver accesses sensors over the "SLIMpro" mailbox.
+> >
+> > DT bindings describe h/w, not driver data.
+> How about this description: "APM X-Gene SOC sensors are accessed over
+> the "SLIMpro" mailbox" ?
+> > I'm not sure this belongs in
+> > DT and perhaps the devices for the mailbox should be created by the
+> > mailbox driver.
+> I don't think the current mailbox supports it.
 
->> >* On other platforms, polling the register is likely required because
->> >  an MMIO write is "posted", meaning that a sync after writel() will
->> >  only ensure that it has left the CPU write queue, but it may still be
->> >  on the bus fabric and whatever side-effects are triggered by the
->> >  write are normally not guaranteed to be completed even after the
->> >  'sync'. You need to check the datasheet for your IOMMU to find out
->> >  whether the 'dsb' instruction actually has any effect on the IOMMU.
->> >  If not, then neither the barrier that you add here nor the barrier
->> >  in the following writel() is sufficient.
->> >
->>    Thanks for the detailed explanation.
->> i will check this. So with this, i think that if the iommu does not
->>  support polling for its status, then it should listen to 'dsb' otherwise
->>  there will no be no way of make it coherent ?
->
->It's more likely that you have to do a readl() after the writel() to
->any address inside of the device in order to ensure the writel()
->has completed, but that is something that the hardware manual for
->the iommu should describe.
->
- ok, get it. So will do it as required for here.
+Then add it. The mailbox binding is really only needed when other h/w 
+blocks use a mailbox. As this is purely a firmware interface then the 
+mailbox driver can create any devices it needs. The devices don't have 
+to be in DT to be created.
 
->> >* The one barrier that is normally required in an IOMMU is between
->> >  updating the in-memory page tables and the following MMIO store
->> >  that triggers the TLB flush for that entry. This barrier is
->> >  implied by writel() but not writel_relaxed(). If you don't have
->> >  a hardware page table walker in your IOMMU, you don't need to worry
->> >  about this.
->> >
->>   To get my understanding correct here, is the barrier required here because
->>    of speculative fetch ?
->
->It doesn't have to be a speculative fetch, it could also be a normal
->fetch triggered by a DMA. The point is that the CPU is free to reorder
->the store to (io page table) memory relative to the store to the
->IOMMU flush register, and when you directly follow up with a store to
->the DMA master that triggers a transfer, this transfer can hit the
->IOMMU and cause the stale page table entry to be read.
->
->I guess in practice the barrier that comes before the MMIO write to the
->DMA master would ensure ordering of the DMA after both the IOPTE
->update and the MMIO flush (unless there was the speculative fetch you
->mentioned), but this is where I'm no longer confident enough in my
->pwn understanding of th ordering rules to rely on that. Having the
->barrier between the IOPTE update and the flush certainly leaves
->no room for ambiguity.
-    Ok understand. Also i think speculative access if any, should 
-     go away if unmap is done first and then remap by clients.
-
-Regards,
- Sricharan
+Rob
