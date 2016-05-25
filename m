@@ -1,133 +1,172 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Wed, 25 May 2016 09:38:23 +0200
-Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
- support
-In-Reply-To: <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
-References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
- <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <25947777-9871-ccc4-011b-0775c2b88d8b@de.bosch.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 25 May 2016 15:39:35 +0800
+Subject: [RESEND PATCH] ARM64: dts: rockchip: add thermal zone node for rk3399
+ SoCs
+Message-ID: <1464161975-31299-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24.05.2016 03:54, Simon Horman wrote:
-> Basic support for the Gen 3 R-Car M3-W SoC.
->
-> Based on work for the r8a7795 and r8a7796 SoCs by
-> Takeshi Kihara, Dirk Behme and Geert Uytterhoeven.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v3
-> * As suggested by Geert Uytterhoeven:
->   - Drop 0x from unit address of gic
-> * As suggested by Khiem Nguyen:
->   - Use psci-0.2
-> * Added Reviewed-by tag from Geert Uytterhoeven
->
-> v2
-> * As suggested by Geert Uytterhoeven:
->   - Move L2_CA57 node under cpus node and include reg property
->   - Omit status = "disabled" from scif_clk node
-> ---
->  Documentation/devicetree/bindings/arm/shmobile.txt |   4 +
->  arch/arm64/Kconfig.platforms                       |   6 ++
->  arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 120 +++++++++++++++++++++
->  3 files changed, 130 insertions(+)
->  create mode 100644 arch/arm64/boot/dts/renesas/r8a7796.dtsi
->
-> diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-> index 9cf67e48f222..d5ed554830d7 100644
-> --- a/Documentation/devicetree/bindings/arm/shmobile.txt
-> +++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-> @@ -29,6 +29,8 @@ SoCs:
->      compatible = "renesas,r8a7794"
->    - R-Car H3 (R8A77950)
->      compatible = "renesas,r8a7795"
-> +  - R-Car M3-W (R8A77960)
-> +    compatible = "renesas,r8a7796"
->
->
->  Boards:
-> @@ -61,5 +63,7 @@ Boards:
->      compatible = "renesas,porter", "renesas,r8a7791"
->    - Salvator-X (RTP0RC7795SIPB0010S)
->      compatible = "renesas,salvator-x", "renesas,r8a7795";
-> +  - Salvator-X
-> +    compatible = "renesas,salvator-x", "renesas,r8a7796";
->    - SILK (RTP0RC7794LCB00011S)
->      compatible = "renesas,silk", "renesas,r8a7794"
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index efa77c146415..16d8d26839ea 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -114,6 +114,12 @@ config ARCH_R8A7795
->  	help
->  	  This enables support for the Renesas R-Car H3 SoC.
->
-> +config ARCH_R8A7796
-> +	bool "Renesas R-Car M3-W SoC Platform"
-> +	depends on ARCH_RENESAS
-> +	help
-> +	  This enables support for the Renesas R-Car M3-W SoC.
-> +
->  config ARCH_STRATIX10
->  	bool "Altera's Stratix 10 SoCFPGA Family"
->  	help
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> new file mode 100644
-> index 000000000000..178debf68318
-> --- /dev/null
-> +++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-> @@ -0,0 +1,120 @@
-> +/*
-> + * Device Tree Source for the r8a7796 SoC
-> + *
-> + * Copyright (C) 2016 Renesas Electronics Corp.
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +#include <dt-bindings/clock/r8a7796-cpg-mssr.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +
-> +/ {
-> +	compatible = "renesas,r8a7796";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +
-> +	psci {
-> +		compatible = "arm,psci-0.2";
-> +		method = "smc";
-> +	};
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		/* 1 core only at this point */
-> +		a57_0: cpu at 0 {
-> +			compatible = "arm,cortex-a57", "arm,armv8";
-> +			reg = <0x0>;
-> +			device_type = "cpu";
-> +			next-level-cache = <&L2_CA57>;
-> +			enable-method = "psci";
-> +		};
-> +
-> +		L2_CA57: cache-controller at 0 {
-> +			compatible = "cache";
-> +			reg = <0>;
-> +			cache-unified;
-> +			cache-level = <2>;
-> +		};
-> +	};
+This adds thermal zone node to rk3399 dtsi, rk3399 thermal data is
+including the cpu and gpu sensor zone node.
 
+The thermal zone node is the node containing all the required info
+for describing a thermal zone, including its cooling device bindings.
+The thermal zone node must contain, apart from its own properties, one
+sub-node containing trip nodes and one sub-node containing all the zone
+cooling maps.
 
-It looks to me that in the r8a7795.dtsi the cache-controller node is 
-outside the cpus node? I'd think that we should keep is consistent.
+The following is the parameter is introduced:
+* polling-delay:
+The maximum number of milliseconds to wait between polls
 
-Best regards
+* polling-delay-passive:
+The maximum number of milliseconds to wait between polls when performing
+passive cooling.
 
-Dirk
+* trips:
+A sub-node which is a container of only trip point nodes required to
+describe the thermal zone.
+
+* cooling-maps:
+A sub-node which is a container of only cooling device map nodes, used to
+describe the relation between trips and cooling devices.
+
+* cooling-device:
+A phandle of a cooling device with its specifier, referring to which
+cooling device is used in this cooling specifier binding. In the cooling
+specifier, the first cell is the minimum cooling state and the second cell
+is the maximum cooling state used in this map.
+
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
+
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 100 +++++++++++++++++++++++++++++++
+ 1 file changed, 100 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index 46f325a..f8a80c2 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -45,6 +45,7 @@
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/thermal/thermal.h>
+ 
+ / {
+ 	compatible = "rockchip,rk3399";
+@@ -389,6 +390,95 @@
+ 		status = "disabled";
+ 	};
+ 
++	thermal-zones {
++		cpu_thermal: cpu {
++			polling-delay-passive = <100>; /* milliseconds */
++			polling-delay = <1000>; /* milliseconds */
++
++			thermal-sensors = <&tsadc 0>;
++
++			trips {
++				cpu_alert0: cpu_alert0 {
++					temperature = <70000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				cpu_alert1: cpu_alert1 {
++					temperature = <75000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				cpu_crit: cpu_crit {
++					temperature = <95000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&cpu_alert0>;
++					cooling-device =
++						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++				map1 {
++					trip = <&cpu_alert1>;
++					cooling-device =
++						<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
++						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++		};
++
++		gpu_thermal: gpu {
++			polling-delay-passive = <100>; /* milliseconds */
++			polling-delay = <1000>; /* milliseconds */
++
++			thermal-sensors = <&tsadc 1>;
++
++			trips {
++				gpu_alert0: gpu_alert0 {
++					temperature = <75000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "passive";
++				};
++				gpu_crit: gpu_crit {
++					temperature = <95000>; /* millicelsius */
++					hysteresis = <2000>; /* millicelsius */
++					type = "critical";
++				};
++			};
++
++			cooling-maps {
++				map0 {
++					trip = <&gpu_alert0>;
++					cooling-device =
++						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
++				};
++			};
++		};
++	};
++
++	tsadc: tsadc at ff260000 {
++		compatible = "rockchip,rk3399-tsadc";
++		reg = <0x0 0xff260000 0x0 0x100>;
++		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
++		rockchip,grf = <&grf>;
++		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
++		clock-names = "tsadc", "apb_pclk";
++		assigned-clocks = <&cru SCLK_TSADC>;
++		assigned-clock-rates = <750000>;
++		resets = <&cru SRST_TSADC>;
++		reset-names = "tsadc-apb";
++		pinctrl-names = "init", "default", "sleep";
++		pinctrl-0 = <&otp_gpio>;
++		pinctrl-1 = <&otp_out>;
++		pinctrl-2 = <&otp_gpio>;
++		#thermal-sensor-cells = <1>;
++		rockchip,hw-tshut-temp = <95000>;
++		status = "disabled";
++	};
++
+ 	pmugrf: syscon at ff320000 {
+ 		compatible = "rockchip,rk3399-pmugrf", "syscon";
+ 		reg = <0x0 0xff320000 0x0 0x1000>;
+@@ -881,6 +971,16 @@
+ 			};
+ 		};
+ 
++		tsadc {
++			otp_gpio: otp-gpio {
++				rockchip,pins = <1 6 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
++
++			otp_out: otp-out {
++				rockchip,pins = <1 6 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
+ 		uart0 {
+ 			uart0_xfer: uart0-xfer {
+ 				rockchip,pins =
+-- 
+1.9.1
