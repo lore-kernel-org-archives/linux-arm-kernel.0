@@ -1,51 +1,164 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Wed, 25 May 2016 16:51:56 +0800
-Subject: [PATCH] clk: rockchip: add a dummy clock for the watchdog pclk on
- rk3399
-Message-ID: <1464166316-22480-1-git-send-email-zhengxing@rock-chips.com>
+From: rajeevkumar.linux@gmail.com (rajeev kumar)
+Date: Wed, 25 May 2016 15:01:29 +0530
+Subject: [PATCH v3 2/2] i2c: qup: support SMBus block read
+In-Reply-To: <1463694268-9473-2-git-send-email-austinwc@codeaurora.org>
+References: <1463694268-9473-1-git-send-email-austinwc@codeaurora.org>
+ <1463694268-9473-2-git-send-email-austinwc@codeaurora.org>
+Message-ID: <CAA7nrtgAh6EDJO_qTgMawE=tpZe6F_Ae1G0OhuUME0QF4W5AJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Like rk3288, the pclk supplying the watchdog is controlled via the
-SGRF register area. Additionally the SGRF isn't even writable in
-every boot mode.
+On Fri, May 20, 2016 at 3:14 AM, Austin Christ <austinwc@codeaurora.org> wrote:
+> From: Naveen Kaje <nkaje@codeaurora.org>
+>
+> I2C QUP driver relies on SMBus emulation support from the framework.
+> To handle SMBus block reads, the driver should check I2C_M_RECV_LEN
+> flag and should read the first byte received as the message length.
+>
+> The driver configures the QUP hardware to read one byte. Once the
+> message length is known from this byte, the QUP hardware is configured
+> to read the rest.
+>
+> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+> Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+> ---
+>  drivers/i2c/busses/i2c-qup.c | 68 ++++++++++++++++++++++++++++++++++++++++++--
+>  1 file changed, 65 insertions(+), 3 deletions(-)
+>
+> Changes:
+> - v3:
+>  - clean up redundant checks
+>  - use constant instead of variable for smbus length field
+> - v2:
+>  - rework the smbus block read and break into separate function
+>
+> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+> index ea6ca5f..9fbed83 100644
+> --- a/drivers/i2c/busses/i2c-qup.c
+> +++ b/drivers/i2c/busses/i2c-qup.c
+> @@ -517,6 +517,33 @@ static int qup_i2c_get_data_len(struct qup_i2c_dev *qup)
+>         return data_len;
+>  }
+>
+> +static bool qup_i2c_check_msg_len(struct i2c_msg *msg)
+> +{
+> +       return ((msg->flags & I2C_M_RD) && (msg->flags & I2C_M_RECV_LEN));
+> +}
+> +
+> +static int qup_i2c_set_tags_smb(u16 addr, u8 *tags, struct qup_i2c_dev *qup,
+> +                       struct i2c_msg *msg)
+> +{
+> +       int len = 0;
+> +
+> +       if (msg->len > 1) {
+> +               tags[len++] = QUP_TAG_V2_DATARD_STOP;
+> +               tags[len++] = qup_i2c_get_data_len(qup) - 1;
+> +       } else {
+> +               tags[len++] = QUP_TAG_V2_START;
+> +               tags[len++] = addr & 0xff;
+> +
+> +               if (msg->flags & I2C_M_TEN)
+> +                       tags[len++] = addr >> 8;
+> +
+> +               tags[len++] = QUP_TAG_V2_DATARD;
+> +               /* Read 1 byte indicating the length of the SMBus message */
+> +               tags[len++] = 1;
+> +       }
+> +       return len;
+> +}
+> +
+>  static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
+>                             struct i2c_msg *msg,  int is_dma)
+>  {
+> @@ -526,6 +553,10 @@ static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
+>
+>         int last = (qup->blk.pos == (qup->blk.count - 1)) && (qup->is_last);
+>
+> +       /* Handle tags for SMBus block read */
+> +       if (qup_i2c_check_msg_len(msg))
+> +               return qup_i2c_set_tags_smb(addr, tags, qup, msg);
+> +
+>         if (qup->blk.pos == 0) {
+>                 tags[len++] = QUP_TAG_V2_START;
+>                 tags[len++] = addr & 0xff;
+> @@ -1065,9 +1096,17 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
+>                                 struct i2c_msg *msg)
+>  {
+>         u32 val;
+> -       int idx, pos = 0, ret = 0, total;
+> +       int idx, pos = 0, ret = 0, total, msg_offset = 0;
+>
+> +       /*
+> +        * If the message length is already read in
+> +        * the first byte of the buffer, account for
+> +        * that by setting the offset
+> +        */
+> +       if (qup_i2c_check_msg_len(msg) && (msg->len > 1))
+> +               msg_offset = 1;
+>         total = qup_i2c_get_data_len(qup);
+> +       total -= msg_offset;
+>
+>         /* 2 extra bytes for read tags */
+>         while (pos < (total + 2)) {
+> @@ -1087,8 +1126,8 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
+>
+>                         if (pos >= (total + 2))
+>                                 goto out;
+> -
+> -                       msg->buf[qup->pos++] = val & 0xff;
+> +                       msg->buf[qup->pos + msg_offset] = val & 0xff;
+> +                       qup->pos++;
+>                 }
+>         }
+>
+> @@ -1128,6 +1167,24 @@ static int qup_i2c_read_one_v2(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+>                         goto err;
+>
+>                 qup->blk.pos++;
+> +
+> +               /* Handle SMBus block read length */
+> +               if (qup_i2c_check_msg_len(msg) && (msg->len == 1)) {
+> +                       if (msg->buf[0] > I2C_SMBUS_BLOCK_MAX) {
+> +                               ret = -EPROTO;
+> +                               goto err;
+> +                       }
+> +                       msg->len += msg->buf[0];
+> +                       qup->pos = 0;
+> +                       qup_i2c_set_read_mode_v2(qup, msg->len);
+> +                       ret = qup_i2c_issue_xfer_v2(qup, msg);
+> +                       if (ret)
+> +                               goto err;
+> +                       ret = qup_i2c_wait_for_complete(qup, msg);
+> +                       if (ret)
+> +                               goto err;
+> +                       qup_i2c_set_blk_data(qup, msg);
+> +               }
+>         } while (qup->blk.pos < qup->blk.count);
+>
+>  err:
+> @@ -1210,6 +1267,11 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
+>                         goto out;
+>                 }
+>
+> +               if (qup_i2c_check_msg_len(&msgs[idx])) {
+> +                       ret = -EOPNOTSUPP;
 
-But still the clock control is available and in the future someone
-might want to use it. Therefore define a simple clock for the time
-being so that the watchdog driver can read its rate.
+Could you please rethink on this return value ? It should not be "EOPNOTSUPP"
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+~Rajeev
 
- drivers/clk/rockchip/clk-rk3399.c |    9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 291543f..b6742fa 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -1498,6 +1498,7 @@ static void __init rk3399_clk_init(struct device_node *np)
- {
- 	struct rockchip_clk_provider *ctx;
- 	void __iomem *reg_base;
-+	struct clk *clk;
- 
- 	reg_base = of_iomap(np, 0);
- 	if (!reg_base) {
-@@ -1511,6 +1512,14 @@ static void __init rk3399_clk_init(struct device_node *np)
- 		return;
- 	}
- 
-+	/* Watchdog pclk is controlled by RK3399 SECURE_GRF_SOC_CON3[8]. */
-+	clk = clk_register_fixed_factor(NULL, "pclk_wdt", "pclk_alive", 0, 1, 1);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: could not register clock pclk_wdt: %ld\n",
-+			__func__, PTR_ERR(clk));
-+	else
-+		rockchip_clk_add_lookup(ctx, clk, PCLK_WDT);
-+
- 	rockchip_clk_register_plls(ctx, rk3399_pll_clks,
- 				   ARRAY_SIZE(rk3399_pll_clks), -1);
- 
--- 
-1.7.9.5
+> +                       goto out;
+> +               }
+> +
+>                 if (msgs[idx].flags & I2C_M_RD)
+>                         ret = qup_i2c_read_one(qup, &msgs[idx]);
+>                 else
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
