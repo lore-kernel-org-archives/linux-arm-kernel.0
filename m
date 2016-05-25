@@ -1,50 +1,43 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Wed, 25 May 2016 18:49:18 +0530
-Subject: [PATCH V5 6/7] iommu/msm: Use writel_relaxed and add a barrier
-In-Reply-To: <14302911.qQPb4UMJ8d@wuerfel>
-References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
- <7555154.mU2oTAdECP@wuerfel> <000a01d1b672$93d54690$bb7fd3b0$@codeaurora.org>
- <14302911.qQPb4UMJ8d@wuerfel>
-Message-ID: <004c01d1b688$0f6379c0$2e2a6d40$@codeaurora.org>
+From: robert.richter@cavium.com (Robert Richter)
+Date: Wed, 25 May 2016 15:22:29 +0200
+Subject: [PATCH v5] irqchip, gicv3-its, numa: Enable workaround for
+ Cavium thunderx erratum 23144
+In-Reply-To: <20160422090052.GA4236@arm.com>
+References: <1460748606-28390-1-git-send-email-rrichter@caviumnetworks.com>
+ <20160421174042.GD24726@rric.localdomain> <5719DA41.60304@arm.com>
+ <20160422090052.GA4236@arm.com>
+Message-ID: <20160525132229.GG1535@rric.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Will, Marc,
 
->> Ok, so i was doing this from the idea that, other iommu drivers
->>  where polling on a status bit in their sync call to ensure completion
->> of pending TLB invalidations. But in this case, there is no status bit.
->>  So added a barrier to have no ordering issues before the client
->> triggers the dma operation. But as you say above that it is implicit that
->> the device would have a barrier before starting the trigger, then the
->> barrier here becomes redundant.
->
->Ok. There are two more things to note here:
->
->* On other platforms, polling the register is likely required because
->  an MMIO write is "posted", meaning that a sync after writel() will
->  only ensure that it has left the CPU write queue, but it may still be
->  on the bus fabric and whatever side-effects are triggered by the
->  write are normally not guaranteed to be completed even after the
->  'sync'. You need to check the datasheet for your IOMMU to find out
->  whether the 'dsb' instruction actually has any effect on the IOMMU.
->  If not, then neither the barrier that you add here nor the barrier
->  in the following writel() is sufficient.
->
-   Thanks for the detailed explanation.
-i will check this. So with this, i think that if the iommu does not
- support polling for its status, then it should listen to 'dsb' otherwise
- there will no be no way of make it coherent ?
+On 22.04.16 10:00:52, Will Deacon wrote:
+> On Fri, Apr 22, 2016 at 09:01:05AM +0100, Marc Zyngier wrote:
+> > On 21/04/16 18:40, Robert Richter wrote:
+> > > On 15.04.16 21:30:05, Robert Richter wrote:
+> > >> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> > >>
+> > >> The erratum fixes the hang of ITS SYNC command by avoiding inter node
+> > >> io and collections/cpu mapping on thunderx dual-socket platform.
+> > >>
+> > >> This fix is only applicable for Cavium's ThunderX dual-socket platform.
+> > >>
+> > >> This is based on NUMA v16 series.
+> > >> Message-Id: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
+> > > 
+> > > Will, Catalin,
+> > > 
+> > > after NUMA base patches went into linux-next (many thanks), please
+> > > consider this pass 1.x errata workaround for inclusion too.
+> > 
+> > I'll queue it as a fix once the NUMA patches are merged into mainline.
+> 
+> Yeah, this can probably go in as -rc1 material if you're happy with it.
 
->* The one barrier that is normally required in an IOMMU is between
->  updating the in-memory page tables and the following MMIO store
->  that triggers the TLB flush for that entry. This barrier is
->  implied by writel() but not writel_relaxed(). If you don't have
->  a hardware page table walker in your IOMMU, you don't need to worry
->  about this.
->
-  To get my understanding correct here, is the barrier required here because
-   of speculative fetch ?
+I am going to send a rebased version 6 as there is a minor conflict
+with upstream. Please include that one as numa fix after rc1 is out.
 
-Regards,
- Sricharan
+Thanks,
+
+-Robert
