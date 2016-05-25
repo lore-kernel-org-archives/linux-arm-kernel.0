@@ -1,20 +1,53 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 25 May 2016 13:50:39 -0700 (PDT)
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <6293194.tGy03QJ9ME@wuerfel>
-References: <20160525200327.GA22395@yury-N73SV>
- <20160525.132145.1271448744307448631.davem@davemloft.net>
- <6293194.tGy03QJ9ME@wuerfel>
-Message-ID: <20160525.135039.244098606649448826.davem@davemloft.net>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 25 May 2016 13:50:58 -0700
+Subject: [Patch v5 5/8] firmware: qcom: scm: Convert to streaming DMA APIS
+In-Reply-To: <20160525033731.GA30220@hector.attlocal.net> (Andy Gross's
+ message of "Tue, 24 May 2016 22:37:31 -0500")
+References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
+ <1463111221-6963-6-git-send-email-andy.gross@linaro.org>
+ <CAOi56cVB1Z-gO6Dx0KOSr9wiRF3Y9ahDHe0=qT9WW4MdFMhjng@mail.gmail.com>
+ <CAPBZ5Qc0oZ+k_5OiUGU6c9jFfcmAfsK3Uy-s=ONGCSGzCDyYNw@mail.gmail.com>
+ <20160525033731.GA30220@hector.attlocal.net>
+Message-ID: <7hbn3tg8ul.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 25 May 2016 22:47:33 +0200
+Andy Gross <andy.gross@linaro.org> writes:
 
-> If we use the normal calling conventions, we could remove these overrides
-> along with the respective special-case handling in glibc. None of them
-> look particularly performance-sensitive, but I could be wrong there.
+> On Mon, May 23, 2016 at 04:02:06PM -0500, Andy Gross wrote:
+>> On 23 May 2016 at 14:26, Kevin Hilman <khilman@kernel.org> wrote:
+>> > Hi Andy,
+>> >
+>> > On Thu, May 12, 2016 at 8:46 PM, Andy Gross <andy.gross@linaro.org> wrote:
+>> >> This patch converts the Qualcomm SCM driver to use the streaming DMA APIs
+>> >> for communication buffers.
+>> >>
+>> >> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+>> >
+>> > This patch has landed in linux-next in the form of commit a551c3dbd689
+>> > (firmware: qcom: scm: Convert to streaming DMA APIS), and kernelci.org
+>> > found some boot breakage in next-20160523 on apq8064[1] which was
+>> > bisected down to this commit.
+>> >
+>> > I reverted this commit on top of next-20160523 and it no longer
+>> > builds, so I didn't validate if things boot again with this patch
+>> > reverted.
+>> 
+>> Ouch I missed this failure.  I'll investigate and get it fixed.
+>
+> So the root cause was the fact that the DFAB clock required by the SCM is an RPM
+> clock.  That support isn't present yet in the kernel, so SCM probe fails.
+>
+> The core clock is really only accessed so that we can bump the clock on it up to
+> the max for performance.  As such, I'll make it optional in the platform code.
+>
+> This does bring up the issue of probe defer causing issues with the spm driver,
+> as it calls set_warm_boot_addr.  That may have to be addressed, but is probably
+> a problem best fixed in the spm.
 
-You could set the lowest bit in the system call entry pointer to indicate
-the upper-half clears should be elided.
+Nice, thanks for the explanation.
+
+Is there a patch somewhere you'd like me to test? or were you able to
+dust off an 8064 platform for testing?
+
+Kevin
