@@ -1,53 +1,20 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 25 May 2016 13:50:58 -0700
-Subject: [Patch v5 5/8] firmware: qcom: scm: Convert to streaming DMA APIS
-In-Reply-To: <20160525033731.GA30220@hector.attlocal.net> (Andy Gross's
- message of "Tue, 24 May 2016 22:37:31 -0500")
-References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
- <1463111221-6963-6-git-send-email-andy.gross@linaro.org>
- <CAOi56cVB1Z-gO6Dx0KOSr9wiRF3Y9ahDHe0=qT9WW4MdFMhjng@mail.gmail.com>
- <CAPBZ5Qc0oZ+k_5OiUGU6c9jFfcmAfsK3Uy-s=ONGCSGzCDyYNw@mail.gmail.com>
- <20160525033731.GA30220@hector.attlocal.net>
-Message-ID: <7hbn3tg8ul.fsf@baylibre.com>
+From: josh.coombs@gmail.com (Josh Coombs)
+Date: Wed, 25 May 2016 16:59:31 -0400
+Subject: Modern kernel on a Chumby
+Message-ID: <CAMW5UfYH6UiaB1ddRT0KBP1thyyebnCw2h4VigYQQ55v4MYqdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andy Gross <andy.gross@linaro.org> writes:
+I've likely bitten off way more than I can chew but I'd like to see if
+this is possible:  I have a i.MX21 powered 'original' Chumby happily
+running on a modified 2.6.16 kernel, ideally I'd like to do the
+legwork to get it running on a current, mainline kernel.  Looking at
+4.6 I see a single i.MX21 device supported by a board file, the
+mx21ads.  Flipping through the list archives I see discussions of
+i.MX21 being moved to device tree operation but I can't see any signs
+of any such devices actually being supported that way.
 
-> On Mon, May 23, 2016 at 04:02:06PM -0500, Andy Gross wrote:
->> On 23 May 2016 at 14:26, Kevin Hilman <khilman@kernel.org> wrote:
->> > Hi Andy,
->> >
->> > On Thu, May 12, 2016 at 8:46 PM, Andy Gross <andy.gross@linaro.org> wrote:
->> >> This patch converts the Qualcomm SCM driver to use the streaming DMA APIs
->> >> for communication buffers.
->> >>
->> >> Signed-off-by: Andy Gross <andy.gross@linaro.org>
->> >
->> > This patch has landed in linux-next in the form of commit a551c3dbd689
->> > (firmware: qcom: scm: Convert to streaming DMA APIS), and kernelci.org
->> > found some boot breakage in next-20160523 on apq8064[1] which was
->> > bisected down to this commit.
->> >
->> > I reverted this commit on top of next-20160523 and it no longer
->> > builds, so I didn't validate if things boot again with this patch
->> > reverted.
->> 
->> Ouch I missed this failure.  I'll investigate and get it fixed.
->
-> So the root cause was the fact that the DFAB clock required by the SCM is an RPM
-> clock.  That support isn't present yet in the kernel, so SCM probe fails.
->
-> The core clock is really only accessed so that we can bump the clock on it up to
-> the max for performance.  As such, I'll make it optional in the platform code.
->
-> This does bring up the issue of probe defer causing issues with the spm driver,
-> as it calls set_warm_boot_addr.  That may have to be addressed, but is probably
-> a problem best fixed in the spm.
+Should I try to bash up support based on the mx21ads or is there a
+device tree template I can start from?
 
-Nice, thanks for the explanation.
-
-Is there a patch somewhere you'd like me to test? or were you able to
-dust off an 8064 platform for testing?
-
-Kevin
+Josh C
