@@ -1,27 +1,81 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 25 May 2016 11:34:20 +0200
-Subject: [PATCH 3/3] clk: samsung: exynos5433: add CPU clocks configuration
- data and instantiate CPU clocks
-In-Reply-To: <1464095957-25851-4-git-send-email-b.zolnierkie@samsung.com>
-References: <1464095957-25851-1-git-send-email-b.zolnierkie@samsung.com>
- <1464095957-25851-4-git-send-email-b.zolnierkie@samsung.com>
-Message-ID: <5745719C.4000106@samsung.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 25 May 2016 15:16:50 +0530
+Subject: [PATCH] ARM: dts: keystone-k2*: Increase SPI Flash partition size for
+ U-Boot
+Message-ID: <20160525094650.6169-1-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/2016 03:19 PM, Bartlomiej Zolnierkiewicz wrote:
-> Add the CPU clocks configuration data and instantiate the CPU clocks
-> type for Exynos5433.
-> 
-> Cc: Kukjin Kim <kgene@kernel.org>
-> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos5433.c | 72 ++++++++++++++++++++++++++++++++----
->  1 file changed, 64 insertions(+), 8 deletions(-)
-> 
+U-Boot SPI Boot image is now more than 512KB for Keystone2 devices and
+cannot fit into existing partition. So, increase the SPI Flash partition
+for U-Boot to 1MB for all Keystone2 devices.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ arch/arm/boot/dts/keystone-k2e-evm.dts  | 4 ++--
+ arch/arm/boot/dts/keystone-k2hk-evm.dts | 4 ++--
+ arch/arm/boot/dts/keystone-k2l-evm.dts  | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
+index 4c32ebc1425a..39c91185e112 100644
+--- a/arch/arm/boot/dts/keystone-k2e-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
+@@ -129,13 +129,13 @@
+ 
+ 		partition at 0 {
+ 			label = "u-boot-spl";
+-			reg = <0x0 0x80000>;
++			reg = <0x0 0x100000>;
+ 			read-only;
+ 		};
+ 
+ 		partition at 1 {
+ 			label = "misc";
+-			reg = <0x80000 0xf80000>;
++			reg = <0x100000 0xf00000>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+index b38b3441818b..afc70d0481d4 100644
+--- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+@@ -157,13 +157,13 @@
+ 
+ 		partition at 0 {
+ 			label = "u-boot-spl";
+-			reg = <0x0 0x80000>;
++			reg = <0x0 0x100000>;
+ 			read-only;
+ 		};
+ 
+ 		partition at 1 {
+ 			label = "misc";
+-			reg = <0x80000 0xf80000>;
++			reg = <0x100000 0xf00000>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
+index 7f9c2e94d605..cabbdf69ddf5 100644
+--- a/arch/arm/boot/dts/keystone-k2l-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
+@@ -106,13 +106,13 @@
+ 
+ 		partition at 0 {
+ 			label = "u-boot-spl";
+-			reg = <0x0 0x80000>;
++			reg = <0x0 0x100000>;
+ 			read-only;
+ 		};
+ 
+ 		partition at 1 {
+ 			label = "misc";
+-			reg = <0x80000 0xf80000>;
++			reg = <0x100000 0xf00000>;
+ 		};
+ 	};
+ };
+-- 
+2.8.3
