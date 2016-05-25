@@ -1,26 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2016 23:01:06 +0200
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <20160525.135039.244098606649448826.davem@davemloft.net>
-References: <20160525200327.GA22395@yury-N73SV> <6293194.tGy03QJ9ME@wuerfel>
- <20160525.135039.244098606649448826.davem@davemloft.net>
-Message-ID: <6407614.fdv5XFSBue@wuerfel>
+Date: Wed, 25 May 2016 23:09:32 +0200
+Subject: Modern kernel on a Chumby
+In-Reply-To: <CAMW5UfYH6UiaB1ddRT0KBP1thyyebnCw2h4VigYQQ55v4MYqdA@mail.gmail.com>
+References: <CAMW5UfYH6UiaB1ddRT0KBP1thyyebnCw2h4VigYQQ55v4MYqdA@mail.gmail.com>
+Message-ID: <4758440.JnRBmYVBjM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 25, 2016 1:50:39 PM CEST David Miller wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Wed, 25 May 2016 22:47:33 +0200
+On Wednesday, May 25, 2016 4:59:31 PM CEST Josh Coombs wrote:
+> I've likely bitten off way more than I can chew but I'd like to see if
+> this is possible:  I have a i.MX21 powered 'original' Chumby happily
+> running on a modified 2.6.16 kernel, ideally I'd like to do the
+> legwork to get it running on a current, mainline kernel.  Looking at
+> 4.6 I see a single i.MX21 device supported by a board file, the
+> mx21ads.  Flipping through the list archives I see discussions of
+> i.MX21 being moved to device tree operation but I can't see any signs
+> of any such devices actually being supported that way.
 > 
-> > If we use the normal calling conventions, we could remove these overrides
-> > along with the respective special-case handling in glibc. None of them
-> > look particularly performance-sensitive, but I could be wrong there.
-> 
-> You could set the lowest bit in the system call entry pointer to indicate
-> the upper-half clears should be elided.
+> Should I try to bash up support based on the mx21ads or is there a
+> device tree template I can start from?
 
-Right, but that would introduce an extra conditional branch in the syscall
-hotpath, and likely eliminate the gains from passing the loff_t arguments
-in a single register instead of a pair.
+I think your best bet is to start from the imx27 DT support.
+As I understand, it's closely related to imx21, though it's possible
+that you have to add some other drivers.
+
+Alexander Shiyan (added to Cc here) has written DT support for the imx21
+clk controller, he may have other patches that never made it upstream,
+or have additional information.
 
 	Arnd
