@@ -1,31 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 25 May 2016 14:11:25 -0500
-Subject: [PATCH 1/5] dt-bindings: document rk3399 rk-timer bindings
-In-Reply-To: <1464169802-6033-2-git-send-email-wxt@rock-chips.com>
-References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
- <1464169802-6033-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <20160525191125.GA25213@rob-hp-laptop>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 25 May 2016 12:30:17 -0700 (PDT)
+Subject: [PATCH 01/23] all: syscall wrappers: add documentation
+In-Reply-To: <1464048292-30136-2-git-send-email-ynorov@caviumnetworks.com>
+References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+ <1464048292-30136-2-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <20160525.123017.1597296248000772613.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 05:49:58PM +0800, Caesar Wang wrote:
-> From: Huang Tao <huangtao@rock-chips.com>
-> 
-> Add compatible string for rk3399 because which timer is a little
-> different from older SoCs. So rename the file name from
-> rockchip,rk3288-timer.txt to rockchip,rk-timer.txt.
-> Clarify rockchip,rk3288-timer supported SoCs.
-> 
-> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
-> 
->  .../timer/{rockchip,rk3288-timer.txt => rockchip,rk-timer.txt}      | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->  rename Documentation/devicetree/bindings/timer/{rockchip,rk3288-timer.txt => rockchip,rk-timer.txt} (75%)
+From: Yury Norov <ynorov@caviumnetworks.com>
+Date: Tue, 24 May 2016 03:04:30 +0300
 
-Acked-by: Rob Herring <robh@kernel.org>
+> +To clear that top halves, automatic wrappers are introduced. They clear all
+> +required registers before passing control to regular syscall handler.
+
+Why have one of these for every single compat system call, rather than
+simply clearing the top half of all of these registers unconditionally
+in the 32-bit system call trap before the system call is invoked?
+
+That's what we do on sparc64.
+
+And with that, you only need wrappers for the case where there needs
+to be proper sign extention of a 32-bit signed argument.
