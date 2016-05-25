@@ -1,42 +1,21 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 May 2016 14:40:53 +0200
-Subject: [PATCH 0/6] ARM: dts: sun5i: q8-common: Enable various peripherals
-In-Reply-To: <abbb9686-bbc7-cfad-ec1d-e5f099ac124b@redhat.com>
+Date: Wed, 25 May 2016 14:41:59 +0200
+Subject: [PATCH 4/6] ARM: dts: sun5i: q8-common: Enable USB power supply
+In-Reply-To: <1463500571-28970-5-git-send-email-wens@csie.org>
 References: <1463500571-28970-1-git-send-email-wens@csie.org>
- <abbb9686-bbc7-cfad-ec1d-e5f099ac124b@redhat.com>
-Message-ID: <20160525124053.GG9232@lukather>
+ <1463500571-28970-5-git-send-email-wens@csie.org>
+Message-ID: <20160525124159.GH9232@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hans,
-
-On Wed, May 18, 2016 at 10:13:52AM +0200, Hans de Goede wrote:
-> Hi Chen-Yu,
+On Tue, May 17, 2016 at 11:56:09PM +0800, Chen-Yu Tsai wrote:
+> On the A13 Q8 tablets, the PMIC's USB power supply (VBUS) is connected
+> to the external OTG port. This can be used to provide power and OTG VBUS
+> sensing.
 > 
-> On 17-05-16 17:56, Chen-Yu Tsai wrote:
-> >Hi everyone,
-> >
-> >This series enables more peripherals for Allwinner A13-based Q8 devices.
-> >The peripherals include the WiFi, the PMIC's micro-usb power supply
-> >(driver), audio codec (headphone and speaker), and full display support
-> >with the new DRM KMS driver. The series is based on parts of Maxime's
-> >"drm: Add Support for Passive RGB to VGA bridges" series, specifically
-> >the clk and drm fixes, and common DTS bits.
-> >
-> >Hans, since you have a collection of q8 tablets, I'm hoping you could
-> >test these bits and provide some feedback.
-> 
-> I've not run any tests, just looked at the patches, the stuff in
-> patch 3 is already present in arch/arm/boot/dts/sun5i-a13-q8-tablet.dts
-> I put it there because I saw some .fex files which don't use ldo3 for wifi
-> I'm fine with moving it to -common though, I believe that you're right
-> that it makes more sense there, having it in 2 places is not really
-> useful though.
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-I'm not quite sure what you mean, do you want Chen-Yu to send a second
-version, or are you ok with this patch?
-
-Thanks,
+Applied, thanks!
 Maxime
 
 -- 
@@ -49,4 +28,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160525/2d9b7f8e/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160525/ee47c2a1/attachment.sig>
