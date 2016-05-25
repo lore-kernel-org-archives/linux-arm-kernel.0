@@ -1,70 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2016 16:15:33 +0200
-Subject: [PATCH V5 6/7] iommu/msm: Use writel_relaxed and add a barrier
-In-Reply-To: <004c01d1b688$0f6379c0$2e2a6d40$@codeaurora.org>
-References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
- <14302911.qQPb4UMJ8d@wuerfel>
- <004c01d1b688$0f6379c0$2e2a6d40$@codeaurora.org>
-Message-ID: <7715835.BXgVNoY5UO@wuerfel>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 25 May 2016 17:15:49 +0300
+Subject: [PATCH v4 0/7] ARM/ASoC: OMAP3: Fix McBSP2/3 sidetone support
+Message-ID: <1464185756-28401-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 25, 2016 6:49:18 PM CEST Sricharan wrote:
-> Hi Arnd,
-> 
-> >> Ok, so i was doing this from the idea that, other iommu drivers
-> >>  where polling on a status bit in their sync call to ensure completion
-> >> of pending TLB invalidations. But in this case, there is no status bit.
-> >>  So added a barrier to have no ordering issues before the client
-> >> triggers the dma operation. But as you say above that it is implicit that
-> >> the device would have a barrier before starting the trigger, then the
-> >> barrier here becomes redundant.
-> >
-> >Ok. There are two more things to note here:
-> >
-> >* On other platforms, polling the register is likely required because
-> >  an MMIO write is "posted", meaning that a sync after writel() will
-> >  only ensure that it has left the CPU write queue, but it may still be
-> >  on the bus fabric and whatever side-effects are triggered by the
-> >  write are normally not guaranteed to be completed even after the
-> >  'sync'. You need to check the datasheet for your IOMMU to find out
-> >  whether the 'dsb' instruction actually has any effect on the IOMMU.
-> >  If not, then neither the barrier that you add here nor the barrier
-> >  in the following writel() is sufficient.
-> >
->    Thanks for the detailed explanation.
-> i will check this. So with this, i think that if the iommu does not
->  support polling for its status, then it should listen to 'dsb' otherwise
->  there will no be no way of make it coherent ?
+Hi,
 
-It's more likely that you have to do a readl() after the writel() to
-any address inside of the device in order to ensure the writel()
-has completed, but that is something that the hardware manual for
-the iommu should describe.
+Changes since v3:
+- Rebased on next-20160525 [1] to apply cleanly
+- Fixed subject line for patch5
+- Added Mark's acked-by to the ASoC patches
 
-> >* The one barrier that is normally required in an IOMMU is between
-> >  updating the in-memory page tables and the following MMIO store
-> >  that triggers the TLB flush for that entry. This barrier is
-> >  implied by writel() but not writel_relaxed(). If you don't have
-> >  a hardware page table walker in your IOMMU, you don't need to worry
-> >  about this.
-> >
->   To get my understanding correct here, is the barrier required here because
->    of speculative fetch ?
+[1] "ASoC: omap-mcbsp: Enable/disable sidetone block auto clock
+gating for omap3" is gone missing from linux-next - it was in next-20160517 and
+I'm not sure when it got dropped.
 
-It doesn't have to be a speculative fetch, it could also be a normal
-fetch triggered by a DMA. The point is that the CPU is free to reorder
-the store to (io page table) memory relative to the store to the
-IOMMU flush register, and when you directly follow up with a store to
-the DMA master that triggers a transfer, this transfer can hit the
-IOMMU and cause the stale page table entry to be read.
+Tony: since Paul did not replied to the series, I'm sending the v4 now, I hope
+he will have time to look at this.
 
-I guess in practice the barrier that comes before the MMIO write to the
-DMA master would ensure ordering of the DMA after both the IOPTE
-update and the MMIO flush (unless there was the speculative fetch you
-mentioned), but this is where I'm no longer confident enough in my
-pwn understanding of th ordering rules to rely on that. Having the
-barrier between the IOPTE update and the flush certainly leaves
-no room for ambiguity.
+Commit message from v3:
 
-	Arnd
+Based on the ongoing discussion on v2 (ARM: OMAP3: Fix McBSP2/3 hwmod setup for
+sidetone) I have dropped the removal of the sidetone hwmod and only corrected
+it. The series now includes all related changes needed to have correct sidetone
+support whenever we boot in legacy or in DT mode.
+
+This time the ASoC part have dependency on earlier patches so they can not be
+applied separately.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (7):
+  ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
+  ARM: dts: omap3: Add clocks to McBSP nodes
+  ARM: OMAP3: McBSP: New callback for McBSP2/3 ICLK idle configuration
+  ARM: OMAP3: pdata-quirks: Add support for McBSP2/3 sidetone handling
+  ASoC: omap-mcbsp: Rename omap_mcbsp_sysfs_remove() to
+    omap_mcbsp_cleanup()
+  ASoC: omap-mcbsp: sidetone: Use the new callback for iclk handling
+  ARM: OMAP2+: McBSP: Remove the old iclk allow/deny idle code
+
+ arch/arm/boot/dts/omap3.dtsi                | 10 ++++++++++
+ arch/arm/mach-omap2/mcbsp.c                 | 31 ++++++++++++++++-------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  | 24 ++++------------------
+ arch/arm/mach-omap2/pdata-quirks.c          | 18 +++++++++++++++++
+ include/linux/platform_data/asoc-ti-mcbsp.h |  4 +++-
+ sound/soc/omap/mcbsp.c                      | 21 +++++++++++++------
+ sound/soc/omap/mcbsp.h                      |  3 ++-
+ sound/soc/omap/omap-mcbsp.c                 |  5 ++++-
+ 8 files changed, 73 insertions(+), 43 deletions(-)
+
+-- 
+2.8.2
