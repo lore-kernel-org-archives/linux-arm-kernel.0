@@ -1,93 +1,64 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 25 May 2016 19:41:32 +0300
-Subject: [PATCH v6 00/21] ILP32 for ARM64
-In-Reply-To: <5745817C.1070406@arm.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <5745817C.1070406@arm.com>
-Message-ID: <20160525164132.GB4595@yury-N73SV>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 25 May 2016 22:19:29 +0530
+Subject: [PATCH V5 6/7] iommu/msm: Use writel_relaxed and add a barrier
+In-Reply-To: <7715835.BXgVNoY5UO@wuerfel>
+References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
+ <14302911.qQPb4UMJ8d@wuerfel>
+ <004c01d1b688$0f6379c0$2e2a6d40$@codeaurora.org> <7715835.BXgVNoY5UO@wuerfel>
+Message-ID: <000901d1b6a5$6dcd5f90$49681eb0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 11:42:04AM +0100, Szabolcs Nagy wrote:
-> On 24/05/16 01:04, Yury Norov wrote:
-> > This version is based on kernel v4.6.
-> > It works with glibc-2.23, and tested with LTP.
-> > 
-> ...
-> > ILP32 glibc branch is available here:
-> > https://github.com/norov/glibc/tree/ilp32-2.23
-> > 
-> > It is tested with this series with no major downsides. I will send it to 
-> > glibc-alpha soon, after final revise. Please review and comment it as well.
-> 
-> i spotted one __ilp32__ vs __ILP32__ typo in the glibc code,
+Hi Arnd,
 
-Yes, I also found it. Thank you.
+>> >* On other platforms, polling the register is likely required because
+>> >  an MMIO write is "posted", meaning that a sync after writel() will
+>> >  only ensure that it has left the CPU write queue, but it may still be
+>> >  on the bus fabric and whatever side-effects are triggered by the
+>> >  write are normally not guaranteed to be completed even after the
+>> >  'sync'. You need to check the datasheet for your IOMMU to find out
+>> >  whether the 'dsb' instruction actually has any effect on the IOMMU.
+>> >  If not, then neither the barrier that you add here nor the barrier
+>> >  in the following writel() is sufficient.
+>> >
+>>    Thanks for the detailed explanation.
+>> i will check this. So with this, i think that if the iommu does not
+>>  support polling for its status, then it should listen to 'dsb' otherwise
+>>  there will no be no way of make it coherent ?
+>
+>It's more likely that you have to do a readl() after the writel() to
+>any address inside of the device in order to ensure the writel()
+>has completed, but that is something that the hardware manual for
+>the iommu should describe.
+>
+ ok, get it. So will do it as required for here.
 
-> i can review it in detail when there is a cleaned up patch set.
-> 
-> in general the approach seems ok, the ugly part is when lp64
-> and ilp32 share code, but ilp32 needs some tweaks compared to
-> the current code (e.g. x vs w regs in asm, long changed to
-> long long in syscalls, different relocations etc) those will
-> be hard to review. the naming is sometimes _be_ilp32 sometimes
-> ilp32_be, but let's hope there will be no new abi variant to
-> confuse this further.
+>> >* The one barrier that is normally required in an IOMMU is between
+>> >  updating the in-memory page tables and the following MMIO store
+>> >  that triggers the TLB flush for that entry. This barrier is
+>> >  implied by writel() but not writel_relaxed(). If you don't have
+>> >  a hardware page table walker in your IOMMU, you don't need to worry
+>> >  about this.
+>> >
+>>   To get my understanding correct here, is the barrier required here because
+>>    of speculative fetch ?
+>
+>It doesn't have to be a speculative fetch, it could also be a normal
+>fetch triggered by a DMA. The point is that the CPU is free to reorder
+>the store to (io page table) memory relative to the store to the
+>IOMMU flush register, and when you directly follow up with a store to
+>the DMA master that triggers a transfer, this transfer can hit the
+>IOMMU and cause the stale page table entry to be read.
+>
+>I guess in practice the barrier that comes before the MMIO write to the
+>DMA master would ensure ordering of the DMA after both the IOPTE
+>update and the MMIO flush (unless there was the speculative fetch you
+>mentioned), but this is where I'm no longer confident enough in my
+>pwn understanding of th ordering rules to rely on that. Having the
+>barrier between the IOPTE update and the flush certainly leaves
+>no room for ambiguity.
+    Ok understand. Also i think speculative access if any, should 
+     go away if unmap is done first and then remap by clients.
 
-I think I shared the link too soon, and patches should be revised 
-again. So I continue the work on it. If you curious, find it here.
-https://github.com/norov/glibc/tree/ilp32-dev
-(I don't promise I'll keep it stable, or will avoid using things like
-fast-forward. It's just a branch for my experiments.)
-
-For now, it has fixed:
- - __ilp32__ mess (by introducing DELOUSE() macro);
- - few unneeded patches dropped;
- - 32-bit off_t turned to 64-bit.
-
-With all changes, LPT fail list grows:
-peio_3                       FAIL       5    
-pipeio_6                       FAIL       1    
-abort01                        FAIL       2    
-clone02                        FAIL       4    
-fcntl11                        FAIL       1    
-fcntl14                        FAIL       1    
-fcntl17                        FAIL       1    
-fcntl19                        FAIL       1    
-fcntl20                        FAIL       1    
-fcntl21                        FAIL       1    
-fpathconf01                    FAIL       1    
-ftruncate04                    FAIL       1    
-kill11                         FAIL       2    
-mmap16                         FAIL       6    
-open12                         FAIL       2    
-pread01                        FAIL       2    
-pread02                        FAIL       2    
-pread03                        FAIL       2    
-preadv01                       FAIL       6    
-preadv02                       FAIL       6    
-pwrite01                       FAIL       2    
-pwrite02                       FAIL       2    
-pwrite04                       FAIL       6    
-pwrite02_64                    FAIL       1    
-pwritev01                      FAIL       2    
-pwritev02                      FAIL       2    
-rename11                       FAIL       2    
-rmdir02                        FAIL       2    
-umount2_01                     FAIL       2    
-umount2_02                     FAIL       2    
-umount2_03                     FAIL       2    
-utime06                        FAIL       2    
-mtest01                        FAIL       1    
-mtest01w                       FAIL       1    
-mtest06                        FAIL       11   
-gf01                           FAIL       1    
-gf02                           FAIL       1    
-gf07                           FAIL       1    
-gf10                           FAIL       1    
-gf11                           FAIL       1    
-gf15                           FAIL       1    
-gf18                           FAIL       1    
-gf19                           FAIL       1    
-
-Yury
+Regards,
+ Sricharan
