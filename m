@@ -1,54 +1,69 @@
 From: agustinv@codeaurora.org (agustinv at codeaurora.org)
-Date: Wed, 25 May 2016 10:38:07 -0400
-Subject: [PATCH V3 1/2] ACPI: Add support for ResourceSource/IRQ domain
- mapping
-In-Reply-To: <1463156203-10970-2-git-send-email-agustinv@codeaurora.org>
+Date: Wed, 25 May 2016 10:38:33 -0400
+Subject: [PATCH V3 2/2] irqchip: qcom: Add IRQ combiner driver
+In-Reply-To: <1463156203-10970-3-git-send-email-agustinv@codeaurora.org>
 References: <1463156203-10970-1-git-send-email-agustinv@codeaurora.org>
- <1463156203-10970-2-git-send-email-agustinv@codeaurora.org>
-Message-ID: <24448d48e2e62cec20993d0d0ac96737@codeaurora.org>
+ <1463156203-10970-3-git-send-email-agustinv@codeaurora.org>
+Message-ID: <5e01650b27dc2e92ccae50078cdecfb7@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Adding linux-arm-kernel and linux-acpi
 
 On 2016-05-13 12:16, Agustin Vega-Frias wrote:
-> This allows irqchip drivers to associate an ACPI DSDT device to
-> an IRQ domain and provides support for using the ResourceSource
-> in Extended IRQ Resources to find the domain and map the IRQs
-> specified on that domain.
+> Driver for interrupt combiners in the Top-level Control and Status
+> Registers (TCSR) hardware block in Qualcomm Technologies chips.
+> 
+> An interrupt combiner in this block combines a set of interrupts by
+> OR'ing the individual interrupt signals into a summary interrupt
+> signal routed to a parent interrupt controller, and provides read-
+> only, 32-bit registers to query the status of individual interrupts.
+> The status bit for IRQ n is bit (n % 32) within register (n / 32)
+> of the given combiner. Thus, each combiner can be described as a set
+> of register offsets and the number of IRQs managed.
 > 
 > Signed-off-by: Agustin Vega-Frias <agustinv@codeaurora.org>
 > ---
->  drivers/acpi/Makefile    |   1 +
->  drivers/acpi/irqdomain.c | 108 
-> +++++++++++++++++++++++++++++++++++++++++++++++
->  drivers/acpi/resource.c  |  23 ++++++----
->  include/linux/acpi.h     |   6 +++
->  4 files changed, 130 insertions(+), 8 deletions(-)
->  create mode 100644 drivers/acpi/irqdomain.c
+>  drivers/irqchip/Kconfig             |   8 +
+>  drivers/irqchip/Makefile            |   1 +
+>  drivers/irqchip/qcom-irq-combiner.c | 344 
+> ++++++++++++++++++++++++++++++++++++
+>  3 files changed, 353 insertions(+)
+>  create mode 100644 drivers/irqchip/qcom-irq-combiner.c
 > 
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index b12fa64..79db78f 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -56,6 +56,7 @@ acpi-$(CONFIG_ACPI_NUMA)	+= numa.o
->  acpi-$(CONFIG_ACPI_PROCFS_POWER) += cm_sbs.o
->  acpi-y				+= acpi_lpat.o
->  acpi-$(CONFIG_ACPI_GENERIC_GSI) += gsi.o
-> +acpi-y				+= irqdomain.o
-> 
->  # These are (potentially) separate modules
-> 
-> diff --git a/drivers/acpi/irqdomain.c b/drivers/acpi/irqdomain.c
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index f582e0d..609ff28 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -245,3 +245,11 @@ config IRQ_MXS
+>  config MVEBU_ODMI
+>  	bool
+>  	select GENERIC_MSI_IRQ_DOMAIN
+> +
+> +config QCOM_IRQ_COMBINER
+> +	bool "QCOM IRQ combiner support"
+> +	depends on ARCH_QCOM
+> +	select IRQ_DOMAIN
+> +	help
+> +	  Say yes here to add support for the IRQ combiner devices embedded
+> +	  in Qualcomm Technologies chips.
+> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+> index b03cfcb..05c688b 100644
+> --- a/drivers/irqchip/Makefile
+> +++ b/drivers/irqchip/Makefile
+> @@ -65,3 +65,4 @@ obj-$(CONFIG_INGENIC_IRQ)		+= irq-ingenic.o
+>  obj-$(CONFIG_IMX_GPCV2)			+= irq-imx-gpcv2.o
+>  obj-$(CONFIG_PIC32_EVIC)		+= irq-pic32-evic.o
+>  obj-$(CONFIG_MVEBU_ODMI)		+= irq-mvebu-odmi.o
+> +obj-$(CONFIG_QCOM_IRQ_COMBINER)		+= qcom-irq-combiner.o
+> diff --git a/drivers/irqchip/qcom-irq-combiner.c
+> b/drivers/irqchip/qcom-irq-combiner.c
 > new file mode 100644
-> index 0000000..0fd10a9
+> index 0000000..b4f767c
 > --- /dev/null
-> +++ b/drivers/acpi/irqdomain.c
-> @@ -0,0 +1,108 @@
-> +/*
-> + * ACPI ResourceSource/IRQ domain mapping support
-> + *
-> + * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+> +++ b/drivers/irqchip/qcom-irq-combiner.c
+> @@ -0,0 +1,344 @@
+> +/* Copyright (c) 2015-2016, The Linux Foundation. All rights reserved.
 > + *
 > + * This program is free software; you can redistribute it and/or 
 > modify
@@ -60,222 +75,348 @@ On 2016-05-13 12:16, Agustin Vega-Frias wrote:
 > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 > + * GNU General Public License for more details.
 > + */
+> +
+> +/*
+> + * Driver for interrupt combiners in the Top-level Control and Status
+> + * Registers (TCSR) hardware block in Qualcomm Technologies chips.
+> + * An interrupt combiner in this block combines a set of interrupts by
+> + * OR'ing the individual interrupt signals into a summary interrupt
+> + * signal routed to a parent interrupt controller, and provides read-
+> + * only, 32-bit registers to query the status of individual 
+> interrupts.
+> + * The status bit for IRQ n is bit (n % 32) within register (n / 32)
+> + * of the given combiner. Thus, each combiner can be described as a 
+> set
+> + * of register offsets and the number of IRQs managed.
+> + */
+> +
 > +#include <linux/acpi.h>
-> +#include <linux/irq.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irqchip/chained_irq.h>
 > +#include <linux/irqdomain.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/property.h>
+> +#include <linux/slab.h>
 > +
-> +/**
-> + * acpi_irq_domain_register_irq() - Register the mapping for an IRQ 
-> produced
-> + *                                  by the given acpi_resource_source 
-> to a
-> + *                                  Linux IRQ number
-> + * @source: IRQ source
-> + * @rcirq: IRQ number
-> + * @trigger: trigger type of the IRQ number to be mapped
-> + * @polarity: polarity of the IRQ to be mapped
-> + *
-> + * Returns: a valid linux IRQ number on success
-> + *          -ENODEV if the given acpi_resource_source cannot be found
-> + *          -EPROBE_DEFER if the IRQ domain has not been registered
-> + *          -EINVAL for all other errors
-> + */
-> +int acpi_irq_domain_register_irq(struct acpi_resource_source *source,
-> u32 rcirq,
-> +				 int trigger, int polarity)
+> +#define REG_SIZE 32
+> +
+> +struct combiner_reg {
+> +	void __iomem *addr;
+> +	unsigned long mask;
+> +};
+> +
+> +struct combiner {
+> +	struct irq_chip     irq_chip;
+> +	struct irq_domain   *domain;
+> +	int                 parent_irq;
+> +	u32                 nirqs;
+> +	u32                 nregs;
+> +	struct combiner_reg regs[0];
+> +};
+> +
+> +static inline u32 irq_register(int irq)
 > +{
-> +	struct irq_domain *domain;
-> +	struct acpi_device *device;
-> +	acpi_handle handle;
-> +	acpi_status status;
-> +	unsigned int type;
-> +	int ret;
+> +	return irq / REG_SIZE;
+> +}
 > +
-> +	status = acpi_get_handle(NULL, source->string_ptr, &handle);
-> +	if (ACPI_FAILURE(status))
-> +		return -ENODEV;
+> +static inline u32 irq_bit(int irq)
+> +{
+> +	return irq % REG_SIZE;
 > +
-> +	device = acpi_bus_get_acpi_device(handle);
-> +	if (!device)
-> +		return -ENODEV;
+> +}
 > +
-> +	domain = irq_find_matching_fwnode(&device->fwnode, DOMAIN_BUS_ANY);
-> +	if (!domain) {
-> +		ret = -EPROBE_DEFER;
-> +		goto out_put_device;
+> +static inline int irq_nr(u32 reg, u32 bit)
+> +{
+> +	return reg * REG_SIZE + bit;
+> +}
+> +
+> +/*
+> + * Handler for the cascaded IRQ.
+> + */
+> +static void combiner_handle_irq(struct irq_desc *desc)
+> +{
+> +	struct combiner *combiner = irq_desc_get_handler_data(desc);
+> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> +	u32 reg;
+> +
+> +	chained_irq_enter(chip, desc);
+> +
+> +	for (reg = 0; reg < combiner->nregs; reg++) {
+> +		int virq;
+> +		int hwirq;
+> +		u32 bit;
+> +		u32 status;
+> +
+> +		if (combiner->regs[reg].mask == 0)
+> +			continue;
+> +
+> +		status = readl_relaxed(combiner->regs[reg].addr);
+> +		status &= combiner->regs[reg].mask;
+> +
+> +		while (status) {
+> +			bit = __ffs(status);
+> +			status &= ~(1 << bit);
+> +			hwirq = irq_nr(reg, bit);
+> +			virq = irq_find_mapping(combiner->domain, hwirq);
+> +			if (virq >= 0)
+> +				generic_handle_irq(virq);
+> +
+> +		}
 > +	}
 > +
-> +	type = acpi_dev_get_irq_type(trigger, polarity);
-> +	ret = irq_create_mapping(domain, rcirq);
-> +	if (ret)
-> +		irq_set_irq_type(ret, type);
-> +
-> +out_put_device:
-> +	acpi_bus_put_acpi_device(device);
-> +	return ret;
+> +	chained_irq_exit(chip, desc);
 > +}
-> +EXPORT_SYMBOL_GPL(acpi_irq_domain_register_irq);
 > +
-> +/**
-> + * acpi_irq_domain_unregister_irq() - Delete the mapping for an IRQ 
-> produced
-> + *                                    by the given 
-> acpi_resource_source to a
-> + *                                    Linux IRQ number
-> + * @source: IRQ source
-> + * @rcirq: IRQ number
-> + *
-> + * Returns: 0 on success
-> + *          -ENODEV if the given acpi_resource_source cannot be found
-> + *          -EINVAL for all other errors
+> +/*
+> + * irqchip callbacks
 > + */
-> +int acpi_irq_domain_unregister_irq(struct acpi_resource_source 
-> *source,
-> +				   u32 rcirq)
+> +
+> +static void combiner_irq_chip_mask_irq(struct irq_data *data)
 > +{
-> +	struct irq_domain *domain;
-> +	struct acpi_device *device;
-> +	acpi_handle handle;
-> +	acpi_status status;
-> +	int ret = 0;
+> +	struct combiner *combiner = irq_data_get_irq_chip_data(data);
+> +	struct combiner_reg *reg = combiner->regs + 
+> irq_register(data->hwirq);
 > +
-> +	status = acpi_get_handle(NULL, source->string_ptr, &handle);
-> +	if (ACPI_FAILURE(status))
-> +		return -ENODEV;
-> +
-> +	device = acpi_bus_get_acpi_device(handle);
-> +	if (!device)
-> +		return -ENODEV;
-> +
-> +	domain = irq_find_matching_fwnode(&device->fwnode, DOMAIN_BUS_ANY);
-> +	if (!domain) {
-> +		ret = -EINVAL;
-> +		goto out_put_device;
-> +	}
-> +
-> +	irq_dispose_mapping(irq_find_mapping(domain, rcirq));
-> +
-> +out_put_device:
-> +	acpi_bus_put_acpi_device(device);
-> +	return ret;
+> +	clear_bit(irq_bit(data->hwirq), &reg->mask);
 > +}
-> +EXPORT_SYMBOL_GPL(acpi_irq_domain_unregister_irq);
-> diff --git a/drivers/acpi/resource.c b/drivers/acpi/resource.c
-> index 56241eb..1551698 100644
-> --- a/drivers/acpi/resource.c
-> +++ b/drivers/acpi/resource.c
-> @@ -381,14 +381,15 @@ static void acpi_dev_irqresource_disabled(struct
-> resource *res, u32 gsi)
->  	res->flags = IORESOURCE_IRQ | IORESOURCE_DISABLED | IORESOURCE_UNSET;
->  }
-> 
-> -static void acpi_dev_get_irqresource(struct resource *res, u32 gsi,
-> +static void acpi_dev_get_irqresource(struct resource *res, u32 rcirq,
-> +				     struct acpi_resource_source *source,
->  				     u8 triggering, u8 polarity, u8 shareable,
->  				     bool legacy)
->  {
->  	int irq, p, t;
-> 
-> -	if (!valid_IRQ(gsi)) {
-> -		acpi_dev_irqresource_disabled(res, gsi);
-> +	if ((source->string_length == 0) && !valid_IRQ(rcirq)) {
-> +		acpi_dev_irqresource_disabled(res, rcirq);
->  		return;
->  	}
-> 
-> @@ -402,12 +403,12 @@ static void acpi_dev_get_irqresource(struct
-> resource *res, u32 gsi,
->  	 * using extended IRQ descriptors we take the IRQ configuration
->  	 * from _CRS directly.
->  	 */
-> -	if (legacy && !acpi_get_override_irq(gsi, &t, &p)) {
-> +	if (legacy && !acpi_get_override_irq(rcirq, &t, &p)) {
->  		u8 trig = t ? ACPI_LEVEL_SENSITIVE : ACPI_EDGE_SENSITIVE;
->  		u8 pol = p ? ACPI_ACTIVE_LOW : ACPI_ACTIVE_HIGH;
-> 
->  		if (triggering != trig || polarity != pol) {
-> -			pr_warning("ACPI: IRQ %d override to %s, %s\n", gsi,
-> +			pr_warning("ACPI: IRQ %d override to %s, %s\n", rcirq,
->  				   t ? "level" : "edge", p ? "low" : "high");
->  			triggering = trig;
->  			polarity = pol;
-> @@ -415,12 +416,16 @@ static void acpi_dev_get_irqresource(struct
-> resource *res, u32 gsi,
->  	}
-> 
->  	res->flags = acpi_dev_irq_flags(triggering, polarity, shareable);
-> -	irq = acpi_register_gsi(NULL, gsi, triggering, polarity);
-> +	if (source->string_length > 0)
-> +		irq = acpi_irq_domain_register_irq(source, rcirq, triggering,
-> +						   polarity);
+> +
+> +static void combiner_irq_chip_unmask_irq(struct irq_data *data)
+> +{
+> +	struct combiner *combiner = irq_data_get_irq_chip_data(data);
+> +	struct combiner_reg *reg = combiner->regs + 
+> irq_register(data->hwirq);
+> +
+> +	set_bit(irq_bit(data->hwirq), &reg->mask);
+> +}
+> +
+> +#ifdef CONFIG_SMP
+> +static int combiner_irq_chip_set_affinity(struct irq_data *data,
+> +					 const struct cpumask *mask, bool force)
+> +{
+> +	struct combiner *combiner = irq_data_get_irq_chip_data(data);
+> +	struct irq_data *pdata = irq_get_irq_data(combiner->parent_irq);
+> +
+> +	if (pdata->chip && pdata->chip->irq_set_affinity)
+> +		return pdata->chip->irq_set_affinity(pdata, mask, force);
 > +	else
-> +		irq = acpi_register_gsi(NULL, rcirq, triggering, polarity);
->  	if (irq >= 0) {
->  		res->start = irq;
->  		res->end = irq;
->  	} else {
-> -		acpi_dev_irqresource_disabled(res, gsi);
-> +		acpi_dev_irqresource_disabled(res, rcirq);
->  	}
->  }
-> 
-> @@ -448,6 +453,7 @@ bool acpi_dev_resource_interrupt(struct
-> acpi_resource *ares, int index,
->  {
->  	struct acpi_resource_irq *irq;
->  	struct acpi_resource_extended_irq *ext_irq;
-> +	struct acpi_resource_source dummy = { 0, 0, NULL };
-> 
->  	switch (ares->type) {
->  	case ACPI_RESOURCE_TYPE_IRQ:
-> @@ -460,7 +466,7 @@ bool acpi_dev_resource_interrupt(struct
-> acpi_resource *ares, int index,
->  			acpi_dev_irqresource_disabled(res, 0);
->  			return false;
->  		}
-> -		acpi_dev_get_irqresource(res, irq->interrupts[index],
-> +		acpi_dev_get_irqresource(res, irq->interrupts[index], &dummy,
->  					 irq->triggering, irq->polarity,
->  					 irq->sharable, true);
->  		break;
-> @@ -471,6 +477,7 @@ bool acpi_dev_resource_interrupt(struct
-> acpi_resource *ares, int index,
->  			return false;
->  		}
->  		acpi_dev_get_irqresource(res, ext_irq->interrupts[index],
-> +					 &ext_irq->resource_source,
->  					 ext_irq->triggering, ext_irq->polarity,
->  					 ext_irq->sharable, false);
->  		break;
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 06ed7e5..f4f515e 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -26,6 +26,7 @@
->  #include <linux/resource_ext.h>
->  #include <linux/device.h>
->  #include <linux/property.h>
-> +#include <linux/irqdomain.h>
-> 
->  #ifndef _LINUX
->  #define _LINUX
-> @@ -294,6 +295,11 @@ int acpi_isa_irq_to_gsi (unsigned isa_irq, u32 
-> *gsi);
->  void acpi_set_irq_model(enum acpi_irq_model_id model,
->  			struct fwnode_handle *fwnode);
-> 
-> +int acpi_irq_domain_register_irq(struct acpi_resource_source *source,
-> u32 rcirq,
-> +		      int trigger, int polarity);
-> +int acpi_irq_domain_unregister_irq(struct acpi_resource_source 
-> *source,
-> +				   u32 rcirq);
+> +		return -EINVAL;
+> +}
+> +#endif
 > +
->  #ifdef CONFIG_X86_IO_APIC
->  extern int acpi_get_override_irq(u32 gsi, int *trigger, int 
-> *polarity);
->  #else
+> +/*
+> + * domain callbacks
+> + */
+> +
+> +static int combiner_irq_map(struct irq_domain *domain, unsigned int 
+> irq,
+> +				   irq_hw_number_t hwirq)
+> +{
+> +	struct combiner *combiner = domain->host_data;
+> +
+> +	if (hwirq >= combiner->nirqs)
+> +		return -EINVAL;
+> +
+> +	irq_set_chip_and_handler(irq, &combiner->irq_chip, handle_level_irq);
+> +	irq_set_chip_data(irq, combiner);
+> +	irq_set_parent(irq, combiner->parent_irq);
+> +	irq_set_noprobe(irq);
+> +	return 0;
+> +}
+> +
+> +static void combiner_irq_unmap(struct irq_domain *domain, unsigned int 
+> irq)
+> +{
+> +	irq_set_chip_and_handler(irq, NULL, NULL);
+> +	irq_set_chip_data(irq, NULL);
+> +	irq_set_parent(irq, -1);
+> +}
+> +
+> +static struct irq_domain_ops domain_ops = {
+> +	.map = combiner_irq_map,
+> +	.unmap = combiner_irq_unmap
+> +};
+> +
+> +/*
+> + * Probing and initialization.
+> + *
+> + * Combiner devices reside inside the TCSR block so the resulting DSDT
+> + * topology is:
+> + *
+> + * Device (TCS0)
+> + * {
+> + *         Name (_HID, "QCOM80B0") // Qualcomm TCSR controller
+> + *         Name (_UID, 0)
+> + *
+> + *         Method (_CRS, 0x0, Serialized) {
+> + *                 Name (RBUF, ResourceTemplate ()
+> + *                 {
+> + *                         Memory32Fixed (ReadWrite, 0x2E10000, 
+> 0x00001000)
+> + *                 })
+> + *                 Return (RBUF)
+> + *         }
+> + *
+> + *         Device (QIC0)
+> + *         {
+> + *                 Name(_HID,"QCOM80B1") // Qualcomm TCSR IRQ combiner
+> + *                 ...
+> + *         } // end Device QIC0
+> + *         ...
+> + * }
+> + *
+> + * Thus all combiner devices same the same memory mapping from the 
+> parent
+> + * device.
+> + */
+> +
+> +static int __init combiner_probe(struct platform_device *pdev)
+> +{
+> +	struct platform_device *tcsr_pdev;
+> +	struct combiner *combiner;
+> +	void __iomem *tcsr_base;
+> +	size_t alloc_sz;
+> +	u32 nregs;
+> +	u32 nirqs;
+> +
+> +	tcsr_pdev = to_platform_device(pdev->dev.parent);
+> +	tcsr_base = platform_get_drvdata(tcsr_pdev);
+> +	if (!tcsr_base)
+> +		return -ENODEV;
+> +
+> +	if (device_property_read_u32(&pdev->dev, "qcom,combiner-nr-irqs",
+> +				     &nirqs)) {
+> +		dev_err(&pdev->dev, "Error reading number of IRQs\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	nregs = device_property_read_u32_array(&pdev->dev, 
+> "qcom,combiner-regs",
+> +					       NULL, 0);
+> +	if (nregs < DIV_ROUND_UP(nirqs, REG_SIZE)) {
+> +		dev_err(&pdev->dev, "Error reading regs property\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	alloc_sz = sizeof(*combiner) + sizeof(struct combiner_reg) * nregs;
+> +	combiner = devm_kzalloc(&pdev->dev, alloc_sz, GFP_KERNEL);
+> +	if (combiner) {
+> +		int i;
+> +		u32 regs[nregs];
+> +
+> +		if (device_property_read_u32_array(&pdev->dev,
+> +						   "qcom,combiner-regs",
+> +						   regs, nregs)) {
+> +			dev_err(&pdev->dev, "Error reading regs property\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		combiner->nirqs = nirqs;
+> +		combiner->nregs = nregs;
+> +		for (i = 0; i < nregs; i++) {
+> +			combiner->regs[i].addr = tcsr_base + regs[i];
+> +			combiner->regs[i].mask = 0;
+> +		}
+> +	} else {
+> +		return -ENOMEM;
+> +	}
+> +
+> +	combiner->irq_chip.irq_mask   = combiner_irq_chip_mask_irq;
+> +	combiner->irq_chip.irq_unmask = combiner_irq_chip_unmask_irq;
+> +#ifdef CONFIG_SMP
+> +	combiner->irq_chip.irq_set_affinity = combiner_irq_chip_set_affinity;
+> +#endif
+> +
+> +	combiner->parent_irq = platform_get_irq(pdev, 0);
+> +	if (combiner->parent_irq <= 0) {
+> +		dev_err(&pdev->dev, "Error getting IRQ resource\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	combiner->domain = irq_domain_create_linear(pdev->dev.fwnode, nirqs,
+> +						    &domain_ops, combiner);
+> +	if (!combiner->domain)
+> +		/* Errors printed by irq_domain_create_linear */
+> +		return -ENODEV;
+> +
+> +	irq_set_chained_handler_and_data(combiner->parent_irq,
+> +					 combiner_handle_irq, combiner);
+> +
+> +	if (device_property_read_string(&pdev->dev, "qcom,combiner-name",
+> +					&combiner->irq_chip.name) != 0)
+> +		combiner->irq_chip.name = "qcom-irq-combiner";
+> +
+> +	dev_info(&pdev->dev, "Initialized with [p=%d,n=%d,r=%p]\n",
+> +		 combiner->parent_irq, nirqs, combiner->regs[0].addr);
+> +	return 0;
+> +}
+> +
+> +static const struct acpi_device_id qcom_irq_combiner_acpi_match[] = {
+> +	{ "QCOM80B1", },
+> +	{ }
+> +};
+> +
+> +static struct platform_driver qcom_irq_combiner_probe = {
+> +	.driver = {
+> +		.name = "qcom-irq-combiner",
+> +		.owner = THIS_MODULE,
+> +		.acpi_match_table = ACPI_PTR(qcom_irq_combiner_acpi_match),
+> +	},
+> +	.probe = combiner_probe,
+> +};
+> +
+> +static int __init register_qcom_irq_combiner(void)
+> +{
+> +	return platform_driver_register(&qcom_irq_combiner_probe);
+> +}
+> +arch_initcall(register_qcom_irq_combiner);
+> +
+> +static int __init tcsr_probe(struct platform_device *pdev)
+> +{
+> +	struct resource *mr;
+> +	void __iomem *tcsr_base;
+> +
+> +	mr = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (mr == NULL) {
+> +		dev_err(&pdev->dev, "Error getting memory resource\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	tcsr_base = devm_ioremap_resource(&pdev->dev, mr);
+> +	if (IS_ERR(tcsr_base)) {
+> +		dev_err(&pdev->dev, "Error mapping memory resource\n");
+> +		return PTR_ERR(tcsr_base);
+> +	}
+> +
+> +	dev_info(&pdev->dev, "Initialized TCSR block @%pa\n", &mr->start);
+> +	platform_set_drvdata(pdev, tcsr_base);
+> +	return 0;
+> +}
+> +
+> +static const struct acpi_device_id qcom_tcsr_acpi_match[] = {
+> +	{ "QCOM80B0", },
+> +	{ }
+> +};
+> +
+> +static struct platform_driver qcom_tcsr_probe = {
+> +	.driver = {
+> +		.name = "qcom-tcsr",
+> +		.owner = THIS_MODULE,
+> +		.acpi_match_table = ACPI_PTR(qcom_tcsr_acpi_match),
+> +	},
+> +	.probe = tcsr_probe,
+> +};
+> +
+> +static int __init register_qcom_tcsr(void)
+> +{
+> +	return platform_driver_register(&qcom_tcsr_probe);
+> +}
+> +arch_initcall(register_qcom_tcsr);
 > --
 > Qualcomm Innovation Center, Inc.
 > The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
