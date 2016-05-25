@@ -1,41 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2016 10:49:53 +0200
-Subject: [PATCH v6 1/2] soc: samsung: add exynos chipid driver support
-In-Reply-To: <1464163104-8163-2-git-send-email-pankaj.dubey@samsung.com>
-References: <1464163104-8163-1-git-send-email-pankaj.dubey@samsung.com>
- <1464163104-8163-2-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <15114439.HIyt1ChUT2@wuerfel>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed, 25 May 2016 16:51:56 +0800
+Subject: [PATCH] clk: rockchip: add a dummy clock for the watchdog pclk on
+ rk3399
+Message-ID: <1464166316-22480-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 25, 2016 1:28:23 PM CEST Pankaj Dubey wrote:
-> Exynos SoCs have Chipid, for identification of product IDs
-> and SoC revisions. This patch intends to provide initialization
-> code for all these functionalities, at the same time it provides some
-> sysfs entries for accessing these information to user-space.
-> 
-> This driver uses existing binding for exynos-chipid.
-> 
-> CC: Grant Likely <grant.likely@linaro.org>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  drivers/soc/samsung/Kconfig            |   5 +
->  drivers/soc/samsung/Makefile           |   1 +
->  drivers/soc/samsung/exynos-chipid.c    | 172 +++++++++++++++++++++++++++++++++
->  include/linux/soc/samsung/exynos-soc.h |  51 ++++++++++
-> 
+Like rk3288, the pclk supplying the watchdog is controlled via the
+SGRF register area. Additionally the SGRF isn't even writable in
+every boot mode.
 
+But still the clock control is available and in the future someone
+might want to use it. Therefore define a simple clock for the time
+being so that the watchdog driver can read its rate.
 
-I don't like how this exposes the internals of the samsung SoC in a global header
-file, after we spent a considerable amount of work on keeping it confined
-to arch/arm/{mach-exynos,mach-s3c64xx,plat-samsung}.
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
-Please remove the external interface of the driver, in particular the global
-data structure. We keep coming back to this for a lot of platforms, and
-I still think we should have an architecture-independent way of matching
-platforms to struct soc_device, using an exported function from drivers/base/soc.c
-that uses glob_match() to compare a platform string against the running system.
+ drivers/clk/rockchip/clk-rk3399.c |    9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-	Arnd
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index 291543f..b6742fa 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -1498,6 +1498,7 @@ static void __init rk3399_clk_init(struct device_node *np)
+ {
+ 	struct rockchip_clk_provider *ctx;
+ 	void __iomem *reg_base;
++	struct clk *clk;
+ 
+ 	reg_base = of_iomap(np, 0);
+ 	if (!reg_base) {
+@@ -1511,6 +1512,14 @@ static void __init rk3399_clk_init(struct device_node *np)
+ 		return;
+ 	}
+ 
++	/* Watchdog pclk is controlled by RK3399 SECURE_GRF_SOC_CON3[8]. */
++	clk = clk_register_fixed_factor(NULL, "pclk_wdt", "pclk_alive", 0, 1, 1);
++	if (IS_ERR(clk))
++		pr_warn("%s: could not register clock pclk_wdt: %ld\n",
++			__func__, PTR_ERR(clk));
++	else
++		rockchip_clk_add_lookup(ctx, clk, PCLK_WDT);
++
+ 	rockchip_clk_register_plls(ctx, rk3399_pll_clks,
+ 				   ARRAY_SIZE(rk3399_pll_clks), -1);
+ 
+-- 
+1.7.9.5
