@@ -1,43 +1,195 @@
-From: robert.richter@cavium.com (Robert Richter)
-Date: Wed, 25 May 2016 15:22:29 +0200
-Subject: [PATCH v5] irqchip, gicv3-its, numa: Enable workaround for
- Cavium thunderx erratum 23144
-In-Reply-To: <20160422090052.GA4236@arm.com>
-References: <1460748606-28390-1-git-send-email-rrichter@caviumnetworks.com>
- <20160421174042.GD24726@rric.localdomain> <5719DA41.60304@arm.com>
- <20160422090052.GA4236@arm.com>
-Message-ID: <20160525132229.GG1535@rric.localdomain>
+From: rrichter@cavium.com (Robert Richter)
+Date: Wed, 25 May 2016 15:29:20 +0200
+Subject: [PATCH v6] irqchip, gicv3-its,
+ numa: Enable workaround for Cavium thunderx erratum 23144
+Message-ID: <1464182961-9167-1-git-send-email-rrichter@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will, Marc,
+From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
 
-On 22.04.16 10:00:52, Will Deacon wrote:
-> On Fri, Apr 22, 2016 at 09:01:05AM +0100, Marc Zyngier wrote:
-> > On 21/04/16 18:40, Robert Richter wrote:
-> > > On 15.04.16 21:30:05, Robert Richter wrote:
-> > >> From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> > >>
-> > >> The erratum fixes the hang of ITS SYNC command by avoiding inter node
-> > >> io and collections/cpu mapping on thunderx dual-socket platform.
-> > >>
-> > >> This fix is only applicable for Cavium's ThunderX dual-socket platform.
-> > >>
-> > >> This is based on NUMA v16 series.
-> > >> Message-Id: <1460155828-8690-1-git-send-email-ddaney.cavm@gmail.com>
-> > > 
-> > > Will, Catalin,
-> > > 
-> > > after NUMA base patches went into linux-next (many thanks), please
-> > > consider this pass 1.x errata workaround for inclusion too.
-> > 
-> > I'll queue it as a fix once the NUMA patches are merged into mainline.
-> 
-> Yeah, this can probably go in as -rc1 material if you're happy with it.
+The erratum fixes the hang of ITS SYNC command by avoiding inter node
+io and collections/cpu mapping on thunderx dual-socket platform.
 
-I am going to send a rebased version 6 as there is a minor conflict
-with upstream. Please include that one as numa fix after rc1 is out.
+This fix is only applicable for Cavium's ThunderX dual-socket platform.
 
-Thanks,
+This is based on NUMA upstream patches (Linus tree
+v4.6-10530-g28165ec7a99b).
 
--Robert
+v6 (by Robert Richter):
+rebased onto v4.6-10530-g28165ec7a99b to solve minor conflicts with
+upstream, no further changes
+
+v5 (by Robert Richter):
+fixed use of cpumask_of_node() only for (node >= 0)
+minor style fixes
+
+v4:
+updated silicon-errata.txt
+updated as per Robert Richter review comment.
+
+v3:
+updatated as per Marc Zyngier's review comments.
+http://www.spinics.net/lists/arm-kernel/msg443462.html
+
+v2:
+updatated as per Marc Zyngier's review comments.
+
+Reviewed-by: Robert Richter <rrichter@cavium.com>
+Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+Signed-off-by: Robert Richter <rrichter@cavium.com>
+---
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     |  9 +++++++
+ drivers/irqchip/irq-gic-v3-its.c       | 49 ++++++++++++++++++++++++++++++++--
+ 3 files changed, 57 insertions(+), 2 deletions(-)
+
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index c6938e50e71f..4da60b463995 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -56,6 +56,7 @@ stable kernels.
+ | ARM            | MMU-500         | #841119,#826419 | N/A                     |
+ |                |                 |                 |                         |
+ | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
++| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
+ | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
+ | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
+ | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 76747d92bc72..57a9f67971d3 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -426,6 +426,15 @@ config CAVIUM_ERRATUM_22375
+ 
+ 	  If unsure, say Y.
+ 
++config CAVIUM_ERRATUM_23144
++	bool "Cavium erratum 23144: ITS SYNC hang on dual socket system"
++	depends on NUMA
++	default y
++	help
++	  ITS SYNC command hang for cross node io and collections/cpu mapping.
++
++	  If unsure, say Y.
++
+ config CAVIUM_ERRATUM_23154
+ 	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
+ 	default y
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 6bd881be24ea..5eb1f9e17a98 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -41,6 +41,7 @@
+ 
+ #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
+ #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
++#define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
+ 
+ #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
+ 
+@@ -82,6 +83,7 @@ struct its_node {
+ 	u64			flags;
+ 	u32			ite_size;
+ 	u32			device_ids;
++	int			numa_node;
+ };
+ 
+ #define ITS_ITT_ALIGN		SZ_256
+@@ -613,11 +615,23 @@ static void its_unmask_irq(struct irq_data *d)
+ static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
+ 			    bool force)
+ {
+-	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
++	unsigned int cpu;
++	const struct cpumask *cpu_mask = cpu_online_mask;
+ 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+ 	struct its_collection *target_col;
+ 	u32 id = its_get_event_id(d);
+ 
++       /* lpi cannot be routed to a redistributor that is on a foreign node */
++	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
++		if (its_dev->its->numa_node >= 0) {
++			cpu_mask = cpumask_of_node(its_dev->its->numa_node);
++			if (!cpumask_intersects(mask_val, cpu_mask))
++				return -EINVAL;
++		}
++	}
++
++	cpu = cpumask_any_and(mask_val, cpu_mask);
++
+ 	if (cpu >= nr_cpu_ids)
+ 		return -EINVAL;
+ 
+@@ -1101,6 +1115,16 @@ static void its_cpu_init_collection(void)
+ 	list_for_each_entry(its, &its_nodes, entry) {
+ 		u64 target;
+ 
++		/* avoid cross node collections and its mapping */
++		if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
++			struct device_node *cpu_node;
++
++			cpu_node = of_get_cpu_node(cpu, NULL);
++			if (its->numa_node != NUMA_NO_NODE &&
++				its->numa_node != of_node_to_nid(cpu_node))
++				continue;
++		}
++
+ 		/*
+ 		 * We now have to bind each collection to its target
+ 		 * redistributor.
+@@ -1351,9 +1375,14 @@ static void its_irq_domain_activate(struct irq_domain *domain,
+ {
+ 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
+ 	u32 event = its_get_event_id(d);
++	const struct cpumask *cpu_mask = cpu_online_mask;
++
++	/* get the cpu_mask of local node */
++	if (its_dev->its->numa_node >= 0)
++		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
+ 
+ 	/* Bind the LPI to the first possible CPU */
+-	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
++	its_dev->event_map.col_map[event] = cpumask_first(cpu_mask);
+ 
+ 	/* Map the GIC IRQ and event to the device */
+ 	its_send_mapvi(its_dev, d->hwirq, event);
+@@ -1443,6 +1472,13 @@ static void __maybe_unused its_enable_quirk_cavium_22375(void *data)
+ 	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_22375;
+ }
+ 
++static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
++{
++	struct its_node *its = data;
++
++	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
++}
++
+ static const struct gic_quirk its_quirks[] = {
+ #ifdef CONFIG_CAVIUM_ERRATUM_22375
+ 	{
+@@ -1452,6 +1488,14 @@ static const struct gic_quirk its_quirks[] = {
+ 		.init	= its_enable_quirk_cavium_22375,
+ 	},
+ #endif
++#ifdef CONFIG_CAVIUM_ERRATUM_23144
++	{
++		.desc	= "ITS: Cavium erratum 23144",
++		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
++		.mask	= 0xffff0fff,
++		.init	= its_enable_quirk_cavium_23144,
++	},
++#endif
+ 	{
+ 	}
+ };
+@@ -1514,6 +1558,7 @@ static int __init its_probe(struct device_node *node,
+ 	its->base = its_base;
+ 	its->phys_base = res.start;
+ 	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
++	its->numa_node = of_node_to_nid(node);
+ 
+ 	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
+ 	if (!its->cmd_base) {
+-- 
+2.7.0.rc3
