@@ -1,64 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 May 2016 11:50:22 +0100
-Subject: [PATCH 1/1] arm64: fix flush_cache_range
-In-Reply-To: <57451DC6.7080106@huawei.com>
-References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
- <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
- <20160524130255.GU4892@e104818-lin.cambridge.arm.com>
- <5744FDD0.8060504@huawei.com> <57451DC6.7080106@huawei.com>
-Message-ID: <20160525105022.GC5996@e104818-lin.cambridge.arm.com>
+From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
+Date: Wed, 25 May 2016 14:13:38 +0300
+Subject: [PATCH v2 4/9] remoteproc: Introduce Qualcomm WCNSS firmware
+ loader
+In-Reply-To: <1459222625-11440-5-git-send-email-bjorn.andersson@linaro.org>
+References: <1459222625-11440-1-git-send-email-bjorn.andersson@linaro.org>
+ <1459222625-11440-5-git-send-email-bjorn.andersson@linaro.org>
+Message-ID: <574588E2.60506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 11:36:38AM +0800, Leizhen (ThunderTown) wrote:
-> On 2016/5/25 9:20, Leizhen (ThunderTown) wrote:
-> > On 2016/5/24 21:02, Catalin Marinas wrote:
-> >> On Tue, May 24, 2016 at 08:19:05PM +0800, Leizhen (ThunderTown) wrote:
-> >>> On 2016/5/24 19:37, Mark Rutland wrote:
-> >>>> It looks like the test may be missing I-cache maintenance regardless of
-> >>>> the semantics of mprotect in this case.
-> >>>>
-> >>>> I have not yet devled into flush_cache_range and how it is called.
-> >>>
-> >>> SYSCALL_DEFINE3(mprotect ---> mprotect_fixup ---> change_protection ---> change_protection_range --> flush_cache_range
-> >>
-> >> The change_protection() shouldn't need to flush the caches in
-> >> flush_cache_range(). The change_pte_range() function eventually ends up
-> >> calling set_pte_at() which calls __sync_icache_dcache() if the mapping
-> >> is executable.
-> > 
-> > OK, I see.
-> > But I'm afraid it entered the "if (pte_present(oldpte))" branch in
-> > function change_pte_range. Because the test case called mmap to
-> > create pte first, then called pte_modify. I will check it later.
+On 03/29/2016 06:37 AM, Bjorn Andersson wrote:
+> From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 > 
-> I have checked that it entered "if (pte_present(oldpte))" branch.
+> This introduces the peripheral image loader, for loading WCNSS firmware
+> and boot the core on e.g. MSM8974. The firmware is verified and booted
+> with the help of the Peripheral Authentication System (PAS) in
+> TrustZone.
+> 
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> ---
+> 
+> Changes since v1:
+> - Split iris definition into separate driver/dt-node
+> - Move constants from DT to code
+> - Make stop-state and some of interrupts optional to properly work on 8064
+> - Cleaned up and made mdt loader support relocation, which is needed on 8016.
+> 
+>  drivers/remoteproc/Kconfig           |  12 +
+>  drivers/remoteproc/Makefile          |   2 +
+>  drivers/remoteproc/qcom_mdt_loader.c | 172 +++++++++++
+>  drivers/remoteproc/qcom_mdt_loader.h |   7 +
+>  drivers/remoteproc/qcom_wcnss.c      | 579 +++++++++++++++++++++++++++++++++++
+>  drivers/remoteproc/qcom_wcnss.h      |  22 ++
+>  drivers/remoteproc/qcom_wcnss_iris.c | 185 +++++++++++
+>  7 files changed, 979 insertions(+)
+>  create mode 100644 drivers/remoteproc/qcom_mdt_loader.c
+>  create mode 100644 drivers/remoteproc/qcom_mdt_loader.h
+>  create mode 100644 drivers/remoteproc/qcom_wcnss.c
+>  create mode 100644 drivers/remoteproc/qcom_wcnss.h
+>  create mode 100644 drivers/remoteproc/qcom_wcnss_iris.c
+> 
 
-This path eventually calls set_pte_at() via ptep_modify_prot_commit().
+<cut>
 
-> But I don't known why I add flush_icache_range is OK, but add
-> __sync_icache_dcache have no effect.
+> +
+> +static int wcnss_remove(struct platform_device *pdev)
+> +{
+> +	struct qcom_wcnss *wcnss = platform_get_drvdata(pdev);
+> +
+> +	of_platform_depopulate(&pdev->dev);
+> +
+> +	qcom_smem_state_put(wcnss->state);
+> +	rproc_put(wcnss->rproc);
 
-Do you mean you modified set_pte_at() to use flush_icache_range()
-instead of __sync_icache_dcache() and it works?
+might be need to call rproc_del() too ?
 
-What happens is that __sync_icache_dcache() only takes care of the first
-time a page is mapped in user space and flushes the caches, marking it
-as "clean" (PG_dcache_clean) afterwards. Subsequent changes to this
-mapping or writes to it are entirely the responsibility of the user. So
-if the user plans to execute instructions, it better explicitly flush
-the caches (as Mark Rutland already stated in a previous reply).
+> +
+> +	return 0;
+> +}
+> +
 
-I ran our internal LTP version yesterday and it was fine but didn't
-realise that we actually patched mprotect04.c to include:
-
-	__clear_cache((char *)func, (char *)func + page_sz);
-
-just after memcpy().
-
-(we still need to investigate whether the I-cache invalidation is
-actually needed in flush_cache_range() or it's just something we forgot
-to remove)
+<cut>
 
 -- 
-Catalin
+regards,
+Stan
