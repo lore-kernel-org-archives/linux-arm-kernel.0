@@ -1,133 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2016 17:18:22 +0200
-Subject: [PATCH v3 4/4] soc: Add SoC driver for Freescale Vybrid platform
-In-Reply-To: <CAL_JsqKCwy=aXveTfnaQuZ5b3Ld9nzABgPfdPm1JX3CBuvzG+Q@mail.gmail.com>
-References: <cover.1463737502.git.maitysanchayan@gmail.com>
- <20160524041447.GA2884@Sanchayan-Arch.localdomain>
- <CAL_JsqKCwy=aXveTfnaQuZ5b3Ld9nzABgPfdPm1JX3CBuvzG+Q@mail.gmail.com>
-Message-ID: <5922111.afqro67xTI@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 May 2016 16:22:55 +0100
+Subject: [PATCH 1/1] arm64: fix flush_cache_range
+In-Reply-To: <20160524151235.GA11605@leverpostej>
+References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
+ <20160524151235.GA11605@leverpostej>
+Message-ID: <20160525152255.GH5996@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 24, 2016 12:09:41 PM CEST Rob Herring wrote:
-> On Mon, May 23, 2016 at 11:14 PM,  <maitysanchayan@gmail.com> wrote:
-> > Hello Rob,
-> >
-> > On 16-05-23 16:18:13, Rob Herring wrote:
-> >> On Fri, May 20, 2016 at 03:32:05PM +0530, Sanchayan Maity wrote:
-> >> > This adds a SoC driver to be used by Freescale Vybrid SoC's.
-> >> > Driver utilises syscon and nvmem consumer API's to get the
-> >> > various register values needed and expose the SoC specific
-> >> > properties via sysfs.
-> >> >
-> >> > A sample output from Colibri Vybrid VF61 is below:
-> >> >
-> >> > root at colibri-vf:~# cd /sys/bus/soc/devices/soc0
-> >> > root at colibri-vf:/sys/bus/soc/devices/soc0# ls
-> >> > family     machine    power      revision   soc_id     subsystem  uevent
-> >> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat family
-> >> > Freescale Vybrid VF610
-> >> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat machine
-> >> > Freescale Vybrid
-> >> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat revision
-> >> > 00000013
-> >> > root at colibri-vf:/sys/bus/soc/devices/soc0# cat soc_id
-> >> > df6472a6130f29d4
-> >> >
-> >> > Signed-off-by: Sanchayan Maity <maitysanchayan@gmail.com>
-> >> > ---
-> >> >  .../bindings/arm/freescale/fsl,vf610-soc.txt       |  20 +++
-> >> >  drivers/soc/Kconfig                                |   1 +
-> >> >  drivers/soc/fsl/Kconfig                            |  10 ++
-> >> >  drivers/soc/fsl/Makefile                           |   1 +
-> >> >  drivers/soc/fsl/soc-vf610.c                        | 198 +++++++++++++++++++++
-> >> >  5 files changed, 230 insertions(+)
-> >> >  create mode 100644 Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
-> >> >  create mode 100644 drivers/soc/fsl/Kconfig
-> >> >  create mode 100644 drivers/soc/fsl/soc-vf610.c
-> >> >
-> >> > diff --git a/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
-> >> > new file mode 100644
-> >> > index 0000000..338905d
-> >> > --- /dev/null
-> >> > +++ b/Documentation/devicetree/bindings/arm/freescale/fsl,vf610-soc.txt
-> >> > @@ -0,0 +1,20 @@
-> >> > +Vybrid System-on-Chip
-> >> > +---------------------
-> >> > +
-> >> > +Required properties:
-> >> > +
-> >> > +- compatible: "fsl,vf610-soc"
-> >> > +- rom-revision: phandle to the on-chip ROM node
-> >> > +- mscm: phandle to the MSCM CPU configuration node
-> >> > +- nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
-> >> > +- nvmem-cell-names: should contain string names "cfg0" and "cfg1"
-> >>
-> >> I still have similar concerns as the discussion on the last version.
-> >> This version only proves that you aren't describing h/w, but rather just
-> >> a collection of data that some driver wants.
-> >>
-> >> A driver can just as easily look-up all the nodes directly that these
-> >> phandles point to.
-> >
-> > Agreed, that we can look up all the nodes directly that these phandles
-> > refer to but I would still need a DT entry to bind to. While I could
-> > bind to existing nodes like mscm cpucfg but that doesn't seem right.
-> >
-> > The very first approach that we had taken was to integrate this functionality
-> > in mach-vf610.c code under mach-imx
-> > http://www.spinics.net/lists/devicetree/msg80654.html
+On Tue, May 24, 2016 at 04:12:35PM +0100, Mark Rutland wrote:
+> On Tue, May 24, 2016 at 08:19:05PM +0800, Leizhen (ThunderTown) wrote:
+> > On 2016/5/24 19:37, Mark Rutland wrote:
+> > > On Tue, May 24, 2016 at 07:16:37PM +0800, Zhen Lei wrote:
+> > >> When we ran mprotect04(a test case in LTP) infinitely, it would always
+> > >> failed after a few seconds. The case can be described briefly that: copy
+> > >> a empty function from code area into a new memory area(created by mmap),
+> > >> then call mprotect to change the protection to PROT_EXEC. The syscall
+> > >> sys_mprotect will finally invoke flush_cache_range, but this function
+> > >> currently only invalid icache, the operation of flush dcache is missed.
+[...]
+> Jumping back to the problem at hand:
 > 
-> Yes, everyone wants to move all platform devices in the kernel to a
-> corresponding DT node. The result is often making up nodes to do this.
-> It's the same thing with cpufreq.
+> It looks like we inherited this from ARM, which has done this for all
+> executable mappings since commit  6060e8df517847bf ("ARM: I-cache: flush
+> executable mappings in flush_cache_range()"). The commit message refers
+> to a4db94d, which doesn't seem to exist, and I assume is
+> 115b22474eb1905d ("ARM: 5794/1: Flush the D-cache during
+> copy_user_highpage()") which happened to get rebased at some point.
 > 
-> > and then it was recommended to migrate this to drivers/soc where we did use
-> > phandles or direct look up via compatible strings
-> 
-> The location in the tree is an orthogonal issue. You could move it and
-> use of_machine_is_compatible without any DT change.
-> 
-> The primary issue I have here is how do we bind soc_bus to DT in a
-> consistent way. Sorry, but vybrid specific patches alone are never
-> going to solve that issue.
+> That all implies that the icache maintenance is only intended to ensure
+> that CoW does not result in unexpected incoherency. Which in turn
+> implies that flipping permissions with mprotect is not expected to
+> synchronise the D and I caches.
 
-On a lot of chips, there is actually one device that holds the soc
-identification registers, and that can easily be used for this purpose.
+Looking through the arm32 history:
 
-Originally, the soc_device was meant to be the parent device for all
-other on-chip devices and be bound to the DT node that holds that
-bus (unlike things like external clocks that are not part of the SoC).
+2.6.33:
+  115b22474eb1 ("ARM: 5794/1: Flush the D-cache during copy_user_highpage()")
+  6060e8df5178 ("ARM: I-cache: flush executable mappings in flush_cache_range()")
 
-However, that model has never really caught on, and we have stopped
-doing this for new chips. Instead, the soc_device now somewhat
-stands for itself.
+These both take care of the CoW issue with executable pages.
 
-> > http://www.spinics.net/lists/arm-kernel/msg420847.html
-> >
-> > and
-> >
-> > http://lkml.iu.edu/hypermail/linux/kernel/1506.0/03787.html
-> >
-> > There hasn't been a consensus since v1.
-> 
-> I actually prefer your previous version binding soc_bus to the root
-> bus node to this version. I think that is closer to the right
-> direction. After all, pretty much everything is an SOC and every SOC
-> has an SOC bus. Pretty much every SOC and board have revisions and may
-> need to expose that revision info as well. We have to do this
-> consistently which means having a default implementation for
-> simple-bus that is not opt-in.
-> 
-> Alternatively, we should just deprecate soc_bus and come up a
-> different solution. Either way, I think we have a half implemented
-> solution currently.
+2.6.37:
+  6012191aa9c6 ("ARM: 6380/1: Introduce __sync_icache_dcache() for VIPT caches")
 
-We have had several drivers in the past that needed to figure out
-whether they were running on a particular version of a SoC, and that
-could not get this information from the DT. My suggested solution
-for this is to provide an API from soc_bus that compares a
-glob string to the available soc_device instance(s) in order to
-figure out whether we are running on a particular kind of system.
+The above is a fix for SMP systems where update_mmu_cache() happens
+after the PTE was actually written, so slight chance of race with
+another CPU. We generalised it to all ARMv6+ systems (so VIPT caches).
 
-	Arnd
+3.1:
+  c7e89b16eb90 ("ARM: 6995/2: mm: remove unnecessary cache flush on v6 copypage")
+
+That's when we realised that the CoW problem no longer exists for
+non-aliasing VIPT caches. However, the I-cache counterpart 6060e8df5178
+has not been reverted.
+
+So I think that for arm64 and arm32 with non-aliasing VIPT,
+flush_cache_range() can safely be a no-op.
+
+-- 
+Catalin
