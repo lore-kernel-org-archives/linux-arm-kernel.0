@@ -1,68 +1,84 @@
-From: stanimir.varbanov@linaro.org (Stanimir Varbanov)
-Date: Wed, 25 May 2016 14:13:38 +0300
-Subject: [PATCH v2 4/9] remoteproc: Introduce Qualcomm WCNSS firmware
- loader
-In-Reply-To: <1459222625-11440-5-git-send-email-bjorn.andersson@linaro.org>
-References: <1459222625-11440-1-git-send-email-bjorn.andersson@linaro.org>
- <1459222625-11440-5-git-send-email-bjorn.andersson@linaro.org>
-Message-ID: <574588E2.60506@linaro.org>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Wed, 25 May 2016 19:16:14 +0800
+Subject: [PATCH] arm64:efi fix the format of debug message from efi
+Message-ID: <1464174974-4733-1-git-send-email-dennis.chen@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/29/2016 06:37 AM, Bjorn Andersson wrote:
-> From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> 
-> This introduces the peripheral image loader, for loading WCNSS firmware
-> and boot the core on e.g. MSM8974. The firmware is verified and booted
-> with the help of the Peripheral Authentication System (PAS) in
-> TrustZone.
-> 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> ---
-> 
-> Changes since v1:
-> - Split iris definition into separate driver/dt-node
-> - Move constants from DT to code
-> - Make stop-state and some of interrupts optional to properly work on 8064
-> - Cleaned up and made mdt loader support relocation, which is needed on 8016.
-> 
->  drivers/remoteproc/Kconfig           |  12 +
->  drivers/remoteproc/Makefile          |   2 +
->  drivers/remoteproc/qcom_mdt_loader.c | 172 +++++++++++
->  drivers/remoteproc/qcom_mdt_loader.h |   7 +
->  drivers/remoteproc/qcom_wcnss.c      | 579 +++++++++++++++++++++++++++++++++++
->  drivers/remoteproc/qcom_wcnss.h      |  22 ++
->  drivers/remoteproc/qcom_wcnss_iris.c | 185 +++++++++++
->  7 files changed, 979 insertions(+)
->  create mode 100644 drivers/remoteproc/qcom_mdt_loader.c
->  create mode 100644 drivers/remoteproc/qcom_mdt_loader.h
->  create mode 100644 drivers/remoteproc/qcom_wcnss.c
->  create mode 100644 drivers/remoteproc/qcom_wcnss.h
->  create mode 100644 drivers/remoteproc/qcom_wcnss_iris.c
-> 
+When enable debug of efi and memblock with 'efi=debug memblock=debug' appended
+to the kernel command line, the debug message output for earyly_con looks like:
+[    0.000000] efi:   0x0000e1050000-0x0000e105ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x0000e1300000-0x0000e1300fff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x0000e8200000-0x0000e827ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x008000000000-0x008001e7ffff [Runtime Data       |RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]
+[    0.000000] memblock_add: [0x00008000000000-0x00008001e7ffff] flags 0x0 early_init_dt_add_memory_arch+0x54/0x5c
+[    0.000000] *
+...
+This patch is trying to fix the above output messed up by memblock_add(), so we can get below debug mesg looks
+more formally after applied:
+[    0.000000] efi:   0x0000e1050000-0x0000e105ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x0000e1300000-0x0000e1300fff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x0000e8200000-0x0000e827ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x008000000000-0x008001e7ffff [Runtime Data       |RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]*
+[    0.000000] memblock_add: [0x00008000000000-0x00008001e7ffff] flags 0x0 early_init_dt_add_memory_arch+0x54/0x5c
+...
 
-<cut>
+Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ drivers/firmware/efi/arm-init.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-> +
-> +static int wcnss_remove(struct platform_device *pdev)
-> +{
-> +	struct qcom_wcnss *wcnss = platform_get_drvdata(pdev);
-> +
-> +	of_platform_depopulate(&pdev->dev);
-> +
-> +	qcom_smem_state_put(wcnss->state);
-> +	rproc_put(wcnss->rproc);
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+index a850cbc..272f674 100644
+--- a/drivers/firmware/efi/arm-init.c
++++ b/drivers/firmware/efi/arm-init.c
+@@ -174,6 +174,7 @@ static __init void reserve_regions(void)
+ {
+        efi_memory_desc_t *md;
+        u64 paddr, npages, size;
++       int resv;
 
-might be need to call rproc_del() too ?
+        if (efi_enabled(EFI_DBG))
+                pr_info("Processing EFI memory map:\n");
+@@ -190,12 +191,16 @@ static __init void reserve_regions(void)
+                paddr = md->phys_addr;
+                npages = md->num_pages;
 
-> +
-> +	return 0;
-> +}
-> +
++               resv = is_reserve_region(md);
+                if (efi_enabled(EFI_DBG)) {
+                        char buf[64];
 
-<cut>
+                        pr_info("  0x%012llx-0x%012llx %s%s",
+                                paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
+-                               efi_md_typeattr_format(buf, sizeof(buf), md));
++                               efi_md_typeattr_format(buf, sizeof(buf), md),
++                               resv ? "*" : "");
++
++                       pr_cont("\n");
+                }
 
--- 
-regards,
-Stan
+                memrange_efi_to_native(&paddr, &npages);
+@@ -204,14 +209,9 @@ static __init void reserve_regions(void)
+                if (is_normal_ram(md))
+                        early_init_dt_add_memory_arch(paddr, size);
+
+-               if (is_reserve_region(md)) {
++               if (resv)
+                        memblock_mark_nomap(paddr, size);
+-                       if (efi_enabled(EFI_DBG))
+-                               pr_cont("*");
+-               }
+
+-               if (efi_enabled(EFI_DBG))
+-                       pr_cont("\n");
+        }
+
+        set_bit(EFI_MEMMAP, &efi.flags);
+--
+2.7.4
+
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
