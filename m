@@ -1,71 +1,316 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 25 May 2016 12:25:49 +0100
-Subject: [PATCH] arm64:efi fix the format of debug message from efi
-In-Reply-To: <1464174974-4733-1-git-send-email-dennis.chen@arm.com>
-References: <1464174974-4733-1-git-send-email-dennis.chen@arm.com>
-Message-ID: <20160525112549.GJ1337@leverpostej>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 25 May 2016 12:37:57 +0100
+Subject: [PATCH v4 06/12] KVM: arm64: implement basic ITS register handlers
+In-Reply-To: <5706704C.5060307@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-7-git-send-email-andre.przywara@arm.com>
+ <5706704C.5060307@arm.com>
+Message-ID: <671b7144-7929-df7b-14f4-20dc6a32abdb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 07:16:14PM +0800, Dennis Chen wrote:
-> When enable debug of efi and memblock with 'efi=debug memblock=debug' appended
-> to the kernel command line, the debug message output for earyly_con looks like:
-> [    0.000000] efi:   0x0000e1050000-0x0000e105ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x0000e1300000-0x0000e1300fff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x0000e8200000-0x0000e827ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x008000000000-0x008001e7ffff [Runtime Data       |RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]
-> [    0.000000] memblock_add: [0x00008000000000-0x00008001e7ffff] flags 0x0 early_init_dt_add_memory_arch+0x54/0x5c
-> [    0.000000] *
-> ...
-> This patch is trying to fix the above output messed up by memblock_add(), so we can get below debug mesg looks
-> more formally after applied:
-> [    0.000000] efi:   0x0000e1050000-0x0000e105ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x0000e1300000-0x0000e1300fff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x0000e8200000-0x0000e827ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
-> [    0.000000] efi:   0x008000000000-0x008001e7ffff [Runtime Data       |RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]*
-> [    0.000000] memblock_add: [0x00008000000000-0x00008001e7ffff] flags 0x0 early_init_dt_add_memory_arch+0x54/0x5c
-> ...
-> 
-> Signed-off-by: Dennis Chen <dennis.chen@arm.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Steve Capper <steve.capper@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/firmware/efi/arm-init.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
-> index a850cbc..272f674 100644
-> --- a/drivers/firmware/efi/arm-init.c
-> +++ b/drivers/firmware/efi/arm-init.c
-> @@ -174,6 +174,7 @@ static __init void reserve_regions(void)
->  {
->         efi_memory_desc_t *md;
->         u64 paddr, npages, size;
-> +       int resv;
-> 
->         if (efi_enabled(EFI_DBG))
->                 pr_info("Processing EFI memory map:\n");
-> @@ -190,12 +191,16 @@ static __init void reserve_regions(void)
->                 paddr = md->phys_addr;
->                 npages = md->num_pages;
-> 
-> +               resv = is_reserve_region(md);
->                 if (efi_enabled(EFI_DBG)) {
->                         char buf[64];
-> 
->                         pr_info("  0x%012llx-0x%012llx %s%s",
->                                 paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
-> -                               efi_md_typeattr_format(buf, sizeof(buf), md));
-> +                               efi_md_typeattr_format(buf, sizeof(buf), md),
-> +                               resv ? "*" : "");
-> +
-> +                       pr_cont("\n");
+Hi Marc,
 
-As I mentioned in my (off-list) mail previously, please fold this
-pr_cont in. You just need to move the "\n" into the end of the format
-string for the pr_info.
+this series is mostly obsolete now, but I wanted to elaborate on the
+locking scheme, which hasn't changed.
 
-Thanks,
-Mark,
+On 07/04/16 15:35, Marc Zyngier wrote:
+> On 26/03/16 02:14, Andre Przywara wrote:
+
+....
+
+>> --- a/virt/kvm/arm/vgic/its-emul.c
+>> +++ b/virt/kvm/arm/vgic/its-emul.c
+>> @@ -31,23 +31,263 @@
+>>  #include "vgic.h"
+>>  #include "vgic_mmio.h"
+>>  
+>> +#define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>> +
+>> +static int vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
+>> +				   struct kvm_io_device *this,
+>> +				   gpa_t addr, int len, void *val)
+>> +{
+>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>> +	u32 reg;
+>> +
+>> +	reg = GITS_CTLR_QUIESCENT;
+> 
+> So your ITS is always in a quiescent state? Even when you're processing
+> the command queue? You'll have to convince me...
+
+Does QUIESCENT actually cover the command queue status? I was under the
+impression that this is purely to cope with distributed implementations
+and the possible delays caused by propagating commands.
+If not so, I can surely take the lock here and respect
+(creadr == cwriter) upon setting the bit.
+
+> 
+>> +	if (its->enabled)
+>> +		reg |= GITS_CTLR_ENABLE;
+>> +
+>> +	write_mask32(reg, addr & 3, len, val);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int vgic_mmio_write_its_ctlr(struct kvm_vcpu *vcpu,
+>> +				    struct kvm_io_device *this,
+>> +				    gpa_t addr, int len, const void *val)
+>> +{
+>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>> +	struct vgic_io_device *iodev = container_of(this,
+>> +						    struct vgic_io_device, dev);
+>> +
+>> +        if (addr - iodev->base_addr == 0)
+> 
+> whitespace issue.
+> 
+>> +		its->enabled = !!(*(u8*)val & GITS_CTLR_ENABLE);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int vgic_mmio_read_its_typer(struct kvm_vcpu *vcpu,
+>> +				    struct kvm_io_device *this,
+>> +				    gpa_t addr, int len, void *val)
+>> +{
+>> +	u64 reg = GITS_TYPER_PLPIS;
+>> +
+>> +	/*
+>> +	 * We use linear CPU numbers for redistributor addressing,
+>> +	 * so GITS_TYPER.PTA is 0.
+>> +	 * To avoid memory waste on the guest side, we keep the
+>> +	 * number of IDBits and DevBits low for the time being.
+>> +	 * This could later be made configurable by userland.
+>> +	 * Since we have all collections in linked list, we claim
+>> +	 * that we can hold all of the collection tables in our
+>> +	 * own memory and that the ITT entry size is 1 byte (the
+>> +	 * smallest possible one).
+> 
+> All of this is going to bite us when we want to implement migration,
+> specially the HW collection bit.
+
+How so? Clearly we keep the number of VCPUs constant, so everything
+guest visible stays the same even upon migrating to a much different
+host? Or are we talking about different things here?
+
+> 
+>> +	 */
+>> +	reg |= 0xff << GITS_TYPER_HWCOLLCNT_SHIFT;
+>> +	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+>> +	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
+>> +
+>> +	write_mask64(reg, addr & 7, len, val);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int vgic_mmio_read_its_iidr(struct kvm_vcpu *vcpu,
+>> +				   struct kvm_io_device *this,
+>> +				   gpa_t addr, int len, void *val)
+>> +{
+>> +	u32 reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+>> +
+>> +	write_mask32(reg, addr & 3, len, val);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
+>> +				     struct kvm_io_device *this,
+>> +				     gpa_t addr, int len, void *val)
+>> +{
+>> +	struct vgic_io_device *iodev = container_of(this,
+>> +						    struct vgic_io_device, dev);
+>> +	u32 reg = 0;
+>> +	int idreg = (addr & ~3) - iodev->base_addr + GITS_IDREGS_BASE;
+>> +
+>> +	switch (idreg) {
+>> +	case GITS_PIDR2:
+>> +		reg = GIC_PIDR2_ARCH_GICv3;
+> 
+> Are we leaving the lowest 4 bits to zero?
+
+I couldn't stuff "42" in 4 bits, so: yes ;-)
+
+>> +		break;
+>> +	case GITS_PIDR4:
+>> +		/* This is a 64K software visible page */
+>> +		reg = 0x40;
+> 
+> Same question.
+> 
+> Also, how about all the others PIDR registers?
+
+I guess I was halfway undecided between going with the pure
+architectural requirements (which only mandate bits 7:4 in PIDR2) and
+complying with the recommendation later in the spec.
+So I will just fill PIDR0, PIDR2 and the rest of PIDR2 as well.
+
+>> +		break;
+>> +	/* Those are the ID registers for (any) GIC. */
+>> +	case GITS_CIDR0:
+>> +		reg = 0x0d;
+>> +		break;
+>> +	case GITS_CIDR1:
+>> +		reg = 0xf0;
+>> +		break;
+>> +	case GITS_CIDR2:
+>> +		reg = 0x05;
+>> +		break;
+>> +	case GITS_CIDR3:
+>> +		reg = 0xb1;
+>> +		break;
+>> +	}
+> 
+> Given that these values are directly taken from the architecture, and
+> seem common to the whole GICv3 architecture when implemented by ARM, we
+> could have a common handler for the whole GICv3 implementatuin. Not a
+> bit deal though.
+
+Agreed.
+
+>> +
+>> +	write_mask32(reg, addr & 3, len, val);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +/*
+>> + * This function is called with both the ITS and the distributor lock dropped,
+>> + * so the actual command handlers must take the respective locks when needed.
+>> + */
+>> +static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
+>> +{
+>> +	return -ENODEV;
+>> +}
+>> +
+>> +static int vgic_mmio_read_its_cbaser(struct kvm_vcpu *vcpu,
+>> +				    struct kvm_io_device *this,
+>> +				    gpa_t addr, int len, void *val)
+>> +{
+>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>> +
+>> +	write_mask64(its->cbaser, addr & 7, len, val);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int vgic_mmio_write_its_cbaser(struct kvm_vcpu *vcpu,
+>> +				      struct kvm_io_device *this,
+>> +				      gpa_t addr, int len, const void *val)
+>> +{
+>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>> +
+>> +	if (its->enabled)
+>> +		return 0;
+>> +
+>> +	its->cbaser = mask64(its->cbaser, addr & 7, len, val);
+>> +	its->creadr = 0;
+> 
+> Don't you need to acquire the command queue lock here?
+
+I don't think so, because we "return 0;" above if the ITS is enabled,
+which means that nothing is going on at the moment.
+But I guess I can just take the lock anyway to be sure.
+
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static int its_cmd_buffer_size(struct kvm *kvm)
+>> +{
+>> +	struct vgic_its *its = &kvm->arch.vgic.its;
+>> +
+>> +	return ((its->cbaser & 0xff) + 1) << 12;
+>> +}
+>> +
+>> +static gpa_t its_cmd_buffer_base(struct kvm *kvm)
+>> +{
+>> +	struct vgic_its *its = &kvm->arch.vgic.its;
+>> +
+>> +	return BASER_BASE_ADDRESS(its->cbaser);
+>> +}
+>> +
+>> +/*
+>> + * By writing to CWRITER the guest announces new commands to be processed.
+>> + * Since we cannot read from guest memory inside the ITS spinlock, we
+>> + * iterate over the command buffer (with the lock dropped) until the read
+>> + * pointer matches the write pointer. Other VCPUs writing this register in the
+>> + * meantime will just update the write pointer, leaving the command
+>> + * processing to the first instance of the function.
+>> + */
+>> +static int vgic_mmio_write_its_cwriter(struct kvm_vcpu *vcpu,
+>> +				       struct kvm_io_device *this,
+>> +				       gpa_t addr, int len, const void *val)
+>> +{
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	struct vgic_its *its = &dist->its;
+>> +	gpa_t cbaser = its_cmd_buffer_base(vcpu->kvm);
+>> +	u64 cmd_buf[4];
+>> +	u32 reg;
+>> +	bool finished;
+>> +
+>> +	reg = mask64(its->cwriter & 0xfffe0, addr & 7, len, val);
+>> +	reg &= 0xfffe0;
+>> +	if (reg > its_cmd_buffer_size(vcpu->kvm))
+>> +		return 0;
+>> +
+>> +	spin_lock(&its->lock);
+>> +
+>> +	/*
+>> +	 * If there is still another VCPU handling commands, let this
+>> +	 * one pick up the new CWRITER and process "our" new commands as well.
+>> +	 */
+> 
+> How do you detect that condition? All I see is a massive race here, with
+> two threads processing the queue in parallel, possibly corrupting each
+> other's data.
+> 
+> Please explain why you think this is safe.
+
+OK, here you go: Actually we are handling the command queue
+synchronously: The first writer to CWRITER will end up here and will
+iterate over all commands below. From the guests point of view it will
+take some time to do the CWRITER MMIO write, but upon the writel
+returning the queue is actually already empty again.
+That means that any _sane_ guest will _never_ trigger the case where two
+threads/VCPUs are handling the queue, because a concurrent write to
+CWRITER without a lock in the guest would be broken by design.
+
+However I am not sure we can rely on this, so I added this precaution
+scheme:
+The first writer takes our ITS (emulation) lock and examines cwriter and
+creadr to see if they are equal. If they are, then the queue is
+currently empty, which means we are the first one and need to take care
+of the commands. We update our copy of cwriter (now marking the queue as
+non-empty) and drop the lock. As we kept the queue-was-empty status in a
+local variable, we now can start iterating through the queue. We only
+take the lock briefly when really needed in this process (for instance
+when one command has been processed and creadr is incremented).
+
+If now a second VCPU writes CWRITER, we also take the lock and compare
+creadr and cwriter. Now they are different, because the first thread is
+still busy with handling the commands and hasn't finished yet.
+So we set our local "finished" to true. Also we update cwriter to the
+new value, then drop the lock. The while loop below will not be entered
+in this thread and we return to the guest.
+Now the first thread has handled another command, takes the lock to
+increase creadr and compares it with cwriter. Without the second writer
+it may have been finished already, but now cwriter has grown, so it will
+just carry on with handling the commands.
+
+A bit like someone washing the dishes while another person adds some
+more dirty plates to the pile ;-)
+
+But again: this is just insurance against broken guests and due to guest
+locking requirements this would actually never happen.
+
+Does that make sense?
+
+Btw: I have finished rebasing this upon the new VGIC and will post a new
+version after -rc1.
+
+Cheers,
+Andre.
