@@ -1,60 +1,53 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 May 2016 15:26:32 +0100
-Subject: [PATCH v2 0/7] vgic fixes for 4.7-rc1
-Message-ID: <1464186399-16604-1-git-send-email-marc.zyngier@arm.com>
+Date: Wed, 25 May 2016 15:26:35 +0100
+Subject: [PATCH v2 3/7] KVM: arm/arm64: vgic-v2: Always resample level
+ interrupts
+In-Reply-To: <1464186399-16604-1-git-send-email-marc.zyngier@arm.com>
+References: <1464186399-16604-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1464186399-16604-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dust has not yet settled on the new vgic, but here's the first
-batch of fixes anyway!
+When reading back from the list registers, we need to perform
+two actions for level interrupts:
+1) clear the soft-pending bit if the interrupt is not pending
+   anymore *in the list register*
+2) resample the line level and propagate it to the pending state
 
-The first two patches are courtesy of Christoffer, who noticed that we
-fail to clear LRs that generate a maintenance interrupt, leading to
-potential screaming interrupts. This bug already exists in the current
-mainline (cc stable?)
+But these two actions shouldn't be linked, and we should *always*
+resample the line level, no matter what state is in the list
+register. Otherwise, we may end-up injecting spurious interrupts
+that have been already retired.
 
-The next two address a bug where we fail to properly resample the line
-level on exit, which could result in spurious interrupts being
-injected. This is specific to the new vgic implementation.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-v2.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
 
-The following two patches tighten our GICv3 emulation by preventing
-the guest from changing the SRE setting. This bug already exists in
-mainline, though it is hardly critical.
-
-The last patch is actually a performance optimization: if the guest is
-using GICv3, we can drop a number of barriers (since we don't need to
-change SRE, and there is no memory-mapped view to synchronize
-with). This results in a world switch that is 2.5% faster on my LS2085
-box when running GICv3 guests. I suspect that the bigger the box, the
-bigger this impact this change will have (system-wide DSBs don't really
-come cheap).
-
-These patches have been tested on top of the kvmarm/next branch.
-
-Thanks,
-
-	M.
-
-- From v1: Fix pending bit regeneration by adding the soft_pending bit
-  to the mix.
-
-Christoffer Dall (2):
-  KVM: arm/arm64: vgic-v2: Clear all dirty LRs
-  KVM: arm/arm64: vgic-v3: Clear all dirty LRs
-
-Marc Zyngier (5):
-  KVM: arm/arm64: vgic-v2: Always resample level interrupts
-  KVM: arm/arm64: vgic-v3: Always resample level interrupts
-  arm64: KVM: Make ICC_SRE_EL1 access return the configured SRE value
-  arm64: KVM: vgic-v3: Prevent the guest from messing with ICC_SRE_EL1
-  arm64: KVM: vgic-v3: Relax synchronization when SRE==1
-
- arch/arm64/kvm/hyp/vgic-v3-sr.c | 36 +++++++++++++++++++++---------------
- arch/arm64/kvm/sys_regs.c       | 13 ++++++++++++-
- virt/kvm/arm/hyp/vgic-v2-sr.c   |  7 +++----
- virt/kvm/arm/vgic/vgic-v2.c     | 14 +++++++++-----
- virt/kvm/arm/vgic/vgic-v3.c     | 14 +++++++++-----
- 5 files changed, 54 insertions(+), 30 deletions(-)
-
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 8ad42c2..e31405e 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -112,11 +112,15 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+ 			}
+ 		}
+ 
+-		/* Clear soft pending state when level IRQs have been acked */
+-		if (irq->config == VGIC_CONFIG_LEVEL &&
+-		    !(val & GICH_LR_PENDING_BIT)) {
+-			irq->soft_pending = false;
+-			irq->pending = irq->line_level;
++		/*
++		 * Clear soft pending state when level irqs have been acked.
++		 * Always regenerate the pending state.
++		 */
++		if (irq->config == VGIC_CONFIG_LEVEL) {
++			if (!(val & GICH_LR_PENDING_BIT))
++				irq->soft_pending = false;
++
++			irq->pending = irq->line_level || irq->soft_pending;
+ 		}
+ 
+ 		spin_unlock(&irq->irq_lock);
 -- 
 2.1.4
