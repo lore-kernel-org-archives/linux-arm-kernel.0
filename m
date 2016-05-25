@@ -1,61 +1,32 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 25 May 2016 11:02:04 -0400
-Subject: ARM: dts: exynos: Add MFC memory banks for Peach boards
-In-Reply-To: <57456344.7020708@samsung.com>
-References: <1461871311-18344-1-git-send-email-javier@osg.samsung.com>
- <57456344.7020708@samsung.com>
-Message-ID: <d045b880-4a44-acd8-f7f6-e521caf374aa@osg.samsung.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 25 May 2016 12:07:56 -0300
+Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
+In-Reply-To: <0cf90ebe86e0461f82cb22b2a6b6ea83@rwthex-s1-b.rwth-ad.de>
+References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
+ <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
+ <20abc2f6769b4369ba87ec27274a090e@rwthex-s2-a.rwth-ad.de>
+ <644530ff6bb04b5898dc33604dc7a93a@rwthex-s1-b.rwth-ad.de>
+ <9b905766c6cc4680be4b33f79a179d5a@rwthex-w1-b.rwth-ad.de>
+ <0cf90ebe86e0461f82cb22b2a6b6ea83@rwthex-s1-b.rwth-ad.de>
+Message-ID: <CAOMZO5DpTrxE+=d6saCowkncR=xpDY060_uTV_WGYxoN7dKUpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Pankaj,
+On Wed, May 25, 2016 at 11:05 AM, Christopher Spinrath
+<christopher.spinrath@rwth-aachen.de> wrote:
 
-On 05/25/2016 04:33 AM, pankaj.dubey wrote:
-> Hi Javier,
-> 
-> On Friday 29 April 2016 12:51 AM, Javier Martinez Canillas wrote:
->> The MFC nodes with the memory regions reserved for memory allocations
->> are missing in the Exynos5420 Peach Pit and Exynos5800 Peach Pi DTS.
->>
->> This causes the s5p-mfc driver probe to fail with the following error:
->>
->> [    4.140647] s5p_mfc_alloc_memdevs:1072: Failed to declare coherent memory for MFC device
->> [    4.216163] s5p-mfc: probe of 11000000.codec failed with error -12
->>
->> Add the missing nodes so the driver probes and the {en,de}coder video
->> nodes are registered correctly:
->>
->> [    4.096277] s5p-mfc 11000000.codec: decoder registered as /dev/video4
->> [    4.102282] s5p-mfc 11000000.codec: encoder registered as /dev/video5
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> Just noticed that, current krzk/for-next failed to boot on Exynos5880
-> based Chromebook device. Git bisect is showing culprit as this patch.
+> OK, done. Can I always use the default value in this case? If yes, can
+> you point me to a proper documentation of these?
 
-Strange, krzk/for-next boots correctly on my Exynos5800 Peach Pi:
+You can look at
+"36.4.316 Pad Control Register
+(IOMUXC_SW_PAD_CTL_PAD_ENET_TX_DATA1)" in the mx6quad reference manual.
 
-$ git log --pretty=oneline --abbrev-commit HEAD
-35e691cf5165 Merge branch 'fixes-v4.7' into for-next
+For GPIO functionality the default power-on-reset value should work fine.
 
-$ uname -r
-4.6.0-00073-g35e691cf5165
+You can confirm this by reading address 0x20E0500 in the bootloader:
+mw.l 0x20E0500 1
 
-> When I reverted this patch, its able to boot normally.
-> Is there any missing patches that we need to take on krzk/for-next to
-> boot on Chromebook.
->
-
-No that I'm aware of. I wonder why it boots for me but fails for
-you. Can you please share your complete boot log to see if there
-are any hints there?
- 
-> Thanks,
-> Pankaj Dubey
-> 
-
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+and then use this value on the dts. This way the kernel will always
+have a sane value instead of relying in the value passed from the
+bootloader.
