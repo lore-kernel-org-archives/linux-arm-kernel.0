@@ -1,78 +1,30 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 25 May 2016 12:14:23 +0200
-Subject: [PATCH v2 1/4] reset: Add support for the Amlogic Meson SoC
- Reset Controller
-In-Reply-To: <1464169758-26975-2-git-send-email-narmstrong@baylibre.com>
-References: <1464169758-26975-1-git-send-email-narmstrong@baylibre.com>
- <1464169758-26975-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1464171263.3545.40.camel@pengutronix.de>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Wed, 25 May 2016 11:42:04 +0100
+Subject: [PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <5745817C.1070406@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
-
-looks fine, just two comments below.
-
-Am Mittwoch, den 25.05.2016, 11:49 +0200 schrieb Neil Armstrong:
-> This patch adds the platform driver for the Amlogic Meson SoC Reset
-> Controller.
+On 24/05/16 01:04, Yury Norov wrote:
+> This version is based on kernel v4.6.
+> It works with glibc-2.23, and tested with LTP.
 > 
-> The Meson8b and GXBB SoCs are supported.
+...
+> ILP32 glibc branch is available here:
+> https://github.com/norov/glibc/tree/ilp32-2.23
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  drivers/reset/Makefile      |   1 +
->  drivers/reset/reset-meson.c | 137 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 138 insertions(+)
->  create mode 100644 drivers/reset/reset-meson.c
-> 
-[...]
-> diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
-> new file mode 100644
-> index 0000000..98087ae
-> --- /dev/null
-> +++ b/drivers/reset/reset-meson.c
-[...]
-> +static int meson_reset_reset(struct reset_controller_dev *rcdev,
-> +			      unsigned long id)
-> +{
-> +	struct meson_reset *data =
-> +		container_of(rcdev, struct meson_reset, rcdev);
-> +	unsigned int bank = id / BITS_PER_REG;
-> +	unsigned int offset = id % BITS_PER_REG;
-> +	void *reg_addr = data->reg_base + (bank << 2);
+> It is tested with this series with no major downsides. I will send it to 
+> glibc-alpha soon, after final revise. Please review and comment it as well.
 
-We lost the __iomem here.
+i spotted one __ilp32__ vs __ILP32__ typo in the glibc code,
+i can review it in detail when there is a cleaned up patch set.
 
-> +
-> +	if (bank >= REG_COUNT)
-> +		return -EINVAL;
-> +
-> +	writel(BIT(offset), reg_addr);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct reset_control_ops meson_reset_ops = {
-> +	.reset		= meson_reset_reset,
-> +};
-> +
-> +static const struct of_device_id meson_reset_dt_ids[] = {
-> +	 { .compatible = "amlogic,meson8b-reset", },
-> +	 { .compatible = "amlogic,meson-gxbb-reset", },
-> +	 { /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, meson_reset_dt_ids);
-[...]
-> +MODULE_ALIAS("platform:meson_reset");
-
-And I think you can drop the MODULE_ALIAS since of: modaliases will be
-generated from the MODULE_DEVICE_TABLE above. This driver is only ever
-going to be probed from device tree, isn't it?
-
-> +MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
-> +MODULE_DESCRIPTION("Amlogic Meson Reset Controller driver");
-> +MODULE_LICENSE("Dual BSD/GPL");
-
-regards
-Philipp
+in general the approach seems ok, the ugly part is when lp64
+and ilp32 share code, but ilp32 needs some tweaks compared to
+the current code (e.g. x vs w regs in asm, long changed to
+long long in syscalls, different relocations etc) those will
+be hard to review. the naming is sometimes _be_ilp32 sometimes
+ilp32_be, but let's hope there will be no new abi variant to
+confuse this further.
