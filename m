@@ -1,56 +1,49 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 25 May 2016 17:15:49 +0300
-Subject: [PATCH v4 0/7] ARM/ASoC: OMAP3: Fix McBSP2/3 sidetone support
-Message-ID: <1464185756-28401-1-git-send-email-peter.ujfalusi@ti.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed, 25 May 2016 10:17:52 -0400
+Subject: [PATCH 0/2] ARM: dts: Fix imprecise external abort error when
+ accessing Exynos MFC
+In-Reply-To: <6479e0c0-97fb-ca3b-1337-6ed11410d94f@samsung.com>
+References: <1464111662-15336-1-git-send-email-javier@osg.samsung.com>
+ <6479e0c0-97fb-ca3b-1337-6ed11410d94f@samsung.com>
+Message-ID: <d90b6245-1ed4-32c6-c98d-cc5f12601205@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Marek,
 
-Changes since v3:
-- Rebased on next-20160525 [1] to apply cleanly
-- Fixed subject line for patch5
-- Added Mark's acked-by to the ASoC patches
+On 05/25/2016 02:51 AM, Marek Szyprowski wrote:
+> Hello,
+> 
+> 
+> On 2016-05-24 19:41, Javier Martinez Canillas wrote:
+>> This series fixes an imprecise external abort error when accessing the
+>> Exynos MFC registers due the power domain configuration requiring the
+>> aclk333 clock to be enabled during a domain switch.
+>>
+>> There isn't a dependency between the clock and Linux Samsung SoC trees
+>> because the CLK_ACLK333 clock ID is already defined so the patches can
+>> be picked indepedently by the relevant subsystem maintainers.
+> 
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+> I'm really curious what kind of async-bridge is there, but this patch
+> really fixes the problem with mfc power domain.
+>
 
-[1] "ASoC: omap-mcbsp: Enable/disable sidetone block auto clock
-gating for omap3" is gone missing from linux-next - it was in next-20160517 and
-I'm not sure when it got dropped.
+Yes, the Exynos manual is not that clear about what clocks have to remain
+enabled during a power domain switch for an IP block so maybe I got wrong.
 
-Tony: since Paul did not replied to the series, I'm sending the v4 now, I hope
-he will have time to look at this.
+I see that the MFC block has an async-bridge in "Figure 15-1" at section 
+"15.2.1 NoC Probes in 5420 Bus". And I thought that since the IP block
+has an async-bridge, the clock needs to remain ungated when the PMU turn
+it on and off on a power domain switch.
 
-Commit message from v3:
+I chose that clock because "Figure 7-10 MFC Clock Diagram" at section
+"7.4.7 MFC Clock Diagram" shows that ACLK_333 is associated with the
+MFC internal buses, or at least that's my understanding.
 
-Based on the ongoing discussion on v2 (ARM: OMAP3: Fix McBSP2/3 hwmod setup for
-sidetone) I have dropped the removal of the sidetone hwmod and only corrected
-it. The series now includes all related changes needed to have correct sidetone
-support whenever we boot in legacy or in DT mode.
-
-This time the ASoC part have dependency on earlier patches so they can not be
-applied separately.
-
-Regards,
-Peter
----
-Peter Ujfalusi (7):
-  ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
-  ARM: dts: omap3: Add clocks to McBSP nodes
-  ARM: OMAP3: McBSP: New callback for McBSP2/3 ICLK idle configuration
-  ARM: OMAP3: pdata-quirks: Add support for McBSP2/3 sidetone handling
-  ASoC: omap-mcbsp: Rename omap_mcbsp_sysfs_remove() to
-    omap_mcbsp_cleanup()
-  ASoC: omap-mcbsp: sidetone: Use the new callback for iclk handling
-  ARM: OMAP2+: McBSP: Remove the old iclk allow/deny idle code
-
- arch/arm/boot/dts/omap3.dtsi                | 10 ++++++++++
- arch/arm/mach-omap2/mcbsp.c                 | 31 ++++++++++++++++-------------
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c  | 24 ++++------------------
- arch/arm/mach-omap2/pdata-quirks.c          | 18 +++++++++++++++++
- include/linux/platform_data/asoc-ti-mcbsp.h |  4 +++-
- sound/soc/omap/mcbsp.c                      | 21 +++++++++++++------
- sound/soc/omap/mcbsp.h                      |  3 ++-
- sound/soc/omap/omap-mcbsp.c                 |  5 ++++-
- 8 files changed, 73 insertions(+), 43 deletions(-)
-
+Best regards,
 -- 
-2.8.2
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
