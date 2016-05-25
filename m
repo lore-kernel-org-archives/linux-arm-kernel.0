@@ -1,58 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2016 20:54:59 +0200
-Subject: [PATCH] phy: exynos-mipi-video: avoid uninitialized variable use
-In-Reply-To: <20160511185155.GB8265@kozik-lap>
-References: <1462971012-562097-1-git-send-email-arnd@arndb.de>
- <20160511185155.GB8265@kozik-lap>
-Message-ID: <14219690.YQPrXjp7cP@wuerfel>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 25 May 2016 12:00:58 -0700
+Subject: [PATCH v2 4/9] remoteproc: Introduce Qualcomm WCNSS firmware
+ loader
+In-Reply-To: <574588E2.60506@linaro.org>
+References: <1459222625-11440-1-git-send-email-bjorn.andersson@linaro.org>
+ <1459222625-11440-5-git-send-email-bjorn.andersson@linaro.org>
+ <574588E2.60506@linaro.org>
+Message-ID: <20160525190058.GV1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 11, 2016 8:51:55 PM CEST Krzysztof Kozlowski wrote:
-> On Wed, May 11, 2016 at 02:49:53PM +0200, Arnd Bergmann wrote:
-> > A rework of the exynos-mipi-video driver caused a warning
-> > about the new __set_phy_state function potentially accessing
-> > a variable before its initialization:
+On Wed 25 May 04:13 PDT 2016, Stanimir Varbanov wrote:
+
+> On 03/29/2016 06:37 AM, Bjorn Andersson wrote:
+> > From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 > > 
-> > drivers/phy/phy-exynos-mipi-video.c: In function '__set_phy_state':
-> > drivers/phy/phy-exynos-mipi-video.c:238:13: error: 'val' may be used uninitialized in this function [-Werror=maybe-uninitialized]
-> >   return val & data->resetn_val;
-> >          ~~~~^~~~~~~~~~~~~~~~~~
-> > drivers/phy/phy-exynos-mipi-video.c:235:6: note: 'val' was declared here
-> >   u32 val;
+> > This introduces the peripheral image loader, for loading WCNSS firmware
+> > and boot the core on e.g. MSM8974. The firmware is verified and booted
+> > with the help of the Peripheral Authentication System (PAS) in
+> > TrustZone.
 > > 
-> > The failure scenario here is the offset passed into a the
-> > stub regmap_read() function that does not modify its output,
-> > however regmap_read() can also fail for other reasons, so
-> > adding error handling (in this case, returning zero from
-> > is_running) seems the best solution.
-> > 
-> > Note that this warning showed up with the ARM s5pv210_defconfig,
-> > indicating that we most likely want to either enable CONFIG_REGMAP
-> > in that defconfig as well, or disable the phy-exynos-mipi-video
-> > driver.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: 97a3042f7616 ("phy: exynos-mipi-video: Rewrite handling of phy registers")
+> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 > > ---
-> >  drivers/phy/phy-exynos-mipi-video.c | 6 +++++-
-> >  1 file changed, 5 insertions(+), 1 deletion(-)
 > > 
-> > diff --git a/drivers/phy/phy-exynos-mipi-video.c b/drivers/phy/phy-exynos-mipi-video.c
-> > index cc093ebfda94..8b851f718123 100644
-> > --- a/drivers/phy/phy-exynos-mipi-video.c
-> > +++ b/drivers/phy/phy-exynos-mipi-video.c
-> > @@ -233,8 +233,12 @@ static inline int __is_running(const struct exynos_mipi_phy_desc *data,
-> >                       struct exynos_mipi_video_phy *state)
-> >  {
-> >       u32 val;
+> > Changes since v1:
+> > - Split iris definition into separate driver/dt-node
+> > - Move constants from DT to code
+> > - Make stop-state and some of interrupts optional to properly work on 8064
+> > - Cleaned up and made mdt loader support relocation, which is needed on 8016.
+> > 
+> >  drivers/remoteproc/Kconfig           |  12 +
+> >  drivers/remoteproc/Makefile          |   2 +
+> >  drivers/remoteproc/qcom_mdt_loader.c | 172 +++++++++++
+> >  drivers/remoteproc/qcom_mdt_loader.h |   7 +
+> >  drivers/remoteproc/qcom_wcnss.c      | 579 +++++++++++++++++++++++++++++++++++
+> >  drivers/remoteproc/qcom_wcnss.h      |  22 ++
+> >  drivers/remoteproc/qcom_wcnss_iris.c | 185 +++++++++++
+> >  7 files changed, 979 insertions(+)
+> >  create mode 100644 drivers/remoteproc/qcom_mdt_loader.c
+> >  create mode 100644 drivers/remoteproc/qcom_mdt_loader.h
+> >  create mode 100644 drivers/remoteproc/qcom_wcnss.c
+> >  create mode 100644 drivers/remoteproc/qcom_wcnss.h
+> >  create mode 100644 drivers/remoteproc/qcom_wcnss_iris.c
+> > 
 > 
-> Other way would be to initialize val=0 since there is no real error code
-> returned. Anyway:
+> <cut>
 > 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > +
+> > +static int wcnss_remove(struct platform_device *pdev)
+> > +{
+> > +	struct qcom_wcnss *wcnss = platform_get_drvdata(pdev);
+> > +
+> > +	of_platform_depopulate(&pdev->dev);
+> > +
+> > +	qcom_smem_state_put(wcnss->state);
+> > +	rproc_put(wcnss->rproc);
+> 
+> might be need to call rproc_del() too ?
+> 
 
+You're correct. Thanks for having a look!
 
-This hasn't made it into linux-next yet, any chance we'll see it in -rc1 or -rc2?
-
-	Arnd
+Regards,
+Bjorn
