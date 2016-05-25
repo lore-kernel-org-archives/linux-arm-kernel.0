@@ -1,48 +1,32 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 May 2016 17:06:47 +0100
-Subject: [PATCH v4 13/18] ARM: DT: STiH407: Add i2s_in pinctrl configuration
+Date: Wed, 25 May 2016 17:06:48 +0100
+Subject: [PATCH v4 14/18] ARM: DT: STiH407: Add spdif_out pinctrl config
 In-Reply-To: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
 References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1464192412-16386-15-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1464192412-16386-16-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the pinctrl config for the i2s_in pins
-used by the uniperif reader IP.
+This patch adds the pinctrl config for the spidf out
+pins used by the sasg codec IP.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
 diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index 0fb5c8a..537db7e 100644
+index 537db7e..598dbab 100644
 --- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
 +++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -1090,6 +1090,30 @@
+@@ -1114,6 +1114,14 @@
  				};
  			};
  
-+			i2s_in {
-+				pinctrl_i2s_8ch_in: i2s_8ch_in{
++			spdif_out {
++				pinctrl_spdif_out: spdif_out{
 +					st,pins {
-+						mclk = <&pio32 5 ALT1 IN>;
-+						lrclk = <&pio32 7 ALT1 IN>;
-+						sclk = <&pio32 6 ALT1 IN>;
-+						data0 = <&pio32 4 ALT1 IN>;
-+						data1 = <&pio33 0 ALT1 IN>;
-+						data2 = <&pio33 1 ALT1 IN>;
-+						data3 = <&pio33 2 ALT1 IN>;
-+						data4 = <&pio33 3 ALT1 IN>;
-+					};
-+				};
-+
-+				pinctrl_i2s_2ch_in: i2s_2ch_in{
-+					st,pins {
-+						mclk = <&pio32 5 ALT1 IN>;
-+						lrclk = <&pio32 7 ALT1 IN>;
-+						sclk = <&pio32 6 ALT1 IN>;
-+						data0 = <&pio32 4 ALT1 IN>;
++						spdif_out = <&pio34 7 ALT1 OUT>;
 +					};
 +				};
 +			};
