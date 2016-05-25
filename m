@@ -1,92 +1,58 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 25 May 2016 10:38:19 -0500
-Subject: [PATCH] arm64/efi: remove spurious WARN_ON for !4K kernels
-In-Reply-To: <1464189116-30898-1-git-send-email-mark.rutland@arm.com>
-References: <1464189116-30898-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <5745C6EB.8090004@arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 25 May 2016 09:42:28 -0600
+Subject: [PATCH] arm64: tegra: Fix CPU compatible string for Tegra132
+In-Reply-To: <574509E7.4030208@nvidia.com>
+References: <20160523074221.7135-1-josephl@nvidia.com>
+ <574509E7.4030208@nvidia.com>
+Message-ID: <5745C7E4.2050908@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2016 10:11 AM, Mark Rutland wrote:
-> Since commit 1fd55a9a09b0293a ("arm64/efi: Apply strict permissions to
-> UEFI Runtime Services regions"), booting a !4K page kernel results in a
-> boot-time splat on some systems, due to to a WARN_ONCE added in that
-> commit which fires if the base address of an EFI memory descriptor is
-> not aligned to the kernel page size (which might be 4K, 16K, or 64K).
+On 05/24/2016 08:11 PM, Joseph Lo wrote:
+> On 05/23/2016 03:42 PM, Joseph Lo wrote:
+>> As per commit f634da375fc96 ("Documentation: DT bindings: add nvidia,
+>> tegra132-denver compatible string"), fixing the CPU compatible string for
+>> Tegra132 to match the binding document currently.
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>> ---
+>>   arch/arm64/boot/dts/nvidia/tegra132.dtsi | 4 ++--
+>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+>> b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+>> index 2013f8916084..7b1cdc029de3 100644
+>> --- a/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+>> +++ b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+>> @@ -964,13 +964,13 @@
+>>
+>>           cpu at 0 {
+>>               device_type = "cpu";
+>> -            compatible = "nvidia,denver", "arm,armv8";
+>> +            compatible = "nvidia,tegra132-denver", "arm,armv8";
 >
-> On page 38 of the UEFI 2.6 specification it is stated:
+> Hi Stephen, Thierry,
 >
-> 	If a 64KiB physical page contains any 4KiB page with any of the
-> 	following types listed below, then all 4KiB pages in the 64KiB
-> 	page must use identical ARM Memory Page Attributes (as described
-> 	in Table 8):
-> 	? EfiRuntimeServicesCode
-> 	? EfiRuntimeServicesData
-> 	? EfiReserved
-> 	? EfiACPIMemoryNVS
-> 	Mixed attribute mappings within a larger page are not allowed.
->
-> On page 158 of the UEFI 2.6 specification, in the description of a
-> memory descriptor, the PhysicalStart and VirtualStart fields are
-> mandated as being 4K aligned, with NumberOfPages describing the number
-> of 4K pages in the region.
->
-> No further restriction on alignment is provided in the UEFI
-> specification, neither generically nor in a rule specific to AArch64.
->
-> So while attributes within a naturally-aligned 64K region must be
-> consistent across memory descriptors, the regions described by those
-> descriptors are not mandated to be 64K aligned.
->
-> Not being able to apply strict permissions is sub-optimal, and worthy of
-> some notice, but it is not helpful to erroneously suggest that firmware
-> is buggy, nor is it beneficial to have a noisy backtrace at boot time.
+> Should we fix this or fix the compatible string in the binding document
+> as just "nvidia,denver" to represent all the Devner CPU revisions just
+> like some other CPUs did? e.g. arm,cortex-a57, which represents all the
+> A57 revisions.
 
+I would expect compatible to be:
 
+compatible = "nvidia,tegra132-denver", "nvidia,denver", "arm,armv8";
 
->
-> This patch downgrades the WARN_ONCE to a pr_warn_once, and re-words the
-> message to also describe the implication of the insufficient alignment.
+The "nvidia,denver" entry is already present, and hence probably 
+shouldn't be removed. It can represent "Denver 1.0". We should add the 
+T132 entry to indicate the specific implementation. Admittedly right now 
+there's a 1:1 relation between SoC and Denver version. Either/both of 
+those could in theory be required to trigger specific bug-fixes/WARs.
 
-I've been seeing this a lot, and this should help to lower the noise level.
+For later chips which have a different Denver version, I'd expect to see 
+something like:
 
-Reviewed-by: Jeremy Linton <jeremy.linton@arm.com>
+compatible = "nvidia,tegraNNN-denver", "nvidia,denverMMM", "arm,armv8";
 
-Thanks,
-
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Jeremy Linton <jeremy.linton@arm.com>
-> Cc: Leif Lindholm <leif.lindholm@linaro.org>
-> Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: linux-efi at vger.kernel.org
-> ---
->   arch/arm64/kernel/efi.c | 5 +++--
->   1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index 78f5248..95e748e 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -30,14 +30,15 @@ static __init pteval_t create_mapping_protection(efi_memory_desc_t *md)
->   	if (type == EFI_MEMORY_MAPPED_IO)
->   		return PROT_DEVICE_nGnRE;
->
-> -	if (WARN_ONCE(!PAGE_ALIGNED(md->phys_addr),
-> -		      "UEFI Runtime regions are not aligned to 64 KB -- buggy firmware?"))
-> +	if (!PAGE_ALIGNED(md->phys_addr)) {
-> +		pr_warn_once("UEFI Runtime regions insufficiently aligned for strict permissions\n");
->   		/*
->   		 * If the region is not aligned to the page size of the OS, we
->   		 * can not use strict permissions, since that would also affect
->   		 * the mapping attributes of the adjacent regions.
->   		 */
->   		return pgprot_val(PAGE_KERNEL_EXEC);
-> +	}
->
->   	/* R-- */
->   	if ((attr & (EFI_MEMORY_XP | EFI_MEMORY_RO)) ==
->
+... where NNN is the SoC version/name and MMM is the Denver version. 
+There could be extra entries in the property if the new versions are 
+backwards-compatible with old versions.
