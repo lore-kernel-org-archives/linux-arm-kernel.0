@@ -1,69 +1,46 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 25 May 2016 14:13:20 +0200
-Subject: [PATCH 1/2] drm/exynos: g2d: Add support for old S5Pv210 type
-In-Reply-To: <57447BDA.2000004@math.uni-bielefeld.de>
-References: <1464096493-13378-1-git-send-email-k.kozlowski@samsung.com>
- <57445BE5.7060702@math.uni-bielefeld.de> <57445E16.90301@samsung.com>
- <57447BDA.2000004@math.uni-bielefeld.de>
-Message-ID: <574596E0.4090104@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 May 2016 14:18:12 +0200
+Subject: [PATCH V5 6/7] iommu/msm: Use writel_relaxed and add a barrier
+In-Reply-To: <000a01d1b672$93d54690$bb7fd3b0$@codeaurora.org>
+References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
+ <7555154.mU2oTAdECP@wuerfel> <000a01d1b672$93d54690$bb7fd3b0$@codeaurora.org>
+Message-ID: <14302911.qQPb4UMJ8d@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/2016 06:05 PM, Tobias Jakobi wrote:
-> Hello Krzysztof,
+On Wednesday, May 25, 2016 4:15:31 PM CEST Sricharan wrote:
+> >
+> >Any operation that could trigger a DMA from a device is required
+> >to have a barrier preceding it (usually wmb() one implied by writel()),
+> >so this is clearly not about a driver that installs a DMA mapping
+> >before starting a DMA, but I don't see what else it would be.
+> >
 > 
-> 
-> Krzysztof Kozlowski wrote:
->> On 05/24/2016 03:49 PM, Tobias Jakobi wrote:
->>> Hello Krzysztof,
->>>
->>> are you sure that these are the only differences. Because AFAIK there
->>> are quite a few more:
->>> - DMA submission of commands
->>> - blend mode / rounding
->>> - solid fill
->>> - YCrCb support
->>> - and probably more
->>>
->>> One would need to add least split the command list parser into a v3 and
->>> v41 version to accomodate for the differences. In fact userspace/libdrm
->>> would need to know which hw type it currently uses, but you currently
->>> always return 4.1 in the corresponding ioctl.
->>
->> Eh, so probably my patch does not cover fully the support for v3 G2D. I
->> looked mostly at the differences between v3 and v4 in the s5p-g2d driver
->> itself. However you are right that this might be not sufficient because
->> exynos-g2d moved forward and is different than s5p-g2d.
->>
->>> Krzysztof Kozlowski wrote:
->>>> The non-DRM s5p-g2d driver supports two versions of G2D: v3.0 on
->>>> S5Pv210 and v4.x on Exynos 4x12 (or newer). The driver for 3.0 device
->>>> version is doing two things differently:
->>>> 1. Before starting the render process, it invalidates caches (pattern,
->>>>    source buffer and mask buffer). Cache control is not present on v4.x
->>>>    device.
->>>> 2. Scalling is done through StretchEn command (in BITBLT_COMMAND_REG
->>>>    register) instead of SRC_SCALE_CTRL_REG as in v4.x. However the
->>>>    exynos_drm_g2d driver does not implement the scalling so this
->>>>    difference can be eliminated.
->>> Huh? Where did you get this from? Scaling works with the DRM driver.
->>
->> I was looking for the usage of scaling reg (as there is no scaling
->> command). How the scaling is implemented then?
-> Like you said above the drivers work completly different. The DRM one
-> receives a command list that is constructed by userspace (libdrm
-> mostly), copies it to a contiguous buffer and passes the memory address
-> of that buffer to the engine which then works on it. Of course
-> everything is slightly more complex.
-> 
-> You don't see any reference to scaling in the driver because the scaling
-> regs don't need any kind of specific validation.
-> 
-> If you want to know how the command list is constructed, the best way is
-> to look into libdrm. The Exynos specific tests actually cover scaling.
+> Ok, so i was doing this from the idea that, other iommu drivers
+>  where polling on a status bit in their sync call to ensure completion
+> of pending TLB invalidations. But in this case, there is no status bit.
+>  So added a barrier to have no ordering issues before the client
+> triggers the dma operation. But as you say above that it is implicit that
+> the device would have a barrier before starting the trigger, then the
+> barrier here becomes redundant.
 
-Thanks for explanations. The patch is insufficient then and it requires
-much more effort. Please drop the series as of now.
+Ok. There are two more things to note here:
 
-Best regards,
-Krzysztof
+* On other platforms, polling the register is likely required because
+  an MMIO write is "posted", meaning that a sync after writel() will
+  only ensure that it has left the CPU write queue, but it may still be
+  on the bus fabric and whatever side-effects are triggered by the
+  write are normally not guaranteed to be completed even after the
+  'sync'. You need to check the datasheet for your IOMMU to find out
+  whether the 'dsb' instruction actually has any effect on the IOMMU.
+  If not, then neither the barrier that you add here nor the barrier
+  in the following writel() is sufficient.
+
+* The one barrier that is normally required in an IOMMU is between
+  updating the in-memory page tables and the following MMIO store
+  that triggers the TLB flush for that entry. This barrier is
+  implied by writel() but not writel_relaxed(). If you don't have
+  a hardware page table walker in your IOMMU, you don't need to worry
+  about this.
+
+	Arnd
