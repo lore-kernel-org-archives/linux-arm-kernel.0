@@ -1,46 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2016 14:18:12 +0200
-Subject: [PATCH V5 6/7] iommu/msm: Use writel_relaxed and add a barrier
-In-Reply-To: <000a01d1b672$93d54690$bb7fd3b0$@codeaurora.org>
-References: <1463741694-1735-1-git-send-email-sricharan@codeaurora.org>
- <7555154.mU2oTAdECP@wuerfel> <000a01d1b672$93d54690$bb7fd3b0$@codeaurora.org>
-Message-ID: <14302911.qQPb4UMJ8d@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 May 2016 14:33:04 +0200
+Subject: [PATCH 14/20] ARM: sun5i: a13: Add LCD pins
+In-Reply-To: <CAGb2v66g_xZEyOf8ky_TKpT70D_EQwirVKNMQbubT5U2cD8rnw@mail.gmail.com>
+References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1463402840-17062-15-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66g_xZEyOf8ky_TKpT70D_EQwirVKNMQbubT5U2cD8rnw@mail.gmail.com>
+Message-ID: <20160525123304.GD9232@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 25, 2016 4:15:31 PM CEST Sricharan wrote:
+On Tue, May 17, 2016 at 01:13:01AM +0800, Chen-Yu Tsai wrote:
+> >  arch/arm/boot/dts/sun5i-a13.dtsi | 10 ++++++++++
+> >  1 file changed, 10 insertions(+)
 > >
-> >Any operation that could trigger a DMA from a device is required
-> >to have a barrier preceding it (usually wmb() one implied by writel()),
-> >so this is clearly not about a driver that installs a DMA mapping
-> >before starting a DMA, but I don't see what else it would be.
+> > diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> > index 263d46dbc7e6..79b5d513c142 100644
+> > --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> > +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> > @@ -237,6 +237,16 @@
+> >  &pio {
+> >         compatible = "allwinner,sun5i-a13-pinctrl";
 > >
+> > +       lcd_rgb666_pins: lcd_rgb666 at 0 {
+> > +               allwinner,pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
+> > +                                "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
+> > +                                "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
+> > +                                "PD24", "PD25", "PD26", "PD27";
+> > +               allwinner,function = "lcd0";
+> > +               allwinner,drive = <SUN4I_PINCTRL_10_MA>;
 > 
-> Ok, so i was doing this from the idea that, other iommu drivers
->  where polling on a status bit in their sync call to ensure completion
-> of pending TLB invalidations. But in this case, there is no status bit.
->  So added a barrier to have no ordering issues before the client
-> triggers the dma operation. But as you say above that it is implicit that
-> the device would have a barrier before starting the trigger, then the
-> barrier here becomes redundant.
+> Just a thought: would we ever need to increase the drive strength for very high
+> resolutions?
 
-Ok. There are two more things to note here:
+I don't think we need to, but we can always change that later.
 
-* On other platforms, polling the register is likely required because
-  an MMIO write is "posted", meaning that a sync after writel() will
-  only ensure that it has left the CPU write queue, but it may still be
-  on the bus fabric and whatever side-effects are triggered by the
-  write are normally not guaranteed to be completed even after the
-  'sync'. You need to check the datasheet for your IOMMU to find out
-  whether the 'dsb' instruction actually has any effect on the IOMMU.
-  If not, then neither the barrier that you add here nor the barrier
-  in the following writel() is sufficient.
+Applied, thanks!
+Maxime
 
-* The one barrier that is normally required in an IOMMU is between
-  updating the in-memory page tables and the following MMIO store
-  that triggers the TLB flush for that entry. This barrier is
-  implied by writel() but not writel_relaxed(). If you don't have
-  a hardware page table walker in your IOMMU, you don't need to worry
-  about this.
-
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160525/48adf3f9/attachment-0001.sig>
