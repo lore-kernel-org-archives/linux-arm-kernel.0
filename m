@@ -1,48 +1,43 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Wed, 25 May 2016 22:18:31 +0200
-Subject: [PATCH v4 3/3] ARM64: dts: amlogic: gxbb: Enable secure monitor
-In-Reply-To: <1464207511-11786-1-git-send-email-carlo@caione.org>
-References: <1464207511-11786-1-git-send-email-carlo@caione.org>
-Message-ID: <1464207511-11786-4-git-send-email-carlo@caione.org>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 25 May 2016 13:21:45 -0700 (PDT)
+Subject: [PATCH 01/23] all: syscall wrappers: add documentation
+In-Reply-To: <20160525200327.GA22395@yury-N73SV>
+References: <1464048292-30136-2-git-send-email-ynorov@caviumnetworks.com>
+ <20160525.123017.1597296248000772613.davem@davemloft.net>
+ <20160525200327.GA22395@yury-N73SV>
+Message-ID: <20160525.132145.1271448744307448631.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+From: Yury Norov <ynorov@caviumnetworks.com>
+Date: Wed, 25 May 2016 23:03:27 +0300
 
-Add the secure monitor node in the Amlogic Meson GXBB DTSI file to
-enable it.
+> On Wed, May 25, 2016 at 12:30:17PM -0700, David Miller wrote:
+>> From: Yury Norov <ynorov@caviumnetworks.com>
+>> Date: Tue, 24 May 2016 03:04:30 +0300
+>> 
+>> > +To clear that top halves, automatic wrappers are introduced. They clear all
+>> > +required registers before passing control to regular syscall handler.
+>> 
+>> Why have one of these for every single compat system call, rather than
+>> simply clearing the top half of all of these registers unconditionally
+>> in the 32-bit system call trap before the system call is invoked?
+>> 
+>> That's what we do on sparc64.
+>> 
+>> And with that, you only need wrappers for the case where there needs
+>> to be proper sign extention of a 32-bit signed argument.
+> 
+> It was discussed as one of possible solutions. The downside of it is
+> that we cannot pass 64-bit types (like off_t) in single register.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Wrappers can be added for the cases where you'd like to do that.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 76b3b6d..735a751 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -44,6 +44,7 @@
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/gpio/meson-gxbb-gpio.h>
-+#include <dt-bindings/firmware/meson-sm.h>
- 
- / {
- 	compatible = "amlogic,meson-gxbb";
-@@ -98,6 +99,14 @@
- 		method = "smc";
- 	};
- 
-+	firmware {
-+		compatible = "simple-bus";
-+
-+		sm: secure-monitor {
-+			compatible = "amlogic,meson-gxbb-sm";
-+		};
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <GIC_PPI 13
--- 
-2.7.4
+> The other downside is that we clear top halves for every single
+> syscall, and it looks excessive. So, from spark64 and s390 approaches
+> we choosed second.
+
+It's like 4 cpu cycles even on crappy sparc64 cpus which only dual
+issue. :)
+
+And that's a pretty low cost for the benefits if you ask me.
