@@ -1,46 +1,77 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Tue, 24 May 2016 22:37:31 -0500
-Subject: [Patch v5 5/8] firmware: qcom: scm: Convert to streaming DMA APIS
-In-Reply-To: <CAPBZ5Qc0oZ+k_5OiUGU6c9jFfcmAfsK3Uy-s=ONGCSGzCDyYNw@mail.gmail.com>
-References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
- <1463111221-6963-6-git-send-email-andy.gross@linaro.org>
- <CAOi56cVB1Z-gO6Dx0KOSr9wiRF3Y9ahDHe0=qT9WW4MdFMhjng@mail.gmail.com>
- <CAPBZ5Qc0oZ+k_5OiUGU6c9jFfcmAfsK3Uy-s=ONGCSGzCDyYNw@mail.gmail.com>
-Message-ID: <20160525033731.GA30220@hector.attlocal.net>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 25 May 2016 11:36:38 +0800
+Subject: [PATCH 1/1] arm64: fix flush_cache_range
+In-Reply-To: <5744FDD0.8060504@huawei.com>
+References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
+ <20160524130255.GU4892@e104818-lin.cambridge.arm.com>
+ <5744FDD0.8060504@huawei.com>
+Message-ID: <57451DC6.7080106@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2016 at 04:02:06PM -0500, Andy Gross wrote:
-> On 23 May 2016 at 14:26, Kevin Hilman <khilman@kernel.org> wrote:
-> > Hi Andy,
-> >
-> > On Thu, May 12, 2016 at 8:46 PM, Andy Gross <andy.gross@linaro.org> wrote:
-> >> This patch converts the Qualcomm SCM driver to use the streaming DMA APIs
-> >> for communication buffers.
-> >>
-> >> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> >
-> > This patch has landed in linux-next in the form of commit a551c3dbd689
-> > (firmware: qcom: scm: Convert to streaming DMA APIS), and kernelci.org
-> > found some boot breakage in next-20160523 on apq8064[1] which was
-> > bisected down to this commit.
-> >
-> > I reverted this commit on top of next-20160523 and it no longer
-> > builds, so I didn't validate if things boot again with this patch
-> > reverted.
+
+
+On 2016/5/25 9:20, Leizhen (ThunderTown) wrote:
 > 
-> Ouch I missed this failure.  I'll investigate and get it fixed.
+> 
+> On 2016/5/24 21:02, Catalin Marinas wrote:
+>> On Tue, May 24, 2016 at 08:19:05PM +0800, Leizhen (ThunderTown) wrote:
+>>> On 2016/5/24 19:37, Mark Rutland wrote:
+>>>> On Tue, May 24, 2016 at 07:16:37PM +0800, Zhen Lei wrote:
+>>>>> When we ran mprotect04(a test case in LTP) infinitely, it would always
+>>>>> failed after a few seconds. The case can be described briefly that: copy
+>>>>> a empty function from code area into a new memory area(created by mmap),
+>>>>> then call mprotect to change the protection to PROT_EXEC. The syscall
+>>>>> sys_mprotect will finally invoke flush_cache_range, but this function
+>>>>> currently only invalid icache, the operation of flush dcache is missed.
+>>>>
+>>>> In the LTP code I see powerpc-specific D-cache / I-cache synchronisation
+>>>> (i.e. d-cache cleaning followed by I-cache invalidation), so there
+>>>> appears to be some expectation of userspace maintenance. Hoever, there
+>>>> is no such ARM-specific I-cache maintenance.
+>>>
+>>> But I see some other platforms have D-cache maintenance, like: arch/nios2/mm/cacheflush.c
+>>> And according to the name of flush_cache_range, it should do this, I judged. Otherwise,
+>>> mprotect04 will be failed on more platforms, it's easy to discover. Only PPC have specific
+>>> cache synchronization, maybe it meets some hardware limitation. It's impossible a programmer
+>>> fixed a common bug on only one platform but leave others unchanged.
+>>
+>> flush_cache_range() is primarily used on VIVT caches before changing the
+>> mapping and should not really be implemented on arm64. I don't recall
+>> why we still have the I-cache invalidation, possibly for the ASID-tagged
+>> VIVT I-cache case, though we should have a specific check for this.
+>>
+>> There are some other cases where flush_cache_range() is called and no
+>> D-cache maintenance is necessary on arm64, so I don't want to penalise
+>> them by implementing flush_cache_range().
+>>
+>>>> It looks like the test may be missing I-cache maintenance regardless of
+>>>> the semantics of mprotect in this case.
+>>>>
+>>>> I have not yet devled into flush_cache_range and how it is called.
+>>>
+>>> SYSCALL_DEFINE3(mprotect ---> mprotect_fixup ---> change_protection ---> change_protection_range --> flush_cache_range
+>>
+>> The change_protection() shouldn't need to flush the caches in
+>> flush_cache_range(). The change_pte_range() function eventually ends up
+>> calling set_pte_at() which calls __sync_icache_dcache() if the mapping
+>> is executable.
+> 
+> OK, I see.
+> But I'm afraid it entered the "if (pte_present(oldpte))" branch in function change_pte_range.
+> Because the test case called mmap to create pte first, then called pte_modify.
+> I will check it later.
 
-So the root cause was the fact that the DFAB clock required by the SCM is an RPM
-clock.  That support isn't present yet in the kernel, so SCM probe fails.
+I have checked that it entered "if (pte_present(oldpte))" branch.
 
-The core clock is really only accessed so that we can bump the clock on it up to
-the max for performance.  As such, I'll make it optional in the platform code.
+But I don't known why I add flush_icache_range is OK, but add __sync_icache_dcache have no effect.
 
-This does bring up the issue of probe defer causing issues with the spm driver,
-as it calls set_warm_boot_addr.  That may have to be addressed, but is probably
-a problem best fixed in the spm.
-
-Regards,
-
-Andy
+> 
+>>
+>> Can you be more specific about the kernel version you are using, its
+>> configuration?
+>>
+> I used the latest mainline kernel version, and built with arch/arm64/configs/defconfig, ran on our D02 board.
+> I have attached the testcase, you can simply run: sh test.sh
+> 
