@@ -1,8 +1,10 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 May 2016 17:06:33 +0100
-Subject: [PATCH 00/18] Add support for FDMA DMA controller and xp70 rproc
+Date: Wed, 25 May 2016 17:06:34 +0100
+Subject: [PATCH v4 00/18] Add support for FDMA DMA controller and xp70 rproc
  found on STi chipsets
-Message-ID: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+In-Reply-To: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1464192412-16386-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -84,17 +86,17 @@ Changes since v1:
  - Unit address should match reg property (Lee)
 
 Peter Griffin (18):
+  remoteproc: st_xp70_rproc: add a xp70 slimcore rproc driver
+  ARM: multi_v7_defconfig: enable st xp70 rproc driver.
+  MAINTAINERS: Add st xp70 rproc driver to STi section.
   dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
     documentation
-  dmaengine: st_fdma:  Add STMicroelectronics FDMA driver header file
+  dmaengine: st_fdma: Add STMicroelectronics FDMA driver header file
   dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
-  dmaengine: st_fdma: Add xp70 firmware loading mechanism.
-  dmaengine: st_fdma: Add fdma suspend and resume callbacks.
   ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
   MAINTAINERS: Add FDMA driver files to STi section.
   ARM: multi_v7_defconfig: Enable STi FDMA driver
   ASoC: sti: Update DT example to match the driver code
-  ASoC: sti: Update example to include assigned-clocks and mclk-fs
   ARM: multi_v7_defconfig: Enable STi and simple-card drivers.
   ARM: DT: STiH407: Add i2s_out pinctrl configuration
   ARM: DT: STiH407: Add i2s_in pinctrl configuration
@@ -104,21 +106,27 @@ Peter Griffin (18):
   ARM: STi: DT: STiH407: Add uniperif reader dt nodes
   ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi audio card
 
- Documentation/devicetree/bindings/dma/st_fdma.txt  |   87 ++
- .../devicetree/bindings/sound/st,sti-asoc-card.txt |   22 +-
- MAINTAINERS                                        |    1 +
- arch/arm/boot/dts/stih407-family.dtsi              |  164 +++
- arch/arm/boot/dts/stih407-pinctrl.dtsi             |   55 +
- arch/arm/boot/dts/stihxxx-b2120.dtsi               |   40 +
- arch/arm/configs/multi_v7_defconfig                |    4 +
- drivers/dma/Kconfig                                |   12 +
- drivers/dma/Makefile                               |    1 +
- drivers/dma/st_fdma.c                              | 1203 ++++++++++++++++++++
- drivers/dma/st_fdma.h                              |  281 +++++
- 11 files changed, 1863 insertions(+), 7 deletions(-)
+ Documentation/devicetree/bindings/dma/st_fdma.txt  |  87 ++
+ .../devicetree/bindings/sound/st,sti-asoc-card.txt |  20 +-
+ MAINTAINERS                                        |   3 +
+ arch/arm/boot/dts/stih407-family.dtsi              | 165 ++++
+ arch/arm/boot/dts/stih407-pinctrl.dtsi             |  55 ++
+ arch/arm/boot/dts/stihxxx-b2120.dtsi               |  40 +
+ arch/arm/configs/multi_v7_defconfig                |   5 +
+ drivers/dma/Kconfig                                |  12 +
+ drivers/dma/Makefile                               |   1 +
+ drivers/dma/st_fdma.c                              | 882 +++++++++++++++++++++
+ drivers/dma/st_fdma.h                              | 243 ++++++
+ drivers/remoteproc/Kconfig                         |   8 +
+ drivers/remoteproc/Makefile                        |   1 +
+ drivers/remoteproc/st_xp70_rproc.c                 | 380 +++++++++
+ include/linux/remoteproc/st_xp70_rproc.h           |  56 ++
+ 15 files changed, 1948 insertions(+), 10 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
  create mode 100644 drivers/dma/st_fdma.c
  create mode 100644 drivers/dma/st_fdma.h
+ create mode 100644 drivers/remoteproc/st_xp70_rproc.c
+ create mode 100644 include/linux/remoteproc/st_xp70_rproc.h
 
 -- 
 1.9.1
