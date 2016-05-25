@@ -1,47 +1,46 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 May 2016 14:06:37 +0200
-Subject: [PATCH 08/20] drm/sun4i: rgb: panel is an error pointer
-In-Reply-To: <CAGb2v6485nF_e9GeANLsy2Rq1XOn4nV5wD_eWskTmL2ME316+w@mail.gmail.com>
+Date: Wed, 25 May 2016 14:09:15 +0200
+Subject: [PATCH 09/20] drm/sun4i: defer only if we didn't find our panel
+In-Reply-To: <CAGb2v655q_w8s7Eg8xnpzdX9PDxSEhRLvMu3bNOd==U4APgg0Q@mail.gmail.com>
 References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-9-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v6485nF_e9GeANLsy2Rq1XOn4nV5wD_eWskTmL2ME316+w@mail.gmail.com>
-Message-ID: <20160525120637.GB9232@lukather>
+ <1463402840-17062-10-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v655q_w8s7Eg8xnpzdX9PDxSEhRLvMu3bNOd==U4APgg0Q@mail.gmail.com>
+Message-ID: <20160525120915.GC9232@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2016 at 11:51:36AM +0800, Chen-Yu Tsai wrote:
+On Tue, May 17, 2016 at 11:52:10AM +0800, Chen-Yu Tsai wrote:
 > Hi,
 > 
 > On Mon, May 16, 2016 at 8:47 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > In case of an error, our pointer to the drm_panel structure attached to our
-> > encoder will hold an error pointer, not a NULL pointer.
+> > Our code currently defers our probe on any error, even if we were not
+> > expecting to have one at all.
 > >
-> > Make sure we check the right thing.
+> > Make sure we return -EPROBE_DEFER only when we were supposed to have a
+> > panel, but it's not probed yet.
 > >
 > > Fixes: 29e57fab97fc ("drm: sun4i: Add RGB output")
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > > ---
-> >  drivers/gpu/drm/sun4i/sun4i_rgb.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.c | 15 ++++++++-------
+> >  1 file changed, 8 insertions(+), 7 deletions(-)
 > >
-> > diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> > index 923f55039cb1..b46d2c15dc95 100644
-> > --- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> > +++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-> > @@ -217,7 +217,7 @@ int sun4i_rgb_init(struct drm_device *drm)
-> >         int ret;
+> > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > index 9f19b0e08560..eed6a9e8d9a6 100644
+> > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > @@ -429,7 +429,7 @@ static struct drm_panel *sun4i_tcon_find_panel(struct device_node *node)
+> >                 return ERR_PTR(-EINVAL);
+> >         }
 > >
-> >         /* If we don't have a panel, there's no point in going on */
-> > -       if (!tcon->panel)
-> > +       if (IS_ERR(tcon->panel))
+> > -       return of_drm_find_panel(remote);
+> > +       return of_drm_find_panel(remote) ?: ERR_PTR(-EPROBE_DEFER);
 > 
-> Without the next patch, tcon->panel could be the result of of_drm_find_panel(),
-> which could be NULL.
-> 
-> Use IS_ERR_OR_NULL here, or reorder/squash the patches.
+> There's also a typo in the DRM_DEBUG_DRIVER call a few lines up. Could you
+> fix it as well?
 
-Switched the order, and applied both, thanks!
+Done, thanks!
 Maxime
 
 -- 
@@ -54,4 +53,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160525/c766743b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160525/7695e4da/attachment.sig>
