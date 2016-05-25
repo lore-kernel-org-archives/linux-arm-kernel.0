@@ -1,69 +1,48 @@
-From: lokeshvutla@ti.com (Lokesh Vutla)
-Date: Wed, 25 May 2016 15:23:58 +0530
-Subject: [PATCH] ARM: omap2: am437x: rollback to use
- omap3_gptimer_timer_init()
-In-Reply-To: <20160412184250.GT5995@atomide.com>
-References: <1460457775-23850-1-git-send-email-grygorii.strashko@ti.com>
- <20160412160448.GN5995@atomide.com> <570D3EC8.7090807@ti.com>
- <20160412184250.GT5995@atomide.com>
-Message-ID: <57457636.3010409@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 25 May 2016 12:06:24 +0200
+Subject: [PATCH] hwrng: stm32 - fix build warning
+In-Reply-To: <5745085D.6000104@gmail.com>
+References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
+ <6297051.TAxtzW5OIB@wuerfel> <5745085D.6000104@gmail.com>
+Message-ID: <7211115.EdoBLRGZ1i@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday, May 25, 2016 7:35:17 AM CEST Sudip Mukherjee wrote:
+> On Tuesday 24 May 2016 02:05 AM, Arnd Bergmann wrote:
+> > On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
+> >> We have been getting build warning about:
+> >> drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
+> >> drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
+> >>                                      uninitialized in this function
+> >>
+> >> On checking the code it turns out that sr can never be used
+> >> uninitialized as sr is getting initialized in the while loop and while
+> >> loop will always execute as the minimum value of max can be 32.
+> >> So just initialize sr to 0 while declaring it to silence the compiler.
+> >>
+> >> Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
+> >> ---
+> >
+> > I notice that you are using a really old compiler. While this warning
+> > seems to be valid in the sense that the compiler should figure out that
+> > the variable might be used uninitialized, please update your toolchain
+> > before reporting other such problems, as gcc-4.6 had a lot more false
+> > positives that newer ones (5.x or 6.x) have.
+> 
+> yes, i need to upgrade gcc in my travis bot. But in my local system I am 
+> having gcc-4.8.4 and there also I am having this error and i am sure 
+> 4.8.4 is still being used by many people.
 
+Right, the change from gcc-4.8 to 4.9 is what drastically changed hte
+maybe-uninitialized warnings, introducing a number of additional warnings
+(many of them correct) but removing many others (mostly false positives).
+I tend to care only about the ones in 4.9+ for this reason. I haven't
+run statistics on this in a while, but I guess we could consider turning
+off this warning for 4.8 and earlier (though IIRC the switch to turn it
+off only appeared in 4.9).
 
-On Wednesday 13 April 2016 12:12 AM, Tony Lindgren wrote:
-> * Grygorii Strashko <grygorii.strashko@ti.com> [160412 11:31]:
->> On 04/12/2016 07:04 PM, Tony Lindgren wrote:
->>> * Grygorii Strashko <grygorii.strashko@ti.com> [160412 03:44]:
->>>> The commit 55ee7017ee31 ("arm: omap2: board-generic: use
->>>> omap4_local_timer_init for AM437x") unintentionally changes the
->>>> clocksource devices for AM437x from OMAP GP Timer to SyncTimer32K.
->>>>
->>>> Unfortunately, the SyncTimer32K is starving from frequency deviation
->>>> as mentioned in commit 5b5c01359152 ("ARM: OMAP2+: AM43x: Use gptimer
->>>> as clocksource") and, as reported by Franklin [1], even its monotonic
->>>> nature is under question (most probably there is a HW issue, but it's
->>>> still under investigation).
->>>>
->>>> Taking into account above facts It's reasonable to rollback to the use
->>>> of omap3_gptimer_timer_init().
->>>
->>> I thought only the ePOS EVM does not have the 32k clock available?
->>> Maybe this is the the old sync timer autocorrection drift issue?
->>>
->>
->> May be, as i mentioned in [1] it could be errata same as for Watchdog
->> Advisory 22 (or OMAP_TIMER_ERRATA_I103_I767).
->>
->> But as per commit 5b5c01359152 ("ARM: OMAP2+: AM43x: Use gptimer
->> as clocksource") there is no reason to use SyncTimer32K as
->> clocksource any way (not only on epos):
->>
->> commit 5b5c01359152f3ddaa1aa0e5d1141bc2b29ba2c5
->> Author: Rajendra Nayak <rnayak@ti.com>
->> Date:   Fri Feb 7 15:51:26 2014 +0530
->>
->>     ARM: OMAP2+: AM43x: Use gptimer as clocksource
->>     
->>     The SyncTimer in AM43x is clocked using the following two sources:
->>     1) An inaccuarte 32k clock (CLK_32KHZ) derived from PER DPLL, causing system
->>        time to go slowly (~10% deviation).
->> ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+BTW, regarding your build infrastructure, I'd also recommend building
+with 'make -s' to make the output more compact.
 
-I don't think this statement is right. If clock from PER DPLL is
-inaccurate then all the IPs which uses PER DPLL are in danger. It is the
-On-Chip 32K RC Osc clock that is not an accurate clock-source as per the
-design/spec.
-
->>     2) external 32KHz RTC clock, which may not always be available on board like
->>        in the case of ePOS EVM
-
-Also this 32KHz RTC clock is not enabled by default and is handled by RTC.
-
-IMO, it is better to change the clock source of sync timer to
-CLK_32KHz(like it is done in case of am43x-epos). Or do you have any
-other reason to shift to gptimer?
-
-Thanks and regards,
-Lokesh
+	Arnd
