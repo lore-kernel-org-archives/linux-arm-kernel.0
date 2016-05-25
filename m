@@ -1,80 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2016 20:29:40 +0200
-Subject: [PATCH v3] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <20160525173419.GA7510@rob-hp-laptop>
-References: <1464067268-35299-1-git-send-email-navam@xilinx.com>
- <C89496FEAE474D468F30D558A9468D9F26CED772@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20160525173419.GA7510@rob-hp-laptop>
-Message-ID: <5392766.vCAWrASuOA@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 May 2016 13:46:12 -0500
+Subject: [PATCH 1/3] dt-bindings: add bindings documentation for PDC
+ driver.
+In-Reply-To: <1464113250-15629-2-git-send-email-rob.rice@broadcom.com>
+References: <1464113250-15629-1-git-send-email-rob.rice@broadcom.com>
+ <1464113250-15629-2-git-send-email-rob.rice@broadcom.com>
+Message-ID: <20160525184612.GA12110@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 25, 2016 12:34:19 PM CEST Rob Herring wrote:
-> On Tue, May 24, 2016 at 11:47:31AM +0000, Nava kishore Manne wrote:
-> > 
-> > 
-> > > -----Original Message-----
-> > > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > > Sent: Tuesday, May 24, 2016 2:21 PM
-> > > To: Nava kishore Manne <navam@xilinx.com>
-> > > Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> > > ijc+devicetree at hellion.org.uk; galak at codeaurora.org; Michal Simek
-> > > <michals@xilinx.com>; Soren Brinkmann <sorenb@xilinx.com>;
-> > > balbi at ti.com; gregkh at linuxfoundation.org; Hyun Kwon
-> > > <hyunk@xilinx.com>; Nava kishore Manne <navam@xilinx.com>; Radhey
-> > > Shyam Pandey <radheys@xilinx.com>; devicetree at vger.kernel.org; linux-
-> > > arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> > > Subject: Re: [PATCH v3] Axi-usb: Add support for 64-bit addressing.
-> > > 
-> > > On Tuesday, May 24, 2016 10:51:08 AM CEST Nava kishore Manne wrote:
-> > > > diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > > > b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > > > index 47b4e39..09df757 100644
-> > > > --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > > > +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> > > > @@ -1,18 +1,23 @@
-> > > >  Xilinx USB2 device controller
-> > > >
-> > > >  Required properties:
-> > > > -- compatible             : Should be "xlnx,usb2-device-4.00.a"
-> > > > +- compatible             : Should be "xlnx,usb2-device-4.00.a" or
-> > > > +                   "xlnx,usb2-device-5.00"
-> > > >  - reg                    : Physical base address and size of the USB2
-> > > >                     device registers map.
-> > > >  - interrupts             : Should contain single irq line of USB2 device
-> > > >                     controller
-> > > >  - xlnx,has-builtin-dma   : if DMA is included
-> > > > +- dma-ranges             : Should be as the following
-> > > > +                   <child-bus-address, parent-bus-address, length>
-> > > 
-> > > A USB host should not have any children that are DMA capable, I think, so
-> > > this property doesn't make sense here. It should be part of the parent bus.
-> > > 
-> > Will send next version (v4) by removing this property from the DT.
-> > 
-> > > > +- xlnx,addrwidth : Should be the dma addressing size in bits(ex: 64
-> > > bits)
-> > > 
-> > > I'm still unconvinced about the property definition here. What are the
-> > > possible options for the IP block? I don't think I ever saw a reply from you to
-> > > my earlier questions.
-> > > 
-> > 
-> > Sorry Let me clearly explain
-> > 
-> > From the IP version 5.0 onwards The IP support both 32-bit and 64-bit addressing.
-> > But the older version of the IP's supports only 32-bit addressing.
-> > 
-> > This addrwidth property differentiates the address width for the new IP (I mean 5.0 version on wards)
-> > For older IP it will be always 32-bit.
+On Tue, May 24, 2016 at 02:07:28PM -0400, Rob Rice wrote:
+> From: Rob Rice <rrice@broadcom.com>
 > 
-> Then I think you should have a simple boolean property for 64-bit 
-> configuration.
+> Add the device tree binding documentation for the PDC hardware
+> in Broadcom iProc SoCs.
+> 
+> Signed-off-by: Rob Rice <rob.rice@broadcom.com>
+> Reviewed-by: Ray Jui <ray.jui@broadcom.com>
+> Reviewed-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Scott Branden <scott.branden@broadcom.com>
+> ---
+>  .../bindings/mailbox/brcm,iproc-pdc-mbox.txt       | 23 ++++++++++++++++++++++
+>  1 file changed, 23 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/brcm,iproc-pdc-mbox.txt
 
-I think matching on the version number is slightly better, as we have the version
-already and it identifies whether the register exists.
-
-Having a boolean property of course works as well, it just duplicates that
-information.
-
-	Arnd
+Acked-by: Rob Herring <robh@kernel.org>
