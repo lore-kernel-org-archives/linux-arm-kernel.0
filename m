@@ -1,48 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2016 12:06:24 +0200
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <5745085D.6000104@gmail.com>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
- <6297051.TAxtzW5OIB@wuerfel> <5745085D.6000104@gmail.com>
-Message-ID: <7211115.EdoBLRGZ1i@wuerfel>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 25 May 2016 12:14:23 +0200
+Subject: [PATCH v2 1/4] reset: Add support for the Amlogic Meson SoC
+ Reset Controller
+In-Reply-To: <1464169758-26975-2-git-send-email-narmstrong@baylibre.com>
+References: <1464169758-26975-1-git-send-email-narmstrong@baylibre.com>
+ <1464169758-26975-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1464171263.3545.40.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 25, 2016 7:35:17 AM CEST Sudip Mukherjee wrote:
-> On Tuesday 24 May 2016 02:05 AM, Arnd Bergmann wrote:
-> > On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
-> >> We have been getting build warning about:
-> >> drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
-> >> drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
-> >>                                      uninitialized in this function
-> >>
-> >> On checking the code it turns out that sr can never be used
-> >> uninitialized as sr is getting initialized in the while loop and while
-> >> loop will always execute as the minimum value of max can be 32.
-> >> So just initialize sr to 0 while declaring it to silence the compiler.
-> >>
-> >> Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
-> >> ---
-> >
-> > I notice that you are using a really old compiler. While this warning
-> > seems to be valid in the sense that the compiler should figure out that
-> > the variable might be used uninitialized, please update your toolchain
-> > before reporting other such problems, as gcc-4.6 had a lot more false
-> > positives that newer ones (5.x or 6.x) have.
+Hi Neil,
+
+looks fine, just two comments below.
+
+Am Mittwoch, den 25.05.2016, 11:49 +0200 schrieb Neil Armstrong:
+> This patch adds the platform driver for the Amlogic Meson SoC Reset
+> Controller.
 > 
-> yes, i need to upgrade gcc in my travis bot. But in my local system I am 
-> having gcc-4.8.4 and there also I am having this error and i am sure 
-> 4.8.4 is still being used by many people.
+> The Meson8b and GXBB SoCs are supported.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/reset/Makefile      |   1 +
+>  drivers/reset/reset-meson.c | 137 ++++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 138 insertions(+)
+>  create mode 100644 drivers/reset/reset-meson.c
+> 
+[...]
+> diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
+> new file mode 100644
+> index 0000000..98087ae
+> --- /dev/null
+> +++ b/drivers/reset/reset-meson.c
+[...]
+> +static int meson_reset_reset(struct reset_controller_dev *rcdev,
+> +			      unsigned long id)
+> +{
+> +	struct meson_reset *data =
+> +		container_of(rcdev, struct meson_reset, rcdev);
+> +	unsigned int bank = id / BITS_PER_REG;
+> +	unsigned int offset = id % BITS_PER_REG;
+> +	void *reg_addr = data->reg_base + (bank << 2);
 
-Right, the change from gcc-4.8 to 4.9 is what drastically changed hte
-maybe-uninitialized warnings, introducing a number of additional warnings
-(many of them correct) but removing many others (mostly false positives).
-I tend to care only about the ones in 4.9+ for this reason. I haven't
-run statistics on this in a while, but I guess we could consider turning
-off this warning for 4.8 and earlier (though IIRC the switch to turn it
-off only appeared in 4.9).
+We lost the __iomem here.
 
-BTW, regarding your build infrastructure, I'd also recommend building
-with 'make -s' to make the output more compact.
+> +
+> +	if (bank >= REG_COUNT)
+> +		return -EINVAL;
+> +
+> +	writel(BIT(offset), reg_addr);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct reset_control_ops meson_reset_ops = {
+> +	.reset		= meson_reset_reset,
+> +};
+> +
+> +static const struct of_device_id meson_reset_dt_ids[] = {
+> +	 { .compatible = "amlogic,meson8b-reset", },
+> +	 { .compatible = "amlogic,meson-gxbb-reset", },
+> +	 { /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, meson_reset_dt_ids);
+[...]
+> +MODULE_ALIAS("platform:meson_reset");
 
-	Arnd
+And I think you can drop the MODULE_ALIAS since of: modaliases will be
+generated from the MODULE_DEVICE_TABLE above. This driver is only ever
+going to be probed from device tree, isn't it?
+
+> +MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
+> +MODULE_DESCRIPTION("Amlogic Meson Reset Controller driver");
+> +MODULE_LICENSE("Dual BSD/GPL");
+
+regards
+Philipp
