@@ -1,50 +1,30 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 25 May 2016 09:48:25 +0900
-Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
- support
-In-Reply-To: <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
-References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
- <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
- <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
-Message-ID: <20160525004825.GC7292@verge.net.au>
+Date: Wed, 25 May 2016 10:01:51 +0900
+Subject: [PATCH] ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on
+ all SoCs
+In-Reply-To: <1463498133-23918-1-git-send-email-geert+renesas@glider.be>
+References: <1463498133-23918-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160525010150.GD7292@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
-
-On Tue, May 24, 2016 at 07:30:17AM +0200, Dirk Behme wrote:
-> Hi Simon,
-
-[...]
-
-> With Renesas R-Car3 we will get a whole family of SoCs. I.e. different
-> computing power (e.g. different number of Cores) with more or less similar
-> peripherals.
+On Tue, May 17, 2016 at 05:15:33PM +0200, Geert Uytterhoeven wrote:
+> Currently the different SoCs in the R-Car Gen2 family use different
+> types of on-chip RAM for the jump stub:
+>   - R-Car H2 uses Media RAM,
+>   - R-Car M2-W uses another type of optional On-chip RAM, as it doesn't
+>     have Media RAM,
+>   - R-Car M2-N uses Inter Connect RAM in Magnus Damm's "ARM: shmobile:
+>     r8a7793 boot address update".
 > 
-> I would think that we want to reflect this in the device tree, too.
-> Therefore I think what we want is a hierarchy of device trees. Similar
-> what's done with other SoC families (compare e.g. i.MX6).
+> As all R-Car Gen2 SoCs have 4 KiB of Inter Connect RAM, consolidate the
+> code by always using that.
 > 
-> E.g. we want an initial rcar3.dtsi, which contains all common parts of all
-> R-Car3 SoCs. E.g. one CA57 core, the SCIF where its common etc.
-> 
-> Then you will have the r8a779x.dtsi which includes the rcar3.dtsi and
-> extends it for SoC specific parts. Which then will be included by the board
-> device trees, as already done, now.
-> 
-> Or in other words: As soon as you have similar parts in the r8a779x.dtsi's,
-> it's time to think about moving the parts one hierarchy level up into the
-> rcar3.dtsi. Else you will end up in a maintenance hell once you have to
-> change/fix anything.
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> Tested on r8a7790/lager and r8a7791/koelsch.
+> ---
+>  arch/arm/mach-shmobile/pm-rcar-gen2.c | 13 ++++---------
+>  1 file changed, 4 insertions(+), 9 deletions(-)
 
-Thanks for raising this issue.
-
-I agree entirely that we should work towards a situation where maintenance
-is as easy as it can be. However, due to the per-SoC binding scheme that
-we are using for IP related to Renesas SoCs I suspect that very few DT nodes
-can be shared between SoCs verbatim.
-
-Probably some sort of scheme can be cooked up using preprocessor macros.
-And probably there are other ways to resolve this problem. But I would
-prefer if we worked towards resolving this maintenance problem in parallel
-with rather than as a dependency of merging r8a7796 support into mainline.
+Thanks, I have queued this up.
