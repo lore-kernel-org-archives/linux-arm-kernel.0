@@ -1,77 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 25 May 2016 17:21:01 +0300
-Subject: [PATCH v4 7/7] ARM: OMAP2+: McBSP: Remove the old iclk allow/deny
- idle code
-In-Reply-To: <1464186061-28639-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1464186061-28639-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1464186061-28639-8-git-send-email-peter.ujfalusi@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 May 2016 15:26:33 +0100
+Subject: [PATCH v2 1/7] KVM: arm/arm64: vgic-v2: Clear all dirty LRs
+In-Reply-To: <1464186399-16604-1-git-send-email-marc.zyngier@arm.com>
+References: <1464186399-16604-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1464186399-16604-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new pdata callback (force_ick_on) is now used by the driver and the old
-callback related code can be removed.
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+When saving the state of the list registers, it is critical to
+reset them zero, as we could otherwise leave unexpected EOI
+interrupts pending for virtual level interrupts.
+
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-omap2/mcbsp.c                 | 18 ------------------
- include/linux/platform_data/asoc-ti-mcbsp.h |  1 -
- 2 files changed, 19 deletions(-)
+ virt/kvm/arm/hyp/vgic-v2-sr.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index edf4f41c0135..fc04be74e064 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -34,20 +34,6 @@
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index a3f12b3..3a3a699 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -100,12 +100,11 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ 		if (!(vcpu->arch.vgic_cpu.live_lrs & (1UL << i)))
+ 			continue;
  
--static struct clk *mcbsp_iclks[5];
--
--static int omap3_enable_st_clock(unsigned int id, bool enable)
--{
--	/*
--	 * Sidetone uses McBSP ICLK - which must not idle when sidetones
--	 * are enabled or sidetones start sounding ugly.
--	 */
--	if (enable)
--		return omap2_clk_deny_idle(mcbsp_iclks[id]);
--	else
--		return omap2_clk_allow_idle(mcbsp_iclks[id]);
--}
--
- static int omap3_mcbsp_force_ick_on(struct clk *clk, bool force_on)
- {
- 	if (!clk)
-@@ -75,7 +61,6 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	struct omap_hwmod *oh_device[2];
- 	struct omap_mcbsp_platform_data *pdata = NULL;
- 	struct platform_device *pdev;
--	char clk_name[11];
+-		if (cpu_if->vgic_elrsr & (1UL << i)) {
++		if (cpu_if->vgic_elrsr & (1UL << i))
+ 			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
+-			continue;
+-		}
++		else
++			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
  
- 	sscanf(oh->name, "mcbsp%d", &id);
- 
-@@ -116,10 +101,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	if (oh->dev_attr) {
- 		oh_device[1] = omap_hwmod_lookup((
- 		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
--		pdata->enable_st_clock = omap3_enable_st_clock;
- 		pdata->force_ick_on = omap3_mcbsp_force_ick_on;
--		sprintf(clk_name, "mcbsp%d_ick", id);
--		mcbsp_iclks[id] = clk_get(NULL, clk_name);
- 		count++;
+-		cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+ 		writel_relaxed(0, base + GICH_LR0 + (i * 4));
  	}
- 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
-diff --git a/include/linux/platform_data/asoc-ti-mcbsp.h b/include/linux/platform_data/asoc-ti-mcbsp.h
-index 5530971abf4d..e684543254f3 100644
---- a/include/linux/platform_data/asoc-ti-mcbsp.h
-+++ b/include/linux/platform_data/asoc-ti-mcbsp.h
-@@ -44,7 +44,6 @@ struct omap_mcbsp_platform_data {
- 	/* McBSP platform and instance specific features */
- 	bool has_wakeup; /* Wakeup capability */
- 	bool has_ccr; /* Transceiver has configuration control registers */
--	int (*enable_st_clock)(unsigned int, bool);
- 	int (*force_ick_on)(struct clk *clk, bool force_on);
- };
- 
+ }
 -- 
-2.8.2
+2.1.4
