@@ -1,36 +1,52 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 25 May 2016 14:28:21 -0700 (PDT)
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <6407614.fdv5XFSBue@wuerfel>
-References: <6293194.tGy03QJ9ME@wuerfel>
- <20160525.135039.244098606649448826.davem@davemloft.net>
- <6407614.fdv5XFSBue@wuerfel>
-Message-ID: <20160525.142821.1719403997976778673.davem@davemloft.net>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 25 May 2016 14:45:00 -0700
+Subject: interrupts properties and API usage with GPIO controllers/Device Tree
+Message-ID: <57461CDC.603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Wed, 25 May 2016 23:01:06 +0200
+Hi Linus, Gregory,
 
-> On Wednesday, May 25, 2016 1:50:39 PM CEST David Miller wrote:
->> From: Arnd Bergmann <arnd@arndb.de>
->> Date: Wed, 25 May 2016 22:47:33 +0200
->> 
->> > If we use the normal calling conventions, we could remove these overrides
->> > along with the respective special-case handling in glibc. None of them
->> > look particularly performance-sensitive, but I could be wrong there.
->> 
->> You could set the lowest bit in the system call entry pointer to indicate
->> the upper-half clears should be elided.
-> 
-> Right, but that would introduce an extra conditional branch in the syscall
-> hotpath, and likely eliminate the gains from passing the loff_t arguments
-> in a single register instead of a pair.
+Recently came across an use case that looks like the following:
 
-Ok, then, how much are you really gaining from avoiding a 'shift' and
-an 'or' to build the full 64-bit value?  3 cycles?  Maybe 4?
+gpio0: gpio at deadbeef {
+	compatible = "brcm,brcmstb-gpio";
+	#interrrupt-cells = <2>;
+	#gpio-cells = <2>;
+	gpio-controller;
+	interrupt-controller;
+	...
+};
 
-And the executing the wrappers, those have a non-trivial cost too.
+test at cafeb00b {
+	interrupt-parent = <&gpio0>;
+	interrupts = <99 3>;
+};
 
-Cost wise, this seems like it all cancels out in the end, but what
-do I know?
+The driver consuming the test node's interrupts property tries to get
+the interrupt by using platform_get_irq() or of_irq_parse_and_map() and
+in the case of the gpio-brcmstb.c, this fails because the interrupt is
+out of range  as flagged by kernel/irq/irqdomain.c::irq_domain_associate.
+
+Unlike other GPIO provider drivers gpio-brcmstb.c, this driver registers
+one gpiolib irqchip per each of its banks, and still uses the generic
+map/unmap functions for its irq_domain_ops, so there is no way we can
+provide a valid mapping outside of the gpio_to_irq() function
+unfortunately since gpiochip_irq_map() does
+
+So here are a few questions for either of you:
+
+- is this a valid API and Device Tree use case: call
+of_irq_parse_and_map on an "interrupts" property which has not been
+acquired using the GPIO API and then gpio_to_irq? While gpio_to_irq()
+works, are not we losing the second specifier in the interrupt cells
+about what kind of interrupt type this is?
+
+- would it be acceptable to export gpiochip_irq_map and
+gpiochip_irq_export to make them accessible as helpers so we could just
+wrap things a bit around or should I just open code the same things and
+allow gpiochip_irqchip_add to be passed custom irq_domain_ops for instance?
+
+Thanks!
+-- 
+Florian
