@@ -1,69 +1,91 @@
-From: rk@ti.com (Ravikumar Kattekola)
-Date: Wed, 25 May 2016 18:23:40 +0530
-Subject: [PATCH 1/2] arm: dra7: Add hwmod entry for i2c6
-In-Reply-To: <20160525125341.10044-1-rk@ti.com>
-References: <20160525125341.10044-1-rk@ti.com>
-Message-ID: <20160525125341.10044-2-rk@ti.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Wed, 25 May 2016 14:59:48 +0200
+Subject: [PATCH 1/2] drm/exynos: g2d: Add support for old S5Pv210 type
+In-Reply-To: <574596E0.4090104@samsung.com>
+References: <1464096493-13378-1-git-send-email-k.kozlowski@samsung.com>
+ <57445BE5.7060702@math.uni-bielefeld.de> <57445E16.90301@samsung.com>
+ <57447BDA.2000004@math.uni-bielefeld.de> <574596E0.4090104@samsung.com>
+Message-ID: <5745A1C4.6060405@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dra72x device has i2c6 controller.
-Adding hwmod definition for the same.
+Hey Krzysztof,
 
-Reference DRA72x TRM [ SPRUHP2Q ]
 
-Signed-off-by: Ravikumar Kattekola <rk@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Krzysztof Kozlowski wrote:
+> On 05/24/2016 06:05 PM, Tobias Jakobi wrote:
+>> Hello Krzysztof,
+>>
+>>
+>> Krzysztof Kozlowski wrote:
+>>> On 05/24/2016 03:49 PM, Tobias Jakobi wrote:
+>>>> Hello Krzysztof,
+>>>>
+>>>> are you sure that these are the only differences. Because AFAIK there
+>>>> are quite a few more:
+>>>> - DMA submission of commands
+>>>> - blend mode / rounding
+>>>> - solid fill
+>>>> - YCrCb support
+>>>> - and probably more
+>>>>
+>>>> One would need to add least split the command list parser into a v3 and
+>>>> v41 version to accomodate for the differences. In fact userspace/libdrm
+>>>> would need to know which hw type it currently uses, but you currently
+>>>> always return 4.1 in the corresponding ioctl.
+>>>
+>>> Eh, so probably my patch does not cover fully the support for v3 G2D. I
+>>> looked mostly at the differences between v3 and v4 in the s5p-g2d driver
+>>> itself. However you are right that this might be not sufficient because
+>>> exynos-g2d moved forward and is different than s5p-g2d.
+>>>
+>>>> Krzysztof Kozlowski wrote:
+>>>>> The non-DRM s5p-g2d driver supports two versions of G2D: v3.0 on
+>>>>> S5Pv210 and v4.x on Exynos 4x12 (or newer). The driver for 3.0 device
+>>>>> version is doing two things differently:
+>>>>> 1. Before starting the render process, it invalidates caches (pattern,
+>>>>>    source buffer and mask buffer). Cache control is not present on v4.x
+>>>>>    device.
+>>>>> 2. Scalling is done through StretchEn command (in BITBLT_COMMAND_REG
+>>>>>    register) instead of SRC_SCALE_CTRL_REG as in v4.x. However the
+>>>>>    exynos_drm_g2d driver does not implement the scalling so this
+>>>>>    difference can be eliminated.
+>>>> Huh? Where did you get this from? Scaling works with the DRM driver.
+>>>
+>>> I was looking for the usage of scaling reg (as there is no scaling
+>>> command). How the scaling is implemented then?
+>> Like you said above the drivers work completly different. The DRM one
+>> receives a command list that is constructed by userspace (libdrm
+>> mostly), copies it to a contiguous buffer and passes the memory address
+>> of that buffer to the engine which then works on it. Of course
+>> everything is slightly more complex.
+>>
+>> You don't see any reference to scaling in the driver because the scaling
+>> regs don't need any kind of specific validation.
+>>
+>> If you want to know how the command list is constructed, the best way is
+>> to look into libdrm. The Exynos specific tests actually cover scaling.
+> 
+> Thanks for explanations. The patch is insufficient then and it requires
+> much more effort. Please drop the series as of now.
+If you intend to add support for v3 hardware we might want to join
+forces. I have an (ongoing) rewrite of the driver to enable additional
+functionality and to make it more suitable to provide EXA for a X11 DDX.
+However this breaks the existing API and rewrites quite a bit of the driver
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-index d0e7e525..b84c0f7 100644
---- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
-@@ -1127,6 +1127,20 @@ static struct omap_hwmod dra7xx_i2c5_hwmod = {
- 	.dev_attr	= &i2c_dev_attr,
- };
- 
-+/* i2c6 */
-+static struct omap_hwmod dra7xx_i2c6_hwmod = {
-+	.name		= "i2c6",
-+	.class		= &dra7xx_i2c_hwmod_class,
-+	.clkdm_name	= "l4per2_clkdm",
-+	.flags		= HWMOD_16BIT_REG | HWMOD_SET_DEFAULT_CLOCKACT,
-+	.main_clk	= "func_96m_fclk",
-+	.prcm = {
-+		.omap4 = {
-+		},
-+	},
-+	.dev_attr	= &i2c_dev_attr,
-+};
-+
- /*
-  * 'mailbox' class
-  *
-@@ -3186,6 +3200,14 @@ static struct omap_hwmod_ocp_if dra7xx_l4_per1__i2c5 = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
- };
- 
-+/* l4_per2 -> i2c6 */
-+static struct omap_hwmod_ocp_if dra7xx_l4_per2__i2c6 = {
-+	.master		= &dra7xx_l4_per2_hwmod,
-+	.slave		= &dra7xx_i2c6_hwmod,
-+	.clk		= "l3_iclk_div",
-+	.user		= OCP_USER_MPU | OCP_USER_SDMA,
-+};
-+
- /* l4_cfg -> mailbox1 */
- static struct omap_hwmod_ocp_if dra7xx_l4_cfg__mailbox1 = {
- 	.master		= &dra7xx_l4_cfg_hwmod,
-@@ -3857,6 +3879,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
- 	&dra7xx_l4_per1__i2c3,
- 	&dra7xx_l4_per1__i2c4,
- 	&dra7xx_l4_per1__i2c5,
-+	&dra7xx_l4_per2__i2c6,
- 	&dra7xx_l4_cfg__mailbox1,
- 	&dra7xx_l4_per3__mailbox2,
- 	&dra7xx_l4_per3__mailbox3,
--- 
-2.8.2.396.g5fe494c
+Here's what's there so far.
+https://github.com/tobiasjakobi/linux-odroid-public/compare/e35ca9aca1214c5e104e6906c1d9affeb80fe5df...3d1ddb86db73b0d664f3e339709e8e8dacdc8e91
+
+And here's the DDX:
+https://github.com/tobiasjakobi/xf86-video-armsoc/commits/g2d
+
+
+With best wishes,
+Tobias
+
+
+
+> 
+> Best regards,
+> Krzysztof
+> 
