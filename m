@@ -1,39 +1,32 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 25 May 2016 17:06:37 +0100
-Subject: [PATCH v4 03/18] MAINTAINERS: Add st xp70 rproc driver to STi section.
+Date: Wed, 25 May 2016 17:06:36 +0100
+Subject: [PATCH v4 02/18] ARM: multi_v7_defconfig: enable st xp70 rproc driver.
 In-Reply-To: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
 References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1464192412-16386-5-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1464192412-16386-4-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the xp70 rproc driver to the STi section
-of the MAINTAINERS file.
+This is used by other device drivers whose IP is based
+around the xp70 slim core (such as fdma) to load and
+boot the firmware in the slimcore.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- MAINTAINERS | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 61a323a..de99aec 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1647,6 +1647,7 @@ F:	drivers/phy/phy-miphy365x.c
- F:	drivers/phy/phy-stih407-usb.c
- F:	drivers/phy/phy-stih41x-usb.c
- F:	drivers/pinctrl/pinctrl-st.c
-+F:	drivers/remoteproc/st_xp70_rproc.c
- F:	drivers/reset/sti/
- F:	drivers/rtc/rtc-st-lpc.c
- F:	drivers/tty/serial/st-asc.c
-@@ -1655,6 +1656,7 @@ F:	drivers/usb/host/ehci-st.c
- F:	drivers/usb/host/ohci-st.c
- F:	drivers/watchdog/st_lpc_wdt.c
- F:	drivers/ata/ahci_st.c
-+F:	include/linux/remoteproc/st_xp70_rproc.h
- 
- ARM/STM32 ARCHITECTURE
- M:	Maxime Coquelin <mcoquelin.stm32@gmail.com>
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2823490..d319d8f 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -503,6 +503,7 @@ CONFIG_REGULATOR_TPS6586X=y
+ CONFIG_REGULATOR_TPS65910=y
+ CONFIG_REGULATOR_TWL4030=y
+ CONFIG_REGULATOR_VEXPRESS=y
++CONFIG_ST_XP70_REMOTEPROC=m
+ CONFIG_MEDIA_SUPPORT=m
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_CONTROLLER=y
 -- 
 1.9.1
