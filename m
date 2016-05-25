@@ -1,53 +1,48 @@
-From: tthayer@opensource.altera.com (tthayer at opensource.altera.com)
-Date: Wed, 25 May 2016 11:29:43 -0500
-Subject: [PATCH 5/5] ARM: dts: Move Arria10 SDRAM as child of ECC Manager
-In-Reply-To: <1464193783-5071-1-git-send-email-tthayer@opensource.altera.com>
-References: <1464193783-5071-1-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <1464193783-5071-6-git-send-email-tthayer@opensource.altera.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 25 May 2016 18:29:45 +0200
+Subject: [PATCH 12/20] drm/sun4i: Add bridge support
+In-Reply-To: <CAKMK7uG-uq7XSqyesVnPtx0Ajx-FQjVKm_QzjEZgWJQDn8EkPA@mail.gmail.com>
+References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1463402840-17062-13-git-send-email-maxime.ripard@free-electrons.com>
+ <CAKMK7uG-uq7XSqyesVnPtx0Ajx-FQjVKm_QzjEZgWJQDn8EkPA@mail.gmail.com>
+Message-ID: <20160525162945.GK9232@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+Hi Daniel,
 
-Changes to support ECC Manager as SDRAM IRQ parent by
-1) updating IRQ property values to correct child IRQs
-2) moving node under ECC Manager.
+On Mon, May 16, 2016 at 03:12:15PM +0200, Daniel Vetter wrote:
+> On Mon, May 16, 2016 at 2:47 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Our RGB bus can be either connected to a bridge or a panel. While the panel
+> > support was already there, the bridge was not.
+> >
+> > Fix that.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> For bridge support the only thing you need is to set
+> drm_encoder->bridge. Why do you need to hand-roll your own bridge
+> support? That pretty muchmeans you'll do it slightly differently (e.g.
+> you don't bother with a lot of the calls), which will make sharing
+> bridge drivers ever so harder. And also reviewing code, since using
+> shared code but slightly differently is really confusing.
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
----
- arch/arm/boot/dts/socfpga_arria10.dtsi |   13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+Because I overlooked it :)
 
-diff --git a/arch/arm/boot/dts/socfpga_arria10.dtsi b/arch/arm/boot/dts/socfpga_arria10.dtsi
-index 0901090..605c21e 100644
---- a/arch/arm/boot/dts/socfpga_arria10.dtsi
-+++ b/arch/arm/boot/dts/socfpga_arria10.dtsi
-@@ -568,12 +568,6 @@
- 			reg = <0xffcfb100 0x80>;
- 		};
- 
--		sdramedac {
--			compatible = "altr,sdram-edac-a10";
--			altr,sdr-syscon = <&sdr>;
--			interrupts = <0 2 4>, <0 0 4>;
--		};
--
- 		L2: l2-cache at fffff000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0xfffff000 0x1000>;
-@@ -610,6 +604,13 @@
- 			#interrupt-cells = <2>;
- 			ranges;
- 
-+			sdramedac {
-+				compatible = "altr,sdram-edac-a10";
-+				altr,sdr-syscon = <&sdr>;
-+				interrupts = <17 IRQ_TYPE_LEVEL_HIGH>,
-+					     <49 IRQ_TYPE_LEVEL_HIGH>;
-+			};
-+
- 			l2-ecc at ffd06010 {
- 				compatible = "altr,socfpga-a10-l2-ecc";
- 				reg = <0xffd06010 0x4>;
+I'll change that.
+
+Thanks!
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160525/56a7f4a6/attachment-0001.sig>
