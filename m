@@ -1,55 +1,68 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Wed, 25 May 2016 07:30:09 +0530
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <CALszF6BAFgoccC6fmkdnwQxwHmQ35oLcor6v9yOLyVeXrt-KGA@mail.gmail.com>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>	<12548318.auB4PSA3KC@wuerfel>	<CALszF6BPPA=tezMLhmdC4YFwmH1tGhDxCNDZNwGp1cTDWP7Fmg@mail.gmail.com>	<6044541.yeLQbYg2Jv@wuerfel>
- <CALszF6BAFgoccC6fmkdnwQxwHmQ35oLcor6v9yOLyVeXrt-KGA@mail.gmail.com>
-Message-ID: <57450729.3000609@gmail.com>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 25 May 2016 12:01:32 +0530
+Subject: [PATCH kexec-tools 09/32] kexec: phys_to_virt() must take
+ unsigned long long
+In-Reply-To: <E1axXSf-0004hl-PC@e0050434b2927.dyn.arm.linux.org.uk>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <E1axXSf-0004hl-PC@e0050434b2927.dyn.arm.linux.org.uk>
+Message-ID: <CAHB_Guqx-TaVk7_ORbFNxB3HhxvByeu5obFLXPg9UR-axDoyBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 May 2016 02:50 PM, Maxime Coquelin wrote:
-> 2016-05-24 10:58 GMT+02:00 Arnd Bergmann <arnd@arndb.de>:
->> On Tuesday, May 24, 2016 10:50:17 AM CEST Maxime Coquelin wrote:
->>> diff --git a/drivers/char/hw_random/stm32-rng.c
->>> b/drivers/char/hw_random/stm32-rng.c
->>> index 92a810648bd0..2a0fc90e4dc3 100644
->>> --- a/drivers/char/hw_random/stm32-rng.c
->>> +++ b/drivers/char/hw_random/stm32-rng.c
->>> @@ -68,6 +68,10 @@ static int stm32_rng_read(struct hwrng *rng, void
->>> *data, size_t max, bool wait)
->>>                          } while (!sr && --timeout);
->>>                  }
->>>
->>> +               if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
->>> +                               "bad RNG status - %x\n", sr))
->>> +                       writel_relaxed(0, priv->base + RNG_SR);
->>> +
->>>                  /* If error detected or data not ready... */
->>>                  if (sr != RNG_SR_DRDY)
->>>                          break;
->>> @@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void
->>> *data, size_t max, bool wait)
->>>                  max -= sizeof(u32);
->>>          }
->>>
->>> -       if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
->>> -                     "bad RNG status - %x\n", sr))
->>> -               writel_relaxed(0, priv->base + RNG_SR);
->>> -
->>>          pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
->>>          pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
->>>
->>> Thanks,
->>>
->>
->> Yes, that looks good to me.
+On Tue, May 3, 2016 at 3:51 PM, Russell King <rmk@arm.linux.org.uk> wrote:
+> crashdump-elf.c passes unsigned long long addresses into phys_to_virt()
+> so make phys_to_virt() accept such addresses without truncating them.
+> This is important for ARM LPAE systems.
 >
-> Thanks!
-> Sudip, do you want to send the patch, or I manage to do it?
+> Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 
-Maybe you should send it, i have not done anything in reaching its final 
-form.
+Reviewed-by: Pratyush Anand <panand@redhat.com>
 
-Regards
-Sudip
+> ---
+>  kexec/arch/arm/phys_to_virt.c | 2 +-
+>  kexec/crashdump.h             | 2 +-
+>  kexec/phys_to_virt.c          | 2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/kexec/arch/arm/phys_to_virt.c b/kexec/arch/arm/phys_to_virt.c
+> index bcced52..c2fe2ea 100644
+> --- a/kexec/arch/arm/phys_to_virt.c
+> +++ b/kexec/arch/arm/phys_to_virt.c
+> @@ -14,7 +14,7 @@
+>   * http://lists.arm.linux.org.uk/lurker/message/20010723.185051.94ce743c.en.html
+>   */
+>  unsigned long
+> -phys_to_virt(struct crash_elf_info *elf_info, unsigned long paddr)
+> +phys_to_virt(struct crash_elf_info *elf_info, unsigned long long paddr)
+>  {
+>         return paddr + elf_info->page_offset - phys_offset;
+>  }
+> diff --git a/kexec/crashdump.h b/kexec/crashdump.h
+> index 95f1f0c..96219a8 100644
+> --- a/kexec/crashdump.h
+> +++ b/kexec/crashdump.h
+> @@ -55,7 +55,7 @@ int crash_create_elf64_headers(struct kexec_info *info,
+>  unsigned long crash_architecture(struct crash_elf_info *elf_info);
+>
+>  unsigned long phys_to_virt(struct crash_elf_info *elf_info,
+> -                          unsigned long paddr);
+> +                          unsigned long long paddr);
+>
+>  unsigned long xen_architecture(struct crash_elf_info *elf_info);
+>  int xen_get_nr_phys_cpus(void);
+> diff --git a/kexec/phys_to_virt.c b/kexec/phys_to_virt.c
+> index 91b6d01..5e8c4e3 100644
+> --- a/kexec/phys_to_virt.c
+> +++ b/kexec/phys_to_virt.c
+> @@ -10,7 +10,7 @@
+>   * their own implementation.
+>   */
+>  unsigned long
+> -phys_to_virt(struct crash_elf_info *elf_info, unsigned long paddr)
+> +phys_to_virt(struct crash_elf_info *elf_info, unsigned long long paddr)
+>  {
+>         return paddr + elf_info->page_offset;
+>  }
+> --
+> 1.9.1
+>
