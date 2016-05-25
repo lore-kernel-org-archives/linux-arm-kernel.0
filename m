@@ -1,48 +1,93 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 25 May 2016 18:29:45 +0200
-Subject: [PATCH 12/20] drm/sun4i: Add bridge support
-In-Reply-To: <CAKMK7uG-uq7XSqyesVnPtx0Ajx-FQjVKm_QzjEZgWJQDn8EkPA@mail.gmail.com>
-References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-13-git-send-email-maxime.ripard@free-electrons.com>
- <CAKMK7uG-uq7XSqyesVnPtx0Ajx-FQjVKm_QzjEZgWJQDn8EkPA@mail.gmail.com>
-Message-ID: <20160525162945.GK9232@lukather>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 25 May 2016 19:41:32 +0300
+Subject: [PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <5745817C.1070406@arm.com>
+References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+ <5745817C.1070406@arm.com>
+Message-ID: <20160525164132.GB4595@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Mon, May 16, 2016 at 03:12:15PM +0200, Daniel Vetter wrote:
-> On Mon, May 16, 2016 at 2:47 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Our RGB bus can be either connected to a bridge or a panel. While the panel
-> > support was already there, the bridge was not.
-> >
-> > Fix that.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Wed, May 25, 2016 at 11:42:04AM +0100, Szabolcs Nagy wrote:
+> On 24/05/16 01:04, Yury Norov wrote:
+> > This version is based on kernel v4.6.
+> > It works with glibc-2.23, and tested with LTP.
+> > 
+> ...
+> > ILP32 glibc branch is available here:
+> > https://github.com/norov/glibc/tree/ilp32-2.23
+> > 
+> > It is tested with this series with no major downsides. I will send it to 
+> > glibc-alpha soon, after final revise. Please review and comment it as well.
 > 
-> For bridge support the only thing you need is to set
-> drm_encoder->bridge. Why do you need to hand-roll your own bridge
-> support? That pretty muchmeans you'll do it slightly differently (e.g.
-> you don't bother with a lot of the calls), which will make sharing
-> bridge drivers ever so harder. And also reviewing code, since using
-> shared code but slightly differently is really confusing.
+> i spotted one __ilp32__ vs __ILP32__ typo in the glibc code,
 
-Because I overlooked it :)
+Yes, I also found it. Thank you.
 
-I'll change that.
+> i can review it in detail when there is a cleaned up patch set.
+> 
+> in general the approach seems ok, the ugly part is when lp64
+> and ilp32 share code, but ilp32 needs some tweaks compared to
+> the current code (e.g. x vs w regs in asm, long changed to
+> long long in syscalls, different relocations etc) those will
+> be hard to review. the naming is sometimes _be_ilp32 sometimes
+> ilp32_be, but let's hope there will be no new abi variant to
+> confuse this further.
 
-Thanks!
-Maxime
+I think I shared the link too soon, and patches should be revised 
+again. So I continue the work on it. If you curious, find it here.
+https://github.com/norov/glibc/tree/ilp32-dev
+(I don't promise I'll keep it stable, or will avoid using things like
+fast-forward. It's just a branch for my experiments.)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160525/56a7f4a6/attachment-0001.sig>
+For now, it has fixed:
+ - __ilp32__ mess (by introducing DELOUSE() macro);
+ - few unneeded patches dropped;
+ - 32-bit off_t turned to 64-bit.
+
+With all changes, LPT fail list grows:
+peio_3                       FAIL       5    
+pipeio_6                       FAIL       1    
+abort01                        FAIL       2    
+clone02                        FAIL       4    
+fcntl11                        FAIL       1    
+fcntl14                        FAIL       1    
+fcntl17                        FAIL       1    
+fcntl19                        FAIL       1    
+fcntl20                        FAIL       1    
+fcntl21                        FAIL       1    
+fpathconf01                    FAIL       1    
+ftruncate04                    FAIL       1    
+kill11                         FAIL       2    
+mmap16                         FAIL       6    
+open12                         FAIL       2    
+pread01                        FAIL       2    
+pread02                        FAIL       2    
+pread03                        FAIL       2    
+preadv01                       FAIL       6    
+preadv02                       FAIL       6    
+pwrite01                       FAIL       2    
+pwrite02                       FAIL       2    
+pwrite04                       FAIL       6    
+pwrite02_64                    FAIL       1    
+pwritev01                      FAIL       2    
+pwritev02                      FAIL       2    
+rename11                       FAIL       2    
+rmdir02                        FAIL       2    
+umount2_01                     FAIL       2    
+umount2_02                     FAIL       2    
+umount2_03                     FAIL       2    
+utime06                        FAIL       2    
+mtest01                        FAIL       1    
+mtest01w                       FAIL       1    
+mtest06                        FAIL       11   
+gf01                           FAIL       1    
+gf02                           FAIL       1    
+gf07                           FAIL       1    
+gf10                           FAIL       1    
+gf11                           FAIL       1    
+gf15                           FAIL       1    
+gf18                           FAIL       1    
+gf19                           FAIL       1    
+
+Yury
