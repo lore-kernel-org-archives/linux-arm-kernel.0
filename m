@@ -1,195 +1,89 @@
-From: rrichter@cavium.com (Robert Richter)
-Date: Wed, 25 May 2016 15:29:20 +0200
-Subject: [PATCH v6] irqchip, gicv3-its,
- numa: Enable workaround for Cavium thunderx erratum 23144
-Message-ID: <1464182961-9167-1-git-send-email-rrichter@cavium.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 25 May 2016 14:49:03 +0100
+Subject: [PATCH v4 06/12] KVM: arm64: implement basic ITS register handlers
+In-Reply-To: <5704D8B8.4000504@linaro.org>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-7-git-send-email-andre.przywara@arm.com>
+ <5704D8B8.4000504@linaro.org>
+Message-ID: <0c89ea29-4c40-ce87-f499-d600c466ace4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+Hi Eric,
 
-The erratum fixes the hang of ITS SYNC command by avoiding inter node
-io and collections/cpu mapping on thunderx dual-socket platform.
+On 06/04/16 10:36, Eric Auger wrote:
+> Hi Andre,
+> On 03/26/2016 03:14 AM, Andre Przywara wrote:
+>> Add emulation for some basic MMIO registers used in the ITS emulation.
 
-This fix is only applicable for Cavium's ThunderX dual-socket platform.
+...
 
-This is based on NUMA upstream patches (Linus tree
-v4.6-10530-g28165ec7a99b).
+>> +
+>> +/*
+>> + * By writing to CWRITER the guest announces new commands to be processed.
+>> + * Since we cannot read from guest memory inside the ITS spinlock, we
+>> + * iterate over the command buffer (with the lock dropped) until the read
+>> + * pointer matches the write pointer. Other VCPUs writing this register in the
+>> + * meantime will just update the write pointer, leaving the command
+>> + * processing to the first instance of the function.
+>> + */
+>> +static int vgic_mmio_write_its_cwriter(struct kvm_vcpu *vcpu,
+>> +				       struct kvm_io_device *this,
+>> +				       gpa_t addr, int len, const void *val)
+>> +{
+>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>> +	struct vgic_its *its = &dist->its;
+>> +	gpa_t cbaser = its_cmd_buffer_base(vcpu->kvm);
+>> +	u64 cmd_buf[4];
+>> +	u32 reg;
+>> +	bool finished;
+>> +
+>> +	reg = mask64(its->cwriter & 0xfffe0, addr & 7, len, val);
+>> +	reg &= 0xfffe0;
+>> +	if (reg > its_cmd_buffer_size(vcpu->kvm))
+>> +		return 0;
+>> +
+>> +	spin_lock(&its->lock);
+>> +
+>> +	/*
+>> +	 * If there is still another VCPU handling commands, let this
+>> +	 * one pick up the new CWRITER and process "our" new commands as well.
+>> +	 */
+>> +	finished = (its->cwriter != its->creadr);
+> empty?
 
-v6 (by Robert Richter):
-rebased onto v4.6-10530-g28165ec7a99b to solve minor conflicts with
-upstream, no further changes
+Maybe that is indeed less misleading ...
 
-v5 (by Robert Richter):
-fixed use of cpumask_of_node() only for (node >= 0)
-minor style fixes
+>> +	its->cwriter = reg;
+>> +
+>> +	spin_unlock(&its->lock);
+> Assuming we have 2 vcpus attempting a cwriter write at the same moment I
+> don't understand what does guarantee they are not going to execute the
+> following loop concurrently and possibly execute vits_handle_command
+> twice on the same cmd from the same its->creadr start?
 
-v4:
-updated silicon-errata.txt
-updated as per Robert Richter review comment.
+So does my explanation of the algorithm in that other mail today explain
+it? Or do you still see a hole in the locking scheme here?
 
-v3:
-updatated as per Marc Zyngier's review comments.
-http://www.spinics.net/lists/arm-kernel/msg443462.html
+>> +
+>> +	while (!finished) {
+>> +		int ret = kvm_read_guest(vcpu->kvm, cbaser + its->creadr,
+>> +					 cmd_buf, 32);
+>> +		if (ret) {
+>> +			/*
+>> +			 * Gah, we are screwed. Reset CWRITER to that command
+>> +			 * that we have finished processing and return.
+>> +			 */
+>> +			spin_lock(&its->lock);
+>> +			its->cwriter = its->creadr;
+> don't get why do you set the queue empty?
 
-v2:
-updatated as per Marc Zyngier's review comments.
+So from a guest's point of view this is something like an ITS internal
+error which shouldn't happen. So I just bail out, but leave the queue in
+a consistent (read: empty) state to allow possible future commands to be
+processed at best effort.
+I guess this is the best we can come up with, since there is no feasible
+way of communicating errors back(?)
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-Signed-off-by: Robert Richter <rrichter@cavium.com>
----
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     |  9 +++++++
- drivers/irqchip/irq-gic-v3-its.c       | 49 ++++++++++++++++++++++++++++++++--
- 3 files changed, 57 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index c6938e50e71f..4da60b463995 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -56,6 +56,7 @@ stable kernels.
- | ARM            | MMU-500         | #841119,#826419 | N/A                     |
- |                |                 |                 |                         |
- | Cavium         | ThunderX ITS    | #22375, #24313  | CAVIUM_ERRATUM_22375    |
-+| Cavium         | ThunderX ITS    | #23144          | CAVIUM_ERRATUM_23144    |
- | Cavium         | ThunderX GICv3  | #23154          | CAVIUM_ERRATUM_23154    |
- | Cavium         | ThunderX Core   | #27456          | CAVIUM_ERRATUM_27456    |
- | Cavium         | ThunderX SMMUv2 | #27704          | N/A		       |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 76747d92bc72..57a9f67971d3 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -426,6 +426,15 @@ config CAVIUM_ERRATUM_22375
- 
- 	  If unsure, say Y.
- 
-+config CAVIUM_ERRATUM_23144
-+	bool "Cavium erratum 23144: ITS SYNC hang on dual socket system"
-+	depends on NUMA
-+	default y
-+	help
-+	  ITS SYNC command hang for cross node io and collections/cpu mapping.
-+
-+	  If unsure, say Y.
-+
- config CAVIUM_ERRATUM_23154
- 	bool "Cavium erratum 23154: Access to ICC_IAR1_EL1 is not sync'ed"
- 	default y
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 6bd881be24ea..5eb1f9e17a98 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -41,6 +41,7 @@
- 
- #define ITS_FLAGS_CMDQ_NEEDS_FLUSHING		(1ULL << 0)
- #define ITS_FLAGS_WORKAROUND_CAVIUM_22375	(1ULL << 1)
-+#define ITS_FLAGS_WORKAROUND_CAVIUM_23144	(1ULL << 2)
- 
- #define RDIST_FLAGS_PROPBASE_NEEDS_FLUSHING	(1 << 0)
- 
-@@ -82,6 +83,7 @@ struct its_node {
- 	u64			flags;
- 	u32			ite_size;
- 	u32			device_ids;
-+	int			numa_node;
- };
- 
- #define ITS_ITT_ALIGN		SZ_256
-@@ -613,11 +615,23 @@ static void its_unmask_irq(struct irq_data *d)
- static int its_set_affinity(struct irq_data *d, const struct cpumask *mask_val,
- 			    bool force)
- {
--	unsigned int cpu = cpumask_any_and(mask_val, cpu_online_mask);
-+	unsigned int cpu;
-+	const struct cpumask *cpu_mask = cpu_online_mask;
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	struct its_collection *target_col;
- 	u32 id = its_get_event_id(d);
- 
-+       /* lpi cannot be routed to a redistributor that is on a foreign node */
-+	if (its_dev->its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
-+		if (its_dev->its->numa_node >= 0) {
-+			cpu_mask = cpumask_of_node(its_dev->its->numa_node);
-+			if (!cpumask_intersects(mask_val, cpu_mask))
-+				return -EINVAL;
-+		}
-+	}
-+
-+	cpu = cpumask_any_and(mask_val, cpu_mask);
-+
- 	if (cpu >= nr_cpu_ids)
- 		return -EINVAL;
- 
-@@ -1101,6 +1115,16 @@ static void its_cpu_init_collection(void)
- 	list_for_each_entry(its, &its_nodes, entry) {
- 		u64 target;
- 
-+		/* avoid cross node collections and its mapping */
-+		if (its->flags & ITS_FLAGS_WORKAROUND_CAVIUM_23144) {
-+			struct device_node *cpu_node;
-+
-+			cpu_node = of_get_cpu_node(cpu, NULL);
-+			if (its->numa_node != NUMA_NO_NODE &&
-+				its->numa_node != of_node_to_nid(cpu_node))
-+				continue;
-+		}
-+
- 		/*
- 		 * We now have to bind each collection to its target
- 		 * redistributor.
-@@ -1351,9 +1375,14 @@ static void its_irq_domain_activate(struct irq_domain *domain,
- {
- 	struct its_device *its_dev = irq_data_get_irq_chip_data(d);
- 	u32 event = its_get_event_id(d);
-+	const struct cpumask *cpu_mask = cpu_online_mask;
-+
-+	/* get the cpu_mask of local node */
-+	if (its_dev->its->numa_node >= 0)
-+		cpu_mask = cpumask_of_node(its_dev->its->numa_node);
- 
- 	/* Bind the LPI to the first possible CPU */
--	its_dev->event_map.col_map[event] = cpumask_first(cpu_online_mask);
-+	its_dev->event_map.col_map[event] = cpumask_first(cpu_mask);
- 
- 	/* Map the GIC IRQ and event to the device */
- 	its_send_mapvi(its_dev, d->hwirq, event);
-@@ -1443,6 +1472,13 @@ static void __maybe_unused its_enable_quirk_cavium_22375(void *data)
- 	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_22375;
- }
- 
-+static void __maybe_unused its_enable_quirk_cavium_23144(void *data)
-+{
-+	struct its_node *its = data;
-+
-+	its->flags |= ITS_FLAGS_WORKAROUND_CAVIUM_23144;
-+}
-+
- static const struct gic_quirk its_quirks[] = {
- #ifdef CONFIG_CAVIUM_ERRATUM_22375
- 	{
-@@ -1452,6 +1488,14 @@ static const struct gic_quirk its_quirks[] = {
- 		.init	= its_enable_quirk_cavium_22375,
- 	},
- #endif
-+#ifdef CONFIG_CAVIUM_ERRATUM_23144
-+	{
-+		.desc	= "ITS: Cavium erratum 23144",
-+		.iidr	= 0xa100034c,	/* ThunderX pass 1.x */
-+		.mask	= 0xffff0fff,
-+		.init	= its_enable_quirk_cavium_23144,
-+	},
-+#endif
- 	{
- 	}
- };
-@@ -1514,6 +1558,7 @@ static int __init its_probe(struct device_node *node,
- 	its->base = its_base;
- 	its->phys_base = res.start;
- 	its->ite_size = ((readl_relaxed(its_base + GITS_TYPER) >> 4) & 0xf) + 1;
-+	its->numa_node = of_node_to_nid(node);
- 
- 	its->cmd_base = kzalloc(ITS_CMD_QUEUE_SZ, GFP_KERNEL);
- 	if (!its->cmd_base) {
--- 
-2.7.0.rc3
+Cheers,
+Andre.
