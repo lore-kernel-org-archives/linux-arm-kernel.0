@@ -1,56 +1,66 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 25 May 2016 11:11:05 -0500
-Subject: [PATCH 2/2] dts: dra7: Add device tree node for i2c6
-In-Reply-To: <20160525125341.10044-3-rk@ti.com>
-References: <20160525125341.10044-1-rk@ti.com>
- <20160525125341.10044-3-rk@ti.com>
-Message-ID: <5745CE99.50704@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 May 2016 17:16:54 +0100
+Subject: [PATCH v4 01/12] KVM: extend struct kvm_msi to hold a 32-bit
+ device ID
+In-Reply-To: <e520a5a8-b259-27f3-f33c-f87e008f1c6f@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-2-git-send-email-andre.przywara@arm.com>
+ <20160403091508.GA5261@cbox> <e520a5a8-b259-27f3-f33c-f87e008f1c6f@arm.com>
+Message-ID: <5745CFF6.6070001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2016 07:53 AM, Ravikumar Kattekola wrote:
-> DRA72x devices have an extra i2c controller instance - i2c6
-> Adding device description for the same.
+On 25/05/16 16:55, Andre Przywara wrote:
+> Hi Christoffer,
 > 
-> Reference : DRA72x_SR1.0 TRM [ SPRUHP2Q ]
+> On 03/04/16 10:15, Christoffer Dall wrote:
+>> On Sat, Mar 26, 2016 at 02:13:59AM +0000, Andre Przywara wrote:
+>>> The ARM GICv3 ITS MSI controller requires a device ID to be able to
+>>> assign the proper interrupt vector. On real hardware, this ID is
+>>> sampled from the bus. To be able to emulate an ITS controller, extend
+>>> the KVM MSI interface to let userspace provide such a device ID. For
+>>> PCI devices, the device ID is simply the 16-bit bus-device-function
+>>> triplet, which should be easily available to the userland tool.
+>>>
+>>> Also there is a new KVM capability which advertises whether the
+>>> current VM requires a device ID to be set along with the MSI data.
+>>> This flag is still reported as not available everywhere, later we will
+>>> enable it when ITS emulation is used.
+>>>
+>>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+>>> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+>>> ---
+>>>  Documentation/virtual/kvm/api.txt | 12 ++++++++++--
+>>>  include/uapi/linux/kvm.h          |  5 ++++-
+>>>  2 files changed, 14 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>>> index cb2ef0b..8f7351d 100644
+>>> --- a/Documentation/virtual/kvm/api.txt
+>>> +++ b/Documentation/virtual/kvm/api.txt
+>>> @@ -2163,10 +2163,18 @@ struct kvm_msi {
+>>>  	__u32 address_hi;
+>>>  	__u32 data;
+>>>  	__u32 flags;
+>>> -	__u8  pad[16];
+>>> +	__u32 devid;
+>>
+>> Are we imposing any unfortunate restrictions for other architectures by
+>> using a u32 over a u64 for the device ID?
 > 
-> Signed-off-by: Ravikumar Kattekola <rk@ti.com>
-> ---
->  arch/arm/boot/dts/dra7.dtsi | 11 +++++++++++
->  1 file changed, 11 insertions(+)
+> Mmmh, good point. I guess not only for other architectures, but also for
+> the future in general.
 > 
-> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-> index 3a8f397..84729a1 100644
-> --- a/arch/arm/boot/dts/dra7.dtsi
-> +++ b/arch/arm/boot/dts/dra7.dtsi
-> @@ -27,6 +27,7 @@
->  		i2c2 = &i2c3;
->  		i2c3 = &i2c4;
->  		i2c4 = &i2c5;
-> +		i2c5 = &i2c6;
->  		serial0 = &uart1;
->  		serial1 = &uart2;
->  		serial2 = &uart3;
-> @@ -929,6 +930,16 @@
->  			status = "disabled";
->  		};
->  
-> +		i2c6: i2c at 48458000 {
-> +			compatible = "ti,omap4-i2c";
-> +			reg = <0x48458000 0x100>;
-> +			interrupts = <GIC_SPI 402 IRQ_TYPE_LEVEL_HIGH>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			ti,hwmods = "i2c6";
-> +			status = "disabled";
-> +		};
-> +
->  		mmc1: mmc at 4809c000 {
->  			compatible = "ti,omap4-hsmmc";
->  			reg = <0x4809c000 0x400>;
-> 
-NAK again for the same reasoning.
+> Are there any objections against increasing this to a u64?
 
+I'm not sure this is really necessary. A PCI RID is 16bit, and expanding
+it to 32bit is already making quite a bit of space for further extension.
+
+Also, some architecture might be unhappy of having a 64bit quantity that
+is not 64bit aligned...
+
+Thanks,
+
+	M.
 -- 
-Regards,
-Nishanth Menon
+Jazz is not dead. It just smells funny...
