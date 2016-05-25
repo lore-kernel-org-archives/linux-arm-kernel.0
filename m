@@ -1,27 +1,61 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 May 2016 18:27:07 +0100
-Subject: [PATCH 1/1] arm64: fix flush_cache_range
-In-Reply-To: <20160525152255.GH5996@e104818-lin.cambridge.arm.com>
-References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
- <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
- <20160524151235.GA11605@leverpostej>
- <20160525152255.GH5996@e104818-lin.cambridge.arm.com>
-Message-ID: <20160525172705.GD19428@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 May 2016 12:32:46 -0500
+Subject: [RESEND PATCH v2] ASoC: rockchip: Add machine driver for
+ MAX98357A/RT5514/DA7219
+In-Reply-To: <1464053774-15914-1-git-send-email-zhengxing@rock-chips.com>
+References: <1464053774-15914-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20160525173246.GA5125@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 04:22:55PM +0100, Catalin Marinas wrote:
-> That's when we realised that the CoW problem no longer exists for
-> non-aliasing VIPT caches. However, the I-cache counterpart 6060e8df5178
-> has not been reverted.
+On Tue, May 24, 2016 at 09:36:14AM +0800, Xing Zheng wrote:
+> There are multi codec devices on the RK3399 platform, we can use
+> this patch support and control these codecs.
+> 
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> ---
+> 
+> Changes in v2:
+> - use the FS 256 to set mclks of the max98357a and rt5514 danamically
+> - add more sample rate for da7219
+> 
+>  .../sound/rockchip-max98357a-rt5514-da7219.txt     |   15 +
+>  sound/soc/rockchip/Kconfig                         |   11 +
+>  sound/soc/rockchip/Makefile                        |    2 +
+>  .../rockchip/rockchip_max98357a_rt5514_da7219.c    |  333 ++++++++++++++++++++
+>  4 files changed, 361 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/rockchip-max98357a-rt5514-da7219.txt
+>  create mode 100644 sound/soc/rockchip/rockchip_max98357a_rt5514_da7219.c
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/rockchip-max98357a-rt5514-da7219.txt b/Documentation/devicetree/bindings/sound/rockchip-max98357a-rt5514-da7219.txt
+> new file mode 100644
+> index 0000000..5928384
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/rockchip-max98357a-rt5514-da7219.txt
+> @@ -0,0 +1,15 @@
+> +ROCKCHIP with MAX98357A/RT5514/DA7219 codecs
+> +
+> +Required properties:
+> +- compatible: "rockchip,rockchip-sound"
 
-I think I mostly agree, except for reverting 6060e8df5178, which I don't
-think would be correct.  That reintroduces the possibility of flushing
-the I-cache twice in that path, once for aliasing vipt dcaches, and again
-for asid tagged vivt icaches.  I'd rather have the code structured so we
-only do this once.
+This is generic, but the binding seems to be very specific to only 3 
+specific codecs. Listing all 3 codecs seems a bit strange. Perhaps a 
+name related to the board name would be better.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> +- rockchip,cpu: The phandle of the Rockchip I2S controller that's
+> +  connected to the codecs
+
+What's the size? always 3?
+
+> +- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
+
+Please make the size and ordering clear.
+
+> +
+> +Example:
+> +
+> +sound {
+> +	compatible = "rockchip,rockchip-sound";
+> +	rockchip,cpu = <&i2s0 &i2s0 &i2s1>;
+> +	rockchip,codec = <&max98357a &headsetcodec &codec>;
+> +};
