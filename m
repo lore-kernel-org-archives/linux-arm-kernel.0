@@ -1,66 +1,100 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Wed, 25 May 2016 12:00:58 -0700
-Subject: [PATCH v2 4/9] remoteproc: Introduce Qualcomm WCNSS firmware
- loader
-In-Reply-To: <574588E2.60506@linaro.org>
-References: <1459222625-11440-1-git-send-email-bjorn.andersson@linaro.org>
- <1459222625-11440-5-git-send-email-bjorn.andersson@linaro.org>
- <574588E2.60506@linaro.org>
-Message-ID: <20160525190058.GV1256@tuxbot>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 25 May 2016 14:08:29 -0500
+Subject: [PATCH 2/2] ARM: at91: Add DT support for Olimex SAM9-L9260 board.
+In-Reply-To: <1464164106-28359-2-git-send-email-raashidmuhammed@zilogic.com>
+References: <1464164106-28359-1-git-send-email-raashidmuhammed@zilogic.com>
+ <1464164106-28359-2-git-send-email-raashidmuhammed@zilogic.com>
+Message-ID: <20160525190828.GA22435@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 25 May 04:13 PDT 2016, Stanimir Varbanov wrote:
+On Wed, May 25, 2016 at 01:45:06PM +0530, Raashid Muhammed wrote:
+> From: Raashid Muhammed <raashidmuhammed@zilogic.com>
+> 
+> sam9-l9260 is a low cost board designed by Olimex.
+> 
+> More information is available at:
+> https://www.olimex.com/Products/ARM/Atmel/SAM9-L9260/
+> 
+> Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
+> Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
+> ---
+>  Documentation/devicetree/bindings/arm/olimex.txt |   8 +-
+>  arch/arm/boot/dts/Makefile                       |   1 +
+>  arch/arm/boot/dts/at91-sam9_l9260.dts            | 115 +++++++++++++++++++++++
+>  3 files changed, 122 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/at91-sam9_l9260.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/olimex.txt b/Documentation/devicetree/bindings/arm/olimex.txt
+> index 007fb5c..d726aec 100644
+> --- a/Documentation/devicetree/bindings/arm/olimex.txt
+> +++ b/Documentation/devicetree/bindings/arm/olimex.txt
+> @@ -1,5 +1,9 @@
+> -Olimex i.MX Platforms Device Tree Bindings
+> -------------------------------------------
+> +Olimex Device Tree Bindings
+> +---------------------------
+> +
+> +SAM9-L9260 Board
+> +Required root node properties:
+> +    - compatible = "olimex,sam9-l9260", "atmel,at91sam9260";
+>  
+>  i.MX23 Olinuxino Low Cost Board
+>  Required root node properties:
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 0f89d87..d27f09d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -19,6 +19,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
+>  	usb_a9260.dtb \
+>  	at91sam9261ek.dtb \
+>  	at91sam9263ek.dtb \
+> +	at91-sam9_l9260.dtb \
+>  	tny_a9263.dtb \
+>  	usb_a9263.dtb \
+>  	at91-foxg20.dtb \
+> diff --git a/arch/arm/boot/dts/at91-sam9_l9260.dts b/arch/arm/boot/dts/at91-sam9_l9260.dts
+> new file mode 100644
+> index 0000000..e2da9b906
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/at91-sam9_l9260.dts
+> @@ -0,0 +1,115 @@
+> +/*
+> + * at91-sam9_l9260.dts - Device Tree file for Olimex SAM9-L9260 board
+> + *
+> + *  Copyright (C) 2016 Raashid Muhammed <raashidmuhammed@zilogic.com>
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +/dts-v1/;
+> +#include "at91sam9260.dtsi"
+> +
+> +/ {
+> +	model = "Olimex sam9-l9260";
+> +	compatible = "olimex,sam9-l9260", "atmel,at91sam9260", "atmel,at91sam9";
+> +
+> +	chosen {
+> +		stdout-path = "serial0:115200n8";
+> +	 };
+> +
+> +	 memory {
+> +		reg = <0x20000000 0x4000000>;
+> +	 };
+> +
+> +	 clocks {
+> +		slow_xtal {
+> +			clock-frequency = <32768>;
+> +		};
+> +
+> +		main_xtal {
+> +			clock-frequency = <18432000>;
+> +		};
+> +	 };
+> +
+> +	 ahb {
 
-> On 03/29/2016 06:37 AM, Bjorn Andersson wrote:
-> > From: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > 
-> > This introduces the peripheral image loader, for loading WCNSS firmware
-> > and boot the core on e.g. MSM8974. The firmware is verified and booted
-> > with the help of the Peripheral Authentication System (PAS) in
-> > TrustZone.
-> > 
-> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> > ---
-> > 
-> > Changes since v1:
-> > - Split iris definition into separate driver/dt-node
-> > - Move constants from DT to code
-> > - Make stop-state and some of interrupts optional to properly work on 8064
-> > - Cleaned up and made mdt loader support relocation, which is needed on 8016.
-> > 
-> >  drivers/remoteproc/Kconfig           |  12 +
-> >  drivers/remoteproc/Makefile          |   2 +
-> >  drivers/remoteproc/qcom_mdt_loader.c | 172 +++++++++++
-> >  drivers/remoteproc/qcom_mdt_loader.h |   7 +
-> >  drivers/remoteproc/qcom_wcnss.c      | 579 +++++++++++++++++++++++++++++++++++
-> >  drivers/remoteproc/qcom_wcnss.h      |  22 ++
-> >  drivers/remoteproc/qcom_wcnss_iris.c | 185 +++++++++++
-> >  7 files changed, 979 insertions(+)
-> >  create mode 100644 drivers/remoteproc/qcom_mdt_loader.c
-> >  create mode 100644 drivers/remoteproc/qcom_mdt_loader.h
-> >  create mode 100644 drivers/remoteproc/qcom_wcnss.c
-> >  create mode 100644 drivers/remoteproc/qcom_wcnss.h
-> >  create mode 100644 drivers/remoteproc/qcom_wcnss_iris.c
-> > 
-> 
-> <cut>
-> 
-> > +
-> > +static int wcnss_remove(struct platform_device *pdev)
-> > +{
-> > +	struct qcom_wcnss *wcnss = platform_get_drvdata(pdev);
-> > +
-> > +	of_platform_depopulate(&pdev->dev);
-> > +
-> > +	qcom_smem_state_put(wcnss->state);
-> > +	rproc_put(wcnss->rproc);
-> 
-> might be need to call rproc_del() too ?
-> 
+The whitespace is off here and throughout. You've got a <tab><space>...
 
-You're correct. Thanks for having a look!
+Otherwise,
 
-Regards,
-Bjorn
+Acked-by: Rob Herring <robh@kernel.org>
