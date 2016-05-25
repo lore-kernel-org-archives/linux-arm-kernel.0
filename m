@@ -1,156 +1,137 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Wed, 25 May 2016 13:49:14 +0530
-Subject: [PATCH v3 2/2] i2c: qup: support SMBus block read
-In-Reply-To: <1463694268-9473-2-git-send-email-austinwc@codeaurora.org>
-References: <1463694268-9473-1-git-send-email-austinwc@codeaurora.org>
- <1463694268-9473-2-git-send-email-austinwc@codeaurora.org>
-Message-ID: <000201d1b65e$256a7590$703f60b0$@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 25 May 2016 10:19:40 +0200
+Subject: [PATCH 1/3] clk: samsung: exynos5433: prepare for adding CPU
+ clocks
+In-Reply-To: <1464095957-25851-2-git-send-email-b.zolnierkie@samsung.com>
+References: <1464095957-25851-1-git-send-email-b.zolnierkie@samsung.com>
+ <1464095957-25851-2-git-send-email-b.zolnierkie@samsung.com>
+Message-ID: <5745601C.6000806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/24/2016 03:19 PM, Bartlomiej Zolnierkiewicz wrote:
+> Open-code samsung_cmu_register_one() calls for CMU_APOLLO and
+> CMU_ATLAS setup code as a preparation for adding CPU clocks
+> support for Exynos5433.
+> 
+> There should be no functional change resulting from this patch.
+> 
+> Cc: Kukjin Kim <kgene@kernel.org>
+> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Bartlomiej Zolnierkiewicz <b.zolnierkie@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos5433.c | 85 +++++++++++++++++++++++-------------
+>  drivers/clk/samsung/clk.c            | 12 ++---
+>  drivers/clk/samsung/clk.h            |  4 ++
+>  3 files changed, 65 insertions(+), 36 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+> index 128527b..6dd81ed 100644
+> --- a/drivers/clk/samsung/clk-exynos5433.c
+> +++ b/drivers/clk/samsung/clk-exynos5433.c
+> @@ -11,6 +11,7 @@
+>  
+>  #include <linux/clk-provider.h>
+>  #include <linux/of.h>
+> +#include <linux/of_address.h>
+>  
+>  #include <dt-bindings/clock/exynos5433.h>
+>  
+> @@ -3594,23 +3595,35 @@ static struct samsung_gate_clock apollo_gate_clks[] __initdata = {
+>  			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
+>  };
+>  
+> -static struct samsung_cmu_info apollo_cmu_info __initdata = {
+> -	.pll_clks		= apollo_pll_clks,
+> -	.nr_pll_clks		= ARRAY_SIZE(apollo_pll_clks),
+> -	.mux_clks		= apollo_mux_clks,
+> -	.nr_mux_clks		= ARRAY_SIZE(apollo_mux_clks),
+> -	.div_clks		= apollo_div_clks,
+> -	.nr_div_clks		= ARRAY_SIZE(apollo_div_clks),
+> -	.gate_clks		= apollo_gate_clks,
+> -	.nr_gate_clks		= ARRAY_SIZE(apollo_gate_clks),
+> -	.nr_clk_ids		= APOLLO_NR_CLK,
+> -	.clk_regs		= apollo_clk_regs,
+> -	.nr_clk_regs		= ARRAY_SIZE(apollo_clk_regs),
+> -};
+> -
+>  static void __init exynos5433_cmu_apollo_init(struct device_node *np)
+>  {
+> -	samsung_cmu_register_one(np, &apollo_cmu_info);
+> +	void __iomem *reg_base;
+> +	struct samsung_clk_provider *ctx;
+> +
+> +	reg_base = of_iomap(np, 0);
+> +	if (!reg_base) {
+> +		panic("%s: failed to map registers\n", __func__);
+> +		return;
+> +	}
+> +
+> +	ctx = samsung_clk_init(np, reg_base, APOLLO_NR_CLK);
+> +	if (!ctx) {
+> +		panic("%s: unable to allocate ctx\n", __func__);
+> +		return;
+> +	}
+> +
+> +	samsung_clk_register_pll(ctx, apollo_pll_clks,
+> +				 ARRAY_SIZE(apollo_pll_clks), reg_base);
+> +	samsung_clk_register_mux(ctx, apollo_mux_clks,
+> +				 ARRAY_SIZE(apollo_mux_clks));
+> +	samsung_clk_register_div(ctx, apollo_div_clks,
+> +				 ARRAY_SIZE(apollo_div_clks));
+> +	samsung_clk_register_gate(ctx, apollo_gate_clks,
+> +				  ARRAY_SIZE(apollo_gate_clks));
+> +	samsung_clk_sleep_init(reg_base, apollo_clk_regs,
+> +			       ARRAY_SIZE(apollo_clk_regs));
+> +
+> +	samsung_clk_of_add_provider(np, ctx);
+>  }
+>  CLK_OF_DECLARE(exynos5433_cmu_apollo, "samsung,exynos5433-cmu-apollo",
+>  		exynos5433_cmu_apollo_init);
+> @@ -3806,23 +3819,35 @@ static struct samsung_gate_clock atlas_gate_clks[] __initdata = {
+>  			CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0),
+>  };
+>  
+> -static struct samsung_cmu_info atlas_cmu_info __initdata = {
+> -	.pll_clks		= atlas_pll_clks,
+> -	.nr_pll_clks		= ARRAY_SIZE(atlas_pll_clks),
+> -	.mux_clks		= atlas_mux_clks,
+> -	.nr_mux_clks		= ARRAY_SIZE(atlas_mux_clks),
+> -	.div_clks		= atlas_div_clks,
+> -	.nr_div_clks		= ARRAY_SIZE(atlas_div_clks),
+> -	.gate_clks		= atlas_gate_clks,
+> -	.nr_gate_clks		= ARRAY_SIZE(atlas_gate_clks),
+> -	.nr_clk_ids		= ATLAS_NR_CLK,
+> -	.clk_regs		= atlas_clk_regs,
+> -	.nr_clk_regs		= ARRAY_SIZE(atlas_clk_regs),
+> -};
+> -
+>  static void __init exynos5433_cmu_atlas_init(struct device_node *np)
+>  {
+> -	samsung_cmu_register_one(np, &atlas_cmu_info);
+> +	void __iomem *reg_base;
+> +	struct samsung_clk_provider *ctx;
+> +
+> +	reg_base = of_iomap(np, 0);
+> +	if (!reg_base) {
+> +		panic("%s: failed to map registers\n", __func__);
+> +		return;
 
->From: Naveen Kaje <nkaje@codeaurora.org>
->
->I2C QUP driver relies on SMBus emulation support from the framework.
->To handle SMBus block reads, the driver should check I2C_M_RECV_LEN
->flag and should read the first byte received as the message length.
->
->The driver configures the QUP hardware to read one byte. Once the
->message length is known from this byte, the QUP hardware is configured
->to read the rest.
->
->Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
->Signed-off-by: Austin Christ <austinwc@codeaurora.org>
->---
-> drivers/i2c/busses/i2c-qup.c | 68 ++++++++++++++++++++++++++++++++++++++++++--
-> 1 file changed, 65 insertions(+), 3 deletions(-)
->
->Changes:
->- v3:
-> - clean up redundant checks
-> - use constant instead of variable for smbus length field
->- v2:
-> - rework the smbus block read and break into separate function
->
->diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
->index ea6ca5f..9fbed83 100644
->--- a/drivers/i2c/busses/i2c-qup.c
->+++ b/drivers/i2c/busses/i2c-qup.c
->@@ -517,6 +517,33 @@ static int qup_i2c_get_data_len(struct qup_i2c_dev *qup)
-> 	return data_len;
-> }
->
->+static bool qup_i2c_check_msg_len(struct i2c_msg *msg)
->+{
->+	return ((msg->flags & I2C_M_RD) && (msg->flags & I2C_M_RECV_LEN));
->+}
->+
->+static int qup_i2c_set_tags_smb(u16 addr, u8 *tags, struct qup_i2c_dev *qup,
->+			struct i2c_msg *msg)
->+{
->+	int len = 0;
->+
->+	if (msg->len > 1) {
->+		tags[len++] = QUP_TAG_V2_DATARD_STOP;
->+		tags[len++] = qup_i2c_get_data_len(qup) - 1;
->+	} else {
->+		tags[len++] = QUP_TAG_V2_START;
->+		tags[len++] = addr & 0xff;
->+
->+		if (msg->flags & I2C_M_TEN)
->+			tags[len++] = addr >> 8;
->+
->+		tags[len++] = QUP_TAG_V2_DATARD;
->+		/* Read 1 byte indicating the length of the SMBus message */
->+		tags[len++] = 1;
->+	}
->+	return len;
->+}
->+
-> static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
-> 			    struct i2c_msg *msg,  int is_dma)
-> {
->@@ -526,6 +553,10 @@ static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
->
-> 	int last = (qup->blk.pos == (qup->blk.count - 1)) && (qup->is_last);
->
->+	/* Handle tags for SMBus block read */
->+	if (qup_i2c_check_msg_len(msg))
->+		return qup_i2c_set_tags_smb(addr, tags, qup, msg);
->+
-> 	if (qup->blk.pos == 0) {
-> 		tags[len++] = QUP_TAG_V2_START;
-> 		tags[len++] = addr & 0xff;
->@@ -1065,9 +1096,17 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
-> 				struct i2c_msg *msg)
-> {
-> 	u32 val;
->-	int idx, pos = 0, ret = 0, total;
->+	int idx, pos = 0, ret = 0, total, msg_offset = 0;
->
->+	/*
->+	 * If the message length is already read in
->+	 * the first byte of the buffer, account for
->+	 * that by setting the offset
->+	 */
->+	if (qup_i2c_check_msg_len(msg) && (msg->len > 1))
->+		msg_offset = 1;
-> 	total = qup_i2c_get_data_len(qup);
->+	total -= msg_offset;
->
-> 	/* 2 extra bytes for read tags */
-> 	while (pos < (total + 2)) {
->@@ -1087,8 +1126,8 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
->
-> 			if (pos >= (total + 2))
-> 				goto out;
->-
->-			msg->buf[qup->pos++] = val & 0xff;
->+			msg->buf[qup->pos + msg_offset] = val & 0xff;
->+			qup->pos++;
-> 		}
-> 	}
->
->@@ -1128,6 +1167,24 @@ static int qup_i2c_read_one_v2(struct qup_i2c_dev *qup, struct i2c_msg *msg)
-> 			goto err;
->
-> 		qup->blk.pos++;
->+
->+		/* Handle SMBus block read length */
->+		if (qup_i2c_check_msg_len(msg) && (msg->len == 1)) {
->+			if (msg->buf[0] > I2C_SMBUS_BLOCK_MAX) {
->+				ret = -EPROTO;
->+				goto err;
->+			}
->+			msg->len += msg->buf[0];
->+			qup->pos = 0;
->+			qup_i2c_set_read_mode_v2(qup, msg->len);
->+			ret = qup_i2c_issue_xfer_v2(qup, msg);
->+			if (ret)
->+				goto err;
->+			ret = qup_i2c_wait_for_complete(qup, msg);
->+			if (ret)
->+				goto err;
->+			qup_i2c_set_blk_data(qup, msg);
->+		}
-> 	} while (qup->blk.pos < qup->blk.count);
->
-> err:
->@@ -1210,6 +1267,11 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
-> 			goto out;
-> 		}
->
->+		if (qup_i2c_check_msg_len(&msgs[idx])) {
->+			ret = -EOPNOTSUPP;
->+			goto out;
->+		}
->+
-> 		if (msgs[idx].flags & I2C_M_RD)
-> 			ret = qup_i2c_read_one(qup, &msgs[idx]);
-> 		else
+Return is useless here.
 
-Reviewed-by: sricharan at codeaurora.org
+> +	}
+> +
+> +	ctx = samsung_clk_init(np, reg_base, ATLAS_NR_CLK);
+> +	if (!ctx) {
+> +		panic("%s: unable to allocate ctx\n", __func__);
+> +		return;
+> +	}
 
-Regards,
- Sricharan
+This entire if() is useless. The samsung_clk_init() already panics. I
+recently tried to make it consistent across our drivers:
+http://www.spinics.net/lists/arm-kernel/msg503014.html
+
+Beside that, looks fine.
+
+Best regards,
+Krzysztof
