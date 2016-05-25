@@ -1,31 +1,25 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 25 May 2016 09:02:17 +0200
-Subject: [PATCH] rm64: dts: r8a7795: Drop 0x from unit address of gic
-In-Reply-To: <1464138700-12219-1-git-send-email-horms+renesas@verge.net.au>
-References: <1464138700-12219-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVUSmRtFHFA1E9_sqFUEo9KER2CSW4qtjcsY0LWs6tfeA@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 25 May 2016 09:11:08 +0200
+Subject: [PATCH 1/2] clk: exynos5420: Set ID for aclk333 gate clock
+In-Reply-To: <1464111662-15336-2-git-send-email-javier@osg.samsung.com>
+References: <1464111662-15336-1-git-send-email-javier@osg.samsung.com>
+ <1464111662-15336-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <5745500C.1060309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 3:11 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Drop 0x from unit address of gic as this is the desired form for
-> a unit address.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On 05/24/2016 07:41 PM, Javier Martinez Canillas wrote:
+> The aclk333 clock needs to be ungated during the MFC power domain switch,
+> so set the clock ID to allow the Exynos power domain logic to lookup this
+> clock if is defined in the MFC PD device tree node.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+> 
+>  drivers/clk/samsung/clk-exynos5420.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-If you increase the entropy of the universe even more by adding the missing
-"a" prefix to the one-line summary, you can add my
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Best regards,
+Krzysztof
