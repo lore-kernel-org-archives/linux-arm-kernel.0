@@ -1,77 +1,40 @@
 From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 25 May 2016 13:30:27 +0530
-Subject: [PATCH kexec-tools 11/32] kexec: add mem_regions sorting
- implementation
-In-Reply-To: <E1axXSq-0004hx-8H@e0050434b2927.dyn.arm.linux.org.uk>
+Date: Wed, 25 May 2016 13:30:55 +0530
+Subject: [PATCH kexec-tools 13/32] arm: fix pointer signedness warning in
+ kexec-uImage-arm.c
+In-Reply-To: <E1axXT0-0004i9-Nv@e0050434b2927.dyn.arm.linux.org.uk>
 References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
- <E1axXSq-0004hx-8H@e0050434b2927.dyn.arm.linux.org.uk>
-Message-ID: <CAHB_Gur=Lf7-wX+=ddfEwXrC7U0mduSGTbV2hPp4HSG7nx-8yA@mail.gmail.com>
+ <E1axXT0-0004i9-Nv@e0050434b2927.dyn.arm.linux.org.uk>
+Message-ID: <CAHB_Guo5Z+1Esn9Pc075ChRxBj6beNEXVuExxN5Lr537RPUQ+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, May 3, 2016 at 3:52 PM, Russell King <rmk@arm.linux.org.uk> wrote:
-> Add a mem_regions sorting implementation taken from the arm code.
+> kexec/arch/arm/kexec-uImage-arm.c: In function 'uImage_arm_probe':
+> kexec/arch/arm/kexec-uImage-arm.c:14:2: warning: pointer targets in passing argument 1 of 'uImage_probe_kernel' differ in signedness [-Wpointer-sign]
 >
 > Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 
 Reviewed-by: Pratyush Anand <panand@redhat.com>
 
 > ---
->  kexec/mem_regions.c | 27 +++++++++++++++++++++++++++
->  kexec/mem_regions.h |  2 ++
->  2 files changed, 29 insertions(+)
+>  kexec/arch/arm/kexec-uImage-arm.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 >
-> diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
-> index a4952ff..804984a 100644
-> --- a/kexec/mem_regions.c
-> +++ b/kexec/mem_regions.c
-> @@ -1,6 +1,33 @@
-> +#include <stdlib.h>
-> +
->  #include "kexec.h"
->  #include "mem_regions.h"
+> diff --git a/kexec/arch/arm/kexec-uImage-arm.c b/kexec/arch/arm/kexec-uImage-arm.c
+> index 03c2f4d..8e0a9ac 100644
+> --- a/kexec/arch/arm/kexec-uImage-arm.c
+> +++ b/kexec/arch/arm/kexec-uImage-arm.c
+> @@ -11,7 +11,8 @@
 >
-> +static int mem_range_cmp(const void *a1, const void *a2)
-> +{
-> +       const struct memory_range *r1 = a1;
-> +       const struct memory_range *r2 = a2;
-> +
-> +       if (r1->start > r2->start)
-> +               return 1;
-> +       if (r1->start < r2->start)
-> +               return -1;
-> +
-> +       return 0;
-> +}
-> +
-> +/**
-> + * mem_regions_sort() - sort ranges into ascending address order
-> + * @ranges: ranges to sort
-> + *
-> + * Sort the memory regions into ascending address order.
-> + */
-> +void mem_regions_sort(struct memory_ranges *ranges)
-> +{
-> +       qsort(ranges->ranges, ranges->size, sizeof(ranges->ranges),
-> +             mem_range_cmp);
-> +}
-> +
->  /**
->   * mem_regions_add() - add a memory region to a set of ranges
->   * @ranges: ranges to add the memory region to
-> diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
-> index b9cfba1..da7b5e8 100644
-> --- a/kexec/mem_regions.h
-> +++ b/kexec/mem_regions.h
-> @@ -3,6 +3,8 @@
+>  int uImage_arm_probe(const char *buf, off_t len)
+>  {
+> -       return uImage_probe_kernel(buf, len, IH_ARCH_ARM);
+> +       return uImage_probe_kernel((const unsigned char *)buf, len,
+> +                                  IH_ARCH_ARM);
+>  }
 >
->  struct memory_ranges;
->
-> +void mem_regions_sort(struct memory_ranges *ranges);
-> +
->  int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
->                      unsigned long long length, int type);
->
+>  int uImage_arm_load(int argc, char **argv, const char *buf, off_t len,
 > --
 > 1.9.1
 >
