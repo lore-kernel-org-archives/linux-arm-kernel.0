@@ -1,37 +1,43 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Wed, 25 May 2016 07:35:17 +0530
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <6297051.TAxtzW5OIB@wuerfel>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
- <6297051.TAxtzW5OIB@wuerfel>
-Message-ID: <5745085D.6000104@gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Wed, 25 May 2016 09:48:32 +0300
+Subject: [PATCH] pinctrl: digicolor: add missing platform_set_drvdata()
+ call
+In-Reply-To: <1464155932-25344-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1464155932-25344-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160525064832.GG2178@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 May 2016 02:05 AM, Arnd Bergmann wrote:
-> On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
->> We have been getting build warning about:
->> drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
->> drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
->> 					uninitialized in this function
->>
->> On checking the code it turns out that sr can never be used
->> uninitialized as sr is getting initialized in the while loop and while
->> loop will always execute as the minimum value of max can be 32.
->> So just initialize sr to 0 while declaring it to silence the compiler.
->>
->> Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
->> ---
->
-> I notice that you are using a really old compiler. While this warning
-> seems to be valid in the sense that the compiler should figure out that
-> the variable might be used uninitialized, please update your toolchain
-> before reporting other such problems, as gcc-4.6 had a lot more false
-> positives that newer ones (5.x or 6.x) have.
+Hi Masahiro Yamada,
 
-yes, i need to upgrade gcc in my travis bot. But in my local system I am 
-having gcc-4.8.4 and there also I am having this error and i am sure 
-4.8.4 is still being used by many people.
+On Wed, May 25, 2016 at 02:58:52PM +0900, Masahiro Yamada wrote:
+> gc_pinctrl_remove() calls platform_get_drvdata(), but I see neither
+> platform_set_drvdata() nor dev_set_drvdata() anywhere in this driver.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Regards
-Sudip
+Acked-by: Baruch Siach <baruch@tkos.co.il>
+
+Thanks,
+baruch
+
+>  drivers/pinctrl/pinctrl-digicolor.c | 2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/pinctrl/pinctrl-digicolor.c b/drivers/pinctrl/pinctrl-digicolor.c
+> index 30ee564..c8073d4 100644
+> --- a/drivers/pinctrl/pinctrl-digicolor.c
+> +++ b/drivers/pinctrl/pinctrl-digicolor.c
+> @@ -332,6 +332,8 @@ static int dc_pinctrl_probe(struct platform_device *pdev)
+>  		return PTR_ERR(pmap->pctl);
+>  	}
+>  
+> +	platform_set_drvdata(pdev, pmap);
+> +
+>  	return dc_gpiochip_add(pmap, pdev->dev.of_node);
+>  }
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
