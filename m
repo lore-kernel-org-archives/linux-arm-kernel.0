@@ -1,177 +1,160 @@
-From: sricharan@codeaurora.org (Sricharan R)
-Date: Wed, 25 May 2016 13:46:52 +0530
-Subject: [PATCH V3 2/2] i2c: qup: Fix error handling
-In-Reply-To: <1464164212-11377-1-git-send-email-sricharan@codeaurora.org>
-References: <1464164212-11377-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1464164212-11377-3-git-send-email-sricharan@codeaurora.org>
+From: sricharan@codeaurora.org (Sricharan)
+Date: Wed, 25 May 2016 13:48:34 +0530
+Subject: [PATCH v3 1/2] i2c: qup: add ACPI support
+In-Reply-To: <1463694268-9473-1-git-send-email-austinwc@codeaurora.org>
+References: <1463694268-9473-1-git-send-email-austinwc@codeaurora.org>
+Message-ID: <000001d1b65e$0bfbfde0$23f3f9a0$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Among the bus errors reported from the QUP_MASTER_STATUS register
-only NACK is considered and transfer gets suspended, while
-other errors are ignored. Correct this and suspend the transfer
-for other errors as well. This avoids unnecessary 'timeouts' which
-happens when waiting for events that would never happen when there
-is already an error condition on the bus. Also the error handling
-procedure should be the same for both NACK and other bus errors in
-case of dma mode. So correct that as well.
+Hi,
 
-Signed-off-by: Sricharan R <sricharan@codeaurora.org>
----
-[V3] Change the return error code for NACK and other bus errors.
-     Added the error handling procedure for other bus errors in
-     dma mode. Removed the dev_err print in case of NACK.
+>From: Naveen Kaje <nkaje@codeaurora.org>
+>
+>Add support to get the device parameters from ACPI. Assume
+>that the clocks are managed by firmware.
+>
+>Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+>---
+> drivers/i2c/busses/i2c-qup.c | 60 ++++++++++++++++++++++++++++++++------------
+> 1 file changed, 44 insertions(+), 16 deletions(-)
+>
+>Changes:
+>- v3:
+> - clean up unused variable
+>- v2:
+> - clean up redundant checks and variables
+>
+>diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+>index dddd4da..ea6ca5f 100644
+>--- a/drivers/i2c/busses/i2c-qup.c
+>+++ b/drivers/i2c/busses/i2c-qup.c
+>@@ -29,6 +29,7 @@
+> #include <linux/platform_device.h>
+> #include <linux/pm_runtime.h>
+> #include <linux/scatterlist.h>
+>+#include <linux/acpi.h>
+>
+> /* QUP Registers */
+> #define QUP_CONFIG		0x000
+>@@ -132,6 +133,10 @@
+> /* Max timeout in ms for 32k bytes */
+> #define TOUT_MAX			300
+>
+>+/* Default values. Use these if FW query fails */
+>+#define DEFAULT_CLK_FREQ 100000
+>+#define DEFAULT_SRC_CLK 20000000
+>+
+> struct qup_i2c_block {
+> 	int	count;
+> 	int	pos;
+>@@ -1354,14 +1359,13 @@ static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
+> static int qup_i2c_probe(struct platform_device *pdev)
+> {
+> 	static const int blk_sizes[] = {4, 16, 32};
+>-	struct device_node *node = pdev->dev.of_node;
+> 	struct qup_i2c_dev *qup;
+> 	unsigned long one_bit_t;
+> 	struct resource *res;
+> 	u32 io_mode, hw_ver, size;
+> 	int ret, fs_div, hs_div;
+>-	int src_clk_freq;
+>-	u32 clk_freq = 100000;
+>+	u32 src_clk_freq = 0;
+>+	u32 clk_freq = 0;
+> 	int blocks;
+>
+> 	qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
+>@@ -1372,7 +1376,12 @@ static int qup_i2c_probe(struct platform_device *pdev)
+> 	init_completion(&qup->xfer);
+> 	platform_set_drvdata(pdev, qup);
+>
+>-	of_property_read_u32(node, "clock-frequency", &clk_freq);
+>+	ret = device_property_read_u32(qup->dev, "clock-frequency", &clk_freq);
+>+	if (ret) {
+>+		dev_warn(qup->dev, "using default clock-frequency %d",
+>+			DEFAULT_CLK_FREQ);
+>+		clk_freq = DEFAULT_CLK_FREQ;
+>+	}
+>
+> 	if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v1.1.1")) {
+> 		qup->adap.algo = &qup_i2c_algo;
+>@@ -1454,20 +1463,31 @@ nodma:
+> 		return qup->irq;
+> 	}
+>
+>-	qup->clk = devm_clk_get(qup->dev, "core");
+>-	if (IS_ERR(qup->clk)) {
+>-		dev_err(qup->dev, "Could not get core clock\n");
+>-		return PTR_ERR(qup->clk);
+>-	}
+>+	if (ACPI_HANDLE(qup->dev)) {
+>+		ret = device_property_read_u32(qup->dev,
+>+				"src-clock-hz", &src_clk_freq);
+>+		if (ret) {
+>+			dev_warn(qup->dev, "using default src-clock-hz %d",
+>+				DEFAULT_SRC_CLK);
+>+			src_clk_freq = DEFAULT_SRC_CLK;
+>+		}
+>+		ACPI_COMPANION_SET(&qup->adap.dev, ACPI_COMPANION(qup->dev));
+>+	} else {
+>+		qup->clk = devm_clk_get(qup->dev, "core");
+>+		if (IS_ERR(qup->clk)) {
+>+			dev_err(qup->dev, "Could not get core clock\n");
+>+			return PTR_ERR(qup->clk);
+>+		}
+>
+>-	qup->pclk = devm_clk_get(qup->dev, "iface");
+>-	if (IS_ERR(qup->pclk)) {
+>-		dev_err(qup->dev, "Could not get iface clock\n");
+>-		return PTR_ERR(qup->pclk);
+>+		qup->pclk = devm_clk_get(qup->dev, "iface");
+>+		if (IS_ERR(qup->pclk)) {
+>+			dev_err(qup->dev, "Could not get iface clock\n");
+>+			return PTR_ERR(qup->pclk);
+>+		}
+>+		qup_i2c_enable_clocks(qup);
+>+		src_clk_freq = clk_get_rate(qup->clk);
+> 	}
+>
+>-	qup_i2c_enable_clocks(qup);
+>-
+> 	/*
+> 	 * Bootloaders might leave a pending interrupt on certain QUP's,
+> 	 * so we reset the core before registering for interrupts.
+>@@ -1514,7 +1534,6 @@ nodma:
+> 	size = QUP_INPUT_FIFO_SIZE(io_mode);
+> 	qup->in_fifo_sz = qup->in_blk_sz * (2 << size);
+>
+>-	src_clk_freq = clk_get_rate(qup->clk);
+> 	fs_div = ((src_clk_freq / clk_freq) / 2) - 3;
+> 	hs_div = 3;
+> 	qup->clk_ctl = (hs_div << 8) | (fs_div & 0xff);
+>@@ -1639,6 +1658,14 @@ static const struct of_device_id qup_i2c_dt_match[] = {
+> };
+> MODULE_DEVICE_TABLE(of, qup_i2c_dt_match);
+>
+>+#if IS_ENABLED(CONFIG_ACPI)
+>+static const struct acpi_device_id qup_i2c_acpi_match[] = {
+>+	{ "QCOM8010"},
+>+	{ },
+>+};
+>+MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_ids);
+>+#endif
+>+
+> static struct platform_driver qup_i2c_driver = {
+> 	.probe  = qup_i2c_probe,
+> 	.remove = qup_i2c_remove,
+>@@ -1646,6 +1673,7 @@ static struct platform_driver qup_i2c_driver = {
+> 		.name = "i2c_qup",
+> 		.pm = &qup_i2c_qup_pm_ops,
+> 		.of_match_table = qup_i2c_dt_match,
+>+		.acpi_match_table = ACPI_PTR(qup_i2c_acpi_match),
+> 	},
+> };
 
- drivers/i2c/busses/i2c-qup.c | 76 ++++++++++++++++++++++++--------------------
- 1 file changed, 41 insertions(+), 35 deletions(-)
+Reviewed-by: sricharan at codeaurora.org
 
-diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index 8620e99..edced86 100644
---- a/drivers/i2c/busses/i2c-qup.c
-+++ b/drivers/i2c/busses/i2c-qup.c
-@@ -310,6 +310,7 @@ static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
- 	u32 opflags;
- 	u32 status;
- 	u32 shift = __ffs(op);
-+	int ret = 0;
- 
- 	len *= qup->one_byte_t;
- 	/* timeout after a wait of twice the max time */
-@@ -321,18 +322,28 @@ static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
- 
- 		if (((opflags & op) >> shift) == val) {
- 			if ((op == QUP_OUT_NOT_EMPTY) && qup->is_last) {
--				if (!(status & I2C_STATUS_BUS_ACTIVE))
--					return 0;
-+				if (!(status & I2C_STATUS_BUS_ACTIVE)) {
-+					ret = 0;
-+					goto done;
-+				}
- 			} else {
--				return 0;
-+				ret = 0;
-+				goto done;
- 			}
- 		}
- 
--		if (time_after(jiffies, timeout))
--			return -ETIMEDOUT;
--
-+		if (time_after(jiffies, timeout)) {
-+			ret = -ETIMEDOUT;
-+			goto done;
-+		}
- 		usleep_range(len, len * 2);
- 	}
-+
-+done:
-+	if (qup->bus_err || qup->qup_err)
-+		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
-+
-+	return ret;
- }
- 
- static void qup_i2c_set_write_mode_v2(struct qup_i2c_dev *qup,
-@@ -793,39 +804,35 @@ static int qup_i2c_bam_do_xfer(struct qup_i2c_dev *qup, struct i2c_msg *msg,
- 	}
- 
- 	if (ret || qup->bus_err || qup->qup_err) {
--		if (qup->bus_err & QUP_I2C_NACK_FLAG) {
--			msg--;
--			dev_err(qup->dev, "NACK from %x\n", msg->addr);
--			ret = -EIO;
-+		if (qup_i2c_change_state(qup, QUP_RUN_STATE)) {
-+			dev_err(qup->dev, "change to run state timed out");
-+			goto desc_err;
-+		}
- 
--			if (qup_i2c_change_state(qup, QUP_RUN_STATE)) {
--				dev_err(qup->dev, "change to run state timed out");
--				return ret;
--			}
-+		if (rx_nents)
-+			writel(QUP_BAM_INPUT_EOT,
-+			       qup->base + QUP_OUT_FIFO_BASE);
- 
--			if (rx_nents)
--				writel(QUP_BAM_INPUT_EOT,
--				       qup->base + QUP_OUT_FIFO_BASE);
-+		writel(QUP_BAM_FLUSH_STOP, qup->base + QUP_OUT_FIFO_BASE);
- 
--			writel(QUP_BAM_FLUSH_STOP,
--			       qup->base + QUP_OUT_FIFO_BASE);
-+		qup_i2c_flush(qup);
- 
--			qup_i2c_flush(qup);
-+		/* wait for remaining interrupts to occur */
-+		if (!wait_for_completion_timeout(&qup->xfer, HZ))
-+			dev_err(qup->dev, "flush timed out\n");
- 
--			/* wait for remaining interrupts to occur */
--			if (!wait_for_completion_timeout(&qup->xfer, HZ))
--				dev_err(qup->dev, "flush timed out\n");
-+		qup_i2c_rel_dma(qup);
- 
--			qup_i2c_rel_dma(qup);
--		}
-+		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
- 	}
- 
-+desc_err:
- 	dma_unmap_sg(qup->dev, qup->btx.sg, tx_nents, DMA_TO_DEVICE);
- 
- 	if (rx_nents)
- 		dma_unmap_sg(qup->dev, qup->brx.sg, rx_nents,
- 			     DMA_FROM_DEVICE);
--desc_err:
-+
- 	return ret;
- }
- 
-@@ -841,9 +848,6 @@ static int qup_i2c_bam_xfer(struct i2c_adapter *adap, struct i2c_msg *msg,
- 	if (ret)
- 		goto out;
- 
--	qup->bus_err = 0;
--	qup->qup_err = 0;
--
- 	writel(0, qup->base + QUP_MX_INPUT_CNT);
- 	writel(0, qup->base + QUP_MX_OUTPUT_CNT);
- 
-@@ -881,12 +885,8 @@ static int qup_i2c_wait_for_complete(struct qup_i2c_dev *qup,
- 		ret = -ETIMEDOUT;
- 	}
- 
--	if (qup->bus_err || qup->qup_err) {
--		if (qup->bus_err & QUP_I2C_NACK_FLAG) {
--			dev_err(qup->dev, "NACK from %x\n", msg->addr);
--			ret = -EIO;
--		}
--	}
-+	if (qup->bus_err || qup->qup_err)
-+		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
- 
- 	return ret;
- }
-@@ -1178,6 +1178,9 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
- 	if (ret < 0)
- 		goto out;
- 
-+	qup->bus_err = 0;
-+	qup->qup_err = 0;
-+
- 	writel(1, qup->base + QUP_SW_RESET);
- 	ret = qup_i2c_poll_state(qup, QUP_RESET_STATE);
- 	if (ret)
-@@ -1227,6 +1230,9 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
- 	struct qup_i2c_dev *qup = i2c_get_adapdata(adap);
- 	int ret, len, idx = 0, use_dma = 0;
- 
-+	qup->bus_err = 0;
-+	qup->qup_err = 0;
-+
- 	ret = pm_runtime_get_sync(qup->dev);
- 	if (ret < 0)
- 		goto out;
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Regards,
+ Sricharan
