@@ -1,89 +1,50 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 25 May 2016 14:49:03 +0100
-Subject: [PATCH v4 06/12] KVM: arm64: implement basic ITS register handlers
-In-Reply-To: <5704D8B8.4000504@linaro.org>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-7-git-send-email-andre.przywara@arm.com>
- <5704D8B8.4000504@linaro.org>
-Message-ID: <0c89ea29-4c40-ce87-f499-d600c466ace4@arm.com>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Wed, 25 May 2016 16:05:13 +0200
+Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
+In-Reply-To: <9b905766c6cc4680be4b33f79a179d5a@rwthex-w1-b.rwth-ad.de>
+References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
+ <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
+ <20abc2f6769b4369ba87ec27274a090e@rwthex-s2-a.rwth-ad.de>
+ <644530ff6bb04b5898dc33604dc7a93a@rwthex-s1-b.rwth-ad.de>
+ <9b905766c6cc4680be4b33f79a179d5a@rwthex-w1-b.rwth-ad.de>
+Message-ID: <0cf90ebe86e0461f82cb22b2a6b6ea83@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Fabio,
 
-On 06/04/16 10:36, Eric Auger wrote:
-> Hi Andre,
-> On 03/26/2016 03:14 AM, Andre Przywara wrote:
->> Add emulation for some basic MMIO registers used in the ITS emulation.
+On 05/24/2016 01:20 AM, Fabio Estevam wrote:
+> Hi Christopher,
+> 
+> On Mon, May 23, 2016 at 8:08 PM, Christopher Spinrath
+> <christopher.spinrath@rwth-aachen.de> wrote:
+> 
+>> I would like to but I'm not sure if I'm allowed to. As I stated in the
+>> license header some nodes are copied (and cleaned up) from the vendor
+>> kernel/devicetree. They are licensed GPL-v2 only. So I don't know, can I
+>> add the X11 license?
+> 
+> Maybe you could contact the original author anc check?
+> 
+I have sent an email to the author and will wait about a week for a
+reply before I send v2.
 
-...
+>>> Better to avoid 0x80000000. Replace it with the real iomux value
+>>> instead so that you don't need to rely on the bootloader
+>>> configuration.
+>> hmm, I don't know how to determine this value. The device documentation
+>> I have does not say anything about it and the vendor kernel uses
+>> 0x80000000...
+> 
+> The default value of register IOMUXC_SW_PAD_CTL_PAD_ENET_TX_DATA1 is
+> 0x1b0b0, so you can use this value.
+>
+> Another thing I forgot to comment: instead of putting this pin inside
+> the hog group you could put it inside the gpio-keys node.
+> 
 
->> +
->> +/*
->> + * By writing to CWRITER the guest announces new commands to be processed.
->> + * Since we cannot read from guest memory inside the ITS spinlock, we
->> + * iterate over the command buffer (with the lock dropped) until the read
->> + * pointer matches the write pointer. Other VCPUs writing this register in the
->> + * meantime will just update the write pointer, leaving the command
->> + * processing to the first instance of the function.
->> + */
->> +static int vgic_mmio_write_its_cwriter(struct kvm_vcpu *vcpu,
->> +				       struct kvm_io_device *this,
->> +				       gpa_t addr, int len, const void *val)
->> +{
->> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
->> +	struct vgic_its *its = &dist->its;
->> +	gpa_t cbaser = its_cmd_buffer_base(vcpu->kvm);
->> +	u64 cmd_buf[4];
->> +	u32 reg;
->> +	bool finished;
->> +
->> +	reg = mask64(its->cwriter & 0xfffe0, addr & 7, len, val);
->> +	reg &= 0xfffe0;
->> +	if (reg > its_cmd_buffer_size(vcpu->kvm))
->> +		return 0;
->> +
->> +	spin_lock(&its->lock);
->> +
->> +	/*
->> +	 * If there is still another VCPU handling commands, let this
->> +	 * one pick up the new CWRITER and process "our" new commands as well.
->> +	 */
->> +	finished = (its->cwriter != its->creadr);
-> empty?
+OK, done. Can I always use the default value in this case? If yes, can
+you point me to a proper documentation of these?
 
-Maybe that is indeed less misleading ...
-
->> +	its->cwriter = reg;
->> +
->> +	spin_unlock(&its->lock);
-> Assuming we have 2 vcpus attempting a cwriter write at the same moment I
-> don't understand what does guarantee they are not going to execute the
-> following loop concurrently and possibly execute vits_handle_command
-> twice on the same cmd from the same its->creadr start?
-
-So does my explanation of the algorithm in that other mail today explain
-it? Or do you still see a hole in the locking scheme here?
-
->> +
->> +	while (!finished) {
->> +		int ret = kvm_read_guest(vcpu->kvm, cbaser + its->creadr,
->> +					 cmd_buf, 32);
->> +		if (ret) {
->> +			/*
->> +			 * Gah, we are screwed. Reset CWRITER to that command
->> +			 * that we have finished processing and return.
->> +			 */
->> +			spin_lock(&its->lock);
->> +			its->cwriter = its->creadr;
-> don't get why do you set the queue empty?
-
-So from a guest's point of view this is something like an ITS internal
-error which shouldn't happen. So I just bail out, but leave the queue in
-a consistent (read: empty) state to allow possible future commands to be
-processed at best effort.
-I guess this is the best we can come up with, since there is no feasible
-way of communicating errors back(?)
-
-Cheers,
-Andre.
+Thanks,
+Christopher
