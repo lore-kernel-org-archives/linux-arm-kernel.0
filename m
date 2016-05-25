@@ -1,77 +1,63 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 25 May 2016 11:36:38 +0800
-Subject: [PATCH 1/1] arm64: fix flush_cache_range
-In-Reply-To: <5744FDD0.8060504@huawei.com>
-References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
- <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
- <20160524130255.GU4892@e104818-lin.cambridge.arm.com>
- <5744FDD0.8060504@huawei.com>
-Message-ID: <57451DC6.7080106@huawei.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Wed, 25 May 2016 11:47:44 +0800
+Subject: [PATCH v3 0/5] Thermal: Support for hardware-tracked trip points
+Message-ID: <1464148069-26254-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The history patches come from Mikko and Sascha.
+    http://thread.gmane.org/gmane.linux.power-management.general/59451
+
+Now, I pick them up to continue upstream.
+Nevermind!
+
+This series history patches:
+v2: https://lkml.org/lkml/2016/5/3/220
+v1: https://lkml.org/lkml/2016/4/24/227
+
+This series adds support for hardware trip points. It picks up earlier
+work from Mikko Perttunen. Mikko implemented hardware trip points as part
+of the device tree support. It was suggested back then to move the
+functionality to the thermal core instead of putting more code into the
+device tree support. This series does exactly that.
+
+This series patches rebase the conflicts.
+Note that the hardware-tracked trip points are very well tested currently.
+
+Verified and tested on https://github.com/Caesar-github/rockchip/tree/wip/fixes-thermal-0525
+That's based on linux-kernel 20160524.
 
 
-On 2016/5/25 9:20, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2016/5/24 21:02, Catalin Marinas wrote:
->> On Tue, May 24, 2016 at 08:19:05PM +0800, Leizhen (ThunderTown) wrote:
->>> On 2016/5/24 19:37, Mark Rutland wrote:
->>>> On Tue, May 24, 2016 at 07:16:37PM +0800, Zhen Lei wrote:
->>>>> When we ran mprotect04(a test case in LTP) infinitely, it would always
->>>>> failed after a few seconds. The case can be described briefly that: copy
->>>>> a empty function from code area into a new memory area(created by mmap),
->>>>> then call mprotect to change the protection to PROT_EXEC. The syscall
->>>>> sys_mprotect will finally invoke flush_cache_range, but this function
->>>>> currently only invalid icache, the operation of flush dcache is missed.
->>>>
->>>> In the LTP code I see powerpc-specific D-cache / I-cache synchronisation
->>>> (i.e. d-cache cleaning followed by I-cache invalidation), so there
->>>> appears to be some expectation of userspace maintenance. Hoever, there
->>>> is no such ARM-specific I-cache maintenance.
->>>
->>> But I see some other platforms have D-cache maintenance, like: arch/nios2/mm/cacheflush.c
->>> And according to the name of flush_cache_range, it should do this, I judged. Otherwise,
->>> mprotect04 will be failed on more platforms, it's easy to discover. Only PPC have specific
->>> cache synchronization, maybe it meets some hardware limitation. It's impossible a programmer
->>> fixed a common bug on only one platform but leave others unchanged.
->>
->> flush_cache_range() is primarily used on VIVT caches before changing the
->> mapping and should not really be implemented on arm64. I don't recall
->> why we still have the I-cache invalidation, possibly for the ASID-tagged
->> VIVT I-cache case, though we should have a specific check for this.
->>
->> There are some other cases where flush_cache_range() is called and no
->> D-cache maintenance is necessary on arm64, so I don't want to penalise
->> them by implementing flush_cache_range().
->>
->>>> It looks like the test may be missing I-cache maintenance regardless of
->>>> the semantics of mprotect in this case.
->>>>
->>>> I have not yet devled into flush_cache_range and how it is called.
->>>
->>> SYSCALL_DEFINE3(mprotect ---> mprotect_fixup ---> change_protection ---> change_protection_range --> flush_cache_range
->>
->> The change_protection() shouldn't need to flush the caches in
->> flush_cache_range(). The change_pte_range() function eventually ends up
->> calling set_pte_at() which calls __sync_icache_dcache() if the mapping
->> is executable.
-> 
-> OK, I see.
-> But I'm afraid it entered the "if (pte_present(oldpte))" branch in function change_pte_range.
-> Because the test case called mmap to create pte first, then called pte_modify.
-> I will check it later.
+Changes in v3:
+- as Javi comments on https://patchwork.kernel.org/patch/9001281/.
+- add the lock for preventing the called from multi placce
+- add the note for pre_low/high_trip.
+- as the Javi comments on https://patchwork.kernel.org/patch/9001311/.
+- add the select if they set the option for devicetree.
+- Add the peter's ACK.
 
-I have checked that it entered "if (pte_present(oldpte))" branch.
+Changes in v2:
+- update the sysfs-api.txt for set_trips.
+- add the commit in patch[v2 2/5].
+- Update the commit for patch[v2 4/5].
 
-But I don't known why I add flush_icache_range is OK, but add __sync_icache_dcache have no effect.
+Caesar Wang (1):
+  thermal: rockchip: add the set_trips function
 
-> 
->>
->> Can you be more specific about the kernel version you are using, its
->> configuration?
->>
-> I used the latest mainline kernel version, and built with arch/arm64/configs/defconfig, ran on our D02 board.
-> I have attached the testcase, you can simply run: sh test.sh
-> 
+Sascha Hauer (4):
+  thermal: Add support for hardware-tracked trip points
+  thermal: of: implement .set_trips for device tree thermal zones
+  thermal: streamline get_trend callbacks
+  thermal: bang-bang governor: act on lower trip boundary
+
+ Documentation/thermal/sysfs-api.txt                |  7 +++
+ drivers/thermal/gov_bang_bang.c                    |  2 +-
+ drivers/thermal/of-thermal.c                       | 30 ++++++++-----
+ drivers/thermal/rockchip_thermal.c                 | 39 ++++++++++++++++
+ drivers/thermal/thermal_core.c                     | 52 ++++++++++++++++++++++
+ drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 25 ++++-------
+ include/linux/thermal.h                            | 13 +++++-
+ 7 files changed, 139 insertions(+), 29 deletions(-)
+
+-- 
+1.9.1
