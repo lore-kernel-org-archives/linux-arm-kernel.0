@@ -1,172 +1,73 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 25 May 2016 12:27:04 +0800
-Subject: [PATCH] ARM64: dts: rockchip: add thermal zone node for rk3399 SoCs
-Message-ID: <1464150424-27809-1-git-send-email-wxt@rock-chips.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 25 May 2016 07:10:26 +0200
+Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
+ support
+In-Reply-To: <20160525004825.GC7292@verge.net.au>
+References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
+ <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
+ <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
+ <20160525004825.GC7292@verge.net.au>
+Message-ID: <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds thermal zone node to rk3399 dtsi, rk3399 thermal data is
-including the cpu and gpu sensor zone node.
-At the moment, remove the rk3368 thermal data from rk399 dtsi.
+Hi Simon,
 
-The thermal zone node is the node containing all the required info
-for describing a thermal zone, including its cooling device bindings.
-The thermal zone node must contain, apart from its own properties, one
-sub-node containing trip nodes and one sub-node containing all the zone
-cooling maps.
+On 25.05.2016 02:48, Simon Horman wrote:
+> Hi Dirk,
+>
+> On Tue, May 24, 2016 at 07:30:17AM +0200, Dirk Behme wrote:
+>> Hi Simon,
+>
+> [...]
+>
+>> With Renesas R-Car3 we will get a whole family of SoCs. I.e. different
+>> computing power (e.g. different number of Cores) with more or less similar
+>> peripherals.
+>>
+>> I would think that we want to reflect this in the device tree, too.
+>> Therefore I think what we want is a hierarchy of device trees. Similar
+>> what's done with other SoC families (compare e.g. i.MX6).
+>>
+>> E.g. we want an initial rcar3.dtsi, which contains all common parts of all
+>> R-Car3 SoCs. E.g. one CA57 core, the SCIF where its common etc.
+>>
+>> Then you will have the r8a779x.dtsi which includes the rcar3.dtsi and
+>> extends it for SoC specific parts. Which then will be included by the board
+>> device trees, as already done, now.
+>>
+>> Or in other words: As soon as you have similar parts in the r8a779x.dtsi's,
+>> it's time to think about moving the parts one hierarchy level up into the
+>> rcar3.dtsi. Else you will end up in a maintenance hell once you have to
+>> change/fix anything.
+>
+> Thanks for raising this issue.
+>
+> I agree entirely that we should work towards a situation where maintenance
+> is as easy as it can be. However, due to the per-SoC binding scheme that
+> we are using for IP related to Renesas SoCs I suspect that very few DT nodes
+> can be shared between SoCs verbatim.
 
-The following is the parameter is introduced:
-* polling-delay:
-The maximum number of milliseconds to wait between polls
 
-* polling-delay-passive:
-The maximum number of milliseconds to wait between polls when performing
-passive cooling.
+Could you kindly share an example for this? Looking into the H3 and the 
+M3-W manual, it looks to me that ~90% (?) of the peripherals are the same.
 
-* trips:
-A sub-node which is a container of only trip point nodes required to
-describe the thermal zone.
 
-* cooling-maps:
-A sub-node which is a container of only cooling device map nodes, used to
-describe the relation between trips and cooling devices.
+> Probably some sort of scheme can be cooked up using preprocessor macros.
+> And probably there are other ways to resolve this problem. But I would
+> prefer if we worked towards resolving this maintenance problem in parallel
+> with rather than as a dependency of merging r8a7796 support into mainline.
 
-* cooling-device:
-A phandle of a cooling device with its specifier, referring to which
-cooling device is used in this cooling specifier binding. In the cooling
-specifier, the first cell is the minimum cooling state and the second cell
-is the maximum cooling state used in this map.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+I'd propose to do it correct from the beginning.
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 100 +++++++++++++++++++++++++++++++
- 1 file changed, 100 insertions(+)
+Doing it later would either be more work or forgotten, and never be 
+done, then.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 46f325a..cc4ca2a 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -45,6 +45,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/pinctrl/rockchip.h>
-+#include <dt-bindings/thermal/thermal.h>
- 
- / {
- 	compatible = "rockchip,rk3399";
-@@ -389,6 +390,95 @@
- 		status = "disabled";
- 	};
- 
-+	thermal-zones {
-+		cpu-thermal: cpu {
-+			polling-delay-passive = <100>; /* milliseconds */
-+			polling-delay = <1000>; /* milliseconds */
-+
-+			thermal-sensors = <&tsadc 0>;
-+
-+			trips {
-+				cpu_alert0: cpu_alert0 {
-+					temperature = <70000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_alert1: cpu_alert1 {
-+					temperature = <75000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				cpu_crit: cpu_crit {
-+					temperature = <95000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&cpu_alert0>;
-+					cooling-device =
-+						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+				map1 {
-+					trip = <&cpu_alert1>;
-+					cooling-device =
-+						<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>,
-+						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
-+		};
-+
-+		gpu-thermal: gpu {
-+			polling-delay-passive = <100>; /* milliseconds */
-+			polling-delay = <1000>; /* milliseconds */
-+
-+			thermal-sensors = <&tsadc 1>;
-+
-+			trips {
-+				gpu_alert0: gpu_alert0 {
-+					temperature = <75000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "passive";
-+				};
-+				gpu_crit: gpu_crit {
-+					temperature = <95000>; /* millicelsius */
-+					hysteresis = <2000>; /* millicelsius */
-+					type = "critical";
-+				};
-+			};
-+
-+			cooling-maps {
-+				map0 {
-+					trip = <&gpu_alert0>;
-+					cooling-device =
-+						<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+				};
-+			};
-+		};
-+	};
-+
-+	tsadc: tsadc at ff260000 {
-+		compatible = "rockchip,rk3399-tsadc";
-+		reg = <0x0 0xff260000 0x0 0x100>;
-+		interrupts = <GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>;
-+		rockchip,grf = <&grf>;
-+		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
-+		clock-names = "tsadc", "apb_pclk";
-+		assigned-clocks = <&cru SCLK_TSADC>;
-+		assigned-clock-rates = <750000>;
-+		resets = <&cru SRST_TSADC>;
-+		reset-names = "tsadc-apb";
-+		pinctrl-names = "init", "default", "sleep";
-+		pinctrl-0 = <&otp_gpio>;
-+		pinctrl-1 = <&otp_out>;
-+		pinctrl-2 = <&otp_gpio>;
-+		#thermal-sensor-cells = <1>;
-+		rockchip,hw-tshut-temp = <95000>;
-+		status = "disabled";
-+	};
-+
- 	pmugrf: syscon at ff320000 {
- 		compatible = "rockchip,rk3399-pmugrf", "syscon";
- 		reg = <0x0 0xff320000 0x0 0x1000>;
-@@ -881,6 +971,16 @@
- 			};
- 		};
- 
-+		tsadc {
-+			otp_gpio: otp-gpio {
-+				rockchip,pins = <1 6 RK_FUNC_GPIO &pcfg_pull_none>;
-+			};
-+
-+			otp_out: otp-out {
-+				rockchip,pins = <1 6 RK_FUNC_1 &pcfg_pull_none>;
-+			};
-+		};
-+
- 		uart0 {
- 			uart0_xfer: uart0-xfer {
- 				rockchip,pins =
--- 
-1.9.1
+For a starting point, I'd propose to put the r8a7795.dtsi and 
+r8a7796.dtsi into a graphical diff tool and move all common parts to a 
+rcar3.dtsi (I'd be happy to discuss the name, though)
+
+Best regards
+
+Dirk
