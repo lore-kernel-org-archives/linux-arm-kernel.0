@@ -1,64 +1,60 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 25 May 2016 15:34:32 +0100
-Subject: [PATCH v4 10/12] KVM: arm64: implement ITS command queue command
- handlers
-In-Reply-To: <3F572EDF-329A-4D6D-BA06-7E6F3B89C819@caviumnetworks.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-11-git-send-email-andre.przywara@arm.com>
- <3F572EDF-329A-4D6D-BA06-7E6F3B89C819@caviumnetworks.com>
-Message-ID: <904cef0a-4f9e-2510-c6bc-19c45bd2ef1e@arm.com>
+From: agustinv@codeaurora.org (agustinv at codeaurora.org)
+Date: Wed, 25 May 2016 10:37:36 -0400
+Subject: [PATCH V3 0/2] irqchip: qcom: Add IRQ combiner driver
+In-Reply-To: <1463156203-10970-1-git-send-email-agustinv@codeaurora.org>
+References: <1463156203-10970-1-git-send-email-agustinv@codeaurora.org>
+Message-ID: <a7f49bb9ecfb9181d9d9f76cc45d6dbf@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tirumalesh,
+Adding linux-arm-kernel and linux-acpi
 
-....
-
->> +/* The MOVI command moves an ITTE to a different collection. */
->> +static int vits_cmd_handle_movi(struct kvm *kvm, u64 *its_cmd)
->> +{
->> +	struct vgic_its *its = &kvm->arch.vgic.its;
->> +	u32 device_id = its_cmd_get_deviceid(its_cmd);
->> +	u32 event_id = its_cmd_get_id(its_cmd);
->> +	u32 coll_id = its_cmd_get_collection(its_cmd);
->> +	struct its_itte *itte;
->> +	struct its_collection *collection;
->> +	int ret;
->> +
->> +	spin_lock(&its->lock);
->> +	itte = find_itte(kvm, device_id, event_id);
->> +	if (!itte) {
->> +		ret = E_ITS_MOVI_UNMAPPED_INTERRUPT;
->> +		goto out_unlock;
->> +	}
->> +	if (!its_is_collection_mapped(itte->collection)) {
->> +		ret = E_ITS_MOVI_UNMAPPED_COLLECTION;
->> +		goto out_unlock;
->> +	}
->> +
->> +	collection = find_collection(kvm, coll_id);
->> +	if (!its_is_collection_mapped(collection)) {
->> +		ret = E_ITS_MOVI_UNMAPPED_COLLECTION;
->> +		goto out_unlock;
->> +	}
->> +
->> +	itte->collection = collection;
->> +	update_affinity(kvm, collection);
->> +
+On 2016-05-13 12:16, Agustin Vega-Frias wrote:
+> Add support for IRQ combiners in the Top-level Control and Status
+> Registers (TCSR) hardware block in Qualcomm Technologies chips.
 > 
-> Not planning to send this down to Physical ITS in case of VFIO for performance reasons?
+> The first patch adds support for ResourceSource/IRQ domain mapping
+> when using Extended IRQ Resources with a specific ResourceSource.
+> The core ACPI resource management code has been changed to lookup
+> the IRQ domain when an IRQ resource indicates a ResourceSource,
+> and register the IRQ on that domain, instead of a GSI.
+> 
+> The second patch takes advantage of the new capabilities to implement
+> the driver for the IRQ combiners.
+> 
+> Changes V1 -> V2:
+> * Remove use of GPIO library for the combiner
+> * Refactor to use fwnode/ResourceSource to IRQ domain mapping
+>   introduced in ACPI core
+> 
+> Changes V2 -> V3:
+> * Removed parsing of _PRS to find IRQs
+> * Removed acpi_irq_domain_create and acpi_irq_domain_remove
+> 
+> Agustin Vega-Frias (2):
+>   ACPI: Add support for ResourceSource/IRQ domain mapping
+>   irqchip: qcom: Add IRQ combiner driver
+> 
+>  drivers/acpi/Makefile               |   1 +
+>  drivers/acpi/irqdomain.c            | 108 +++++++++++
+>  drivers/acpi/resource.c             |  23 ++-
+>  drivers/irqchip/Kconfig             |   8 +
+>  drivers/irqchip/Makefile            |   1 +
+>  drivers/irqchip/qcom-irq-combiner.c | 344 
+> ++++++++++++++++++++++++++++++++++++
+>  include/linux/acpi.h                |   6 +
+>  7 files changed, 483 insertions(+), 8 deletions(-)
+>  create mode 100644 drivers/acpi/irqdomain.c
+>  create mode 100644 drivers/irqchip/qcom-irq-combiner.c
+> 
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+> Forum,
+> a Linux Foundation Collaborative Project.
 
-Why should we?
-So in general: this virtual ITS is a purely emulated one, it does not
-depend on any hardware ITS to work. Also at this point we don't focus on
-VFIO (in fact this doesn't even work without further patches).
-So it would break abstraction to pass on commands. Besides I don't see
-the benefit of passing a 32-byte structure around, which needs to be
-validated (and thus touched) anyway.
-Also in this particular case: Why would a change of the _virtual_
-affinity affect a VFIO IRQ on the host at all?
-Actually the collection IDs of the guests are _totally_ separate and
-unrelated to a host collection ID.
-
-Cheers,
-Andre
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+a Linux Foundation Collaborative Project.
