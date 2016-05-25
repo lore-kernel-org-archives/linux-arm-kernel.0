@@ -1,95 +1,159 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 25 May 2016 10:01:52 +0200
-Subject: [PATCH 2/2] ARM: dts: Add async-bridge clock to MFC power domain
- for Exynos5420
-In-Reply-To: <574558DF.1090000@samsung.com>
-References: <1464111662-15336-1-git-send-email-javier@osg.samsung.com>
- <1464111662-15336-3-git-send-email-javier@osg.samsung.com>
- <574558DF.1090000@samsung.com>
-Message-ID: <57455BF0.8080609@samsung.com>
+From: raashidmuhammed@zilogic.com (Raashid Muhammed)
+Date: Wed, 25 May 2016 13:45:05 +0530
+Subject: [PATCH 1/2] ARM: at91/dt: at91sam9260: Remove leading zeros in OHCI
+ node.
+Message-ID: <1464164106-28359-1-git-send-email-raashidmuhammed@zilogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2016 09:48 AM, Krzysztof Kozlowski wrote:
-> On 05/24/2016 07:41 PM, Javier Martinez Canillas wrote:
->> The MFC IP is also inter-connected by an Async-Bridge so the CLK_ACLK333
->> has to be ungated during a power domain switch. Trying to do it when the
->> clock is gated will fail and lead to an imprecise external abort error
->> when the driver tries to access the MFC registers with the PD disabled.
->>
->> For example, if the s5p-mfc module is removed and the MFC PD turned off:
->>
->> [  186.835606] Power domain power-domain at 10044060 disable failed
->> [  186.835671] s5p-mfc 11000000.codec: Removing 11000000.codec
->> [  186.837670] Power domain power-domain at 10044060 disable failed
->>
->> And when the module is inserted again:
->>
->> [ 2395.176956] s5p_mfc_wait_for_done_dev:34: Interrupt (dev->int_type:0, command:12) timed out
->> [ 2395.177031] s5p_mfc_init_hw:272: Failed to load firmware
->> [ 2395.177384] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
->> [ 2395.177441] pgd = ec3b4000
->> [ 2395.177467] [00000000] *pgd=00000000
->> [ 2395.177507] Internal error: : 1406 [#1] PREEMPT SMP ARM
->> [ 2395.177550] Modules linked in: s5p_mfc mwifiex_sdio mwifiex uvcvideo s5p_jpeg v4l2_mem2mem videobuf2_vmalloc videobuf2_dma_contig videobuf2_memops videobuf2_v4l2 videobuf2_core v4l2_common videodev media [last unloaded: s5p_mfc]
->> [ 2395.177774] CPU: 1 PID: 2382 Comm: v4l_id Tainted: G        W       4.6.0-rc6-next-20160502-00010-g7730dc64d2c1-dirty #179
->> [ 2395.177857] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
->> [ 2395.177906] task: ed275500 ti: e6c8c000 task.ti: e6c8c000
->> [ 2395.177996] PC is at s5p_mfc_reset+0x1c4/0x284 [s5p_mfc]
->> [ 2395.178057] LR is at s5p_mfc_reset+0x1a4/0x284 [s5p_mfc]
->>
->> This patch fixes this issue by adding the CLK_ACLK333 as an Async-Bridge
->> clock for the MFC power domain, so the PD configuration works properly.
->>
->> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>
->> ---
->>
->>  arch/arm/boot/dts/exynos5420.dtsi | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> Indeed patch #1 is not a hard dependency here because there are no other
-> asb clocks. It is entirely obvious but works fine.
+From: Raashid Muhammed <raashidmuhammed@zilogic.com>
 
-Damn, I wanted to write:
-"It is not entirely obvious but works fine."
-(in Exynos pm_domains driver the clk_get() returns -ENOENT and the loop
-is escaped early)
+Remove leading zeros in OHCI node for at91sam9260 based boards.
 
-BR,
-Krzysztof
+Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
+Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
+---
+ arch/arm/boot/dts/aks-cdu.dts               | 2 +-
+ arch/arm/boot/dts/animeo_ip.dts             | 2 +-
+ arch/arm/boot/dts/at91-foxg20.dts           | 2 +-
+ arch/arm/boot/dts/at91-kizbox.dts           | 2 +-
+ arch/arm/boot/dts/at91-qil_a9260.dts        | 2 +-
+ arch/arm/boot/dts/at91sam9260.dtsi          | 2 +-
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 2 +-
+ arch/arm/boot/dts/ethernut5.dts             | 2 +-
+ arch/arm/boot/dts/evk-pro3.dts              | 2 +-
+ arch/arm/boot/dts/usb_a9260_common.dtsi     | 2 +-
+ 10 files changed, 10 insertions(+), 10 deletions(-)
 
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Unless all other patches are meant to current fixes cycle (and/or
-> cc-stable), I do not plan to apply it now. I'll take it for v4.8, because:
-> 1. Your previous patches are needed. Without them bind/unbind won't work.
-> 2. This is not reproducible in a regular driver operation.
-> 3. It needs clock change to actually be useful.
-> 
-> Is it okay?
-> 
-> Best regards,
-> Krzysztof
-> 
->>
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
->> index 4c8523471c65..f3e9d873633e 100644
->> --- a/arch/arm/boot/dts/exynos5420.dtsi
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -313,8 +313,9 @@
->>  	mfc_pd: power-domain at 10044060 {
->>  		compatible = "samsung,exynos4210-pd";
->>  		reg = <0x10044060 0x20>;
->> -		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_USER_ACLK333>;
->> -		clock-names = "oscclk", "clk0";
->> +		clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_USER_ACLK333>,
->> +			 <&clock CLK_ACLK333>;
->> +		clock-names = "oscclk", "clk0","asb0";
->>  		#power-domain-cells = <0>;
->>  	};
->>  
->>
-> 
-> 
+diff --git a/arch/arm/boot/dts/aks-cdu.dts b/arch/arm/boot/dts/aks-cdu.dts
+index d9c50fb..5b1bf92 100644
+--- a/arch/arm/boot/dts/aks-cdu.dts
++++ b/arch/arm/boot/dts/aks-cdu.dts
+@@ -57,7 +57,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <2>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
+index 0962f2f..8bcbad3 100644
+--- a/arch/arm/boot/dts/animeo_ip.dts
++++ b/arch/arm/boot/dts/animeo_ip.dts
+@@ -114,7 +114,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <2>;
+ 			atmel,vbus-gpio = <&pioB 15 GPIO_ACTIVE_LOW>;
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
+index 6bf873e..42a535d 100644
+--- a/arch/arm/boot/dts/at91-foxg20.dts
++++ b/arch/arm/boot/dts/at91-foxg20.dts
+@@ -128,7 +128,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <2>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
+index 229e989..0e3f34e 100644
+--- a/arch/arm/boot/dts/at91-kizbox.dts
++++ b/arch/arm/boot/dts/at91-kizbox.dts
+@@ -54,7 +54,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <1>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
+index 4f2eebf..5309e19 100644
+--- a/arch/arm/boot/dts/at91-qil_a9260.dts
++++ b/arch/arm/boot/dts/at91-qil_a9260.dts
+@@ -111,7 +111,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <2>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index d4884dd..af5ba31 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -1007,7 +1007,7 @@
+ 			status = "disabled";
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x100000>;
+ 			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index e9cc99b..1395b30 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -170,7 +170,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <2>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
+index 2430443..298ee2f 100644
+--- a/arch/arm/boot/dts/ethernut5.dts
++++ b/arch/arm/boot/dts/ethernut5.dts
+@@ -77,7 +77,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <2>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
+index f72969e..312d3e8 100644
+--- a/arch/arm/boot/dts/evk-pro3.dts
++++ b/arch/arm/boot/dts/evk-pro3.dts
+@@ -46,7 +46,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <2>;
+ 			status = "okay";
+ 		};
+diff --git a/arch/arm/boot/dts/usb_a9260_common.dtsi b/arch/arm/boot/dts/usb_a9260_common.dtsi
+index 9beea89..12119b5 100644
+--- a/arch/arm/boot/dts/usb_a9260_common.dtsi
++++ b/arch/arm/boot/dts/usb_a9260_common.dtsi
+@@ -90,7 +90,7 @@
+ 			};
+ 		};
+ 
+-		usb0: ohci at 00500000 {
++		usb0: ohci at 500000 {
+ 			num-ports = <2>;
+ 			status = "okay";
+ 		};
+-- 
+2.1.4
