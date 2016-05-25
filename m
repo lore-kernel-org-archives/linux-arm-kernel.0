@@ -1,156 +1,95 @@
-From: honghui.zhang@mediatek.com (Honghui Zhang)
-Date: Wed, 25 May 2016 15:58:50 +0800
-Subject: [PATCH v2 4/5] iommu/mediatek: add support for mtk iommu
- generation one HW
-In-Reply-To: <5744750D.9080006@arm.com>
-References: <1463658558-567-1-git-send-email-honghui.zhang@mediatek.com>
- <1463658558-567-5-git-send-email-honghui.zhang@mediatek.com>
- <57435AA1.3090602@arm.com> <1464083839.30939.54.camel@mtksdaap41>
- <5744750D.9080006@arm.com>
-Message-ID: <1464163130.30939.59.camel@mtksdaap41>
+From: panand@redhat.com (Pratyush Anand)
+Date: Wed, 25 May 2016 13:30:12 +0530
+Subject: [PATCH kexec-tools 10/32] kexec: add generic helper to add to
+ memory_regions
+In-Reply-To: <E1axXSl-0004hr-0T@e0050434b2927.dyn.arm.linux.org.uk>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <E1axXSl-0004hr-0T@e0050434b2927.dyn.arm.linux.org.uk>
+Message-ID: <CAHB_GuohKypNtesrjfT3H=U74_X4gudqS5jw+Tu1u1BsO_QF_A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2016-05-24 at 16:36 +0100, Robin Murphy wrote:
-> On 24/05/16 10:57, Honghui Zhang wrote:
-> [...]
-> >>> @@ -48,6 +48,9 @@ struct mtk_iommu_domain {
-> >>>    	struct io_pgtable_ops		*iop;
-> >>>
-> >>>    	struct iommu_domain		domain;
-> >>> +	void				*pgt_va;
-> >>> +	dma_addr_t			pgt_pa;
-> >>> +	void				*cookie;
-> >>
-> >> These are going to be mutually exclusive with the cfg and iop members,
-> >> which implies it might be a good idea to use a union and not waste
-> >> space. Or better, just forward-declare struct mtk_iommu_domain here and
-> >> leave separate definitions private to each driver. The void *cookie is
-> >> also an unnecessary level of abstraction, I think.
-> >>
-> >
-> > Do you mean declare struct mtk_iommu_domain here, and implement a new
-> > struct in mtk_iommu_v1.c like
-> > struct mtk_iommu_domain_v1 {
-> > 	struct mtk_iommu_domain	domain;
-> > 	u32			*pgt_va;
-> > 	dma_addr_t		pgt_pa;
-> > 	mtk_iommu_data		*data;
-> > };
-> > If this is acceptable I would implement it in the next version.
-> 
-> Pretty much, except they both want to be called struct mtk_iommu_domain, 
-> so that a *declaration* for the sake of the m4u_dom member of struct 
-> mtk_iommu_data in the header file can remain common to both drivers - it 
-> then just picks up whichever private *definition* from the .c file being 
-> compiled.
+On Tue, May 3, 2016 at 3:51 PM, Russell King <rmk@arm.linux.org.uk> wrote:
+> Add a helper to add a memory range to a memory_regions array.
+>
+> Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 
-I will follow your advise in the next version, thanks very much.
+Reviewed-by: Pratyush Anand <panand@redhat.com>
 
-> 
-> >>>    };
-> >>>
-> >>>    struct mtk_iommu_data {
-> >>> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> >>> new file mode 100644
-> >>> index 0000000..55023e1
-> >>> --- /dev/null
-> >>> +++ b/drivers/iommu/mtk_iommu_v1.c
-> >>> @@ -0,0 +1,742 @@
-> >>> +/*
-> >>> + * Copyright (c) 2015-2016 MediaTek Inc.
-> >>> + * Author: Yong Wu <yong.wu@mediatek.com>
-> >>
-> >> Nit: is that in the sense that this patch should also have Yong's
-> >> signed-off-by on it, or in that it's your work derived from his version
-> >> in mtk_iommu.c?
-> >
-> > I write this driver based on Yong's version of mtk_iommu.c, should I add
-> > his signed-off-by for this patch? Or should I put a comment about this?
-> > Thanks.
-> 
-> OK, in that case I think the appropriate attribution would be along the 
-> lines of "Author: Honghui Zhang, based on mtk_iommu.c by Yong Wu" (if in 
-> doubt, grepping for "Based on" gives a feel for how this is commonly 
-> done). If the work that comprises this patch itself (i.e. the copying 
-> and modification of the existing code) is all yours then your sign-off 
-> alone is fine.
-> 
-> [...]
-> >>> +static int mtk_iommu_add_device(struct device *dev)
-> >>> +{
-> >>> +	struct iommu_group *group;
-> >>> +	struct device_node *np;
-> >>> +	struct of_phandle_args iommu_spec;
-> >>> +	int idx = 0;
-> >>> +
-> >>> +	while (!of_parse_phandle_with_args(dev->of_node, "iommus",
-> >>> +				   "#iommu-cells", idx,
-> >>> +				   &iommu_spec)) {
-> >>
-> >> Hang on, this doesn't seem right - why do you need to reimplement all
-> >> this instead of using IOMMU_OF_DECLARE()?
-> >
-> > All the clients of mtk generation one iommu share the same iommu domain,
-> > as a matter of fact, mtk generation one iommu only support one iommu
-> > domain. ALl the clients share the same iova address and use the same
-> > pagetable. That means all iommu clients needed to be attached to the
-> > same dma_iommu_mapping.
-> 
-> Ugh, right - I'd forgotten that the arch/arm DMA mapping code doesn't 
-> respect IOMMU groups or default domains at all. That's the real root 
-> cause of the issue here.
-> 
-> > If use IOMMU_OF_DELCARE, we need to call of_iommu_set_ops to set the
-> > iommu_ops, I do not want the iommu_ops be set since it would cause iommu
-> > client device in different dma_iommu_mapping.
-> >
-> > When an iommu client device has been created, the following sequence is
-> > called.
-> >
-> > of_platform_device_create
-> > 	->of_dma_config
-> > 		->arch_setup_dma_ops
-> > 			->arch_setup_iommu_dma_ops
-> > In this function of arch_setup_iommu_dma_ops would create a new
-> > dma_iommu_mapping for each iommu client device and then attach the
-> > device to this new dma_iommu_mapping. Since all the iommu clients share
-> > the very same pagetable, this will not workable for our HW.
-> > I could not release the dma_iommu_mapping in attach_device since the
-> > to_dma_iommu_mapping was set after device_attached.
-> > Any suggest for this?
-> 
-> On a second look, you're doing more or less the same thing that the 
-> Renesas IPMMU driver currently does, so it's probably OK as a workaround 
-> for now. Fixing the arch/arm code is part of the bigger ongoing problem 
-> of sorting out IOMMU probing and DMA configuration, and it doesn't seem 
-> fair to force that on you for the sake of one driver ;)
-> 
-
-Yes, I did read the IPMMU driver before I coding this driver. Thanks.
-
-> [...]
-> >>> +static int __maybe_unused mtk_iommu_resume(struct device *dev)
-> >>> +{
-> >>> +	struct mtk_iommu_data *data = dev_get_drvdata(dev);
-> >>> +	struct mtk_iommu_suspend_reg *reg = &data->reg;
-> >>> +	void __iomem *base = data->base;
-> >>> +
-> >>> +	writel_relaxed(data->m4u_dom->pgt_pa, base + REG_MMU_PT_BASE_ADDR);
-> >>
-> >> Hmm, this looks like the only case where m4u_dom actually seems
-> >> necessary - I'm pretty sure all the others could be fairly easily
-> >> reworked to not use it (I might try having a quick hack at the existing
-> >> M4U driver to see) - at which point we could just explicitly
-> >> save/restore the base register here and get rid of m4u_dom entirely.
-> >
-> > Let me take a while to think about this.
-> 
-> That was true in the context of arm64, but you're right that the current 
-> state of the 32-bit code does make m4u_dom more necessary, so I guess we 
-> may as well leave it as-is for now.
-> 
-> Robin.
-
-Thanks very much for your comments.
-I will fix all of this later.
+> ---
+>  kexec/Makefile      |  4 ++++
+>  kexec/mem_regions.c | 30 ++++++++++++++++++++++++++++++
+>  kexec/mem_regions.h |  9 +++++++++
+>  3 files changed, 43 insertions(+)
+>  create mode 100644 kexec/mem_regions.c
+>  create mode 100644 kexec/mem_regions.h
+>
+> diff --git a/kexec/Makefile b/kexec/Makefile
+> index a758b4a..e2aee84 100644
+> --- a/kexec/Makefile
+> +++ b/kexec/Makefile
+> @@ -69,6 +69,10 @@ dist                         += kexec/fs2dt.c kexec/fs2dt.h
+>  $(ARCH)_FS2DT                  =
+>  KEXEC_SRCS                     += $($(ARCH)_FS2DT)
+>
+> +dist                           += kexec/mem_regions.c kexec/mem_regions.h
+> +$(ARCH)_MEM_REGIONS            =
+> +KEXEC_SRCS                     += $($(ARCH)_MEM_REGIONS)
+> +
+>  include $(srcdir)/kexec/arch/alpha/Makefile
+>  include $(srcdir)/kexec/arch/arm/Makefile
+>  include $(srcdir)/kexec/arch/i386/Makefile
+> diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
+> new file mode 100644
+> index 0000000..a4952ff
+> --- /dev/null
+> +++ b/kexec/mem_regions.c
+> @@ -0,0 +1,30 @@
+> +#include "kexec.h"
+> +#include "mem_regions.h"
+> +
+> +/**
+> + * mem_regions_add() - add a memory region to a set of ranges
+> + * @ranges: ranges to add the memory region to
+> + * @max: maximum number of entries in memory region
+> + * @base: base address of memory region
+> + * @length: length of memory region in bytes
+> + * @type: type of memory region
+> + *
+> + * Add the memory region to the set of ranges, and return %0 if successful,
+> + * or %-1 if we ran out of space.
+> + */
+> +int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
+> +                    unsigned long long length, int type)
+> +{
+> +       struct memory_range *range;
+> +
+> +       if (ranges->size >= ranges->max_size)
+> +               return -1;
+> +
+> +       range = ranges->ranges + ranges->size++;
+> +       range->start = base;
+> +       range->end = base + length - 1;
+> +       range->type = type;
+> +
+> +       return 0;
+> +}
+> +
+> diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
+> new file mode 100644
+> index 0000000..b9cfba1
+> --- /dev/null
+> +++ b/kexec/mem_regions.h
+> @@ -0,0 +1,9 @@
+> +#ifndef MEM_REGIONS_H
+> +#define MEM_REGIONS_H
+> +
+> +struct memory_ranges;
+> +
+> +int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
+> +                    unsigned long long length, int type);
+> +
+> +#endif
+> --
+> 1.9.1
+>
