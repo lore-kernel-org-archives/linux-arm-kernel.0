@@ -1,134 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 26 May 2016 13:34:59 +0100
-Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
- for X-Gene v1
-In-Reply-To: <CADaLNDnywVPER9QhmK4C6JyCLhta_M_cVSOuSkEHnmnLPFo3JA@mail.gmail.com>
-References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
- <1456330151.5681.46.camel@redhat.com> <56CDD767.6020103@arm.com>
- <CADaLND=mrkxOWOzcEb8os16Rb=SDHfnn_8eSgB4bQYH3UguS3w@mail.gmail.com>
- <20160225173822.GA6349@red-moon>
- <CADaLNDnywVPER9QhmK4C6JyCLhta_M_cVSOuSkEHnmnLPFo3JA@mail.gmail.com>
-Message-ID: <20160526123459.GA23794@red-moon>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 26 May 2016 07:46:40 -0500
+Subject: [PATCH 02/11] drivers: clk: st: Add clock propagation for audio
+ clocks
+In-Reply-To: <CAG374jDTCJfZB+PuAnggjXhbcd3NjJqrESpe_EnMniCAeoph9A@mail.gmail.com>
+References: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1463560892-7209-3-git-send-email-gabriel.fernandez@linaro.org>
+ <20160525172409.GA27913@rob-hp-laptop>
+ <CAG374jDTCJfZB+PuAnggjXhbcd3NjJqrESpe_EnMniCAeoph9A@mail.gmail.com>
+Message-ID: <CAL_JsqLOG4P0H+HkQ3mJhfibatuV2T51KqOn-+U+LK8WUx7QgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Duc,
+On Thu, May 26, 2016 at 4:49 AM, Gabriel Fernandez
+<gabriel.fernandez@linaro.org> wrote:
+> On 25 May 2016 at 19:24, Rob Herring <robh@kernel.org> wrote:
+>>
+>> On Wed, May 18, 2016 at 10:41:23AM +0200, Gabriel Fernandez wrote:
+>> > This patch allows fine tuning of the quads FS for audio clocks
+>> > accuracy.
+>> >
+>> > Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
+>> > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
+>> > ---
+>> >  .../devicetree/bindings/clock/st/st,flexgen.txt    |  1 +
+>> >  drivers/clk/st/clk-flexgen.c                       | 24 ++++++++++++++++++++++
+>> >  2 files changed, 25 insertions(+)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+>> > index b7ee5c7..15b33c7 100644
+>> > --- a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+>> > +++ b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
+>> > @@ -60,6 +60,7 @@ This binding uses the common clock binding[2].
+>> >  Required properties:
+>> >  - compatible : shall be:
+>> >    "st,flexgen"
+>> > +  "st,stih407-clkgend0", "st,flexgen" (enable clock propagation on parent)
+>>
+>> What do "d0" and "d2" refer to?
+>>
+>> This seems to indicate you have too much clock detail in the DT (with
+>> individual clocks described) or not enough with genericish compatible
+>> strings. What happens for the mext clock you need to adjust the flags
+>> on? You should be able to make these adjustments without DT updates.
+>> Perhaps you need a wider fixing of clock compatible strings.
+>>
+>> Rob
+>
+> Sorry i sent my response in html...
+>
+> Hi Rob,
+>
+> Thanks for reviewing.
+>
+> Can i remove
+> "
+> st,stih407-clkgend0" & "
+> st,stih407-clkgend2" compatible strings and add proprieties instead ?
+> I only need to activate 2 features and then we can keep generic
+> compatible strings.
 
-On Wed, May 25, 2016 at 04:13:35PM -0700, Duc Dang wrote:
-> On Thu, Feb 25, 2016 at 9:38 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > On Wed, Feb 24, 2016 at 02:28:10PM -0800, Duc Dang wrote:
-> >> On Wed, Feb 24, 2016 at 8:16 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> >> > On 24/02/16 16:09, Mark Salter wrote:
-> >> >> On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
-> >> >>> This patch makes pci-xgene-msi driver ACPI-aware and provides
-> >> >>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
-> >> >>>
-> >> >>> Signed-off-by: Duc Dang <dhdang@apm.com>
-> >> >>> ---
-> >> >>>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
-> >> >>>  1 file changed, 32 insertions(+), 3 deletions(-)
-> >> >>>
-> >> >>> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
-> >> >>> index a6456b5..466aa93 100644
-> >> >>> --- a/drivers/pci/host/pci-xgene-msi.c
-> >> >>> +++ b/drivers/pci/host/pci-xgene-msi.c
-> >> >>> @@ -24,6 +24,7 @@
-> >> >>>  #include <linux/pci.h>
-> >> >>>  #include <linux/platform_device.h>
-> >> >>>  #include <linux/of_pci.h>
-> >> >>> +#include <linux/acpi.h>
-> >> >>>
-> >> >>>  #define MSI_IR0                     0x000000
-> >> >>>  #define MSI_INT0            0x800000
-> >> >>> @@ -39,7 +40,7 @@ struct xgene_msi_group {
-> >> >>>  };
-> >> >>>
-> >> >>>  struct xgene_msi {
-> >> >>> -    struct device_node      *node;
-> >> >>> +    struct fwnode_handle    *fwnode;
-> >> >>>      struct irq_domain       *inner_domain;
-> >> >>>      struct irq_domain       *msi_domain;
-> >> >>>      u64                     msi_addr;
-> >> >>> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
-> >> >>>      .free   = xgene_irq_domain_free,
-> >> >>>  };
-> >> >>>
-> >> >>> +#ifdef CONFIG_ACPI
-> >> >>> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
-> >> >>> +{
-> >> >>> +    return xgene_msi_ctrl.fwnode;
-> >> >>> +}
-> >> >>> +#endif
-> >> >>> +
-> >> >>>  static int xgene_allocate_domains(struct xgene_msi *msi)
-> >> >>>  {
-> >> >>>      msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
-> >> >>> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
-> >> >>>      if (!msi->inner_domain)
-> >> >>>              return -ENOMEM;
-> >> >>>
-> >> >>> -    msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
-> >> >>> +    msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
-> >> >>>                                                  &xgene_msi_domain_info,
-> >> >>>                                                  msi->inner_domain);
-> >> >>
-> >> >> This doesn't work for me (ACPI probing on Mustang) unless I change this
-> >> >> to be pci_msi_create_default_irq_domain(). The problem seems to be that
-> >> >> the MSI probe happens after the PCIe RC is probed so there is no MSI domain
-> >> >> at the time the PCIe root is initialized by ACPI.
-> >> >
-> >> > pci_msi_create_default_irq_domain is the wrong thing do use, specially
-> >> > if you have multiple MSI controllers in the system. I certainly wouldn't
-> >> > want to see it being used on arm64.
-> >> >
-> >> > This is the usual dependency hell. You try moving the probing earlier,
-> >> > but that may break something else in the process.
-> >>
-> >> Hi Mark and Marc,
-> >>
-> >> I have modified Tianocore firmware to have MSI node declared before
-> >> PCIe node in Dsdt table. With this modification, the MSI driver will
-> >> be loaded before PCIe driver and MSI domain is available at the time
-> >> PCIe root is initialized.
-> >
-> > I am totally against this. We should not hack ACPI tables to make
-> > the kernel work (on top of that with unwritten ordering rules that may
-> > well require changes as kernel evolves), we should have a standard set
-> > of bindings that people use to describe HW in the DSDT and the kernel(s)
-> > has to cope with that. If there is a dependency problem in the description
-> > we may solve it at bindings level, but I absolutely do not want to rely
-> > on DSDT nodes ordering for things to work, that's fragile, no shortcuts
-> > please.
-> 
-> Hi Lorenzo, Bjorn,
-> 
-> (Refresh this thread on this merge cycle)
-> 
-> I tried to use _DEP method to describe the dependency of PCIe node to
-> MSI node but it turns out that PCIe driver does not check for the
-> dependency (only EC (ec.c) and I2C core (i2c-core.c) use
-> acpi_walk_dep_device_list to check for dependency before loading
-> dependent drivers)
-> 
-> Do you have other suggestion/example about how to ensure strict
-> ordering on driver loading in ACPI boot mode without changing the
-> order of ACPI nodes in DSDT?
+That is no different and suffers the same point I raised. It requires
+updating the DT for any clock configuration change or enhancement.
 
-Before doing anything else, I would like to ask you to report the code
-paths leading to failures (what fails actually ?) please, and I want
-to understand what "this does not work" means.
-
-In particular:
-
-- Why using pci_msi_create_default_irq_domain() works
-- Why, if you change the DSDT nodes ordering, things work (please add
-  some debugging to MSI allocation functions to detect the code paths
-  leading to correct MSI allocation)
-- What's the difference wrt the DT probe path
-
-When we have a detailed view of MSI allocation code paths and failures
-we can see what we can do to fix it in ACPI.
-
-Thanks,
-Lorenzo
+Rob
