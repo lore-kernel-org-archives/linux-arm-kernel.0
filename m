@@ -1,33 +1,52 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: 26 May 2016 19:25:24 -0000
-Subject: [PATCH 3/3] ARM: dts: sun5i: Add spi2 alias on A10s Olinuxino
-In-Reply-To: <908ed06eb46f2162e222258aa14df545d0fa5b48.1464129859.git.hramrach@gmail.com>
-References: <908ed06eb46f2162e222258aa14df545d0fa5b48.1464129859.git.hramrach@gmail.com>
-Message-ID: <df27dbe5931dcb7d8f404759ad42e25b15bcf780.1464129859.git.hramrach@gmail.com>
+Date: 26 May 2016 19:25:25 -0000
+Subject: [PATCH 4/5] spi: sunxi: set maximum and minimum speed of SPI master
+In-Reply-To: <cover.1464130597.git.hramrach@gmail.com>
+References: <cover.1464130597.git.hramrach@gmail.com>
+Message-ID: <7292b1fa08de4f453a643beb63e9faa7826726f6.1464130597.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-spi2 is available on the UEXT connector
+The maximum speed of SPI master is used when maximum speed of SPI slave
+is not specified. Also the __spi_validate function should check that
+transfer speeds do not exceed the master limits.
 
-The bus is named spi2 in the A10s manual and Olinuxino manual so it is
-pointless to alias it to something else like spi0.
+The user manual for A10 and A31 specifies maximum
+speed of the SPI clock as 100MHz and minimum as 3kHz.
+
+Setting the SPI clock to out-of-spec values can lock up the SoC.
 
 Signed-off-by: Michal Suchanek <hramrach@gmail.com>
 ---
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/spi/spi-sun4i.c | 2 ++
+ drivers/spi/spi-sun6i.c | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-index 7d2ff60..9729c37 100644
---- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-@@ -58,6 +58,7 @@
- 		serial0 = &uart0;
- 		serial1 = &uart2;
- 		serial2 = &uart3;
-+		spi2 = &spi2;
- 	};
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index bf52b09..e1a75dd6 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -405,6 +405,8 @@ static int sun4i_spi_probe(struct platform_device *pdev)
+ 	}
  
- 	chosen {
+ 	sspi->master = master;
++	master->max_speed_hz = 100*1000*1000;
++	master->min_speed_hz =        3*1000;
+ 	master->set_cs = sun4i_spi_set_cs;
+ 	master->transfer_one = sun4i_spi_transfer_one;
+ 	master->num_chipselect = 4;
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index 1952956..0c378ff 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -400,6 +400,8 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	sspi->master = master;
++	master->max_speed_hz = 100*1000*1000;
++	master->min_speed_hz =        3*1000;
+ 	master->set_cs = sun6i_spi_set_cs;
+ 	master->transfer_one = sun6i_spi_transfer_one;
+ 	master->num_chipselect = 4;
 -- 
 2.8.1
