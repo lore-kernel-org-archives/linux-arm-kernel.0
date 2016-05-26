@@ -1,45 +1,29 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 26 May 2016 11:28:59 +0300
-Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <CAOMZO5C5goJUdHKB9a=eOv9TKDkJWxnkWWb-G7E5Kvceg6sZVg@mail.gmail.com>
-References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
- <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
- <CAOMZO5C5goJUdHKB9a=eOv9TKDkJWxnkWWb-G7E5Kvceg6sZVg@mail.gmail.com>
-Message-ID: <5746B3CB.20804@compulab.co.il>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 May 2016 09:35:28 +0100
+Subject: [PATCH kexec-tools 01/32] kdump: mmap() and munmap() only work
+ on page-aligned quantites
+In-Reply-To: <CAHB_GupQcopOR7Qn5Nk0kNvYT_p0AWTzp+vJe87b+BsQTwr1CQ@mail.gmail.com>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <E1axXS0-0004gz-5a@e0050434b2927.dyn.arm.linux.org.uk>
+ <CAHB_GupQcopOR7Qn5Nk0kNvYT_p0AWTzp+vJe87b+BsQTwr1CQ@mail.gmail.com>
+Message-ID: <20160526083528.GE19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Wed, May 25, 2016 at 11:46:08AM +0530, Pratyush Anand wrote:
+> On Tue, May 3, 2016 at 3:51 PM, Russell King <rmk@arm.linux.org.uk> wrote:
+> > The man page for mmap() and munmap() says that mmap() and munmap()
+> > only works for page-aligned addresses, sizes and offsets.  Arrange
+> > to give these interfaces what they want.
+> >
+> 
+> If I read correctly, it talks only offsets to be page aligned.
 
-On 05/23/2016 08:49 PM, Fabio Estevam wrote:
-> On Sun, May 22, 2016 at 7:47 PM,  <christopher.spinrath@rwth-aachen.de> wrote:
-> 
->> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
->> new file mode 100644
->> index 0000000..bcd8e0d
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
->> @@ -0,0 +1,128 @@
->> +/*
->> + * Copyright 2016 Christopher Spinrath
->> + * Copyright 2013 CompuLab Ltd.
->> + *
->> + * Based on the GPLv2 licensed devicetree distributed with the vendor
->> + * kernel for the Utilite Pro:
->> + *     Copyright 2013 CompuLab Ltd.
->> + *     Author: Valentin Raevsky <valentin@compulab.co.il>
->> + *
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
-> 
-> Can you make this dual GPL/X11 license?
-> 
-> For reference take a look at:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/imx6sl-warp.dts?id=refs/tags/v4.6
-
-Please excuse me my ignorance, what is the rationale for this change?
+Yes, it's not really needed, but as we have to adjust the size anyway to
+compensate for the reduced file offset, it makes little difference whether
+we align the size or not.
 
 -- 
-Regards,
-Igor.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
