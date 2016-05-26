@@ -1,275 +1,177 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu, 26 May 2016 11:40:37 -0400
-Subject: [PATCH v12 05/10] arm64: Kprobes with single stepping support
-In-Reply-To: <20160517085807.GA842@sha-win-210.asiapac.arm.com>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-6-git-send-email-dave.long@linaro.org>
- <20160517085807.GA842@sha-win-210.asiapac.arm.com>
-Message-ID: <574718F5.2000308@linaro.org>
+From: austinwc@codeaurora.org (Christ, Austin)
+Date: Thu, 26 May 2016 09:42:46 -0600
+Subject: [PATCH v3 2/2] i2c: qup: support SMBus block read
+In-Reply-To: <CAA7nrtgAh6EDJO_qTgMawE=tpZe6F_Ae1G0OhuUME0QF4W5AJA@mail.gmail.com>
+References: <1463694268-9473-1-git-send-email-austinwc@codeaurora.org>
+ <1463694268-9473-2-git-send-email-austinwc@codeaurora.org>
+ <CAA7nrtgAh6EDJO_qTgMawE=tpZe6F_Ae1G0OhuUME0QF4W5AJA@mail.gmail.com>
+Message-ID: <a658f005-4a1d-0ce8-1e75-7f4bab9c1abc@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2016 04:58 AM, Huang Shijie wrote:
-> On Wed, Apr 27, 2016 at 02:53:00PM -0400, David Long wrote:
->> +
->> +/*
->> + * Interrupts need to be disabled before single-step mode is set, and not
->> + * reenabled until after single-step mode ends.
->> + * Without disabling interrupt on local CPU, there is a chance of
->> + * interrupt occurrence in the period of exception return and  start of
->> + * out-of-line single-step, that result in wrongly single stepping
->> + * into the interrupt handler.
->> + */
->> +static void __kprobes kprobes_save_local_irqflag(struct pt_regs *regs)
->> +{
->> +     struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
->
-> Why not add a parameter for this function to save the @kcb?
->
->> +
->> +     kcb->saved_irqflag = regs->pstate;
->> +     regs->pstate |= PSR_I_BIT;
->> +}
->> +
->> +static void __kprobes kprobes_restore_local_irqflag(struct pt_regs *regs)
->> +{
->> +     struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
-> ditto.
->
->> +
->> +     if (kcb->saved_irqflag & PSR_I_BIT)
->> +             regs->pstate |= PSR_I_BIT;
->> +     else
->> +             regs->pstate &= ~PSR_I_BIT;
->> +}
->> +
->> +static void __kprobes
->> +set_ss_context(struct kprobe_ctlblk *kcb, unsigned long addr)
->> +{
->> +     kcb->ss_ctx.ss_pending = true;
->> +     kcb->ss_ctx.match_addr = addr + sizeof(kprobe_opcode_t);
->> +}
->> +
->> +static void __kprobes clear_ss_context(struct kprobe_ctlblk *kcb)
->> +{
->> +     kcb->ss_ctx.ss_pending = false;
->> +     kcb->ss_ctx.match_addr = 0;
->> +}
->> +
->> +static void __kprobes setup_singlestep(struct kprobe *p,
->> +                                    struct pt_regs *regs,
->> +                                    struct kprobe_ctlblk *kcb, int reenter)
->> +{
->> +     unsigned long slot;
->> +
->> +     if (reenter) {
->> +             save_previous_kprobe(kcb);
->> +             set_current_kprobe(p);
->> +             kcb->kprobe_status = KPROBE_REENTER;
->> +     } else {
->> +             kcb->kprobe_status = KPROBE_HIT_SS;
->> +     }
->> +
->> +     if (p->ainsn.insn) {
->> +             /* prepare for single stepping */
->> +             slot = (unsigned long)p->ainsn.insn;
->> +
->> +             set_ss_context(kcb, slot);      /* mark pending ss */
->> +
->> +             if (kcb->kprobe_status == KPROBE_REENTER)
->> +                     spsr_set_debug_flag(regs, 0);
->> +
->> +             /* IRQs and single stepping do not mix well. */
->> +             kprobes_save_local_irqflag(regs);
->> +             kernel_enable_single_step(regs);
->> +             instruction_pointer(regs) = slot;
->> +     } else  {
->> +             BUG();
->> +     }
->> +}
->> +
->> +static int __kprobes reenter_kprobe(struct kprobe *p,
->> +                                 struct pt_regs *regs,
->> +                                 struct kprobe_ctlblk *kcb)
->> +{
->> +     switch (kcb->kprobe_status) {
->> +     case KPROBE_HIT_SSDONE:
->> +     case KPROBE_HIT_ACTIVE:
->> +             kprobes_inc_nmissed_count(p);
->> +             setup_singlestep(p, regs, kcb, 1);
->> +             break;
->> +     case KPROBE_HIT_SS:
->> +     case KPROBE_REENTER:
->> +             pr_warn("Unrecoverable kprobe detected at %p.\n", p->addr);
->> +             dump_kprobe(p);
->> +             BUG();
->> +             break;
->> +     default:
->> +             WARN_ON(1);
->> +             return 0;
->> +     }
->> +
->> +     return 1;
->> +}
->> +
->> +static void __kprobes
->> +post_kprobe_handler(struct kprobe_ctlblk *kcb, struct pt_regs *regs)
->> +{
->> +     struct kprobe *cur = kprobe_running();
->> +
->> +     if (!cur)
->> +             return;
->> +
->> +     /* return addr restore if non-branching insn */
->> +     if (cur->ainsn.restore.type == RESTORE_PC) {
->> +             instruction_pointer(regs) = cur->ainsn.restore.addr;
->> +             if (!instruction_pointer(regs))
->> +                     BUG();
->> +     }
->> +
->> +     /* restore back original saved kprobe variables and continue */
->> +     if (kcb->kprobe_status == KPROBE_REENTER) {
->> +             restore_previous_kprobe(kcb);
->> +             return;
->> +     }
->> +     /* call post handler */
->> +     kcb->kprobe_status = KPROBE_HIT_SSDONE;
->> +     if (cur->post_handler)  {
->> +             /* post_handler can hit breakpoint and single step
->> +              * again, so we enable D-flag for recursive exception.
->> +              */
->> +             cur->post_handler(cur, regs, 0);
->> +     }
->> +
->> +     reset_current_kprobe();
->> +}
->> +
->> +int __kprobes kprobe_fault_handler(struct pt_regs *regs, unsigned int fsr)
->> +{
->> +     struct kprobe *cur = kprobe_running();
->> +     struct kprobe_ctlblk *kcb = get_kprobe_ctlblk();
->> +
->> +     switch (kcb->kprobe_status) {
->> +     case KPROBE_HIT_SS:
->> +     case KPROBE_REENTER:
->> +             /*
->> +              * We are here because the instruction being single
->> +              * stepped caused a page fault. We reset the current
->> +              * kprobe and the ip points back to the probe address
->> +              * and allow the page fault handler to continue as a
->> +              * normal page fault.
->> +              */
->> +             instruction_pointer(regs) = (unsigned long)cur->addr;
->> +             if (!instruction_pointer(regs))
->> +                     BUG();
->> +             if (kcb->kprobe_status == KPROBE_REENTER)
->> +                     restore_previous_kprobe(kcb);
->> +             else
->> +                     reset_current_kprobe();
->> +
->> +             break;
->> +     case KPROBE_HIT_ACTIVE:
->> +     case KPROBE_HIT_SSDONE:
->> +             /*
->> +              * We increment the nmissed count for accounting,
->> +              * we can also use npre/npostfault count for accounting
->> +              * these specific fault cases.
->> +              */
->> +             kprobes_inc_nmissed_count(cur);
->> +
->> +             /*
->> +              * We come here because instructions in the pre/post
->> +              * handler caused the page_fault, this could happen
->> +              * if handler tries to access user space by
->> +              * copy_from_user(), get_user() etc. Let the
->> +              * user-specified handler try to fix it first.
->> +              */
->> +             if (cur->fault_handler && cur->fault_handler(cur, regs, fsr))
->> +                     return 1;
->> +
->> +             /*
->> +              * In case the user-specified fault handler returned
->> +              * zero, try to fix up.
->> +              */
->> +             if (fixup_exception(regs))
->> +                     return 1;
->> +     }
->> +     return 0;
->> +}
->> +
->> +int __kprobes kprobe_exceptions_notify(struct notifier_block *self,
->> +                                    unsigned long val, void *data)
->> +{
->> +     return NOTIFY_DONE;
->> +}
->> +
->> +static void __kprobes kprobe_handler(struct pt_regs *regs)
->> +{
->> +     struct kprobe *p, *cur_kprobe;
->> +     struct kprobe_ctlblk *kcb;
->> +     unsigned long addr = instruction_pointer(regs);
->> +
->> +     kcb = get_kprobe_ctlblk();
->> +     cur_kprobe = kprobe_running();
->> +
->> +     p = get_kprobe((kprobe_opcode_t *) addr);
->> +
->> +     if (p) {
->> +             if (cur_kprobe) {
->> +                     if (reenter_kprobe(p, regs, kcb))
->> +                             return;
->> +             } else {
->> +                     /* Probe hit */
->> +                     set_current_kprobe(p);
->> +                     kcb->kprobe_status = KPROBE_HIT_ACTIVE;
->> +
->> +                     /*
->> +                      * If we have no pre-handler or it returned 0, we
->> +                      * continue with normal processing.  If we have a
->> +                      * pre-handler and it returned non-zero, it prepped
->> +                      * for calling the break_handler below on re-entry,
->> +                      * so get out doing nothing more here.
->> +                      *
->> +                      * pre_handler can hit a breakpoint and can step thru
->> +                      * before return, keep PSTATE D-flag enabled until
->> +                      * pre_handler return back.
->> +                      */
->> +                     if (!p->pre_handler || !p->pre_handler(p, regs)) {
->> +                             kcb->kprobe_status = KPROBE_HIT_SS;
-> The above line is duplicated.
-> You will set KPROBE_HIT_SS in the setup_singlestep.
->
->> +                             setup_singlestep(p, regs, kcb, 0);
->> +                             return;
->> +                     }
->> +             }
->> +     } else if ((le32_to_cpu(*(kprobe_opcode_t *) addr) ==
->> +         BRK64_OPCODE_KPROBES) && cur_kprobe) {
->> +             /* We probably hit a jprobe.  Call its break handler. */
->> +             if (cur_kprobe->break_handler  &&
->> +                  cur_kprobe->break_handler(cur_kprobe, regs)) {
->> +                     kcb->kprobe_status = KPROBE_HIT_SS;
-> ditto
->> +                     setup_singlestep(cur_kprobe, regs, kcb, 0);
->> +                     return;
->> +             }
->> +     }
->> +     /*
->> +      * The breakpoint instruction was removed right
->> +      * after we hit it.  Another cpu has removed
->> +      * either a probepoint or a debugger breakpoint
->> +      * at this address.  In either case, no further
->> +      * handling of this interrupt is appropriate.
->> +      * Return back to original instruction, and continue.
->> +      */
->> +}
-> thanks
-> Huang Shijie
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
->
+Hello,
 
 
-I've made the above changes for the next version of this patch.
+On 5/25/2016 3:31 AM, rajeev kumar wrote:
+> On Fri, May 20, 2016 at 3:14 AM, Austin Christ <austinwc@codeaurora.org> wrote:
+>> From: Naveen Kaje <nkaje@codeaurora.org>
+>>
+>> I2C QUP driver relies on SMBus emulation support from the framework.
+>> To handle SMBus block reads, the driver should check I2C_M_RECV_LEN
+>> flag and should read the first byte received as the message length.
+>>
+>> The driver configures the QUP hardware to read one byte. Once the
+>> message length is known from this byte, the QUP hardware is configured
+>> to read the rest.
+>>
+>> Signed-off-by: Naveen Kaje <nkaje@codeaurora.org>
+>> Signed-off-by: Austin Christ <austinwc@codeaurora.org>
+>> ---
+>>   drivers/i2c/busses/i2c-qup.c | 68 ++++++++++++++++++++++++++++++++++++++++++--
+>>   1 file changed, 65 insertions(+), 3 deletions(-)
+>>
+>> Changes:
+>> - v3:
+>>   - clean up redundant checks
+>>   - use constant instead of variable for smbus length field
+>> - v2:
+>>   - rework the smbus block read and break into separate function
+>>
+>> diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
+>> index ea6ca5f..9fbed83 100644
+>> --- a/drivers/i2c/busses/i2c-qup.c
+>> +++ b/drivers/i2c/busses/i2c-qup.c
+>> @@ -517,6 +517,33 @@ static int qup_i2c_get_data_len(struct qup_i2c_dev *qup)
+>>          return data_len;
+>>   }
+>>
+>> +static bool qup_i2c_check_msg_len(struct i2c_msg *msg)
+>> +{
+>> +       return ((msg->flags & I2C_M_RD) && (msg->flags & I2C_M_RECV_LEN));
+>> +}
+>> +
+>> +static int qup_i2c_set_tags_smb(u16 addr, u8 *tags, struct qup_i2c_dev *qup,
+>> +                       struct i2c_msg *msg)
+>> +{
+>> +       int len = 0;
+>> +
+>> +       if (msg->len > 1) {
+>> +               tags[len++] = QUP_TAG_V2_DATARD_STOP;
+>> +               tags[len++] = qup_i2c_get_data_len(qup) - 1;
+>> +       } else {
+>> +               tags[len++] = QUP_TAG_V2_START;
+>> +               tags[len++] = addr & 0xff;
+>> +
+>> +               if (msg->flags & I2C_M_TEN)
+>> +                       tags[len++] = addr >> 8;
+>> +
+>> +               tags[len++] = QUP_TAG_V2_DATARD;
+>> +               /* Read 1 byte indicating the length of the SMBus message */
+>> +               tags[len++] = 1;
+>> +       }
+>> +       return len;
+>> +}
+>> +
+>>   static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
+>>                              struct i2c_msg *msg,  int is_dma)
+>>   {
+>> @@ -526,6 +553,10 @@ static int qup_i2c_set_tags(u8 *tags, struct qup_i2c_dev *qup,
+>>
+>>          int last = (qup->blk.pos == (qup->blk.count - 1)) && (qup->is_last);
+>>
+>> +       /* Handle tags for SMBus block read */
+>> +       if (qup_i2c_check_msg_len(msg))
+>> +               return qup_i2c_set_tags_smb(addr, tags, qup, msg);
+>> +
+>>          if (qup->blk.pos == 0) {
+>>                  tags[len++] = QUP_TAG_V2_START;
+>>                  tags[len++] = addr & 0xff;
+>> @@ -1065,9 +1096,17 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
+>>                                  struct i2c_msg *msg)
+>>   {
+>>          u32 val;
+>> -       int idx, pos = 0, ret = 0, total;
+>> +       int idx, pos = 0, ret = 0, total, msg_offset = 0;
+>>
+>> +       /*
+>> +        * If the message length is already read in
+>> +        * the first byte of the buffer, account for
+>> +        * that by setting the offset
+>> +        */
+>> +       if (qup_i2c_check_msg_len(msg) && (msg->len > 1))
+>> +               msg_offset = 1;
+>>          total = qup_i2c_get_data_len(qup);
+>> +       total -= msg_offset;
+>>
+>>          /* 2 extra bytes for read tags */
+>>          while (pos < (total + 2)) {
+>> @@ -1087,8 +1126,8 @@ static int qup_i2c_read_fifo_v2(struct qup_i2c_dev *qup,
+>>
+>>                          if (pos >= (total + 2))
+>>                                  goto out;
+>> -
+>> -                       msg->buf[qup->pos++] = val & 0xff;
+>> +                       msg->buf[qup->pos + msg_offset] = val & 0xff;
+>> +                       qup->pos++;
+>>                  }
+>>          }
+>>
+>> @@ -1128,6 +1167,24 @@ static int qup_i2c_read_one_v2(struct qup_i2c_dev *qup, struct i2c_msg *msg)
+>>                          goto err;
+>>
+>>                  qup->blk.pos++;
+>> +
+>> +               /* Handle SMBus block read length */
+>> +               if (qup_i2c_check_msg_len(msg) && (msg->len == 1)) {
+>> +                       if (msg->buf[0] > I2C_SMBUS_BLOCK_MAX) {
+>> +                               ret = -EPROTO;
+>> +                               goto err;
+>> +                       }
+>> +                       msg->len += msg->buf[0];
+>> +                       qup->pos = 0;
+>> +                       qup_i2c_set_read_mode_v2(qup, msg->len);
+>> +                       ret = qup_i2c_issue_xfer_v2(qup, msg);
+>> +                       if (ret)
+>> +                               goto err;
+>> +                       ret = qup_i2c_wait_for_complete(qup, msg);
+>> +                       if (ret)
+>> +                               goto err;
+>> +                       qup_i2c_set_blk_data(qup, msg);
+>> +               }
+>>          } while (qup->blk.pos < qup->blk.count);
+>>
+>>   err:
+>> @@ -1210,6 +1267,11 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
+>>                          goto out;
+>>                  }
+>>
+>> +               if (qup_i2c_check_msg_len(&msgs[idx])) {
+>> +                       ret = -EOPNOTSUPP;
+> Could you please rethink on this return value ? It should not be "EOPNOTSUPP"
+>
+> ~Rajeev
+
+This will be replaced with "EINVAL" in v4 patches.
+>
+>> +                       goto out;
+>> +               }
+>> +
+>>                  if (msgs[idx].flags & I2C_M_RD)
+>>                          ret = qup_i2c_read_one(qup, &msgs[idx]);
+>>                  else
+>> --
+>> Qualcomm Innovation Center, Inc.
+>> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+>> a Linux Foundation Collaborative Project.
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 Thanks,
--dl
+Austin
