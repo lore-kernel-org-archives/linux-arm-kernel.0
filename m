@@ -1,46 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 May 2016 16:19:02 +0100
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <57470D19.2000501@arm.com>
-References: <6293194.tGy03QJ9ME@wuerfel>
- <20160525.135039.244098606649448826.davem@davemloft.net>
- <6407614.fdv5XFSBue@wuerfel>
- <20160525.142821.1719403997976778673.davem@davemloft.net>
- <20160526142057.GA7456@e104818-lin.cambridge.arm.com>
- <57470D19.2000501@arm.com>
-Message-ID: <20160526151902.GC7456@e104818-lin.cambridge.arm.com>
+From: dave.long@linaro.org (David Long)
+Date: Thu, 26 May 2016 11:26:01 -0400
+Subject: [PATCH v12 06/10] arm64: Treat all entry code as non-kprobe-able
+In-Reply-To: <573497FA.5030309@arm.com>
+References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
+ <1461783185-9056-7-git-send-email-dave.long@linaro.org>
+ <573497FA.5030309@arm.com>
+Message-ID: <57471589.9030301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 03:50:01PM +0100, Szabolcs Nagy wrote:
-> On 26/05/16 15:20, Catalin Marinas wrote:
-> > While writing the above, I realised the current ILP32 patches still miss
-> > on converting pointers passed from user space (unless I got myself
-> > confused in macros). The new __SC_WRAP() and COMPAT_SYSCALL_WRAPx()
-> > macros take care of zero or sign extension via __SC_COMPAT_CAST().
-> > However, we have two more existing cases which I don't see covered:
-> > 
-> > a) Native syscalls taking a pointer argument and invoked directly from
-> >    ILP32. For example, sys_read() takes a pointer but I don't see any
-> >    __SC_WRAP added by patch 5
-> > 
-> > b) Current compat syscalls taking a pointer argument. For example,
-> >    compat_sys_vmsplice() gets the iov32 pointer and the compiler assumes
-> >    it is a 64-bit variable. I don't see where the upper half is zeroed
-> 
-> on x32 sign/zero extension is currently left to userspace,
-> which is difficult to deal with, (long long)arg does the
-> wrong thing for pointer args.
+On 05/12/2016 10:49 AM, James Morse wrote:
+> Hi David, Pratyush
+>
+> On 27/04/16 19:53, David Long wrote:
+>> From: Pratyush Anand <panand@redhat.com>
+>>
+>> Entry symbols are not kprobe safe. So blacklist them for kprobing.
+>>
+>> Signed-off-by: Pratyush Anand <panand@redhat.com>
+>
+>> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+>> index dfa1b1f..6a1292b 100644
+>> --- a/arch/arm64/kernel/kprobes.c
+>> +++ b/arch/arm64/kernel/kprobes.c
+>> @@ -29,6 +29,7 @@
+>>   #include <asm/system_misc.h>
+>>   #include <asm/insn.h>
+>>   #include <asm/uaccess.h>
+>> +#include <asm-generic/sections.h>
+>>
+>>   #include "kprobes-arm64.h"
+>>
+>> @@ -514,6 +515,15 @@ int __kprobes longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+>>   	return 1;
+>>   }
+>>
+>> +bool arch_within_kprobe_blacklist(unsigned long addr)
+>> +{
+>> +	return  (addr >= (unsigned long)__kprobes_text_start &&
+>> +		 addr < (unsigned long)__kprobes_text_end) ||
+>> +		(addr >= (unsigned long)__entry_text_start &&
+>> +		 addr < (unsigned long)__entry_text_end) ||
+>> +		 !!search_exception_tables(addr);
+>> +}
+>> +
+>
+> Looking at __kvm_hyp_vector, we don't have support for handling breakpoints at
+> EL2, so we should forbid kprobing these address ranges too:
+> __hyp_text_start -> __hyp_text_end
+> __hyp_idmap_text_start -> __hyp_idmap_text_end
+>
+> These can probably be guarded with is_kernel_in_hyp_mode(), if this is true then
+> we are running with VHE where this code runs at the same exception level as the
+> rest of the kernel, so we can probe them. (In this case you may want to add
+> 'eret' to aarch64_insn_is_branch() in patch 2)
+>
+>
+> Probing things in the kernel idmap sounds dangerous! Lets blacklist that too:
+> __idmap_text_start -> __idmap_text_end
+>
 
-I agree, I don't think we should leave sign/zero extension to user. We
-should do it in the kernel either in a way similar to s390 (specific
-__SC_COMPAT_CAST, __SC_DELOUSE) or by always zeroing the arguments upper
-half on kernel entry with a few additional wrappers (where we have
-64-bit arguments or they require sign extension). The latter has the
-disadvantage of having to split 64-bit arguments in user space while the
-former adds more maintenance burden to the kernel.
+I've made these changes.  I noticed there's no include file definitions 
+for these symbols so I've added local extern declarations in 
+arch_within_kprobe_blacklist().
 
-I can't comment on performance aspects without some real numbers.
-
--- 
-Catalin
+Thanks,
+-dl
