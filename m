@@ -1,84 +1,40 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 26 May 2016 11:42:07 -0700
-Subject: [PATCH v2 1/4] reset: Add support for the Amlogic Meson SoC Reset
- Controller
-In-Reply-To: <1464260562.4109.77.camel@pengutronix.de> (Philipp Zabel's
- message of "Thu, 26 May 2016 13:02:42 +0200")
-References: <1464169758-26975-1-git-send-email-narmstrong@baylibre.com>
- <1464169758-26975-2-git-send-email-narmstrong@baylibre.com>
- <m2iny1h74c.fsf@baylibre.com>
- <1464260562.4109.77.camel@pengutronix.de>
-Message-ID: <m28tywhda8.fsf@baylibre.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Thu, 26 May 2016 20:48:05 +0200
+Subject: [PATCH V3 1/2] i2c: qup: Fix broken dma when CONFIG_DEBUG_SG is
+ enabled
+In-Reply-To: <1464164212-11377-2-git-send-email-sricharan@codeaurora.org>
+References: <1464164212-11377-1-git-send-email-sricharan@codeaurora.org>
+ <1464164212-11377-2-git-send-email-sricharan@codeaurora.org>
+Message-ID: <20160526184805.GC1614@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp Zabel <p.zabel@pengutronix.de> writes:
 
-> Am Mittwoch, den 25.05.2016, 19:42 -0700 schrieb Kevin Hilman:
->> Neil Armstrong <narmstrong@baylibre.com> writes:
->> 
->> > This patch adds the platform driver for the Amlogic Meson SoC Reset
->> > Controller.
->> >
->> > The Meson8b and GXBB SoCs are supported.
->> >
->> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> 
->> Maybe a question for Philipp, but when testog this version with the
->> stmmac ethernet driver on the Amlogic boards, I noticed that ->reset was
->> never getting called.
->> 
->> Turns out, the stmmac driver only uses reset_control_assert() and
->> reset_control_deassert(), both of which return -ENOTSUPP since this
->> driver doesn't provide ->assert or ->deassert, so the driver's ->reset()
->> never gets called.
->> 
->> I haven't looked into the reset framework in detail, but if there's only
->> a ->reset hook, I kind of expected that reset_control_deassert() would
->> use that instead of returning -ENOTSUPP.
->> 
->> If not, what's the proper way of handling hardware that only supports a
->> write-only reset pulse?  Should users of reset_control_* be adapted to
->> check if ->deassert returns -ENOTSUPP and call ->reset?
->
-> I initially came up with this for i.MX6, which has a reset controller
-> that just like the Meson ones doesn't support manual assertion and
-> deassertion of the reset line.
-> My assumption then was that reset() is the default for all devices that
-> just need their internal state to be reset at some point. I didn't
-> expect the clock-like usage of manual deassert()/assert() for power
-> management to become so common.
-> So assert() and deassert() return -ENOTSUPP if the reset controller
-> doesn't support manually asserting or deasserting the reset line.
->
-> Of course you can argue that after a reset() pulse the reset line is
-> deasserted, and if you instead interpret the API in terms of expected
-> outcome, that would be similar to the state after call to deassert()
-> (iff the line was asserted before).
-> That would blur the line between reset() and deassert() somewhat, and in
-> my opinion having a call to deassert() first doing the exact opposite
-> isn't good nomenclature.
-> Personally, I'd prefer if the driver could switch to only using
-> 	reset_control_reset(rstc);
+> sg_set_buf expects that the buf parameter passed in should be from
+> lowmem and a valid pageframe. This is not true for pages from
+> dma_alloc_coherent which can be carveouts, hence the check fails.
 
-Then what would happen if that same driver is used on platforms that
-have ->assert and ->deassert but no -reset?
+OK, given you mean dma_pool_alloc here, the check fails for the
+pageframe because of the pool? Is my understanding correct?
 
-The bind I'm in is that I'm using an exsting network driver
-(stmicro/stmmac) which is used on a bunch of platforms and I dont' know
-what all those reset controllers are actually doing, so going and
-changing the driver seems problematic.
+> Change allocation of sg buffers from dma_coherent memory to kzalloc
+> to fix the issue.
 
-> or, if the reset line needs to stay asserted during powerdown where the
-> reset controller supports it, but doesn't matter whert not, use:
-> 	ret = reset_control_deassert(rstc);
-> 	if (ret == -ENOTSUPP)
-> 		ret = reset_control_reset(rstc);
->
-> We could add a helper reset_control_deassert_or_reset() for that.
+But why can you drop the coherency?
 
-IMO, that would be a useful helper function, but I still think that
-should be the default behavior of _deassert, otherwise it will still
-require changing all the drivers.
+> @@ -1268,6 +1260,8 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
+>  		}
+>  	}
+>  
+> +	idx = 0;
+> +
 
-Kevin
+This looks like an unrelated change.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160526/fc8f1e78/attachment.sig>
