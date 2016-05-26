@@ -1,40 +1,35 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 26 May 2016 17:36:05 +0100
+Date: Thu, 26 May 2016 17:44:57 +0100
 Subject: [PATCH 1/1] arm64: fix flush_cache_range
-In-Reply-To: <5746E203.4000906@huawei.com>
+In-Reply-To: <20160525172705.GD19428@n2100.arm.linux.org.uk>
 References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
  <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
- <20160524130255.GU4892@e104818-lin.cambridge.arm.com>
- <5744FDD0.8060504@huawei.com> <57451DC6.7080106@huawei.com>
- <20160525105022.GC5996@e104818-lin.cambridge.arm.com>
- <5746E203.4000906@huawei.com>
-Message-ID: <20160526163604.GD7456@e104818-lin.cambridge.arm.com>
+ <20160524151235.GA11605@leverpostej>
+ <20160525152255.GH5996@e104818-lin.cambridge.arm.com>
+ <20160525172705.GD19428@n2100.arm.linux.org.uk>
+Message-ID: <20160526164456.GE7456@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 07:46:11PM +0800, Leizhen (ThunderTown) wrote:
-> On 2016/5/25 18:50, Catalin Marinas wrote:
-> > What happens is that __sync_icache_dcache() only takes care of the first
-> > time a page is mapped in user space and flushes the caches, marking it
-> > as "clean" (PG_dcache_clean) afterwards. Subsequent changes to this
+On Wed, May 25, 2016 at 06:27:07PM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 25, 2016 at 04:22:55PM +0100, Catalin Marinas wrote:
+> > That's when we realised that the CoW problem no longer exists for
+> > non-aliasing VIPT caches. However, the I-cache counterpart 6060e8df5178
+> > has not been reverted.
 > 
-> As my tracing, it is returned by "if (!page_mapping(page))", because
-> "mmap" are anonymous pages. I commented below code lines, it works
-> well.
-> 	
-> 	/* no flushing needed for anonymous pages */
-> 	if (!page_mapping(page))
-> 		return;
+> I think I mostly agree, except for reverting 6060e8df5178, which I don't
+> think would be correct.  That reintroduces the possibility of flushing
+> the I-cache twice in that path, once for aliasing vipt dcaches, and again
+> for asid tagged vivt icaches.  I'd rather have the code structured so we
+> only do this once.
 
-I think it only works by luck. As I said above, even with your
-modification for anonymous pages, the first time set_pte_at() is called,
-__sync_icache_dcache() would set the PG_dcache_clean bit. Subsequent
-set_pte_at() calls for changing the attributes would ignore the D-cache
-invalidation as the page seems clean (unless there is a call to
-flush_dcache_page() but this shouldn't be done on this path). What
-probably happens is that memcpy() for copying the code triggers some
-write streaming mode in the CPU and the information makes its way to the
-PoU. The I-cache invalidation only removes the stale instructions.
+__sync_icache_dcache() seems to take care of AIVIVT caches as well (i.e.
+it invalidates the whole I-cache) so I think we could just remove the
+__flush_icache_all() from flush_cache_range().
+
+I can't find a scenario where we still need D-cache clean+invalidate in
+flush_cache_range() for aliasing VIPT. As for the I-cache,
+__sync_icache_dcache() takes care of all the aliases.
 
 -- 
 Catalin
