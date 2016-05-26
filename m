@@ -1,34 +1,41 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: Wed, 25 May 2016 00:56:37 +0200
-Subject: [PATCH 0/5] sunxi spi fixes
-Message-ID: <cover.1464130597.git.hramrach@gmail.com>
+Date: 26 May 2016 19:25:22 -0000
+Subject: [PATCH 1/3] ARM: dts: sun5i: a10s: add spi2 pins
+Message-ID: <908ed06eb46f2162e222258aa14df545d0fa5b48.1464129859.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Used on A10s Olinuxino.
 
-This series addresses some issues with sunxi SPI drivers.
+Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+---
+ arch/arm/boot/dts/sun5i-a10s.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-The last patch adding DMA support is not completed. It addresses some issues
-with the previous version of the patch and it works in practice but some issues
-still remain.
-
-Thanks
-
-Michal
-
-Emilio L?pez (1):
-  RFC spi: sun4i: add DMA support
-
-Michal Suchanek (4):
-  spi: sunxi: fix transfer timeout
-  spi: sun4i: fix FIFO limit
-  spi: sunxi: expose maximum transfer size limit
-  spi: sunxi: set maximum and minimum speed of SPI master
-
- drivers/spi/spi-sun4i.c | 186 +++++++++++++++++++++++++++++++++++++++++++++---
- drivers/spi/spi-sun6i.c |  20 +++++-
- 2 files changed, 194 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index bddd0de..651837c 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -241,6 +241,20 @@
+ 		allwinner,drive = <SUN4I_PINCTRL_30_MA>;
+ 		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
+ 	};
++
++	spi2_pins_a: spi2 at 0 {
++		allwinner,pins = "PB12", "PB13", "PB14";
++		allwinner,function = "spi2";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	spi2_cs0_pins_a: spi2_cs0 at 0 {
++		allwinner,pins = "PB11";
++		allwinner,function = "spi2";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
+ };
+ 
+ &sram_a {
 -- 
 2.8.1
