@@ -1,65 +1,72 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 26 May 2016 07:46:40 -0500
-Subject: [PATCH 02/11] drivers: clk: st: Add clock propagation for audio
- clocks
-In-Reply-To: <CAG374jDTCJfZB+PuAnggjXhbcd3NjJqrESpe_EnMniCAeoph9A@mail.gmail.com>
-References: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
- <1463560892-7209-3-git-send-email-gabriel.fernandez@linaro.org>
- <20160525172409.GA27913@rob-hp-laptop>
- <CAG374jDTCJfZB+PuAnggjXhbcd3NjJqrESpe_EnMniCAeoph9A@mail.gmail.com>
-Message-ID: <CAL_JsqLOG4P0H+HkQ3mJhfibatuV2T51KqOn-+U+LK8WUx7QgA@mail.gmail.com>
+From: pc.liao@mediatek.com (PC Liao)
+Date: Thu, 26 May 2016 20:50:50 +0800
+Subject: [PATCH] ASoC: mediatek: Change the order of MCLK clock configuration
+Message-ID: <1464267050-57287-1-git-send-email-pc.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 4:49 AM, Gabriel Fernandez
-<gabriel.fernandez@linaro.org> wrote:
-> On 25 May 2016 at 19:24, Rob Herring <robh@kernel.org> wrote:
->>
->> On Wed, May 18, 2016 at 10:41:23AM +0200, Gabriel Fernandez wrote:
->> > This patch allows fine tuning of the quads FS for audio clocks
->> > accuracy.
->> >
->> > Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
->> > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->> > ---
->> >  .../devicetree/bindings/clock/st/st,flexgen.txt    |  1 +
->> >  drivers/clk/st/clk-flexgen.c                       | 24 ++++++++++++++++++++++
->> >  2 files changed, 25 insertions(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
->> > index b7ee5c7..15b33c7 100644
->> > --- a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
->> > +++ b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
->> > @@ -60,6 +60,7 @@ This binding uses the common clock binding[2].
->> >  Required properties:
->> >  - compatible : shall be:
->> >    "st,flexgen"
->> > +  "st,stih407-clkgend0", "st,flexgen" (enable clock propagation on parent)
->>
->> What do "d0" and "d2" refer to?
->>
->> This seems to indicate you have too much clock detail in the DT (with
->> individual clocks described) or not enough with genericish compatible
->> strings. What happens for the mext clock you need to adjust the flags
->> on? You should be able to make these adjustments without DT updates.
->> Perhaps you need a wider fixing of clock compatible strings.
->>
->> Rob
->
-> Sorry i sent my response in html...
->
-> Hi Rob,
->
-> Thanks for reviewing.
->
-> Can i remove
-> "
-> st,stih407-clkgend0" & "
-> st,stih407-clkgend2" compatible strings and add proprieties instead ?
-> I only need to activate 2 features and then we can keep generic
-> compatible strings.
+Because MCLK opens later and closes earlier than codec, this patch
+changes the order of MCLK clock configuration.
 
-That is no different and suffers the same point I raised. It requires
-updating the DT for any clock configuration change or enhancement.
+Signed-off-by: PC Liao <pc.liao@mediatek.com>
+---
+ sound/soc/mediatek/mtk-afe-pcm.c |   16 ++++++++++++----
+ 1 file changed, 12 insertions(+), 4 deletions(-)
 
-Rob
+diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
+index f1c58a2..440ae06 100644
+--- a/sound/soc/mediatek/mtk-afe-pcm.c
++++ b/sound/soc/mediatek/mtk-afe-pcm.c
+@@ -360,8 +360,6 @@ static int mtk_afe_i2s_startup(struct snd_pcm_substream *substream,
+ 	if (dai->active)
+ 		return 0;
+ 
+-	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
+-	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
+ 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
+ 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M, 0);
+ 	return 0;
+@@ -380,8 +378,6 @@ static void mtk_afe_i2s_shutdown(struct snd_pcm_substream *substream,
+ 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
+ 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M,
+ 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M);
+-	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
+-	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
+ }
+ 
+ static int mtk_afe_i2s_prepare(struct snd_pcm_substream *substream,
+@@ -1132,6 +1128,8 @@ static int mtk_afe_runtime_suspend(struct device *dev)
+ 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
+ 			   AUD_TCON0_PDN_AFE, AUD_TCON0_PDN_AFE);
+ 
++	clk_disable_unprepare(afe->clocks[MTK_CLK_I2S1_M]);
++	clk_disable_unprepare(afe->clocks[MTK_CLK_I2S2_M]);
+ 	clk_disable_unprepare(afe->clocks[MTK_CLK_BCK0]);
+ 	clk_disable_unprepare(afe->clocks[MTK_CLK_BCK1]);
+ 	clk_disable_unprepare(afe->clocks[MTK_CLK_TOP_PDN_AUD]);
+@@ -1164,6 +1162,12 @@ static int mtk_afe_runtime_resume(struct device *dev)
+ 	ret = clk_prepare_enable(afe->clocks[MTK_CLK_BCK1]);
+ 	if (ret)
+ 		goto err_bck0;
++	ret = clk_prepare_enable(afe->clocks[MTK_CLK_I2S1_M]);
++	if (ret)
++		goto err_i2s1_m;
++	ret = clk_prepare_enable(afe->clocks[MTK_CLK_I2S2_M]);
++	if (ret)
++		goto err_i2s2_m;
+ 
+ 	/* enable AFE clk */
+ 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0, AUD_TCON0_PDN_AFE, 0);
+@@ -1179,6 +1183,10 @@ static int mtk_afe_runtime_resume(struct device *dev)
+ 	regmap_update_bits(afe->regmap, AFE_DAC_CON0, 0x1, 0x1);
+ 	return 0;
+ 
++err_i2s1_m:
++	clk_disable_unprepare(afe->clocks[MTK_CLK_I2S1_M]);
++err_i2s2_m:
++	clk_disable_unprepare(afe->clocks[MTK_CLK_I2S2_M]);
+ err_bck0:
+ 	clk_disable_unprepare(afe->clocks[MTK_CLK_BCK0]);
+ err_top_aud:
+-- 
+1.7.9.5
