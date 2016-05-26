@@ -1,69 +1,46 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu, 26 May 2016 08:36:15 +0200
-Subject: [PATCH 1/2] Revert "mtd: atmel_nand: Support variable RB_EDGE
- interrupts"
-In-Reply-To: <20160526031654.GA107505@google.com>
-References: <1462776680-5284-1-git-send-email-wenyou.yang@atmel.com>
- <1462776680-5284-2-git-send-email-wenyou.yang@atmel.com>
- <20160526031654.GA107505@google.com>
-Message-ID: <20160526083615.6960686d@bbrezillon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 26 May 2016 09:03:33 +0200
+Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
+ support
+In-Reply-To: <edee7345-280a-0d7c-7e5a-798215fbd2b9@de.bosch.com>
+References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
+ <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
+ <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
+ <20160525004825.GC7292@verge.net.au>
+ <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
+ <edee7345-280a-0d7c-7e5a-798215fbd2b9@de.bosch.com>
+Message-ID: <CAMuHMdXnN-GTN4crXeWRvtWT4E2kYFvMdPPcH8z+gJb-B4PbYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 May 2016 20:16:54 -0700
-Brian Norris <computersforpeace@gmail.com> wrote:
+Hi Dirk,
 
-> Hi,
-> 
-> On Mon, May 09, 2016 at 02:51:18PM +0800, Wenyou Yang wrote:
-> > This reverts commit 5ddc7bd43ccc ("mtd: atmel_nand: Support variable
-> > RB_EDGE interrupts")
-> > 
-> > Because for current SoCs, the RB_EDGE3(i.e. bit 27) of HSMC_SR
-> > register does not exist, the RB_EDGE0 (i.e. bit 24) is the ready/busy
-> > line edge status bit. It is a datasheet bug.
-> > 
-> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
-> > ---
-> > 
-> >  .../devicetree/bindings/mtd/atmel-nand.txt         |  2 +-
-> >  drivers/mtd/nand/atmel_nand.c                      | 35 +++++-----------------
-> >  drivers/mtd/nand/atmel_nand_nfc.h                  |  3 +-
-> >  3 files changed, 10 insertions(+), 30 deletions(-)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> > index d53aba9..3e7ee99 100644
-> > --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> > +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
-> > @@ -39,7 +39,7 @@ Optional properties:
-> >  
-> >  Nand Flash Controller(NFC) is an optional sub-node
-> >  Required properties:
-> > -- compatible : "atmel,sama5d3-nfc" or "atmel,sama5d4-nfc".
-> > +- compatible : "atmel,sama5d3-nfc".
-> >  - reg : should specify the address and size used for NFC command registers,
-> >          NFC registers and NFC SRAM. NFC SRAM address and size can be absent
-> >          if don't want to use it.
-> > diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> > index efc8ea2..68b9160 100644
-> > --- a/drivers/mtd/nand/atmel_nand.c
-> > +++ b/drivers/mtd/nand/atmel_nand.c  
-> [...]
-> >  static const struct of_device_id atmel_nand_nfc_match[] = {
-> > -	{ .compatible = "atmel,sama5d3-nfc", .data = &sama5d3_nfc_caps },
-> > -	{ .compatible = "atmel,sama5d4-nfc", .data = &sama5d4_nfc_caps },
-> > +	{ .compatible = "atmel,sama5d3-nfc" },  
-> 
-> Hmm, wait. Didn't Rob and Alexandre suggest that we should *not* drop
-> the compatible property? We could have easily supported both here, and
-> just not listed any different capabilities. But I see that Nicholas took
-> the patch anyway, so I guess it's not a big deal...
+On Wed, May 25, 2016 at 9:32 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> P.S.: This also results in the question why we need similar
+> r8a7795-cpg-mssr.h and r8a7796-cpg-mssr.h with just different "numbers" for
+> the same clocks. Can't we use the same numbers on all SoCs, with just having
+> wholes in the list where the clocks don't exist on a SoC? I haven't looked
 
-Yes, actually the compatible change was introduced and fixed in the
-same release, so I don't think the stable ABI argument stands here.
+The CPG and MSSR block are the IP blocks that differ most among SoCs of the
+same family. Some clocks are present on H3 only, others on M3-W only.
 
+Having a shared driver core, but different defines, is a compromise between
+reusability and avoiding mistakes in DTSes (e.g. pointing to a nonexisting
+clock due to copy and paste from another SoC).
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> into the manual if these numbers are given by the hardware, though.
+
+The actual numbers don't map to numbers in the datasheet, just to an unordered
+list in a table. The list of number is considered part of the DT bindings, and
+thus append-only (to be considered in case the datasheet is updated).
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
