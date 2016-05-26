@@ -1,67 +1,109 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 26 May 2016 09:44:10 +0200
-Subject: [v10,
- 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-R1.0-R2.0
-In-Reply-To: <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <4448030.Zs8fVnr3nm@wuerfel>
- <HE1PR04MB0889B52134A43C0E7A452B7BF87C0@HE1PR04MB0889.eurprd04.prod.outlook.com>
- <5159406.HOFrj7pRfW@wuerfel>
- <1462937186.16584.77.camel@buserror.net>
- <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
-Message-ID: <CAPDyKFqx2JMLzXoDxGCKFYMFV47+SegnkuWFXKvsQHK7L5w-1g@mail.gmail.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Thu, 26 May 2016 15:43:00 +0800
+Subject: [PATCH v4 01/18] of/platform: Add common method to populate
+ default bus
+In-Reply-To: <CAL_JsqJt9qa+3eAO95kvM7h2beRfq3q1Bi39K7uhURTp=f_DtQ@mail.gmail.com>
+References: <1463054775-18170-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1463054775-18170-2-git-send-email-wangkefeng.wang@huawei.com>
+ <CAL_JsqJt9qa+3eAO95kvM7h2beRfq3q1Bi39K7uhURTp=f_DtQ@mail.gmail.com>
+Message-ID: <5746A904.6080003@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26 May 2016 at 06:05, Yangbo Lu <yangbo.lu@nxp.com> wrote:
-> Hi Uffe,
->
-> Could we merge this patchset? ...
-> It has been a long time to wait for Arnd's response...
->
-> Thanks a lot.
->
->
 
-As we are still in the merge window I won't queue anything but fixes.
-Let's give Arnd another week or so to respond.
 
-Kind regards
-Uffe
+On 2016/5/25 22:46, Rob Herring wrote:
+> On Thu, May 12, 2016 at 7:05 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
+>> The arch code calls of_platform_populate() with default match table
+>> when it want to populate default bus.
+>>
+>> This patch introduce a new of_platform_default_populate_init() and make it
+>> arch_initcall_sync(it should be later than some iommu configration, eg,
+>> of_iommu_init() and swiotlb_late_init in arm64), then we can finish above
+>> job in common method.
+>>
+>> In order to avoid the default bus being populated twice, simply checking
+>> the flag of bus node whether has be set OF_POPULATED_BUS or not.
+>>
+>> After that, we can safely remove the caller in arch code.
+>>
+>> Btw, add debug print in of_platform_populate(), and use __func__ to
+>> print function's name of of_platform_bus_create().
+>>
+>> Cc: Rob Herring <robh+dt@kernel.org>
+>> Cc: Frank Rowand <frowand.list@gmail.com>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>> ---
+>>  drivers/of/platform.c | 23 ++++++++++++++++++++++-
+>>  1 file changed, 22 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>> index 8d103e4..f601b30 100644
+>> --- a/drivers/of/platform.c
+>> +++ b/drivers/of/platform.c
+>> @@ -11,6 +11,7 @@
+>>   *  2 of the License, or (at your option) any later version.
+>>   *
+>>   */
+>> +#include <linux/acpi.h>
+>>  #include <linux/errno.h>
+>>  #include <linux/module.h>
+>>  #include <linux/amba/bus.h>
+>> @@ -345,6 +346,12 @@ static int of_platform_bus_create(struct device_node *bus,
+>>                 return 0;
+>>         }
+>>
+>> +       if (of_node_check_flag(bus, OF_POPULATED_BUS)) {
+>> +               pr_debug("%s() - skipping %s, already populated\n",
+>> +                       __func__, bus->full_name);
+>> +               return 0;
+>> +       }
+>> +
+>>         auxdata = of_dev_lookup(lookup, bus);
+>>         if (auxdata) {
+>>                 bus_id = auxdata->name;
+>> @@ -396,7 +403,7 @@ int of_platform_bus_probe(struct device_node *root,
+>>         if (!root)
+>>                 return -EINVAL;
+>>
+>> -       pr_debug("of_platform_bus_probe()\n");
+>> +       pr_debug("%s()\n", __func__);
+>>         pr_debug(" starting at: %s\n", root->full_name);
+>>
+>>         /* Do a self check of bus type, if there's a match, create children */
+>> @@ -448,6 +455,9 @@ int of_platform_populate(struct device_node *root,
+>>         if (!root)
+>>                 return -EINVAL;
+>>
+>> +       pr_debug("%s()\n", __func__);
+>> +       pr_debug(" starting at: %s\n", root->full_name);
+>> +
+>>         for_each_child_of_node(root, child) {
+>>                 rc = of_platform_bus_create(child, matches, lookup, parent, true);
+>>                 if (rc) {
+>> @@ -471,6 +481,17 @@ int of_platform_default_populate(struct device_node *root,
+>>  }
+>>  EXPORT_SYMBOL_GPL(of_platform_default_populate);
+>>
+>> +static int __init of_platform_default_populate_init(void)
+>> +{
+>> +       if (of_have_populated_dt())
+>> +               of_platform_default_populate(NULL, NULL, NULL);
+>> +       else if (acpi_disabled)
+> 
+> This ACPI dependency needs to go. The error msg is somewhat pointless
+> as if both DT and ACPI are not used, the boot will be horribly broken
+> and I'm not sure that you would actually see the message given you
+> have no information to setup a console.
 
-> Best regards,
-> Yangbo Lu
->
->
->> -----Original Message-----
->> From: Yangbo Lu
->> Sent: Friday, May 20, 2016 2:06 PM
->> To: 'Scott Wood'; Arnd Bergmann; linux-arm-kernel at lists.infradead.org
->> Cc: linuxppc-dev at lists.ozlabs.org; Mark Rutland;
->> devicetree at vger.kernel.org; ulf.hansson at linaro.org; Russell King; Bhupesh
->> Sharma; netdev at vger.kernel.org; Joerg Roedel; Kumar Gala; linux-
->> mmc at vger.kernel.org; linux-kernel at vger.kernel.org; Yang-Leo Li;
->> iommu at lists.linux-foundation.org; Rob Herring; linux-i2c at vger.kernel.org;
->> Claudiu Manoil; Santosh Shilimkar; Xiaobo Xie; linux-clk at vger.kernel.org;
->> Qiang Zhao
->> Subject: RE: [v10, 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-
->> R1.0-R2.0
->>
->> Hi Arnd,
->>
->> Any comments?
->> Please reply when you see the email since we want this eSDHC issue to be
->> fixed soon.
->>
->> All the patches are Freescale-specific and is to fix the eSDHC driver.
->> Could we let them merged first if you were talking about a new way of
->> abstracting getting SoC version.
->>
->>
->> Thanks :)
->>
->>
->> Best regards,
->> Yangbo Lu
->>
->
+Fair enough, will update and rebase patches after 4.7-rc1.
+
+Thanks,
+Kefeng
+
+> 
+> Rob
+> 
+> .
+> 
