@@ -1,45 +1,76 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 26 May 2016 09:17:28 +0200
-Subject: [PATCH v4 1/3] firmware: Amlogic: Add secure monitor driver
-In-Reply-To: <1464207511-11786-2-git-send-email-carlo@caione.org>
+Date: Thu, 26 May 2016 09:20:27 +0200
+Subject: [PATCH v4 2/3] documentation: Add secure monitor binding
+ documentation
+In-Reply-To: <1464207511-11786-3-git-send-email-carlo@caione.org>
 References: <1464207511-11786-1-git-send-email-carlo@caione.org>
- <1464207511-11786-2-git-send-email-carlo@caione.org>
-Message-ID: <5746A308.8070606@baylibre.com>
+ <1464207511-11786-3-git-send-email-carlo@caione.org>
+Message-ID: <5746A3BB.3030505@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Carlo,
 
 On 05/25/2016 10:18 PM, Carlo Caione wrote:
-> diff --git a/include/dt-bindings/firmware/meson-sm.h b/include/dt-bindings/firmware/meson-sm.h
+> From: Carlo Caione <carlo@endlessm.com>
+> 
+> Add the binding documentation for the Amlogic secure monitor driver.
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>  .../bindings/firmware/meson/meson_sm.txt           | 42 ++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
 > new file mode 100644
-> index 0000000..3a52a13
+> index 0000000..896758d
 > --- /dev/null
-> +++ b/include/dt-bindings/firmware/meson-sm.h
-> @@ -0,0 +1,20 @@
-> +/*
-> + * Copyright (C) 2016 Endless Mobile, Inc.
-> + * Author: Carlo Caione <carlo@endlessm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program. If not, see <http://www.gnu.org/licenses/>.
-> + */
+> +++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+> @@ -0,0 +1,42 @@
+> +* Amlogic Secure Monitor
 > +
-> +#ifndef _MESON_DT_H_
-> +#define _MESON_DT_H_
+> +In the Amlogic SoCs the Secure Monitor code is used to provide access to the
+> +NVMEM, enable JTAG, set USB boot, etc...
 > +
-> +#define SM_EFUSE_READ		0
-> +#define SM_EFUSE_WRITE		1
-> +#define SM_EFUSE_USER_MAX	2
+> +Required properties for the secure monitor node:
+> +- compatible: Should be "amlogic,meson-gxbb-sm"
 > +
-> +#endif /* _MESON_DT_H_ */
+> +Example:
+> +
+> +	#include <dt-bindings/firmware/meson-sm.h>
+> +
+> +	...
+> +
+> +	firmware {
+> +		compatible = "simple-bus";
+> +
+> +		sm: secure-monitor {
+> +			compatible = "amlogic,meson-gxbb-sm";
+> +		};
+> +	};
+> +
+> +Node of a device using the secure monitor must have a custom property to
+> +specify the SMC32 function ID the driver is going to use.
+> +
+> +Example of the node using the secure monitor:
+> +
+> +	#include <dt-bindings/firmware/meson-sm.h>
+> +
+> +	...
+> +
+> +	efuse: efuse {
+> +		compatible = "amlogic,meson-gxbb-efuse";
+> +		secure-monitor = <&sm>;
+> +		amlogic,sm-cmd-read-efuse = <SM_EFUSE_READ>;
+> +		amlogic,sm-cmd-max-efuse = <SM_EFUSE_USER_MAX>;
 
-Now this has been refactored, I don't see the point of this dt-bindings header ?
+Same here, since the compatible is "gxbb" specific, there is no need for these properties, and so no need for the dt-bindings header.
 
-These defines should take place in linux/firmware/meson/meson-sm.h
-
-Neil
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		...
+> +	};
+> +
+> 
