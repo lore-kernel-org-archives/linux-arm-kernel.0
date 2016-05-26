@@ -1,216 +1,52 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Thu, 26 May 2016 13:49:23 -0700
-Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
- for X-Gene v1
-In-Reply-To: <20160526123459.GA23794@red-moon>
-References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
- <1456330151.5681.46.camel@redhat.com> <56CDD767.6020103@arm.com>
- <CADaLND=mrkxOWOzcEb8os16Rb=SDHfnn_8eSgB4bQYH3UguS3w@mail.gmail.com>
- <20160225173822.GA6349@red-moon>
- <CADaLNDnywVPER9QhmK4C6JyCLhta_M_cVSOuSkEHnmnLPFo3JA@mail.gmail.com>
- <20160526123459.GA23794@red-moon>
-Message-ID: <CADaLNDnf8SRbUkBN9fZMvrvsnTQs+DLyqnZfVpWqVyyY8Hk=1Q@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 26 May 2016 14:05:50 -0700
+Subject: [PATCH 0/7] pinctrl: meson: Add a bunch more pins
+In-Reply-To: <CACRpkdbURowJNT_ZkKuv7C_3oW3BJGPBK6etKc4cBc4ujQdPXw@mail.gmail.com>
+ (Linus Walleij's message of "Thu, 26 May 2016 11:28:44 +0200")
+References: <1462544486-9516-1-git-send-email-khilman@baylibre.com>
+ <CACRpkdY9oGZLt431NwTaFmZk98O8n3ZnMA1odhYZtcH7P1p=Jg@mail.gmail.com>
+ <m260u3ia37.fsf@baylibre.com>
+ <CACRpkdbURowJNT_ZkKuv7C_3oW3BJGPBK6etKc4cBc4ujQdPXw@mail.gmail.com>
+Message-ID: <m21t4ofs29.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-On Thu, May 26, 2016 at 5:34 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> Hi Duc,
+> On Tue, May 24, 2016 at 8:29 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+>> Linus Walleij <linus.walleij@linaro.org> writes:
 >
-> On Wed, May 25, 2016 at 04:13:35PM -0700, Duc Dang wrote:
->> On Thu, Feb 25, 2016 at 9:38 AM, Lorenzo Pieralisi
->> <lorenzo.pieralisi@arm.com> wrote:
->> > On Wed, Feb 24, 2016 at 02:28:10PM -0800, Duc Dang wrote:
->> >> On Wed, Feb 24, 2016 at 8:16 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> >> > On 24/02/16 16:09, Mark Salter wrote:
->> >> >> On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
->> >> >>> This patch makes pci-xgene-msi driver ACPI-aware and provides
->> >> >>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
->> >> >>>
->> >> >>> Signed-off-by: Duc Dang <dhdang@apm.com>
->> >> >>> ---
->> >> >>>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
->> >> >>>  1 file changed, 32 insertions(+), 3 deletions(-)
->> >> >>>
->> >> >>> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
->> >> >>> index a6456b5..466aa93 100644
->> >> >>> --- a/drivers/pci/host/pci-xgene-msi.c
->> >> >>> +++ b/drivers/pci/host/pci-xgene-msi.c
->> >> >>> @@ -24,6 +24,7 @@
->> >> >>>  #include <linux/pci.h>
->> >> >>>  #include <linux/platform_device.h>
->> >> >>>  #include <linux/of_pci.h>
->> >> >>> +#include <linux/acpi.h>
->> >> >>>
->> >> >>>  #define MSI_IR0                     0x000000
->> >> >>>  #define MSI_INT0            0x800000
->> >> >>> @@ -39,7 +40,7 @@ struct xgene_msi_group {
->> >> >>>  };
->> >> >>>
->> >> >>>  struct xgene_msi {
->> >> >>> -    struct device_node      *node;
->> >> >>> +    struct fwnode_handle    *fwnode;
->> >> >>>      struct irq_domain       *inner_domain;
->> >> >>>      struct irq_domain       *msi_domain;
->> >> >>>      u64                     msi_addr;
->> >> >>> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
->> >> >>>      .free   = xgene_irq_domain_free,
->> >> >>>  };
->> >> >>>
->> >> >>> +#ifdef CONFIG_ACPI
->> >> >>> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
->> >> >>> +{
->> >> >>> +    return xgene_msi_ctrl.fwnode;
->> >> >>> +}
->> >> >>> +#endif
->> >> >>> +
->> >> >>>  static int xgene_allocate_domains(struct xgene_msi *msi)
->> >> >>>  {
->> >> >>>      msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
->> >> >>> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
->> >> >>>      if (!msi->inner_domain)
->> >> >>>              return -ENOMEM;
->> >> >>>
->> >> >>> -    msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
->> >> >>> +    msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
->> >> >>>                                                  &xgene_msi_domain_info,
->> >> >>>                                                  msi->inner_domain);
->> >> >>
->> >> >> This doesn't work for me (ACPI probing on Mustang) unless I change this
->> >> >> to be pci_msi_create_default_irq_domain(). The problem seems to be that
->> >> >> the MSI probe happens after the PCIe RC is probed so there is no MSI domain
->> >> >> at the time the PCIe root is initialized by ACPI.
->> >> >
->> >> > pci_msi_create_default_irq_domain is the wrong thing do use, specially
->> >> > if you have multiple MSI controllers in the system. I certainly wouldn't
->> >> > want to see it being used on arm64.
->> >> >
->> >> > This is the usual dependency hell. You try moving the probing earlier,
->> >> > but that may break something else in the process.
->> >>
->> >> Hi Mark and Marc,
->> >>
->> >> I have modified Tianocore firmware to have MSI node declared before
->> >> PCIe node in Dsdt table. With this modification, the MSI driver will
->> >> be loaded before PCIe driver and MSI domain is available at the time
->> >> PCIe root is initialized.
->> >
->> > I am totally against this. We should not hack ACPI tables to make
->> > the kernel work (on top of that with unwritten ordering rules that may
->> > well require changes as kernel evolves), we should have a standard set
->> > of bindings that people use to describe HW in the DSDT and the kernel(s)
->> > has to cope with that. If there is a dependency problem in the description
->> > we may solve it at bindings level, but I absolutely do not want to rely
->> > on DSDT nodes ordering for things to work, that's fragile, no shortcuts
->> > please.
->>
->> Hi Lorenzo, Bjorn,
->>
->> (Refresh this thread on this merge cycle)
->>
->> I tried to use _DEP method to describe the dependency of PCIe node to
->> MSI node but it turns out that PCIe driver does not check for the
->> dependency (only EC (ec.c) and I2C core (i2c-core.c) use
->> acpi_walk_dep_device_list to check for dependency before loading
->> dependent drivers)
->>
->> Do you have other suggestion/example about how to ensure strict
->> ordering on driver loading in ACPI boot mode without changing the
->> order of ACPI nodes in DSDT?
+>> Looking closer, these have dependencies on the DT changes that you've
+>> suggested we take through arm-soc, so it would be cleaner if I take
+>> these with your ack through the amlogic tree.
 >
-> Before doing anything else, I would like to ask you to report the code
-> paths leading to failures (what fails actually ?) please, and I want
-> to understand what "this does not work" means.
+> I really prefer to take DT changes and driver code in different
+> trees i possible.
 >
-> In particular:
+> My reasoning is plainly: if the DT stuff was a separate git, as
+> has been explicitly suggested as a goal off and on, this should
+> be merge:able still. So DT changes and driver code should ideally
+> be orthogonal.
 >
-> - Why using pci_msi_create_default_irq_domain() works
-> - Why, if you change the DSDT nodes ordering, things work (please add
->   some debugging to MSI allocation functions to detect the code paths
->   leading to correct MSI allocation)
-> - What's the difference wrt the DT probe path
+> I don't know about this case but is it a disaster if one or the other
+> of the DT changes and the driver arrive in different order to Torvald's
+> tree, or will it simply be that the lights go on when the last patch
+> arrives?
 
-The MSI allocation happens with following code path (I use PMC pm80xx
-SAS driver as an example (drivers/scsi/pm8001/pm8001_init.c)):
-pci_enable_msix_exact
-    pci_enable_msix_range
-        pci_enable_msix
-            msix_capbility_init
-                pci_msi_setup_msi_irqs
-                    pci_msi_get_domain
-                        dev_get_msi_domain
-                        arch_get_pci_msi_domain
-                            return pci_msi_default_domain;
+Actually, it wasn't about built/boot dependencies but rather one of the
+patches (mistakenly) had both a pinctrl change and a DT change, so a
+simple rebase failed (and I gave up early since I was busy with
+something else... and also lazy.)
 
-In my failing case: pci_msi_get_domain return NULL, so MSI allocation
-function (pci_enable_msix_exact) fails.
+Anyways, I've now separated things, so the pinctrl patches can go
+through your tree, and we'll submit the rest (DT, kconfig etc.)  through
+arm-soc, and things will "just work" when they both land in mainline.
 
-The expected MSI domain is registered when X-Gene MSI driver is
-initialized and is attached to each PCI bus by calling
-pci_set_bus_msi_domain during PCIe bus-scan:
-pci_scan_root_bus
-    pci_scan_root_bus_msi
-        pci_scan_child_bus
-            pci_scan_bridge
-                pci_add_new_bus
-                    pci_alloc_child_bus
-                        pci_set_bus_msi_domain
-                            pci_host_bridge_msi_domain
-                                pci_host_bridge_of_msi_domain
-                                pci_host_bridge_acpi_msi_domain
+I'll repost the series shortly, but if you prefer to just pull, the
+pinctrl-only stuff based on linus/master is here:
 
-+ When booting with DT: X-Gene MSI driver is initialized early
-(subsys_initcall level); X-Gene PCIe driver is initialized later at
-device_initcall level (using module_platform_driver). Because of that
-when PCIe enumeration happens, the X-Gene MSI domain was already
-registered and available. So when the driver of PCIe Endpoint devices
-gets loaded, the call to pci_enable_msix_exact (to allocate MSI)
-succeeds.
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux.git amlogic/v4.7/pinctrl-drv
 
-+ When booting with ACPI: acpi_scan_init is called at subsys_initcall
-level (the same level with X-Gene MSI driver):
-acpi_init
-    acpi_bus_init (GIC is initialized here)
-        acpi_scan_init
-            acpi_pci_root_init
-            acpi_pci_link_init
-            ...
-            acpi_bus_scan
-                acpi_bus_check_add
- ...
+Thanks for the nudge in the right direction,
 
-Currently, in DSDT table, X-Gene MSI node is defined right after
-X-Gene PCIe nodes. So PCIe driver initialization and PCIe enumeration
-happens before MSI driver is initialized. During PCIe bus scan, the
-pci_set_bus_msi_domain gets a NULL  irq_domain value from
-pci_host_bridge_msi_domain (as MSI driver is not initialized), so
-there is no MSI support for PCIe bus.
-
-+ Using pci_msi_create_default_irq_domain() helps MSI allocation
-succeed as pci_msi_get_domain (in the code path of
-pci_enable_msix_exact above) can fall back to get a valid domain from
-arch_get_pci_msi_domain (please note that PCIe endpoint driver gets
-called later (at device_initcall level (using module_init)), so at the
-time PCIe endpoint driver probe function executes, the MSI driver
-already register the global MSI domain with
-pci_msi_create_default_irq_domain)
-
-+ If changing DSDT node ordering, to define MSI node before PCIe
-nodes, then X-Gene MSI driver will be loaded before PCIe host driver.
-At the time PCIe enumeration happens, X-Gene MSI driver already
-registered a valid MSI domain (by calling
-pci_msi_register_fwnode_provider to register the fwnode provider
-function), so all the detected PCIe buses (and PCIe endpoint devices)
-will have a valid MSI domain attached to them (as a result of function
-pci_set_bus_msi_domain)
-
-Regards,
-Duc Dang.
->
-> When we have a detailed view of MSI allocation code paths and failures
-> we can see what we can do to fix it in ACPI.
->
-> Thanks,
-> Lorenzo
+Kevin
