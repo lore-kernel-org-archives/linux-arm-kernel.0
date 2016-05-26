@@ -1,112 +1,137 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Thu, 26 May 2016 11:28:33 +0900
+Date: Thu, 26 May 2016 11:31:32 +0900
 Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
  support
-In-Reply-To: <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
+In-Reply-To: <25947777-9871-ccc4-011b-0775c2b88d8b@de.bosch.com>
 References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
  <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
- <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
- <20160525004825.GC7292@verge.net.au>
- <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
-Message-ID: <20160526022833.GE18393@verge.net.au>
+ <25947777-9871-ccc4-011b-0775c2b88d8b@de.bosch.com>
+Message-ID: <20160526023132.GF18393@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
-
-On Wed, May 25, 2016 at 07:10:26AM +0200, Dirk Behme wrote:
-> Hi Simon,
-> 
-> On 25.05.2016 02:48, Simon Horman wrote:
-> >Hi Dirk,
+On Wed, May 25, 2016 at 09:38:23AM +0200, Dirk Behme wrote:
+> On 24.05.2016 03:54, Simon Horman wrote:
+> >Basic support for the Gen 3 R-Car M3-W SoC.
 > >
-> >On Tue, May 24, 2016 at 07:30:17AM +0200, Dirk Behme wrote:
-> >>Hi Simon,
+> >Based on work for the r8a7795 and r8a7796 SoCs by
+> >Takeshi Kihara, Dirk Behme and Geert Uytterhoeven.
 > >
-> >[...]
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >---
+> >v3
+> >* As suggested by Geert Uytterhoeven:
+> >  - Drop 0x from unit address of gic
+> >* As suggested by Khiem Nguyen:
+> >  - Use psci-0.2
+> >* Added Reviewed-by tag from Geert Uytterhoeven
 > >
-> >>With Renesas R-Car3 we will get a whole family of SoCs. I.e. different
-> >>computing power (e.g. different number of Cores) with more or less similar
-> >>peripherals.
-> >>
-> >>I would think that we want to reflect this in the device tree, too.
-> >>Therefore I think what we want is a hierarchy of device trees. Similar
-> >>what's done with other SoC families (compare e.g. i.MX6).
-> >>
-> >>E.g. we want an initial rcar3.dtsi, which contains all common parts of all
-> >>R-Car3 SoCs. E.g. one CA57 core, the SCIF where its common etc.
-> >>
-> >>Then you will have the r8a779x.dtsi which includes the rcar3.dtsi and
-> >>extends it for SoC specific parts. Which then will be included by the board
-> >>device trees, as already done, now.
-> >>
-> >>Or in other words: As soon as you have similar parts in the r8a779x.dtsi's,
-> >>it's time to think about moving the parts one hierarchy level up into the
-> >>rcar3.dtsi. Else you will end up in a maintenance hell once you have to
-> >>change/fix anything.
+> >v2
+> >* As suggested by Geert Uytterhoeven:
+> >  - Move L2_CA57 node under cpus node and include reg property
+> >  - Omit status = "disabled" from scif_clk node
+> >---
+> > Documentation/devicetree/bindings/arm/shmobile.txt |   4 +
+> > arch/arm64/Kconfig.platforms                       |   6 ++
+> > arch/arm64/boot/dts/renesas/r8a7796.dtsi           | 120 +++++++++++++++++++++
+> > 3 files changed, 130 insertions(+)
+> > create mode 100644 arch/arm64/boot/dts/renesas/r8a7796.dtsi
 > >
-> >Thanks for raising this issue.
+> >diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+> >index 9cf67e48f222..d5ed554830d7 100644
+> >--- a/Documentation/devicetree/bindings/arm/shmobile.txt
+> >+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+> >@@ -29,6 +29,8 @@ SoCs:
+> >     compatible = "renesas,r8a7794"
+> >   - R-Car H3 (R8A77950)
+> >     compatible = "renesas,r8a7795"
+> >+  - R-Car M3-W (R8A77960)
+> >+    compatible = "renesas,r8a7796"
 > >
-> >I agree entirely that we should work towards a situation where maintenance
-> >is as easy as it can be. However, due to the per-SoC binding scheme that
-> >we are using for IP related to Renesas SoCs I suspect that very few DT nodes
-> >can be shared between SoCs verbatim.
+> >
+> > Boards:
+> >@@ -61,5 +63,7 @@ Boards:
+> >     compatible = "renesas,porter", "renesas,r8a7791"
+> >   - Salvator-X (RTP0RC7795SIPB0010S)
+> >     compatible = "renesas,salvator-x", "renesas,r8a7795";
+> >+  - Salvator-X
+> >+    compatible = "renesas,salvator-x", "renesas,r8a7796";
+> >   - SILK (RTP0RC7794LCB00011S)
+> >     compatible = "renesas,silk", "renesas,r8a7794"
+> >diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> >index efa77c146415..16d8d26839ea 100644
+> >--- a/arch/arm64/Kconfig.platforms
+> >+++ b/arch/arm64/Kconfig.platforms
+> >@@ -114,6 +114,12 @@ config ARCH_R8A7795
+> > 	help
+> > 	  This enables support for the Renesas R-Car H3 SoC.
+> >
+> >+config ARCH_R8A7796
+> >+	bool "Renesas R-Car M3-W SoC Platform"
+> >+	depends on ARCH_RENESAS
+> >+	help
+> >+	  This enables support for the Renesas R-Car M3-W SoC.
+> >+
+> > config ARCH_STRATIX10
+> > 	bool "Altera's Stratix 10 SoCFPGA Family"
+> > 	help
+> >diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> >new file mode 100644
+> >index 000000000000..178debf68318
+> >--- /dev/null
+> >+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+> >@@ -0,0 +1,120 @@
+> >+/*
+> >+ * Device Tree Source for the r8a7796 SoC
+> >+ *
+> >+ * Copyright (C) 2016 Renesas Electronics Corp.
+> >+ *
+> >+ * This file is licensed under the terms of the GNU General Public License
+> >+ * version 2.  This program is licensed "as is" without any warranty of any
+> >+ * kind, whether express or implied.
+> >+ */
+> >+
+> >+#include <dt-bindings/clock/r8a7796-cpg-mssr.h>
+> >+#include <dt-bindings/interrupt-controller/arm-gic.h>
+> >+
+> >+/ {
+> >+	compatible = "renesas,r8a7796";
+> >+	#address-cells = <2>;
+> >+	#size-cells = <2>;
+> >+
+> >+	psci {
+> >+		compatible = "arm,psci-0.2";
+> >+		method = "smc";
+> >+	};
+> >+
+> >+	cpus {
+> >+		#address-cells = <1>;
+> >+		#size-cells = <0>;
+> >+
+> >+		/* 1 core only at this point */
+> >+		a57_0: cpu at 0 {
+> >+			compatible = "arm,cortex-a57", "arm,armv8";
+> >+			reg = <0x0>;
+> >+			device_type = "cpu";
+> >+			next-level-cache = <&L2_CA57>;
+> >+			enable-method = "psci";
+> >+		};
+> >+
+> >+		L2_CA57: cache-controller at 0 {
+> >+			compatible = "cache";
+> >+			reg = <0>;
+> >+			cache-unified;
+> >+			cache-level = <2>;
+> >+		};
+> >+	};
 > 
 > 
-> Could you kindly share an example for this? Looking into the H3 and the M3-W
-> manual, it looks to me that ~90% (?) of the peripherals are the same.
+> It looks to me that in the r8a7795.dtsi the cache-controller node is outside
+> the cpus node? I'd think that we should keep is consistent.
 
-The background is that this is a conversation that has been going around
-for years. The basic thinking is that at this point we have documentation
-that indicates that many hardware blocks on the H3 and M3-W are the same.
-But we do not have insight into the internal versioning of the IP blocks
-nor if they are really the same. And furthermore even if they are currently
-the same we don't really know if that will continue to be the case.
+As of c10cdf93a119 ("arm64: dts: r8a7795: Fix W=1 dtc warnings"),
+which was recently added to the devel branch of the renesas tree,
+the cache-controller is inside the cpu node on the r8a7795.dtsi.
 
-Probably it is. Maybe it isn't. The response has been to take a
-conservative approach to DT bindings to give us the flexibility to update
-the driver implementation to reflect any differences that subsequently
-surface. And by providing per-SoC bindings these driver changes can be
-activated on a per-SoC basis without updating DTB files (which may be
-burned into ROMs).
-
-There is of course scope to take a different approach. But getting
-consensus on this is frankly difficult. And at the very least I would
-expect it to take time.
-
-> >Probably some sort of scheme can be cooked up using preprocessor macros.
-> >And probably there are other ways to resolve this problem. But I would
-> >prefer if we worked towards resolving this maintenance problem in parallel
-> >with rather than as a dependency of merging r8a7796 support into mainline.
-> 
-> 
-> I'd propose to do it correct from the beginning.
-> 
-> Doing it later would either be more work or forgotten, and never be done,
-> then.
-
-I'm sorry but I don't agree. I think that having r8a7796 support
-in mainline is a higher priority than sorting this out.
-
-> For a starting point, I'd propose to put the r8a7795.dtsi and r8a7796.dtsi
-> into a graphical diff tool and move all common parts to a rcar3.dtsi (I'd be
-> happy to discuss the name, though)
-
-I'm not opposed to that. But being consistent with my statement above
-I would prefer it to be done as follow-up work.
-
-My suspicion is that right now much of the proposed r8a7796.dtsi can be
-moved into a hypothetical rcar3.dtsi. But that this is because the proposed
-r8a7796.dtsi is very small. I would not expect nearly such a large
-proportion of r8a7795.dtsi to be able to be moved into rcar3.dtsi because
-it enables more hardware blocks and they typically have (or should have in
-keeping with the prevailing policy as described above) per-SoC bindings.
-
-I believe that there is also a another issue which is that we wish
-to control enabling features on different SoCs once they are known to work.
-Of course things slip through the cracks. But blindly assuming all
-IP blocks enabled for one SoC work on another, even if based on the
-documentation, seems to be asking for trouble to me. For one thing
-it implies that the level of firmware support is the same.
-
-As for a name, I suggest rcar-gen3.dtsi.
+This patch aims to be consistent with that change.
