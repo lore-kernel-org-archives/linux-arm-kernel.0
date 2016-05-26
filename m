@@ -1,76 +1,135 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 26 May 2016 11:40:34 +0800
-Subject: [PATCH 1/1] arm64: fix flush_cache_range
-In-Reply-To: <20160525105022.GC5996@e104818-lin.cambridge.arm.com>
-References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
- <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
- <20160524130255.GU4892@e104818-lin.cambridge.arm.com>
- <5744FDD0.8060504@huawei.com> <57451DC6.7080106@huawei.com>
- <20160525105022.GC5996@e104818-lin.cambridge.arm.com>
-Message-ID: <57467032.1030200@huawei.com>
+From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
+Date: Thu, 26 May 2016 06:46:08 +0300
+Subject: [PATCHv3] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160524202059.GB18536@amd>
+References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
+ <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
+ <57441BF8.60606@gmail.com> <20160524202059.GB18536@amd>
+Message-ID: <57467180.5070201@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2016/5/25 18:50, Catalin Marinas wrote:
-> On Wed, May 25, 2016 at 11:36:38AM +0800, Leizhen (ThunderTown) wrote:
->> On 2016/5/25 9:20, Leizhen (ThunderTown) wrote:
->>> On 2016/5/24 21:02, Catalin Marinas wrote:
->>>> On Tue, May 24, 2016 at 08:19:05PM +0800, Leizhen (ThunderTown) wrote:
->>>>> On 2016/5/24 19:37, Mark Rutland wrote:
->>>>>> It looks like the test may be missing I-cache maintenance regardless of
->>>>>> the semantics of mprotect in this case.
->>>>>>
->>>>>> I have not yet devled into flush_cache_range and how it is called.
->>>>>
->>>>> SYSCALL_DEFINE3(mprotect ---> mprotect_fixup ---> change_protection ---> change_protection_range --> flush_cache_range
->>>>
->>>> The change_protection() shouldn't need to flush the caches in
->>>> flush_cache_range(). The change_pte_range() function eventually ends up
->>>> calling set_pte_at() which calls __sync_icache_dcache() if the mapping
->>>> is executable.
+On 24.05.2016 23:20, Pavel Machek wrote:
+> Hi!
+>
+>>>> devm_regulator_get()?
 >>>
->>> OK, I see.
->>> But I'm afraid it entered the "if (pte_present(oldpte))" branch in
->>> function change_pte_range. Because the test case called mmap to
->>> create pte first, then called pte_modify. I will check it later.
+>>> I'd rather avoid devm_ here. Driver is simple enough to allow it.
+>>>
 >>
->> I have checked that it entered "if (pte_present(oldpte))" branch.
-> 
-> This path eventually calls set_pte_at() via ptep_modify_prot_commit().
-OK, I see.
+>> Now thinking about it, what would happen here if regulator_get() returns
+>> -EPROBE_DEFER? Wouldn't it be better to move regulator_get to the probe()
+>> function, something like:
+>
+> Ok, I can do it.
+>
+> Oh, and don't try to complain about newlines before returns. It looks
+> better this way.
+>
 
-> 
->> But I don't known why I add flush_icache_range is OK, but add
->> __sync_icache_dcache have no effect.
-> 
-> Do you mean you modified set_pte_at() to use flush_icache_range()
-Just about. I added in change_pte_range after below statement.
-ptent = pte_modify(ptent, newprot);
+All I complain about is missing empty line before a final return at the 
+end of a function :). I guess it is a matter of preference though.
 
-> instead of __sync_icache_dcache() and it works?
-Yes.
+>> static int ad5820_probe(struct i2c_client *client,
+>> 			const struct i2c_device_id *devid)
+>> {
+>> 	struct ad5820_device *coil;
+>> 	int ret = 0;
+>>
+>> 	coil = devm_kzalloc(sizeof(*coil), GFP_KERNEL);
+>> 	if (coil == NULL)
+>> 		return -ENOMEM;
+>>
+>> 	coil->vana = devm_regulator_get(&client->dev, NULL);
+>> 	if (IS_ERR(coil->vana)) {
+>> 		ret = PTR_ERR(coil->vana);
+>> 		if (ret != -EPROBE_DEFER)
+>> 			dev_err(&client->dev, "could not get regulator for vana\n");
+>> 		return ret;
+>> 	}
+>>
+>> 	mutex_init(&coil->power_lock);
+>> ...
+>>
+>> with the appropriate changes to remove() because of the devm API
+>> 			usage.
+>
+> Something like this?
+>
 
-> 
-> What happens is that __sync_icache_dcache() only takes care of the first
-> time a page is mapped in user space and flushes the caches, marking it
-> as "clean" (PG_dcache_clean) afterwards. Subsequent changes to this
-> mapping or writes to it are entirely the responsibility of the user. So
-> if the user plans to execute instructions, it better explicitly flush
-> the caches (as Mark Rutland already stated in a previous reply).
-> 
-> I ran our internal LTP version yesterday and it was fine but didn't
-> realise that we actually patched mprotect04.c to include:
-> 
-> 	__clear_cache((char *)func, (char *)func + page_sz);
-> 
-> just after memcpy().
-Yes, I aslo tried this before I sent this patch. Flush dcache in userspace
-or kernel can both fixs this problem.
+Didn't try to apply it, but yes, looks right. Besides the missing
+mutex_destroy(&coil->power_lock); pointed out by Sakari.
 
-> 
-> (we still need to investigate whether the I-cache invalidation is
-> actually needed in flush_cache_range() or it's just something we forgot
-> to remove)
-> 
+> diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
+> index f956bd3..f871366 100644
+> --- a/drivers/media/i2c/ad5820.c
+> +++ b/drivers/media/i2c/ad5820.c
+> @@ -8,7 +8,7 @@
+>    * Copyright (C) 2016 Pavel Machek <pavel@ucw.cz>
+>    *
+>    * Contact: Tuukka Toivonen
+> - *          Sakari Ailus
+> + *	    Sakari Ailus
+>    *
+>    * Based on af_d88.c by Texas Instruments.
+>    *
+> @@ -263,13 +263,6 @@ static int ad5820_init_controls(struct ad5820_device *coil)
+>   static int ad5820_registered(struct v4l2_subdev *subdev)
+>   {
+>   	struct ad5820_device *coil = to_ad5820_device(subdev);
+> -	struct i2c_client *client = v4l2_get_subdevdata(subdev);
+> -
+> -	coil->vana = regulator_get(&client->dev, "VANA");
+> -	if (IS_ERR(coil->vana)) {
+> -		dev_err(&client->dev, "could not get regulator for vana\n");
+> -		return -ENODEV;
+> -	}
+>
+>   	return ad5820_init_controls(coil);
+>   }
+> @@ -367,10 +360,18 @@ static int ad5820_probe(struct i2c_client *client,
+>   	struct ad5820_device *coil;
+>   	int ret = 0;
+>
+> -	coil = kzalloc(sizeof(*coil), GFP_KERNEL);
+> +	coil = devm_kzalloc(sizeof(*coil), GFP_KERNEL);
+>   	if (!coil)
+>   		return -ENOMEM;
+>
+> +	coil->vana = devm_regulator_get(&client->dev, NULL);
+> +	if (IS_ERR(coil->vana)) {
+> +		ret = PTR_ERR(coil->vana);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(&client->dev, "could not get regulator for vana\n");
+> +		return ret;
+> +	}
+> +	
+>   	mutex_init(&coil->power_lock);
+>
+>   	v4l2_i2c_subdev_init(&coil->subdev, client, &ad5820_ops);
+> @@ -390,10 +391,6 @@ static int ad5820_probe(struct i2c_client *client,
+>
+>   cleanup:
+>   	media_entity_cleanup(&coil->subdev.entity);
+> -
+> -free:
+> -	kfree(coil);
+> -
+>   	return ret;
+>   }
+>
+> @@ -405,11 +402,6 @@ static int __exit ad5820_remove(struct i2c_client *client)
+>   	v4l2_device_unregister_subdev(&coil->subdev);
+>   	v4l2_ctrl_handler_free(&coil->ctrls);
+>   	media_entity_cleanup(&coil->subdev.entity);
+> -	if (coil->vana)
+> -		regulator_put(coil->vana);
+> -
+> -	kfree(coil);
+> -
+>   	return 0;
+>   }
+>
