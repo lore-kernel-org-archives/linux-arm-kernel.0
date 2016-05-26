@@ -1,176 +1,112 @@
-From: raashidmuhammed@zilogic.com (Raashid Muhammed)
-Date: Thu, 26 May 2016 12:48:26 +0530
-Subject: [PATCH v2 2/2] ARM: at91: Add DT support for Olimex SAM9-L9260 board.
-In-Reply-To: <0b33151de87d9249a49a90c3a17ee0d112d45043.1464245706.git.raashidmuhammed@zilogic.com>
-References: <0b33151de87d9249a49a90c3a17ee0d112d45043.1464245706.git.raashidmuhammed@zilogic.com>
-Message-ID: <8720a8d5154bdc6c61f01ee2bd4f52e577db9445.1464245706.git.raashidmuhammed@zilogic.com>
+From: ck.hu@mediatek.com (CK Hu)
+Date: Thu, 26 May 2016 15:28:28 +0800
+Subject: [PATCH v7 2/4] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <1464092829.19894.16.camel@mtksdaap41>
+References: <1464006190-344-1-git-send-email-hs.liao@mediatek.com>
+ <1464006190-344-3-git-send-email-hs.liao@mediatek.com>
+ <1464059159.7425.6.camel@mtksdaap41> <1464092829.19894.16.camel@mtksdaap41>
+Message-ID: <1464247708.13536.14.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Raashid Muhammed <raashidmuhammed@zilogic.com>
+Hi, HS:
 
-sam9-l9260 is a low cost board designed by Olimex.
+Replay inline.
 
-More information is available at:
-https://www.olimex.com/Products/ARM/Atmel/SAM9-L9260/
+On Tue, 2016-05-24 at 20:27 +0800, Horng-Shyang Liao wrote:
+> Hi CK,
+> 
+> Reply in line.
+> 
+> On Tue, 2016-05-24 at 11:05 +0800, CK Hu wrote:
+> > Hi, HS:
+> > 
+> > Some comments below.
+> > 
+> ...
+> > > +static void cmdq_thread_irq_handler(struct cmdq *cmdq, int tid)
+> > > +{
+> > > +	struct cmdq_thread *thread = &cmdq->thread[tid];
+> > > +	unsigned long flags = 0L;
+> > > +	int value;
+> > > +
+> > > +	spin_lock_irqsave(&cmdq->exec_lock, flags);
+> > > +
+> > > +	/*
+> > > +	 * it is possible for another CPU core
+> > > +	 * to run "release task" right before we acquire the spin lock
+> > > +	 * and thus reset / disable this HW thread
+> > > +	 * so we check both the IRQ flag and the enable bit of this thread
+> > > +	 */
+> > > +	value = cmdq_thread_readl(thread, CMDQ_THR_IRQ_STATUS);
+> > > +	if (!(value & CMDQ_THR_IRQ_MASK)) {
+> > > +		spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> > > +		return;
+> > > +	}
+> > 
+> > If this case happen and just return without clearing irq status, the irq
+> > would keep triggering and system hang up. So just remove this checking
+> > and go down to clear irq status.
+> 
+> This case is safe because irq status is cleared.
+> But, next if condition has the problem which you mentioned.
+> 
+> I will change it as below.
+> 
+> 	if (!(cmdq_thread_readl(thread, CMDQ_THR_ENABLE_TASK) &
+> 	      CMDQ_THR_ENABLED)) {
+> 		cmdq_thread_writel(thread, ~value, CMDQ_THR_IRQ_STATUS);
+> 		spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> 		return;
+> 	}
+> 
+> If thread is disabled, tasks must be all finished.
+> Therefore, just clear irq status and return.
+> 
 
-Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
-Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
----
- Documentation/devicetree/bindings/arm/olimex.txt |   8 +-
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/at91-sam9_l9260.dts            | 115 +++++++++++++++++++++++
- 3 files changed, 122 insertions(+), 2 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-sam9_l9260.dts
+For irq status checking part, if irq status & irq mask is zero, remove
+this checking and let it go down, it still do nothing because value &
+CMDQ_THR_IRQ_ERROR is zero and value & CMDQ_THR_IRQ_DONE is zero. So you
+can just remove this checking and get the same result.
 
-diff --git a/Documentation/devicetree/bindings/arm/olimex.txt b/Documentation/devicetree/bindings/arm/olimex.txt
-index 007fb5c..d726aec 100644
---- a/Documentation/devicetree/bindings/arm/olimex.txt
-+++ b/Documentation/devicetree/bindings/arm/olimex.txt
-@@ -1,5 +1,9 @@
--Olimex i.MX Platforms Device Tree Bindings
--------------------------------------------
-+Olimex Device Tree Bindings
-+---------------------------
-+
-+SAM9-L9260 Board
-+Required root node properties:
-+    - compatible = "olimex,sam9-l9260", "atmel,at91sam9260";
- 
- i.MX23 Olinuxino Low Cost Board
- Required root node properties:
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 0f89d87..d27f09d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -19,6 +19,7 @@ dtb-$(CONFIG_SOC_SAM_V4_V5) += \
- 	usb_a9260.dtb \
- 	at91sam9261ek.dtb \
- 	at91sam9263ek.dtb \
-+	at91-sam9_l9260.dtb \
- 	tny_a9263.dtb \
- 	usb_a9263.dtb \
- 	at91-foxg20.dtb \
-diff --git a/arch/arm/boot/dts/at91-sam9_l9260.dts b/arch/arm/boot/dts/at91-sam9_l9260.dts
-new file mode 100644
-index 0000000..b3d738b
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-sam9_l9260.dts
-@@ -0,0 +1,115 @@
-+/*
-+ * at91-sam9_l9260.dts - Device Tree file for Olimex SAM9-L9260 board
-+ *
-+ *  Copyright (C) 2016 Raashid Muhammed <raashidmuhammed@zilogic.com>
-+ *
-+ * Licensed under GPLv2 or later.
-+ */
-+/dts-v1/;
-+#include "at91sam9260.dtsi"
-+
-+/ {
-+	model = "Olimex sam9-l9260";
-+	compatible = "olimex,sam9-l9260", "atmel,at91sam9260", "atmel,at91sam9";
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory {
-+		reg = <0x20000000 0x4000000>;
-+	};
-+
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <18432000>;
-+		};
-+	};
-+
-+	ahb {
-+		apb {
-+			mmc0: mmc at fffa8000 {
-+				pinctrl-0 = <
-+					&pinctrl_board_mmc0
-+					&pinctrl_mmc0_clk
-+					&pinctrl_mmc0_slot1_cmd_dat0
-+					&pinctrl_mmc0_slot1_dat1_3>;
-+				status = "okay";
-+
-+				slot at 1 {
-+					reg = <1>;
-+					bus-width = <4>;
-+					cd-gpios = <&pioC 8 GPIO_ACTIVE_HIGH>;
-+					wp-gpios = <&pioC 4 GPIO_ACTIVE_HIGH>;
-+				};
-+			};
-+
-+			macb0: ethernet at fffc4000 {
-+				phy-mode = "mii";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				status = "okay";
-+
-+				ethernet-phy at 1 {
-+					reg = <0x1>;
-+				};
-+			};
-+
-+			spi0: spi at fffc8000 {
-+				cs-gpios = <&pioC 11 0>, <0>, <0>, <0>;
-+				status = "okay";
-+
-+				mtd_dataflash at 0 {
-+					compatible = "atmel,at45", "atmel,dataflash";
-+					spi-max-frequency = <15000000>;
-+					reg = <0>;
-+				};
-+			};
-+
-+			dbgu: serial at fffff200 {
-+				status = "okay";
-+			};
-+
-+			pinctrl at fffff400 {
-+				mmc0 {
-+					pinctrl_board_mmc0: mmc0-board {
-+						atmel,pins =
-+							<AT91_PIOC 8 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH	/* CD pin */
-+							 AT91_PIOC 4 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP>;	/* WP pin */
-+					};
-+				};
-+			};
-+		};
-+
-+		nand0: nand at 40000000 {
-+			nand-bus-width = <8>;
-+			nand-ecc-mode = "soft";
-+			nand-on-flash-bbt = <1>;
-+			status = "okay";
-+		};
-+
-+		usb0: ohci at 500000 {
-+			status = "okay";
-+		};
-+
-+	};
-+
-+	i2c at 0 {
-+		status = "okay";
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+
-+		b0 {
-+			label = "b0";
-+			gpios = <&pioA 6 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+	};
-+};
--- 
-2.1.4
+In general HW design, once a HW is not enable, it does not trigger
+interrupt any more. Be sure that it's necessary to clear irq status even
+though thread is disable.
+
+
+> > > +
+> > > +	if (!(cmdq_thread_readl(thread, CMDQ_THR_ENABLE_TASK) &
+> > > +	      CMDQ_THR_ENABLED)) {
+> > > +		spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> > > +		return;
+> > > +	}
+> > > +
+> > > +	cmdq_thread_writel(thread, ~value, CMDQ_THR_IRQ_STATUS);
+> > > +
+> > > +	if (value & CMDQ_THR_IRQ_ERROR)
+> > > +		cmdq_handle_error_done(cmdq, thread, true);
+> > > +	else if (value & CMDQ_THR_IRQ_DONE)
+> > > +		cmdq_handle_error_done(cmdq, thread, false);
+> > 
+> > These irq status checking and clearing code here is the same as those in
+> > cmdq_task_handle_error_result(). To move the checking and clearing code
+> > into cmdq_handle_error_done() and here just to call
+> > cmdq_handle_error_done(cmdq, thread) would reduce duplicated code.
+> 
+> Will do.
+> 
+> > > +
+> > > +	spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> > > +}
+> ...
+> ...
+> > 
+> > Regards,
+> > CK
+> 
+> Thanks,
+> HS
+> 
+
+Regards,
+CK
