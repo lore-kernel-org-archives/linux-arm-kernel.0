@@ -1,244 +1,73 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 26 May 2016 09:58:21 +0000
-Subject: [PATCH V7 00/11] Support for generic ACPI based PCI host
- controller
-In-Reply-To: <20160524190048.GA4288@localhost>
-References: <3d4aae09-51c4-f007-5100-191a4a85e27a@redhat.com>
- <CAKv+Gu8fdeJ9OvRSmtu9zyvcjK3O-4WU=jG=6-7t4xZwvV8d2g@mail.gmail.com>
- <95b1d06e-f9c5-39f3-1003-f536b65eef60@redhat.com>
- <CAKv+Gu-_xp_t_Ze3Pw_-82-fmy=tCy-h=4FbP98eLbuXVk2hHQ@mail.gmail.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EDAF6AC@lhreml503-mbs>
- <CAKv+Gu_zpoFsDr7e8zPCDKPpRdKDVH+vnC0nfvmGaJ7xcP3Zng@mail.gmail.com>
- <20160523105655.GA22902@red-moon>
- <EE11001F9E5DDD47B7634E2F8A612F2E1EDB35A5@lhreml503-mbs>
- <20160523233918.GA32555@localhost> <20160524172423.GA15855@red-moon>
- <20160524190048.GA4288@localhost>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1EDB835E@lhreml503-mbs>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 26 May 2016 12:06:55 +0200
+Subject: [RFC PATCH 1/3] watchdog: Add Meson GXBB Watchdog Driver
+In-Reply-To: <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
+References: <1464249112-13658-1-git-send-email-narmstrong@baylibre.com>
+ <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160526100655.GB14703@mephisto>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn many thanks for your suggestions
+On 26/05/16 09:51, Neil Armstrong wrote:
+> Add watchdog specific driver for Amlogic Meson GXBB SoC.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> +
 
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: 24 May 2016 20:01
-> To: Lorenzo Pieralisi
-> Cc: Gabriele Paoloni; Ard Biesheuvel; Jon Masters; Tomasz Nowicki;
-> arnd at arndb.de; will.deacon at arm.com; catalin.marinas at arm.com;
-> rafael at kernel.org; hanjun.guo at linaro.org; okaya at codeaurora.org;
-> jchandra at broadcom.com; linaro-acpi at lists.linaro.org; linux-
-> pci at vger.kernel.org; dhdang at apm.com; Liviu.Dudau at arm.com;
-> ddaney at caviumnetworks.com; jeremy.linton at arm.com; linux-
-> kernel at vger.kernel.org; linux-acpi at vger.kernel.org;
-> robert.richter at caviumnetworks.com; Suravee.Suthikulpanit at amd.com;
-> msalter at redhat.com; Wangyijing; mw at semihalf.com;
-> andrea.gallo at linaro.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH V7 00/11] Support for generic ACPI based PCI host
-> controller
-> 
-> On Tue, May 24, 2016 at 06:24:23PM +0100, Lorenzo Pieralisi wrote:
-> > Hi Bjorn,
-> >
-> > On Mon, May 23, 2016 at 06:39:18PM -0500, Bjorn Helgaas wrote:
-> >
-> > [...]
-> >
-> > > On Mon, May 23, 2016 at 03:16:01PM +0000, Gabriele Paoloni wrote:
-> > > I don't think of ECAM support itself as a "driver".  It's just a
-> > > service available to drivers, similar to OF resource parsing.
-> > >
-> > > Per PCI Firmware r3.2, sec 4.1.5, "PNP0A03" means a PCI/PCI-X/PCIe
-> > > host bridge.  "PNP0A08" means a PCI-X Mode 2 or PCIe bridge that
-> > > supports extended config space.  It doesn't specify how we access
-> that
-> > > config space, so I think hardware with non-standard ECAM should
-> still
-> > > have PNP0A03 and PNP0A08 in _CID or _HID.
-> > >
-> > > "ECAM" as used in the specs (PCIe r3.0, sec 7.2.2, and PCI Firmware
-> > > r3.2, sec 4.1) means:
-> > >
-> > >   (a) a memory-mapped model for config space access, and
-> > >   (b) a specific mapping of address bits to bus/device/function/
-> > >       register
-> > >
-> > > MCFG and _CBA assume both (a) and (b), so I think a device with
-> > > non-standard ECAM mappings should not be described in MCFG or _CBA.
-> > >
-> > > If a bridge has ECAM with non-standard mappings, I think either a
-> > > vendor-specific _HID or a device-specific method, e.g., _DSM, could
-> > > communicate that.
-> > >
-> > > Jon, I agree that we should avoid describing non-standardized
-> hardware
-> > > in Linux-specific ways.  Is there a mechanism in use already?  How
-> > > does Windows handle this?  DMI is a poor long-term solution because
-> it
-> > > requires ongoing maintenance for new platforms, but I think it's OK
-> > > for getting started with platforms already shipping.
-> > >
-> > > A _DSM has the advantage that once it is defined and supported,
-> OEMs
-> > > can ship new platforms without requiring a new quirk or a new _HID
-> to
-> > > be added to a driver.
-> > >
-> > > There would still be the problem of config access before the
-> namespace
-> > > is available, i.e., the MCFG use case.  I don't know how important
-> > > that is.  Defining an MCFG extension seems like the most obvious
-> > > solution.
-> >
-> > Your summary above is a perfect representation of the situation.
-> >
-> > We had an opportunity to sync-up on the current status of ACPI PCI
-> > for ARM64 (and talked about a way forward for this series, which
-> > includes quirks handling), let me summarize it here for everyone
-> > involved so that we can agree on a way forward.
-> >
-> > 1) ACPI PCI support for PNP0A03/PNP0A08 host bridges on top of MCFG
-> >    ECAM for config space is basically ready (Tomasz and JC addressed
-> >    Rafael's concerns in relation to ARM64 specific code, and managed
-> >    to find a way to allocate domain numbers in preparation for Arnd
-> >    pci_create_root_bus() clean-up, v8 to be posted shortly and should
-> >    be final). This provides support for de-facto ACPI/PCI ECAM base
-> >    standard for ARM64 (with a clean-split between generic code and
-> ARM64
-> >    bits, where ARM64, like X86 and IA64, manages in arch code IO
-> space and
-> >    PCI resources, to be further consolidated in the near future).
-> >    I do not think anyone can complain about the generality of what we
-> >    achieved, for systems that are PCI standard (yes, PCI STANDARD)
-> this
-> >    would just be sufficient.
-> 
-> Sounds good to me.
-> 
-> > 2) In a real world (1) is not enough. Some ARM64 platforms, not
-> entirely
-> >    ECAM compliant, already shipped with the corresponding firmware
-> that
-> >    we can't update. HW has ECAM quirks and to work around it in the
-> kernel
-> >    we put forward many solutions to the problem, it is time we found
-> a
-> >    solution (when, of course, (1) is completed and upstream).
-> >    Using the MCFG table OEMID matching floated around in this thread
-> >    would work fine for most of the platforms (and cross-OS) that have
-> >    shipped with HW ECAM quirks, so I think that's the starting point
-> for
-> >    our solution and that's how we can sort this out, _today_.
-> >
-> >    The solution is a trivial look-up table:
-> >    MCFG OEMID <-> PCI config space ops
-> 
-> Sounds reasonable to me.
-> 
-> > 3) (2) does not just work on some platforms (and we can't predict the
-> >    future either - actually I can, it is three letters, ECAM), simply
-> >    because MCFG OEMID matching does not provide a way to attach
-> further
-> >    data to the MCFG (eg if config space for, say, bus 0 domain 0, is
-> not
-> >    ECAM compliant, the config region can't be handled and must not be
-> >    handled through a corresponding MCFG region.
-> 
-> Couldn't this be handled by custom pci_ops that do something special
-> for bus 0 domain 0, and default to some different pci_ops for the
-> rest?
+[...]
+> +#define DEFAULT_TIMEOUT	10	/* seconds */
+> +
+> +#define GXBB_WDT_CTRL_REG	0x0
+> +#define GXBB_WDT_CTRL1_REG	0x4
+> +#define GXBB_WDT_TCNT_REG	0x8
+> +#define GXBB_WDT_RSET_REG	0xc
+> +
+> +#define GXBB_WDT_CTRL_EE_RESET_NOW	BIT(26)
+> +
+> +#define GXBB_WDT_CTRL_CLKDIV_EN	BIT(25)
+> +#define GXBB_WDT_CTRL_CLK_EN	BIT(24)
+> +#define GXBB_WDT_CTRL_IRQ_EN	BIT(23)
+> +#define GXBB_WDT_CTRL_EE_RESET	BIT(21)
+> +#define GXBB_WDT_CTRL_XTAL_SEL	(0)
+> +#define GXBB_WDT_CTRL_CLK81_SEL	BIT(19)
+> +#define GXBB_WDT_CTRL_EN	BIT(18)
+> +#define GXBB_WDT_CTRL_DIV_MASK	(BIT(18)-1)
+> +
+> +#define GXBB_WDT_CTRL1_GPIO_PULSE	BIT(17)
+> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_0	BIT(16)
+> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_1	(0)
+> +#define GXBB_WDT_CTRL1_GPIO_PULSE_CNT	(BIT(16)-1)
+> +
+> +#define GXBB_WDT_TCNT_SETUP_MASK	(BIT(16)-1)
+> +#define GXBB_WDT_TCNT_CNT_SHIFT		16
 
-My idea was to remove bus 0 from domain 0 MCFG (and also the other
-buses corresponding to the root complexes ports)
+Indentation
 
-So the driver would use the ECAM access with addresses retrieved from
-MCFG for any devices except the RCs.
+[...]
+> +int meson_gxbb_wdt_set_timeout(struct watchdog_device *wdt_dev,
+> +			       unsigned int timeout)
+> +{
+> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
+> +
+> +	if (watchdog_active(wdt_dev))
+> +		meson_gxbb_wdt_stop(wdt_dev);
+> +
+> +	meson_gxbb_wdt_ping(wdt_dev);
+> +
+> +	writel(timeout*1000, data->reg_base + GXBB_WDT_TCNT_REG);
 
-For the RC we could retrieve special addresses from the "PNP0C02"
-reserved resource... 
+nit: spaces around "*"
 
+[...]
+> +	data->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(data->clk))
+> +		return PTR_ERR(data->clk);
+> +
+> +	clk_prepare_enable(data->clk);
 
-> 
-> >    That's the problem Gabriele is facing and wants to solve through
-> >    something like:
-> >
-> >    https://lkml.org/lkml/2016/3/9/91
-> >
-> >    in the respective ACPI tables-bindings. It may be an idea worth
-> >    pursuing, it does not solve (2) simply because that FW has
-> shipped,
-> >    we can't patch it any longer.
-> 
-> (2) is for quirks to deal with MCFG.  Gabriele's post is a proposal
-> for ACPI namespace.  We can't use anything in the namespace to
-> implement MCFG quirks because MCFG is needed before the namespace is
-> available.
+Do we need to merge the clock controller driver before this?
 
-Honestly I have to dig better into this (and I will once V8 is out),
-However from my current understanding so far we have look-up where
-MCFG OEMID is going to tell which specific pci-ops are going to be used.
+Cheers,
 
-Now from my quirk idea I need to retrieve the "special address" from the
-ACPI namespace before cfg rd/wr take place...if this is not doable then
-I need to find a different solution...than can be the one you proposed
-below (many thanks for this).
-
-I will look into details later on once v8 is out.
-
-Thanks
-
-Gab
-
-> 
-> I think Gabriele's post is a good proposal for the namespace, but I
-> would propose the following modifications:
-> 
->   - Add PNP0A08 to the PCI1 _CID since this is a PCIe host bridge
->   - Add a PCI1 _DSM describing the ECAM space
->   - Remove the HISI0081 _HID
-> 
-> The result would be:
-> 
->   Device (PCI1) {
->     Name(_HID, "HISI0080")
->     Name(_CID, "PNP0A03,PNP0A08")
->     Method(_CRS) { ... }
->     Method(_DSM) { <describe ECAM base and mapping function> }
->   }
->   Device (RES0) {
->     Name(_HID, "PNP0C02")
->     Name(_CRS) { <describe ECAM base and size> }
->   }
-> 
-> RES0 could also be contained within PCI1, as Gabriele suggested.  I
-> don't really care whether it's contained or not, and making it
-> contained might make it easier for firmware, because addition/removal
-> of PCI1 and RES0 should always happen together.
-> 
-> I think the _DSM is important because it is really ugly if the
-> HISI0080 driver has to look for a separate HISI0081 device to learn
-> about the ECAM space.  There are several PCI drivers that do something
-> similar, using for_each_pci_dev(), and I cringe every time I see them,
-> because this totally screws up the driver model.  A driver should
-> claim a device via a .probe() method called by the core, and it
-> shouldn't look at devices it hasn't claimed.  This is required to make
-> hotplug work correctly.
-> 
-> > Hence to finally support ACPI PCI on ARM64 I suggest we carry out the
-> > following steps, in order:
-> >
-> > - Let's complete/merge (1), that's fundamental to this whole thread
-> > - On top of (1) we apply a quirking mechanism based on (2) that
-> allows
-> >   us to boot mainline with boxes shipping today with no FW update
-> required.
-> > - We devise a way to handle quirks that is more generic than (2) so
-> that
-> >   can we can accomodate further platforms that can't rely on (2) but
-> >   have more leeway in terms of FW updates.
-> >
-> > I hope that's a reasonable plan, Tomasz's v8 series coming to kick it
-> off.
-> 
-> Sounds very good to me; I'm looking forward to v8.
-> 
-> Bjorn
+-- 
+Carlo Caione
