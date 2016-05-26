@@ -1,55 +1,53 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Thu, 26 May 2016 16:26:00 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <a6cc6b85d2fa4994b3cb7e2b047f800d@rwthex-w2-b.rwth-ad.de>
-References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
- <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
- <CAOMZO5C5goJUdHKB9a=eOv9TKDkJWxnkWWb-G7E5Kvceg6sZVg@mail.gmail.com>
- <a6cc6b85d2fa4994b3cb7e2b047f800d@rwthex-w2-b.rwth-ad.de>
-Message-ID: <9d7793850de942cfb578b0aeb2728f41@rwthex-s1-b.rwth-ad.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 May 2016 15:33:15 +0100
+Subject: [PATCH kexec-tools 04/32] kdump: fix kdump mapping
+In-Reply-To: <CAHB_GurQ44ybkxaYJJQeGgnuw=3tKOk7xyB6FTAursMLuZGrJg@mail.gmail.com>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <E1axXSF-0004hH-Oo@e0050434b2927.dyn.arm.linux.org.uk>
+ <CAHB_GurQ44ybkxaYJJQeGgnuw=3tKOk7xyB6FTAursMLuZGrJg@mail.gmail.com>
+Message-ID: <20160526143315.GJ19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igor,
-
-On 05/26/2016 10:28 AM, Igor Grinberg wrote:
-> Hi Fabio,
+On Wed, May 25, 2016 at 11:47:33AM +0530, Pratyush Anand wrote:
+> On Tue, May 3, 2016 at 3:51 PM, Russell King <rmk@arm.linux.org.uk> wrote:
+> > diff --git a/kdump/kdump.c b/kdump/kdump.c
+> > index 1f5b984..34d2149 100644
+> > --- a/kdump/kdump.c
+> > +++ b/kdump/kdump.c
+> > @@ -284,7 +284,8 @@ int main(int argc, char **argv)
+> >         }
+> >
+> >         /* Get the program header */
+> > -       phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum), ehdr->e_phoff);
+> > +       phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum),
+> > +                       start_addr + ehdr->e_phoff);
 > 
-> On 05/23/2016 08:49 PM, Fabio Estevam wrote:
->> On Sun, May 22, 2016 at 7:47 PM,  <christopher.spinrath@rwth-aachen.de> wrote:
->>
->>> diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
->>> new file mode 100644
->>> index 0000000..bcd8e0d
->>> --- /dev/null
->>> +++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
->>> @@ -0,0 +1,128 @@
->>> +/*
->>> + * Copyright 2016 Christopher Spinrath
->>> + * Copyright 2013 CompuLab Ltd.
->>> + *
->>> + * Based on the GPLv2 licensed devicetree distributed with the vendor
->>> + * kernel for the Utilite Pro:
->>> + *     Copyright 2013 CompuLab Ltd.
->>> + *     Author: Valentin Raevsky <valentin@compulab.co.il>
->>> + *
->>> + * The code contained herein is licensed under the GNU General Public
->>> + * License. You may obtain a copy of the GNU General Public License
->>> + * Version 2 or later at the following locations:
->>
->> Can you make this dual GPL/X11 license?
->>
->> For reference take a look at:
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/imx6sl-warp.dts?id=refs/tags/v4.6
-> 
-> Please excuse me my ignorance, what is the rationale for this change?
-> 
+> This is fine. But at the same time should n't we also fix the offset
+> for mmap of memory segments?  For memory segments, offset is
+> phdr[i].p_offset, and I do not see generate_new_headers() taking care
+> of start_addr.
 
-Thanks for joining this discussion. I *guess* the rationale is to share
-the same device tree with projects that are incompatible with the GPL
-(e.g. *BSD). Even if there is no support for a particular device/board
-having all (or most) files dual licensed makes it easier to just pull
-them all in.
+Unfortunately not.  The reason is, p_offset is not an offset, but an
+absolute address - see kexec/crashdump-elf.c, which is the bit of
+code which creates the table and writes it into kernel memory when
+loading the panic kernel:
 
-Cheers,
-Christopher
+                phdr->p_offset  = phdr->p_paddr = notes_addr;
+
+                phdr->p_offset  = phdr->p_paddr = vmcoreinfo_addr;
+
+                phdr->p_offset  = phdr->p_paddr = elf_info->kern_paddr_start;
+
+                mstart = range->start;
+                phdr->p_offset  = mstart;
+                phdr->p_paddr = mstart;
+
+etc.  So, p_offset is also the physical address, not the file offset.
+Of course, that could be a bug in crashdump-elf.c.  To change that,
+we would also need to fix crashdump-elf.c in lock-step as well.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
