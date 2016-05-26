@@ -1,39 +1,35 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 25 May 2016 19:42:59 -0700
-Subject: [PATCH v2 1/4] reset: Add support for the Amlogic Meson SoC Reset
- Controller
-In-Reply-To: <1464169758-26975-2-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Wed, 25 May 2016 11:49:15 +0200")
-References: <1464169758-26975-1-git-send-email-narmstrong@baylibre.com>
- <1464169758-26975-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <m2iny1h74c.fsf@baylibre.com>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Thu, 26 May 2016 10:43:59 +0800
+Subject: [PATCH 3/3] arm64/numa: fix type info
+In-Reply-To: <1464230639-9852-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1464230639-9852-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1464230639-9852-3-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
+numa_init(of_numa_init) may returned error because of numa configuration
+error. So "No NUMA configuration found" is inaccurate. In fact, specific
+configuration error information can be immediately printed by the
+testing branch. So "No NUMA..." only needs to be printed when numa_off.
 
-> This patch adds the platform driver for the Amlogic Meson SoC Reset
-> Controller.
->
-> The Meson8b and GXBB SoCs are supported.
->
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ arch/arm64/mm/numa.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Maybe a question for Philipp, but when testog this version with the
-stmmac ethernet driver on the Amlogic boards, I noticed that ->reset was
-never getting called.
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 98dc104..9937cc1 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -362,7 +362,8 @@ static int __init dummy_numa_init(void)
+ 	int ret;
+ 	struct memblock_region *mblk;
 
-Turns out, the stmmac driver only uses reset_control_assert() and
-reset_control_deassert(), both of which return -ENOTSUPP since this
-driver doesn't provide ->assert or ->deassert, so the driver's ->reset()
-never gets called.
+-	pr_info("%s\n", "No NUMA configuration found");
++	if (numa_off)
++		pr_info("%s\n", "No NUMA configuration found");
+ 	pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
+ 	       0LLU, PFN_PHYS(max_pfn) - 1);
 
-I haven't looked into the reset framework in detail, but if there's only
-a ->reset hook, I kind of expected that reset_control_deassert() would
-use that instead of returning -ENOTSUPP.
-
-If not, what's the proper way of handling hardware that only supports a
-write-only reset pulse?  Should users of reset_control_* be adapted to
-check if ->deassert returns -ENOTSUPP and call ->reset?
-
-Kevin
+--
+2.5.0
