@@ -1,82 +1,143 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 26 May 2016 19:46:11 +0800
-Subject: [PATCH 1/1] arm64: fix flush_cache_range
-In-Reply-To: <20160525105022.GC5996@e104818-lin.cambridge.arm.com>
-References: <1464088597-8820-1-git-send-email-thunder.leizhen@huawei.com>
- <20160524113727.GD25374@leverpostej> <574446B9.8040105@huawei.com>
- <20160524130255.GU4892@e104818-lin.cambridge.arm.com>
- <5744FDD0.8060504@huawei.com> <57451DC6.7080106@huawei.com>
- <20160525105022.GC5996@e104818-lin.cambridge.arm.com>
-Message-ID: <5746E203.4000906@huawei.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 26 May 2016 19:45:49 +0800
+Subject: [PATCH 21/23] mmc: sdhci-esdhc-imx: factor out hw related
+ intialization into function
+In-Reply-To: <5731D0FF.60807@intel.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-22-git-send-email-aisheng.dong@nxp.com>
+ <5731D0FF.60807@intel.com>
+Message-ID: <20160526114548.GB23988@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 10, 2016 at 03:15:59PM +0300, Adrian Hunter wrote:
+> On 15/04/16 20:29, Dong Aisheng wrote:
+> > Factor out hw related intialization into a separate function which
+> > has two benifits:
+> > 1) concentrate hw related intialization at one place
+> > 2) ease the hw state restore after resume by simply
+> > calling this function
+> 
+> There are really 2 changes here, please make it 2 patches.
+> 
 
+Okay i will do it in V2.
+Thanks for the suggestion.
 
-On 2016/5/25 18:50, Catalin Marinas wrote:
-> On Wed, May 25, 2016 at 11:36:38AM +0800, Leizhen (ThunderTown) wrote:
->> On 2016/5/25 9:20, Leizhen (ThunderTown) wrote:
->>> On 2016/5/24 21:02, Catalin Marinas wrote:
->>>> On Tue, May 24, 2016 at 08:19:05PM +0800, Leizhen (ThunderTown) wrote:
->>>>> On 2016/5/24 19:37, Mark Rutland wrote:
->>>>>> It looks like the test may be missing I-cache maintenance regardless of
->>>>>> the semantics of mprotect in this case.
->>>>>>
->>>>>> I have not yet devled into flush_cache_range and how it is called.
->>>>>
->>>>> SYSCALL_DEFINE3(mprotect ---> mprotect_fixup ---> change_protection ---> change_protection_range --> flush_cache_range
->>>>
->>>> The change_protection() shouldn't need to flush the caches in
->>>> flush_cache_range(). The change_pte_range() function eventually ends up
->>>> calling set_pte_at() which calls __sync_icache_dcache() if the mapping
->>>> is executable.
->>>
->>> OK, I see.
->>> But I'm afraid it entered the "if (pte_present(oldpte))" branch in
->>> function change_pte_range. Because the test case called mmap to
->>> create pte first, then called pte_modify. I will check it later.
->>
->> I have checked that it entered "if (pte_present(oldpte))" branch.
-> 
-> This path eventually calls set_pte_at() via ptep_modify_prot_commit().
-> 
->> But I don't known why I add flush_icache_range is OK, but add
->> __sync_icache_dcache have no effect.
-> 
-> Do you mean you modified set_pte_at() to use flush_icache_range()
-> instead of __sync_icache_dcache() and it works?
-> 
-> What happens is that __sync_icache_dcache() only takes care of the first
-> time a page is mapped in user space and flushes the caches, marking it
-> as "clean" (PG_dcache_clean) afterwards. Subsequent changes to this
+Regards
+Dong Aisheng
 
-Hi,
-As my tracing, it is returned by "if (!page_mapping(page))", because "mmap" are anonymous pages. I commented below code lines, it works well.
-	
-	/* no flushing needed for anonymous pages */
-	if (!page_mapping(page))
-		return;
-
-
-I printed the page information three times, as below:
-page->mapping=ffff8017baf36961, page->flags=0x1000000000040048
-page->mapping=ffff8017b265bf51, page->flags=0x1000000000040048
-page->mapping=ffff8017b94fc5a1, page->flags=0x1000000000040048
-
-PG_slab=7, PG_arch_1=9, PG_swapcache=15
-
-> mapping or writes to it are entirely the responsibility of the user. So
-> if the user plans to execute instructions, it better explicitly flush
-> the caches (as Mark Rutland already stated in a previous reply).
-> 
-> I ran our internal LTP version yesterday and it was fine but didn't
-> realise that we actually patched mprotect04.c to include:
-> 
-> 	__clear_cache((char *)func, (char *)func + page_sz);
-> 
-> just after memcpy().
-> 
-> (we still need to investigate whether the I-cache invalidation is
-> actually needed in flush_cache_range() or it's just something we forgot
-> to remove)
+> > 
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/mmc/host/sdhci-esdhc-imx.c | 76 +++++++++++++++++++++-----------------
+> >  1 file changed, 42 insertions(+), 34 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > index 3ff213f..95f3632 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > @@ -978,6 +978,44 @@ static const struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+> >  	.ops = &sdhci_esdhc_ops,
+> >  };
+> >  
+> > +static void sdhci_esdhc_imx_hwinit(struct sdhci_host *host)
+> > +{
+> > +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > +	struct pltfm_imx_data *imx_data = sdhci_pltfm_priv(pltfm_host);
+> > +
+> > +	if (esdhc_is_usdhc(imx_data)) {
+> > +		/*
+> > +		 * The imx6q ROM code will change the default watermark
+> > +		 * level setting to something insane.  Change it back here.
+> > +		 */
+> > +		writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
+> > +
+> > +		/*
+> > +		 * ROM code will change the bit burst_length_enable setting
+> > +		 * to zero if this usdhc is choosed to boot system. Change
+> > +		 * it back here, otherwise it will impact the performance a
+> > +		 * lot. This bit is used to enable/disable the burst length
+> > +		 * for the external AHB2AXI bridge, it's usefully especially
+> > +		 * for INCR transfer because without burst length indicator,
+> > +		 * the AHB2AXI bridge does not know the burst length in
+> > +		 * advance. And without burst length indicator, AHB INCR
+> > +		 * transfer can only be converted to singles on the AXI side.
+> > +		 */
+> > +		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
+> > +			| ESDHC_BURST_LEN_EN_INCR,
+> > +			host->ioaddr + SDHCI_HOST_CONTROL);
+> > +		/*
+> > +		* errata ESDHC_FLAG_ERR004536 fix for MX6Q TO1.2 and MX6DL
+> > +		* TO1.1, it's harmless for MX6SL
+> > +		*/
+> > +		writel(readl(host->ioaddr + 0x6c) | BIT(7),
+> > +			host->ioaddr + 0x6c);
+> > +
+> > +		/* disable DLL_CTRL delay line settings */
+> > +		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
+> > +	}
+> > +}
+> > +
+> >  #ifdef CONFIG_OF
+> >  static int
+> >  sdhci_esdhc_imx_probe_dt(struct platform_device *pdev,
+> > @@ -1175,43 +1213,13 @@ static int sdhci_esdhc_imx_probe(struct platform_device *pdev)
+> >  		host->quirks |= SDHCI_QUIRK_NO_MULTIBLOCK
+> >  			| SDHCI_QUIRK_BROKEN_ADMA;
+> >  
+> > -	/*
+> > -	 * The imx6q ROM code will change the default watermark level setting
+> > -	 * to something insane.  Change it back here.
+> > -	 */
+> > -	if (esdhc_is_usdhc(imx_data)) {
+> > -		writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
+> > +	sdhci_esdhc_imx_hwinit(host);
+> >  
+> > +	if (esdhc_is_usdhc(imx_data)) {
+> >  		host->quirks2 |= SDHCI_QUIRK2_PRESET_VALUE_BROKEN;
+> >  		host->mmc->caps |= MMC_CAP_1_8V_DDR;
+> > -
+> > -		/*
+> > -		 * ROM code will change the bit burst_length_enable setting
+> > -		 * to zero if this usdhc is choosed to boot system. Change
+> > -		 * it back here, otherwise it will impact the performance a
+> > -		 * lot. This bit is used to enable/disable the burst length
+> > -		 * for the external AHB2AXI bridge, it's usefully especially
+> > -		 * for INCR transfer because without burst length indicator,
+> > -		 * the AHB2AXI bridge does not know the burst length in
+> > -		 * advance. And without burst length indicator, AHB INCR
+> > -		 * transfer can only be converted to singles on the AXI side.
+> > -		 */
+> > -		writel(readl(host->ioaddr + SDHCI_HOST_CONTROL)
+> > -			| ESDHC_BURST_LEN_EN_INCR,
+> > -			host->ioaddr + SDHCI_HOST_CONTROL);
+> > -
+> >  		if (!(imx_data->socdata->flags & ESDHC_FLAG_HS200))
+> >  			host->quirks2 |= SDHCI_QUIRK2_BROKEN_HS200;
+> > -
+> > -		/*
+> > -		* errata ESDHC_FLAG_ERR004536 fix for MX6Q TO1.2 and MX6DL
+> > -		* TO1.1, it's harmless for MX6SL
+> > -		*/
+> > -		writel(readl(host->ioaddr + 0x6c) | BIT(7),
+> > -			host->ioaddr + 0x6c);
+> > -
+> > -		/* disable DLL_CTRL delay line settings */
+> > -		writel(0x0, host->ioaddr + ESDHC_DLL_CTRL);
+> >  	}
+> >  
+> >  	if (imx_data->socdata->flags & ESDHC_FLAG_MAN_TUNING)
+> > @@ -1289,8 +1297,8 @@ static int sdhci_esdhc_resume(struct device *dev)
+> >  {
+> >  	struct sdhci_host *host = dev_get_drvdata(dev);
+> >  
+> > -	/* restore watermark setting in case it's lost in low power mode */
+> > -	writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
+> > +	/* reinitialize hw state in case it's lost in low power mode */
+> > +	sdhci_esdhc_imx_hwinit(host);
+> >  
+> >  	return sdhci_pltfm_resume(dev);
+> >  }
+> > 
 > 
