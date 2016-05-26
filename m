@@ -1,372 +1,102 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 26 May 2016 06:54:46 -0700
-Subject: [RFC PATCH 1/3] watchdog: Add Meson GXBB Watchdog Driver
-In-Reply-To: <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
-References: <1464249112-13658-1-git-send-email-narmstrong@baylibre.com>
- <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <57470026.3000501@roeck-us.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 May 2016 15:20:58 +0100
+Subject: [PATCH 01/23] all: syscall wrappers: add documentation
+In-Reply-To: <20160525.142821.1719403997976778673.davem@davemloft.net>
+References: <6293194.tGy03QJ9ME@wuerfel>
+ <20160525.135039.244098606649448826.davem@davemloft.net>
+ <6407614.fdv5XFSBue@wuerfel>
+ <20160525.142821.1719403997976778673.davem@davemloft.net>
+Message-ID: <20160526142057.GA7456@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2016 12:51 AM, Neil Armstrong wrote:
-> Add watchdog specific driver for Amlogic Meson GXBB SoC.
->
+On Wed, May 25, 2016 at 02:28:21PM -0700, David Miller wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Wed, 25 May 2016 23:01:06 +0200
+> 
+> > On Wednesday, May 25, 2016 1:50:39 PM CEST David Miller wrote:
+> >> From: Arnd Bergmann <arnd@arndb.de>
+> >> Date: Wed, 25 May 2016 22:47:33 +0200
+> >> 
+> >> > If we use the normal calling conventions, we could remove these overrides
+> >> > along with the respective special-case handling in glibc. None of them
+> >> > look particularly performance-sensitive, but I could be wrong there.
+> >> 
+> >> You could set the lowest bit in the system call entry pointer to indicate
+> >> the upper-half clears should be elided.
+> > 
+> > Right, but that would introduce an extra conditional branch in the syscall
+> > hotpath, and likely eliminate the gains from passing the loff_t arguments
+> > in a single register instead of a pair.
+> 
+> Ok, then, how much are you really gaining from avoiding a 'shift' and
+> an 'or' to build the full 64-bit value?  3 cycles?  Maybe 4?
 
-Wondering - why RFC ?
+It's possible a few more cycles overall. Whether this is noticeable, I
+can't really tell without some benchmarks (e.g. a getpid wrapper zeroing
+top 32-bit of all possible 6 arguments, called in a loop).
 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->   drivers/watchdog/Makefile         |   1 +
->   drivers/watchdog/meson_gxbb_wdt.c | 287 ++++++++++++++++++++++++++++++++++++++
->   2 files changed, 288 insertions(+)
->   create mode 100644 drivers/watchdog/meson_gxbb_wdt.c
->
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 9bde095..7679d93 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -68,6 +68,7 @@ obj-$(CONFIG_QCOM_WDT) += qcom-wdt.o
->   obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
->   obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
->   obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
-> +obj-$(CONFIG_MESON_WATCHDOG) += meson_gxbb_wdt.o
->   obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
->   obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
->   obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
-> diff --git a/drivers/watchdog/meson_gxbb_wdt.c b/drivers/watchdog/meson_gxbb_wdt.c
-> new file mode 100644
-> index 0000000..0c7c0d9
-> --- /dev/null
-> +++ b/drivers/watchdog/meson_gxbb_wdt.c
-> @@ -0,0 +1,287 @@
-> +/*
-> + * This file is provided under a dual BSD/GPLv2 license.  When using or
-> + * redistributing this file, you may do so under either license.
-> + *
-> + * GPL LICENSE SUMMARY
-> + *
-> + * Copyright (c) 2016 BayLibre, SAS.
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of version 2 of the GNU General Public License as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> + * WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> + * General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
-> + * The full GNU General Public License is included in this distribution
-> + * in the file called COPYING.
-> + *
-> + * BSD LICENSE
-> + *
-> + * Copyright (c) 2016 BayLibre, SAS.
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * Redistribution and use in source and binary forms, with or without
-> + * modification, are permitted provided that the following conditions
-> + * are met:
-> + *
-> + *   * Redistributions of source code must retain the above copyright
-> + *     notice, this list of conditions and the following disclaimer.
-> + *   * Redistributions in binary form must reproduce the above copyright
-> + *     notice, this list of conditions and the following disclaimer in
-> + *     the documentation and/or other materials provided with the
-> + *     distribution.
-> + *   * Neither the name of Intel Corporation nor the names of its
-> + *     contributors may be used to endorse or promote products derived
-> + *     from this software without specific prior written permission.
-> + *
-> + * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-> + * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-> + * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-> + * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-> + * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-> + * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-> + * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-> + * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-> + * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-> + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-> + * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-> + */
-> +#include <linux/err.h>
-> +#include <linux/module.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/clk.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <linux/types.h>
-> +#include <linux/watchdog.h>
-> +
-> +#define DEFAULT_TIMEOUT	10	/* seconds */
-> +
-> +#define GXBB_WDT_CTRL_REG	0x0
-> +#define GXBB_WDT_CTRL1_REG	0x4
-> +#define GXBB_WDT_TCNT_REG	0x8
-> +#define GXBB_WDT_RSET_REG	0xc
-> +
-> +#define GXBB_WDT_CTRL_EE_RESET_NOW	BIT(26)
-> +
-> +#define GXBB_WDT_CTRL_CLKDIV_EN	BIT(25)
-> +#define GXBB_WDT_CTRL_CLK_EN	BIT(24)
-> +#define GXBB_WDT_CTRL_IRQ_EN	BIT(23)
-> +#define GXBB_WDT_CTRL_EE_RESET	BIT(21)
-> +#define GXBB_WDT_CTRL_XTAL_SEL	(0)
-> +#define GXBB_WDT_CTRL_CLK81_SEL	BIT(19)
-> +#define GXBB_WDT_CTRL_EN	BIT(18)
-> +#define GXBB_WDT_CTRL_DIV_MASK	(BIT(18)-1)
-> +
-> +#define GXBB_WDT_CTRL1_GPIO_PULSE	BIT(17)
-> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_0	BIT(16)
-> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_1	(0)
-> +#define GXBB_WDT_CTRL1_GPIO_PULSE_CNT	(BIT(16)-1)
-> +
+On arm64 with ILP32 we have three types of syscalls w.r.t. parameter
+width (I guess that's true for all other compat implementations):
 
-Spaces around operators, please.
+1. User syscall definition with 32-bit arguments, kernel handling 32-bit
+   arguments
 
-> +#define GXBB_WDT_TCNT_SETUP_MASK	(BIT(16)-1)
-> +#define GXBB_WDT_TCNT_CNT_SHIFT		16
-> +
-> +struct meson_gxbb_wdt {
-> +	void __iomem *reg_base;
-> +	struct watchdog_device wdt_dev;
-> +	struct clk *clk;
-> +};
-> +
-> +int meson_gxbb_wdt_start(struct watchdog_device *wdt_dev)
+2. User 32-bit arguments, kernel 64-bit arguments
 
-Functions should all be static.
+3. User 64-bit arguments, kernel 64-bit arguments
 
-> +{
-> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
-> +
-> +	writel(readl(data->reg_base + GXBB_WDT_CTRL_REG) | GXBB_WDT_CTRL_EN,
-> +		data->reg_base + GXBB_WDT_CTRL_REG);
-> +
-> +	return 0;
-> +}
-> +
-> +int meson_gxbb_wdt_stop(struct watchdog_device *wdt_dev)
-> +{
-> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
-> +
-> +	writel(readl(data->reg_base + GXBB_WDT_CTRL_REG) & ~GXBB_WDT_CTRL_EN,
-> +		data->reg_base + GXBB_WDT_CTRL_REG);
-> +
-> +	return 0;
-> +}
-> +
-> +unsigned int meson_gxbb_wdt_status(struct watchdog_device *wdt_dev)
-> +{
-> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
-> +
-> +	return !!(readl(data->reg_base + GXBB_WDT_CTRL_REG) & GXBB_WDT_CTRL_EN);
+For (1), the AArch64 ABI (AAPCS) allows us to ignore the garbage in the
+top 32-bit of a 64-bit register as long as the callee has 32-bit
+arguments (IOW, the generated code will use 32-git Wn instead of 64-bit
+Xn registers). In this case, zeroing the top 32-bit of all 6 arguments
+is unnecessary.
 
-This function is not supposed to return 0/1 but a bit mask with relevant
-WDIOF_bits set. sbsa_gwdt.c is buggy (oops, and I reviewed it ;-), so
-please don't use it as example; it doesn't make much sense to return
-a kernel-only flag to user space.
+In the 2nd case, we need sign or zero extension of 32-bit arguments. For
+sign extension we would still need a wrapper as the generic one can only
+zero-extend without knowing the underlying type. How many cases do we
+have where sign extension is required (off_t is a signed type but does
+it actually make sense as a negative value)? The __SC_WRAP and
+COMPAT_SYSCALL_WRAP macros introduced by patches 3-5 in this series
+handle such conversion for both sign and unsigned arguments.
 
-Overall I would suggest to not implement the function at all. We'll have
-to revisit it - its current implementation in the watchdog core does not
-make much sense and for the most part only returns 0 to user space.
-The only driver implementing it (sbsa) returns a bad value. It is also
-_not_ supposed to return the "watchdog running" status as currently
-implemented (there is no WDIOF_ flag indicating that the watchdog is
-running).
+We don't have such problem with AArch32 tasks since the architecture
+guarantees zeroing or preserving the top half of all registers.
 
-> +}
-> +
-> +int meson_gxbb_wdt_ping(struct watchdog_device *wdt_dev)
-> +{
-> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
-> +
-> +	writel(0, data->reg_base + GXBB_WDT_RSET_REG);
-> +
-> +	return 0;
-> +}
-> +
-> +int meson_gxbb_wdt_set_timeout(struct watchdog_device *wdt_dev,
-> +			       unsigned int timeout)
-> +{
-> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
-> +
-> +	if (watchdog_active(wdt_dev))
-> +		meson_gxbb_wdt_stop(wdt_dev);
-> +
+For (3), with the current ILP32 approach we wouldn't need any wrapper.
+If we are to pass the argument as two 32-bit values, we would need both
+the user (glibc) to split the argument and the kernel to re-construct
+it. This would be in addition to any default top 32-bit zeroing on
+kernel entry.
 
-Is the stop/start sequence mandatory ? It leaves the system unprotected
-for a few cycles, so it is undesirable.
+The overhead may be lost in the noise (we need some data) but IIRC our
+decision was mostly based on a cleaner user implementation for point (3)
+above. Since an AArch64/ILP32 process can freely use 64-bit registers,
+we found it nicer to be able to pass such value directly to the kernel.
+Reusing the s390 macros should reduce the amount of new code added to
+the kernel.
 
-> +	meson_gxbb_wdt_ping(wdt_dev);
-> +
-> +	writel(timeout*1000, data->reg_base + GXBB_WDT_TCNT_REG);
-> +
-> +	if (watchdog_active(wdt_dev))
-> +		meson_gxbb_wdt_start(wdt_dev);
-> +
-> +	return 0;
-> +}
-> +
-> +unsigned int meson_gxbb_wdt_get_timeleft(struct watchdog_device *wdt_dev)
-> +{
-> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
-> +	unsigned long reg;
-> +
-> +	reg = readl(data->reg_base + GXBB_WDT_TCNT_REG);
-> +
-> +	return ((reg >> GXBB_WDT_TCNT_CNT_SHIFT)-
-> +			(reg & GXBB_WDT_TCNT_SETUP_MASK)) / 1000;
-> +}
-> +
-> +static const struct watchdog_ops meson_gxbb_wdt_ops = {
-> +	.start = meson_gxbb_wdt_start,
-> +	.stop = meson_gxbb_wdt_stop,
-> +	.status = meson_gxbb_wdt_status,
-> +	.ping = meson_gxbb_wdt_ping,
-> +	.set_timeout = meson_gxbb_wdt_set_timeout,
-> +	.get_timeleft = meson_gxbb_wdt_get_timeleft,
-> +};
-> +
-> +static const struct watchdog_info meson_gxbb_wdt_info = {
-> +	.identity = "meson-gxbb-wdt",
-> +	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
-> +};
-> +
-> +static int __maybe_unused meson_gxbb_wdt_resume(struct device *dev)
-> +{
-> +	struct meson_gxbb_wdt *data = dev_get_drvdata(dev);
-> +
-> +	if (watchdog_active(&data->wdt_dev))
-> +		meson_gxbb_wdt_start(&data->wdt_dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int __maybe_unused meson_gxbb_wdt_suspend(struct device *dev)
-> +{
-> +	struct meson_gxbb_wdt *data = dev_get_drvdata(dev);
-> +
-> +	if (watchdog_active(&data->wdt_dev))
-> +		meson_gxbb_wdt_stop(&data->wdt_dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops meson_gxbb_wdt_pm_ops = {
-> +	SET_SYSTEM_SLEEP_PM_OPS(meson_gxbb_wdt_suspend, meson_gxbb_wdt_resume)
-> +};
-> +
-> +static const struct of_device_id meson_gxbb_wdt_dt_ids[] = {
-> +	 { .compatible = "amlogic,meson-gxbb-wdt", },
-> +	 { /* sentinel */ },
-> +};
-> +MODULE_DEVICE_TABLE(of, meson_gxbb_wdt_dt_ids);
-> +
-> +static int meson_gxbb_wdt_probe(struct platform_device *pdev)
-> +{
-> +	struct meson_gxbb_wdt *data;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
-> +	if (!data)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	data->reg_base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(data->reg_base))
-> +		return PTR_ERR(data->reg_base);
-> +
-> +	data->clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(data->clk))
-> +		return PTR_ERR(data->clk);
-> +
-> +	clk_prepare_enable(data->clk);
-> +
-> +	platform_set_drvdata(pdev, data);
-> +
-> +	data->wdt_dev.parent = &pdev->dev;
-> +	data->wdt_dev.info = &meson_gxbb_wdt_info;
-> +	data->wdt_dev.ops = &meson_gxbb_wdt_ops;
-> +	data->wdt_dev.max_hw_heartbeat_ms = GXBB_WDT_TCNT_SETUP_MASK;
-> +	data->wdt_dev.min_hw_heartbeat_ms = 1;
 
-Does the device require a minimum time between heartbeats ?
-Just asking, because you violate it yourself below.
+While writing the above, I realised the current ILP32 patches still miss
+on converting pointers passed from user space (unless I got myself
+confused in macros). The new __SC_WRAP() and COMPAT_SYSCALL_WRAPx()
+macros take care of zero or sign extension via __SC_COMPAT_CAST().
+However, we have two more existing cases which I don't see covered:
 
-If you want to set the minimum timeout, that would be min_timeout.
+a) Native syscalls taking a pointer argument and invoked directly from
+   ILP32. For example, sys_read() takes a pointer but I don't see any
+   __SC_WRAP added by patch 5
 
-> +	data->wdt_dev.timeout = DEFAULT_TIMEOUT;
-> +	watchdog_set_drvdata(&data->wdt_dev, data);
-> +
-> +	watchdog_init_timeout(&data->wdt_dev, DEFAULT_TIMEOUT, &pdev->dev);
-> +
+b) Current compat syscalls taking a pointer argument. For example,
+   compat_sys_vmsplice() gets the iov32 pointer and the compiler assumes
+   it is a 64-bit variable. I don't see where the upper half is zeroed
 
-DEFAULT_TIMEOUT is unnecessary here. Since the default timeout is already set,
-it makes the call useless.
+We can solve (a) by adding more __SC_WRAP annotations in the generic
+unistd.h. For (b), we would need an __SC_DELOUSE with a bit of penalty
+on AArch32/compat support where it isn't needed. So maybe davem has a
+point on the overall impact of always zeroing the upper half of the
+arguments ;) (both from a performance and maintainability perspective).
+I guess this part of the ABI is still up for discussion.
 
-> +	ret = watchdog_register_device(&data->wdt_dev);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* Setup with 1ms timebase */
-> +	writel(((clk_get_rate(data->clk) / 1000) & GXBB_WDT_CTRL_DIV_MASK) |
-> +		GXBB_WDT_CTRL_EE_RESET |
-> +		GXBB_WDT_CTRL_CLK_EN |
-> +		GXBB_WDT_CTRL_CLKDIV_EN,
-> +		data->reg_base + GXBB_WDT_CTRL_REG);
-> +	meson_gxbb_wdt_set_timeout(&data->wdt_dev, data->wdt_dev.timeout);
-
-set_timeout already calls the ping function. Also, the functions should be called
-prior to watchdog registration to avoid race conditions.
-
-> +	meson_gxbb_wdt_ping(&data->wdt_dev);
-
-This is unusual. If the watchdog can be already running, it might make sense
-to tell the core about it (set WDOG_HW_RUNNING in the status field), so it
-can send heartbeats until user space opens the device.
-
-> +
-> +	return 0;
-> +}
-> +
-> +static int meson_gxbb_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct meson_gxbb_wdt *data = platform_get_drvdata(pdev);
-> +
-> +	watchdog_unregister_device(&data->wdt_dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static void meson_gxbb_wdt_shutdown(struct platform_device *pdev)
-> +{
-> +	struct meson_gxbb_wdt *data = platform_get_drvdata(pdev);
-> +
-> +	meson_gxbb_wdt_stop(&data->wdt_dev);
-> +}
-> +
-> +static struct platform_driver meson_gxbb_wdt_driver = {
-> +	.probe	= meson_gxbb_wdt_probe,
-> +	.remove	= meson_gxbb_wdt_remove,
-> +	.shutdown = meson_gxbb_wdt_shutdown,
-> +	.driver = {
-> +		.name = "meson-gxbb-wdt",
-> +		.pm = &meson_gxbb_wdt_pm_ops,
-> +		.of_match_table	= meson_gxbb_wdt_dt_ids,
-> +	},
-> +};
-> +
-> +module_platform_driver(meson_gxbb_wdt_driver);
-> +
-> +MODULE_ALIAS("platform:meson-gxbb-wdt");
-> +MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
-> +MODULE_DESCRIPTION("Amlogic Meson GXBB Watchdog timer driver");
-> +MODULE_LICENSE("Dual BSD/GPL");
->
+-- 
+Catalin
