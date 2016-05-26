@@ -1,48 +1,23 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 27 May 2016 03:31:13 +0530
-Subject: [PATCH V3 1/2] i2c: qup: Fix broken dma when CONFIG_DEBUG_SG is
- enabled
-In-Reply-To: <20160526184805.GC1614@katana>
-References: <1464164212-11377-1-git-send-email-sricharan@codeaurora.org>
- <1464164212-11377-2-git-send-email-sricharan@codeaurora.org>
- <20160526184805.GC1614@katana>
-Message-ID: <002201d1b79a$22862bc0$67928340$@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 26 May 2016 19:20:38 -0300
+Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
+In-Reply-To: <9d7793850de942cfb578b0aeb2728f41@rwthex-s1-b.rwth-ad.de>
+References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
+ <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
+ <CAOMZO5C5goJUdHKB9a=eOv9TKDkJWxnkWWb-G7E5Kvceg6sZVg@mail.gmail.com>
+ <a6cc6b85d2fa4994b3cb7e2b047f800d@rwthex-w2-b.rwth-ad.de>
+ <9d7793850de942cfb578b0aeb2728f41@rwthex-s1-b.rwth-ad.de>
+Message-ID: <CAOMZO5C3_bd-2Nz+G956+VPOcKoFaGGJK7G1p=U0yf5OyWekZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, May 26, 2016 at 11:26 AM, Christopher Spinrath
+<christopher.spinrath@rwth-aachen.de> wrote:
 
->> sg_set_buf expects that the buf parameter passed in should be from
->> lowmem and a valid pageframe. This is not true for pages from
->> dma_alloc_coherent which can be carveouts, hence the check fails.
->
->OK, given you mean dma_pool_alloc here, the check fails for the
->pageframe because of the pool? Is my understanding correct?
->
-Yes right. Since those are carveouts, there is no valid pageframe,
- so the check fails.
+> Thanks for joining this discussion. I *guess* the rationale is to share
+> the same device tree with projects that are incompatible with the GPL
+> (e.g. *BSD). Even if there is no support for a particular device/board
+> having all (or most) files dual licensed makes it easier to just pull
+> them all in.
 
->> Change allocation of sg buffers from dma_coherent memory to kzalloc
->> to fix the issue.
->
->But why can you drop the coherency?
->
- The coherency is not dropped here. dma_map/unmap used
- makes the buffer coherent before passing it to
- dmaengine. Previously it was not required.
- I can add this in description if its not clear.
-
- >> @@ -1268,6 +1260,8 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
->>  		}
->>  	}
->>
->> +	idx = 0;
->> +
->
->This looks like an unrelated change.
-    Ha, wrong. This should have been in a separate patch. This was to fix a
-    initialization issue in dma mode. Sorry, should not have been here, will
-    move it to out.
-
-Regards,
- Sricharan
+Yes, that's correct.
