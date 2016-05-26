@@ -1,305 +1,372 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Thu, 26 May 2016 21:49:42 +0800
-Subject: [PATCH 16/23] arm64: ilp32: introduce binfmt_ilp32.c
-In-Reply-To: <1464048292-30136-17-git-send-email-ynorov@caviumnetworks.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-17-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <5746FEF6.9070405@huawei.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 26 May 2016 06:54:46 -0700
+Subject: [RFC PATCH 1/3] watchdog: Add Meson GXBB Watchdog Driver
+In-Reply-To: <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
+References: <1464249112-13658-1-git-send-email-narmstrong@baylibre.com>
+ <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <57470026.3000501@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, yury
-
-The coredump is usable in our platform. It miss the following definition:
-+#define compat_elf_greg_t	elf_greg_t
-+#define compat_elf_gregset_t	elf_gregset_t
-
-And it leads to the wrong register save in core dump. After apply this patch,
-gdb could debug core dump files.
-
-Here is the full patch:
- From 102624840aa5dacdd1bbfe3b390290f52f530ea2 Mon Sep 17 00:00:00 2001
-From: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
-Date: Thu, 26 May 2016 21:00:16 +0800
-Subject: [PATCH hulk-4.1-next] arm64: ilp32: fix coredump issue
-
-ILP32 use aarch64 register and 32bit signal struct which means it
-could not make use of the existing compat_elf_prstatus/elf_prstatus
-and compat_elf_prpsinfo/elf_prpsinfo.
-
-This patch fix this issue by introducing the different
-compat_elf_greg_t, compat_elf_gregset_t for aarch64 ilp32 and aarch32
-el0.
-
-Tested pass on huawei's hardware in bigendian.
-
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
----
-  arch/arm64/include/asm/elf.h     | 14 +++++++-------
-  arch/arm64/kernel/binfmt_elf32.c |  3 +++
-  arch/arm64/kernel/binfmt_ilp32.c |  8 +++++++-
-  arch/arm64/kernel/ptrace.c       | 20 ++++++++++----------
-  4 files changed, 27 insertions(+), 18 deletions(-)
-
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 0106d18..9019441 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -154,18 +154,18 @@ extern int arch_setup_additional_pages(struct linux_binprm *bprm,
-  				       int uses_interp);
-
-  /* 1GB of VA */
--#define STACK_RND_MASK			(is_compat_task() ? \
--						0x7ff >> (PAGE_SHIFT - 12) : \
--						0x3ffff >> (PAGE_SHIFT - 12))
-+#define STACK_RND_MASK		(is_compat_task() ? \
-+					0x7ff >> (PAGE_SHIFT - 12) : \
-+					0x3ffff >> (PAGE_SHIFT - 12))
-
-  #ifdef CONFIG_COMPAT
-
--#define COMPAT_ELF_ET_DYN_BASE		(2 * TASK_SIZE_32 / 3)
-+#define COMPAT_ELF_ET_DYN_BASE	(2 * TASK_SIZE_32 / 3)
-
-  /* AArch32 registers. */
--#define COMPAT_ELF_NGREG		18
--typedef unsigned int			compat_elf_greg_t;
--typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
-+#define COMPAT_ELF_NGREG	18
-+typedef unsigned int		compat_a32_elf_greg_t;
-+typedef compat_a32_elf_greg_t	compat_a32_elf_gregset_t[COMPAT_ELF_NGREG];
-
-  #endif /* CONFIG_COMPAT */
-
-diff --git a/arch/arm64/kernel/binfmt_elf32.c b/arch/arm64/kernel/binfmt_elf32.c
-index 7b9b445..f75253c 100644
---- a/arch/arm64/kernel/binfmt_elf32.c
-+++ b/arch/arm64/kernel/binfmt_elf32.c
-@@ -31,4 +31,7 @@ struct linux_binprm;
-  extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
-  				      int uses_interp);
-
-+#define compat_elf_greg_t	compat_a32_elf_greg_t
-+#define compat_elf_gregset_t	compat_a32_elf_gregset_t
-+
-  #include "../../../fs/compat_binfmt_elf.c"
-diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
-index b827a9a..01baf83 100644
---- a/arch/arm64/kernel/binfmt_ilp32.c
-+++ b/arch/arm64/kernel/binfmt_ilp32.c
-@@ -2,7 +2,9 @@
-   * Support for ILP32 Linux/aarch64 ELF binaries.
-   */
-
--#include <linux/elfcore-compat.h>
-+#include <linux/elf.h>
-+#include <linux/elfcore.h>
-+#include <linux/compat.h>
-  #include <linux/time.h>
-
-  #undef	ELF_CLASS
-@@ -30,9 +32,13 @@
-   * The machine-dependent core note format types are defined in elfcore-compat.h,
-   * which requires asm/elf.h to define compat_elf_gregset_t et al.
-   */
-+#define compat_elf_greg_t	elf_greg_t
-+#define compat_elf_gregset_t	elf_gregset_t
-  #define elf_prstatus	compat_elf_prstatus
-  #define elf_prpsinfo	compat_elf_prpsinfo
-
-+#include <linux/elfcore-compat.h>
-+
-  /*
-   * Compat version of cputime_to_compat_timeval, perhaps this
-   * should be an inline in <linux/compat.h>.
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 5c86135..9784c77 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -913,8 +913,8 @@ static const struct user_regset aarch32_regsets[] = {
-  	[REGSET_COMPAT_GPR] = {
-  		.core_note_type = NT_PRSTATUS,
-  		.n = COMPAT_ELF_NGREG,
--		.size = sizeof(compat_elf_greg_t),
--		.align = sizeof(compat_elf_greg_t),
-+		.size = sizeof(compat_a32_elf_greg_t),
-+		.align = sizeof(compat_a32_elf_greg_t),
-  		.get = compat_gpr_get,
-  		.set = compat_gpr_set
-  	},
-@@ -947,7 +947,7 @@ static int compat_ptrace_read_user(struct task_struct *tsk, compat_ulong_t off,
-  		tmp = tsk->mm->start_data;
-  	else if (off == COMPAT_PT_TEXT_END_ADDR)
-  		tmp = tsk->mm->end_code;
--	else if (off < sizeof(compat_elf_gregset_t))
-+	else if (off < sizeof(compat_a32_elf_gregset_t))
-  		return copy_regset_to_user(tsk, &user_aarch32_view,
-  					   REGSET_COMPAT_GPR, off,
-  					   sizeof(compat_ulong_t), ret);
-@@ -968,7 +968,7 @@ static int compat_ptrace_write_user(struct task_struct *tsk, compat_ulong_t off,
-  	if (off & 3 || off >= COMPAT_USER_SZ)
-  		return -EIO;
-
--	if (off >= sizeof(compat_elf_gregset_t))
-+	if (off >= sizeof(compat_a32_elf_gregset_t))
-  		return 0;
-
-  	set_fs(KERNEL_DS);
-@@ -1116,9 +1116,11 @@ static long compat_a32_ptrace(struct task_struct *child, compat_long_t request,
-  	unsigned long addr = caddr;
-  	unsigned long data = cdata;
-  	void __user *datap = compat_ptr(data);
-+	unsigned int pr_reg_size = sizeof(compat_a32_elf_gregset_t);
-  	int ret;
-
-  	switch (request) {
-+
-  		case PTRACE_PEEKUSR:
-  			ret = compat_ptrace_read_user(child, addr, datap);
-  			break;
-@@ -1130,17 +1132,15 @@ static long compat_a32_ptrace(struct task_struct *child, compat_long_t request,
-  		case COMPAT_PTRACE_GETREGS:
-  			ret = copy_regset_to_user(child,
-  						  &user_aarch32_view,
--						  REGSET_COMPAT_GPR,
--						  0, sizeof(compat_elf_gregset_t),
--						  datap);
-+						  REGSET_COMPAT_GPR, 0,
-+						  pr_reg_size, datap);
-  			break;
-
-  		case COMPAT_PTRACE_SETREGS:
-  			ret = copy_regset_from_user(child,
-  						    &user_aarch32_view,
--						    REGSET_COMPAT_GPR,
--						    0, sizeof(compat_elf_gregset_t),
--						    datap);
-+						    REGSET_COMPAT_GPR, 0,
-+						    pr_reg_size, datap);
-  			break;
-
-  		case COMPAT_PTRACE_GET_THREAD_AREA:
--- 
-1.8.4.5
-
-
-On 2016/5/24 8:04, Yury Norov wrote:
-> to handle ILP32 binaries
+On 05/26/2016 12:51 AM, Neil Armstrong wrote:
+> Add watchdog specific driver for Amlogic Meson GXBB SoC.
 >
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+
+Wondering - why RFC ?
+
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > ---
->   arch/arm64/kernel/Makefile       |  1 +
->   arch/arm64/kernel/binfmt_ilp32.c | 91 ++++++++++++++++++++++++++++++++++++++++
->   2 files changed, 92 insertions(+)
->   create mode 100644 arch/arm64/kernel/binfmt_ilp32.c
+>   drivers/watchdog/Makefile         |   1 +
+>   drivers/watchdog/meson_gxbb_wdt.c | 287 ++++++++++++++++++++++++++++++++++++++
+>   2 files changed, 288 insertions(+)
+>   create mode 100644 drivers/watchdog/meson_gxbb_wdt.c
 >
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 6bc9738..9dfdf86 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -28,6 +28,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
->   arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
->   					   sys_compat.o entry32.o		\
->   					   ../../arm/kernel/opcodes.o binfmt_elf32.o
-> +arm64-obj-$(CONFIG_ARM64_ILP32)		+= binfmt_ilp32.o
->   arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
->   arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
->   arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
-> diff --git a/arch/arm64/kernel/binfmt_ilp32.c b/arch/arm64/kernel/binfmt_ilp32.c
+> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> index 9bde095..7679d93 100644
+> --- a/drivers/watchdog/Makefile
+> +++ b/drivers/watchdog/Makefile
+> @@ -68,6 +68,7 @@ obj-$(CONFIG_QCOM_WDT) += qcom-wdt.o
+>   obj-$(CONFIG_BCM_KONA_WDT) += bcm_kona_wdt.o
+>   obj-$(CONFIG_TEGRA_WATCHDOG) += tegra_wdt.o
+>   obj-$(CONFIG_MESON_WATCHDOG) += meson_wdt.o
+> +obj-$(CONFIG_MESON_WATCHDOG) += meson_gxbb_wdt.o
+>   obj-$(CONFIG_MEDIATEK_WATCHDOG) += mtk_wdt.o
+>   obj-$(CONFIG_DIGICOLOR_WATCHDOG) += digicolor_wdt.o
+>   obj-$(CONFIG_LPC18XX_WATCHDOG) += lpc18xx_wdt.o
+> diff --git a/drivers/watchdog/meson_gxbb_wdt.c b/drivers/watchdog/meson_gxbb_wdt.c
 > new file mode 100644
-> index 0000000..a934fd4
+> index 0000000..0c7c0d9
 > --- /dev/null
-> +++ b/arch/arm64/kernel/binfmt_ilp32.c
-> @@ -0,0 +1,91 @@
+> +++ b/drivers/watchdog/meson_gxbb_wdt.c
+> @@ -0,0 +1,287 @@
 > +/*
-> + * Support for ILP32 Linux/aarch64 ELF binaries.
+> + * This file is provided under a dual BSD/GPLv2 license.  When using or
+> + * redistributing this file, you may do so under either license.
+> + *
+> + * GPL LICENSE SUMMARY
+> + *
+> + * Copyright (c) 2016 BayLibre, SAS.
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of version 2 of the GNU General Public License as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+> + * The full GNU General Public License is included in this distribution
+> + * in the file called COPYING.
+> + *
+> + * BSD LICENSE
+> + *
+> + * Copyright (c) 2016 BayLibre, SAS.
+> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+> + *
+> + * Redistribution and use in source and binary forms, with or without
+> + * modification, are permitted provided that the following conditions
+> + * are met:
+> + *
+> + *   * Redistributions of source code must retain the above copyright
+> + *     notice, this list of conditions and the following disclaimer.
+> + *   * Redistributions in binary form must reproduce the above copyright
+> + *     notice, this list of conditions and the following disclaimer in
+> + *     the documentation and/or other materials provided with the
+> + *     distribution.
+> + *   * Neither the name of Intel Corporation nor the names of its
+> + *     contributors may be used to endorse or promote products derived
+> + *     from this software without specific prior written permission.
+> + *
+> + * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+> + * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+> + * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+> + * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+> + * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+> + * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+> + * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+> + * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+> + * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+> + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+> + * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 > + */
+> +#include <linux/err.h>
+> +#include <linux/module.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/clk.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/types.h>
+> +#include <linux/watchdog.h>
 > +
-> +#include <linux/elfcore-compat.h>
-> +#include <linux/time.h>
+> +#define DEFAULT_TIMEOUT	10	/* seconds */
 > +
-> +#undef	ELF_CLASS
-> +#define ELF_CLASS	ELFCLASS32
+> +#define GXBB_WDT_CTRL_REG	0x0
+> +#define GXBB_WDT_CTRL1_REG	0x4
+> +#define GXBB_WDT_TCNT_REG	0x8
+> +#define GXBB_WDT_RSET_REG	0xc
 > +
-> +#undef	elfhdr
-> +#undef	elf_phdr
-> +#undef	elf_shdr
-> +#undef	elf_note
-> +#undef	elf_addr_t
-> +#define elfhdr		elf32_hdr
-> +#define elf_phdr	elf32_phdr
-> +#define elf_shdr	elf32_shdr
-> +#define elf_note	elf32_note
-> +#define elf_addr_t	Elf32_Addr
+> +#define GXBB_WDT_CTRL_EE_RESET_NOW	BIT(26)
 > +
-> +/*
-> + * Some data types as stored in coredump.
-> + */
-> +#define user_long_t		compat_long_t
-> +#define user_siginfo_t		compat_siginfo_t
-> +#define copy_siginfo_to_user	copy_siginfo_to_user32
+> +#define GXBB_WDT_CTRL_CLKDIV_EN	BIT(25)
+> +#define GXBB_WDT_CTRL_CLK_EN	BIT(24)
+> +#define GXBB_WDT_CTRL_IRQ_EN	BIT(23)
+> +#define GXBB_WDT_CTRL_EE_RESET	BIT(21)
+> +#define GXBB_WDT_CTRL_XTAL_SEL	(0)
+> +#define GXBB_WDT_CTRL_CLK81_SEL	BIT(19)
+> +#define GXBB_WDT_CTRL_EN	BIT(18)
+> +#define GXBB_WDT_CTRL_DIV_MASK	(BIT(18)-1)
 > +
-> +/*
-> + * The machine-dependent core note format types are defined in elfcore-compat.h,
-> + * which requires asm/elf.h to define compat_elf_gregset_t et al.
-> + */
-> +#define elf_prstatus	compat_elf_prstatus
-> +#define elf_prpsinfo	compat_elf_prpsinfo
+> +#define GXBB_WDT_CTRL1_GPIO_PULSE	BIT(17)
+> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_0	BIT(16)
+> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_1	(0)
+> +#define GXBB_WDT_CTRL1_GPIO_PULSE_CNT	(BIT(16)-1)
 > +
-> +/*
-> + * Compat version of cputime_to_compat_timeval, perhaps this
-> + * should be an inline in <linux/compat.h>.
-> + */
-> +static void cputime_to_compat_timeval(const cputime_t cputime,
-> +				      struct compat_timeval *value)
+
+Spaces around operators, please.
+
+> +#define GXBB_WDT_TCNT_SETUP_MASK	(BIT(16)-1)
+> +#define GXBB_WDT_TCNT_CNT_SHIFT		16
+> +
+> +struct meson_gxbb_wdt {
+> +	void __iomem *reg_base;
+> +	struct watchdog_device wdt_dev;
+> +	struct clk *clk;
+> +};
+> +
+> +int meson_gxbb_wdt_start(struct watchdog_device *wdt_dev)
+
+Functions should all be static.
+
 > +{
-> +	struct timeval tv;
-> +	cputime_to_timeval(cputime, &tv);
-> +	value->tv_sec = tv.tv_sec;
-> +	value->tv_usec = tv.tv_usec;
+> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
+> +
+> +	writel(readl(data->reg_base + GXBB_WDT_CTRL_REG) | GXBB_WDT_CTRL_EN,
+> +		data->reg_base + GXBB_WDT_CTRL_REG);
+> +
+> +	return 0;
 > +}
 > +
-> +#undef cputime_to_timeval
-> +#define cputime_to_timeval cputime_to_compat_timeval
+> +int meson_gxbb_wdt_stop(struct watchdog_device *wdt_dev)
+> +{
+> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
 > +
-> +/* AARCH64 ILP32 EABI. */
-> +#undef elf_check_arch
-> +#define elf_check_arch(x)		(((x)->e_machine == EM_AARCH64)	\
-> +					&& (x)->e_ident[EI_CLASS] == ELFCLASS32)
+> +	writel(readl(data->reg_base + GXBB_WDT_CTRL_REG) & ~GXBB_WDT_CTRL_EN,
+> +		data->reg_base + GXBB_WDT_CTRL_REG);
 > +
-> +#undef SET_PERSONALITY
-> +#define SET_PERSONALITY(ex)						\
-> +do {									\
-> +	set_thread_flag(TIF_32BIT_AARCH64);				\
-> +	clear_thread_flag(TIF_32BIT);					\
-> +} while (0)
+> +	return 0;
+> +}
 > +
-> +#undef ARCH_DLINFO
-> +#define ARCH_DLINFO							\
-> +do {									\
-> +	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
-> +		    (elf_addr_t)(long)current->mm->context.vdso);	\
-> +} while (0)
+> +unsigned int meson_gxbb_wdt_status(struct watchdog_device *wdt_dev)
+> +{
+> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
 > +
-> +#ifdef __AARCH64EB__
-> +#define COMPAT_ELF_PLATFORM		("aarch64_be:ilp32")
-> +#else
-> +#define COMPAT_ELF_PLATFORM		("aarch64:ilp32")
-> +#endif
+> +	return !!(readl(data->reg_base + GXBB_WDT_CTRL_REG) & GXBB_WDT_CTRL_EN);
+
+This function is not supposed to return 0/1 but a bit mask with relevant
+WDIOF_bits set. sbsa_gwdt.c is buggy (oops, and I reviewed it ;-), so
+please don't use it as example; it doesn't make much sense to return
+a kernel-only flag to user space.
+
+Overall I would suggest to not implement the function at all. We'll have
+to revisit it - its current implementation in the watchdog core does not
+make much sense and for the most part only returns 0 to user space.
+The only driver implementing it (sbsa) returns a bad value. It is also
+_not_ supposed to return the "watchdog running" status as currently
+implemented (there is no WDIOF_ flag indicating that the watchdog is
+running).
+
+> +}
 > +
-> +#undef ELF_HWCAP
-> +#undef ELF_HWCAP2
-> +#define ELF_HWCAP			((u32) elf_hwcap)
-> +#define ELF_HWCAP2			((u32) (elf_hwcap >> 32))
+> +int meson_gxbb_wdt_ping(struct watchdog_device *wdt_dev)
+> +{
+> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
 > +
-> +/*
-> + * Rename a few of the symbols that binfmt_elf.c will define.
-> + * These are all local so the names don't really matter, but it
-> + * might make some debugging less confusing not to duplicate them.
-> + */
-> +#define elf_format		compat_elf_format
-> +#define init_elf_binfmt		init_compat_elf_binfmt
-> +#define exit_elf_binfmt		exit_compat_elf_binfmt
+> +	writel(0, data->reg_base + GXBB_WDT_RSET_REG);
 > +
-> +#include "../../../fs/binfmt_elf.c"
+> +	return 0;
+> +}
+> +
+> +int meson_gxbb_wdt_set_timeout(struct watchdog_device *wdt_dev,
+> +			       unsigned int timeout)
+> +{
+> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
+> +
+> +	if (watchdog_active(wdt_dev))
+> +		meson_gxbb_wdt_stop(wdt_dev);
+> +
+
+Is the stop/start sequence mandatory ? It leaves the system unprotected
+for a few cycles, so it is undesirable.
+
+> +	meson_gxbb_wdt_ping(wdt_dev);
+> +
+> +	writel(timeout*1000, data->reg_base + GXBB_WDT_TCNT_REG);
+> +
+> +	if (watchdog_active(wdt_dev))
+> +		meson_gxbb_wdt_start(wdt_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +unsigned int meson_gxbb_wdt_get_timeleft(struct watchdog_device *wdt_dev)
+> +{
+> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
+> +	unsigned long reg;
+> +
+> +	reg = readl(data->reg_base + GXBB_WDT_TCNT_REG);
+> +
+> +	return ((reg >> GXBB_WDT_TCNT_CNT_SHIFT)-
+> +			(reg & GXBB_WDT_TCNT_SETUP_MASK)) / 1000;
+> +}
+> +
+> +static const struct watchdog_ops meson_gxbb_wdt_ops = {
+> +	.start = meson_gxbb_wdt_start,
+> +	.stop = meson_gxbb_wdt_stop,
+> +	.status = meson_gxbb_wdt_status,
+> +	.ping = meson_gxbb_wdt_ping,
+> +	.set_timeout = meson_gxbb_wdt_set_timeout,
+> +	.get_timeleft = meson_gxbb_wdt_get_timeleft,
+> +};
+> +
+> +static const struct watchdog_info meson_gxbb_wdt_info = {
+> +	.identity = "meson-gxbb-wdt",
+> +	.options = WDIOF_SETTIMEOUT | WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
+> +};
+> +
+> +static int __maybe_unused meson_gxbb_wdt_resume(struct device *dev)
+> +{
+> +	struct meson_gxbb_wdt *data = dev_get_drvdata(dev);
+> +
+> +	if (watchdog_active(&data->wdt_dev))
+> +		meson_gxbb_wdt_start(&data->wdt_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __maybe_unused meson_gxbb_wdt_suspend(struct device *dev)
+> +{
+> +	struct meson_gxbb_wdt *data = dev_get_drvdata(dev);
+> +
+> +	if (watchdog_active(&data->wdt_dev))
+> +		meson_gxbb_wdt_stop(&data->wdt_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops meson_gxbb_wdt_pm_ops = {
+> +	SET_SYSTEM_SLEEP_PM_OPS(meson_gxbb_wdt_suspend, meson_gxbb_wdt_resume)
+> +};
+> +
+> +static const struct of_device_id meson_gxbb_wdt_dt_ids[] = {
+> +	 { .compatible = "amlogic,meson-gxbb-wdt", },
+> +	 { /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(of, meson_gxbb_wdt_dt_ids);
+> +
+> +static int meson_gxbb_wdt_probe(struct platform_device *pdev)
+> +{
+> +	struct meson_gxbb_wdt *data;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->reg_base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(data->reg_base))
+> +		return PTR_ERR(data->reg_base);
+> +
+> +	data->clk = devm_clk_get(&pdev->dev, NULL);
+> +	if (IS_ERR(data->clk))
+> +		return PTR_ERR(data->clk);
+> +
+> +	clk_prepare_enable(data->clk);
+> +
+> +	platform_set_drvdata(pdev, data);
+> +
+> +	data->wdt_dev.parent = &pdev->dev;
+> +	data->wdt_dev.info = &meson_gxbb_wdt_info;
+> +	data->wdt_dev.ops = &meson_gxbb_wdt_ops;
+> +	data->wdt_dev.max_hw_heartbeat_ms = GXBB_WDT_TCNT_SETUP_MASK;
+> +	data->wdt_dev.min_hw_heartbeat_ms = 1;
+
+Does the device require a minimum time between heartbeats ?
+Just asking, because you violate it yourself below.
+
+If you want to set the minimum timeout, that would be min_timeout.
+
+> +	data->wdt_dev.timeout = DEFAULT_TIMEOUT;
+> +	watchdog_set_drvdata(&data->wdt_dev, data);
+> +
+> +	watchdog_init_timeout(&data->wdt_dev, DEFAULT_TIMEOUT, &pdev->dev);
+> +
+
+DEFAULT_TIMEOUT is unnecessary here. Since the default timeout is already set,
+it makes the call useless.
+
+> +	ret = watchdog_register_device(&data->wdt_dev);
+> +	if (ret)
+> +		return ret;
+> +
+> +	/* Setup with 1ms timebase */
+> +	writel(((clk_get_rate(data->clk) / 1000) & GXBB_WDT_CTRL_DIV_MASK) |
+> +		GXBB_WDT_CTRL_EE_RESET |
+> +		GXBB_WDT_CTRL_CLK_EN |
+> +		GXBB_WDT_CTRL_CLKDIV_EN,
+> +		data->reg_base + GXBB_WDT_CTRL_REG);
+> +	meson_gxbb_wdt_set_timeout(&data->wdt_dev, data->wdt_dev.timeout);
+
+set_timeout already calls the ping function. Also, the functions should be called
+prior to watchdog registration to avoid race conditions.
+
+> +	meson_gxbb_wdt_ping(&data->wdt_dev);
+
+This is unusual. If the watchdog can be already running, it might make sense
+to tell the core about it (set WDOG_HW_RUNNING in the status field), so it
+can send heartbeats until user space opens the device.
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int meson_gxbb_wdt_remove(struct platform_device *pdev)
+> +{
+> +	struct meson_gxbb_wdt *data = platform_get_drvdata(pdev);
+> +
+> +	watchdog_unregister_device(&data->wdt_dev);
+> +
+> +	return 0;
+> +}
+> +
+> +static void meson_gxbb_wdt_shutdown(struct platform_device *pdev)
+> +{
+> +	struct meson_gxbb_wdt *data = platform_get_drvdata(pdev);
+> +
+> +	meson_gxbb_wdt_stop(&data->wdt_dev);
+> +}
+> +
+> +static struct platform_driver meson_gxbb_wdt_driver = {
+> +	.probe	= meson_gxbb_wdt_probe,
+> +	.remove	= meson_gxbb_wdt_remove,
+> +	.shutdown = meson_gxbb_wdt_shutdown,
+> +	.driver = {
+> +		.name = "meson-gxbb-wdt",
+> +		.pm = &meson_gxbb_wdt_pm_ops,
+> +		.of_match_table	= meson_gxbb_wdt_dt_ids,
+> +	},
+> +};
+> +
+> +module_platform_driver(meson_gxbb_wdt_driver);
+> +
+> +MODULE_ALIAS("platform:meson-gxbb-wdt");
+> +MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
+> +MODULE_DESCRIPTION("Amlogic Meson GXBB Watchdog timer driver");
+> +MODULE_LICENSE("Dual BSD/GPL");
 >
