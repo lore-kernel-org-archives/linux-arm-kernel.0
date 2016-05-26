@@ -1,117 +1,105 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 26 May 2016 19:27:18 +0800
-Subject: [PATCH 3/3] mmc: core: support hs speed mode if hs200 mode fails
-In-Reply-To: <1463130397.3151.13.camel@toradex.com>
-References: <1461171092-30631-1-git-send-email-aisheng.dong@nxp.com>
- <1461171092-30631-3-git-send-email-aisheng.dong@nxp.com>
- <1463130397.3151.13.camel@toradex.com>
-Message-ID: <CAA+hA=SZQSjSU73_8sityJ_FZHngqaHZwspyg-iMBRzr_z7vRA@mail.gmail.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 26 May 2016 14:37:06 +0300
+Subject: [PATCH 1/2] ARM: dts: imx6q: extend support for the cm-fx6
+In-Reply-To: <1464256217.14453.10.camel@pengutronix.de>
+References: <709d6b3d522f4fcb8112830e0426dbb3@rwthex-s1-b.rwth-ad.de>
+ <1463994191.2370.3.camel@pengutronix.de> <5746B8C4.6020406@compulab.co.il>
+ <1464256217.14453.10.camel@pengutronix.de>
+Message-ID: <5746DFE2.9040903@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 5:06 PM, Marcel Ziswiler
-<marcel.ziswiler@toradex.com> wrote:
-> On Thu, 2016-04-21 at 00:51 +0800, Dong Aisheng wrote:
->> Currently if mmc_select_hs200 mode switch fails, MMC core
->> can only use legacy mode to run the card.
->> Let's retry HS speed mode if HS200 fails.
+On 05/26/2016 12:50 PM, Lucas Stach wrote:
+> Hi Igor,
+> 
+> Am Donnerstag, den 26.05.2016, 11:50 +0300 schrieb Igor Grinberg:
+>> Hi Lucas,
 >>
->> Before the fix:
->> mmc0: mmc_select_hs200 failed, error -74
->> : switch to mmc0 failed
->> mmc0: new MMC card at address 0001
->> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
->> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
->> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
->> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
->>  mmcblk0: p1 p2
+>> Thanks for reviewing the patch(es).
 >>
->> After the fix:
->> mmc0: mmc_select_hs200 failed, error -74
->> mmc0: new DDR MMC card at address 0001
->> mmcblk0: mmc0:0001 Q2J55L 7.12 GiB
->> mmcblk0boot0: mmc0:0001 Q2J55L partition 1 2.00 MiB
->> mmcblk0boot1: mmc0:0001 Q2J55L partition 2 2.00 MiB
->> mmcblk0rpmb: mmc0:0001 Q2J55L partition 3 4.00 MiB
->>  mmcblk0: p1 p2
+>> On 05/23/2016 12:03 PM, Lucas Stach wrote:
+>>> Am Montag, den 23.05.2016, 00:47 +0200 schrieb
+>>> christopher.spinrath at rwth-aachen.de:
+>>>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 >>
->> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
->> ---
->>  drivers/mmc/core/mmc.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
+>> [...]
 >>
->> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->> index 55c8201..b573dc7 100644
->> --- a/drivers/mmc/core/mmc.c
->> +++ b/drivers/mmc/core/mmc.c
->> @@ -1315,7 +1315,8 @@ static int mmc_select_timing(struct mmc_card
->> *card)
+>>>> +&ecspi1 {
+>>>> +	fsl,spi-num-chipselects = <2>;
+>>>> +	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
+>>>> +	pinctrl-names = "default";
+>>>> +	pinctrl-0 = <&pinctrl_ecspi1>;
+>>>> +	status = "okay";
+>>>> +
+>>>> +	flash: m25p80 at 0 {
+>>>> +		#address-cells = <1>;
+>>>> +		#size-cells = <1>;
+>>>> +		compatible = "st,m25p", "jedec,spi-nor";
+>>>> +		spi-max-frequency = <20000000>;
+>>>> +		reg = <0>;
+>>>> +
+>>>> +		partition at 0 {
+>>>> +			label = "uboot";
+>>>> +			reg = <0x0 0xc0000>;
+>>>> +		};
+>>>> +
+>>>> +		partition at c0000 {
+>>>> +			label = "uboot environment";
+>>>> +			reg = <0xc0000 0x40000>;
+>>>> +		};
+>>>> +
+>>>> +		partition at 100000 {
+>>>> +			label = "reserved";
+>>>> +			reg = <0x100000 0x100000>;
+>>>> +		};
+>>>
+>>> Partition layouts don't belong in the upstream DT, as it a device
+>>> configuration thing. Please kep them in the bootloader/firmware and make
+>>> this one pass the partition layout to the kernel.
 >>
->>       if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200)
->>               err = mmc_select_hs200(card);
->> -     else if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS)
->> +
->> +     if (err && (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS))
->>               err = mmc_select_hs(card);
->>
->>       if (err && err != -EBADMSG)
->
->
-> This seems to break on TK1 where eMMC so far was detected as an 8-bit
-> high speed MMC card. With this patch it reverts to detecting a 1-bit only
-> MMC card! This has been observed both on a NVIDIA's Jetson TK1 as well as
-> our new Toradex Apalis TK1 (CC Tegra mailing list, Jon Hunter and Lucas
-> Stach as well). So far T30 is not affected as there we are still doing
-> full HS200 with whatever issues that has.
->
+>> I don't completely agree with this.
+>> We have lots of partition layouts in the upstream DT.
+> 
+> No, we don't. At least not for the i.MX6. There are some for the earlier
+> i.MX boards, but IMO it's wrong to put device configuration into the
+> upstream DT. Let's not start doing this again.
 
-Oh, sorry, just found there's a logic error in the patch.
-It may wrongly bypass the HS mode select for non hs200 mode eMMCs
-due to the 'err' condition.
+Why not?
+For i.MX6 there are 2 boards that have the partitioning scheme.
+I'm not considering this a device configuration, but rather
+a default partitioning layout/scheme.
+Current case is for the firmware storage device that is not likely
+to change.
+Moreover, a DT is not really a part of the kernel, but lays along the kernel
+sources for convenience and simplicity (at least IIRC as it was decided
+about 5 years ago). It is more a part of the firmware for a device, than
+an upstream kernel source code.
+I think it is only a meter of time when Linus will decide that he does not
+want it inside the kernel anymore...
 
-Will send a fixed version.
+> 
+>> Moreover, this is the default layout and changing it, will
+>> result in incompatibilities and also might result in device "bricking".
+>> Those can be changed from the boot loader in case you need those
+>> the other way around.
+>> Another question of mine is, why should you?
+>>
+> Partition layout is device configuration, which is governed by the
+> device firmware.
 
-Regards
-Dong Aisheng
+Yet again, DT is a part of device firmware.
+Moreover, the firmware (in that case U-Boot), can be configured
+using the very same DT code, so not having this in, might force
+various w/a and hacks.
 
-> Before:
-> [    3.726894] sdhci: Secure Digital Host Controller Interface driver
-> [    3.733081] sdhci: Copyright(c) Pierre Ossman
-> [    3.737462] sdhci-pltfm: SDHCI platform and OF driver helper
-> [    3.753411] mmc0: Unknown controller version (3). You may experience
->  problems.
-> [    3.768345] mmc0: Invalid maximum block size, assuming 512 bytes
-> [    3.814896] mmc0: SDHCI controller on 700b0600.sdhci [700b0600.sdhci]
->  using ADMA 64-bit
-> [    3.892088] mmc0: new high speed MMC card at address 0001
-> [    3.899194] mmcblk0: mmc0:0001 SEM16G 14.7 GiB
-> [    3.904217] mmcblk0boot0: mmc0:0001 SEM16G partition 1 4.00 MiB
-> [    3.910645] mmcblk0boot1: mmc0:0001 SEM16G partition 2 4.00 MiB
-> [    3.917119] mmcblk0rpmb: mmc0:0001 SEM16G partition 3 4.00 MiB
-> [    3.926006]  mmcblk0: p1 p2 p3 p4 p5 p6 p7 p8 p9
-> root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios
-> clock:          52000000 Hz
-> actual clock:   51000000 Hz
-> vdd:            21 (3.3 ~ 3.4 V)
-> bus mode:       2 (push-pull)
-> chip select:    0 (don't care)
-> power mode:     2 (on)
-> bus width:      3 (8 bits)
-> timing spec:    1 (mmc high-speed)
-> signal voltage: 0 (3.30 V)
-> driver type:    0 (driver type B)
->
-> After:
-> [    3.899918] mmc0: new MMC card at address 0001
-> root at jetson_tk1:~# cat /sys/kernel/debug/mmc0/ios
-> clock:          25000000 Hz
-> actual clock:   24727273 Hz
-> vdd:            21 (3.3 ~ 3.4 V)
-> bus mode:       2 (push-pull)
-> chip select:    0 (don't care)
-> power mode:     2 (on)
-> bus width:      0 (1 bits)
-> timing spec:    0 (legacy)
-> signal voltage: 0 (3.30 V)
-> driver type:    0 (driver type B)
->
+> By not having the partition layout in the upstream DT
+> people are forced to set it from the firmware, which is exactly the
+> right thing to do, weather or not you plan to change it at any time.
+
+I might be ignorant, sorry for that.
+Why? Why is it right and why would you want to force people to do that?
+
+
+-- 
+Regards,
+Igor.
