@@ -1,33 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 26 May 2016 11:28:44 +0200
-Subject: [PATCH 0/7] pinctrl: meson: Add a bunch more pins
-In-Reply-To: <m260u3ia37.fsf@baylibre.com>
-References: <1462544486-9516-1-git-send-email-khilman@baylibre.com>
- <CACRpkdY9oGZLt431NwTaFmZk98O8n3ZnMA1odhYZtcH7P1p=Jg@mail.gmail.com>
- <m260u3ia37.fsf@baylibre.com>
-Message-ID: <CACRpkdbURowJNT_ZkKuv7C_3oW3BJGPBK6etKc4cBc4ujQdPXw@mail.gmail.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Thu, 26 May 2016 11:34:57 +0200
+Subject: [PATCH] hwrng: stm32: fix maybe uninitialized variable warning
+Message-ID: <1464255297-21090-1-git-send-email-mcoquelin.stm32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2016 at 8:29 PM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Linus Walleij <linus.walleij@linaro.org> writes:
+This patch fixes the following warning:
+drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
+drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
+                                        uninitialized in this function
 
-> Looking closer, these have dependencies on the DT changes that you've
-> suggested we take through arm-soc, so it would be cleaner if I take
-> these with your ack through the amlogic tree.
+Reported-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Daniel Thompson <daniel.thompson@linaro.org>
+Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+---
+ drivers/char/hw_random/stm32-rng.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-I really prefer to take DT changes and driver code in different
-trees i possible.
-
-My reasoning is plainly: if the DT stuff was a separate git, as
-has been explicitly suggested as a goal off and on, this should
-be merge:able still. So DT changes and driver code should ideally
-be orthogonal.
-
-I don't know about this case but is it a disaster if one or the other
-of the DT changes and the driver arrive in different order to Torvald's
-tree, or will it simply be that the lights go on when the last patch
-arrives?
-
-Yours,
-Linus Walleij
+diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
+index 92a810648bd0..63d84e6f1891 100644
+--- a/drivers/char/hw_random/stm32-rng.c
++++ b/drivers/char/hw_random/stm32-rng.c
+@@ -69,8 +69,12 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+ 		}
+ 
+ 		/* If error detected or data not ready... */
+-		if (sr != RNG_SR_DRDY)
++		if (sr != RNG_SR_DRDY) {
++			if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
++					"bad RNG status - %x\n", sr))
++				writel_relaxed(0, priv->base + RNG_SR);
+ 			break;
++		}
+ 
+ 		*(u32 *)data = readl_relaxed(priv->base + RNG_DR);
+ 
+@@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
+ 		max -= sizeof(u32);
+ 	}
+ 
+-	if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
+-		      "bad RNG status - %x\n", sr))
+-		writel_relaxed(0, priv->base + RNG_SR);
+-
+ 	pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
+ 	pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
+ 
+-- 
+1.9.1
