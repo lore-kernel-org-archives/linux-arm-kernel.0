@@ -1,37 +1,40 @@
-From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
-Date: Thu, 26 May 2016 18:33:48 +0200 (CEST)
-Subject: [PATCH 0095/1529] Fix typo
-In-Reply-To: <20160521114905.4276-1-andrea.gelmini@gelma.net>
-References: <20160521114905.4276-1-andrea.gelmini@gelma.net>
-Message-ID: <alpine.LNX.2.00.1605261832200.15970@T420s>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Thu, 26 May 2016 15:50:01 +0100
+Subject: [PATCH 01/23] all: syscall wrappers: add documentation
+In-Reply-To: <20160526142057.GA7456@e104818-lin.cambridge.arm.com>
+References: <6293194.tGy03QJ9ME@wuerfel>
+ <20160525.135039.244098606649448826.davem@davemloft.net>
+ <6407614.fdv5XFSBue@wuerfel>
+ <20160525.142821.1719403997976778673.davem@davemloft.net>
+ <20160526142057.GA7456@e104818-lin.cambridge.arm.com>
+Message-ID: <57470D19.2000501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Sat, 21 May 2016, Andrea Gelmini wrote:
-
-> Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
-> ---
->  arch/arm/mach-gemini/idle.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On 26/05/16 15:20, Catalin Marinas wrote:
+> While writing the above, I realised the current ILP32 patches still miss
+> on converting pointers passed from user space (unless I got myself
+> confused in macros). The new __SC_WRAP() and COMPAT_SYSCALL_WRAPx()
+> macros take care of zero or sign extension via __SC_COMPAT_CAST().
+> However, we have two more existing cases which I don't see covered:
 > 
-> diff --git a/arch/arm/mach-gemini/idle.c b/arch/arm/mach-gemini/idle.c
-> index ddf8ec9..cb34fe4e 100644
-> --- a/arch/arm/mach-gemini/idle.c
-> +++ b/arch/arm/mach-gemini/idle.c
-> @@ -10,7 +10,7 @@ static void gemini_idle(void)
->  {
->  	/*
->  	 * Because of broken hardware we have to enable interrupts or the CPU
-> -	 * will never wakeup... Acctualy it is not very good to enable
-> +	 * will never wakeup... Actually it is not very good to enable
->  	 * interrupts first since scheduler can miss a tick, but there is
->  	 * no other way around this. Platforms that needs it for power saving
->  	 * should enable it in init code, since by default it is
-> -- 
-> 2.8.2.534.g1f66975
+> a) Native syscalls taking a pointer argument and invoked directly from
+>    ILP32. For example, sys_read() takes a pointer but I don't see any
+>    __SC_WRAP added by patch 5
 > 
+> b) Current compat syscalls taking a pointer argument. For example,
+>    compat_sys_vmsplice() gets the iov32 pointer and the compiler assumes
+>    it is a 64-bit variable. I don't see where the upper half is zeroed
 > 
 
-Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
+on x32 sign/zero extension is currently left to userspace,
+which is difficult to deal with, (long long)arg does the
+wrong thing for pointer args.
+
+> We can solve (a) by adding more __SC_WRAP annotations in the generic
+> unistd.h. For (b), we would need an __SC_DELOUSE with a bit of penalty
+> on AArch32/compat support where it isn't needed. So maybe davem has a
+> point on the overall impact of always zeroing the upper half of the
+> arguments ;) (both from a performance and maintainability perspective).
+> I guess this part of the ABI is still up for discussion.
+> 
