@@ -1,90 +1,88 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 26 May 2016 14:24:25 -0700
-Subject: [PATCH v2 4/4] pinctrl: amlogic: gxbb: add ethernet pins
-In-Reply-To: <1464297865-8965-1-git-send-email-khilman@baylibre.com>
-References: <1464297865-8965-1-git-send-email-khilman@baylibre.com>
-Message-ID: <1464297865-8965-5-git-send-email-khilman@baylibre.com>
+From: John.Youn@synopsys.com (John Youn)
+Date: Thu, 26 May 2016 14:44:40 -0700
+Subject: [PATCH] reset: Put back *_optional variants
+In-Reply-To: <12e450f0-70ea-29f8-0bf7-8a0697263f2d@redhat.com>
+References: <ca359e013c30f27c825a9580164b01da5ca6476d.1464224883.git.johnyoun@synopsys.com>
+ <12e450f0-70ea-29f8-0bf7-8a0697263f2d@redhat.com>
+Message-ID: <57476E48.2060204@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add EE domain pins for ethernet interface.
+On 5/26/2016 1:25 PM, Hans de Goede wrote:
+> Hi,
+> 
+> On 26-05-16 03:15, John Youn wrote:
+>> Prior to commit 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo]
+>> functions wrappers"), the optional variants returned -ENOTSUPP when
+>> CONFIG_RESET_CONTROLLER was not set. This patch reverts to this
+>> behavior. Otherwise those calls will return -EINVAL causing users to
+>> think that an error occurred when CONFIG_RESET_CONTROLLER is not set.
+>>
+>> Fixes: 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo] functions wrappers")
+>> Signed-off-by: John Youn <johnyoun@synopsys.com>
+>> ---
+>>
+>> Hi Philipp, Hans,
+>>
+>> The commit referenced above breaks an upcoming patch for the dwc2
+>> driver that adds an optional reset control.
+>>
+>> https://marc.info/?l=linux-usb&m=146161328211584&w=2
+>>
+>> I've attempted to add the optional variants back the way they were
+>> working before. Let me know if I need to do anything else to fix it or
+>> if it should be done another way.
+>>
+>> Regards,
+>> John
+> 
+> Hmm, I don't like all the extra code your patch adds just to fix
+> a return value...
+> 
+> Looking at the code before my "reset: Make [of_]reset_control_get[_foo]
+> functions wrappers" patch, all the dev*_get* functions were
+> returning ENOTSUPP except for [devm_]reset_control_get, so following
+> your logic we should also change the of_reset_control_get_by_index
+> variant to return -ENOTSUP.
+> 
+> Or better, simply make them all return -ENOTSUP, that seems both
+> consistent and more KISS to me, this would mean an error code
+> change for [devm_]reset_control_get, but will fix all the other
+> getters from having a changed error-code, and I would callers
+> of [devm_]reset_control_get to not care which error code they
+> get, except for -EPROBE_DEFER.
+> 
+> So IMHO the following change would be a better way to fix this:
+> 
+> --- a/include/linux/reset.h
+> +++ b/include/linux/reset.h
+> @@ -65,14 +65,14 @@ static inline struct reset_control *__of_reset_control_get(
+>                                          struct device_node *node,
+>                                          const char *id, int index, int shared)
+>   {
+> -   return ERR_PTR(-EINVAL);
+> + return ERR_PTR(-ENOTSUPP);
+>   }
+> 
+>   static inline struct reset_control *__devm_reset_control_get(
+>                                          struct device *dev,
+>                                          const char *id, int index, int shared)
+>   {
+> -   return ERR_PTR(-EINVAL);
+> + return ERR_PTR(-ENOTSUPP);
+>   }
+> 
+>   #endif /* CONFIG_RESET_CONTROLLER */
 
-Acked-by: Carlo Caione <carlo@endlessm.com>
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- drivers/pinctrl/meson/pinctrl-meson-gxbb.c | 39 ++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-index b2ec5f8ada33..cb4d6ad30530 100644
---- a/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-+++ b/drivers/pinctrl/meson/pinctrl-meson-gxbb.c
-@@ -178,6 +178,21 @@ static const unsigned int uart_rx_c_pins[]	= { PIN(GPIOY_14, EE_OFF) };
- static const unsigned int uart_cts_c_pins[]	= { PIN(GPIOX_11, EE_OFF) };
- static const unsigned int uart_rts_c_pins[]	= { PIN(GPIOX_12, EE_OFF) };
- 
-+static const unsigned int eth_mdio_pins[]	= { PIN(GPIOZ_0, EE_OFF) };
-+static const unsigned int eth_mdc_pins[]	= { PIN(GPIOZ_1, EE_OFF) };
-+static const unsigned int eth_clk_rx_clk_pins[]	= { PIN(GPIOZ_2, EE_OFF) };
-+static const unsigned int eth_rx_dv_pins[]	= { PIN(GPIOZ_3, EE_OFF) };
-+static const unsigned int eth_rxd0_pins[]	= { PIN(GPIOZ_4, EE_OFF) };
-+static const unsigned int eth_rxd1_pins[]	= { PIN(GPIOZ_5, EE_OFF) };
-+static const unsigned int eth_rxd2_pins[]	= { PIN(GPIOZ_6, EE_OFF) };
-+static const unsigned int eth_rxd3_pins[]	= { PIN(GPIOZ_7, EE_OFF) };
-+static const unsigned int eth_rgmii_tx_clk_pins[] = { PIN(GPIOZ_8, EE_OFF) };
-+static const unsigned int eth_tx_en_pins[]	= { PIN(GPIOZ_9, EE_OFF) };
-+static const unsigned int eth_txd0_pins[]	= { PIN(GPIOZ_10, EE_OFF) };
-+static const unsigned int eth_txd1_pins[]	= { PIN(GPIOZ_11, EE_OFF) };
-+static const unsigned int eth_txd2_pins[]	= { PIN(GPIOZ_12, EE_OFF) };
-+static const unsigned int eth_txd3_pins[]	= { PIN(GPIOZ_13, EE_OFF) };
-+
- static const struct pinctrl_pin_desc meson_gxbb_aobus_pins[] = {
- 	MESON_PIN(GPIOAO_0, 0),
- 	MESON_PIN(GPIOAO_1, 0),
-@@ -351,6 +366,22 @@ static struct meson_pmx_group meson_gxbb_periphs_groups[] = {
- 	GROUP(uart_tx_c,	1,	17),
- 	GROUP(uart_rx_c,	1,	16),
- 
-+	/* Bank Z */
-+	GROUP(eth_mdio,		6,	1),
-+	GROUP(eth_mdc,		6,	0),
-+	GROUP(eth_clk_rx_clk,	6,	13),
-+	GROUP(eth_rx_dv,	6,	12),
-+	GROUP(eth_rxd0,		6,	11),
-+	GROUP(eth_rxd1,		6,	10),
-+	GROUP(eth_rxd2,		6,	9),
-+	GROUP(eth_rxd3,		6,	8),
-+	GROUP(eth_rgmii_tx_clk,	6,	7),
-+	GROUP(eth_tx_en,	6,	6),
-+	GROUP(eth_txd0,		6,	5),
-+	GROUP(eth_txd1,		6,	4),
-+	GROUP(eth_txd2,		6,	3),
-+	GROUP(eth_txd3,		6,	2),
-+
- 	/* Bank DV */
- 	GROUP(uart_tx_b,	2,	29),
- 	GROUP(uart_rx_b,	2,	28),
-@@ -461,6 +492,13 @@ static const char * const uart_c_groups[] = {
- 	"uart_tx_c", "uart_rx_c", "uart_cts_c", "uart_rts_c",
- };
- 
-+static const char * const eth_groups[] = {
-+	"eth_mdio", "eth_mdc", "eth_clk_rx_clk", "eth_rx_dv",
-+	"eth_rxd0", "eth_rxd1", "eth_rxd2", "eth_rxd3",
-+	"eth_rgmii_tx_clk", "eth_tx_en",
-+	"eth_txd0", "eth_txd1", "eth_txd2", "eth_txd3",
-+};
-+
- static const char * const gpio_aobus_groups[] = {
- 	"GPIOAO_0", "GPIOAO_1", "GPIOAO_2", "GPIOAO_3", "GPIOAO_4",
- 	"GPIOAO_5", "GPIOAO_6", "GPIOAO_7", "GPIOAO_8", "GPIOAO_9",
-@@ -490,6 +528,7 @@ static struct meson_pmx_func meson_gxbb_periphs_functions[] = {
- 	FUNCTION(uart_a),
- 	FUNCTION(uart_b),
- 	FUNCTION(uart_c),
-+	FUNCTION(eth),
- };
- 
- static struct meson_pmx_func meson_gxbb_aobus_functions[] = {
--- 
-2.7.4
+I'm good with this. However, per Philipp on a previous thread, the
+intended behavior is to return -EINVAL for the non-optional functions.
+
+http://marc.info/?l=linux-usb&m=146156945528848&w=2
+
+Philipp,
+
+Any suggestions?
+
+Regards,
+John
