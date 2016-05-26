@@ -1,23 +1,84 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 26 May 2016 19:20:38 -0300
-Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <9d7793850de942cfb578b0aeb2728f41@rwthex-s1-b.rwth-ad.de>
-References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
- <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
- <CAOMZO5C5goJUdHKB9a=eOv9TKDkJWxnkWWb-G7E5Kvceg6sZVg@mail.gmail.com>
- <a6cc6b85d2fa4994b3cb7e2b047f800d@rwthex-w2-b.rwth-ad.de>
- <9d7793850de942cfb578b0aeb2728f41@rwthex-s1-b.rwth-ad.de>
-Message-ID: <CAOMZO5C3_bd-2Nz+G956+VPOcKoFaGGJK7G1p=U0yf5OyWekZA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 May 2016 23:29:45 +0100
+Subject: [PATCH 01/23] all: syscall wrappers: add documentation
+In-Reply-To: <20160526204819.GA10274@yury-N73SV>
+References: <6293194.tGy03QJ9ME@wuerfel>
+ <20160525.135039.244098606649448826.davem@davemloft.net>
+ <6407614.fdv5XFSBue@wuerfel>
+ <20160525.142821.1719403997976778673.davem@davemloft.net>
+ <20160526204819.GA10274@yury-N73SV>
+Message-ID: <20160526222943.GA16729@MBP.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 11:26 AM, Christopher Spinrath
-<christopher.spinrath@rwth-aachen.de> wrote:
+On Thu, May 26, 2016 at 11:48:19PM +0300, Yury Norov wrote:
+> On Wed, May 25, 2016 at 02:28:21PM -0700, David Miller wrote:
+> > From: Arnd Bergmann <arnd@arndb.de>
+> > Date: Wed, 25 May 2016 23:01:06 +0200
+> > 
+> > > On Wednesday, May 25, 2016 1:50:39 PM CEST David Miller wrote:
+> > >> From: Arnd Bergmann <arnd@arndb.de>
+> > >> Date: Wed, 25 May 2016 22:47:33 +0200
+> > >> 
+> > >> > If we use the normal calling conventions, we could remove these overrides
+> > >> > along with the respective special-case handling in glibc. None of them
+> > >> > look particularly performance-sensitive, but I could be wrong there.
+> > >> 
+> > >> You could set the lowest bit in the system call entry pointer to indicate
+> > >> the upper-half clears should be elided.
+> > > 
+> > > Right, but that would introduce an extra conditional branch in the syscall
+> > > hotpath, and likely eliminate the gains from passing the loff_t arguments
+> > > in a single register instead of a pair.
+> > 
+> > Ok, then, how much are you really gaining from avoiding a 'shift' and
+> > an 'or' to build the full 64-bit value?  3 cycles?  Maybe 4?
+> 
+> 4 cycles in kernel and ~same cost in glibc to create a pair.
 
-> Thanks for joining this discussion. I *guess* the rationale is to share
-> the same device tree with projects that are incompatible with the GPL
-> (e.g. *BSD). Even if there is no support for a particular device/board
-> having all (or most) files dual licensed makes it easier to just pull
-> them all in.
+It would take a single instruction per argument in the kernel to do
+shift+or and maybe 1-2 more instructions to move the remaining arguments
+in place (we do this for a few wrappers in arch/arm64/kernel/entry32.S).
+And the glibc counterpart.
 
-Yes, that's correct.
+> And 8 'mov's that exist for every syscall, even yield().
+> 
+> > And the executing the wrappers, those have a non-trivial cost too.
+> 
+> The cost is pretty trivial though. See kernel/compat_wrapper.o:
+> COMPAT_SYSCALL_WRAP2(creat, const char __user *, pathname, umode_t, mode);
+> 0:   a9bf7bfd        stp     x29, x30, [sp,#-16]!
+> 4:   910003fd        mov     x29, sp
+> 8:   2a0003e0        mov     w0, w0
+> c:   94000000        bl      0 <sys_creat>
+> 10:  a8c17bfd        ldp     x29, x30, [sp],#16
+> 14:  d65f03c0        ret
+
+I would say the above could be more expensive than 8 movs (16 bytes to
+write, read, a branch and a ret). You can also add the I-cache locality,
+having wrappers for each syscalls instead of a single place for zeroing
+the upper half (where no other wrapper is necessary).
+
+Can we trick the compiler into doing a tail call optimisation. This
+could have simply been:
+
+COMPAT_SYSCALL_WRAP2(creat, ...):
+	mov	w0, w0
+	b	<sys_creat>
+
+> > Cost wise, this seems like it all cancels out in the end, but what
+> > do I know?
+> 
+> I think you know something, and I also think Heiko and other s390 guys
+> know something as well. So I'd like to listen their arguments here.
+> 
+> For me spark64 way is looking reasonable only because it's really simple
+> and takes less coding. I'll try it on some branch and share here what happened.
+
+The kernel code will definitely look simpler ;). It would be good to see
+if there actually is any performance impact. Even with 16 more cycles on
+syscall entry, would they be lost in the noise? You don't need a full
+implementation, just some dummy mov x0, x0 on the entry path.
+
+-- 
+Catalin
