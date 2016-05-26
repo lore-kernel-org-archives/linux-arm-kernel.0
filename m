@@ -1,70 +1,90 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Thu, 26 May 2016 11:43:51 -0700
-Subject: [PATCH] arm64: kasan: instrument user memory access API
-Message-ID: <1464288231-11304-1-git-send-email-yang.shi@linaro.org>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: 26 May 2016 19:25:23 -0000
+Subject: [PATCH 1/5] spi: sunxi: fix transfer timeout
+In-Reply-To: <cover.1464130597.git.hramrach@gmail.com>
+References: <cover.1464130597.git.hramrach@gmail.com>
+Message-ID: <cb90b922caa6ac07c1425d726ea19709ee5284f4.1464130597.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
-("x86/kasan: instrument user memory access API") added KASAN instrument to
-x86 user memory access API, so added such instrument to ARM64 too.
+The trasfer timeout is fixed at 1000 ms. Reading a 4Mbyte flash over
+1MHz SPI bus takes way longer than that. Calculate the timeout from the
+actual time the transfer is supposed to take and multiply by 2 for good
+measure.
 
-Tested by test_kasan module.
-
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
+Signed-off-by: Michal Suchanek <hramrach@gmail.com>
 ---
- arch/arm64/include/asm/uaccess.h | 18 ++++++++++++++++--
- 1 file changed, 16 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 0685d74..ec352fa 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -23,6 +23,7 @@
-  */
- #include <linux/string.h>
- #include <linux/thread_info.h>
-+#include <linux/kasan-checks.h>
- 
- #include <asm/alternative.h>
- #include <asm/cpufeature.h>
-@@ -276,6 +277,8 @@ extern unsigned long __must_check __clear_user(void __user *addr, unsigned long
- 
- static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
+v2:
+- fix build error
+- use unsigned instead of int in max_t
+- use tfr->speed_hz instead of sspi->max_speed_hz
+---
+ drivers/spi/spi-sun4i.c | 11 ++++++++++-
+ drivers/spi/spi-sun6i.c | 11 ++++++++++-
+ 2 files changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index 1ddd9e2..fe63bbd 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -173,6 +173,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
  {
-+	kasan_check_write(to, n);
-+
- 	if (access_ok(VERIFY_READ, from, n))
- 		n = __copy_from_user(to, from, n);
- 	else /* security hole - plug it */
-@@ -285,6 +288,8 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
+ 	struct sun4i_spi *sspi = spi_master_get_devdata(master);
+ 	unsigned int mclk_rate, div, timeout;
++	unsigned int start, end, tx_time;
+ 	unsigned int tx_len = 0;
+ 	int ret = 0;
+ 	u32 reg;
+@@ -279,9 +280,17 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+ 	sun4i_spi_write(sspi, SUN4I_CTL_REG, reg | SUN4I_CTL_XCH);
  
- static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
- {
-+	kasan_check_read(from, n);
-+
- 	if (access_ok(VERIFY_WRITE, to, n))
- 		n = __copy_to_user(to, from, n);
- 	return n;
-@@ -297,8 +302,17 @@ static inline unsigned long __must_check copy_in_user(void __user *to, const voi
- 	return n;
- }
++	tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
++			100);
++	start = jiffies;
+ 	timeout = wait_for_completion_timeout(&sspi->done,
+-					      msecs_to_jiffies(1000));
++					      msecs_to_jiffies(tx_time));
++	end = jiffies;
+ 	if (!timeout) {
++		dev_warn(&master->dev,
++			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
++			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
++			 jiffies_to_msecs(end - start), tx_time);
+ 		ret = -ETIMEDOUT;
+ 		goto out;
+ 	}
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index 42e2c4b..8be5c5c 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -162,6 +162,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	unsigned int mclk_rate, div, timeout;
+ 	unsigned int tx_len = 0;
+ 	int ret = 0;
++	unsigned int start, end, tx_time;
+ 	u32 reg;
  
--#define __copy_to_user_inatomic __copy_to_user
--#define __copy_from_user_inatomic __copy_from_user
-+static inline unsigned long __copy_to_user_inatomic(void __user *to, const void *from, unsigned long n)
-+{
-+	kasan_check_read(from, n);
-+	return __copy_to_user(to, from, n);
-+}
-+
-+static inline unsigned long __copy_from_user_inatomic(void *to, const void __user *from, unsigned long n)
-+{
-+	kasan_check_write(to, n);
-+	return __copy_from_user(to, from, n);
-+}
+ 	/* We don't support transfer larger than the FIFO */
+@@ -269,9 +270,17 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+ 	reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+ 	sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
  
- static inline unsigned long __must_check clear_user(void __user *to, unsigned long n)
- {
++	tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
++			100);
++	start = jiffies;
+ 	timeout = wait_for_completion_timeout(&sspi->done,
+-					      msecs_to_jiffies(1000));
++					      msecs_to_jiffies(tx_time));
++	end = jiffies;
+ 	if (!timeout) {
++		dev_warn(&master->dev,
++			 "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
++			 dev_name(&spi->dev), tfr->len, tfr->speed_hz,
++			 jiffies_to_msecs(end - start), tx_time);
+ 		ret = -ETIMEDOUT;
+ 		goto out;
+ 	}
 -- 
-2.0.2
+2.8.1
