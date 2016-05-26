@@ -1,65 +1,134 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 26 May 2016 20:21:44 +0800
-Subject: [PATCH 18/23] mmc: sdhci-esdhc-imx: enable hw auto retuning for
- STD_TUNING
-In-Reply-To: <5731C3CC.1000806@intel.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-19-git-send-email-aisheng.dong@nxp.com>
- <5731C3CC.1000806@intel.com>
-Message-ID: <20160526122144.GE23988@shlinux2>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 26 May 2016 13:34:59 +0100
+Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
+ for X-Gene v1
+In-Reply-To: <CADaLNDnywVPER9QhmK4C6JyCLhta_M_cVSOuSkEHnmnLPFo3JA@mail.gmail.com>
+References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
+ <1456330151.5681.46.camel@redhat.com> <56CDD767.6020103@arm.com>
+ <CADaLND=mrkxOWOzcEb8os16Rb=SDHfnn_8eSgB4bQYH3UguS3w@mail.gmail.com>
+ <20160225173822.GA6349@red-moon>
+ <CADaLNDnywVPER9QhmK4C6JyCLhta_M_cVSOuSkEHnmnLPFo3JA@mail.gmail.com>
+Message-ID: <20160526123459.GA23794@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 02:19:40PM +0300, Adrian Hunter wrote:
-> On 15/04/16 20:29, Dong Aisheng wrote:
-> > Enable HW auto retuning when set SDHCI_CTRL_EXEC_TUNING and clear it
-> > when clear SDHCI_CTRL_TUNED_CLK.
-> > 
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> 
-> I presume this patch should wait for patch 17, but nevertheless:
-> 
-> Acked-by: Adrian Hunter <adrian.hunter@intel.com>
-> 
+Hi Duc,
 
-Actually the interesting thing here is patch 18 and 19 do not need
-patch 17 since our IC guy told me IMX uSDHC auto-tuning will
-not Retuning request for mode 3.
-
-Thanks for the pre-ACK.
-
-Regards
-Dong Aisheng
-
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc-imx.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > index 9f9be3f..a582a83 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -44,6 +44,7 @@
-> >  #define  ESDHC_MIX_CTRL_AC23EN		(1 << 7)
-> >  #define  ESDHC_MIX_CTRL_EXE_TUNE	(1 << 22)
-> >  #define  ESDHC_MIX_CTRL_SMPCLK_SEL	(1 << 23)
-> > +#define  ESDHC_MIX_CTRL_AUTO_TUNE_EN	(1 << 24)
-> >  #define  ESDHC_MIX_CTRL_FBCLK_SEL	(1 << 25)
-> >  #define  ESDHC_MIX_CTRL_HS400_EN	(1 << 26)
-> >  /* Bits 3 and 6 are not SDHCI standard definitions */
-> > @@ -484,11 +485,13 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
-> >  			} else {
-> >  				v &= ~ESDHC_MIX_CTRL_SMPCLK_SEL;
-> >  				m &= ~ESDHC_MIX_CTRL_FBCLK_SEL;
-> > +				m &= ~ESDHC_MIX_CTRL_AUTO_TUNE_EN;
-> >  			}
-> >  
-> >  			if (val & SDHCI_CTRL_EXEC_TUNING) {
-> >  				v |= ESDHC_MIX_CTRL_EXE_TUNE;
-> >  				m |= ESDHC_MIX_CTRL_FBCLK_SEL;
-> > +				m |= ESDHC_MIX_CTRL_AUTO_TUNE_EN;
-> >  				tuning_ctrl = readl(host->ioaddr + ESDHC_TUNING_CTRL);
-> >  				tuning_ctrl |= ESDHC_STD_TUNING_EN | ESDHC_TUNING_START_TAP_DEFAULT;
-> >  				if (imx_data->boarddata.tuning_start_tap) {
-> > 
+On Wed, May 25, 2016 at 04:13:35PM -0700, Duc Dang wrote:
+> On Thu, Feb 25, 2016 at 9:38 AM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > On Wed, Feb 24, 2016 at 02:28:10PM -0800, Duc Dang wrote:
+> >> On Wed, Feb 24, 2016 at 8:16 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >> > On 24/02/16 16:09, Mark Salter wrote:
+> >> >> On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
+> >> >>> This patch makes pci-xgene-msi driver ACPI-aware and provides
+> >> >>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+> >> >>>
+> >> >>> Signed-off-by: Duc Dang <dhdang@apm.com>
+> >> >>> ---
+> >> >>>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
+> >> >>>  1 file changed, 32 insertions(+), 3 deletions(-)
+> >> >>>
+> >> >>> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+> >> >>> index a6456b5..466aa93 100644
+> >> >>> --- a/drivers/pci/host/pci-xgene-msi.c
+> >> >>> +++ b/drivers/pci/host/pci-xgene-msi.c
+> >> >>> @@ -24,6 +24,7 @@
+> >> >>>  #include <linux/pci.h>
+> >> >>>  #include <linux/platform_device.h>
+> >> >>>  #include <linux/of_pci.h>
+> >> >>> +#include <linux/acpi.h>
+> >> >>>
+> >> >>>  #define MSI_IR0                     0x000000
+> >> >>>  #define MSI_INT0            0x800000
+> >> >>> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+> >> >>>  };
+> >> >>>
+> >> >>>  struct xgene_msi {
+> >> >>> -    struct device_node      *node;
+> >> >>> +    struct fwnode_handle    *fwnode;
+> >> >>>      struct irq_domain       *inner_domain;
+> >> >>>      struct irq_domain       *msi_domain;
+> >> >>>      u64                     msi_addr;
+> >> >>> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
+> >> >>>      .free   = xgene_irq_domain_free,
+> >> >>>  };
+> >> >>>
+> >> >>> +#ifdef CONFIG_ACPI
+> >> >>> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+> >> >>> +{
+> >> >>> +    return xgene_msi_ctrl.fwnode;
+> >> >>> +}
+> >> >>> +#endif
+> >> >>> +
+> >> >>>  static int xgene_allocate_domains(struct xgene_msi *msi)
+> >> >>>  {
+> >> >>>      msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+> >> >>> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> >> >>>      if (!msi->inner_domain)
+> >> >>>              return -ENOMEM;
+> >> >>>
+> >> >>> -    msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+> >> >>> +    msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+> >> >>>                                                  &xgene_msi_domain_info,
+> >> >>>                                                  msi->inner_domain);
+> >> >>
+> >> >> This doesn't work for me (ACPI probing on Mustang) unless I change this
+> >> >> to be pci_msi_create_default_irq_domain(). The problem seems to be that
+> >> >> the MSI probe happens after the PCIe RC is probed so there is no MSI domain
+> >> >> at the time the PCIe root is initialized by ACPI.
+> >> >
+> >> > pci_msi_create_default_irq_domain is the wrong thing do use, specially
+> >> > if you have multiple MSI controllers in the system. I certainly wouldn't
+> >> > want to see it being used on arm64.
+> >> >
+> >> > This is the usual dependency hell. You try moving the probing earlier,
+> >> > but that may break something else in the process.
+> >>
+> >> Hi Mark and Marc,
+> >>
+> >> I have modified Tianocore firmware to have MSI node declared before
+> >> PCIe node in Dsdt table. With this modification, the MSI driver will
+> >> be loaded before PCIe driver and MSI domain is available at the time
+> >> PCIe root is initialized.
+> >
+> > I am totally against this. We should not hack ACPI tables to make
+> > the kernel work (on top of that with unwritten ordering rules that may
+> > well require changes as kernel evolves), we should have a standard set
+> > of bindings that people use to describe HW in the DSDT and the kernel(s)
+> > has to cope with that. If there is a dependency problem in the description
+> > we may solve it at bindings level, but I absolutely do not want to rely
+> > on DSDT nodes ordering for things to work, that's fragile, no shortcuts
+> > please.
 > 
+> Hi Lorenzo, Bjorn,
+> 
+> (Refresh this thread on this merge cycle)
+> 
+> I tried to use _DEP method to describe the dependency of PCIe node to
+> MSI node but it turns out that PCIe driver does not check for the
+> dependency (only EC (ec.c) and I2C core (i2c-core.c) use
+> acpi_walk_dep_device_list to check for dependency before loading
+> dependent drivers)
+> 
+> Do you have other suggestion/example about how to ensure strict
+> ordering on driver loading in ACPI boot mode without changing the
+> order of ACPI nodes in DSDT?
+
+Before doing anything else, I would like to ask you to report the code
+paths leading to failures (what fails actually ?) please, and I want
+to understand what "this does not work" means.
+
+In particular:
+
+- Why using pci_msi_create_default_irq_domain() works
+- Why, if you change the DSDT nodes ordering, things work (please add
+  some debugging to MSI allocation functions to detect the code paths
+  leading to correct MSI allocation)
+- What's the difference wrt the DT probe path
+
+When we have a detailed view of MSI allocation code paths and failures
+we can see what we can do to fix it in ACPI.
+
+Thanks,
+Lorenzo
