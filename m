@@ -1,93 +1,102 @@
-From: loic.pallardy@st.com (loic pallardy)
-Date: Thu, 26 May 2016 15:05:10 +0200
-Subject: [STLinux Kernel] [PATCH 02/11] drivers: clk: st: Add clock
- propagation for audio clocks
-In-Reply-To: <CAL_JsqLOG4P0H+HkQ3mJhfibatuV2T51KqOn-+U+LK8WUx7QgA@mail.gmail.com>
-References: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
- <1463560892-7209-3-git-send-email-gabriel.fernandez@linaro.org>
- <20160525172409.GA27913@rob-hp-laptop>
- <CAG374jDTCJfZB+PuAnggjXhbcd3NjJqrESpe_EnMniCAeoph9A@mail.gmail.com>
- <CAL_JsqLOG4P0H+HkQ3mJhfibatuV2T51KqOn-+U+LK8WUx7QgA@mail.gmail.com>
-Message-ID: <5746F486.602@st.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 26 May 2016 08:13:45 -0500
+Subject: [PATCH 2/3] of/numa: fix a memory@ dt node can only contains one
+ memory block
+In-Reply-To: <1464230639-9852-2-git-send-email-thunder.leizhen@huawei.com>
+References: <1464230639-9852-1-git-send-email-thunder.leizhen@huawei.com>
+ <1464230639-9852-2-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160526131345.GA12024@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 26, 2016 at 10:43:58AM +0800, Zhen Lei wrote:
+> For a normal memory@ devicetree node, its reg property can contains more
+> memory blocks.
+> 
+> Because we don't known how many memory blocks maybe contained, so we try
+> from index=0, increase 1 until error returned(the end).
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  drivers/of/of_numa.c | 30 ++++++++++++++++++++----------
+>  1 file changed, 20 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+> index 21d831f..2c5f249 100644
+> --- a/drivers/of/of_numa.c
+> +++ b/drivers/of/of_numa.c
+> @@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
+>  	struct device_node *np = NULL;
+>  	struct resource rsrc;
+>  	u32 nid;
+> -	int r = 0;
+> +	int i, r = 0;
+> 
+>  	for (;;) {
+>  		np = of_find_node_by_type(np, "memory");
+> @@ -82,17 +82,27 @@ static int __init of_numa_parse_memory_nodes(void)
+>  			/* some other error */
+>  			break;
+> 
+> -		r = of_address_to_resource(np, 0, &rsrc);
+> -		if (r) {
+> -			pr_err("NUMA: bad reg property in memory node\n");
+> -			break;
+> +		for (i = 0; ; i++) {
+> +			r = of_address_to_resource(np, i, &rsrc);
+> +			if (r) {
+> +				/* reached the end of of_address */
+> +				if (i > 0) {
+> +					r = 0;
+> +					break;
+> +				}
+> +
+> +				pr_err("NUMA: bad reg property in memory node\n");
+> +				goto finished;
+> +			}
+> +
+> +			r = numa_add_memblk(nid, rsrc.start,
+> +					    rsrc.end - rsrc.start + 1);
+> +			if (r)
+> +				goto finished;
+>  		}
+> -
+> -		r = numa_add_memblk(nid, rsrc.start,
+> -				    rsrc.end - rsrc.start + 1);
+> -		if (r)
+> -			break;
+>  	}
+> +
+> +finished:
+>  	of_node_put(np);
+
+This function can be simplified down to:
+
+	for_each_node_by_type(np, "memory") {
+		r = of_property_read_u32(np, "numa-node-id", &nid);
+		if (r == -EINVAL)
+			/*
+			 * property doesn't exist if -EINVAL, continue
+			 * looking for more memory nodes with
+			 * "numa-node-id" property
+			 */
+			continue;
+		else if (r)
+			/* some other error */
+			break;
+
+		r = of_address_to_resource(np, 0, &rsrc);
+		for (i = 0; !r; i++, r = of_address_to_resource(np, i, 
+&rsrc)) {
+			r = numa_add_memblk(nid, rsrc.start,
+				    rsrc.end - rsrc.start + 1);
+		}
+	}
+	of_node_put(np);
+
+	return r;
 
 
-On 05/26/2016 02:46 PM, Rob Herring wrote:
-> On Thu, May 26, 2016 at 4:49 AM, Gabriel Fernandez
-> <gabriel.fernandez@linaro.org> wrote:
->> On 25 May 2016 at 19:24, Rob Herring <robh@kernel.org> wrote:
->>>
->>> On Wed, May 18, 2016 at 10:41:23AM +0200, Gabriel Fernandez wrote:
->>>> This patch allows fine tuning of the quads FS for audio clocks
->>>> accuracy.
->>>>
->>>> Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
->>>> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
->>>> ---
->>>>   .../devicetree/bindings/clock/st/st,flexgen.txt    |  1 +
->>>>   drivers/clk/st/clk-flexgen.c                       | 24 ++++++++++++++++++++++
->>>>   2 files changed, 25 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
->>>> index b7ee5c7..15b33c7 100644
->>>> --- a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
->>>> +++ b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
->>>> @@ -60,6 +60,7 @@ This binding uses the common clock binding[2].
->>>>   Required properties:
->>>>   - compatible : shall be:
->>>>     "st,flexgen"
->>>> +  "st,stih407-clkgend0", "st,flexgen" (enable clock propagation on parent)
->>>
->>> What do "d0" and "d2" refer to?
->>>
->>> This seems to indicate you have too much clock detail in the DT (with
->>> individual clocks described) or not enough with genericish compatible
->>> strings. What happens for the mext clock you need to adjust the flags
->>> on? You should be able to make these adjustments without DT updates.
->>> Perhaps you need a wider fixing of clock compatible strings.
->>>
->>> Rob
->>
->> Sorry i sent my response in html...
->>
->> Hi Rob,
->>
->> Thanks for reviewing.
->>
->> Can i remove
->> "
->> st,stih407-clkgend0" & "
->> st,stih407-clkgend2" compatible strings and add proprieties instead ?
->> I only need to activate 2 features and then we can keep generic
->> compatible strings.
->
-Hi Rob,
-> That is no different and suffers the same point I raised. It requires
-> updating the DT for any clock configuration change or enhancement.
->
-Agree with you, DT update is needed as soon as a clock configuration 
-should be changed. This is due to STiH clock driver design based on DT 
-description of SoC clock tree.
+Perhaps with a "if (!i && r) pr_err()" for an error message at the end.
 
-This clock driver was accepted 2 years ago. At the time being there was 
-discussion about clock tree description location: driver or DT.
-Bad choice was done for this driver...
-
-If we decide to redesign STiH clock driver using in-driver clock tree 
-description, this will modify STiH clock DT nodes description and so 
-break DT backward compatibility.
-
-What's from your pov the best option?
-
-Regards,
-Loic
-
-> Rob
->
-> _______________________________________________
-> Kernel mailing list
-> Kernel at stlinux.com
-> http://www.stlinux.com/mailman/listinfo/kernel
->
+Rob
