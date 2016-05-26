@@ -1,46 +1,43 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 26 May 2016 09:03:33 +0200
-Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
- support
-In-Reply-To: <edee7345-280a-0d7c-7e5a-798215fbd2b9@de.bosch.com>
-References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
- <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
- <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
- <20160525004825.GC7292@verge.net.au>
- <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
- <edee7345-280a-0d7c-7e5a-798215fbd2b9@de.bosch.com>
-Message-ID: <CAMuHMdXnN-GTN4crXeWRvtWT4E2kYFvMdPPcH8z+gJb-B4PbYA@mail.gmail.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Thu, 26 May 2016 10:13:30 +0300
+Subject: =?UTF-8?B?UmU6IE1vZGVybiBrZXJuZWwgb24gYSBDaHVtYnk=?=
+In-Reply-To: <4758440.JnRBmYVBjM@wuerfel>
+References: <CAMW5UfYH6UiaB1ddRT0KBP1thyyebnCw2h4VigYQQ55v4MYqdA@mail.gmail.com>
+ <4758440.JnRBmYVBjM@wuerfel>
+Message-ID: <1464246810.783789508@f42.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+> ???????, 26 ??? 2016, 0:09 +03:00 ?? Arnd Bergmann <arnd@arndb.de>:
+> 
+> On Wednesday, May 25, 2016 4:59:31 PM CEST Josh Coombs wrote:
+> > I've likely bitten off way more than I can chew but I'd like to see if
+> > this is possible:  I have a i.MX21 powered 'original' Chumby happily
+> > running on a modified 2.6.16 kernel, ideally I'd like to do the
+> > legwork to get it running on a current, mainline kernel.  Looking at
+> > 4.6 I see a single i.MX21 device supported by a board file, the
+> > mx21ads.  Flipping through the list archives I see discussions of
+> > i.MX21 being moved to device tree operation but I can't see any signs
+> > of any such devices actually being supported that way.
+> > 
+> > Should I try to bash up support based on the mx21ads or is there a
+> > device tree template I can start from?
+> 
+> I think your best bet is to start from the imx27 DT support.
+> As I understand, it's closely related to imx21, though it's possible
+> that you have to add some other drivers.
+> 
+> Alexander Shiyan (added to Cc here) has written DT support for the imx21
+> clk controller, he may have other patches that never made it upstream,
+> or have additional information.
 
-On Wed, May 25, 2016 at 9:32 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> P.S.: This also results in the question why we need similar
-> r8a7795-cpg-mssr.h and r8a7796-cpg-mssr.h with just different "numbers" for
-> the same clocks. Can't we use the same numbers on all SoCs, with just having
-> wholes in the list where the clocks don't exist on a SoC? I haven't looked
+Hello.
 
-The CPG and MSSR block are the IP blocks that differ most among SoCs of the
-same family. Some clocks are present on H3 only, others on M3-W only.
+i.MX21 platform is fully ready for use with DT. To start using DT You need to write
+imx21-dt machine startup (which is almost identical to imx27-dt) and basic DT
+templates imx21-pinfunc.h & imx21.dtsi and so on. Then you can write DT-support
+for your board.
+I have no any additional patches for i.MX21.
 
-Having a shared driver core, but different defines, is a compromise between
-reusability and avoiding mistakes in DTSes (e.g. pointing to a nonexisting
-clock due to copy and paste from another SoC).
-
-> into the manual if these numbers are given by the hardware, though.
-
-The actual numbers don't map to numbers in the datasheet, just to an unordered
-list in a table. The list of number is considered part of the DT bindings, and
-thus append-only (to be considered in case the datasheet is updated).
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks.
+---
