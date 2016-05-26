@@ -1,55 +1,243 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Thu, 26 May 2016 04:05:26 +0000
-Subject: [v10, 7/7] mmc: sdhci-of-esdhc: fix host version for
- T4240-R1.0-R2.0
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <4448030.Zs8fVnr3nm@wuerfel>
- <HE1PR04MB0889B52134A43C0E7A452B7BF87C0@HE1PR04MB0889.eurprd04.prod.outlook.com>
- <5159406.HOFrj7pRfW@wuerfel> <1462937186.16584.77.camel@buserror.net>
-Message-ID: <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Thu, 26 May 2016 12:07:25 +0800
+Subject: [PATCH] mmc: dw_mmc: Consider HLE errors to be data and command
+ errors
+In-Reply-To: <5746748B.7080305@samsung.com>
+References: <1426002490-2014-1-git-send-email-dianders@chromium.org>
+ <5502CA4E.9060401@samsung.com>
+ <CAD=FV=VX3ix-j4y95W1q8b-aVuVEN+4xsd8WLx2xcE7KPNJwRw@mail.gmail.com>
+ <5506707D.40708@samsung.com> <55189F04.8000404@samsung.com>
+ <CAD=FV=WFAZqAsXOqunt0fxw87M-FruwUrxuzW0MJsG6UvfSjzA@mail.gmail.com>
+ <CAD=FV=UJGcwa_biSCGhD=kS-T+fppCniBFfOHb5ohnwSwSwMMA@mail.gmail.com>
+ <573BCC8D.5090606@kernel-upstream.org>
+ <CAD=FV=VneQR3wurjezBkRhtQiH+q-FfhDN8=Ym=XqtZpVmsdUw@mail.gmail.com>
+ <573C3283.1040606@rock-chips.com>
+ <CAD=FV=UoT2GRYWJWXEn_ccvKGgC+PzQM_BCtLHAa7jxzbaQ9SA@mail.gmail.com>
+ <10b3dc0e-aebf-664b-b36b-c54692cd9983@rock-chips.com>
+ <573DBAA5.2070706@samsung.com>
+ <CGME20160526022412epcas1p1408431e9596aaf84e8b58510ee81d4c4@epcas1p1.samsung.com>
+ <4d8f3992-a1d3-6010-4964-8ca13cddc1c5@rock-chips.com>
+ <5746748B.7080305@samsung.com>
+Message-ID: <10d2520b-0919-0a5b-f5b6-23b133e63dbb@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uffe,
+? 2016/5/26 11:59, Jaehoon Chung ??:
+> On 05/26/2016 11:23 AM, Shawn Lin wrote:
+>> Hi Jaehoon,
+>>
+>> On 2016/5/19 21:07, Jaehoon Chung wrote:
+>>> On 05/19/2016 08:31 PM, Shawn Lin wrote:
+>>>> Hi,
+>>>>
+>>>> On 2016/5/19 1:37, Doug Anderson wrote:
+>>>>> Hi,
+>>>>>
+>>>>> On Wed, May 18, 2016 at 2:14 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+>>>>>> Hi
+>>>>>>
+>>>>>>
+>>>>>> On 2016-5-18 12:12, Doug Anderson wrote:
+>>>>>>>
+>>>>>>> Hi,
+>>>>>>>
+>>>>>>> On Tue, May 17, 2016 at 6:59 PM, Shawn Lin
+>>>>>>> <shawn.lin@kernel-upstream.org> wrote:
+>>>>>>>>
+>>>>>>>> Could you try this patch to see if you can still find HLE?
+>>>>>>>>
+>>>>>>>> @@ -2356,12 +2356,22 @@ static void dw_mci_cmd_interrupt(struct dw_mci
+>>>>>>>> *host, u32 status)
+>>>>>>>>   static void dw_mci_handle_cd(struct dw_mci *host)
+>>>>>>>>   {
+>>>>>>>>          int i;
+>>>>>>>> +       int present;
+>>>>>>>>
+>>>>>>>>          for (i = 0; i < host->num_slots; i++) {
+>>>>>>>>                  struct dw_mci_slot *slot = host->slot[i];
+>>>>>>>>
+>>>>>>>>                  if (!slot)
+>>>>>>>>                          continue;
+>>>>>>>>
+>>>>>>>> +               present = !(mci_readl(slot->host, CDETECT) & (1 <<
+>>>>>>>> slot->id));
+>>>>>>>> +               if (present)
+>>>>>>>> +                       set_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+>>>>>>>> +               else
+>>>>>>>> +                       clear_bit(DW_MMC_CARD_PRESENT, &slot->flags);
+>>>>>>>
+>>>>>>>
+>>>>>>> No, because we don't use the builtin card detect on veyron.  ;)
+>>>>>>>
+>>>>>>> We use GPIO card detect because we didn't like the way JTAG and SD
+>>>>>>> interacted.  Also on rk3288 the builtin card detect line had the wrong
+>>>>>>> voltage domain (you couldn't detect a card when the IO lines were
+>>>>>>> powered off).  The builtin card detect line is always driven low on
+>>>>>>> veyron.
+>>>>>>
+>>>>>>
+>>>>>> Okay, I see.
+>>>>>>
+>>>>>>>
+>>>>>>>
+>>>>>>> I'm nearly certain that the root cause of my HLE errors is actually
+>>>>>>> related to the same problem addressed by the commit 7c5209c315ea
+>>>>>>> ("mmc: core: Increase delay for voltage to stabilize from 3.3V to
+>>>>>>> 1.8V").  I think that on minnie we're still on the hairy edge and
+>>>>>>> sometimes the line doesn't transition fast enough.
+>>>>>>
+>>>>>>
+>>>>>> Things are not so simple from your details.
+>>>>>>
+>>>>>> I was not enabling SD3.0 support, then I also found HLE sometimes.
+>>>>>> So it seems commit 7c5209c315ea does not contibute to this phenomenon.
+>>>>>
+>>>>> Just to clarify, in my case commit 7c5209c315ea didn't make the
+>>>>> problem worse, but made it better.  Just not better enough.  ;)
+>>>>>
+>>>>>
+>>>>>> The scenario looks like:
+>>>>>> remove sd-card -> mmc_sd_detect -> send status(CMD13) ->power_off ->
+>>>>>> set_ios -> setup_bus -> disabled clk , then HLE irq storm coming
+>>>>>>
+>>>>>> From the code of dw_mci_prepare_command:
+>>>>>> SDMMC_CMD_PRV_DAT_WAIT will not be used for CMD13, so we don't
+>>>>>> wait_busy here, then cmd code is loding into queue of dw_mmc but
+>>>>>> still failing send out because it's in busy?
+>>>>>>
+>>>>>> With my patch, things go well:
+>>>>>> remove sd-card -> clear bit of DW_MMC_CARD_PRESENT  -> send
+>>>>>> status(CMD13) return directly -> power_off -> set_ios -> setup_bus ->
+>>>>>> disable clk
+>>>>>>
+>>>>>> So why should we allow inquiry of card status if we sure the card is
+>>>>>> removed? I mean no any further cmds should be delivered.
+>>>>>
+>>>>> Quite honestly just dealing with the HLE error (my patch or
+>>>>> equivalent) might be a sane solution for the problem you describe.
+>>>>
+>>>> Yes, your patch looks good to me, so it should be merged firstly. :)
+>>>> Then let's push it a bit further more that when HLEs are coming,
+>>>> somethings must be wrong(currently I don't see a obvious clue from
+>>>> the code itself although, I'm prone to think it belongs to the
+>>>> software issue).
+>>>
+>>> We don't know what's main cause for HLE..But i also think it's relevant to SW issue.
+>>> But we need to consider all possibilities..
+>>>
+>>>>
+>>>>
+>>>>>
+>>>>> dw_mmc needs to be able to work with an external card detect GPIO.
+>>>>> It's been part of the dw_mmc driver for a long time and is (in fact)
+>>>>> in use upstream at least by rk3288-veyron.  Any solution that only
+>>>>> works for internal card detect is not enough.  Just handling the HLE
+>>>>> error to deal with the interrupt storm and then letting Linux remove
+>>>>> the card (because of the card detect interrupt) seems totally OK to
+>>>>> me.
+>>>>>
+>>>>
+>>>> Sure, some of rockchip Socs use gpio for CD because they don't
+>>>> have a internal CD, such as RK3036, right?
+>>>>
+>>>>> Note: I'd be very curious if your problems get better if you disable
+>>>>
+>>>> Not at all.
+>>>>
+>>>>> the "grf_force_jtag" bit in the GRF.  If you're using the builtin card
+>>>>> detect and you use the boot default of "grf_force_jtag" then your pins
+>>>>> will be unmuxed behind your back when the card is ejected.  This could
+>>>>> be causing the dw_mmc controller to get confused.
+>>>>
+>>>> Right, grf_force_jtag is also not a friend of mine. :)
+>>>> So I had disabled this function before I was debugging it.
+>>>>
+>>>>>
+>>>>>
+>>>>>> And another question: should we wait busy for cmd13?
+>>>>>
+>>>>> I don't think so.  As I understand it CMD13 uses only the CMD line for
+>>>>> communication and it should be appropriate to send this when the bus
+>>>>> is "busy" (which means that the DATA lines are low).
+>>>>
+>>>> Ahh... take back my question.. I was just considering a wired situation
+>>>> that pins are unmuxed on the background(cmd line as well) when cmd13 is
+>>>> delivering....
+>>>>
+>>>>
+>>>>>
+>>>>> Also: it seems odd that the HLE IRQ storm didn't come right after the
+>>>>> CMD 13 in your description above.  Are you sure it was the CMD 13 that
+>>>>> caused the HLEs, or could it has been something else?
+>>>>
+>>>> Actually no. Any cmds be issued can trigger HLEs, I think, after sd card is removed When I hacked mmc_sd_detecd to send other cmds intead
+>>>> of cmd13.
+>>>>
+>>>> From dw_mmc databook v270a(7.2.3 Clock Programming) we can see:
+>>>> The DWC_mobile_storage loads each of these registers only when the
+>>>> start_cmd bit and the Update_clk_regs_only bit in the CMD register are
+>>>> set. When a command is successfully loaded, the DWC_mobile_storage
+>>>> clears this bit, unless the DWC_mobile_storage already has another
+>>>> command in the queue, at which point it gives an HLE (Hardware Locked
+>>>> Error); for details on HLEs, refer to ?Error Handling? on page 233.
+>>>> Software should look for the start_cmd and the Update_clk_regs_only
+>>>> bits, and should also set the wait_prvdata_complete bit to ensure that
+>>>> clock parameters do not change during data transfer.
+>>>>
+>>>> Maybe the cmd is trying to load(or somethings wrong with the
+>>>> controller?) when we disable the clk? That may explain my observation
+>>>> that HLEs came after disabling clk.
+>>>
+>>> I agreed.
+>>>
+>>> To Disable clock, it sends cmd with update_clk_regs_only and wait_prvdata_complete bit.
+>>> I think it's problem..(waiting for prvdata..)
+>>>
+>>> If there are ongoing some data(read/write), then before disabling clock, waiting for completing previous data.
+>>> (But card was already removed, and it couldn't do anything.)
+>>> It's difficult to analyze the HLE..So After applying first, then we can solve this problem, step by step.
+>>>
+>>
+>> I saw you send a PR for v4.7-fix to Ulf which didn't include this one.
+>> Do you plan to add it into 4.8 materials? :)
+>
+> Yes, I think good that this is prepared for next. (Will apply on this weekend.)
+> Do you have other opinion? :)
 
-Could we merge this patchset? ...
-It has been a long time to wait for Arnd's response...
- 
-Thanks a lot.
+No, thanks. I just wanna make sure this one will be merged. :)
+
+>
+> If you have other opinion, i will reflect yours. Thanks!
+>
+> Best Regards,
+> Jaehoon Chung
+>
+>>
+>>> Best Regards,
+>>> Jaehoon Chung
+>>>
+>>>>
+>>>>
+>>>>>
+>>>>>
+>>>>> -Doug
+>>>>>
+>>>>>
+>>>>>
+>>>>
+>>>>
+>>>
+>>>
+>>>
+>>>
+>>
+>>
+>
+>
+>
+>
 
 
-Best regards,
-Yangbo Lu
-
-
-> -----Original Message-----
-> From: Yangbo Lu
-> Sent: Friday, May 20, 2016 2:06 PM
-> To: 'Scott Wood'; Arnd Bergmann; linux-arm-kernel at lists.infradead.org
-> Cc: linuxppc-dev at lists.ozlabs.org; Mark Rutland;
-> devicetree at vger.kernel.org; ulf.hansson at linaro.org; Russell King; Bhupesh
-> Sharma; netdev at vger.kernel.org; Joerg Roedel; Kumar Gala; linux-
-> mmc at vger.kernel.org; linux-kernel at vger.kernel.org; Yang-Leo Li;
-> iommu at lists.linux-foundation.org; Rob Herring; linux-i2c at vger.kernel.org;
-> Claudiu Manoil; Santosh Shilimkar; Xiaobo Xie; linux-clk at vger.kernel.org;
-> Qiang Zhao
-> Subject: RE: [v10, 7/7] mmc: sdhci-of-esdhc: fix host version for T4240-
-> R1.0-R2.0
-> 
-> Hi Arnd,
-> 
-> Any comments?
-> Please reply when you see the email since we want this eSDHC issue to be
-> fixed soon.
-> 
-> All the patches are Freescale-specific and is to fix the eSDHC driver.
-> Could we let them merged first if you were talking about a new way of
-> abstracting getting SoC version.
-> 
-> 
-> Thanks :)
-> 
-> 
-> Best regards,
-> Yangbo Lu
-> 
+-- 
+Best Regards
+Shawn Lin
