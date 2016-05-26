@@ -1,246 +1,349 @@
-From: pankaj.dubey@samsung.com (pankaj.dubey)
-Date: Thu, 26 May 2016 14:40:44 +0530
-Subject: ARM: dts: exynos: Add MFC memory banks for Peach boards
-In-Reply-To: <476edff1-9f3e-fc5b-4385-d04ae917b58e@osg.samsung.com>
-References: <1461871311-18344-1-git-send-email-javier@osg.samsung.com>
- <57456344.7020708@samsung.com>
- <d045b880-4a44-acd8-f7f6-e521caf374aa@osg.samsung.com>
- <574670E7.3060508@samsung.com>
- <476edff1-9f3e-fc5b-4385-d04ae917b58e@osg.samsung.com>
-Message-ID: <5746BD94.3070903@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 May 2016 10:10:31 +0100
+Subject: [PATCH v4 06/12] KVM: arm64: implement basic ITS register handlers
+In-Reply-To: <671b7144-7929-df7b-14f4-20dc6a32abdb@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-7-git-send-email-andre.przywara@arm.com>
+ <5706704C.5060307@arm.com> <671b7144-7929-df7b-14f4-20dc6a32abdb@arm.com>
+Message-ID: <5746BD87.9060206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On Thursday 26 May 2016 01:15 PM, Javier Martinez Canillas wrote:
-> [adding Kevin and Sjoerd who also noticed issues with this patch]
+On 25/05/16 12:37, Andre Przywara wrote:
+> Hi Marc,
 > 
-> Hi Pankaj,
+> this series is mostly obsolete now, but I wanted to elaborate on the
+> locking scheme, which hasn't changed.
 > 
-> On 05/25/2016 11:43 PM, pankaj.dubey wrote:
->> Hi Javier,
->>
->> On Wednesday 25 May 2016 08:32 PM, Javier Martinez Canillas wrote:
->>> Hello Pankaj,
->>>
->>> On 05/25/2016 04:33 AM, pankaj.dubey wrote:
->>>> Hi Javier,
->>>>
->>>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>
->>>> Just noticed that, current krzk/for-next failed to boot on Exynos5880
->>>> based Chromebook device. Git bisect is showing culprit as this patch.
->>>
->>> Strange, krzk/for-next boots correctly on my Exynos5800 Peach Pi:
->>>
->>> $ git log --pretty=oneline --abbrev-commit HEAD
->>> 35e691cf5165 Merge branch 'fixes-v4.7' into for-next
->>>
->>
->> This is same as mine.
->>
->> My other build parameters are:
->> defconfig: exynos_defconfig
->> CROSS_COMPILE: gcc-linaro-arm-linux-gnueabihf-4.9-2014.09_linux
+> On 07/04/16 15:35, Marc Zyngier wrote:
+>> On 26/03/16 02:14, Andre Przywara wrote:
 > 
-> I'm also using exynos_defconfig and a similar compiler
-> (gcc-linaro-arm-linux-gnueabihf-4.9-2015.01-3).
+> ....
 > 
->> rootfs: small cramfs
->>
->>> $ uname -r
->>> 4.6.0-00073-g35e691cf5165
->>>
->>>> When I reverted this patch, its able to boot normally.
->>>> Is there any missing patches that we need to take on krzk/for-next to
->>>> boot on Chromebook.
->>>>
->>>
->>
->> Further I checked that, either I revert this patch OR do not reserve
->> memory for MFC in exynos_reserve using following changes, both cases I
->> am able to boot kernel on Chromebook (Exynos5800).
->>
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index f977eea..e615e24 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -268,7 +268,7 @@ static char const *const exynos_dt_compat[]
->> __initconst = {
->>
->>  static void __init exynos_reserve(void)
->>  {
->> -#ifdef CONFIG_S5P_DEV_MFC
->> +#ifndef CONFIG_S5P_DEV_MFC
->>         int i;
->>         char *mfc_mem[] = {
->>                 "samsung,mfc-v5",
->> @@ -280,6 +280,8 @@ static void __init exynos_reserve(void)
->>         for (i = 0; i < ARRAY_SIZE(mfc_mem); i++)
->>                 if (of_scan_flat_dt(s5p_fdt_alloc_mfc_mem, mfc_mem[i]))
->>                         break;
->> +#else
->> +       pr_err("*****exynos_reserve Bypassing Memory Reservation for MFC
->> ********\n");
->>  #endif
->>  }
->>
->>
->>> No that I'm aware of. I wonder why it boots for me but fails for
->>> you. Can you please share your complete boot log to see if there
->>> are any hints there?
+>>> --- a/virt/kvm/arm/vgic/its-emul.c
+>>> +++ b/virt/kvm/arm/vgic/its-emul.c
+>>> @@ -31,23 +31,263 @@
+>>>  #include "vgic.h"
+>>>  #include "vgic_mmio.h"
 >>>  
+>>> +#define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>>> +
+>>> +static int vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
+>>> +				   struct kvm_io_device *this,
+>>> +				   gpa_t addr, int len, void *val)
+>>> +{
+>>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>>> +	u32 reg;
+>>> +
+>>> +	reg = GITS_CTLR_QUIESCENT;
 >>
->> Following is failed boot log:
->> U-Boot 2013.04-g8e3e5ef (May 26 2015 - 16:11:36) for Peach
->>
->> CPU:    Exynos5422 at 900MHz
->>
->> Board: Google Peach Pi, rev 11.6
->> I2C:   ready
->> DRAM:  3.5 GiB
->> Relocation Offset dbd54000, base at ffb54000
->> SPL stack at 2072c00, used 3f0, free 10
->> PMIC max77802-pmic initialized
->> CPU:    Exynos5422 at 1800MHz
->> TPS65090 PMIC EC init
->> MMC:   EXYNOS DWMMC: 0, EXYNOS DWMMC: 1
->> SF: Detected W25Q32DW with page size 4 KiB, total 32 MiB
->> In:    cros-ec-keyb
->> Out:   lcd
->> Err:   lcd
->> SF: Detected W25Q32DW with page size 4 KiB, total 32 MiB
->> ELOG: Event(17) added with size 13
->> Net:   No ethernet found.
->> Hit any key to stop autoboot:  0
->> mmc1 is current device
->> 4586144 bytes read in 242 ms (18.1 MiB/s)
->> 26583040 bytes read in 1166 ms (21.7 MiB/s)
->> ## Loading kernel from FIT Image at 20008000 ...
->>    Using 'conf at 2' configuration
->>    Trying 'kernel at 1' kernel subimage
->>      Description:  unavailable
->>      Type:         Kernel Image (no loading done)
->>      Compression:  uncompressed
->>      Data Start:   0x200080c8
->>      Data Size:    4459024 Bytes = 4.3 MiB
->>    Verifying Hash Integrity ... OK
->> ## Loading fdt from FIT Image at 20008000 ...
+>> So your ITS is always in a quiescent state? Even when you're processing
+>> the command queue? You'll have to convince me...
 > 
-> A difference I see is that I'm chain loading a non-verified u-boot and you
-> are loading a signed FIT image directly. But Sjoerd also chain loads a nv
-> u-boot and his Peach doesn't boot either so I don't think that's a cause.
-> 
->>    Using 'conf at 2' configuration
->>    Trying 'fdt at 2' fdt subimage
->>      Description:  exynos5800-peach-pi.dtb
->>      Type:         Flat Device Tree
->>      Compression:  uncompressed
->>      Data Start:   0x20458148
->>      Data Size:    63002 Bytes = 61.5 KiB
->>      Architecture: ARM
->>      Hash algo:    sha1
->>      Hash value:   cd1c1703f744b44b1833ca61ec36b625665548de
->>    Verifying Hash Integrity ... sha1+ OK
->>    Booting using the fdt blob at 0x20458148
->>    XIP Kernel Image (no loading done) ... OK
->>    Loading Device Tree to 3ffe1000, end 3ffffb49 ... OK
->> boot_kernel.c: ft_board_setup: warning: Must pass exactly one of vboot
->> or cdata
->>
->> Starting kernel ...
->>
->> Timer summary in microseconds:
->>        Mark    Elapsed  Stage
->>           0          0  reset
->>     122,793    122,793  board_init_f
->>     143,214     20,421  board_init_r
->>     238,069     94,855  id=64
->>     240,278      2,209  main_loop
->>   4,841,682  4,601,404  bootm_start
->>   4,841,683          1  id=1
->>   4,846,604      4,921  id=100
->>   4,846,607          3  id=101
->>   4,846,607          0  id=102
->>   4,850,208      3,601  id=110
->>   4,877,729     27,521  id=105
->>   4,877,731          2  id=106
->>   4,877,734          3  id=107
->>   4,877,735          1  id=108
->>   4,877,736          1  id=109
->>   4,882,406      4,670  id=90
->>   4,882,408          2  id=92
->>   4,882,408          0  id=91
->>   4,927,272     44,864  id=95
->>   4,927,274          2  id=96
->>   4,927,276          2  id=97
->>   4,927,277          1  id=98
->>   4,927,279          2  id=99
->>   4,937,617     10,338  id=7
->>   4,951,899     14,282  id=15
->>   4,955,112      3,213  start_kernel
->>
->> Accumulated time:
->>                  6,948  SPI read
->> Uncompressing Linux... done, booting the kernel.
->> [    0.000000] Booting Linux on physical CPU 0x0
->> [    0.000000] Linux version 4.6.0-00073-g35e691c
->> (pankaj at chromebld-server) (gcc version 4.9.2 20140904 (prerelease)
->> (crosstool-NG linaro-1.13.1-4.9-2014.09 - Linaro GCC
->> 4.9-2014.09) ) #59 SMP PREEMPT Thu May 26 08:21:07 IST 2016
->> [    0.000000] CPU: ARMv7 Processor [412fc0f3] revision 3 (ARMv7),
->> cr=10c5387d
->> [    0.000000] CPU: div instructions available: patching division code
->> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction
->> cache
->> [    0.000000] Machine model: Google Peach Pi Rev 10+
->> [    0.000000] bootconsole [earlycon0] enabled
->> [    0.000000] cma: Reserved 64 MiB at 0xfbc00000
->> [    0.000000] Memory policy: Data cache writealloc
->> [    0.000000] Samsung CPU ID: 0xe5422001
->> [    0.000000] On node 0 totalpages: 913407
->> [    0.000000] free_area_init_node: node 0, pgdat c0b42cc0, node_mem_map
->> ee3f7000
->> [    0.000000]   Normal zone: 1536 pages used for memmap
->> [    0.000000]   Normal zone: 0 pages reserved
->> [    0.000000]   Normal zone: 194560 pages, LIFO batch:31
->> [    0.000000]   HighMem zone: 718847 pages, LIFO batch:31
->> [    0.000000] percpu: Embedded 12 pages/cpu @ee341000 s19392 r8192
->> d21568 u49152
->> [    0.000000] pcpu-alloc: s19392 r8192 d21568 u49152 alloc=12*4096
->> [    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 [0] 4 [0] 5 [0] 6 [0] 7
->> [    0.000000] Built 1 zonelists in Zone order, mobility grouping on.
->> Total pages: 911871
->> [    0.000000] Kernel command line: cros_legacy console=ttySAC3,115200
->> debug earlyprintk cros_debug no_console_suspend root=/dev/ram0 rw
->> ramdisk=32768 initrd=0x42000000,3
->> 2M
-> 
-> I see that you are loading an initrd at 0x42000000 with size of 32 MiB.
-> 
-> [...]
-> 
->> [    1.121421] Trying to unpack rootfs image as initramfs...
->> [    1.126940] rootfs image is not initramfs (junk in compressed
->> archive); looks like an initrd
->> [    1.160139] Unable to handle kernel paging request at virtual address
->> e3000000
-> 
-> So I wonder if the problem is that the memblock_remove() is called very
-> early and so the kernel is not able to copy the initrd from 0x42000000
-> to 0x44000000 since overlaps with the mfc-r mem (0x43000000-0x43800000).
-> 
-> Specially since the NULL pointer dereference below happens in the
-> populate_rootfs() function when calling xwrite() to do the copy.
-> 
-> Could you please try to change the load address for your initrd, or
-> change the mfc-r start address to see if that prevents the issue?
-> 
+> Does QUIESCENT actually cover the command queue status? I was under the
+> impression that this is purely to cope with distributed implementations
+> and the possible delays caused by propagating commands.
 
-Yes, you are correct. This was the case.
-I changed initrd location from 0x42000000 to 0x44000000, and it is able
-to boot without any crash.
+Here's what the spec says:
+
+"For the ITS to be quiescent, there must be no transactions in progress.
+In addition, all operations required to ensure that mapping data is
+consistent with external memory must be complete."
+
+How can you enforce consistency if you have command in progress?
+
+> If not so, I can surely take the lock here and respect
+> (creadr == cwriter) upon setting the bit.
+
+Please do.
+
+> 
+>>
+>>> +	if (its->enabled)
+>>> +		reg |= GITS_CTLR_ENABLE;
+>>> +
+>>> +	write_mask32(reg, addr & 3, len, val);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int vgic_mmio_write_its_ctlr(struct kvm_vcpu *vcpu,
+>>> +				    struct kvm_io_device *this,
+>>> +				    gpa_t addr, int len, const void *val)
+>>> +{
+>>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>>> +	struct vgic_io_device *iodev = container_of(this,
+>>> +						    struct vgic_io_device, dev);
+>>> +
+>>> +        if (addr - iodev->base_addr == 0)
+>>
+>> whitespace issue.
+>>
+>>> +		its->enabled = !!(*(u8*)val & GITS_CTLR_ENABLE);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int vgic_mmio_read_its_typer(struct kvm_vcpu *vcpu,
+>>> +				    struct kvm_io_device *this,
+>>> +				    gpa_t addr, int len, void *val)
+>>> +{
+>>> +	u64 reg = GITS_TYPER_PLPIS;
+>>> +
+>>> +	/*
+>>> +	 * We use linear CPU numbers for redistributor addressing,
+>>> +	 * so GITS_TYPER.PTA is 0.
+>>> +	 * To avoid memory waste on the guest side, we keep the
+>>> +	 * number of IDBits and DevBits low for the time being.
+>>> +	 * This could later be made configurable by userland.
+>>> +	 * Since we have all collections in linked list, we claim
+>>> +	 * that we can hold all of the collection tables in our
+>>> +	 * own memory and that the ITT entry size is 1 byte (the
+>>> +	 * smallest possible one).
+>>
+>> All of this is going to bite us when we want to implement migration,
+>> specially the HW collection bit.
+> 
+> How so? Clearly we keep the number of VCPUs constant, so everything
+> guest visible stays the same even upon migrating to a much different
+> host? Or are we talking about different things here?
+
+Let me rephrase this: How are you going to address HW collections from
+userspace in order to dump them? Short of having memory tables, you cannot.
+
+> 
+>>
+>>> +	 */
+>>> +	reg |= 0xff << GITS_TYPER_HWCOLLCNT_SHIFT;
+>>> +	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+>>> +	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
+>>> +
+>>> +	write_mask64(reg, addr & 7, len, val);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int vgic_mmio_read_its_iidr(struct kvm_vcpu *vcpu,
+>>> +				   struct kvm_io_device *this,
+>>> +				   gpa_t addr, int len, void *val)
+>>> +{
+>>> +	u32 reg = (PRODUCT_ID_KVM << 24) | (IMPLEMENTER_ARM << 0);
+>>> +
+>>> +	write_mask32(reg, addr & 3, len, val);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
+>>> +				     struct kvm_io_device *this,
+>>> +				     gpa_t addr, int len, void *val)
+>>> +{
+>>> +	struct vgic_io_device *iodev = container_of(this,
+>>> +						    struct vgic_io_device, dev);
+>>> +	u32 reg = 0;
+>>> +	int idreg = (addr & ~3) - iodev->base_addr + GITS_IDREGS_BASE;
+>>> +
+>>> +	switch (idreg) {
+>>> +	case GITS_PIDR2:
+>>> +		reg = GIC_PIDR2_ARCH_GICv3;
+>>
+>> Are we leaving the lowest 4 bits to zero?
+> 
+> I couldn't stuff "42" in 4 bits, so: yes ;-)
+
+The 4 bottom bits are "Implementation Defined", so you could fit
+something in it if you wanted.
+
+> 
+>>> +		break;
+>>> +	case GITS_PIDR4:
+>>> +		/* This is a 64K software visible page */
+>>> +		reg = 0x40;
+>>
+>> Same question.
+>>
+>> Also, how about all the others PIDR registers?
+> 
+> I guess I was halfway undecided between going with the pure
+> architectural requirements (which only mandate bits 7:4 in PIDR2) and
+> complying with the recommendation later in the spec.
+> So I will just fill PIDR0, PIDR2 and the rest of PIDR2 as well.
+> 
+>>> +		break;
+>>> +	/* Those are the ID registers for (any) GIC. */
+>>> +	case GITS_CIDR0:
+>>> +		reg = 0x0d;
+>>> +		break;
+>>> +	case GITS_CIDR1:
+>>> +		reg = 0xf0;
+>>> +		break;
+>>> +	case GITS_CIDR2:
+>>> +		reg = 0x05;
+>>> +		break;
+>>> +	case GITS_CIDR3:
+>>> +		reg = 0xb1;
+>>> +		break;
+>>> +	}
+>>
+>> Given that these values are directly taken from the architecture, and
+>> seem common to the whole GICv3 architecture when implemented by ARM, we
+>> could have a common handler for the whole GICv3 implementatuin. Not a
+>> bit deal though.
+> 
+> Agreed.
+> 
+>>> +
+>>> +	write_mask32(reg, addr & 3, len, val);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +/*
+>>> + * This function is called with both the ITS and the distributor lock dropped,
+>>> + * so the actual command handlers must take the respective locks when needed.
+>>> + */
+>>> +static int vits_handle_command(struct kvm_vcpu *vcpu, u64 *its_cmd)
+>>> +{
+>>> +	return -ENODEV;
+>>> +}
+>>> +
+>>> +static int vgic_mmio_read_its_cbaser(struct kvm_vcpu *vcpu,
+>>> +				    struct kvm_io_device *this,
+>>> +				    gpa_t addr, int len, void *val)
+>>> +{
+>>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>>> +
+>>> +	write_mask64(its->cbaser, addr & 7, len, val);
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int vgic_mmio_write_its_cbaser(struct kvm_vcpu *vcpu,
+>>> +				      struct kvm_io_device *this,
+>>> +				      gpa_t addr, int len, const void *val)
+>>> +{
+>>> +	struct vgic_its *its = &vcpu->kvm->arch.vgic.its;
+>>> +
+>>> +	if (its->enabled)
+>>> +		return 0;
+>>> +
+>>> +	its->cbaser = mask64(its->cbaser, addr & 7, len, val);
+>>> +	its->creadr = 0;
+>>
+>> Don't you need to acquire the command queue lock here?
+> 
+> I don't think so, because we "return 0;" above if the ITS is enabled,
+> which means that nothing is going on at the moment.
+
+What would prevent the ITS from becoming enabled between the two
+assignments?
+
+> But I guess I can just take the lock anyway to be sure.
+
+I don't think this is optional.
+
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int its_cmd_buffer_size(struct kvm *kvm)
+>>> +{
+>>> +	struct vgic_its *its = &kvm->arch.vgic.its;
+>>> +
+>>> +	return ((its->cbaser & 0xff) + 1) << 12;
+>>> +}
+>>> +
+>>> +static gpa_t its_cmd_buffer_base(struct kvm *kvm)
+>>> +{
+>>> +	struct vgic_its *its = &kvm->arch.vgic.its;
+>>> +
+>>> +	return BASER_BASE_ADDRESS(its->cbaser);
+>>> +}
+>>> +
+>>> +/*
+>>> + * By writing to CWRITER the guest announces new commands to be processed.
+>>> + * Since we cannot read from guest memory inside the ITS spinlock, we
+>>> + * iterate over the command buffer (with the lock dropped) until the read
+>>> + * pointer matches the write pointer. Other VCPUs writing this register in the
+>>> + * meantime will just update the write pointer, leaving the command
+>>> + * processing to the first instance of the function.
+>>> + */
+>>> +static int vgic_mmio_write_its_cwriter(struct kvm_vcpu *vcpu,
+>>> +				       struct kvm_io_device *this,
+>>> +				       gpa_t addr, int len, const void *val)
+>>> +{
+>>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>>> +	struct vgic_its *its = &dist->its;
+>>> +	gpa_t cbaser = its_cmd_buffer_base(vcpu->kvm);
+>>> +	u64 cmd_buf[4];
+>>> +	u32 reg;
+>>> +	bool finished;
+>>> +
+>>> +	reg = mask64(its->cwriter & 0xfffe0, addr & 7, len, val);
+>>> +	reg &= 0xfffe0;
+>>> +	if (reg > its_cmd_buffer_size(vcpu->kvm))
+>>> +		return 0;
+>>> +
+>>> +	spin_lock(&its->lock);
+>>> +
+>>> +	/*
+>>> +	 * If there is still another VCPU handling commands, let this
+>>> +	 * one pick up the new CWRITER and process "our" new commands as well.
+>>> +	 */
+>>
+>> How do you detect that condition? All I see is a massive race here, with
+>> two threads processing the queue in parallel, possibly corrupting each
+>> other's data.
+>>
+>> Please explain why you think this is safe.
+> 
+> OK, here you go: Actually we are handling the command queue
+> synchronously: The first writer to CWRITER will end up here and will
+> iterate over all commands below. From the guests point of view it will
+> take some time to do the CWRITER MMIO write, but upon the writel
+> returning the queue is actually already empty again.
+> That means that any _sane_ guest will _never_ trigger the case where two
+> threads/VCPUs are handling the queue, because a concurrent write to
+> CWRITER without a lock in the guest would be broken by design.
+
+That feels very fragile, and you're relying on a well behaved guest.
+
+> 
+> However I am not sure we can rely on this, so I added this precaution
+> scheme:
+> The first writer takes our ITS (emulation) lock and examines cwriter and
+> creadr to see if they are equal. If they are, then the queue is
+> currently empty, which means we are the first one and need to take care
+> of the commands. We update our copy of cwriter (now marking the queue as
+> non-empty) and drop the lock. As we kept the queue-was-empty status in a
+> local variable, we now can start iterating through the queue. We only
+> take the lock briefly when really needed in this process (for instance
+> when one command has been processed and creadr is incremented).
+> 
+> If now a second VCPU writes CWRITER, we also take the lock and compare
+> creadr and cwriter. Now they are different, because the first thread is
+> still busy with handling the commands and hasn't finished yet.
+> So we set our local "finished" to true. Also we update cwriter to the
+> new value, then drop the lock. The while loop below will not be entered
+> in this thread and we return to the guest.
+> Now the first thread has handled another command, takes the lock to
+> increase creadr and compares it with cwriter. Without the second writer
+> it may have been finished already, but now cwriter has grown, so it will
+> just carry on with handling the commands.
+> 
+> A bit like someone washing the dishes while another person adds some
+> more dirty plates to the pile ;-)
+
+I'm sorry, this feels incredibly complicated, and will make actual
+debugging/tracing a nightmare. It also penalize the first vcpu that gets
+to submitting a command, leading to scheduling imbalances.
+
+Why can't you simply turn the ITS lock into a mutex and keep it held,
+processing each batch in the context of the vcpu that is writing to
+GITC_CWRITER?
 
 Thanks,
-Pankaj Dubey
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
