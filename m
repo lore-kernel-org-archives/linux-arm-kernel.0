@@ -1,53 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 May 2016 15:33:15 +0100
-Subject: [PATCH kexec-tools 04/32] kdump: fix kdump mapping
-In-Reply-To: <CAHB_GurQ44ybkxaYJJQeGgnuw=3tKOk7xyB6FTAursMLuZGrJg@mail.gmail.com>
-References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
- <E1axXSF-0004hH-Oo@e0050434b2927.dyn.arm.linux.org.uk>
- <CAHB_GurQ44ybkxaYJJQeGgnuw=3tKOk7xyB6FTAursMLuZGrJg@mail.gmail.com>
-Message-ID: <20160526143315.GJ19428@n2100.arm.linux.org.uk>
+From: ulli.kroll@googlemail.com (Hans Ulli Kroll)
+Date: Thu, 26 May 2016 18:33:48 +0200 (CEST)
+Subject: [PATCH 0095/1529] Fix typo
+In-Reply-To: <20160521114905.4276-1-andrea.gelmini@gelma.net>
+References: <20160521114905.4276-1-andrea.gelmini@gelma.net>
+Message-ID: <alpine.LNX.2.00.1605261832200.15970@T420s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 11:47:33AM +0530, Pratyush Anand wrote:
-> On Tue, May 3, 2016 at 3:51 PM, Russell King <rmk@arm.linux.org.uk> wrote:
-> > diff --git a/kdump/kdump.c b/kdump/kdump.c
-> > index 1f5b984..34d2149 100644
-> > --- a/kdump/kdump.c
-> > +++ b/kdump/kdump.c
-> > @@ -284,7 +284,8 @@ int main(int argc, char **argv)
-> >         }
-> >
-> >         /* Get the program header */
-> > -       phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum), ehdr->e_phoff);
-> > +       phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum),
-> > +                       start_addr + ehdr->e_phoff);
+
+
+On Sat, 21 May 2016, Andrea Gelmini wrote:
+
+> Signed-off-by: Andrea Gelmini <andrea.gelmini@gelma.net>
+> ---
+>  arch/arm/mach-gemini/idle.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> This is fine. But at the same time should n't we also fix the offset
-> for mmap of memory segments?  For memory segments, offset is
-> phdr[i].p_offset, and I do not see generate_new_headers() taking care
-> of start_addr.
+> diff --git a/arch/arm/mach-gemini/idle.c b/arch/arm/mach-gemini/idle.c
+> index ddf8ec9..cb34fe4e 100644
+> --- a/arch/arm/mach-gemini/idle.c
+> +++ b/arch/arm/mach-gemini/idle.c
+> @@ -10,7 +10,7 @@ static void gemini_idle(void)
+>  {
+>  	/*
+>  	 * Because of broken hardware we have to enable interrupts or the CPU
+> -	 * will never wakeup... Acctualy it is not very good to enable
+> +	 * will never wakeup... Actually it is not very good to enable
+>  	 * interrupts first since scheduler can miss a tick, but there is
+>  	 * no other way around this. Platforms that needs it for power saving
+>  	 * should enable it in init code, since by default it is
+> -- 
+> 2.8.2.534.g1f66975
+> 
+> 
 
-Unfortunately not.  The reason is, p_offset is not an offset, but an
-absolute address - see kexec/crashdump-elf.c, which is the bit of
-code which creates the table and writes it into kernel memory when
-loading the panic kernel:
-
-                phdr->p_offset  = phdr->p_paddr = notes_addr;
-
-                phdr->p_offset  = phdr->p_paddr = vmcoreinfo_addr;
-
-                phdr->p_offset  = phdr->p_paddr = elf_info->kern_paddr_start;
-
-                mstart = range->start;
-                phdr->p_offset  = mstart;
-                phdr->p_paddr = mstart;
-
-etc.  So, p_offset is also the physical address, not the file offset.
-Of course, that could be a bug in crashdump-elf.c.  To change that,
-we would also need to fix crashdump-elf.c in lock-step as well.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Acked-by: Hans Ulli Kroll <ulli.kroll@googlemail.com>
