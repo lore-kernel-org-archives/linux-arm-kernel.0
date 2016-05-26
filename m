@@ -1,73 +1,43 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 26 May 2016 10:43:58 +0800
-Subject: [PATCH 2/3] of/numa: fix a memory@ dt node can only contains one
- memory block
-In-Reply-To: <1464230639-9852-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1464230639-9852-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1464230639-9852-2-git-send-email-thunder.leizhen@huawei.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 25 May 2016 20:10:05 -0700
+Subject: [PATCH 1/2] Revert "mtd: atmel_nand: Support variable RB_EDGE
+ interrupts"
+In-Reply-To: <20160523095557.1efea63d@bbrezillon>
+References: <1462776680-5284-1-git-send-email-wenyou.yang@atmel.com>
+ <1462776680-5284-2-git-send-email-wenyou.yang@atmel.com>
+ <20160523095557.1efea63d@bbrezillon>
+Message-ID: <20160526031005.GA137092@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a normal memory@ devicetree node, its reg property can contains more
-memory blocks.
+Hi,
 
-Because we don't known how many memory blocks maybe contained, so we try
-from index=0, increase 1 until error returned(the end).
+On Mon, May 23, 2016 at 09:55:57AM +0200, Boris Brezillon wrote:
+> On Mon, 9 May 2016 14:51:18 +0800
+> Wenyou Yang <wenyou.yang@atmel.com> wrote:
+> 
+> > This reverts commit 5ddc7bd43ccc ("mtd: atmel_nand: Support variable
+> > RB_EDGE interrupts")
+> > 
+> > Because for current SoCs, the RB_EDGE3(i.e. bit 27) of HSMC_SR
+> > register does not exist, the RB_EDGE0 (i.e. bit 24) is the ready/busy
+> > line edge status bit. It is a datasheet bug.
+> > 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> 
+> Wenyou, I know you sent it before v4.6 was released, but now we should
+> probably add
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/of/of_numa.c | 30 ++++++++++++++++++++----------
- 1 file changed, 20 insertions(+), 10 deletions(-)
+Sorry for the delay...
 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index 21d831f..2c5f249 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
- 	struct device_node *np = NULL;
- 	struct resource rsrc;
- 	u32 nid;
--	int r = 0;
-+	int i, r = 0;
+> Cc: <stable@vger.kernel.org>
 
- 	for (;;) {
- 		np = of_find_node_by_type(np, "memory");
-@@ -82,17 +82,27 @@ static int __init of_numa_parse_memory_nodes(void)
- 			/* some other error */
- 			break;
+Added that and a Fixes: tag.
 
--		r = of_address_to_resource(np, 0, &rsrc);
--		if (r) {
--			pr_err("NUMA: bad reg property in memory node\n");
--			break;
-+		for (i = 0; ; i++) {
-+			r = of_address_to_resource(np, i, &rsrc);
-+			if (r) {
-+				/* reached the end of of_address */
-+				if (i > 0) {
-+					r = 0;
-+					break;
-+				}
-+
-+				pr_err("NUMA: bad reg property in memory node\n");
-+				goto finished;
-+			}
-+
-+			r = numa_add_memblk(nid, rsrc.start,
-+					    rsrc.end - rsrc.start + 1);
-+			if (r)
-+				goto finished;
- 		}
--
--		r = numa_add_memblk(nid, rsrc.start,
--				    rsrc.end - rsrc.start + 1);
--		if (r)
--			break;
- 	}
-+
-+finished:
- 	of_node_put(np);
+> Brian, can you apply this patch directly in your tree (as previously
+> discussed, I'm not sure creating a nand/fixes branch is really useful)?
 
- 	return r;
---
-2.5.0
+Pushed to linux-mtd.git. I'll probably send it to Linus in the next day
+or two.
+
+Brian
