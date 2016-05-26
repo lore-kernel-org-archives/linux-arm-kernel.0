@@ -1,78 +1,69 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Thu, 26 May 2016 14:00:06 +0800
-Subject: [PATCH 2/2] aer: add support aer interrupt with none MSI/MSI-X/INTx
- mode
-Message-ID: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Thu, 26 May 2016 08:36:15 +0200
+Subject: [PATCH 1/2] Revert "mtd: atmel_nand: Support variable RB_EDGE
+ interrupts"
+In-Reply-To: <20160526031654.GA107505@google.com>
+References: <1462776680-5284-1-git-send-email-wenyou.yang@atmel.com>
+ <1462776680-5284-2-git-send-email-wenyou.yang@atmel.com>
+ <20160526031654.GA107505@google.com>
+Message-ID: <20160526083615.6960686d@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-maybe there is interrupt line for aer pme etc. Search the interrupt
-number in the fdt file.
+On Wed, 25 May 2016 20:16:54 -0700
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-Signed-off-by: Po Liu <po.liu@nxp.com>
----
- drivers/pci/pcie/portdrv_core.c | 31 ++++++++++++++++++++++++++++---
- 1 file changed, 28 insertions(+), 3 deletions(-)
+> Hi,
+> 
+> On Mon, May 09, 2016 at 02:51:18PM +0800, Wenyou Yang wrote:
+> > This reverts commit 5ddc7bd43ccc ("mtd: atmel_nand: Support variable
+> > RB_EDGE interrupts")
+> > 
+> > Because for current SoCs, the RB_EDGE3(i.e. bit 27) of HSMC_SR
+> > register does not exist, the RB_EDGE0 (i.e. bit 24) is the ready/busy
+> > line edge status bit. It is a datasheet bug.
+> > 
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> > 
+> >  .../devicetree/bindings/mtd/atmel-nand.txt         |  2 +-
+> >  drivers/mtd/nand/atmel_nand.c                      | 35 +++++-----------------
+> >  drivers/mtd/nand/atmel_nand_nfc.h                  |  3 +-
+> >  3 files changed, 10 insertions(+), 30 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mtd/atmel-nand.txt b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> > index d53aba9..3e7ee99 100644
+> > --- a/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> > +++ b/Documentation/devicetree/bindings/mtd/atmel-nand.txt
+> > @@ -39,7 +39,7 @@ Optional properties:
+> >  
+> >  Nand Flash Controller(NFC) is an optional sub-node
+> >  Required properties:
+> > -- compatible : "atmel,sama5d3-nfc" or "atmel,sama5d4-nfc".
+> > +- compatible : "atmel,sama5d3-nfc".
+> >  - reg : should specify the address and size used for NFC command registers,
+> >          NFC registers and NFC SRAM. NFC SRAM address and size can be absent
+> >          if don't want to use it.
+> > diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> > index efc8ea2..68b9160 100644
+> > --- a/drivers/mtd/nand/atmel_nand.c
+> > +++ b/drivers/mtd/nand/atmel_nand.c  
+> [...]
+> >  static const struct of_device_id atmel_nand_nfc_match[] = {
+> > -	{ .compatible = "atmel,sama5d3-nfc", .data = &sama5d3_nfc_caps },
+> > -	{ .compatible = "atmel,sama5d4-nfc", .data = &sama5d4_nfc_caps },
+> > +	{ .compatible = "atmel,sama5d3-nfc" },  
+> 
+> Hmm, wait. Didn't Rob and Alexandre suggest that we should *not* drop
+> the compatible property? We could have easily supported both here, and
+> just not listed any different capabilities. But I see that Nicholas took
+> the patch anyway, so I guess it's not a big deal...
 
-diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
-index 32d4d0a..64833e5 100644
---- a/drivers/pci/pcie/portdrv_core.c
-+++ b/drivers/pci/pcie/portdrv_core.c
-@@ -15,6 +15,7 @@
- #include <linux/slab.h>
- #include <linux/pcieport_if.h>
- #include <linux/aer.h>
-+#include <linux/of_irq.h>
- 
- #include "../pci.h"
- #include "portdrv.h"
-@@ -199,6 +200,28 @@ static int pcie_port_enable_msix(struct pci_dev *dev, int *vectors, int mask)
- static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
- {
- 	int i, irq = -1;
-+	int ret;
-+	struct device_node *np = NULL;
-+
-+	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-+		irqs[i] = 0;
-+
-+	if (dev->bus->dev.of_node)
-+		np = dev->bus->dev.of_node;
-+
-+	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-+	 * request irq for aer
-+	 */
-+	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
-+			(mask & PCIE_PORT_SERVICE_PME)) {
-+		ret = of_irq_get_byname(np, "aer");
-+		if (ret > 0) {
-+			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
-+			if (dev->irq)
-+				irq = dev->irq;
-+			goto no_msi;
-+		}
-+	}
- 
- 	/*
- 	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
-@@ -224,11 +247,13 @@ static int init_service_irqs(struct pci_dev *dev, int *irqs, int mask)
- 		irq = dev->irq;
- 
-  no_msi:
--	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
--		irqs[i] = irq;
-+	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
-+		if (!irqs[i])
-+			irqs[i] = irq;
-+	}
- 	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
- 
--	if (irq < 0)
-+	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
- 		return -ENODEV;
- 	return 0;
- }
+Yes, actually the compatible change was introduced and fixed in the
+same release, so I don't think the stable ABI argument stands here.
+
+
 -- 
-2.1.0.27.g96db324
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
