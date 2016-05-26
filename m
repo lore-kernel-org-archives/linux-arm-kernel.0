@@ -1,52 +1,49 @@
 From: hramrach@gmail.com (Michal Suchanek)
-Date: 26 May 2016 19:25:25 -0000
-Subject: [PATCH 4/5] spi: sunxi: set maximum and minimum speed of SPI master
+Date: 26 May 2016 19:25:24 -0000
+Subject: [PATCH 2/5] spi: sun4i: fix FIFO limit
 In-Reply-To: <cover.1464130597.git.hramrach@gmail.com>
 References: <cover.1464130597.git.hramrach@gmail.com>
-Message-ID: <7292b1fa08de4f453a643beb63e9faa7826726f6.1464130597.git.hramrach@gmail.com>
+Message-ID: <e315008b5e9dc3f1490507508fd2f6e94767dfbb.1464130597.git.hramrach@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The maximum speed of SPI master is used when maximum speed of SPI slave
-is not specified. Also the __spi_validate function should check that
-transfer speeds do not exceed the master limits.
+When testing SPI without DMA I noticed that filling the FIFO on the
+spi controller causes timeout.
 
-The user manual for A10 and A31 specifies maximum
-speed of the SPI clock as 100MHz and minimum as 3kHz.
-
-Setting the SPI clock to out-of-spec values can lock up the SoC.
+Always leave room for one byte in the FIFO.
 
 Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+
 ---
- drivers/spi/spi-sun4i.c | 2 ++
- drivers/spi/spi-sun6i.c | 2 ++
- 2 files changed, 4 insertions(+)
+v2:
+use EMSGSIZE instead of EINVAL
+---
+ drivers/spi/spi-sun4i.c | 8 ++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
-index bf52b09..e1a75dd6 100644
+index fe63bbd..04f1b77 100644
 --- a/drivers/spi/spi-sun4i.c
 +++ b/drivers/spi/spi-sun4i.c
-@@ -405,6 +405,8 @@ static int sun4i_spi_probe(struct platform_device *pdev)
- 	}
+@@ -180,7 +180,9 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
  
- 	sspi->master = master;
-+	master->max_speed_hz = 100*1000*1000;
-+	master->min_speed_hz =        3*1000;
- 	master->set_cs = sun4i_spi_set_cs;
- 	master->transfer_one = sun4i_spi_transfer_one;
- 	master->num_chipselect = 4;
-diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index 1952956..0c378ff 100644
---- a/drivers/spi/spi-sun6i.c
-+++ b/drivers/spi/spi-sun6i.c
-@@ -400,6 +400,8 @@ static int sun6i_spi_probe(struct platform_device *pdev)
- 	}
+ 	/* We don't support transfer larger than the FIFO */
+ 	if (tfr->len > SUN4I_FIFO_DEPTH)
+-		return -EINVAL;
++		return -EMSGSIZE;
++	if (tfr->tx_buf && tfr->len >= SUN4I_FIFO_DEPTH)
++		return -EMSGSIZE;
  
- 	sspi->master = master;
-+	master->max_speed_hz = 100*1000*1000;
-+	master->min_speed_hz =        3*1000;
- 	master->set_cs = sun6i_spi_set_cs;
- 	master->transfer_one = sun6i_spi_transfer_one;
- 	master->num_chipselect = 4;
--- 
-2.8.1
+ 	reinit_completion(&sspi->done);
+ 	sspi->tx_buf = tfr->tx_buf;
+@@ -271,7 +273,9 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+ 	sun4i_spi_write(sspi, SUN4I_XMIT_CNT_REG, SUN4I_XMIT_CNT(tx_len));
+ 
+ 	/* Fill the TX FIFO */
+-	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH);
++	/* Filling the FIFO fully causes timeout for some reason
++	 * at least on spi2 on A10s */
++	sun4i_spi_fill_fifo(sspi, SUN4I_FIFO_DEPTH - 1);
+ 
+ 	/* Enable the interrupts */
+ 	sun4i_spi_write(sspi, SUN4I_INT_CTL_REG, SUN4I_INT_CTL_TC);
