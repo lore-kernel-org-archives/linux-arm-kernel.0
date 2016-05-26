@@ -1,59 +1,72 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 May 2016 10:16:59 +0100
-Subject: [PATCH 13/20] drm/bridge: Add RGB to VGA bridge support
-In-Reply-To: <20160526085330.GM9232@lukather>
-References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-14-git-send-email-maxime.ripard@free-electrons.com>
- <1773896.kpi58ilqqm@avalon> <20160526085330.GM9232@lukather>
-Message-ID: <20160526091659.GG19428@n2100.arm.linux.org.uk>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 26 May 2016 17:29:21 +0800
+Subject: [PATCH] arm64: tegra: Fix CPU compatible string for Tegra132
+In-Reply-To: <5745C7E4.2050908@wwwdotorg.org>
+References: <20160523074221.7135-1-josephl@nvidia.com>
+ <574509E7.4030208@nvidia.com> <5745C7E4.2050908@wwwdotorg.org>
+Message-ID: <5746C1F1.6070703@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 10:53:30AM +0200, Maxime Ripard wrote:
-> Hi Laurent,
-> 
-> On Mon, May 16, 2016 at 04:24:15PM +0300, Laurent Pinchart wrote:
-> > Hi Maxime,
-> > 
-> > Thank you for the patch.
-> > 
-> > On Monday 16 May 2016 14:47:13 Maxime Ripard wrote:
-> > > +fallback:
-> > > +	/*
-> > > +	 * In case we cannot retrieve the EDIDs (broken or missing i2c
-> > > +	 * bus), fallback on the XGA standards
-> > > +	 */
-> > > +	ret = drm_add_modes_noedid(connector, 1920, 1200);
-> > 
-> > The DRM core adds modes up to 1024x768 in 
-> > drm_helper_probe_single_connector_modes(). I wonder if it really makes sense 
-> > to override that in drivers, compared to increasing the maximum resolution in 
-> > the core. What we can reasonable expect from a VGA monitor doesn't really 
-> > depend on which display engine it is connected to.
-> 
-> Actually, I would expect it to come from the connectors. Nowadays, the
-> core add modes that might not even be relevant at all for a given
-> connector. Take TV as an example, there's not a single TV output that
-> can reach 1024x768, but actually rely on very different resolutions.
+On 05/25/2016 11:42 PM, Stephen Warren wrote:
+> On 05/24/2016 08:11 PM, Joseph Lo wrote:
+>> On 05/23/2016 03:42 PM, Joseph Lo wrote:
+>>> As per commit f634da375fc96 ("Documentation: DT bindings: add nvidia,
+>>> tegra132-denver compatible string"), fixing the CPU compatible string
+>>> for
+>>> Tegra132 to match the binding document currently.
+>>>
+>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>>> ---
+>>>   arch/arm64/boot/dts/nvidia/tegra132.dtsi | 4 ++--
+>>>   1 file changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+>>> b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+>>> index 2013f8916084..7b1cdc029de3 100644
+>>> --- a/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+>>> +++ b/arch/arm64/boot/dts/nvidia/tegra132.dtsi
+>>> @@ -964,13 +964,13 @@
+>>>
+>>>           cpu at 0 {
+>>>               device_type = "cpu";
+>>> -            compatible = "nvidia,denver", "arm,armv8";
+>>> +            compatible = "nvidia,tegra132-denver", "arm,armv8";
+>>
+>> Hi Stephen, Thierry,
+>>
+>> Should we fix this or fix the compatible string in the binding document
+>> as just "nvidia,denver" to represent all the Devner CPU revisions just
+>> like some other CPUs did? e.g. arm,cortex-a57, which represents all the
+>> A57 revisions.
+>
+> I would expect compatible to be:
+>
+> compatible = "nvidia,tegra132-denver", "nvidia,denver", "arm,armv8";
 
-There is the requirement to support 640x480 almost universally.
+Because we don't have "nvidia,denver" binding in the document, to do 
+what you said, supposely I should add that first and fix the binding for 
+Tegra132, right?
 
-> > Would it make sense to add an optional GPIO-based connection detection to this 
-> > driver ?
-> 
-> I asked for it in our prototypes, and apparently, doing VGA cable
-> detection is really non-trivial, so I don't really expect it to be
-> found in a lot of designs.
+>
+> The "nvidia,denver" entry is already present, and hence probably
+> shouldn't be removed. It can represent "Denver 1.0". We should add the
+> T132 entry to indicate the specific implementation. Admittedly right now
+> there's a 1:1 relation between SoC and Denver version. Either/both of
+> those could in theory be required to trigger specific bug-fixes/WARs.
+>
+> For later chips which have a different Denver version, I'd expect to see
+> something like:
+>
+> compatible = "nvidia,tegraNNN-denver", "nvidia,denverMMM", "arm,armv8";
+>
+> ... where NNN is the SoC version/name and MMM is the Denver version.
+> There could be extra entries in the property if the new versions are
+> backwards-compatible with old versions.
 
-... and prone to problems.  Intel designs try to measure the termination
-resistance to detect whether something is connected (they pulse the RGB
-signals and measure the current.)  This mostly works fine, except if you
-have some KVM boxes which can make this very unreliable.
+Because it's 1:1 relationship, if we have new cores coming later, we 
+should add both of the compatible string of SoC version and CPU core 
+version in the ARM CPU binding document, is that correct?
 
-I ended up replacing the bipolar transistors switching the RGB signals
-in my KVM switch with FETs because of this problem.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Joseph
