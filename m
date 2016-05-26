@@ -1,61 +1,76 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Thu, 26 May 2016 17:04:39 +0800
-Subject: [RESEND PATCH v2] ASoC: rockchip: Add machine driver for
- MAX98357A/RT5514/DA7219
-In-Reply-To: <20160525173246.GA5125@rob-hp-laptop>
-References: <1464053774-15914-1-git-send-email-zhengxing@rock-chips.com>
- <20160525173246.GA5125@rob-hp-laptop>
-Message-ID: <5746BC27.1030008@rock-chips.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 26 May 2016 11:06:48 +0200
+Subject: [PATCH v3] gpio: UniPhier: add driver for UniPhier GPIO controller
+In-Reply-To: <CAK7LNAQcfrvuG6fD+gN2Ojq4wzCSNa=qpr5kh2QSFJZMCA2UaQ@mail.gmail.com>
+References: <1436841787-7734-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdYaAMw5U3pctf96j0QpY2Qf+e=LX740F0okCmVU6pXkhA@mail.gmail.com>
+ <CAK7LNAQ+_ynWT944fPZsHCzMBLtfNu5AnppzaOxNgPSBTvj_tw@mail.gmail.com>
+ <CACRpkdZK41P-1JQsL6RiywqFEUj6=g5xJMKy86wDdp6BxLJNzQ@mail.gmail.com>
+ <CAK7LNASd9z99RBmUgLVEM1WuLNSzGFM8qzrHwDf58tgGDy2SAw@mail.gmail.com>
+ <CACRpkdbBfidn_otxzSV-8HMv2AuD-htUbcRHZ8n9CHAUO=TB9w@mail.gmail.com>
+ <CAK7LNAQH+Ge61+MJo2rLmjCBJRnYviT3LyCo0nrOPRQL+RtK2g@mail.gmail.com>
+ <CAK7LNAQcfrvuG6fD+gN2Ojq4wzCSNa=qpr5kh2QSFJZMCA2UaQ@mail.gmail.com>
+Message-ID: <CACRpkdYn3WWAKeKa0dUjXg3QtMYdTrysGGK3aND5VwBH=NPqTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Fri, May 20, 2016 at 6:30 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-On 2016?05?26? 01:32, Rob Herring wrote:
-> On Tue, May 24, 2016 at 09:36:14AM +0800, Xing Zheng wrote:
->> There are multi codec devices on the RK3399 platform, we can use
->> this patch support and control these codecs.
->>
->> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
->> ---
->>
->> Changes in v2:
->> - use the FS 256 to set mclks of the max98357a and rt5514 danamically
->> - add more sample rate for da7219
->>
->>   .../sound/rockchip-max98357a-rt5514-da7219.txt     |   15 +
->>   sound/soc/rockchip/Kconfig                         |   11 +
->>   sound/soc/rockchip/Makefile                        |    2 +
->>   .../rockchip/rockchip_max98357a_rt5514_da7219.c    |  333 ++++++++++++++++++++
->>   4 files changed, 361 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/sound/rockchip-max98357a-rt5514-da7219.txt
->>   create mode 100644 sound/soc/rockchip/rockchip_max98357a_rt5514_da7219.c
->>
->> diff --git a/Documentation/devicetree/bindings/sound/rockchip-max98357a-rt5514-da7219.txt b/Documentation/devicetree/bindings/sound/rockchip-max98357a-rt5514-da7219.txt
->> new file mode 100644
->> index 0000000..5928384
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/sound/rockchip-max98357a-rt5514-da7219.txt
->> @@ -0,0 +1,15 @@
->> +ROCKCHIP with MAX98357A/RT5514/DA7219 codecs
->> +
->> +Required properties:
->> +- compatible: "rockchip,rockchip-sound"
-> This is generic, but the binding seems to be very specific to only 3
-> specific codecs. Listing all 3 codecs seems a bit strange. Perhaps a
-> name related to the board name would be better.
-Yes, I think that I should rename to rk3399_max98357a_rt5514_da7219.c, 
-it is related to the rk3399 boards.
->> +- rockchip,cpu: The phandle of the Rockchip I2S controller that's
->> +  connected to the codecs
-> What's the size? always 3?
-Not always 3, the size is limited by machine driver, The similar 
-approach with mt8173-rt5650-rt5676.txt.
->> +- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
-> Please make the size and ordering clear.
-Ditto.
+> So, I'd like to know the recommended driver coding style
+> based on 4.7-rc1.
 
-Thanks.
+Sure, best is to look at other recently added drivers
+I guess.
 
--- 
-- Xing Zheng
+> Diving into the git-log so far, I came up the following list:
+>
+> [1] The "dev" member of gpiochip was renamed to "parent"
+
+Yes.
+
+> [2] The most recommended register function is now
+>     devm_gpiochip_add_data()
+
+Yes, saves some code.
+
+> [3] Pass the driver private data to the
+>     3rd argument of devm_gpiochip_add_data().
+
+Yes.
+
+> [4] Do not use container_of() to covert
+>     from gpiochip to driver private data.
+>     Instead, gpiochip_get_data() should be used.
+
+Yes.
+
+>     (I used of_mm_gpio_chip in v3,
+>      but I needed to use container_of() to
+>      convert from gpiochip to of_mm_gpio_chip.
+>      I am wondering if you are happy with it or not.)
+
+We will see when we look at the code ;)
+I guess it is OK. The alternative is to use gpio-generic instead,
+see commit 42178e2a1e42b480ada954750f248b53d3fb5940
+"drivers/gpio: Switch gpio-mpc8xxx to use gpio-generic"
+for an example of that approach.
+
+> [5] gpiochip.owner is being deprecated.
+>     So, platform drivers need not set
+>      "gpiochip.owner =  THIS_MODULE".
+
+Yes.
+
+> Correct?
+
+Yes.
+
+> Is there anything else missing?
+
+I advice to add a .get_direction() callback if possible and
+also .set_single_ended() if the GPIO chip supports open
+drain / open source in hardware.
+
+Yours,
+Linus Walleij
