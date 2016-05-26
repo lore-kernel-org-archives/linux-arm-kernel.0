@@ -1,72 +1,77 @@
-From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Thu, 26 May 2016 11:49:46 +0200
-Subject: [PATCH 02/11] drivers: clk: st: Add clock propagation for audio
- clocks
-In-Reply-To: <20160525172409.GA27913@rob-hp-laptop>
-References: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
- <1463560892-7209-3-git-send-email-gabriel.fernandez@linaro.org>
- <20160525172409.GA27913@rob-hp-laptop>
-Message-ID: <CAG374jDTCJfZB+PuAnggjXhbcd3NjJqrESpe_EnMniCAeoph9A@mail.gmail.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 26 May 2016 11:50:17 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6q: extend support for the cm-fx6
+In-Reply-To: <5746B8C4.6020406@compulab.co.il>
+References: <709d6b3d522f4fcb8112830e0426dbb3@rwthex-s1-b.rwth-ad.de>
+ <1463994191.2370.3.camel@pengutronix.de> <5746B8C4.6020406@compulab.co.il>
+Message-ID: <1464256217.14453.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2016 at 19:24, Rob Herring <robh@kernel.org> wrote:
->
-> On Wed, May 18, 2016 at 10:41:23AM +0200, Gabriel Fernandez wrote:
-> > This patch allows fine tuning of the quads FS for audio clocks
-> > accuracy.
-> >
-> > Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
-> > Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
-> > ---
-> >  .../devicetree/bindings/clock/st/st,flexgen.txt    |  1 +
-> >  drivers/clk/st/clk-flexgen.c                       | 24 ++++++++++++++++++++++
-> >  2 files changed, 25 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
-> > index b7ee5c7..15b33c7 100644
-> > --- a/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
-> > +++ b/Documentation/devicetree/bindings/clock/st/st,flexgen.txt
-> > @@ -60,6 +60,7 @@ This binding uses the common clock binding[2].
-> >  Required properties:
-> >  - compatible : shall be:
-> >    "st,flexgen"
-> > +  "st,stih407-clkgend0", "st,flexgen" (enable clock propagation on parent)
->
-> What do "d0" and "d2" refer to?
->
-> This seems to indicate you have too much clock detail in the DT (with
-> individual clocks described) or not enough with genericish compatible
-> strings. What happens for the mext clock you need to adjust the flags
-> on? You should be able to make these adjustments without DT updates.
-> Perhaps you need a wider fixing of clock compatible strings.
->
-> Rob
+Hi Igor,
 
-Sorry i sent my response in html...
+Am Donnerstag, den 26.05.2016, 11:50 +0300 schrieb Igor Grinberg:
+> Hi Lucas,
+> 
+> Thanks for reviewing the patch(es).
+> 
+> On 05/23/2016 12:03 PM, Lucas Stach wrote:
+> > Am Montag, den 23.05.2016, 00:47 +0200 schrieb
+> > christopher.spinrath at rwth-aachen.de:
+> >> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> 
+> [...]
+> 
+> >> +&ecspi1 {
+> >> +	fsl,spi-num-chipselects = <2>;
+> >> +	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
+> >> +	pinctrl-names = "default";
+> >> +	pinctrl-0 = <&pinctrl_ecspi1>;
+> >> +	status = "okay";
+> >> +
+> >> +	flash: m25p80 at 0 {
+> >> +		#address-cells = <1>;
+> >> +		#size-cells = <1>;
+> >> +		compatible = "st,m25p", "jedec,spi-nor";
+> >> +		spi-max-frequency = <20000000>;
+> >> +		reg = <0>;
+> >> +
+> >> +		partition at 0 {
+> >> +			label = "uboot";
+> >> +			reg = <0x0 0xc0000>;
+> >> +		};
+> >> +
+> >> +		partition at c0000 {
+> >> +			label = "uboot environment";
+> >> +			reg = <0xc0000 0x40000>;
+> >> +		};
+> >> +
+> >> +		partition at 100000 {
+> >> +			label = "reserved";
+> >> +			reg = <0x100000 0x100000>;
+> >> +		};
+> > 
+> > Partition layouts don't belong in the upstream DT, as it a device
+> > configuration thing. Please kep them in the bootloader/firmware and make
+> > this one pass the partition layout to the kernel.
+> 
+> I don't completely agree with this.
+> We have lots of partition layouts in the upstream DT.
 
-Hi Rob,
+No, we don't. At least not for the i.MX6. There are some for the earlier
+i.MX boards, but IMO it's wrong to put device configuration into the
+upstream DT. Let's not start doing this again.
 
-Thanks for reviewing.
+> Moreover, this is the default layout and changing it, will
+> result in incompatibilities and also might result in device "bricking".
+> Those can be changed from the boot loader in case you need those
+> the other way around.
+> Another question of mine is, why should you?
+> 
+Partition layout is device configuration, which is governed by the
+device firmware. By not having the partition layout in the upstream DT
+people are forced to set it from the firmware, which is exactly the
+right thing to do, weather or not you plan to change it at any time.
 
-Can i remove
-"
-st,stih407-clkgend0" & "
-st,stih407-clkgend2" compatible strings and add proprieties instead ?
-I only need to activate 2 features and then we can keep generic
-compatible strings.
-
-e.g.
-
-clk_s_d2_flexgen: clk-s-d2-flexgen {
-#clock-cells = <1>;
-compatible = "st,flexgen";
-        ...
-       st-sync-mode;
-        st-update
--parent-rate;
-};
-
-for d0_flexgen i will enable only st-sync-mode;
-
-Best Regards
+Regards,
+Lucas
