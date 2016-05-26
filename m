@@ -1,51 +1,100 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 26 May 2016 11:34:57 +0200
-Subject: [PATCH] hwrng: stm32: fix maybe uninitialized variable warning
-Message-ID: <1464255297-21090-1-git-send-email-mcoquelin.stm32@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 26 May 2016 11:38:12 +0200
+Subject: [PATCH 13/20] drm/bridge: Add RGB to VGA bridge support
+In-Reply-To: <CAL_JsqKMJ7X2MU7vF9n7_MmAUQJ2v+yKyazcmMurgbTxYGfw_Q@mail.gmail.com>
+References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1463402840-17062-14-git-send-email-maxime.ripard@free-electrons.com>
+ <CAL_JsqKMJ7X2MU7vF9n7_MmAUQJ2v+yKyazcmMurgbTxYGfw_Q@mail.gmail.com>
+Message-ID: <20160526093812.GN9232@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following warning:
-drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
-drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
-                                        uninitialized in this function
+Hi Rob,
 
-Reported-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Daniel Thompson <daniel.thompson@linaro.org>
-Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
----
- drivers/char/hw_random/stm32-rng.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+On Mon, May 16, 2016 at 09:07:18AM -0500, Rob Herring wrote:
+> On Mon, May 16, 2016 at 7:47 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Some boards have an entirely passive RGB to VGA bridge, based on either
+> > DACs or resistor ladders.
+> >
+> > Those might or might not have an i2c bus routed to the VGA connector in
+> > order to access the screen EDIDs.
+> >
+> > Add a bridge that doesn't do anything but expose the modes available on the
+> > screen, either based on the EDIDs if available, or based on the XGA
+> > standards.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  .../bindings/display/bridge/dumb-vga.txt           |  40 +++++
+> >  drivers/gpu/drm/bridge/Kconfig                     |   6 +
+> >  drivers/gpu/drm/bridge/Makefile                    |   1 +
+> >  drivers/gpu/drm/bridge/dumb-vga.c                  | 186 +++++++++++++++++++++
+> >  4 files changed, 233 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+> >  create mode 100644 drivers/gpu/drm/bridge/dumb-vga.c
+> >
+> > diff --git a/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt b/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+> > new file mode 100644
+> > index 000000000000..757f04de97f3
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/display/bridge/dumb-vga.txt
+> > @@ -0,0 +1,40 @@
+> > +Passive RGB to VGA bridge
+> > +-------------------------
+> > +
+> > +This binding is aimed for entirely passive RGB to VGA bridges that do not
+> > +require any configuration.
+> 
+> No reset or enable lines or regulators?
 
-diff --git a/drivers/char/hw_random/stm32-rng.c b/drivers/char/hw_random/stm32-rng.c
-index 92a810648bd0..63d84e6f1891 100644
---- a/drivers/char/hw_random/stm32-rng.c
-+++ b/drivers/char/hw_random/stm32-rng.c
-@@ -69,8 +69,12 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
- 		}
+On the three designs I've seen:
+  - One doesn't need any of these
+  - One has a GPIO enable pin but with it's resistor not populated
+  - One has a regulator controlled by a GPIO
+
+So I guess in most cases, we don't need anything, but we still might
+to cover all cases.
+
+> > +
+> > +Required properties:
+> > +
+> > +- compatible: Should be "dumb-vga-bridge"
+> > +
+> > +Optional properties:
+> > +
+> > +- ddc-i2c-bus: phandle to the i2c bus used to communicate with the monitor
+> 
+> The i2c bus is a property of the connector, not the bridge chip, so it
+> belongs in a VGA connector node (which we already have binding for).
+> 
+> I think for the really "dumb" (or transparent case), you should only
+> have a connector. For anything more complex, then you should have both
+> a DAC and connector node.
+
+So, in essence, something like:
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/r8a7794-alt.dts#n37
  
- 		/* If error detected or data not ready... */
--		if (sr != RNG_SR_DRDY)
-+		if (sr != RNG_SR_DRDY) {
-+			if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
-+					"bad RNG status - %x\n", sr))
-+				writel_relaxed(0, priv->base + RNG_SR);
- 			break;
-+		}
- 
- 		*(u32 *)data = readl_relaxed(priv->base + RNG_DR);
- 
-@@ -79,10 +83,6 @@ static int stm32_rng_read(struct hwrng *rng, void *data, size_t max, bool wait)
- 		max -= sizeof(u32);
- 	}
- 
--	if (WARN_ONCE(sr & (RNG_SR_SEIS | RNG_SR_CEIS),
--		      "bad RNG status - %x\n", sr))
--		writel_relaxed(0, priv->base + RNG_SR);
--
- 	pm_runtime_mark_last_busy((struct device *) priv->rng.priv);
- 	pm_runtime_put_sync_autosuspend((struct device *) priv->rng.priv);
- 
+> On the driver side, I think we could handle multiple connectors with a
+> single driver. Ideally, that would work with any DRM driver that has a
+> connector node.
+
+I'm not sure what you mean by that. I really think it should be a
+separate driver in order to share the common code that so far the
+current implementations put in some driver specific code (even though
+it might be completely generic).
+
+Thanks!
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160526/c56e1bc6/attachment.sig>
