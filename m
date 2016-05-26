@@ -1,60 +1,113 @@
-From: smbarber@chromium.org (Stephen Barber)
-Date: Wed, 25 May 2016 17:07:01 -0700
-Subject: [PATCH] clk: rockchip: add a dummy clock for the watchdog pclk on
- rk3399
-In-Reply-To: <1464166316-22480-1-git-send-email-zhengxing@rock-chips.com>
-References: <1464166316-22480-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <CADR9n4_D2WdEvj8XdZ_yW4n5-K6jeDWkhZJbGbmeR59zvyUp+w@mail.gmail.com>
+From: johnyoun@synopsys.com (John Youn)
+Date: Wed, 25 May 2016 18:15:45 -0700
+Subject: [PATCH] reset: Put back *_optional variants
+Message-ID: <ca359e013c30f27c825a9580164b01da5ca6476d.1464224883.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 1:51 AM, Xing Zheng <zhengxing@rock-chips.com> wrote:
-> Like rk3288, the pclk supplying the watchdog is controlled via the
-> SGRF register area. Additionally the SGRF isn't even writable in
-> every boot mode.
->
-> But still the clock control is available and in the future someone
-> might want to use it. Therefore define a simple clock for the time
-> being so that the watchdog driver can read its rate.
->
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> ---
->
->  drivers/clk/rockchip/clk-rk3399.c |    9 +++++++++
->  1 file changed, 9 insertions(+)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-> index 291543f..b6742fa 100644
-> --- a/drivers/clk/rockchip/clk-rk3399.c
-> +++ b/drivers/clk/rockchip/clk-rk3399.c
-> @@ -1498,6 +1498,7 @@ static void __init rk3399_clk_init(struct device_node *np)
->  {
->         struct rockchip_clk_provider *ctx;
->         void __iomem *reg_base;
-> +       struct clk *clk;
->
->         reg_base = of_iomap(np, 0);
->         if (!reg_base) {
-> @@ -1511,6 +1512,14 @@ static void __init rk3399_clk_init(struct device_node *np)
->                 return;
->         }
->
-> +       /* Watchdog pclk is controlled by RK3399 SECURE_GRF_SOC_CON3[8]. */
-> +       clk = clk_register_fixed_factor(NULL, "pclk_wdt", "pclk_alive", 0, 1, 1);
-> +       if (IS_ERR(clk))
-> +               pr_warn("%s: could not register clock pclk_wdt: %ld\n",
-> +                       __func__, PTR_ERR(clk));
-> +       else
-> +               rockchip_clk_add_lookup(ctx, clk, PCLK_WDT);
-> +
->         rockchip_clk_register_plls(ctx, rk3399_pll_clks,
->                                    ARRAY_SIZE(rk3399_pll_clks), -1);
->
-> --
-> 1.7.9.5
->
->
+Prior to commit 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo]
+functions wrappers"), the optional variants returned -ENOTSUPP when
+CONFIG_RESET_CONTROLLER was not set. This patch reverts to this
+behavior. Otherwise those calls will return -EINVAL causing users to
+think that an error occurred when CONFIG_RESET_CONTROLLER is not set.
 
-Reviewed-by: Stephen Barber <smbarber@chromium.org>
+Fixes: 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo] functions wrappers")
+Signed-off-by: John Youn <johnyoun@synopsys.com>
+---
 
-Steve
+Hi Philipp, Hans,
+
+The commit referenced above breaks an upcoming patch for the dwc2
+driver that adds an optional reset control.
+
+https://marc.info/?l=linux-usb&m=146161328211584&w=2
+
+I've attempted to add the optional variants back the way they were
+working before. Let me know if I need to do anything else to fix it or
+if it should be done another way.
+
+Regards,
+John
+
+
+ include/linux/reset.h | 33 +++++++++++++++++++++++++++++++--
+ 1 file changed, 31 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index ec0306ce..739d33d 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -14,10 +14,24 @@ int reset_control_status(struct reset_control *rstc);
+ 
+ struct reset_control *__of_reset_control_get(struct device_node *node,
+ 				     const char *id, int index, int shared);
++
++struct reset_control *__of_reset_control_get_optional(struct device_node *node,
++				     const char *id, int index, int shared)
++{
++	return __of_reset_control_get(node, id, index, shared);
++}
++
+ void reset_control_put(struct reset_control *rstc);
+ struct reset_control *__devm_reset_control_get(struct device *dev,
+ 				     const char *id, int index, int shared);
+ 
++static inline struct reset_control *__devm_reset_control_get_optional(
++					struct device *dev,
++					const char *id, int index, int shared)
++{
++	return __devm_reset_control_get(dev, id, index, shared);
++}
++
+ int __must_check device_reset(struct device *dev);
+ 
+ static inline int device_reset_optional(struct device *dev)
+@@ -74,6 +88,13 @@ static inline struct reset_control *__of_reset_control_get(
+ 	return ERR_PTR(-EINVAL);
+ }
+ 
++static inline struct reset_control *__of_reset_control_get_optional(
++					struct device_node *node,
++					const char *id, int index, int shared)
++{
++	return ERR_PTR(-ENOTSUPP);
++}
++
+ static inline struct reset_control *__devm_reset_control_get(
+ 					struct device *dev,
+ 					const char *id, int index, int shared)
+@@ -81,6 +102,13 @@ static inline struct reset_control *__devm_reset_control_get(
+ 	return ERR_PTR(-EINVAL);
+ }
+ 
++static inline struct reset_control *__devm_reset_control_get_optional(
++					struct device *dev,
++					const char *id, int index, int shared)
++{
++	return ERR_PTR(-ENOTSUPP);
++}
++
+ #endif /* CONFIG_RESET_CONTROLLER */
+ 
+ /**
+@@ -110,7 +138,8 @@ static inline struct reset_control *__must_check reset_control_get(
+ static inline struct reset_control *reset_control_get_optional(
+ 					struct device *dev, const char *id)
+ {
+-	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
++	return __of_reset_control_get_optional(dev ? dev->of_node : NULL,
++					       id, 0, 0);
+ }
+ 
+ /**
+@@ -194,7 +223,7 @@ static inline struct reset_control *__must_check devm_reset_control_get(
+ static inline struct reset_control *devm_reset_control_get_optional(
+ 					struct device *dev, const char *id)
+ {
+-	return __devm_reset_control_get(dev, id, 0, 0);
++	return __devm_reset_control_get_optional(dev, id, 0, 0);
+ }
+ 
+ /**
+-- 
+2.8.2
