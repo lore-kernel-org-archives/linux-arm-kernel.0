@@ -1,31 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 27 May 2016 18:14:03 +0100
-Subject: [PATCH v4 10/18] ASoC: sti: Update DT example to match the
- driver code
-In-Reply-To: <1464192412-16386-12-git-send-email-peter.griffin@linaro.org>
-References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
- <1464192412-16386-12-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160527171403.GN16172@sirena.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 May 2016 18:14:25 +0100
+Subject: [PATCH v2 5/5] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
+In-Reply-To: <1463674518-22477-6-git-send-email-aleksey.makarov@linaro.org>
+References: <1463674518-22477-1-git-send-email-aleksey.makarov@linaro.org>
+ <1463674518-22477-6-git-send-email-aleksey.makarov@linaro.org>
+Message-ID: <20160527171424.GG10909@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 05:06:44PM +0100, Peter Griffin wrote:
-> uniperiph-id, version and mode are ST specific bindings and
-> need the 'st,' prefix. Update the examples, as otherwise copying
-> them yields a runtime error parsing the DT node.
+On Thu, May 19, 2016 at 07:15:16PM +0300, Aleksey Makarov wrote:
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index aee323b..d75f6c7 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -113,4 +113,6 @@ static inline const char *acpi_get_enable_method(int cpu)
+>  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+>  #endif
+>  
+> +#define ACPI_TABLE_UPGRADE_MAX_PHYS PFN_PHYS(max_pfn)
+> +
+>  #endif /*_ASM_ACPI_H*/
+> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+> index feab2ee..4bce811 100644
+> --- a/arch/arm64/kernel/setup.c
+> +++ b/arch/arm64/kernel/setup.c
+> @@ -261,11 +261,13 @@ void __init setup_arch(char **cmdline_p)
+>  	efi_init();
+>  	arm64_memblock_init();
+>  
+> +	paging_init();
+> +
+> +	acpi_table_upgrade();
+> +
+>  	/* Parse the ACPI tables for possible boot-time configuration */
+>  	acpi_boot_table_init();
+>  
+> -	paging_init();
+> -
+>  	if (acpi_disabled)
+>  		unflatten_device_tree();
 
-You've not copied me on the rest of the series so I've no idea what's
-going on with dependencies.  When sending a patch series it is important
-to ensure that all the various maintainers understand what the
-relationship between the patches as the expecation is that there will be
-interdependencies.  Either copy everyone on the whole series or at least
-copy them on the cover letter and explain what's going on.  If there are
-no strong interdependencies then it's generally simplest to just send
-the patches separately to avoid any possible confusion.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160527/17a8742a/attachment.sig>
+So ACPI_TABLE_UPGRADE_MAX_PHYS is defined in terms of max_pfn and
+presumably used by acpi_table_upgrade(). max_pfn is only initialised in
+the arm64 bootmem_init() called just below the last line of context in
+the hunk above.
+
+-- 
+Catalin
