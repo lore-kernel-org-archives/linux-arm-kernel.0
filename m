@@ -1,55 +1,26 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Fri, 27 May 2016 09:34:03 -0700
-Subject: [PATCH] arm64: kasan: instrument user memory access API
-In-Reply-To: <57482930.6020608@virtuozzo.com>
-References: <1464288231-11304-1-git-send-email-yang.shi@linaro.org>
- <57482930.6020608@virtuozzo.com>
-Message-ID: <cea39367-65b6-62df-7e4c-57ae1ce36dcc@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 27 May 2016 09:35:09 -0700
+Subject: [PATCH v4 2/7] ARM: dts: omap3: Add clocks to McBSP nodes
+In-Reply-To: <1464185756-28401-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1464185756-28401-1-git-send-email-peter.ujfalusi@ti.com>
+ <1464185756-28401-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20160527163508.GZ5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/27/2016 4:02 AM, Andrey Ryabinin wrote:
->
->
-> On 05/26/2016 09:43 PM, Yang Shi wrote:
->> The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
->> ("x86/kasan: instrument user memory access API") added KASAN instrument to
->> x86 user memory access API, so added such instrument to ARM64 too.
->>
->> Tested by test_kasan module.
->>
->> Signed-off-by: Yang Shi <yang.shi@linaro.org>
->> ---
->>  arch/arm64/include/asm/uaccess.h | 18 ++++++++++++++++--
->>  1 file changed, 16 insertions(+), 2 deletions(-)
->
-> Please, cover __copy_from_user() and __copy_to_user() too.
-> Unlike x86, your patch doesn't instrument these two.
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160525 07:20]:
+> Add clock properties to the McBSP nodes. McBSP2 and 3 need to have ick also
+> since the Sidetone block of these modules are operating using the McBSP
+> interface clock.
 
-I should elaborated this in my review. Yes, I did think about it, but 
-unlike x86, __copy_to/from_user are implemented by asm code on ARM64. If 
-I add kasan_check_read/write into them, I have to move the registers 
-around to prepare the parameters for kasan calls, then restore them 
-after the call, for example the below code for __copy_to_user:
+Can you please apply this dts patch as the first patch in the
+series? That way I can merge it separately into my dts patches.
 
-         mov     x9, x0
-         mov     x10, x1
-         mov     x11, x2
-         mov     x0, x10
-         mov     x1, x11
-         bl      kasan_check_read
-         mov     x0, x9
-         mov     x1, x10
+If no more comments other than the patch ordering change, when
+v4.17-rc1 is out, please do an immutable branch against v4.17-rc1
+and a pull request for me. Then that branch can be merged into
+other trees as needed too.
 
+Regards,
 
-So, I'm wondering if it is worth or not since __copy_to/from_user are 
-just called at a couple of places, i.e. sctp, a couple of drivers, etc 
-and not used too much. Actually, I think some of them could be replaced 
-by __copy_to/from_user_inatomic.
-
-Any idea is appreciated.
-
-Thanks,
-Yang
-
->
+Tony
