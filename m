@@ -1,236 +1,91 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 27 May 2016 09:32:18 +0200
-Subject: [PATCH v3 1/3] arm64: dts: r8a7796: Add Renesas R8A7796 SoC
- support
-In-Reply-To: <20160527004256.GD14269@verge.net.au>
-References: <1464054880-25843-1-git-send-email-horms+renesas@verge.net.au>
- <1464054880-25843-2-git-send-email-horms+renesas@verge.net.au>
- <b30c9c84-23b6-b088-4983-b2498317492b@de.bosch.com>
- <20160525004825.GC7292@verge.net.au>
- <c0fd13d5-c5c4-579b-6fad-c637bda92398@de.bosch.com>
- <20160526022833.GE18393@verge.net.au>
- <59e6225a-6dfa-8bde-dd2e-3428d6fedfe2@de.bosch.com>
- <20160527004256.GD14269@verge.net.au>
-Message-ID: <b03c68c9-6949-519d-2c44-c140eac727a4@de.bosch.com>
+From: kever.yang@rock-chips.com (Kever Yang)
+Date: Fri, 27 May 2016 15:38:01 +0800
+Subject: [PATCH 0/6] Rockchip Type-C and DispplayPort driver
+In-Reply-To: <1464328939-8073-1-git-send-email-zyw@rock-chips.com>
+References: <1464328939-8073-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <5747F959.7010101@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Chris,
 
-On 27.05.2016 02:42, Simon Horman wrote:
-> On Thu, May 26, 2016 at 09:14:16AM +0200, Dirk Behme wrote:
->> Hi Simon,
->>
->> On 26.05.2016 04:28, Simon Horman wrote:
->>> Hi Dirk,
->>>
->>> On Wed, May 25, 2016 at 07:10:26AM +0200, Dirk Behme wrote:
->>>> Hi Simon,
->>>>
->>>> On 25.05.2016 02:48, Simon Horman wrote:
->>>>> Hi Dirk,
->>>>>
->>>>> On Tue, May 24, 2016 at 07:30:17AM +0200, Dirk Behme wrote:
->>>>>> Hi Simon,
->>>>>
->>>>> [...]
->>>>>
->>>>>> With Renesas R-Car3 we will get a whole family of SoCs. I.e. different
->>>>>> computing power (e.g. different number of Cores) with more or less similar
->>>>>> peripherals.
->>>>>>
->>>>>> I would think that we want to reflect this in the device tree, too.
->>>>>> Therefore I think what we want is a hierarchy of device trees. Similar
->>>>>> what's done with other SoC families (compare e.g. i.MX6).
->>>>>>
->>>>>> E.g. we want an initial rcar3.dtsi, which contains all common parts of all
->>>>>> R-Car3 SoCs. E.g. one CA57 core, the SCIF where its common etc.
->>>>>>
->>>>>> Then you will have the r8a779x.dtsi which includes the rcar3.dtsi and
->>>>>> extends it for SoC specific parts. Which then will be included by the board
->>>>>> device trees, as already done, now.
->>>>>>
->>>>>> Or in other words: As soon as you have similar parts in the r8a779x.dtsi's,
->>>>>> it's time to think about moving the parts one hierarchy level up into the
->>>>>> rcar3.dtsi. Else you will end up in a maintenance hell once you have to
->>>>>> change/fix anything.
->>>>>
->>>>> Thanks for raising this issue.
->>>>>
->>>>> I agree entirely that we should work towards a situation where maintenance
->>>>> is as easy as it can be. However, due to the per-SoC binding scheme that
->>>>> we are using for IP related to Renesas SoCs I suspect that very few DT nodes
->>>>> can be shared between SoCs verbatim.
->>>>
->>>>
->>>> Could you kindly share an example for this? Looking into the H3 and the M3-W
->>>> manual, it looks to me that ~90% (?) of the peripherals are the same.
->>>
->>> The background is that this is a conversation that has been going around
->>> for years. The basic thinking is that at this point we have documentation
->>> that indicates that many hardware blocks on the H3 and M3-W are the same.
->>> But we do not have insight into the internal versioning of the IP blocks
->>> nor if they are really the same. And furthermore even if they are currently
->>> the same we don't really know if that will continue to be the case.
->>>
->>> Probably it is. Maybe it isn't. The response has been to take a
->>> conservative approach to DT bindings to give us the flexibility to update
->>> the driver implementation to reflect any differences that subsequently
->>> surface. And by providing per-SoC bindings these driver changes can be
->>> activated on a per-SoC basis without updating DTB files (which may be
->>> burned into ROMs).
->>
->>
->> Sorry, but I don't think that these are good arguments for this kind of
->> discussion ;)
+On 05/27/2016 02:02 PM, Chris Zhong wrote:
+> Hi all
 >
->>From my point of view this is the central point. It is my believe that we
-> simply do not have enough information to conclude that the IP blocks will
-> be the same in perpetuity.
+> This series patch is for rockchip Type-C phy and DisplayPort controller
+> driver.
 >
->> The discussion has to be based on facts. And not on "maybe" or "probably".
->> The fact is that the documentation tells us that the IPs are the same. And
->> the documentation tells us where this isn't the case. This is what we can
->> reflect in the code and the device trees.
->>
->> Or the other way around: I don't ask to not have any SoC specific device
->> trees (r8a7795.dtsi, r8a7796.dtsi etc). So we *always* have the option to
->> move anything to them, once there might be any difference found or
->> documented. But maintaining x (x > 5?) quite similar device trees just
->> because there *might* be the possibility that one or two device *might* be
->> different doesn't sound like a good argument to me.
->>
->> Or again, an other way: If I understood correctly, you are working already
->> since some time on R-Car, e.g. R-Car Gen2. How many examples do you have
->> from the Gen2 family where the IP blocks are different that they need to be
->> distinguished in the device tree?
+> The USB Type-C PHY is designed to support the USB3 and DP applications.
+> The PHY basically has two main components: USB3 and DisplyPort. USB3
+> operates in SuperSpeed mode and the DP can operate at RBR, HBR and HBR2
+> data rates. The Type-C cable orientation detection and Power Delivery
+> (PD) is accomplished using a PD PHY or a exernal PD chip.
 >
-> I think the question is different. The question is, if a difference comes
-> up, how do we handle it?
+> The DP controller is compliant with DisplayPort Specification,
+> Version 1.3, This IP is compatible with the rockchip type-c PHY IP.
+> There is a uCPU in DP controller, it need a firmware to work, please
+> put the firmware file to /lib/firmware/cdn/dptx.bin. The uCPU in charge
+> of aux communication and link training, the host use mailbox to
+> communicate with the ucpu.
 >
-> So far we have a solution. Not an ideal one, but a solution none the less.
-> I do agree entirely that replicated DTs leads to significant maintenance
-> overhead. But lets not throw the baby out with the bath water.
+> The PHY driver has register a notification, to get the alt mode from PD,
+> the PD driver need call the tcphy_notifier_call_chain to notify PHY and
+> DP controller.
+For the notification for the port status change from PD, I think we can
+use the extcon class, pls reference the code in drivers/extcon/ for usage.
 
-
-Well, we could continue this kind of discussion infinite ;)
-
-But I agree to your below point "Lets discuss the change on its merits" 
-and therefore stop here and continue with the technical aspects below ....
-
-
->>>>> Probably some sort of scheme can be cooked up using preprocessor macros.
->>>>> And probably there are other ways to resolve this problem. But I would
->>>>> prefer if we worked towards resolving this maintenance problem in parallel
->>>>> with rather than as a dependency of merging r8a7796 support into mainline.
->>>>
->>>>
->>>> I'd propose to do it correct from the beginning.
->>>>
->>>> Doing it later would either be more work or forgotten, and never be done,
->>>> then.
->>>
->>> I'm sorry but I don't agree. I think that having r8a7796 support
->>> in mainline is a higher priority than sorting this out.
->>
->>
->> Looking at the example I gave in
->>
->> http://article.gmane.org/gmane.linux.kernel.renesas-soc/4013
->>
->> which took me < 1h to create, I'm not sure what would block us from
->> mainlining the r8a7796 *including* this.
+Thanks,
+- Kever
 >
-> Point taken. Lets discuss the change on its merits.
-
-
-I totally agree, thanks! Let's continue below ...
-
-
->>>> For a starting point, I'd propose to put the r8a7795.dtsi and r8a7796.dtsi
->>>> into a graphical diff tool and move all common parts to a rcar3.dtsi (I'd be
->>>> happy to discuss the name, though)
->>>
->>> I'm not opposed to that. But being consistent with my statement above
->>> I would prefer it to be done as follow-up work.
->>>
->>> My suspicion is that right now much of the proposed r8a7796.dtsi can be
->>> moved into a hypothetical rcar3.dtsi. But that this is because the proposed
->>> r8a7796.dtsi is very small. I would not expect nearly such a large
->>> proportion of r8a7795.dtsi to be able to be moved into rcar3.dtsi because
->>> it enables more hardware blocks and they typically have (or should have in
->>> keeping with the prevailing policy as described above) per-SoC bindings.
->>
->>
->> What doesn't prevent us to use a rcar3.dtsi like given in
->>
->> http://article.gmane.org/gmane.linux.kernel.renesas-soc/4013
->>
->>
->> Having a rcar3.dtsi gives us *both* options. It doesn't force us to use the
->> one or the other. I.e. we have for each IP block the *option* to declare it
->> as common (put it onto rcar3.dtsi) *or* SoC specific (put it into
->> r8a779x.dtsi).
->>
->> Without having a common rcar3.dtsi we don't have this option at all.
->>
->> So I think the conclusion is: Let's have all options (by adding a
->> rcar3.dtsi) and then decide for each IP block individually where to place it
->> best. Or move it later from the common dtsi to the individual dtsi once
->> there is an issue found (what I really doubt that it will happen that often,
->> but this is an other topic ;) )
+> This series is based on Mark Yao's branch:
+> https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2016-05-23
 >
-> I think that most of the nodes you have moved into the common dtsi file
-> make sense. But there are some I am less sure about:
+> I test this patches on the rk3399-evb board, with a fusb302 driver,
+> this branch has no rk3399.dtsi, so the patch about dts is not included
+> in this series.
 >
-> * cpus
 >
->   Probably there are some central aspects of cpus that are shared
->   between the r8a7795 and r8a7796. And I think that your patch captures
->   that. But I also think that there will be non-shared aspects and
->   perhaps the complexity of splitting the cpus node between per-SoC
->   and common dtsi files isn't worth it.
 >
->   I don't feel strongly about this at this point.
+> Chris Zhong (6):
+>    phy: Add USB Type-C PHY driver for rk3399
+>    Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
+>    drm/rockchip: vop: add cdn DP support for rk3399
+>    Documentation: bindings: add dt documentation for cdn DP controller
+>    ASoC: cdn-dp: Add cdn DP codec driver
+>    ASoC: rockchip: Add machine driver for cdn dp codec
 >
->   I am also particularly sensitive about enabling CPU features across
->   multiple SoCs. But I think that the scheme you propose allows for
->   per-SoC control of features in per-SoC dtsi files. So I think
->   I am ok about that at this point.
+>   .../bindings/display/rockchip/cdn-dp-rockchip.txt  |  57 ++
+>   .../devicetree/bindings/phy/phy-rockchip-typec.txt |  55 ++
+>   .../bindings/sound/rockchip-cdn-dp-audio.txt       |  12 +
+>   drivers/gpu/drm/rockchip/Kconfig                   |   9 +
+>   drivers/gpu/drm/rockchip/Makefile                  |   1 +
+>   drivers/gpu/drm/rockchip/cdn-dp-core.c             | 620 ++++++++++++++++
+>   drivers/gpu/drm/rockchip/cdn-dp-core.h             |  95 +++
+>   drivers/gpu/drm/rockchip/cdn-dp-reg.c              | 730 ++++++++++++++++++
+>   drivers/gpu/drm/rockchip/cdn-dp-reg.h              | 404 ++++++++++
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |   9 +-
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   2 +
+>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |   2 +
+>   drivers/phy/Kconfig                                |   7 +
+>   drivers/phy/Makefile                               |   1 +
+>   drivers/phy/phy-rockchip-typec.c                   | 823 +++++++++++++++++++++
+>   include/sound/cdn-dp-audio.h                       |  51 ++
+>   sound/soc/codecs/Kconfig                           |   3 +
+>   sound/soc/codecs/Makefile                          |   2 +
+>   sound/soc/codecs/cdn-dp-audio.c                    | 246 ++++++
+>   sound/soc/rockchip/Kconfig                         |   9 +
+>   sound/soc/rockchip/Makefile                        |   2 +
+>   sound/soc/rockchip/rockchip-cdn-dp-audio.c         | 167 +++++
+>   22 files changed, 3306 insertions(+), 1 deletion(-)
+>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+>   create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>   create mode 100644 Documentation/devicetree/bindings/sound/rockchip-cdn-dp-audio.txt
+>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
+>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
+>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+>   create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
+>   create mode 100644 drivers/phy/phy-rockchip-typec.c
+>   create mode 100644 include/sound/cdn-dp-audio.h
+>   create mode 100644 sound/soc/codecs/cdn-dp-audio.c
+>   create mode 100644 sound/soc/rockchip/rockchip-cdn-dp-audio.c
 >
->   Lastly, shouldn't the cache-controller go inside the cpu node
->   in the common dtsi file to reflect the change recently made
->   upstream to r8a7795.dtsi and the structure of r8a7796.dtsi in
->   the current patchset (v3).
-
-
-We already talked about that in an other thread, and I think I missed 
-that change you mentioned. So I'm fine with your proposal. I just saw 
-that it's different between r8a7795 and r8a7796 and wanted to highlight 
-that it should be the same.
-
-
-> * cpg, scif2
->
->   This is the compatibility string issue.
->
->   Could we at least agree to defer this part of the discussion
->   and thus omit these nodes from the common dtsi file at this time?
-
-
-Fine with me :)
-
-
->   I understand that you are concerned that if we don't handle this
->   now it will be forgotten. FWIW I strongly doubt this particular
->   problem will be forgotten.
-
-
-Ok.
-
-Thanks!
-
-
-Best regards
-
-Dirk
