@@ -1,76 +1,78 @@
-From: pc.liao@mediatek.com (PC Liao)
-Date: Fri, 27 May 2016 15:43:17 +0800
-Subject: [PATCH v2] ASoC: mediatek: Change the order of MCLK clock
- configuration
-Message-ID: <1464334997-42960-1-git-send-email-pc.liao@mediatek.com>
+From: dennis.chen@linaro.org (Dennis Chen)
+Date: Fri, 27 May 2016 15:58:49 +0800
+Subject: [PATCH v7 07/15] arm64, numa: Cleanup NUMA disabled messages.
+In-Reply-To: <1464129345-18985-8-git-send-email-ddaney.cavm@gmail.com>
+References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
+ <1464129345-18985-8-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <CADKHWac_0TO97JE8ZO43n+fSDWFJnB=QXJxnkpbYYeKausDHmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because MCLK turns on later and turns off earlier than codec, this patch
-changes the order of MCLK clock configuration.
+On 25 May 2016 at 06:35, David Daney <ddaney.cavm@gmail.com> wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> As noted by Dennis Chen, we don't want to print "No NUMA configuration
+> found" if NUMA was forced off from the command line.
+>
+> Change the type of numa_off to bool, and clean up printing code.
+> Print "NUMA disabled" if forced off on command line and "No NUMA
+> configuration found" if there was no firmware NUMA information.
+>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  arch/arm64/mm/numa.c | 11 +++++++----
+>  1 file changed, 7 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index 6cb03f9..1def1de 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -29,7 +29,7 @@ static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
+>
+>  static int numa_distance_cnt;
+>  static u8 *numa_distance;
+> -static int numa_off;
+> +static bool numa_off;
+>
+>  static __init int numa_parse_early_param(char *opt)
+>  {
+> @@ -37,7 +37,7 @@ static __init int numa_parse_early_param(char *opt)
+>                 return -EINVAL;
+>         if (!strncmp(opt, "off", 3)) {
+>                 pr_info("%s\n", "NUMA turned off");
+> -               numa_off = 1;
+> +               numa_off = true;
+>         }
+>         return 0;
+>  }
+> @@ -362,7 +362,10 @@ static int __init dummy_numa_init(void)
+>         int ret;
+>         struct memblock_region *mblk;
+>
+> -       pr_info("%s\n", "No NUMA configuration found");
+> +       if (numa_off)
+> +               pr_info("NUMA disabled\n"); /* Forced off on command line. */
+> +       else
+> +               pr_info("No NUMA configuration found\n");
+>         pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
+>                0LLU, PFN_PHYS(max_pfn) - 1);
+>
+> @@ -375,7 +378,7 @@ static int __init dummy_numa_init(void)
+>                 return ret;
+>         }
+>
+> -       numa_off = 1;
+> +       numa_off = true;
+>         return 0;
+>  }
+>
+> --
+> 1.7.11.7
+>
 
-Signed-off-by: PC Liao <pc.liao@mediatek.com>
----
-Changes since v1:
-update commit message
----
- sound/soc/mediatek/mtk-afe-pcm.c |   16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+Reviewed-by: Dennis Chen <dennis.chen@arm.com>
 
-diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
-index f1c58a2..440ae06 100644
---- a/sound/soc/mediatek/mtk-afe-pcm.c
-+++ b/sound/soc/mediatek/mtk-afe-pcm.c
-@@ -360,8 +360,6 @@ static int mtk_afe_i2s_startup(struct snd_pcm_substream *substream,
- 	if (dai->active)
- 		return 0;
- 
--	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
--	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
- 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
- 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M, 0);
- 	return 0;
-@@ -380,8 +378,6 @@ static void mtk_afe_i2s_shutdown(struct snd_pcm_substream *substream,
- 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
- 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M,
- 			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M);
--	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
--	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S2_M], NULL);
- }
- 
- static int mtk_afe_i2s_prepare(struct snd_pcm_substream *substream,
-@@ -1132,6 +1128,8 @@ static int mtk_afe_runtime_suspend(struct device *dev)
- 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
- 			   AUD_TCON0_PDN_AFE, AUD_TCON0_PDN_AFE);
- 
-+	clk_disable_unprepare(afe->clocks[MTK_CLK_I2S1_M]);
-+	clk_disable_unprepare(afe->clocks[MTK_CLK_I2S2_M]);
- 	clk_disable_unprepare(afe->clocks[MTK_CLK_BCK0]);
- 	clk_disable_unprepare(afe->clocks[MTK_CLK_BCK1]);
- 	clk_disable_unprepare(afe->clocks[MTK_CLK_TOP_PDN_AUD]);
-@@ -1164,6 +1162,12 @@ static int mtk_afe_runtime_resume(struct device *dev)
- 	ret = clk_prepare_enable(afe->clocks[MTK_CLK_BCK1]);
- 	if (ret)
- 		goto err_bck0;
-+	ret = clk_prepare_enable(afe->clocks[MTK_CLK_I2S1_M]);
-+	if (ret)
-+		goto err_i2s1_m;
-+	ret = clk_prepare_enable(afe->clocks[MTK_CLK_I2S2_M]);
-+	if (ret)
-+		goto err_i2s2_m;
- 
- 	/* enable AFE clk */
- 	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0, AUD_TCON0_PDN_AFE, 0);
-@@ -1179,6 +1183,10 @@ static int mtk_afe_runtime_resume(struct device *dev)
- 	regmap_update_bits(afe->regmap, AFE_DAC_CON0, 0x1, 0x1);
- 	return 0;
- 
-+err_i2s1_m:
-+	clk_disable_unprepare(afe->clocks[MTK_CLK_I2S1_M]);
-+err_i2s2_m:
-+	clk_disable_unprepare(afe->clocks[MTK_CLK_I2S2_M]);
- err_bck0:
- 	clk_disable_unprepare(afe->clocks[MTK_CLK_BCK0]);
- err_top_aud:
 -- 
-1.7.9.5
+Regards,
+Dennis
