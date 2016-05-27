@@ -1,73 +1,92 @@
-From: emil.l.velikov@gmail.com (Emil Velikov)
-Date: Fri, 27 May 2016 10:24:57 +0100
-Subject: [RFC v2 3/5] drm/mediatek: add *driver_data for different
- hardware settings
-In-Reply-To: <1464334313.31149.16.camel@mtksdaap41>
-References: <1463756736-46573-1-git-send-email-yt.shen@mediatek.com>
- <1463756736-46573-4-git-send-email-yt.shen@mediatek.com>
- <1463996582.30093.5.camel@mtksdaap41>
- <1464334313.31149.16.camel@mtksdaap41>
-Message-ID: <CACvgo52xB0KwumC75u2dxfz_yv2PNE0Gem+0t8dqV9qn+pPRLg@mail.gmail.com>
+From: dennis.chen@arm.com (Dennis Chen)
+Date: Fri, 27 May 2016 17:27:24 +0800
+Subject: [PATCH v2] arm64:efi fix the format of debug message from efi
+Message-ID: <1464341244-14152-1-git-send-email-dennis.chen@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2016 at 08:31, YT Shen <yt.shen@mediatek.com> wrote:
-> Hi CK,
->
->
-> On Mon, 2016-05-23 at 17:43 +0800, CK Hu wrote:
->> Hi, YT:
->>
->> One comment below.
->>
->> On Fri, 2016-05-20 at 23:05 +0800, yt.shen at mediatek.com wrote:
->> > From: YT Shen <yt.shen@mediatek.com>
->> >
->> > There are some hardware settings changed, between MT8173 & MT2701:
->> > DISP_OVL address offset changed, color format definition changed.
->> > DISP_RDMA fifo size changed.
->> > DISP_COLOR offset changed.
->> >
->> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
->> > ---
->> > +
->> > +static inline struct mtk_ddp_comp_driver_data *mtk_ovl_get_driver_data(
->> > +   struct platform_device *pdev)
->> > +{
->> > +   const struct of_device_id *of_id =
->> > +           of_match_device(mtk_disp_ovl_driver_dt_match, &pdev->dev);
->> > +
->> > +   return (struct mtk_ddp_comp_driver_data *)of_id->data;
->> > +}
->> > +
->> > +static inline struct mtk_ddp_comp_driver_data *mtk_rdma_get_driver_data(
->> > +   struct platform_device *pdev)
->> > +{
->> > +   const struct of_device_id *of_id =
->> > +           of_match_device(mtk_disp_rdma_driver_dt_match, &pdev->dev);
->> > +
->> > +   return (struct mtk_ddp_comp_driver_data *)of_id->data;
->> > +}
->> > +
->> > +static inline struct mtk_ddp_comp_driver_data *mtk_color_get_driver_data(
->> > +   struct device_node *node)
->> > +{
->> > +   const struct of_device_id *of_id =
->> > +           of_match_node(mtk_disp_color_driver_dt_match, node);
->> > +
->> > +   return (struct mtk_ddp_comp_driver_data *)of_id->data;
->> > +}
->> > +
->>
->> These three functions looks the same with different parameter:
->> mtk_disp_ovl_driver_dt_match, mtk_disp_rdma_driver_dt_match, and
->> mtk_disp_color_driver_dt_match. So merge them to prevent duplicated
->> code.
-> OK, I'll do this in the next version.
+When enable debug of efi and memblock with 'efi=debug memblock=debug' appended
+to the kernel command line, the debug message output for earyly_con looks like:
 
-Also preserve the const-ness of the data - don't cast it away on the
-return line.
-Note that the function return type (and some of the users of said
-functions) should be updated as well.
+[    0.000000] efi:   0x0000e1050000-0x0000e105ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x0000e1300000-0x0000e1300fff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x0000e8200000-0x0000e827ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x008000000000-0x008001e7ffff [Runtime Data       |RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]
+[    0.000000] memblock_add: [0x00008000000000-0x00008001e7ffff] flags 0x0 early_init_dt_add_memory_arch+0x54/0x5c
+[    0.000000] *
+...
 
--Emil
+This patch is trying to fix the above output messed up by memblock_add(), so we can get below debug mesg looks
+more formally after applied:
+
+[    0.000000] efi:   0x0000e1050000-0x0000e105ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x0000e1300000-0x0000e1300fff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x0000e8200000-0x0000e827ffff [Memory Mapped I/O  |RUN|  |  |  |  |  |  |   |  |  |  |UC]
+[    0.000000] efi:   0x008000000000-0x008001e7ffff [Runtime Data       |RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]*
+[    0.000000] memblock_add: [0x00008000000000-0x00008001e7ffff] flags 0x0 early_init_dt_add_memory_arch+0x54/0x5c
+...
+
+Signed-off-by: Dennis Chen <dennis.chen@arm.com>
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Cc: linux-efi at vger.kernel.org
+
+Since v1[1]:
+ According to the suggestion from Mark Rutland, v2 folds the pr_cont("\n") into pr_info.
+ [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/431233.html
+---
+ drivers/firmware/efi/arm-init.c | 14 ++++++--------
+ 1 file changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
+index a850cbc..c49d50e 100644
+--- a/drivers/firmware/efi/arm-init.c
++++ b/drivers/firmware/efi/arm-init.c
+@@ -174,6 +174,7 @@ static __init void reserve_regions(void)
+ {
+ 	efi_memory_desc_t *md;
+ 	u64 paddr, npages, size;
++	int resv;
+ 
+ 	if (efi_enabled(EFI_DBG))
+ 		pr_info("Processing EFI memory map:\n");
+@@ -190,12 +191,14 @@ static __init void reserve_regions(void)
+ 		paddr = md->phys_addr;
+ 		npages = md->num_pages;
+ 
++		resv = is_reserve_region(md);
+ 		if (efi_enabled(EFI_DBG)) {
+ 			char buf[64];
+ 
+-			pr_info("  0x%012llx-0x%012llx %s",
++			pr_info("  0x%012llx-0x%012llx %s%s\n",
+ 				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
+-				efi_md_typeattr_format(buf, sizeof(buf), md));
++				efi_md_typeattr_format(buf, sizeof(buf), md),
++				resv ? "*" : "");
+ 		}
+ 
+ 		memrange_efi_to_native(&paddr, &npages);
+@@ -204,14 +207,9 @@ static __init void reserve_regions(void)
+ 		if (is_normal_ram(md))
+ 			early_init_dt_add_memory_arch(paddr, size);
+ 
+-		if (is_reserve_region(md)) {
++		if (resv)
+ 			memblock_mark_nomap(paddr, size);
+-			if (efi_enabled(EFI_DBG))
+-				pr_cont("*");
+-		}
+ 
+-		if (efi_enabled(EFI_DBG))
+-			pr_cont("\n");
+ 	}
+ 
+ 	set_bit(EFI_MEMMAP, &efi.flags);
+-- 
+2.7.4
