@@ -1,23 +1,129 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 27 May 2016 21:31:40 +0100
-Subject: [PATCH 14/14] ASoC: omap-mcpdm: Add support for pdmclk clock
- handling
-In-Reply-To: <1463579196-5484-15-git-send-email-peter.ujfalusi@ti.com>
-References: <1463579196-5484-1-git-send-email-peter.ujfalusi@ti.com>
- <1463579196-5484-15-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20160527203140.GD29837@sirena.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 27 May 2016 22:33:11 +0200
+Subject: [PATCHv4] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
+ <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
+ <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+Message-ID: <20160527203311.GA13282@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 04:46:36PM +0300, Peter Ujfalusi wrote:
+Hi!
 
-> +	clk_prepare_enable(mcpdm->pdmclk);
+> > + * Contact: Tuukka Toivonen
+> > + *          Sakari Ailus
+> 
+> Could you put the e-mail addresses back, please?
+> 
+> Tuukka's e-mail is tuukkat76 at gmail.com .
 
-Should really check the return value here.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160527/e9a4f037/attachment.sig>
+Ok.
+
+> > +#include <linux/module.h>
+> > +#include <linux/errno.h>
+> > +#include <linux/i2c.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/regulator/consumer.h>
+> 
+> Alphabetical order would be nice. The same below.
+
+I was afraid you'd ask. Ok.
+
+> > +/**
+> > + * @brief I2C write using i2c_transfer().
+> > + * @param coil - the driver data structure
+> > + * @param data - register value to be written
+> 
+> This does not look entirely right. But you could just remove the entire
+> comment. It's useless.
+
+Ok.
+> > +	int ret = 0;
+> > +
+> > +	/*
+> > +	 * Go to standby first as real power off my be denied by the hardware
+> > +	 * (single power line control for both coil and sensor).
+> > +	 */
+> > +	if (standby) {
+> > +		coil->standby = 1;
+> > +		ret = ad5820_update_hw(coil);
+> > +	}
+> > +
+> > +	ret |= regulator_disable(coil->vana);
+> 
+> This is actually an error code and you shouldn't use or to combine two error
+> codes. The result will make no sense.
+> 
+> It might be the driver did this in the past but it should not be done. The
+> right thing, as elsewhere, is to assign the value to ret and check it. The
+> assigment in declaration may be dropped as well.
+
+Yeah, its broken. Let me fix it. 
+
+> I think this happens in a few places in the driver.
+
+Actually this was the only place left.
+
+
+> > +	struct ad5820_device *coil = to_ad5820_device(subdev);
+> > +	struct i2c_client *client = v4l2_get_subdevdata(subdev);
+> > +
+> > +	coil->vana = regulator_get(&client->dev, "VANA");
+> 
+> Is there a reason not to acquire this in probe instead?
+
+Yeah, new version will do that (already done, Dmitry was faster).
+
+> > +	if (IS_ERR(coil->vana)) {
+> > +		dev_err(&client->dev, "could not get regulator for vana\n");
+> > +		return -ENODEV;
+> 
+> I wonder if -EPROBE_DEFER might be the right error code here.
+
+..and should handle PROBE_DEFER, too.
+
+> > +static int ad5820_probe(struct i2c_client *client,
+> > +			const struct i2c_device_id *devid)
+> > +{
+> > +	struct ad5820_device *coil;
+> > +	int ret = 0;
+> 
+> No need to assign ret here.
+
+Ok.
+
+> > +
+> > +	coil = kzalloc(sizeof(*coil), GFP_KERNEL);
+> 
+> You could use devm_kzalloc() here and drop kfree() below and in _remove().
+> 
+> The driver might be actually older than the devm_*() functions. Not sure. At
+> least they were not widely used back then. :-)
+
+Already done, Dmitry was faster.
+
+> > +static int __exit ad5820_remove(struct i2c_client *client)
+> > +{
+> > +	struct v4l2_subdev *subdev = i2c_get_clientdata(client);
+> > +	struct ad5820_device *coil = to_ad5820_device(subdev);
+> > +
+> > +	v4l2_device_unregister_subdev(&coil->subdev);
+> > +	v4l2_ctrl_handler_free(&coil->ctrls);
+> > +	media_entity_cleanup(&coil->subdev.entity);
+> > +	if (coil->vana)
+> > +		regulator_put(coil->vana);
+> 
+> mutex_destroy(&coil->power_lock);
+> 
+> Here. And in probe() error paths as well.
+
+Ok. Can do, altrough it is pretty much a NOP in the error paths.
+
+Thanks,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
