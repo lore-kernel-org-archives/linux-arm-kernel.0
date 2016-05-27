@@ -1,57 +1,79 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 May 2016 18:36:53 +0100
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <20160527165806.GA20966@yury-N73SV>
-References: <6293194.tGy03QJ9ME@wuerfel> <13240365.okADkKsTBJ@wuerfel>
- <20160527093052.GB7865@e104818-lin.cambridge.arm.com>
- <5422652.7gdoDlB8u0@wuerfel>
- <20160527130446.GD7865@e104818-lin.cambridge.arm.com>
- <20160527165806.GA20966@yury-N73SV>
-Message-ID: <20160527173653.GA19961@e104818-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 May 2016 18:46:36 +0100
+Subject: [PATCH] arm64: kasan: instrument user memory access API
+In-Reply-To: <cea39367-65b6-62df-7e4c-57ae1ce36dcc@linaro.org>
+References: <1464288231-11304-1-git-send-email-yang.shi@linaro.org>
+ <57482930.6020608@virtuozzo.com>
+ <cea39367-65b6-62df-7e4c-57ae1ce36dcc@linaro.org>
+Message-ID: <20160527174635.GL24469@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2016 at 07:58:06PM +0300, Yury Norov wrote:
-> So, we have 3 options for now:
-> 1. Clear top halves in entry.S which means we pass off_t as a pair.
->    The cost is performance (didn't measure it yet and doubt about it
->    makes serious impact). The advantage is simplicity and unification with
->    aarch32, as I mentioned above. And David likes it. And it mininizes
->    the amount of changes on glibc side.
-> 2. Clear top halves in in separated file hosted wrappers.
-> 3. Clear top halves in I-cache and tail optimization friendly in-site wrappers.
+On Fri, May 27, 2016 at 09:34:03AM -0700, Shi, Yang wrote:
+> On 5/27/2016 4:02 AM, Andrey Ryabinin wrote:
+> >
+> >
+> >On 05/26/2016 09:43 PM, Yang Shi wrote:
+> >>The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
+> >>("x86/kasan: instrument user memory access API") added KASAN instrument to
+> >>x86 user memory access API, so added such instrument to ARM64 too.
+> >>
+> >>Tested by test_kasan module.
+> >>
+> >>Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> >>---
+> >> arch/arm64/include/asm/uaccess.h | 18 ++++++++++++++++--
+> >> 1 file changed, 16 insertions(+), 2 deletions(-)
+> >
+> >Please, cover __copy_from_user() and __copy_to_user() too.
+> >Unlike x86, your patch doesn't instrument these two.
+
+Argh, I missed those when reviewing. My bad.
+
+> I should elaborated this in my review. Yes, I did think about it,
+> but unlike x86, __copy_to/from_user are implemented by asm code on
+> ARM64. If I add kasan_check_read/write into them, I have to move the
+> registers around to prepare the parameters for kasan calls, then
+> restore them after the call, for example the below code for
+> __copy_to_user:
 > 
-> 2 and 3 are the same from ABI point of view.
-> 
-> 2 is the worst for me as it is the most complex in implementation and 
-> I-cache and tail optimization non-friendly. But Heiko likes it.
->  
-> 3 is what Catalin is talking about, and it was my initial approach.
-> Though I didn't made compiler to do tail optimization, I think we can
-> do it.
+>         mov     x9, x0
+>         mov     x10, x1
+>         mov     x11, x2
+>         mov     x0, x10
+>         mov     x1, x11
+>         bl      kasan_check_read
+>         mov     x0, x9
+>         mov     x1, x10
 
-I don't fully understand the difference between 2 and 3. My comment was
-more around annotating the wrappers in (2) with __naked to no longer
-generate function prologue/epilogue. They would still be in a separate
-kernel/compat_wrapper.c file.
+There's no need to alter the assembly.
 
-I can't figure out how you would have in-place wrappers for all
-syscalls. You can indeed handle the current COMPAT_SYSCALL_DEFINE via
-__SC_DELOUSE (and penalising the AArch32/compat support slightly) but
-there is no solution for native SYSCALL_DEFINE functions to do it
-in-place.
+Rename the functions (e.g. have __arch_raw_copy_from_user), and add
+static inline wrappers in uaccess.h that do the kasan calls before
+calling the assembly functions.
 
-> But 2 is what we have now. And I'd choose it. We'll never get ilp32 done
-> if will roll back previously agreed decisions again and again.
+That gives the compiler the freedom to do the right thing, and avoids
+horrible ifdeffery in the assembly code.
 
-I would rather roll back a decision than going ahead with a wrong one.
-Note that this is *ABI*, not a driver that you can fix upstream later.
+> So, I'm wondering if it is worth or not since __copy_to/from_user
+> are just called at a couple of places, i.e. sctp, a couple of
+> drivers, etc and not used too much.
 
-Since yesterday, I realised that (2) requires further annotations and
-wrapping for the native and compat syscalls used by ILP32 just to cope
-with pointers. Also given davem's comments, (1) starts to look a bit
-more appealing (I don't like reverting such decisions either, I'd have
-to review the code again and again).
+[mark at leverpostej:~/src/linux]% git grep -w __copy_to_user -- ^arch | wc -l
+63
+[mark at leverpostej:~/src/linux]% git grep -w __copy_from_user -- ^arch | wc -l
+47
 
--- 
-Catalin
+That's a reasonable number of callsites.
+
+If we're going to bother adding this, it should be complete. So please
+do update __copy_from_user and __copy_to_user.
+
+> Actually, I think some of them
+> could be replaced by __copy_to/from_user_inatomic.
+
+Given the number of existing callers outside of arch code, I think we'll
+get far more traction reworking the arm64 parts for now.
+
+Thanks,
+Mark.
