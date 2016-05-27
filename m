@@ -1,91 +1,87 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 27 May 2016 17:13:29 +0100
-Subject: [PATCH v4 01/18] remoteproc: st_xp70_rproc: add a xp70 slimcore
- rproc driver
-In-Reply-To: <57484867.6030608@st.com>
-References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
- <1464192412-16386-3-git-send-email-peter.griffin@linaro.org>
- <57484867.6030608@st.com>
-Message-ID: <20160527161329.GA29319@griffinp-ThinkPad-X1-Carbon-2nd>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 27 May 2016 17:14:33 +0100
+Subject: v7_dma_inv_range performance/high expense
+In-Reply-To: <20160527144045.GB20214@lunn.ch>
+References: <20160527144045.GB20214@lunn.ch>
+Message-ID: <20160527161432.GI24469@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Patrice,
-
-On Fri, 27 May 2016, Patrice Chotard wrote:
-<snip>
-
-> >+struct rproc *xp70_rproc_alloc(struct platform_device *pdev, char *fw_name);
-> >+void xp70_rproc_put(struct st_xp70_rproc *xp70_rproc);
-> >+
-> >+#endif
+On Fri, May 27, 2016 at 04:40:45PM +0200, Andrew Lunn wrote:
+> Hi folks
 > 
-> Hi Peter
+> I have an imx6q, which is a quad core v7 processor. Attached to it via
+> pcie i have an intel i210 Ethernet controller.
 > 
-> Applying this series on top of v4.6 kernel leads to the following
-> compilation error due to patch 01/18 :
+> When the ethernet is transmitting, i can get gigabit line rate, and
+> use one core to about 35% of one core. When receiving, i get around
+> 700Mbps and ksoftirqd/0 is 98% loading a core.
 > 
-> drivers/remoteproc/st_xp70_rproc.c: In function 'xp70_rproc_alloc':
-> drivers/remoteproc/st_xp70_rproc.c:291:2: error: implicit
-> declaration of function 'rproc_get_elf_ops'
-> [-Werror=implicit-function-declaration]
->   elf_ops = rproc_get_elf_ops();
->   ^
->   LD [M]  drivers/remoteproc/remoteproc.o
+> Using perf to profile the ksoftirqd/0 pid is see:
+> 
+>   46.38%  [kernel]  [k] v7_dma_inv_range
+>   21.25%  [kernel]  [k] l2c210_inv_range
+>   10.90%  [kernel]  [k] igb_poll
+>    1.69%  [kernel]  [k] dma_cache_maint_page
+>    1.27%  [kernel]  [k] eth_type_trans
+>    1.20%  [kernel]  [k] skb_add_rx_frag
+> 
+> Digging deeper into v7_dma_inv_range i see:
+> 
+>            801182c0 <v7_dma_inv_range>:
+>            v7_dma_inv_range():
+>   0.26       mrc    15, 0, r3, cr0, cr0, {1}
+>   0.07       lsr    r3, r3, #16
+>              and    r3, r3, #15
+>   0.04       mov    r2, #4
+>              lsl    r2, r2, r3
+>   0.04       sub    r3, r2, #1
+>              tst    r0, r3
+>   0.02       bic    r0, r0, r3
+>   0.03       dsb    sy
+>   3.01       mcrne  15, 0, r0, cr7, cr14, {1}
+>   0.54       tst    r1, r3
+>              bic    r1, r1, r3
+>   0.08       mcrne  15, 0, r1, cr7, cr14, {1}
+>   3.82 34:   mcr    15, 0, r0, cr7, cr6, {1}
+>  88.32       add    r0, r0, r2
+>              cmp    r0, r1
+>   1.97       bcc    34
+>   0.43       dsb    st
+>   1.37       bx     lr
+> 
+> I'm assuming perf is off by one here, and the add is not taking 88.32%
+> of the load, rather it is the mcr instruction before it.
 
-Whoops. Looks like I forgot to include the first patch of the series. Doh! I will
-include it when I send v5.
+The address perf reports is the PC at the moment the PMU overflow
+interrupt was architecturally taken by the core. Reporting anything else
+would require us to make up bogus PC values (e.g. if a branch was just
+taken, you can't reconstruct the previous PC).
 
-The missing patch looks like this. Bjorn do you have any issues with adding this
-interface?
+If the PMU overflow interrupt comes in (asynchronously) while an
+expensive instruction is in progress, the CPU will likely have to wait
+for that to complete before it can handle the interrupt.
 
-regards,
+So yes, the MCR is very likely to be the expensive instruction here.
 
-Peter.
+> The original code in arch/arm/mm/cache-v7.S  says:
+> 
+>         mcr     p15, 0, r0, c7, c6, 1           @ invalidate D / U line
+> 
+> I don't get why a cache invalidate instruction should be so expensive.
+> It is just throwing away the contents of the cache line, not flushing
+> it out to DRAM. 
 
+This really depends on the microarchitecture and integration.
 
+The cache maintenance operations likely have to synchronise with some
+logic in other cores to safely invalidate all copies of the line, there
+may be some limit on the number of outstanding operations, etc.
 
->From 4664bb628cb5c99a43976a0b74ae1ee6cb05a68e Mon Sep 17 00:00:00 2001
-From: Peter Griffin <peter.griffin@linaro.org>
-Date: Wed, 25 May 2016 09:54:02 +0100
-Subject: [PATCH 01/19] remoteproc: add a rproc_get_elf_ops interface
+> Should i trust perf?
 
-This allows us to re-use some of the generic fw_ops such
-as rproc_elf_sanity_check() and rproc_elf_load_segments() whilst
-overriding some of the others with our own implementation.
+I don't see a reason not to. Nothing above implies that perf is
+providing erroneous information.
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
----
- drivers/remoteproc/remoteproc_elf_loader.c | 6 ++++++
- include/linux/remoteproc.h                 | 2 ++
- 2 files changed, 8 insertions(+)
-
-diff --git a/drivers/remoteproc/remoteproc_elf_loader.c b/drivers/remoteproc/remoteproc_elf_loader.c
-index ce283a5..a3e06df 100644
---- a/drivers/remoteproc/remoteproc_elf_loader.c
-+++ b/drivers/remoteproc/remoteproc_elf_loader.c
-@@ -335,3 +335,9 @@ const struct rproc_fw_ops rproc_elf_fw_ops = {
- 	.sanity_check = rproc_elf_sanity_check,
- 	.get_boot_addr = rproc_elf_get_boot_addr
- };
-+
-+const struct rproc_fw_ops *rproc_get_elf_ops(void)
-+{
-+	return &rproc_elf_fw_ops;
-+}
-+EXPORT_SYMBOL_GPL(rproc_get_elf_ops);
-diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
-index 9c4e138..b0b06c8 100644
---- a/include/linux/remoteproc.h
-+++ b/include/linux/remoteproc.h
-@@ -495,6 +495,8 @@ int rproc_boot(struct rproc *rproc);
- void rproc_shutdown(struct rproc *rproc);
- void rproc_report_crash(struct rproc *rproc, enum rproc_crash_type type);
- 
-+const struct rproc_fw_ops *rproc_get_elf_ops(void);
-+
- static inline struct rproc_vdev *vdev_to_rvdev(struct virtio_device *vdev)
- {
- 	return container_of(vdev, struct rproc_vdev, vdev);
--- 
-1.9.1
+Thanks,
+Mark.
