@@ -1,146 +1,49 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Fri, 27 May 2016 14:01:03 -0700
-Subject: [v2 PATCH] arm64: kasan: instrument user memory access API
-Message-ID: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 28 May 2016 00:54:08 +0200
+Subject: [PATCH] tty/serial: atmel: fix RS485 half duplex with DMA
+Message-ID: <1464389648-4820-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
-("x86/kasan: instrument user memory access API") added KASAN instrument to
-x86 user memory access API, so added such instrument to ARM64 too.
+When using DMA, half duplex doesn't work properly because rx is not stopped
+before starting tx. Ensure we call atmel_stop_rx() in the DMA case.
 
-Define __copy_to/from_user in C in order to add kasan_check_read/write call,
-rename assembly implementation to __arch_copy_to/from_user.
-
-Tested by test_kasan module.
-
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-v2:
- Adopted the comment from Andrey and Mark to add kasan_check_read/write into
- __copy_to/from_user.
+ drivers/tty/serial/atmel_serial.c | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
 
- arch/arm64/include/asm/uaccess.h | 25 +++++++++++++++++++++----
- arch/arm64/kernel/arm64ksyms.c   |  4 ++--
- arch/arm64/lib/copy_from_user.S  |  4 ++--
- arch/arm64/lib/copy_to_user.S    |  4 ++--
- 4 files changed, 27 insertions(+), 10 deletions(-)
-
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 0685d74..4dc9a8f 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -23,6 +23,7 @@
-  */
- #include <linux/string.h>
- #include <linux/thread_info.h>
-+#include <linux/kasan-checks.h>
- 
- #include <asm/alternative.h>
- #include <asm/cpufeature.h>
-@@ -269,15 +270,29 @@ do {									\
- 		-EFAULT;						\
- })
- 
--extern unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n);
--extern unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n);
-+extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
-+extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
- extern unsigned long __must_check __copy_in_user(void __user *to, const void __user *from, unsigned long n);
- extern unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
- 
-+static inline unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n)
-+{
-+	kasan_check_write(to, n);
-+	return  __arch_copy_from_user(to, from, n);
-+}
-+
-+static inline unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n)
-+{
-+	kasan_check_read(from, n);
-+	return  __arch_copy_to_user(to, from, n);
-+}
-+
- static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 954941dd8124..f9c798cba83f 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -482,19 +482,21 @@ static void atmel_start_tx(struct uart_port *port)
  {
-+	kasan_check_write(to, n);
-+
- 	if (access_ok(VERIFY_READ, from, n))
--		n = __copy_from_user(to, from, n);
-+		n = __arch_copy_from_user(to, from, n);
- 	else /* security hole - plug it */
- 		memset(to, 0, n);
- 	return n;
-@@ -285,8 +300,10 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
+ 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
  
- static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
- {
-+	kasan_check_read(from, n);
+-	if (atmel_use_pdc_tx(port)) {
+-		if (atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN)
+-			/* The transmitter is already running.  Yes, we
+-			   really need this.*/
+-			return;
++	if (atmel_use_pdc_tx(port) && (atmel_uart_readl(port, ATMEL_PDC_PTSR)
++				       & ATMEL_PDC_TXTEN))
++		/* The transmitter is already running.  Yes, we
++		   really need this.*/
++		return;
+ 
++	if (atmel_use_pdc_tx(port) || atmel_use_dma_tx(port))
+ 		if ((port->rs485.flags & SER_RS485_ENABLED) &&
+ 		    !(port->rs485.flags & SER_RS485_RX_DURING_TX))
+ 			atmel_stop_rx(port);
+ 
++	if (atmel_use_pdc_tx(port))
+ 		/* re-enable PDC transmit */
+ 		atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTEN);
+-	}
 +
- 	if (access_ok(VERIFY_WRITE, to, n))
--		n = __copy_to_user(to, from, n);
-+		n = __arch_copy_to_user(to, from, n);
- 	return n;
+ 	/* Enable interrupts */
+ 	atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
  }
- 
-diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-index 678f30b0..2dc4440 100644
---- a/arch/arm64/kernel/arm64ksyms.c
-+++ b/arch/arm64/kernel/arm64ksyms.c
-@@ -34,8 +34,8 @@ EXPORT_SYMBOL(copy_page);
- EXPORT_SYMBOL(clear_page);
- 
- 	/* user mem (segment) */
--EXPORT_SYMBOL(__copy_from_user);
--EXPORT_SYMBOL(__copy_to_user);
-+EXPORT_SYMBOL(__arch_copy_from_user);
-+EXPORT_SYMBOL(__arch_copy_to_user);
- EXPORT_SYMBOL(__clear_user);
- EXPORT_SYMBOL(__copy_in_user);
- 
-diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-index 17e8306..0b90497 100644
---- a/arch/arm64/lib/copy_from_user.S
-+++ b/arch/arm64/lib/copy_from_user.S
-@@ -66,7 +66,7 @@
- 	.endm
- 
- end	.req	x5
--ENTRY(__copy_from_user)
-+ENTRY(__arch_copy_from_user)
- ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
-@@ -75,7 +75,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0				// Nothing to copy
- 	ret
--ENDPROC(__copy_from_user)
-+ENDPROC(__arch_copy_from_user)
- 
- 	.section .fixup,"ax"
- 	.align	2
-diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-index 21faae6..7a7efe2 100644
---- a/arch/arm64/lib/copy_to_user.S
-+++ b/arch/arm64/lib/copy_to_user.S
-@@ -65,7 +65,7 @@
- 	.endm
- 
- end	.req	x5
--ENTRY(__copy_to_user)
-+ENTRY(__arch_copy_to_user)
- ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	add	end, x0, x2
-@@ -74,7 +74,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
- 	    CONFIG_ARM64_PAN)
- 	mov	x0, #0
- 	ret
--ENDPROC(__copy_to_user)
-+ENDPROC(__arch_copy_to_user)
- 
- 	.section .fixup,"ax"
- 	.align	2
 -- 
-2.0.2
+2.8.1
