@@ -1,116 +1,132 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Fri, 27 May 2016 07:05:12 +0200
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Fri, 27 May 2016 15:10:11 +1000
 Subject: [linux-sunxi] [PATCH 1/5] spi: sunxi: fix transfer timeout
-In-Reply-To: <CAGRGNgWDrVHG26umTSHHAxFC3KXjwmpDejBAfKqvuik0_2-Jcw@mail.gmail.com>
+In-Reply-To: <CAOMqctS0AD6rHGt3wjxxyidee=_5xqby95t5TGuozAA12DdPjQ@mail.gmail.com>
 References: <cover.1464130597.git.hramrach@gmail.com>
  <cb90b922caa6ac07c1425d726ea19709ee5284f4.1464130597.git.hramrach@gmail.com>
  <CAGRGNgWDrVHG26umTSHHAxFC3KXjwmpDejBAfKqvuik0_2-Jcw@mail.gmail.com>
-Message-ID: <CAOMqctS0AD6rHGt3wjxxyidee=_5xqby95t5TGuozAA12DdPjQ@mail.gmail.com>
+ <CAOMqctS0AD6rHGt3wjxxyidee=_5xqby95t5TGuozAA12DdPjQ@mail.gmail.com>
+Message-ID: <CAGRGNgW=UnmwwiREV+nVcws6sk18-4fKz3qf-WKf4LY9-VqBKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2016 at 04:05, Julian Calaby <julian.calaby@gmail.com> wrote:
-> Hi Michal,
->
-> On Fri, May 27, 2016 at 5:25 AM, Michal Suchanek <hramrach@gmail.com> wrote:
->> The trasfer timeout is fixed at 1000 ms. Reading a 4Mbyte flash over
->> 1MHz SPI bus takes way longer than that. Calculate the timeout from the
->> actual time the transfer is supposed to take and multiply by 2 for good
->> measure.
+Hi Michal,
+
+On Fri, May 27, 2016 at 3:05 PM, Michal Suchanek <hramrach@gmail.com> wrote:
+> On 27 May 2016 at 04:05, Julian Calaby <julian.calaby@gmail.com> wrote:
+>> Hi Michal,
 >>
->> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->> ---
+>> On Fri, May 27, 2016 at 5:25 AM, Michal Suchanek <hramrach@gmail.com> wrote:
+>>> The trasfer timeout is fixed at 1000 ms. Reading a 4Mbyte flash over
+>>> 1MHz SPI bus takes way longer than that. Calculate the timeout from the
+>>> actual time the transfer is supposed to take and multiply by 2 for good
+>>> measure.
+>>>
+>>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>>> ---
+>>>
+>>> v2:
+>>> - fix build error
+>>> - use unsigned instead of int in max_t
+>>> - use tfr->speed_hz instead of sspi->max_speed_hz
+>>> ---
+>>>  drivers/spi/spi-sun4i.c | 11 ++++++++++-
+>>>  drivers/spi/spi-sun6i.c | 11 ++++++++++-
+>>>  2 files changed, 20 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+>>> index 1ddd9e2..fe63bbd 100644
+>>> --- a/drivers/spi/spi-sun4i.c
+>>> +++ b/drivers/spi/spi-sun4i.c
+>>> @@ -173,6 +173,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+>>>  {
+>>>         struct sun4i_spi *sspi = spi_master_get_devdata(master);
+>>>         unsigned int mclk_rate, div, timeout;
+>>> +       unsigned int start, end, tx_time;
+>>>         unsigned int tx_len = 0;
+>>>         int ret = 0;
+>>>         u32 reg;
+>>> @@ -279,9 +280,17 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+>>>         reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+>>>         sun4i_spi_write(sspi, SUN4I_CTL_REG, reg | SUN4I_CTL_XCH);
+>>>
+>>> +       tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
 >>
->> v2:
->> - fix build error
->> - use unsigned instead of int in max_t
->> - use tfr->speed_hz instead of sspi->max_speed_hz
->> ---
->>  drivers/spi/spi-sun4i.c | 11 ++++++++++-
->>  drivers/spi/spi-sun6i.c | 11 ++++++++++-
->>  2 files changed, 20 insertions(+), 2 deletions(-)
+>> You should probably use "unsigned int" instead of just "unsigned" here.
 >>
->> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
->> index 1ddd9e2..fe63bbd 100644
->> --- a/drivers/spi/spi-sun4i.c
->> +++ b/drivers/spi/spi-sun4i.c
->> @@ -173,6 +173,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->>  {
->>         struct sun4i_spi *sspi = spi_master_get_devdata(master);
->>         unsigned int mclk_rate, div, timeout;
->> +       unsigned int start, end, tx_time;
->>         unsigned int tx_len = 0;
->>         int ret = 0;
->>         u32 reg;
->> @@ -279,9 +280,17 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->>         reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
->>         sun4i_spi_write(sspi, SUN4I_CTL_REG, reg | SUN4I_CTL_XCH);
+>>> +                       100);
+>
+> Or just 100U constant and avoid max_t altogether.
+>
+>>> +       start = jiffies;
+>>>         timeout = wait_for_completion_timeout(&sspi->done,
+>>> -                                             msecs_to_jiffies(1000));
+>>> +                                             msecs_to_jiffies(tx_time));
+>>> +       end = jiffies;
+>>>         if (!timeout) {
+>>> +               dev_warn(&master->dev,
+>>> +                        "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
+>>> +                        dev_name(&spi->dev), tfr->len, tfr->speed_hz,
+>>> +                        jiffies_to_msecs(end - start), tx_time);
 >>
->> +       tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
+>> Should the debug changes be in a separate patch?
 >
-> You should probably use "unsigned int" instead of just "unsigned" here.
->
->> +                       100);
+> Is this so big of a change that it needs to be split?
 
-Or just 100U constant and avoid max_t altogether.
-
->> +       start = jiffies;
->>         timeout = wait_for_completion_timeout(&sspi->done,
->> -                                             msecs_to_jiffies(1000));
->> +                                             msecs_to_jiffies(tx_time));
->> +       end = jiffies;
->>         if (!timeout) {
->> +               dev_warn(&master->dev,
->> +                        "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
->> +                        dev_name(&spi->dev), tfr->len, tfr->speed_hz,
->> +                        jiffies_to_msecs(end - start), tx_time);
->
-> Should the debug changes be in a separate patch?
-
-Is this so big of a change that it needs to be split?
+Some people get touchy about changes not being mentioned in the commit
+log. Technically this is two changes: fixing the timeout and adding
+the timeout debugging, however they're related, so maybe just mention
+that you've added this debugging in the commit log.
 
 >
->>                 ret = -ETIMEDOUT;
->>                 goto out;
->>         }
->> diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
->> index 42e2c4b..8be5c5c 100644
->> --- a/drivers/spi/spi-sun6i.c
->> +++ b/drivers/spi/spi-sun6i.c
->> @@ -162,6 +162,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
->>         unsigned int mclk_rate, div, timeout;
->>         unsigned int tx_len = 0;
->>         int ret = 0;
->> +       unsigned int start, end, tx_time;
->>         u32 reg;
 >>
->>         /* We don't support transfer larger than the FIFO */
->> @@ -269,9 +270,17 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
->>         reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
->>         sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
+>>>                 ret = -ETIMEDOUT;
+>>>                 goto out;
+>>>         }
+>>> diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+>>> index 42e2c4b..8be5c5c 100644
+>>> --- a/drivers/spi/spi-sun6i.c
+>>> +++ b/drivers/spi/spi-sun6i.c
+>>> @@ -162,6 +162,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+>>>         unsigned int mclk_rate, div, timeout;
+>>>         unsigned int tx_len = 0;
+>>>         int ret = 0;
+>>> +       unsigned int start, end, tx_time;
+>>>         u32 reg;
+>>>
+>>>         /* We don't support transfer larger than the FIFO */
+>>> @@ -269,9 +270,17 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+>>>         reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+>>>         sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
+>>>
+>>> +       tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
 >>
->> +       tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
+>> Ditto, "unsigned int" instead of "unsigned"?
+>>
+>>> +                       100);
+>>> +       start = jiffies;
+>>>         timeout = wait_for_completion_timeout(&sspi->done,
+>>> -                                             msecs_to_jiffies(1000));
+>>> +                                             msecs_to_jiffies(tx_time));
+>>> +       end = jiffies;
+>>>         if (!timeout) {
+>>> +               dev_warn(&master->dev,
+>>> +                        "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
+>>> +                        dev_name(&spi->dev), tfr->len, tfr->speed_hz,
+>>> +                        jiffies_to_msecs(end - start), tx_time);
+>>
+>> Ditto, separate patch?
+>>
+>> Also, should the changes for the drivers be in two separate patches also?
 >
-> Ditto, "unsigned int" instead of "unsigned"?
->
->> +                       100);
->> +       start = jiffies;
->>         timeout = wait_for_completion_timeout(&sspi->done,
->> -                                             msecs_to_jiffies(1000));
->> +                                             msecs_to_jiffies(tx_time));
->> +       end = jiffies;
->>         if (!timeout) {
->> +               dev_warn(&master->dev,
->> +                        "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
->> +                        dev_name(&spi->dev), tfr->len, tfr->speed_hz,
->> +                        jiffies_to_msecs(end - start), tx_time);
->
-> Ditto, separate patch?
->
-> Also, should the changes for the drivers be in two separate patches also?
+> That's basically the same driver with different constants so I guess not.
 
-That's basically the same driver with different constants so I guess not.
+Fair enough, I withdraw my comment then.
 
-Thanks
+Thanks,
 
-Michal
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
