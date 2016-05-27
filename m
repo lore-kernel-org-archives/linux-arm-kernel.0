@@ -1,134 +1,273 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 27 May 2016 22:26:52 +0200
-Subject: [RFC PATCH v2 0/7] AC97 device/driver model revamp
-Message-ID: <1464380819-19075-1-git-send-email-robert.jarzmik@free.fr>
+Date: Fri, 27 May 2016 22:26:57 +0200
+Subject: [RFC PATCH v2 5/7] ASoC: pxa: switch to new ac97 bus support
+In-Reply-To: <1464380819-19075-1-git-send-email-robert.jarzmik@free.fr>
+References: <1464380819-19075-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1464380819-19075-6-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It all started in the pxa device-tree submission here :
-   https://lkml.org/lkml/2016/2/25/965
-   
-It will be maintained in :
-   git fetch https://github.com/rjarzmik/linux.git work/ac97
+Switch to the new ac97 bus support in sound/ac97 instead of the legacy
+snd_ac97 one.
 
-And now it transformed into this RFC, which would bring a ground for AC'97
-devices closer to the linux device/driver model.
+Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+---
+ include/sound/pxa2xx-lib.h  | 15 +++++++++------
+ sound/arm/Kconfig           |  1 -
+ sound/arm/pxa2xx-ac97-lib.c | 39 +++++++++++++++++++++++----------------
+ sound/soc/pxa/Kconfig       |  4 ++--
+ sound/soc/pxa/pxa2xx-ac97.c | 20 +++++++++++---------
+ 5 files changed, 45 insertions(+), 34 deletions(-)
 
-The driving ideas are still the same, and I put them in [1] for memory. This is
-the second opus of the RFC. I'm intending to stop the RFC cycle here if possible
-and have a true PATCH v1 submission after this RFC v2 unless there is a deep
-design flaw uncovered.
-
-I took into account Mark's and Takashi's remarks, I hope I forgot none. All the
-changes should be documented in the first 2 patches mainly. I also added :
- - the AC97 link clock
-   For now, bus code doesn't disable it in suspend and re-enable in resume,
-   leaving the controller decide. I'm still pondering if for S2RAM (as opposed
-   to runtime suspend), bus code should disable the clock.
-
- - the .h guards
-   I'm not particularly happy with my naming even for v2, feel free to propose
-   anything better, the codec.h is particularly ugly.
-
- - statics and namespace pollution
-   I made more functions static, limiting further the namespace pollution.
-
- - Kconfig/Makefile layout change
-   I get the feeling that the KConfig "select" flavor would have better been a
-   "depends on" one. And yet I didn't find a good way to enforce it, because of
-   the way sound/soc/codecs/Kconfig is designed, and I'm afraid to break the
-   structure by doing a "depends on AC97_BUS_NEW" in WM9713 configuration.
-
-Let's have another review cycle, that will let me test this serie more
-thoroughly, especially the suspend/resume and the reset in the resume, which
-doesn't work, and requires me to test more deeply. I'll also test by removing
-the wm9713 change to see how robust the implementation is.
-
-Happy review.
-
---
-Robert
-
-Robert Jarzmik (7):
-  ALSA: ac97: split out the generic ac97 registers
-  ALSA: ac97: add an ac97 bus
-  ASoC: add new ac97 bus support
-  ASoC: wm9713: add ac97 new bus support
-  ASoC: pxa: switch to new ac97 bus support
-  ARM: pxa: mioa701 convert to the new AC97 bus
-  ASoC: mioa701_wm9713: convert to new ac97 bus
-
- arch/arm/mach-pxa/mioa701.c     |  12 +-
- include/sound/ac97/codec.h      | 111 ++++++++++++
- include/sound/ac97/compat.h     |  21 +++
- include/sound/ac97/controller.h |  80 +++++++++
- include/sound/ac97/regs.h       | 262 +++++++++++++++++++++++++++
- include/sound/ac97_codec.h      | 239 +------------------------
- include/sound/pxa2xx-lib.h      |  15 +-
- sound/Kconfig                   |   2 +
- sound/Makefile                  |   1 +
- sound/ac97/Kconfig              |  18 ++
- sound/ac97/Makefile             |   8 +
- sound/ac97/ac97_core.h          |  10 ++
- sound/ac97/bus.c                | 381 ++++++++++++++++++++++++++++++++++++++++
- sound/ac97/codec.c              |  15 ++
- sound/ac97/snd_ac97_compat.c    | 104 +++++++++++
- sound/arm/Kconfig               |   1 -
- sound/arm/pxa2xx-ac97-lib.c     |  39 ++--
- sound/soc/Kconfig               |   4 +
- sound/soc/codecs/Kconfig        |   1 +
- sound/soc/codecs/wm9713.c       |  62 ++++++-
- sound/soc/pxa/Kconfig           |   4 +-
- sound/soc/pxa/mioa701_wm9713.c  |   4 +-
- sound/soc/pxa/pxa2xx-ac97.c     |  20 ++-
- 23 files changed, 1132 insertions(+), 282 deletions(-)
- create mode 100644 include/sound/ac97/codec.h
- create mode 100644 include/sound/ac97/compat.h
- create mode 100644 include/sound/ac97/controller.h
- create mode 100644 include/sound/ac97/regs.h
- create mode 100644 sound/ac97/Kconfig
- create mode 100644 sound/ac97/Makefile
- create mode 100644 sound/ac97/ac97_core.h
- create mode 100644 sound/ac97/bus.c
- create mode 100644 sound/ac97/codec.c
- create mode 100644 sound/ac97/snd_ac97_compat.c
-
+diff --git a/include/sound/pxa2xx-lib.h b/include/sound/pxa2xx-lib.h
+index 6ef629bde164..0e2b8ae3e00e 100644
+--- a/include/sound/pxa2xx-lib.h
++++ b/include/sound/pxa2xx-lib.h
+@@ -2,7 +2,8 @@
+ #define PXA2XX_LIB_H
+ 
+ #include <linux/platform_device.h>
+-#include <sound/ac97_codec.h>
++#include <sound/ac97/controller.h>
++#include <sound/ac97/compat.h>
+ 
+ /* PCM */
+ 
+@@ -21,12 +22,14 @@ extern void pxa2xx_pcm_free_dma_buffers(struct snd_pcm *pcm);
+ 
+ /* AC97 */
+ 
+-extern unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg);
+-extern void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg, unsigned short val);
++extern int pxa2xx_ac97_read(struct ac97_controller *adrv, int slot,
++			    unsigned short reg);
++extern int pxa2xx_ac97_write(struct ac97_controller *adrv, int slot,
++			     unsigned short reg, unsigned short val);
+ 
+-extern bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97);
+-extern bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97);
+-extern void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97);
++extern bool pxa2xx_ac97_try_warm_reset(struct ac97_controller *adrv);
++extern bool pxa2xx_ac97_try_cold_reset(struct ac97_controller *adrv);
++extern void pxa2xx_ac97_finish_reset(struct ac97_controller *adrv);
+ 
+ extern int pxa2xx_ac97_hw_suspend(void);
+ extern int pxa2xx_ac97_hw_resume(void);
+diff --git a/sound/arm/Kconfig b/sound/arm/Kconfig
+index e0406211716b..94f7539a2c1f 100644
+--- a/sound/arm/Kconfig
++++ b/sound/arm/Kconfig
+@@ -11,7 +11,6 @@ menuconfig SND_ARM
+ 
+ config SND_PXA2XX_LIB
+ 	tristate
+-	select SND_AC97_CODEC if SND_PXA2XX_LIB_AC97
+ 	select SND_DMAENGINE_PCM
+ 
+ config SND_PXA2XX_LIB_AC97
+diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
+index 39c3969ac1c7..62b31e909d31 100644
+--- a/sound/arm/pxa2xx-ac97-lib.c
++++ b/sound/arm/pxa2xx-ac97-lib.c
+@@ -20,7 +20,7 @@
+ #include <linux/io.h>
+ #include <linux/gpio.h>
+ 
+-#include <sound/ac97_codec.h>
++#include <sound/ac97/controller.h>
+ #include <sound/pxa2xx-lib.h>
+ 
+ #include <mach/irqs.h>
+@@ -46,38 +46,41 @@ extern void pxa27x_configure_ac97reset(int reset_gpio, bool to_gpio);
+  * 1 jiffy timeout if interrupt never comes).
+  */
+ 
+-unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
++int pxa2xx_ac97_read(struct ac97_controller *ac97, int slot, unsigned short reg)
+ {
+-	unsigned short val = -1;
++	int val = -ENODEV;
+ 	volatile u32 *reg_addr;
+ 
++	if (slot > 0)
++		return -ENODEV;
++
+ 	mutex_lock(&car_mutex);
+ 
+ 	/* set up primary or secondary codec space */
+ 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
+-		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
++		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
+ 	else
+-		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
++		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
+ 	reg_addr += (reg >> 1);
+ 
+ 	/* start read access across the ac97 link */
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+-	val = *reg_addr;
++	val = (*reg_addr & 0xffff);
+ 	if (reg == AC97_GPIO_STATUS)
+ 		goto out;
+ 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1) <= 0 &&
+ 	    !((GSR | gsr_bits) & GSR_SDONE)) {
+ 		printk(KERN_ERR "%s: read error (ac97_reg=%d GSR=%#lx)\n",
+ 				__func__, reg, GSR | gsr_bits);
+-		val = -1;
++		val = -ETIMEDOUT;
+ 		goto out;
+ 	}
+ 
+ 	/* valid data now */
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+-	val = *reg_addr;
++	val = (*reg_addr & 0xffff);
+ 	/* but we've just started another cycle... */
+ 	wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1);
+ 
+@@ -86,29 +89,33 @@ out:	mutex_unlock(&car_mutex);
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_read);
+ 
+-void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
+-			unsigned short val)
++int pxa2xx_ac97_write(struct ac97_controller *ac97, int slot,
++		      unsigned short reg, unsigned short val)
+ {
+ 	volatile u32 *reg_addr;
++	int ret = 0;
+ 
+ 	mutex_lock(&car_mutex);
+ 
+ 	/* set up primary or secondary codec space */
+ 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
+-		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
++		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
+ 	else
+-		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
++		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
+ 	reg_addr += (reg >> 1);
+ 
+ 	GSR = GSR_CDONE | GSR_SDONE;
+ 	gsr_bits = 0;
+ 	*reg_addr = val;
+ 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_CDONE, 1) <= 0 &&
+-	    !((GSR | gsr_bits) & GSR_CDONE))
++	    !((GSR | gsr_bits) & GSR_CDONE)) {
+ 		printk(KERN_ERR "%s: write error (ac97_reg=%d GSR=%#lx)\n",
+ 				__func__, reg, GSR | gsr_bits);
++		ret = -EIO;
++	}
+ 
+ 	mutex_unlock(&car_mutex);
++	return ret;
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_write);
+ 
+@@ -188,7 +195,7 @@ static inline void pxa_ac97_cold_pxa3xx(void)
+ }
+ #endif
+ 
+-bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
++bool pxa2xx_ac97_try_warm_reset(struct ac97_controller *adrv)
+ {
+ 	unsigned long gsr;
+ 	unsigned int timeout = 100;
+@@ -225,7 +232,7 @@ bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_warm_reset);
+ 
+-bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
++bool pxa2xx_ac97_try_cold_reset(struct ac97_controller *adrv)
+ {
+ 	unsigned long gsr;
+ 	unsigned int timeout = 1000;
+@@ -263,7 +270,7 @@ bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
+ EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_cold_reset);
+ 
+ 
+-void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97)
++void pxa2xx_ac97_finish_reset(struct ac97_controller *adrv)
+ {
+ 	GCR &= ~(GCR_PRIRDY_IEN|GCR_SECRDY_IEN);
+ 	GCR |= GCR_SDONE_IE|GCR_CDONE_IE;
+diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
+index f2bf8661dd21..784e6dedf5bf 100644
+--- a/sound/soc/pxa/Kconfig
++++ b/sound/soc/pxa/Kconfig
+@@ -23,9 +23,9 @@ config SND_PXA2XX_AC97
+ 
+ config SND_PXA2XX_SOC_AC97
+ 	tristate
+-	select AC97_BUS
++	select AC97_BUS_NEW
+ 	select SND_PXA2XX_LIB_AC97
+-	select SND_SOC_AC97_BUS
++	select SND_SOC_AC97_BUS_NEW
+ 
+ config SND_PXA2XX_SOC_I2S
+ 	tristate
+diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
+index f3de615aacd7..b6551be7c7eb 100644
+--- a/sound/soc/pxa/pxa2xx-ac97.c
++++ b/sound/soc/pxa/pxa2xx-ac97.c
+@@ -17,6 +17,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/dma/pxa-dma.h>
+ 
++#include <sound/ac97/controller.h>
+ #include <sound/core.h>
+ #include <sound/ac97_codec.h>
+ #include <sound/soc.h>
+@@ -29,21 +30,21 @@
+ 
+ #include "pxa2xx-ac97.h"
+ 
+-static void pxa2xx_ac97_warm_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_warm_reset(struct ac97_controller *adrv)
+ {
+-	pxa2xx_ac97_try_warm_reset(ac97);
++	pxa2xx_ac97_try_warm_reset(adrv);
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	pxa2xx_ac97_finish_reset(adrv);
+ }
+ 
+-static void pxa2xx_ac97_cold_reset(struct snd_ac97 *ac97)
++static void pxa2xx_ac97_cold_reset(struct ac97_controller *adrv)
+ {
+-	pxa2xx_ac97_try_cold_reset(ac97);
++	pxa2xx_ac97_try_cold_reset(adrv);
+ 
+-	pxa2xx_ac97_finish_reset(ac97);
++	pxa2xx_ac97_finish_reset(adrv);
+ }
+ 
+-static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
++static struct ac97_controller_ops pxa2xx_ac97_ops = {
+ 	.read	= pxa2xx_ac97_read,
+ 	.write	= pxa2xx_ac97_write,
+ 	.warm_reset	= pxa2xx_ac97_warm_reset,
+@@ -236,7 +237,8 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
+ 
+-	ret = snd_soc_set_ac97_ops(&pxa2xx_ac97_ops);
++	ret = snd_ac97_controller_register(&pxa2xx_ac97_ops, &pdev->dev,
++					   AC97_SLOTS_AVAILABLE_ALL);
+ 	if (ret != 0)
+ 		return ret;
+ 
+@@ -251,7 +253,7 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
+ static int pxa2xx_ac97_dev_remove(struct platform_device *pdev)
+ {
+ 	snd_soc_unregister_component(&pdev->dev);
+-	snd_soc_set_ac97_ops(NULL);
++	snd_ac97_controller_unregister(&pdev->dev);
+ 	pxa2xx_ac97_hw_remove(pdev);
+ 	return 0;
+ }
 -- 
 2.1.4
-
-[1] RFC PATCH reminder:
-
-Amongst the driving ideas behind this RFC :
- - use device/driver model for AC'97
-   device/driver binding is based on vendor_id{1,2}
- - use auto-probe of the AC'97 bus to enumerate codecs and create devices
- - be compatible with previous platform_data model for codecs
-   => this enables a smooth transition, where a codec (here wm9713) can
-      be used either through platform_device or automatic discovery
- - struct snd_ac97 is not used
-   This structure is really heavy, and doesn't represent an AC97 device, but
-   rather an AC'97 codec internals IIUC.
-   I think it's right place would be in include/sound/ac97/codec.h.
-   This is also a problem for regmap adherence, hence the
-   include/sound/ac97/compat.h.
- - a new AC'97 bus Kconfig is created
-   This was done for a smooth transition ... let's see if it's a good idea.
- - split the AC'97 into :
-   - the codec
-   - the digital controller
-   - the bus
-
-Amongst the things that are not all touched yet :
- - ac97_codec.c
-   The generic AC'97 codec in sound/pci/ac97/ac97_codec.c has really a lot
-   features, which are not at all PCI related. They could be transfered to
-   sound/ac97, without the pci specific field.
-   => this deserves a deep ahead thinking, which I'll do if the current approach
-   is accepted by the communauty.
-
-The most important patch is 2/7 "ALSA: ac97: add an ac97 bus". This is the main
-evaluation point for the serie, the others are here so that I can test it all.
-
-Well, this is a long term effort, which might need a complete rewrite according
-to the comments it'll get. Let's expose it for comments and see how I can
-progress with it.
