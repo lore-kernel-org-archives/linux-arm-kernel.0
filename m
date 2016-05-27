@@ -1,45 +1,71 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Fri, 27 May 2016 10:35:51 +0800
-Subject: [PATCH 3/3] arm64/numa: fix type info
-In-Reply-To: <57472E8C.1050607@gmail.com>
-References: <1464230639-9852-1-git-send-email-thunder.leizhen@huawei.com>
- <1464230639-9852-3-git-send-email-thunder.leizhen@huawei.com>
- <CAFpQJXWih2V9Ki-vkL+cDni=VoWL0nA-fx5B5XtfNxFsoUso-g@mail.gmail.com>
- <1464280503.16344.40.camel@perches.com> <57472E8C.1050607@gmail.com>
-Message-ID: <5747B287.7050309@huawei.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 27 May 2016 12:23:11 +0900
+Subject: [PATCH v2] ARM: avoid duplicated "Kernel: arch/arm/boot/*Image is
+ ready" log
+In-Reply-To: <1459736970-21876-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1459736970-21876-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNATwQn5v_2=-Z++awyOXcHuJkZ8Oxs+f3XtKOksnYwoZTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi.
+
+Assuming no objection to this patch,
+I will put it into Russell's patch tracker after v4.7-rc1 is out.
 
 
-On 2016/5/27 1:12, David Daney wrote:
-> The current patch to correct this problem is here:
-> 
-> https://lkml.org/lkml/2016/5/24/679
-> 
-> Since v7 of the ACPI/NUMA patches are likely going to be added to linux-next as soon as the current merge window ends, further simplifications of the informational prints should probably be rebased on top of it.
-> 
-> David Daney
-> 
 
->> On Thu, 2016-05-26 at 09:22 -0700, Ganapatrao Kulkarni wrote:
->>> IIRC, it should be
->>> if (!numa_off)
->>> we want to print this message when we failed to find proper numa configuration.
->>> when numa_off is set, we will not look for any numa configuration.
->>>
->>>>
->>>> +               pr_info("%s\n", "No NUMA configuration found");
->>
+2016-04-04 11:29 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Commit 3939f3345050 ("ARM: 8418/1: add boot image dependencies to not
+> generate invalid images") fixed bad image generation in case of
+> parallel building, but as a side effect, Kbuild now descends into
+> arch/arm/boot/ again and again, duplicating the log messages.  It is
+> clumsy, so let's display the same message only once.
+>
+> I moved the log rules from arch/arm/boot/Makefile to arch/arm/Makefile
+> rather than completely deleting them, because *Image are the final
+> targets that users are interested in.
+>
+> Without this commit, the log of incremental build is like follows:
+>
+> $ make ARCH=arm UIMAGE_LOADADDR=0x80208000 uImage
+>   CHK     include/config/kernel.release
+>   CHK     include/generated/uapi/linux/version.h
+>   CHK     include/generated/utsrelease.h
+>   CHK     include/generated/bounds.h
+>   CHK     include/generated/timeconst.h
+>   CHK     include/generated/asm-offsets.h
+>   CALL    scripts/checksyscalls.sh
+> <stdin>:1310:2: warning: #warning syscall preadv2 not implemented [-Wcpp]
+> <stdin>:1313:2: warning: #warning syscall pwritev2 not implemented [-Wcpp]
+>   CHK     include/generated/compile.h
+>   Kernel: arch/arm/boot/Image is ready
+>   Kernel: arch/arm/boot/Image is ready
+>   Kernel: arch/arm/boot/zImage is ready
+>   Kernel: arch/arm/boot/Image is ready
+>   Kernel: arch/arm/boot/zImage is ready
+>   Image arch/arm/boot/uImage is ready
+>
+> With this commit:
+>
+> $ make ARCH=arm UIMAGE_LOADADDR=0x80208000 uImage
+>   CHK     include/config/kernel.release
+>   CHK     include/generated/uapi/linux/version.h
+>   CHK     include/generated/utsrelease.h
+>   CHK     include/generated/bounds.h
+>   CHK     include/generated/timeconst.h
+>   CHK     include/generated/asm-offsets.h
+>   CALL    scripts/checksyscalls.sh
+> <stdin>:1310:2: warning: #warning syscall preadv2 not implemented [-Wcpp]
+> <stdin>:1313:2: warning: #warning syscall pwritev2 not implemented [-Wcpp]
+>   CHK     include/generated/compile.h
+>   Kernel: Image is ready
+>   Kernel: zImage is ready
+>   Kernel: uImage is ready
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
 
-OK, I think I also missed some cases.
-
-But my problem still have not been resolved by "https://lkml.org/lkml/2016/5/24/679", see below. I will update my patches base on it.
-
-
-[    0.000000] NUMA: Adding memblock [0x0 - 0x6affffff] on node 0
-[    0.000000] NUMA: parsing numa-distance-map-v1
-[    0.000000] NUMA: Warning: invalid memblk node 4 [mem 0x6b000000-0x7fbfffff]		//My numa configuration is incorrect, but not "No ... found"
-[    0.000000] No NUMA configuration found						//Above warning is very detail, this can be removed
-[    0.000000] NUMA: Faking a node at [mem 0x0000000000000000-0x00000017ffffffff]
+-- 
+Best Regards
+Masahiro Yamada
