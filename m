@@ -1,117 +1,77 @@
-From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Fri, 27 May 2016 16:56:40 +0800
-Subject: [PATCH v3 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
-In-Reply-To: <1464339400-22559-1-git-send-email-honghui.zhang@mediatek.com>
-References: <1464339400-22559-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1464339400-22559-6-git-send-email-honghui.zhang@mediatek.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 May 2016 10:01:42 +0100
+Subject: [PATCH 01/23] all: syscall wrappers: add documentation
+In-Reply-To: <20160527060357.GB3820@osiris>
+References: <6293194.tGy03QJ9ME@wuerfel>
+ <20160525.135039.244098606649448826.davem@davemloft.net>
+ <6407614.fdv5XFSBue@wuerfel>
+ <20160525.142821.1719403997976778673.davem@davemloft.net>
+ <20160526204819.GA10274@yury-N73SV>
+ <20160526222943.GA16729@MBP.local>
+ <20160527003753.GA14247@yury-N73SV> <20160527060357.GB3820@osiris>
+Message-ID: <20160527090141.GA7865@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Honghui Zhang <honghui.zhang@mediatek.com>
+On Fri, May 27, 2016 at 08:03:57AM +0200, Heiko Carstens wrote:
+> > > > The cost is pretty trivial though. See kernel/compat_wrapper.o:
+> > > > COMPAT_SYSCALL_WRAP2(creat, const char __user *, pathname, umode_t, mode);
+> > > > 0:   a9bf7bfd        stp     x29, x30, [sp,#-16]!
+> > > > 4:   910003fd        mov     x29, sp
+> > > > 8:   2a0003e0        mov     w0, w0
+> > > > c:   94000000        bl      0 <sys_creat>
+> > > > 10:  a8c17bfd        ldp     x29, x30, [sp],#16
+> > > > 14:  d65f03c0        ret
+> > > 
+> > > I would say the above could be more expensive than 8 movs (16 bytes to
+> > > write, read, a branch and a ret). You can also add the I-cache locality,
+> > > having wrappers for each syscalls instead of a single place for zeroing
+> > > the upper half (where no other wrapper is necessary).
+> > > 
+> > > Can we trick the compiler into doing a tail call optimisation. This
+> > > could have simply been:
+> > > 
+> > > COMPAT_SYSCALL_WRAP2(creat, ...):
+> > > 	mov	w0, w0
+> > > 	b	<sys_creat>
+> > 
+> > What you talk about was in my initial version. But Heiko insisted on having all
+> > wrappers together.
+> > http://www.spinics.net/lists/linux-s390/msg11593.html
+> > 
+> > Grep your email for discussion.
+> 
+> I think Catalin's question was more about why there is even a stack frame
+> generated. It looks like it is not necessary. I did ask this too a couple
+> of months ago, when we discussed this.
 
-Add the dtsi node of iommu and smi for mt2701.
+Indeed, I was questioning the need for prologue/epilogue, not the use of
+COMPAT_SYSCALL_WRAPx(). Maybe something like __naked would do.
 
-Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
----
- arch/arm/boot/dts/mt2701.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+> > > > > Cost wise, this seems like it all cancels out in the end, but what
+> > > > > do I know?
+> > > > 
+> > > > I think you know something, and I also think Heiko and other s390 guys
+> > > > know something as well. So I'd like to listen their arguments here.
+> 
+> If it comes to 64 bit arguments for compat system calls: s390 also has an
+> x32-like ABI extension which allows user space to use full 64 bit
+> registers. As far as I know hardly anybody ever made use of that.
+> 
+> However even if that would be widely used, to me it wouldn't make sense to
+> add new compat system calls which allow 64 bit arguments, simply because
+> something like
+> 
+> c = (u32)a | (u64)b << 32;
+> 
+> can be done with a single 1-cycle instruction. It's just not worth the
+> extra effort to maintain additional system call variants.
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 42d5a37..363de0d 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -16,6 +16,7 @@
- #include <dt-bindings/power/mt2701-power.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/memory/mt2701-larb-port.h>
- #include "skeleton64.dtsi"
- #include "mt2701-pinfunc.h"
- 
-@@ -160,6 +161,16 @@
- 		clock-names = "system-clk", "rtc-clk";
- 	};
- 
-+	smi_common: smi at 1000c000 {
-+		compatible = "mediatek,mt2701-smi-common";
-+		reg = <0 0x1000c000 0 0x1000>;
-+		clocks = <&infracfg CLK_INFRA_SMI>,
-+			 <&mmsys CLK_MM_SMI_COMMON>,
-+			 <&infracfg CLK_INFRA_SMI>;
-+		clock-names = "apb", "smi", "async";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
-+
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -169,6 +180,16 @@
- 		reg = <0 0x10200100 0 0x1c>;
- 	};
- 
-+	iommu: mmsys_iommu at 10205000 {
-+		compatible = "mediatek,mt2701-m4u";
-+		reg = <0 0x10205000 0 0x1000>;
-+		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_M4U>;
-+		clock-names = "bclk";
-+		mediatek,larbs = <&larb0 &larb1 &larb2>;
-+		#iommu-cells = <1>;
-+	};
-+
- 	apmixedsys: syscon at 10209000 {
- 		compatible = "mediatek,mt2701-apmixedsys", "syscon";
- 		reg = <0 0x10209000 0 0x1000>;
-@@ -234,6 +255,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb0: larb at 14010000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x14010000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&mmsys CLK_MM_SMI_LARB0>,
-+			 <&mmsys CLK_MM_SMI_LARB0>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
-@@ -241,6 +272,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb2: larb at 15001000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x15001000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&imgsys CLK_IMG_SMI_COMM>,
-+			 <&imgsys CLK_IMG_SMI_COMM>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-+	};
-+
- 	vdecsys: syscon at 16000000 {
- 		compatible = "mediatek,mt2701-vdecsys", "syscon";
- 		reg = <0 0x16000000 0 0x1000>;
-@@ -248,6 +289,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb1: larb at 16010000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x16010000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&vdecsys CLK_VDEC_CKGEN>,
-+			 <&vdecsys CLK_VDEC_LARB>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
-+	};
-+
- 	hifsys: syscon at 1a000000 {
- 		compatible = "mediatek,mt2701-hifsys", "syscon";
- 		reg = <0 0x1a000000 0 0x1000>;
+If we split 64-bit arguments in two, we can go a step further and avoid
+most of the COMPAT_SYSCALL_WRAPx annotations in favour of a common
+upper-half zeroing of the argument registers on ILP32 syscall entry.
+There would be a few exceptions where we need to re-build 64-bit
+arguments on sign-extend.
+
 -- 
-1.8.1.1.dirty
+Catalin
