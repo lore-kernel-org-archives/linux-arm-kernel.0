@@ -1,71 +1,192 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 May 2016 15:58:11 +0100
-Subject: v7_dma_inv_range performance/high expense
-In-Reply-To: <20160527144045.GB20214@lunn.ch>
-References: <20160527144045.GB20214@lunn.ch>
-Message-ID: <20160527145810.GN19428@n2100.arm.linux.org.uk>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 27 May 2016 20:37:41 +0530
+Subject: [PATCH kexec-tools 12/32] kexec: add helper to exlude a region
+ from a set of memory ranges
+In-Reply-To: <20160526085638.GF19428@n2100.arm.linux.org.uk>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <E1axXSv-0004i3-Gi@e0050434b2927.dyn.arm.linux.org.uk>
+ <CAHB_Guo_ozXhAnkGk_NrdBME2fSYDoKTHwu3kLBvsrmbwxOdww@mail.gmail.com>
+ <20160526085638.GF19428@n2100.arm.linux.org.uk>
+Message-ID: <CAHB_GuoRuQwhe-bXKAzmjOn=3=7KQ7LtT2JTooO1kjx+V3VgpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2016 at 04:40:45PM +0200, Andrew Lunn wrote:
->   0.26       mrc    15, 0, r3, cr0, cr0, {1}
->   0.07       lsr    r3, r3, #16
->              and    r3, r3, #15
->   0.04       mov    r2, #4
->              lsl    r2, r2, r3
->   0.04       sub    r3, r2, #1
->              tst    r0, r3
->   0.02       bic    r0, r0, r3
->   0.03       dsb    sy
->   3.01       mcrne  15, 0, r0, cr7, cr14, {1}
->   0.54       tst    r1, r3
->              bic    r1, r1, r3
->   0.08       mcrne  15, 0, r1, cr7, cr14, {1}
->   3.82 34:   mcr    15, 0, r0, cr7, cr6, {1}
->  88.32       add    r0, r0, r2
->              cmp    r0, r1
->   1.97       bcc    34
->   0.43       dsb    st
->   1.37       bx     lr
-> 
-> I'm assuming perf is off by one here, and the add is not taking 88.32%
-> of the load, rather it is the mcr instruction before it.
+On Thu, May 26, 2016 at 2:26 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Wed, May 25, 2016 at 01:30:44PM +0530, Pratyush Anand wrote:
+>> On Tue, May 3, 2016 at 3:52 PM, Russell King <rmk@arm.linux.org.uk> wrote:
+>> > +int mem_regions_exclude(struct memory_ranges *ranges,
+>> > +                       const struct memory_range *range)
+>> > +{
+>> > +       int i;
+>> > +
+>> > +       for (i = 0; i < ranges->size; i++) {
+>> > +               struct memory_range *r = ranges->ranges + i;
+>> > +
+>> > +               /*
+>> > +                * We assume that crash area is fully contained in
+>> > +                * some larger memory area.
+>> > +                */
+>> > +               if (r->start <= range->start && r->end >= range->end) {
+>> > +                       if (r->start == range->start) {
+>> > +                               /* Shrink the start of this memory range */
+>> > +                               r->start = range->end + 1;
+>> > +                       } else if (r->end == range->end) {
+>> > +                               /* Shrink the end of this memory range */
+>> > +                               r->end = range->start - 1;
+>>
+>> What if r->start == range->start) && (r->end == range->end)?
+>
+> I suppose that could happen, so what about this patch on top (untested).
 
-Possibly, but I'm not sure that merely subtracting four from the PC (or
-two for thumb) would be the correct solution - what if we've branched
-to a function and we've taken the exception with the PC pointing at the
-very first instruction - we'd wind it back by one place, and it will be
-pointing at the instruction before the function (not the previously
-executed instruction.)
+I think, it should be fine, except.....
 
-So, I think folk just have to get used to reading ARM perf traces
-differently[*] - the PC points at the _next_ instruction to be executed
-after the exception which recorded the event returns.
+> This isn't something I'd be able to test on real hardware, it needs a
+> separate test-suite to be written to do modular testing...
+>
+>  kexec/mem_regions.c | 94 +++++++++++++++++++++++++++++++----------------------
+>  1 file changed, 55 insertions(+), 39 deletions(-)
+>
+> diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
+> index c6ba942..4e7061b 100644
+> --- a/kexec/mem_regions.c
+> +++ b/kexec/mem_regions.c
+> @@ -29,6 +29,50 @@ void mem_regions_sort(struct memory_ranges *ranges)
+>  }
+>
+>  /**
+> + * mem_regions_add() - add a memory region to a set of ranges
+> + * @ranges: ranges to add the memory region to
+> + * @max: maximum number of entries in memory region
+> + * @base: base address of memory region
+> + * @length: length of memory region in bytes
+> + * @type: type of memory region
+> + *
+> + * Add the memory region to the set of ranges, and return %0 if successful,
+> + * or %-1 if we ran out of space.
+> + */
+> +int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
+> +                    unsigned long long length, int type)
+> +{
+> +       struct memory_range *range;
+> +
+> +       if (ranges->size >= ranges->max_size)
+> +               return -1;
+> +
+> +       range = ranges->ranges + ranges->size++;
+> +       range->start = base;
+> +       range->end = base + length - 1;
+> +       range->type = type;
+> +
+> +       return 0;
+> +}
+> +
+> +static void mem_regions_remove(struct memory_ranges *ranges, int index)
+> +{
+> +       int tail_entries;
+> +
+> +       /* we are assured to have at least one entry */
+> +       ranges->size -= 1;
+> +
+> +       /* if we have following entries, shuffle them down one place */
+> +       tail_entries = ranges->size - index;
+> +       if (tail_entries)
+> +               memmove(ranges->ranges + index, ranges->ranges + index + 1,
+> +                       tail_entries * sizeof(*ranges->ranges));
+> +
+> +       /* zero the new tail entry */
+> +       memset(ranges->ranges + ranges->size, 0, sizeof(*ranges->ranges));
+> +}
+> +
+> +/**
+>   * mem_regions_exclude() - excludes a memory region from a set of memory ranges
+>   * @ranges: memory ranges to exclude the region from
+>   * @range: memory range to exclude
+> @@ -40,7 +84,7 @@ void mem_regions_sort(struct memory_ranges *ranges)
+>  int mem_regions_exclude(struct memory_ranges *ranges,
+>                         const struct memory_range *range)
+>  {
+> -       int i;
+> +       int i, ret;
+>
+>         for (i = 0; i < ranges->size; i++) {
+>                 struct memory_range *r = ranges->ranges + i;
+> @@ -51,25 +95,25 @@ int mem_regions_exclude(struct memory_ranges *ranges,
+>                  */
+>                 if (r->start <= range->start && r->end >= range->end) {
+>                         if (r->start == range->start) {
+> -                               /* Shrink the start of this memory range */
+> -                               r->start = range->end + 1;
+> +                               if (r->end == range->end)
+> +                                       /* Remove this entry */
+> +                                       mem_regions_remove(ranges, i);
+> +                               else
+> +                                       /* Shrink the start of this memory range */
+> +                                       r->start = range->end + 1;
+>                         } else if (r->end == range->end) {
+>                                 /* Shrink the end of this memory range */
+>                                 r->end = range->start - 1;
+>                         } else {
+> -                               struct memory_range *new;
+> -
+>                                 /*
+>                                  * Split this area into 2 smaller ones and
+>                                  * remove excluded range from between. First
+>                                  * create new entry for the remaining area.
+>                                  */
+> -                               if (ranges->size >= ranges->max_size)
+> -                                       return -1;
+> -
+> -                               new = ranges->ranges + ranges->size++;
+> -                               new->start = range->end + 1;
+> -                               new->end = r->end;
+> +                               ret = mem_regions_add(ranges, range->end + 1,
+> +                                                     r->end, 0);
 
-* - maybe it is the same as x86, I've never looked at an x86 perf trace,
-but I don't see that it would be any different.
+3rd argument should be (r->end - range->end)
 
-> The original code in arch/arm/mm/cache-v7.S  says:
-> 
->         mcr     p15, 0, r0, c7, c6, 1           @ invalidate D / U line
-> 
-> I don't get why a cache invalidate instruction should be so expensive.
-> It is just throwing away the contents of the cache line, not flushing
-> it out to DRAM. Should i trust perf? Is a cache invalidate really so
-> expensive? Or am i totally missing something here?
+> +                               if (ret < 0)
+> +                                       return ret;
+>
+>                                 /*
+>                                  * Update this area to end before excluded
+> @@ -82,31 +126,3 @@ int mem_regions_exclude(struct memory_ranges *ranges,
+>         }
+>         return 0;
+>  }
+> -
+> -/**
+> - * mem_regions_add() - add a memory region to a set of ranges
+> - * @ranges: ranges to add the memory region to
+> - * @max: maximum number of entries in memory region
+> - * @base: base address of memory region
+> - * @length: length of memory region in bytes
+> - * @type: type of memory region
+> - *
+> - * Add the memory region to the set of ranges, and return %0 if successful,
+> - * or %-1 if we ran out of space.
+> - */
+> -int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
+> -                    unsigned long long length, int type)
+> -{
+> -       struct memory_range *range;
+> -
+> -       if (ranges->size >= ranges->max_size)
+> -               return -1;
+> -
+> -       range = ranges->ranges + ranges->size++;
+> -       range->start = base;
+> -       range->end = base + length - 1;
+> -       range->type = type;
+> -
+> -       return 0;
+> -}
+> -
+>
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+> according to speedtest.net.
 
-If we're being asked to do a large region, then flushing the cache one
-line at a time _is_ expensive.  There's no real getting away from that.
-The only thing that saves you from having to do that is having DMA
-coherency with the cache, something which I've pointed out in some
-meetings I've had with ARM over the years.
-
-The response was along the lines that you'd expect... It's only
-relatively recently, with SMP (which needs coherency) that ARM systems
-have had a coherent bus, and even systems which have it, there's
-relatively few SoCs which make use of it.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+~Pratyush
