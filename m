@@ -1,66 +1,31 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Fri, 27 May 2016 16:41:59 +0800
-Subject: [PATCH v4 0/4] Thermal: Support for hardware-tracked trip points
-In-Reply-To: <1464337408-7123-1-git-send-email-wxt@rock-chips.com>
-References: <1464337408-7123-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <57480857.4070904@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 27 May 2016 10:42:29 +0200
+Subject: [PATCH] pinctrl: samsung: Suppress unbinding to prevent
+ theoretical attacks
+In-Reply-To: <CACRpkdYdo5XsJvb9GTYph7P=u31treiDX6HZGbG_AGzW5hp1HQ@mail.gmail.com>
+References: <1463464926-17482-1-git-send-email-k.kozlowski@samsung.com>
+ <CACRpkdYdo5XsJvb9GTYph7P=u31treiDX6HZGbG_AGzW5hp1HQ@mail.gmail.com>
+Message-ID: <57480875.2040502@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Forget to send a patch, sorry for the noise.:-(
-Please ignore this series patches [PATCH v4 0/4].
+On 05/26/2016 11:08 AM, Linus Walleij wrote:
+> On Tue, May 17, 2016 at 8:02 AM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+> 
+>> Although unbinding a pinctrl driver requires root privileges but it
+>> still might be used theoretically in certain attacks (by triggering NULL
+>> pointer exception or memory corruption).
+> 
+> Patch applied with Javier's review tag.
+> 
+> I suspect this kind of patch should be done to a few
+> GPIO controller :/
 
-RESEND the new series patches "[RESEND PATCH v4 0/5]".
+Probably yes... Either the driver properly and safely handles unbind
+(remove() callback) or it should be forbidden. In the same time, even if
+remove() is implemented, unbinding some of the core SoC drivers is like
+shooting self in the foot.
 
-On 2016?05?27? 16:23, Caesar Wang wrote:
-> The history patches come from Mikko and Sascha.
->      http://thread.gmane.org/gmane.linux.power-management.general/59451
->
-> Now, I pick them up to continue upstream.
-> Nevermind!
->
-> This series history patches:
-> v3: https://lkml.org/lkml/2016/5/24/797
-> v2: https://lkml.org/lkml/2016/5/3/220
-> v1: https://lkml.org/lkml/2016/4/24/227
->
-> This series adds support for hardware trip points. It picks up earlier
-> work from Mikko Perttunen. Mikko implemented hardware trip points as part
-> of the device tree support. It was suggested back then to move the
-> functionality to the thermal core instead of putting more code into the
-> device tree support. This series does exactly that.
->
-> This series patches rebase the conflicts.
-> Note that the hardware-tracked trip points are very well tested currently.
->
-> Verified and tested on https://github.com/Caesar-github/rockchip/tree/wip/fixes-thermal-0525
-> That's based on linux-kernel 20160524.
->
->
-> Changes in v4:
-> - as the Javi comments, %s/implemnets/implements.
->
-> Changes in v3:
-> - as the Javi comments on https://patchwork.kernel.org/patch/9001311/.
-> - add the select if they set the option for devicetree.
-> - Add the peter's ACK.
->
-> Changes in v2:
-> - add the commit in patch[v2 2/5].
-> - Update the commit for patch[v2 4/5].
->
-> Caesar Wang (1):
->    thermal: rockchip: add the set_trips function
->
-> Sascha Hauer (3):
->    thermal: of: implement .set_trips for device tree thermal zones
->    thermal: streamline get_trend callbacks
->    thermal: bang-bang governor: act on lower trip boundary
->
->   drivers/thermal/gov_bang_bang.c                    |  2 +-
->   drivers/thermal/of-thermal.c                       | 30 +++++++++++------
->   drivers/thermal/rockchip_thermal.c                 | 39 ++++++++++++++++++++++
->   drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 25 +++++---------
->   include/linux/thermal.h                            |  6 +++-
->   5 files changed, 73 insertions(+), 29 deletions(-)
->
+Best regards,
+Krzysztof
