@@ -1,73 +1,31 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 27 May 2016 19:07:04 +0200
-Subject: [PATCH v1 0/6] drivers: net: xgene: Fix 1G hot-plug and module
- support
-In-Reply-To: <1464333768-26150-1-git-send-email-isubramanian@apm.com>
-References: <1464333768-26150-1-git-send-email-isubramanian@apm.com>
-Message-ID: <57487EB8.6040309@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 27 May 2016 18:14:03 +0100
+Subject: [PATCH v4 10/18] ASoC: sti: Update DT example to match the
+ driver code
+In-Reply-To: <1464192412-16386-12-git-send-email-peter.griffin@linaro.org>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+ <1464192412-16386-12-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160527171403.GN16172@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/05/16 09:22, Iyappan Subramanian wrote:
-> This patchset addresses the following issues,
->
-> 1. hot-plug issue on the SGMII 1G interface
-> 	- by adding a driver for MDIO management
-> 2. fixes the kernel crash when the driver loaded as an kernel module
-> 	- by fixing hardware cleanups and rearrange kernel API calls
->
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> ---
+On Wed, May 25, 2016 at 05:06:44PM +0100, Peter Griffin wrote:
+> uniperiph-id, version and mode are ST specific bindings and
+> need the 'st,' prefix. Update the examples, as otherwise copying
+> them yields a runtime error parsing the DT node.
 
-Without this patches we observed problems on some hardware when the 
-driver was loaded as modules, as well as the kernel crash when 
-unloading/loading the module.
-
-I tested this with an older FW and both issues are fixed, so you can add
-
-Tested-by: Matthias Brugger <mbrugger@suse.com>
-
-But I think the way the series is split in different patches is not 
-correct. Patch 1 on its own won't compile and get fixed in patch 2.
-Although I think backward compatibility to older firmware should be part 
-of the changes which provide support for the new firmware and should not 
-be a patch apart. Said this, I'm not sure if just squashing patch 1 and 
-patch 2 is the right to do, as to me it seems as if some other fixes 
-slipped into the series.
-
- From my point of view, patch 4 and 5 should be squashed, as xge0clk and 
-sge1clk nodes are useless when the mdio nodes are present.
-
-Regards,
-Matthias
-
->
-> Iyappan Subramanian (6):
->    drivers: net: xgene: MAC and PHY configuration changes
->    drivers: net: xgene: Backward compatibility with older firmware
->    drivers: net: phy: Add MDIO driver
->    dtb: xgene: Add MDIO node
->    dtb: xgene: Remove clock nodes
->    drivers: net: xgene: Fix module load/unload crash
->
->   arch/arm64/boot/dts/apm/apm-merlin.dts            |  10 +
->   arch/arm64/boot/dts/apm/apm-mustang.dts           |  12 +
->   arch/arm64/boot/dts/apm/apm-shadowcat.dtsi        |  23 +-
->   arch/arm64/boot/dts/apm/apm-storm.dtsi            |  38 +-
->   drivers/net/ethernet/apm/xgene/Kconfig            |   1 +
->   drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 241 ++++++----
->   drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  18 +-
->   drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 325 ++++++++-----
->   drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  36 +-
->   drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 191 +++++++-
->   drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h |   8 +
->   drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c |  66 ++-
->   drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h |   4 +
->   drivers/net/phy/Kconfig                           |   7 +
->   drivers/net/phy/Makefile                          |   1 +
->   drivers/net/phy/mdio-xgene.c                      | 531 ++++++++++++++++++++++
->   drivers/net/phy/mdio-xgene.h                      | 140 ++++++
->   17 files changed, 1373 insertions(+), 279 deletions(-)
->   create mode 100644 drivers/net/phy/mdio-xgene.c
->   create mode 100644 drivers/net/phy/mdio-xgene.h
->
+You've not copied me on the rest of the series so I've no idea what's
+going on with dependencies.  When sending a patch series it is important
+to ensure that all the various maintainers understand what the
+relationship between the patches as the expecation is that there will be
+interdependencies.  Either copy everyone on the whole series or at least
+copy them on the cover letter and explain what's going on.  If there are
+no strong interdependencies then it's generally simplest to just send
+the patches separately to avoid any possible confusion.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160527/17a8742a/attachment.sig>
