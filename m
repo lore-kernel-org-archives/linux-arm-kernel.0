@@ -1,273 +1,861 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 27 May 2016 22:26:57 +0200
-Subject: [RFC PATCH v2 5/7] ASoC: pxa: switch to new ac97 bus support
+Date: Fri, 27 May 2016 22:26:54 +0200
+Subject: [RFC PATCH v2 2/7] ALSA: ac97: add an ac97 bus
 In-Reply-To: <1464380819-19075-1-git-send-email-robert.jarzmik@free.fr>
 References: <1464380819-19075-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <1464380819-19075-6-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <1464380819-19075-3-git-send-email-robert.jarzmik@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to the new ac97 bus support in sound/ac97 instead of the legacy
-snd_ac97 one.
+AC97 is a bus for sound usage. It enables for a AC97 AC-Link to link one
+controller to 0 to 4 AC97 codecs.
+
+The goal of this new implementation is to implement a device/driver
+model for AC97, with an automatic scan of the bus and automatic
+discovery of AC97 codec devices.
 
 Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- include/sound/pxa2xx-lib.h  | 15 +++++++++------
- sound/arm/Kconfig           |  1 -
- sound/arm/pxa2xx-ac97-lib.c | 39 +++++++++++++++++++++++----------------
- sound/soc/pxa/Kconfig       |  4 ++--
- sound/soc/pxa/pxa2xx-ac97.c | 20 +++++++++++---------
- 5 files changed, 45 insertions(+), 34 deletions(-)
+Since v1:
+ - Takashi's review
+   - changed the codec.h guard ... a better name could be found ...
+   - added the AC97_* macros missing parenthesis
+   - constantified the id_table in the codec driver structure
+   - changed the 4 codecs linked list into an array
+   - enabled the ac97 bus to be a module
+   - added a slots_available to snd_ac97_controller_register() to have a
+     way to prevent scanning and probing of unconnected codecs
+   - removed useless ac97 bus index
+   - all exported functions begin with snd_ac97_*()
+   - change bus operations to controller+slot parameters instead of
+     codec device
 
-diff --git a/include/sound/pxa2xx-lib.h b/include/sound/pxa2xx-lib.h
-index 6ef629bde164..0e2b8ae3e00e 100644
---- a/include/sound/pxa2xx-lib.h
-+++ b/include/sound/pxa2xx-lib.h
-@@ -2,7 +2,8 @@
- #define PXA2XX_LIB_H
- 
- #include <linux/platform_device.h>
--#include <sound/ac97_codec.h>
-+#include <sound/ac97/controller.h>
-+#include <sound/ac97/compat.h>
- 
- /* PCM */
- 
-@@ -21,12 +22,14 @@ extern void pxa2xx_pcm_free_dma_buffers(struct snd_pcm *pcm);
- 
- /* AC97 */
- 
--extern unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg);
--extern void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg, unsigned short val);
-+extern int pxa2xx_ac97_read(struct ac97_controller *adrv, int slot,
-+			    unsigned short reg);
-+extern int pxa2xx_ac97_write(struct ac97_controller *adrv, int slot,
-+			     unsigned short reg, unsigned short val);
- 
--extern bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97);
--extern bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97);
--extern void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97);
-+extern bool pxa2xx_ac97_try_warm_reset(struct ac97_controller *adrv);
-+extern bool pxa2xx_ac97_try_cold_reset(struct ac97_controller *adrv);
-+extern void pxa2xx_ac97_finish_reset(struct ac97_controller *adrv);
- 
- extern int pxa2xx_ac97_hw_suspend(void);
- extern int pxa2xx_ac97_hw_resume(void);
-diff --git a/sound/arm/Kconfig b/sound/arm/Kconfig
-index e0406211716b..94f7539a2c1f 100644
---- a/sound/arm/Kconfig
-+++ b/sound/arm/Kconfig
-@@ -11,7 +11,6 @@ menuconfig SND_ARM
- 
- config SND_PXA2XX_LIB
- 	tristate
--	select SND_AC97_CODEC if SND_PXA2XX_LIB_AC97
- 	select SND_DMAENGINE_PCM
- 
- config SND_PXA2XX_LIB_AC97
-diff --git a/sound/arm/pxa2xx-ac97-lib.c b/sound/arm/pxa2xx-ac97-lib.c
-index 39c3969ac1c7..62b31e909d31 100644
---- a/sound/arm/pxa2xx-ac97-lib.c
-+++ b/sound/arm/pxa2xx-ac97-lib.c
-@@ -20,7 +20,7 @@
- #include <linux/io.h>
- #include <linux/gpio.h>
- 
--#include <sound/ac97_codec.h>
-+#include <sound/ac97/controller.h>
- #include <sound/pxa2xx-lib.h>
- 
- #include <mach/irqs.h>
-@@ -46,38 +46,41 @@ extern void pxa27x_configure_ac97reset(int reset_gpio, bool to_gpio);
-  * 1 jiffy timeout if interrupt never comes).
-  */
- 
--unsigned short pxa2xx_ac97_read(struct snd_ac97 *ac97, unsigned short reg)
-+int pxa2xx_ac97_read(struct ac97_controller *ac97, int slot, unsigned short reg)
- {
--	unsigned short val = -1;
-+	int val = -ENODEV;
- 	volatile u32 *reg_addr;
- 
-+	if (slot > 0)
-+		return -ENODEV;
+ - Mark's review
+   - changed ac97_digital_controller into ac97_controller
+   - rename ac97_digital_controller_*() into ac97_controller_*()
+   - add the ac97 ac-link clock to the codec device (ie. the AC'97 BIT_CLK)
+---
+ include/sound/ac97/codec.h      | 111 ++++++++++++
+ include/sound/ac97/compat.h     |  21 +++
+ include/sound/ac97/controller.h |  80 +++++++++
+ sound/ac97/Kconfig              |  18 ++
+ sound/ac97/Makefile             |   8 +
+ sound/ac97/ac97_core.h          |  10 ++
+ sound/ac97/bus.c                | 381 ++++++++++++++++++++++++++++++++++++++++
+ sound/ac97/codec.c              |  15 ++
+ sound/ac97/snd_ac97_compat.c    | 104 +++++++++++
+ 9 files changed, 748 insertions(+)
+ create mode 100644 include/sound/ac97/codec.h
+ create mode 100644 include/sound/ac97/compat.h
+ create mode 100644 include/sound/ac97/controller.h
+ create mode 100644 sound/ac97/Kconfig
+ create mode 100644 sound/ac97/Makefile
+ create mode 100644 sound/ac97/ac97_core.h
+ create mode 100644 sound/ac97/bus.c
+ create mode 100644 sound/ac97/codec.c
+ create mode 100644 sound/ac97/snd_ac97_compat.c
+
+diff --git a/include/sound/ac97/codec.h b/include/sound/ac97/codec.h
+new file mode 100644
+index 000000000000..a1c9746c987e
+--- /dev/null
++++ b/include/sound/ac97/codec.h
+@@ -0,0 +1,111 @@
++/*
++ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef __SOUND_AC97_CODEC2_H
++#define __SOUND_AC97_CODEC2_H
 +
- 	mutex_lock(&car_mutex);
- 
- 	/* set up primary or secondary codec space */
- 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
--		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
-+		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
- 	else
--		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
-+		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
- 	reg_addr += (reg >> 1);
- 
- 	/* start read access across the ac97 link */
- 	GSR = GSR_CDONE | GSR_SDONE;
- 	gsr_bits = 0;
--	val = *reg_addr;
-+	val = (*reg_addr & 0xffff);
- 	if (reg == AC97_GPIO_STATUS)
- 		goto out;
- 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1) <= 0 &&
- 	    !((GSR | gsr_bits) & GSR_SDONE)) {
- 		printk(KERN_ERR "%s: read error (ac97_reg=%d GSR=%#lx)\n",
- 				__func__, reg, GSR | gsr_bits);
--		val = -1;
-+		val = -ETIMEDOUT;
- 		goto out;
- 	}
- 
- 	/* valid data now */
- 	GSR = GSR_CDONE | GSR_SDONE;
- 	gsr_bits = 0;
--	val = *reg_addr;
-+	val = (*reg_addr & 0xffff);
- 	/* but we've just started another cycle... */
- 	wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_SDONE, 1);
- 
-@@ -86,29 +89,33 @@ out:	mutex_unlock(&car_mutex);
- }
- EXPORT_SYMBOL_GPL(pxa2xx_ac97_read);
- 
--void pxa2xx_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
--			unsigned short val)
-+int pxa2xx_ac97_write(struct ac97_controller *ac97, int slot,
-+		      unsigned short reg, unsigned short val)
- {
- 	volatile u32 *reg_addr;
-+	int ret = 0;
- 
- 	mutex_lock(&car_mutex);
- 
- 	/* set up primary or secondary codec space */
- 	if (cpu_is_pxa25x() && reg == AC97_GPIO_STATUS)
--		reg_addr = ac97->num ? &SMC_REG_BASE : &PMC_REG_BASE;
-+		reg_addr = slot ? &SMC_REG_BASE : &PMC_REG_BASE;
- 	else
--		reg_addr = ac97->num ? &SAC_REG_BASE : &PAC_REG_BASE;
-+		reg_addr = slot ? &SAC_REG_BASE : &PAC_REG_BASE;
- 	reg_addr += (reg >> 1);
- 
- 	GSR = GSR_CDONE | GSR_SDONE;
- 	gsr_bits = 0;
- 	*reg_addr = val;
- 	if (wait_event_timeout(gsr_wq, (GSR | gsr_bits) & GSR_CDONE, 1) <= 0 &&
--	    !((GSR | gsr_bits) & GSR_CDONE))
-+	    !((GSR | gsr_bits) & GSR_CDONE)) {
- 		printk(KERN_ERR "%s: write error (ac97_reg=%d GSR=%#lx)\n",
- 				__func__, reg, GSR | gsr_bits);
-+		ret = -EIO;
-+	}
- 
- 	mutex_unlock(&car_mutex);
-+	return ret;
- }
- EXPORT_SYMBOL_GPL(pxa2xx_ac97_write);
- 
-@@ -188,7 +195,7 @@ static inline void pxa_ac97_cold_pxa3xx(void)
- }
- #endif
- 
--bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
-+bool pxa2xx_ac97_try_warm_reset(struct ac97_controller *adrv)
- {
- 	unsigned long gsr;
- 	unsigned int timeout = 100;
-@@ -225,7 +232,7 @@ bool pxa2xx_ac97_try_warm_reset(struct snd_ac97 *ac97)
- }
- EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_warm_reset);
- 
--bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
-+bool pxa2xx_ac97_try_cold_reset(struct ac97_controller *adrv)
- {
- 	unsigned long gsr;
- 	unsigned int timeout = 1000;
-@@ -263,7 +270,7 @@ bool pxa2xx_ac97_try_cold_reset(struct snd_ac97 *ac97)
- EXPORT_SYMBOL_GPL(pxa2xx_ac97_try_cold_reset);
- 
- 
--void pxa2xx_ac97_finish_reset(struct snd_ac97 *ac97)
-+void pxa2xx_ac97_finish_reset(struct ac97_controller *adrv)
- {
- 	GCR &= ~(GCR_PRIRDY_IEN|GCR_SECRDY_IEN);
- 	GCR |= GCR_SDONE_IE|GCR_CDONE_IE;
-diff --git a/sound/soc/pxa/Kconfig b/sound/soc/pxa/Kconfig
-index f2bf8661dd21..784e6dedf5bf 100644
---- a/sound/soc/pxa/Kconfig
-+++ b/sound/soc/pxa/Kconfig
-@@ -23,9 +23,9 @@ config SND_PXA2XX_AC97
- 
- config SND_PXA2XX_SOC_AC97
- 	tristate
--	select AC97_BUS
-+	select AC97_BUS_NEW
- 	select SND_PXA2XX_LIB_AC97
--	select SND_SOC_AC97_BUS
-+	select SND_SOC_AC97_BUS_NEW
- 
- config SND_PXA2XX_SOC_I2S
- 	tristate
-diff --git a/sound/soc/pxa/pxa2xx-ac97.c b/sound/soc/pxa/pxa2xx-ac97.c
-index f3de615aacd7..b6551be7c7eb 100644
---- a/sound/soc/pxa/pxa2xx-ac97.c
-+++ b/sound/soc/pxa/pxa2xx-ac97.c
-@@ -17,6 +17,7 @@
- #include <linux/dmaengine.h>
- #include <linux/dma/pxa-dma.h>
- 
++#include <linux/device.h>
++
++#define AC97_ID(vendor_id1, vendor_id2) \
++	((((vendor_id1) & 0xffff) << 16) | ((vendor_id2) & 0xffff))
++#define AC97_DRIVER_ID(vendor_id1, vendor_id2, mask_id1, mask_id2, _data) \
++	{ .id = (((vendor_id1) & 0xffff) << 16) | ((vendor_id2) & 0xffff), \
++	  .mask = (((mask_id1) & 0xffff) << 16) | ((mask_id2) & 0xffff), \
++	  .data = (_data) }
++
++#define to_ac97_device(d) container_of(d, struct ac97_codec_device, dev)
++#define to_ac97_driver(d) container_of(d, struct ac97_codec_driver, driver)
++
++struct ac97_controller;
++struct clk;
++
++/**
++ * struct ac97_id - matches a codec device and driver on an ac97 bus
++ * @id: The significant bits if the codec vendor ID1 and ID2
++ * @mask: Bitmask specifying which bits of the id field are significant when
++ *	  matching. A driver binds to a device when :
++ *        ((vendorID1 << 8 | vendorID2) & (mask_id1 << 8 | mask_id2)) == id.
++ * @data: Private data used by the driver.
++ */
++struct ac97_id {
++	unsigned int		id;
++	unsigned int		mask;
++	void			*data;
++};
++
++/**
++ * ac97_codec_device - a ac97 codec
++ * @dev: the core device
++ * @vendor_id: the vendor_id of the codec, as sensed on the AC-link
++ * @num: the codec number, 0 is primary, 1 is first slave, etc ...
++ * @clk: the clock BIT_CLK provided to the codec
++ * @ac97_ctrl: ac97 digital controller on the same AC-link
++ *
++ * This is the device instanciated for each codec living on a AC-link. There are
++ * normally 0 to 4 codec devices per AC-link, and all of them are controlled by
++ * an AC97 digital controller.
++ */
++struct ac97_codec_device {
++	struct device		dev;
++	unsigned int		vendor_id;
++	unsigned int		num;
++	struct clk		*clk;
++	struct ac97_controller	*ac97_ctrl;
++};
++
++/**
++ * ac97_codec_driver - a ac97 codec driver
++ * @driver: the device driver structure
++ * @probe: the function called when a ac97_codec_device is matched
++ * @remove: the function called when the device is unbound/removed
++ * @suspend: suspend function (might be NULL)
++ * @resume: resume function (might be NULL)
++ * @shutdown: shutdown function (might be NULL)
++ * @id_table: ac97 vendor_id match table, { } member terminated
++ */
++struct ac97_codec_driver {
++	struct device_driver	driver;
++	int			(*probe)(struct ac97_codec_device *);
++	int			(*remove)(struct ac97_codec_device *);
++	int			(*suspend)(struct ac97_codec_device *);
++	int			(*resume)(struct ac97_codec_device *);
++	void			(*shutdown)(struct ac97_codec_device *);
++	const struct ac97_id	*id_table;
++};
++
++#if defined(CONFIG_AC97_BUS_NEW)
++int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv);
++void snd_ac97_codec_driver_unregister(struct ac97_codec_driver *drv);
++#else
++static int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
++{
++	return 0;
++}
++static void snd_ac97_codec_driver_unregister(struct ac97_codec_driver *drv)
++{
++}
++#endif
++
++
++static inline struct device *
++ac97_codec_dev2dev(struct ac97_codec_device *adev)
++{
++	return &adev->dev;
++}
++
++static inline void *ac97_get_drvdata(struct ac97_codec_device *adev)
++{
++	return dev_get_drvdata(ac97_codec_dev2dev(adev));
++}
++
++static inline void ac97_set_drvdata(struct ac97_codec_device *adev,
++				    void *data)
++{
++	dev_set_drvdata(ac97_codec_dev2dev(adev), data);
++}
++
++#endif
+diff --git a/include/sound/ac97/compat.h b/include/sound/ac97/compat.h
+new file mode 100644
+index 000000000000..bf611f572f2d
+--- /dev/null
++++ b/include/sound/ac97/compat.h
+@@ -0,0 +1,21 @@
++/*
++ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This file is for backward compatibility with snd_ac97 structure and its
++ * multiple usages, such as the snd_ac97_bus and snd_ac97_build_ops.
++ *
++ */
++#ifndef AC97_COMPAT_H
++#define AC97_COMPAT_H
++
++#include <sound/ac97_codec.h>
++#include <sound/soc.h>
++
++struct snd_ac97 *compat_alloc_snd_ac97_codec(struct snd_soc_codec *codec);
++void compat_release_snd_ac97_codec(struct snd_ac97 *ac97);
++
++#endif
+diff --git a/include/sound/ac97/controller.h b/include/sound/ac97/controller.h
+new file mode 100644
+index 000000000000..7e677f59832a
+--- /dev/null
++++ b/include/sound/ac97/controller.h
+@@ -0,0 +1,80 @@
++/*
++ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++#ifndef AC97_CONTROLLER_H
++#define AC97_CONTROLLER_H
++
++#include <linux/list.h>
++
++#define AC97_BUS_MAX_CODECS 4
++#define AC97_SLOTS_AVAILABLE_ALL 0xf
++
++struct device;
++
++/**
++ * struct ac97_controller - The AC97 controller of the AC-Link
++ * @ops:		the AC97 operations.
++ * @controllers:	linked list of all existing controllers.
++ * @dev:		the device providing the AC97 controller.
++ * @slots_available:	the mask of accessible/scanable codecs.
++ * @codecs:		the 4 possible AC97 codecs (NULL if none found).
++ *
++ * This structure is internal to AC97 bus, and should not be used by the
++ * controllers themselves, excepting for using @dev.
++ */
++struct ac97_controller {
++	const struct ac97_controller_ops *ops;
++	struct list_head controllers;
++	struct device *dev;
++	unsigned short slots_available;
++	struct ac97_codec_device *codecs[AC97_BUS_MAX_CODECS];
++};
++
++/**
++ * struct ac97_controller_ops - The AC97 operations
++ * @reset:	Cold reset of the AC97 AC-Link.
++ * @warm_reset:	Warm reset of the AC97 AC-Link.
++ * @read:	Read of a single AC97 register.
++ *		Returns the register value or a negative error code.
++ * @write:	Write of a single AC97 register.
++ * @wait:	Wait for the current AC97 operation to finish (might be NULL).
++ * @init:	Initialization of the AC97 AC-Link (might be NULL).
++ *
++ * These are the basic operation an AC97 controller must provide for an AC97
++ * access functions. Amongst these, all but the last 2 are mandatory.
++ * The slot number is also known as the AC97 codec number, between 0 and 3.
++ */
++struct ac97_controller_ops {
++	void (*reset)(struct ac97_controller *adrv);
++	void (*warm_reset)(struct ac97_controller *adrv);
++	int (*write)(struct ac97_controller *adrv, int slot,
++		     unsigned short reg, unsigned short val);
++	int (*read)(struct ac97_controller *adrv, int slot, unsigned short reg);
++	void (*wait)(struct ac97_controller *adrv, int slot);
++	void (*init)(struct ac97_controller *adrv, int slot);
++};
++
++#if defined(CONFIG_AC97_BUS_NEW)
++int snd_ac97_controller_register(const struct ac97_controller_ops *ops,
++				 struct device *dev,
++				 unsigned short slots_available);
++int snd_ac97_controller_unregister(const struct device *dev);
++#else
++static int snd_ac97_controller_register(const struct ac97_controller_ops *ops,
++					struct device *dev,
++					unsigned short slots_available)
++{
++	return 0;
++}
++
++static int snd_ac97_controller_unregister(const struct device *dev)
++{
++	return 0;
++}
++#endif
++
++#endif
+diff --git a/sound/ac97/Kconfig b/sound/ac97/Kconfig
+new file mode 100644
+index 000000000000..a99e4dbdf372
+--- /dev/null
++++ b/sound/ac97/Kconfig
+@@ -0,0 +1,18 @@
++#
++# AC97 configuration
++#
++
++
++config AC97_BUS_NEW
++	tristate
++	select AC97
++	help
++	  This is the new AC97 bus type, successor of AC97_BUS. The ported
++	  drivers which benefit from the AC97 automatic probing should "select"
++	  this instead of the AC97_BUS.
++	  Say Y here if you want to have AC97 devices, which are sound oriented
++	  devices around an AC-Link.
++
++config AC97_BUS_COMPAT
++       bool
++       depends on !AC97_BUS
+diff --git a/sound/ac97/Makefile b/sound/ac97/Makefile
+new file mode 100644
+index 000000000000..f9c2640bfb59
+--- /dev/null
++++ b/sound/ac97/Makefile
+@@ -0,0 +1,8 @@
++#
++# make for AC97 bus drivers
++#
++
++obj-$(CONFIG_AC97_BUS_NEW)	+= ac97.o
++
++ac97-y				+= bus.o codec.o
++ac97-$(CONFIG_AC97_BUS_COMPAT)	+= snd_ac97_compat.o
+diff --git a/sound/ac97/ac97_core.h b/sound/ac97/ac97_core.h
+new file mode 100644
+index 000000000000..db6e27288357
+--- /dev/null
++++ b/sound/ac97/ac97_core.h
+@@ -0,0 +1,10 @@
++/*
++ * Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++unsigned int ac97_bus_scan_one(struct ac97_controller *ac97,
++			       int codec_num);
+diff --git a/sound/ac97/bus.c b/sound/ac97/bus.c
+new file mode 100644
+index 000000000000..6755da79d4b7
+--- /dev/null
++++ b/sound/ac97/bus.c
+@@ -0,0 +1,381 @@
++/*
++ * Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/module.h>
++#include <linux/bitops.h>
++#include <linux/clk.h>
++#include <linux/device.h>
++#include <linux/list.h>
++#include <linux/mutex.h>
++#include <linux/pm.h>
++#include <linux/pm_runtime.h>
++#include <linux/slab.h>
++#include <sound/ac97/codec.h>
 +#include <sound/ac97/controller.h>
- #include <sound/core.h>
- #include <sound/ac97_codec.h>
- #include <sound/soc.h>
-@@ -29,21 +30,21 @@
- 
- #include "pxa2xx-ac97.h"
- 
--static void pxa2xx_ac97_warm_reset(struct snd_ac97 *ac97)
-+static void pxa2xx_ac97_warm_reset(struct ac97_controller *adrv)
- {
--	pxa2xx_ac97_try_warm_reset(ac97);
-+	pxa2xx_ac97_try_warm_reset(adrv);
- 
--	pxa2xx_ac97_finish_reset(ac97);
-+	pxa2xx_ac97_finish_reset(adrv);
- }
- 
--static void pxa2xx_ac97_cold_reset(struct snd_ac97 *ac97)
-+static void pxa2xx_ac97_cold_reset(struct ac97_controller *adrv)
- {
--	pxa2xx_ac97_try_cold_reset(ac97);
-+	pxa2xx_ac97_try_cold_reset(adrv);
- 
--	pxa2xx_ac97_finish_reset(ac97);
-+	pxa2xx_ac97_finish_reset(adrv);
- }
- 
--static struct snd_ac97_bus_ops pxa2xx_ac97_ops = {
-+static struct ac97_controller_ops pxa2xx_ac97_ops = {
- 	.read	= pxa2xx_ac97_read,
- 	.write	= pxa2xx_ac97_write,
- 	.warm_reset	= pxa2xx_ac97_warm_reset,
-@@ -236,7 +237,8 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	ret = snd_soc_set_ac97_ops(&pxa2xx_ac97_ops);
-+	ret = snd_ac97_controller_register(&pxa2xx_ac97_ops, &pdev->dev,
-+					   AC97_SLOTS_AVAILABLE_ALL);
- 	if (ret != 0)
- 		return ret;
- 
-@@ -251,7 +253,7 @@ static int pxa2xx_ac97_dev_probe(struct platform_device *pdev)
- static int pxa2xx_ac97_dev_remove(struct platform_device *pdev)
- {
- 	snd_soc_unregister_component(&pdev->dev);
--	snd_soc_set_ac97_ops(NULL);
-+	snd_ac97_controller_unregister(&pdev->dev);
- 	pxa2xx_ac97_hw_remove(pdev);
- 	return 0;
- }
++#include <sound/ac97/regs.h>
++
++/*
++ * Protects ac97_controllers and each ac97_controller structure.
++ */
++static DEFINE_MUTEX(ac97_controllers_mutex);
++static LIST_HEAD(ac97_controllers);
++
++static struct bus_type ac97_bus_type;
++
++static struct ac97_codec_device *
++ac97_codec_find(struct ac97_controller *ac97_ctrl, int codec_num)
++{
++	if ((codec_num < 0) || (codec_num >= AC97_BUS_MAX_CODECS))
++		return ERR_PTR(-ERANGE);
++
++	return ac97_ctrl->codecs[codec_num];
++}
++
++static void ac97_codec_release(struct device *dev)
++{
++	struct ac97_codec_device *adev;
++	struct ac97_controller *ac97_ctrl;
++
++	adev = container_of(dev, struct ac97_codec_device, dev);
++	ac97_ctrl = adev->ac97_ctrl;
++	ac97_ctrl->codecs[adev->num] = NULL;
++	kfree(adev);
++}
++
++static int ac97_codec_add(struct ac97_controller *ac97_ctrl, int idx,
++		   unsigned int vendor_id)
++{
++	struct ac97_codec_device *codec;
++	char *codec_name;
++	int ret;
++
++	codec = kzalloc(sizeof(*codec), GFP_KERNEL);
++	if (!codec)
++		return -ENOMEM;
++	ac97_ctrl->codecs[idx] = codec;
++	codec->vendor_id = vendor_id;
++	codec->dev.release = ac97_codec_release;
++	codec->dev.bus = &ac97_bus_type;
++	codec->dev.parent = ac97_ctrl->dev;
++	codec->num = idx;
++	codec->ac97_ctrl = ac97_ctrl;
++
++	codec_name = kasprintf(GFP_KERNEL, "%s:%d", dev_name(ac97_ctrl->dev),
++			       idx);
++	codec->dev.init_name = codec_name;
++
++	ret = device_register(&codec->dev);
++	kfree(codec_name);
++	if (ret) {
++		kfree(codec);
++		ac97_ctrl->codecs[idx] = NULL;
++	}
++
++	return ret;
++}
++
++unsigned int ac97_bus_scan_one(struct ac97_controller *adrv,
++				      int codec_num)
++{
++	unsigned short vid1, vid2;
++	int ret;
++
++	ret = adrv->ops->read(adrv, codec_num, AC97_VENDOR_ID1);
++	vid1 = (ret & 0xffff);
++	if (ret < 0)
++		return 0;
++
++	ret = adrv->ops->read(adrv, codec_num, AC97_VENDOR_ID2);
++	vid2 = (ret & 0xffff);
++	if (ret < 0)
++		return 0;
++
++	dev_dbg(adrv->dev, "%s(codec_num=%d): vendor_id=0x%08x\n",
++		__func__, codec_num, AC97_ID(vid1, vid2));
++	return AC97_ID(vid1, vid2);
++}
++
++static int ac97_bus_scan(struct ac97_controller *ac97_ctrl)
++{
++	int ret, i;
++	unsigned int vendor_id;
++
++	for (i = 0; i < AC97_BUS_MAX_CODECS; i++) {
++		if (ac97_codec_find(ac97_ctrl, i))
++			continue;
++		if (!(ac97_ctrl->slots_available & BIT(i)))
++			continue;
++		vendor_id = ac97_bus_scan_one(ac97_ctrl, i);
++		if (!vendor_id)
++			continue;
++
++		ret = ac97_codec_add(ac97_ctrl, i, vendor_id);
++		if (ret < 0)
++			return ret;
++	}
++	return 0;
++}
++
++static void ac97_rescan_all_controllers(void)
++{
++	struct ac97_controller *ac97_ctrl;
++	int ret;
++
++	mutex_lock(&ac97_controllers_mutex);
++	list_for_each_entry(ac97_ctrl, &ac97_controllers, controllers) {
++		ret = ac97_bus_scan(ac97_ctrl);
++		if (ret)
++			dev_warn(ac97_ctrl->dev, "scan failed: %d\n", ret);
++	}
++	mutex_unlock(&ac97_controllers_mutex);
++}
++
++static int ac97_bus_reset(struct ac97_controller *ac97_ctrl)
++{
++	ac97_ctrl->ops->reset(ac97_ctrl);
++
++	return 0;
++}
++
++/**
++ * snd_ac97_codec_driver_register - register an AC97 codec driver
++ * @dev: AC97 driver codec to register
++ *
++ * Register an AC97 codec driver to the ac97 bus driver, aka. the AC97 digital
++ * controller.
++ *
++ * Returns 0 on success or error code
++ */
++int snd_ac97_codec_driver_register(struct ac97_codec_driver *drv)
++{
++	int ret;
++
++	drv->driver.bus = &ac97_bus_type;
++
++	ret = driver_register(&drv->driver);
++	if (!ret)
++		ac97_rescan_all_controllers();
++
++	return ret;
++}
++EXPORT_SYMBOL(snd_ac97_codec_driver_register);
++
++/**
++ * snd_ac97_codec_driver_unregister - unregister an AC97 codec driver
++ * @dev: AC97 codec driver to unregister
++ *
++ * Unregister a previously registered ac97 codec driver.
++ */
++void snd_ac97_codec_driver_unregister(struct ac97_codec_driver *drv)
++{
++	driver_unregister(&drv->driver);
++}
++EXPORT_SYMBOL(snd_ac97_codec_driver_unregister);
++
++static int ac97_ctrl_codecs_unregister(struct ac97_controller *ac97_ctrl)
++{
++	int i;
++
++	for (i = 0; i < AC97_BUS_MAX_CODECS; i++)
++		if (ac97_ctrl->codecs[i])
++			put_device(&ac97_ctrl->codecs[i]->dev);
++
++	return 0;
++}
++
++/**
++ * snd_ac97_controller_register - register an ac97 controller
++ * @ops: the ac97 bus operations
++ * @dev: the device providing the ac97 DC function
++ * @slots_available: mask of the ac97 codecs that can be scanned and probed
++ *                   bit0 => codec 0, bit1 => codec 1 ... bit 3 => codec 3
++ *
++ * Register a digital controller which can control up to 4 ac97 codecs. This is
++ * the controller side of the AC97 AC-link, while the slave side are the codecs.
++ *
++ * Returns 0 upon success, negative value upon error
++ */
++int snd_ac97_controller_register(const struct ac97_controller_ops *ops,
++				 struct device *dev,
++				 unsigned short slots_available)
++{
++	struct ac97_controller *ac97_ctrl;
++
++	ac97_ctrl = kzalloc(sizeof(*ac97_ctrl), GFP_KERNEL);
++	if (!ac97_ctrl)
++		return -ENOMEM;
++
++	mutex_lock(&ac97_controllers_mutex);
++	ac97_ctrl->ops = ops;
++	ac97_ctrl->slots_available = slots_available;
++	ac97_ctrl->dev = dev;
++	list_add(&ac97_ctrl->controllers, &ac97_controllers);
++	mutex_unlock(&ac97_controllers_mutex);
++
++	ac97_bus_reset(ac97_ctrl);
++	ac97_bus_scan(ac97_ctrl);
++
++	return 0;
++}
++EXPORT_SYMBOL(snd_ac97_controller_register);
++
++/**
++ * snd_ac97_controller_unregister - unregister an ac97 controller
++ * @dev: the device previously provided to ac97_controller_register()
++ *
++ * Returns 0 on success, negative upon error
++ */
++int snd_ac97_controller_unregister(const struct device *dev)
++{
++	struct ac97_controller *ac97_ctrl, *tmp;
++	int ret = -ENODEV, i;
++
++	mutex_lock(&ac97_controllers_mutex);
++	list_for_each_entry_safe(ac97_ctrl, tmp, &ac97_controllers,
++				 controllers) {
++		if (ac97_ctrl->dev != dev)
++			continue;
++		ret = 0;
++		for (i = 0; i < AC97_BUS_MAX_CODECS; i++)
++			if (ac97_ctrl->codecs[i] &&
++			    device_is_registered(&ac97_ctrl->codecs[i]->dev))
++				ret = -EBUSY;
++		if (!ret)
++			ret = ac97_ctrl_codecs_unregister(ac97_ctrl);
++		if (!ret)
++			list_del(&ac97_ctrl->controllers);
++	}
++
++	mutex_unlock(&ac97_controllers_mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL(snd_ac97_controller_unregister);
++
++static const struct dev_pm_ops ac97_pm = {
++	.suspend	= pm_generic_suspend,
++	.resume		= pm_generic_resume,
++	.freeze		= pm_generic_freeze,
++	.thaw		= pm_generic_thaw,
++	.poweroff	= pm_generic_poweroff,
++	.restore	= pm_generic_restore,
++};
++
++static int ac97_get_enable_clk(struct ac97_codec_device *adev)
++{
++	int ret;
++
++	adev->clk = clk_get(&adev->dev, "ac97_clk");
++	if (IS_ERR(adev->clk))
++		return PTR_ERR(adev->clk);
++
++	ret = clk_prepare_enable(adev->clk);
++	if (ret)
++		clk_put(adev->clk);
++
++	return ret;
++}
++
++static void ac97_put_disable_clk(struct ac97_codec_device *adev)
++{
++	clk_disable_unprepare(adev->clk);
++	clk_put(adev->clk);
++}
++
++static ssize_t vendor_id_show(struct device *dev,
++			      struct device_attribute *attr, char *buf)
++{
++	struct ac97_codec_device *codec = to_ac97_device(dev);
++
++	return sprintf(buf, "%08x", codec->vendor_id);
++}
++
++static struct device_attribute ac97_dev_attrs[] = {
++	__ATTR_RO(vendor_id),
++	__ATTR_NULL,
++};
++
++static int ac97_bus_match(struct device *dev, struct device_driver *drv)
++{
++	struct ac97_codec_device *adev = to_ac97_device(dev);
++	struct ac97_codec_driver *adrv = to_ac97_driver(drv);
++	const struct ac97_id *id = adrv->id_table;
++	int i = 0;
++
++	if (adev->vendor_id == 0x0 || adev->vendor_id == 0xffffffff)
++		return false;
++
++	do {
++		if ((id[i].id & id->mask) == (adev->vendor_id & id[i].mask))
++			return true;
++	} while (id[i++].id);
++
++	return false;
++}
++
++static int ac97_bus_probe(struct device *dev)
++{
++	struct ac97_codec_device *adev = to_ac97_device(dev);
++	struct ac97_codec_driver *adrv = to_ac97_driver(dev->driver);
++	int ret;
++
++	ret = ac97_get_enable_clk(adev);
++	if (ret)
++		return ret;
++
++	pm_runtime_get_noresume(dev);
++	pm_runtime_set_active(dev);
++	pm_runtime_enable(dev);
++
++	ret = adrv->probe(adev);
++	if (ret == 0)
++		return 0;
++
++	pm_runtime_disable(dev);
++	pm_runtime_set_suspended(dev);
++	pm_runtime_put_noidle(dev);
++	ac97_put_disable_clk(adev);
++
++	return ret;
++}
++
++static int ac97_bus_remove(struct device *dev)
++{
++	struct ac97_codec_device *adev = to_ac97_device(dev);
++	struct ac97_codec_driver *adrv = to_ac97_driver(dev->driver);
++	int ret;
++
++	ret = pm_runtime_get_sync(dev);
++	if (ret)
++		return ret;
++
++	ret = adrv->remove(adev);
++	pm_runtime_put_noidle(dev);
++	if (ret == 0)
++		ac97_put_disable_clk(adev);
++
++	return ret;
++}
++
++static struct bus_type ac97_bus_type = {
++	.name		= "ac97",
++	.dev_attrs	= ac97_dev_attrs,
++	.match		= ac97_bus_match,
++	.pm		= &ac97_pm,
++	.probe		= ac97_bus_probe,
++	.remove		= ac97_bus_remove,
++};
++
++static int __init ac97_bus_init(void)
++{
++	return bus_register(&ac97_bus_type);
++}
++subsys_initcall(ac97_bus_init);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
+diff --git a/sound/ac97/codec.c b/sound/ac97/codec.c
+new file mode 100644
+index 000000000000..a835f03744bf
+--- /dev/null
++++ b/sound/ac97/codec.c
+@@ -0,0 +1,15 @@
++/*
++ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <sound/ac97_codec.h>
++#include <sound/ac97/codec.h>
++#include <sound/ac97/controller.h>
++#include <linux/device.h>
++#include <linux/slab.h>
++#include <sound/soc.h>	/* For compat_ac97_* */
++
+diff --git a/sound/ac97/snd_ac97_compat.c b/sound/ac97/snd_ac97_compat.c
+new file mode 100644
+index 000000000000..15ed77c8cf06
+--- /dev/null
++++ b/sound/ac97/snd_ac97_compat.c
+@@ -0,0 +1,104 @@
++/*
++ *  Copyright (C) 2016 Robert Jarzmik <robert.jarzmik@free.fr>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/list.h>
++#include <linux/slab.h>
++#include <sound/ac97/codec.h>
++#include <sound/ac97/controller.h>
++#include <sound/soc.h>
++
++#include "ac97_core.h"
++
++static void compat_ac97_reset(struct snd_ac97 *ac97)
++{
++	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
++	struct ac97_controller *actrl = adev->ac97_ctrl;
++
++	if (actrl->ops->reset)
++		actrl->ops->reset(actrl);
++}
++
++static void compat_ac97_warm_reset(struct snd_ac97 *ac97)
++{
++	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
++	struct ac97_controller *actrl = adev->ac97_ctrl;
++
++	if (actrl->ops->warm_reset)
++		actrl->ops->warm_reset(actrl);
++}
++
++static void compat_ac97_write(struct snd_ac97 *ac97, unsigned short reg,
++			      unsigned short val)
++{
++	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
++	struct ac97_controller *actrl = adev->ac97_ctrl;
++
++	actrl->ops->write(actrl, ac97->num, reg, val);
++}
++
++static unsigned short compat_ac97_read(struct snd_ac97 *ac97,
++				       unsigned short reg)
++{
++	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
++	struct ac97_controller *actrl = adev->ac97_ctrl;
++
++	return actrl->ops->read(actrl, ac97->num, reg);
++}
++
++static struct snd_ac97_bus_ops compat_snd_ac97_bus_ops = {
++	.reset = compat_ac97_reset,
++	.warm_reset = compat_ac97_warm_reset,
++	.write = compat_ac97_write,
++	.read = compat_ac97_read,
++};
++
++static struct snd_ac97_bus compat_soc_ac97_bus = {
++	.ops = &compat_snd_ac97_bus_ops,
++};
++
++struct snd_ac97 *compat_alloc_snd_ac97_codec(struct snd_soc_codec *codec)
++{
++	struct snd_ac97 *ac97;
++
++	ac97 = kzalloc(sizeof(struct snd_ac97), GFP_KERNEL);
++	if (ac97 == NULL)
++		return ERR_PTR(-ENOMEM);
++
++	ac97->dev = *codec->dev;
++	ac97->private_data = codec->dev;
++	ac97->bus = &compat_soc_ac97_bus;
++	return ac97;
++}
++EXPORT_SYMBOL_GPL(compat_alloc_snd_ac97_codec);
++
++void compat_release_snd_ac97_codec(struct snd_ac97 *ac97)
++{
++	kfree(ac97);
++}
++EXPORT_SYMBOL_GPL(compat_release_snd_ac97_codec);
++
++int snd_ac97_reset(struct snd_ac97 *ac97, bool try_warm, unsigned int id,
++	unsigned int id_mask)
++{
++	struct ac97_codec_device *adev = to_ac97_device(ac97->private_data);
++	struct ac97_controller *actrl = adev->ac97_ctrl;
++
++	if (try_warm) {
++		compat_ac97_warm_reset(ac97);
++		if (ac97_bus_scan_one(actrl, adev->num) == adev->vendor_id)
++			return 1;
++	}
++
++	compat_ac97_reset(ac97);
++	compat_ac97_warm_reset(ac97);
++	if (ac97_bus_scan_one(actrl, adev->num) == adev->vendor_id)
++		return 0;
++
++	return -ENODEV;
++}
++EXPORT_SYMBOL_GPL(snd_ac97_reset);
 -- 
 2.1.4
