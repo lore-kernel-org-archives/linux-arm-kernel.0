@@ -1,78 +1,60 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 27 May 2016 10:22:07 +0200
-Subject: [RFC PATCH 1/3] watchdog: Add Meson GXBB Watchdog Driver
-In-Reply-To: <20160526100655.GB14703@mephisto>
-References: <1464249112-13658-1-git-send-email-narmstrong@baylibre.com>
- <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
- <20160526100655.GB14703@mephisto>
-Message-ID: <574803AF.5020409@baylibre.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 27 May 2016 16:23:24 +0800
+Subject: [PATCH v4 0/4] Thermal: Support for hardware-tracked trip points
+Message-ID: <1464337408-7123-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2016 12:06 PM, Carlo Caione wrote:
-> On 26/05/16 09:51, Neil Armstrong wrote:
->> Add watchdog specific driver for Amlogic Meson GXBB SoC.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> +
-> 
-> [...]
->> +#define DEFAULT_TIMEOUT	10	/* seconds */
->> +
->> +#define GXBB_WDT_CTRL_REG	0x0
->> +#define GXBB_WDT_CTRL1_REG	0x4
->> +#define GXBB_WDT_TCNT_REG	0x8
->> +#define GXBB_WDT_RSET_REG	0xc
->> +
->> +#define GXBB_WDT_CTRL_EE_RESET_NOW	BIT(26)
->> +
->> +#define GXBB_WDT_CTRL_CLKDIV_EN	BIT(25)
->> +#define GXBB_WDT_CTRL_CLK_EN	BIT(24)
->> +#define GXBB_WDT_CTRL_IRQ_EN	BIT(23)
->> +#define GXBB_WDT_CTRL_EE_RESET	BIT(21)
->> +#define GXBB_WDT_CTRL_XTAL_SEL	(0)
->> +#define GXBB_WDT_CTRL_CLK81_SEL	BIT(19)
->> +#define GXBB_WDT_CTRL_EN	BIT(18)
->> +#define GXBB_WDT_CTRL_DIV_MASK	(BIT(18)-1)
->> +
->> +#define GXBB_WDT_CTRL1_GPIO_PULSE	BIT(17)
->> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_0	BIT(16)
->> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_1	(0)
->> +#define GXBB_WDT_CTRL1_GPIO_PULSE_CNT	(BIT(16)-1)
->> +
->> +#define GXBB_WDT_TCNT_SETUP_MASK	(BIT(16)-1)
->> +#define GXBB_WDT_TCNT_CNT_SHIFT		16
-> 
-> Indentation
-> 
-> [...]
->> +int meson_gxbb_wdt_set_timeout(struct watchdog_device *wdt_dev,
->> +			       unsigned int timeout)
->> +{
->> +	struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
->> +
->> +	if (watchdog_active(wdt_dev))
->> +		meson_gxbb_wdt_stop(wdt_dev);
->> +
->> +	meson_gxbb_wdt_ping(wdt_dev);
->> +
->> +	writel(timeout*1000, data->reg_base + GXBB_WDT_TCNT_REG);
-> 
-> nit: spaces around "*"
-> 
-> [...]
->> +	data->clk = devm_clk_get(&pdev->dev, NULL);
->> +	if (IS_ERR(data->clk))
->> +		return PTR_ERR(data->clk);
->> +
->> +	clk_prepare_enable(data->clk);
-> 
-> Do we need to merge the clock controller driver before this?
+The history patches come from Mikko and Sascha.
+    http://thread.gmane.org/gmane.linux.power-management.general/59451
 
-It's not necessary, currently it only selects the xtal source, so it's works with the current upstream architecture.
+Now, I pick them up to continue upstream.
+Nevermind!
 
-Neil
+This series history patches:
+v3: https://lkml.org/lkml/2016/5/24/797
+v2: https://lkml.org/lkml/2016/5/3/220
+v1: https://lkml.org/lkml/2016/4/24/227
 
-> 
-> Cheers,
-> 
+This series adds support for hardware trip points. It picks up earlier
+work from Mikko Perttunen. Mikko implemented hardware trip points as part
+of the device tree support. It was suggested back then to move the
+functionality to the thermal core instead of putting more code into the
+device tree support. This series does exactly that.
+
+This series patches rebase the conflicts.
+Note that the hardware-tracked trip points are very well tested currently.
+
+Verified and tested on https://github.com/Caesar-github/rockchip/tree/wip/fixes-thermal-0525
+That's based on linux-kernel 20160524.
+
+
+Changes in v4:
+- as the Javi comments, %s/implemnets/implements.
+
+Changes in v3:
+- as the Javi comments on https://patchwork.kernel.org/patch/9001311/.
+- add the select if they set the option for devicetree.
+- Add the peter's ACK.
+
+Changes in v2:
+- add the commit in patch[v2 2/5].
+- Update the commit for patch[v2 4/5].
+
+Caesar Wang (1):
+  thermal: rockchip: add the set_trips function
+
+Sascha Hauer (3):
+  thermal: of: implement .set_trips for device tree thermal zones
+  thermal: streamline get_trend callbacks
+  thermal: bang-bang governor: act on lower trip boundary
+
+ drivers/thermal/gov_bang_bang.c                    |  2 +-
+ drivers/thermal/of-thermal.c                       | 30 +++++++++++------
+ drivers/thermal/rockchip_thermal.c                 | 39 ++++++++++++++++++++++
+ drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 25 +++++---------
+ include/linux/thermal.h                            |  6 +++-
+ 5 files changed, 73 insertions(+), 29 deletions(-)
+
+-- 
+1.9.1
