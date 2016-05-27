@@ -1,53 +1,45 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 May 2016 11:10:37 +0100
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <20160526.124344.1660236473079504674.davem@davemloft.net>
-References: <6407614.fdv5XFSBue@wuerfel>
- <20160525.142821.1719403997976778673.davem@davemloft.net>
- <20160526142057.GA7456@e104818-lin.cambridge.arm.com>
- <20160526.124344.1660236473079504674.davem@davemloft.net>
-Message-ID: <20160527101036.GC7865@e104818-lin.cambridge.arm.com>
+From: yendapally.reddy@broadcom.com (Yendapally Reddy Dhananjaya Reddy)
+Date: Fri, 27 May 2016 06:10:37 -0400
+Subject: [PATCH v2 0/4] hw rng support for NSP SoC
+Message-ID: <1464343841-29504-1-git-send-email-yendapally.reddy@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 12:43:44PM -0700, David Miller wrote:
-> From: Catalin Marinas <catalin.marinas@arm.com>
-> Date: Thu, 26 May 2016 15:20:58 +0100
-> 
-> > We can solve (a) by adding more __SC_WRAP annotations in the generic
-> > unistd.h.
->  ...
-> 
-> I really think it's much more robust to clear the tops of the registers
-> by default.  Then you won't be auditing constantly and adding more and
-> more wrappers.
+This patchset contains the hw random number generator support for the
+Broadcom's NSP SoC. The block is similar to the block available in
+bcm2835 with different default interrupt mask value. Due to lack of
+documentation, I cannot confirm the interrupt mask register details
+in bcm2835. In an effort to not break the existing functionality of
+bcm2835, I used a different compatible string to mask the interrupt
+for NSP SoC. Please let me know. Also supported providing requested
+number of random numbers instead of static size of four bytes.
 
-I think we could avoid adding a new __SC_WRAP by redefining __SYSCALL
-for ILP32 to always invoke a wrapper. But given the wrapper overhead,
-cache locality, I don't think we would notice any performance difference
-in either case.
+The first patch contains the documentation changes and the second patch
+contains the support for rng available in NSP SoC. The third patch
+contains the device tree changes for NSP SoC. The fourth patch contains
+the support for reading requested number of random numbers.
 
-> You can't even quantify the performance gains for me in any precise
-> way.  Whatever you gain by avoiding the 64-bit
-> decompostion/reconstitution for those few system calls with 64-bit
-> registers, you are losing by calling the wrappers for more common
-> system calls, more often.
+This patch set has been tested on NSP bcm958625HR board.
+This patch set is based on v4.6.0-rc1 and is available from github
+repo: https://github.com/Broadcom/cygnus-linux.git
+branch: nsp-rng-v2
 
-I hope Yury can provide some numbers. All being equal, I would go for
-the lowest code maintenance cost (which is probably less annotations and
-wrappers).
+Changes since v1
 
-> "it's more natural to pass 64-bit values in a register" is not a clear
-> justification for this change.
+Addressed the review comments from Eric
+Added acked by Eric
 
-It's more related to how we went about the ILP32 ABI. We initially asked
-for a 64-bit native ABI similar to x32 until the libc-alpha community
-raised some POSIX compliance issues on time structures. So we decided to
-go for a 32-bit-like ABI while keeping the syscall interface close to
-the AArch64/ILP32 procedure calling standard (64-bit values passed in a
-single register). And now we have this discussion, revisiting this
-decision again (which is perfectly fine, we better get it right before
-any merging plans; thanks for your input).
+Yendapally Reddy Dhananjaya Reddy (4):
+  dt-bindings: rng: Northstar Plus SoC rng bindings
+  hwrng: bcm2835: Support Broadcom NSP SoC rng
+  ARM: dts: nsp: Add rng device tree entry
+  hwrng: bcm2835: Read as much data as available
+
+ .../devicetree/bindings/rng/brcm,bcm2835.txt       |  7 +++-
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |  5 +++
+ drivers/char/hw_random/Kconfig                     |  2 +-
+ drivers/char/hw_random/bcm2835-rng.c               | 46 +++++++++++++++++++---
+ 4 files changed, 52 insertions(+), 8 deletions(-)
 
 -- 
-Catalin
+2.1.0
