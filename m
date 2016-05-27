@@ -1,36 +1,83 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Fri, 27 May 2016 07:52:54 +0200
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <20160525.123017.1597296248000772613.davem@davemloft.net>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-2-git-send-email-ynorov@caviumnetworks.com>
- <20160525.123017.1597296248000772613.davem@davemloft.net>
-Message-ID: <20160527055254.GA3820@osiris>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Fri, 27 May 2016 14:02:13 +0800
+Subject: [PATCH 0/6] Rockchip Type-C and DispplayPort driver
+Message-ID: <1464328939-8073-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 12:30:17PM -0700, David Miller wrote:
-> From: Yury Norov <ynorov@caviumnetworks.com>
-> Date: Tue, 24 May 2016 03:04:30 +0300
-> 
-> > +To clear that top halves, automatic wrappers are introduced. They clear all
-> > +required registers before passing control to regular syscall handler.
-> 
-> Why have one of these for every single compat system call, rather than
-> simply clearing the top half of all of these registers unconditionally
-> in the 32-bit system call trap before the system call is invoked?
-> 
-> That's what we do on sparc64.
-> 
-> And with that, you only need wrappers for the case where there needs
-> to be proper sign extention of a 32-bit signed argument.
+Hi all
 
-That would probably also work for arm. On s390 we still have these odd 31
-bit pointers in compat mode which require us to clear 33 bits instead of 32
-bits. That makes up for appr. one third of all system calls.
+This series patch is for rockchip Type-C phy and DisplayPort controller
+driver.
 
-The additional wrappers are only for zero/sign extension, where I count a
-total of 27 on s390.
+The USB Type-C PHY is designed to support the USB3 and DP applications.
+The PHY basically has two main components: USB3 and DisplyPort. USB3
+operates in SuperSpeed mode and the DP can operate at RBR, HBR and HBR2
+data rates. The Type-C cable orientation detection and Power Delivery
+(PD) is accomplished using a PD PHY or a exernal PD chip.
 
-The reason for doing this in C was the constant copy-paste error rate, when
-adding new system calls plus I got a rid of a lot of unnecessary asm code.
+The DP controller is compliant with DisplayPort Specification,
+Version 1.3, This IP is compatible with the rockchip type-c PHY IP.
+There is a uCPU in DP controller, it need a firmware to work, please
+put the firmware file to /lib/firmware/cdn/dptx.bin. The uCPU in charge
+of aux communication and link training, the host use mailbox to
+communicate with the ucpu.
+
+The PHY driver has register a notification, to get the alt mode from PD,
+the PD driver need call the tcphy_notifier_call_chain to notify PHY and
+DP controller.
+
+This series is based on Mark Yao's branch:
+https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2016-05-23
+
+I test this patches on the rk3399-evb board, with a fusb302 driver,
+this branch has no rk3399.dtsi, so the patch about dts is not included
+in this series.
+
+
+
+Chris Zhong (6):
+  phy: Add USB Type-C PHY driver for rk3399
+  Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
+  drm/rockchip: vop: add cdn DP support for rk3399
+  Documentation: bindings: add dt documentation for cdn DP controller
+  ASoC: cdn-dp: Add cdn DP codec driver
+  ASoC: rockchip: Add machine driver for cdn dp codec
+
+ .../bindings/display/rockchip/cdn-dp-rockchip.txt  |  57 ++
+ .../devicetree/bindings/phy/phy-rockchip-typec.txt |  55 ++
+ .../bindings/sound/rockchip-cdn-dp-audio.txt       |  12 +
+ drivers/gpu/drm/rockchip/Kconfig                   |   9 +
+ drivers/gpu/drm/rockchip/Makefile                  |   1 +
+ drivers/gpu/drm/rockchip/cdn-dp-core.c             | 620 ++++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-core.h             |  95 +++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.c              | 730 ++++++++++++++++++
+ drivers/gpu/drm/rockchip/cdn-dp-reg.h              | 404 ++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |   9 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   2 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |   2 +
+ drivers/phy/Kconfig                                |   7 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-rockchip-typec.c                   | 823 +++++++++++++++++++++
+ include/sound/cdn-dp-audio.h                       |  51 ++
+ sound/soc/codecs/Kconfig                           |   3 +
+ sound/soc/codecs/Makefile                          |   2 +
+ sound/soc/codecs/cdn-dp-audio.c                    | 246 ++++++
+ sound/soc/rockchip/Kconfig                         |   9 +
+ sound/soc/rockchip/Makefile                        |   2 +
+ sound/soc/rockchip/rockchip-cdn-dp-audio.c         | 167 +++++
+ 22 files changed, 3306 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/rockchip-cdn-dp-audio.txt
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
+ create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
+ create mode 100644 drivers/phy/phy-rockchip-typec.c
+ create mode 100644 include/sound/cdn-dp-audio.h
+ create mode 100644 sound/soc/codecs/cdn-dp-audio.c
+ create mode 100644 sound/soc/rockchip/rockchip-cdn-dp-audio.c
+
+-- 
+2.6.3
