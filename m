@@ -1,62 +1,42 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 27 May 2016 17:24:55 +0200
-Subject: [RFC PATCH 1/3] watchdog: Add Meson GXBB Watchdog Driver
-In-Reply-To: <57485045.70707@roeck-us.net>
-References: <1464249112-13658-1-git-send-email-narmstrong@baylibre.com>
- <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
- <57470026.3000501@roeck-us.net> <57480470.4000708@baylibre.com>
- <57485045.70707@roeck-us.net>
-Message-ID: <574866C7.1090201@baylibre.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 27 May 2016 17:38:37 +0200
+Subject: v7_dma_inv_range performance/high expense
+In-Reply-To: <20160527145810.GN19428@n2100.arm.linux.org.uk>
+References: <20160527144045.GB20214@lunn.ch>
+ <20160527145810.GN19428@n2100.arm.linux.org.uk>
+Message-ID: <20160527153837.GE20214@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2016 03:48 PM, Guenter Roeck wrote:
-> On 05/27/2016 01:25 AM, Neil Armstrong wrote:
-> [ ... ]
->>>> +    data->wdt_dev.max_hw_heartbeat_ms = GXBB_WDT_TCNT_SETUP_MASK;
->>>> +    data->wdt_dev.min_hw_heartbeat_ms = 1;
->>>
->>> Does the device require a minimum time between heartbeats ?
->>> Just asking, because you violate it yourself below.
->>>
->>> If you want to set the minimum timeout, that would be min_timeout.
->>
->> Ok, these values are not very clear actually.
->>
-> Hmmm .. yes, reading the description again, it doesn't really describe well
-> what it is doing. Essentially, min_hw_heartbeat_ms is enforced by the watchdog
-> core, and should be used if a watchdog hardware can not tolerate short intervals
-> between heartbeats. min_timeout is the minimum timeout value configurable from
-> user space.
-OK, I'll switch to min_timeout = 1.
-
+> > The original code in arch/arm/mm/cache-v7.S  says:
+> > 
+> >         mcr     p15, 0, r0, c7, c6, 1           @ invalidate D / U line
+> > 
+> > I don't get why a cache invalidate instruction should be so expensive.
+> > It is just throwing away the contents of the cache line, not flushing
+> > it out to DRAM. Should i trust perf? Is a cache invalidate really so
+> > expensive? Or am i totally missing something here?
 > 
+> If we're being asked to do a large region, then flushing the cache one
+> line at a time _is_ expensive.
 
-[ ... ]
+Hi Russell
 
->>>
->>> This is unusual. If the watchdog can be already running, it might make sense
->>> to tell the core about it (set WDOG_HW_RUNNING in the status field), so it
->>> can send heartbeats until user space opens the device.
->>
->> Yes, since meson_gxbb_wdt_set_timeout() already ping, this is useless.
->>
-> 
-> Not only that - if the watchdog _is_ already running at boot time, you should
-> really set WDOG_HW_RUNNING to let the watchdog core know. You status function
-> would come handy there.
-> 
->     if (meson_gxbb_wdt_status(data))    // note the changed parameter
->         set_bit(WDOG_HW_RUNNING, &data->wdt_dev.status);
-Yes, it can be handy.
+It is a 2K block, i.e. space for one ethernet frame.
 
-I will push this feature in a next version, I'll stick to a simpler behavior and check
-if it would be running before the kernel starts.
+You say flush here. Yet we are not flushing, we are invalidating.
 
-Thanks,
-Neil
+What we logically want to happen is that the DMA engine copies the
+packet into DRAM. Once complete we invalidate the cache, and the next
+read instruction would cause a cache miss and the ethernet frame is
+pulled in.
 
-> 
-> Thanks,
-> Guenter
-> 
+Looking at these numbers, the invalidate is much more expensive than
+the cache miss.
+
+You say one line at a time is expensive. Do you have any idea where
+the break even is for invalidating the whole cache? Having said that,
+v7_invalidate_l1 seems to be doing it a line at a time as well.
+
+Thanks
+	Andrew
