@@ -1,77 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 May 2016 10:01:42 +0100
-Subject: [PATCH 01/23] all: syscall wrappers: add documentation
-In-Reply-To: <20160527060357.GB3820@osiris>
-References: <6293194.tGy03QJ9ME@wuerfel>
- <20160525.135039.244098606649448826.davem@davemloft.net>
- <6407614.fdv5XFSBue@wuerfel>
- <20160525.142821.1719403997976778673.davem@davemloft.net>
- <20160526204819.GA10274@yury-N73SV>
- <20160526222943.GA16729@MBP.local>
- <20160527003753.GA14247@yury-N73SV> <20160527060357.GB3820@osiris>
-Message-ID: <20160527090141.GA7865@e104818-lin.cambridge.arm.com>
+From: emil.l.velikov@gmail.com (Emil Velikov)
+Date: Fri, 27 May 2016 10:24:57 +0100
+Subject: [RFC v2 3/5] drm/mediatek: add *driver_data for different
+ hardware settings
+In-Reply-To: <1464334313.31149.16.camel@mtksdaap41>
+References: <1463756736-46573-1-git-send-email-yt.shen@mediatek.com>
+ <1463756736-46573-4-git-send-email-yt.shen@mediatek.com>
+ <1463996582.30093.5.camel@mtksdaap41>
+ <1464334313.31149.16.camel@mtksdaap41>
+Message-ID: <CACvgo52xB0KwumC75u2dxfz_yv2PNE0Gem+0t8dqV9qn+pPRLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2016 at 08:03:57AM +0200, Heiko Carstens wrote:
-> > > > The cost is pretty trivial though. See kernel/compat_wrapper.o:
-> > > > COMPAT_SYSCALL_WRAP2(creat, const char __user *, pathname, umode_t, mode);
-> > > > 0:   a9bf7bfd        stp     x29, x30, [sp,#-16]!
-> > > > 4:   910003fd        mov     x29, sp
-> > > > 8:   2a0003e0        mov     w0, w0
-> > > > c:   94000000        bl      0 <sys_creat>
-> > > > 10:  a8c17bfd        ldp     x29, x30, [sp],#16
-> > > > 14:  d65f03c0        ret
-> > > 
-> > > I would say the above could be more expensive than 8 movs (16 bytes to
-> > > write, read, a branch and a ret). You can also add the I-cache locality,
-> > > having wrappers for each syscalls instead of a single place for zeroing
-> > > the upper half (where no other wrapper is necessary).
-> > > 
-> > > Can we trick the compiler into doing a tail call optimisation. This
-> > > could have simply been:
-> > > 
-> > > COMPAT_SYSCALL_WRAP2(creat, ...):
-> > > 	mov	w0, w0
-> > > 	b	<sys_creat>
-> > 
-> > What you talk about was in my initial version. But Heiko insisted on having all
-> > wrappers together.
-> > http://www.spinics.net/lists/linux-s390/msg11593.html
-> > 
-> > Grep your email for discussion.
-> 
-> I think Catalin's question was more about why there is even a stack frame
-> generated. It looks like it is not necessary. I did ask this too a couple
-> of months ago, when we discussed this.
+On 27 May 2016 at 08:31, YT Shen <yt.shen@mediatek.com> wrote:
+> Hi CK,
+>
+>
+> On Mon, 2016-05-23 at 17:43 +0800, CK Hu wrote:
+>> Hi, YT:
+>>
+>> One comment below.
+>>
+>> On Fri, 2016-05-20 at 23:05 +0800, yt.shen at mediatek.com wrote:
+>> > From: YT Shen <yt.shen@mediatek.com>
+>> >
+>> > There are some hardware settings changed, between MT8173 & MT2701:
+>> > DISP_OVL address offset changed, color format definition changed.
+>> > DISP_RDMA fifo size changed.
+>> > DISP_COLOR offset changed.
+>> >
+>> > Signed-off-by: YT Shen <yt.shen@mediatek.com>
+>> > ---
+>> > +
+>> > +static inline struct mtk_ddp_comp_driver_data *mtk_ovl_get_driver_data(
+>> > +   struct platform_device *pdev)
+>> > +{
+>> > +   const struct of_device_id *of_id =
+>> > +           of_match_device(mtk_disp_ovl_driver_dt_match, &pdev->dev);
+>> > +
+>> > +   return (struct mtk_ddp_comp_driver_data *)of_id->data;
+>> > +}
+>> > +
+>> > +static inline struct mtk_ddp_comp_driver_data *mtk_rdma_get_driver_data(
+>> > +   struct platform_device *pdev)
+>> > +{
+>> > +   const struct of_device_id *of_id =
+>> > +           of_match_device(mtk_disp_rdma_driver_dt_match, &pdev->dev);
+>> > +
+>> > +   return (struct mtk_ddp_comp_driver_data *)of_id->data;
+>> > +}
+>> > +
+>> > +static inline struct mtk_ddp_comp_driver_data *mtk_color_get_driver_data(
+>> > +   struct device_node *node)
+>> > +{
+>> > +   const struct of_device_id *of_id =
+>> > +           of_match_node(mtk_disp_color_driver_dt_match, node);
+>> > +
+>> > +   return (struct mtk_ddp_comp_driver_data *)of_id->data;
+>> > +}
+>> > +
+>>
+>> These three functions looks the same with different parameter:
+>> mtk_disp_ovl_driver_dt_match, mtk_disp_rdma_driver_dt_match, and
+>> mtk_disp_color_driver_dt_match. So merge them to prevent duplicated
+>> code.
+> OK, I'll do this in the next version.
 
-Indeed, I was questioning the need for prologue/epilogue, not the use of
-COMPAT_SYSCALL_WRAPx(). Maybe something like __naked would do.
+Also preserve the const-ness of the data - don't cast it away on the
+return line.
+Note that the function return type (and some of the users of said
+functions) should be updated as well.
 
-> > > > > Cost wise, this seems like it all cancels out in the end, but what
-> > > > > do I know?
-> > > > 
-> > > > I think you know something, and I also think Heiko and other s390 guys
-> > > > know something as well. So I'd like to listen their arguments here.
-> 
-> If it comes to 64 bit arguments for compat system calls: s390 also has an
-> x32-like ABI extension which allows user space to use full 64 bit
-> registers. As far as I know hardly anybody ever made use of that.
-> 
-> However even if that would be widely used, to me it wouldn't make sense to
-> add new compat system calls which allow 64 bit arguments, simply because
-> something like
-> 
-> c = (u32)a | (u64)b << 32;
-> 
-> can be done with a single 1-cycle instruction. It's just not worth the
-> extra effort to maintain additional system call variants.
-
-If we split 64-bit arguments in two, we can go a step further and avoid
-most of the COMPAT_SYSCALL_WRAPx annotations in favour of a common
-upper-half zeroing of the argument registers on ILP32 syscall entry.
-There would be a few exceptions where we need to re-build 64-bit
-arguments on sign-extend.
-
--- 
-Catalin
+-Emil
