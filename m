@@ -1,26 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 May 2016 09:35:09 -0700
-Subject: [PATCH v4 2/7] ARM: dts: omap3: Add clocks to McBSP nodes
-In-Reply-To: <1464185756-28401-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1464185756-28401-1-git-send-email-peter.ujfalusi@ti.com>
- <1464185756-28401-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20160527163508.GZ5995@atomide.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 May 2016 17:37:15 +0100
+Subject: v7_dma_inv_range performance/high expense
+In-Reply-To: <20160527153837.GE20214@lunn.ch>
+References: <20160527144045.GB20214@lunn.ch>
+ <20160527145810.GN19428@n2100.arm.linux.org.uk>
+ <20160527153837.GE20214@lunn.ch>
+Message-ID: <20160527163715.GP19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [160525 07:20]:
-> Add clock properties to the McBSP nodes. McBSP2 and 3 need to have ick also
-> since the Sidetone block of these modules are operating using the McBSP
-> interface clock.
+On Fri, May 27, 2016 at 05:38:37PM +0200, Andrew Lunn wrote:
+> You say flush here. Yet we are not flushing, we are invalidating.
 
-Can you please apply this dts patch as the first patch in the
-series? That way I can merge it separately into my dts patches.
+Yes, I meant invalidating, sorry.
 
-If no more comments other than the patch ordering change, when
-v4.17-rc1 is out, please do an immutable branch against v4.17-rc1
-and a pull request for me. Then that branch can be merged into
-other trees as needed too.
+> What we logically want to happen is that the DMA engine copies the
+> packet into DRAM. Once complete we invalidate the cache, and the next
+> read instruction would cause a cache miss and the ethernet frame is
+> pulled in.
 
-Regards,
+Yes, so you read the data which was DMAd, rather than any data that may
+be in the cache from previous accesses _or_ speculative prefetches.
 
-Tony
+> Looking at these numbers, the invalidate is much more expensive than
+> the cache miss.
+> 
+> You say one line at a time is expensive. Do you have any idea where
+> the break even is for invalidating the whole cache? Having said that,
+> v7_invalidate_l1 seems to be doing it a line at a time as well.
+
+Yes, v7_invalidate_l1 also does it one line at a time, but by set/way
+instead, and set/way doesn't tell you whether the cache line overlaps
+the memory region you're invalidating, so you would end up discarding
+dirty data from other memory regions.
+
+The alternative is to flush all cache lines in the cache, 
+
+Even so, for either to be cheaper, you need to be touching less lines
+than the present method.  For 2K worth of data, it's unlikely to be
+cheaper.
+
+I guess something which may be worth trying is to unroll the loop a
+little, and see what effect it has on the perf numbers... if things
+like the branch predictor are working correctly, I'd have expected
+little difference (except to spread the cost over more of the function.)
+It may be worth just proving that point.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
