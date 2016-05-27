@@ -1,132 +1,133 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Fri, 27 May 2016 15:10:11 +1000
-Subject: [linux-sunxi] [PATCH 1/5] spi: sunxi: fix transfer timeout
-In-Reply-To: <CAOMqctS0AD6rHGt3wjxxyidee=_5xqby95t5TGuozAA12DdPjQ@mail.gmail.com>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <cb90b922caa6ac07c1425d726ea19709ee5284f4.1464130597.git.hramrach@gmail.com>
- <CAGRGNgWDrVHG26umTSHHAxFC3KXjwmpDejBAfKqvuik0_2-Jcw@mail.gmail.com>
- <CAOMqctS0AD6rHGt3wjxxyidee=_5xqby95t5TGuozAA12DdPjQ@mail.gmail.com>
-Message-ID: <CAGRGNgW=UnmwwiREV+nVcws6sk18-4fKz3qf-WKf4LY9-VqBKg@mail.gmail.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Fri, 27 May 2016 13:44:18 +0800
+Subject: [PATCH v7 2/4] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <1464247708.13536.14.camel@mtksdaap41>
+References: <1464006190-344-1-git-send-email-hs.liao@mediatek.com>
+ <1464006190-344-3-git-send-email-hs.liao@mediatek.com>
+ <1464059159.7425.6.camel@mtksdaap41> <1464092829.19894.16.camel@mtksdaap41>
+ <1464247708.13536.14.camel@mtksdaap41>
+Message-ID: <1464327858.8578.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michal,
+Hi CK,
 
-On Fri, May 27, 2016 at 3:05 PM, Michal Suchanek <hramrach@gmail.com> wrote:
-> On 27 May 2016 at 04:05, Julian Calaby <julian.calaby@gmail.com> wrote:
->> Hi Michal,
->>
->> On Fri, May 27, 2016 at 5:25 AM, Michal Suchanek <hramrach@gmail.com> wrote:
->>> The trasfer timeout is fixed at 1000 ms. Reading a 4Mbyte flash over
->>> 1MHz SPI bus takes way longer than that. Calculate the timeout from the
->>> actual time the transfer is supposed to take and multiply by 2 for good
->>> measure.
->>>
->>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
->>> ---
->>>
->>> v2:
->>> - fix build error
->>> - use unsigned instead of int in max_t
->>> - use tfr->speed_hz instead of sspi->max_speed_hz
->>> ---
->>>  drivers/spi/spi-sun4i.c | 11 ++++++++++-
->>>  drivers/spi/spi-sun6i.c | 11 ++++++++++-
->>>  2 files changed, 20 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
->>> index 1ddd9e2..fe63bbd 100644
->>> --- a/drivers/spi/spi-sun4i.c
->>> +++ b/drivers/spi/spi-sun4i.c
->>> @@ -173,6 +173,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->>>  {
->>>         struct sun4i_spi *sspi = spi_master_get_devdata(master);
->>>         unsigned int mclk_rate, div, timeout;
->>> +       unsigned int start, end, tx_time;
->>>         unsigned int tx_len = 0;
->>>         int ret = 0;
->>>         u32 reg;
->>> @@ -279,9 +280,17 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
->>>         reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
->>>         sun4i_spi_write(sspi, SUN4I_CTL_REG, reg | SUN4I_CTL_XCH);
->>>
->>> +       tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
->>
->> You should probably use "unsigned int" instead of just "unsigned" here.
->>
->>> +                       100);
->
-> Or just 100U constant and avoid max_t altogether.
->
->>> +       start = jiffies;
->>>         timeout = wait_for_completion_timeout(&sspi->done,
->>> -                                             msecs_to_jiffies(1000));
->>> +                                             msecs_to_jiffies(tx_time));
->>> +       end = jiffies;
->>>         if (!timeout) {
->>> +               dev_warn(&master->dev,
->>> +                        "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
->>> +                        dev_name(&spi->dev), tfr->len, tfr->speed_hz,
->>> +                        jiffies_to_msecs(end - start), tx_time);
->>
->> Should the debug changes be in a separate patch?
->
-> Is this so big of a change that it needs to be split?
+Reply in line.
 
-Some people get touchy about changes not being mentioned in the commit
-log. Technically this is two changes: fixing the timeout and adding
-the timeout debugging, however they're related, so maybe just mention
-that you've added this debugging in the commit log.
+On Thu, 2016-05-26 at 15:28 +0800, CK Hu wrote:
+> Hi, HS:
+> 
+> Replay inline.
+> 
+> On Tue, 2016-05-24 at 20:27 +0800, Horng-Shyang Liao wrote:
+> > Hi CK,
+> > 
+> > Reply in line.
+> > 
+> > On Tue, 2016-05-24 at 11:05 +0800, CK Hu wrote:
+> > > Hi, HS:
+> > > 
+> > > Some comments below.
+> > > 
+> > ...
+> > > > +static void cmdq_thread_irq_handler(struct cmdq *cmdq, int tid)
+> > > > +{
+> > > > +	struct cmdq_thread *thread = &cmdq->thread[tid];
+> > > > +	unsigned long flags = 0L;
+> > > > +	int value;
+> > > > +
+> > > > +	spin_lock_irqsave(&cmdq->exec_lock, flags);
+> > > > +
+> > > > +	/*
+> > > > +	 * it is possible for another CPU core
+> > > > +	 * to run "release task" right before we acquire the spin lock
+> > > > +	 * and thus reset / disable this HW thread
+> > > > +	 * so we check both the IRQ flag and the enable bit of this thread
+> > > > +	 */
+> > > > +	value = cmdq_thread_readl(thread, CMDQ_THR_IRQ_STATUS);
+> > > > +	if (!(value & CMDQ_THR_IRQ_MASK)) {
+> > > > +		spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> > > > +		return;
+> > > > +	}
+> > > 
+> > > If this case happen and just return without clearing irq status, the irq
+> > > would keep triggering and system hang up. So just remove this checking
+> > > and go down to clear irq status.
+> > 
+> > This case is safe because irq status is cleared.
+> > But, next if condition has the problem which you mentioned.
+> > 
+> > I will change it as below.
+> > 
+> > 	if (!(cmdq_thread_readl(thread, CMDQ_THR_ENABLE_TASK) &
+> > 	      CMDQ_THR_ENABLED)) {
+> > 		cmdq_thread_writel(thread, ~value, CMDQ_THR_IRQ_STATUS);
+> > 		spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> > 		return;
+> > 	}
+> > 
+> > If thread is disabled, tasks must be all finished.
+> > Therefore, just clear irq status and return.
+> > 
+> 
+> For irq status checking part, if irq status & irq mask is zero, remove
+> this checking and let it go down, it still do nothing because value &
+> CMDQ_THR_IRQ_ERROR is zero and value & CMDQ_THR_IRQ_DONE is zero. So you
+> can just remove this checking and get the same result.
+> 
+> In general HW design, once a HW is not enable, it does not trigger
+> interrupt any more. Be sure that it's necessary to clear irq status even
+> though thread is disable.
+> 
 
->
->>
->>>                 ret = -ETIMEDOUT;
->>>                 goto out;
->>>         }
->>> diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
->>> index 42e2c4b..8be5c5c 100644
->>> --- a/drivers/spi/spi-sun6i.c
->>> +++ b/drivers/spi/spi-sun6i.c
->>> @@ -162,6 +162,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
->>>         unsigned int mclk_rate, div, timeout;
->>>         unsigned int tx_len = 0;
->>>         int ret = 0;
->>> +       unsigned int start, end, tx_time;
->>>         u32 reg;
->>>
->>>         /* We don't support transfer larger than the FIFO */
->>> @@ -269,9 +270,17 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
->>>         reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
->>>         sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
->>>
->>> +       tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
->>
->> Ditto, "unsigned int" instead of "unsigned"?
->>
->>> +                       100);
->>> +       start = jiffies;
->>>         timeout = wait_for_completion_timeout(&sspi->done,
->>> -                                             msecs_to_jiffies(1000));
->>> +                                             msecs_to_jiffies(tx_time));
->>> +       end = jiffies;
->>>         if (!timeout) {
->>> +               dev_warn(&master->dev,
->>> +                        "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
->>> +                        dev_name(&spi->dev), tfr->len, tfr->speed_hz,
->>> +                        jiffies_to_msecs(end - start), tx_time);
->>
->> Ditto, separate patch?
->>
->> Also, should the changes for the drivers be in two separate patches also?
->
-> That's basically the same driver with different constants so I guess not.
+I Will remove first if condition,
+so rewrite first two if condition parts as below.
 
-Fair enough, I withdraw my comment then.
+value = cmdq_thread_readl(thread, CMDQ_THR_IRQ_STATUS);
+cmdq_thread_writel(thread, ~value, CMDQ_THR_IRQ_STATUS);
+
+if (!(cmdq_thread_readl(thread, CMDQ_THR_ENABLE_TASK) &
+			CMDQ_THR_ENABLED))
+	value = 0;
+
+> > > > +
+> > > > +	if (!(cmdq_thread_readl(thread, CMDQ_THR_ENABLE_TASK) &
+> > > > +	      CMDQ_THR_ENABLED)) {
+> > > > +		spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> > > > +		return;
+> > > > +	}
+> > > > +
+> > > > +	cmdq_thread_writel(thread, ~value, CMDQ_THR_IRQ_STATUS);
+> > > > +
+> > > > +	if (value & CMDQ_THR_IRQ_ERROR)
+> > > > +		cmdq_handle_error_done(cmdq, thread, true);
+> > > > +	else if (value & CMDQ_THR_IRQ_DONE)
+> > > > +		cmdq_handle_error_done(cmdq, thread, false);
+> > > 
+> > > These irq status checking and clearing code here is the same as those in
+> > > cmdq_task_handle_error_result(). To move the checking and clearing code
+> > > into cmdq_handle_error_done() and here just to call
+> > > cmdq_handle_error_done(cmdq, thread) would reduce duplicated code.
+> > 
+> > Will do.
+> > 
+> > > > +
+> > > > +	spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> > > > +}
+> > ...
+> > ...
+> > > 
+> > > Regards,
+> > > CK
+> > 
+> > Thanks,
+> > HS
+> > 
+> 
+> Regards,
+> CK
+> 
+> 
 
 Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+HS
