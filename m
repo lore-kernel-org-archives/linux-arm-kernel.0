@@ -1,40 +1,39 @@
-From: sudipm.mukherjee@gmail.com (Sudip Mukherjee)
-Date: Fri, 27 May 2016 14:30:48 +0530
-Subject: [PATCH] hwrng: stm32 - fix build warning
-In-Reply-To: <7211115.EdoBLRGZ1i@wuerfel>
-References: <1464007448-25395-1-git-send-email-sudipm.mukherjee@gmail.com>
- <6297051.TAxtzW5OIB@wuerfel> <5745085D.6000104@gmail.com>
- <7211115.EdoBLRGZ1i@wuerfel>
-Message-ID: <57480CC0.80500@gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 May 2016 14:36:25 +0100
+Subject: [PATCH kexec-tools 18/32] arm: report if crash kernel is out of
+ bounds
+In-Reply-To: <CAHB_Guo-N0Coxj=fHBBM=QULMo6QK3uKbzOh15R6FCihGERjMA@mail.gmail.com>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <E1axXTQ-0004ih-NN@e0050434b2927.dyn.arm.linux.org.uk>
+ <CAHB_Guo-N0Coxj=fHBBM=QULMo6QK3uKbzOh15R6FCihGERjMA@mail.gmail.com>
+Message-ID: <20160527133624.GL19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 May 2016 03:36 PM, Arnd Bergmann wrote:
-> On Wednesday, May 25, 2016 7:35:17 AM CEST Sudip Mukherjee wrote:
->> On Tuesday 24 May 2016 02:05 AM, Arnd Bergmann wrote:
->>> On Monday, May 23, 2016 6:14:08 PM CEST Sudip Mukherjee wrote:
->>>> We have been getting build warning about:
->>>> drivers/char/hw_random/stm32-rng.c: In function 'stm32_rng_read':
->>>> drivers/char/hw_random/stm32-rng.c:82:19: warning: 'sr' may be used
->>>>                                       uninitialized in this function
->>>>
->>>> On checking the code it turns out that sr can never be used
->>>> uninitialized as sr is getting initialized in the while loop and while
->>>> loop will always execute as the minimum value of max can be 32.
->>>> So just initialize sr to 0 while declaring it to silence the compiler.
->>>>
->>>> Signed-off-by: Sudip Mukherjee <sudip.mukherjee@codethink.co.uk>
->>>> ---
->>>
->snip>
->
-> BTW, regarding your build infrastructure, I'd also recommend building
-> with 'make -s' to make the output more compact.
+On Fri, May 27, 2016 at 04:57:47PM +0530, Pratyush Anand wrote:
+> On Tue, May 3, 2016 at 3:52 PM, Russell King <rmk@arm.linux.org.uk> wrote:
+> > diff --git a/kexec/arch/arm/crashdump-arm.h b/kexec/arch/arm/crashdump-arm.h
+> > index 2dbde04..7314960 100644
+> > --- a/kexec/arch/arm/crashdump-arm.h
+> > +++ b/kexec/arch/arm/crashdump-arm.h
+> > @@ -9,6 +9,7 @@ extern "C" {
+> >  #define DEFAULT_PAGE_OFFSET            (0xc0000000)
+> >  #define KVBASE_MASK    (0x1ffffff)
+> >  #define CRASH_MAX_MEMORY_RANGES        32
+> > +#define ARM_MAX_VIRTUAL                UINT32_MAX
+> 
+> If I see a kernel code then a virtual address is always defined as
+> unsigned long. So, shouldn't we use ULONG_MAX instead?
 
-travis is having a timeout and if there is no output from the build 
-within a time limit then it will cancel the build. I can use the option 
-if i can increase the timeout limit. I will have a look at the options. 
-Thanks for the idea.
+What is the definition of ULONG_MAX?  The maximum unsigned value that
+can fit in an unsigned long quantity.
 
-Regards
-Sudip
+While unsigned long _may_ be 32-bit, it's a very round-about way to
+say "the maximum virtual address is the maximum unsigned 32-bit value".
+Hence why I'm using UINT32_MAX here - it's a tighter and accurate
+macro for what we're wanting.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
