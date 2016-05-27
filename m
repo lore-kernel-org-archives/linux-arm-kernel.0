@@ -1,79 +1,69 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 May 2016 18:46:36 +0100
-Subject: [PATCH] arm64: kasan: instrument user memory access API
-In-Reply-To: <cea39367-65b6-62df-7e4c-57ae1ce36dcc@linaro.org>
-References: <1464288231-11304-1-git-send-email-yang.shi@linaro.org>
- <57482930.6020608@virtuozzo.com>
- <cea39367-65b6-62df-7e4c-57ae1ce36dcc@linaro.org>
-Message-ID: <20160527174635.GL24469@leverpostej>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Fri, 27 May 2016 23:26:41 +0530
+Subject: [PATCH v3 4/4] soc: Add SoC driver for Freescale Vybrid platform
+In-Reply-To: <475f53d2bb4c611bfe1c6652215b8626@agner.ch>
+References: <cover.1463737502.git.maitysanchayan@gmail.com>
+ <CAL_JsqKCwy=aXveTfnaQuZ5b3Ld9nzABgPfdPm1JX3CBuvzG+Q@mail.gmail.com>
+ <20160527063301.GB1554@Sanchayan-Arch.localdomain>
+ <9495361.v6aft1QR0M@wuerfel>
+ <20160527100817.GA8294@Sanchayan-Arch.localdomain>
+ <475f53d2bb4c611bfe1c6652215b8626@agner.ch>
+Message-ID: <20160527175641.GA10705@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2016 at 09:34:03AM -0700, Shi, Yang wrote:
-> On 5/27/2016 4:02 AM, Andrey Ryabinin wrote:
-> >
-> >
-> >On 05/26/2016 09:43 PM, Yang Shi wrote:
-> >>The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
-> >>("x86/kasan: instrument user memory access API") added KASAN instrument to
-> >>x86 user memory access API, so added such instrument to ARM64 too.
-> >>
-> >>Tested by test_kasan module.
-> >>
-> >>Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> >>---
-> >> arch/arm64/include/asm/uaccess.h | 18 ++++++++++++++++--
-> >> 1 file changed, 16 insertions(+), 2 deletions(-)
-> >
-> >Please, cover __copy_from_user() and __copy_to_user() too.
-> >Unlike x86, your patch doesn't instrument these two.
+Hello Stefan,
 
-Argh, I missed those when reviewing. My bad.
-
-> I should elaborated this in my review. Yes, I did think about it,
-> but unlike x86, __copy_to/from_user are implemented by asm code on
-> ARM64. If I add kasan_check_read/write into them, I have to move the
-> registers around to prepare the parameters for kasan calls, then
-> restore them after the call, for example the below code for
-> __copy_to_user:
+On 16-05-27 10:28:45, Stefan Agner wrote:
+> On 2016-05-27 03:08, maitysanchayan at gmail.com wrote:
+> > On 16-05-27 10:31:55, Arnd Bergmann wrote:
+> >> On Friday, May 27, 2016 12:03:01 PM CEST maitysanchayan at gmail.com wrote:
+> >> >
+> >> > So if I understand correctly, the binding at the SoC level is fine.
+> >> > Keeping that but removing the additional made-up properties, viz. below
+> >> >
+> >> > rom-revision: phandle to the on-chip ROM node
+> >> > mscm: phandle to the MSCM CPU configuration node
+> >> > nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+> >> > nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+> >> >
+> >> > would be fine?
+> >> >
+> >> > We would have something similar to here
+> >> > http://www.spinics.net/lists/devicetree/msg80655.html
+> >> >
+> >> > but now with the DT binding under SoC bus.
+> >> >
+> >>
+> >>
+> >> You look up the OTP device as a syscon here, which seems odd since there
+> >> is already an nvmem driver for it. Shouldn't you use the nvmem API for
+> >> that?
+> >>
+> >> 	Arnd
+> > 
+> > I need the following 
+> > 
+> > nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+> > nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+> > 
+> > to be able to use the NVMEM consumer API.
 > 
->         mov     x9, x0
->         mov     x10, x1
->         mov     x11, x2
->         mov     x0, x10
->         mov     x1, x11
->         bl      kasan_check_read
->         mov     x0, x9
->         mov     x1, x10
+> I did not tested it, but it seems the NVMEM consumer API has some kind
+> of non-DT fallback:
+> http://lxr.free-electrons.com/source/drivers/nvmem/core.c#L827
+> 
+> Right now, it seems to me that it does not handle the case where we have
+> a of_node but don't want to use it... You might need to add some extra
+> handling if there is a of_node without nvmem-cell-names/nvmem-cells, and
+> fall back to nvmem_cell_get_from_list.
+> 
 
-There's no need to alter the assembly.
+I have already looked at the core nvmem code for options but wanted to avoid
+any additons if possible.
 
-Rename the functions (e.g. have __arch_raw_copy_from_user), and add
-static inline wrappers in uaccess.h that do the kasan calls before
-calling the assembly functions.
+However if adding the nvmem properties at the SoC node level is frowned upon
+I will make the necessary changes required.
 
-That gives the compiler the freedom to do the right thing, and avoids
-horrible ifdeffery in the assembly code.
-
-> So, I'm wondering if it is worth or not since __copy_to/from_user
-> are just called at a couple of places, i.e. sctp, a couple of
-> drivers, etc and not used too much.
-
-[mark at leverpostej:~/src/linux]% git grep -w __copy_to_user -- ^arch | wc -l
-63
-[mark at leverpostej:~/src/linux]% git grep -w __copy_from_user -- ^arch | wc -l
-47
-
-That's a reasonable number of callsites.
-
-If we're going to bother adding this, it should be complete. So please
-do update __copy_from_user and __copy_to_user.
-
-> Actually, I think some of them
-> could be replaced by __copy_to/from_user_inatomic.
-
-Given the number of existing callers outside of arch code, I think we'll
-get far more traction reworking the arm64 parts for now.
-
-Thanks,
-Mark.
+Regards,
+Sanchayan.
