@@ -1,34 +1,34 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 27 May 2016 12:35:12 -0600
-Subject: [PATCH] arm: tegra124: remove commas from unit addresses
-In-Reply-To: <1464366471-23832-1-git-send-email-marcel.ziswiler@toradex.com>
-References: <1464366471-23832-1-git-send-email-marcel.ziswiler@toradex.com>
-Message-ID: <57489360.1030300@wwwdotorg.org>
+From: geoff@infradead.org (Geoff Levand)
+Date: Fri, 27 May 2016 12:19:45 -0700
+Subject: Help needed with kexec on arm64
+In-Reply-To: <20160527135820.GM19428@n2100.arm.linux.org.uk>
+References: <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
+ <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
+ <DB5PR04MB168874758924173BBD5CC037E69D0@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <20160405052341.GA19476@linaro.org>
+ <DB5PR04MB1688F09062B2A5ECACCA4D80E6710@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <20160511005334.GA8417@linaro.org>
+ <DB5PR04MB1688C3F122091109E6BD9B68E6740@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <20160519110307.GA4941@linaro.org>
+ <DB5PR04MB16887FF10CEA6AA9BF990F0DE6420@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <20160527135820.GM19428@n2100.arm.linux.org.uk>
+Message-ID: <1464376785.12343.3.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2016 10:27 AM, Marcel Ziswiler wrote:
-> Remove commas from unit addresses as suggested by Rob Herring upon me
-> posting initial Apalis TK1 support:
->
-> http://article.gmane.org/gmane.linux.ports.tegra/26608
+On Fri, 2016-05-27 at 14:58 +0100, Russell King - ARM Linux wrote:
+> On Fri, May 27, 2016 at 11:51:03AM +0000, Harninder Rai wrote:Hello Takahiro Akashi,
+> > 
+> > Please see the following log which I was talking about in my last communication
+> > Any idea as to what could be wrong just when I move from RAM based rootfs to SD based rootfs?
 
-> diff --git a/arch/arm/boot/dts/tegra124-jetson-tk1.dts b/arch/arm/boot/dts/tegra124-jetson-tk1.dts
+> debug output... if the architecture is usefully printing stuff like
+> memory layouts etc.
+You should be able to get more information by using kexec -d to enable
 
-> -	gpu at 0,57000000 {
-> +	gpu at 57000000 {
->   		/*
->   		 * Node left disabled on purpose - the bootloader will enable
->   		 * it after having set the VPR up
+Also, use the latest from here:
 
-The last time a similar patch was proposed[1], I pointed out that U-Boot 
-uses the node name to enable the node, so this change will break GPU 
-functionality on this board. U-Boot has since been updated to find the 
-node to enable using compatible value rather than hard-coding the node 
-name, but this doesn't help people with existing bootloader binaries; 
-kernel changes shouldn't force them to upgrade the bootloader. I think 
-the DT node names are part of the ABI and shouldn't be changed. We can 
-fix this for completely new SoCs, but not existing SoCs.
-
-[1] http://www.spinics.net/lists/devicetree/msg122164.html "[PATCH] ARM: 
-tegra: Remove 0, prefix from unit-addresses".
+  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git
+  
+-Geoff
