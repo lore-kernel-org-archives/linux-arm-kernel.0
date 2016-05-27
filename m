@@ -1,166 +1,102 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Fri, 27 May 2016 15:04:11 +0800
-Subject: [PATCH 2/3] of/numa: fix a memory@ dt node can only contains one
- memory block
-In-Reply-To: <CAL_JsqJXu36qYMOZeWDnMQ8BnOxMrixv5N70hvTjDixhMCQKRw@mail.gmail.com>
-References: <1464230639-9852-1-git-send-email-thunder.leizhen@huawei.com>
- <1464230639-9852-2-git-send-email-thunder.leizhen@huawei.com>
- <20160526131345.GA12024@rob-hp-laptop> <5747C0BF.505@huawei.com>
- <CAL_JsqJXu36qYMOZeWDnMQ8BnOxMrixv5N70hvTjDixhMCQKRw@mail.gmail.com>
-Message-ID: <5747F16B.5050404@huawei.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 27 May 2016 09:06:40 +0200
+Subject: [PATCH] reset: Put back *_optional variants
+In-Reply-To: <57476E48.2060204@synopsys.com>
+References: <ca359e013c30f27c825a9580164b01da5ca6476d.1464224883.git.johnyoun@synopsys.com>
+ <12e450f0-70ea-29f8-0bf7-8a0697263f2d@redhat.com>
+ <57476E48.2060204@synopsys.com>
+Message-ID: <dcf6372f-4910-bd03-f1b5-c7e0086fdead@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-
-On 2016/5/27 12:20, Rob Herring wrote:
-> On Thu, May 26, 2016 at 10:36 PM, Leizhen (ThunderTown)
-> <thunder.leizhen@huawei.com> wrote:
+On 26-05-16 23:44, John Youn wrote:
+> On 5/26/2016 1:25 PM, Hans de Goede wrote:
+>> Hi,
 >>
->>
->> On 2016/5/26 21:13, Rob Herring wrote:
->>> On Thu, May 26, 2016 at 10:43:58AM +0800, Zhen Lei wrote:
->>>> For a normal memory@ devicetree node, its reg property can contains more
->>>> memory blocks.
->>>>
->>>> Because we don't known how many memory blocks maybe contained, so we try
->>>> from index=0, increase 1 until error returned(the end).
->>>>
->>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->>>> ---
->>>>  drivers/of/of_numa.c | 30 ++++++++++++++++++++----------
->>>>  1 file changed, 20 insertions(+), 10 deletions(-)
->>>>
->>>> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
->>>> index 21d831f..2c5f249 100644
->>>> --- a/drivers/of/of_numa.c
->>>> +++ b/drivers/of/of_numa.c
->>>> @@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
->>>>      struct device_node *np = NULL;
->>>>      struct resource rsrc;
->>>>      u32 nid;
->>>> -    int r = 0;
->>>> +    int i, r = 0;
->>>>
->>>>      for (;;) {
->>>>              np = of_find_node_by_type(np, "memory");
->>>> @@ -82,17 +82,27 @@ static int __init of_numa_parse_memory_nodes(void)
->>>>                      /* some other error */
->>>>                      break;
->>>>
->>>> -            r = of_address_to_resource(np, 0, &rsrc);
->>>> -            if (r) {
->>>> -                    pr_err("NUMA: bad reg property in memory node\n");
->>>> -                    break;
->>>> +            for (i = 0; ; i++) {
->>>> +                    r = of_address_to_resource(np, i, &rsrc);
->>>> +                    if (r) {
->>>> +                            /* reached the end of of_address */
->>>> +                            if (i > 0) {
->>>> +                                    r = 0;
->>>> +                                    break;
->>>> +                            }
->>>> +
->>>> +                            pr_err("NUMA: bad reg property in memory node\n");
->>>> +                            goto finished;
->>>> +                    }
->>>> +
->>>> +                    r = numa_add_memblk(nid, rsrc.start,
->>>> +                                        rsrc.end - rsrc.start + 1);
->>>> +                    if (r)
->>>> +                            goto finished;
->>>>              }
->>>> -
->>>> -            r = numa_add_memblk(nid, rsrc.start,
->>>> -                                rsrc.end - rsrc.start + 1);
->>>> -            if (r)
->>>> -                    break;
->>>>      }
->>>> +
->>>> +finished:
->>>>      of_node_put(np);
+>> On 26-05-16 03:15, John Youn wrote:
+>>> Prior to commit 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo]
+>>> functions wrappers"), the optional variants returned -ENOTSUPP when
+>>> CONFIG_RESET_CONTROLLER was not set. This patch reverts to this
+>>> behavior. Otherwise those calls will return -EINVAL causing users to
+>>> think that an error occurred when CONFIG_RESET_CONTROLLER is not set.
 >>>
->>> This function can be simplified down to:
+>>> Fixes: 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo] functions wrappers")
+>>> Signed-off-by: John Youn <johnyoun@synopsys.com>
+>>> ---
 >>>
->>>       for_each_node_by_type(np, "memory") {
->> OK, That's good.
->>
->>>               r = of_property_read_u32(np, "numa-node-id", &nid);
->>>               if (r == -EINVAL)
->>>                       /*
->>>                        * property doesn't exist if -EINVAL, continue
->>>                        * looking for more memory nodes with
->>>                        * "numa-node-id" property
->>>                        */
->>>                       continue;
->> Hi, everybody:
->>     If some "memory" node contains "numa-node-id", but some others missed. Can we simply ignored it?
->> I think we should break out too, and faking to only have node0.
-> 
-> Continuing to work is probably better than not.
-> 
->>
->>>               else if (r)
->>>                       /* some other error */
->>>                       break;
+>>> Hi Philipp, Hans,
 >>>
->>>               r = of_address_to_resource(np, 0, &rsrc);
->>>               for (i = 0; !r; i++, r = of_address_to_resource(np, i,
+>>> The commit referenced above breaks an upcoming patch for the dwc2
+>>> driver that adds an optional reset control.
+>>>
+>>> https://marc.info/?l=linux-usb&m=146161328211584&w=2
+>>>
+>>> I've attempted to add the optional variants back the way they were
+>>> working before. Let me know if I need to do anything else to fix it or
+>>> if it should be done another way.
+>>>
+>>> Regards,
+>>> John
 >>
->> But r(non-zero) is just break this loop, the original is break the outer for (;;) loop
-> 
-> It is not really the kernel's job to validate the DT. If there's
-> random things in it then kernel's behavior is undefined.
-> 
+>> Hmm, I don't like all the extra code your patch adds just to fix
+>> a return value...
 >>
->> How about as below?
+>> Looking at the code before my "reset: Make [of_]reset_control_get[_foo]
+>> functions wrappers" patch, all the dev*_get* functions were
+>> returning ENOTSUPP except for [devm_]reset_control_get, so following
+>> your logic we should also change the of_reset_control_get_by_index
+>> variant to return -ENOTSUP.
 >>
->>         for_each_node_by_type(np, "memory") {
->>                 ... ...
+>> Or better, simply make them all return -ENOTSUP, that seems both
+>> consistent and more KISS to me, this would mean an error code
+>> change for [devm_]reset_control_get, but will fix all the other
+>> getters from having a changed error-code, and I would callers
+>> of [devm_]reset_control_get to not care which error code they
+>> get, except for -EPROBE_DEFER.
 >>
->>                 for (i = 0; !of_address_to_resource(np, i, &rsrc); i++) {
->>                         r = numa_add_memblk(nid, rsrc.start,
->>                                             rsrc.end - rsrc.start + 1);
->>                         if (r)
->>                                 goto finished;
->>                 }
+>> So IMHO the following change would be a better way to fix this:
 >>
->>                 if (!i)
->>                         pr_err("NUMA: bad reg property in memory node\n");
->>         }
+>> --- a/include/linux/reset.h
+>> +++ b/include/linux/reset.h
+>> @@ -65,14 +65,14 @@ static inline struct reset_control *__of_reset_control_get(
+>>                                          struct device_node *node,
+>>                                          const char *id, int index, int shared)
+>>   {
+>> -   return ERR_PTR(-EINVAL);
+>> + return ERR_PTR(-ENOTSUPP);
+>>   }
 >>
->> finished:
-> 
-> Please try to avoid the goto. You can check r in the outer loop too.
+>>   static inline struct reset_control *__devm_reset_control_get(
+>>                                          struct device *dev,
+>>                                          const char *id, int index, int shared)
+>>   {
+>> -   return ERR_PTR(-EINVAL);
+>> + return ERR_PTR(-ENOTSUPP);
+>>   }
+>>
+>>   #endif /* CONFIG_RESET_CONTROLLER */
+>
+>
+> I'm good with this. However, per Philipp on a previous thread, the
+> intended behavior is to return -EINVAL for the non-optional functions.
+>
+> http://marc.info/?l=linux-usb&m=146156945528848&w=2
 
-OK. I have rewritten this function according to your advice.
+As Philipp rightfully points out, calling the non-optional functions
+without CONFIG_RESET_CONTROLLER is a no-no, so IMHO we should not have to
+care too much about the error code in that case, as long as we return
+an error.
 
-	for_each_node_by_type(np, "memory") {
-                r = of_property_read_u32(np, "numa-node-id", &nid);
-                if (r == -EINVAL)
-                        /*
-                         * property doesn't exist if -EINVAL, continue
-                         * looking for more memory nodes with
-                         * "numa-node-id" property
-                         */
-                        continue;
-									//I deleted the break of "some other error", and it will break in below "if (!i || r)" branch
+Also note that even before my patch things were already inconsistent
+with the of_...get... functions already always returning
+-ENOTSUPP when CONFIG_RESET_CONTROLLER was not set, to me it seems
+best and also KISS to just return -ENOTSUPP from all get functions
+when CONFIG_RESET_CONTROLLER is not set.
 
-                for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
-                        r = numa_add_memblk(nid, rsrc.start,
-                                            rsrc.end - rsrc.start + 1);
+Anyways this is Philipp's call, this is all just my 2 cents.
 
-                if (!i || r) {
-                        of_node_put(np);				//I moved here, so that it looks more clear. Because in the normal use of for_each_node_by_type, of_node_put is not required
-                        pr_err("NUMA: bad property in memory node\n");	//Deleted "reg", so that it's suitable or harmless for other error cases
-                        break;
-                }
-        }
+Regards,
 
-	return r;
-
-> 
-> Rob
-> 
-> .
-> 
+Hans
