@@ -1,152 +1,128 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 27 May 2016 16:23:28 +0800
-Subject: [PATCH v4 4/4] thermal: rockchip: add the set_trips function
-In-Reply-To: <1464337408-7123-1-git-send-email-wxt@rock-chips.com>
-References: <1464337408-7123-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1464337408-7123-5-git-send-email-wxt@rock-chips.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 27 May 2016 10:25:20 +0200
+Subject: [RFC PATCH 1/3] watchdog: Add Meson GXBB Watchdog Driver
+In-Reply-To: <57470026.3000501@roeck-us.net>
+References: <1464249112-13658-1-git-send-email-narmstrong@baylibre.com>
+ <1464249112-13658-2-git-send-email-narmstrong@baylibre.com>
+ <57470026.3000501@roeck-us.net>
+Message-ID: <57480470.4000708@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whenever the current temperature is updated, the trip points immediately
-below and above the current temperature are found. A sensor driver
-callback `set_trips' is then called with the temperatures.
-Lastly, The sensor will trigger the hardware high temperature interrupts
-to increase the sampleing rate and throttle frequency to limit the
-temperature rising When performing passive cooling.
+On 05/26/2016 03:54 PM, Guenter Roeck wrote:
+> On 05/26/2016 12:51 AM, Neil Armstrong wrote:
+>> Add watchdog specific driver for Amlogic Meson GXBB SoC.
+>>
+> 
+> Wondering - why RFC ?
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <edubezval@gmail.com>
-Cc: linux-pm at vger.kernel.org
+For these precious comments !
+Thanks Guenter.
 
----
+> 
+>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>> ---
+>>   drivers/watchdog/Makefile         |   1 +
+>>   drivers/watchdog/meson_gxbb_wdt.c | 287 ++++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 288 insertions(+)
+>>   create mode 100644 drivers/watchdog/meson_gxbb_wdt.c
+>>
+>> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+>> index 9bde095..7679d93 100644
+>> --- a/drivers/watchdog/Makefile
+>> +++ b/drivers/watchdog/Makefile
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+[...]
 
- drivers/thermal/rockchip_thermal.c | 39 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+>> +
+>> +unsigned int meson_gxbb_wdt_status(struct watchdog_device *wdt_dev)
+>> +{
+>> +    struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
+>> +
+>> +    return !!(readl(data->reg_base + GXBB_WDT_CTRL_REG) & GXBB_WDT_CTRL_EN);
+> 
+> This function is not supposed to return 0/1 but a bit mask with relevant
+> WDIOF_bits set. sbsa_gwdt.c is buggy (oops, and I reviewed it ;-), so
+> please don't use it as example; it doesn't make much sense to return
+> a kernel-only flag to user space.
+> 
+> Overall I would suggest to not implement the function at all. We'll have
+> to revisit it - its current implementation in the watchdog core does not
+> make much sense and for the most part only returns 0 to user space.
+> The only driver implementing it (sbsa) returns a bad value. It is also
+> _not_ supposed to return the "watchdog running" status as currently
+> implemented (there is no WDIOF_ flag indicating that the watchdog is
+> running).
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index 86a1ab0..39e2eec 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -96,6 +96,7 @@ struct chip_tsadc_table {
-  * @initialize: SoC special initialize tsadc controller method
-  * @irq_ack: clear the interrupt
-  * @get_temp: get the temperature
-+ * @set_alarm_temp: set the high temperature interrupt
-  * @set_tshut_temp: set the hardware-controlled shutdown temperature
-  * @set_tshut_mode: set the hardware-controlled shutdown mode
-  * @table: the chip-specific conversion table
-@@ -119,6 +120,8 @@ struct rockchip_tsadc_chip {
- 	/* Per-sensor methods */
- 	int (*get_temp)(struct chip_tsadc_table table,
- 			int chn, void __iomem *reg, int *temp);
-+	void (*set_alarm_temp)(struct chip_tsadc_table table,
-+			       int chn, void __iomem *reg, int temp);
- 	void (*set_tshut_temp)(struct chip_tsadc_table table,
- 			       int chn, void __iomem *reg, int temp);
- 	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
-@@ -183,6 +186,7 @@ struct rockchip_thermal_data {
- #define TSADCV2_INT_EN				0x08
- #define TSADCV2_INT_PD				0x0c
- #define TSADCV2_DATA(chn)			(0x20 + (chn) * 0x04)
-+#define TSADCV2_COMP_INT(chn)		        (0x30 + (chn) * 0x04)
- #define TSADCV2_COMP_SHUT(chn)		        (0x40 + (chn) * 0x04)
- #define TSADCV2_HIGHT_INT_DEBOUNCE		0x60
- #define TSADCV2_HIGHT_TSHUT_DEBOUNCE		0x64
-@@ -628,6 +632,20 @@ static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
- 	return rk_tsadcv2_code_to_temp(table, val, temp);
- }
- 
-+static void rk_tsadcv2_alarm_temp(struct chip_tsadc_table table,
-+				  int chn, void __iomem *regs, int temp)
-+{
-+	u32 alarm_value, int_en;
-+
-+	alarm_value = rk_tsadcv2_temp_to_code(table, temp);
-+	writel_relaxed(alarm_value & table.data_mask,
-+		       regs + TSADCV2_COMP_INT(chn));
-+
-+	int_en = readl_relaxed(regs + TSADCV2_INT_EN);
-+	int_en |= TSADCV2_INT_SRC_EN(chn);
-+	writel_relaxed(int_en, regs + TSADCV2_INT_EN);
-+}
-+
- static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
- 				  int chn, void __iomem *regs, int temp)
- {
-@@ -670,6 +688,7 @@ static const struct rockchip_tsadc_chip rk3228_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -694,6 +713,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
- 	.irq_ack = rk_tsadcv2_irq_ack,
- 	.control = rk_tsadcv2_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -718,6 +738,7 @@ static const struct rockchip_tsadc_chip rk3366_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -742,6 +763,7 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
- 	.irq_ack = rk_tsadcv2_irq_ack,
- 	.control = rk_tsadcv2_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -766,6 +788,7 @@ static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
- 	.irq_ack = rk_tsadcv3_irq_ack,
- 	.control = rk_tsadcv3_control,
- 	.get_temp = rk_tsadcv2_get_temp,
-+	.set_alarm_temp = rk_tsadcv2_alarm_temp,
- 	.set_tshut_temp = rk_tsadcv2_tshut_temp,
- 	.set_tshut_mode = rk_tsadcv2_tshut_mode,
- 
-@@ -826,6 +849,21 @@ static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
- 	return IRQ_HANDLED;
- }
- 
-+static int rockchip_thermal_set_trips(void *_sensor, int low, int high)
-+{
-+	struct rockchip_thermal_sensor *sensor = _sensor;
-+	struct rockchip_thermal_data *thermal = sensor->thermal;
-+	const struct rockchip_tsadc_chip *tsadc = thermal->chip;
-+
-+	dev_dbg(&thermal->pdev->dev, "%s: sensor %d: low: %d, high %d\n",
-+		__func__, sensor->id, low, high);
-+
-+	tsadc->set_alarm_temp(tsadc->table,
-+			      sensor->id, thermal->regs, high);
-+
-+	return 0;
-+}
-+
- static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
- {
- 	struct rockchip_thermal_sensor *sensor = _sensor;
-@@ -843,6 +881,7 @@ static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
- 
- static const struct thermal_zone_of_device_ops rockchip_of_thermal_ops = {
- 	.get_temp = rockchip_thermal_get_temp,
-+	.set_trips = rockchip_thermal_set_trips,
- };
- 
- static int rockchip_configure_from_dt(struct device *dev,
--- 
-1.9.1
+Ok, will remove it.
+
+>> +}
+>> +
+>> +int meson_gxbb_wdt_ping(struct watchdog_device *wdt_dev)
+>> +{
+>> +    struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
+>> +
+>> +    writel(0, data->reg_base + GXBB_WDT_RSET_REG);
+>> +
+>> +    return 0;
+>> +}
+>> +
+>> +int meson_gxbb_wdt_set_timeout(struct watchdog_device *wdt_dev,
+>> +                   unsigned int timeout)
+>> +{
+>> +    struct meson_gxbb_wdt *data = watchdog_get_drvdata(wdt_dev);
+>> +
+>> +    if (watchdog_active(wdt_dev))
+>> +        meson_gxbb_wdt_stop(wdt_dev);
+>> +
+> 
+> Is the stop/start sequence mandatory ? It leaves the system unprotected
+> for a few cycles, so it is undesirable.
+
+No, it's not mandatory, it's a good point.
+
+>> +
+>> +    data->wdt_dev.parent = &pdev->dev;
+>> +    data->wdt_dev.info = &meson_gxbb_wdt_info;
+>> +    data->wdt_dev.ops = &meson_gxbb_wdt_ops;
+>> +    data->wdt_dev.max_hw_heartbeat_ms = GXBB_WDT_TCNT_SETUP_MASK;
+>> +    data->wdt_dev.min_hw_heartbeat_ms = 1;
+> 
+> Does the device require a minimum time between heartbeats ?
+> Just asking, because you violate it yourself below.
+> 
+> If you want to set the minimum timeout, that would be min_timeout.
+
+Ok, these values are not very clear actually.
+
+>> +    data->wdt_dev.timeout = DEFAULT_TIMEOUT;
+>> +    watchdog_set_drvdata(&data->wdt_dev, data);
+>> +
+>> +    watchdog_init_timeout(&data->wdt_dev, DEFAULT_TIMEOUT, &pdev->dev);
+>> +
+> 
+> DEFAULT_TIMEOUT is unnecessary here. Since the default timeout is already set,
+> it makes the call useless.
+> 
+>> +    ret = watchdog_register_device(&data->wdt_dev);
+>> +    if (ret)
+>> +        return ret;
+>> +
+>> +    /* Setup with 1ms timebase */
+>> +    writel(((clk_get_rate(data->clk) / 1000) & GXBB_WDT_CTRL_DIV_MASK) |
+>> +        GXBB_WDT_CTRL_EE_RESET |
+>> +        GXBB_WDT_CTRL_CLK_EN |
+>> +        GXBB_WDT_CTRL_CLKDIV_EN,
+>> +        data->reg_base + GXBB_WDT_CTRL_REG);
+>> +    meson_gxbb_wdt_set_timeout(&data->wdt_dev, data->wdt_dev.timeout);
+> 
+> set_timeout already calls the ping function. Also, the functions should be called
+> prior to watchdog registration to avoid race conditions.
+> 
+>> +    meson_gxbb_wdt_ping(&data->wdt_dev);
+> 
+> This is unusual. If the watchdog can be already running, it might make sense
+> to tell the core about it (set WDOG_HW_RUNNING in the status field), so it
+> can send heartbeats until user space opens the device.
+
+Yes, since meson_gxbb_wdt_set_timeout() already ping, this is useless.
