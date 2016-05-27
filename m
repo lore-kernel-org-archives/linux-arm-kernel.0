@@ -1,109 +1,62 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 27 May 2016 13:38:10 +0100
-Subject: [PATCH] arm64: kasan: instrument user memory access API
-In-Reply-To: <1464288231-11304-1-git-send-email-yang.shi@linaro.org>
-References: <1464288231-11304-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20160527123809.GD24469@leverpostej>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 May 2016 14:04:47 +0100
+Subject: [PATCH 01/23] all: syscall wrappers: add documentation
+In-Reply-To: <5422652.7gdoDlB8u0@wuerfel>
+References: <6293194.tGy03QJ9ME@wuerfel> <13240365.okADkKsTBJ@wuerfel>
+ <20160527093052.GB7865@e104818-lin.cambridge.arm.com>
+ <5422652.7gdoDlB8u0@wuerfel>
+Message-ID: <20160527130446.GD7865@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, May 26, 2016 at 11:43:51AM -0700, Yang Shi wrote:
-> The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
-> ("x86/kasan: instrument user memory access API") added KASAN instrument to
-> x86 user memory access API, so added such instrument to ARM64 too.
+On Fri, May 27, 2016 at 12:49:11PM +0200, Arnd Bergmann wrote:
+> On Friday, May 27, 2016 10:30:52 AM CEST Catalin Marinas wrote:
+> > On Fri, May 27, 2016 at 10:42:59AM +0200, Arnd Bergmann wrote:
+> > > On Friday, May 27, 2016 8:03:57 AM CEST Heiko Carstens wrote:
+> > > > > > > > Cost wise, this seems like it all cancels out in the end, but what
+> > > > > > > > do I know?
+> > > > > > > 
+> > > > > > > I think you know something, and I also think Heiko and other s390 guys
+> > > > > > > know something as well. So I'd like to listen their arguments here.
+> > > > 
+> > > > If it comes to 64 bit arguments for compat system calls: s390 also has an
+> > > > x32-like ABI extension which allows user space to use full 64 bit
+> > > > registers. As far as I know hardly anybody ever made use of that.
+> > > > 
+> > > > However even if that would be widely used, to me it wouldn't make sense to
+> > > > add new compat system calls which allow 64 bit arguments, simply because
+> > > > something like
+> > > > 
+> > > > c = (u32)a | (u64)b << 32;
+> > > > 
+> > > > can be done with a single 1-cycle instruction. It's just not worth the
+> > > > extra effort to maintain additional system call variants.
+> > > 
+> > > For reference, both tile and mips also have separate 32-bit ABIs that are
+> > > only used on 64-bit kernels (aside from the normal 32-bit ABI). Tile
+> > > does it like s390 and passes 64-bit arguments as pairs, while MIPS
+> > > and x86 and pass them as single registers.
+> > 
+> > AFAIK, x32 also requires that the upper half of a 64-bit reg is zeroed
+> > by the user when a 32-bit value is passed. We could require the same on
+> > AArch64/ILP32 but I'm a bit uneasy on trusting a multitude of C
+> > libraries on this.
 > 
-> Tested by test_kasan module.
+> It's not about trusting a C library, it's about ensuring malicious code
+> cannot pass argumentst that the kernel code assumes will never happen.
 
-I just gave this a go atop of the current HEAD (dc03c0f9d12d8528) on a
-Juno R1 board. I hit the expected exceptions when using the test_kasan
-module (once I remembered to rebuild it), and things seem to run
-smoothly otherwise.
+At least for pointers and sizes, we have additional checks in place
+already, like __access_ok(). Most of the syscalls should be safe since
+they either go through some compat functions taking 32-bit arguments or
+are routed to native functions which already need to cope with a full
+random 64-bit value.
 
-I don't see any built issues when !CONFIG_KASAN, and the patch itself
-looks right to me.
+On arm64, I think the only risk comes from syscall handlers expecting
+32-bit arguments but using 64-bit types. Apart from pointer types, I
+don't expect this to happen but we could enforce it via a
+BUILD_BUG_ON(sizeof(t) > 4 && !__TYPE_IS_PTR(t)) in __SC_DELOUSE as per
+the s390 implementation. With ILP32 if we go for 64-bit off_t, those
+syscalls would be routed directly to the native layer.
 
-So FWIW:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-As an aside, it's a shame that each architecture has to duplicate this
-logic, rather than having something in the generic code like:
-
-static inline unsigned long __must_check
-copy_from_user(void *to, const void __user *from, unsigned long n)
-{
-	kasan_check_read(from, n);
-	arch_copy_from_user(to, from, n);
-}
-
-Thanks,
-Mark.
-
-> 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> ---
->  arch/arm64/include/asm/uaccess.h | 18 ++++++++++++++++--
->  1 file changed, 16 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 0685d74..ec352fa 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -23,6 +23,7 @@
->   */
->  #include <linux/string.h>
->  #include <linux/thread_info.h>
-> +#include <linux/kasan-checks.h>
->  
->  #include <asm/alternative.h>
->  #include <asm/cpufeature.h>
-> @@ -276,6 +277,8 @@ extern unsigned long __must_check __clear_user(void __user *addr, unsigned long
->  
->  static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
->  {
-> +	kasan_check_write(to, n);
-> +
->  	if (access_ok(VERIFY_READ, from, n))
->  		n = __copy_from_user(to, from, n);
->  	else /* security hole - plug it */
-> @@ -285,6 +288,8 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
->  
->  static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
->  {
-> +	kasan_check_read(from, n);
-> +
->  	if (access_ok(VERIFY_WRITE, to, n))
->  		n = __copy_to_user(to, from, n);
->  	return n;
-> @@ -297,8 +302,17 @@ static inline unsigned long __must_check copy_in_user(void __user *to, const voi
->  	return n;
->  }
->  
-> -#define __copy_to_user_inatomic __copy_to_user
-> -#define __copy_from_user_inatomic __copy_from_user
-> +static inline unsigned long __copy_to_user_inatomic(void __user *to, const void *from, unsigned long n)
-> +{
-> +	kasan_check_read(from, n);
-> +	return __copy_to_user(to, from, n);
-> +}
-> +
-> +static inline unsigned long __copy_from_user_inatomic(void *to, const void __user *from, unsigned long n)
-> +{
-> +	kasan_check_write(to, n);
-> +	return __copy_from_user(to, from, n);
-> +}
->  
->  static inline unsigned long __must_check clear_user(void __user *to, unsigned long n)
->  {
-> -- 
-> 2.0.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+-- 
+Catalin
