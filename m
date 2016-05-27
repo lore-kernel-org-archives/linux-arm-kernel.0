@@ -1,82 +1,63 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 27 May 2016 17:23:00 +0300
-Subject: interrupts properties and API usage with GPIO controllers/Device
- Tree
-In-Reply-To: <57461CDC.603@gmail.com>
-References: <57461CDC.603@gmail.com>
-Message-ID: <57485844.3050807@ti.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 27 May 2016 16:40:45 +0200
+Subject: v7_dma_inv_range performance/high expense
+Message-ID: <20160527144045.GB20214@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/26/2016 12:45 AM, Florian Fainelli wrote:
-> Hi Linus, Gregory,
-> 
-> Recently came across an use case that looks like the following:
-> 
-> gpio0: gpio at deadbeef {
-> 	compatible = "brcm,brcmstb-gpio";
-> 	#interrrupt-cells = <2>;
-> 	#gpio-cells = <2>;
-> 	gpio-controller;
-> 	interrupt-controller;
-> 	...
-> };
-> 
-> test at cafeb00b {
-> 	interrupt-parent = <&gpio0>;
-> 	interrupts = <99 3>;
-> };
-> 
-> The driver consuming the test node's interrupts property tries to get
-> the interrupt by using platform_get_irq() or of_irq_parse_and_map() and
-> in the case of the gpio-brcmstb.c, this fails because the interrupt is
-> out of range  as flagged by kernel/irq/irqdomain.c::irq_domain_associate.
-> 
-> Unlike other GPIO provider drivers gpio-brcmstb.c, this driver registers
-> one gpiolib irqchip per each of its banks, and still uses the generic
-> map/unmap functions for its irq_domain_ops, so there is no way we can
-> provide a valid mapping outside of the gpio_to_irq() function
-> unfortunately since gpiochip_irq_map() does
+Hi folks
 
-And this is not working :( Each irq_domain has to be assigned to separate DT node,
-otherwise IRQ mapping will not work (most probably will work, but only for bank 0)
+I have an imx6q, which is a quad core v7 processor. Attached to it via
+pcie i have an intel i210 Ethernet controller.
 
-Such kind of GPIO controllers are incompatible with gpiochip_irqchip_add() and required
-to have one, common irq_domain for all internal banks.
+When the ethernet is transmitting, i can get gigabit line rate, and
+use one core to about 35% of one core. When receiving, i get around
+700Mbps and ksoftirqd/0 is 98% loading a core.
 
-like 	irq_domain = irq_domain_add_xxx(dev->of_node, ngpio, irq, 0,
-							&davinci_gpio_irq_ops,
-							chips);
+Using perf to profile the ksoftirqd/0 pid is see:
 
-ngpio = 120 in case of bcm7445.dtsi
-and custom .map() function need to be implemented 
+  46.38%  [kernel]  [k] v7_dma_inv_range
+  21.25%  [kernel]  [k] l2c210_inv_range
+  10.90%  [kernel]  [k] igb_poll
+   1.69%  [kernel]  [k] dma_cache_maint_page
+   1.27%  [kernel]  [k] eth_type_trans
+   1.20%  [kernel]  [k] skb_add_rx_frag
 
-More or less similar situation is with davinci_gpio.
+Digging deeper into v7_dma_inv_range i see:
 
-> 
-> So here are a few questions for either of you:
-> 
-> - is this a valid API and Device Tree use case: call
-> of_irq_parse_and_map on an "interrupts" property which has not been
-> acquired using the GPIO API and then gpio_to_irq? 
+           801182c0 <v7_dma_inv_range>:
+           v7_dma_inv_range():
+  0.26       mrc    15, 0, r3, cr0, cr0, {1}
+  0.07       lsr    r3, r3, #16
+             and    r3, r3, #15
+  0.04       mov    r2, #4
+             lsl    r2, r2, r3
+  0.04       sub    r3, r2, #1
+             tst    r0, r3
+  0.02       bic    r0, r0, r3
+  0.03       dsb    sy
+  3.01       mcrne  15, 0, r0, cr7, cr14, {1}
+  0.54       tst    r1, r3
+             bic    r1, r1, r3
+  0.08       mcrne  15, 0, r1, cr7, cr14, {1}
+  3.82 34:   mcr    15, 0, r0, cr7, cr6, {1}
+ 88.32       add    r0, r0, r2
+             cmp    r0, r1
+  1.97       bcc    34
+  0.43       dsb    st
+  1.37       bx     lr
 
-this is valid use case
+I'm assuming perf is off by one here, and the add is not taking 88.32%
+of the load, rather it is the mcr instruction before it.
 
-> While gpio_to_irq()
-> works, are not we losing the second specifier in the interrupt cells
-> about what kind of interrupt type this is?
-> 
-> - would it be acceptable to export gpiochip_irq_map and
-> gpiochip_irq_export to make them accessible as helpers so we could just
-> wrap things a bit around or should I just open code the same things and
-> allow gpiochip_irqchip_add to be passed custom irq_domain_ops for instance?
-> 
+The original code in arch/arm/mm/cache-v7.S  says:
 
-Yah, custom implementation might be needed.
+        mcr     p15, 0, r0, c7, c6, 1           @ invalidate D / U line
 
-Another interesting, related question (as for me) is "Is there a limitation
- that gpio bank can have only 32 GPIO pins (from gpiolib point of view)?" 
+I don't get why a cache invalidate instruction should be so expensive.
+It is just throwing away the contents of the cache line, not flushing
+it out to DRAM. Should i trust perf? Is a cache invalidate really so
+expensive? Or am i totally missing something here?
 
--- 
-regards,
--grygorii
+Thanks
+	Andrew
