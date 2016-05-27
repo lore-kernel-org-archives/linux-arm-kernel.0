@@ -1,132 +1,116 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 26 May 2016 23:20:55 -0500
-Subject: [PATCH 2/3] of/numa: fix a memory@ dt node can only contains one
- memory block
-In-Reply-To: <5747C0BF.505@huawei.com>
-References: <1464230639-9852-1-git-send-email-thunder.leizhen@huawei.com>
- <1464230639-9852-2-git-send-email-thunder.leizhen@huawei.com>
- <20160526131345.GA12024@rob-hp-laptop> <5747C0BF.505@huawei.com>
-Message-ID: <CAL_JsqJXu36qYMOZeWDnMQ8BnOxMrixv5N70hvTjDixhMCQKRw@mail.gmail.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Fri, 27 May 2016 07:05:12 +0200
+Subject: [linux-sunxi] [PATCH 1/5] spi: sunxi: fix transfer timeout
+In-Reply-To: <CAGRGNgWDrVHG26umTSHHAxFC3KXjwmpDejBAfKqvuik0_2-Jcw@mail.gmail.com>
+References: <cover.1464130597.git.hramrach@gmail.com>
+ <cb90b922caa6ac07c1425d726ea19709ee5284f4.1464130597.git.hramrach@gmail.com>
+ <CAGRGNgWDrVHG26umTSHHAxFC3KXjwmpDejBAfKqvuik0_2-Jcw@mail.gmail.com>
+Message-ID: <CAOMqctS0AD6rHGt3wjxxyidee=_5xqby95t5TGuozAA12DdPjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 10:36 PM, Leizhen (ThunderTown)
-<thunder.leizhen@huawei.com> wrote:
+On 27 May 2016 at 04:05, Julian Calaby <julian.calaby@gmail.com> wrote:
+> Hi Michal,
 >
->
-> On 2016/5/26 21:13, Rob Herring wrote:
->> On Thu, May 26, 2016 at 10:43:58AM +0800, Zhen Lei wrote:
->>> For a normal memory@ devicetree node, its reg property can contains more
->>> memory blocks.
->>>
->>> Because we don't known how many memory blocks maybe contained, so we try
->>> from index=0, increase 1 until error returned(the end).
->>>
->>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->>> ---
->>>  drivers/of/of_numa.c | 30 ++++++++++++++++++++----------
->>>  1 file changed, 20 insertions(+), 10 deletions(-)
->>>
->>> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
->>> index 21d831f..2c5f249 100644
->>> --- a/drivers/of/of_numa.c
->>> +++ b/drivers/of/of_numa.c
->>> @@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
->>>      struct device_node *np = NULL;
->>>      struct resource rsrc;
->>>      u32 nid;
->>> -    int r = 0;
->>> +    int i, r = 0;
->>>
->>>      for (;;) {
->>>              np = of_find_node_by_type(np, "memory");
->>> @@ -82,17 +82,27 @@ static int __init of_numa_parse_memory_nodes(void)
->>>                      /* some other error */
->>>                      break;
->>>
->>> -            r = of_address_to_resource(np, 0, &rsrc);
->>> -            if (r) {
->>> -                    pr_err("NUMA: bad reg property in memory node\n");
->>> -                    break;
->>> +            for (i = 0; ; i++) {
->>> +                    r = of_address_to_resource(np, i, &rsrc);
->>> +                    if (r) {
->>> +                            /* reached the end of of_address */
->>> +                            if (i > 0) {
->>> +                                    r = 0;
->>> +                                    break;
->>> +                            }
->>> +
->>> +                            pr_err("NUMA: bad reg property in memory node\n");
->>> +                            goto finished;
->>> +                    }
->>> +
->>> +                    r = numa_add_memblk(nid, rsrc.start,
->>> +                                        rsrc.end - rsrc.start + 1);
->>> +                    if (r)
->>> +                            goto finished;
->>>              }
->>> -
->>> -            r = numa_add_memblk(nid, rsrc.start,
->>> -                                rsrc.end - rsrc.start + 1);
->>> -            if (r)
->>> -                    break;
->>>      }
->>> +
->>> +finished:
->>>      of_node_put(np);
+> On Fri, May 27, 2016 at 5:25 AM, Michal Suchanek <hramrach@gmail.com> wrote:
+>> The trasfer timeout is fixed at 1000 ms. Reading a 4Mbyte flash over
+>> 1MHz SPI bus takes way longer than that. Calculate the timeout from the
+>> actual time the transfer is supposed to take and multiply by 2 for good
+>> measure.
 >>
->> This function can be simplified down to:
+>> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
+>> ---
 >>
->>       for_each_node_by_type(np, "memory") {
-> OK, That's good.
->
->>               r = of_property_read_u32(np, "numa-node-id", &nid);
->>               if (r == -EINVAL)
->>                       /*
->>                        * property doesn't exist if -EINVAL, continue
->>                        * looking for more memory nodes with
->>                        * "numa-node-id" property
->>                        */
->>                       continue;
-> Hi, everybody:
->     If some "memory" node contains "numa-node-id", but some others missed. Can we simply ignored it?
-> I think we should break out too, and faking to only have node0.
-
-Continuing to work is probably better than not.
-
->
->>               else if (r)
->>                       /* some other error */
->>                       break;
+>> v2:
+>> - fix build error
+>> - use unsigned instead of int in max_t
+>> - use tfr->speed_hz instead of sspi->max_speed_hz
+>> ---
+>>  drivers/spi/spi-sun4i.c | 11 ++++++++++-
+>>  drivers/spi/spi-sun6i.c | 11 ++++++++++-
+>>  2 files changed, 20 insertions(+), 2 deletions(-)
 >>
->>               r = of_address_to_resource(np, 0, &rsrc);
->>               for (i = 0; !r; i++, r = of_address_to_resource(np, i,
+>> diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+>> index 1ddd9e2..fe63bbd 100644
+>> --- a/drivers/spi/spi-sun4i.c
+>> +++ b/drivers/spi/spi-sun4i.c
+>> @@ -173,6 +173,7 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+>>  {
+>>         struct sun4i_spi *sspi = spi_master_get_devdata(master);
+>>         unsigned int mclk_rate, div, timeout;
+>> +       unsigned int start, end, tx_time;
+>>         unsigned int tx_len = 0;
+>>         int ret = 0;
+>>         u32 reg;
+>> @@ -279,9 +280,17 @@ static int sun4i_spi_transfer_one(struct spi_master *master,
+>>         reg = sun4i_spi_read(sspi, SUN4I_CTL_REG);
+>>         sun4i_spi_write(sspi, SUN4I_CTL_REG, reg | SUN4I_CTL_XCH);
+>>
+>> +       tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
 >
-> But r(non-zero) is just break this loop, the original is break the outer for (;;) loop
+> You should probably use "unsigned int" instead of just "unsigned" here.
+>
+>> +                       100);
 
-It is not really the kernel's job to validate the DT. If there's
-random things in it then kernel's behavior is undefined.
+Or just 100U constant and avoid max_t altogether.
+
+>> +       start = jiffies;
+>>         timeout = wait_for_completion_timeout(&sspi->done,
+>> -                                             msecs_to_jiffies(1000));
+>> +                                             msecs_to_jiffies(tx_time));
+>> +       end = jiffies;
+>>         if (!timeout) {
+>> +               dev_warn(&master->dev,
+>> +                        "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
+>> +                        dev_name(&spi->dev), tfr->len, tfr->speed_hz,
+>> +                        jiffies_to_msecs(end - start), tx_time);
+>
+> Should the debug changes be in a separate patch?
+
+Is this so big of a change that it needs to be split?
 
 >
-> How about as below?
+>>                 ret = -ETIMEDOUT;
+>>                 goto out;
+>>         }
+>> diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+>> index 42e2c4b..8be5c5c 100644
+>> --- a/drivers/spi/spi-sun6i.c
+>> +++ b/drivers/spi/spi-sun6i.c
+>> @@ -162,6 +162,7 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+>>         unsigned int mclk_rate, div, timeout;
+>>         unsigned int tx_len = 0;
+>>         int ret = 0;
+>> +       unsigned int start, end, tx_time;
+>>         u32 reg;
+>>
+>>         /* We don't support transfer larger than the FIFO */
+>> @@ -269,9 +270,17 @@ static int sun6i_spi_transfer_one(struct spi_master *master,
+>>         reg = sun6i_spi_read(sspi, SUN6I_TFR_CTL_REG);
+>>         sun6i_spi_write(sspi, SUN6I_TFR_CTL_REG, reg | SUN6I_TFR_CTL_XCH);
+>>
+>> +       tx_time = max_t(unsigned, tfr->len * 8 * 2 / (tfr->speed_hz / 1000),
 >
->         for_each_node_by_type(np, "memory") {
->                 ... ...
+> Ditto, "unsigned int" instead of "unsigned"?
 >
->                 for (i = 0; !of_address_to_resource(np, i, &rsrc); i++) {
->                         r = numa_add_memblk(nid, rsrc.start,
->                                             rsrc.end - rsrc.start + 1);
->                         if (r)
->                                 goto finished;
->                 }
+>> +                       100);
+>> +       start = jiffies;
+>>         timeout = wait_for_completion_timeout(&sspi->done,
+>> -                                             msecs_to_jiffies(1000));
+>> +                                             msecs_to_jiffies(tx_time));
+>> +       end = jiffies;
+>>         if (!timeout) {
+>> +               dev_warn(&master->dev,
+>> +                        "%s: timeout transferring %u bytes@%iHz for %i(%i)ms",
+>> +                        dev_name(&spi->dev), tfr->len, tfr->speed_hz,
+>> +                        jiffies_to_msecs(end - start), tx_time);
 >
->                 if (!i)
->                         pr_err("NUMA: bad reg property in memory node\n");
->         }
+> Ditto, separate patch?
 >
-> finished:
+> Also, should the changes for the drivers be in two separate patches also?
 
-Please try to avoid the goto. You can check r in the outer loop too.
+That's basically the same driver with different constants so I guess not.
 
-Rob
+Thanks
+
+Michal
