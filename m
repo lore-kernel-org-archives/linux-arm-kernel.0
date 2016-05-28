@@ -1,38 +1,70 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 28 May 2016 14:53:20 +0100
-Subject: [PATCH kexec-tools 07/32] kexec: fix warnings caused by
- selecting 64-bit file IO on 32-bit platforms
-In-Reply-To: <20160528113354.GB2429@x1.redhat.com>
-References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
- <E1axXSV-0004hZ-CH@e0050434b2927.dyn.arm.linux.org.uk>
- <20160528113354.GB2429@x1.redhat.com>
-Message-ID: <20160528135320.GQ19428@n2100.arm.linux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 28 May 2016 14:17:05 -0700
+Subject: pxa_defconfig runtime failures due to 'ARM: pxa: activate pinctrl
+ for device-tree machines'
+In-Reply-To: <87a8jah9ok.fsf@belgarion.home>
+References: <20160527202715.GA4841@roeck-us.net>
+ <87a8jah9ok.fsf@belgarion.home>
+Message-ID: <574A0AD1.9000304@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 28, 2016 at 07:33:54PM +0800, Baoquan He wrote:
-> On 05/03/16 at 11:21am, Russell King wrote:
-> > diff --git a/kexec/kexec-uImage.c b/kexec/kexec-uImage.c
-> > index 9df601b..5e24629 100644
-> > --- a/kexec/kexec-uImage.c
-> > +++ b/kexec/kexec-uImage.c
-> > @@ -82,7 +82,8 @@ int uImage_probe(const unsigned char *buf, off_t len, unsigned int arch)
-> >  	if (be32_to_cpu(header.ih_size) > len - sizeof(header)) {
-> >  		printf("uImage header claims that image has %d bytes\n",
-> >  				be32_to_cpu(header.ih_size));
-> > -		printf("we read only %ld bytes.\n", len - sizeof(header));
-> > +		printf("we read only %lld bytes.\n",
-> > +		       (long long)len - sizeof(header));
-> 
-> With "D_FILE_OFFSET_BITS=64" adding, off_t is identical to off64_t, is
-> that necessary to still take a type conversion here?
+On 05/28/2016 01:24 AM, Robert Jarzmik wrote:
+> Guenter Roeck <linux@roeck-us.net> writes:
+>
+>> Hi,
+>>
+>> your mainline commit f806dac5938b ("ARM: pxa: activate pinctrl for device-tree
+>> machines") causes various non-devicetree systems to fail with the following
+>> error messages when running a pxa_defconfig image.
+> Ah yes, you're right.
+>
+>>
+>> During boot:
+>>
+>> Can't request reset_gpio
+>>
+>> At reboot:
+>>
+>> reboot: Restarting system
+>> ------------[ cut here ]------------
+>> kernel BUG at arch/arm/mach-pxa/reset.c:59!
+>> ...
+>>
+>> Added logging shows that the error seen when trying to request the reset gpio
+>> is -EPROBE_DEFER, and that the pxa gpio driver is not instantiated.
+>>
+>> This is seen when attempting to run akita, borzoi, spitz, terrier, or tosa
+>> in qemu with pxa_defconfig. Reverting your patch fixes the problem.
+>>
+>> Is this on purpose ?
+> Well no :)
+> The real reason behind is that gpio handling for pxa in its current state cannot
+> be built for _both_ a devicetree machine (ie. pxa-dt.c) and a non devicetree
+> machine (ie. corgi, tosa, ...).
+>
+> This is turn is because for devicetree a pinctrl is enforced for the machine,
+> and a pinctrl driver is required. If it's not available, pxa_gpio_request()
+> fails on pinctrl_request_gpio() and returns -EPROBE_DEFER.
+>
+> Now the true chicken and egg problem is than machine files,
+> ie. arch/arm/mach-pxa/xxx.c are using gpio before the drivers are probed, in the
+> init_machine() function, and that's why pinctrl/gpio for legacy machine files is
+> a bit difficult.
+>
+>> Unless I am missing something, it effectively means that
+>> pxa_defconfig no longer works for pxa3xx systems, since those do not support
+>> devicetree (or at least there is no devicetree file which includes
+>> pxa3xx.dtsi).
+> I'd rather say that pxa_defconfig doesn't work anymore on any legacy system.
+> Its first purpose was to ensure compilation coverage of all legacy pxa systems.
+> Its second one was to have a single kernel bootable on all legacy pxa systems.
+>
+> Therefore, would you tell me if the patch in [1] fixes your issue ?
+>
 
-The printf format specifies an argument of "long long" type, which is
-defined as a data type of at least 64-bits wide.  So, it's more
-correct to cast to long long, rather than relying on off64_t being
-the same size as long long.
+Yes, it does. It is actually the workaround I deployed for my test builds,
+since I thought that the change was on purpose.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Guenter
