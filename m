@@ -1,54 +1,44 @@
 From: bhe@redhat.com (Baoquan He)
-Date: Sat, 28 May 2016 19:28:42 +0800
-Subject: [PATCH kexec-tools 05/32] arm: fix kdump to work on LPAE systems
-In-Reply-To: <E1axXSK-0004hN-V7@e0050434b2927.dyn.arm.linux.org.uk>
+Date: Sat, 28 May 2016 19:33:54 +0800
+Subject: [PATCH kexec-tools 07/32] kexec: fix warnings caused by
+ selecting 64-bit file IO on 32-bit platforms
+In-Reply-To: <E1axXSV-0004hZ-CH@e0050434b2927.dyn.arm.linux.org.uk>
 References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
- <E1axXSK-0004hN-V7@e0050434b2927.dyn.arm.linux.org.uk>
-Message-ID: <20160528112842.GA2429@x1.redhat.com>
+ <E1axXSV-0004hZ-CH@e0050434b2927.dyn.arm.linux.org.uk>
+Message-ID: <20160528113354.GB2429@x1.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/03/16 at 11:21am, Russell King wrote:
-> We need to use 64-bit file IO when mapping system memory and the core
-> dump file as we may be running on a LPAE system, otherwise we risk
-> mapping memory we shouldn't, and causing a kernel oops:
+> Fix warnings caused by selecting 64-bit file IO on 32-bit platforms.
 > 
-> Unhandled fault: asynchronous external abort (0x211) at 0x00000000
-> pgd = edd2c740
-> [00000000] *pgd=82ec98003, *pmd=82dcd2003, *pte=00000000
+> kexec/kexec.c:710:2: warning: format '%lx' expects argument of type 'long unsigned int', but argument 4 has type 'off_t' [-Wformat]
+> kexec/zlib.c:63:4: warning: format '%ld' expects argument of type 'long int', but argument 4 has type 'off_t' [-Wformat]
+> kexec/kexec-uImage.c:85:3: warning: format '%ld' expects argument of type 'long
+> int', but argument 2 has type 'off_t' [-Wformat]
 > 
 > Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 > ---
->  kexec/arch/arm/Makefile | 3 +++
->  1 file changed, 3 insertions(+)
+>  kexec/kexec-uImage.c | 3 ++-
+>  kexec/kexec.c        | 4 ++--
+>  kexec/zlib.c         | 4 ++--
+>  3 files changed, 6 insertions(+), 5 deletions(-)
 > 
-> diff --git a/kexec/arch/arm/Makefile b/kexec/arch/arm/Makefile
-> index 38137d7..60e433a 100644
-> --- a/kexec/arch/arm/Makefile
-> +++ b/kexec/arch/arm/Makefile
-> @@ -18,6 +18,9 @@ libfdt_SRCS += $(LIBFDT_SRCS:%=kexec/libfdt/%)
->  
->  arm_CPPFLAGS = -I$(srcdir)/kexec/libfdt
->  
-> +# We want 64-bit file IO for kdump to work correctly on LPAE systems
-> +arm_CPPFLAGS += -D_FILE_OFFSET_BITS=64
-> +
+> diff --git a/kexec/kexec-uImage.c b/kexec/kexec-uImage.c
+> index 9df601b..5e24629 100644
+> --- a/kexec/kexec-uImage.c
+> +++ b/kexec/kexec-uImage.c
+> @@ -82,7 +82,8 @@ int uImage_probe(const unsigned char *buf, off_t len, unsigned int arch)
+>  	if (be32_to_cpu(header.ih_size) > len - sizeof(header)) {
+>  		printf("uImage header claims that image has %d bytes\n",
+>  				be32_to_cpu(header.ih_size));
+> -		printf("we read only %ld bytes.\n", len - sizeof(header));
+> +		printf("we read only %lld bytes.\n",
+> +		       (long long)len - sizeof(header));
 
-It makes sense in this situation.
+With "D_FILE_OFFSET_BITS=64" adding, off_t is identical to off64_t, is
+that necessary to still take a type conversion here?
 
-In "man 2 stat" and /usr/include/features.h, we can find the relevant
-information.
+Is that OK to be like this:
 
-EOVERFLOW
-	pathname or fd refers to a file whose size, inode number, or number
-	of blocks cannot be represented in, respectively, the types off_t, ino_t,
-	or blkcnt_t.  This error can occur when, for example, an  application
-	compiled  on  a  32-bit  platform  without -D_FILE_OFFSET_BITS=64 calls
-	stat() on a file whose size exceeds (1<<31)-1 bytes.
-
-Ack this patch.
-
-Acked-by: Baoquan He <bhe@redhat.com>
-
-Baoquan
-Thanks
+		printf("we read only %lld bytes.\n", len - sizeof(header));
