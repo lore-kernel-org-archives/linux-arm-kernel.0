@@ -1,325 +1,198 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 28 May 2016 11:54:27 +0200
-Subject: [PATCH v5 16/22] ARM: dts: exynos: Add USB to Exynos5410
+Date: Sat, 28 May 2016 11:54:31 +0200
+Subject: [PATCH v5 20/22] ARM: dts: exynos: Move HSI2C nodes to exynos54xx.dtsi
 In-Reply-To: <1464429273-23457-1-git-send-email-krzk@kernel.org>
 References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
-Message-ID: <1464429273-23457-17-git-send-email-krzk@kernel.org>
+Message-ID: <1464429273-23457-21-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move USB 3.0 DWC and 2.0 EHCI/OHCI nodes from exynos5420.dtsi to
-exynos54xx.dtsi common for entire family. For Exynos542x/5800 this
-should not have functional impact but for Exynos5410 this effectively
-adds USB support.
+The USI/HSI2C nodes can be mostly shared between Exynos5420 and
+Exynos5410 so move them to common DTSI.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
- arch/arm/boot/dts/exynos5410.dtsi |  39 +++++++++++
- arch/arm/boot/dts/exynos5420.dtsi | 133 +++++++++++---------------------------
- arch/arm/boot/dts/exynos54xx.dtsi |  79 ++++++++++++++++++++++
- 3 files changed, 157 insertions(+), 94 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 1354b5bbc14e..6146bf164248 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -188,4 +188,43 @@
- 		  3 0 0x07000000 0x20000>;
- };
- 
-+&usbdrd3_0 {
-+	clocks = <&clock CLK_USBD300>;
-+	clock-names = "usbdrd30";
-+};
-+
-+&usbdrd_phy0 {
-+	clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
-+	clock-names = "phy", "ref";
-+	samsung,pmu-syscon = <&pmu_system_controller>;
-+};
-+
-+&usbdrd3_1 {
-+	clocks = <&clock CLK_USBD301>;
-+	clock-names = "usbdrd30";
-+};
-+
-+&usbdrd_phy1 {
-+	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
-+	clock-names = "phy", "ref";
-+	samsung,pmu-syscon = <&pmu_system_controller>;
-+};
-+
-+&usbhost1 {
-+	clocks = <&clock CLK_USBH20>;
-+	clock-names = "usbhost";
-+};
-+
-+&usbhost2 {
-+	clocks = <&clock CLK_USBH20>;
-+	clock-names = "usbhost";
-+};
-+
-+&usb2_phy {
-+	clocks = <&clock CLK_USBH20>, <&clock CLK_SCLK_USBPHY300>;
-+	clock-names = "phy", "ref";
-+	samsung,sysreg-phandle = <&sysreg_system_controller>;
-+	samsung,pmureg-phandle = <&pmu_system_controller>;
-+};
-+
- #include "exynos5410-pinctrl.dtsi"
+---
+
+Change since v4:
+1. Remove the nodes in exynos5420.dtsi (before they were actually just
+   copied instead of moving).
+2. Use lower-case for hex.
+---
+ arch/arm/boot/dts/exynos5420.dtsi | 85 +++++++++++++--------------------------
+ arch/arm/boot/dts/exynos54xx.dtsi | 41 +++++++++++++++++++
+ 2 files changed, 69 insertions(+), 57 deletions(-)
+
 diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index ebf2ed3c5ff8..8fa65eb8027d 100644
+index 8fa65eb8027d..8b1e706e9250 100644
 --- a/arch/arm/boot/dts/exynos5420.dtsi
 +++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -41,8 +41,6 @@
- 		spi0 = &spi_0;
- 		spi1 = &spi_1;
- 		spi2 = &spi_2;
--		usbdrdphy0 = &usbdrd_phy0;
--		usbdrdphy1 = &usbdrd_phy1;
- 	};
- 
- 	/*
-@@ -770,98 +768,6 @@
- 			clock-names = "secss";
+@@ -29,10 +29,6 @@
+ 		pinctrl2 = &pinctrl_2;
+ 		pinctrl3 = &pinctrl_3;
+ 		pinctrl4 = &pinctrl_4;
+-		i2c4 = &hsi2c_4;
+-		i2c5 = &hsi2c_5;
+-		i2c6 = &hsi2c_6;
+-		i2c7 = &hsi2c_7;
+ 		i2c8 = &hsi2c_8;
+ 		i2c9 = &hsi2c_9;
+ 		i2c10 = &hsi2c_10;
+@@ -526,59 +522,6 @@
+ 			status = "disabled";
  		};
  
--		usbdrd3_0: usb3-0 {
--			compatible = "samsung,exynos5250-dwusb3";
--			clocks = <&clock CLK_USBD300>;
--			clock-names = "usbdrd30";
--			#address-cells = <1>;
--			#size-cells = <1>;
--			ranges;
--
--			usbdrd_dwc3_0: dwc3 at 12000000 {
--				compatible = "snps,dwc3";
--				reg = <0x12000000 0x10000>;
--				interrupts = <0 72 0>;
--				phys = <&usbdrd_phy0 0>, <&usbdrd_phy0 1>;
--				phy-names = "usb2-phy", "usb3-phy";
--			};
--		};
--
--		usbdrd_phy0: phy at 12100000 {
--			compatible = "samsung,exynos5420-usbdrd-phy";
--			reg = <0x12100000 0x100>;
--			clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
--			clock-names = "phy", "ref";
--			samsung,pmu-syscon = <&pmu_system_controller>;
--			#phy-cells = <1>;
--		};
--
--		usbdrd3_1: usb3-1 {
--			compatible = "samsung,exynos5250-dwusb3";
--			clocks = <&clock CLK_USBD301>;
--			clock-names = "usbdrd30";
--			#address-cells = <1>;
--			#size-cells = <1>;
--			ranges;
--
--			usbdrd_dwc3_1: dwc3 at 12400000 {
--				compatible = "snps,dwc3";
--				reg = <0x12400000 0x10000>;
--				interrupts = <0 73 0>;
--				phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
--				phy-names = "usb2-phy", "usb3-phy";
--			};
--		};
--
--		usbdrd_phy1: phy at 12500000 {
--			compatible = "samsung,exynos5420-usbdrd-phy";
--			reg = <0x12500000 0x100>;
--			clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
--			clock-names = "phy", "ref";
--			samsung,pmu-syscon = <&pmu_system_controller>;
--			#phy-cells = <1>;
--		};
--
--		usbhost2: usb at 12110000 {
--			compatible = "samsung,exynos4210-ehci";
--			reg = <0x12110000 0x100>;
--			interrupts = <0 71 0>;
--
--			clocks = <&clock CLK_USBH20>;
--			clock-names = "usbhost";
+-		/* i2c_0-3 are defined in exynos5.dtsi */
+-		hsi2c_4: i2c at 12CA0000 {
+-			compatible = "samsung,exynos5250-hsi2c";
+-			reg = <0x12CA0000 0x1000>;
+-			interrupts = <0 60 0>;
 -			#address-cells = <1>;
 -			#size-cells = <0>;
--			port at 0 {
--				reg = <0>;
--				phys = <&usb2_phy 1>;
--			};
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c4_hs_bus>;
+-			clocks = <&clock CLK_USI0>;
+-			clock-names = "hsi2c";
+-			status = "disabled";
 -		};
 -
--		usbhost1: usb at 12120000 {
--			compatible = "samsung,exynos4210-ohci";
--			reg = <0x12120000 0x100>;
--			interrupts = <0 71 0>;
--
--			clocks = <&clock CLK_USBH20>;
--			clock-names = "usbhost";
+-		hsi2c_5: i2c at 12CB0000 {
+-			compatible = "samsung,exynos5250-hsi2c";
+-			reg = <0x12CB0000 0x1000>;
+-			interrupts = <0 61 0>;
 -			#address-cells = <1>;
 -			#size-cells = <0>;
--			port at 0 {
--				reg = <0>;
--				phys = <&usb2_phy 1>;
--			};
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c5_hs_bus>;
+-			clocks = <&clock CLK_USI1>;
+-			clock-names = "hsi2c";
+-			status = "disabled";
 -		};
 -
--		usb2_phy: phy at 12130000 {
--			compatible = "samsung,exynos5250-usb2-phy";
--			reg = <0x12130000 0x100>;
--			clocks = <&clock CLK_USBH20>, <&clock CLK_SCLK_USBPHY300>;
--			clock-names = "phy", "ref";
--			#phy-cells = <1>;
--			samsung,sysreg-phandle = <&sysreg_system_controller>;
--			samsung,pmureg-phandle = <&pmu_system_controller>;
+-		hsi2c_6: i2c at 12CC0000 {
+-			compatible = "samsung,exynos5250-hsi2c";
+-			reg = <0x12CC0000 0x1000>;
+-			interrupts = <0 62 0>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c6_hs_bus>;
+-			clocks = <&clock CLK_USI2>;
+-			clock-names = "hsi2c";
+-			status = "disabled";
 -		};
 -
- 		sysmmu_g2dr: sysmmu at 0x10A60000 {
- 			compatible = "samsung,exynos-sysmmu";
- 			reg = <0x10A60000 0x1000>;
-@@ -1153,4 +1059,43 @@
- 	clock-names = "uart", "clk_uart_baud0";
+-		hsi2c_7: i2c at 12CD0000 {
+-			compatible = "samsung,exynos5250-hsi2c";
+-			reg = <0x12CD0000 0x1000>;
+-			interrupts = <0 63 0>;
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&i2c7_hs_bus>;
+-			clocks = <&clock CLK_USI3>;
+-			clock-names = "hsi2c";
+-			status = "disabled";
+-		};
+-
+ 		hsi2c_8: i2c at 12E00000 {
+ 			compatible = "samsung,exynos5250-hsi2c";
+ 			reg = <0x12E00000 0x1000>;
+@@ -1022,6 +965,34 @@
+ 	pinctrl-0 = <&i2c3_bus>;
  };
  
-+&usbdrd3_0 {
-+	clocks = <&clock CLK_USBD300>;
-+	clock-names = "usbdrd30";
++&hsi2c_4 {
++	clocks = <&clock CLK_USI0>;
++	clock-names = "hsi2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c4_hs_bus>;
 +};
 +
-+&usbdrd_phy0 {
-+	clocks = <&clock CLK_USBD300>, <&clock CLK_SCLK_USBPHY300>;
-+	clock-names = "phy", "ref";
-+	samsung,pmu-syscon = <&pmu_system_controller>;
++&hsi2c_5 {
++	clocks = <&clock CLK_USI1>;
++	clock-names = "hsi2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c5_hs_bus>;
 +};
 +
-+&usbdrd3_1 {
-+	clocks = <&clock CLK_USBD301>;
-+	clock-names = "usbdrd30";
++&hsi2c_6 {
++	clocks = <&clock CLK_USI2>;
++	clock-names = "hsi2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c6_hs_bus>;
 +};
 +
-+&usbdrd_phy1 {
-+	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
-+	clock-names = "phy", "ref";
-+	samsung,pmu-syscon = <&pmu_system_controller>;
++&hsi2c_7 {
++	clocks = <&clock CLK_USI3>;
++	clock-names = "hsi2c";
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c7_hs_bus>;
 +};
 +
-+&usbhost1 {
-+	clocks = <&clock CLK_USBH20>;
-+	clock-names = "usbhost";
-+};
-+
-+&usbhost2 {
-+	clocks = <&clock CLK_USBH20>;
-+	clock-names = "usbhost";
-+};
-+
-+&usb2_phy {
-+	clocks = <&clock CLK_USBH20>, <&clock CLK_SCLK_USBPHY300>;
-+	clock-names = "phy", "ref";
-+	samsung,sysreg-phandle = <&sysreg_system_controller>;
-+	samsung,pmureg-phandle = <&pmu_system_controller>;
-+};
-+
- #include "exynos5420-pinctrl.dtsi"
+ &mct {
+ 	clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MCT>;
+ 	clock-names = "fin_pll", "mct";
 diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
-index 1bcfb7f455c1..e01d068d4c38 100644
+index e01d068d4c38..44a8391c8524 100644
 --- a/arch/arm/boot/dts/exynos54xx.dtsi
 +++ b/arch/arm/boot/dts/exynos54xx.dtsi
-@@ -20,6 +20,11 @@
- / {
+@@ -21,6 +21,10 @@
  	compatible = "samsung,exynos5";
  
-+	aliases {
-+		usbdrdphy0 = &usbdrd_phy0;
-+		usbdrdphy1 = &usbdrd_phy1;
-+	};
-+
- 	soc: soc {
- 		sysram at 02020000 {
- 			compatible = "mmio-sram";
-@@ -64,5 +69,79 @@
- 						<11 &gic 0 131 0>;
+ 	aliases {
++		i2c4 = &hsi2c_4;
++		i2c5 = &hsi2c_5;
++		i2c6 = &hsi2c_6;
++		i2c7 = &hsi2c_7;
+ 		usbdrdphy0 = &usbdrd_phy0;
+ 		usbdrdphy1 = &usbdrd_phy1;
+ 	};
+@@ -70,6 +74,43 @@
  			};
  		};
-+
-+		usbdrd3_0: usb3-0 {
-+			compatible = "samsung,exynos5250-dwusb3";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			usbdrd_dwc3_0: dwc3 at 12000000 {
-+				compatible = "snps,dwc3";
-+				reg = <0x12000000 0x10000>;
-+				interrupts = <0 72 0>;
-+				phys = <&usbdrd_phy0 0>, <&usbdrd_phy0 1>;
-+				phy-names = "usb2-phy", "usb3-phy";
-+			};
-+		};
-+
-+		usbdrd_phy0: phy at 12100000 {
-+			compatible = "samsung,exynos5420-usbdrd-phy";
-+			reg = <0x12100000 0x100>;
-+			#phy-cells = <1>;
-+		};
-+
-+		usbdrd3_1: usb3-1 {
-+			compatible = "samsung,exynos5250-dwusb3";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			usbdrd_dwc3_1: dwc3 at 12400000 {
-+				compatible = "snps,dwc3";
-+				reg = <0x12400000 0x10000>;
-+				interrupts = <0 73 0>;
-+				phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
-+				phy-names = "usb2-phy", "usb3-phy";
-+			};
-+		};
-+
-+		usbdrd_phy1: phy at 12500000 {
-+			compatible = "samsung,exynos5420-usbdrd-phy";
-+			reg = <0x12500000 0x100>;
-+			#phy-cells = <1>;
-+		};
-+
-+		usbhost2: usb at 12110000 {
-+			compatible = "samsung,exynos4210-ehci";
-+			reg = <0x12110000 0x100>;
-+			interrupts = <0 71 0>;
-+
+ 
++		/* i2c_0-3 are defined in exynos5.dtsi */
++		hsi2c_4: i2c at 12ca0000 {
++			compatible = "samsung,exynos5250-hsi2c";
++			reg = <0x12ca0000 0x1000>;
++			interrupts = <0 60 0>;
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			port at 0 {
-+				reg = <0>;
-+				phys = <&usb2_phy 1>;
-+			};
++			status = "disabled";
 +		};
 +
-+		usbhost1: usb at 12120000 {
-+			compatible = "samsung,exynos4210-ohci";
-+			reg = <0x12120000 0x100>;
-+			interrupts = <0 71 0>;
-+
++		hsi2c_5: i2c at 12cb0000 {
++			compatible = "samsung,exynos5250-hsi2c";
++			reg = <0x12cb0000 0x1000>;
++			interrupts = <0 61 0>;
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			port at 0 {
-+				reg = <0>;
-+				phys = <&usb2_phy 1>;
-+			};
++			status = "disabled";
 +		};
 +
-+		usb2_phy: phy at 12130000 {
-+			compatible = "samsung,exynos5250-usb2-phy";
-+			reg = <0x12130000 0x100>;
-+			#phy-cells = <1>;
++		hsi2c_6: i2c at 12cc0000 {
++			compatible = "samsung,exynos5250-hsi2c";
++			reg = <0x12cc0000 0x1000>;
++			interrupts = <0 62 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
 +		};
- 	};
- };
++
++		hsi2c_7: i2c at 12cd0000 {
++			compatible = "samsung,exynos5250-hsi2c";
++			reg = <0x12cd0000 0x1000>;
++			interrupts = <0 63 0>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
++
+ 		usbdrd3_0: usb3-0 {
+ 			compatible = "samsung,exynos5250-dwusb3";
+ 			#address-cells = <1>;
 -- 
 2.7.4
