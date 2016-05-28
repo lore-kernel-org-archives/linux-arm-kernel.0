@@ -1,70 +1,82 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 28 May 2016 14:17:05 -0700
-Subject: pxa_defconfig runtime failures due to 'ARM: pxa: activate pinctrl
- for device-tree machines'
-In-Reply-To: <87a8jah9ok.fsf@belgarion.home>
-References: <20160527202715.GA4841@roeck-us.net>
- <87a8jah9ok.fsf@belgarion.home>
-Message-ID: <574A0AD1.9000304@roeck-us.net>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sat, 28 May 2016 18:01:11 -0400
+Subject: [PATCH V6 1/8] vfio: platform: move reset call to a common function
+In-Reply-To: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
+References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1464472878-27176-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2016 01:24 AM, Robert Jarzmik wrote:
-> Guenter Roeck <linux@roeck-us.net> writes:
->
->> Hi,
->>
->> your mainline commit f806dac5938b ("ARM: pxa: activate pinctrl for device-tree
->> machines") causes various non-devicetree systems to fail with the following
->> error messages when running a pxa_defconfig image.
-> Ah yes, you're right.
->
->>
->> During boot:
->>
->> Can't request reset_gpio
->>
->> At reboot:
->>
->> reboot: Restarting system
->> ------------[ cut here ]------------
->> kernel BUG at arch/arm/mach-pxa/reset.c:59!
->> ...
->>
->> Added logging shows that the error seen when trying to request the reset gpio
->> is -EPROBE_DEFER, and that the pxa gpio driver is not instantiated.
->>
->> This is seen when attempting to run akita, borzoi, spitz, terrier, or tosa
->> in qemu with pxa_defconfig. Reverting your patch fixes the problem.
->>
->> Is this on purpose ?
-> Well no :)
-> The real reason behind is that gpio handling for pxa in its current state cannot
-> be built for _both_ a devicetree machine (ie. pxa-dt.c) and a non devicetree
-> machine (ie. corgi, tosa, ...).
->
-> This is turn is because for devicetree a pinctrl is enforced for the machine,
-> and a pinctrl driver is required. If it's not available, pxa_gpio_request()
-> fails on pinctrl_request_gpio() and returns -EPROBE_DEFER.
->
-> Now the true chicken and egg problem is than machine files,
-> ie. arch/arm/mach-pxa/xxx.c are using gpio before the drivers are probed, in the
-> init_machine() function, and that's why pinctrl/gpio for legacy machine files is
-> a bit difficult.
->
->> Unless I am missing something, it effectively means that
->> pxa_defconfig no longer works for pxa3xx systems, since those do not support
->> devicetree (or at least there is no devicetree file which includes
->> pxa3xx.dtsi).
-> I'd rather say that pxa_defconfig doesn't work anymore on any legacy system.
-> Its first purpose was to ensure compilation coverage of all legacy pxa systems.
-> Its second one was to have a single kernel bootable on all legacy pxa systems.
->
-> Therefore, would you tell me if the patch in [1] fixes your issue ?
->
+The reset call sequence seems to replicate itself multiple times
+across the file. Grouping them together for maintenance reasons.
 
-Yes, it does. It is actually the workaround I deployed for my test builds,
-since I thought that the change was on purpose.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reviewed-by: Eric Auger <eric.auger@linaro.org>
+---
+ drivers/vfio/platform/vfio_platform_common.c | 30 +++++++++++++---------------
+ 1 file changed, 14 insertions(+), 16 deletions(-)
 
-Thanks,
-Guenter
+diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+index 08fd7c2..3e2a7c0 100644
+--- a/drivers/vfio/platform/vfio_platform_common.c
++++ b/drivers/vfio/platform/vfio_platform_common.c
+@@ -134,6 +134,17 @@ static void vfio_platform_regions_cleanup(struct vfio_platform_device *vdev)
+ 	kfree(vdev->regions);
+ }
+ 
++static int vfio_platform_call_reset(struct vfio_platform_device *vdev)
++{
++	if (vdev->of_reset) {
++		dev_info(vdev->device, "reset\n");
++		return vdev->of_reset(vdev);
++	}
++
++	dev_warn(vdev->device, "no reset function found!\n");
++	return -EINVAL;
++}
++
+ static void vfio_platform_release(void *device_data)
+ {
+ 	struct vfio_platform_device *vdev = device_data;
+@@ -141,12 +152,7 @@ static void vfio_platform_release(void *device_data)
+ 	mutex_lock(&driver_lock);
+ 
+ 	if (!(--vdev->refcnt)) {
+-		if (vdev->of_reset) {
+-			dev_info(vdev->device, "reset\n");
+-			vdev->of_reset(vdev);
+-		} else {
+-			dev_warn(vdev->device, "no reset function found!\n");
+-		}
++		vfio_platform_call_reset(vdev);
+ 		vfio_platform_regions_cleanup(vdev);
+ 		vfio_platform_irq_cleanup(vdev);
+ 	}
+@@ -175,12 +181,7 @@ static int vfio_platform_open(void *device_data)
+ 		if (ret)
+ 			goto err_irq;
+ 
+-		if (vdev->of_reset) {
+-			dev_info(vdev->device, "reset\n");
+-			vdev->of_reset(vdev);
+-		} else {
+-			dev_warn(vdev->device, "no reset function found!\n");
+-		}
++		vfio_platform_call_reset(vdev);
+ 	}
+ 
+ 	vdev->refcnt++;
+@@ -312,10 +313,7 @@ static long vfio_platform_ioctl(void *device_data,
+ 		return ret;
+ 
+ 	} else if (cmd == VFIO_DEVICE_RESET) {
+-		if (vdev->of_reset)
+-			return vdev->of_reset(vdev);
+-		else
+-			return -EINVAL;
++		return vfio_platform_call_reset(vdev);
+ 	}
+ 
+ 	return -ENOTTY;
+-- 
+1.8.2.1
