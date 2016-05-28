@@ -1,101 +1,43 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Sat, 28 May 2016 11:54:33 +0200
-Subject: [PATCH v5 22/22] ARM: dts: exynos: Add RTC and I2C to Exynos5410
-In-Reply-To: <1464429273-23457-1-git-send-email-krzk@kernel.org>
-References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
-Message-ID: <1464429273-23457-23-git-send-email-krzk@kernel.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 28 May 2016 18:54:06 +0800
+Subject: [rjarzmik:work/ac97 4/7] sound/soc/codecs/.tmp_gl_wm9713.o:undefined
+ reference to `compat_release_snd_ac97_codec'
+Message-ID: <201605281803.w7MfrmbD%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure Exynos5410-specific properties of RTC, I2C and HSI2C nodes.
-This still does not enable them on the board level though.
+tree:   https://github.com/rjarzmik/linux work/ac97
+head:   3350c2230e9e1331442724f919c86542d9668d4b
+commit: 8715b68899fdeea2968c7760843a0f908b4def2c [4/7] ASoC: wm9713: add ac97 new bus support
+config: microblaze-allyesconfig (attached as .config)
+compiler: microblaze-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 8715b68899fdeea2968c7760843a0f908b4def2c
+        # save the attached .config to linux build tree
+        make.cross ARCH=microblaze 
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Note: the rjarzmik/work/ac97 HEAD 3350c2230e9e1331442724f919c86542d9668d4b builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+   `.exit.data' referenced in section `.exit.text' of drivers/built-in.o: defined in discarded section `.exit.data' of drivers/built-in.o
+   `.exit.data' referenced in section `.exit.text' of drivers/built-in.o: defined in discarded section `.exit.data' of drivers/built-in.o
+   sound/built-in.o: In function `wm9713_soc_remove':
+>> sound/soc/codecs/.tmp_gl_wm9713.o:(.text+0x921b9c): undefined reference to `compat_release_snd_ac97_codec'
+   sound/built-in.o: In function `wm9713_soc_probe':
+>> sound/soc/codecs/.tmp_gl_wm9713.o:(.text+0x921c40): undefined reference to `compat_alloc_snd_ac97_codec'
+   sound/soc/codecs/.tmp_gl_wm9713.o:(.text+0x921d0c): undefined reference to `compat_release_snd_ac97_codec'
+
 ---
- arch/arm/boot/dts/exynos5410.dtsi | 63 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 6146bf164248..a937d9bdad90 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -149,6 +149,62 @@
- 	};
- };
- 
-+&i2c_0 {
-+	clocks = <&clock CLK_I2C0>;
-+	clock-names = "i2c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_bus>;
-+};
-+
-+&i2c_1 {
-+	clocks = <&clock CLK_I2C1>;
-+	clock-names = "i2c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_bus>;
-+};
-+
-+&i2c_2 {
-+	clocks = <&clock CLK_I2C2>;
-+	clock-names = "i2c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_bus>;
-+};
-+
-+&i2c_3 {
-+	clocks = <&clock CLK_I2C3>;
-+	clock-names = "i2c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c3_bus>;
-+};
-+
-+&hsi2c_4 {
-+	clocks = <&clock CLK_USI0>;
-+	clock-names = "hsi2c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c4_hs_bus>;
-+};
-+
-+&hsi2c_5 {
-+	clocks = <&clock CLK_USI1>;
-+	clock-names = "hsi2c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c5_hs_bus>;
-+};
-+
-+&hsi2c_6 {
-+	clocks = <&clock CLK_USI2>;
-+	clock-names = "hsi2c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c6_hs_bus>;
-+};
-+
-+&hsi2c_7 {
-+	clocks = <&clock CLK_USI3>;
-+	clock-names = "hsi2c";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c7_hs_bus>;
-+};
-+
- &mct {
- 	clocks = <&fin_pll>, <&clock CLK_MCT>;
- 	clock-names = "fin_pll", "mct";
-@@ -159,6 +215,13 @@
- 	clock-names = "timers";
- };
- 
-+&rtc {
-+	clocks = <&clock CLK_RTC>;
-+	clock-names = "rtc";
-+	interrupt-parent = <&pmu_system_controller>;
-+	status = "disabled";
-+};
-+
- &serial_0 {
- 	clocks = <&clock CLK_UART0>, <&clock CLK_SCLK_UART0>;
- 	clock-names = "uart", "clk_uart_baud0";
--- 
-2.7.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 44817 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160528/c9c4fdc0/attachment-0001.obj>
