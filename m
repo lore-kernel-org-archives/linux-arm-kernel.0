@@ -1,82 +1,79 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Sat, 28 May 2016 17:33:50 +0800
-Subject: [PATCH 1/4] clocksource: sp804: cleanup clk_get_sys()
+Date: Sat, 28 May 2016 17:33:51 +0800
+Subject: [PATCH 2/4] clocksource: sp804: introduce helper sp804_load_mode_set()
 In-Reply-To: <1464428033-52106-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1464428033-52106-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464428033-52106-2-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1464428033-52106-3-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the clk_get_sys() part into sp804_get_clock_rate(), cleanup the same code.
+Introduce helper sp804_load_mode_set(), and use it, prepare for 64bit
+mode timer support.
 
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/clocksource/timer-sp804.c | 34 +++++++++++-----------------------
- 1 file changed, 11 insertions(+), 23 deletions(-)
+ drivers/clocksource/timer-sp804.c | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/clocksource/timer-sp804.c b/drivers/clocksource/timer-sp804.c
-index 5f45b9a..362e5d0 100644
+index 362e5d0..b8848e5 100644
 --- a/drivers/clocksource/timer-sp804.c
 +++ b/drivers/clocksource/timer-sp804.c
-@@ -34,11 +34,19 @@
+@@ -73,6 +73,15 @@ static long __init sp804_get_clock_rate(struct clk *clk, const char *name)
+ 	return rate;
+ }
  
- #include "timer-sp.h"
- 
--static long __init sp804_get_clock_rate(struct clk *clk)
-+static long __init sp804_get_clock_rate(struct clk *clk, const char *name)
- {
- 	long rate;
- 	int err;
- 
-+	if (!clk) {
-+		clk = clk_get_sys("sp804", name);
-+		if (IS_ERR(clk)) {
-+			pr_err("sp804: clock not found: %ld\n", PTR_ERR(clk));
-+			return PTR_ERR(clk);
-+		}
-+	}
++static inline void sp804_load_mode_set(void __iomem *base, unsigned long load, int mode)
++{
++	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
++			     mode | TIMER_CTRL_ENABLE;
 +
- 	err = clk_prepare(clk);
- 	if (err) {
- 		pr_err("sp804: clock failed to prepare: %d\n", err);
-@@ -82,18 +90,7 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
- 						     struct clk *clk,
- 						     int use_sched_clock)
- {
--	long rate;
--
--	if (!clk) {
--		clk = clk_get_sys("sp804", name);
--		if (IS_ERR(clk)) {
--			pr_err("sp804: clock not found: %d\n",
--			       (int)PTR_ERR(clk));
--			return;
--		}
--	}
--
--	rate = sp804_get_clock_rate(clk);
-+	long rate = sp804_get_clock_rate(clk, name);
++	writel(load, base + TIMER_LOAD);
++	writel(ctrl, base + TIMER_CTRL);
++}
++
+ static void __iomem *sched_clock_base;
  
- 	if (rate < 0)
- 		return;
-@@ -189,17 +186,8 @@ static struct irqaction sp804_timer_irq = {
- void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struct clk *clk, const char *name)
- {
- 	struct clock_event_device *evt = &sp804_clockevent;
--	long rate;
--
--	if (!clk)
--		clk = clk_get_sys("sp804", name);
--	if (IS_ERR(clk)) {
--		pr_err("sp804: %s clock not found: %d\n", name,
--			(int)PTR_ERR(clk));
--		return;
--	}
-+	long rate = sp804_get_clock_rate(clk, name);
+ static u64 notrace sp804_read(void)
+@@ -97,10 +106,8 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
  
--	rate = sp804_get_clock_rate(clk);
- 	if (rate < 0)
- 		return;
+ 	/* setup timer 0 as free-running clocksource */
+ 	writel(0, base + TIMER_CTRL);
+-	writel(0xffffffff, base + TIMER_LOAD);
+ 	writel(0xffffffff, base + TIMER_VALUE);
+-	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+-		base + TIMER_CTRL);
++	sp804_load_mode_set(base, 0xffffffff, TIMER_CTRL_PERIODIC & ~TIMER_CTRL_IE);
+ 
+ 	clocksource_mmio_init(base + TIMER_VALUE, name,
+ 		rate, 200, 32, clocksource_mmio_readl_down);
+@@ -143,24 +150,16 @@ static int sp804_shutdown(struct clock_event_device *evt)
+ 
+ static int sp804_set_periodic(struct clock_event_device *evt)
+ {
+-	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
+-			     TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
+-
+ 	timer_shutdown(evt);
+-	writel(clkevt_reload, clkevt_base + TIMER_LOAD);
+-	writel(ctrl, clkevt_base + TIMER_CTRL);
++	sp804_load_mode_set(clkevt_base, clkevt_reload, TIMER_CTRL_PERIODIC);
+ 	return 0;
+ }
+ 
+ static int sp804_set_next_event(unsigned long next,
+-	struct clock_event_device *evt)
++				struct clock_event_device *evt)
+ {
+-	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
+-			     TIMER_CTRL_ONESHOT | TIMER_CTRL_ENABLE;
+-
+-	writel(next, clkevt_base + TIMER_LOAD);
+-	writel(ctrl, clkevt_base + TIMER_CTRL);
+ 
++	sp804_load_mode_set(clkevt_base, next, TIMER_CTRL_ONESHOT);
+ 	return 0;
+ }
  
 -- 
 1.7.12.4
