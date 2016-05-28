@@ -1,62 +1,92 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Sat, 28 May 2016 17:33:52 +0800
-Subject: [PATCH 3/4] clocksource: sp804: use sp804_timer_disable() where
- possible
-In-Reply-To: <1464428033-52106-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1464428033-52106-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464428033-52106-4-git-send-email-wangkefeng.wang@huawei.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Sat, 28 May 2016 11:54:12 +0200
+Subject: [PATCH v5 01/22] dt-bindings: clock: Add license and reformat
+ Exynos5410 clock IDs
+In-Reply-To: <1464429273-23457-1-git-send-email-krzk@kernel.org>
+References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
+Message-ID: <1464429273-23457-2-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use sp804_timer_disable() where possible, prepare for 64bit mode timer support.
+Add license and copyrights (file introduced in 2014) to header with
+Exynos5410 clock IDs. Additionally reformat it to improve readability.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- drivers/clocksource/timer-sp804.c | 11 +++++------
- 1 file changed, 5 insertions(+), 6 deletions(-)
+ include/dt-bindings/clock/exynos5410.h | 54 ++++++++++++++++++++--------------
+ 1 file changed, 32 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/clocksource/timer-sp804.c b/drivers/clocksource/timer-sp804.c
-index b8848e5..2ff8777 100644
---- a/drivers/clocksource/timer-sp804.c
-+++ b/drivers/clocksource/timer-sp804.c
-@@ -105,7 +105,7 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
- 		return;
+diff --git a/include/dt-bindings/clock/exynos5410.h b/include/dt-bindings/clock/exynos5410.h
+index 9b180f032e2d..213f19e02870 100644
+--- a/include/dt-bindings/clock/exynos5410.h
++++ b/include/dt-bindings/clock/exynos5410.h
+@@ -1,33 +1,43 @@
++/*
++ * Copyright (c) 2014 Samsung Electronics Co., Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Device Tree binding constants for Exynos5421 clock controller.
++*/
++
+ #ifndef _DT_BINDINGS_CLOCK_EXYNOS_5410_H
+ #define _DT_BINDINGS_CLOCK_EXYNOS_5410_H
  
- 	/* setup timer 0 as free-running clocksource */
--	writel(0, base + TIMER_CTRL);
-+	sp804_timer_disable(base);
- 	writel(0xffffffff, base + TIMER_VALUE);
- 	sp804_load_mode_set(base, 0xffffffff, TIMER_CTRL_PERIODIC & ~TIMER_CTRL_IE);
+ /* core clocks */
+-#define CLK_FIN_PLL 1
+-#define CLK_FOUT_APLL 2
+-#define CLK_FOUT_CPLL 3
+-#define CLK_FOUT_MPLL 4
+-#define CLK_FOUT_BPLL 5
+-#define CLK_FOUT_KPLL 6
++#define CLK_FIN_PLL		1
++#define CLK_FOUT_APLL		2
++#define CLK_FOUT_CPLL		3
++#define CLK_FOUT_MPLL		4
++#define CLK_FOUT_BPLL		5
++#define CLK_FOUT_KPLL		6
  
-@@ -196,8 +196,7 @@ void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struc
- 	evt->irq = irq;
- 	evt->cpumask = cpu_possible_mask;
+ /* gate for special clocks (sclk) */
+-#define CLK_SCLK_UART0 128
+-#define CLK_SCLK_UART1 129
+-#define CLK_SCLK_UART2 130
+-#define CLK_SCLK_UART3 131
+-#define CLK_SCLK_MMC0 132
+-#define CLK_SCLK_MMC1 133
+-#define CLK_SCLK_MMC2 134
++#define CLK_SCLK_UART0		128
++#define CLK_SCLK_UART1		129
++#define CLK_SCLK_UART2		130
++#define CLK_SCLK_UART3		131
++#define CLK_SCLK_MMC0		132
++#define CLK_SCLK_MMC1		133
++#define CLK_SCLK_MMC2		134
  
--	writel(0, base + TIMER_CTRL);
--
-+	sp804_timer_disable(base);
- 	setup_irq(irq, &sp804_timer_irq);
- 	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
- }
-@@ -216,8 +215,8 @@ static void __init sp804_of_init(struct device_node *np)
- 		return;
+ /* gate clocks */
+-#define CLK_UART0 257
+-#define CLK_UART1 258
+-#define CLK_UART2 259
+-#define CLK_UART3 260
+-#define CLK_MCT 315
+-#define CLK_MMC0 351
+-#define CLK_MMC1 352
+-#define CLK_MMC2 353
++#define CLK_UART0		257
++#define CLK_UART1		258
++#define CLK_UART2		259
++#define CLK_UART3		260
++#define CLK_MCT			315
++#define CLK_MMC0		351
++#define CLK_MMC1		352
++#define CLK_MMC2		353
  
- 	/* Ensure timers are disabled */
--	writel(0, base + TIMER_CTRL);
--	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
-+	sp804_timer_disable(base);
-+	sp804_timer_disable(base + TIMER_2_BASE);
+-#define CLK_NR_CLKS 512
++#define CLK_NR_CLKS		512
  
- 	if (initialized || !of_device_is_available(np))
- 		goto err;
-@@ -274,7 +273,7 @@ static void __init integrator_cp_of_init(struct device_node *np)
- 		return;
- 
- 	/* Ensure timer is disabled */
--	writel(0, base + TIMER_CTRL);
-+	sp804_timer_disable(base);
- 
- 	if (init_count == 2 || !of_device_is_available(np))
- 		goto err;
+ #endif /* _DT_BINDINGS_CLOCK_EXYNOS_5410_H */
 -- 
-1.7.12.4
+2.7.4
