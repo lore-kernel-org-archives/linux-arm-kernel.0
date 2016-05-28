@@ -1,50 +1,54 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 28 May 2016 13:09:35 +0200
-Subject: Nokia N900 retention mode in v4.6, camera buttons fun
-In-Reply-To: <20160502201216.GA19211@earth>
-References: <20160411211026.GH5995@atomide.com> <20160412121658.GA32486@amd>
- <20160412123013.GA12296@amd> <20160412163055.GP5995@atomide.com>
- <20160417175539.GA502@amd> <20160421130450.GQ29406@pali>
- <20160429200559.GA16598@earth> <20160501085236.GA14243@amd>
- <20160501154855.GA24970@earth> <20160502201216.GA19211@earth>
-Message-ID: <20160528110935.GB21182@amd>
+From: bhe@redhat.com (Baoquan He)
+Date: Sat, 28 May 2016 19:28:42 +0800
+Subject: [PATCH kexec-tools 05/32] arm: fix kdump to work on LPAE systems
+In-Reply-To: <E1axXSK-0004hN-V7@e0050434b2927.dyn.arm.linux.org.uk>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <E1axXSK-0004hN-V7@e0050434b2927.dyn.arm.linux.org.uk>
+Message-ID: <20160528112842.GA2429@x1.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2016-05-02 22:12:17, Sebastian Reichel wrote:
-> Hi Pavel,
+On 05/03/16 at 11:21am, Russell King wrote:
+> We need to use 64-bit file IO when mapping system memory and the core
+> dump file as we may be running on a LPAE system, otherwise we risk
+> mapping memory we shouldn't, and causing a kernel oops:
 > 
-> On Sun, May 01, 2016 at 05:48:56PM +0200, Sebastian Reichel wrote:
-> > > I see latest series, and it also talks about frequency scaling.
-> > > But I guess it is not going to fix this issue?
-> > 
-> > No, this is independent of the runtime PM problems. I also worked
-> > on runtime PM/idling yesterday and pm_runtime_irq_safe is the main
-> > culprit for breaking it (not the only one, though). It's not yet
-> > finished though
+> Unhandled fault: asynchronous external abort (0x211) at 0x00000000
+> pgd = edd2c740
+> [00000000] *pgd=82ec98003, *pmd=82dcd2003, *pte=00000000
 > 
-> I will be on vacation for a week starting tomorrow. If you want to
-> play around with my intermediate SSI PM status, you can try this branch:
+> Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+> ---
+>  kexec/arch/arm/Makefile | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
-> https://git.kernel.org/cgit/linux/kernel/git/sre/linux-hsi.git/log/?h=runtime-pm-fixes
+> diff --git a/kexec/arch/arm/Makefile b/kexec/arch/arm/Makefile
+> index 38137d7..60e433a 100644
+> --- a/kexec/arch/arm/Makefile
+> +++ b/kexec/arch/arm/Makefile
+> @@ -18,6 +18,9 @@ libfdt_SRCS += $(LIBFDT_SRCS:%=kexec/libfdt/%)
+>  
+>  arm_CPPFLAGS = -I$(srcdir)/kexec/libfdt
+>  
+> +# We want 64-bit file IO for kdump to work correctly on LPAE systems
+> +arm_CPPFLAGS += -D_FILE_OFFSET_BITS=64
+> +
 
-Ok, I did:
+It makes sense in this situation.
 
-pavel at amd:/data/l/linux-n900$ git pull
-git://git.kernel.org/pub/scm/linux/kernel/git/sre/linux-hsi.git
-runtime-pm-fixes
-remote: Counting objects: 65, done.
-remote: Compressing objects: 100% (25/25), done.
-remote: Total 65 (delta 51), reused 54 (delta 40)
-Unpacking objects: 100% (65/65), done.
+In "man 2 stat" and /usr/include/features.h, we can find the relevant
+information.
 
-And yes, now the LED goes off (so far with modem enabled but not
-used). Thanks!
+EOVERFLOW
+	pathname or fd refers to a file whose size, inode number, or number
+	of blocks cannot be represented in, respectively, the types off_t, ino_t,
+	or blkcnt_t.  This error can occur when, for example, an  application
+	compiled  on  a  32-bit  platform  without -D_FILE_OFFSET_BITS=64 calls
+	stat() on a file whose size exceeds (1<<31)-1 bytes.
 
-(You can have my Tested-by: when you submit them, or something :-) )
+Ack this patch.
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Acked-by: Baoquan He <bhe@redhat.com>
+
+Baoquan
+Thanks
