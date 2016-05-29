@@ -1,65 +1,45 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sun, 29 May 2016 13:36:58 +0200
-Subject: [PATCH v5 1/3] firmware: Amlogic: Add secure monitor driver
-In-Reply-To: <CANe6Qb8ECk_1S=pyJBACUwSRyNUi7ROF-GvybcpYLTks4L38fg@mail.gmail.com>
-References: <1464520323-19531-1-git-send-email-carlo@caione.org>
- <1464520323-19531-2-git-send-email-carlo@caione.org>
- <CANe6Qb8ECk_1S=pyJBACUwSRyNUi7ROF-GvybcpYLTks4L38fg@mail.gmail.com>
-Message-ID: <20160529113658.GA21309@mephisto>
+From: bhe@redhat.com (Baoquan He)
+Date: Sun, 29 May 2016 21:29:10 +0800
+Subject: [PATCH kexec-tools 07/32] kexec: fix warnings caused by
+ selecting 64-bit file IO on 32-bit platforms
+In-Reply-To: <20160528135320.GQ19428@n2100.arm.linux.org.uk>
+References: <CAHB_GurHc1aVfzJATpNW5yf5s5KkF=t5s09FbWq3+9+ZX39KUg@mail.gmail.com>
+ <E1axXSV-0004hZ-CH@e0050434b2927.dyn.arm.linux.org.uk>
+ <20160528113354.GB2429@x1.redhat.com>
+ <20160528135320.GQ19428@n2100.arm.linux.org.uk>
+Message-ID: <20160529132910.GA5752@x1.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/05/16 12:27, Ben Dooks wrote:
+On 05/28/16 at 02:53pm, Russell King - ARM Linux wrote:
+> On Sat, May 28, 2016 at 07:33:54PM +0800, Baoquan He wrote:
+> > On 05/03/16 at 11:21am, Russell King wrote:
+> > > diff --git a/kexec/kexec-uImage.c b/kexec/kexec-uImage.c
+> > > index 9df601b..5e24629 100644
+> > > --- a/kexec/kexec-uImage.c
+> > > +++ b/kexec/kexec-uImage.c
+> > > @@ -82,7 +82,8 @@ int uImage_probe(const unsigned char *buf, off_t len, unsigned int arch)
+> > >  	if (be32_to_cpu(header.ih_size) > len - sizeof(header)) {
+> > >  		printf("uImage header claims that image has %d bytes\n",
+> > >  				be32_to_cpu(header.ih_size));
+> > > -		printf("we read only %ld bytes.\n", len - sizeof(header));
+> > > +		printf("we read only %lld bytes.\n",
+> > > +		       (long long)len - sizeof(header));
+> > 
+> > With "D_FILE_OFFSET_BITS=64" adding, off_t is identical to off64_t, is
+> > that necessary to still take a type conversion here?
+> 
+> The printf format specifies an argument of "long long" type, which is
+> defined as a data type of at least 64-bits wide.  So, it's more
+> correct to cast to long long, rather than relying on off64_t being
+> the same size as long long.
 
-[...]
-> > +u32 meson_sm_call_read(struct meson_sm_firmware *fw, void *buffer,
-> > +                      unsigned int cmd_index, u32 arg0, u32 arg1,
-> > +                      u32 arg2, u32 arg3, u32 arg4)
-> > +{
-> > +       u32 size;
-> > +
-> > +       if (!fw->chip->cmd_shmem_out_base)
-> > +               return -EINVAL;
-> > +
-> > +       size = meson_sm_call(fw, cmd_index, arg0, arg1, arg2, arg3, arg4);
-> > +       if (size <= 0 || size > fw->chip->shmem_size)
-> > +               return -EINVAL;
-> > +
-> u32 cannot be less than 0
+Ok, it's fine to have an explict cast here so that people don't need
+to consider off_t is long or long long.
 
-Ouch. Definitely overlooked that. Fix coming.
+Ack this patch.
 
-[...]
-> > +static int meson_sm_probe(struct platform_device *pdev)
-> > +{
-> > +       const struct meson_sm_chip *chip;
-> > +       struct meson_sm_firmware *fw;
-> > +
-> > +       fw = devm_kzalloc(&pdev->dev, sizeof(*fw), GFP_KERNEL);
-> > +       if (!fw)
-> > +               return -ENOMEM;
-> > +
-> > +       fw->dev = &pdev->dev;
-> > +
-> > +       chip = of_device_get_match_data(fw->dev);
-> > +       if (!chip) {
-> > +               dev_err(fw->dev, "Unable to setup secure-monitor data\n");
-> > +               return -ENODEV;
-> > +       }
-> -ENODEV not best return here. Return -EINVAL better. -ENODEV won't get
-> reported by device layer
+Acked-by: Baoquan He <bhe@redhat.com>
 
-Ok
-
-[...]
-> > +               if (!fw->sm_shmem_in_base)
-> > +                       goto out;
-> > +       }
->   Maybe use WarnOn here
-
-Alright.
-
-Cheers,
-
--- 
-Carlo Caione
+Thanks
+Baoquan
