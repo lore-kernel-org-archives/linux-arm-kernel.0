@@ -1,35 +1,73 @@
-From: zourongrong@gmail.com (Rongrong Zou)
-Date: Sun, 29 May 2016 17:40:55 +0800
-Subject: [path v2 7/7] drm/hisilicon/hibmc: Add maintainer for Hibmc DRM
-In-Reply-To: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
-References: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
-Message-ID: <1464514855-108050-8-git-send-email-zourongrong@gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sun, 29 May 2016 13:12:00 +0200
+Subject: [PATCH v5 0/3] Add Amlogic secure monitor driver
+Message-ID: <1464520323-19531-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
-Signed-off-by: Jianhua Li <lijianhua@huawei.com>
----
- MAINTAINERS | 7 +++++++
- 1 file changed, 7 insertions(+)
+From: Carlo Caione <carlo@endlessm.com>
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index f466673..a8a62e0 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -3957,6 +3957,13 @@ T:	git git://github.com/patjak/drm-gma500
- S:	Maintained
- F:	drivers/gpu/drm/gma500/
- 
-+DRM DRIVERS FOR HIBMC
-+M:	lijianhua <lijianhua@huawei.com>
-+M:	Rongrong Zou <zourongrong@gmail.com>
-+L:	dri-devel at lists.freedesktop.org
-+S:	Maintained
-+F:	drivers/gpu/drm/hisilicon/hibmc
-+
- DRM DRIVERS FOR HISILICON
- M:	Xinliang Liu <z.liuxinliang@hisilicon.com>
- R:	Xinwei Kong <kong.kongxinwei@hisilicon.com>
+In the Amlogic SoCs the secure monitor calls are used for a lot of reasons:
+interact with the NVMEM (efuses), check the reboot reason, set USB boot, ...
+
+This driver defines a generic interface towards the secure monitor that can be
+used by more specialized drivers to interact with the secure monitor itself
+without worrying about bounce buffers managing.
+
+Changelog:
+
+v5:
+  * Moved IDs from DT to header file
+  * Made read/write bounce buffers not mandatory
+  * Introduced helper meson_sm_map_shmem()
+
+v4:
+  * Changed patches order
+  * Removed now useless PATCH 2/4
+  * Changed compatible to be SoC-specific
+  * In the DT now we use SoC-agnostic IDs for the SMC functions. These IDs are
+    traslated into SoC specific function IDs inside the driver
+  * Added error checking on meson_sm_call() to retrieve the base address
+  * Improved printing on errors
+
+v3:
+  * Moved driver to drivers/firmware
+  * Added EXPORT_SYMBOL macros
+  * Changed '_' in '-'
+  * Introduced 'struct meson_sm_firmware' and 'meson_sm_get_fw()' to be used by
+    drivers using the secure-monitor to enforce probe ordering
+
+v2:
+  * All the SMC function identifiers are now in a SoC-specific header file to
+    be included by the DTS files so the SMC commands are now defined in the DT
+    instead to be hardcoded into the driver
+  * Patchset is no longer an RFC
+  * Better error management and boundary checking
+  * s/unsigned int/u32/
+  * SMC call not only on CPU 0
+  * Fix memory leaking
+  * s/amlogic/meson/ in the directory names
+
+
+Carlo Caione (3):
+  firmware: Amlogic: Add secure monitor driver
+  documentation: Add secure monitor binding documentation
+  ARM64: dts: amlogic: gxbb: Enable secure monitor
+
+ .../bindings/firmware/meson/meson_sm.txt           |  33 +++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   8 +
+ drivers/firmware/Kconfig                           |   1 +
+ drivers/firmware/Makefile                          |   1 +
+ drivers/firmware/meson/Kconfig                     |   8 +
+ drivers/firmware/meson/Makefile                    |   1 +
+ drivers/firmware/meson/meson_sm.c                  | 223 +++++++++++++++++++++
+ include/linux/firmware/meson/meson_sm.h            |  32 +++
+ 8 files changed, 307 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+ create mode 100644 drivers/firmware/meson/Kconfig
+ create mode 100644 drivers/firmware/meson/Makefile
+ create mode 100644 drivers/firmware/meson/meson_sm.c
+ create mode 100644 include/linux/firmware/meson/meson_sm.h
+
 -- 
-1.9.1
+2.7.4
