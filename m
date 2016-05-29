@@ -1,38 +1,86 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 29 May 2016 11:21:38 +0200
-Subject: [PATCH 05/54] MAINTAINERS: Add file patterns for rockchip device
- tree bindings
-In-Reply-To: <1575416.jfSztnP7S8@phil>
-References: <1463907991-7916-1-git-send-email-geert@linux-m68k.org>
- <1463907991-7916-6-git-send-email-geert@linux-m68k.org>
- <1575416.jfSztnP7S8@phil>
-Message-ID: <CAMuHMdVYd01kWvN5Gv_2RtPXFX2VP0nOx7Ys6=em35rk0HoOmA@mail.gmail.com>
+From: zourongrong@gmail.com (Rongrong Zou)
+Date: Sun, 29 May 2016 17:40:48 +0800
+Subject: [path v2 0/7] Add DRM driver for Hisilicon Hibmc
+Message-ID: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+This patch set adds a new drm driver for Hisilicon Hibmc. Hibmc is a
+base board management controller, usually it is used on server for
+Out-of-band management purpose. In this patch set, we just support basic
+function for Hibmc display subsystem. Hibmc display subsystem is connected
+to host CPU by PCIe as blow:
 
-On Sun, May 22, 2016 at 11:27 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Am Sonntag, 22. Mai 2016, 11:05:42 schrieb Geert Uytterhoeven:
->> Submitters of device tree binding documentation may forget to CC
->> the subsystem maintainer if this is missing.
->
-> The "N: rockchip" line at the bottom of the block catches this nicely
-> already (also just verified with a get_maintainer.pl -f call), so I don't
-> think this new more explicit line is really necessary?
++----------+       +----------+
+|          | PCIe  |  Hibmc   |
+|host CPU( |<----->| display  |
+|arm64,x86)|       |subsystem |
++----------+       +----------+
 
-Oh right, thanks! I (my bashery) only looked at direct references to
-Documentation/devicetree/bindings. I complely missed the rare users of "N:".
+Hardware Detail for Hibmc display subsystem
+-----------
 
-Will drop this patch.
+  The display subsystem of Hibmc is show as bellow:
+  +----+      +----+      +----+     +--------+
+  |    |      |    |      |    |     |        |
+  | FB |----->| DE |----->|VDAC|---->|external|
+  |    |      |    |      |    |     | VGA    |
+  +----+      +----+      +----+     +--------+
 
-Gr{oetje,eeting}s,
+  -DE(Display Engine) is the display controller.
+  -VDAC(Video Digital-to-Analog converter) converts the RGB diaital data
+  stream from DE to VGA analog signals.
 
-                        Geert
+Change History
+------------
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Changes in v2:
+  -Remove self-defined macros for bit operations.
+  -Remove unused register.
+  -Replace those deprecated functions with new version of them.
+  -use drm_connector_register_all() to register connector after
+   drm_dev_register().
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+The patch v1 is at
+https://lists.freedesktop.org/archives/dri-devel/2016-February/101921.html
+Sorry for too late sending.
+
+
+Rongrong Zou (7):
+  idrm/hisilicon/hibmc: Add hisilicon hibmc drm master driver
+  drm/hisilicon/hibmc: Add plane for DE
+  drm/hisilicon/hibmc: Add crtc for DE
+  drm/hisilicon/hibmc: Add encoder for VDAC
+  drm/hisilicon/hibmc: Add connector for VDAC
+  drm/hisilicon/hibmc: Add support for frame buffer
+  drm/hisilicon/hibmc: Add maintainer for Hibmc DRM
+
+ MAINTAINERS                                       |   7 +
+ drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
+ drivers/gpu/drm/hisilicon/Makefile                |   3 +-
+ drivers/gpu/drm/hisilicon/hibmc/Kconfig           |  13 +
+ drivers/gpu/drm/hisilicon/hibmc/Makefile          |   4 +
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c    | 477 ++++++++++++++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.h    |  29 ++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 399 ++++++++++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   |  64 +++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 286 +++++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c |  91 +++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h |  28 ++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 214 ++++++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c  | 174 ++++++++
+ 14 files changed, 1789 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
+ create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+
+-- 
+1.9.1
