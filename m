@@ -1,422 +1,199 @@
 From: zourongrong@gmail.com (Rongrong Zou)
-Date: Sun, 29 May 2016 17:40:54 +0800
-Subject: [path v2 6/7] drm/hisilicon/hibmc: Add support for frame buffer
+Date: Sun, 29 May 2016 17:40:53 +0800
+Subject: [path v2 5/7] drm/hisilicon/hibmc: Add connector for VDAC
 In-Reply-To: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
 References: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
-Message-ID: <1464514855-108050-7-git-send-email-zourongrong@gmail.com>
+Message-ID: <1464514855-108050-6-git-send-email-zourongrong@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for fbdev.
+Add connector funcs and helper funcs for VDAC.
 
 Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
 Signed-off-by: Jianhua Li <lijianhua@huawei.com>
 ---
- drivers/gpu/drm/hisilicon/hibmc/Makefile          |   2 +-
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   |  20 ++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   |  17 ++
- drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 286 ++++++++++++++++++++++
- 4 files changed, 324 insertions(+), 1 deletion(-)
- create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c  | 21 ++++++
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h  |  3 +-
+ drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c | 89 ++++++++++++++++++++++++
+ 3 files changed, 112 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/Makefile b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-index 4e7797a..92e7b33 100644
---- a/drivers/gpu/drm/hisilicon/hibmc/Makefile
-+++ b/drivers/gpu/drm/hisilicon/hibmc/Makefile
-@@ -1,4 +1,4 @@
--hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_vdac.o hibmc_drm_power.o
-+hibmc-drm-y := hibmc_drm_drv.o hibmc_drm_de.o hibmc_drm_vdac.o hibmc_drm_fbdev.o hibmc_drm_power.o
- 
- obj-$(CONFIG_DRM_HISI_HIBMC)	+=hibmc-drm.o
- #obj-y	+= hibmc-drm.o
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-index 70d79d2..e36a7ec 100644
+index 962072f..70d79d2 100644
 --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
 +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
-@@ -72,9 +72,16 @@ static int hibmc_pm_suspend(struct device *dev)
- {
- 	struct pci_dev *pdev = to_pci_dev(dev);
- 	struct drm_device *drm_dev = pci_get_drvdata(pdev);
-+	struct hibmc_drm_device *hidev = drm_dev->dev_private;
+@@ -135,6 +135,14 @@ static int hibmc_kms_init(struct hibmc_drm_device *hidev)
+ 		return ret;
+ 	}
  
- 	drm_kms_helper_poll_disable(drm_dev);
- 
-+	if (hidev->fbdev.initialized) {
-+		console_lock();
-+		drm_fb_helper_set_suspend(&hidev->fbdev.helper, 1);
-+		console_unlock();
++	ret = hibmc_connector_init(hidev);
++	if (ret) {
++		DRM_ERROR("failed to init connector\n");
++		return ret;
 +	}
 +
++	drm_mode_connector_attach_encoder(&hidev->connector,
++					  &hidev->encoder);
  	return 0;
  }
  
-@@ -82,8 +89,16 @@ static int hibmc_pm_resume(struct device *dev)
- {
- 	struct pci_dev *pdev = to_pci_dev(dev);
- 	struct drm_device *drm_dev = pci_get_drvdata(pdev);
-+	struct hibmc_drm_device *hidev = drm_dev->dev_private;
+@@ -278,6 +286,12 @@ err:
+ 	return ret;
+ }
  
- 	drm_helper_resume_force_mode(drm_dev);
-+
-+	if (hidev->fbdev.initialized) {
-+		console_lock();
-+		drm_fb_helper_set_suspend(&hidev->fbdev.helper, 0);
-+		console_unlock();
-+	}
-+
- 	drm_kms_helper_poll_enable(drm_dev);
++static void hibmc_connector_unplug_all(struct drm_device *dev)
++{
++	mutex_lock(&dev->mode_config.mutex);
++	drm_connector_unregister_all(dev);
++	mutex_unlock(&dev->mode_config.mutex);
++}
  
- 	return 0;
-@@ -245,6 +260,7 @@ static int hibmc_unload(struct drm_device *dev)
- {
- 	struct hibmc_drm_device *hidev = dev->dev_private;
+ static int hibmc_pci_probe(struct pci_dev *pdev,
+ 			   const struct pci_device_id *ent)
+@@ -304,8 +318,14 @@ static int hibmc_pci_probe(struct pci_dev *pdev,
+ 	if (ret)
+ 		goto err_unload;
  
-+	hibmc_fbdev_fini(hidev);
- 	hibmc_kms_fini(hidev);
- 	hibmc_hw_fini(hidev);
- 	dev->dev_private = NULL;
-@@ -278,6 +294,10 @@ static int hibmc_load(struct drm_device *dev, unsigned long flags)
- 	/* reset all the states of crtc/plane/encoder/connector */
- 	drm_mode_config_reset(dev);
- 
-+	ret = hibmc_fbdev_init(hidev);
++	ret = drm_connector_register_all(dev);
 +	if (ret)
-+		goto err;
++		goto err_unregister;
 +
  	return 0;
  
- err:
++err_unregister:
++	drm_dev_unregister(dev);
+ err_unload:
+ 	hibmc_unload(dev);
+ err_disable:
+@@ -320,6 +340,7 @@ static void hibmc_pci_remove(struct pci_dev *pdev)
+ {
+ 	struct drm_device *dev = pci_get_drvdata(pdev);
+ 
++	hibmc_connector_unplug_all(dev);
+ 	drm_dev_unregister(dev);
+ 	hibmc_unload(dev);
+ 	drm_dev_unref(dev);
 diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-index eb5a892..1f32f2e 100644
+index d0c5982..eb5a892 100644
 --- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
 +++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
-@@ -23,6 +23,18 @@
- #include <drm/drm_fb_helper.h>
- #include <drm/drm_gem_cma_helper.h>
- 
-+struct hibmc_framebuffer {
-+	struct drm_framebuffer fb;
-+	struct drm_gem_cma_object *obj;
-+	bool is_fbdev_fb;
-+};
-+
-+struct hibmc_fbdev {
-+	struct hibmc_framebuffer fb;
-+	struct drm_fb_helper helper;
-+	bool initialized;
-+};
-+
- struct hibmc_drm_device {
- 	/* hw */
- 	void __iomem   *mmio;
-@@ -37,11 +49,16 @@ struct hibmc_drm_device {
+@@ -35,12 +35,13 @@ struct hibmc_drm_device {
+ 	struct drm_plane plane;
+ 	struct drm_crtc crtc;
  	struct drm_encoder encoder;
- 	struct drm_connector connector;
++	struct drm_connector connector;
  	bool mode_config_initialized;
-+
-+	/* fbdev */
-+	struct hibmc_fbdev fbdev;
  };
  
  int hibmc_plane_init(struct hibmc_drm_device *hidev);
  int hibmc_crtc_init(struct hibmc_drm_device *hidev);
  int hibmc_encoder_init(struct hibmc_drm_device *hidev);
- int hibmc_connector_init(struct hibmc_drm_device *hidev);
-+int hibmc_fbdev_init(struct hibmc_drm_device *hidev);
-+void hibmc_fbdev_fini(struct hibmc_drm_device *hidev);
+-
++int hibmc_connector_init(struct hibmc_drm_device *hidev);
  
  #endif
-diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
-new file mode 100644
-index 0000000..774bfb0
---- /dev/null
-+++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
-@@ -0,0 +1,286 @@
-+/* Hisilicon Hibmc SoC drm driver
-+ *
-+ * Based on the bochs drm driver.
-+ *
-+ * Copyright (c) 2016 Huawei Limited.
-+ *
-+ * Author:
-+ *	Rongrong Zou <zourongrong@huawei>
-+ *	Rongrong Zou <zourongrong@gmail.com>
-+ *	Jianhua Li <lijianhua@huawei.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
+diff --git a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+index cb9a130..b39ec65 100644
+--- a/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
++++ b/drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+@@ -24,6 +24,13 @@
+ #include "hibmc_drm_drv.h"
+ #include "hibmc_drm_regs.h"
+ 
++static int defx = 800;
++static int defy = 600;
 +
-+#include <drm/drm_crtc.h>
-+#include <drm/drm_crtc_helper.h>
-+#include <drm/drm_fb_helper.h>
-+#include <drm/drm_gem_cma_helper.h>
-+
-+#include "hibmc_drm_drv.h"
-+
-+/* ---------------------------------------------------------------------- */
-+
-+static void hibmc_drm_fb_destroy(struct drm_framebuffer *fb)
++module_param(defx, int, 0444);
++module_param(defy, int, 0444);
++MODULE_PARM_DESC(defx, "default x resolution");
++MODULE_PARM_DESC(defy, "default y resolution");
+ 
+ static void hibmc_encoder_disable(struct drm_encoder *encoder)
+ {
+@@ -83,3 +90,85 @@ int hibmc_encoder_init(struct hibmc_drm_device *hidev)
+ 	return 0;
+ }
+ 
++static int hibmc_connector_get_modes(struct drm_connector *connector)
 +{
-+	struct hibmc_drm_device *hidev =
-+		container_of(fb, struct hibmc_drm_device, fbdev.fb.fb);
-+	struct drm_gem_object *base = &hidev->fbdev.fb.obj->base;
++	int count;
 +
-+	if (hidev->fbdev.fb.obj)
-+		drm_gem_object_unreference_unlocked(base);
-+	drm_framebuffer_cleanup(fb);
-+	kfree(fb);
++	count = drm_add_modes_noedid(connector, 800, 600);
++	drm_set_preferred_mode(connector, defx, defy);
++	return count;
 +}
 +
-+static struct drm_framebuffer_funcs hibmc_drm_fb_funcs = {
-+	.destroy	= hibmc_drm_fb_destroy,
++static int hibmc_connector_mode_valid(struct drm_connector *connector,
++				      struct drm_display_mode *mode)
++{
++	struct hibmc_drm_device *hiprivate =
++	 container_of(connector, struct hibmc_drm_device, connector);
++	unsigned long size = mode->hdisplay * mode->vdisplay * 4;
++
++	/*
++	* Make sure we can fit two framebuffers into video memory.
++	* This allows up to 1600x1200 with 16 MB (default size).
++	* If you want more try this:
++	* 'qemu -vga std -global VGA.vgamem_mb=32 $otherargs'
++	*/
++	if (size * 2 > hiprivate->fb_size)
++		return MODE_BAD;
++
++	return MODE_OK;
++}
++
++static struct drm_encoder *
++hibmc_connector_best_encoder(struct drm_connector *connector)
++{
++	int enc_id = connector->encoder_ids[0];
++
++	/* pick the encoder ids */
++	if (enc_id)
++		return drm_encoder_find(connector->dev, enc_id);
++
++	return NULL;
++}
++
++static enum drm_connector_status hibmc_connector_detect(struct drm_connector
++						 *connector, bool force)
++{
++	return connector_status_connected;
++}
++
++static const struct drm_connector_helper_funcs
++	hibmc_connector_connector_helper_funcs = {
++	.get_modes = hibmc_connector_get_modes,
++	.mode_valid = hibmc_connector_mode_valid,
++	.best_encoder = hibmc_connector_best_encoder,
 +};
 +
-+static int hibmc_drm_fb_init(struct drm_device *dev,
-+		      struct hibmc_framebuffer *gfb,
-+		      struct drm_mode_fb_cmd2 *mode_cmd,
-+		      struct drm_gem_cma_object *obj)
-+{
-+	int ret;
-+
-+	drm_helper_mode_fill_fb_struct(&gfb->fb, mode_cmd);
-+	gfb->obj = obj;
-+	gfb->is_fbdev_fb = true;
-+	ret = drm_framebuffer_init(dev, &gfb->fb, &hibmc_drm_fb_funcs);
-+	if (ret) {
-+		DRM_ERROR("drm_framebuffer_init failed: %d\n", ret);
-+		return ret;
-+	}
-+	return 0;
-+}
-+
-+static struct drm_gem_cma_object *hibmc_drm_gem_create_object(
-+						struct hibmc_drm_device *hidev,
-+						size_t size)
-+{
-+	struct drm_gem_cma_object *cma_obj;
-+	struct drm_gem_object *gem_obj;
-+	struct drm_device *drm = hidev->dev;
-+	int ret;
-+
-+	cma_obj = devm_kzalloc(drm->dev, sizeof(*cma_obj), GFP_KERNEL);
-+	if (!cma_obj)
-+		return ERR_PTR(-ENOMEM);
-+
-+	gem_obj = &cma_obj->base;
-+
-+	ret = drm_gem_object_init(drm, gem_obj, size);
-+	if (ret)
-+		return ERR_PTR(ret);
-+
-+	cma_obj->vaddr = hidev->fb_map;
-+	cma_obj->paddr = hidev->fb_base;
-+	return cma_obj;
-+}
-+
-+static void hibmc_drm_gem_free_object(struct drm_gem_object *gem_obj)
-+{
-+	struct drm_gem_cma_object *cma_obj;
-+
-+	cma_obj = to_drm_gem_cma_obj(gem_obj);
-+	drm_gem_object_release(gem_obj);
-+}
-+
-+static struct fb_ops hibmc_drm_fb_ops = {
-+	.owner = THIS_MODULE,
-+	.fb_check_var = drm_fb_helper_check_var,
-+	.fb_set_par = drm_fb_helper_set_par,
-+	.fb_fillrect = drm_fb_helper_sys_fillrect,
-+	.fb_copyarea = drm_fb_helper_sys_copyarea,
-+	.fb_imageblit = drm_fb_helper_sys_imageblit,
-+	.fb_pan_display = drm_fb_helper_pan_display,
-+	.fb_blank = drm_fb_helper_blank,
-+	.fb_setcmap = drm_fb_helper_setcmap,
++static const struct drm_connector_funcs hibmc_connector_connector_funcs = {
++	.dpms = drm_atomic_helper_connector_dpms,
++	.detect = hibmc_connector_detect,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.destroy = drm_connector_cleanup,
++	.reset = drm_atomic_helper_connector_reset,
++	.atomic_duplicate_state = drm_atomic_helper_connector_duplicate_state,
++	.atomic_destroy_state = drm_atomic_helper_connector_destroy_state,
 +};
 +
-+static int hibmc_drm_fb_probe(struct drm_fb_helper *helper,
-+			      struct drm_fb_helper_surface_size *sizes)
++int hibmc_connector_init(struct hibmc_drm_device *hidev)
 +{
-+	struct hibmc_drm_device *hidev =
-+		container_of(helper, struct hibmc_drm_device, fbdev.helper);
 +	struct drm_device *dev = hidev->dev;
-+	struct fb_info *info;
-+	struct drm_framebuffer *fb;
-+	struct drm_mode_fb_cmd2 mode_cmd;
-+	struct drm_gem_cma_object *obj = NULL;
-+	int ret = 0;
-+	size_t size;
-+	unsigned int bytes_per_pixel;
-+	unsigned long offset;
-+
-+	DRM_DEBUG_DRIVER("surface width(%d), height(%d) and bpp(%d)\n",
-+			 sizes->surface_width, sizes->surface_height,
-+			 sizes->surface_bpp);
-+	sizes->surface_depth = 32;
-+
-+	bytes_per_pixel = DIV_ROUND_UP(sizes->surface_bpp, 8);
-+
-+	mode_cmd.width = sizes->surface_width;
-+	mode_cmd.height = sizes->surface_height;
-+	mode_cmd.pitches[0] = mode_cmd.width * bytes_per_pixel;
-+	mode_cmd.pixel_format = drm_mode_legacy_fb_format(sizes->surface_bpp,
-+							  sizes->surface_depth);
-+
-+	size = roundup(mode_cmd.pitches[0] * mode_cmd.height, PAGE_SIZE);
-+
-+	obj = hibmc_drm_gem_create_object(hidev, size);
-+	if (IS_ERR(obj)) {
-+		DRM_ERROR("can't allocate gem object\n");
-+		return -ENOMEM;
-+	}
-+
-+
-+	/* init fb device */
-+	/*info = framebuffer_alloc(0, device);*/
-+	info = drm_fb_helper_alloc_fbi(helper);
-+	if (!info) {
-+		DRM_ERROR("can't allocate fb info\n");
-+		goto err_drm_gem_cma_free_object;
-+	}
-+
-+	ret = hibmc_drm_fb_init(hidev->dev,
-+				&hidev->fbdev.fb, &mode_cmd, obj);
-+	if (ret) {
-+		DRM_ERROR("framebuffer init error\n");
-+		goto err_drm_gem_cma_free_object;
-+	}
-+
-+	/* setup helper */
-+	fb = &hidev->fbdev.fb.fb;
-+	hidev->fbdev.helper.fb = fb;
-+	hidev->fbdev.helper.fbdev = info;
-+
-+	strcpy(info->fix.id, "hibmcdrmfb");
-+	info->par = &hidev->fbdev.helper;
-+	info->flags = FBINFO_DEFAULT;
-+	info->fbops = &hibmc_drm_fb_ops;
-+
-+	drm_fb_helper_fill_fix(info, fb->pitches[0], fb->depth);
-+	drm_fb_helper_fill_var(info, &hidev->fbdev.helper, sizes->fb_width,
-+			       sizes->fb_height);
-+
-+	offset = info->var.xoffset * bytes_per_pixel;
-+	offset += info->var.yoffset * fb->pitches[0];
-+
-+	dev->mode_config.fb_base = (resource_size_t)obj->paddr;
-+	info->screen_base = obj->vaddr + offset;
-+	info->fix.smem_start = (unsigned long)(obj->paddr + offset);
-+	info->screen_size = size;
-+	info->fix.smem_len = size;
-+
-+	return 0;
-+
-+err_drm_gem_cma_free_object:
-+	hibmc_drm_gem_free_object(&obj->base);
-+	return ret;
-+}
-+
-+static int hibmc_fbdev_destroy(struct hibmc_drm_device *hidev)
-+{
-+	struct hibmc_framebuffer *gfb = &hidev->fbdev.fb;
-+	struct drm_fb_helper *fbh = &hidev->fbdev.helper;
-+
-+	DRM_DEBUG_DRIVER("hibmc_fbdev_destroy\n");
-+
-+	drm_fb_helper_unregister_fbi(fbh);
-+	drm_fb_helper_release_fbi(fbh);
-+
-+	drm_framebuffer_unregister_private(&gfb->fb);
-+	if (gfb->obj) {
-+		drm_gem_object_unreference_unlocked(&gfb->obj->base);
-+		gfb->obj = NULL;
-+	}
-+
-+	drm_framebuffer_cleanup(&gfb->fb);
-+	drm_fb_helper_fini(&hidev->fbdev.helper);
-+
-+	return 0;
-+}
-+
-+static const struct drm_fb_helper_funcs hibmc_fbdev_helper_funcs = {
-+	.fb_probe = hibmc_drm_fb_probe,
-+};
-+
-+int hibmc_fbdev_init(struct hibmc_drm_device *hidev)
-+{
++	struct drm_connector *connector = &hidev->connector;
 +	int ret;
-+	struct fb_var_screeninfo *var;
-+	struct fb_fix_screeninfo *fix;
 +
-+	drm_fb_helper_prepare(hidev->dev, &hidev->fbdev.helper,
-+			      &hibmc_fbdev_helper_funcs);
-+
-+	/* Now just one crtc and one channel */
-+	ret = drm_fb_helper_init(hidev->dev,
-+				 &hidev->fbdev.helper, 1, 1);
-+	if (ret)
++	ret = drm_connector_init(dev, connector,
++				 &hibmc_connector_connector_funcs,
++				 DRM_MODE_CONNECTOR_VIRTUAL);
++	if (ret) {
++		DRM_ERROR("failed to init connector\n");
 +		return ret;
-+
-+	ret = drm_fb_helper_single_add_all_connectors(&hidev->fbdev.helper);
-+	if (ret)
-+		goto fini;
-+
-+	drm_helper_disable_unused_functions(hidev->dev);
-+
-+	ret = drm_fb_helper_initial_config(&hidev->fbdev.helper, 16);
-+	if (ret)
-+		goto fini;
-+
-+	hidev->fbdev.initialized = true;
-+
-+	var = &hidev->fbdev.helper.fbdev->var;
-+	fix = &hidev->fbdev.helper.fbdev->fix;
-+
-+	DRM_DEBUG("Member of info->var is :\n"
-+		 "xres=%d\n"
-+		 "yres=%d\n"
-+		 "xres_virtual=%d\n"
-+		 "yres_virtual=%d\n"
-+		 "xoffset=%d\n"
-+		 "yoffset=%d\n"
-+		 "bits_per_pixel=%d\n"
-+		 "...\n", var->xres, var->yres, var->xres_virtual,
-+		 var->yres_virtual, var->xoffset, var->yoffset,
-+		 var->bits_per_pixel);
-+	DRM_DEBUG("Member of info->fix is :\n"
-+		 "smem_start=%lx\n"
-+		 "smem_len=%d\n"
-+		 "type=%d\n"
-+		 "type_aux=%d\n"
-+		 "visual=%d\n"
-+		 "xpanstep=%d\n"
-+		 "ypanstep=%d\n"
-+		 "ywrapstep=%d\n"
-+		 "line_length=%d\n"
-+		 "accel=%d\n"
-+		 "capabilities=%d\n"
-+		 "...\n", fix->smem_start, fix->smem_len, fix->type,
-+		 fix->type_aux, fix->visual, fix->xpanstep,
-+		 fix->ypanstep, fix->ywrapstep, fix->line_length,
-+		 fix->accel, fix->capabilities);
++	}
++	drm_connector_helper_add(connector,
++				 &hibmc_connector_connector_helper_funcs);
 +
 +	return 0;
-+
-+fini:
-+	drm_fb_helper_fini(&hidev->fbdev.helper);
-+	return ret;
 +}
 +
-+void hibmc_fbdev_fini(struct hibmc_drm_device *hidev)
-+{
-+	if (!hidev->fbdev.initialized)
-+		return;
-+
-+	hibmc_fbdev_destroy(hidev);
-+	hidev->fbdev.initialized = false;
-+}
 -- 
 1.9.1
