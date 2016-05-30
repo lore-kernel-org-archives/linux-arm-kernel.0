@@ -1,56 +1,178 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 30 May 2016 15:27:14 +0200
-Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
-Message-ID: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+Date: Mon, 30 May 2016 15:27:15 +0200
+Subject: [PATCH v3 1/4] reset: Add support for the Amlogic Meson SoC Reset
+ Controller
+In-Reply-To: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+References: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1464614838-28107-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patchset to add and enable the reset controller driver on Meson SoCs platforms.
+This patch adds the platform driver for the Amlogic Meson SoC Reset
+Controller.
 
-This reset controller has up to 256 reset lines with reset pulse generation only,
-so the assert and deassert calls are not available.
+The Meson8b and GXBB SoCs are supported.
 
-Depends on the patch :
- - "reset: add devm_reset_controller_register API" [1]
-
-Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
-- Get back __iomem in _reset() callback
-- Get rid of MODULE_ALIAS
-
-Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
-- Remove _gxbb_ in names
-- Depends build on ARCH_MESON only
-- Add meson8b compatible and bindings
-- Re-indent dt-bindings headers
-- Switch to devm_ reset controller register
-- Remove platform "remove" callback
-- Update Dual BSD/GPL file headers
-
-Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
-- Fix register mapping and bit defines in bindings header
-- Remove assert and unassert calls
-- Fix missing __iomem
-
-[1] https://patchwork.kernel.org/patch/8988471/
-
-Neil Armstrong (4):
-  reset: Add support for the Amlogic Meson SoC Reset Controller
-  dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
-  ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
-  ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
-
- .../bindings/reset/amlogic,meson-reset.txt         |  18 ++
- arch/arm/boot/dts/meson8b.dtsi                     |   7 +
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   7 +
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-meson.c                        | 136 +++++++++++++
- .../dt-bindings/reset/amlogic,meson-gxbb-reset.h   | 210 +++++++++++++++++++++
- include/dt-bindings/reset/amlogic,meson8b-reset.h  | 175 +++++++++++++++++
- 7 files changed, 554 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-reset.txt
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ drivers/reset/Makefile      |   1 +
+ drivers/reset/reset-meson.c | 136 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 137 insertions(+)
  create mode 100644 drivers/reset/reset-meson.c
- create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
- create mode 100644 include/dt-bindings/reset/amlogic,meson8b-reset.h
 
+diff --git a/drivers/reset/Makefile b/drivers/reset/Makefile
+index f173fc3..03dc1bb 100644
+--- a/drivers/reset/Makefile
++++ b/drivers/reset/Makefile
+@@ -3,6 +3,7 @@ obj-$(CONFIG_ARCH_LPC18XX) += reset-lpc18xx.o
+ obj-$(CONFIG_ARCH_SOCFPGA) += reset-socfpga.o
+ obj-$(CONFIG_ARCH_BERLIN) += reset-berlin.o
+ obj-$(CONFIG_MACH_PISTACHIO) += reset-pistachio.o
++obj-$(CONFIG_ARCH_MESON) += reset-meson.o
+ obj-$(CONFIG_ARCH_SUNXI) += reset-sunxi.o
+ obj-$(CONFIG_ARCH_STI) += sti/
+ obj-$(CONFIG_ARCH_HISI) += hisilicon/
+diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
+new file mode 100644
+index 0000000..c32f11a
+--- /dev/null
++++ b/drivers/reset/reset-meson.c
+@@ -0,0 +1,136 @@
++/*
++ * This file is provided under a dual BSD/GPLv2 license.  When using or
++ * redistributing this file, you may do so under either license.
++ *
++ * GPL LICENSE SUMMARY
++ *
++ * Copyright (c) 2016 BayLibre, SAS.
++ * Author: Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of version 2 of the GNU General Public License as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, see <http://www.gnu.org/licenses/>.
++ * The full GNU General Public License is included in this distribution
++ * in the file called COPYING.
++ *
++ * BSD LICENSE
++ *
++ * Copyright (c) 2016 BayLibre, SAS.
++ * Author: Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in
++ *     the documentation and/or other materials provided with the
++ *     distribution.
++ *   * Neither the name of Intel Corporation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++#include <linux/err.h>
++#include <linux/module.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reset-controller.h>
++#include <linux/slab.h>
++#include <linux/types.h>
++
++#define REG_COUNT	8
++#define BITS_PER_REG	32
++
++struct meson_reset {
++	void __iomem *reg_base;
++	struct reset_controller_dev rcdev;
++};
++
++static int meson_reset_reset(struct reset_controller_dev *rcdev,
++			      unsigned long id)
++{
++	struct meson_reset *data =
++		container_of(rcdev, struct meson_reset, rcdev);
++	unsigned int bank = id / BITS_PER_REG;
++	unsigned int offset = id % BITS_PER_REG;
++	void __iomem *reg_addr = data->reg_base + (bank << 2);
++
++	if (bank >= REG_COUNT)
++		return -EINVAL;
++
++	writel(BIT(offset), reg_addr);
++
++	return 0;
++}
++
++static const struct reset_control_ops meson_reset_ops = {
++	.reset		= meson_reset_reset,
++};
++
++static const struct of_device_id meson_reset_dt_ids[] = {
++	 { .compatible = "amlogic,meson8b-reset", },
++	 { .compatible = "amlogic,meson-gxbb-reset", },
++	 { /* sentinel */ },
++};
++MODULE_DEVICE_TABLE(of, meson_reset_dt_ids);
++
++static int meson_reset_probe(struct platform_device *pdev)
++{
++	struct meson_reset *data;
++	struct resource *res;
++
++	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
++	if (!data)
++		return -ENOMEM;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	data->reg_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(data->reg_base))
++		return PTR_ERR(data->reg_base);
++
++	platform_set_drvdata(pdev, data);
++
++	data->rcdev.owner = THIS_MODULE;
++	data->rcdev.nr_resets = REG_COUNT * BITS_PER_REG;
++	data->rcdev.ops = &meson_reset_ops;
++	data->rcdev.of_node = pdev->dev.of_node;
++
++	return devm_reset_controller_register(&pdev->dev, &data->rcdev);
++}
++
++static struct platform_driver meson_reset_driver = {
++	.probe	= meson_reset_probe,
++	.driver = {
++		.name		= "meson_reset",
++		.of_match_table	= meson_reset_dt_ids,
++	},
++};
++
++module_platform_driver(meson_reset_driver);
++
++MODULE_AUTHOR("Neil Armstrong <narmstrong@baylibre.com>");
++MODULE_DESCRIPTION("Amlogic Meson Reset Controller driver");
++MODULE_LICENSE("Dual BSD/GPL");
 -- 
 2.7.0
