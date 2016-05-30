@@ -1,77 +1,24 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 30 May 2016 11:23:50 +0300
-Subject: [PATCH v5 7/7] ARM: OMAP2+: McBSP: Remove the old iclk allow/deny
- idle code
-In-Reply-To: <20160530082350.24285-1-peter.ujfalusi@ti.com>
-References: <20160530082350.24285-1-peter.ujfalusi@ti.com>
-Message-ID: <20160530082350.24285-8-peter.ujfalusi@ti.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Mon, 30 May 2016 11:26:41 +0300
+Subject: [v2 PATCH] arm64: kasan: instrument user memory access API
+In-Reply-To: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
+References: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <574BF941.7090906@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new pdata callback (force_ick_on) is now used by the driver and the old
-callback related code can be removed.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/mach-omap2/mcbsp.c                 | 18 ------------------
- include/linux/platform_data/asoc-ti-mcbsp.h |  1 -
- 2 files changed, 19 deletions(-)
+On 05/28/2016 12:01 AM, Yang Shi wrote:
+> The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
+> ("x86/kasan: instrument user memory access API") added KASAN instrument to
+> x86 user memory access API, so added such instrument to ARM64 too.
+> 
+> Define __copy_to/from_user in C in order to add kasan_check_read/write call,
+> rename assembly implementation to __arch_copy_to/from_user.
+> 
+> Tested by test_kasan module.
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> 
 
-diff --git a/arch/arm/mach-omap2/mcbsp.c b/arch/arm/mach-omap2/mcbsp.c
-index edf4f41c0135..fc04be74e064 100644
---- a/arch/arm/mach-omap2/mcbsp.c
-+++ b/arch/arm/mach-omap2/mcbsp.c
-@@ -34,20 +34,6 @@
- #include "cm3xxx.h"
- #include "cm-regbits-34xx.h"
- 
--static struct clk *mcbsp_iclks[5];
--
--static int omap3_enable_st_clock(unsigned int id, bool enable)
--{
--	/*
--	 * Sidetone uses McBSP ICLK - which must not idle when sidetones
--	 * are enabled or sidetones start sounding ugly.
--	 */
--	if (enable)
--		return omap2_clk_deny_idle(mcbsp_iclks[id]);
--	else
--		return omap2_clk_allow_idle(mcbsp_iclks[id]);
--}
--
- static int omap3_mcbsp_force_ick_on(struct clk *clk, bool force_on)
- {
- 	if (!clk)
-@@ -75,7 +61,6 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	struct omap_hwmod *oh_device[2];
- 	struct omap_mcbsp_platform_data *pdata = NULL;
- 	struct platform_device *pdev;
--	char clk_name[11];
- 
- 	sscanf(oh->name, "mcbsp%d", &id);
- 
-@@ -116,10 +101,7 @@ static int __init omap_init_mcbsp(struct omap_hwmod *oh, void *unused)
- 	if (oh->dev_attr) {
- 		oh_device[1] = omap_hwmod_lookup((
- 		(struct omap_mcbsp_dev_attr *)(oh->dev_attr))->sidetone);
--		pdata->enable_st_clock = omap3_enable_st_clock;
- 		pdata->force_ick_on = omap3_mcbsp_force_ick_on;
--		sprintf(clk_name, "mcbsp%d_ick", id);
--		mcbsp_iclks[id] = clk_get(NULL, clk_name);
- 		count++;
- 	}
- 	pdev = omap_device_build_ss(name, id, oh_device, count, pdata,
-diff --git a/include/linux/platform_data/asoc-ti-mcbsp.h b/include/linux/platform_data/asoc-ti-mcbsp.h
-index 5530971abf4d..e684543254f3 100644
---- a/include/linux/platform_data/asoc-ti-mcbsp.h
-+++ b/include/linux/platform_data/asoc-ti-mcbsp.h
-@@ -44,7 +44,6 @@ struct omap_mcbsp_platform_data {
- 	/* McBSP platform and instance specific features */
- 	bool has_wakeup; /* Wakeup capability */
- 	bool has_ccr; /* Transceiver has configuration control registers */
--	int (*enable_st_clock)(unsigned int, bool);
- 	int (*force_ick_on)(struct clk *clk, bool force_on);
- };
- 
--- 
-2.8.3
+Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
