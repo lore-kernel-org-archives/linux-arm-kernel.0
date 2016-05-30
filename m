@@ -1,61 +1,63 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 31 May 2016 01:16:46 +0200
-Subject: [PATCH 3/5] clocksource: rockchip: add dynamic irq flag to the
- timer
-In-Reply-To: <1464169802-6033-4-git-send-email-wxt@rock-chips.com>
-References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
- <1464169802-6033-4-git-send-email-wxt@rock-chips.com>
-Message-ID: <574CC9DE.1050501@linaro.org>
+From: chanho.min@lge.com (Chanho Min)
+Date: Tue, 31 May 2016 08:25:27 +0900
+Subject: [PATCH] arm64: dts: drop "arm,
+ amba-bus" in favor of "simple-bus" part 2
+In-Reply-To: <1464574353-31477-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1464574353-31477-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <021901d1baca$8ddf8050$a99e80f0$@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2016 11:50 AM, Caesar Wang wrote:
-> From: Huang Tao <huangtao@rock-chips.com>
->
-> The rockchip timer is broadcast timer. Add CLOCK_EVT_FEAT_DYNIRQ
-> flag and set cpumask to all cpu to save power by avoid unnecessary
-> wakeups and IPIs.
->
-> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Subject: [PATCH] arm64: dts: drop "arm,amba-bus" in favor of "simple-bus" part
+> 2
+> 
+> Tree-wide replacement was done by commit 2ef7d5f342c1 (ARM, ARM64:
+> dts: drop "arm,amba-bus" in favor of "simple-bus"), but we have some
+> new users of "arm,amba-bus" at Linux 4.7-rc1.  Eliminate them now.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
->
->   drivers/clocksource/rockchip_timer.c | 5 +++--
->   1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-> index b93fed6..f3dfb1a 100644
-> --- a/drivers/clocksource/rockchip_timer.c
-> +++ b/drivers/clocksource/rockchip_timer.c
-> @@ -150,12 +150,13 @@ static void __init rk_timer_init(struct device_node *np)
->   	}
->
->   	ce->name = TIMER_NAME;
-> -	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-> +	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-> +		       CLOCK_EVT_FEAT_DYNIRQ;
->   	ce->set_next_event = rk_timer_set_next_event;
->   	ce->set_state_shutdown = rk_timer_shutdown;
->   	ce->set_state_periodic = rk_timer_set_periodic;
->   	ce->irq = irq;
-> -	ce->cpumask = cpumask_of(0);
-> +	ce->cpumask = cpu_all_mask;
+> 
+> In order to not leave these compatible strings for the release,
+> is it OK to apply this patch for Linux 4.7 ?
+> 
+> 
+> 
+>  arch/arm64/boot/dts/lg/lg1312.dtsi       | 2 +-
+>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+> 
 
-s/cpu_all_mask/cpu_possible_mask/
+> diff --git a/arch/arm64/boot/dts/lg/lg1312.dtsi
+> b/arch/arm64/boot/dts/lg/lg1312.dtsi
+> index 3a4e9a2..fbafa24 100644
+> --- a/arch/arm64/boot/dts/lg/lg1312.dtsi
+> +++ b/arch/arm64/boot/dts/lg/lg1312.dtsi
+> @@ -125,7 +125,7 @@
+>  		#size-cells = <1>;
+>  		#interrupts-cells = <3>;
+> 
+> -		compatible = "arm,amba-bus";
+> +		compatible = "simple-bus";
+>  		interrupt-parent = <&gic>;
+>  		ranges;
+> 
 
->   	ce->rating = 250;
->
->   	ret = request_irq(irq, rk_timer_interrupt, IRQF_TIMER, TIMER_NAME, ce);
->
+Acked-by: Chanho Min <chanho.min@lge.com>
 
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> index 46f325a..d7f8e06 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+> @@ -163,7 +163,7 @@
+>  	};
+> 
+>  	amba {
+> -		compatible = "arm,amba-bus";
+> +		compatible = "simple-bus";
+>  		#address-cells = <2>;
+>  		#size-cells = <2>;
+>  		ranges;
+> --
+> 1.9.1
