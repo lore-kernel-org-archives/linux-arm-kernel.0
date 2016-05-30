@@ -1,50 +1,59 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 30 May 2016 17:27:14 +0200
-Subject: [PATCH v5 00/22] ARM: dts: exynos: Add initial support for Odroid
- XU
-In-Reply-To: <1464429273-23457-1-git-send-email-krzk@kernel.org>
-References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
-Message-ID: <574C5BD2.60008@samsung.com>
+From: hramrach@gmail.com (Michal Suchanek)
+Date: Mon, 30 May 2016 17:28:10 +0200
+Subject: [PATCH 5/5] RFC spi: sun4i: add DMA support
+In-Reply-To: <20160530150343.GL29837@sirena.org.uk>
+References: <cover.1464130597.git.hramrach@gmail.com>
+ <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
+ <20160530112610.GJ29837@sirena.org.uk>
+ <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
+ <20160530150343.GL29837@sirena.org.uk>
+Message-ID: <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2016 11:54 AM, Krzysztof Kozlowski wrote:
+Hello,
+
+On 30 May 2016 at 17:03, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, May 30, 2016 at 02:11:51PM +0200, Geert Uytterhoeven wrote:
+>> On Mon, May 30, 2016 at 1:26 PM, Mark Brown <broonie@kernel.org> wrote:
+>> > On Thu, May 26, 2016 at 07:25:25PM -0000, Michal Suchanek wrote:
+>> >>  - fallback to previous behaviour when DMA initialization fails
+>> >>
+>> >>    + this has the problem that when the driver happens to load before the dma
+>> >>      driver it will not use dma - can be addressed with a module parameter
 >
-> The clock changes can go to clock tree. ARM changes to samsung-soc tree.
-> Please provide me a tag with include/dt-bindings/clock commits so I can
-> merge it.
+>> > No, you should pay attention to the error you are getting and let probe
+>> > deferral happen if that's the error you get.
+>
+>> Unfortunately DMA is an optional feature.
+>
+>> There's no way to distinguish between -EPROBE_DEFER due to the SPI master
+>> driver being probed before the DMA engine driver, and -EPROBE_DEFER due to
+>> support for the DMA engine not having been compiled in.
+>
+> I really don't think it's worth caring too much about cases where the
+> DMA driver hasn't been compiled in, it's not like SPI is the only thing
+> that's going to be using it.  I really think it's better to defer the
+> problem - not getting DMA (or worse, only getting DMA on some boots) is
+> not great and if people are optimising on that level my feeling is that
+> they're probably going to be OK with customizing DT to match.  Ideally
+> we would have something a bit nicer than deferred probe but right now
+> this seems the more helpful option.
 
-I applied the clock tree patches and here is the tag for the three
-include/dt-bindings patches:
+It's what the driver did to start with and it was requested to fall
+back to non-DMA in the case DMA is not available.
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+We get to the much discussed problem that it's never possible to tell
+if a driver is available or not.
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+It's possible to add a parameter like require_dma which could be used
+to load the driver without dma if unset. If it was set by default then
+driver ordering is not important so long as dma driver is loaded
+eventually. Also an informative print that such parameter exists when
+probing the driver is deferred would be helpful. It would probably
+create quite a bit of log spam, however. The driver can be deferred
+several times during boot.
 
-are available in the git repository at:
+Thanks
 
-  git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.8-exynos5410-dt
-
-for you to fetch changes up to ed1e1505db0c116affdfab01e650c44a9c459c65:
-
-  dt-bindings: clock: Add I2C, HSI2C and RTC clock IDs to Exynos5410
-(2016-05-30 16:00:11 +0200)
-
-----------------------------------------------------------------
-Adition of missing clock index definitions for exynos5410 SoC
-PWM, USB, I2C, and RTC device related clocks.
-
-----------------------------------------------------------------
-Krzysztof Kozlowski (3):
-      dt-bindings: clock: Add license and reformat Exynos5410 clock IDs
-      dt-bindings: clock: Add PWM and USB clock IDs to Exynos5410
-      dt-bindings: clock: Add I2C, HSI2C and RTC clock IDs to Exynos5410
-
- include/dt-bindings/clock/exynos5410.h | 73
-+++++++++++++++++++++++++++++++++++++++++++++++++++----------------------
- 1 file changed, 51 insertions(+), 22 deletions(-)
-
-
---
-Thanks,
-Sylwester
+Michal
