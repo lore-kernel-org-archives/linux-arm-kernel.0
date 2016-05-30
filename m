@@ -1,128 +1,258 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 30 May 2016 17:14:13 +0200
-Subject: [PATCH V8 0/9] Support for ARM64 ACPI based PCI host controller
-Message-ID: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+Date: Mon, 30 May 2016 17:14:14 +0200
+Subject: [PATCH V8 1/9] PCI: ecam: move ecam.h to linux/include/pci-ecam.h
+In-Reply-To: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+Message-ID: <1464621262-26770-2-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From the functionality point of view this series may be split into the
-following logic parts:
-1. Export ECAM API and add parent device to pci_config_window
-2. Add IO resources handling to PCI core code
-3. Support for generic domain assignment based on ACPI
-4. New MCFG driver
-5. Implement ARM64 ACPI based PCI host controller driver under arch/arm64/
+From: Jayachandran C <jchandra@broadcom.com>
 
-Patches has been built on top of 4.7-rc1 and can be found here:
-git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v8)
+This header will be used from arch/arm64 for ACPI PCI implementation
+so it needs to be moved out of drivers/pci.
 
-This has been tested on Cavium ThunderX server. Any help in reviewing and
-testing is very appreciated.
+Update users of the header file to use the new name. No functional
+changes.
 
-v7 -> v8
-- move code from drivers/acpi/pci_root_generic.c to arch/arm64/kernel/pci.c
-- minor changes around domain assignment
-- pci_mcfg.c improvements for parsing MCFG tables and lookup its entries
-
-v6 -> v7
-- drop quirks handling
-- changes for ACPI companion and domain number assignment approach
-- implement arch pcibios_{add|remove}_bus and call acpi_pci_{add|remove}_bus from there
-- cleanups around nomenclature
-- use resources oriented API for ECAM
-- fix for based address calculation before mapping ECAM region
-- remove useless lock for MCFG lookup
-- move MCFG stuff to separated file pci_mcfg.c
-- drop MCFG entries caching
-- rebase against 4.6-rc7
-
-v5 -> v6
-- drop idea of x86 MMCONFIG code refactoring
-- integrate JC's patches which introduce new ECAM API:
-  https://lkml.org/lkml/2016/4/11/907
-  git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
-- integrate Sinan's fix for releasing IO resources, see patch [06/13]
-- added ACPI support for ThunderX ECAM and PEM drivers
-- rebase against 4.6-rc2
-
-v4 -> v5
-- drop MCFG refactoring group patches 1-6 from series v4 and integrate Jayachandran's patch
-  https://patchwork.ozlabs.org/patch/575525/
-- rewrite PCI legacy IRQs allocation
-- squash two patches 11 and 12 from series v4, fixed bisection issue
-- changelog improvements
-- rebase against 4.5-rc3
-
-v3 -> v4
-- drop Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
-- add Lorenzo's fix patch 19/24
-- ACPI PCI bus domain number assigning cleanup
-- change resource management, we now claim and reassign resources
-- improvements for applying quirks
-- drop Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
-- rebase against 4.5-rc1
-
-v2 -> v3
-- fix legacy IRQ assigning and IO ports registration
-- remove reference to arch specific companion device for ia64
-- move ACPI PCI host controller driver to pci_root.c
-- drop generic domain assignment for x86 and ia64 as I am not
-  able to run all necessary test variants
-- drop patch which cleaned legacy IRQ assignment since it belongs to
-  Mathew's series:
-  https://patchwork.ozlabs.org/patch/557504/
-- extend MCFG quirk code
-- rebase against 4.4
-
-v1 -> v2
-- move non-arch specific piece of code to dirver/acpi/ directory
-- fix IO resource handling
-- introduce PCI config accessors quirks matching
-- moved ACPI_COMPANION_SET to generic code
-
-v1 - https://lkml.org/lkml/2015/10/27/504
-v2 - https://lkml.org/lkml/2015/12/16/246
-v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
-v4 - https://lkml.org/lkml/2016/2/4/646
-v5 - https://lkml.org/lkml/2016/2/16/426
-v6 - https://lkml.org/lkml/2016/4/15/594
-
-Jayachandran C (2):
-  PCI: ecam: move ecam.h to linux/include/pci-ecam.h
-  PCI: ecam: Add parent device field to pci_config_window
-
-Tomasz Nowicki (7):
-  pci: Add new function to unmap IO resources.
-  acpi, pci: Support IO resources when parsing PCI host bridge
-    resources.
-  pci, acpi: add acpi hook to assign domain number.
-  arm64, pci, acpi: ACPI support for legacy IRQs parsing and
-    consolidation with DT code.
-  acpi: Add generic MCFG table handling
-  arm64, pci, acpi: Provide ACPI-specific prerequisites for PCI bus
-    enumeration.
-  pci, acpi: ARM64 support for ACPI based generic PCI host controller
-
- arch/arm64/Kconfig                  |   2 +
- arch/arm64/kernel/pci.c             | 143 ++++++++++++++++++++++++++++++++++--
- drivers/acpi/Kconfig                |   3 +
- drivers/acpi/Makefile               |   1 +
- drivers/acpi/pci_mcfg.c             |  94 ++++++++++++++++++++++++
- drivers/acpi/pci_root.c             |  39 ++++++++++
- drivers/pci/ecam.c                  |   6 +-
- drivers/pci/ecam.h                  |  67 -----------------
- drivers/pci/host/pci-host-common.c  |   3 +-
- drivers/pci/host/pci-host-generic.c |   3 +-
- drivers/pci/host/pci-thunder-ecam.c |   3 +-
- drivers/pci/host/pci-thunder-pem.c  |   6 +-
- drivers/pci/pci.c                   |  29 +++++++-
- include/linux/pci-acpi.h            |   2 +
- include/linux/pci-ecam.h            |  67 +++++++++++++++++
- include/linux/pci.h                 |   9 ++-
- 16 files changed, 387 insertions(+), 90 deletions(-)
- create mode 100644 drivers/acpi/pci_mcfg.c
+Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+---
+ drivers/pci/ecam.c                  |  3 +-
+ drivers/pci/ecam.h                  | 67 -------------------------------------
+ drivers/pci/host/pci-host-common.c  |  3 +-
+ drivers/pci/host/pci-host-generic.c |  3 +-
+ drivers/pci/host/pci-thunder-ecam.c |  3 +-
+ drivers/pci/host/pci-thunder-pem.c  |  3 +-
+ include/linux/pci-ecam.h            | 67 +++++++++++++++++++++++++++++++++++++
+ 7 files changed, 72 insertions(+), 77 deletions(-)
  delete mode 100644 drivers/pci/ecam.h
  create mode 100644 include/linux/pci-ecam.h
 
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+index f9832ad..820e26b 100644
+--- a/drivers/pci/ecam.c
++++ b/drivers/pci/ecam.c
+@@ -19,10 +19,9 @@
+ #include <linux/kernel.h>
+ #include <linux/module.h>
+ #include <linux/pci.h>
++#include <linux/pci-ecam.h>
+ #include <linux/slab.h>
+ 
+-#include "ecam.h"
+-
+ /*
+  * On 64-bit systems, we do a single ioremap for the whole config space
+  * since we have enough virtual address range available.  On 32-bit, we
+diff --git a/drivers/pci/ecam.h b/drivers/pci/ecam.h
+deleted file mode 100644
+index 9878beb..0000000
+--- a/drivers/pci/ecam.h
++++ /dev/null
+@@ -1,67 +0,0 @@
+-/*
+- * Copyright 2016 Broadcom
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License, version 2, as
+- * published by the Free Software Foundation (the "GPL").
+- *
+- * This program is distributed in the hope that it will be useful, but
+- * WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+- * General Public License version 2 (GPLv2) for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * version 2 (GPLv2) along with this source code.
+- */
+-#ifndef DRIVERS_PCI_ECAM_H
+-#define DRIVERS_PCI_ECAM_H
+-
+-#include <linux/kernel.h>
+-#include <linux/platform_device.h>
+-
+-/*
+- * struct to hold pci ops and bus shift of the config window
+- * for a PCI controller.
+- */
+-struct pci_config_window;
+-struct pci_ecam_ops {
+-	unsigned int			bus_shift;
+-	struct pci_ops			pci_ops;
+-	int				(*init)(struct device *,
+-						struct pci_config_window *);
+-};
+-
+-/*
+- * struct to hold the mappings of a config space window. This
+- * is expected to be used as sysdata for PCI controllers that
+- * use ECAM.
+- */
+-struct pci_config_window {
+-	struct resource			res;
+-	struct resource			busr;
+-	void				*priv;
+-	struct pci_ecam_ops		*ops;
+-	union {
+-		void __iomem		*win;	/* 64-bit single mapping */
+-		void __iomem		**winp; /* 32-bit per-bus mapping */
+-	};
+-};
+-
+-/* create and free pci_config_window */
+-struct pci_config_window *pci_ecam_create(struct device *dev,
+-		struct resource *cfgres, struct resource *busr,
+-		struct pci_ecam_ops *ops);
+-void pci_ecam_free(struct pci_config_window *cfg);
+-
+-/* map_bus when ->sysdata is an instance of pci_config_window */
+-void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
+-			       int where);
+-/* default ECAM ops */
+-extern struct pci_ecam_ops pci_generic_ecam_ops;
+-
+-#ifdef CONFIG_PCI_HOST_GENERIC
+-/* for DT-based PCI controllers that support ECAM */
+-int pci_host_common_probe(struct platform_device *pdev,
+-			  struct pci_ecam_ops *ops);
+-#endif
+-#endif
+diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+index 8cba7ab..c18b9e3 100644
+--- a/drivers/pci/host/pci-host-common.c
++++ b/drivers/pci/host/pci-host-common.c
+@@ -20,10 +20,9 @@
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+ #include <linux/of_pci.h>
++#include <linux/pci-ecam.h>
+ #include <linux/platform_device.h>
+ 
+-#include "../ecam.h"
+-
+ static int gen_pci_parse_request_of_pci_ranges(struct device *dev,
+ 		       struct list_head *resources, struct resource **bus_range)
+ {
+diff --git a/drivers/pci/host/pci-host-generic.c b/drivers/pci/host/pci-host-generic.c
+index 6eaceab..f0ca6de 100644
+--- a/drivers/pci/host/pci-host-generic.c
++++ b/drivers/pci/host/pci-host-generic.c
+@@ -23,10 +23,9 @@
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+ #include <linux/of_pci.h>
++#include <linux/pci-ecam.h>
+ #include <linux/platform_device.h>
+ 
+-#include "../ecam.h"
+-
+ static struct pci_ecam_ops gen_pci_cfg_cam_bus_ops = {
+ 	.bus_shift	= 16,
+ 	.pci_ops	= {
+diff --git a/drivers/pci/host/pci-thunder-ecam.c b/drivers/pci/host/pci-thunder-ecam.c
+index 540d030..a9fc1c9 100644
+--- a/drivers/pci/host/pci-thunder-ecam.c
++++ b/drivers/pci/host/pci-thunder-ecam.c
+@@ -11,10 +11,9 @@
+ #include <linux/ioport.h>
+ #include <linux/of_pci.h>
+ #include <linux/of.h>
++#include <linux/pci-ecam.h>
+ #include <linux/platform_device.h>
+ 
+-#include "../ecam.h"
+-
+ static void set_val(u32 v, int where, int size, u32 *val)
+ {
+ 	int shift = (where & 3) * 8;
+diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+index 9b8ab94..5020d3d 100644
+--- a/drivers/pci/host/pci-thunder-pem.c
++++ b/drivers/pci/host/pci-thunder-pem.c
+@@ -18,10 +18,9 @@
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+ #include <linux/of_pci.h>
++#include <linux/pci-ecam.h>
+ #include <linux/platform_device.h>
+ 
+-#include "../ecam.h"
+-
+ #define PEM_CFG_WR 0x28
+ #define PEM_CFG_RD 0x30
+ 
+diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+new file mode 100644
+index 0000000..9878beb
+--- /dev/null
++++ b/include/linux/pci-ecam.h
+@@ -0,0 +1,67 @@
++/*
++ * Copyright 2016 Broadcom
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation (the "GPL").
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
++ * General Public License version 2 (GPLv2) for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * version 2 (GPLv2) along with this source code.
++ */
++#ifndef DRIVERS_PCI_ECAM_H
++#define DRIVERS_PCI_ECAM_H
++
++#include <linux/kernel.h>
++#include <linux/platform_device.h>
++
++/*
++ * struct to hold pci ops and bus shift of the config window
++ * for a PCI controller.
++ */
++struct pci_config_window;
++struct pci_ecam_ops {
++	unsigned int			bus_shift;
++	struct pci_ops			pci_ops;
++	int				(*init)(struct device *,
++						struct pci_config_window *);
++};
++
++/*
++ * struct to hold the mappings of a config space window. This
++ * is expected to be used as sysdata for PCI controllers that
++ * use ECAM.
++ */
++struct pci_config_window {
++	struct resource			res;
++	struct resource			busr;
++	void				*priv;
++	struct pci_ecam_ops		*ops;
++	union {
++		void __iomem		*win;	/* 64-bit single mapping */
++		void __iomem		**winp; /* 32-bit per-bus mapping */
++	};
++};
++
++/* create and free pci_config_window */
++struct pci_config_window *pci_ecam_create(struct device *dev,
++		struct resource *cfgres, struct resource *busr,
++		struct pci_ecam_ops *ops);
++void pci_ecam_free(struct pci_config_window *cfg);
++
++/* map_bus when ->sysdata is an instance of pci_config_window */
++void __iomem *pci_ecam_map_bus(struct pci_bus *bus, unsigned int devfn,
++			       int where);
++/* default ECAM ops */
++extern struct pci_ecam_ops pci_generic_ecam_ops;
++
++#ifdef CONFIG_PCI_HOST_GENERIC
++/* for DT-based PCI controllers that support ECAM */
++int pci_host_common_probe(struct platform_device *pdev,
++			  struct pci_ecam_ops *ops);
++#endif
++#endif
 -- 
 1.9.1
