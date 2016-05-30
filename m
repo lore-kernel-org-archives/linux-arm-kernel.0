@@ -1,37 +1,72 @@
-From: hs.liao@mediatek.com (HS Liao)
-Date: Mon, 30 May 2016 11:19:57 +0800
-Subject: [PATCH v8 3/3] arm64: dts: mt8173: Add GCE node
-In-Reply-To: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
-References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
-Message-ID: <1464578397-29743-4-git-send-email-hs.liao@mediatek.com>
+From: zourongrong@huawei.com (Rongrong Zou)
+Date: Mon, 30 May 2016 11:21:54 +0800
+Subject: [path v2 7/7] drm/hisilicon/hibmc: Add maintainer for Hibmc DRM
+In-Reply-To: <CAGd==07sV0qaDES5D5ozvkC1FDQXZ-Z9_UCNX8vO09HKBktq3w@mail.gmail.com>
+References: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
+ <1464514855-108050-8-git-send-email-zourongrong@gmail.com>
+ <CAGd==07sV0qaDES5D5ozvkC1FDQXZ-Z9_UCNX8vO09HKBktq3w@mail.gmail.com>
+Message-ID: <574BB1D2.9030409@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device node of the GCE hardware for CMDQ module.
+Hi Xinliang,
 
-Signed-off-by: HS Liao <hs.liao@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+? 2016/5/30 10:31, Xinliang Liu ??:
+> On 29 May 2016 at 17:40, Rongrong Zou <zourongrong@gmail.com> wrote:
+>> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
+>> Signed-off-by: Jianhua Li <lijianhua@huawei.com>
+>> ---
+>>   MAINTAINERS | 7 +++++++
+>>   1 file changed, 7 insertions(+)
+>>
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index f466673..a8a62e0 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -3957,6 +3957,13 @@ T:       git git://github.com/patjak/drm-gma500
+>>   S:     Maintained
+>>   F:     drivers/gpu/drm/gma500/
+>>
+>> +DRM DRIVERS FOR HIBMC
+>> +M:     lijianhua <lijianhua@huawei.com>
+>> +M:     Rongrong Zou <zourongrong@gmail.com>
+>> +L:     dri-devel at lists.freedesktop.org
+>> +S:     Maintained
+>> +F:     drivers/gpu/drm/hisilicon/hibmc
+>
+> Please add a "/" ad the end of this line.
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index eab7efc..63d1718 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -300,6 +300,14 @@
- 			#clock-cells = <1>;
- 		};
- 
-+		gce: gce at 10212000 {
-+			compatible = "mediatek,mt8173-gce";
-+			reg = <0 0x10212000 0 0x1000>;
-+			interrupts = <GIC_SPI 135 IRQ_TYPE_LEVEL_LOW>;
-+			clocks = <&infracfg CLK_INFRA_GCE>;
-+			clock-names = "gce";
-+		};
-+
- 		gic: interrupt-controller at 10220000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
+OK, thanks!
+
+> And move this part into DRM DRIVERS FOR HISILICON
+
+Can it be placed as below:
+
+DRM DRIVERS FOR HISILICON HIBMC
+M:     lijianhua <lijianhua@huawei.com>
+M:     Rongrong Zou <zourongrong@gmail.com>
+...
+
+DRM DRIVERS FOR HISILICON KIRIN
+M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
+R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
+...
+>
+> Thanks,
+> -xinliang
+>
+>> +
+>>   DRM DRIVERS FOR HISILICON
+>>   M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
+>>   R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
+>> --
+>> 1.9.1
+>>
+>
+> .
+>
+
+
 -- 
-1.9.1
+Regards,
+Rongrong
