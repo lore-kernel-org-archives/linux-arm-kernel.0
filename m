@@ -1,66 +1,64 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Mon, 30 May 2016 20:05:29 +0200
-Subject: [PATCH 2/3] mmc: sunxi: Fix DDR MMC timings for A80
-In-Reply-To: <CAGb2v65=ZM+deSmTmMnT6XFJv8PuY+Kba3kJGKrk_46hxxRyHA@mail.gmail.com>
-References: <1464505484-3661-1-git-send-email-wens@csie.org>
- <1464505484-3661-3-git-send-email-wens@csie.org>
- <99d78ff3-db4d-45cc-024a-d94583b56f35@redhat.com>
- <CAGb2v65=ZM+deSmTmMnT6XFJv8PuY+Kba3kJGKrk_46hxxRyHA@mail.gmail.com>
-Message-ID: <822dc3f1-9afe-f356-e0e7-89073586d401@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 May 2016 20:45:32 +0200
+Subject: [PATCH v2] clk: sunxi: predivider handling for factors clock
+In-Reply-To: <CAEzqOZvnKKNs_sXUJrwTykA5mzwKMg+HpaFcKgBTFr+utT4qQg@mail.gmail.com>
+References: <1461084466-20889-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1461084466-20889-2-git-send-email-vishnupatekar0510@gmail.com>
+ <20160502111337.GR17159@lukather>
+ <CAEzqOZvnKKNs_sXUJrwTykA5mzwKMg+HpaFcKgBTFr+utT4qQg@mail.gmail.com>
+Message-ID: <20160530184532.GD4908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Vishnu,
 
-On 30-05-16 14:59, Chen-Yu Tsai wrote:
-> On Mon, May 30, 2016 at 7:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 29-05-16 09:04, Chen-Yu Tsai wrote:
->>>
->>> The MMC clock timings were incorrectly calculated, when the conversion
->>> from delay value to delay phase was done.
->>>
->>> The 50M DDR and 50M DDR 8bit timings are off, and make eMMC DDR
->>> unusable. Unfortunately it seems different controllers on the same SoC
->>> have different timings. The new settings are taken from mmc2, which is
->>> commonly used with eMMC.
->>
->>
->> Hmm, I'm not really all that familiar with mmc, but can't an external
->> sdcard connected to mmc0 use DDR too ? Assuming the answer is yes, then
->> we really need to update the driver to use the right per controller
->> timings.
+On Mon, May 16, 2016 at 07:28:42AM +0800, Vishnu Patekar wrote:
+> > > @@ -307,7 +305,7 @@ static void sun6i_get_ahb1_factors(struct factors_request *req)
+> > >       div = DIV_ROUND_UP(req->parent_rate, req->rate);
+> > >
+> > >       /* calculate pre-divider if parent is pll6 */
+> > > -     if (req->parent_index == SUN6I_AHB1_PARENT_PLL6) {
+> > > +     if (req->prediv_width) {
+> > >               if (div < 4)
+> > >                       calcp = 0;
+> > >               else if (div / 2 < 4)
+> >
+> > You should also remove that code from that function. Now that the core
+> > can tell the pre-divider configuration, it can adjust the parent rate
+> > so that you don't have to care anymore.
 >
-> I would very much like that to happen. However, SD card UHS-1 DDR modes
-> require 1.8V signaling, which is unavailable on _all_ sunxi boards.
-> This seems like a limit of most of the SoCs not having a separate IO
-> voltage rail for mmc pins.
->
-> Until then, I wouldn't worry that much.
->
->>> The settings for the slower timing modes seem to work despite being
->>> wrong, so leave them be.
->>
->>
->> If you're sure the timings are wrong, please fix them. Sometimes wrong
->> timings do seem to work, but lead to unreliable communication, or turn
->> out to work on some boards and not on others due to routing differences.
->
-> Unfortunately I did try putting in the correct numbers for them, and my
-> eMMC then failed to probe. It seems the core switches up from 400kHz to
-> 50MHz then to 50MHz DDR, and it fails somewhere in there, maybe at 50MHz.
->
-> I'm not sure if we need to add DT bindings to specify different delays
-> for different controllers, though. Seems like we'll never actually use
-> it.
->
-> Hope this answers your questions.
+> We still need to get m factor when it's called from set_rate and
+> determine_rate.
+> 
+> Sorry, I did not your "that code from that function" meaning. I assumed
+> you're talking about m factor in sun6i_get_ahb1_factors.
 
-Yes that answers my questions, and with my questions answered, this series is:
+Sorry for the late answer.
 
-Acked-by: Hans de Goede <hdegoede@redhat.com>
+I don't know if you've seen it, but I have been working on a new clock
+framework.
 
-Regards,
+I went over all the A83T clocks, and most of them could be
+covered. The issue only lies in the PLLs and their additional 1-bit
+dividers.
 
-Hans
+If we just choos to ignore (one of) them, it should be pretty trivial
+to implement with the current clock classes we have.
+
+There's also the current assumption that there's a single parent that
+has a pre-divider, but that can easily be fixed by setting up an
+array.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160530/d2c5751b/attachment.sig>
