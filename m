@@ -1,26 +1,63 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 May 2016 12:26:10 +0100
-Subject: [PATCH 5/5] RFC spi: sun4i: add DMA support
-In-Reply-To: <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
-Message-ID: <20160530112610.GJ29837@sirena.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 30 May 2016 13:30:35 +0200
+Subject: building and using modules on arm64 hikey board
+In-Reply-To: <87a3195c-febb-a6c8-a679-272b9f7b59cc@broadcom.com>
+References: <87a3195c-febb-a6c8-a679-272b9f7b59cc@broadcom.com>
+Message-ID: <0240F9F0-0146-4DCC-B512-195415B29B34@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 07:25:25PM -0000, Michal Suchanek wrote:
+This is likely caused by the fact that the Android AArch64 toolchain uses -fpic by default. Could you try adding -fno-pic to the CFLAGS?
 
->  - fallback to previous behaviour when DMA initialization fails
+
+> On 30 mei 2016, at 12:21, Arend Van Spriel <arend.vanspriel@broadcom.com> wrote:
 > 
->    + this has the problem that when the driver happens to load before the dma
->      driver it will not use dma - can be addressed with a module parameter
-
-No, you should pay attention to the error you are getting and let probe
-deferral happen if that's the error you get.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160530/076d2e84/attachment.sig>
+> I got myself an arm64 HiKey board from LeMaker and build an Android AOSP
+> image for it (see [1]). For development I would like to use
+> CONFIG_MODULES. However, when I try to insmod the build module I get:
+> 
+> [  287.903653] module cfg80211: overflow in relocation type 261 val
+> ffffffbffc006530
+> 
+> Looking AArch64 ELF documentation [2], section 4.6.5, it has:
+> code|name            |operation |overflow check   |
+> 261 |R_AARCH64_PREL32|S + A - P |-2^31 <= X < 2^32|
+> 
+> So basically the highest 32 bits should all be one and so ffffffbf is
+> invalid. From what I could find searching internet it could be an issue
+> with linker options so I build kernel and modules with V=1. Here the
+> linker invocation for them:
+> 
+> + aarch64-linux-android-ld -EL -p --no-undefined -X --build-id -o vmlinux \
+> -T ./arch/arm64/kernel/vmlinux.lds arch/arm64/kernel/head.o
+> init/built-in.o \
+> --start-group usr/built-in.o arch/arm64/kernel/built-in.o
+> arch/arm64/mm/built-in.o \
+> arch/arm64/net/built-in.o arch/arm64/kvm/built-in.o
+> arch/arm64/crypto/built-in.o \
+> ./drivers/firmware/efi/libstub/lib.a kernel/built-in.o certs/built-in.o
+> mm/built-in.o \
+> fs/built-in.o ipc/built-in.o security/built-in.o crypto/built-in.o
+> block/built-in.o \
+> arch/arm64/lib/lib.a lib/lib.a arch/arm64/lib/built-in.o lib/built-in.o
+> drivers/built-in.o \
+> sound/built-in.o firmware/built-in.o net/built-in.o virt/built-in.o
+> --end-group .tmp_kallsyms2.o
+> 
+>  aarch64-linux-android-ld -EL -r  -T ./scripts/module-common.lds
+> --build-id \
+>  -o net/wireless/cfg80211.ko net/wireless/cfg80211.o
+> net/wireless/cfg80211.mod.o
+> 
+> Attached are vmlinux.lds and module-common.lds. I also tried taking
+> upstream arch/arm64/kernel/module.lds in hikey-linaro tree. If someone
+> can give a hint or educated guess at what to try it would be appreciated.
+> 
+> Regards,
+> Arend
+> 
+> [1] https://source.android.com/source/devices.html#building-kernel
+> [2]
+> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0056b/IHI0056B_aaelf64.pdf
+> <module-common.lds>
+> <vmlinux.lds>
