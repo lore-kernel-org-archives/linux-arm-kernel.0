@@ -1,119 +1,49 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Mon, 30 May 2016 09:34:00 +0200
-Subject: [PATCH v1 5/6] dtb: xgene: Remove clock nodes
-In-Reply-To: <1464333768-26150-6-git-send-email-isubramanian@apm.com>
-References: <1464333768-26150-1-git-send-email-isubramanian@apm.com>
- <1464333768-26150-6-git-send-email-isubramanian@apm.com>
-Message-ID: <574BECE8.2050307@gmail.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Mon, 30 May 2016 15:33:52 +0800
+Subject: [Question] Crash when cat /dev/kmem in arm/arm64 but not in x86
+Message-ID: <574BECE0.9070105@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
+
+When cat /dev/kmem in arm/arm64, it will crash, this is caused by "from = 0"
+in copy_to_user(void __user *to, const void *from, unsigned long n),
+call trace shows below(eg, arm64)
+
+[    9.913370] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+[    9.914391] pgd = ffff800008345000
+[    9.914976] [00000000] *pgd=00000000482bb003, *pud=00000000f69b4003, *pmd=0000000000000000
+[    9.918036] Internal error: Oops: 96000006 [#1] PREEMPT SMP
+[    9.918683] Modules linked in:
+[    9.919413] CPU: 6 PID: 1021 Comm: cat Not tainted 4.6.0+ #80
+[    9.920410] Hardware name: linux,dummy-virt (DT)
+[    9.921003] task: ffff8000b6448000 ti: ffff8000083b0000 task.ti: ffff8000083b0000
+[    9.922356] PC is at __copy_to_user+0x180/0x280
+[    9.922847] LR is at read_kmem+0x200/0x220
+[    9.923265] pc : [<ffff000008339500>] lr : [<ffff000008473168>] pstate: 20000145
+[    9.923988] sp : ffff8000083b3d60
+[    9.924670] x29: ffff8000083b3d60 x28: 0000000000001000
+[    9.925420] x27: 0000000000001000 x26: ffff8000083b3ec8
+[    9.926039] x25: ffff8000083b0000 x24: ffff000008a20638
+[    9.926810] x23: 0000000000001000 x22: 0000ffffe4dac550
+[    9.927668] x21: 0000000000000000 x20: 0000000000001000
+[    9.928771] x19: 0000000000000000 x18: 0000ffffe4dab240
+[    9.929494] x17: 0000000000497458 x16: ffff0000081bc098
+[    9.930162] x15: ffffffffffffffff x14: ff00000000000000
+[    9.930857] x13: ffffffffffffffff x12: 0000000000000038
+[    9.931629] x11: 00000000000000c7 x10: 0000000000000006
+[    9.932649] x9 : 0000000000000006 x8 : 207a73202c296c6c
+[    9.933356] x7 : 756e282020202020 x6 : 0000ffffe4dab550
+[    9.934050] x5 : 0000ffffe4dac550 x4 : 0000000000000000
+[    9.934801] x3 : 0000000000000000 x2 : 0000000000000f80
+[    9.935601] x1 : 0000000000000000 x0 : 0000ffffe4dab550
 
 
-On 27/05/16 09:22, Iyappan Subramanian wrote:
-> Since the MDIO will be responsible for clock reset, removing the clock
-> nodes from shadowcat xge0 and storm sgenet1.
->
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
-> Tested-by: Fushen Chen <fchen@apm.com>
-> Tested-by: Toan Le <toanle@apm.com>
-> ---
->   arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 12 ------------
->   arch/arm64/boot/dts/apm/apm-storm.dtsi     | 18 ++++--------------
->   2 files changed, 4 insertions(+), 26 deletions(-)
->
-> diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> index 8106957..f27563d 100644
-> --- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
-> @@ -299,17 +299,6 @@
->   				clock-output-names = "pcie1clk";
->   			};
->
-> -			xge0clk: xge0clk at 1f61c000 {
-> -				compatible = "apm,xgene-device-clock";
-> -				#clock-cells = <1>;
-> -				clocks = <&socplldiv2 0>;
-> -				reg = <0x0 0x1f61c000 0x0 0x1000>;
-> -				reg-names = "csr-reg";
-> -				enable-mask = <0x3>;
-> -				csr-mask = <0x3>;
-> -				clock-output-names = "xge0clk";
-> -			};
-> -
+but in x86, cat /dev/kmem, will just return "Bad address". After check the x86 code,
+copy_to_user ->  _copy_to_user(copy_user_64.S, fixup) -> copy_user_handle_tail (will return len > 0),
+then the copy_to_user() will return -EFAULT, the fixup_exception will deal with this situation,
+so does the arm/arm64 need the same mechanism to deal with it too?
 
-mdio at 0x1f610000 has xge0clk as input (patch 4), so deleting the node 
-here will break the device tree. I suppose the mdio consumes the 
-menetclk as in apm-storm.dtsi.
-
-Regards,
-Matthias
-
->   			xge1clk: xge1clk at 1f62c000 {
->   				compatible = "apm,xgene-device-clock";
->   				#clock-cells = <1>;
-> @@ -643,7 +632,6 @@
->   			interrupts = <0 96 4>,
->   				     <0 97 4>;
->   			dma-coherent;
-> -			clocks = <&xge0clk 0>;
->   			local-mac-address = [00 01 73 00 00 01];
->   			phy-connection-type = "sgmii";
->   			phy-handle = <&sgenet0phy>;
-> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> index 18f694ea..f631fe4 100644
-> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-> @@ -237,20 +237,11 @@
->   				clocks = <&socplldiv2 0>;
->   				reg = <0x0 0x1f21c000 0x0 0x1000>;
->   				reg-names = "csr-reg";
-> -				csr-mask = <0x3>;
-> +				csr-mask = <0xa>;
-> +				enable-mask = <0xf>;
->   				clock-output-names = "sge0clk";
->   			};
->
-> -			sge1clk: sge1clk at 1f21c000 {
-> -				compatible = "apm,xgene-device-clock";
-> -				#clock-cells = <1>;
-> -				clocks = <&socplldiv2 0>;
-> -				reg = <0x0 0x1f21c000 0x0 0x1000>;
-> -				reg-names = "csr-reg";
-> -				csr-mask = <0xc>;
-> -				clock-output-names = "sge1clk";
-> -			};
-> -
->   			xge0clk: xge0clk at 1f61c000 {
->   				compatible = "apm,xgene-device-clock";
->   				#clock-cells = <1>;
-> @@ -938,9 +929,9 @@
->   			reg-names = "enet_csr", "ring_csr", "ring_cmd";
->   			interrupts = <0x0 0x3c 0x4>;
->   			dma-coherent;
-> -			clocks = <&menetclk 0>;
->   			/* mac address will be overwritten by the bootloader */
->   			local-mac-address = [00 00 00 00 00 00];
-> +			clocks = <&menetclk 0>;
->   			phy-connection-type = "rgmii";
->   			phy-handle = <&menetphy>;
->   		};
-> @@ -955,8 +946,8 @@
->   			interrupts = <0x0 0xA0 0x4>,
->   				     <0x0 0xA1 0x4>;
->   			dma-coherent;
-> -			clocks = <&sge0clk 0>;
->   			local-mac-address = [00 00 00 00 00 00];
-> +			clocks = <&sge0clk 0>;
->   			phy-connection-type = "sgmii";
->   			phy-handle = <&sgenet0phy>;
->   		};
-> @@ -972,7 +963,6 @@
->   				     <0x0 0xAD 0x4>;
->   			port-id = <1>;
->   			dma-coherent;
-> -			clocks = <&sge1clk 0>;
->   			local-mac-address = [00 00 00 00 00 00];
->   			phy-connection-type = "sgmii";
->   			phy-handle = <&sgenet1phy>;
->
+Thanks
+Kefeng
