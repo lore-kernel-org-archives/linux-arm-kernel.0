@@ -1,51 +1,45 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Mon, 30 May 2016 10:14:28 +0800
-Subject: [PATCH 3/3] arm64: add a new macro for the pgd table descriptor
-In-Reply-To: <1464574468-22700-1-git-send-email-shijie.huang@arm.com>
-References: <1464574468-22700-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <1464574468-22700-3-git-send-email-shijie.huang@arm.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Mon, 30 May 2016 10:31:53 +0800
+Subject: [path v2 7/7] drm/hisilicon/hibmc: Add maintainer for Hibmc DRM
+In-Reply-To: <1464514855-108050-8-git-send-email-zourongrong@gmail.com>
+References: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
+ <1464514855-108050-8-git-send-email-zourongrong@gmail.com>
+Message-ID: <CAGd==07sV0qaDES5D5ozvkC1FDQXZ-Z9_UCNX8vO09HKBktq3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new macro for the pgd table descriptor to define the "Table"
-type, and use it to replace the numerical constant in the pgd_bad().
+On 29 May 2016 at 17:40, Rongrong Zou <zourongrong@gmail.com> wrote:
+> Signed-off-by: Rongrong Zou <zourongrong@gmail.com>
+> Signed-off-by: Jianhua Li <lijianhua@huawei.com>
+> ---
+>  MAINTAINERS | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index f466673..a8a62e0 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -3957,6 +3957,13 @@ T:       git git://github.com/patjak/drm-gma500
+>  S:     Maintained
+>  F:     drivers/gpu/drm/gma500/
+>
+> +DRM DRIVERS FOR HIBMC
+> +M:     lijianhua <lijianhua@huawei.com>
+> +M:     Rongrong Zou <zourongrong@gmail.com>
+> +L:     dri-devel at lists.freedesktop.org
+> +S:     Maintained
+> +F:     drivers/gpu/drm/hisilicon/hibmc
 
-This patch makes the code more legible.
+Please add a "/" ad the end of this line.
+And move this part into DRM DRIVERS FOR HISILICON
 
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
- arch/arm64/include/asm/pgtable-hwdef.h | 5 +++++
- arch/arm64/include/asm/pgtable.h       | 2 +-
- 2 files changed, 6 insertions(+), 1 deletion(-)
+Thanks,
+-xinliang
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 54e2fbf..f648c28 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -113,6 +113,11 @@
- /*
-  * Hardware page table definitions.
-  *
-+ * Level 0 descriptor (PGD).
-+ */
-+#define PGD_TABLE_BIT		(_AT(pgdval_t, 1) << 1)
-+
-+/*
-  * Level 1 descriptor (PUD).
-  */
- #define PUD_TYPE_TABLE		(_AT(pudval_t, 3) << 0)
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index 46472a9..bfa0092 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -453,7 +453,7 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
- #define pud_ERROR(pud)		__pud_error(__FILE__, __LINE__, pud_val(pud))
- 
- #define pgd_none(pgd)		(!pgd_val(pgd))
--#define pgd_bad(pgd)		(!(pgd_val(pgd) & 2))
-+#define pgd_bad(pgd)		(!(pgd_val(pgd) & PGD_TABLE_BIT))
- #define pgd_present(pgd)	(pgd_val(pgd))
- 
- static inline void set_pgd(pgd_t *pgdp, pgd_t pgd)
--- 
-2.5.5
+> +
+>  DRM DRIVERS FOR HISILICON
+>  M:     Xinliang Liu <z.liuxinliang@hisilicon.com>
+>  R:     Xinwei Kong <kong.kongxinwei@hisilicon.com>
+> --
+> 1.9.1
+>
