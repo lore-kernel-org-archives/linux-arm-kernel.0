@@ -1,71 +1,92 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 30 May 2016 17:14:16 +0200
-Subject: [PATCH V8 3/9] pci: Add new function to unmap IO resources.
+Date: Mon, 30 May 2016 17:14:17 +0200
+Subject: [PATCH V8 4/9] acpi,
+ pci: Support IO resources when parsing PCI host bridge resources.
 In-Reply-To: <1464621262-26770-1-git-send-email-tn@semihalf.com>
 References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
-Message-ID: <1464621262-26770-4-git-send-email-tn@semihalf.com>
+Message-ID: <1464621262-26770-5-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to release I/O resources so that the same I/O resources
-can be allocated again (pci_remap_iospace), like in PCI hotplug removal
-scenario. Therefore this patch implements new pci_unmap_iospace call which
-unmaps I/O space as the symmetry to pci_remap_iospace.
+Platforms that have memory mapped IO port (such as ARM64) need special
+handling for PCI I/O resources. For host bridge's resource probing case
+these resources need to be fixed up with pci_register_io_range/pci_remap_iospace etc.
 
+The same I/O resources need to be released after hotplug
+removal so that it can be re-added back by the pci_remap_iospace
+function during insertion. As a consequence we unmap I/O resources
+with pci_unmap_iospace when we release host bridge resources.
+
+Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- drivers/pci/pci.c   | 18 ++++++++++++++++++
- include/linux/pci.h |  1 +
- 2 files changed, 19 insertions(+)
+ drivers/acpi/pci_root.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index c8b4dbd..eb431b5 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -25,6 +25,7 @@
- #include <linux/device.h>
- #include <linux/pm_runtime.h>
- #include <linux/pci_hotplug.h>
-+#include <linux/vmalloc.h>
- #include <asm/setup.h>
- #include <linux/aer.h>
- #include "pci.h"
-@@ -3165,6 +3166,23 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
- #endif
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index ae3fe4e..ee3b728 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -720,6 +720,40 @@ next:
+ 	}
  }
  
-+/**
-+ *	pci_unmap_iospace - Unmap the memory mapped I/O space
-+ *	@res: resource to be unmapped
-+ *
-+ *	Unmap the CPU virtual address @res from virtual address space.
-+ *	Only architectures that have memory mapped IO functions defined
-+ *	(and the PCI_IOBASE value defined) should call this function.
-+ */
-+void pci_unmap_iospace(struct resource *res)
++#ifdef PCI_IOBASE
++static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
 +{
-+#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-+	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
++	struct resource *res = entry->res;
++	resource_size_t cpu_addr = res->start;
++	resource_size_t pci_addr = cpu_addr - entry->offset;
++	resource_size_t length = resource_size(res);
++	unsigned long port;
 +
-+	unmap_kernel_range(vaddr, resource_size(res));
-+#endif
++	if (pci_register_io_range(cpu_addr, length))
++		goto err;
++
++	port = pci_address_to_pio(cpu_addr);
++	if (port == (unsigned long)-1)
++		goto err;
++
++	res->start = port;
++	res->end = port + length - 1;
++	entry->offset = port - pci_addr;
++
++	if (pci_remap_iospace(res, cpu_addr) < 0)
++		goto err;
++
++	pr_info("Remapped I/O %pa to %pR\n", &cpu_addr, res);
++	return;
++err:
++	res->flags |= IORESOURCE_DISABLED;
 +}
++#else
++static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
++{
++}
++#endif
 +
- static void __pci_set_master(struct pci_dev *dev, bool enable)
+ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
  {
- 	u16 old_cmd, cmd;
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index b67e4df..12349de 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1167,6 +1167,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
- unsigned long pci_address_to_pio(phys_addr_t addr);
- phys_addr_t pci_pio_to_address(unsigned long pio);
- int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
-+void pci_unmap_iospace(struct resource *res);
+ 	int ret;
+@@ -740,6 +774,9 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+ 			"no IO and memory resources present in _CRS\n");
+ 	else {
+ 		resource_list_for_each_entry_safe(entry, tmp, list) {
++			if (entry->res->flags & IORESOURCE_IO)
++				acpi_pci_root_remap_iospace(entry);
++
+ 			if (entry->res->flags & IORESOURCE_DISABLED)
+ 				resource_list_destroy_entry(entry);
+ 			else
+@@ -811,6 +848,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
  
- static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
- {
+ 	resource_list_for_each_entry(entry, &bridge->windows) {
+ 		res = entry->res;
++		if (res->flags & IORESOURCE_IO)
++			pci_unmap_iospace(res);
+ 		if (res->parent &&
+ 		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+ 			release_resource(res);
 -- 
 1.9.1
