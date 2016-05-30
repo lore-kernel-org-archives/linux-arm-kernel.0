@@ -1,29 +1,27 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 May 2016 10:37:45 +0200
-Subject: [PATCH 3/5] spi: sunxi: expose maximum transfer size limit
-In-Reply-To: <5fffb7eca6f4b70853d92be2403595d6d06bede7.1464130597.git.hramrach@gmail.com>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <5fffb7eca6f4b70853d92be2403595d6d06bede7.1464130597.git.hramrach@gmail.com>
-Message-ID: <20160530083745.GG4247@lukather>
+From: weiqing.kong@mediatek.com (Weiqing Kong)
+Date: Mon, 30 May 2016 16:41:49 +0800
+Subject: [PATCH RESEND 0/3] Support Mediatek Soc MT2701 disp pwm
+Message-ID: <1464597712-5399-1-git-send-email-weiqing.kong@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 07:25:24PM -0000, Michal Suchanek wrote:
-> The sun4i spi hardware can trasfer at most 63 bytes of data without DMA
-> support so report the limitation. Same on sun6i.
+Sorry for sending many times, because of company
+permission settings, many people and groups can't
+receive these patches before.
 
-Is it? Is there timeouts on the A31 and later SoCs?
+These series patches modify pwm-mtk-disp.c
+and dts/dtsi config to support MT2701 disp pwm.
 
-Maxime
+Weiqing Kong (3):
+  dt-bindings: pwm: Add MediaTek display PWM bindings
+  pwm: Add MediaTek MT2701 display PWM driver support
+  dts: Add disp bls dsti and dts config for MT2701
+
+ .../devicetree/bindings/pwm/pwm-mtk-disp.txt       |  5 +-
+ arch/arm/boot/dts/mt2701-evb.dts                   | 29 +++++++
+ arch/arm/boot/dts/mt2701.dtsi                      |  9 +++
+ drivers/pwm/pwm-mtk-disp.c                         | 89 +++++++++++++++++-----
+ 4 files changed, 113 insertions(+), 19 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160530/4739a050/attachment.sig>
+1.8.1.1.dirty
