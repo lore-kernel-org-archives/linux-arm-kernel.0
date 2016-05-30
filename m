@@ -1,32 +1,32 @@
-From: harninder.rai@nxp.com (Harninder Rai)
-Date: Mon, 30 May 2016 11:10:58 +0000
-Subject: Help needed with kexec on arm64
-In-Reply-To: <1464376785.12343.3.camel@infradead.org>
-References: <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
- <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
- <DB5PR04MB168874758924173BBD5CC037E69D0@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160405052341.GA19476@linaro.org>
- <DB5PR04MB1688F09062B2A5ECACCA4D80E6710@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160511005334.GA8417@linaro.org>
- <DB5PR04MB1688C3F122091109E6BD9B68E6740@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160519110307.GA4941@linaro.org>
- <DB5PR04MB16887FF10CEA6AA9BF990F0DE6420@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160527135820.GM19428@n2100.arm.linux.org.uk>
- <1464376785.12343.3.camel@infradead.org>
-Message-ID: <DB5PR04MB1688E3A3C72D9173B5DC0DCDE6450@DB5PR04MB1688.eurprd04.prod.outlook.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 30 May 2016 12:23:50 +0100
+Subject: [linux-sunxi] [PATCH 1/5] spi: sunxi: fix transfer timeout
+In-Reply-To: <CAGRGNgW=UnmwwiREV+nVcws6sk18-4fKz3qf-WKf4LY9-VqBKg@mail.gmail.com>
+References: <cover.1464130597.git.hramrach@gmail.com>
+ <cb90b922caa6ac07c1425d726ea19709ee5284f4.1464130597.git.hramrach@gmail.com>
+ <CAGRGNgWDrVHG26umTSHHAxFC3KXjwmpDejBAfKqvuik0_2-Jcw@mail.gmail.com>
+ <CAOMqctS0AD6rHGt3wjxxyidee=_5xqby95t5TGuozAA12DdPjQ@mail.gmail.com>
+ <CAGRGNgW=UnmwwiREV+nVcws6sk18-4fKz3qf-WKf4LY9-VqBKg@mail.gmail.com>
+Message-ID: <20160530112350.GI29837@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Also, use the latest from here:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git
+On Fri, May 27, 2016 at 03:10:11PM +1000, Julian Calaby wrote:
+> On Fri, May 27, 2016 at 3:05 PM, Michal Suchanek <hramrach@gmail.com> wrote:
 
-I am using kexec -v
-kexec version: 16.03.14.10.05-gef652df-dirty
-kexec-tools 2.0.12-rc1
+> >> Also, should the changes for the drivers be in two separate patches also?
 
-Do you think still later version will help in this case?
+> > That's basically the same driver with different constants so I guess not.
 
-Regards
-Harry++
+> Fair enough, I withdraw my comment then.
+
+If it's the same driver with different constants it should really
+actually be the same driver - I did ask this when the drivers were
+originally merged...
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160530/fafb72c7/attachment.sig>
