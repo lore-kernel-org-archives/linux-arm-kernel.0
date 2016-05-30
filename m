@@ -1,7 +1,7 @@
 From: harninder.rai@nxp.com (Harninder Rai)
-Date: Mon, 30 May 2016 11:07:41 +0000
+Date: Mon, 30 May 2016 11:10:58 +0000
 Subject: Help needed with kexec on arm64
-In-Reply-To: <20160527135820.GM19428@n2100.arm.linux.org.uk>
+In-Reply-To: <1464376785.12343.3.camel@infradead.org>
 References: <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
  <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
  <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
@@ -13,16 +13,20 @@ References: <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
  <20160519110307.GA4941@linaro.org>
  <DB5PR04MB16887FF10CEA6AA9BF990F0DE6420@DB5PR04MB1688.eurprd04.prod.outlook.com>
  <20160527135820.GM19428@n2100.arm.linux.org.uk>
-Message-ID: <DB5PR04MB1688119765FF39B668E71E9EE6450@DB5PR04MB1688.eurprd04.prod.outlook.com>
+ <1464376785.12343.3.camel@infradead.org>
+Message-ID: <DB5PR04MB1688E3A3C72D9173B5DC0DCDE6450@DB5PR04MB1688.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> Also, use the latest from here:
 > 
-> You should be able to get more information by using kexec -d to enable debug
-> output... if the architecture is usefully printing stuff like memory layouts
-> etc.
-Unfortunately, kexec -d didn't give any additional information in this case :(
-Any more pointers?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/geoff/kexec-tools.git
+
+I am using kexec -v
+kexec version: 16.03.14.10.05-gef652df-dirty
+kexec-tools 2.0.12-rc1
+
+Do you think still later version will help in this case?
 
 Regards
 Harry++
