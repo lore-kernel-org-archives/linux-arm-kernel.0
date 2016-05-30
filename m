@@ -1,53 +1,100 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Mon, 30 May 2016 10:52:30 +0800
-Subject: [PATCH 9/9] arm64: entry: remove the duplicated hardirq flags trace
- code
-In-Reply-To: <1464576750-25160-1-git-send-email-shijie.huang@arm.com>
-References: <1464576750-25160-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <1464576750-25160-10-git-send-email-shijie.huang@arm.com>
+From: xinliang.liu@linaro.org (Xinliang Liu)
+Date: Mon, 30 May 2016 11:01:33 +0800
+Subject: [path v2 0/7] Add DRM driver for Hisilicon Hibmc
+In-Reply-To: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
+References: <1464514855-108050-1-git-send-email-zourongrong@gmail.com>
+Message-ID: <CAGd==0662wa-mAdX+tUf9_Tw6qQhc0-D5ivSYdRBS=OrqAVYnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have added the trace code to the interrupt enable/disable macros,
-so the trace code in work_pending and do_notify_resume are
-duplicated, just remove them.
+Hi Rongrong,
 
-Signed-off-by: Huang Shijie <shijie.huang@arm.com>
----
- arch/arm64/kernel/entry.S  | 3 ---
- arch/arm64/kernel/signal.c | 6 ------
- 2 files changed, 9 deletions(-)
+It seems that you haven't run the checkpatch script.
+Please run this script to check your patches before you send them. Like bellow:
+$ cd yourkerneldir
+$ ./scripts/checkpatch.pl --strict yourpatches
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 7005789..b6edb55 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -691,9 +691,6 @@ ret_fast_syscall_trace:
- work_pending:
- 	mov	x0, sp				// 'regs'
- 	bl	do_notify_resume
--#ifdef CONFIG_TRACE_IRQFLAGS
--	bl	trace_hardirqs_on		// enabled while in userspace
--#endif
- 	ldr	x1, [tsk, #TI_FLAGS]		// re-check for single-step
- 	b	finish_ret_to_user
- /*
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 404dd67..56fdcb2 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -402,12 +402,6 @@ static void do_signal(struct pt_regs *regs)
- asmlinkage void do_notify_resume(struct pt_regs *regs,
- 				 unsigned int thread_flags)
- {
--	/*
--	 * The assembly code enters us with IRQs off, but it hasn't
--	 * informed the tracing code of that for efficiency reasons.
--	 * Update the trace code with the current status.
--	 */
--	trace_hardirqs_off();
- 	do {
- 		if (thread_flags & _TIF_NEED_RESCHED) {
- 			schedule();
--- 
-2.5.5
+Thanks,
+-xinliang
+
+On 29 May 2016 at 17:40, Rongrong Zou <zourongrong@gmail.com> wrote:
+> This patch set adds a new drm driver for Hisilicon Hibmc. Hibmc is a
+> base board management controller, usually it is used on server for
+> Out-of-band management purpose. In this patch set, we just support basic
+> function for Hibmc display subsystem. Hibmc display subsystem is connected
+> to host CPU by PCIe as blow:
+>
+> +----------+       +----------+
+> |          | PCIe  |  Hibmc   |
+> |host CPU( |<----->| display  |
+> |arm64,x86)|       |subsystem |
+> +----------+       +----------+
+>
+> Hardware Detail for Hibmc display subsystem
+> -----------
+>
+>   The display subsystem of Hibmc is show as bellow:
+>   +----+      +----+      +----+     +--------+
+>   |    |      |    |      |    |     |        |
+>   | FB |----->| DE |----->|VDAC|---->|external|
+>   |    |      |    |      |    |     | VGA    |
+>   +----+      +----+      +----+     +--------+
+>
+>   -DE(Display Engine) is the display controller.
+>   -VDAC(Video Digital-to-Analog converter) converts the RGB diaital data
+>   stream from DE to VGA analog signals.
+>
+> Change History
+> ------------
+>
+> Changes in v2:
+>   -Remove self-defined macros for bit operations.
+>   -Remove unused register.
+>   -Replace those deprecated functions with new version of them.
+>   -use drm_connector_register_all() to register connector after
+>    drm_dev_register().
+>
+> The patch v1 is at
+> https://lists.freedesktop.org/archives/dri-devel/2016-February/101921.html
+> Sorry for too late sending.
+>
+>
+> Rongrong Zou (7):
+>   idrm/hisilicon/hibmc: Add hisilicon hibmc drm master driver
+>   drm/hisilicon/hibmc: Add plane for DE
+>   drm/hisilicon/hibmc: Add crtc for DE
+>   drm/hisilicon/hibmc: Add encoder for VDAC
+>   drm/hisilicon/hibmc: Add connector for VDAC
+>   drm/hisilicon/hibmc: Add support for frame buffer
+>   drm/hisilicon/hibmc: Add maintainer for Hibmc DRM
+>
+>  MAINTAINERS                                       |   7 +
+>  drivers/gpu/drm/hisilicon/Kconfig                 |   1 +
+>  drivers/gpu/drm/hisilicon/Makefile                |   3 +-
+>  drivers/gpu/drm/hisilicon/hibmc/Kconfig           |  13 +
+>  drivers/gpu/drm/hisilicon/hibmc/Makefile          |   4 +
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c    | 477 ++++++++++++++++++++++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.h    |  29 ++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c   | 399 ++++++++++++++++++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h   |  64 +++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c | 286 +++++++++++++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c |  91 +++++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h |  28 ++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h  | 214 ++++++++++
+>  drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c  | 174 ++++++++
+>  14 files changed, 1789 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Kconfig
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/Makefile
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.c
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_de.h
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.c
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_drv.h
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_fbdev.c
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.c
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_power.h
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_regs.h
+>  create mode 100644 drivers/gpu/drm/hisilicon/hibmc/hibmc_drm_vdac.c
+>
+> --
+> 1.9.1
+>
