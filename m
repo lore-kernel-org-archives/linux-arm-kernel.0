@@ -1,46 +1,90 @@
 From: shijie.huang@arm.com (Huang Shijie)
-Date: Mon, 30 May 2016 10:52:21 +0800
-Subject: [PATCH 0/9] arm64: add more accurate code for tracing the hardirq
- flags changes
-Message-ID: <1464576750-25160-1-git-send-email-shijie.huang@arm.com>
+Date: Mon, 30 May 2016 10:52:25 +0800
+Subject: [PATCH 4/9] arm64: entry: remove the duplicated code for tracing the
+ IRQ flags
+In-Reply-To: <1464576750-25160-1-git-send-email-shijie.huang@arm.com>
+References: <1464576750-25160-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <1464576750-25160-5-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the current arm64 code, we trace the hardirq flags change occasionally.
-Sometimes, the trace code is buggy, such as the el0_irq.
+We record the hardirq flags changes in the entry/exit code now,
+So the code becomes duplicated, just remove it.
 
-This patch sets 
-   0.) in order to avoid the save/restore registers, add patches to adjust
-        the code.
-   1.) add the trace code at the entry/exit, 
-   2.) add the trace code at the irq macros.
-   3.) removes the duplicated trace code.
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+---
+ arch/arm64/kernel/entry.S | 12 ------------
+ arch/arm64/mm/fault.c     | 10 ----------
+ 2 files changed, 22 deletions(-)
 
-I tested this patch set with CONFIG_PROVE_LOCKING/CONFIG_LOCKDEP/CONFIG_LOCK_STAT
-enabled in the Juno-r1 board.
-
-The whole patch set is based on the patch: 
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/420154.html
-
-Thanks to the code review of Steve/James/Mark, I really appriciate it.
-
-Huang Shijie (9):
-  arm64: entry: use the callee-saved registers to save some registers
-  arm64: entry: add a new macro to restore the registers for syscall
-  arm64: entry: record the hardirq changes on the entry/exit code
-  arm64: entry: remove the duplicated code for tracing the IRQ flags
-  arm64: entry: only restore the syscall registers once
-  arm64: entry: adjust el1_sync so that a function can be called
-  arm64: entry: save the x0 back into the stack before disabling the
-    interrupt
-  arm64: add the hardirq flags trace code for irq macros
-  arm64: entry: remove the duplicated hardirq flags trace code
-
- arch/arm64/include/asm/assembler.h |  9 ++++
- arch/arm64/kernel/entry.S          | 88 ++++++++++++++++++++++----------------
- arch/arm64/kernel/signal.c         |  6 ---
- arch/arm64/mm/fault.c              | 10 -----
- 4 files changed, 59 insertions(+), 54 deletions(-)
-
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 4c67c56..102fd8b 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -428,9 +428,6 @@ ENDPROC(el1_sync)
+ el1_irq:
+ 	kernel_entry 1
+ 	enable_dbg
+-#ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_off
+-#endif
+ 
+ 	get_thread_info tsk
+ 	irq_handler
+@@ -443,9 +440,6 @@ el1_irq:
+ 	bl	el1_preempt
+ 1:
+ #endif
+-#ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_on
+-#endif
+ 	kernel_exit 1
+ ENDPROC(el1_irq)
+ 
+@@ -632,16 +626,10 @@ el0_irq:
+ 	kernel_entry 0
+ el0_irq_naked:
+ 	enable_dbg
+-#ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_off
+-#endif
+ 
+ 	ct_user_exit
+ 	irq_handler
+ 
+-#ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_on
+-#endif
+ 	b	ret_to_user
+ ENDPROC(el0_irq)
+ 
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 5954881..f94e598 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -603,13 +603,6 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 	struct siginfo info;
+ 	int rv;
+ 
+-	/*
+-	 * Tell lockdep we disabled irqs in entry.S. Do nothing if they were
+-	 * already disabled to preserve the last enabled/disabled addresses.
+-	 */
+-	if (interrupts_enabled(regs))
+-		trace_hardirqs_off();
+-
+ 	if (!inf->fn(addr, esr, regs)) {
+ 		rv = 1;
+ 	} else {
+@@ -624,9 +617,6 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
+ 		rv = 0;
+ 	}
+ 
+-	if (interrupts_enabled(regs))
+-		trace_hardirqs_on();
+-
+ 	return rv;
+ }
+ 
 -- 
 2.5.5
