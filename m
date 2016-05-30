@@ -1,63 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 30 May 2016 13:30:35 +0200
-Subject: building and using modules on arm64 hikey board
-In-Reply-To: <87a3195c-febb-a6c8-a679-272b9f7b59cc@broadcom.com>
-References: <87a3195c-febb-a6c8-a679-272b9f7b59cc@broadcom.com>
-Message-ID: <0240F9F0-0146-4DCC-B512-195415B29B34@linaro.org>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 30 May 2016 13:32:31 +0200
+Subject: [PATCH] reset: Put back *_optional variants
+In-Reply-To: <1464603520.3808.34.camel@pengutronix.de>
+References: <ca359e013c30f27c825a9580164b01da5ca6476d.1464224883.git.johnyoun@synopsys.com>
+ <12e450f0-70ea-29f8-0bf7-8a0697263f2d@redhat.com>
+ <57476E48.2060204@synopsys.com>
+ <dcf6372f-4910-bd03-f1b5-c7e0086fdead@redhat.com>
+ <1464603520.3808.34.camel@pengutronix.de>
+Message-ID: <5cf9f346-9b6e-d521-612c-9edd167aa759@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is likely caused by the fact that the Android AArch64 toolchain uses -fpic by default. Could you try adding -fno-pic to the CFLAGS?
+Hi,
 
+On 30-05-16 12:18, Philipp Zabel wrote:
+> Hi,
+>
+> Am Freitag, den 27.05.2016, 09:06 +0200 schrieb Hans de Goede:
+> [...]
+>>>> So IMHO the following change would be a better way to fix this:
+>>>>
+>>>> --- a/include/linux/reset.h
+>>>> +++ b/include/linux/reset.h
+>>>> @@ -65,14 +65,14 @@ static inline struct reset_control *__of_reset_control_get(
+>>>>                                          struct device_node *node,
+>>>>                                          const char *id, int index, int shared)
+>>>>   {
+>>>> -   return ERR_PTR(-EINVAL);
+>>>> + return ERR_PTR(-ENOTSUPP);
+>>>>   }
+>>>>
+>>>>   static inline struct reset_control *__devm_reset_control_get(
+>>>>                                          struct device *dev,
+>>>>                                          const char *id, int index, int shared)
+>>>>   {
+>>>> -   return ERR_PTR(-EINVAL);
+>>>> + return ERR_PTR(-ENOTSUPP);
+>>>>   }
+>>>>
+>>>>   #endif /* CONFIG_RESET_CONTROLLER */
+>>>
+>>>
+>>> I'm good with this. However, per Philipp on a previous thread, the
+>>> intended behavior is to return -EINVAL for the non-optional functions.
+>>>
+>>> http://marc.info/?l=linux-usb&m=146156945528848&w=2
+>
+> Adding Dinh to Cc: because he wanted this changed from -EINVAL.
+> My point then was that WARN_ON + -EINVAL is indented in this case.
+>
+> Given that the warning backtrace already helps to identify the issue
+> (CONFIG_RESET_CONTROLLER disabled), and that changing the return value
+> to -ENOTSUPP improves consistency with the rest of the API and reduces
+> the amount of inline wrappers, I concur.
+>
+>> As Philipp rightfully points out, calling the non-optional functions
+>> without CONFIG_RESET_CONTROLLER is a no-no, so IMHO we should not have to
+>> care too much about the error code in that case, as long as we return
+>> an error.
+>>
+>> Also note that even before my patch things were already inconsistent
+>> with the of_...get... functions already always returning
+>> -ENOTSUPP when CONFIG_RESET_CONTROLLER was not set, to me it seems
+>> best and also KISS to just return -ENOTSUPP from all get functions
+>> when CONFIG_RESET_CONTROLLER is not set.
+>>
+>> Anyways this is Philipp's call, this is all just my 2 cents.
+>
+> Let the stubs return -ENOTSUPP consistently. A quick grep doesn't show
+> any driver handling -EINVAL explicitly either.
 
-> On 30 mei 2016, at 12:21, Arend Van Spriel <arend.vanspriel@broadcom.com> wrote:
-> 
-> I got myself an arm64 HiKey board from LeMaker and build an Android AOSP
-> image for it (see [1]). For development I would like to use
-> CONFIG_MODULES. However, when I try to insmod the build module I get:
-> 
-> [  287.903653] module cfg80211: overflow in relocation type 261 val
-> ffffffbffc006530
-> 
-> Looking AArch64 ELF documentation [2], section 4.6.5, it has:
-> code|name            |operation |overflow check   |
-> 261 |R_AARCH64_PREL32|S + A - P |-2^31 <= X < 2^32|
-> 
-> So basically the highest 32 bits should all be one and so ffffffbf is
-> invalid. From what I could find searching internet it could be an issue
-> with linker options so I build kernel and modules with V=1. Here the
-> linker invocation for them:
-> 
-> + aarch64-linux-android-ld -EL -p --no-undefined -X --build-id -o vmlinux \
-> -T ./arch/arm64/kernel/vmlinux.lds arch/arm64/kernel/head.o
-> init/built-in.o \
-> --start-group usr/built-in.o arch/arm64/kernel/built-in.o
-> arch/arm64/mm/built-in.o \
-> arch/arm64/net/built-in.o arch/arm64/kvm/built-in.o
-> arch/arm64/crypto/built-in.o \
-> ./drivers/firmware/efi/libstub/lib.a kernel/built-in.o certs/built-in.o
-> mm/built-in.o \
-> fs/built-in.o ipc/built-in.o security/built-in.o crypto/built-in.o
-> block/built-in.o \
-> arch/arm64/lib/lib.a lib/lib.a arch/arm64/lib/built-in.o lib/built-in.o
-> drivers/built-in.o \
-> sound/built-in.o firmware/built-in.o net/built-in.o virt/built-in.o
-> --end-group .tmp_kallsyms2.o
-> 
->  aarch64-linux-android-ld -EL -r  -T ./scripts/module-common.lds
-> --build-id \
->  -o net/wireless/cfg80211.ko net/wireless/cfg80211.o
-> net/wireless/cfg80211.mod.o
-> 
-> Attached are vmlinux.lds and module-common.lds. I also tried taking
-> upstream arch/arm64/kernel/module.lds in hikey-linaro tree. If someone
-> can give a hint or educated guess at what to try it would be appreciated.
-> 
-> Regards,
-> Arend
-> 
-> [1] https://source.android.com/source/devices.html#building-kernel
-> [2]
-> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0056b/IHI0056B_aaelf64.pdf
-> <module-common.lds>
-> <vmlinux.lds>
+Great.
+
+John Youn, can you submit a patch changing the return of the stubs
+from -EINVAL to -ENOTSUPP please ?
+
+Thanks & Regards,
+
+Hans
