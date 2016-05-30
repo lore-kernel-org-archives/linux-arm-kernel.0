@@ -1,98 +1,59 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 30 May 2016 17:14:18 +0200
-Subject: [PATCH V8 5/9] pci, acpi: add acpi hook to assign domain number.
+Date: Mon, 30 May 2016 17:14:19 +0200
+Subject: [PATCH V8 6/9] arm64, pci,
+ acpi: ACPI support for legacy IRQs parsing and consolidation with DT
+ code.
 In-Reply-To: <1464621262-26770-1-git-send-email-tn@semihalf.com>
 References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
-Message-ID: <1464621262-26770-6-git-send-email-tn@semihalf.com>
+Message-ID: <1464621262-26770-7-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI core code provides a config option (CONFIG_PCI_DOMAINS_GENERIC)
-that allows assigning the PCI bus domain number generically by
-relying on device tree bindings, and falling back to a simple counter
-when the respective DT properties (ie "linux,pci-domain") are not
-specified in the host bridge device tree node.
+To enable PCI legacy IRQs on platforms booting with ACPI, arch code
+should include ACPI specific callbacks that parse and set-up the
+device IRQ number, equivalent to the DT boot path. Owing to the current
+ACPI core scan handlers implementation, ACPI PCI legacy IRQs bindings
+cannot be parsed at device add time, since that would trigger ACPI scan
+handlers ordering issues depending on how the ACPI tables are defined.
 
-In a similar way, when a system is booted through ACPI, architectures
-that are selecting CONFIG_PCI_DOMAINS_GENERIC (ie ARM64) require kernel
-hooks to retrieve the domain number so that the PCI bus domain number
-set-up can be handled seamlessly with DT and ACPI in generic core code
-when CONFIG_PCI_DOMAINS_GENERIC is selected.
-
-Since currently it is not possible to retrieve a pointer to the PCI
-host bridge ACPI device backing the host bridge from core PCI code
-(which would allow retrieving the domain number in an arch agnostic
-way through the ACPI _SEG method), an arch specific ACPI hook has to
-be declared and implemented by all arches that rely on
-CONFIG_PCI_DOMAINS_GENERIC to retrieve the domain number and set it
-up in core PCI code.
-
-For the aforementioned reasons, this patch introduces a dummy
-acpi_pci_bus_domain_nr() hook in preparation for per-arch implementation
-of the same to retrieve the domain number on a per-arch basis when
-the system boots through ACPI.
-
-For the sake of code clarity the current code implementing generic
-domain number assignment (ie pci_bus_assign_domain_nr(), selected by
-CONFIG_PCI_DOMAINS_GENERIC) is reshuffled so that the code implementing
-the DT domain assignment function is stubbed out into a corresponding
-helper, so that DT and ACPI functions are clearly separated in
-preparation for arches acpi_pci_bus_domain_nr() implementations.
+To solve this problem and consolidate FW PCI legacy IRQs parsing in
+one single pcibios callback (pending final removal), this patch moves
+DT PCI IRQ parsing to the pcibios_alloc_irq() callback (called by
+PCI core code at device probe time) and adds ACPI PCI legacy IRQs
+parsing to the same callback too, so that FW PCI legacy IRQs parsing
+is confined in one single arch callback that can be easily removed
+when code parsing PCI legacy IRQs is consolidated and moved to core
+PCI code.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Suggested-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/pci/pci.c   | 11 +++++++++--
- include/linux/pci.h |  1 +
- 2 files changed, 10 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/pci.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index eb431b5..2b52178 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -7,6 +7,7 @@
-  *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 3c4e308..336deef 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -50,11 +50,16 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
+ }
+ 
+ /*
+- * Try to assign the IRQ number from DT when adding a new device
++ * Try to assign the IRQ number when probing a new device
   */
- 
-+#include <linux/acpi.h>
- #include <linux/kernel.h>
- #include <linux/delay.h>
- #include <linux/init.h>
-@@ -4941,7 +4942,7 @@ int pci_get_new_domain_nr(void)
- }
- 
- #ifdef CONFIG_PCI_DOMAINS_GENERIC
--void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+static int of_pci_bus_domain_nr(struct device *parent)
+-int pcibios_add_device(struct pci_dev *dev)
++int pcibios_alloc_irq(struct pci_dev *dev)
  {
- 	static int use_dt_domains = -1;
- 	int domain = -1;
-@@ -4985,7 +4986,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
- 		domain = -1;
- 	}
+-	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
++	if (acpi_disabled)
++		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
++#ifdef CONFIG_ACPI
++	else
++		return acpi_pci_irq_enable(dev);
++#endif
  
--	bus->domain_nr = domain;
-+	return domain;
-+}
-+
-+void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-+{
-+	bus->domain_nr = acpi_disabled ? of_pci_bus_domain_nr(parent) :
-+					 acpi_pci_bus_domain_nr(bus);
+ 	return 0;
  }
- #endif
- #endif
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 12349de..bba4053 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1390,6 +1390,7 @@ static inline int pci_domain_nr(struct pci_bus *bus)
- {
- 	return bus->domain_nr;
- }
-+static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus) { return -1; }
- void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
- #else
- static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
 -- 
 1.9.1
