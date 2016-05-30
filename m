@@ -1,18 +1,18 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Mon, 30 May 2016 14:49:37 +0200
-Subject: [PATCH 1/2] clk: exynos5420: Set ID for aclk333 gate clock
-In-Reply-To: <1464111662-15336-2-git-send-email-javier@osg.samsung.com>
-References: <1464111662-15336-1-git-send-email-javier@osg.samsung.com>
- <1464111662-15336-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <574C36E1.5000709@samsung.com>
+Date: Mon, 30 May 2016 14:50:32 +0200
+Subject: [PATCH] clk: samsung: exynos7: Don't gate CMU_{CCORE,
+ FSYS0} blocks clock
+In-Reply-To: <1460608972-13878-1-git-send-email-alim.akhtar@samsung.com>
+References: <1460608972-13878-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <574C3718.3050301@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/2016 07:41 PM, Javier Martinez Canillas wrote:
-> The aclk333 clock needs to be ungated during the MFC power domain switch,
-> so set the clock ID to allow the Exynos power domain logic to lookup this
-> clock if is defined in the MFC PD device tree node.
+On 04/14/2016 06:42 AM, Alim Akhtar wrote:
+> This patch adds CLK_IS_CRITICAL flag to ACLK_CCORE_133 and ACLK_FSYS0_200
+> clocks. These clocks are critical for accessing CMU_CCORE and CMU_FSYS0
+> blocks registers. Let these clocks to be enabled all the time.
 > 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
 
-Thanks, patch applied.
+Patch applied, thanks.
