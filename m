@@ -1,54 +1,23 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 30 May 2016 10:09:40 +0200
-Subject: [PATCH 2/3] ARM: dts: sun5i: add spi2 on A10s Olinuxino Micro
-In-Reply-To: <602069f7735ad37b1849dac484d2e8e7c9ec08b3.1464129859.git.hramrach@gmail.com>
-References: <908ed06eb46f2162e222258aa14df545d0fa5b48.1464129859.git.hramrach@gmail.com>
- <602069f7735ad37b1849dac484d2e8e7c9ec08b3.1464129859.git.hramrach@gmail.com>
-Message-ID: <20160530080940.GD4247@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 May 2016 10:16:43 +0200
+Subject: [PATCH v3] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <C89496FEAE474D468F30D558A9468D9F26CEEBAB@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1464067268-35299-1-git-send-email-navam@xilinx.com>
+ <CAL_Jsq+VL6jjo5QLwnsC8rEfgP4KN5hCSB7QicWWN-uvZU0GHw@mail.gmail.com>
+ <C89496FEAE474D468F30D558A9468D9F26CEEBAB@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <5333252.Un7tdhWc5Q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday, May 30, 2016 5:46:21 AM CEST Nava kishore Manne wrote:
+> >
+> The Axi-usb 5.00 IP is a FPGA based one. This IP needs to support two H/w designs one with 32 bit DMA addressing another one is 64 bit DMA addressing.
+> And also in the software point for view we don?t have any register to figure out whether it is supporting 32 bit DMA addressing or 64 bit DMA addressing.
+> To support both the designs I kept addrwidth property in the dt. I think here addrwidth property is make sense to differentiate the h/w configurations.
+> If you want me to changes it to boolean please let me know I will fix it in the next version.
 
-On Thu, May 26, 2016 at 07:25:23PM -0000, Michal Suchanek wrote:
-> spi2 is available on the UEXT connector
-> 
-> Signed-off-by: Michal Suchanek <hramrach@gmail.com>
-> ---
->  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-> index 86d046a..7d2ff60 100644
-> --- a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-> +++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
-> @@ -192,6 +192,13 @@
->  	status = "okay";
->  };
->  
-> +&spi2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&spi2_pins_a>,
-> +		    <&spi2_cs0_pins_a>;
-> +	status = "okay";
-> +};
-> +
+I think boolean would be more logical here, since what is configurable
+here is not how many bits are supported, but whether the XUSB_DMA_DSAR_ADDR
+register is present or not.
 
-This should be ordered alphabetically.
-
-Fixed it, and applied.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160530/c59b2662/attachment.sig>
+	Arnd
