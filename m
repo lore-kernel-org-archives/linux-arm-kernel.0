@@ -1,51 +1,125 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 30 May 2016 09:41:20 +0200
-Subject: [PATCH 2/2] ARM: dts: Add async-bridge clock to MFC power domain
- for Exynos5420
-In-Reply-To: <1464111662-15336-3-git-send-email-javier@osg.samsung.com>
-References: <1464111662-15336-1-git-send-email-javier@osg.samsung.com>
- <1464111662-15336-3-git-send-email-javier@osg.samsung.com>
-Message-ID: <574BEEA0.5020103@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 30 May 2016 09:57:30 +0200
+Subject: [PATCH 14/16] clk: sunxi-ng: Add N-K-M-P factor clock
+In-Reply-To: <CAGb2v66b7jXrAs0rBrcHWskQQPqrhRVzY6OmCSoGZg2tfDJrDA@mail.gmail.com>
+References: <1462737711-10017-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1462737711-10017-15-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66b7jXrAs0rBrcHWskQQPqrhRVzY6OmCSoGZg2tfDJrDA@mail.gmail.com>
+Message-ID: <20160530075730.GB4247@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/24/2016 07:41 PM, Javier Martinez Canillas wrote:
-> The MFC IP is also inter-connected by an Async-Bridge so the CLK_ACLK333
-> has to be ungated during a power domain switch. Trying to do it when the
-> clock is gated will fail and lead to an imprecise external abort error
-> when the driver tries to access the MFC registers with the PD disabled.
-> 
-> For example, if the s5p-mfc module is removed and the MFC PD turned off:
-> 
-> [  186.835606] Power domain power-domain at 10044060 disable failed
-> [  186.835671] s5p-mfc 11000000.codec: Removing 11000000.codec
-> [  186.837670] Power domain power-domain at 10044060 disable failed
-> 
-> And when the module is inserted again:
-> 
-> [ 2395.176956] s5p_mfc_wait_for_done_dev:34: Interrupt (dev->int_type:0, command:12) timed out
-> [ 2395.177031] s5p_mfc_init_hw:272: Failed to load firmware
-> [ 2395.177384] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
-> [ 2395.177441] pgd = ec3b4000
-> [ 2395.177467] [00000000] *pgd=00000000
-> [ 2395.177507] Internal error: : 1406 [#1] PREEMPT SMP ARM
-> [ 2395.177550] Modules linked in: s5p_mfc mwifiex_sdio mwifiex uvcvideo s5p_jpeg v4l2_mem2mem videobuf2_vmalloc videobuf2_dma_contig videobuf2_memops videobuf2_v4l2 videobuf2_core v4l2_common videodev media [last unloaded: s5p_mfc]
-> [ 2395.177774] CPU: 1 PID: 2382 Comm: v4l_id Tainted: G        W       4.6.0-rc6-next-20160502-00010-g7730dc64d2c1-dirty #179
-> [ 2395.177857] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
-> [ 2395.177906] task: ed275500 ti: e6c8c000 task.ti: e6c8c000
-> [ 2395.177996] PC is at s5p_mfc_reset+0x1c4/0x284 [s5p_mfc]
-> [ 2395.178057] LR is at s5p_mfc_reset+0x1a4/0x284 [s5p_mfc]
-> 
-> This patch fixes this issue by adding the CLK_ACLK333 as an Async-Bridge
-> clock for the MFC power domain, so the PD configuration works properly.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
->  arch/arm/boot/dts/exynos5420.dtsi | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+Hi Chen-Yu,
 
-Thanks, applied.
+On Mon, May 23, 2016 at 10:36:04PM +0800, Chen-Yu Tsai wrote:
+> On Mon, May 9, 2016 at 4:01 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Introduce support for clocks that use a combination of two linear
+> > multipliers (N and K factors), one linear divider (M) and one power of two
+> > divider (P).
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi-ng/Makefile   |   1 +
+> >  drivers/clk/sunxi-ng/ccu_nkmp.c | 157 ++++++++++++++++++++++++++++++++++++++++
+> >  drivers/clk/sunxi-ng/ccu_nkmp.h |  43 +++++++++++
+> >  3 files changed, 201 insertions(+)
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu_nkmp.c
+> >  create mode 100644 drivers/clk/sunxi-ng/ccu_nkmp.h
+> >
+> > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> > index 2bb8bc22e907..c794f57b6fb1 100644
+> > --- a/drivers/clk/sunxi-ng/Makefile
+> > +++ b/drivers/clk/sunxi-ng/Makefile
+> > @@ -9,6 +9,7 @@ obj-y += ccu_mp.o
+> >  obj-y += ccu_mux.o
+> >  obj-y += ccu_nk.o
+> >  obj-y += ccu_nkm.o
+> > +obj-y += ccu_nkmp.o
+> >  obj-y += ccu_nm.o
+> >  obj-y += ccu_p.o
+> >  obj-y += ccu_phase.o
+> > diff --git a/drivers/clk/sunxi-ng/ccu_nkmp.c b/drivers/clk/sunxi-ng/ccu_nkmp.c
+> > new file mode 100644
+> > index 000000000000..b7da00773cd6
+> > --- /dev/null
+> > +++ b/drivers/clk/sunxi-ng/ccu_nkmp.c
+> > @@ -0,0 +1,157 @@
+> > +/*
+> > + * Copyright (C) 2016 Maxime Ripard
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/rational.h>
+> > +
+> > +#include "ccu_gate.h"
+> > +#include "ccu_nkmp.h"
+> > +
+> > +void ccu_nkmp_find_best(unsigned long parent, unsigned long rate,
+> > +                       unsigned long max_n, unsigned long max_k,
+> > +                       unsigned long max_m, unsigned long max_p,
+> > +                       unsigned long *n, unsigned long *k,
+> > +                       unsigned long *m, unsigned long *p)
+> 
+> We definitely should just pass struct ccu_nkmp* here.
 
-Krzysztof
+Ok
+
+> > +{
+> > +       unsigned long best_rate = 0;
+> > +       unsigned long best_n = 0, best_k = 0, best_m = 0, best_p = 0;
+> > +       unsigned long _n, _k, _m, _p;
+> > +
+> > +       for (_k = 1; _k <= max_k; _k++) {
+> > +               for (_p = 0; _p <= max_p; _p++) {
+> > +                       unsigned long tmp_rate;
+> > +
+> > +                       rational_best_approximation(rate / _k, parent << _p,
+> 
+> I think you mean "parent >> _p" ?
+
+Indeed :/
+
+> In general we might lose some precision if parent is too small or _p is
+> too large. But the only place we see this type of clock is the CPU PLL,
+> and parent (24 MHz) are divisible by all the possible values of P.
+> 
+> This brings up another issue: P does not go all the way up to (1 << width - 1).
+> A register value of 3, or P = 8 is not valid, and it's not restricted in
+> the driver. This is not true for all the SoCs though.
+> 
+> The manual also says P should only be used when rate < 288 MHz. Moving
+> P to the outer loop, and maybe adding a short circuit exit when the rate
+> matches exactly would help.
+
+This is already something that was already reported by
+Jean-Francois. Apart from the P limitation this is the current logic
+used in the clock driver. We should probably fix that, but without any
+user (ie, cpufreq), it's just wild guesses in the middle of a massive
+and very intrusive changes.
+
+So I don't really want to actually try to figure that out for now (and
+this is exactly why I don't want to convert the SoCs with a good
+support for now, since we'll pretty much uncover a whole lot of bugs
+that would turn into regressions).
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160530/4a242ac9/attachment.sig>
