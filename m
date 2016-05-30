@@ -1,85 +1,66 @@
-From: simon.marchi@ericsson.com (Simon Marchi)
-Date: Mon, 30 May 2016 13:48:11 -0400
-Subject: Possible race between PTRACE_SETVFPREGS and PTRACE_CONT on ARM?
-Message-ID: <574C7CDB.7050103@ericsson.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Mon, 30 May 2016 20:05:29 +0200
+Subject: [PATCH 2/3] mmc: sunxi: Fix DDR MMC timings for A80
+In-Reply-To: <CAGb2v65=ZM+deSmTmMnT6XFJv8PuY+Kba3kJGKrk_46hxxRyHA@mail.gmail.com>
+References: <1464505484-3661-1-git-send-email-wens@csie.org>
+ <1464505484-3661-3-git-send-email-wens@csie.org>
+ <99d78ff3-db4d-45cc-024a-d94583b56f35@redhat.com>
+ <CAGb2v65=ZM+deSmTmMnT6XFJv8PuY+Kba3kJGKrk_46hxxRyHA@mail.gmail.com>
+Message-ID: <822dc3f1-9afe-f356-e0e7-89073586d401@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello knowledgeable ARM people!
+Hi,
 
-(Background: https://sourceware.org/ml/gdb/2016-05/msg00020.html )
+On 30-05-16 14:59, Chen-Yu Tsai wrote:
+> On Mon, May 30, 2016 at 7:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+>> Hi,
+>>
+>> On 29-05-16 09:04, Chen-Yu Tsai wrote:
+>>>
+>>> The MMC clock timings were incorrectly calculated, when the conversion
+>>> from delay value to delay phase was done.
+>>>
+>>> The 50M DDR and 50M DDR 8bit timings are off, and make eMMC DDR
+>>> unusable. Unfortunately it seems different controllers on the same SoC
+>>> have different timings. The new settings are taken from mmc2, which is
+>>> commonly used with eMMC.
+>>
+>>
+>> Hmm, I'm not really all that familiar with mmc, but can't an external
+>> sdcard connected to mmc0 use DDR too ? Assuming the answer is yes, then
+>> we really need to update the driver to use the right per controller
+>> timings.
+>
+> I would very much like that to happen. However, SD card UHS-1 DDR modes
+> require 1.8V signaling, which is unavailable on _all_ sunxi boards.
+> This seems like a limit of most of the SoCs not having a separate IO
+> voltage rail for mmc pins.
+>
+> Until then, I wouldn't worry that much.
+>
+>>> The settings for the slower timing modes seem to work despite being
+>>> wrong, so leave them be.
+>>
+>>
+>> If you're sure the timings are wrong, please fix them. Sometimes wrong
+>> timings do seem to work, but lead to unreliable communication, or turn
+>> out to work on some boards and not on others due to routing differences.
+>
+> Unfortunately I did try putting in the correct numbers for them, and my
+> eMMC then failed to probe. It seems the core switches up from 400kHz to
+> 50MHz then to 50MHz DDR, and it fails somewhere in there, maybe at 50MHz.
+>
+> I'm not sure if we need to add DT bindings to specify different delays
+> for different controllers, though. Seems like we'll never actually use
+> it.
+>
+> Hope this answers your questions.
 
-Debugging a flaky GDB test case on ARM lead me to think there might
-be race between PTRACE_SETVFPREGS and PTRACE_CONT on ARM
-(PTRACE_SETVFPREGS is ARM-specific anyway).  The test case (and the
-reproducer below) changes the value of a VFP register (let's say d0)
-using PTRACE_SETVFPREGS and resumes the thread with PTRACE_CONT.  It
-happens intermittently that the thread resumes execution with the
-old value in d0 instead of the new one.
+Yes that answers my questions, and with my questions answered, this series is:
 
-Here is a minimal reproducing example.
+Acked-by: Hans de Goede <hdegoede@redhat.com>
 
-test.S:
+Regards,
 
-  .global _start
-  _start:
-      vldr.64 d0, constant
-      vldr.64 d1, constant
-
-  break_here:
-      vcmp.f64 d0, d1
-      vmrs APSR_nzcv, fpscr
-
-      # Exit code
-      moveq r0, #1
-      movne r0, #0
-
-      # Exit syscall
-      mov r7, #1
-      svc 0
-
-  .align 8
-  constant:
-  .word 0xc8b43958
-  .word 0x40594676
-
-Built with:
-
-  $ gcc -g3 -O0 -o test test.S -nostdlib
-
-And the gdb script, test.gdb:
-
-  file test
-  b break_here
-  run
-  p $d0 = 4.0
-  c
-
-The test is ran with
-
-  $ ./gdb -nx -x test.gdb -batch
-
-The test loads the same constant in d0 and d1.  It then does a comparison between
-them and exits with 1 (failure) if they are the same, 0 (success) if they are different.
-The GDB script breaks at "break_here", tries to change the value of d0 to some other
-constant (4.0) and lets the program continue and exit.  If our register write succeeded,
-the program should exit with 0 (values are different).  If our register write failed, the
-program will exit with 1 (values are still the same).
-
-The result is that I randomly see both cases, hinting to a race between the register write
-and the time where the kernel restores the thread's vfp registers.  Note that when GDB's
-affinity is pinned to a single core, I do not see the failure.  Also, note that when I
-remove the vldr.64 instructions, I can't seem to reproduce the problem, so it looks
-like they are somehow important.
-
-I see this behavior on 3 different boards:
-
-- ODroid XU-4, kernel 3.10.96
-- Firefly RK3288, kernel 3.10.0
-- Raspberry Pi 2, kernel 4.4.8
-
-Any ideas about this problem?
-
-Thanks,
-
-Simon
+Hans
