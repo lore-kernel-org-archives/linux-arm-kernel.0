@@ -1,85 +1,85 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 30 May 2016 14:41:37 -0300
-Subject: [PATCH] ARM: dts: imx6ul-14x14-evk: Add LCD and backlight support
-Message-ID: <1464630097-23992-1-git-send-email-festevam@gmail.com>
+From: simon.marchi@ericsson.com (Simon Marchi)
+Date: Mon, 30 May 2016 13:48:11 -0400
+Subject: Possible race between PTRACE_SETVFPREGS and PTRACE_CONT on ARM?
+Message-ID: <574C7CDB.7050103@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hello knowledgeable ARM people!
 
-Add support for the LCD8000-43T display and for the backlight
-controlled via PWM1.
+(Background: https://sourceware.org/ml/gdb/2016-05/msg00020.html )
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 48 ++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+Debugging a flaky GDB test case on ARM lead me to think there might
+be race between PTRACE_SETVFPREGS and PTRACE_CONT on ARM
+(PTRACE_SETVFPREGS is ARM-specific anyway).  The test case (and the
+reproducer below) changes the value of a VFP register (let's say d0)
+using PTRACE_SETVFPREGS and resumes the thread with PTRACE_CONT.  It
+happens intermittently that the thread resumes execution with the
+old value in d0 instead of the new one.
 
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index 668a729..df19391 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -22,6 +22,14 @@
- 		reg = <0x80000000 0x20000000>;
- 	};
- 
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm1 0 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+		status = "okay";
-+	};
-+
- 	regulators {
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
-@@ -125,6 +133,46 @@
- 	};
- };
- 
-+
-+&lcdif {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_lcdif_dat
-+		     &pinctrl_lcdif_ctrl>;
-+	display = <&display0>;
-+	status = "okay";
-+
-+	display0: display {
-+		bits-per-pixel = <16>;
-+		bus-width = <24>;
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+
-+			timing0: timing0 {
-+				clock-frequency = <9200000>;
-+				hactive = <480>;
-+				vactive = <272>;
-+				hfront-porch = <8>;
-+				hback-porch = <4>;
-+				hsync-len = <41>;
-+				vback-porch = <2>;
-+				vfront-porch = <4>;
-+				vsync-len = <10>;
-+				hsync-active = <0>;
-+				vsync-active = <0>;
-+				de-active = <1>;
-+				pixelclk-active = <0>;
-+			};
-+		};
-+	};
-+};
-+
-+&pwm1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm1>;
-+	status = "okay";
-+};
-+
- &qspi {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_qspi>;
--- 
-1.9.1
+Here is a minimal reproducing example.
+
+test.S:
+
+  .global _start
+  _start:
+      vldr.64 d0, constant
+      vldr.64 d1, constant
+
+  break_here:
+      vcmp.f64 d0, d1
+      vmrs APSR_nzcv, fpscr
+
+      # Exit code
+      moveq r0, #1
+      movne r0, #0
+
+      # Exit syscall
+      mov r7, #1
+      svc 0
+
+  .align 8
+  constant:
+  .word 0xc8b43958
+  .word 0x40594676
+
+Built with:
+
+  $ gcc -g3 -O0 -o test test.S -nostdlib
+
+And the gdb script, test.gdb:
+
+  file test
+  b break_here
+  run
+  p $d0 = 4.0
+  c
+
+The test is ran with
+
+  $ ./gdb -nx -x test.gdb -batch
+
+The test loads the same constant in d0 and d1.  It then does a comparison between
+them and exits with 1 (failure) if they are the same, 0 (success) if they are different.
+The GDB script breaks at "break_here", tries to change the value of d0 to some other
+constant (4.0) and lets the program continue and exit.  If our register write succeeded,
+the program should exit with 0 (values are different).  If our register write failed, the
+program will exit with 1 (values are still the same).
+
+The result is that I randomly see both cases, hinting to a race between the register write
+and the time where the kernel restores the thread's vfp registers.  Note that when GDB's
+affinity is pinned to a single core, I do not see the failure.  Also, note that when I
+remove the vldr.64 instructions, I can't seem to reproduce the problem, so it looks
+like they are somehow important.
+
+I see this behavior on 3 different boards:
+
+- ODroid XU-4, kernel 3.10.96
+- Firefly RK3288, kernel 3.10.0
+- Raspberry Pi 2, kernel 4.4.8
+
+Any ideas about this problem?
+
+Thanks,
+
+Simon
