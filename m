@@ -1,70 +1,87 @@
-From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
-Date: Mon, 30 May 2016 14:15:42 +0000
-Subject: [PATCH] iommu/arm-smmu: Properly initialize CBAR MemAttr
-Message-ID: <1464617742-5493-1-git-send-email-bogdan.purcareata@nxp.com>
+From: pramod.kumar@broadcom.com (Pramod Kumar)
+Date: Mon, 30 May 2016 20:09:08 +0530
+Subject: [PATCH 5/7] net:mdio-mux: Add MDIO mux driver for iProc SoCs
+In-Reply-To: <20160530133442.GK6027@lunn.ch>
+References: <1464592251-2688-1-git-send-email-pramod.kumar@broadcom.com>
+ <1464592251-2688-6-git-send-email-pramod.kumar@broadcom.com>
+ <20160530133442.GK6027@lunn.ch>
+Message-ID: <c26a73e6243f0cf11b7745ac5bcc8a4b@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, when initializing the CBAR memattr attributes to the weakest
-values, it is expected that the final ones will be declared in the TTBCR
-register (SMMU_CBn_TCR).
+Hi Andrew,
 
-This is not required when CBAR type consists of a stage 1 translation
-followed by a stage 2 bypass. This is the case when assigning a VFIO PCI
-device to a KVM guest. Overriding the default transaction attributes to
-writeback cacheable results in the device no longer working in the guest
-(the adapter requires explicit flushes on the descriptor rings memory).
+Thanks for reviewing. Please see my comment inline.
 
-Update the context init routine to initialize the CBAR MemAttr field only
-if there's a stage 1 followed by a stage 2 translation.
+> -----Original Message-----
+> From: Andrew Lunn [mailto:andrew at lunn.ch]
+> Sent: 30 May 2016 19:05
+> To: Pramod Kumar
+> Cc: Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala;
+Catalin
+> Marinas; Will Deacon; Kishon Vijay Abraham I; David S. Miller;
+> devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-
+> kernel at vger.kernel.org; bcm-kernel-feedback-list at broadcom.com;
+linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH 5/7] net:mdio-mux: Add MDIO mux driver for iProc
+SoCs
+>
+> On Mon, May 30, 2016 at 12:40:49PM +0530, Pramod Kumar wrote:
+> > iProc based SoCs supports the integrated mdio multiplexer which has
+> > the bus selection as well as mdio transaction generation logic inside.
+>
+> Hi Pramod
+>
+> Great to see you using the existing MDIO framework. Thanks.
+>
+> > +static int mdio_mux_iproc_switch_fn(int current_child, int
+desired_child,
+> > +				    void *data)
+> > +{
+> > +	struct iproc_mdiomux_desc *md = data;
+> > +	struct mdiomux_bus_param *bp = &md->bus_param[desired_child];
+> > +	u32 param, bus_id;
+> > +	bool bus_dir;
+> > +
+> > +	/* select bus and its properties */
+> > +	bus_dir = (desired_child < EXT_BUS_START_ADDR);
+> > +	bus_id = bus_dir ? desired_child : (desired_child -
+> > +EXT_BUS_START_ADDR);
+> > +
+> > +	param = (bus_dir ? 1 : 0) << MDIO_PARAM_INTERNAL_SEL;
+> > +	param |= (bp->is_c45 ? 1 : 0) << MDIO_PARAM_C45_SEL;
+> > +	param |= (bus_id << MDIO_PARAM_BUS_ID);
+> > +
+> > +	writel(param, md->base + MDIO_PARAM_OFFSET);
+> > +	return 0;
+> > +}
+>
+> What i don't yet see is why you went for the concept of an integrated
+MDIO and
+> MUX. This function above is the mux function, and it looks like it could
+be used
+> to implement a standard mdio-mux driver.
+>
 
-Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
----
- drivers/iommu/arm-smmu.c | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+iProc based SoCs Integrated MDIO Multiplexer has both logic in a hardware.
+MDIO transaction and Child bus selection logic share the same address
+space.
+For ex-
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index ff7a392..1400ec9 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -765,13 +765,14 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- {
- 	u32 reg;
- 	u64 reg64;
--	bool stage1;
-+	bool stage1, stage1_stage2;
- 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 	void __iomem *cb_base, *gr1_base;
- 
- 	gr1_base = ARM_SMMU_GR1(smmu);
- 	stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
-+	stage1_stage2 = cfg->cbar == CBAR_TYPE_S1_TRANS_S2_TRANS;
- 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
- 
- 	if (smmu->version > ARM_SMMU_V1) {
-@@ -793,15 +794,19 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
- 
- 	/*
- 	 * Use the weakest shareability/memory types, so they are
--	 * overridden by the ttbcr/pte.
-+	 * overridden by the ttbcr/pte. This happens only if the stage
-+	 * 1 is followed by a stage 2 translation.
- 	 */
--	if (stage1) {
-+	if (stage1_stage2) {
- 		reg |= (CBAR_S1_BPSHCFG_NSH << CBAR_S1_BPSHCFG_SHIFT) |
- 			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
--	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
-+	}
-+
-+	if (!stage1 && !(smmu->features & ARM_SMMU_FEAT_VMID16)) {
- 		/* 8-bit VMIDs live in CBAR */
- 		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
- 	}
-+
- 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
- 
- 	/* TTBRs */
--- 
-1.9.1
+In above mux function- Register-MDIO_PARAM_OFFSET is used for bus,
+direction and transaction type. Same register
+Is used for programming the PHY Ids and write data values in MDIO parent
+bus transaction.
+
+Writing MDIO bus driver and mux driver separately gives a notion of being
+two separate device/address space, obviously it is not our use case.
+Even if we used syscon for accessing the shared register, this does not
+appears good for writing separate drivers for a single device.
+
+
+> Thanks
+>      Andrew
+
+Regards,
+Pramod
