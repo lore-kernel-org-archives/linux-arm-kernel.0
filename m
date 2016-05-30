@@ -1,10 +1,10 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 30 May 2016 11:55:15 +0300
-Subject: [PATCH v1 07/14] ARM: dts: omap4-panda-common: Add pdmclk binding for
+Date: Mon, 30 May 2016 11:55:17 +0300
+Subject: [PATCH v1 09/14] ARM: dts: omap4-var-som-om44: Add pdmclk binding for
  audio
 In-Reply-To: <20160530085522.30398-1-peter.ujfalusi@ti.com>
 References: <20160530085522.30398-1-peter.ujfalusi@ti.com>
-Message-ID: <20160530085522.30398-8-peter.ujfalusi@ti.com>
+Message-ID: <20160530085522.30398-10-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,14 +13,14 @@ functional clock.
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi | 5 +++++
+ arch/arm/boot/dts/omap4-var-som-om44.dtsi | 5 +++++
  1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index df2e356ec089..e1d606f64cb7 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -376,6 +376,7 @@
+diff --git a/arch/arm/boot/dts/omap4-var-som-om44.dtsi b/arch/arm/boot/dts/omap4-var-som-om44.dtsi
+index a17997f4e9aa..873cfc87260c 100644
+--- a/arch/arm/boot/dts/omap4-var-som-om44.dtsi
++++ b/arch/arm/boot/dts/omap4-var-som-om44.dtsi
+@@ -189,6 +189,7 @@
  
  	twl6040: twl at 4b {
  		compatible = "ti,twl6040";
@@ -28,7 +28,7 @@ index df2e356ec089..e1d606f64cb7 100644
  		reg = <0x4b>;
  
  		pinctrl-names = "default";
-@@ -479,6 +480,10 @@
+@@ -252,6 +253,10 @@
  &mcpdm {
  	pinctrl-names = "default";
  	pinctrl-0 = <&mcpdm_pins>;
