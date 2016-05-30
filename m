@@ -1,51 +1,50 @@
 From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Mon, 30 May 2016 12:40:47 +0530
-Subject: [PATCH 3/7] binding: mdio-mux: Add DT binding doc for Broadcom MDIO
- bus mutiplexer
+Date: Mon, 30 May 2016 12:40:48 +0530
+Subject: [PATCH 4/7] DT:mdio-mux: Add mdio multiplexer driver node
 In-Reply-To: <1464592251-2688-1-git-send-email-pramod.kumar@broadcom.com>
 References: <1464592251-2688-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1464592251-2688-4-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <1464592251-2688-5-git-send-email-pramod.kumar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding doc for Broadcom MDIO bus mutiplexer driver.
+Add integrated MDIO multiplexer driver node which contains
+two mux PCIe bus and one ethernet bus along with phys
+lying on these bus.
 
 Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
 ---
- .../bindings/net/brcm,mdio-mux-iproc.txt           | 64 ++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-new file mode 100644
-index 0000000..dd74ee0
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-@@ -0,0 +1,64 @@
-+Properties for an MDIO bus mutiplexer found in Broadcom iProc based SoCs.
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index ce0ab84..8f6a6cc 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -87,3 +87,15 @@
+ 		#size-cells = <1>;
+ 	};
+ };
 +
-+This MDIO bus multiplexer defines buses that could be internal as well as
-+external to SoCs and could accept MDIO transaction compatible to C-22 or
-+C-45 Clause. When Child bus is selected, one need to select these two
-+properties as well to generate desired MDIO trascation on appropriate bus.
++&mdio_mux_iproc {
++	mdio at 10 {
++		reg = <0x10>;
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+Required properties in addition to the generic multiplexer properties:
-+
-+MDIO multiplexer node:
-+- complatible: brcm,mdio-mux-iproc.
-+
-+Child bus node:
-+-brcm,is-c45: Boolean property indicating PHYs attached to this bus supports
-+	      C-45 mdio transaction.
-+
-+Every non-ethernet PHY requires a compatible so that it could be probed based
-+on this compatible string.
-+
-+Additional information regarding generic multiplexer properties could be found
-+at- Documentation/devicetree/bindings/net/mdio-mux.txt
-+
-+
-+for example:
++		gphy0: eth-phy at 10 {
++			reg = <0x10>;
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index 6f81c9d..efc320a 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -330,6 +330,38 @@
+ 			      <0x65260000 0x1000>;
+ 		};
+ 
 +		mdio_mux_iproc: mdio_mux_iproc at 6602023c {
 +			compatible = "brcm,mdio-mux-iproc";
 +			reg = <0x6602023c 0x14>;
@@ -76,15 +75,10 @@ index 0000000..dd74ee0
 +					#phy-cells = <0>;
 +				};
 +			};
-+			mdio at 10 {
-+				reg = <0x10>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				gphy0: eth-phy at 10 {
-+					reg = <0x10>;
-+				};
-+			};
 +		};
++
+ 		timer0: timer at 66030000 {
+ 			compatible = "arm,sp804", "arm,primecell";
+ 			reg = <0x66030000 0x1000>;
 -- 
 1.9.1
