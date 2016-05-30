@@ -1,63 +1,109 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Tue, 31 May 2016 08:25:27 +0900
-Subject: [PATCH] arm64: dts: drop "arm,
- amba-bus" in favor of "simple-bus" part 2
-In-Reply-To: <1464574353-31477-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1464574353-31477-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <021901d1baca$8ddf8050$a99e80f0$@lge.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 31 May 2016 01:28:52 +0200
+Subject: [PATCH 4/5] clocksource: rockchip: add support for rk3399 SoC
+In-Reply-To: <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
+References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
+ <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
+Message-ID: <574CCCB4.1030001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Subject: [PATCH] arm64: dts: drop "arm,amba-bus" in favor of "simple-bus" part
-> 2
-> 
-> Tree-wide replacement was done by commit 2ef7d5f342c1 (ARM, ARM64:
-> dts: drop "arm,amba-bus" in favor of "simple-bus"), but we have some
-> new users of "arm,amba-bus" at Linux 4.7-rc1.  Eliminate them now.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On 05/25/2016 11:50 AM, Caesar Wang wrote:
+> From: Huang Tao <huangtao@rock-chips.com>
+>
+> The CONTROL register offset is different from old SoCs.
+> For Linux driver, there are not functional changes at all.
+> Let's call it v2.
+>
+> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 > ---
-> 
-> In order to not leave these compatible strings for the release,
-> is it OK to apply this patch for Linux 4.7 ?
-> 
-> 
-> 
->  arch/arm64/boot/dts/lg/lg1312.dtsi       | 2 +-
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-> 
 
-> diff --git a/arch/arm64/boot/dts/lg/lg1312.dtsi
-> b/arch/arm64/boot/dts/lg/lg1312.dtsi
-> index 3a4e9a2..fbafa24 100644
-> --- a/arch/arm64/boot/dts/lg/lg1312.dtsi
-> +++ b/arch/arm64/boot/dts/lg/lg1312.dtsi
-> @@ -125,7 +125,7 @@
->  		#size-cells = <1>;
->  		#interrupts-cells = <3>;
-> 
-> -		compatible = "arm,amba-bus";
-> +		compatible = "simple-bus";
->  		interrupt-parent = <&gic>;
->  		ranges;
-> 
+That's hackish.
 
-Acked-by: Chanho Min <chanho.min@lge.com>
+Please consider something like:
 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> index 46f325a..d7f8e06 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-> @@ -163,7 +163,7 @@
->  	};
-> 
->  	amba {
-> -		compatible = "arm,amba-bus";
-> +		compatible = "simple-bus";
->  		#address-cells = <2>;
->  		#size-cells = <2>;
->  		ranges;
-> --
-> 1.9.1
+diff --git a/drivers/clocksource/rockchip_timer.c 
+b/drivers/clocksource/rockchip_timer.c
+index b991b28..b6ba6f9 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -19,7 +19,8 @@
+
+  #define TIMER_LOAD_COUNT0	0x00
+  #define TIMER_LOAD_COUNT1	0x04
+-#define TIMER_CONTROL_REG	0x10
++#define TIMER_CONTROL_REG3288	0x10
++#define TIMER_CONTROL_REG3399	0x1C
+  #define TIMER_INT_STATUS	0x18
+
+  #define TIMER_DISABLE		0x0
+@@ -31,6 +32,7 @@
+  struct bc_timer {
+  	struct clock_event_device ce;
+  	void __iomem *base;
++	void __iomem *ctrl;
+  	u32 freq;
+  };
+
+@@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct 
+clock_event_device *ce)
+  	return rk_timer(ce)->base;
+  }
+
++static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
++{
++        return rk_timer(ce)->ctrl;
++}
++
+  static inline void rk_timer_disable(struct clock_event_device *ce)
+  {
+-	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
++	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
+  }
+
+  static inline void rk_timer_enable(struct clock_event_device *ce, u32 
+flags)
+  {
+  	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+-		       rk_base(ce) + TIMER_CONTROL_REG);
++		       rk_ctrl(ce));
+  }
+
+  static void rk_timer_update_counter(unsigned long cycles,
+@@ -179,4 +186,18 @@ out_unmap:
+  	iounmap(bc_timer.base);
+  }
+
+-CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
++static void __init rk3288_timer_init(struct device_node *np)
++{
++	bc_timer.ctrl = TIMER_CONTROL_REG3288;
++	rk_timer_init(np);
++}
++
++static void __init rk3399_timer_init(struct device_node *np)
++{
++        bc_timer.ctrl = TIMER_CONTROL_REG3399;
++	rk_timer_init(np);
++}
++
++
++CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", 
+rk3288_timer_init);
++CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3399-timer", 
+rk3399_timer_init);
+
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
