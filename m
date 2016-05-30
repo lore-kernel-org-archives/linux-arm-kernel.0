@@ -1,77 +1,82 @@
-From: weiqing.kong@mediatek.com (Weiqing Kong)
-Date: Mon, 30 May 2016 16:41:52 +0800
-Subject: [PATCH 3/3] dts: Add disp bls dsti and dts config for MT2701
-In-Reply-To: <1464597712-5399-1-git-send-email-weiqing.kong@mediatek.com>
-References: <1464597712-5399-1-git-send-email-weiqing.kong@mediatek.com>
-Message-ID: <1464597712-5399-4-git-send-email-weiqing.kong@mediatek.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 30 May 2016 11:55:08 +0300
+Subject: [PATCH v1 00/14] clk/mfd/ASoC/ARM: OMAP4/5: McPDM/twl6040 pdmclk
+ support
+Message-ID: <20160530085522.30398-1-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
----
- arch/arm/boot/dts/mt2701-evb.dts | 29 +++++++++++++++++++++++++++++
- arch/arm/boot/dts/mt2701.dtsi    |  9 +++++++++
- 2 files changed, 38 insertions(+)
+Hi,
 
-diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
-index 082ca88..6d572f4 100644
---- a/arch/arm/boot/dts/mt2701-evb.dts
-+++ b/arch/arm/boot/dts/mt2701-evb.dts
-@@ -22,6 +22,35 @@
- 	memory {
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
-+
-+	backlight_lcd: backlight_lcd {
-+		compatible = "pwm-backlight";
-+		pwms = <&disp_bls 0 100000>;
-+		brightness-levels = <
-+			  0  16  32  48  64  80  96 112
-+			128 144 160 176 192 208 224 240
-+			255
-+		>;
-+		default-brightness-level = <9>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pwm_bls_gpio>;
-+	};
-+};
-+
-+&disp_bls {
-+	status = "okay";
-+};
-+
-+&mmsys {
-+	status = "okay";
-+};
-+
-+&pio {
-+	pwm_bls_gpio: pwm_bls_gpio {
-+		pins_cmd_dat {
-+			pinmux = <MT2701_PIN_208_AUD_EXT_CK1__FUNC_DISP_PWM>;
-+		};
-+	};
- };
- 
- &uart0 {
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 42d5a37..dae55d6 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -234,6 +234,15 @@
- 		status = "disabled";
- 	};
- 
-+	disp_bls: dispsys at 1400a000 {
-+		compatible = "mediatek,mt2701-disp-bls";
-+		reg = <0 0x1400a000 0 0x1000>;
-+		#pwm-cells = <2>;
-+		clocks = <&mmsys CLK_MM_MDP_BLS_26M>, <&mmsys CLK_MM_DISP_BLS>;
-+		clock-names = "main", "mm";
-+		status = "disabled";
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
+Changes since v1:
+- Added Rob's Acked-by to patch 5 and 14
+- Check the return value of clk_prepare_enable() calls in the last patch
+
+this is something I wanted to do for a long time...
+
+First of all: sorry for the cross domain series. I did tested alone all the
+domain patches and they are not causing any regression. When they come together
+we will have ability to control the pdmclk needed by McPDM.
+
+CLK patches:
+The driver was w/o DT support and needed some cleanup so we can use the driver.
+I have also renamed it to twl6040-pdmclk from twl6040-clk to be precise.
+
+MFD patches:
+The regmap_sync() was not working since the twl6040 does not support bulk access
+and now we are going to create the needed child for the pdmclk.
+
+ARM patches:
+Updatding the board DTS files and add the needed lines for the pdmclk.
+
+ASoC patches:
+The machine driver needs to select the twl6040-clk driver as it will be used
+by the omap-mcpdm.
+I needed to do some cleanup and add also suspend/resume support before adding
+the code for pdmclk handling since I don't want to keep the twl6040 powered on
+when the board is suspended. At the moment it is not possible to do true
+dynamic twl6040 power up/down due to pop noises, but I will be looking at that
+later.
+The driver in the future will fail if it is not able to get the pdmclk to avoid
+kernel crash (McPDM registers are not accessible when pdmclk is not available).
+
+I have tested the patches by domain and also in all (I hope) permutation they
+could be. I have not experienced any regression.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (14):
+  clk: twl6040: Correct clk_ops
+  clk: twl6040: Register the clock as of_clk_provider
+  clk: twl6040: Rename the driver and use consistent names in the code
+  mfd: twl6040: The chip does not support bulk access
+  mfd: twl6040: Register child device for twl6040-pdmclk
+  ARM: dts: omap5-board-common: Add pdmclk binding for audio
+  ARM: dts: omap4-panda-common: Add pdmclk binding for audio
+  ARM: dts: omap4-sdp: Add pdmclk binding for audio
+  ARM: dts: omap4-var-som-om44: Add pdmclk binding for audio
+  ARM: dts: omap4-duovero: Add pdmclk binding for audio
+  ASoC: omap: Kconfig: SND_OMAP_SOC_OMAP_ABE_TWL6040 to select
+    CLK_TWL6040
+  ASoC: omap-mcpdm: Move the WD enable write inside
+    omap_mcpdm_open_streams()
+  ASoC: omap-mcpdm: Support for suspend resume
+  ASoC: omap-mcpdm: Add support for pdmclk clock handling
+
+ Documentation/devicetree/bindings/mfd/twl6040.txt  |  1 +
+ .../devicetree/bindings/sound/omap-mcpdm.txt       | 10 +++
+ arch/arm/boot/dts/omap4-duovero.dtsi               |  5 ++
+ arch/arm/boot/dts/omap4-panda-common.dtsi          |  5 ++
+ arch/arm/boot/dts/omap4-sdp.dts                    |  5 ++
+ arch/arm/boot/dts/omap4-var-som-om44.dtsi          |  5 ++
+ arch/arm/boot/dts/omap5-board-common.dtsi          |  5 ++
+ drivers/clk/clk-twl6040.c                          | 80 ++++++++++++---------
+ drivers/mfd/twl6040.c                              |  6 ++
+ include/linux/mfd/twl6040.h                        |  2 +-
+ sound/soc/omap/Kconfig                             |  1 +
+ sound/soc/omap/omap-mcpdm.c                        | 84 ++++++++++++++++++++--
+ 12 files changed, 170 insertions(+), 39 deletions(-)
+
 -- 
-1.8.1.1.dirty
+2.8.3
