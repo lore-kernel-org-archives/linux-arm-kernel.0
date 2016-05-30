@@ -1,44 +1,48 @@
 From: naga.sureshkumar.relli@xilinx.com (Naga Sureshkumar Relli)
-Date: Mon, 30 May 2016 15:17:01 +0530
-Subject: [PATCH v2 2/3] spi: xilinx: Add QUAD support
-Message-ID: <1464601621-5157-1-git-send-email-nagasure@xilinx.com>
+Date: Mon, 30 May 2016 15:17:07 +0530
+Subject: [PATCH v2 3/3] spi: xilinx: Update devicetree bindings for spi-xilinx
+Message-ID: <1464601627-5246-1-git-send-email-nagasure@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds QUAD mode support to axi spi controller.
-updated supported mode bits to SPI_TX_QUAD and SPI_RX_QUAD.
+Update bindings for spi-xilinx.
+as per spi-bus.txt rename num-ss-bits to num-cs.
+and add fifo-size and bits-per-word properties.
 
 Signed-off-by: Naga Sureshkumar Relli <nagasure@xilinx.com>
 ---
 changes for v2
  - none
 ---
- drivers/spi/spi-xilinx.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/spi/spi-xilinx.txt | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/spi/spi-xilinx.c b/drivers/spi/spi-xilinx.c
-index d903857..4467590 100644
---- a/drivers/spi/spi-xilinx.c
-+++ b/drivers/spi/spi-xilinx.c
-@@ -74,6 +74,7 @@
+diff --git a/Documentation/devicetree/bindings/spi/spi-xilinx.txt b/Documentation/devicetree/bindings/spi/spi-xilinx.txt
+index c7b7856..539bbe9 100644
+--- a/Documentation/devicetree/bindings/spi/spi-xilinx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-xilinx.txt
+@@ -7,9 +7,11 @@ Required properties:
+ - interrupts		: Property with a value describing the interrupt
+ 			  number.
+ - interrupt-parent	: Must be core interrupt controller
++- fifo-size		: Depth of TX/RX Fifos
  
- /* Number of data lines used to receive */
- #define XSPI_RX_ONE_WIRE	1
-+#define XSPI_RX_FOUR_WIRE	4
+ Optional properties:
+-- xlnx,num-ss-bits	: Number of chip selects used.
++- num-cs		: Number of chip selects used.
++- bits-per-word		: Number of bits per word.
  
- /**
-  * struct xilinx_spi - This definition define spi driver instance
-@@ -558,8 +559,10 @@ static int xilinx_spi_probe(struct platform_device *pdev)
- 			xspi->tx_fifo = xspi_fill_tx_fifo_32;
- 			xspi->rx_fifo = xspi_read_rx_fifo_32;
- 		}
-+	} else if (xspi->rx_bus_width == XSPI_RX_FOUR_WIRE) {
-+		master->mode_bits |= SPI_TX_QUAD | SPI_RX_QUAD;
- 	} else {
--		dev_err(&pdev->dev, "Dual/Quad Modes are not supported\n");
-+		dev_err(&pdev->dev, "Dual Mode not supported\n");
- 		goto put_master;
- 	}
- 	xspi->cs_inactive = 0xffffffff;
+ Example:
+ 	axi_quad_spi at 41e00000 {
+@@ -17,6 +19,8 @@ Example:
+ 			interrupt-parent = <&intc>;
+ 			interrupts = <0 31 1>;
+ 			reg = <0x41e00000 0x10000>;
+-			xlnx,num-ss-bits = <0x1>;
++			num-cs = <0x1>;
++			fifo-size = <256>;
++			bits-per-word = <8>;
+ 	};
+ 
 -- 
 2.1.1
