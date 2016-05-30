@@ -1,44 +1,67 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 30 May 2016 16:03:43 +0100
-Subject: [PATCH 5/5] RFC spi: sun4i: add DMA support
-In-Reply-To: <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
- <20160530112610.GJ29837@sirena.org.uk>
- <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
-Message-ID: <20160530150343.GL29837@sirena.org.uk>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 30 May 2016 17:07:16 +0200
+Subject: [PATCH v5 2/6] clocksource/drivers/arm_arch_timer: Add a new enum
+ for spi type
+In-Reply-To: <1464096633-9309-3-git-send-email-fu.wei@linaro.org>
+References: <1464096633-9309-1-git-send-email-fu.wei@linaro.org>
+ <1464096633-9309-3-git-send-email-fu.wei@linaro.org>
+Message-ID: <574C5724.30200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 02:11:51PM +0200, Geert Uytterhoeven wrote:
-> On Mon, May 30, 2016 at 1:26 PM, Mark Brown <broonie@kernel.org> wrote:
-> > On Thu, May 26, 2016 at 07:25:25PM -0000, Michal Suchanek wrote:
-> >>  - fallback to previous behaviour when DMA initialization fails
-> >>
-> >>    + this has the problem that when the driver happens to load before the dma
-> >>      driver it will not use dma - can be addressed with a module parameter
+On 05/24/2016 03:30 PM, fu.wei at linaro.org wrote:
+> From: Fu Wei <fu.wei@linaro.org>
+>
+> This patch add a new enum "spi_nr" and use it in the driver.
+> Just for code's readability, no functional change.
+>
+> Signed-off-by: Fu Wei <fu.wei@linaro.org>
+> ---
+>   drivers/clocksource/arm_arch_timer.c | 4 ++--
+>   include/clocksource/arm_arch_timer.h | 6 ++++++
+>   2 files changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index 5d7272e..966c574 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -826,9 +826,9 @@ static void __init arch_timer_mem_init(struct device_node *np)
+>   	}
+>
+>   	if (arch_timer_mem_use_virtual)
+> -		irq = irq_of_parse_and_map(best_frame, 1);
+> +		irq = irq_of_parse_and_map(best_frame, VIRT_SPI);
+>   	else
+> -		irq = irq_of_parse_and_map(best_frame, 0);
+> +		irq = irq_of_parse_and_map(best_frame, PHYS_SPI);
+>
+>   	if (!irq) {
+>   		pr_err("arch_timer: Frame missing %s irq",
+> diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+> index 6f06481..16dcd10 100644
+> --- a/include/clocksource/arm_arch_timer.h
+> +++ b/include/clocksource/arm_arch_timer.h
+> @@ -45,6 +45,12 @@ enum ppi_nr {
+>   	MAX_TIMER_PPI
+>   };
+>
+> +enum spi_nr {
+> +	PHYS_SPI,
+> +	VIRT_SPI,
+> +	MAX_TIMER_SPI
+> +};
 
-> > No, you should pay attention to the error you are getting and let probe
-> > deferral happen if that's the error you get.
+Wouldn't make sense to use the constant below instead of defining new ones ?
 
-> Unfortunately DMA is an optional feature.
+>   #define ARCH_TIMER_PHYS_ACCESS		0
+>   #define ARCH_TIMER_VIRT_ACCESS		1
+>   #define ARCH_TIMER_MEM_PHYS_ACCESS	2
+>
 
-> There's no way to distinguish between -EPROBE_DEFER due to the SPI master
-> driver being probed before the DMA engine driver, and -EPROBE_DEFER due to
-> support for the DMA engine not having been compiled in.
 
-I really don't think it's worth caring too much about cases where the
-DMA driver hasn't been compiled in, it's not like SPI is the only thing
-that's going to be using it.  I really think it's better to defer the
-problem - not getting DMA (or worse, only getting DMA on some boots) is
-not great and if people are optimising on that level my feeling is that
-they're probably going to be OK with customizing DT to match.  Ideally
-we would have something a bit nicer than deferred probe but right now
-this seems the more helpful option.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160530/7e494196/attachment.sig>
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
