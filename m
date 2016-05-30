@@ -1,90 +1,63 @@
 From: shijie.huang@arm.com (Huang Shijie)
-Date: Mon, 30 May 2016 10:52:25 +0800
-Subject: [PATCH 4/9] arm64: entry: remove the duplicated code for tracing the
- IRQ flags
+Date: Mon, 30 May 2016 10:52:24 +0800
+Subject: [PATCH 3/9] arm64: entry: record the hardirq changes on the
+ entry/exit code
 In-Reply-To: <1464576750-25160-1-git-send-email-shijie.huang@arm.com>
 References: <1464576750-25160-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <1464576750-25160-5-git-send-email-shijie.huang@arm.com>
+Message-ID: <1464576750-25160-4-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We record the hardirq flags changes in the entry/exit code now,
-So the code becomes duplicated, just remove it.
+Just as the arm32 code does, record the hardirq changes at the entry/exit
+code.
+
+The trace code may changes some registers, but the syscall path
+needs the x0 ~ x7, we restore them in the el0_svc_naked.
 
 Signed-off-by: Huang Shijie <shijie.huang@arm.com>
 ---
- arch/arm64/kernel/entry.S | 12 ------------
- arch/arm64/mm/fault.c     | 10 ----------
- 2 files changed, 22 deletions(-)
+ arch/arm64/kernel/entry.S | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 4c67c56..102fd8b 100644
+index 21b6068..4c67c56 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -428,9 +428,6 @@ ENDPROC(el1_sync)
- el1_irq:
- 	kernel_entry 1
- 	enable_dbg
--#ifdef CONFIG_TRACE_IRQFLAGS
--	bl	trace_hardirqs_off
--#endif
+@@ -132,6 +132,15 @@
+ 	mov	scno, x8
+ 	.endif
  
- 	get_thread_info tsk
- 	irq_handler
-@@ -443,9 +440,6 @@ el1_irq:
- 	bl	el1_preempt
- 1:
- #endif
--#ifdef CONFIG_TRACE_IRQFLAGS
--	bl	trace_hardirqs_on
--#endif
- 	kernel_exit 1
- ENDPROC(el1_irq)
++#ifdef CONFIG_TRACE_IRQFLAGS
++	/*
++	 * The trace_hardirqs_off may changes some registers, so we should
++	 * restore them back from the stack in the necessary place, such as
++	 * el0_svc_naked.
++	 */
++	bl	trace_hardirqs_off
++#endif
++
+ 	/*
+ 	 * Registers that may be useful after this macro is invoked:
+ 	 *
+@@ -142,6 +151,9 @@
+ 	.endm
  
-@@ -632,16 +626,10 @@ el0_irq:
- 	kernel_entry 0
- el0_irq_naked:
- 	enable_dbg
--#ifdef CONFIG_TRACE_IRQFLAGS
--	bl	trace_hardirqs_off
--#endif
- 
- 	ct_user_exit
- 	irq_handler
- 
--#ifdef CONFIG_TRACE_IRQFLAGS
--	bl	trace_hardirqs_on
--#endif
- 	b	ret_to_user
- ENDPROC(el0_irq)
- 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 5954881..f94e598 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -603,13 +603,6 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 	struct siginfo info;
- 	int rv;
- 
--	/*
--	 * Tell lockdep we disabled irqs in entry.S. Do nothing if they were
--	 * already disabled to preserve the last enabled/disabled addresses.
--	 */
--	if (interrupts_enabled(regs))
--		trace_hardirqs_off();
--
- 	if (!inf->fn(addr, esr, regs)) {
- 		rv = 1;
- 	} else {
-@@ -624,9 +617,6 @@ asmlinkage int __exception do_debug_exception(unsigned long addr,
- 		rv = 0;
- 	}
- 
--	if (interrupts_enabled(regs))
--		trace_hardirqs_on();
--
- 	return rv;
- }
- 
+ 	.macro	kernel_exit, el
++#ifdef CONFIG_TRACE_IRQFLAGS
++	bl	trace_hardirqs_on
++#endif
+ 	ldp	x21, x22, [sp, #S_PC]		// load ELR, SPSR
+ 	.if	\el == 0
+ 	ct_user_enter
+@@ -729,6 +741,9 @@ el0_svc:
+ 	uxtw	scno, w26			// syscall number in w8
+ 	mov	sc_nr, #__NR_syscalls
+ el0_svc_naked:					// compat entry point
++#ifdef CONFIG_TRACE_IRQFLAGS
++	restore_syscall_regs
++#endif
+ 	stp	x19, scno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+ 	enable_dbg_and_irq
+ 	ct_user_exit 1
 -- 
 2.5.5
