@@ -1,52 +1,99 @@
 From: thommyj@gmail.com (Thommy Jakobsson)
-Date: Mon, 30 May 2016 22:40:05 +0200
-Subject: [PATCH 1/2] arm-smmu: doc: add binding for stream ID mask
+Date: Mon, 30 May 2016 22:40:06 +0200
+Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
 In-Reply-To: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
 References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
-Message-ID: <1464640806-3942-2-git-send-email-thommyj@gmail.com>
+Message-ID: <1464640806-3942-3-git-send-email-thommyj@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for new device tree binding, mmu-masters-mask.
+Use DT bindings to allow masks to be added for a masters streamIDs. This
+is necessary for devices that have multiple IDs, or use dynamic signals to
+build up the ID. For example the ZynqMPSoC that mirrors 6bits from the
+AXI ID into the streamid.
 
 Signed-off-by: Thommy Jakobsson <thommyj@gmail.com>
 ---
- Documentation/devicetree/bindings/iommu/arm,smmu.txt | 15 +++++++++++++--
- 1 file changed, 13 insertions(+), 2 deletions(-)
+ drivers/iommu/arm-smmu.c | 46 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-index 19fe6f2..cabd1dc 100644
---- a/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
-@@ -56,6 +56,13 @@ conditions.
-                   aliases of secure registers have to be used during
-                   SMMU configuration.
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 9345a3f..14438f8 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -305,6 +305,7 @@ struct arm_smmu_smr {
+ struct arm_smmu_master_cfg {
+ 	int				num_streamids;
+ 	u16				streamids[MAX_MASTER_STREAMIDS];
++	u16				streammasks[MAX_MASTER_STREAMIDS];
+ 	struct arm_smmu_smr		*smrs;
+ };
  
-+- mmu-masters-mask : An optional list that specifies a mask per StreamID.
-+                  A master included in this liss, have to specify masks
-+                  for all of its StreamIDs. A master not included in the
-+                  list will default to mask 0 (i.e entire ID is used).
-+                  This can for example be used in systems where parts of
-+                  the StreamID is dynamic.
+@@ -554,6 +555,38 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
+ 	return insert_smmu_master(smmu, master);
+ }
+ 
++static int register_smmu_master_mask(struct arm_smmu_device *smmu,
++				     struct device *dev,
++				     struct of_phandle_args *masterspec)
++{
++	int i;
++	struct arm_smmu_master *master;
 +
- Example:
++	master = find_smmu_master(smmu, masterspec->np);
++	if (!master) {
++		dev_err(dev,
++			"mask phandle to %s, but no ID registred\n",
++			masterspec->np->name);
++		return -EINVAL;
++	}
++
++	if (masterspec->args_count != master->cfg.num_streamids) {
++		dev_err(dev,
++			"Different number of ids %d and masks %d not supported for master device %s\n",
++			master->cfg.num_streamids,
++			masterspec->args_count,
++			masterspec->np->name);
++		return -ENOSPC;
++	}
++
++	for (i = 0; i < master->cfg.num_streamids; ++i) {
++		u16 streammask = masterspec->args[i];
++
++		master->cfg.streamids[i] = streammask;
++	}
++	return 0;
++}
++
+ static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
+ {
+ 	struct arm_smmu_device *smmu;
+@@ -1106,7 +1139,7 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
  
-         smmu {
-@@ -70,9 +77,13 @@ Example:
-                              <0 37 4>;
+ 		smrs[i] = (struct arm_smmu_smr) {
+ 			.idx	= idx,
+-			.mask	= 0, /* We don't currently share SMRs */
++			.mask	= cfg->streammasks[i],
+ 			.id	= cfg->streamids[i],
+ 		};
+ 	}
+@@ -1972,6 +2005,17 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
  
-                 /*
--                 * Two DMA controllers, the first with two StreamIDs (0xd01d
-+                 * Three DMA controllers, the first with two StreamIDs (0xd01d
-                  * and 0xd01e) and the second with only one (0xd11c).
-+                 * The third uses a mask to use all StreamIDs that starts with
-+                 * 0xd8
-                  */
-                 mmu-masters = <&dma0 0xd01d 0xd01e>,
--                              <&dma1 0xd11c>;
-+                              <&dma1 0xd11c>,
-+                              <&dma2 0xd800>;
-+                mmu-masters-mask = <&dma2 0x07FF>
-         };
+ 	dev_notice(dev, "registered %d master devices\n", i);
+ 
++	while (!of_parse_phandle_with_args(dev->of_node, "mmu-masters-mask",
++					   "#stream-id-cells", i,
++					   &masterspec)) {
++		err = register_smmu_master_mask(smmu, dev, &masterspec);
++		if (err) {
++			dev_err(dev, "failed to add mask for%s\n",
++				masterspec.np->name);
++			goto out_put_masters;
++		}
++
++	}
+ 	kfree(masterspec);
+ 
+ 	parse_driver_options(smmu);
 -- 
 1.9.1
