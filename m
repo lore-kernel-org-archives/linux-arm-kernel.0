@@ -1,171 +1,84 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Mon, 30 May 2016 12:40:51 +0530
-Subject: [PATCH 7/7] phy: Add Northstar2 PCI Phy support
-In-Reply-To: <1464592251-2688-1-git-send-email-pramod.kumar@broadcom.com>
-References: <1464592251-2688-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1464592251-2688-8-git-send-email-pramod.kumar@broadcom.com>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Mon, 30 May 2016 09:30:06 +0200
+Subject: [STLinux Kernel] [PATCH 02/11] drivers: clk: st: Add clock
+ propagation for audio clocks
+In-Reply-To: <20160527154159.GA17818@rob-hp-laptop>
+References: <1463560892-7209-1-git-send-email-gabriel.fernandez@linaro.org>
+ <1463560892-7209-3-git-send-email-gabriel.fernandez@linaro.org>
+ <20160525172409.GA27913@rob-hp-laptop>
+ <CAG374jDTCJfZB+PuAnggjXhbcd3NjJqrESpe_EnMniCAeoph9A@mail.gmail.com>
+ <CAL_JsqLOG4P0H+HkQ3mJhfibatuV2T51KqOn-+U+LK8WUx7QgA@mail.gmail.com>
+ <5746F486.602@st.com>
+ <CAL_JsqLeD8uTmMYLFZ5Sh9=JV5s1xthvruXL-W=c=zcVS=G-ZA@mail.gmail.com>
+ <5747F5E8.5030300@st.com> <20160527154159.GA17818@rob-hp-laptop>
+Message-ID: <CAG374jBTLDiXHQVuxKMA2-xZr1yHUBLmSdT2HAZhp16dTsQDoQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCI Phy support for Broadcom Northstar2 SoCs.  This driver uses the
-interface from the iproc mdio mux driver to enable the devices
-respective phys.
+On 27 May 2016 at 17:41, Rob Herring <robh@kernel.org> wrote:
+> On Fri, May 27, 2016 at 09:23:20AM +0200, loic pallardy wrote:
+>>
+>>
+>> On 05/26/2016 03:20 PM, Rob Herring wrote:
+>> >On Thu, May 26, 2016 at 8:05 AM, loic pallardy <loic.pallardy@st.com> wrote:
+>> >>
+>> >>
+>> >>On 05/26/2016 02:46 PM, Rob Herring wrote:
+>> >>>
+>> >>>On Thu, May 26, 2016 at 4:49 AM, Gabriel Fernandez
+>> >>><gabriel.fernandez@linaro.org> wrote:
+>> >>>>
+>> >>>>On 25 May 2016 at 19:24, Rob Herring <robh@kernel.org> wrote:
+>> >>>>>
+>> >>>>>
+>> >>>>>On Wed, May 18, 2016 at 10:41:23AM +0200, Gabriel Fernandez wrote:
+>> >>>>>>
+>> >>>>>>This patch allows fine tuning of the quads FS for audio clocks
+>> >>>>>>accuracy.
+>> >>>>>>
+>
+>> >>>
+>> >>>That is no different and suffers the same point I raised. It requires
+>> >>>updating the DT for any clock configuration change or enhancement.
+>> >>>
+>> >>Agree with you, DT update is needed as soon as a clock configuration should
+>> >>be changed. This is due to STiH clock driver design based on DT description
+>> >>of SoC clock tree.
+>> >>
+>> >>This clock driver was accepted 2 years ago. At the time being there was
+>> >>discussion about clock tree description location: driver or DT.
+>> >>Bad choice was done for this driver...
+>> >>
+>> >>If we decide to redesign STiH clock driver using in-driver clock tree
+>> >>description, this will modify STiH clock DT nodes description and so break
+>> >>DT backward compatibility.
+>> >>
+>> >>What's from your pov the best option?
+>> >
+>> >You can break it once or every time you need a clock change. I'd go
+>> >with the former. Maybe more specific compatible strings throughout
+>> >alone would be enough rather than a flag day changing the binding.
+>>
+>> So if I understand you correctly, main issue is d0 and d2 signification.
+>> d0 and d2 are indeed location of the flexgen in the SoC. But that's right
+>> flexgen are dedicated to clocks generation for features (system, audio,
+>> video).
+>> What about "st,flexgen-audio" and "st,flexgen-video"?
+>
+> It is not so much the name of these 2, but whether there are other cases
+> for different clock nodes that could need the same thing. If so, update
+> them all now rather than 1 by 1.
+>
+> Rob
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
-Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
----
- drivers/phy/Kconfig            |   8 +++
- drivers/phy/Makefile           |   1 +
- drivers/phy/phy-bcm-ns2-pcie.c | 115 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 124 insertions(+)
- create mode 100644 drivers/phy/phy-bcm-ns2-pcie.c
+Hi Rob,
+Ok i will send a V2 for that.
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 26566db..5ff60b2 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -421,4 +421,12 @@ config PHY_CYGNUS_PCIE
- 	  Enable this to support the Broadcom Cygnus PCIe PHY.
- 	  If unsure, say N.
- 
-+config PHY_NS2_PCIE
-+	tristate "Broadcom Northstar2 PCIe PHY driver"
-+	depends on OF && MDIO_BUS_MUX_BCM_IPROC
-+	select GENERIC_PHY
-+	default ARCH_BCM_IPROC
-+	help
-+	  Enable this to support the Broadcom Northstar2 PCIe PHY.
-+	  If unsure, say N.
- endmenu
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 24596a9..77d51ff 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -52,3 +52,4 @@ obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
- obj-$(CONFIG_PHY_BRCMSTB_SATA)		+= phy-brcmstb-sata.o
- obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
- obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
-+obj-$(CONFIG_PHY_NS2_PCIE)		+= phy-bcm-ns2-pcie.o
-diff --git a/drivers/phy/phy-bcm-ns2-pcie.c b/drivers/phy/phy-bcm-ns2-pcie.c
-new file mode 100644
-index 0000000..65c3870
---- /dev/null
-+++ b/drivers/phy/phy-bcm-ns2-pcie.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright (C) 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/of_mdio.h>
-+#include <linux/mdio.h>
-+#include <linux/phy.h>
-+#include <linux/phy/phy.h>
-+
-+struct ns2_pci_phy {
-+	struct mdio_device *mdiodev;
-+	struct phy *phy;
-+};
-+
-+#define BLK_ADDR_REG_OFFSET	0x1f
-+#define PLL_AFE1_100MHZ_BLK	0x2100
-+#define PLL_CLK_AMP_OFFSET	0x03
-+#define PLL_CLK_AMP_2P05V	0x2b18
-+
-+static int ns2_pci_phy_init(struct phy *p)
-+{
-+	struct ns2_pci_phy *phy = phy_get_drvdata(p);
-+	int rc;
-+
-+	/* select the AFE 100MHz block page */
-+	rc = mdiobus_write(phy->mdiodev->bus, phy->mdiodev->addr,
-+			   BLK_ADDR_REG_OFFSET, PLL_AFE1_100MHZ_BLK);
-+	if (rc)
-+		goto err;
-+
-+	/* set the 100 MHz reference clock amplitude to 2.05 v */
-+	rc = mdiobus_write(phy->mdiodev->bus, phy->mdiodev->addr,
-+			   PLL_CLK_AMP_OFFSET, PLL_CLK_AMP_2P05V);
-+	if (rc)
-+		goto err;
-+
-+	return 0;
-+
-+err:
-+	dev_err(&phy->mdiodev->dev, "Error %d writing to phy\n", rc);
-+	return rc;
-+}
-+
-+static struct phy_ops ns2_pci_phy_ops = {
-+	.init = ns2_pci_phy_init,
-+};
-+
-+static int ns2_pci_phy_probe(struct mdio_device *mdiodev)
-+{
-+	struct device *dev = &mdiodev->dev;
-+	struct phy_provider *provider;
-+	struct ns2_pci_phy *p;
-+	struct phy *phy;
-+
-+	phy = devm_phy_create(dev, dev->of_node, &ns2_pci_phy_ops);
-+	if (IS_ERR_OR_NULL(phy)) {
-+		dev_err(dev, "failed to create Phy\n");
-+		return PTR_ERR(phy);
-+	}
-+
-+	p = devm_kmalloc(dev, sizeof(struct ns2_pci_phy),
-+			 GFP_KERNEL);
-+	if (!p)
-+		return -ENOMEM;
-+
-+	p->mdiodev = mdiodev;
-+	dev_set_drvdata(dev, p);
-+
-+	p->phy = phy;
-+	phy_set_drvdata(phy, p);
-+
-+	provider = devm_of_phy_provider_register(&phy->dev,
-+						 of_phy_simple_xlate);
-+	if (IS_ERR(provider)) {
-+		dev_err(dev, "failed to register Phy provider\n");
-+		return PTR_ERR(provider);
-+	}
-+
-+	dev_info(dev, "%s PHY registered\n", dev_name(dev));
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id ns2_pci_phy_of_match[] = {
-+	{ .compatible = "brcm,ns2-pcie-phy", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, ns2_pci_phy_of_match);
-+
-+static struct mdio_driver ns2_pci_phy_driver = {
-+	.mdiodrv = {
-+		.driver = {
-+			.name = "phy-bcm-ns2-pci",
-+			.of_match_table = ns2_pci_phy_of_match,
-+		},
-+	},
-+	.probe = ns2_pci_phy_probe,
-+};
-+mdio_module_driver(ns2_pci_phy_driver);
-+
-+MODULE_AUTHOR("Broadcom");
-+MODULE_DESCRIPTION("Broadcom Northstar2 PCI Phy driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:phy-bcm-ns2-pci");
--- 
-1.9.1
+Mike,
+the first patch "drivers: clk: st: Add fs660c32 synthesizer algorithm"  can
+be taken into account regardless the remark of Rob. Can you have a look ?
+
+Thanks.
+Best Regards
+
+Gabriel
