@@ -1,39 +1,70 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 30 May 2016 16:13:10 +0200
-Subject: [PATCH 0/3] watchdog: Add Amlogic Meson GXBB Watchdog Timer driver
-In-Reply-To: <20160530134537.GA16188@mephisto>
-References: <1464614948-28247-1-git-send-email-narmstrong@baylibre.com>
- <20160530134537.GA16188@mephisto>
-Message-ID: <574C4A76.10807@baylibre.com>
+From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
+Date: Mon, 30 May 2016 14:15:42 +0000
+Subject: [PATCH] iommu/arm-smmu: Properly initialize CBAR MemAttr
+Message-ID: <1464617742-5493-1-git-send-email-bogdan.purcareata@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2016 03:45 PM, Carlo Caione wrote:
-> On 30/05/16 15:29, Neil Armstrong wrote:
->> Adds support for the Amlogic Meson GXBB SoC Watchdog Timer.
->> It differs from the meson6/meson8b HW, so need for a separate driver.
->> The HW provides a divider capable of having a 1ms timebase thus simplifying
->> the counter update.
->> The restart call is not provided even if the HW is capable of triggering a
->> system reset immediately because of the PSCI firmare having such functionnality.
->> The watchdog is not expected to be running at boot time since there is a separate
->> system-level watchdog running from the SCPI co-processor, but this case would be
->> handle in a next driver update.
->>
->> Changes since RFC version at http://lkml.kernel.org/r/1464249112-13658-1-git-send-email-narmstrong at baylibre.com :
->> - Remove status callback, will re-introduce it later to managed the already-running use case
->> - Fix registers defines indentation
->> - Fix space between operators
->> - Make all callbacks static functions
->> - Fix bindings with missing clocks attribute
->> - Do not stop/start watchdog on a timeout setup
->> - Fix probe device configuration
->>
->> Neil Armstrong (3):
->>   watchdog: Add Meson GXBB Watchdog Driver
->>   dt-bindings: watchdog: Add Meson GXBB Watchdog bindings
->>   ARM64: dts: amlogic: meson-gxbb: Add watchdog node
-> 
-> I'm missing [PATCH 2/3]
-> 
-Sorry, fixed here :
+Currently, when initializing the CBAR memattr attributes to the weakest
+values, it is expected that the final ones will be declared in the TTBCR
+register (SMMU_CBn_TCR).
+
+This is not required when CBAR type consists of a stage 1 translation
+followed by a stage 2 bypass. This is the case when assigning a VFIO PCI
+device to a KVM guest. Overriding the default transaction attributes to
+writeback cacheable results in the device no longer working in the guest
+(the adapter requires explicit flushes on the descriptor rings memory).
+
+Update the context init routine to initialize the CBAR MemAttr field only
+if there's a stage 1 followed by a stage 2 translation.
+
+Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
+---
+ drivers/iommu/arm-smmu.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index ff7a392..1400ec9 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -765,13 +765,14 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ {
+ 	u32 reg;
+ 	u64 reg64;
+-	bool stage1;
++	bool stage1, stage1_stage2;
+ 	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 	void __iomem *cb_base, *gr1_base;
+ 
+ 	gr1_base = ARM_SMMU_GR1(smmu);
+ 	stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
++	stage1_stage2 = cfg->cbar == CBAR_TYPE_S1_TRANS_S2_TRANS;
+ 	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
+ 
+ 	if (smmu->version > ARM_SMMU_V1) {
+@@ -793,15 +794,19 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
+ 
+ 	/*
+ 	 * Use the weakest shareability/memory types, so they are
+-	 * overridden by the ttbcr/pte.
++	 * overridden by the ttbcr/pte. This happens only if the stage
++	 * 1 is followed by a stage 2 translation.
+ 	 */
+-	if (stage1) {
++	if (stage1_stage2) {
+ 		reg |= (CBAR_S1_BPSHCFG_NSH << CBAR_S1_BPSHCFG_SHIFT) |
+ 			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
+-	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
++	}
++
++	if (!stage1 && !(smmu->features & ARM_SMMU_FEAT_VMID16)) {
+ 		/* 8-bit VMIDs live in CBAR */
+ 		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
+ 	}
++
+ 	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
+ 
+ 	/* TTBRs */
+-- 
+1.9.1
