@@ -1,33 +1,128 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Mon, 30 May 2016 10:57:10 +0200
-Subject: [PATCH 3/5] spi: sunxi: expose maximum transfer size limit
-In-Reply-To: <20160530083745.GG4247@lukather>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <5fffb7eca6f4b70853d92be2403595d6d06bede7.1464130597.git.hramrach@gmail.com>
- <20160530083745.GG4247@lukather>
-Message-ID: <CAOMqctQdbipvvTnF253S4jGDos1crYXk9nuzDcRvy4geeS=GrQ@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 30 May 2016 11:55:22 +0300
+Subject: [PATCH v1 14/14] ASoC: omap-mcpdm: Add support for pdmclk clock
+ handling
+In-Reply-To: <20160530085522.30398-1-peter.ujfalusi@ti.com>
+References: <20160530085522.30398-1-peter.ujfalusi@ti.com>
+Message-ID: <20160530085522.30398-15-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+McPDM module receives it's functional clock from external source. This
+clock is the pdmclk provided by the twl6040 audio IC. If the clock is not
+available all register accesses to McPDM fails and the module is not
+operational.
 
-On 30 May 2016 at 10:37, Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> On Thu, May 26, 2016 at 07:25:24PM -0000, Michal Suchanek wrote:
->> The sun4i spi hardware can trasfer at most 63 bytes of data without DMA
->> support so report the limitation. Same on sun6i.
->
-> Is it? Is there timeouts on the A31 and later SoCs?
->
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/sound/omap-mcpdm.txt       | 10 ++++++++
+ sound/soc/omap/omap-mcpdm.c                        | 27 ++++++++++++++++++++++
+ 2 files changed, 37 insertions(+)
 
-I have no sun6i hardware to test with.
-
-This is an advisory limit you can query and it better be smaller
-rather than unreliable. The hard limit in the driver is still
-SUN6I_FIFO_DEPTH (which is 128 bytes on sun6i).
-
-You can test his without any actual SPI device. Unused pins you can
-multiplex as SPI suffice.
-
-Thanks
-
-Michal
+diff --git a/Documentation/devicetree/bindings/sound/omap-mcpdm.txt b/Documentation/devicetree/bindings/sound/omap-mcpdm.txt
+index 0741dff048dd..6f6c2f8e908d 100644
+--- a/Documentation/devicetree/bindings/sound/omap-mcpdm.txt
++++ b/Documentation/devicetree/bindings/sound/omap-mcpdm.txt
+@@ -8,6 +8,8 @@ Required properties:
+ - interrupts: Interrupt number for McPDM
+ - interrupt-parent: The parent interrupt controller
+ - ti,hwmods: Name of the hwmod associated to the McPDM
++- clocks:  phandle for the pdmclk provider, likely <&twl6040>
++- clock-names: Must be "pdmclk"
+ 
+ Example:
+ 
+@@ -19,3 +21,11 @@ mcpdm: mcpdm at 40132000 {
+ 	interrupt-parent = <&gic>;
+ 	ti,hwmods = "mcpdm";
+ };
++
++In board DTS file the pdmclk needs to be added:
++
++&mcpdm {
++	clocks = <&twl6040>;
++	clock-names = "pdmclk";
++	status = "okay";
++};
+diff --git a/sound/soc/omap/omap-mcpdm.c b/sound/soc/omap/omap-mcpdm.c
+index 74d6e6fdcfd0..2d2119e7d094 100644
+--- a/sound/soc/omap/omap-mcpdm.c
++++ b/sound/soc/omap/omap-mcpdm.c
+@@ -31,6 +31,7 @@
+ #include <linux/err.h>
+ #include <linux/io.h>
+ #include <linux/irq.h>
++#include <linux/clk.h>
+ #include <linux/slab.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/of_device.h>
+@@ -54,6 +55,7 @@ struct omap_mcpdm {
+ 	unsigned long phys_base;
+ 	void __iomem *io_base;
+ 	int irq;
++	struct clk *pdmclk;
+ 
+ 	struct mutex mutex;
+ 
+@@ -388,6 +390,12 @@ static int omap_mcpdm_probe(struct snd_soc_dai *dai)
+ 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
+ 	int ret;
+ 
++	ret = clk_prepare_enable(mcpdm->pdmclk);
++	if (!ret) {
++		dev_err(mcpdm->dev, "Failed to enable PDMCLK: %d\n", ret);
++		return ret;
++	}
++
+ 	pm_runtime_enable(mcpdm->dev);
+ 
+ 	/* Disable lines while request is ongoing */
+@@ -422,6 +430,7 @@ static int omap_mcpdm_remove(struct snd_soc_dai *dai)
+ 
+ 	pm_runtime_disable(mcpdm->dev);
+ 
++	clk_disable_unprepare(mcpdm->pdmclk);
+ 	return 0;
+ }
+ 
+@@ -441,12 +450,21 @@ static int omap_mcpdm_suspend(struct snd_soc_dai *dai)
+ 		mcpdm->pm_active_count++;
+ 	}
+ 
++	clk_disable_unprepare(mcpdm->pdmclk);
++
+ 	return 0;
+ }
+ 
+ static int omap_mcpdm_resume(struct snd_soc_dai *dai)
+ {
+ 	struct omap_mcpdm *mcpdm = snd_soc_dai_get_drvdata(dai);
++	int ret;
++
++	ret = clk_prepare_enable(mcpdm->pdmclk);
++	if (!ret) {
++		dev_err(mcpdm->dev, "Failed to enable PDMCLK: %d\n", ret);
++		return ret;
++	}
+ 
+ 	if (mcpdm->pm_active_count) {
+ 		while (mcpdm->pm_active_count--)
+@@ -541,6 +559,15 @@ static int asoc_mcpdm_probe(struct platform_device *pdev)
+ 
+ 	mcpdm->dev = &pdev->dev;
+ 
++	mcpdm->pdmclk = devm_clk_get(&pdev->dev, "pdmclk");
++	if (IS_ERR(mcpdm->pdmclk)) {
++		if (PTR_ERR(mcpdm->pdmclk) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		dev_warn(&pdev->dev, "Error getting pdmclk (%ld)!\n",
++			 PTR_ERR(mcpdm->pdmclk));
++		mcpdm->pdmclk = NULL;
++	}
++
+ 	ret =  devm_snd_soc_register_component(&pdev->dev,
+ 					       &omap_mcpdm_component,
+ 					       &omap_mcpdm_dai, 1);
+-- 
+2.8.3
