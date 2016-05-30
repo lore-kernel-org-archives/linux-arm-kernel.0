@@ -1,56 +1,41 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 30 May 2016 15:28:13 +0200
-Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
-Message-ID: <1464614897-28173-1-git-send-email-narmstrong@baylibre.com>
+Date: Mon, 30 May 2016 15:29:05 +0200
+Subject: [PATCH 0/3] watchdog: Add Amlogic Meson GXBB Watchdog Timer driver
+Message-ID: <1464614948-28247-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patchset to add and enable the reset controller driver on Meson SoCs platforms.
+Adds support for the Amlogic Meson GXBB SoC Watchdog Timer.
+It differs from the meson6/meson8b HW, so need for a separate driver.
+The HW provides a divider capable of having a 1ms timebase thus simplifying
+the counter update.
+The restart call is not provided even if the HW is capable of triggering a
+system reset immediately because of the PSCI firmare having such functionnality.
+The watchdog is not expected to be running at boot time since there is a separate
+system-level watchdog running from the SCPI co-processor, but this case would be
+handle in a next driver update.
 
-This reset controller has up to 256 reset lines with reset pulse generation only,
-so the assert and deassert calls are not available.
+Changes since RFC version at http://lkml.kernel.org/r/1464249112-13658-1-git-send-email-narmstrong at baylibre.com :
+- Remove status callback, will re-introduce it later to managed the already-running use case
+- Fix registers defines indentation
+- Fix space between operators
+- Make all callbacks static functions
+- Fix bindings with missing clocks attribute
+- Do not stop/start watchdog on a timeout setup
+- Fix probe device configuration
 
-Depends on the patch :
- - "reset: add devm_reset_controller_register API" [1]
+Neil Armstrong (3):
+  watchdog: Add Meson GXBB Watchdog Driver
+  dt-bindings: watchdog: Add Meson GXBB Watchdog bindings
+  ARM64: dts: amlogic: meson-gxbb: Add watchdog node
 
-Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
-- Get back __iomem in _reset() callback
-- Get rid of MODULE_ALIAS
-
-Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
-- Remove _gxbb_ in names
-- Depends build on ARCH_MESON only
-- Add meson8b compatible and bindings
-- Re-indent dt-bindings headers
-- Switch to devm_ reset controller register
-- Remove platform "remove" callback
-- Update Dual BSD/GPL file headers
-
-Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
-- Fix register mapping and bit defines in bindings header
-- Remove assert and unassert calls
-- Fix missing __iomem
-
-[1] https://patchwork.kernel.org/patch/8988471/
-
-Neil Armstrong (4):
-  reset: Add support for the Amlogic Meson SoC Reset Controller
-  dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
-  ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
-  ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
-
- .../bindings/reset/amlogic,meson-reset.txt         |  18 ++
- arch/arm/boot/dts/meson8b.dtsi                     |   7 +
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   7 +
- drivers/reset/Makefile                             |   1 +
- drivers/reset/reset-meson.c                        | 136 +++++++++++++
- .../dt-bindings/reset/amlogic,meson-gxbb-reset.h   | 210 +++++++++++++++++++++
- include/dt-bindings/reset/amlogic,meson8b-reset.h  | 175 +++++++++++++++++
- 7 files changed, 554 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-reset.txt
- create mode 100644 drivers/reset/reset-meson.c
- create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
- create mode 100644 include/dt-bindings/reset/amlogic,meson8b-reset.h
+ .../bindings/watchdog/meson-gxbb-wdt.txt           |  16 ++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   6 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/meson_gxbb_wdt.c                  | 277 +++++++++++++++++++++
+ 4 files changed, 300 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/meson-gxbb-wdt.txt
+ create mode 100644 drivers/watchdog/meson_gxbb_wdt.c
 
 -- 
 2.7.0
