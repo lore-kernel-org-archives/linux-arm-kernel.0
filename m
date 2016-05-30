@@ -1,23 +1,68 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 May 2016 10:16:43 +0200
-Subject: [PATCH v3] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <C89496FEAE474D468F30D558A9468D9F26CEEBAB@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1464067268-35299-1-git-send-email-navam@xilinx.com>
- <CAL_Jsq+VL6jjo5QLwnsC8rEfgP4KN5hCSB7QicWWN-uvZU0GHw@mail.gmail.com>
- <C89496FEAE474D468F30D558A9468D9F26CEEBAB@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <5333252.Un7tdhWc5Q@wuerfel>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 30 May 2016 11:23:45 +0300
+Subject: [PATCH v5 2/7] ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
+In-Reply-To: <20160530082350.24285-1-peter.ujfalusi@ti.com>
+References: <20160530082350.24285-1-peter.ujfalusi@ti.com>
+Message-ID: <20160530082350.24285-3-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, May 30, 2016 5:46:21 AM CEST Nava kishore Manne wrote:
-> >
-> The Axi-usb 5.00 IP is a FPGA based one. This IP needs to support two H/w designs one with 32 bit DMA addressing another one is 64 bit DMA addressing.
-> And also in the software point for view we don?t have any register to figure out whether it is supporting 32 bit DMA addressing or 64 bit DMA addressing.
-> To support both the designs I kept addrwidth property in the dt. I think here addrwidth property is make sense to differentiate the h/w configurations.
-> If you want me to changes it to boolean please let me know I will fix it in the next version.
+The McBSPLP's sidetone main clock is the McBSPLP's ICLK, not FCLK as the
+sidetone only receives the ICLK from the main McBSP module.
+Since the McBSP and sidetone is using the very same clock from PRCM level
+the sidetone must not have the prcm section to check the clock status since
+the sidetone is only used when McBSP is already configured.
+If two separate hwmods looking at the same bit and they would use
+pm_runtime in nested way (as it must happen with McBSP and it's ST module)
+the hwmod would warn, because the idlest will not match what it is expected
+after enable/disable of the clocks.
 
-I think boolean would be more logical here, since what is configurable
-here is not how many bits are supported, but whether the XUSB_DMA_DSAR_ADDR
-register is present or not.
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 24 ++++--------------------
+ 1 file changed, 4 insertions(+), 20 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 9869a75c5d96..d72ee6185d5e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1322,16 +1322,8 @@ static struct omap_hwmod omap3xxx_mcbsp2_sidetone_hwmod = {
+ 	.name		= "mcbsp2_sidetone",
+ 	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
+ 	.mpu_irqs	= omap3xxx_mcbsp2_sidetone_irqs,
+-	.main_clk	= "mcbsp2_fck",
+-	.prcm		= {
+-		.omap2 = {
+-			.prcm_reg_id = 1,
+-			 .module_bit = OMAP3430_EN_MCBSP2_SHIFT,
+-			.module_offs = OMAP3430_PER_MOD,
+-			.idlest_reg_id = 1,
+-			.idlest_idle_bit = OMAP3430_ST_MCBSP2_SHIFT,
+-		},
+-	},
++	.main_clk	= "mcbsp2_ick",
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* mcbsp3_sidetone */
+@@ -1344,16 +1336,8 @@ static struct omap_hwmod omap3xxx_mcbsp3_sidetone_hwmod = {
+ 	.name		= "mcbsp3_sidetone",
+ 	.class		= &omap3xxx_mcbsp_sidetone_hwmod_class,
+ 	.mpu_irqs	= omap3xxx_mcbsp3_sidetone_irqs,
+-	.main_clk	= "mcbsp3_fck",
+-	.prcm		= {
+-		.omap2 = {
+-			.prcm_reg_id = 1,
+-			.module_bit = OMAP3430_EN_MCBSP3_SHIFT,
+-			.module_offs = OMAP3430_PER_MOD,
+-			.idlest_reg_id = 1,
+-			.idlest_idle_bit = OMAP3430_ST_MCBSP3_SHIFT,
+-		},
+-	},
++	.main_clk	= "mcbsp3_ick",
++	.flags		= HWMOD_NO_IDLEST,
+ };
+ 
+ /* SR common */
+-- 
+2.8.3
