@@ -1,38 +1,39 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Mon, 30 May 2016 15:45:37 +0200
-Subject: [PATCH 0/3] watchdog: Add Amlogic Meson GXBB Watchdog Timer driver
-In-Reply-To: <1464614948-28247-1-git-send-email-narmstrong@baylibre.com>
+Date: Mon, 30 May 2016 15:51:25 +0200
+Subject: [PATCH 1/3] watchdog: Add Meson GXBB Watchdog Driver
+In-Reply-To: <1464614948-28247-2-git-send-email-narmstrong@baylibre.com>
 References: <1464614948-28247-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20160530134537.GA16188@mephisto>
+ <1464614948-28247-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160530135125.GB16188@mephisto>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 30/05/16 15:29, Neil Armstrong wrote:
-> Adds support for the Amlogic Meson GXBB SoC Watchdog Timer.
-> It differs from the meson6/meson8b HW, so need for a separate driver.
-> The HW provides a divider capable of having a 1ms timebase thus simplifying
-> the counter update.
-> The restart call is not provided even if the HW is capable of triggering a
-> system reset immediately because of the PSCI firmare having such functionnality.
-> The watchdog is not expected to be running at boot time since there is a separate
-> system-level watchdog running from the SCPI co-processor, but this case would be
-> handle in a next driver update.
+> Add watchdog specific driver for Amlogic Meson GXBB SoC.
 > 
-> Changes since RFC version at http://lkml.kernel.org/r/1464249112-13658-1-git-send-email-narmstrong at baylibre.com :
-> - Remove status callback, will re-introduce it later to managed the already-running use case
-> - Fix registers defines indentation
-> - Fix space between operators
-> - Make all callbacks static functions
-> - Fix bindings with missing clocks attribute
-> - Do not stop/start watchdog on a timeout setup
-> - Fix probe device configuration
-> 
-> Neil Armstrong (3):
->   watchdog: Add Meson GXBB Watchdog Driver
->   dt-bindings: watchdog: Add Meson GXBB Watchdog bindings
->   ARM64: dts: amlogic: meson-gxbb: Add watchdog node
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> +
 
-I'm missing [PATCH 2/3]
+> +#define GXBB_WDT_CTRL1_REG			0x4
+...
+> +#define GXBB_WDT_CTRL_EE_RESET_NOW		BIT(26)
+...
+> +#define GXBB_WDT_CTRL_IRQ_EN			BIT(23)
+...
+> +#define GXBB_WDT_CTRL_XTAL_SEL			(0)
+...
+> +#define GXBB_WDT_CTRL_CLK81_SEL			BIT(19)
+...
+> +#define GXBB_WDT_CTRL1_GPIO_PULSE		BIT(17)
+...
+> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_0		BIT(16)
+> +#define GXBB_WDT_CTRL1_GPIO_POL_RESET_1		(0)
+> +#define GXBB_WDT_CTRL1_GPIO_PULSE_CNT		(BIT(16) - 1)
+
+nit: all these defines are not used at all in the driver. You can remove them
+
+Thanks!
+
 
 -- 
 Carlo Caione
