@@ -1,45 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 30 May 2016 15:34:42 +0200
-Subject: [PATCH 5/7] net:mdio-mux: Add MDIO mux driver for iProc SoCs
-In-Reply-To: <1464592251-2688-6-git-send-email-pramod.kumar@broadcom.com>
-References: <1464592251-2688-1-git-send-email-pramod.kumar@broadcom.com>
- <1464592251-2688-6-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <20160530133442.GK6027@lunn.ch>
+From: carlo@caione.org (Carlo Caione)
+Date: Mon, 30 May 2016 15:45:37 +0200
+Subject: [PATCH 0/3] watchdog: Add Amlogic Meson GXBB Watchdog Timer driver
+In-Reply-To: <1464614948-28247-1-git-send-email-narmstrong@baylibre.com>
+References: <1464614948-28247-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160530134537.GA16188@mephisto>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 12:40:49PM +0530, Pramod Kumar wrote:
-> iProc based SoCs supports the integrated mdio multiplexer which
-> has the bus selection as well as mdio transaction generation logic
-> inside.
+On 30/05/16 15:29, Neil Armstrong wrote:
+> Adds support for the Amlogic Meson GXBB SoC Watchdog Timer.
+> It differs from the meson6/meson8b HW, so need for a separate driver.
+> The HW provides a divider capable of having a 1ms timebase thus simplifying
+> the counter update.
+> The restart call is not provided even if the HW is capable of triggering a
+> system reset immediately because of the PSCI firmare having such functionnality.
+> The watchdog is not expected to be running at boot time since there is a separate
+> system-level watchdog running from the SCPI co-processor, but this case would be
+> handle in a next driver update.
+> 
+> Changes since RFC version at http://lkml.kernel.org/r/1464249112-13658-1-git-send-email-narmstrong at baylibre.com :
+> - Remove status callback, will re-introduce it later to managed the already-running use case
+> - Fix registers defines indentation
+> - Fix space between operators
+> - Make all callbacks static functions
+> - Fix bindings with missing clocks attribute
+> - Do not stop/start watchdog on a timeout setup
+> - Fix probe device configuration
+> 
+> Neil Armstrong (3):
+>   watchdog: Add Meson GXBB Watchdog Driver
+>   dt-bindings: watchdog: Add Meson GXBB Watchdog bindings
+>   ARM64: dts: amlogic: meson-gxbb: Add watchdog node
 
-Hi Pramod
+I'm missing [PATCH 2/3]
 
-Great to see you using the existing MDIO framework. Thanks.
-
-> +static int mdio_mux_iproc_switch_fn(int current_child, int desired_child,
-> +				    void *data)
-> +{
-> +	struct iproc_mdiomux_desc *md = data;
-> +	struct mdiomux_bus_param *bp = &md->bus_param[desired_child];
-> +	u32 param, bus_id;
-> +	bool bus_dir;
-> +
-> +	/* select bus and its properties */
-> +	bus_dir = (desired_child < EXT_BUS_START_ADDR);
-> +	bus_id = bus_dir ? desired_child : (desired_child - EXT_BUS_START_ADDR);
-> +
-> +	param = (bus_dir ? 1 : 0) << MDIO_PARAM_INTERNAL_SEL;
-> +	param |= (bp->is_c45 ? 1 : 0) << MDIO_PARAM_C45_SEL;
-> +	param |= (bus_id << MDIO_PARAM_BUS_ID);
-> +
-> +	writel(param, md->base + MDIO_PARAM_OFFSET);
-> +	return 0;
-> +}
-
-What i don't yet see is why you went for the concept of an integrated
-MDIO and MUX. This function above is the mux function, and it looks
-like it could be used to implement a standard mdio-mux driver.
-
-Thanks
-     Andrew
+-- 
+Carlo Caione
