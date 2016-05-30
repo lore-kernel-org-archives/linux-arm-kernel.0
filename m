@@ -1,129 +1,81 @@
 From: tiffany.lin@mediatek.com (Tiffany Lin)
-Date: Mon, 30 May 2016 20:29:15 +0800
-Subject: [PATCH v3 1/9] VPU: mediatek: Add decode support
-In-Reply-To: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+Date: Mon, 30 May 2016 20:29:23 +0800
+Subject: [PATCH v3 9/9] arm64: dts: mediatek: Add Video Decoder for MT8173
+In-Reply-To: <1464611363-14936-9-git-send-email-tiffany.lin@mediatek.com>
 References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-2-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-3-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-4-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-5-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-6-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-7-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-8-git-send-email-tiffany.lin@mediatek.com>
+ <1464611363-14936-9-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1464611363-14936-10-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+Add video decoder node for MT8173
 
-VPU driver add decode support
-
-Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
 ---
- drivers/media/platform/mtk-vpu/mtk_vpu.c |   12 ++++++++++++
- drivers/media/platform/mtk-vpu/mtk_vpu.h |   27 +++++++++++++++++++++++++++
- 2 files changed, 39 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   44 ++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.c b/drivers/media/platform/mtk-vpu/mtk_vpu.c
-index b60d02c..ca23b1f 100644
---- a/drivers/media/platform/mtk-vpu/mtk_vpu.c
-+++ b/drivers/media/platform/mtk-vpu/mtk_vpu.c
-@@ -134,6 +134,8 @@ struct vpu_wdt {
-  *
-  * @signaled:		the signal of vpu initialization completed
-  * @fw_ver:		VPU firmware version
-+ * @dec_capability:	decoder capability which is not used for now and
-+ *			the value is reserved for future use
-  * @enc_capability:	encoder capability which is not used for now and
-  *			the value is reserved for future use
-  * @wq:			wait queue for VPU initialization status
-@@ -141,6 +143,7 @@ struct vpu_wdt {
- struct vpu_run {
- 	u32 signaled;
- 	char fw_ver[VPU_FW_VER_LEN];
-+	unsigned int	dec_capability;
- 	unsigned int	enc_capability;
- 	wait_queue_head_t wq;
- };
-@@ -415,6 +418,14 @@ int vpu_wdt_reg_handler(struct platform_device *pdev,
- }
- EXPORT_SYMBOL_GPL(vpu_wdt_reg_handler);
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 348ce0e..4ac06d3 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -691,6 +691,50 @@
+ 			#clock-cells = <1>;
+ 		};
  
-+unsigned int vpu_get_vdec_hw_capa(struct platform_device *pdev)
-+{
-+	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
++		vcodec_dec: vcodec at 16000000 {
++			compatible = "mediatek,mt8173-vcodec-dec";
++			reg = <0 0x16000000 0 0x100>,	/* VDEC_SYS */
++			      <0 0x16020000 0 0x1000>,	/* VDEC_MISC */
++			      <0 0x16021000 0 0x800>,	/* VDEC_LD */
++			      <0 0x16021800 0 0x800>,	/* VDEC_TOP */
++			      <0 0x16022000 0 0x1000>,	/* VDEC_CM */
++			      <0 0x16023000 0 0x1000>,	/* VDEC_AD */
++			      <0 0x16024000 0 0x1000>,	/* VDEC_AV */
++			      <0 0x16025000 0 0x1000>,	/* VDEC_PP */
++			      <0 0x16026800 0 0x800>,	/* VDEC_HWD */
++			      <0 0x16027000 0 0x800>,	/* VDEC_HWQ */
++			      <0 0x16027800 0 0x800>,	/* VDEC_HWB */
++			      <0 0x16028400 0 0x400>;	/* VDEC_HWG */
++			interrupts = <GIC_SPI 204 IRQ_TYPE_LEVEL_LOW>;
++			mediatek,larb = <&larb1>;
++			iommus = <&iommu M4U_PORT_HW_VDEC_MC_EXT>,
++				 <&iommu M4U_PORT_HW_VDEC_PP_EXT>,
++				 <&iommu M4U_PORT_HW_VDEC_AVC_MV_EXT>,
++				 <&iommu M4U_PORT_HW_VDEC_PRED_RD_EXT>,
++				 <&iommu M4U_PORT_HW_VDEC_PRED_WR_EXT>,
++				 <&iommu M4U_PORT_HW_VDEC_UFO_EXT>,
++				 <&iommu M4U_PORT_HW_VDEC_VLD_EXT>,
++				 <&iommu M4U_PORT_HW_VDEC_VLD2_EXT>;
++			mediatek,vpu = <&vpu>;
++			power-domains = <&scpsys MT8173_POWER_DOMAIN_VDEC>;
++			clocks = <&apmixedsys CLK_APMIXED_VCODECPLL>,
++				 <&topckgen CLK_TOP_UNIVPLL_D2>,
++				 <&topckgen CLK_TOP_CCI400_SEL>,
++				 <&topckgen CLK_TOP_VDEC_SEL>,
++				 <&topckgen CLK_TOP_VCODECPLL>,
++				 <&apmixedsys CLK_APMIXED_VENCPLL>,
++				 <&topckgen CLK_TOP_VENC_LT_SEL>,
++				 <&topckgen CLK_TOP_VCODECPLL_370P5>;
++			clock-names = "vcodecpll",
++				      "univpll_d2",
++				      "clk_cci400_sel",
++				      "vdec_sel",
++				      "vdecpll",
++				      "vencpll",
++				      "venc_lt_sel",
++				      "vdec_bus_clk_src";
++		};
 +
-+	return vpu->run.dec_capability;
-+}
-+EXPORT_SYMBOL_GPL(vpu_get_vdec_hw_capa);
-+
- unsigned int vpu_get_venc_hw_capa(struct platform_device *pdev)
- {
- 	struct mtk_vpu *vpu = platform_get_drvdata(pdev);
-@@ -600,6 +611,7 @@ static void vpu_init_ipi_handler(void *data, unsigned int len, void *priv)
- 
- 	vpu->run.signaled = run->signaled;
- 	strncpy(vpu->run.fw_ver, run->fw_ver, VPU_FW_VER_LEN);
-+	vpu->run.dec_capability = run->dec_capability;
- 	vpu->run.enc_capability = run->enc_capability;
- 	wake_up_interruptible(&vpu->run.wq);
- }
-diff --git a/drivers/media/platform/mtk-vpu/mtk_vpu.h b/drivers/media/platform/mtk-vpu/mtk_vpu.h
-index 5ab37f0..f457479 100644
---- a/drivers/media/platform/mtk-vpu/mtk_vpu.h
-+++ b/drivers/media/platform/mtk-vpu/mtk_vpu.h
-@@ -37,6 +37,18 @@ typedef void (*ipi_handler_t) (void *data,
- 			 command to VPU.
- 			 For other IPI below, AP should send the request
- 			 to VPU to trigger the interrupt.
-+ * @IPI_VDEC_H264:	 The interrupt from vpu is to notify kernel to
-+			 handle H264 vidoe decoder job, and vice versa.
-+			 Decode output format is always MT21 no matter what
-+			 the input format is.
-+ * @IPI_VDEC_VP8:	 The interrupt from is to notify kernel to
-+			 handle VP8 video decoder job, and vice versa.
-+			 Decode output format is always MT21 no matter what
-+			 the input format is.
-+ * @IPI_VDEC_VP9:	 The interrupt from vpu is to notify kernel to
-+			 handle VP9 video decoder job, and vice versa.
-+			 Decode output format is always MT21 no matter what
-+			 the input format is.
-  * @IPI_VENC_H264:	 The interrupt from vpu is to notify kernel to
- 			 handle H264 video encoder job, and vice versa.
-  * @IPI_VENC_VP8:	 The interrupt fro vpu is to notify kernel to
-@@ -46,6 +58,9 @@ typedef void (*ipi_handler_t) (void *data,
- 
- enum ipi_id {
- 	IPI_VPU_INIT = 0,
-+	IPI_VDEC_H264,
-+	IPI_VDEC_VP8,
-+	IPI_VDEC_VP9,
- 	IPI_VENC_H264,
- 	IPI_VENC_VP8,
- 	IPI_MAX,
-@@ -55,10 +70,12 @@ enum ipi_id {
-  * enum rst_id - reset id to register reset function for VPU watchdog timeout
-  *
-  * @VPU_RST_ENC: encoder reset id
-+ * @VPU_RST_DEC: decoder reset id
-  * @VPU_RST_MAX: maximum reset id
-  */
- enum rst_id {
- 	VPU_RST_ENC,
-+	VPU_RST_DEC,
- 	VPU_RST_MAX,
- };
- 
-@@ -125,6 +142,16 @@ struct platform_device *vpu_get_plat_device(struct platform_device *pdev);
- int vpu_wdt_reg_handler(struct platform_device *pdev,
- 			void vpu_wdt_reset_func(void *),
- 			void *priv, enum rst_id id);
-+
-+/**
-+ * vpu_get_vdec_hw_capa - get video decoder hardware capability
-+ *
-+ * @pdev:	VPU platform device
-+ *
-+ * Return: video decoder hardware capability
-+ **/
-+unsigned int vpu_get_vdec_hw_capa(struct platform_device *pdev);
-+
- /**
-  * vpu_get_venc_hw_capa - get video encoder hardware capability
-  *
+ 		larb1: larb at 16010000 {
+ 			compatible = "mediatek,mt8173-smi-larb";
+ 			reg = <0 0x16010000 0 0x1000>;
 -- 
 1.7.9.5
