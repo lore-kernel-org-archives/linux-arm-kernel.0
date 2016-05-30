@@ -1,97 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 30 May 2016 23:38:37 +0800
-Subject: [PATCH 2/3] mmc: sunxi: Fix DDR MMC timings for A80
-In-Reply-To: <CAGb2v65=ZM+deSmTmMnT6XFJv8PuY+Kba3kJGKrk_46hxxRyHA@mail.gmail.com>
-References: <1464505484-3661-1-git-send-email-wens@csie.org>
- <1464505484-3661-3-git-send-email-wens@csie.org>
- <99d78ff3-db4d-45cc-024a-d94583b56f35@redhat.com>
- <CAGb2v65=ZM+deSmTmMnT6XFJv8PuY+Kba3kJGKrk_46hxxRyHA@mail.gmail.com>
-Message-ID: <CAGb2v64qo=kY=ekhbzJUWM_6p9oUupsE+YASD6g9beZS7eg9NQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 30 May 2016 16:50:16 +0100
+Subject: [PATCH 5/5] RFC spi: sun4i: add DMA support
+In-Reply-To: <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
+References: <cover.1464130597.git.hramrach@gmail.com>
+ <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
+ <20160530112610.GJ29837@sirena.org.uk>
+ <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
+ <20160530150343.GL29837@sirena.org.uk>
+ <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
+Message-ID: <20160530155016.GO29837@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 8:59 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Mon, May 30, 2016 at 7:34 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> Hi,
->>
->> On 29-05-16 09:04, Chen-Yu Tsai wrote:
->>>
->>> The MMC clock timings were incorrectly calculated, when the conversion
->>> from delay value to delay phase was done.
->>>
->>> The 50M DDR and 50M DDR 8bit timings are off, and make eMMC DDR
->>> unusable. Unfortunately it seems different controllers on the same SoC
->>> have different timings. The new settings are taken from mmc2, which is
->>> commonly used with eMMC.
->>
->>
->> Hmm, I'm not really all that familiar with mmc, but can't an external
->> sdcard connected to mmc0 use DDR too ? Assuming the answer is yes, then
->> we really need to update the driver to use the right per controller
->> timings.
->
-> I would very much like that to happen. However, SD card UHS-1 DDR modes
-> require 1.8V signaling, which is unavailable on _all_ sunxi boards.
-> This seems like a limit of most of the SoCs not having a separate IO
-> voltage rail for mmc pins.
->
-> Until then, I wouldn't worry that much.
+On Mon, May 30, 2016 at 05:28:10PM +0200, Michal Suchanek wrote:
+> On 30 May 2016 at 17:03, Mark Brown <broonie@kernel.org> wrote:
 
-P.S. I also tried the settings from mmc0 in Allwinner sources. They gave
-horrible results ( < 5 MB/s read ) on my CC-A80, while my Optimus wasn't
-really affected. I wonder if there's some kind of auto-retry mechanism
-in the MMC controller, or driver?
+> > I really don't think it's worth caring too much about cases where the
+> > DMA driver hasn't been compiled in, it's not like SPI is the only thing
 
-ChenYu
+> It's what the driver did to start with and it was requested to fall
+> back to non-DMA in the case DMA is not available.
 
->>> The settings for the slower timing modes seem to work despite being
->>> wrong, so leave them be.
->>
->>
->> If you're sure the timings are wrong, please fix them. Sometimes wrong
->> timings do seem to work, but lead to unreliable communication, or turn
->> out to work on some boards and not on others due to routing differences.
->
-> Unfortunately I did try putting in the correct numbers for them, and my
-> eMMC then failed to probe. It seems the core switches up from 400kHz to
-> 50MHz then to 50MHz DDR, and it fails somewhere in there, maybe at 50MHz.
->
-> I'm not sure if we need to add DT bindings to specify different delays
-> for different controllers, though. Seems like we'll never actually use
-> it.
->
-> Hope this answers your questions.
->
-> Regards
-> ChenYu
->
->> Thanks & Regards,
->>
->> Hans
->>
->>
->>
->>>
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>>  drivers/mmc/host/sunxi-mmc.c | 4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
->>> index 7fc8b7aa83f0..5873dc344ab2 100644
->>> --- a/drivers/mmc/host/sunxi-mmc.c
->>> +++ b/drivers/mmc/host/sunxi-mmc.c
->>> @@ -970,8 +970,8 @@ static const struct sunxi_mmc_clk_delay
->>> sun9i_mmc_clk_delays[] = {
->>>         [SDXC_CLK_400K]         = { .output = 180, .sample = 180 },
->>>         [SDXC_CLK_25M]          = { .output = 180, .sample =  75 },
->>>         [SDXC_CLK_50M]          = { .output = 150, .sample = 120 },
->>> -       [SDXC_CLK_50M_DDR]      = { .output =  90, .sample = 120 },
->>> -       [SDXC_CLK_50M_DDR_8BIT] = { .output =  90, .sample = 120 },
->>> +       [SDXC_CLK_50M_DDR]      = { .output =  54, .sample =  36 },
->>> +       [SDXC_CLK_50M_DDR_8BIT] = { .output =  72, .sample =  72 },
->>>  };
->>>
->>>  static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
->>>
->>
+Why?  I really can't see any sensible use case for this that doesn't
+have a better solution available.
+
+> It's possible to add a parameter like require_dma which could be used
+> to load the driver without dma if unset. If it was set by default then
+> driver ordering is not important so long as dma driver is loaded
+> eventually. Also an informative print that such parameter exists when
+> probing the driver is deferred would be helpful. It would probably
+> create quite a bit of log spam, however. The driver can be deferred
+> several times during boot.
+
+That seems fairly hacky, if we were going to do anything like that it
+should be the other way around so that we default to trying to use
+resources and even then it seems like something that should be handled
+at a framework level rather than having random options in individual
+drivers to ignore things.  Having things behave inconsistently between
+different drivers is going to lead to a worse user experience and if
+this is a good idea for one driver it seems like it'd be a good idea for
+all of them.
+
+But really 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160530/4ad69a21/attachment.sig>
