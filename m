@@ -1,42 +1,49 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Tue, 31 May 2016 10:09:39 -0700
-Subject: [PATCH v2 0/4] hw rng support for NSP SoC
-In-Reply-To: <20160531101934.GM15376@gondor.apana.org.au>
-References: <1464343841-29504-1-git-send-email-yendapally.reddy@broadcom.com>
- <20160531101934.GM15376@gondor.apana.org.au>
-Message-ID: <574DC553.4030009@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 31 May 2016 19:09:57 +0200
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun7i: Add dts file for
+ Bananapi M1 Plus board
+In-Reply-To: <574CA1ED.8050007@web.de>
+References: <20160530123013.11575-1-luoyi.ly@gmail.com>
+ <20160530194340.GE4908@lukather> <574CA1ED.8050007@web.de>
+Message-ID: <20160531170957.GM4908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2016 03:19 AM, Herbert Xu wrote:
-> On Fri, May 27, 2016 at 06:10:37AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
->> This patchset contains the hw random number generator support for the
->> Broadcom's NSP SoC. The block is similar to the block available in
->> bcm2835 with different default interrupt mask value. Due to lack of
->> documentation, I cannot confirm the interrupt mask register details
->> in bcm2835. In an effort to not break the existing functionality of
->> bcm2835, I used a different compatible string to mask the interrupt
->> for NSP SoC. Please let me know. Also supported providing requested
->> number of random numbers instead of static size of four bytes.
->>
->> The first patch contains the documentation changes and the second patch
->> contains the support for rng available in NSP SoC. The third patch
->> contains the device tree changes for NSP SoC. The fourth patch contains
->> the support for reading requested number of random numbers.
->>
->> This patch set has been tested on NSP bcm958625HR board.
->> This patch set is based on v4.6.0-rc1 and is available from github
->> repo: https://github.com/Broadcom/cygnus-linux.git
->> branch: nsp-rng-v2
->>
->> Changes since v1
+On Mon, May 30, 2016 at 10:26:21PM +0200, Bernhard Nortmann wrote:
+> Am 30.05.2016 um 21:43 schrieb Maxime Ripard:
+> >Hi,
+> >
+> >On Mon, May 30, 2016 at 08:30:13PM +0800, luoyi.ly at gmail.com wrote:
+> >>From: luoyi <luoyi.ly@gmail.com>
+> >>
+> >>Add support for the Bananapi M1 Plus A20 development board from sinovoip.com.cn .
+> >>This board features 1G RAM, 2 USB A receptacles, 1 micro USB receptacle for
+> >>OTG, 1 micro USB receptacle for power, HDMI, sata, Gbit ethernet, ir receiver,
+> >>3.5 mm jack for stero sound out, on board microphone, 40 gpio pins and sdio wifi.
+> >What is the difference between the M1+ and the M1?
 > 
-> All applied.
+> The M1+ is an updated version of the original Banana Pi. If you're
+> interested in the details, have a look at
+> http://linux-sunxi.org/Banana_Pi#Variants .  "BPi-M1+" is SinoVoip's
+> counterpart of LeMaker's "Banana Pro", for which a .dts already
+> exists. Judging from .fex files, only a single pin assignment seems
+> to differ between the two (audio_pa_ctrl, PH26 vs. PH15).
 
-FYI, ARM Device Tree patches usually go via ARM SoC pull requests, so it
-is best if this is planned in advance. Can you make sure you document
-that there could be a merge conflict in your pull request to Linus?
+Gee, that's confusing :)
 
-Thanks
+I guess we should just include the banana pro DTB and change that pin
+(and the i2s pins Luo was mentionning).
+
+Maxime
+
 -- 
-Florian
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/eba0f737/attachment.sig>
