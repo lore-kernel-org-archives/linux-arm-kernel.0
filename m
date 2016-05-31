@@ -1,62 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 May 2016 21:01:13 +0200
-Subject: [PATCH resend v2 5/6] ARM: dts: sun9i: a80-optimus: Disable
- dummy regulators vcc3v0, vcc3v3, vcc5v0
-In-Reply-To: <1464711804-19256-6-git-send-email-wens@csie.org>
-References: <1464711804-19256-1-git-send-email-wens@csie.org>
- <1464711804-19256-6-git-send-email-wens@csie.org>
-Message-ID: <20160531190113.GO4908@lukather>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 31 May 2016 15:01:24 -0400
+Subject: [PATCH 3/6] ARM: dts: exynos: Interrupt for USB DWC3-1 differs
+ between Exynos5420 and 5410
+In-Reply-To: <1464719945-3417-3-git-send-email-krzk@kernel.org>
+References: <1464719945-3417-1-git-send-email-krzk@kernel.org>
+ <1464719945-3417-3-git-send-email-krzk@kernel.org>
+Message-ID: <fca224e1-af8c-5540-d47a-9f05e494b2c4@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Krzysztof,
 
-On Wed, Jun 01, 2016 at 12:23:23AM +0800, Chen-Yu Tsai wrote:
-> These 3 regulators are provided in sunxi-common-regulators.dtsi.
-> 3.0V/3.3V and 5.0V are commonly used voltages in Allwinner devices.
-> These dummy regulators provide a stand-in when bindings that require
-> one, but the real regulator is not supported yet.
+On 05/31/2016 02:39 PM, Krzysztof Kozlowski wrote:
+> On Exynos5410 the SPI interrupt for second USB DWC3 (called DRD: Dual
+> Role Device) is different - 200 instead of 73.
 > 
-> Since these are no longer needed, we can disable them.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 > ---
->  arch/arm/boot/dts/sun9i-a80-optimus.dts | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+>  arch/arm/boot/dts/exynos5410.dtsi | 4 ++++
+>  arch/arm/boot/dts/exynos5420.dtsi | 4 ++++
+>  arch/arm/boot/dts/exynos54xx.dtsi | 1 -
+>  3 files changed, 8 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> index 6cfc02194035..991337d1d6f1 100644
-> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> @@ -322,6 +322,18 @@
+> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> index a937d9bdad90..994d16a44fe4 100644
+> --- a/arch/arm/boot/dts/exynos5410.dtsi
+> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> @@ -267,6 +267,10 @@
+>  	clock-names = "usbdrd30";
+>  };
 >  
->  #include "axp809.dtsi"
->  
-> +&reg_vcc3v0 {
-> +	status = "disabled";
-> +};
-> +
-> +&reg_vcc3v3 {
-> +	status = "disabled";
-> +};
-> +
-> +&reg_vcc5v0 {
-> +	status = "disabled";
-> +};
-> +
+> +&usbdrd_dwc3_1 {
+> +	interrupts = <0 200 0>;
 
-Why not remove the include entirely?
+Please use GIC_SPI from <dt-bindings/interrupt-controller/arm-gic.h> instead 0.
 
-Maxime
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
+Best regards,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/ea5464ad/attachment.sig>
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
