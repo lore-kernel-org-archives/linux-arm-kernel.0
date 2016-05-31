@@ -1,132 +1,59 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Tue, 31 May 2016 16:44:01 -0700
-Subject: [PATCH v1 5/6] dtb: xgene: Remove clock nodes
-In-Reply-To: <574BECE8.2050307@gmail.com>
-References: <1464333768-26150-1-git-send-email-isubramanian@apm.com>
- <1464333768-26150-6-git-send-email-isubramanian@apm.com>
- <574BECE8.2050307@gmail.com>
-Message-ID: <CAKh23FmM3Dfo+XQT++b0y0ETQJMgjngdxCcDxhLBRc4UVsrnAA@mail.gmail.com>
+From: johnyoun@synopsys.com (John Youn)
+Date: Tue, 31 May 2016 16:55:01 -0700
+Subject: [PATCH v2] reset: Return -ENOTSUPP when not configured
+Message-ID: <2b8732d98087e52edec39ec83a063912fcc23962.1464738402.git.johnyoun@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 12:34 AM, Matthias Brugger
-<matthias.bgg@gmail.com> wrote:
->
->
-> On 27/05/16 09:22, Iyappan Subramanian wrote:
->>
->> Since the MDIO will be responsible for clock reset, removing the clock
->> nodes from shadowcat xge0 and storm sgenet1.
->>
->> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
->> Tested-by: Fushen Chen <fchen@apm.com>
->> Tested-by: Toan Le <toanle@apm.com>
->> ---
->>   arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 12 ------------
->>   arch/arm64/boot/dts/apm/apm-storm.dtsi     | 18 ++++--------------
->>   2 files changed, 4 insertions(+), 26 deletions(-)
->>
->> diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
->> b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
->> index 8106957..f27563d 100644
->> --- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
->> +++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
->> @@ -299,17 +299,6 @@
->>                                 clock-output-names = "pcie1clk";
->>                         };
->>
->> -                       xge0clk: xge0clk at 1f61c000 {
->> -                               compatible = "apm,xgene-device-clock";
->> -                               #clock-cells = <1>;
->> -                               clocks = <&socplldiv2 0>;
->> -                               reg = <0x0 0x1f61c000 0x0 0x1000>;
->> -                               reg-names = "csr-reg";
->> -                               enable-mask = <0x3>;
->> -                               csr-mask = <0x3>;
->> -                               clock-output-names = "xge0clk";
->> -                       };
->> -
->
->
-> mdio at 0x1f610000 has xge0clk as input (patch 4), so deleting the node here
-> will break the device tree. I suppose the mdio consumes the menetclk as in
-> apm-storm.dtsi.
+Prior to commit 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo]
+functions wrappers"), the "optional" functions returned -ENOTSUPP when
+CONFIG_RESET_CONTROLLER was not set.
 
-I added back xge0clk.
+Revert back to the old behavior by changing the new
+__devm_reset_control_get() and __of_reset_control_get() functions to
+return ERR_PTR(-ENOTSUPP) when compiled without CONFIG_RESET_CONTROLLER.
 
->
-> Regards,
-> Matthias
->
->
->>                         xge1clk: xge1clk at 1f62c000 {
->>                                 compatible = "apm,xgene-device-clock";
->>                                 #clock-cells = <1>;
->> @@ -643,7 +632,6 @@
->>                         interrupts = <0 96 4>,
->>                                      <0 97 4>;
->>                         dma-coherent;
->> -                       clocks = <&xge0clk 0>;
->>                         local-mac-address = [00 01 73 00 00 01];
->>                         phy-connection-type = "sgmii";
->>                         phy-handle = <&sgenet0phy>;
->> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> b/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> index 18f694ea..f631fe4 100644
->> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
->> @@ -237,20 +237,11 @@
->>                                 clocks = <&socplldiv2 0>;
->>                                 reg = <0x0 0x1f21c000 0x0 0x1000>;
->>                                 reg-names = "csr-reg";
->> -                               csr-mask = <0x3>;
->> +                               csr-mask = <0xa>;
->> +                               enable-mask = <0xf>;
->>                                 clock-output-names = "sge0clk";
->>                         };
->>
->> -                       sge1clk: sge1clk at 1f21c000 {
->> -                               compatible = "apm,xgene-device-clock";
->> -                               #clock-cells = <1>;
->> -                               clocks = <&socplldiv2 0>;
->> -                               reg = <0x0 0x1f21c000 0x0 0x1000>;
->> -                               reg-names = "csr-reg";
->> -                               csr-mask = <0xc>;
->> -                               clock-output-names = "sge1clk";
->> -                       };
->> -
->>                         xge0clk: xge0clk at 1f61c000 {
->>                                 compatible = "apm,xgene-device-clock";
->>                                 #clock-cells = <1>;
->> @@ -938,9 +929,9 @@
->>                         reg-names = "enet_csr", "ring_csr", "ring_cmd";
->>                         interrupts = <0x0 0x3c 0x4>;
->>                         dma-coherent;
->> -                       clocks = <&menetclk 0>;
->>                         /* mac address will be overwritten by the
->> bootloader */
->>                         local-mac-address = [00 00 00 00 00 00];
->> +                       clocks = <&menetclk 0>;
->>                         phy-connection-type = "rgmii";
->>                         phy-handle = <&menetphy>;
->>                 };
->> @@ -955,8 +946,8 @@
->>                         interrupts = <0x0 0xA0 0x4>,
->>                                      <0x0 0xA1 0x4>;
->>                         dma-coherent;
->> -                       clocks = <&sge0clk 0>;
->>                         local-mac-address = [00 00 00 00 00 00];
->> +                       clocks = <&sge0clk 0>;
->>                         phy-connection-type = "sgmii";
->>                         phy-handle = <&sgenet0phy>;
->>                 };
->> @@ -972,7 +963,6 @@
->>                                      <0x0 0xAD 0x4>;
->>                         port-id = <1>;
->>                         dma-coherent;
->> -                       clocks = <&sge1clk 0>;
->>                         local-mac-address = [00 00 00 00 00 00];
->>                         phy-connection-type = "sgmii";
->>                         phy-handle = <&sgenet1phy>;
->>
->
+Otherwise they will return -EINVAL causing users to think that an error
+occurred when CONFIG_RESET_CONTROLLER is not set.
+
+Fixes: 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo] functions wrappers")
+Signed-off-by: John Youn <johnyoun@synopsys.com>
+---
+
+Hi Philipp,
+
+Here are the changes as discussed previously. It just returns
+-ENOTSUPP directly when not configured. Tested and works with DWC2
+driver with Dinh's patch that adds the reset controller, using a
+configuration with no reset controller configured.
+
+v2:
+* Return ERR_PTR(-ENOTSUPP) directly.
+
+
+ include/linux/reset.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index ec0306ce..067db57 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -71,14 +71,14 @@ static inline struct reset_control *__of_reset_control_get(
+ 					struct device_node *node,
+ 					const char *id, int index, int shared)
+ {
+-	return ERR_PTR(-EINVAL);
++	return ERR_PTR(-ENOTSUPP);
+ }
+ 
+ static inline struct reset_control *__devm_reset_control_get(
+ 					struct device *dev,
+ 					const char *id, int index, int shared)
+ {
+-	return ERR_PTR(-EINVAL);
++	return ERR_PTR(-ENOTSUPP);
+ }
+ 
+ #endif /* CONFIG_RESET_CONTROLLER */
+-- 
+2.8.2
