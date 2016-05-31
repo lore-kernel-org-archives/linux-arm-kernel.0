@@ -1,68 +1,63 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 31 May 2016 15:18:37 +0800
-Subject: [PATCH 13/23] mmc: sdhci-esdhc-imx: restore watermark level
- setting after resume
-In-Reply-To: <5731AA28.9030304@intel.com>
-References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
- <1460741387-23815-14-git-send-email-aisheng.dong@nxp.com>
- <5731AA28.9030304@intel.com>
-Message-ID: <20160531071837.GA4096@shlinux2>
+From: holgerschurig@gmail.com (Holger Schurig)
+Date: Tue, 31 May 2016 09:40:29 +0200
+Subject: [BUG] CONFIG_UNINLINE_SPIN_UNLOCK important for Cortex-A9
+Message-ID: <874m9eoetu.fsf@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2016 at 12:30:16PM +0300, Adrian Hunter wrote:
-> On 15/04/16 20:29, Dong Aisheng wrote:
-> > Currently, we config the watermark_level register only in probe.
-> > This will cause the mmc write operation timeout issue after system
-> > resume back in LPSR mode. Because in LPSR mode, after system resume
-> > back, the watermark_level register(0x44) changes to 0x08000880, which
-> > set the write watermark level as 0, and set the read watermark level
-> > as 128. This value is incorrect.
-> > 
-> > This patch restores the setting of watermark level register after
-> > system resume back.
-> 
-> In sdhci_esdhc_imx_probe() the watermark setting is conditional on
-> esdhc_is_usdhc(imx_data), but in the resume it is not.  Is that intended?
-> If so, maybe explain that in the commit message.
-> 
-
-Good catch!
-I think we'd probably better keep that condition check.
-Will update it in V2.
+I chased a bug in the recent weeks that seems to be related to spinlocks.
 
 
-> Might be worth pulling out the constant 0x10401040 and #defining it since it
-> is used in more than one place too.
-> 
 
-Good point!
-Will do it.
+Hardware & Kernel config
+------------------------
+I have an i.MX6Q device. I don't use "make imx_v6_v7_defconfig", but
+selected only what I need. As such, I only have CONFIG_ARCH_MXC and
+CONFIG_SOC_IMX6Q enabled.
 
-Regards
-Dong Aisheng
+As a result, in my kernel CONFIG_UNINLINE_SPIN_UNLOCK was *not* defined.
 
-> > 
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/mmc/host/sdhci-esdhc-imx.c | 5 +++++
-> >  1 file changed, 5 insertions(+)
-> > 
-> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > index 6fef6bc..4c28fbb 100644
-> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> > @@ -1261,6 +1261,11 @@ static int sdhci_esdhc_suspend(struct device *dev)
-> >  
-> >  static int sdhci_esdhc_resume(struct device *dev)
-> >  {
-> > +	struct sdhci_host *host = dev_get_drvdata(dev);
-> > +
-> > +	/* restore watermark setting in case it's lost in low power mode */
-> > +	writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
-> > +
-> >  	return sdhci_pltfm_resume(dev);
-> >  }
-> >  
-> > 
-> 
+In a kernel configured with "make imx_v6_v7_defconfig" this is
+configured. And so people (e.g. the Freescale/NPX people) that normally
+use this defconfig will never see the issue.
+
+
+
+Reproduction
+------------
+There is a test tool called "stress-ng" in Debian, already compiled for
+armhf.
+
+If you run "stress-ng --sock 5 --timeout 999999" then you'll get weird
+errors within 1 ... 30 hours. It's always some kernel OOPS, and
+differing. Usually it's in the network stack, but not always. At it's
+core the skb's seem to be inconsistent. I can submit oops logs if you
+want.
+
+This stress-ng starts 5 unix domain listeners, and 5 unix domain senders
+(and one manager process). They send and receive at full speed. If you
+run top, you see that on a 4 core system they eat 79% of system time on
+each processor.
+
+My assumption is that those processes fight over the list head of the
+skb list and use therefore heavily spinlocks.
+
+
+
+Cure
+----
+When I turned on CONFIG_PROVE_RCU the issue stopped. This option does
+"select UNINLINE_SPIN_UNLOCK", and this uninline option is also selected
+with the imx_v6_v7_defconfig. I actually don't care if RCUs are proven
+or not, this just turns on the uninlining as a side-effect.
+
+
+
+Question
+--------
+I don't have the slightest idea what produces the error and why
+uninlining helps (I'm not deep in such internals), so I wonder how to
+proceed.
+
+Should I simply send in a patch that "select UNINLINE_SPIN_UNLOCK" on
+i.MX6Q ???
