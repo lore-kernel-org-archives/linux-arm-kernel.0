@@ -1,44 +1,21 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Tue, 31 May 2016 10:55:20 +0200
-Subject: [PATCH v4 11/18] ARM: multi_v7_defconfig: Enable STi and
- simple-card drivers.
-In-Reply-To: <1464192412-16386-13-git-send-email-peter.griffin@linaro.org>
-References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
- <1464192412-16386-13-git-send-email-peter.griffin@linaro.org>
-Message-ID: <574D5178.5030200@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 31 May 2016 10:56:46 +0200
+Subject: [PATCH] pinctrl: uniphier: fix .pin_dbg_show() callback
+In-Reply-To: <1464676210-16508-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1464676210-16508-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdbwD5Kb+HG+T2Geo4fN272CD2iAgDH4qSkgo8HgA4U3SQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, May 31, 2016 at 8:30 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
 
-On 05/25/2016 06:06 PM, Peter Griffin wrote:
-> This patch enables the STi ALSA drivers found on STi platforms
-> as well as the simple-card driver which is a dependency to have
-> working sound.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> Cc: arnaud.pouliquen at st.com
-> Cc: broonie at kernel.org
-> ---
->  arch/arm/configs/multi_v7_defconfig | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 5eee45b..0ced665 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
-> @@ -589,6 +589,9 @@ CONFIG_SND_SOC_AK4642=m
->  CONFIG_SND_SOC_SGTL5000=m
->  CONFIG_SND_SOC_SPDIF=m
->  CONFIG_SND_SOC_WM8978=m
-> +CONFIG_SND_SOC_STI=m
-> +CONFIG_SND_SOC_STI_SAS=m
-> +CONFIG_SND_SIMPLE_CARD=m
-Simple card config seems enabled by default, at least on 4.7 rc1.
+> Without this, reading the "pins" in the debugfs causes kernel BUG.
+>
+> Fixes: 6e9088920258 ("pinctrl: UniPhier: add UniPhier pinctrl core support")
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Regards,
-Arnaud
->  CONFIG_USB=y
->  CONFIG_USB_XHCI_HCD=y
->  CONFIG_USB_XHCI_MVEBU=y
-> 
+Patch applied.
+
+Yours,
+Linus Walleij
