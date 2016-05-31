@@ -1,37 +1,34 @@
-From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue, 31 May 2016 14:08:10 +0800
-Subject: [PATCH 3/3] sbsa_gwdt: Set WDOG_HW_RUNNING,
- when watchdog is already running.
-In-Reply-To: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
-References: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1464674890-10512-4-git-send-email-fu.wei@linaro.org>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Tue, 31 May 2016 08:27:15 +0200
+Subject: pxa_defconfig runtime failures due to 'ARM: pxa: activate pinctrl
+ for device-tree machines'
+In-Reply-To: <574A0AD1.9000304@roeck-us.net> (Guenter Roeck's message of "Sat,
+ 28 May 2016 14:17:05 -0700")
+References: <20160527202715.GA4841@roeck-us.net>
+ <87a8jah9ok.fsf@belgarion.home> <574A0AD1.9000304@roeck-us.net>
+Message-ID: <87vb1ueo8s.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pratyush Anand <panand@redhat.com>
+Guenter Roeck <linux@roeck-us.net> writes:
 
-This patch uses the new flag WDOG_HW_RUNNING in driver.
-According to the definition of this flag, it should be set,
-if watchdog is running after booting, before it's opened.
+> On 05/28/2016 01:24 AM, Robert Jarzmik wrote:
+>> Guenter Roeck <linux@roeck-us.net> writes:
+>>
+>>> Hi,
+>> I'd rather say that pxa_defconfig doesn't work anymore on any legacy system.
+>> Its first purpose was to ensure compilation coverage of all legacy pxa systems.
+>> Its second one was to have a single kernel bootable on all legacy pxa systems.
+>>
+>> Therefore, would you tell me if the patch in [1] fixes your issue ?
+>>
+>
+> Yes, it does. It is actually the workaround I deployed for my test builds,
+> since I thought that the change was on purpose.
 
-Signed-off-by: Pratyush Anand <panand@redhat.com>
-Signed-off-by: Fu Wei <fu.wei@linaro.org>
----
- drivers/watchdog/sbsa_gwdt.c | 2 ++
- 1 file changed, 2 insertions(+)
+Good. Can I take that as a Tested-by ?
 
-diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
-index 6af71e0..cc885f1 100644
---- a/drivers/watchdog/sbsa_gwdt.c
-+++ b/drivers/watchdog/sbsa_gwdt.c
-@@ -283,6 +283,8 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
- 		dev_warn(dev, "System reset by WDT.\n");
- 		wdd->bootstatus |= WDIOF_CARDRESET;
- 	}
-+	if (status & SBSA_GWDT_WCS_EN)
-+		set_bit(WDOG_HW_RUNNING, &wdd->status);
- 
- 	if (action) {
- 		irq = platform_get_irq(pdev, 0);
+Cheers.
+
 -- 
-2.5.5
+Robert
