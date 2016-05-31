@@ -1,84 +1,95 @@
-From: John.Youn@synopsys.com (John Youn)
-Date: Mon, 30 May 2016 22:53:18 -0700
-Subject: [PATCH] reset: Put back *_optional variants
-In-Reply-To: <5cf9f346-9b6e-d521-612c-9edd167aa759@redhat.com>
-References: <ca359e013c30f27c825a9580164b01da5ca6476d.1464224883.git.johnyoun@synopsys.com>
- <12e450f0-70ea-29f8-0bf7-8a0697263f2d@redhat.com>
- <57476E48.2060204@synopsys.com>
- <dcf6372f-4910-bd03-f1b5-c7e0086fdead@redhat.com>
- <1464603520.3808.34.camel@pengutronix.de>
- <5cf9f346-9b6e-d521-612c-9edd167aa759@redhat.com>
-Message-ID: <da7e41b2-de80-c692-e7ec-ba8231dadb0a@synopsys.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 31 May 2016 13:52:38 +0800
+Subject: [PATCH v2,
+ 1/5] dt-bindings: mt8173-xhci: support host side of dual-role mode
+In-Reply-To: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1464673962-11506-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/30/2016 4:32 AM, Hans de Goede wrote:
-> Hi,
-> 
-> On 30-05-16 12:18, Philipp Zabel wrote:
->> Hi,
->>
->> Am Freitag, den 27.05.2016, 09:06 +0200 schrieb Hans de Goede:
->> [...]
->>>>> So IMHO the following change would be a better way to fix this:
->>>>>
->>>>> --- a/include/linux/reset.h
->>>>> +++ b/include/linux/reset.h
->>>>> @@ -65,14 +65,14 @@ static inline struct reset_control *__of_reset_control_get(
->>>>>                                          struct device_node *node,
->>>>>                                          const char *id, int index, int shared)
->>>>>   {
->>>>> -   return ERR_PTR(-EINVAL);
->>>>> + return ERR_PTR(-ENOTSUPP);
->>>>>   }
->>>>>
->>>>>   static inline struct reset_control *__devm_reset_control_get(
->>>>>                                          struct device *dev,
->>>>>                                          const char *id, int index, int shared)
->>>>>   {
->>>>> -   return ERR_PTR(-EINVAL);
->>>>> + return ERR_PTR(-ENOTSUPP);
->>>>>   }
->>>>>
->>>>>   #endif /* CONFIG_RESET_CONTROLLER */
->>>>
->>>>
->>>> I'm good with this. However, per Philipp on a previous thread, the
->>>> intended behavior is to return -EINVAL for the non-optional functions.
->>>>
->>>> http://marc.info/?l=linux-usb&m=146156945528848&w=2
->>
->> Adding Dinh to Cc: because he wanted this changed from -EINVAL.
->> My point then was that WARN_ON + -EINVAL is indented in this case.
->>
->> Given that the warning backtrace already helps to identify the issue
->> (CONFIG_RESET_CONTROLLER disabled), and that changing the return value
->> to -ENOTSUPP improves consistency with the rest of the API and reduces
->> the amount of inline wrappers, I concur.
->>
->>> As Philipp rightfully points out, calling the non-optional functions
->>> without CONFIG_RESET_CONTROLLER is a no-no, so IMHO we should not have to
->>> care too much about the error code in that case, as long as we return
->>> an error.
->>>
->>> Also note that even before my patch things were already inconsistent
->>> with the of_...get... functions already always returning
->>> -ENOTSUPP when CONFIG_RESET_CONTROLLER was not set, to me it seems
->>> best and also KISS to just return -ENOTSUPP from all get functions
->>> when CONFIG_RESET_CONTROLLER is not set.
->>>
->>> Anyways this is Philipp's call, this is all just my 2 cents.
->>
->> Let the stubs return -ENOTSUPP consistently. A quick grep doesn't show
->> any driver handling -EINVAL explicitly either.
-> 
-> Great.
-> 
-> John Youn, can you submit a patch changing the return of the stubs
-> from -EINVAL to -ENOTSUPP please ?
-> 
+Some resources, such as IPPC register etc, shared with device
+driver are moved into common glue layer when xHCI driver is the
+host side of dual-role mode and they should be changed as optional
+properties if they are required ones before. For clarity, add
+a new part of binding to support host side of dual-role mode.
 
-Sure. I'll send a patch tomorrow.
+Additionally add optional properties of pinctrl for host only mode
 
-Regards,
-John
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/usb/mt8173-xhci.txt        |   48 ++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+index b3a7ffa..542e3fa 100644
+--- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -2,6 +2,14 @@ MT8173 xHCI
+ 
+ The device node for Mediatek SOC USB3.0 host controller
+ 
++There are two scenarios: the first one only supports xHCI driver;
++the second one supports dual-role mode, and the host is based on xHCI
++driver. Take account of backward compatibility, we divide bindings
++into two parts.
++
++1st: only supports xHCI driver
++------------------------------------------------------------------------
++
+ Required properties:
+  - compatible : should contain "mediatek,mt8173-xhci"
+  - reg : specifies physical base address and size of the registers,
+@@ -27,6 +35,9 @@ Optional properties:
+ 	control register, it depends on "mediatek,wakeup-src".
+  - vbus-supply : reference to the VBUS regulator;
+  - usb3-lpm-capable : supports USB3.0 LPM
++ - pinctl-names : a pinctrl state named "default" must be defined
++ - pinctrl-0 : pin control group
++	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
+ 
+ Example:
+ usb30: usb at 11270000 {
+@@ -49,3 +60,40 @@ usb30: usb at 11270000 {
+ 	mediatek,syscon-wakeup = <&pericfg>;
+ 	mediatek,wakeup-src = <1>;
+ };
++
++2nd: dual-role mode with xHCI driver
++------------------------------------------------------------------------
++
++In the case, xhci is added as subnode to mtu3. An example and the DT binding
++details of mtu3 can be found in:
++Documentation/devicetree/bindings/usb/mtu3.txt
++
++Required properties:
++ - compatible : should contain "mediatek,mt8173-xhci"
++ - reg : specifies physical base address and size of the registers,
++	should be only for xHCI IP registers
++ - interrupts : interrupt used by the host controller
++ - power-domains : a phandle to USB power domain node to control USB's
++	mtcmos
++ - vusb33-supply : regulator of USB avdd3.3v
++
++ - clocks : a list of phandle + clock-specifier pairs, one for each
++	entry in clock-names
++ - clock-names : must be
++	"sys_ck": for clock of xHCI MAC
++
++Optional properties:
++ - vbus-supply : reference to the VBUS regulator;
++ - usb3-lpm-capable : supports USB3.0 LPM
++
++Example:
++usb30: usb at 11270000 {
++	compatible = "mediatek,mt8173-xhci";
++	reg = <0 0x11270000 0 0x1000>;
++	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>;
++	clock-names = "sys_ck";
++	vusb33-supply = <&mt6397_vusb_reg>;
++	usb3-lpm-capable;
++};
+-- 
+1.7.9.5
