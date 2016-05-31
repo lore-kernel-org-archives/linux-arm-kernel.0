@@ -1,135 +1,184 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 31 May 2016 12:32:08 +0900
-Subject: [RFC 4/4] ARM: dts: r8a7790: lager: use demuxer for IIC3/I2C3
-In-Reply-To: <1464665528-11398-1-git-send-email-horms+renesas@verge.net.au>
-References: <1464665528-11398-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1464665528-11398-5-git-send-email-horms+renesas@verge.net.au>
+From: vikas.cha.sajjan@hpe.com (Sajjan, Vikas C)
+Date: Tue, 31 May 2016 04:57:13 +0000
+Subject: [PATCH] Add support to parse RASF Table
+In-Reply-To: <TU4PR84MB0079FF2412932840DBE794C0C2770@TU4PR84MB0079.NAMPRD84.PROD.OUTLOOK.COM>
+References: <1462796276-3987-1-git-send-email-nagendra.k-v@hpe.com>
+ <TU4PR84MB0079FF2412932840DBE794C0C2770@TU4PR84MB0079.NAMPRD84.PROD.OUTLOOK.COM>
+Message-ID: <TU4PR84MB004598D95417F3C00FC6BFC7D9460@TU4PR84MB0045.NAMPRD84.PROD.OUTLOOK.COM>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a separate bus for dla98063 PMIC and da9210 regulator
-related I2C slaves.
+Hi Bob,
 
-Based on similar work for HDMI by Wolfram Sang.
+Any thoughts on this patch
 
-Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Regards
+Vikas Sajjan
+
+-----Original Message-----
+From: K V, Nagendra 
+Sent: Monday, May 16, 2016 2:05 PM
+To: robert.moore at intel.com
+Cc: Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>; Lakshminarasimha, Sunil Vishwanathpur <sunil.vl@hpe.com>; devel at acpica.org; linux-acpi at vger.kernel.org
+Subject: RE: [PATCH] Add support to parse RASF Table
+
+Bob,
+
+Did you get chance to look into this?
+
+Regards
+Nagendra
+
+-----Original Message-----
+From: K V, Nagendra 
+Sent: Monday, May 09, 2016 5:48 PM
+To: robert.moore at intel.com
+Cc: Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>; Lakshminarasimha, Sunil Vishwanathpur <sunil.vl@hpe.com>; devel at acpica.org; K V, Nagendra <nagendra.k-v@hpe.com>
+Subject: [PATCH] Add support to parse RASF Table
+
+This patch adds support to parse RASF table. Currently RASF table is not being recognized.
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 80 +++++++++++++++++++++++--------------
- 1 file changed, 49 insertions(+), 31 deletions(-)
+ source/common/ahtable.c      |  1 +
+ source/common/dmtable.c      |  7 +++++++
+ source/common/dmtbinfo.c     | 13 +++++++++++++
+ source/compiler/dtcompiler.h |  1 +
+ source/compiler/dttemplate.h | 11 +++++++++++
+ source/compiler/dtutils.c    |  5 +++++
+ source/include/acdisasm.h    |  2 ++
+ 7 files changed, 40 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index aa316bc358e1..d5fafdf3bcbd 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -53,6 +53,7 @@
- 		i2c8 = "i2cexio0";
- 		i2c9 = "i2cexio1";
- 		i2c10 = "i2chdmi";
-+		i2c11 = "i2cpwr";
- 	};
+diff --git a/source/common/ahtable.c b/source/common/ahtable.c index 021ae33..59ddc83 100644
+--- a/source/common/ahtable.c
++++ b/source/common/ahtable.c
+@@ -196,6 +196,7 @@ const AH_TABLE      AcpiSupportedTables[] =
+     {ACPI_SIG_NFIT, "NVDIMM Firmware Interface Table"},
+     {ACPI_SIG_PCCT, "Platform Communications Channel Table"},
+     {ACPI_SIG_PMTT, "Platform Memory Topology Table"},
++    {ACPI_SIG_RASF, "RAS Features Table"},
+     {ACPI_RSDP_NAME,"Root System Description Pointer"},
+     {ACPI_SIG_RSDT, "Root System Description Table"},
+     {ACPI_SIG_S3PT, "S3 Performance Table"}, diff --git a/source/common/dmtable.c b/source/common/dmtable.c index 51d91f8..321407c 100644
+--- a/source/common/dmtable.c
++++ b/source/common/dmtable.c
+@@ -430,6 +430,7 @@ const ACPI_DMTABLE_DATA     AcpiDmTableData[] =
+     {ACPI_SIG_NFIT, AcpiDmTableInfoNfit,    AcpiDmDumpNfit, DtCompileNfit,  TemplateNfit},
+     {ACPI_SIG_PCCT, AcpiDmTableInfoPcct,    AcpiDmDumpPcct, DtCompilePcct,  TemplatePcct},
+     {ACPI_SIG_PMTT, NULL,                   AcpiDmDumpPmtt, DtCompilePmtt,  TemplatePmtt},
++    {ACPI_SIG_RASF, AcpiDmTableInfoRasf,    NULL,           NULL,           TemplateRasf},
+     {ACPI_SIG_RSDT, NULL,                   AcpiDmDumpRsdt, DtCompileRsdt,  TemplateRsdt},
+     {ACPI_SIG_S3PT, NULL,                   NULL,           NULL,           TemplateS3pt},
+     {ACPI_SIG_SBST, AcpiDmTableInfoSbst,    NULL,           NULL,           TemplateSbst},
+@@ -916,6 +917,11 @@ AcpiDmDumpTable (
+             ByteLength = 10;
+             break;
  
- 	chosen {
-@@ -344,6 +345,42 @@
- 			};
- 		};
- 	};
++        case ACPI_DMT_RASF:
 +
-+	i2cpwr: i2c-11 {
-+		compatible = "i2c-demux-pinctrl";
-+		i2c-parent = <&iic3>, <&i2c3>;
-+		i2c-bus-name = "i2c-pwr";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++            ByteLength = 12;
++            break;
 +
-+		pmic at 58 {
-+			compatible = "dlg,da9063";
-+			reg = <0x58>;
-+			interrupt-parent = <&irqc0>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+			interrupt-controller;
-+
-+			rtc {
-+				compatible = "dlg,da9063-rtc";
-+			};
-+
-+			wdt {
-+				compatible = "dlg,da9063-watchdog";
-+			};
-+		};
-+
-+		vdd_dvfs: regulator at 68 {
-+			compatible = "dlg,da9210";
-+			reg = <0x68>;
-+			interrupt-parent = <&irqc0>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <1000000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+	};
- };
+         case ACPI_DMT_BUF16:
+         case ACPI_DMT_UUID:
  
- &du {
-@@ -486,6 +523,11 @@
- 		function = "iic2";
- 	};
+@@ -1048,6 +1054,7 @@ AcpiDmDumpTable (
  
-+	i2c3_pins: i2c3 {
-+		groups = "i2c3";
-+		function = "i2c3";
-+	};
+         /* Integer Data Types */
+ 
++        case ACPI_DMT_RASF:
+         case ACPI_DMT_UINT8:
+         case ACPI_DMT_UINT16:
+         case ACPI_DMT_UINT24:
+diff --git a/source/common/dmtbinfo.c b/source/common/dmtbinfo.c index 5520da2..3896b69 100644
+--- a/source/common/dmtbinfo.c
++++ b/source/common/dmtbinfo.c
+@@ -178,6 +178,7 @@
+ #define ACPI_NFIT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_NFIT,f)
+ #define ACPI_PCCT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_PCCT,f)
+ #define ACPI_PMTT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_PMTT,f)
++#define ACPI_RASF_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_RASF,f)
+ #define ACPI_S3PT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_S3PT,f)
+ #define ACPI_SBST_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_SBST,f)
+ #define ACPI_SLIT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_SLIT,f)
+@@ -2512,6 +2513,18 @@ ACPI_DMTABLE_INFO           AcpiDmTableInfoPmtt2[] =
+ 
+ /*******************************************************************************
+  *
++ * RASF -  RAS Feature table
++ *
++ **********************************************************************
++ ********/
 +
- 	iic3_pins: iic3 {
- 		groups = "iic3";
- 		function = "iic3";
-@@ -696,38 +738,14 @@
- 	clock-frequency = <100000>;
- };
- 
--&iic3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&iic3_pins>;
--	status = "okay";
--
--	pmic at 58 {
--		compatible = "dlg,da9063";
--		reg = <0x58>;
--		interrupt-parent = <&irqc0>;
--		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
--		interrupt-controller;
--
--		rtc {
--			compatible = "dlg,da9063-rtc";
--		};
--
--		wdt {
--			compatible = "dlg,da9063-watchdog";
--		};
--	};
--
--	vdd_dvfs: regulator at 68 {
--		compatible = "dlg,da9210";
--		reg = <0x68>;
--		interrupt-parent = <&irqc0>;
--		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+&i2c3	{
-+	pinctrl-0 = <&i2c3_pins>;
-+	pinctrl-names = "i2c-pwr";
++ACPI_DMTABLE_INFO           AcpiDmTableInfoRasf[] =
++{
++    {ACPI_DMT_RASF,     ACPI_RASF_OFFSET (ChannelId[0]),            "Channel Identifier", 0},
++    ACPI_DMT_TERMINATOR
 +};
- 
--		regulator-min-microvolt = <1000000>;
--		regulator-max-microvolt = <1000000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
-+&iic3	{
-+	pinctrl-0 = <&iic3_pins>;
-+	pinctrl-names = "i2c-pwr";
++
++/**********************************************************************
++*********
++ *
+  * S3PT - S3 Performance Table
+  *
+  ******************************************************************************/
+diff --git a/source/compiler/dtcompiler.h b/source/compiler/dtcompiler.h index eb85ddc..1072f52 100644
+--- a/source/compiler/dtcompiler.h
++++ b/source/compiler/dtcompiler.h
+@@ -681,6 +681,7 @@ extern const unsigned char  TemplateMtmr[];  extern const unsigned char  TemplateNfit[];  extern const unsigned char  TemplatePcct[];  extern const unsigned char  TemplatePmtt[];
++extern const unsigned char  TemplateRasf[];
+ extern const unsigned char  TemplateRsdt[];  extern const unsigned char  TemplateS3pt[];  extern const unsigned char  TemplateSbst[]; diff --git a/source/compiler/dttemplate.h b/source/compiler/dttemplate.h index e420ec4..d17b2af 100644
+--- a/source/compiler/dttemplate.h
++++ b/source/compiler/dttemplate.h
+@@ -978,6 +978,17 @@ const unsigned char TemplatePmtt[] =
+     0x00,0x00,0x00,0x00                       /* 000000B0    "...."     */
  };
  
- &pci0 {
--- 
-2.1.4
++const unsigned char TemplateRasf[] =
++{
++    0x42,0x45,0x52,0x54,0x30,0x00,0x00,0x00,  /* 00000000    "RASF0..." */
++    0x01,0x15,0x49,0x4E,0x54,0x45,0x4C,0x20,  /* 00000008    "..INTEL " */
++    0x54,0x45,0x4D,0x50,0x4C,0x41,0x54,0x45,  /* 00000010    "TEMPLATE" */
++    0x01,0x00,0x00,0x00,0x49,0x4E,0x54,0x4C,  /* 00000018    "....INTL" */
++    0x28,0x05,0x10,0x20,0x00,0x00,0x00,0x00,  /* 00000020    "(.. ...." */
++    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  /* 00000028    "........" */
++    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00   /* 00000030    "........" */
++};
++
+ const unsigned char TemplateRsdp[] =
+ {
+     0x52,0x53,0x44,0x20,0x50,0x54,0x52,0x20,  /* 00000000    "RSD PTR " */
+diff --git a/source/compiler/dtutils.c b/source/compiler/dtutils.c index 6ca418c..774db8b 100644
+--- a/source/compiler/dtutils.c
++++ b/source/compiler/dtutils.c
+@@ -688,6 +688,11 @@ DtGetFieldLength (
+         ByteLength = 10;
+         break;
+ 
++    case ACPI_DMT_RASF:
++
++        ByteLength = 12;
++        break;
++
+     case ACPI_DMT_BUF16:
+     case ACPI_DMT_UUID:
+ 
+diff --git a/source/include/acdisasm.h b/source/include/acdisasm.h index ba8f274..d59e4d9 100644
+--- a/source/include/acdisasm.h
++++ b/source/include/acdisasm.h
+@@ -227,6 +227,7 @@ typedef enum
+     ACPI_DMT_NFIT,
+     ACPI_DMT_PCCT,
+     ACPI_DMT_PMTT,
++    ACPI_DMT_RASF,
+     ACPI_DMT_SLIC,
+     ACPI_DMT_SRAT,
+ 
+@@ -458,6 +459,7 @@ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoPcctHdr[];
+ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoPcct0[];
+ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoPcct1[];
+ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoPcct2[];
++extern ACPI_DMTABLE_INFO        AcpiDmTableInfoRasf[];
+ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoRsdp1[];
+ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoRsdp2[];
+ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoS3pt[];
+--
+2.5.0
