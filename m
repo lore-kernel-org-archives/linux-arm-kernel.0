@@ -1,30 +1,64 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 31 May 2016 20:39:01 +0200
-Subject: [PATCH 2/6] clk: samsung: exynos5410: Add TMU clock
+Date: Tue, 31 May 2016 20:39:02 +0200
+Subject: [PATCH 3/6] ARM: dts: exynos: Interrupt for USB DWC3-1 differs
+ between Exynos5420 and 5410
 In-Reply-To: <1464719945-3417-1-git-send-email-krzk@kernel.org>
 References: <1464719945-3417-1-git-send-email-krzk@kernel.org>
-Message-ID: <1464719945-3417-2-git-send-email-krzk@kernel.org>
+Message-ID: <1464719945-3417-3-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock for TMU to the Exynos5410 clock driver.
+On Exynos5410 the SPI interrupt for second USB DWC3 (called DRD: Dual
+Role Device) is different - 200 instead of 73.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- drivers/clk/samsung/clk-exynos5410.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/exynos5410.dtsi | 4 ++++
+ arch/arm/boot/dts/exynos5420.dtsi | 4 ++++
+ arch/arm/boot/dts/exynos54xx.dtsi | 1 -
+ 3 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
-index 6c2e59c576ee..db9978dc6e83 100644
---- a/drivers/clk/samsung/clk-exynos5410.c
-+++ b/drivers/clk/samsung/clk-exynos5410.c
-@@ -160,6 +160,7 @@ static struct samsung_div_clock exynos5410_div_clks[] __initdata = {
- static struct samsung_gate_clock exynos5410_gate_clks[] __initdata = {
- 	GATE(CLK_MCT, "mct", "aclk66", GATE_IP_PERIS, 18, 0, 0),
- 	GATE(CLK_RTC, "rtc", "aclk66", GATE_IP_PERIS, 20, 0, 0),
-+	GATE(CLK_TMU, "tmu", "aclk66", GATE_IP_PERIS, 21, 0, 0),
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index a937d9bdad90..994d16a44fe4 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -267,6 +267,10 @@
+ 	clock-names = "usbdrd30";
+ };
  
- 	GATE(CLK_SCLK_MMC0, "sclk_mmc0", "div_mmc_pre0",
- 			SRC_MASK_FSYS, 0, CLK_SET_RATE_PARENT, 0),
++&usbdrd_dwc3_1 {
++	interrupts = <0 200 0>;
++};
++
+ &usbdrd_phy1 {
+ 	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
+ 	clock-names = "phy", "ref";
+diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
+index 8b1e706e9250..265747bb19d1 100644
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
+@@ -1046,6 +1046,10 @@
+ 	clock-names = "usbdrd30";
+ };
+ 
++&usbdrd_dwc3_1 {
++	interrupts = <0 73 0>;
++};
++
+ &usbdrd_phy1 {
+ 	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
+ 	clock-names = "phy", "ref";
+diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
+index 44a8391c8524..0eb8aa31b7d9 100644
+--- a/arch/arm/boot/dts/exynos54xx.dtsi
++++ b/arch/arm/boot/dts/exynos54xx.dtsi
+@@ -141,7 +141,6 @@
+ 			usbdrd_dwc3_1: dwc3 at 12400000 {
+ 				compatible = "snps,dwc3";
+ 				reg = <0x12400000 0x10000>;
+-				interrupts = <0 73 0>;
+ 				phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
+ 				phy-names = "usb2-phy", "usb3-phy";
+ 			};
 -- 
 2.7.4
