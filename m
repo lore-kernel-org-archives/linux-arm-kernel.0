@@ -1,112 +1,39 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Tue, 31 May 2016 19:27:25 +0800
-Subject: [PATCH v2 5/5] arm64/numa: avoid inconsistent information to be
- printed
-In-Reply-To: <574D543A.2090406@suse.com>
-References: <1464427377-12712-1-git-send-email-thunder.leizhen@huawei.com>
- <1464427377-12712-6-git-send-email-thunder.leizhen@huawei.com>
- <574D543A.2090406@suse.com>
-Message-ID: <574D751D.9020901@huawei.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 31 May 2016 12:33:00 +0100
+Subject: [PATCH 0/3] arm64: Kill ESR_LNX_EXEC
+Message-ID: <1464694383-31700-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Currently we (ab)use a reserved bit in ESR_ELx for our own purposes as
+ESR_LNX_EXEC, which isn't ideal, especially as we're inconsistent with our
+mnemonic usage. This series removes ESR_LNX_EXEC entirely, avoiding (ab)use of
+reserved ESR_ELx bits, and makes things a little more consistent.
+
+I've extracted this from my entry-deasm branch [1], and rebased to v4.7-rc1.
+I've split the KVM changes as the KVM code is undergoing rapid change these
+days, and it should be possible to take those as a subsequent cleanup rather
+than forcing a painful merging process.
+
+Thanks,
+Mark.
+
+[1] https://git.kernel.org/cgit/linux/kernel/git/mark/linux.git/log/?h=arm64/entry-deasm
 
 
-On 2016/5/31 17:07, Matthias Brugger wrote:
-> 
-> 
-> On 28/05/16 11:22, Zhen Lei wrote:
->> numa_init(of_numa_init) may returned error because of numa configuration
->> error. So "No NUMA configuration found" is inaccurate. In fact, specific
->> configuration error information should be immediately printed by the
->> testing branch.
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
-> 
-> Which kernel version is this patch based on?
+Mark Rutland (3):
+  arm64: add macro to extract ESR_ELx.EC
+  arm64/kvm: use ESR_ELx_EC to extract EC
+  arm64: kill ESR_LNX_EXEC
 
-Base on mainline(git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git), I git pulled about 3-5 days ago, the last commit-id is dc03c0f.
+ arch/arm64/include/asm/esr.h         |  1 +
+ arch/arm64/include/asm/kvm_emulate.h |  2 +-
+ arch/arm64/kernel/entry.S            |  2 +-
+ arch/arm64/kernel/traps.c            |  2 +-
+ arch/arm64/kvm/handle_exit.c         |  4 ++--
+ arch/arm64/kvm/hyp/switch.c          |  2 +-
+ arch/arm64/mm/fault.c                | 15 +++++++++------
+ 7 files changed, 16 insertions(+), 12 deletions(-)
 
-And thess patches base on https://lkml.org/lkml/2016/5/24/679 series(acpi numa) as David Daney's requirement.
-
-> 
-> Regards,
-> Matthias
-> 
->>   arch/arm64/mm/numa.c | 6 +++---
->>   drivers/of/of_numa.c | 7 +++----
->>   2 files changed, 6 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
->> index 2601660..1b9622c 100644
->> --- a/arch/arm64/mm/numa.c
->> +++ b/arch/arm64/mm/numa.c
->> @@ -338,8 +338,10 @@ static int __init numa_init(int (*init_func)(void))
->>       if (ret < 0)
->>           return ret;
->>
->> -    if (nodes_empty(numa_nodes_parsed))
->> +    if (nodes_empty(numa_nodes_parsed)) {
->> +        pr_info("No NUMA configuration found\n");
->>           return -EINVAL;
->> +    }
->>
->>       ret = numa_register_nodes();
->>       if (ret < 0)
->> @@ -370,8 +372,6 @@ static int __init dummy_numa_init(void)
->>
->>       if (numa_off)
->>           pr_info("NUMA disabled\n"); /* Forced off on command line. */
->> -    else
->> -        pr_info("No NUMA configuration found\n");
->>       pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
->>              0LLU, PFN_PHYS(max_pfn) - 1);
->>
->> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
->> index fb62307..3157130 100644
->> --- a/drivers/of/of_numa.c
->> +++ b/drivers/of/of_numa.c
->> @@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
->>       struct device_node *np = NULL;
->>       struct resource rsrc;
->>       u32 nid;
->> -    int i, r = 0;
->> +    int i, r;
->>
->>       for_each_node_by_type(np, "memory") {
->>           r = of_property_read_u32(np, "numa-node-id", &nid);
->> @@ -81,12 +81,11 @@ static int __init of_numa_parse_memory_nodes(void)
->>           if (!i || r) {
->>               of_node_put(np);
->>               pr_err("NUMA: bad property in memory node\n");
->> -            r = r ? : -EINVAL;
->> -            break;
->> +            return r ? : -EINVAL;
->>           }
->>       }
->>
->> -    return r;
->> +    return 0;
->>   }
->>
-> 
-> Well this is fixing changes you introduced in this patch-set. Any reason this is not part of patch 2?
-
-Because they fixed two different problems.
-
-> 
->>   static int __init of_numa_parse_distance_map_v1(struct device_node *map)
->> -- 
->> 2.5.0
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> 
-> .
-> 
+-- 
+1.9.1
