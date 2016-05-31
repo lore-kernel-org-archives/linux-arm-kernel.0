@@ -1,150 +1,110 @@
 From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 31 May 2016 13:52:42 +0800
-Subject: [PATCH v2,5/5] arm64: dts: mediatek: add USB3 DRD driver
+Date: Tue, 31 May 2016 13:52:40 +0800
+Subject: [PATCH v2,3/5] dt-bindings: mtu3: add devicetree bindings
 In-Reply-To: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
 References: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <1464673962-11506-6-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1464673962-11506-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-USB3 DRD driver is added for MT8173-EVB, and xHCI driver
-becomes its subnode
+add a DT binding doc for MediaTek USB3 DRD driver
 
 Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts |   46 +++++++++++++++++++++++++--
- arch/arm64/boot/dts/mediatek/mt8173.dtsi    |   28 ++++++++++++----
- 2 files changed, 65 insertions(+), 9 deletions(-)
+ Documentation/devicetree/bindings/usb/mtu3.txt |   85 ++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/mtu3.txt
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-index 7453a47..682dfd7 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-+++ b/arch/arm64/boot/dts/mediatek/mt8173-evb.dts
-@@ -34,6 +34,11 @@
- 
- 	chosen { };
- 
-+	extcon_usb: extcon_iddig {
-+		compatible = "linux,extcon-usb-gpio";
-+		id-gpio = <&pio 16 GPIO_ACTIVE_HIGH>;
-+	};
+diff --git a/Documentation/devicetree/bindings/usb/mtu3.txt b/Documentation/devicetree/bindings/usb/mtu3.txt
+new file mode 100644
+index 0000000..571ae8b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/mtu3.txt
+@@ -0,0 +1,85 @@
++The device node for Mediatek USB3.0 DRD controller
 +
- 	usb_p1_vbus: regulator at 0 {
- 		compatible = "regulator-fixed";
- 		regulator-name = "usb_vbus";
-@@ -42,6 +47,16 @@
- 		gpio = <&pio 130 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
- 	};
++Required properties:
++ - compatible : should be "mediatek,mt8173-mtu3"
++ - reg : specifies physical base address and size of the registers
++ - reg-names: should be "mac" for device IP and "ippc" for IP port control
++ - interrupts : interrupt used by the device IP
++ - power-domains : a phandle to USB power domain node to control USB's
++	mtcmos
++ - vusb33-supply : regulator of USB avdd3.3v
++ - clocks : a list of phandle + clock-specifier pairs, one for each
++	entry in clock-names
++ - clock-names : must contain "sys_ck" for clock of controller;
++	"wakeup_deb_p0" and "wakeup_deb_p1" are optional, they are
++	depends on "mediatek,enable-wakeup"
++ - phys : a list of phandle + phy specifier pairs
++ - dr_mode : should be one of "host", "peripheral" or "otg",
++	refer to usb/generic.txt
 +
-+	usb_p0_vbus: regulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&pio 9 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
++Optional properties:
++ - #address-cells, #size-cells : should be '2' if the device has sub-nodes
++	with 'reg' property
++ - ranges : allows valid 1:1 translation between child's address space and
++	parent's address space
++ - extcon : external connector for vbus and idpin changes detection, needed
++	when supports dual-role mode.
++ - vbus-supply : reference to the VBUS regulator, needed when supports
++	dual-role mode.
++ - pinctl-names : a pinctrl state named "default" must be defined,
++	"id_float" and "id_ground" are optinal which depends on
++	"mediatek,enable-manual-drd"
++ - pinctrl-0 : pin control group
++	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
 +
- };
- 
- &i2c1 {
-@@ -205,6 +220,20 @@
- 			bias-pull-down = <MTK_PUPD_SET_R1R0_10>;
- 		};
- 	};
++ - maximum-speed : valid arguments are "super-speed", "high-speed" and
++	"full-speed"; refer to usb/generic.txt
++ - enable-manual-drd : supports manual dual-role switch via sysfs; only used
++	when receptacle is TYPE-A and also wants to support dual-role mode.
++ - mediatek,enable-wakeup : supports ip sleep wakeup used by host mode
++ - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
++	control register, it depends on "mediatek,enable-wakeup".
 +
-+	usb_id_pins_float: usb_iddig_pull_up {
-+		pins_iddig {
-+			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
-+			bias-pull-up;
-+		};
-+	};
++Sub-nodes:
++The xhci should be added as subnode to mtu3 as shown in the following example
++if host mode is enabled. The DT binding details of xhci can be found in:
++Documentation/devicetree/bindings/usb/mt8173-xhci.txt
 +
-+	usb_id_pins_ground: usb_iddig_pull_down {
-+		pins_iddig {
-+			pinmux = <MT8173_PIN_16_IDDIG__FUNC_IDDIG>;
-+			bias-pull-down;
-+		};
-+	};
- };
- 
- &pwm0 {
-@@ -431,12 +460,25 @@
- 	status = "okay";
- };
- 
-+&ssusb {
++Example:
++ssusb: usb at 11271000 {
++	compatible = "mediatek,mt8173-mtu3";
++	reg = <0 0x11271000 0 0x3000>,
++	      <0 0x11280700 0 0x0100>;
++	reg-names = "mac", "ippc";
++	interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
++	phys = <&phy_port0 PHY_TYPE_USB3>,
++	       <&phy_port1 PHY_TYPE_USB2>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>,
++		 <&pericfg CLK_PERI_USB0>,
++		 <&pericfg CLK_PERI_USB1>;
++	clock-names = "sys_ck",
++		      "wakeup_deb_p0",
++		      "wakeup_deb_p1";
 +	vusb33-supply = <&mt6397_vusb_reg>;
 +	vbus-supply = <&usb_p0_vbus>;
 +	extcon = <&extcon_usb>;
 +	dr_mode = "otg";
 +	mediatek,enable-wakeup;
-+	pinctrl-names = "default", "id_float", "id_ground";
-+	pinctrl-0 = <&usb_id_pins_float>;
-+	pinctrl-1 = <&usb_id_pins_float>;
-+	pinctrl-2 = <&usb_id_pins_ground>;
-+	status = "okay";
++	mediatek,syscon-wakeup = <&pericfg>;
++	#address-cells = <2>;
++	#size-cells = <2>;
++	ranges;
++	status = "disabled";
++
++	usb_host: xhci at 11270000 {
++		compatible = "mediatek,mt8173-xhci";
++		reg = <0 0x11270000 0 0x1000>;
++		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++		power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++		clocks = <&topckgen CLK_TOP_USB30_SEL>;
++		clock-names = "sys_ck";
++		vusb33-supply = <&mt6397_vusb_reg>;
++		status = "disabled";
++	};
 +};
-+
- &uart0 {
- 	status = "okay";
- };
- 
--&usb30 {
-+&usb_host {
- 	vusb33-supply = <&mt6397_vusb_reg>;
- 	vbus-supply = <&usb_p1_vbus>;
--	mediatek,wakeup-src = <1>;
-+	status = "okay";
- };
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 05f89c4..723ab6e 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -608,11 +608,14 @@
- 			status = "disabled";
- 		};
- 
--		usb30: usb at 11270000 {
--			compatible = "mediatek,mt8173-xhci";
--			reg = <0 0x11270000 0 0x1000>,
-+		ssusb: usb at 11271000 {
-+			compatible = "mediatek,mt8173-mtu3";
-+			reg = <0 0x11271000 0 0x3000>,
- 			      <0 0x11280700 0 0x0100>;
--			interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+			reg-names = "mac", "ippc";
-+			interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
-+			phys = <&phy_port0 PHY_TYPE_USB3>,
-+			       <&phy_port1 PHY_TYPE_USB2>;
- 			power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
- 			clocks = <&topckgen CLK_TOP_USB30_SEL>,
- 				 <&pericfg CLK_PERI_USB0>,
-@@ -620,10 +623,21 @@
- 			clock-names = "sys_ck",
- 				      "wakeup_deb_p0",
- 				      "wakeup_deb_p1";
--			phys = <&phy_port0 PHY_TYPE_USB3>,
--			       <&phy_port1 PHY_TYPE_USB2>;
- 			mediatek,syscon-wakeup = <&pericfg>;
--			status = "okay";
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges;
-+			status = "disabled";
-+
-+			usb_host: xhci at 11270000 {
-+				compatible = "mediatek,mt8173-xhci";
-+				reg = <0 0x11270000 0 0x1000>;
-+				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-+				power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-+				clocks = <&topckgen CLK_TOP_USB30_SEL>;
-+				clock-names = "sys_ck";
-+				status = "disabled";
-+			};
- 		};
- 
- 		u3phy: usb-phy at 11290000 {
 -- 
 1.7.9.5
