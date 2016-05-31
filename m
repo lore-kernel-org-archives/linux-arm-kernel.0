@@ -1,98 +1,105 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 31 May 2016 12:57:37 +0100
-Subject: [PATCH 4/5] coresight: Add better messages for coresight_timeout
+Date: Tue, 31 May 2016 12:57:36 +0100
+Subject: [PATCH 3/5] coresight: Fix csdev connections initialisation
 In-Reply-To: <1464695858-29284-1-git-send-email-suzuki.poulose@arm.com>
 References: <1464695858-29284-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1464695858-29284-5-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1464695858-29284-4-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we encounter a timeout waiting for a status change via
-coresight_timeout, the caller always print the offset which
-was tried. This is pretty much useless as it doesn't specify
-the bit position we wait for. Also, one needs to lookup the
-TRM to figure out, what was wrong. This patch changes all
-such error messages to print something more meaningful.
+This is a cleanup patch.
+
+coresight_device->conns holds an array to point to the devices
+connected to the OUT ports of a component. Sinks, e.g ETR, do not
+have an OUT port (nr_outport = 0), as it streams the trace to
+memory via AXI.
+
+At coresight_register() we do :
+
+	conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+	if (!conns) {
+		ret = -ENOMEM;
+		goto err_kzalloc_conns;
+	}
+
+For ETR, since the total size requested for kcalloc is zero, the return value is,
+ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR which cannot be
+verified later to contain a valid pointer. The code which accesses the csdev->conns
+is bounded by the csdev->nr_outport check, hence we don't try to dereference the
+ZERO_SIZE_PTR. This patch cleans up the csdev->conns and csdev->refcnt, initialisation
+to make sure we initialise it properly(i.e, either NULL or valid conns array).
 
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 6 ++----
- drivers/hwtracing/coresight/coresight-etm4x.c | 6 ++----
- drivers/hwtracing/coresight/coresight-tmc.c   | 6 ++----
- 3 files changed, 6 insertions(+), 12 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 42 +++++++++++++++++++--------------
+ 1 file changed, 24 insertions(+), 18 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 4d20b0b..6bd4b93 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -184,8 +184,7 @@ static void etb_disable_hw(struct etb_drvdata *drvdata)
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 0fdaaf4..8410420 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -890,7 +890,7 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 	int nr_refcnts = 1;
+ 	atomic_t *refcnts = NULL;
+ 	struct coresight_device *csdev;
+-	struct coresight_connection *conns;
++	struct coresight_connection *conns = NULL;
  
- 	if (coresight_timeout(drvdata->base, ETB_FFCR, ETB_FFCR_BIT, 0)) {
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			ETB_FFCR);
-+			"timeout while waiting for completion of Manual Flush\n");
+ 	csdev = kzalloc(sizeof(*csdev), GFP_KERNEL);
+ 	if (!csdev) {
+@@ -908,29 +908,35 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 			nr_refcnts = desc->pdata->nr_outport;
  	}
  
- 	/* disable trace capture */
-@@ -193,8 +192,7 @@ static void etb_disable_hw(struct etb_drvdata *drvdata)
+-	refcnts = kcalloc(nr_refcnts, sizeof(*refcnts), GFP_KERNEL);
+-	if (!refcnts) {
+-		ret = -ENOMEM;
+-		goto err_kzalloc_refcnts;
+-	}
++	if (nr_refcnts) {
++		refcnts = kcalloc(nr_refcnts, sizeof(*refcnts), GFP_KERNEL);
++		if (!refcnts) {
++			ret = -ENOMEM;
++			goto err_kzalloc_refcnts;
++		}
  
- 	if (coresight_timeout(drvdata->base, ETB_FFSR, ETB_FFSR_BIT, 1)) {
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			ETB_FFCR);
-+			"timeout while waiting for Formatter to Stop\n");
- 	}
+-	csdev->refcnt = refcnts;
++		csdev->refcnt = refcnts;
++	}
  
- 	CS_LOCK(drvdata->base);
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 88947f3..e494042 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -111,8 +111,7 @@ static void etm4_enable_hw(void *info)
- 	/* wait for TRCSTATR.IDLE to go up */
- 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 1))
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			TRCSTATR);
-+			"timeout when waiting for Idle Trace Status\n");
+ 	csdev->nr_inport = desc->pdata->nr_inport;
+ 	csdev->nr_outport = desc->pdata->nr_outport;
+-	conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+-	if (!conns) {
+-		ret = -ENOMEM;
+-		goto err_kzalloc_conns;
+-	}
  
- 	writel_relaxed(config->pe_sel, drvdata->base + TRCPROCSELR);
- 	writel_relaxed(config->cfg, drvdata->base + TRCCONFIGR);
-@@ -184,8 +183,7 @@ static void etm4_enable_hw(void *info)
- 	/* wait for TRCSTATR.IDLE to go back down to '0' */
- 	if (coresight_timeout(drvdata->base, TRCSTATR, TRCSTATR_IDLE_BIT, 0))
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			TRCSTATR);
-+			"timeout when waiting for Idle Trace Status\n");
+-	for (i = 0; i < csdev->nr_outport; i++) {
+-		conns[i].outport = desc->pdata->outports[i];
+-		conns[i].child_name = desc->pdata->child_names[i];
+-		conns[i].child_port = desc->pdata->child_ports[i];
+-	}
++	/* Initialise connections if there is at least one outport for this component */
++	if (csdev->nr_outport) {
++		conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
++		if (!conns) {
++			ret = -ENOMEM;
++			goto err_kzalloc_conns;
++		}
  
- 	CS_LOCK(drvdata->base);
+-	csdev->conns = conns;
++		for (i = 0; i < csdev->nr_outport; i++) {
++			conns[i].outport = desc->pdata->outports[i];
++			conns[i].child_name = desc->pdata->child_names[i];
++			conns[i].child_port = desc->pdata->child_ports[i];
++		}
++
++		csdev->conns = conns;
++	}
  
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 9e02ac9..c7d8ba6 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -38,8 +38,7 @@ void tmc_wait_for_tmcready(struct tmc_drvdata *drvdata)
- 	if (coresight_timeout(drvdata->base,
- 			      TMC_STS, TMC_STS_TMCREADY_BIT, 1)) {
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			TMC_STS);
-+			"timeout observed when waiting for TMC to be Ready\n");
- 	}
- }
- 
-@@ -56,8 +55,7 @@ void tmc_flush_and_stop(struct tmc_drvdata *drvdata)
- 	if (coresight_timeout(drvdata->base,
- 			      TMC_FFCR, TMC_FFCR_FLUSHMAN_BIT, 0)) {
- 		dev_err(drvdata->dev,
--			"timeout observed when probing at offset %#x\n",
--			TMC_FFCR);
-+			"timeout observed while waiting for completion of Manual Flush\n");
- 	}
- 
- 	tmc_wait_for_tmcready(drvdata);
+ 	csdev->type = desc->type;
+ 	csdev->subtype = desc->subtype;
 -- 
 1.9.1
