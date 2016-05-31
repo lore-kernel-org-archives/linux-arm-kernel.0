@@ -1,34 +1,42 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 31 May 2016 07:53:18 -0700
-Subject: pxa_defconfig runtime failures due to 'ARM: pxa: activate pinctrl
- for device-tree machines'
-In-Reply-To: <87vb1ueo8s.fsf@belgarion.home>
-References: <20160527202715.GA4841@roeck-us.net>
- <87a8jah9ok.fsf@belgarion.home> <574A0AD1.9000304@roeck-us.net>
- <87vb1ueo8s.fsf@belgarion.home>
-Message-ID: <574DA55E.7070109@roeck-us.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 May 2016 15:55:04 +0100
+Subject: [PATCH 2/2] arm64: Always provide compat /proc/cpuinfo for 32-bit
+ tasks
+In-Reply-To: <1464706504-25224-1-git-send-email-catalin.marinas@arm.com>
+References: <1464706504-25224-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1464706504-25224-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2016 11:27 PM, Robert Jarzmik wrote:
-> Guenter Roeck <linux@roeck-us.net> writes:
->
->> On 05/28/2016 01:24 AM, Robert Jarzmik wrote:
->>> Guenter Roeck <linux@roeck-us.net> writes:
->>>
->>>> Hi,
->>> I'd rather say that pxa_defconfig doesn't work anymore on any legacy system.
->>> Its first purpose was to ensure compilation coverage of all legacy pxa systems.
->>> Its second one was to have a single kernel bootable on all legacy pxa systems.
->>>
->>> Therefore, would you tell me if the patch in [1] fixes your issue ?
->>>
->>
->> Yes, it does. It is actually the workaround I deployed for my test builds,
->> since I thought that the change was on purpose.
->
-> Good. Can I take that as a Tested-by ?
->
-Yes.
+Currently, the compat /proc/cpuinfo is provided only if a task has the
+PER_LINUX32 personality, either by setting it explicitly or by
+inheriting it from the parent task. This is in line with the "uname -m"
+behaviour.
 
-Guenter
+However, there are 32-bit user applications making use of the
+/proc/cpuinfo and unaware of a need to set the personality. This patch
+changes the arm64 /proc/cpuinfo logic to provide the compat information
+if the task is 32-bit _or_ the PER_LINUX32 personality is set.
+
+Cc: <stable@vger.kernel.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm64/kernel/cpuinfo.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index c173d329397f..bd6a122ea856 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -106,7 +106,8 @@ static const char *const compat_hwcap2_str[] = {
+ static int c_show(struct seq_file *m, void *v)
+ {
+ 	int i, j;
+-	bool compat = personality(current->personality) == PER_LINUX32;
++	bool compat = is_compat_task() ||
++		personality(current->personality) == PER_LINUX32;
+ 
+ 	for_each_online_cpu(i) {
+ 		struct cpuinfo_arm64 *cpuinfo = &per_cpu(cpu_data, i);
