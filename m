@@ -1,54 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Jun 2016 21:56:19 -0500
-Subject: [PATCH 6/7] dt-bindings: net: bgmac: add bindings documentation
- for bgmac
-In-Reply-To: <1467327554-22074-7-git-send-email-jon.mason@broadcom.com>
-References: <1467327554-22074-1-git-send-email-jon.mason@broadcom.com>
- <1467327554-22074-7-git-send-email-jon.mason@broadcom.com>
-Message-ID: <20160701025619.GA4906@rob-hp-laptop>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  1 Jun 2016 00:23:18 +0800
+Subject: [PATCH resend v2 0/6] regulator: axp20x: Add support for AXP809 PMIC
+Message-ID: <1464711804-19256-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2016 at 06:59:13PM -0400, Jon Mason wrote:
-> Signed-off-by: Jon Mason <jon.mason@broadcom.com>
-> ---
->  .../devicetree/bindings/net/brcm,bgmac-nsp.txt     | 24 ++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt b/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
-> new file mode 100644
-> index 0000000..022946c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/brcm,bgmac-nsp.txt
-> @@ -0,0 +1,24 @@
-> +Broadcom GMAC Ethernet Controller Device Tree Bindings
-> +-------------------------------------------------------------
-> +
-> +Required properties:
-> + - compatible:	"brcm,bgmac-nsp"
+Hi everyone,
 
-Usually we do <soc>-<block> order.
+These are the remaining patches of my AXP809 PMIC support series. The
+mfd parts and regulator fixes were merged in v4.7-rc1. What's left are
+the AXP809 regulator driver and dts changes.
 
-> + - reg:		Address and length of the GMAC registers,
-> +		Address and length of the GMAC IDM registers
-> + - reg-names:	Names of the registers.  Must have both "gmac_base" and
-> +		"idm_base"
-> + - interrupts:	Interrupt number
-> +
-> +Optional properties:
-> +- mac-address:	See ethernet.txt file in the same directory
-> +
-> +Examples:
-> +
-> +gmac0: ethernet at 18022000 {
-> +	compatible = "brcm,bgmac-nsp";
-> +	reg = <0x18022000 0x1000>,
-> +	      <0x18110000 0x1000>;
-> +	reg-names = "gmac_base", "idm_base";
-> +	interrupts = <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>;
-> +	status = "disabled";
-> +};
-> -- 
-> 1.9.1
-> 
+Patch 1 adds AXP809 support to the axp20x regulator driver. This patch
+depends on patch 3, and patches already in regulator/topic/axp20x.
+
+Patch 2 adds a dtsi file for AXP809.
+
+Patch 3 enables AXP809 support on the A80 Optimus board.
+
+Patch 4 enables AXP809 support on the Cubieboard 4.
+
+Patch 5 disables the dummy regulators from sunxi-common-regulators.dtsi
+on the A80 Optimus board. These aren't used in the board DTS anymore.
+
+Patch 6 disables the dummy regulators from sunxi-common-regulators.dtsi,
+on the Cubieboard4. These aren't used in the board DTS anymore.
+
+
+Chen-Yu Tsai (6):
+  regulator: axp20x: support AXP809 variant
+  ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
+  ARM: dts: sun9i: a80-optimus: Add AXP809 PMIC device node and
+    regulators
+  ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC device node and
+    regulators
+  ARM: dts: sun9i: a80-optimus: Disable dummy regulators vcc3v0, vcc3v3,
+    vcc5v0
+  ARM: dts: sun9i: cubieboard4: Disable dummy regulators vcc3v0, vcc3v3,
+    vcc5v0
+
+ .../dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} |  98 ++------------
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 143 ++++++++++++++++++++-
+ arch/arm/boot/dts/sun9i-a80-optimus.dts            | 143 ++++++++++++++++++++-
+ drivers/regulator/axp20x-regulator.c               | 119 ++++++++++++-----
+ 4 files changed, 380 insertions(+), 123 deletions(-)
+ copy arch/arm/boot/dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} (52%)
+
+-- 
+2.8.1
