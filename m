@@ -1,55 +1,51 @@
 From: julien.grall@arm.com (Julien Grall)
-Date: Tue, 31 May 2016 12:41:21 +0100
-Subject: [PATCH 1/3] drivers/perf: arm_pmu: Fix reference count of a
- device_node in of_pmu_irq_cfg
+Date: Tue, 31 May 2016 12:41:22 +0100
+Subject: [PATCH 2/3] drivers/perf: arm_pmu: Defer the setting of
+ __oprofile_cpu_pmu
 In-Reply-To: <1464694883-26298-1-git-send-email-julien.grall@arm.com>
 References: <1464694883-26298-1-git-send-email-julien.grall@arm.com>
-Message-ID: <1464694883-26298-2-git-send-email-julien.grall@arm.com>
+Message-ID: <1464694883-26298-3-git-send-email-julien.grall@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The only function called by of_pmu_irq_cfg that will increment the
-reference count on dn is of_parse_phandle.
+The global variable __oprofile_cpu_pmu is set before the PMU is fully
+initialized. If an error occurs before the end of the initialization,
+the PMU will be freed and the variable will contain an invalid pointer.
 
-Each time we successfully parse a possible CPU from an
-interrupt-affinity property, we increment the refcount of that CPU node
-once via of_parse_handle. After validating the CPU is possible, we
-decrement the refcount once. Subsequently, we decrement the refcount
-again, either as part of an early break if we don't have a matching SPI,
-or as part of the end of the loop body.
+This will result in a kernel crash when perf will be used.
 
-This will lead to decrementing twice the refcounnt.
-Remove the second pairs of call to of_node_put as nobody is using dn
-between the first and second call to of_node_put.
+Fix it by moving the setting of __oprofile_cpu_pmu when the PMU is fully
+initialized (i.e when it is no longer possible to fail).
 
 Signed-off-by: Julien Grall <julien.grall@arm.com>
 Acked-by: Mark Rutland <mark.rutland@arm.com>
 ---
- drivers/perf/arm_pmu.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/perf/arm_pmu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-index f2d01d4..6401f0c 100644
+index 6401f0c..95614d2 100644
 --- a/drivers/perf/arm_pmu.c
 +++ b/drivers/perf/arm_pmu.c
-@@ -950,17 +950,14 @@ static int of_pmu_irq_cfg(struct arm_pmu *pmu)
+@@ -992,9 +992,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
  
- 		/* For SPIs, we need to track the affinity per IRQ */
- 		if (using_spi) {
--			if (i >= pdev->num_resources) {
--				of_node_put(dn);
-+			if (i >= pdev->num_resources)
- 				break;
--			}
+ 	armpmu_init(pmu);
  
- 			irqs[i] = cpu;
- 		}
+-	if (!__oprofile_cpu_pmu)
+-		__oprofile_cpu_pmu = pmu;
+-
+ 	pmu->plat_device = pdev;
  
- 		/* Keep track of the CPUs containing this PMU type */
- 		cpumask_set_cpu(cpu, &pmu->supported_cpus);
--		of_node_put(dn);
- 		i++;
- 	} while (1);
+ 	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
+@@ -1030,6 +1027,9 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 	if (ret)
+ 		goto out_destroy;
+ 
++	if (!__oprofile_cpu_pmu)
++		__oprofile_cpu_pmu = pmu;
++
+ 	pr_info("enabled with %s PMU driver, %d counters available\n",
+ 			pmu->name, pmu->num_events);
  
 -- 
 1.9.1
