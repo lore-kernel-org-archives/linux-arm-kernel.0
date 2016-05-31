@@ -1,40 +1,87 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 May 2016 14:49:00 +0100
-Subject: [PATCH 0/2] arm64: mm: dump: rework and fix
-Message-ID: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
+Date: Tue, 31 May 2016 14:49:02 +0100
+Subject: [PATCH 2/2] arm64: mm: dump: log span level
+In-Reply-To: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
+References: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <1464702542-24394-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+The page table dump code logs spans of entries at the same level
+(pgd/pud/pmd/pte) which have the same attributes. While we log the
+(decoded) attributes, we don't log the level, which leaves the output
+ambiguous and/or confusing in some cases.
 
-Here are a couple of patches for the arm64 pagetable dump code.
+For example:
 
-The first patch is the final reusable ptdump patch, rebased to v4.7-rc1, as per
-your request [1]. Other than the rebase, I have made no changes.
+0xffff800800000000-0xffff800980000000           6G       RW NX SHD AF        BLK UXN MEM/NORMAL
 
-The second patch addresses an ambiguity in the dump output, in that we cannot
-determine whether a span of block entries exists at the PGD, PUD, or PMD level.
-It's logically unrelated to patch 1, and the two should apply independently,
-but I've put them in a series so that I can call that out, and to avoid the
-inevitable confusion with patches that appear to intersect.
+If using 4K pages, this may describe a span of 6 1G block entries at the
+PGD/PUD level, or 3072 2M block entries at the PMD level.
 
-I've given them both a spin on Juno R1 with v4.7-rc1 defconfig, fiddling with
-the page size and number of levels. So far everything seems to work as
-expected.
+This patch adds the page table level to each output line, removing this
+ambiguity. For the example above, this will produce:
 
-Thanks,
-Mark.
+0xffffffc800000000-0xffffffc980000000           6G PUD       RW NX SHD AF        BLK UXN MEM/NORMAL
 
-[1] http://lkml.kernel.org/r/20160531132508.GJ24936 at arm.com
+When 3 level tables are in use, and we use the asm-generic/nopud.h
+definitions, the dump code treats each entry in the PGD as a 1 element
+table at the PUD level, and logs spans as being PUDs, which can be
+confusing. To counteract this, the "PUD" mnemonic is replaced with "PGD"
+when CONFIG_PGTABLE_LEVELS <= 3. Likewise for "PMD" when
+CONFIG_PGTABLE_LEVELS <= 2.
 
-Mark Rutland (2):
-  arm64: mm: dump: make page table dumping reusable
-  arm64: mm: dump: log span level
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Huang Shijie <shijie.huang@arm.com>
+Cc: Laura Abbott <labbott@fedoraproject.org>
+Cc: Steve Capper <steve.capper@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/dump.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
- arch/arm64/include/asm/ptdump.h | 44 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/dump.c            | 40 +++++++++++++++++++++++++------------
- 2 files changed, 71 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm64/include/asm/ptdump.h
-
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index a56a7ad..f94b80e 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -146,6 +146,7 @@ static const struct prot_bits pte_bits[] = {
+ 
+ struct pg_level {
+ 	const struct prot_bits *bits;
++	const char *name;
+ 	size_t num;
+ 	u64 mask;
+ };
+@@ -153,15 +154,19 @@ struct pg_level {
+ static struct pg_level pg_level[] = {
+ 	{
+ 	}, { /* pgd */
++		.name	= "PGD",
+ 		.bits	= pte_bits,
+ 		.num	= ARRAY_SIZE(pte_bits),
+ 	}, { /* pud */
++		.name	= (CONFIG_PGTABLE_LEVELS > 3) ? "PUD" : "PGD",
+ 		.bits	= pte_bits,
+ 		.num	= ARRAY_SIZE(pte_bits),
+ 	}, { /* pmd */
++		.name	= (CONFIG_PGTABLE_LEVELS > 2) ? "PMD" : "PGD",
+ 		.bits	= pte_bits,
+ 		.num	= ARRAY_SIZE(pte_bits),
+ 	}, { /* pte */
++		.name	= "PTE",
+ 		.bits	= pte_bits,
+ 		.num	= ARRAY_SIZE(pte_bits),
+ 	},
+@@ -210,7 +215,8 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
+ 				delta >>= 10;
+ 				unit++;
+ 			}
+-			seq_printf(st->seq, "%9lu%c", delta, *unit);
++			seq_printf(st->seq, "%9lu%c %s", delta, *unit,
++				   pg_level[st->level].name);
+ 			if (pg_level[st->level].bits)
+ 				dump_prot(st, pg_level[st->level].bits,
+ 					  pg_level[st->level].num);
 -- 
 1.9.1
