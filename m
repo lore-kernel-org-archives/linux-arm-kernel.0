@@ -1,101 +1,42 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 31 May 2016 18:04:40 +0100
-Subject: [PATCH v3] arm64: Implement optimised IP checksum helpers
-In-Reply-To: <ba9cf5bf84b8adc766f7f7511dda8cb501cd4101.1464693619.git.robin.murphy@arm.com>
-References: <ba9cf5bf84b8adc766f7f7511dda8cb501cd4101.1464693619.git.robin.murphy@arm.com>
-Message-ID: <4cef631ae5ff455d080cb17c8e0fa918c9a5c067.1464714040.git.robin.murphy@arm.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 31 May 2016 10:09:39 -0700
+Subject: [PATCH v2 0/4] hw rng support for NSP SoC
+In-Reply-To: <20160531101934.GM15376@gondor.apana.org.au>
+References: <1464343841-29504-1-git-send-email-yendapally.reddy@broadcom.com>
+ <20160531101934.GM15376@gondor.apana.org.au>
+Message-ID: <574DC553.4030009@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-AArch64 is capable of 128-bit memory accesses without alignment
-restrictions, which makes it both possible and highly practical to slurp
-up a typical 20-byte IP header in just 2 loads. Implement our own
-version of ip_fast_checksum() to take advantage of that, resulting in
-considerably fewer instructions and memory accesses than the generic
-version. We can also get more optimal code generation for csum_fold() by
-defining it a slightly different way round from the generic version, so
-throw that into the mix too.
+On 05/31/2016 03:19 AM, Herbert Xu wrote:
+> On Fri, May 27, 2016 at 06:10:37AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
+>> This patchset contains the hw random number generator support for the
+>> Broadcom's NSP SoC. The block is similar to the block available in
+>> bcm2835 with different default interrupt mask value. Due to lack of
+>> documentation, I cannot confirm the interrupt mask register details
+>> in bcm2835. In an effort to not break the existing functionality of
+>> bcm2835, I used a different compatible string to mask the interrupt
+>> for NSP SoC. Please let me know. Also supported providing requested
+>> number of random numbers instead of static size of four bytes.
+>>
+>> The first patch contains the documentation changes and the second patch
+>> contains the support for rng available in NSP SoC. The third patch
+>> contains the device tree changes for NSP SoC. The fourth patch contains
+>> the support for reading requested number of random numbers.
+>>
+>> This patch set has been tested on NSP bcm958625HR board.
+>> This patch set is based on v4.6.0-rc1 and is available from github
+>> repo: https://github.com/Broadcom/cygnus-linux.git
+>> branch: nsp-rng-v2
+>>
+>> Changes since v1
+> 
+> All applied.
 
-Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
-Acked-by: Luke Starrett <luke.starrett@broadcom.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+FYI, ARM Device Tree patches usually go via ARM SoC pull requests, so it
+is best if this is planned in advance. Can you make sure you document
+that there could be a merge conflict in your pull request to Linus?
 
-v3: Don't generate generic header [James]
-v2: Include types.h, add Luke's ack
-
- arch/arm64/include/asm/Kbuild     |  1 -
- arch/arm64/include/asm/checksum.h | 51 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 51 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/include/asm/checksum.h
-
-diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-index cff532a6744e..f43d2c44c765 100644
---- a/arch/arm64/include/asm/Kbuild
-+++ b/arch/arm64/include/asm/Kbuild
-@@ -1,6 +1,5 @@
- generic-y += bug.h
- generic-y += bugs.h
--generic-y += checksum.h
- generic-y += clkdev.h
- generic-y += cputime.h
- generic-y += current.h
-diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
-new file mode 100644
-index 000000000000..09f65339d66d
---- /dev/null
-+++ b/arch/arm64/include/asm/checksum.h
-@@ -0,0 +1,51 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_CHECKSUM_H
-+#define __ASM_CHECKSUM_H
-+
-+#include <linux/types.h>
-+
-+static inline __sum16 csum_fold(__wsum csum)
-+{
-+	u32 sum = (__force u32)csum;
-+	sum += (sum >> 16) | (sum << 16);
-+	return ~(__force __sum16)(sum >> 16);
-+}
-+#define csum_fold csum_fold
-+
-+static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
-+{
-+	__uint128_t tmp;
-+	u64 sum;
-+
-+	tmp = *(const __uint128_t *)iph;
-+	iph += 16;
-+	ihl -= 4;
-+	tmp += ((tmp >> 64) | (tmp << 64));
-+	sum = tmp >> 64;
-+	do {
-+		sum += *(const u32 *)iph;
-+		iph += 4;
-+	} while (--ihl);
-+
-+	sum += ((sum >> 32) | (sum << 32));
-+	return csum_fold(sum >> 32);
-+}
-+#define ip_fast_csum ip_fast_csum
-+
-+#include <asm-generic/checksum.h>
-+
-+#endif	/* __ASM_CHECKSUM_H */
+Thanks
 -- 
-2.8.1.dirty
+Florian
