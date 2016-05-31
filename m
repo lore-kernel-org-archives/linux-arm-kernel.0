@@ -1,47 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  1 Jun 2016 00:23:24 +0800
-Subject: [PATCH resend v2 6/6] ARM: dts: sun9i: cubieboard4: Disable dummy
- regulators vcc3v0, vcc3v3, vcc5v0
-In-Reply-To: <1464711804-19256-1-git-send-email-wens@csie.org>
-References: <1464711804-19256-1-git-send-email-wens@csie.org>
-Message-ID: <1464711804-19256-7-git-send-email-wens@csie.org>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 1 Jun 2016 00:22:22 +0300
+Subject: [PATCHv5] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160527205140.GA26767@amd>
+References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
+ <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
+ <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+ <20160527205140.GA26767@amd>
+Message-ID: <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These 3 regulators are provided in sunxi-common-regulators.dtsi.
-3.0V/3.3V and 5.0V are commonly used voltages in Allwinner devices.
-These dummy regulators provide a stand-in when bindings that require
-one, but the real regulator is not supported yet.
+Hi Pavel,
 
-Since these are no longer needed, we can disable them.
+On Fri, May 27, 2016 at 10:51:40PM +0200, Pavel Machek wrote:
+> 
+> This adds support for AD5820 autofocus coil, found for example in
+> Nokia N900 smartphone.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+The patch looks good to me but then I came to think of a question I've
+missed so far: is there DT documentation somewhere for the properties used
+by the driver? I might put that to a separate patch, and cc the relevant
+list.
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-index 8d8af1189d87..84a12fef5768 100644
---- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
-@@ -255,6 +255,18 @@
- 
- #include "axp809.dtsi"
- 
-+&reg_vcc3v0 {
-+	status = "disabled";
-+};
-+
-+&reg_vcc3v3 {
-+	status = "disabled";
-+};
-+
-+&reg_vcc5v0 {
-+	status = "disabled";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
+Whether we decide to have the module in DT or not is orthogonal to this.
+
 -- 
-2.8.1
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
