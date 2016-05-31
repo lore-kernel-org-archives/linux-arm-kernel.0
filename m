@@ -1,91 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 31 May 2016 22:58:59 +0200
-Subject: building and using modules on arm64 hikey board
-In-Reply-To: <CAH7ZN-xMfE-+RiXfdvzEHtOVARy--yAV+fbjS+wsbujrkZgm0A@mail.gmail.com>
-References: <87a3195c-febb-a6c8-a679-272b9f7b59cc@broadcom.com>
- <0240F9F0-0146-4DCC-B512-195415B29B34@linaro.org>
- <CAH7ZN-xMfE-+RiXfdvzEHtOVARy--yAV+fbjS+wsbujrkZgm0A@mail.gmail.com>
-Message-ID: <CAKv+Gu_=SCHwi8nBXGQ6wux4T59BGAU_H-942+QnSL0KO=zp4w@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 31 May 2016 14:05:27 -0700
+Subject: [PATCH v2 RESEND] irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ
+Message-ID: <1464728727-16300-1-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 May 2016 at 22:24, Dmitry Shmidt <dimitrysh@google.com> wrote:
-> On Mon, May 30, 2016 at 4:30 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->> This is likely caused by the fact that the Android AArch64 toolchain uses -fpic by default. Could you try adding -fno-pic to the CFLAGS?
->
-> Actually Arend is using 4.4, and we need to pull your fix, Ard:
->
-> commit 80a2d83376001f6a1993f2e925670ab0e4cdb76d
-> Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Date:   Tue Jan 5 10:18:52 2016 +0100
->
->     arm64: module: avoid undefined shift behavior in reloc_data()
->
+This is equivalent and works for arm64 as well.
 
-OK, that was going to be my next question to Arend, i.e., to check
-whether he has all the recent fixes we did for the module loader.
+Signed-off-by: Eric Anholt <eric@anholt.net>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+---
 
-But I'd also like to understand how we ended up with PREL32
-relocations in the first place, since those are quite unusual in
-object code generated from generic C source code when using the
-non-pic small model, which is normally GCC's default. Are there any
-other code generation defaults for the Android  AArch64 GCC toolchain
-that you are aware of?
+Patch 1 of the arm64 series was left out of the 4.7 pull request.
+Would it be possible to merge this through the SOC tree?  Otherwise I
+would need a stable branch to merge from you, so that I can land the
+Makefile changes to start building it.
 
->>> On 30 mei 2016, at 12:21, Arend Van Spriel <arend.vanspriel@broadcom.com> wrote:
->>>
->>> I got myself an arm64 HiKey board from LeMaker and build an Android AOSP
->>> image for it (see [1]). For development I would like to use
->>> CONFIG_MODULES. However, when I try to insmod the build module I get:
->>>
->>> [  287.903653] module cfg80211: overflow in relocation type 261 val
->>> ffffffbffc006530
->>>
->>> Looking AArch64 ELF documentation [2], section 4.6.5, it has:
->>> code|name            |operation |overflow check   |
->>> 261 |R_AARCH64_PREL32|S + A - P |-2^31 <= X < 2^32|
->>>
->>> So basically the highest 32 bits should all be one and so ffffffbf is
->>> invalid. From what I could find searching internet it could be an issue
->>> with linker options so I build kernel and modules with V=1. Here the
->>> linker invocation for them:
->>>
->>> + aarch64-linux-android-ld -EL -p --no-undefined -X --build-id -o vmlinux \
->>> -T ./arch/arm64/kernel/vmlinux.lds arch/arm64/kernel/head.o
->>> init/built-in.o \
->>> --start-group usr/built-in.o arch/arm64/kernel/built-in.o
->>> arch/arm64/mm/built-in.o \
->>> arch/arm64/net/built-in.o arch/arm64/kvm/built-in.o
->>> arch/arm64/crypto/built-in.o \
->>> ./drivers/firmware/efi/libstub/lib.a kernel/built-in.o certs/built-in.o
->>> mm/built-in.o \
->>> fs/built-in.o ipc/built-in.o security/built-in.o crypto/built-in.o
->>> block/built-in.o \
->>> arch/arm64/lib/lib.a lib/lib.a arch/arm64/lib/built-in.o lib/built-in.o
->>> drivers/built-in.o \
->>> sound/built-in.o firmware/built-in.o net/built-in.o virt/built-in.o
->>> --end-group .tmp_kallsyms2.o
->>>
->>>  aarch64-linux-android-ld -EL -r  -T ./scripts/module-common.lds
->>> --build-id \
->>>  -o net/wireless/cfg80211.ko net/wireless/cfg80211.o
->>> net/wireless/cfg80211.mod.o
->>>
->>> Attached are vmlinux.lds and module-common.lds. I also tried taking
->>> upstream arch/arm64/kernel/module.lds in hikey-linaro tree. If someone
->>> can give a hint or educated guess at what to try it would be appreciated.
->>>
->>> Regards,
->>> Arend
->>>
->>> [1] https://source.android.com/source/devices.html#building-kernel
->>> [2]
->>> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0056b/IHI0056B_aaelf64.pdf
->>> <module-common.lds>
->>> <vmlinux.lds>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ drivers/irqchip/irq-bcm2835.c | 3 +--
+ drivers/irqchip/irq-bcm2836.c | 2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+index bf9cc5f2e839..44d7c38dde47 100644
+--- a/drivers/irqchip/irq-bcm2835.c
++++ b/drivers/irqchip/irq-bcm2835.c
+@@ -52,7 +52,6 @@
+ #include <linux/irqdomain.h>
+ 
+ #include <asm/exception.h>
+-#include <asm/mach/irq.h>
+ 
+ /* Put the bank and irq (32 bits) into the hwirq */
+ #define MAKE_HWIRQ(b, n)	((b << 5) | (n))
+@@ -242,7 +241,7 @@ static void __exception_irq_entry bcm2835_handle_irq(
+ 	u32 hwirq;
+ 
+ 	while ((hwirq = get_next_armctrl_hwirq()) != ~0)
+-		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
++		handle_domain_irq(intc.domain, hwirq, regs);
+ }
+ 
+ static void bcm2836_chained_handle_irq(struct irq_desc *desc)
+diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+index 72ff1d5c5de6..27875982657e 100644
+--- a/drivers/irqchip/irq-bcm2836.c
++++ b/drivers/irqchip/irq-bcm2836.c
+@@ -180,7 +180,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
+ 	} else if (stat) {
+ 		u32 hwirq = ffs(stat) - 1;
+ 
+-		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
++		handle_domain_irq(intc.domain, hwirq, regs);
+ 	}
+ }
+ 
+-- 
+2.8.0.rc3
