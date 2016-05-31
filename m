@@ -1,304 +1,594 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 31 May 2016 17:05:15 +0900
-Subject: [PATCH 09/17] pinctrl: uniphier: support pin configuration in sparse
- pin space
+Date: Tue, 31 May 2016 17:05:08 +0900
+Subject: [PATCH 02/17] pinctrl: uniphier: rename function and variable names
 In-Reply-To: <1464681923-7469-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1464681923-7469-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1464681923-7469-10-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1464681923-7469-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unfortunately, the pin number of the new SoC, PH1-LD11, is not
-contiguous.  The base frame work must be adjusted to support the new
-SoC pinctrl driver.  The pin_desc_get() exploits radix-tree for pin
-look-up, so it works more efficiently with sparse pin space.
+Make function/variable names match the file names for consistency.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 86 ++++++++++++------------
- 1 file changed, 42 insertions(+), 44 deletions(-)
+ drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c  | 42 ++++++++++++------------
+ drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c | 42 ++++++++++++------------
+ drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 42 ++++++++++++------------
+ drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c | 42 ++++++++++++------------
+ drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c | 42 ++++++++++++------------
+ drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c | 42 ++++++++++++------------
+ 6 files changed, 126 insertions(+), 126 deletions(-)
 
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-index 017b84f..39e3375 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-@@ -64,10 +64,10 @@ static int uniphier_pctl_get_group_pins(struct pinctrl_dev *pctldev,
- static void uniphier_pctl_pin_dbg_show(struct pinctrl_dev *pctldev,
- 				       struct seq_file *s, unsigned offset)
- {
--	const struct pinctrl_pin_desc *pin = &pctldev->desc->pins[offset];
-+	const struct pin_desc *desc = pin_desc_get(pctldev, offset);
- 	const char *pull_dir, *drv_type;
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
+index 4a0439c..fdcdc91 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
+@@ -19,9 +19,9 @@
  
--	switch (uniphier_pin_get_pull_dir(pin->drv_data)) {
-+	switch (uniphier_pin_get_pull_dir(desc->drv_data)) {
- 	case UNIPHIER_PIN_PULL_UP:
- 		pull_dir = "UP";
- 		break;
-@@ -87,7 +87,7 @@ static void uniphier_pctl_pin_dbg_show(struct pinctrl_dev *pctldev,
- 		BUG();
- 	}
+ #include "pinctrl-uniphier.h"
  
--	switch (uniphier_pin_get_drv_type(pin->drv_data)) {
-+	switch (uniphier_pin_get_drv_type(desc->drv_data)) {
- 	case UNIPHIER_PIN_DRV_1BIT:
- 		drv_type = "4/8(mA)";
- 		break;
-@@ -129,12 +129,12 @@ static const struct pinctrl_ops uniphier_pctlops = {
+-#define DRIVER_NAME "ph1-ld4-pinctrl"
++#define DRIVER_NAME "uniphier-ld4-pinctrl"
+ 
+-static const struct pinctrl_pin_desc ph1_ld4_pins[] = {
++static const struct pinctrl_pin_desc uniphier_ld4_pins[] = {
+ 	UNIPHIER_PINCTRL_PIN(0, "EA1", UNIPHIER_PIN_IECTRL_NONE,
+ 			     8, UNIPHIER_PIN_DRV_4_8,
+ 			     8, UNIPHIER_PIN_PULL_DOWN),
+@@ -612,7 +612,7 @@ static const unsigned xirq_range1_muxvals[] = {
+ 	0, 14,						/* XIRQ14-15 */
  };
  
- static int uniphier_conf_pin_bias_get(struct pinctrl_dev *pctldev,
--				      const struct pinctrl_pin_desc *pin,
-+				      const struct pin_desc *desc,
- 				      enum pin_config_param param)
+-static const struct uniphier_pinctrl_group ph1_ld4_groups[] = {
++static const struct uniphier_pinctrl_group uniphier_ld4_groups[] = {
+ 	UNIPHIER_PINCTRL_GROUP(emmc),
+ 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
+ 	UNIPHIER_PINCTRL_GROUP(i2c0),
+@@ -828,7 +828,7 @@ static const char * const xirq_groups[] = {
+ 	"xirq12", /* none*/ "xirq14", "xirq15",
+ };
+ 
+-static const struct uniphier_pinmux_function ph1_ld4_functions[] = {
++static const struct uniphier_pinmux_function uniphier_ld4_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(emmc),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c0),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c1),
+@@ -847,43 +847,43 @@ static const struct uniphier_pinmux_function ph1_ld4_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(xirq),
+ };
+ 
+-static struct uniphier_pinctrl_socdata ph1_ld4_pindata = {
+-	.groups = ph1_ld4_groups,
+-	.groups_count = ARRAY_SIZE(ph1_ld4_groups),
+-	.functions = ph1_ld4_functions,
+-	.functions_count = ARRAY_SIZE(ph1_ld4_functions),
++static struct uniphier_pinctrl_socdata uniphier_ld4_pindata = {
++	.groups = uniphier_ld4_groups,
++	.groups_count = ARRAY_SIZE(uniphier_ld4_groups),
++	.functions = uniphier_ld4_functions,
++	.functions_count = ARRAY_SIZE(uniphier_ld4_functions),
+ 	.mux_bits = 8,
+ 	.reg_stride = 4,
+ 	.load_pinctrl = false,
+ };
+ 
+-static struct pinctrl_desc ph1_ld4_pinctrl_desc = {
++static struct pinctrl_desc uniphier_ld4_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+-	.pins = ph1_ld4_pins,
+-	.npins = ARRAY_SIZE(ph1_ld4_pins),
++	.pins = uniphier_ld4_pins,
++	.npins = ARRAY_SIZE(uniphier_ld4_pins),
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static int ph1_ld4_pinctrl_probe(struct platform_device *pdev)
++static int uniphier_ld4_pinctrl_probe(struct platform_device *pdev)
  {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
- 	enum uniphier_pin_pull_dir pull_dir =
--				uniphier_pin_get_pull_dir(pin->drv_data);
-+				uniphier_pin_get_pull_dir(desc->drv_data);
- 	unsigned int pupdctrl, reg, shift, val;
- 	unsigned int expected = 1;
- 	int ret;
-@@ -164,7 +164,7 @@ static int uniphier_conf_pin_bias_get(struct pinctrl_dev *pctldev,
- 		BUG();
- 	}
- 
--	pupdctrl = uniphier_pin_get_pupdctrl(pin->drv_data);
-+	pupdctrl = uniphier_pin_get_pupdctrl(desc->drv_data);
- 
- 	reg = UNIPHIER_PINCTRL_PUPDCTRL_BASE + pupdctrl / 32 * 4;
- 	shift = pupdctrl % 32;
-@@ -179,12 +179,12 @@ static int uniphier_conf_pin_bias_get(struct pinctrl_dev *pctldev,
+-	return uniphier_pinctrl_probe(pdev, &ph1_ld4_pinctrl_desc,
+-				      &ph1_ld4_pindata);
++	return uniphier_pinctrl_probe(pdev, &uniphier_ld4_pinctrl_desc,
++				      &uniphier_ld4_pindata);
  }
  
- static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
--				       const struct pinctrl_pin_desc *pin,
-+				       const struct pin_desc *desc,
- 				       u16 *strength)
+-static const struct of_device_id ph1_ld4_pinctrl_match[] = {
++static const struct of_device_id uniphier_ld4_pinctrl_match[] = {
+ 	{ .compatible = "socionext,ph1-ld4-pinctrl" },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, ph1_ld4_pinctrl_match);
++MODULE_DEVICE_TABLE(of, uniphier_ld4_pinctrl_match);
+ 
+-static struct platform_driver ph1_ld4_pinctrl_driver = {
+-	.probe = ph1_ld4_pinctrl_probe,
++static struct platform_driver uniphier_ld4_pinctrl_driver = {
++	.probe = uniphier_ld4_pinctrl_probe,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+-		.of_match_table = ph1_ld4_pinctrl_match,
++		.of_match_table = uniphier_ld4_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(ph1_ld4_pinctrl_driver);
++module_platform_driver(uniphier_ld4_pinctrl_driver);
+ 
+ MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
+ MODULE_DESCRIPTION("UniPhier PH1-LD4 pinctrl driver");
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
+index 150d339..99a3e1a 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
+@@ -19,9 +19,9 @@
+ 
+ #include "pinctrl-uniphier.h"
+ 
+-#define DRIVER_NAME "ph1-ld6b-pinctrl"
++#define DRIVER_NAME "uniphier-ld6b-pinctrl"
+ 
+-static const struct pinctrl_pin_desc ph1_ld6b_pins[] = {
++static const struct pinctrl_pin_desc uniphier_ld6b_pins[] = {
+ 	UNIPHIER_PINCTRL_PIN(0, "ED0", UNIPHIER_PIN_IECTRL_NONE,
+ 			     0, UNIPHIER_PIN_DRV_4_8,
+ 			     0, UNIPHIER_PIN_PULL_DOWN),
+@@ -858,7 +858,7 @@ static const unsigned xirq_muxvals[] = {
+ 	14, 14, 14, 14, 14, 14, 14, 14,			/* XIRQ16-23 */
+ };
+ 
+-static const struct uniphier_pinctrl_group ph1_ld6b_groups[] = {
++static const struct uniphier_pinctrl_group uniphier_ld6b_groups[] = {
+ 	UNIPHIER_PINCTRL_GROUP(adinter),
+ 	UNIPHIER_PINCTRL_GROUP(emmc),
+ 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
+@@ -1215,7 +1215,7 @@ static const char * const xirq_groups[] = {
+ 	"xirq20", "xirq21", "xirq22", "xirq23",
+ };
+ 
+-static const struct uniphier_pinmux_function ph1_ld6b_functions[] = {
++static const struct uniphier_pinmux_function uniphier_ld6b_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(adinter), /* Achip-Dchip interconnect */
+ 	UNIPHIER_PINMUX_FUNCTION(emmc),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c0),
+@@ -1235,43 +1235,43 @@ static const struct uniphier_pinmux_function ph1_ld6b_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(xirq),
+ };
+ 
+-static struct uniphier_pinctrl_socdata ph1_ld6b_pindata = {
+-	.groups = ph1_ld6b_groups,
+-	.groups_count = ARRAY_SIZE(ph1_ld6b_groups),
+-	.functions = ph1_ld6b_functions,
+-	.functions_count = ARRAY_SIZE(ph1_ld6b_functions),
++static struct uniphier_pinctrl_socdata uniphier_ld6b_pindata = {
++	.groups = uniphier_ld6b_groups,
++	.groups_count = ARRAY_SIZE(uniphier_ld6b_groups),
++	.functions = uniphier_ld6b_functions,
++	.functions_count = ARRAY_SIZE(uniphier_ld6b_functions),
+ 	.mux_bits = 8,
+ 	.reg_stride = 4,
+ 	.load_pinctrl = false,
+ };
+ 
+-static struct pinctrl_desc ph1_ld6b_pinctrl_desc = {
++static struct pinctrl_desc uniphier_ld6b_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+-	.pins = ph1_ld6b_pins,
+-	.npins = ARRAY_SIZE(ph1_ld6b_pins),
++	.pins = uniphier_ld6b_pins,
++	.npins = ARRAY_SIZE(uniphier_ld6b_pins),
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static int ph1_ld6b_pinctrl_probe(struct platform_device *pdev)
++static int uniphier_ld6b_pinctrl_probe(struct platform_device *pdev)
  {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
- 	enum uniphier_pin_drv_type type =
--				uniphier_pin_get_drv_type(pin->drv_data);
-+				uniphier_pin_get_drv_type(desc->drv_data);
- 	const unsigned int strength_1bit[] = {4, 8};
- 	const unsigned int strength_2bit[] = {8, 12, 16, 20};
- 	const unsigned int strength_3bit[] = {4, 5, 7, 9, 11, 12, 14, 16};
-@@ -222,7 +222,7 @@ static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
- 		return -EINVAL;
- 	}
- 
--	drvctrl = uniphier_pin_get_drvctrl(pin->drv_data);
-+	drvctrl = uniphier_pin_get_drvctrl(desc->drv_data);
- 	drvctrl *= width;
- 
- 	reg += drvctrl / 32 * 4;
-@@ -239,10 +239,10 @@ static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
+-	return uniphier_pinctrl_probe(pdev, &ph1_ld6b_pinctrl_desc,
+-				      &ph1_ld6b_pindata);
++	return uniphier_pinctrl_probe(pdev, &uniphier_ld6b_pinctrl_desc,
++				      &uniphier_ld6b_pindata);
  }
  
- static int uniphier_conf_pin_input_enable_get(struct pinctrl_dev *pctldev,
--					const struct pinctrl_pin_desc *pin)
-+					      const struct pin_desc *desc)
- {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
--	unsigned int iectrl = uniphier_pin_get_iectrl(pin->drv_data);
-+	unsigned int iectrl = uniphier_pin_get_iectrl(desc->drv_data);
- 	unsigned int val;
- 	int ret;
+-static const struct of_device_id ph1_ld6b_pinctrl_match[] = {
++static const struct of_device_id uniphier_ld6b_pinctrl_match[] = {
+ 	{ .compatible = "socionext,ph1-ld6b-pinctrl" },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, ph1_ld6b_pinctrl_match);
++MODULE_DEVICE_TABLE(of, uniphier_ld6b_pinctrl_match);
  
-@@ -261,7 +261,7 @@ static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
- 					unsigned pin,
- 					unsigned long *configs)
+-static struct platform_driver ph1_ld6b_pinctrl_driver = {
+-	.probe = ph1_ld6b_pinctrl_probe,
++static struct platform_driver uniphier_ld6b_pinctrl_driver = {
++	.probe = uniphier_ld6b_pinctrl_probe,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+-		.of_match_table = ph1_ld6b_pinctrl_match,
++		.of_match_table = uniphier_ld6b_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(ph1_ld6b_pinctrl_driver);
++module_platform_driver(uniphier_ld6b_pinctrl_driver);
+ 
+ MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
+ MODULE_DESCRIPTION("UniPhier PH1-LD6b pinctrl driver");
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
+index b1f09e6..2d45307 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
+@@ -19,9 +19,9 @@
+ 
+ #include "pinctrl-uniphier.h"
+ 
+-#define DRIVER_NAME "ph1-pro4-pinctrl"
++#define DRIVER_NAME "uniphier-pro4-pinctrl"
+ 
+-static const struct pinctrl_pin_desc ph1_pro4_pins[] = {
++static const struct pinctrl_pin_desc uniphier_pro4_pins[] = {
+ 	UNIPHIER_PINCTRL_PIN(0, "CK24O", UNIPHIER_PIN_IECTRL_NONE,
+ 			     0, UNIPHIER_PIN_DRV_4_8,
+ 			     0, UNIPHIER_PIN_PULL_DOWN),
+@@ -1135,7 +1135,7 @@ static const unsigned xirq_alternatives_muxvals[] = {
+ 	2, 2, 2,
+ };
+ 
+-static const struct uniphier_pinctrl_group ph1_pro4_groups[] = {
++static const struct uniphier_pinctrl_group uniphier_pro4_groups[] = {
+ 	UNIPHIER_PINCTRL_GROUP(emmc),
+ 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
+ 	UNIPHIER_PINCTRL_GROUP(i2c0),
+@@ -1499,7 +1499,7 @@ static const char * const xirq_groups[] = {
+ 	"xirq14b", "xirq17b", "xirq18b",
+ };
+ 
+-static const struct uniphier_pinmux_function ph1_pro4_functions[] = {
++static const struct uniphier_pinmux_function uniphier_pro4_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(emmc),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c0),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c1),
+@@ -1521,43 +1521,43 @@ static const struct uniphier_pinmux_function ph1_pro4_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(xirq),
+ };
+ 
+-static struct uniphier_pinctrl_socdata ph1_pro4_pindata = {
+-	.groups = ph1_pro4_groups,
+-	.groups_count = ARRAY_SIZE(ph1_pro4_groups),
+-	.functions = ph1_pro4_functions,
+-	.functions_count = ARRAY_SIZE(ph1_pro4_functions),
++static struct uniphier_pinctrl_socdata uniphier_pro4_pindata = {
++	.groups = uniphier_pro4_groups,
++	.groups_count = ARRAY_SIZE(uniphier_pro4_groups),
++	.functions = uniphier_pro4_functions,
++	.functions_count = ARRAY_SIZE(uniphier_pro4_functions),
+ 	.mux_bits = 4,
+ 	.reg_stride = 8,
+ 	.load_pinctrl = true,
+ };
+ 
+-static struct pinctrl_desc ph1_pro4_pinctrl_desc = {
++static struct pinctrl_desc uniphier_pro4_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+-	.pins = ph1_pro4_pins,
+-	.npins = ARRAY_SIZE(ph1_pro4_pins),
++	.pins = uniphier_pro4_pins,
++	.npins = ARRAY_SIZE(uniphier_pro4_pins),
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static int ph1_pro4_pinctrl_probe(struct platform_device *pdev)
++static int uniphier_pro4_pinctrl_probe(struct platform_device *pdev)
  {
--	const struct pinctrl_pin_desc *pin_desc = &pctldev->desc->pins[pin];
-+	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
- 	enum pin_config_param param = pinconf_to_config_param(*configs);
- 	bool has_arg = false;
- 	u16 arg;
-@@ -271,14 +271,14 @@ static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
- 	case PIN_CONFIG_BIAS_DISABLE:
- 	case PIN_CONFIG_BIAS_PULL_UP:
- 	case PIN_CONFIG_BIAS_PULL_DOWN:
--		ret = uniphier_conf_pin_bias_get(pctldev, pin_desc, param);
-+		ret = uniphier_conf_pin_bias_get(pctldev, desc, param);
- 		break;
- 	case PIN_CONFIG_DRIVE_STRENGTH:
--		ret = uniphier_conf_pin_drive_get(pctldev, pin_desc, &arg);
-+		ret = uniphier_conf_pin_drive_get(pctldev, desc, &arg);
- 		has_arg = true;
- 		break;
- 	case PIN_CONFIG_INPUT_ENABLE:
--		ret = uniphier_conf_pin_input_enable_get(pctldev, pin_desc);
-+		ret = uniphier_conf_pin_input_enable_get(pctldev, desc);
- 		break;
- 	default:
- 		/* unsupported parameter */
-@@ -293,13 +293,12 @@ static int uniphier_conf_pin_config_get(struct pinctrl_dev *pctldev,
+-	return uniphier_pinctrl_probe(pdev, &ph1_pro4_pinctrl_desc,
+-				      &ph1_pro4_pindata);
++	return uniphier_pinctrl_probe(pdev, &uniphier_pro4_pinctrl_desc,
++				      &uniphier_pro4_pindata);
  }
  
- static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
--				      const struct pinctrl_pin_desc *pin,
--				      enum pin_config_param param,
--				      u16 arg)
-+				      const struct pin_desc *desc,
-+				      enum pin_config_param param, u16 arg)
+-static const struct of_device_id ph1_pro4_pinctrl_match[] = {
++static const struct of_device_id uniphier_pro4_pinctrl_match[] = {
+ 	{ .compatible = "socionext,ph1-pro4-pinctrl" },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, ph1_pro4_pinctrl_match);
++MODULE_DEVICE_TABLE(of, uniphier_pro4_pinctrl_match);
+ 
+-static struct platform_driver ph1_pro4_pinctrl_driver = {
+-	.probe = ph1_pro4_pinctrl_probe,
++static struct platform_driver uniphier_pro4_pinctrl_driver = {
++	.probe = uniphier_pro4_pinctrl_probe,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+-		.of_match_table = ph1_pro4_pinctrl_match,
++		.of_match_table = uniphier_pro4_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(ph1_pro4_pinctrl_driver);
++module_platform_driver(uniphier_pro4_pinctrl_driver);
+ 
+ MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
+ MODULE_DESCRIPTION("UniPhier PH1-Pro4 pinctrl driver");
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
+index 3087f76..a96559c 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
+@@ -19,9 +19,9 @@
+ 
+ #include "pinctrl-uniphier.h"
+ 
+-#define DRIVER_NAME "ph1-pro5-pinctrl"
++#define DRIVER_NAME "uniphier-pro5-pinctrl"
+ 
+-static const struct pinctrl_pin_desc ph1_pro5_pins[] = {
++static const struct pinctrl_pin_desc uniphier_pro5_pins[] = {
+ 	UNIPHIER_PINCTRL_PIN(0, "AEXCKA1", 0,
+ 			     0, UNIPHIER_PIN_DRV_4_8,
+ 			     0, UNIPHIER_PIN_PULL_DOWN),
+@@ -919,7 +919,7 @@ static const unsigned xirq_alternatives_muxvals[] = {
+ 	14, 14, 14, 14, 14, 14, 14, 14, 14,
+ };
+ 
+-static const struct uniphier_pinctrl_group ph1_pro5_groups[] = {
++static const struct uniphier_pinctrl_group uniphier_pro5_groups[] = {
+ 	UNIPHIER_PINCTRL_GROUP(nand),
+ 	UNIPHIER_PINCTRL_GROUP(nand_cs1),
+ 	UNIPHIER_PINCTRL_GROUP(emmc),
+@@ -1291,7 +1291,7 @@ static const char * const xirq_groups[] = {
+ 	"xirq18b", "xirq18c", "xirq19b", "xirq20b",
+ };
+ 
+-static const struct uniphier_pinmux_function ph1_pro5_functions[] = {
++static const struct uniphier_pinmux_function uniphier_pro5_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(emmc),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c0),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c1),
+@@ -1312,43 +1312,43 @@ static const struct uniphier_pinmux_function ph1_pro5_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(xirq),
+ };
+ 
+-static struct uniphier_pinctrl_socdata ph1_pro5_pindata = {
+-	.groups = ph1_pro5_groups,
+-	.groups_count = ARRAY_SIZE(ph1_pro5_groups),
+-	.functions = ph1_pro5_functions,
+-	.functions_count = ARRAY_SIZE(ph1_pro5_functions),
++static struct uniphier_pinctrl_socdata uniphier_pro5_pindata = {
++	.groups = uniphier_pro5_groups,
++	.groups_count = ARRAY_SIZE(uniphier_pro5_groups),
++	.functions = uniphier_pro5_functions,
++	.functions_count = ARRAY_SIZE(uniphier_pro5_functions),
+ 	.mux_bits = 4,
+ 	.reg_stride = 8,
+ 	.load_pinctrl = true,
+ };
+ 
+-static struct pinctrl_desc ph1_pro5_pinctrl_desc = {
++static struct pinctrl_desc uniphier_pro5_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+-	.pins = ph1_pro5_pins,
+-	.npins = ARRAY_SIZE(ph1_pro5_pins),
++	.pins = uniphier_pro5_pins,
++	.npins = ARRAY_SIZE(uniphier_pro5_pins),
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static int ph1_pro5_pinctrl_probe(struct platform_device *pdev)
++static int uniphier_pro5_pinctrl_probe(struct platform_device *pdev)
  {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
- 	enum uniphier_pin_pull_dir pull_dir =
--				uniphier_pin_get_pull_dir(pin->drv_data);
-+				uniphier_pin_get_pull_dir(desc->drv_data);
- 	unsigned int pupdctrl, reg, shift;
- 	unsigned int val = 1;
- 
-@@ -310,8 +309,8 @@ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
- 		if (pull_dir == UNIPHIER_PIN_PULL_UP_FIXED ||
- 		    pull_dir == UNIPHIER_PIN_PULL_DOWN_FIXED) {
- 			dev_err(pctldev->dev,
--				"can not disable pull register for pin %u (%s)\n",
--				pin->number, pin->name);
-+				"can not disable pull register for pin %s\n",
-+				desc->name);
- 			return -EINVAL;
- 		}
- 		val = 0;
-@@ -321,8 +320,8 @@ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
- 			return 0;
- 		if (pull_dir != UNIPHIER_PIN_PULL_UP) {
- 			dev_err(pctldev->dev,
--				"pull-up is unsupported for pin %u (%s)\n",
--				pin->number, pin->name);
-+				"pull-up is unsupported for pin %s\n",
-+				desc->name);
- 			return -EINVAL;
- 		}
- 		if (arg == 0) {
-@@ -335,8 +334,8 @@ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
- 			return 0;
- 		if (pull_dir != UNIPHIER_PIN_PULL_DOWN) {
- 			dev_err(pctldev->dev,
--				"pull-down is unsupported for pin %u (%s)\n",
--				pin->number, pin->name);
-+				"pull-down is unsupported for pin %s\n",
-+				desc->name);
- 			return -EINVAL;
- 		}
- 		if (arg == 0) {
-@@ -347,8 +346,8 @@ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
- 	case PIN_CONFIG_BIAS_PULL_PIN_DEFAULT:
- 		if (pull_dir == UNIPHIER_PIN_PULL_NONE) {
- 			dev_err(pctldev->dev,
--				"pull-up/down is unsupported for pin %u (%s)\n",
--				pin->number, pin->name);
-+				"pull-up/down is unsupported for pin %s\n",
-+				desc->name);
- 			return -EINVAL;
- 		}
- 
-@@ -359,7 +358,7 @@ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
- 		BUG();
- 	}
- 
--	pupdctrl = uniphier_pin_get_pupdctrl(pin->drv_data);
-+	pupdctrl = uniphier_pin_get_pupdctrl(desc->drv_data);
- 
- 	reg = UNIPHIER_PINCTRL_PUPDCTRL_BASE + pupdctrl / 32 * 4;
- 	shift = pupdctrl % 32;
-@@ -368,12 +367,12 @@ static int uniphier_conf_pin_bias_set(struct pinctrl_dev *pctldev,
+-	return uniphier_pinctrl_probe(pdev, &ph1_pro5_pinctrl_desc,
+-				      &ph1_pro5_pindata);
++	return uniphier_pinctrl_probe(pdev, &uniphier_pro5_pinctrl_desc,
++				      &uniphier_pro5_pindata);
  }
  
- static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
--				       const struct pinctrl_pin_desc *pin,
-+				       const struct pin_desc *desc,
- 				       u16 strength)
+-static const struct of_device_id ph1_pro5_pinctrl_match[] = {
++static const struct of_device_id uniphier_pro5_pinctrl_match[] = {
+ 	{ .compatible = "socionext,ph1-pro5-pinctrl" },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, ph1_pro5_pinctrl_match);
++MODULE_DEVICE_TABLE(of, uniphier_pro5_pinctrl_match);
+ 
+-static struct platform_driver ph1_pro5_pinctrl_driver = {
+-	.probe = ph1_pro5_pinctrl_probe,
++static struct platform_driver uniphier_pro5_pinctrl_driver = {
++	.probe = uniphier_pro5_pinctrl_probe,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+-		.of_match_table = ph1_pro5_pinctrl_match,
++		.of_match_table = uniphier_pro5_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(ph1_pro5_pinctrl_driver);
++module_platform_driver(uniphier_pro5_pinctrl_driver);
+ 
+ MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
+ MODULE_DESCRIPTION("UniPhier PH1-Pro5 pinctrl driver");
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
+index e868030..8074460e 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
+@@ -19,9 +19,9 @@
+ 
+ #include "pinctrl-uniphier.h"
+ 
+-#define DRIVER_NAME "proxstream2-pinctrl"
++#define DRIVER_NAME "uniphier-pxs2-pinctrl"
+ 
+-static const struct pinctrl_pin_desc proxstream2_pins[] = {
++static const struct pinctrl_pin_desc uniphier_pxs2_pins[] = {
+ 	UNIPHIER_PINCTRL_PIN(0, "ED0", UNIPHIER_PIN_IECTRL_NONE,
+ 			     0, UNIPHIER_PIN_DRV_4_8,
+ 			     0, UNIPHIER_PIN_PULL_DOWN),
+@@ -848,7 +848,7 @@ static const unsigned xirq_muxvals[] = {
+ 	14, 14, 14, 14, 14, 14, 14, 14,			/* XIRQ16-23 */
+ };
+ 
+-static const struct uniphier_pinctrl_group proxstream2_groups[] = {
++static const struct uniphier_pinctrl_group uniphier_pxs2_groups[] = {
+ 	UNIPHIER_PINCTRL_GROUP(emmc),
+ 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
+ 	UNIPHIER_PINCTRL_GROUP(i2c0),
+@@ -1208,7 +1208,7 @@ static const char * const xirq_groups[] = {
+ 	"xirq20", "xirq21", "xirq22", "xirq23",
+ };
+ 
+-static const struct uniphier_pinmux_function proxstream2_functions[] = {
++static const struct uniphier_pinmux_function uniphier_pxs2_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(emmc),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c0),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c1),
+@@ -1230,43 +1230,43 @@ static const struct uniphier_pinmux_function proxstream2_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(xirq),
+ };
+ 
+-static struct uniphier_pinctrl_socdata proxstream2_pindata = {
+-	.groups = proxstream2_groups,
+-	.groups_count = ARRAY_SIZE(proxstream2_groups),
+-	.functions = proxstream2_functions,
+-	.functions_count = ARRAY_SIZE(proxstream2_functions),
++static struct uniphier_pinctrl_socdata uniphier_pxs2_pindata = {
++	.groups = uniphier_pxs2_groups,
++	.groups_count = ARRAY_SIZE(uniphier_pxs2_groups),
++	.functions = uniphier_pxs2_functions,
++	.functions_count = ARRAY_SIZE(uniphier_pxs2_functions),
+ 	.mux_bits = 8,
+ 	.reg_stride = 4,
+ 	.load_pinctrl = false,
+ };
+ 
+-static struct pinctrl_desc proxstream2_pinctrl_desc = {
++static struct pinctrl_desc uniphier_pxs2_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+-	.pins = proxstream2_pins,
+-	.npins = ARRAY_SIZE(proxstream2_pins),
++	.pins = uniphier_pxs2_pins,
++	.npins = ARRAY_SIZE(uniphier_pxs2_pins),
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static int proxstream2_pinctrl_probe(struct platform_device *pdev)
++static int uniphier_pxs2_pinctrl_probe(struct platform_device *pdev)
  {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
- 	enum uniphier_pin_drv_type type =
--				uniphier_pin_get_drv_type(pin->drv_data);
-+				uniphier_pin_get_drv_type(desc->drv_data);
- 	const unsigned int strength_1bit[] = {4, 8, -1};
- 	const unsigned int strength_2bit[] = {8, 12, 16, 20, -1};
- 	const unsigned int strength_3bit[] = {4, 5, 7, 9, 11, 12, 14, 16, -1};
-@@ -398,8 +397,8 @@ static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
- 		break;
- 	default:
- 		dev_err(pctldev->dev,
--			"cannot change drive strength for pin %u (%s)\n",
--			pin->number, pin->name);
-+			"cannot change drive strength for pin %s\n",
-+			desc->name);
- 		return -EINVAL;
- 	}
- 
-@@ -410,14 +409,14 @@ static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
- 
- 	if (val == 0) {
- 		dev_err(pctldev->dev,
--			"unsupported drive strength %u mA for pin %u (%s)\n",
--			strength, pin->number, pin->name);
-+			"unsupported drive strength %u mA for pin %s\n",
-+			strength, desc->name);
- 		return -EINVAL;
- 	}
- 
- 	val--;
- 
--	drvctrl = uniphier_pin_get_drvctrl(pin->drv_data);
-+	drvctrl = uniphier_pin_get_drvctrl(desc->drv_data);
- 	drvctrl *= width;
- 
- 	reg += drvctrl / 32 * 4;
-@@ -429,11 +428,11 @@ static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
+-	return uniphier_pinctrl_probe(pdev, &proxstream2_pinctrl_desc,
+-				      &proxstream2_pindata);
++	return uniphier_pinctrl_probe(pdev, &uniphier_pxs2_pinctrl_desc,
++				      &uniphier_pxs2_pindata);
  }
  
- static int uniphier_conf_pin_input_enable(struct pinctrl_dev *pctldev,
--					  const struct pinctrl_pin_desc *pin,
-+					  const struct pin_desc *desc,
- 					  u16 enable)
+-static const struct of_device_id proxstream2_pinctrl_match[] = {
++static const struct of_device_id uniphier_pxs2_pinctrl_match[] = {
+ 	{ .compatible = "socionext,proxstream2-pinctrl" },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, proxstream2_pinctrl_match);
++MODULE_DEVICE_TABLE(of, uniphier_pxs2_pinctrl_match);
+ 
+-static struct platform_driver proxstream2_pinctrl_driver = {
+-	.probe = proxstream2_pinctrl_probe,
++static struct platform_driver uniphier_pxs2_pinctrl_driver = {
++	.probe = uniphier_pxs2_pinctrl_probe,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+-		.of_match_table = proxstream2_pinctrl_match,
++		.of_match_table = uniphier_pxs2_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(proxstream2_pinctrl_driver);
++module_platform_driver(uniphier_pxs2_pinctrl_driver);
+ 
+ MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
+ MODULE_DESCRIPTION("UniPhier ProXstream2 pinctrl driver");
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
+index ceb7a98..1e26b96 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
+@@ -19,9 +19,9 @@
+ 
+ #include "pinctrl-uniphier.h"
+ 
+-#define DRIVER_NAME "ph1-sld8-pinctrl"
++#define DRIVER_NAME "uniphier-sld8-pinctrl"
+ 
+-static const struct pinctrl_pin_desc ph1_sld8_pins[] = {
++static const struct pinctrl_pin_desc uniphier_sld8_pins[] = {
+ 	UNIPHIER_PINCTRL_PIN(0, "PCA00", 0,
+ 			     15, UNIPHIER_PIN_DRV_4_8,
+ 			     15, UNIPHIER_PIN_PULL_DOWN),
+@@ -529,7 +529,7 @@ static const unsigned xirq_range1_muxvals[] = {
+ 	14, 14,						/* XIRQ14-15 */
+ };
+ 
+-static const struct uniphier_pinctrl_group ph1_sld8_groups[] = {
++static const struct uniphier_pinctrl_group uniphier_sld8_groups[] = {
+ 	UNIPHIER_PINCTRL_GROUP(emmc),
+ 	UNIPHIER_PINCTRL_GROUP(emmc_dat8),
+ 	UNIPHIER_PINCTRL_GROUP(i2c0),
+@@ -736,7 +736,7 @@ static const char * const xirq_groups[] = {
+ 	"xirq12", /* none*/ "xirq14", "xirq15",
+ };
+ 
+-static const struct uniphier_pinmux_function ph1_sld8_functions[] = {
++static const struct uniphier_pinmux_function uniphier_sld8_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(emmc),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c0),
+ 	UNIPHIER_PINMUX_FUNCTION(i2c1),
+@@ -755,43 +755,43 @@ static const struct uniphier_pinmux_function ph1_sld8_functions[] = {
+ 	UNIPHIER_PINMUX_FUNCTION(xirq),
+ };
+ 
+-static struct uniphier_pinctrl_socdata ph1_sld8_pindata = {
+-	.groups = ph1_sld8_groups,
+-	.groups_count = ARRAY_SIZE(ph1_sld8_groups),
+-	.functions = ph1_sld8_functions,
+-	.functions_count = ARRAY_SIZE(ph1_sld8_functions),
++static struct uniphier_pinctrl_socdata uniphier_sld8_pindata = {
++	.groups = uniphier_sld8_groups,
++	.groups_count = ARRAY_SIZE(uniphier_sld8_groups),
++	.functions = uniphier_sld8_functions,
++	.functions_count = ARRAY_SIZE(uniphier_sld8_functions),
+ 	.mux_bits = 8,
+ 	.reg_stride = 4,
+ 	.load_pinctrl = false,
+ };
+ 
+-static struct pinctrl_desc ph1_sld8_pinctrl_desc = {
++static struct pinctrl_desc uniphier_sld8_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+-	.pins = ph1_sld8_pins,
+-	.npins = ARRAY_SIZE(ph1_sld8_pins),
++	.pins = uniphier_sld8_pins,
++	.npins = ARRAY_SIZE(uniphier_sld8_pins),
+ 	.owner = THIS_MODULE,
+ };
+ 
+-static int ph1_sld8_pinctrl_probe(struct platform_device *pdev)
++static int uniphier_sld8_pinctrl_probe(struct platform_device *pdev)
  {
- 	struct uniphier_pinctrl_priv *priv = pinctrl_dev_get_drvdata(pctldev);
--	unsigned int iectrl = uniphier_pin_get_iectrl(pin->drv_data);
-+	unsigned int iectrl = uniphier_pin_get_iectrl(desc->drv_data);
+-	return uniphier_pinctrl_probe(pdev, &ph1_sld8_pinctrl_desc,
+-				      &ph1_sld8_pindata);
++	return uniphier_pinctrl_probe(pdev, &uniphier_sld8_pinctrl_desc,
++				      &uniphier_sld8_pindata);
+ }
  
- 	if (enable == 0) {
- 		/*
-@@ -457,7 +456,7 @@ static int uniphier_conf_pin_config_set(struct pinctrl_dev *pctldev,
- 					unsigned long *configs,
- 					unsigned num_configs)
- {
--	const struct pinctrl_pin_desc *pin_desc = &pctldev->desc->pins[pin];
-+	const struct pin_desc *desc = pin_desc_get(pctldev, pin);
- 	int i, ret;
+-static const struct of_device_id ph1_sld8_pinctrl_match[] = {
++static const struct of_device_id uniphier_sld8_pinctrl_match[] = {
+ 	{ .compatible = "socionext,ph1-sld8-pinctrl" },
+ 	{ /* sentinel */ }
+ };
+-MODULE_DEVICE_TABLE(of, ph1_sld8_pinctrl_match);
++MODULE_DEVICE_TABLE(of, uniphier_sld8_pinctrl_match);
  
- 	for (i = 0; i < num_configs; i++) {
-@@ -470,16 +469,15 @@ static int uniphier_conf_pin_config_set(struct pinctrl_dev *pctldev,
- 		case PIN_CONFIG_BIAS_PULL_UP:
- 		case PIN_CONFIG_BIAS_PULL_DOWN:
- 		case PIN_CONFIG_BIAS_PULL_PIN_DEFAULT:
--			ret = uniphier_conf_pin_bias_set(pctldev, pin_desc,
-+			ret = uniphier_conf_pin_bias_set(pctldev, desc,
- 							 param, arg);
- 			break;
- 		case PIN_CONFIG_DRIVE_STRENGTH:
--			ret = uniphier_conf_pin_drive_set(pctldev, pin_desc,
--							  arg);
-+			ret = uniphier_conf_pin_drive_set(pctldev, desc, arg);
- 			break;
- 		case PIN_CONFIG_INPUT_ENABLE:
--			ret = uniphier_conf_pin_input_enable(pctldev,
--							     pin_desc, arg);
-+			ret = uniphier_conf_pin_input_enable(pctldev, desc,
-+							     arg);
- 			break;
- 		default:
- 			dev_err(pctldev->dev,
-@@ -561,7 +559,7 @@ static int uniphier_pmx_set_one_mux(struct pinctrl_dev *pctldev, unsigned pin,
+-static struct platform_driver ph1_sld8_pinctrl_driver = {
+-	.probe = ph1_sld8_pinctrl_probe,
++static struct platform_driver uniphier_sld8_pinctrl_driver = {
++	.probe = uniphier_sld8_pinctrl_probe,
+ 	.driver = {
+ 		.name = DRIVER_NAME,
+-		.of_match_table = ph1_sld8_pinctrl_match,
++		.of_match_table = uniphier_sld8_pinctrl_match,
+ 	},
+ };
+-module_platform_driver(ph1_sld8_pinctrl_driver);
++module_platform_driver(uniphier_sld8_pinctrl_driver);
  
- 	/* some pins need input-enabling */
- 	ret = uniphier_conf_pin_input_enable(pctldev,
--					     &pctldev->desc->pins[pin], 1);
-+					     pin_desc_get(pctldev, pin), 1);
- 	if (ret)
- 		return ret;
- 
+ MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
+ MODULE_DESCRIPTION("UniPhier PH1-sLD8 pinctrl driver");
 -- 
 1.9.1
