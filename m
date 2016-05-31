@@ -1,67 +1,57 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 31 May 2016 15:05:59 +0200
-Subject: [PATCH v4 01/12] KVM: extend struct kvm_msi to hold a 32-bit
- device ID
-In-Reply-To: <5745CFF6.6070001@arm.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <1458958450-19662-2-git-send-email-andre.przywara@arm.com>
- <20160403091508.GA5261@cbox>
- <e520a5a8-b259-27f3-f33c-f87e008f1c6f@arm.com>
- <5745CFF6.6070001@arm.com>
-Message-ID: <20160531130559.GA12568@cbox>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 May 2016 14:08:21 +0100
+Subject: [PATCH] drivers: char: mem: Check {read,write}_kmem() addresses
+In-Reply-To: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
+References: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
+Message-ID: <20160531130821.GV19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 05:16:54PM +0100, Marc Zyngier wrote:
-> On 25/05/16 16:55, Andre Przywara wrote:
-> > Hi Christoffer,
-> > 
-> > On 03/04/16 10:15, Christoffer Dall wrote:
-> >> On Sat, Mar 26, 2016 at 02:13:59AM +0000, Andre Przywara wrote:
-> >>> The ARM GICv3 ITS MSI controller requires a device ID to be able to
-> >>> assign the proper interrupt vector. On real hardware, this ID is
-> >>> sampled from the bus. To be able to emulate an ITS controller, extend
-> >>> the KVM MSI interface to let userspace provide such a device ID. For
-> >>> PCI devices, the device ID is simply the 16-bit bus-device-function
-> >>> triplet, which should be easily available to the userland tool.
-> >>>
-> >>> Also there is a new KVM capability which advertises whether the
-> >>> current VM requires a device ID to be set along with the MSI data.
-> >>> This flag is still reported as not available everywhere, later we will
-> >>> enable it when ITS emulation is used.
-> >>>
-> >>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> >>> Reviewed-by: Eric Auger <eric.auger@linaro.org>
-> >>> ---
-> >>>  Documentation/virtual/kvm/api.txt | 12 ++++++++++--
-> >>>  include/uapi/linux/kvm.h          |  5 ++++-
-> >>>  2 files changed, 14 insertions(+), 3 deletions(-)
-> >>>
-> >>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> >>> index cb2ef0b..8f7351d 100644
-> >>> --- a/Documentation/virtual/kvm/api.txt
-> >>> +++ b/Documentation/virtual/kvm/api.txt
-> >>> @@ -2163,10 +2163,18 @@ struct kvm_msi {
-> >>>  	__u32 address_hi;
-> >>>  	__u32 data;
-> >>>  	__u32 flags;
-> >>> -	__u8  pad[16];
-> >>> +	__u32 devid;
-> >>
-> >> Are we imposing any unfortunate restrictions for other architectures by
-> >> using a u32 over a u64 for the device ID?
-> > 
-> > Mmmh, good point. I guess not only for other architectures, but also for
-> > the future in general.
-> > 
-> > Are there any objections against increasing this to a u64?
+On Tue, May 31, 2016 at 01:52:45PM +0100, Robin Murphy wrote:
+> Arriving at read_kmem() with an offset representing a bogus kernel
+> address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
+> faulting on the kernel-space read.
 > 
-> I'm not sure this is really necessary. A PCI RID is 16bit, and expanding
-> it to 32bit is already making quite a bit of space for further extension.
+> x86_64 happens to get away with this since the optimised implementation
+> uses "rep movs*", thus the user write (which is allowed to fault) and
+> the kernel read are the same instruction, the kernel-side fault falls
+> into the userspace fixup handler and a chain of events transpires
+> leading to returning the expected -EFAULT. On other architectures,
+> though, the read is not covered by the fixup entry for the write, and we
+> get a straightforward "Unable to hande kernel paging request..." dump.
 > 
-> Also, some architecture might be unhappy of having a 64bit quantity that
-> is not 64bit aligned...
+> The more typical use-case of mmap_kmem() already validates the address
+> with pfn_valid() as one might expect, so let's make that consistent
+> across {read,write}_kem() too.
 > 
-ok, thanks for the explanation.
+> Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
+> 
+> I'm not sure if this warrants going to stable or not, as it's really
+> just making an existing failure case more graceful and less confusing.
 
--Christoffer
+Returning -EFAULT because the kernel-side address (iow, file offset) is
+invalid is not particularly nice:
+
+NAME
+       read - read from a file descriptor
+
+ERRORS
+       EFAULT buf is outside your accessible address space.
+
+Latest POSIX has:
+
+ENXIO
+	A request was made of a nonexistent device, or the
+	request was outside the capabilities of the device.
+
+which to me looks like a better error code to return, as file offsets
+which are not valid can be interpreted as being "outside the
+capabilities of the device".  EFAULT has always on Linux meant that
+the user passed an invalid userspace buffer.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
