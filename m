@@ -1,159 +1,64 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 May 2016 14:49:01 +0100
-Subject: [PATCH 1/2] arm64: mm: dump: make page table dumping reusable
-In-Reply-To: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
-References: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1464702542-24394-2-git-send-email-mark.rutland@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 31 May 2016 14:52:52 +0100
+Subject: Possible race between PTRACE_SETVFPREGS and PTRACE_CONT on ARM?
+In-Reply-To: <20160530224028.GT19428@n2100.arm.linux.org.uk>
+References: <574C7CDB.7050103@ericsson.com>
+ <20160530213529.GS19428@n2100.arm.linux.org.uk>
+ <20160530224028.GT19428@n2100.arm.linux.org.uk>
+Message-ID: <20160531135251.GK24936@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For debugging purposes, it would be nice if we could export page tables
-other than the swapper_pg_dir to userspace. To enable this, this patch
-refactors the arm64 page table dumping code such that multiple tables
-may be registered with the framework, and exported under debugfs.
+On Mon, May 30, 2016 at 11:40:28PM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 30, 2016 at 10:35:29PM +0100, Russell King - ARM Linux wrote:
+> > With that, on a single CPU, it seems to work correctly every time, but
+> > if I bring up a secondary CPU I start seeing the same problems you've
+> > reported - which seems to need the following patch to solve.  Please can
+> > you check whether this resolves your problem?
+> 
+> More background behind this patch... I think that commit 8130b9d7b9d8
+> ("ARM: 7308/1: vfp: flush thread hwstate before copying ptrace registers")
+> was wrong.
+> 
+> Let's look at what's happening.  The above commit had the following effect:
+> 
+> 	vfp_sync_hwstate();
+> 	new_vfp = thread->vfpstate.hard;
+> 	modify new_vfp (but not new_vfp.cpu)
+> +	vfp_flush_hwstate(thread);
+> 	thread->vfpstate.hard = new_vfp;
+> -	vfp_flush_hwstate(thread);
+> 
+> Now, the commit above claims that a context switch mid-copy of new_vfp
+> into thread->vfpstate.hard may result in corrupted state.
+> 
+> I'm not quite sure how we could get to that point: the only thread which
+> is allowed to touch the traced child's state is the ptracing parent, and
+> the ptracing parent can't do anything until after vfp_set() has returned.
+> Even if the traced child gets a fatal signal, the point at which the
+> signal is delivered to the child is when returning to userspace, which
+> means the child must be runnable.  That in turn means that we are not
+> in the middle of changing the register state.
+> 
+> So, I'm not sure where Will got the idea that the partially copied state
+> would be visible: it shouldn't ever be visible.  If it is visible, then
+> we've got problems even with Will's patch applied, because a partial
+> copy whenever it happens would be visible.
+> 
+> In any case, the above change is wrong: vfp_flush_hwstate() sets
+> thread->vfpstate.hard.cpu to an invalid CPU number.  Switching the order
+> as Will has done _undoes_ the effect of vfp_flush_hwstate(), which leads
+> to the bug you are seeing.
+> 
+> So, I think the correct approach is to revert it.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Laura Abbott <labbott@fedoraproject.org>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/ptdump.h | 44 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/dump.c            | 32 +++++++++++++++++++-----------
- 2 files changed, 64 insertions(+), 12 deletions(-)
- create mode 100644 arch/arm64/include/asm/ptdump.h
+Yes, it looks like I was over-zealous in fixing all users of
+vfp_flush_hwstate after I fixed the signal handling code. Given that the
+child isn't runnable until the parent has finished poking at the register
+state, the original code looks fine.
 
-diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
-new file mode 100644
-index 0000000..07b8ed0
---- /dev/null
-+++ b/arch/arm64/include/asm/ptdump.h
-@@ -0,0 +1,44 @@
-+/*
-+ * Copyright (C) 2014 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_PTDUMP_H
-+#define __ASM_PTDUMP_H
-+
-+#ifdef CONFIG_ARM64_PTDUMP
-+
-+#include <linux/mm_types.h>
-+
-+struct addr_marker {
-+	unsigned long start_address;
-+	char *name;
-+};
-+
-+struct ptdump_info {
-+	struct mm_struct		*mm;
-+	const struct addr_marker	*markers;
-+	unsigned long			base_addr;
-+	unsigned long			max_addr;
-+};
-+
-+int ptdump_register(struct ptdump_info *info, const char *name);
-+
-+#else
-+static inline int ptdump_register(struct ptdump_info *info, const char *name)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_ARM64_PTDUMP */
-+
-+#endif /* __ASM_PTDUMP_H */
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index 8404190..a56a7ad 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -27,11 +27,7 @@
- #include <asm/memory.h>
- #include <asm/pgtable.h>
- #include <asm/pgtable-hwdef.h>
--
--struct addr_marker {
--	unsigned long start_address;
--	const char *name;
--};
-+#include <asm/ptdump.h>
- 
- static const struct addr_marker address_markers[] = {
- #ifdef CONFIG_KASAN
-@@ -284,7 +280,8 @@ static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
- 	}
- }
- 
--static void walk_pgd(struct pg_state *st, struct mm_struct *mm, unsigned long start)
-+static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
-+		     unsigned long start)
- {
- 	pgd_t *pgd = pgd_offset(mm, 0UL);
- 	unsigned i;
-@@ -303,12 +300,13 @@ static void walk_pgd(struct pg_state *st, struct mm_struct *mm, unsigned long st
- 
- static int ptdump_show(struct seq_file *m, void *v)
- {
-+	struct ptdump_info *info = m->private;
- 	struct pg_state st = {
- 		.seq = m,
--		.marker = address_markers,
-+		.marker = info->markers,
- 	};
- 
--	walk_pgd(&st, &init_mm, VA_START);
-+	walk_pgd(&st, info->mm, info->base_addr);
- 
- 	note_page(&st, 0, 0, 0);
- 	return 0;
-@@ -316,7 +314,7 @@ static int ptdump_show(struct seq_file *m, void *v)
- 
- static int ptdump_open(struct inode *inode, struct file *file)
- {
--	return single_open(file, ptdump_show, NULL);
-+	return single_open(file, ptdump_show, inode->i_private);
- }
- 
- static const struct file_operations ptdump_fops = {
-@@ -326,7 +324,7 @@ static const struct file_operations ptdump_fops = {
- 	.release	= single_release,
- };
- 
--static int ptdump_init(void)
-+int ptdump_register(struct ptdump_info *info, const char *name)
- {
- 	struct dentry *pe;
- 	unsigned i, j;
-@@ -336,8 +334,18 @@ static int ptdump_init(void)
- 			for (j = 0; j < pg_level[i].num; j++)
- 				pg_level[i].mask |= pg_level[i].bits[j].mask;
- 
--	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
--				 &ptdump_fops);
-+	pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
- 	return pe ? 0 : -ENOMEM;
- }
-+
-+static struct ptdump_info kernel_ptdump_info = {
-+	.mm		= &init_mm,
-+	.markers	= address_markers,
-+	.base_addr	= VA_START,
-+};
-+
-+static int ptdump_init(void)
-+{
-+	return ptdump_register(&kernel_ptdump_info, "kernel_page_tables");
-+}
- device_initcall(ptdump_init);
--- 
-1.9.1
+The only thing I'm uncertain of is whether or not PTRACE_SEIZE/PTRACE_LISTEN
+allow switching to the child (but even then, how is the parent doing
+to issue such a request?).
+
+Will
