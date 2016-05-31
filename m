@@ -1,98 +1,119 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 31 May 2016 18:47:29 +0100
-Subject: [PATCH] coresight: Remove erroneous dma_free_coherent in tmc_probe
-Message-ID: <1464716849-32066-1-git-send-email-suzuki.poulose@arm.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 31 May 2016 11:55:36 -0600
+Subject: [PATCH 3/5] coresight: Fix csdev connections initialisation
+In-Reply-To: <1464695858-29284-4-git-send-email-suzuki.poulose@arm.com>
+References: <1464695858-29284-1-git-send-email-suzuki.poulose@arm.com>
+ <1464695858-29284-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CANLsYkzQJVY3CDC7D9_Miw3Lu7iqV-6ABsVbTUCpivc-R0WB+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
-removed the static allocation of buffer for the trace data in ETR mode in
-tmc_probe. However it failed to remove the "devm_free_coherent" in tmc_probe
-when the probe fails due to other reasons. This patch gets rid of the
-incorrect dma_free_coherent() call. Also consolidates the error return
-paths.
+On 31 May 2016 at 05:57, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+> This is a cleanup patch.
+>
+> coresight_device->conns holds an array to point to the devices
+> connected to the OUT ports of a component. Sinks, e.g ETR, do not
+> have an OUT port (nr_outport = 0), as it streams the trace to
+> memory via AXI.
+>
+> At coresight_register() we do :
+>
+>         conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+>         if (!conns) {
+>                 ret = -ENOMEM;
+>                 goto err_kzalloc_conns;
+>         }
+>
+> For ETR, since the total size requested for kcalloc is zero, the return value is,
+> ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR which cannot be
+> verified later to contain a valid pointer. The code which accesses the csdev->conns
+> is bounded by the csdev->nr_outport check, hence we don't try to dereference the
+> ZERO_SIZE_PTR. This patch cleans up the csdev->conns and csdev->refcnt, initialisation
+> to make sure we initialise it properly(i.e, either NULL or valid conns array).
+>
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight.c | 42 +++++++++++++++++++--------------
+>  1 file changed, 24 insertions(+), 18 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+> index 0fdaaf4..8410420 100644
+> --- a/drivers/hwtracing/coresight/coresight.c
+> +++ b/drivers/hwtracing/coresight/coresight.c
+> @@ -890,7 +890,7 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+>         int nr_refcnts = 1;
+>         atomic_t *refcnts = NULL;
+>         struct coresight_device *csdev;
+> -       struct coresight_connection *conns;
+> +       struct coresight_connection *conns = NULL;
+>
+>         csdev = kzalloc(sizeof(*csdev), GFP_KERNEL);
+>         if (!csdev) {
+> @@ -908,29 +908,35 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+>                         nr_refcnts = desc->pdata->nr_outport;
+>         }
+>
+> -       refcnts = kcalloc(nr_refcnts, sizeof(*refcnts), GFP_KERNEL);
+> -       if (!refcnts) {
+> -               ret = -ENOMEM;
+> -               goto err_kzalloc_refcnts;
+> -       }
+> +       if (nr_refcnts) {
 
-Fixes: commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-tmc.c | 32 ++++++++++++++---------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+Did you manage to find a usecase where "nr_refcnts == 0" ?  Since
+components have at least one port this condition will always be true.
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index c7d8ba6..ca38144 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -307,22 +307,31 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	if (np) {
- 		pdata = of_get_coresight_platform_data(dev, np);
--		if (IS_ERR(pdata))
--			return PTR_ERR(pdata);
-+		if (IS_ERR(pdata)) {
-+			ret = PTR_ERR(pdata);
-+			goto out;
-+		}
- 		adev->dev.platform_data = pdata;
- 	}
- 
-+	ret = -ENOMEM;
- 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
- 	if (!drvdata)
--		return -ENOMEM;
-+		goto out;
-+
-+	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
-+	if (!desc)
-+		goto out;
- 
- 	drvdata->dev = &adev->dev;
- 	dev_set_drvdata(dev, drvdata);
- 
- 	/* Validity for the resource is already checked by the AMBA core */
- 	base = devm_ioremap_resource(dev, res);
--	if (IS_ERR(base))
--		return PTR_ERR(base);
-+	if (IS_ERR(base)) {
-+		ret = PTR_ERR(base);
-+		goto out;
-+	}
- 
- 	drvdata->base = base;
- 
-@@ -345,12 +354,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 
- 	pm_runtime_put(&adev->dev);
- 
--	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
--	if (!desc) {
--		ret = -ENOMEM;
--		goto err_devm_kzalloc;
--	}
--
- 	desc->pdata = pdata;
- 	desc->dev = dev;
- 	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
-@@ -371,7 +374,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 	drvdata->csdev = coresight_register(desc);
- 	if (IS_ERR(drvdata->csdev)) {
- 		ret = PTR_ERR(drvdata->csdev);
--		goto err_devm_kzalloc;
-+		goto out;
- 	}
- 
- 	drvdata->miscdev.name = pdata->name;
-@@ -385,10 +388,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- 
- err_misc_register:
- 	coresight_unregister(drvdata->csdev);
--err_devm_kzalloc:
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
--		dma_free_coherent(dev, drvdata->size,
--				drvdata->vaddr, drvdata->paddr);
-+out:
- 	return ret;
- }
- 
--- 
-1.9.1
+> +               refcnts = kcalloc(nr_refcnts, sizeof(*refcnts), GFP_KERNEL);
+> +               if (!refcnts) {
+> +                       ret = -ENOMEM;
+> +                       goto err_kzalloc_refcnts;
+> +               }
+>
+> -       csdev->refcnt = refcnts;
+> +               csdev->refcnt = refcnts;
+> +       }
+>
+>         csdev->nr_inport = desc->pdata->nr_inport;
+>         csdev->nr_outport = desc->pdata->nr_outport;
+> -       conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+> -       if (!conns) {
+> -               ret = -ENOMEM;
+> -               goto err_kzalloc_conns;
+> -       }
+>
+> -       for (i = 0; i < csdev->nr_outport; i++) {
+> -               conns[i].outport = desc->pdata->outports[i];
+> -               conns[i].child_name = desc->pdata->child_names[i];
+> -               conns[i].child_port = desc->pdata->child_ports[i];
+> -       }
+> +       /* Initialise connections if there is at least one outport for this component */
+> +       if (csdev->nr_outport) {
+> +               conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+> +               if (!conns) {
+> +                       ret = -ENOMEM;
+> +                       goto err_kzalloc_conns;
+> +               }
+>
+> -       csdev->conns = conns;
+> +               for (i = 0; i < csdev->nr_outport; i++) {
+> +                       conns[i].outport = desc->pdata->outports[i];
+> +                       conns[i].child_name = desc->pdata->child_names[i];
+> +                       conns[i].child_port = desc->pdata->child_ports[i];
+> +               }
+> +
+> +               csdev->conns = conns;
+
+The purpose of your patch is to correctly initialise csdev->conns to
+NULL if there is no output port to speak of.  As such shouldn't the
+above statement be out of the if (csdev->nr_outport) {} ?.
+
+I'm also getting a couple of checkpatch.pl warnings on this patch.
+
+> +       }
+>
+>         csdev->type = desc->type;
+>         csdev->subtype = desc->subtype;
+> --
+> 1.9.1
+>
