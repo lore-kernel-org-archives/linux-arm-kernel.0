@@ -1,20 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 May 2016 12:58:46 +0200
-Subject: [PATCH 17/17] pinctrl: uniphier: add UniPhier PH1-LD20 pinctrl
- driver
-In-Reply-To: <1464681923-7469-18-git-send-email-yamada.masahiro@socionext.com>
-References: <1464681923-7469-1-git-send-email-yamada.masahiro@socionext.com>
- <1464681923-7469-18-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdbAP3RLUSd=NqEzOVk2fib4UOM1NBj7X_jdj4a+8cYjDg@mail.gmail.com>
+Date: Tue, 31 May 2016 12:59:51 +0200
+Subject: [PATCH] pinctrl: oxnas: Rename pinctrl_utils_dt_free_map to
+ pinctrl_utils_free_map
+In-Reply-To: <1464687375-1370-1-git-send-email-narmstrong@baylibre.com>
+References: <1464687375-1370-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CACRpkdb0yrqbyk8k38DpZ1KP1WvPv6qxsDNgXm9XHCsiJRgmmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 10:05 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Tue, May 31, 2016 at 11:36 AM, Neil Armstrong
+<narmstrong@baylibre.com> wrote:
 
-> Add pin configuration and pinmux support for UniPhier PH1-LD20 SoC.
+> Rename pinctrl_utils_dt_free_map to pinctrl_utils_free_map, introduced in
+> d32f7fd3bbc3 ("pinctrl: Rename pinctrl_utils_dt_free_map to pinctrl_utils_free_map")
+> but not reported into oxnas driver.
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Fixes: 611dac1e48a4 ("pinctrl: Add Oxford Semiconductor OXNAS pinctrl and gpio driver")
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 
 Patch applied.
 
