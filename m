@@ -1,109 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 31 May 2016 01:28:52 +0200
-Subject: [PATCH 4/5] clocksource: rockchip: add support for rk3399 SoC
-In-Reply-To: <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
-References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
- <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
-Message-ID: <574CCCB4.1030001@linaro.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 30 May 2016 20:20:22 -0400
+Subject: [PATCH] drm/exynos: fimd: don't set .has_hw_trigger in s3c6400 driver
+ data
+Message-ID: <1464654022-344-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2016 11:50 AM, Caesar Wang wrote:
-> From: Huang Tao <huangtao@rock-chips.com>
->
-> The CONTROL register offset is different from old SoCs.
-> For Linux driver, there are not functional changes at all.
-> Let's call it v2.
->
-> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
+The field value is only checked in fimd_setup_trigger() if .trg_type is
+I80_HW_TRG so there's no point in setting this field for the s3c6400 if
+is never going to be used since .trg_type is not set.
 
-That's hackish.
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+---
 
-Please consider something like:
+ drivers/gpu/drm/exynos/exynos_drm_fimd.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/drivers/clocksource/rockchip_timer.c 
-b/drivers/clocksource/rockchip_timer.c
-index b991b28..b6ba6f9 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -19,7 +19,8 @@
-
-  #define TIMER_LOAD_COUNT0	0x00
-  #define TIMER_LOAD_COUNT1	0x04
--#define TIMER_CONTROL_REG	0x10
-+#define TIMER_CONTROL_REG3288	0x10
-+#define TIMER_CONTROL_REG3399	0x1C
-  #define TIMER_INT_STATUS	0x18
-
-  #define TIMER_DISABLE		0x0
-@@ -31,6 +32,7 @@
-  struct bc_timer {
-  	struct clock_event_device ce;
-  	void __iomem *base;
-+	void __iomem *ctrl;
-  	u32 freq;
-  };
-
-@@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct 
-clock_event_device *ce)
-  	return rk_timer(ce)->base;
-  }
-
-+static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
-+{
-+        return rk_timer(ce)->ctrl;
-+}
-+
-  static inline void rk_timer_disable(struct clock_event_device *ce)
-  {
--	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
-+	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
-  }
-
-  static inline void rk_timer_enable(struct clock_event_device *ce, u32 
-flags)
-  {
-  	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
--		       rk_base(ce) + TIMER_CONTROL_REG);
-+		       rk_ctrl(ce));
-  }
-
-  static void rk_timer_update_counter(unsigned long cycles,
-@@ -179,4 +186,18 @@ out_unmap:
-  	iounmap(bc_timer.base);
-  }
-
--CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
-+static void __init rk3288_timer_init(struct device_node *np)
-+{
-+	bc_timer.ctrl = TIMER_CONTROL_REG3288;
-+	rk_timer_init(np);
-+}
-+
-+static void __init rk3399_timer_init(struct device_node *np)
-+{
-+        bc_timer.ctrl = TIMER_CONTROL_REG3399;
-+	rk_timer_init(np);
-+}
-+
-+
-+CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", 
-rk3288_timer_init);
-+CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3399-timer", 
-rk3399_timer_init);
-
-
-
-
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_fimd.c b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+index 3efe1aa89416..1c23a8ff5e83 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_fimd.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_fimd.c
+@@ -120,7 +120,6 @@ static struct fimd_driver_data s3c64xx_fimd_driver_data = {
+ 	.timing_base = 0x0,
+ 	.has_clksel = 1,
+ 	.has_limited_fmt = 1,
+-	.has_hw_trigger = 1,
+ };
+ 
+ static struct fimd_driver_data exynos3_fimd_driver_data = {
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+2.5.5
