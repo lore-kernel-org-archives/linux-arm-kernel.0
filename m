@@ -1,81 +1,62 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 01 Jun 2016 01:32:35 +0300
-Subject: [PATCH 12/13] ARM: dts: blanche: initial device tree
+Date: Wed, 01 Jun 2016 01:33:49 +0300
+Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
 In-Reply-To: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
 References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
-Message-ID: <1923946.Jvi0TDUXFC@wasted.cogentembedded.com>
+Message-ID: <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the initial device  tree for the R8A7792 SoC based Blanche board.
-The board has 2 debug serial ports: SCIF0 and SCIF3; include support for
-them,  so that  the serial console  can  work.
+R8A7792  SoC  doesn't have the EtherMAC core, so SMSC  LAN89218  Ethernet
+chip was used instead on the Blanche board; this chip  is compatible with
+SMSC LAN9115  for  which there's a (device tree aware) driver. Describe
+the  chip in  the  Blanche device tree;  enable DHCP and NFS root in the
+kernel command line for the kernel booting.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
 ---
- arch/arm/boot/dts/Makefile            |    1 
- arch/arm/boot/dts/r8a7792-blanche.dts |   44 ++++++++++++++++++++++++++++++++++
- 2 files changed, 45 insertions(+)
+ arch/arm/boot/dts/r8a7792-blanche.dts |   23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-Index: renesas/arch/arm/boot/dts/Makefile
-===================================================================
---- renesas.orig/arch/arm/boot/dts/Makefile
-+++ renesas/arch/arm/boot/dts/Makefile
-@@ -638,6 +638,7 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
- 	r8a7790-lager.dtb \
- 	r8a7791-koelsch.dtb \
- 	r8a7791-porter.dtb \
-+	r8a7792-blanche.dtb \
- 	r8a7793-gose.dtb \
- 	r8a7794-alt.dtb \
- 	r8a7794-silk.dtb \
 Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
 ===================================================================
---- /dev/null
+--- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
 +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -0,0 +1,44 @@
-+/*
-+ * Device Tree Source for the Blanche board
-+ *
-+ * Copyright (C) 2016 Cogent Embedded, Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
+@@ -21,7 +21,7 @@
+ 	};
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel";
++		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+@@ -29,6 +29,27 @@
+ 		device_type = "memory";
+ 		reg = <0 0x40000000 0 0x40000000>;
+ 	};
 +
-+/dts-v1/;
-+#include "r8a7792.dtsi"
-+
-+/ {
-+	model = "Blanche";
-+	compatible = "renesas,blanche", "renesas,r8a7792";
-+
-+	aliases {
-+		serial0 = &scif0;
-+		serial1 = &scif3;
++	d3_3v: regulator-3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "D3.3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
 +	};
 +
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
++	ethernet at 18000000 {
++		compatible = "smsc,lan89218", "smsc,lan9115";
++		reg = <0 0x18000000 0 0x100>;
++		phy-mode = "mii";
++		interrupt-parent = <&irqc>;
++		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
++		smsc,irq-push-pull;
++		reg-io-width = <4>;
++		vddvario-supply = <&d3_3v>;
++		vdd33a-supply = <&d3_3v>;
 +	};
-+
-+	memory at 40000000 {
-+		device_type = "memory";
-+		reg = <0 0x40000000 0 0x40000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <20000000>;
-+};
-+
-+&scif0 {
-+	status = "okay";
-+};
-+
-+&scif3 {
-+	status = "okay";
-+};
+ };
+ 
+ &extal_clk {
