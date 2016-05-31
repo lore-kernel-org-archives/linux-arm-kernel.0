@@ -1,87 +1,67 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 31 May 2016 10:24:02 +0200
-Subject: [PATCH 2/4] clocksource: sp804: introduce helper
- sp804_load_mode_set()
-In-Reply-To: <1464428033-52106-3-git-send-email-wangkefeng.wang@huawei.com>
+Date: Tue, 31 May 2016 10:25:34 +0200
+Subject: [PATCH 3/4] clocksource: sp804: use sp804_timer_disable() where
+ possible
+In-Reply-To: <1464428033-52106-4-git-send-email-wangkefeng.wang@huawei.com>
 References: <1464428033-52106-1-git-send-email-wangkefeng.wang@huawei.com>
- <1464428033-52106-3-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <574D4A22.703@linaro.org>
+ <1464428033-52106-4-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <574D4A7E.7000301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 05/28/2016 11:33 AM, Kefeng Wang wrote:
-> Introduce helper sp804_load_mode_set(), and use it, prepare for 64bit
-> mode timer support.
+> Use sp804_timer_disable() where possible, prepare for 64bit mode timer support.
 
-More verbose please.
+Explain this change please.
 
 > Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 > ---
->   drivers/clocksource/timer-sp804.c | 27 +++++++++++++--------------
->   1 file changed, 13 insertions(+), 14 deletions(-)
+>   drivers/clocksource/timer-sp804.c | 11 +++++------
+>   1 file changed, 5 insertions(+), 6 deletions(-)
 >
 > diff --git a/drivers/clocksource/timer-sp804.c b/drivers/clocksource/timer-sp804.c
-> index 362e5d0..b8848e5 100644
+> index b8848e5..2ff8777 100644
 > --- a/drivers/clocksource/timer-sp804.c
 > +++ b/drivers/clocksource/timer-sp804.c
-> @@ -73,6 +73,15 @@ static long __init sp804_get_clock_rate(struct clk *clk, const char *name)
->   	return rate;
->   }
->
-> +static inline void sp804_load_mode_set(void __iomem *base, unsigned long load, int mode)
-> +{
-> +	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
-> +			     mode | TIMER_CTRL_ENABLE;
-> +
-> +	writel(load, base + TIMER_LOAD);
-> +	writel(ctrl, base + TIMER_CTRL);
-> +}
-> +
->   static void __iomem *sched_clock_base;
->
->   static u64 notrace sp804_read(void)
-> @@ -97,10 +106,8 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
+> @@ -105,7 +105,7 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
+>   		return;
 >
 >   	/* setup timer 0 as free-running clocksource */
->   	writel(0, base + TIMER_CTRL);
-> -	writel(0xffffffff, base + TIMER_LOAD);
+> -	writel(0, base + TIMER_CTRL);
+> +	sp804_timer_disable(base);
 >   	writel(0xffffffff, base + TIMER_VALUE);
-> -	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
-> -		base + TIMER_CTRL);
-> +	sp804_load_mode_set(base, 0xffffffff, TIMER_CTRL_PERIODIC & ~TIMER_CTRL_IE);
-
-Can you explain this change ?
-
->   	clocksource_mmio_init(base + TIMER_VALUE, name,
->   		rate, 200, 32, clocksource_mmio_readl_down);
-> @@ -143,24 +150,16 @@ static int sp804_shutdown(struct clock_event_device *evt)
+>   	sp804_load_mode_set(base, 0xffffffff, TIMER_CTRL_PERIODIC & ~TIMER_CTRL_IE);
 >
->   static int sp804_set_periodic(struct clock_event_device *evt)
->   {
-> -	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
-> -			     TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
+> @@ -196,8 +196,7 @@ void __init __sp804_clockevents_init(void __iomem *base, unsigned int irq, struc
+>   	evt->irq = irq;
+>   	evt->cpumask = cpu_possible_mask;
+>
+> -	writel(0, base + TIMER_CTRL);
 > -
->   	timer_shutdown(evt);
-> -	writel(clkevt_reload, clkevt_base + TIMER_LOAD);
-> -	writel(ctrl, clkevt_base + TIMER_CTRL);
-> +	sp804_load_mode_set(clkevt_base, clkevt_reload, TIMER_CTRL_PERIODIC);
->   	return 0;
+> +	sp804_timer_disable(base);
+>   	setup_irq(irq, &sp804_timer_irq);
+>   	clockevents_config_and_register(evt, rate, 0xf, 0xffffffff);
 >   }
+> @@ -216,8 +215,8 @@ static void __init sp804_of_init(struct device_node *np)
+>   		return;
 >
->   static int sp804_set_next_event(unsigned long next,
-> -	struct clock_event_device *evt)
-> +				struct clock_event_device *evt)
->   {
-> -	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
-> -			     TIMER_CTRL_ONESHOT | TIMER_CTRL_ENABLE;
-> -
-> -	writel(next, clkevt_base + TIMER_LOAD);
-> -	writel(ctrl, clkevt_base + TIMER_CTRL);
+>   	/* Ensure timers are disabled */
+> -	writel(0, base + TIMER_CTRL);
+> -	writel(0, base + TIMER_2_BASE + TIMER_CTRL);
+> +	sp804_timer_disable(base);
+> +	sp804_timer_disable(base + TIMER_2_BASE);
 >
-> +	sp804_load_mode_set(clkevt_base, next, TIMER_CTRL_ONESHOT);
->   	return 0;
->   }
+>   	if (initialized || !of_device_is_available(np))
+>   		goto err;
+> @@ -274,7 +273,7 @@ static void __init integrator_cp_of_init(struct device_node *np)
+>   		return;
 >
+>   	/* Ensure timer is disabled */
+> -	writel(0, base + TIMER_CTRL);
+> +	sp804_timer_disable(base);
+>
+>   	if (init_count == 2 || !of_device_is_available(np))
+>   		goto err;
 >
 
 
