@@ -1,63 +1,51 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 31 May 2016 14:07:48 +0300
-Subject: [PATCH v2,1/5] dt-bindings: mt8173-xhci: support host side of
- dual-role mode
-In-Reply-To: <1464673962-11506-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
- <1464673962-11506-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <7828750b-f5ac-6fa0-ee6e-d4775c227e1a@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 31 May 2016 12:07:47 +0100
+Subject: [PATCH] arm64: report CPU number in bad_mode
+Message-ID: <1464692867-339-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+If we take an exception we don't expect (e.g. SError), we report this in
+the bad_mode handler with pr_crit. Depending on the configured log
+level, we may or may not log additional information in functions called
+subsequently. Notably, the messages in dump_stack (including the CPU
+number) are printed with KERN_DEFAULT and may not appear.
 
-On 5/31/2016 8:52 AM, Chunfeng Yun wrote:
+Some exceptions have an IMPLEMENTATION DEFINED ESR_ELx.ISS encoding, and
+knowing the CPU number is crucial to correctly decode them. To ensure
+that this is always possible, we should log the CPU number along with
+the ESR_ELx value, so we are not reliant on subsequent logs or
+additional printk configuration options.
 
-> Some resources, such as IPPC register etc, shared with device
-> driver are moved into common glue layer when xHCI driver is the
-> host side of dual-role mode and they should be changed as optional
-> properties if they are required ones before. For clarity, add
-> a new part of binding to support host side of dual-role mode.
->
-> Additionally add optional properties of pinctrl for host only mode
->
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->  .../devicetree/bindings/usb/mt8173-xhci.txt        |   48 ++++++++++++++++++++
->  1 file changed, 48 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> index b3a7ffa..542e3fa 100644
-> --- a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> @@ -2,6 +2,14 @@ MT8173 xHCI
->
->  The device node for Mediatek SOC USB3.0 host controller
->
-> +There are two scenarios: the first one only supports xHCI driver;
-> +the second one supports dual-role mode, and the host is based on xHCI
-> +driver. Take account of backward compatibility, we divide bindings
-> +into two parts.
-> +
-> +1st: only supports xHCI driver
-> +------------------------------------------------------------------------
-> +
->  Required properties:
->   - compatible : should contain "mediatek,mt8173-xhci"
->   - reg : specifies physical base address and size of the registers,
-> @@ -27,6 +35,9 @@ Optional properties:
->  	control register, it depends on "mediatek,wakeup-src".
->   - vbus-supply : reference to the VBUS regulator;
->   - usb3-lpm-capable : supports USB3.0 LPM
-> + - pinctl-names : a pinctrl state named "default" must be defined
+This patch logs the CPU number in bad_mode such that it is possible for
+a developer to decode these exceptions, provided access to sufficient
+documentation.
 
-    pinctrl-names.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Al Grant <Al.Grant@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Dave Martin <dave.martin@arm.com>
+Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/traps.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-> + - pinctrl-0 : pin control group
-> +	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
->
->  Example:
->  usb30: usb at 11270000 {
-[...]
-
-MBR, Sergei
+diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+index c539208..f7cf463 100644
+--- a/arch/arm64/kernel/traps.c
++++ b/arch/arm64/kernel/traps.c
+@@ -477,8 +477,9 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
+ 	void __user *pc = (void __user *)instruction_pointer(regs);
+ 	console_verbose();
+ 
+-	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
+-		handler[reason], esr, esr_get_class_string(esr));
++	pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
++		handler[reason], smp_processor_id(), esr,
++		esr_get_class_string(esr));
+ 	__show_regs(regs);
+ 
+ 	info.si_signo = SIGILL;
+-- 
+1.9.1
