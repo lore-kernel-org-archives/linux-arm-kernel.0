@@ -1,21 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 May 2016 12:47:58 +0200
-Subject: [PATCH 09/17] pinctrl: uniphier: support pin configuration in
- sparse pin space
-In-Reply-To: <1464681923-7469-10-git-send-email-yamada.masahiro@socionext.com>
+Date: Tue, 31 May 2016 12:49:16 +0200
+Subject: [PATCH 10/17] pinctrl: uniphier: introduce capability flag
+In-Reply-To: <1464681923-7469-11-git-send-email-yamada.masahiro@socionext.com>
 References: <1464681923-7469-1-git-send-email-yamada.masahiro@socionext.com>
- <1464681923-7469-10-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdYw=YCT6xtEdxXfxfSX-OWoGfzv2vbY5_+gKQ_uoDsjFA@mail.gmail.com>
+ <1464681923-7469-11-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdaGqCfNYcqNbWwLzcBngqrPX23JDOyQfeeBO+5ngxd1gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, May 31, 2016 at 10:05 AM, Masahiro Yamada
 <yamada.masahiro@socionext.com> wrote:
 
-> Unfortunately, the pin number of the new SoC, PH1-LD11, is not
-> contiguous.  The base frame work must be adjusted to support the new
-> SoC pinctrl driver.  The pin_desc_get() exploits radix-tree for pin
-> look-up, so it works more efficiently with sparse pin space.
+> The core part of the UniPhier pinctrl driver needs to support a new
+> capability for upcoming UniPhier ARMv8 SoCs.  This sometimes happens
+> because pinctrl drivers include really SoC-specific stuff.
+>
+> This commit intends to tidy up SoC-specific parameters of the existing
+> drivers before adding the new one.  Having just one flag would be
+> better than adding a new struct member every time a new SoC-specific
+> capability comes up.
+>
+> At this time, there is one flag, UNIPHIER_PINCTRL_CAPS_DBGMUX_SEPARATE.
+> This capability (I'd say rather quirk) was added for PH1-Pro4 and
+> PH1-Pro5 as requirement from a customer.  For those SoCs, one pin-mux
+> setting is controlled by the combination of two separate registers; the
+> LSB bits at register offset (8 * N) and the MSB bits at (8 * N + 4).
+> Because it is impossible to update two separate registers atomically,
+> the LOAD_PINCTRL register should be set in order to make the pin-mux
+> settings really effective.
 >
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
