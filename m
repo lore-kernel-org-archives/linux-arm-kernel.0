@@ -1,50 +1,198 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 May 2016 14:57:41 +0100
-Subject: [PATCH] arm64: defconfig: add options for virtualization and
- containers
-In-Reply-To: <1464345747-11729-1-git-send-email-riku.voipio@linaro.org>
-References: <1464345747-11729-1-git-send-email-riku.voipio@linaro.org>
-Message-ID: <20160531135740.GL24936@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 31 May 2016 16:06:30 +0200
+Subject: [PATCH 4/5] clocksource: rockchip: add support for rk3399 SoC
+In-Reply-To: <574D95AF.2020905@rock-chips.com>
+References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
+ <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
+ <574CCCB4.1030001@linaro.org> <574D95AF.2020905@rock-chips.com>
+Message-ID: <574D9A66.4090209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2016 at 01:42:27PM +0300, Riku Voipio wrote:
-> Enable options commonly needed by popular virtualization
-> and container applications. Use modules when possible to
-> avoid too much overhead for users not interested.
-> 
-> - add namespace and cgroup options needed
-> - add seccomp - optional, but enhances Qemu etc
-> - bridge, nat, veth, macvtap and multicast for routing
->   guests and containers
-> - btfrs and overlayfs modules for container COW backends
-> - while near it, make fuse a module instead of built-in.
-> 
-> Generated with make saveconfig and dropping unrelated spurious
-> change hunks while commiting. bloat-o-meter old-vmlinux vmlinux:
-> 
-> add/remove: 899/388 grow/shrink: 744/216 up/down: 183556/-94881 (88675)
-> ...
-> Total: Before=10515333, After=10604008, chg 0.000000%
-> 
-> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
-> ---
->  arch/arm64/configs/defconfig | 53 +++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 47 insertions(+), 6 deletions(-)
+On 05/31/2016 03:46 PM, Huang, Tao wrote:
+> Hi Daniel:
+> On 2016?05?31? 07:28, Daniel Lezcano wrote:
+>> On 05/25/2016 11:50 AM, Caesar Wang wrote:
+>>> From: Huang Tao <huangtao@rock-chips.com>
+>>>
+>>> The CONTROL register offset is different from old SoCs.
+>>> For Linux driver, there are not functional changes at all.
+>>> Let's call it v2.
+>>>
+>>> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
+>>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: Heiko Stuebner <heiko@sntech.de>
+>>> Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
+>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>> ---
+>>
+>> That's hackish.
+> Yes:( I blamed our IC guy.
+>>
+>> Please consider something like:
+>>
+>> diff --git a/drivers/clocksource/rockchip_timer.c
+>> b/drivers/clocksource/rockchip_timer.c
+>> index b991b28..b6ba6f9 100644
+>> --- a/drivers/clocksource/rockchip_timer.c
+>> +++ b/drivers/clocksource/rockchip_timer.c
+>> @@ -19,7 +19,8 @@
+>>
+>>    #define TIMER_LOAD_COUNT0	0x00
+>>    #define TIMER_LOAD_COUNT1	0x04
+>> -#define TIMER_CONTROL_REG	0x10
+>> +#define TIMER_CONTROL_REG3288	0x10
+>> +#define TIMER_CONTROL_REG3399	0x1C
+>>    #define TIMER_INT_STATUS	0x18
+>>
+>>    #define TIMER_DISABLE		0x0
+>> @@ -31,6 +32,7 @@
+>>    struct bc_timer {
+>>    	struct clock_event_device ce;
+>>    	void __iomem *base;
+>> +	void __iomem *ctrl;
+>>    	u32 freq;
+>>    };
+>>
+>> @@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct
+>> clock_event_device *ce)
+>>    	return rk_timer(ce)->base;
+>>    }
+>>
+>> +static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
+>> +{
+>> +        return rk_timer(ce)->ctrl;
+>> +}
+>> +
+>>    static inline void rk_timer_disable(struct clock_event_device *ce)
+>>    {
+>> -	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
+>> +	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
+>>    }
+>>
+>>    static inline void rk_timer_enable(struct clock_event_device *ce, u32
+>> flags)
+>>    {
+>>    	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+>> -		       rk_base(ce) + TIMER_CONTROL_REG);
+>> +		       rk_ctrl(ce));
+>>    }
+>>
+>>    static void rk_timer_update_counter(unsigned long cycles,
+>> @@ -179,4 +186,18 @@ out_unmap:
+>>    	iounmap(bc_timer.base);
+>>    }
+>>
+>> -CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+>> +static void __init rk3288_timer_init(struct device_node *np)
+>> +{
+>> +	bc_timer.ctrl = TIMER_CONTROL_REG3288;
+>> +	rk_timer_init(np);
+>> +}
+>> +
+>> +static void __init rk3399_timer_init(struct device_node *np)
+>> +{
+>> +        bc_timer.ctrl = TIMER_CONTROL_REG3399;
+>> +	rk_timer_init(np);
+>> +}
+>> +
+>> +
+>> +CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer",
+>> rk3288_timer_init);
+>> +CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3399-timer",
+>> rk3399_timer_init);
+>>
+>>
+>
+> I think you mean this patch otherwise compile will fail:
+> @@ -19,7 +19,8 @@
+>
+>   #define TIMER_LOAD_COUNT0	0x00
+>   #define TIMER_LOAD_COUNT1	0x04
+> -#define TIMER_CONTROL_REG	0x10
+> +#define TIMER_CONTROL_REG3288	0x10
+> +#define TIMER_CONTROL_REG3399	0x1C
+>   #define TIMER_INT_STATUS	0x18
+>
+>   #define TIMER_DISABLE		0x0
+> @@ -31,6 +32,7 @@
+>   struct bc_timer {
+>   	struct clock_event_device ce;
+>   	void __iomem *base;
+> +	u32 ctrl;
+>   	u32 freq;
+>   };
+>
+> @@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct
+> clock_event_device *ce)
+>   	return rk_timer(ce)->base;
+>   }
+>
+> +static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
+> +{
+> +	return rk_timer(ce)->base + rk_timer(ce)->ctrl;
 
-I'm fine with adding stuff to defconfig if it's useful to people (and it
-looks like this is), but it's probably about time we figured out what to
-do about '=y' vs '=m'. Until recently (i.e. this merge window), the arm64
-defconfig didn't build any modules. Obviously this only scales so far,
-since the Image tends to get rather huge, but it would be good to try and
-establish a rule-of-thumb as to whether we treat something as a module
-or a built-in. We could even consider retrospectively applying the rule
-if its straightforward enough.
+You can do a small optimization by pre-computing 'ctrl' at init time, so 
+no need to do this addition each time.
 
-One easy way to do it would be: if you need the option to boot, then
-it's a built-in, but that brings up questions around "boot a full android
-system" vs "boot to a point where you could load an initrd".
+> +}
+> +
+>   static inline void rk_timer_disable(struct clock_event_device *ce)
+>   {
+> -	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
+> +	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
+>   }
+>
+>   static inline void rk_timer_enable(struct clock_event_device *ce, u32
+> flags)
+>   {
+>   	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+> -		       rk_base(ce) + TIMER_CONTROL_REG);
+> +		       rk_ctrl(ce));
+>   }
+>
+>   static void rk_timer_update_counter(unsigned long cycles,
+> @@ -179,4 +186,19 @@ out_unmap:
+>   	iounmap(bc_timer.base);
+>   }
+>
+> -CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+> +static void __init rk3288_timer_init(struct device_node *np)
+> +{
+> +	bc_timer.ctrl = TIMER_CONTROL_REG3288;
+> +	rk_timer_init(np);
 
-Any ideas? Am I mad trying to put method into madness?
+	rk_timer_init(np);
+	bc_timer.ctrl = bc_timer.base + TIMER_CONTROL_REG3288;
 
-Will
+> +}
+> +
+> +static void __init rk3399_timer_init(struct device_node *np)
+> +{
+> +	bc_timer.ctrl = TIMER_CONTROL_REG3399;
+> +	rk_timer_init(np);
+
+	rk_timer_init(np);
+	bc_timer.ctrl = bc_timer.base + TIMER_CONTROL_REG3399;
+
+> +}
+> +
+> +CLOCKSOURCE_OF_DECLARE(rk3288_timer, "rockchip,rk3288-timer",
+> +		       rk3288_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(rk3399_timer, "rockchip,rk3399-timer",
+> +		       rk3399_timer_init);
+>
+> This patch will give us a little lager text size. If we do disassemble,
+> we can see additional LDR is called. I can accept this performance drop.
+> So we will send new patches.
+> BTW, the patch "clocksource: rockchip: remove unnecessary clear irq
+> before request_irq" can drop if we use this patch.
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
