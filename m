@@ -1,73 +1,98 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 31 May 2016 18:46:29 +0100
-Subject: Applied "spi/rockchip: add the rk3036/rk3228/rk3368 to match for
- driver" to the spi tree
-In-Reply-To: <1463672824-15367-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <E1b7nkL-0006By-NN@debutante>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 31 May 2016 18:47:29 +0100
+Subject: [PATCH] coresight: Remove erroneous dma_free_coherent in tmc_probe
+Message-ID: <1464716849-32066-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
+removed the static allocation of buffer for the trace data in ETR mode in
+tmc_probe. However it failed to remove the "devm_free_coherent" in tmc_probe
+when the probe fails due to other reasons. This patch gets rid of the
+incorrect dma_free_coherent() call. Also consolidates the error return
+paths.
 
-   spi/rockchip: add the rk3036/rk3228/rk3368 to match for driver
-
-has been applied to the spi tree at
-
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From aa29ea3df27dbba19ef59023d0f7330f2fdc58ae Mon Sep 17 00:00:00 2001
-From: Caesar Wang <wxt@rock-chips.com>
-Date: Fri, 20 May 2016 07:56:21 +0800
-Subject: [PATCH] spi/rockchip: add the rk3036/rk3228/rk3368 to match for
- driver
-
-In gerenal, the "rockchip,rockchip-spi" string will match the dts
-that's great in spi driver. After all the most of rockchip SoCs ar
-same spi controller.
-
-Then, we should keep the old style to match the dts various.
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
+Fixes: commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/spi/spi-rockchip.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/hwtracing/coresight/coresight-tmc.c | 32 ++++++++++++++---------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
-index cd89682065b9..bead5bfcbb0c 100644
---- a/drivers/spi/spi-rockchip.c
-+++ b/drivers/spi/spi-rockchip.c
-@@ -892,9 +892,12 @@ static const struct dev_pm_ops rockchip_spi_pm = {
- };
+diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+index c7d8ba6..ca38144 100644
+--- a/drivers/hwtracing/coresight/coresight-tmc.c
++++ b/drivers/hwtracing/coresight/coresight-tmc.c
+@@ -307,22 +307,31 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
  
- static const struct of_device_id rockchip_spi_dt_match[] = {
-+	{ .compatible = "rockchip,rk3036-spi", },
- 	{ .compatible = "rockchip,rk3066-spi", },
- 	{ .compatible = "rockchip,rk3188-spi", },
-+	{ .compatible = "rockchip,rk3228-spi", },
- 	{ .compatible = "rockchip,rk3288-spi", },
-+	{ .compatible = "rockchip,rk3368-spi", },
- 	{ .compatible = "rockchip,rk3399-spi", },
- 	{ },
- };
+ 	if (np) {
+ 		pdata = of_get_coresight_platform_data(dev, np);
+-		if (IS_ERR(pdata))
+-			return PTR_ERR(pdata);
++		if (IS_ERR(pdata)) {
++			ret = PTR_ERR(pdata);
++			goto out;
++		}
+ 		adev->dev.platform_data = pdata;
+ 	}
+ 
++	ret = -ENOMEM;
+ 	drvdata = devm_kzalloc(dev, sizeof(*drvdata), GFP_KERNEL);
+ 	if (!drvdata)
+-		return -ENOMEM;
++		goto out;
++
++	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
++	if (!desc)
++		goto out;
+ 
+ 	drvdata->dev = &adev->dev;
+ 	dev_set_drvdata(dev, drvdata);
+ 
+ 	/* Validity for the resource is already checked by the AMBA core */
+ 	base = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(base))
+-		return PTR_ERR(base);
++	if (IS_ERR(base)) {
++		ret = PTR_ERR(base);
++		goto out;
++	}
+ 
+ 	drvdata->base = base;
+ 
+@@ -345,12 +354,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ 	pm_runtime_put(&adev->dev);
+ 
+-	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+-	if (!desc) {
+-		ret = -ENOMEM;
+-		goto err_devm_kzalloc;
+-	}
+-
+ 	desc->pdata = pdata;
+ 	desc->dev = dev;
+ 	desc->subtype.sink_subtype = CORESIGHT_DEV_SUBTYPE_SINK_BUFFER;
+@@ -371,7 +374,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 	drvdata->csdev = coresight_register(desc);
+ 	if (IS_ERR(drvdata->csdev)) {
+ 		ret = PTR_ERR(drvdata->csdev);
+-		goto err_devm_kzalloc;
++		goto out;
+ 	}
+ 
+ 	drvdata->miscdev.name = pdata->name;
+@@ -385,10 +388,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+ 
+ err_misc_register:
+ 	coresight_unregister(drvdata->csdev);
+-err_devm_kzalloc:
+-	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
+-		dma_free_coherent(dev, drvdata->size,
+-				drvdata->vaddr, drvdata->paddr);
++out:
+ 	return ret;
+ }
+ 
 -- 
-2.8.1
+1.9.1
