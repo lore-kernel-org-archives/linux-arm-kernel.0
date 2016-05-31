@@ -1,71 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 May 2016 15:58:00 +0100
-Subject: [PATCH 2/2] arm64: fix alignment when RANDOMIZE_TEXT_OFFSET is enabled
-In-Reply-To: <1464706680-15713-1-git-send-email-mark.rutland@arm.com>
-References: <1464706680-15713-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1464706680-15713-3-git-send-email-mark.rutland@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 May 2016 16:14:30 +0100
+Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
+In-Reply-To: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With ARM64_64K_PAGES and RANDOMIZE_TEXT_OFFSET enabled, we hit the
-following issue on the boot:
+The for_each_efi_memory_desc_continue() macro and corresponding
+"_in_map" allow iterating over an efi_memory_map from a given position.
+For code reuse between the existing iterator and the _continue variant,
+this patch also introduces efi_memory_desc_next_entry_map().
 
-kernel BUG at arch/arm64/mm/mmu.c:480!
-Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.6.0 #310
-Hardware name: ARM Juno development board (r2) (DT)
-task: ffff000008d58a80 ti: ffff000008d30000 task.ti: ffff000008d30000
-PC is at map_kernel_segment+0x44/0xb0
-LR is at paging_init+0x84/0x5b0
-pc : [<ffff000008c450b4>] lr : [<ffff000008c451a4>] pstate: 600002c5
-
-Call trace:
-[<ffff000008c450b4>] map_kernel_segment+0x44/0xb0
-[<ffff000008c451a4>] paging_init+0x84/0x5b0
-[<ffff000008c42728>] setup_arch+0x198/0x534
-[<ffff000008c40848>] start_kernel+0x70/0x388
-[<ffff000008c401bc>] __primary_switched+0x30/0x74
-
-Commit 7eb90f2ff7e3 ("arm64: cover the .head.text section in the .text
-segment mapping") removed the alignment between the .head.text and .text
-sections, and used the _text rather than the _stext interval for mapping
-the .text segment.
-
-Prior to this commit _stext was always section aligned and didn't cause
-any issue even when RANDOMIZE_TEXT_OFFSET was enabled. Since that
-alignment has been removed and _text is used to map the .text segment,
-we need ensure _text is always page aligned when RANDOMIZE_TEXT_OFFSET
-is enabled.
-
-This patch adds logic to TEXT_OFFSET fuzzing to ensure that the offset
-is always aligned to the kernel page size. To ensure this, we rely on
-the PAGE_SHIFT being available via Kconfig.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Fixes: 7eb90f2ff7e3 ("arm64: cover the .head.text section in the .text segment mapping")
+Cc: Matt Fleming <matt@codeblueprint.co.uk>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm64/Makefile | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ include/linux/efi.h | 19 +++++++++++++++++--
+ 1 file changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 354d754..7085e32 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -60,7 +60,9 @@ head-y		:= arch/arm64/kernel/head.o
+diff --git a/include/linux/efi.h b/include/linux/efi.h
+index c2db3ca22217..4b0d880f1cd7 100644
+--- a/include/linux/efi.h
++++ b/include/linux/efi.h
+@@ -1002,11 +1002,16 @@ extern int efi_memattr_init(void);
+ extern int efi_memattr_apply_permissions(struct mm_struct *mm,
+ 					 efi_memattr_perm_setter fn);
  
- # The byte offset of the kernel image in RAM from the start of RAM.
- ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
--TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%03x000\n", int(512 * rand())}')
-+TEXT_OFFSET := $(shell awk "BEGIN {srand(); printf \"0x%06x\n\", \
-+		 int(2 * 1024 * 1024 / (2 ^ $(CONFIG_ARM64_PAGE_SHIFT)) * \
-+		 rand()) * (2 ^ $(CONFIG_ARM64_PAGE_SHIFT))}")
- else
- TEXT_OFFSET := 0x00080000
- endif
--- 
-1.9.1
++/* Find next entry in an efi_memory_map or NULL if md is last */
++#define efi_memory_desc_next_entry_map(m, md)				   \
++	((md) == (efi_memory_desc_t *)((m)->map_end - (m)->desc_size)	   \
++	 ? NULL : (void *)(md) + (m)->desc_size)
++
+ /* Iterate through an efi_memory_map */
+ #define for_each_efi_memory_desc_in_map(m, md)				   \
+ 	for ((md) = (m)->map;						   \
+-	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
+-	     (md) = (void *)(md) + (m)->desc_size)
++	     (md);							   \
++	     (md) = efi_memory_desc_next_entry_map(m, md))
+ 
+ /**
+  * for_each_efi_memory_desc - iterate over descriptors in efi.memmap
+@@ -1017,6 +1022,16 @@ extern int efi_memattr_apply_permissions(struct mm_struct *mm,
+ #define for_each_efi_memory_desc(md) \
+ 	for_each_efi_memory_desc_in_map(&efi.memmap, md)
+ 
++/* Continue iterating through an efi_memory_map */
++#define for_each_efi_memory_desc_in_map_continue(m, md)			   \
++	for ((md) = efi_memory_desc_next_entry_map(m, md);		   \
++	     (md);							   \
++	     (md) = efi_memory_desc_next_entry_map(m, md))
++
++/* Continue iterating through efi.memmap */
++#define for_each_efi_memory_desc_continue(md) \
++	for_each_efi_memory_desc_in_map_continue(&efi.memmap, md)
++
+ /*
+  * Format an EFI memory descriptor's type and attributes to a user-provided
+  * character buffer, as per snprintf(), and return the buffer.
