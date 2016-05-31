@@ -1,60 +1,107 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 May 2016 16:14:30 +0100
-Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
+Date: Tue, 31 May 2016 16:14:32 +0100
+Subject: [PATCH 3/3] arm64: mm: Remove split_p*d() functions
 In-Reply-To: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
 References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1464707672-21882-4-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The for_each_efi_memory_desc_continue() macro and corresponding
-"_in_map" allow iterating over an efi_memory_map from a given position.
-For code reuse between the existing iterator and the _continue variant,
-this patch also introduces efi_memory_desc_next_entry_map().
+Since the efi_create_mapping() no longer generates overlapping regions
+and being the last user of the split_p*d code, remove these functions
+and the corresponding TLBI.
 
-Cc: Matt Fleming <matt@codeblueprint.co.uk>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- include/linux/efi.h | 19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+ arch/arm64/mm/mmu.c | 47 ++++-------------------------------------------
+ 1 file changed, 4 insertions(+), 43 deletions(-)
 
-diff --git a/include/linux/efi.h b/include/linux/efi.h
-index c2db3ca22217..4b0d880f1cd7 100644
---- a/include/linux/efi.h
-+++ b/include/linux/efi.h
-@@ -1002,11 +1002,16 @@ extern int efi_memattr_init(void);
- extern int efi_memattr_apply_permissions(struct mm_struct *mm,
- 					 efi_memattr_perm_setter fn);
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index c31f796f33ac..00a9e3f64ea9 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -134,24 +134,6 @@ void __strict_break_before_make(pte_t old_pte, pte_t new_pte, const char *info)
+ }
+ #endif
  
-+/* Find next entry in an efi_memory_map or NULL if md is last */
-+#define efi_memory_desc_next_entry_map(m, md)				   \
-+	((md) == (efi_memory_desc_t *)((m)->map_end - (m)->desc_size)	   \
-+	 ? NULL : (void *)(md) + (m)->desc_size)
-+
- /* Iterate through an efi_memory_map */
- #define for_each_efi_memory_desc_in_map(m, md)				   \
- 	for ((md) = (m)->map;						   \
--	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
--	     (md) = (void *)(md) + (m)->desc_size)
-+	     (md);							   \
-+	     (md) = efi_memory_desc_next_entry_map(m, md))
+-/*
+- * remap a PMD into pages
+- */
+-static void split_pmd(pmd_t *pmd, pte_t *pte)
+-{
+-	unsigned long pfn = pmd_pfn(*pmd);
+-	int i = 0;
+-
+-	do {
+-		/*
+-		 * Need to have the least restrictive permissions available
+-		 * permissions will be fixed up later
+-		 */
+-		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
+-		pfn++;
+-	} while (pte++, i++, i < PTRS_PER_PTE);
+-}
+-
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 				  unsigned long end, unsigned long pfn,
+ 				  pgprot_t prot,
+@@ -159,15 +141,13 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ {
+ 	pte_t *pte;
  
- /**
-  * for_each_efi_memory_desc - iterate over descriptors in efi.memmap
-@@ -1017,6 +1022,16 @@ extern int efi_memattr_apply_permissions(struct mm_struct *mm,
- #define for_each_efi_memory_desc(md) \
- 	for_each_efi_memory_desc_in_map(&efi.memmap, md)
+-	if (pmd_none(*pmd) || pmd_sect(*pmd)) {
++	BUG_ON(pmd_sect(*pmd));
++	if (pmd_none(*pmd)) {
+ 		phys_addr_t pte_phys;
+ 		BUG_ON(!pgtable_alloc);
+ 		pte_phys = pgtable_alloc();
+ 		pte = pte_set_fixmap(pte_phys);
+-		if (pmd_sect(*pmd))
+-			split_pmd(pmd, pte);
+ 		__pmd_populate(pmd, pte_phys, PMD_TYPE_TABLE);
+-		flush_tlb_all();
+ 		pte_clear_fixmap();
+ 	}
+ 	BUG_ON(pmd_bad(*pmd));
+@@ -181,18 +161,6 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 	pte_clear_fixmap();
+ }
  
-+/* Continue iterating through an efi_memory_map */
-+#define for_each_efi_memory_desc_in_map_continue(m, md)			   \
-+	for ((md) = efi_memory_desc_next_entry_map(m, md);		   \
-+	     (md);							   \
-+	     (md) = efi_memory_desc_next_entry_map(m, md))
-+
-+/* Continue iterating through efi.memmap */
-+#define for_each_efi_memory_desc_continue(md) \
-+	for_each_efi_memory_desc_in_map_continue(&efi.memmap, md)
-+
- /*
-  * Format an EFI memory descriptor's type and attributes to a user-provided
-  * character buffer, as per snprintf(), and return the buffer.
+-static void split_pud(pud_t *old_pud, pmd_t *pmd)
+-{
+-	unsigned long addr = pud_pfn(*old_pud) << PAGE_SHIFT;
+-	pgprot_t prot = __pgprot(pud_val(*old_pud) ^ addr);
+-	int i = 0;
+-
+-	do {
+-		set_pmd(pmd, __pmd(addr | pgprot_val(prot)));
+-		addr += PMD_SIZE;
+-	} while (pmd++, i++, i < PTRS_PER_PMD);
+-}
+-
+ #ifdef CONFIG_DEBUG_PAGEALLOC
+ static bool block_mappings_allowed(phys_addr_t (*pgtable_alloc)(void))
+ {
+@@ -223,20 +191,13 @@ static void alloc_init_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	/*
+ 	 * Check for initial section mappings in the pgd/pud and remove them.
+ 	 */
+-	if (pud_none(*pud) || pud_sect(*pud)) {
++	BUG_ON(pud_sect(*pud));
++	if (pud_none(*pud)) {
+ 		phys_addr_t pmd_phys;
+ 		BUG_ON(!pgtable_alloc);
+ 		pmd_phys = pgtable_alloc();
+ 		pmd = pmd_set_fixmap(pmd_phys);
+-		if (pud_sect(*pud)) {
+-			/*
+-			 * need to have the 1G of mappings continue to be
+-			 * present
+-			 */
+-			split_pud(pud, pmd);
+-		}
+ 		__pud_populate(pud, pmd_phys, PUD_TYPE_TABLE);
+-		flush_tlb_all();
+ 		pmd_clear_fixmap();
+ 	}
+ 	BUG_ON(pud_bad(*pud));
