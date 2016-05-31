@@ -1,50 +1,84 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  1 Jun 2016 00:23:18 +0800
-Subject: [PATCH resend v2 0/6] regulator: axp20x: Add support for AXP809 PMIC
-Message-ID: <1464711804-19256-1-git-send-email-wens@csie.org>
+Date: Wed,  1 Jun 2016 00:23:20 +0800
+Subject: [PATCH resend v2 2/6] ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
+In-Reply-To: <1464711804-19256-1-git-send-email-wens@csie.org>
+References: <1464711804-19256-1-git-send-email-wens@csie.org>
+Message-ID: <1464711804-19256-3-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The AXP809 PMIC is used with the Allwinner A80 SoC, along with
+an AXP806 PMIC as a slave.
 
-These are the remaining patches of my AXP809 PMIC support series. The
-mfd parts and regulator fixes were merged in v4.7-rc1. What's left are
-the AXP809 regulator driver and dts changes.
+This patch adds a dtsi file for all the common bindings and default
+values unrelated to board design. Currently this is just listing all
+the regulator nodes. The regulators are initialized based on their
+device node names.
 
-Patch 1 adds AXP809 support to the axp20x regulator driver. This patch
-depends on patch 3, and patches already in regulator/topic/axp20x.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/axp809.dtsi | 53 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
+ create mode 100644 arch/arm/boot/dts/axp809.dtsi
 
-Patch 2 adds a dtsi file for AXP809.
-
-Patch 3 enables AXP809 support on the A80 Optimus board.
-
-Patch 4 enables AXP809 support on the Cubieboard 4.
-
-Patch 5 disables the dummy regulators from sunxi-common-regulators.dtsi
-on the A80 Optimus board. These aren't used in the board DTS anymore.
-
-Patch 6 disables the dummy regulators from sunxi-common-regulators.dtsi,
-on the Cubieboard4. These aren't used in the board DTS anymore.
-
-
-Chen-Yu Tsai (6):
-  regulator: axp20x: support AXP809 variant
-  ARM: dts: sunxi: Add dtsi file for AXP809 PMIC
-  ARM: dts: sun9i: a80-optimus: Add AXP809 PMIC device node and
-    regulators
-  ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC device node and
-    regulators
-  ARM: dts: sun9i: a80-optimus: Disable dummy regulators vcc3v0, vcc3v3,
-    vcc5v0
-  ARM: dts: sun9i: cubieboard4: Disable dummy regulators vcc3v0, vcc3v3,
-    vcc5v0
-
- .../dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} |  98 ++------------
- arch/arm/boot/dts/sun9i-a80-cubieboard4.dts        | 143 ++++++++++++++++++++-
- arch/arm/boot/dts/sun9i-a80-optimus.dts            | 143 ++++++++++++++++++++-
- drivers/regulator/axp20x-regulator.c               | 119 ++++++++++++-----
- 4 files changed, 380 insertions(+), 123 deletions(-)
- copy arch/arm/boot/dts/{sun9i-a80-cubieboard4.dts => axp809.dtsi} (52%)
-
+diff --git a/arch/arm/boot/dts/axp809.dtsi b/arch/arm/boot/dts/axp809.dtsi
+new file mode 100644
+index 000000000000..ab8e5f2d9246
+--- /dev/null
++++ b/arch/arm/boot/dts/axp809.dtsi
+@@ -0,0 +1,53 @@
++/*
++ * Copyright 2015 Chen-Yu Tsai
++ *
++ * Chen-Yu Tsai <wens@csie.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/*
++ * AXP809 Integrated Power Management Chip
++ */
++
++&axp809 {
++	compatible = "x-powers,axp809";
++	interrupt-controller;
++	#interrupt-cells = <1>;
++};
 -- 
 2.8.1
