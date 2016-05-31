@@ -1,98 +1,60 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Tue, 31 May 2016 11:07:06 +0200
-Subject: [PATCH v2 5/5] arm64/numa: avoid inconsistent information to be
- printed
-In-Reply-To: <1464427377-12712-6-git-send-email-thunder.leizhen@huawei.com>
-References: <1464427377-12712-1-git-send-email-thunder.leizhen@huawei.com>
- <1464427377-12712-6-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <574D543A.2090406@suse.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 31 May 2016 11:12:31 +0200
+Subject: [PATCH v5 00/22] ARM: dts: exynos: Add initial support for Odroid
+ XU
+In-Reply-To: <574C5BD2.60008@samsung.com>
+References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
+ <574C5BD2.60008@samsung.com>
+Message-ID: <574D557F.70209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/30/2016 05:27 PM, Sylwester Nawrocki wrote:
+> On 05/28/2016 11:54 AM, Krzysztof Kozlowski wrote:
+>>
+>> The clock changes can go to clock tree. ARM changes to samsung-soc tree.
+>> Please provide me a tag with include/dt-bindings/clock commits so I can
+>> merge it.
+> 
+> I applied the clock tree patches and here is the tag for the three
+> include/dt-bindings patches:
 
+Thanks mate!
+Pulled.
 
-On 28/05/16 11:22, Zhen Lei wrote:
-> numa_init(of_numa_init) may returned error because of numa configuration
-> error. So "No NUMA configuration found" is inaccurate. In fact, specific
-> configuration error information should be immediately printed by the
-> testing branch.
->
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
+Best regards,
+Krzysztof
 
-Which kernel version is this patch based on?
-
-Regards,
-Matthias
-
->   arch/arm64/mm/numa.c | 6 +++---
->   drivers/of/of_numa.c | 7 +++----
->   2 files changed, 6 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index 2601660..1b9622c 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -338,8 +338,10 @@ static int __init numa_init(int (*init_func)(void))
->   	if (ret < 0)
->   		return ret;
->
-> -	if (nodes_empty(numa_nodes_parsed))
-> +	if (nodes_empty(numa_nodes_parsed)) {
-> +		pr_info("No NUMA configuration found\n");
->   		return -EINVAL;
-> +	}
->
->   	ret = numa_register_nodes();
->   	if (ret < 0)
-> @@ -370,8 +372,6 @@ static int __init dummy_numa_init(void)
->
->   	if (numa_off)
->   		pr_info("NUMA disabled\n"); /* Forced off on command line. */
-> -	else
-> -		pr_info("No NUMA configuration found\n");
->   	pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
->   	       0LLU, PFN_PHYS(max_pfn) - 1);
->
-> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-> index fb62307..3157130 100644
-> --- a/drivers/of/of_numa.c
-> +++ b/drivers/of/of_numa.c
-> @@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
->   	struct device_node *np = NULL;
->   	struct resource rsrc;
->   	u32 nid;
-> -	int i, r = 0;
-> +	int i, r;
->
->   	for_each_node_by_type(np, "memory") {
->   		r = of_property_read_u32(np, "numa-node-id", &nid);
-> @@ -81,12 +81,11 @@ static int __init of_numa_parse_memory_nodes(void)
->   		if (!i || r) {
->   			of_node_put(np);
->   			pr_err("NUMA: bad property in memory node\n");
-> -			r = r ? : -EINVAL;
-> -			break;
-> +			return r ? : -EINVAL;
->   		}
->   	}
->
-> -	return r;
-> +	return 0;
->   }
->
-
-Well this is fixing changes you introduced in this patch-set. Any reason 
-this is not part of patch 2?
-
->   static int __init of_numa_parse_distance_map_v1(struct device_node *map)
+> 
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> 
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.8-exynos5410-dt
+> 
+> for you to fetch changes up to ed1e1505db0c116affdfab01e650c44a9c459c65:
+> 
+>   dt-bindings: clock: Add I2C, HSI2C and RTC clock IDs to Exynos5410
+> (2016-05-30 16:00:11 +0200)
+> 
+> ----------------------------------------------------------------
+> Adition of missing clock index definitions for exynos5410 SoC
+> PWM, USB, I2C, and RTC device related clocks.
+> 
+> ----------------------------------------------------------------
+> Krzysztof Kozlowski (3):
+>       dt-bindings: clock: Add license and reformat Exynos5410 clock IDs
+>       dt-bindings: clock: Add PWM and USB clock IDs to Exynos5410
+>       dt-bindings: clock: Add I2C, HSI2C and RTC clock IDs to Exynos5410
+> 
+>  include/dt-bindings/clock/exynos5410.h | 73
+> +++++++++++++++++++++++++++++++++++++++++++++++++++----------------------
+>  1 file changed, 51 insertions(+), 22 deletions(-)
+> 
+> 
 > --
-> 2.5.0
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> Thanks,
+> Sylwester
+> 
