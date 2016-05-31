@@ -1,84 +1,64 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 31 May 2016 16:35:28 +0200
-Subject: [PATCH 2/3] arm64/kvm: use ESR_ELx_EC to extract EC
-In-Reply-To: <1464694383-31700-3-git-send-email-mark.rutland@arm.com>
-References: <1464694383-31700-1-git-send-email-mark.rutland@arm.com>
- <1464694383-31700-3-git-send-email-mark.rutland@arm.com>
-Message-ID: <20160531143528.GC12568@cbox>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 31 May 2016 15:39:06 +0100
+Subject: [PATCH v2] arm64: Implement optimised IP checksum helpers
+In-Reply-To: <574D9E8F.7080509@arm.com>
+References: <ba9cf5bf84b8adc766f7f7511dda8cb501cd4101.1464693619.git.robin.murphy@arm.com>
+ <574D9E8F.7080509@arm.com>
+Message-ID: <574DA20A.4070302@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 12:33:02PM +0100, Mark Rutland wrote:
-> Now that we have a helper to extract the EC from an ESR_ELx value, make
-> use of this in the arm64 KVM code for simplicity and consistency. There
-> should be no functional changes as a result of this patch.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Dave P Martin <dave.martin@arm.com>
-> Cc: Huang Shijie <shijie.huang@arm.com>
-> Cc: James Morse <james.morse@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: kvmarm at lists.cs.columbia.edu
+Hi James,
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+On 31/05/16 15:24, James Morse wrote:
+> Hi Robin,
+>
+> On 31/05/16 12:22, Robin Murphy wrote:
+>> AArch64 is capable of 128-bit memory accesses without alignment
+>> restrictions, which makes it both possible and highly practical to slurp
+>> up a typical 20-byte IP header in just 2 loads. Implement our own
+>> version of ip_fast_checksum() to take advantage of that, resulting in
+>> considerably fewer instructions and memory accesses than the generic
+>> version. We can also get more optimal code generation for csum_fold() by
+>> defining it a slightly different way round from the generic version, so
+>> throw that into the mix too.
+>>
+>> Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
+>> Acked-by: Luke Starrett <luke.starrett@broadcom.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> Minor changes: include types.h for correctness, add Luke's ack.
+>>
+>>   arch/arm64/include/asm/checksum.h | 51 +++++++++++++++++++++++++++++++++++++++
+>
+> Maybe a nit, don't you need to remove the 'generic-y += checksum.h' line from
+> arch/arm64/include/asm/Kbuild to avoid the generated version being created too? [0]
 
-> ---
->  arch/arm64/include/asm/kvm_emulate.h | 2 +-
->  arch/arm64/kvm/handle_exit.c         | 4 ++--
->  arch/arm64/kvm/hyp/switch.c          | 2 +-
->  3 files changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-> index 40bc168..4cdeae3 100644
-> --- a/arch/arm64/include/asm/kvm_emulate.h
-> +++ b/arch/arm64/include/asm/kvm_emulate.h
-> @@ -210,7 +210,7 @@ static inline bool kvm_vcpu_trap_il_is32bit(const struct kvm_vcpu *vcpu)
->  
->  static inline u8 kvm_vcpu_trap_get_class(const struct kvm_vcpu *vcpu)
->  {
-> -	return kvm_vcpu_get_hsr(vcpu) >> ESR_ELx_EC_SHIFT;
-> +	return ESR_ELx_EC(kvm_vcpu_get_hsr(vcpu));
->  }
->  
->  static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index 3246c4a..fa96fe2 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -106,7 +106,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  	run->exit_reason = KVM_EXIT_DEBUG;
->  	run->debug.arch.hsr = hsr;
->  
-> -	switch (hsr >> ESR_ELx_EC_SHIFT) {
-> +	switch (ESR_ELx_EC(hsr)) {
->  	case ESR_ELx_EC_WATCHPT_LOW:
->  		run->debug.arch.far = vcpu->arch.fault.far_el2;
->  		/* fall through */
-> @@ -149,7 +149,7 @@ static exit_handle_fn arm_exit_handlers[] = {
->  static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
->  {
->  	u32 hsr = kvm_vcpu_get_hsr(vcpu);
-> -	u8 hsr_ec = hsr >> ESR_ELx_EC_SHIFT;
-> +	u8 hsr_ec = ESR_ELx_EC(hsr);
->  
->  	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
->  	    !arm_exit_handlers[hsr_ec]) {
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 437cfad..4373997 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -198,7 +198,7 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
->  static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
->  {
->  	u64 esr = read_sysreg_el2(esr);
-> -	u8 ec = esr >> ESR_ELx_EC_SHIFT;
-> +	u8 ec = ESR_ELx_EC(esr);
->  	u64 hpfar, far;
->  
->  	vcpu->arch.fault.esr_el2 = esr;
-> -- 
-> 1.9.1
-> 
+I guess you skimmed the very end of the patch ;)
+
++#include <asm-generic/checksum.h>
+
+> The compiler on my box picks your header in preference to the generated one, but
+> [1] suggests it isn't to be trusted!
+
+We only cherry-pick a couple of functions to optimise, so not building 
+the generic file would necessitate copy-pasting the rest of it. I'd hope 
+this pattern is sufficiently robust, since it's already in use on a 
+number of other architectures! AFAICS [1] only applies when the generic 
+file shouldn't be built at all, so cross fingers we're probably OK.
+
+Robin.
+
+> Thanks,
+>
+> James
+>
+> [0] d8ecc5cd8e22 ("kbuild: asm-generic support")
+> [1] https://lkml.org/lkml/2016/5/23/78
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
