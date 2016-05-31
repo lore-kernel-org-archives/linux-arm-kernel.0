@@ -1,131 +1,111 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 31 May 2016 17:05:14 +0900
-Subject: [PATCH 08/17] pinctrl: uniphier: support 3-bit drive strength control
+Date: Tue, 31 May 2016 17:05:10 +0900
+Subject: [PATCH 04/17] pinctrl: uniphier: set pinctrl_desc owner in common
+ probe function
 In-Reply-To: <1464681923-7469-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1464681923-7469-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1464681923-7469-9-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1464681923-7469-5-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new ARMv8 SoC, PH1-LD20, supports more fine-grained drive
-strength control.  Drive strength of some pins are controlled by
-3-bit width registers (8-level granularity).
+The owner of the struct pinctrl_desc matches that of platform_driver.
+Set it in the common probe function.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
 
- drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 25 ++++++++++++++++++------
- drivers/pinctrl/uniphier/pinctrl-uniphier.h      |  2 ++
- 2 files changed, 21 insertions(+), 6 deletions(-)
+ drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 1 +
+ drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c  | 1 -
+ drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c | 1 -
+ drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c | 1 -
+ drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c | 1 -
+ drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c | 1 -
+ drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c | 1 -
+ 7 files changed, 1 insertion(+), 6 deletions(-)
 
 diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-index 7f7274e..017b84f 100644
+index 5d08de0..ab89efb 100644
 --- a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
 +++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
-@@ -94,6 +94,9 @@ static void uniphier_pctl_pin_dbg_show(struct pinctrl_dev *pctldev,
- 	case UNIPHIER_PIN_DRV_2BIT:
- 		drv_type = "8/12/16/20(mA)";
- 		break;
-+	case UNIPHIER_PIN_DRV_3BIT:
-+		drv_type = "4/5/7/9/11/12/14/16(mA)";
-+		break;
- 	case UNIPHIER_PIN_DRV_FIXED4:
- 		drv_type = "4(mA)";
- 		break;
-@@ -184,6 +187,7 @@ static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
- 				uniphier_pin_get_drv_type(pin->drv_data);
- 	const unsigned int strength_1bit[] = {4, 8};
- 	const unsigned int strength_2bit[] = {8, 12, 16, 20};
-+	const unsigned int strength_3bit[] = {4, 5, 7, 9, 11, 12, 14, 16};
- 	const unsigned int *supported_strength;
- 	unsigned int drvctrl, reg, shift, mask, width, val;
- 	int ret;
-@@ -191,12 +195,19 @@ static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
- 	switch (type) {
- 	case UNIPHIER_PIN_DRV_1BIT:
- 		supported_strength = strength_1bit;
-+		reg = UNIPHIER_PINCTRL_DRVCTRL_BASE;
- 		width = 1;
- 		break;
- 	case UNIPHIER_PIN_DRV_2BIT:
- 		supported_strength = strength_2bit;
-+		reg = UNIPHIER_PINCTRL_DRV2CTRL_BASE;
- 		width = 2;
- 		break;
-+	case UNIPHIER_PIN_DRV_3BIT:
-+		supported_strength = strength_3bit;
-+		reg = UNIPHIER_PINCTRL_DRV3CTRL_BASE;
-+		width = 4;
-+		break;
- 	case UNIPHIER_PIN_DRV_FIXED4:
- 		*strength = 4;
- 		return 0;
-@@ -214,9 +225,6 @@ static int uniphier_conf_pin_drive_get(struct pinctrl_dev *pctldev,
- 	drvctrl = uniphier_pin_get_drvctrl(pin->drv_data);
- 	drvctrl *= width;
+@@ -670,6 +670,7 @@ int uniphier_pinctrl_probe(struct platform_device *pdev,
+ 	desc->pctlops = &uniphier_pctlops;
+ 	desc->pmxops = &uniphier_pmxops;
+ 	desc->confops = &uniphier_confops;
++	desc->owner = dev->driver->owner;
  
--	reg = (width == 2) ? UNIPHIER_PINCTRL_DRV2CTRL_BASE :
--			     UNIPHIER_PINCTRL_DRVCTRL_BASE;
--
- 	reg += drvctrl / 32 * 4;
- 	shift = drvctrl % 32;
- 	mask = (1U << width) - 1;
-@@ -368,18 +376,26 @@ static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
- 				uniphier_pin_get_drv_type(pin->drv_data);
- 	const unsigned int strength_1bit[] = {4, 8, -1};
- 	const unsigned int strength_2bit[] = {8, 12, 16, 20, -1};
-+	const unsigned int strength_3bit[] = {4, 5, 7, 9, 11, 12, 14, 16, -1};
- 	const unsigned int *supported_strength;
- 	unsigned int drvctrl, reg, shift, mask, width, val;
+ 	priv->pctldev = devm_pinctrl_register(dev, desc, priv);
+ 	if (IS_ERR(priv->pctldev)) {
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
+index ad193c7..5353ce4 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld4.c
+@@ -861,7 +861,6 @@ static struct pinctrl_desc uniphier_ld4_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+ 	.pins = uniphier_ld4_pins,
+ 	.npins = ARRAY_SIZE(uniphier_ld4_pins),
+-	.owner = THIS_MODULE,
+ };
  
- 	switch (type) {
- 	case UNIPHIER_PIN_DRV_1BIT:
- 		supported_strength = strength_1bit;
-+		reg = UNIPHIER_PINCTRL_DRVCTRL_BASE;
- 		width = 1;
- 		break;
- 	case UNIPHIER_PIN_DRV_2BIT:
- 		supported_strength = strength_2bit;
-+		reg = UNIPHIER_PINCTRL_DRV2CTRL_BASE;
- 		width = 2;
- 		break;
-+	case UNIPHIER_PIN_DRV_3BIT:
-+		supported_strength = strength_3bit;
-+		reg = UNIPHIER_PINCTRL_DRV3CTRL_BASE;
-+		width = 4;
-+		break;
- 	default:
- 		dev_err(pctldev->dev,
- 			"cannot change drive strength for pin %u (%s)\n",
-@@ -404,9 +420,6 @@ static int uniphier_conf_pin_drive_set(struct pinctrl_dev *pctldev,
- 	drvctrl = uniphier_pin_get_drvctrl(pin->drv_data);
- 	drvctrl *= width;
+ static int uniphier_ld4_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
+index 0782a6d..c405960 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld6b.c
+@@ -1249,7 +1249,6 @@ static struct pinctrl_desc uniphier_ld6b_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+ 	.pins = uniphier_ld6b_pins,
+ 	.npins = ARRAY_SIZE(uniphier_ld6b_pins),
+-	.owner = THIS_MODULE,
+ };
  
--	reg = (width == 2) ? UNIPHIER_PINCTRL_DRV2CTRL_BASE :
--			     UNIPHIER_PINCTRL_DRVCTRL_BASE;
--
- 	reg += drvctrl / 32 * 4;
- 	shift = drvctrl % 32;
- 	mask = (1U << width) - 1;
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier.h b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-index 7f3e7ff..eca379a 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier.h
-@@ -25,6 +25,7 @@ struct platform_device;
- #define UNIPHIER_PINCTRL_LOAD_PINMUX	0x700
- #define UNIPHIER_PINCTRL_DRVCTRL_BASE	0x800
- #define UNIPHIER_PINCTRL_DRV2CTRL_BASE	0x900
-+#define UNIPHIER_PINCTRL_DRV3CTRL_BASE	0x980
- #define UNIPHIER_PINCTRL_PUPDCTRL_BASE	0xa00
- #define UNIPHIER_PINCTRL_IECTRL		0xd00
+ static int uniphier_ld6b_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
+index 2d45307..54b08d5 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro4.c
+@@ -1535,7 +1535,6 @@ static struct pinctrl_desc uniphier_pro4_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+ 	.pins = uniphier_pro4_pins,
+ 	.npins = ARRAY_SIZE(uniphier_pro4_pins),
+-	.owner = THIS_MODULE,
+ };
  
-@@ -72,6 +73,7 @@ struct platform_device;
- enum uniphier_pin_drv_type {
- 	UNIPHIER_PIN_DRV_1BIT,		/* 2 level control: 4/8 mA */
- 	UNIPHIER_PIN_DRV_2BIT,		/* 4 level control: 8/12/16/20 mA */
-+	UNIPHIER_PIN_DRV_3BIT,		/* 8 level control: 4/5/7/9/11/12/14/16 mA */
- 	UNIPHIER_PIN_DRV_FIXED4,	/* fixed to 4mA */
- 	UNIPHIER_PIN_DRV_FIXED5,	/* fixed to 5mA */
- 	UNIPHIER_PIN_DRV_FIXED8,	/* fixed to 8mA */
+ static int uniphier_pro4_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
+index 8452dad..19b15db 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pro5.c
+@@ -1326,7 +1326,6 @@ static struct pinctrl_desc uniphier_pro5_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+ 	.pins = uniphier_pro5_pins,
+ 	.npins = ARRAY_SIZE(uniphier_pro5_pins),
+-	.owner = THIS_MODULE,
+ };
+ 
+ static int uniphier_pro5_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
+index 89d3fdb..762de0e 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-pxs2.c
+@@ -1244,7 +1244,6 @@ static struct pinctrl_desc uniphier_pxs2_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+ 	.pins = uniphier_pxs2_pins,
+ 	.npins = ARRAY_SIZE(uniphier_pxs2_pins),
+-	.owner = THIS_MODULE,
+ };
+ 
+ static int uniphier_pxs2_pinctrl_probe(struct platform_device *pdev)
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
+index ab635f2..9fe8762 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-sld8.c
+@@ -769,7 +769,6 @@ static struct pinctrl_desc uniphier_sld8_pinctrl_desc = {
+ 	.name = DRIVER_NAME,
+ 	.pins = uniphier_sld8_pins,
+ 	.npins = ARRAY_SIZE(uniphier_sld8_pins),
+-	.owner = THIS_MODULE,
+ };
+ 
+ static int uniphier_sld8_pinctrl_probe(struct platform_device *pdev)
 -- 
 1.9.1
