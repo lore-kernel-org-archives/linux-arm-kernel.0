@@ -1,58 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 May 2016 17:28:34 +0100
-Subject: [PATCH 2/3] drivers/perf: arm_pmu: Defer the setting of
- __oprofile_cpu_pmu
-In-Reply-To: <1464694883-26298-3-git-send-email-julien.grall@arm.com>
-References: <1464694883-26298-1-git-send-email-julien.grall@arm.com>
- <1464694883-26298-3-git-send-email-julien.grall@arm.com>
-Message-ID: <20160531162834.GR24936@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 31 May 2016 17:37:40 +0100
+Subject: [PATCH 2/2] ARM: mm: Fix definition of pmd_mknotpresent
+In-Reply-To: <1464712660-25177-1-git-send-email-catalin.marinas@arm.com>
+References: <1464712660-25177-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1464712660-25177-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 12:41:22PM +0100, Julien Grall wrote:
-> The global variable __oprofile_cpu_pmu is set before the PMU is fully
-> initialized. If an error occurs before the end of the initialization,
-> the PMU will be freed and the variable will contain an invalid pointer.
-> 
-> This will result in a kernel crash when perf will be used.
-> 
-> Fix it by moving the setting of __oprofile_cpu_pmu when the PMU is fully
-> initialized (i.e when it is no longer possible to fail).
-> 
-> Signed-off-by: Julien Grall <julien.grall@arm.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  drivers/perf/arm_pmu.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+From: Steve Capper <steve.capper@arm.com>
 
-Should this one go to -stable too?
+Currently pmd_mknotpresent will use a zero entry to respresent an
+invalidated pmd.
 
-Will
+Unfortunately this definition clashes with pmd_none, thus it is
+possible for a race condition to occur if zap_pmd_range sees pmd_none
+whilst __split_huge_pmd_locked is running too with pmdp_invalidate
+just called.
 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 6401f0c..95614d2 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -992,9 +992,6 @@ int arm_pmu_device_probe(struct platform_device *pdev,
->  
->  	armpmu_init(pmu);
->  
-> -	if (!__oprofile_cpu_pmu)
-> -		__oprofile_cpu_pmu = pmu;
-> -
->  	pmu->plat_device = pdev;
->  
->  	if (node && (of_id = of_match_node(of_table, pdev->dev.of_node))) {
-> @@ -1030,6 +1027,9 @@ int arm_pmu_device_probe(struct platform_device *pdev,
->  	if (ret)
->  		goto out_destroy;
->  
-> +	if (!__oprofile_cpu_pmu)
-> +		__oprofile_cpu_pmu = pmu;
-> +
->  	pr_info("enabled with %s PMU driver, %d counters available\n",
->  			pmu->name, pmu->num_events);
->  
-> -- 
-> 1.9.1
-> 
+This patch fixes the race condition by modifying pmd_mknotpresent to
+create non-zero faulting entries (as is done in other architectures),
+removing the ambiguity with pmd_none.
+
+Fixes: 8d9625070073 ("ARM: mm: Transparent huge page support for LPAE systems.")
+Cc: <stable@vger.kernel.org> # 3.11+
+Reported-by: Kirill A. Shutemov <kirill.shutemov@linux.intel.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+[catalin.marinas at arm.com: using L_PMD_SECT_VALID instead of PMD_TYPE_SECT]
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/pgtable-3level.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/pgtable-3level.h b/arch/arm/include/asm/pgtable-3level.h
+index 4dce1580bc15..2a029bceaf2f 100644
+--- a/arch/arm/include/asm/pgtable-3level.h
++++ b/arch/arm/include/asm/pgtable-3level.h
+@@ -250,10 +250,10 @@ PMD_BIT_FUNC(mkyoung,   |= PMD_SECT_AF);
+ #define pfn_pmd(pfn,prot)	(__pmd(((phys_addr_t)(pfn) << PAGE_SHIFT) | pgprot_val(prot)))
+ #define mk_pmd(page,prot)	pfn_pmd(page_to_pfn(page),prot)
+ 
+-/* represent a notpresent pmd by zero, this is used by pmdp_invalidate */
++/* represent a notpresent pmd by faulting entry, this is used by pmdp_invalidate */
+ static inline pmd_t pmd_mknotpresent(pmd_t pmd)
+ {
+-	return __pmd(0);
++	return __pmd(pmd_val(pmd) & ~L_PMD_SECT_VALID);
+ }
+ 
+ static inline pmd_t pmd_modify(pmd_t pmd, pgprot_t newprot)
