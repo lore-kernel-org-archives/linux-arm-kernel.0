@@ -1,64 +1,94 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 31 May 2016 20:39:02 +0200
-Subject: [PATCH 3/6] ARM: dts: exynos: Interrupt for USB DWC3-1 differs
- between Exynos5420 and 5410
+Date: Tue, 31 May 2016 20:39:03 +0200
+Subject: [PATCH 4/6] ARM: dts: exynos: Add Thermal Management Unit to
+ Exynos5410
 In-Reply-To: <1464719945-3417-1-git-send-email-krzk@kernel.org>
 References: <1464719945-3417-1-git-send-email-krzk@kernel.org>
-Message-ID: <1464719945-3417-3-git-send-email-krzk@kernel.org>
+Message-ID: <1464719945-3417-4-git-send-email-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Exynos5410 the SPI interrupt for second USB DWC3 (called DRD: Dual
-Role Device) is different - 200 instead of 73.
+Add nodes for Thermal Management Unit to exynos5410.dtsi. Use the same
+compatible as for Exynos5420 however without second base for TRIMINFO
+register.
 
 Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
 ---
- arch/arm/boot/dts/exynos5410.dtsi | 4 ++++
- arch/arm/boot/dts/exynos5420.dtsi | 4 ++++
- arch/arm/boot/dts/exynos54xx.dtsi | 1 -
- 3 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/exynos5410.dtsi | 55 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
 diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index a937d9bdad90..994d16a44fe4 100644
+index 994d16a44fe4..f1effd3f03c4 100644
 --- a/arch/arm/boot/dts/exynos5410.dtsi
 +++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -267,6 +267,10 @@
- 	clock-names = "usbdrd30";
+@@ -81,6 +81,42 @@
+ 			#clock-cells = <1>;
+ 		};
+ 
++		tmu_cpu0: tmu at 10060000 {
++			compatible = "samsung,exynos5420-tmu";
++			reg = <0x10060000 0x100>;
++			interrupts = <0 65 0>;
++			clocks = <&clock CLK_TMU>;
++			clock-names = "tmu_apbif";
++			#include "exynos4412-tmu-sensor-conf.dtsi"
++		};
++
++		tmu_cpu1: tmu at 10064000 {
++			compatible = "samsung,exynos5420-tmu";
++			reg = <0x10064000 0x100>;
++			interrupts = <0 183 0>;
++			clocks = <&clock CLK_TMU>;
++			clock-names = "tmu_apbif";
++			#include "exynos4412-tmu-sensor-conf.dtsi"
++		};
++
++		tmu_cpu2: tmu at 10068000 {
++			compatible = "samsung,exynos5420-tmu";
++			reg = <0x10068000 0x100>;
++			interrupts = <0 184 0>;
++			clocks = <&clock CLK_TMU>;
++			clock-names = "tmu_apbif";
++			#include "exynos4412-tmu-sensor-conf.dtsi"
++		};
++
++		tmu_cpu3: tmu at 1006c000 {
++			compatible = "samsung,exynos5420-tmu";
++			reg = <0x1006c000 0x100>;
++			interrupts = <0 185 0>;
++			clocks = <&clock CLK_TMU>;
++			clock-names = "tmu_apbif";
++			#include "exynos4412-tmu-sensor-conf.dtsi"
++		};
++
+ 		mmc_0: mmc at 12200000 {
+ 			compatible = "samsung,exynos5250-dw-mshc";
+ 			reg = <0x12200000 0x1000>;
+@@ -147,6 +183,25 @@
+ 			interrupts = <0 47 0>;
+ 		};
+ 	};
++
++	thermal-zones {
++		cpu0_thermal: cpu0-thermal {
++			thermal-sensors = <&tmu_cpu0>;
++			#include "exynos5420-trip-points.dtsi"
++		};
++		cpu1_thermal: cpu1-thermal {
++		       thermal-sensors = <&tmu_cpu1>;
++		       #include "exynos5420-trip-points.dtsi"
++		};
++		cpu2_thermal: cpu2-thermal {
++		       thermal-sensors = <&tmu_cpu2>;
++		       #include "exynos5420-trip-points.dtsi"
++		};
++		cpu3_thermal: cpu3-thermal {
++		       thermal-sensors = <&tmu_cpu3>;
++		       #include "exynos5420-trip-points.dtsi"
++		};
++	};
  };
  
-+&usbdrd_dwc3_1 {
-+	interrupts = <0 200 0>;
-+};
-+
- &usbdrd_phy1 {
- 	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
- 	clock-names = "phy", "ref";
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 8b1e706e9250..265747bb19d1 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -1046,6 +1046,10 @@
- 	clock-names = "usbdrd30";
- };
- 
-+&usbdrd_dwc3_1 {
-+	interrupts = <0 73 0>;
-+};
-+
- &usbdrd_phy1 {
- 	clocks = <&clock CLK_USBD301>, <&clock CLK_SCLK_USBPHY301>;
- 	clock-names = "phy", "ref";
-diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
-index 44a8391c8524..0eb8aa31b7d9 100644
---- a/arch/arm/boot/dts/exynos54xx.dtsi
-+++ b/arch/arm/boot/dts/exynos54xx.dtsi
-@@ -141,7 +141,6 @@
- 			usbdrd_dwc3_1: dwc3 at 12400000 {
- 				compatible = "snps,dwc3";
- 				reg = <0x12400000 0x10000>;
--				interrupts = <0 73 0>;
- 				phys = <&usbdrd_phy1 0>, <&usbdrd_phy1 1>;
- 				phy-names = "usb2-phy", "usb3-phy";
- 			};
+ &i2c_0 {
 -- 
 2.7.4
