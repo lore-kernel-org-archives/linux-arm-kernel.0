@@ -1,31 +1,84 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 31 May 2016 16:34:47 +0200
-Subject: [RFT PATCH 1/2] serial: Fix console setup section mismatch
-In-Reply-To: <20160531142142.GX19428@n2100.arm.linux.org.uk>
-References: <1464704372-17668-1-git-send-email-k.kozlowski@samsung.com>
- <20160531142142.GX19428@n2100.arm.linux.org.uk>
-Message-ID: <574DA107.8050002@samsung.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 31 May 2016 16:35:28 +0200
+Subject: [PATCH 2/3] arm64/kvm: use ESR_ELx_EC to extract EC
+In-Reply-To: <1464694383-31700-3-git-send-email-mark.rutland@arm.com>
+References: <1464694383-31700-1-git-send-email-mark.rutland@arm.com>
+ <1464694383-31700-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160531143528.GC12568@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2016 04:21 PM, Russell King - ARM Linux wrote:
-> On Tue, May 31, 2016 at 04:19:31PM +0200, Krzysztof Kozlowski wrote:
->> Remove __init annotation from all of console->setup implementations
->> because:
->> 1. The pointer to it is stored in a struct console which is not
->>    marked with __initdata.
->> 2. It is referenced by register_console() from kernel which is not
->>    marked with __init.
+On Tue, May 31, 2016 at 12:33:02PM +0100, Mark Rutland wrote:
+> Now that we have a helper to extract the EC from an ESR_ELx value, make
+> use of this in the arm64 KVM code for simplicity and consistency. There
+> should be no functional changes as a result of this patch.
 > 
-> However, many of these drivers, the console can only be used when the
-> driver is built-in, and register_console() is only called early in
-> initialisation.
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Dave P Martin <dave.martin@arm.com>
+> Cc: Huang Shijie <shijie.huang@arm.com>
+> Cc: James Morse <james.morse@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: kvmarm at lists.cs.columbia.edu
 
-Indeed so maybe the word "fix" in commit subject is not proper because
-there might be no error at all. My point is that current solution is a
-little bit non-obvious and an error might happen. If we were sure that
-register_console() is called only from other __init functions, then it
-should be made also __init.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 
-Best regards,
-Krzysztof
+> ---
+>  arch/arm64/include/asm/kvm_emulate.h | 2 +-
+>  arch/arm64/kvm/handle_exit.c         | 4 ++--
+>  arch/arm64/kvm/hyp/switch.c          | 2 +-
+>  3 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 40bc168..4cdeae3 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -210,7 +210,7 @@ static inline bool kvm_vcpu_trap_il_is32bit(const struct kvm_vcpu *vcpu)
+>  
+>  static inline u8 kvm_vcpu_trap_get_class(const struct kvm_vcpu *vcpu)
+>  {
+> -	return kvm_vcpu_get_hsr(vcpu) >> ESR_ELx_EC_SHIFT;
+> +	return ESR_ELx_EC(kvm_vcpu_get_hsr(vcpu));
+>  }
+>  
+>  static inline bool kvm_vcpu_trap_is_iabt(const struct kvm_vcpu *vcpu)
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 3246c4a..fa96fe2 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -106,7 +106,7 @@ static int kvm_handle_guest_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  	run->exit_reason = KVM_EXIT_DEBUG;
+>  	run->debug.arch.hsr = hsr;
+>  
+> -	switch (hsr >> ESR_ELx_EC_SHIFT) {
+> +	switch (ESR_ELx_EC(hsr)) {
+>  	case ESR_ELx_EC_WATCHPT_LOW:
+>  		run->debug.arch.far = vcpu->arch.fault.far_el2;
+>  		/* fall through */
+> @@ -149,7 +149,7 @@ static exit_handle_fn arm_exit_handlers[] = {
+>  static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+>  {
+>  	u32 hsr = kvm_vcpu_get_hsr(vcpu);
+> -	u8 hsr_ec = hsr >> ESR_ELx_EC_SHIFT;
+> +	u8 hsr_ec = ESR_ELx_EC(hsr);
+>  
+>  	if (hsr_ec >= ARRAY_SIZE(arm_exit_handlers) ||
+>  	    !arm_exit_handlers[hsr_ec]) {
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 437cfad..4373997 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -198,7 +198,7 @@ static bool __hyp_text __translate_far_to_hpfar(u64 far, u64 *hpfar)
+>  static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+>  {
+>  	u64 esr = read_sysreg_el2(esr);
+> -	u8 ec = esr >> ESR_ELx_EC_SHIFT;
+> +	u8 ec = ESR_ELx_EC(esr);
+>  	u64 hpfar, far;
+>  
+>  	vcpu->arch.fault.esr_el2 = esr;
+> -- 
+> 1.9.1
+> 
