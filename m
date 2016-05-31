@@ -1,112 +1,134 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 31 May 2016 13:19:40 +0200
-Subject: [PATCH V5 3/7] irqchip, GICv3,
- ITS: Cleanup for ITS domain initialization.
+Date: Tue, 31 May 2016 13:19:42 +0200
+Subject: [PATCH V5 5/7] irqchip, gicv3, its: Probe ITS in the ACPI way.
 In-Reply-To: <1464693584-22343-1-git-send-email-tn@semihalf.com>
 References: <1464693584-22343-1-git-send-email-tn@semihalf.com>
-Message-ID: <1464693584-22343-4-git-send-email-tn@semihalf.com>
+Message-ID: <1464693584-22343-6-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no point to initialize ITS without having msi-controller
-property in corresponding DT node. However, its_probe is checking
-msi-controller presence at the end, so we can save our time and do that
-check prior to its_probe call. Also, for the code clarity purpose,
-we put domain initialization to separate function.
+ITS is prepared for being initialized different than DT,
+therefore we can initialize it in ACPI way. We collect register base
+address from MADT table and pass mandatory info to firmware-agnostic
+ITS init call.
+
+Note that we are using here IORT lib to register ITS domain which
+then can be found and used on to build another PCI MSI domain
+in hierarchical stack domain.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic-v3-its.c | 57 ++++++++++++++++++++++++----------------
- 1 file changed, 34 insertions(+), 23 deletions(-)
+ drivers/irqchip/Kconfig          |  1 +
+ drivers/irqchip/irq-gic-v3-its.c | 60 ++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 61 insertions(+)
 
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index fa33c50..c6e652f 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -32,6 +32,7 @@ config ARM_GIC_V3
+ config ARM_GIC_V3_ITS
+ 	bool
+ 	select PCI_MSI_IRQ_DOMAIN
++	select IORT_TABLE if ACPI
+ 
+ config ARM_NVIC
+ 	bool
 diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 6bd881b..cb33c92 100644
+index 6a97ee5..c8f36a5 100644
 --- a/drivers/irqchip/irq-gic-v3-its.c
 +++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -1463,13 +1463,37 @@ static void its_enable_quirks(struct its_node *its)
- 	gic_enable_quirks(iidr, its_quirks, its);
+@@ -15,10 +15,13 @@
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+ 
++#include <linux/acpi.h>
+ #include <linux/bitmap.h>
+ #include <linux/cpu.h>
+ #include <linux/delay.h>
+ #include <linux/interrupt.h>
++#include <linux/irqdomain.h>
++#include <linux/iort.h>
+ #include <linux/log2.h>
+ #include <linux/mm.h>
+ #include <linux/msi.h>
+@@ -1312,6 +1315,11 @@ static int its_irq_gic_domain_alloc(struct irq_domain *domain,
+ 		fwspec.param[0] = GIC_IRQ_TYPE_LPI;
+ 		fwspec.param[1] = hwirq;
+ 		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
++	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
++		fwspec.fwnode = domain->parent->fwnode;
++		fwspec.param_count = 2;
++		fwspec.param[0] = hwirq;
++		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
+ 	} else {
+ 		return -EINVAL;
+ 	}
+@@ -1645,6 +1653,56 @@ static int __init its_of_probe(struct device_node *node)
+ 	return 0;
  }
  
-+static int its_init_domain(struct device_node *node, struct its_node *its,
-+			   struct irq_domain *parent)
++#ifdef CONFIG_ACPI
++
++#define ACPI_GICV3_ITS_MEM_SIZE (2 * SZ_64K)
++
++static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
++					  const unsigned long end)
 +{
-+	struct irq_domain *inner_domain;
-+	struct msi_domain_info *info;
++	struct acpi_madt_generic_translator *its_entry;
++	struct fwnode_handle *dom_handle;
++	struct resource res;
++	int err;
 +
-+	info = kzalloc(sizeof(*info), GFP_KERNEL);
-+	if (!info)
-+		return -ENOMEM;
++	its_entry = (struct acpi_madt_generic_translator *)header;
++	res.start = its_entry->base_address;
++	res.end = its_entry->base_address + ACPI_GICV3_ITS_MEM_SIZE - 1;
 +
-+	inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
-+	if (!inner_domain) {
-+		kfree(info);
++	dom_handle = irq_domain_alloc_fwnode((void *)its_entry->base_address);
++	if (!dom_handle) {
++		pr_err("ITS@%pa: Unable to allocate GICv3 ITS domain token\n",
++		       &res.start);
 +		return -ENOMEM;
 +	}
 +
-+	inner_domain->parent = parent;
-+	inner_domain->bus_token = DOMAIN_BUS_NEXUS;
-+	info->ops = &its_msi_domain_ops;
-+	info->data = its;
-+	inner_domain->host_data = info;
++	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
++	if (err) {
++		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
++		       &res.start, its_entry->translation_id);
++		goto dom_err;
++	}
 +
-+	return 0;
++	err = its_probe_one(&res, dom_handle);
++	if (!err)
++		return 0;
++
++	iort_deregister_domain_token(its_entry->translation_id);
++dom_err:
++	irq_domain_free_fwnode(dom_handle);
++	return err;
 +}
 +
- static int __init its_probe(struct device_node *node,
- 			    struct irq_domain *parent)
- {
- 	struct resource res;
- 	struct its_node *its;
- 	void __iomem *its_base;
--	struct irq_domain *inner_domain;
- 	u32 val;
- 	u64 baser, tmp;
- 	int err;
-@@ -1560,28 +1584,9 @@ static int __init its_probe(struct device_node *node,
- 	writeq_relaxed(0, its->base + GITS_CWRITER);
- 	writel_relaxed(GITS_CTLR_ENABLE, its->base + GITS_CTLR);
- 
--	if (of_property_read_bool(node, "msi-controller")) {
--		struct msi_domain_info *info;
--
--		info = kzalloc(sizeof(*info), GFP_KERNEL);
--		if (!info) {
--			err = -ENOMEM;
--			goto out_free_tables;
--		}
--
--		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
--		if (!inner_domain) {
--			err = -ENOMEM;
--			kfree(info);
--			goto out_free_tables;
--		}
--
--		inner_domain->parent = parent;
--		inner_domain->bus_token = DOMAIN_BUS_NEXUS;
--		info->ops = &its_msi_domain_ops;
--		info->data = its;
--		inner_domain->host_data = info;
--	}
-+	err = its_init_domain(node, its, parent);
-+	if (err)
-+		goto out_free_tables;
- 
- 	spin_lock(&its_lock);
- 	list_add(&its->entry, &its_nodes);
-@@ -1632,6 +1637,12 @@ int __init its_init(struct device_node *node, struct rdists *rdists,
- 
- 	for (np = of_find_matching_node(node, its_device_id); np;
- 	     np = of_find_matching_node(np, its_device_id)) {
-+		if (!of_property_read_bool(np, "msi-controller")) {
-+			pr_warn("%s: no msi-controller property, ITS ignored\n",
-+				np->full_name);
-+			continue;
-+		}
++void __init its_acpi_probe(void)
++{
++	if (acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
++				  gic_acpi_parse_madt_its, 0) <= 0)
++		pr_info("No valid GIC ITS entries exist\n");
++}
++#else
++static inline void __init its_acpi_probe(struct irq_domain *parent_domain) { }
++#endif
 +
- 		its_probe(np, parent_domain);
- 	}
+ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+ 		    struct irq_domain *parent_domain)
+ {
+@@ -1654,6 +1712,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+ 	of_node = to_of_node(handle);
+ 	if (of_node)
+ 		its_of_probe(of_node);
++	else
++		its_acpi_probe();
  
+ 	if (list_empty(&its_nodes)) {
+ 		pr_warn("ITS: No ITS available, not enabling LPIs\n");
 -- 
 1.9.1
