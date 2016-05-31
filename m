@@ -1,59 +1,78 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 31 May 2016 13:52:45 +0100
-Subject: [PATCH] drivers: char: mem: Check {read,write}_kmem() addresses
-Message-ID: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Tue, 31 May 2016 21:05:13 +0800
+Subject: [PATCH v7 13/15] ACPI / processor: Add acpi_map_madt_entry().
+In-Reply-To: <1464129345-18985-14-git-send-email-ddaney.cavm@gmail.com>
+References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
+ <1464129345-18985-14-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <574D8C09.3030608@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arriving at read_kmem() with an offset representing a bogus kernel
-address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
-faulting on the kernel-space read.
+On 2016/5/25 6:35, David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+>
+> Follow-on arm64 ACPI/NUMA patches need to map MADT entries very early
+> (before kmalloc is usable).
+>
+> Add acpi_map_madt_entry() which, indirectly, uses
+> early_memremap()/early_memunmap() to access the table and parse out
+> the mpidr.  The existing implementation of map_madt_entry() is
+> modified to take a pointer to the MADT as a parameter and the callers
+> adjusted.
+>
+> Signed-off-by: David Daney <david.daney@cavium.com>
+> ---
+>   drivers/acpi/processor_core.c | 26 ++++++++++++++++++++++----
+>   include/acpi/processor.h      |  1 +
+>   2 files changed, 23 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
+> index 33a38d6..9125d7d 100644
+> --- a/drivers/acpi/processor_core.c
+> +++ b/drivers/acpi/processor_core.c
+> @@ -108,13 +108,12 @@ static int map_gicc_mpidr(struct acpi_subtable_header *entry,
+>   	return -EINVAL;
+>   }
+>
+> -static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
+> +static phys_cpuid_t map_madt_entry(struct acpi_table_madt *madt,
+> +				   int type, u32 acpi_id)
+>   {
+>   	unsigned long madt_end, entry;
+>   	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;	/* CPU hardware ID */
+> -	struct acpi_table_madt *madt;
+>
+> -	madt = get_madt_table();
+>   	if (!madt)
+>   		return phys_id;
+>
+> @@ -145,6 +144,25 @@ static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
+>   	return phys_id;
+>   }
+>
+> +phys_cpuid_t __init acpi_map_madt_entry(u32 acpi_id)
+> +{
+> +	struct acpi_table_madt *madt = NULL;
+> +	acpi_size tbl_size;
+> +	phys_cpuid_t rv;
+> +
+> +	acpi_get_table_with_size(ACPI_SIG_MADT, 0,
+> +				 (struct acpi_table_header **)&madt,
+> +				 &tbl_size);
+> +	if (!madt)
+> +		return PHYS_CPUID_INVALID;
+> +
+> +	rv = map_madt_entry(madt, 1, acpi_id);
 
-x86_64 happens to get away with this since the optimised implementation
-uses "rep movs*", thus the user write (which is allowed to fault) and
-the kernel read are the same instruction, the kernel-side fault falls
-into the userspace fixup handler and a chain of events transpires
-leading to returning the expected -EFAULT. On other architectures,
-though, the read is not covered by the fixup entry for the write, and we
-get a straightforward "Unable to hande kernel paging request..." dump.
+Just nit-pick, pass 1 here means we need to define an acpi processor
+device object in DSDT (see function map_gicc_mpidr(),
+device_declaration), it would be fine for x2apic and gic mode,
+but not for lapic mode, since the function name is acpi_map_madt_entry
+which is general for all architecture, it will confuse people I think.
 
-The more typical use-case of mmap_kmem() already validates the address
-with pfn_valid() as one might expect, so let's make that consistent
-across {read,write}_kem() too.
+How about rename acpi_map_madt_entry() to acpi_map_madt_gicc_entry()?
+It's only used for AMR64 to get mpidrs from GICC entries using acpi_id,
+other than that, it's good to me.
 
-Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
-
-I'm not sure if this warrants going to stable or not, as it's really
-just making an existing failure case more graceful and less confusing.
-
- drivers/char/mem.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/char/mem.c b/drivers/char/mem.c
-index 71025c2f6bbb..64c766023b15 100644
---- a/drivers/char/mem.c
-+++ b/drivers/char/mem.c
-@@ -384,6 +384,9 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
- 	char *kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
- 	int err = 0;
- 
-+	if (!pfn_valid(PFN_DOWN(p)))
-+		return -EFAULT;
-+
- 	read = 0;
- 	if (p < (unsigned long) high_memory) {
- 		low_count = count;
-@@ -512,6 +515,9 @@ static ssize_t write_kmem(struct file *file, const char __user *buf,
- 	char *kbuf; /* k-addr because vwrite() takes vmlist_lock rwlock */
- 	int err = 0;
- 
-+	if (!pfn_valid(PFN_DOWN(p)))
-+		return -EFAULT;
-+
- 	if (p < (unsigned long) high_memory) {
- 		unsigned long to_write = min_t(unsigned long, count,
- 					       (unsigned long)high_memory - p);
--- 
-2.8.1.dirty
+Thanks
+Hanjun
