@@ -1,27 +1,79 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 31 May 2016 15:37:28 -0400
-Subject: [PATCH 6/6] ARM: dts: exynos: No need to enable TMU nodes on
- Odroid XU3 family
-In-Reply-To: <1464719945-3417-6-git-send-email-krzk@kernel.org>
-References: <1464719945-3417-1-git-send-email-krzk@kernel.org>
- <1464719945-3417-6-git-send-email-krzk@kernel.org>
-Message-ID: <c3222e0a-51a9-a93f-97e4-9a12e17167de@osg.samsung.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 31 May 2016 12:52:22 -0700
+Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
+ soc
+In-Reply-To: <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
+References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
+ <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
+Message-ID: <87mvn6qa2x.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+kernel at martin.sperl.org writes:
 
-On 05/31/2016 02:39 PM, Krzysztof Kozlowski wrote:
-> The thermal nodes are not disabled in exynos5420.dtsi so there is no
-> need to manually enable them on Odroid XU3/XU3-Lite/XU4 boards.
-> 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> From: Martin Sperl <kernel@martin.sperl.org>
+>
+> Add basic thermal driver for bcm2835 SOC.
+>
+> This driver currently relies on the firmware setting up the
+> tsense HW block and does not set it up itself.
+>
+> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+>
+> ChangeLog:
+>  V1 -> V2: added specific settings depending on compatiblity
+> 	   added trip point based on register
+> 	   setting up ctrl-register if HW is not enabled by firmware
+> 	     as per recommendation of Eric (untested)
+> 	   check that clock frequency is in range
+> 	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
 > ---
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> diff --git a/drivers/thermal/bcm/Makefile b/drivers/thermal/bcm/Makefile
+> new file mode 100644
+> index 0000000..13456d2
+> --- /dev/null
+> +++ b/drivers/thermal/bcm/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_BCM2835_THERMAL)		:= bcm2835_thermal.o
+> diff --git a/drivers/thermal/bcm/bcm2835_thermal.c b/drivers/thermal/bcm/bcm2835_thermal.c
+> new file mode 100644
+> index 0000000..73138cb
+> --- /dev/null
+> +++ b/drivers/thermal/bcm/bcm2835_thermal.c
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> +static const struct of_device_id bcm2835_thermal_of_match_table[];
+> +static int bcm2835_thermal_probe(struct platform_device *pdev)
+> +{
+
+> +	/* enable clock and check rate */
+> +	clk_prepare_enable(data->clk);
+> +	rate = clk_get_rate(data->clk);
+> +	if ((rate < 1920000) || (rate > 5000000)) {
+> +		dev_warn(&pdev->dev,
+> +			 "Clock %pCn is running at %pCr Hz, which is outside the recommended range of 1.9 to 5.0 MHz\n",
+> +			 data->clk, data->clk);
+> +	}
+> +
+> +	/* register it */
+> +	tz = thermal_zone_device_register("bcm2835_thermal",
+> +					  1, 0, data,
+> +					  &bcm2835_thermal_ops,
+> +					  NULL, 0, 0);
+
+I notice that the polling_delay is set to 0, but we're not using
+interrupts to trigger the trip.  Is it valid to expose a trip without a
+polling_delay or interrupts?  Should passive_delay be set as well?
+
+This is up to the thermal maintainers.  As far as I'm concerned, it's:
+
+Acked-by: Eric Anholt <eric@anholt.net>
+
+One it lands I'll pull the defconfig and DT bits.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/fdfb9eec/attachment.sig>
