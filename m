@@ -1,57 +1,34 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 31 May 2016 16:49:37 +0200
-Subject: [PATCH] ARM: dts: imx6: fix IPU1 DI1 node name
-Message-ID: <1464706177-30330-1-git-send-email-l.stach@pengutronix.de>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 31 May 2016 07:53:18 -0700
+Subject: pxa_defconfig runtime failures due to 'ARM: pxa: activate pinctrl
+ for device-tree machines'
+In-Reply-To: <87vb1ueo8s.fsf@belgarion.home>
+References: <20160527202715.GA4841@roeck-us.net>
+ <87a8jah9ok.fsf@belgarion.home> <574A0AD1.9000304@roeck-us.net>
+ <87vb1ueo8s.fsf@belgarion.home>
+Message-ID: <574DA55E.7070109@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Juergen Borleis <jbe@pengutronix.de>
+On 05/30/2016 11:27 PM, Robert Jarzmik wrote:
+> Guenter Roeck <linux@roeck-us.net> writes:
+>
+>> On 05/28/2016 01:24 AM, Robert Jarzmik wrote:
+>>> Guenter Roeck <linux@roeck-us.net> writes:
+>>>
+>>>> Hi,
+>>> I'd rather say that pxa_defconfig doesn't work anymore on any legacy system.
+>>> Its first purpose was to ensure compilation coverage of all legacy pxa systems.
+>>> Its second one was to have a single kernel bootable on all legacy pxa systems.
+>>>
+>>> Therefore, would you tell me if the patch in [1] fixes your issue ?
+>>>
+>>
+>> Yes, it does. It is actually the workaround I deployed for my test builds,
+>> since I thought that the change was on purpose.
+>
+> Good. Can I take that as a Tested-by ?
+>
+Yes.
 
-This node describes the DI1 port of IPU, fix the node name to reflect this.
-There's currently no user of this node in mainline, so this change should
-not break any supported platforms.
-
-Signed-off-by: Juergen Borleis <jbe@pengutronix.de>
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/imx6q-apalis-ixora.dts | 4 ++--
- arch/arm/boot/dts/imx6qdl.dtsi           | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6q-apalis-ixora.dts b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-index 8e67ca27ad79..207b85b91ada 100644
---- a/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-+++ b/arch/arm/boot/dts/imx6q-apalis-ixora.dts
-@@ -93,7 +93,7 @@
- 			reg = <0>;
- 
- 			lcd_display_in: endpoint {
--				remote-endpoint = <&ipu1_di0_disp1>;
-+				remote-endpoint = <&ipu1_di1_disp1>;
- 			};
- 		};
- 
-@@ -210,7 +210,7 @@
- 	};
- };
- 
--&ipu1_di0_disp1 {
-+&ipu1_di1_disp1 {
- 	remote-endpoint = <&lcd_display_in>;
- };
- 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ed613ebe0812..c270dc2c629f 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -1255,7 +1255,7 @@
- 				#size-cells = <0>;
- 				reg = <3>;
- 
--				ipu1_di0_disp1: disp1-endpoint {
-+				ipu1_di1_disp1: disp1-endpoint {
- 				};
- 
- 				ipu1_di1_hdmi: hdmi-endpoint {
--- 
-2.8.1
+Guenter
