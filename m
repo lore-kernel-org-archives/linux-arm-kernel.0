@@ -1,183 +1,135 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 31 May 2016 12:32:07 +0900
-Subject: [RFC 3/4] ARM: dts: r8a7790: lager: use demuxer for IIC2/I2C2
+Date: Tue, 31 May 2016 12:32:08 +0900
+Subject: [RFC 4/4] ARM: dts: r8a7790: lager: use demuxer for IIC3/I2C3
 In-Reply-To: <1464665528-11398-1-git-send-email-horms+renesas@verge.net.au>
 References: <1464665528-11398-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1464665528-11398-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1464665528-11398-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a seperate bus for HDMI related I2C slaves.
+Create a separate bus for dla98063 PMIC and da9210 regulator
+related I2C slaves.
 
-Based on work by Wolfram Sang.
+Based on similar work for HDMI by Wolfram Sang.
 
 Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 126 +++++++++++++++++++++---------------
- 1 file changed, 73 insertions(+), 53 deletions(-)
+ arch/arm/boot/dts/r8a7790-lager.dts | 80 +++++++++++++++++++++++--------------
+ 1 file changed, 49 insertions(+), 31 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 2e671aeafbef..aa316bc358e1 100644
+index aa316bc358e1..d5fafdf3bcbd 100644
 --- a/arch/arm/boot/dts/r8a7790-lager.dts
 +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -52,6 +52,7 @@
- 		serial1 = &scifa1;
+@@ -53,6 +53,7 @@
  		i2c8 = "i2cexio0";
  		i2c9 = "i2cexio1";
-+		i2c10 = "i2chdmi";
+ 		i2c10 = "i2chdmi";
++		i2c11 = "i2cpwr";
  	};
  
  	chosen {
-@@ -284,6 +285,65 @@
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+@@ -344,6 +345,42 @@
+ 			};
+ 		};
  	};
 +
-+	i2chdmi: i2c-10 {
++	i2cpwr: i2c-11 {
 +		compatible = "i2c-demux-pinctrl";
-+		i2c-parent = <&iic2>, <&i2c2>;
-+		i2c-bus-name = "i2c-hdmi";
++		i2c-parent = <&iic3>, <&i2c3>;
++		i2c-bus-name = "i2c-pwr";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +
-+		ak4643: codec at 12 {
-+			compatible = "asahi-kasei,ak4643";
-+			#sound-dai-cells = <0>;
-+			reg = <0x12>;
-+		};
++		pmic at 58 {
++			compatible = "dlg,da9063";
++			reg = <0x58>;
++			interrupt-parent = <&irqc0>;
++			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++			interrupt-controller;
 +
-+		composite-in at 20 {
-+			compatible = "adi,adv7180";
-+			reg = <0x20>;
-+			remote = <&vin1>;
++			rtc {
++				compatible = "dlg,da9063-rtc";
++			};
 +
-+			port {
-+				adv7180: endpoint {
-+					bus-width = <8>;
-+					remote-endpoint = <&vin1ep0>;
-+				};
++			wdt {
++				compatible = "dlg,da9063-watchdog";
 +			};
 +		};
 +
-+		hdmi at 39 {
-+			compatible = "adi,adv7511w";
-+			reg = <0x39>;
-+			interrupt-parent = <&gpio1>;
-+			interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
++		vdd_dvfs: regulator at 68 {
++			compatible = "dlg,da9210";
++			reg = <0x68>;
++			interrupt-parent = <&irqc0>;
++			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
 +
-+			adi,input-depth = <8>;
-+			adi,input-colorspace = "rgb";
-+			adi,input-clock = "1x";
-+			adi,input-style = <1>;
-+			adi,input-justification = "evenly";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					adv7511_in: endpoint {
-+						remote-endpoint = <&du_out_lvds0>;
-+					};
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					adv7511_out: endpoint {
-+						remote-endpoint = <&hdmi_con>;
-+					};
-+				};
-+			};
++			regulator-min-microvolt = <1000000>;
++			regulator-max-microvolt = <1000000>;
++			regulator-boot-on;
++			regulator-always-on;
 +		};
 +	};
  };
  
  &du {
-@@ -416,6 +476,11 @@
- 		function = "iic1";
+@@ -486,6 +523,11 @@
+ 		function = "iic2";
  	};
  
-+	i2c2_pins: i2c2 {
-+		groups = "i2c2";
-+		function = "i2c2";
++	i2c3_pins: i2c3 {
++		groups = "i2c3";
++		function = "i2c3";
 +	};
 +
- 	iic2_pins: iic2 {
- 		groups = "iic2";
- 		function = "iic2";
-@@ -617,63 +682,18 @@
- 	pinctrl-names = "i2c-exio1";
+ 	iic3_pins: iic3 {
+ 		groups = "iic3";
+ 		function = "iic3";
+@@ -696,38 +738,14 @@
+ 	clock-frequency = <100000>;
  };
  
--&iic2	{
--	status = "okay";
--	pinctrl-0 = <&iic2_pins>;
+-&iic3 {
 -	pinctrl-names = "default";
-+&i2c2	{
-+	pinctrl-0 = <&i2c2_pins>;
-+	pinctrl-names = "i2c-hdmi";
- 
- 	clock-frequency = <100000>;
+-	pinctrl-0 = <&iic3_pins>;
+-	status = "okay";
+-
+-	pmic at 58 {
+-		compatible = "dlg,da9063";
+-		reg = <0x58>;
+-		interrupt-parent = <&irqc0>;
+-		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
+-		interrupt-controller;
+-
+-		rtc {
+-			compatible = "dlg,da9063-rtc";
+-		};
+-
+-		wdt {
+-			compatible = "dlg,da9063-watchdog";
+-		};
+-	};
+-
+-	vdd_dvfs: regulator at 68 {
+-		compatible = "dlg,da9210";
+-		reg = <0x68>;
+-		interrupt-parent = <&irqc0>;
+-		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
++&i2c3	{
++	pinctrl-0 = <&i2c3_pins>;
++	pinctrl-names = "i2c-pwr";
 +};
  
--	ak4643: codec at 12 {
--		compatible = "asahi-kasei,ak4643";
--		#sound-dai-cells = <0>;
--		reg = <0x12>;
+-		regulator-min-microvolt = <1000000>;
+-		regulator-max-microvolt = <1000000>;
+-		regulator-boot-on;
+-		regulator-always-on;
 -	};
--
--	composite-in at 20 {
--		compatible = "adi,adv7180";
--		reg = <0x20>;
--		remote = <&vin1>;
--
--		port {
--			adv7180: endpoint {
--				bus-width = <8>;
--				remote-endpoint = <&vin1ep0>;
--			};
--		};
--	};
--
--	hdmi at 39 {
--		compatible = "adi,adv7511w";
--		reg = <0x39>;
--		interrupt-parent = <&gpio1>;
--		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
--
--		adi,input-depth = <8>;
--		adi,input-colorspace = "rgb";
--		adi,input-clock = "1x";
--		adi,input-style = <1>;
--		adi,input-justification = "evenly";
--
--		ports {
--			#address-cells = <1>;
--			#size-cells = <0>;
--
--			port at 0 {
--				reg = <0>;
--				adv7511_in: endpoint {
--					remote-endpoint = <&du_out_lvds0>;
--				};
--			};
-+&iic2	{
-+	pinctrl-0 = <&iic2_pins>;
-+	pinctrl-names = "i2c-hdmi";
- 
--			port at 1 {
--				reg = <1>;
--				adv7511_out: endpoint {
--					remote-endpoint = <&hdmi_con>;
--				};
--			};
--		};
--	};
-+	clock-frequency = <100000>;
++&iic3	{
++	pinctrl-0 = <&iic3_pins>;
++	pinctrl-names = "i2c-pwr";
  };
  
- &iic3 {
+ &pci0 {
 -- 
 2.1.4
