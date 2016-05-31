@@ -1,39 +1,44 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue, 31 May 2016 14:08:08 +0800
-Subject: [PATCH 1/3] watchdog: skip min and max timeout validity check when
- max_hw_heartbeat_ms is defined
+Date: Tue, 31 May 2016 14:08:09 +0800
+Subject: [PATCH 2/3] sbsa_gwdt: Use max_hw_heartbeat_ms instead of max_timeout
 In-Reply-To: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
 References: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <1464674890-10512-2-git-send-email-fu.wei@linaro.org>
+Message-ID: <1464674890-10512-3-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Pratyush Anand <panand@redhat.com>
 
-When max_hw_heartbeat_ms has a none zero value, max_timeout is not used.
-So it's value can be 0. In such case if a driver uses min_timeout
-functionality, then check will always fail.
-
-This patch fixes above issue.
+Using max_hw_heartbeat_ms instead of max_timeout gives the flexibility to
+achieve higher user "timeout". Therefore, use this new infrastructure.
 
 Signed-off-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: Fu Wei <fu.wei@linaro.org>
 ---
- drivers/watchdog/watchdog_core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/watchdog/sbsa_gwdt.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
-index 7c3ba58..65e62d1 100644
---- a/drivers/watchdog/watchdog_core.c
-+++ b/drivers/watchdog/watchdog_core.c
-@@ -88,7 +88,7 @@ static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
- 	 * Check that we have valid min and max timeout values, if
- 	 * not reset them both to 0 (=not used or unknown)
+diff --git a/drivers/watchdog/sbsa_gwdt.c b/drivers/watchdog/sbsa_gwdt.c
+index ad383f6..6af71e0 100644
+--- a/drivers/watchdog/sbsa_gwdt.c
++++ b/drivers/watchdog/sbsa_gwdt.c
+@@ -273,7 +273,7 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
+ 	wdd->info = &sbsa_gwdt_info;
+ 	wdd->ops = &sbsa_gwdt_ops;
+ 	wdd->min_timeout = 1;
+-	wdd->max_timeout = U32_MAX / gwdt->clk;
++	wdd->max_hw_heartbeat_ms = U32_MAX / gwdt->clk * 1000;
+ 	wdd->timeout = DEFAULT_TIMEOUT;
+ 	watchdog_set_drvdata(wdd, gwdt);
+ 	watchdog_set_nowayout(wdd, nowayout);
+@@ -310,7 +310,7 @@ static int sbsa_gwdt_probe(struct platform_device *pdev)
+ 	 * the timeout is (WOR * 2), so the maximum timeout should be doubled.
  	 */
--	if (wdd->min_timeout > wdd->max_timeout) {
-+	if (!wdd->max_hw_heartbeat_ms && wdd->min_timeout > wdd->max_timeout) {
- 		pr_info("Invalid min and max timeout values, resetting to 0!\n");
- 		wdd->min_timeout = 0;
- 		wdd->max_timeout = 0;
+ 	if (!action)
+-		wdd->max_timeout *= 2;
++		wdd->max_hw_heartbeat_ms *= 2;
+ 
+ 	watchdog_init_timeout(wdd, timeout, dev);
+ 	/*
 -- 
 2.5.5
