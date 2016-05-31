@@ -1,32 +1,29 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Tue, 31 May 2016 10:39:05 +0200
-Subject: [PATCH v2] clk: sunxi: predivider handling for factors clock
-In-Reply-To: <20160530184532.GD4908@lukather>
-References: <1461084466-20889-1-git-send-email-vishnupatekar0510@gmail.com>
- <1461084466-20889-2-git-send-email-vishnupatekar0510@gmail.com>
- <20160502111337.GR17159@lukather>
- <CAEzqOZvnKKNs_sXUJrwTykA5mzwKMg+HpaFcKgBTFr+utT4qQg@mail.gmail.com>
- <20160530184532.GD4908@lukather>
-Message-ID: <20160531103905.faf5e2b80d60d46c8757ad1c@free.fr>
+Date: Tue, 31 May 2016 09:47:45 +0200
+Subject: [PATCH RFC 0/2] clk: sunxi-ng: Add the A83T clocks
+Message-ID: <cover.1464680865.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 May 2016 20:45:32 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+This patch series is a proposal to add the clocks of the sunxi A83T
+in the "modern" clock framework proposed by Maxime Ripard.
+It is currently being tested on a Banana Pi M3.
 
-> I went over all the A83T clocks, and most of them could be
-> covered. The issue only lies in the PLLs and their additional 1-bit
-> dividers.
-> 
-> If we just choos to ignore (one of) them, it should be pretty trivial
-> to implement with the current clock classes we have.
+Jean-Francois Moine (2):
+  clk: sunxi: Add the PLL clocks of the A83T and A80 SoCs
+  clk: sunxi-ng: Add the A83T clocks
 
-Hi Maxime,
-
-I already did the job for all the A83T clocks.
-It is not fully tested yet, but, to be sure we are on the same way,
-I am sending a RFC series.
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c  | 755 +++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_ndmp.c        | 247 +++++++++++
+ drivers/clk/sunxi-ng/ccu_ndmp.h        |  45 ++
+ include/dt-bindings/clock/sun8i-a83t.h | 150 +++++++
+ include/dt-bindings/reset/sun8i-a83t.h |  96 +++++
+ 5 files changed, 1293 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_ndmp.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_ndmp.h
+ create mode 100644 include/dt-bindings/clock/sun8i-a83t.h
+ create mode 100644 include/dt-bindings/reset/sun8i-a83t.h
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+2.8.3
