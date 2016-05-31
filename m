@@ -1,46 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 May 2016 10:59:15 +0200
-Subject: [PATCH v2] clk: sunxi: predivider handling for factors clock
-In-Reply-To: <20160531103905.faf5e2b80d60d46c8757ad1c@free.fr>
-References: <1461084466-20889-1-git-send-email-vishnupatekar0510@gmail.com>
- <1461084466-20889-2-git-send-email-vishnupatekar0510@gmail.com>
- <20160502111337.GR17159@lukather>
- <CAEzqOZvnKKNs_sXUJrwTykA5mzwKMg+HpaFcKgBTFr+utT4qQg@mail.gmail.com>
- <20160530184532.GD4908@lukather>
- <20160531103905.faf5e2b80d60d46c8757ad1c@free.fr>
-Message-ID: <20160531085915.GK4908@lukather>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Tue, 31 May 2016 11:05:43 +0200
+Subject: [PATCH v4 15/18] ARM: STi: DT: STiH407: Add sti-sasg-codec dt node
+In-Reply-To: <1464192412-16386-17-git-send-email-peter.griffin@linaro.org>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+ <1464192412-16386-17-git-send-email-peter.griffin@linaro.org>
+Message-ID: <574D53E7.40008@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 10:39:05AM +0200, Jean-Francois Moine wrote:
-> On Mon, 30 May 2016 20:45:32 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > I went over all the A83T clocks, and most of them could be
-> > covered. The issue only lies in the PLLs and their additional 1-bit
-> > dividers.
-> > 
-> > If we just choos to ignore (one of) them, it should be pretty trivial
-> > to implement with the current clock classes we have.
-> 
-> Hi Maxime,
-> 
-> I already did the job for all the A83T clocks.
-> It is not fully tested yet, but, to be sure we are on the same way,
-> I am sending a RFC series.
 
-Awesome, thanks!
 
-Maxime
+On 05/25/2016 06:06 PM, Peter Griffin wrote:
+> This patch adds the dt node for the internal audio
+> codec IP.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-family.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index b423836..60f95b6 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -746,5 +746,14 @@
+>  				<&clk_s_c0_flexgen CLK_TX_ICN_DISP_0>,
+>  				<&clk_s_c0_flexgen CLK_EXT2F_A9>;
+>  		};
+> +
+> +		sti_sasg_codec: sti-sasg-codec {
+> +			compatible = "st,stih407-sas-codec";
+> +			#sound-dai-cells = <1>;
+> +			status = "okay";
+Should be set to disable in family and enabled it depending on boards
+(stihxxx-b2120.dtsi)
+> +			st,syscfg = <&syscfg_core>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&pinctrl_spdif_out >;
+Declare pinctrl use in stihxxx-b2120.dtsi, should be set only if SPDIF used.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/72963101/attachment.sig>
+Regards
+Arnaud
+> +		};
+>  	};
+>  };
+> 
