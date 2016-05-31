@@ -1,39 +1,103 @@
-From: nava.manne@xilinx.com (Nava kishore Manne)
-Date: Tue, 31 May 2016 05:15:10 +0000
-Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <CAKfKVtF1hOn9QwiqtjqqPYtUz5PscTBs4kBC1zRH6FY-4vVoUA@mail.gmail.com>
-References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
- <CAKfKVtF1hOn9QwiqtjqqPYtUz5PscTBs4kBC1zRH6FY-4vVoUA@mail.gmail.com>
-Message-ID: <C89496FEAE474D468F30D558A9468D9F26CEF0EF@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 31 May 2016 13:52:39 +0800
+Subject: [PATCH v2,2/5] usb: xhci-mtk: make IPPC register optional
+In-Reply-To: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1464673962-11506-3-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shubhrajyoti,
+Make IPPC register optional to support host side of dual-role mode,
+due to it is moved into common glue layer for simplification.
 
-	
-	Thanks for the review...
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/host/xhci-mtk.c |   32 +++++++++++++++++++++++++++-----
+ 1 file changed, 27 insertions(+), 5 deletions(-)
 
-> >  /**
-> > + * xudc_write64 - write 64bit value to device registers
-> > + * @ep: pointer to the usb device endpoint structure.
-> > + * @offset: register offset
-> > + * @val: data to be written
-> > + **/
-> > +static void xudc_write64(struct xusb_ep *ep, u32 offset, u64 val) {
-> > +       struct xusb_udc *udc = ep->udc;
-> > +
-> > +       udc->write_fn(udc->addr, offset, lower_32_bits(val));
-> > +       udc->write_fn(udc->addr, offset+0x04, upper_32_bits(val));
-> 
-> can we move this to a single 64 bit write?
-
-Initially I sent the patches with writeq() ,lo_hi_writeq()  later we decided to replace with write_fun().
-The reason for this is lo_hi_writeq() always assumes a little-endian register, so it's broken if anyone builds this device with big-endian registers.
-So replaced the 64bit calls with write_fun() as suggested by Arnd Bergmann. Hope it clears your query.
-Please refer to the below thread
-
-	http://lkml.iu.edu/hypermail/linux/kernel/1604.2/02046.html 
-
-
-Regards,
-Navakishore.
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 79959f1..dc86832 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* power on host ip */
+ 	value = readl(&ippc->ip_pw_ctr1);
+ 	value &= ~CTRL1_IP_HOST_PDN;
+@@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* power down all u3 ports */
+ 	for (i = 0; i < mtk->num_u3_ports; i++) {
+ 		value = readl(&ippc->u3_ctrl_p[i]);
+@@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
+ 	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
+ 	u32 value;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* reset whole ip */
+ 	value = readl(&ippc->ip_pw_ctr0);
+ 	value |= CTRL0_IP_SW_RST;
+@@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
+ /* called during probe() after chip reset completes */
+ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ {
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+ 	int ret;
+ 
+@@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ 		ret = xhci_mtk_ssusb_config(mtk);
+ 		if (ret)
+ 			return ret;
++	}
++
++	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
++	if (ret)
++		return ret;
++
++	if (usb_hcd_is_primary_hcd(hcd)) {
++		mtk->num_u3_ports = xhci->num_usb3_ports;
++		mtk->num_u2_ports = xhci->num_usb2_ports;
+ 		ret = xhci_mtk_sch_init(mtk);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+-	return xhci_gen_setup(hcd, xhci_mtk_quirks);
++	return ret;
+ }
+ 
+ static int xhci_mtk_probe(struct platform_device *pdev)
+@@ -595,11 +614,14 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	hcd->rsrc_start = res->start;
+ 	hcd->rsrc_len = resource_size(res);
+ 
++	mtk->ippc_regs = NULL;
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	mtk->ippc_regs = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(mtk->ippc_regs)) {
+-		ret = PTR_ERR(mtk->ippc_regs);
+-		goto put_usb2_hcd;
++	if (res) {	/* ippc register is optional */
++		mtk->ippc_regs = devm_ioremap_resource(dev, res);
++		if (IS_ERR(mtk->ippc_regs)) {
++			ret = PTR_ERR(mtk->ippc_regs);
++			goto put_usb2_hcd;
++		}
+ 	}
+ 
+ 	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
+-- 
+1.7.9.5
