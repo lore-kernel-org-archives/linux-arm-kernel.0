@@ -1,41 +1,70 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 31 May 2016 14:27:07 +0100
-Subject: [PATCH 5/5] RFC spi: sun4i: add DMA support
-In-Reply-To: <CAOMqctQijjO2amwSmSMGp96KBRGrLb0fvXRwnybOEqvV3-HZ0g@mail.gmail.com>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
- <20160530112610.GJ29837@sirena.org.uk>
- <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
- <20160530150343.GL29837@sirena.org.uk>
- <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
- <20160530155016.GO29837@sirena.org.uk>
- <CAOMqctQijjO2amwSmSMGp96KBRGrLb0fvXRwnybOEqvV3-HZ0g@mail.gmail.com>
-Message-ID: <20160531132706.GC29837@sirena.org.uk>
+From: pramod.kumar@broadcom.com (Pramod Kumar)
+Date: Tue, 31 May 2016 19:06:34 +0530
+Subject: [PATCH v2 0/7] Add MDIO bus multiplexer support for iProc SoCs
+Message-ID: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 12:44:54PM +0200, Michal Suchanek wrote:
-> On 30 May 2016 at 17:50, Mark Brown <broonie@kernel.org> wrote:
-> > On Mon, May 30, 2016 at 05:28:10PM +0200, Michal Suchanek wrote:
+Broadcom iProc based SoCs use a MDIO bus multiplexer where child buses
+could be internal as well external to SoCs. These buses could supports
+MDIO transaction compatible to C-22/C-45.
 
-> >> It's what the driver did to start with and it was requested to fall
-> >> back to non-DMA in the case DMA is not available.
+Broadcom MDIO bus mulitplexer is an integrated multiplexer where child bus
+selection and mdio transaction logic lies inside multiplexer itself.
+To accommodate this multiplexer in existing mux framework below changes
+were required-
 
-> > Why?  I really can't see any sensible use case for this that doesn't
-> > have a better solution available.
+1. Passed MDIO parent bus via mdio_mux_init to MDIO mux framework.
 
-> Of course, the solution is to compile in the DMA driver.
+2. Defined one new boolean property named "mdio-integrated-mux". Integrated
+   bus Multiplexer node defines this so when parent bus is registered
+   by calling "of_mdiobus_register", this api will not scan for child
+   nodes. Child node of integrated multiplexer will be muxed nodes not
+   PHYs one hence should not be scanned.
 
-> It's been argued that some drivers which use only short transfers will
-> just work.
+This patch set includes MDIO bus multiplexer driver along with above
+framework changes. It includes one external bus node having Ethernet PHY
+attached and two internal bus node holding PCIe PHYs.
 
-With nothing else in the system that needs DMA?  It's making the
-performance of the system less reliable for the benefit of a very narrow
-use case.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/f521afd4/attachment.sig>
+This patch series is based on v4.6.0-rc1 and is available from github-
+repo: https://github.com/Broadcom/arm64-linux.git
+branch:mdio-mux-v2
+
+Changes from v1:
+- stop using "brcm,is_c45" from bus node as suggested by Andrew. MDIO
+PHY driver will logically OR MII_ADDR_C45 into the address when issues
+any C45 MDIO read/write transaction.
+
+Pramod Kumar (7):
+  mdio:mux: Enhanced MDIO mux framework for integrated multiplexers
+  DT: phy.txt: Add mdio-integrated-mux property
+  binding: mdio-mux: Add DT binding doc for Broadcom MDIO bus mutiplexer
+  DT:mdio-mux: Add mdio multiplexer driver node
+  net:mdio-mux: Add MDIO mux driver for iProc SoCs
+  Binding:PHY: Binding doc for NS2 PCIe PHYs.
+  phy: Add Northstar2 PCI Phy support
+
+ .../bindings/net/brcm,mdio-mux-iproc.txt           |  60 +++++
+ Documentation/devicetree/bindings/net/mdio-mux.txt |   9 +-
+ .../bindings/phy/brcm,mdio-mux-bus-pci.txt         |  27 +++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  12 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  32 +++
+ drivers/net/phy/Kconfig                            |  11 +
+ drivers/net/phy/Makefile                           |   1 +
+ drivers/net/phy/mdio-mux-bcm-iproc.c               | 243 +++++++++++++++++++++
+ drivers/net/phy/mdio-mux-gpio.c                    |   2 +-
+ drivers/net/phy/mdio-mux-mmioreg.c                 |   2 +-
+ drivers/net/phy/mdio-mux.c                         |  28 ++-
+ drivers/of/of_mdio.c                               |   3 +
+ drivers/phy/Kconfig                                |   8 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-pcie.c                     | 115 ++++++++++
+ include/linux/mdio-mux.h                           |   4 +-
+ 16 files changed, 544 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,mdio-mux-bus-pci.txt
+ create mode 100644 drivers/net/phy/mdio-mux-bcm-iproc.c
+ create mode 100644 drivers/phy/phy-bcm-ns2-pcie.c
+
+-- 
+1.9.1
