@@ -1,64 +1,60 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 31 May 2016 10:03:37 -0700
-Subject: [PATCH 2/5] clocksource: rockchip: remove unnecessary clear irq
- before request_irq
-In-Reply-To: <574CC839.60608@linaro.org>
-References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
- <1464169802-6033-3-git-send-email-wxt@rock-chips.com>
- <574CC839.60608@linaro.org>
-Message-ID: <CAD=FV=U5zqU0CMeg1dDTYHrRqWAxTQO_xk2T7p09GJuj-Fn9Gw@mail.gmail.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Tue, 31 May 2016 10:04:20 -0700
+Subject: [RFC v2] dma-mapping: Use unsigned long for dma_attrs
+In-Reply-To: <1464609246-6948-2-git-send-email-k.kozlowski@samsung.com>
+References: <1464609246-6948-1-git-send-email-k.kozlowski@samsung.com>
+ <1464609246-6948-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160531170420.GB25366@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, May 30, 2016 at 01:54:06PM +0200, Krzysztof Kozlowski wrote:
+> The dma-mapping core and the implementations do not change the
+> DMA attributes passed by pointer.  Thus the pointer can point to const
+> data.  However the attributes do not have to be a bitfield. Instead
+> unsigned long will do fine:
+> 
+> 1. This is just simpler.  Both in terms of reading the code and setting
+>    attributes.  Instead of initializing local attributes on the stack and
+>    passing pointer to it to dma_set_attr(), just set the bits.
+> 
+> 2. It brings safeness and checking for const correctness because the
+>    attributes are passed by value.
+> 
+> Please have in mind that this is RFC, not finished yet.  Only ARM and
+> ARM64 are fixed (and not everywhere).
+> However other API users also have to be converted which is quite
+> intrusive.  I would rather avoid it until the overall approach is
+> accepted.
 
-On Mon, May 30, 2016 at 4:09 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 05/25/2016 11:49 AM, Caesar Wang wrote:
->>
->> From: Huang Tao <huangtao@rock-chips.com>
->>
->> rk_timer_interrupt_clear and rk_timer_disable is unnecessary before
->> request_irq. Timer should keep disabled before booting Linux.
->
->
-> That's true in the perfect world :/ Some version has u-boot letting the
-> timer with irq enabled, therefore as soon as request_irq is done, an irq
-> fires and leads to a kernel panic.
->
-> On the other side, this timer is not used on the other rockchip version than
-> rk3399 because of no need of a broadcast timer, so removing these two lines
-> may be acceptable.
->
-> Can try the changes with another board, eg rk3288 (and forcing to use this
-> timer). Can you do the test and confirm it does not break with different
-> version of u-boot ?
+This looks great!  Please continue doing the full conversion.
 
-Actually, I'm not even sure that's true in a perfect world.  ;)  There
-are two main problems that might be lurking here:
+> +/**
+> + * List of possible attributes associated with a DMA mapping. The semantics
+> + * of each attribute should be defined in Documentation/DMA-attributes.txt.
+> + */
+> +#define DMA_ATTR_WRITE_BARRIER		BIT(1)
+> +#define DMA_ATTR_WEAK_ORDERING		BIT(2)
+> +#define DMA_ATTR_WRITE_COMBINE		BIT(3)
+> +#define DMA_ATTR_NON_CONSISTENT		BIT(4)
+> +#define DMA_ATTR_NO_KERNEL_MAPPING	BIT(5)
+> +#define DMA_ATTR_SKIP_CPU_SYNC		BIT(6)
+> +#define DMA_ATTR_FORCE_CONTIGUOUS	BIT(7)
+> +#define DMA_ATTR_ALLOC_SINGLE_PAGES	BIT(8)
 
-1. On exynos5 devices I've worked with, the private timer (MCT)
-actually shared the same physical counter with the ARM Architected
-Timer.  IIRC stopping or resetting the MCT had the effect of stopping
-/ resetting the Arch Timer.  Is it the same for you?  As I understand
-it the Arch Timer isn't supposed to ever be stopped or reset.  If
-firmware left the timer stopped and the kernel happened to be compiled
-without support for the Rockchip timer (but had the Arch Timers) then
-things would be very broken.  Also the early kernel boot might be
-broken if the Arch Timer inits before the Rockchip timer.
+No really for this patch, but I would much prefer to document them next
+to the code in the long run.  Also I really think these BIT() macros
+are a distraction compared to the (1 << N) notation.
 
-NOTE: If your timer and the Arch Timer are totally separate then point
-#1 is not important.
+> +/**
+> + * dma_get_attr - check for a specific attribute
+> + * @attr: attribute to look for
+> + * @attrs: attributes to check within
+> + */
+> +static inline bool dma_get_attr(unsigned long attr, unsigned long attrs)
+> +{
+> +	return !!(attr & attrs);
+> +}
 
-
-2. Historically in Chrome OS there's been an unofficial agreement that
-the firmware would start its high speed timer as soon as possible at
-bootup and that this could be used to (roughly) measure the time
-between the start of firmware and the start of the kernel.  That means
-that the kernel was expecting the timer to actually be running when it
-started up.  Yup, this is a bit of a hack and I'm not sure it's
-terribly well documented, but it does provide a reason that firmware
-might have left the timer running.
-
-
--Doug
+I'd just kill this helper, much easier to simply open code it in the
+caller.
