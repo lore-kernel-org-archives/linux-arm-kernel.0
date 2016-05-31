@@ -1,113 +1,132 @@
-From: sgoel@codeaurora.org (Goel, Sameer)
-Date: Tue, 31 May 2016 17:30:28 -0600
-Subject: [PATCH v3] arm64: Implement optimised IP checksum helpers
-In-Reply-To: <4cef631ae5ff455d080cb17c8e0fa918c9a5c067.1464714040.git.robin.murphy@arm.com>
-References: <ba9cf5bf84b8adc766f7f7511dda8cb501cd4101.1464693619.git.robin.murphy@arm.com>
- <4cef631ae5ff455d080cb17c8e0fa918c9a5c067.1464714040.git.robin.murphy@arm.com>
-Message-ID: <7d5e45a9-6e48-3f67-c633-77a3d50d71e8@codeaurora.org>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Tue, 31 May 2016 16:44:01 -0700
+Subject: [PATCH v1 5/6] dtb: xgene: Remove clock nodes
+In-Reply-To: <574BECE8.2050307@gmail.com>
+References: <1464333768-26150-1-git-send-email-isubramanian@apm.com>
+ <1464333768-26150-6-git-send-email-isubramanian@apm.com>
+ <574BECE8.2050307@gmail.com>
+Message-ID: <CAKh23FmM3Dfo+XQT++b0y0ETQJMgjngdxCcDxhLBRc4UVsrnAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the arm64 checksum file. I saw a 4 fold speedup when 
-calculating checksum for a 20 byte buffer on my test platform.
+On Mon, May 30, 2016 at 12:34 AM, Matthias Brugger
+<matthias.bgg@gmail.com> wrote:
+>
+>
+> On 27/05/16 09:22, Iyappan Subramanian wrote:
+>>
+>> Since the MDIO will be responsible for clock reset, removing the clock
+>> nodes from shadowcat xge0 and storm sgenet1.
+>>
+>> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+>> Tested-by: Fushen Chen <fchen@apm.com>
+>> Tested-by: Toan Le <toanle@apm.com>
+>> ---
+>>   arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 12 ------------
+>>   arch/arm64/boot/dts/apm/apm-storm.dtsi     | 18 ++++--------------
+>>   2 files changed, 4 insertions(+), 26 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+>> b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+>> index 8106957..f27563d 100644
+>> --- a/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+>> +++ b/arch/arm64/boot/dts/apm/apm-shadowcat.dtsi
+>> @@ -299,17 +299,6 @@
+>>                                 clock-output-names = "pcie1clk";
+>>                         };
+>>
+>> -                       xge0clk: xge0clk at 1f61c000 {
+>> -                               compatible = "apm,xgene-device-clock";
+>> -                               #clock-cells = <1>;
+>> -                               clocks = <&socplldiv2 0>;
+>> -                               reg = <0x0 0x1f61c000 0x0 0x1000>;
+>> -                               reg-names = "csr-reg";
+>> -                               enable-mask = <0x3>;
+>> -                               csr-mask = <0x3>;
+>> -                               clock-output-names = "xge0clk";
+>> -                       };
+>> -
+>
+>
+> mdio at 0x1f610000 has xge0clk as input (patch 4), so deleting the node here
+> will break the device tree. I suppose the mdio consumes the menetclk as in
+> apm-storm.dtsi.
 
-Thanks,
-Sameer
+I added back xge0clk.
 
-On 5/31/2016 11:04 AM, Robin Murphy wrote:
-> AArch64 is capable of 128-bit memory accesses without alignment
-> restrictions, which makes it both possible and highly practical to slurp
-> up a typical 20-byte IP header in just 2 loads. Implement our own
-> version of ip_fast_checksum() to take advantage of that, resulting in
-> considerably fewer instructions and memory accesses than the generic
-> version. We can also get more optimal code generation for csum_fold() by
-> defining it a slightly different way round from the generic version, so
-> throw that into the mix too.
 >
-> Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
-> Acked-by: Luke Starrett <luke.starrett@broadcom.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
+> Regards,
+> Matthias
 >
-> v3: Don't generate generic header [James]
-> v2: Include types.h, add Luke's ack
 >
->  arch/arm64/include/asm/Kbuild     |  1 -
->  arch/arm64/include/asm/checksum.h | 51 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 51 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/include/asm/checksum.h
+>>                         xge1clk: xge1clk at 1f62c000 {
+>>                                 compatible = "apm,xgene-device-clock";
+>>                                 #clock-cells = <1>;
+>> @@ -643,7 +632,6 @@
+>>                         interrupts = <0 96 4>,
+>>                                      <0 97 4>;
+>>                         dma-coherent;
+>> -                       clocks = <&xge0clk 0>;
+>>                         local-mac-address = [00 01 73 00 00 01];
+>>                         phy-connection-type = "sgmii";
+>>                         phy-handle = <&sgenet0phy>;
+>> diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> index 18f694ea..f631fe4 100644
+>> --- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> +++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
+>> @@ -237,20 +237,11 @@
+>>                                 clocks = <&socplldiv2 0>;
+>>                                 reg = <0x0 0x1f21c000 0x0 0x1000>;
+>>                                 reg-names = "csr-reg";
+>> -                               csr-mask = <0x3>;
+>> +                               csr-mask = <0xa>;
+>> +                               enable-mask = <0xf>;
+>>                                 clock-output-names = "sge0clk";
+>>                         };
+>>
+>> -                       sge1clk: sge1clk at 1f21c000 {
+>> -                               compatible = "apm,xgene-device-clock";
+>> -                               #clock-cells = <1>;
+>> -                               clocks = <&socplldiv2 0>;
+>> -                               reg = <0x0 0x1f21c000 0x0 0x1000>;
+>> -                               reg-names = "csr-reg";
+>> -                               csr-mask = <0xc>;
+>> -                               clock-output-names = "sge1clk";
+>> -                       };
+>> -
+>>                         xge0clk: xge0clk at 1f61c000 {
+>>                                 compatible = "apm,xgene-device-clock";
+>>                                 #clock-cells = <1>;
+>> @@ -938,9 +929,9 @@
+>>                         reg-names = "enet_csr", "ring_csr", "ring_cmd";
+>>                         interrupts = <0x0 0x3c 0x4>;
+>>                         dma-coherent;
+>> -                       clocks = <&menetclk 0>;
+>>                         /* mac address will be overwritten by the
+>> bootloader */
+>>                         local-mac-address = [00 00 00 00 00 00];
+>> +                       clocks = <&menetclk 0>;
+>>                         phy-connection-type = "rgmii";
+>>                         phy-handle = <&menetphy>;
+>>                 };
+>> @@ -955,8 +946,8 @@
+>>                         interrupts = <0x0 0xA0 0x4>,
+>>                                      <0x0 0xA1 0x4>;
+>>                         dma-coherent;
+>> -                       clocks = <&sge0clk 0>;
+>>                         local-mac-address = [00 00 00 00 00 00];
+>> +                       clocks = <&sge0clk 0>;
+>>                         phy-connection-type = "sgmii";
+>>                         phy-handle = <&sgenet0phy>;
+>>                 };
+>> @@ -972,7 +963,6 @@
+>>                                      <0x0 0xAD 0x4>;
+>>                         port-id = <1>;
+>>                         dma-coherent;
+>> -                       clocks = <&sge1clk 0>;
+>>                         local-mac-address = [00 00 00 00 00 00];
+>>                         phy-connection-type = "sgmii";
+>>                         phy-handle = <&sgenet1phy>;
+>>
 >
-> diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
-> index cff532a6744e..f43d2c44c765 100644
-> --- a/arch/arm64/include/asm/Kbuild
-> +++ b/arch/arm64/include/asm/Kbuild
-> @@ -1,6 +1,5 @@
->  generic-y += bug.h
->  generic-y += bugs.h
-> -generic-y += checksum.h
->  generic-y += clkdev.h
->  generic-y += cputime.h
->  generic-y += current.h
-> diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
-> new file mode 100644
-> index 000000000000..09f65339d66d
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/checksum.h
-> @@ -0,0 +1,51 @@
-> +/*
-> + * Copyright (C) 2016 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +#ifndef __ASM_CHECKSUM_H
-> +#define __ASM_CHECKSUM_H
-> +
-> +#include <linux/types.h>
-> +
-> +static inline __sum16 csum_fold(__wsum csum)
-> +{
-> +	u32 sum = (__force u32)csum;
-> +	sum += (sum >> 16) | (sum << 16);
-> +	return ~(__force __sum16)(sum >> 16);
-> +}
-> +#define csum_fold csum_fold
-> +
-> +static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
-> +{
-> +	__uint128_t tmp;
-> +	u64 sum;
-> +
-> +	tmp = *(const __uint128_t *)iph;
-> +	iph += 16;
-> +	ihl -= 4;
-> +	tmp += ((tmp >> 64) | (tmp << 64));
-> +	sum = tmp >> 64;
-> +	do {
-> +		sum += *(const u32 *)iph;
-> +		iph += 4;
-> +	} while (--ihl);
-> +
-> +	sum += ((sum >> 32) | (sum << 32));
-> +	return csum_fold(sum >> 32);
-> +}
-> +#define ip_fast_csum ip_fast_csum
-> +
-> +#include <asm-generic/checksum.h>
-> +
-> +#endif	/* __ASM_CHECKSUM_H */
->
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
