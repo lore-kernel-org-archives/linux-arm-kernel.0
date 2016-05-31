@@ -1,78 +1,67 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Tue, 31 May 2016 21:05:13 +0800
-Subject: [PATCH v7 13/15] ACPI / processor: Add acpi_map_madt_entry().
-In-Reply-To: <1464129345-18985-14-git-send-email-ddaney.cavm@gmail.com>
-References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
- <1464129345-18985-14-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <574D8C09.3030608@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 31 May 2016 15:05:59 +0200
+Subject: [PATCH v4 01/12] KVM: extend struct kvm_msi to hold a 32-bit
+ device ID
+In-Reply-To: <5745CFF6.6070001@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-2-git-send-email-andre.przywara@arm.com>
+ <20160403091508.GA5261@cbox>
+ <e520a5a8-b259-27f3-f33c-f87e008f1c6f@arm.com>
+ <5745CFF6.6070001@arm.com>
+Message-ID: <20160531130559.GA12568@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/5/25 6:35, David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
->
-> Follow-on arm64 ACPI/NUMA patches need to map MADT entries very early
-> (before kmalloc is usable).
->
-> Add acpi_map_madt_entry() which, indirectly, uses
-> early_memremap()/early_memunmap() to access the table and parse out
-> the mpidr.  The existing implementation of map_madt_entry() is
-> modified to take a pointer to the MADT as a parameter and the callers
-> adjusted.
->
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> ---
->   drivers/acpi/processor_core.c | 26 ++++++++++++++++++++++----
->   include/acpi/processor.h      |  1 +
->   2 files changed, 23 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/acpi/processor_core.c b/drivers/acpi/processor_core.c
-> index 33a38d6..9125d7d 100644
-> --- a/drivers/acpi/processor_core.c
-> +++ b/drivers/acpi/processor_core.c
-> @@ -108,13 +108,12 @@ static int map_gicc_mpidr(struct acpi_subtable_header *entry,
->   	return -EINVAL;
->   }
->
-> -static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
-> +static phys_cpuid_t map_madt_entry(struct acpi_table_madt *madt,
-> +				   int type, u32 acpi_id)
->   {
->   	unsigned long madt_end, entry;
->   	phys_cpuid_t phys_id = PHYS_CPUID_INVALID;	/* CPU hardware ID */
-> -	struct acpi_table_madt *madt;
->
-> -	madt = get_madt_table();
->   	if (!madt)
->   		return phys_id;
->
-> @@ -145,6 +144,25 @@ static phys_cpuid_t map_madt_entry(int type, u32 acpi_id)
->   	return phys_id;
->   }
->
-> +phys_cpuid_t __init acpi_map_madt_entry(u32 acpi_id)
-> +{
-> +	struct acpi_table_madt *madt = NULL;
-> +	acpi_size tbl_size;
-> +	phys_cpuid_t rv;
-> +
-> +	acpi_get_table_with_size(ACPI_SIG_MADT, 0,
-> +				 (struct acpi_table_header **)&madt,
-> +				 &tbl_size);
-> +	if (!madt)
-> +		return PHYS_CPUID_INVALID;
-> +
-> +	rv = map_madt_entry(madt, 1, acpi_id);
+On Wed, May 25, 2016 at 05:16:54PM +0100, Marc Zyngier wrote:
+> On 25/05/16 16:55, Andre Przywara wrote:
+> > Hi Christoffer,
+> > 
+> > On 03/04/16 10:15, Christoffer Dall wrote:
+> >> On Sat, Mar 26, 2016 at 02:13:59AM +0000, Andre Przywara wrote:
+> >>> The ARM GICv3 ITS MSI controller requires a device ID to be able to
+> >>> assign the proper interrupt vector. On real hardware, this ID is
+> >>> sampled from the bus. To be able to emulate an ITS controller, extend
+> >>> the KVM MSI interface to let userspace provide such a device ID. For
+> >>> PCI devices, the device ID is simply the 16-bit bus-device-function
+> >>> triplet, which should be easily available to the userland tool.
+> >>>
+> >>> Also there is a new KVM capability which advertises whether the
+> >>> current VM requires a device ID to be set along with the MSI data.
+> >>> This flag is still reported as not available everywhere, later we will
+> >>> enable it when ITS emulation is used.
+> >>>
+> >>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> >>> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+> >>> ---
+> >>>  Documentation/virtual/kvm/api.txt | 12 ++++++++++--
+> >>>  include/uapi/linux/kvm.h          |  5 ++++-
+> >>>  2 files changed, 14 insertions(+), 3 deletions(-)
+> >>>
+> >>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+> >>> index cb2ef0b..8f7351d 100644
+> >>> --- a/Documentation/virtual/kvm/api.txt
+> >>> +++ b/Documentation/virtual/kvm/api.txt
+> >>> @@ -2163,10 +2163,18 @@ struct kvm_msi {
+> >>>  	__u32 address_hi;
+> >>>  	__u32 data;
+> >>>  	__u32 flags;
+> >>> -	__u8  pad[16];
+> >>> +	__u32 devid;
+> >>
+> >> Are we imposing any unfortunate restrictions for other architectures by
+> >> using a u32 over a u64 for the device ID?
+> > 
+> > Mmmh, good point. I guess not only for other architectures, but also for
+> > the future in general.
+> > 
+> > Are there any objections against increasing this to a u64?
+> 
+> I'm not sure this is really necessary. A PCI RID is 16bit, and expanding
+> it to 32bit is already making quite a bit of space for further extension.
+> 
+> Also, some architecture might be unhappy of having a 64bit quantity that
+> is not 64bit aligned...
+> 
+ok, thanks for the explanation.
 
-Just nit-pick, pass 1 here means we need to define an acpi processor
-device object in DSDT (see function map_gicc_mpidr(),
-device_declaration), it would be fine for x2apic and gic mode,
-but not for lapic mode, since the function name is acpi_map_madt_entry
-which is general for all architecture, it will confuse people I think.
-
-How about rename acpi_map_madt_entry() to acpi_map_madt_gicc_entry()?
-It's only used for AMR64 to get mpidrs from GICC entries using acpi_id,
-other than that, it's good to me.
-
-Thanks
-Hanjun
+-Christoffer
