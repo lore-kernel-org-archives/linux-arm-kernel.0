@@ -1,34 +1,38 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 31 May 2016 08:27:15 +0200
-Subject: pxa_defconfig runtime failures due to 'ARM: pxa: activate pinctrl
- for device-tree machines'
-In-Reply-To: <574A0AD1.9000304@roeck-us.net> (Guenter Roeck's message of "Sat,
- 28 May 2016 14:17:05 -0700")
-References: <20160527202715.GA4841@roeck-us.net>
- <87a8jah9ok.fsf@belgarion.home> <574A0AD1.9000304@roeck-us.net>
-Message-ID: <87vb1ueo8s.fsf@belgarion.home>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 31 May 2016 15:30:10 +0900
+Subject: [PATCH] pinctrl: uniphier: fix .pin_dbg_show() callback
+Message-ID: <1464676210-16508-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guenter Roeck <linux@roeck-us.net> writes:
+Without this, reading the "pins" in the debugfs causes kernel BUG.
 
-> On 05/28/2016 01:24 AM, Robert Jarzmik wrote:
->> Guenter Roeck <linux@roeck-us.net> writes:
->>
->>> Hi,
->> I'd rather say that pxa_defconfig doesn't work anymore on any legacy system.
->> Its first purpose was to ensure compilation coverage of all legacy pxa systems.
->> Its second one was to have a single kernel bootable on all legacy pxa systems.
->>
->> Therefore, would you tell me if the patch in [1] fixes your issue ?
->>
->
-> Yes, it does. It is actually the workaround I deployed for my test builds,
-> since I thought that the change was on purpose.
+Fixes: 6e9088920258 ("pinctrl: UniPhier: add UniPhier pinctrl core support")
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-Good. Can I take that as a Tested-by ?
+Hi Linus,
+I hope this will be applied as a bug-fix patch for Linux 4.7 .
 
-Cheers.
+ drivers/pinctrl/uniphier/pinctrl-uniphier-core.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
+diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
+index 9674009..5d08de0 100644
+--- a/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
++++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-core.c
+@@ -73,6 +73,12 @@ static void uniphier_pctl_pin_dbg_show(struct pinctrl_dev *pctldev,
+ 	case UNIPHIER_PIN_PULL_DOWN:
+ 		pull_dir = "DOWN";
+ 		break;
++	case UNIPHIER_PIN_PULL_UP_FIXED:
++		pull_dir = "UP(FIXED)";
++		break;
++	case UNIPHIER_PIN_PULL_DOWN_FIXED:
++		pull_dir = "DOWN(FIXED)";
++		break;
+ 	case UNIPHIER_PIN_PULL_NONE:
+ 		pull_dir = "NONE";
+ 		break;
 -- 
-Robert
+1.9.1
