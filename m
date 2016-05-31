@@ -1,50 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 May 2016 21:02:07 +0200
-Subject: [PATCH resend v2 0/6] regulator: axp20x: Add support for AXP809
- PMIC
-In-Reply-To: <1464711804-19256-1-git-send-email-wens@csie.org>
-References: <1464711804-19256-1-git-send-email-wens@csie.org>
-Message-ID: <20160531190207.GP4908@lukather>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 31 May 2016 15:21:06 -0400
+Subject: [PATCH 4/6] ARM: dts: exynos: Add Thermal Management Unit to
+ Exynos5410
+In-Reply-To: <1464719945-3417-4-git-send-email-krzk@kernel.org>
+References: <1464719945-3417-1-git-send-email-krzk@kernel.org>
+ <1464719945-3417-4-git-send-email-krzk@kernel.org>
+Message-ID: <25549eaa-a286-7579-8407-411f0c1834ae@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 12:23:18AM +0800, Chen-Yu Tsai wrote:
-> Hi everyone,
-> 
-> These are the remaining patches of my AXP809 PMIC support series. The
-> mfd parts and regulator fixes were merged in v4.7-rc1. What's left are
-> the AXP809 regulator driver and dts changes.
-> 
-> Patch 1 adds AXP809 support to the axp20x regulator driver. This patch
-> depends on patch 3, and patches already in regulator/topic/axp20x.
-> 
-> Patch 2 adds a dtsi file for AXP809.
-> 
-> Patch 3 enables AXP809 support on the A80 Optimus board.
-> 
-> Patch 4 enables AXP809 support on the Cubieboard 4.
+Hello Krzysztof,
 
-Merged the last 3
-
+On 05/31/2016 02:39 PM, Krzysztof Kozlowski wrote:
+> Add nodes for Thermal Management Unit to exynos5410.dtsi. Use the same
+> compatible as for Exynos5420 however without second base for TRIMINFO
+> register.
 > 
-> Patch 5 disables the dummy regulators from sunxi-common-regulators.dtsi
-> on the A80 Optimus board. These aren't used in the board DTS anymore.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> ---
+>  arch/arm/boot/dts/exynos5410.dtsi | 55 +++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 55 insertions(+)
 > 
-> Patch 6 disables the dummy regulators from sunxi-common-regulators.dtsi,
-> on the Cubieboard4. These aren't used in the board DTS anymore.
+> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> index 994d16a44fe4..f1effd3f03c4 100644
+> --- a/arch/arm/boot/dts/exynos5410.dtsi
+> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> @@ -81,6 +81,42 @@
+>  			#clock-cells = <1>;
+>  		};
+>  
+> +		tmu_cpu0: tmu at 10060000 {
+> +			compatible = "samsung,exynos5420-tmu";
+> +			reg = <0x10060000 0x100>;
+> +			interrupts = <0 65 0>;
 
-And we should just remove the include on his one.
+Please use GIC_SPI instead of 0 on these.
 
-Maxime
+> +			clocks = <&clock CLK_TMU>;
+> +			clock-names = "tmu_apbif";
+> +			#include "exynos4412-tmu-sensor-conf.dtsi"
+> +		};
+> +
+> +		tmu_cpu1: tmu at 10064000 {
+> +			compatible = "samsung,exynos5420-tmu";
+> +			reg = <0x10064000 0x100>;
+> +			interrupts = <0 183 0>;
+> +			clocks = <&clock CLK_TMU>;
+> +			clock-names = "tmu_apbif";
+> +			#include "exynos4412-tmu-sensor-conf.dtsi"
+> +		};
+> +
+> +		tmu_cpu2: tmu at 10068000 {
+> +			compatible = "samsung,exynos5420-tmu";
+> +			reg = <0x10068000 0x100>;
+> +			interrupts = <0 184 0>;
+> +			clocks = <&clock CLK_TMU>;
+> +			clock-names = "tmu_apbif";
+> +			#include "exynos4412-tmu-sensor-conf.dtsi"
+> +		};
+> +
+> +		tmu_cpu3: tmu at 1006c000 {
+> +			compatible = "samsung,exynos5420-tmu";
+> +			reg = <0x1006c000 0x100>;
+> +			interrupts = <0 185 0>;
+> +			clocks = <&clock CLK_TMU>;
+> +			clock-names = "tmu_apbif";
+> +			#include "exynos4412-tmu-sensor-conf.dtsi"
+> +		};
+> +
 
+Exynos5420 has 5 TMU channels and you are adding only 4 so I guess this
+is another difference with Exynos5410 besides the TRIMINFO register not
+being misplaced? Probably is worth to mention it in the commit message.
+
+Anyway, the patch looks good to me.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/a71a6c72/attachment.sig>
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
