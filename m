@@ -1,180 +1,40 @@
-From: huangtao@rock-chips.com (Huang, Tao)
-Date: Tue, 31 May 2016 21:46:23 +0800
-Subject: [PATCH 4/5] clocksource: rockchip: add support for rk3399 SoC
-In-Reply-To: <574CCCB4.1030001@linaro.org>
-References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
- <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
- <574CCCB4.1030001@linaro.org>
-Message-ID: <574D95AF.2020905@rock-chips.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 31 May 2016 14:49:00 +0100
+Subject: [PATCH 0/2] arm64: mm: dump: rework and fix
+Message-ID: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel:
-On 2016?05?31? 07:28, Daniel Lezcano wrote:
-> On 05/25/2016 11:50 AM, Caesar Wang wrote:
->> From: Huang Tao <huangtao@rock-chips.com>
->>
->> The CONTROL register offset is different from old SoCs.
->> For Linux driver, there are not functional changes at all.
->> Let's call it v2.
->>
->> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
->> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
->> Cc: Thomas Gleixner <tglx@linutronix.de>
->> Cc: Heiko Stuebner <heiko@sntech.de>
->> Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> ---
-> 
-> That's hackish.
-Yes:( I blamed our IC guy.
-> 
-> Please consider something like:
-> 
-> diff --git a/drivers/clocksource/rockchip_timer.c 
-> b/drivers/clocksource/rockchip_timer.c
-> index b991b28..b6ba6f9 100644
-> --- a/drivers/clocksource/rockchip_timer.c
-> +++ b/drivers/clocksource/rockchip_timer.c
-> @@ -19,7 +19,8 @@
-> 
->   #define TIMER_LOAD_COUNT0	0x00
->   #define TIMER_LOAD_COUNT1	0x04
-> -#define TIMER_CONTROL_REG	0x10
-> +#define TIMER_CONTROL_REG3288	0x10
-> +#define TIMER_CONTROL_REG3399	0x1C
->   #define TIMER_INT_STATUS	0x18
-> 
->   #define TIMER_DISABLE		0x0
-> @@ -31,6 +32,7 @@
->   struct bc_timer {
->   	struct clock_event_device ce;
->   	void __iomem *base;
-> +	void __iomem *ctrl;
->   	u32 freq;
->   };
-> 
-> @@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct 
-> clock_event_device *ce)
->   	return rk_timer(ce)->base;
->   }
-> 
-> +static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
-> +{
-> +        return rk_timer(ce)->ctrl;
-> +}
-> +
->   static inline void rk_timer_disable(struct clock_event_device *ce)
->   {
-> -	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
-> +	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
->   }
-> 
->   static inline void rk_timer_enable(struct clock_event_device *ce, u32 
-> flags)
->   {
->   	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
-> -		       rk_base(ce) + TIMER_CONTROL_REG);
-> +		       rk_ctrl(ce));
->   }
-> 
->   static void rk_timer_update_counter(unsigned long cycles,
-> @@ -179,4 +186,18 @@ out_unmap:
->   	iounmap(bc_timer.base);
->   }
-> 
-> -CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
-> +static void __init rk3288_timer_init(struct device_node *np)
-> +{
-> +	bc_timer.ctrl = TIMER_CONTROL_REG3288;
-> +	rk_timer_init(np);
-> +}
-> +
-> +static void __init rk3399_timer_init(struct device_node *np)
-> +{
-> +        bc_timer.ctrl = TIMER_CONTROL_REG3399;
-> +	rk_timer_init(np);
-> +}
-> +
-> +
-> +CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", 
-> rk3288_timer_init);
-> +CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3399-timer", 
-> rk3399_timer_init);
-> 
-> 
+Hi Will,
 
-I think you mean this patch otherwise compile will fail:
-@@ -19,7 +19,8 @@
+Here are a couple of patches for the arm64 pagetable dump code.
 
- #define TIMER_LOAD_COUNT0	0x00
- #define TIMER_LOAD_COUNT1	0x04
--#define TIMER_CONTROL_REG	0x10
-+#define TIMER_CONTROL_REG3288	0x10
-+#define TIMER_CONTROL_REG3399	0x1C
- #define TIMER_INT_STATUS	0x18
+The first patch is the final reusable ptdump patch, rebased to v4.7-rc1, as per
+your request [1]. Other than the rebase, I have made no changes.
 
- #define TIMER_DISABLE		0x0
-@@ -31,6 +32,7 @@
- struct bc_timer {
- 	struct clock_event_device ce;
- 	void __iomem *base;
-+	u32 ctrl;
- 	u32 freq;
- };
+The second patch addresses an ambiguity in the dump output, in that we cannot
+determine whether a span of block entries exists at the PGD, PUD, or PMD level.
+It's logically unrelated to patch 1, and the two should apply independently,
+but I've put them in a series so that I can call that out, and to avoid the
+inevitable confusion with patches that appear to intersect.
 
-@@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct
-clock_event_device *ce)
- 	return rk_timer(ce)->base;
- }
-
-+static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
-+{
-+	return rk_timer(ce)->base + rk_timer(ce)->ctrl;
-+}
-+
- static inline void rk_timer_disable(struct clock_event_device *ce)
- {
--	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
-+	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
- }
-
- static inline void rk_timer_enable(struct clock_event_device *ce, u32
-flags)
- {
- 	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
--		       rk_base(ce) + TIMER_CONTROL_REG);
-+		       rk_ctrl(ce));
- }
-
- static void rk_timer_update_counter(unsigned long cycles,
-@@ -179,4 +186,19 @@ out_unmap:
- 	iounmap(bc_timer.base);
- }
-
--CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
-+static void __init rk3288_timer_init(struct device_node *np)
-+{
-+	bc_timer.ctrl = TIMER_CONTROL_REG3288;
-+	rk_timer_init(np);
-+}
-+
-+static void __init rk3399_timer_init(struct device_node *np)
-+{
-+	bc_timer.ctrl = TIMER_CONTROL_REG3399;
-+	rk_timer_init(np);
-+}
-+
-+CLOCKSOURCE_OF_DECLARE(rk3288_timer, "rockchip,rk3288-timer",
-+		       rk3288_timer_init);
-+CLOCKSOURCE_OF_DECLARE(rk3399_timer, "rockchip,rk3399-timer",
-+		       rk3399_timer_init);
-
-This patch will give us a little lager text size. If we do disassemble,
-we can see additional LDR is called. I can accept this performance drop.
-So we will send new patches.
-BTW, the patch "clocksource: rockchip: remove unnecessary clear irq
-before request_irq" can drop if we use this patch.
+I've given them both a spin on Juno R1 with v4.7-rc1 defconfig, fiddling with
+the page size and number of levels. So far everything seems to work as
+expected.
 
 Thanks,
-Huang, Tao
+Mark.
+
+[1] http://lkml.kernel.org/r/20160531132508.GJ24936 at arm.com
+
+Mark Rutland (2):
+  arm64: mm: dump: make page table dumping reusable
+  arm64: mm: dump: log span level
+
+ arch/arm64/include/asm/ptdump.h | 44 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/dump.c            | 40 +++++++++++++++++++++++++------------
+ 2 files changed, 71 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm64/include/asm/ptdump.h
+
+-- 
+1.9.1
