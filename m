@@ -1,51 +1,65 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 May 2016 12:07:47 +0100
-Subject: [PATCH] arm64: report CPU number in bad_mode
-Message-ID: <1464692867-339-1-git-send-email-mark.rutland@arm.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 31 May 2016 13:19:37 +0200
+Subject: [PATCH V5 0/7] Introduce ACPI world to ITS irqchip
+Message-ID: <1464693584-22343-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we take an exception we don't expect (e.g. SError), we report this in
-the bad_mode handler with pr_crit. Depending on the configured log
-level, we may or may not log additional information in functions called
-subsequently. Notably, the messages in dump_stack (including the CPU
-number) are printed with KERN_DEFAULT and may not appear.
+Patches can be found:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-acpi-v5)
 
-Some exceptions have an IMPLEMENTATION DEFINED ESR_ELx.ISS encoding, and
-knowing the CPU number is crucial to correctly decode them. To ensure
-that this is always possible, we should log the CPU number along with
-the ESR_ELx value, so we are not reliant on subsequent logs or
-additional printk configuration options.
+Since this series depends on pending ARM64 ACPI PCI support, please pull:
+https://github.com/semihalf-nowicki-tomasz/linux.git (its-pci-acpi-v5)
+The its-pci-acpi-v5 git branch contains submitted patches along with
+the useful PCI patches from the test point of view.
 
-This patch logs the CPU number in bad_mode such that it is possible for
-a developer to decode these exceptions, provided access to sufficient
-documentation.
+Series has been tested on Cavium ThunderX server.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Al Grant <Al.Grant@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Dave Martin <dave.martin@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/traps.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+v4 -> v5
+- rebased against v4.7-rc1
+- drop generic layer and call IORT functions directly
+- improve resource abstraction and string formatting
 
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index c539208..f7cf463 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -477,8 +477,9 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 	void __user *pc = (void __user *)instruction_pointer(regs);
- 	console_verbose();
- 
--	pr_crit("Bad mode in %s handler detected, code 0x%08x -- %s\n",
--		handler[reason], esr, esr_get_class_string(esr));
-+	pr_crit("Bad mode in %s handler detected on CPU%d, code 0x%08x -- %s\n",
-+		handler[reason], smp_processor_id(), esr,
-+		esr_get_class_string(esr));
- 	__show_regs(regs);
- 
- 	info.si_signo = SIGILL;
+v3 -> v4
+- rebased against v4.5
+- add ACPI support for IRQ domain handling on a per-device basis
+- reorder domain setup step
+- improve error handling
+- code style improvements
+
+v2 -> v3
+- rebased on top of 4.4
+- fixes and improvements for redistributor init via GICC structures
+- fixes as per kbuild reports
+
+v1 -> v2
+- rebased on top of 4.4-rc4
+- use pci_msi_domain_get_msi_rid for requester ID to device ID translation
+
+
+Tomasz Nowicki (7):
+  ARM64, ACPI, PCI: I/O Remapping Table (IORT) initial support.
+  acpi, pci: Setup MSI domain on a per-devices basis.
+  irqchip, GICv3, ITS: Cleanup for ITS domain initialization.
+  irqchip, GICv3, ITS: Refator ITS DT init code to prepare for ACPI.
+  irqchip, gicv3, its: Probe ITS in the ACPI way.
+  its, pci, msi: Factor out code that might be reused for ACPI.
+  acpi, gicv3, its: Use MADT ITS subtable to do PCI/MSI domain
+    initialization.
+
+ drivers/acpi/Kconfig                     |   3 +
+ drivers/acpi/Makefile                    |   1 +
+ drivers/acpi/iort.c                      | 344 +++++++++++++++++++++++++++++++
+ drivers/irqchip/Kconfig                  |   1 +
+ drivers/irqchip/irq-gic-v3-its-pci-msi.c |  84 ++++++--
+ drivers/irqchip/irq-gic-v3-its.c         | 184 ++++++++++++-----
+ drivers/irqchip/irq-gic-v3.c             |   7 +-
+ drivers/pci/msi.c                        |  11 +-
+ include/linux/iort.h                     |  38 ++++
+ include/linux/irqchip/arm-gic-v3.h       |   4 +-
+ 10 files changed, 600 insertions(+), 77 deletions(-)
+ create mode 100644 drivers/acpi/iort.c
+ create mode 100644 include/linux/iort.h
+
 -- 
 1.9.1
