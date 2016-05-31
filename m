@@ -1,64 +1,50 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 May 2016 14:52:52 +0100
-Subject: Possible race between PTRACE_SETVFPREGS and PTRACE_CONT on ARM?
-In-Reply-To: <20160530224028.GT19428@n2100.arm.linux.org.uk>
-References: <574C7CDB.7050103@ericsson.com>
- <20160530213529.GS19428@n2100.arm.linux.org.uk>
- <20160530224028.GT19428@n2100.arm.linux.org.uk>
-Message-ID: <20160531135251.GK24936@arm.com>
+Date: Tue, 31 May 2016 14:57:41 +0100
+Subject: [PATCH] arm64: defconfig: add options for virtualization and
+ containers
+In-Reply-To: <1464345747-11729-1-git-send-email-riku.voipio@linaro.org>
+References: <1464345747-11729-1-git-send-email-riku.voipio@linaro.org>
+Message-ID: <20160531135740.GL24936@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 11:40:28PM +0100, Russell King - ARM Linux wrote:
-> On Mon, May 30, 2016 at 10:35:29PM +0100, Russell King - ARM Linux wrote:
-> > With that, on a single CPU, it seems to work correctly every time, but
-> > if I bring up a secondary CPU I start seeing the same problems you've
-> > reported - which seems to need the following patch to solve.  Please can
-> > you check whether this resolves your problem?
+On Fri, May 27, 2016 at 01:42:27PM +0300, Riku Voipio wrote:
+> Enable options commonly needed by popular virtualization
+> and container applications. Use modules when possible to
+> avoid too much overhead for users not interested.
 > 
-> More background behind this patch... I think that commit 8130b9d7b9d8
-> ("ARM: 7308/1: vfp: flush thread hwstate before copying ptrace registers")
-> was wrong.
+> - add namespace and cgroup options needed
+> - add seccomp - optional, but enhances Qemu etc
+> - bridge, nat, veth, macvtap and multicast for routing
+>   guests and containers
+> - btfrs and overlayfs modules for container COW backends
+> - while near it, make fuse a module instead of built-in.
 > 
-> Let's look at what's happening.  The above commit had the following effect:
+> Generated with make saveconfig and dropping unrelated spurious
+> change hunks while commiting. bloat-o-meter old-vmlinux vmlinux:
 > 
-> 	vfp_sync_hwstate();
-> 	new_vfp = thread->vfpstate.hard;
-> 	modify new_vfp (but not new_vfp.cpu)
-> +	vfp_flush_hwstate(thread);
-> 	thread->vfpstate.hard = new_vfp;
-> -	vfp_flush_hwstate(thread);
+> add/remove: 899/388 grow/shrink: 744/216 up/down: 183556/-94881 (88675)
+> ...
+> Total: Before=10515333, After=10604008, chg 0.000000%
 > 
-> Now, the commit above claims that a context switch mid-copy of new_vfp
-> into thread->vfpstate.hard may result in corrupted state.
-> 
-> I'm not quite sure how we could get to that point: the only thread which
-> is allowed to touch the traced child's state is the ptracing parent, and
-> the ptracing parent can't do anything until after vfp_set() has returned.
-> Even if the traced child gets a fatal signal, the point at which the
-> signal is delivered to the child is when returning to userspace, which
-> means the child must be runnable.  That in turn means that we are not
-> in the middle of changing the register state.
-> 
-> So, I'm not sure where Will got the idea that the partially copied state
-> would be visible: it shouldn't ever be visible.  If it is visible, then
-> we've got problems even with Will's patch applied, because a partial
-> copy whenever it happens would be visible.
-> 
-> In any case, the above change is wrong: vfp_flush_hwstate() sets
-> thread->vfpstate.hard.cpu to an invalid CPU number.  Switching the order
-> as Will has done _undoes_ the effect of vfp_flush_hwstate(), which leads
-> to the bug you are seeing.
-> 
-> So, I think the correct approach is to revert it.
+> Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
+> ---
+>  arch/arm64/configs/defconfig | 53 +++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 47 insertions(+), 6 deletions(-)
 
-Yes, it looks like I was over-zealous in fixing all users of
-vfp_flush_hwstate after I fixed the signal handling code. Given that the
-child isn't runnable until the parent has finished poking at the register
-state, the original code looks fine.
+I'm fine with adding stuff to defconfig if it's useful to people (and it
+looks like this is), but it's probably about time we figured out what to
+do about '=y' vs '=m'. Until recently (i.e. this merge window), the arm64
+defconfig didn't build any modules. Obviously this only scales so far,
+since the Image tends to get rather huge, but it would be good to try and
+establish a rule-of-thumb as to whether we treat something as a module
+or a built-in. We could even consider retrospectively applying the rule
+if its straightforward enough.
 
-The only thing I'm uncertain of is whether or not PTRACE_SEIZE/PTRACE_LISTEN
-allow switching to the child (but even then, how is the parent doing
-to issue such a request?).
+One easy way to do it would be: if you need the option to boot, then
+it's a built-in, but that brings up questions around "boot a full android
+system" vs "boot to a point where you could load an initrd".
+
+Any ideas? Am I mad trying to put method into madness?
 
 Will
