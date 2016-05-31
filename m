@@ -1,44 +1,50 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 31 May 2016 15:01:24 -0400
-Subject: [PATCH 3/6] ARM: dts: exynos: Interrupt for USB DWC3-1 differs
- between Exynos5420 and 5410
-In-Reply-To: <1464719945-3417-3-git-send-email-krzk@kernel.org>
-References: <1464719945-3417-1-git-send-email-krzk@kernel.org>
- <1464719945-3417-3-git-send-email-krzk@kernel.org>
-Message-ID: <fca224e1-af8c-5540-d47a-9f05e494b2c4@osg.samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 31 May 2016 21:02:07 +0200
+Subject: [PATCH resend v2 0/6] regulator: axp20x: Add support for AXP809
+ PMIC
+In-Reply-To: <1464711804-19256-1-git-send-email-wens@csie.org>
+References: <1464711804-19256-1-git-send-email-wens@csie.org>
+Message-ID: <20160531190207.GP4908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
-
-On 05/31/2016 02:39 PM, Krzysztof Kozlowski wrote:
-> On Exynos5410 the SPI interrupt for second USB DWC3 (called DRD: Dual
-> Role Device) is different - 200 instead of 73.
+On Wed, Jun 01, 2016 at 12:23:18AM +0800, Chen-Yu Tsai wrote:
+> Hi everyone,
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
-> ---
->  arch/arm/boot/dts/exynos5410.dtsi | 4 ++++
->  arch/arm/boot/dts/exynos5420.dtsi | 4 ++++
->  arch/arm/boot/dts/exynos54xx.dtsi | 1 -
->  3 files changed, 8 insertions(+), 1 deletion(-)
+> These are the remaining patches of my AXP809 PMIC support series. The
+> mfd parts and regulator fixes were merged in v4.7-rc1. What's left are
+> the AXP809 regulator driver and dts changes.
 > 
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> index a937d9bdad90..994d16a44fe4 100644
-> --- a/arch/arm/boot/dts/exynos5410.dtsi
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -267,6 +267,10 @@
->  	clock-names = "usbdrd30";
->  };
->  
-> +&usbdrd_dwc3_1 {
-> +	interrupts = <0 200 0>;
+> Patch 1 adds AXP809 support to the axp20x regulator driver. This patch
+> depends on patch 3, and patches already in regulator/topic/axp20x.
+> 
+> Patch 2 adds a dtsi file for AXP809.
+> 
+> Patch 3 enables AXP809 support on the A80 Optimus board.
+> 
+> Patch 4 enables AXP809 support on the Cubieboard 4.
 
-Please use GIC_SPI from <dt-bindings/interrupt-controller/arm-gic.h> instead 0.
+Merged the last 3
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> Patch 5 disables the dummy regulators from sunxi-common-regulators.dtsi
+> on the A80 Optimus board. These aren't used in the board DTS anymore.
+> 
+> Patch 6 disables the dummy regulators from sunxi-common-regulators.dtsi,
+> on the Cubieboard4. These aren't used in the board DTS anymore.
 
-Best regards,
+And we should just remove the include on his one.
+
+Maxime
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/a71a6c72/attachment.sig>
