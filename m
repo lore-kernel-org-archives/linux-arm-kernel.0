@@ -1,34 +1,66 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 31 May 2016 11:30:34 +0200
-Subject: [PATCH 1/3] mmc: fix mmc mode selection for HS-DDR and higher
-In-Reply-To: <1464505484-3661-2-git-send-email-wens@csie.org>
-References: <1464505484-3661-1-git-send-email-wens@csie.org>
- <1464505484-3661-2-git-send-email-wens@csie.org>
-Message-ID: <CAJKOXPcGCXJb5j2ShwL15GzKUXqR=z8p7TApORoHm9t-z1i6kA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 31 May 2016 11:35:08 +0200
+Subject: [BUG] CONFIG_UNINLINE_SPIN_UNLOCK important for Cortex-A9
+In-Reply-To: <874m9eoetu.fsf@gmail.com>
+References: <874m9eoetu.fsf@gmail.com>
+Message-ID: <4854518.jvbplH0SM0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 29, 2016 at 9:04 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> When IS_ERR_VALUE was removed from the mmc core code, it was replaced
-> with a simple not-zero check. This does not work, as the value checked
-> is the return value for mmc_select_bus_width, which returns the set
-> bit width on success. This made eMMC modes higher than HS-DDR unusable.
->
-> Fix this by checking for a positive return value instead.
->
-> Fixes: 287980e49ffc ("remove lots of IS_ERR_VALUE abuses")
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mmc/core/mmc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
+On Tuesday, May 31, 2016 9:40:29 AM CEST Holger Schurig wrote:
+> I chased a bug in the recent weeks that seems to be related to spinlocks.
+> 
+> 
+> 
+> Hardware & Kernel config
+> ------------------------
+> I have an i.MX6Q device. I don't use "make imx_v6_v7_defconfig", but
+> selected only what I need. As such, I only have CONFIG_ARCH_MXC and
+> CONFIG_SOC_IMX6Q enabled.
+> 
+> As a result, in my kernel CONFIG_UNINLINE_SPIN_UNLOCK was *not* defined.
+> 
+> In a kernel configured with "make imx_v6_v7_defconfig" this is
+> configured. And so people (e.g. the Freescale/NPX people) that normally
+> use this defconfig will never see the issue.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Have you tried multi_v7_defconfig? That also does not set 
+CONFIG_UNINLINE_SPIN_UNLOCK, but it is generally assumed to work.
 
-Could you be so kind and pick it up as fast as possible for current
-RC? Half of my boards fail (because they work on eMMC) so testing
-patches before applying is limited.
+> Cure
+> ----
+> When I turned on CONFIG_PROVE_RCU the issue stopped. This option does
+> "select UNINLINE_SPIN_UNLOCK", and this uninline option is also selected
+> with the imx_v6_v7_defconfig. I actually don't care if RCUs are proven
+> or not, this just turns on the uninlining as a side-effect.
 
-Best regards,
-Krzysztof
+Just to be sure: If you just enable UNINLINE_SPIN_UNLOCK (e.g. using
+a 'select' from arch/arm/mach-imx/Kconfig) without selecting PROVE_RCU,
+you say the bug is gone too?
+
+> Question
+> --------
+> I don't have the slightest idea what produces the error and why
+> uninlining helps (I'm not deep in such internals), so I wonder how to
+> proceed.
+>
+> Should I simply send in a patch that "select UNINLINE_SPIN_UNLOCK" on
+> i.MX6Q ???
+
+I think we really need to get to the bottom of this, as there are tons
+of possible reasons for the behavior, and selecting it for i.MX6Q.
+
+Please provide a few more details about your environment:
+
+- Specific kernel version, and full list of patches applied (if any).
+  Have you reproduced this with a plain unpatched linux-4.6 kernel?
+
+- Specific gcc version you used for building the kernel. Does this
+  happen with both old and new compilers, e.g. 4.7 and 6.1?
+
+- If it happens with an unpatched linux-4.6 and all gcc versions
+  with multi_v7_defconfig, we should try reproducing it on some
+  other quad-core Cortex-A9 (non-imx) platform with the same kernel
+  binary.
+
+	Arnd
