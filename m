@@ -1,36 +1,36 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  1 Jun 2016 00:23:21 +0800
-Subject: [PATCH resend v2 3/6] ARM: dts: sun9i: a80-optimus: Add AXP809 PMIC
+Date: Wed,  1 Jun 2016 00:23:22 +0800
+Subject: [PATCH resend v2 4/6] ARM: dts: sun9i: cubieboard4: Add AXP809 PMIC
  device node and regulators
 In-Reply-To: <1464711804-19256-1-git-send-email-wens@csie.org>
 References: <1464711804-19256-1-git-send-email-wens@csie.org>
-Message-ID: <1464711804-19256-4-git-send-email-wens@csie.org>
+Message-ID: <1464711804-19256-5-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The AXP809 PMIC is the primary PMIC. It provides various supply voltages
-for the SoC and other peripherals. The PMIC's interrupt line is
-connected to NMI pin of the SoC.
+for the SoC and other peripherals. The PMIC's interrupt line is connected
+to NMI pin of the SoC.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 131 +++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 131 +++++++++++++++++++++++++++-
  1 file changed, 129 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index d7a20d92b114..6cfc02194035 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -150,7 +150,7 @@
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index eb2ccd0a3bd5..8d8af1189d87 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -98,7 +98,7 @@
  &mmc0 {
  	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_optimus>;
+ 	pinctrl-0 = <&mmc0_pins>, <&mmc0_cd_pin_cubieboard4>;
 -	vmmc-supply = <&reg_vcc3v0>;
 +	vmmc-supply = <&reg_dcdc1>;
  	bus-width = <4>;
- 	cd-gpios = <&pio 7 18 GPIO_ACTIVE_HIGH>; /* PH8 */
+ 	cd-gpios = <&pio 7 18 GPIO_ACTIVE_HIGH>; /* PH18 */
  	cd-inverted;
-@@ -160,7 +160,7 @@
+@@ -108,7 +108,7 @@
  &mmc2 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&mmc2_8bit_pins>;
@@ -39,7 +39,7 @@ index d7a20d92b114..6cfc02194035 100644
  	bus-width = <8>;
  	non-removable;
  	cap-mmc-hw-reset;
-@@ -193,8 +193,135 @@
+@@ -126,8 +126,135 @@
  
  &r_rsb {
  	status = "okay";
