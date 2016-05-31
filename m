@@ -1,184 +1,39 @@
-From: vikas.cha.sajjan@hpe.com (Sajjan, Vikas C)
-Date: Tue, 31 May 2016 04:57:13 +0000
-Subject: [PATCH] Add support to parse RASF Table
-In-Reply-To: <TU4PR84MB0079FF2412932840DBE794C0C2770@TU4PR84MB0079.NAMPRD84.PROD.OUTLOOK.COM>
-References: <1462796276-3987-1-git-send-email-nagendra.k-v@hpe.com>
- <TU4PR84MB0079FF2412932840DBE794C0C2770@TU4PR84MB0079.NAMPRD84.PROD.OUTLOOK.COM>
-Message-ID: <TU4PR84MB004598D95417F3C00FC6BFC7D9460@TU4PR84MB0045.NAMPRD84.PROD.OUTLOOK.COM>
+From: nava.manne@xilinx.com (Nava kishore Manne)
+Date: Tue, 31 May 2016 05:15:10 +0000
+Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <CAKfKVtF1hOn9QwiqtjqqPYtUz5PscTBs4kBC1zRH6FY-4vVoUA@mail.gmail.com>
+References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
+ <CAKfKVtF1hOn9QwiqtjqqPYtUz5PscTBs4kBC1zRH6FY-4vVoUA@mail.gmail.com>
+Message-ID: <C89496FEAE474D468F30D558A9468D9F26CEF0EF@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bob,
+Hi Shubhrajyoti,
 
-Any thoughts on this patch
+	
+	Thanks for the review...
 
-Regards
-Vikas Sajjan
+> >  /**
+> > + * xudc_write64 - write 64bit value to device registers
+> > + * @ep: pointer to the usb device endpoint structure.
+> > + * @offset: register offset
+> > + * @val: data to be written
+> > + **/
+> > +static void xudc_write64(struct xusb_ep *ep, u32 offset, u64 val) {
+> > +       struct xusb_udc *udc = ep->udc;
+> > +
+> > +       udc->write_fn(udc->addr, offset, lower_32_bits(val));
+> > +       udc->write_fn(udc->addr, offset+0x04, upper_32_bits(val));
+> 
+> can we move this to a single 64 bit write?
 
------Original Message-----
-From: K V, Nagendra 
-Sent: Monday, May 16, 2016 2:05 PM
-To: robert.moore at intel.com
-Cc: Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>; Lakshminarasimha, Sunil Vishwanathpur <sunil.vl@hpe.com>; devel at acpica.org; linux-acpi at vger.kernel.org
-Subject: RE: [PATCH] Add support to parse RASF Table
+Initially I sent the patches with writeq() ,lo_hi_writeq()  later we decided to replace with write_fun().
+The reason for this is lo_hi_writeq() always assumes a little-endian register, so it's broken if anyone builds this device with big-endian registers.
+So replaced the 64bit calls with write_fun() as suggested by Arnd Bergmann. Hope it clears your query.
+Please refer to the below thread
 
-Bob,
+	http://lkml.iu.edu/hypermail/linux/kernel/1604.2/02046.html 
 
-Did you get chance to look into this?
 
-Regards
-Nagendra
-
------Original Message-----
-From: K V, Nagendra 
-Sent: Monday, May 09, 2016 5:48 PM
-To: robert.moore at intel.com
-Cc: Sajjan, Vikas C <vikas.cha.sajjan@hpe.com>; Lakshminarasimha, Sunil Vishwanathpur <sunil.vl@hpe.com>; devel at acpica.org; K V, Nagendra <nagendra.k-v@hpe.com>
-Subject: [PATCH] Add support to parse RASF Table
-
-This patch adds support to parse RASF table. Currently RASF table is not being recognized.
----
- source/common/ahtable.c      |  1 +
- source/common/dmtable.c      |  7 +++++++
- source/common/dmtbinfo.c     | 13 +++++++++++++
- source/compiler/dtcompiler.h |  1 +
- source/compiler/dttemplate.h | 11 +++++++++++
- source/compiler/dtutils.c    |  5 +++++
- source/include/acdisasm.h    |  2 ++
- 7 files changed, 40 insertions(+)
-
-diff --git a/source/common/ahtable.c b/source/common/ahtable.c index 021ae33..59ddc83 100644
---- a/source/common/ahtable.c
-+++ b/source/common/ahtable.c
-@@ -196,6 +196,7 @@ const AH_TABLE      AcpiSupportedTables[] =
-     {ACPI_SIG_NFIT, "NVDIMM Firmware Interface Table"},
-     {ACPI_SIG_PCCT, "Platform Communications Channel Table"},
-     {ACPI_SIG_PMTT, "Platform Memory Topology Table"},
-+    {ACPI_SIG_RASF, "RAS Features Table"},
-     {ACPI_RSDP_NAME,"Root System Description Pointer"},
-     {ACPI_SIG_RSDT, "Root System Description Table"},
-     {ACPI_SIG_S3PT, "S3 Performance Table"}, diff --git a/source/common/dmtable.c b/source/common/dmtable.c index 51d91f8..321407c 100644
---- a/source/common/dmtable.c
-+++ b/source/common/dmtable.c
-@@ -430,6 +430,7 @@ const ACPI_DMTABLE_DATA     AcpiDmTableData[] =
-     {ACPI_SIG_NFIT, AcpiDmTableInfoNfit,    AcpiDmDumpNfit, DtCompileNfit,  TemplateNfit},
-     {ACPI_SIG_PCCT, AcpiDmTableInfoPcct,    AcpiDmDumpPcct, DtCompilePcct,  TemplatePcct},
-     {ACPI_SIG_PMTT, NULL,                   AcpiDmDumpPmtt, DtCompilePmtt,  TemplatePmtt},
-+    {ACPI_SIG_RASF, AcpiDmTableInfoRasf,    NULL,           NULL,           TemplateRasf},
-     {ACPI_SIG_RSDT, NULL,                   AcpiDmDumpRsdt, DtCompileRsdt,  TemplateRsdt},
-     {ACPI_SIG_S3PT, NULL,                   NULL,           NULL,           TemplateS3pt},
-     {ACPI_SIG_SBST, AcpiDmTableInfoSbst,    NULL,           NULL,           TemplateSbst},
-@@ -916,6 +917,11 @@ AcpiDmDumpTable (
-             ByteLength = 10;
-             break;
- 
-+        case ACPI_DMT_RASF:
-+
-+            ByteLength = 12;
-+            break;
-+
-         case ACPI_DMT_BUF16:
-         case ACPI_DMT_UUID:
- 
-@@ -1048,6 +1054,7 @@ AcpiDmDumpTable (
- 
-         /* Integer Data Types */
- 
-+        case ACPI_DMT_RASF:
-         case ACPI_DMT_UINT8:
-         case ACPI_DMT_UINT16:
-         case ACPI_DMT_UINT24:
-diff --git a/source/common/dmtbinfo.c b/source/common/dmtbinfo.c index 5520da2..3896b69 100644
---- a/source/common/dmtbinfo.c
-+++ b/source/common/dmtbinfo.c
-@@ -178,6 +178,7 @@
- #define ACPI_NFIT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_NFIT,f)
- #define ACPI_PCCT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_PCCT,f)
- #define ACPI_PMTT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_PMTT,f)
-+#define ACPI_RASF_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_RASF,f)
- #define ACPI_S3PT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_S3PT,f)
- #define ACPI_SBST_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_SBST,f)
- #define ACPI_SLIT_OFFSET(f)             (UINT16) ACPI_OFFSET (ACPI_TABLE_SLIT,f)
-@@ -2512,6 +2513,18 @@ ACPI_DMTABLE_INFO           AcpiDmTableInfoPmtt2[] =
- 
- /*******************************************************************************
-  *
-+ * RASF -  RAS Feature table
-+ *
-+ **********************************************************************
-+ ********/
-+
-+ACPI_DMTABLE_INFO           AcpiDmTableInfoRasf[] =
-+{
-+    {ACPI_DMT_RASF,     ACPI_RASF_OFFSET (ChannelId[0]),            "Channel Identifier", 0},
-+    ACPI_DMT_TERMINATOR
-+};
-+
-+/**********************************************************************
-+*********
-+ *
-  * S3PT - S3 Performance Table
-  *
-  ******************************************************************************/
-diff --git a/source/compiler/dtcompiler.h b/source/compiler/dtcompiler.h index eb85ddc..1072f52 100644
---- a/source/compiler/dtcompiler.h
-+++ b/source/compiler/dtcompiler.h
-@@ -681,6 +681,7 @@ extern const unsigned char  TemplateMtmr[];  extern const unsigned char  TemplateNfit[];  extern const unsigned char  TemplatePcct[];  extern const unsigned char  TemplatePmtt[];
-+extern const unsigned char  TemplateRasf[];
- extern const unsigned char  TemplateRsdt[];  extern const unsigned char  TemplateS3pt[];  extern const unsigned char  TemplateSbst[]; diff --git a/source/compiler/dttemplate.h b/source/compiler/dttemplate.h index e420ec4..d17b2af 100644
---- a/source/compiler/dttemplate.h
-+++ b/source/compiler/dttemplate.h
-@@ -978,6 +978,17 @@ const unsigned char TemplatePmtt[] =
-     0x00,0x00,0x00,0x00                       /* 000000B0    "...."     */
- };
- 
-+const unsigned char TemplateRasf[] =
-+{
-+    0x42,0x45,0x52,0x54,0x30,0x00,0x00,0x00,  /* 00000000    "RASF0..." */
-+    0x01,0x15,0x49,0x4E,0x54,0x45,0x4C,0x20,  /* 00000008    "..INTEL " */
-+    0x54,0x45,0x4D,0x50,0x4C,0x41,0x54,0x45,  /* 00000010    "TEMPLATE" */
-+    0x01,0x00,0x00,0x00,0x49,0x4E,0x54,0x4C,  /* 00000018    "....INTL" */
-+    0x28,0x05,0x10,0x20,0x00,0x00,0x00,0x00,  /* 00000020    "(.. ...." */
-+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,  /* 00000028    "........" */
-+    0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00   /* 00000030    "........" */
-+};
-+
- const unsigned char TemplateRsdp[] =
- {
-     0x52,0x53,0x44,0x20,0x50,0x54,0x52,0x20,  /* 00000000    "RSD PTR " */
-diff --git a/source/compiler/dtutils.c b/source/compiler/dtutils.c index 6ca418c..774db8b 100644
---- a/source/compiler/dtutils.c
-+++ b/source/compiler/dtutils.c
-@@ -688,6 +688,11 @@ DtGetFieldLength (
-         ByteLength = 10;
-         break;
- 
-+    case ACPI_DMT_RASF:
-+
-+        ByteLength = 12;
-+        break;
-+
-     case ACPI_DMT_BUF16:
-     case ACPI_DMT_UUID:
- 
-diff --git a/source/include/acdisasm.h b/source/include/acdisasm.h index ba8f274..d59e4d9 100644
---- a/source/include/acdisasm.h
-+++ b/source/include/acdisasm.h
-@@ -227,6 +227,7 @@ typedef enum
-     ACPI_DMT_NFIT,
-     ACPI_DMT_PCCT,
-     ACPI_DMT_PMTT,
-+    ACPI_DMT_RASF,
-     ACPI_DMT_SLIC,
-     ACPI_DMT_SRAT,
- 
-@@ -458,6 +459,7 @@ extern ACPI_DMTABLE_INFO        AcpiDmTableInfoPcctHdr[];
- extern ACPI_DMTABLE_INFO        AcpiDmTableInfoPcct0[];
- extern ACPI_DMTABLE_INFO        AcpiDmTableInfoPcct1[];
- extern ACPI_DMTABLE_INFO        AcpiDmTableInfoPcct2[];
-+extern ACPI_DMTABLE_INFO        AcpiDmTableInfoRasf[];
- extern ACPI_DMTABLE_INFO        AcpiDmTableInfoRsdp1[];
- extern ACPI_DMTABLE_INFO        AcpiDmTableInfoRsdp2[];
- extern ACPI_DMTABLE_INFO        AcpiDmTableInfoS3pt[];
---
-2.5.0
+Regards,
+Navakishore.
