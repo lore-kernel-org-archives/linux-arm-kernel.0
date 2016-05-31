@@ -1,71 +1,84 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 31 May 2016 13:52:37 +0800
-Subject: Add MediaTek USB3 DRD Driver
-Message-ID: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
+From: John.Youn@synopsys.com (John Youn)
+Date: Mon, 30 May 2016 22:53:18 -0700
+Subject: [PATCH] reset: Put back *_optional variants
+In-Reply-To: <5cf9f346-9b6e-d521-612c-9edd167aa759@redhat.com>
+References: <ca359e013c30f27c825a9580164b01da5ca6476d.1464224883.git.johnyoun@synopsys.com>
+ <12e450f0-70ea-29f8-0bf7-8a0697263f2d@redhat.com>
+ <57476E48.2060204@synopsys.com>
+ <dcf6372f-4910-bd03-f1b5-c7e0086fdead@redhat.com>
+ <1464603520.3808.34.camel@pengutronix.de>
+ <5cf9f346-9b6e-d521-612c-9edd167aa759@redhat.com>
+Message-ID: <da7e41b2-de80-c692-e7ec-ba8231dadb0a@synopsys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From f2b6744b1ed13636db8690dd3e8d65ad7f3fb7ce Mon Sep 17 00:00:00 2001
-From: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Date: Tue, 31 May 2016 10:52:46 +0800
-Subject: [PATCH 0/5] Add MediaTek USB3 DRD Driver
+On 5/30/2016 4:32 AM, Hans de Goede wrote:
+> Hi,
+> 
+> On 30-05-16 12:18, Philipp Zabel wrote:
+>> Hi,
+>>
+>> Am Freitag, den 27.05.2016, 09:06 +0200 schrieb Hans de Goede:
+>> [...]
+>>>>> So IMHO the following change would be a better way to fix this:
+>>>>>
+>>>>> --- a/include/linux/reset.h
+>>>>> +++ b/include/linux/reset.h
+>>>>> @@ -65,14 +65,14 @@ static inline struct reset_control *__of_reset_control_get(
+>>>>>                                          struct device_node *node,
+>>>>>                                          const char *id, int index, int shared)
+>>>>>   {
+>>>>> -   return ERR_PTR(-EINVAL);
+>>>>> + return ERR_PTR(-ENOTSUPP);
+>>>>>   }
+>>>>>
+>>>>>   static inline struct reset_control *__devm_reset_control_get(
+>>>>>                                          struct device *dev,
+>>>>>                                          const char *id, int index, int shared)
+>>>>>   {
+>>>>> -   return ERR_PTR(-EINVAL);
+>>>>> + return ERR_PTR(-ENOTSUPP);
+>>>>>   }
+>>>>>
+>>>>>   #endif /* CONFIG_RESET_CONTROLLER */
+>>>>
+>>>>
+>>>> I'm good with this. However, per Philipp on a previous thread, the
+>>>> intended behavior is to return -EINVAL for the non-optional functions.
+>>>>
+>>>> http://marc.info/?l=linux-usb&m=146156945528848&w=2
+>>
+>> Adding Dinh to Cc: because he wanted this changed from -EINVAL.
+>> My point then was that WARN_ON + -EINVAL is indented in this case.
+>>
+>> Given that the warning backtrace already helps to identify the issue
+>> (CONFIG_RESET_CONTROLLER disabled), and that changing the return value
+>> to -ENOTSUPP improves consistency with the rest of the API and reduces
+>> the amount of inline wrappers, I concur.
+>>
+>>> As Philipp rightfully points out, calling the non-optional functions
+>>> without CONFIG_RESET_CONTROLLER is a no-no, so IMHO we should not have to
+>>> care too much about the error code in that case, as long as we return
+>>> an error.
+>>>
+>>> Also note that even before my patch things were already inconsistent
+>>> with the of_...get... functions already always returning
+>>> -ENOTSUPP when CONFIG_RESET_CONTROLLER was not set, to me it seems
+>>> best and also KISS to just return -ENOTSUPP from all get functions
+>>> when CONFIG_RESET_CONTROLLER is not set.
+>>>
+>>> Anyways this is Philipp's call, this is all just my 2 cents.
+>>
+>> Let the stubs return -ENOTSUPP consistently. A quick grep doesn't show
+>> any driver handling -EINVAL explicitly either.
+> 
+> Great.
+> 
+> John Youn, can you submit a patch changing the return of the stubs
+> from -EINVAL to -ENOTSUPP please ?
+> 
 
-These patches introduce the MediaTek USB3 dual-role controller
-driver.
+Sure. I'll send a patch tomorrow.
 
-The driver can be configured as Dual-Role Device (DRD),
-Peripheral Only and Host Only (xHCI) modes. It works well
-with Mass Storage, RNDIS and g_zero on FS/HS and SS. And it is
-tested on MT8173 platform which only contains USB2.0 device IP,
-and on MT6290 platform which contains USB3.0 device IP.
-
-Change in v2:
-1. modify binding docs according to suggestions 
-2. modify some comments and remove some dummy blank lines
-3. fix memory leakage
-
-Chunfeng Yun (5):
-  dt-bindings: mt8173-xhci: support host side of dual-role mode
-  usb: xhci-mtk: make IPPC register optional
-  dt-bindings: mtu3: add devicetree bindings
-  usb: Add MediaTek USB3 DRD Driver
-  arm64: dts: mediatek: add USB3 DRD driver
-
- .../devicetree/bindings/usb/mt8173-xhci.txt        |   48 ++
- Documentation/devicetree/bindings/usb/mtu3.txt     |   85 ++
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   46 +-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi           |   28 +-
- drivers/usb/Kconfig                                |    2 +
- drivers/usb/Makefile                               |    1 +
- drivers/usb/host/xhci-mtk.c                        |   32 +-
- drivers/usb/mtu3/Kconfig                           |   47 ++
- drivers/usb/mtu3/Makefile                          |   20 +
- drivers/usb/mtu3/mtu3.h                            |  422 ++++++++++
- drivers/usb/mtu3/mtu3_core.c                       |  879 ++++++++++++++++++++
- drivers/usb/mtu3/mtu3_dr.c                         |  348 ++++++++
- drivers/usb/mtu3/mtu3_dr.h                         |  108 +++
- drivers/usb/mtu3/mtu3_gadget.c                     |  731 ++++++++++++++++
- drivers/usb/mtu3/mtu3_gadget_ep0.c                 |  879 ++++++++++++++++++++
- drivers/usb/mtu3/mtu3_host.c                       |  294 +++++++
- drivers/usb/mtu3/mtu3_hw_regs.h                    |  474 +++++++++++
- drivers/usb/mtu3/mtu3_plat.c                       |  490 +++++++++++
- drivers/usb/mtu3/mtu3_qmu.c                        |  599 +++++++++++++
- drivers/usb/mtu3/mtu3_qmu.h                        |   43 +
- 20 files changed, 5562 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/usb/mtu3.txt
- create mode 100644 drivers/usb/mtu3/Kconfig
- create mode 100644 drivers/usb/mtu3/Makefile
- create mode 100644 drivers/usb/mtu3/mtu3.h
- create mode 100644 drivers/usb/mtu3/mtu3_core.c
- create mode 100644 drivers/usb/mtu3/mtu3_dr.c
- create mode 100644 drivers/usb/mtu3/mtu3_dr.h
- create mode 100644 drivers/usb/mtu3/mtu3_gadget.c
- create mode 100644 drivers/usb/mtu3/mtu3_gadget_ep0.c
- create mode 100644 drivers/usb/mtu3/mtu3_host.c
- create mode 100644 drivers/usb/mtu3/mtu3_hw_regs.h
- create mode 100644 drivers/usb/mtu3/mtu3_plat.c
- create mode 100644 drivers/usb/mtu3/mtu3_qmu.c
- create mode 100644 drivers/usb/mtu3/mtu3_qmu.h
-
--- 
-1.7.9.5
+Regards,
+John
