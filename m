@@ -1,10 +1,10 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed,  1 Jun 2016 00:23:23 +0800
-Subject: [PATCH resend v2 5/6] ARM: dts: sun9i: a80-optimus: Disable dummy
+Date: Wed,  1 Jun 2016 00:23:24 +0800
+Subject: [PATCH resend v2 6/6] ARM: dts: sun9i: cubieboard4: Disable dummy
  regulators vcc3v0, vcc3v3, vcc5v0
 In-Reply-To: <1464711804-19256-1-git-send-email-wens@csie.org>
 References: <1464711804-19256-1-git-send-email-wens@csie.org>
-Message-ID: <1464711804-19256-6-git-send-email-wens@csie.org>
+Message-ID: <1464711804-19256-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,14 +17,14 @@ Since these are no longer needed, we can disable them.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun9i-a80-optimus.dts | 12 ++++++++++++
+ arch/arm/boot/dts/sun9i-a80-cubieboard4.dts | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-index 6cfc02194035..991337d1d6f1 100644
---- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-+++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-@@ -322,6 +322,18 @@
+diff --git a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+index 8d8af1189d87..84a12fef5768 100644
+--- a/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
++++ b/arch/arm/boot/dts/sun9i-a80-cubieboard4.dts
+@@ -255,6 +255,18 @@
  
  #include "axp809.dtsi"
  
