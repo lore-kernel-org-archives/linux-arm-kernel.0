@@ -1,74 +1,71 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 May 2016 15:57:59 +0100
-Subject: [PATCH 1/2] arm64: move {PAGE,CONT}_SHIFT into Kconfig
+Date: Tue, 31 May 2016 15:58:00 +0100
+Subject: [PATCH 2/2] arm64: fix alignment when RANDOMIZE_TEXT_OFFSET is enabled
 In-Reply-To: <1464706680-15713-1-git-send-email-mark.rutland@arm.com>
 References: <1464706680-15713-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1464706680-15713-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1464706680-15713-3-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In some cases (e.g. the awk for CONFIG_RANDOMIZE_TEXT_OFFSET) we would
-like to make use of PAGE_SHIFT outside of code that can include the
-usual header files.
+With ARM64_64K_PAGES and RANDOMIZE_TEXT_OFFSET enabled, we hit the
+following issue on the boot:
 
-Add a new CONFIG_ARM64_PAGE_SHIFT for this, likewise with
-ARM64_CONT_SHIFT for consistency.
+kernel BUG at arch/arm64/mm/mmu.c:480!
+Internal error: Oops - BUG: 0 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 0 Comm: swapper Not tainted 4.6.0 #310
+Hardware name: ARM Juno development board (r2) (DT)
+task: ffff000008d58a80 ti: ffff000008d30000 task.ti: ffff000008d30000
+PC is at map_kernel_segment+0x44/0xb0
+LR is at paging_init+0x84/0x5b0
+pc : [<ffff000008c450b4>] lr : [<ffff000008c451a4>] pstate: 600002c5
+
+Call trace:
+[<ffff000008c450b4>] map_kernel_segment+0x44/0xb0
+[<ffff000008c451a4>] paging_init+0x84/0x5b0
+[<ffff000008c42728>] setup_arch+0x198/0x534
+[<ffff000008c40848>] start_kernel+0x70/0x388
+[<ffff000008c401bc>] __primary_switched+0x30/0x74
+
+Commit 7eb90f2ff7e3 ("arm64: cover the .head.text section in the .text
+segment mapping") removed the alignment between the .head.text and .text
+sections, and used the _text rather than the _stext interval for mapping
+the .text segment.
+
+Prior to this commit _stext was always section aligned and didn't cause
+any issue even when RANDOMIZE_TEXT_OFFSET was enabled. Since that
+alignment has been removed and _text is used to map the .text segment,
+we need ensure _text is always page aligned when RANDOMIZE_TEXT_OFFSET
+is enabled.
+
+This patch adds logic to TEXT_OFFSET fuzzing to ensure that the offset
+is always aligned to the kernel page size. To ensure this, we rely on
+the PAGE_SHIFT being available via Kconfig.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Sudeep Holla <sudeep.holla@arm.com>
 Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Fixes: 7eb90f2ff7e3 ("arm64: cover the .head.text section in the .text segment mapping")
 ---
- arch/arm64/Kconfig            | 12 ++++++++++++
- arch/arm64/include/asm/page.h | 12 ++----------
- 2 files changed, 14 insertions(+), 10 deletions(-)
+ arch/arm64/Makefile | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 76747d9..5fe3208 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -113,6 +113,18 @@ config ARCH_PHYS_ADDR_T_64BIT
- config MMU
- 	def_bool y
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 354d754..7085e32 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -60,7 +60,9 @@ head-y		:= arch/arm64/kernel/head.o
  
-+config ARM64_PAGE_SHIFT
-+	int
-+	default 16 if ARM64_64K_PAGES
-+	default 14 if ARM64_16K_PAGES
-+	default 12
-+
-+config ARM64_CONT_SHIFT
-+	int
-+	default 5 if ARM64_64K_PAGES
-+	default 7 if ARM64_16K_PAGES
-+	default 4
-+
- config ARCH_MMAP_RND_BITS_MIN
-        default 14 if ARM64_64K_PAGES
-        default 16 if ARM64_16K_PAGES
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 17b45f7..8472c6d 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -23,16 +23,8 @@
- 
- /* PAGE_SHIFT determines the page size */
- /* CONT_SHIFT determines the number of pages which can be tracked together  */
--#ifdef CONFIG_ARM64_64K_PAGES
--#define PAGE_SHIFT		16
--#define CONT_SHIFT		5
--#elif defined(CONFIG_ARM64_16K_PAGES)
--#define PAGE_SHIFT		14
--#define CONT_SHIFT		7
--#else
--#define PAGE_SHIFT		12
--#define CONT_SHIFT		4
--#endif
-+#define PAGE_SHIFT		CONFIG_ARM64_PAGE_SHIFT
-+#define CONT_SHIFT		CONFIG_ARM64_CONT_SHIFT
- #define PAGE_SIZE		(_AC(1, UL) << PAGE_SHIFT)
- #define PAGE_MASK		(~(PAGE_SIZE-1))
- 
+ # The byte offset of the kernel image in RAM from the start of RAM.
+ ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
+-TEXT_OFFSET := $(shell awk 'BEGIN {srand(); printf "0x%03x000\n", int(512 * rand())}')
++TEXT_OFFSET := $(shell awk "BEGIN {srand(); printf \"0x%06x\n\", \
++		 int(2 * 1024 * 1024 / (2 ^ $(CONFIG_ARM64_PAGE_SHIFT)) * \
++		 rand()) * (2 ^ $(CONFIG_ARM64_PAGE_SHIFT))}")
+ else
+ TEXT_OFFSET := 0x00080000
+ endif
 -- 
 1.9.1
