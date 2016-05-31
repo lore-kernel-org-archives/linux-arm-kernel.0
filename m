@@ -1,35 +1,29 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 1 Jun 2016 00:22:22 +0300
-Subject: [PATCHv5] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160527205140.GA26767@amd>
-References: <20160517181927.GA28741@amd> <20160521054336.GA27123@amd>
- <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
- <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
- <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd>
-Message-ID: <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 01 Jun 2016 01:06:37 +0300
+Subject: [PATCH 00/13] Add R8A7794/SILK board eMMC DT support
+Message-ID: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Hello.
 
-On Fri, May 27, 2016 at 10:51:40PM +0200, Pavel Machek wrote:
-> 
-> This adds support for AD5820 autofocus coil, found for example in
-> Nokia N900 smartphone.
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+   Here's the set of 13 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160530-v4.7-rc1' tag. We add the device tree support for
+the R8A7792-based Blanche board. The R-Car 'clk' driver patch was posted last
+week separately...
 
-The patch looks good to me but then I came to think of a question I've
-missed so far: is there DT documentation somewhere for the properties used
-by the driver? I might put that to a separate patch, and cc the relevant
-list.
+[01/13] ARM: shmobile: r8a7792: add clock index macros
+[02/13] ARM: shmobile: r8a7792: add power domain index macros
+[03/13] soc: renesas: rcar-sysc: add R8A7792 support
+[04/13] ARM: shmobile: r8a7792: basic SoC support
+[05/13] DT: clock: rcar-gen2-cpg-clocks: document R8A7792 support
+[06/13] DT: clock: cpg-mstp-clocks: document-R8A7792-support
+[07/13] ARM: dts: r8a7792: initial SoC device tree
+[08/13] ARM: dts: r8a7792: add SYS-DMAC support
+[09/13] ARM: dts: r8a7792: add [H]SCIF support
+[10/13] ARM dts: r8a7792: add IRQC support
+[11/13] DT: arm: shmobile: document Blanche board
+[12/13] ARM: dts: blanche: initial device tree
+[13/13] ARM: dts: blanche: add Ethernet support
 
-Whether we decide to have the module in DT or not is orthogonal to this.
-
--- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+WBR, Sergei
