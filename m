@@ -1,87 +1,68 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Tue, 31 May 2016 11:39:00 -0600
-Subject: [PATCH 1/5] coresight: Fix NULL pointer dereference in
- _coresight_build_path
-In-Reply-To: <1464695858-29284-2-git-send-email-suzuki.poulose@arm.com>
+Date: Tue, 31 May 2016 11:45:38 -0600
+Subject: [PATCH 2/5] coresight: etmv4: Fix ETMv4x peripheral ID table
+In-Reply-To: <1464695858-29284-3-git-send-email-suzuki.poulose@arm.com>
 References: <1464695858-29284-1-git-send-email-suzuki.poulose@arm.com>
- <1464695858-29284-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <CANLsYkwgdSF9CA+fZFg_SFN2xg4LW7eqZ0=-v8yaM4wdgwMPjA@mail.gmail.com>
+ <1464695858-29284-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <CANLsYkzzogTMRdhuSc6AtFUjM7BM3xgMHqth4sJeYn=dA1=qNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 31 May 2016 at 05:57, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
-> _coresight_build_path assumes that all the connections of a csdev
-> has the child_dev initialised. This may not be true if the particular
-> component is not supported by the kernel config(e.g TPIU) but is
-> present in the DT. In which case, building a path can cause a crash like this :
+> This patch cleans up the peripheral id table for different ETMv4
+> implementations.
 >
->   Unable to handle kernel NULL pointer dereference at virtual address 00000010
->   pgd = ffffffc9750dd000
->   [00000010] *pgd=00000009f5e90003, *pud=00000009f5e90003, *pmd=0000000000000000
->   Internal error: Oops: 96000006 [#1] PREEMPT SMP
->   Modules linked in:
->   CPU: 4 PID: 1348 Comm: bash Not tainted 4.6.0-next-20160517 #1646
->   Hardware name: ARM Juno development board (r0) (DT)
->   task: ffffffc97517a280 ti: ffffffc9762c4000 task.ti: ffffffc9762c4000
->   PC is at _coresight_build_path+0x18/0xe4
->   LR is at _coresight_build_path+0xc0/0xe4
->   pc : [<ffffff80083d5130>] lr : [<ffffff80083d51d8>] pstate: 20000145
->   sp : ffffffc9762c7ba0
+> As per Cortex-A53 TRM, the ETM has following id values:
 >
->   [<ffffff80083d5130>] _coresight_build_path+0x18/0xe4
->   [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
->   [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
->   [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
->   [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
->   [<ffffff80083d51d8>] _coresight_build_path+0xc0/0xe4
->   [<ffffff80083d5cdc>] coresight_build_path+0x40/0x68
->   [<ffffff80083d5e14>] coresight_enable+0x74/0x1bc
->   [<ffffff80083d60a0>] enable_source_store+0x3c/0x6c
->   [<ffffff800830b17c>] dev_attr_store+0x18/0x28
->   [<ffffff80081ca9c4>] sysfs_kf_write+0x40/0x50
->   [<ffffff80081c9e38>] kernfs_fop_write+0x140/0x1cc
->   [<ffffff8008163ec8>] __vfs_write+0x28/0x110
->   [<ffffff8008164bf0>] vfs_write+0xa0/0x174
->   [<ffffff8008165d18>] SyS_write+0x44/0xa0
->   [<ffffff8008084e70>] el0_svc_naked+0x24/0x28
+> Peripheral ID0  0x5D    0xFE0
+> Peripheral ID1  0xB9    0xFE4
+> Peripheral ID2  0x4B    0xFE8
+> Peripheral ID3  0x00    0xFEC
+>
+> where, PID2: has the following format:
+>
+> [7:4]   Revision
+> [3]     JEDEC   0b1     res1. Indicates a JEP106 identity code is used
+> [2:0]   DES_1   0b011   ARM Limited. This is bits[6:4] of JEP106 ID code
+>
+> The existing table entry checks only the bits [1:0], which is not
+> sufficient enough. Fix it to match bits [3:0], just like the other
+> entries do. While at it, correct the comment for A57 and the A53 entry.
 >
 > Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 > Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 > ---
->  drivers/hwtracing/coresight/coresight.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+>  drivers/hwtracing/coresight/coresight-etm4x.c | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 >
-> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-> index 5443d03..0fdaaf4 100644
-> --- a/drivers/hwtracing/coresight/coresight.c
-> +++ b/drivers/hwtracing/coresight/coresight.c
-> @@ -385,7 +385,6 @@ static int _coresight_build_path(struct coresight_device *csdev,
->         int i;
->         bool found = false;
->         struct coresight_node *node;
-> -       struct coresight_connection *conn;
+> diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+> index 462f0dc..88947f3 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm4x.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+> @@ -815,12 +815,12 @@ err_arch_supported:
+>  }
 >
->         /* An activated sink has been found.  Enqueue the element */
->         if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
-> @@ -394,8 +393,9 @@ static int _coresight_build_path(struct coresight_device *csdev,
->
->         /* Not a sink - recursively explore each port found on this element */
->         for (i = 0; i < csdev->nr_outport; i++) {
-> -               conn = &csdev->conns[i];
-> -               if (_coresight_build_path(conn->child_dev, path) == 0) {
-> +               struct coresight_device *child_dev = csdev->conns[i].child_dev;
-> +
-> +               if (child_dev && _coresight_build_path(child_dev, path) == 0) {
->                         found = true;
->                         break;
->                 }
+>  static struct amba_id etm4_ids[] = {
+> -       {       /* ETM 4.0 - Qualcomm */
+> -               .id     = 0x0003b95d,
+> -               .mask   = 0x0003ffff,
+> +       {       /* ETM 4.0 - Cortex-A53  */
+> +               .id     = 0x000bb95d,
+> +               .mask   = 0x000fffff,
+>                 .data   = "ETM 4.0",
+>         },
+> -       {       /* ETM 4.0 - Juno board */
+> +       {       /* ETM 4.0 - Cortex-A57 */
+>                 .id     = 0x000bb95e,
+>                 .mask   = 0x000fffff,
+>                 .data   = "ETM 4.0",
 > --
 > 1.9.1
 >
 
-Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-
-Greg, since this is a bug fix can we add it to 4.7-rc2?
+I'll apply this to my next tree but since it doesn't cause a core dump
+or prevent the kernel from booting, I don't think it deserves to be in
+-rc2.
 
 Thanks,
 Mathieu
