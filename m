@@ -1,171 +1,60 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Tue, 31 May 2016 19:06:41 +0530
-Subject: [PATCH v2 7/7] phy: Add Northstar2 PCI Phy support
-In-Reply-To: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
-References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1464701801-17243-8-git-send-email-pramod.kumar@broadcom.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 31 May 2016 14:40:24 +0100
+Subject: [PATCH] drivers: char: mem: Check {read,write}_kmem() addresses
+In-Reply-To: <20160531130821.GV19428@n2100.arm.linux.org.uk>
+References: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
+ <20160531130821.GV19428@n2100.arm.linux.org.uk>
+Message-ID: <574D9448.7080206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCI Phy support for Broadcom Northstar2 SoCs.  This driver uses the
-interface from the iproc mdio mux driver to enable the devices
-respective phys.
+On 31/05/16 14:08, Russell King - ARM Linux wrote:
+> On Tue, May 31, 2016 at 01:52:45PM +0100, Robin Murphy wrote:
+>> Arriving at read_kmem() with an offset representing a bogus kernel
+>> address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
+>> faulting on the kernel-space read.
+>>
+>> x86_64 happens to get away with this since the optimised implementation
+>> uses "rep movs*", thus the user write (which is allowed to fault) and
+>> the kernel read are the same instruction, the kernel-side fault falls
+>> into the userspace fixup handler and a chain of events transpires
+>> leading to returning the expected -EFAULT. On other architectures,
+>> though, the read is not covered by the fixup entry for the write, and we
+>> get a straightforward "Unable to hande kernel paging request..." dump.
+>>
+>> The more typical use-case of mmap_kmem() already validates the address
+>> with pfn_valid() as one might expect, so let's make that consistent
+>> across {read,write}_kem() too.
+>>
+>> Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+>>
+>> I'm not sure if this warrants going to stable or not, as it's really
+>> just making an existing failure case more graceful and less confusing.
+>
+> Returning -EFAULT because the kernel-side address (iow, file offset) is
+> invalid is not particularly nice:
+>
+> NAME
+>         read - read from a file descriptor
+>
+> ERRORS
+>         EFAULT buf is outside your accessible address space.
+>
+> Latest POSIX has:
+>
+> ENXIO
+> 	A request was made of a nonexistent device, or the
+> 	request was outside the capabilities of the device.
+>
+> which to me looks like a better error code to return, as file offsets
+> which are not valid can be interpreted as being "outside the
+> capabilities of the device".  EFAULT has always on Linux meant that
+> the user passed an invalid userspace buffer.
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
-Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
----
- drivers/phy/Kconfig            |   8 +++
- drivers/phy/Makefile           |   1 +
- drivers/phy/phy-bcm-ns2-pcie.c | 115 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 124 insertions(+)
- create mode 100644 drivers/phy/phy-bcm-ns2-pcie.c
+Good point - seems I failed to twig that the error code in the x86 case 
+is still effectively falling out of the "fault with the user address" 
+path. ENXIO indeed sounds more reasonable, thanks.
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index 26566db..5ff60b2 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -421,4 +421,12 @@ config PHY_CYGNUS_PCIE
- 	  Enable this to support the Broadcom Cygnus PCIe PHY.
- 	  If unsure, say N.
- 
-+config PHY_NS2_PCIE
-+	tristate "Broadcom Northstar2 PCIe PHY driver"
-+	depends on OF && MDIO_BUS_MUX_BCM_IPROC
-+	select GENERIC_PHY
-+	default ARCH_BCM_IPROC
-+	help
-+	  Enable this to support the Broadcom Northstar2 PCIe PHY.
-+	  If unsure, say N.
- endmenu
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 24596a9..77d51ff 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -52,3 +52,4 @@ obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
- obj-$(CONFIG_PHY_BRCMSTB_SATA)		+= phy-brcmstb-sata.o
- obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
- obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
-+obj-$(CONFIG_PHY_NS2_PCIE)		+= phy-bcm-ns2-pcie.o
-diff --git a/drivers/phy/phy-bcm-ns2-pcie.c b/drivers/phy/phy-bcm-ns2-pcie.c
-new file mode 100644
-index 0000000..65c3870
---- /dev/null
-+++ b/drivers/phy/phy-bcm-ns2-pcie.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright (C) 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/of_mdio.h>
-+#include <linux/mdio.h>
-+#include <linux/phy.h>
-+#include <linux/phy/phy.h>
-+
-+struct ns2_pci_phy {
-+	struct mdio_device *mdiodev;
-+	struct phy *phy;
-+};
-+
-+#define BLK_ADDR_REG_OFFSET	0x1f
-+#define PLL_AFE1_100MHZ_BLK	0x2100
-+#define PLL_CLK_AMP_OFFSET	0x03
-+#define PLL_CLK_AMP_2P05V	0x2b18
-+
-+static int ns2_pci_phy_init(struct phy *p)
-+{
-+	struct ns2_pci_phy *phy = phy_get_drvdata(p);
-+	int rc;
-+
-+	/* select the AFE 100MHz block page */
-+	rc = mdiobus_write(phy->mdiodev->bus, phy->mdiodev->addr,
-+			   BLK_ADDR_REG_OFFSET, PLL_AFE1_100MHZ_BLK);
-+	if (rc)
-+		goto err;
-+
-+	/* set the 100 MHz reference clock amplitude to 2.05 v */
-+	rc = mdiobus_write(phy->mdiodev->bus, phy->mdiodev->addr,
-+			   PLL_CLK_AMP_OFFSET, PLL_CLK_AMP_2P05V);
-+	if (rc)
-+		goto err;
-+
-+	return 0;
-+
-+err:
-+	dev_err(&phy->mdiodev->dev, "Error %d writing to phy\n", rc);
-+	return rc;
-+}
-+
-+static struct phy_ops ns2_pci_phy_ops = {
-+	.init = ns2_pci_phy_init,
-+};
-+
-+static int ns2_pci_phy_probe(struct mdio_device *mdiodev)
-+{
-+	struct device *dev = &mdiodev->dev;
-+	struct phy_provider *provider;
-+	struct ns2_pci_phy *p;
-+	struct phy *phy;
-+
-+	phy = devm_phy_create(dev, dev->of_node, &ns2_pci_phy_ops);
-+	if (IS_ERR_OR_NULL(phy)) {
-+		dev_err(dev, "failed to create Phy\n");
-+		return PTR_ERR(phy);
-+	}
-+
-+	p = devm_kmalloc(dev, sizeof(struct ns2_pci_phy),
-+			 GFP_KERNEL);
-+	if (!p)
-+		return -ENOMEM;
-+
-+	p->mdiodev = mdiodev;
-+	dev_set_drvdata(dev, p);
-+
-+	p->phy = phy;
-+	phy_set_drvdata(phy, p);
-+
-+	provider = devm_of_phy_provider_register(&phy->dev,
-+						 of_phy_simple_xlate);
-+	if (IS_ERR(provider)) {
-+		dev_err(dev, "failed to register Phy provider\n");
-+		return PTR_ERR(provider);
-+	}
-+
-+	dev_info(dev, "%s PHY registered\n", dev_name(dev));
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id ns2_pci_phy_of_match[] = {
-+	{ .compatible = "brcm,ns2-pcie-phy", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, ns2_pci_phy_of_match);
-+
-+static struct mdio_driver ns2_pci_phy_driver = {
-+	.mdiodrv = {
-+		.driver = {
-+			.name = "phy-bcm-ns2-pci",
-+			.of_match_table = ns2_pci_phy_of_match,
-+		},
-+	},
-+	.probe = ns2_pci_phy_probe,
-+};
-+mdio_module_driver(ns2_pci_phy_driver);
-+
-+MODULE_AUTHOR("Broadcom");
-+MODULE_DESCRIPTION("Broadcom Northstar2 PCI Phy driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:phy-bcm-ns2-pci");
--- 
-1.9.1
+Robin.
