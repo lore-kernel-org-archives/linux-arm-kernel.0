@@ -1,110 +1,84 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Tue, 31 May 2016 08:58:08 +0800
-Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
-In-Reply-To: <20160528033613.GA3291@shlinux2>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <20160505224240.GA31429@rob-hp-laptop>
- <CAPDyKFqpoi03Egfuvd8qJXnn_+FBgPXAb7S4UvkxVs8BA+zwnA@mail.gmail.com>
- <20160509181829.GA19687@rob-hp-laptop>
- <CAPDyKFq2=mqujFjvJSYxg2nVmK=OrBKLtFfb-ErNJO3Zr_LMVw@mail.gmail.com>
- <20160528033613.GA3291@shlinux2>
-Message-ID: <20160531005808.GA7913@shlinux2>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 31 May 2016 09:53:57 +0800
+Subject: building and using modules on arm64 hikey board
+In-Reply-To: <574C8C69.6020501@broadcom.com>
+References: <87a3195c-febb-a6c8-a679-272b9f7b59cc@broadcom.com>
+ <0240F9F0-0146-4DCC-B512-195415B29B34@linaro.org>
+ <574C8C69.6020501@broadcom.com>
+Message-ID: <20160531095357.3eb6548c@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 28, 2016 at 11:36:13AM +0800, Peter Chen wrote:
-> On Tue, May 10, 2016 at 01:02:08PM +0200, Ulf Hansson wrote:
-> > + Arnd
-> > 
-> > [...]
-> > 
-> > >> >> Solution
-> > >> >> ========
-> > >> >> This is very similar to the MMC pwrseq behavior so the idea is to:
-> > >> >> 1. Move MMC pwrseq drivers to generic place,
-> > >> >
-> > >> > You can do that, but I'm going to NAK any use of pwrseq bindings outside
-> > >> > of MMC. I think it is the wrong way to do things. The DT should describe
-> > >>
-> > >> Huh, I didn't know that was your view of the mmc pwrseq bindings. Why
-> > >> didn't you NAK them before?
-> > >
-> > > Unfortunately, either I missed it or it was a time I couldn't spend much
-> > > time on reviews.
-> > 
-> > Okay, I guess it's common issue among maintainers. The problem with DT
-> > is that it gets really hard to be fixed up later. :-)
-> > 
-> > >
-> > >> > the devices. If they happen to be "simple" then the core can walk the
-> > >> > tree and do any setup. For example, look for "reset-gpios" and toggle
-> > >> > that GPIO. There is no need for a special node.
-> > >> >
-> > >> >> 2. Extend the pwrseq-simple with regulator toggling,
-> > >> >> 3. Add support to USB hub and port core for pwrseq,
-> > >> >
-> > >> > We discussed this for USB already[1] and is why we defined how to add
-> > >> > USB child devices. The idea is not to add pwrseq to that.
-> > >>
-> > >> I am not familiar with the USB discussion.
-> > >>
-> > >> Still, let me give you some more background to the mmc pwrseq. The
-> > >> idea from the mmc pwrseq bindings comes from the power-domain DT
-> > >> bindings, as I thought these things were a bit related.
-> > >> In both cases they are not directly a property of the device, but more
-> > >> describing a HW dependency to allow the device to work.
-> > >
-> > > I could see this as a board level power domain. However the difference
-> > > is we are not generally exposing internal SOC details the same way as
-> > > board level components. Perhaps we could extend power domains to board
-> > > level, but that is not what was done here.
-> > >
-> > >> One could probably use a child node instead of a phandle, but that
-> > >> wasn't chosen back then. Of course you are the DT expert, but could
-> > >> you perhaps tell me why a child node is better for cases like this?
-> > >
-> > > If there is a control path hierarchy, then we try to model that in DT
-> > > with child nodes. In cases of SDIO and USB, there is a clear hierarchy.
-> > > Ignoring the discovery ordering problem, we already have defined ways to
-> > > describe GPIO connections, regulators, etc. to devices. Describing those
-> > > things separately from the device to solve a particular issue that is
-> > > really a kernel limitation is what I don't like.
-> > 
-> > Okay, I see.
-> > 
-> > To move forward in trying to make mmc pwrseq a generic pwrseq, could
-> > we perhaps allow both cases?
-> > 
-> > In the mmc case, there are already deployed bindings so we need to
-> > cope with these by using the phandle option, but for USB etc we could
-> > force the child node option.
-> > As long as we agree that we keep using a compatible string for the
-> > child node as well, both options should be able to co-exist and we
-> > should probably be able to managed them both from a common pwrseq
-> > driver framework.
-> > 
-> > Although, I do remember from an older conversations around some of
-> > mine submission for the mmc pwrseq code, that some people (maybe
-> > Arnd?) wasn't keen on adding a new framework for this. Perhaps that
-> > has changed?
-> > 
-> 
-> All, how we move on for this?
-> 
-> 1. Using a generic driver to manage both mmc and USB (and further
-> subsystem), USB and further subsystem do not use pwrseq node in dts.
-> 2. USB creates the similar driver under drivers/usb for its own use. 
-> 
-> Which one do you prefer, thanks.
-> 
+On Mon, 30 May 2016 20:54:33 +0200
+Arend van Spriel <arend.vanspriel@broadcom.com> wrote:
 
-Hi Krzysztof Kozlowski,
+> On 30-05-16 13:30, Ard Biesheuvel wrote:
+> > This is likely caused by the fact that the Android AArch64 toolchain uses -fpic by default. Could you try adding -fno-pic to the CFLAGS?  
+> 
+> I did only to notice with 'make V=1 ...' that it was already used hence
+> showing up in the compile command line twice. To no avail so that ain't
+> working.
 
-I think option 1 may be better according to Rob and Ulf's comment.
-Would you like going on your patch set? You can work on generic pwrseq
-driver, I will do USB stuffs based on generic pwrseq driver?
+Per my experience, the default ld in android toolchain is gold, can you plz try
+to use ld.bfd instead?
 
--- 
-
-Best Regards,
-Peter Chen
+> 
+> Regards,
+> Arend
+> 
+> >> On 30 mei 2016, at 12:21, Arend Van Spriel <arend.vanspriel@broadcom.com> wrote:
+> >>
+> >> I got myself an arm64 HiKey board from LeMaker and build an Android AOSP
+> >> image for it (see [1]). For development I would like to use
+> >> CONFIG_MODULES. However, when I try to insmod the build module I get:
+> >>
+> >> [  287.903653] module cfg80211: overflow in relocation type 261 val
+> >> ffffffbffc006530
+> >>
+> >> Looking AArch64 ELF documentation [2], section 4.6.5, it has:
+> >> code|name            |operation |overflow check   |
+> >> 261 |R_AARCH64_PREL32|S + A - P |-2^31 <= X < 2^32|
+> >>
+> >> So basically the highest 32 bits should all be one and so ffffffbf is
+> >> invalid. From what I could find searching internet it could be an issue
+> >> with linker options so I build kernel and modules with V=1. Here the
+> >> linker invocation for them:
+> >>
+> >> + aarch64-linux-android-ld -EL -p --no-undefined -X --build-id -o vmlinux \
+> >> -T ./arch/arm64/kernel/vmlinux.lds arch/arm64/kernel/head.o
+> >> init/built-in.o \
+> >> --start-group usr/built-in.o arch/arm64/kernel/built-in.o
+> >> arch/arm64/mm/built-in.o \
+> >> arch/arm64/net/built-in.o arch/arm64/kvm/built-in.o
+> >> arch/arm64/crypto/built-in.o \
+> >> ./drivers/firmware/efi/libstub/lib.a kernel/built-in.o certs/built-in.o
+> >> mm/built-in.o \
+> >> fs/built-in.o ipc/built-in.o security/built-in.o crypto/built-in.o
+> >> block/built-in.o \
+> >> arch/arm64/lib/lib.a lib/lib.a arch/arm64/lib/built-in.o lib/built-in.o
+> >> drivers/built-in.o \
+> >> sound/built-in.o firmware/built-in.o net/built-in.o virt/built-in.o
+> >> --end-group .tmp_kallsyms2.o
+> >>
+> >>  aarch64-linux-android-ld -EL -r  -T ./scripts/module-common.lds
+> >> --build-id \
+> >>  -o net/wireless/cfg80211.ko net/wireless/cfg80211.o
+> >> net/wireless/cfg80211.mod.o
+> >>
+> >> Attached are vmlinux.lds and module-common.lds. I also tried taking
+> >> upstream arch/arm64/kernel/module.lds in hikey-linaro tree. If someone
+> >> can give a hint or educated guess at what to try it would be appreciated.
+> >>
+> >> Regards,
+> >> Arend
+> >>
+> >> [1] https://source.android.com/source/devices.html#building-kernel
+> >> [2]
+> >> http://infocenter.arm.com/help/topic/com.arm.doc.ihi0056b/IHI0056B_aaelf64.pdf
+> >> <module-common.lds>
+> >> <vmlinux.lds>  
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
