@@ -1,32 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 May 2016 15:55:02 +0100
-Subject: [PATCH 0/2] arm64: /proc/cpuinfo updates for compat tasks
-Message-ID: <1464706504-25224-1-git-send-email-catalin.marinas@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 31 May 2016 15:57:58 +0100
+Subject: [PATCH 0/2] arm64: Fix RANDOMIZE_TEXT_OFFSET for !4K kernels
+Message-ID: <1464706680-15713-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first patch is relatively simple, adding the "model name" line which
-is present in the arm32 /proc/cpuinfo.
+Recently we inadvertently broke RANDOMIZE_TEXT_OFFSET for !4K page
+kernels, as we changed the way we map the kernel image. Now, when
+TEXT_OFFSET is not a multiple of the kernel page size, we may attempt to
+create (block) entries for misaligned addresses, leading to failures at
+pagetable creation time.
 
-The second patch is up for discussion. When arm64 support was merged, we
-concluded that "uname -m" should report "aarch64" even for compat tasks.
-The only way to change the output to "armv8l" was to set the PER_LINUX32
-personality (and I think this is in line with x86).
+To avoid this issue, these patches ensure that the TEXT_OFFSET value is
+always a multiple of the kernel page size. Doing this requires factoring
+PAGE_SHIFT out into Kconfig such that it is available to the awk code
+that generates TEXT_OFFSET.
 
-We followed a similar personality approach for /proc/cpuinfo where the
-compat one is only exposed if the task sets/inherits PER_LINUX32. The
-downside is that apparently some 32-bit applications started making use
-of the 64-bit /proc/cpuinfo format. To prevent further spread, I'm
-proposing the second patch in this series to force compat /proc/cpuinfo
-for 32-bit tasks. This is a departure from the "uname -m" behaviour but
-maybe they don't need to be coupled anyway.
+Thanks,
+Mark.
 
-Thoughts?
+Mark Rutland (2):
+  arm64: move {PAGE,CONT}_SHIFT into Kconfig
+  arm64: fix alignment when RANDOMIZE_TEXT_OFFSET is enabled
 
-Catalin Marinas (2):
-  arm64: Provide "model name" in /proc/cpuinfo for PER_LINUX32 tasks
-  arm64: Always provide compat /proc/cpuinfo for 32-bit tasks
+ arch/arm64/Kconfig            | 12 ++++++++++++
+ arch/arm64/Makefile           |  4 +++-
+ arch/arm64/include/asm/page.h | 12 ++----------
+ 3 files changed, 17 insertions(+), 11 deletions(-)
 
- arch/arm64/include/asm/elf.h | 4 ++--
- arch/arm64/kernel/cpuinfo.c  | 9 ++++++++-
- 2 files changed, 10 insertions(+), 3 deletions(-)
+-- 
+1.9.1
