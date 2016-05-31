@@ -1,116 +1,54 @@
-From: bogdan.purcareata@nxp.com (Bogdan Purcareata)
-Date: Tue, 31 May 2016 13:09:23 +0000
-Subject: [PATCH] iommu/arm-smmu: Properly initialize CBAR MemAttr
-In-Reply-To: <574D5EBF.8010707@arm.com>
-References: <1464617742-5493-1-git-send-email-bogdan.purcareata@nxp.com>
- <574D5EBF.8010707@arm.com>
-Message-ID: <574D8D01.7090500@nxp.com>
+From: yehuday@marvell.com (Yehuda Yitschak)
+Date: Tue, 31 May 2016 13:10:44 +0000
+Subject: [BUG] Page allocation failures with newest kernels
+In-Reply-To: <CAPv3WKdYdwpi3k5eY86qibfprMFwkYOkDwHOsNydp=0sTV3mgg@mail.gmail.com>
+References: <CAPv3WKcVsWBgHHC3UPNcbka2JUmN4CTw1Ym4BR1=1V9=B9av5Q@mail.gmail.com>
+ <574D64A0.2070207@arm.com>
+ <CAPv3WKdYdwpi3k5eY86qibfprMFwkYOkDwHOsNydp=0sTV3mgg@mail.gmail.com>
+Message-ID: <60e8df74202e40b28a4d53dbc7fd0b22@IL-EXCH02.marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.05.2016 12:51, Robin Murphy wrote:
-> On 30/05/16 15:15, Bogdan Purcareata wrote:
->> Currently, when initializing the CBAR memattr attributes to the weakest
->> values, it is expected that the final ones will be declared in the TTBCR
->> register (SMMU_CBn_TCR).
->
-> You mean the stage 1 PTE, right? TTBCR only controls the attributes for
-> table walks.
+Hi Robin 
 
-I got lost in the SMMU spec. I couldn't find the direct correlation between CBAR 
-and TTBCR. Thanks for the clarification.
+During some of the stress tests we also came across a different warning from the arm64  page management code
+It looks like a race is detected between HW and SW marking a bit in the PTE
 
->> This is not required when CBAR type consists of a stage 1 translation
->> followed by a stage 2 bypass.
->
-> On the contrary, this is _only_ required for stage 1 translation with
-> stage 2 bypass - CBAR.MemAttr gives the _stage 2_ memory type (see
-> section 2.4 "Memory type and shareability attribute determination" in
-> the SMMU spec). For nested translation the stage 2 attributes come from
-> the stage 2 context itself.
+Not sure it's really related but I thought it might give a clue on the issue
+http://pastebin.com/ASv19vZP
 
-Yes. In the previous "this", I was referring to the TTBCR configurations, not 
-CBAR itself.
+Thanks
 
->>                                This is the case when assigning a VFIO PCI
->> device to a KVM guest. Overriding the default transaction attributes to
->> writeback cacheable results in the device no longer working in the guest
->> (the adapter requires explicit flushes on the descriptor rings memory).
->
->   From that, the real problem is almost certainly that you're erroneously
-> describing the device as coherent or non-coherent (whichever it actually
-> isn't) somewhere.
+Yehuda 
 
-And that was the issue, indeed. The PCIe controller was not described as 
-dma-coherent in the device tree, when in fact it was, thus wreaking all this havoc.
 
-Thank you for the valuable insight and please discard the patch.
-
-Bogdan P.
-
->> Update the context init routine to initialize the CBAR MemAttr field only
->> if there's a stage 1 followed by a stage 2 translation.
->
-> The CBAR.MemAttr field doesn't even exist in that format - it's a good
-> thing that we don't actually implement nested translation (we currently
-> just use a stage 2 context instead), because this would end up
-> corrupting CBAR.CBNDX (i.e. the stage 2 context bank index). Now that I
-> should probably fix...
->
->> Signed-off-by: Bogdan Purcareata <bogdan.purcareata@nxp.com>
->> ---
->>    drivers/iommu/arm-smmu.c | 13 +++++++++----
->>    1 file changed, 9 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
->> index ff7a392..1400ec9 100644
->> --- a/drivers/iommu/arm-smmu.c
->> +++ b/drivers/iommu/arm-smmu.c
->> @@ -765,13 +765,14 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->>    {
->>    	u32 reg;
->>    	u64 reg64;
->> -	bool stage1;
->> +	bool stage1, stage1_stage2;
->>    	struct arm_smmu_cfg *cfg = &smmu_domain->cfg;
->>    	struct arm_smmu_device *smmu = smmu_domain->smmu;
->>    	void __iomem *cb_base, *gr1_base;
->>
->>    	gr1_base = ARM_SMMU_GR1(smmu);
->>    	stage1 = cfg->cbar != CBAR_TYPE_S2_TRANS;
->> +	stage1_stage2 = cfg->cbar == CBAR_TYPE_S1_TRANS_S2_TRANS;
->>    	cb_base = ARM_SMMU_CB_BASE(smmu) + ARM_SMMU_CB(smmu, cfg->cbndx);
->>
->>    	if (smmu->version > ARM_SMMU_V1) {
->> @@ -793,15 +794,19 @@ static void arm_smmu_init_context_bank(struct arm_smmu_domain *smmu_domain,
->>
->>    	/*
->>    	 * Use the weakest shareability/memory types, so they are
->> -	 * overridden by the ttbcr/pte.
->> +	 * overridden by the ttbcr/pte. This happens only if the stage
->> +	 * 1 is followed by a stage 2 translation.
->>    	 */
->> -	if (stage1) {
->> +	if (stage1_stage2) {
->>    		reg |= (CBAR_S1_BPSHCFG_NSH << CBAR_S1_BPSHCFG_SHIFT) |
->>    			(CBAR_S1_MEMATTR_WB << CBAR_S1_MEMATTR_SHIFT);
->> -	} else if (!(smmu->features & ARM_SMMU_FEAT_VMID16)) {
->
-> Since MemAttr is initially zero, the net result of this is that *all*
-> stage 1 transactions will now get overridden to Strongly-Ordered. That
-> may hide your problem, but it's definitely not the correct thing to do.
->
-> Robin.
->
->> +	}
->> +
->> +	if (!stage1 && !(smmu->features & ARM_SMMU_FEAT_VMID16)) {
->>    		/* 8-bit VMIDs live in CBAR */
->>    		reg |= ARM_SMMU_CB_VMID(smmu, cfg) << CBAR_VMID_SHIFT;
->>    	}
->> +
->>    	writel_relaxed(reg, gr1_base + ARM_SMMU_GR1_CBAR(cfg->cbndx));
->>
->>    	/* TTBRs */
->>
->
+> -----Original Message-----
+> From: Marcin Wojtas [mailto:mw at semihalf.com]
+> Sent: Tuesday, May 31, 2016 13:30
+> To: Robin Murphy
+> Cc: linux-mm at kvack.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; Lior Amsalem; Thomas Petazzoni; Yehuda
+> Yitschak; Catalin Marinas; Arnd Bergmann; Grzegorz Jaszczyk; Will Deacon;
+> Nadav Haklai; Tomasz Nowicki; Gregory Cl?ment
+> Subject: Re: [BUG] Page allocation failures with newest kernels
+> 
+> Hi Robin,
+> 
+> >
+> > I remember there were some issues around 4.2 with the revision of the
+> > arm64 atomic implementations affecting the cmpxchg_double() in SLUB,
+> > but those should all be fixed (and the symptoms tended to be
+> considerably more fatal).
+> > A stronger candidate would be 97303480753e (which landed in 4.4),
+> > which has various knock-on effects on the layout of SLUB internals -
+> > does fiddling with L1_CACHE_SHIFT make any difference?
+> >
+> 
+> I'll check the commits, thanks. I forgot to add L1_CACHE_SHIFT was my first
+> suspect - I had spent a long time debugging network controller, which
+> stopped working because of this change - L1_CACHE_BYTES (and hence
+> NET_SKB_PAD) not fitting HW constraints. Anyway reverting it didn't help at
+> all for page alloc issue.
+> 
+> Best regards,
+> Marcin
