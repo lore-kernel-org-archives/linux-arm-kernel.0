@@ -1,46 +1,84 @@
 From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Tue, 31 May 2016 19:06:36 +0530
-Subject: [PATCH v2 2/7] DT: phy.txt: Add mdio-integrated-mux property
+Date: Tue, 31 May 2016 19:06:38 +0530
+Subject: [PATCH v2 4/7] DT:mdio-mux: Add mdio multiplexer driver node
 In-Reply-To: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
 References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1464701801-17243-3-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <1464701801-17243-5-git-send-email-pramod.kumar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This property is used by integrated MDIO multiplexer
-which has bus selection and mdio transaction generation logic,
-integrated inside.
+Add integrated MDIO multiplexer driver node which contains
+two mux PCIe bus and one ethernet bus along with phys
+lying on these bus.
 
 Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
 ---
- Documentation/devicetree/bindings/net/mdio-mux.txt | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/mdio-mux.txt b/Documentation/devicetree/bindings/net/mdio-mux.txt
-index 491f5bd..b5ad83e 100644
---- a/Documentation/devicetree/bindings/net/mdio-mux.txt
-+++ b/Documentation/devicetree/bindings/net/mdio-mux.txt
-@@ -5,13 +5,20 @@ numbered uniquely in a device dependent manner.  The nodes for an MDIO
- bus multiplexer/switch will have one child node for each child bus.
- 
- Required properties:
--- mdio-parent-bus : phandle to the parent MDIO bus.
- - #address-cells = <1>;
- - #size-cells = <0>;
- 
- Optional properties:
-+- mdio-parent-bus : phandle to the parent MDIO bus. Should be used
-+		if parent mdio bus is not part of multiplexer.
-+- mdio-integrated-mux: boolean property indicateing that the hardware
-+		is an integrated multiplex supporting muxed bus selection
-+		and MDIO transaction logic generation.
- - Other properties specific to the multiplexer/switch hardware.
- 
-+Note: one of mdio-parent-bus and mdio-integrated-mux is mandatory to
-+get parent bus regsitered.
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index ce0ab84..8f6a6cc 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -87,3 +87,15 @@
+ 		#size-cells = <1>;
+ 	};
+ };
 +
- Required properties for child nodes:
- - #address-cells = <1>;
- - #size-cells = <0>;
++&mdio_mux_iproc {
++	mdio at 10 {
++		reg = <0x10>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		gphy0: eth-phy at 10 {
++			reg = <0x10>;
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index 6f81c9d..efc320a 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -330,6 +330,38 @@
+ 			      <0x65260000 0x1000>;
+ 		};
+ 
++		mdio_mux_iproc: mdio_mux_iproc at 6602023c {
++			compatible = "brcm,mdio-mux-iproc";
++			reg = <0x6602023c 0x14>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			mdio-integrated-mux;
++
++			mdio at 0 {
++				reg = <0x0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				pci_phy0: pci-phy at 0 {
++					compatible = "brcm,ns2-pcie-phy";
++					reg = <0x0>;
++					#phy-cells = <0>;
++				};
++			};
++
++			mdio at 7 {
++				reg = <0x7>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				pci_phy1: pci-phy at 0 {
++					compatible = "brcm,ns2-pcie-phy";
++					reg = <0x0>;
++					#phy-cells = <0>;
++				};
++			};
++		};
++
+ 		timer0: timer at 66030000 {
+ 			compatible = "arm,sp804", "arm,primecell";
+ 			reg = <0x66030000 0x1000>;
 -- 
 1.9.1
