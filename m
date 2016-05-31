@@ -1,37 +1,39 @@
 From: fu.wei@linaro.org (fu.wei at linaro.org)
-Date: Tue, 31 May 2016 14:08:07 +0800
-Subject: [PATCH 0/3] watchdog,
- sbsa_gwdt: Update SBSA watchdog with the new infrastructure of
- watchdog.
-Message-ID: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
+Date: Tue, 31 May 2016 14:08:08 +0800
+Subject: [PATCH 1/3] watchdog: skip min and max timeout validity check when
+ max_hw_heartbeat_ms is defined
+In-Reply-To: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
+References: <1464674890-10512-1-git-send-email-fu.wei@linaro.org>
+Message-ID: <1464674890-10512-2-git-send-email-fu.wei@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fu Wei <fu.wei@linaro.org>
+From: Pratyush Anand <panand@redhat.com>
 
-This patchset:
-    (1)Try to fix an issue about min and max timeout validity check:
-    when max_hw_heartbeat_ms is defined, this check should be skipped.
+When max_hw_heartbeat_ms has a none zero value, max_timeout is not used.
+So it's value can be 0. In such case if a driver uses min_timeout
+functionality, then check will always fail.
 
-    (2)Use max_hw_heartbeat_ms instead of max_timeout in SBSA watchdog.
+This patch fixes above issue.
 
-    (3)Set WDOG_HW_RUNNING, when SBSA watchdog is already running before
-    it's initialized.
-
-Changelog:
-v1: The first formal upstreaming version
-
-RFC: https://lkml.org/lkml/2016/5/3/145
-
-Pratyush Anand (3):
-  watchdog: skip min and max timeout validity check when
-    max_hw_heartbeat_ms is defined
-  sbsa_gwdt: Use max_hw_heartbeat_ms instead of max_timeout
-  sbsa_gwdt: Set WDOG_HW_RUNNING, when watchdog is already running.
-
- drivers/watchdog/sbsa_gwdt.c     | 6 ++++--
+Signed-off-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Fu Wei <fu.wei@linaro.org>
+---
  drivers/watchdog/watchdog_core.c | 2 +-
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/drivers/watchdog/watchdog_core.c b/drivers/watchdog/watchdog_core.c
+index 7c3ba58..65e62d1 100644
+--- a/drivers/watchdog/watchdog_core.c
++++ b/drivers/watchdog/watchdog_core.c
+@@ -88,7 +88,7 @@ static void watchdog_check_min_max_timeout(struct watchdog_device *wdd)
+ 	 * Check that we have valid min and max timeout values, if
+ 	 * not reset them both to 0 (=not used or unknown)
+ 	 */
+-	if (wdd->min_timeout > wdd->max_timeout) {
++	if (!wdd->max_hw_heartbeat_ms && wdd->min_timeout > wdd->max_timeout) {
+ 		pr_info("Invalid min and max timeout values, resetting to 0!\n");
+ 		wdd->min_timeout = 0;
+ 		wdd->max_timeout = 0;
 -- 
 2.5.5
