@@ -1,22 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 May 2016 10:31:16 +0200
-Subject: [PATCH] pinctrl: digicolor: add missing platform_set_drvdata()
- call
-In-Reply-To: <1464155932-25344-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1464155932-25344-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdZMZvV6fYsr0Dx8Fiu-W8uYrqK92tzHkMG4BOECRbbHkA@mail.gmail.com>
+Date: Tue, 31 May 2016 10:35:08 +0200
+Subject: [PATCH v2 1/4] pinctrl: amlogic: gxbb: add UART_AO_B, I2C
+In-Reply-To: <1464297865-8965-2-git-send-email-khilman@baylibre.com>
+References: <1464297865-8965-1-git-send-email-khilman@baylibre.com>
+ <1464297865-8965-2-git-send-email-khilman@baylibre.com>
+Message-ID: <CACRpkdZSXtuHxpxxQB3JEOQPYHuWzQrDt5=F627ujNMFnBnKog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2016 at 7:58 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Thu, May 26, 2016 at 11:24 PM, Kevin Hilman <khilman@baylibre.com> wrote:
 
-> gc_pinctrl_remove() calls platform_get_drvdata(), but I see neither
-> platform_set_drvdata() nor dev_set_drvdata() anywhere in this driver.
+> Add pins for some more AO domain devices: UART_AO_B and I2C master &
+> slave.
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> Acked-by: Carlo Caione <carlo@endlessm.com>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
 
-Patch applied with Baruch's ACK.
+Patch applied.
 
 Yours,
 Linus Walleij
