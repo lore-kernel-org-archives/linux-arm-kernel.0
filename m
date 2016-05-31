@@ -1,60 +1,36 @@
-From: hramrach@gmail.com (Michal Suchanek)
-Date: Tue, 31 May 2016 12:44:54 +0200
-Subject: [PATCH 5/5] RFC spi: sun4i: add DMA support
-In-Reply-To: <20160530155016.GO29837@sirena.org.uk>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
- <20160530112610.GJ29837@sirena.org.uk>
- <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
- <20160530150343.GL29837@sirena.org.uk>
- <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
- <20160530155016.GO29837@sirena.org.uk>
-Message-ID: <CAOMqctQijjO2amwSmSMGp96KBRGrLb0fvXRwnybOEqvV3-HZ0g@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 31 May 2016 12:45:44 +0200
+Subject: [PATCH 07/17] pinctrl: uniphier: rename macros for drive strength
+ control
+In-Reply-To: <1464681923-7469-8-git-send-email-yamada.masahiro@socionext.com>
+References: <1464681923-7469-1-git-send-email-yamada.masahiro@socionext.com>
+ <1464681923-7469-8-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdZGNU_fu+66tEheuE_bY0nW+M18BsQNQAsL2Qs7=g4S_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 May 2016 at 17:50, Mark Brown <broonie@kernel.org> wrote:
-> On Mon, May 30, 2016 at 05:28:10PM +0200, Michal Suchanek wrote:
->> On 30 May 2016 at 17:03, Mark Brown <broonie@kernel.org> wrote:
+On Tue, May 31, 2016 at 10:05 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+
+> The new ARMv8 SoC, PH1-LD20, supports more fine-grained drive
+> strength control.  Some of the configuration registers on it have
+> 3-bit width.
 >
->> > I really don't think it's worth caring too much about cases where the
->> > DMA driver hasn't been compiled in, it's not like SPI is the only thing
+> The feature will be supported in the next commit, but a problem is
+> that macro names are getting longer and longer in the current naming
+> scheme.
 >
->> It's what the driver did to start with and it was requested to fall
->> back to non-DMA in the case DMA is not available.
+> Before moving forward, this commit renames macros as follows:
 >
-> Why?  I really can't see any sensible use case for this that doesn't
-> have a better solution available.
-
-Of course, the solution is to compile in the DMA driver.
-
-It's been argued that some drivers which use only short transfers will
-just work.
-
+>   UNIPHIER_PIN_DRV_4_8        -> UNIPHIER_PIN_DRV_1BIT
+>   UNIPHIER_PIN_DRV_8_12_16_20 -> UNIPHIER_PIN_DRV_2BIT
+>   UNIPHIER_PIN_DRV_FIXED_4    -> UNIPHIER_PIN_DRV_FIXED4
+>   UNIPHIER_PIN_DRV_FIXED_5    -> UNIPHIER_PIN_DRV_FIXED5
+>   UNIPHIER_PIN_DRV_FIXED_8    -> UNIPHIER_PIN_DRV_FIXED8
 >
->> It's possible to add a parameter like require_dma which could be used
->> to load the driver without dma if unset. If it was set by default then
->> driver ordering is not important so long as dma driver is loaded
->> eventually. Also an informative print that such parameter exists when
->> probing the driver is deferred would be helpful. It would probably
->> create quite a bit of log spam, however. The driver can be deferred
->> several times during boot.
->
-> That seems fairly hacky, if we were going to do anything like that it
-> should be the other way around so that we default to trying to use
-> resources and even then it seems like something that should be handled
-> at a framework level rather than having random options in individual
-> drivers to ignore things.  Having things behave inconsistently between
-> different drivers is going to lead to a worse user experience and if
-> this is a good idea for one driver it seems like it'd be a good idea for
-> all of them.
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Hacky but doable if desirable. It's awesome for testing SPI transfer
-fragmentation with different drivers ;-)
+Patch applied.
 
-The previous discussion of this driver is here
-http://thread.gmane.org/gmane.linux.kernel/2162327
-
-Thanks
-
-Michal
+Yours,
+Linus Walleij
