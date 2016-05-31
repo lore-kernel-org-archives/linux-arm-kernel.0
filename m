@@ -1,30 +1,59 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 May 2016 13:38:27 +0100
-Subject: Support for unaligned watchpoints in arm/arm64
-In-Reply-To: <CAJt8pk8FBbTVMMM45SaEs86MZOp0o6xChAsMT1sO+_Xy-GENyw@mail.gmail.com>
-References: <CAJt8pk8FBbTVMMM45SaEs86MZOp0o6xChAsMT1sO+_Xy-GENyw@mail.gmail.com>
-Message-ID: <20160531123827.GF24936@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 31 May 2016 13:52:45 +0100
+Subject: [PATCH] drivers: char: mem: Check {read,write}_kmem() addresses
+Message-ID: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 05:04:46PM +0100, Pavel Labath wrote:
-> Hello all,
+Arriving at read_kmem() with an offset representing a bogus kernel
+address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
+faulting on the kernel-space read.
 
-Hi Pavel,
+x86_64 happens to get away with this since the optimised implementation
+uses "rep movs*", thus the user write (which is allowed to fault) and
+the kernel read are the same instruction, the kernel-side fault falls
+into the userspace fixup handler and a chain of events transpires
+leading to returning the expected -EFAULT. On other architectures,
+though, the read is not covered by the fixup entry for the write, and we
+get a straightforward "Unable to hande kernel paging request..." dump.
 
-> I've been wondering if there are any plans about adding support for
-> unaligned watchpoints to the kernel. It seems quite a shame that
-> applications are not able not use them, even though the hardware
-> should support that feature.
+The more typical use-case of mmap_kmem() already validates the address
+with pfn_valid() as one might expect, so let's make that consistent
+across {read,write}_kem() too.
 
-I'm actually coming round to the idea of ditching the perf hw_breakpoint
-mechanism entirely and simply writing a ptrace back-end that can expose
-the hardware features directly to userspace. The two issues with this
-are:
+Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-  (1) It's a fair amount of work
-  (2) We might already have users of the perf interface (including compat)
+I'm not sure if this warrants going to stable or not, as it's really
+just making an existing failure case more graceful and less confusing.
 
-I'm really not happy with the way hw_breakpoint worked out :(
+ drivers/char/mem.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Will
+diff --git a/drivers/char/mem.c b/drivers/char/mem.c
+index 71025c2f6bbb..64c766023b15 100644
+--- a/drivers/char/mem.c
++++ b/drivers/char/mem.c
+@@ -384,6 +384,9 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
+ 	char *kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
+ 	int err = 0;
+ 
++	if (!pfn_valid(PFN_DOWN(p)))
++		return -EFAULT;
++
+ 	read = 0;
+ 	if (p < (unsigned long) high_memory) {
+ 		low_count = count;
+@@ -512,6 +515,9 @@ static ssize_t write_kmem(struct file *file, const char __user *buf,
+ 	char *kbuf; /* k-addr because vwrite() takes vmlist_lock rwlock */
+ 	int err = 0;
+ 
++	if (!pfn_valid(PFN_DOWN(p)))
++		return -EFAULT;
++
+ 	if (p < (unsigned long) high_memory) {
+ 		unsigned long to_write = min_t(unsigned long, count,
+ 					       (unsigned long)high_memory - p);
+-- 
+2.8.1.dirty
