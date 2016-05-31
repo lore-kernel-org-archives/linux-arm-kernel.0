@@ -1,41 +1,62 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Tue, 31 May 2016 14:56:03 -0400
-Subject: [PATCH 2/6] clk: samsung: exynos5410: Add TMU clock
-In-Reply-To: <1464719945-3417-2-git-send-email-krzk@kernel.org>
-References: <1464719945-3417-1-git-send-email-krzk@kernel.org>
- <1464719945-3417-2-git-send-email-krzk@kernel.org>
-Message-ID: <8281b473-22c8-f87d-4282-45f93f61b937@osg.samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 31 May 2016 21:01:13 +0200
+Subject: [PATCH resend v2 5/6] ARM: dts: sun9i: a80-optimus: Disable
+ dummy regulators vcc3v0, vcc3v3, vcc5v0
+In-Reply-To: <1464711804-19256-6-git-send-email-wens@csie.org>
+References: <1464711804-19256-1-git-send-email-wens@csie.org>
+ <1464711804-19256-6-git-send-email-wens@csie.org>
+Message-ID: <20160531190113.GO4908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Hi,
 
-On 05/31/2016 02:39 PM, Krzysztof Kozlowski wrote:
-> Add clock for TMU to the Exynos5410 clock driver.
+On Wed, Jun 01, 2016 at 12:23:23AM +0800, Chen-Yu Tsai wrote:
+> These 3 regulators are provided in sunxi-common-regulators.dtsi.
+> 3.0V/3.3V and 5.0V are commonly used voltages in Allwinner devices.
+> These dummy regulators provide a stand-in when bindings that require
+> one, but the real regulator is not supported yet.
 > 
-> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Since these are no longer needed, we can disable them.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 > ---
->  drivers/clk/samsung/clk-exynos5410.c | 1 +
->  1 file changed, 1 insertion(+)
+>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 > 
-> diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
-> index 6c2e59c576ee..db9978dc6e83 100644
-> --- a/drivers/clk/samsung/clk-exynos5410.c
-> +++ b/drivers/clk/samsung/clk-exynos5410.c
-> @@ -160,6 +160,7 @@ static struct samsung_div_clock exynos5410_div_clks[] __initdata = {
->  static struct samsung_gate_clock exynos5410_gate_clks[] __initdata = {
->  	GATE(CLK_MCT, "mct", "aclk66", GATE_IP_PERIS, 18, 0, 0),
->  	GATE(CLK_RTC, "rtc", "aclk66", GATE_IP_PERIS, 20, 0, 0),
-> +	GATE(CLK_TMU, "tmu", "aclk66", GATE_IP_PERIS, 21, 0, 0),
+> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> index 6cfc02194035..991337d1d6f1 100644
+> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> @@ -322,6 +322,18 @@
 >  
->  	GATE(CLK_SCLK_MMC0, "sclk_mmc0", "div_mmc_pre0",
->  			SRC_MASK_FSYS, 0, CLK_SET_RATE_PARENT, 0),
-> 
+>  #include "axp809.dtsi"
+>  
+> +&reg_vcc3v0 {
+> +	status = "disabled";
+> +};
+> +
+> +&reg_vcc3v3 {
+> +	status = "disabled";
+> +};
+> +
+> +&reg_vcc5v0 {
+> +	status = "disabled";
+> +};
+> +
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Why not remove the include entirely?
 
-Best regards,
+Maxime
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/ea5464ad/attachment.sig>
