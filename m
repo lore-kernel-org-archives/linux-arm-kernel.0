@@ -1,60 +1,123 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 31 May 2016 11:12:31 +0200
-Subject: [PATCH v5 00/22] ARM: dts: exynos: Add initial support for Odroid
- XU
-In-Reply-To: <574C5BD2.60008@samsung.com>
-References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
- <574C5BD2.60008@samsung.com>
-Message-ID: <574D557F.70209@samsung.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Tue, 31 May 2016 11:14:48 +0200
+Subject: [PATCH v4 16/18] ARM: STi: DT: STiH407: Add uniperif player dt
+ nodes
+In-Reply-To: <1464192412-16386-18-git-send-email-peter.griffin@linaro.org>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+ <1464192412-16386-18-git-send-email-peter.griffin@linaro.org>
+Message-ID: <574D5608.3080800@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2016 05:27 PM, Sylwester Nawrocki wrote:
-> On 05/28/2016 11:54 AM, Krzysztof Kozlowski wrote:
->>
->> The clock changes can go to clock tree. ARM changes to samsung-soc tree.
->> Please provide me a tag with include/dt-bindings/clock commits so I can
->> merge it.
-> 
-> I applied the clock tree patches and here is the tag for the three
-> include/dt-bindings patches:
 
-Thanks mate!
-Pulled.
 
-Best regards,
-Krzysztof
+On 05/25/2016 06:06 PM, Peter Griffin wrote:
+> This patch adds the DT nodes for the uniperif player
+> IP blocks found on STiH407 family silicon.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-family.dtsi | 76 +++++++++++++++++++++++++++++++++++
+>  1 file changed, 76 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> index 60f95b6..7ca149b 100644
+> --- a/arch/arm/boot/dts/stih407-family.dtsi
+> +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> @@ -755,5 +755,81 @@
+>  			pinctrl-names = "default";
+>  			pinctrl-0 = <&pinctrl_spdif_out >;
+>  		};
+> +
+> +		sti_uni_player0: sti-uni-player at 0 {
+> +			compatible = "st,sti-uni-player";
+> +			status = "disabled";
+> +			#sound-dai-cells = <0>;
+> +			st,syscfg = <&syscfg_core>;
+> +			clocks = <&clk_s_d0_flexgen CLK_PCM_0>;
+> +			assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_0>;
+> +			assigned-clock-parents = <&clk_s_d0_quadfs 0>;
+This does not work properly. You need to declare parent like this:
+assigned-clocks = <&clk_s_d0_quadfs 0>, <&clk_s_d0_flexgen CLK_PCM_0>;
+assigned-clock-parents = <0>, <&clk_s_d0_quadfs 0>;
 
-> 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://linuxtv.org/snawrocki/samsung.git tags/clk-v4.8-exynos5410-dt
-> 
-> for you to fetch changes up to ed1e1505db0c116affdfab01e650c44a9c459c65:
-> 
->   dt-bindings: clock: Add I2C, HSI2C and RTC clock IDs to Exynos5410
-> (2016-05-30 16:00:11 +0200)
-> 
-> ----------------------------------------------------------------
-> Adition of missing clock index definitions for exynos5410 SoC
-> PWM, USB, I2C, and RTC device related clocks.
-> 
-> ----------------------------------------------------------------
-> Krzysztof Kozlowski (3):
->       dt-bindings: clock: Add license and reformat Exynos5410 clock IDs
->       dt-bindings: clock: Add PWM and USB clock IDs to Exynos5410
->       dt-bindings: clock: Add I2C, HSI2C and RTC clock IDs to Exynos5410
-> 
->  include/dt-bindings/clock/exynos5410.h | 73
-> +++++++++++++++++++++++++++++++++++++++++++++++++++----------------------
->  1 file changed, 51 insertions(+), 22 deletions(-)
-> 
-> 
-> --
-> Thanks,
-> Sylwester
+> +			assigned-clock-rates = <50000000>;
+> +			reg = <0x8D80000 0x158>;
+> +			interrupts = <GIC_SPI 84 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 2 0 1>;
+> +			dai-name = "Uni Player #0 (HDMI)";
+> +			dma-names = "tx";
+> +			st,uniperiph-id = <0>;
+> +			st,version = <5>;
+> +			st,mode = "HDMI";
+> +		};
+> +
+> +		sti_uni_player1: sti-uni-player at 1 {
+> +			compatible = "st,sti-uni-player";
+> +			status = "disabled";
+> +			#sound-dai-cells = <0>;
+> +			st,syscfg = <&syscfg_core>;
+> +			clocks = <&clk_s_d0_flexgen CLK_PCM_1>;
+> +			assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_1>;
+> +			assigned-clock-parents = <&clk_s_d0_quadfs 1>;
+assigned-clocks = <&clk_s_d0_quadfs 1>, <&clk_s_d0_flexgen CLK_PCM_1>;
+assigned-clock-parents = <0>, <&clk_s_d0_quadfs 1>;
+
+> +			assigned-clock-rates = <50000000>;
+> +			reg = <0x8D81000 0x158>;
+> +			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 3 0 1>;
+> +			dai-name = "Uni Player #1 (PIO)";
+> +			dma-names = "tx";
+> +			st,uniperiph-id = <1>;
+> +			st,version = <5>;
+> +			st,mode = "PCM";
+> +		};
+> +
+> +		sti_uni_player2: sti-uni-player at 2 {
+> +			compatible = "st,sti-uni-player";
+> +			status = "disabled";
+> +			#sound-dai-cells = <0>;
+> +			st,syscfg = <&syscfg_core>;
+> +			clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
+> +			assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
+> +			assigned-clock-parents = <&clk_s_d0_quadfs 2>;
+assigned-clocks = <&clk_s_d0_quadfs 2>, <&clk_s_d0_flexgen CLK_PCM_2>;
+assigned-clock-parents = <0>, <&clk_s_d0_quadfs 2>;
+> +			assigned-clock-rates = <50000000>;
+> +			reg = <0x8D82000 0x158>;
+> +			interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 4 0 1>;
+> +			dai-name = "Uni Player #1 (DAC)";
+> +			dma-names = "tx";
+> +			st,uniperiph-id = <2>;
+> +			st,version = <5>;
+> +			st,mode = "PCM";
+> +		};
+> +
+> +		sti_uni_player3: sti-uni-player at 3 {
+> +			compatible = "st,sti-uni-player";
+> +			status = "disabled";
+> +			#sound-dai-cells = <0>;
+> +			st,syscfg = <&syscfg_core>;
+> +			clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
+> +			assigned-clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
+> +			assigned-clock-parents = <&clk_s_d0_quadfs 3>;
+> +			assigned-clock-rates = <50000000>;
+assigned-clocks = <&clk_s_d0_quadfs 3>, <&clk_s_d0_flexgen CLK_SPDIFF>;
+assigned-clock-parents = <0>, <&clk_s_d0_quadfs 3>;
+
+Regards,
+Arnaud
+> +			reg = <0x8D85000 0x158>;
+> +			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
+> +			dmas = <&fdma0 7 0 1>;
+> +			dma-names = "tx";
+> +			dai-name = "Uni Player #1 (PIO)";
+> +			st,uniperiph-id = <3>;
+> +			st,version = <5>;
+> +			st,mode = "SPDIF";
+> +		};
+>  	};
+>  };
 > 
