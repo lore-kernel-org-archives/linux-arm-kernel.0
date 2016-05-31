@@ -1,117 +1,84 @@
-From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
-Date: Tue, 31 May 2016 07:59:01 +0530
-Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
-In-Reply-To: <1464626798-1334-1-git-send-email-navam@xilinx.com>
-References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
-Message-ID: <CAKfKVtF1hOn9QwiqtjqqPYtUz5PscTBs4kBC1zRH6FY-4vVoUA@mail.gmail.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 31 May 2016 05:02:50 +0200
+Subject: [BUG] Page allocation failures with newest kernels
+Message-ID: <CAPv3WKcVsWBgHHC3UPNcbka2JUmN4CTw1Ym4BR1=1V9=B9av5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 10:16 PM, Nava kishore Manne
-<nava.manne@xilinx.com> wrote:
-> This patch updates the driver to support 64-bit DMA addressing.
->
-> Signed-off-by: Nava kishore Manne <navam@xilinx.com>
-> ---
-> Changes for v4:
->                 -Used boolen property insted of addrwith property in the DT
->                  as suggested by Arnd Bergmann.
->                 -Adopt the DT relevant changes into the driver.
->
-> Changes for v3:
->                 -Added new compatable string for 5.00 IP version as suggested by
->                  Arnd Bergmann.
->                 -Used write_fn() insted of lo_hi_writeq() as suggested by
->                  Arnd Bergmann.
->
-> Changes for v2:
->                 -Added dma-ranges property in device tree as suggested by Arnd Bergmann.
->                 -Modified the driver code based on the xlnx,addrwidth.
->
->  .../devicetree/bindings/usb/udc-xilinx.txt         |  5 ++-
->  drivers/usb/gadget/udc/udc-xilinx.c                | 52 +++++++++++++++++++++-
->  2 files changed, 54 insertions(+), 3 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/usb/udc-xilinx.txt b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> index 47b4e39..d08d972 100644
-> --- a/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> +++ b/Documentation/devicetree/bindings/usb/udc-xilinx.txt
-> @@ -1,12 +1,14 @@
->  Xilinx USB2 device controller
->
->  Required properties:
-> -- compatible           : Should be "xlnx,usb2-device-4.00.a"
-> +- compatible           : Should be "xlnx,usb2-device-4.00.a" or
-> +                         "xlnx,usb2-device-5.00"
->  - reg                  : Physical base address and size of the USB2
->                           device registers map.
->  - interrupts           : Should contain single irq line of USB2 device
->                           controller
->  - xlnx,has-builtin-dma : if DMA is included
-> +- xlnx,has-64bit-dma   : if DMA is included 64-bit addressing support.
->
->  Example:
->                 axi-usb2-device at 42e00000 {
-> @@ -14,5 +16,6 @@ Example:
->                          interrupts = <0x0 0x39 0x1>;
->                          reg = <0x42e00000 0x10000>;
->                          xlnx,has-builtin-dma;
-> +                       xlnx,has-64bit-dma;
->                  };
->
-> diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
-> index 1cbb0ac..6fb80c6 100644
-> --- a/drivers/usb/gadget/udc/udc-xilinx.c
-> +++ b/drivers/usb/gadget/udc/udc-xilinx.c
-> @@ -47,6 +47,15 @@
->  #define XUSB_DMA_LENGTH_OFFSET         0x0210  /* DMA Length Register */
->  #define XUSB_DMA_STATUS_OFFSET         0x0214  /* DMA Status Register */
->
-> +/* DMA source Address Reg for LSB */
-> +#define XUSB_DMA_DSAR_ADDR_OFFSET_LSB   0x0308
-> +/* DMA source Address Reg for MSB */
-> +#define XUSB_DMA_DSAR_ADDR_OFFSET_MSB   0x030C
-> +/* DMA destination Addr Reg LSB */
-> +#define XUSB_DMA_DDAR_ADDR_OFFSET_LSB   0x0310
-> +/* DMA destination Addr Reg MSB */
-> +#define XUSB_DMA_DDAR_ADDR_OFFSET_MSB   0x0314
-> +
->  /* Endpoint Configuration Space offsets */
->  #define XUSB_EP_CFGSTATUS_OFFSET       0x00    /* Endpoint Config Status  */
->  #define XUSB_EP_BUF0COUNT_OFFSET       0x08    /* Buffer 0 Count */
-> @@ -169,6 +178,7 @@ struct xusb_ep {
->   * @setup: usb_ctrlrequest structure for control requests
->   * @req: pointer to dummy request for get status command
->   * @dev: pointer to device structure in gadget
-> + * @is_extend_dma: flag indiacting whether the dma is 64-bit support or not.
->   * @usb_state: device in suspended state or not
->   * @remote_wkp: remote wakeup enabled by host
->   * @setupseqtx: tx status
-> @@ -186,6 +196,7 @@ struct xusb_udc {
->         struct usb_ctrlrequest setup;
->         struct xusb_req *req;
->         struct device *dev;
-> +       bool is_extend_dma;
->         u32 usb_state;
->         u32 remote_wkp;
->         u32 setupseqtx;
-> @@ -215,6 +226,20 @@ static const struct usb_endpoint_descriptor config_bulk_out_desc = {
->  };
->
->  /**
-> + * xudc_write64 - write 64bit value to device registers
-> + * @ep: pointer to the usb device endpoint structure.
-> + * @offset: register offset
-> + * @val: data to be written
-> + **/
-> +static void xudc_write64(struct xusb_ep *ep, u32 offset, u64 val)
-> +{
-> +       struct xusb_udc *udc = ep->udc;
-> +
-> +       udc->write_fn(udc->addr, offset, lower_32_bits(val));
-> +       udc->write_fn(udc->addr, offset+0x04, upper_32_bits(val));
+Hi,
 
-can we move this to a single 64 bit write?
-> +}
-> +
-> +/**
+After rebasing platform support of two different ARMv8 SoC's from v4.1
+baseline to v4.4 it occurred that stressed systems tend to have page
+allocation problems, related to creating new slabs:
+
+http://pastebin.com/FhRW5DsF
+
+Steps to reproduce:
+- use SATA drive (on-board or over PCIe) with 2 btrfs 50G partitions
+- run a couple of loops of following script:
+mount /dev/sd${1}1 /mnt
+mount /dev/sd${1}2 /mnt2
+i=0
+while [[ $i -lt ${2} ]]
+do
+echo -e "i = ${i}\n"
+dd if=/dev/zero of=/mnt/3g bs=3M count=1024 &
+dd if=/dev/zero of=/mnt/2g bs=2M count=1024 &
+dd if=/dev/zero of=/mnt/1g bs=1M count=1024 &
+dd if=/dev/zero of=/mnt2/2g bs=2M count=1024 &
+dd if=/dev/zero of=/mnt2/1g bs=1M count=1024 &
+dd if=/dev/zero of=/mnt2/3g bs=3M count=1024
+let "i++"
+done
+
+The issue also reproduced on v4.6. Usually problems occur within first
+iteration and then the rest is done without errors, also kernel remain
+stable. I got an information, that page alloc problem were observed
+also on Marvell ARMv7 platfrom (Armada38x).
+
+About the debug itself - after adding simplest possible trace in
+trace/events/kmem.h (single argument u64 for counter or whatever kind
+of number), it was shown both on v4.1 and v4.4 following condition is
+achieved multiple times during test:
+In __alloc_pages_nodemask(), during the test kernel jumps huge amount
+of times (~250k times in v4.1 and ~570k in v4.4 per one script loop)
+into following 'unlikely' condition:
+page = get_page_from_freelist(alloc_mask, order, alloc_flags, &ac);
+if (unlikely(!page)) {
+    [...]
+    page = __alloc_pages_slowpath(alloc_mask, order, &ac);
+}
+
+The further difference is seen in __alloc_pages_slowpath().
+warn_alloc_page() (routine responsible for printing page alloc failure
+message) is reached via following condition:
+if (!can_direct_reclaim) {
+    [...]
+    goto nopage;
+}
+In v4.1 ~5 times and in v4.4 ~40 times per one script loop.
+
+Printing message however can be blocked by following condition in
+warn_alloc_fail():
+if ((gfp_mask & _GFP_NOWARN) || !_ratelimit(&nopage_rs) ||
+    debug_guardpage_minorder() > 0)
+        return;
+Only first two are relevant. As ratelimit is derived directly from
+CONFIG_HZ and this parameter differ between v4.1 and v4.4 (100 vs 250,
+also CONFIG_SCHED_HRTICK is enabled only in v4.4) the configs were
+swapped, but no change in behavior.
+
+Also within 'faulty' revision there is a difference, depending on
+filesystem used - with buildroot the dumps occur, but with same test
+under ubuntu - it's impossible see the failure output (and it's not a
+question of dmesg level:)). Comparing /proc/sys/vm contents didn't
+show anything meaningful.
+
+I tried to analyze changes around mm/ folder between v4.1 and v4.4
+that may cause such difference, but wasn't able to find out what may
+be causing the issue. Have anyone encountered such problems in recent
+revisions? I would be very grateful for any hint or comment. Also if
+any other data can be captured, please let know.
+
+Best regards,
+Marcin Wojtas
