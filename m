@@ -1,87 +1,159 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 31 May 2016 14:49:02 +0100
-Subject: [PATCH 2/2] arm64: mm: dump: log span level
+Date: Tue, 31 May 2016 14:49:01 +0100
+Subject: [PATCH 1/2] arm64: mm: dump: make page table dumping reusable
 In-Reply-To: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
 References: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1464702542-24394-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1464702542-24394-2-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The page table dump code logs spans of entries at the same level
-(pgd/pud/pmd/pte) which have the same attributes. While we log the
-(decoded) attributes, we don't log the level, which leaves the output
-ambiguous and/or confusing in some cases.
-
-For example:
-
-0xffff800800000000-0xffff800980000000           6G       RW NX SHD AF        BLK UXN MEM/NORMAL
-
-If using 4K pages, this may describe a span of 6 1G block entries at the
-PGD/PUD level, or 3072 2M block entries at the PMD level.
-
-This patch adds the page table level to each output line, removing this
-ambiguity. For the example above, this will produce:
-
-0xffffffc800000000-0xffffffc980000000           6G PUD       RW NX SHD AF        BLK UXN MEM/NORMAL
-
-When 3 level tables are in use, and we use the asm-generic/nopud.h
-definitions, the dump code treats each entry in the PGD as a 1 element
-table at the PUD level, and logs spans as being PUDs, which can be
-confusing. To counteract this, the "PUD" mnemonic is replaced with "PGD"
-when CONFIG_PGTABLE_LEVELS <= 3. Likewise for "PMD" when
-CONFIG_PGTABLE_LEVELS <= 2.
+For debugging purposes, it would be nice if we could export page tables
+other than the swapper_pg_dir to userspace. To enable this, this patch
+refactors the arm64 page table dumping code such that multiple tables
+may be registered with the framework, and exported under debugfs.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Huang Shijie <shijie.huang@arm.com>
 Cc: Laura Abbott <labbott@fedoraproject.org>
-Cc: Steve Capper <steve.capper@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/mm/dump.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/ptdump.h | 44 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/dump.c            | 32 +++++++++++++++++++-----------
+ 2 files changed, 64 insertions(+), 12 deletions(-)
+ create mode 100644 arch/arm64/include/asm/ptdump.h
 
+diff --git a/arch/arm64/include/asm/ptdump.h b/arch/arm64/include/asm/ptdump.h
+new file mode 100644
+index 0000000..07b8ed0
+--- /dev/null
++++ b/arch/arm64/include/asm/ptdump.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright (C) 2014 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PTDUMP_H
++#define __ASM_PTDUMP_H
++
++#ifdef CONFIG_ARM64_PTDUMP
++
++#include <linux/mm_types.h>
++
++struct addr_marker {
++	unsigned long start_address;
++	char *name;
++};
++
++struct ptdump_info {
++	struct mm_struct		*mm;
++	const struct addr_marker	*markers;
++	unsigned long			base_addr;
++	unsigned long			max_addr;
++};
++
++int ptdump_register(struct ptdump_info *info, const char *name);
++
++#else
++static inline int ptdump_register(struct ptdump_info *info, const char *name)
++{
++	return 0;
++}
++#endif /* CONFIG_ARM64_PTDUMP */
++
++#endif /* __ASM_PTDUMP_H */
 diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index a56a7ad..f94b80e 100644
+index 8404190..a56a7ad 100644
 --- a/arch/arm64/mm/dump.c
 +++ b/arch/arm64/mm/dump.c
-@@ -146,6 +146,7 @@ static const struct prot_bits pte_bits[] = {
+@@ -27,11 +27,7 @@
+ #include <asm/memory.h>
+ #include <asm/pgtable.h>
+ #include <asm/pgtable-hwdef.h>
+-
+-struct addr_marker {
+-	unsigned long start_address;
+-	const char *name;
+-};
++#include <asm/ptdump.h>
  
- struct pg_level {
- 	const struct prot_bits *bits;
-+	const char *name;
- 	size_t num;
- 	u64 mask;
+ static const struct addr_marker address_markers[] = {
+ #ifdef CONFIG_KASAN
+@@ -284,7 +280,8 @@ static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
+ 	}
+ }
+ 
+-static void walk_pgd(struct pg_state *st, struct mm_struct *mm, unsigned long start)
++static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
++		     unsigned long start)
+ {
+ 	pgd_t *pgd = pgd_offset(mm, 0UL);
+ 	unsigned i;
+@@ -303,12 +300,13 @@ static void walk_pgd(struct pg_state *st, struct mm_struct *mm, unsigned long st
+ 
+ static int ptdump_show(struct seq_file *m, void *v)
+ {
++	struct ptdump_info *info = m->private;
+ 	struct pg_state st = {
+ 		.seq = m,
+-		.marker = address_markers,
++		.marker = info->markers,
+ 	};
+ 
+-	walk_pgd(&st, &init_mm, VA_START);
++	walk_pgd(&st, info->mm, info->base_addr);
+ 
+ 	note_page(&st, 0, 0, 0);
+ 	return 0;
+@@ -316,7 +314,7 @@ static int ptdump_show(struct seq_file *m, void *v)
+ 
+ static int ptdump_open(struct inode *inode, struct file *file)
+ {
+-	return single_open(file, ptdump_show, NULL);
++	return single_open(file, ptdump_show, inode->i_private);
+ }
+ 
+ static const struct file_operations ptdump_fops = {
+@@ -326,7 +324,7 @@ static const struct file_operations ptdump_fops = {
+ 	.release	= single_release,
  };
-@@ -153,15 +154,19 @@ struct pg_level {
- static struct pg_level pg_level[] = {
- 	{
- 	}, { /* pgd */
-+		.name	= "PGD",
- 		.bits	= pte_bits,
- 		.num	= ARRAY_SIZE(pte_bits),
- 	}, { /* pud */
-+		.name	= (CONFIG_PGTABLE_LEVELS > 3) ? "PUD" : "PGD",
- 		.bits	= pte_bits,
- 		.num	= ARRAY_SIZE(pte_bits),
- 	}, { /* pmd */
-+		.name	= (CONFIG_PGTABLE_LEVELS > 2) ? "PMD" : "PGD",
- 		.bits	= pte_bits,
- 		.num	= ARRAY_SIZE(pte_bits),
- 	}, { /* pte */
-+		.name	= "PTE",
- 		.bits	= pte_bits,
- 		.num	= ARRAY_SIZE(pte_bits),
- 	},
-@@ -210,7 +215,8 @@ static void note_page(struct pg_state *st, unsigned long addr, unsigned level,
- 				delta >>= 10;
- 				unit++;
- 			}
--			seq_printf(st->seq, "%9lu%c", delta, *unit);
-+			seq_printf(st->seq, "%9lu%c %s", delta, *unit,
-+				   pg_level[st->level].name);
- 			if (pg_level[st->level].bits)
- 				dump_prot(st, pg_level[st->level].bits,
- 					  pg_level[st->level].num);
+ 
+-static int ptdump_init(void)
++int ptdump_register(struct ptdump_info *info, const char *name)
+ {
+ 	struct dentry *pe;
+ 	unsigned i, j;
+@@ -336,8 +334,18 @@ static int ptdump_init(void)
+ 			for (j = 0; j < pg_level[i].num; j++)
+ 				pg_level[i].mask |= pg_level[i].bits[j].mask;
+ 
+-	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
+-				 &ptdump_fops);
++	pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
+ 	return pe ? 0 : -ENOMEM;
+ }
++
++static struct ptdump_info kernel_ptdump_info = {
++	.mm		= &init_mm,
++	.markers	= address_markers,
++	.base_addr	= VA_START,
++};
++
++static int ptdump_init(void)
++{
++	return ptdump_register(&kernel_ptdump_info, "kernel_page_tables");
++}
+ device_initcall(ptdump_init);
 -- 
 1.9.1
