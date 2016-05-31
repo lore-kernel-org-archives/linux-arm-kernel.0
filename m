@@ -1,159 +1,68 @@
-From: raashidmuhammed@zilogic.com (Raashid Muhammed)
-Date: Tue, 31 May 2016 12:47:30 +0530
-Subject: [PATCH v2 1/2] ARM: at91/dt: at91sam9260: Remove leading zeros in
- OHCI node.
-Message-ID: <1464679051-5263-1-git-send-email-raashidmuhammed@zilogic.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Tue, 31 May 2016 15:18:37 +0800
+Subject: [PATCH 13/23] mmc: sdhci-esdhc-imx: restore watermark level
+ setting after resume
+In-Reply-To: <5731AA28.9030304@intel.com>
+References: <1460741387-23815-1-git-send-email-aisheng.dong@nxp.com>
+ <1460741387-23815-14-git-send-email-aisheng.dong@nxp.com>
+ <5731AA28.9030304@intel.com>
+Message-ID: <20160531071837.GA4096@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Raashid Muhammed <raashidmuhammed@zilogic.com>
+On Tue, May 10, 2016 at 12:30:16PM +0300, Adrian Hunter wrote:
+> On 15/04/16 20:29, Dong Aisheng wrote:
+> > Currently, we config the watermark_level register only in probe.
+> > This will cause the mmc write operation timeout issue after system
+> > resume back in LPSR mode. Because in LPSR mode, after system resume
+> > back, the watermark_level register(0x44) changes to 0x08000880, which
+> > set the write watermark level as 0, and set the read watermark level
+> > as 128. This value is incorrect.
+> > 
+> > This patch restores the setting of watermark level register after
+> > system resume back.
+> 
+> In sdhci_esdhc_imx_probe() the watermark setting is conditional on
+> esdhc_is_usdhc(imx_data), but in the resume it is not.  Is that intended?
+> If so, maybe explain that in the commit message.
+> 
 
-Remove leading zeros in OHCI node for at91sam9260 based boards.
+Good catch!
+I think we'd probably better keep that condition check.
+Will update it in V2.
 
-Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
-Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
----
- arch/arm/boot/dts/aks-cdu.dts               | 2 +-
- arch/arm/boot/dts/animeo_ip.dts             | 2 +-
- arch/arm/boot/dts/at91-foxg20.dts           | 2 +-
- arch/arm/boot/dts/at91-kizbox.dts           | 2 +-
- arch/arm/boot/dts/at91-qil_a9260.dts        | 2 +-
- arch/arm/boot/dts/at91sam9260.dtsi          | 2 +-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 2 +-
- arch/arm/boot/dts/ethernut5.dts             | 2 +-
- arch/arm/boot/dts/evk-pro3.dts              | 2 +-
- arch/arm/boot/dts/usb_a9260_common.dtsi     | 2 +-
- 10 files changed, 10 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/boot/dts/aks-cdu.dts b/arch/arm/boot/dts/aks-cdu.dts
-index d9c50fb..5b1bf92 100644
---- a/arch/arm/boot/dts/aks-cdu.dts
-+++ b/arch/arm/boot/dts/aks-cdu.dts
-@@ -57,7 +57,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <2>;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-index 0962f2f..8bcbad3 100644
---- a/arch/arm/boot/dts/animeo_ip.dts
-+++ b/arch/arm/boot/dts/animeo_ip.dts
-@@ -114,7 +114,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <2>;
- 			atmel,vbus-gpio = <&pioB 15 GPIO_ACTIVE_LOW>;
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
-index 6bf873e..42a535d 100644
---- a/arch/arm/boot/dts/at91-foxg20.dts
-+++ b/arch/arm/boot/dts/at91-foxg20.dts
-@@ -128,7 +128,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <2>;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index 229e989..0e3f34e 100644
---- a/arch/arm/boot/dts/at91-kizbox.dts
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -54,7 +54,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <1>;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
-index 4f2eebf..5309e19 100644
---- a/arch/arm/boot/dts/at91-qil_a9260.dts
-+++ b/arch/arm/boot/dts/at91-qil_a9260.dts
-@@ -111,7 +111,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <2>;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index d4884dd..af5ba31 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -1007,7 +1007,7 @@
- 			status = "disabled";
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
- 			reg = <0x00500000 0x100000>;
- 			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index e9cc99b..1395b30 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -170,7 +170,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <2>;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
-index 2430443..298ee2f 100644
---- a/arch/arm/boot/dts/ethernut5.dts
-+++ b/arch/arm/boot/dts/ethernut5.dts
-@@ -77,7 +77,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <2>;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
-index f72969e..312d3e8 100644
---- a/arch/arm/boot/dts/evk-pro3.dts
-+++ b/arch/arm/boot/dts/evk-pro3.dts
-@@ -46,7 +46,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <2>;
- 			status = "okay";
- 		};
-diff --git a/arch/arm/boot/dts/usb_a9260_common.dtsi b/arch/arm/boot/dts/usb_a9260_common.dtsi
-index 9beea89..12119b5 100644
---- a/arch/arm/boot/dts/usb_a9260_common.dtsi
-+++ b/arch/arm/boot/dts/usb_a9260_common.dtsi
-@@ -90,7 +90,7 @@
- 			};
- 		};
- 
--		usb0: ohci at 00500000 {
-+		usb0: ohci at 500000 {
- 			num-ports = <2>;
- 			status = "okay";
- 		};
--- 
-2.1.4
+> Might be worth pulling out the constant 0x10401040 and #defining it since it
+> is used in more than one place too.
+> 
+
+Good point!
+Will do it.
+
+Regards
+Dong Aisheng
+
+> > 
+> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > ---
+> >  drivers/mmc/host/sdhci-esdhc-imx.c | 5 +++++
+> >  1 file changed, 5 insertions(+)
+> > 
+> > diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > index 6fef6bc..4c28fbb 100644
+> > --- a/drivers/mmc/host/sdhci-esdhc-imx.c
+> > +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+> > @@ -1261,6 +1261,11 @@ static int sdhci_esdhc_suspend(struct device *dev)
+> >  
+> >  static int sdhci_esdhc_resume(struct device *dev)
+> >  {
+> > +	struct sdhci_host *host = dev_get_drvdata(dev);
+> > +
+> > +	/* restore watermark setting in case it's lost in low power mode */
+> > +	writel(0x10401040, host->ioaddr + ESDHC_WTMK_LVL);
+> > +
+> >  	return sdhci_pltfm_resume(dev);
+> >  }
+> >  
+> > 
+> 
