@@ -1,79 +1,106 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 31 May 2016 12:52:22 -0700
-Subject: [PATCH V3 2/5] thermal: bcm2835: add thermal driver for bcm2835
- soc
-In-Reply-To: <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
-References: <1463495753-967-1-git-send-email-kernel@martin.sperl.org>
- <1463495753-967-3-git-send-email-kernel@martin.sperl.org>
-Message-ID: <87mvn6qa2x.fsf@eliezer.anholt.net>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 31 May 2016 12:57:17 -0700
+Subject: [PATCH 2/6] Documentation: bindings: add dt doc for Rockchip USB
+ Type-C PHY
+In-Reply-To: <5748094F.6030204@rock-chips.com>
+References: <1464328939-8073-1-git-send-email-zyw@rock-chips.com>
+ <1464328939-8073-3-git-send-email-zyw@rock-chips.com>
+ <2812026.ptEv4ktvbn@phil> <5748094F.6030204@rock-chips.com>
+Message-ID: <CAD=FV=W9iFXX_BfORP-9=8tnu9Ea_f2k1wK_T2j=ZAVA9cFSwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kernel at martin.sperl.org writes:
+Chris,
 
-> From: Martin Sperl <kernel@martin.sperl.org>
+On Fri, May 27, 2016 at 1:46 AM, Chris Zhong <zyw@rock-chips.com> wrote:
+> Hi Heiko
 >
-> Add basic thermal driver for bcm2835 SOC.
 >
-> This driver currently relies on the firmware setting up the
-> tsense HW block and does not set it up itself.
+> On 05/27/2016 04:29 PM, Heiko Stuebner wrote:
+>>
+>> Hi Chris,
+>>
+>> Am Freitag, 27. Mai 2016, 14:02:15 schrieb Chris Zhong:
+>>>
+>>> This patch adds a binding that describes the Rockchip USB Type-C PHY
+>>> for rk3399.
+>>>
+>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>> ---
+>>>
+>>>   .../devicetree/bindings/phy/phy-rockchip-typec.txt | 55
+>>> ++++++++++++++++++++++ 1 file changed, 55 insertions(+)
+>>>   create mode 100644
+>>> Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>>> b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt new file
+>>> mode 100644
+>>> index 0000000..402f667
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>>> @@ -0,0 +1,55 @@
+>>> +ROCKCHIP type-c PHY
+>>> +
+>>> +Required properties:
+>>> + - compatible: should be "rockchip,rk3399-typec-phy"
+>>> + - reg : Address and length of the usb phy control register set
+>>> + - rockchip,grf : phandle to the syscon managing the "general
+>>> +   register files"
+>>> + - clocks : phandle + clock specifier for the phy clocks
+>>> + - clock-names: string, clock name, must be "tcpdcore", "tcpdphy_ref";
+>>> + - resets : a list of phandle + reset specifier pairs
+>>> + - reset-names : string reset name, must be:
+>>> +                "tcphy_rst", "tcphy_pipe_rst", "uphy_tcphy_rst"
+
+In other contexts I believe Heiko has requested that a suffix like
+"_rst" not be present in the names of reset signals.  We already know
+that this is a list of reset names so the "_rst" is redundant.
+
+>>> + - #phy-cells: Must be 0.  See ./phy-bindings.txt for details.
+>>> + - rockchip,usb3phy*: phy registers embed in grf
+>>> +
+>>> +Example:
+>>> +       tcphy0: phy at ff7c0000 {
+>>> +               compatible = "rockchip,rk3399-typec-phy";
+>>> +               reg = <0x0 0xff7c0000 0x0 0x40000>;
+>>> +               #phy-cells = <0>;
+>>> +               rockchip,grf = <&grf>;
+>>> +               clocks = <&cru SCLK_UPHY0_TCPDCORE>,
+>>> +                        <&cru SCLK_UPHY0_TCPDPHY_REF>;
+>>> +               clock-names = "tcpdcore", "tcpdphy_ref";
+>>> +               resets = <&cru SRST_UPHY0>,
+>>> +                        <&cru SRST_UPHY0_PIPE_L00>,
+>>> +                        <&cru SRST_P_UPHY0_TCPHY>;
+>>> +               reset-names = "tcphy_rst", "tcphy_pipe_rst",
+>>> "uphy_tcphy_rst";
+>>> +               rockchip,usb3phy_con0 = <0x0e580 0 16>;
+>>> +               rockchip,usb3phy_con1 = <0x0e584 0 16>;
+>>> +               rockchip,usb3phy_con2 = <0x0e588 0 16>;
+>>> +               rockchip,usb3phy_status0 = <0x0e5c0 0 13>;
+>>> +               rockchip,usb3phy_status1 = <0x0e5c4 0 12>;
+>>
+>> please embedded this register data in the driver instead (not in the
+>> devicetree), matched against the compatible value.
+>> See Frank's usb2phy driver for reference if needed.
 >
-> Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
->
-> ChangeLog:
->  V1 -> V2: added specific settings depending on compatiblity
-> 	   added trip point based on register
-> 	   setting up ctrl-register if HW is not enabled by firmware
-> 	     as per recommendation of Eric (untested)
-> 	   check that clock frequency is in range
-> 	     (1.9 - 5MHz - as per comment in clk-bcm2835.c)
-> ---
+> Okay, I will move them to driver file next version, Thanks.
 
-> diff --git a/drivers/thermal/bcm/Makefile b/drivers/thermal/bcm/Makefile
-> new file mode 100644
-> index 0000000..13456d2
-> --- /dev/null
-> +++ b/drivers/thermal/bcm/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_BCM2835_THERMAL)		:= bcm2835_thermal.o
-> diff --git a/drivers/thermal/bcm/bcm2835_thermal.c b/drivers/thermal/bcm/bcm2835_thermal.c
-> new file mode 100644
-> index 0000000..73138cb
-> --- /dev/null
-> +++ b/drivers/thermal/bcm/bcm2835_thermal.c
+Just making sure: I saw a RESEND of your original version get posted,
+but nothing that addresses Heiko's comments, right?
 
-> +static const struct of_device_id bcm2835_thermal_of_match_table[];
-> +static int bcm2835_thermal_probe(struct platform_device *pdev)
-> +{
+Also: note that bindings should be sent in the patch _before_ the
+code.  So instead of:
+  [1] phy: Add USB Type-C PHY driver for rk3399
+  [2] Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
+  [3] drm/rockchip: vop: add cdn DP support for rk3399
+  [4] Documentation: bindings: add dt documentation for cdn DP controller
 
-> +	/* enable clock and check rate */
-> +	clk_prepare_enable(data->clk);
-> +	rate = clk_get_rate(data->clk);
-> +	if ((rate < 1920000) || (rate > 5000000)) {
-> +		dev_warn(&pdev->dev,
-> +			 "Clock %pCn is running at %pCr Hz, which is outside the recommended range of 1.9 to 5.0 MHz\n",
-> +			 data->clk, data->clk);
-> +	}
-> +
-> +	/* register it */
-> +	tz = thermal_zone_device_register("bcm2835_thermal",
-> +					  1, 0, data,
-> +					  &bcm2835_thermal_ops,
-> +					  NULL, 0, 0);
+You should have:
+  [1] Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
+  [2] phy: Add USB Type-C PHY driver for rk3399
+  [3] Documentation: bindings: add dt documentation for cdn DP controller
+  [4] drm/rockchip: vop: add cdn DP support for rk3399
 
-I notice that the polling_delay is set to 0, but we're not using
-interrupts to trigger the trip.  Is it valid to expose a trip without a
-polling_delay or interrupts?  Should passive_delay be set as well?
 
-This is up to the thermal maintainers.  As far as I'm concerned, it's:
-
-Acked-by: Eric Anholt <eric@anholt.net>
-
-One it lands I'll pull the defconfig and DT bits.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/fdfb9eec/attachment.sig>
+-Doug
