@@ -1,60 +1,60 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 31 May 2016 14:40:24 +0100
-Subject: [PATCH] drivers: char: mem: Check {read,write}_kmem() addresses
-In-Reply-To: <20160531130821.GV19428@n2100.arm.linux.org.uk>
-References: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
- <20160531130821.GV19428@n2100.arm.linux.org.uk>
-Message-ID: <574D9448.7080206@arm.com>
+From: huangtao@rock-chips.com (Huang, Tao)
+Date: Tue, 31 May 2016 21:45:51 +0800
+Subject: [PATCH 3/5] clocksource: rockchip: add dynamic irq flag to the
+ timer
+In-Reply-To: <574CC9DE.1050501@linaro.org>
+References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
+ <1464169802-6033-4-git-send-email-wxt@rock-chips.com>
+ <574CC9DE.1050501@linaro.org>
+Message-ID: <574D958F.9010707@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/16 14:08, Russell King - ARM Linux wrote:
-> On Tue, May 31, 2016 at 01:52:45PM +0100, Robin Murphy wrote:
->> Arriving at read_kmem() with an offset representing a bogus kernel
->> address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
->> faulting on the kernel-space read.
+Hi Daniel:
+On 2016?05?31? 07:16, Daniel Lezcano wrote:
+> On 05/25/2016 11:50 AM, Caesar Wang wrote:
+>> From: Huang Tao <huangtao@rock-chips.com>
 >>
->> x86_64 happens to get away with this since the optimised implementation
->> uses "rep movs*", thus the user write (which is allowed to fault) and
->> the kernel read are the same instruction, the kernel-side fault falls
->> into the userspace fixup handler and a chain of events transpires
->> leading to returning the expected -EFAULT. On other architectures,
->> though, the read is not covered by the fixup entry for the write, and we
->> get a straightforward "Unable to hande kernel paging request..." dump.
+>> The rockchip timer is broadcast timer. Add CLOCK_EVT_FEAT_DYNIRQ
+>> flag and set cpumask to all cpu to save power by avoid unnecessary
+>> wakeups and IPIs.
 >>
->> The more typical use-case of mmap_kmem() already validates the address
->> with pfn_valid() as one might expect, so let's make that consistent
->> across {read,write}_kem() too.
->>
->> Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Heiko Stuebner <heiko@sntech.de>
+>> Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 >> ---
 >>
->> I'm not sure if this warrants going to stable or not, as it's really
->> just making an existing failure case more graceful and less confusing.
->
-> Returning -EFAULT because the kernel-side address (iow, file offset) is
-> invalid is not particularly nice:
->
-> NAME
->         read - read from a file descriptor
->
-> ERRORS
->         EFAULT buf is outside your accessible address space.
->
-> Latest POSIX has:
->
-> ENXIO
-> 	A request was made of a nonexistent device, or the
-> 	request was outside the capabilities of the device.
->
-> which to me looks like a better error code to return, as file offsets
-> which are not valid can be interpreted as being "outside the
-> capabilities of the device".  EFAULT has always on Linux meant that
-> the user passed an invalid userspace buffer.
+>>   drivers/clocksource/rockchip_timer.c | 5 +++--
+>>   1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+>> index b93fed6..f3dfb1a 100644
+>> --- a/drivers/clocksource/rockchip_timer.c
+>> +++ b/drivers/clocksource/rockchip_timer.c
+>> @@ -150,12 +150,13 @@ static void __init rk_timer_init(struct device_node *np)
+>>   	}
+>>
+>>   	ce->name = TIMER_NAME;
+>> -	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
+>> +	ce->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+>> +		       CLOCK_EVT_FEAT_DYNIRQ;
+>>   	ce->set_next_event = rk_timer_set_next_event;
+>>   	ce->set_state_shutdown = rk_timer_shutdown;
+>>   	ce->set_state_periodic = rk_timer_set_periodic;
+>>   	ce->irq = irq;
+>> -	ce->cpumask = cpumask_of(0);
+>> +	ce->cpumask = cpu_all_mask;
+> 
+> s/cpu_all_mask/cpu_possible_mask/
 
-Good point - seems I failed to twig that the error code in the x86 case 
-is still effectively falling out of the "fault with the user address" 
-path. ENXIO indeed sounds more reasonable, thanks.
+Okay for me.
+It seems drivers in drivers/clocksource are very confusing about use
+cpu_all_mask or cpu_possible_mask. For example arm_arch_timer.c use
+cpu_all_mask, while mtk_timer.c use cpu_possible_mask. I think all just
+work.
 
-Robin.
+Thanks,
+Huang, Tao
