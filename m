@@ -1,43 +1,58 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 31 May 2016 13:54:31 +0200
-Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
-In-Reply-To: <20160531005808.GA7913@shlinux2>
-References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
- <20160505224240.GA31429@rob-hp-laptop>
- <CAPDyKFqpoi03Egfuvd8qJXnn_+FBgPXAb7S4UvkxVs8BA+zwnA@mail.gmail.com>
- <20160509181829.GA19687@rob-hp-laptop>
- <CAPDyKFq2=mqujFjvJSYxg2nVmK=OrBKLtFfb-ErNJO3Zr_LMVw@mail.gmail.com>
- <20160528033613.GA3291@shlinux2> <20160531005808.GA7913@shlinux2>
-Message-ID: <574D7B77.4000606@samsung.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Tue, 31 May 2016 12:57:35 +0100
+Subject: [PATCH 2/5] coresight: etmv4: Fix ETMv4x peripheral ID table
+In-Reply-To: <1464695858-29284-1-git-send-email-suzuki.poulose@arm.com>
+References: <1464695858-29284-1-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1464695858-29284-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2016 02:58 AM, Peter Chen wrote:
-> On Sat, May 28, 2016 at 11:36:13AM +0800, Peter Chen wrote:
->> All, how we move on for this?
->>
->> 1. Using a generic driver to manage both mmc and USB (and further
->> subsystem), USB and further subsystem do not use pwrseq node in dts.
->> 2. USB creates the similar driver under drivers/usb for its own use. 
->>
->> Which one do you prefer, thanks.
->>
-> 
-> Hi Krzysztof Kozlowski,
-> 
-> I think option 1 may be better according to Rob and Ulf's comment.
+This patch cleans up the peripheral id table for different ETMv4
+implementations.
 
-Hi,
+As per Cortex-A53 TRM, the ETM has following id values:
 
-I like the option #1 as well. The generic driver should rely and parse
-existing bindings like 'reset-gpios'. Still additional property (e.g.
-"do-the-power-sequence") seems needed as we do not want to play with all
-reset-gpios in DTB.
+Peripheral ID0	0x5D	0xFE0
+Peripheral ID1	0xB9	0xFE4
+Peripheral ID2	0x4B	0xFE8
+Peripheral ID3	0x00	0xFEC
 
-> Would you like going on your patch set? You can work on generic pwrseq
-> driver, I will do USB stuffs based on generic pwrseq driver?
+where, PID2: has the following format:
 
-Great, that sounds good! I'll start the work.
+[7:4]   Revision
+[3]     JEDEC   0b1     res1. Indicates a JEP106 identity code is used
+[2:0]   DES_1   0b011   ARM Limited. This is bits[6:4] of JEP106 ID code
 
-Best regards,
-Krzysztof
+The existing table entry checks only the bits [1:0], which is not
+sufficient enough. Fix it to match bits [3:0], just like the other
+entries do. While at it, correct the comment for A57 and the A53 entry.
+
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+---
+ drivers/hwtracing/coresight/coresight-etm4x.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index 462f0dc..88947f3 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -815,12 +815,12 @@ err_arch_supported:
+ }
+ 
+ static struct amba_id etm4_ids[] = {
+-	{       /* ETM 4.0 - Qualcomm */
+-		.id	= 0x0003b95d,
+-		.mask	= 0x0003ffff,
++	{       /* ETM 4.0 - Cortex-A53  */
++		.id	= 0x000bb95d,
++		.mask	= 0x000fffff,
+ 		.data	= "ETM 4.0",
+ 	},
+-	{       /* ETM 4.0 - Juno board */
++	{       /* ETM 4.0 - Cortex-A57 */
+ 		.id	= 0x000bb95e,
+ 		.mask	= 0x000fffff,
+ 		.data	= "ETM 4.0",
+-- 
+1.9.1
