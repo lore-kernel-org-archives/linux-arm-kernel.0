@@ -1,58 +1,110 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 31 May 2016 09:34:27 +0900
-Subject: Help needed with kexec on arm64
-In-Reply-To: <DB5PR04MB16887FF10CEA6AA9BF990F0DE6420@DB5PR04MB1688.eurprd04.prod.outlook.com>
-References: <CAB5YjtBEO=efjhcFdVOaZqG13qK3uzCbS5SFym5hhw-n+_QLhw@mail.gmail.com>
- <DB5PR04MB1688A6D4385B76DAFF71D364E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <CAB5YjtAqjL8LMvNPbxwVWe+Zhi5rFkz_X7rti9wSrXQ7Y_2kOA@mail.gmail.com>
- <DB5PR04MB16880834700413C3B80194B5E68C0@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <CAB5YjtCP6M9=ESJhfxyyYKSGTg8s3Y83qp8RS_oyYkUqcqYcCw@mail.gmail.com>
- <DB5PR04MB168874758924173BBD5CC037E69D0@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160405052341.GA19476@linaro.org>
- <DB5PR04MB1688F09062B2A5ECACCA4D80E6710@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160511005334.GA8417@linaro.org>
- <DB5PR04MB1688C3F122091109E6BD9B68E6740@DB5PR04MB1688.eurprd04.prod.outlook.com>
- <20160519110307.GA4941@linaro.org>
- <DB5PR04MB16887FF10CEA6AA9BF990F0DE6420@DB5PR04MB1688.eurprd04.prod.outlook.com>
-Message-ID: <574CDC13.9090709@linaro.org>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Tue, 31 May 2016 08:58:08 +0800
+Subject: [RFC v2 00/13] usb/mmc/power: Fix USB/LAN when TFTP booting
+In-Reply-To: <20160528033613.GA3291@shlinux2>
+References: <1462451666-17945-1-git-send-email-k.kozlowski@samsung.com>
+ <20160505224240.GA31429@rob-hp-laptop>
+ <CAPDyKFqpoi03Egfuvd8qJXnn_+FBgPXAb7S4UvkxVs8BA+zwnA@mail.gmail.com>
+ <20160509181829.GA19687@rob-hp-laptop>
+ <CAPDyKFq2=mqujFjvJSYxg2nVmK=OrBKLtFfb-ErNJO3Zr_LMVw@mail.gmail.com>
+ <20160528033613.GA3291@shlinux2>
+Message-ID: <20160531005808.GA7913@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2016 08:51 PM, Harninder Rai wrote:
-> Hello Takahiro Akashi,
->
-> Please see the following log which I was talking about in my last communication
-> Any idea as to what could be wrong just when I move from RAM based rootfs to SD based rootfs?
->
->> I did check /proc/iomem and everything looks there. This is very strange
->> since if I keep everything same and just move the rootfs from RAM based to
->> SD based, I start getting this issue.
->
-> root at ls2085ardb:/# kexec -p ./vmlinux.wor --initrd=./initramfs_arm64_busybox1_22_1_with_coremark.cpio.gz --append='console=ttyS1,115200 root=/dev/ram0 earlycon=uart8250,mmio,0x21c0600ramdisk_size=0x2000000 default_hugepagesz=2m hugepagesz=2m hugepages=256 memblock=debug maxcpus=1'
-> Memory for crashkernel is not reserved
-> Please reserve memory by passing"crashkernel=X at Y" parameter to kernel
-> Then try to loading kdump kernel
-> root at ls2085ardb:/# cat /proc/iomem
-> 02000000-0200ffff : /i2c at 2000000
-> 02140000-0214ffff : mmc0
-> 021c0500-021c05ff : serial
-> 021c0600-021c06ff : serial
-> 03100000-03107fff : /usb3 at 3100000
-> 0310c100-0310ffff : /usb3 at 3100000
-> 03110000-03117fff : /usb3 at 3110000
-> 0311c100-0311ffff : /usb3 at 3110000
-> 05000000-057fffff : /iommu at 5000000
-> 80000000-ffffffff : System RAM
->    80080000-80a39333 : Kernel code
->    80af5000-80bd4fff : Kernel data
->    8c000000-8fffffff : Crash kernel
-> 80c000000-80c00003f : mc_portal
+On Sat, May 28, 2016 at 11:36:13AM +0800, Peter Chen wrote:
+> On Tue, May 10, 2016 at 01:02:08PM +0200, Ulf Hansson wrote:
+> > + Arnd
+> > 
+> > [...]
+> > 
+> > >> >> Solution
+> > >> >> ========
+> > >> >> This is very similar to the MMC pwrseq behavior so the idea is to:
+> > >> >> 1. Move MMC pwrseq drivers to generic place,
+> > >> >
+> > >> > You can do that, but I'm going to NAK any use of pwrseq bindings outside
+> > >> > of MMC. I think it is the wrong way to do things. The DT should describe
+> > >>
+> > >> Huh, I didn't know that was your view of the mmc pwrseq bindings. Why
+> > >> didn't you NAK them before?
+> > >
+> > > Unfortunately, either I missed it or it was a time I couldn't spend much
+> > > time on reviews.
+> > 
+> > Okay, I guess it's common issue among maintainers. The problem with DT
+> > is that it gets really hard to be fixed up later. :-)
+> > 
+> > >
+> > >> > the devices. If they happen to be "simple" then the core can walk the
+> > >> > tree and do any setup. For example, look for "reset-gpios" and toggle
+> > >> > that GPIO. There is no need for a special node.
+> > >> >
+> > >> >> 2. Extend the pwrseq-simple with regulator toggling,
+> > >> >> 3. Add support to USB hub and port core for pwrseq,
+> > >> >
+> > >> > We discussed this for USB already[1] and is why we defined how to add
+> > >> > USB child devices. The idea is not to add pwrseq to that.
+> > >>
+> > >> I am not familiar with the USB discussion.
+> > >>
+> > >> Still, let me give you some more background to the mmc pwrseq. The
+> > >> idea from the mmc pwrseq bindings comes from the power-domain DT
+> > >> bindings, as I thought these things were a bit related.
+> > >> In both cases they are not directly a property of the device, but more
+> > >> describing a HW dependency to allow the device to work.
+> > >
+> > > I could see this as a board level power domain. However the difference
+> > > is we are not generally exposing internal SOC details the same way as
+> > > board level components. Perhaps we could extend power domains to board
+> > > level, but that is not what was done here.
+> > >
+> > >> One could probably use a child node instead of a phandle, but that
+> > >> wasn't chosen back then. Of course you are the DT expert, but could
+> > >> you perhaps tell me why a child node is better for cases like this?
+> > >
+> > > If there is a control path hierarchy, then we try to model that in DT
+> > > with child nodes. In cases of SDIO and USB, there is a clear hierarchy.
+> > > Ignoring the discovery ordering problem, we already have defined ways to
+> > > describe GPIO connections, regulators, etc. to devices. Describing those
+> > > things separately from the device to solve a particular issue that is
+> > > really a kernel limitation is what I don't like.
+> > 
+> > Okay, I see.
+> > 
+> > To move forward in trying to make mmc pwrseq a generic pwrseq, could
+> > we perhaps allow both cases?
+> > 
+> > In the mmc case, there are already deployed bindings so we need to
+> > cope with these by using the phandle option, but for USB etc we could
+> > force the child node option.
+> > As long as we agree that we keep using a compatible string for the
+> > child node as well, both options should be able to co-exist and we
+> > should probably be able to managed them both from a common pwrseq
+> > driver framework.
+> > 
+> > Although, I do remember from an older conversations around some of
+> > mine submission for the mmc pwrseq code, that some people (maybe
+> > Arnd?) wasn't keen on adding a new framework for this. Perhaps that
+> > has changed?
+> > 
+> 
+> All, how we move on for this?
+> 
+> 1. Using a generic driver to manage both mmc and USB (and further
+> subsystem), USB and further subsystem do not use pwrseq node in dts.
+> 2. USB creates the similar driver under drivers/usb for its own use. 
+> 
+> Which one do you prefer, thanks.
+> 
 
+Hi Krzysztof Kozlowski,
 
-Please trace is_crashkernel_mem_reserved() and kexec_iomem_for_each_line().
+I think option 1 may be better according to Rob and Ulf's comment.
+Would you like going on your patch set? You can work on generic pwrseq
+driver, I will do USB stuffs based on generic pwrseq driver?
 
--Takahiro AKASHI
+-- 
 
-> Regards
-> Harry++
->
+Best Regards,
+Peter Chen
