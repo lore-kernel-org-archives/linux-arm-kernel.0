@@ -1,49 +1,120 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 31 May 2016 19:09:57 +0200
-Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun7i: Add dts file for
- Bananapi M1 Plus board
-In-Reply-To: <574CA1ED.8050007@web.de>
-References: <20160530123013.11575-1-luoyi.ly@gmail.com>
- <20160530194340.GE4908@lukather> <574CA1ED.8050007@web.de>
-Message-ID: <20160531170957.GM4908@lukather>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Tue, 31 May 2016 11:10:32 -0600
+Subject: [PATCH 1/2] perf tools: making coresight PMU listable
+In-Reply-To: <1464714633-16697-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1464714633-16697-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1464714633-16697-2-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 10:26:21PM +0200, Bernhard Nortmann wrote:
-> Am 30.05.2016 um 21:43 schrieb Maxime Ripard:
-> >Hi,
-> >
-> >On Mon, May 30, 2016 at 08:30:13PM +0800, luoyi.ly at gmail.com wrote:
-> >>From: luoyi <luoyi.ly@gmail.com>
-> >>
-> >>Add support for the Bananapi M1 Plus A20 development board from sinovoip.com.cn .
-> >>This board features 1G RAM, 2 USB A receptacles, 1 micro USB receptacle for
-> >>OTG, 1 micro USB receptacle for power, HDMI, sata, Gbit ethernet, ir receiver,
-> >>3.5 mm jack for stero sound out, on board microphone, 40 gpio pins and sdio wifi.
-> >What is the difference between the M1+ and the M1?
-> 
-> The M1+ is an updated version of the original Banana Pi. If you're
-> interested in the details, have a look at
-> http://linux-sunxi.org/Banana_Pi#Variants .  "BPi-M1+" is SinoVoip's
-> counterpart of LeMaker's "Banana Pro", for which a .dts already
-> exists. Judging from .fex files, only a single pin assignment seems
-> to differ between the two (audio_pa_ctrl, PH26 vs. PH15).
+Adding the required mechanic allowing 'perf list pmu' to
+discover coresight ETM/PTM tracers.
 
-Gee, that's confusing :)
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ MAINTAINERS                    |  1 +
+ tools/perf/MANIFEST            |  1 +
+ tools/perf/arch/arm/util/Build |  2 ++
+ tools/perf/arch/arm/util/pmu.c | 34 ++++++++++++++++++++++++++++++++++
+ tools/perf/config/Makefile     | 11 ++++++++---
+ 5 files changed, 46 insertions(+), 3 deletions(-)
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
 
-I guess we should just include the banana pro DTB and change that pin
-(and the i2s pins Luo was mentionning).
-
-Maxime
-
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7304d2e37a98..d3451007718b 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1085,6 +1085,7 @@ F:	drivers/hwtracing/coresight/*
+ F:	Documentation/trace/coresight.txt
+ F:	Documentation/devicetree/bindings/arm/coresight.txt
+ F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
++F:	tools/perf/arch/arm/util/pmu.c
+ 
+ ARM/CORGI MACHINE SUPPORT
+ M:	Richard Purdie <rpurdie@rpsys.net>
+diff --git a/tools/perf/MANIFEST b/tools/perf/MANIFEST
+index 8c8c6b9ce915..c6683e60e603 100644
+--- a/tools/perf/MANIFEST
++++ b/tools/perf/MANIFEST
+@@ -64,6 +64,7 @@ include/asm-generic/bitops/const_hweight.h
+ include/asm-generic/bitops/fls64.h
+ include/asm-generic/bitops/__fls.h
+ include/asm-generic/bitops/fls.h
++include/linux/coresight-pmu.h
+ include/linux/perf_event.h
+ include/linux/list.h
+ include/linux/hash.h
+diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
+index d22e3d07de3d..66ab0b05549c 100644
+--- a/tools/perf/arch/arm/util/Build
++++ b/tools/perf/arch/arm/util/Build
+@@ -2,3 +2,5 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
+ 
+ libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
+ libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
++
++libperf-$(CONFIG_AUXTRACE) += pmu.o
+diff --git a/tools/perf/arch/arm/util/pmu.c b/tools/perf/arch/arm/util/pmu.c
+new file mode 100644
+index 000000000000..af9fb666b44f
+--- /dev/null
++++ b/tools/perf/arch/arm/util/pmu.c
+@@ -0,0 +1,34 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <string.h>
++#include <linux/coresight-pmu.h>
++#include <linux/perf_event.h>
++
++#include "../../util/pmu.h"
++
++struct perf_event_attr
++*perf_pmu__get_default_config(struct perf_pmu *pmu __maybe_unused)
++{
++#ifdef HAVE_AUXTRACE_SUPPORT
++	if (!strcmp(pmu->name, CORESIGHT_ETM_PMU_NAME)) {
++		/* add ETM default config here */
++		pmu->selectable = true;
++	}
++#endif
++	return NULL;
++}
+diff --git a/tools/perf/config/Makefile b/tools/perf/config/Makefile
+index 5ad0255f8756..494a672aa11d 100644
+--- a/tools/perf/config/Makefile
++++ b/tools/perf/config/Makefile
+@@ -681,9 +681,14 @@ ifdef LIBBABELTRACE
+ endif
+ 
+ ifndef NO_AUXTRACE
+-  ifeq ($(feature-get_cpuid), 0)
+-    msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
+-    NO_AUXTRACE := 1
++  ifeq ($(ARCH),x86)
++    ifeq ($(feature-get_cpuid), 0)
++      msg := $(warning Your gcc lacks the __get_cpuid() builtin, disables support for auxtrace/Intel PT, please install a newer gcc);
++      NO_AUXTRACE := 1
++    else
++      $(call detected,CONFIG_AUXTRACE)
++      CFLAGS += -DHAVE_AUXTRACE_SUPPORT
++    endif
+   else
+     $(call detected,CONFIG_AUXTRACE)
+     CFLAGS += -DHAVE_AUXTRACE_SUPPORT
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160531/eba0f737/attachment.sig>
+2.5.0
