@@ -1,83 +1,93 @@
-From: fan.chen@mediatek.com (Fan Chen)
-Date: Tue, 31 May 2016 16:20:35 +0800
-Subject: [PATCH v2 1/3] regulator: DT: Add DT property for operation
- mode configuration
-In-Reply-To: <20160523112856.GR8206@sirena.org.uk>
-References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
- <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
- <20160523104703.GB26992@leverpostej> <20160523112856.GR8206@sirena.org.uk>
-Message-ID: <1464682835.25847.3.camel@mtksdaap41>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 31 May 2016 10:24:02 +0200
+Subject: [PATCH 2/4] clocksource: sp804: introduce helper
+ sp804_load_mode_set()
+In-Reply-To: <1464428033-52106-3-git-send-email-wangkefeng.wang@huawei.com>
+References: <1464428033-52106-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1464428033-52106-3-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <574D4A22.703@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On 05/28/2016 11:33 AM, Kefeng Wang wrote:
+> Introduce helper sp804_load_mode_set(), and use it, prepare for 64bit
+> mode timer support.
 
-On Mon, 2016-05-23 at 12:28 +0100, Mark Brown wrote:
-> On Mon, May 23, 2016 at 11:47:04AM +0100, Mark Rutland wrote:
-> 
-> > > +/* Regulator operating modes */
-> > > +#define REGULATOR_OPERATION_MODE_FAST			0x0
-> > > +#define REGULATOR_OPERATION_MODE_NORMAL			0x1
-> > > +#define REGULATOR_OPERATION_MODE_IDLE			0x2
-> > > +#define REGULATOR_OPERATION_MODE_STANDBY		0x3
-> 
-> > These sound like they're tied to linux internal details (e.g. the
-> > implementation of idle and/or suspend).
-> 
-> > What do each of these actually mean?
-> 
-> They are not really at all general and I'm fairly sure I've provided the
-> same feedback repeatedly on earlier versions of the patch set.  They are
-> not entirely based on Linux internal details (or at least the Linux
-> internal details tend to flow from the hardware) - broadly fast is
-> forced PWM, normal is default, idle is LDO mode and standby is a lower
-> quality LDO mode - but how this translates into anything that a consumer
-> could actually use is unclear since the supported output loads and
-> quality of regulation can vary wildy.  It's also somewhat implementation
-> dependent what a given regulator does (and it's always possible that
-> some regulators may have more modes to control or differing definitions
-> in the hardware).
-> 
-> Henry, *please* look at how the existing mode support in the bindings is
-> done and consider how a consumer would use this given that it doesn't
-> know anything about the regulator...
+More verbose please.
 
-Hi Mark,
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+> ---
+>   drivers/clocksource/timer-sp804.c | 27 +++++++++++++--------------
+>   1 file changed, 13 insertions(+), 14 deletions(-)
+>
+> diff --git a/drivers/clocksource/timer-sp804.c b/drivers/clocksource/timer-sp804.c
+> index 362e5d0..b8848e5 100644
+> --- a/drivers/clocksource/timer-sp804.c
+> +++ b/drivers/clocksource/timer-sp804.c
+> @@ -73,6 +73,15 @@ static long __init sp804_get_clock_rate(struct clk *clk, const char *name)
+>   	return rate;
+>   }
+>
+> +static inline void sp804_load_mode_set(void __iomem *base, unsigned long load, int mode)
+> +{
+> +	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
+> +			     mode | TIMER_CTRL_ENABLE;
+> +
+> +	writel(load, base + TIMER_LOAD);
+> +	writel(ctrl, base + TIMER_CTRL);
+> +}
+> +
+>   static void __iomem *sched_clock_base;
+>
+>   static u64 notrace sp804_read(void)
+> @@ -97,10 +106,8 @@ void __init __sp804_clocksource_and_sched_clock_init(void __iomem *base,
+>
+>   	/* setup timer 0 as free-running clocksource */
+>   	writel(0, base + TIMER_CTRL);
+> -	writel(0xffffffff, base + TIMER_LOAD);
+>   	writel(0xffffffff, base + TIMER_VALUE);
+> -	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+> -		base + TIMER_CTRL);
+> +	sp804_load_mode_set(base, 0xffffffff, TIMER_CTRL_PERIODIC & ~TIMER_CTRL_IE);
 
-Thanks for your review and patiently explain your thought to us.
+Can you explain this change ?
 
-In the case of svs[1], which Henry mentioned in cover letter, it can be
-regarded as a special consumer who requires very accurate voltage for
-calibration the hardware in its initialization stage. So, this kinds of
-consumers know their regulator very well and only need to switch to the
-modes they want in the particular conditions.
-However, IIUC, you want a proposal to provide a sort of QoS framework
-which can cover most of use cases who care about the regular quality in
-runtime, is that correct?
+>   	clocksource_mmio_init(base + TIMER_VALUE, name,
+>   		rate, 200, 32, clocksource_mmio_readl_down);
+> @@ -143,24 +150,16 @@ static int sp804_shutdown(struct clock_event_device *evt)
+>
+>   static int sp804_set_periodic(struct clock_event_device *evt)
+>   {
+> -	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
+> -			     TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
+> -
+>   	timer_shutdown(evt);
+> -	writel(clkevt_reload, clkevt_base + TIMER_LOAD);
+> -	writel(ctrl, clkevt_base + TIMER_CTRL);
+> +	sp804_load_mode_set(clkevt_base, clkevt_reload, TIMER_CTRL_PERIODIC);
+>   	return 0;
+>   }
+>
+>   static int sp804_set_next_event(unsigned long next,
+> -	struct clock_event_device *evt)
+> +				struct clock_event_device *evt)
+>   {
+> -	unsigned long ctrl = TIMER_CTRL_32BIT | TIMER_CTRL_IE |
+> -			     TIMER_CTRL_ONESHOT | TIMER_CTRL_ENABLE;
+> -
+> -	writel(next, clkevt_base + TIMER_LOAD);
+> -	writel(ctrl, clkevt_base + TIMER_CTRL);
+>
+> +	sp804_load_mode_set(clkevt_base, next, TIMER_CTRL_ONESHOT);
+>   	return 0;
+>   }
+>
+>
 
-IMHO, some quality index can be considered, for example:
-Minimum Current Requirement (mA): If a user specified this constraint in
-runtime, it means that he cares more about the supplying quality like
-transient voltage drop, ripple above certain load.
-Maximum Current Requirement (mA): If a user specified this constraint in
-runtime, it means that he cares more about the power consumption under
-certain load.
-It could be a flexible way instead to tie the operation modes directly.
 
-BTW, we should encourage people here to share more use cases related to
-regulator quality issues, especially in runtime, so we can evaluate the
-most suitable index to fit the requirements.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-What do you think?
-
-
-[1] http://www.spinics.net/lists/devicetree/msg111208.html
-
-
-Best regards,
-Fan
-
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
