@@ -1,65 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 May 2016 15:23:21 +0100
-Subject: [PATCH] arm64: defconfig: add options for virtualization and
- containers
-In-Reply-To: <20160531135740.GL24936@arm.com>
-References: <1464345747-11729-1-git-send-email-riku.voipio@linaro.org>
- <20160531135740.GL24936@arm.com>
-Message-ID: <20160531142321.GB11321@e104818-lin.cambridge.arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 31 May 2016 15:24:15 +0100
+Subject: [PATCH v2] arm64: Implement optimised IP checksum helpers
+In-Reply-To: <ba9cf5bf84b8adc766f7f7511dda8cb501cd4101.1464693619.git.robin.murphy@arm.com>
+References: <ba9cf5bf84b8adc766f7f7511dda8cb501cd4101.1464693619.git.robin.murphy@arm.com>
+Message-ID: <574D9E8F.7080509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 02:57:41PM +0100, Will Deacon wrote:
-> On Fri, May 27, 2016 at 01:42:27PM +0300, Riku Voipio wrote:
-> > Enable options commonly needed by popular virtualization
-> > and container applications. Use modules when possible to
-> > avoid too much overhead for users not interested.
-> > 
-> > - add namespace and cgroup options needed
-> > - add seccomp - optional, but enhances Qemu etc
-> > - bridge, nat, veth, macvtap and multicast for routing
-> >   guests and containers
-> > - btfrs and overlayfs modules for container COW backends
-> > - while near it, make fuse a module instead of built-in.
-> > 
-> > Generated with make saveconfig and dropping unrelated spurious
-> > change hunks while commiting. bloat-o-meter old-vmlinux vmlinux:
-> > 
-> > add/remove: 899/388 grow/shrink: 744/216 up/down: 183556/-94881 (88675)
-> > ...
-> > Total: Before=10515333, After=10604008, chg 0.000000%
-> > 
-> > Signed-off-by: Riku Voipio <riku.voipio@linaro.org>
-> > ---
-> >  arch/arm64/configs/defconfig | 53 +++++++++++++++++++++++++++++++++++++++-----
-> >  1 file changed, 47 insertions(+), 6 deletions(-)
+Hi Robin,
+
+On 31/05/16 12:22, Robin Murphy wrote:
+> AArch64 is capable of 128-bit memory accesses without alignment
+> restrictions, which makes it both possible and highly practical to slurp
+> up a typical 20-byte IP header in just 2 loads. Implement our own
+> version of ip_fast_checksum() to take advantage of that, resulting in
+> considerably fewer instructions and memory accesses than the generic
+> version. We can also get more optimal code generation for csum_fold() by
+> defining it a slightly different way round from the generic version, so
+> throw that into the mix too.
 > 
-> I'm fine with adding stuff to defconfig if it's useful to people (and it
-> looks like this is), but it's probably about time we figured out what to
-> do about '=y' vs '=m'. Until recently (i.e. this merge window), the arm64
-> defconfig didn't build any modules. Obviously this only scales so far,
-> since the Image tends to get rather huge, but it would be good to try and
-> establish a rule-of-thumb as to whether we treat something as a module
-> or a built-in. We could even consider retrospectively applying the rule
-> if its straightforward enough.
+> Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
+> Acked-by: Luke Starrett <luke.starrett@broadcom.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+> ---
 > 
-> One easy way to do it would be: if you need the option to boot, then
-> it's a built-in, but that brings up questions around "boot a full android
-> system" vs "boot to a point where you could load an initrd".
+> Minor changes: include types.h for correctness, add Luke's ack.
+> 
+>  arch/arm64/include/asm/checksum.h | 51 +++++++++++++++++++++++++++++++++++++++
 
-For the time being, I would say defconfig should cover "boot to a login
-prompt" where this may imply NFS + network driver built in for the
-supported SoCs, couple of commonly used filesystems (ext4, btrfs). The
-rest can be enabled as modules.
+Maybe a nit, don't you need to remove the 'generic-y += checksum.h' line from
+arch/arm64/include/asm/Kbuild to avoid the generated version being created too? [0]
 
-As the image continues to grow over years, we will have to revisit this
-and possibly separate the mobile from the server SoC defconfig. For the
-former, we can probably keep the same "boot to a login prompt" approach.
-For the latter, especially if you install it under a distro (e.g. you do
-make deb-pkg or rpm-pkg), we can aim for "boot to initramfs". That said,
-I'd like to see most of the SoC drivers stuff built as modules (whatever
-is not essential for booting to initramfs and comes in at
-device_initcall level).
+The compiler on my box picks your header in preference to the generated one, but
+[1] suggests it isn't to be trusted!
 
--- 
-Catalin
+
+Thanks,
+
+James
+
+[0] d8ecc5cd8e22 ("kbuild: asm-generic support")
+[1] https://lkml.org/lkml/2016/5/23/78
