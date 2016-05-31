@@ -1,69 +1,180 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 31 May 2016 14:46:17 +0100
-Subject: [PATCH] drivers: char: mem: Check {read,write}_kmem() addresses
-In-Reply-To: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
-References: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
-Message-ID: <20160531134617.GA11321@e104818-lin.cambridge.arm.com>
+From: huangtao@rock-chips.com (Huang, Tao)
+Date: Tue, 31 May 2016 21:46:23 +0800
+Subject: [PATCH 4/5] clocksource: rockchip: add support for rk3399 SoC
+In-Reply-To: <574CCCB4.1030001@linaro.org>
+References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
+ <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
+ <574CCCB4.1030001@linaro.org>
+Message-ID: <574D95AF.2020905@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 01:52:45PM +0100, Robin Murphy wrote:
-> Arriving at read_kmem() with an offset representing a bogus kernel
-> address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
-> faulting on the kernel-space read.
+Hi Daniel:
+On 2016?05?31? 07:28, Daniel Lezcano wrote:
+> On 05/25/2016 11:50 AM, Caesar Wang wrote:
+>> From: Huang Tao <huangtao@rock-chips.com>
+>>
+>> The CONTROL register offset is different from old SoCs.
+>> For Linux driver, there are not functional changes at all.
+>> Let's call it v2.
+>>
+>> Signed-off-by: Huang Tao <huangtao@rock-chips.com>
+>> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Heiko Stuebner <heiko@sntech.de>
+>> Tested-by: Jianqun Xu <jay.xu@rock-chips.com>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> ---
 > 
-> x86_64 happens to get away with this since the optimised implementation
-> uses "rep movs*", thus the user write (which is allowed to fault) and
-> the kernel read are the same instruction, the kernel-side fault falls
-> into the userspace fixup handler and a chain of events transpires
-> leading to returning the expected -EFAULT. On other architectures,
-> though, the read is not covered by the fixup entry for the write, and we
-> get a straightforward "Unable to hande kernel paging request..." dump.
+> That's hackish.
+Yes:( I blamed our IC guy.
 > 
-> The more typical use-case of mmap_kmem() already validates the address
-> with pfn_valid() as one might expect, so let's make that consistent
-> across {read,write}_kem() too.
+> Please consider something like:
 > 
-> Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
-> ---
+> diff --git a/drivers/clocksource/rockchip_timer.c 
+> b/drivers/clocksource/rockchip_timer.c
+> index b991b28..b6ba6f9 100644
+> --- a/drivers/clocksource/rockchip_timer.c
+> +++ b/drivers/clocksource/rockchip_timer.c
+> @@ -19,7 +19,8 @@
 > 
-> I'm not sure if this warrants going to stable or not, as it's really
-> just making an existing failure case more graceful and less confusing.
+>   #define TIMER_LOAD_COUNT0	0x00
+>   #define TIMER_LOAD_COUNT1	0x04
+> -#define TIMER_CONTROL_REG	0x10
+> +#define TIMER_CONTROL_REG3288	0x10
+> +#define TIMER_CONTROL_REG3399	0x1C
+>   #define TIMER_INT_STATUS	0x18
 > 
->  drivers/char/mem.c | 6 ++++++
->  1 file changed, 6 insertions(+)
+>   #define TIMER_DISABLE		0x0
+> @@ -31,6 +32,7 @@
+>   struct bc_timer {
+>   	struct clock_event_device ce;
+>   	void __iomem *base;
+> +	void __iomem *ctrl;
+>   	u32 freq;
+>   };
 > 
-> diff --git a/drivers/char/mem.c b/drivers/char/mem.c
-> index 71025c2f6bbb..64c766023b15 100644
-> --- a/drivers/char/mem.c
-> +++ b/drivers/char/mem.c
-> @@ -384,6 +384,9 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
->  	char *kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
->  	int err = 0;
->  
-> +	if (!pfn_valid(PFN_DOWN(p)))
-> +		return -EFAULT;
+> @@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct 
+> clock_event_device *ce)
+>   	return rk_timer(ce)->base;
+>   }
+> 
+> +static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
+> +{
+> +        return rk_timer(ce)->ctrl;
+> +}
 > +
->  	read = 0;
->  	if (p < (unsigned long) high_memory) {
->  		low_count = count;
-> @@ -512,6 +515,9 @@ static ssize_t write_kmem(struct file *file, const char __user *buf,
->  	char *kbuf; /* k-addr because vwrite() takes vmlist_lock rwlock */
->  	int err = 0;
->  
-> +	if (!pfn_valid(PFN_DOWN(p)))
-> +		return -EFAULT;
+>   static inline void rk_timer_disable(struct clock_event_device *ce)
+>   {
+> -	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
+> +	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
+>   }
+> 
+>   static inline void rk_timer_enable(struct clock_event_device *ce, u32 
+> flags)
+>   {
+>   	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+> -		       rk_base(ce) + TIMER_CONTROL_REG);
+> +		       rk_ctrl(ce));
+>   }
+> 
+>   static void rk_timer_update_counter(unsigned long cycles,
+> @@ -179,4 +186,18 @@ out_unmap:
+>   	iounmap(bc_timer.base);
+>   }
+> 
+> -CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+> +static void __init rk3288_timer_init(struct device_node *np)
+> +{
+> +	bc_timer.ctrl = TIMER_CONTROL_REG3288;
+> +	rk_timer_init(np);
+> +}
+> +
+> +static void __init rk3399_timer_init(struct device_node *np)
+> +{
+> +        bc_timer.ctrl = TIMER_CONTROL_REG3399;
+> +	rk_timer_init(np);
+> +}
+> +
+> +
+> +CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", 
+> rk3288_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3399-timer", 
+> rk3399_timer_init);
+> 
+> 
 
-Since the /dev/kmem interface is about kernel virtual address rather
-than physical (like /dev/mem), the pfn may not always be mapped. I think
-a better check would be to use kern_addr_valid(kaddr) just before
-copy_(to|from)_user (a similar approach is taken by read_kcore()). The
-downside is that it breaks a couple of configurations where
-kern_addr_valid() is 0:
+I think you mean this patch otherwise compile will fail:
+@@ -19,7 +19,8 @@
 
-- x86_32 with !CONFIG_FLATMEM
-- alpha with CONFIG_DISCONTIGMEM
+ #define TIMER_LOAD_COUNT0	0x00
+ #define TIMER_LOAD_COUNT1	0x04
+-#define TIMER_CONTROL_REG	0x10
++#define TIMER_CONTROL_REG3288	0x10
++#define TIMER_CONTROL_REG3399	0x1C
+ #define TIMER_INT_STATUS	0x18
 
--- 
-Catalin
+ #define TIMER_DISABLE		0x0
+@@ -31,6 +32,7 @@
+ struct bc_timer {
+ 	struct clock_event_device ce;
+ 	void __iomem *base;
++	u32 ctrl;
+ 	u32 freq;
+ };
+
+@@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct
+clock_event_device *ce)
+ 	return rk_timer(ce)->base;
+ }
+
++static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
++{
++	return rk_timer(ce)->base + rk_timer(ce)->ctrl;
++}
++
+ static inline void rk_timer_disable(struct clock_event_device *ce)
+ {
+-	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
++	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
+ }
+
+ static inline void rk_timer_enable(struct clock_event_device *ce, u32
+flags)
+ {
+ 	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+-		       rk_base(ce) + TIMER_CONTROL_REG);
++		       rk_ctrl(ce));
+ }
+
+ static void rk_timer_update_counter(unsigned long cycles,
+@@ -179,4 +186,19 @@ out_unmap:
+ 	iounmap(bc_timer.base);
+ }
+
+-CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
++static void __init rk3288_timer_init(struct device_node *np)
++{
++	bc_timer.ctrl = TIMER_CONTROL_REG3288;
++	rk_timer_init(np);
++}
++
++static void __init rk3399_timer_init(struct device_node *np)
++{
++	bc_timer.ctrl = TIMER_CONTROL_REG3399;
++	rk_timer_init(np);
++}
++
++CLOCKSOURCE_OF_DECLARE(rk3288_timer, "rockchip,rk3288-timer",
++		       rk3288_timer_init);
++CLOCKSOURCE_OF_DECLARE(rk3399_timer, "rockchip,rk3399-timer",
++		       rk3399_timer_init);
+
+This patch will give us a little lager text size. If we do disassemble,
+we can see additional LDR is called. I can accept this performance drop.
+So we will send new patches.
+BTW, the patch "clocksource: rockchip: remove unnecessary clear irq
+before request_irq" can drop if we use this patch.
+
+Thanks,
+Huang, Tao
