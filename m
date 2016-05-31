@@ -1,21 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 May 2016 10:37:33 +0200
-Subject: [PATCH v2 4/4] pinctrl: amlogic: gxbb: add ethernet pins
-In-Reply-To: <1464297865-8965-5-git-send-email-khilman@baylibre.com>
-References: <1464297865-8965-1-git-send-email-khilman@baylibre.com>
- <1464297865-8965-5-git-send-email-khilman@baylibre.com>
-Message-ID: <CACRpkdb=p4ALi7DqUu7o8iEZajUX0Nb8nfwp8_-c5CCJUV_pag@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 31 May 2016 10:39:05 +0200
+Subject: [PATCH v2] clk: sunxi: predivider handling for factors clock
+In-Reply-To: <20160530184532.GD4908@lukather>
+References: <1461084466-20889-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1461084466-20889-2-git-send-email-vishnupatekar0510@gmail.com>
+ <20160502111337.GR17159@lukather>
+ <CAEzqOZvnKKNs_sXUJrwTykA5mzwKMg+HpaFcKgBTFr+utT4qQg@mail.gmail.com>
+ <20160530184532.GD4908@lukather>
+Message-ID: <20160531103905.faf5e2b80d60d46c8757ad1c@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 11:24 PM, Kevin Hilman <khilman@baylibre.com> wrote:
+On Mon, 30 May 2016 20:45:32 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> Add EE domain pins for ethernet interface.
->
-> Acked-by: Carlo Caione <carlo@endlessm.com>
-> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> I went over all the A83T clocks, and most of them could be
+> covered. The issue only lies in the PLLs and their additional 1-bit
+> dividers.
+> 
+> If we just choos to ignore (one of) them, it should be pretty trivial
+> to implement with the current clock classes we have.
 
-Patch applied.
+Hi Maxime,
 
-Yours,
-Linus Walleij
+I already did the job for all the A83T clocks.
+It is not fully tested yet, but, to be sure we are on the same way,
+I am sending a RFC series.
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
