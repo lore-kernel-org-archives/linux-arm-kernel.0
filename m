@@ -1,62 +1,26 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Tue, 31 May 2016 11:18:06 +0200
-Subject: [PATCH v4 17/18] ARM: STi: DT: STiH407: Add uniperif reader dt
- nodes
-In-Reply-To: <1464192412-16386-19-git-send-email-peter.griffin@linaro.org>
-References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
- <1464192412-16386-19-git-send-email-peter.griffin@linaro.org>
-Message-ID: <574D56CE.5020802@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 31 May 2016 11:21:37 +0200
+Subject: [PATCH] ARM: uniphier: drop code for old DT binding
+In-Reply-To: <1464682628-12163-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1464682628-12163-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <4992506.m4GEHIOqdc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday, May 31, 2016 5:17:08 PM CEST Masahiro Yamada wrote:
+> Commit 307d40c56b0c ("ARM: uniphier: rework SMP code to support new
+> System Bus binding") added a new DT binding for SMP code, but still
+> kept old code for the backward compatibility.
+> 
+> Linux 4.6 was out with both bindings supported, so it should not
+> hurt to drop the old code now.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> 
 
+That explanation is in general not sufficient. Are you sure that
+nobody is shipping a machine with their own dts file that is not
+merged upstream, and that there are no bootloaders that have a
+hardcoded dtb file that we need to support indefinitely?
 
-On 05/25/2016 06:06 PM, Peter Griffin wrote:
-> This patch adds the DT node for the uniperif reader
-> IP block found on STiH407 family silicon.
-> 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407-family.dtsi | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> index 7ca149b..fb6363e1 100644
-> --- a/arch/arm/boot/dts/stih407-family.dtsi
-> +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> @@ -831,5 +831,33 @@
->  			st,version = <5>;
->  			st,mode = "SPDIF";
->  		};
-> +
-> +		sti_uni_reader0: sti-uni-reader at 0 {
-> +			compatible = "st,sti-uni-reader";
-> +			status = "disabled";
-> +			#sound-dai-cells = <0>;
-> +			st,syscfg = <&syscfg_core>;
-> +			reg = <0x8D83000 0x158>;
-> +			interrupts = <GIC_SPI 87 IRQ_TYPE_NONE>;
-> +			dmas = <&fdma0 5 0 1>;
-> +			dma-names = "rx";
-> +			dai-name = "Uni Reader #0 (PCM IN)";
-> +			st,version = <3>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&pinctrl_i2s_8ch_in>;
-suppress pinctrl declaration
-> +		};
-> +
-> +		sti_uni_reader1: sti-uni-reader at 1 {
-> +			compatible = "st,sti-uni-reader";
-> +			status = "disabled";
-> +			#sound-dai-cells = <0>;
-> +			st,syscfg = <&syscfg_core>;
-> +			reg = <0x8D84000 0x158>;
-> +			interrupts = <GIC_SPI 88 IRQ_TYPE_NONE>;
-> +			dmas = <&fdma0 6 0 1>;
-> +			dma-names = "rx";
-> +			dai-name = "Uni Reader #1 (HDMI RX)";
-> +			st,version = <3>;
-> +		};
->  	};
->  };
-> 
+	Arnd
