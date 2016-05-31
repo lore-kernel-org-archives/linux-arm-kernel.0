@@ -1,33 +1,20 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 May 2016 12:49:16 +0200
-Subject: [PATCH 10/17] pinctrl: uniphier: introduce capability flag
-In-Reply-To: <1464681923-7469-11-git-send-email-yamada.masahiro@socionext.com>
+Date: Tue, 31 May 2016 12:50:22 +0200
+Subject: [PATCH 11/17] pinctrl: uniphier: support per-pin input enable for
+ new SoCs
+In-Reply-To: <1464681923-7469-12-git-send-email-yamada.masahiro@socionext.com>
 References: <1464681923-7469-1-git-send-email-yamada.masahiro@socionext.com>
- <1464681923-7469-11-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdaGqCfNYcqNbWwLzcBngqrPX23JDOyQfeeBO+5ngxd1gQ@mail.gmail.com>
+ <1464681923-7469-12-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdYUusdcLR2Q-KCwyg=_PDbLkrn22gvDx27nb9YhSdQnRw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, May 31, 2016 at 10:05 AM, Masahiro Yamada
 <yamada.masahiro@socionext.com> wrote:
 
-> The core part of the UniPhier pinctrl driver needs to support a new
-> capability for upcoming UniPhier ARMv8 SoCs.  This sometimes happens
-> because pinctrl drivers include really SoC-specific stuff.
->
-> This commit intends to tidy up SoC-specific parameters of the existing
-> drivers before adding the new one.  Having just one flag would be
-> better than adding a new struct member every time a new SoC-specific
-> capability comes up.
->
-> At this time, there is one flag, UNIPHIER_PINCTRL_CAPS_DBGMUX_SEPARATE.
-> This capability (I'd say rather quirk) was added for PH1-Pro4 and
-> PH1-Pro5 as requirement from a customer.  For those SoCs, one pin-mux
-> setting is controlled by the combination of two separate registers; the
-> LSB bits at register offset (8 * N) and the MSB bits at (8 * N + 4).
-> Because it is impossible to update two separate registers atomically,
-> the LOAD_PINCTRL register should be set in order to make the pin-mux
-> settings really effective.
+> Upcoming new pinctrl drivers for PH1-LD11 and PH-LD20 support input
+> signal gating for each pin.  (While, existing ones only support it
+> per pin-group.)  This commit updates the core part for that.
 >
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
