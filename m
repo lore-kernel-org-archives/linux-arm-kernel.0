@@ -1,60 +1,101 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Tue, 31 May 2016 10:04:20 -0700
-Subject: [RFC v2] dma-mapping: Use unsigned long for dma_attrs
-In-Reply-To: <1464609246-6948-2-git-send-email-k.kozlowski@samsung.com>
-References: <1464609246-6948-1-git-send-email-k.kozlowski@samsung.com>
- <1464609246-6948-2-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160531170420.GB25366@infradead.org>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 31 May 2016 18:04:40 +0100
+Subject: [PATCH v3] arm64: Implement optimised IP checksum helpers
+In-Reply-To: <ba9cf5bf84b8adc766f7f7511dda8cb501cd4101.1464693619.git.robin.murphy@arm.com>
+References: <ba9cf5bf84b8adc766f7f7511dda8cb501cd4101.1464693619.git.robin.murphy@arm.com>
+Message-ID: <4cef631ae5ff455d080cb17c8e0fa918c9a5c067.1464714040.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 01:54:06PM +0200, Krzysztof Kozlowski wrote:
-> The dma-mapping core and the implementations do not change the
-> DMA attributes passed by pointer.  Thus the pointer can point to const
-> data.  However the attributes do not have to be a bitfield. Instead
-> unsigned long will do fine:
-> 
-> 1. This is just simpler.  Both in terms of reading the code and setting
->    attributes.  Instead of initializing local attributes on the stack and
->    passing pointer to it to dma_set_attr(), just set the bits.
-> 
-> 2. It brings safeness and checking for const correctness because the
->    attributes are passed by value.
-> 
-> Please have in mind that this is RFC, not finished yet.  Only ARM and
-> ARM64 are fixed (and not everywhere).
-> However other API users also have to be converted which is quite
-> intrusive.  I would rather avoid it until the overall approach is
-> accepted.
+AArch64 is capable of 128-bit memory accesses without alignment
+restrictions, which makes it both possible and highly practical to slurp
+up a typical 20-byte IP header in just 2 loads. Implement our own
+version of ip_fast_checksum() to take advantage of that, resulting in
+considerably fewer instructions and memory accesses than the generic
+version. We can also get more optimal code generation for csum_fold() by
+defining it a slightly different way round from the generic version, so
+throw that into the mix too.
 
-This looks great!  Please continue doing the full conversion.
+Suggested-by: Luke Starrett <luke.starrett@broadcom.com>
+Acked-by: Luke Starrett <luke.starrett@broadcom.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-> +/**
-> + * List of possible attributes associated with a DMA mapping. The semantics
-> + * of each attribute should be defined in Documentation/DMA-attributes.txt.
-> + */
-> +#define DMA_ATTR_WRITE_BARRIER		BIT(1)
-> +#define DMA_ATTR_WEAK_ORDERING		BIT(2)
-> +#define DMA_ATTR_WRITE_COMBINE		BIT(3)
-> +#define DMA_ATTR_NON_CONSISTENT		BIT(4)
-> +#define DMA_ATTR_NO_KERNEL_MAPPING	BIT(5)
-> +#define DMA_ATTR_SKIP_CPU_SYNC		BIT(6)
-> +#define DMA_ATTR_FORCE_CONTIGUOUS	BIT(7)
-> +#define DMA_ATTR_ALLOC_SINGLE_PAGES	BIT(8)
+v3: Don't generate generic header [James]
+v2: Include types.h, add Luke's ack
 
-No really for this patch, but I would much prefer to document them next
-to the code in the long run.  Also I really think these BIT() macros
-are a distraction compared to the (1 << N) notation.
+ arch/arm64/include/asm/Kbuild     |  1 -
+ arch/arm64/include/asm/checksum.h | 51 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 51 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm64/include/asm/checksum.h
 
-> +/**
-> + * dma_get_attr - check for a specific attribute
-> + * @attr: attribute to look for
-> + * @attrs: attributes to check within
-> + */
-> +static inline bool dma_get_attr(unsigned long attr, unsigned long attrs)
-> +{
-> +	return !!(attr & attrs);
-> +}
-
-I'd just kill this helper, much easier to simply open code it in the
-caller.
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index cff532a6744e..f43d2c44c765 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -1,6 +1,5 @@
+ generic-y += bug.h
+ generic-y += bugs.h
+-generic-y += checksum.h
+ generic-y += clkdev.h
+ generic-y += cputime.h
+ generic-y += current.h
+diff --git a/arch/arm64/include/asm/checksum.h b/arch/arm64/include/asm/checksum.h
+new file mode 100644
+index 000000000000..09f65339d66d
+--- /dev/null
++++ b/arch/arm64/include/asm/checksum.h
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (C) 2016 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_CHECKSUM_H
++#define __ASM_CHECKSUM_H
++
++#include <linux/types.h>
++
++static inline __sum16 csum_fold(__wsum csum)
++{
++	u32 sum = (__force u32)csum;
++	sum += (sum >> 16) | (sum << 16);
++	return ~(__force __sum16)(sum >> 16);
++}
++#define csum_fold csum_fold
++
++static inline __sum16 ip_fast_csum(const void *iph, unsigned int ihl)
++{
++	__uint128_t tmp;
++	u64 sum;
++
++	tmp = *(const __uint128_t *)iph;
++	iph += 16;
++	ihl -= 4;
++	tmp += ((tmp >> 64) | (tmp << 64));
++	sum = tmp >> 64;
++	do {
++		sum += *(const u32 *)iph;
++		iph += 4;
++	} while (--ihl);
++
++	sum += ((sum >> 32) | (sum << 32));
++	return csum_fold(sum >> 32);
++}
++#define ip_fast_csum ip_fast_csum
++
++#include <asm-generic/checksum.h>
++
++#endif	/* __ASM_CHECKSUM_H */
+-- 
+2.8.1.dirty
