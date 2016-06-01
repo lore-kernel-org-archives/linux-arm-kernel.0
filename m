@@ -1,20 +1,25 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 1 Jun 2016 10:17:24 +0200
-Subject: [PATCH 10/13] ARM: dts: r8a7792: add IRQC support
-In-Reply-To: <3573091.BUvyGW3hVt@wasted.cogentembedded.com>
+Date: Wed, 1 Jun 2016 10:22:28 +0200
+Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
+In-Reply-To: <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
 References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <3573091.BUvyGW3hVt@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdWvaGyWEbotmG53CW9hB2avJAbmJS72WXVod64UEdmf1w@mail.gmail.com>
+ <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdU2P6VKXNpEHGOKpyuM45Pk0CuHWngxwu5AYGqYfduXXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2016 at 12:29 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Describe the IRQC interrupt controller in the R8A7792 device tree.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi Sergei,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Wed, Jun 1, 2016 at 12:33 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
+> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+
+> +       ethernet at 18000000 {
+> +               compatible = "smsc,lan89218", "smsc,lan9115";
+
+The "smsc,lan89218" needs to be documented in the device tree bindings.
+Google couldn't find any evidence you submitted a patch for that.
 
 Gr{oetje,eeting}s,
 
