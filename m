@@ -1,42 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 1 Jun 2016 17:02:39 +0300
-Subject: [PATCH 10/13] ARM: dts: r8a7792: add IRQC support
-In-Reply-To: <20160601011813.GJ20527@verge.net.au>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <3573091.BUvyGW3hVt@wasted.cogentembedded.com>
- <20160601011813.GJ20527@verge.net.au>
-Message-ID: <b0c021a2-f8e6-bab4-3556-b61895f49b78@cogentembedded.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 01 Jun 2016 16:08:33 +0200
+Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
+In-Reply-To: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+References: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1464790113.3522.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 04:18 AM, Simon Horman wrote:
+Hi Kevin,
 
->> Describe the IRQC interrupt controller in the R8A7792 device tree.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->>  arch/arm/boot/dts/r8a7792.dtsi |   13 +++++++++++++
->>  1 file changed, 13 insertions(+)
->>
->> Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
->> ===================================================================
->> --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
->> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
->> @@ -62,6 +62,19 @@
->>  			      IRQ_TYPE_LEVEL_HIGH)>;
->>  	};
->>
->> +	irqc: interrupt-controller at e61c0000 {
->
-> Could you consider using irqc0 as the node name for consistency with the
-> DT of other R-Car Gen2 SoCs?
+Am Montag, den 30.05.2016, 15:27 +0200 schrieb Neil Armstrong:
+> Patchset to add and enable the reset controller driver on Meson SoCs platforms.
+> 
+> This reset controller has up to 256 reset lines with reset pulse generation only,
+> so the assert and deassert calls are not available.
+> 
+> Depends on the patch :
+>  - "reset: add devm_reset_controller_register API" [1]
+> 
+> Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
+> - Get back __iomem in _reset() callback
+> - Get rid of MODULE_ALIAS
+> 
+> Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
+> - Remove _gxbb_ in names
+> - Depends build on ARCH_MESON only
+> - Add meson8b compatible and bindings
+> - Re-indent dt-bindings headers
+> - Switch to devm_ reset controller register
+> - Remove platform "remove" callback
+> - Update Dual BSD/GPL file headers
+> 
+> Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
+> - Fix register mapping and bit defines in bindings header
+> - Remove assert and unassert calls
+> - Fix missing __iomem
+> 
+> [1] https://patchwork.kernel.org/patch/8988471/
+> 
+> Neil Armstrong (4):
+>   reset: Add support for the Amlogic Meson SoC Reset Controller
+>   dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
+>   ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
+>   ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
 
-    Frankly speaking I didn't get that name indexing thing at all. Could you 
-share the reasoning behind it?
+Should I take the two device tree patches into the reset tree?
+Is resolving the reset/deassert situation a prerequisite for these
+patches?
 
-> What follows looks correct to me.
-
-    Thank you. :-)
-
-MBR, Sergei
+regards
+Philipp
