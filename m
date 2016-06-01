@@ -1,49 +1,138 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 1 Jun 2016 14:27:57 +0200
-Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
-In-Reply-To: <a60346f2-2abb-342b-dd20-38d401c4ceb3@cogentembedded.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
- <CAMuHMdU2P6VKXNpEHGOKpyuM45Pk0CuHWngxwu5AYGqYfduXXg@mail.gmail.com>
- <a60346f2-2abb-342b-dd20-38d401c4ceb3@cogentembedded.com>
-Message-ID: <CAMuHMdXUdg8+ux2j5SsthZS6DWZnHfan0jL=PpYEwfnS7fbRkQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed,  1 Jun 2016 14:31:22 +0200
+Subject: [PATCH 1/3] pci: introduce read_bridge/write_bridge pci ops
+Message-ID: <1464784332-3775650-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+A lot of PCI host bridges require different methods for initiating
+type 0 and type 1 config space accesses, leading to duplication of
+code.
 
-On Wed, Jun 1, 2016 at 2:16 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> On 6/1/2016 11:22 AM, Geert Uytterhoeven wrote:
->>> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
->>> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
->>
->>> +       ethernet at 18000000 {
->>> +               compatible = "smsc,lan89218", "smsc,lan9115";
->>
->>
->> The "smsc,lan89218" needs to be documented in the device tree bindings.
->
->    Have you looked at those bindings?
+This adds support for the two different kinds at the pci_ops
+level, with the newly added map_bridge/read_bridge/write_bridge
+operations for type 1 accesses.
 
-Now I did.
+When these are not set, we fall back to the regular map_bus/read/write
+operations, so all existing drivers keep working, and bridges that
+have identical operations continue to only require one set.
 
->> Google couldn't find any evidence you submitted a patch for that.
->
->    Because the bindings document *any* LAN9115 compatible chip already.
+In most cases, a driver will only have to override either map_bridge
+or read_bridge/write_bridge but not both.
 
-Ah, generic wildcard, not listing valid values. Hence checkpatch complained...
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+This is slightly refined over what I had in the "Add PCIe driver for
+Rockchip Soc" thread earlier, but probably not the final version yet,
+so I'd like to get more feedback on it.
 
-Google predict-while-you-type suggests "lan89218aq"? Should you use that?
-BTW, that's why we always want to document all valid values...
+In particular, I think it may be useful to add a third set of
+functions for the config space of devices that are directly attached
+to the host bridge, as those are sometimes (designware, rcar, mvebu)
+yet again different from the host bridge itself and from all other
+devices. On the other hand, that adds further complexity that we
+may want to leave out of the common code, and I honestly can't
+seem to come up for a catchy name form the callbacks.
 
-Gr{oetje,eeting}s,
+ drivers/pci/access.c | 35 +++++++++++++++++++++++++++--------
+ include/linux/pci.h  |  3 +++
+ 2 files changed, 30 insertions(+), 8 deletions(-)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/drivers/pci/access.c b/drivers/pci/access.c
+index d11cdbb8fba3..263606ece211 100644
+--- a/drivers/pci/access.c
++++ b/drivers/pci/access.c
+@@ -34,9 +34,12 @@ int pci_bus_read_config_##size \
+ 	u32 data = 0;							\
+ 	if (PCI_##size##_BAD) return PCIBIOS_BAD_REGISTER_NUMBER;	\
+ 	raw_spin_lock_irqsave(&pci_lock, flags);			\
+-	res = bus->ops->read(bus, devfn, pos, len, &data);		\
++	if (!bus->parent == 0 && bus->ops->read_bridge)			\
++		res = bus->ops->read_bridge(bus, devfn, pos, len, &data);	\
++	else								\
++		res = bus->ops->read(bus, devfn, pos, len, &data);	\
+ 	*value = (type)data;						\
+-	raw_spin_unlock_irqrestore(&pci_lock, flags);		\
++	raw_spin_unlock_irqrestore(&pci_lock, flags);			\
+ 	return res;							\
+ }
+ 
+@@ -48,8 +51,11 @@ int pci_bus_write_config_##size \
+ 	unsigned long flags;						\
+ 	if (PCI_##size##_BAD) return PCIBIOS_BAD_REGISTER_NUMBER;	\
+ 	raw_spin_lock_irqsave(&pci_lock, flags);			\
+-	res = bus->ops->write(bus, devfn, pos, len, value);		\
+-	raw_spin_unlock_irqrestore(&pci_lock, flags);		\
++	if (!bus->parent && bus->ops->write_bridge)			\
++		res = bus->ops->write_bridge(bus, devfn, pos, len, value);\
++	else								\
++		res = bus->ops->write(bus, devfn, pos, len, value);	\
++	raw_spin_unlock_irqrestore(&pci_lock, flags);			\
+ 	return res;							\
+ }
+ 
+@@ -72,7 +78,11 @@ int pci_generic_config_read(struct pci_bus *bus, unsigned int devfn,
+ {
+ 	void __iomem *addr;
+ 
+-	addr = bus->ops->map_bus(bus, devfn, where);
++	if (!bus->parent && bus->ops->map_bridge)
++		addr = bus->ops->map_bridge(bus, devfn, where);
++	else
++		addr = bus->ops->map_bus(bus, devfn, where);
++
+ 	if (!addr) {
+ 		*val = ~0;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+@@ -94,7 +104,10 @@ int pci_generic_config_write(struct pci_bus *bus, unsigned int devfn,
+ {
+ 	void __iomem *addr;
+ 
+-	addr = bus->ops->map_bus(bus, devfn, where);
++	if (!bus->parent && bus->ops->map_bridge)
++		addr = bus->ops->map_bridge(bus, devfn, where);
++	else
++		addr = bus->ops->map_bus(bus, devfn, where);
+ 	if (!addr)
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+@@ -114,7 +127,10 @@ int pci_generic_config_read32(struct pci_bus *bus, unsigned int devfn,
+ {
+ 	void __iomem *addr;
+ 
+-	addr = bus->ops->map_bus(bus, devfn, where & ~0x3);
++	if (!bus->parent && bus->ops->map_bridge)
++		addr = bus->ops->map_bridge(bus, devfn, where);
++	else
++		addr = bus->ops->map_bus(bus, devfn, where & ~0x3);
+ 	if (!addr) {
+ 		*val = ~0;
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+@@ -135,7 +151,10 @@ int pci_generic_config_write32(struct pci_bus *bus, unsigned int devfn,
+ 	void __iomem *addr;
+ 	u32 mask, tmp;
+ 
+-	addr = bus->ops->map_bus(bus, devfn, where & ~0x3);
++	if (!bus->parent && bus->ops->map_bridge)
++		addr = bus->ops->map_bridge(bus, devfn, where);
++	else
++		addr = bus->ops->map_bus(bus, devfn, where & ~0x3);
+ 	if (!addr)
+ 		return PCIBIOS_DEVICE_NOT_FOUND;
+ 
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index df41c4645911..2b1d08771b36 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -580,6 +580,9 @@ struct pci_ops {
+ 	void __iomem *(*map_bus)(struct pci_bus *bus, unsigned int devfn, int where);
+ 	int (*read)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val);
+ 	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
++	void __iomem *(*map_bridge)(struct pci_bus *bus, unsigned int devfn, int where);
++	int (*read_bridge)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val);
++	int (*write_bridge)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
+ };
+ 
+ /*
+-- 
+2.7.0
