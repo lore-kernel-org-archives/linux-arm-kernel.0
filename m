@@ -1,26 +1,55 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 1 Jun 2016 10:24:51 +0900
-Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
-In-Reply-To: <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
-Message-ID: <20160601012451.GL20527@verge.net.au>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Wed, 01 Jun 2016 10:25:05 +0900
+Subject: [PATCH 1/3] mmc: fix mmc mode selection for HS-DDR and higher
+In-Reply-To: <1464505484-3661-2-git-send-email-wens@csie.org>
+References: <1464505484-3661-1-git-send-email-wens@csie.org>
+ <CGME20160529070454epcas1p4cf3be0deda6773296b516e7d25a4188e@epcas1p4.samsung.com>
+ <1464505484-3661-2-git-send-email-wens@csie.org>
+Message-ID: <574E3971.30202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 01:33:49AM +0300, Sergei Shtylyov wrote:
-> R8A7792  SoC  doesn't have the EtherMAC core, so SMSC  LAN89218  Ethernet
-> chip was used instead on the Blanche board; this chip  is compatible with
-> SMSC LAN9115  for  which there's a (device tree aware) driver. Describe
-> the  chip in  the  Blanche device tree;  enable DHCP and NFS root in the
-> kernel command line for the kernel booting.
+On 05/29/2016 04:04 PM, Chen-Yu Tsai wrote:
+> When IS_ERR_VALUE was removed from the mmc core code, it was replaced
+> with a simple not-zero check. This does not work, as the value checked
+> is the return value for mmc_select_bus_width, which returns the set
+> bit width on success. This made eMMC modes higher than HS-DDR unusable.
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Fix this by checking for a positive return value instead.
+> 
+> Fixes: 287980e49ffc ("remove lots of IS_ERR_VALUE abuses")
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-At this time I do not have access to documentation or hardware for this
-board. So I am relying on you to test this and make sure it complies
-with the spec.
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
 
-What you have looks reasonable to me:
+Best Regards,
+Jaehoon Chung
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  drivers/mmc/core/mmc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index c984321d1881..aafb73d080ca 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
+>  	 * switch to HS200 mode if bus width is set successfully.
+>  	 */
+>  	err = mmc_select_bus_width(card);
+> -	if (!err) {
+> +	if (err > 0) {
+>  		val = EXT_CSD_TIMING_HS200 |
+>  		      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
+>  		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+> @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>  	} else if (mmc_card_hs(card)) {
+>  		/* Select the desired bus width optionally */
+>  		err = mmc_select_bus_width(card);
+> -		if (!err) {
+> +		if (err > 0) {
+>  			err = mmc_select_hs_ddr(card);
+>  			if (err)
+>  				goto free_card;
+> 
