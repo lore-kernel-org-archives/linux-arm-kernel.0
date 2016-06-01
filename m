@@ -1,44 +1,41 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  1 Jun 2016 23:43:32 +0200
-Subject: [PATCH 23/32] ARM: bcm2835: Enable SDHOST by default.
+Date: Wed,  1 Jun 2016 23:43:28 +0200
+Subject: [PATCH 19/32] bcm2837-rpi-3-b.dts: move most RPi default pin groups
+ to their devices
 In-Reply-To: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
 References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1464817421-8519-24-git-send-email-kraxel@redhat.com>
+Message-ID: <1464817421-8519-20-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Anholt <eric@anholt.net>
-
-This improves read speed on my SD card (as reported by hdparm -t) from
-10.15MB/sec to 16.70MB/sec.  Once we add slave DMA, we can get to
-18.45MB/sec.
-
-Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts | 14 +++-----------
+ 1 file changed, 3 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index a207693..97496cd 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -65,8 +65,16 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&emmc_gpio48>;
- 
-+	bus-width = <4>;
-+};
-+
-+&sdhost {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdhost_gpio48>;
-+
-+	bus-width = <4>;
-+
- 	status = "okay";
--	bus-width = <4>;
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+index 8579df3..4636c16 100644
+--- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
++++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+@@ -25,17 +25,9 @@
+ 	};
  };
  
- &pwm {
+-&gpio {
+-	pinctrl-0 = <&i2c0_gpio0
+-		     &i2c1_gpio2
+-		     &gpclk0_gpio4
+-		     &gpclk1_gpio5
+-		     &spi0_gpio7
+-		     &pcm_gpio18
+-		     &pwm0_gpio40
+-		     &pwm1_gpio45
+-		     &emmc_gpio48
+-		     &gpioout>;
++&i2s {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcm_gpio18>;
+ };
+ 
+ &uart1 {
 -- 
 1.8.3.1
