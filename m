@@ -1,25 +1,37 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jun 2016 17:17:29 +0100
-Subject: [PATCH 2/2] ARM: dts: imx6: tag boards that have the HW
- workaround for ERR006687
-In-Reply-To: <1464794983-31484-3-git-send-email-l.stach@pengutronix.de>
-References: <1464794983-31484-1-git-send-email-l.stach@pengutronix.de>
- <1464794983-31484-3-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20160601161729.GB19428@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed,  1 Jun 2016 09:21:52 -0700
+Subject: [PATCH] ARM: dts: Fix omap5 SDIO dat1 interrupt
+Message-ID: <1464798112-8793-1-git-send-email-tony@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 05:29:43PM +0200, Lucas Stach wrote:
-> @@ -97,6 +97,7 @@
->  	phy-reset-gpios = <&gpio3 31 0>;
->  	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
->  			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
-> +	fsl,err006687-war-present;
+The SDIO wakeirq is wrong, it needs to be SDIO dat1 line, not dat0.
+Otherwise the system won't wake to SDIO interrupts from idle states.
 
-war?  Any reason not to spell it out, or use the more natural
-abbreviation "wa"?
+This makes the wl12xx behave better on igepv5, otherwise we may have hard
+time connecting to an access point.
 
+And omap5-uevm or wl18xx still seems to have some other issues remaining.
+
+Cc: Agust? Fontquerni <af@iseebcn.com>
+Cc: Eduard Gavin <egavin@iseebcn.com>
+Cc: Enric Balletbo Serra <eballetbo@gmail.com>
+Cc: Uri Mashiach <uri.mashiach@compulab.co.il>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/boot/dts/omap5-board-common.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+--- a/arch/arm/boot/dts/omap5-board-common.dtsi
++++ b/arch/arm/boot/dts/omap5-board-common.dtsi
+@@ -357,7 +357,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc3_pins &wlcore_irq_pin>;
+ 	interrupts-extended = <&gic GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH
+-			       &omap5_pmx_core 0x168>;
++			       &omap5_pmx_core 0x16a>;
+ 
+ 	#address-cells = <1>;
+ 	#size-cells = <0>;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.8.1
