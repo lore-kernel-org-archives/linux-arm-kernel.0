@@ -1,59 +1,28 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 01 Jun 2016 20:48:31 +0200
-Subject: [RFC PATCH 0/2] scpi: Add SCPI framework to handle vendors
- variants
-In-Reply-To: <7hy46oeusn.fsf@baylibre.com>
-References: <1464255491-18503-1-git-send-email-narmstrong@baylibre.com>
- <574EB4A5.9000805@arm.com> <7hy46oeusn.fsf@baylibre.com>
-Message-ID: <2913601.uXsaKdIlc0@diego>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Wed, 1 Jun 2016 11:58:34 -0700
+Subject: [PATCH 1/3] mmc: fix mmc mode selection for HS-DDR and higher
+In-Reply-To: <1464505484-3661-2-git-send-email-wens@csie.org>
+References: <1464505484-3661-1-git-send-email-wens@csie.org>
+ <1464505484-3661-2-git-send-email-wens@csie.org>
+Message-ID: <CAOCOHw7aHvSUUoxkrDkGwNrTGNbZm-3RSuhJF3CCvRUiK5tDgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am Mittwoch, 1. Juni 2016, 09:30:16 schrieb Kevin Hilman:
-> [ + Heiko, who may know about the Rockchip implementation ]
+On Sun, May 29, 2016 at 12:04 AM, Chen-Yu Tsai <wens@csie.org> wrote:
+> When IS_ERR_VALUE was removed from the mmc core code, it was replaced
+> with a simple not-zero check. This does not work, as the value checked
+> is the return value for mmc_select_bus_width, which returns the set
+> bit width on success. This made eMMC modes higher than HS-DDR unusable.
 >
-> Sudeep Holla <sudeep.holla@arm.com> writes:
-> > On 30/05/16 09:30, Neil Armstrong wrote:
-> >> On 05/27/2016 10:17 AM, Neil Armstrong wrote:
-> > [..]
-> > 
-> >> While looking for other ARMv8 based platform, I found that the RK3368
-> >> platform has the same SCPI implementation as Amlogic.
-> >> 
-> >> They extended it with DDR, system and thermal commands.
-> >> 
-> >> Look at :
-> >> https://github.com/geekboxzone/mmallow_kernel/blob/geekbox/drivers/mailbo
-> >> x/scpi_cmd.h>>
-> >>https://github.com/geekboxzone/mmallow_kernel/blob/geekbox/drivers/mailbox
-> >>/scpi_protocol.c>>
-> >> So the SCPI must have a framework to allow different protocol
-> >> versions, and must allow command extension. Grouping Rockchip and
-> >> Amlogic should be done, thus needing a generic name like vendor_scpi
-> >> or with a version.
-> > 
-> > Makes sense. I understand the need to reuse and I need a bit of time to
-> > have a look at the code(both Amlogic one's you have pointed out and the
-> > Rockchip one) in detail to see what's the best way to proceed. I will
-> > have a look at this later this week and get back to you.
-> > 
-> >> Sudeep, could you somehow find out which version of the protocol
-> >> AmLogic and Rockchip based their SCPI development ?
-> > 
-> > Yes I tried checking with Rockchip but didn't get a response. But my
-> > guess is that it was some preliminary unpublished version of SCPI
-> > unfortunately :(
+> Fix this by checking for a positive return value instead.
 
-I only glanced a bit on the scpi stuff of the rk3368, but it seems you already 
-found the rockchip implementation above.
-
-The mailbox driver entered mainline recently, but I think it differs a bit 
-from the one used there.
-
-I've also added Caesar, who did the upstreaming of the mailbox driver, maybe 
-he knows more about the scpi side as well.
+mmc_select_bus_width() can return 0 on "success" as well and the
+previous check was !IS_ERR_VALUE(err), which coverts that. So I
+believe these checks should be for err >= 0 rather than just > 0.
 
 
-Heiko
+Either way this fixes the boot failures seen on my Qualcomm based
+boards with v4.7-rc1.
+
+Regards,
+Bjorn
