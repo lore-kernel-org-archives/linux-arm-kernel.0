@@ -1,47 +1,42 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Wed, 1 Jun 2016 16:01:31 +0200
-Subject: [PATCH 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <CAOAejn0Fsizp9fK1mNn3BBeL2LeoVgt5_zF5656La4G2uDPH7g@mail.gmail.com>
-References: <1462980974-22091-1-git-send-email-cedric.madianga@gmail.com>
- <1462980974-22091-3-git-send-email-cedric.madianga@gmail.com>
- <CALszF6A-jiCBtSO1RFDdgHKTKmsonRXFVs0x2zHha1LJ3UhwtQ@mail.gmail.com>
- <CAOAejn0Fsizp9fK1mNn3BBeL2LeoVgt5_zF5656La4G2uDPH7g@mail.gmail.com>
-Message-ID: <CAOAejn1NQDJpGrTwGtpvSfVOGg3UuCkj8wLJ7B5LnW1-Z2VrQA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 1 Jun 2016 17:02:39 +0300
+Subject: [PATCH 10/13] ARM: dts: r8a7792: add IRQC support
+In-Reply-To: <20160601011813.GJ20527@verge.net.au>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <3573091.BUvyGW3hVt@wasted.cogentembedded.com>
+ <20160601011813.GJ20527@verge.net.au>
+Message-ID: <b0c021a2-f8e6-bab4-3556-b61895f49b78@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+On 06/01/2016 04:18 AM, Simon Horman wrote:
 
->>> +static void stm32f4_i2c_set_speed_mode(struct stm32f4_i2c_dev *i2c_dev)
->>> +{
->>> +       struct stm32f4_i2c_timings *t = &i2c_timings[i2c_dev->speed];
->>> +       u32 ccr, val, clk_rate;
->>> +
->>> +       ccr = readl_relaxed(i2c_dev->base + STM32F4_I2C_CCR);
->>> +       ccr &= ~(STM32F4_I2C_CCR_FS | STM32F4_I2C_CCR_DUTY |
->>> +                STM32F4_I2C_CCR_CCR_MASK);
->>> +
->>> +       clk_rate = clk_get_rate(i2c_dev->clk);
->>> +
->>> +       switch (i2c_dev->speed) {
->>> +       case STM32F4_I2C_SPEED_STANDARD:
->>> +               val = clk_rate / t->rate * 2;
->>> +               if (val < STM32F4_I2C_MIN_CCR)
->>> +                       ccr |= STM32F4_I2C_CCR_CCR(STM32F4_I2C_MIN_CCR);
->>> +               else
->>> +                       ccr |= STM32F4_I2C_CCR_CCR(val);
->>> +               break;
->>> +       case STM32F4_I2C_SPEED_FAST:
->>> +               ccr |= STM32F4_I2C_CCR_FS;
->>> +               if (t->duty) {
->>> +                       ccr |= STM32F4_I2C_CCR_DUTY;
->>> +                       ccr |= STM32F4_I2C_CCR_CCR(clk_rate / t->rate * 25);
->>> +               } else {
->>> +                       ccr |= STM32F4_I2C_CCR_CCR(clk_rate / t->rate * 3);
->>> +               }
->> Is it really useful since duty seems to always be 0?
-> Agree, I will rework it by directly set duty at 0 in the register.
+>> Describe the IRQC interrupt controller in the R8A7792 device tree.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>>  arch/arm/boot/dts/r8a7792.dtsi |   13 +++++++++++++
+>>  1 file changed, 13 insertions(+)
+>>
+>> Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
+>> ===================================================================
+>> --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
+>> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
+>> @@ -62,6 +62,19 @@
+>>  			      IRQ_TYPE_LEVEL_HIGH)>;
+>>  	};
+>>
+>> +	irqc: interrupt-controller at e61c0000 {
+>
+> Could you consider using irqc0 as the node name for consistency with the
+> DT of other R-Car Gen2 SoCs?
 
-Contrary to what I wrote previously, the duty has to be set for FAST
-Mode to reach 400khz.
-So, I am going to keep the timing struct and set duty to 1 for FAST mode
+    Frankly speaking I didn't get that name indexing thing at all. Could you 
+share the reasoning behind it?
+
+> What follows looks correct to me.
+
+    Thank you. :-)
+
+MBR, Sergei
