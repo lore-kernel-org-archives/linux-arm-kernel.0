@@ -1,45 +1,39 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 1 Jun 2016 14:53:00 +0800
-Subject: [PATCH v5 07/18] metag: Remove unnecessary of_platform_populate with
- default match table
+Date: Wed, 1 Jun 2016 14:53:11 +0800
+Subject: [PATCH v5 18/18] Revert "of/platform: export
+ of_default_bus_match_table"
 In-Reply-To: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464763991-26634-8-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1464763991-26634-19-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After patch "of/platform: Add common method to populate default bus",
-it is possible for arch code to remove unnecessary callers of
-of_platform_populate with default match table.
+This reverts commit b80443c2211c7daaabd20fbbe9e7beb3fa3408e0.
 
-Cc: James Hogan <james.hogan@imgtec.com>
+After covering to use helper of_platform_default_populate() to populate
+the default bus, no need to export of_default_bus_match_table anymore.
+
+Reviewed-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/metag/kernel/setup.c | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+ drivers/of/platform.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/metag/kernel/setup.c b/arch/metag/kernel/setup.c
-index 31cf53d..1166f1f 100644
---- a/arch/metag/kernel/setup.c
-+++ b/arch/metag/kernel/setup.c
-@@ -20,7 +20,6 @@
- #include <linux/memblock.h>
- #include <linux/mm.h>
- #include <linux/of_fdt.h>
--#include <linux/of_platform.h>
- #include <linux/pfn.h>
- #include <linux/root_dev.h>
- #include <linux/sched.h>
-@@ -414,9 +413,7 @@ static int __init customize_machine(void)
- 	/* customizes platform devices, or adds new ones */
- 	if (machine_desc->init_machine)
- 		machine_desc->init_machine();
--	else
--		of_platform_populate(NULL, of_default_bus_match_table, NULL,
--				     NULL);
-+
- 	return 0;
- }
- arch_initcall(customize_machine);
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index c559ef8..153dbe1 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -31,7 +31,6 @@ const struct of_device_id of_default_bus_match_table[] = {
+ #endif /* CONFIG_ARM_AMBA */
+ 	{} /* Empty terminated list */
+ };
+-EXPORT_SYMBOL(of_default_bus_match_table);
+ 
+ static int of_dev_node_match(struct device *dev, void *data)
+ {
 -- 
 1.7.12.4
