@@ -1,72 +1,104 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 1 Jun 2016 09:02:11 +0100
-Subject: Tegra baseline test results for v4.7-rc1
-Message-ID: <574E9683.4020405@nvidia.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 01 Jun 2016 10:02:09 +0200
+Subject: [PATCH v3 00/12] usb/mmc/power: Generic power sequence (and fix
+ USB/LAN when TFTP booting)
+Message-ID: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.7-rc1.
-Logs and other details at:
-
-    https://nvtb.github.io//linux/test_v4.7-rc1/20160531073102/
+Hi,
 
 
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
-		   tegra210-p2371-0000, tegra210-smaug
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
-
-PM: System suspend: multi_v7_defconfig:
-    FAIL: ( 1/ 5): tegra30-beaver
-    Pass: ( 4/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice
-
-PM: System suspend: tegra_defconfig:
-    Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+My third approach for a USB power sequence which fixes usb3503+lan
+on Odroid U3 board if it was initialized by bootloader
+(e.g. for TFTP boot).
 
 
-vmlinux object size
-(delta in bytes from test_v4.6 (2dcd0af568b0cf583645c8a317dd12e344b1c72a)):
-   text     data      bss    total  kernel
-+929034   +88176   +17288  +1034498  defconfig
-+225509  +415328    +1928  +642765  multi_v7_defconfig
-+103892  +319480    +4372  +427744  tegra_defconfig
+Changes since v2
+================
+1. Add Javier's reviewed-by tags. Address some comments.
+2. Re-use existing properties for GPIOs etc by pwrseq-simple
+   driver.  New property is still added: "power-sequence".
+   I tried to address and do according to Rob's comments.
+
+   Please look at patch 6/12 ("power: pwrseq: simple: Add support
+   for regulator and generic property") for bindings and the
+   new code around matching "power-sequence" property.
+
+3. I marked the usb code as "EXAMPLE" because that part
+   is left to Peter Chen.
 
 
-Boot-time memory difference
-(delta in bytes from test_v4.6 (2dcd0af568b0cf583645c8a317dd12e344b1c72a))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-     -16k      16k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-     -20k      20k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-     -28k      28k        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-     -32k      32k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
-      -8k       8k        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-     -12k      12k        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
-     -16k      16k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-     -20k      20k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+Problem
+=======
+When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
+the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
+is required, e.g. by suspend to RAM. The actual TFTP boot does
+not have to happen. Just "usb start" from U-Boot is sufficient.
 
---
-nvpublic
+>From the schematics, the regulator is a supply only to LAN, however
+without toggling it off/on, the usb3503 hub won appear neither.
+
+
+Solution
+========
+This is very similar to the MMC pwrseq behavior so the idea is to:
+1. Move MMC pwrseq drivers to generic place,
+2. Extend the pwrseq-simple with regulator toggling,
+3. Add support to USB hub and port core for pwrseq,
+4. Toggle the regulator when needed.
+
+Best regards,
+Krzysztof
+
+Krzysztof Kozlowski (12):
+  power/mmc: Move pwrseq drivers to power/pwrseq
+  MAINTAINERS: Retain Ulf Hansson as the same maintainer of pwrseq
+  power: pwrseq: Enable COMPILE_TEST for drivers
+  power: pwrseq: Remove mmc prefix from mmc_pwrseq
+  power: pwrseq: Generalize mmc_pwrseq operations by removing mmc prefix
+  power: pwrseq: simple: Add support for regulator and generic property
+  power: pwrseq: Add support for USB hubs with external power
+  usb: hub: Handle deferred probe
+  EXAMPLE CODE: usb: port: Parse pwrseq phandle from Device Tree
+  EXAMPLE CODE: usb: hub: Power sequence the ports on activation
+  ARM: dts: exynos: Switch the buck8 to GPIO mode on Odroid U3
+  ARM: dts: exynos: Fix LAN and HUB after bootloader initialization on
+    Odroid U3
+
+ .../pwrseq/pwrseq-emmc.txt}                        |   0
+ .../pwrseq/pwrseq-simple.txt}                      |  29 +++-
+ MAINTAINERS                                        |   9 ++
+ arch/arm/boot/dts/exynos4412-odroidu3.dts          |   5 +
+ drivers/mmc/Kconfig                                |   2 -
+ drivers/mmc/core/Makefile                          |   3 -
+ drivers/mmc/core/core.c                            |   8 +-
+ drivers/mmc/core/host.c                            |   2 +-
+ drivers/mmc/core/pwrseq.c                          | 110 ---------------
+ drivers/mmc/core/pwrseq.h                          |  52 -------
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/{mmc/core => power/pwrseq}/Kconfig         |  22 ++-
+ drivers/power/pwrseq/Makefile                      |   3 +
+ drivers/power/pwrseq/pwrseq.c                      | 153 +++++++++++++++++++++
+ drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c   |  17 +--
+ drivers/{mmc/core => power/pwrseq}/pwrseq_simple.c | 110 ++++++++++++---
+ drivers/usb/core/hub.c                             |  16 ++-
+ drivers/usb/core/hub.h                             |   3 +
+ drivers/usb/core/port.c                            |  15 ++
+ include/linux/mmc/host.h                           |   4 +-
+ include/linux/pwrseq.h                             |  63 +++++++++
+ 22 files changed, 414 insertions(+), 214 deletions(-)
+ rename Documentation/devicetree/bindings/{mmc/mmc-pwrseq-emmc.txt => power/pwrseq/pwrseq-emmc.txt} (100%)
+ rename Documentation/devicetree/bindings/{mmc/mmc-pwrseq-simple.txt => power/pwrseq/pwrseq-simple.txt} (53%)
+ delete mode 100644 drivers/mmc/core/pwrseq.c
+ delete mode 100644 drivers/mmc/core/pwrseq.h
+ rename drivers/{mmc/core => power/pwrseq}/Kconfig (60%)
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/pwrseq.c
+ rename drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c (88%)
+ rename drivers/{mmc/core => power/pwrseq}/pwrseq_simple.c (52%)
+ create mode 100644 include/linux/pwrseq.h
+
+-- 
+1.9.1
