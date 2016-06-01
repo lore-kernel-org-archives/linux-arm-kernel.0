@@ -1,431 +1,90 @@
-From: chanho.min@lge.com (Chanho Min)
-Date: Wed, 1 Jun 2016 10:39:58 +0900
-Subject: [PATCH 1/2] arm64: dts: Add dts files for LG Electronics's lg1313 SoC
-Message-ID: <1464745199-19186-1-git-send-email-chanho.min@lge.com>
+From: huangtao@rock-chips.com (Huang, Tao)
+Date: Wed, 1 Jun 2016 09:58:08 +0800
+Subject: [PATCH 4/5] clocksource: rockchip: add support for rk3399 SoC
+In-Reply-To: <574D9A66.4090209@linaro.org>
+References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
+ <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
+ <574CCCB4.1030001@linaro.org> <574D95AF.2020905@rock-chips.com>
+ <574D9A66.4090209@linaro.org>
+Message-ID: <574E4130.8090600@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dtsi file to support lg1313 SoC which based on Cortex-A53.
-Also add dts file to support lg1312 reference board which based
-on lg1313 SoC.
+Hi Daniel:
+On 2016?05?31? 22:06, Daniel Lezcano wrote:
+>>
+>> @@ -46,15 +48,20 @@ static inline void __iomem *rk_base(struct
+>> clock_event_device *ce)
+>>   	return rk_timer(ce)->base;
+>>   }
+>>
+>> +static inline void __iomem *rk_ctrl(struct clock_event_device *ce)
+>> +{
+>> +	return rk_timer(ce)->base + rk_timer(ce)->ctrl;
+> 
+> You can do a small optimization by pre-computing 'ctrl' at init time, so 
+> no need to do this addition each time.
 
-Signed-off-by: Chanho Min <chanho.min@lge.com>
----
- arch/arm64/boot/dts/lg/Makefile       |    1 +
- arch/arm64/boot/dts/lg/lg1313-ref.dts |   36 ++++
- arch/arm64/boot/dts/lg/lg1313.dtsi    |  351 +++++++++++++++++++++++++++++++++
- 3 files changed, 388 insertions(+)
- create mode 100644 arch/arm64/boot/dts/lg/lg1313-ref.dts
- create mode 100644 arch/arm64/boot/dts/lg/lg1313.dtsi
+I understand what you mean, please see comment below.
+And even we use ctrl as pointer, we still will get addition LDR other
+then ADD.
+This is disassemble code before:
+   0:	f9408021 	ldr	x1, [x1,#256]
+   4:	52800003 	mov	w3, #0x0
+   8:	91004022 	add	x2, x1, #0x10
+   c:	b9000043 	str	w3, [x2]
+This is disassemble code after change:
+   0:	52800003 	mov	w3, #0x0
+   4:	f9408422 	ldr	x2, [x1,#264]
+   8:	b9000043 	str	w3, [x2]
+   c:	f9408021 	ldr	x1, [x1,#256]
+Of course we can assume cache hit.
 
-diff --git a/arch/arm64/boot/dts/lg/Makefile b/arch/arm64/boot/dts/lg/Makefile
-index b0cc649..5c7b54c1 100644
---- a/arch/arm64/boot/dts/lg/Makefile
-+++ b/arch/arm64/boot/dts/lg/Makefile
-@@ -1,4 +1,5 @@
- dtb-$(CONFIG_ARCH_LG1K) += lg1312-ref.dtb
-+dtb-$(CONFIG_ARCH_LG1K) += lg1313-ref.dtb
- 
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/lg/lg1313-ref.dts b/arch/arm64/boot/dts/lg/lg1313-ref.dts
-new file mode 100644
-index 0000000..df0ece4
---- /dev/null
-+++ b/arch/arm64/boot/dts/lg/lg1313-ref.dts
-@@ -0,0 +1,36 @@
-+/*
-+ * dts file for lg1313 Reference Board.
-+ *
-+ * Copyright (C) 2016, LG Electronics
-+ */
-+
-+/dts-v1/;
-+
-+#include "lg1313.dtsi"
-+
-+/ {
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+
-+	model = "LG Electronics, DTV SoC LG1313 Reference Board";
-+	compatible = "lge,lg1313-ref", "lge,lg1313";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		serial1 = &uart1;
-+		serial2 = &uart2;
-+	};
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x0 0x00000000 0x20000000>;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&uart0 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/lg/lg1313.dtsi b/arch/arm64/boot/dts/lg/lg1313.dtsi
-new file mode 100644
-index 0000000..e703e11
---- /dev/null
-+++ b/arch/arm64/boot/dts/lg/lg1313.dtsi
-@@ -0,0 +1,351 @@
-+/*
-+ * dts file for lg1313 SoC
-+ *
-+ * Copyright (C) 2016, LG Electronics
-+ */
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	compatible = "lge,lg1313";
-+	interrupt-parent = <&gic>;
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			next-level-cache = <&L2_0>;
-+		};
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+			next-level-cache = <&L2_0>;
-+		};
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+			next-level-cache = <&L2_0>;
-+		};
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+			next-level-cache = <&L2_0>;
-+		};
-+		L2_0: l2-cache0 {
-+			compatible = "cache";
-+		};
-+	};
-+
-+	psci {
-+		compatible  = "arm,psci-0.2", "arm,psci";
-+		method = "smc";
-+		cpu_suspend = <0x84000001>;
-+		cpu_off = <0x84000002>;
-+		cpu_on = <0x84000003>;
-+	};
-+
-+	gic: interrupt-controller at c0001000 {
-+		#interrupt-cells = <3>;
-+		compatible = "arm,gic-400";
-+		interrupt-controller;
-+		reg = <0x0 0xc0001000 0x1000>,
-+		      <0x0 0xc0002000 0x2000>,
-+		      <0x0 0xc0004000 0x2000>,
-+		      <0x0 0xc0006000 0x2000>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a53-pmu";
-+		interrupts = <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 150 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 151 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>,
-+				     <&cpu1>,
-+				     <&cpu2>,
-+				     <&cpu3>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_RAW(0x0f) |
-+			      IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14 (GIC_CPU_MASK_RAW(0x0f) |
-+			      IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11 (GIC_CPU_MASK_RAW(0x0f) |
-+			      IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10 (GIC_CPU_MASK_RAW(0x0f) |
-+			      IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	clk_bus: clk_bus {
-+		#clock-cells = <0>;
-+
-+		compatible = "fixed-clock";
-+		clock-frequency = <198000000>;
-+		clock-output-names = "BUSCLK";
-+	};
-+
-+	soc {
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		eth0: ethernet at c3700000 {
-+			compatible = "cdns,gem";
-+			reg = <0x0 0xc3700000 0x1000>;
-+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>, <&clk_bus>;
-+			clock-names = "hclk", "pclk";
-+			phy-mode = "rmii";
-+			/* Filled in by boot */
-+			mac-address = [ 00 00 00 00 00 00 ];
-+		};
-+	};
-+
-+	amba {
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		#interrupts-cells = <3>;
-+
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+		ranges;
-+
-+		timers: timer at fd100000 {
-+			compatible = "arm,sp804";
-+			reg = <0x0 0xfd100000 0x1000>;
-+			interrupts = <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+		};
-+		wdog: watchdog at fd200000 {
-+			compatible = "arm,sp805", "arm,primecell";
-+			reg = <0x0 0xfd200000 0x1000>;
-+			interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+		};
-+		uart0: serial at fe000000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x0 0xfe000000 0x1000>;
-+			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		uart1: serial at fe100000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x0 0xfe100000 0x1000>;
-+			interrupts = <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		uart2: serial at fe200000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x0 0xfe200000 0x1000>;
-+			interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		spi0: ssp at fe800000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x0 0xfe800000 0x1000>;
-+			interrupts = <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+		};
-+		spi1: ssp at fe900000 {
-+			compatible = "arm,pl022", "arm,primecell";
-+			reg = <0x0 0xfe900000 0x1000>;
-+			interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+		};
-+		dmac0: dma at c1128000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0x0 0xc1128000 0x1000>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+		};
-+		gpio0: gpio at fd400000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd400000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio1: gpio at fd410000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd410000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio2: gpio at fd420000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd420000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio3: gpio at fd430000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd430000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+		};
-+		gpio4: gpio at fd440000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd440000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio5: gpio at fd450000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd450000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio6: gpio at fd460000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd460000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio7: gpio at fd470000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd470000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio8: gpio at fd480000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd480000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio9: gpio at fd490000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd490000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio10: gpio at fd4a0000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd4a0000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio11: gpio at fd4b0000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd4b0000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+		};
-+		gpio12: gpio at fd4c0000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd4c0000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio13: gpio at fd4d0000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd4d0000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio14: gpio at fd4e0000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd4e0000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio15: gpio at fd4f0000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd4f0000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio16: gpio at fd500000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd500000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+			status="disabled";
-+		};
-+		gpio17: gpio at fd510000 {
-+			#gpio-cells = <2>;
-+			compatible = "arm,pl061", "arm,primecell";
-+			gpio-controller;
-+			reg = <0x0 0xfd510000 0x1000>;
-+			clocks = <&clk_bus>;
-+			clock-names = "apb_pclk";
-+		};
-+	};
-+};
--- 
-1.7.9.5
+> 
+>> +}
+>> +
+>>   static inline void rk_timer_disable(struct clock_event_device *ce)
+>>   {
+>> -	writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
+>> +	writel_relaxed(TIMER_DISABLE, rk_ctrl(ce));
+>>   }
+>>
+>>   static inline void rk_timer_enable(struct clock_event_device *ce, u32
+>> flags)
+>>   {
+>>   	writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+>> -		       rk_base(ce) + TIMER_CONTROL_REG);
+>> +		       rk_ctrl(ce));
+>>   }
+>>
+>>   static void rk_timer_update_counter(unsigned long cycles,
+>> @@ -179,4 +186,19 @@ out_unmap:
+>>   	iounmap(bc_timer.base);
+>>   }
+>>
+>> -CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+>> +static void __init rk3288_timer_init(struct device_node *np)
+>> +{
+>> +	bc_timer.ctrl = TIMER_CONTROL_REG3288;
+>> +	rk_timer_init(np);
+> 
+> 	rk_timer_init(np);
+> 	bc_timer.ctrl = bc_timer.base + TIMER_CONTROL_REG3288;
+
+No. It's not such simple. You will access null pointer when
+rk_timer_init, if we keep rk_timer_disable call in init or after
+request_irq/clockevents_config_and_register and interrupt happen
+immediately.
+
+So the code maybe:
+static void __init rk3288_timer_init(struct device_node *np)
+{
+	bc_timer.base = of_iomap(np, 0);
+	if (!bc_timer.base) {
+		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
+		return;
+	}
+	bc_timer.ctrl = bc_timer.base + TIMER_CONTROL_REG3288;
+	rk_imter_init(np); // of course remove of_iomap from init.
+
+Is this what you want?
