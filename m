@@ -1,83 +1,80 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 01 Jun 2016 15:28:13 +0200
-Subject: [PATCH] ARM: dts: imx6: add support for Auvidea H100 board
-In-Reply-To: <CAOMZO5CQvhJTBN7iHD5dkiTCnFy=fVe9hd6CLOrDUR4K7JqyXA@mail.gmail.com>
-References: <1464785229-27330-1-git-send-email-l.stach@pengutronix.de>
- <CAOMZO5CQvhJTBN7iHD5dkiTCnFy=fVe9hd6CLOrDUR4K7JqyXA@mail.gmail.com>
-Message-ID: <1464787693.25525.12.camel@pengutronix.de>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed, 1 Jun 2016 15:52:06 +0200
+Subject: [PULL] drm: atmel-hlcdc: fixes for 4.7-rc2
+In-Reply-To: <20160601142327.700821ab@bbrezillon>
+References: <20160601142327.700821ab@bbrezillon>
+Message-ID: <20160601155206.47a3d460@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi Dave,
 
-thanks for the review.
+On Wed, 1 Jun 2016 14:23:27 +0200
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-Am Mittwoch, den 01.06.2016, 10:15 -0300 schrieb Fabio Estevam:
-> Hi Lucas,
+> Hi Dave,
 > 
-> On Wed, Jun 1, 2016 at 9:47 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> 
-> > +       reg_3p3v: regulator-3p3v {
-> > +               compatible = "regulator-fixed";
-> > +               regulator-name = "3P3V";
-> > +               regulator-min-microvolt = <3300000>;
-> > +               regulator-max-microvolt = <3300000>;
-> > +               regulator-always-on;
-> 
-> "regulator-always-on" can be removed in this case.
-> 
-Ok.
+> This pull request contains 2 trivial fixes for the atmel-hlcdc driver.
 
-> > +       };
-> > +
-> > +       reg_hdmi: regulator-hdmi {
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&pinctrl_h100_reg_hdmi>;
-> > +               compatible = "regulator-fixed";
-> > +               gpio = <&gpio2 20 0>;
-> 
-> It would be better to use the gpio label like:
-> gpio = <&gpio2 20 GPIO_ACTIVE_HIGH>;
-> 
-> ,and since this is active high, the "enable-active-high" property is missing.
-> 
-Urgh, right. This is an oversight.
+Please ignore this PR. The __drm_atomic_helper_crtc_destroy_state()
+prototype has changed between my submission and the 4.7-rc1 release and
+it no longer compiles.
 
-> > +       reg_usbh1_vbus: regulator-usb-h1-vbus {
-> > +               compatible = "regulator-fixed";
-> > +               enable-active-high;
-> > +               gpio = <&gpio1 0 0>;
-> 
-> GPIO_ACTIVE_HIGH
-> 
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&pinctrl_h100_usbh1_vbus>;
-> > +               regulator-name = "USB_H1_VBUS";
-> > +               regulator-min-microvolt = <5000000>;
-> > +               regulator-max-microvolt = <5000000>;
-> > +       };
-> > +
-> > +       reg_usbotg_vbus: regulator-usb-otg-vbus {
-> > +               compatible = "regulator-fixed";
-> > +               enable-active-high;
-> > +               gpio = <&gpio3 22 0>;
-> 
-> GPIO_ACTIVE_HIGH
-> 
-> > +
-> > +&iomuxc {
-> > +       h100 {
-> 
-> This h100 label can be removed and then you can remove one level of
-> indentation below.
-> 
-No, it can not. This would require to remove the same level of
-indentation from the base microsom dtsi. IMO too much churn for little
-gain...
+Sorry for the inconvenience.
 
-> > +               pinctrl_h100_hdmi: h100-hdmi {
-> > +                       fsl,pins = <
-> > +                               MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE   0x1f8b0
-> > +                       >;
-> > +               };
+Regards,
+
+Boris
+
 > 
+> The first one is making use of __drm_atomic_helper_crtc_destroy_state()
+> instead of duplicating its logic in atmel_hlcdc_crtc_reset() and
+> risking memory leaks if other objects are added to the common CRTC
+> state.
+> 
+> The second one is fixing a possible NULL pointer dereference.
+> 
+> Regards,
+> 
+> Boris
+> 
+> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> 
+>   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git at github.com:bbrezillon/linux-at91.git tags/drm-atmel-hlcdc-fixes/for-4.7-rc2
+> 
+> for you to fetch changes up to dcd64e313ff2d2a15574cd92ec27e73194ba7537:
+> 
+>   drm: atmel-hlcdc: fix a NULL check (2016-06-01 13:36:26 +0200)
+> 
+> ----------------------------------------------------------------
+> Two trivial bugfixes on the atmel-hlcdc driver for 4.7-rc2.
+> 
+> The first one is making use of __drm_atomic_helper_crtc_destroy_state()
+> instead of duplicating its logic in atmel_hlcdc_crtc_reset() and
+> risking memory leaks if other objects are added to the common CRTC
+> state.
+> 
+> The second one is fixing a possible NULL pointer dereference.
+> 
+> ----------------------------------------------------------------
+> Boris Brezillon (1):
+>       drm: atmel-hlcdc: fix atmel_hlcdc_crtc_reset() implementation
+> 
+> Dan Carpenter (1):
+>       drm: atmel-hlcdc: fix a NULL check
+> 
+>  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
