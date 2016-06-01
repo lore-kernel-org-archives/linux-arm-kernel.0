@@ -1,109 +1,83 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed,  1 Jun 2016 09:20:35 -0400
-Subject: [PATCH v2] ARM: dts: exynos: Add TMU nodes regulator supply for Peach
- boards
-Message-ID: <1464787235-8400-1-git-send-email-javier@osg.samsung.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 01 Jun 2016 15:28:13 +0200
+Subject: [PATCH] ARM: dts: imx6: add support for Auvidea H100 board
+In-Reply-To: <CAOMZO5CQvhJTBN7iHD5dkiTCnFy=fVe9hd6CLOrDUR4K7JqyXA@mail.gmail.com>
+References: <1464785229-27330-1-git-send-email-l.stach@pengutronix.de>
+ <CAOMZO5CQvhJTBN7iHD5dkiTCnFy=fVe9hd6CLOrDUR4K7JqyXA@mail.gmail.com>
+Message-ID: <1464787693.25525.12.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos5800 Peach Pi and Exynos5420 Peach Pit Chromebooks have the
-LDO10 1.8V output connected to the VDD18_TS{01,23,4} Exynos SoC pins.
+Hi Fabio,
 
-Add this regulator as the input supply of the Thermal Management Unit
-channels and also remove the always-on property since all the devices
-using LDO10 as input supply are now defined.
+thanks for the review.
 
-Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Am Mittwoch, den 01.06.2016, 10:15 -0300 schrieb Fabio Estevam:
+> Hi Lucas,
+> 
+> On Wed, Jun 1, 2016 at 9:47 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> 
+> > +       reg_3p3v: regulator-3p3v {
+> > +               compatible = "regulator-fixed";
+> > +               regulator-name = "3P3V";
+> > +               regulator-min-microvolt = <3300000>;
+> > +               regulator-max-microvolt = <3300000>;
+> > +               regulator-always-on;
+> 
+> "regulator-always-on" can be removed in this case.
+> 
+Ok.
 
----
+> > +       };
+> > +
+> > +       reg_hdmi: regulator-hdmi {
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&pinctrl_h100_reg_hdmi>;
+> > +               compatible = "regulator-fixed";
+> > +               gpio = <&gpio2 20 0>;
+> 
+> It would be better to use the gpio label like:
+> gpio = <&gpio2 20 GPIO_ACTIVE_HIGH>;
+> 
+> ,and since this is active high, the "enable-active-high" property is missing.
+> 
+Urgh, right. This is an oversight.
 
-Changes in v2:
-- Sorted nodes in alphabetical order (Krzysztof Kozlowski).
-- Added Krzysztof's Suggested-by tag since he mentioned in other
-  thread that the TMU supplies were missing.
+> > +       reg_usbh1_vbus: regulator-usb-h1-vbus {
+> > +               compatible = "regulator-fixed";
+> > +               enable-active-high;
+> > +               gpio = <&gpio1 0 0>;
+> 
+> GPIO_ACTIVE_HIGH
+> 
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&pinctrl_h100_usbh1_vbus>;
+> > +               regulator-name = "USB_H1_VBUS";
+> > +               regulator-min-microvolt = <5000000>;
+> > +               regulator-max-microvolt = <5000000>;
+> > +       };
+> > +
+> > +       reg_usbotg_vbus: regulator-usb-otg-vbus {
+> > +               compatible = "regulator-fixed";
+> > +               enable-active-high;
+> > +               gpio = <&gpio3 22 0>;
+> 
+> GPIO_ACTIVE_HIGH
+> 
+> > +
+> > +&iomuxc {
+> > +       h100 {
+> 
+> This h100 label can be removed and then you can remove one level of
+> indentation below.
+> 
+No, it can not. This would require to remove the same level of
+indentation from the base microsom dtsi. IMO too much churn for little
+gain...
 
- arch/arm/boot/dts/exynos5420-peach-pit.dts | 21 ++++++++++++++++++++-
- arch/arm/boot/dts/exynos5800-peach-pi.dts  | 21 ++++++++++++++++++++-
- 2 files changed, 40 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-index c1247402cb17..f3078430d866 100644
---- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-+++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-@@ -425,7 +425,6 @@
- 				regulator-name = "vdd_ldo10";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
--				regulator-always-on;
- 				regulator-state-mem {
- 					regulator-off-in-suspend;
- 				};
-@@ -1041,6 +1040,26 @@
- 	status = "okay";
- };
- 
-+&tmu_cpu0 {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
-+&tmu_cpu1 {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
-+&tmu_cpu2 {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
-+&tmu_cpu3 {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
-+&tmu_gpu {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
- &usbdrd_dwc3_0 {
- 	dr_mode = "host";
- };
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index af1c9b9a63f9..203c8da4d58e 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -425,7 +425,6 @@
- 				regulator-name = "vdd_ldo10";
- 				regulator-min-microvolt = <1800000>;
- 				regulator-max-microvolt = <1800000>;
--				regulator-always-on;
- 				regulator-state-mem {
- 					regulator-off-in-suspend;
- 				};
-@@ -1017,6 +1016,26 @@
- 	status = "okay";
- };
- 
-+&tmu_cpu0 {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
-+&tmu_cpu1 {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
-+&tmu_cpu2 {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
-+&tmu_cpu3 {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
-+&tmu_gpu {
-+	vtmu-supply = <&ldo10_reg>;
-+};
-+
- &usbdrd_dwc3_0 {
- 	dr_mode = "host";
- };
--- 
-2.5.5
+> > +               pinctrl_h100_hdmi: h100-hdmi {
+> > +                       fsl,pins = <
+> > +                               MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE   0x1f8b0
+> > +                       >;
+> > +               };
+> 
