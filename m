@@ -1,66 +1,23 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 2 Jun 2016 00:08:40 +0200
-Subject: [PATCHv5] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
-References: <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
- <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
- <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd>
- <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
- <20160531213437.GA28397@amd>
- <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
-Message-ID: <20160601220840.GA21946@amd>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 1 Jun 2016 15:15:52 -0700
+Subject: [PATCH v5 19/22] clk: samsung: exynos5410: Add I2C, HSI2C and
+ RTC clocks
+In-Reply-To: <1464429273-23457-20-git-send-email-krzk@kernel.org>
+References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
+ <1464429273-23457-20-git-send-email-krzk@kernel.org>
+Message-ID: <20160601221552.GH28218@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2016-06-01 18:24:39, Sakari Ailus wrote:
-> Hi Pavel,
-
-> > Well, it does not use any dt properties. So there's not really much to
-> > discuss with dt people...
-> > 
-> > Maybe "ad5820" needs to go to list of simple i2c drivers somewhere,
-> > but...
+On 05/28, Krzysztof Kozlowski wrote:
+> Add clocks for I2C, USI (HSI2C) and RTC to the Exynos5410 clock driver.
 > 
-> It's an I2C device and it does use a regulator. Not a lot, though, these are
-> both quite basic stuff. This should still be documented as the people who
-> write the DT bindings (in general) aren't expected to read driver code as
-> well. That's at least my understanding.
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
 
-Yep, you are right, I forgot about the regulator. Something like this?
-
-Thanks,
-									Pavel
-
-diff --git a/Documentation/devicetree/bindings/media/i2c/ad5820.txt b/Documentation/devicetree/bindings/media/i2c/ad5820.txt
-new file mode 100644
-index 0000000..87c98f1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/i2c/ad5820.txt
-@@ -0,0 +1,20 @@
-+* Analog Devices AD5820 autofocus coil
-+
-+Required Properties:
-+
-+  - compatible: Must contain "adi,ad5820"
-+
-+  - reg: I2C slave address
-+
-+  - VANA-supply: supply of voltage for VANA pin
-+
-+Example:
-+
-+       /* D/A converter for auto-focus */
-+       ad5820: dac at 0c {
-+               compatible = "adi,ad5820";
-+               reg = <0x0c>;
-+
-+               VANA-supply = <&vaux4>;
-+       };
-+
-
+Acked-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
