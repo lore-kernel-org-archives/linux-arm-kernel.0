@@ -1,62 +1,59 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  1 Jun 2016 19:21:42 +0100
-Subject: [PATCH v2] drivers: char: mem: Check {read,write}_kmem() addresses
-In-Reply-To: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
-References: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
-Message-ID: <384215b19582acfb30a6a3660fdebee5189d687b.1464805050.git.robin.murphy@arm.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 01 Jun 2016 20:48:31 +0200
+Subject: [RFC PATCH 0/2] scpi: Add SCPI framework to handle vendors
+ variants
+In-Reply-To: <7hy46oeusn.fsf@baylibre.com>
+References: <1464255491-18503-1-git-send-email-narmstrong@baylibre.com>
+ <574EB4A5.9000805@arm.com> <7hy46oeusn.fsf@baylibre.com>
+Message-ID: <2913601.uXsaKdIlc0@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arriving at read_kmem() with an offset representing a bogus kernel
-address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
-faulting on the kernel-side read.
+Hi,
 
-x86_64 happens to get away with this since the optimised implementation
-uses "rep movs*", thus the user write (which is allowed to fault) and
-the kernel read are the same instruction, the kernel-side fault falls
-into the user-side fixup handler and the chain of events which
-transpires ends up returning an error as one might expect, even if it's
-an inappropriate -EFAULT. On other architectures, though, the read is
-not covered by the fixup entry for the write, and we get a big scary
-"Unable to hande kernel paging request..." dump.
+Am Mittwoch, 1. Juni 2016, 09:30:16 schrieb Kevin Hilman:
+> [ + Heiko, who may know about the Rockchip implementation ]
+>
+> Sudeep Holla <sudeep.holla@arm.com> writes:
+> > On 30/05/16 09:30, Neil Armstrong wrote:
+> >> On 05/27/2016 10:17 AM, Neil Armstrong wrote:
+> > [..]
+> > 
+> >> While looking for other ARMv8 based platform, I found that the RK3368
+> >> platform has the same SCPI implementation as Amlogic.
+> >> 
+> >> They extended it with DDR, system and thermal commands.
+> >> 
+> >> Look at :
+> >> https://github.com/geekboxzone/mmallow_kernel/blob/geekbox/drivers/mailbo
+> >> x/scpi_cmd.h>>
+> >>https://github.com/geekboxzone/mmallow_kernel/blob/geekbox/drivers/mailbox
+> >>/scpi_protocol.c>>
+> >> So the SCPI must have a framework to allow different protocol
+> >> versions, and must allow command extension. Grouping Rockchip and
+> >> Amlogic should be done, thus needing a generic name like vendor_scpi
+> >> or with a version.
+> > 
+> > Makes sense. I understand the need to reuse and I need a bit of time to
+> > have a look at the code(both Amlogic one's you have pointed out and the
+> > Rockchip one) in detail to see what's the best way to proceed. I will
+> > have a look at this later this week and get back to you.
+> > 
+> >> Sudeep, could you somehow find out which version of the protocol
+> >> AmLogic and Rockchip based their SCPI development ?
+> > 
+> > Yes I tried checking with Rockchip but didn't get a response. But my
+> > guess is that it was some preliminary unpublished version of SCPI
+> > unfortunately :(
 
-The more typical use-case of mmap_kmem() has always (within living
-memory at least) returned -EIO for addresses which don't satisfy
-pfn_valid(), so let's make that consistent across {read,write}_kem()
-too.
+I only glanced a bit on the scpi stuff of the rk3368, but it seems you already 
+found the rockchip implementation above.
 
-Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+The mailbox driver entered mainline recently, but I think it differs a bit 
+from the one used there.
 
-v2: Make the error code consistent and more appropriate, tweak commit message.
+I've also added Caesar, who did the upstreaming of the mailbox driver, maybe 
+he knows more about the scpi side as well.
 
- drivers/char/mem.c | 6 ++++++
- 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/char/mem.c b/drivers/char/mem.c
-index 71025c2f6bbb..e1b8d960341f 100644
---- a/drivers/char/mem.c
-+++ b/drivers/char/mem.c
-@@ -384,6 +384,9 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
- 	char *kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
- 	int err = 0;
- 
-+	if (!pfn_valid(PFN_DOWN(p)))
-+		return -EIO;
-+
- 	read = 0;
- 	if (p < (unsigned long) high_memory) {
- 		low_count = count;
-@@ -512,6 +515,9 @@ static ssize_t write_kmem(struct file *file, const char __user *buf,
- 	char *kbuf; /* k-addr because vwrite() takes vmlist_lock rwlock */
- 	int err = 0;
- 
-+	if (!pfn_valid(PFN_DOWN(p)))
-+		return -EIO;
-+
- 	if (p < (unsigned long) high_memory) {
- 		unsigned long to_write = min_t(unsigned long, count,
- 					       (unsigned long)high_memory - p);
--- 
-2.8.1.dirty
+Heiko
