@@ -1,58 +1,107 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed,  1 Jun 2016 20:37:46 +0900
-Subject: [PATCH v2] ARM: uniphier: drop code for old DT binding
-Message-ID: <1464781066-25975-1-git-send-email-yamada.masahiro@socionext.com>
+From: j.anaszewski@samsung.com (Jacek Anaszewski)
+Date: Wed, 01 Jun 2016 13:37:18 +0200
+Subject: [PATCH v7 1/6] mfd: max8997: Use regmap to access registers
+In-Reply-To: <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
+References: <1464773339-756-1-git-send-email-k.kozlowski@samsung.com>
+ <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <574EC8EE.5000509@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 307d40c56b0c ("ARM: uniphier: rework SMP code to support new
-System Bus binding") added a new DT binding for SMP code, but still
-kept old code for the backward compatibility.
+Hi Krzysztof,
 
-Linux 4.6 was out with both bindings supported, so it should not
-hurt to drop the old code now.  Moreover, the mainline code are
-currently not used for any of our products, so this change has
-no impact on our customers in any way.
+One thing drew my attention while reviewing this again:
+max8997_led_brightness_set() can sleep, but the brightness_set
+op it is assigned to must not sleep. At the time when this driver was
+merged we were delegating brightness setting to workqueues task
+in LED class drivers that can sleep during this call.
+This must have been overlooked, which is even more likely, taking into
+account that the initial patch doesn't have LED maintainer's ack.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+The non-sleeping requirement is motivated by the fact that brightness
+can be set from softirq context, e.g. when timer trigger is enabled.
 
-Changes in v2:
-  - Add more explanation in git-log
+Currently LED class drivers don't have to use workqueue on their own,
+but are required to use brightness_set_blocking op instead of
+brightness_set if they can sleep while setting brightness.
 
- arch/arm/mach-uniphier/platsmp.c | 18 +++++-------------
- 1 file changed, 5 insertions(+), 13 deletions(-)
+Apart of that, I think that operations in max8997_led_brightness_set()
+should be protected with mutex to assure leaving the device in
+a consistent state in case of concurrent calls.
 
-diff --git a/arch/arm/mach-uniphier/platsmp.c b/arch/arm/mach-uniphier/platsmp.c
-index e802ca8..9978c41 100644
---- a/arch/arm/mach-uniphier/platsmp.c
-+++ b/arch/arm/mach-uniphier/platsmp.c
-@@ -101,21 +101,13 @@ static int __init uniphier_smp_prepare_trampoline(unsigned int max_cpus)
- 	np = of_find_compatible_node(NULL, NULL, "socionext,uniphier-smpctrl");
- 	ret = of_address_to_resource(np, 0, &res);
- 	of_node_put(np);
--	if (!ret) {
--		rom_rsv2_phys = res.start + UNIPHIER_SMPCTRL_ROM_RSV2;
--	} else {
--		/* try old binding too */
--		np = of_find_compatible_node(NULL, NULL,
--					     "socionext,uniphier-system-bus-controller");
--		ret = of_address_to_resource(np, 1, &res);
--		of_node_put(np);
--		if (ret) {
--			pr_err("failed to get resource of SMP control\n");
--			return ret;
--		}
--		rom_rsv2_phys = res.start + 0x1000 + UNIPHIER_SMPCTRL_ROM_RSV2;
-+	if (ret) {
-+		pr_err("failed to get resource of SMP control\n");
-+		return ret;
- 	}
- 
-+	rom_rsv2_phys = res.start + UNIPHIER_SMPCTRL_ROM_RSV2;
-+
- 	ret = uniphier_smp_copy_trampoline(rom_rsv2_phys);
- 	if (ret)
- 		return ret;
--- 
-1.9.1
+I am aware that this is out of this patch scope, but I'd be grateful
+if you could apply those changes and test them on hardware if you have
+an access to.
+
+Thanks,
+Jacek Anaszewski
+
+On 06/01/2016 11:53 AM, Krzysztof Kozlowski wrote:
+> From: Robert Baldyga <r.baldyga@samsung.com>
+
+> diff --git a/drivers/leds/leds-max8997.c b/drivers/leds/leds-max8997.c
+> index 4edf74f1d6d4..e5f0dc2e9edf 100644
+> --- a/drivers/leds/leds-max8997.c
+> +++ b/drivers/leds/leds-max8997.c
+> @@ -17,6 +17,7 @@
+>   #include <linux/mfd/max8997.h>
+>   #include <linux/mfd/max8997-private.h>
+>   #include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+>
+>   #define MAX8997_LED_FLASH_SHIFT			3
+>   #define MAX8997_LED_FLASH_CUR_MASK		0xf8
+> @@ -52,7 +53,6 @@ static void max8997_led_set_mode(struct max8997_led *led,
+>   			enum max8997_led_mode mode)
+>   {
+>   	int ret;
+> -	struct i2c_client *client = led->iodev->i2c;
+>   	u8 mask = 0, val;
+>
+>   	switch (mode) {
+> @@ -88,8 +88,8 @@ static void max8997_led_set_mode(struct max8997_led *led,
+>   	}
+>
+>   	if (mask) {
+> -		ret = max8997_update_reg(client, MAX8997_REG_LEN_CNTL, val,
+> -					 mask);
+> +		ret = regmap_update_bits(led->iodev->regmap,
+> +					MAX8997_REG_LEN_CNTL, mask, val);
+>   		if (ret)
+>   			dev_err(led->iodev->dev,
+>   				"failed to update register(%d)\n", ret);
+> @@ -101,7 +101,6 @@ static void max8997_led_set_mode(struct max8997_led *led,
+>   static void max8997_led_enable(struct max8997_led *led, bool enable)
+>   {
+>   	int ret;
+> -	struct i2c_client *client = led->iodev->i2c;
+>   	u8 val = 0, mask = MAX8997_LED_BOOST_ENABLE_MASK;
+>
+>   	if (led->enabled == enable)
+> @@ -109,7 +108,8 @@ static void max8997_led_enable(struct max8997_led *led, bool enable)
+>
+>   	val = enable ? MAX8997_LED_BOOST_ENABLE_MASK : 0;
+>
+> -	ret = max8997_update_reg(client, MAX8997_REG_BOOST_CNTL, val, mask);
+> +	ret = regmap_update_bits(led->iodev->regmap,
+> +				MAX8997_REG_BOOST_CNTL, mask, val);
+>   	if (ret)
+>   		dev_err(led->iodev->dev,
+>   			"failed to update register(%d)\n", ret);
+> @@ -121,7 +121,6 @@ static void max8997_led_set_current(struct max8997_led *led,
+>   				enum led_brightness value)
+>   {
+>   	int ret;
+> -	struct i2c_client *client = led->iodev->i2c;
+>   	u8 val = 0, mask = 0, reg = 0;
+>
+>   	switch (led->led_mode) {
+> @@ -142,7 +141,7 @@ static void max8997_led_set_current(struct max8997_led *led,
+>   	}
+>
+>   	if (mask) {
+> -		ret = max8997_update_reg(client, reg, val, mask);
+> +		ret = regmap_update_bits(led->iodev->regmap, reg, mask, val);
+>   		if (ret)
+>   			dev_err(led->iodev->dev,
+>   				"failed to update register(%d)\n", ret);
