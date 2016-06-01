@@ -1,42 +1,57 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 01 Jun 2016 08:08:11 +0200
-Subject: [RFC v2] dma-mapping: Use unsigned long for dma_attrs
-In-Reply-To: <20160531181533.GD11300@char.us.oracle.com>
-References: <1464609246-6948-1-git-send-email-k.kozlowski@samsung.com>
- <1464609246-6948-2-git-send-email-k.kozlowski@samsung.com>
- <20160531181533.GD11300@char.us.oracle.com>
-Message-ID: <574E7BCB.6040505@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 1 Jun 2016 08:16:41 +0200
+Subject: [PATCH 4/5] clocksource: rockchip: add support for rk3399 SoC
+In-Reply-To: <574E4130.8090600@rock-chips.com>
+References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
+ <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
+ <574CCCB4.1030001@linaro.org> <574D95AF.2020905@rock-chips.com>
+ <574D9A66.4090209@linaro.org> <574E4130.8090600@rock-chips.com>
+Message-ID: <574E7DC9.4000102@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2016 08:15 PM, Konrad Rzeszutek Wilk wrote:
-> On Mon, May 30, 2016 at 01:54:06PM +0200, Krzysztof Kozlowski wrote:
->> The dma-mapping core and the implementations do not change the
->> DMA attributes passed by pointer.  Thus the pointer can point to const
->> data.  However the attributes do not have to be a bitfield. Instead
->> unsigned long will do fine:
+On 06/01/2016 03:58 AM, Huang, Tao wrote:
+> Hi Daniel:
+> On 2016?05?31? 22:06, Daniel Lezcano wrote:
+
+[ ... ]
+
+>>> -CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+>>> +static void __init rk3288_timer_init(struct device_node *np)
+>>> +{
+>>> +	bc_timer.ctrl = TIMER_CONTROL_REG3288;
+>>> +	rk_timer_init(np);
 >>
->> 1. This is just simpler.  Both in terms of reading the code and setting
->>    attributes.  Instead of initializing local attributes on the stack and
->>    passing pointer to it to dma_set_attr(), just set the bits.
->>
->> 2. It brings safeness and checking for const correctness because the
->>    attributes are passed by value.
-> 
-> 
-> .. why not go the next step a do an enum? Perhaps that should be mentioned
-> as part of the description?
+>> 	rk_timer_init(np);
+>> 	bc_timer.ctrl = bc_timer.base + TIMER_CONTROL_REG3288;
+>
+> No. It's not such simple. You will access null pointer when
+> rk_timer_init, if we keep rk_timer_disable call in init or after
+> request_irq/clockevents_config_and_register and interrupt happen
+> immediately.
+>
+> So the code maybe:
+> static void __init rk3288_timer_init(struct device_node *np)
+> {
+> 	bc_timer.base = of_iomap(np, 0);
+> 	if (!bc_timer.base) {
+> 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
+> 		return;
+> 	}
+> 	bc_timer.ctrl = bc_timer.base + TIMER_CONTROL_REG3288;
+> 	rk_imter_init(np); // of course remove of_iomap from init.
+>
+> Is this what you want?
 
-These are additive flags so to me this would look a little bit weird:
-enum dma_attr {
-	DMA_ATTR_WRITE_BARRIER	= 0x1,
-	DMA_ATTR_WEAK_ORDERING	= 0x2,
-	DMA_ATTR_WRITE_COMBINE	= 0x4,
-	DMA_ATTR_NON_CONSISTENT	= 0x8,
-	...
-}
+Not necessarily. There are plenty of variants.
 
-It doesn't really look like enumeration.
+eg. rk_timer_init(np, TIMER_CONTROL_REG3288);
 
-Best regards,
-Krzysztof
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
