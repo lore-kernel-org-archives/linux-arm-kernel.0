@@ -1,53 +1,38 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 1 Jun 2016 11:16:58 -0400
-Subject: [PATCH 3/3] ARM: dts: exynos: Add watchdog amd Security SubSystem
- to Exynos5410
-In-Reply-To: <1464774351-23604-3-git-send-email-k.kozlowski@samsung.com>
-References: <1464774351-23604-1-git-send-email-k.kozlowski@samsung.com>
- <1464774351-23604-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <f7e99aad-f773-27c6-d554-ba30bc54b5f7@osg.samsung.com>
+From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
+Date: Wed,  1 Jun 2016 17:22:24 +0200
+Subject: [PATCHv7 1/6] dma-mapping: add {map,unmap}_resource to dma_map_ops
+In-Reply-To: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+References: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Message-ID: <1464794549-6601-2-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+Add methods to handle mapping of device resources from a physical
+address. This is needed for example to be able to map MMIO FIFO
+registers to a IOMMU.
 
-On 06/01/2016 05:45 AM, Krzysztof Kozlowski wrote:
-> Move watchdog and Security SubSystem nodes from exynos5420.dtsi to file
-> shared with Exynos5410 and configure the clocks on the latter.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+---
+ include/linux/dma-mapping.h | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-[snip]
-
->  
-> +&sss {
-> +	clocks = <&clock CLK_SSS>;
-> +	clock-names = "secss";
-> +};
-> +
-
-[snip]
-
->  
-> +&watchdog {
-> +	clocks = <&clock CLK_WDT>;
-> +	clock-names = "watchdog";
-> +	samsung,syscon-phandle = <&pmu_system_controller>;
-> +};
-> +
-
-Since you used the same ID than Exynos5420 for the SSS and WDT clocks,
-I wonder if the clock and clock-names shouldn't be just defined in the
-shared exynos54xx.dtsi as is the case for the interrupts that are also
-the same?
-
-The patch looks good to me though, so whatever you decide:
-
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
-Best regards,
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index c980a92..a11ff9d 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -49,6 +49,12 @@ struct dma_map_ops {
+ 			 struct scatterlist *sg, int nents,
+ 			 enum dma_data_direction dir,
+ 			 struct dma_attrs *attrs);
++	dma_addr_t (*map_resource)(struct device *dev, phys_addr_t phys_addr,
++			       size_t size, enum dma_data_direction dir,
++			       struct dma_attrs *attrs);
++	void (*unmap_resource)(struct device *dev, dma_addr_t dma_handle,
++			   size_t size, enum dma_data_direction dir,
++			   struct dma_attrs *attrs);
+ 	void (*sync_single_for_cpu)(struct device *dev,
+ 				    dma_addr_t dma_handle, size_t size,
+ 				    enum dma_data_direction dir);
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+2.8.2
