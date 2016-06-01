@@ -1,25 +1,82 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed,  1 Jun 2016 12:05:32 -0700
-Subject: [PATCH v3 0/4] clk: bcm2835: critical clocks and parent selection
-Message-ID: <1464807936-532-1-git-send-email-eric@anholt.net>
+Date: Wed,  1 Jun 2016 12:05:35 -0700
+Subject: [PATCH v3 3/4] clk: bcm2835: Mark the CM SDRAM clock's parent as
+ critical
+In-Reply-To: <1464807936-532-1-git-send-email-eric@anholt.net>
+References: <1464807936-532-1-git-send-email-eric@anholt.net>
+Message-ID: <1464807936-532-4-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I figured out another critical clock (patch 3), but didn't use the
-CLK_IS_CRITICAL flag since I want to just protect whatever clock
-happens to be the parent (there are #ifdefs in the firmware indicating
-that they've experimented with using different clocks as the parent).
+While the SDRAM is being driven by its dedicated PLL most of the time,
+there is a little loop running in the firmware that periodically turns
+on the CM SDRAM clock (using its pre-initialized parent) and switches
+SDRAM to using the CM clock to do PVT recalibration.
 
-I think these fixes are all suitable for 4.7.
+This avoids system hangs if we choose SDRAM's parent for some other
+clock, then disable that clock.
 
-Eric Anholt (4):
-  clk: bcm2835: Mark the VPU clock as critical
-  clk: bcm2835: Mark GPIO clocks enabled at boot as critical
-  clk: bcm2835: Mark the CM SDRAM clock's parent as critical
-  clk: bcm2835: Skip PLLC clocks when deciding on a new clock parent
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ drivers/clk/bcm/clk-bcm2835.c | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
 
- drivers/clk/bcm/clk-bcm2835.c | 63 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 61 insertions(+), 2 deletions(-)
-
+diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
+index 400615baea97..c6420b36cbcb 100644
+--- a/drivers/clk/bcm/clk-bcm2835.c
++++ b/drivers/clk/bcm/clk-bcm2835.c
+@@ -36,6 +36,7 @@
+ 
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
++#include <linux/clk.h>
+ #include <linux/clk/bcm2835.h>
+ #include <linux/debugfs.h>
+ #include <linux/module.h>
+@@ -1801,6 +1802,25 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.ctl_reg = CM_PERIICTL),
+ };
+ 
++/*
++ * Permanently take a reference on the parent of the SDRAM clock.
++ *
++ * While the SDRAM is being driven by its dedicated PLL most of the
++ * time, there is a little loop running in the firmware that
++ * periodically switches the SDRAM to using our CM clock to do PVT
++ * recalibration, with the assumption that the previously configured
++ * SDRAM parent is still enabled and running.
++ */
++static int bcm2835_mark_sdc_parent_critical(struct clk *sdc)
++{
++	struct clk *parent = clk_get_parent(sdc);
++
++	if (IS_ERR(parent))
++		return PTR_ERR(parent);
++
++	return clk_prepare_enable(parent);
++}
++
+ static int bcm2835_clk_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -1810,6 +1830,7 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
+ 	const struct bcm2835_clk_desc *desc;
+ 	const size_t asize = ARRAY_SIZE(clk_desc_array);
+ 	size_t i;
++	int ret;
+ 
+ 	cprman = devm_kzalloc(dev,
+ 			      sizeof(*cprman) + asize * sizeof(*clks),
+@@ -1840,6 +1861,10 @@ static int bcm2835_clk_probe(struct platform_device *pdev)
+ 			clks[i] = desc->clk_register(cprman, desc->data);
+ 	}
+ 
++	ret = bcm2835_mark_sdc_parent_critical(clks[BCM2835_CLOCK_SDRAM]);
++	if (ret)
++		return ret;
++
+ 	return of_clk_add_provider(dev->of_node, of_clk_src_onecell_get,
+ 				   &cprman->onecell);
+ }
 -- 
 2.8.0.rc3
