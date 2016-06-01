@@ -1,48 +1,44 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 1 Jun 2016 11:56:05 +0300
-Subject: [PATCH 04/28] crypto: omap: do not call dmaengine_terminate_all
+Date: Wed, 1 Jun 2016 11:56:07 +0300
+Subject: [PATCH 06/28] crypto: omap-sham: avoid executing tasklet where not
+ needed
 In-Reply-To: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
 References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1464771389-10640-5-git-send-email-t-kristo@ti.com>
+Message-ID: <1464771389-10640-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+Some of the call paths of OMAP SHA driver can avoid executing the next
+step of the crypto queue under tasklet; instead, execute the next step
+directly via function call. This avoids a costly round-trip via the
+scheduler giving a slight performance boost.
 
-The extra call to dmaengine_terminate_all is not needed, as the DMA
-is not running at this point. This improves performance slightly.
-
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-aes.c  | 2 --
- drivers/crypto/omap-sham.c | 1 -
- 2 files changed, 3 deletions(-)
+ drivers/crypto/omap-sham.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index 4a0e6a5..8178632 100644
---- a/drivers/crypto/omap-aes.c
-+++ b/drivers/crypto/omap-aes.c
-@@ -528,8 +528,6 @@ static int omap_aes_crypt_dma_stop(struct omap_aes_dev *dd)
- 
- 	omap_aes_dma_stop(dd);
- 
--	dmaengine_terminate_all(dd->dma_lch_in);
--	dmaengine_terminate_all(dd->dma_lch_out);
- 
- 	return 0;
- }
 diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 71eac5c..287bc43 100644
+index a5c823b..34ebe1d 100644
 --- a/drivers/crypto/omap-sham.c
 +++ b/drivers/crypto/omap-sham.c
-@@ -805,7 +805,6 @@ static int omap_sham_update_dma_stop(struct omap_sham_dev *dd)
+@@ -240,6 +240,8 @@ static struct omap_sham_drv sham = {
+ 	.lock = __SPIN_LOCK_UNLOCKED(sham.lock),
+ };
+ 
++static void omap_sham_done_task(unsigned long data);
++
+ static inline u32 omap_sham_read(struct omap_sham_dev *dd, u32 offset)
  {
- 	struct omap_sham_reqctx *ctx = ahash_request_ctx(dd->req);
+ 	return __raw_readl(dd->io_base + offset);
+@@ -994,7 +996,7 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
+ 		req->base.complete(&req->base, err);
  
--	dmaengine_terminate_all(dd->dma_lch);
+ 	/* handle new request */
+-	tasklet_schedule(&dd->done_task);
++	omap_sham_done_task((unsigned long)dd);
+ }
  
- 	if (ctx->flags & BIT(FLAGS_SG)) {
- 		dma_unmap_sg(dd->dev, ctx->sg, 1, DMA_TO_DEVICE);
+ static int omap_sham_handle_queue(struct omap_sham_dev *dd,
 -- 
 1.9.1
