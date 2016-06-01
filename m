@@ -1,89 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Jun 2016 00:18:52 +0200
-Subject: [PATCH 21/32] mmc: bcm2835-sdhost: Add new driver for the
- internal SD controller.
-In-Reply-To: <1464817421-8519-22-git-send-email-kraxel@redhat.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 01 Jun 2016 15:30:35 -0700
+Subject: [PATCH 09/32] bcm2837-rpi-3-b.dts for 32bit arm
+In-Reply-To: <7065434.SNfT8zjcK3@wuerfel>
 References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-22-git-send-email-kraxel@redhat.com>
-Message-ID: <4715245.LFBOAeJdHc@wuerfel>
+ <1464817421-8519-10-git-send-email-kraxel@redhat.com>
+ <7065434.SNfT8zjcK3@wuerfel>
+Message-ID: <87zir4leyc.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 1, 2016 11:43:30 PM CEST Gerd Hoffmann wrote:
+Arnd Bergmann <arnd@arndb.de> writes:
 
-> +static void bcm2835_sdhost_reset_internal(struct bcm2835_host *host)
-> +{
-> +	u32 temp;
-> +
-> +	bcm2835_sdhost_set_power(host, false);
-> +
-> +	bcm2835_sdhost_write(host, 0, SDCMD);
-> +	bcm2835_sdhost_write(host, 0, SDARG);
-> +	bcm2835_sdhost_write(host, 0xf00000, SDTOUT);
-> +	bcm2835_sdhost_write(host, 0, SDCDIV);
-> +	bcm2835_sdhost_write(host, 0x7f8, SDHSTS); /* Write 1s to clear */
-> +	bcm2835_sdhost_write(host, 0, SDHCFG);
-> +	bcm2835_sdhost_write(host, 0, SDHBCT);
-> +	bcm2835_sdhost_write(host, 0, SDHBLC);
-> +
-> +	/* Limit fifo usage due to silicon bug */
-> +	temp = bcm2835_sdhost_read(host, SDEDM);
-> +	temp &= ~((SDEDM_THRESHOLD_MASK << SDEDM_READ_THRESHOLD_SHIFT) |
-> +		  (SDEDM_THRESHOLD_MASK << SDEDM_WRITE_THRESHOLD_SHIFT));
-> +	temp |= (FIFO_READ_THRESHOLD << SDEDM_READ_THRESHOLD_SHIFT) |
-> +		(FIFO_WRITE_THRESHOLD << SDEDM_WRITE_THRESHOLD_SHIFT);
-> +	bcm2835_sdhost_write(host, temp, SDEDM);
-> +	mdelay(10);
-> +	bcm2835_sdhost_set_power(host, true);
-> +	mdelay(10);
+> On Wednesday, June 1, 2016 11:43:18 PM CEST Gerd Hoffmann wrote:
+>> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+>> new file mode 100644
+>> index 0000000..36178a6
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+>> @@ -0,0 +1 @@
+>> +#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
+>> -- 
+>> 1.8.3.1
+>> 
+>
+> What does this gain you?
 
-Are you sure you cannot use msleep() here?
-
-> +	host->clock = 0;
-> +	bcm2835_sdhost_write(host, host->hcfg, SDHCFG);
-> +	bcm2835_sdhost_write(host, host->cdiv, SDCDIV);
-> +	mmiowb();
-> +}
-
-What is the barrier for? Same question for all the other instances
-
-> +
-> +static void bcm2835_sdhost_reset(struct mmc_host *mmc)
-> +{
-> +	struct bcm2835_host *host = mmc_priv(mmc);
-> +	unsigned long flags;
-> +
-> +	spin_lock_irqsave(&host->lock, flags);
-> +	bcm2835_sdhost_reset_internal(host);
-> +	spin_unlock_irqrestore(&host->lock, flags);
-> +}
-
-The spinlock seems to only protect the reset from happening concurrently
-with bcm2835_sdhost_dma_complete() here. So if you ensure that this
-function is no longer pending, you can probably use msleep() above.
-
-> +static void bcm2835_sdhost_set_ios(struct mmc_host *mmc, struct mmc_ios *ios);
-
-Maybe rearrange the order of the functions to avoid forward declarations?
-
-> +	spin_lock_init(&host->lock);
-> +
-> +	if (IS_ERR_OR_NULL(host->dma_chan_tx) ||
-> +	    IS_ERR_OR_NULL(host->dma_chan_rx)) {
-> +		pr_err("%s: unable to initialise DMA channels. Falling back to PIO\n",
-> +		       mmc_hostname(mmc));
-
-When are these ever NULL?
-
-> +	/* Parse OF address directly to get the physical address for
-> +	 * DMA to our registers.
-> +	 */
-> +	host->phys_addr = be32_to_cpup(of_get_address(pdev->dev.of_node, 0,
-> +						      NULL, NULL));
-
-This looks broken on 64-bit systems when #address-cells=<2>, or if there
-is an intermediate bus with a non-empty ranges property.
-
-What's wrong with platform_get_resource(pdev, IORESOURCE_MEM, 0)?
-
-	Arnd
+Many Raspberry Pi users use a small set of SD cards that they swap
+between various versions of the hardware.  It would be good to have
+their 32-bit OS images work on the Pi3 as well.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160601/d63d9ec8/attachment.sig>
