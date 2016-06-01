@@ -1,29 +1,77 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 1 Jun 2016 17:32:26 +0900
-Subject: [RFC 0/4] ARM: dts: r8a7790: lager: use demuxer for I2C
-In-Reply-To: <CANqRtoTRRNQGk-gy1NrQhXNB0fzvkHDxwJGxyQHTYAgHUXm9ZA@mail.gmail.com>
-References: <1464665528-11398-1-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoTRRNQGk-gy1NrQhXNB0fzvkHDxwJGxyQHTYAgHUXm9ZA@mail.gmail.com>
-Message-ID: <20160601083226.GA4163@verge.net.au>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed,  1 Jun 2016 10:34:46 +0200
+Subject: [PATCH 3/9] clocksource/drivers/rockchip_timer: Convert init function
+ to return error
+In-Reply-To: <1464770093-12667-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1464770093-12667-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1464770093-12667-4-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 12:17:29PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Tue, May 31, 2016 at 12:32 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > the intention of this series is to extend use of the demuxer for I2C
-> > on the lager/r8a7790 to cover all I2C IP blocks.
-> >
-> > This is based on work by Wolfram Sang.
-> >
-> > I have not included GPIO in the demux configuration. This is in keeping
-> > with the existing usage for IIC0/I2C0.
-> 
-> Thanks for your efforts! Can you please include GPIO support in next
-> version? This way we should in the future be able to use
-> distro-kernels out of the box that may only have GPIO bitbang support
-> enabled.
+The init functions do not return any error. They behave as the following:
 
-Sure, will do.
+ - panic, thus leading to a kernel crash while another timer may work and
+   make the system boot up correctly
+
+ or
+
+ - print an error and let the caller unaware if the state of the system
+
+Change that by converting the init functions to return an error conforming
+to the CLOCKSOURCE_OF_RET prototype.
+
+Proper error handling (rollback, errno value) will be changed later case
+by case, thus this change just return back an error or success in the init
+function.
+
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ drivers/clocksource/rockchip_timer.c | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
+index b991b28..36b0209 100644
+--- a/drivers/clocksource/rockchip_timer.c
++++ b/drivers/clocksource/rockchip_timer.c
+@@ -106,17 +106,17 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
+ 
+-static void __init rk_timer_init(struct device_node *np)
++static int __init rk_timer_init(struct device_node *np)
+ {
+ 	struct clock_event_device *ce = &bc_timer.ce;
+ 	struct clk *timer_clk;
+ 	struct clk *pclk;
+-	int ret, irq;
++	int ret = -EINVAL, irq;
+ 
+ 	bc_timer.base = of_iomap(np, 0);
+ 	if (!bc_timer.base) {
+ 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
+-		return;
++		return -ENXIO;
+ 	}
+ 
+ 	pclk = of_clk_get_by_name(np, "pclk");
+@@ -169,7 +169,7 @@ static void __init rk_timer_init(struct device_node *np)
+ 
+ 	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
+ 
+-	return;
++	return 0;
+ 
+ out_irq:
+ 	clk_disable_unprepare(timer_clk);
+@@ -177,6 +177,8 @@ out_timer_clk:
+ 	clk_disable_unprepare(pclk);
+ out_unmap:
+ 	iounmap(bc_timer.base);
++
++	return ret;
+ }
+ 
+-CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+-- 
+1.9.1
