@@ -1,59 +1,58 @@
-From: johnyoun@synopsys.com (John Youn)
-Date: Tue, 31 May 2016 16:55:01 -0700
-Subject: [PATCH v2] reset: Return -ENOTSUPP when not configured
-Message-ID: <2b8732d98087e52edec39ec83a063912fcc23962.1464738402.git.johnyoun@synopsys.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Tue, 31 May 2016 17:10:35 -0700
+Subject: [PATCH v2 0/5] drivers: net: xgene: Fix 1G hot-plug and module support
+Message-ID: <1464739840-21971-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prior to commit 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo]
-functions wrappers"), the "optional" functions returned -ENOTSUPP when
-CONFIG_RESET_CONTROLLER was not set.
+This patchset addresses the following issues,
 
-Revert back to the old behavior by changing the new
-__devm_reset_control_get() and __of_reset_control_get() functions to
-return ERR_PTR(-ENOTSUPP) when compiled without CONFIG_RESET_CONTROLLER.
+1. hot-plug issue on the SGMII 1G interface
+	- by adding a driver for MDIO management
+2. fixes the kernel crash when the driver loaded as an kernel module
+	- by fixing hardware cleanups and rearrange kernel API calls
 
-Otherwise they will return -EINVAL causing users to think that an error
-occurred when CONFIG_RESET_CONTROLLER is not set.
-
-Fixes: 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo] functions wrappers")
-Signed-off-by: John Youn <johnyoun@synopsys.com>
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Tested-by: Matthias Brugger <mbrugger@suse.com>
 ---
 
-Hi Philipp,
+v2: Address review comments from v1
+	- Fixed patch 1 compilation error
+	- Fixed mdio at 1f610000 xge0clk reference
+	- Squashed dtb patches
+	- Added PORT_OFFSET macro
 
-Here are the changes as discussed previously. It just returns
--ENOTSUPP directly when not configured. Tested and works with DWC2
-driver with Dinh's patch that adds the reset controller, using a
-configuration with no reset controller configured.
+v1:
+	- Initial version
+---
 
-v2:
-* Return ERR_PTR(-ENOTSUPP) directly.
+Iyappan Subramanian (5):
+  drivers: net: xgene: MAC and PHY configuration changes
+  drivers: net: xgene: Backward compatibility with older firmware
+  drivers: net: phy: Add MDIO driver
+  dtb: xgene: Add MDIO node
+  drivers: net: xgene: Fix module load/unload crash
 
+ arch/arm64/boot/dts/apm/apm-merlin.dts            |   9 +
+ arch/arm64/boot/dts/apm/apm-mustang.dts           |  12 +
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi        |  11 +
+ arch/arm64/boot/dts/apm/apm-storm.dtsi            |  38 +-
+ drivers/net/ethernet/apm/xgene/Kconfig            |   1 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c    | 241 ++++++----
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h    |  19 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c  | 325 ++++++++-----
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h  |  36 +-
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.c | 191 +++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_sgmac.h |   8 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.c |  66 ++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_xgmac.h |   4 +
+ drivers/net/phy/Kconfig                           |   7 +
+ drivers/net/phy/Makefile                          |   1 +
+ drivers/net/phy/mdio-xgene.c                      | 531 ++++++++++++++++++++++
+ drivers/net/phy/mdio-xgene.h                      | 140 ++++++
+ 17 files changed, 1373 insertions(+), 267 deletions(-)
+ create mode 100644 drivers/net/phy/mdio-xgene.c
+ create mode 100644 drivers/net/phy/mdio-xgene.h
 
- include/linux/reset.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-index ec0306ce..067db57 100644
---- a/include/linux/reset.h
-+++ b/include/linux/reset.h
-@@ -71,14 +71,14 @@ static inline struct reset_control *__of_reset_control_get(
- 					struct device_node *node,
- 					const char *id, int index, int shared)
- {
--	return ERR_PTR(-EINVAL);
-+	return ERR_PTR(-ENOTSUPP);
- }
- 
- static inline struct reset_control *__devm_reset_control_get(
- 					struct device *dev,
- 					const char *id, int index, int shared)
- {
--	return ERR_PTR(-EINVAL);
-+	return ERR_PTR(-ENOTSUPP);
- }
- 
- #endif /* CONFIG_RESET_CONTROLLER */
 -- 
-2.8.2
+1.9.1
