@@ -1,64 +1,54 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed,  1 Jun 2016 16:04:15 +0530
-Subject: [PATCH 1/8] ARM: s3c24xx: Sort cpufreq tables
-In-Reply-To: <cover.1464776797.git.viresh.kumar@linaro.org>
-References: <cover.1464776797.git.viresh.kumar@linaro.org>
-Message-ID: <872a8b970ce7eabb06b988680eaf6b1154fe99fa.1464776797.git.viresh.kumar@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 1 Jun 2016 11:34:47 +0100
+Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
+In-Reply-To: <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20160601103446.GC9280@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some later changes in cpufreq core require these tables to be sorted
-based on ascending order of their frequencies. There was only one
-offender. Fix it and add comments over the arrays.
+Hi Catalin,
 
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mach-s3c24xx/pll-s3c2410.c          | 3 ++-
- arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c | 1 +
- arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c | 1 +
- 3 files changed, 4 insertions(+), 1 deletion(-)
+On Tue, May 31, 2016 at 04:14:30PM +0100, Catalin Marinas wrote:
+> The for_each_efi_memory_desc_continue() macro and corresponding
+> "_in_map" allow iterating over an efi_memory_map from a given position.
+> For code reuse between the existing iterator and the _continue variant,
+> this patch also introduces efi_memory_desc_next_entry_map().
+> 
+> Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+>  include/linux/efi.h | 19 +++++++++++++++++--
+>  1 file changed, 17 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/linux/efi.h b/include/linux/efi.h
+> index c2db3ca22217..4b0d880f1cd7 100644
+> --- a/include/linux/efi.h
+> +++ b/include/linux/efi.h
+> @@ -1002,11 +1002,16 @@ extern int efi_memattr_init(void);
+>  extern int efi_memattr_apply_permissions(struct mm_struct *mm,
+>  					 efi_memattr_perm_setter fn);
+>  
+> +/* Find next entry in an efi_memory_map or NULL if md is last */
+> +#define efi_memory_desc_next_entry_map(m, md)				   \
+> +	((md) == (efi_memory_desc_t *)((m)->map_end - (m)->desc_size)	   \
+> +	 ? NULL : (void *)(md) + (m)->desc_size)
+> +
+>  /* Iterate through an efi_memory_map */
+>  #define for_each_efi_memory_desc_in_map(m, md)				   \
+>  	for ((md) = (m)->map;						   \
+> -	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
+> -	     (md) = (void *)(md) + (m)->desc_size)
+> +	     (md);							   \
+> +	     (md) = efi_memory_desc_next_entry_map(m, md))
 
-diff --git a/arch/arm/mach-s3c24xx/pll-s3c2410.c b/arch/arm/mach-s3c24xx/pll-s3c2410.c
-index 5e37d368594b..7ee4924a543d 100644
---- a/arch/arm/mach-s3c24xx/pll-s3c2410.c
-+++ b/arch/arm/mach-s3c24xx/pll-s3c2410.c
-@@ -32,11 +32,12 @@
- #include <plat/cpu.h>
- #include <plat/cpu-freq-core.h>
- 
-+/* This array should be sorted in ascending order of the frequencies */
- static struct cpufreq_frequency_table pll_vals_12MHz[] = {
-     { .frequency = 34000000,  .driver_data = PLLVAL(82, 2, 3),   },
-     { .frequency = 45000000,  .driver_data = PLLVAL(82, 1, 3),   },
--    { .frequency = 51000000,  .driver_data = PLLVAL(161, 3, 3),  },
-     { .frequency = 48000000,  .driver_data = PLLVAL(120, 2, 3),  },
-+    { .frequency = 51000000,  .driver_data = PLLVAL(161, 3, 3),  },
-     { .frequency = 56000000,  .driver_data = PLLVAL(142, 2, 3),  },
-     { .frequency = 68000000,  .driver_data = PLLVAL(82, 2, 2),   },
-     { .frequency = 79000000,  .driver_data = PLLVAL(71, 1, 2),   },
-diff --git a/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c b/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
-index b355fca6cc2e..a3fbfed75e28 100644
---- a/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
-+++ b/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
-@@ -20,6 +20,7 @@
- #include <plat/cpu.h>
- #include <plat/cpu-freq-core.h>
- 
-+/* This array should be sorted in ascending order of the frequencies */
- static struct cpufreq_frequency_table s3c2440_plls_12[] = {
- 	{ .frequency = 75000000,	.driver_data = PLLVAL(0x75, 3, 3),  }, 	/* FVco 600.000000 */
- 	{ .frequency = 80000000,	.driver_data = PLLVAL(0x98, 4, 3),  }, 	/* FVco 640.000000 */
-diff --git a/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c b/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
-index be9a248b5ce9..bcff89fd9871 100644
---- a/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
-+++ b/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
-@@ -20,6 +20,7 @@
- #include <plat/cpu.h>
- #include <plat/cpu-freq-core.h>
- 
-+/* This array should be sorted in ascending order of the frequencies */
- static struct cpufreq_frequency_table s3c2440_plls_169344[] = {
- 	{ .frequency = 78019200,	.driver_data = PLLVAL(121, 5, 3), 	}, 	/* FVco 624.153600 */
- 	{ .frequency = 84067200,	.driver_data = PLLVAL(131, 5, 3), 	}, 	/* FVco 672.537600 */
--- 
-2.7.1.410.g6faf27b
+As a heads-up, this will conflict with the efi/urgent branch [1], due to
+commit ee92562e33c516dd ("efi: Fix for_each_efi_memory_desc_in_map() for
+empty memmaps"). A pull went out for that yesterday [2].
+
+Thanks,
+Mark.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mfleming/efi.git urgent
+[2] http://lkml.kernel.org/r/1464690224-4503-1-git-send-email-matt at codeblueprint.co.uk
