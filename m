@@ -1,135 +1,35 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  1 Jun 2016 23:43:11 +0200
-Subject: [PATCH 02/32] arm64: Add BCM2835 support to the defconfig.
+Date: Wed,  1 Jun 2016 23:43:13 +0200
+Subject: [PATCH 04/32] dt-bindings: Add root properties for Raspberry Pi 3
 In-Reply-To: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
 References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1464817421-8519-3-git-send-email-kraxel@redhat.com>
+Message-ID: <1464817421-8519-5-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Anholt <eric@anholt.net>
 
-Made with make defconfig; make menuconfig (only saying Y to new
-entries); make savedefconfig.
-
 Signed-off-by: Eric Anholt <eric@anholt.net>
-
-[ kraxel: quick+dirty rebase to 4.7 ]
-
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- arch/arm64/configs/defconfig | 23 ++++++++++++++++++++---
- 1 file changed, 20 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d..03f246a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_ALPINE=y
-+CONFIG_ARCH_BCM2835=y
- CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS=y
-@@ -140,6 +141,9 @@ CONFIG_USB_NET_PLUSB=m
- CONFIG_USB_NET_MCS7830=m
- CONFIG_WL18XX=m
- CONFIG_WLCORE_SDIO=m
-+CONFIG_USB_USBNET=y
-+CONFIG_USB_NET_SMSC95XX=y
-+# CONFIG_WLAN is not set
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_SERIO_SERPORT is not set
-@@ -147,6 +151,9 @@ CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_SHARE_IRQ=y
-+CONFIG_SERIAL_8250_BCM2835AUX=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_8250_UNIPHIER=y
-@@ -173,6 +180,7 @@ CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_IMX=y
-+CONFIG_I2C_BCM2835=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_QUP=y
- CONFIG_I2C_TEGRA=y
-@@ -180,6 +188,8 @@ CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_ORION=y
-+CONFIG_SPI_BCM2835=y
-+CONFIG_SPI_BCM2835AUX=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_QUP=y
- CONFIG_SPI_SPIDEV=m
-@@ -206,20 +216,24 @@ CONFIG_MFD_SPMI_PMIC=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_HI655X_PMIC=y
- CONFIG_REGULATOR=y
-+CONFIG_BCM2835_WDT=y
-+CONFIG_MFD_SPMI_PMIC=y
-+CONFIG_MFD_SEC_CORE=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_QCOM_SPMI=y
- CONFIG_REGULATOR_S2MPS11=y
--CONFIG_FB=y
-+CONFIG_DRM=y
-+CONFIG_DRM_VC4=y
- CONFIG_FB_ARMCLCD=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_VGA16 is not set
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-+CONFIG_SND_BCM2835_SOC_I2S=y
- CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_AK4613=y
- CONFIG_USB=y
-@@ -270,6 +284,7 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_XGENE=y
- CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
-+CONFIG_DMA_BCM2835=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_RCAR_DMAC=y
-@@ -289,7 +304,9 @@ CONFIG_HWSPINLOCK_QCOM=y
- CONFIG_MAILBOX=y
- CONFIG_ARM_MHU=y
- CONFIG_HI6220_MBOX=y
-+CONFIG_BCM2835_MBOX=y
- CONFIG_ARM_SMMU=y
-+CONFIG_RASPBERRYPI_POWER=y
- CONFIG_QCOM_SMEM=y
- CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
-@@ -302,6 +319,7 @@ CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_XGENE=y
- CONFIG_ARM_SCPI_PROTOCOL=y
- CONFIG_ACPI=y
-+CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_FANOTIFY=y
-@@ -311,7 +329,6 @@ CONFIG_AUTOFS4_FS=y
- CONFIG_FUSE_FS=y
- CONFIG_CUSE=y
- CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
- CONFIG_HUGETLBFS=y
- CONFIG_CONFIGFS_FS=y
- CONFIG_EFIVAR_FS=y
+diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+index 11d3056..6ffe087 100644
+--- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
++++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
+@@ -30,6 +30,10 @@ Raspberry Pi 2 Model B
+ Required root node properties:
+ compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
+ 
++Raspberry Pi 3 Model B
++Required root node properties:
++compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
++
+ Raspberry Pi Compute Module
+ Required root node properties:
+ compatible = "raspberrypi,compute-module", "brcm,bcm2835";
 -- 
 1.8.3.1
