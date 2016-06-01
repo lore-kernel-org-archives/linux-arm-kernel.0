@@ -1,70 +1,61 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Wed, 1 Jun 2016 19:47:10 +0900
-Subject: [RFC PATCH 3/4] PM / devfreq: rockchip: add devfreq driver for
- rk3399 dmc
-In-Reply-To: <1464773739-18152-4-git-send-email-hl@rock-chips.com>
-References: <1464773739-18152-1-git-send-email-hl@rock-chips.com>
- <1464773739-18152-4-git-send-email-hl@rock-chips.com>
-Message-ID: <CAJ0PZbQaPm1YjgAgEzGbPYSzfi7kk5NG=zAj80t4XmBV5MqEqg@mail.gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 1 Jun 2016 20:04:41 +0900
+Subject: DTS for Zynq Microzed/Picozed
+In-Reply-To: <574EB904.2070900@xilinx.com>
+References: <CAK7LNASAe0mFD28sM=8_qDsyeGVH_wZTYyFY1uLEp85LmmSuHQ@mail.gmail.com>
+ <574EB904.2070900@xilinx.com>
+Message-ID: <CAK7LNASao2aE-VskwsZ4DWxQSUkAHHKTgzNP9ESAgoJbUfDO-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2016 at 6:35 PM, Lin Huang <hl@rock-chips.com> wrote:
-> there is dfi controller on rk3399 platform, it can monitor
-> ddr load, register this controller to devfreq framework, and
-> default to use simple_ondeamnd policy, and do ddr frequency
-> scaling base on this result.
+Hi Michal.
+
+2016-06-01 19:29 GMT+09:00 Michal Simek <michal.simek@xilinx.com>:
+> Hi Masahiro,
 >
-> Signed-off-by: Lin Huang <hl@rock-chips.com>
-> ---
->  drivers/devfreq/Kconfig                 |   2 +-
->  drivers/devfreq/Makefile                |   1 +
->  drivers/devfreq/rockchip/Kconfig        |  14 +
->  drivers/devfreq/rockchip/Makefile       |   2 +
->  drivers/devfreq/rockchip/rk3399_dmc.c   | 438 ++++++++++++++++++++++++++++++++
->  drivers/devfreq/rockchip/rockchip_dmc.c | 132 ++++++++++
->  include/soc/rockchip/rockchip_dmc.h     |  44 ++++
->  7 files changed, 632 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/devfreq/rockchip/Kconfig
->  create mode 100644 drivers/devfreq/rockchip/Makefile
->  create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
->  create mode 100644 drivers/devfreq/rockchip/rockchip_dmc.c
->  create mode 100644 include/soc/rockchip/rockchip_dmc.h
 >
-> +
-> +       /* check the rate we get whether correct */
-> +       dmcfreq->rate = clk_get_rate(dmcfreq->dmc_clk);
-> +       if (dmcfreq->rate != target_rate) {
-> +               dev_err(dev, "get wrong ddr frequency, Request freq %lu,\
-> +                       Current freq %lu\n", target_rate, dmcfreq->rate);
-> +               regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
-> +                                     dmcfreq->volt);
+> On 1.6.2016 12:10, Masahiro Yamada wrote:
+>> Hi Michal,
+>>
+>>
+>> zynq-microzed.dts and zynq-picozed.dts are missing
+>> in Linux tree.
+>> (I do not see them in linux-xlnx on the GitHub, either)
+>
+> microzed and picozed board are made by Avnet not by Xilinx and none
+> pushed support for these boards.
+>
 
-Why do you need to check this and
-more importantly, why do you assume that dmvfreq->volt
-will be safe in this case? (what if the new dmcfreq->rate is
-larger than the old dmcfreq->rate after clk_get_rate?)
-Note that you didn't update dmcfreq->volt after clk_get_rate()
+I see.
 
-
-> +EXPORT_SYMBOL_GPL(dmc_event);
-> +EXPORT_SYMBOL_GPL(rockchip_dmc_enabled);
-> +EXPORT_SYMBOL_GPL(rockchip_dmc_enable);
-> +EXPORT_SYMBOL_GPL(rockchip_dmc_disable);
-> +EXPORT_SYMBOL_GPL(dmc_register_notifier);
-> +EXPORT_SYMBOL_GPL(dmc_unregister_notifier);
-> +EXPORT_SYMBOL_GPL(rockchip_dmc_get);
-> +EXPORT_SYMBOL_GPL(rockchip_dmc_put);
-
-Do you really need to export all these device driver specific
-functions? Looks like a design flaw here.
+I guess Avnet boards are attractive for hobbyists
+because they are cheaper than xilinx ones.
+Supporting them would be useful I guess,
+but it is true that you have no obligation to do that.
 
 
 
-Cheers,
-MyungJoo
+>> Interestingly enough, I see both in U-Boot tree.
+>
+> Yes they are in the u-boot because IRC Nathan wanted to have support there.
+>
+>
+>> Is there some reason for that?
+>> Otherwise, do you have a plan to port them to Linux?
+>
+> I was in touch with Avnet to improve support for their reference boards
+> but there is no conclusion from that discussion.
+> I have microzed here (I don't have picozed) but I don't have any
+> immediate plan to push support for this board to Linux without any
+> support from them.
+> And pushing board without regular testing is not the right way to go.
+>
+> TBH: I am thinking to remove zynq boards which are not regularly tested.
+> For Linux this is not a problem because diff is just DTS and for U-Boot
+> with DM I believe we can be there soon.
 
+I see.
 
 -- 
-MyungJoo Ham, Ph.D.
-S/W R&D Center, Samsung Electronics
+Best Regards
+Masahiro Yamada
