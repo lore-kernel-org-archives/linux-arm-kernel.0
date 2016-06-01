@@ -1,42 +1,54 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 01 Jun 2016 11:59:02 +0200
-Subject: [PATCH 2/6] clk: samsung: exynos5410: Add TMU clock
-In-Reply-To: <8281b473-22c8-f87d-4282-45f93f61b937@osg.samsung.com>
-References: <1464719945-3417-1-git-send-email-krzk@kernel.org>
- <1464719945-3417-2-git-send-email-krzk@kernel.org>
- <8281b473-22c8-f87d-4282-45f93f61b937@osg.samsung.com>
-Message-ID: <574EB1E6.8050808@samsung.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 1 Jun 2016 11:10:45 +0100
+Subject: [RFC PATCH 0/2] scpi: Add SCPI framework to handle vendors
+ variants
+In-Reply-To: <574BFA13.40009@baylibre.com>
+References: <1464255491-18503-1-git-send-email-narmstrong@baylibre.com>
+ <57472450.4000709@arm.com> <574802AF.2080909@baylibre.com>
+ <574BFA13.40009@baylibre.com>
+Message-ID: <574EB4A5.9000805@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2016 08:56 PM, Javier Martinez Canillas wrote:
-> On 05/31/2016 02:39 PM, Krzysztof Kozlowski wrote:
->> > Add clock for TMU to the Exynos5410 clock driver.
->> > 
->> > Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> > ---
->> >  drivers/clk/samsung/clk-exynos5410.c | 1 +
->> >  1 file changed, 1 insertion(+)
->> > 
->> > diff --git a/drivers/clk/samsung/clk-exynos5410.c b/drivers/clk/samsung/clk-exynos5410.c
->> > index 6c2e59c576ee..db9978dc6e83 100644
->> > --- a/drivers/clk/samsung/clk-exynos5410.c
->> > +++ b/drivers/clk/samsung/clk-exynos5410.c
->> > @@ -160,6 +160,7 @@ static struct samsung_div_clock exynos5410_div_clks[] __initdata = {
->> >  static struct samsung_gate_clock exynos5410_gate_clks[] __initdata = {
->> >  	GATE(CLK_MCT, "mct", "aclk66", GATE_IP_PERIS, 18, 0, 0),
->> >  	GATE(CLK_RTC, "rtc", "aclk66", GATE_IP_PERIS, 20, 0, 0),
->> > +	GATE(CLK_TMU, "tmu", "aclk66", GATE_IP_PERIS, 21, 0, 0),
->> >  
->> >  	GATE(CLK_SCLK_MMC0, "sclk_mmc0", "div_mmc_pre0",
->> >  			SRC_MASK_FSYS, 0, CLK_SET_RATE_PARENT, 0),
->> > 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-I have applied patches 1/6, 2/6. I will hold back for a moment
-with providing another tag for the "dt-bindings" patches, in case
-there are more such patches submitted in the coming days.
+
+On 30/05/16 09:30, Neil Armstrong wrote:
+> On 05/27/2016 10:17 AM, Neil Armstrong wrote:
+
+[..]
+
+>
+> While looking for other ARMv8 based platform, I found that the RK3368
+> platform has the same SCPI implementation as Amlogic.
+>
+> They extended it with DDR, system and thermal commands.
+>
+> Look at :
+> https://github.com/geekboxzone/mmallow_kernel/blob/geekbox/drivers/mailbox/scpi_cmd.h
+>
+>https://github.com/geekboxzone/mmallow_kernel/blob/geekbox/drivers/mailbox/scpi_protocol.c
+>
+
+
+> So the SCPI must have a framework to allow different protocol
+> versions, and must allow command extension. Grouping Rockchip and
+> Amlogic should be done, thus needing a generic name like vendor_scpi
+> or with a version.
+>
+
+Makes sense. I understand the need to reuse and I need a bit of time to
+have a look at the code(both Amlogic one's you have pointed out and the
+Rockchip one) in detail to see what's the best way to proceed. I will
+have a look at this later this week and get back to you.
+
+> Sudeep, could you somehow find out which version of the protocol
+> AmLogic and Rockchip based their SCPI development ?
+>
+
+Yes I tried checking with Rockchip but didn't get a response. But my
+guess is that it was some preliminary unpublished version of SCPI
+unfortunately :(
 
 -- 
-Thanks,
-Sylwester
+Regards,
+Sudeep
