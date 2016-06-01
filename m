@@ -1,34 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 01 Jun 2016 10:02:20 +0200
-Subject: [PATCH v3 11/12] ARM: dts: exynos: Switch the buck8 to GPIO mode on
- Odroid U3
-In-Reply-To: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1464768141-25420-12-git-send-email-k.kozlowski@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 1 Jun 2016 10:15:30 +0200
+Subject: [PATCH 08/13] ARM: dts: r8a7792: add SYS-DMAC support
+In-Reply-To: <5621267.GpvUaW18zI@wasted.cogentembedded.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <5621267.GpvUaW18zI@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdWajU_rM3wS0mSsoW32NNeWVA1gFR4jNq-h=5oEnBrBXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch the control of buck8 to GPIO mode. It is faster than I2C/register
-mode and it is the easiest way to disable it (regulator state is a
-logical OR state of GPIO and register value).
+On Wed, Jun 1, 2016 at 12:25 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe SYS-DMAC0/1 in the R8A7792 device tree.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
- arch/arm/boot/dts/exynos4412-odroidu3.dts | 1 +
- 1 file changed, 1 insertion(+)
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-index d73aa6c58fe3..31cdc036fda4 100644
---- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-@@ -74,6 +74,7 @@
- 	regulator-name = "BUCK8_P3V3";
- 	regulator-min-microvolt = <3300000>;
- 	regulator-max-microvolt = <3300000>;
-+	maxim,ena-gpios = <&gpa1 1 GPIO_ACTIVE_HIGH>;
- };
- 
- /* VDDQ for MSHC (eMMC card) */
--- 
-1.9.1
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
