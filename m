@@ -1,51 +1,71 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 1 Jun 2016 15:30:03 +0900
-Subject: [PATCH] ARM: uniphier: drop code for old DT binding
-In-Reply-To: <4992506.m4GEHIOqdc@wuerfel>
-References: <1464682628-12163-1-git-send-email-yamada.masahiro@socionext.com>
- <4992506.m4GEHIOqdc@wuerfel>
-Message-ID: <CAK7LNAT0n=VdfOmZ0dHaoVbD9jEsa16tY__9sVkuuuStMYA7WA@mail.gmail.com>
+From: wangkefeng.wang@huawei.com (Kefeng Wang)
+Date: Wed, 1 Jun 2016 14:42:19 +0800
+Subject: [PATCH] drivers: char: mem: Check {read,write}_kmem() addresses
+In-Reply-To: <574D9448.7080206@arm.com>
+References: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
+ <20160531130821.GV19428@n2100.arm.linux.org.uk> <574D9448.7080206@arm.com>
+Message-ID: <574E83CB.5040404@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd.
 
-2016-05-31 18:21 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday, May 31, 2016 5:17:08 PM CEST Masahiro Yamada wrote:
->> Commit 307d40c56b0c ("ARM: uniphier: rework SMP code to support new
->> System Bus binding") added a new DT binding for SMP code, but still
->> kept old code for the backward compatibility.
+
+On 2016/5/31 21:40, Robin Murphy wrote:
+> On 31/05/16 14:08, Russell King - ARM Linux wrote:
+>> On Tue, May 31, 2016 at 01:52:45PM +0100, Robin Murphy wrote:
+>>> Arriving at read_kmem() with an offset representing a bogus kernel
+>>> address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
+>>> faulting on the kernel-space read.
+>>>
+>>> x86_64 happens to get away with this since the optimised implementation
+>>> uses "rep movs*", thus the user write (which is allowed to fault) and
+>>> the kernel read are the same instruction, the kernel-side fault falls
+>>> into the userspace fixup handler and a chain of events transpires
+>>> leading to returning the expected -EFAULT. On other architectures,
+>>> though, the read is not covered by the fixup entry for the write, and we
+>>> get a straightforward "Unable to hande kernel paging request..." dump.
+>>>
+>>> The more typical use-case of mmap_kmem() already validates the address
+>>> with pfn_valid() as one might expect, so let's make that consistent
+>>> across {read,write}_kem() too.
+>>>
+>>> Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+>>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>>> ---
+>>>
+>>> I'm not sure if this warrants going to stable or not, as it's really
+>>> just making an existing failure case more graceful and less confusing.
 >>
->> Linux 4.6 was out with both bindings supported, so it should not
->> hurt to drop the old code now.
+>> Returning -EFAULT because the kernel-side address (iow, file offset) is
+>> invalid is not particularly nice:
 >>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>> NAME
+>>         read - read from a file descriptor
 >>
->
-> That explanation is in general not sufficient. Are you sure that
-> nobody is shipping a machine with their own dts file that is not
-> merged upstream, and that there are no bootloaders that have a
-> hardcoded dtb file that we need to support indefinitely?
->
+>> ERRORS
+>>         EFAULT buf is outside your accessible address space.
+>>
+>> Latest POSIX has:
+>>
+>> ENXIO
+>>     A request was made of a nonexistent device, or the
+>>     request was outside the capabilities of the device.
+>>
+>> which to me looks like a better error code to return, as file offsets
+>> which are not valid can be interpreted as being "outside the
+>> capabilities of the device".  EFAULT has always on Linux meant that
+>> the user passed an invalid userspace buffer.
+> 
+> Good point - seems I failed to twig that the error code in the x86 case is still effectively falling out of the "fault with the user address" path. ENXIO indeed sounds more reasonable, thanks.
 
-I have to confess that almost no one (except me) uses this upstreamed
-code directly.
-It can boot, but it is almost useless for practical uses (at least for
-production level)
-because it still lacks lots of drivers.
+Hi Robin, thanks for you fix, return -EIO like mmap_kmem() is better to me.
 
-Our products based on ARM 32bit SoCs were shipped with old kernel
-(without device tree) that were never upstreamed.
-
-Socionext is now trying to change the development procedure
-and the situation will be much better for ARM64 SoC products; it will be
-more community-based development, although they are not shipped yet.
-
-So, the answer is,  nobody is shipping ARM32 products using this upstream code.
-Device Tree is not used in the first place.
-(But, I still believe I should keep upstreaming.)
+BRs,
+Kefeng
 
 
--- 
-Best Regards
-Masahiro Yamada
+> 
+> Robin.
+> 
+> .
+> 
