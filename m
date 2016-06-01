@@ -1,38 +1,36 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 1 Jun 2016 12:06:41 +0300
-Subject: [PATCH 23/28] ARM: dts: DRA7: Add DT node for DES IP
+Date: Wed, 1 Jun 2016 12:06:44 +0300
+Subject: [PATCH 26/28] ARM: dts: DRA7: Add DT node for RNG IP
 In-Reply-To: <1464772006-11254-1-git-send-email-t-kristo@ti.com>
 References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
  <1464772006-11254-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1464772006-11254-4-git-send-email-t-kristo@ti.com>
+Message-ID: <1464772006-11254-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joel Fernandes <joelf@ti.com>
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-DRA7xx SoCs have a DES3DES IP. Add DT data for the same.
+Adding dt node for hardware random number generator IP.
 
-Signed-off-by: Joel Fernandes <joelf@ti.com>
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/dra7.dtsi | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index e007401..959f99b 100644
+index 64759e1..16ff083 100644
 --- a/arch/arm/boot/dts/dra7.dtsi
 +++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1743,6 +1743,17 @@
- 				clock-names = "fck", "sys_clk";
- 			};
+@@ -1787,6 +1787,15 @@
+ 			clocks = <&l3_iclk_div>;
+ 			clock-names = "fck";
  		};
 +
-+		des: des at 480a5000 {
-+			compatible = "ti,omap4-des";
-+			ti,hwmods = "des";
-+			reg = <0x480a5000 0xa0>;
-+			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&sdma_xbar 117>, <&sdma_xbar 116>;
-+			dma-names = "tx", "rx";
++		rng: rng at 48090000 {
++			compatible = "ti,omap4-rng";
++			ti,hwmods = "rng";
++			reg = <0x48090000 0x2000>;
++			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&l3_iclk_div>;
 +			clock-names = "fck";
 +		};
