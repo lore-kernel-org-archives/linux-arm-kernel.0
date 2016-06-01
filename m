@@ -1,161 +1,49 @@
-From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Wed,  1 Jun 2016 17:22:29 +0200
-Subject: [PATCHv7 6/6] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1464794549-6601-7-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 1 Jun 2016 18:24:39 +0300
+Subject: [PATCHv5] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160531213437.GA28397@amd>
+References: <20160521054336.GA27123@amd> <573FFF51.1000004@gmail.com>
+ <20160521105607.GA20071@amd> <574049EF.2090208@gmail.com>
+ <20160524090433.GA1277@amd> <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+ <20160527205140.GA26767@amd>
+ <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
+ <20160531213437.GA28397@amd>
+Message-ID: <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable slave transfers to a device behind a IPMMU by mapping the slave
-addresses using the dma-mapping API.
+Hi Pavel,
 
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
----
- drivers/dma/sh/rcar-dmac.c | 82 +++++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 74 insertions(+), 8 deletions(-)
+On Tue, May 31, 2016 at 11:34:37PM +0200, Pavel Machek wrote:
+> On Wed 2016-06-01 00:22:22, Sakari Ailus wrote:
+> > Hi Pavel,
+> > 
+> > On Fri, May 27, 2016 at 10:51:40PM +0200, Pavel Machek wrote:
+> > > 
+> > > This adds support for AD5820 autofocus coil, found for example in
+> > > Nokia N900 smartphone.
+> > > 
+> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > 
+> > The patch looks good to me but then I came to think of a question I've
+> > missed so far: is there DT documentation somewhere for the properties used
+> > by the driver? I might put that to a separate patch, and cc the relevant
+> > list.
+> 
+> Well, it does not use any dt properties. So there's not really much to
+> discuss with dt people...
+> 
+> Maybe "ad5820" needs to go to list of simple i2c drivers somewhere,
+> but...
 
-diff --git a/drivers/dma/sh/rcar-dmac.c b/drivers/dma/sh/rcar-dmac.c
-index b0c3bb2..8592598 100644
---- a/drivers/dma/sh/rcar-dmac.c
-+++ b/drivers/dma/sh/rcar-dmac.c
-@@ -128,6 +128,18 @@ struct rcar_dmac_chan_slave {
- };
- 
- /*
-+ * struct rcar_dmac_chan_map - Map of slave device phys to dma address
-+ * @addr: slave dma address
-+ * @dir: direction of mapping
-+ * @slave: slave configuration that is mapped
-+ */
-+struct rcar_dmac_chan_map {
-+	dma_addr_t addr;
-+	enum dma_data_direction dir;
-+	struct rcar_dmac_chan_slave slave;
-+};
-+
-+/*
-  * struct rcar_dmac_chan - R-Car Gen2 DMA Controller Channel
-  * @chan: base DMA channel object
-  * @iomem: channel I/O memory base
-@@ -152,6 +164,7 @@ struct rcar_dmac_chan {
- 
- 	struct rcar_dmac_chan_slave src;
- 	struct rcar_dmac_chan_slave dst;
-+	struct rcar_dmac_chan_map map;
- 	int mid_rid;
- 
- 	spinlock_t lock;
-@@ -1027,13 +1040,65 @@ rcar_dmac_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dma_dest,
- 				      DMA_MEM_TO_MEM, flags, false);
- }
- 
-+static int rcar_dmac_map_slave_addr(struct dma_chan *chan,
-+				    enum dma_transfer_direction dir)
-+{
-+	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
-+	struct rcar_dmac_chan_map *map = &rchan->map;
-+	phys_addr_t dev_addr;
-+	size_t dev_size;
-+	enum dma_data_direction dev_dir;
-+
-+	if (dir == DMA_DEV_TO_MEM) {
-+		dev_addr = rchan->src.slave_addr;
-+		dev_size = rchan->src.xfer_size;
-+		dev_dir = DMA_TO_DEVICE;
-+	} else {
-+		dev_addr = rchan->dst.slave_addr;
-+		dev_size = rchan->dst.xfer_size;
-+		dev_dir = DMA_FROM_DEVICE;
-+	}
-+
-+	/* Reuse current map if possible. */
-+	if (dev_addr == map->slave.slave_addr &&
-+	    dev_size == map->slave.xfer_size &&
-+	    dev_dir == map->dir)
-+		return 0;
-+
-+	/* Remove old mapping if present. */
-+	if (map->slave.xfer_size)
-+		dma_unmap_resource(chan->device->dev, map->addr,
-+				   map->slave.xfer_size, map->dir, NULL);
-+	map->slave.xfer_size = 0;
-+
-+	/* Create new slave address map. */
-+	map->addr = dma_map_resource(chan->device->dev, dev_addr, dev_size,
-+				     dev_dir, NULL);
-+
-+	if (dma_mapping_error(chan->device->dev, map->addr)) {
-+		dev_err(chan->device->dev,
-+			"chan%u: failed to map %zx@%pap", rchan->index,
-+			dev_size, &dev_addr);
-+		return -EIO;
-+	}
-+
-+	dev_dbg(chan->device->dev, "chan%u: map %zx@%pap to %pad dir: %s\n",
-+		rchan->index, dev_size, &dev_addr, &map->addr,
-+		dev_dir == DMA_TO_DEVICE ? "DMA_TO_DEVICE" : "DMA_FROM_DEVICE");
-+
-+	map->slave.slave_addr = dev_addr;
-+	map->slave.xfer_size = dev_size;
-+	map->dir = dev_dir;
-+
-+	return 0;
-+}
-+
- static struct dma_async_tx_descriptor *
- rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 			unsigned int sg_len, enum dma_transfer_direction dir,
- 			unsigned long flags, void *context)
- {
- 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
--	dma_addr_t dev_addr;
- 
- 	/* Someone calling slave DMA on a generic channel? */
- 	if (rchan->mid_rid < 0 || !sg_len) {
-@@ -1043,9 +1108,10 @@ rcar_dmac_prep_slave_sg(struct dma_chan *chan, struct scatterlist *sgl,
- 		return NULL;
- 	}
- 
--	dev_addr = dir == DMA_DEV_TO_MEM
--		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
--	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
-+	if (rcar_dmac_map_slave_addr(chan, dir))
-+		return NULL;
-+
-+	return rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, rchan->map.addr,
- 				      dir, flags, false);
- }
- 
-@@ -1059,7 +1125,6 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 	struct rcar_dmac_chan *rchan = to_rcar_dmac_chan(chan);
- 	struct dma_async_tx_descriptor *desc;
- 	struct scatterlist *sgl;
--	dma_addr_t dev_addr;
- 	unsigned int sg_len;
- 	unsigned int i;
- 
-@@ -1071,6 +1136,9 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 		return NULL;
- 	}
- 
-+	if (rcar_dmac_map_slave_addr(chan, dir))
-+		return NULL;
-+
- 	sg_len = buf_len / period_len;
- 	if (sg_len > RCAR_DMAC_MAX_SG_LEN) {
- 		dev_err(chan->device->dev,
-@@ -1098,9 +1166,7 @@ rcar_dmac_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr,
- 		sg_dma_len(&sgl[i]) = period_len;
- 	}
- 
--	dev_addr = dir == DMA_DEV_TO_MEM
--		 ? rchan->src.slave_addr : rchan->dst.slave_addr;
--	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, dev_addr,
-+	desc = rcar_dmac_chan_prep_sg(rchan, sgl, sg_len, rchan->map.addr,
- 				      dir, flags, true);
- 
- 	kfree(sgl);
+It's an I2C device and it does use a regulator. Not a lot, though, these are
+both quite basic stuff. This should still be documented as the people who
+write the DT bindings (in general) aren't expected to read driver code as
+well. That's at least my understanding.
+
 -- 
-2.8.2
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
