@@ -1,130 +1,117 @@
-From: d-gerlach@ti.com (Dave Gerlach)
-Date: Wed, 1 Jun 2016 18:03:52 -0500
-Subject: [PATCH 02/28] crypto: omap-sham: Don't idle/start SHA device
- between Encrypt operations
-In-Reply-To: <574EB091.6040001@ti.com>
-References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
- <1464771389-10640-3-git-send-email-t-kristo@ti.com> <574EB091.6040001@ti.com>
-Message-ID: <574F69D8.1010809@ti.com>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Wed,  1 Jun 2016 16:14:59 -0700
+Subject: [PATCH 00/34] Convert clk providers to clk_hw based APIs (part 1)
+Message-ID: <20160601231533.9354-1-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 04:53 AM, Grygorii Strashko wrote:
-> On 06/01/2016 11:56 AM, Tero Kristo wrote:
->> From: Lokesh Vutla <lokeshvutla@ti.com>
->>
->> Calling runtime PM API for every block causes serious perf hit to
->> crypto operations that are done on a long buffer.
->> As crypto is performed on a page boundary, encrypting large buffers can
->> cause a series of crypto operations divided by page. The runtime PM API
->> is also called those many times.
->>
->> We call runtime_pm_get_sync only at beginning on the session (cra_init)
->> and runtime_pm_put at the end. This result in upto a 50% speedup.
->> This doesn't make the driver to keep the system awake as runtime get/put
->> is only called during a crypto session which completes usually quickly.
->>
->> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->> ---
->>   drivers/crypto/omap-sham.c | 27 +++++++++++++++++----------
->>   1 file changed, 17 insertions(+), 10 deletions(-)
->>
->> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
->> index 6eefaa2..bd0258f 100644
->> --- a/drivers/crypto/omap-sham.c
->> +++ b/drivers/crypto/omap-sham.c
->> @@ -360,14 +360,6 @@ static void omap_sham_copy_ready_hash(struct
->> ahash_request *req)
->>
->>   static int omap_sham_hw_init(struct omap_sham_dev *dd)
->>   {
->> -    int err;
->> -
->> -    err = pm_runtime_get_sync(dd->dev);
->> -    if (err < 0) {
->> -        dev_err(dd->dev, "failed to get sync: %d\n", err);
->> -        return err;
->> -    }
->> -
+This is an initial set of patches to convert clk provider
+drivers over to the clk_hw based approach of registering clks.
+The foundational part of that has merged into v4.7-rc1 (see commit
+58657d189a2f and it's children for details), so this series updates
+some drivers for the new registration style. Not all drivers are
+converted because this takes quite some time, but this should be
+a good chunk of it.
 
-Would it be worth it to investigate a pm_runtime autosuspend approach 
-rather than knocking runtime PM out here completely? I am not clear if 
-the overhead is coming from the pm_runtime calls themselves or the 
-actual idling of the IP, but if it's the idling of the IP causing the 
-slowdown, with a large enough autosuspend_delay we don't actually sleep 
-between each block but after a long enough period of idle time we would 
-actually suspend.
+Stephen Boyd (34):
+  clk: qcom: Migrate to clk_hw based registration and OF APIs
+  clk: at91: Migrate to clk_hw based registration and OF APIs
+  clk: highbank: Migrate to clk_hw based registration and OF APIs
+  clk: bcm2835: Migrate to clk_hw based registration and OF APIs
+  clk: bcm: iproc: Migrate to clk_hw based registration and OF APIs
+  clk: bcm: kona: Migrate to clk_hw based registration and OF APIs
+  clk: berlin: Migrate to clk_hw based registration and OF APIs
+  clk: asm9260: Migrate to clk_hw based registration and OF APIs
+  clk: axi-clkgen: Migrate to clk_hw based OF and registration APIs
+  clk: axm5516: Migrate to clk_hw based OF and registration APIs
+  clk: cdce: Migrate to clk_hw based OF and registration APIs
+  clk: cdce925: Migrate to clk_hw based OF and provider APIs
+  clk: clps711x: Migrate to clk_hw based OF and registration APIs
+  clk: cs2000: Migrate to clk_hw based OF and registration APIs
+  clk: efm32gg: Migrate to clk_hw based OF and registration APIs
+  clk: ls1x: Migrate to clk_hw based OF and registration APIs
+  clk: maxgen: Migrate to clk_hw based OF and registration APIs
+  clk: mb86s7x: Migrate to clk_hw based OF and registration APIs
+  clk: moxart: Migrate to clk_hw based OF and registration APIs
+  clk: nomadik: Migrate to clk_hw based OF and registration APIs
+  clk: nspire: Migrate to clk_hw based OF and registration APIs
+  clk: palmas: Migrate to clk_hw based OF and registration APIs
+  clk: pwm: Migrate to clk_hw based OF and registration APIs
+  clk: rk808: Migrate to clk_hw based OF and registration APIs
+  clk: s2mps11: Migrate to clk_hw based OF and registration APIs
+  clk: scpi: Migrate to clk_hw based OF and registration APIs
+  clk: si514: Migrate to clk_hw based OF and registration APIs
+  clk: si5351: Migrate to clk_hw based OF and registration APIs
+  clk: si570: Migrate to clk_hw based OF and registration APIs
+  clk: stm32f3: Migrate to clk_hw based OF and registration APIs
+  clk: twl6040: Migrate to clk_hw based registration APIs
+  clk: u300: Migrate to clk_hw based registration APIs
+  clk: vt8500: Migrate to clk_hw based registration APIs
+  clk: wm831x: Migrate to clk_hw based registration APIs
 
-Regards,
-Dave
+ drivers/clk/at91/clk-generated.c    | 30 +++++++-----
+ drivers/clk/at91/clk-h32mx.c        |  8 +--
+ drivers/clk/at91/clk-main.c         | 88 +++++++++++++++++++--------------
+ drivers/clk/at91/clk-master.c       | 21 ++++----
+ drivers/clk/at91/clk-peripheral.c   | 39 +++++++++------
+ drivers/clk/at91/clk-pll.c          | 21 ++++----
+ drivers/clk/at91/clk-plldiv.c       | 24 ++++-----
+ drivers/clk/at91/clk-programmable.c | 22 +++++----
+ drivers/clk/at91/clk-slow.c         | 88 +++++++++++++++++++--------------
+ drivers/clk/at91/clk-smd.c          | 22 +++++----
+ drivers/clk/at91/clk-system.c       | 22 +++++----
+ drivers/clk/at91/clk-usb.c          | 69 +++++++++++++++-----------
+ drivers/clk/at91/clk-utmi.c         | 22 +++++----
+ drivers/clk/bcm/clk-bcm2835-aux.c   | 28 +++++------
+ drivers/clk/bcm/clk-bcm2835.c       | 83 +++++++++++++++++--------------
+ drivers/clk/bcm/clk-iproc-armpll.c  |  9 ++--
+ drivers/clk/bcm/clk-iproc-asiu.c    | 27 +++++-----
+ drivers/clk/bcm/clk-iproc-pll.c     | 32 ++++++------
+ drivers/clk/bcm/clk-kona-setup.c    | 76 +++++++++++++---------------
+ drivers/clk/bcm/clk-kona.c          |  9 ++--
+ drivers/clk/bcm/clk-kona.h          |  7 +--
+ drivers/clk/berlin/berlin2-avpll.c  | 12 ++---
+ drivers/clk/berlin/berlin2-avpll.h  |  8 +--
+ drivers/clk/berlin/berlin2-div.c    |  4 +-
+ drivers/clk/berlin/berlin2-div.h    |  4 +-
+ drivers/clk/berlin/berlin2-pll.c    |  6 +--
+ drivers/clk/berlin/berlin2-pll.h    |  5 +-
+ drivers/clk/berlin/bg2.c            | 98 ++++++++++++++++++++-----------------
+ drivers/clk/berlin/bg2q.c           | 39 ++++++++-------
+ drivers/clk/clk-asm9260.c           | 31 +++++++-----
+ drivers/clk/clk-axi-clkgen.c        | 12 ++---
+ drivers/clk/clk-axm5516.c           | 39 +++++++--------
+ drivers/clk/clk-cdce706.c           | 40 ++++++++-------
+ drivers/clk/clk-cdce925.c           | 42 +++++++++-------
+ drivers/clk/clk-clps711x.c          | 78 ++++++++++++++---------------
+ drivers/clk/clk-cs2000-cp.c         | 16 +++---
+ drivers/clk/clk-efm32gg.c           | 63 +++++++++++++-----------
+ drivers/clk/clk-highbank.c          |  9 ++--
+ drivers/clk/clk-ls1x.c              | 69 +++++++++++++-------------
+ drivers/clk/clk-max-gen.c           | 64 ++++++++++++------------
+ drivers/clk/clk-mb86s7x.c           | 16 +++---
+ drivers/clk/clk-moxart.c            | 22 +++++----
+ drivers/clk/clk-nomadik.c           | 48 +++++++++---------
+ drivers/clk/clk-nspire.c            | 19 +++----
+ drivers/clk/clk-palmas.c            | 12 ++---
+ drivers/clk/clk-pwm.c               |  9 ++--
+ drivers/clk/clk-rk808.c             | 42 ++++++++--------
+ drivers/clk/clk-s2mps11.c           | 21 ++++----
+ drivers/clk/clk-scpi.c              | 33 ++++++-------
+ drivers/clk/clk-si514.c             | 11 ++---
+ drivers/clk/clk-si5351.c            | 71 +++++++++++++++------------
+ drivers/clk/clk-si570.c             | 13 +++--
+ drivers/clk/clk-stm32f4.c           | 12 ++---
+ drivers/clk/clk-twl6040.c           |  8 +--
+ drivers/clk/clk-u300.c              | 59 ++++++++++++----------
+ drivers/clk/clk-vt8500.c            | 22 +++++----
+ drivers/clk/clk-wm831x.c            | 21 ++++----
+ drivers/clk/qcom/clk-regmap.c       |  5 +-
+ drivers/clk/qcom/clk-regmap.h       |  3 +-
+ drivers/clk/qcom/common.c           | 58 ++++++++++++----------
+ drivers/clk/qcom/gcc-msm8996.c      |  9 ++--
+ drivers/clk/qcom/mmcc-msm8996.c     |  9 ++--
+ 62 files changed, 1004 insertions(+), 905 deletions(-)
 
->>       if (!test_bit(FLAGS_INIT, &dd->flags)) {
->>           set_bit(FLAGS_INIT, &dd->flags);
->>           dd->err = 0;
->> @@ -999,8 +991,6 @@ static void omap_sham_finish_req(struct
->> ahash_request *req, int err)
->>       dd->flags &= ~(BIT(FLAGS_BUSY) | BIT(FLAGS_FINAL) |
->> BIT(FLAGS_CPU) |
->>               BIT(FLAGS_DMA_READY) | BIT(FLAGS_OUTPUT_READY));
->>
->> -    pm_runtime_put(dd->dev);
->> -
->>       if (req->base.complete)
->>           req->base.complete(&req->base, err);
->>
->> @@ -1239,6 +1229,7 @@ static int omap_sham_cra_init_alg(struct
->> crypto_tfm *tfm, const char *alg_base)
->>   {
->>       struct omap_sham_ctx *tctx = crypto_tfm_ctx(tfm);
->>       const char *alg_name = crypto_tfm_alg_name(tfm);
->> +    struct omap_sham_dev *dd;
->>
->>       /* Allocate a fallback and abort if it failed. */
->>       tctx->fallback = crypto_alloc_shash(alg_name, 0,
->> @@ -1266,6 +1257,13 @@ static int omap_sham_cra_init_alg(struct
->> crypto_tfm *tfm, const char *alg_base)
->>
->>       }
->>
->> +    spin_lock_bh(&sham.lock);
->> +    list_for_each_entry(dd, &sham.dev_list, list) {
->> +        break;
->> +    }
->> +    spin_unlock_bh(&sham.lock);
->> +
->> +    pm_runtime_get_sync(dd->dev);
->>       return 0;
->>   }
->>
->> @@ -1307,6 +1305,7 @@ static int omap_sham_cra_sha512_init(struct
->> crypto_tfm *tfm)
->>   static void omap_sham_cra_exit(struct crypto_tfm *tfm)
->>   {
->>       struct omap_sham_ctx *tctx = crypto_tfm_ctx(tfm);
->> +    struct omap_sham_dev *dd;
->>
->>       crypto_free_shash(tctx->fallback);
->>       tctx->fallback = NULL;
->> @@ -1315,6 +1314,14 @@ static void omap_sham_cra_exit(struct
->> crypto_tfm *tfm)
->>           struct omap_sham_hmac_ctx *bctx = tctx->base;
->>           crypto_free_shash(bctx->shash);
->>       }
->> +
->> +    spin_lock_bh(&sham.lock);
->> +    list_for_each_entry(dd, &sham.dev_list, list) {
->> +        break;
->> +    }
->> +    spin_unlock_bh(&sham.lock);
->> +
->> +    pm_runtime_get_sync(dd->dev);
->
-> May be put_?
->
->>   }
->>
->>   static struct ahash_alg algs_sha1_md5[] = {
->>
->
->
+-- 
+2.7.4
