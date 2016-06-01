@@ -1,59 +1,49 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 1 Jun 2016 14:23:27 +0200
-Subject: [PULL] drm: atmel-hlcdc: fixes for 4.7-rc2
-Message-ID: <20160601142327.700821ab@bbrezillon>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 1 Jun 2016 14:27:57 +0200
+Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
+In-Reply-To: <a60346f2-2abb-342b-dd20-38d401c4ceb3@cogentembedded.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
+ <CAMuHMdU2P6VKXNpEHGOKpyuM45Pk0CuHWngxwu5AYGqYfduXXg@mail.gmail.com>
+ <a60346f2-2abb-342b-dd20-38d401c4ceb3@cogentembedded.com>
+Message-ID: <CAMuHMdXUdg8+ux2j5SsthZS6DWZnHfan0jL=PpYEwfnS7fbRkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+Hi Sergei,
 
-This pull request contains 2 trivial fixes for the atmel-hlcdc driver.
+On Wed, Jun 1, 2016 at 2:16 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> On 6/1/2016 11:22 AM, Geert Uytterhoeven wrote:
+>>> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
+>>> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+>>
+>>> +       ethernet at 18000000 {
+>>> +               compatible = "smsc,lan89218", "smsc,lan9115";
+>>
+>>
+>> The "smsc,lan89218" needs to be documented in the device tree bindings.
+>
+>    Have you looked at those bindings?
 
-The first one is making use of __drm_atomic_helper_crtc_destroy_state()
-instead of duplicating its logic in atmel_hlcdc_crtc_reset() and
-risking memory leaks if other objects are added to the common CRTC
-state.
+Now I did.
 
-The second one is fixing a possible NULL pointer dereference.
+>> Google couldn't find any evidence you submitted a patch for that.
+>
+>    Because the bindings document *any* LAN9115 compatible chip already.
 
-Regards,
+Ah, generic wildcard, not listing valid values. Hence checkpatch complained...
 
-Boris
+Google predict-while-you-type suggests "lan89218aq"? Should you use that?
+BTW, that's why we always want to document all valid values...
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+Gr{oetje,eeting}s,
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+                        Geert
 
-are available in the git repository at:
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-  git at github.com:bbrezillon/linux-at91.git tags/drm-atmel-hlcdc-fixes/for-4.7-rc2
-
-for you to fetch changes up to dcd64e313ff2d2a15574cd92ec27e73194ba7537:
-
-  drm: atmel-hlcdc: fix a NULL check (2016-06-01 13:36:26 +0200)
-
-----------------------------------------------------------------
-Two trivial bugfixes on the atmel-hlcdc driver for 4.7-rc2.
-
-The first one is making use of __drm_atomic_helper_crtc_destroy_state()
-instead of duplicating its logic in atmel_hlcdc_crtc_reset() and
-risking memory leaks if other objects are added to the common CRTC
-state.
-
-The second one is fixing a possible NULL pointer dereference.
-
-----------------------------------------------------------------
-Boris Brezillon (1):
-      drm: atmel-hlcdc: fix atmel_hlcdc_crtc_reset() implementation
-
-Dan Carpenter (1):
-      drm: atmel-hlcdc: fix a NULL check
-
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
