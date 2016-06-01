@@ -1,33 +1,59 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 1 Jun 2016 10:22:28 +0200
-Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
-In-Reply-To: <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdU2P6VKXNpEHGOKpyuM45Pk0CuHWngxwu5AYGqYfduXXg@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 1 Jun 2016 10:27:49 +0200
+Subject: [PATCH v3 0/2] nvmem: remove regmap dependency
+In-Reply-To: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1462214174-469-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <7eec3215-b455-6567-28a2-e2a860e1d3ec@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Greg,
 
-On Wed, Jun 1, 2016 at 12:33 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
-> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+Am 02.05.2016 um 20:36 schrieb Srinivas Kandagatla:
+> Hi Greg, 
+>
+> This is v3 patchset for the leftover 2 patches for nvmem regmap
+> removal series [1]. These patches are based on char-misc tree.
+>
+> nvmem uses regmap_raw_read/write apis to read/write data from providers,
+> With recent patch 922a9f936e40 ("regmap: mmio: Convert to regmap_bus
+> and fix accessor usage") nvmem providers based on regmap-mmio stopped
+> working, as nvmem core was using raw accessors.
+> This issue can be fixed temporarly by moving to other regmap apis,
+> but we might hit same issue in future, and regmap looks like an
+> overdo for nvmem. Moving to interfaces based on read/write callbacks
+> from providers would be more robust.
+>
+> This patchset converts the nvmem core and nvmem provider drivers to
+> use the new callbacks. Tested this patchset on qfprom and at24 drivers.
+> Other driver are only compile tested, any testing on them would be great.
+>
+> Most of the patches have been applied to char-misc tree, these are the
+> two patches which had some outstanding comments on mxs nvmemprovider,
+> which are now fixed.
+>
+> Changes since v2:
+>  - Fixed the mxs size and dt data pointer spotted by Stefan and Fabio
+>
+> Changes since v1:
+>  - rebased mtk-efuse on top of char-misc
+>  - addressed concerns raised by Stefan Wahren.
+>
+> [1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1130026.html
+>
+> Thanks,
+> srini
+>
+> Srinivas Kandagatla (2):
+>   nvmem: mtk-efuse: remove nvmem regmap dependency
+>   nvmem: mxs-ocotp: remove nvmem regmap dependency
+>
+>  drivers/nvmem/Kconfig     |  1 -
+>  drivers/nvmem/mtk-efuse.c | 47 ++++++++++++++++++---------
+>  drivers/nvmem/mxs-ocotp.c | 83 +++++++++++++----------------------------------
+>  3 files changed, 54 insertions(+), 77 deletions(-)
+>
 
-> +       ethernet at 18000000 {
-> +               compatible = "smsc,lan89218", "smsc,lan9115";
+any objections about this series or is it still in queue?
 
-The "smsc,lan89218" needs to be documented in the device tree bindings.
-Google couldn't find any evidence you submitted a patch for that.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Stefan
