@@ -1,61 +1,66 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed,  1 Jun 2016 15:07:25 -0700
-Subject: [PATCH] i2c: bcm2835: Set up the clock stretching timeout at boot.
-Message-ID: <1464818845-5348-1-git-send-email-eric@anholt.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 2 Jun 2016 00:08:40 +0200
+Subject: [PATCHv5] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+References: <573FFF51.1000004@gmail.com> <20160521105607.GA20071@amd>
+ <574049EF.2090208@gmail.com> <20160524090433.GA1277@amd>
+ <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+ <20160527205140.GA26767@amd>
+ <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
+ <20160531213437.GA28397@amd>
+ <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+Message-ID: <20160601220840.GA21946@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The register at poweron contains 0x40, which at our typical 100khz bus
-rate means .64ms instead of the desired 25ms.
+On Wed 2016-06-01 18:24:39, Sakari Ailus wrote:
+> Hi Pavel,
 
-Fixes many clock stretching timeouts when talking to the DSI panel's
-bridge chip, and will hopefully fix talking to the FXL6408 GPIO
-expander on the Pi3 as well.
+> > Well, it does not use any dt properties. So there's not really much to
+> > discuss with dt people...
+> > 
+> > Maybe "ad5820" needs to go to list of simple i2c drivers somewhere,
+> > but...
+> 
+> It's an I2C device and it does use a regulator. Not a lot, though, these are
+> both quite basic stuff. This should still be documented as the people who
+> write the DT bindings (in general) aren't expected to read driver code as
+> well. That's at least my understanding.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/i2c/busses/i2c-bcm2835.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+Yep, you are right, I forgot about the regulator. Something like this?
 
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index 818b051d25e6..1348f224013d 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -28,6 +28,11 @@
- #define BCM2835_I2C_FIFO	0x10
- #define BCM2835_I2C_DIV		0x14
- #define BCM2835_I2C_DEL		0x18
-+/*
-+ * 16-bit field for the number of SCL cycles to wait after rising SCL
-+ * before deciding the slave is not responding.  0 disables the
-+ * timeout detection.
-+ */
- #define BCM2835_I2C_CLKT	0x1c
- 
- #define BCM2835_I2C_C_READ	BIT(0)
-@@ -238,6 +243,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
- 	u32 bus_clk_rate, divider;
- 	int ret;
- 	struct i2c_adapter *adap;
-+	u32 clkt;
- 
- 	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
- 	if (!i2c_dev)
-@@ -280,6 +286,15 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
- 	}
- 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
- 
-+	/*
-+	 * SMBUS says "Devices participating in a transfer will
-+	 * timeout when any clock low exceeds the value of
-+	 * T_TIMEOUT,MIN of 25 ms."
-+	 */
-+	clkt = DIV_ROUND_UP(25 * bus_clk_rate, 1000);
-+	clkt = min(clkt, 0xffffu);
-+	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_CLKT, clkt);
+Thanks,
+									Pavel
+
+diff --git a/Documentation/devicetree/bindings/media/i2c/ad5820.txt b/Documentation/devicetree/bindings/media/i2c/ad5820.txt
+new file mode 100644
+index 0000000..87c98f1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/media/i2c/ad5820.txt
+@@ -0,0 +1,20 @@
++* Analog Devices AD5820 autofocus coil
 +
- 	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
- 	if (!irq) {
- 		dev_err(&pdev->dev, "No IRQ resource\n");
++Required Properties:
++
++  - compatible: Must contain "adi,ad5820"
++
++  - reg: I2C slave address
++
++  - VANA-supply: supply of voltage for VANA pin
++
++Example:
++
++       /* D/A converter for auto-focus */
++       ad5820: dac at 0c {
++               compatible = "adi,ad5820";
++               reg = <0x0c>;
++
++               VANA-supply = <&vaux4>;
++       };
++
+
+
 -- 
-2.8.0.rc3
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
