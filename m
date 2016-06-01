@@ -1,16 +1,135 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 1 Jun 2016 10:03:00 +0900
-Subject: [PATCH 08/13] ARM: dts: r8a7792: add SYS-DMAC support
-In-Reply-To: <5621267.GpvUaW18zI@wasted.cogentembedded.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <5621267.GpvUaW18zI@wasted.cogentembedded.com>
-Message-ID: <20160601010300.GH20527@verge.net.au>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 1 Jun 2016 09:05:02 +0800
+Subject: [PATCH v2 5/5] arm64/numa: avoid inconsistent information to be
+ printed
+In-Reply-To: <574D751D.9020901@huawei.com>
+References: <1464427377-12712-1-git-send-email-thunder.leizhen@huawei.com>
+ <1464427377-12712-6-git-send-email-thunder.leizhen@huawei.com>
+ <574D543A.2090406@suse.com> <574D751D.9020901@huawei.com>
+Message-ID: <574E34BE.5040204@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 01:25:24AM +0300, Sergei Shtylyov wrote:
-> Describe SYS-DMAC0/1 in the R8A7792 device tree.
-> 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+
+On 2016/5/31 19:27, Leizhen (ThunderTown) wrote:
+> 
+> 
+> On 2016/5/31 17:07, Matthias Brugger wrote:
+>>
+>>
+>> On 28/05/16 11:22, Zhen Lei wrote:
+>>> numa_init(of_numa_init) may returned error because of numa configuration
+>>> error. So "No NUMA configuration found" is inaccurate. In fact, specific
+>>> configuration error information should be immediately printed by the
+>>> testing branch.
+>>>
+>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>>> ---
+>>
+>> Which kernel version is this patch based on?
+> 
+> Base on mainline(git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git), I git pulled about 3-5 days ago, the last commit-id is dc03c0f.
+> 
+> And thess patches base on https://lkml.org/lkml/2016/5/24/679 series(acpi numa) as David Daney's requirement.
+> 
+>>
+>> Regards,
+>> Matthias
+>>
+>>>   arch/arm64/mm/numa.c | 6 +++---
+>>>   drivers/of/of_numa.c | 7 +++----
+>>>   2 files changed, 6 insertions(+), 7 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+>>> index 2601660..1b9622c 100644
+>>> --- a/arch/arm64/mm/numa.c
+>>> +++ b/arch/arm64/mm/numa.c
+>>> @@ -338,8 +338,10 @@ static int __init numa_init(int (*init_func)(void))
+>>>       if (ret < 0)
+>>>           return ret;
+>>>
+>>> -    if (nodes_empty(numa_nodes_parsed))
+>>> +    if (nodes_empty(numa_nodes_parsed)) {
+>>> +        pr_info("No NUMA configuration found\n");
+>>>           return -EINVAL;
+>>> +    }
+>>>
+>>>       ret = numa_register_nodes();
+>>>       if (ret < 0)
+>>> @@ -370,8 +372,6 @@ static int __init dummy_numa_init(void)
+>>>
+>>>       if (numa_off)
+>>>           pr_info("NUMA disabled\n"); /* Forced off on command line. */
+>>> -    else
+>>> -        pr_info("No NUMA configuration found\n");
+>>>       pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
+>>>              0LLU, PFN_PHYS(max_pfn) - 1);
+>>>
+>>> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
+>>> index fb62307..3157130 100644
+>>> --- a/drivers/of/of_numa.c
+>>> +++ b/drivers/of/of_numa.c
+>>> @@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
+>>>       struct device_node *np = NULL;
+>>>       struct resource rsrc;
+>>>       u32 nid;
+>>> -    int i, r = 0;
+>>> +    int i, r;
+>>>
+>>>       for_each_node_by_type(np, "memory") {
+>>>           r = of_property_read_u32(np, "numa-node-id", &nid);
+>>> @@ -81,12 +81,11 @@ static int __init of_numa_parse_memory_nodes(void)
+>>>           if (!i || r) {
+>>>               of_node_put(np);
+>>>               pr_err("NUMA: bad property in memory node\n");
+>>> -            r = r ? : -EINVAL;
+>>> -            break;
+>>> +            return r ? : -EINVAL;
+>>>           }
+>>>       }
+>>>
+>>> -    return r;
+>>> +    return 0;
+>>>   }
+>>>
+>>
+>> Well this is fixing changes you introduced in this patch-set. Any reason this is not part of patch 2?
+> 
+> Because they fixed two different problems.
+
+Hi, Matthias
+
+I thougth it again on my way home yesterday. Yeah, you're right, move this part to patch 2, will make these two
+patches looks more well. I put it here before, because for "No numa configuration" case, it originally returns error
+code, so that it can not walk to "if (nodes_empty(numa_nodes_parsed))".
+
+	ret = init_func();
+	if (ret < 0)
+		return ret;
+
+   -    if (nodes_empty(numa_nodes_parsed))
+   +    if (nodes_empty(numa_nodes_parsed)) {
+   +        pr_info("No NUMA configuration found\n");
+       		return -EINVAL;
+   +    }
+
+Regards,
+Zhen Lei
+
+> 
+>>
+>>>   static int __init of_numa_parse_distance_map_v1(struct device_node *map)
+>>> -- 
+>>> 2.5.0
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>
+>> .
+>>
