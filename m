@@ -1,79 +1,38 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 1 Jun 2016 15:13:19 -0500
-Subject: [PATCH v2 2/5] of/numa: fix a memory@ node can only contains one
- memory block
-In-Reply-To: <1464427377-12712-3-git-send-email-thunder.leizhen@huawei.com>
-References: <1464427377-12712-1-git-send-email-thunder.leizhen@huawei.com>
- <1464427377-12712-3-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <CAL_JsqJO1jXpmAJWUhCW+OK2mpTvtwzCuy_--3sQNUQhTvyFdA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 01 Jun 2016 22:51:04 +0200
+Subject: [PATCH] ARM: nspire: Fix Kconfig dependency
+In-Reply-To: <1464807997-3804-1-git-send-email-shc_work@mail.ru>
+References: <1464807997-3804-1-git-send-email-shc_work@mail.ru>
+Message-ID: <8460879.2UeHqDeEbb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 28, 2016 at 4:22 AM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
-> For a normal memory@ devicetree node, its reg property can contains more
-> memory blocks.
->
-> Because we don't known how many memory blocks maybe contained, so we try
-> from index=0, increase 1 until error returned(the end).
->
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  drivers/of/of_numa.c | 26 +++++++++-----------------
->  1 file changed, 9 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-> index fb71b4e..fa85a51 100644
-> --- a/drivers/of/of_numa.c
-> +++ b/drivers/of/of_numa.c
-> @@ -63,13 +63,9 @@ static int __init of_numa_parse_memory_nodes(void)
->         struct device_node *np = NULL;
->         struct resource rsrc;
->         u32 nid;
-> -       int r = 0;
-> -
-> -       for (;;) {
-> -               np = of_find_node_by_type(np, "memory");
-> -               if (!np)
-> -                       break;
-> +       int i, r = 0;
->
-> +       for_each_node_by_type(np, "memory") {
->                 r = of_property_read_u32(np, "numa-node-id", &nid);
->                 if (r == -EINVAL)
->                         /*
-> @@ -78,21 +74,17 @@ static int __init of_numa_parse_memory_nodes(void)
->                          * "numa-node-id" property
->                          */
->                         continue;
-> -               else if (r)
-> -                       /* some other error */
-> -                       break;
->
-> -               r = of_address_to_resource(np, 0, &rsrc);
-> -               if (r) {
-> -                       pr_err("NUMA: bad reg property in memory node\n");
-> -                       break;
-> -               }
-> +               for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
-> +                       r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
->
-> -               r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
-> -               if (r)
-> +               if (!i || r) {
-> +                       of_node_put(np);
-> +                       pr_err("NUMA: bad property in memory node\n");
-> +                       r = r ? : -EINVAL;
->                         break;
-> +               }
->         }
-> -       of_node_put(np);
+On Wednesday, June 1, 2016 10:06:37 PM CEST Alexander Shiyan wrote:
+> ARM926T-based machine should depend on the ARCH_MULTI_V5 option.
+> The ARCH_MULTI_V4_V5 is selected automatically by basic ARM configuration.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-I believe you still need this and not the one above. You only need it
-within the loop if you return. Otherwise, the last node always need to
-be put.
+The patch looks good, but I don't think bcm-kernel-feedback-list
+is the right recipient.
 
-With that, for the series:
+Daniel added the code initially, so I'm adding him on Cc, but I can
+also put the patch into arm-soc directly if he doesn't want to forward
+it to me.
 
-Acked-by: Rob Herring <robh@kernel.org>
-
-Rob
+>  arch/arm/mach-nspire/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-nspire/Kconfig b/arch/arm/mach-nspire/Kconfig
+> index bc41f26..a22e99c6 100644
+> --- a/arch/arm/mach-nspire/Kconfig
+> +++ b/arch/arm/mach-nspire/Kconfig
+> @@ -1,6 +1,6 @@
+>  config ARCH_NSPIRE
+>  	bool "TI-NSPIRE based"
+> -	depends on ARCH_MULTI_V4_V5
+> +	depends on ARCH_MULTI_V5
+>  	depends on MMU
+>  	select CPU_ARM926T
+>  	select GENERIC_IRQ_CHIP
+> 
