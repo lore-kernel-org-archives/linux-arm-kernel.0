@@ -1,35 +1,28 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 1 Jun 2016 11:03:41 -0500
-Subject: [PATCH v5 5/6] clocksource/drivers/arm_arch_timer: Simplify ACPI
- support code.
-In-Reply-To: <1464096633-9309-6-git-send-email-fu.wei@linaro.org>
-References: <1464096633-9309-1-git-send-email-fu.wei@linaro.org>
- <1464096633-9309-6-git-send-email-fu.wei@linaro.org>
-Message-ID: <574F075D.1010007@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Jun 2016 17:04:02 +0100
+Subject: [PATCH] include/linux/arm-smccc.h: avoid sign extension problem
+In-Reply-To: <1464785361-20038-1-git-send-email-jens.wiklander@linaro.org>
+References: <1464785361-20038-1-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20160601160401.GZ19428@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fu.wei at linaro.org wrote:
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index 47352d2..5a5baa1 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -8,6 +8,7 @@ config CLKSRC_OF
->   config CLKSRC_ACPI
->   	bool
->   	select CLKSRC_PROBE
-> +	select ACPI_GTDT
+On Wed, Jun 01, 2016 at 02:49:21PM +0200, Jens Wiklander wrote:
+> Prior to this patch the ARM_SMCCC_FAST_CALL constant was of a signed
+> type causing unwanted sign extension. This patch explicitly selects an
+> unsigned type for the constant.
+> 
+> Reported-by: Saksham Jain <sakjain92@gmail.com>
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 
-I think this should be under the ARM64 Kconfig option 
-(arch/arm64/Kconfig), perhaps like this:
+Looks fine to me.  Who's merging this change?  If they're going some
+other route:
 
-	select ACPI_SPCR_TABLE if ACPI
-+	select ACPI_GTDT if ACPI
+Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-We want GTDT to be parsed on ARM64 if we have ACPI, even if we don't 
-have CLKSRC enabled.
+Thanks.
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora
-Forum, a Linux Foundation collaborative project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
