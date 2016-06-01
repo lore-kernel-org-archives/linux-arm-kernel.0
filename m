@@ -1,65 +1,37 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 01 Jun 2016 10:43:28 -0700
-Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
-In-Reply-To: <1464790113.3522.4.camel@pengutronix.de> (Philipp Zabel's message
- of "Wed, 01 Jun 2016 16:08:33 +0200")
-References: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
- <1464790113.3522.4.camel@pengutronix.de>
-Message-ID: <7heg8geren.fsf@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed,  1 Jun 2016 19:54:26 +0200
+Subject: [PATCH 0/4] ASoC: sunxi: Add i2s controller support
+Message-ID: <20160601175430.11625-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Philipp Zabel <p.zabel@pengutronix.de> writes:
+Hi everyone,
 
-> Hi Kevin,
->
-> Am Montag, den 30.05.2016, 15:27 +0200 schrieb Neil Armstrong:
->> Patchset to add and enable the reset controller driver on Meson SoCs platforms.
->> 
->> This reset controller has up to 256 reset lines with reset pulse generation only,
->> so the assert and deassert calls are not available.
->> 
->> Depends on the patch :
->>  - "reset: add devm_reset_controller_register API" [1]
->> 
->> Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
->> - Get back __iomem in _reset() callback
->> - Get rid of MODULE_ALIAS
->> 
->> Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
->> - Remove _gxbb_ in names
->> - Depends build on ARCH_MESON only
->> - Add meson8b compatible and bindings
->> - Re-indent dt-bindings headers
->> - Switch to devm_ reset controller register
->> - Remove platform "remove" callback
->> - Update Dual BSD/GPL file headers
->> 
->> Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
->> - Fix register mapping and bit defines in bindings header
->> - Remove assert and unassert calls
->> - Fix missing __iomem
->> 
->> [1] https://patchwork.kernel.org/patch/8988471/
->> 
->> Neil Armstrong (4):
->>   reset: Add support for the Amlogic Meson SoC Reset Controller
->>   dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
->>   ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
->>   ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
->
-> Should I take the two device tree patches into the reset tree?
+This is the first version of the I2S support for the controller found
+in the Allwinner A10 and later SoCs.
 
-You can take the driver and the bindings. We will take the DT patches
-through the amlogic tree, and submit via arm-soc.
+Playback has been tested with an UDA1380 on an A20-Olinuxino. Capture
+is not implemented yet, but will come eventually.
 
-> Is resolving the reset/deassert situation a prerequisite for these
-> patches?
+Let me know what you think,
+Maxime
 
-No, not a prerequisite.  Go ahead and merge the driver.
+Emilio L?pez (1):
+  ARM: sun7i: Add mod1 clock nodes
 
-It just means that hardware reset doesn't actually happen when using
-drivers/net/ethernet/stmicro/stmmac/* because it only uses
-assert/reassert currently.
+Maxime Ripard (3):
+  dt-bindings: Add A10 I2S controller binding documentation
+  ASoC: sunxi: Add Allwinner A10 Digital Audio driver
+  ARM: sun7i: Add DAI nodes
 
-Kevin
+ .../devicetree/bindings/sound/sun4i-i2s.txt        |  33 +
+ arch/arm/boot/dts/sun7i-a20.dtsi                   |  87 ++-
+ sound/soc/sunxi/Kconfig                            |  10 +
+ sound/soc/sunxi/Makefile                           |   2 +-
+ sound/soc/sunxi/sun4i-i2s.c                        | 714 +++++++++++++++++++++
+ 5 files changed, 843 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+ create mode 100644 sound/soc/sunxi/sun4i-i2s.c
+
+-- 
+2.8.3
