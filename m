@@ -1,79 +1,55 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Wed,  1 Jun 2016 12:05:36 -0700
-Subject: [PATCH v3 4/4] clk: bcm2835: Skip PLLC clocks when deciding on a new
- clock parent
+Date: Wed,  1 Jun 2016 12:05:33 -0700
+Subject: [PATCH v3 1/4] clk: bcm2835: Mark the VPU clock as critical
 In-Reply-To: <1464807936-532-1-git-send-email-eric@anholt.net>
 References: <1464807936-532-1-git-send-email-eric@anholt.net>
-Message-ID: <1464807936-532-5-git-send-email-eric@anholt.net>
+Message-ID: <1464807936-532-2-git-send-email-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the firmware had set up a clock to source from PLLC, go along with
-it.  But if we're looking for a new parent, we don't want to switch it
-to PLLC because the firmware will force PLLC (and thus the AXI bus
-clock) to different frequencies during over-temp/under-voltage,
-without notification to Linux.
-
-On my system, this moves the Linux-enabled HDMI state machine and DSI1
-escape clock over to plld_per from pllc_per.  EMMC still ends up on
-pllc_per, because the firmware had set it up to use that.
+The VPU clock is also the clock for our AXI bus, so we really can't
+disable it.  This might have happened during boot if, for example,
+uart1 (aux_uart clock) probed and was then disabled before the other
+consumers of the VPU clock had probed.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
-Fixes: 41691b8862e2 ("clk: bcm2835: Add support for programming the audio domain clocks")
 ---
- drivers/clk/bcm/clk-bcm2835.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+
+v2: Rewrite to use a .flags in bcm2835_clock_data, since other clocks
+    will need this too.
+
+ drivers/clk/bcm/clk-bcm2835.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/clk/bcm/clk-bcm2835.c b/drivers/clk/bcm/clk-bcm2835.c
-index c6420b36cbcb..e8a9646afd6d 100644
+index 7a7970865c2d..d9db03cb3fd8 100644
 --- a/drivers/clk/bcm/clk-bcm2835.c
 +++ b/drivers/clk/bcm/clk-bcm2835.c
-@@ -1009,16 +1009,28 @@ static int bcm2835_clock_set_rate(struct clk_hw *hw,
- 	return 0;
- }
+@@ -443,6 +443,8 @@ struct bcm2835_clock_data {
+ 	/* Number of fractional bits in the divider */
+ 	u32 frac_bits;
  
-+static bool
-+bcm2835_clk_is_pllc(struct clk_hw *hw)
-+{
-+	if (!hw)
-+		return false;
++	u32 flags;
 +
-+	return strncmp(clk_hw_get_name(hw), "pllc", 4) == 0;
-+}
-+
- static int bcm2835_clock_determine_rate(struct clk_hw *hw,
- 					struct clk_rate_request *req)
- {
- 	struct bcm2835_clock *clock = bcm2835_clock_from_hw(hw);
- 	struct clk_hw *parent, *best_parent = NULL;
-+	bool current_parent_is_pllc;
- 	unsigned long rate, best_rate = 0;
- 	unsigned long prate, best_prate = 0;
- 	size_t i;
- 	u32 div;
+ 	bool is_vpu_clock;
+ 	bool is_mash_clock;
+ };
+@@ -1230,7 +1232,7 @@ static struct clk *bcm2835_register_clock(struct bcm2835_cprman *cprman,
+ 	init.parent_names = parents;
+ 	init.num_parents = data->num_mux_parents;
+ 	init.name = data->name;
+-	init.flags = CLK_IGNORE_UNUSED;
++	init.flags = data->flags | CLK_IGNORE_UNUSED;
  
-+	current_parent_is_pllc = bcm2835_clk_is_pllc(clk_hw_get_parent(hw));
-+
- 	/*
- 	 * Select parent clock that results in the closest but lower rate
- 	 */
-@@ -1026,6 +1038,17 @@ static int bcm2835_clock_determine_rate(struct clk_hw *hw,
- 		parent = clk_hw_get_parent_by_index(hw, i);
- 		if (!parent)
- 			continue;
-+
-+		/*
-+		 * Don't choose a PLLC-derived clock as our parent
-+		 * unless it had been manually set that way.  PLLC's
-+		 * frequency gets adjusted by the firmware due to
-+		 * over-temp or under-voltage conditions, without
-+		 * prior notification to our clock consumer.
-+		 */
-+		if (bcm2835_clk_is_pllc(parent) && !current_parent_is_pllc)
-+			continue;
-+
- 		prate = clk_hw_get_rate(parent);
- 		div = bcm2835_clock_choose_div(hw, req->rate, prate, true);
- 		rate = bcm2835_clock_rate_from_divisor(clock, prate, div);
+ 	if (data->is_vpu_clock) {
+ 		init.ops = &bcm2835_vpu_clock_clk_ops;
+@@ -1649,6 +1651,7 @@ static const struct bcm2835_clk_desc clk_desc_array[] = {
+ 		.div_reg = CM_VPUDIV,
+ 		.int_bits = 12,
+ 		.frac_bits = 8,
++		.flags = CLK_IS_CRITICAL,
+ 		.is_vpu_clock = true),
+ 
+ 	/* clocks with per parent mux */
 -- 
 2.8.0.rc3
