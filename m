@@ -1,52 +1,78 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed, 01 Jun 2016 01:57:23 -0700
-Subject: [PATCH v3 09/12] EXAMPLE CODE: usb: port: Parse pwrseq phandle
- from Device Tree
-In-Reply-To: <1464768141-25420-10-git-send-email-k.kozlowski@samsung.com>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
- <1464768141-25420-10-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <146477144362.1485.3331887341591876278@sboyd-linaro>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 1 Jun 2016 11:56:09 +0300
+Subject: [PATCH 08/28] crypto: omap-sham: implement context export/import APIs
+In-Reply-To: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1464771389-10640-9-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Krzysztof Kozlowski (2016-06-01 01:02:18)
-> Parse usb-pwrseq property from Device Tree to get the phandle to pwrseq
-> device.  The pwrseq device will be used by USB hub to cycle the power
-> before activating ports.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Context export/import are now required for ahash algorithms due to
+required support in algif_hash. Implement these for OMAP SHA driver,
+saving and restoring the internal state of the driver.
 
-Drive by review comment.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ drivers/crypto/omap-sham.c | 40 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 38 insertions(+), 2 deletions(-)
 
-I was hoping this would help me with a problem I'm having where I have a
-hub (smsc4604) that needs to be taken out of reset before my HSIC
-controller sends a USB reset to it, but it seems this is more about
-doing some sort of power on sequence after enumeration?
-
-> diff --git a/drivers/usb/core/port.c b/drivers/usb/core/port.c
-> index 460c855be0d0..89b9bdfc7061 100644
-> --- a/drivers/usb/core/port.c
-> +++ b/drivers/usb/core/port.c
-> @@ -18,6 +18,8 @@
->  
->  #include <linux/slab.h>
->  #include <linux/pm_qos.h>
-> +#include <linux/pwrseq.h>
-> +#include <linux/usb/of.h>
->  
->  #include "hub.h"
->  
-> @@ -526,6 +528,14 @@ int usb_hub_create_port_device(struct usb_hub *hub, int port1)
->                 return retval;
->         }
->  
-> +       port_dev->dev.of_node = usb_of_get_child_node(hdev->dev.parent->of_node,
-> +                                                     port1);
-> +       port_dev->pwrseq = pwrseq_alloc(&port_dev->dev, "usb-pwrseq");
-> +       if (IS_ERR(port_dev->pwrseq)) {
-> +               device_unregister(&port_dev->dev);
-> +               return PTR_ERR(port_dev->pwrseq);
-
-Are we certain that port_dev hasn't been freed at this point? We just
-called device_unregister() on it, so it seems safer to save away the
-return value before calling device_unregister() here.
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index 34ebe1d..321c097 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -1329,6 +1329,35 @@ static void omap_sham_cra_exit(struct crypto_tfm *tfm)
+ 	pm_runtime_get_sync(dd->dev);
+ }
+ 
++static int omap_sham_export(struct ahash_request *req, void *out)
++{
++	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
++	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
++	struct omap_sham_ctx *ctx = crypto_ahash_ctx(tfm);
++	struct omap_sham_hmac_ctx *bctx = ctx->base;
++
++	memcpy(out, rctx, sizeof(*rctx) + BUFLEN);
++	memcpy(out + sizeof(*rctx) + BUFLEN, ctx, sizeof(*ctx));
++	memcpy(out + sizeof(*rctx) + BUFLEN + sizeof(*ctx), bctx,
++	       sizeof(*bctx));
++
++	return 0;
++}
++
++static int omap_sham_import(struct ahash_request *req, const void *in)
++{
++	struct crypto_ahash *tfm = crypto_ahash_reqtfm(req);
++	struct omap_sham_reqctx *rctx = ahash_request_ctx(req);
++	struct omap_sham_ctx *ctx = crypto_ahash_ctx(tfm);
++	struct omap_sham_hmac_ctx *bctx = ctx->base;
++
++	memcpy(rctx, in, sizeof(*rctx) + BUFLEN);
++	memcpy(ctx, in + sizeof(*rctx) + BUFLEN, sizeof(*ctx));
++	memcpy(bctx, in + sizeof(*rctx) + BUFLEN + sizeof(*ctx), sizeof(*bctx));
++
++	return 0;
++}
++
+ static struct ahash_alg algs_sha1_md5[] = {
+ {
+ 	.init		= omap_sham_init,
+@@ -1980,8 +2009,15 @@ static int omap_sham_probe(struct platform_device *pdev)
+ 
+ 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
+ 		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
+-			err = crypto_register_ahash(
+-					&dd->pdata->algs_info[i].algs_list[j]);
++			struct ahash_alg *alg;
++
++			alg = &dd->pdata->algs_info[i].algs_list[j];
++			alg->export = omap_sham_export;
++			alg->import = omap_sham_import;
++			alg->halg.statesize = sizeof(struct omap_sham_reqctx) +
++				sizeof(struct omap_sham_ctx) +
++				sizeof(struct omap_sham_hmac_ctx) + BUFLEN;
++			err = crypto_register_ahash(alg);
+ 			if (err)
+ 				goto err_algs;
+ 
+-- 
+1.9.1
