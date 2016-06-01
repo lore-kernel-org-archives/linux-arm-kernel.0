@@ -1,64 +1,127 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 1 Jun 2016 03:11:48 +0200
-Subject: [PATCH v2 3/5] drivers: net: phy: Add MDIO driver
-In-Reply-To: <1464739840-21971-4-git-send-email-isubramanian@apm.com>
-References: <1464739840-21971-1-git-send-email-isubramanian@apm.com>
- <1464739840-21971-4-git-send-email-isubramanian@apm.com>
-Message-ID: <20160601011148.GD31982@lunn.ch>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 1 Jun 2016 10:13:49 +0900
+Subject: [PATCH 09/13] ARM: dts: r8a7792: add [H]SCIF support
+In-Reply-To: <1493287.pGnW6U6caN@wasted.cogentembedded.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <1493287.pGnW6U6caN@wasted.cogentembedded.com>
+Message-ID: <20160601011348.GI20527@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 05:10:38PM -0700, Iyappan Subramanian wrote:
-> +static int xgene_mdio_reset(struct xgene_mdio_pdata *pdata)
-> +{
-> +	int ret;
+On Wed, Jun 01, 2016 at 01:26:56AM +0300, Sergei Shtylyov wrote:
+> Describe [H]SCIFs in the R8A7792 device tree.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+
+This looks correct to me.
+
+I am wondering if you have been able to confirm DMA operation of the
+devices enabled later on in the series.
+
+> 
+> ---
+>  arch/arm/boot/dts/r8a7792.dtsi |   90 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 90 insertions(+)
+> 
+> Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
+> ===================================================================
+> --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
+> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
+> @@ -140,6 +140,96 @@
+>  		dma-channels = <15>;
+>  	};
+>  
+> +	scif0: serial at e6e60000 {
+> +		compatible = "renesas,scif-r8a7792", "renesas,rcar-gen2-scif",
+> +			     "renesas,scif";
+> +		reg = <0 0xe6e60000 0 64>;
+> +		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp7_clks R8A7792_CLK_SCIF0>, <&zs_clk>,
+> +			 <&scif_clk>;
+> +		clock-names = "fck", "brg_int", "scif_clk";
+> +		dmas = <&dmac0 0x29>, <&dmac0 0x2a>,
+> +		       <&dmac1 0x29>, <&dmac1 0x2a>;
+> +		dma-names = "tx", "rx", "tx", "rx";
+> +		power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
+> +		status = "disabled";
+> +	};
 > +
-> +	if (pdata->mdio_id == XGENE_MDIO_RGMII) {
-> +		if (pdata->dev->of_node) {
-> +			clk_prepare_enable(pdata->clk);
-> +			clk_disable_unprepare(pdata->clk);
-> +			clk_prepare_enable(pdata->clk);
-
-Hi Iyappan
-
-Is that a workaround for a hardware problem? If so, i would suggest
-adding a comment, to stop people submitting a patch simplifying it.
-
-
-> +static int xgene_mdio_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct mii_bus *mdio_bus;
-> +	const struct of_device_id *of_id;
-> +	struct resource *res;
-> +	struct xgene_mdio_pdata *pdata;
-> +	void __iomem *csr_addr;
-> +	int mdio_id = 0, ret = 0;
+> +	scif1: serial at e6e68000 {
+> +		compatible = "renesas,scif-r8a7792", "renesas,rcar-gen2-scif",
+> +			     "renesas,scif";
+> +		reg = <0 0xe6e68000 0 64>;
+> +		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp7_clks R8A7792_CLK_SCIF1>, <&zs_clk>,
+> +			 <&scif_clk>;
+> +		clock-names = "fck", "brg_int", "scif_clk";
+> +		dmas = <&dmac0 0x2d>, <&dmac0 0x2e>,
+> +		       <&dmac1 0x2d>, <&dmac1 0x2e>;
+> +		dma-names = "tx", "rx", "tx", "rx";
+> +		power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
+> +		status = "disabled";
+> +	};
 > +
-
-
-> +	of_id = of_match_device(xgene_mdio_of_match, &pdev->dev);
-> +	if (mdio_id == XGENE_MDIO_RGMII) {
-> +		mdio_bus->read = xgene_mdio_rgmii_read;
-> +		mdio_bus->write = xgene_mdio_rgmii_write;
-> +	} else {
-> +		mdio_bus->read = xgene_xfi_mdio_read;
-> +		mdio_bus->write = xgene_xfi_mdio_write;
-> +	}
-
-> +static const struct of_device_id xgene_mdio_of_match[] = {
-> +	{
-> +		.compatible = "apm,xgene-mdio-rgmii",
-> +		.data = (void *)XGENE_MDIO_RGMII
-> +	},
-> +	{
-> +		.compatible = "apm,xgene-mdio-xfi",
-> +		.data = (void *)XGENE_MDIO_XFI},
-> +	{},
-> +};
-
-
-This all makes me think you should have two separate MDIO drivers, one
-for each compatible string. There is not that much shared code.
-
-    Andrew
+> +	scif2: serial at e6e58000 {
+> +		compatible = "renesas,scif-r8a7792", "renesas,rcar-gen2-scif",
+> +			     "renesas,scif";
+> +		reg = <0 0xe6e58000 0 64>;
+> +		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp7_clks R8A7792_CLK_SCIF2>, <&zs_clk>,
+> +			 <&scif_clk>;
+> +		clock-names = "fck", "brg_int", "scif_clk";
+> +		dmas = <&dmac0 0x2b>, <&dmac0 0x2c>,
+> +		       <&dmac1 0x2b>, <&dmac1 0x2c>;
+> +		dma-names = "tx", "rx", "tx", "rx";
+> +		power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
+> +		status = "disabled";
+> +	};
+> +
+> +	scif3: serial at e6ea8000 {
+> +		compatible = "renesas,scif-r8a7792", "renesas,rcar-gen2-scif",
+> +			     "renesas,scif";
+> +		reg = <0 0xe6ea8000 0 64>;
+> +		interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp7_clks R8A7792_CLK_SCIF3>, <&zs_clk>,
+> +			 <&scif_clk>;
+> +		clock-names = "fck", "brg_int", "scif_clk";
+> +		dmas = <&dmac0 0x2f>, <&dmac0 0x30>,
+> +		       <&dmac1 0x2f>, <&dmac1 0x30>;
+> +		dma-names = "tx", "rx", "tx", "rx";
+> +		power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
+> +		status = "disabled";
+> +	};
+> +
+> +	hscif0: serial at e62c0000 {
+> +		compatible = "renesas,hscif-r8a7792", "renesas,rcar-gen2-hscif",
+> +			     "renesas,hscif";
+> +		reg = <0 0xe62c0000 0 96>;
+> +		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp7_clks R8A7792_CLK_HSCIF0>, <&zs_clk>,
+> +			 <&scif_clk>;
+> +		clock-names = "fck", "brg_int", "scif_clk";
+> +		dmas = <&dmac0 0x39>, <&dmac0 0x3a>,
+> +		       <&dmac1 0x39>, <&dmac1 0x3a>;
+> +		dma-names = "tx", "rx", "tx", "rx";
+> +		power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
+> +		status = "disabled";
+> +	};
+> +
+> +	hscif1: serial at e62c8000 {
+> +		compatible = "renesas,hscif-r8a7792", "renesas,rcar-gen2-hscif",
+> +			     "renesas,hscif";
+> +		reg = <0 0xe62c8000 0 96>;
+> +		interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&mstp7_clks R8A7792_CLK_HSCIF1>, <&zs_clk>,
+> +			 <&scif_clk>;
+> +		clock-names = "fck", "brg_int", "scif_clk";
+> +		dmas = <&dmac0 0x4d>, <&dmac0 0x4e>,
+> +		       <&dmac1 0x4d>, <&dmac1 0x4e>;
+> +		dma-names = "tx", "rx", "tx", "rx";
+> +		power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
+> +		status = "disabled";
+> +	};
+> +
+>  	clocks {
+>  		#address-cells = <2>;
+>  		#size-cells = <2>;
+> 
