@@ -1,10 +1,10 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  1 Jun 2016 16:15:24 -0700
-Subject: [PATCH 25/34] clk: s2mps11: Migrate to clk_hw based OF and
- registration APIs
+Date: Wed,  1 Jun 2016 16:15:25 -0700
+Subject: [PATCH 26/34] clk: scpi: Migrate to clk_hw based OF and registration
+ APIs
 In-Reply-To: <20160601231533.9354-1-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
-Message-ID: <20160601231533.9354-26-stephen.boyd@linaro.org>
+Message-ID: <20160601231533.9354-27-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,72 +13,118 @@ can get rid of struct clk pointers while registering clks in
 these drivers, allowing us to move closer to a clear split of
 consumer and provider clk APIs.
 
-Cc: Andi Shyti <andi.shyti@samsung.com>
-Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
 
 See commit 58657d189a2f and it's children for details on this
 new registration API.
 
- drivers/clk/clk-s2mps11.c | 21 +++++++++------------
- 1 file changed, 9 insertions(+), 12 deletions(-)
+ drivers/clk/clk-scpi.c | 33 ++++++++++++++-------------------
+ 1 file changed, 14 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/clk/clk-s2mps11.c b/drivers/clk/clk-s2mps11.c
-index f8c83977c7fa..fbaa84a33c46 100644
---- a/drivers/clk/clk-s2mps11.c
-+++ b/drivers/clk/clk-s2mps11.c
-@@ -137,7 +137,7 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
+diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
+index 6962ee5d1e9a..2a3e9d8e88b0 100644
+--- a/drivers/clk/clk-scpi.c
++++ b/drivers/clk/clk-scpi.c
+@@ -146,13 +146,13 @@ static const struct of_device_id scpi_clk_match[] = {
+ 	{}
+ };
+ 
+-static struct clk *
++static int
+ scpi_clk_ops_init(struct device *dev, const struct of_device_id *match,
+ 		  struct scpi_clk *sclk, const char *name)
  {
- 	struct sec_pmic_dev *iodev = dev_get_drvdata(pdev->dev.parent);
- 	struct s2mps11_clk *s2mps11_clks;
--	struct clk_onecell_data *clk_data;
-+	struct clk_hw_onecell_data *clk_data;
- 	unsigned int s2mps11_reg;
- 	int i, ret = 0;
- 	enum sec_device_type hwid = platform_get_device_id(pdev)->driver_data;
-@@ -147,15 +147,12 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 	if (!s2mps11_clks)
- 		return -ENOMEM;
+ 	struct clk_init_data init;
+-	struct clk *clk;
+ 	unsigned long min = 0, max = 0;
++	int ret;
  
--	clk_data = devm_kzalloc(&pdev->dev, sizeof(*clk_data), GFP_KERNEL);
-+	clk_data = devm_kzalloc(&pdev->dev, sizeof(*clk_data) +
-+				sizeof(*clk_data->hws) * S2MPS11_CLKS_NUM,
-+				GFP_KERNEL);
- 	if (!clk_data)
- 		return -ENOMEM;
- 
--	clk_data->clks = devm_kcalloc(&pdev->dev, S2MPS11_CLKS_NUM,
--				sizeof(struct clk *), GFP_KERNEL);
--	if (!clk_data->clks)
--		return -ENOMEM;
--
- 	switch (hwid) {
- 	case S2MPS11X:
- 		s2mps11_reg = S2MPS11_REG_RTC_CTRL;
-@@ -196,18 +193,18 @@ static int s2mps11_clk_probe(struct platform_device *pdev)
- 			goto err_reg;
- 		}
- 
--		s2mps11_clks[i].lookup = clkdev_create(s2mps11_clks[i].clk,
-+		s2mps11_clks[i].lookup = clkdev_hw_create(&s2mps11_clks[i].hw,
- 					s2mps11_clks_init[i].name, NULL);
- 		if (!s2mps11_clks[i].lookup) {
- 			ret = -ENOMEM;
- 			goto err_reg;
- 		}
--		clk_data->clks[i] = s2mps11_clks[i].clk;
-+		clk_data->hws[i] = &s2mps11_clks[i].hw;
+ 	init.name = name;
+ 	init.flags = 0;
+@@ -164,18 +164,18 @@ scpi_clk_ops_init(struct device *dev, const struct of_device_id *match,
+ 	if (init.ops == &scpi_dvfs_ops) {
+ 		sclk->info = sclk->scpi_ops->dvfs_get_info(sclk->id);
+ 		if (IS_ERR(sclk->info))
+-			return NULL;
++			return PTR_ERR(sclk->info);
+ 	} else if (init.ops == &scpi_clk_ops) {
+ 		if (sclk->scpi_ops->clk_get_range(sclk->id, &min, &max) || !max)
+-			return NULL;
++			return -EINVAL;
+ 	} else {
+-		return NULL;
++		return -EINVAL;
  	}
  
--	clk_data->clk_num = S2MPS11_CLKS_NUM;
--	of_clk_add_provider(s2mps11_clks->clk_np, of_clk_src_onecell_get,
--			clk_data);
-+	clk_data->num = S2MPS11_CLKS_NUM;
-+	of_clk_add_hw_provider(s2mps11_clks->clk_np, of_clk_hw_onecell_get,
-+			       clk_data);
+-	clk = devm_clk_register(dev, &sclk->hw);
+-	if (!IS_ERR(clk) && max)
++	ret = devm_clk_hw_register(dev, &sclk->hw);
++	if (!ret && max)
+ 		clk_hw_set_rate_range(&sclk->hw, min, max);
+-	return clk;
++	return ret;
+ }
  
- 	platform_set_drvdata(pdev, s2mps11_clks);
+ struct scpi_clk_data {
+@@ -183,7 +183,7 @@ struct scpi_clk_data {
+ 	unsigned int clk_num;
+ };
  
+-static struct clk *
++static struct clk_hw *
+ scpi_of_clk_src_get(struct of_phandle_args *clkspec, void *data)
+ {
+ 	struct scpi_clk *sclk;
+@@ -193,7 +193,7 @@ scpi_of_clk_src_get(struct of_phandle_args *clkspec, void *data)
+ 	for (count = 0; count < clk_data->clk_num; count++) {
+ 		sclk = clk_data->clk[count];
+ 		if (idx == sclk->id)
+-			return sclk->hw.clk;
++			return &sclk->hw;
+ 	}
+ 
+ 	return ERR_PTR(-EINVAL);
+@@ -202,8 +202,7 @@ scpi_of_clk_src_get(struct of_phandle_args *clkspec, void *data)
+ static int scpi_clk_add(struct device *dev, struct device_node *np,
+ 			const struct of_device_id *match)
+ {
+-	struct clk **clks;
+-	int idx, count;
++	int idx, count, err;
+ 	struct scpi_clk_data *clk_data;
+ 
+ 	count = of_property_count_strings(np, "clock-output-names");
+@@ -222,10 +221,6 @@ static int scpi_clk_add(struct device *dev, struct device_node *np,
+ 	if (!clk_data->clk)
+ 		return -ENOMEM;
+ 
+-	clks = devm_kcalloc(dev, count, sizeof(*clks), GFP_KERNEL);
+-	if (!clks)
+-		return -ENOMEM;
+-
+ 	for (idx = 0; idx < count; idx++) {
+ 		struct scpi_clk *sclk;
+ 		const char *name;
+@@ -249,15 +244,15 @@ static int scpi_clk_add(struct device *dev, struct device_node *np,
+ 
+ 		sclk->id = val;
+ 
+-		clks[idx] = scpi_clk_ops_init(dev, match, sclk, name);
+-		if (IS_ERR_OR_NULL(clks[idx]))
++		err = scpi_clk_ops_init(dev, match, sclk, name);
++		if (err)
+ 			dev_err(dev, "failed to register clock '%s'\n", name);
+ 		else
+ 			dev_dbg(dev, "Registered clock '%s'\n", name);
+ 		clk_data->clk[idx] = sclk;
+ 	}
+ 
+-	return of_clk_add_provider(np, scpi_of_clk_src_get, clk_data);
++	return of_clk_add_hw_provider(np, scpi_of_clk_src_get, clk_data);
+ }
+ 
+ static int scpi_clocks_remove(struct platform_device *pdev)
 -- 
 2.7.4
