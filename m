@@ -1,66 +1,29 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 01 Jun 2016 10:50:25 +0200
-Subject: [PATCH] ARM: dts: exynos: Add TMU nodes regulator supply for Peach
- boards
-In-Reply-To: <1464731280-24588-1-git-send-email-javier@osg.samsung.com>
-References: <1464731280-24588-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <574EA1D1.6020606@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed,  1 Jun 2016 10:54:56 +0200
+Subject: [PATCH] ARM: defconfig: enable the MSM8660 pin controller
+Message-ID: <1464771296-8329-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2016 11:48 PM, Javier Martinez Canillas wrote:
-> The Exynos5800 Peach Pi and Exynos5420 Peach Pit Chromebooks have the
-> LDO10 1.8V output connected to the VDD18_TS{01,23,4} Exynos SoC pins.
-> 
-> Add this regulator as the input supply of the Thermal Management Unit
-> channels and also remove the always-on property since all the devices
-> using LDO10 as input supply are now defined.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> ---
-> 
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 21 ++++++++++++++++++++-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 21 ++++++++++++++++++++-
->  2 files changed, 40 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> index c1247402cb17..a55760b5fa82 100644
-> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
-> @@ -425,7 +425,6 @@
->  				regulator-name = "vdd_ldo10";
->  				regulator-min-microvolt = <1800000>;
->  				regulator-max-microvolt = <1800000>;
-> -				regulator-always-on;
->  				regulator-state-mem {
->  					regulator-off-in-suspend;
->  				};
-> @@ -924,6 +923,26 @@
->  	assigned-clock-parents = <&clock CLK_FIN_PLL>;
->  };
->  
-> +&tmu_cpu0 {
-> +	vtmu-supply = <&ldo10_reg>;
-> +};
-> +
-> +&tmu_cpu1 {
-> +	vtmu-supply = <&ldo10_reg>;
-> +};
-> +
-> +&tmu_cpu2 {
-> +	vtmu-supply = <&ldo10_reg>;
-> +};
-> +
-> +&tmu_cpu3 {
-> +	vtmu-supply = <&ldo10_reg>;
-> +};
-> +
-> +&tmu_gpu {
-> +	vtmu-supply = <&ldo10_reg>;
-> +};
-> +
+After enabling this I get pins, GPIO, keys and everything on
+the MSM8660 surf (APQ8660 DragonBoard).
 
-Here and for Peach Pi please put the nodes in alphabetical order.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/configs/qcom_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Best regards,
-Krzysztof
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 7bff7bf24a85..dddb917f7ea9 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -103,6 +103,7 @@ CONFIG_SPMI=y
+ CONFIG_PINCTRL_APQ8064=y
+ CONFIG_PINCTRL_APQ8084=y
+ CONFIG_PINCTRL_IPQ8064=y
++CONFIG_PINCTRL_MSM8660=y
+ CONFIG_PINCTRL_MSM8960=y
+ CONFIG_PINCTRL_MSM8X74=y
+ CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+-- 
+2.4.11
