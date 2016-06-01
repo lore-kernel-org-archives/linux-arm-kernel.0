@@ -1,55 +1,47 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 1 Jun 2016 14:52:57 +0800
-Subject: [PATCH v5 04/18] arm64: Remove unnecessary of_platform_populate with
- default match table
+Date: Wed, 1 Jun 2016 14:53:10 +0800
+Subject: [PATCH v5 17/18] of: unittest: use of_platform_default_populate() to
+ populate default bus
 In-Reply-To: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464763991-26634-5-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1464763991-26634-18-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After patch "of/platform: Add common method to populate default bus",
-it is possible for arch code to remove unnecessary callers of
-of_platform_populate with default match table.
+Use helper of_platform_default_populate() in linux/of_platform
+when possible, instead of calling of_platform_populate() with
+the default match table.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Grant Likely <grant.likely@linaro.org>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/arm64/kernel/setup.c | 13 -------------
- 1 file changed, 13 deletions(-)
+ drivers/of/unittest.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 8412520..c907e2f 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -40,7 +40,6 @@
- #include <linux/proc_fs.h>
- #include <linux/memblock.h>
- #include <linux/of_fdt.h>
--#include <linux/of_platform.h>
- #include <linux/efi.h>
- #include <linux/psci.h>
+diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
+index f34ed93..53c83d6 100644
+--- a/drivers/of/unittest.c
++++ b/drivers/of/unittest.c
+@@ -771,7 +771,7 @@ static void __init of_unittest_platform_populate(void)
+ 	};
  
-@@ -301,18 +300,6 @@ void __init setup_arch(char **cmdline_p)
+ 	np = of_find_node_by_path("/testcase-data");
+-	of_platform_populate(np, of_default_bus_match_table, NULL, NULL);
++	of_platform_default_populate(np, NULL, NULL);
+ 
+ 	/* Test that a missing irq domain returns -EPROBE_DEFER */
+ 	np = of_find_node_by_path("/testcase-data/testcase-device1");
+@@ -1871,8 +1871,7 @@ static void __init of_unittest_overlay(void)
+ 		goto out;
  	}
- }
  
--static int __init arm64_device_init(void)
--{
--	if (of_have_populated_dt()) {
--		of_platform_populate(NULL, of_default_bus_match_table,
--				     NULL, NULL);
--	} else if (acpi_disabled) {
--		pr_crit("Device tree not populated\n");
--	}
--	return 0;
--}
--arch_initcall_sync(arm64_device_init);
--
- static int __init topology_init(void)
- {
- 	int i;
+-	ret = of_platform_populate(bus_np, of_default_bus_match_table,
+-			NULL, NULL);
++	ret = of_platform_default_populate(bus_np, NULL, NULL);
+ 	if (ret != 0) {
+ 		unittest(0, "could not populate bus @ \"%s\"\n", bus_path);
+ 		goto out;
 -- 
 1.7.12.4
