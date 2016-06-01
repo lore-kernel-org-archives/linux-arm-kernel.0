@@ -1,55 +1,60 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Jun 2016 11:43:26 +0100
-Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
-In-Reply-To: <20160601103446.GC9280@leverpostej>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
- <20160601103446.GC9280@leverpostej>
-Message-ID: <20160601104326.GA24749@e104818-lin.cambridge.arm.com>
+From: sr@denx.de (Stefan Roese)
+Date: Wed,  1 Jun 2016 12:43:32 +0200
+Subject: [PATCH 2/2] dmaengine: mv_xor: Fix incorrect offset in dma_map_page()
+In-Reply-To: <20160601104332.12212-1-sr@denx.de>
+References: <20160601104332.12212-1-sr@denx.de>
+Message-ID: <20160601104332.12212-2-sr@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 11:34:47AM +0100, Mark Rutland wrote:
-> On Tue, May 31, 2016 at 04:14:30PM +0100, Catalin Marinas wrote:
-> > The for_each_efi_memory_desc_continue() macro and corresponding
-> > "_in_map" allow iterating over an efi_memory_map from a given position.
-> > For code reuse between the existing iterator and the _continue variant,
-> > this patch also introduces efi_memory_desc_next_entry_map().
-> > 
-> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > ---
-> >  include/linux/efi.h | 19 +++++++++++++++++--
-> >  1 file changed, 17 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/include/linux/efi.h b/include/linux/efi.h
-> > index c2db3ca22217..4b0d880f1cd7 100644
-> > --- a/include/linux/efi.h
-> > +++ b/include/linux/efi.h
-> > @@ -1002,11 +1002,16 @@ extern int efi_memattr_init(void);
-> >  extern int efi_memattr_apply_permissions(struct mm_struct *mm,
-> >  					 efi_memattr_perm_setter fn);
-> >  
-> > +/* Find next entry in an efi_memory_map or NULL if md is last */
-> > +#define efi_memory_desc_next_entry_map(m, md)				   \
-> > +	((md) == (efi_memory_desc_t *)((m)->map_end - (m)->desc_size)	   \
-> > +	 ? NULL : (void *)(md) + (m)->desc_size)
-> > +
-> >  /* Iterate through an efi_memory_map */
-> >  #define for_each_efi_memory_desc_in_map(m, md)				   \
-> >  	for ((md) = (m)->map;						   \
-> > -	     (md) <= (efi_memory_desc_t *)((m)->map_end - (m)->desc_size); \
-> > -	     (md) = (void *)(md) + (m)->desc_size)
-> > +	     (md);							   \
-> > +	     (md) = efi_memory_desc_next_entry_map(m, md))
-> 
-> As a heads-up, this will conflict with the efi/urgent branch [1], due to
-> commit ee92562e33c516dd ("efi: Fix for_each_efi_memory_desc_in_map() for
-> empty memmaps"). A pull went out for that yesterday [2].
+Upon booting, I occasionally spotted some BUGs triggered by the internal
+DMA test routine executed upon driver probing. This was detected by
+SLUB_DEBUG ("Freechain corrupt" or "Redzone overwritten"). Tracking
+this down located a problem in passing 0 as offset in dma_map_page().
+As kmalloc, especially when used with SLUB_DEBUG, may return a non page
+aligned address.
 
-Thanks for the heads up. I'll rebase the patches after -rc2 but anyway I
-plan to merge them in 4.8 via the arm64 tree, including the patch above
-if Matt acks it. So there is enough time to fix the conflicts.
+This patch fixes this issue by passing the correct offset in
+dma_map_page().
 
+Tested on a custom Armada XP board.
+
+Signed-off-by: Stefan Roese <sr@denx.de>
+Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Cc: Marcin Wojtas <mw@semihalf.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+---
+ drivers/dma/mv_xor.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/dma/mv_xor.c b/drivers/dma/mv_xor.c
+index 55815c1..f4c9f98 100644
+--- a/drivers/dma/mv_xor.c
++++ b/drivers/dma/mv_xor.c
+@@ -703,8 +703,9 @@ static int mv_chan_memcpy_self_test(struct mv_xor_chan *mv_chan)
+ 		goto free_resources;
+ 	}
+ 
+-	src_dma = dma_map_page(dma_chan->device->dev, virt_to_page(src), 0,
+-				 PAGE_SIZE, DMA_TO_DEVICE);
++	src_dma = dma_map_page(dma_chan->device->dev, virt_to_page(src),
++			       (size_t)src & ~PAGE_MASK, PAGE_SIZE,
++			       DMA_TO_DEVICE);
+ 	unmap->addr[0] = src_dma;
+ 
+ 	ret = dma_mapping_error(dma_chan->device->dev, src_dma);
+@@ -714,8 +715,9 @@ static int mv_chan_memcpy_self_test(struct mv_xor_chan *mv_chan)
+ 	}
+ 	unmap->to_cnt = 1;
+ 
+-	dest_dma = dma_map_page(dma_chan->device->dev, virt_to_page(dest), 0,
+-				  PAGE_SIZE, DMA_FROM_DEVICE);
++	dest_dma = dma_map_page(dma_chan->device->dev, virt_to_page(dest),
++				(size_t)dest & ~PAGE_MASK, PAGE_SIZE,
++				DMA_FROM_DEVICE);
+ 	unmap->addr[1] = dest_dma;
+ 
+ 	ret = dma_mapping_error(dma_chan->device->dev, dest_dma);
 -- 
-Catalin
+2.8.3
