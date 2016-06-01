@@ -1,36 +1,47 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 1 Jun 2016 16:54:41 -0400
-Subject: [PATCH v5 13/22] ARM: dts: exynos: Enable UART3 on Exynos5410
-In-Reply-To: <e9a103cc-a5cf-95d8-ee49-d44542dbcb1e@osg.samsung.com>
-References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
- <1464429273-23457-14-git-send-email-krzk@kernel.org>
- <CAOi56cXeRjGgE+=psk7K45oeAgZ27HFxbi+an-ELnA3-_Z_BTA@mail.gmail.com>
- <CAJKOXPcDZFaqL7+wT9d9iD7Y4QbZWPFQw2hTR3AzyU4K099WYA@mail.gmail.com>
- <e9a103cc-a5cf-95d8-ee49-d44542dbcb1e@osg.samsung.com>
-Message-ID: <cabfd6c2-fc7e-622a-36e6-5be0b674cdd2@osg.samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 2 Jun 2016 00:00:02 +0300
+Subject: [PATCH 04/13] ARM: shmobile: r8a7792: basic SoC support
+In-Reply-To: <CAMuHMdXtqwby6_E-izx=h=ryQfH2LsXvNyP+14rnaF-TksmEbg@mail.gmail.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2352834.cNFKgiQiVO@wasted.cogentembedded.com>
+ <CAMuHMdXtqwby6_E-izx=h=ryQfH2LsXvNyP+14rnaF-TksmEbg@mail.gmail.com>
+Message-ID: <f7b4e1f5-dcbc-06b5-ac44-af6bef9b2658@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 04:52 PM, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
+On 06/01/2016 10:47 AM, Geert Uytterhoeven wrote:
 
-[snip]
-
+>> --- renesas.orig/arch/arm/mach-shmobile/Kconfig
+>> +++ renesas/arch/arm/mach-shmobile/Kconfig
+>> @@ -86,6 +86,11 @@ config ARCH_R8A7791
+>>         select ARCH_RCAR_GEN2
+>>         select I2C
 >>
->> I left the commit in my tree as it is correct (strictly speaking).
->> Sorry for any trouble it makes.
->>
-> 
-> Kevin pointed me to this issue over IRC and I was able to reproduce it in
-> my Peach Pi by removing the UART3 clocks from the Exynos5420 clock driver.
-> 
-> Your patch indeed fixes the issue, I'll add a Reviewed-by on that thread.
-> 
+>> +config ARCH_R8A7792
+>> +       bool "R-Car V2H (R8A77920)"
+>> +       select ARCH_RCAR_GEN2
+>> +       select I2C
+>
+> I2c is selected for the other SoCs because of regulator-quirk-rcar-gen2.
+> I do not have schematics for Blanche, so I don't know if it has DA9063 and
+> DA9210 regulators sharing the same interrupt.
 
-err, I meant a Tested-by tag... but yes I've also reviewed the patch :)
+    No, it only has DA9063.
 
-Best regards, 
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+> If yes, you should make sure regulator-quirk-rcar-gen2 is updated for Blanche,
+> and built.
+> If no, you should drop the select.
+
+    Thanks for noticing!
+
+> If the above is clarified:
+
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+    Thank you, adding...
+
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+
+MBR, Sergei
