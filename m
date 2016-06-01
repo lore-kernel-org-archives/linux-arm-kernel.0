@@ -1,76 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 1 Jun 2016 09:01:14 +0200
-Subject: [PATCH resend v2 5/6] ARM: dts: sun9i: a80-optimus: Disable
- dummy regulators vcc3v0, vcc3v3, vcc5v0
-In-Reply-To: <CAGb2v65_kAtrOW_G51Tn1urroXVuo=AqzX66zm7Ewsyw_AJdvA@mail.gmail.com>
-References: <1464711804-19256-1-git-send-email-wens@csie.org>
- <1464711804-19256-6-git-send-email-wens@csie.org>
- <20160531190113.GO4908@lukather>
- <CAGb2v65_kAtrOW_G51Tn1urroXVuo=AqzX66zm7Ewsyw_AJdvA@mail.gmail.com>
-Message-ID: <20160601070114.GQ4908@lukather>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 1 Jun 2016 09:04:28 +0200
+Subject: [PATCH 00/13] Add R8A7794/SILK board eMMC DT support
+In-Reply-To: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdV4BqUC2QMX-=-R6K6gdrvkX=rUcWn_uFF-jdQuYruhbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 10:45:51AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Jun 1, 2016 at 3:01 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Wed, Jun 01, 2016 at 12:23:23AM +0800, Chen-Yu Tsai wrote:
-> >> These 3 regulators are provided in sunxi-common-regulators.dtsi.
-> >> 3.0V/3.3V and 5.0V are commonly used voltages in Allwinner devices.
-> >> These dummy regulators provide a stand-in when bindings that require
-> >> one, but the real regulator is not supported yet.
-> >>
-> >> Since these are no longer needed, we can disable them.
-> >>
-> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> ---
-> >>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 12 ++++++++++++
-> >>  1 file changed, 12 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> >> index 6cfc02194035..991337d1d6f1 100644
-> >> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> >> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
-> >> @@ -322,6 +322,18 @@
-> >>
-> >>  #include "axp809.dtsi"
-> >>
-> >> +&reg_vcc3v0 {
-> >> +     status = "disabled";
-> >> +};
-> >> +
-> >> +&reg_vcc3v3 {
-> >> +     status = "disabled";
-> >> +};
-> >> +
-> >> +&reg_vcc5v0 {
-> >> +     status = "disabled";
-> >> +};
-> >> +
-> >
-> > Why not remove the include entirely?
-> 
-> reg_usb1_vbus is still used. Or I could just copy it and
-> get rid of the include.
+Hi Sergei,
 
-Ah yes, it is on the Optimus (but not the cubieboard I initially
-looked at).
+On Wed, Jun 1, 2016 at 12:06 AM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+>    Here's the set of 13 patches against Simon Horman's 'renesas.git' repo,
+> 'renesas-devel-20160530-v4.7-rc1' tag. We add the device tree support for
+> the R8A7792-based Blanche board. The R-Car 'clk' driver patch was posted last
+> week separately...
+>
+> [01/13] ARM: shmobile: r8a7792: add clock index macros
+> [02/13] ARM: shmobile: r8a7792: add power domain index macros
+> [03/13] soc: renesas: rcar-sysc: add R8A7792 support
+> [04/13] ARM: shmobile: r8a7792: basic SoC support
+> [05/13] DT: clock: rcar-gen2-cpg-clocks: document R8A7792 support
+> [06/13] DT: clock: cpg-mstp-clocks: document-R8A7792-support
+> [07/13] ARM: dts: r8a7792: initial SoC device tree
+> [08/13] ARM: dts: r8a7792: add SYS-DMAC support
+> [09/13] ARM: dts: r8a7792: add [H]SCIF support
+> [10/13] ARM dts: r8a7792: add IRQC support
+> [11/13] DT: arm: shmobile: document Blanche board
+> [12/13] ARM: dts: blanche: initial device tree
+> [13/13] ARM: dts: blanche: add Ethernet support
 
-Since we have that other regulator usb3 regulator, we can simply
-remove it.
+Thanks for your series!
 
-Maxime
+The subject doesn't seem to cover the contents, though:
+> [PATCH 00/13] Add R8A7794/SILK board eMMC DT support
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160601/80858236/attachment.sig>
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
