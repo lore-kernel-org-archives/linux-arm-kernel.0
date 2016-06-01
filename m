@@ -1,61 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 1 Jun 2016 20:20:00 +0200
-Subject: [linux-sunxi] [PATCH 1/5] spi: sunxi: fix transfer timeout
-In-Reply-To: <20160530112350.GI29837@sirena.org.uk>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <cb90b922caa6ac07c1425d726ea19709ee5284f4.1464130597.git.hramrach@gmail.com>
- <CAGRGNgWDrVHG26umTSHHAxFC3KXjwmpDejBAfKqvuik0_2-Jcw@mail.gmail.com>
- <CAOMqctS0AD6rHGt3wjxxyidee=_5xqby95t5TGuozAA12DdPjQ@mail.gmail.com>
- <CAGRGNgW=UnmwwiREV+nVcws6sk18-4fKz3qf-WKf4LY9-VqBKg@mail.gmail.com>
- <20160530112350.GI29837@sirena.org.uk>
-Message-ID: <20160601182000.GC4908@lukather>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed,  1 Jun 2016 19:21:42 +0100
+Subject: [PATCH v2] drivers: char: mem: Check {read,write}_kmem() addresses
+In-Reply-To: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
+References: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
+Message-ID: <384215b19582acfb30a6a3660fdebee5189d687b.1464805050.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Arriving at read_kmem() with an offset representing a bogus kernel
+address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
+faulting on the kernel-side read.
 
-On Mon, May 30, 2016 at 12:23:50PM +0100, Mark Brown wrote:
-> On Fri, May 27, 2016 at 03:10:11PM +1000, Julian Calaby wrote:
-> > On Fri, May 27, 2016 at 3:05 PM, Michal Suchanek <hramrach@gmail.com> wrote:
-> 
-> > >> Also, should the changes for the drivers be in two separate patches also?
-> 
-> > > That's basically the same driver with different constants so I guess not.
-> 
-> > Fair enough, I withdraw my comment then.
-> 
-> If it's the same driver with different constants it should really
-> actually be the same driver - I did ask this when the drivers were
-> originally merged...
+x86_64 happens to get away with this since the optimised implementation
+uses "rep movs*", thus the user write (which is allowed to fault) and
+the kernel read are the same instruction, the kernel-side fault falls
+into the user-side fixup handler and the chain of events which
+transpires ends up returning an error as one might expect, even if it's
+an inappropriate -EFAULT. On other architectures, though, the read is
+not covered by the fixup entry for the write, and we get a big scary
+"Unable to hande kernel paging request..." dump.
 
-I think we already had this discussion a few times :)
+The more typical use-case of mmap_kmem() has always (within living
+memory at least) returned -EIO for addresses which don't satisfy
+pfn_valid(), so let's make that consistent across {read,write}_kem()
+too.
 
-The thing is that the SPI framework now deals pretty well with the SPI
-controllers, and you basically only have the probe function and how to
-start a transfer. Which is nice.
+Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+---
 
-However, the sun4i and sun6i SPI controllers have very significant
-register layout differences: the registers offset are different, some
-registers in the sun4i have been split in several in the sun6i. So
-while I concur that they look alike, merging the two in a single
-driver would complicate a lot the code, while we would not be able to
-share most of the code, so I am really not sure it's worth it.
+v2: Make the error code consistent and more appropriate, tweak commit message.
 
-Where the issue really lies is that they've been both written at the
-same time, and share the same flaws, especially in their probe
-method. But that's not really related to the controller itself, but
-more because the code has been close to copy/pasted.
+ drivers/char/mem.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Maxime
-
+diff --git a/drivers/char/mem.c b/drivers/char/mem.c
+index 71025c2f6bbb..e1b8d960341f 100644
+--- a/drivers/char/mem.c
++++ b/drivers/char/mem.c
+@@ -384,6 +384,9 @@ static ssize_t read_kmem(struct file *file, char __user *buf,
+ 	char *kbuf; /* k-addr because vread() takes vmlist_lock rwlock */
+ 	int err = 0;
+ 
++	if (!pfn_valid(PFN_DOWN(p)))
++		return -EIO;
++
+ 	read = 0;
+ 	if (p < (unsigned long) high_memory) {
+ 		low_count = count;
+@@ -512,6 +515,9 @@ static ssize_t write_kmem(struct file *file, const char __user *buf,
+ 	char *kbuf; /* k-addr because vwrite() takes vmlist_lock rwlock */
+ 	int err = 0;
+ 
++	if (!pfn_valid(PFN_DOWN(p)))
++		return -EIO;
++
+ 	if (p < (unsigned long) high_memory) {
+ 		unsigned long to_write = min_t(unsigned long, count,
+ 					       (unsigned long)high_memory - p);
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160601/1248687a/attachment.sig>
+2.8.1.dirty
