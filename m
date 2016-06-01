@@ -1,45 +1,53 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 1 Jun 2016 12:06:43 +0300
-Subject: [PATCH 25/28] ARM: dts: DRA7: Add support for SHA IP
+Date: Wed, 1 Jun 2016 12:06:45 +0300
+Subject: [PATCH 27/28] ARM: dts: AM43xx: clk: Add RNG clk node
 In-Reply-To: <1464772006-11254-1-git-send-email-t-kristo@ti.com>
 References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
  <1464772006-11254-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1464772006-11254-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1464772006-11254-8-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lokesh Vutla <lokeshvutla@ti.com>
 
-DRA7 SoC has the same SHA IP as OMAP5. Add DT entry for the same.
+Add clk node for RNG module.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-[t-kristo at ti.com: changed SHA to use EDMA instead of SDMA]
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/boot/dts/dra7.dtsi | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/am43xx-clocks.dtsi | 8 ++++++++
+ drivers/clk/ti/clk-43xx.c            | 1 +
+ 2 files changed, 9 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index da31a72..64759e1 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1776,6 +1776,17 @@
- 			clocks = <&l3_iclk_div>;
- 			clock-names = "fck";
- 		};
-+
-+		sham: sham at 53100000 {
-+			compatible = "ti,omap5-sham";
-+			ti,hwmods = "sham";
-+			reg = <0x4b101000 0x300>;
-+			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-+			dmas = <&edma_xbar 119 0>;
-+			dma-names = "rx";
-+			clocks = <&l3_iclk_div>;
-+			clock-names = "fck";
-+		};
+diff --git a/arch/arm/boot/dts/am43xx-clocks.dtsi b/arch/arm/boot/dts/am43xx-clocks.dtsi
+index 7630ba1..d1d73b7 100644
+--- a/arch/arm/boot/dts/am43xx-clocks.dtsi
++++ b/arch/arm/boot/dts/am43xx-clocks.dtsi
+@@ -104,6 +104,14 @@
+ 		clock-div = <1>;
  	};
  
- 	thermal_zones: thermal-zones {
++	rng_fck: rng_fck {
++		#clock-cells = <0>;
++		compatible = "fixed-factor-clock";
++		clocks = <&sys_clkin_ck>;
++		clock-mult = <1>;
++		clock-div = <1>;
++	};
++
+ 	ehrpwm0_tbclk: ehrpwm0_tbclk at 664 {
+ 		#clock-cells = <0>;
+ 		compatible = "ti,gate-clock";
+diff --git a/drivers/clk/ti/clk-43xx.c b/drivers/clk/ti/clk-43xx.c
+index 097fc90..3f157a4 100644
+--- a/drivers/clk/ti/clk-43xx.c
++++ b/drivers/clk/ti/clk-43xx.c
+@@ -58,6 +58,7 @@ static struct ti_dt_clk am43xx_clks[] = {
+ 	DT_CLK(NULL, "smartreflex1_fck", "smartreflex1_fck"),
+ 	DT_CLK(NULL, "sha0_fck", "sha0_fck"),
+ 	DT_CLK(NULL, "aes0_fck", "aes0_fck"),
++	DT_CLK(NULL, "rng_fck", "rng_fck"),
+ 	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
+ 	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
+ 	DT_CLK(NULL, "timer3_fck", "timer3_fck"),
 -- 
 1.9.1
