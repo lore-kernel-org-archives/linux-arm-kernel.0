@@ -1,10 +1,10 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  1 Jun 2016 16:15:20 -0700
-Subject: [PATCH 21/34] clk: nspire: Migrate to clk_hw based OF and
+Date: Wed,  1 Jun 2016 16:15:21 -0700
+Subject: [PATCH 22/34] clk: palmas: Migrate to clk_hw based OF and
  registration APIs
 In-Reply-To: <20160601231533.9354-1-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
-Message-ID: <20160601231533.9354-22-stephen.boyd@linaro.org>
+Message-ID: <20160601231533.9354-23-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,66 +13,71 @@ can get rid of struct clk pointers while registering clks in
 these drivers, allowing us to move closer to a clear split of
 consumer and provider clk APIs.
 
-Cc: Daniel Tang <dt.tangr@gmail.com>
+Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Cc: Nishanth Menon <nm@ti.com>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
 
 See commit 58657d189a2f and it's children for details on this
 new registration API.
 
- drivers/clk/clk-nspire.c | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+ drivers/clk/clk-palmas.c | 12 ++++--------
+ 1 file changed, 4 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/clk/clk-nspire.c b/drivers/clk/clk-nspire.c
-index 64f196a90816..f861011d5d21 100644
---- a/drivers/clk/clk-nspire.c
-+++ b/drivers/clk/clk-nspire.c
-@@ -69,7 +69,7 @@ static void __init nspire_ahbdiv_setup(struct device_node *node,
- {
- 	u32 val;
- 	void __iomem *io;
+diff --git a/drivers/clk/clk-palmas.c b/drivers/clk/clk-palmas.c
+index 8328863cb0e0..31f590cea493 100644
+--- a/drivers/clk/clk-palmas.c
++++ b/drivers/clk/clk-palmas.c
+@@ -41,7 +41,6 @@ struct palmas_clk32k_desc {
+ 
+ struct palmas_clock_info {
+ 	struct device *dev;
 -	struct clk *clk;
-+	struct clk_hw *hw;
- 	const char *clk_name = node->name;
- 	const char *parent_name;
- 	struct nspire_clk_info info;
-@@ -85,10 +85,10 @@ static void __init nspire_ahbdiv_setup(struct device_node *node,
- 	of_property_read_string(node, "clock-output-names", &clk_name);
- 	parent_name = of_clk_get_parent_name(node, 0);
+ 	struct clk_hw hw;
+ 	struct palmas *palmas;
+ 	const struct palmas_clk32k_desc *clk_desc;
+@@ -218,7 +217,7 @@ static int palmas_clks_init_configure(struct palmas_clock_info *cinfo)
+ 	}
  
--	clk = clk_register_fixed_factor(NULL, clk_name, parent_name, 0,
--					1, info.base_ahb_ratio);
--	if (!IS_ERR(clk))
--		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	hw = clk_hw_register_fixed_factor(NULL, clk_name, parent_name, 0,
-+					  1, info.base_ahb_ratio);
-+	if (!IS_ERR(hw))
-+		of_clk_add_hw_provider(node, of_clk_hw_simple_get, hw);
- }
- 
- static void __init nspire_ahbdiv_setup_cx(struct device_node *node)
-@@ -111,7 +111,7 @@ static void __init nspire_clk_setup(struct device_node *node,
- {
- 	u32 val;
- 	void __iomem *io;
+ 	if (cinfo->ext_control_pin) {
+-		ret = clk_prepare(cinfo->clk);
++		ret = clk_prepare(cinfo->hw.clk);
+ 		if (ret < 0) {
+ 			dev_err(cinfo->dev, "Clock prep failed, %d\n", ret);
+ 			return ret;
+@@ -242,7 +241,6 @@ static int palmas_clks_probe(struct platform_device *pdev)
+ 	struct device_node *node = pdev->dev.of_node;
+ 	const struct palmas_clks_of_match_data *match_data;
+ 	struct palmas_clock_info *cinfo;
 -	struct clk *clk;
-+	struct clk_hw *hw;
- 	const char *clk_name = node->name;
- 	struct nspire_clk_info info;
+ 	int ret;
  
-@@ -125,9 +125,10 @@ static void __init nspire_clk_setup(struct device_node *node,
+ 	match_data = of_device_get_match_data(&pdev->dev);
+@@ -261,22 +259,20 @@ static int palmas_clks_probe(struct platform_device *pdev)
  
- 	of_property_read_string(node, "clock-output-names", &clk_name);
+ 	cinfo->clk_desc = &match_data->desc;
+ 	cinfo->hw.init = &match_data->init;
+-	clk = devm_clk_register(&pdev->dev, &cinfo->hw);
+-	if (IS_ERR(clk)) {
+-		ret = PTR_ERR(clk);
++	ret = devm_clk_hw_register(&pdev->dev, &cinfo->hw);
++	if (ret) {
+ 		dev_err(&pdev->dev, "Fail to register clock %s, %d\n",
+ 			match_data->desc.clk_name, ret);
+ 		return ret;
+ 	}
  
--	clk = clk_register_fixed_rate(NULL, clk_name, NULL, 0, info.base_clock);
--	if (!IS_ERR(clk))
--		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	hw = clk_hw_register_fixed_rate(NULL, clk_name, NULL, 0,
-+					info.base_clock);
-+	if (!IS_ERR(hw))
-+		of_clk_add_hw_provider(node, of_clk_hw_simple_get, hw);
- 	else
- 		return;
+-	cinfo->clk = clk;
+ 	ret = palmas_clks_init_configure(cinfo);
+ 	if (ret < 0) {
+ 		dev_err(&pdev->dev, "Clock config failed, %d\n", ret);
+ 		return ret;
+ 	}
  
+-	ret = of_clk_add_provider(node, of_clk_src_simple_get, cinfo->clk);
++	ret = of_clk_add_hw_provider(node, of_clk_hw_simple_get, &cinfo->hw);
+ 	if (ret < 0)
+ 		dev_err(&pdev->dev, "Fail to add clock driver, %d\n", ret);
+ 	return ret;
 -- 
 2.7.4
