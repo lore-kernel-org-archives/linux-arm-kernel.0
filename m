@@ -1,107 +1,34 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Wed, 01 Jun 2016 13:37:18 +0200
-Subject: [PATCH v7 1/6] mfd: max8997: Use regmap to access registers
-In-Reply-To: <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
-References: <1464773339-756-1-git-send-email-k.kozlowski@samsung.com>
- <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <574EC8EE.5000509@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Wed,  1 Jun 2016 13:42:50 +0200
+Subject: [PATCH] drm: atmel-hlcdc: actually disable scaling when no scaling is
+ required
+Message-ID: <1464781370-19277-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+The driver is only enabling scaling, but never disabling it, thus, if you
+enable the scaling feature once it stays enabled forever.
 
-One thing drew my attention while reviewing this again:
-max8997_led_brightness_set() can sleep, but the brightness_set
-op it is assigned to must not sleep. At the time when this driver was
-merged we were delegating brightness setting to workqueues task
-in LED class drivers that can sleep during this call.
-This must have been overlooked, which is even more likely, taking into
-account that the initial patch doesn't have LED maintainer's ack.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reported-by: Alex Vazquez <avazquez.dev@gmail.com>
+Fixes: 1a396789f65a ("drm: add Atmel HLCDC Display Controller support")
+Cc: <stable@vger.kernel.org>
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The non-sleeping requirement is motivated by the fact that brightness
-can be set from softirq context, e.g. when timer trigger is enabled.
-
-Currently LED class drivers don't have to use workqueue on their own,
-but are required to use brightness_set_blocking op instead of
-brightness_set if they can sleep while setting brightness.
-
-Apart of that, I think that operations in max8997_led_brightness_set()
-should be protected with mutex to assure leaving the device in
-a consistent state in case of concurrent calls.
-
-I am aware that this is out of this patch scope, but I'd be grateful
-if you could apply those changes and test them on hardware if you have
-an access to.
-
-Thanks,
-Jacek Anaszewski
-
-On 06/01/2016 11:53 AM, Krzysztof Kozlowski wrote:
-> From: Robert Baldyga <r.baldyga@samsung.com>
-
-> diff --git a/drivers/leds/leds-max8997.c b/drivers/leds/leds-max8997.c
-> index 4edf74f1d6d4..e5f0dc2e9edf 100644
-> --- a/drivers/leds/leds-max8997.c
-> +++ b/drivers/leds/leds-max8997.c
-> @@ -17,6 +17,7 @@
->   #include <linux/mfd/max8997.h>
->   #include <linux/mfd/max8997-private.h>
->   #include <linux/platform_device.h>
-> +#include <linux/regmap.h>
->
->   #define MAX8997_LED_FLASH_SHIFT			3
->   #define MAX8997_LED_FLASH_CUR_MASK		0xf8
-> @@ -52,7 +53,6 @@ static void max8997_led_set_mode(struct max8997_led *led,
->   			enum max8997_led_mode mode)
->   {
->   	int ret;
-> -	struct i2c_client *client = led->iodev->i2c;
->   	u8 mask = 0, val;
->
->   	switch (mode) {
-> @@ -88,8 +88,8 @@ static void max8997_led_set_mode(struct max8997_led *led,
->   	}
->
->   	if (mask) {
-> -		ret = max8997_update_reg(client, MAX8997_REG_LEN_CNTL, val,
-> -					 mask);
-> +		ret = regmap_update_bits(led->iodev->regmap,
-> +					MAX8997_REG_LEN_CNTL, mask, val);
->   		if (ret)
->   			dev_err(led->iodev->dev,
->   				"failed to update register(%d)\n", ret);
-> @@ -101,7 +101,6 @@ static void max8997_led_set_mode(struct max8997_led *led,
->   static void max8997_led_enable(struct max8997_led *led, bool enable)
->   {
->   	int ret;
-> -	struct i2c_client *client = led->iodev->i2c;
->   	u8 val = 0, mask = MAX8997_LED_BOOST_ENABLE_MASK;
->
->   	if (led->enabled == enable)
-> @@ -109,7 +108,8 @@ static void max8997_led_enable(struct max8997_led *led, bool enable)
->
->   	val = enable ? MAX8997_LED_BOOST_ENABLE_MASK : 0;
->
-> -	ret = max8997_update_reg(client, MAX8997_REG_BOOST_CNTL, val, mask);
-> +	ret = regmap_update_bits(led->iodev->regmap,
-> +				MAX8997_REG_BOOST_CNTL, mask, val);
->   	if (ret)
->   		dev_err(led->iodev->dev,
->   			"failed to update register(%d)\n", ret);
-> @@ -121,7 +121,6 @@ static void max8997_led_set_current(struct max8997_led *led,
->   				enum led_brightness value)
->   {
->   	int ret;
-> -	struct i2c_client *client = led->iodev->i2c;
->   	u8 val = 0, mask = 0, reg = 0;
->
->   	switch (led->led_mode) {
-> @@ -142,7 +141,7 @@ static void max8997_led_set_current(struct max8997_led *led,
->   	}
->
->   	if (mask) {
-> -		ret = max8997_update_reg(client, reg, val, mask);
-> +		ret = regmap_update_bits(led->iodev->regmap, reg, mask, val);
->   		if (ret)
->   			dev_err(led->iodev->dev,
->   				"failed to update register(%d)\n", ret);
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+index aef3ca8..016c191 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
+@@ -339,6 +339,8 @@ atmel_hlcdc_plane_update_pos_and_size(struct atmel_hlcdc_plane *plane,
+ 
+ 		atmel_hlcdc_layer_update_cfg(&plane->layer, 13, 0xffffffff,
+ 					     factor_reg);
++	} else {
++		atmel_hlcdc_layer_update_cfg(&plane->layer, 13, 0xffffffff, 0);
+ 	}
+ }
+ 
+-- 
+2.7.4
