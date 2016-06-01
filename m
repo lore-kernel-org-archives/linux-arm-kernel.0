@@ -1,37 +1,65 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 1 Jun 2016 20:35:26 +0300
-Subject: [PATCH 5/5] ARM: dts: omap5-board-common: Add phandle for mclk clock
- for twl6040
-In-Reply-To: <1464802526-16372-1-git-send-email-t-kristo@ti.com>
-References: <1464802526-16372-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1464802526-16372-6-git-send-email-t-kristo@ti.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 01 Jun 2016 10:43:28 -0700
+Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
+In-Reply-To: <1464790113.3522.4.camel@pengutronix.de> (Philipp Zabel's message
+ of "Wed, 01 Jun 2016 16:08:33 +0200")
+References: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+ <1464790113.3522.4.camel@pengutronix.de>
+Message-ID: <7heg8geren.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Philipp Zabel <p.zabel@pengutronix.de> writes:
 
-The xref_xtal clock is used y twl6040 as mclk. It is needed for the HPPLL
-internally.
+> Hi Kevin,
+>
+> Am Montag, den 30.05.2016, 15:27 +0200 schrieb Neil Armstrong:
+>> Patchset to add and enable the reset controller driver on Meson SoCs platforms.
+>> 
+>> This reset controller has up to 256 reset lines with reset pulse generation only,
+>> so the assert and deassert calls are not available.
+>> 
+>> Depends on the patch :
+>>  - "reset: add devm_reset_controller_register API" [1]
+>> 
+>> Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
+>> - Get back __iomem in _reset() callback
+>> - Get rid of MODULE_ALIAS
+>> 
+>> Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
+>> - Remove _gxbb_ in names
+>> - Depends build on ARCH_MESON only
+>> - Add meson8b compatible and bindings
+>> - Re-indent dt-bindings headers
+>> - Switch to devm_ reset controller register
+>> - Remove platform "remove" callback
+>> - Update Dual BSD/GPL file headers
+>> 
+>> Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
+>> - Fix register mapping and bit defines in bindings header
+>> - Remove assert and unassert calls
+>> - Fix missing __iomem
+>> 
+>> [1] https://patchwork.kernel.org/patch/8988471/
+>> 
+>> Neil Armstrong (4):
+>>   reset: Add support for the Amlogic Meson SoC Reset Controller
+>>   dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
+>>   ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
+>>   ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
+>
+> Should I take the two device tree patches into the reset tree?
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
----
- arch/arm/boot/dts/omap5-board-common.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+You can take the driver and the bindings. We will take the DT patches
+through the amlogic tree, and submit via arm-soc.
 
-diff --git a/arch/arm/boot/dts/omap5-board-common.dtsi b/arch/arm/boot/dts/omap5-board-common.dtsi
-index dc759a3..bd0e315 100644
---- a/arch/arm/boot/dts/omap5-board-common.dtsi
-+++ b/arch/arm/boot/dts/omap5-board-common.dtsi
-@@ -606,8 +606,8 @@
- 		v2v1-supply = <&smps9_reg>;
- 		enable-active-high;
- 
--		clocks = <&clk32kgaudio>;
--		clock-names = "clk32k";
-+		clocks = <&clk32kgaudio>, <&fref_xtal_ck>;
-+		clock-names = "clk32k", "mclk";
- 	};
- };
- 
--- 
-1.9.1
+> Is resolving the reset/deassert situation a prerequisite for these
+> patches?
+
+No, not a prerequisite.  Go ahead and merge the driver.
+
+It just means that hardware reset doesn't actually happen when using
+drivers/net/ethernet/stmicro/stmmac/* because it only uses
+assert/reassert currently.
+
+Kevin
