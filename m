@@ -1,67 +1,42 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 1 Jun 2016 12:50:06 -0700
-Subject: [PATCH] ARM: BCM5301X: Specify PHY of USB 2.0 in DT
-In-Reply-To: <CACna6ryjSYcxKcCaTtkdkExo0G1qiDMQCUCAgx-bMtnjziAoUQ@mail.gmail.com>
-References: <1464808585-14996-1-git-send-email-zajec5@gmail.com>
- <574F35C3.6050004@gmail.com>
- <CACna6ryjSYcxKcCaTtkdkExo0G1qiDMQCUCAgx-bMtnjziAoUQ@mail.gmail.com>
-Message-ID: <574F3C6E.4090001@gmail.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 1 Jun 2016 12:57:52 -0700
+Subject: [PATCH v5 13/22] ARM: dts: exynos: Enable UART3 on Exynos5410
+In-Reply-To: <1464429273-23457-14-git-send-email-krzk@kernel.org>
+References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
+ <1464429273-23457-14-git-send-email-krzk@kernel.org>
+Message-ID: <CAOi56cXeRjGgE+=psk7K45oeAgZ27HFxbi+an-ELnA3-_Z_BTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 12:35 PM, Rafa? Mi?ecki wrote:
-> On 1 June 2016 at 21:21, Florian Fainelli <f.fainelli@gmail.com> wrote:
->> On 06/01/2016 12:16 PM, Rafa? Mi?ecki wrote:
->>> Driver for Northstar USB 2.0 PHY was added in 4.7-rc1 by:
->>> commit d3feb4067335 ("phy: bcm-ns-usb2: new driver for USB 2.0 PHY on
->>> Northstar").
->>> It should be used to let EHCI platform driver init PHY.
->>>
->>> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
->>> ---
->>>  arch/arm/boot/dts/bcm5301x.dtsi | 18 ++++++++++++++++++
->>>  1 file changed, 18 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
->>> index 7d4d29b..9300e19 100644
->>> --- a/arch/arm/boot/dts/bcm5301x.dtsi
->>> +++ b/arch/arm/boot/dts/bcm5301x.dtsi
->>> @@ -140,6 +140,22 @@
->>>               };
->>>       };
->>>
->>> +     phys {
->>> +             compatible = "simple-bus";
->>> +             ranges = <0x00000000 0x18000000 0x00100000>;
->>> +             #address-cells = <1>;
->>> +             #size-cells = <1>;
->>> +
->>> +             usb2_phy2: usb2-phy {
->>> +                     compatible = "brcm,ns-usb2-phy";
->>> +                     reg = <0x0000c000 0x1000>;
->>> +                     reg-names = "dmu";
->>> +                     #phy-cells = <0>;
->>> +                     clocks = <&genpll BCM_NSP_GENPLL_USB_PHY_REF_CLK>;
->>> +                     clock-names = "phy-ref-clk";
->>> +             };
->>
->> You guys need to get everything straigthen up when it comes to busing
->> and child nodes for bcm53101x.dtsi, why do we need a "simple-bus" node
->> here which overlaps in part with the brcm-bus-axi node's range?
-> 
-> I believed I'm making things cleaner by adding a separated node for
-> PHYs (in the future there will be also USB 3.0 PHY and probably a PCIe
-> PHY). I'm fine with placing this PHY node somewhere else if you think
-> it better fits there.
+Hi Krzysztof,
 
-The intent looks good, but it seems to me (and the datasheet helps here
-too) that extending the brcm,bus-axi node to cover a wider register
-range size could allow you to put the different PHYs as child nodes of
-that bus. That way even if the core is probed with BCMA you still have a
-proper of_node refefence that your driver can use.
+On Sat, May 28, 2016 at 2:54 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> Just like other Exynos5 family SoCs, this one has four UARTs. Configure
+> clocks for UART3 and enable it.
+>
+> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Maybe as a better immediate solution, something like the NAND controller
-node would be more elegant, where it only consumes its register space
-and not more?
--- 
-Florian
+This patch landed in linux-next[1] and kernelci.org found a boot
+regression on the exynos5410-odroidxu[2], where it looks like it's
+faulting in clk_prepare().  Bisecting pointed to this patch.  I added
+"status = disabled" back into the DTS on top of next-20160601[3] and
+verified my odroid-XU to be booting fine again.
+
+Kevin
+
+[1] 594127ada6df ARM: dts: exynos: Enable UART3 on Exynos5410
+[2] https://kernelci.org/boot/exynos5410-odroidxu/job/next/kernel/next-20160601/defconfig/multi_v7_defconfig/lab/lab-baylibre-seattle/?_id=574e97c759b5140f4141c8ef
+[3] diff --git a/arch/arm/boot/dts/exynos5410.dtsi
+b/arch/arm/boot/dts/exynos5410.dtsi
+index a937d9bdad90..f4baf1d1e864 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -238,6 +238,7 @@
+ };
+
+ &serial_3 {
++       status = "disabled";
+        clocks = <&clock CLK_UART3>, <&clock CLK_SCLK_UART3>;
+        clock-names = "uart", "clk_uart_baud0";
+ };
