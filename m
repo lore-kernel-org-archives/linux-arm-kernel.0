@@ -1,10 +1,10 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 1 Jun 2016 14:53:09 +0800
-Subject: [PATCH v5 16/18] memory: omap-gpmc: use
- of_platform_default_populate() to populate default bus
+Date: Wed, 1 Jun 2016 14:53:06 +0800
+Subject: [PATCH v5 13/18] mips: use of_platform_default_populate() to populate
+ default bus
 In-Reply-To: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464763991-26634-17-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1464763991-26634-14-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,26 +12,25 @@ Use helper of_platform_default_populate() in linux/of_platform
 when possible, instead of calling of_platform_populate() with
 the default match table.
 
-Acked-by: Roger Quadros <rogerq@ti.com>
-Cc: Roger Quadros <rogerq@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
+Cc: Joshua Henderson <joshua.henderson@microchip.com>
+Cc: Ralf Baechle <ralf@linux-mips.org>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/memory/omap-gpmc.c | 3 +--
+ arch/mips/pic32/pic32mzda/init.c | 3 +--
  1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/drivers/memory/omap-gpmc.c b/drivers/memory/omap-gpmc.c
-index af4884b..4b1913a 100644
---- a/drivers/memory/omap-gpmc.c
-+++ b/drivers/memory/omap-gpmc.c
-@@ -2134,8 +2134,7 @@ no_timings:
- 	/* is child a common bus? */
- 	if (of_match_node(of_default_bus_match_table, child))
- 		/* create children and other common bus children */
--		if (of_platform_populate(child, of_default_bus_match_table,
--					 NULL, &pdev->dev))
-+		if (of_platform_default_populate(child, NULL, &pdev->dev))
- 			goto err_child_fail;
+diff --git a/arch/mips/pic32/pic32mzda/init.c b/arch/mips/pic32/pic32mzda/init.c
+index 775ff90..77ecf32 100644
+--- a/arch/mips/pic32/pic32mzda/init.c
++++ b/arch/mips/pic32/pic32mzda/init.c
+@@ -147,8 +147,7 @@ static int __init plat_of_setup(void)
+ 		panic("Device tree not present");
+ 
+ 	pic32_of_prepare_platform_data(pic32_auxdata_lookup);
+-	if (of_platform_populate(NULL, of_default_bus_match_table,
+-				 pic32_auxdata_lookup, NULL))
++	if (of_platform_default_populate(NULL, pic32_auxdata_lookup, NULL))
+ 		panic("Failed to populate DT");
  
  	return 0;
 -- 
