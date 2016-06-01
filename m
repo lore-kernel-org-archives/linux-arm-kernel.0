@@ -1,104 +1,130 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Wed, 1 Jun 2016 17:49:24 -0500
-Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
- typical Keystone features
-In-Reply-To: <3593753.UuDg5ybrvm@wuerfel>
-References: <1464816714-3900-1-git-send-email-nm@ti.com>
- <3593753.UuDg5ybrvm@wuerfel>
-Message-ID: <574F6674.3010100@ti.com>
+From: d-gerlach@ti.com (Dave Gerlach)
+Date: Wed, 1 Jun 2016 18:03:52 -0500
+Subject: [PATCH 02/28] crypto: omap-sham: Don't idle/start SHA device
+ between Encrypt operations
+In-Reply-To: <574EB091.6040001@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+ <1464771389-10640-3-git-send-email-t-kristo@ti.com> <574EB091.6040001@ti.com>
+Message-ID: <574F69D8.1010809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 05:31 PM, Arnd Bergmann wrote:
-> On Wednesday, June 1, 2016 4:31:54 PM CEST Nishanth Menon wrote:
->> Introduce ARCH_KEYSTONE_TYPICAL which is common for all Keystone
->> platforms. This is particularly useful when custom optimized defconfig
->> builds are created for Keystone architecture platforms.
+On 06/01/2016 04:53 AM, Grygorii Strashko wrote:
+> On 06/01/2016 11:56 AM, Tero Kristo wrote:
+>> From: Lokesh Vutla <lokeshvutla@ti.com>
 >>
->> An example of the same would be a sample fragment ks_only.cfg:
->> http://pastebin.ubuntu.com/16904991/ - This prunes all arch other than
->> keystone and any options the other architectures may enable.
+>> Calling runtime PM API for every block causes serious perf hit to
+>> crypto operations that are done on a long buffer.
+>> As crypto is performed on a page boundary, encrypting large buffers can
+>> cause a series of crypto operations divided by page. The runtime PM API
+>> is also called those many times.
 >>
->> git clean -fdx && git reset --hard && \
->>  ./scripts/kconfig/merge_config.sh -m \
->>  	./arch/arm/configs/multi_v7_defconfig ~/tmp/ks_only.cfg &&\
->>  make olddefconfig
+>> We call runtime_pm_get_sync only at beginning on the session (cra_init)
+>> and runtime_pm_put at the end. This result in upto a 50% speedup.
+>> This doesn't make the driver to keep the system awake as runtime get/put
+>> is only called during a crypto session which completes usually quickly.
 >>
->> The above unfortunately will disable options necessary for KS2 boards
->> to boot to the bare minimum initramfs.
->>
->> Hence the "KEYSTONE_TYPICAL" option is designed similar to commit 8d9166b519fd
->> ("omap2/3/4: Add Kconfig option to compile in typical omap features")
->> that can be enabled for most boards keystone platforms
->> without needing to rediscover these in defconfig all over again -
->> examples include multi_v7_defconfig base and optimizations done on top
->> of them for keystone platform.
-> 
-> I'd rather remove the option for OMAP as well, it doesn't really fit in with
-> how we do things for other platforms, and selecting a lot of other Kconfig
-> symbols tends to cause circular dependencies.
-
-Hmm, fair enough -> adding Tony as well if he sees an problem with
-dropping ARCH_OMAP2PLUS_TYPICAL.
-
-> 
->>
->> NOTE: the alternative is to select the configurations under
->> ARCH_KEYSTONE. However, that would fail multi_v7 builds on ARM
->> variants that dont work with LPAE.
-> 
-> Please no arbitrary selects from the platform.
-> 
-
-Agreed.
-
->> Cc: Bill Mills <wmills@ti.com>
->> Cc: Murali Karicheri <m-karicheri2@ti.com>
->> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
->> Cc: Tero Kristo <t-kristo@ti.com>
->> Cc: Lokesh Vutla <lokeshvutla@ti.com>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 >> ---
+>>   drivers/crypto/omap-sham.c | 27 +++++++++++++++++----------
+>>   1 file changed, 17 insertions(+), 10 deletions(-)
 >>
->> Based on: next-20160601
+>> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+>> index 6eefaa2..bd0258f 100644
+>> --- a/drivers/crypto/omap-sham.c
+>> +++ b/drivers/crypto/omap-sham.c
+>> @@ -360,14 +360,6 @@ static void omap_sham_copy_ready_hash(struct
+>> ahash_request *req)
 >>
->> Tested for basic initramfs boot for K2HK/K2G platforms with the
->> http://pastebin.ubuntu.com/16904991/ fragment + multi_v7_defconfig
->>
->> Side note on LPAE:
->> For our current device tree and u-boot, LPAE is mandatory to bootup
->> for current Keystone boards - but this is not a SoC requirement,
->> booting without LPAE/HIGHMEM results in non-coherent DDR accesses.
-> 
-> This sounds like a regression, I thought we had this working when
-> keystone was initially merged and we got both the coherent and
-> non-coherent mode working with the same DT.
-> 
->> Currently:
->> - U-Boot assumes that lpae is always enabled in kennel and updates the 
->> DT memory node with higher addresses. Because of which you are not 
->> detecting any memory without lpae and kernel crashed very early, hence 
->> no prints. So, make mem_lpae env setting as 0 in U-boot.
-> 
-> We could work around this in the kernel by detecting the faulty u-boot
-> behavior and fixing up the addresses in an early platform callback.
-> 
->> - DT also assumes that lpae is always enabled, and always asks for 
->> dma-address translation for higher addresses to lower addresses.
->> Just delete the "dma-ranges" property or create a one-on-one mapping 
->> like dma-ranges = <0x80000000 0x0 0x80000000 0x80000000>
-> 
-> This may be a bit trickier, I think originally keystone ignored the
-> dma-ranges property and hacked up its own offset by adding a magic
-> constant to the dma address using a bus notifier. We probably don't
-> want to bring that hack back, but maybe we can come up with another
-> solution.
-> 
+>>   static int omap_sham_hw_init(struct omap_sham_dev *dd)
+>>   {
+>> -    int err;
+>> -
+>> -    err = pm_runtime_get_sync(dd->dev);
+>> -    if (err < 0) {
+>> -        dev_err(dd->dev, "failed to get sync: %d\n", err);
+>> -        return err;
+>> -    }
+>> -
 
-Santosh, Bill, Lokesh, Grygorii: could you help feedback on the above
-comments from Arnd?
+Would it be worth it to investigate a pm_runtime autosuspend approach 
+rather than knocking runtime PM out here completely? I am not clear if 
+the overhead is coming from the pm_runtime calls themselves or the 
+actual idling of the IP, but if it's the idling of the IP causing the 
+slowdown, with a large enough autosuspend_delay we don't actually sleep 
+between each block but after a long enough period of idle time we would 
+actually suspend.
 
-
--- 
 Regards,
-Nishanth Menon
+Dave
+
+>>       if (!test_bit(FLAGS_INIT, &dd->flags)) {
+>>           set_bit(FLAGS_INIT, &dd->flags);
+>>           dd->err = 0;
+>> @@ -999,8 +991,6 @@ static void omap_sham_finish_req(struct
+>> ahash_request *req, int err)
+>>       dd->flags &= ~(BIT(FLAGS_BUSY) | BIT(FLAGS_FINAL) |
+>> BIT(FLAGS_CPU) |
+>>               BIT(FLAGS_DMA_READY) | BIT(FLAGS_OUTPUT_READY));
+>>
+>> -    pm_runtime_put(dd->dev);
+>> -
+>>       if (req->base.complete)
+>>           req->base.complete(&req->base, err);
+>>
+>> @@ -1239,6 +1229,7 @@ static int omap_sham_cra_init_alg(struct
+>> crypto_tfm *tfm, const char *alg_base)
+>>   {
+>>       struct omap_sham_ctx *tctx = crypto_tfm_ctx(tfm);
+>>       const char *alg_name = crypto_tfm_alg_name(tfm);
+>> +    struct omap_sham_dev *dd;
+>>
+>>       /* Allocate a fallback and abort if it failed. */
+>>       tctx->fallback = crypto_alloc_shash(alg_name, 0,
+>> @@ -1266,6 +1257,13 @@ static int omap_sham_cra_init_alg(struct
+>> crypto_tfm *tfm, const char *alg_base)
+>>
+>>       }
+>>
+>> +    spin_lock_bh(&sham.lock);
+>> +    list_for_each_entry(dd, &sham.dev_list, list) {
+>> +        break;
+>> +    }
+>> +    spin_unlock_bh(&sham.lock);
+>> +
+>> +    pm_runtime_get_sync(dd->dev);
+>>       return 0;
+>>   }
+>>
+>> @@ -1307,6 +1305,7 @@ static int omap_sham_cra_sha512_init(struct
+>> crypto_tfm *tfm)
+>>   static void omap_sham_cra_exit(struct crypto_tfm *tfm)
+>>   {
+>>       struct omap_sham_ctx *tctx = crypto_tfm_ctx(tfm);
+>> +    struct omap_sham_dev *dd;
+>>
+>>       crypto_free_shash(tctx->fallback);
+>>       tctx->fallback = NULL;
+>> @@ -1315,6 +1314,14 @@ static void omap_sham_cra_exit(struct
+>> crypto_tfm *tfm)
+>>           struct omap_sham_hmac_ctx *bctx = tctx->base;
+>>           crypto_free_shash(bctx->shash);
+>>       }
+>> +
+>> +    spin_lock_bh(&sham.lock);
+>> +    list_for_each_entry(dd, &sham.dev_list, list) {
+>> +        break;
+>> +    }
+>> +    spin_unlock_bh(&sham.lock);
+>> +
+>> +    pm_runtime_get_sync(dd->dev);
+>
+> May be put_?
+>
+>>   }
+>>
+>>   static struct ahash_alg algs_sha1_md5[] = {
+>>
+>
+>
