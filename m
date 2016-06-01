@@ -1,46 +1,64 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 1 Jun 2016 13:30:29 +0300
-Subject: [PATCH 00/13] Add R8A7794/SILK board eMMC DT support
-In-Reply-To: <CAMuHMdV4BqUC2QMX-=-R6K6gdrvkX=rUcWn_uFF-jdQuYruhbw@mail.gmail.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <CAMuHMdV4BqUC2QMX-=-R6K6gdrvkX=rUcWn_uFF-jdQuYruhbw@mail.gmail.com>
-Message-ID: <ec4904b9-cf61-b396-ef6c-ded717e68ea5@cogentembedded.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed,  1 Jun 2016 16:04:15 +0530
+Subject: [PATCH 1/8] ARM: s3c24xx: Sort cpufreq tables
+In-Reply-To: <cover.1464776797.git.viresh.kumar@linaro.org>
+References: <cover.1464776797.git.viresh.kumar@linaro.org>
+Message-ID: <872a8b970ce7eabb06b988680eaf6b1154fe99fa.1464776797.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Some later changes in cpufreq core require these tables to be sorted
+based on ascending order of their frequencies. There was only one
+offender. Fix it and add comments over the arrays.
 
-On 6/1/2016 10:04 AM, Geert Uytterhoeven wrote:
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ arch/arm/mach-s3c24xx/pll-s3c2410.c          | 3 ++-
+ arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c | 1 +
+ arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c | 1 +
+ 3 files changed, 4 insertions(+), 1 deletion(-)
 
->>    Here's the set of 13 patches against Simon Horman's 'renesas.git' repo,
->> 'renesas-devel-20160530-v4.7-rc1' tag. We add the device tree support for
->> the R8A7792-based Blanche board. The R-Car 'clk' driver patch was posted last
->> week separately...
->>
->> [01/13] ARM: shmobile: r8a7792: add clock index macros
->> [02/13] ARM: shmobile: r8a7792: add power domain index macros
->> [03/13] soc: renesas: rcar-sysc: add R8A7792 support
->> [04/13] ARM: shmobile: r8a7792: basic SoC support
->> [05/13] DT: clock: rcar-gen2-cpg-clocks: document R8A7792 support
->> [06/13] DT: clock: cpg-mstp-clocks: document-R8A7792-support
->> [07/13] ARM: dts: r8a7792: initial SoC device tree
->> [08/13] ARM: dts: r8a7792: add SYS-DMAC support
->> [09/13] ARM: dts: r8a7792: add [H]SCIF support
->> [10/13] ARM dts: r8a7792: add IRQC support
->> [11/13] DT: arm: shmobile: document Blanche board
->> [12/13] ARM: dts: blanche: initial device tree
->> [13/13] ARM: dts: blanche: add Ethernet support
->
-> Thanks for your series!
->
-> The subject doesn't seem to cover the contents, though:
->> [PATCH 00/13] Add R8A7794/SILK board eMMC DT support
-
-    Oops. :-(
-    Sorry about that...
-
-> Gr{oetje,eeting}s,
->
->                         Geert
-
-MBR, Sergei
+diff --git a/arch/arm/mach-s3c24xx/pll-s3c2410.c b/arch/arm/mach-s3c24xx/pll-s3c2410.c
+index 5e37d368594b..7ee4924a543d 100644
+--- a/arch/arm/mach-s3c24xx/pll-s3c2410.c
++++ b/arch/arm/mach-s3c24xx/pll-s3c2410.c
+@@ -32,11 +32,12 @@
+ #include <plat/cpu.h>
+ #include <plat/cpu-freq-core.h>
+ 
++/* This array should be sorted in ascending order of the frequencies */
+ static struct cpufreq_frequency_table pll_vals_12MHz[] = {
+     { .frequency = 34000000,  .driver_data = PLLVAL(82, 2, 3),   },
+     { .frequency = 45000000,  .driver_data = PLLVAL(82, 1, 3),   },
+-    { .frequency = 51000000,  .driver_data = PLLVAL(161, 3, 3),  },
+     { .frequency = 48000000,  .driver_data = PLLVAL(120, 2, 3),  },
++    { .frequency = 51000000,  .driver_data = PLLVAL(161, 3, 3),  },
+     { .frequency = 56000000,  .driver_data = PLLVAL(142, 2, 3),  },
+     { .frequency = 68000000,  .driver_data = PLLVAL(82, 2, 2),   },
+     { .frequency = 79000000,  .driver_data = PLLVAL(71, 1, 2),   },
+diff --git a/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c b/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
+index b355fca6cc2e..a3fbfed75e28 100644
+--- a/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
++++ b/arch/arm/mach-s3c24xx/pll-s3c2440-12000000.c
+@@ -20,6 +20,7 @@
+ #include <plat/cpu.h>
+ #include <plat/cpu-freq-core.h>
+ 
++/* This array should be sorted in ascending order of the frequencies */
+ static struct cpufreq_frequency_table s3c2440_plls_12[] = {
+ 	{ .frequency = 75000000,	.driver_data = PLLVAL(0x75, 3, 3),  }, 	/* FVco 600.000000 */
+ 	{ .frequency = 80000000,	.driver_data = PLLVAL(0x98, 4, 3),  }, 	/* FVco 640.000000 */
+diff --git a/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c b/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
+index be9a248b5ce9..bcff89fd9871 100644
+--- a/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
++++ b/arch/arm/mach-s3c24xx/pll-s3c2440-16934400.c
+@@ -20,6 +20,7 @@
+ #include <plat/cpu.h>
+ #include <plat/cpu-freq-core.h>
+ 
++/* This array should be sorted in ascending order of the frequencies */
+ static struct cpufreq_frequency_table s3c2440_plls_169344[] = {
+ 	{ .frequency = 78019200,	.driver_data = PLLVAL(121, 5, 3), 	}, 	/* FVco 624.153600 */
+ 	{ .frequency = 84067200,	.driver_data = PLLVAL(131, 5, 3), 	}, 	/* FVco 672.537600 */
+-- 
+2.7.1.410.g6faf27b
