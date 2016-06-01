@@ -1,10 +1,10 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  1 Jun 2016 16:15:17 -0700
-Subject: [PATCH 18/34] clk: mb86s7x: Migrate to clk_hw based OF and
+Date: Wed,  1 Jun 2016 16:15:18 -0700
+Subject: [PATCH 19/34] clk: moxart: Migrate to clk_hw based OF and
  registration APIs
 In-Reply-To: <20160601231533.9354-1-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
-Message-ID: <20160601231533.9354-19-stephen.boyd@linaro.org>
+Message-ID: <20160601231533.9354-20-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,68 +13,77 @@ can get rid of struct clk pointers while registering clks in
 these drivers, allowing us to move closer to a clear split of
 consumer and provider clk APIs.
 
-Cc: Jassi Brar <jaswinder.singh@linaro.org>
+Cc: Jonas Jensen <jonas.jensen@gmail.com>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
 
 See commit 58657d189a2f and it's children for details on this
 new registration API.
 
- drivers/clk/clk-mb86s7x.c | 16 ++++++++++------
- 1 file changed, 10 insertions(+), 6 deletions(-)
+ drivers/clk/clk-moxart.c | 22 ++++++++++++----------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/clk/clk-mb86s7x.c b/drivers/clk/clk-mb86s7x.c
-index e0817754ca3e..2a83a3ff1d09 100644
---- a/drivers/clk/clk-mb86s7x.c
-+++ b/drivers/clk/clk-mb86s7x.c
-@@ -327,10 +327,11 @@ static struct clk_ops clk_clc_ops = {
- 	.set_rate = clc_set_rate,
- };
- 
--struct clk *mb86s7x_clclk_register(struct device *cpu_dev)
-+static struct clk_hw *mb86s7x_clclk_register(struct device *cpu_dev)
+diff --git a/drivers/clk/clk-moxart.c b/drivers/clk/clk-moxart.c
+index f37f719643ec..b86dac851116 100644
+--- a/drivers/clk/clk-moxart.c
++++ b/drivers/clk/clk-moxart.c
+@@ -19,7 +19,8 @@
+ static void __init moxart_of_pll_clk_init(struct device_node *node)
  {
- 	struct clk_init_data init;
- 	struct cl_clk *clc;
-+	int ret;
- 
- 	clc = kzalloc(sizeof(*clc), GFP_KERNEL);
- 	if (!clc)
-@@ -344,14 +345,17 @@ struct clk *mb86s7x_clclk_register(struct device *cpu_dev)
- 	init.flags = CLK_GET_RATE_NOCACHE;
- 	init.num_parents = 0;
- 
--	return devm_clk_register(cpu_dev, &clc->hw);
-+	ret = devm_clk_hw_register(cpu_dev, &clc->hw);
-+	if (ret)
-+		return ERR_PTR(ret);
-+	return &clc->hw;
- }
- 
- static int mb86s7x_clclk_of_init(void)
- {
- 	int cpu, ret = -ENODEV;
- 	struct device_node *np;
--	struct clk *clk;
+ 	static void __iomem *base;
+-	struct clk *clk, *ref_clk;
 +	struct clk_hw *hw;
++	struct clk *ref_clk;
+ 	unsigned int mul;
+ 	const char *name = node->name;
+ 	const char *parent_name;
+@@ -42,14 +43,14 @@ static void __init moxart_of_pll_clk_init(struct device_node *node)
+ 		return;
+ 	}
  
- 	np = of_find_compatible_node(NULL, NULL, "fujitsu,mb86s70-scb-1.0");
- 	if (!np || !of_device_is_available(np))
-@@ -365,12 +369,12 @@ static int mb86s7x_clclk_of_init(void)
- 			continue;
- 		}
+-	clk = clk_register_fixed_factor(NULL, name, parent_name, 0, mul, 1);
+-	if (IS_ERR(clk)) {
++	hw = clk_hw_register_fixed_factor(NULL, name, parent_name, 0, mul, 1);
++	if (IS_ERR(hw)) {
+ 		pr_err("%s: failed to register clock\n", node->full_name);
+ 		return;
+ 	}
  
--		clk = mb86s7x_clclk_register(cpu_dev);
--		if (IS_ERR(clk)) {
-+		hw = mb86s7x_clclk_register(cpu_dev);
-+		if (IS_ERR(hw)) {
- 			pr_err("failed to register cpu%d clock\n", cpu);
- 			continue;
- 		}
--		if (clk_register_clkdev(clk, NULL, dev_name(cpu_dev))) {
-+		if (clk_hw_register_clkdev(hw, NULL, dev_name(cpu_dev))) {
- 			pr_err("failed to register cpu%d clock lookup\n", cpu);
- 			continue;
- 		}
+-	clk_register_clkdev(clk, NULL, name);
+-	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	clk_hw_register_clkdev(hw, NULL, name);
++	of_clk_add_hw_provider(node, of_clk_hw_simple_get, hw);
+ }
+ CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
+ 	       moxart_of_pll_clk_init);
+@@ -57,7 +58,8 @@ CLK_OF_DECLARE(moxart_pll_clock, "moxa,moxart-pll-clock",
+ static void __init moxart_of_apb_clk_init(struct device_node *node)
+ {
+ 	static void __iomem *base;
+-	struct clk *clk, *pll_clk;
++	struct clk_hw *hw;
++	struct clk *pll_clk;
+ 	unsigned int div, val;
+ 	unsigned int div_idx[] = { 2, 3, 4, 6, 8};
+ 	const char *name = node->name;
+@@ -85,14 +87,14 @@ static void __init moxart_of_apb_clk_init(struct device_node *node)
+ 		return;
+ 	}
+ 
+-	clk = clk_register_fixed_factor(NULL, name, parent_name, 0, 1, div);
+-	if (IS_ERR(clk)) {
++	hw = clk_hw_register_fixed_factor(NULL, name, parent_name, 0, 1, div);
++	if (IS_ERR(hw)) {
+ 		pr_err("%s: failed to register clock\n", node->full_name);
+ 		return;
+ 	}
+ 
+-	clk_register_clkdev(clk, NULL, name);
+-	of_clk_add_provider(node, of_clk_src_simple_get, clk);
++	clk_hw_register_clkdev(hw, NULL, name);
++	of_clk_add_hw_provider(node, of_clk_hw_simple_get, hw);
+ }
+ CLK_OF_DECLARE(moxart_apb_clock, "moxa,moxart-apb-clock",
+ 	       moxart_of_apb_clk_init);
 -- 
 2.7.4
