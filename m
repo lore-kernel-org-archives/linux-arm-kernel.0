@@ -1,29 +1,31 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 1 Jun 2016 12:17:29 +0900
-Subject: [RFC 0/4] ARM: dts: r8a7790: lager: use demuxer for I2C
-In-Reply-To: <1464665528-11398-1-git-send-email-horms+renesas@verge.net.au>
-References: <1464665528-11398-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CANqRtoTRRNQGk-gy1NrQhXNB0fzvkHDxwJGxyQHTYAgHUXm9ZA@mail.gmail.com>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Wed, 1 Jun 2016 12:29:58 +0800
+Subject: [PATCH v2 0/2] ARM: ohci-at91: Add support to forcibly suspend ports
+ while sleep
+Message-ID: <1464755400-6825-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+To save the power consumption, add a new compatible to support forcibly
+suspend the USB PORTA/B/C via OHCI Interrupt Configuration SFR Register.
 
-On Tue, May 31, 2016 at 12:32 PM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> the intention of this series is to extend use of the demuxer for I2C
-> on the lager/r8a7790 to cover all I2C IP blocks.
->
-> This is based on work by Wolfram Sang.
->
-> I have not included GPIO in the demux configuration. This is in keeping
-> with the existing usage for IIC0/I2C0.
+Changes in v2:
+ - Add compatible to support forcibly suspend the ports.
+ - Add soc/at91/at91_sfr.h to accommodate the defines.
+ - Add error checking for .sfr_regmap.
+ - Remove unnecessary regmap_read() statement.
+ - Use the new compatible for ohci-node.
 
-Thanks for your efforts! Can you please include GPIO support in next
-version? This way we should in the future be able to use
-distro-kernels out of the box that may only have GPIO bitbang support
-enabled.
+Wenyou Yang (2):
+  usb: ohci-at91: Forcibly suspend ports while USB suspend
+  ARM: at91/dt: sama5d2: Use new compatible for ohci node
 
-Cheers,
+ .../devicetree/bindings/usb/atmel-usb.txt          |  5 +-
+ arch/arm/boot/dts/sama5d2.dtsi                     |  2 +-
+ drivers/usb/host/ohci-at91.c                       | 80 +++++++++++++++++++++-
+ include/soc/at91/at91_sfr.h                        | 29 ++++++++
+ 4 files changed, 112 insertions(+), 4 deletions(-)
+ create mode 100644 include/soc/at91/at91_sfr.h
 
-/ magnus
+-- 
+2.7.4
