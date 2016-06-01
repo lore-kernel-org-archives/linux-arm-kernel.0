@@ -1,114 +1,43 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Wed, 01 Jun 2016 17:46:22 +0200
-Subject: [RFC PATCH 2/4] clk: rockchip: rk3399: add ddrc clock support
-In-Reply-To: <CAD=FV=UQoWe7DcPe3sZrocXLmX4JNpBBF1rr+-+T_q3FttihEQ@mail.gmail.com>
-References: <1464773739-18152-1-git-send-email-hl@rock-chips.com>
- <1464773739-18152-3-git-send-email-hl@rock-chips.com>
- <CAD=FV=UQoWe7DcPe3sZrocXLmX4JNpBBF1rr+-+T_q3FttihEQ@mail.gmail.com>
-Message-ID: <7336973.nHpy8GhqcO@diego>
+From: john@metanate.com (John Keeping)
+Date: Wed,  1 Jun 2016 16:46:10 +0100
+Subject: [RESEND PATCH] iommu/rockchip: fix zap cache during device attach
+Message-ID: <20160601154610.22899-1-john@metanate.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 1. Juni 2016, 08:24:48 schrieb Doug Anderson:
-> Lin Huang,
-> 
-> On Wed, Jun 1, 2016 at 2:35 AM, Lin Huang <hl@rock-chips.com> wrote:
-> > add ddrc clock setting, so we can do ddr frequency
-> > scaling on rk3399 platform in future.
-> > 
-> > Signed-off-by: Lin Huang <hl@rock-chips.com>
-> > ---
-> > 
-> >  drivers/clk/rockchip/clk-rk3399.c      | 16 ++++++++++++++++
-> >  include/dt-bindings/clock/rk3399-cru.h |  1 +
-> >  2 files changed, 17 insertions(+)
-> > 
-> > diff --git a/drivers/clk/rockchip/clk-rk3399.c
-> > b/drivers/clk/rockchip/clk-rk3399.c index f1d8e44..749ea59 100644
-> > --- a/drivers/clk/rockchip/clk-rk3399.c
-> > +++ b/drivers/clk/rockchip/clk-rk3399.c
-> > @@ -118,6 +118,10 @@ PNAME(mux_armclkb_p)                               =
-> > { "clk_core_b_lpll_src",> 
-> >                                                     "clk_core_b_bpll_src",
-> >                                                     "clk_core_b_dpll_src",
-> >                                                     "clk_core_b_gpll_src"
-> >                                                     };
-> > 
-> > +PNAME(mux_ddrclk_p)                            = { "clk_ddrc_lpll_src",
-> > +                                                   "clk_ddrc_bpll_src",
-> > +                                                   "clk_ddrc_dpll_src",
-> > +                                                   "clk_ddrc_gpll_src" };
-> > 
-> >  PNAME(mux_aclk_cci_p)                          = { "cpll_aclk_cci_src",
-> >  
-> >                                                     "gpll_aclk_cci_src",
-> >                                                     "npll_aclk_cci_src",
-> > 
-> > @@ -1377,6 +1381,18 @@ static struct rockchip_clk_branch
-> > rk3399_clk_branches[] __initdata = {> 
-> >         COMPOSITE_NOMUX(0, "clk_test", "clk_test_pre", CLK_IGNORE_UNUSED,
-> >         
-> >                         RK3368_CLKSEL_CON(58), 0, 5, DFLAGS,
-> >                         RK3368_CLKGATE_CON(13), 11, GFLAGS),
-> > 
-> > +
-> > +       /* ddrc */
-> > +       GATE(0, "clk_ddrc_lpll_src", "lpll", CLK_IGNORE_UNUSED,
-> > +            RK3399_CLKGATE_CON(3), 0, GFLAGS),
-> > +       GATE(0, "clk_ddrc_bpll_src", "bpll", CLK_IGNORE_UNUSED,
-> > +            RK3399_CLKGATE_CON(3), 1, GFLAGS),
-> > +       GATE(0, "clk_ddrc_dpll_src", "dpll", CLK_IGNORE_UNUSED,
-> > +            RK3399_CLKGATE_CON(3), 2, GFLAGS),
-> > +       GATE(0, "clk_ddrc_gpll_src", "gpll", CLK_IGNORE_UNUSED,
-> > +            RK3399_CLKGATE_CON(3), 3, GFLAGS),
-> > +       COMPOSITE_DDRC(SCLK_DDRCLK, "clk_ddrc", mux_ddrclk_p,
-> > CLK_IGNORE_UNUSED, +                      RK3399_CLKSEL_CON(6), 4, 2,
-> > MFLAGS, 0, 3, DFLAGS),
-> It seems slightly unfortunate that we need CLK_IGNORE_UNUSED on these.
-> Only one of these will ever be used at once and it would be awfully
-> nice if the others could get gated, right?
-> 
-> ...presumably this is needed because we might not have an actual
-> driver for DDR Freq and we definitely want to make sure that clk_ddrc
-> is enabled in that case.  I guess what we really want is something
-> like CLK_ENABLE_HAND_OFF eventually, but until then I think you might
-> get slightly better behavior by getting rid of all of these
-> CLK_IGNORE_UNUSED and setting "clk_ddrc" as a critical clock, either
-> using the table in this file or the new flag.
+rk_iommu_command() takes a struct rk_iommu and iterates over the slave
+MMUs, so this is doubly wrong in that we're passing in the wrong pointer
+and talking to MMUs that we shouldn't be.
 
-My current feeling is that staying with the homegrown solution for critical 
-clocks might be preferable until the clk-handoff mechanism lands as well, as 
-our critical clocks fall into both categories and I'd like to not touch 
-everything twice.
+Fixes: cd6438c5f844 ("iommu/rockchip: Reconstruct to support multi slaves")
+Cc: stable at vger.kernel.org
+Signed-off-by: John Keeping <john@metanate.com>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+---
+The original was sent just before the merge window [0].  The only
+changes are to the commit message:
 
-The clock above should be controlled by the dcf, so falls into the handoff 
-category (critical until a driver picks up the clock).
+* add Cc: stable
+* add Heiko's {Tested,Reviewed}-by
 
-Also mixing both new and old approach might get confusing.
+[0] http://article.gmane.org/gmane.linux.kernel.iommu/13556
 
-But I'm definitly open to counter-arguments :-)
+ drivers/iommu/rockchip-iommu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-> >  };
-> >  
-> >  static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata =
-> >  {
-> > 
-> > diff --git a/include/dt-bindings/clock/rk3399-cru.h
-> > b/include/dt-bindings/clock/rk3399-cru.h index 50a44cf..8a0f0442 100644
-> > --- a/include/dt-bindings/clock/rk3399-cru.h
-> > +++ b/include/dt-bindings/clock/rk3399-cru.h
-> > @@ -131,6 +131,7 @@
-> > 
-> >  #define SCLK_DPHY_RX0_CFG              165
-> >  #define SCLK_RMII_SRC                  166
-> >  #define SCLK_PCIEPHY_REF100M           167
-> > 
-> > +#define SCLK_DDRCLK                    168
-> 
-> Almost certainly you'll want to create a separate patch for the
-> dt-bindings change since it will need to land in a different tree so
-> it can be pulled into both Heiko's clock topic branch and dts64 topic
-> branch.
-
-correct.
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index c7d6156ff536..25b4627cb57f 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -815,7 +815,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 	dte_addr = virt_to_phys(rk_domain->dt);
+ 	for (i = 0; i < iommu->num_mmu; i++) {
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_DTE_ADDR, dte_addr);
+-		rk_iommu_command(iommu->bases[i], RK_MMU_CMD_ZAP_CACHE);
++		rk_iommu_base_command(iommu->bases[i], RK_MMU_CMD_ZAP_CACHE);
+ 		rk_iommu_write(iommu->bases[i], RK_MMU_INT_MASK, RK_MMU_IRQ_MASK);
+ 	}
+ 
+-- 
+2.8.2.565.gdb84f68.dirty
