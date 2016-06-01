@@ -1,71 +1,171 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 1 Jun 2016 11:56:12 +0300
-Subject: [PATCH 11/28] crypto: omap-aes: Add support for multiple cores
+Date: Wed, 1 Jun 2016 11:56:13 +0300
+Subject: [PATCH 12/28] crypto: omap-aes: Add fallback support
 In-Reply-To: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
 References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1464771389-10640-12-git-send-email-t-kristo@ti.com>
+Message-ID: <1464771389-10640-13-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Some SoCs like omap4/omap5/dra7 contain multiple AES crypto accelerator
-cores. Adapt the driver to support this. The driver picks the last used
-device from a list of AES devices.
+As setting up the DMA operations is quite costly, add software fallback
+support for requests smaller than 200 bytes. This change gives some 10%
+extra performance in ipsec use case.
 
 Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-[t-kristo at ti.com: forward ported to 4.7 kernel]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-aes.c | 20 ++++++--------------
- 1 file changed, 6 insertions(+), 14 deletions(-)
+ drivers/crypto/Kconfig    |  3 +++
+ drivers/crypto/omap-aes.c | 45 ++++++++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 45 insertions(+), 3 deletions(-)
 
+diff --git a/drivers/crypto/Kconfig b/drivers/crypto/Kconfig
+index d77ba2f..0c57ac9 100644
+--- a/drivers/crypto/Kconfig
++++ b/drivers/crypto/Kconfig
+@@ -305,6 +305,9 @@ config CRYPTO_DEV_OMAP_AES
+ 	select CRYPTO_AES
+ 	select CRYPTO_BLKCIPHER
+ 	select CRYPTO_ENGINE
++	select CRYPTO_CBC
++	select CRYPTO_ECB
++	select CRYPTO_CTR
+ 	help
+ 	  OMAP processors have AES module accelerator. Select this if you
+ 	  want to use the OMAP module for AES algorithms.
 diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
-index cf53d3f..f710602 100644
+index f710602..867e56a 100644
 --- a/drivers/crypto/omap-aes.c
 +++ b/drivers/crypto/omap-aes.c
-@@ -319,20 +319,12 @@ static void omap_aes_dma_stop(struct omap_aes_dev *dd)
+@@ -103,6 +103,7 @@ struct omap_aes_ctx {
+ 	int		keylen;
+ 	u32		key[AES_KEYSIZE_256 / sizeof(u32)];
+ 	unsigned long	flags;
++	struct crypto_ablkcipher	*fallback;
+ };
  
- static struct omap_aes_dev *omap_aes_find_dev(struct omap_aes_ctx *ctx)
+ struct omap_aes_reqctx {
+@@ -680,15 +681,28 @@ static void omap_aes_done_task(unsigned long data)
+ 
+ static int omap_aes_crypt(struct ablkcipher_request *req, unsigned long mode)
  {
--	struct omap_aes_dev *dd = NULL, *tmp;
-+	struct omap_aes_dev *dd;
- 
- 	spin_lock_bh(&list_lock);
--	if (!ctx->dd) {
--		list_for_each_entry(tmp, &dev_list, list) {
--			/* FIXME: take fist available aes core */
--			dd = tmp;
--			break;
--		}
--		ctx->dd = dd;
--	} else {
--		/* already found before */
--		dd = ctx->dd;
--	}
-+	dd = list_first_entry(&dev_list, struct omap_aes_dev, list);
-+	list_move_tail(&dd->list, &dev_list);
-+	ctx->dd = dd;
- 	spin_unlock_bh(&list_lock);
- 
- 	return dd;
-@@ -600,7 +592,7 @@ static int omap_aes_prepare_req(struct crypto_engine *engine,
- {
++	struct crypto_tfm *tfm =
++		crypto_ablkcipher_tfm(crypto_ablkcipher_reqtfm(req));
  	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
  			crypto_ablkcipher_reqtfm(req));
--	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
-+	struct omap_aes_dev *dd = ctx->dd;
- 	struct omap_aes_reqctx *rctx;
- 	int len;
+ 	struct omap_aes_reqctx *rctx = ablkcipher_request_ctx(req);
+ 	struct omap_aes_dev *dd;
++	int ret;
  
-@@ -644,7 +636,7 @@ static int omap_aes_crypt_req(struct crypto_engine *engine,
- {
- 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(
- 			crypto_ablkcipher_reqtfm(req));
--	struct omap_aes_dev *dd = omap_aes_find_dev(ctx);
-+	struct omap_aes_dev *dd = ctx->dd;
+ 	pr_debug("nbytes: %d, enc: %d, cbc: %d\n", req->nbytes,
+ 		  !!(mode & FLAGS_ENCRYPT),
+ 		  !!(mode & FLAGS_CBC));
  
++	if (req->nbytes < 200) {
++		ablkcipher_request_set_tfm(req, ctx->fallback);
++
++		if (mode & FLAGS_ENCRYPT)
++			ret = crypto_ablkcipher_encrypt(req);
++		else
++			ret = crypto_ablkcipher_decrypt(req);
++		ablkcipher_request_set_tfm(req, __crypto_ablkcipher_cast(tfm));
++		return ret;
++	}
+ 	dd = omap_aes_find_dev(ctx);
  	if (!dd)
  		return -ENODEV;
+@@ -704,6 +718,7 @@ static int omap_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
+ 			   unsigned int keylen)
+ {
+ 	struct omap_aes_ctx *ctx = crypto_ablkcipher_ctx(tfm);
++	int ret;
+ 
+ 	if (keylen != AES_KEYSIZE_128 && keylen != AES_KEYSIZE_192 &&
+ 		   keylen != AES_KEYSIZE_256)
+@@ -714,6 +729,14 @@ static int omap_aes_setkey(struct crypto_ablkcipher *tfm, const u8 *key,
+ 	memcpy(ctx->key, key, keylen);
+ 	ctx->keylen = keylen;
+ 
++	ctx->fallback->base.crt_flags &= ~CRYPTO_TFM_REQ_MASK;
++	ctx->fallback->base.crt_flags |=
++		tfm->base.crt_flags & CRYPTO_TFM_REQ_MASK;
++
++	ret = crypto_ablkcipher_setkey(ctx->fallback, key, keylen);
++	if (!ret)
++		return 0;
++
+ 	return 0;
+ }
+ 
+@@ -751,6 +774,11 @@ static int omap_aes_cra_init(struct crypto_tfm *tfm)
+ {
+ 	struct omap_aes_dev *dd = NULL;
+ 	int err;
++	const char *name = crypto_tfm_alg_name(tfm);
++	const u32 flags = CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK;
++	struct omap_aes_ctx *ctx = crypto_tfm_ctx(tfm);
++	struct crypto_ablkcipher *blk;
++
+ 
+ 	list_for_each_entry(dd, &dev_list, list) {
+ 		err = pm_runtime_get_sync(dd->dev);
+@@ -761,6 +789,12 @@ static int omap_aes_cra_init(struct crypto_tfm *tfm)
+ 		}
+ 	}
+ 
++	blk = crypto_alloc_ablkcipher(name, 0, flags);
++	if (IS_ERR(blk))
++		return PTR_ERR(blk);
++
++	ctx->fallback = blk;
++
+ 	tfm->crt_ablkcipher.reqsize = sizeof(struct omap_aes_reqctx);
+ 
+ 	return 0;
+@@ -769,11 +803,16 @@ static int omap_aes_cra_init(struct crypto_tfm *tfm)
+ static void omap_aes_cra_exit(struct crypto_tfm *tfm)
+ {
+ 	struct omap_aes_dev *dd = NULL;
++	struct omap_aes_ctx *ctx = crypto_tfm_ctx(tfm);
+ 
+ 	list_for_each_entry(dd, &dev_list, list) {
+ 		pm_runtime_put_sync(dd->dev);
+ 	}
+ 
++	if (ctx->fallback)
++		crypto_free_ablkcipher(ctx->fallback);
++
++	ctx->fallback = NULL;
+ }
+ 
+ /* ********************** ALGS ************************************ */
+@@ -785,7 +824,7 @@ static struct crypto_alg algs_ecb_cbc[] = {
+ 	.cra_priority		= 300,
+ 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
+ 				  CRYPTO_ALG_KERN_DRIVER_ONLY |
+-				  CRYPTO_ALG_ASYNC,
++				  CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+ 	.cra_blocksize		= AES_BLOCK_SIZE,
+ 	.cra_ctxsize		= sizeof(struct omap_aes_ctx),
+ 	.cra_alignmask		= 0,
+@@ -807,7 +846,7 @@ static struct crypto_alg algs_ecb_cbc[] = {
+ 	.cra_priority		= 300,
+ 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
+ 				  CRYPTO_ALG_KERN_DRIVER_ONLY |
+-				  CRYPTO_ALG_ASYNC,
++				  CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+ 	.cra_blocksize		= AES_BLOCK_SIZE,
+ 	.cra_ctxsize		= sizeof(struct omap_aes_ctx),
+ 	.cra_alignmask		= 0,
+@@ -833,7 +872,7 @@ static struct crypto_alg algs_ctr[] = {
+ 	.cra_priority		= 300,
+ 	.cra_flags		= CRYPTO_ALG_TYPE_ABLKCIPHER |
+ 				  CRYPTO_ALG_KERN_DRIVER_ONLY |
+-				  CRYPTO_ALG_ASYNC,
++				  CRYPTO_ALG_ASYNC | CRYPTO_ALG_NEED_FALLBACK,
+ 	.cra_blocksize		= AES_BLOCK_SIZE,
+ 	.cra_ctxsize		= sizeof(struct omap_aes_ctx),
+ 	.cra_alignmask		= 0,
 -- 
 1.9.1
