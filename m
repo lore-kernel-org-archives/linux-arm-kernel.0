@@ -1,123 +1,113 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 01 Jun 2016 11:45:51 +0200
-Subject: [PATCH 3/3] ARM: dts: exynos: Add watchdog amd Security SubSystem to
- Exynos5410
-In-Reply-To: <1464774351-23604-1-git-send-email-k.kozlowski@samsung.com>
-References: <1464774351-23604-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1464774351-23604-3-git-send-email-k.kozlowski@samsung.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 1 Jun 2016 12:53:21 +0300
+Subject: [PATCH 02/28] crypto: omap-sham: Don't idle/start SHA device
+ between Encrypt operations
+In-Reply-To: <1464771389-10640-3-git-send-email-t-kristo@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+ <1464771389-10640-3-git-send-email-t-kristo@ti.com>
+Message-ID: <574EB091.6040001@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move watchdog and Security SubSystem nodes from exynos5420.dtsi to file
-shared with Exynos5410 and configure the clocks on the latter.
+On 06/01/2016 11:56 AM, Tero Kristo wrote:
+> From: Lokesh Vutla <lokeshvutla@ti.com>
+>
+> Calling runtime PM API for every block causes serious perf hit to
+> crypto operations that are done on a long buffer.
+> As crypto is performed on a page boundary, encrypting large buffers can
+> cause a series of crypto operations divided by page. The runtime PM API
+> is also called those many times.
+>
+> We call runtime_pm_get_sync only at beginning on the session (cra_init)
+> and runtime_pm_put at the end. This result in upto a 50% speedup.
+> This doesn't make the driver to keep the system awake as runtime get/put
+> is only called during a crypto session which completes usually quickly.
+>
+> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+>   drivers/crypto/omap-sham.c | 27 +++++++++++++++++----------
+>   1 file changed, 17 insertions(+), 10 deletions(-)
+>
+> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+> index 6eefaa2..bd0258f 100644
+> --- a/drivers/crypto/omap-sham.c
+> +++ b/drivers/crypto/omap-sham.c
+> @@ -360,14 +360,6 @@ static void omap_sham_copy_ready_hash(struct ahash_request *req)
+>
+>   static int omap_sham_hw_init(struct omap_sham_dev *dd)
+>   {
+> -	int err;
+> -
+> -	err = pm_runtime_get_sync(dd->dev);
+> -	if (err < 0) {
+> -		dev_err(dd->dev, "failed to get sync: %d\n", err);
+> -		return err;
+> -	}
+> -
+>   	if (!test_bit(FLAGS_INIT, &dd->flags)) {
+>   		set_bit(FLAGS_INIT, &dd->flags);
+>   		dd->err = 0;
+> @@ -999,8 +991,6 @@ static void omap_sham_finish_req(struct ahash_request *req, int err)
+>   	dd->flags &= ~(BIT(FLAGS_BUSY) | BIT(FLAGS_FINAL) | BIT(FLAGS_CPU) |
+>   			BIT(FLAGS_DMA_READY) | BIT(FLAGS_OUTPUT_READY));
+>
+> -	pm_runtime_put(dd->dev);
+> -
+>   	if (req->base.complete)
+>   		req->base.complete(&req->base, err);
+>
+> @@ -1239,6 +1229,7 @@ static int omap_sham_cra_init_alg(struct crypto_tfm *tfm, const char *alg_base)
+>   {
+>   	struct omap_sham_ctx *tctx = crypto_tfm_ctx(tfm);
+>   	const char *alg_name = crypto_tfm_alg_name(tfm);
+> +	struct omap_sham_dev *dd;
+>
+>   	/* Allocate a fallback and abort if it failed. */
+>   	tctx->fallback = crypto_alloc_shash(alg_name, 0,
+> @@ -1266,6 +1257,13 @@ static int omap_sham_cra_init_alg(struct crypto_tfm *tfm, const char *alg_base)
+>
+>   	}
+>
+> +	spin_lock_bh(&sham.lock);
+> +	list_for_each_entry(dd, &sham.dev_list, list) {
+> +		break;
+> +	}
+> +	spin_unlock_bh(&sham.lock);
+> +
+> +	pm_runtime_get_sync(dd->dev);
+>   	return 0;
+>   }
+>
+> @@ -1307,6 +1305,7 @@ static int omap_sham_cra_sha512_init(struct crypto_tfm *tfm)
+>   static void omap_sham_cra_exit(struct crypto_tfm *tfm)
+>   {
+>   	struct omap_sham_ctx *tctx = crypto_tfm_ctx(tfm);
+> +	struct omap_sham_dev *dd;
+>
+>   	crypto_free_shash(tctx->fallback);
+>   	tctx->fallback = NULL;
+> @@ -1315,6 +1314,14 @@ static void omap_sham_cra_exit(struct crypto_tfm *tfm)
+>   		struct omap_sham_hmac_ctx *bctx = tctx->base;
+>   		crypto_free_shash(bctx->shash);
+>   	}
+> +
+> +	spin_lock_bh(&sham.lock);
+> +	list_for_each_entry(dd, &sham.dev_list, list) {
+> +		break;
+> +	}
+> +	spin_unlock_bh(&sham.lock);
+> +
+> +	pm_runtime_get_sync(dd->dev);
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/boot/dts/exynos5410.dtsi | 11 +++++++++++
- arch/arm/boot/dts/exynos5420.dtsi | 28 +++++++++++-----------------
- arch/arm/boot/dts/exynos54xx.dtsi | 12 ++++++++++++
- 3 files changed, 34 insertions(+), 17 deletions(-)
+May be put_?
 
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index f1effd3f03c4..b76f56c2fe8b 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -297,6 +297,11 @@
- 	clock-names = "uart", "clk_uart_baud0";
- };
- 
-+&sss {
-+	clocks = <&clock CLK_SSS>;
-+	clock-names = "secss";
-+};
-+
- &sromc {
- 	#address-cells = <2>;
- 	#size-cells = <1>;
-@@ -349,4 +354,10 @@
- 	samsung,pmureg-phandle = <&pmu_system_controller>;
- };
- 
-+&watchdog {
-+	clocks = <&clock CLK_WDT>;
-+	clock-names = "watchdog";
-+	samsung,syscon-phandle = <&pmu_system_controller>;
-+};
-+
- #include "exynos5410-pinctrl.dtsi"
-diff --git a/arch/arm/boot/dts/exynos5420.dtsi b/arch/arm/boot/dts/exynos5420.dtsi
-index 265747bb19d1..beb6f453039e 100644
---- a/arch/arm/boot/dts/exynos5420.dtsi
-+++ b/arch/arm/boot/dts/exynos5420.dtsi
-@@ -694,23 +694,6 @@
- 			#include "exynos4412-tmu-sensor-conf.dtsi"
- 		};
- 
--		watchdog: watchdog at 101D0000 {
--			compatible = "samsung,exynos5420-wdt";
--			reg = <0x101D0000 0x100>;
--			interrupts = <0 42 0>;
--			clocks = <&clock CLK_WDT>;
--			clock-names = "watchdog";
--			samsung,syscon-phandle = <&pmu_system_controller>;
--		};
--
--		sss: sss at 10830000 {
--			compatible = "samsung,exynos4210-secss";
--			reg = <0x10830000 0x300>;
--			interrupts = <0 112 0>;
--			clocks = <&clock CLK_SSS>;
--			clock-names = "secss";
--		};
--
- 		sysmmu_g2dr: sysmmu at 0x10A60000 {
- 			compatible = "samsung,exynos-sysmmu";
- 			reg = <0x10A60000 0x1000>;
-@@ -1030,6 +1013,11 @@
- 	clock-names = "uart", "clk_uart_baud0";
- };
- 
-+&sss {
-+	clocks = <&clock CLK_SSS>;
-+	clock-names = "secss";
-+};
-+
- &usbdrd3_0 {
- 	clocks = <&clock CLK_USBD300>;
- 	clock-names = "usbdrd30";
-@@ -1073,4 +1061,10 @@
- 	samsung,pmureg-phandle = <&pmu_system_controller>;
- };
- 
-+&watchdog {
-+	clocks = <&clock CLK_WDT>;
-+	clock-names = "watchdog";
-+	samsung,syscon-phandle = <&pmu_system_controller>;
-+};
-+
- #include "exynos5420-pinctrl.dtsi"
-diff --git a/arch/arm/boot/dts/exynos54xx.dtsi b/arch/arm/boot/dts/exynos54xx.dtsi
-index 0eb8aa31b7d9..06a604911e87 100644
---- a/arch/arm/boot/dts/exynos54xx.dtsi
-+++ b/arch/arm/boot/dts/exynos54xx.dtsi
-@@ -74,6 +74,18 @@
- 			};
- 		};
- 
-+		watchdog: watchdog at 101d0000 {
-+			compatible = "samsung,exynos5420-wdt";
-+			reg = <0x101d0000 0x100>;
-+			interrupts = <0 42 0>;
-+		};
-+
-+		sss: sss at 10830000 {
-+			compatible = "samsung,exynos4210-secss";
-+			reg = <0x10830000 0x300>;
-+			interrupts = <0 112 0>;
-+		};
-+
- 		/* i2c_0-3 are defined in exynos5.dtsi */
- 		hsi2c_4: i2c at 12ca0000 {
- 			compatible = "samsung,exynos5250-hsi2c";
+>   }
+>
+>   static struct ahash_alg algs_sha1_md5[] = {
+>
+
+
 -- 
-1.9.1
+regards,
+-grygorii
