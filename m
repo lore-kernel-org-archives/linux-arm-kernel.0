@@ -1,16 +1,16 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 1 Jun 2016 10:17:04 +0200
-Subject: [PATCH 09/13] ARM: dts: r8a7792: add [H]SCIF support
-In-Reply-To: <1493287.pGnW6U6caN@wasted.cogentembedded.com>
+Date: Wed, 1 Jun 2016 10:17:24 +0200
+Subject: [PATCH 10/13] ARM: dts: r8a7792: add IRQC support
+In-Reply-To: <3573091.BUvyGW3hVt@wasted.cogentembedded.com>
 References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <1493287.pGnW6U6caN@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdVhAqjMY+sG+=qajrTKuGivWj2Lnm3b8Kfjpe-WyHzC=w@mail.gmail.com>
+ <3573091.BUvyGW3hVt@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdWvaGyWEbotmG53CW9hB2avJAbmJS72WXVod64UEdmf1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2016 at 12:26 AM, Sergei Shtylyov
+On Wed, Jun 1, 2016 at 12:29 AM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Describe [H]SCIFs in the R8A7792 device tree.
+> Describe the IRQC interrupt controller in the R8A7792 device tree.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
