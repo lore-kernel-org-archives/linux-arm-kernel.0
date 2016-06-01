@@ -1,47 +1,76 @@
-From: haas@computerlinguist.org (Michael Haas)
-Date: Sun, 1 May 2016 08:46:28 +0200
-Subject: [linux-sunxi] Re: [PATCH 2/3] sunxi: A20-OLinuXino-LIME2: Add
- usb-power-supply
-In-Reply-To: <20160402103648.GI4227@lukather>
-References: <1458932647-24268-1-git-send-email-haas@computerlinguist.org>
- <1458932647-24268-2-git-send-email-haas@computerlinguist.org>
- <20160402103648.GI4227@lukather>
-Message-ID: <dec3f06a-1b27-8426-9119-fd7472e0a090@computerlinguist.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 1 Jun 2016 09:01:14 +0200
+Subject: [PATCH resend v2 5/6] ARM: dts: sun9i: a80-optimus: Disable
+ dummy regulators vcc3v0, vcc3v3, vcc5v0
+In-Reply-To: <CAGb2v65_kAtrOW_G51Tn1urroXVuo=AqzX66zm7Ewsyw_AJdvA@mail.gmail.com>
+References: <1464711804-19256-1-git-send-email-wens@csie.org>
+ <1464711804-19256-6-git-send-email-wens@csie.org>
+ <20160531190113.GO4908@lukather>
+ <CAGb2v65_kAtrOW_G51Tn1urroXVuo=AqzX66zm7Ewsyw_AJdvA@mail.gmail.com>
+Message-ID: <20160601070114.GQ4908@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-
-On 04/02/2016 12:36 PM, Maxime Ripard wrote:
-> Hi,
+On Wed, Jun 01, 2016 at 10:45:51AM +0800, Chen-Yu Tsai wrote:
+> On Wed, Jun 1, 2016 at 3:01 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Wed, Jun 01, 2016 at 12:23:23AM +0800, Chen-Yu Tsai wrote:
+> >> These 3 regulators are provided in sunxi-common-regulators.dtsi.
+> >> 3.0V/3.3V and 5.0V are commonly used voltages in Allwinner devices.
+> >> These dummy regulators provide a stand-in when bindings that require
+> >> one, but the real regulator is not supported yet.
+> >>
+> >> Since these are no longer needed, we can disable them.
+> >>
+> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> ---
+> >>  arch/arm/boot/dts/sun9i-a80-optimus.dts | 12 ++++++++++++
+> >>  1 file changed, 12 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/sun9i-a80-optimus.dts b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> index 6cfc02194035..991337d1d6f1 100644
+> >> --- a/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> +++ b/arch/arm/boot/dts/sun9i-a80-optimus.dts
+> >> @@ -322,6 +322,18 @@
+> >>
+> >>  #include "axp809.dtsi"
+> >>
+> >> +&reg_vcc3v0 {
+> >> +     status = "disabled";
+> >> +};
+> >> +
+> >> +&reg_vcc3v3 {
+> >> +     status = "disabled";
+> >> +};
+> >> +
+> >> +&reg_vcc5v0 {
+> >> +     status = "disabled";
+> >> +};
+> >> +
+> >
+> > Why not remove the include entirely?
 > 
-> On Fri, Mar 25, 2016 at 08:04:06PM +0100, Michael Haas wrote:
->> The A20-OLinuXino-LIME2 uses the AXP209 PMIC. This patch adds the
->> corresponding usb-power-supply node to the DTS.
->> If CONFIG_AXP20X_POWER is set, this patch enables the /sys/class/power_supply/
->> diirectory.
->>
->> Signed-off-by: Michael Haas <haas@computerlinguist.org>
-> 
-> Is there *any* reason to not use the AXP209 dtsi where it's already
-> defined?
-> 
+> reg_usb1_vbus is still used. Or I could just copy it and
+> get rid of the include.
 
-do you have any preference for this being in the AXP209 dtsi? I've been
-thinking about it and it makes sense to enable the power supply nodes
-for all devices using the AXP209. They will just report themselves as
-offline if the PMIC indicates nothing is connected.
+Ah yes, it is on the Optimus (but not the cubieboard I initially
+looked at).
 
-Best,
+Since we have that other regulator usb3 regulator, we can simply
+remove it.
 
-Michael
+Maxime
 
-
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 473 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160501/5dcb9301/attachment.sig>
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160601/80858236/attachment.sig>
