@@ -1,159 +1,99 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed,  1 Jun 2016 17:29:42 +0200
-Subject: [PATCH 1/2] ARM: imx6: disable deeper idle states when FEC is active
- w/o HW workaround
-In-Reply-To: <1464794983-31484-1-git-send-email-l.stach@pengutronix.de>
-References: <1464794983-31484-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1464794983-31484-2-git-send-email-l.stach@pengutronix.de>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 1 Jun 2016 23:35:20 +0800
+Subject: [RESEND PATCH 2/6] Documentation: bindings: add dt doc for
+ Rockchip USB Type-C PHY
+In-Reply-To: <20160601145404.GA7596@rob-hp-laptop>
+References: <1464345942-4795-1-git-send-email-zyw@rock-chips.com>
+ <1464345942-4795-3-git-send-email-zyw@rock-chips.com>
+ <20160601145404.GA7596@rob-hp-laptop>
+Message-ID: <574F00B8.2050201@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i.MX6 Q/DL has an erratum (ERR006687) that prevents the FEC from
-waking the CPUs when they are in wait(unclocked) state. As the hardware
-workaround isn't applicable to all boards, disable the deeper idle state
-when the workaround isn't present and the FEC is in use.
+Hi Rob
 
-This allows to safely run a kernel with CPUidle enabled on all i.MX6
-boards.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- Documentation/devicetree/bindings/net/fsl-fec.txt |  3 +++
- arch/arm/mach-imx/cpuidle-imx6q.c                 | 16 +++++++++++++++
- drivers/net/ethernet/freescale/fec.h              |  2 ++
- drivers/net/ethernet/freescale/fec_main.c         | 12 +++++++++++
- include/soc/imx/cpuidle.h                         | 25 +++++++++++++++++++++++
- 5 files changed, 58 insertions(+)
- create mode 100644 include/soc/imx/cpuidle.h
+On 06/01/2016 10:54 PM, Rob Herring wrote:
+> On Fri, May 27, 2016 at 06:45:38PM +0800, Chris Zhong wrote:
+>> This patch adds a binding that describes the Rockchip USB Type-C PHY
+>> for rk3399.
+>>
+>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>> ---
+>>
+>>   .../devicetree/bindings/phy/phy-rockchip-typec.txt | 55 ++++++++++++++++++++++
+>>   1 file changed, 55 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>> new file mode 100644
+>> index 0000000..402f667
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
+>> @@ -0,0 +1,55 @@
+>> +ROCKCHIP type-c PHY
+>> +
+>> +Required properties:
+>> + - compatible: should be "rockchip,rk3399-typec-phy"
+>> + - reg : Address and length of the usb phy control register set
+>> + - rockchip,grf : phandle to the syscon managing the "general
+>> +   register files"
+>> + - clocks : phandle + clock specifier for the phy clocks
+>> + - clock-names: string, clock name, must be "tcpdcore", "tcpdphy_ref";
+>> + - resets : a list of phandle + reset specifier pairs
+>> + - reset-names : string reset name, must be:
+>> +		 "tcphy_rst", "tcphy_pipe_rst", "uphy_tcphy_rst"
+>> + - #phy-cells: Must be 0.  See ./phy-bindings.txt for details.
+>> + - rockchip,usb3phy*: phy registers embed in grf
+> You need to document each one and state the number of cells and what the
+> contain. Also, don't use '_' in the names.
+I am going to move these registers to phy driver, Thanks for your comment.
 
-diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
-index b037a9d78d93..7d923cd2dba7 100644
---- a/Documentation/devicetree/bindings/net/fsl-fec.txt
-+++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
-@@ -27,6 +27,9 @@ Optional properties:
-   number to 1.
- - fsl,magic-packet : If present, indicates that the hardware supports waking
-   up via magic packet.
-+- fsl,err006687-war-present: If present indicates that the system has the
-+  hardware workaround for ERR006687 applied and does not need a software
-+  workaround.
- 
- Optional subnodes:
- - mdio : specifies the mdio bus in the FEC, used as a container for phy nodes
-diff --git a/arch/arm/mach-imx/cpuidle-imx6q.c b/arch/arm/mach-imx/cpuidle-imx6q.c
-index 353bb8774112..c3cc8ca8d2ff 100644
---- a/arch/arm/mach-imx/cpuidle-imx6q.c
-+++ b/arch/arm/mach-imx/cpuidle-imx6q.c
-@@ -62,6 +62,22 @@ static struct cpuidle_driver imx6q_cpuidle_driver = {
- 	.safe_state_index = 0,
- };
- 
-+/*
-+ * i.MX6 Q/DL has an erratum (ERR006687) that prevents the FEC from waking the
-+ * CPUs when they are in wait(unclocked) state. As the hardware workaround isn't
-+ * applicable to all boards, disable the deeper idle state when the workaround
-+ * isn't present and the FEC is in use.
-+ */
-+void imx6q_cpuidle_fec_irqs_used(void)
-+{
-+	imx6q_cpuidle_driver.states[1].disabled = true;
-+}
-+
-+void imx6q_cpuidle_fec_irqs_unused(void)
-+{
-+	imx6q_cpuidle_driver.states[1].disabled = false;
-+}
-+
- int __init imx6q_cpuidle_init(void)
- {
- 	/* Set INT_MEM_CLK_LPM bit to get a reliable WAIT mode support */
-diff --git a/drivers/net/ethernet/freescale/fec.h b/drivers/net/ethernet/freescale/fec.h
-index f58f9ea51639..dc71a88e9c55 100644
---- a/drivers/net/ethernet/freescale/fec.h
-+++ b/drivers/net/ethernet/freescale/fec.h
-@@ -442,6 +442,8 @@ struct bufdesc_ex {
- #define FEC_QUIRK_SINGLE_MDIO		(1 << 11)
- /* Controller supports RACC register */
- #define FEC_QUIRK_HAS_RACC		(1 << 12)
-+/* Interrupt doesn't wake CPU from deep idle */
-+#define FEC_QUIRK_ERR006687		(1 << 13)
- 
- struct bufdesc_prop {
- 	int qid;
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index ca2cccc594fd..8fb4f370dcc3 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -60,6 +60,7 @@
- #include <linux/if_vlan.h>
- #include <linux/pinctrl/consumer.h>
- #include <linux/prefetch.h>
-+#include <soc/imx/cpuidle.h>
- 
- #include <asm/cacheflush.h>
- 
-@@ -2820,6 +2821,9 @@ fec_enet_open(struct net_device *ndev)
- 	if (ret)
- 		goto err_enet_mii_probe;
- 
-+	if (fep->quirks & FEC_QUIRK_ERR006687)
-+		imx6q_cpuidle_fec_irqs_used();
-+
- 	napi_enable(&fep->napi);
- 	phy_start(ndev->phydev);
- 	netif_tx_start_all_queues(ndev);
-@@ -2855,6 +2859,9 @@ fec_enet_close(struct net_device *ndev)
- 
- 	phy_disconnect(ndev->phydev);
- 
-+	if (fep->quirks & FEC_QUIRK_ERR006687)
-+		imx6q_cpuidle_fec_irqs_unused();
-+
- 	fec_enet_clk_enable(ndev, false);
- 	pinctrl_pm_select_sleep_state(&fep->pdev->dev);
- 	pm_runtime_mark_last_busy(&fep->pdev->dev);
-@@ -3294,6 +3301,11 @@ fec_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, ndev);
- 
-+	if ((of_machine_is_compatible("fsl,imx6q") ||
-+	     of_machine_is_compatible("fsl,imx6dl")) &&
-+	    !of_property_read_bool(np, "fsl,err006687-war-present"))
-+		fep->quirks |= FEC_QUIRK_ERR006687;
-+
- 	if (of_get_property(np, "fsl,magic-packet", NULL))
- 		fep->wol_flag |= FEC_WOL_HAS_MAGIC_PACKET;
- 
-diff --git a/include/soc/imx/cpuidle.h b/include/soc/imx/cpuidle.h
-new file mode 100644
-index 000000000000..986a4823bce1
---- /dev/null
-+++ b/include/soc/imx/cpuidle.h
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright 2016 Pengutronix, <kernel@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ */
-+
-+#ifndef __SOC_IMX_CPUIDLE_H__
-+#define __SOC_IMX_CPUIDLE_H__
-+
-+#if defined(CONFIG_CPU_IDLE) && defined(CONFIG_SOC_IMX6Q)
-+void imx6q_cpuidle_fec_irqs_used(void);
-+void imx6q_cpuidle_fec_irqs_unused(void);
-+#else
-+void imx6q_cpuidle_fec_irqs_used(void) { }
-+void imx6q_cpuidle_fec_irqs_unused(void) { }
-+#endif
-+
-+#endif /* __SOC_IMX_CPUIDLE_H__ */
--- 
-2.8.1
+
+>
+>> +
+>> +Example:
+>> +	tcphy0: phy at ff7c0000 {
+>> +		compatible = "rockchip,rk3399-typec-phy";
+>> +		reg = <0x0 0xff7c0000 0x0 0x40000>;
+>> +		#phy-cells = <0>;
+>> +		rockchip,grf = <&grf>;
+>> +		clocks = <&cru SCLK_UPHY0_TCPDCORE>,
+>> +			 <&cru SCLK_UPHY0_TCPDPHY_REF>;
+>> +		clock-names = "tcpdcore", "tcpdphy_ref";
+>> +		resets = <&cru SRST_UPHY0>,
+>> +			 <&cru SRST_UPHY0_PIPE_L00>,
+>> +			 <&cru SRST_P_UPHY0_TCPHY>;
+>> +		reset-names = "tcphy_rst", "tcphy_pipe_rst", "uphy_tcphy_rst";
+>> +		rockchip,usb3phy_con0 = <0x0e580 0 16>;
+>> +		rockchip,usb3phy_con1 = <0x0e584 0 16>;
+>> +		rockchip,usb3phy_con2 = <0x0e588 0 16>;
+>> +		rockchip,usb3phy_status0 = <0x0e5c0 0 13>;
+>> +		rockchip,usb3phy_status1 = <0x0e5c4 0 12>;
+>> +		status = "disabled";
+>> +	};
+>> +
+>> +	tcphy1: phy at ff800000 {
+>> +		compatible = "rockchip,rk3399-typec-phy";
+>> +		reg = <0x0 0xff800000 0x0 0x40000>;
+>> +		#phy-cells = <0>;
+>> +		rockchip,grf = <&grf>;
+>> +		clocks = <&cru SCLK_UPHY1_TCPDCORE>,
+>> +			 <&cru SCLK_UPHY1_TCPDPHY_REF>;
+>> +		clock-names = "tcpdcore", "tcpdphy_ref";
+>> +		resets = <&cru SRST_UPHY1>,
+>> +		         <&cru SRST_UPHY1_PIPE_L00>,
+>> +			 <&cru SRST_P_UPHY1_TCPHY>;
+>> +		reset-names = "tcphy_rst", "tcphy_pipe_rst", "uphy_tcphy_rst";
+>> +		rockchip,usb3phy_con0 = <0x0e58c 0 16>;
+>> +		rockchip,usb3phy_con1 = <0x0e590 0 16>;
+>> +		rockchip,usb3phy_con2 = <0x0e594 0 16>;
+>> +		rockchip,usb3phy_status0 = <0x0e5c0 16 13>;
+>> +		rockchip,usb3phy_status1 = <0x0e5c4 16 12>;
+>> +		status = "disabled";
+>> +	};
+>> -- 
+>> 2.6.3
+>>
+>
+>
