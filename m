@@ -1,168 +1,102 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 02 Jun 2016 01:35:44 +0200
-Subject: [PATCH 1/6] phy: Add USB Type-C PHY driver for rk3399
-In-Reply-To: <CAD=FV=V1qX_YTTygsz=v+p6BdG8VZcu8np2nDvm1NiJHDnf==g@mail.gmail.com>
-References: <1464328939-8073-1-git-send-email-zyw@rock-chips.com>
- <1464328939-8073-2-git-send-email-zyw@rock-chips.com>
- <CAD=FV=V1qX_YTTygsz=v+p6BdG8VZcu8np2nDvm1NiJHDnf==g@mail.gmail.com>
-Message-ID: <4995389.1NeJsSFJWj@diego>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Wed, 1 Jun 2016 16:26:20 -0700
+Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
+ typical Keystone features
+In-Reply-To: <3593753.UuDg5ybrvm@wuerfel>
+References: <1464816714-3900-1-git-send-email-nm@ti.com>
+ <3593753.UuDg5ybrvm@wuerfel>
+Message-ID: <cdbd2482-de98-569b-7ff0-c8963037de53@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris, Doug,
+On 6/1/2016 3:31 PM, Arnd Bergmann wrote:
+> On Wednesday, June 1, 2016 4:31:54 PM CEST Nishanth Menon wrote:
+>> Introduce ARCH_KEYSTONE_TYPICAL which is common for all Keystone
+>> platforms. This is particularly useful when custom optimized defconfig
+>> builds are created for Keystone architecture platforms.
+>>
+>> An example of the same would be a sample fragment ks_only.cfg:
+>> http://pastebin.ubuntu.com/16904991/ - This prunes all arch other than
+>> keystone and any options the other architectures may enable.
+>>
+>> git clean -fdx && git reset --hard && \
+>>  ./scripts/kconfig/merge_config.sh -m \
+>>  	./arch/arm/configs/multi_v7_defconfig ~/tmp/ks_only.cfg &&\
+>>  make olddefconfig
+>>
+>> The above unfortunately will disable options necessary for KS2 boards
+>> to boot to the bare minimum initramfs.
+>>
+>> Hence the "KEYSTONE_TYPICAL" option is designed similar to commit 8d9166b519fd
+>> ("omap2/3/4: Add Kconfig option to compile in typical omap features")
+>> that can be enabled for most boards keystone platforms
+>> without needing to rediscover these in defconfig all over again -
+>> examples include multi_v7_defconfig base and optimizations done on top
+>> of them for keystone platform.
+>
+> I'd rather remove the option for OMAP as well, it doesn't really fit in with
+> how we do things for other platforms, and selecting a lot of other Kconfig
+> symbols tends to cause circular dependencies.
+>
+Yes.
 
-Am Dienstag, 31. Mai 2016, 14:35:39 schrieb Doug Anderson:
-> > diff --git a/drivers/phy/phy-rockchip-typec.c
-> > b/drivers/phy/phy-rockchip-typec.c new file mode 100644
-> > index 0000000..6609cfb
-> > --- /dev/null
-> > +++ b/drivers/phy/phy-rockchip-typec.c
-> > @@ -0,0 +1,823 @@
+>>
+>> NOTE: the alternative is to select the configurations under
+>> ARCH_KEYSTONE. However, that would fail multi_v7 builds on ARM
+>> variants that dont work with LPAE.
+>
+> Please no arbitrary selects from the platform.
+>
+>> Cc: Bill Mills <wmills@ti.com>
+>> Cc: Murali Karicheri <m-karicheri2@ti.com>
+>> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Cc: Tero Kristo <t-kristo@ti.com>
+>> Cc: Lokesh Vutla <lokeshvutla@ti.com>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>>
+>> Based on: next-20160601
+>>
+>> Tested for basic initramfs boot for K2HK/K2G platforms with the
+>> http://pastebin.ubuntu.com/16904991/ fragment + multi_v7_defconfig
+>>
+>> Side note on LPAE:
+>> For our current device tree and u-boot, LPAE is mandatory to bootup
+>> for current Keystone boards - but this is not a SoC requirement,
+>> booting without LPAE/HIGHMEM results in non-coherent DDR accesses.
+>
+> This sounds like a regression, I thought we had this working when
+> keystone was initially merged and we got both the coherent and
+> non-coherent mode working with the same DT.
+>
+Yes and it works. The coherent memory space itself is beyond 4GB so
+I don't understand a requirement of having coherent memory without
+LPAE.
 
-[...]
+>> Currently:
+>> - U-Boot assumes that lpae is always enabled in kennel and updates the
+>> DT memory node with higher addresses. Because of which you are not
+>> detecting any memory without lpae and kernel crashed very early, hence
+>> no prints. So, make mem_lpae env setting as 0 in U-boot.
+>
+> We could work around this in the kernel by detecting the faulty u-boot
+> behavior and fixing up the addresses in an early platform callback.
+>
+U-boot is already doing that and I don't see any issue with it.
 
-> > +#define ADDR_ADJ                       2
+>> - DT also assumes that lpae is always enabled, and always asks for
+>> dma-address translation for higher addresses to lower addresses.
+>> Just delete the "dma-ranges" property or create a one-on-one mapping
+>> like dma-ranges = <0x80000000 0x0 0x80000000 0x80000000>
+>
+> This may be a bit trickier, I think originally keystone ignored the
+> dma-ranges property and hacked up its own offset by adding a magic
+> constant to the dma address using a bus notifier. We probably don't
+> want to bring that hack back, but maybe we can come up with another
+> solution.
+>
+I don't think we should go on this path ever. U-boot should modify
+this parameter as done previously.
 
-what purpose does this ADDR_ADJ serve.
-It is only used in the big block of defines below, but nowhere else in the 
-driver and even the naming does not improve readability as it isn't very 
-descriptive. So you could just as well just use "foo << 2" instead of ADDR_ADJ
-
-
-> > +#define CMN_SSM_BANDGAP                        (0x21 << ADDR_ADJ)
-> > +#define CMN_SSM_BIAS                   (0x22 << ADDR_ADJ)
-> > +#define CMN_PLLSM0_PLLEN               (0x29 << ADDR_ADJ)
-> > +#define CMN_PLLSM0_PLLPRE              (0x2a << ADDR_ADJ)
-> > +#define CMN_PLLSM0_PLLVREF             (0x2b << ADDR_ADJ)
-
-[...]
-
-> > +static void tcphy_cfg_24m(struct rockchip_typec_phy *tcphy,
-> > +                         unsigned int num_lanes)
-> > +{
-> > +       unsigned int i;()?
-> > +
-> > +       writel(0x830, tcphy->base + PMA_CMN_CTRL1);
-> > +       for (i = 0; i < num_lanes; i++) {
-> > +               writel(0x90, tcphy->base + XCVR_DIAG_LANE_FCM_EN_MGN(i));
-> > +               writel(0x960, tcphy->base + TX_RCVDET_EN_TMR(i));
-> > +               writel(0x30, tcphy->base + TX_RCVDET_ST_TMR(i));
-> 
-> Would it be too much to ask to get more details about all these magic
-> values?
-
-Magic values are generally not well liked and I guess you will probably see a 
-request for nicely named constants some more ;-)
-Especially, as we also generally want to know that the code in questions 
-actually wants to do.
-
-
-> > +       }
-> > +}
-> > +
-> > +static void tcphy_cfg_usb_pll(struct rockchip_typec_phy *tcphy)
-> > +{
-> > +       unsigned int rdata;
-> > +
-> > +       rdata = readl(tcphy->base + CMN_DIAG_HSCLK_SEL);
-> > +       writel(rdata & 0xfffc, tcphy->base + CMN_DIAG_HSCLK_SEL);
-> > +       writel(0xf0, tcphy->base + CMN_PLL0_VCOCAL_INIT);
-> > +       writel(0x18, tcphy->base + CMN_PLL0_VCOCAL_ITER);
-> > +       writel(0xd0, tcphy->base + CMN_PLL0_INTDIV);
-> > +       writel(0x4a4a, tcphy->base + CMN_PLL0_FRACDIV);
-> > +       writel(0x34, tcphy->base + CMN_PLL0_HIGH_THR);
-> > +       writel(0x1ee, tcphy->base + CMN_PLL0_SS_CTRL1);
-> > +       writel(0x7f03, tcphy->base + CMN_PLL0_SS_CTRL2);
-> > +       writel(0x20, tcphy->base + CMN_PLL0_DSM_DIAG);
-> > +       writel(0, tcphy->base + CMN_DIAG_PLL0_OVRD);
-> > +       writel(0, tcphy->base + CMN_DIAG_PLL0_FBH_OVRD);
-> > +       writel(0, tcphy->base + CMN_DIAG_PLL0_FBL_OVRD);
-> > +       writel(0x7, tcphy->base + CMN_DIAG_PLL0_V2I_TUNE);
-> > +       writel(0x45, tcphy->base + CMN_DIAG_PLL0_CP_TUNE);
-> > +       writel(0x8, tcphy->base + CMN_DIAG_PLL0_LF_PROG);
-
-same here and even if these are some super-secret values, this code definitly 
-needs some explanation what this is doing and what is the expected result.
-
-Same for all the other blocks of magic values. Named constants preferred but 
-at least comments on functionality required.
-
-> > +}
-
-[...]
-
-> > +static int rockchip_typec_phy_probe(struct platform_device *pdev)
-> > +{
-> > +       struct device *dev = &pdev->dev;
-> > +       struct rockchip_typec_phy *tcphy;
-> > +       struct resource *res;
-> > +       struct phy_provider *phy_provider;
-> > +
-> > +       tcphy = devm_kzalloc(dev, sizeof(*tcphy), GFP_KERNEL);
-> > +       if (!tcphy)
-> > +               return -ENOMEM;
-> > +
-> > +       tcphy->dev = dev;
-> > +       platform_set_drvdata(pdev, tcphy);
-> > +
-> > +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +       tcphy->base = devm_ioremap_resource(dev, res);
-> > +       if (IS_ERR(tcphy->base)) {
-> > +               dev_err(dev, "failed to remap phy regs\n");
-> > +               return PTR_ERR(tcphy->base);
-> > +       }
-> > +       tcphy->grf_regs = syscon_regmap_lookup_by_phandle(dev->of_node,
-> > +                                                       "rockchip,grf");
-> > +       if (IS_ERR(tcphy->grf_regs)) {
-> > +               dev_err(dev, "%s: could not find grf dt node\n",
-> > __func__);
-> > +               return PTR_ERR(tcphy->grf_regs);
-> > +       }
-> > +
-> > +       tcphy->clk_core = of_clk_get_by_name(dev->of_node, "tcpdcore");
-
-this shouldn't be an of_clk_* function. Your clock is defined in the core 
-device node, so please use a simple
-
-	tcphy->clk_core = devm_clk_get(&pdev->dev, "tcpdcore");
-
-especially as the code right now lacks a matching clk_put(). The of-variant is 
-needed if you get your clock from subnodes, but not when it is defined in the 
-core device node.
-
-
-> > +       if (IS_ERR(tcphy->clk_core)) {
-> > +               dev_err(dev, "%s: could not get uphy core clock\n",
-> > __func__);
-> nit: No real need for __func__.  That's useful to add in when you
-> don't have a "dev" pointer and need a "pr_err" to show something that
-> will help the user find the right line of code.
-> 
-> > +               tcphy->clk_core = NULL;
-> 
-> So is tcpdcore optional or required?  Bindings doc says "required" and
-> the "dev_err" above implies required.  ...but then you don't return an
-> error code.  That makes it optional.  ...but then you use it
-> unconditional elsewhere in this file.  That makes it required.
-
-clk_prepare and clk_enable work with NULL clks just fine (and even return 
-sucessful).
-
-> Summary: return an error here, don't just set to NULL.
-
-But the summary is still correct. If the clock is defined as required, the 
-driver should fail if it's missing.
-
-> > +       }
-> > +
-> > +       tcphy->clk_ref = of_clk_get_by_name(dev->of_node, "tcpdphy_ref");
-> > +       if (IS_ERR(tcphy->clk_core)) {
-> > +               dev_err(dev, "%s: could not get uphy ref clock\n",
-> > __func__); +               tcphy->clk_core = NULL;
-> 
-> "if" test and NULL assignment are for wrong variables.
-
-and all the same remarks as for tcpdcore apply.
-
-
-Heiko
+Regards,
+Santosh
