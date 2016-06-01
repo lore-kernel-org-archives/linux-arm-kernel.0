@@ -1,29 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 1 Jun 2016 09:42:28 +0100
-Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
-In-Reply-To: <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
-References: <1463576010-115428-1-git-send-email-agraf@suse.de>
- <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
-Message-ID: <20160601084228.GB23375@e104818-lin.cambridge.arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 01 Jun 2016 10:50:25 +0200
+Subject: [PATCH] ARM: dts: exynos: Add TMU nodes regulator supply for Peach
+ boards
+In-Reply-To: <1464731280-24588-1-git-send-email-javier@osg.samsung.com>
+References: <1464731280-24588-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <574EA1D1.6020606@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2016 at 02:27:41PM +0100, Catalin Marinas wrote:
-> On Wed, May 18, 2016 at 02:53:30PM +0200, Alexander Graf wrote:
-> > On arm64, all SoCs we supported so far either have an IOMMU or have bus
-> > addresses equal to CPU addresses.
-> > 
-> > However, with the Raspberry Pi 3 coming up, this is no longer true. To
-> > allow DMA to work with an AArch64 kernel on those devices, let's allow
-> > devices to have DMA offsets again.
-> > 
-> > Signed-off-by: Alexander Graf <agraf@suse.de>
+On 05/31/2016 11:48 PM, Javier Martinez Canillas wrote:
+> The Exynos5800 Peach Pi and Exynos5420 Peach Pit Chromebooks have the
+> LDO10 1.8V output connected to the VDD18_TS{01,23,4} Exynos SoC pins.
 > 
-> We were aware about this issue but we've been waiting for an actual use
-> case. I'll queue this for 4.8 (given that RPi3 is not supported by the
-> arm64 kernel, I don't see the rush to merge it earlier).
+> Add this regulator as the input supply of the Thermal Management Unit
+> channels and also remove the always-on property since all the devices
+> using LDO10 as input supply are now defined.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> ---
+> 
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 21 ++++++++++++++++++++-
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 21 ++++++++++++++++++++-
+>  2 files changed, 40 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5420-peach-pit.dts b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> index c1247402cb17..a55760b5fa82 100644
+> --- a/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> +++ b/arch/arm/boot/dts/exynos5420-peach-pit.dts
+> @@ -425,7 +425,6 @@
+>  				regulator-name = "vdd_ldo10";
+>  				regulator-min-microvolt = <1800000>;
+>  				regulator-max-microvolt = <1800000>;
+> -				regulator-always-on;
+>  				regulator-state-mem {
+>  					regulator-off-in-suspend;
+>  				};
+> @@ -924,6 +923,26 @@
+>  	assigned-clock-parents = <&clock CLK_FIN_PLL>;
+>  };
+>  
+> +&tmu_cpu0 {
+> +	vtmu-supply = <&ldo10_reg>;
+> +};
+> +
+> +&tmu_cpu1 {
+> +	vtmu-supply = <&ldo10_reg>;
+> +};
+> +
+> +&tmu_cpu2 {
+> +	vtmu-supply = <&ldo10_reg>;
+> +};
+> +
+> +&tmu_cpu3 {
+> +	vtmu-supply = <&ldo10_reg>;
+> +};
+> +
+> +&tmu_gpu {
+> +	vtmu-supply = <&ldo10_reg>;
+> +};
+> +
 
-In case this patch goes in via the arm-soc tree (together with other
-RPi3 patches):
+Here and for Peach Pi please put the nodes in alphabetical order.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Best regards,
+Krzysztof
