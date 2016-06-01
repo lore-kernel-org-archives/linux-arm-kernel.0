@@ -1,135 +1,64 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 1 Jun 2016 09:05:02 +0800
-Subject: [PATCH v2 5/5] arm64/numa: avoid inconsistent information to be
- printed
-In-Reply-To: <574D751D.9020901@huawei.com>
-References: <1464427377-12712-1-git-send-email-thunder.leizhen@huawei.com>
- <1464427377-12712-6-git-send-email-thunder.leizhen@huawei.com>
- <574D543A.2090406@suse.com> <574D751D.9020901@huawei.com>
-Message-ID: <574E34BE.5040204@huawei.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 1 Jun 2016 03:11:48 +0200
+Subject: [PATCH v2 3/5] drivers: net: phy: Add MDIO driver
+In-Reply-To: <1464739840-21971-4-git-send-email-isubramanian@apm.com>
+References: <1464739840-21971-1-git-send-email-isubramanian@apm.com>
+ <1464739840-21971-4-git-send-email-isubramanian@apm.com>
+Message-ID: <20160601011148.GD31982@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 31, 2016 at 05:10:38PM -0700, Iyappan Subramanian wrote:
+> +static int xgene_mdio_reset(struct xgene_mdio_pdata *pdata)
+> +{
+> +	int ret;
+> +
+> +	if (pdata->mdio_id == XGENE_MDIO_RGMII) {
+> +		if (pdata->dev->of_node) {
+> +			clk_prepare_enable(pdata->clk);
+> +			clk_disable_unprepare(pdata->clk);
+> +			clk_prepare_enable(pdata->clk);
+
+Hi Iyappan
+
+Is that a workaround for a hardware problem? If so, i would suggest
+adding a comment, to stop people submitting a patch simplifying it.
 
 
-On 2016/5/31 19:27, Leizhen (ThunderTown) wrote:
-> 
-> 
-> On 2016/5/31 17:07, Matthias Brugger wrote:
->>
->>
->> On 28/05/16 11:22, Zhen Lei wrote:
->>> numa_init(of_numa_init) may returned error because of numa configuration
->>> error. So "No NUMA configuration found" is inaccurate. In fact, specific
->>> configuration error information should be immediately printed by the
->>> testing branch.
->>>
->>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->>> ---
->>
->> Which kernel version is this patch based on?
-> 
-> Base on mainline(git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git), I git pulled about 3-5 days ago, the last commit-id is dc03c0f.
-> 
-> And thess patches base on https://lkml.org/lkml/2016/5/24/679 series(acpi numa) as David Daney's requirement.
-> 
->>
->> Regards,
->> Matthias
->>
->>>   arch/arm64/mm/numa.c | 6 +++---
->>>   drivers/of/of_numa.c | 7 +++----
->>>   2 files changed, 6 insertions(+), 7 deletions(-)
->>>
->>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
->>> index 2601660..1b9622c 100644
->>> --- a/arch/arm64/mm/numa.c
->>> +++ b/arch/arm64/mm/numa.c
->>> @@ -338,8 +338,10 @@ static int __init numa_init(int (*init_func)(void))
->>>       if (ret < 0)
->>>           return ret;
->>>
->>> -    if (nodes_empty(numa_nodes_parsed))
->>> +    if (nodes_empty(numa_nodes_parsed)) {
->>> +        pr_info("No NUMA configuration found\n");
->>>           return -EINVAL;
->>> +    }
->>>
->>>       ret = numa_register_nodes();
->>>       if (ret < 0)
->>> @@ -370,8 +372,6 @@ static int __init dummy_numa_init(void)
->>>
->>>       if (numa_off)
->>>           pr_info("NUMA disabled\n"); /* Forced off on command line. */
->>> -    else
->>> -        pr_info("No NUMA configuration found\n");
->>>       pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
->>>              0LLU, PFN_PHYS(max_pfn) - 1);
->>>
->>> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
->>> index fb62307..3157130 100644
->>> --- a/drivers/of/of_numa.c
->>> +++ b/drivers/of/of_numa.c
->>> @@ -63,7 +63,7 @@ static int __init of_numa_parse_memory_nodes(void)
->>>       struct device_node *np = NULL;
->>>       struct resource rsrc;
->>>       u32 nid;
->>> -    int i, r = 0;
->>> +    int i, r;
->>>
->>>       for_each_node_by_type(np, "memory") {
->>>           r = of_property_read_u32(np, "numa-node-id", &nid);
->>> @@ -81,12 +81,11 @@ static int __init of_numa_parse_memory_nodes(void)
->>>           if (!i || r) {
->>>               of_node_put(np);
->>>               pr_err("NUMA: bad property in memory node\n");
->>> -            r = r ? : -EINVAL;
->>> -            break;
->>> +            return r ? : -EINVAL;
->>>           }
->>>       }
->>>
->>> -    return r;
->>> +    return 0;
->>>   }
->>>
->>
->> Well this is fixing changes you introduced in this patch-set. Any reason this is not part of patch 2?
-> 
-> Because they fixed two different problems.
+> +static int xgene_mdio_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct mii_bus *mdio_bus;
+> +	const struct of_device_id *of_id;
+> +	struct resource *res;
+> +	struct xgene_mdio_pdata *pdata;
+> +	void __iomem *csr_addr;
+> +	int mdio_id = 0, ret = 0;
+> +
 
-Hi, Matthias
 
-I thougth it again on my way home yesterday. Yeah, you're right, move this part to patch 2, will make these two
-patches looks more well. I put it here before, because for "No numa configuration" case, it originally returns error
-code, so that it can not walk to "if (nodes_empty(numa_nodes_parsed))".
+> +	of_id = of_match_device(xgene_mdio_of_match, &pdev->dev);
+> +	if (mdio_id == XGENE_MDIO_RGMII) {
+> +		mdio_bus->read = xgene_mdio_rgmii_read;
+> +		mdio_bus->write = xgene_mdio_rgmii_write;
+> +	} else {
+> +		mdio_bus->read = xgene_xfi_mdio_read;
+> +		mdio_bus->write = xgene_xfi_mdio_write;
+> +	}
 
-	ret = init_func();
-	if (ret < 0)
-		return ret;
+> +static const struct of_device_id xgene_mdio_of_match[] = {
+> +	{
+> +		.compatible = "apm,xgene-mdio-rgmii",
+> +		.data = (void *)XGENE_MDIO_RGMII
+> +	},
+> +	{
+> +		.compatible = "apm,xgene-mdio-xfi",
+> +		.data = (void *)XGENE_MDIO_XFI},
+> +	{},
+> +};
 
-   -    if (nodes_empty(numa_nodes_parsed))
-   +    if (nodes_empty(numa_nodes_parsed)) {
-   +        pr_info("No NUMA configuration found\n");
-       		return -EINVAL;
-   +    }
 
-Regards,
-Zhen Lei
+This all makes me think you should have two separate MDIO drivers, one
+for each compatible string. There is not that much shared code.
 
-> 
->>
->>>   static int __init of_numa_parse_distance_map_v1(struct device_node *map)
->>> -- 
->>> 2.5.0
->>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->> .
->>
+    Andrew
