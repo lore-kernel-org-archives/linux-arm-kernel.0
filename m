@@ -1,51 +1,76 @@
-From: dave.long@linaro.org (David Long)
-Date: Wed, 1 Jun 2016 01:15:41 -0400
-Subject: [PATCH v12 05/10] arm64: Kprobes with single stepping support
-In-Reply-To: <20160517091009.GA5082@sha-win-210.asiapac.arm.com>
-References: <1461783185-9056-1-git-send-email-dave.long@linaro.org>
- <1461783185-9056-6-git-send-email-dave.long@linaro.org>
- <20160517091009.GA5082@sha-win-210.asiapac.arm.com>
-Message-ID: <574E6F7D.1040902@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 01 Jun 2016 07:36:42 +0200
+Subject: [RFC v2] dma-mapping: Use unsigned long for dma_attrs
+In-Reply-To: <20160531170420.GB25366@infradead.org>
+References: <1464609246-6948-1-git-send-email-k.kozlowski@samsung.com>
+ <1464609246-6948-2-git-send-email-k.kozlowski@samsung.com>
+ <20160531170420.GB25366@infradead.org>
+Message-ID: <574E746A.2030806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2016 05:10 AM, Huang Shijie wrote:
-> On Wed, Apr 27, 2016 at 02:53:00PM -0400, David Long wrote:
->> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
->> +
->> +static bool __kprobes aarch64_insn_is_steppable(u32 insn)
->
-> Could we add more comment for this function? In the comment, we can tell
-> that which type of instructions are steppable, which are not.
->
+On 05/31/2016 07:04 PM, Christoph Hellwig wrote:
+> On Mon, May 30, 2016 at 01:54:06PM +0200, Krzysztof Kozlowski wrote:
+>> The dma-mapping core and the implementations do not change the
+>> DMA attributes passed by pointer.  Thus the pointer can point to const
+>> data.  However the attributes do not have to be a bitfield. Instead
+>> unsigned long will do fine:
+>>
+>> 1. This is just simpler.  Both in terms of reading the code and setting
+>>    attributes.  Instead of initializing local attributes on the stack and
+>>    passing pointer to it to dma_set_attr(), just set the bits.
+>>
+>> 2. It brings safeness and checking for const correctness because the
+>>    attributes are passed by value.
+>>
+>> Please have in mind that this is RFC, not finished yet.  Only ARM and
+>> ARM64 are fixed (and not everywhere).
+>> However other API users also have to be converted which is quite
+>> intrusive.  I would rather avoid it until the overall approach is
+>> accepted.
+> 
+> This looks great!  Please continue doing the full conversion.
+> 
+>> +/**
+>> + * List of possible attributes associated with a DMA mapping. The semantics
+>> + * of each attribute should be defined in Documentation/DMA-attributes.txt.
+>> + */
+>> +#define DMA_ATTR_WRITE_BARRIER		BIT(1)
+>> +#define DMA_ATTR_WEAK_ORDERING		BIT(2)
+>> +#define DMA_ATTR_WRITE_COMBINE		BIT(3)
+>> +#define DMA_ATTR_NON_CONSISTENT		BIT(4)
+>> +#define DMA_ATTR_NO_KERNEL_MAPPING	BIT(5)
+>> +#define DMA_ATTR_SKIP_CPU_SYNC		BIT(6)
+>> +#define DMA_ATTR_FORCE_CONTIGUOUS	BIT(7)
+>> +#define DMA_ATTR_ALLOC_SINGLE_PAGES	BIT(8)
+> 
+> No really for this patch, but I would much prefer to document them next
+> to the code in the long run.  Also I really think these BIT() macros
+> are a distraction compared to the (1 << N) notation.
+
+Not much difference to me but maybe plain number:
+...	0x01u
+...	0x02u
+?
+
+> 
+>> +/**
+>> + * dma_get_attr - check for a specific attribute
+>> + * @attr: attribute to look for
+>> + * @attrs: attributes to check within
+>> + */
+>> +static inline bool dma_get_attr(unsigned long attr, unsigned long attrs)
 >> +{
->> +	if (aarch64_get_insn_class(insn) == AARCH64_INSN_CLS_BR_SYS) {
->> +		if (aarch64_insn_is_branch(insn) ||
->> +		    aarch64_insn_is_msr_imm(insn) ||
->> +		    aarch64_insn_is_msr_reg(insn) ||
->> +		    aarch64_insn_is_exception(insn))
->> +			return false;
->> +
->> +		if (aarch64_insn_is_mrs(insn))
->> +			return aarch64_insn_extract_system_reg(insn)
->> +			     != AARCH64_INSN_SPCLREG_DAIF;
->> +
->> +		if (aarch64_insn_is_hint(insn))
->> +			return aarch64_insn_is_nop(insn);
->> +
->> +		return true;
->> +	}
->> +
->> +	if (aarch64_insn_uses_literal(insn) ||
->> +	    aarch64_insn_is_exclusive(insn))
->> +		return false;
->> +
->> +	return true;
->
-> Thanks
-> Huang Shijie
->
+>> +	return !!(attr & attrs);
+>> +}
+> 
+> I'd just kill this helper, much easier to simply open code it in the
+> caller.
 
-I did add a comment to this for the next version of the patch.
+Keeping it for now helps reducing the number of changes in the patch.
+The patch will be quite big as it has to replace all the uses atomically.
 
--dl
+I can get rid of the helper in consecutive patch.
+
+Best regards,
+Krzysztof
