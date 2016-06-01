@@ -1,56 +1,43 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Wed, 1 Jun 2016 10:36:51 +0800
-Subject: [PATCH 1/3] mmc: fix mmc mode selection for HS-DDR and higher
-In-Reply-To: <1464505484-3661-2-git-send-email-wens@csie.org>
-References: <1464505484-3661-1-git-send-email-wens@csie.org>
- <1464505484-3661-2-git-send-email-wens@csie.org>
-Message-ID: <472b6b94-a773-e4cd-07c0-4b184a840f87@rock-chips.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Wed, 1 Jun 2016 10:39:42 +0800
+Subject: [PATCH 2/2] arm64: mm: dump: log span level
+In-Reply-To: <1464702542-24394-3-git-send-email-mark.rutland@arm.com>
+References: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
+ <1464702542-24394-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <20160601023940.GA14411@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/5/29 15:04, Chen-Yu Tsai wrote:
-> When IS_ERR_VALUE was removed from the mmc core code, it was replaced
-> with a simple not-zero check. This does not work, as the value checked
-> is the return value for mmc_select_bus_width, which returns the set
-> bit width on success. This made eMMC modes higher than HS-DDR unusable.
+On Tue, May 31, 2016 at 02:49:02PM +0100, Mark Rutland wrote:
+> The page table dump code logs spans of entries at the same level
+> (pgd/pud/pmd/pte) which have the same attributes. While we log the
+> (decoded) attributes, we don't log the level, which leaves the output
+> ambiguous and/or confusing in some cases.
 >
-> Fix this by checking for a positive return value instead.
-
-Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
-
+> For example:
 >
-> Fixes: 287980e49ffc ("remove lots of IS_ERR_VALUE abuses")
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> ---
->  drivers/mmc/core/mmc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> 0xffff800800000000-0xffff800980000000           6G       RW NX SHD AF        BLK UXN MEM/NORMAL
 >
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index c984321d1881..aafb73d080ca 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
->  	 * switch to HS200 mode if bus width is set successfully.
->  	 */
->  	err = mmc_select_bus_width(card);
-> -	if (!err) {
-> +	if (err > 0) {
->  		val = EXT_CSD_TIMING_HS200 |
->  		      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
->  		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-> @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->  	} else if (mmc_card_hs(card)) {
->  		/* Select the desired bus width optionally */
->  		err = mmc_select_bus_width(card);
-> -		if (!err) {
-> +		if (err > 0) {
->  			err = mmc_select_hs_ddr(card);
->  			if (err)
->  				goto free_card;
+> If using 4K pages, this may describe a span of 6 1G block entries at the
+> PGD/PUD level, or 3072 2M block entries at the PMD level.
 >
+> This patch adds the page table level to each output line, removing this
+> ambiguity. For the example above, this will produce:
+>
+> 0xffffffc800000000-0xffffffc980000000           6G PUD       RW NX SHD AF        BLK UXN MEM/NORMAL
+>
+> When 3 level tables are in use, and we use the asm-generic/nopud.h
+> definitions, the dump code treats each entry in the PGD as a 1 element
+> table at the PUD level, and logs spans as being PUDs, which can be
+> confusing. To counteract this, the "PUD" mnemonic is replaced with "PGD"
+> when CONFIG_PGTABLE_LEVELS <= 3. Likewise for "PMD" when
+> CONFIG_PGTABLE_LEVELS <= 2.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Huang Shijie <shijie.huang@arm.com>
+Tested-by: Huang Shijie <shijie.huang@arm.com>
 
-
--- 
-Best Regards
-Shawn Lin
+thanks
+Huang Shijie
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
