@@ -1,80 +1,33 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed, 1 Jun 2016 15:52:06 +0200
-Subject: [PULL] drm: atmel-hlcdc: fixes for 4.7-rc2
-In-Reply-To: <20160601142327.700821ab@bbrezillon>
-References: <20160601142327.700821ab@bbrezillon>
-Message-ID: <20160601155206.47a3d460@bbrezillon>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 1 Jun 2016 17:00:27 +0300
+Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <20160601005751.GG20527@verge.net.au>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
+ <20160601005751.GG20527@verge.net.au>
+Message-ID: <83904aa1-edde-0968-3f0b-0d2962d377f5@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On 06/01/2016 03:57 AM, Simon Horman wrote:
 
-On Wed, 1 Jun 2016 14:23:27 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+>> The initial R8A7792 SoC device tree including 2 CPU cores, GIC, timer, SYSC,
+>> and the required  clock descriptions.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> This is rather large for an initial DTSI. Did you give any consideration
+> to splitting it up: e.g. only providing what is needed to get to a serial
+> console?
 
-> Hi Dave,
-> 
-> This pull request contains 2 trivial fixes for the atmel-hlcdc driver.
+    You mean dropping the majority of clocks, right?
 
-Please ignore this PR. The __drm_atomic_helper_crtc_destroy_state()
-prototype has changed between my submission and the 4.7-rc1 release and
-it no longer compiles.
+> With regards to SMP. Have you checked to make sure CPU hotplug works
+> on all CPUs? And that the system behaves sanely on suspend/resume.
+> If it is not possible to verify this at this stage then I would recommend
+> only enabling one CPU at this stage.
 
-Sorry for the inconvenience.
+    No, the SMP support isn't ready yet.
+    And I'll have to enable SMP on R8A7794 as well...
 
-Regards,
-
-Boris
-
-> 
-> The first one is making use of __drm_atomic_helper_crtc_destroy_state()
-> instead of duplicating its logic in atmel_hlcdc_crtc_reset() and
-> risking memory leaks if other objects are added to the common CRTC
-> state.
-> 
-> The second one is fixing a possible NULL pointer dereference.
-> 
-> Regards,
-> 
-> Boris
-> 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git at github.com:bbrezillon/linux-at91.git tags/drm-atmel-hlcdc-fixes/for-4.7-rc2
-> 
-> for you to fetch changes up to dcd64e313ff2d2a15574cd92ec27e73194ba7537:
-> 
->   drm: atmel-hlcdc: fix a NULL check (2016-06-01 13:36:26 +0200)
-> 
-> ----------------------------------------------------------------
-> Two trivial bugfixes on the atmel-hlcdc driver for 4.7-rc2.
-> 
-> The first one is making use of __drm_atomic_helper_crtc_destroy_state()
-> instead of duplicating its logic in atmel_hlcdc_crtc_reset() and
-> risking memory leaks if other objects are added to the common CRTC
-> state.
-> 
-> The second one is fixing a possible NULL pointer dereference.
-> 
-> ----------------------------------------------------------------
-> Boris Brezillon (1):
->       drm: atmel-hlcdc: fix atmel_hlcdc_crtc_reset() implementation
-> 
-> Dan Carpenter (1):
->       drm: atmel-hlcdc: fix a NULL check
-> 
->  drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_crtc.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+MBR, Sergei
