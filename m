@@ -1,37 +1,88 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 01 Jun 2016 15:30:35 -0700
-Subject: [PATCH 09/32] bcm2837-rpi-3-b.dts for 32bit arm
-In-Reply-To: <7065434.SNfT8zjcK3@wuerfel>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-10-git-send-email-kraxel@redhat.com>
- <7065434.SNfT8zjcK3@wuerfel>
-Message-ID: <87zir4leyc.fsf@eliezer.anholt.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jun 2016 00:31:37 +0200
+Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
+ typical Keystone features
+In-Reply-To: <1464816714-3900-1-git-send-email-nm@ti.com>
+References: <1464816714-3900-1-git-send-email-nm@ti.com>
+Message-ID: <3593753.UuDg5ybrvm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Wednesday, June 1, 2016 4:31:54 PM CEST Nishanth Menon wrote:
+> Introduce ARCH_KEYSTONE_TYPICAL which is common for all Keystone
+> platforms. This is particularly useful when custom optimized defconfig
+> builds are created for Keystone architecture platforms.
+> 
+> An example of the same would be a sample fragment ks_only.cfg:
+> http://pastebin.ubuntu.com/16904991/ - This prunes all arch other than
+> keystone and any options the other architectures may enable.
+> 
+> git clean -fdx && git reset --hard && \
+>  ./scripts/kconfig/merge_config.sh -m \
+>  	./arch/arm/configs/multi_v7_defconfig ~/tmp/ks_only.cfg &&\
+>  make olddefconfig
+> 
+> The above unfortunately will disable options necessary for KS2 boards
+> to boot to the bare minimum initramfs.
+> 
+> Hence the "KEYSTONE_TYPICAL" option is designed similar to commit 8d9166b519fd
+> ("omap2/3/4: Add Kconfig option to compile in typical omap features")
+> that can be enabled for most boards keystone platforms
+> without needing to rediscover these in defconfig all over again -
+> examples include multi_v7_defconfig base and optimizations done on top
+> of them for keystone platform.
 
-> On Wednesday, June 1, 2016 11:43:18 PM CEST Gerd Hoffmann wrote:
->> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
->> new file mode 100644
->> index 0000000..36178a6
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
->> @@ -0,0 +1 @@
->> +#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
->> -- 
->> 1.8.3.1
->> 
->
-> What does this gain you?
+I'd rather remove the option for OMAP as well, it doesn't really fit in with
+how we do things for other platforms, and selecting a lot of other Kconfig
+symbols tends to cause circular dependencies.
 
-Many Raspberry Pi users use a small set of SD cards that they swap
-between various versions of the hardware.  It would be good to have
-their 32-bit OS images work on the Pi3 as well.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160601/d63d9ec8/attachment.sig>
+> 
+> NOTE: the alternative is to select the configurations under
+> ARCH_KEYSTONE. However, that would fail multi_v7 builds on ARM
+> variants that dont work with LPAE.
+
+Please no arbitrary selects from the platform.
+
+> Cc: Bill Mills <wmills@ti.com>
+> Cc: Murali Karicheri <m-karicheri2@ti.com>
+> Cc: Grygorii Strashko <grygorii.strashko@ti.com>
+> Cc: Tero Kristo <t-kristo@ti.com>
+> Cc: Lokesh Vutla <lokeshvutla@ti.com>
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> 
+> Based on: next-20160601
+> 
+> Tested for basic initramfs boot for K2HK/K2G platforms with the
+> http://pastebin.ubuntu.com/16904991/ fragment + multi_v7_defconfig
+> 
+> Side note on LPAE:
+> For our current device tree and u-boot, LPAE is mandatory to bootup
+> for current Keystone boards - but this is not a SoC requirement,
+> booting without LPAE/HIGHMEM results in non-coherent DDR accesses.
+
+This sounds like a regression, I thought we had this working when
+keystone was initially merged and we got both the coherent and
+non-coherent mode working with the same DT.
+
+> Currently:
+> - U-Boot assumes that lpae is always enabled in kennel and updates the 
+> DT memory node with higher addresses. Because of which you are not 
+> detecting any memory without lpae and kernel crashed very early, hence 
+> no prints. So, make mem_lpae env setting as 0 in U-boot.
+
+We could work around this in the kernel by detecting the faulty u-boot
+behavior and fixing up the addresses in an early platform callback.
+
+> - DT also assumes that lpae is always enabled, and always asks for 
+> dma-address translation for higher addresses to lower addresses.
+> Just delete the "dma-ranges" property or create a one-on-one mapping 
+> like dma-ranges = <0x80000000 0x0 0x80000000 0x80000000>
+
+This may be a bit trickier, I think originally keystone ignored the
+dma-ranges property and hacked up its own offset by adding a magic
+constant to the dma address using a bus notifier. We probably don't
+want to bring that hack back, but maybe we can come up with another
+solution.
+
+	Arnd
