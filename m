@@ -1,47 +1,48 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 1 Jun 2016 14:53:10 +0800
-Subject: [PATCH v5 17/18] of: unittest: use of_platform_default_populate() to
- populate default bus
+Date: Wed, 1 Jun 2016 14:52:55 +0800
+Subject: [PATCH v5 02/18] arc: Remove unnecessary of_platform_populate with
+ default match table
 In-Reply-To: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464763991-26634-18-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1464763991-26634-3-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use helper of_platform_default_populate() in linux/of_platform
-when possible, instead of calling of_platform_populate() with
-the default match table.
+After patch "of/platform: Add common method to populate default bus",
+it is possible for arch code to remove unnecessary callers of
+of_platform_populate with default match table.
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: Grant Likely <grant.likely@linaro.org>
+Acked-by: Vineet Gupta <vgupta@synopsys.com>
+Cc: Vineet Gupta <vgupta@synopsys.com>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/of/unittest.c | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arc/kernel/setup.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-diff --git a/drivers/of/unittest.c b/drivers/of/unittest.c
-index f34ed93..53c83d6 100644
---- a/drivers/of/unittest.c
-+++ b/drivers/of/unittest.c
-@@ -771,7 +771,7 @@ static void __init of_unittest_platform_populate(void)
- 	};
+diff --git a/arch/arc/kernel/setup.c b/arch/arc/kernel/setup.c
+index f63b8bf..59053c1 100644
+--- a/arch/arc/kernel/setup.c
++++ b/arch/arc/kernel/setup.c
+@@ -14,7 +14,6 @@
+ #include <linux/module.h>
+ #include <linux/cpu.h>
+ #include <linux/of_fdt.h>
+-#include <linux/of_platform.h>
+ #include <linux/cache.h>
+ #include <asm/sections.h>
+ #include <asm/arcregs.h>
+@@ -435,12 +434,6 @@ void __init setup_arch(char **cmdline_p)
  
- 	np = of_find_node_by_path("/testcase-data");
--	of_platform_populate(np, of_default_bus_match_table, NULL, NULL);
-+	of_platform_default_populate(np, NULL, NULL);
+ static int __init customize_machine(void)
+ {
+-	/*
+-	 * Traverses flattened DeviceTree - registering platform devices
+-	 * (if any) complete with their resources
+-	 */
+-	of_platform_default_populate(NULL, NULL, NULL);
+-
+ 	if (machine_desc->init_machine)
+ 		machine_desc->init_machine();
  
- 	/* Test that a missing irq domain returns -EPROBE_DEFER */
- 	np = of_find_node_by_path("/testcase-data/testcase-device1");
-@@ -1871,8 +1871,7 @@ static void __init of_unittest_overlay(void)
- 		goto out;
- 	}
- 
--	ret = of_platform_populate(bus_np, of_default_bus_match_table,
--			NULL, NULL);
-+	ret = of_platform_default_populate(bus_np, NULL, NULL);
- 	if (ret != 0) {
- 		unittest(0, "could not populate bus @ \"%s\"\n", bus_path);
- 		goto out;
 -- 
 1.7.12.4
