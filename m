@@ -1,28 +1,24 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 1 Jun 2016 10:15:30 +0200
-Subject: [PATCH 08/13] ARM: dts: r8a7792: add SYS-DMAC support
-In-Reply-To: <5621267.GpvUaW18zI@wasted.cogentembedded.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <5621267.GpvUaW18zI@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdWajU_rM3wS0mSsoW32NNeWVA1gFR4jNq-h=5oEnBrBXA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 1 Jun 2016 09:16:41 +0100
+Subject: [PATCH v5 04/18] arm64: Remove unnecessary of_platform_populate
+ with default match table
+In-Reply-To: <1464763991-26634-5-git-send-email-wangkefeng.wang@huawei.com>
+References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
+ <1464763991-26634-5-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <20160601081640.GA23375@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2016 at 12:25 AM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Describe SYS-DMAC0/1 in the R8A7792 device tree.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Wed, Jun 01, 2016 at 02:52:57PM +0800, Kefeng Wang wrote:
+> After patch "of/platform: Add common method to populate default bus",
+> it is possible for arch code to remove unnecessary callers of
+> of_platform_populate with default match table.
+> 
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+For arm64:
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
