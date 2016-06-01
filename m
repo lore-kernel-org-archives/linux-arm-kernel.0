@@ -1,49 +1,87 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 1 Jun 2016 18:24:39 +0300
-Subject: [PATCHv5] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160531213437.GA28397@amd>
-References: <20160521054336.GA27123@amd> <573FFF51.1000004@gmail.com>
- <20160521105607.GA20071@amd> <574049EF.2090208@gmail.com>
- <20160524090433.GA1277@amd> <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd>
- <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
- <20160531213437.GA28397@amd>
-Message-ID: <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 1 Jun 2016 08:24:48 -0700
+Subject: [RFC PATCH 2/4] clk: rockchip: rk3399: add ddrc clock support
+In-Reply-To: <1464773739-18152-3-git-send-email-hl@rock-chips.com>
+References: <1464773739-18152-1-git-send-email-hl@rock-chips.com>
+ <1464773739-18152-3-git-send-email-hl@rock-chips.com>
+Message-ID: <CAD=FV=UQoWe7DcPe3sZrocXLmX4JNpBBF1rr+-+T_q3FttihEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+Lin Huang,
 
-On Tue, May 31, 2016 at 11:34:37PM +0200, Pavel Machek wrote:
-> On Wed 2016-06-01 00:22:22, Sakari Ailus wrote:
-> > Hi Pavel,
-> > 
-> > On Fri, May 27, 2016 at 10:51:40PM +0200, Pavel Machek wrote:
-> > > 
-> > > This adds support for AD5820 autofocus coil, found for example in
-> > > Nokia N900 smartphone.
-> > > 
-> > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > 
-> > The patch looks good to me but then I came to think of a question I've
-> > missed so far: is there DT documentation somewhere for the properties used
-> > by the driver? I might put that to a separate patch, and cc the relevant
-> > list.
-> 
-> Well, it does not use any dt properties. So there's not really much to
-> discuss with dt people...
-> 
-> Maybe "ad5820" needs to go to list of simple i2c drivers somewhere,
-> but...
+On Wed, Jun 1, 2016 at 2:35 AM, Lin Huang <hl@rock-chips.com> wrote:
+> add ddrc clock setting, so we can do ddr frequency
+> scaling on rk3399 platform in future.
+>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+>  drivers/clk/rockchip/clk-rk3399.c      | 16 ++++++++++++++++
+>  include/dt-bindings/clock/rk3399-cru.h |  1 +
+>  2 files changed, 17 insertions(+)
+>
+> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+> index f1d8e44..749ea59 100644
+> --- a/drivers/clk/rockchip/clk-rk3399.c
+> +++ b/drivers/clk/rockchip/clk-rk3399.c
+> @@ -118,6 +118,10 @@ PNAME(mux_armclkb_p)                               = { "clk_core_b_lpll_src",
+>                                                     "clk_core_b_bpll_src",
+>                                                     "clk_core_b_dpll_src",
+>                                                     "clk_core_b_gpll_src" };
+> +PNAME(mux_ddrclk_p)                            = { "clk_ddrc_lpll_src",
+> +                                                   "clk_ddrc_bpll_src",
+> +                                                   "clk_ddrc_dpll_src",
+> +                                                   "clk_ddrc_gpll_src" };
+>  PNAME(mux_aclk_cci_p)                          = { "cpll_aclk_cci_src",
+>                                                     "gpll_aclk_cci_src",
+>                                                     "npll_aclk_cci_src",
+> @@ -1377,6 +1381,18 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+>         COMPOSITE_NOMUX(0, "clk_test", "clk_test_pre", CLK_IGNORE_UNUSED,
+>                         RK3368_CLKSEL_CON(58), 0, 5, DFLAGS,
+>                         RK3368_CLKGATE_CON(13), 11, GFLAGS),
+> +
+> +       /* ddrc */
+> +       GATE(0, "clk_ddrc_lpll_src", "lpll", CLK_IGNORE_UNUSED,
+> +            RK3399_CLKGATE_CON(3), 0, GFLAGS),
+> +       GATE(0, "clk_ddrc_bpll_src", "bpll", CLK_IGNORE_UNUSED,
+> +            RK3399_CLKGATE_CON(3), 1, GFLAGS),
+> +       GATE(0, "clk_ddrc_dpll_src", "dpll", CLK_IGNORE_UNUSED,
+> +            RK3399_CLKGATE_CON(3), 2, GFLAGS),
+> +       GATE(0, "clk_ddrc_gpll_src", "gpll", CLK_IGNORE_UNUSED,
+> +            RK3399_CLKGATE_CON(3), 3, GFLAGS),
+> +       COMPOSITE_DDRC(SCLK_DDRCLK, "clk_ddrc", mux_ddrclk_p, CLK_IGNORE_UNUSED,
+> +                      RK3399_CLKSEL_CON(6), 4, 2, MFLAGS, 0, 3, DFLAGS),
 
-It's an I2C device and it does use a regulator. Not a lot, though, these are
-both quite basic stuff. This should still be documented as the people who
-write the DT bindings (in general) aren't expected to read driver code as
-well. That's at least my understanding.
+It seems slightly unfortunate that we need CLK_IGNORE_UNUSED on these.
+Only one of these will ever be used at once and it would be awfully
+nice if the others could get gated, right?
 
--- 
-Kind regards,
+...presumably this is needed because we might not have an actual
+driver for DDR Freq and we definitely want to make sure that clk_ddrc
+is enabled in that case.  I guess what we really want is something
+like CLK_ENABLE_HAND_OFF eventually, but until then I think you might
+get slightly better behavior by getting rid of all of these
+CLK_IGNORE_UNUSED and setting "clk_ddrc" as a critical clock, either
+using the table in this file or the new flag.
 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+>  };
+>
+>  static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata = {
+> diff --git a/include/dt-bindings/clock/rk3399-cru.h b/include/dt-bindings/clock/rk3399-cru.h
+> index 50a44cf..8a0f0442 100644
+> --- a/include/dt-bindings/clock/rk3399-cru.h
+> +++ b/include/dt-bindings/clock/rk3399-cru.h
+> @@ -131,6 +131,7 @@
+>  #define SCLK_DPHY_RX0_CFG              165
+>  #define SCLK_RMII_SRC                  166
+>  #define SCLK_PCIEPHY_REF100M           167
+> +#define SCLK_DDRCLK                    168
+
+Almost certainly you'll want to create a separate patch for the
+dt-bindings change since it will need to land in a different tree so
+it can be pulled into both Heiko's clock topic branch and dts64 topic
+branch.
+
+
+
+-Doug
