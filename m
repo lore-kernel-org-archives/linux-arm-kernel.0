@@ -1,24 +1,31 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 1 Jun 2016 09:28:17 +0800
-Subject: [PATCH v2 0/4] hw rng support for NSP SoC
-In-Reply-To: <574DC553.4030009@gmail.com>
-References: <1464343841-29504-1-git-send-email-yendapally.reddy@broadcom.com>
- <20160531101934.GM15376@gondor.apana.org.au>
- <574DC553.4030009@gmail.com>
-Message-ID: <20160601012817.GB30653@gondor.apana.org.au>
+From: chanho.min@lge.com (Chanho Min)
+Date: Wed, 1 Jun 2016 10:39:59 +0900
+Subject: [PATCH 2/2] arm64: defconfig: Enable Cadence MACB/GEM support
+In-Reply-To: <1464745199-19186-1-git-send-email-chanho.min@lge.com>
+References: <1464745199-19186-1-git-send-email-chanho.min@lge.com>
+Message-ID: <1464745199-19186-2-git-send-email-chanho.min@lge.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 10:09:39AM -0700, Florian Fainelli wrote:
->
-> FYI, ARM Device Tree patches usually go via ARM SoC pull requests, so it
-> is best if this is planned in advance. Can you make sure you document
-> that there could be a merge conflict in your pull request to Linus?
+This patch enables the cadence MACB/GEM support that is needed
+by lg1k SoCs.
 
-Sure I can do that.
+Signed-off-by: Chanho Min <chanho.min@lge.com>
+---
+ arch/arm64/configs/defconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index fd2d74d..4edbbac 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -120,6 +120,7 @@ CONFIG_TUN=y
+ CONFIG_VIRTIO_NET=y
+ CONFIG_AMD_XGBE=y
+ CONFIG_NET_XGENE=y
++CONFIG_MACB=y
+ CONFIG_E1000E=y
+ CONFIG_IGB=y
+ CONFIG_IGBVF=y
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+1.7.9.5
