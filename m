@@ -1,24 +1,33 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 1 Jun 2016 11:56:01 +0300
-Subject: [PATCH 00/28] crypto: omap fixes / support additions
-Message-ID: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+Date: Wed, 1 Jun 2016 11:56:04 +0300
+Subject: [PATCH 03/28] crypto: omap-sham: change queue size from 1 to 10
+In-Reply-To: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1464771389-10640-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Change crypto queue size from 1 to 10 for omap SHA driver. This should
+allow clients to enqueue requests more effectively to avoid serializing
+whole crypto sequences, giving extra performance.
 
-This series adds support for crypto hardware accelerators on TI DRA7xx
-and AM43xx SoCs, and fixes a number of bugs in the existing codebase.
-This series also addresses performance issues with the AES / SHA
-accelerators, doing some optimizations on these.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ drivers/crypto/omap-sham.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Patch #7 and #13 are generic crypto API implementation changes.
-Without #7, omap-sham export/import does not work, #13 is kind
-of nice to have.
-
-Patches 16+ should be picked-up / acked by Tony, but they have
-dependencies on the preceding patches; at least the AES dual core
-support must be in before applying the rest, otherwise bad things
-will happen.
-
--Tero
+diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+index bd0258f..71eac5c 100644
+--- a/drivers/crypto/omap-sham.c
++++ b/drivers/crypto/omap-sham.c
+@@ -173,7 +173,7 @@ struct omap_sham_ctx {
+ 	struct omap_sham_hmac_ctx base[0];
+ };
+ 
+-#define OMAP_SHAM_QUEUE_LENGTH	1
++#define OMAP_SHAM_QUEUE_LENGTH	10
+ 
+ struct omap_sham_algs_info {
+ 	struct ahash_alg	*algs_list;
+-- 
+1.9.1
