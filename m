@@ -1,38 +1,65 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  1 Jun 2016 23:43:18 +0200
-Subject: [PATCH 09/32] bcm2837-rpi-3-b.dts for 32bit arm
+Date: Wed,  1 Jun 2016 23:43:29 +0200
+Subject: [PATCH 20/32] dt-bindings: Add binding for brcm,bcm2835-sdhost.
 In-Reply-To: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
 References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1464817421-8519-10-git-send-email-kraxel@redhat.com>
+Message-ID: <1464817421-8519-21-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
----
- arch/arm/boot/dts/Makefile            | 3 ++-
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts | 1 +
- 2 files changed, 3 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+From: Eric Anholt <eric@anholt.net>
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 06b6c2d..16de98f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -66,7 +66,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-b-rev2.dtb \
- 	bcm2835-rpi-b-plus.dtb \
- 	bcm2835-rpi-a-plus.dtb \
--	bcm2836-rpi-2-b.dtb
-+	bcm2836-rpi-2-b.dtb \
-+	bcm2837-rpi-3-b.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-asus-rt-ac56u.dtb \
- 	bcm4708-asus-rt-ac68u.dtb \
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+This is the other SD controller on the platform, which can be swapped
+to the role of SD card host using pin muxing.
+
+Signed-off-by: Eric Anholt <eric@anholt.net>
+---
+ .../devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt |  3 +++
+ .../bindings/mmc/brcm,bcm2835-sdhost.txt           | 24 ++++++++++++++++++++++
+ 2 files changed, 27 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
+
+diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
+index 59476fb..3cc74e2 100644
+--- a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
++++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
+@@ -15,4 +15,7 @@ sdhci: sdhci {
+ 	interrupts = <2 30>;
+ 	clocks = <&clk_mmc>;
+ 	bus-width = <4>;
++	dmas = <&dma 13>,
++	       <&dma 13>;
++	dma-names = "tx", "rx";
+ };
+diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
 new file mode 100644
-index 0000000..36178a6
+index 0000000..074992c
 --- /dev/null
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -0,0 +1 @@
-+#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
++++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
+@@ -0,0 +1,24 @@
++Broadcom BCM2835 SDHOST controller
++
++This file documents differences between the core properties described
++by mmc.txt and the properties that represent the BCM2835 controller.
++
++Required properties:
++- compatible: Should be "brcm,bcm2835-sdhci".
++- clocks: The clock feeding the SDHOST controller.
++
++Optional properties:
++- dmas: DMA channels for read and write.
++          See Documentation/devicetree/bindings/dma/dma.txt for details
++
++Example:
++
++sdhost: sdhost at 7e202000 {
++	compatible = "brcm,bcm2835-sdhost";
++	reg = <0x7e202000 0x100>;
++	interrupts = <2 24>;
++	clocks = <&clocks BCM2835_CLOCK_VPU>;
++	dmas = <&dma 13>,
++	       <&dma 13>;
++	dma-names = "tx", "rx";
++};
 -- 
 1.8.3.1
