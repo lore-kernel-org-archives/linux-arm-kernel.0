@@ -1,55 +1,24 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Wed, 01 Jun 2016 10:25:05 +0900
-Subject: [PATCH 1/3] mmc: fix mmc mode selection for HS-DDR and higher
-In-Reply-To: <1464505484-3661-2-git-send-email-wens@csie.org>
-References: <1464505484-3661-1-git-send-email-wens@csie.org>
- <CGME20160529070454epcas1p4cf3be0deda6773296b516e7d25a4188e@epcas1p4.samsung.com>
- <1464505484-3661-2-git-send-email-wens@csie.org>
-Message-ID: <574E3971.30202@samsung.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 1 Jun 2016 09:28:17 +0800
+Subject: [PATCH v2 0/4] hw rng support for NSP SoC
+In-Reply-To: <574DC553.4030009@gmail.com>
+References: <1464343841-29504-1-git-send-email-yendapally.reddy@broadcom.com>
+ <20160531101934.GM15376@gondor.apana.org.au>
+ <574DC553.4030009@gmail.com>
+Message-ID: <20160601012817.GB30653@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2016 04:04 PM, Chen-Yu Tsai wrote:
-> When IS_ERR_VALUE was removed from the mmc core code, it was replaced
-> with a simple not-zero check. This does not work, as the value checked
-> is the return value for mmc_select_bus_width, which returns the set
-> bit width on success. This made eMMC modes higher than HS-DDR unusable.
-> 
-> Fix this by checking for a positive return value instead.
-> 
-> Fixes: 287980e49ffc ("remove lots of IS_ERR_VALUE abuses")
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+On Tue, May 31, 2016 at 10:09:39AM -0700, Florian Fainelli wrote:
+>
+> FYI, ARM Device Tree patches usually go via ARM SoC pull requests, so it
+> is best if this is planned in advance. Can you make sure you document
+> that there could be a merge conflict in your pull request to Linus?
 
-Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+Sure I can do that.
 
-Best Regards,
-Jaehoon Chung
-
-> ---
->  drivers/mmc/core/mmc.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> index c984321d1881..aafb73d080ca 100644
-> --- a/drivers/mmc/core/mmc.c
-> +++ b/drivers/mmc/core/mmc.c
-> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
->  	 * switch to HS200 mode if bus width is set successfully.
->  	 */
->  	err = mmc_select_bus_width(card);
-> -	if (!err) {
-> +	if (err > 0) {
->  		val = EXT_CSD_TIMING_HS200 |
->  		      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
->  		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-> @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->  	} else if (mmc_card_hs(card)) {
->  		/* Select the desired bus width optionally */
->  		err = mmc_select_bus_width(card);
-> -		if (!err) {
-> +		if (err > 0) {
->  			err = mmc_select_hs_ddr(card);
->  			if (err)
->  				goto free_card;
-> 
+Thanks,
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
