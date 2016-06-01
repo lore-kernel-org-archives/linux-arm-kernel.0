@@ -1,10 +1,10 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed,  1 Jun 2016 10:34:46 +0200
-Subject: [PATCH 3/9] clocksource/drivers/rockchip_timer: Convert init function
- to return error
+Date: Wed,  1 Jun 2016 10:34:47 +0200
+Subject: [PATCH 4/9] clocksource/drivers/mkt_timer: Convert init function to
+ return error
 In-Reply-To: <1464770093-12667-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1464770093-12667-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1464770093-12667-4-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1464770093-12667-5-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,52 +26,48 @@ function.
 
 Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 ---
- drivers/clocksource/rockchip_timer.c | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ drivers/clocksource/mtk_timer.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/clocksource/rockchip_timer.c b/drivers/clocksource/rockchip_timer.c
-index b991b28..36b0209 100644
---- a/drivers/clocksource/rockchip_timer.c
-+++ b/drivers/clocksource/rockchip_timer.c
-@@ -106,17 +106,17 @@ static irqreturn_t rk_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
+diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+index 7e583f8..432a2c0 100644
+--- a/drivers/clocksource/mtk_timer.c
++++ b/drivers/clocksource/mtk_timer.c
+@@ -181,7 +181,7 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
+ 			evt->gpt_base + GPT_IRQ_EN_REG);
  }
  
--static void __init rk_timer_init(struct device_node *np)
-+static int __init rk_timer_init(struct device_node *np)
+-static void __init mtk_timer_init(struct device_node *node)
++static int __init mtk_timer_init(struct device_node *node)
  {
- 	struct clock_event_device *ce = &bc_timer.ce;
- 	struct clk *timer_clk;
- 	struct clk *pclk;
--	int ret, irq;
-+	int ret = -EINVAL, irq;
+ 	struct mtk_clock_event_device *evt;
+ 	struct resource res;
+@@ -190,7 +190,7 @@ static void __init mtk_timer_init(struct device_node *node)
  
- 	bc_timer.base = of_iomap(np, 0);
- 	if (!bc_timer.base) {
- 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
+ 	evt = kzalloc(sizeof(*evt), GFP_KERNEL);
+ 	if (!evt)
 -		return;
-+		return -ENXIO;
- 	}
++		return -ENOMEM;
  
- 	pclk = of_clk_get_by_name(np, "pclk");
-@@ -169,7 +169,7 @@ static void __init rk_timer_init(struct device_node *np)
+ 	evt->dev.name = "mtk_tick";
+ 	evt->dev.rating = 300;
+@@ -248,7 +248,7 @@ static void __init mtk_timer_init(struct device_node *node)
  
- 	clockevents_config_and_register(ce, bc_timer.freq, 1, UINT_MAX);
+ 	mtk_timer_enable_irq(evt, GPT_CLK_EVT);
  
 -	return;
 +	return 0;
  
- out_irq:
- 	clk_disable_unprepare(timer_clk);
-@@ -177,6 +177,8 @@ out_timer_clk:
- 	clk_disable_unprepare(pclk);
- out_unmap:
- 	iounmap(bc_timer.base);
+ err_clk_disable:
+ 	clk_disable_unprepare(clk);
+@@ -262,5 +262,7 @@ err_mem:
+ 	release_mem_region(res.start, resource_size(&res));
+ err_kzalloc:
+ 	kfree(evt);
 +
-+	return ret;
++	return -EINVAL;
  }
- 
--CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
-+CLOCKSOURCE_OF_DECLARE_RET(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
+-CLOCKSOURCE_OF_DECLARE(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
++CLOCKSOURCE_OF_DECLARE_RET(mtk_mt6577, "mediatek,mt6577-timer", mtk_timer_init);
 -- 
 1.9.1
