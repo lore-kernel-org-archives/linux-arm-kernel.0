@@ -1,62 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 1 Jun 2016 16:43:53 +0200
-Subject: [PATCH 7/9] clocksource/drivers/cadence_ttc: Convert init
- function to return error
-In-Reply-To: <20160601143622.GA3766@xsjsorenbubuntu>
-References: <1464770093-12667-1-git-send-email-daniel.lezcano@linaro.org>
- <1464770093-12667-8-git-send-email-daniel.lezcano@linaro.org>
- <20160601143622.GA3766@xsjsorenbubuntu>
-Message-ID: <574EF4A9.7010405@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 1 Jun 2016 09:45:42 -0500
+Subject: [PATCH v3] ASoC: rockchip: Add machine driver for
+ MAX98357A/RT5514/DA7219
+In-Reply-To: <1464267742-15312-1-git-send-email-zhengxing@rock-chips.com>
+References: <1464267742-15312-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20160601144542.GA3835@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 04:36 PM, S?ren Brinkmann wrote:
-> Hi Daniel,
+On Thu, May 26, 2016 at 09:02:22PM +0800, Xing Zheng wrote:
+> There are multi codec devices on the RK3399 platform, we can use
+> this patch support and control these codecs.
+> 
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> ---
+> 
+> Changes in v3:
+> - rename DOC to rockchip,rk3399-max98357a-rt5514-da7219.txt
+> - rename compatible to rockchip,rk3399-max98357a-rt5514-da7219
+> - rename source code to rk3399_max98357a_rt5514_da7219.c
+> 
+> Changes in v2:
+> - use the FS 256 to set mclks of the max98357a and rt5514 danamically
+> - add more sample rate for da7219
+> 
+>  .../rockchip,rk3399-max98357a-rt5514-da7219.txt    |   15 +
+>  sound/soc/rockchip/Kconfig                         |   11 +
+>  sound/soc/rockchip/Makefile                        |    2 +
+>  .../soc/rockchip/rk3399_max98357a_rt5514_da7219.c  |  333 ++++++++++++++++++++
+>  4 files changed, 361 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rk3399-max98357a-rt5514-da7219.txt
+>  create mode 100644 sound/soc/rockchip/rk3399_max98357a_rt5514_da7219.c
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-max98357a-rt5514-da7219.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-max98357a-rt5514-da7219.txt
+> new file mode 100644
+> index 0000000..3ae603e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-max98357a-rt5514-da7219.txt
+> @@ -0,0 +1,15 @@
+> +ROCKCHIP with MAX98357A/RT5514/DA7219 codecs
+> +
+> +Required properties:
+> +- compatible: "rockchip,rk3399-max98357a-rt5514-da7219"
 
-Hi Soren,
+I'm still not very clear on the naming convention thoughout this. This 
+doesn't seem like a pattern we want to repeat (<chip>-<codec>-<codec>).
 
-[ ... ]
-
->> +	err = clk_notifier_register(ttcce->ttc.clk,
->> +				    &ttcce->ttc.clk_rate_change_nb);
->> +	if (err) {
->>   		pr_warn("Unable to register clock notifier.\n");
->> +		return err;
->
-> So far we handle this as warning only and move on, as the notifier is
-> only needed when frequency scaling is enabled. And even then, the effect
-> is usually just that timing is off.
-
-Ok, I will fix it.
-
-[ ... ]
-
->> -	static int initialized;
->> -	int clksel;
->> +	int clksel, ret;
->>   	u32 timer_width = 16;
->>
->> -	if (initialized)
->> -		return;
->> -
->> -	initialized = 1;
->> -
->
-> This also changes behavior. We have multiple of these timer modules in
-> our HW and we don't want them all to be used for time keeping. This
-> construct made sure that we only use the first timer for which init is
-> called leaving the others for non-OS purposes.
-
-Ha, yes. My bad, this change was not supposed to be here.
-
-Thanks for spotting this.
-
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Rob
