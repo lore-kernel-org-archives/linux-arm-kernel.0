@@ -1,10 +1,10 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Wed,  1 Jun 2016 16:15:25 -0700
-Subject: [PATCH 26/34] clk: scpi: Migrate to clk_hw based OF and registration
- APIs
+Date: Wed,  1 Jun 2016 16:15:27 -0700
+Subject: [PATCH 28/34] clk: si5351: Migrate to clk_hw based OF and
+ registration APIs
 In-Reply-To: <20160601231533.9354-1-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
-Message-ID: <20160601231533.9354-27-stephen.boyd@linaro.org>
+Message-ID: <20160601231533.9354-29-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,118 +13,198 @@ can get rid of struct clk pointers while registering clks in
 these drivers, allowing us to move closer to a clear split of
 consumer and provider clk APIs.
 
-Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+Cc: Mike Looijmans <mike.looijmans@topic.nl>
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
 
 See commit 58657d189a2f and it's children for details on this
 new registration API.
 
- drivers/clk/clk-scpi.c | 33 ++++++++++++++-------------------
- 1 file changed, 14 insertions(+), 19 deletions(-)
+ drivers/clk/clk-si5351.c | 71 ++++++++++++++++++++++++++++--------------------
+ 1 file changed, 41 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/clk/clk-scpi.c b/drivers/clk/clk-scpi.c
-index 6962ee5d1e9a..2a3e9d8e88b0 100644
---- a/drivers/clk/clk-scpi.c
-+++ b/drivers/clk/clk-scpi.c
-@@ -146,13 +146,13 @@ static const struct of_device_id scpi_clk_match[] = {
- 	{}
+diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+index b1bc12c045d3..b051db43fae1 100644
+--- a/drivers/clk/clk-si5351.c
++++ b/drivers/clk/clk-si5351.c
+@@ -54,7 +54,6 @@ struct si5351_driver_data {
+ 	enum si5351_variant	variant;
+ 	struct i2c_client	*client;
+ 	struct regmap		*regmap;
+-	struct clk_onecell_data onecell;
+ 
+ 	struct clk		*pxtal;
+ 	const char		*pxtal_name;
+@@ -66,6 +65,7 @@ struct si5351_driver_data {
+ 	struct si5351_hw_data	pll[2];
+ 	struct si5351_hw_data	*msynth;
+ 	struct si5351_hw_data	*clkout;
++	size_t			num_clkout;
  };
  
--static struct clk *
-+static int
- scpi_clk_ops_init(struct device *dev, const struct of_device_id *match,
- 		  struct scpi_clk *sclk, const char *name)
+ static const char * const si5351_input_names[] = {
+@@ -1307,11 +1307,31 @@ put_child:
+ 	of_node_put(child);
+ 	return -EINVAL;
+ }
++
++static struct clk_hw *
++si53351_of_clk_get(struct of_phandle_args *clkspec, void *data)
++{
++	struct si5351_driver_data *drvdata = data;
++	unsigned int idx = clkspec->args[0];
++
++	if (idx >= drvdata->num_clkout) {
++		pr_err("%s: invalid index %u\n", __func__, idx);
++		return ERR_PTR(-EINVAL);
++	}
++
++	return &drvdata->clkout[idx].hw;
++}
+ #else
+ static int si5351_dt_parse(struct i2c_client *client, enum si5351_variant variant)
  {
+ 	return 0;
+ }
++
++static struct clk_hw *
++si53351_of_clk_get(struct of_phandle_args *clkspec, void *data)
++{
++	return NULL;
++}
+ #endif /* CONFIG_OF */
+ 
+ static int si5351_i2c_probe(struct i2c_client *client,
+@@ -1321,7 +1341,6 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 	struct si5351_platform_data *pdata;
+ 	struct si5351_driver_data *drvdata;
  	struct clk_init_data init;
 -	struct clk *clk;
- 	unsigned long min = 0, max = 0;
-+	int ret;
+ 	const char *parent_names[4];
+ 	u8 num_parents, num_clocks;
+ 	int ret, n;
+@@ -1438,10 +1457,9 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 		init.num_parents = 1;
+ 	}
+ 	drvdata->xtal.init = &init;
+-	clk = devm_clk_register(&client->dev, &drvdata->xtal);
+-	if (IS_ERR(clk)) {
++	ret = devm_clk_hw_register(&client->dev, &drvdata->xtal);
++	if (ret) {
+ 		dev_err(&client->dev, "unable to register %s\n", init.name);
+-		ret = PTR_ERR(clk);
+ 		goto err_clk;
+ 	}
  
- 	init.name = name;
+@@ -1456,11 +1474,10 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 			init.num_parents = 1;
+ 		}
+ 		drvdata->clkin.init = &init;
+-		clk = devm_clk_register(&client->dev, &drvdata->clkin);
+-		if (IS_ERR(clk)) {
++		ret = devm_clk_hw_register(&client->dev, &drvdata->clkin);
++		if (ret) {
+ 			dev_err(&client->dev, "unable to register %s\n",
+ 				init.name);
+-			ret = PTR_ERR(clk);
+ 			goto err_clk;
+ 		}
+ 	}
+@@ -1480,10 +1497,9 @@ static int si5351_i2c_probe(struct i2c_client *client,
  	init.flags = 0;
-@@ -164,18 +164,18 @@ scpi_clk_ops_init(struct device *dev, const struct of_device_id *match,
- 	if (init.ops == &scpi_dvfs_ops) {
- 		sclk->info = sclk->scpi_ops->dvfs_get_info(sclk->id);
- 		if (IS_ERR(sclk->info))
--			return NULL;
-+			return PTR_ERR(sclk->info);
- 	} else if (init.ops == &scpi_clk_ops) {
- 		if (sclk->scpi_ops->clk_get_range(sclk->id, &min, &max) || !max)
--			return NULL;
-+			return -EINVAL;
- 	} else {
--		return NULL;
-+		return -EINVAL;
+ 	init.parent_names = parent_names;
+ 	init.num_parents = num_parents;
+-	clk = devm_clk_register(&client->dev, &drvdata->pll[0].hw);
+-	if (IS_ERR(clk)) {
++	ret = devm_clk_hw_register(&client->dev, &drvdata->pll[0].hw);
++	if (ret) {
+ 		dev_err(&client->dev, "unable to register %s\n", init.name);
+-		ret = PTR_ERR(clk);
+ 		goto err_clk;
  	}
  
--	clk = devm_clk_register(dev, &sclk->hw);
--	if (!IS_ERR(clk) && max)
-+	ret = devm_clk_hw_register(dev, &sclk->hw);
-+	if (!ret && max)
- 		clk_hw_set_rate_range(&sclk->hw, min, max);
--	return clk;
-+	return ret;
- }
- 
- struct scpi_clk_data {
-@@ -183,7 +183,7 @@ struct scpi_clk_data {
- 	unsigned int clk_num;
- };
- 
--static struct clk *
-+static struct clk_hw *
- scpi_of_clk_src_get(struct of_phandle_args *clkspec, void *data)
- {
- 	struct scpi_clk *sclk;
-@@ -193,7 +193,7 @@ scpi_of_clk_src_get(struct of_phandle_args *clkspec, void *data)
- 	for (count = 0; count < clk_data->clk_num; count++) {
- 		sclk = clk_data->clk[count];
- 		if (idx == sclk->id)
--			return sclk->hw.clk;
-+			return &sclk->hw;
+@@ -1505,10 +1521,9 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 		init.parent_names = parent_names;
+ 		init.num_parents = num_parents;
+ 	}
+-	clk = devm_clk_register(&client->dev, &drvdata->pll[1].hw);
+-	if (IS_ERR(clk)) {
++	ret = devm_clk_hw_register(&client->dev, &drvdata->pll[1].hw);
++	if (ret) {
+ 		dev_err(&client->dev, "unable to register %s\n", init.name);
+-		ret = PTR_ERR(clk);
+ 		goto err_clk;
  	}
  
- 	return ERR_PTR(-EINVAL);
-@@ -202,8 +202,7 @@ scpi_of_clk_src_get(struct of_phandle_args *clkspec, void *data)
- static int scpi_clk_add(struct device *dev, struct device_node *np,
- 			const struct of_device_id *match)
- {
--	struct clk **clks;
--	int idx, count;
-+	int idx, count, err;
- 	struct scpi_clk_data *clk_data;
+@@ -1524,13 +1539,9 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 				       sizeof(*drvdata->msynth), GFP_KERNEL);
+ 	drvdata->clkout = devm_kzalloc(&client->dev, num_clocks *
+ 				       sizeof(*drvdata->clkout), GFP_KERNEL);
++	drvdata->num_clkout = num_clocks;
  
- 	count = of_property_count_strings(np, "clock-output-names");
-@@ -222,10 +221,6 @@ static int scpi_clk_add(struct device *dev, struct device_node *np,
- 	if (!clk_data->clk)
- 		return -ENOMEM;
- 
--	clks = devm_kcalloc(dev, count, sizeof(*clks), GFP_KERNEL);
--	if (!clks)
--		return -ENOMEM;
+-	drvdata->onecell.clk_num = num_clocks;
+-	drvdata->onecell.clks = devm_kzalloc(&client->dev,
+-		num_clocks * sizeof(*drvdata->onecell.clks), GFP_KERNEL);
 -
- 	for (idx = 0; idx < count; idx++) {
- 		struct scpi_clk *sclk;
- 		const char *name;
-@@ -249,15 +244,15 @@ static int scpi_clk_add(struct device *dev, struct device_node *np,
+-	if (WARN_ON(!drvdata->msynth || !drvdata->clkout ||
+-		    !drvdata->onecell.clks)) {
++	if (WARN_ON(!drvdata->msynth || !drvdata->clkout)) {
+ 		ret = -ENOMEM;
+ 		goto err_clk;
+ 	}
+@@ -1547,11 +1558,11 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 			init.flags |= CLK_SET_RATE_PARENT;
+ 		init.parent_names = parent_names;
+ 		init.num_parents = 2;
+-		clk = devm_clk_register(&client->dev, &drvdata->msynth[n].hw);
+-		if (IS_ERR(clk)) {
++		ret = devm_clk_hw_register(&client->dev,
++					   &drvdata->msynth[n].hw);
++		if (ret) {
+ 			dev_err(&client->dev, "unable to register %s\n",
+ 				init.name);
+-			ret = PTR_ERR(clk);
+ 			goto err_clk;
+ 		}
+ 	}
+@@ -1575,19 +1586,19 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 			init.flags |= CLK_SET_RATE_PARENT;
+ 		init.parent_names = parent_names;
+ 		init.num_parents = num_parents;
+-		clk = devm_clk_register(&client->dev, &drvdata->clkout[n].hw);
+-		if (IS_ERR(clk)) {
++		ret = devm_clk_hw_register(&client->dev,
++					   &drvdata->clkout[n].hw);
++		if (ret) {
+ 			dev_err(&client->dev, "unable to register %s\n",
+ 				init.name);
+-			ret = PTR_ERR(clk);
+ 			goto err_clk;
+ 		}
+-		drvdata->onecell.clks[n] = clk;
  
- 		sclk->id = val;
- 
--		clks[idx] = scpi_clk_ops_init(dev, match, sclk, name);
--		if (IS_ERR_OR_NULL(clks[idx]))
-+		err = scpi_clk_ops_init(dev, match, sclk, name);
-+		if (err)
- 			dev_err(dev, "failed to register clock '%s'\n", name);
- 		else
- 			dev_dbg(dev, "Registered clock '%s'\n", name);
- 		clk_data->clk[idx] = sclk;
+ 		/* set initial clkout rate */
+ 		if (pdata->clkout[n].rate != 0) {
+ 			int ret;
+-			ret = clk_set_rate(clk, pdata->clkout[n].rate);
++			ret = clk_set_rate(drvdata->clkout[n].hw.clk,
++					   pdata->clkout[n].rate);
+ 			if (ret != 0) {
+ 				dev_err(&client->dev, "Cannot set rate : %d\n",
+ 					ret);
+@@ -1595,8 +1606,8 @@ static int si5351_i2c_probe(struct i2c_client *client,
+ 		}
  	}
  
--	return of_clk_add_provider(np, scpi_of_clk_src_get, clk_data);
-+	return of_clk_add_hw_provider(np, scpi_of_clk_src_get, clk_data);
- }
- 
- static int scpi_clocks_remove(struct platform_device *pdev)
+-	ret = of_clk_add_provider(client->dev.of_node, of_clk_src_onecell_get,
+-				  &drvdata->onecell);
++	ret = of_clk_add_hw_provider(client->dev.of_node, si53351_of_clk_get,
++				     drvdata);
+ 	if (ret) {
+ 		dev_err(&client->dev, "unable to add clk provider\n");
+ 		goto err_clk;
 -- 
 2.7.4
