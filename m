@@ -1,29 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed,  1 Jun 2016 10:54:56 +0200
-Subject: [PATCH] ARM: defconfig: enable the MSM8660 pin controller
-Message-ID: <1464771296-8329-1-git-send-email-linus.walleij@linaro.org>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 1 Jun 2016 11:56:02 +0300
+Subject: [PATCH 01/28] crypto: omap-aes: Fix registration of algorithms
+In-Reply-To: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1464771389-10640-2-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After enabling this I get pins, GPIO, keys and everything on
-the MSM8660 surf (APQ8660 DragonBoard).
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Algorithms can be registered only once. So skip registration of
+algorithms if already registered (i.e. in case we have two AES cores
+in the system.)
+
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- arch/arm/configs/qcom_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/crypto/omap-aes.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
-index 7bff7bf24a85..dddb917f7ea9 100644
---- a/arch/arm/configs/qcom_defconfig
-+++ b/arch/arm/configs/qcom_defconfig
-@@ -103,6 +103,7 @@ CONFIG_SPMI=y
- CONFIG_PINCTRL_APQ8064=y
- CONFIG_PINCTRL_APQ8084=y
- CONFIG_PINCTRL_IPQ8064=y
-+CONFIG_PINCTRL_MSM8660=y
- CONFIG_PINCTRL_MSM8960=y
- CONFIG_PINCTRL_MSM8X74=y
- CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+diff --git a/drivers/crypto/omap-aes.c b/drivers/crypto/omap-aes.c
+index ce174d3..4a0e6a5 100644
+--- a/drivers/crypto/omap-aes.c
++++ b/drivers/crypto/omap-aes.c
+@@ -1185,17 +1185,19 @@ static int omap_aes_probe(struct platform_device *pdev)
+ 	spin_unlock(&list_lock);
+ 
+ 	for (i = 0; i < dd->pdata->algs_info_size; i++) {
+-		for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
+-			algp = &dd->pdata->algs_info[i].algs_list[j];
++		if (!dd->pdata->algs_info[i].registered) {
++			for (j = 0; j < dd->pdata->algs_info[i].size; j++) {
++				algp = &dd->pdata->algs_info[i].algs_list[j];
+ 
+-			pr_debug("reg alg: %s\n", algp->cra_name);
+-			INIT_LIST_HEAD(&algp->cra_list);
++				pr_debug("reg alg: %s\n", algp->cra_name);
++				INIT_LIST_HEAD(&algp->cra_list);
+ 
+-			err = crypto_register_alg(algp);
+-			if (err)
+-				goto err_algs;
++				err = crypto_register_alg(algp);
++				if (err)
++					goto err_algs;
+ 
+-			dd->pdata->algs_info[i].registered++;
++				dd->pdata->algs_info[i].registered++;
++			}
+ 		}
+ 	}
+ 
 -- 
-2.4.11
+1.9.1
