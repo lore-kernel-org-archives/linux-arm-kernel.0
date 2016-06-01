@@ -1,55 +1,34 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 1 Jun 2016 11:56:06 +0300
-Subject: [PATCH 05/28] crypto: omap-sham: set sw fallback to 240 bytes
+Date: Wed, 1 Jun 2016 11:56:08 +0300
+Subject: [PATCH 07/28] crypto: ahash: increase the maximum allowed statesize
 In-Reply-To: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
 References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1464771389-10640-6-git-send-email-t-kristo@ti.com>
+Message-ID: <1464771389-10640-8-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bin Liu <b-liu@ti.com>
+The statesize is used to determine the maximum size for saved ahash
+context. In some cases, this can be much larger than what is currently
+allocated for it, for example omap-sham driver uses a buffer size of
+PAGE_SIZE. Increase the statesize to accommodate this.
 
-Adds software fallback support for small crypto requests. In these cases,
-it is undesirable to use DMA, as setting it up itself is rather heavy
-operation. Gives about 40% extra performance in ipsec usecase.
-
-Signed-off-by: Bin Liu <b-liu@ti.com>
-[t-kristo at ti.com: dropped the extra traces, updated some comments
- on the code]
 Signed-off-by: Tero Kristo <t-kristo@ti.com>
 ---
- drivers/crypto/omap-sham.c | 12 ++++++++----
- 1 file changed, 8 insertions(+), 4 deletions(-)
+ crypto/ahash.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-index 287bc43..a5c823b 100644
---- a/drivers/crypto/omap-sham.c
-+++ b/drivers/crypto/omap-sham.c
-@@ -1082,7 +1082,7 @@ static int omap_sham_update(struct ahash_request *req)
- 	ctx->offset = 0;
+diff --git a/crypto/ahash.c b/crypto/ahash.c
+index 3887a98..375bbd7 100644
+--- a/crypto/ahash.c
++++ b/crypto/ahash.c
+@@ -536,7 +536,7 @@ static int ahash_prepare_alg(struct ahash_alg *alg)
+ 	struct crypto_alg *base = &alg->halg.base;
  
- 	if (ctx->flags & BIT(FLAGS_FINUP)) {
--		if ((ctx->digcnt + ctx->bufcnt + ctx->total) < 9) {
-+		if ((ctx->digcnt + ctx->bufcnt + ctx->total) < 240) {
- 			/*
- 			* OMAP HW accel works only with buffers >= 9
- 			* will switch to bypass in final()
-@@ -1138,9 +1138,13 @@ static int omap_sham_final(struct ahash_request *req)
- 	if (ctx->flags & BIT(FLAGS_ERROR))
- 		return 0; /* uncompleted hash is not needed */
+ 	if (alg->halg.digestsize > PAGE_SIZE / 8 ||
+-	    alg->halg.statesize > PAGE_SIZE / 8 ||
++	    alg->halg.statesize > PAGE_SIZE * 2 ||
+ 	    alg->halg.statesize == 0)
+ 		return -EINVAL;
  
--	/* OMAP HW accel works only with buffers >= 9 */
--	/* HMAC is always >= 9 because ipad == block size */
--	if ((ctx->digcnt + ctx->bufcnt) < 9)
-+	/*
-+	 * OMAP HW accel works only with buffers >= 9.
-+	 * HMAC is always >= 9 because ipad == block size.
-+	 * If buffersize is less than 240, we use fallback SW encoding,
-+	 * as using DMA + HW in this case doesn't provide any benefit.
-+	 */
-+	if ((ctx->digcnt + ctx->bufcnt) < 240)
- 		return omap_sham_final_shash(req);
- 	else if (ctx->bufcnt)
- 		return omap_sham_enqueue(req, OP_FINAL);
 -- 
 1.9.1
