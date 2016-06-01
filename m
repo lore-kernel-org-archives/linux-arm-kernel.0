@@ -1,88 +1,147 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 1 Jun 2016 14:52:54 +0800
-Subject: [PATCH v5 01/18] of/platform: Add common method to populate default
- bus
-In-Reply-To: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
-References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464763991-26634-2-git-send-email-wangkefeng.wang@huawei.com>
+Date: Wed, 1 Jun 2016 14:52:53 +0800
+Subject: [PATCH v5 00/18] Cleanup for populate default bus
+Message-ID: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch code calls of_platform_populate() with default match table
-when it wants to populate default bus.
+This cleanup patchset cantains two parts.
 
-This patch introduce a new of_platform_default_populate_init() and make it
-arch_initcall_sync(it should be later than some iommu configration, eg,
-of_iommu_init() and swiotlb_late_init in arm64), then we can finish above
-job in common method.
+Firstly, introduce a new way to populate the default bus, then, we can
+drop unnecessary calls from the arch code, and do the same thing for
+of_iommu_init() in [1].
 
-In order to avoid the default bus being populated twice, simply checking
-the flag of bus node whether has be set OF_POPULATED_BUS or not.
+Secondly, use helper of_platform_default_populate() in linux/of_platform
+when possible, instead of calling of_platform_populate() with default
+match table, After that, it is possible for driver code build as a module,
+and no need to export of_default_bus_match_table anymore.
 
-After that, we can safely remove the caller in arch code.
+This patchset is based on Linux 4.7-rc1, and only test in arm/arm64 qemu
+with defconfig.
 
-Btw, add debug print in of_platform_populate(), and use __func__ to
-print function's name of of_platform_bus_create().
+Changes since v4:
+- Rebase to v4.7-rc1
+- Remove pointless msg when acpi_disabled, sugguested by Rob Herring
 
-Cc: Rob Herring <robh+dt@kernel.org>
-Cc: Frank Rowand <frowand.list@gmail.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- drivers/of/platform.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+Changes since v3:
+- Get rid of by making of_platform_populate callable multiple times,
+  sugguested by Rob Herring
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 16e8daf..c559ef8 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -363,6 +363,12 @@ static int of_platform_bus_create(struct device_node *bus,
- 		return 0;
- 	}
- 
-+	if (of_node_check_flag(bus, OF_POPULATED_BUS)) {
-+		pr_debug("%s() - skipping %s, already populated\n",
-+			__func__, bus->full_name);
-+		return 0;
-+	}
-+
- 	auxdata = of_dev_lookup(lookup, bus);
- 	if (auxdata) {
- 		bus_id = auxdata->name;
-@@ -414,7 +420,7 @@ int of_platform_bus_probe(struct device_node *root,
- 	if (!root)
- 		return -EINVAL;
- 
--	pr_debug("of_platform_bus_probe()\n");
-+	pr_debug("%s()\n", __func__);
- 	pr_debug(" starting at: %s\n", root->full_name);
- 
- 	/* Do a self check of bus type, if there's a match, create children */
-@@ -466,6 +472,9 @@ int of_platform_populate(struct device_node *root,
- 	if (!root)
- 		return -EINVAL;
- 
-+	pr_debug("%s()\n", __func__);
-+	pr_debug(" starting at: %s\n", root->full_name);
-+
- 	for_each_child_of_node(root, child) {
- 		rc = of_platform_bus_create(child, matches, lookup, parent, true);
- 		if (rc) {
-@@ -489,6 +498,15 @@ int of_platform_default_populate(struct device_node *root,
- }
- EXPORT_SYMBOL_GPL(of_platform_default_populate);
- 
-+static int __init of_platform_default_populate_init(void)
-+{
-+	if (of_have_populated_dt())
-+		of_platform_default_populate(NULL, NULL, NULL);
-+
-+	return 0;
-+}
-+arch_initcall_sync(of_platform_default_populate_init);
-+
- static int of_platform_device_destroy(struct device *dev, void *data)
- {
- 	/* Do not touch devices not populated from the device tree */
+Changes since v2:
+- Add more acks
+- Update based on v4.6-rc2, of-generic.c in sh and board-artpec6.c in arm
+  are considered
+
+Changes since v1:
+- Add ack, test and review
+- Remove v1 patch 14/15, the similar patch has posted and applied,
+  see https://patchwork.kernel.org/patch/8096991/
+
+v1:
+- https://lkml.org/lkml/2016/1/26/1123
+
+[1]: 
+- v1: https://lkml.org/lkml/2016/4/23/31
+- v2: https://lkml.org/lkml/2016/6/1/43
+
+Kefeng Wang (18):
+  of/platform: Add common method to populate default bus
+  arc: Remove unnecessary of_platform_populate with default match table
+  arm: Remove unnecessary of_platform_populate with default match table
+  arm64: Remove unnecessary of_platform_populate with default match
+    table
+  c6x: Remove unnecessary of_platform_populate with default match table
+  cris: Remove unnecessary of_platform_populate with default match
+    table
+  metag: Remove unnecessary of_platform_populate with default match
+    table
+  mips: Remove unnecessary of_platform_populate with default match
+    table
+  nios2: Remove unnecessary of_platform_populate with default match
+    table
+  sh: Remove unnecessary of_platform_populate with default match table
+  xtensa: Remove unnecessary of_platform_populate with default match
+    table
+  arm: use of_platform_default_populate() to populate
+  mips: use of_platform_default_populate() to populate default bus
+  bus: imx-weim: use of_platform_default_populate() to populate default
+    bus
+  bus: uniphier-system-bus: use of_platform_default_populate() to
+    populate default bus
+  memory: omap-gpmc: use of_platform_default_populate() to populate
+    default bus
+  of: unittest: use of_platform_default_populate() to populate default
+    bus
+  Revert "of/platform: export of_default_bus_match_table"
+
+ arch/arc/kernel/setup.c                  |  7 -------
+ arch/arm/kernel/setup.c                  |  6 +-----
+ arch/arm/mach-artpec/board-artpec6.c     |  3 ---
+ arch/arm/mach-at91/at91rm9200.c          |  2 +-
+ arch/arm/mach-at91/at91sam9.c            |  2 +-
+ arch/arm/mach-at91/sama5.c               |  2 +-
+ arch/arm/mach-bcm/board_bcm21664.c       |  2 --
+ arch/arm/mach-bcm/board_bcm281xx.c       |  2 --
+ arch/arm/mach-bcm/board_bcm2835.c        | 10 ----------
+ arch/arm/mach-cns3xxx/core.c             |  3 +--
+ arch/arm/mach-exynos/exynos.c            |  3 ---
+ arch/arm/mach-highbank/highbank.c        |  3 ---
+ arch/arm/mach-imx/mach-imx51.c           |  2 --
+ arch/arm/mach-imx/mach-imx53.c           |  2 --
+ arch/arm/mach-imx/mach-imx6q.c           |  2 +-
+ arch/arm/mach-imx/mach-imx6sl.c          |  2 +-
+ arch/arm/mach-imx/mach-imx6sx.c          |  2 +-
+ arch/arm/mach-imx/mach-imx6ul.c          |  1 -
+ arch/arm/mach-imx/mach-imx7d.c           |  1 -
+ arch/arm/mach-integrator/integrator_ap.c |  3 +--
+ arch/arm/mach-integrator/integrator_cp.c |  3 +--
+ arch/arm/mach-keystone/keystone.c        |  1 -
+ arch/arm/mach-lpc32xx/phy3250.c          |  3 +--
+ arch/arm/mach-mvebu/board-v7.c           |  3 ---
+ arch/arm/mach-mvebu/dove.c               |  2 --
+ arch/arm/mach-mvebu/kirkwood.c           |  2 +-
+ arch/arm/mach-mxs/mach-mxs.c             |  3 +--
+ arch/arm/mach-nspire/nspire.c            |  3 +--
+ arch/arm/mach-orion5x/board-dt.c         |  3 +--
+ arch/arm/mach-picoxcell/common.c         |  2 --
+ arch/arm/mach-rockchip/rockchip.c        |  1 -
+ arch/arm/mach-s3c24xx/mach-s3c2416-dt.c  |  2 --
+ arch/arm/mach-s3c64xx/mach-s3c64xx-dt.c  |  3 ---
+ arch/arm/mach-shmobile/setup-r8a7740.c   |  3 ---
+ arch/arm/mach-shmobile/setup-sh73a0.c    |  2 --
+ arch/arm/mach-spear/spear1310.c          |  2 --
+ arch/arm/mach-spear/spear1340.c          |  1 -
+ arch/arm/mach-spear/spear300.c           |  3 +--
+ arch/arm/mach-spear/spear310.c           |  3 +--
+ arch/arm/mach-spear/spear320.c           |  3 +--
+ arch/arm/mach-spear/spear6xx.c           |  3 +--
+ arch/arm/mach-tegra/tegra.c              |  2 +-
+ arch/arm/mach-u300/core.c                |  3 +--
+ arch/arm/mach-versatile/versatile_dt.c   |  3 +--
+ arch/arm/mach-vt8500/vt8500.c            |  3 ---
+ arch/arm/mach-zynq/common.c              |  2 +-
+ arch/arm64/kernel/setup.c                | 13 -------------
+ arch/c6x/platforms/Makefile              |  2 +-
+ arch/c6x/platforms/platform.c            | 17 -----------------
+ arch/cris/kernel/setup.c                 |  8 --------
+ arch/metag/kernel/setup.c                |  5 +----
+ arch/mips/ath79/setup.c                  |  3 ---
+ arch/mips/jz4740/setup.c                 |  8 --------
+ arch/mips/mti-sead3/sead3-setup.c        |  8 --------
+ arch/mips/pic32/pic32mzda/init.c         |  3 +--
+ arch/mips/pistachio/init.c               | 13 -------------
+ arch/mips/xilfpga/init.c                 | 13 -------------
+ arch/nios2/platform/platform.c           |  4 +---
+ arch/sh/boards/of-generic.c              | 14 --------------
+ arch/xtensa/kernel/setup.c               | 11 -----------
+ arch/xtensa/kernel/time.c                |  2 ++
+ drivers/bus/imx-weim.c                   |  5 ++---
+ drivers/bus/uniphier-system-bus.c        |  3 +--
+ drivers/memory/omap-gpmc.c               |  3 +--
+ drivers/of/platform.c                    | 21 +++++++++++++++++++--
+ drivers/of/unittest.c                    |  5 ++---
+ 66 files changed, 54 insertions(+), 231 deletions(-)
+ delete mode 100644 arch/c6x/platforms/platform.c
+
 -- 
 1.7.12.4
