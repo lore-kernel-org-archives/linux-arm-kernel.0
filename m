@@ -1,66 +1,84 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 01 Jun 2016 11:06:46 +0200
-Subject: [PATCH v3 09/12] EXAMPLE CODE: usb: port: Parse pwrseq phandle
- from Device Tree
-In-Reply-To: <146477144362.1485.3331887341591876278@sboyd-linaro>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
- <1464768141-25420-10-git-send-email-k.kozlowski@samsung.com>
- <146477144362.1485.3331887341591876278@sboyd-linaro>
-Message-ID: <574EA5A6.3090102@samsung.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Wed, 1 Jun 2016 12:06:34 +0300
+Subject: [PATCH 18/28] ARM: DRA7: hwmod: Add data for SHA IP
+In-Reply-To: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1464771994-11178-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 10:57 AM, Stephen Boyd wrote:
-> Quoting Krzysztof Kozlowski (2016-06-01 01:02:18)
->> Parse usb-pwrseq property from Device Tree to get the phandle to pwrseq
->> device.  The pwrseq device will be used by USB hub to cycle the power
->> before activating ports.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Drive by review comment.
-> 
-> I was hoping this would help me with a problem I'm having where I have a
-> hub (smsc4604) that needs to be taken out of reset before my HSIC
-> controller sends a USB reset to it, but it seems this is more about
-> doing some sort of power on sequence after enumeration?
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-This example is not finished but from what you wrote, it might suit your
-needs as well. The power sequence is done before enumeration because
-without it, the device won't enumerate.
+DRA7 SoC contains SHA crypto hardware accelerator. Add hwmod data for
+this IP so that it can be utilized by crypto frameworks.
 
-The exact power sequence for USB devices has to be still developed.
-Comments are welcomed.
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 37 +++++++++++++++++++++++++++++++
+ 1 file changed, 37 insertions(+)
 
->> diff --git a/drivers/usb/core/port.c b/drivers/usb/core/port.c
->> index 460c855be0d0..89b9bdfc7061 100644
->> --- a/drivers/usb/core/port.c
->> +++ b/drivers/usb/core/port.c
->> @@ -18,6 +18,8 @@
->>  
->>  #include <linux/slab.h>
->>  #include <linux/pm_qos.h>
->> +#include <linux/pwrseq.h>
->> +#include <linux/usb/of.h>
->>  
->>  #include "hub.h"
->>  
->> @@ -526,6 +528,14 @@ int usb_hub_create_port_device(struct usb_hub *hub, int port1)
->>                 return retval;
->>         }
->>  
->> +       port_dev->dev.of_node = usb_of_get_child_node(hdev->dev.parent->of_node,
->> +                                                     port1);
->> +       port_dev->pwrseq = pwrseq_alloc(&port_dev->dev, "usb-pwrseq");
->> +       if (IS_ERR(port_dev->pwrseq)) {
->> +               device_unregister(&port_dev->dev);
->> +               return PTR_ERR(port_dev->pwrseq);
-> 
-> Are we certain that port_dev hasn't been freed at this point? We just
-> called device_unregister() on it, so it seems safer to save away the
-> return value before calling device_unregister() here.
-
-Right, good point. Thanks for feedback.
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+index ceb1b42..8932619 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+@@ -734,6 +734,34 @@ static struct omap_hwmod dra7xx_aes2_hwmod = {
+ 	},
+ };
+ 
++/* sha0 HIB2 (the 'P' (public) device) */
++static struct omap_hwmod_class_sysconfig dra7xx_sha0_sysc = {
++	.rev_offs	= 0x100,
++	.sysc_offs	= 0x110,
++	.syss_offs	= 0x114,
++	.sysc_flags	= SYSS_HAS_RESET_STATUS,
++};
++
++static struct omap_hwmod_class dra7xx_sha0_hwmod_class = {
++	.name		= "sham",
++	.sysc		= &dra7xx_sha0_sysc,
++	.rev		= 2,
++};
++
++struct omap_hwmod dra7xx_sha0_hwmod = {
++	.name		= "sham",
++	.class		= &dra7xx_sha0_hwmod_class,
++	.clkdm_name	= "l4sec_clkdm",
++	.main_clk	= "l3_iclk_div",
++	.prcm		= {
++		.omap4 = {
++			.clkctrl_offs = DRA7XX_CM_L4SEC_SHA2MD51_CLKCTRL_OFFSET,
++			.context_offs = DRA7XX_RM_L4SEC_SHA2MD51_CONTEXT_OFFSET,
++			.modulemode   = MODULEMODE_HWCTRL,
++		},
++	},
++};
++
+ /*
+  * 'elm' class
+  *
+@@ -3048,6 +3076,14 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__aes2 = {
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
++/* l3_main_1 -> sha0 */
++static struct omap_hwmod_ocp_if dra7xx_l3_main_1__sha0 = {
++	.master		= &dra7xx_l3_main_1_hwmod,
++	.slave		= &dra7xx_sha0_hwmod,
++	.clk		= "l3_iclk_div",
++	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++};
++
+ /* l4_per2 -> mcasp1 */
+ static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp1 = {
+ 	.master		= &dra7xx_l4_per2_hwmod,
+@@ -3939,6 +3975,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+ 	&dra7xx_l3_main_1__hdmi,
+ 	&dra7xx_l3_main_1__aes1,
+ 	&dra7xx_l3_main_1__aes2,
++	&dra7xx_l3_main_1__sha0,
+ 	&dra7xx_l4_per1__elm,
+ 	&dra7xx_l4_wkup__gpio1,
+ 	&dra7xx_l4_per1__gpio2,
+-- 
+1.9.1
