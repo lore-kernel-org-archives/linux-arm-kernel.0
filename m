@@ -1,45 +1,46 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Wed, 1 Jun 2016 12:29:24 +0200
-Subject: DTS for Zynq Microzed/Picozed
-In-Reply-To: <CAK7LNASAe0mFD28sM=8_qDsyeGVH_wZTYyFY1uLEp85LmmSuHQ@mail.gmail.com>
-References: <CAK7LNASAe0mFD28sM=8_qDsyeGVH_wZTYyFY1uLEp85LmmSuHQ@mail.gmail.com>
-Message-ID: <574EB904.2070900@xilinx.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 1 Jun 2016 13:30:29 +0300
+Subject: [PATCH 00/13] Add R8A7794/SILK board eMMC DT support
+In-Reply-To: <CAMuHMdV4BqUC2QMX-=-R6K6gdrvkX=rUcWn_uFF-jdQuYruhbw@mail.gmail.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <CAMuHMdV4BqUC2QMX-=-R6K6gdrvkX=rUcWn_uFF-jdQuYruhbw@mail.gmail.com>
+Message-ID: <ec4904b9-cf61-b396-ef6c-ded717e68ea5@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+Hello.
 
+On 6/1/2016 10:04 AM, Geert Uytterhoeven wrote:
 
-On 1.6.2016 12:10, Masahiro Yamada wrote:
-> Hi Michal,
-> 
-> 
-> zynq-microzed.dts and zynq-picozed.dts are missing
-> in Linux tree.
-> (I do not see them in linux-xlnx on the GitHub, either)
+>>    Here's the set of 13 patches against Simon Horman's 'renesas.git' repo,
+>> 'renesas-devel-20160530-v4.7-rc1' tag. We add the device tree support for
+>> the R8A7792-based Blanche board. The R-Car 'clk' driver patch was posted last
+>> week separately...
+>>
+>> [01/13] ARM: shmobile: r8a7792: add clock index macros
+>> [02/13] ARM: shmobile: r8a7792: add power domain index macros
+>> [03/13] soc: renesas: rcar-sysc: add R8A7792 support
+>> [04/13] ARM: shmobile: r8a7792: basic SoC support
+>> [05/13] DT: clock: rcar-gen2-cpg-clocks: document R8A7792 support
+>> [06/13] DT: clock: cpg-mstp-clocks: document-R8A7792-support
+>> [07/13] ARM: dts: r8a7792: initial SoC device tree
+>> [08/13] ARM: dts: r8a7792: add SYS-DMAC support
+>> [09/13] ARM: dts: r8a7792: add [H]SCIF support
+>> [10/13] ARM dts: r8a7792: add IRQC support
+>> [11/13] DT: arm: shmobile: document Blanche board
+>> [12/13] ARM: dts: blanche: initial device tree
+>> [13/13] ARM: dts: blanche: add Ethernet support
+>
+> Thanks for your series!
+>
+> The subject doesn't seem to cover the contents, though:
+>> [PATCH 00/13] Add R8A7794/SILK board eMMC DT support
 
-microzed and picozed board are made by Avnet not by Xilinx and none
-pushed support for these boards.
+    Oops. :-(
+    Sorry about that...
 
-> 
-> Interestingly enough, I see both in U-Boot tree.
+> Gr{oetje,eeting}s,
+>
+>                         Geert
 
-Yes they are in the u-boot because IRC Nathan wanted to have support there.
-
-
-> Is there some reason for that?
-> Otherwise, do you have a plan to port them to Linux?
-
-I was in touch with Avnet to improve support for their reference boards
-but there is no conclusion from that discussion.
-I have microzed here (I don't have picozed) but I don't have any
-immediate plan to push support for this board to Linux without any
-support from them.
-And pushing board without regular testing is not the right way to go.
-
-TBH: I am thinking to remove zynq boards which are not regularly tested.
-For Linux this is not a problem because diff is just DTS and for U-Boot
-with DM I believe we can be there soon.
-
-Thanks,
-Michal
+MBR, Sergei
