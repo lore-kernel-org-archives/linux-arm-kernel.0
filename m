@@ -1,115 +1,66 @@
-From: ttnguyen@apm.com (Tai Tri Nguyen)
-Date: Tue, 31 May 2016 18:25:56 -0700
-Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene
- SoC PMU DTS binding
-In-Reply-To: <CACgAJHwtb0hNs0JWOrpyF=_fRVvUi2QG4q7qohgCw4SjxqtX6A@mail.gmail.com>
-References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
- <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
- <20160418170009.GA15338@rob-hp-laptop>
- <CACgAJHyBbO_LXwtfNVK1f=dY3v1Jfxwxq1dw98EZ0aYdhjPpAg@mail.gmail.com>
- <20160420113121.GE2514@arm.com>
- <20160502205648.GA7374@rob-hp-laptop>
- <CACgAJHyT31DuVNoyRQZVKjv=zM5Fc-EY0gy=y=pHHrBTT+1Xow@mail.gmail.com>
- <20160531165630.GE4254@leverpostej>
- <CACgAJHwtb0hNs0JWOrpyF=_fRVvUi2QG4q7qohgCw4SjxqtX6A@mail.gmail.com>
-Message-ID: <CACgAJHxMCa2Hp_A8YnHmmVrHGd3yLhFs2k33MN6OHRUmZ7Y_Wg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 31 May 2016 19:36:55 -0700
+Subject: [PATCH 2/5] clocksource: rockchip: remove unnecessary clear irq
+ before request_irq
+In-Reply-To: <574E48CC.1040004@rock-chips.com>
+References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
+ <1464169802-6033-3-git-send-email-wxt@rock-chips.com>
+ <574CC839.60608@linaro.org>
+ <CAD=FV=U5zqU0CMeg1dDTYHrRqWAxTQO_xk2T7p09GJuj-Fn9Gw@mail.gmail.com>
+ <574E48CC.1040004@rock-chips.com>
+Message-ID: <CAD=FV=WA6OaOTM07+qxDJOW_TMsG06eAYwq5p5L_hw7PKd5MwA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi,
 
-On Tue, May 31, 2016 at 10:17 AM, Tai Tri Nguyen <ttnguyen@apm.com> wrote:
-> Hi Mark,
->
-> On Tue, May 31, 2016 at 9:56 AM, Mark Rutland <mark.rutland@arm.com> wrote:
->> On Mon, May 02, 2016 at 02:46:05PM -0700, Tai Tri Nguyen wrote:
->>> Hi Rob,
->>>
->>> On Mon, May 2, 2016 at 1:56 PM, Rob Herring <robh@kernel.org> wrote:
->>> > On Wed, Apr 20, 2016 at 12:31:22PM +0100, Will Deacon wrote:
->>> >> On Mon, Apr 18, 2016 at 01:04:53PM -0700, Tai Tri Nguyen wrote:
->>> >> > >> +Required properties for MCB subnode:
->>> >> > >> +- compatible         : Shall be "apm,xgene-pmu-mcb".
->>> >> > >> +- reg                        : First resource shall be the MCB PMU resource.
->>> >> > >> +- index                      : Instance number of the MCB PMU.
->>> >> > >> +
->>> >> > >> +Required properties for MC subnode:
->>> >> > >> +- compatible         : Shall be "apm,xgene-pmu-mc".
->>> >> > >> +- reg                        : First resource shall be the MC PMU resource.
->>> >> > >> +- index                      : Instance number of the MC PMU.
->>> >> > >
->>> >> > > Don't use indexes. You probably need phandles to the nodes these are
->>> >> > > related to.
->>> >> > >
->>> >> > > How many variations of child nodes do you expect to have? 2, 10, 50? You
->>> >> > > might want to just collapse all this down to a single node and put this
->>> >> > > information in the driver if it is fixed for each SoC and there's only a
->>> >> > > handful.
->>> >> > >
->>> >> >
->>> >> > For each kind of PMU, for example memory controller PMU, I expect to
->>> >> > have the number of instances up to 8.
->>> >> > They are actually all independent PMU nodes and have their own CSR memory bases.
->>> >> > The indexes are used for exposing the devices to perf user only. It
->>> >> > doesn't have an impact on the programming model.
->>> >> > Mark also had the same concern.
->>> >>
->>> >> Regardless, I'll need an ack from Rob or Mark before I can merge this.
->>> >
->>> > I still have a concern with this. Needing an index to expose to the user
->>> > is generally not a valid reason. That's OS specific and therefore
->>> > doesn't belong in DT.
->>> >
->>> > Rob
->>>
->>> I can use device name here. However, the perf event names will be
->>> different between DT and ACPI which I want to avoid.
->>> And the names don't look good at all.
->>> Also, specifically for MC and MCB PMUs, the indexes are compared
->>> against the active MC/MCB mask to find out whether they are populated
->>> or not.
->>> Without using the index property, I will also need a mapping function
->>> of physical device addresses and their physical ids.
+On Tue, May 31, 2016 at 7:30 PM, Huang, Tao <huangtao@rock-chips.com> wrote:
+>> Actually, I'm not even sure that's true in a perfect world.  ;)  There
+>> are two main problems that might be lurking here:
 >>
->> What's wrong with using ${device}.{physical_address} as the PMU name?
->> That would be unique and consistent regardless of the firmware, no
->> mapping nor index property necessary.
+>> 1. On exynos5 devices I've worked with, the private timer (MCT)
+>> actually shared the same physical counter with the ARM Architected
+>> Timer.  IIRC stopping or resetting the MCT had the effect of stopping
+>> / resetting the Arch Timer.  Is it the same for you?  As I understand
+>> it the Arch Timer isn't supposed to ever be stopped or reset.  If
+>> firmware left the timer stopped and the kernel happened to be compiled
+>> without support for the Rockchip timer (but had the Arch Timers) then
+>> things would be very broken.  Also the early kernel boot might be
+>> broken if the Arch Timer inits before the Rockchip timer.
 >>
->> That's sufficient for any user already familiar with the topology, a
->> familiarity you seem to be assuming regardless by not explicitly
->> describing the topology in the DT.
->>
->> Thanks,
->> Mark.
+>> NOTE: If your timer and the Arch Timer are totally separate then point
+>> #1 is not important.
 >
-> Okay. I'll do fix it for the next patches.
+> We never use the timer which provide clock source of arch timer as
+> clockevent timer. If we do such stupid thing, when rk timer disabled,
+> the arch timer will stop too. Generally, we use this special timer as
+> clocksouce or never touch it again when it is running.
+
+Ah, OK.  :)  I didn't go through and review / test the code.  I just
+wanted to make sure we weren't going to run into the same bug I
+remember running into before.  ;)
+
+
+>> 2. Historically in Chrome OS there's been an unofficial agreement that
+>> the firmware would start its high speed timer as soon as possible at
+>> bootup and that this could be used to (roughly) measure the time
+>> between the start of firmware and the start of the kernel.  That means
+>> that the kernel was expecting the timer to actually be running when it
+>> started up.  Yup, this is a bit of a hack and I'm not sure it's
+>> terribly well documented, but it does provide a reason that firmware
+>> might have left the timer running.
 >
-> Thanks,
-> --
-> Tai
+> Why you chose the timer shared with Linux kernel, there are so many
+> timer? I think loader should do the right thing, uninit the resources
+> when it boot the kernel. I believe this code is lagacy from very old
+> chip such as rk2908 which is Cortex-A8. There are not arch timer, so the
+> loader may keep the timer running when enter kernel. Any way, if we
+> adopt the code suggested by Daniel, it is safe to keep the code.
 
-I'm facing a problem after removing the index for MCU and MC sub-nodes.
-The MCUs and MCs aren't always enabled depending on how DRAM DIMMs are
-installed on the system.
-I still need a way to associate the MCU with its indicator bit in the
-enable mask retrieved from CSR.
-For MC and MCB nodes only, can I introduce an "enable-mask" field?
-For example:
-"
-pmucmcb at 7e710000 {
-        compatible = "apm,xgene-pmu-mcb";
-        reg = <0x0 0x7e710000 0x0 0x1000>;
-        enable-mask = <0x00000001>;
-};
+If this is a separate / distinct timer than the main clocksource
+timer, then you can ignore my comments.  ;)
 
-pmucmcb at 7e730000 {
-        compatible = "apm,xgene-pmu-mcb";
-        reg = <0x0 0x7e730000 0x0 0x1000>;
-        enable-mask = <0x00000002>;
-};
-"
-Or can you please give a suggestion how I can fix it?
+...but obviously the comments from Daniel are much more important to
+address and it sounds like you're all set for doing that.  :)
 
-Thanks,
--- 
-Tai
+-Doug
