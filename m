@@ -1,34 +1,28 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  1 Jun 2016 13:42:50 +0200
-Subject: [PATCH] drm: atmel-hlcdc: actually disable scaling when no scaling is
- required
-Message-ID: <1464781370-19277-1-git-send-email-boris.brezillon@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Wed, 1 Jun 2016 13:47:17 +0200
+Subject: [PATCH 1/2] dmaengine: mv_xor: Minor coding style fix
+In-Reply-To: <20160601104332.12212-1-sr@denx.de>
+References: <20160601104332.12212-1-sr@denx.de>
+Message-ID: <20160601134717.6c715751@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is only enabling scaling, but never disabling it, thus, if you
-enable the scaling feature once it stays enabled forever.
+Hello,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reported-by: Alex Vazquez <avazquez.dev@gmail.com>
-Fixes: 1a396789f65a ("drm: add Atmel HLCDC Display Controller support")
-Cc: <stable@vger.kernel.org>
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c | 2 ++
- 1 file changed, 2 insertions(+)
+On Wed,  1 Jun 2016 12:43:31 +0200, Stefan Roese wrote:
+> Remove the space before the "err_free_dma:" label in mv_xor_channel_add().
+> 
+> Signed-off-by: Stefan Roese <sr@denx.de>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Marcin Wojtas <mw@semihalf.com>
+> Cc: Vinod Koul <vinod.koul@intel.com>
+> ---
+>  drivers/dma/mv_xor.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-index aef3ca8..016c191 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_plane.c
-@@ -339,6 +339,8 @@ atmel_hlcdc_plane_update_pos_and_size(struct atmel_hlcdc_plane *plane,
- 
- 		atmel_hlcdc_layer_update_cfg(&plane->layer, 13, 0xffffffff,
- 					     factor_reg);
-+	} else {
-+		atmel_hlcdc_layer_update_cfg(&plane->layer, 13, 0xffffffff, 0);
- 	}
- }
- 
+Reviewed-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
