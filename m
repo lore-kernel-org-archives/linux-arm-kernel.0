@@ -1,38 +1,53 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 1 Jun 2016 22:06:21 +0200
-Subject: [PATCH v5 13/22] ARM: dts: exynos: Enable UART3 on Exynos5410
-In-Reply-To: <CAOi56cXeRjGgE+=psk7K45oeAgZ27HFxbi+an-ELnA3-_Z_BTA@mail.gmail.com>
-References: <1464429273-23457-1-git-send-email-krzk@kernel.org>
- <1464429273-23457-14-git-send-email-krzk@kernel.org>
- <CAOi56cXeRjGgE+=psk7K45oeAgZ27HFxbi+an-ELnA3-_Z_BTA@mail.gmail.com>
-Message-ID: <CAJKOXPcDZFaqL7+wT9d9iD7Y4QbZWPFQw2hTR3AzyU4K099WYA@mail.gmail.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Wed,  1 Jun 2016 22:07:07 +0200
+Subject: [PATCH V2] ARM: BCM5301X: Specify PHY of USB 2.0 in DT
+In-Reply-To: <1464808585-14996-1-git-send-email-zajec5@gmail.com>
+References: <1464808585-14996-1-git-send-email-zajec5@gmail.com>
+Message-ID: <1464811627-12218-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2016 at 9:57 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Hi Krzysztof,
->
-> On Sat, May 28, 2016 at 2:54 AM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
->> Just like other Exynos5 family SoCs, this one has four UARTs. Configure
->> clocks for UART3 and enable it.
->>
->> Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
->> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->
-> This patch landed in linux-next[1] and kernelci.org found a boot
-> regression on the exynos5410-odroidxu[2], where it looks like it's
-> faulting in clk_prepare().  Bisecting pointed to this patch.  I added
-> "status = disabled" back into the DTS on top of next-20160601[3] and
-> verified my odroid-XU to be booting fine again.
+Driver for Northstar USB 2.0 PHY was added in 4.7-rc1 by:
+commit d3feb4067335 ("phy: bcm-ns-usb2: new driver for USB 2.0 PHY on
+Northstar").
+It should be used to let EHCI platform driver init PHY.
 
-Hi,
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+V2: Add usb2_phy as child of root node instead of adding separated phys
+    "simple-bus".
+---
+ arch/arm/boot/dts/bcm5301x.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Thanks for report. Indeed the patch brings up to the light an issue in
-serial driver. Fixed here:
-https://lkml.org/lkml/2016/5/31/570
-
-I left the commit in my tree as it is correct (strictly speaking).
-Sorry for any trouble it makes.
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 7d4d29b..142811d 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -140,6 +140,15 @@
+ 		};
+ 	};
+ 
++	usb2_phy: usb2-phy {
++		compatible = "brcm,ns-usb2-phy";
++		reg = <0x1800c000 0x1000>;
++		reg-names = "dmu";
++		#phy-cells = <0>;
++		clocks = <&genpll BCM_NSP_GENPLL_USB_PHY_REF_CLK>;
++		clock-names = "phy-ref-clk";
++	};
++
+ 	axi at 18000000 {
+ 		compatible = "brcm,bus-axi";
+ 		reg = <0x18000000 0x1000>;
+@@ -217,6 +226,8 @@
+ 
+ 			#address-cells = <1>;
+ 			#size-cells = <1>;
++
++			phys = <&usb2_phy>;
+ 		};
+ 
+ 		usb3: usb3 at 23000 {
+-- 
+1.8.4.5
