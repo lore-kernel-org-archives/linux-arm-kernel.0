@@ -1,143 +1,169 @@
 From: niklas.soderlund+renesas@ragnatech.se (=?UTF-8?q?Niklas=20S=C3=B6derlund?=)
-Date: Wed,  1 Jun 2016 17:22:25 +0200
-Subject: [PATCHv7 2/6] dma-debug: add support for resource mappings
-In-Reply-To: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-References: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
-Message-ID: <1464794549-6601-3-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+Date: Wed,  1 Jun 2016 17:22:23 +0200
+Subject: [PATCHv7 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+Message-ID: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A MMIO mapped resource can not be represented by a struct page so a new
-debug type is needed to handle this. This patch add such type and
-functionality to add/remove entries and how to translate them to a
-physical address.
+Hi,
 
-Signed-off-by: Niklas S?derlund <niklas.soderlund+renesas@ragnatech.se>
----
- include/linux/dma-debug.h | 19 +++++++++++++++++
- lib/dma-debug.c           | 52 +++++++++++++++++++++++++++++++++++++++++++++--
- 2 files changed, 69 insertions(+), 2 deletions(-)
+[In this v7 series I have tried to address the questions raised by Christoph 
+Hellwig and I hope it can awnser your concernes regarding dma-debug.]
 
-diff --git a/include/linux/dma-debug.h b/include/linux/dma-debug.h
-index fe8cb61..c7d844f 100644
---- a/include/linux/dma-debug.h
-+++ b/include/linux/dma-debug.h
-@@ -56,6 +56,13 @@ extern void debug_dma_alloc_coherent(struct device *dev, size_t size,
- extern void debug_dma_free_coherent(struct device *dev, size_t size,
- 				    void *virt, dma_addr_t addr);
- 
-+extern void debug_dma_map_resource(struct device *dev, phys_addr_t addr,
-+				   size_t size, int direction,
-+				   dma_addr_t dma_addr);
-+
-+extern void debug_dma_unmap_resource(struct device *dev, dma_addr_t dma_addr,
-+				     size_t size, int direction);
-+
- extern void debug_dma_sync_single_for_cpu(struct device *dev,
- 					  dma_addr_t dma_handle, size_t size,
- 					  int direction);
-@@ -141,6 +148,18 @@ static inline void debug_dma_free_coherent(struct device *dev, size_t size,
- {
- }
- 
-+static inline void debug_dma_map_resource(struct device *dev, phys_addr_t addr,
-+					  size_t size, int direction,
-+					  dma_addr_t dma_addr)
-+{
-+}
-+
-+static inline void debug_dma_unmap_resource(struct device *dev,
-+					    dma_addr_t dma_addr, size_t size,
-+					    int direction)
-+{
-+}
-+
- static inline void debug_dma_sync_single_for_cpu(struct device *dev,
- 						 dma_addr_t dma_handle,
- 						 size_t size, int direction)
-diff --git a/lib/dma-debug.c b/lib/dma-debug.c
-index 51a76af..ce75fba 100644
---- a/lib/dma-debug.c
-+++ b/lib/dma-debug.c
-@@ -43,6 +43,7 @@ enum {
- 	dma_debug_page,
- 	dma_debug_sg,
- 	dma_debug_coherent,
-+	dma_debug_resource,
- };
- 
- enum map_err_types {
-@@ -150,8 +151,9 @@ static const char *const maperr2str[] = {
- 	[MAP_ERR_CHECKED] = "dma map error checked",
- };
- 
--static const char *type2name[4] = { "single", "page",
--				    "scather-gather", "coherent" };
-+static const char *type2name[5] = { "single", "page",
-+				    "scather-gather", "coherent",
-+				    "resource" };
- 
- static const char *dir2name[4] = { "DMA_BIDIRECTIONAL", "DMA_TO_DEVICE",
- 				   "DMA_FROM_DEVICE", "DMA_NONE" };
-@@ -397,6 +399,9 @@ static void hash_bucket_del(struct dma_debug_entry *entry)
- 
- static unsigned long long phys_addr(struct dma_debug_entry *entry)
- {
-+	if (entry->type == dma_debug_resource)
-+		return __pfn_to_phys(entry->pfn) + entry->offset;
-+
- 	return page_to_phys(pfn_to_page(entry->pfn)) + entry->offset;
- }
- 
-@@ -1493,6 +1498,49 @@ void debug_dma_free_coherent(struct device *dev, size_t size,
- }
- EXPORT_SYMBOL(debug_dma_free_coherent);
- 
-+void debug_dma_map_resource(struct device *dev, phys_addr_t addr, size_t size,
-+			    int direction, dma_addr_t dma_addr)
-+{
-+	struct dma_debug_entry *entry;
-+
-+	if (unlikely(dma_debug_disabled()))
-+		return;
-+
-+	entry = dma_entry_alloc();
-+	if (!entry)
-+		return;
-+
-+	entry->type		= dma_debug_resource;
-+	entry->dev		= dev;
-+	entry->pfn		= __phys_to_pfn(addr);
-+	entry->offset		= offset_in_page(addr);
-+	entry->size		= size;
-+	entry->dev_addr		= dma_addr;
-+	entry->direction	= direction;
-+	entry->map_err_type	= MAP_ERR_NOT_CHECKED;
-+
-+	add_dma_entry(entry);
-+}
-+EXPORT_SYMBOL(debug_dma_map_resource);
-+
-+void debug_dma_unmap_resource(struct device *dev, dma_addr_t dma_addr,
-+			      size_t size, int direction)
-+{
-+	struct dma_debug_entry ref = {
-+		.type           = dma_debug_resource,
-+		.dev            = dev,
-+		.dev_addr       = dma_addr,
-+		.size           = size,
-+		.direction      = direction,
-+	};
-+
-+	if (unlikely(dma_debug_disabled()))
-+		return;
-+
-+	check_unmap(&ref);
-+}
-+EXPORT_SYMBOL(debug_dma_unmap_resource);
-+
- void debug_dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle,
- 				   size_t size, int direction)
- {
+This series tries to solve the problem with DMA with device registers
+(MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
+recent patch '9575632 (dmaengine: make slave address physical)'
+clarifies that DMA slave address provided by clients is the physical
+address. This puts the task of mapping the DMA slave address from a
+phys_addr_t to a dma_addr_t on the DMA engine.
+
+Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
+the same and no special care is needed. However if you have a IOMMU you
+need to map the DMA slave phys_addr_t to a dma_addr_t using something
+like this.
+
+This series is based on top of v4.7-rc1.
+
+It's tested on a Koelsch with CONFIG_IPMMU_VMSA and by enabling the
+ipmmu_ds node in r8a7791.dtsi. I verified operation by interacting with
+/dev/mmcblk1, i2c and the serial console which are devices behind the
+iommu.
+
+Furthermore I have audited to the best of my ability all call paths
+involved to make sure that the dma_addr_t obtained from
+dma_map_resource() to is not used in a way where it would be expected
+for the mapping to be RAM (have a struct page). Many thanks to Christoph
+Hellwig and Laurent Pinchart for there input in this effort.
+
+  * drivers/dma/sh/rcar-dmac.c
+    Once the phys_addr_t is mapped to a dma_addr_t using
+    dma_map_resource() it is only used to check that the transferee do not
+    cross 4GB boundaries and then only directly written to HW registers.
+
+  * drivers/iommu/iommu.c
+    - iommu_map()
+      Check that it's align to min page size or return -EINVAL then calls
+      domain->ops->map()
+
+  * drivers/iommu/ipmmu-vmsa.c
+    - ipmmu_map()
+      No logic only calls domain->ops->map()
+
+  * drivers/iommu/io-pgtable-arm.c
+    - arm_lpae_map()
+      No logic only calls __arm_lpae_map()
+    - __arm_lpae_map()
+      No logic only calls arm_lpae_init_pte()
+    - arm_lpae_init_pte()
+      Used to get a pte:
+        pte |= pfn_to_iopte(paddr >> data->pg_shift, data);
+
+  * drivers/iommu/io-pgtable-arm-v7s.c
+    - arm_v7s_map()
+      No logic only calls __arm_v7s_map()
+    - __arm_v7s_map()
+      No logic only calls arm_v7s_init_pte()
+    - arm_v7s_init_pte
+      Used to get a pte:
+        pte |= paddr & ARM_V7S_LVL_MASK(lvl);
+
+  * ARM dma-mapping
+    - dma_unmap_*
+      Only valid unmap is dma_unmap_resource() all others are an invalid
+      use case.
+    - dma_sync_single_*
+      Invalid use case, memory that is mapped is device memory
+    - dma_common_mmap() and dma_mmap_attrs()
+      Invalid use case
+    - dma_common_get_sgtable() and dma_get_sgtable_attrs()
+      Invalid use case, only for dma_alloc_* allocated memory,
+    - dma_mapping_error()
+      OK
+
+* Changes since v6
+- Use offset_in_page() and __pfn_to_phys(). This fixed a bug in the 
+  lib/dma-debug.c. Thanks to Konrad Rzeszutek Wilk for finding it and Robin 
+  Murphy for suggesting offset_in_page().
+- Rebased on top of v4.7-rc1.
+- Dropped DT patches which enabled the IPMMU on Renesas Koelsch and Lager. Will 
+  post them separately at a later time.
+
+* Changes since v5
+- Add dma-debug work which adds a new mapping type for the resource
+  mapping which correctly can be translated to a physical address.
+- Drop patches from Robin Murphy since they now are accepted in the
+  iommu repository and base the series on that tree instead.
+- Add a review tag from Laurent.
+
+* Changes since v4
+- Move the mapping from phys_addr_t to dma_addr_t from slave_config to the
+  prepare calls. This way we know the direction of the mapping and don't have
+  to use DMA_BIDIRECTIONAL. Thanks Vinod for suggesting this.
+- To be clear that the data type for slave addresses are changed add a patch
+  that only changes the data type to phys_addr_t.
+- Fixed up commit messages.
+
+* Changes since v3
+- Folded in a fix from Robin to his patch.
+- Added a check to make sure dma_map_resource can not be used to map RAM as
+  pointed out by Robin. I use BUG_ON to enforce this. It might not be the best
+  method but I saw no other good way since DMA_ERROR_CODE might not be defined
+  on all platforms.
+- Added comment about that DTS changes will disable 2 DMA channels due to a HW
+  (?) but in the DMAC.
+- Dropped the use of dma_attrs, no longer needed.
+- Collected Acked-by and Reviewed-by from Laurent.
+- Various indentation fix ups.
+
+* Changes since v2
+- Drop patch to add dma_{map,unmap}_page_attrs.
+- Add dma_{map,unmap}_resource to handle the mapping without involving a
+  'struct page'. Thanks Laurent and Robin for pointing this out.
+- Use size instead of address to keep track of if a mapping exist or not
+  since addr == 0 is valid. Thanks Laurent.
+- Pick up patch from Robin with Laurents ack (hope it's OK for me to
+  attach the ack?) to add IOMMU_MMIO.
+- Fix bug in rcar_dmac_device_config where the error check where
+  inverted.
+- Use DMA_BIDIRECTIONAL in rcar_dmac_device_config since we at that
+  point can't be sure what direction the mapping is going to be used.
+
+* Changes since v1
+- Add and use a dma_{map,unmap}_page_attrs to be able to map the page
+  using attributes DMA_ATTR_NO_KERNEL_MAPPING and
+  DMA_ATTR_SKIP_CPU_SYNC. Thanks Laurent.
+- Drop check if dmac is part of a iommu group or not, let the DMA
+  mapping api handle it.
+- Move slave configuration data around in rcar-dmac to avoid code
+  duplication.
+- Fix build issue reported by 'kbuild test robot' regarding phys_to_page
+  not availability on some configurations.
+- Add DT information for r8a7791.
+
+* Changes since RFC
+- Switch to use the dma-mapping api instead of using the iommu_map()
+  directly. Turns out the dma-mapper is much smarter then me...
+- Dropped the patch to expose domain->ops->pgsize_bitmap from within the
+  iommu api.
+- Dropped the patch showing how I tested the RFC.
+
+
+Niklas S?derlund (6):
+  dma-mapping: add {map,unmap}_resource to dma_map_ops
+  dma-debug: add support for resource mappings
+  dma-mapping: add dma_{map,unmap}_resource
+  arm: dma-mapping: add {map,unmap}_resource for iommu ops
+  dmaengine: rcar-dmac: group slave configuration
+  dmaengine: rcar-dmac: add iommu support for slave transfers
+
+ Documentation/DMA-API.txt   |  22 +++++++--
+ arch/arm/mm/dma-mapping.c   |  63 ++++++++++++++++++++++++
+ drivers/dma/sh/rcar-dmac.c  | 116 +++++++++++++++++++++++++++++++++++---------
+ include/linux/dma-debug.h   |  19 ++++++++
+ include/linux/dma-mapping.h |  42 ++++++++++++++++
+ lib/dma-debug.c             |  52 +++++++++++++++++++-
+ 6 files changed, 285 insertions(+), 29 deletions(-)
+
 -- 
 2.8.2
