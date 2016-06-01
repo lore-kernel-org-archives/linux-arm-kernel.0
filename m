@@ -1,153 +1,239 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Wed,  1 Jun 2016 23:43:16 +0200
-Subject: [PATCH 07/32] ARM: bcm2835: dt: Add the ethernet to the device trees
+Date: Wed,  1 Jun 2016 23:43:27 +0200
+Subject: [PATCH 18/32] ARM: bcm2835: Move most RPi default pin groups to their
+ devices.
 In-Reply-To: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
 References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1464817421-8519-8-git-send-email-kraxel@redhat.com>
+Message-ID: <1464817421-8519-19-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lubomir Rintel <lkundrak@v3.sk>
+From: Eric Anholt <eric@anholt.net>
 
-The hub and the ethernet in its port 1 are hardwired on the board.
+This way we can get the duplicated pin group definitions out of each
+RPi board file, and just leave the i2s variations in them.
 
-Compared to the adapters that can be plugged into the USB ports, this
-one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
-has the MAC address for this adapter in its ROM, accessible from its
-firmware.
+Signed-off-by: Eric Anholt <eric@anholt.net>
 
-U-Boot can read out the address and set the local-mac-address property of the
-node with "ethernet" alias. Let's add the node so that U-Boot can do its
-business.
-
-Model B rev2 and Model B+ entries were verified by me, the hierarchy and
-pid/vid pair for the Version 2 was provided by Peter Chen. Original
-Model B is a blind shot, though very likely correct.
-
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+Conflicts:
+	arch/arm/boot/dts/bcm2835-rpi-b.dts
+	arch/arm/boot/dts/bcm2835-rpi.dtsi
 ---
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts    |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts    |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b.dts         |  1 +
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts       |  1 +
- arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm283x.dtsi              |  2 ++
- 7 files changed, 44 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 14 +++-----------
+ arch/arm/boot/dts/bcm2835-rpi-a.dts      | 14 +++-----------
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 14 +++-----------
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 14 +++-----------
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      | 12 ------------
+ arch/arm/boot/dts/bcm2835-rpi.dtsi       | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts    | 14 +++-----------
+ 7 files changed, 35 insertions(+), 67 deletions(-)
 
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+index 5bd0bfe..670ae70 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+@@ -20,17 +20,9 @@
+ 	};
+ };
+ 
+-&gpio {
+-	pinctrl-0 = <&i2c0_gpio0
+-		     &i2c1_gpio2
+-		     &gpclk0_gpio4
+-		     &gpclk1_gpio5
+-		     &spi0_gpio7
+-		     &pcm_gpio18
+-		     &pwm0_gpio40
+-		     &pwm1_gpio45
+-		     &emmc_gpio48
+-		     &gpioout>;
++&i2s {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcm_gpio18>;
+ };
+ 
+ &hdmi {
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+index ba1b0ac..e980637 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+@@ -13,17 +13,9 @@
+ 	};
+ };
+ 
+-&gpio {
+-	pinctrl-0 = <&i2c0_gpio0
+-		     &i2c1_gpio2
+-		     &gpclk0_gpio4
+-		     &gpclk1_gpio5
+-		     &spi0_gpio7
+-		     &pcm_gpio28
+-		     &pwm0_gpio40
+-		     &pwm1_gpio45
+-		     &emmc_gpio48
+-		     &gpioout>;
++&i2s {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcm_gpio28>;
+ };
+ 
+ &hdmi {
 diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index 57d313b..d5fdb8e 100644
+index 609a5e8..312d977 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
 +++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
+@@ -21,17 +21,9 @@
+ 	};
+ };
  
- / {
- 	compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
+-&gpio {
+-	pinctrl-0 = <&i2c0_gpio0
+-		     &i2c1_gpio2
+-		     &gpclk0_gpio4
+-		     &gpclk1_gpio5
+-		     &spi0_gpio7
+-		     &pcm_gpio18
+-		     &pwm0_gpio40
+-		     &pwm1_gpio45
+-		     &emmc_gpio48
+-		     &gpioout>;
++&i2s {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcm_gpio18>;
+ };
+ 
+ &hdmi {
 diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index cf2774e..bfc4bd9 100644
+index 97de2d5..3d1d061 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
 +++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9512.dtsi"
+@@ -14,17 +14,9 @@
+ 	};
+ };
  
- / {
- 	compatible = "raspberrypi,model-b-rev2", "brcm,bcm2835";
+-&gpio {
+-	pinctrl-0 = <&i2c0_gpio0
+-		     &i2c1_gpio2
+-		     &gpclk0_gpio4
+-		     &gpclk1_gpio5
+-		     &spi0_gpio7
+-		     &pcm_gpio28
+-		     &pwm0_gpio40
+-		     &pwm1_gpio45
+-		     &emmc_gpio48
+-		     &gpioout>;
++&i2s {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcm_gpio28>;
+ };
+ 
+ &hdmi {
 diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 8b15f9c..0371bb7 100644
+index bc59f7e..0f96582 100644
 --- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
 +++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9512.dtsi"
+@@ -14,18 +14,6 @@
+ 	};
+ };
  
- / {
- 	compatible = "raspberrypi,model-b", "brcm,bcm2835";
+-&gpio {
+-	pinctrl-0 = <&i2c0_gpio0
+-		     &i2c1_gpio2
+-		     &gpclk0_gpio4
+-		     &gpclk1_gpio5
+-		     &spi0_gpio7
+-		     &pwm0_gpio40
+-		     &pwm1_gpio45
+-		     &emmc_gpio48
+-		     &gpioout>;
+-};
+-
+ &hdmi {
+ 	hpd-gpios = <&gpio 46 GPIO_ACTIVE_HIGH>;
+ };
+diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+index 7e65d16..a207693 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
++++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
+@@ -31,6 +31,9 @@
+ 
+ &gpio {
+ 	pinctrl-names = "default";
++	pinctrl-0 = <&gpclk0_gpio4
++		     &gpclk1_gpio5
++		     &gpioout>;
+ 
+ 	gpioout: gpioout {
+ 		brcm,pins = <6>;
+@@ -39,11 +42,17 @@
+ };
+ 
+ &i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_gpio0>;
++
+ 	status = "okay";
+ 	clock-frequency = <100000>;
+ };
+ 
+ &i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_gpio2>;
++
+ 	status = "okay";
+ 	clock-frequency = <100000>;
+ };
+@@ -53,11 +62,17 @@
+ };
+ 
+ &sdhci {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emmc_gpio48>;
++
+ 	status = "okay";
+ 	bus-width = <4>;
+ };
+ 
+ &pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_gpio40 &pwm1_gpio45>;
++
+ 	status = "okay";
+ };
+ 
+@@ -73,3 +88,8 @@
+ 	power-domains = <&power RPI_POWER_DOMAIN_HDMI>;
+ 	status = "okay";
+ };
++
++&spi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&spi0_gpio7>;
++};
 diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index c4743f4..29e1cfe 100644
+index b4cbffe..e6e1791 100644
 --- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
 +++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2836.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
+@@ -25,17 +25,9 @@
+ 	};
+ };
  
- / {
- 	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
-new file mode 100644
-index 0000000..12c981e
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
-@@ -0,0 +1,19 @@
-+/ {
-+	aliases {
-+		ethernet = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,9512";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethernet: usbether at 1 {
-+			compatible = "usb424,ec00";
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-new file mode 100644
-index 0000000..3f0a56e
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-@@ -0,0 +1,19 @@
-+/ {
-+	aliases {
-+		ethernet = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,9514";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethernet: usbether at 1 {
-+			compatible = "usb424,ec00";
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 10b27b9..b982522 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -287,6 +287,8 @@
- 			compatible = "brcm,bcm2835-usb";
- 			reg = <0x7e980000 0x10000>;
- 			interrupts = <1 9>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
+-&gpio {
+-	pinctrl-0 = <&i2c0_gpio0
+-		     &i2c1_gpio2
+-		     &gpclk0_gpio4
+-		     &gpclk1_gpio5
+-		     &spi0_gpio7
+-		     &pcm_gpio18
+-		     &pwm0_gpio40
+-		     &pwm1_gpio45
+-		     &emmc_gpio48
+-		     &gpioout>;
++&i2s {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pcm_gpio18>;
+ };
  
- 		v3d: v3d at 7ec00000 {
+ &hdmi {
 -- 
 1.8.3.1
