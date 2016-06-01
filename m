@@ -1,57 +1,38 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 1 Jun 2016 08:16:41 +0200
-Subject: [PATCH 4/5] clocksource: rockchip: add support for rk3399 SoC
-In-Reply-To: <574E4130.8090600@rock-chips.com>
-References: <1464169802-6033-1-git-send-email-wxt@rock-chips.com>
- <1464169802-6033-5-git-send-email-wxt@rock-chips.com>
- <574CCCB4.1030001@linaro.org> <574D95AF.2020905@rock-chips.com>
- <574D9A66.4090209@linaro.org> <574E4130.8090600@rock-chips.com>
-Message-ID: <574E7DC9.4000102@linaro.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 01 Jun 2016 08:27:33 +0200
+Subject: [PATCH v2] reset: Return -ENOTSUPP when not configured
+In-Reply-To: <2b8732d98087e52edec39ec83a063912fcc23962.1464738402.git.johnyoun@synopsys.com>
+References: <2b8732d98087e52edec39ec83a063912fcc23962.1464738402.git.johnyoun@synopsys.com>
+Message-ID: <1464762453.3522.0.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 03:58 AM, Huang, Tao wrote:
-> Hi Daniel:
-> On 2016?05?31? 22:06, Daniel Lezcano wrote:
+Hi John,
 
-[ ... ]
+Am Dienstag, den 31.05.2016, 16:55 -0700 schrieb John Youn:
+> Prior to commit 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo]
+> functions wrappers"), the "optional" functions returned -ENOTSUPP when
+> CONFIG_RESET_CONTROLLER was not set.
+> 
+> Revert back to the old behavior by changing the new
+> __devm_reset_control_get() and __of_reset_control_get() functions to
+> return ERR_PTR(-ENOTSUPP) when compiled without CONFIG_RESET_CONTROLLER.
+> 
+> Otherwise they will return -EINVAL causing users to think that an error
+> occurred when CONFIG_RESET_CONTROLLER is not set.
+> 
+> Fixes: 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo] functions wrappers")
+> Signed-off-by: John Youn <johnyoun@synopsys.com>
+> ---
+> 
+> Hi Philipp,
+> 
+> Here are the changes as discussed previously. It just returns
+> -ENOTSUPP directly when not configured. Tested and works with DWC2
+> driver with Dinh's patch that adds the reset controller, using a
+> configuration with no reset controller configured.
 
->>> -CLOCKSOURCE_OF_DECLARE(rk_timer, "rockchip,rk3288-timer", rk_timer_init);
->>> +static void __init rk3288_timer_init(struct device_node *np)
->>> +{
->>> +	bc_timer.ctrl = TIMER_CONTROL_REG3288;
->>> +	rk_timer_init(np);
->>
->> 	rk_timer_init(np);
->> 	bc_timer.ctrl = bc_timer.base + TIMER_CONTROL_REG3288;
->
-> No. It's not such simple. You will access null pointer when
-> rk_timer_init, if we keep rk_timer_disable call in init or after
-> request_irq/clockevents_config_and_register and interrupt happen
-> immediately.
->
-> So the code maybe:
-> static void __init rk3288_timer_init(struct device_node *np)
-> {
-> 	bc_timer.base = of_iomap(np, 0);
-> 	if (!bc_timer.base) {
-> 		pr_err("Failed to get base address for '%s'\n", TIMER_NAME);
-> 		return;
-> 	}
-> 	bc_timer.ctrl = bc_timer.base + TIMER_CONTROL_REG3288;
-> 	rk_imter_init(np); // of course remove of_iomap from init.
->
-> Is this what you want?
+Thank you, I've applied the patch to my reset/next branch.
 
-Not necessarily. There are plenty of variants.
-
-eg. rk_timer_init(np, TIMER_CONTROL_REG3288);
-
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+regards
+Philipp
