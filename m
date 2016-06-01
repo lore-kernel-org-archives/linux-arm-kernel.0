@@ -1,85 +1,49 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 01 Jun 2016 10:02:18 +0200
-Subject: [PATCH v3 09/12] EXAMPLE CODE: usb: port: Parse pwrseq phandle from
- Device Tree
+Date: Wed, 01 Jun 2016 10:02:19 +0200
+Subject: [PATCH v3 10/12] EXAMPLE CODE: usb: hub: Power sequence the ports on
+ activation
 In-Reply-To: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
 References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1464768141-25420-10-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1464768141-25420-11-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parse usb-pwrseq property from Device Tree to get the phandle to pwrseq
-device.  The pwrseq device will be used by USB hub to cycle the power
-before activating ports.
+The autodetection of attached USB device might not work on certain
+boards where the power is delivered externally.  These devices also might
+require a hard reset.  Use pwrseq for that in USB hub.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- drivers/usb/core/hub.h  |  3 +++
- drivers/usb/core/port.c | 15 +++++++++++++++
- 2 files changed, 18 insertions(+)
+ drivers/usb/core/hub.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/drivers/usb/core/hub.h b/drivers/usb/core/hub.h
-index 34c1a7e22aae..68ca89780d26 100644
---- a/drivers/usb/core/hub.h
-+++ b/drivers/usb/core/hub.h
-@@ -24,6 +24,8 @@
- #include <linux/usb/hcd.h>
- #include "usb.h"
- 
-+struct pwrseq;
-+
- struct usb_hub {
- 	struct device		*intfdev;	/* the "interface" device */
- 	struct usb_device	*hdev;
-@@ -101,6 +103,7 @@ struct usb_port {
- 	struct usb_dev_state *port_owner;
- 	struct usb_port *peer;
- 	struct dev_pm_qos_request *req;
-+	struct pwrseq *pwrseq;
- 	enum usb_port_connect_type connect_type;
- 	usb_port_location_t location;
- 	struct mutex status_lock;
-diff --git a/drivers/usb/core/port.c b/drivers/usb/core/port.c
-index 460c855be0d0..89b9bdfc7061 100644
---- a/drivers/usb/core/port.c
-+++ b/drivers/usb/core/port.c
-@@ -18,6 +18,8 @@
- 
- #include <linux/slab.h>
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index c421745b84aa..46d9f9aedacc 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -26,6 +26,7 @@
+ #include <linux/mutex.h>
+ #include <linux/random.h>
  #include <linux/pm_qos.h>
 +#include <linux/pwrseq.h>
-+#include <linux/usb/of.h>
  
- #include "hub.h"
+ #include <asm/uaccess.h>
+ #include <asm/byteorder.h>
+@@ -1663,6 +1664,15 @@ static int hub_configure(struct usb_hub *hub,
  
-@@ -526,6 +528,14 @@ int usb_hub_create_port_device(struct usb_hub *hub, int port1)
- 		return retval;
- 	}
+ 	usb_hub_adjust_deviceremovable(hdev, hub->descriptor);
  
-+	port_dev->dev.of_node = usb_of_get_child_node(hdev->dev.parent->of_node,
-+						      port1);
-+	port_dev->pwrseq = pwrseq_alloc(&port_dev->dev, "usb-pwrseq");
-+	if (IS_ERR(port_dev->pwrseq)) {
-+		device_unregister(&port_dev->dev);
-+		return PTR_ERR(port_dev->pwrseq);
-+	}
++	/* FIXME: When do the pre-power-on? */
++	/*
++	for (i = 0; i < maxchild; i++)
++		pwrseq_pre_power_on(hub->ports[i]->pwrseq);
++	*/
 +
- 	find_and_link_peer(hub, port1);
- 
- 	/*
-@@ -567,8 +577,13 @@ void usb_hub_remove_port_device(struct usb_hub *hub, int port1)
- 	struct usb_port *port_dev = hub->ports[port1 - 1];
- 	struct usb_port *peer;
- 
-+	pwrseq_power_off(port_dev->pwrseq);
++	for (i = 0; i < maxchild; i++)
++		pwrseq_post_power_on(hub->ports[i]->pwrseq);
 +
- 	peer = port_dev->peer;
- 	if (peer)
- 		unlink_peers(port_dev, peer);
-+
-+	pwrseq_free(port_dev->pwrseq);
-+	port_dev->pwrseq = NULL;
- 	device_unregister(&port_dev->dev);
- }
+ 	hub_activate(hub, HUB_INIT);
+ 	return 0;
+ 
 -- 
 1.9.1
