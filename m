@@ -1,69 +1,67 @@
 From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Wed, 1 Jun 2016 11:06:02 +0800
-Subject: [RFC PATCH 4/4] arm64: vdso: check whether the res pointer is valid
- in clock_getres()
+Date: Wed, 1 Jun 2016 11:06:00 +0800
+Subject: [RFC PATCH 2/4] arm64: vdso: check whether the params of
+ gettimeofday() is valid
 In-Reply-To: <1464750362-14188-1-git-send-email-yangyingliang@huawei.com>
 References: <1464750362-14188-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <1464750362-14188-5-git-send-email-yangyingliang@huawei.com>
+Message-ID: <1464750362-14188-3-git-send-email-yangyingliang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use RANGE_OK to check whether the res pointer is valid. Returns
--EINVAL if the it's NULL, returns -EFAULT if it's invalid, otherwise
-return 0.
+When the params of gettimeofday() is an invalid addr(E.g.
+gettimeofday(-1, -1)), it will get segment fault. To avoid
+this fault, use RANGE_OK to test whether a block of memory
+is valid. Returns -EFAULT if the range is invalid, 0 otherwise.
 
 Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
 ---
- arch/arm64/kernel/vdso/gettimeofday.S | 22 +++++++++++++++-------
- 1 file changed, 15 insertions(+), 7 deletions(-)
+ arch/arm64/kernel/vdso/gettimeofday.S | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm64/kernel/vdso/gettimeofday.S b/arch/arm64/kernel/vdso/gettimeofday.S
-index 1e377ac..d7e4341 100644
+index 05ccaca..43ec321 100644
 --- a/arch/arm64/kernel/vdso/gettimeofday.S
 +++ b/arch/arm64/kernel/vdso/gettimeofday.S
-@@ -217,28 +217,36 @@ ENTRY(__kernel_clock_getres)
- 	ccmp	w0, #CLOCK_MONOTONIC, #0x4, ne
- 	b.ne	1f
+@@ -22,6 +22,7 @@
+ #include <asm/asm-offsets.h>
+ #include <asm/unistd.h>
+ #include <asm/memory.h>
++#include <asm-generic/errno-base.h>
  
--	ldr	x2, 5f
-+	ldr	x2, 6f
- 	b	2f
- 1:
- 	cmp	w0, #CLOCK_REALTIME_COARSE
- 	ccmp	w0, #CLOCK_MONOTONIC_COARSE, #0x4, ne
--	b.ne	4f
--	ldr	x2, 6f
-+	b.ne	5f
-+	ldr	x2, 7f
- 2:
- 	cbz	w1, 3f
-+	RANGE_OK(1, #TSPEC_SZ)
+ #define NSEC_PER_SEC_LO16	0xca00
+ #define NSEC_PER_SEC_HI16	0x3b9a
+@@ -78,10 +79,12 @@ ENTRY(__kernel_gettimeofday)
+ 	/* Acquire the sequence counter and get the timespec. */
+ 	adr	vdso_data, _vdso_data
+ 1:	seqcnt_acquire
+-	cbnz	use_syscall, 4f
++	cbnz	use_syscall, 5f
+ 
+ 	/* If tv is NULL, skip to the timezone code. */
+ 	cbz	x0, 2f
++	RANGE_OK(0, #TVAL_SZ)
 +	cbz	x4, 4f
- 	stp	xzr, x2, [x1]
-+	mov     w0, wzr
-+	ret
+ 	bl	__do_get_tspec
+ 	seqcnt_check w9, 1b
  
- 3:	/* res == NULL. */
--	mov	w0, wzr
-+	mov	x0, #-EINVAL
- 	ret
- 
--4:	/* Syscall fallback. */
-+4:	/* res is invalid. */
+@@ -93,12 +96,18 @@ ENTRY(__kernel_gettimeofday)
+ 2:
+ 	/* If tz is NULL, return 0. */
+ 	cbz	x1, 3f
++	RANGE_OK(1, #TZ_SZ)
++	cbz	x4, 4f
+ 	ldp	w4, w5, [vdso_data, #VDSO_TZ_MINWEST]
+ 	stp	w4, w5, [x1, #TZ_MINWEST]
+ 3:
+ 	mov	x0, xzr
+ 	ret	x2
+ 4:
++	/* tz is invalid */
 +	mov	x0, #-EFAULT
-+	ret
-+
-+5:	/* Syscall fallback. */
- 	mov	x8, #__NR_clock_getres
++	ret	x2
++5:
+ 	/* Syscall fallback. */
+ 	mov	x8, #__NR_gettimeofday
  	svc	#0
- 	ret
--5:
--	.quad	CLOCK_REALTIME_RES
- 6:
-+	.quad	CLOCK_REALTIME_RES
-+7:
- 	.quad	CLOCK_COARSE_RES
- 	.cfi_endproc
- ENDPROC(__kernel_clock_getres)
 -- 
 2.5.0
