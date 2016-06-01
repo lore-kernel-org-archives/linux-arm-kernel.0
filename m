@@ -1,44 +1,40 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 1 Jun 2016 14:53:02 +0800
-Subject: [PATCH v5 09/18] nios2: Remove unnecessary of_platform_populate with
- default match table
+Date: Wed, 1 Jun 2016 14:53:07 +0800
+Subject: [PATCH v5 14/18] bus: imx-weim: use of_platform_default_populate() to
+ populate default bus
 In-Reply-To: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464763991-26634-10-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1464763991-26634-15-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After patch "of/platform: Add common method to populate default bus",
-it is possible for arch code to remove unnecessary callers of
-of_platform_populate with default match table.
+Use helper of_platform_default_populate() in linux/of_platform
+when possible, instead of calling of_platform_populate() with
+the default match table.
 
-Cc: Ley Foon Tan <lftan@altera.com>
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Signed-off-by: Huang Shijie <b32955@freescale.com>
+Cc: Shawn Guo <shawn.guo@linaro.org>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- arch/nios2/platform/platform.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ drivers/bus/imx-weim.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/nios2/platform/platform.c b/arch/nios2/platform/platform.c
-index d478773..2a35154 100644
---- a/arch/nios2/platform/platform.c
-+++ b/arch/nios2/platform/platform.c
-@@ -9,7 +9,6 @@
-  */
- 
- #include <linux/init.h>
--#include <linux/of_platform.h>
- #include <linux/of_address.h>
- #include <linux/of_fdt.h>
- #include <linux/err.h>
-@@ -39,8 +38,7 @@ static int __init nios2_soc_device_init(void)
- 		}
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index 1827fc4..4bd361d 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -163,9 +163,8 @@ static int __init weim_parse_dt(struct platform_device *pdev,
  	}
  
--	return of_platform_populate(NULL, of_default_bus_match_table,
--		NULL, NULL);
-+	return 0;
- }
- 
- device_initcall(nios2_soc_device_init);
+ 	if (have_child)
+-		ret = of_platform_populate(pdev->dev.of_node,
+-				   of_default_bus_match_table,
+-				   NULL, &pdev->dev);
++		ret = of_platform_default_populate(pdev->dev.of_node,
++						   NULL, &pdev->dev);
+ 	if (ret)
+ 		dev_err(&pdev->dev, "%s fail to create devices.\n",
+ 			pdev->dev.of_node->full_name);
 -- 
 1.7.12.4
