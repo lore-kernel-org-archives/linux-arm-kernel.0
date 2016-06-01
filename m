@@ -1,38 +1,51 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Wed, 01 Jun 2016 08:27:33 +0200
-Subject: [PATCH v2] reset: Return -ENOTSUPP when not configured
-In-Reply-To: <2b8732d98087e52edec39ec83a063912fcc23962.1464738402.git.johnyoun@synopsys.com>
-References: <2b8732d98087e52edec39ec83a063912fcc23962.1464738402.git.johnyoun@synopsys.com>
-Message-ID: <1464762453.3522.0.camel@pengutronix.de>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 1 Jun 2016 15:30:03 +0900
+Subject: [PATCH] ARM: uniphier: drop code for old DT binding
+In-Reply-To: <4992506.m4GEHIOqdc@wuerfel>
+References: <1464682628-12163-1-git-send-email-yamada.masahiro@socionext.com>
+ <4992506.m4GEHIOqdc@wuerfel>
+Message-ID: <CAK7LNAT0n=VdfOmZ0dHaoVbD9jEsa16tY__9sVkuuuStMYA7WA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi John,
+Hi Arnd.
 
-Am Dienstag, den 31.05.2016, 16:55 -0700 schrieb John Youn:
-> Prior to commit 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo]
-> functions wrappers"), the "optional" functions returned -ENOTSUPP when
-> CONFIG_RESET_CONTROLLER was not set.
-> 
-> Revert back to the old behavior by changing the new
-> __devm_reset_control_get() and __of_reset_control_get() functions to
-> return ERR_PTR(-ENOTSUPP) when compiled without CONFIG_RESET_CONTROLLER.
-> 
-> Otherwise they will return -EINVAL causing users to think that an error
-> occurred when CONFIG_RESET_CONTROLLER is not set.
-> 
-> Fixes: 6c96f05c8bb8 ("reset: Make [of_]reset_control_get[_foo] functions wrappers")
-> Signed-off-by: John Youn <johnyoun@synopsys.com>
-> ---
-> 
-> Hi Philipp,
-> 
-> Here are the changes as discussed previously. It just returns
-> -ENOTSUPP directly when not configured. Tested and works with DWC2
-> driver with Dinh's patch that adds the reset controller, using a
-> configuration with no reset controller configured.
+2016-05-31 18:21 GMT+09:00 Arnd Bergmann <arnd@arndb.de>:
+> On Tuesday, May 31, 2016 5:17:08 PM CEST Masahiro Yamada wrote:
+>> Commit 307d40c56b0c ("ARM: uniphier: rework SMP code to support new
+>> System Bus binding") added a new DT binding for SMP code, but still
+>> kept old code for the backward compatibility.
+>>
+>> Linux 4.6 was out with both bindings supported, so it should not
+>> hurt to drop the old code now.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>
+>
+> That explanation is in general not sufficient. Are you sure that
+> nobody is shipping a machine with their own dts file that is not
+> merged upstream, and that there are no bootloaders that have a
+> hardcoded dtb file that we need to support indefinitely?
+>
 
-Thank you, I've applied the patch to my reset/next branch.
+I have to confess that almost no one (except me) uses this upstreamed
+code directly.
+It can boot, but it is almost useless for practical uses (at least for
+production level)
+because it still lacks lots of drivers.
 
-regards
-Philipp
+Our products based on ARM 32bit SoCs were shipped with old kernel
+(without device tree) that were never upstreamed.
+
+Socionext is now trying to change the development procedure
+and the situation will be much better for ARM64 SoC products; it will be
+more community-based development, although they are not shipped yet.
+
+So, the answer is,  nobody is shipping ARM32 products using this upstream code.
+Device Tree is not used in the first place.
+(But, I still believe I should keep upstreaming.)
+
+
+-- 
+Best Regards
+Masahiro Yamada
