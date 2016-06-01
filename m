@@ -1,71 +1,88 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 1 Jun 2016 14:42:19 +0800
-Subject: [PATCH] drivers: char: mem: Check {read,write}_kmem() addresses
-In-Reply-To: <574D9448.7080206@arm.com>
-References: <5e293c103f0a86f512d71f17091a55e9746e711f.1464698496.git.robin.murphy@arm.com>
- <20160531130821.GV19428@n2100.arm.linux.org.uk> <574D9448.7080206@arm.com>
-Message-ID: <574E83CB.5040404@huawei.com>
+Date: Wed, 1 Jun 2016 14:52:54 +0800
+Subject: [PATCH v5 01/18] of/platform: Add common method to populate default
+ bus
+In-Reply-To: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
+References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1464763991-26634-2-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The arch code calls of_platform_populate() with default match table
+when it wants to populate default bus.
 
+This patch introduce a new of_platform_default_populate_init() and make it
+arch_initcall_sync(it should be later than some iommu configration, eg,
+of_iommu_init() and swiotlb_late_init in arm64), then we can finish above
+job in common method.
 
-On 2016/5/31 21:40, Robin Murphy wrote:
-> On 31/05/16 14:08, Russell King - ARM Linux wrote:
->> On Tue, May 31, 2016 at 01:52:45PM +0100, Robin Murphy wrote:
->>> Arriving at read_kmem() with an offset representing a bogus kernel
->>> address (e.g. 0 from a simple "cat /dev/kmem") leads to copy_to_user
->>> faulting on the kernel-space read.
->>>
->>> x86_64 happens to get away with this since the optimised implementation
->>> uses "rep movs*", thus the user write (which is allowed to fault) and
->>> the kernel read are the same instruction, the kernel-side fault falls
->>> into the userspace fixup handler and a chain of events transpires
->>> leading to returning the expected -EFAULT. On other architectures,
->>> though, the read is not covered by the fixup entry for the write, and we
->>> get a straightforward "Unable to hande kernel paging request..." dump.
->>>
->>> The more typical use-case of mmap_kmem() already validates the address
->>> with pfn_valid() as one might expect, so let's make that consistent
->>> across {read,write}_kem() too.
->>>
->>> Reported-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
->>> ---
->>>
->>> I'm not sure if this warrants going to stable or not, as it's really
->>> just making an existing failure case more graceful and less confusing.
->>
->> Returning -EFAULT because the kernel-side address (iow, file offset) is
->> invalid is not particularly nice:
->>
->> NAME
->>         read - read from a file descriptor
->>
->> ERRORS
->>         EFAULT buf is outside your accessible address space.
->>
->> Latest POSIX has:
->>
->> ENXIO
->>     A request was made of a nonexistent device, or the
->>     request was outside the capabilities of the device.
->>
->> which to me looks like a better error code to return, as file offsets
->> which are not valid can be interpreted as being "outside the
->> capabilities of the device".  EFAULT has always on Linux meant that
->> the user passed an invalid userspace buffer.
-> 
-> Good point - seems I failed to twig that the error code in the x86 case is still effectively falling out of the "fault with the user address" path. ENXIO indeed sounds more reasonable, thanks.
+In order to avoid the default bus being populated twice, simply checking
+the flag of bus node whether has be set OF_POPULATED_BUS or not.
 
-Hi Robin, thanks for you fix, return -EIO like mmap_kmem() is better to me.
+After that, we can safely remove the caller in arch code.
 
-BRs,
-Kefeng
+Btw, add debug print in of_platform_populate(), and use __func__ to
+print function's name of of_platform_bus_create().
 
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Frank Rowand <frowand.list@gmail.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+---
+ drivers/of/platform.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-> 
-> Robin.
-> 
-> .
-> 
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 16e8daf..c559ef8 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -363,6 +363,12 @@ static int of_platform_bus_create(struct device_node *bus,
+ 		return 0;
+ 	}
+ 
++	if (of_node_check_flag(bus, OF_POPULATED_BUS)) {
++		pr_debug("%s() - skipping %s, already populated\n",
++			__func__, bus->full_name);
++		return 0;
++	}
++
+ 	auxdata = of_dev_lookup(lookup, bus);
+ 	if (auxdata) {
+ 		bus_id = auxdata->name;
+@@ -414,7 +420,7 @@ int of_platform_bus_probe(struct device_node *root,
+ 	if (!root)
+ 		return -EINVAL;
+ 
+-	pr_debug("of_platform_bus_probe()\n");
++	pr_debug("%s()\n", __func__);
+ 	pr_debug(" starting at: %s\n", root->full_name);
+ 
+ 	/* Do a self check of bus type, if there's a match, create children */
+@@ -466,6 +472,9 @@ int of_platform_populate(struct device_node *root,
+ 	if (!root)
+ 		return -EINVAL;
+ 
++	pr_debug("%s()\n", __func__);
++	pr_debug(" starting at: %s\n", root->full_name);
++
+ 	for_each_child_of_node(root, child) {
+ 		rc = of_platform_bus_create(child, matches, lookup, parent, true);
+ 		if (rc) {
+@@ -489,6 +498,15 @@ int of_platform_default_populate(struct device_node *root,
+ }
+ EXPORT_SYMBOL_GPL(of_platform_default_populate);
+ 
++static int __init of_platform_default_populate_init(void)
++{
++	if (of_have_populated_dt())
++		of_platform_default_populate(NULL, NULL, NULL);
++
++	return 0;
++}
++arch_initcall_sync(of_platform_default_populate_init);
++
+ static int of_platform_device_destroy(struct device *dev, void *data)
+ {
+ 	/* Do not touch devices not populated from the device tree */
+-- 
+1.7.12.4
