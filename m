@@ -1,37 +1,45 @@
 From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Wed, 1 Jun 2016 14:53:08 +0800
-Subject: [PATCH v5 15/18] bus: uniphier-system-bus: use
- of_platform_default_populate() to populate default bus
+Date: Wed, 1 Jun 2016 14:53:00 +0800
+Subject: [PATCH v5 07/18] metag: Remove unnecessary of_platform_populate with
+ default match table
 In-Reply-To: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
 References: <1464763991-26634-1-git-send-email-wangkefeng.wang@huawei.com>
-Message-ID: <1464763991-26634-16-git-send-email-wangkefeng.wang@huawei.com>
+Message-ID: <1464763991-26634-8-git-send-email-wangkefeng.wang@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use helper of_platform_default_populate() in linux/of_platform
-when possible, instead of calling of_platform_populate() with
-the default match table.
+After patch "of/platform: Add common method to populate default bus",
+it is possible for arch code to remove unnecessary callers of
+of_platform_populate with default match table.
 
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-Cc: Masahiro Yamada <yamada.masahiro@socionext.com>
+Cc: James Hogan <james.hogan@imgtec.com>
 Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
 ---
- drivers/bus/uniphier-system-bus.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/metag/kernel/setup.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-diff --git a/drivers/bus/uniphier-system-bus.c b/drivers/bus/uniphier-system-bus.c
-index 350b730..1e6e0269 100644
---- a/drivers/bus/uniphier-system-bus.c
-+++ b/drivers/bus/uniphier-system-bus.c
-@@ -257,8 +257,7 @@ static int uniphier_system_bus_probe(struct platform_device *pdev)
- 	uniphier_system_bus_set_reg(priv);
- 
- 	/* Now, the bus is configured.  Populate platform_devices below it */
--	return of_platform_populate(dev->of_node, of_default_bus_match_table,
--				    NULL, dev);
-+	return of_platform_default_populate(dev->of_node, NULL, dev);
+diff --git a/arch/metag/kernel/setup.c b/arch/metag/kernel/setup.c
+index 31cf53d..1166f1f 100644
+--- a/arch/metag/kernel/setup.c
++++ b/arch/metag/kernel/setup.c
+@@ -20,7 +20,6 @@
+ #include <linux/memblock.h>
+ #include <linux/mm.h>
+ #include <linux/of_fdt.h>
+-#include <linux/of_platform.h>
+ #include <linux/pfn.h>
+ #include <linux/root_dev.h>
+ #include <linux/sched.h>
+@@ -414,9 +413,7 @@ static int __init customize_machine(void)
+ 	/* customizes platform devices, or adds new ones */
+ 	if (machine_desc->init_machine)
+ 		machine_desc->init_machine();
+-	else
+-		of_platform_populate(NULL, of_default_bus_match_table, NULL,
+-				     NULL);
++
+ 	return 0;
  }
- 
- static const struct of_device_id uniphier_system_bus_match[] = {
+ arch_initcall(customize_machine);
 -- 
 1.7.12.4
