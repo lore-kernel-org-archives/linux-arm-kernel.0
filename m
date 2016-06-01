@@ -1,71 +1,60 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Wed, 1 Jun 2016 17:10:26 +0800
-Subject: [RFC v2 3/5] drm/mediatek: add *driver_data for different
- hardware settings
-In-Reply-To: <20160530104553.GB8388@ulmo.ba.sec>
-References: <1463756736-46573-1-git-send-email-yt.shen@mediatek.com>
- <1463756736-46573-4-git-send-email-yt.shen@mediatek.com>
- <1463996582.30093.5.camel@mtksdaap41> <20160530104553.GB8388@ulmo.ba.sec>
-Message-ID: <1464772226.10410.28.camel@mtksdaap41>
+From: marcel@ziswiler.com (Marcel Ziswiler)
+Date: Wed, 01 Jun 2016 11:19:06 +0200
+Subject: [PATCH 1/3] mmc: fix mmc mode selection for HS-DDR and higher
+In-Reply-To: <1464505484-3661-2-git-send-email-wens@csie.org>
+References: <1464505484-3661-1-git-send-email-wens@csie.org>
+ <1464505484-3661-2-git-send-email-wens@csie.org>
+Message-ID: <1464772746.3079.4.camel@ziswiler.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-On Mon, 2016-05-30 at 12:45 +0200, Thierry Reding wrote:
-> On Mon, May 23, 2016 at 05:43:02PM +0800, CK Hu wrote:
-> > Hi, YT:
-> > 
-> > One comment below.
-> > 
-> > On Fri, 2016-05-20 at 23:05 +0800, yt.shen at mediatek.com wrote:
-> > > From: YT Shen <yt.shen@mediatek.com>
-> > > 
-> > > There are some hardware settings changed, between MT8173 & MT2701:
-> > > DISP_OVL address offset changed, color format definition changed.
-> > > DISP_RDMA fifo size changed.
-> > > DISP_COLOR offset changed.
-> > > 
-> > > Signed-off-by: YT Shen <yt.shen@mediatek.com>
-> > > ---
-> > > +
-> > > +static inline struct mtk_ddp_comp_driver_data *mtk_ovl_get_driver_data(
-> > > +	struct platform_device *pdev)
-> > > +{
-> > > +	const struct of_device_id *of_id =
-> > > +		of_match_device(mtk_disp_ovl_driver_dt_match, &pdev->dev);
-> > > +
-> > > +	return (struct mtk_ddp_comp_driver_data *)of_id->data;
-> > > +}
-> > > +
-> > > +static inline struct mtk_ddp_comp_driver_data *mtk_rdma_get_driver_data(
-> > > +	struct platform_device *pdev)
-> > > +{
-> > > +	const struct of_device_id *of_id =
-> > > +		of_match_device(mtk_disp_rdma_driver_dt_match, &pdev->dev);
-> > > +
-> > > +	return (struct mtk_ddp_comp_driver_data *)of_id->data;
-> > > +}
-> > > +
-> > > +static inline struct mtk_ddp_comp_driver_data *mtk_color_get_driver_data(
-> > > +	struct device_node *node)
-> > > +{
-> > > +	const struct of_device_id *of_id =
-> > > +		of_match_node(mtk_disp_color_driver_dt_match, node);
-> > > +
-> > > +	return (struct mtk_ddp_comp_driver_data *)of_id->data;
-> > > +}
-> > > + 
-> > 
-> > These three functions looks the same with different parameter:
-> > mtk_disp_ovl_driver_dt_match, mtk_disp_rdma_driver_dt_match, and
-> > mtk_disp_color_driver_dt_match. So merge them to prevent duplicated
-> > code.
+On Sun, 2016-05-29 at 15:04 +0800, Chen-Yu Tsai wrote:
+> When IS_ERR_VALUE was removed from the mmc core code, it was replaced
+> with a simple not-zero check. This does not work, as the value
+> checked
+> is the return value for mmc_select_bus_width, which returns the set
+> bit width on success. This made eMMC modes higher than HS-DDR
+> unusable.
 > 
-> I think what you really want is of_device_get_match_data().
+> Fix this by checking for a positive return value instead.
 > 
-> Thierry
+> Fixes: 287980e49ffc ("remove lots of IS_ERR_VALUE abuses")
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Great, that function is really what we need, thanks.
+This fixes the following eMMC issue as experienced on Apalis T30 as
+well:
 
-yt.shen
+[????7.194625] mmc1: mmc_select_hs200 failed, error 3
+[????7.201549] mmc1: error 3 whilst initialising MMC card
+
+Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+
+> ---
+> ?drivers/mmc/core/mmc.c | 4 ++--
+> ?1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index c984321d1881..aafb73d080ca 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card
+> *card)
+> ?	?* switch to HS200 mode if bus width is set successfully.
+> ?	?*/
+> ?	err = mmc_select_bus_width(card);
+> -	if (!err) {
+> +	if (err > 0) {
+> ?		val = EXT_CSD_TIMING_HS200 |
+> ?		??????card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
+> ?		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+> @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host,
+> u32 ocr,
+> ?	} else if (mmc_card_hs(card)) {
+> ?		/* Select the desired bus width optionally */
+> ?		err = mmc_select_bus_width(card);
+> -		if (!err) {
+> +		if (err > 0) {
+> ?			err = mmc_select_hs_ddr(card);
+> ?			if (err)
+> ?				goto free_card;
