@@ -1,62 +1,16 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 01 Jun 2016 01:33:49 +0300
-Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
-In-Reply-To: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 1 Jun 2016 09:25:53 +0900
+Subject: [PATCH 04/13] ARM: shmobile: r8a7792: basic SoC support
+In-Reply-To: <2352834.cNFKgiQiVO@wasted.cogentembedded.com>
 References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
-Message-ID: <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
+ <2352834.cNFKgiQiVO@wasted.cogentembedded.com>
+Message-ID: <20160601002553.GC20527@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R8A7792  SoC  doesn't have the EtherMAC core, so SMSC  LAN89218  Ethernet
-chip was used instead on the Blanche board; this chip  is compatible with
-SMSC LAN9115  for  which there's a (device tree aware) driver. Describe
-the  chip in  the  Blanche device tree;  enable DHCP and NFS root in the
-kernel command line for the kernel booting.
+On Wed, Jun 01, 2016 at 01:18:22AM +0300, Sergei Shtylyov wrote:
+> Add minimal support for the R-Car V2H (R8A7792) SoC.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
- arch/arm/boot/dts/r8a7792-blanche.dts |   23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -21,7 +21,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -29,6 +29,27 @@
- 		device_type = "memory";
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
-+
-+	d3_3v: regulator-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	ethernet at 18000000 {
-+		compatible = "smsc,lan89218", "smsc,lan9115";
-+		reg = <0 0x18000000 0 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+		smsc,irq-push-pull;
-+		reg-io-width = <4>;
-+		vddvario-supply = <&d3_3v>;
-+		vdd33a-supply = <&d3_3v>;
-+	};
- };
- 
- &extal_clk {
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
