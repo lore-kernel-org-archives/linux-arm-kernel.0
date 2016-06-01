@@ -1,29 +1,31 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 2 Jun 2016 10:28:06 +0800
-Subject: [PATCH v3 0/5] fix some type infos and bugs for arm64/of numa
-Message-ID: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
+From: mandy@tmeasure.com (TEC)
+Date: Wed, 01 Jun 2016 23:36:06 +0530
+Subject: VoIP Phones & Phone Systems Wanted (Cisco, Avaya & Polycom)
+Message-ID: <9bcc073e0a2992a17352fadafbb5270b@auged.fairseal.in>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v2 -> v3:
-1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
-   patches looks more well. The final code have no change. 
+We are looking to purchase surplus Cisco, Avaya & Polycom VoIP phones,
+phone systems and related Telephony hardware. Do you have any
+decommissioned VoIP phones/phone systems for sale? If yes, please send a
+list and we will make an immediate cash offer. We offer the highest market
+value paid in industry. Turn excess or depreciated assets into working
+capital. We provide Trade-in and like value asset exchanges.
 
-v1 -> v2:
-1. Base on https://lkml.org/lkml/2016/5/24/679
-2. Rewrote of_numa_parse_memory_nodes according to Rob Herring's advice. So that it looks more clear.
-3. Rewrote patch 5 because some scenes were not considered before.
+We also buy networking equipment manufactured by such companies as:
 
-Zhen Lei (5):
-  of/numa: remove a duplicated pr_debug information
-  of/numa: fix a memory@ node can only contains one memory block
-  arm64/numa: add nid check for memory block
-  of/numa: remove a duplicated warning
-  arm64/numa: avoid inconsistent information to be printed
+Cisco, Avaya, Juniper, Extreme, HP Procurve, Brocade/Foundry, Polycom,
+Dell-Force10,  Palo Alto, Arista Networks and many others.
 
- arch/arm64/mm/numa.c | 11 ++++++++---
- drivers/of/of_numa.c | 42 ++++++++++++------------------------------
- 2 files changed, 20 insertions(+), 33 deletions(-)
+Mandy
+Test Equipment Connection
+30 Skyline Drive, Lake Mary, Florida 32746
+407-833-9883
 
---
-2.5.0
+
+To unsubscribe please send an email to
+subscriptions at testequipmentcontact.org with the subject line "Unsubscribe"
+
+
+Click this link to unsubscribe:
+http://auged.fairseal.in/unsubscribe.php?M=12888081&C=83f77542153f91ac8470aaea42459fcf&L=816&N=1241
