@@ -1,31 +1,89 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Thu, 2 Jun 2016 09:06:48 +0800
-Subject: [PATCH v2 1/4] dt-bindings: rng: Northstar Plus SoC rng bindings
-In-Reply-To: <CAL2FKYkSnf1Lc9d=S_7ipgySprTX9Zu=sMSmRnDDtBLcrz2X=Q@mail.gmail.com>
-References: <CAL2FKYkSnf1Lc9d=S_7ipgySprTX9Zu=sMSmRnDDtBLcrz2X=Q@mail.gmail.com>
-Message-ID: <20160602010648.GA3171@gondor.apana.org.au>
+From: oss@buserror.net (Scott Wood)
+Date: Wed, 01 Jun 2016 20:11:14 -0500
+Subject: [PATCH 3/4] mmc: sdhci-of-esdhc: fix host version for
+ T4240-R1.0-R2.0
+In-Reply-To: <6110875.0k1HlSKhzn@wuerfel>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
+ <CAPDyKFqx2JMLzXoDxGCKFYMFV47+SegnkuWFXKvsQHK7L5w-1g@mail.gmail.com>
+ <6110875.0k1HlSKhzn@wuerfel>
+Message-ID: <1464829874.16584.163.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 08:34:11PM +0530, Yendapally Reddy Dhananjaya Reddy wrote:
-> On Wed, Jun 1, 2016 at 8:17 PM, Rob Herring <robh@kernel.org> wrote:
-> > On Fri, May 27, 2016 at 06:10:38AM -0400, Yendapally Reddy Dhananjaya Reddy wrote:
-> >> Document the bindings used by Northstar Plus(NSP) SoC random number
-> >> generator.
-> >>
-> >> Signed-off-by: Yendapally Reddy Dhananjaya Reddy <yendapally.reddy@broadcom.com>
-> >> Acked-by: Eric Anholt <eric@anholt.net>
-> >
-> > You missed my ack...
+On Mon, 2016-05-30 at 15:16 +0200, Arnd Bergmann wrote:
+> This is a rewrite of an earlier patch from Yangbo Lu, adding a quirk
+> for the NXP QorIQ T4240 in the detection of the host device version.
 > 
-> Sorry Rob. I missed it.
+> Unfortunately, this device cannot be detected using the compatible
+> string, as we have to support existing DTS files that use the generic
+> "fsl,t4240-esdhc" identifier but that have other host versions that
+> are correctly detected.
 > 
-> Herbert,
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> Can i send the v3 patch set with the ack added.
+> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of
+> -esdhc.c
+> index 3f34d354f1fc..1d4814fe4cb2 100644
+> --- a/drivers/mmc/host/sdhci-of-esdhc.c
+> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
+> @@ -73,14 +73,16 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
+>  static u16 esdhc_readw_fixup(struct sdhci_host *host,
+>  				     int spec_reg, u32 value)
+>  {
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
+>  	u16 ret;
+>  	int shift = (spec_reg & 0x2) * 8;
+>  
+>  	if (spec_reg == SDHCI_HOST_VERSION)
+> -		ret = value & 0xffff;
+> -	else
+> -		ret = (value >> shift) & 0xffff;
+> -	return ret;
+> +		return esdhc->vendor_ver << SDHCI_VENDOR_VER_SHIFT |
+> +		       esdhc->spec_ver;
+> +
+> +	return (value >> shift) & 0xffff;
+>  }
+>  
+>  static u8 esdhc_readb_fixup(struct sdhci_host *host,
+> @@ -562,16 +564,32 @@ static const struct sdhci_pltfm_data
+> sdhci_esdhc_le_pdata = {
+>  	.ops = &sdhci_esdhc_le_ops,
+>  };
+>  
+> +#define T4240_HOST_VER ((VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) |
+> SDHCI_SPEC_200)
+> +static const struct soc_device_attribute esdhc_t4240_quirk = {
+> +	/* T4240 revision < 0x20 uses vendor version 23, SDHCI version 200
+> */
+> +	{ .soc_id = "T4*(0x824000)", .revision = "0x[01]?",
+> +	  .data = (void *)(uintptr_t)(T4240_HOST_VER) },
 
-It's too late.  Your patches have already been applied.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Why should this code need to care that the string begins with "T4"?  This
+creates dual maintenance if that were to change.  It's also broken because
+T4240 has compatible = "fsl,t4240-device-config", "fsl,qoriq-device-config
+-2.0" and thus with these patches it would incorrectly show up as "P series
+(0x824000)".  The compatible string of this node was never meant to be a key
+for choosing a string to describe the system to userspace.
+
+0x824000 is a magic number which should be represented symbolically.
+
+If T4240 is affected, then so are the reduced-core variants T4160 and T4080,
+but 0x824000 doesn't match them (Yangbo's patch had the same problem).  And
+please don't respond with "0x824*"
+
+You also didn't strip out the E bit of SVR which indicates encryption
+capability and nothing else (Yangbo's patch did not have this problem because
+it used SVR_SOC_VER).
+
+What happens if the revision condition is more complicated, such as <= 0x20
+with 0x21 being fine?  Multiple quirk entries where before we had as simple
+comparison?
+
+I fail to see how this approach is an improvement (much less one that needs to
+hold up a patchset that is fixing a problem and is not touching any generic
+code).  Why does this need to be a string?
+
+-Scott
