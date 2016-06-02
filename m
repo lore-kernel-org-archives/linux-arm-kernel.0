@@ -1,75 +1,70 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 2 Jun 2016 07:54:28 +0200
-Subject: [PATCH/RFC v3 20/22] clk: renesas: r8a7778: Remove obsolete
- r8a7778_clocks_init()
-In-Reply-To: <1464808880-343-21-git-send-email-geert+renesas@glider.be>
-References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
- <1464808880-343-21-git-send-email-geert+renesas@glider.be>
-Message-ID: <9f19c6e5-54d1-abd8-b666-bdf1a502d9c4@de.bosch.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 02 Jun 2016 07:55:13 +0200
+Subject: [PATCH 1/4] ARM: multi_v7_defconfig: Enable Trats2 audio codec,
+ touchscreen and sensors
+Message-ID: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.06.2016 21:21, Geert Uytterhoeven wrote:
-> The R-Car M1A board code no longer calls r8a7778_clocks_init().
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v3:
->   - New.
-> ---
->  drivers/clk/renesas/clk-r8a7778.c | 13 -------------
->  include/linux/clk/renesas.h       |  1 -
->  2 files changed, 14 deletions(-)
->
-> diff --git a/drivers/clk/renesas/clk-r8a7778.c b/drivers/clk/renesas/clk-r8a7778.c
-> index 07ea411098a75ad1..886a8380e91247a1 100644
-> --- a/drivers/clk/renesas/clk-r8a7778.c
-> +++ b/drivers/clk/renesas/clk-r8a7778.c
-> @@ -143,16 +143,3 @@ static void __init r8a7778_cpg_clocks_init(struct device_node *np)
->
->  CLK_OF_DECLARE(r8a7778_cpg_clks, "renesas,r8a7778-cpg-clocks",
->  	       r8a7778_cpg_clocks_init);
-> -
-> -void __init r8a7778_clocks_init(u32 mode)
-> -{
-> -	BUG_ON(!(mode & BIT(19)));
-> -
-> -	cpg_mode_rates = (!!(mode & BIT(18)) << 2) |
-> -			 (!!(mode & BIT(12)) << 1) |
-> -			 (!!(mode & BIT(11)));
-> -	cpg_mode_divs = (!!(mode & BIT(2)) << 1) |
-> -			(!!(mode & BIT(1)));
-> -
-> -	of_clk_init(NULL);
-> -}
+The Exynos4412-based Trats2 board has CM36651 proximity/ambient light
+sensor, MMS114 touchscreen and Wolfson Microelectronics WM1811 CODEC.
+Enable them in defconfig to get some testing coverage and use its
+features.
 
+While saving defconfig the SND_SOC_ODROIDX2 is removed because it does
+not exist since commit ee12a817bb4b ("ASoC: samsung: Remove unused
+Odroid x2/u3 machine driver").
 
-Just a question on how you structured the patches: Is there a special 
-reason why you do the adding of new code and the removal of dead code in 
-two patches?
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
-Having both in one patch normally makes it more obvious which old code 
-is replaced by which new code.
-
-An example: In patch
-
-[PATCH/RFC v3 11/22] clk: renesas: r8a7778: Obtain mode pin values using 
-R-Car RST driver
-
-I wondered where the section
-
-+	BUG_ON(!(mode & BIT(19)));
-+
-+	cpg_mode_rates = (!!(mode & BIT(18)) << 2) |
-+			 (!!(mode & BIT(12)) << 1) |
-+			 (!!(mode & BIT(11)));
-+	cpg_mode_divs = (!!(mode & BIT(2)) << 1) |
-+			(!!(mode & BIT(1)));
-
-comes from. This becomes obvious with this patch 20/22. But it's 9 
-patches later ;) So why don't make the whole replacement visible in one 
-patch?
-
-Best regards
-
-Dirk
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 995cc9b444bf..c5db9cf02e31 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -270,6 +270,7 @@ CONFIG_MOUSE_CYAPA=m
+ CONFIG_MOUSE_ELAN_I2C=y
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ATMEL_MXT=y
++CONFIG_TOUCHSCREEN_MMS114=m
+ CONFIG_TOUCHSCREEN_ST1232=m
+ CONFIG_TOUCHSCREEN_STMPE=y
+ CONFIG_TOUCHSCREEN_SUN4I=y
+@@ -515,6 +516,7 @@ CONFIG_REGULATOR_TPS6586X=y
+ CONFIG_REGULATOR_TPS65910=y
+ CONFIG_REGULATOR_TWL4030=y
+ CONFIG_REGULATOR_VEXPRESS=y
++CONFIG_REGULATOR_WM8994=m
+ CONFIG_MEDIA_SUPPORT=m
+ CONFIG_MEDIA_CAMERA_SUPPORT=y
+ CONFIG_MEDIA_CONTROLLER=y
+@@ -597,13 +599,14 @@ CONFIG_SND_SOC_ROCKCHIP=m
+ CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
+ CONFIG_SND_SOC_ROCKCHIP_MAX98090=m
+ CONFIG_SND_SOC_ROCKCHIP_RT5645=m
++CONFIG_SND_SOC_SAMSUNG=m
++CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994=m
++CONFIG_SND_SOC_SMDK_WM8994_PCM=m
++CONFIG_SND_SOC_SNOW=m
+ CONFIG_SND_SOC_SH4_FSI=m
+ CONFIG_SND_SOC_RCAR=m
+ CONFIG_SND_SOC_RSRC_CARD=m
+ CONFIG_SND_SUN4I_CODEC=m
+-CONFIG_SND_SOC_SAMSUNG=m
+-CONFIG_SND_SOC_SNOW=m
+-CONFIG_SND_SOC_ODROIDX2=m
+ CONFIG_SND_SOC_TEGRA=m
+ CONFIG_SND_SOC_TEGRA_RT5640=m
+ CONFIG_SND_SOC_TEGRA_WM8753=m
+@@ -800,6 +803,7 @@ CONFIG_BERLIN2_ADC=m
+ CONFIG_EXYNOS_ADC=m
+ CONFIG_VF610_ADC=m
+ CONFIG_XILINX_XADC=y
++CONFIG_CM36651=m
+ CONFIG_AK8975=y
+ CONFIG_RASPBERRYPI_POWER=y
+ CONFIG_PWM=y
+-- 
+1.9.1
