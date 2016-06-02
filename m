@@ -1,39 +1,52 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 02 Jun 2016 11:12:38 -0700
-Subject: [PATCH 21/32] mmc: bcm2835-sdhost: Add new driver for the
- internal SD controller.
-In-Reply-To: <4715245.LFBOAeJdHc@wuerfel>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-22-git-send-email-kraxel@redhat.com>
- <4715245.LFBOAeJdHc@wuerfel>
-Message-ID: <87vb1ra295.fsf@eliezer.anholt.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Jun 2016 19:16:09 +0100
+Subject: [PATCH 1/3] arm64: move the PTE_VALID to pgtable-hwdef.h
+In-Reply-To: <1464574468-22700-1-git-send-email-shijie.huang@arm.com>
+References: <1464574468-22700-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <20160602181609.GF7697@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Mon, May 30, 2016 at 10:14:26AM +0800, Huang Shijie wrote:
+> The PTE_VALID is used to check whether the page descriptor is valid.
+> It's not a software defined PTE bits, such as PTE_WRITE/PTE_DIRTY.
+> 
+> So move it to the proper header file: pgtable-hwdef.h.
+> 
+> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> ---
+>  arch/arm64/include/asm/pgtable-hwdef.h | 1 +
+>  arch/arm64/include/asm/pgtable-prot.h  | 1 -
+>  2 files changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+> index 2813748..eeb3269 100644
+> --- a/arch/arm64/include/asm/pgtable-hwdef.h
+> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
+> @@ -154,6 +154,7 @@
+>  #define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
+>  #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
+>  #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
+> +#define PTE_VALID		(_AT(pteval_t, 1) << 0)
+>  #define PTE_TABLE_BIT		(_AT(pteval_t, 1) << 1)
+>  #define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
+>  #define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
+> diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+> index 29fcb33..5ac71f4 100644
+> --- a/arch/arm64/include/asm/pgtable-prot.h
+> +++ b/arch/arm64/include/asm/pgtable-prot.h
+> @@ -24,7 +24,6 @@
+>  /*
+>   * Software defined PTE bits definition.
+>   */
+> -#define PTE_VALID		(_AT(pteval_t, 1) << 0)
+>  #define PTE_WRITE		(PTE_DBM)		 /* same as DBM (51) */
 
-> On Wednesday, June 1, 2016 11:43:30 PM CEST Gerd Hoffmann wrote:
->> +	/* Parse OF address directly to get the physical address for
->> +	 * DMA to our registers.
->> +	 */
->> +	host->phys_addr = be32_to_cpup(of_get_address(pdev->dev.of_node, 0,
->> +						      NULL, NULL));
->
-> This looks broken on 64-bit systems when #address-cells=<2>, or if there
-> is an intermediate bus with a non-empty ranges property.
->
-> What's wrong with platform_get_resource(pdev, IORESOURCE_MEM, 0)?
+So how would you define PTE_WRITE? It's a software bit in v8.0 and a
+hardware bit in v8.1 ;)
 
-I'll get to the rest of the review later, but this is a weird pattern
-that we have in several bcm2835-related drivers.
+I don't mind shuffling the #defines about, I just think the boundaries
+are somewhat blurred and maybe it's a mistake to put software bits and
+hardware bits in separate headers.
 
-We need the address as seen by the DMA controller, not the address from
-the ARM's perspective (which is offset by the dma-ranges DT property).
-This is the way that people have figured out to get that address.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/a60abe4d/attachment.sig>
+Will
