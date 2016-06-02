@@ -1,67 +1,39 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu,  2 Jun 2016 15:10:57 +0100
-Subject: [PATCH 5/5] Revert "arm64: hibernate: Refuse to hibernate if the boot
- cpu is offline"
-In-Reply-To: <1464876657-6692-1-git-send-email-james.morse@arm.com>
-References: <1464876657-6692-1-git-send-email-james.morse@arm.com>
-Message-ID: <1464876657-6692-6-git-send-email-james.morse@arm.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 2 Jun 2016 22:14:48 +0800
+Subject: [PATCH resend v2 1/6] regulator: axp20x: support AXP809 variant
+In-Reply-To: <20160602132536.GI2282@sirena.org.uk>
+References: <1464711804-19256-1-git-send-email-wens@csie.org>
+ <1464711804-19256-2-git-send-email-wens@csie.org>
+ <20160531173647.GJ29837@sirena.org.uk>
+ <CAGb2v67eVjNnON1pAPKMSMgq83sk6u7Q53qDs0dTEbhyTAR_gA@mail.gmail.com>
+ <20160602102742.GG2282@sirena.org.uk>
+ <CAGb2v64sh_2ScP-WQioWe9su6Hx8wjyjMHVLE6Q1q9zSHZohCA@mail.gmail.com>
+ <20160602132536.GI2282@sirena.org.uk>
+Message-ID: <CAGb2v660su71SHOgF4ZEdFNz=HyJQxe+Y+wvD-cYTHCL5ZdhgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we use the MPIDR to resume on the same CPU that we hibernated on,
-we no longer need to refuse to hibernate if the boot cpu is offline. (Which
-we can't possibly know if kexec causes logical CPUs to be renumbered).
+On Thu, Jun 2, 2016 at 9:25 PM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Jun 02, 2016 at 07:05:22PM +0800, Chen-Yu Tsai wrote:
+>> On Thu, Jun 2, 2016 at 6:27 PM, Mark Brown <broonie@kernel.org> wrote:
+>
+>> >> The mfd patches this one depended on were pushed around a week before
+>> >> the merge window, about a month after you reviewed, merged, then backed
+>> >> out this patch. There was no immutable branch either.
+>
+>> > Why did it get backed out?
+>
+>> Because of missing compile dependencies on the mfd bits, which weren't
+>> merged yet.
+>
+> No, what I'm asking is why didn't it get merge along with the MFD bits?
 
-This reverts commit 1fe492ce6482b77807b25d29690a48c46456beee.
+I had asked Lee to push an immutable branch for you to merge this patch
+on top of. Obviously that did not come through. Lee did not merge this
+patch with the mfd bits either.
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/kernel/hibernate.c | 26 --------------------------
- 1 file changed, 26 deletions(-)
+So unfortunately I do not have a proper answer for you. Sorry.
 
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index 6b6ea9aca6d0..9bb3edd0eea6 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -18,7 +18,6 @@
- #include <linux/cpu.h>
- #include <linux/kvm_host.h>
- #include <linux/mm.h>
--#include <linux/notifier.h>
- #include <linux/pm.h>
- #include <linux/sched.h>
- #include <linux/suspend.h>
-@@ -518,31 +517,6 @@ out:
- 	return rc;
- }
- 
--static int check_boot_cpu_online_pm_callback(struct notifier_block *nb,
--					     unsigned long action, void *ptr)
--{
--	if (action == PM_HIBERNATION_PREPARE &&
--	     cpumask_first(cpu_online_mask) != 0) {
--		pr_warn("CPU0 is offline.\n");
--		return notifier_from_errno(-ENODEV);
--	}
--
--	return NOTIFY_OK;
--}
--
--static int __init check_boot_cpu_online_init(void)
--{
--	/*
--	 * Set this pm_notifier callback with a lower priority than
--	 * cpu_hotplug_pm_callback, so that cpu_hotplug_pm_callback will be
--	 * called earlier to disable cpu hotplug before the cpu online check.
--	 */
--	pm_notifier(check_boot_cpu_online_pm_callback, -INT_MAX);
--
--	return 0;
--}
--core_initcall(check_boot_cpu_online_init);
--
- /* This overrides the weak version in kernel/power/hibernate.c */
- int arch_hibernation_disable_cpus(bool suspend)
- {
--- 
-2.8.0.rc3
+
+Regards
+ChenYu
