@@ -1,38 +1,33 @@
-From: bernhard.nortmann@web.de (Bernhard Nortmann)
-Date: Thu, 2 Jun 2016 11:15:55 +0200
-Subject: [linux-sunxi] [PATCH] [V2] ARM: dts: sun7i: Add dts file for
- Bananapi M1 Plus board
-In-Reply-To: <20160602081638.GG4908@lukather>
-References: <20160602023623.5761-1-luoyi.ly@gmail.com>
- <CAGRGNgUiGaxoVxtq=k8NG5mCqEXS9fd-ry1vvVJfzb+R2ATMTA@mail.gmail.com>
- <20160602081638.GG4908@lukather>
-Message-ID: <574FF94B.3020309@web.de>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 2 Jun 2016 10:18:59 +0100
+Subject: [linux-sunxi] Re: [PATCH 5/5] RFC spi: sun4i: add DMA support
+In-Reply-To: <1464842546.23881.3.camel@plaes.org>
+References: <cover.1464130597.git.hramrach@gmail.com>
+ <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
+ <20160530112610.GJ29837@sirena.org.uk>
+ <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
+ <20160530150343.GL29837@sirena.org.uk>
+ <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
+ <20160530155016.GO29837@sirena.org.uk>
+ <20160601180056.GA4908@lukather>
+ <1464842546.23881.3.camel@plaes.org>
+Message-ID: <20160602091859.GD2282@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 02.06.2016 um 10:16 schrieb Maxime Ripard:
-> [...]
-> Yes, everything that is shared with the banana-pro (which, judging
-> from Bernhard, is pretty much everything but a GPIO) should be merged
-> in the banapro DT.
->
-> Maxime
->
+On Thu, Jun 02, 2016 at 07:42:26AM +0300, Priit Laes wrote:
 
-Don't take my word for granted, as I do not own this hardware or know it
-particularly well. There is no doubt that "BPi-M1+" and "Banana Pro" are
-very similar, but if in doubt the information form the wiki should be 
-verified.
+> This was addressed by this patch, but was never applied:
+> http://permalink.gmane.org/gmane.linux.kernel.spi.devel/18950
 
-@luoyi:
-
-You seem to be using an editor that uses 4 spaces for displaying a <TAB>.
-It looks like that makes you prone to whitespace formatting issues, which
-have shown up in both versions of the .dts you submitted so far.
-
-Please double-check that you're using TABs for indentation and they weren't
-mixed up with SPACEs accidentally. (Most editors will also offer a setting
-that allows you to display "non-printable" chars, where you might be able to
-distinguish whitespace better.)
-
-Regards, B. Nortmann
+I've never seen that patch before, if it was CCed to me there's a good
+chance it'd have been deleted unread because you put ARM: at the start
+of the subject line which says it's a patch for arch/arm.  You'll need
+to resubmit.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/467fd971/attachment.sig>
