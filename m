@@ -1,101 +1,101 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 03 Jun 2016 00:47:03 +0300
-Subject: [PATCH/RFC v3 01/22] reset: Add renesas,rst DT bindings
-In-Reply-To: <1464808880-343-2-git-send-email-geert+renesas@glider.be>
-References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
- <1464808880-343-2-git-send-email-geert+renesas@glider.be>
-Message-ID: <10393056.BKo7UTPXFi@avalon>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 2 Jun 2016 23:57:02 +0200
+Subject: [PATCH 01/20] drm/atomic: Fix remaining places where
+ !funcs->best_encoder is valid
+In-Reply-To: <8671722.LHaiaBNqfE@avalon>
+References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1464877907-27723-2-git-send-email-boris.brezillon@free-electrons.com>
+ <8671722.LHaiaBNqfE@avalon>
+Message-ID: <CAKMK7uHyqNbA8Scw2fE0geAyNt0a0XVtzf81nwWjEhbZ-gAvKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geert,
+On Thu, Jun 2, 2016 at 11:05 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Boris,
+>
+> Thank you for the patch.
+>
+> On Thursday 02 Jun 2016 16:31:28 Boris Brezillon wrote:
+>> Adapt drm_pick_crtcs() and update_connector_routing() to fallback to
+>> drm_atomic_helper_best_encoder() if funcs->best_encoder() is NULL so
+>> that DRM drivers can leave this hook unassigned if they know they want
+>> to use drm_atomic_helper_best_encoder().
+>
+> Could you please update include/drm/drm_modeset_helper_vtables.h to document
+> this new behaviour ?
 
-Thank you for the patch.
+Thanks for reminding me. Please update hooks for both
+atomic_best_encoder and best_encoder. Also mention that it's only
+optional for atomic drivers. There's lots of examples in that file for
+the wording usually used.
 
-On Wednesday 01 Jun 2016 21:20:59 Geert Uytterhoeven wrote:
-> Add DT bindings for the Renesas R-Car Reset Controller (R-Car Gen1
-> RESET/WDT and R-Car Gen2/Gen3 RST).
-> 
-> As the features provided by the hardware module differ a lot across the
-> various SoC families and members, only SoC-specific compatible values
-> are defined.
-> 
-> For now we use the RST only for providing access to the state of the
-> mode pins.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> Acked-by: Magnus Damm <damm+renesas@opensource.se>
-> ---
-> v3:
->   - Clarify current usage,
->   - Use "renesas,<soctype>-rst" instead of "renesas,rst-<soctype>",
->   - Drop "syscon" compatible value,
->   - Add R-Car M3-W,
->   - Add R-Car Gen1,
-> 
-> v2:
->   - Add Acked-by.
-> ---
->  .../devicetree/bindings/reset/renesas,rst.txt      | 35 +++++++++++++++++++
->  1 file changed, 35 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/renesas,rst.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt
-> b/Documentation/devicetree/bindings/reset/renesas,rst.txt new file mode
-> 100644
-> index 0000000000000000..488c72e1ee849cd3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
-> @@ -0,0 +1,35 @@
-> +DT bindings for the Renesas R-Car Reset Controller
-> +
-> +The R-Car Reset Controller provides reset control, and implements the
-> following
-> +functions:
-> +  - Latching of the levels on mode pins when PRESET# is negated,
-> +  - Mode monitoring register,
-> +  - Reset control of peripheral devices (on R-Car Gen1),
-> +  - Watchdog timer (on R-Car Gen1).
-> +  - Register-based reset control and boot address registers for the various
-> CPU
-> +    cores (on R-Car Gen2/Gen3),
-> +
-> +
-> +Required properties:
-> +  - compatible: Should be
-> +		  - "renesas,<soctype>-reset-wdt" for R-Car Gen1,
-> +		  - "renesas,<soctype>-rst" for R-Car Gen2/Gen3.
-> +		Examples with soctypes are:
-> +		  - "renesas,r8a7778-reset-wdt" (R-Car M1A)
-> +		  - "renesas,r8a7779-reset-wdt" (R-Car H1)
-> +		  - "renesas,r8a7790-rst" (R-Car H2)
-> +		  - "renesas,r8a7791-rst" (R-Car M2-W)
-> +		  - "renesas,r8a7792-rst" (R-Car V2H
-> +		  - "renesas,r8a7793-rst" (R-Car M2-N)
-> +		  - "renesas,r8a7794-rst" (R-Car E2)
-> +		  - "renesas,r8a7795-rst" (R-Car H3)
-> +		  - "renesas,r8a7796-rst" (R-Car M3-W)
+> The only drawback I see in this patch is the additional object lookup
+> performed by drm_atomic_helper_best_encoder() at runtime. I wonder if we could
+> somehow cache the information, as the assignment can't change when there's a
+> 1:1 correspondence between encoders and connectors.
 
-Any specific reason for such a large indentation ? (I know this is really 
-nitpicking)
+drm_encoder_find is an idr lookup. That should be plenty fast,
+especially for modeset code. Usually what's too expensive even for
+modeset code is linear list walks. But Chris just submitted patches to
+convert most of them into simple lookups.
+-Daniel
 
-Apart from that, it's just a bit of a shame we can't have generic compatible 
-strings, but that would require additional DT properties to describe the reset 
-controller features, and I assume that's not a path we want to take.
+>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>> ---
+>>  drivers/gpu/drm/drm_atomic_helper.c |  4 +++-
+>>  drivers/gpu/drm/drm_fb_helper.c     | 13 ++++++++++++-
+>>  2 files changed, 15 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/drm_atomic_helper.c
+>> b/drivers/gpu/drm/drm_atomic_helper.c index f6a3350..849d029 100644
+>> --- a/drivers/gpu/drm/drm_atomic_helper.c
+>> +++ b/drivers/gpu/drm/drm_atomic_helper.c
+>> @@ -300,8 +300,10 @@ update_connector_routing(struct drm_atomic_state
+>> *state, if (funcs->atomic_best_encoder)
+>>               new_encoder = funcs->atomic_best_encoder(connector,
+>>                                                        connector_state);
+>> -     else
+>> +     else if (funcs->best_encoder)
+>>               new_encoder = funcs->best_encoder(connector);
+>> +     else
+>> +             new_encoder = drm_atomic_helper_best_encoder(connector);
+>>
+>>       if (!new_encoder) {
+>>               DRM_DEBUG_ATOMIC("No suitable encoder found for [CONNECTOR:%d:%s]\n",
+>> diff --git a/drivers/gpu/drm/drm_fb_helper.c
+>> b/drivers/gpu/drm/drm_fb_helper.c index 7c2eb75..d44389a 100644
+>> --- a/drivers/gpu/drm/drm_fb_helper.c
+>> +++ b/drivers/gpu/drm/drm_fb_helper.c
+>> @@ -2000,7 +2000,18 @@ static int drm_pick_crtcs(struct drm_fb_helper
+>> *fb_helper, my_score++;
+>>
+>>       connector_funcs = connector->helper_private;
+>> -     encoder = connector_funcs->best_encoder(connector);
+>> +
+>> +     /*
+>> +      * If the DRM device implements atomic hooks and ->best_encoder() is
+>> +      * NULL we fallback to the default drm_atomic_helper_best_encoder()
+>> +      * helper.
+>> +      */
+>> +     if (fb_helper->dev->mode_config.funcs->atomic_commit &&
+>> +         !connector_funcs->best_encoder)
+>> +             encoder = drm_atomic_helper_best_encoder(connector);
+>> +     else
+>> +             encoder = connector_funcs->best_encoder(connector);
+>> +
+>>       if (!encoder)
+>>               goto out;
+>
+> --
+> Regards,
+>
+> Laurent Pinchart
+>
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-> +  - reg: Address start and address range for the device.
-> +
-> +
-> +Example:
-> +
-> +	rst: reset-controller at e6160000 {
-> +		compatible = "renesas,r8a7795-rst";
-> +		reg = <0 0xe6160000 0 0x0200>;
-> +	};
 
 -- 
-Regards,
-
-Laurent Pinchart
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
