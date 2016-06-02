@@ -1,85 +1,51 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jun 2016 07:55:14 +0200
-Subject: [PATCH 2/4] ARM: multi_v7_defconfig: Enable drivers for Exynos4210
- Universal C210 board
+Date: Thu, 02 Jun 2016 07:55:15 +0200
+Subject: [PATCH 3/4] ARM: multi_v7_defconfig: Enable s5p-secss driver
 In-Reply-To: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
 References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1464846916-3110-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1464846916-3110-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable drivers needed to get Exynos 4210 Universal C210 board working:
-MAX8998 MFD and regulators, GPIO-based bit-bang SPI, Exynos DRM FIMD
-parallel output and Samsung LD9040 RGB panel.
+The Exynos SoC provides a Security SubSystem block for accelerating some
+cryptographic operations.  Enable the driver for it - s5p-secss to
+utilize the hardware acceleration.
+
+Currently the s5p-secss driver supports AES in CBC and ECB modes.
+However its usefulness could be doubted. Excerpt of tests on Odroid XU3
+(Exynos5422), for 256 bit key, encryption, performance CPU freq governor:
+
+  algorithm        | block size [b] | average speed [MB/s] |
+  cbc-aes-s5p      |             16 |                 11.5 |
+  cbc-aes-s5p      |             64 |                 25.4 |
+  cbc-aes-s5p      |            256 |                 41.0 |
+  cbc-aes-s5p      |           1024 |                 47.4 |
+  cbc-aes-s5p      |           8192 |                 49.0 |
+  cbc(aes-generic) |             16 |                  0.4 |
+  cbc(aes-generic) |             64 |                  1.8 |
+  cbc(aes-generic) |            256 |                  6.6 |
+  cbc(aes-generic) |           1024 |                 25.2 |
+  cbc(aes-generic) |           8192 |                 83.1 |
+
+Anyway enable the driver so it will get some testing coverage by
+community.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/configs/multi_v7_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index c5db9cf02e31..68cb3c766c39 100644
+index 68cb3c766c39..ee7c884ab5d8 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -359,6 +359,7 @@ CONFIG_SPI_BCM2835=y
- CONFIG_SPI_BCM2835AUX=y
- CONFIG_SPI_CADENCE=y
- CONFIG_SPI_DAVINCI=y
-+CONFIG_SPI_GPIO=m
- CONFIG_SPI_FSL_DSPI=m
- CONFIG_SPI_OMAP24XX=y
- CONFIG_SPI_ORION=y
-@@ -411,6 +412,7 @@ CONFIG_BATTERY_MAX17042=m
- CONFIG_CHARGER_MAX14577=m
- CONFIG_CHARGER_MAX77693=m
- CONFIG_CHARGER_MAX8997=m
-+CONFIG_CHARGER_MAX8998=m
- CONFIG_CHARGER_TPS65090=y
- CONFIG_AXP20X_POWER=m
- CONFIG_POWER_RESET_AS3722=y
-@@ -467,6 +469,7 @@ CONFIG_MFD_MAX77686=y
- CONFIG_MFD_MAX77693=m
- CONFIG_MFD_MAX8907=y
- CONFIG_MFD_MAX8997=y
-+CONFIG_MFD_MAX8998=y
- CONFIG_MFD_RK808=y
- CONFIG_MFD_PM8921_CORE=y
- CONFIG_MFD_QCOM_RPM=y
-@@ -496,6 +499,7 @@ CONFIG_REGULATOR_MAX14577=m
- CONFIG_REGULATOR_MAX8907=y
- CONFIG_REGULATOR_MAX8973=y
- CONFIG_REGULATOR_MAX8997=m
-+CONFIG_REGULATOR_MAX8998=m
- CONFIG_REGULATOR_MAX77686=y
- CONFIG_REGULATOR_MAX77693=m
- CONFIG_REGULATOR_MAX77802=m
-@@ -550,9 +554,10 @@ CONFIG_DRM_NXP_PTN3460=m
- CONFIG_DRM_PARADE_PS8622=m
- CONFIG_DRM_NOUVEAU=m
- CONFIG_DRM_EXYNOS=m
--CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_FIMD=y
- CONFIG_DRM_EXYNOS_MIXER=y
-+CONFIG_DRM_EXYNOS_DPI=y
-+CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_ROCKCHIP=m
- CONFIG_ROCKCHIP_ANALOGIX_DP=m
-@@ -565,6 +570,7 @@ CONFIG_DRM_RCAR_HDMI=y
- CONFIG_DRM_RCAR_LVDS=y
- CONFIG_DRM_SUN4I=m
- CONFIG_DRM_TEGRA=y
-+CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
- CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_DRM_VC4=y
-@@ -712,6 +718,7 @@ CONFIG_RTC_DRV_AS3722=y
- CONFIG_RTC_DRV_DS1307=y
- CONFIG_RTC_DRV_HYM8563=m
- CONFIG_RTC_DRV_MAX8907=y
-+CONFIG_RTC_DRV_MAX8998=m
- CONFIG_RTC_DRV_MAX8997=m
- CONFIG_RTC_DRV_MAX77686=y
- CONFIG_RTC_DRV_RK808=m
+@@ -875,6 +875,7 @@ CONFIG_KEYSTONE_IRQ=y
+ CONFIG_HW_RANDOM=y
+ CONFIG_HW_RANDOM_ST=y
+ CONFIG_CRYPTO_DEV_MARVELL_CESA=m
++CONFIG_CRYPTO_DEV_S5P=m
+ CONFIG_CRYPTO_DEV_SUN4I_SS=m
+ CONFIG_CRYPTO_DEV_ROCKCHIP=m
+ CONFIG_ARM_CRYPTO=y
 -- 
 1.9.1
