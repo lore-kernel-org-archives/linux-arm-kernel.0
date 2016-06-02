@@ -1,39 +1,34 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 2 Jun 2016 07:34:49 -0500
-Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
- typical Keystone features
-In-Reply-To: <cdbd2482-de98-569b-7ff0-c8963037de53@oracle.com>
-References: <1464816714-3900-1-git-send-email-nm@ti.com>
- <3593753.UuDg5ybrvm@wuerfel>
- <cdbd2482-de98-569b-7ff0-c8963037de53@oracle.com>
-Message-ID: <575027E9.3070202@ti.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 2 Jun 2016 14:45:42 +0200
+Subject: [PATCH 1/3] dt-bindings: add DT binding for the Aardvark PCIe
+ controller
+In-Reply-To: <8313817.cgODJZVrao@wuerfel>
+References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1464858585-10963-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20160602122405.GG17343@lunn.ch> <8313817.cgODJZVrao@wuerfel>
+Message-ID: <20160602144542.6bc1b421@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 06:26 PM, Santosh Shilimkar wrote:
-[...]
->>> Side note on LPAE:
->>> For our current device tree and u-boot, LPAE is mandatory to bootup
->>> for current Keystone boards - but this is not a SoC requirement,
->>> booting without LPAE/HIGHMEM results in non-coherent DDR accesses.
->>
->> This sounds like a regression, I thought we had this working when
->> keystone was initially merged and we got both the coherent and
->> non-coherent mode working with the same DT.
->>
-> Yes and it works. The coherent memory space itself is beyond 4GB so
+Hello,
 
-Hmm... True, I just tested next-20160602 with mem_lpae set to 0 in
-u-boot and it seems to boot just fine.
+On Thu, 02 Jun 2016 14:34:14 +0200, Arnd Bergmann wrote:
 
-> I don't understand a requirement of having coherent memory without
-> LPAE.
+> I think some other PCI hosts just move the interrupt-controller
+> and #interrupt-cells properties into the PCI host node itself,
+> which avoids the ambiguity here.
 
-Looks like a messed up description on my end, Looks like I have to
-update my automated test framework to incorporate the manual steps
-involved.
+Do you have an example of this? I have modeled my DT binding after the
+one used by the pci-dra7xx driver, which is in the same situation as I
+am in terms of interrupt handling.
 
+But I can indeed try to make the top-level PCIe controller node the
+interrupt controller. Let me try that quickly.
 
+Best regards,
+
+Thomas
 -- 
-Regards,
-Nishanth Menon
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
