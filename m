@@ -1,53 +1,50 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Thu, 02 Jun 2016 08:56:05 +0200
-Subject: [PATCH 09/32] bcm2837-rpi-3-b.dts for 32bit arm
-In-Reply-To: <5616246.RRQ2rLjLud@wuerfel>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <7065434.SNfT8zjcK3@wuerfel> <87zir4leyc.fsf@eliezer.anholt.net>
- <5616246.RRQ2rLjLud@wuerfel>
-Message-ID: <1464850565.24775.40.camel@redhat.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 2 Jun 2016 09:59:54 +0300
+Subject: [PATCH 0/5] ARM: OMAP5: add support for fref-xtal-clk
+In-Reply-To: <1464802526-16372-1-git-send-email-t-kristo@ti.com>
+References: <1464802526-16372-1-git-send-email-t-kristo@ti.com>
+Message-ID: <80bb7d87-28a7-7817-3b62-21271a752e16@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Do, 2016-06-02 at 00:39 +0200, Arnd Bergmann wrote:
-> On Wednesday, June 1, 2016 3:30:35 PM CEST Eric Anholt wrote:
-> > Arnd Bergmann <arnd@arndb.de> writes:
-> > 
-> > > On Wednesday, June 1, 2016 11:43:18 PM CEST Gerd Hoffmann wrote:
-> > >> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> > >> new file mode 100644
-> > >> index 0000000..36178a6
-> > >> --- /dev/null
-> > >> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-> > >> @@ -0,0 +1 @@
-> > >> +#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
-> > >> -- 
-> > >> 1.8.3.1
-> > >> 
-> > >
-> > > What does this gain you?
-> > 
-> > Many Raspberry Pi users use a small set of SD cards that they swap
-> > between various versions of the hardware.  It would be good to have
-> > their 32-bit OS images work on the Pi3 as well.
+On 06/01/16 20:35, Tero Kristo wrote:
+> Hi,
 > 
-> Sure, but you already have the dts file in the other directory,
-> and the dtb is the same.
+> fref_xtal_clk is a clock going out from omap5 chip, sourced directly
+> from the system oscillator. fref_xtal_clk can be used to provide a
+> high frequency clock to some external component, in omap5 setups,
+> typically twl6040 audio chip.
 > 
-> According to the comment in the other patch, the idea was to have
-> the file in the arm64 directory because it's a 64-bit platform,
-> but now you have it here as well.
+> Testing done (number of boards on the test farm are currently out of order):
+> 
+> am335x-evm      : BOOT FAIL!
+> am335x-evmsk    : boot
+> am37x-evm       : boot
+> am437x-sk       : boot
+> am43x-epos-evm  : boot
+> am437x-gp-evm   : boot
+> am57xx-evm      : boot
+> omap3-beagle-xm : boot
+> am335x-boneblack: boot
+> am335x-bone     : boot
+> dra72x-evm      : boot
+> dra7xx-evm      : boot
+> omap5-uevm      : boot
+> 
+> On omap5, also verified that the new clock node appears under debugfs.
+> 
+> am335x-evm failure is due to inability to mount NFS rootfs on the board
+> in question the boot goes fine until that. There are some issues with
+> the u-boot installed on this board currently.
 
-Well, it just includes the arm64 version as-is, so we don't have
-duplication.  I'm open to suggestions to how handle this better.  
+With the [1] patch applied to twl6040 I have verified that the HPPLL is
+working fine with this series on omap5-uevm. This is so great!
 
-Symbolic link?
+Thanks Tero,
 
-Reference to ../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-directly in the Makefile?
+Tested-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-I've seen arch/arm/boot/dts/Makefile uses globs on *.dts, so I suspect
-the later wouldn't be that straight forward.
+[1] https://patchwork.kernel.org/patch/9067911/
 
-cheers,
-  Gerd
+-- 
+P?ter
