@@ -1,52 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 2 Jun 2016 18:27:03 -0500
-Subject: [PATCH v2 2/7] DT: phy.txt: Add mdio-integrated-mux property
-In-Reply-To: <1464701801-17243-3-git-send-email-pramod.kumar@broadcom.com>
-References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
- <1464701801-17243-3-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <20160602232703.GA17619@rob-hp-laptop>
+From: stephen.boyd@linaro.org (Stephen Boyd)
+Date: Thu, 02 Jun 2016 16:59:55 -0700
+Subject: [PATCH v3 09/12] EXAMPLE CODE: usb: port: Parse pwrseq phandle
+ from Device Tree
+In-Reply-To: <20160602012419.GA7953@shlinux2>
+References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
+ <1464768141-25420-10-git-send-email-k.kozlowski@samsung.com>
+ <146477144362.1485.3331887341591876278@sboyd-linaro>
+ <20160601120520.GB16740@shlinux2>
+ <146480499491.3686.4996610748316511864@sboyd-linaro>
+ <20160602012419.GA7953@shlinux2>
+Message-ID: <146491199510.7580.5649614149557346848@sboyd-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 07:06:36PM +0530, Pramod Kumar wrote:
-> This property is used by integrated MDIO multiplexer
-> which has bus selection and mdio transaction generation logic,
-> integrated inside.
+Quoting Peter Chen (2016-06-01 18:24:19)
+> On Wed, Jun 01, 2016 at 11:16:34AM -0700, Stephen Boyd wrote:
+> > > 
+> > > No, you may need to do reset before enumeration, the general purpose of
+> > > reset is eliminate unstable hardware state, and let the controller find
+> > > the device.
+> > > 
+> > > Try to do it at bootloader to see if it works for you.
+> > > 
+> > 
+> > Sorry the bootloader doesn't do this so that doesn't work for me.
 > 
-> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-> ---
->  Documentation/devicetree/bindings/net/mdio-mux.txt | 9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
+> I mean try to see if the HUB can work if you reset it at bootloader.
+> If it works, it means you need to do reset before enumeration, and you
+> don't need to do anything after enumeration.
 > 
-> diff --git a/Documentation/devicetree/bindings/net/mdio-mux.txt b/Documentation/devicetree/bindings/net/mdio-mux.txt
-> index 491f5bd..b5ad83e 100644
-> --- a/Documentation/devicetree/bindings/net/mdio-mux.txt
-> +++ b/Documentation/devicetree/bindings/net/mdio-mux.txt
-> @@ -5,13 +5,20 @@ numbered uniquely in a device dependent manner.  The nodes for an MDIO
->  bus multiplexer/switch will have one child node for each child bus.
->  
->  Required properties:
-> -- mdio-parent-bus : phandle to the parent MDIO bus.
->  - #address-cells = <1>;
->  - #size-cells = <0>;
->  
->  Optional properties:
-> +- mdio-parent-bus : phandle to the parent MDIO bus. Should be used
-> +		if parent mdio bus is not part of multiplexer.
 
-You don't appear to be using this. When would you?
-
-> +- mdio-integrated-mux: boolean property indicateing that the hardware
-> +		is an integrated multiplex supporting muxed bus selection
-> +		and MDIO transaction logic generation.
->  - Other properties specific to the multiplexer/switch hardware.
->  
-> +Note: one of mdio-parent-bus and mdio-integrated-mux is mandatory to
-> +get parent bus regsitered.
-> +
->  Required properties for child nodes:
->  - #address-cells = <1>;
->  - #size-cells = <0>;
-> -- 
-> 1.9.1
-> 
+Ah ok. Yes, I need to deassert the reset before enumeration. Right now I
+have a driver for the 4604 hub controller that deasserts a reset gpio
+and sends an i2c command to put the controller into "hub" mode. If I do
+this before the usb controller driver probes then everything works. If I
+do it after the controller probes it doesn't.
