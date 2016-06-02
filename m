@@ -1,33 +1,49 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 3 Jun 2016 00:27:46 +0300
-Subject: [PATCH] device tree description for AD5820 camera auto-focus coil
-In-Reply-To: <20160602193027.GB7984@amd>
-References: <20160524090433.GA1277@amd> <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd>
- <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
- <20160531213437.GA28397@amd>
- <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
- <20160601220840.GA21946@amd>
- <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
- <20160602193027.GB7984@amd>
-Message-ID: <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 3 Jun 2016 00:33:05 +0300
+Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
+In-Reply-To: <CAMuHMdXUdg8+ux2j5SsthZS6DWZnHfan0jL=PpYEwfnS7fbRkQ@mail.gmail.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
+ <CAMuHMdU2P6VKXNpEHGOKpyuM45Pk0CuHWngxwu5AYGqYfduXXg@mail.gmail.com>
+ <a60346f2-2abb-342b-dd20-38d401c4ceb3@cogentembedded.com>
+ <CAMuHMdXUdg8+ux2j5SsthZS6DWZnHfan0jL=PpYEwfnS7fbRkQ@mail.gmail.com>
+Message-ID: <3097ebac-9d5a-8e71-ee64-f3f4629c1785@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 09:30:27PM +0200, Pavel Machek wrote:
-> 
-> Add documentation for ad5820 device tree binding.
-> 
-> Signed-off-by: Pavel Machek <pavel@denx.de>
+On 06/01/2016 03:27 PM, Geert Uytterhoeven wrote:
 
-Thanks, Pavel!!
+>>>> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
+>>>> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+>>>
+>>>> +       ethernet at 18000000 {
+>>>> +               compatible = "smsc,lan89218", "smsc,lan9115";
+>>>
+>>>
+>>> The "smsc,lan89218" needs to be documented in the device tree bindings.
+>>
+>>    Have you looked at those bindings?
+>
+> Now I did.
+>
+>>> Google couldn't find any evidence you submitted a patch for that.
+>>
+>>    Because the bindings document *any* LAN9115 compatible chip already.
+>
+> Ah, generic wildcard, not listing valid values. Hence checkpatch complained...
 
-Can I pick the two patches (this one + the driver) or would you like to send
-a pull request? In the latter case you can add:
+    Note that it doesn't complain about "smsc,lan9220" though that is only 
+mentioned in the example.
 
-Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> Google predict-while-you-type suggests "lan89218aq"? Should you use that?
 
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+    No, my googling shows that the suffix can be different, and the Microchip 
+(the new owner?) has it without the suffix on their site.
+
+> BTW, that's why we always want to document all valid values...
+
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+
+MBR, Sergei
