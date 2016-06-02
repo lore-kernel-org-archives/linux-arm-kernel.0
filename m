@@ -1,66 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Jun 2016 10:52:48 +0200
-Subject: [PATCH 3/4] mmc: sdhci-of-esdhc: fix host version for
- T4240-R1.0-R2.0
-In-Reply-To: <1464829874.16584.163.camel@buserror.net>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <6110875.0k1HlSKhzn@wuerfel> <1464829874.16584.163.camel@buserror.net>
-Message-ID: <3851136.KiJNtFycNm@wuerfel>
+From: charanya@codeaurora.org (charanya at codeaurora.org)
+Date: Thu, 02 Jun 2016 14:37:57 +0530
+Subject: [PATCH] tty: serial: msm: Disable restoring Rx interrupts for DMA
+ Mode
+In-Reply-To: <20160525224623.GS3492@codeaurora.org>
+References: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
+ <20160512014126.GK3492@codeaurora.org>
+ <20160512050245.GD8453@hector.attlocal.net>
+ <5cce36b3c1d62816feffb4048f782b20@codeaurora.org>
+ <20160525224623.GS3492@codeaurora.org>
+Message-ID: <9c627293b1a13f5e71ba1a61c3bc2bfa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 1, 2016 8:11:14 PM CEST Scott Wood wrote:
-> > +#define T4240_HOST_VER ((VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) |
-> > SDHCI_SPEC_200)
-> > +static const struct soc_device_attribute esdhc_t4240_quirk = {
-> > +     /* T4240 revision < 0x20 uses vendor version 23, SDHCI version 200
-> > */
-> > +     { .soc_id = "T4*(0x824000)", .revision = "0x[01]?",
-> > +       .data = (void *)(uintptr_t)(T4240_HOST_VER) },
+On 2016-05-26 04:16, Stephen Boyd wrote:
+> On 05/13, charanya at codeaurora.org wrote:
+>> Hi Stephen/Andy,
+>> 
+>> If both Tx and Rx are used simultaneously, restoring Rx interrupts in
+>> msm_complete_rx_dma could lead to RXSTALE interrupt being triggered,
+>> when
+>> the ISR execution for TXLEV interrupt is completed, since
+>> msm_port->imr is
+>> rewritten to UART_IMR in msm_uart_irq. Hence, we do not have to 
+>> restore
+>> Rx interrupts since Rx is always in DMA mode once enabled.
+>> 
 > 
-> Why should this code need to care that the string begins with "T4"?  This
-> creates dual maintenance if that were to change.  It's also broken because
-> T4240 has compatible = "fsl,t4240-device-config", "fsl,qoriq-device-config
-> -2.0" and thus with these patches it would incorrectly show up as "P series
-> (0x824000)".  The compatible string of this node was never meant to be a key
-> for choosing a string to describe the system to userspace.
-
-This is an artifact of not knowing the specific SoC name, and we can change
-that by looking up the name from the SVR value in the soc_device driver.
- 
-> 0x824000 is a magic number which should be represented symbolically.
-
-Sure, feel free to change the format of the soc_device string in any
-name, I just converted the information I had available in the comments.
-The only thing that is important here is that the string matches what
-the soc_device driver calls it.
-
-> If T4240 is affected, then so are the reduced-core variants T4160 and T4080,
-> but 0x824000 doesn't match them (Yangbo's patch had the same problem).  And
-> please don't respond with "0x824*"
+> Ok, but what's the exact sequence of events that happens? I think
+> we unlock the spinlock in the dma completion handler and then the
+> txlev interrupt runs? At that point we may have more data to push
+> out and then rx stale handling runs and corrupts the fifo state?
 > 
-> You also didn't strip out the E bit of SVR which indicates encryption
-> capability and nothing else (Yangbo's patch did not have this problem because
-> it used SVR_SOC_VER).
+> I was hoping for some sort of CPU sequence of events like:
+> 
+>  CPU0                   CPU1
+>  ----                   ----
+> 
+>  msm_start_rx_dma()
+>                        msm_complete_rx_dma()
+> 		        spin_unlock_irqrestore(&port->lock)
+>  msm_uart_irq()
+>   msm_handle_rx_dm()
+>    <Read from FIFO and breaks>
+> 
+> This patch seems correct, but the commit text isn't fully
+> describing the sequence of events that causes this to happen, so
+> it's taking a while to convince myself that this patch fixes
+> anything.
 
-Ok, that should be easy enough to fix in the soc_device driver.
 
-> What happens if the revision condition is more complicated, such as <= 0x20
-> with 0x21 being fine?  Multiple quirk entries where before we had as simple
-> comparison?
-
-I guess yes. I would really hope that there is no need to use this interface
-pervasively, it's really just to work around the cases where there is no
-way to pass the information in DT otherwise.
-
-> I fail to see how this approach is an improvement (much less one that needs to
-> hold up a patchset that is fixing a problem and is not touching any generic
-> code).  Why does this need to be a string?
-
-A string is what user space gets in /sys/devices/soc/*, and we already have
-code that does the same things there to work around quirks, here we just
-use the same interface in a completely generic way. Note that not every
-SoC family uses numbers in the same way, some have multiple subrevisions,
-some have names etc.
-
-	Arnd
+The sequence of events is as mentioned. When the TXLEV interrupt occurs 
+after the
+spinlock is unlocked, the rx stale handling runs since the interrupts 
+are restored
+and hence it corrupts the fifo state.
