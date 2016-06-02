@@ -1,72 +1,39 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Thu, 2 Jun 2016 09:25:17 -0700
-Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
-In-Reply-To: <1464849936.24775.33.camel@redhat.com>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-2-git-send-email-kraxel@redhat.com>
- <574F5881.4060008@gmail.com> <1464849936.24775.33.camel@redhat.com>
-Message-ID: <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 Jun 2016 17:29:25 +0100
+Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
+In-Reply-To: <20160602143650.GG2658@codeblueprint.co.uk>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
+ <20160601103446.GC9280@leverpostej>
+ <20160601104326.GA24749@e104818-lin.cambridge.arm.com>
+ <20160602143650.GG2658@codeblueprint.co.uk>
+Message-ID: <20160602162925.GC24938@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 02, 2016 at 03:36:50PM +0100, Matt Fleming wrote:
+> On Wed, 01 Jun, at 11:43:26AM, Catalin Marinas wrote:
+> > 
+> > Thanks for the heads up. I'll rebase the patches after -rc2 but anyway I
+> > plan to merge them in 4.8 via the arm64 tree, including the patch above
+> > if Matt acks it. So there is enough time to fix the conflicts.
+> 
+> I'd really prefer it if you didn't take this series through the arm64
+> tree, unless there are existing dependencies, of course.
+> 
+> There were a number of conflicts in 3 different maintainer trees in
+> linux-next before the most recent merge window opened, and extra work
+> was required to sort that out. I want to avoid that in the future, so
+> expect me to be more insistent about keeping EFI patches in the EFI
+> tree than I have been in the past. 
+> 
+> Do arm64 prerequisites exist for this series? Or are you planning on
+> adding dependencies on top?
 
+I don't know when Jeremy plans to submit his contiguous PTE patches (we
+rejected them on the grounds of unnecessary huge page splitting, hence
+this series). If he's not targeting 4.8, I'm happy for the patches to go
+in via the EFI tree.
 
-On 6/1/2016 11:45 PM, Gerd Hoffmann wrote:
->>>  config ARCH_BCM2835
->>>  	bool "Broadcom BCM2835 family"
->>> -	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
->>> +	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7 || ARM64
->>
->> Humm, what does that achieve?
->
-> Nothing ;)
->
-> Slipped through unnoticed, I'll drop it.
->
->>> +config ARCH_BCM
->>> +	bool "Broadcom SoC Support"
->>> +	help
->>> +	  This enables support for Broadcom ARM based SoC chips
->>
->> menuconfig maybe?
->
-> There isn't any in arch/arm64/Kconfig.platforms right now, so I didn't
-> feel like introducing one.  Also the dependency should have pretty much
-> the same effect ...
->
->>> +config ARCH_BCM2835
->>> +	bool "Broadcom BCM2835 family"
->>> +	depends on ARCH_BCM
->>> +	select ARCH_REQUIRE_GPIOLIB
->>> +	select CLKSRC_OF
->>> +	select PINCTRL
->>> +	select PINCTRL_BCM2835
->>> +	select ARM_AMBA
->>> +	select ARM_TIMER_SP804
->>> +	select HAVE_ARM_ARCH_TIMER
->>> +	help
->>> +	  This enables support for the Broadcom BCM2837 SoC.
->>> +	  This SoC is used in the Raspberry Pi 3 device.
->>> +
->>>  config ARCH_BCM_IPROC
->>>  	bool "Broadcom iProc SoC Family"
->>> +	depends on ARCH_BCM
->>
->> Does not seem necessary nor adding anything here.
->
-> Added for consistency.  When we add ARCH_BCM all ARCH_BCM_* should
-> depend on it ...
->
-> We could also do it the other way around: make ARCH_BCM a hidden bool
-> and have ARCH_BCM_* select it.
-
-Yes, this is probably better.
-
-ARCH_BCM_IPROC is currently enabled in arch/arm64/configs/defconfig. By 
-adding a dependency here without enabling ARCH_BCM in arm64 defconfig, 
-this effectively disables ARCH_BCM_IPROC from arm64 defconfig.
-
->
-> cheers,
->   Gerd
->
+-- 
+Catalin
