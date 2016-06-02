@@ -1,71 +1,51 @@
-From: Jeremy.Linton@arm.com (Jeremy Linton)
-Date: Thu, 2 Jun 2016 17:15:06 +0000
-Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
-In-Reply-To: <20160602171152.GE24938@e104818-lin.cambridge.arm.com>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
- <20160601103446.GC9280@leverpostej>
- <20160601104326.GA24749@e104818-lin.cambridge.arm.com>
- <20160602143650.GG2658@codeblueprint.co.uk>
- <20160602162925.GC24938@e104818-lin.cambridge.arm.com>
- <57505F52.3040108@arm.com>
- <20160602171152.GE24938@e104818-lin.cambridge.arm.com>
-Message-ID: <AM3PR08MB0008C1E125C039E33284C20CF7580@AM3PR08MB0008.eurprd08.prod.outlook.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu,  2 Jun 2016 19:18:55 +0200
+Subject: [PATCH v2 3/4] mfd: axp20x: Add axp20x-usb-power-supply for axp22x
+ pmics
+In-Reply-To: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
+References: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1464887936-17020-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add axp20x-usb-power-supply for axp22x pmics.
 
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Change compatible string for axp22x usb-power-supply cell to match v2 of:
+ "power: axp20x_usb: Add support for usb power-supply on axp22x pmics"
+---
+ drivers/mfd/axp20x.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-|-----Original Message-----
-|From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-|Sent: Thursday, June 02, 2016 12:12 PM
-|To: Jeremy Linton
-|Cc: Matt Fleming; Mark Rutland; linux-efi at vger.kernel.org; Will Deacon;
-|linux-arm-kernel at lists.infradead.org
-|Subject: Re: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc
-|iterators
-|
-|On Thu, Jun 02, 2016 at 11:31:14AM -0500, Jeremy Linton wrote:
-|> On 06/02/2016 11:29 AM, Catalin Marinas wrote:
-|> >On Thu, Jun 02, 2016 at 03:36:50PM +0100, Matt Fleming wrote:
-|> >>On Wed, 01 Jun, at 11:43:26AM, Catalin Marinas wrote:
-|> >>>
-|> >>>Thanks for the heads up. I'll rebase the patches after -rc2 but
-|> >>>anyway I plan to merge them in 4.8 via the arm64 tree, including
-|> >>>the patch above if Matt acks it. So there is enough time to fix the
-|conflicts.
-|> >>
-|> >>I'd really prefer it if you didn't take this series through the
-|> >>arm64 tree, unless there are existing dependencies, of course.
-|> >>
-|> >>There were a number of conflicts in 3 different maintainer trees in
-|> >>linux-next before the most recent merge window opened, and extra
-|> >>work was required to sort that out. I want to avoid that in the
-|> >>future, so expect me to be more insistent about keeping EFI patches
-|> >>in the EFI tree than I have been in the past.
-|> >>
-|> >>Do arm64 prerequisites exist for this series? Or are you planning on
-|> >>adding dependencies on top?
-|> >
-|> >I don't know when Jeremy plans to submit his contiguous PTE patches
-|> >(we rejected them on the grounds of unnecessary huge page splitting,
-|> >hence this series). If he's not targeting 4.8, I'm happy for the
-|> >patches to go in via the EFI tree.
-|>
-|> I can re-post them again for 4.8. They seem to get simpler every time!
-|
-|I think you should post them fairly soon so that we get a chance to review
-|them and ideally push into next around -rc4.
-|
-|Regarding these efi/arm64 patches, I can push them to a branch (once the
-|conflicting efi/urgent patches hit upstream, I guess around -rc2) that Matt can
-|pull into the EFI tree and I can also pull in the arm64 tree
-|*if* we are to merge the Jeremy's patches.
-|
-|Jeremy, you can base your patches on such branch (I'll follow up with the
-|details if that's ok with Matt).
-
-Sure. Most of the delay on posting them generally comes down to how many machines I try to boot them on with a given kernel, which is related to how many ACPI issues I happen to have.
-
-
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index ca04361..6364dab 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -160,6 +160,11 @@ static struct resource axp20x_usb_power_supply_resources[] = {
+ 	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
+ };
+ 
++static struct resource axp22x_usb_power_supply_resources[] = {
++	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
++	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
++};
++
+ static struct resource axp22x_pek_resources[] = {
+ 	{
+ 		.name   = "PEK_DBR",
+@@ -527,6 +532,11 @@ static struct mfd_cell axp22x_cells[] = {
+ 		.resources		= axp22x_pek_resources,
+ 	}, {
+ 		.name			= "axp20x-regulator",
++	}, {
++		.name		= "axp20x-usb-power-supply",
++		.of_compatible	= "x-powers,axp221-usb-power-supply",
++		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
++		.resources	= axp22x_usb_power_supply_resources,
+ 	},
+ };
+ 
+-- 
+2.7.4
