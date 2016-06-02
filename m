@@ -1,46 +1,48 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 2 Jun 2016 09:52:07 -0400
-Subject: [PATCH 3/4] ARM: multi_v7_defconfig: Enable s5p-secss driver
-In-Reply-To: <1464846916-3110-3-git-send-email-k.kozlowski@samsung.com>
-References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
- <1464846916-3110-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <b3518170-bf5c-dde0-b170-68910a2aaf42@osg.samsung.com>
+From: mgorman@techsingularity.net (Mel Gorman)
+Date: Thu, 2 Jun 2016 14:52:26 +0100
+Subject: [BUG] Page allocation failures with newest kernels
+In-Reply-To: <CAPv3WKftqsEXbdU-geAcUKXBSskhA0V72N61a1a+5DfahLK_Dg@mail.gmail.com>
+References: <CAPv3WKcVsWBgHHC3UPNcbka2JUmN4CTw1Ym4BR1=1V9=B9av5Q@mail.gmail.com>
+ <574D64A0.2070207@arm.com>
+ <CAPv3WKdYdwpi3k5eY86qibfprMFwkYOkDwHOsNydp=0sTV3mgg@mail.gmail.com>
+ <60e8df74202e40b28a4d53dbc7fd0b22@IL-EXCH02.marvell.com>
+ <20160531131520.GI24936@arm.com>
+ <CAPv3WKftqsEXbdU-geAcUKXBSskhA0V72N61a1a+5DfahLK_Dg@mail.gmail.com>
+Message-ID: <20160602135226.GX2527@techsingularity.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+On Thu, Jun 02, 2016 at 07:48:38AM +0200, Marcin Wojtas wrote:
+> Hi Will,
+> 
+> I think I found a right trace. Following one-liner fixes the issue
+> beginning from v4.2-rc1 up to v4.4 included:
+> 
+> --- a/mm/page_alloc.c
+> +++ b/mm/page_alloc.c
+> @@ -294,7 +294,7 @@ static inline bool
+> early_page_uninitialised(unsigned long pfn)
+> 
+>  static inline bool early_page_nid_uninitialised(unsigned long pfn, int nid)
+>  {
+> -       return false;
+> +       return true;
+>  }
+> 
 
-On 06/02/2016 01:55 AM, Krzysztof Kozlowski wrote:
-> The Exynos SoC provides a Security SubSystem block for accelerating some
-> cryptographic operations.  Enable the driver for it - s5p-secss to
-> utilize the hardware acceleration.
-> 
-> Currently the s5p-secss driver supports AES in CBC and ECB modes.
-> However its usefulness could be doubted. Excerpt of tests on Odroid XU3
-> (Exynos5422), for 256 bit key, encryption, performance CPU freq governor:
-> 
->   algorithm        | block size [b] | average speed [MB/s] |
->   cbc-aes-s5p      |             16 |                 11.5 |
->   cbc-aes-s5p      |             64 |                 25.4 |
->   cbc-aes-s5p      |            256 |                 41.0 |
->   cbc-aes-s5p      |           1024 |                 47.4 |
->   cbc-aes-s5p      |           8192 |                 49.0 |
->   cbc(aes-generic) |             16 |                  0.4 |
->   cbc(aes-generic) |             64 |                  1.8 |
->   cbc(aes-generic) |            256 |                  6.6 |
->   cbc(aes-generic) |           1024 |                 25.2 |
->   cbc(aes-generic) |           8192 |                 83.1 |
-> 
-> Anyway enable the driver so it will get some testing coverage by
-> community.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+How does that make a difference in v4.4 since commit
+974a786e63c96a2401a78ddba926f34c128474f1 removed the only
+early_page_nid_uninitialised() ? It further doesn't make sense if deferred
+memory initialisation is not enabled as the pages will always be
+initialised.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> From what I understood, now order-0 allocation keep no reserve at all.
 
-Best regards,
+Watermarks should still be preserved. zone_watermark_ok is still there.
+What might change is the size of reserves for high-order atomic
+allocations only. Fragmentation shouldn't be a factor. I'm missing some
+major part of the picture.
+
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Mel Gorman
+SUSE Labs
