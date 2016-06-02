@@ -1,28 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Jun 2016 19:05:14 +0100
-Subject: [PATCH] arm64: do away with ARCH_[WANT_OPTIONAL|REQUIRE]_GPIOLIB
-In-Reply-To: <1464869670-7208-1-git-send-email-linus.walleij@linaro.org>
-References: <1464869670-7208-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20160602180514.GD7697@arm.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 02 Jun 2016 11:06:10 -0700
+Subject: [PATCH 03/32] irqchip: bcm2835: Avoid arch/arm-specific
+ handle_IRQ.
+In-Reply-To: <20160602005044.GN24391@io.lakedaemon.net>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-4-git-send-email-kraxel@redhat.com>
+ <20160602005044.GN24391@io.lakedaemon.net>
+Message-ID: <871t4fbh4d.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 02:14:30PM +0200, Linus Walleij wrote:
-> This replaces:
-> 
-> - "select ARCH_REQUIRE_GPIOLIB" with "select GPIOLIB" as this can
->   now be selected directly.
-> 
-> - "select ARCH_WANT_OPTIONAL_GPIOLIB" with no dependency: GPIOLIB
->   is now selectable by everyone, so we need not declare our
->   intent to select it.
-> 
-> Cc: Michael B?sch <m@bues.ch>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM64/AArch64 maintainers:
-> Please apply this patch directly for cleanups.
+Jason Cooper <jason@lakedaemon.net> writes:
 
-Just checking -- you're aiming to have this in 4.7-rc ?
+> Hey Gerd,
+>
+> On Wed, Jun 01, 2016 at 11:43:12PM +0200, Gerd Hoffmann wrote:
+>> From: Eric Anholt <eric@anholt.net>
+>> 
+>> This is equivalent and works for arm64 as well.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>
+> I don't mind taking this, or Eric's V2 resend.  However, the commit
+> message needs a rewrite.
 
-Will
+Can you clarify what you don't like about it or suggest replacement
+wording?  This is the first concern I've seen.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/2ba94f16/attachment.sig>
