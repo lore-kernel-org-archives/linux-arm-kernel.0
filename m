@@ -1,35 +1,65 @@
-From: jcm@redhat.com (Jon Masters)
-Date: Thu, 2 Jun 2016 03:31:38 -0400
-Subject: [PATCH V8 0/9] Support for ARM64 ACPI based PCI host controller
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F767865@lhreml507-mbx>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F767865@lhreml507-mbx>
-Message-ID: <f606faa9-72f3-3219-02a8-69e948338d2e@redhat.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 02 Jun 2016 09:42:13 +0200
+Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
+In-Reply-To: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+References: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1464853333.3307.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 03:36 AM, Gabriele Paoloni wrote:
+Hi Neil,
 
-> If you agree I think Jon can tell who's the best person to
-> push the quirk RFC (as my understanding is that this mechanism
-> is currently used by some platforms deployed on the market...)
+Am Montag, den 30.05.2016, 15:27 +0200 schrieb Neil Armstrong:
+> Patchset to add and enable the reset controller driver on Meson SoCs platforms.
+> 
+> This reset controller has up to 256 reset lines with reset pulse generation only,
+> so the assert and deassert calls are not available.
+> 
+> Depends on the patch :
+>  - "reset: add devm_reset_controller_register API" [1]
+> 
+> Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
+> - Get back __iomem in _reset() callback
+> - Get rid of MODULE_ALIAS
+> 
+> Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
+> - Remove _gxbb_ in names
+> - Depends build on ARCH_MESON only
+> - Add meson8b compatible and bindings
+> - Re-indent dt-bindings headers
+> - Switch to devm_ reset controller register
+> - Remove platform "remove" callback
+> - Update Dual BSD/GPL file headers
+> 
+> Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
+> - Fix register mapping and bit defines in bindings header
+> - Remove assert and unassert calls
+> - Fix missing __iomem
+> 
+> [1] https://patchwork.kernel.org/patch/8988471/
+> 
+> Neil Armstrong (4):
+>   reset: Add support for the Amlogic Meson SoC Reset Controller
+>   dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
 
-Let me ping Linaro folks to see who has that (quirks) ball. We can
-certainly share the older OEM matching quirks Mark Salter did for
-earlier RHEL(SA) internal versions as a seed for that[0] activity.
+I've applied these two patches to the reset/next branch.
 
-BUT...I don't think we should block this thread on the quirks. They're
-separate (but important). I see Arnd's reply as well, but nobody else
-has yet chimed in to this thread (and I am about to prod all of the
-vendors to reply to this thread and ACK). Can I ask whether we can't
-just stage v8 as-is for -next at this point? Can Arnd's (or other)
-suggestions be handled as followup patches post-merge please? Bjorn?
+regards
+Philipp
 
-Jon.
-
-[0] RHEL(SA) has had three different PCIe enabled ACPI stacks maintained
-independently so far since we need PCIe to boot most of the hundreds of
-v8 systems we have internal to Red Hat - which all have PCI.
-
--- 
-Computer Architect | Sent from my Fedora powered laptop
+>   ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
+>   ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
+> 
+>  .../bindings/reset/amlogic,meson-reset.txt         |  18 ++
+>  arch/arm/boot/dts/meson8b.dtsi                     |   7 +
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   7 +
+>  drivers/reset/Makefile                             |   1 +
+>  drivers/reset/reset-meson.c                        | 136 +++++++++++++
+>  .../dt-bindings/reset/amlogic,meson-gxbb-reset.h   | 210 +++++++++++++++++++++
+>  include/dt-bindings/reset/amlogic,meson8b-reset.h  | 175 +++++++++++++++++
+>  7 files changed, 554 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-reset.txt
+>  create mode 100644 drivers/reset/reset-meson.c
+>  create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
+>  create mode 100644 include/dt-bindings/reset/amlogic,meson8b-reset.h
+> 
