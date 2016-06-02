@@ -1,32 +1,49 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 3 Jun 2016 00:34:26 +0300
-Subject: [PATCH 12/13] ARM: dts: blanche: initial device tree
-In-Reply-To: <20160601012153.GK20527@verge.net.au>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <1923946.Jvi0TDUXFC@wasted.cogentembedded.com>
- <20160601012153.GK20527@verge.net.au>
-Message-ID: <149347f1-f636-cd65-6c6d-509f7c3306f0@cogentembedded.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 02 Jun 2016 14:40:13 -0700
+Subject: [PATCH 32/32] mmc: bcm2835: Import bcm2835-mmc and switch to it
+In-Reply-To: <2100811505.238666.65d5fa25-985a-4a30-86e2-3a7bebb5caaf.open-xchange@email.1und1.de>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-33-git-send-email-kraxel@redhat.com>
+ <e16936ee-3b0d-3798-72e0-8969c2c1a309@i2se.com>
+ <87oa7j314j.fsf@eliezer.anholt.net>
+ <2100811505.238666.65d5fa25-985a-4a30-86e2-3a7bebb5caaf.open-xchange@email.1und1.de>
+Message-ID: <87d1nze0ci.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 04:21 AM, Simon Horman wrote:
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
->> Add the initial device  tree for the R8A7792 SoC based Blanche board.
->> The board has 2 debug serial ports: SCIF0 and SCIF3; include support for
->> them,  so that  the serial console  can  work.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Hi Eric,
 >
-> At this time I do not have access to documentation or hardware for this
-> board. So I am relying on you to test this and make sure it complies
-> with the spec.
-
-    Don't worry, the patches have been tested on the real hardware.
-
-> What you have looks reasonable to me:
+>> Eric Anholt <eric@anholt.net> hat am 2. Juni 2016 um 20:18 geschrieben:
+>> 
+>> 
+>> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>> 
+>> > Hi Gerd,
+>> >
+>> > Am 01.06.2016 um 23:43 schrieb Gerd Hoffmann:
+>> >> From: Eric Anholt <eric@anholt.net>
+>> >>
+>> >> With this we can get wifi (brcmfmac) to probe.  Without it we're stuck
+>> >> with timeouts from sdio.c when it tries to set the bus width to 4.
+>> >
+>> > adding a new MMC driver to fix a wifi issue is really weird.
+>> >
+>> > Beside that there are already two MMC drivers (sdhci-bcm2835.c and
+>> > sdhci-iproc.c) in the Kernel which are compatible to BCM2835. Why should
+>> > we add two new ones?
+>> 
+>> Despite the fact that this is my commit, I don't think it should be
+>> merged.  We should figure out why sdhci-iproc.c isn't working, instead.
 >
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> so it doesn't work with sdhci-bcm2835 on RPi 3, too?
 
-    Thank you. :-)
-
-MBR, Sergei
+Correct.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/8c7a5e39/attachment.sig>
