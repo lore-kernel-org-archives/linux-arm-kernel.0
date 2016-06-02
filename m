@@ -1,56 +1,25 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Jun 2016 18:11:52 +0100
-Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
-In-Reply-To: <57505F52.3040108@arm.com>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
- <20160601103446.GC9280@leverpostej>
- <20160601104326.GA24749@e104818-lin.cambridge.arm.com>
- <20160602143650.GG2658@codeblueprint.co.uk>
- <20160602162925.GC24938@e104818-lin.cambridge.arm.com>
- <57505F52.3040108@arm.com>
-Message-ID: <20160602171152.GE24938@e104818-lin.cambridge.arm.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Thu, 02 Jun 2016 19:12:49 +0200
+Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
+In-Reply-To: <57506351.3060706@broadcom.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-2-git-send-email-kraxel@redhat.com>
+ <574F5881.4060008@gmail.com> <1464849936.24775.33.camel@redhat.com>
+ <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
+ <57506351.3060706@broadcom.com>
+Message-ID: <1464887569.24775.123.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 11:31:14AM -0500, Jeremy Linton wrote:
-> On 06/02/2016 11:29 AM, Catalin Marinas wrote:
-> >On Thu, Jun 02, 2016 at 03:36:50PM +0100, Matt Fleming wrote:
-> >>On Wed, 01 Jun, at 11:43:26AM, Catalin Marinas wrote:
-> >>>
-> >>>Thanks for the heads up. I'll rebase the patches after -rc2 but anyway I
-> >>>plan to merge them in 4.8 via the arm64 tree, including the patch above
-> >>>if Matt acks it. So there is enough time to fix the conflicts.
-> >>
-> >>I'd really prefer it if you didn't take this series through the arm64
-> >>tree, unless there are existing dependencies, of course.
-> >>
-> >>There were a number of conflicts in 3 different maintainer trees in
-> >>linux-next before the most recent merge window opened, and extra work
-> >>was required to sort that out. I want to avoid that in the future, so
-> >>expect me to be more insistent about keeping EFI patches in the EFI
-> >>tree than I have been in the past.
-> >>
-> >>Do arm64 prerequisites exist for this series? Or are you planning on
-> >>adding dependencies on top?
-> >
-> >I don't know when Jeremy plans to submit his contiguous PTE patches (we
-> >rejected them on the grounds of unnecessary huge page splitting, hence
-> >this series). If he's not targeting 4.8, I'm happy for the patches to go
-> >in via the EFI tree.
-> 
-> I can re-post them again for 4.8. They seem to get simpler every time!
+> There is no need to add ARCH_BCM though?
 
-I think you should post them fairly soon so that we get a chance to
-review them and ideally push into next around -rc4.
+There are Makefile(s) with
 
-Regarding these efi/arm64 patches, I can push them to a branch (once the
-conflicting efi/urgent patches hit upstream, I guess around -rc2) that
-Matt can pull into the EFI tree and I can also pull in the arm64 tree
-*if* we are to merge the Jeremy's patches.
+obj-$(CONFIG_ARCH_BCM)          += bcm/
 
-Jeremy, you can base your patches on such branch (I'll follow up with
-the details if that's ok with Matt).
+in drivers/pinctrl for example, maybe more, didn't check the whole tree.
 
--- 
-Catalin
+So without ARCH_BCM some drivers are dropped from the build ...
+
+cheers,
+  Gerd
