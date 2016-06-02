@@ -1,69 +1,59 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 01 Jun 2016 22:37:28 +0200
-Subject: [PATCH 1/3] pci: introduce read_bridge/write_bridge pci ops
-In-Reply-To: <20160601190430.GA19546@localhost>
-References: <1464784332-3775650-1-git-send-email-arnd@arndb.de>
- <4890460.9IGW89muCc@wuerfel> <20160601190430.GA19546@localhost>
-Message-ID: <4967020.J4dsRYGugq@wuerfel>
+Date: Thu, 02 Jun 2016 11:01:45 +0200
+Subject: [PATCH 4/4] Revert "powerpc/fsl: Move fsl_guts.h out of
+ arch/powerpc"
+In-Reply-To: <1464830660.22191.6.camel@buserror.net>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <5513501.AmZs7h1vI2@wuerfel> <1464830660.22191.6.camel@buserror.net>
+Message-ID: <3225846.9EJ0sHv0XK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 1, 2016 2:04:30 PM CEST Bjorn Helgaas wrote:
-> On Wed, Jun 01, 2016 at 05:41:53PM +0200, Arnd Bergmann wrote:
-> > On Wednesday, June 1, 2016 10:09:29 AM CEST Bjorn Helgaas wrote:
-> > > Hi Arnd,
-> > > 
-> > > On Wed, Jun 01, 2016 at 02:31:22PM +0200, Arnd Bergmann wrote:
-> > > > A lot of PCI host bridges require different methods for initiating
-> > > > type 0 and type 1 config space accesses, leading to duplication of
-> > > > code.
-> > > > 
-> > > > This adds support for the two different kinds at the pci_ops
-> > > > level, with the newly added map_bridge/read_bridge/write_bridge
-> > > > operations for type 1 accesses.
-> > > > 
-> > > > When these are not set, we fall back to the regular map_bus/read/write
-> > > > operations, so all existing drivers keep working, and bridges that
-> > > > have identical operations continue to only require one set.
-> > > 
-> > > This adds new config accessor functions to struct pci_ops and makes
-> > > the callers responsible for figuring out which one to use.  The
-> > > benefit is to reduce code duplication in some host bridge drivers
-> > > (DesignWare and MVEBU so far).
-> > > 
-> > > From a design perspective, I'm not comfortable with moving this burden
-> > > from the host bridge drivers to the callers of the config accessors.
-> > ...
+On Wednesday, June 1, 2016 8:24:20 PM CEST Scott Wood wrote:
+> On Mon, 2016-05-30 at 15:18 +0200, Arnd Bergmann wrote:
+> > All users of this driver are PowerPC specific and the header file
+> > has no business in the global include/linux/ hierarchy, so move
+> > it back before anyone starts using it on ARM.
+> > 
+> > This reverts commit 948486544713492f00ac8a9572909101ea892cb0.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > This part of the series is not required for the eSDHC quirk,
+> > but it restores the asm/fsl_guts.h header so it doesn't accidentally
+> > get abused for this in the future. I found two drivers outside of
+> > arch/powerpc that already accessed the registers directly, but the
+> > functions look fairly contained, and can be easily hidden in an
+> > #ifdef CONFIG_PPC
 > 
-> > Maybe we can simply change them to use the normal API and come up with
-> > a way to make the pci_ops harder to misuse? Would it make you feel better
-> > if we also renamed .read/.write into .read_type0/.write_type0 or something
-> > like that?
+> NACK
 > 
-> I'm trying to get a better feel for the tradeoff here.  It seems like
-> an API complication vs. code duplication.
-> 
-> I don't really think the callers should have to figure out which
-> accessor to use.  How much of a benefit do we really gain by
-> complicating the callers?  We've managed for quite a few years with
-> the current scheme, and it seems like only a couple new ARM platforms
-> would benefit.
+> Besides adding ifdef pollution for no good reason, this register block is used
+> on some ARM chips as well.  Why is it a problem if "anyone starts using it on
+> ARM"?
 
-I just did a count of the implementations of pci_ops: I found 107
-instances of 'struct pci_ops', and 67 of them treat type0 and type1
-access differently in some form.
+It's just not a good interface when it's defined as "this is the layout of
+a register area that any driver can ioremap() if they can figure out the
+device node". It's not uncommon to have register areas like that, but
+normally you have at the minimum a 'syscon' device to handle locking
+between drivers accessing the same registers and to avoid having to map
+the same area multiple times.
 
-I'd estimate that about half of them, or roughly a third of the total
-instances would benefit from my change, if we were to do them again.
-Clearly there is no need to change the existing code here when it works,
-unless the benefit is very clear and the code is actively maintained.
+If we need to use 'guts' registers on ARM, we can find a way to abstract
+them properly for the given use cases, using a syscon or a driver with
+exported functions, but just making a PowerPC platform specific header
+global to all Linux drivers by putting it into include/linux doesn't seem
+right.
 
-In some cases, the difference is only that the root bus has a limited
-set of devices that are allowed to be accessed, so there would
-likely be no benefit of this, compared to e.g. yet another callback
-that checks the validity.
-Some other instances have type0 registers at a different memory location
-from type1, some use different layout inside of that space, and some
-are completely different.
+Note that the header file uses a structure definition rather than the more
+common macros with register offsets, which is fine for a driver that has
+its own registers and abstracts them, but it doesn't really work with
+the regmap interface, so if we want to use it with syscon, it also needs to
+be rewritten.
+
+> BTW, of all the mailing lists you included on this CC, you seem to have left
+> off the PPC list (I've added it).
+
+Sorry, my mistake.
 
 	Arnd
