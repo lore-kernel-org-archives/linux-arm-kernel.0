@@ -1,92 +1,139 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Thu, 2 Jun 2016 09:36:40 +0800
-Subject: [PATCH v2 2/5] of/numa: fix a memory@ node can only contains one
- memory block
-In-Reply-To: <CAL_JsqJO1jXpmAJWUhCW+OK2mpTvtwzCuy_--3sQNUQhTvyFdA@mail.gmail.com>
-References: <1464427377-12712-1-git-send-email-thunder.leizhen@huawei.com>
- <1464427377-12712-3-git-send-email-thunder.leizhen@huawei.com>
- <CAL_JsqJO1jXpmAJWUhCW+OK2mpTvtwzCuy_--3sQNUQhTvyFdA@mail.gmail.com>
-Message-ID: <574F8DA8.4040503@huawei.com>
+From: oss@buserror.net (Scott Wood)
+Date: Wed, 01 Jun 2016 20:47:22 -0500
+Subject: [PATCH 2/4] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <5339448.D8rpq4ofAC@wuerfel>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
+ <CAPDyKFqx2JMLzXoDxGCKFYMFV47+SegnkuWFXKvsQHK7L5w-1g@mail.gmail.com>
+ <5339448.D8rpq4ofAC@wuerfel>
+Message-ID: <1464832042.22191.23.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2016-05-30 at 15:15 +0200, Arnd Bergmann wrote:
+> diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
+> new file mode 100644
+> index 000000000000..2f30698f5bcf
+> --- /dev/null
+> +++ b/drivers/soc/fsl/guts.c
+> @@ -0,0 +1,130 @@
+> +/*
+> + * Freescale QorIQ Platforms GUTS Driver
+> + *
+> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/module.h>
+> +#include <linux/slab.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/sys_soc.h>
+> +
+> +#define GUTS_PVR	0x0a0
+> +#define GUTS_SVR	0x0a4
+> +
+> +struct guts {
+> +	void __iomem *regs;
 
+We already have a struct to define guts.  Why are you not using it?  Why do
+you consider using it to be "abuse"?  What if we want to move more guts
+functionality into this driver?
 
-On 2016/6/2 4:13, Rob Herring wrote:
-> On Sat, May 28, 2016 at 4:22 AM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
->> For a normal memory@ devicetree node, its reg property can contains more
->> memory blocks.
->>
->> Because we don't known how many memory blocks maybe contained, so we try
->> from index=0, increase 1 until error returned(the end).
->>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->> ---
->>  drivers/of/of_numa.c | 26 +++++++++-----------------
->>  1 file changed, 9 insertions(+), 17 deletions(-)
->>
->> diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
->> index fb71b4e..fa85a51 100644
->> --- a/drivers/of/of_numa.c
->> +++ b/drivers/of/of_numa.c
->> @@ -63,13 +63,9 @@ static int __init of_numa_parse_memory_nodes(void)
->>         struct device_node *np = NULL;
->>         struct resource rsrc;
->>         u32 nid;
->> -       int r = 0;
->> -
->> -       for (;;) {
->> -               np = of_find_node_by_type(np, "memory");
->> -               if (!np)
->> -                       break;
->> +       int i, r = 0;
->>
->> +       for_each_node_by_type(np, "memory") {
->>                 r = of_property_read_u32(np, "numa-node-id", &nid);
->>                 if (r == -EINVAL)
->>                         /*
->> @@ -78,21 +74,17 @@ static int __init of_numa_parse_memory_nodes(void)
->>                          * "numa-node-id" property
->>                          */
->>                         continue;
->> -               else if (r)
->> -                       /* some other error */
->> -                       break;
->>
->> -               r = of_address_to_resource(np, 0, &rsrc);
->> -               if (r) {
->> -                       pr_err("NUMA: bad reg property in memory node\n");
->> -                       break;
->> -               }
->> +               for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
->> +                       r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
->>
->> -               r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
->> -               if (r)
->> +               if (!i || r) {
->> +                       of_node_put(np);
->> +                       pr_err("NUMA: bad property in memory node\n");
->> +                       r = r ? : -EINVAL;
->>                         break;
->> +               }
->>         }
->> -       of_node_put(np);
-> 
-> I believe you still need this and not the one above. You only need it
-> within the loop if you return. Otherwise, the last node always need to
-> be put.
+> +	bool little_endian;
+> +	struct soc_device_attribute soc;
+> +};
+> +
+> +static u32 fsl_guts_get_svr(struct guts *guts)
+> +{
+> +	if (guts->little_endian)
+> +		return ioread32(guts->regs + GUTS_SVR);
+> +	else
+> +		return ioread32be(guts->regs + GUTS_SVR);
+> +}
+> +
+> +static u32 fsl_guts_get_pvr(struct guts *guts)
+> +{
+> +	if (guts->little_endian)
+> +		return ioread32(guts->regs + GUTS_PVR);
+> +	else
+> +		return ioread32be(guts->regs + GUTS_PVR);
+> +}
 
-OK. Thanks.
+You've removed the fallback to mfspr() on PPC, which would be helpful in some
+virtualized environments where we don't have the guts node (but do have other
+directly assigned devices).  Of course, this is a consequence of the
+conversion into a platform device.
 
-Addition with Matthias's suggestion, I will move "return" into this patch, so that this of_node_put(np) can be safely removed.
+> +
+> +/*
+> + * Table for matching compatible strings, for device tree
+> + * guts node, for Freescale QorIQ SOCs.
+> + */
+> +static const struct of_device_id fsl_guts_of_match[] = {
+> +	/* For T4 & B4 Series SOCs */
+> +	{ .compatible = "fsl,qoriq-device-config-1.0", .data = "T4/B4
+> series" },
+[snip]
+> +	{ .compatible = "fsl,qoriq-device-config-2.0", .data = "P series"
 
+As noted in my comment on patch 3/4, these descriptions are reversed.
 
-> 
-> With that, for the series:
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> Rob
-> 
-> .
-> 
+They're also incomplete.  t2080 has device config 2.0.  t1040 is described as
+2.0 though it should probably be 2.1 (or better, drop the generic compatible
+altogether).
+
+> +	/*
+> +	 * syscon devices default to little-endian, but on powerpc we have
+> +	 * existing device trees with big-endian maps and an absent
+> endianess
+> +	 * "big-property"
+> +	 */
+> +	if (!IS_ENABLED(CONFIG_POWERPC) &&
+> +	    !of_property_read_bool(dev->of_node, "big-endian"))
+> +		guts->little_endian = true;
+
+This is not a syscon device (Yangbo's patch to add a guts node on ls2080 is
+the only guts node that says "syscon", and that was a leftover from earlier
+revisions and should probably be removed).  Even if it were, where is it
+documented that syscon defaults to little-endian?  
+
+Documentation/devicetree/bindings/common-properties.txt says that the
+individual binding specifies the default.  The default for this node should be
+big-endian because that's what existed before there was a need to describe the
+endianness.  And we need an update to the guts binding to specify that.
+
+> +
+> +	guts->regs = devm_ioremap_resource(dev, 0);
+> +	if (!guts->regs) {
+> +		ret = -ENOMEM;
+> +		kfree(guts);
+> +		goto out;
+> +	}
+> +
+> +	fsl_guts_init(dev, guts);
+> +	ret = 0;
+> +out:
+> +	return ret;
+> +}
+> +
+> +static struct platform_driver fsl_soc_guts = {
+> +	.probe = fsl_guts_probe,
+> +	.driver.of_match_table = fsl_guts_of_match,
+> +};
+> +
+> +module_platform_driver(fsl_soc_guts);
+
+Again, this means that the information is not available during early boot,
+such as in the clock driver.  Thus we would not be able to convert clk-qoriq's
+direct mfspr(SPRN_SVR) into an soc_device_match() (or anything else that makes
+use of this file), nor would we be able to move its access of the guts RCW
+registers into this driver.
+
+-Scott
