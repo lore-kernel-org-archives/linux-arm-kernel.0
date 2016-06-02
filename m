@@ -1,61 +1,75 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 2 Jun 2016 10:45:55 +0100
-Subject: [PATCH V8 8/9] arm64, pci, acpi: Provide ACPI-specific
- prerequisites for PCI bus enumeration.
-In-Reply-To: <1464621262-26770-9-git-send-email-tn@semihalf.com>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <1464621262-26770-9-git-send-email-tn@semihalf.com>
-Message-ID: <20160602094555.GB13962@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jun 2016 11:46:04 +0200
+Subject: [PATCH 2/3] PCI: host: new PCI host controller driver for Marvell
+ Armada 3700
+In-Reply-To: <1464858585-10963-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1464858585-10963-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <3112077.0RPfokLCAs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 05:14:21PM +0200, Tomasz Nowicki wrote:
-> ACPI requires to run acpi_pci_{add|remove}_bus while new PCI bus is created.
-> This allows to do some ACPI-specific additional configuration, like
-> PCI hotplug slot enumeration. In order to fulfill these requirements,
-> we implement arch-specific pcibios_{add|remove}_bus calls
-> and call acpi_pci_{add|remove}_bus from there.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  arch/arm64/kernel/pci.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+On Thursday, June 2, 2016 11:09:44 AM CEST Thomas Petazzoni wrote:
 
-Is there a reason why this has to be a standalone patch ?
-
-It is pretty much useless without patch 9 or I have stared at
-this series for too long.
-
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 336deef..3663be1 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -17,6 +17,7 @@
->  #include <linux/mm.h>
->  #include <linux/of_pci.h>
->  #include <linux/of_platform.h>
-> +#include <linux/pci-acpi.h>
->  #include <linux/slab.h>
->  
->  /*
-> @@ -96,4 +97,15 @@ struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  	/* TODO: Should be revisited when implementing PCI on ACPI */
->  	return NULL;
->  }
-> +
-> +void pcibios_add_bus(struct pci_bus *bus)
+> +static bool advk_pcie_link_up(struct advk_pcie *pcie)
 > +{
-> +	acpi_pci_add_bus(bus);
-> +}
+> +	int timeout;
+> +	u32 ltssm_state;
+> +	u32 val;
 > +
-> +void pcibios_remove_bus(struct pci_bus *bus)
+> +	timeout = PCIE_LINKUP_TIMEOUT;
+> +	do {
+> +		val = advk_readl(pcie, CFG_REG);
+> +		ltssm_state = (val >> LTSSM_SHIFT) & LTSSM_MASK;
+> +		timeout--;
+> +	/* Use ltssm < LTSSM_L0 instead of ltssm != LTSSM_L0 */
+> +	} while (ltssm_state < LTSSM_L0 && timeout > 0);
+> +
+> +	return (timeout > 0);
+> +}
+
+Maybe wait for some amount of time to have passed here (using 
+time_before(jiffies, end)) rather than a number of retries,
+for robustness and determinism.
+
+> +	/* Point PCIe unit MBUS decode windows to DRAM space. */
+> +	for (i = 0; i < 8; i++)
+> +		advk_pcie_set_ob_win(pcie, i, 0, 0, 0, 0, 0, 0, 0);
+
+Is this actually mbus based, or is the comment copied from some
+other Marvell driver?
+
+> +static int advk_pcie_setup_msi_irq(struct msi_controller *chip,
+> +				   struct pci_dev *pdev,
+> +				   struct msi_desc *desc)
 > +{
-> +	acpi_pci_remove_bus(bus);
-> +}
+> +	struct advk_pcie *pcie = pdev->bus->sysdata;
+> +	struct msi_msg msg;
+> +	int virq, hwirq;
+> +	phys_addr_t msi_msg_phys;
 > +
->  #endif
-> -- 
-> 1.9.1
-> 
+> +	/* We support MSI, but not MSI-X */
+> +	if (desc->msi_attrib.is_msix)
+> +		return -EINVAL;
+> +
+> +	hwirq = advk_pcie_alloc_msi(pcie);
+> +	if (hwirq < 0)
+> +		return hwirq;
+> +
+> +	virq = irq_create_mapping(pcie->msi_domain, hwirq);
+> +	if (!virq) {
+> +		advk_pcie_free_msi(pcie, hwirq);
+> +		return -EINVAL;
+> +	}
+
+What is the version of the GIC in the Armada 3700? If you have GICv3
+or GICv2m, could you use that instead of the built-in MSI logic?
+
+We typically handle this using the msi-map or msi-parent properties
+pointing to either the gic or the PCI host, depending on which one
+you want to use, but either of them should work, and the GIC should
+be more efficient because you can distribute the interrupts of the
+PCI devices over all CPUs by workload, rather than having to
+multiplex all MSI through a single GIC interrupt.
+
+	Arnd
