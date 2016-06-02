@@ -1,40 +1,39 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Thu, 2 Jun 2016 11:10:33 -0700
-Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
- typical Keystone features
-In-Reply-To: <575027E9.3070202@ti.com>
-References: <1464816714-3900-1-git-send-email-nm@ti.com>
- <3593753.UuDg5ybrvm@wuerfel>
- <cdbd2482-de98-569b-7ff0-c8963037de53@oracle.com> <575027E9.3070202@ti.com>
-Message-ID: <58a082cf-9936-0b04-6d4a-82c724c02e73@oracle.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 02 Jun 2016 11:12:38 -0700
+Subject: [PATCH 21/32] mmc: bcm2835-sdhost: Add new driver for the
+ internal SD controller.
+In-Reply-To: <4715245.LFBOAeJdHc@wuerfel>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-22-git-send-email-kraxel@redhat.com>
+ <4715245.LFBOAeJdHc@wuerfel>
+Message-ID: <87vb1ra295.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/2/2016 5:34 AM, Nishanth Menon wrote:
-> On 06/01/2016 06:26 PM, Santosh Shilimkar wrote:
-> [...]
->>>> Side note on LPAE:
->>>> For our current device tree and u-boot, LPAE is mandatory to bootup
->>>> for current Keystone boards - but this is not a SoC requirement,
->>>> booting without LPAE/HIGHMEM results in non-coherent DDR accesses.
->>>
->>> This sounds like a regression, I thought we had this working when
->>> keystone was initially merged and we got both the coherent and
->>> non-coherent mode working with the same DT.
->>>
->> Yes and it works. The coherent memory space itself is beyond 4GB so
->
-> Hmm... True, I just tested next-20160602 with mem_lpae set to 0 in
-> u-boot and it seems to boot just fine.
->
->> I don't understand a requirement of having coherent memory without
->> LPAE.
->
-> Looks like a messed up description on my end, Looks like I have to
-> update my automated test framework to incorporate the manual steps
-> involved.
->
-No worries. Am glad you got your setup working.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Regards,
-Santosh
+> On Wednesday, June 1, 2016 11:43:30 PM CEST Gerd Hoffmann wrote:
+>> +	/* Parse OF address directly to get the physical address for
+>> +	 * DMA to our registers.
+>> +	 */
+>> +	host->phys_addr = be32_to_cpup(of_get_address(pdev->dev.of_node, 0,
+>> +						      NULL, NULL));
+>
+> This looks broken on 64-bit systems when #address-cells=<2>, or if there
+> is an intermediate bus with a non-empty ranges property.
+>
+> What's wrong with platform_get_resource(pdev, IORESOURCE_MEM, 0)?
+
+I'll get to the rest of the review later, but this is a weird pattern
+that we have in several bcm2835-related drivers.
+
+We need the address as seen by the DMA controller, not the address from
+the ARM's perspective (which is offset by the dma-ranges DT property).
+This is the way that people have figured out to get that address.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/a60abe4d/attachment.sig>
