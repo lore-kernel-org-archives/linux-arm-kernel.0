@@ -1,82 +1,89 @@
-From: scott.branden@broadcom.com (Scott Branden)
-Date: Thu, 2 Jun 2016 09:48:17 -0700
-Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
-In-Reply-To: <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-2-git-send-email-kraxel@redhat.com>
- <574F5881.4060008@gmail.com> <1464849936.24775.33.camel@redhat.com>
- <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
-Message-ID: <57506351.3060706@broadcom.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 2 Jun 2016 17:50:18 +0100
+Subject: [PATCH V8 3/9] pci: Add new function to unmap IO resources.
+In-Reply-To: <1464621262-26770-4-git-send-email-tn@semihalf.com>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-4-git-send-email-tn@semihalf.com>
+Message-ID: <20160602165018.GG13962@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reply inline.
+On Mon, May 30, 2016 at 05:14:16PM +0200, Tomasz Nowicki wrote:
+> We need to release I/O resources so that the same I/O resources
+> can be allocated again (pci_remap_iospace), like in PCI hotplug removal
+> scenario. Therefore this patch implements new pci_unmap_iospace call which
+> unmaps I/O space as the symmetry to pci_remap_iospace.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>  drivers/pci/pci.c   | 18 ++++++++++++++++++
+>  include/linux/pci.h |  1 +
+>  2 files changed, 19 insertions(+)
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index c8b4dbd..eb431b5 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pci_hotplug.h>
+> +#include <linux/vmalloc.h>
+>  #include <asm/setup.h>
+>  #include <linux/aer.h>
+>  #include "pci.h"
+> @@ -3165,6 +3166,23 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
+>  #endif
+>  }
+>  
+> +/**
+> + *	pci_unmap_iospace - Unmap the memory mapped I/O space
+> + *	@res: resource to be unmapped
+> + *
+> + *	Unmap the CPU virtual address @res from virtual address space.
+> + *	Only architectures that have memory mapped IO functions defined
+> + *	(and the PCI_IOBASE value defined) should call this function.
+> + */
+> +void pci_unmap_iospace(struct resource *res)
+> +{
+> +#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
+> +	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
+> +
+> +	unmap_kernel_range(vaddr, resource_size(res));
+> +#endif
+> +}
 
-On 16-06-02 09:25 AM, Ray Jui wrote:
->
->
-> On 6/1/2016 11:45 PM, Gerd Hoffmann wrote:
->>>>  config ARCH_BCM2835
->>>>      bool "Broadcom BCM2835 family"
->>>> -    depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
->>>> +    depends on ARCH_MULTI_V6 || ARCH_MULTI_V7 || ARM64
->>>
->>> Humm, what does that achieve?
->>
->> Nothing ;)
->>
->> Slipped through unnoticed, I'll drop it.
->>
->>>> +config ARCH_BCM
->>>> +    bool "Broadcom SoC Support"
->>>> +    help
->>>> +      This enables support for Broadcom ARM based SoC chips
->>>
->>> menuconfig maybe?
->>
->> There isn't any in arch/arm64/Kconfig.platforms right now, so I didn't
->> feel like introducing one.  Also the dependency should have pretty much
->> the same effect .
+Rafael mentioned that, it would be cleaner to move the ifdef outside
+the function and add an empty static inline (but that probably should
+be done in one go along with pci_remap_iospace() and
+pci_pio_to_address() and pci_address_to_pio()) it would be weird
+to do it just for pci_unmap_iospace().
 
-No need to add ARCH_BCM
-.
->>
->>>> +config ARCH_BCM2835
->>>> +    bool "Broadcom BCM2835 family"
->>>> +    depends on ARCH_BCM
->>>> +    select ARCH_REQUIRE_GPIOLIB
->>>> +    select CLKSRC_OF
->>>> +    select PINCTRL
->>>> +    select PINCTRL_BCM2835
->>>> +    select ARM_AMBA
->>>> +    select ARM_TIMER_SP804
->>>> +    select HAVE_ARM_ARCH_TIMER
->>>> +    help
->>>> +      This enables support for the Broadcom BCM2837 SoC.
->>>> +      This SoC is used in the Raspberry Pi 3 device.
->>>> +
->>>>  config ARCH_BCM_IPROC
->>>>      bool "Broadcom iProc SoC Family"
->>>> +    depends on ARCH_BCM
->>>
->>> Does not seem necessary nor adding anything here.
->>
->> Added for consistency.  When we add ARCH_BCM all ARCH_BCM_* should
->> depend on it ...
->>
->> We could also do it the other way around: make ARCH_BCM a hidden bool
->> and have ARCH_BCM_* select it.
->
-> Yes, this is probably better.
->
-> ARCH_BCM_IPROC is currently enabled in arch/arm64/configs/defconfig. By
-> adding a dependency here without enabling ARCH_BCM in arm64 defconfig,
-> this effectively disables ARCH_BCM_IPROC from arm64 defconfig.
+It is true that unmap_kernel_range() is not commonly used in generic
+code, but to the best of my knowledge it does what's required here,
+(ie clear page table entries and flush tlbs, given that it is used
+in conjuction with ioremap_page_range() that maps a physical address
+to a specific preallocated virtual address ie PCI_IOBASE), so:
 
-There is no need to add ARCH_BCM though?
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
->
->>
->> cheers,
->>   Gerd
->>
+> +
+>  static void __pci_set_master(struct pci_dev *dev, bool enable)
+>  {
+>  	u16 old_cmd, cmd;
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index b67e4df..12349de 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1167,6 +1167,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
+>  unsigned long pci_address_to_pio(phys_addr_t addr);
+>  phys_addr_t pci_pio_to_address(unsigned long pio);
+>  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
+> +void pci_unmap_iospace(struct resource *res);
+>  
+>  static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
+>  {
+> -- 
+> 1.9.1
+> 
