@@ -1,76 +1,99 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  2 Jun 2016 16:31:41 +0200
-Subject: [PATCH 14/20] drm: vc4: Rely on the default ->best_encoder() behavior
+Date: Thu,  2 Jun 2016 16:31:36 +0200
+Subject: [PATCH 09/20] drm: rcar-du: Rely on the default ->best_encoder()
+ behavior
 In-Reply-To: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1464877907-27723-15-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1464877907-27723-10-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All outputs have a 1:1 relationship between connectors and encoders and
-the driver is relying on the atomic helpers: we can drop the custom
+All outputs have a 1:1 relationship between connectors and encoders,
+and the driver is relying on the atomic helpers: we can drop the custom
 ->best_encoder() implementations and let the core call
 drm_atomic_helper_best_encoder() for us.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/vc4/vc4_dpi.c  | 9 ---------
- drivers/gpu/drm/vc4/vc4_hdmi.c | 9 ---------
- 2 files changed, 18 deletions(-)
+ drivers/gpu/drm/rcar-du/rcar_du_encoder.c | 12 ------------
+ drivers/gpu/drm/rcar-du/rcar_du_encoder.h |  3 ---
+ drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c |  1 -
+ drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c |  1 -
+ drivers/gpu/drm/rcar-du/rcar_du_vgacon.c  |  1 -
+ 5 files changed, 18 deletions(-)
 
-diff --git a/drivers/gpu/drm/vc4/vc4_dpi.c b/drivers/gpu/drm/vc4/vc4_dpi.c
-index 9817dbf..dba1114 100644
---- a/drivers/gpu/drm/vc4/vc4_dpi.c
-+++ b/drivers/gpu/drm/vc4/vc4_dpi.c
-@@ -208,14 +208,6 @@ static int vc4_dpi_connector_get_modes(struct drm_connector *connector)
- 	return 0;
- }
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_encoder.c b/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
+index 4e939e4..55149e9 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
+@@ -27,18 +27,6 @@
+ #include "rcar_du_vgacon.h"
  
--static struct drm_encoder *
--vc4_dpi_connector_best_encoder(struct drm_connector *connector)
+ /* -----------------------------------------------------------------------------
+- * Common connector functions
+- */
+-
+-struct drm_encoder *
+-rcar_du_connector_best_encoder(struct drm_connector *connector)
 -{
--	struct vc4_dpi_connector *dpi_connector =
--		to_vc4_dpi_connector(connector);
--	return dpi_connector->encoder;
+-	struct rcar_du_connector *rcon = to_rcar_connector(connector);
+-
+-	return rcar_encoder_to_drm_encoder(rcon->encoder);
 -}
 -
- static const struct drm_connector_funcs vc4_dpi_connector_funcs = {
- 	.dpms = drm_atomic_helper_connector_dpms,
- 	.detect = vc4_dpi_connector_detect,
-@@ -228,7 +220,6 @@ static const struct drm_connector_funcs vc4_dpi_connector_funcs = {
+-/* -----------------------------------------------------------------------------
+  * Encoder
+  */
  
- static const struct drm_connector_helper_funcs vc4_dpi_connector_helper_funcs = {
- 	.get_modes = vc4_dpi_connector_get_modes,
--	.best_encoder = vc4_dpi_connector_best_encoder,
- };
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_encoder.h b/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
+index 719b6f2a..a8669c3 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
++++ b/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
+@@ -49,9 +49,6 @@ struct rcar_du_connector {
+ #define to_rcar_connector(c) \
+ 	container_of(c, struct rcar_du_connector, connector)
  
- static struct drm_connector *vc4_dpi_connector_init(struct drm_device *dev,
-diff --git a/drivers/gpu/drm/vc4/vc4_hdmi.c b/drivers/gpu/drm/vc4/vc4_hdmi.c
-index fd2644d..68df91c 100644
---- a/drivers/gpu/drm/vc4/vc4_hdmi.c
-+++ b/drivers/gpu/drm/vc4/vc4_hdmi.c
-@@ -208,14 +208,6 @@ static int vc4_hdmi_connector_get_modes(struct drm_connector *connector)
- 	return ret;
- }
- 
--static struct drm_encoder *
--vc4_hdmi_connector_best_encoder(struct drm_connector *connector)
--{
--	struct vc4_hdmi_connector *hdmi_connector =
--		to_vc4_hdmi_connector(connector);
--	return hdmi_connector->encoder;
--}
+-struct drm_encoder *
+-rcar_du_connector_best_encoder(struct drm_connector *connector);
 -
- static const struct drm_connector_funcs vc4_hdmi_connector_funcs = {
- 	.dpms = drm_atomic_helper_connector_dpms,
- 	.detect = vc4_hdmi_connector_detect,
-@@ -228,7 +220,6 @@ static const struct drm_connector_funcs vc4_hdmi_connector_funcs = {
- 
- static const struct drm_connector_helper_funcs vc4_hdmi_connector_helper_funcs = {
- 	.get_modes = vc4_hdmi_connector_get_modes,
--	.best_encoder = vc4_hdmi_connector_best_encoder,
+ int rcar_du_encoder_init(struct rcar_du_device *rcdu,
+ 			 enum rcar_du_encoder_type type,
+ 			 enum rcar_du_output output,
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c b/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
+index 6c92714..612b4d5 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
+@@ -52,7 +52,6 @@ static int rcar_du_hdmi_connector_mode_valid(struct drm_connector *connector,
+ static const struct drm_connector_helper_funcs connector_helper_funcs = {
+ 	.get_modes = rcar_du_hdmi_connector_get_modes,
+ 	.mode_valid = rcar_du_hdmi_connector_mode_valid,
+-	.best_encoder = rcar_du_connector_best_encoder,
  };
  
- static struct drm_connector *vc4_hdmi_connector_init(struct drm_device *dev,
+ static enum drm_connector_status
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c b/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
+index e905f5d..6afd0af 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
+@@ -59,7 +59,6 @@ static int rcar_du_lvds_connector_get_modes(struct drm_connector *connector)
+ 
+ static const struct drm_connector_helper_funcs connector_helper_funcs = {
+ 	.get_modes = rcar_du_lvds_connector_get_modes,
+-	.best_encoder = rcar_du_connector_best_encoder,
+ };
+ 
+ static enum drm_connector_status
+diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c b/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
+index 9d7e5c9..68f7ffa 100644
+--- a/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
++++ b/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
+@@ -28,7 +28,6 @@ static int rcar_du_vga_connector_get_modes(struct drm_connector *connector)
+ 
+ static const struct drm_connector_helper_funcs connector_helper_funcs = {
+ 	.get_modes = rcar_du_vga_connector_get_modes,
+-	.best_encoder = rcar_du_connector_best_encoder,
+ };
+ 
+ static enum drm_connector_status
 -- 
 2.7.4
