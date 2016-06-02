@@ -1,163 +1,43 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu,  2 Jun 2016 19:31:06 +0200
-Subject: [PATCH 4/4] musb: sunxi: Simplify dr_mode handling
-In-Reply-To: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
-References: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1464888666-17728-4-git-send-email-hdegoede@redhat.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Thu, 2 Jun 2016 10:36:28 -0700
+Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
+In-Reply-To: <57506B31.2010600@broadcom.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-2-git-send-email-kraxel@redhat.com>
+ <574F5881.4060008@gmail.com> <1464849936.24775.33.camel@redhat.com>
+ <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
+ <57506351.3060706@broadcom.com> <1464887569.24775.123.camel@redhat.com>
+ <57506B31.2010600@broadcom.com>
+Message-ID: <57506E9C.9090303@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-phy-sun4i-usb now has proper dr_mode handling, it always registers an
-extcon, and sends a notify with the mode (even when in peripheral- /
-host-only mode) at least once.
+On 06/02/2016 10:21 AM, Scott Branden wrote:
+> 
+> 
+> On 16-06-02 10:12 AM, Gerd Hoffmann wrote:
+>>> There is no need to add ARCH_BCM though?
+>>
+>> There are Makefile(s) with
+>>
+>> obj-$(CONFIG_ARCH_BCM)          += bcm/
+>>
+>> in drivers/pinctrl for example, maybe more, didn't check the whole tree.
+>>
+>> So without ARCH_BCM some drivers are dropped from the build ...
+> 
+> I see that now.  Quite bizarre how the NS2 pinctl driver (used on a
+> arm64 SoC) gets built right now....
+> 
+> Yes, adding the select with hidden option seems like what needs to be
+> done.  The ARM Maintainers did not like multi-level ARCH_BCM being added
+> in the arm64 Kconfig previously so we dropped it.
 
-So we can simply the sunxi musb glue by always registering its extcon
-notifier and relying on sunxi_musb_work() to enable vbus when in
-host-only mode.
+We should always recusrse into that directory and build the respective
+pinctrl drivers within drivers/pinctrl/bcm, only for the enabled
+platforms, it makes no sense to have this kind of config symbol gating that.
 
-This also enables host- and peripheral-only mode with vbus monitoring.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
- drivers/usb/musb/sunxi.c | 68 ++++++++++++++++++------------------------------
- 1 file changed, 25 insertions(+), 43 deletions(-)
-
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index e7d4617..b88a2f6 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -255,12 +255,10 @@ static int sunxi_musb_init(struct musb *musb)
- 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
- 
- 	/* Register notifier before calling phy_init() */
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE) {
--		ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
--					       &glue->host_nb);
--		if (ret)
--			goto error_reset_assert;
--	}
-+	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
-+				       &glue->host_nb);
-+	if (ret)
-+		goto error_reset_assert;
- 
- 	ret = phy_init(glue->phy);
- 	if (ret)
-@@ -274,9 +272,8 @@ static int sunxi_musb_init(struct musb *musb)
- 	return 0;
- 
- error_unregister_notifier:
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
--		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--					   &glue->host_nb);
-+	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-+				   &glue->host_nb);
- error_reset_assert:
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
-@@ -300,9 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
- 
- 	phy_exit(glue->phy);
- 
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
--		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--					   &glue->host_nb);
-+	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-+				   &glue->host_nb);
- 
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
-@@ -314,25 +310,6 @@ static int sunxi_musb_exit(struct musb *musb)
- 	return 0;
- }
- 
--static int sunxi_set_mode(struct musb *musb, u8 mode)
--{
--	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
--	int ret;
--
--	if (mode == MUSB_HOST) {
--		ret = phy_power_on(glue->phy);
--		if (ret)
--			return ret;
--
--		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
--		/* Stop musb work from turning vbus off again */
--		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
--		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
--	}
--
--	return 0;
--}
--
- static void sunxi_musb_enable(struct musb *musb)
- {
- 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-@@ -579,7 +556,6 @@ static const struct musb_platform_ops sunxi_musb_ops = {
- 	.exit		= sunxi_musb_exit,
- 	.enable		= sunxi_musb_enable,
- 	.disable	= sunxi_musb_disable,
--	.set_mode	= sunxi_set_mode,
- 	.fifo_offset	= sunxi_musb_fifo_offset,
- 	.ep_offset	= sunxi_musb_ep_offset,
- 	.busctl_offset	= sunxi_musb_busctl_offset,
-@@ -635,10 +611,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
--	if (!glue)
--		return -ENOMEM;
--
- 	memset(&pdata, 0, sizeof(pdata));
- 	switch (usb_get_dr_mode(&pdev->dev)) {
- #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
-@@ -646,15 +618,13 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		pdata.mode = MUSB_PORT_MODE_HOST;
- 		break;
- #endif
-+#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
-+	case USB_DR_MODE_PERIPHERAL:
-+		pdata.mode = MUSB_PORT_MODE_GADGET;
-+		break;
-+#endif
- #ifdef CONFIG_USB_MUSB_DUAL_ROLE
- 	case USB_DR_MODE_OTG:
--		glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
--		if (IS_ERR(glue->extcon)) {
--			if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
--				return -EPROBE_DEFER;
--			dev_err(&pdev->dev, "Invalid or missing extcon\n");
--			return PTR_ERR(glue->extcon);
--		}
- 		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
- 		break;
- #endif
-@@ -665,6 +635,10 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 	pdata.platform_ops	= &sunxi_musb_ops;
- 	pdata.config		= &sunxi_musb_hdrc_config;
- 
-+	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
-+	if (!glue)
-+		return -ENOMEM;
-+
- 	glue->dev = &pdev->dev;
- 	INIT_WORK(&glue->work, sunxi_musb_work);
- 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
-@@ -698,6 +672,14 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
-+	if (IS_ERR(glue->extcon)) {
-+		if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_err(&pdev->dev, "Invalid or missing extcon\n");
-+		return PTR_ERR(glue->extcon);
-+	}
-+
- 	glue->phy = devm_phy_get(&pdev->dev, "usb");
- 	if (IS_ERR(glue->phy)) {
- 		if (PTR_ERR(glue->phy) == -EPROBE_DEFER)
+I can submit a patch doing just that unless somebody wants to do it as
+part of this patch series.
 -- 
-2.7.4
+Florian
