@@ -1,208 +1,177 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu,  2 Jun 2016 10:41:03 +0200
-Subject: [RFC PATCH 3/3] pci,
- pci-thunder-pem: Add ACPI support for ThunderX PEM.
-In-Reply-To: <1464856864-18049-1-git-send-email-tn@semihalf.com>
-References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
-Message-ID: <1464856864-18049-4-git-send-email-tn@semihalf.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jun 2016 10:43:09 +0200
+Subject: [PATCH 2/4] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <1464832042.22191.23.camel@buserror.net>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <5339448.D8rpq4ofAC@wuerfel> <1464832042.22191.23.camel@buserror.net>
+Message-ID: <3435609.s5m1DCsoNb@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch uses DECLARE_ACPI_MCFG_FIXUP to overwrite PCI config accessors.
-Also, it provides alternative way to find additional configuration region:
-thunder_pem_get_acpi_res is looking for host bridge's child (_HID "THRX0001")
-which contains mentioned configuration region description.
-See example below:
+On Wednesday, June 1, 2016 8:47:22 PM CEST Scott Wood wrote:
+> On Mon, 2016-05-30 at 15:15 +0200, Arnd Bergmann wrote:
+> > diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
+> > new file mode 100644
+> > index 000000000000..2f30698f5bcf
+> > --- /dev/null
+> > +++ b/drivers/soc/fsl/guts.c
+> > @@ -0,0 +1,130 @@
+> > +/*
+> > + * Freescale QorIQ Platforms GUTS Driver
+> > + *
+> > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + */
+> > +
+> > +#include <linux/io.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/module.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/sys_soc.h>
+> > +
+> > +#define GUTS_PVR	0x0a0
+> > +#define GUTS_SVR	0x0a4
+> > +
+> > +struct guts {
+> > +	void __iomem *regs;
+> 
+> We already have a struct to define guts.  Why are you not using it?  Why do
+> you consider using it to be "abuse"?  What if we want to move more guts
+> functionality into this driver?
 
-Device (PEM0) {
-    Name (_HID, EISAID ("PNP0A08"))
-    Name (_CID, EISAID ("PNP0A03"))
+This structure was in the original patch, I left it in there, only
+removed the inclusion of the powerpc header file, which seemed to
+be misplaced.
 
-    [...]
+> > +	bool little_endian;
+> > +	struct soc_device_attribute soc;
+> > +};
+> > +
+> > +static u32 fsl_guts_get_svr(struct guts *guts)
+> > +{
+> > +	if (guts->little_endian)
+> > +		return ioread32(guts->regs + GUTS_SVR);
+> > +	else
+> > +		return ioread32be(guts->regs + GUTS_SVR);
+> > +}
+> > +
+> > +static u32 fsl_guts_get_pvr(struct guts *guts)
+> > +{
+> > +	if (guts->little_endian)
+> > +		return ioread32(guts->regs + GUTS_PVR);
+> > +	else
+> > +		return ioread32be(guts->regs + GUTS_PVR);
+> > +}
+> 
+> You've removed the fallback to mfspr() on PPC, which would be helpful in some
+> virtualized environments where we don't have the guts node (but do have other
+> directly assigned devices).  Of course, this is a consequence of the
+> conversion into a platform device.
 
-    Device (CFG0)
-    {
-      Name (_HID, "THRX0001") // PEM configuration space resources
-      Name (_CRS, ResourceTemplate () {
-        QWordMemory(ResourceConsumer, PosDecode, MinFixed, MaxFixed,
-          NonCacheable, ReadWrite, 0, 0x87e0c5000000, 0x87E0C5FFFFFF,
-          0, 0x01000000)
-      })
-    }
-}
+Right, it just didn't make any sense after the conversion. I couldn't
+figure out what the intention was for the fallback. Virtualized environments
+are an interesting case, but I'd also argue that a virtualized system is
+not the original SoC anyway, so reporting the physical SoC as the
+main system in the guest is a bit strange and we probably want to
+come up with a different solution there.
 
-Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
----
- drivers/pci/host/pci-thunder-pem.c | 132 +++++++++++++++++++++++++++++++++----
- 1 file changed, 119 insertions(+), 13 deletions(-)
+In soc_device, we probably want to just report the type of hypervisor
+in this case, which is what most users would expect there. For the
+specific case of the mmc driver (are there any real use cases where
+you'd pass on the mmc controller to a guest, as opposed to passing either
+an emulated block device or the mmc device on an emulated mmc host?),
+that means we have to come up with a different solution, but then
+we'd be free to work around this by modifying the DT node of the mmc
+device.
 
-diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
-index 91f6fc6..8f002ef 100644
---- a/drivers/pci/host/pci-thunder-pem.c
-+++ b/drivers/pci/host/pci-thunder-pem.c
-@@ -18,6 +18,7 @@
- #include <linux/module.h>
- #include <linux/of_address.h>
- #include <linux/of_pci.h>
-+#include <linux/pci-acpi.h>
- #include <linux/pci-ecam.h>
- #include <linux/platform_device.h>
- 
-@@ -284,6 +285,83 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
- 	return pci_generic_config_write(bus, devfn, where, size, val);
- }
- 
-+#ifdef CONFIG_ACPI
-+
-+struct pem_acpi_res {
-+	struct resource	resource;
-+	int found;
-+};
-+
-+static acpi_status
-+thunder_pem_cfg(struct acpi_resource *resource, void *ctx)
-+{
-+	struct pem_acpi_res *pem_ctx = ctx;
-+	struct resource *res = &pem_ctx->resource;
-+
-+	if ((resource->type != ACPI_RESOURCE_TYPE_ADDRESS64) ||
-+	    (resource->data.address32.resource_type != ACPI_MEMORY_RANGE))
-+		return AE_OK;
-+
-+	res->start = resource->data.address64.address.minimum;
-+	res->end = resource->data.address64.address.maximum;
-+	res->flags = IORESOURCE_MEM;
-+
-+	pem_ctx->found++;
-+	return AE_OK;
-+}
-+
-+static acpi_status
-+thunder_pem_find_dev(acpi_handle handle, u32 level, void *ctx, void **ret)
-+{
-+	struct pem_acpi_res *pem_ctx = ctx;
-+	struct acpi_device_info *info;
-+	acpi_status status = AE_OK;
-+
-+	status = acpi_get_object_info(handle, &info);
-+	if (ACPI_FAILURE(status))
-+		return AE_OK;
-+
-+	if (strncmp(info->hardware_id.string, "THRX0001", 8) != 0)
-+		goto out;
-+
-+	pem_ctx->found = 0;
-+	status = acpi_walk_resources(handle, METHOD_NAME__CRS, thunder_pem_cfg,
-+				     pem_ctx);
-+	if (ACPI_FAILURE(status))
-+		goto out;
-+
-+	if (pem_ctx->found)
-+		status = AE_CTRL_TERMINATE;
-+out:
-+	kfree(info);
-+	return status;
-+}
-+
-+static struct resource *thunder_pem_get_acpi_res(struct device *dev)
-+{
-+	struct acpi_device *adev = to_acpi_device(dev);
-+	acpi_handle handle = acpi_device_handle(adev);
-+	struct pem_acpi_res *pem_ctx;
-+	acpi_status status;
-+
-+	pem_ctx = devm_kzalloc(dev, sizeof(*pem_ctx), GFP_KERNEL);
-+	if (!pem_ctx)
-+		return NULL;
-+
-+	status = acpi_walk_namespace(ACPI_TYPE_DEVICE, handle, 1,
-+				     thunder_pem_find_dev, NULL, pem_ctx, NULL);
-+	if (ACPI_FAILURE(status) || !pem_ctx->found)
-+		return NULL;
-+
-+	return &pem_ctx->resource;
-+}
-+#else
-+static struct resource *thunder_pem_get_acpi_res(struct device *dev)
-+{
-+	return NULL;
-+}
-+#endif
-+
- static int thunder_pem_init(struct pci_config_window *cfg)
- {
- 	struct device *dev = cfg->parent;
-@@ -292,24 +370,24 @@ static int thunder_pem_init(struct pci_config_window *cfg)
- 	struct thunder_pem_pci *pem_pci;
- 	struct platform_device *pdev;
- 
--	/* Only OF support for now */
--	if (!dev->of_node)
--		return -EINVAL;
--
- 	pem_pci = devm_kzalloc(dev, sizeof(*pem_pci), GFP_KERNEL);
- 	if (!pem_pci)
- 		return -ENOMEM;
- 
--	pdev = to_platform_device(dev);
--
--	/*
--	 * The second register range is the PEM bridge to the PCIe
--	 * bus.  It has a different config access method than those
--	 * devices behind the bridge.
--	 */
--	res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	if (acpi_disabled) {
-+		pdev = to_platform_device(dev);
-+
-+		/*
-+		 * The second register range is the PEM bridge to the PCIe
-+		 * bus.  It has a different config access method than those
-+		 * devices behind the bridge.
-+		 */
-+		res_pem = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	} else {
-+		res_pem = thunder_pem_get_acpi_res(dev);
-+	}
- 	if (!res_pem) {
--		dev_err(dev, "missing \"reg[1]\"property\n");
-+		dev_err(dev, "missing configuration region\n");
- 		return -EINVAL;
- 	}
- 
-@@ -362,5 +440,33 @@ static struct platform_driver thunder_pem_driver = {
- };
- module_platform_driver(thunder_pem_driver);
- 
-+#ifdef CONFIG_ACPI
-+
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			4, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			5, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			6, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			7, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			8, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			9, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			14, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			15, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			16, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			17, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			18, PCI_MCFG_BUS_ANY);
-+DECLARE_ACPI_MCFG_FIXUP(&pci_thunder_pem_ops, "CAVIUM", 1,
-+			19, PCI_MCFG_BUS_ANY);
-+#endif
-+
- MODULE_DESCRIPTION("Thunder PEM PCIe host driver");
- MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+> > +/*
+> > + * Table for matching compatible strings, for device tree
+> > + * guts node, for Freescale QorIQ SOCs.
+> > + */
+> > +static const struct of_device_id fsl_guts_of_match[] = {
+> > +	/* For T4 & B4 Series SOCs */
+> > +	{ .compatible = "fsl,qoriq-device-config-1.0", .data = "T4/B4
+> > series" },
+> [snip]
+> > +	{ .compatible = "fsl,qoriq-device-config-2.0", .data = "P series"
+> 
+> As noted in my comment on patch 3/4, these descriptions are reversed.
+> 
+> They're also incomplete.  t2080 has device config 2.0.  t1040 is described as
+> 2.0 though it should probably be 2.1 (or better, drop the generic compatible
+> altogether).
+
+Ok. Ideally I think we'd even look up the specific SoC names from the
+SVC rather than the compatible string. I just didn't have a good list
+for those to put in the driver.
+
+> > +	/*
+> > +	 * syscon devices default to little-endian, but on powerpc we have
+> > +	 * existing device trees with big-endian maps and an absent
+> > endianess
+> > +	 * "big-property"
+> > +	 */
+> > +	if (!IS_ENABLED(CONFIG_POWERPC) &&
+> > +	    !of_property_read_bool(dev->of_node, "big-endian"))
+> > +		guts->little_endian = true;
+> 
+> This is not a syscon device (Yangbo's patch to add a guts node on ls2080 is
+> the only guts node that says "syscon", and that was a leftover from earlier
+> revisions and should probably be removed).  Even if it were, where is it
+> documented that syscon defaults to little-endian?
+
+Documentation/devicetree/bindings/regmap/regmap.txt
+
+We had a little screwup here, basically regmap (and by consequence, syscon)
+always defaulted to little-endian way before that was documented, so it's
+too late to change it, although I agree it would have made sense to document
+regmap to default to big-endian on powerpc.
+
+> Documentation/devicetree/bindings/common-properties.txt says that the
+> individual binding specifies the default.  The default for this node should be
+> big-endian because that's what existed before there was a need to describe the
+> endianness.  And we need an update to the guts binding to specify that.
+
+Good point. This proably means that specifying both the "guts" and "syscon"
+compatible strings implies having to also specify the endianess explicitly
+both ways, because otherwise we break one of the two bindings.
+
+> > +
+> > +	guts->regs = devm_ioremap_resource(dev, 0);
+> > +	if (!guts->regs) {
+> > +		ret = -ENOMEM;
+> > +		kfree(guts);
+> > +		goto out;
+> > +	}
+> > +
+> > +	fsl_guts_init(dev, guts);
+> > +	ret = 0;
+> > +out:
+> > +	return ret;
+> > +}
+> > +
+> > +static struct platform_driver fsl_soc_guts = {
+> > +	.probe = fsl_guts_probe,
+> > +	.driver.of_match_table = fsl_guts_of_match,
+> > +};
+> > +
+> > +module_platform_driver(fsl_soc_guts);
+> 
+> Again, this means that the information is not available during early boot,
+> such as in the clock driver.  Thus we would not be able to convert clk-qoriq's
+> direct mfspr(SPRN_SVR) into an soc_device_match() (or anything else that makes
+> use of this file), nor would we be able to move its access of the guts RCW
+> registers into this driver.
+
+Correct. Do we have a reason to convert the mfspr() though? I don't really
+see an improvement over the current state if we do that, and for new devices
+that might need the erratum workaround, we could add a DT property that would
+be preferred to both.
+
+	Arnd
