@@ -1,39 +1,41 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 Jun 2016 09:38:57 +0200
-Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry Pi
- 3.
-In-Reply-To: <1464934708-24769-8-git-send-email-kraxel@redhat.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <1464934708-24769-8-git-send-email-kraxel@redhat.com>
-Message-ID: <5490184.9quKRk1Imx@wuerfel>
+Date: Thu, 02 Jun 2016 17:06:55 +0200
+Subject: [PATCH 1/3] pci: introduce read_bridge/write_bridge pci ops
+In-Reply-To: <20160602140001.GB8262@localhost>
+References: <1464784332-3775650-1-git-send-email-arnd@arndb.de>
+ <4967020.J4dsRYGugq@wuerfel> <20160602140001.GB8262@localhost>
+Message-ID: <3585926.N1C2xx3GaB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 3, 2016 8:18:26 AM CEST Gerd Hoffmann wrote:
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index 06b6c2d..71e2d36 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -66,7 +66,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
->         bcm2835-rpi-b-rev2.dtb \
->         bcm2835-rpi-b-plus.dtb \
->         bcm2835-rpi-a-plus.dtb \
-> -       bcm2836-rpi-2-b.dtb
-> +       bcm2836-rpi-2-b.dtb \
-> +       ../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
->  dtb-$(CONFIG_ARCH_BCM_5301X) += \
->         bcm4708-asus-rt-ac56u.dtb \
->         bcm4708-asus-rt-ac68u.dtb \
+On Thursday, June 2, 2016 9:00:01 AM CEST Bjorn Helgaas wrote:
+> > I just did a count of the implementations of pci_ops: I found 107
+> > instances of 'struct pci_ops', and 67 of them treat type0 and type1
+> > access differently in some form.
+> > 
+> > I'd estimate that about half of them, or roughly a third of the total
+> > instances would benefit from my change, if we were to do them again.
+> > Clearly there is no need to change the existing code here when it works,
+> > unless the benefit is very clear and the code is actively maintained.
+> > 
+> > In some cases, the difference is only that the root bus has a limited
+> > set of devices that are allowed to be accessed, so there would
+> > likely be no benefit of this, compared to e.g. yet another callback
+> > that checks the validity.
+> > Some other instances have type0 registers at a different memory location
+> > from type1, some use different layout inside of that space, and some
+> > are completely different.
+> 
+> The type0/type1 distinction still seems out of place to me at the call
+> site.  Is there any other reason a caller would care about the
+> difference between type0 and type1?
 
-Let's make this hunk a separate patch so we can discuss it on its
-own. I'm not really happy about the way it looks (in general, using ../../../
-anywhere in the kernel looks hacky.
+The callers really shouldn't care, but they also shouldn't call the
+pci_ops function pointer (and as we found earlier, there are only
+three such callers).
 
-How about a separate
-
-dtb-$(CONFIG_ARCH_BCM2835) +=
-	../../../arm64/boot/dts/broadcom/
-
-so at least we don't have to add each board on its own?
+The distinction between type0 and type1 in my mind is an implementation
+detail of the pci_{read,write}_config_{byte,word,dword} functions
+that call the low-level operations here.
 
 	Arnd
