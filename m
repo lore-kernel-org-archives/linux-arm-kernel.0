@@ -1,86 +1,47 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  2 Jun 2016 12:20:59 +0200
-Subject: [PULL 7/8] arm64: KVM: vgic-v3: Relax synchronization when SRE==1
+Date: Thu,  2 Jun 2016 12:21:00 +0200
+Subject: [PULL 8/8] KVM: arm/arm64: vgic-new: Removel harmful BUG_ON
 In-Reply-To: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464862860-1183-8-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464862860-1183-9-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-The GICv3 backend of the vgic is quite barrier heavy, in order
-to ensure synchronization of the system registers and the
-memory mapped view for a potential GICv2 guest.
+When changing the active bit from an MMIO trap, we decide to
+explode if the intid is that of a private interrupt.
 
-But when the guest is using a GICv3 model, there is absolutely
-no need to execute all these heavy barriers, and it is actually
-beneficial to avoid them altogether.
+This flawed logic comes from the fact that we were assuming that
+kvm_vcpu_kick() as called by kvm_arm_halt_vcpu() would not return before
+the called vcpu responded, but this is not the case, so we need to
+perform this wait even for private interrupts.
 
-This patch makes the synchonization conditional, and ensures
-that we do not change the EL1 SRE settings if we do not need to.
+Dropping the BUG_ON seems like the right thing to do.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+ [ Commit message tweaked by Christoffer ]
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/vgic-v3-sr.c | 23 ++++++++++++++++-------
- 1 file changed, 16 insertions(+), 7 deletions(-)
+ virt/kvm/arm/vgic/vgic-mmio.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/vgic-v3-sr.c b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-index 40c3b4c..5f8f80b 100644
---- a/arch/arm64/kvm/hyp/vgic-v3-sr.c
-+++ b/arch/arm64/kvm/hyp/vgic-v3-sr.c
-@@ -169,7 +169,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 	 * Make sure stores to the GIC via the memory mapped interface
- 	 * are now visible to the system register interface.
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 059595e..9f6fab7 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -191,10 +191,8 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	 * other thread sync back the IRQ.
  	 */
--	dsb(st);
-+	if (!cpu_if->vgic_sre)
-+		dsb(st);
+ 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+-	       irq->vcpu->cpu != -1) { /* VCPU thread is running */
+-		BUG_ON(irq->intid < VGIC_NR_PRIVATE_IRQS);
++	       irq->vcpu->cpu != -1) /* VCPU thread is running */
+ 		cond_resched_lock(&irq->irq_lock);
+-	}
  
- 	cpu_if->vgic_vmcr  = read_gicreg(ICH_VMCR_EL2);
- 
-@@ -235,8 +236,12 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
- 
- 	val = read_gicreg(ICC_SRE_EL2);
- 	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
--	isb(); /* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
--	write_gicreg(1, ICC_SRE_EL1);
-+
-+	if (!cpu_if->vgic_sre) {
-+		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
-+		isb();
-+		write_gicreg(1, ICC_SRE_EL1);
-+	}
- }
- 
- void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
-@@ -255,8 +260,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 	 * been actually programmed with the value we want before
- 	 * starting to mess with the rest of the GIC.
- 	 */
--	write_gicreg(cpu_if->vgic_sre, ICC_SRE_EL1);
--	isb();
-+	if (!cpu_if->vgic_sre) {
-+		write_gicreg(0, ICC_SRE_EL1);
-+		isb();
-+	}
- 
- 	val = read_gicreg(ICH_VTR_EL2);
- 	max_lr_idx = vtr_to_max_lr_idx(val);
-@@ -305,8 +312,10 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
- 	 * (re)distributors. This ensure the guest will read the
- 	 * correct values from the memory-mapped interface.
- 	 */
--	isb();
--	dsb(sy);
-+	if (!cpu_if->vgic_sre) {
-+		isb();
-+		dsb(sy);
-+	}
- 	vcpu->arch.vgic_cpu.live_lrs = live_lrs;
- 
- 	/*
+ 	irq->active = new_active_state;
+ 	if (new_active_state)
 -- 
 2.1.2.330.g565301e.dirty
