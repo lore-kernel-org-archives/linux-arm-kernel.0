@@ -1,24 +1,94 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Jun 2016 11:09:56 +0100
-Subject: [PATCH 1/4] dt-bindings: Add A10 I2S controller binding
- documentation
-In-Reply-To: <20160601175430.11625-2-maxime.ripard@free-electrons.com>
-References: <20160601175430.11625-1-maxime.ripard@free-electrons.com>
- <20160601175430.11625-2-maxime.ripard@free-electrons.com>
-Message-ID: <20160602100956.GE2282@sirena.org.uk>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 2 Jun 2016 11:13:56 +0100
+Subject: [PATCH V8 2/9] PCI: ecam: Add parent device field to
+ pci_config_window
+In-Reply-To: <1464621262-26770-3-git-send-email-tn@semihalf.com>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-3-git-send-email-tn@semihalf.com>
+Message-ID: <20160602101356.GD13962@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 07:54:27PM +0200, Maxime Ripard wrote:
-> Introduce the device tree binding for the I2S controller found in the
-> Allwinner A10 and later SoCs.
+On Mon, May 30, 2016 at 05:14:15PM +0200, Tomasz Nowicki wrote:
+> From: Jayachandran C <jchandra@broadcom.com>
+> 
+> Add a parent device field to struct pci_config_window. The parent
+> is not saved now, but will be useful to save it in some cases.
+> Specifically in case of ACPI for ARM64, it can be used to setup
+> ACPI companion and domain.
+> 
+> Since the parent dev is in struct pci_config_window now, we need
+> not pass it to he init function as a separate argument.
 
-Please use subject lines matching the style for the subsystem.  This
-makes it easier for people to identify relevant patches.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/8ed42184/attachment.sig>
+Nit: "the init function"
+
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+>  drivers/pci/ecam.c                 | 3 ++-
+>  drivers/pci/host/pci-thunder-pem.c | 3 ++-
+>  include/linux/pci-ecam.h           | 4 ++--
+>  3 files changed, 6 insertions(+), 4 deletions(-)
+
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+> index 820e26b..66e0d71 100644
+> --- a/drivers/pci/ecam.c
+> +++ b/drivers/pci/ecam.c
+> @@ -51,6 +51,7 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
+>  	if (!cfg)
+>  		return ERR_PTR(-ENOMEM);
+>  
+> +	cfg->parent = dev;
+>  	cfg->ops = ops;
+>  	cfg->busr.start = busr->start;
+>  	cfg->busr.end = busr->end;
+> @@ -94,7 +95,7 @@ struct pci_config_window *pci_ecam_create(struct device *dev,
+>  	}
+>  
+>  	if (ops->init) {
+> -		err = ops->init(dev, cfg);
+> +		err = ops->init(cfg);
+>  		if (err)
+>  			goto err_exit;
+>  	}
+> diff --git a/drivers/pci/host/pci-thunder-pem.c b/drivers/pci/host/pci-thunder-pem.c
+> index 5020d3d..91f6fc6 100644
+> --- a/drivers/pci/host/pci-thunder-pem.c
+> +++ b/drivers/pci/host/pci-thunder-pem.c
+> @@ -284,8 +284,9 @@ static int thunder_pem_config_write(struct pci_bus *bus, unsigned int devfn,
+>  	return pci_generic_config_write(bus, devfn, where, size, val);
+>  }
+>  
+> -static int thunder_pem_init(struct device *dev, struct pci_config_window *cfg)
+> +static int thunder_pem_init(struct pci_config_window *cfg)
+>  {
+> +	struct device *dev = cfg->parent;
+>  	resource_size_t bar4_start;
+>  	struct resource *res_pem;
+>  	struct thunder_pem_pci *pem_pci;
+> diff --git a/include/linux/pci-ecam.h b/include/linux/pci-ecam.h
+> index 9878beb..7adad20 100644
+> --- a/include/linux/pci-ecam.h
+> +++ b/include/linux/pci-ecam.h
+> @@ -27,8 +27,7 @@ struct pci_config_window;
+>  struct pci_ecam_ops {
+>  	unsigned int			bus_shift;
+>  	struct pci_ops			pci_ops;
+> -	int				(*init)(struct device *,
+> -						struct pci_config_window *);
+> +	int				(*init)(struct pci_config_window *);
+>  };
+>  
+>  /*
+> @@ -45,6 +44,7 @@ struct pci_config_window {
+>  		void __iomem		*win;	/* 64-bit single mapping */
+>  		void __iomem		**winp; /* 32-bit per-bus mapping */
+>  	};
+> +	struct device			*parent;/* ECAM res was from this dev */
+>  };
+>  
+>  /* create and free pci_config_window */
+> -- 
+> 1.9.1
+> 
