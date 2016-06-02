@@ -1,39 +1,49 @@
-From: oss@buserror.net (Scott Wood)
-Date: Wed, 01 Jun 2016 20:24:20 -0500
-Subject: [PATCH 4/4] Revert "powerpc/fsl: Move fsl_guts.h out of
- arch/powerpc"
-In-Reply-To: <5513501.AmZs7h1vI2@wuerfel>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
- <CAPDyKFqx2JMLzXoDxGCKFYMFV47+SegnkuWFXKvsQHK7L5w-1g@mail.gmail.com>
- <5513501.AmZs7h1vI2@wuerfel>
-Message-ID: <1464830660.22191.6.camel@buserror.net>
+From: hzpeterchen@gmail.com (Peter Chen)
+Date: Thu, 2 Jun 2016 09:24:19 +0800
+Subject: [PATCH v3 09/12] EXAMPLE CODE: usb: port: Parse pwrseq phandle
+ from Device Tree
+In-Reply-To: <146480499491.3686.4996610748316511864@sboyd-linaro>
+References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
+ <1464768141-25420-10-git-send-email-k.kozlowski@samsung.com>
+ <146477144362.1485.3331887341591876278@sboyd-linaro>
+ <20160601120520.GB16740@shlinux2>
+ <146480499491.3686.4996610748316511864@sboyd-linaro>
+Message-ID: <20160602012419.GA7953@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-05-30 at 15:18 +0200, Arnd Bergmann wrote:
-> All users of this driver are PowerPC specific and the header file
-> has no business in the global include/linux/ hierarchy, so move
-> it back before anyone starts using it on ARM.
+On Wed, Jun 01, 2016 at 11:16:34AM -0700, Stephen Boyd wrote:
+> Quoting Peter Chen (2016-06-01 05:05:20)
+> > On Wed, Jun 01, 2016 at 01:57:23AM -0700, Stephen Boyd wrote:
+> > > Quoting Krzysztof Kozlowski (2016-06-01 01:02:18)
+> > > > Parse usb-pwrseq property from Device Tree to get the phandle to pwrseq
+> > > > device.  The pwrseq device will be used by USB hub to cycle the power
+> > > > before activating ports.
+> > > > 
+> > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > > 
+> > > Drive by review comment.
+> > > 
+> > > I was hoping this would help me with a problem I'm having where I have a
+> > > hub (smsc4604) that needs to be taken out of reset before my HSIC
+> > > controller sends a USB reset to it, but it seems this is more about
+> > > doing some sort of power on sequence after enumeration?
+> > > 
+> > 
+> > No, you may need to do reset before enumeration, the general purpose of
+> > reset is eliminate unstable hardware state, and let the controller find
+> > the device.
+> > 
+> > Try to do it at bootloader to see if it works for you.
+> > 
 > 
-> This reverts commit 948486544713492f00ac8a9572909101ea892cb0.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> This part of the series is not required for the eSDHC quirk,
-> but it restores the asm/fsl_guts.h header so it doesn't accidentally
-> get abused for this in the future. I found two drivers outside of
-> arch/powerpc that already accessed the registers directly, but the
-> functions look fairly contained, and can be easily hidden in an
-> #ifdef CONFIG_PPC
+> Sorry the bootloader doesn't do this so that doesn't work for me.
 
-NACK
+I mean try to see if the HUB can work if you reset it at bootloader.
+If it works, it means you need to do reset before enumeration, and you
+don't need to do anything after enumeration.
 
-Besides adding ifdef pollution for no good reason, this register block is used
-on some ARM chips as well.  Why is it a problem if "anyone starts using it on
-ARM"?
+-- 
 
-BTW, of all the mailing lists you included on this CC, you seem to have left
-off the PPC list (I've added it).
-
--Scott
+Best Regards,
+Peter Chen
