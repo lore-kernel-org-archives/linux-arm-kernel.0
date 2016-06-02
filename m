@@ -1,160 +1,126 @@
-From: smbarber@google.com (Steve Barber)
-Date: Thu, 2 Jun 2016 13:31:14 -0700
-Subject: [RESEND PATCH v4 5/5] thermal: rockchip: add the set_trips
- function
-In-Reply-To: <1464338208-8105-6-git-send-email-wxt@rock-chips.com>
-References: <1464338208-8105-1-git-send-email-wxt@rock-chips.com>
- <1464338208-8105-6-git-send-email-wxt@rock-chips.com>
-Message-ID: <CADR9n4_LQxJtnEW79xzJy13U9S19FmFpy4Kq4WZm658z2GPA0g@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 02 Jun 2016 23:57:14 +0300
+Subject: [PATCH 09/20] drm: rcar-du: Rely on the default ->best_encoder()
+ behavior
+In-Reply-To: <1464877907-27723-10-git-send-email-boris.brezillon@free-electrons.com>
+References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1464877907-27723-10-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <5863270.jtrd0Kruzj@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2016 at 1:36 AM, Caesar Wang <wxt@rock-chips.com> wrote:
-> Whenever the current temperature is updated, the trip points immediately
-> below and above the current temperature are found. A sensor driver
-> callback `set_trips' is then called with the temperatures.
-> Lastly, The sensor will trigger the hardware high temperature interrupts
-> to increase the sampleing rate and throttle frequency to limit the
-> temperature rising When performing passive cooling.
->
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: Eduardo Valentin <edubezval@gmail.com>
-> Cc: linux-pm at vger.kernel.org
->
+Hi Boris,
+
+Thank you for the patch.
+
+On Thursday 02 Jun 2016 16:31:36 Boris Brezillon wrote:
+> All outputs have a 1:1 relationship between connectors and encoders,
+> and the driver is relying on the atomic helpers: we can drop the custom
+> ->best_encoder() implementations and let the core call
+> drm_atomic_helper_best_encoder() for us.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
->
-> Changes in v4: None
-> Changes in v3: None
-> Changes in v2: None
->
->  drivers/thermal/rockchip_thermal.c | 39 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 39 insertions(+)
->
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index 86a1ab0..39e2eec 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -96,6 +96,7 @@ struct chip_tsadc_table {
->   * @initialize: SoC special initialize tsadc controller method
->   * @irq_ack: clear the interrupt
->   * @get_temp: get the temperature
-> + * @set_alarm_temp: set the high temperature interrupt
->   * @set_tshut_temp: set the hardware-controlled shutdown temperature
->   * @set_tshut_mode: set the hardware-controlled shutdown mode
->   * @table: the chip-specific conversion table
-> @@ -119,6 +120,8 @@ struct rockchip_tsadc_chip {
->         /* Per-sensor methods */
->         int (*get_temp)(struct chip_tsadc_table table,
->                         int chn, void __iomem *reg, int *temp);
-> +       void (*set_alarm_temp)(struct chip_tsadc_table table,
-> +                              int chn, void __iomem *reg, int temp);
->         void (*set_tshut_temp)(struct chip_tsadc_table table,
->                                int chn, void __iomem *reg, int temp);
->         void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
-> @@ -183,6 +186,7 @@ struct rockchip_thermal_data {
->  #define TSADCV2_INT_EN                         0x08
->  #define TSADCV2_INT_PD                         0x0c
->  #define TSADCV2_DATA(chn)                      (0x20 + (chn) * 0x04)
-> +#define TSADCV2_COMP_INT(chn)                  (0x30 + (chn) * 0x04)
->  #define TSADCV2_COMP_SHUT(chn)                 (0x40 + (chn) * 0x04)
->  #define TSADCV2_HIGHT_INT_DEBOUNCE             0x60
->  #define TSADCV2_HIGHT_TSHUT_DEBOUNCE           0x64
-> @@ -628,6 +632,20 @@ static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
->         return rk_tsadcv2_code_to_temp(table, val, temp);
->  }
->
-> +static void rk_tsadcv2_alarm_temp(struct chip_tsadc_table table,
-> +                                 int chn, void __iomem *regs, int temp)
-> +{
-> +       u32 alarm_value, int_en;
-> +
-> +       alarm_value = rk_tsadcv2_temp_to_code(table, temp);
-> +       writel_relaxed(alarm_value & table.data_mask,
-> +                      regs + TSADCV2_COMP_INT(chn));
-> +
-> +       int_en = readl_relaxed(regs + TSADCV2_INT_EN);
-> +       int_en |= TSADCV2_INT_SRC_EN(chn);
-> +       writel_relaxed(int_en, regs + TSADCV2_INT_EN);
-> +}
-> +
->  static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
->                                   int chn, void __iomem *regs, int temp)
->  {
-> @@ -670,6 +688,7 @@ static const struct rockchip_tsadc_chip rk3228_tsadc_data = {
->         .irq_ack = rk_tsadcv3_irq_ack,
->         .control = rk_tsadcv3_control,
->         .get_temp = rk_tsadcv2_get_temp,
-> +       .set_alarm_temp = rk_tsadcv2_alarm_temp,
->         .set_tshut_temp = rk_tsadcv2_tshut_temp,
->         .set_tshut_mode = rk_tsadcv2_tshut_mode,
->
-> @@ -694,6 +713,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
->         .irq_ack = rk_tsadcv2_irq_ack,
->         .control = rk_tsadcv2_control,
->         .get_temp = rk_tsadcv2_get_temp,
-> +       .set_alarm_temp = rk_tsadcv2_alarm_temp,
->         .set_tshut_temp = rk_tsadcv2_tshut_temp,
->         .set_tshut_mode = rk_tsadcv2_tshut_mode,
->
-> @@ -718,6 +738,7 @@ static const struct rockchip_tsadc_chip rk3366_tsadc_data = {
->         .irq_ack = rk_tsadcv3_irq_ack,
->         .control = rk_tsadcv3_control,
->         .get_temp = rk_tsadcv2_get_temp,
-> +       .set_alarm_temp = rk_tsadcv2_alarm_temp,
->         .set_tshut_temp = rk_tsadcv2_tshut_temp,
->         .set_tshut_mode = rk_tsadcv2_tshut_mode,
->
-> @@ -742,6 +763,7 @@ static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
->         .irq_ack = rk_tsadcv2_irq_ack,
->         .control = rk_tsadcv2_control,
->         .get_temp = rk_tsadcv2_get_temp,
-> +       .set_alarm_temp = rk_tsadcv2_alarm_temp,
->         .set_tshut_temp = rk_tsadcv2_tshut_temp,
->         .set_tshut_mode = rk_tsadcv2_tshut_mode,
->
-> @@ -766,6 +788,7 @@ static const struct rockchip_tsadc_chip rk3399_tsadc_data = {
->         .irq_ack = rk_tsadcv3_irq_ack,
->         .control = rk_tsadcv3_control,
->         .get_temp = rk_tsadcv2_get_temp,
-> +       .set_alarm_temp = rk_tsadcv2_alarm_temp,
->         .set_tshut_temp = rk_tsadcv2_tshut_temp,
->         .set_tshut_mode = rk_tsadcv2_tshut_mode,
->
-> @@ -826,6 +849,21 @@ static irqreturn_t rockchip_thermal_alarm_irq_thread(int irq, void *dev)
->         return IRQ_HANDLED;
->  }
->
-> +static int rockchip_thermal_set_trips(void *_sensor, int low, int high)
-> +{
-> +       struct rockchip_thermal_sensor *sensor = _sensor;
-> +       struct rockchip_thermal_data *thermal = sensor->thermal;
-> +       const struct rockchip_tsadc_chip *tsadc = thermal->chip;
-> +
-> +       dev_dbg(&thermal->pdev->dev, "%s: sensor %d: low: %d, high %d\n",
-> +               __func__, sensor->id, low, high);
-> +
-> +       tsadc->set_alarm_temp(tsadc->table,
-> +                             sensor->id, thermal->regs, high);
-> +
-> +       return 0;
-> +}
-> +
->  static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
->  {
->         struct rockchip_thermal_sensor *sensor = _sensor;
-> @@ -843,6 +881,7 @@ static int rockchip_thermal_get_temp(void *_sensor, int *out_temp)
->
->  static const struct thermal_zone_of_device_ops rockchip_of_thermal_ops = {
->         .get_temp = rockchip_thermal_get_temp,
-> +       .set_trips = rockchip_thermal_set_trips,
+>  drivers/gpu/drm/rcar-du/rcar_du_encoder.c | 12 ------------
+>  drivers/gpu/drm/rcar-du/rcar_du_encoder.h |  3 ---
+>  drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c |  1 -
+>  drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c |  1 -
+>  drivers/gpu/drm/rcar-du/rcar_du_vgacon.c  |  1 -
+>  5 files changed, 18 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_encoder.c index 4e939e4..55149e9 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
+> @@ -27,18 +27,6 @@
+>  #include "rcar_du_vgacon.h"
+> 
+>  /*
+> ---------------------------------------------------------------------------
+> -- - * Common connector functions
+> - */
+> -
+> -struct drm_encoder *
+> -rcar_du_connector_best_encoder(struct drm_connector *connector)
+> -{
+> -	struct rcar_du_connector *rcon = to_rcar_connector(connector);
+> -
+> -	return rcar_encoder_to_drm_encoder(rcon->encoder);
+> -}
+> -
+> -/*
+> ---------------------------------------------------------------------------
+> -- * Encoder
+>   */
+> 
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
+> b/drivers/gpu/drm/rcar-du/rcar_du_encoder.h index 719b6f2a..a8669c3 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
+> @@ -49,9 +49,6 @@ struct rcar_du_connector {
+>  #define to_rcar_connector(c) \
+>  	container_of(c, struct rcar_du_connector, connector)
+> 
+> -struct drm_encoder *
+> -rcar_du_connector_best_encoder(struct drm_connector *connector);
+> -
+>  int rcar_du_encoder_init(struct rcar_du_device *rcdu,
+>  			 enum rcar_du_encoder_type type,
+>  			 enum rcar_du_output output,
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c index 6c92714..612b4d5 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
+> @@ -52,7 +52,6 @@ static int rcar_du_hdmi_connector_mode_valid(struct
+> drm_connector *connector, static const struct drm_connector_helper_funcs
+> connector_helper_funcs = { .get_modes = rcar_du_hdmi_connector_get_modes,
+>  	.mode_valid = rcar_du_hdmi_connector_mode_valid,
+> -	.best_encoder = rcar_du_connector_best_encoder,
 >  };
->
->  static int rockchip_configure_from_dt(struct device *dev,
-> --
-> 1.9.1
->
+> 
+>  static enum drm_connector_status
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c index e905f5d..6afd0af 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
+> @@ -59,7 +59,6 @@ static int rcar_du_lvds_connector_get_modes(struct
+> drm_connector *connector)
+> 
+>  static const struct drm_connector_helper_funcs connector_helper_funcs = {
+>  	.get_modes = rcar_du_lvds_connector_get_modes,
+> -	.best_encoder = rcar_du_connector_best_encoder,
+>  };
+> 
+>  static enum drm_connector_status
+> diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
+> b/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c index 9d7e5c9..68f7ffa 100644
+> --- a/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
+> +++ b/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
+> @@ -28,7 +28,6 @@ static int rcar_du_vga_connector_get_modes(struct
+> drm_connector *connector)
+> 
+>  static const struct drm_connector_helper_funcs connector_helper_funcs = {
+>  	.get_modes = rcar_du_vga_connector_get_modes,
+> -	.best_encoder = rcar_du_connector_best_encoder,
+>  };
+> 
+>  static enum drm_connector_status
 
-Tested-by: Stephen Barber <smbarber@chromium.org>
+You can also remove
 
-Steve
+        rcon->encoder = renc;
+
+from rcar_du_vga_connector_init(), it's not needed anymore. The same code in 
+rcar_du_hdmi_connector_init() has to stay for now though, as it's used to 
+locate the slave encoder in the HDMI support code. That should change when the 
+driver will be converted to use drm_bridge.
+
+I can also fix this during the conversion to drm_bridge if you don't want to 
+resubmit. In any case,
+
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+-- 
+Regards,
+
+Laurent Pinchart
