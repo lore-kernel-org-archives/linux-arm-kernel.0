@@ -1,115 +1,142 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jun 2016 07:55:16 +0200
-Subject: [PATCH 4/4] ARM: exynos_defconfig: Save defconfig on current
- linux-next
-In-Reply-To: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
-References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1464846916-3110-4-git-send-email-k.kozlowski@samsung.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Thu, 2 Jun 2016 07:57:46 +0200
+Subject: [PATCH/RFC v3 00/22] soc: renesas: Add R-Car RST driver for
+ obtaining mode pin state
+In-Reply-To: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
+References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <850e7e37-7c41-314d-5996-8e36e6a0d218@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save defconfig on next-20160602. Most of changes are just re-ordering of
-symbols.  Removed symbols:
- - FHANDLE (default y),
- - THERMAL, EXYNOS_THERMAL (selected by ARCH_EXYNOS),
- - CHROME_PLATFORMS (selected by MFD_CROS_EC),
- - EXT4_FS (selected by EXT3_FS)
- - SND_SOC_ODROIDX2 (obsolete since commit ee12a817bb4b ("ASoC: samsung:
-   Remove unused Odroid x2/u3 machine driver"), replaced with
-   SND_SIMPLE_CARD).
+On 01.06.2016 21:20, Geert Uytterhoeven wrote:
+> 	Hi all,
+>
+> Currently the R-Car Clock Pulse Generator (CPG) drivers obtains the
+> state of the mode pins either by a call from the board code, or directly
+> by using a hardcoded register access. This is a bit messy, and creates a
+> dependency between driver and platform code.
+>
+> This RFC patch series converts the various Renesas R-Car clock drivers
+> and support code from reading the mode pin states using a hardcoded
+> register access to using a new R-Car RST driver.
+>
+> This series consists of 5 parts:
+>   A. Patches 1 and 2 add DT bindings and driver code for the R-Car RST
+>      driver,
+>   B. Patches 3-10 add device nodes for the RST modules to the R-Car DTS
+>      files,
+>   C. Patches 11-16 convert the clock drivers to call into the new R-Car
+>      RST driver,
+>   D. Patches 17-19 remove passing mode pin state to the clock drivers
+>      from the board code,
+>   E. Patches 20-22 remove dead code from the clock drivers.
+>
+> I've kept all parts together as this is an RFC, and to avoid losing the
+> bigger picture. I will split it in series per maintainer, when we have
+> decided how to handle the dependencies (see below).
+>
+> After this, there are still a few users of rcar_gen2_read_mode_pins()
+> left in board code, which should be converted in one way or another.
+> However, all R-Car clock drivers will rely on the presence in DT of a
+> device node for the RST module.  Backwards compatibility with old DTBs
+> is retained only for R-Car Gen2, which has fallback code calling into
+> rcar_gen2_read_mode_pins().
+>
+> As is usually the case with moving functionality from board code to DT,
+> there are lots of hard dependencies:
+>   - The DT updates in Part B can be merged as soon as the DT bindings in
+>     Part A have been approved,
+>   - The clock driver updates in Part C depend functionally on the driver
+>     code in Part A,
+>   - The board code cleanups in Part D depend on the clock driver updates
+>     in Part C,
+>   - The block driver cleanups in part E depend on the board code
+>     cleanups in part D.
+>
+> This series has evolved over time, cfr.
+>   - "[PATCH/RFC 00/11] ARM: shmobile: Let CPG use syscon for MD pin
+>     values" (http://www.spinics.net/lists/linux-clk/msg01478.html),
+>   - "[PATCH 00/10] arm64: renesas: Obtain MD pin values using
+>     syscon/regmap".
+>     (http://www.spinics.net/lists/linux-sh/msg44757.html)
+>
+> Changes compared to v2:
+>   - Use "renesas,<soctype>-rst" instead of "renesas,rst-<soctype>",
+>   - Drop "syscon" compatible value and "renesas,modemr" property, use a
+>     real driver instead,
+>   - Add support for R-Car M1A, H1, and M3-W.
+>
+> Changes compared to v1:
+>   - Add support for R-Car H3.
+>
+> An alternative and broader solution was proposed by Simon Horman as
+> "[PATCH/RFC 0/6] boot-mode-reg: Add core"
+> (http://www.spinics.net/lists/linux-sh/msg45969.html).
+>
+> This patch series is against renesas-drivers.
+> It has been tested on r8a7778/bockw, r8a7779/marzen, r8a7791/koelsch,
+> and r8a7795/salvator-x.
+>
+> Thanks for your comments!
+>
+> Geert Uytterhoeven (22):
+>   reset: Add renesas,rst DT bindings
+>   soc: renesas: Add R-Car RST driver
+>   ARM: dts: r8a7778: Add device node for RESET/WDT module
+>   ARM: dts: r8a7779: Add device node for RESET/WDT module
+>   ARM: dts: r8a7790: Add device node for RST module
+>   ARM: dts: r8a7791: Add device node for RST module
+>   ARM: dts: r8a7793: Add device node for RST module
+>   ARM: dts: r8a7794: Add device node for RST module
+>   arm64: renesas: r8a7795 dtsi: Add device node for RST module
+>   arm64: renesas: r8a7796 dtsi: Add device node for RST module
+>   clk: renesas: r8a7778: Obtain mode pin values using R-Car RST driver
+>   clk: renesas: r8a7779: Obtain mode pin values from R-Car RST driver
+>   clk: renesas: rcar-gen2: Obtain mode pin values using RST driver
+>   clk: renesas: r8a7795: Obtain mode pin values from R-Car RST driver
+>   clk: renesas: r8a7796: Obtain mode pin values from R-Car RST driver
+>   clk: renesas: rcar-gen3-cpg: Remove obsolete
+>     rcar_gen3_read_mode_pins()
+>   ARM: shmobile: r8a7778: Stop passing mode pins state to clock driver
+>   ARM: shmobile: r8a7779: Stop passing mode pins state to clock driver
+>   ARM: shmobile: rcar-gen2: Stop passing mode pins state to clock driver
+>   clk: renesas: r8a7778: Remove obsolete r8a7778_clocks_init()
+>   clk: renesas: r8a7779: Remove obsolete r8a7779_clocks_init()
+>   clk: renesas: rcar-gen2: Remove obsolete rcar_gen2_clocks_init()
+>
+>  .../devicetree/bindings/reset/renesas,rst.txt      | 35 ++++++++
+>  arch/arm/boot/dts/r8a7778.dtsi                     |  5 ++
+>  arch/arm/boot/dts/r8a7779.dtsi                     |  5 ++
+>  arch/arm/boot/dts/r8a7790.dtsi                     |  5 ++
+>  arch/arm/boot/dts/r8a7791.dtsi                     |  5 ++
+>  arch/arm/boot/dts/r8a7793.dtsi                     |  5 ++
+>  arch/arm/boot/dts/r8a7794.dtsi                     |  5 ++
+>  arch/arm/mach-shmobile/setup-r8a7778.c             | 15 ----
+>  arch/arm/mach-shmobile/setup-r8a7779.c             | 27 -------
+>  arch/arm/mach-shmobile/setup-rcar-gen2.c           |  6 +-
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi           |  5 ++
+>  arch/arm64/boot/dts/renesas/r8a7796.dtsi           |  5 ++
+>  drivers/clk/renesas/clk-r8a7778.c                  | 26 +++---
+>  drivers/clk/renesas/clk-r8a7779.c                  | 18 ++---
+>  drivers/clk/renesas/clk-rcar-gen2.c                | 17 ++--
+>  drivers/clk/renesas/r8a7795-cpg-mssr.c             |  8 +-
+>  drivers/clk/renesas/r8a7796-cpg-mssr.c             |  8 +-
+>  drivers/clk/renesas/rcar-gen3-cpg.c                | 17 ----
+>  drivers/clk/renesas/rcar-gen3-cpg.h                |  1 -
+>  drivers/soc/renesas/Makefile                       |  5 ++
+>  drivers/soc/renesas/rcar-rst.c                     | 94 ++++++++++++++++++++++
+>  include/linux/clk/renesas.h                        |  4 -
+>  include/linux/soc/renesas/rcar-rst.h               |  6 ++
+>  23 files changed, 227 insertions(+), 100 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/reset/renesas,rst.txt
+>  create mode 100644 drivers/soc/renesas/rcar-rst.c
+>  create mode 100644 include/linux/soc/renesas/rcar-rst.h
 
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/configs/exynos_defconfig | 16 +++++-----------
- 1 file changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-index 5e4fc3a771e9..9ee32375d05a 100644
---- a/arch/arm/configs/exynos_defconfig
-+++ b/arch/arm/configs/exynos_defconfig
-@@ -1,5 +1,4 @@
- CONFIG_SYSVIPC=y
--CONFIG_FHANDLE=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
- CONFIG_CGROUPS=y
-@@ -71,6 +70,7 @@ CONFIG_MWIFIEX=m
- CONFIG_MWIFIEX_SDIO=m
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
-+CONFIG_KEYBOARD_SAMSUNG=y
- CONFIG_KEYBOARD_CROS_EC=y
- # CONFIG_MOUSE_PS2 is not set
- CONFIG_MOUSE_CYAPA=y
-@@ -80,11 +80,10 @@ CONFIG_TOUCHSCREEN_MMS114=y
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MAX77693_HAPTIC=y
- CONFIG_INPUT_MAX8997_HAPTIC=y
--CONFIG_KEYBOARD_SAMSUNG=y
- CONFIG_SERIAL_8250=y
-+CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_SERIAL_SAMSUNG=y
- CONFIG_SERIAL_SAMSUNG_CONSOLE=y
--CONFIG_SERIAL_OF_PLATFORM=y
- CONFIG_HW_RANDOM=y
- CONFIG_TCG_TPM=y
- CONFIG_TCG_TIS_I2C_INFINEON=y
-@@ -110,10 +109,8 @@ CONFIG_SENSORS_LM90=y
- CONFIG_SENSORS_NTC_THERMISTOR=y
- CONFIG_SENSORS_PWM_FAN=y
- CONFIG_SENSORS_INA2XX=y
--CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_THERMAL_EMULATION=y
--CONFIG_EXYNOS_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_S3C2410_WATCHDOG=y
- CONFIG_MFD_CROS_EC=y
-@@ -156,17 +153,17 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
- CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
- CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
- CONFIG_DRM=y
--CONFIG_DRM_NXP_PTN3460=y
--CONFIG_DRM_PARADE_PS8622=y
- CONFIG_DRM_EXYNOS=y
- CONFIG_DRM_EXYNOS_FIMD=y
--CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_MIXER=y
- CONFIG_DRM_EXYNOS_DPI=y
-+CONFIG_DRM_EXYNOS_DSI=y
- CONFIG_DRM_EXYNOS_HDMI=y
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_DRM_PANEL_SAMSUNG_LD9040=y
- CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
-+CONFIG_DRM_NXP_PTN3460=y
-+CONFIG_DRM_PARADE_PS8622=y
- CONFIG_EXYNOS_VIDEO=y
- CONFIG_EXYNOS_MIPI_DSI=y
- CONFIG_LCD_CLASS_DEVICE=y
-@@ -180,7 +177,6 @@ CONFIG_SND_SOC_SAMSUNG=y
- CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994=y
- CONFIG_SND_SOC_SMDK_WM8994_PCM=y
- CONFIG_SND_SOC_SNOW=y
--CONFIG_SND_SOC_ODROIDX2=y
- CONFIG_SND_SIMPLE_CARD=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-@@ -218,7 +214,6 @@ CONFIG_RTC_DRV_S5M=y
- CONFIG_RTC_DRV_S3C=y
- CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
--CONFIG_CHROME_PLATFORMS=y
- CONFIG_CROS_EC_CHARDEV=y
- CONFIG_COMMON_CLK_MAX77686=y
- CONFIG_COMMON_CLK_MAX77802=y
-@@ -236,7 +231,6 @@ CONFIG_PWM_SAMSUNG=y
- CONFIG_PHY_EXYNOS5250_SATA=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
--CONFIG_EXT4_FS=y
- CONFIG_AUTOFS4_FS=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
--- 
-1.9.1
+Whole series:
+
+Acked-by: Dirk Behme <dirk.behme@de.bosch.com>
+
+Thanks!
+
+Dirk
