@@ -1,143 +1,45 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 2 Jun 2016 18:16:09 -0500
-Subject: [PATCH v3 2/2] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
-In-Reply-To: <1464677903-28412-3-git-send-email-songjun.wu@atmel.com>
-References: <1464677903-28412-1-git-send-email-songjun.wu@atmel.com>
- <1464677903-28412-3-git-send-email-songjun.wu@atmel.com>
-Message-ID: <20160602231609.GA24529@rob-hp-laptop>
+Date: Thu, 2 Jun 2016 18:19:39 -0500
+Subject: [PATCH v2 2/2] ARM: at91: Add DT support for Olimex SAM9-L9260
+ board.
+In-Reply-To: <1464679051-5263-2-git-send-email-raashidmuhammed@zilogic.com>
+References: <1464679051-5263-1-git-send-email-raashidmuhammed@zilogic.com>
+ <1464679051-5263-2-git-send-email-raashidmuhammed@zilogic.com>
+Message-ID: <20160602231939.GA32346@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 02:58:23PM +0800, Songjun Wu wrote:
-> DT binding documentation for ISC driver.
+On Tue, May 31, 2016 at 12:47:31PM +0530, Raashid Muhammed wrote:
+> From: Raashid Muhammed <raashidmuhammed@zilogic.com>
 > 
-> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+> sam9-l9260 is a low cost board designed by Olimex.
+> 
+> More information is available at:
+> https://www.olimex.com/Products/ARM/Atmel/SAM9-L9260/
+> 
+> Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
+> Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
 > ---
-> 
-> Changes in v3:
-> - Remove the 'atmel,sensor-preferred'.
-> - Modify the isc clock node according to the Rob's remarks.
-> 
-> Changes in v2:
-> - Remove the unit address of the endpoint.
-> - Add the unit address to the clock node.
-> - Avoid using underscores in node names.
-> - Drop the "0x" in the unit address of the i2c node.
-> - Modify the description of 'atmel,sensor-preferred'.
-> - Add the description for the ISC internal clock.
-> 
->  .../devicetree/bindings/media/atmel-isc.txt        | 88 ++++++++++++++++++++++
->  1 file changed, 88 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
-> new file mode 100644
-> index 0000000..2ae1d60
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
-> @@ -0,0 +1,88 @@
-> +Atmel Image Sensor Controller (ISC)
-> +----------------------------------------------
-> +
-> +Required properties for ISC:
-> +- compatible
-> +	Must be "atmel,sama5d2-isc"
-> +- reg
-> +	Physical base address and length of the registers set for the device;
-> +- interrupts
-> +	Should contain IRQ line for the ISI;
-> +- clocks
-> +	List of clock specifiers, corresponding to entries in
-> +	the clock-names property;
-> +	Please refer to clock-bindings.txt.
-> +- clock-names
-> +	Required elements: "hclock", "ispck".
-> +- pinctrl-names, pinctrl-0
-> +	Please refer to pinctrl-bindings.txt.
-> +- isc-ispck
-> +	The clock for the ISC digital pipeline.
-> +	- compatible
-> +		Must be "atmel,sama5d2-isc-ispck".
-> +	- clock-cells
-> +		From common clock binding; should be set to 0.
-> +	- clocks
-> +		The clock source phandles.
-> +- isc-mck
-> +	The clock for the image sensor.
-> +	- compatible
-> +		Must be "atmel,sama5d2-isc-mck".
-> +	- clock-cells
-> +		From common clock binding; should be set to 0.
-> +	- clocks
-> +		The clock source phandles.
-> +
-> +ISC supports a single port node with parallel bus. It should contain one
-> +'port' child node with child 'endpoint' node. Please refer to the bindings
-> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +
-> +Example:
-> +isc: isc at f0008000 {
-> +	compatible = "atmel,sama5d2-isc";
-> +	reg = <0xf0008000 0x4000>;
-> +	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-> +	clocks = <&isc_clk>, <&isc_ispck>;
-> +	clock-names = "hclock", "ispck";
-> +
-> +	port {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		isc_0: endpoint {
-> +			remote-endpoint = <&ov7740_0>;
-> +			hsync-active = <1>;
-> +			vsync-active = <0>;
-> +			pclk-sample = <1>;
-> +		};
-> +	};
-> +
-> +	isc_ispck: isc-ispck at 0 {
+>  Documentation/devicetree/bindings/arm/olimex.txt |   8 +-
+>  arch/arm/boot/dts/Makefile                       |   1 +
+>  arch/arm/boot/dts/at91-sam9_l9260.dts            | 115 +++++++++++++++++++++++
+>  3 files changed, 122 insertions(+), 2 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/at91-sam9_l9260.dts
 
-Drop the unit-address. You should only have one if you have a reg 
-property.
+One nit, otherwise:
 
-> +		compatible = "atmel,sama5d2-isc-ispck";
-> +		#clock-cells = <0>;
-> +		clocks = <&isc_clk>, <&iscck>;
-> +	};
+Acked-by: Rob Herring <robh@kernel.org>
+
+> +			spi0: spi at fffc8000 {
+> +				cs-gpios = <&pioC 11 0>, <0>, <0>, <0>;
+> +				status = "okay";
 > +
-> +	isc_mck: isc-mck at 1 {
+> +				mtd_dataflash at 0 {
 
-ditto.
+flash at 0
 
-I still think these should be implied by atmel,sama5d2-isc and not in 
-DT. The fact that you don't have any registers for them pretty much 
-indicates that. It is also strange that isc-ispck is used by isc. If 
-that is the only user, there is certainly no need to put it in DT.
-
-
-> +		compatible = "atmel,sama5d2-isc-mck";
-> +		#clock-cells = <0>;
-> +		clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
-> +	};
-> +};
-> +
-> +i2c1: i2c at fc028000 {
-> +	ov7740: camera at 21 {
-> +	compatible = "ovti,ov7740";
-> +	reg = <0x21>;
-> +
-> +	clocks = <&isc_mck>;
-> +	clock-names = "xvclk";
-> +	assigned-clocks = <&isc_mck>;
-> +	assigned-clock-rates = <24000000>;
-> +
-> +	port {
-> +		ov7740_0: endpoint {
-> +			remote-endpoint = <&isc_0>;
-> +		};
-> +	};
-> +};
-> -- 
-> 2.7.4
-> 
+> +					compatible = "atmel,at45", "atmel,dataflash";
+> +					spi-max-frequency = <15000000>;
+> +					reg = <0>;
+> +				};
+> +			};
