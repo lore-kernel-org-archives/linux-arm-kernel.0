@@ -1,47 +1,91 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  2 Jun 2016 12:21:00 +0200
-Subject: [PULL 8/8] KVM: arm/arm64: vgic-new: Removel harmful BUG_ON
-In-Reply-To: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
-References: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464862860-1183-9-git-send-email-christoffer.dall@linaro.org>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 2 Jun 2016 11:26:51 +0100
+Subject: [PATCH 2/4] ASoC: sunxi: Add Allwinner A10 Digital Audio driver
+In-Reply-To: <20160601175430.11625-3-maxime.ripard@free-electrons.com>
+References: <20160601175430.11625-1-maxime.ripard@free-electrons.com>
+ <20160601175430.11625-3-maxime.ripard@free-electrons.com>
+Message-ID: <20160602102651.GF2282@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On Wed, Jun 01, 2016 at 07:54:28PM +0200, Maxime Ripard wrote:
 
-When changing the active bit from an MMIO trap, we decide to
-explode if the intid is that of a private interrupt.
+> @@ -16,4 +25,5 @@ config SND_SUN4I_SPDIF
+>  	help
+>  	  Say Y or M to add support for the S/PDIF audio block in the Allwinner
+>  	  A10 and affiliated SoCs.
+> +
+>  endmenu
 
-This flawed logic comes from the fact that we were assuming that
-kvm_vcpu_kick() as called by kvm_arm_halt_vcpu() would not return before
-the called vcpu responded, but this is not the case, so we need to
-perform this wait even for private interrupts.
+Unrelated whitespace change.
 
-Dropping the BUG_ON seems like the right thing to do.
+> +static int sun4i_i2s_params_to_sr(struct snd_pcm_hw_params *params)
+> +{
+> +	switch (params_width(params)) {
+> +	case 16:
+> +		return 0;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
 
- [ Commit message tweaked by Christoffer ]
+The switch statement here and in the _wss() function look weird because
+they don't have default cases.  Since there's only one user of both
+functions it seems better to have the switch statements inline anyway.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic/vgic-mmio.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+> +	for (i = 0; sun4i_i2s_mclk_div[i].div; i++) {
+> +		const struct sun4i_i2s_clk_div *mdiv = sun4i_i2s_mclk_div + i;
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 059595e..9f6fab7 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -191,10 +191,8 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	 * other thread sync back the IRQ.
- 	 */
- 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
--	       irq->vcpu->cpu != -1) { /* VCPU thread is running */
--		BUG_ON(irq->intid < VGIC_NR_PRIVATE_IRQS);
-+	       irq->vcpu->cpu != -1) /* VCPU thread is running */
- 		cond_resched_lock(&irq->irq_lock);
--	}
- 
- 	irq->active = new_active_state;
- 	if (new_active_state)
--- 
-2.1.2.330.g565301e.dirty
+Why not just write these as normal array lookups?
+
+> +	switch (rate) {
+> +        case 176400:
+> +        case 88200:
+
+Weird indentation here...  it also seems spaces not tabs are being
+used for the case labels.
+
+> +	clk_set_rate(i2s->mod_clk, clk_rate);
+
+Should really check the return value.
+
+> +	/* Enable the first output line */
+> +	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> +			   SUN4I_I2S_CTRL_SDO_EN_MASK,
+> +			   SUN4I_I2S_CTRL_SDO_EN(0));
+> +
+> +	/* Enable the first two channels */
+> +	regmap_write(i2s->regmap, SUN4I_I2S_TX_CHAN_SEL_REG,
+> +		     SUN4I_I2S_TX_CHAN_SEL(2));
+> +
+> +	/* Map them to the two first samples coming in */
+> +	regmap_write(i2s->regmap, SUN4I_I2S_TX_CHAN_MAP_REG,
+> +		     SUN4I_I2S_TX_CHAN_MAP(0, 0) | SUN4I_I2S_TX_CHAN_MAP(1, 1));
+
+We don't undo these if setup fails...  do them once on probe?
+
+> +static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+> +{
+> +        struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> +	u32 val;
+
+More tab/space damage, there seems to be quite a bit in the rest of the
+driver.
+
+> +static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
+> +{
+> +	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> +
+> +	/* Enable the whole hardware block */
+> +	regmap_write(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> +		     SUN4I_I2S_CTRL_GL_EN);
+
+Runtime PM?  It also seems like this is something that ought to be
+covered in the suspend and resume callbacks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/1844c091/attachment.sig>
