@@ -1,34 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Jun 2016 15:53:33 +0200
-Subject: [PATCH 1/3] dt-bindings: add DT binding for the Aardvark PCIe
- controller
-In-Reply-To: <20160602144542.6bc1b421@free-electrons.com>
-References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <8313817.cgODJZVrao@wuerfel> <20160602144542.6bc1b421@free-electrons.com>
-Message-ID: <7070543.PV5raqmBSF@wuerfel>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 2 Jun 2016 09:54:08 -0400
+Subject: [PATCH 4/4] ARM: exynos_defconfig: Save defconfig on current
+ linux-next
+In-Reply-To: <1464846916-3110-4-git-send-email-k.kozlowski@samsung.com>
+References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
+ <1464846916-3110-4-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <f5faaac7-7e26-b1fa-4327-fb3e4daee754@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 2, 2016 2:45:42 PM CEST Thomas Petazzoni wrote:
-> 
-> On Thu, 02 Jun 2016 14:34:14 +0200, Arnd Bergmann wrote:
-> 
-> > I think some other PCI hosts just move the interrupt-controller
-> > and #interrupt-cells properties into the PCI host node itself,
-> > which avoids the ambiguity here.
-> 
-> Do you have an example of this? I have modeled my DT binding after the
-> one used by the pci-dra7xx driver, which is in the same situation as I
-> am in terms of interrupt handling.
-> 
-> But I can indeed try to make the top-level PCIe controller node the
-> interrupt controller. Let me try that quickly.
-> 
+Hello Krzysztof,
 
-Looking at the binding files, I see only this one:
+On 06/02/2016 01:55 AM, Krzysztof Kozlowski wrote:
+> Save defconfig on next-20160602. Most of changes are just re-ordering of
+> symbols.  Removed symbols:
+>  - FHANDLE (default y),
+>  - THERMAL, EXYNOS_THERMAL (selected by ARCH_EXYNOS),
+>  - CHROME_PLATFORMS (selected by MFD_CROS_EC),
+>  - EXT4_FS (selected by EXT3_FS)
+>  - SND_SOC_ODROIDX2 (obsolete since commit ee12a817bb4b ("ASoC: samsung:
+>    Remove unused Odroid x2/u3 machine driver"), replaced with
+>    SND_SIMPLE_CARD).
+> 
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-Documentation/devicetree/bindings/pci/altera-pcie.txt
+Looks good to me.
 
-and a couple of others using a child node.
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-	Arnd
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
