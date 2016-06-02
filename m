@@ -1,43 +1,33 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Thu, 2 Jun 2016 10:36:28 -0700
-Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
-In-Reply-To: <57506B31.2010600@broadcom.com>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-2-git-send-email-kraxel@redhat.com>
- <574F5881.4060008@gmail.com> <1464849936.24775.33.camel@redhat.com>
- <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
- <57506351.3060706@broadcom.com> <1464887569.24775.123.camel@redhat.com>
- <57506B31.2010600@broadcom.com>
-Message-ID: <57506E9C.9090303@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Jun 2016 10:39:33 -0700
+Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
+In-Reply-To: <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
+References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
+ <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
+Message-ID: <20160602173932.GF5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2016 10:21 AM, Scott Branden wrote:
+* Robert Nelson <robertcnelson@gmail.com> [160602 10:39]:
+> On Thu, Jun 2, 2016 at 2:41 AM, Yong Li <yong.b.li@intel.com> wrote:
+> 
+> > From: Yong Li <sdliyong@gmail.com>
+> >
+> > Without this patch, I2C-1 is missing on beaglebone black boards
+> >
+> > Signed-off-by: Yong Li <sdliyong@gmail.com>
+> > ---
+> >  arch/arm/boot/dts/am335x-boneblack.dts | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> >
 > 
 > 
-> On 16-06-02 10:12 AM, Gerd Hoffmann wrote:
->>> There is no need to add ARCH_BCM though?
->>
->> There are Makefile(s) with
->>
->> obj-$(CONFIG_ARCH_BCM)          += bcm/
->>
->> in drivers/pinctrl for example, maybe more, didn't check the whole tree.
->>
->> So without ARCH_BCM some drivers are dropped from the build ...
+> This is also 'common' for the white/green, if your really going to push
+> this, please add it to:
 > 
-> I see that now.  Quite bizarre how the NS2 pinctl driver (used on a
-> arm64 SoC) gets built right now....
-> 
-> Yes, adding the select with hidden option seems like what needs to be
-> done.  The ARM Maintainers did not like multi-level ARCH_BCM being added
-> in the arm64 Kconfig previously so we dropped it.
+> am335x-bone-common.dtsi
 
-We should always recusrse into that directory and build the respective
-pinctrl drivers within drivers/pinctrl/bcm, only for the enabled
-platforms, it makes no sense to have this kind of config symbol gating that.
+But isn't this exposed on the cape pins? So the use can be
+whatever for these pins?
 
-I can submit a patch doing just that unless somebody wants to do it as
-part of this patch series.
--- 
-Florian
+Tony
