@@ -1,44 +1,39 @@
-From: po.liu@nxp.com (Po Liu)
-Date: Thu, 2 Jun 2016 01:17:24 +0000
-Subject: [PATCH 1/2] freescale/dts: add pcie aer interrupt-name property
- in the dts
-In-Reply-To: <20160601143950.GA1817@rob-hp-laptop>
-References: <1464242349-15323-1-git-send-email-po.liu@nxp.com>
- <20160601143950.GA1817@rob-hp-laptop>
-Message-ID: <VI1PR0401MB1709DFD5A437FD01D724FF9F92580@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+From: oss@buserror.net (Scott Wood)
+Date: Wed, 01 Jun 2016 20:24:20 -0500
+Subject: [PATCH 4/4] Revert "powerpc/fsl: Move fsl_guts.h out of
+ arch/powerpc"
+In-Reply-To: <5513501.AmZs7h1vI2@wuerfel>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
+ <CAPDyKFqx2JMLzXoDxGCKFYMFV47+SegnkuWFXKvsQHK7L5w-1g@mail.gmail.com>
+ <5513501.AmZs7h1vI2@wuerfel>
+Message-ID: <1464830660.22191.6.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2016-05-30 at 15:18 +0200, Arnd Bergmann wrote:
+> All users of this driver are PowerPC specific and the header file
+> has no business in the global include/linux/ hierarchy, so move
+> it back before anyone starts using it on ARM.
+> 
+> This reverts commit 948486544713492f00ac8a9572909101ea892cb0.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> This part of the series is not required for the eSDHC quirk,
+> but it restores the asm/fsl_guts.h header so it doesn't accidentally
+> get abused for this in the future. I found two drivers outside of
+> arch/powerpc that already accessed the registers directly, but the
+> functions look fairly contained, and can be easily hidden in an
+> #ifdef CONFIG_PPC
 
->  -----Original Message-----
->  From: Rob Herring [mailto:robh at kernel.org]
->  Sent: Wednesday, June 01, 2016 10:40 PM
->  To: Po Liu
->  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
->  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Shawn Guo;
->  Marc Zyngier; Roy Zang; Mingkai Hu; Stuart Yoder; Yang-Leo Li; Arnd
->  Bergmann; Bjorn Helgaas; Minghuan Lian
->  Subject: Re: [PATCH 1/2] freescale/dts: add pcie aer interrupt-name
->  property in the dts
->  
->  On Thu, May 26, 2016 at 01:59:09PM +0800, Po Liu wrote:
->  > Freescale some platforms aer interrupt was not MSI/MSI-X/INTx
->  
->  some or all?
+NACK
 
-For all Layerscape platforms, that should be clear, sorry.
+Besides adding ifdef pollution for no good reason, this register block is used
+on some ARM chips as well.  Why is it a problem if "anyone starts using it on
+ARM"?
 
->  
->  > but using interrupt line independently. This patch add a "aer"
->  > interrupt-names for aer interrupt.
->  
->  You are not adding, but replacing the interrupt. This needs a better
->  explanation as you are breaking compatibility.
+BTW, of all the mailing lists you included on this CC, you seem to have left
+off the PPC list (I've added it).
 
-We used to the "intr" name for general concept, but no use. So removed.
-In the Layerscape platform, the aer and pme interrupt lines are independent, 
-not in the Complex Root by MSI or MSIX, so need to read from the DTS before
-MSIX and MSI searching for pci service driver.
- 
->  
->  Rob
+-Scott
