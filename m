@@ -1,147 +1,72 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Thu, 2 Jun 2016 07:42:12 +0200
-Subject: [PATCH/RFC v3 02/22] soc: renesas: Add R-Car RST driver
-In-Reply-To: <1464808880-343-3-git-send-email-geert+renesas@glider.be>
-References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
- <1464808880-343-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <d38d97fb-5b96-0773-abf6-c737b4f2fef1@de.bosch.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Thu, 2 Jun 2016 07:48:38 +0200
+Subject: [BUG] Page allocation failures with newest kernels
+In-Reply-To: <20160531131520.GI24936@arm.com>
+References: <CAPv3WKcVsWBgHHC3UPNcbka2JUmN4CTw1Ym4BR1=1V9=B9av5Q@mail.gmail.com>
+ <574D64A0.2070207@arm.com>
+ <CAPv3WKdYdwpi3k5eY86qibfprMFwkYOkDwHOsNydp=0sTV3mgg@mail.gmail.com>
+ <60e8df74202e40b28a4d53dbc7fd0b22@IL-EXCH02.marvell.com>
+ <20160531131520.GI24936@arm.com>
+Message-ID: <CAPv3WKftqsEXbdU-geAcUKXBSskhA0V72N61a1a+5DfahLK_Dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01.06.2016 21:21, Geert Uytterhoeven wrote:
-> Add a driver for the Renesas R-Car Gen1 RESET/WDT and R-Car Gen2/Gen3
-> RST module.
+Hi Will,
+
+I think I found a right trace. Following one-liner fixes the issue
+beginning from v4.2-rc1 up to v4.4 included:
+
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -294,7 +294,7 @@ static inline bool
+early_page_uninitialised(unsigned long pfn)
+
+ static inline bool early_page_nid_uninitialised(unsigned long pfn, int nid)
+ {
+-       return false;
++       return true;
+ }
+
+The regression was introduced by commit 7e18adb4f80b ("mm: meminit:
+initialise remaining struct pages in parallel with kswapd"), which in
+fact disabled memblock reserve at all for all platfroms not using
+CONFIG_DEFERRED_STRUCT_PAGE_INIT (x86 is the only user), hence
+temporary shortage of memory possible to allocate during my test.
+
+Since v4.4-rc1 following changes of approach have been introduced:
+97a16fc - mm, page_alloc: only enforce watermarks for order-0 allocations
+0aaa29a - mm, page_alloc: reserve pageblocks for high-order atomic
+allocations on demand
+974a786 - mm, page_alloc: remove MIGRATE_RESERVE
+
+>From what I understood, now order-0 allocation keep no reserve at all.
+I checked all gathered logs and indeed it was order-0 which failed and
+apparently weren't able to reclaim successfully. Since the problem is
+very easy to reproduce (at least in my test, as well as stressing
+device in NAS setup) is there any chance to avoid destiny of page
+alloc failures? Or any trick to play with fragmentation parameters,
+etc.?
+
+I would be grateful for any hint.
+
+Best regards,
+Marcin
+
+2016-05-31 15:15 GMT+02:00 Will Deacon <will.deacon@arm.com>:
+> On Tue, May 31, 2016 at 01:10:44PM +0000, Yehuda Yitschak wrote:
+>> During some of the stress tests we also came across a different warning
+>> from the arm64  page management code
+>> It looks like a race is detected between HW and SW marking a bit in the PTE
 >
-> For now this driver just provides an API to obtain the state of the mode
-> pins, as latched at reset time.  As this is typically called from the
-> probe function of a clock driver, which can run much earlier than any
-> initcall, calling rcar_rst_read_mode_pins() may force an early
-> initialization of the driver.
+> A72 (which I believe is the CPU in that SoC) is a v8.0 CPU and therefore
+> doesn't have hardware DBM.
 >
-> Despite the current simple and almost identical handling for all
-> supported SoCs, the driver matches against SoC-specific compatible
-> values only, as the features provided by the hardware module differ a
-> lot across the various SoC families and members.
+>> Not sure it's really related but I thought it might give a clue on the issue
+>> http://pastebin.com/ASv19vZP
 >
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> ---
-> v3:
->   - New.
-> ---
->  drivers/soc/renesas/Makefile         |  5 ++
->  drivers/soc/renesas/rcar-rst.c       | 94 ++++++++++++++++++++++++++++++++++++
->  include/linux/soc/renesas/rcar-rst.h |  6 +++
->  3 files changed, 105 insertions(+)
->  create mode 100644 drivers/soc/renesas/rcar-rst.c
->  create mode 100644 include/linux/soc/renesas/rcar-rst.h
+> There have been a few patches from Catalin to fix up the hardware DBM
+> patches, so it might be worth trying to reproduce this failure with a
+> more recent kernel. I doubt this is related to the allocation failures,
+> however.
 >
-> diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
-> index f32a001c65c3ab44..0d732ff893dd8fba 100644
-> --- a/drivers/soc/renesas/Makefile
-> +++ b/drivers/soc/renesas/Makefile
-> @@ -1,3 +1,8 @@
-> +obj-$(CONFIG_ARCH_RCAR_GEN1)	+= rcar-rst.o
-> +obj-$(CONFIG_ARCH_RCAR_GEN2)	+= rcar-rst.o
-> +obj-$(CONFIG_ARCH_R8A7795)	+= rcar-rst.o
-> +obj-$(CONFIG_ARCH_R8A7796)	+= rcar-rst.o
-> +
->  obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
->  obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
->  obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
-> diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
-> new file mode 100644
-> index 0000000000000000..1997c348c0853254
-> --- /dev/null
-> +++ b/drivers/soc/renesas/rcar-rst.c
-> @@ -0,0 +1,94 @@
-> +/*
-> + * R-Car Gen1 RESET/WDT and R-Car Gen2/Gen3 RST Driver
-> + *
-> + * Copyright (C) 2016 Glider bvba
-> + *
-> + * This file is subject to the terms and conditions of the GNU General Public
-> + * License.  See the file "COPYING" in the main directory of this archive
-> + * for more details.
-> + */
-> +
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/of_address.h>
-> +#include <linux/soc/renesas/rcar-rst.h>
-> +
-> +struct rst_config {
-> +	unsigned int modemr;	/* Mode Monitoring Register Offset */
-> +};
-> +
-> +static const struct rst_config rcar_rst_gen1 __initconst = {
-> +	.modemr = 0x20,
-> +};
-> +
-> +static const struct rst_config rcar_rst_gen2 __initconst = {
-> +	.modemr = 0x60,
-> +};
-> +
-> +static const struct rst_config rcar_rst_gen3 __initconst = {
-> +	.modemr = 0x60,
-> +};
-> +
-> +static const struct of_device_id rcar_rst_matches[] __initconst = {
-> +	{ .compatible = "renesas,r8a7778-reset-wdt", .data = &rcar_rst_gen1 },
-> +	{ .compatible = "renesas,r8a7779-reset-wdt", .data = &rcar_rst_gen1 },
-> +	{ .compatible = "renesas,r8a7790-rst", .data = &rcar_rst_gen2 },
-> +	{ .compatible = "renesas,r8a7791-rst", .data = &rcar_rst_gen2 },
-> +	{ .compatible = "renesas,r8a7792-rst", .data = &rcar_rst_gen2 },
-> +	{ .compatible = "renesas,r8a7793-rst", .data = &rcar_rst_gen2 },
-> +	{ .compatible = "renesas,r8a7794-rst", .data = &rcar_rst_gen2 },
-> +	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen3 },
-> +	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen3 },
-> +	{ /* sentinel */ }
-> +};
-> +
-> +static void __iomem *rcar_rst_base __initdata;
-> +static u32 saved_mode __initdata;
-> +
-> +static int __init rcar_rst_init(void)
-> +{
-> +	const struct of_device_id *match;
-> +	const struct rst_config *cfg;
-> +	struct device_node *np;
-> +	void __iomem *base;
-> +	int error = 0;
-> +
-> +	if (rcar_rst_base)
-> +		return 0;
-> +
-> +	np = of_find_matching_node_and_match(NULL, rcar_rst_matches, &match);
-> +	if (!np)
-> +		return -ENODEV;
-> +
-> +	base = of_iomap(np, 0);
-> +	if (!base) {
-> +		pr_warn("%s: Cannot map regs\n", np->full_name);
-> +		error = -ENOMEM;
-> +		goto out_put;
-> +	}
-> +
-> +	rcar_rst_base = base;
-> +	cfg = match->data;
-> +	saved_mode = ioread32(base + cfg->modemr);
-> +
-> +	pr_debug("%s: MODE = 0x%08x\n", np->full_name, saved_mode);
-> +
-> +out_put:
-> +	of_node_put(np);
-> +	return error;
-> +}
-> +arch_initcall(rcar_rst_init);
-> +
-> +int __init rcar_rst_read_mode_pins(u32 *mode)
-
-
-Just a style issue: Is the string 'pins' in the function name still 
-relevant? I.e. what's about just 'rcar_rst_read_mode()'?
-
-
-Best regards
-
-Dirk
+> Will
