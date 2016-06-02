@@ -1,48 +1,204 @@
-From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu, 2 Jun 2016 17:35:12 +0200
-Subject: [PATCH 2/5] i2c: Add STM32F4 I2C driver
-In-Reply-To: <CALszF6ADLuZ0wK=L68FDzy5M5_eSPRTbNOjSoQw=dWDOjsPqCA@mail.gmail.com>
-References: <1462980974-22091-1-git-send-email-cedric.madianga@gmail.com>
- <1462980974-22091-3-git-send-email-cedric.madianga@gmail.com>
- <CALszF6A-jiCBtSO1RFDdgHKTKmsonRXFVs0x2zHha1LJ3UhwtQ@mail.gmail.com>
- <CAOAejn0Fsizp9fK1mNn3BBeL2LeoVgt5_zF5656La4G2uDPH7g@mail.gmail.com>
- <CAOAejn1NQDJpGrTwGtpvSfVOGg3UuCkj8wLJ7B5LnW1-Z2VrQA@mail.gmail.com>
- <CALszF6ADLuZ0wK=L68FDzy5M5_eSPRTbNOjSoQw=dWDOjsPqCA@mail.gmail.com>
-Message-ID: <CAOAejn0G3JzATKME5DaMV0GEBwQVWjkB1=ei-7LOQ98vzkUeVw@mail.gmail.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 2 Jun 2016 11:37:28 -0400
+Subject: [PATCH 2/2] aer: add support aer interrupt with none
+ MSI/MSI-X/INTx mode
+In-Reply-To: <20160602135546.GA8262@localhost>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <20160602034828.GA10240@localhost>
+ <VI1PR0401MB1709E215DCE264B2C27B3DAB92580@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+ <20160602135546.GA8262@localhost>
+Message-ID: <575052B8.3090203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/02/2016 09:55 AM, Bjorn Helgaas wrote:
+> On Thu, Jun 02, 2016 at 05:01:19AM +0000, Po Liu wrote:
+>>>  -----Original Message-----
+>>>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+>>>  Sent: Thursday, June 02, 2016 11:48 AM
+>>>  To: Po Liu
+>>>  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>>>  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Arnd Bergmann;
+>>>  Roy Zang; Marc Zyngier; Stuart Yoder; Yang-Leo Li; Minghuan Lian; Bjorn
+>>>  Helgaas; Shawn Guo; Mingkai Hu; Rob Herring
+>>>  Subject: Re: [PATCH 2/2] aer: add support aer interrupt with none
+>>>  MSI/MSI-X/INTx mode
+>>>  
+>>>  [+cc Rob]
+>>>  
+>>>  Hi Po,
+>>>  
+>>>  On Thu, May 26, 2016 at 02:00:06PM +0800, Po Liu wrote:
+>>>  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
+>>>  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
+>>>  > maybe there is interrupt line for aer pme etc. Search the interrupt
+>>>  > number in the fdt file.
+>>>  
+>>>  My understanding is that AER interrupt signaling can be done via INTx,
+>>>  MSI, or MSI-X (PCIe spec r3.0, sec 6.2.4.1.2).  Apparently your device
+>>>  doesn't support MSI or MSI-X.  Are you saying it doesn't support INTx
+>>>  either?  How is the interrupt you're requesting here different from INTx?
+>>
+>> Layerscape use none of MSI or MSI-X or INTx to indicate the devices
+>> or root error in RC mode. But use an independent SPI interrupt(arm
+>> interrupt controller) line.  
+> 
+> The Root Port is a PCI device and should follow the normal PCI rules
+> for interrupts.  As far as I understand, that means it should use MSI,
+> MSI-X, or INTx.  If your Root Port doesn't use MSI or MSI-X, it should
+> use INTx, the PCI_INTERRUPT_PIN register should tell us which (INTA/
+> INTB/etc.), and PCI_COMMAND_INTX_DISABLE should work to disable it.
+> That's all from the PCI point of view, of course.
+> 
+Bjorn.
 
->> +
->> +/**
->> + * stm32f4_i2c_xfer() - Transfer combined I2C message
->> + * @i2c_adap: Adapter pointer to the controller
->> + * @msgs: Pointer to data to be written.
->> + * @num: Number of messages to be executed
->> + */
->> +static int stm32f4_i2c_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[],
->> +                           int num)
->> +{
->> +       struct stm32f4_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
->> +       int ret, i;
->> +
->> +       i2c_dev->busy = true;
->> +
->> +       ret = clk_prepare_enable(i2c_dev->clk);
->> +       if (ret) {
->> +               dev_err(i2c_dev->dev, "Failed to prepare_enable clock\n");
->> +               return ret;
->> +       }
->> +
->> +       stm32f4_i2c_hw_config(i2c_dev);
-> Maybe you could call this only at probe and resume time?
-> You would save some register accesses.
-Some clarification about this point.
-We need to call stm32f4_i2c_hw_config before each I2C transfer as at
-the end of I2C communication the peripheral is automatically disabled
-and configuration registers are reset.
+I am faced with the same issue on Keystone PCI hardware and it has been
+on my TODO list  for quite some time. Keystone PCI hardware also doesn't
+use MSI or MSI-X or INTx for reporting errors received at the root port,
+but use a platform interrupt instead (not complaint to PCI standard as
+per PCI base spec). So I would need similar change to have the error
+interrupt passed to the aer driver. So there are hardware out there
+like Keystone which requires to support this through platform IRQ.
+
+> What's on the other end of those interrupts is outside the scope of
+> PCI.  An INTx interrupt (either a conventional PCI wire or a PCIe
+> virtual INTx wire) might be connected to an IOAPIC, an ARM SPI, or
+> something else.  Drivers should not care about how it is connected,
+> and that's why I don't think this code really fits in portdrv.
+> 
+> Maybe your Root Port is non-compliant in some way and maybe we need a
+> quirk or something to work around that hardware defect.  But I'm not
+> convinced yet that we have that sort of problem.  It seems like we
+> just don't have the correct DT description.
+
+Is quirk is what is suggested here to support this?
+
+Murali
+> 
+>> And at same time, AER capability list
+>> in PCIe register descriptors. And also, The Root Error
+>> Command/status register was proper to enable/disable the AER
+>> interrupt.
+> 
+> I'm not sure what you're saying here.  Here's what I think you said;
+> please correct me if I'm wrong:
+> 
+>   - Your Root Port has an AER capability.
+> 
+>   - Your Root Port does not support MSI or MSI-X.  (This would
+>     actually be a spec violation because the PCIe spec r3.0, sec 7.7
+>     says "All PCI Express device Functions that are capable of
+>     generating interrupts must implement MSI or MSI-X or both.")
+>   
+>   - The three enable bits in the Root Error Command Register enable or
+>     disable generation of interrupts.  These enable bits control all
+>     interrupts, whether MSI, MSI-X, or INTx.
+> 
+>   - The Root Error Status Register contains an "Advanced Error
+>     Interrupt Message Number" field, but that's only applicable if MSI
+>     or MSI-X is enabled, and if your device doesn't support MSI or
+>     MSI-X, this field doesn't apply.
+> 
+>> This hardware implementation make sense in some platforms, and this
+>> was described in the function init_service_irqs() in the
+>> drivers/pci/pcie/portdrv_core.c in current kernel as:
+> 
+>>
+>> 241      * We're not going to use MSI-X, so try MSI and fall back to INTx.     
+>> 242      * If neither MSI/MSI-X nor INTx available, try other interrupt.  On  
+>> 243      * some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode
+>> 244      */                                                                             
+>>
+>> So I think this was the proper place to update the irq number before aer service
+>> driver was loaded.
+>>
+>>>  
+>>>  My guess is that your device *does* support INTx, and we should use that.
+>>>  ACPI has the generic _PRT that describes INTx routing.  There must be
+>>>  something similar for DT, but I don't know what it is.  It seems like
+>>>  this should be described using that DT mechanism (whatever it is), and
+>>>  we shouldn't need special-case code in the portdrv code.
+>>>  
+>>>  > Signed-off-by: Po Liu <po.liu@nxp.com>
+>>>  > ---
+>>>  >  drivers/pci/pcie/portdrv_core.c | 31 ++++++++++++++++++++++++++++---
+>>>  >  1 file changed, 28 insertions(+), 3 deletions(-)
+>>>  >
+>>>  > diff --git a/drivers/pci/pcie/portdrv_core.c
+>>>  > b/drivers/pci/pcie/portdrv_core.c index 32d4d0a..64833e5 100644
+>>>  > --- a/drivers/pci/pcie/portdrv_core.c
+>>>  > +++ b/drivers/pci/pcie/portdrv_core.c
+>>>  > @@ -15,6 +15,7 @@
+>>>  >  #include <linux/slab.h>
+>>>  >  #include <linux/pcieport_if.h>
+>>>  >  #include <linux/aer.h>
+>>>  > +#include <linux/of_irq.h>
+>>>  >
+>>>  >  #include "../pci.h"
+>>>  >  #include "portdrv.h"
+>>>  > @@ -199,6 +200,28 @@ static int pcie_port_enable_msix(struct pci_dev
+>>>  > *dev, int *vectors, int mask)  static int init_service_irqs(struct
+>>>  > pci_dev *dev, int *irqs, int mask)  {
+>>>  >  	int i, irq = -1;
+>>>  > +	int ret;
+>>>  > +	struct device_node *np = NULL;
+>>>  > +
+>>>  > +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
+>>>  > +		irqs[i] = 0;
+>>>  > +
+>>>  > +	if (dev->bus->dev.of_node)
+>>>  > +		np = dev->bus->dev.of_node;
+>>>  > +
+>>>  > +	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
+>>>  > +	 * request irq for aer
+>>>  > +	 */
+>>>  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
+>>>  > +			(mask & PCIE_PORT_SERVICE_PME)) {
+>>>  > +		ret = of_irq_get_byname(np, "aer");
+>>>  > +		if (ret > 0) {
+>>>  > +			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
+>>>  > +			if (dev->irq)
+>>>  > +				irq = dev->irq;
+>>>  > +			goto no_msi;
+>>>  > +		}
+>>>  > +	}
+>>>  >
+>>>  >  	/*
+>>>  >  	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
+>>>  @@
+>>>  > -224,11 +247,13 @@ static int init_service_irqs(struct pci_dev *dev,
+>>>  int *irqs, int mask)
+>>>  >  		irq = dev->irq;
+>>>  >
+>>>  >   no_msi:
+>>>  > -	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
+>>>  > -		irqs[i] = irq;
+>>>  > +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
+>>>  > +		if (!irqs[i])
+>>>  > +			irqs[i] = irq;
+>>>  > +	}
+>>>  >  	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
+>>>  >
+>>>  > -	if (irq < 0)
+>>>  > +	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
+>>>  >  		return -ENODEV;
+>>>  >  	return 0;
+>>>  >  }
+>>>  > --
+>>>  > 2.1.0.27.g96db324
+>>>  >
+>>>  >
+>>>  > _______________________________________________
+>>>  > linux-arm-kernel mailing list
+>>>  > linux-arm-kernel at lists.infradead.org
+>>>  > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
 
-BR,
-Cedric
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
