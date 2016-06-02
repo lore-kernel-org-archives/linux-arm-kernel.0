@@ -1,11 +1,11 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 03 Jun 2016 01:01:48 +0300
-Subject: [PATCH/RFC v3 14/22] clk: renesas: r8a7795: Obtain mode pin
+Date: Fri, 03 Jun 2016 01:02:21 +0300
+Subject: [PATCH/RFC v3 15/22] clk: renesas: r8a7796: Obtain mode pin
  values from R-Car RST driver
-In-Reply-To: <1464808880-343-15-git-send-email-geert+renesas@glider.be>
+In-Reply-To: <1464808880-343-16-git-send-email-geert+renesas@glider.be>
 References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
- <1464808880-343-15-git-send-email-geert+renesas@glider.be>
-Message-ID: <4553060.NE6q0PIF0B@avalon>
+ <1464808880-343-16-git-send-email-geert+renesas@glider.be>
+Message-ID: <1606406.2DcGx2H7dc@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,7 +13,7 @@ Hi Geert,
 
 Thank you for the patch.
 
-On Wednesday 01 Jun 2016 21:21:12 Geert Uytterhoeven wrote:
+On Wednesday 01 Jun 2016 21:21:13 Geert Uytterhoeven wrote:
 > Obtain the values of the mode pins from the R-Car RST driver, which
 > relies on the presence in DT of a device node for the RST module.
 > 
@@ -25,25 +25,25 @@ Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > v3:
 >   - New.
 > ---
->  drivers/clk/renesas/r8a7795-cpg-mssr.c | 8 +++++++-
+>  drivers/clk/renesas/r8a7796-cpg-mssr.c | 8 +++++++-
 >  1 file changed, 7 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/clk/renesas/r8a7795-cpg-mssr.c
-> b/drivers/clk/renesas/r8a7795-cpg-mssr.c index
-> e53aff5b23ad4967..e1f2359a59feee7e 100644
-> --- a/drivers/clk/renesas/r8a7795-cpg-mssr.c
-> +++ b/drivers/clk/renesas/r8a7795-cpg-mssr.c
-> @@ -15,6 +15,7 @@
+> diff --git a/drivers/clk/renesas/r8a7796-cpg-mssr.c
+> b/drivers/clk/renesas/r8a7796-cpg-mssr.c index
+> c84b549c14d2e57d..3db2d1cfc8cd788e 100644
+> --- a/drivers/clk/renesas/r8a7796-cpg-mssr.c
+> +++ b/drivers/clk/renesas/r8a7796-cpg-mssr.c
+> @@ -16,6 +16,7 @@
 >  #include <linux/device.h>
 >  #include <linux/init.h>
 >  #include <linux/kernel.h>
 > +#include <linux/soc/renesas/rcar-rst.h>
 > 
->  #include <dt-bindings/clock/r8a7795-cpg-mssr.h>
+>  #include <dt-bindings/clock/r8a7796-cpg-mssr.h>
 > 
-> @@ -294,7 +295,12 @@ static const struct rcar_gen3_cpg_pll_config
+> @@ -159,7 +160,12 @@ static const struct rcar_gen3_cpg_pll_config
 > cpg_pll_configs[16] __initconst = { static int __init
-> r8a7795_cpg_mssr_init(struct device *dev)
+> r8a7796_cpg_mssr_init(struct device *dev)
 >  {
 >  	const struct rcar_gen3_cpg_pll_config *cpg_pll_config;
 > -	u32 cpg_mode = rcar_gen3_read_mode_pins();
