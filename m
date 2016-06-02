@@ -1,51 +1,82 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 2 Jun 2016 22:17:11 +0530
-Subject: [PATCHv7 0/6] dmaengine: rcar-dmac: add iommu support for slave
- transfers
-In-Reply-To: <20160602125807.GN8307@bigcity.dyn.berto.se>
-References: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
- <20160601180610.GV16910@localhost>
- <20160602125807.GN8307@bigcity.dyn.berto.se>
-Message-ID: <20160602164711.GS16910@localhost>
+From: scott.branden@broadcom.com (Scott Branden)
+Date: Thu, 2 Jun 2016 09:48:17 -0700
+Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
+In-Reply-To: <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-2-git-send-email-kraxel@redhat.com>
+ <574F5881.4060008@gmail.com> <1464849936.24775.33.camel@redhat.com>
+ <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
+Message-ID: <57506351.3060706@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 02:58:07PM +0200, Niklas S?derlund wrote:
-> Hi Vinod,
-> 
-> On 2016-06-01 23:36:11 +0530, Vinod Koul wrote:
-> > On Wed, Jun 01, 2016 at 05:22:23PM +0200, Niklas S?derlund wrote:
-> > > Hi,
-> > > 
-> > > [In this v7 series I have tried to address the questions raised by Christoph 
-> > > Hellwig and I hope it can awnser your concernes regarding dma-debug.]
-> > > 
-> > > This series tries to solve the problem with DMA with device registers
-> > > (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
-> > > recent patch '9575632 (dmaengine: make slave address physical)'
-> > > clarifies that DMA slave address provided by clients is the physical
-> > > address. This puts the task of mapping the DMA slave address from a
-> > > phys_addr_t to a dma_addr_t on the DMA engine.
-> > > 
-> > > Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
-> > > the same and no special care is needed. However if you have a IOMMU you
-> > > need to map the DMA slave phys_addr_t to a dma_addr_t using something
-> > > like this.
-> > > 
-> > > This series is based on top of v4.7-rc1.
-> > 
-> > The dmanegine bits looks okay to me. Btw how is the merge planned for this?
-> > Do you wnat this to be merged thru dmaengine tree or something else?
-> 
-> Yes, since the arm specific patch are depending on other parts of the 
-> series I was hoping to be able to get Russells Ack on it and then try to 
-> get it all in through the dmaengine tree.
+Reply inline.
 
-Sounds good to me..
+On 16-06-02 09:25 AM, Ray Jui wrote:
+>
+>
+> On 6/1/2016 11:45 PM, Gerd Hoffmann wrote:
+>>>>  config ARCH_BCM2835
+>>>>      bool "Broadcom BCM2835 family"
+>>>> -    depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
+>>>> +    depends on ARCH_MULTI_V6 || ARCH_MULTI_V7 || ARM64
+>>>
+>>> Humm, what does that achieve?
+>>
+>> Nothing ;)
+>>
+>> Slipped through unnoticed, I'll drop it.
+>>
+>>>> +config ARCH_BCM
+>>>> +    bool "Broadcom SoC Support"
+>>>> +    help
+>>>> +      This enables support for Broadcom ARM based SoC chips
+>>>
+>>> menuconfig maybe?
+>>
+>> There isn't any in arch/arm64/Kconfig.platforms right now, so I didn't
+>> feel like introducing one.  Also the dependency should have pretty much
+>> the same effect .
 
-> If you see a better way I'm happy to do it that way, let me know what 
-> you think. I hold off v8 that adresses the issues Russell brought up a 
-> few days untill I know what you think is best.
+No need to add ARCH_BCM
+.
+>>
+>>>> +config ARCH_BCM2835
+>>>> +    bool "Broadcom BCM2835 family"
+>>>> +    depends on ARCH_BCM
+>>>> +    select ARCH_REQUIRE_GPIOLIB
+>>>> +    select CLKSRC_OF
+>>>> +    select PINCTRL
+>>>> +    select PINCTRL_BCM2835
+>>>> +    select ARM_AMBA
+>>>> +    select ARM_TIMER_SP804
+>>>> +    select HAVE_ARM_ARCH_TIMER
+>>>> +    help
+>>>> +      This enables support for the Broadcom BCM2837 SoC.
+>>>> +      This SoC is used in the Raspberry Pi 3 device.
+>>>> +
+>>>>  config ARCH_BCM_IPROC
+>>>>      bool "Broadcom iProc SoC Family"
+>>>> +    depends on ARCH_BCM
+>>>
+>>> Does not seem necessary nor adding anything here.
+>>
+>> Added for consistency.  When we add ARCH_BCM all ARCH_BCM_* should
+>> depend on it ...
+>>
+>> We could also do it the other way around: make ARCH_BCM a hidden bool
+>> and have ARCH_BCM_* select it.
+>
+> Yes, this is probably better.
+>
+> ARCH_BCM_IPROC is currently enabled in arch/arm64/configs/defconfig. By
+> adding a dependency here without enabling ARCH_BCM in arm64 defconfig,
+> this effectively disables ARCH_BCM_IPROC from arm64 defconfig.
 
--- 
-~Vinod
+There is no need to add ARCH_BCM though?
+
+>
+>>
+>> cheers,
+>>   Gerd
+>>
