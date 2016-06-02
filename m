@@ -1,89 +1,61 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 2 Jun 2016 08:36:14 +0200
-Subject: [PATCH v9 0/2] memory: add Atmel EBI (External Bus Interface)
- driver
-In-Reply-To: <1463989495-13787-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1463989495-13787-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160602063337.GH4249@piout.net>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Thu, 02 Jun 2016 08:45:36 +0200
+Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
+In-Reply-To: <574F5881.4060008@gmail.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-2-git-send-email-kraxel@redhat.com>
+ <574F5881.4060008@gmail.com>
+Message-ID: <1464849936.24775.33.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/05/2016 at 09:44:53 +0200, Boris Brezillon wrote :
-> Hello,
+> >  config ARCH_BCM2835
+> >  	bool "Broadcom BCM2835 family"
+> > -	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
+> > +	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7 || ARM64
 > 
-> This patch series provides support for the EBI bus.
-> 
-> The EBI (External Bus Interface) is used to access external peripherals
-> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
-> Each device is assigned a CS line and an address range and can have its
-> own configuration (timings, access mode, bus width, ...).
-> This driver provides a generic DT binding to configure a device according
-> to its requirements.
-> For specific device controllers (like the NAND one) the SMC timings
-> should be configured by the controller driver through the matrix and
-> smc syscon regmaps.
-> 
-> Best Regards,
-> 
-> Boris
-> 
-> Changes since v8:
-> - fixed typo in DT bindings doc
-> 
-> Changes since v7:
-> - move EBI bus config properties directly in the sub-device node
-> - prefix all EBI/SMC properties with atmel,smc-
-> - rework the driver to take the new binding into account
-> - disable the subdevice when EBI implementation fails to configure
->   the bus as requested
-> 
-> Changes since v6:
-> - rework the binding to put per-device config information into a
->   separate subnode and have devices connected to the EBI bus
->   defined as direct children of the EBI node
-> - make all EBI timings mandatory
-> - keep adding sub-devices when a failure occurs on one of them
-> 
-> Changes since v5:
-> - remove the "atmel,specialized-logic" property: now all devices are
->   are attached to the SMC logic by default, and specialized drivers
->   (like the NAND controller one), should change this configuration
->   manually.
-> - provide hardware readout to allow partial config description.
->   This is mainly here to keep existing platforms (where everything
->   is configured by the bootloader/bootstrap) in working state.
-> - rename "atmel,tdf-optimized" into "atmel,tdf-mode" and switch from
->   a boolean to string property to properly support partial config
-> 
-> Changes since v4:
-> - fix inconsistencies in SMC and MATRIX registers definition
-> - add missing compatible strings for at91sam9rl SoC
-> - fix DT bindings documentation
-> - replace "atmel,generic-dev" property by "atmel,specialized-logic"
-> 
-> Changes since v3:
-> - added AT91_MATRIX_USBPUCR_PUON definition
-> - removed useless macros (those directly returning SoC specific register
->   offsets)
-> - use syscon_regmap_lookup_by_phandle instead of of_parse_phandle +
->   syscon_node_to_regmap
-> - drop AT91_EBICSA_REGFIELD and AT91_MULTI_EBICSA_REGFIELD macros
-> 
-> Changes since v2:
-> - minor fixes int DT bindings doc
-> - fix SMC macros
-> - make use of SMC macros defined in include/linux/mfd/syscon/atmel-smc.h
-> 
-> Changes since v1:
-> - almost everything :-)
-> 
-> Boris Brezillon (2):
->   memory: add Atmel EBI (External Bus Interface) driver
->   memory: atmel-ebi: add DT bindings documentation
-> 
-Applied, thanks.
+> Humm, what does that achieve?
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Nothing ;)
+
+Slipped through unnoticed, I'll drop it.
+
+> > +config ARCH_BCM
+> > +	bool "Broadcom SoC Support"
+> > +	help
+> > +	  This enables support for Broadcom ARM based SoC chips
+> 
+> menuconfig maybe?
+
+There isn't any in arch/arm64/Kconfig.platforms right now, so I didn't
+feel like introducing one.  Also the dependency should have pretty much
+the same effect ...
+
+> > +config ARCH_BCM2835
+> > +	bool "Broadcom BCM2835 family"
+> > +	depends on ARCH_BCM
+> > +	select ARCH_REQUIRE_GPIOLIB
+> > +	select CLKSRC_OF
+> > +	select PINCTRL
+> > +	select PINCTRL_BCM2835
+> > +	select ARM_AMBA
+> > +	select ARM_TIMER_SP804
+> > +	select HAVE_ARM_ARCH_TIMER
+> > +	help
+> > +	  This enables support for the Broadcom BCM2837 SoC.
+> > +	  This SoC is used in the Raspberry Pi 3 device.
+> > +
+> >  config ARCH_BCM_IPROC
+> >  	bool "Broadcom iProc SoC Family"
+> > +	depends on ARCH_BCM
+> 
+> Does not seem necessary nor adding anything here.
+
+Added for consistency.  When we add ARCH_BCM all ARCH_BCM_* should
+depend on it ...
+
+We could also do it the other way around: make ARCH_BCM a hidden bool
+and have ARCH_BCM_* select it.
+
+cheers,
+  Gerd
