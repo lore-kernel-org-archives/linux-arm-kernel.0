@@ -1,37 +1,68 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu, 2 Jun 2016 09:54:08 -0400
-Subject: [PATCH 4/4] ARM: exynos_defconfig: Save defconfig on current
- linux-next
-In-Reply-To: <1464846916-3110-4-git-send-email-k.kozlowski@samsung.com>
-References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
- <1464846916-3110-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <f5faaac7-7e26-b1fa-4327-fb3e4daee754@osg.samsung.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 2 Jun 2016 09:54:40 -0400
+Subject: [PATCH 1/2] ARM: dts: keystone: fix to PCI bindings
+Message-ID: <1464875681-14543-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof,
+The PCI DT bindings contain a bogus entry for IO space which is not
+supported on Keystone. The current bogus entry has an invalid size
+and throws following error during boot.
 
-On 06/02/2016 01:55 AM, Krzysztof Kozlowski wrote:
-> Save defconfig on next-20160602. Most of changes are just re-ordering of
-> symbols.  Removed symbols:
->  - FHANDLE (default y),
->  - THERMAL, EXYNOS_THERMAL (selected by ARCH_EXYNOS),
->  - CHROME_PLATFORMS (selected by MFD_CROS_EC),
->  - EXT4_FS (selected by EXT3_FS)
->  - SND_SOC_ODROIDX2 (obsolete since commit ee12a817bb4b ("ASoC: samsung:
->    Remove unused Odroid x2/u3 machine driver"), replaced with
->    SND_SIMPLE_CARD).
-> 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
+[0.420713] keystone-pcie 21021000.pcie: error -22: failed to map
+           resource [io  0x0000-0x400000003fff]
 
-Looks good to me.
+So remove it from the dts. While at it also add a bus-range
+value that eliminates following log at boot up.
 
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+[0.420659] No bus range found for /soc/pcie at 21020000, using [bus 00-ff]
 
-Best regards,
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+---
+ - applies to master v4.7-rcx at kernel.org git repo
+ arch/arm/boot/dts/keystone-k2e.dtsi | 5 +++--
+ arch/arm/boot/dts/keystone.dtsi     | 5 +++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
+index 96b349f..5374c9a 100644
+--- a/arch/arm/boot/dts/keystone-k2e.dtsi
++++ b/arch/arm/boot/dts/keystone-k2e.dtsi
+@@ -96,12 +96,13 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			reg =  <0x21021000 0x2000>, <0x21020000 0x1000>, <0x02620128 4>;
+-			ranges = <0x81000000 0 0 0x23260000 0x4000 0x4000
+-				0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
++			ranges = <0x82000000 0 0x60000000 0x60000000
++				  0 0x10000000>;
+ 
+ 			status = "disabled";
+ 			device_type = "pci";
+ 			num-lanes = <2>;
++			bus-range = <0x00 0xff>;
+ 
+ 			#interrupt-cells = <1>;
+ 			interrupt-map-mask = <0 0 0 7>;
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index e34b226..f627a1c 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -294,12 +294,13 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			reg =  <0x21801000 0x2000>, <0x21800000 0x1000>, <0x02620128 4>;
+-			ranges = <0x81000000 0 0 0x23250000 0 0x4000
+-				0x82000000 0 0x50000000 0x50000000 0 0x10000000>;
++			ranges = <0x82000000 0 0x50000000 0x50000000
++				  0 0x10000000>;
+ 
+ 			status = "disabled";
+ 			device_type = "pci";
+ 			num-lanes = <2>;
++			bus-range = <0x00 0xff>;
+ 
+ 			#interrupt-cells = <1>;
+ 			interrupt-map-mask = <0 0 0 7>;
 -- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+1.9.1
