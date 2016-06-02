@@ -1,33 +1,21 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Jun 2016 10:18:59 +0100
-Subject: [linux-sunxi] Re: [PATCH 5/5] RFC spi: sun4i: add DMA support
-In-Reply-To: <1464842546.23881.3.camel@plaes.org>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
- <20160530112610.GJ29837@sirena.org.uk>
- <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
- <20160530150343.GL29837@sirena.org.uk>
- <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
- <20160530155016.GO29837@sirena.org.uk>
- <20160601180056.GA4908@lukather>
- <1464842546.23881.3.camel@plaes.org>
-Message-ID: <20160602091859.GD2282@sirena.org.uk>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 02 Jun 2016 11:20:05 +0200
+Subject: [PATCH 2/3] clk: samsung: exynos5410: Add WDT,
+ ACLK266 and SSS clocks
+In-Reply-To: <61eead99-d8a7-71f7-a2a4-18dfd3d780a1@osg.samsung.com>
+References: <1464774351-23604-1-git-send-email-k.kozlowski@samsung.com>
+ <1464774351-23604-2-git-send-email-k.kozlowski@samsung.com>
+ <61eead99-d8a7-71f7-a2a4-18dfd3d780a1@osg.samsung.com>
+Message-ID: <574FFA45.9060409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 07:42:26AM +0300, Priit Laes wrote:
+On 06/01/2016 04:55 PM, Javier Martinez Canillas wrote:
+> On 06/01/2016 05:45 AM, Krzysztof Kozlowski wrote:
+>> > Add clock hierarchy for Security SubSystem clock and watchdog.
+>> > 
+>> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> > ---
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-> This was addressed by this patch, but was never applied:
-> http://permalink.gmane.org/gmane.linux.kernel.spi.devel/18950
-
-I've never seen that patch before, if it was CCed to me there's a good
-chance it'd have been deleted unread because you put ARM: at the start
-of the subject line which says it's a patch for arch/arm.  You'll need
-to resubmit.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/467fd971/attachment.sig>
+Patches 1/3, 2/3 applied, thanks.
