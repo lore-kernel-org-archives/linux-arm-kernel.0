@@ -1,89 +1,25 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 2 Jun 2016 17:50:18 +0100
-Subject: [PATCH V8 3/9] pci: Add new function to unmap IO resources.
-In-Reply-To: <1464621262-26770-4-git-send-email-tn@semihalf.com>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <1464621262-26770-4-git-send-email-tn@semihalf.com>
-Message-ID: <20160602165018.GG13962@red-moon>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 2 Jun 2016 18:52:45 +0200
+Subject: [PATCH 32/32] mmc: bcm2835: Import bcm2835-mmc and switch to it
+In-Reply-To: <1464817421-8519-33-git-send-email-kraxel@redhat.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-33-git-send-email-kraxel@redhat.com>
+Message-ID: <e16936ee-3b0d-3798-72e0-8969c2c1a309@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 05:14:16PM +0200, Tomasz Nowicki wrote:
-> We need to release I/O resources so that the same I/O resources
-> can be allocated again (pci_remap_iospace), like in PCI hotplug removal
-> scenario. Therefore this patch implements new pci_unmap_iospace call which
-> unmaps I/O space as the symmetry to pci_remap_iospace.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/pci/pci.c   | 18 ++++++++++++++++++
->  include/linux/pci.h |  1 +
->  2 files changed, 19 insertions(+)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index c8b4dbd..eb431b5 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -25,6 +25,7 @@
->  #include <linux/device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pci_hotplug.h>
-> +#include <linux/vmalloc.h>
->  #include <asm/setup.h>
->  #include <linux/aer.h>
->  #include "pci.h"
-> @@ -3165,6 +3166,23 @@ int __weak pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr)
->  #endif
->  }
->  
-> +/**
-> + *	pci_unmap_iospace - Unmap the memory mapped I/O space
-> + *	@res: resource to be unmapped
-> + *
-> + *	Unmap the CPU virtual address @res from virtual address space.
-> + *	Only architectures that have memory mapped IO functions defined
-> + *	(and the PCI_IOBASE value defined) should call this function.
-> + */
-> +void pci_unmap_iospace(struct resource *res)
-> +{
-> +#if defined(PCI_IOBASE) && defined(CONFIG_MMU)
-> +	unsigned long vaddr = (unsigned long)PCI_IOBASE + res->start;
-> +
-> +	unmap_kernel_range(vaddr, resource_size(res));
-> +#endif
-> +}
+Hi Gerd,
 
-Rafael mentioned that, it would be cleaner to move the ifdef outside
-the function and add an empty static inline (but that probably should
-be done in one go along with pci_remap_iospace() and
-pci_pio_to_address() and pci_address_to_pio()) it would be weird
-to do it just for pci_unmap_iospace().
+Am 01.06.2016 um 23:43 schrieb Gerd Hoffmann:
+> From: Eric Anholt <eric@anholt.net>
+>
+> With this we can get wifi (brcmfmac) to probe.  Without it we're stuck
+> with timeouts from sdio.c when it tries to set the bus width to 4.
 
-It is true that unmap_kernel_range() is not commonly used in generic
-code, but to the best of my knowledge it does what's required here,
-(ie clear page table entries and flush tlbs, given that it is used
-in conjuction with ioremap_page_range() that maps a physical address
-to a specific preallocated virtual address ie PCI_IOBASE), so:
+adding a new MMC driver to fix a wifi issue is really weird.
 
-Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Beside that there are already two MMC drivers (sdhci-bcm2835.c and
+sdhci-iproc.c) in the Kernel which are compatible to BCM2835. Why should
+we add two new ones?
 
-> +
->  static void __pci_set_master(struct pci_dev *dev, bool enable)
->  {
->  	u16 old_cmd, cmd;
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index b67e4df..12349de 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1167,6 +1167,7 @@ int pci_register_io_range(phys_addr_t addr, resource_size_t size);
->  unsigned long pci_address_to_pio(phys_addr_t addr);
->  phys_addr_t pci_pio_to_address(unsigned long pio);
->  int pci_remap_iospace(const struct resource *res, phys_addr_t phys_addr);
-> +void pci_unmap_iospace(struct resource *res);
->  
->  static inline pci_bus_addr_t pci_bus_address(struct pci_dev *pdev, int bar)
->  {
-> -- 
-> 1.9.1
-> 
+Stefan
