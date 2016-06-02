@@ -1,72 +1,51 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 2 Jun 2016 18:35:34 +0200
-Subject: [PATCH] i2c: bcm2835: Set up the clock stretching timeout at boot.
-In-Reply-To: <1464818845-5348-1-git-send-email-eric@anholt.net>
-References: <1464818845-5348-1-git-send-email-eric@anholt.net>
-Message-ID: <30fcc305-971d-4a1c-18c1-08c28585e260@i2se.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 2 Jun 2016 22:17:11 +0530
+Subject: [PATCHv7 0/6] dmaengine: rcar-dmac: add iommu support for slave
+ transfers
+In-Reply-To: <20160602125807.GN8307@bigcity.dyn.berto.se>
+References: <1464794549-6601-1-git-send-email-niklas.soderlund+renesas@ragnatech.se>
+ <20160601180610.GV16910@localhost>
+ <20160602125807.GN8307@bigcity.dyn.berto.se>
+Message-ID: <20160602164711.GS16910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+On Thu, Jun 02, 2016 at 02:58:07PM +0200, Niklas S?derlund wrote:
+> Hi Vinod,
+> 
+> On 2016-06-01 23:36:11 +0530, Vinod Koul wrote:
+> > On Wed, Jun 01, 2016 at 05:22:23PM +0200, Niklas S?derlund wrote:
+> > > Hi,
+> > > 
+> > > [In this v7 series I have tried to address the questions raised by Christoph 
+> > > Hellwig and I hope it can awnser your concernes regarding dma-debug.]
+> > > 
+> > > This series tries to solve the problem with DMA with device registers
+> > > (MMIO registers) that are behind an IOMMU for the rcar-dmac driver. A
+> > > recent patch '9575632 (dmaengine: make slave address physical)'
+> > > clarifies that DMA slave address provided by clients is the physical
+> > > address. This puts the task of mapping the DMA slave address from a
+> > > phys_addr_t to a dma_addr_t on the DMA engine.
+> > > 
+> > > Without an IOMMU this is easy since the phys_addr_t and dma_addr_t are
+> > > the same and no special care is needed. However if you have a IOMMU you
+> > > need to map the DMA slave phys_addr_t to a dma_addr_t using something
+> > > like this.
+> > > 
+> > > This series is based on top of v4.7-rc1.
+> > 
+> > The dmanegine bits looks okay to me. Btw how is the merge planned for this?
+> > Do you wnat this to be merged thru dmaengine tree or something else?
+> 
+> Yes, since the arm specific patch are depending on other parts of the 
+> series I was hoping to be able to get Russells Ack on it and then try to 
+> get it all in through the dmaengine tree.
 
-Am 02.06.2016 um 00:07 schrieb Eric Anholt:
-> The register at poweron contains 0x40, which at our typical 100khz bus
-> rate means .64ms instead of the desired 25ms.
->
-> Fixes many clock stretching timeouts when talking to the DSI panel's
-> bridge chip, and will hopefully fix talking to the FXL6408 GPIO
-> expander on the Pi3 as well.
->
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  drivers/i2c/busses/i2c-bcm2835.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-> index 818b051d25e6..1348f224013d 100644
-> --- a/drivers/i2c/busses/i2c-bcm2835.c
-> +++ b/drivers/i2c/busses/i2c-bcm2835.c
-> @@ -28,6 +28,11 @@
->  #define BCM2835_I2C_FIFO	0x10
->  #define BCM2835_I2C_DIV		0x14
->  #define BCM2835_I2C_DEL		0x18
-> +/*
-> + * 16-bit field for the number of SCL cycles to wait after rising SCL
-> + * before deciding the slave is not responding.  0 disables the
-> + * timeout detection.
-> + */
->  #define BCM2835_I2C_CLKT	0x1c
->  
->  #define BCM2835_I2C_C_READ	BIT(0)
-> @@ -238,6 +243,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
->  	u32 bus_clk_rate, divider;
->  	int ret;
->  	struct i2c_adapter *adap;
-> +	u32 clkt;
->  
->  	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
->  	if (!i2c_dev)
-> @@ -280,6 +286,15 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
->  	}
->  	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_DIV, divider);
->  
-> +	/*
-> +	 * SMBUS says "Devices participating in a transfer will
-> +	 * timeout when any clock low exceeds the value of
-> +	 * T_TIMEOUT,MIN of 25 ms."
-> +	 */
-> +	clkt = DIV_ROUND_UP(25 * bus_clk_rate, 1000);
-> +	clkt = min(clkt, 0xffffu);
-> +	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_CLKT, clkt);
-> +
+Sounds good to me..
 
-could we really assume that the clk rate never change after driver probing?
+> If you see a better way I'm happy to do it that way, let me know what 
+> you think. I hold off v8 that adresses the issues Russell brought up a 
+> few days untill I know what you think is best.
 
-This also affects Gerd's patch [PATCH 28/32] i2c: bcm2835: Set up the
-rising/falling edge delays.
-
-Stefan
-
->  	irq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
->  	if (!irq) {
->  		dev_err(&pdev->dev, "No IRQ resource\n");
+-- 
+~Vinod
