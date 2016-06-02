@@ -1,49 +1,132 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 2 Jun 2016 09:24:19 +0800
-Subject: [PATCH v3 09/12] EXAMPLE CODE: usb: port: Parse pwrseq phandle
- from Device Tree
-In-Reply-To: <146480499491.3686.4996610748316511864@sboyd-linaro>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
- <1464768141-25420-10-git-send-email-k.kozlowski@samsung.com>
- <146477144362.1485.3331887341591876278@sboyd-linaro>
- <20160601120520.GB16740@shlinux2>
- <146480499491.3686.4996610748316511864@sboyd-linaro>
-Message-ID: <20160602012419.GA7953@shlinux2>
+From: hl@rock-chips.com (hl)
+Date: Thu, 2 Jun 2016 09:32:42 +0800
+Subject: [RFC PATCH 2/4] clk: rockchip: rk3399: add ddrc clock support
+In-Reply-To: <7336973.nHpy8GhqcO@diego>
+References: <1464773739-18152-1-git-send-email-hl@rock-chips.com>
+ <1464773739-18152-3-git-send-email-hl@rock-chips.com>
+ <CAD=FV=UQoWe7DcPe3sZrocXLmX4JNpBBF1rr+-+T_q3FttihEQ@mail.gmail.com>
+ <7336973.nHpy8GhqcO@diego>
+Message-ID: <574F8CBA.2040203@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 11:16:34AM -0700, Stephen Boyd wrote:
-> Quoting Peter Chen (2016-06-01 05:05:20)
-> > On Wed, Jun 01, 2016 at 01:57:23AM -0700, Stephen Boyd wrote:
-> > > Quoting Krzysztof Kozlowski (2016-06-01 01:02:18)
-> > > > Parse usb-pwrseq property from Device Tree to get the phandle to pwrseq
-> > > > device.  The pwrseq device will be used by USB hub to cycle the power
-> > > > before activating ports.
-> > > > 
-> > > > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > > 
-> > > Drive by review comment.
-> > > 
-> > > I was hoping this would help me with a problem I'm having where I have a
-> > > hub (smsc4604) that needs to be taken out of reset before my HSIC
-> > > controller sends a USB reset to it, but it seems this is more about
-> > > doing some sort of power on sequence after enumeration?
-> > > 
-> > 
-> > No, you may need to do reset before enumeration, the general purpose of
-> > reset is eliminate unstable hardware state, and let the controller find
-> > the device.
-> > 
-> > Try to do it at bootloader to see if it works for you.
-> > 
-> 
-> Sorry the bootloader doesn't do this so that doesn't work for me.
+Hi Doug&Heiko,
 
-I mean try to see if the HUB can work if you reset it at bootloader.
-If it works, it means you need to do reset before enumeration, and you
-don't need to do anything after enumeration.
+On 2016?06?01? 23:46, Heiko St?bner wrote:
+> Am Mittwoch, 1. Juni 2016, 08:24:48 schrieb Doug Anderson:
+>> Lin Huang,
+>>
+>> On Wed, Jun 1, 2016 at 2:35 AM, Lin Huang <hl@rock-chips.com> wrote:
+>>> add ddrc clock setting, so we can do ddr frequency
+>>> scaling on rk3399 platform in future.
+>>>
+>>> Signed-off-by: Lin Huang <hl@rock-chips.com>
+>>> ---
+>>>
+>>>   drivers/clk/rockchip/clk-rk3399.c      | 16 ++++++++++++++++
+>>>   include/dt-bindings/clock/rk3399-cru.h |  1 +
+>>>   2 files changed, 17 insertions(+)
+>>>
+>>> diff --git a/drivers/clk/rockchip/clk-rk3399.c
+>>> b/drivers/clk/rockchip/clk-rk3399.c index f1d8e44..749ea59 100644
+>>> --- a/drivers/clk/rockchip/clk-rk3399.c
+>>> +++ b/drivers/clk/rockchip/clk-rk3399.c
+>>> @@ -118,6 +118,10 @@ PNAME(mux_armclkb_p)                               =
+>>> { "clk_core_b_lpll_src",>
+>>>                                                      "clk_core_b_bpll_src",
+>>>                                                      "clk_core_b_dpll_src",
+>>>                                                      "clk_core_b_gpll_src"
+>>>                                                      };
+>>>
+>>> +PNAME(mux_ddrclk_p)                            = { "clk_ddrc_lpll_src",
+>>> +                                                   "clk_ddrc_bpll_src",
+>>> +                                                   "clk_ddrc_dpll_src",
+>>> +                                                   "clk_ddrc_gpll_src" };
+>>>
+>>>   PNAME(mux_aclk_cci_p)                          = { "cpll_aclk_cci_src",
+>>>   
+>>>                                                      "gpll_aclk_cci_src",
+>>>                                                      "npll_aclk_cci_src",
+>>>
+>>> @@ -1377,6 +1381,18 @@ static struct rockchip_clk_branch
+>>> rk3399_clk_branches[] __initdata = {>
+>>>          COMPOSITE_NOMUX(0, "clk_test", "clk_test_pre", CLK_IGNORE_UNUSED,
+>>>          
+>>>                          RK3368_CLKSEL_CON(58), 0, 5, DFLAGS,
+>>>                          RK3368_CLKGATE_CON(13), 11, GFLAGS),
+>>>
+>>> +
+>>> +       /* ddrc */
+>>> +       GATE(0, "clk_ddrc_lpll_src", "lpll", CLK_IGNORE_UNUSED,
+>>> +            RK3399_CLKGATE_CON(3), 0, GFLAGS),
+>>> +       GATE(0, "clk_ddrc_bpll_src", "bpll", CLK_IGNORE_UNUSED,
+>>> +            RK3399_CLKGATE_CON(3), 1, GFLAGS),
+>>> +       GATE(0, "clk_ddrc_dpll_src", "dpll", CLK_IGNORE_UNUSED,
+>>> +            RK3399_CLKGATE_CON(3), 2, GFLAGS),
+>>> +       GATE(0, "clk_ddrc_gpll_src", "gpll", CLK_IGNORE_UNUSED,
+>>> +            RK3399_CLKGATE_CON(3), 3, GFLAGS),
+>>> +       COMPOSITE_DDRC(SCLK_DDRCLK, "clk_ddrc", mux_ddrclk_p,
+>>> CLK_IGNORE_UNUSED, +                      RK3399_CLKSEL_CON(6), 4, 2,
+>>> MFLAGS, 0, 3, DFLAGS),
+>> It seems slightly unfortunate that we need CLK_IGNORE_UNUSED on these.
+>> Only one of these will ever be used at once and it would be awfully
+>> nice if the others could get gated, right?
+>>
+>> ...presumably this is needed because we might not have an actual
+>> driver for DDR Freq and we definitely want to make sure that clk_ddrc
+>> is enabled in that case.  I guess what we really want is something
+>> like CLK_ENABLE_HAND_OFF eventually, but until then I think you might
+>> get slightly better behavior by getting rid of all of these
+>> CLK_IGNORE_UNUSED and setting "clk_ddrc" as a critical clock, either
+>> using the table in this file or the new flag.
+> My current feeling is that staying with the homegrown solution for critical
+> clocks might be preferable until the clk-handoff mechanism lands as well, as
+> our critical clocks fall into both categories and I'd like to not touch
+> everything twice.
+>
+> The clock above should be controlled by the dcf, so falls into the handoff
+> category (critical until a driver picks up the clock).
+>
+> Also mixing both new and old approach might get confusing.
+>
+> But I'm definitly open to counter-arguments :-)
+     I will remove CLK_IGNORE_UNUSED flag  and set
+     "clk_ddrc"  as critical clock in next version. Besides, i think we 
+should also
+     set "clk_ddrc_dpll_src" as critical clock, since we always use dpll 
+as ddr clock source,
+     and it should always on.
+>
+>>>   };
+>>>   
+>>>   static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata =
+>>>   {
+>>>
+>>> diff --git a/include/dt-bindings/clock/rk3399-cru.h
+>>> b/include/dt-bindings/clock/rk3399-cru.h index 50a44cf..8a0f0442 100644
+>>> --- a/include/dt-bindings/clock/rk3399-cru.h
+>>> +++ b/include/dt-bindings/clock/rk3399-cru.h
+>>> @@ -131,6 +131,7 @@
+>>>
+>>>   #define SCLK_DPHY_RX0_CFG              165
+>>>   #define SCLK_RMII_SRC                  166
+>>>   #define SCLK_PCIEPHY_REF100M           167
+>>>
+>>> +#define SCLK_DDRCLK                    168
+>> Almost certainly you'll want to create a separate patch for the
+>> dt-bindings change since it will need to land in a different tree so
+>> it can be pulled into both Heiko's clock topic branch and dts64 topic
+>> branch.
+> correct.
+     will fix next version, thanks.
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
+>
+>
 
 -- 
-
-Best Regards,
-Peter Chen
+Lin Huang
