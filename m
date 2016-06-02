@@ -1,26 +1,143 @@
-From: chris@chris-wilson.co.uk (Chris Wilson)
-Date: Thu, 2 Jun 2016 23:40:04 +0100
-Subject: [Intel-gfx] [PATCH 01/20] drm/atomic: Fix remaining places where
- !funcs->best_encoder is valid
-In-Reply-To: <CAKMK7uHyqNbA8Scw2fE0geAyNt0a0XVtzf81nwWjEhbZ-gAvKw@mail.gmail.com>
-References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464877907-27723-2-git-send-email-boris.brezillon@free-electrons.com>
- <8671722.LHaiaBNqfE@avalon>
- <CAKMK7uHyqNbA8Scw2fE0geAyNt0a0XVtzf81nwWjEhbZ-gAvKw@mail.gmail.com>
-Message-ID: <20160602224004.GA1819@nuc-i3427.alporthouse.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 2 Jun 2016 18:16:09 -0500
+Subject: [PATCH v3 2/2] [media] atmel-isc: DT binding for Image Sensor
+ Controller driver
+In-Reply-To: <1464677903-28412-3-git-send-email-songjun.wu@atmel.com>
+References: <1464677903-28412-1-git-send-email-songjun.wu@atmel.com>
+ <1464677903-28412-3-git-send-email-songjun.wu@atmel.com>
+Message-ID: <20160602231609.GA24529@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 11:57:02PM +0200, Daniel Vetter wrote:
-> drm_encoder_find is an idr lookup. That should be plenty fast,
-> especially for modeset code. Usually what's too expensive even for
-> modeset code is linear list walks. But Chris just submitted patches to
-> convert most of them into simple lookups.
+On Tue, May 31, 2016 at 02:58:23PM +0800, Songjun Wu wrote:
+> DT binding documentation for ISC driver.
+> 
+> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
+> ---
+> 
+> Changes in v3:
+> - Remove the 'atmel,sensor-preferred'.
+> - Modify the isc clock node according to the Rob's remarks.
+> 
+> Changes in v2:
+> - Remove the unit address of the endpoint.
+> - Add the unit address to the clock node.
+> - Avoid using underscores in node names.
+> - Drop the "0x" in the unit address of the i2c node.
+> - Modify the description of 'atmel,sensor-preferred'.
+> - Add the description for the ISC internal clock.
+> 
+>  .../devicetree/bindings/media/atmel-isc.txt        | 88 ++++++++++++++++++++++
+>  1 file changed, 88 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
+> new file mode 100644
+> index 0000000..2ae1d60
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
+> @@ -0,0 +1,88 @@
+> +Atmel Image Sensor Controller (ISC)
+> +----------------------------------------------
+> +
+> +Required properties for ISC:
+> +- compatible
+> +	Must be "atmel,sama5d2-isc"
+> +- reg
+> +	Physical base address and length of the registers set for the device;
+> +- interrupts
+> +	Should contain IRQ line for the ISI;
+> +- clocks
+> +	List of clock specifiers, corresponding to entries in
+> +	the clock-names property;
+> +	Please refer to clock-bindings.txt.
+> +- clock-names
+> +	Required elements: "hclock", "ispck".
+> +- pinctrl-names, pinctrl-0
+> +	Please refer to pinctrl-bindings.txt.
+> +- isc-ispck
+> +	The clock for the ISC digital pipeline.
+> +	- compatible
+> +		Must be "atmel,sama5d2-isc-ispck".
+> +	- clock-cells
+> +		From common clock binding; should be set to 0.
+> +	- clocks
+> +		The clock source phandles.
+> +- isc-mck
+> +	The clock for the image sensor.
+> +	- compatible
+> +		Must be "atmel,sama5d2-isc-mck".
+> +	- clock-cells
+> +		From common clock binding; should be set to 0.
+> +	- clocks
+> +		The clock source phandles.
+> +
+> +ISC supports a single port node with parallel bus. It should contain one
+> +'port' child node with child 'endpoint' node. Please refer to the bindings
+> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +
+> +Example:
+> +isc: isc at f0008000 {
+> +	compatible = "atmel,sama5d2-isc";
+> +	reg = <0xf0008000 0x4000>;
+> +	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
+> +	clocks = <&isc_clk>, <&isc_ispck>;
+> +	clock-names = "hclock", "ispck";
+> +
+> +	port {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		isc_0: endpoint {
+> +			remote-endpoint = <&ov7740_0>;
+> +			hsync-active = <1>;
+> +			vsync-active = <0>;
+> +			pclk-sample = <1>;
+> +		};
+> +	};
+> +
+> +	isc_ispck: isc-ispck at 0 {
 
-For the idr_find, I'm tempted to replace the mutex with a rwlock. It
-helps pathological cases, but in reality there are more crucial
-locks around the hw that limit concurrency. ;-)
--Chris
+Drop the unit-address. You should only have one if you have a reg 
+property.
 
--- 
-Chris Wilson, Intel Open Source Technology Centre
+> +		compatible = "atmel,sama5d2-isc-ispck";
+> +		#clock-cells = <0>;
+> +		clocks = <&isc_clk>, <&iscck>;
+> +	};
+> +
+> +	isc_mck: isc-mck at 1 {
+
+ditto.
+
+I still think these should be implied by atmel,sama5d2-isc and not in 
+DT. The fact that you don't have any registers for them pretty much 
+indicates that. It is also strange that isc-ispck is used by isc. If 
+that is the only user, there is certainly no need to put it in DT.
+
+
+> +		compatible = "atmel,sama5d2-isc-mck";
+> +		#clock-cells = <0>;
+> +		clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
+> +	};
+> +};
+> +
+> +i2c1: i2c at fc028000 {
+> +	ov7740: camera at 21 {
+> +	compatible = "ovti,ov7740";
+> +	reg = <0x21>;
+> +
+> +	clocks = <&isc_mck>;
+> +	clock-names = "xvclk";
+> +	assigned-clocks = <&isc_mck>;
+> +	assigned-clock-rates = <24000000>;
+> +
+> +	port {
+> +		ov7740_0: endpoint {
+> +			remote-endpoint = <&isc_0>;
+> +		};
+> +	};
+> +};
+> -- 
+> 2.7.4
+> 
