@@ -1,57 +1,37 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jun 2016 08:18:26 +0200
-Subject: [PATCH 3/3] ARM: dts: exynos: Add watchdog amd Security SubSystem
- to Exynos5410
-In-Reply-To: <f7e99aad-f773-27c6-d554-ba30bc54b5f7@osg.samsung.com>
-References: <1464774351-23604-1-git-send-email-k.kozlowski@samsung.com>
- <1464774351-23604-3-git-send-email-k.kozlowski@samsung.com>
- <f7e99aad-f773-27c6-d554-ba30bc54b5f7@osg.samsung.com>
-Message-ID: <574FCFB2.1080607@samsung.com>
+Date: Thu, 02 Jun 2016 08:21:29 +0200
+Subject: [PATCH v2] ARM: dts: exynos: Add TMU nodes regulator supply for
+ Peach boards
+In-Reply-To: <1464787235-8400-1-git-send-email-javier@osg.samsung.com>
+References: <1464787235-8400-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <574FD069.8020709@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 05:16 PM, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
+On 06/01/2016 03:20 PM, Javier Martinez Canillas wrote:
+> The Exynos5800 Peach Pi and Exynos5420 Peach Pit Chromebooks have the
+> LDO10 1.8V output connected to the VDD18_TS{01,23,4} Exynos SoC pins.
 > 
-> On 06/01/2016 05:45 AM, Krzysztof Kozlowski wrote:
->> Move watchdog and Security SubSystem nodes from exynos5420.dtsi to file
->> shared with Exynos5410 and configure the clocks on the latter.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
+> Add this regulator as the input supply of the Thermal Management Unit
+> channels and also remove the always-on property since all the devices
+> using LDO10 as input supply are now defined.
 > 
-> [snip]
+> Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 > 
->>  
->> +&sss {
->> +	clocks = <&clock CLK_SSS>;
->> +	clock-names = "secss";
->> +};
->> +
+> ---
 > 
-> [snip]
+> Changes in v2:
+> - Sorted nodes in alphabetical order (Krzysztof Kozlowski).
+> - Added Krzysztof's Suggested-by tag since he mentioned in other
+>   thread that the TMU supplies were missing.
 > 
->>  
->> +&watchdog {
->> +	clocks = <&clock CLK_WDT>;
->> +	clock-names = "watchdog";
->> +	samsung,syscon-phandle = <&pmu_system_controller>;
->> +};
->> +
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts | 21 ++++++++++++++++++++-
+>  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 21 ++++++++++++++++++++-
+>  2 files changed, 40 insertions(+), 2 deletions(-)
 > 
-> Since you used the same ID than Exynos5420 for the SSS and WDT clocks,
-> I wonder if the clock and clock-names shouldn't be just defined in the
-> shared exynos54xx.dtsi as is the case for the interrupts that are also
-> the same?
-> 
-> The patch looks good to me though, so whatever you decide:
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Thanks for review and comments.
-
-The 'clock' property cannot be moved - there is no clock phandle and the
-clock IDs are not included in 54xx.
+Thanks, applied.
 
 Best regards,
 Krzysztof
