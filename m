@@ -1,56 +1,37 @@
-From: charanya@codeaurora.org (charanya at codeaurora.org)
-Date: Thu, 02 Jun 2016 14:37:57 +0530
-Subject: [PATCH] tty: serial: msm: Disable restoring Rx interrupts for DMA
- Mode
-In-Reply-To: <20160525224623.GS3492@codeaurora.org>
-References: <1462896580-11554-1-git-send-email-absahu@codeaurora.org>
- <20160512014126.GK3492@codeaurora.org>
- <20160512050245.GD8453@hector.attlocal.net>
- <5cce36b3c1d62816feffb4048f782b20@codeaurora.org>
- <20160525224623.GS3492@codeaurora.org>
-Message-ID: <9c627293b1a13f5e71ba1a61c3bc2bfa@codeaurora.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu,  2 Jun 2016 11:09:42 +0200
+Subject: [PATCH 0/3] PCIe controller driver for Marvell Armada 3700
+Message-ID: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016-05-26 04:16, Stephen Boyd wrote:
-> On 05/13, charanya at codeaurora.org wrote:
->> Hi Stephen/Andy,
->> 
->> If both Tx and Rx are used simultaneously, restoring Rx interrupts in
->> msm_complete_rx_dma could lead to RXSTALE interrupt being triggered,
->> when
->> the ISR execution for TXLEV interrupt is completed, since
->> msm_port->imr is
->> rewritten to UART_IMR in msm_uart_irq. Hence, we do not have to 
->> restore
->> Rx interrupts since Rx is always in DMA mode once enabled.
->> 
-> 
-> Ok, but what's the exact sequence of events that happens? I think
-> we unlock the spinlock in the dma completion handler and then the
-> txlev interrupt runs? At that point we may have more data to push
-> out and then rx stale handling runs and corrupts the fifo state?
-> 
-> I was hoping for some sort of CPU sequence of events like:
-> 
->  CPU0                   CPU1
->  ----                   ----
-> 
->  msm_start_rx_dma()
->                        msm_complete_rx_dma()
-> 		        spin_unlock_irqrestore(&port->lock)
->  msm_uart_irq()
->   msm_handle_rx_dm()
->    <Read from FIFO and breaks>
-> 
-> This patch seems correct, but the commit text isn't fully
-> describing the sequence of events that causes this to happen, so
-> it's taking a while to convince myself that this patch fixes
-> anything.
+Hello,
 
+This small patch series adds a new driver for the PCIe controller
+found on Marvell Armada 3700 ARM64 SoCs. Like any other new driver
+submission, this patch series includes: a Device Tree binding
+documentation patch, a patch adding the driver itself, and a patch
+adding the Device Tree description of the hardware.
 
-The sequence of events is as mentioned. When the TXLEV interrupt occurs 
-after the
-spinlock is unlocked, the rx stale handling runs since the interrupts 
-are restored
-and hence it corrupts the fifo state.
+Thanks in advance for your reviews!
+
+Thomas
+
+Thomas Petazzoni (3):
+  dt-bindings: add DT binding for the Aardvark PCIe controller
+  PCI: host: new PCI host controller driver for Marvell Armada 3700
+  arm64: dts: marvell: PCIe support for Armada 3700
+
+ .../devicetree/bindings/pci/aardvark-pci.txt       |   51 +
+ MAINTAINERS                                        |    7 +
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts     |    5 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   23 +
+ drivers/pci/host/Kconfig                           |    9 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-aardvark.c                    | 1029 ++++++++++++++++++++
+ 7 files changed, 1125 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/aardvark-pci.txt
+ create mode 100644 drivers/pci/host/pci-aardvark.c
+
+-- 
+2.7.4
