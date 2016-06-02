@@ -1,202 +1,139 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu,  2 Jun 2016 19:18:53 +0200
-Subject: [PATCH v2 1/4] power: axp20x_usb: Add support for usb power-supply on
- axp22x pmics
-Message-ID: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
+Date: Thu,  2 Jun 2016 19:18:56 +0200
+Subject: [PATCH v2 4/4] regulator: axp20x: Add support for the (external)
+ drivebus regulator
+In-Reply-To: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
+References: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1464887936-17020-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usb power-supply on the axp22x pmics is mostly identical to the
-one on the axp20x pmics. One significant difference is that it cannot
-measure / monitor the usb voltage / current.
+The axp20x pmics have 2 power inputs, one called ACIN which is intended
+for to be supplied via a powerbarrel on the board and one called VBUS
+which is intended to be supplied via an otg connector.
+
+In the VBUS case the pmic needs to know if the board is supplying power
+to the otg connector, because then it should not take any power from
+its VBUS pin. The axp209 pmic has a N_VBUSEN input pin via which the
+board can signal to the pmic whether the board is supplying power to the
+otg connector or not.
+
+On the axp221/axp223 this pin can alternatively be used as an output
+which controls an external regulator which (optionally) supplies
+power to the otg connector from the board. When the pin is used as
+output it is called DRIVEVBUS in the datasheet.
+
+This commit adds support for the DRIVEVBUS pin as an extra pmic
+controlled regulator. Since this is optional a new x-powers,drivebus dt
+property is added. When this is present the misc-control register is
+written to change the N_VBUSEN input pin to DRIVEVBUS output pin mode and
+the extra drivebus regulator is registered with the regulator subsystem.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
 Changes in v2:
--Use compatible instead of axp20x->variant to detect pmic type
+-Rename the dt property to drive-vbus-en
+-s/drivebus/drivevbus/
+-Add a line describing the drivevbus regulator to the table in
+ Documentation/devicetree/bindings/mfd/axp20x.txt
+-Set supply_name to drivevbus-supply
 ---
- .../bindings/power_supply/axp20x_usb_power.txt     |  3 +-
- drivers/power/axp20x_usb_power.c                   | 92 ++++++++++++++++------
- 2 files changed, 71 insertions(+), 24 deletions(-)
+ Documentation/devicetree/bindings/mfd/axp20x.txt |  6 +++++
+ drivers/regulator/axp20x-regulator.c             | 30 ++++++++++++++++++++++++
+ 2 files changed, 36 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-index 862f4a4..f1d7bee 100644
---- a/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-+++ b/Documentation/devicetree/bindings/power_supply/axp20x_usb_power.txt
-@@ -1,7 +1,8 @@
- AXP20x USB power supply
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index d20b103..6aca4fe 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -22,6 +22,11 @@ Optional properties:
+ 		      AXP152/20X: range:  750-1875, Default: 1.5 MHz
+ 		      AXP22X/80X: range: 1800-4050, Default: 3   MHz
  
- Required Properties:
---compatible: "x-powers,axp202-usb-power-supply"
-+-compatible: One of: "x-powers,axp202-usb-power-supply"
-+                     "x-powers,axp221-usb-power-supply"
++- x-powers,drive-vbus-en: axp221 / axp223 only boolean, set this when the
++                  N_VBUSEN pin is used as an output pin to control an external
++                  regulator to drive the OTG VBus, rather then as an input pin
++                  which signals whether the board is driving OTG VBus or not.
++
+ - <input>-supply: a phandle to the regulator supply node. May be omitted if
+ 		  inputs are unregulated, such as using the IPSOUT output
+ 		  from the PMIC.
+@@ -79,6 +84,7 @@ ELDO3		: LDO		: eldoin-supply		: shared supply
+ LDO_IO0		: LDO		: ips-supply		: GPIO 0
+ LDO_IO1		: LDO		: ips-supply		: GPIO 1
+ RTC_LDO		: LDO		: ips-supply		: always on
++DRIVEVBUS	: Enable output	: drivevbus-supply	: external regulator
  
- This node is a subnode of the axp20x PMIC.
+ AXP809 regulators, type, and corresponding input supply names:
  
-diff --git a/drivers/power/axp20x_usb_power.c b/drivers/power/axp20x_usb_power.c
-index 421a90b..6af6feb 100644
---- a/drivers/power/axp20x_usb_power.c
-+++ b/drivers/power/axp20x_usb_power.c
-@@ -42,6 +42,7 @@
- #define AXP20X_VBUS_MON_VBUS_VALID	BIT(3)
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 728be64..3f1bba4 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -36,6 +36,8 @@
  
- struct axp20x_usb_power {
-+	struct device_node *np;
- 	struct regmap *regmap;
- 	struct power_supply *supply;
+ #define AXP20X_FREQ_DCDC_MASK		0x0f
+ 
++#define AXP22X_MISC_N_VBUSEN_FUNC	BIT(4)
++
+ #define AXP_DESC_IO(_family, _id, _match, _supply, _min, _max, _step, _vreg,	\
+ 		    _vmask, _ereg, _emask, _enable_val, _disable_val)		\
+ 	[_family##_##_id] = {							\
+@@ -230,6 +232,18 @@ static const struct regulator_desc axp22x_regulators[] = {
+ 	AXP_DESC_FIXED(AXP22X, RTC_LDO, "rtc_ldo", "ips", 3000),
  };
-@@ -85,7 +86,12 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
  
- 		switch (v & AXP20X_VBUS_CLIMIT_MASK) {
- 		case AXP20X_VBUC_CLIMIT_100mA:
--			val->intval = 100000;
-+			if (of_device_is_compatible(power->np,
-+					"x-powers,axp202-usb-power-supply")) {
-+				val->intval = 100000;
-+			} else {
-+				val->intval = -1; /* No 100mA limit */
-+			}
- 			break;
- 		case AXP20X_VBUC_CLIMIT_500mA:
- 			val->intval = 500000;
-@@ -122,16 +128,19 @@ static int axp20x_usb_power_get_property(struct power_supply *psy,
- 			break;
- 		}
++static const struct regulator_desc axp22x_drivevbus_regulator = {
++	.name		= "drivevbus",
++	.supply_name	= "drivevbus-supply",
++	.of_match	= of_match_ptr("drivevbus"),
++	.regulators_node = of_match_ptr("regulators"),
++	.type		= REGULATOR_VOLTAGE,
++	.owner		= THIS_MODULE,
++	.enable_reg	= AXP20X_VBUS_IPSOUT_MGMT,
++	.enable_mask	= BIT(2),
++	.ops		= &axp20x_ops_sw,
++};
++
+ static const struct regulator_linear_range axp809_dcdc4_ranges[] = {
+ 	REGULATOR_LINEAR_RANGE(600000, 0x0, 0x2f, 20000),
+ 	REGULATOR_LINEAR_RANGE(1800000, 0x30, 0x38, 100000),
+@@ -411,6 +425,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 	u32 workmode;
+ 	const char *dcdc1_name = axp22x_regulators[AXP22X_DCDC1].name;
+ 	const char *dcdc5_name = axp22x_regulators[AXP22X_DCDC5].name;
++	bool drivevbus = false;
  
--		ret = regmap_read(power->regmap, AXP20X_USB_OTG_STATUS, &v);
--		if (ret)
--			return ret;
-+		val->intval = POWER_SUPPLY_HEALTH_GOOD;
- 
--		if (!(v & AXP20X_USB_STATUS_VBUS_VALID)) {
--			val->intval = POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
--			break;
--		}
-+		if (of_device_is_compatible(power->np,
-+				"x-powers,axp202-usb-power-supply")) {
-+			ret = regmap_read(power->regmap,
-+					  AXP20X_USB_OTG_STATUS, &v);
-+			if (ret)
-+				return ret;
- 
--		val->intval = POWER_SUPPLY_HEALTH_GOOD;
-+			if (!(v & AXP20X_USB_STATUS_VBUS_VALID))
-+				val->intval =
-+					POWER_SUPPLY_HEALTH_UNSPEC_FAILURE;
-+		}
+ 	switch (axp20x->variant) {
+ 	case AXP202_ID:
+@@ -422,6 +437,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 	case AXP223_ID:
+ 		regulators = axp22x_regulators;
+ 		nregulators = AXP22X_REG_ID_MAX;
++		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
++						  "x-powers,drive-vbus-en");
  		break;
- 	case POWER_SUPPLY_PROP_PRESENT:
- 		val->intval = !!(input & AXP20X_PWR_STATUS_VBUS_PRESENT);
-@@ -156,6 +165,14 @@ static enum power_supply_property axp20x_usb_power_properties[] = {
- 	POWER_SUPPLY_PROP_CURRENT_NOW,
- };
+ 	case AXP809_ID:
+ 		regulators = axp809_regulators;
+@@ -500,6 +517,19 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 						&dcdc5_name);
+ 	}
  
-+static enum power_supply_property axp22x_usb_power_properties[] = {
-+	POWER_SUPPLY_PROP_HEALTH,
-+	POWER_SUPPLY_PROP_PRESENT,
-+	POWER_SUPPLY_PROP_ONLINE,
-+	POWER_SUPPLY_PROP_VOLTAGE_MIN,
-+	POWER_SUPPLY_PROP_CURRENT_MAX,
-+};
-+
- static const struct power_supply_desc axp20x_usb_power_desc = {
- 	.name = "axp20x-usb",
- 	.type = POWER_SUPPLY_TYPE_USB,
-@@ -164,13 +181,25 @@ static const struct power_supply_desc axp20x_usb_power_desc = {
- 	.get_property = axp20x_usb_power_get_property,
- };
- 
-+static const struct power_supply_desc axp22x_usb_power_desc = {
-+	.name = "axp20x-usb",
-+	.type = POWER_SUPPLY_TYPE_USB,
-+	.properties = axp22x_usb_power_properties,
-+	.num_properties = ARRAY_SIZE(axp22x_usb_power_properties),
-+	.get_property = axp20x_usb_power_get_property,
-+};
-+
- static int axp20x_usb_power_probe(struct platform_device *pdev)
- {
- 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
- 	struct power_supply_config psy_cfg = {};
- 	struct axp20x_usb_power *power;
--	static const char * const irq_names[] = { "VBUS_PLUGIN",
--		"VBUS_REMOVAL", "VBUS_VALID", "VBUS_NOT_VALID" };
-+	static const char * const axp20x_irq_names[] = { "VBUS_PLUGIN",
-+		"VBUS_REMOVAL", "VBUS_VALID", "VBUS_NOT_VALID", NULL };
-+	static const char * const axp22x_irq_names[] = {
-+		"VBUS_PLUGIN", "VBUS_REMOVAL", NULL };
-+	static const char * const *irq_names;
-+	const struct power_supply_desc *usb_power_desc;
- 	int i, irq, ret;
- 
- 	if (!of_device_is_available(pdev->dev.of_node))
-@@ -185,31 +214,47 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
- 	if (!power)
- 		return -ENOMEM;
- 
-+	power->np = pdev->dev.of_node;
- 	power->regmap = axp20x->regmap;
- 
--	/* Enable vbus valid checking */
--	ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
--		    AXP20X_VBUS_MON_VBUS_VALID, AXP20X_VBUS_MON_VBUS_VALID);
--	if (ret)
--		return ret;
-+	if (of_device_is_compatible(power->np,
-+			"x-powers,axp202-usb-power-supply")) {
-+		/* Enable vbus valid checking */
-+		ret = regmap_update_bits(power->regmap, AXP20X_VBUS_MON,
-+					 AXP20X_VBUS_MON_VBUS_VALID,
-+					 AXP20X_VBUS_MON_VBUS_VALID);
-+		if (ret)
-+			return ret;
- 
--	/* Enable vbus voltage and current measurement */
--	ret = regmap_update_bits(power->regmap, AXP20X_ADC_EN1,
-+		/* Enable vbus voltage and current measurement */
-+		ret = regmap_update_bits(power->regmap, AXP20X_ADC_EN1,
- 			AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT,
- 			AXP20X_ADC_EN1_VBUS_CURR | AXP20X_ADC_EN1_VBUS_VOLT);
--	if (ret)
--		return ret;
-+		if (ret)
-+			return ret;
-+
-+		usb_power_desc = &axp20x_usb_power_desc;
-+		irq_names = axp20x_irq_names;
-+	} else if (of_device_is_compatible(power->np,
-+			"x-powers,axp221-usb-power-supply")) {
-+		usb_power_desc = &axp22x_usb_power_desc;
-+		irq_names = axp22x_irq_names;
-+	} else {
-+		dev_err(&pdev->dev, "Unsupported AXP variant: %ld\n",
-+			axp20x->variant);
-+		return -EINVAL;
++	if (drivevbus) {
++		/* Change N_VBUSEN sense pin to DRIVEVBUS output pin */
++		regmap_update_bits(axp20x->regmap, AXP20X_OVER_TMP,
++				   AXP22X_MISC_N_VBUSEN_FUNC, 0);
++		rdev = devm_regulator_register(&pdev->dev,
++					       &axp22x_drivevbus_regulator,
++					       &config);
++		if (IS_ERR(rdev)) {
++			dev_err(&pdev->dev, "Failed to register drivevbus\n");
++			return PTR_ERR(rdev);
++		}
 +	}
++
+ 	return 0;
+ }
  
- 	psy_cfg.of_node = pdev->dev.of_node;
- 	psy_cfg.drv_data = power;
- 
--	power->supply = devm_power_supply_register(&pdev->dev,
--					&axp20x_usb_power_desc, &psy_cfg);
-+	power->supply = devm_power_supply_register(&pdev->dev, usb_power_desc,
-+						   &psy_cfg);
- 	if (IS_ERR(power->supply))
- 		return PTR_ERR(power->supply);
- 
- 	/* Request irqs after registering, as irqs may trigger immediately */
--	for (i = 0; i < ARRAY_SIZE(irq_names); i++) {
-+	for (i = 0; irq_names[i]; i++) {
- 		irq = platform_get_irq_byname(pdev, irq_names[i]);
- 		if (irq < 0) {
- 			dev_warn(&pdev->dev, "No IRQ for %s: %d\n",
-@@ -229,6 +274,7 @@ static int axp20x_usb_power_probe(struct platform_device *pdev)
- 
- static const struct of_device_id axp20x_usb_power_match[] = {
- 	{ .compatible = "x-powers,axp202-usb-power-supply" },
-+	{ .compatible = "x-powers,axp221-usb-power-supply" },
- 	{ }
- };
- MODULE_DEVICE_TABLE(of, axp20x_usb_power_match);
 -- 
 2.7.4
