@@ -1,155 +1,212 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  2 Jun 2016 15:10:52 +0100
-Subject: [PATCH 0/5] arm64: hibernate: Fix DEBUG_PAGEALLOC and hibernate on
- non-boot cpu
-Message-ID: <1464876657-6692-1-git-send-email-james.morse@arm.com>
+Date: Thu,  2 Jun 2016 15:10:53 +0100
+Subject: [PATCH 1/5] arm64: Add markers around .text section and create
+ sections.h
+In-Reply-To: <1464876657-6692-1-git-send-email-james.morse@arm.com>
+References: <1464876657-6692-1-git-send-email-james.morse@arm.com>
+Message-ID: <1464876657-6692-2-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+During resume from hibernate, memory containing the kernel text is cleaned
+to the PoU. Some parts of the kernel are executed with the MMU off, in
+which case these instructions need to be cleaned to the PoC.
 
-These patches improve the hibernate support for v4.8.
+To aid the cleaning of this text, add markers around the existing section.
 
-Patches 1&2 fix the hibernate problem with DEBUG_PAGEALLOC reported by Will.
-This also addresses the outstanding comment from Catalin [0] regarding cleaning
-of the whole kernel to the PoC. Now we clean just the sections grouped by
-'TEXT_TEXT'.
+Each time new section markers are added, kernel/vmlinux.ld.S is updated,
+and new extern char __start_foo[] definitions are scattered through the
+tree.
 
-Patch one adds sections.h to avoid duplicate definitions of
-__hyp_idmap_text_start. (it looks like kprobes will duplicate this too [1)
+Create asm/include/sections.h to collect these definitions (and include
+the existing asm-generic version).
 
-The rest of the patches fix hibernate/resume on any CPU as discussed on the
-list[2]. Suzuki's maxcpus improvements mean the CPU we hibernated on may be
-offline during boot, and kexec will allow the CPUs logical order to be shuffled.
-Log output below[3], suspend happens on cpu0, with mpidr 0x103. For
-resume, cpu5 is brought up as it has mpidr 0x103, and cpu0 is taken down.
-After resume, /proc/cpuinfo shows only the original cpu0.
-
-
-[0] http://www.spinics.net/lists/arm-kernel/msg499305.html
-[1] http://www.spinics.net/lists/arm-kernel/msg506451.html
-[2] http://www.spinics.net/lists/arm-kernel/msg499036.html
-[3] hotplug cpu0, kexec, hibernate, resume
--------------------------%<-------------------------
-root@ubuntu:~# echo disk > /sys/power/state
-PM: Syncing filesystems ... done.
-Freezing user space processes ... (elapsed 0.007 seconds) done.
-PM: Preallocating image memory... done (allocated 10112 pages)
-PM: Allocated 647168 kbytes in 2.69 seconds (240.58 MB/s)
-Freezing remaining freezable tasks ... (elapsed 0.005 seconds) done.
-PM: freeze of devices complete after 27.013 msecs
-PM: late freeze of devices complete after 20.624 msecs
-PM: noirq freeze of devices complete after 22.211 msecs
-Disabling non-boot CPUs ...
-PM: Creating hibernation image:
-PM: Need to copy 10103 pages
-PM: Hibernation image created (10103 pages copied)
-PM: noirq thaw of devices complete after 22.350 msecs
-PM: early thaw of devices complete after 23.680 msecs
-PM: thaw of devices complete after 98.331 msecs
-hibernate: Suspending on cpu 0 [mpidr:0x103]
-PM: Using 1 thread(s) for compression.
-PM: Compressing and saving image data (10105 pages)...
-PM: Image saving progress:   0%
-atkbd serio0: keyboard reset failed on 1c060000.kmi
-atkbd serio1: keyboard reset failed on 1c070000.kmi
-PM: Image saving progress:  10%
-PM: Image saving progress:  20%
-PM: Image saving progress:  30%
-PM: Image saving progress:  40%
-PM: Image saving progress:  50%
-PM: Image saving progress:  60%
-PM: Image saving progress:  70%
-PM: Image saving progress:  80%
-PM: Image saving progress:  90%
-PM: Image saving progress: 100%
-PM: Image saving done.
-PM: Wrote 646720 kbytes in 93.08 seconds (6.94 MB/s)
-PM: S|
-reboot: Power down
-
-[ ... ]
-
-Freezing user space processes ... (elapsed 0.000 seconds) done.
-PM: Using 1 thread(s) for decompression.
-PM: Loading and decompressing image data (10105 pages)...
-hibernate: Suspended on cpu 5 [mpidr:0x103]
-hibernate: Suspended on a CPU that is offline! Brining CPU up.
-Detected VIPT I-cache on CPU5
-CPU5: Booted secondary processor [410fd033]
-random: nonblocking pool is initialized
-PM: Image loading progress:   0%
-PM: Image loading progress:  10%
-PM: Image loading progress:  20%
-PM: Image loading progress:  30%
-PM: Image loading progress:  40%
-PM: Image loading progress:  50%
-PM: Image loading progress:  60%
-PM: Image loading progress:  70%
-PM: Image loading progress:  80%
-PM: Image loading progress:  90%
-PM: Image loading progress: 100%
-PM: Image loading done.
-PM: Read 646720 kbytes in 30.47 seconds (21.22 MB/s)
-PM: quiesce of devices complete after 32.958 msecs
-PM: late quiesce of devices complete after 11.574 msecs
-PM: noirq quiesce of devices complete after 24.918 msecs
-hibernate: Disabling secondary CPUs ...
-IRQ1 no longer affine to CPU0
-IRQ6 no longer affine to CPU0
-IRQ28 no longer affine to CPU0
-IRQ29 no longer affine to CPU0
-IRQ32 no longer affine to CPU0
-IRQ34 no longer affine to CPU0
-IRQ35 no longer affine to CPU0
-IRQ37 no longer affine to CPU0
-IRQ41 no longer affine to CPU0
-IRQ48 no longer affine to CPU0
-CPU0: shutdown
-
-psci: CPU0 killed.
-PM: noirq restore of devices complete after 27.419 msecs
-PM: early restore of devices complete after 23.554 msecs
-PM: restore of devices complete after 113.188 msecs
-Restarting tasks ... done.
-root at ubuntu:~# atkbd serio0: keyboard reset failed on 1c060000.kmi
-atkbd serio1: keyboard reset failed on 1c070000.kmi
-root at ubuntu:~# cat /proc/cpuinfo
-processor       : 0
-BogoMIPS        : 100.00
-Features        : fp asimd evtstrm aes pmull sha1 sha2 crc32
-CPU implementer : 0x41
-CPU architecture: 8
-CPU variant     : 0x0
-CPU part        : 0xd03
-CPU revision    : 3
-
-root at ubuntu:~#
--------------------------%<-------------------------
-
-James Morse (5):
-  arm64: Add markers around .text section and create sections.h
-  arm64: hibernate: Support DEBUG_PAGEALLOC
-  PM / Hibernate: Allow architectures to specify the hibernate/resume
-    CPU
-  arm64: hibernate: Identify the CPU to resume on by its MPIDR
-  Revert "arm64: hibernate: Refuse to hibernate if the boot cpu is
-    offline"
-
- arch/arm64/Kconfig                |   1 -
- arch/arm64/include/asm/Kbuild     |   1 -
- arch/arm64/include/asm/sections.h |  29 ++++++++
- arch/arm64/include/asm/suspend.h  |   1 +
- arch/arm64/include/asm/traps.h    |   3 +-
- arch/arm64/include/asm/virt.h     |   5 +-
- arch/arm64/kernel/alternative.c   |   7 +-
- arch/arm64/kernel/hibernate.c     | 137 ++++++++++++++++++++++++++++----------
- arch/arm64/kernel/vmlinux.lds.S   |   2 +
- arch/arm64/kvm/reset.c            |   3 +-
- arch/arm64/mm/pageattr.c          |  40 ++++++++++-
- kernel/power/hibernate.c          |  16 ++++-
- 12 files changed, 191 insertions(+), 54 deletions(-)
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/include/asm/Kbuild     |  1 -
+ arch/arm64/include/asm/sections.h | 29 +++++++++++++++++++++++++++++
+ arch/arm64/include/asm/traps.h    |  3 +--
+ arch/arm64/include/asm/virt.h     |  5 +----
+ arch/arm64/kernel/alternative.c   |  7 +++----
+ arch/arm64/kernel/hibernate.c     |  6 ------
+ arch/arm64/kernel/vmlinux.lds.S   |  2 ++
+ arch/arm64/kvm/reset.c            |  3 +--
+ 8 files changed, 37 insertions(+), 19 deletions(-)
  create mode 100644 arch/arm64/include/asm/sections.h
 
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index cff532a6744e..50c1f646b704 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -33,7 +33,6 @@ generic-y += poll.h
+ generic-y += preempt.h
+ generic-y += resource.h
+ generic-y += rwsem.h
+-generic-y += sections.h
+ generic-y += segment.h
+ generic-y += sembuf.h
+ generic-y += serial.h
+diff --git a/arch/arm64/include/asm/sections.h b/arch/arm64/include/asm/sections.h
+new file mode 100644
+index 000000000000..1d9b0149f413
+--- /dev/null
++++ b/arch/arm64/include/asm/sections.h
+@@ -0,0 +1,29 @@
++/*
++ * Copyright (C) 2016 ARM Limited
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_SECTIONS_H
++#define __ASM_SECTIONS_H
++
++#include <asm-generic/sections.h>
++
++extern char __hyp_idmap_text_start[], __hyp_idmap_text_end[];
++extern char __hyp_text_start[], __hyp_text_end[];
++extern char __idmap_text_start[], __idmap_text_end[];
++extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
++extern char __text_text_start[], __text_text_end[];
++extern char __exception_text_start[], __exception_text_end[];
++extern char __alt_instructions[], __alt_instructions_end[];
++
++#endif /* __ASM_SECTIONS_H */
+diff --git a/arch/arm64/include/asm/traps.h b/arch/arm64/include/asm/traps.h
+index 0cc2f29bf9da..90156c803f11 100644
+--- a/arch/arm64/include/asm/traps.h
++++ b/arch/arm64/include/asm/traps.h
+@@ -19,6 +19,7 @@
+ #define __ASM_TRAP_H
+ 
+ #include <linux/list.h>
++#include <asm/sections.h>
+ 
+ struct pt_regs;
+ 
+@@ -52,8 +53,6 @@ static inline int __in_irqentry_text(unsigned long ptr)
+ 
+ static inline int in_exception_text(unsigned long ptr)
+ {
+-	extern char __exception_text_start[];
+-	extern char __exception_text_end[];
+ 	int in;
+ 
+ 	in = ptr >= (unsigned long)&__exception_text_start &&
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index dcbcf8dcbefb..b78611157f8b 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -40,6 +40,7 @@
+ #ifndef __ASSEMBLY__
+ 
+ #include <asm/ptrace.h>
++#include <asm/sections.h>
+ 
+ /*
+  * __boot_cpu_mode records what mode CPUs were booted in.
+@@ -82,10 +83,6 @@ extern void verify_cpu_run_el(void);
+ static inline void verify_cpu_run_el(void) {}
+ #endif
+ 
+-/* The section containing the hypervisor text */
+-extern char __hyp_text_start[];
+-extern char __hyp_text_end[];
+-
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif /* ! __ASM__VIRT_H */
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index d2ee1b21a10d..4434dabde898 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -25,14 +25,13 @@
+ #include <asm/alternative.h>
+ #include <asm/cpufeature.h>
+ #include <asm/insn.h>
++#include <asm/sections.h>
+ #include <linux/stop_machine.h>
+ 
+ #define __ALT_PTR(a,f)		(u32 *)((void *)&(a)->f + (a)->f)
+ #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
+ #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+ 
+-extern struct alt_instr __alt_instructions[], __alt_instructions_end[];
+-
+ struct alt_region {
+ 	struct alt_instr *begin;
+ 	struct alt_instr *end;
+@@ -124,8 +123,8 @@ static int __apply_alternatives_multi_stop(void *unused)
+ {
+ 	static int patched = 0;
+ 	struct alt_region region = {
+-		.begin	= __alt_instructions,
+-		.end	= __alt_instructions_end,
++		.begin	= (struct alt_instr *)__alt_instructions,
++		.end	= (struct alt_instr *)__alt_instructions_end,
+ 	};
+ 
+ 	/* We always have a CPU 0 at this point (__init) */
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index f8df75d740f4..56e548fe0386 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -52,12 +52,6 @@ extern int in_suspend;
+ /* Do we need to reset el2? */
+ #define el2_reset_needed() (is_hyp_mode_available() && !is_kernel_in_hyp_mode())
+ 
+-/*
+- * Start/end of the hibernate exit code, this must be copied to a 'safe'
+- * location in memory, and executed from there.
+- */
+-extern char __hibernate_exit_text_start[], __hibernate_exit_text_end[];
+-
+ /* temporary el2 vectors in the __hibernate_exit_text section. */
+ extern char hibernate_el2_vectors[];
+ 
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 435e820e898d..6b3d2781a9f2 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -118,7 +118,9 @@ SECTIONS
+ 			__exception_text_end = .;
+ 			IRQENTRY_TEXT
+ 			SOFTIRQENTRY_TEXT
++			__text_text_start = .;
+ 			TEXT_TEXT
++			__text_text_end = .;
+ 			SCHED_TEXT
+ 			LOCK_TEXT
+ 			HYPERVISOR_TEXT
+diff --git a/arch/arm64/kvm/reset.c b/arch/arm64/kvm/reset.c
+index b1ad730e1567..c2d3594dd546 100644
+--- a/arch/arm64/kvm/reset.c
++++ b/arch/arm64/kvm/reset.c
+@@ -32,6 +32,7 @@
+ #include <asm/kvm_asm.h>
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_mmu.h>
++#include <asm/sections.h>
+ 
+ /*
+  * ARMv8 Reset Values
+@@ -133,8 +134,6 @@ int kvm_reset_vcpu(struct kvm_vcpu *vcpu)
+ 	return kvm_timer_vcpu_reset(vcpu, cpu_vtimer_irq);
+ }
+ 
+-extern char __hyp_idmap_text_start[];
+-
+ unsigned long kvm_hyp_reset_entry(void)
+ {
+ 	if (!__kvm_cpu_uses_extended_idmap()) {
 -- 
 2.8.0.rc3
