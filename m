@@ -1,89 +1,44 @@
-From: oss@buserror.net (Scott Wood)
-Date: Wed, 01 Jun 2016 20:11:14 -0500
-Subject: [PATCH 3/4] mmc: sdhci-of-esdhc: fix host version for
- T4240-R1.0-R2.0
-In-Reply-To: <6110875.0k1HlSKhzn@wuerfel>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
- <CAPDyKFqx2JMLzXoDxGCKFYMFV47+SegnkuWFXKvsQHK7L5w-1g@mail.gmail.com>
- <6110875.0k1HlSKhzn@wuerfel>
-Message-ID: <1464829874.16584.163.camel@buserror.net>
+From: po.liu@nxp.com (Po Liu)
+Date: Thu, 2 Jun 2016 01:17:24 +0000
+Subject: [PATCH 1/2] freescale/dts: add pcie aer interrupt-name property
+ in the dts
+In-Reply-To: <20160601143950.GA1817@rob-hp-laptop>
+References: <1464242349-15323-1-git-send-email-po.liu@nxp.com>
+ <20160601143950.GA1817@rob-hp-laptop>
+Message-ID: <VI1PR0401MB1709DFD5A437FD01D724FF9F92580@VI1PR0401MB1709.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-05-30 at 15:16 +0200, Arnd Bergmann wrote:
-> This is a rewrite of an earlier patch from Yangbo Lu, adding a quirk
-> for the NXP QorIQ T4240 in the detection of the host device version.
-> 
-> Unfortunately, this device cannot be detected using the compatible
-> string, as we have to support existing DTS files that use the generic
-> "fsl,t4240-esdhc" identifier but that have other host versions that
-> are correctly detected.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/mmc/host/sdhci-of-esdhc.c b/drivers/mmc/host/sdhci-of
-> -esdhc.c
-> index 3f34d354f1fc..1d4814fe4cb2 100644
-> --- a/drivers/mmc/host/sdhci-of-esdhc.c
-> +++ b/drivers/mmc/host/sdhci-of-esdhc.c
-> @@ -73,14 +73,16 @@ static u32 esdhc_readl_fixup(struct sdhci_host *host,
->  static u16 esdhc_readw_fixup(struct sdhci_host *host,
->  				     int spec_reg, u32 value)
->  {
-> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +	struct sdhci_esdhc *esdhc = sdhci_pltfm_priv(pltfm_host);
->  	u16 ret;
->  	int shift = (spec_reg & 0x2) * 8;
+
+>  -----Original Message-----
+>  From: Rob Herring [mailto:robh at kernel.org]
+>  Sent: Wednesday, June 01, 2016 10:40 PM
+>  To: Po Liu
+>  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+>  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Shawn Guo;
+>  Marc Zyngier; Roy Zang; Mingkai Hu; Stuart Yoder; Yang-Leo Li; Arnd
+>  Bergmann; Bjorn Helgaas; Minghuan Lian
+>  Subject: Re: [PATCH 1/2] freescale/dts: add pcie aer interrupt-name
+>  property in the dts
 >  
->  	if (spec_reg == SDHCI_HOST_VERSION)
-> -		ret = value & 0xffff;
-> -	else
-> -		ret = (value >> shift) & 0xffff;
-> -	return ret;
-> +		return esdhc->vendor_ver << SDHCI_VENDOR_VER_SHIFT |
-> +		       esdhc->spec_ver;
-> +
-> +	return (value >> shift) & 0xffff;
->  }
+>  On Thu, May 26, 2016 at 01:59:09PM +0800, Po Liu wrote:
+>  > Freescale some platforms aer interrupt was not MSI/MSI-X/INTx
 >  
->  static u8 esdhc_readb_fixup(struct sdhci_host *host,
-> @@ -562,16 +564,32 @@ static const struct sdhci_pltfm_data
-> sdhci_esdhc_le_pdata = {
->  	.ops = &sdhci_esdhc_le_ops,
->  };
+>  some or all?
+
+For all Layerscape platforms, that should be clear, sorry.
+
 >  
-> +#define T4240_HOST_VER ((VENDOR_V_23 << SDHCI_VENDOR_VER_SHIFT) |
-> SDHCI_SPEC_200)
-> +static const struct soc_device_attribute esdhc_t4240_quirk = {
-> +	/* T4240 revision < 0x20 uses vendor version 23, SDHCI version 200
-> */
-> +	{ .soc_id = "T4*(0x824000)", .revision = "0x[01]?",
-> +	  .data = (void *)(uintptr_t)(T4240_HOST_VER) },
+>  > but using interrupt line independently. This patch add a "aer"
+>  > interrupt-names for aer interrupt.
+>  
+>  You are not adding, but replacing the interrupt. This needs a better
+>  explanation as you are breaking compatibility.
 
-Why should this code need to care that the string begins with "T4"?  This
-creates dual maintenance if that were to change.  It's also broken because
-T4240 has compatible = "fsl,t4240-device-config", "fsl,qoriq-device-config
--2.0" and thus with these patches it would incorrectly show up as "P series
-(0x824000)".  The compatible string of this node was never meant to be a key
-for choosing a string to describe the system to userspace.
-
-0x824000 is a magic number which should be represented symbolically.
-
-If T4240 is affected, then so are the reduced-core variants T4160 and T4080,
-but 0x824000 doesn't match them (Yangbo's patch had the same problem).  And
-please don't respond with "0x824*"
-
-You also didn't strip out the E bit of SVR which indicates encryption
-capability and nothing else (Yangbo's patch did not have this problem because
-it used SVR_SOC_VER).
-
-What happens if the revision condition is more complicated, such as <= 0x20
-with 0x21 being fine?  Multiple quirk entries where before we had as simple
-comparison?
-
-I fail to see how this approach is an improvement (much less one that needs to
-hold up a patchset that is fixing a problem and is not touching any generic
-code).  Why does this need to be a string?
-
--Scott
+We used to the "intr" name for general concept, but no use. So removed.
+In the Layerscape platform, the aer and pme interrupt lines are independent, 
+not in the Complex Root by MSI or MSIX, so need to read from the DTS before
+MSIX and MSI searching for pci service driver.
+ 
+>  
+>  Rob
