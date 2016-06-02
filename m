@@ -1,77 +1,66 @@
-From: jitao.shi@mediatek.com (Jitao Shi)
-Date: Thu, 2 Jun 2016 17:57:24 +0800
-Subject: [PATCH 1/2 v16] Documentation: bridge: Add documentation for ps8640
- DT properties
-Message-ID: <1464861445-11086-1-git-send-email-jitao.shi@mediatek.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 2 Jun 2016 10:06:27 +0000
+Subject: [PATCH V8 0/9] Support for ARM64 ACPI based PCI host controller
+In-Reply-To: <f606faa9-72f3-3219-02a8-69e948338d2e@redhat.com>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F767865@lhreml507-mbx>
+ <f606faa9-72f3-3219-02a8-69e948338d2e@redhat.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F769AAB@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for DT properties supported by
-ps8640 DSI-eDP converter.
+Hi Jon
 
-Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
----
-Changes since v15:
- - No change.
+> -----Original Message-----
+> From: Jon Masters [mailto:jcm at redhat.com]
+> Sent: 02 June 2016 08:32
+> To: Gabriele Paoloni; Tomasz Nowicki; helgaas at kernel.org;
+> arnd at arndb.de; will.deacon at arm.com; catalin.marinas at arm.com;
+> rafael at kernel.org; hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com;
+> okaya at codeaurora.org; jchandra at broadcom.com
+> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
+> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
+> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
+> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
+> dhdang at apm.com; jeremy.linton at arm.com
+> Subject: Re: [PATCH V8 0/9] Support for ARM64 ACPI based PCI host
+> controller
+> 
+> On 06/01/2016 03:36 AM, Gabriele Paoloni wrote:
+> 
+> > If you agree I think Jon can tell who's the best person to
+> > push the quirk RFC (as my understanding is that this mechanism
+> > is currently used by some platforms deployed on the market...)
+> 
+> Let me ping Linaro folks to see who has that (quirks) ball. We can
+> certainly share the older OEM matching quirks Mark Salter did for
+> earlier RHEL(SA) internal versions as a seed for that[0] activity.
 
-Changes since v14:
- - change mode-sel-gpios as optional.
----
- .../devicetree/bindings/display/bridge/ps8640.txt  |   44 ++++++++++++++++++++
- 1 file changed, 44 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
+Tomasz has posted the RFC so we'll start to look at that
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
-new file mode 100644
-index 0000000..7b13f92
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
-@@ -0,0 +1,44 @@
-+ps8640-bridge bindings
-+
-+Required properties:
-+	- compatible: "parade,ps8640"
-+	- reg: first page address of the bridge.
-+	- sleep-gpios: OF device-tree gpio specification for PD pin.
-+	- reset-gpios: OF device-tree gpio specification for reset pin.
-+	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
-+	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
-+	- ports: The device node can contain video interface port nodes per
-+		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
-+		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
-+
-+Optional properties:
-+	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
-+[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+
-+Example:
-+	edp-bridge at 18 {
-+		compatible = "parade,ps8640";
-+		reg = <0x18>;
-+		sleep-gpios = <&pio 116 GPIO_ACTIVE_LOW>;
-+		reset-gpios = <&pio 115 GPIO_ACTIVE_LOW>;
-+		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
-+		vdd12-supply = <&ps8640_fixed_1v2>;
-+		vdd33-supply = <&mt6397_vgp2_reg>;
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			port at 0 {
-+				reg = <0>;
-+				ps8640_in: endpoint {
-+					remote-endpoint = <&dsi0_out>;
-+				};
-+			};
-+			port at 1 {
-+				reg = <1>;
-+				ps8640_out: endpoint {
-+					remote-endpoint = <&panel_in>;
-+				};
-+			};
-+		};
-+	};
--- 
-1.7.9.5
+> 
+> BUT...I don't think we should block this thread on the quirks. They're
+> separate (but important). I see Arnd's reply as well, but nobody else
+> has yet chimed in to this thread (and I am about to prod all of the
+> vendors to reply to this thread and ACK). Can I ask whether we can't
+> just stage v8 as-is for -next at this point? Can Arnd's (or other)
+> suggestions be handled as followup patches post-merge please? Bjorn?
+
+I will ask HiSilicon folks to test it so we can add Tested-by on this
+
+Thanks
+
+Gab
+
+> 
+> Jon.
+> 
+> [0] RHEL(SA) has had three different PCIe enabled ACPI stacks
+> maintained
+> independently so far since we need PCIe to boot most of the hundreds of
+> v8 systems we have internal to Red Hat - which all have PCI.
+> 
+> --
+> Computer Architect | Sent from my Fedora powered laptop
