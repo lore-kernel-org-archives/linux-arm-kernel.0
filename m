@@ -1,139 +1,87 @@
-From: oss@buserror.net (Scott Wood)
-Date: Wed, 01 Jun 2016 20:47:22 -0500
-Subject: [PATCH 2/4] soc: fsl: add GUTS driver for QorIQ platforms
-In-Reply-To: <5339448.D8rpq4ofAC@wuerfel>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <HE1PR04MB0889852B7809A1CCFF8922ACF8410@HE1PR04MB0889.eurprd04.prod.outlook.com>
- <CAPDyKFqx2JMLzXoDxGCKFYMFV47+SegnkuWFXKvsQHK7L5w-1g@mail.gmail.com>
- <5339448.D8rpq4ofAC@wuerfel>
-Message-ID: <1464832042.22191.23.camel@buserror.net>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Thu, 2 Jun 2016 09:48:13 +0800
+Subject: [PATCH 1/2] arm64: mm: dump: make page table dumping reusable
+In-Reply-To: <20160601095818.GA9280@leverpostej>
+References: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
+ <1464702542-24394-2-git-send-email-mark.rutland@arm.com>
+ <20160601030133.GB14411@sha-win-210.asiapac.arm.com>
+ <20160601095818.GA9280@leverpostej>
+Message-ID: <20160602014811.GA8902@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2016-05-30 at 15:15 +0200, Arnd Bergmann wrote:
-> diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
-> new file mode 100644
-> index 000000000000..2f30698f5bcf
-> --- /dev/null
-> +++ b/drivers/soc/fsl/guts.c
-> @@ -0,0 +1,130 @@
-> +/*
-> + * Freescale QorIQ Platforms GUTS Driver
-> + *
-> + * Copyright (C) 2016 Freescale Semiconductor, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/module.h>
-> +#include <linux/slab.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/sys_soc.h>
-> +
-> +#define GUTS_PVR	0x0a0
-> +#define GUTS_SVR	0x0a4
-> +
-> +struct guts {
-> +	void __iomem *regs;
+On Wed, Jun 01, 2016 at 10:58:18AM +0100, Mark Rutland wrote:
+> On Wed, Jun 01, 2016 at 11:01:35AM +0800, Huang Shijie wrote:
+> > On Tue, May 31, 2016 at 02:49:01PM +0100, Mark Rutland wrote:
+> > > +struct ptdump_info {
+> > > +	struct mm_struct		*mm;
+> > > +	const struct addr_marker	*markers;
+> > > +	unsigned long			base_addr;
+> > > +	unsigned long			max_addr;
+> > > +};
+> > > +
+> > > +int ptdump_register(struct ptdump_info *info, const char *name);
+> > Since we export this to other page tables,  I guess the @base_addr in
+> > the ptdump_info{} may not equal to the VA_START.
+> 
+> Yes, that is the intent.
+> 
+> The only requirement is that this is only VA_START or 0, as these are the only
+> addresses aligned to VA_BITS which actually correspond to regions page tables
+> can cover.
+> 
+> > But the current dump.c does _NOT_ use the @start address been
+> > passed in, it use the 0 as the start address for the walk_pgd/walk_pud/walk_pmd/walk_pte.
+> 
+> Yes, this is deliberate. The trick is that start must be aligned to
+> VA_BITS, and the page table accessors do the right thing, masking out
+yes, this is the trick...
 
-We already have a struct to define guts.  Why are you not using it?  Why do
-you consider using it to be "abuse"?  What if we want to move more guts
-functionality into this driver?
+> bits which do not matter for their respective indices, e.g.
+> 
+> #define pgd_index(addr)			(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+> #define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
+> #define pgd_offset(mm, addr)		(pgd_offset_raw((mm)->pgd, (addr)))
+> 
+> This allows us to either provide a virtual address to the accessors
+> (which can be in the low or high half), or an offset relative to the
+> start of each pgd, pud, pmd, or pte.
+> 
+> So for walk_pgd:
+> 
+> static void walk_pgd(struct pg_state *st, struct mm_struct *mm, unsigned long start)
+> {
+> 	pgd_t *pgd = pgd_offset(mm, 0UL);
+> 	unsigned i;
+> 	unsigned long addr;
+> 
+> 	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
+> 		addr = start + i * PGDIR_SIZE;
+> 		if (pgd_none(*pgd)) {
+> 			note_page(st, addr, 1, pgd_val(*pgd));
+> 		} else {
+> 			BUG_ON(pgd_bad(*pgd));
+> 			walk_pud(st, pgd, addr);
+> 		}
+> 	}
+> }
+> 
+> Here, the 0UL we pass to pgd_offset is the offset from the start of the
+> pgd, not the absolute virtual address. 
+> 
+> In the loop, we generate the virtual address each pgd_t corresponds to,
+> and we pass this down to note_page or walk_pud as appropriate. We do
+> likewise in walk_pud, walk_pmd, and walk_pte.
+> 
+> So when we reach note_page, we should always have the right virtual
+> address in the addr parameter.
+> 
+> > It is wrong in logic, since the start address is VA_START, the code gets
+> > the right result coincidentally.
+> 
+> As above, I think that the logic is correct.
+> 
+> Hopefully the explanation above allays your fears?
+Thanks for the explanation.
 
-> +	bool little_endian;
-> +	struct soc_device_attribute soc;
-> +};
-> +
-> +static u32 fsl_guts_get_svr(struct guts *guts)
-> +{
-> +	if (guts->little_endian)
-> +		return ioread32(guts->regs + GUTS_SVR);
-> +	else
-> +		return ioread32be(guts->regs + GUTS_SVR);
-> +}
-> +
-> +static u32 fsl_guts_get_pvr(struct guts *guts)
-> +{
-> +	if (guts->little_endian)
-> +		return ioread32(guts->regs + GUTS_PVR);
-> +	else
-> +		return ioread32be(guts->regs + GUTS_PVR);
-> +}
-
-You've removed the fallback to mfspr() on PPC, which would be helpful in some
-virtualized environments where we don't have the guts node (but do have other
-directly assigned devices).  Of course, this is a consequence of the
-conversion into a platform device.
-
-> +
-> +/*
-> + * Table for matching compatible strings, for device tree
-> + * guts node, for Freescale QorIQ SOCs.
-> + */
-> +static const struct of_device_id fsl_guts_of_match[] = {
-> +	/* For T4 & B4 Series SOCs */
-> +	{ .compatible = "fsl,qoriq-device-config-1.0", .data = "T4/B4
-> series" },
-[snip]
-> +	{ .compatible = "fsl,qoriq-device-config-2.0", .data = "P series"
-
-As noted in my comment on patch 3/4, these descriptions are reversed.
-
-They're also incomplete.  t2080 has device config 2.0.  t1040 is described as
-2.0 though it should probably be 2.1 (or better, drop the generic compatible
-altogether).
-
-> +	/*
-> +	 * syscon devices default to little-endian, but on powerpc we have
-> +	 * existing device trees with big-endian maps and an absent
-> endianess
-> +	 * "big-property"
-> +	 */
-> +	if (!IS_ENABLED(CONFIG_POWERPC) &&
-> +	    !of_property_read_bool(dev->of_node, "big-endian"))
-> +		guts->little_endian = true;
-
-This is not a syscon device (Yangbo's patch to add a guts node on ls2080 is
-the only guts node that says "syscon", and that was a leftover from earlier
-revisions and should probably be removed).  Even if it were, where is it
-documented that syscon defaults to little-endian?  
-
-Documentation/devicetree/bindings/common-properties.txt says that the
-individual binding specifies the default.  The default for this node should be
-big-endian because that's what existed before there was a need to describe the
-endianness.  And we need an update to the guts binding to specify that.
-
-> +
-> +	guts->regs = devm_ioremap_resource(dev, 0);
-> +	if (!guts->regs) {
-> +		ret = -ENOMEM;
-> +		kfree(guts);
-> +		goto out;
-> +	}
-> +
-> +	fsl_guts_init(dev, guts);
-> +	ret = 0;
-> +out:
-> +	return ret;
-> +}
-> +
-> +static struct platform_driver fsl_soc_guts = {
-> +	.probe = fsl_guts_probe,
-> +	.driver.of_match_table = fsl_guts_of_match,
-> +};
-> +
-> +module_platform_driver(fsl_soc_guts);
-
-Again, this means that the information is not available during early boot,
-such as in the clock driver.  Thus we would not be able to convert clk-qoriq's
-direct mfspr(SPRN_SVR) into an soc_device_match() (or anything else that makes
-use of this file), nor would we be able to move its access of the guts RCW
-registers into this driver.
-
--Scott
+Huang Shijie
