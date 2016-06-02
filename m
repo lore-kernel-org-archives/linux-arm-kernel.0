@@ -1,131 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jun 2016 09:26:57 +0200
-Subject: [PATCH v3 12/12] ARM: dts: exynos: Fix LAN and HUB after
- bootloader initialization on Odroid U3
-In-Reply-To: <20160601115929.GA16740@shlinux2>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
- <1464768141-25420-13-git-send-email-k.kozlowski@samsung.com>
- <20160601115929.GA16740@shlinux2>
-Message-ID: <574FDFC1.5050209@samsung.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Thu, 2 Jun 2016 03:31:38 -0400
+Subject: [PATCH V8 0/9] Support for ARM64 ACPI based PCI host controller
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F767865@lhreml507-mbx>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F767865@lhreml507-mbx>
+Message-ID: <f606faa9-72f3-3219-02a8-69e948338d2e@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 01:59 PM, Peter Chen wrote:
-> On Wed, Jun 01, 2016 at 10:02:21AM +0200, Krzysztof Kozlowski wrote:
->> On Odroid U3 (Exynos4412-based) board if USB was initialized by
->> bootloader (in U-Boot "usb start" before tftpboot), the HUB (usb3503)
->> and LAN (smsc95xx) after after successful probing were not visible in the
->> system ("lsusb").
->>
->> In such case the devices had to be fully reset before configuring.
->> Reset by GPIO (called RESET_N pin) and by RESET field in STCD register
->> in usb3503 HUB are not sufficient. Instead full reset has to be done by
->> disabling and enabling regulator.
->>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> ---
->>  arch/arm/boot/dts/exynos4412-odroidu3.dts | 4 ++++
->>  1 file changed, 4 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
->> index 31cdc036fda4..23e30e4609df 100644
->> --- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
->> +++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
->> @@ -99,11 +99,15 @@
->>  	clock-names = "refclk";
->>  	clocks = <&pmu_system_controller 0>;
->>  	refclk-frequency = <24000000>;
->> +
->> +	power-sequence;
->> +	ext-supply = <&buck8_reg>;
->>  };
->>  
->>  &ehci {
->>  	port at 1 {
->>  		status = "okay";
->> +		usb-pwrseq = <&usb3503>;
->>  	};
->>  	port at 2 {
->>  		status = "okay";
->> -- 
->> 1.9.1
->>
-> 
-> The hub is under the port1, you may need to describe it
-> under the port at 1, see below:
-> Documentation/devicetree/bindings/usb/usb-device.txt
+On 06/01/2016 03:36 AM, Gabriele Paoloni wrote:
 
-My configuration is a little bit different than yours.
+> If you agree I think Jon can tell who's the best person to
+> push the quirk RFC (as my understanding is that this mechanism
+> is currently used by some platforms deployed on the market...)
 
-In my case I have a USB hub (usb3503) which is also a a i2c device
-because it has to be configured through I2C.
+Let me ping Linaro folks to see who has that (quirks) ball. We can
+certainly share the older OEM matching quirks Mark Salter did for
+earlier RHEL(SA) internal versions as a seed for that[0] activity.
 
-I can add the power-sequence properties to the I2C node or as you
-pointed under port using the vendor-product-id compatible. In the first
-option: not many USB changes are needed. It works for me, at least as a
-proof of concept.
+BUT...I don't think we should block this thread on the quirks. They're
+separate (but important). I see Arnd's reply as well, but nobody else
+has yet chimed in to this thread (and I am about to prod all of the
+vendors to reply to this thread and ACK). Can I ask whether we can't
+just stage v8 as-is for -next at this point? Can Arnd's (or other)
+suggestions be handled as followup patches post-merge please? Bjorn?
 
-The second solution: currently it does not work because the USB device
-does not get enumerated before the power sequence begins. It would be
-great if you could implement this on USB side.
+Jon.
 
-> 
-> If I get Rob's comments correctly, you may need to consider 
-> below MMC and USB device tree description together, it seems
-> hard for USB to use pwrseq driver, sorry for confusing you.
-> 
-> If rob can accept below USB device description, we have to
-> do it under USB. In future, if there is some suitable framework,
-> we can move it.
-> 
-> 1. MMC device:
-> 	usdhc3_pwrseq: usdhc3_pwrseq {
-> 		compatible = "mmc-pwrseq-simple";
-> 		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>, 	/* WL_REG_ON */
-> 			      <&gpio4 7 GPIO_ACTIVE_LOW>, 	/* WL_HOSTWAKE */
-> 			      <&gpio3 25 GPIO_ACTIVE_LOW>, 	/* BT_REG_ON */
-> 			      <&gpio3 27 GPIO_ACTIVE_LOW>,	/* BT_HOSTWAKE */
-> 			      <&gpio4 4 GPIO_ACTIVE_LOW>, 	/* BT_WAKE */
-> 			      <&gpio4 6 GPIO_ACTIVE_LOW>; 	/* BT_RST_N */
-> 	};
-> 
-> &usdhc3 {
-> 	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> 	pinctrl-0 = <&pinctrl_usdhc3>;
-> 	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-> 	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-> 	bus-width = <4>;
-> 	non-removable;
-> 	keep-power-in-suspend;
-> 	wakeup-source;
-> 	mmc-pwrseq = <&usdhc3_pwrseq>;
-> 	status = "okay";
-> };
-> 
-> 2. USB device 
-> 
-> &usbotg1 {
-> 	vbus-supply = <&reg_usb_otg1_vbus>;
-> 	pinctrl-names = "default";
-> 	pinctrl-0 = <&pinctrl_usb_otg1_id>;
-> 	status = "okay";
-> 
-> 	#address-cells = <1>;
-> 	#size-cells = <0>;
-> 	hub: genesys at 1 {
-> 		compatible = "usb5e3,608";
-> 		reg = <1>;
-> 		reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
-> 		reset-duration-us = <10>;
-> 		clocks = <&clks IMX6SX_CLK_CKO>;
-> 	};
+[0] RHEL(SA) has had three different PCIe enabled ACPI stacks maintained
+independently so far since we need PCIe to boot most of the hundreds of
+v8 systems we have internal to Red Hat - which all have PCI.
 
-Yes, that looks like what Rob wanted... Do you plan to work on it? The
-power sequence is needed before device is enumerated.
-
-BTW, if you would like to play with the patchset, it is here:
-repo:   https://github.com/krzk/linux
-branch: for-next/odroid-u3-usb3503-lan-boot-fixes-v3
-
-Best regards,
-Krzysztof
+-- 
+Computer Architect | Sent from my Fedora powered laptop
