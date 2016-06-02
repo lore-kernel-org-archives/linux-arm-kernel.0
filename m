@@ -1,90 +1,71 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 2 Jun 2016 09:13:36 +0200
-Subject: [PATCH/RFC v3 20/22] clk: renesas: r8a7778: Remove obsolete
- r8a7778_clocks_init()
-In-Reply-To: <9f19c6e5-54d1-abd8-b666-bdf1a502d9c4@de.bosch.com>
-References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
- <1464808880-343-21-git-send-email-geert+renesas@glider.be>
- <9f19c6e5-54d1-abd8-b666-bdf1a502d9c4@de.bosch.com>
-Message-ID: <CAMuHMdWNZ8tV1Tc6HGL4qqs-hg6G5f1M5AYuB05Mb-JQPrPf4A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jun 2016 09:24:25 +0200
+Subject: [PATCH 09/32] bcm2837-rpi-3-b.dts for 32bit arm
+In-Reply-To: <1464850565.24775.40.camel@redhat.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <5616246.RRQ2rLjLud@wuerfel> <1464850565.24775.40.camel@redhat.com>
+Message-ID: <3336185.FIBLI6ezsy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dirk,
+On Thursday, June 2, 2016 8:56:05 AM CEST Gerd Hoffmann wrote:
+> On Do, 2016-06-02 at 00:39 +0200, Arnd Bergmann wrote:
+> > On Wednesday, June 1, 2016 3:30:35 PM CEST Eric Anholt wrote:
+> > > Arnd Bergmann <arnd@arndb.de> writes:
+> > > 
+> > > > On Wednesday, June 1, 2016 11:43:18 PM CEST Gerd Hoffmann wrote:
+> > > >> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> > > >> new file mode 100644
+> > > >> index 0000000..36178a6
+> > > >> --- /dev/null
+> > > >> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> > > >> @@ -0,0 +1 @@
+> > > >> +#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
+> > > >> -- 
+> > > >> 1.8.3.1
+> > > >> 
+> > > >
+> > > > What does this gain you?
+> > > 
+> > > Many Raspberry Pi users use a small set of SD cards that they swap
+> > > between various versions of the hardware.  It would be good to have
+> > > their 32-bit OS images work on the Pi3 as well.
+> > 
+> > Sure, but you already have the dts file in the other directory,
+> > and the dtb is the same.
+> > 
+> > According to the comment in the other patch, the idea was to have
+> > the file in the arm64 directory because it's a 64-bit platform,
+> > but now you have it here as well.
+> 
+> Well, it just includes the arm64 version as-is, so we don't have
+> duplication.  I'm open to suggestions to how handle this better.  
+> 
+> Symbolic link?
+> 
+> Reference to ../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+> directly in the Makefile?
+> 
+> I've seen arch/arm/boot/dts/Makefile uses globs on *.dts, so I suspect
+> the later wouldn't be that straight forward.
 
-On Thu, Jun 2, 2016 at 7:54 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
-> On 01.06.2016 21:21, Geert Uytterhoeven wrote:
->> The R-Car M1A board code no longer calls r8a7778_clocks_init().
->>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> v3:
->>   - New.
->> ---
->>  drivers/clk/renesas/clk-r8a7778.c | 13 -------------
->>  include/linux/clk/renesas.h       |  1 -
->>  2 files changed, 14 deletions(-)
->>
->> diff --git a/drivers/clk/renesas/clk-r8a7778.c
->> b/drivers/clk/renesas/clk-r8a7778.c
->> index 07ea411098a75ad1..886a8380e91247a1 100644
->> --- a/drivers/clk/renesas/clk-r8a7778.c
->> +++ b/drivers/clk/renesas/clk-r8a7778.c
->> @@ -143,16 +143,3 @@ static void __init r8a7778_cpg_clocks_init(struct
->> device_node *np)
->>
->>  CLK_OF_DECLARE(r8a7778_cpg_clks, "renesas,r8a7778-cpg-clocks",
->>                r8a7778_cpg_clocks_init);
->> -
->> -void __init r8a7778_clocks_init(u32 mode)
->> -{
->> -       BUG_ON(!(mode & BIT(19)));
->> -
->> -       cpg_mode_rates = (!!(mode & BIT(18)) << 2) |
->> -                        (!!(mode & BIT(12)) << 1) |
->> -                        (!!(mode & BIT(11)));
->> -       cpg_mode_divs = (!!(mode & BIT(2)) << 1) |
->> -                       (!!(mode & BIT(1)));
->> -
->> -       of_clk_init(NULL);
->> -}
->
-> Just a question on how you structured the patches: Is there a special reason
-> why you do the adding of new code and the removal of dead code in two
-> patches?
->
-> Having both in one patch normally makes it more obvious which old code is
-> replaced by which new code.
->
-> An example: In patch
->
-> [PATCH/RFC v3 11/22] clk: renesas: r8a7778: Obtain mode pin values using
-> R-Car RST driver
->
-> I wondered where the section
->
-> +       BUG_ON(!(mode & BIT(19)));
-> +
-> +       cpg_mode_rates = (!!(mode & BIT(18)) << 2) |
-> +                        (!!(mode & BIT(12)) << 1) |
-> +                        (!!(mode & BIT(11)));
-> +       cpg_mode_divs = (!!(mode & BIT(2)) << 1) |
-> +                       (!!(mode & BIT(1)));
->
-> comes from. This becomes obvious with this patch 20/22. But it's 9 patches
-> later ;) So why don't make the whole replacement visible in one patch?
+It's just weird that the arm64 file includes the .dtsi files from arch/arm/
+and is then again included back from another file there.
 
-Because that would break bisection.
-Path 20 depends on patch 17, which depends on patch 11.
-These three can't be a single patch because they touch multiple subsystems.
+I can see two possible ways to handle this better:
 
-Gr{oetje,eeting}s,
+- leave the complete set of bcm2837 files in arch/arm and then have one
+  reference from arch/arm64 per .dts that refers to just that file.
 
-                        Geert
+- come up with a rule to also build the .dtb files in arch/arm64 when
+  we run 'make dtbs' for arch/arm and leave this file there. The argument
+  that one could use the same dtb with a 32-bit kernel should basically
+  hold true for any arm64 system, it's not specific to rpi-3 really.
+  We don't normally test 32-bit kernels on 64-bit SoCs because 64-bit
+  kernels are more efficient in a number of ways, and I'm sure there
+  are bugs that prevent some systems from working (aside from how some
+  machines cannot work because they don't have RAM below 4GB), but if
+  this is now something that users are interested in, making it just
+  work seems nicer than having a couple of board specific hacks.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	Arnd
