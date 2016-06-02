@@ -1,28 +1,34 @@
-From: rkrcmar@redhat.com (Radim =?utf-8?B?S3LEjW3DocWZ?=)
-Date: Thu, 2 Jun 2016 15:52:56 +0200
-Subject: [PULL 0/8] KVM/ARM Fixes for v4.7-rc2
-In-Reply-To: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
-References: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20160602135255.GA20275@potion>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jun 2016 15:53:33 +0200
+Subject: [PATCH 1/3] dt-bindings: add DT binding for the Aardvark PCIe
+ controller
+In-Reply-To: <20160602144542.6bc1b421@free-electrons.com>
+References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <8313817.cgODJZVrao@wuerfel> <20160602144542.6bc1b421@free-electrons.com>
+Message-ID: <7070543.PV5raqmBSF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-06-02 12:20+0200, Christoffer Dall:
-> Hi Paolo and Radim,
+On Thursday, June 2, 2016 2:45:42 PM CEST Thomas Petazzoni wrote:
 > 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+> On Thu, 02 Jun 2016 14:34:14 +0200, Arnd Bergmann wrote:
 > 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+> > I think some other PCI hosts just move the interrupt-controller
+> > and #interrupt-cells properties into the PCI host node itself,
+> > which avoids the ambiguity here.
 > 
-> are available in the git repository at:
+> Do you have an example of this? I have modeled my DT binding after the
+> one used by the pci-dra7xx driver, which is in the same situation as I
+> am in terms of interrupt handling.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-for-v4.7-rc2
+> But I can indeed try to make the top-level PCIe controller node the
+> interrupt controller. Let me try that quickly.
 > 
-> for you to fetch changes up to 05fb05a6ca25e02ad8c31bc440b3c4996864f379:
-> 
->   KVM: arm/arm64: vgic-new: Removel harmful BUG_ON (2016-06-02 11:52:21 +0200)
-> 
-> They contain fixes for the vgic; two of the patches address a bug introduced in
-> v4.6 while the rest are for the new vgic.
 
-Pulled, thanks.
+Looking at the binding files, I see only this one:
+
+Documentation/devicetree/bindings/pci/altera-pcie.txt
+
+and a couple of others using a child node.
+
+	Arnd
