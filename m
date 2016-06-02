@@ -1,52 +1,47 @@
-From: plaes@plaes.org (Priit Laes)
-Date: Thu, 02 Jun 2016 07:42:26 +0300
-Subject: [linux-sunxi] Re: [PATCH 5/5] RFC spi: sun4i: add DMA support
-In-Reply-To: <20160601180056.GA4908@lukather>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
- <20160530112610.GJ29837@sirena.org.uk>
- <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
- <20160530150343.GL29837@sirena.org.uk>
- <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
- <20160530155016.GO29837@sirena.org.uk> <20160601180056.GA4908@lukather>
-Message-ID: <1464842546.23881.3.camel@plaes.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 02 Jun 2016 06:43:19 +0200
+Subject: [PATCH v7 1/6] mfd: max8997: Use regmap to access registers
+In-Reply-To: <574EC8EE.5000509@samsung.com>
+References: <1464773339-756-1-git-send-email-k.kozlowski@samsung.com>
+ <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
+ <574EC8EE.5000509@samsung.com>
+Message-ID: <574FB967.7090201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-06-01 at 20:00 +0200, Maxime Ripard wrote:
-> Hi,
+On 06/01/2016 01:37 PM, Jacek Anaszewski wrote:
+> Hi Krzysztof,
 > 
-> On Mon, May 30, 2016 at 04:50:16PM +0100, Mark Brown wrote:
-> > 
-> > On Mon, May 30, 2016 at 05:28:10PM +0200, Michal Suchanek wrote:
-> > > 
-> > > On 30 May 2016 at 17:03, Mark Brown <broonie@kernel.org> wrote:
-> > > 
-> > > > 
-> > > > I really don't think it's worth caring too much about cases
-> > > > where the
-> > > > DMA driver hasn't been compiled in, it's not like SPI is the
-> > > > only thing
-> > > 
-> > > It's what the driver did to start with and it was requested to
-> > > fall
-> > > back to non-DMA in the case DMA is not available.
-> > Why???I really can't see any sensible use case for this that
-> > doesn't
-> > have a better solution available.
-> SPI works just fine without DMA, which might just be considered an
-> (optional) optimisation.
+> One thing drew my attention while reviewing this again:
+> max8997_led_brightness_set() can sleep, but the brightness_set
+> op it is assigned to must not sleep. At the time when this driver was
+> merged we were delegating brightness setting to workqueues task
+> in LED class drivers that can sleep during this call.
+> This must have been overlooked, which is even more likely, taking into
+> account that the initial patch doesn't have LED maintainer's ack.
 > 
-> We've been using it without DMA for years now, and it was working
-> just
-> fine, and it will work even better with the other patches in this
-> serie. There's no reason to add a hard dependency on something that
-> we
-> don't really need.
+> The non-sleeping requirement is motivated by the fact that brightness
+> can be set from softirq context, e.g. when timer trigger is enabled.
 > 
+> Currently LED class drivers don't have to use workqueue on their own,
+> but are required to use brightness_set_blocking op instead of
+> brightness_set if they can sleep while setting brightness.
+> 
+> Apart of that, I think that operations in max8997_led_brightness_set()
+> should be protected with mutex to assure leaving the device in
+> a consistent state in case of concurrent calls.
+> 
+> I am aware that this is out of this patch scope, but I'd be grateful
+> if you could apply those changes and test them on hardware if you have
+> an access to.
 
-Actually it non-DMA case works fine if you don't need SPI transfers
-larger than?SUN4I_FIFO_DEPTH - 1, which is 63 bytes.
+The problem you mention existed before the patch. It was using sleeping
+primitives (mutex) before adding regmap so I understand you don't have
+anything against this patch, right?
 
-This was addressed by this patch, but was never applied:
-http://permalink.gmane.org/gmane.linux.kernel.spi.devel/18950
+I can fix the issue but it will be a little bit trickier because I don't
+have the hardware. Other guys in the team tested the patchset for me so
+I rely on them in that matter. Anyway I'll work on it.
+
+Best regards,
+Krzysztof
