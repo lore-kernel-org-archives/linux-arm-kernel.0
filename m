@@ -1,49 +1,68 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 02 Jun 2016 14:40:13 -0700
-Subject: [PATCH 32/32] mmc: bcm2835: Import bcm2835-mmc and switch to it
-In-Reply-To: <2100811505.238666.65d5fa25-985a-4a30-86e2-3a7bebb5caaf.open-xchange@email.1und1.de>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-33-git-send-email-kraxel@redhat.com>
- <e16936ee-3b0d-3798-72e0-8969c2c1a309@i2se.com>
- <87oa7j314j.fsf@eliezer.anholt.net>
- <2100811505.238666.65d5fa25-985a-4a30-86e2-3a7bebb5caaf.open-xchange@email.1und1.de>
-Message-ID: <87d1nze0ci.fsf@eliezer.anholt.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu,  2 Jun 2016 23:41:34 +0200
+Subject: [PATCH 3/6] clocksource/drivers/bcm2835: Add the COMPILE_TEST option
+In-Reply-To: <1464903697-3802-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1464903697-3802-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1464903697-3802-3-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Change the Kconfig option logic to fullfil with the current approach.
 
-> Hi Eric,
->
->> Eric Anholt <eric@anholt.net> hat am 2. Juni 2016 um 20:18 geschrieben:
->> 
->> 
->> Stefan Wahren <stefan.wahren@i2se.com> writes:
->> 
->> > Hi Gerd,
->> >
->> > Am 01.06.2016 um 23:43 schrieb Gerd Hoffmann:
->> >> From: Eric Anholt <eric@anholt.net>
->> >>
->> >> With this we can get wifi (brcmfmac) to probe.  Without it we're stuck
->> >> with timeouts from sdio.c when it tries to set the bus width to 4.
->> >
->> > adding a new MMC driver to fix a wifi issue is really weird.
->> >
->> > Beside that there are already two MMC drivers (sdhci-bcm2835.c and
->> > sdhci-iproc.c) in the Kernel which are compatible to BCM2835. Why should
->> > we add two new ones?
->> 
->> Despite the fact that this is my commit, I don't think it should be
->> merged.  We should figure out why sdhci-iproc.c isn't working, instead.
->
-> so it doesn't work with sdhci-bcm2835 on RPi 3, too?
+A new Kconfig option is added, CONFIG_BCM2835_TIMER and is selected by the
+platform. Then the clocksource's Kconfig is changed to make this option
+selectable by the user if the COMPILE_TEST option is set. Otherwise, it
+is up to the platform's Kconfig to select the timer.
 
-Correct.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/8c7a5e39/attachment.sig>
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-bcm/Kconfig    | 1 +
+ drivers/clocksource/Kconfig  | 7 +++++++
+ drivers/clocksource/Makefile | 2 +-
+ 3 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 7ef1214..b7414df 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -143,6 +143,7 @@ config ARCH_BCM2835
+ 	select ARM_TIMER_SP804
+ 	select HAVE_ARM_ARCH_TIMER if ARCH_MULTI_V7
+ 	select CLKSRC_OF
++	select BCM2835_TIMER
+ 	select PINCTRL
+ 	select PINCTRL_BCM2835
+ 	help
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 6ff327a..34053ab 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -27,6 +27,13 @@ config CLKBLD_I8253
+ config CLKSRC_MMIO
+ 	bool
+ 
++config BCM2835_TIMER
++	bool "BCM2835 timer driver" if COMPILE_TEST
++	depends on GENERIC_CLOCKEVENTS
++	select CLKSRC_MMIO
++	help
++	  Enables the support for the BCM2835 timer driver.
++
+ config DIGICOLOR_TIMER
+ 	bool "Digicolor timer driver" if COMPILE_TEST
+ 	depends on GENERIC_CLOCKEVENTS
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index b0a3c96..6e278d4 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -19,7 +19,7 @@ obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
+ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
+ obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
+ obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
+-obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
++obj-$(CONFIG_BCM2835_TIMER)	+= bcm2835_timer.o
+ obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
+ obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
+ obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
+-- 
+1.9.1
