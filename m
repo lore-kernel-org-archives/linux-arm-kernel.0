@@ -1,34 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 2 Jun 2016 14:45:42 +0200
-Subject: [PATCH 1/3] dt-bindings: add DT binding for the Aardvark PCIe
- controller
-In-Reply-To: <8313817.cgODJZVrao@wuerfel>
-References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1464858585-10963-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160602122405.GG17343@lunn.ch> <8313817.cgODJZVrao@wuerfel>
-Message-ID: <20160602144542.6bc1b421@free-electrons.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 02 Jun 2016 14:49:01 +0200
+Subject: [PATCH 3/5] Documentation/devicetree/bindings: Add b850v3_lvds_dp
+In-Reply-To: <1464626385-19253-4-git-send-email-peter.senna@collabora.com>
+References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
+ <1464626385-19253-4-git-send-email-peter.senna@collabora.com>
+Message-ID: <1464871741.3307.16.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Peter,
 
-On Thu, 02 Jun 2016 14:34:14 +0200, Arnd Bergmann wrote:
+Am Montag, den 30.05.2016, 18:39 +0200 schrieb Peter Senna Tschudin:
+> Devicetree bindings documentation for the GE B850v3 LVDS/DP++
+> display bridge.
+> 
+> Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+> ---
+>  .../devicetree/bindings/ge/b850v3_lvds_dp.txt      | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ge/b850v3_lvds_dp.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/ge/b850v3_lvds_dp.txt b/Documentation/devicetree/bindings/ge/b850v3_lvds_dp.txt
+> new file mode 100644
+> index 0000000..32e123a
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/ge/b850v3_lvds_dp.txt
+> @@ -0,0 +1,38 @@
+> +Driver for GE B850v3 LVDS/DP++ display bridge
+> +
+> +Required properties:
+> +  - compatible : should be "ge,b850v3_lvds_dp".
 
-> I think some other PCI hosts just move the interrupt-controller
-> and #interrupt-cells properties into the PCI host node itself,
-> which avoids the ambiguity here.
+In the cover mail you write that this is a combination of the STDP4028
+DP transmitter and STDP2690 DP/DP++ converter. So shouldn't this binding
+comprise two device tree nodes, one with compatible "st,stdp4028", one
+with "st,stdp2690", then?
+Is the stdp2690 connected to the stdp4028's i2c master?
 
-Do you have an example of this? I have modeled my DT binding after the
-one used by the pci-dra7xx driver, which is in the same situation as I
-am in terms of interrupt handling.
-
-But I can indeed try to make the top-level PCIe controller node the
-interrupt controller. Let me try that quickly.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+regards
+Philipp
