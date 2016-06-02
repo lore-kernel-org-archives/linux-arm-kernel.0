@@ -1,52 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Jun 2016 19:16:09 +0100
-Subject: [PATCH 1/3] arm64: move the PTE_VALID to pgtable-hwdef.h
-In-Reply-To: <1464574468-22700-1-git-send-email-shijie.huang@arm.com>
-References: <1464574468-22700-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <20160602181609.GF7697@arm.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Thu, 2 Jun 2016 13:16:48 -0500
+Subject: [PATCH 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy
+ block
+In-Reply-To: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
+References: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160602181648.GB28820@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 10:14:26AM +0800, Huang Shijie wrote:
-> The PTE_VALID is used to check whether the page descriptor is valid.
-> It's not a software defined PTE bits, such as PTE_WRITE/PTE_DIRTY.
-> 
-> So move it to the proper header file: pgtable-hwdef.h.
-> 
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> ---
->  arch/arm64/include/asm/pgtable-hwdef.h | 1 +
->  arch/arm64/include/asm/pgtable-prot.h  | 1 -
->  2 files changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index 2813748..eeb3269 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -154,6 +154,7 @@
->  #define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
->  #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
->  #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
-> +#define PTE_VALID		(_AT(pteval_t, 1) << 0)
->  #define PTE_TABLE_BIT		(_AT(pteval_t, 1) << 1)
->  #define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
->  #define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
-> diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
-> index 29fcb33..5ac71f4 100644
-> --- a/arch/arm64/include/asm/pgtable-prot.h
-> +++ b/arch/arm64/include/asm/pgtable-prot.h
-> @@ -24,7 +24,6 @@
->  /*
->   * Software defined PTE bits definition.
->   */
-> -#define PTE_VALID		(_AT(pteval_t, 1) << 0)
->  #define PTE_WRITE		(PTE_DBM)		 /* same as DBM (51) */
+Hi,
 
-So how would you define PTE_WRITE? It's a software bit in v8.0 and a
-hardware bit in v8.1 ;)
+On Thu, Jun 02, 2016 at 07:31:03PM +0200, Hans de Goede wrote:
+> Some SoCs have a single phy-hw-block with multiple phys, this is
+> modelled by a single phy dts node, so we end up with multiple
+> controller nodes with a phys property pointing to the phy-node
+> of the otg-phy.
+> 
+> Only one of these controllers typically is an otg controller, yet we
 
-I don't mind shuffling the #defines about, I just think the boundaries
-are somewhat blurred and maybe it's a mistake to put software bits and
-hardware bits in separate headers.
+Is it guaranteed that only one of them will be otg? 
 
-Will
+> were checking the first controller who uses a phy from the block and
+> then end up looking for a dr_mode property in e.g. the ehci controller.
+> 
+> Instead of looking for nodes with a phy property, look for nodes
+> with a dr_mode property, so that we actually access the dr_mode property
+> in a node which has it.
+
+Quote from Documentation/devicetree/bindings/usb/generic.txt:
+"- dr_mode: ...
+		In case this attribute isn't
+		passed via DT, USB DRD controllers should default to
+		OTG."
+
+So it is not mandatory to define dr_mode in DT, then you wouldn't be
+able to find the controller in such case.
+
+Regards,
+-Bin.
