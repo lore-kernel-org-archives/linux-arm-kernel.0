@@ -1,75 +1,99 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 2 Jun 2016 09:00:01 -0500
-Subject: [PATCH 1/3] pci: introduce read_bridge/write_bridge pci ops
-In-Reply-To: <4967020.J4dsRYGugq@wuerfel>
-References: <1464784332-3775650-1-git-send-email-arnd@arndb.de>
- <4890460.9IGW89muCc@wuerfel> <20160601190430.GA19546@localhost>
- <4967020.J4dsRYGugq@wuerfel>
-Message-ID: <20160602140001.GB8262@localhost>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Thu, 02 Jun 2016 15:09:40 +0100
+Subject: [PATCH 2/3] ARM: introduce svc_pt_regs structure
+Message-ID: <E1b8TJc-0007zs-0a@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 10:37:28PM +0200, Arnd Bergmann wrote:
-> On Wednesday, June 1, 2016 2:04:30 PM CEST Bjorn Helgaas wrote:
-> > On Wed, Jun 01, 2016 at 05:41:53PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday, June 1, 2016 10:09:29 AM CEST Bjorn Helgaas wrote:
-> > > > Hi Arnd,
-> > > > 
-> > > > On Wed, Jun 01, 2016 at 02:31:22PM +0200, Arnd Bergmann wrote:
-> > > > > A lot of PCI host bridges require different methods for initiating
-> > > > > type 0 and type 1 config space accesses, leading to duplication of
-> > > > > code.
-> > > > > 
-> > > > > This adds support for the two different kinds at the pci_ops
-> > > > > level, with the newly added map_bridge/read_bridge/write_bridge
-> > > > > operations for type 1 accesses.
-> > > > > 
-> > > > > When these are not set, we fall back to the regular map_bus/read/write
-> > > > > operations, so all existing drivers keep working, and bridges that
-> > > > > have identical operations continue to only require one set.
-> > > > 
-> > > > This adds new config accessor functions to struct pci_ops and makes
-> > > > the callers responsible for figuring out which one to use.  The
-> > > > benefit is to reduce code duplication in some host bridge drivers
-> > > > (DesignWare and MVEBU so far).
-> > > > 
-> > > > From a design perspective, I'm not comfortable with moving this burden
-> > > > from the host bridge drivers to the callers of the config accessors.
-> > > ...
-> > 
-> > > Maybe we can simply change them to use the normal API and come up with
-> > > a way to make the pci_ops harder to misuse? Would it make you feel better
-> > > if we also renamed .read/.write into .read_type0/.write_type0 or something
-> > > like that?
-> > 
-> > I'm trying to get a better feel for the tradeoff here.  It seems like
-> > an API complication vs. code duplication.
-> > 
-> > I don't really think the callers should have to figure out which
-> > accessor to use.  How much of a benefit do we really gain by
-> > complicating the callers?  We've managed for quite a few years with
-> > the current scheme, and it seems like only a couple new ARM platforms
-> > would benefit.
-> 
-> I just did a count of the implementations of pci_ops: I found 107
-> instances of 'struct pci_ops', and 67 of them treat type0 and type1
-> access differently in some form.
-> 
-> I'd estimate that about half of them, or roughly a third of the total
-> instances would benefit from my change, if we were to do them again.
-> Clearly there is no need to change the existing code here when it works,
-> unless the benefit is very clear and the code is actively maintained.
-> 
-> In some cases, the difference is only that the root bus has a limited
-> set of devices that are allowed to be accessed, so there would
-> likely be no benefit of this, compared to e.g. yet another callback
-> that checks the validity.
-> Some other instances have type0 registers at a different memory location
-> from type1, some use different layout inside of that space, and some
-> are completely different.
+Since the privileged mode pt_regs are an extended version of the saved
+userland pt_regs, introduce a new svc_pt_regs structure to describe this
+layout.
 
-The type0/type1 distinction still seems out of place to me at the call
-site.  Is there any other reason a caller would care about the
-difference between type0 and type1?
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/include/asm/assembler.h | 4 ++--
+ arch/arm/include/asm/ptrace.h    | 8 ++++++++
+ arch/arm/kernel/asm-offsets.c    | 2 ++
+ arch/arm/kernel/entry-armv.S     | 4 ++--
+ 4 files changed, 14 insertions(+), 4 deletions(-)
 
-Bjorn
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 60d9c5471eb6..4eaea2173bf8 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -480,13 +480,13 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ 	.macro	uaccess_save, tmp
+ #ifdef CONFIG_CPU_SW_DOMAIN_PAN
+ 	mrc	p15, 0, \tmp, c3, c0, 0
+-	str	\tmp, [sp, #PT_REGS_SIZE]
++	str	\tmp, [sp, #SVC_DACR]
+ #endif
+ 	.endm
+ 
+ 	.macro	uaccess_restore
+ #ifdef CONFIG_CPU_SW_DOMAIN_PAN
+-	ldr	r0, [sp, #PT_REGS_SIZE]
++	ldr	r0, [sp, #SVC_DACR]
+ 	mcr	p15, 0, r0, c3, c0, 0
+ #endif
+ 	.endm
+diff --git a/arch/arm/include/asm/ptrace.h b/arch/arm/include/asm/ptrace.h
+index 51622ba7c4a6..5194cf79c90f 100644
+--- a/arch/arm/include/asm/ptrace.h
++++ b/arch/arm/include/asm/ptrace.h
+@@ -13,10 +13,18 @@
+ #include <uapi/asm/ptrace.h>
+ 
+ #ifndef __ASSEMBLY__
++#include <linux/types.h>
++
+ struct pt_regs {
+ 	unsigned long uregs[18];
+ };
+ 
++struct svc_pt_regs {
++	struct pt_regs regs;
++	u32 dacr;
++	u32 unused;
++};
++
+ #define user_mode(regs)	\
+ 	(((regs)->ARM_cpsr & 0xf) == 0)
+ 
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index 2841c9980bcd..9a8ce342cd82 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -108,6 +108,8 @@ int main(void)
+   DEFINE(S_PSR,			offsetof(struct pt_regs, ARM_cpsr));
+   DEFINE(S_OLD_R0,		offsetof(struct pt_regs, ARM_ORIG_r0));
+   DEFINE(PT_REGS_SIZE,		sizeof(struct pt_regs));
++  DEFINE(SVC_DACR,		offsetof(struct svc_pt_regs, dacr));
++  DEFINE(SVC_REGS_SIZE,		sizeof(struct svc_pt_regs));
+   BLANK();
+ #ifdef CONFIG_CACHE_L2X0
+   DEFINE(L2X0_R_PHY_BASE,	offsetof(struct l2x0_regs, phy_base));
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index a6cb019d9920..0d6f5413be18 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -152,7 +152,7 @@ ENDPROC(__und_invalid)
+ 	.macro	svc_entry, stack_hole=0, trace=1, uaccess=1
+  UNWIND(.fnstart		)
+  UNWIND(.save {r0 - pc}		)
+-	sub	sp, sp, #(PT_REGS_SIZE + 8 + \stack_hole - 4)
++	sub	sp, sp, #(SVC_REGS_SIZE + \stack_hole - 4)
+ #ifdef CONFIG_THUMB2_KERNEL
+  SPFIX(	str	r0, [sp]	)	@ temporarily saved
+  SPFIX(	mov	r0, sp		)
+@@ -167,7 +167,7 @@ ENDPROC(__und_invalid)
+ 	ldmia	r0, {r3 - r5}
+ 	add	r7, sp, #S_SP - 4	@ here for interlock avoidance
+ 	mov	r6, #-1			@  ""  ""      ""       ""
+-	add	r2, sp, #(PT_REGS_SIZE + 8 + \stack_hole - 4)
++	add	r2, sp, #(SVC_REGS_SIZE + \stack_hole - 4)
+  SPFIX(	addeq	r2, r2, #4	)
+ 	str	r3, [sp, #-4]!		@ save the "real" r0 copied
+ 					@ from the exception stack
+-- 
+2.1.0
