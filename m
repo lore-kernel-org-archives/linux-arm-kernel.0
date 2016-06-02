@@ -1,53 +1,90 @@
-From: j.anaszewski@samsung.com (Jacek Anaszewski)
-Date: Thu, 02 Jun 2016 09:08:54 +0200
-Subject: [PATCH v7 1/6] mfd: max8997: Use regmap to access registers
-In-Reply-To: <574FB967.7090201@samsung.com>
-References: <1464773339-756-1-git-send-email-k.kozlowski@samsung.com>
- <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
- <574EC8EE.5000509@samsung.com> <574FB967.7090201@samsung.com>
-Message-ID: <574FDB86.2070107@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 2 Jun 2016 09:13:36 +0200
+Subject: [PATCH/RFC v3 20/22] clk: renesas: r8a7778: Remove obsolete
+ r8a7778_clocks_init()
+In-Reply-To: <9f19c6e5-54d1-abd8-b666-bdf1a502d9c4@de.bosch.com>
+References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
+ <1464808880-343-21-git-send-email-geert+renesas@glider.be>
+ <9f19c6e5-54d1-abd8-b666-bdf1a502d9c4@de.bosch.com>
+Message-ID: <CAMuHMdWNZ8tV1Tc6HGL4qqs-hg6G5f1M5AYuB05Mb-JQPrPf4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2016 06:43 AM, Krzysztof Kozlowski wrote:
-> On 06/01/2016 01:37 PM, Jacek Anaszewski wrote:
->> Hi Krzysztof,
+Hi Dirk,
+
+On Thu, Jun 2, 2016 at 7:54 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
+> On 01.06.2016 21:21, Geert Uytterhoeven wrote:
+>> The R-Car M1A board code no longer calls r8a7778_clocks_init().
 >>
->> One thing drew my attention while reviewing this again:
->> max8997_led_brightness_set() can sleep, but the brightness_set
->> op it is assigned to must not sleep. At the time when this driver was
->> merged we were delegating brightness setting to workqueues task
->> in LED class drivers that can sleep during this call.
->> This must have been overlooked, which is even more likely, taking into
->> account that the initial patch doesn't have LED maintainer's ack.
+>> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>> ---
+>> v3:
+>>   - New.
+>> ---
+>>  drivers/clk/renesas/clk-r8a7778.c | 13 -------------
+>>  include/linux/clk/renesas.h       |  1 -
+>>  2 files changed, 14 deletions(-)
 >>
->> The non-sleeping requirement is motivated by the fact that brightness
->> can be set from softirq context, e.g. when timer trigger is enabled.
+>> diff --git a/drivers/clk/renesas/clk-r8a7778.c
+>> b/drivers/clk/renesas/clk-r8a7778.c
+>> index 07ea411098a75ad1..886a8380e91247a1 100644
+>> --- a/drivers/clk/renesas/clk-r8a7778.c
+>> +++ b/drivers/clk/renesas/clk-r8a7778.c
+>> @@ -143,16 +143,3 @@ static void __init r8a7778_cpg_clocks_init(struct
+>> device_node *np)
 >>
->> Currently LED class drivers don't have to use workqueue on their own,
->> but are required to use brightness_set_blocking op instead of
->> brightness_set if they can sleep while setting brightness.
->>
->> Apart of that, I think that operations in max8997_led_brightness_set()
->> should be protected with mutex to assure leaving the device in
->> a consistent state in case of concurrent calls.
->>
->> I am aware that this is out of this patch scope, but I'd be grateful
->> if you could apply those changes and test them on hardware if you have
->> an access to.
+>>  CLK_OF_DECLARE(r8a7778_cpg_clks, "renesas,r8a7778-cpg-clocks",
+>>                r8a7778_cpg_clocks_init);
+>> -
+>> -void __init r8a7778_clocks_init(u32 mode)
+>> -{
+>> -       BUG_ON(!(mode & BIT(19)));
+>> -
+>> -       cpg_mode_rates = (!!(mode & BIT(18)) << 2) |
+>> -                        (!!(mode & BIT(12)) << 1) |
+>> -                        (!!(mode & BIT(11)));
+>> -       cpg_mode_divs = (!!(mode & BIT(2)) << 1) |
+>> -                       (!!(mode & BIT(1)));
+>> -
+>> -       of_clk_init(NULL);
+>> -}
 >
-> The problem you mention existed before the patch. It was using sleeping
-> primitives (mutex) before adding regmap so I understand you don't have
-> anything against this patch, right?
+> Just a question on how you structured the patches: Is there a special reason
+> why you do the adding of new code and the removal of dead code in two
+> patches?
+>
+> Having both in one patch normally makes it more obvious which old code is
+> replaced by which new code.
+>
+> An example: In patch
+>
+> [PATCH/RFC v3 11/22] clk: renesas: r8a7778: Obtain mode pin values using
+> R-Car RST driver
+>
+> I wondered where the section
+>
+> +       BUG_ON(!(mode & BIT(19)));
+> +
+> +       cpg_mode_rates = (!!(mode & BIT(18)) << 2) |
+> +                        (!!(mode & BIT(12)) << 1) |
+> +                        (!!(mode & BIT(11)));
+> +       cpg_mode_divs = (!!(mode & BIT(2)) << 1) |
+> +                       (!!(mode & BIT(1)));
+>
+> comes from. This becomes obvious with this patch 20/22. But it's 9 patches
+> later ;) So why don't make the whole replacement visible in one patch?
 
-Right, I just wanted to indicate the problem. The patch itself is ok.
+Because that would break bisection.
+Path 20 depends on patch 17, which depends on patch 11.
+These three can't be a single patch because they touch multiple subsystems.
 
-> I can fix the issue but it will be a little bit trickier because I don't
-> have the hardware. Other guys in the team tested the patchset for me so
-> I rely on them in that matter. Anyway I'll work on it.
+Gr{oetje,eeting}s,
 
-Ack.
+                        Geert
 
--- 
-Best regards,
-Jacek Anaszewski
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
