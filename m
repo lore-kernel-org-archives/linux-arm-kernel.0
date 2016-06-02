@@ -1,51 +1,48 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  2 Jun 2016 16:27:24 +0100
-Subject: [PATCH] arm64: unistd32.h: wire up missing syscalls for compat tasks
-Message-ID: <1464881244-24513-1-git-send-email-will.deacon@arm.com>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Thu, 2 Jun 2016 17:35:12 +0200
+Subject: [PATCH 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <CALszF6ADLuZ0wK=L68FDzy5M5_eSPRTbNOjSoQw=dWDOjsPqCA@mail.gmail.com>
+References: <1462980974-22091-1-git-send-email-cedric.madianga@gmail.com>
+ <1462980974-22091-3-git-send-email-cedric.madianga@gmail.com>
+ <CALszF6A-jiCBtSO1RFDdgHKTKmsonRXFVs0x2zHha1LJ3UhwtQ@mail.gmail.com>
+ <CAOAejn0Fsizp9fK1mNn3BBeL2LeoVgt5_zF5656La4G2uDPH7g@mail.gmail.com>
+ <CAOAejn1NQDJpGrTwGtpvSfVOGg3UuCkj8wLJ7B5LnW1-Z2VrQA@mail.gmail.com>
+ <CALszF6ADLuZ0wK=L68FDzy5M5_eSPRTbNOjSoQw=dWDOjsPqCA@mail.gmail.com>
+Message-ID: <CAOAejn0G3JzATKME5DaMV0GEBwQVWjkB1=ei-7LOQ98vzkUeVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're missing entries for mlock2, copy_file_range, preadv2 and pwritev2
-in our compat syscall table, so hook them up. Only the last two need
-compat wrappers.
+Hi,
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/unistd.h   | 2 +-
- arch/arm64/include/asm/unistd32.h | 8 ++++++++
- 2 files changed, 9 insertions(+), 1 deletion(-)
+>> +
+>> +/**
+>> + * stm32f4_i2c_xfer() - Transfer combined I2C message
+>> + * @i2c_adap: Adapter pointer to the controller
+>> + * @msgs: Pointer to data to be written.
+>> + * @num: Number of messages to be executed
+>> + */
+>> +static int stm32f4_i2c_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[],
+>> +                           int num)
+>> +{
+>> +       struct stm32f4_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
+>> +       int ret, i;
+>> +
+>> +       i2c_dev->busy = true;
+>> +
+>> +       ret = clk_prepare_enable(i2c_dev->clk);
+>> +       if (ret) {
+>> +               dev_err(i2c_dev->dev, "Failed to prepare_enable clock\n");
+>> +               return ret;
+>> +       }
+>> +
+>> +       stm32f4_i2c_hw_config(i2c_dev);
+> Maybe you could call this only at probe and resume time?
+> You would save some register accesses.
+Some clarification about this point.
+We need to call stm32f4_i2c_hw_config before each I2C transfer as at
+the end of I2C communication the peripheral is automatically disabled
+and configuration registers are reset.
 
-diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
-index 41e58fe3c041..e78ac26324bd 100644
---- a/arch/arm64/include/asm/unistd.h
-+++ b/arch/arm64/include/asm/unistd.h
-@@ -44,7 +44,7 @@
- #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
- #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
- 
--#define __NR_compat_syscalls		390
-+#define __NR_compat_syscalls		394
- #endif
- 
- #define __ARCH_WANT_SYS_CLONE
-diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-index 5b925b761a2a..b7e8ef16ff0d 100644
---- a/arch/arm64/include/asm/unistd32.h
-+++ b/arch/arm64/include/asm/unistd32.h
-@@ -801,6 +801,14 @@ __SYSCALL(__NR_execveat, compat_sys_execveat)
- __SYSCALL(__NR_userfaultfd, sys_userfaultfd)
- #define __NR_membarrier 389
- __SYSCALL(__NR_membarrier, sys_membarrier)
-+#define __NR_mlock2 390
-+__SYSCALL(__NR_mlock2, sys_mlock2)
-+#define __NR_copy_file_range 391
-+__SYSCALL(__NR_copy_file_range, sys_copy_file_range)
-+#define __NR_preadv2 392
-+__SYSCALL(__NR_preadv2, compat_sys_preadv2)
-+#define __NR_pwritev2 393
-+__SYSCALL(__NR_pwritev2, compat_sys_pwritev2)
- 
- /*
-  * Please add new compat syscalls above this comment and update
--- 
-2.1.4
+
+BR,
+Cedric
