@@ -1,160 +1,163 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu,  2 Jun 2016 19:31:04 +0200
-Subject: [PATCH 2/4] phy-sun4i-usb: Add support for peripheral-only mode
+Date: Thu,  2 Jun 2016 19:31:06 +0200
+Subject: [PATCH 4/4] musb: sunxi: Simplify dr_mode handling
 In-Reply-To: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
 References: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1464888666-17728-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1464888666-17728-4-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new of_usb_get_dr_mode_by_phy() function to get the dr_mode
-from the musb controller node instead of assuming that having an id_det
-gpio means otg mode, and not having one means host mode.
+phy-sun4i-usb now has proper dr_mode handling, it always registers an
+extcon, and sends a notify with the mode (even when in peripheral- /
+host-only mode) at least once.
 
-Implement peripheral-only mode by adding a sun4i_usb_phy0_get_id_det
-helper which looks at the dr_mode, always registering our extcon and
-always monitoring vbus.
+So we can simply the sunxi musb glue by always registering its extcon
+notifier and relying on sunxi_musb_work() to enable vbus when in
+host-only mode.
 
-If dr_mode is not specified in the dts, do not register phy0 as we then
-do not know how to treat it. This is actually a good thing as this means
-we will not be registering phy0 on devices where the otg controller is
-not enabled in the devicetree.
+This also enables host- and peripheral-only mode with vbus monitoring.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- drivers/phy/phy-sun4i-usb.c | 62 ++++++++++++++++++++++++++++++---------------
- 1 file changed, 42 insertions(+), 20 deletions(-)
+ drivers/usb/musb/sunxi.c | 68 ++++++++++++++++++------------------------------
+ 1 file changed, 25 insertions(+), 43 deletions(-)
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index bae54f7..1ea71f5 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -40,6 +40,7 @@
- #include <linux/power_supply.h>
- #include <linux/regulator/consumer.h>
- #include <linux/reset.h>
-+#include <linux/usb/of.h>
- #include <linux/workqueue.h>
+diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
+index e7d4617..b88a2f6 100644
+--- a/drivers/usb/musb/sunxi.c
++++ b/drivers/usb/musb/sunxi.c
+@@ -255,12 +255,10 @@ static int sunxi_musb_init(struct musb *musb)
+ 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
  
- #define REG_ISCR			0x00
-@@ -109,6 +110,7 @@ struct sun4i_usb_phy_cfg {
- struct sun4i_usb_phy_data {
- 	void __iomem *base;
- 	const struct sun4i_usb_phy_cfg *cfg;
-+	enum usb_dr_mode dr_mode;
- 	struct mutex mutex;
- 	struct sun4i_usb_phy {
- 		struct phy *phy;
-@@ -119,6 +121,7 @@ struct sun4i_usb_phy_data {
- 		bool regulator_on;
- 		int index;
- 	} phys[MAX_PHYS];
-+	int first_phy;
- 	/* phy0 / otg related variables */
- 	struct extcon_dev *extcon;
- 	bool phy0_init;
-@@ -285,16 +288,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_DPDM_PULLUP_EN);
- 		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_ID_PULLUP_EN);
+ 	/* Register notifier before calling phy_init() */
+-	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE) {
+-		ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
+-					       &glue->host_nb);
+-		if (ret)
+-			goto error_reset_assert;
+-	}
++	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
++				       &glue->host_nb);
++	if (ret)
++		goto error_reset_assert;
  
--		if (data->id_det_gpio) {
--			/* OTG mode, force ISCR and cable state updates */
--			data->id_det = -1;
--			data->vbus_det = -1;
--			queue_delayed_work(system_wq, &data->detect, 0);
--		} else {
--			/* Host only mode */
--			sun4i_usb_phy0_set_id_detect(_phy, 0);
--			sun4i_usb_phy0_set_vbus_detect(_phy, 1);
--		}
-+		/* Force ISCR and cable state updates */
-+		data->id_det = -1;
-+		data->vbus_det = -1;
-+		queue_delayed_work(system_wq, &data->detect, 0);
- 	}
- 
+ 	ret = phy_init(glue->phy);
+ 	if (ret)
+@@ -274,9 +272,8 @@ static int sunxi_musb_init(struct musb *musb)
  	return 0;
-@@ -319,6 +316,19 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
+ 
+ error_unregister_notifier:
+-	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
+-		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+-					   &glue->host_nb);
++	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
++				   &glue->host_nb);
+ error_reset_assert:
+ 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+ 		reset_control_assert(glue->rst);
+@@ -300,9 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
+ 
+ 	phy_exit(glue->phy);
+ 
+-	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
+-		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
+-					   &glue->host_nb);
++	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
++				   &glue->host_nb);
+ 
+ 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
+ 		reset_control_assert(glue->rst);
+@@ -314,25 +310,6 @@ static int sunxi_musb_exit(struct musb *musb)
  	return 0;
  }
  
-+static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
-+{
-+	switch (data->dr_mode) {
-+	case USB_DR_MODE_OTG:
-+		return gpiod_get_value_cansleep(data->id_det_gpio);
-+	case USB_DR_MODE_HOST:
-+		return 0;
-+	case USB_DR_MODE_PERIPHERAL:
-+	default:
-+		return 1;
-+	}
-+}
-+
- static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
- {
- 	if (data->vbus_det_gpio)
-@@ -414,7 +424,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
- 	struct phy *phy0 = data->phys[0].phy;
- 	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
- 
--	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
-+	if (phy0 == NULL)
-+		return;
-+
-+	id_det = sun4i_usb_phy0_get_id_det(data);
- 	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
- 
- 	mutex_lock(&phy0->mutex);
-@@ -501,7 +514,8 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
- {
- 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
- 
--	if (args->args[0] >= data->cfg->num_phys)
-+	if (args->args[0] < data->first_phy ||
-+	    args->args[0] >= data->cfg->num_phys)
- 		return ERR_PTR(-ENODEV);
- 
- 	return data->phys[args->args[0]].phy;
-@@ -575,13 +589,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			return -EPROBE_DEFER;
- 	}
- 
--	/* vbus_det without id_det makes no sense, and is not supported */
--	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
--		dev_err(dev, "usb0_id_det missing or invalid\n");
--		return -ENODEV;
+-static int sunxi_set_mode(struct musb *musb, u8 mode)
+-{
+-	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+-	int ret;
+-
+-	if (mode == MUSB_HOST) {
+-		ret = phy_power_on(glue->phy);
+-		if (ret)
+-			return ret;
+-
+-		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
+-		/* Stop musb work from turning vbus off again */
+-		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
+-		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
 -	}
 -
--	if (data->id_det_gpio) {
-+	data->dr_mode = of_usb_get_dr_mode_by_phy(np);
-+	switch (data->dr_mode) {
-+	case USB_DR_MODE_OTG:
-+		/* otg without id_det makes no sense, and is not supported */
-+		if (!data->id_det_gpio) {
-+			dev_err(dev, "usb0_id_det missing or invalid\n");
-+			return -ENODEV;
-+		}
-+		/* fall through */
-+	case USB_DR_MODE_HOST:
-+	case USB_DR_MODE_PERIPHERAL:
- 		data->extcon = devm_extcon_dev_allocate(dev,
- 							sun4i_usb_phy0_cable);
- 		if (IS_ERR(data->extcon))
-@@ -592,9 +610,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			dev_err(dev, "failed to register extcon: %d\n", ret);
- 			return ret;
- 		}
-+		break;
-+	default:
-+		dev_info(dev, "dr_mode unknown, not registering usb phy0\n");
-+		data->first_phy = 1;
+-	return 0;
+-}
+-
+ static void sunxi_musb_enable(struct musb *musb)
+ {
+ 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
+@@ -579,7 +556,6 @@ static const struct musb_platform_ops sunxi_musb_ops = {
+ 	.exit		= sunxi_musb_exit,
+ 	.enable		= sunxi_musb_enable,
+ 	.disable	= sunxi_musb_disable,
+-	.set_mode	= sunxi_set_mode,
+ 	.fifo_offset	= sunxi_musb_fifo_offset,
+ 	.ep_offset	= sunxi_musb_ep_offset,
+ 	.busctl_offset	= sunxi_musb_busctl_offset,
+@@ -635,10 +611,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		return -EINVAL;
  	}
  
--	for (i = 0; i < data->cfg->num_phys; i++) {
-+	for (i = data->first_phy; i < data->cfg->num_phys; i++) {
- 		struct sun4i_usb_phy *phy = data->phys + i;
- 		char name[16];
+-	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
+-	if (!glue)
+-		return -ENOMEM;
+-
+ 	memset(&pdata, 0, sizeof(pdata));
+ 	switch (usb_get_dr_mode(&pdev->dev)) {
+ #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
+@@ -646,15 +618,13 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		pdata.mode = MUSB_PORT_MODE_HOST;
+ 		break;
+ #endif
++#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
++	case USB_DR_MODE_PERIPHERAL:
++		pdata.mode = MUSB_PORT_MODE_GADGET;
++		break;
++#endif
+ #ifdef CONFIG_USB_MUSB_DUAL_ROLE
+ 	case USB_DR_MODE_OTG:
+-		glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
+-		if (IS_ERR(glue->extcon)) {
+-			if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
+-				return -EPROBE_DEFER;
+-			dev_err(&pdev->dev, "Invalid or missing extcon\n");
+-			return PTR_ERR(glue->extcon);
+-		}
+ 		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
+ 		break;
+ #endif
+@@ -665,6 +635,10 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 	pdata.platform_ops	= &sunxi_musb_ops;
+ 	pdata.config		= &sunxi_musb_hdrc_config;
  
++	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
++	if (!glue)
++		return -ENOMEM;
++
+ 	glue->dev = &pdev->dev;
+ 	INIT_WORK(&glue->work, sunxi_musb_work);
+ 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
+@@ -698,6 +672,14 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 		}
+ 	}
+ 
++	glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
++	if (IS_ERR(glue->extcon)) {
++		if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
++			return -EPROBE_DEFER;
++		dev_err(&pdev->dev, "Invalid or missing extcon\n");
++		return PTR_ERR(glue->extcon);
++	}
++
+ 	glue->phy = devm_phy_get(&pdev->dev, "usb");
+ 	if (IS_ERR(glue->phy)) {
+ 		if (PTR_ERR(glue->phy) == -EPROBE_DEFER)
 -- 
 2.7.4
