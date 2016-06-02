@@ -1,24 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 Jun 2016 14:06:53 +0200
-Subject: [PATCH 32/34] clk: u300: Migrate to clk_hw based registration APIs
-In-Reply-To: <20160601231533.9354-33-stephen.boyd@linaro.org>
-References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-33-stephen.boyd@linaro.org>
-Message-ID: <CACRpkdaR1geN2WfE3EoyB5i8J-=VJWq-qhHgELsPX0EkJhFOpA@mail.gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 2 Jun 2016 14:07:43 +0200
+Subject: [RFC PATCH 1/3] pci, acpi: Match PCI config space accessors
+ against platfrom specific ECAM quirks.
+In-Reply-To: <4347711.qDrKz2s8lr@wuerfel>
+References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
+ <1464856864-18049-2-git-send-email-tn@semihalf.com>
+ <4347711.qDrKz2s8lr@wuerfel>
+Message-ID: <5750218F.9030406@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 2, 2016 at 1:15 AM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
-
-> Now that we have clk_hw based provider APIs to register clks, we
-> can get rid of struct clk pointers while registering clks in
-> these drivers, allowing us to move closer to a clear split of
-> consumer and provider clk APIs.
+On 02.06.2016 13:42, Arnd Bergmann wrote:
+> On Thursday, June 2, 2016 10:41:01 AM CEST Tomasz Nowicki wrote:
+>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+>> +{
+>> +       int bus_num = root->secondary.start;
+>> +       int domain = root->segment;
+>> +       struct pci_cfg_fixup *f;
+>> +
+>> +       if (!mcfg_table)
+>> +               return &pci_generic_ecam_ops;
+>> +
+>> +       /*
+>> +        * Match against platform specific quirks and return corresponding
+>> +        * CAM ops.
+>> +        *
+>> +        * First match against PCI topology <domain:bus> then use OEM ID and
+>> +        * OEM revision from MCFG table standard header.
+>> +        */
+>> +       for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+>> +               if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+>> +                   (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+>> +                   (!strncmp(f->oem_id, mcfg_table->header.oem_id,
+>> +                             ACPI_OEM_ID_SIZE)) &&
+>> +                   (f->oem_revision == mcfg_table->header.oem_revision))
+>> +                       return f->ops;
+>> +       }
+>> +       /* No quirks, use ECAM */
+>> +       return &pci_generic_ecam_ops;
+>> +}
+>> +
+>>   int pci_mcfg_lookup(struct acpi_pci_root *root)
 >
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> Can you explain the use of pci_ecam_ops instead of pci_ops here?
+>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I wanted to get associated bus_shift and use it to setup configuration 
+region properly before calling pci_ecam_create. Please see next patch.
 
-Yours,
-Linus Walleij
+Thanks,
+Tomasz
