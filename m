@@ -1,58 +1,38 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Thu, 02 Jun 2016 11:14:30 +0200
-Subject: [PATCH 09/32] bcm2837-rpi-3-b.dts for 32bit arm
-In-Reply-To: <3336185.FIBLI6ezsy@wuerfel>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <5616246.RRQ2rLjLud@wuerfel> <1464850565.24775.40.camel@redhat.com>
- <3336185.FIBLI6ezsy@wuerfel>
-Message-ID: <1464858870.24775.65.camel@redhat.com>
+From: bernhard.nortmann@web.de (Bernhard Nortmann)
+Date: Thu, 2 Jun 2016 11:15:55 +0200
+Subject: [linux-sunxi] [PATCH] [V2] ARM: dts: sun7i: Add dts file for
+ Bananapi M1 Plus board
+In-Reply-To: <20160602081638.GG4908@lukather>
+References: <20160602023623.5761-1-luoyi.ly@gmail.com>
+ <CAGRGNgUiGaxoVxtq=k8NG5mCqEXS9fd-ry1vvVJfzb+R2ATMTA@mail.gmail.com>
+ <20160602081638.GG4908@lukather>
+Message-ID: <574FF94B.3020309@web.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+Am 02.06.2016 um 10:16 schrieb Maxime Ripard:
+> [...]
+> Yes, everything that is shared with the banana-pro (which, judging
+> from Bernhard, is pretty much everything but a GPIO) should be merged
+> in the banapro DT.
+>
+> Maxime
+>
 
-> > Well, it just includes the arm64 version as-is, so we don't have
-> > duplication.  I'm open to suggestions to how handle this better.  
-> > 
-> > Symbolic link?
-> > 
-> > Reference to ../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-> > directly in the Makefile?
-> > 
-> > I've seen arch/arm/boot/dts/Makefile uses globs on *.dts, so I suspect
-> > the later wouldn't be that straight forward.
-> 
-> It's just weird that the arm64 file includes the .dtsi files from arch/arm/
-> and is then again included back from another file there.
-> 
-> I can see two possible ways to handle this better:
-> 
-> - leave the complete set of bcm2837 files in arch/arm and then have one
->   reference from arch/arm64 per .dts that refers to just that file.
+Don't take my word for granted, as I do not own this hardware or know it
+particularly well. There is no doubt that "BPi-M1+" and "Banana Pro" are
+very similar, but if in doubt the information form the wiki should be 
+verified.
 
-So basically do it the other way around.  Would be a bit less messy
-indeed.
+@luoyi:
 
-> - come up with a rule to also build the .dtb files in arch/arm64 when
->   we run 'make dtbs' for arch/arm and leave this file there. The argument
->   that one could use the same dtb with a 32-bit kernel should basically
->   hold true for any arm64 system, it's not specific to rpi-3 really.
+You seem to be using an editor that uses 4 spaces for displaying a <TAB>.
+It looks like that makes you prone to whitespace formatting issues, which
+have shown up in both versions of the .dts you submitted so far.
 
-Yes, in theory.  No, in practice.  As far I know the rpi3 is the only
-64bit soc where a almost identical 32bit version exists, so running
-32bit kernels on a 64bit processor actually happens in practice and I
-expect this to continue.  If you want create sdcard images which run on
-any rpi variant this is pretty much the only reasonable way to do it.
+Please double-check that you're using TABs for indentation and they weren't
+mixed up with SPACEs accidentally. (Most editors will also offer a setting
+that allows you to display "non-printable" chars, where you might be able to
+distinguish whitespace better.)
 
->   We don't normally test 32-bit kernels on 64-bit SoCs because 64-bit
->   kernels are more efficient in a number of ways, and I'm sure there
->   are bugs that prevent some systems from working (aside from how some
->   machines cannot work because they don't have RAM below 4GB), but if
->   this is now something that users are interested in, making it just
->   work seems nicer than having a couple of board specific hacks.
-
-See above, I have my doubts that the user interest in this expands to
-other boards.  So I'd tend to pick the first option.
-
-cheers,
-  Gerd
+Regards, B. Nortmann
