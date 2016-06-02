@@ -1,55 +1,56 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  2 Jun 2016 12:20:56 +0200
-Subject: [PULL 4/8] KVM: arm/arm64: vgic-v3: Always resample level interrupts
+Date: Thu,  2 Jun 2016 12:20:57 +0200
+Subject: [PULL 5/8] arm64: KVM: Make ICC_SRE_EL1 access return the configured
+ SRE value
 In-Reply-To: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464862860-1183-5-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464862860-1183-6-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-When reading back from the list registers, we need to perform
-two actions for level interrupts:
-1) clear the soft-pending bit if the interrupt is not pending
-   anymore *in the list register*
-2) resample the line level and propagate it to the pending state
+When we trap ICC_SRE_EL1, we handle it as RAZ/WI. It would be
+more correct to actual make it RO, and return the configured
+value when read.
 
-But these two actions shouldn't be linked, and we should *always*
-resample the line level, no matter what state is in the list
-register. Otherwise, we may end-up injecting spurious interrupts
-that have been already retired.
-
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-v3.c | 14 +++++++++-----
- 1 file changed, 9 insertions(+), 5 deletions(-)
+ arch/arm64/kvm/sys_regs.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-index 336a461..346b4ad 100644
---- a/virt/kvm/arm/vgic/vgic-v3.c
-+++ b/virt/kvm/arm/vgic/vgic-v3.c
-@@ -101,11 +101,15 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
- 			}
- 		}
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 7bbe3ff..a57d650 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -134,6 +134,17 @@ static bool access_gic_sgi(struct kvm_vcpu *vcpu,
+ 	return true;
+ }
  
--		/* Clear soft pending state when level irqs have been acked */
--		if (irq->config == VGIC_CONFIG_LEVEL &&
--		    !(val & ICH_LR_PENDING_BIT)) {
--			irq->soft_pending = false;
--			irq->pending = irq->line_level;
-+		/*
-+		 * Clear soft pending state when level irqs have been acked.
-+		 * Always regenerate the pending state.
-+		 */
-+		if (irq->config == VGIC_CONFIG_LEVEL) {
-+			if (!(val & ICH_LR_PENDING_BIT))
-+				irq->soft_pending = false;
++static bool access_gic_sre(struct kvm_vcpu *vcpu,
++			   struct sys_reg_params *p,
++			   const struct sys_reg_desc *r)
++{
++	if (p->is_write)
++		return ignore_write(vcpu, p);
 +
-+			irq->pending = irq->line_level || irq->soft_pending;
- 		}
++	p->regval = vcpu->arch.vgic_cpu.vgic_v3.vgic_sre;
++	return true;
++}
++
+ static bool trap_raz_wi(struct kvm_vcpu *vcpu,
+ 			struct sys_reg_params *p,
+ 			const struct sys_reg_desc *r)
+@@ -958,7 +969,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
+ 	  access_gic_sgi },
+ 	/* ICC_SRE_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1100), CRm(0b1100), Op2(0b101),
+-	  trap_raz_wi },
++	  access_gic_sre },
  
- 		spin_unlock(&irq->irq_lock);
+ 	/* CONTEXTIDR_EL1 */
+ 	{ Op0(0b11), Op1(0b000), CRn(0b1101), CRm(0b0000), Op2(0b001),
 -- 
 2.1.2.330.g565301e.dirty
