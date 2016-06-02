@@ -1,11 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 2 Jun 2016 14:06:11 +0200
-Subject: [PATCH 20/34] clk: nomadik: Migrate to clk_hw based OF and
- registration APIs
-In-Reply-To: <20160601231533.9354-21-stephen.boyd@linaro.org>
+Date: Thu, 2 Jun 2016 14:06:53 +0200
+Subject: [PATCH 32/34] clk: u300: Migrate to clk_hw based registration APIs
+In-Reply-To: <20160601231533.9354-33-stephen.boyd@linaro.org>
 References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-21-stephen.boyd@linaro.org>
-Message-ID: <CACRpkdYa5JqZ0ge60C6rEZ_0_0+6TCmf49WcQYtMBgeJBr7FVg@mail.gmail.com>
+ <20160601231533.9354-33-stephen.boyd@linaro.org>
+Message-ID: <CACRpkdaR1geN2WfE3EoyB5i8J-=VJWq-qhHgELsPX0EkJhFOpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
