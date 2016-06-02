@@ -1,30 +1,59 @@
 From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
-Date: Thu,  2 Jun 2016 16:26:08 +0200
-Subject: [PATCH v2 5/5] ARM: configs: Add I2C support for STM32 defconfig
+Date: Thu,  2 Jun 2016 16:26:06 +0200
+Subject: [PATCH v2 3/5] ARM: dts: Add I2C1 support for STM32F429 SoC
 In-Reply-To: <1464877568-21897-1-git-send-email-cedric.madianga@gmail.com>
 References: <1464877568-21897-1-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <1464877568-21897-6-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <1464877568-21897-4-git-send-email-cedric.madianga@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
 Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 ---
- arch/arm/configs/stm32_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/stm32f429.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-index 709e606..411eb0a 100644
---- a/arch/arm/configs/stm32_defconfig
-+++ b/arch/arm/configs/stm32_defconfig
-@@ -49,6 +49,9 @@ CONFIG_SERIAL_NONSTANDARD=y
- CONFIG_SERIAL_STM32=y
- CONFIG_SERIAL_STM32_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_CHARDEV=y
-+CONFIG_I2C_STM32F4=y
- # CONFIG_HWMON is not set
- # CONFIG_USB_SUPPORT is not set
- CONFIG_NEW_LEDS=y
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 434d4b9..d5857eb 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -323,6 +323,18 @@
+ 					slew-rate = <2>;
+ 				};
+ 			};
++
++			i2c1_sda_pin: i2c1_sda at 0 {
++				pins {
++					pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>;
++					drive-open-drain;
++				};
++			};
++			i2c1_scl_pin: i2c1_scl at 0 {
++				pins {
++					pinmux = <STM32F429_PB6_FUNC_I2C1_SCL>;
++				};
++			};
+ 		};
+ 
+ 		rcc: rcc at 40023800 {
+@@ -395,6 +407,18 @@
+ 			interrupts = <80>;
+ 			clocks = <&rcc 0 38>;
+ 		};
++
++		i2c1: i2c at 40005400 {
++			compatible = "st,stm32f4-i2c";
++			reg = <0x40005400 0x400>;
++			interrupts = <31>,
++				     <32>;
++			resets = <&rcc 277>;
++			clocks = <&rcc 0 149>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
+ 	};
+ };
+ 
 -- 
 1.9.1
