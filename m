@@ -1,66 +1,32 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 2 Jun 2016 15:35:34 +0200
-Subject: [RFC PATCH 1/3] pci, acpi: Match PCI config space accessors
- against platfrom specific ECAM quirks.
-In-Reply-To: <9294389.sZPDtyjoUs@wuerfel>
-References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
- <4347711.qDrKz2s8lr@wuerfel> <5750218F.9030406@semihalf.com>
- <9294389.sZPDtyjoUs@wuerfel>
-Message-ID: <57503626.9050208@semihalf.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 2 Jun 2016 09:43:33 -0400
+Subject: [PATCH 1/4] ARM: multi_v7_defconfig: Enable Trats2 audio codec,
+ touchscreen and sensors
+In-Reply-To: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
+References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <2cc696db-554b-643e-d075-a3b47da33587@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.06.2016 14:32, Arnd Bergmann wrote:
-> On Thursday, June 2, 2016 2:07:43 PM CEST Tomasz Nowicki wrote:
->> On 02.06.2016 13:42, Arnd Bergmann wrote:
->>> On Thursday, June 2, 2016 10:41:01 AM CEST Tomasz Nowicki wrote:
->>>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
->>>> +{
->>>> +       int bus_num = root->secondary.start;
->>>> +       int domain = root->segment;
->>>> +       struct pci_cfg_fixup *f;
->>>> +
->>>> +       if (!mcfg_table)
->>>> +               return &pci_generic_ecam_ops;
->>>> +
->>>> +       /*
->>>> +        * Match against platform specific quirks and return corresponding
->>>> +        * CAM ops.
->>>> +        *
->>>> +        * First match against PCI topology <domain:bus> then use OEM ID and
->>>> +        * OEM revision from MCFG table standard header.
->>>> +        */
->>>> +       for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
->>>> +               if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
->>>> +                   (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
->>>> +                   (!strncmp(f->oem_id, mcfg_table->header.oem_id,
->>>> +                             ACPI_OEM_ID_SIZE)) &&
->>>> +                   (f->oem_revision == mcfg_table->header.oem_revision))
->>>> +                       return f->ops;
->>>> +       }
->>>> +       /* No quirks, use ECAM */
->>>> +       return &pci_generic_ecam_ops;
->>>> +}
->>>> +
->>>>    int pci_mcfg_lookup(struct acpi_pci_root *root)
->>>
->>> Can you explain the use of pci_ecam_ops instead of pci_ops here?
->>>
->>
->> I wanted to get associated bus_shift and use it to setup configuration
->> region properly before calling pci_ecam_create. Please see next patch.
->>
->
-> I see. It feels really odd to do it this way though, since having a
-> nonstandard bus_shift essentially means not using anything resembling
-> ECAM to start with.
->
-> I realize that a lot of the host bridges are not ECAM, but because
-> of this, it would be more logical to have their own pci_ops instead
-> of pci_ecam_ops.
+Hello Krzysztof,
 
-Well, we have bus_shift there to express bus shift differentiation. So I 
-would say we should change just structure name to prevent misunderstanding.
+On 06/02/2016 01:55 AM, Krzysztof Kozlowski wrote:
+> The Exynos4412-based Trats2 board has CM36651 proximity/ambient light
+> sensor, MMS114 touchscreen and Wolfson Microelectronics WM1811 CODEC.
+> Enable them in defconfig to get some testing coverage and use its
+> features.
+> 
+> While saving defconfig the SND_SOC_ODROIDX2 is removed because it does
+> not exist since commit ee12a817bb4b ("ASoC: samsung: Remove unused
+> Odroid x2/u3 machine driver").
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
 
-Thanks,
-Tomasz
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
