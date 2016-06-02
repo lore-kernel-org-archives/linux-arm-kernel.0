@@ -1,105 +1,98 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  2 Jun 2016 16:31:35 +0200
-Subject: [PATCH 08/20] drm: msm: Rely on the default ->best_encoder() behavior
- where appropriate
+Date: Thu,  2 Jun 2016 16:31:38 +0200
+Subject: [PATCH 11/20] drm: sti: Rely on the default ->best_encoder() behavior
 In-Reply-To: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1464877907-27723-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1464877907-27723-12-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For all outputs except DSI we have a 1:1 relationship between connectors
-and encoders and the driver is relying on the atomic helpers: we can
-drop the custom ->best_encoder() and let the core call
+All outputs have a 1:1 relationship between connectors and encoders
+and the driver is relying on the atomic helpers: we can drop the custom
+->best_encoder() implementations and let the core call
 drm_atomic_helper_best_encoder() for us.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/msm/edp/edp_connector.c            | 10 ----------
- drivers/gpu/drm/msm/hdmi/hdmi_connector.c          |  8 --------
- drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c |  9 ---------
- 3 files changed, 27 deletions(-)
+ drivers/gpu/drm/sti/sti_dvo.c  | 10 ----------
+ drivers/gpu/drm/sti/sti_hda.c  | 10 ----------
+ drivers/gpu/drm/sti/sti_hdmi.c | 10 ----------
+ 3 files changed, 30 deletions(-)
 
-diff --git a/drivers/gpu/drm/msm/edp/edp_connector.c b/drivers/gpu/drm/msm/edp/edp_connector.c
-index 72360cd..5960628 100644
---- a/drivers/gpu/drm/msm/edp/edp_connector.c
-+++ b/drivers/gpu/drm/msm/edp/edp_connector.c
-@@ -91,15 +91,6 @@ static int edp_connector_mode_valid(struct drm_connector *connector,
+diff --git a/drivers/gpu/drm/sti/sti_dvo.c b/drivers/gpu/drm/sti/sti_dvo.c
+index 25f7663..d5627d1 100644
+--- a/drivers/gpu/drm/sti/sti_dvo.c
++++ b/drivers/gpu/drm/sti/sti_dvo.c
+@@ -384,20 +384,10 @@ static int sti_dvo_connector_mode_valid(struct drm_connector *connector,
  	return MODE_OK;
  }
  
--static struct drm_encoder *
--edp_connector_best_encoder(struct drm_connector *connector)
+-struct drm_encoder *sti_dvo_best_encoder(struct drm_connector *connector)
 -{
--	struct edp_connector *edp_connector = to_edp_connector(connector);
+-	struct sti_dvo_connector *dvo_connector
+-		= to_sti_dvo_connector(connector);
 -
--	DBG("");
--	return edp_connector->edp->encoder;
+-	/* Best encoder is the one associated during connector creation */
+-	return dvo_connector->encoder;
 -}
 -
- static const struct drm_connector_funcs edp_connector_funcs = {
- 	.dpms = drm_atomic_helper_connector_dpms,
- 	.detect = edp_connector_detect,
-@@ -113,7 +104,6 @@ static const struct drm_connector_funcs edp_connector_funcs = {
- static const struct drm_connector_helper_funcs edp_connector_helper_funcs = {
- 	.get_modes = edp_connector_get_modes,
- 	.mode_valid = edp_connector_mode_valid,
--	.best_encoder = edp_connector_best_encoder,
+ static const
+ struct drm_connector_helper_funcs sti_dvo_connector_helper_funcs = {
+ 	.get_modes = sti_dvo_connector_get_modes,
+ 	.mode_valid = sti_dvo_connector_mode_valid,
+-	.best_encoder = sti_dvo_best_encoder,
  };
  
- /* initialize connector */
-diff --git a/drivers/gpu/drm/msm/hdmi/hdmi_connector.c b/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
-index b15d726..a2515b4 100644
---- a/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
-+++ b/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
-@@ -406,13 +406,6 @@ static int msm_hdmi_connector_mode_valid(struct drm_connector *connector,
- 	return 0;
- }
- 
--static struct drm_encoder *
--msm_hdmi_connector_best_encoder(struct drm_connector *connector)
--{
--	struct hdmi_connector *hdmi_connector = to_hdmi_connector(connector);
--	return hdmi_connector->hdmi->encoder;
--}
--
- static const struct drm_connector_funcs hdmi_connector_funcs = {
- 	.dpms = drm_atomic_helper_connector_dpms,
- 	.detect = hdmi_connector_detect,
-@@ -426,7 +419,6 @@ static const struct drm_connector_funcs hdmi_connector_funcs = {
- static const struct drm_connector_helper_funcs msm_hdmi_connector_helper_funcs = {
- 	.get_modes = msm_hdmi_connector_get_modes,
- 	.mode_valid = msm_hdmi_connector_mode_valid,
--	.best_encoder = msm_hdmi_connector_best_encoder,
- };
- 
- /* initialize connector */
-diff --git a/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c b/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
-index 2648cd7..353429b 100644
---- a/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
-+++ b/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
-@@ -90,14 +90,6 @@ static int mdp4_lvds_connector_mode_valid(struct drm_connector *connector,
+ static enum drm_connector_status
+diff --git a/drivers/gpu/drm/sti/sti_hda.c b/drivers/gpu/drm/sti/sti_hda.c
+index f7d3464..c4649f5 100644
+--- a/drivers/gpu/drm/sti/sti_hda.c
++++ b/drivers/gpu/drm/sti/sti_hda.c
+@@ -676,20 +676,10 @@ static int sti_hda_connector_mode_valid(struct drm_connector *connector,
  	return MODE_OK;
  }
  
--static struct drm_encoder *
--mdp4_lvds_connector_best_encoder(struct drm_connector *connector)
+-struct drm_encoder *sti_hda_best_encoder(struct drm_connector *connector)
 -{
--	struct mdp4_lvds_connector *mdp4_lvds_connector =
--			to_mdp4_lvds_connector(connector);
--	return mdp4_lvds_connector->encoder;
+-	struct sti_hda_connector *hda_connector
+-		= to_sti_hda_connector(connector);
+-
+-	/* Best encoder is the one associated during connector creation */
+-	return hda_connector->encoder;
 -}
 -
- static const struct drm_connector_funcs mdp4_lvds_connector_funcs = {
- 	.dpms = drm_atomic_helper_connector_dpms,
- 	.detect = mdp4_lvds_connector_detect,
-@@ -111,7 +103,6 @@ static const struct drm_connector_funcs mdp4_lvds_connector_funcs = {
- static const struct drm_connector_helper_funcs mdp4_lvds_connector_helper_funcs = {
- 	.get_modes = mdp4_lvds_connector_get_modes,
- 	.mode_valid = mdp4_lvds_connector_mode_valid,
--	.best_encoder = mdp4_lvds_connector_best_encoder,
+ static const
+ struct drm_connector_helper_funcs sti_hda_connector_helper_funcs = {
+ 	.get_modes = sti_hda_connector_get_modes,
+ 	.mode_valid = sti_hda_connector_mode_valid,
+-	.best_encoder = sti_hda_best_encoder,
  };
  
- /* initialize connector */
+ static enum drm_connector_status
+diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
+index 6ef0715..dc9ab6e 100644
+--- a/drivers/gpu/drm/sti/sti_hdmi.c
++++ b/drivers/gpu/drm/sti/sti_hdmi.c
+@@ -897,20 +897,10 @@ static int sti_hdmi_connector_mode_valid(struct drm_connector *connector,
+ 	return MODE_OK;
+ }
+ 
+-struct drm_encoder *sti_hdmi_best_encoder(struct drm_connector *connector)
+-{
+-	struct sti_hdmi_connector *hdmi_connector
+-		= to_sti_hdmi_connector(connector);
+-
+-	/* Best encoder is the one associated during connector creation */
+-	return hdmi_connector->encoder;
+-}
+-
+ static const
+ struct drm_connector_helper_funcs sti_hdmi_connector_helper_funcs = {
+ 	.get_modes = sti_hdmi_connector_get_modes,
+ 	.mode_valid = sti_hdmi_connector_mode_valid,
+-	.best_encoder = sti_hdmi_best_encoder,
+ };
+ 
+ /* get detection status of display device */
 -- 
 2.7.4
