@@ -1,34 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Jun 2016 14:25:36 +0100
-Subject: [PATCH resend v2 1/6] regulator: axp20x: support AXP809 variant
-In-Reply-To: <CAGb2v64sh_2ScP-WQioWe9su6Hx8wjyjMHVLE6Q1q9zSHZohCA@mail.gmail.com>
-References: <1464711804-19256-1-git-send-email-wens@csie.org>
- <1464711804-19256-2-git-send-email-wens@csie.org>
- <20160531173647.GJ29837@sirena.org.uk>
- <CAGb2v67eVjNnON1pAPKMSMgq83sk6u7Q53qDs0dTEbhyTAR_gA@mail.gmail.com>
- <20160602102742.GG2282@sirena.org.uk>
- <CAGb2v64sh_2ScP-WQioWe9su6Hx8wjyjMHVLE6Q1q9zSHZohCA@mail.gmail.com>
-Message-ID: <20160602132536.GI2282@sirena.org.uk>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu, 2 Jun 2016 09:27:28 -0400
+Subject: [PATCH 3/3] ARM: dts: exynos: Add watchdog amd Security SubSystem
+ to Exynos5410
+In-Reply-To: <574FCFB2.1080607@samsung.com>
+References: <1464774351-23604-1-git-send-email-k.kozlowski@samsung.com>
+ <1464774351-23604-3-git-send-email-k.kozlowski@samsung.com>
+ <f7e99aad-f773-27c6-d554-ba30bc54b5f7@osg.samsung.com>
+ <574FCFB2.1080607@samsung.com>
+Message-ID: <057fb9e8-002a-0aac-a36d-ef074ab2111e@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 07:05:22PM +0800, Chen-Yu Tsai wrote:
-> On Thu, Jun 2, 2016 at 6:27 PM, Mark Brown <broonie@kernel.org> wrote:
+Hello Krzysztof,
 
-> >> The mfd patches this one depended on were pushed around a week before
-> >> the merge window, about a month after you reviewed, merged, then backed
-> >> out this patch. There was no immutable branch either.
+On 06/02/2016 02:18 AM, Krzysztof Kozlowski wrote:
+> On 06/01/2016 05:16 PM, Javier Martinez Canillas wrote:
 
-> > Why did it get backed out?
+[snip]
 
-> Because of missing compile dependencies on the mfd bits, which weren't
-> merged yet.
+>>>  
+>>> +&watchdog {
+>>> +	clocks = <&clock CLK_WDT>;
+>>> +	clock-names = "watchdog";
+>>> +	samsung,syscon-phandle = <&pmu_system_controller>;
+>>> +};
+>>> +
+>>
+>> Since you used the same ID than Exynos5420 for the SSS and WDT clocks,
+>> I wonder if the clock and clock-names shouldn't be just defined in the
+>> shared exynos54xx.dtsi as is the case for the interrupts that are also
+>> the same?
+>>
+>> The patch looks good to me though, so whatever you decide:
+>>
+>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
+> Thanks for review and comments.
+> 
+> The 'clock' property cannot be moved - there is no clock phandle and the
+> clock IDs are not included in 54xx.
+>
 
-No, what I'm asking is why didn't it get merge along with the MFD bits?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/afb71348/attachment.sig>
+You are right, I missed that. Thanks a lot for the clarification.
+
+> Best regards,
+> Krzysztof
+> 
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
