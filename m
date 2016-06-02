@@ -1,57 +1,112 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  2 Jun 2016 16:31:29 +0200
-Subject: [PATCH 02/20] drm: arc: Rely on the default ->best_encoder() behavior
+Date: Thu,  2 Jun 2016 16:31:31 +0200
+Subject: [PATCH 04/20] drm: exynos: Rely on the default ->best_encoder()
+ behavior
 In-Reply-To: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1464877907-27723-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1464877907-27723-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have a 1:1 relationship between connectors and encoders and the
-driver is relying on the atomic helpers: we can drop the custom
-->best_encoder(), and let the core call drm_atomic_helper_best_encoder()
+We have 1:1 relationship between connectors and encoders and the driver
+is relying on the atomic helpers: we can drop the custom ->best_encoder()
+implementations and let the core call drm_atomic_helper_best_encoder()
 for us.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/arc/arcpgu_hdmi.c | 18 ------------------
- 1 file changed, 18 deletions(-)
+ drivers/gpu/drm/exynos/exynos_drm_dpi.c  | 9 ---------
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c  | 9 ---------
+ drivers/gpu/drm/exynos/exynos_drm_vidi.c | 8 --------
+ drivers/gpu/drm/exynos/exynos_hdmi.c     | 8 --------
+ 4 files changed, 34 deletions(-)
 
-diff --git a/drivers/gpu/drm/arc/arcpgu_hdmi.c b/drivers/gpu/drm/arc/arcpgu_hdmi.c
-index 08b6bae..b7a8b2a 100644
---- a/drivers/gpu/drm/arc/arcpgu_hdmi.c
-+++ b/drivers/gpu/drm/arc/arcpgu_hdmi.c
-@@ -46,23 +46,6 @@ static int arcpgu_drm_connector_get_modes(struct drm_connector *connector)
- 	return sfuncs->get_modes(&slave->base, connector);
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dpi.c b/drivers/gpu/drm/exynos/exynos_drm_dpi.c
+index 5e38e74..ad6b73c 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dpi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dpi.c
+@@ -93,17 +93,8 @@ static int exynos_dpi_get_modes(struct drm_connector *connector)
+ 	return 0;
  }
  
--struct drm_encoder *
--arcpgu_drm_connector_best_encoder(struct drm_connector *connector)
+-static struct drm_encoder *
+-exynos_dpi_best_encoder(struct drm_connector *connector)
 -{
--	struct drm_encoder_slave *slave;
--	struct arcpgu_drm_connector *con =
--		container_of(connector, struct arcpgu_drm_connector, connector);
+-	struct exynos_dpi *ctx = connector_to_dpi(connector);
 -
--	slave = con->encoder_slave;
--	if (slave == NULL) {
--		dev_err(connector->dev->dev,
--			"connector_best_encoder: cannot find slave encoder for connector\n");
--		return NULL;
--	}
--
--	return &slave->base;
+-	return &ctx->encoder;
 -}
 -
- static enum drm_connector_status
- arcpgu_drm_connector_detect(struct drm_connector *connector, bool force)
- {
-@@ -97,7 +80,6 @@ static void arcpgu_drm_connector_destroy(struct drm_connector *connector)
- static const struct drm_connector_helper_funcs
- arcpgu_drm_connector_helper_funcs = {
- 	.get_modes = arcpgu_drm_connector_get_modes,
--	.best_encoder = arcpgu_drm_connector_best_encoder,
+ static const struct drm_connector_helper_funcs exynos_dpi_connector_helper_funcs = {
+ 	.get_modes = exynos_dpi_get_modes,
+-	.best_encoder = exynos_dpi_best_encoder,
  };
  
- static const struct drm_connector_funcs arcpgu_drm_connector_funcs = {
+ static int exynos_dpi_create_connector(struct drm_encoder *encoder)
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+index 601ecf8..e07cb1f 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
+@@ -1566,17 +1566,8 @@ static int exynos_dsi_get_modes(struct drm_connector *connector)
+ 	return 0;
+ }
+ 
+-static struct drm_encoder *
+-exynos_dsi_best_encoder(struct drm_connector *connector)
+-{
+-	struct exynos_dsi *dsi = connector_to_dsi(connector);
+-
+-	return &dsi->encoder;
+-}
+-
+ static const struct drm_connector_helper_funcs exynos_dsi_connector_helper_funcs = {
+ 	.get_modes = exynos_dsi_get_modes,
+-	.best_encoder = exynos_dsi_best_encoder,
+ };
+ 
+ static int exynos_dsi_create_connector(struct drm_encoder *encoder)
+diff --git a/drivers/gpu/drm/exynos/exynos_drm_vidi.c b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+index 608b0af..e8f6c92 100644
+--- a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
++++ b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
+@@ -378,16 +378,8 @@ static int vidi_get_modes(struct drm_connector *connector)
+ 	return drm_add_edid_modes(connector, edid);
+ }
+ 
+-static struct drm_encoder *vidi_best_encoder(struct drm_connector *connector)
+-{
+-	struct vidi_context *ctx = ctx_from_connector(connector);
+-
+-	return &ctx->encoder;
+-}
+-
+ static const struct drm_connector_helper_funcs vidi_connector_helper_funcs = {
+ 	.get_modes = vidi_get_modes,
+-	.best_encoder = vidi_best_encoder,
+ };
+ 
+ static int vidi_create_connector(struct drm_encoder *encoder)
+diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
+index 58de5a4..1625d7c 100644
+--- a/drivers/gpu/drm/exynos/exynos_hdmi.c
++++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
+@@ -937,17 +937,9 @@ static int hdmi_mode_valid(struct drm_connector *connector,
+ 	return MODE_OK;
+ }
+ 
+-static struct drm_encoder *hdmi_best_encoder(struct drm_connector *connector)
+-{
+-	struct hdmi_context *hdata = connector_to_hdmi(connector);
+-
+-	return &hdata->encoder;
+-}
+-
+ static const struct drm_connector_helper_funcs hdmi_connector_helper_funcs = {
+ 	.get_modes = hdmi_get_modes,
+ 	.mode_valid = hdmi_mode_valid,
+-	.best_encoder = hdmi_best_encoder,
+ };
+ 
+ static int hdmi_create_connector(struct drm_encoder *encoder)
 -- 
 2.7.4
