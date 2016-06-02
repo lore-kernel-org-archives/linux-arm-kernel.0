@@ -1,25 +1,37 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 2 Jun 2016 15:15:01 -0700
-Subject: [Patch v5 3/8] firmware: qcom: scm: Use atomic SCM for cold boot
-In-Reply-To: <1463111221-6963-4-git-send-email-andy.gross@linaro.org>
-References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
- <1463111221-6963-4-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160602221501.GO28218@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 Jun 2016 00:28:15 +0200
+Subject: [PATCH] arm64: do away with ARCH_[WANT_OPTIONAL|REQUIRE]_GPIOLIB
+In-Reply-To: <20160602180514.GD7697@arm.com>
+References: <1464869670-7208-1-git-send-email-linus.walleij@linaro.org>
+ <20160602180514.GD7697@arm.com>
+Message-ID: <CACRpkdZcxYtZ84AkXsRGYPdPwBOzmK7srb5hzYFhVbEe0Mm2xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12, Andy Gross wrote:
-> This patch changes the cold_set_boot_addr function to use atomic SCM
-> calls.  cold_set_boot_addr required adding qcom_scm_call_atomic2 to
-> support the two arguments going to the smc call.  Using atomic removes
-> the need for memory allocation and instead places all arguments in
-> registers.
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> ---
+On Thu, Jun 2, 2016 at 8:05 PM, Will Deacon <will.deacon@arm.com> wrote:
+> On Thu, Jun 02, 2016 at 02:14:30PM +0200, Linus Walleij wrote:
+>> This replaces:
+>>
+>> - "select ARCH_REQUIRE_GPIOLIB" with "select GPIOLIB" as this can
+>>   now be selected directly.
+>>
+>> - "select ARCH_WANT_OPTIONAL_GPIOLIB" with no dependency: GPIOLIB
+>>   is now selectable by everyone, so we need not declare our
+>>   intent to select it.
+>>
+>> Cc: Michael B?sch <m@bues.ch>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> ---
+>> ARM64/AArch64 maintainers:
+>> Please apply this patch directly for cleanups.
+>
+> Just checking -- you're aiming to have this in 4.7-rc ?
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+No cleanups for v4.8, not fixes for v4.7.
+There is no hurry, I have all patience in the world.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Just letting these trickle out in the beginning of the
+development cycle to be safe.
+
+Yours,
+Linus Walleij
