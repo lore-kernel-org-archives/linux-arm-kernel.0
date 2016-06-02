@@ -1,40 +1,23 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu, 2 Jun 2016 11:31:14 -0500
-Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
-In-Reply-To: <20160602162925.GC24938@e104818-lin.cambridge.arm.com>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
- <20160601103446.GC9280@leverpostej>
- <20160601104326.GA24749@e104818-lin.cambridge.arm.com>
- <20160602143650.GG2658@codeblueprint.co.uk>
- <20160602162925.GC24938@e104818-lin.cambridge.arm.com>
-Message-ID: <57505F52.3040108@arm.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Thu, 2 Jun 2016 16:31:33 +0000
+Subject: What is the Surf board , really?
+In-Reply-To: <CACRpkdYtHWObewx6vJXbPU9Wv4rhR0i7sW9YB0Ap8yo5aTJy=Q@mail.gmail.com>
+References: <CACRpkdYtHWObewx6vJXbPU9Wv4rhR0i7sW9YB0Ap8yo5aTJy=Q@mail.gmail.com>
+Message-ID: <CO2PR01MB2088FC2F5874656CDE844672D0580@CO2PR01MB2088.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2016 11:29 AM, Catalin Marinas wrote:
-> On Thu, Jun 02, 2016 at 03:36:50PM +0100, Matt Fleming wrote:
->> On Wed, 01 Jun, at 11:43:26AM, Catalin Marinas wrote:
->>>
->>> Thanks for the heads up. I'll rebase the patches after -rc2 but anyway I
->>> plan to merge them in 4.8 via the arm64 tree, including the patch above
->>> if Matt acks it. So there is enough time to fix the conflicts.
->>
->> I'd really prefer it if you didn't take this series through the arm64
->> tree, unless there are existing dependencies, of course.
->>
->> There were a number of conflicts in 3 different maintainer trees in
->> linux-next before the most recent merge window opened, and extra work
->> was required to sort that out. I want to avoid that in the future, so
->> expect me to be more insistent about keeping EFI patches in the EFI
->> tree than I have been in the past.
->>
->> Do arm64 prerequisites exist for this series? Or are you planning on
->> adding dependencies on top?
+On Wednesday, June 01, 2016 11:25 PM, Linus Walleij wrote:
+> I located all my schematics to the APQ8660 DragonBoard thing.
 >
-> I don't know when Jeremy plans to submit his contiguous PTE patches (we
-> rejected them on the grounds of unnecessary huge page splitting, hence
-> this series). If he's not targeting 4.8, I'm happy for the patches to go
-> in via the EFI tree.
+> Now: is the "surf" board one and the same as this? I never really
+> got that confirmed. It's got the msm8660 rather than apq8660
+> naming and all so I get confused.
 
-I can re-post them again for 4.8. They seem to get simpler every time!
+I think the APQ8x60 is a MSM8x60 variant without a modem. So
+the APQ parts are "application processors" and the MSM parts are
+"phone processors". Other than that I think they are the same.
+
+But I could be total wrong....
+
+Hartley
