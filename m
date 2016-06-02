@@ -1,80 +1,53 @@
-From: aleksey.makarov@linaro.org (Aleksey Makarov)
-Date: Thu,  2 Jun 2016 20:49:10 +0300
-Subject: [PATCH v3 5/5] ACPI: ARM64: support for ACPI_TABLE_UPGRADE
-In-Reply-To: <20160527171424.GG10909@e104818-lin.cambridge.arm.com>
-References: <20160527171424.GG10909@e104818-lin.cambridge.arm.com>
-Message-ID: <20160602174910.30428-1-aleksey.makarov@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 2 Jun 2016 10:56:35 -0700
+Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
+In-Reply-To: <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
+References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
+ <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
+ <20160602173932.GF5995@atomide.com>
+ <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
+Message-ID: <20160602175635.GG5995@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Masters <jcm@redhat.com>
+* Robert Nelson <robertcnelson@gmail.com> [160602 10:48]:
+> On Thu, Jun 2, 2016 at 12:39 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > * Robert Nelson <robertcnelson@gmail.com> [160602 10:39]:
+> > > On Thu, Jun 2, 2016 at 2:41 AM, Yong Li <yong.b.li@intel.com> wrote:
+> > >
+> > > > From: Yong Li <sdliyong@gmail.com>
+> > > >
+> > > > Without this patch, I2C-1 is missing on beaglebone black boards
+> > > >
+> > > > Signed-off-by: Yong Li <sdliyong@gmail.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/am335x-boneblack.dts | 15 +++++++++++++++
+> > > >  1 file changed, 15 insertions(+)
+> > > >
+> > >
+> > >
+> > > This is also 'common' for the white/green, if your really going to push
+> > > this, please add it to:
+> > >
+> > > am335x-bone-common.dtsi
+> >
+> > But isn't this exposed on the cape pins? So the use can be
+> > whatever for these pins?
+> 
+> That is correct, "i2c1" is on the cape connector, with no primary
+> function defined.
+> 
+> Currently on mainline, the board and cape eeprom i2c bus's are enabled.
+> 
+> i2c0 = board eeprom
+> i2c2 = 'cape' eeprom
+> 
+> personally, nak by me to add i2c1 by default, should use overlay's to enable it.
 
-This patch adds support for ACPI_TABLE_UPGRADE for ARM64
+Yes sounds like the best we can do is define it but set it with
+status = "disabled" for now.
 
-To access initrd image we need to move initialization
-of linear mapping a bit earlier.
+Regards,
 
-The implementation of the feature acpi_table_upgrade()
-(drivers/acpi/tables.c) works with initrd data represented as an array
-in virtual memory.  It uses some library utility to find the redefined
-tables in that array and iterates over it to copy the data to new
-allocated memory.  So to access the initrd data via fixmap
-we need to rewrite it considerably.
-
-In x86 arch, kernel memory is already mapped by the time when
-acpi_table_upgrade() and acpi_boot_table_init() are called so I
-think that we can just move this mapping one function earlier too.
-
-Signed-off-by: Jon Masters <jcm@redhat.com>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@linaro.org>
----
- arch/arm64/Kconfig            | 1 +
- arch/arm64/include/asm/acpi.h | 2 ++
- arch/arm64/kernel/setup.c     | 6 ++++--
- 3 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 87c48ad..baee459 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -5,6 +5,7 @@ config ARM64
- 	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
- 	select ACPI_MCFG if ACPI
- 	select ARCH_HAS_DEVMEM_IS_ALLOWED
-+	select ARCH_HAS_ACPI_TABLE_UPGRADE if ACPI
- 	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
- 	select ARCH_HAS_ELF_RANDOMIZE
- 	select ARCH_HAS_GCOV_PROFILE_ALL
-diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
-index aee323b..c7aefc5 100644
---- a/arch/arm64/include/asm/acpi.h
-+++ b/arch/arm64/include/asm/acpi.h
-@@ -113,4 +113,6 @@ static inline const char *acpi_get_enable_method(int cpu)
- pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
- #endif
- 
-+#define ACPI_TABLE_UPGRADE_MAX_PHYS MEMBLOCK_ALLOC_ACCESSIBLE
-+
- #endif /*_ASM_ACPI_H*/
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index feab2ee..4bce811 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -261,11 +261,13 @@ void __init setup_arch(char **cmdline_p)
- 	efi_init();
- 	arm64_memblock_init();
- 
-+	paging_init();
-+
-+	acpi_table_upgrade();
-+
- 	/* Parse the ACPI tables for possible boot-time configuration */
- 	acpi_boot_table_init();
- 
--	paging_init();
--
- 	if (acpi_disabled)
- 		unflatten_device_tree();
- 
--- 
-2.8.3
+Tony
