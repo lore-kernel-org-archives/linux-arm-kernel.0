@@ -1,49 +1,32 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 3 Jun 2016 00:33:05 +0300
-Subject: [PATCH 13/13] ARM: dts: blanche: add Ethernet support
-In-Reply-To: <CAMuHMdXUdg8+ux2j5SsthZS6DWZnHfan0jL=PpYEwfnS7fbRkQ@mail.gmail.com>
+Date: Fri, 3 Jun 2016 00:34:26 +0300
+Subject: [PATCH 12/13] ARM: dts: blanche: initial device tree
+In-Reply-To: <20160601012153.GK20527@verge.net.au>
 References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <1669958.qjJ7i3NBPv@wasted.cogentembedded.com>
- <CAMuHMdU2P6VKXNpEHGOKpyuM45Pk0CuHWngxwu5AYGqYfduXXg@mail.gmail.com>
- <a60346f2-2abb-342b-dd20-38d401c4ceb3@cogentembedded.com>
- <CAMuHMdXUdg8+ux2j5SsthZS6DWZnHfan0jL=PpYEwfnS7fbRkQ@mail.gmail.com>
-Message-ID: <3097ebac-9d5a-8e71-ee64-f3f4629c1785@cogentembedded.com>
+ <1923946.Jvi0TDUXFC@wasted.cogentembedded.com>
+ <20160601012153.GK20527@verge.net.au>
+Message-ID: <149347f1-f636-cd65-6c6d-509f7c3306f0@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 03:27 PM, Geert Uytterhoeven wrote:
+On 06/01/2016 04:21 AM, Simon Horman wrote:
 
->>>> --- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
->>>> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
->>>
->>>> +       ethernet at 18000000 {
->>>> +               compatible = "smsc,lan89218", "smsc,lan9115";
->>>
->>>
->>> The "smsc,lan89218" needs to be documented in the device tree bindings.
+>> Add the initial device  tree for the R8A7792 SoC based Blanche board.
+>> The board has 2 debug serial ports: SCIF0 and SCIF3; include support for
+>> them,  so that  the serial console  can  work.
 >>
->>    Have you looked at those bindings?
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 >
-> Now I did.
+> At this time I do not have access to documentation or hardware for this
+> board. So I am relying on you to test this and make sure it complies
+> with the spec.
+
+    Don't worry, the patches have been tested on the real hardware.
+
+> What you have looks reasonable to me:
 >
->>> Google couldn't find any evidence you submitted a patch for that.
->>
->>    Because the bindings document *any* LAN9115 compatible chip already.
->
-> Ah, generic wildcard, not listing valid values. Hence checkpatch complained...
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-    Note that it doesn't complain about "smsc,lan9220" though that is only 
-mentioned in the example.
-
-> Google predict-while-you-type suggests "lan89218aq"? Should you use that?
-
-    No, my googling shows that the suffix can be different, and the Microchip 
-(the new owner?) has it without the suffix on their site.
-
-> BTW, that's why we always want to document all valid values...
-
-> Gr{oetje,eeting}s,
->
->                         Geert
+    Thank you. :-)
 
 MBR, Sergei
