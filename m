@@ -1,34 +1,34 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 2 Jun 2016 10:28:07 +0800
-Subject: [PATCH v3 1/5] of/numa: remove a duplicated pr_debug information
+Date: Thu, 2 Jun 2016 10:28:09 +0800
+Subject: [PATCH v3 3/5] arm64/numa: add nid check for memory block
 In-Reply-To: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1464834491-12024-2-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1464834491-12024-4-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This information will be printed in the subfunction numa_add_memblk.
-They are not the same, but very similar.
+Use the same tactic to cpu and numa-distance nodes.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/of/of_numa.c | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/mm/numa.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index ed5a097..fb71b4e 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -88,10 +88,6 @@ static int __init of_numa_parse_memory_nodes(void)
- 			break;
- 		}
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index c7fe3ec..2601660 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -141,6 +141,11 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
+ {
+ 	int ret;
 
--		pr_debug("NUMA:  base = %llx len = %llx, node = %u\n",
--			 rsrc.start, rsrc.end - rsrc.start + 1, nid);
--
--
- 		r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
- 		if (r)
- 			break;
++	if (nid >= MAX_NUMNODES) {
++		pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
++		return -EINVAL;
++	}
++
+ 	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
+ 	if (ret < 0) {
+ 		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
 --
 2.5.0
