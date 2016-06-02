@@ -1,48 +1,63 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  2 Jun 2016 16:31:30 +0200
-Subject: [PATCH 03/20] drm: atmel-hlcdc: Rely on the default ->best_encoder()
- behavior
+Date: Thu,  2 Jun 2016 16:31:28 +0200
+Subject: [PATCH 01/20] drm/atomic: Fix remaining places where
+ !funcs->best_encoder is valid
 In-Reply-To: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1464877907-27723-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1464877907-27723-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have a 1:1 relationship between connectors and encoders and the
-driver is relying on the atomic helpers: we can drop the custom
-->best_encoder() and let the core call drm_atomic_helper_best_encoder()
-for us.
+Adapt drm_pick_crtcs() and update_connector_routing() to fallback to
+drm_atomic_helper_best_encoder() if funcs->best_encoder() is NULL so
+that DRM drivers can leave this hook unassigned if they know they want
+to use drm_atomic_helper_best_encoder().
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 12 ------------
- 1 file changed, 12 deletions(-)
+ drivers/gpu/drm/drm_atomic_helper.c |  4 +++-
+ drivers/gpu/drm/drm_fb_helper.c     | 13 ++++++++++++-
+ 2 files changed, 15 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-index 39802c0..473a475 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-@@ -113,21 +113,9 @@ static int atmel_hlcdc_rgb_mode_valid(struct drm_connector *connector,
- 	return atmel_hlcdc_dc_mode_valid(rgb->dc, mode);
- }
+diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
+index f6a3350..849d029 100644
+--- a/drivers/gpu/drm/drm_atomic_helper.c
++++ b/drivers/gpu/drm/drm_atomic_helper.c
+@@ -300,8 +300,10 @@ update_connector_routing(struct drm_atomic_state *state,
+ 	if (funcs->atomic_best_encoder)
+ 		new_encoder = funcs->atomic_best_encoder(connector,
+ 							 connector_state);
+-	else
++	else if (funcs->best_encoder)
+ 		new_encoder = funcs->best_encoder(connector);
++	else
++		new_encoder = drm_atomic_helper_best_encoder(connector);
  
--
--
--static struct drm_encoder *
--atmel_hlcdc_rgb_best_encoder(struct drm_connector *connector)
--{
--	struct atmel_hlcdc_rgb_output *rgb =
--			drm_connector_to_atmel_hlcdc_rgb_output(connector);
--
--	return &rgb->encoder;
--}
--
- static const struct drm_connector_helper_funcs atmel_hlcdc_panel_connector_helper_funcs = {
- 	.get_modes = atmel_hlcdc_panel_get_modes,
- 	.mode_valid = atmel_hlcdc_rgb_mode_valid,
--	.best_encoder = atmel_hlcdc_rgb_best_encoder,
- };
+ 	if (!new_encoder) {
+ 		DRM_DEBUG_ATOMIC("No suitable encoder found for [CONNECTOR:%d:%s]\n",
+diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
+index 7c2eb75..d44389a 100644
+--- a/drivers/gpu/drm/drm_fb_helper.c
++++ b/drivers/gpu/drm/drm_fb_helper.c
+@@ -2000,7 +2000,18 @@ static int drm_pick_crtcs(struct drm_fb_helper *fb_helper,
+ 		my_score++;
  
- static enum drm_connector_status
+ 	connector_funcs = connector->helper_private;
+-	encoder = connector_funcs->best_encoder(connector);
++
++	/*
++	 * If the DRM device implements atomic hooks and ->best_encoder() is
++	 * NULL we fallback to the default drm_atomic_helper_best_encoder()
++	 * helper.
++	 */
++	if (fb_helper->dev->mode_config.funcs->atomic_commit &&
++	    !connector_funcs->best_encoder)
++		encoder = drm_atomic_helper_best_encoder(connector);
++	else
++		encoder = connector_funcs->best_encoder(connector);
++
+ 	if (!encoder)
+ 		goto out;
+ 
 -- 
 2.7.4
