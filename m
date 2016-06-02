@@ -1,75 +1,127 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Thu, 2 Jun 2016 10:28:08 +0800
-Subject: [PATCH v3 2/5] of/numa: fix a memory@ node can only contains one
- memory block
-In-Reply-To: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1464834491-12024-3-git-send-email-thunder.leizhen@huawei.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Thu, 2 Jun 2016 12:55:23 +1000
+Subject: [linux-sunxi] [PATCH] [V2] ARM: dts: sun7i: Add dts file for
+ Bananapi M1 Plus board
+In-Reply-To: <20160602023623.5761-1-luoyi.ly@gmail.com>
+References: <20160602023623.5761-1-luoyi.ly@gmail.com>
+Message-ID: <CAGRGNgUiGaxoVxtq=k8NG5mCqEXS9fd-ry1vvVJfzb+R2ATMTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a normal memory@ devicetree node, its reg property can contains more
-memory blocks.
+Hi Luo yi,
 
-Because we don't known how many memory blocks maybe contained, so we try
-from index=0, increase 1 until error returned(the end).
+On Thu, Jun 2, 2016 at 12:36 PM,  <luoyi.ly@gmail.com> wrote:
+> From: Luo Yi <luoyi.ly@gmail.com>
+>
+> Add support for the Bananapi M1 Plus A20 development board from
+> sinovoip.com.cn . This board is nearly a clone of the Lemaker's
+> Bananapro, but differ with the wlan chipset connection and i2s pinout.
+> And I also enable the integrated audio codec on default.
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/of/of_numa.c | 29 ++++++++++-------------------
- 1 file changed, 10 insertions(+), 19 deletions(-)
+No signed-off-by.
 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index fb71b4e..7b3fbdc 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -63,13 +63,9 @@ static int __init of_numa_parse_memory_nodes(void)
- 	struct device_node *np = NULL;
- 	struct resource rsrc;
- 	u32 nid;
--	int r = 0;
--
--	for (;;) {
--		np = of_find_node_by_type(np, "memory");
--		if (!np)
--			break;
-+	int i, r;
+> ---
+>  arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 72 ++++++++++++++++++++++++
+>  1 file changed, 72 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+> new file mode 100644
+> index 0000000..6fd55d7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+> @@ -0,0 +1,72 @@
+> +/*
+> + * Copyright 2016 Luo Yi <luoyi.ly@gmail.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include "sun7i-a20-bananapro.dts"
+> +
+> +/ {
+> +       model = "Banana Pi BPI-M1-Plus";
+> +       compatible = "sinovoip,bpi-m1-plus", "allwinner,sun7i-a20";
+> +};
+> +
+> +
 
-+	for_each_node_by_type(np, "memory") {
- 		r = of_property_read_u32(np, "numa-node-id", &nid);
- 		if (r == -EINVAL)
- 			/*
-@@ -78,23 +74,18 @@ static int __init of_numa_parse_memory_nodes(void)
- 			 * "numa-node-id" property
- 			 */
- 			continue;
--		else if (r)
--			/* some other error */
--			break;
+Extra line.
 
--		r = of_address_to_resource(np, 0, &rsrc);
--		if (r) {
--			pr_err("NUMA: bad reg property in memory node\n");
--			break;
--		}
-+		for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
-+			r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
+> +&codec {
+> +       status = "okay";
+> +};
 
--		r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
--		if (r)
--			break;
-+		if (!i || r) {
-+			of_node_put(np);
-+			pr_err("NUMA: bad property in memory node\n");
-+			return r ? : -EINVAL;
-+		}
- 	}
--	of_node_put(np);
+Does anyone know if this should be enabled on the bananapro too?
 
--	return r;
-+	return 0;
- }
+> +
+> +&mmc3 {
+> +       enable-sdio-wakeup;
+> +
+> +       brcmf: bcrmf at 1 {
+> +               reg = <1>;
+> +               compatible = "brcm,bcm4329-fmac";
+> +               interrupt-parent = <&pio>;
+> +               interrupts = <7 15 IRQ_TYPE_LEVEL_LOW>;
+> +               interrupt-names = "host-wake";
+> +       };
+> +
 
- static int __init of_numa_parse_distance_map_v1(struct device_node *map)
---
-2.5.0
+Extra line.
+
+> +};
+> +
+> +&mmc3_pins_a {
+> +    /* AP6210 requires pull-up */
+
+Should this be indented the same as the following line?
+
+> +       allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+> +};
+> +
+
+Extra line.
+
+Thanks,
+
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
