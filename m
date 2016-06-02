@@ -1,70 +1,80 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 2 Jun 2016 11:17:51 -0400
-Subject: [PATCH v1 1/2] ARM: dts: keystone: remove bogus IO resource entry
- from PCI binding
-Message-ID: <1464880672-15203-1-git-send-email-m-karicheri2@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jun 2016 17:19:13 +0200
+Subject: [RFC PATCH 1/3] pci,
+ acpi: Match PCI config space accessors against platfrom specific ECAM
+ quirks.
+In-Reply-To: <57503626.9050208@semihalf.com>
+References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
+ <9294389.sZPDtyjoUs@wuerfel> <57503626.9050208@semihalf.com>
+Message-ID: <4608372.hbXNF1lbNO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PCI DT bindings contain a bogus entry for IO space which is not
-supported on Keystone. The current bogus entry has an invalid size
-and throws following error during boot.
+On Thursday, June 2, 2016 3:35:34 PM CEST Tomasz Nowicki wrote:
+> On 02.06.2016 14:32, Arnd Bergmann wrote:
+> > On Thursday, June 2, 2016 2:07:43 PM CEST Tomasz Nowicki wrote:
+> >> On 02.06.2016 13:42, Arnd Bergmann wrote:
+> >>> On Thursday, June 2, 2016 10:41:01 AM CEST Tomasz Nowicki wrote:
+> >>>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
+> >>>> +{
+> >>>> +       int bus_num = root->secondary.start;
+> >>>> +       int domain = root->segment;
+> >>>> +       struct pci_cfg_fixup *f;
+> >>>> +
+> >>>> +       if (!mcfg_table)
+> >>>> +               return &pci_generic_ecam_ops;
+> >>>> +
+> >>>> +       /*
+> >>>> +        * Match against platform specific quirks and return corresponding
+> >>>> +        * CAM ops.
+> >>>> +        *
+> >>>> +        * First match against PCI topology <domain:bus> then use OEM ID and
+> >>>> +        * OEM revision from MCFG table standard header.
+> >>>> +        */
+> >>>> +       for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
+> >>>> +               if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
+> >>>> +                   (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
+> >>>> +                   (!strncmp(f->oem_id, mcfg_table->header.oem_id,
+> >>>> +                             ACPI_OEM_ID_SIZE)) &&
+> >>>> +                   (f->oem_revision == mcfg_table->header.oem_revision))
+> >>>> +                       return f->ops;
+> >>>> +       }
+> >>>> +       /* No quirks, use ECAM */
+> >>>> +       return &pci_generic_ecam_ops;
+> >>>> +}
+> >>>> +
+> >>>>    int pci_mcfg_lookup(struct acpi_pci_root *root)
+> >>>
+> >>> Can you explain the use of pci_ecam_ops instead of pci_ops here?
+> >>>
+> >>
+> >> I wanted to get associated bus_shift and use it to setup configuration
+> >> region properly before calling pci_ecam_create. Please see next patch.
+> >>
+> >
+> > I see. It feels really odd to do it this way though, since having a
+> > nonstandard bus_shift essentially means not using anything resembling
+> > ECAM to start with.
+> >
+> > I realize that a lot of the host bridges are not ECAM, but because
+> > of this, it would be more logical to have their own pci_ops instead
+> > of pci_ecam_ops.
+> 
+> Well, we have bus_shift there to express bus shift differentiation. So I 
+> would say we should change just structure name to prevent misunderstanding.
 
-[0.420713] keystone-pcie 21021000.pcie: error -22: failed to map
-           resource [io  0x0000-0x400000003fff]
+I'm not really convinced here. We use the bus_shift for two
+completely different things in the end: for sizing the MMIO window
+that gets mapped by ACPI and for the pci_ecam_map_bus() function
+that isn't actually used for the typical fixups that override the
+pci_ops.
 
-So remove it from the dts. While at it also add a bus-range
-value that eliminates following log at boot up.
+I see now that this sneaks in an .init callback for the quirk
+through the backdoor, by adding it to the pci_ecam_ops. I think
+that is not good: if the idea is to have the config space access
+be adapted to various quirks that is one thing, but if we actually
+need a function to be called for the quirk we should do just that
+and have it be obvious. That function can then override the
+pci_ops.
 
-[0.420659] No bus range found for /soc/pcie at 21020000, using [bus 00-ff]
-
-Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
----
- v1 - fixed subject to something more meaningful
- applies to master v4.7-rcx at kernel.org git repo
- arch/arm/boot/dts/keystone-k2e.dtsi | 5 +++--
- arch/arm/boot/dts/keystone.dtsi     | 5 +++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-index 96b349f..5374c9a 100644
---- a/arch/arm/boot/dts/keystone-k2e.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-@@ -96,12 +96,13 @@
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			reg =  <0x21021000 0x2000>, <0x21020000 0x1000>, <0x02620128 4>;
--			ranges = <0x81000000 0 0 0x23260000 0x4000 0x4000
--				0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
-+			ranges = <0x82000000 0 0x60000000 0x60000000
-+				  0 0x10000000>;
- 
- 			status = "disabled";
- 			device_type = "pci";
- 			num-lanes = <2>;
-+			bus-range = <0x00 0xff>;
- 
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 7>;
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index e34b226..f627a1c 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -294,12 +294,13 @@
- 			#address-cells = <3>;
- 			#size-cells = <2>;
- 			reg =  <0x21801000 0x2000>, <0x21800000 0x1000>, <0x02620128 4>;
--			ranges = <0x81000000 0 0 0x23250000 0 0x4000
--				0x82000000 0 0x50000000 0x50000000 0 0x10000000>;
-+			ranges = <0x82000000 0 0x50000000 0x50000000
-+				  0 0x10000000>;
- 
- 			status = "disabled";
- 			device_type = "pci";
- 			num-lanes = <2>;
-+			bus-range = <0x00 0xff>;
- 
- 			#interrupt-cells = <1>;
- 			interrupt-map-mask = <0 0 0 7>;
--- 
-1.9.1
+	Arnd
