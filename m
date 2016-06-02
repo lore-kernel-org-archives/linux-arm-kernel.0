@@ -1,37 +1,21 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jun 2016 08:21:29 +0200
-Subject: [PATCH v2] ARM: dts: exynos: Add TMU nodes regulator supply for
- Peach boards
-In-Reply-To: <1464787235-8400-1-git-send-email-javier@osg.samsung.com>
-References: <1464787235-8400-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <574FD069.8020709@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 2 Jun 2016 08:25:07 +0200
+Subject: What is the Surf board , really?
+Message-ID: <CACRpkdYtHWObewx6vJXbPU9Wv4rhR0i7sW9YB0Ap8yo5aTJy=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 03:20 PM, Javier Martinez Canillas wrote:
-> The Exynos5800 Peach Pi and Exynos5420 Peach Pit Chromebooks have the
-> LDO10 1.8V output connected to the VDD18_TS{01,23,4} Exynos SoC pins.
-> 
-> Add this regulator as the input supply of the Thermal Management Unit
-> channels and also remove the always-on property since all the devices
-> using LDO10 as input supply are now defined.
-> 
-> Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> 
-> Changes in v2:
-> - Sorted nodes in alphabetical order (Krzysztof Kozlowski).
-> - Added Krzysztof's Suggested-by tag since he mentioned in other
->   thread that the TMU supplies were missing.
-> 
->  arch/arm/boot/dts/exynos5420-peach-pit.dts | 21 ++++++++++++++++++++-
->  arch/arm/boot/dts/exynos5800-peach-pi.dts  | 21 ++++++++++++++++++++-
->  2 files changed, 40 insertions(+), 2 deletions(-)
-> 
+I located all my schematics to the APQ8660 DragonBoard thing.
 
-Thanks, applied.
+Now: is the "surf" board one and the same as this? I never really
+got that confirmed. It's got the msm8660 rather than apq8660
+naming and all so I get confused.
 
-Best regards,
-Krzysztof
+So I was thinking that surf is maybe some other (phone) development
+board.
+
+So before I go patching it around, should I work on this DTS file
+or create a new one for the DragonBoard APQ8660?
+
+Yours,
+Linus Walleij
