@@ -1,9 +1,9 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  2 Jun 2016 12:20:55 +0200
-Subject: [PULL 3/8] KVM: arm/arm64: vgic-v2: Always resample level interrupts
+Date: Thu,  2 Jun 2016 12:20:56 +0200
+Subject: [PULL 4/8] KVM: arm/arm64: vgic-v3: Always resample level interrupts
 In-Reply-To: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
 References: <1464862860-1183-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1464862860-1183-4-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <1464862860-1183-5-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -23,20 +23,20 @@ that have been already retired.
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-v2.c | 14 +++++++++-----
+ virt/kvm/arm/vgic/vgic-v3.c | 14 +++++++++-----
  1 file changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 8ad42c2..e31405e 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -112,11 +112,15 @@ void vgic_v2_fold_lr_state(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 336a461..346b4ad 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -101,11 +101,15 @@ void vgic_v3_fold_lr_state(struct kvm_vcpu *vcpu)
  			}
  		}
  
--		/* Clear soft pending state when level IRQs have been acked */
+-		/* Clear soft pending state when level irqs have been acked */
 -		if (irq->config == VGIC_CONFIG_LEVEL &&
--		    !(val & GICH_LR_PENDING_BIT)) {
+-		    !(val & ICH_LR_PENDING_BIT)) {
 -			irq->soft_pending = false;
 -			irq->pending = irq->line_level;
 +		/*
@@ -44,7 +44,7 @@ index 8ad42c2..e31405e 100644
 +		 * Always regenerate the pending state.
 +		 */
 +		if (irq->config == VGIC_CONFIG_LEVEL) {
-+			if (!(val & GICH_LR_PENDING_BIT))
++			if (!(val & ICH_LR_PENDING_BIT))
 +				irq->soft_pending = false;
 +
 +			irq->pending = irq->line_level || irq->soft_pending;
