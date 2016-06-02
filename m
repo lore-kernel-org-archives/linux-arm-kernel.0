@@ -1,29 +1,75 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Thu, 2 Jun 2016 10:28:37 +0200
-Subject: [PATCH] include/linux/arm-smccc.h: avoid sign extension problem
-In-Reply-To: <20160601160401.GZ19428@n2100.arm.linux.org.uk>
-References: <1464785361-20038-1-git-send-email-jens.wiklander@linaro.org>
- <20160601160401.GZ19428@n2100.arm.linux.org.uk>
-Message-ID: <CAHUa44Gv4+aFuBNdsAy3U1iNAR+evM1bfrJgx39GQgERBQ-gWA@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 2 Jun 2016 10:31:13 +0200
+Subject: [PATCH 1/3] mmc: fix mmc mode selection for HS-DDR and higher
+In-Reply-To: <1464505484-3661-2-git-send-email-wens@csie.org>
+References: <1464505484-3661-1-git-send-email-wens@csie.org>
+ <1464505484-3661-2-git-send-email-wens@csie.org>
+Message-ID: <CAPDyKFriC7i1DtF5d8eoY0baRoZ2VTfhWJznw9SvOnPNYksU5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2016 at 6:04 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Wed, Jun 01, 2016 at 02:49:21PM +0200, Jens Wiklander wrote:
->> Prior to this patch the ARM_SMCCC_FAST_CALL constant was of a signed
->> type causing unwanted sign extension. This patch explicitly selects an
->> unsigned type for the constant.
->>
->> Reported-by: Saksham Jain <sakjain92@gmail.com>
->> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
->
-> Looks fine to me.  Who's merging this change?  If they're going some
-> other route:
->
-> Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
++ Linus
 
-Thanks, Russel. I was hoping you would take it when it's reviewed.
+On 29 May 2016 at 09:04, Chen-Yu Tsai <wens@csie.org> wrote:
+> When IS_ERR_VALUE was removed from the mmc core code, it was replaced
+> with a simple not-zero check. This does not work, as the value checked
+> is the return value for mmc_select_bus_width, which returns the set
+> bit width on success. This made eMMC modes higher than HS-DDR unusable.
+>
+> Fix this by checking for a positive return value instead.
+>
+> Fixes: 287980e49ffc ("remove lots of IS_ERR_VALUE abuses")
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> ---
+>  drivers/mmc/core/mmc.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+> index c984321d1881..aafb73d080ca 100644
+> --- a/drivers/mmc/core/mmc.c
+> +++ b/drivers/mmc/core/mmc.c
+> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
+>          * switch to HS200 mode if bus width is set successfully.
+>          */
+>         err = mmc_select_bus_width(card);
+> -       if (!err) {
+> +       if (err > 0) {
+>                 val = EXT_CSD_TIMING_HS200 |
+>                       card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
+>                 err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+> @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+>         } else if (mmc_card_hs(card)) {
+>                 /* Select the desired bus width optionally */
+>                 err = mmc_select_bus_width(card);
+> -               if (!err) {
+> +               if (err > 0) {
 
-Thanks,
-Jens
+As pointed out in the review by Bj?rn, to restore the old behaviour we
+should check for "err >= 0".
+No need to send a new patch, I can amend the current version.
+
+>                         err = mmc_select_hs_ddr(card);
+>                         if (err)
+>                                 goto free_card;
+> --
+> 2.8.1
+>
+
+Finally, I am a little concerned about the commit 287980e49ffc
+("remove lots of IS_ERR_VALUE abuses") which introduced this
+regression.
+
+Surprisingly the IS_ERR_VALUE():s aren't being replaced by equivalent
+checks, so perhaps there a more regressions. Moreover, I wonder why I
+wasn't being on cc/to list when this patch was submitted a few days
+ago, perhaps my review could prevented the regression from even
+happen.
+
+Anyway, let's fix this now! I will pick up $subject patch as fix asap...
+
+and Arnd, can you please double-check that the commit 287980e49ffc
+doesn?t seems to regress anything else!?
+
+Kind regards
+Uffe
