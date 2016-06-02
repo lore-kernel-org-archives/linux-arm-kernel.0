@@ -1,112 +1,118 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  2 Jun 2016 16:31:31 +0200
-Subject: [PATCH 04/20] drm: exynos: Rely on the default ->best_encoder()
- behavior
-In-Reply-To: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1464877907-27723-5-git-send-email-boris.brezillon@free-electrons.com>
+Date: Thu,  2 Jun 2016 16:31:27 +0200
+Subject: [PATCH 00/20] drm/atomic: Provide default ->best_encoder() behavior
+Message-ID: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have 1:1 relationship between connectors and encoders and the driver
-is relying on the atomic helpers: we can drop the custom ->best_encoder()
-implementations and let the core call drm_atomic_helper_best_encoder()
-for us.
+Hello,
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
----
- drivers/gpu/drm/exynos/exynos_drm_dpi.c  | 9 ---------
- drivers/gpu/drm/exynos/exynos_drm_dsi.c  | 9 ---------
- drivers/gpu/drm/exynos/exynos_drm_vidi.c | 8 --------
- drivers/gpu/drm/exynos/exynos_hdmi.c     | 8 --------
- 4 files changed, 34 deletions(-)
+This patch series aims at replacing all dummy ->best_encoder()
+implementations where we have a 1:1 relationship between encoders
+and connectors.
+The core already provides the drm_atomic_helper_best_encoder()
+function which is taking the first encoder attached to the
+connector (after making sure only one encoder was attached to the
+connector), but it's not automatically used, and drivers wanting
+to rely on this default behavior have to explicitly assign their
+->best_encoder() hook to drm_atomic_helper_best_encoder().
 
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dpi.c b/drivers/gpu/drm/exynos/exynos_drm_dpi.c
-index 5e38e74..ad6b73c 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dpi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dpi.c
-@@ -93,17 +93,8 @@ static int exynos_dpi_get_modes(struct drm_connector *connector)
- 	return 0;
- }
- 
--static struct drm_encoder *
--exynos_dpi_best_encoder(struct drm_connector *connector)
--{
--	struct exynos_dpi *ctx = connector_to_dpi(connector);
--
--	return &ctx->encoder;
--}
--
- static const struct drm_connector_helper_funcs exynos_dpi_connector_helper_funcs = {
- 	.get_modes = exynos_dpi_get_modes,
--	.best_encoder = exynos_dpi_best_encoder,
- };
- 
- static int exynos_dpi_create_connector(struct drm_encoder *encoder)
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_dsi.c b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-index 601ecf8..e07cb1f 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_dsi.c
-@@ -1566,17 +1566,8 @@ static int exynos_dsi_get_modes(struct drm_connector *connector)
- 	return 0;
- }
- 
--static struct drm_encoder *
--exynos_dsi_best_encoder(struct drm_connector *connector)
--{
--	struct exynos_dsi *dsi = connector_to_dsi(connector);
--
--	return &dsi->encoder;
--}
--
- static const struct drm_connector_helper_funcs exynos_dsi_connector_helper_funcs = {
- 	.get_modes = exynos_dsi_get_modes,
--	.best_encoder = exynos_dsi_best_encoder,
- };
- 
- static int exynos_dsi_create_connector(struct drm_encoder *encoder)
-diff --git a/drivers/gpu/drm/exynos/exynos_drm_vidi.c b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-index 608b0af..e8f6c92 100644
---- a/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-+++ b/drivers/gpu/drm/exynos/exynos_drm_vidi.c
-@@ -378,16 +378,8 @@ static int vidi_get_modes(struct drm_connector *connector)
- 	return drm_add_edid_modes(connector, edid);
- }
- 
--static struct drm_encoder *vidi_best_encoder(struct drm_connector *connector)
--{
--	struct vidi_context *ctx = ctx_from_connector(connector);
--
--	return &ctx->encoder;
--}
--
- static const struct drm_connector_helper_funcs vidi_connector_helper_funcs = {
- 	.get_modes = vidi_get_modes,
--	.best_encoder = vidi_best_encoder,
- };
- 
- static int vidi_create_connector(struct drm_encoder *encoder)
-diff --git a/drivers/gpu/drm/exynos/exynos_hdmi.c b/drivers/gpu/drm/exynos/exynos_hdmi.c
-index 58de5a4..1625d7c 100644
---- a/drivers/gpu/drm/exynos/exynos_hdmi.c
-+++ b/drivers/gpu/drm/exynos/exynos_hdmi.c
-@@ -937,17 +937,9 @@ static int hdmi_mode_valid(struct drm_connector *connector,
- 	return MODE_OK;
- }
- 
--static struct drm_encoder *hdmi_best_encoder(struct drm_connector *connector)
--{
--	struct hdmi_context *hdata = connector_to_hdmi(connector);
--
--	return &hdata->encoder;
--}
--
- static const struct drm_connector_helper_funcs hdmi_connector_helper_funcs = {
- 	.get_modes = hdmi_get_modes,
- 	.mode_valid = hdmi_mode_valid,
--	.best_encoder = hdmi_best_encoder,
- };
- 
- static int hdmi_create_connector(struct drm_encoder *encoder)
+The first patch fixes remaining places where
+drm_atomic_helper_best_encoder() should be called when ->best_encoder()
+is NULL, so that drivers using the atomic helpers can get rid of the
+explicit ->best_encoder assignment if they need to rely on the default
+drm_atomic_helper_best_encoder() implementation.
+
+The following patches are killing all open coded ->best_encoder()
+implementations that could be replaced by
+drm_atomic_helper_best_encoder().
+
+All modifications have been compile tested except for the changed on
+the intel driver.
+I've also tested on an atmel board, but I recommend waiting for DRM
+driver maintainers feedback before applying the associated changes.
+
+Note that once patch 1 is applied, the other patches can be applied
+independently.
+
+Best Regards,
+
+Boris 
+
+Boris Brezillon (20):
+  drm/atomic: Fix remaining places where !funcs->best_encoder is valid
+  drm: arc: Rely on the default ->best_encoder() behavior
+  drm: atmel-hlcdc: Rely on the default ->best_encoder() behavior
+  drm: exynos: Rely on the default ->best_encoder() behavior
+  drm: fsl-dcu: Rely on the default ->best_encoder() behavior
+  drm: i915: Rely on the default ->best_encoder() behavior where
+    appropriate
+  drm: mediatek: Rely on the default ->best_encoder() behavior
+  drm: msm: Rely on the default ->best_encoder() behavior where
+    appropriate
+  drm: rcar-du: Rely on the default ->best_encoder() behavior
+  drm: rockchip: Rely on the default ->best_encoder() behavior
+  drm: sti: Rely on the default ->best_encoder() behavior
+  drm: sun4i: Rely on the default ->best_encoder() behavior
+  drm: tegra: Rely on the default ->best_encoder() behavior
+  drm: vc4: Rely on the default ->best_encoder() behavior
+  drm: virtgpu: Rely on the default ->best_encoder() behavior
+  drm: omap: Rely on the default ->best_encoder() behavior
+  drm/bridge: anx78xx: Rely on the default ->best_encoder() behavior
+  drm/bridge: ptn3460: Rely on the default ->best_encoder() behavior
+  drm/bridge: ps8622: Rely on the default ->best_encoder() behavior
+  drm/bridge: dw-hdmi: Use drm_atomic_helper_best_encoder()
+
+ drivers/gpu/drm/arc/arcpgu_hdmi.c                  | 18 ------------------
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c   | 12 ------------
+ drivers/gpu/drm/bridge/analogix-anx78xx.c          |  8 --------
+ drivers/gpu/drm/bridge/dw-hdmi.c                   | 11 +----------
+ drivers/gpu/drm/bridge/nxp-ptn3460.c               |  8 --------
+ drivers/gpu/drm/bridge/parade-ps8622.c             | 10 ----------
+ drivers/gpu/drm/drm_atomic_helper.c                |  4 +++-
+ drivers/gpu/drm/drm_fb_helper.c                    | 13 ++++++++++++-
+ drivers/gpu/drm/exynos/exynos_drm_dpi.c            |  9 ---------
+ drivers/gpu/drm/exynos/exynos_drm_dsi.c            |  9 ---------
+ drivers/gpu/drm/exynos/exynos_drm_vidi.c           |  8 --------
+ drivers/gpu/drm/exynos/exynos_hdmi.c               |  8 --------
+ drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_rgb.c          |  9 ---------
+ drivers/gpu/drm/i915/intel_crt.c                   |  1 -
+ drivers/gpu/drm/i915/intel_display.c               |  8 --------
+ drivers/gpu/drm/i915/intel_dp.c                    |  1 -
+ drivers/gpu/drm/i915/intel_drv.h                   |  1 -
+ drivers/gpu/drm/i915/intel_dsi.c                   |  1 -
+ drivers/gpu/drm/i915/intel_dvo.c                   |  1 -
+ drivers/gpu/drm/i915/intel_hdmi.c                  |  1 -
+ drivers/gpu/drm/i915/intel_lvds.c                  |  1 -
+ drivers/gpu/drm/i915/intel_sdvo.c                  |  1 -
+ drivers/gpu/drm/i915/intel_tv.c                    |  1 -
+ drivers/gpu/drm/mediatek/mtk_dsi.c                 |  9 ---------
+ drivers/gpu/drm/msm/edp/edp_connector.c            | 10 ----------
+ drivers/gpu/drm/msm/hdmi/hdmi_connector.c          |  8 --------
+ drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c |  9 ---------
+ drivers/gpu/drm/omapdrm/omap_connector.c           |  8 --------
+ drivers/gpu/drm/rcar-du/rcar_du_encoder.c          | 12 ------------
+ drivers/gpu/drm/rcar-du/rcar_du_encoder.h          |  3 ---
+ drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c          |  1 -
+ drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c          |  1 -
+ drivers/gpu/drm/rcar-du/rcar_du_vgacon.c           |  1 -
+ drivers/gpu/drm/rockchip/dw-mipi-dsi.c             |  9 ---------
+ drivers/gpu/drm/rockchip/inno_hdmi.c               |  9 ---------
+ drivers/gpu/drm/sti/sti_dvo.c                      | 10 ----------
+ drivers/gpu/drm/sti/sti_hda.c                      | 10 ----------
+ drivers/gpu/drm/sti/sti_hdmi.c                     | 10 ----------
+ drivers/gpu/drm/sun4i/sun4i_rgb.c                  | 10 ----------
+ drivers/gpu/drm/sun4i/sun4i_tv.c                   |  9 ---------
+ drivers/gpu/drm/tegra/drm.h                        |  2 --
+ drivers/gpu/drm/tegra/dsi.c                        |  1 -
+ drivers/gpu/drm/tegra/hdmi.c                       |  1 -
+ drivers/gpu/drm/tegra/output.c                     |  8 --------
+ drivers/gpu/drm/tegra/rgb.c                        |  1 -
+ drivers/gpu/drm/tegra/sor.c                        |  1 -
+ drivers/gpu/drm/vc4/vc4_dpi.c                      |  9 ---------
+ drivers/gpu/drm/vc4/vc4_hdmi.c                     |  9 ---------
+ drivers/gpu/drm/virtio/virtgpu_display.c           | 10 ----------
+ 49 files changed, 16 insertions(+), 299 deletions(-)
+
 -- 
 2.7.4
