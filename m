@@ -1,40 +1,36 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Thu, 2 Jun 2016 13:16:48 -0500
-Subject: [PATCH 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy
- block
-In-Reply-To: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
-References: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160602181648.GB28820@uda0271908>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 02 Jun 2016 11:18:52 -0700
+Subject: [PATCH 32/32] mmc: bcm2835: Import bcm2835-mmc and switch to it
+In-Reply-To: <e16936ee-3b0d-3798-72e0-8969c2c1a309@i2se.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-33-git-send-email-kraxel@redhat.com>
+ <e16936ee-3b0d-3798-72e0-8969c2c1a309@i2se.com>
+Message-ID: <87oa7j314j.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-On Thu, Jun 02, 2016 at 07:31:03PM +0200, Hans de Goede wrote:
-> Some SoCs have a single phy-hw-block with multiple phys, this is
-> modelled by a single phy dts node, so we end up with multiple
-> controller nodes with a phys property pointing to the phy-node
-> of the otg-phy.
-> 
-> Only one of these controllers typically is an otg controller, yet we
+> Hi Gerd,
+>
+> Am 01.06.2016 um 23:43 schrieb Gerd Hoffmann:
+>> From: Eric Anholt <eric@anholt.net>
+>>
+>> With this we can get wifi (brcmfmac) to probe.  Without it we're stuck
+>> with timeouts from sdio.c when it tries to set the bus width to 4.
+>
+> adding a new MMC driver to fix a wifi issue is really weird.
+>
+> Beside that there are already two MMC drivers (sdhci-bcm2835.c and
+> sdhci-iproc.c) in the Kernel which are compatible to BCM2835. Why should
+> we add two new ones?
 
-Is it guaranteed that only one of them will be otg? 
-
-> were checking the first controller who uses a phy from the block and
-> then end up looking for a dr_mode property in e.g. the ehci controller.
-> 
-> Instead of looking for nodes with a phy property, look for nodes
-> with a dr_mode property, so that we actually access the dr_mode property
-> in a node which has it.
-
-Quote from Documentation/devicetree/bindings/usb/generic.txt:
-"- dr_mode: ...
-		In case this attribute isn't
-		passed via DT, USB DRD controllers should default to
-		OTG."
-
-So it is not mandatory to define dr_mode in DT, then you wouldn't be
-able to find the controller in such case.
-
-Regards,
--Bin.
+Despite the fact that this is my commit, I don't think it should be
+merged.  We should figure out why sdhci-iproc.c isn't working, instead.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/2d337722/attachment.sig>
