@@ -1,91 +1,110 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 2 Jun 2016 17:01:44 +0200
-Subject: [PATCH 1/3] mmc: fix mmc mode selection for HS-DDR and higher
-In-Reply-To: <CAJKOXPeH_hNutpqzsDWZ09ZrsP_r9A=3p2S63cjJ94VJT_513Q@mail.gmail.com>
-References: <1464505484-3661-1-git-send-email-wens@csie.org>
- <1464505484-3661-2-git-send-email-wens@csie.org>
- <CAPDyKFriC7i1DtF5d8eoY0baRoZ2VTfhWJznw9SvOnPNYksU5w@mail.gmail.com>
- <CAJKOXPeH_hNutpqzsDWZ09ZrsP_r9A=3p2S63cjJ94VJT_513Q@mail.gmail.com>
-Message-ID: <CAPDyKFq4hAGJDNVFOrU__t33jVDi011EuKPdU=gpsbMUO2uAGQ@mail.gmail.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Thu, 2 Jun 2016 22:59:15 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <alpine.DEB.2.11.1604271212290.3941@nanos>
+References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
+ <20160421034520.GA19965@shlinux2.ap.freescale.net>
+ <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+ <20160427015835.GE30692@tiger>
+ <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+ <alpine.DEB.2.11.1604271212290.3941@nanos>
+Message-ID: <20160602145915.GA31124@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 June 2016 at 11:35, Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-> On Thu, Jun 2, 2016 at 10:31 AM, Ulf Hansson <ulf.hansson@linaro.org> wrote:
->> + Linus
->>
->> On 29 May 2016 at 09:04, Chen-Yu Tsai <wens@csie.org> wrote:
->>> When IS_ERR_VALUE was removed from the mmc core code, it was replaced
->>> with a simple not-zero check. This does not work, as the value checked
->>> is the return value for mmc_select_bus_width, which returns the set
->>> bit width on success. This made eMMC modes higher than HS-DDR unusable.
->>>
->>> Fix this by checking for a positive return value instead.
->>>
->>> Fixes: 287980e49ffc ("remove lots of IS_ERR_VALUE abuses")
->>> Cc: Arnd Bergmann <arnd@arndb.de>
->>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->>> ---
->>>  drivers/mmc/core/mmc.c | 4 ++--
->>>  1 file changed, 2 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
->>> index c984321d1881..aafb73d080ca 100644
->>> --- a/drivers/mmc/core/mmc.c
->>> +++ b/drivers/mmc/core/mmc.c
->>> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
->>>          * switch to HS200 mode if bus width is set successfully.
->>>          */
->>>         err = mmc_select_bus_width(card);
->>> -       if (!err) {
->>> +       if (err > 0) {
->>>                 val = EXT_CSD_TIMING_HS200 |
->>>                       card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
->>>                 err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
->>> @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
->>>         } else if (mmc_card_hs(card)) {
->>>                 /* Select the desired bus width optionally */
->>>                 err = mmc_select_bus_width(card);
->>> -               if (!err) {
->>> +               if (err > 0) {
->>
->> As pointed out in the review by Bj?rn, to restore the old behaviour we
->> should check for "err >= 0".
->> No need to send a new patch, I can amend the current version.
->>
->>>                         err = mmc_select_hs_ddr(card);
->>>                         if (err)
->>>                                 goto free_card;
->>> --
->>> 2.8.1
->>>
->>
->> Finally, I am a little concerned about the commit 287980e49ffc
->> ("remove lots of IS_ERR_VALUE abuses") which introduced this
->> regression.
->>
->> Surprisingly the IS_ERR_VALUE():s aren't being replaced by equivalent
->> checks, so perhaps there a more regressions. Moreover, I wonder why I
->> wasn't being on cc/to list when this patch was submitted a few days
->> ago, perhaps my review could prevented the regression from even
->> happen.
->>
->> Anyway, let's fix this now! I will pick up $subject patch as fix asap...
->>
->> and Arnd, can you please double-check that the commit 287980e49ffc
->> doesn?t seems to regress anything else!?
->
-> If only the 287980e49ffc could sit in linux-next for few days before
-> reaching v4.7-rc1... Could you please pick up the fix soon? Maybe
-> directly by Linus?
+Hi Thomas,
 
-The fix has already been applied and published through my mmc tree. I
-am waiting for reports from kernelci, assuming those will be okay, I
-will send a PR tomorrow so it should reach rc2.
+On Wed, Apr 27, 2016 at 12:15:00PM +0200, Thomas Gleixner wrote:
+> On Wed, 27 Apr 2016, Dong Aisheng wrote:
+> > On Wed, Apr 27, 2016 at 9:58 AM, Shawn Guo <shawnguo@kernel.org> wrote:
+> > > On Tue, Apr 26, 2016 at 07:27:03PM +0800, Dong Aisheng wrote:
+> > >> Shawn,
+> > >> What's your suggestion?
+> > >
+> > > I think this needs more discussion, and I just dropped Stefan's patch
+> > > from my tree.
+> > >
+> > > We need to firstly understand why this is happening.  The .prepare hook
+> > > is defined to be non-atomic context, and so that we call sleep function
+> > > in there.  We did everything right.  Why are we getting the warning?  If
+> > > I'm correct, this warning only happens on i.MX7D.  Why is that?
+> > >
+> > 
+> > Why Stefan's patch works (checking irqs_disabled()) is because during kernel
+> > time init, the irq is still not enabled. It fixes the issue indirectly.
+> > See:
+> > asmlinkage __visible void __init start_kernel(void)
+> > {
+> >         /*
+> >          * Set up the scheduler prior starting any interrupts (such as the
+> >          * timer interrupt). Full topology setup happens at smp_init()
+> >          * time - but meanwhile we still have a functioning scheduler.
+> >          */
+> >         sched_init();
+> >         .............
+> >         time_init();
+> >         ..............
+> >         WARN(!irqs_disabled(), "Interrupts were enabled early\n");
+> >         early_boot_irqs_disabled = false;
+> >         local_irq_enable();
+> > }
+> > 
+> > The issue can only happen when PLL enable causes a schedule during
+> > imx_clock_init().
+> 
+> Calling a function which might sleep _BEFORE_ kernel_init() is wrong. Don't
+> try to work around such an issue by doing magic irq_disabled() checks and busy
+> loops. Fix the call site and be done with it.
+> 
 
-Kind regards
-Uffe
+IRQ chip and clocksource are also initialised before kernel_init()
+which may call clk APIs like clk_prepare_enable().
+We may not be able to guarantee those clocks are unsleepable.
 
->
-> Best regards,
-> Krzysztof
+e.g.
+For IRQ chip, the arm,gic documents the optional clocks property in
+Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt.
+Although there seems no user currently, not sure there might be
+a exception in the future.
+
+For clocksource driver, it's quite common to call clk APIs to
+enable and get clock rate which may also cause sleep.
+e.g. ARM twd clock in arch/arm/kernel/smp_twd.c.
+
+If we have to avoid the possible sleep caused by these clocks,
+we may need to manually check it and change the related clocks
+(e.g PLLs) from sleepable to busy loops.
+But that is not a good solution and may also not stable when
+clock varies.
+
+It looks like not easy to find a generic solution for them.
+What's your suggestion?
+
+And Stephen,
+
+Besides above possible sleep, the clk framework itself may also
+cause unexpected sleep before kernel_init().
+1) clk framework now supports CLK_IS_CRITICAL flag which allows to
+enable the clock during register in __clk_core_init(), it usually
+can happen in time_init()->of_clk_init();
+
+2) clk framework also support set default configuration like set_parent
+and set_rate during register clk providers which also happens in
+time_init()->of_clk_init().
+
+Any ideas?
+Do you think if we should move them onto a bit later stage after
+kernel_init()?
+
+Regards
+Dong Aisheng
+
+> Thanks,
+> 
+> 	tglx
+> 
+> 
