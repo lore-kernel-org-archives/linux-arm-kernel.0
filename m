@@ -1,50 +1,70 @@
 From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Thu, 2 Jun 2016 11:17:52 -0400
-Subject: [PATCH v1 2/2] ARM: dts: keystone: add interrupt property to PCI
- controller bindings
-In-Reply-To: <1464880672-15203-1-git-send-email-m-karicheri2@ti.com>
-References: <1464880672-15203-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <1464880672-15203-2-git-send-email-m-karicheri2@ti.com>
+Date: Thu, 2 Jun 2016 11:17:51 -0400
+Subject: [PATCH v1 1/2] ARM: dts: keystone: remove bogus IO resource entry
+ from PCI binding
+Message-ID: <1464880672-15203-1-git-send-email-m-karicheri2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that Keystone PCIe controller supports error interrupt handling
-add interrupt property to PCI controller DT bindings to enable
-error interrupt handling.
+The PCI DT bindings contain a bogus entry for IO space which is not
+supported on Keystone. The current bogus entry has an invalid size
+and throws following error during boot.
+
+[0.420713] keystone-pcie 21021000.pcie: error -22: failed to map
+           resource [io  0x0000-0x400000003fff]
+
+So remove it from the dts. While at it also add a bus-range
+value that eliminates following log at boot up.
+
+[0.420659] No bus range found for /soc/pcie at 21020000, using [bus 00-ff]
 
 Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
 ---
- - v1 - no change from initial version
- - applies to master v4.7-rcx at kernel.org git repo
- arch/arm/boot/dts/keystone-k2e.dtsi | 2 ++
- arch/arm/boot/dts/keystone.dtsi     | 2 ++
- 2 files changed, 4 insertions(+)
+ v1 - fixed subject to something more meaningful
+ applies to master v4.7-rcx at kernel.org git repo
+ arch/arm/boot/dts/keystone-k2e.dtsi | 5 +++--
+ arch/arm/boot/dts/keystone.dtsi     | 5 +++--
+ 2 files changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/boot/dts/keystone-k2e.dtsi b/arch/arm/boot/dts/keystone-k2e.dtsi
-index 5374c9a..9a51b8c 100644
+index 96b349f..5374c9a 100644
 --- a/arch/arm/boot/dts/keystone-k2e.dtsi
 +++ b/arch/arm/boot/dts/keystone-k2e.dtsi
-@@ -104,6 +104,8 @@
- 			num-lanes = <2>;
- 			bus-range = <0x00 0xff>;
+@@ -96,12 +96,13 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			reg =  <0x21021000 0x2000>, <0x21020000 0x1000>, <0x02620128 4>;
+-			ranges = <0x81000000 0 0 0x23260000 0x4000 0x4000
+-				0x82000000 0 0x60000000 0x60000000 0 0x10000000>;
++			ranges = <0x82000000 0 0x60000000 0x60000000
++				  0 0x10000000>;
  
-+			/* error interrupt */
-+			interrupts = <GIC_SPI 385 IRQ_TYPE_EDGE_RISING>;
+ 			status = "disabled";
+ 			device_type = "pci";
+ 			num-lanes = <2>;
++			bus-range = <0x00 0xff>;
+ 
  			#interrupt-cells = <1>;
  			interrupt-map-mask = <0 0 0 7>;
- 			interrupt-map = <0 0 0 1 &pcie_intc1 0>, /* INT A */
 diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index f627a1c..e23f46d 100644
+index e34b226..f627a1c 100644
 --- a/arch/arm/boot/dts/keystone.dtsi
 +++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -302,6 +302,8 @@
- 			num-lanes = <2>;
- 			bus-range = <0x00 0xff>;
+@@ -294,12 +294,13 @@
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			reg =  <0x21801000 0x2000>, <0x21800000 0x1000>, <0x02620128 4>;
+-			ranges = <0x81000000 0 0 0x23250000 0 0x4000
+-				0x82000000 0 0x50000000 0x50000000 0 0x10000000>;
++			ranges = <0x82000000 0 0x50000000 0x50000000
++				  0 0x10000000>;
  
-+			/* error interrupt */
-+			interrupts = <GIC_SPI 38 IRQ_TYPE_EDGE_RISING>;
+ 			status = "disabled";
+ 			device_type = "pci";
+ 			num-lanes = <2>;
++			bus-range = <0x00 0xff>;
+ 
  			#interrupt-cells = <1>;
  			interrupt-map-mask = <0 0 0 7>;
- 			interrupt-map = <0 0 0 1 &pcie_intc0 0>, /* INT A */
 -- 
 1.9.1
