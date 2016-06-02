@@ -1,51 +1,115 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jun 2016 07:55:15 +0200
-Subject: [PATCH 3/4] ARM: multi_v7_defconfig: Enable s5p-secss driver
+Date: Thu, 02 Jun 2016 07:55:16 +0200
+Subject: [PATCH 4/4] ARM: exynos_defconfig: Save defconfig on current
+ linux-next
 In-Reply-To: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
 References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1464846916-3110-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1464846916-3110-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos SoC provides a Security SubSystem block for accelerating some
-cryptographic operations.  Enable the driver for it - s5p-secss to
-utilize the hardware acceleration.
+Save defconfig on next-20160602. Most of changes are just re-ordering of
+symbols.  Removed symbols:
+ - FHANDLE (default y),
+ - THERMAL, EXYNOS_THERMAL (selected by ARCH_EXYNOS),
+ - CHROME_PLATFORMS (selected by MFD_CROS_EC),
+ - EXT4_FS (selected by EXT3_FS)
+ - SND_SOC_ODROIDX2 (obsolete since commit ee12a817bb4b ("ASoC: samsung:
+   Remove unused Odroid x2/u3 machine driver"), replaced with
+   SND_SIMPLE_CARD).
 
-Currently the s5p-secss driver supports AES in CBC and ECB modes.
-However its usefulness could be doubted. Excerpt of tests on Odroid XU3
-(Exynos5422), for 256 bit key, encryption, performance CPU freq governor:
-
-  algorithm        | block size [b] | average speed [MB/s] |
-  cbc-aes-s5p      |             16 |                 11.5 |
-  cbc-aes-s5p      |             64 |                 25.4 |
-  cbc-aes-s5p      |            256 |                 41.0 |
-  cbc-aes-s5p      |           1024 |                 47.4 |
-  cbc-aes-s5p      |           8192 |                 49.0 |
-  cbc(aes-generic) |             16 |                  0.4 |
-  cbc(aes-generic) |             64 |                  1.8 |
-  cbc(aes-generic) |            256 |                  6.6 |
-  cbc(aes-generic) |           1024 |                 25.2 |
-  cbc(aes-generic) |           8192 |                 83.1 |
-
-Anyway enable the driver so it will get some testing coverage by
-community.
-
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/configs/exynos_defconfig | 16 +++++-----------
+ 1 file changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 68cb3c766c39..ee7c884ab5d8 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -875,6 +875,7 @@ CONFIG_KEYSTONE_IRQ=y
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index 5e4fc3a771e9..9ee32375d05a 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -1,5 +1,4 @@
+ CONFIG_SYSVIPC=y
+-CONFIG_FHANDLE=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_CGROUPS=y
+@@ -71,6 +70,7 @@ CONFIG_MWIFIEX=m
+ CONFIG_MWIFIEX_SDIO=m
+ CONFIG_INPUT_EVDEV=y
+ CONFIG_KEYBOARD_GPIO=y
++CONFIG_KEYBOARD_SAMSUNG=y
+ CONFIG_KEYBOARD_CROS_EC=y
+ # CONFIG_MOUSE_PS2 is not set
+ CONFIG_MOUSE_CYAPA=y
+@@ -80,11 +80,10 @@ CONFIG_TOUCHSCREEN_MMS114=y
+ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_MAX77693_HAPTIC=y
+ CONFIG_INPUT_MAX8997_HAPTIC=y
+-CONFIG_KEYBOARD_SAMSUNG=y
+ CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_OF_PLATFORM=y
+ CONFIG_SERIAL_SAMSUNG=y
+ CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+-CONFIG_SERIAL_OF_PLATFORM=y
  CONFIG_HW_RANDOM=y
- CONFIG_HW_RANDOM_ST=y
- CONFIG_CRYPTO_DEV_MARVELL_CESA=m
-+CONFIG_CRYPTO_DEV_S5P=m
- CONFIG_CRYPTO_DEV_SUN4I_SS=m
- CONFIG_CRYPTO_DEV_ROCKCHIP=m
- CONFIG_ARM_CRYPTO=y
+ CONFIG_TCG_TPM=y
+ CONFIG_TCG_TIS_I2C_INFINEON=y
+@@ -110,10 +109,8 @@ CONFIG_SENSORS_LM90=y
+ CONFIG_SENSORS_NTC_THERMISTOR=y
+ CONFIG_SENSORS_PWM_FAN=y
+ CONFIG_SENSORS_INA2XX=y
+-CONFIG_THERMAL=y
+ CONFIG_CPU_THERMAL=y
+ CONFIG_THERMAL_EMULATION=y
+-CONFIG_EXYNOS_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_S3C2410_WATCHDOG=y
+ CONFIG_MFD_CROS_EC=y
+@@ -156,17 +153,17 @@ CONFIG_V4L_MEM2MEM_DRIVERS=y
+ CONFIG_VIDEO_SAMSUNG_S5P_JPEG=m
+ CONFIG_VIDEO_SAMSUNG_S5P_MFC=m
+ CONFIG_DRM=y
+-CONFIG_DRM_NXP_PTN3460=y
+-CONFIG_DRM_PARADE_PS8622=y
+ CONFIG_DRM_EXYNOS=y
+ CONFIG_DRM_EXYNOS_FIMD=y
+-CONFIG_DRM_EXYNOS_DSI=y
+ CONFIG_DRM_EXYNOS_MIXER=y
+ CONFIG_DRM_EXYNOS_DPI=y
++CONFIG_DRM_EXYNOS_DSI=y
+ CONFIG_DRM_EXYNOS_HDMI=y
+ CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_PANEL_SAMSUNG_LD9040=y
+ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=y
++CONFIG_DRM_NXP_PTN3460=y
++CONFIG_DRM_PARADE_PS8622=y
+ CONFIG_EXYNOS_VIDEO=y
+ CONFIG_EXYNOS_MIPI_DSI=y
+ CONFIG_LCD_CLASS_DEVICE=y
+@@ -180,7 +177,6 @@ CONFIG_SND_SOC_SAMSUNG=y
+ CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994=y
+ CONFIG_SND_SOC_SMDK_WM8994_PCM=y
+ CONFIG_SND_SOC_SNOW=y
+-CONFIG_SND_SOC_ODROIDX2=y
+ CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_USB=y
+ CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
+@@ -218,7 +214,6 @@ CONFIG_RTC_DRV_S5M=y
+ CONFIG_RTC_DRV_S3C=y
+ CONFIG_DMADEVICES=y
+ CONFIG_PL330_DMA=y
+-CONFIG_CHROME_PLATFORMS=y
+ CONFIG_CROS_EC_CHARDEV=y
+ CONFIG_COMMON_CLK_MAX77686=y
+ CONFIG_COMMON_CLK_MAX77802=y
+@@ -236,7 +231,6 @@ CONFIG_PWM_SAMSUNG=y
+ CONFIG_PHY_EXYNOS5250_SATA=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+-CONFIG_EXT4_FS=y
+ CONFIG_AUTOFS4_FS=y
+ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
 -- 
 1.9.1
