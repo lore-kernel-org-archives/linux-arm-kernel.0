@@ -1,54 +1,77 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 2 Jun 2016 09:58:42 +0000
-Subject: [PATCH V8 0/9] Support for ARM64 ACPI based PCI host controller
-In-Reply-To: <574FF3BE.4010903@semihalf.com>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F767865@lhreml507-mbx>
- <574FF3BE.4010903@semihalf.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F769A84@lhreml507-mbx>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Thu, 2 Jun 2016 17:57:24 +0800
+Subject: [PATCH 1/2 v16] Documentation: bridge: Add documentation for ps8640
+ DT properties
+Message-ID: <1464861445-11086-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-> -----Original Message-----
-> From: Tomasz Nowicki [mailto:tn at semihalf.com]
-> Sent: 02 June 2016 09:52
-> To: Gabriele Paoloni; helgaas at kernel.org; arnd at arndb.de;
-> will.deacon at arm.com; catalin.marinas at arm.com; rafael at kernel.org;
-> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org;
-> jchandra at broadcom.com
-> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
-> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
-> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
-> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
-> dhdang at apm.com; jeremy.linton at arm.com; liudongdong (C);
-> cov at codeaurora.org
-> Subject: Re: [PATCH V8 0/9] Support for ARM64 ACPI based PCI host
-> controller
-> 
-> Hi Gabriele,
-> 
-> On 01.06.2016 09:36, Gabriele Paoloni wrote:
-> > I think maybe it is worth to post this quirk mechanism as RFC on
-> > top of this v8 patchset, so that we can start to review it and
-> > make some progress on the quirks.
-> 
-> I've just posted my RFC patches, please see:
-> https://patchwork.ozlabs.org/patch/629121/
-> 
-> We can start review from there so that this series is not blocked.
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+Changes since v15:
+ - No change.
 
-Many Thanks for this!
+Changes since v14:
+ - change mode-sel-gpios as optional.
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   44 ++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-Sure let's start working on this.
-
-Cheers
-
-Gab
-
-> 
-> Thanks,
-> Tomasz
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..7b13f92
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,44 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++Optional properties:
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_LOW>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
+-- 
+1.7.9.5
