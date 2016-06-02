@@ -1,51 +1,26 @@
-From: yong.b.li@intel.com (Yong Li)
-Date: Thu,  2 Jun 2016 15:41:50 +0800
-Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
-Message-ID: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 02 Jun 2016 09:58:16 +0200
+Subject: [PATCH 1/4] ARM: multi_v7_defconfig: Enable Trats2 audio codec,
+ touchscreen and sensors
+In-Reply-To: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
+References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <13343743.82cem7RKKT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yong Li <sdliyong@gmail.com>
+On Thursday, June 2, 2016 7:55:13 AM CEST Krzysztof Kozlowski wrote:
+> The Exynos4412-based Trats2 board has CM36651 proximity/ambient light
+> sensor, MMS114 touchscreen and Wolfson Microelectronics WM1811 CODEC.
+> Enable them in defconfig to get some testing coverage and use its
+> features.
+> 
+> While saving defconfig the SND_SOC_ODROIDX2 is removed because it does
+> not exist since commit ee12a817bb4b ("ASoC: samsung: Remove unused
+> Odroid x2/u3 machine driver").
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
 
-Without this patch, I2C-1 is missing on beaglebone black boards
+All four look good to me,
 
-Signed-off-by: Yong Li <sdliyong@gmail.com>
----
- arch/arm/boot/dts/am335x-boneblack.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/boot/dts/am335x-boneblack.dts b/arch/arm/boot/dts/am335x-boneblack.dts
-index 55c0e95..7eee5c4 100644
---- a/arch/arm/boot/dts/am335x-boneblack.dts
-+++ b/arch/arm/boot/dts/am335x-boneblack.dts
-@@ -64,6 +64,13 @@
- 			AM33XX_IOPAD(0x9b0, PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* xdma_event_intr0 */
- 		>;
- 	};
-+
-+	i2c1_pins: pinmux_i2c1_pins {
-+		pinctrl-single,pins = <
-+			AM33XX_IOPAD(0x958, PIN_INPUT_PULLUP | MUX_MODE2)       /* spi0_d1.i2c1_sda */
-+			AM33XX_IOPAD(0x95c, PIN_INPUT_PULLUP | MUX_MODE2)       /* spi0_cs0.i2c1_scl */
-+		>;
-+	};
- };
- 
- &lcdc {
-@@ -91,6 +98,14 @@
- 	};
- };
- 
-+&i2c1 {
-+       pinctrl-names = "default";
-+       pinctrl-0 = <&i2c2_pins>;
-+
-+       status = "okay";
-+       clock-frequency = <100000>;
-+};
-+
- &rtc {
- 	system-power-controller;
- };
--- 
-2.7.4
+Acked-by: Arnd Bergmann <arnd@arndb.de> 
