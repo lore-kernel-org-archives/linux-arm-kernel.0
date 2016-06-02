@@ -1,59 +1,72 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 2 Jun 2016 18:07:11 +0200
-Subject: [PATCH v2 3/5] ARM: dts: Add I2C1 support for STM32F429 SoC
-In-Reply-To: <1464877568-21897-4-git-send-email-cedric.madianga@gmail.com>
-References: <1464877568-21897-1-git-send-email-cedric.madianga@gmail.com>
- <1464877568-21897-4-git-send-email-cedric.madianga@gmail.com>
-Message-ID: <CALszF6D4K1GsFdb0z3Lkb=EJdhzNnZNnAxeyCZGq36+Cnwf+_A@mail.gmail.com>
+From: ray.jui@broadcom.com (Ray Jui)
+Date: Thu, 2 Jun 2016 09:25:17 -0700
+Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
+In-Reply-To: <1464849936.24775.33.camel@redhat.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-2-git-send-email-kraxel@redhat.com>
+ <574F5881.4060008@gmail.com> <1464849936.24775.33.camel@redhat.com>
+Message-ID: <4e72ae37-a018-a17d-6a58-8450db58d1c7@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2016-06-02 16:26 GMT+02:00 M'boumba Cedric Madianga <cedric.madianga@gmail.com>:
-> Signed-off-by: Patrice Chotard <patrice.chotard@st.com>
-> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-> ---
->  arch/arm/boot/dts/stm32f429.dtsi | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
+
+
+On 6/1/2016 11:45 PM, Gerd Hoffmann wrote:
+>>>  config ARCH_BCM2835
+>>>  	bool "Broadcom BCM2835 family"
+>>> -	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
+>>> +	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7 || ARM64
+>>
+>> Humm, what does that achieve?
 >
-> diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-> index 434d4b9..d5857eb 100644
-> --- a/arch/arm/boot/dts/stm32f429.dtsi
-> +++ b/arch/arm/boot/dts/stm32f429.dtsi
-> @@ -323,6 +323,18 @@
->                                         slew-rate = <2>;
->                                 };
->                         };
-> +
-> +                       i2c1_sda_pin: i2c1_sda at 0 {
-> +                               pins {
-> +                                       pinmux = <STM32F429_PB9_FUNC_I2C1_SDA>;
-> +                                       drive-open-drain;
-> +                               };
-> +                       };
-> +                       i2c1_scl_pin: i2c1_scl at 0 {
-> +                               pins {
-> +                                       pinmux = <STM32F429_PB6_FUNC_I2C1_SCL>;
-> +                               };
-> +                       };
->                 };
-Shouldn't be preferrable to group the two functions in a single one,
-as done for usart config in this file?:
+> Nothing ;)
+>
+> Slipped through unnoticed, I'll drop it.
+>
+>>> +config ARCH_BCM
+>>> +	bool "Broadcom SoC Support"
+>>> +	help
+>>> +	  This enables support for Broadcom ARM based SoC chips
+>>
+>> menuconfig maybe?
+>
+> There isn't any in arch/arm64/Kconfig.platforms right now, so I didn't
+> feel like introducing one.  Also the dependency should have pretty much
+> the same effect ...
+>
+>>> +config ARCH_BCM2835
+>>> +	bool "Broadcom BCM2835 family"
+>>> +	depends on ARCH_BCM
+>>> +	select ARCH_REQUIRE_GPIOLIB
+>>> +	select CLKSRC_OF
+>>> +	select PINCTRL
+>>> +	select PINCTRL_BCM2835
+>>> +	select ARM_AMBA
+>>> +	select ARM_TIMER_SP804
+>>> +	select HAVE_ARM_ARCH_TIMER
+>>> +	help
+>>> +	  This enables support for the Broadcom BCM2837 SoC.
+>>> +	  This SoC is used in the Raspberry Pi 3 device.
+>>> +
+>>>  config ARCH_BCM_IPROC
+>>>  	bool "Broadcom iProc SoC Family"
+>>> +	depends on ARCH_BCM
+>>
+>> Does not seem necessary nor adding anything here.
+>
+> Added for consistency.  When we add ARCH_BCM all ARCH_BCM_* should
+> depend on it ...
+>
+> We could also do it the other way around: make ARCH_BCM a hidden bool
+> and have ARCH_BCM_* select it.
 
-            usart1_pins_a: usart1 at 0 {
-                pins1 {
-                    pinmux = <STM32F429_PA9_FUNC_USART1_TX>;
-                    bias-disable;
-                    drive-push-pull;
-                    slew-rate = <0>;
-                };
-                pins2 {
-                    pinmux = <STM32F429_PA10_FUNC_USART1_RX>;
-                    bias-disable;
-                };
-            };
+Yes, this is probably better.
 
-Also, I would prefer the phandle to be suffixed with the port number,
-as multiple muxing options are available, for example "i2c1_pins_b".
+ARCH_BCM_IPROC is currently enabled in arch/arm64/configs/defconfig. By 
+adding a dependency here without enabling ARCH_BCM in arm64 defconfig, 
+this effectively disables ARCH_BCM_IPROC from arm64 defconfig.
 
-Thanks,
-Maxime
+>
+> cheers,
+>   Gerd
+>
