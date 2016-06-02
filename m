@@ -1,30 +1,36 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Thu, 2 Jun 2016 11:08:52 -0700
-Subject: [PATCH v1 1/2] ARM: dts: keystone: remove bogus IO resource entry
- from PCI binding
-In-Reply-To: <1464880672-15203-1-git-send-email-m-karicheri2@ti.com>
-References: <1464880672-15203-1-git-send-email-m-karicheri2@ti.com>
-Message-ID: <bdf18787-46ed-cc15-8914-fc14a3557681@oracle.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Jun 2016 19:09:48 +0100
+Subject: [PATCH] arm64: fix the wrong comment
+In-Reply-To: <1464574369-22618-1-git-send-email-shijie.huang@arm.com>
+References: <1464574369-22618-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <20160602180948.GE7697@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/2/2016 8:17 AM, Murali Karicheri wrote:
-> The PCI DT bindings contain a bogus entry for IO space which is not
-> supported on Keystone. The current bogus entry has an invalid size
-> and throws following error during boot.
->
-> [0.420713] keystone-pcie 21021000.pcie: error -22: failed to map
->            resource [io  0x0000-0x400000003fff]
->
-> So remove it from the dts. While at it also add a bus-range
-> value that eliminates following log at boot up.
->
-> [0.420659] No bus range found for /soc/pcie at 21020000, using [bus 00-ff]
->
-> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+On Mon, May 30, 2016 at 10:12:49AM +0800, Huang Shijie wrote:
+> Currently, we use the 48-bit for the kernel and user by default.
+> The comment becomes stale. This patch fixes the wrong comment.
+> 
+> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
 > ---
-Both 1/2 and 2/2 looks fine to me. Will queue them for
-next merge window.
+>  arch/arm64/mm/proc.S | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> index c431787..421386759 100644
+> --- a/arch/arm64/mm/proc.S
+> +++ b/arch/arm64/mm/proc.S
+> @@ -209,8 +209,8 @@ ENTRY(__cpu_setup)
+>  	bic	x0, x0, x5			// clear bits
+>  	orr	x0, x0, x6			// set bits
+>  	/*
+> -	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
+> -	 * both user and kernel.
+> +	 * Set/prepare TCR. We use VA_BITS of address range for both
+> +	 * kernel and user.
+>  	 */
 
-Regards,
-Santosh
+To be honest, all three of these comments (including the two in the
+context) are totally useless. Can we just remove them instead?
+
+Will
