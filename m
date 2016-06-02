@@ -1,65 +1,80 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 02 Jun 2016 09:42:13 +0200
-Subject: [PATCH v3 0/4] Amlogic: Meson: Add reset controller
-In-Reply-To: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
-References: <1464614838-28107-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1464853333.3307.1.camel@pengutronix.de>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 2 Jun 2016 10:45:45 +0300
+Subject: [PATCHv5] support for AD5820 camera auto-focus coil
+In-Reply-To: <20160601220840.GA21946@amd>
+References: <20160521105607.GA20071@amd> <574049EF.2090208@gmail.com>
+ <20160524090433.GA1277@amd> <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+ <20160527205140.GA26767@amd>
+ <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
+ <20160531213437.GA28397@amd>
+ <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+ <20160601220840.GA21946@amd>
+Message-ID: <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil,
+On Thu, Jun 02, 2016 at 12:08:40AM +0200, Pavel Machek wrote:
+> On Wed 2016-06-01 18:24:39, Sakari Ailus wrote:
+> > Hi Pavel,
+> 
+> > > Well, it does not use any dt properties. So there's not really much to
+> > > discuss with dt people...
+> > > 
+> > > Maybe "ad5820" needs to go to list of simple i2c drivers somewhere,
+> > > but...
+> > 
+> > It's an I2C device and it does use a regulator. Not a lot, though, these are
+> > both quite basic stuff. This should still be documented as the people who
+> > write the DT bindings (in general) aren't expected to read driver code as
+> > well. That's at least my understanding.
+> 
+> Yep, you are right, I forgot about the regulator. Something like this?
+> 
+> Thanks,
+> 									Pavel
+> 
+> diff --git a/Documentation/devicetree/bindings/media/i2c/ad5820.txt b/Documentation/devicetree/bindings/media/i2c/ad5820.txt
+> new file mode 100644
+> index 0000000..87c98f1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/i2c/ad5820.txt
 
-Am Montag, den 30.05.2016, 15:27 +0200 schrieb Neil Armstrong:
-> Patchset to add and enable the reset controller driver on Meson SoCs platforms.
-> 
-> This reset controller has up to 256 reset lines with reset pulse generation only,
-> so the assert and deassert calls are not available.
-> 
-> Depends on the patch :
->  - "reset: add devm_reset_controller_register API" [1]
-> 
-> Changes since v2 at http://lkml.kernel.org/r/1464169758-26975-1-git-send-email-narmstrong at baylibre.com :
-> - Get back __iomem in _reset() callback
-> - Get rid of MODULE_ALIAS
-> 
-> Changes since v1 at http://lkml.kernel.org/r/1463732875-23141-1-git-send-email-narmstrong at baylibre.com :
-> - Remove _gxbb_ in names
-> - Depends build on ARCH_MESON only
-> - Add meson8b compatible and bindings
-> - Re-indent dt-bindings headers
-> - Switch to devm_ reset controller register
-> - Remove platform "remove" callback
-> - Update Dual BSD/GPL file headers
-> 
-> Changes since the RFC at http://lkml.kernel.org/r/1463148012-25988-1-git-send-email-narmstrong at baylibre.com :
-> - Fix register mapping and bit defines in bindings header
-> - Remove assert and unassert calls
-> - Fix missing __iomem
-> 
-> [1] https://patchwork.kernel.org/patch/8988471/
-> 
-> Neil Armstrong (4):
->   reset: Add support for the Amlogic Meson SoC Reset Controller
->   dt-bindings: reset: Add bindings for the Meson SoC Reset Controller
+I might use the compatible string as such as a part of the file name. Up to
+you.
 
-I've applied these two patches to the reset/next branch.
+> @@ -0,0 +1,20 @@
+> +* Analog Devices AD5820 autofocus coil
+> +
+> +Required Properties:
+> +
+> +  - compatible: Must contain "adi,ad5820"
+> +
+> +  - reg: I2C slave address
+> +
+> +  - VANA-supply: supply of voltage for VANA pin
+> +
+> +Example:
+> +
+> +       /* D/A converter for auto-focus */
 
-regards
-Philipp
+There is definitely D/A conversion happening there but I'm not sure I'd
+characterise the device as such. They're typically called "voice coil
+drivers", perhaps because the devices are similar to a parts of a
+loudspeaker.
 
->   ARM64: dts: amlogic: Enable Reset Controller on GXBB-based platforms
->   ARM: dts: amlogic: Enable Reset Controller on Meson8b platforms
+> +       ad5820: dac at 0c {
+> +               compatible = "adi,ad5820";
+> +               reg = <0x0c>;
+> +
+> +               VANA-supply = <&vaux4>;
+> +       };
+> +
 > 
->  .../bindings/reset/amlogic,meson-reset.txt         |  18 ++
->  arch/arm/boot/dts/meson8b.dtsi                     |   7 +
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   7 +
->  drivers/reset/Makefile                             |   1 +
->  drivers/reset/reset-meson.c                        | 136 +++++++++++++
->  .../dt-bindings/reset/amlogic,meson-gxbb-reset.h   | 210 +++++++++++++++++++++
->  include/dt-bindings/reset/amlogic,meson8b-reset.h  | 175 +++++++++++++++++
->  7 files changed, 554 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/reset/amlogic,meson-reset.txt
->  create mode 100644 drivers/reset/reset-meson.c
->  create mode 100644 include/dt-bindings/reset/amlogic,meson-gxbb-reset.h
->  create mode 100644 include/dt-bindings/reset/amlogic,meson8b-reset.h
 > 
+
+-- 
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
