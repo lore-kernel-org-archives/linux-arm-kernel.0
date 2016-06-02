@@ -1,87 +1,95 @@
-From: shijie.huang@arm.com (Huang Shijie)
-Date: Thu, 2 Jun 2016 09:48:13 +0800
-Subject: [PATCH 1/2] arm64: mm: dump: make page table dumping reusable
-In-Reply-To: <20160601095818.GA9280@leverpostej>
-References: <1464702542-24394-1-git-send-email-mark.rutland@arm.com>
- <1464702542-24394-2-git-send-email-mark.rutland@arm.com>
- <20160601030133.GB14411@sha-win-210.asiapac.arm.com>
- <20160601095818.GA9280@leverpostej>
-Message-ID: <20160602014811.GA8902@sha-win-210.asiapac.arm.com>
+From: hl@rock-chips.com (hl)
+Date: Thu, 2 Jun 2016 09:54:32 +0800
+Subject: [RFC PATCH 3/4] PM / devfreq: rockchip: add devfreq driver for
+ rk3399 dmc
+In-Reply-To: <CAJ0PZbQaPm1YjgAgEzGbPYSzfi7kk5NG=zAj80t4XmBV5MqEqg@mail.gmail.com>
+References: <1464773739-18152-1-git-send-email-hl@rock-chips.com>
+ <1464773739-18152-4-git-send-email-hl@rock-chips.com>
+ <CAJ0PZbQaPm1YjgAgEzGbPYSzfi7kk5NG=zAj80t4XmBV5MqEqg@mail.gmail.com>
+Message-ID: <574F91D8.70606@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 10:58:18AM +0100, Mark Rutland wrote:
-> On Wed, Jun 01, 2016 at 11:01:35AM +0800, Huang Shijie wrote:
-> > On Tue, May 31, 2016 at 02:49:01PM +0100, Mark Rutland wrote:
-> > > +struct ptdump_info {
-> > > +	struct mm_struct		*mm;
-> > > +	const struct addr_marker	*markers;
-> > > +	unsigned long			base_addr;
-> > > +	unsigned long			max_addr;
-> > > +};
-> > > +
-> > > +int ptdump_register(struct ptdump_info *info, const char *name);
-> > Since we export this to other page tables,  I guess the @base_addr in
-> > the ptdump_info{} may not equal to the VA_START.
-> 
-> Yes, that is the intent.
-> 
-> The only requirement is that this is only VA_START or 0, as these are the only
-> addresses aligned to VA_BITS which actually correspond to regions page tables
-> can cover.
-> 
-> > But the current dump.c does _NOT_ use the @start address been
-> > passed in, it use the 0 as the start address for the walk_pgd/walk_pud/walk_pmd/walk_pte.
-> 
-> Yes, this is deliberate. The trick is that start must be aligned to
-> VA_BITS, and the page table accessors do the right thing, masking out
-yes, this is the trick...
+Hi Myungloo Ham,
 
-> bits which do not matter for their respective indices, e.g.
-> 
-> #define pgd_index(addr)			(((addr) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
-> #define pgd_offset_raw(pgd, addr)	((pgd) + pgd_index(addr))
-> #define pgd_offset(mm, addr)		(pgd_offset_raw((mm)->pgd, (addr)))
-> 
-> This allows us to either provide a virtual address to the accessors
-> (which can be in the low or high half), or an offset relative to the
-> start of each pgd, pud, pmd, or pte.
-> 
-> So for walk_pgd:
-> 
-> static void walk_pgd(struct pg_state *st, struct mm_struct *mm, unsigned long start)
-> {
-> 	pgd_t *pgd = pgd_offset(mm, 0UL);
-> 	unsigned i;
-> 	unsigned long addr;
-> 
-> 	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
-> 		addr = start + i * PGDIR_SIZE;
-> 		if (pgd_none(*pgd)) {
-> 			note_page(st, addr, 1, pgd_val(*pgd));
-> 		} else {
-> 			BUG_ON(pgd_bad(*pgd));
-> 			walk_pud(st, pgd, addr);
-> 		}
-> 	}
-> }
-> 
-> Here, the 0UL we pass to pgd_offset is the offset from the start of the
-> pgd, not the absolute virtual address. 
-> 
-> In the loop, we generate the virtual address each pgd_t corresponds to,
-> and we pass this down to note_page or walk_pud as appropriate. We do
-> likewise in walk_pud, walk_pmd, and walk_pte.
-> 
-> So when we reach note_page, we should always have the right virtual
-> address in the addr parameter.
-> 
-> > It is wrong in logic, since the start address is VA_START, the code gets
-> > the right result coincidentally.
-> 
-> As above, I think that the logic is correct.
-> 
-> Hopefully the explanation above allays your fears?
-Thanks for the explanation.
 
-Huang Shijie
+On 2016?06?01? 18:47, MyungJoo Ham wrote:
+> On Wed, Jun 1, 2016 at 6:35 PM, Lin Huang <hl@rock-chips.com> wrote:
+>> there is dfi controller on rk3399 platform, it can monitor
+>> ddr load, register this controller to devfreq framework, and
+>> default to use simple_ondeamnd policy, and do ddr frequency
+>> scaling base on this result.
+>>
+>> Signed-off-by: Lin Huang <hl@rock-chips.com>
+>> ---
+>>   drivers/devfreq/Kconfig                 |   2 +-
+>>   drivers/devfreq/Makefile                |   1 +
+>>   drivers/devfreq/rockchip/Kconfig        |  14 +
+>>   drivers/devfreq/rockchip/Makefile       |   2 +
+>>   drivers/devfreq/rockchip/rk3399_dmc.c   | 438 ++++++++++++++++++++++++++++++++
+>>   drivers/devfreq/rockchip/rockchip_dmc.c | 132 ++++++++++
+>>   include/soc/rockchip/rockchip_dmc.h     |  44 ++++
+>>   7 files changed, 632 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/devfreq/rockchip/Kconfig
+>>   create mode 100644 drivers/devfreq/rockchip/Makefile
+>>   create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
+>>   create mode 100644 drivers/devfreq/rockchip/rockchip_dmc.c
+>>   create mode 100644 include/soc/rockchip/rockchip_dmc.h
+>>
+>> +
+>> +       /* check the rate we get whether correct */
+>> +       dmcfreq->rate = clk_get_rate(dmcfreq->dmc_clk);
+>> +       if (dmcfreq->rate != target_rate) {
+>> +               dev_err(dev, "get wrong ddr frequency, Request freq %lu,\
+>> +                       Current freq %lu\n", target_rate, dmcfreq->rate);
+>> +               regulator_set_voltage(dmcfreq->vdd_center, dmcfreq->volt,
+>> +                                     dmcfreq->volt);
+> Why do you need to check this and
+> more importantly, why do you assume that dmvfreq->volt
+> will be safe in this case? (what if the new dmcfreq->rate is
+> larger than the old dmcfreq->rate after clk_get_rate?)
+> Note that you didn't update dmcfreq->volt after clk_get_rate()
+     Now we will set the ddr clock rate in bl31 use dcf controller(as i 
+show in the patch cover letter),
+      and there only two result we can get, set clock rate fail(ddr 
+clock still in old rate) or set clock rate
+     sucessful(use the new ddr rate), if the set rate fail, we should 
+keep the voltage old value. Ah, you
+     remind me, i should check clock rate before:
+         if (old_clk_rate > target_rate)
+     otherwise there have chance set high rate fail and use low voltage.
+
+     And about the dmcfreq->volt, i will update this value when into the 
+function, throuth
+
+     opp = devfreq_recommended_opp(dev, &dmcfreq->rate, flags);
+     if (IS_ERR(opp)) {
+         rcu_read_unlock();
+         return PTR_ERR(opp);
+     }
+     dmcfreq->volt = dev_pm_opp_get_voltage(opp);
+>
+>> +EXPORT_SYMBOL_GPL(dmc_event);
+>> +EXPORT_SYMBOL_GPL(rockchip_dmc_enabled);
+>> +EXPORT_SYMBOL_GPL(rockchip_dmc_enable);
+>> +EXPORT_SYMBOL_GPL(rockchip_dmc_disable);
+>> +EXPORT_SYMBOL_GPL(dmc_register_notifier);
+>> +EXPORT_SYMBOL_GPL(dmc_unregister_notifier);
+>> +EXPORT_SYMBOL_GPL(rockchip_dmc_get);
+>> +EXPORT_SYMBOL_GPL(rockchip_dmc_put);
+> Do you really need to export all these device driver specific
+> functions? Looks like a design flaw here.
+>
+     there is some situation we need to disable ddr frequency 
+scaling(connect two panel etc)
+     on rk3399 platform, and it should be also needed on other rockchip 
+platform, so i move these
+     funticon as separate file.
+>
+> Cheers,
+> MyungJoo
+>
+>
+
+-- 
+Lin Huang
