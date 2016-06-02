@@ -1,165 +1,84 @@
 From: james.morse@arm.com (James Morse)
-Date: Thu,  2 Jun 2016 15:10:54 +0100
-Subject: [PATCH 2/5] arm64: hibernate: Support DEBUG_PAGEALLOC
+Date: Thu,  2 Jun 2016 15:10:55 +0100
+Subject: [PATCH 3/5] PM / Hibernate: Allow architectures to specify the
+ hibernate/resume CPU
 In-Reply-To: <1464876657-6692-1-git-send-email-james.morse@arm.com>
 References: <1464876657-6692-1-git-send-email-james.morse@arm.com>
-Message-ID: <1464876657-6692-3-git-send-email-james.morse@arm.com>
+Message-ID: <1464876657-6692-4-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DEBUG_PAGEALLOC removes the valid bit of page table entries to prevent
-any access to unallocated memory. Hibernate uses this as a hint that those
-pages don't need to be saved/restored. This patch adds the
-kernel_page_present() function it uses.
+On arm64 the cpu with logical id 0 is assumed to be the boot CPU. If a
+user hotplugs this CPU out, then uses kexec to boot a new kernel, the new
+kernel will assign logical id 0 to a different physical CPU.
+This breaks hibernate as hibernate and resume will be attempted on different
+CPUs.
 
-hibernate.c copies the resume kernel's linear map for use during restore.
-Add _copy_pte() to fill-in the holes made by DEBUG_PAGEALLOC in the resume
-kernel, so we can restore data the original kernel had at these addresses.
+Define a weak symbol arch_hibernation_disable_cpus(), which defaults to
+calling disable_nonboot_cpus). Architectures that allow CPU 0 to be
+hotplugged can use this to control which CPU is used for hibernate/resume.
 
-Finally, DEBUG_PAGEALLOC means the linear-map alias of KERNEL_START to
-KERNEL_END may have holes in it, so we can't lazily clean this whole
-area to the PoC. Only clean the 'text_text' region, and the kernel/kvm
-idmaps.
-
-This reverts commit da24eb1f3f9e2c7b75c5f8c40d8e48e2c4789596.
-
-Reported-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: James Morse <james.morse@arm.com>
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Pavel Machek <pavel@ucw.cz>
 ---
- arch/arm64/Kconfig            |  1 -
- arch/arm64/kernel/hibernate.c | 45 ++++++++++++++++++++++++++++++++++---------
- arch/arm64/mm/pageattr.c      | 40 +++++++++++++++++++++++++++++++++++++-
- 3 files changed, 75 insertions(+), 11 deletions(-)
+I would have preferred a macro, but there is no hibernate-relevant header
+file that all arch's have. arm, arm64 and x86 have a suspend.h, but powerpc
+doesn't.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 76747d92bc72..00ee83342949 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -577,7 +577,6 @@ source kernel/Kconfig.preempt
- source kernel/Kconfig.hz
- 
- config ARCH_SUPPORTS_DEBUG_PAGEALLOC
--	depends on !HIBERNATION
- 	def_bool y
- 
- config ARCH_HAS_HOLES_MEMORYMODEL
-diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
-index 56e548fe0386..c114c405d851 100644
---- a/arch/arm64/kernel/hibernate.c
-+++ b/arch/arm64/kernel/hibernate.c
-@@ -235,8 +235,15 @@ int swsusp_arch_suspend(void)
- 	if (__cpu_suspend_enter(&state)) {
- 		ret = swsusp_save();
- 	} else {
--		/* Clean kernel to PoC for secondary core startup */
--		__flush_dcache_area(LMADDR(KERNEL_START), KERNEL_END - KERNEL_START);
-+		/* Clean kernel core startup/idle code to PoC*/
-+		__flush_dcache_area(__text_text_start,
-+				    __text_text_end - __text_text_start);
-+		__flush_dcache_area(__idmap_text_start,
-+				    __idmap_text_end - __idmap_text_start);
-+
-+		/* Clean kvm setup code to PoC? */
-+		if (el2_reset_needed())
-+			__flush_dcache_area(__hyp_idmap_text_start, __hyp_idmap_text_end - __hyp_idmap_text_start);
- 
- 		/*
- 		 * Tell the hibernation core that we've just restored
-@@ -252,6 +259,32 @@ int swsusp_arch_suspend(void)
- 	return ret;
+If this approach is acceptable, this patch should go with 4&5 via the arm64
+tree.
+
+ kernel/power/hibernate.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/kernel/power/hibernate.c b/kernel/power/hibernate.c
+index fca9254280ee..0e668a3207ec 100644
+--- a/kernel/power/hibernate.c
++++ b/kernel/power/hibernate.c
+@@ -70,6 +70,16 @@ bool hibernation_available(void)
  }
  
-+static void _copy_pte(pte_t *dst_pte, pte_t *src_pte, unsigned long addr)
-+{
-+	unsigned long pfn = virt_to_pfn(addr);
-+
-+	if (pte_valid(*src_pte)) {
-+		/*
-+		 * Resume will overwrite areas that may be marked
-+		 * read only (code, rodata). Clear the RDONLY bit from
-+		 * the temporary mappings we use during restore.
-+		 */
-+		set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
-+	} else if (debug_pagealloc_enabled()) {
-+		/*
-+		 * debug_pagealloc may have removed the PTE_VALID bit if
-+		 * the page isn't in use by the resume kernel. It may have
-+		 * been in use by the original kernel, in which case we need
-+		 * to put it back in our copy to do the restore.
-+		 *
-+		 * Check for mappable memory that gives us a translation
-+		 * like part of the linear map.
-+		 */
-+		if (pfn_valid(pfn) && pte_pfn(*src_pte) == pfn)
-+			set_pte(dst_pte, __pte((pte_val(*src_pte) & ~PTE_RDONLY) | PTE_VALID));
-+	}
-+}
-+
- static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
- 		    unsigned long end)
- {
-@@ -267,13 +300,7 @@ static int copy_pte(pmd_t *dst_pmd, pmd_t *src_pmd, unsigned long start,
- 
- 	src_pte = pte_offset_kernel(src_pmd, start);
- 	do {
--		if (!pte_none(*src_pte))
--			/*
--			 * Resume will overwrite areas that may be marked
--			 * read only (code, rodata). Clear the RDONLY bit from
--			 * the temporary mappings we use during restore.
--			 */
--			set_pte(dst_pte, __pte(pte_val(*src_pte) & ~PTE_RDONLY));
-+		_copy_pte(dst_pte, src_pte, addr);
- 	} while (dst_pte++, src_pte++, addr += PAGE_SIZE, addr != end);
- 
- 	return 0;
-diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-index ca6d268e3313..b6c0da84258c 100644
---- a/arch/arm64/mm/pageattr.c
-+++ b/arch/arm64/mm/pageattr.c
-@@ -139,4 +139,42 @@ void __kernel_map_pages(struct page *page, int numpages, int enable)
- 					__pgprot(0),
- 					__pgprot(PTE_VALID));
- }
--#endif
-+#ifdef CONFIG_HIBERNATION
-+/*
-+ * When built with CONFIG_DEBUG_PAGEALLOC and CONFIG_HIBERNATION, this function
-+ * is used to determine if a linear map page has been marked as not-present by
-+ * CONFIG_DEBUG_PAGEALLOC. Walk the page table and check the PTE_VALID bit.
-+ * This is based on kern_addr_valid(), which almost does what we need.
+ /**
++ * arch_hibernation_disable_cpus - Allow architectures to direct which CPU
++ * is used for suspend or resume.
++ * @suspend: True during hibernate, false for resume.
 + */
-+bool kernel_page_present(struct page *page)
++int __weak arch_hibernation_disable_cpus(__maybe_unused bool suspend)
 +{
-+	pgd_t *pgd;
-+	pud_t *pud;
-+	pmd_t *pmd;
-+	pte_t *pte;
-+	unsigned long addr = (unsigned long)page_address(page);
-+
-+	pgd = pgd_offset_k(addr);
-+	if (pgd_none(*pgd))
-+		return false;
-+
-+	pud = pud_offset(pgd, addr);
-+	if (pud_none(*pud))
-+		return false;
-+	if (pud_sect(*pud))
-+		return true;
-+
-+	pmd = pmd_offset(pud, addr);
-+	if (pmd_none(*pmd))
-+		return false;
-+	if (pmd_sect(*pmd))
-+		return true;
-+
-+	pte = pte_offset_kernel(pmd, addr);
-+	if (pte_none(*pte))
-+		return false;
-+
-+	return pte_valid(*pte);
++	return disable_nonboot_cpus();
 +}
-+#endif /* CONFIG_HIBERNATION */
-+#endif /* CONFIG_DEBUG_PAGEALLOC */
++
++/**
+  * hibernation_set_ops - Set the global hibernate operations.
+  * @ops: Hibernation operations to use in subsequent hibernation transitions.
+  */
+@@ -279,7 +289,7 @@ static int create_image(int platform_mode)
+ 	if (error || hibernation_test(TEST_PLATFORM))
+ 		goto Platform_finish;
+ 
+-	error = disable_nonboot_cpus();
++	error = arch_hibernation_disable_cpus(true);
+ 	if (error || hibernation_test(TEST_CPUS))
+ 		goto Enable_cpus;
+ 
+@@ -433,7 +443,7 @@ static int resume_target_kernel(bool platform_mode)
+ 	if (error)
+ 		goto Cleanup;
+ 
+-	error = disable_nonboot_cpus();
++	error = arch_hibernation_disable_cpus(false);
+ 	if (error)
+ 		goto Enable_cpus;
+ 
+@@ -551,7 +561,7 @@ int hibernation_platform_enter(void)
+ 	if (error)
+ 		goto Platform_finish;
+ 
+-	error = disable_nonboot_cpus();
++	error = arch_hibernation_disable_cpus(true);
+ 	if (error)
+ 		goto Enable_cpus;
+ 
 -- 
 2.8.0.rc3
