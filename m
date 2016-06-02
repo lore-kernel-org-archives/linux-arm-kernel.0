@@ -1,101 +1,175 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 2 Jun 2016 23:57:02 +0200
-Subject: [PATCH 01/20] drm/atomic: Fix remaining places where
- !funcs->best_encoder is valid
-In-Reply-To: <8671722.LHaiaBNqfE@avalon>
-References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464877907-27723-2-git-send-email-boris.brezillon@free-electrons.com>
- <8671722.LHaiaBNqfE@avalon>
-Message-ID: <CAKMK7uHyqNbA8Scw2fE0geAyNt0a0XVtzf81nwWjEhbZ-gAvKw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 03 Jun 2016 00:58:53 +0300
+Subject: [PATCH/RFC v3 02/22] soc: renesas: Add R-Car RST driver
+In-Reply-To: <1464808880-343-3-git-send-email-geert+renesas@glider.be>
+References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
+ <1464808880-343-3-git-send-email-geert+renesas@glider.be>
+Message-ID: <6849015.bJCuAeaMgZ@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 2, 2016 at 11:05 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> Hi Boris,
->
-> Thank you for the patch.
->
-> On Thursday 02 Jun 2016 16:31:28 Boris Brezillon wrote:
->> Adapt drm_pick_crtcs() and update_connector_routing() to fallback to
->> drm_atomic_helper_best_encoder() if funcs->best_encoder() is NULL so
->> that DRM drivers can leave this hook unassigned if they know they want
->> to use drm_atomic_helper_best_encoder().
->
-> Could you please update include/drm/drm_modeset_helper_vtables.h to document
-> this new behaviour ?
+Hi Geert,
 
-Thanks for reminding me. Please update hooks for both
-atomic_best_encoder and best_encoder. Also mention that it's only
-optional for atomic drivers. There's lots of examples in that file for
-the wording usually used.
+Thank you for the patch.
 
-> The only drawback I see in this patch is the additional object lookup
-> performed by drm_atomic_helper_best_encoder() at runtime. I wonder if we could
-> somehow cache the information, as the assignment can't change when there's a
-> 1:1 correspondence between encoders and connectors.
+On Wednesday 01 Jun 2016 21:21:00 Geert Uytterhoeven wrote:
+> Add a driver for the Renesas R-Car Gen1 RESET/WDT and R-Car Gen2/Gen3
+> RST module.
+> 
+> For now this driver just provides an API to obtain the state of the mode
+> pins, as latched at reset time.  As this is typically called from the
+> probe function of a clock driver, which can run much earlier than any
+> initcall, calling rcar_rst_read_mode_pins() may force an early
+> initialization of the driver.
+> 
+> Despite the current simple and almost identical handling for all
+> supported SoCs, the driver matches against SoC-specific compatible
+> values only, as the features provided by the hardware module differ a
+> lot across the various SoC families and members.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> v3:
+>   - New.
+> ---
+>  drivers/soc/renesas/Makefile         |  5 ++
+>  drivers/soc/renesas/rcar-rst.c       | 94 +++++++++++++++++++++++++++++++++
+>  include/linux/soc/renesas/rcar-rst.h |  6 +++
+>  3 files changed, 105 insertions(+)
+>  create mode 100644 drivers/soc/renesas/rcar-rst.c
+>  create mode 100644 include/linux/soc/renesas/rcar-rst.h
+> 
+> diff --git a/drivers/soc/renesas/Makefile b/drivers/soc/renesas/Makefile
+> index f32a001c65c3ab44..0d732ff893dd8fba 100644
+> --- a/drivers/soc/renesas/Makefile
+> +++ b/drivers/soc/renesas/Makefile
+> @@ -1,3 +1,8 @@
+> +obj-$(CONFIG_ARCH_RCAR_GEN1)	+= rcar-rst.o
+> +obj-$(CONFIG_ARCH_RCAR_GEN2)	+= rcar-rst.o
+> +obj-$(CONFIG_ARCH_R8A7795)	+= rcar-rst.o
+> +obj-$(CONFIG_ARCH_R8A7796)	+= rcar-rst.o
+> +
+>  obj-$(CONFIG_ARCH_R8A7779)	+= rcar-sysc.o r8a7779-sysc.o
+>  obj-$(CONFIG_ARCH_R8A7790)	+= rcar-sysc.o r8a7790-sysc.o
+>  obj-$(CONFIG_ARCH_R8A7791)	+= rcar-sysc.o r8a7791-sysc.o
+> diff --git a/drivers/soc/renesas/rcar-rst.c b/drivers/soc/renesas/rcar-rst.c
+> new file mode 100644
+> index 0000000000000000..1997c348c0853254
+> --- /dev/null
+> +++ b/drivers/soc/renesas/rcar-rst.c
+> @@ -0,0 +1,94 @@
+> +/*
+> + * R-Car Gen1 RESET/WDT and R-Car Gen2/Gen3 RST Driver
+> + *
+> + * Copyright (C) 2016 Glider bvba
+> + *
+> + * This file is subject to the terms and conditions of the GNU General
+> Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/of_address.h>
+> +#include <linux/soc/renesas/rcar-rst.h>
+> +
+> +struct rst_config {
+> +	unsigned int modemr;	/* Mode Monitoring Register Offset */
+> +};
+> +
+> +static const struct rst_config rcar_rst_gen1 __initconst = {
+> +	.modemr = 0x20,
+> +};
+> +
+> +static const struct rst_config rcar_rst_gen2 __initconst = {
+> +	.modemr = 0x60,
+> +};
+> +
+> +static const struct rst_config rcar_rst_gen3 __initconst = {
+> +	.modemr = 0x60,
+> +};
+> +
+> +static const struct of_device_id rcar_rst_matches[] __initconst = {
+> +	{ .compatible = "renesas,r8a7778-reset-wdt", .data = &rcar_rst_gen1 },
+> +	{ .compatible = "renesas,r8a7779-reset-wdt", .data = &rcar_rst_gen1 },
+> +	{ .compatible = "renesas,r8a7790-rst", .data = &rcar_rst_gen2 },
+> +	{ .compatible = "renesas,r8a7791-rst", .data = &rcar_rst_gen2 },
+> +	{ .compatible = "renesas,r8a7792-rst", .data = &rcar_rst_gen2 },
+> +	{ .compatible = "renesas,r8a7793-rst", .data = &rcar_rst_gen2 },
+> +	{ .compatible = "renesas,r8a7794-rst", .data = &rcar_rst_gen2 },
+> +	{ .compatible = "renesas,r8a7795-rst", .data = &rcar_rst_gen3 },
+> +	{ .compatible = "renesas,r8a7796-rst", .data = &rcar_rst_gen3 },
+> +	{ /* sentinel */ }
+> +};
+> +
+> +static void __iomem *rcar_rst_base __initdata;
+> +static u32 saved_mode __initdata;
+> +
+> +static int __init rcar_rst_init(void)
+> +{
+> +	const struct of_device_id *match;
+> +	const struct rst_config *cfg;
+> +	struct device_node *np;
+> +	void __iomem *base;
+> +	int error = 0;
+> +
+> +	if (rcar_rst_base)
+> +		return 0;
+> +
+> +	np = of_find_matching_node_and_match(NULL, rcar_rst_matches, &match);
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	base = of_iomap(np, 0);
+> +	if (!base) {
+> +		pr_warn("%s: Cannot map regs\n", np->full_name);
+> +		error = -ENOMEM;
+> +		goto out_put;
+> +	}
+> +
+> +	rcar_rst_base = base;
+> +	cfg = match->data;
+> +	saved_mode = ioread32(base + cfg->modemr);
+> +
+> +	pr_debug("%s: MODE = 0x%08x\n", np->full_name, saved_mode);
+> +
+> +out_put:
+> +	of_node_put(np);
+> +	return error;
+> +}
+> +arch_initcall(rcar_rst_init);
 
-drm_encoder_find is an idr lookup. That should be plenty fast,
-especially for modeset code. Usually what's too expensive even for
-modeset code is linear list walks. But Chris just submitted patches to
-convert most of them into simple lookups.
--Daniel
+Given that rcar_rst_init() is only used as a support function for 
+rcar_rst_read_mode_pins(), how about removing the initcall ?
 
->>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->> ---
->>  drivers/gpu/drm/drm_atomic_helper.c |  4 +++-
->>  drivers/gpu/drm/drm_fb_helper.c     | 13 ++++++++++++-
->>  2 files changed, 15 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/drm_atomic_helper.c
->> b/drivers/gpu/drm/drm_atomic_helper.c index f6a3350..849d029 100644
->> --- a/drivers/gpu/drm/drm_atomic_helper.c
->> +++ b/drivers/gpu/drm/drm_atomic_helper.c
->> @@ -300,8 +300,10 @@ update_connector_routing(struct drm_atomic_state
->> *state, if (funcs->atomic_best_encoder)
->>               new_encoder = funcs->atomic_best_encoder(connector,
->>                                                        connector_state);
->> -     else
->> +     else if (funcs->best_encoder)
->>               new_encoder = funcs->best_encoder(connector);
->> +     else
->> +             new_encoder = drm_atomic_helper_best_encoder(connector);
->>
->>       if (!new_encoder) {
->>               DRM_DEBUG_ATOMIC("No suitable encoder found for [CONNECTOR:%d:%s]\n",
->> diff --git a/drivers/gpu/drm/drm_fb_helper.c
->> b/drivers/gpu/drm/drm_fb_helper.c index 7c2eb75..d44389a 100644
->> --- a/drivers/gpu/drm/drm_fb_helper.c
->> +++ b/drivers/gpu/drm/drm_fb_helper.c
->> @@ -2000,7 +2000,18 @@ static int drm_pick_crtcs(struct drm_fb_helper
->> *fb_helper, my_score++;
->>
->>       connector_funcs = connector->helper_private;
->> -     encoder = connector_funcs->best_encoder(connector);
->> +
->> +     /*
->> +      * If the DRM device implements atomic hooks and ->best_encoder() is
->> +      * NULL we fallback to the default drm_atomic_helper_best_encoder()
->> +      * helper.
->> +      */
->> +     if (fb_helper->dev->mode_config.funcs->atomic_commit &&
->> +         !connector_funcs->best_encoder)
->> +             encoder = drm_atomic_helper_best_encoder(connector);
->> +     else
->> +             encoder = connector_funcs->best_encoder(connector);
->> +
->>       if (!encoder)
->>               goto out;
->
-> --
-> Regards,
->
-> Laurent Pinchart
->
-
-
+> +int __init rcar_rst_read_mode_pins(u32 *mode)
+> +{
+> +	int error;
+> +
+> +	if (!rcar_rst_base) {
+> +		error = rcar_rst_init();
+> +		if (error)
+> +			return error;
+> +	}
+> +
+> +	*mode = saved_mode;
+> +	return 0;
+> +}
+> diff --git a/include/linux/soc/renesas/rcar-rst.h
+> b/include/linux/soc/renesas/rcar-rst.h new file mode 100644
+> index 0000000000000000..a18e0783946b66ec
+> --- /dev/null
+> +++ b/include/linux/soc/renesas/rcar-rst.h
+> @@ -0,0 +1,6 @@
+> +#ifndef __LINUX_SOC_RENESAS_RCAR_RST_H__
+> +#define __LINUX_SOC_RENESAS_RCAR_RST_H__
+> +
+> +int rcar_rst_read_mode_pins(u32 *mode);
+> +
+> +#endif /* __LINUX_SOC_RENESAS_RCAR_RST_H__ */
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Regards,
+
+Laurent Pinchart
