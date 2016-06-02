@@ -1,26 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 2 Jun 2016 11:27:42 +0100
-Subject: [PATCH resend v2 1/6] regulator: axp20x: support AXP809 variant
-In-Reply-To: <CAGb2v67eVjNnON1pAPKMSMgq83sk6u7Q53qDs0dTEbhyTAR_gA@mail.gmail.com>
-References: <1464711804-19256-1-git-send-email-wens@csie.org>
- <1464711804-19256-2-git-send-email-wens@csie.org>
- <20160531173647.GJ29837@sirena.org.uk>
- <CAGb2v67eVjNnON1pAPKMSMgq83sk6u7Q53qDs0dTEbhyTAR_gA@mail.gmail.com>
-Message-ID: <20160602102742.GG2282@sirena.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 2 Jun 2016 12:41:36 +0200
+Subject: [PATCH] tty/serial: atmel: fix RS485 half duplex with DMA
+In-Reply-To: <1464389648-4820-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1464389648-4820-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <57500D60.2000900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 10:03:42AM +0800, Chen-Yu Tsai wrote:
+Le 28/05/2016 00:54, Alexandre Belloni a ?crit :
+> When using DMA, half duplex doesn't work properly because rx is not stopped
+> before starting tx. Ensure we call atmel_stop_rx() in the DMA case.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-> The mfd patches this one depended on were pushed around a week before
-> the merge window, about a month after you reviewed, merged, then backed
-> out this patch. There was no immutable branch either.
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Why did it get backed out?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/5d89ea71/attachment.sig>
+We can also add:
+Cc: <stable@vger.kernel.org> # v4.3+
+
+
+Thanks Alexandre!
+
+
+
+> ---
+>  drivers/tty/serial/atmel_serial.c | 14 ++++++++------
+>  1 file changed, 8 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+> index 954941dd8124..f9c798cba83f 100644
+> --- a/drivers/tty/serial/atmel_serial.c
+> +++ b/drivers/tty/serial/atmel_serial.c
+> @@ -482,19 +482,21 @@ static void atmel_start_tx(struct uart_port *port)
+>  {
+>  	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
+>  
+> -	if (atmel_use_pdc_tx(port)) {
+> -		if (atmel_uart_readl(port, ATMEL_PDC_PTSR) & ATMEL_PDC_TXTEN)
+> -			/* The transmitter is already running.  Yes, we
+> -			   really need this.*/
+> -			return;
+> +	if (atmel_use_pdc_tx(port) && (atmel_uart_readl(port, ATMEL_PDC_PTSR)
+> +				       & ATMEL_PDC_TXTEN))
+> +		/* The transmitter is already running.  Yes, we
+> +		   really need this.*/
+> +		return;
+>  
+> +	if (atmel_use_pdc_tx(port) || atmel_use_dma_tx(port))
+>  		if ((port->rs485.flags & SER_RS485_ENABLED) &&
+>  		    !(port->rs485.flags & SER_RS485_RX_DURING_TX))
+>  			atmel_stop_rx(port);
+>  
+> +	if (atmel_use_pdc_tx(port))
+>  		/* re-enable PDC transmit */
+>  		atmel_uart_writel(port, ATMEL_PDC_PTCR, ATMEL_PDC_TXTEN);
+> -	}
+> +
+>  	/* Enable interrupts */
+>  	atmel_uart_writel(port, ATMEL_US_IER, atmel_port->tx_done_mask);
+>  }
+> 
+
+
+-- 
+Nicolas Ferre
