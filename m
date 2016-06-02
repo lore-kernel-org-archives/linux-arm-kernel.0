@@ -1,98 +1,42 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Thu,  2 Jun 2016 16:31:38 +0200
-Subject: [PATCH 11/20] drm: sti: Rely on the default ->best_encoder() behavior
+Date: Thu,  2 Jun 2016 16:31:45 +0200
+Subject: [PATCH 18/20] drm/bridge: ptn3460: Rely on the default
+ ->best_encoder() behavior
 In-Reply-To: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1464877907-27723-12-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1464877907-27723-19-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All outputs have a 1:1 relationship between connectors and encoders
-and the driver is relying on the atomic helpers: we can drop the custom
-->best_encoder() implementations and let the core call
-drm_atomic_helper_best_encoder() for us.
+We have a 1:1 relationship between connectors and encoders, and the driver
+is relying on the atomic helpers: we can drop the custom ->best_encoder(),
+and let the core call drm_atomic_helper_best_encoder() for us.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/sti/sti_dvo.c  | 10 ----------
- drivers/gpu/drm/sti/sti_hda.c  | 10 ----------
- drivers/gpu/drm/sti/sti_hdmi.c | 10 ----------
- 3 files changed, 30 deletions(-)
+ drivers/gpu/drm/bridge/nxp-ptn3460.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/drivers/gpu/drm/sti/sti_dvo.c b/drivers/gpu/drm/sti/sti_dvo.c
-index 25f7663..d5627d1 100644
---- a/drivers/gpu/drm/sti/sti_dvo.c
-+++ b/drivers/gpu/drm/sti/sti_dvo.c
-@@ -384,20 +384,10 @@ static int sti_dvo_connector_mode_valid(struct drm_connector *connector,
- 	return MODE_OK;
+diff --git a/drivers/gpu/drm/bridge/nxp-ptn3460.c b/drivers/gpu/drm/bridge/nxp-ptn3460.c
+index 7ecd59f..93f3dac 100644
+--- a/drivers/gpu/drm/bridge/nxp-ptn3460.c
++++ b/drivers/gpu/drm/bridge/nxp-ptn3460.c
+@@ -235,16 +235,8 @@ out:
+ 	return num_modes;
  }
  
--struct drm_encoder *sti_dvo_best_encoder(struct drm_connector *connector)
+-static struct drm_encoder *ptn3460_best_encoder(struct drm_connector *connector)
 -{
--	struct sti_dvo_connector *dvo_connector
--		= to_sti_dvo_connector(connector);
+-	struct ptn3460_bridge *ptn_bridge = connector_to_ptn3460(connector);
 -
--	/* Best encoder is the one associated during connector creation */
--	return dvo_connector->encoder;
+-	return ptn_bridge->bridge.encoder;
 -}
 -
- static const
- struct drm_connector_helper_funcs sti_dvo_connector_helper_funcs = {
- 	.get_modes = sti_dvo_connector_get_modes,
- 	.mode_valid = sti_dvo_connector_mode_valid,
--	.best_encoder = sti_dvo_best_encoder,
+ static const struct drm_connector_helper_funcs ptn3460_connector_helper_funcs = {
+ 	.get_modes = ptn3460_get_modes,
+-	.best_encoder = ptn3460_best_encoder,
  };
  
- static enum drm_connector_status
-diff --git a/drivers/gpu/drm/sti/sti_hda.c b/drivers/gpu/drm/sti/sti_hda.c
-index f7d3464..c4649f5 100644
---- a/drivers/gpu/drm/sti/sti_hda.c
-+++ b/drivers/gpu/drm/sti/sti_hda.c
-@@ -676,20 +676,10 @@ static int sti_hda_connector_mode_valid(struct drm_connector *connector,
- 	return MODE_OK;
- }
- 
--struct drm_encoder *sti_hda_best_encoder(struct drm_connector *connector)
--{
--	struct sti_hda_connector *hda_connector
--		= to_sti_hda_connector(connector);
--
--	/* Best encoder is the one associated during connector creation */
--	return hda_connector->encoder;
--}
--
- static const
- struct drm_connector_helper_funcs sti_hda_connector_helper_funcs = {
- 	.get_modes = sti_hda_connector_get_modes,
- 	.mode_valid = sti_hda_connector_mode_valid,
--	.best_encoder = sti_hda_best_encoder,
- };
- 
- static enum drm_connector_status
-diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
-index 6ef0715..dc9ab6e 100644
---- a/drivers/gpu/drm/sti/sti_hdmi.c
-+++ b/drivers/gpu/drm/sti/sti_hdmi.c
-@@ -897,20 +897,10 @@ static int sti_hdmi_connector_mode_valid(struct drm_connector *connector,
- 	return MODE_OK;
- }
- 
--struct drm_encoder *sti_hdmi_best_encoder(struct drm_connector *connector)
--{
--	struct sti_hdmi_connector *hdmi_connector
--		= to_sti_hdmi_connector(connector);
--
--	/* Best encoder is the one associated during connector creation */
--	return hdmi_connector->encoder;
--}
--
- static const
- struct drm_connector_helper_funcs sti_hdmi_connector_helper_funcs = {
- 	.get_modes = sti_hdmi_connector_get_modes,
- 	.mode_valid = sti_hdmi_connector_mode_valid,
--	.best_encoder = sti_hdmi_best_encoder,
- };
- 
- /* get detection status of display device */
+ static enum drm_connector_status ptn3460_detect(struct drm_connector *connector,
 -- 
 2.7.4
