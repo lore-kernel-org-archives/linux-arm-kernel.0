@@ -1,79 +1,38 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 03 Jun 2016 00:05:46 +0300
-Subject: [PATCH 01/20] drm/atomic: Fix remaining places where
- !funcs->best_encoder is valid
-In-Reply-To: <1464877907-27723-2-git-send-email-boris.brezillon@free-electrons.com>
-References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464877907-27723-2-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <8671722.LHaiaBNqfE@avalon>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 2 Jun 2016 17:07:46 -0400
+Subject: [PATCH v1 1/2] ARM: dts: keystone: remove bogus IO resource entry
+ from PCI binding
+In-Reply-To: <bdf18787-46ed-cc15-8914-fc14a3557681@oracle.com>
+References: <1464880672-15203-1-git-send-email-m-karicheri2@ti.com>
+ <bdf18787-46ed-cc15-8914-fc14a3557681@oracle.com>
+Message-ID: <5750A022.2000601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-Thank you for the patch.
-
-On Thursday 02 Jun 2016 16:31:28 Boris Brezillon wrote:
-> Adapt drm_pick_crtcs() and update_connector_routing() to fallback to
-> drm_atomic_helper_best_encoder() if funcs->best_encoder() is NULL so
-> that DRM drivers can leave this hook unassigned if they know they want
-> to use drm_atomic_helper_best_encoder().
-
-Could you please update include/drm/drm_modeset_helper_vtables.h to document 
-this new behaviour ?
-
-The only drawback I see in this patch is the additional object lookup 
-performed by drm_atomic_helper_best_encoder() at runtime. I wonder if we could 
-somehow cache the information, as the assignment can't change when there's a 
-1:1 correspondence between encoders and connectors.
-
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/gpu/drm/drm_atomic_helper.c |  4 +++-
->  drivers/gpu/drm/drm_fb_helper.c     | 13 ++++++++++++-
->  2 files changed, 15 insertions(+), 2 deletions(-)
+On 06/02/2016 02:08 PM, Santosh Shilimkar wrote:
+> On 6/2/2016 8:17 AM, Murali Karicheri wrote:
+>> The PCI DT bindings contain a bogus entry for IO space which is not
+>> supported on Keystone. The current bogus entry has an invalid size
+>> and throws following error during boot.
+>>
+>> [0.420713] keystone-pcie 21021000.pcie: error -22: failed to map
+>>            resource [io  0x0000-0x400000003fff]
+>>
+>> So remove it from the dts. While at it also add a bus-range
+>> value that eliminates following log at boot up.
+>>
+>> [0.420659] No bus range found for /soc/pcie at 21020000, using [bus 00-ff]
+>>
+>> Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+>> ---
+> Both 1/2 and 2/2 looks fine to me. Will queue them for
+> next merge window.
 > 
-> diff --git a/drivers/gpu/drm/drm_atomic_helper.c
-> b/drivers/gpu/drm/drm_atomic_helper.c index f6a3350..849d029 100644
-> --- a/drivers/gpu/drm/drm_atomic_helper.c
-> +++ b/drivers/gpu/drm/drm_atomic_helper.c
-> @@ -300,8 +300,10 @@ update_connector_routing(struct drm_atomic_state
-> *state, if (funcs->atomic_best_encoder)
->  		new_encoder = funcs->atomic_best_encoder(connector,
->  							 connector_state);
-> -	else
-> +	else if (funcs->best_encoder)
->  		new_encoder = funcs->best_encoder(connector);
-> +	else
-> +		new_encoder = drm_atomic_helper_best_encoder(connector);
+> Regards,
+> Santosh
 > 
->  	if (!new_encoder) {
->  		DRM_DEBUG_ATOMIC("No suitable encoder found for [CONNECTOR:%d:%s]\n",
-> diff --git a/drivers/gpu/drm/drm_fb_helper.c
-> b/drivers/gpu/drm/drm_fb_helper.c index 7c2eb75..d44389a 100644
-> --- a/drivers/gpu/drm/drm_fb_helper.c
-> +++ b/drivers/gpu/drm/drm_fb_helper.c
-> @@ -2000,7 +2000,18 @@ static int drm_pick_crtcs(struct drm_fb_helper
-> *fb_helper, my_score++;
-> 
->  	connector_funcs = connector->helper_private;
-> -	encoder = connector_funcs->best_encoder(connector);
-> +
-> +	/*
-> +	 * If the DRM device implements atomic hooks and ->best_encoder() is
-> +	 * NULL we fallback to the default drm_atomic_helper_best_encoder()
-> +	 * helper.
-> +	 */
-> +	if (fb_helper->dev->mode_config.funcs->atomic_commit &&
-> +	    !connector_funcs->best_encoder)
-> +		encoder = drm_atomic_helper_best_encoder(connector);
-> +	else
-> +		encoder = connector_funcs->best_encoder(connector);
-> +
->  	if (!encoder)
->  		goto out;
+Ok. Thanks Santosh!
 
 -- 
-Regards,
-
-Laurent Pinchart
+Murali Karicheri
+Linux Kernel, Keystone
