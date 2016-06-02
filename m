@@ -1,61 +1,53 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Thu, 02 Jun 2016 08:45:36 +0200
-Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
-In-Reply-To: <574F5881.4060008@gmail.com>
+Date: Thu, 02 Jun 2016 08:56:05 +0200
+Subject: [PATCH 09/32] bcm2837-rpi-3-b.dts for 32bit arm
+In-Reply-To: <5616246.RRQ2rLjLud@wuerfel>
 References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-2-git-send-email-kraxel@redhat.com>
- <574F5881.4060008@gmail.com>
-Message-ID: <1464849936.24775.33.camel@redhat.com>
+ <7065434.SNfT8zjcK3@wuerfel> <87zir4leyc.fsf@eliezer.anholt.net>
+ <5616246.RRQ2rLjLud@wuerfel>
+Message-ID: <1464850565.24775.40.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >  config ARCH_BCM2835
-> >  	bool "Broadcom BCM2835 family"
-> > -	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7
-> > +	depends on ARCH_MULTI_V6 || ARCH_MULTI_V7 || ARM64
+On Do, 2016-06-02 at 00:39 +0200, Arnd Bergmann wrote:
+> On Wednesday, June 1, 2016 3:30:35 PM CEST Eric Anholt wrote:
+> > Arnd Bergmann <arnd@arndb.de> writes:
+> > 
+> > > On Wednesday, June 1, 2016 11:43:18 PM CEST Gerd Hoffmann wrote:
+> > >> diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> > >> new file mode 100644
+> > >> index 0000000..36178a6
+> > >> --- /dev/null
+> > >> +++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+> > >> @@ -0,0 +1 @@
+> > >> +#include "../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts"
+> > >> -- 
+> > >> 1.8.3.1
+> > >> 
+> > >
+> > > What does this gain you?
+> > 
+> > Many Raspberry Pi users use a small set of SD cards that they swap
+> > between various versions of the hardware.  It would be good to have
+> > their 32-bit OS images work on the Pi3 as well.
 > 
-> Humm, what does that achieve?
-
-Nothing ;)
-
-Slipped through unnoticed, I'll drop it.
-
-> > +config ARCH_BCM
-> > +	bool "Broadcom SoC Support"
-> > +	help
-> > +	  This enables support for Broadcom ARM based SoC chips
+> Sure, but you already have the dts file in the other directory,
+> and the dtb is the same.
 > 
-> menuconfig maybe?
+> According to the comment in the other patch, the idea was to have
+> the file in the arm64 directory because it's a 64-bit platform,
+> but now you have it here as well.
 
-There isn't any in arch/arm64/Kconfig.platforms right now, so I didn't
-feel like introducing one.  Also the dependency should have pretty much
-the same effect ...
+Well, it just includes the arm64 version as-is, so we don't have
+duplication.  I'm open to suggestions to how handle this better.  
 
-> > +config ARCH_BCM2835
-> > +	bool "Broadcom BCM2835 family"
-> > +	depends on ARCH_BCM
-> > +	select ARCH_REQUIRE_GPIOLIB
-> > +	select CLKSRC_OF
-> > +	select PINCTRL
-> > +	select PINCTRL_BCM2835
-> > +	select ARM_AMBA
-> > +	select ARM_TIMER_SP804
-> > +	select HAVE_ARM_ARCH_TIMER
-> > +	help
-> > +	  This enables support for the Broadcom BCM2837 SoC.
-> > +	  This SoC is used in the Raspberry Pi 3 device.
-> > +
-> >  config ARCH_BCM_IPROC
-> >  	bool "Broadcom iProc SoC Family"
-> > +	depends on ARCH_BCM
-> 
-> Does not seem necessary nor adding anything here.
+Symbolic link?
 
-Added for consistency.  When we add ARCH_BCM all ARCH_BCM_* should
-depend on it ...
+Reference to ../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+directly in the Makefile?
 
-We could also do it the other way around: make ARCH_BCM a hidden bool
-and have ARCH_BCM_* select it.
+I've seen arch/arm/boot/dts/Makefile uses globs on *.dts, so I suspect
+the later wouldn't be that straight forward.
 
 cheers,
   Gerd
