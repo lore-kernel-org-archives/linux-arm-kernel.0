@@ -1,27 +1,57 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Thu, 2 Jun 2016 14:03:06 +0800
-Subject: [PATCH 0/3] of: numa: cleanup
-In-Reply-To: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1464847389-11652-1-git-send-email-wangkefeng.wang@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 02 Jun 2016 08:18:26 +0200
+Subject: [PATCH 3/3] ARM: dts: exynos: Add watchdog amd Security SubSystem
+ to Exynos5410
+In-Reply-To: <f7e99aad-f773-27c6-d554-ba30bc54b5f7@osg.samsung.com>
+References: <1464774351-23604-1-git-send-email-k.kozlowski@samsung.com>
+ <1464774351-23604-3-git-send-email-k.kozlowski@samsung.com>
+ <f7e99aad-f773-27c6-d554-ba30bc54b5f7@osg.samsung.com>
+Message-ID: <574FCFB2.1080607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1) Use of_get_next_parent in of_node_to_nid.
-2) Use pr_fmt to prefix kernel output. and drop duplicated message
-   of NUMA turned off.
+On 06/01/2016 05:16 PM, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
+> 
+> On 06/01/2016 05:45 AM, Krzysztof Kozlowski wrote:
+>> Move watchdog and Security SubSystem nodes from exynos5420.dtsi to file
+>> shared with Exynos5410 and configure the clocks on the latter.
+>>
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> ---
+> 
+> [snip]
+> 
+>>  
+>> +&sss {
+>> +	clocks = <&clock CLK_SSS>;
+>> +	clock-names = "secss";
+>> +};
+>> +
+> 
+> [snip]
+> 
+>>  
+>> +&watchdog {
+>> +	clocks = <&clock CLK_WDT>;
+>> +	clock-names = "watchdog";
+>> +	samsung,syscon-phandle = <&pmu_system_controller>;
+>> +};
+>> +
+> 
+> Since you used the same ID than Exynos5420 for the SSS and WDT clocks,
+> I wonder if the clock and clock-names shouldn't be just defined in the
+> shared exynos54xx.dtsi as is the case for the interrupts that are also
+> the same?
+> 
+> The patch looks good to me though, so whatever you decide:
+> 
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Based of Zhen Lei 's patchset v3 "fix some type infos and bugs for arm64/of num"
-in http://www.spinics.net/lists/arm-kernel/msg507650.html.
+Thanks for review and comments.
 
-Kefeng Wang (3):
-  of_numa: Use of_get_next_parent to simplify code
-  of_numa: Use pr_fmt()
-  arm64: numa: Use pr_fmt()
+The 'clock' property cannot be moved - there is no clock phandle and the
+clock IDs are not included in 54xx.
 
- arch/arm64/mm/numa.c | 42 +++++++++++++++++++++---------------------
- drivers/of/of_numa.c | 25 +++++++++++--------------
- 2 files changed, 32 insertions(+), 35 deletions(-)
-
--- 
-1.7.12.4
+Best regards,
+Krzysztof
