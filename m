@@ -1,165 +1,89 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 2 Jun 2016 08:35:09 +0200
-Subject: [PATCH 1/2] drm/rockchip: vop: Do check if an update is pending
- during disable
-In-Reply-To: <574FD161.4050503@rock-chips.com>
-References: <1459937686-9142-1-git-send-email-tomeu.vizoso@collabora.com>
- <5707043D.6060706@rock-chips.com>
- <CAAObsKAeAjUP1retiZqo5geOK2OkVjKvSB6g6nvGTh_rdNiFJQ@mail.gmail.com>
- <570AFAC2.8080907@rock-chips.com>
- <CAAObsKCmPZBaSudVJy8BPThhoZw8VVqxicqsmc8diApajD57nA@mail.gmail.com>
- <CAAObsKBXxb8ZS3CqLy4qsDRWLvT=w2ACANCcDLE5B47nRKtvBw@mail.gmail.com>
- <5742A41B.8030308@rock-chips.com>
- <CAAObsKAj9Ja56buTixvp0EVBk=xE4JCXPPwXdviweHkmUQb2xg@mail.gmail.com>
- <5744FA7C.3080802@rock-chips.com> <574500FE.4050708@rock-chips.com>
- <CAAObsKC=kSbWkBgTgcYnkiudSH=xez3N1+OipT33vZ0YkMSPQQ@mail.gmail.com>
- <574FD161.4050503@rock-chips.com>
-Message-ID: <CAAObsKC-4hFP63AHS_Xw07bWQAXHYkwjNQ0Y_ocGw_-i1jTW2Q@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 2 Jun 2016 08:36:14 +0200
+Subject: [PATCH v9 0/2] memory: add Atmel EBI (External Bus Interface)
+ driver
+In-Reply-To: <1463989495-13787-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1463989495-13787-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160602063337.GH4249@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 June 2016 at 08:25, Mark yao <mark.yao@rock-chips.com> wrote:
-> On 2016?06?02? 13:57, Tomeu Vizoso wrote:
->>
->> On 25 May 2016 at 03:33, Mark yao <mark.yao@rock-chips.com> wrote:
->>>
->>> On 2016?05?25? 09:06, Mark yao wrote:
->>>
->>> On 2016?05?24? 18:11, Tomeu Vizoso wrote:
->>>
->>> Hi Tomeu
->>>>
->>>> Sorry for reply late.
->>>> I don't agree the changes:
->>>>
->>>> - if (!state->enable)
->>>> - return VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0;
->>>> + if (!state->enable &&
->>>> +    VOP_WIN_GET(vop_win->vop, vop_win->data, enable) == 0)
->>>> + return true;
->>>>
->>>> This changes actually would lead a bug.
->>>> when we disable a plane, the vop_win_pending_is_complete would always
->>>> return
->>>> true, That is not allowed, would cause fb free too early.
->>>
->>> Ok, maybe I need to ask you first what the original block of code
->>> intended to achieve. The TRM I have is very terse and I don't find any
->>> explanation there. The battery of tests I have pass just fine without
->>> it.
->>>
->>>> Does this patch is needed for "[PATCH 2/2] drm/rockchip: vop: Wait for
->>>> pending events when disabling a CRTC"
->>>
->>> Yes, this function is currently returning false when the pageflip has
->>> been completed but the plan has been already disabled.
->>>
->>> If you have any different idea of how to fix this bug, please share.
->>>
->>> Thanks,
->>>
->>> Tomeu
->>>
->>>
->>>
->>> Hi Tomeu
->>>
->>> @@ -504,6 +506,9 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
->>>    if (!vop->is_enabled)
->>>    return;
->>>
->>> + if (crtc->state->event || vop->event)
->>> + vop_crtc_wait_for_update(crtc);
->>> +
->>>
->>> I think above change has some problem,
->>>
->>> the function stack:
->>> ->drm swap state
->>> ->vop_crtc_disable
->>> ->vop_atomic_begin
->>> ->vop_atomic_flush
->>>
->>> on vop_crtc_disable, crtc->state is new state, the crtc->state->event not
->>> yet update to vop, wait for  crtc->state->event here is wrong.
->>>
->>> So I think the patch should be:
->>> + if (vop->event)
->>> + vop_crtc_wait_for_update(crtc);
->>> +
->>>
->>>
->>> call vop_crtc_wait_for_update(crtc) here also is unsafe, it will reinit
->>> the
->>> vop->wait_update_complete.
->>>
->>> I doubt that, since use the serialize outstanding nonblocking commits,
->>> only
->>> one process can run into the update stack, old vop->event should be free
->>> on
->>> last time, if we get vop->event here, that should be a bug.
->>>
->>>
->>> Then the patch "drm/rockchip: vop: Do check if an update is pending
->>> during
->>> disable" should be no needed.
->>
->> Hi Mark,
->>
->> with Daniel's series linked below this and the other issues I found in
->> the Rockchip driver are fixed:
->>
->>
->> http://thread.gmane.org/gmane.comp.freedesktop.xorg.drivers.intel/91023/focus=91053
->
->
-> Good news, I also see the Daniel's series patches, wonderful update.
->
-> You can add a Tested-by for Daniel's rockchip patches, and I add a Acked-by
-> for those rockchip patches.
+On 23/05/2016 at 09:44:53 +0200, Boris Brezillon wrote :
+> Hello,
+> 
+> This patch series provides support for the EBI bus.
+> 
+> The EBI (External Bus Interface) is used to access external peripherals
+> (NOR, SRAM, NAND, and other specific devices like ethernet controllers).
+> Each device is assigned a CS line and an address range and can have its
+> own configuration (timings, access mode, bus width, ...).
+> This driver provides a generic DT binding to configure a device according
+> to its requirements.
+> For specific device controllers (like the NAND one) the SMC timings
+> should be configured by the controller driver through the matrix and
+> smc syscon regmaps.
+> 
+> Best Regards,
+> 
+> Boris
+> 
+> Changes since v8:
+> - fixed typo in DT bindings doc
+> 
+> Changes since v7:
+> - move EBI bus config properties directly in the sub-device node
+> - prefix all EBI/SMC properties with atmel,smc-
+> - rework the driver to take the new binding into account
+> - disable the subdevice when EBI implementation fails to configure
+>   the bus as requested
+> 
+> Changes since v6:
+> - rework the binding to put per-device config information into a
+>   separate subnode and have devices connected to the EBI bus
+>   defined as direct children of the EBI node
+> - make all EBI timings mandatory
+> - keep adding sub-devices when a failure occurs on one of them
+> 
+> Changes since v5:
+> - remove the "atmel,specialized-logic" property: now all devices are
+>   are attached to the SMC logic by default, and specialized drivers
+>   (like the NAND controller one), should change this configuration
+>   manually.
+> - provide hardware readout to allow partial config description.
+>   This is mainly here to keep existing platforms (where everything
+>   is configured by the bootloader/bootstrap) in working state.
+> - rename "atmel,tdf-optimized" into "atmel,tdf-mode" and switch from
+>   a boolean to string property to properly support partial config
+> 
+> Changes since v4:
+> - fix inconsistencies in SMC and MATRIX registers definition
+> - add missing compatible strings for at91sam9rl SoC
+> - fix DT bindings documentation
+> - replace "atmel,generic-dev" property by "atmel,specialized-logic"
+> 
+> Changes since v3:
+> - added AT91_MATRIX_USBPUCR_PUON definition
+> - removed useless macros (those directly returning SoC specific register
+>   offsets)
+> - use syscon_regmap_lookup_by_phandle instead of of_parse_phandle +
+>   syscon_node_to_regmap
+> - drop AT91_EBICSA_REGFIELD and AT91_MULTI_EBICSA_REGFIELD macros
+> 
+> Changes since v2:
+> - minor fixes int DT bindings doc
+> - fix SMC macros
+> - make use of SMC macros defined in include/linux/mfd/syscon/atmel-smc.h
+> 
+> Changes since v1:
+> - almost everything :-)
+> 
+> Boris Brezillon (2):
+>   memory: add Atmel EBI (External Bus Interface) driver
+>   memory: atmel-ebi: add DT bindings documentation
+> 
+Applied, thanks.
 
-Yup, should be already there.
-
-Regards,
-
-Tomeu
-
-> Thanks
->
->
->> Thanks,
->>
->> Tomeu
->>
->>> Thanks.
->>>
->>> -- ?ark Yao
->>>
->>> _______________________________________________
->>> dri-devel mailing list
->>> dri-devel at lists.freedesktop.org
->>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->>>
->>>
->>>
->>> --
->>> ?ark Yao
->>>
->>>
->>> _______________________________________________
->>> dri-devel mailing list
->>> dri-devel at lists.freedesktop.org
->>> https://lists.freedesktop.org/mailman/listinfo/dri-devel
->>>
->>
->>
->
->
-> --
-> ?ark Yao
->
->
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
