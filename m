@@ -1,72 +1,101 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu,  2 Jun 2016 23:41:37 +0200
-Subject: [PATCH 6/6] clocksource/drivers/clps_711x: Add the COMPILE_TEST option
-In-Reply-To: <1464903697-3802-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1464903697-3802-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1464903697-3802-6-git-send-email-daniel.lezcano@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 03 Jun 2016 00:47:03 +0300
+Subject: [PATCH/RFC v3 01/22] reset: Add renesas,rst DT bindings
+In-Reply-To: <1464808880-343-2-git-send-email-geert+renesas@glider.be>
+References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
+ <1464808880-343-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <10393056.BKo7UTPXFi@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the Kconfig option logic to fullfil with the current approach.
+Hi Geert,
 
-A new Kconfig option is added, CONFIG_BCM_KONA_TIMER and is selected by the
-platform. Then the clocksource's Kconfig is changed to make this option
-selectable by the user if the COMPILE_TEST option is set. Otherwise, it is
-up to the platform's Kconfig to select the timer.
+Thank you for the patch.
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/Kconfig             | 2 +-
- drivers/clocksource/Kconfig  | 7 +++++++
- drivers/clocksource/Makefile | 2 +-
- 3 files changed, 9 insertions(+), 2 deletions(-)
+On Wednesday 01 Jun 2016 21:20:59 Geert Uytterhoeven wrote:
+> Add DT bindings for the Renesas R-Car Reset Controller (R-Car Gen1
+> RESET/WDT and R-Car Gen2/Gen3 RST).
+> 
+> As the features provided by the hardware module differ a lot across the
+> various SoC families and members, only SoC-specific compatible values
+> are defined.
+> 
+> For now we use the RST only for providing access to the state of the
+> mode pins.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Acked-by: Magnus Damm <damm+renesas@opensource.se>
+> ---
+> v3:
+>   - Clarify current usage,
+>   - Use "renesas,<soctype>-rst" instead of "renesas,rst-<soctype>",
+>   - Drop "syscon" compatible value,
+>   - Add R-Car M3-W,
+>   - Add R-Car Gen1,
+> 
+> v2:
+>   - Add Acked-by.
+> ---
+>  .../devicetree/bindings/reset/renesas,rst.txt      | 35 +++++++++++++++++++
+>  1 file changed, 35 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/reset/renesas,rst.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/reset/renesas,rst.txt
+> b/Documentation/devicetree/bindings/reset/renesas,rst.txt new file mode
+> 100644
+> index 0000000000000000..488c72e1ee849cd3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/reset/renesas,rst.txt
+> @@ -0,0 +1,35 @@
+> +DT bindings for the Renesas R-Car Reset Controller
+> +
+> +The R-Car Reset Controller provides reset control, and implements the
+> following
+> +functions:
+> +  - Latching of the levels on mode pins when PRESET# is negated,
+> +  - Mode monitoring register,
+> +  - Reset control of peripheral devices (on R-Car Gen1),
+> +  - Watchdog timer (on R-Car Gen1).
+> +  - Register-based reset control and boot address registers for the various
+> CPU
+> +    cores (on R-Car Gen2/Gen3),
+> +
+> +
+> +Required properties:
+> +  - compatible: Should be
+> +		  - "renesas,<soctype>-reset-wdt" for R-Car Gen1,
+> +		  - "renesas,<soctype>-rst" for R-Car Gen2/Gen3.
+> +		Examples with soctypes are:
+> +		  - "renesas,r8a7778-reset-wdt" (R-Car M1A)
+> +		  - "renesas,r8a7779-reset-wdt" (R-Car H1)
+> +		  - "renesas,r8a7790-rst" (R-Car H2)
+> +		  - "renesas,r8a7791-rst" (R-Car M2-W)
+> +		  - "renesas,r8a7792-rst" (R-Car V2H
+> +		  - "renesas,r8a7793-rst" (R-Car M2-N)
+> +		  - "renesas,r8a7794-rst" (R-Car E2)
+> +		  - "renesas,r8a7795-rst" (R-Car H3)
+> +		  - "renesas,r8a7796-rst" (R-Car M3-W)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cdfa6c2..0c1f546 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -356,10 +356,10 @@ config ARCH_CLPS711X
- 	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
- 	select ARCH_REQUIRE_GPIOLIB
- 	select AUTO_ZRELADDR
--	select CLKSRC_MMIO
- 	select COMMON_CLK
- 	select CPU_ARM720T
- 	select GENERIC_CLOCKEVENTS
-+	select CLPS711X_TIMER
- 	select MFD_SYSCON
- 	select SOC_BUS
- 	help
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index 6714a22..e92a814 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -155,6 +155,13 @@ config CLKSRC_DBX500_PRCMU
- 	help
- 	  Use the always on PRCMU Timer as clocksource
- 
-+config CLPS711X_TIMER
-+	bool "Cirrus logic timer driver" if COMPILE_TEST
-+	depends on GENERIC_CLOCKEVENTS
-+	select CLKSRC_MMIO
-+	help
-+	  Enables support for the Cirrus Logic PS711 timer.
-+
- config CLKSRC_DBX500_PRCMU_SCHED_CLOCK
- 	bool "Clocksource PRCMU Timer sched_clock"
- 	depends on (CLKSRC_DBX500_PRCMU && !CLKSRC_NOMADIK_MTU_SCHED_CLOCK)
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 662a87c..ae6c09f 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -20,7 +20,7 @@ obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
- obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
- obj-$(CONFIG_BCM2835_TIMER)	+= bcm2835_timer.o
--obj-$(CONFIG_ARCH_CLPS711X)	+= clps711x-timer.o
-+obj-$(CONFIG_CLPS711X_TIMER)	+= clps711x-timer.o
- obj-$(CONFIG_ARCH_ATLAS7)	+= timer-atlas7.o
- obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
+Any specific reason for such a large indentation ? (I know this is really 
+nitpicking)
+
+Apart from that, it's just a bit of a shame we can't have generic compatible 
+strings, but that would require additional DT properties to describe the reset 
+controller features, and I assume that's not a path we want to take.
+
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+> +  - reg: Address start and address range for the device.
+> +
+> +
+> +Example:
+> +
+> +	rst: reset-controller at e6160000 {
+> +		compatible = "renesas,r8a7795-rst";
+> +		reg = <0 0xe6160000 0 0x0200>;
+> +	};
+
 -- 
-1.9.1
+Regards,
+
+Laurent Pinchart
