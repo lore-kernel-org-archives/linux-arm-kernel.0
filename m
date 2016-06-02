@@ -1,34 +1,26 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 02 Jun 2016 11:19:55 -0700
-Subject: [PATCH 10/32] don't force serial pins to uart0
-In-Reply-To: <4676616.O4HcN4eZyZ@wuerfel>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-11-git-send-email-kraxel@redhat.com>
- <4676616.O4HcN4eZyZ@wuerfel>
-Message-ID: <87twhba1x0.fsf@eliezer.anholt.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Jun 2016 19:21:47 +0100
+Subject: [PATCH 0/3] arm64: Kill ESR_LNX_EXEC
+In-Reply-To: <20160531165311.GD11321@e104818-lin.cambridge.arm.com>
+References: <1464694383-31700-1-git-send-email-mark.rutland@arm.com>
+ <20160531165311.GD11321@e104818-lin.cambridge.arm.com>
+Message-ID: <20160602182146.GG7697@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Tue, May 31, 2016 at 05:53:11PM +0100, Catalin Marinas wrote:
+> On Tue, May 31, 2016 at 12:33:00PM +0100, Mark Rutland wrote:
+> > Mark Rutland (3):
+> >   arm64: add macro to extract ESR_ELx.EC
+> >   arm64/kvm: use ESR_ELx_EC to extract EC
+> >   arm64: kill ESR_LNX_EXEC
+> 
+> For the series:
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-> On Wednesday, June 1, 2016 11:43:19 PM CEST Gerd Hoffmann wrote:
->> From: Eric Anholt <eric@anholt.net>
->> 
->> ---
->> 
->
-> No signoff or description?
+You may as well queue this for 4.8 when you start picking up patches.
+I don't think it warrants going in for 4.7, since it doesn't actually
+fix anything.
 
-This commit should not have been sent out as is.  Gerd took a bunch of
-messy commits from my trees that were intended to be squashed (or never
-sent out at all!) and picked them and sent them out.
-
-It's nice though that people are paying attention to this series now.
-Several of these patches had been sent before and got basically silence.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/523cab72/attachment.sig>
+Will
