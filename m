@@ -1,55 +1,41 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 2 Jun 2016 11:52:01 +0200
-Subject: [PATCH] KVM: arm/arm64: vgic-new: Removel harmful BUG_ON
-In-Reply-To: <1464855846-1625-1-git-send-email-marc.zyngier@arm.com>
-References: <1464855846-1625-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20160602095201.GA20310@cbox>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 2 Jun 2016 11:51:52 +0200
+Subject: [PATCH V8 8/9] arm64, pci, acpi: Provide ACPI-specific
+ prerequisites for PCI bus enumeration.
+In-Reply-To: <20160602094555.GB13962@red-moon>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-9-git-send-email-tn@semihalf.com>
+ <20160602094555.GB13962@red-moon>
+Message-ID: <575001B8.9020107@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 09:24:06AM +0100, Marc Zyngier wrote:
-> When changing the active bit from an MMIO trap, we decide to
-> explode if the intid is that of a private interrupt.
-> 
-> This really looks like a leftover from a previous version, as
-> the callers explicitly check for private interrupts and handle
-> them correctly. I've managed to reproduce it using a custom
-> guest.
+On 02.06.2016 11:45, Lorenzo Pieralisi wrote:
+> On Mon, May 30, 2016 at 05:14:21PM +0200, Tomasz Nowicki wrote:
+>> ACPI requires to run acpi_pci_{add|remove}_bus while new PCI bus is created.
+>> This allows to do some ACPI-specific additional configuration, like
+>> PCI hotplug slot enumeration. In order to fulfill these requirements,
+>> we implement arch-specific pcibios_{add|remove}_bus calls
+>> and call acpi_pci_{add|remove}_bus from there.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   arch/arm64/kernel/pci.c | 12 ++++++++++++
+>>   1 file changed, 12 insertions(+)
+>
+> Is there a reason why this has to be a standalone patch ?
 
-Actually this was me mistakingly thinking that kvm_vcpu_kick() would be
-synchronous and we therefore would have an assurance that we're back
-from running the VCPU, but this is clearly not the case, so dropping the
-BUG_ON is indeed the right thing to do.
+No there is no good reason behind this I will squash it with 9.
 
-> 
-> Dropping the BUG_ON seems like the right thing to do.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>
+> It is pretty much useless without patch 9 or I have stared at
+> this series for too long.
 
-Applied, thanks.
+Yes, it is useless w/o patch 9.
 
--Christoffer
+>
+> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>
 
-> ---
->  virt/kvm/arm/vgic/vgic-mmio.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index 059595e..9f6fab7 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -191,10 +191,8 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->  	 * other thread sync back the IRQ.
->  	 */
->  	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
-> -	       irq->vcpu->cpu != -1) { /* VCPU thread is running */
-> -		BUG_ON(irq->intid < VGIC_NR_PRIVATE_IRQS);
-> +	       irq->vcpu->cpu != -1) /* VCPU thread is running */
->  		cond_resched_lock(&irq->irq_lock);
-> -	}
->  
->  	irq->active = new_active_state;
->  	if (new_active_state)
-> -- 
-> 2.1.4
-> 
+Thanks,
+Tomasz
