@@ -1,40 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  2 Jun 2016 09:24:06 +0100
-Subject: [PATCH] KVM: arm/arm64: vgic-new: Removel harmful BUG_ON
-Message-ID: <1464855846-1625-1-git-send-email-marc.zyngier@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 02 Jun 2016 10:25:06 +0200
+Subject: [PATCH 2/2] ARM: dts: imx6: tag boards that have the HW
+ workaround for ERR006687
+In-Reply-To: <20160601161729.GB19428@n2100.arm.linux.org.uk>
+References: <1464794983-31484-1-git-send-email-l.stach@pengutronix.de>
+ <1464794983-31484-3-git-send-email-l.stach@pengutronix.de>
+ <20160601161729.GB19428@n2100.arm.linux.org.uk>
+Message-ID: <1464855906.9501.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When changing the active bit from an MMIO trap, we decide to
-explode if the intid is that of a private interrupt.
+Am Mittwoch, den 01.06.2016, 17:17 +0100 schrieb Russell King - ARM
+Linux:
+> On Wed, Jun 01, 2016 at 05:29:43PM +0200, Lucas Stach wrote:
+> > @@ -97,6 +97,7 @@
+> >  	phy-reset-gpios = <&gpio3 31 0>;
+> >  	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+> >  			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+> > +	fsl,err006687-war-present;
+> 
+> war?  Any reason not to spell it out, or use the more natural
+> abbreviation "wa"?
+> 
+Apparently I've read too many documents where WAR is the abbreviation
+for workaround, so it felt completely natural to me. I agree that it
+would make sense to just spell it out to avoid any confusion.
 
-This really looks like a leftover from a previous version, as
-the callers explicitly check for private interrupts and handle
-them correctly. I've managed to reproduce it using a custom
-guest.
-
-Dropping the BUG_ON seems like the right thing to do.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-mmio.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index 059595e..9f6fab7 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -191,10 +191,8 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	 * other thread sync back the IRQ.
- 	 */
- 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
--	       irq->vcpu->cpu != -1) { /* VCPU thread is running */
--		BUG_ON(irq->intid < VGIC_NR_PRIVATE_IRQS);
-+	       irq->vcpu->cpu != -1) /* VCPU thread is running */
- 		cond_resched_lock(&irq->irq_lock);
--	}
- 
- 	irq->active = new_active_state;
- 	if (new_active_state)
--- 
-2.1.4
+Regards,
+Lucas
