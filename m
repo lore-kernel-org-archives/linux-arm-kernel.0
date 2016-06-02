@@ -1,70 +1,85 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 02 Jun 2016 07:55:13 +0200
-Subject: [PATCH 1/4] ARM: multi_v7_defconfig: Enable Trats2 audio codec,
- touchscreen and sensors
-Message-ID: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
+Date: Thu, 02 Jun 2016 07:55:14 +0200
+Subject: [PATCH 2/4] ARM: multi_v7_defconfig: Enable drivers for Exynos4210
+ Universal C210 board
+In-Reply-To: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
+References: <1464846916-3110-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1464846916-3110-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Exynos4412-based Trats2 board has CM36651 proximity/ambient light
-sensor, MMS114 touchscreen and Wolfson Microelectronics WM1811 CODEC.
-Enable them in defconfig to get some testing coverage and use its
-features.
-
-While saving defconfig the SND_SOC_ODROIDX2 is removed because it does
-not exist since commit ee12a817bb4b ("ASoC: samsung: Remove unused
-Odroid x2/u3 machine driver").
+Enable drivers needed to get Exynos 4210 Universal C210 board working:
+MAX8998 MFD and regulators, GPIO-based bit-bang SPI, Exynos DRM FIMD
+parallel output and Samsung LD9040 RGB panel.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/configs/multi_v7_defconfig | 10 +++++++---
- 1 file changed, 7 insertions(+), 3 deletions(-)
+ arch/arm/configs/multi_v7_defconfig | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 995cc9b444bf..c5db9cf02e31 100644
+index c5db9cf02e31..68cb3c766c39 100644
 --- a/arch/arm/configs/multi_v7_defconfig
 +++ b/arch/arm/configs/multi_v7_defconfig
-@@ -270,6 +270,7 @@ CONFIG_MOUSE_CYAPA=m
- CONFIG_MOUSE_ELAN_I2C=y
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ATMEL_MXT=y
-+CONFIG_TOUCHSCREEN_MMS114=m
- CONFIG_TOUCHSCREEN_ST1232=m
- CONFIG_TOUCHSCREEN_STMPE=y
- CONFIG_TOUCHSCREEN_SUN4I=y
-@@ -515,6 +516,7 @@ CONFIG_REGULATOR_TPS6586X=y
- CONFIG_REGULATOR_TPS65910=y
- CONFIG_REGULATOR_TWL4030=y
- CONFIG_REGULATOR_VEXPRESS=y
-+CONFIG_REGULATOR_WM8994=m
- CONFIG_MEDIA_SUPPORT=m
- CONFIG_MEDIA_CAMERA_SUPPORT=y
- CONFIG_MEDIA_CONTROLLER=y
-@@ -597,13 +599,14 @@ CONFIG_SND_SOC_ROCKCHIP=m
- CONFIG_SND_SOC_ROCKCHIP_SPDIF=m
- CONFIG_SND_SOC_ROCKCHIP_MAX98090=m
- CONFIG_SND_SOC_ROCKCHIP_RT5645=m
-+CONFIG_SND_SOC_SAMSUNG=m
-+CONFIG_SND_SOC_SAMSUNG_SMDK_WM8994=m
-+CONFIG_SND_SOC_SMDK_WM8994_PCM=m
-+CONFIG_SND_SOC_SNOW=m
- CONFIG_SND_SOC_SH4_FSI=m
- CONFIG_SND_SOC_RCAR=m
- CONFIG_SND_SOC_RSRC_CARD=m
- CONFIG_SND_SUN4I_CODEC=m
--CONFIG_SND_SOC_SAMSUNG=m
--CONFIG_SND_SOC_SNOW=m
--CONFIG_SND_SOC_ODROIDX2=m
- CONFIG_SND_SOC_TEGRA=m
- CONFIG_SND_SOC_TEGRA_RT5640=m
- CONFIG_SND_SOC_TEGRA_WM8753=m
-@@ -800,6 +803,7 @@ CONFIG_BERLIN2_ADC=m
- CONFIG_EXYNOS_ADC=m
- CONFIG_VF610_ADC=m
- CONFIG_XILINX_XADC=y
-+CONFIG_CM36651=m
- CONFIG_AK8975=y
- CONFIG_RASPBERRYPI_POWER=y
- CONFIG_PWM=y
+@@ -359,6 +359,7 @@ CONFIG_SPI_BCM2835=y
+ CONFIG_SPI_BCM2835AUX=y
+ CONFIG_SPI_CADENCE=y
+ CONFIG_SPI_DAVINCI=y
++CONFIG_SPI_GPIO=m
+ CONFIG_SPI_FSL_DSPI=m
+ CONFIG_SPI_OMAP24XX=y
+ CONFIG_SPI_ORION=y
+@@ -411,6 +412,7 @@ CONFIG_BATTERY_MAX17042=m
+ CONFIG_CHARGER_MAX14577=m
+ CONFIG_CHARGER_MAX77693=m
+ CONFIG_CHARGER_MAX8997=m
++CONFIG_CHARGER_MAX8998=m
+ CONFIG_CHARGER_TPS65090=y
+ CONFIG_AXP20X_POWER=m
+ CONFIG_POWER_RESET_AS3722=y
+@@ -467,6 +469,7 @@ CONFIG_MFD_MAX77686=y
+ CONFIG_MFD_MAX77693=m
+ CONFIG_MFD_MAX8907=y
+ CONFIG_MFD_MAX8997=y
++CONFIG_MFD_MAX8998=y
+ CONFIG_MFD_RK808=y
+ CONFIG_MFD_PM8921_CORE=y
+ CONFIG_MFD_QCOM_RPM=y
+@@ -496,6 +499,7 @@ CONFIG_REGULATOR_MAX14577=m
+ CONFIG_REGULATOR_MAX8907=y
+ CONFIG_REGULATOR_MAX8973=y
+ CONFIG_REGULATOR_MAX8997=m
++CONFIG_REGULATOR_MAX8998=m
+ CONFIG_REGULATOR_MAX77686=y
+ CONFIG_REGULATOR_MAX77693=m
+ CONFIG_REGULATOR_MAX77802=m
+@@ -550,9 +554,10 @@ CONFIG_DRM_NXP_PTN3460=m
+ CONFIG_DRM_PARADE_PS8622=m
+ CONFIG_DRM_NOUVEAU=m
+ CONFIG_DRM_EXYNOS=m
+-CONFIG_DRM_EXYNOS_DSI=y
+ CONFIG_DRM_EXYNOS_FIMD=y
+ CONFIG_DRM_EXYNOS_MIXER=y
++CONFIG_DRM_EXYNOS_DPI=y
++CONFIG_DRM_EXYNOS_DSI=y
+ CONFIG_DRM_EXYNOS_HDMI=y
+ CONFIG_DRM_ROCKCHIP=m
+ CONFIG_ROCKCHIP_ANALOGIX_DP=m
+@@ -565,6 +570,7 @@ CONFIG_DRM_RCAR_HDMI=y
+ CONFIG_DRM_RCAR_LVDS=y
+ CONFIG_DRM_SUN4I=m
+ CONFIG_DRM_TEGRA=y
++CONFIG_DRM_PANEL_SAMSUNG_LD9040=m
+ CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
+ CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_VC4=y
+@@ -712,6 +718,7 @@ CONFIG_RTC_DRV_AS3722=y
+ CONFIG_RTC_DRV_DS1307=y
+ CONFIG_RTC_DRV_HYM8563=m
+ CONFIG_RTC_DRV_MAX8907=y
++CONFIG_RTC_DRV_MAX8998=m
+ CONFIG_RTC_DRV_MAX8997=m
+ CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_RK808=m
 -- 
 1.9.1
