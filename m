@@ -1,36 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 2 Jun 2016 19:09:48 +0100
-Subject: [PATCH] arm64: fix the wrong comment
-In-Reply-To: <1464574369-22618-1-git-send-email-shijie.huang@arm.com>
-References: <1464574369-22618-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <20160602180948.GE7697@arm.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Thu, 2 Jun 2016 11:10:33 -0700
+Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
+ typical Keystone features
+In-Reply-To: <575027E9.3070202@ti.com>
+References: <1464816714-3900-1-git-send-email-nm@ti.com>
+ <3593753.UuDg5ybrvm@wuerfel>
+ <cdbd2482-de98-569b-7ff0-c8963037de53@oracle.com> <575027E9.3070202@ti.com>
+Message-ID: <58a082cf-9936-0b04-6d4a-82c724c02e73@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 10:12:49AM +0800, Huang Shijie wrote:
-> Currently, we use the 48-bit for the kernel and user by default.
-> The comment becomes stale. This patch fixes the wrong comment.
-> 
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> ---
->  arch/arm64/mm/proc.S | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-> index c431787..421386759 100644
-> --- a/arch/arm64/mm/proc.S
-> +++ b/arch/arm64/mm/proc.S
-> @@ -209,8 +209,8 @@ ENTRY(__cpu_setup)
->  	bic	x0, x0, x5			// clear bits
->  	orr	x0, x0, x6			// set bits
->  	/*
-> -	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
-> -	 * both user and kernel.
-> +	 * Set/prepare TCR. We use VA_BITS of address range for both
-> +	 * kernel and user.
->  	 */
+On 6/2/2016 5:34 AM, Nishanth Menon wrote:
+> On 06/01/2016 06:26 PM, Santosh Shilimkar wrote:
+> [...]
+>>>> Side note on LPAE:
+>>>> For our current device tree and u-boot, LPAE is mandatory to bootup
+>>>> for current Keystone boards - but this is not a SoC requirement,
+>>>> booting without LPAE/HIGHMEM results in non-coherent DDR accesses.
+>>>
+>>> This sounds like a regression, I thought we had this working when
+>>> keystone was initially merged and we got both the coherent and
+>>> non-coherent mode working with the same DT.
+>>>
+>> Yes and it works. The coherent memory space itself is beyond 4GB so
+>
+> Hmm... True, I just tested next-20160602 with mem_lpae set to 0 in
+> u-boot and it seems to boot just fine.
+>
+>> I don't understand a requirement of having coherent memory without
+>> LPAE.
+>
+> Looks like a messed up description on my end, Looks like I have to
+> update my automated test framework to incorporate the manual steps
+> involved.
+>
+No worries. Am glad you got your setup working.
 
-To be honest, all three of these comments (including the two in the
-context) are totally useless. Can we just remove them instead?
-
-Will
+Regards,
+Santosh
