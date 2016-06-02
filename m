@@ -1,61 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 2 Jun 2016 10:18:24 +0200
-Subject: [PATCH 5/5] RFC spi: sun4i: add DMA support
-In-Reply-To: <CAOMqctSWnbUaOveMUhz+yOJqTOK4EhDd5jUqKoHCohfndNAjWA@mail.gmail.com>
-References: <cover.1464130597.git.hramrach@gmail.com>
- <ba0d6eb37cc4b0d2c46acbf9fcd7d644b3545ce8.1464130597.git.hramrach@gmail.com>
- <20160530112610.GJ29837@sirena.org.uk>
- <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
- <20160530150343.GL29837@sirena.org.uk>
- <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
- <20160530155016.GO29837@sirena.org.uk>
- <CAOMqctQijjO2amwSmSMGp96KBRGrLb0fvXRwnybOEqvV3-HZ0g@mail.gmail.com>
- <20160531132706.GC29837@sirena.org.uk>
- <CAOMqctSWnbUaOveMUhz+yOJqTOK4EhDd5jUqKoHCohfndNAjWA@mail.gmail.com>
-Message-ID: <20160602081824.GH4908@lukather>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  2 Jun 2016 09:24:06 +0100
+Subject: [PATCH] KVM: arm/arm64: vgic-new: Removel harmful BUG_ON
+Message-ID: <1464855846-1625-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 04:19:28PM +0200, Michal Suchanek wrote:
-> On 31 May 2016 at 15:27, Mark Brown <broonie@kernel.org> wrote:
-> > On Tue, May 31, 2016 at 12:44:54PM +0200, Michal Suchanek wrote:
-> >> On 30 May 2016 at 17:50, Mark Brown <broonie@kernel.org> wrote:
-> >> > On Mon, May 30, 2016 at 05:28:10PM +0200, Michal Suchanek wrote:
-> >
-> >> >> It's what the driver did to start with and it was requested to fall
-> >> >> back to non-DMA in the case DMA is not available.
-> >
-> >> > Why?  I really can't see any sensible use case for this that doesn't
-> >> > have a better solution available.
-> >
-> >> Of course, the solution is to compile in the DMA driver.
-> >
-> >> It's been argued that some drivers which use only short transfers will
-> >> just work.
-> >
-> > With nothing else in the system that needs DMA?  It's making the
-> > performance of the system less reliable for the benefit of a very narrow
-> > use case.
-> 
-> Some of the platform devices have dedicated DMA *controller* built
-> into the device IP so the DMA engine really is optional on many sunxi
-> devices. Besides SPI you definitely need the DMA engine for audio. You
-> probably don't need it for storage and graphics. I don't have any idea
-> if it's used for USB and Ethernet.
+When changing the active bit from an MMIO trap, we decide to
+explode if the intid is that of a private interrupt.
 
-USB and Ethernet have their own dedicated DMA engines. So currently,
-the only driver that requires it is the audio codec.
+This really looks like a leftover from a previous version, as
+the callers explicitly check for private interrupts and handle
+them correctly. I've managed to reproduce it using a custom
+guest.
 
-Maxime
+Dropping the BUG_ON seems like the right thing to do.
 
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-mmio.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+index 059595e..9f6fab7 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio.c
++++ b/virt/kvm/arm/vgic/vgic-mmio.c
+@@ -191,10 +191,8 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	 * other thread sync back the IRQ.
+ 	 */
+ 	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+-	       irq->vcpu->cpu != -1) { /* VCPU thread is running */
+-		BUG_ON(irq->intid < VGIC_NR_PRIVATE_IRQS);
++	       irq->vcpu->cpu != -1) /* VCPU thread is running */
+ 		cond_resched_lock(&irq->irq_lock);
+-	}
+ 
+ 	irq->active = new_active_state;
+ 	if (new_active_state)
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160602/643ba51f/attachment.sig>
+2.1.4
