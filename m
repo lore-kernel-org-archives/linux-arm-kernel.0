@@ -1,40 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 2 Jun 2016 18:30:56 +0100
-Subject: [PATCH 01/32] arm64: Add platform selection for BCM2835.
-In-Reply-To: <1464849936.24775.33.camel@redhat.com>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-2-git-send-email-kraxel@redhat.com>
- <574F5881.4060008@gmail.com> <1464849936.24775.33.camel@redhat.com>
-Message-ID: <20160602173055.GG24938@e104818-lin.cambridge.arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu,  2 Jun 2016 19:31:03 +0200
+Subject: [PATCH 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy block
+Message-ID: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 08:45:36AM +0200, Gerd Hoffmann wrote:
-> > > +config ARCH_BCM2835
-> > > +	bool "Broadcom BCM2835 family"
-> > > +	depends on ARCH_BCM
-> > > +	select ARCH_REQUIRE_GPIOLIB
-> > > +	select CLKSRC_OF
-> > > +	select PINCTRL
-> > > +	select PINCTRL_BCM2835
-> > > +	select ARM_AMBA
-> > > +	select ARM_TIMER_SP804
-> > > +	select HAVE_ARM_ARCH_TIMER
-> > > +	help
-> > > +	  This enables support for the Broadcom BCM2837 SoC.
-> > > +	  This SoC is used in the Raspberry Pi 3 device.
-> > > +
-> > >  config ARCH_BCM_IPROC
-> > >  	bool "Broadcom iProc SoC Family"
-> > > +	depends on ARCH_BCM
-> > 
-> > Does not seem necessary nor adding anything here.
-> 
-> Added for consistency.  When we add ARCH_BCM all ARCH_BCM_* should
-> depend on it ...
+Some SoCs have a single phy-hw-block with multiple phys, this is
+modelled by a single phy dts node, so we end up with multiple
+controller nodes with a phys property pointing to the phy-node
+of the otg-phy.
 
-For arm64, I prefer to keep Kconfig.platforms to SoC families only. I
-don't think we have any single-SoC Kconfig entry left now.
+Only one of these controllers typically is an otg controller, yet we
+were checking the first controller who uses a phy from the block and
+then end up looking for a dr_mode property in e.g. the ehci controller.
 
+Instead of looking for nodes with a phy property, look for nodes
+with a dr_mode property, so that we actually access the dr_mode property
+in a node which has it.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ drivers/usb/common/common.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/common/common.c b/drivers/usb/common/common.c
+index e3d0161..9806433 100644
+--- a/drivers/usb/common/common.c
++++ b/drivers/usb/common/common.c
+@@ -145,7 +145,7 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
+ 	int err;
+ 
+ 	do {
+-		controller = of_find_node_with_property(controller, "phys");
++		controller = of_find_node_with_property(controller, "dr_mode");
+ 		index = 0;
+ 		do {
+ 			phy = of_parse_phandle(controller, "phys", index);
 -- 
-Catalin
+2.7.4
