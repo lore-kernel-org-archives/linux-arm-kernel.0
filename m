@@ -1,57 +1,46 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Thu,  2 Jun 2016 19:49:01 +0530
-Subject: [PATCH 01/11] ARM: davinci: Sort frequency table
-In-Reply-To: <cover.1464876460.git.viresh.kumar@linaro.org>
-References: <cover.1464876460.git.viresh.kumar@linaro.org>
-Message-ID: <08ad59656c493a72284c523560fb820deac95520.1464876460.git.viresh.kumar@linaro.org>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 2 Jun 2016 08:19:24 -0600
+Subject: [PATCH] coresight: Handle build path error
+In-Reply-To: <574F23B7.2020409@arm.com>
+References: <CANLsYkwEG-4U+hvdVNHQxoH_WuZvD_pYwDC6NSBOok9o5swNoA@mail.gmail.com>
+ <1462545350-15970-1-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkwtSTwRD9kjqU0v60wNHoRLoXW1hTwRq3tZemO=RqnhQw@mail.gmail.com>
+ <574F23B7.2020409@arm.com>
+Message-ID: <CANLsYkyFSaVnkBnfYrxjv1K0mK7X=pVwASr-7ttX6h6y0exNNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is required for some of the changes in cpufreq core. There was only
-one function dependent on the order of the table, that is fixed as well.
+On 1 June 2016 at 12:04, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 06/05/16 15:43, Mathieu Poirier wrote:
+>>
+>> On 6 May 2016 at 08:35, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>>>
+>>> Enabling a component via sysfs (echo 1 > enable_source), would
+>>> trigger building a path from the enabled sources to the sink.
+>>> If there is an error in the process (e.g, sink not enabled or
+>>> the device (CPU corresponding to ETM) is not online), we never report
+>>> failure, except for leaving a message in the dmesg.
+>>>
+>
+>>>
+>>
+>> Thanks for the correction:
+>>
+>> Acked-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+>>
+>> Greg, given how small the changes are can you pick this up?  Otherwise
+>> I'll simply keep it in my tree.
+>
+>
+> Should this go in for rc2 as a fix ?
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@kernel.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mach-davinci/da850.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+It did not make it in time for the 4.7 merge window - it will be part
+of the 4.8 cycle.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 239886299968..f683c119cfed 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1004,13 +1004,14 @@ static const struct da850_opp da850_opp_96 = {
- 		.frequency = freq * 1000, \
- 	}
- 
-+/* Table sorted in ascending order of frequencies */
- static struct cpufreq_frequency_table da850_freq_table[] = {
--	OPP(456),
--	OPP(408),
--	OPP(372),
--	OPP(300),
--	OPP(200),
- 	OPP(96),
-+	OPP(200),
-+	OPP(300),
-+	OPP(372),
-+	OPP(408),
-+	OPP(456),
- 	{
- 		.driver_data		= 0,
- 		.frequency	= CPUFREQ_TABLE_END,
-@@ -1076,8 +1077,9 @@ int da850_register_cpufreq(char *async_clk)
- 		clk_add_alias("async", da850_cpufreq_device.name,
- 							async_clk, NULL);
- 	for (i = 0; i < ARRAY_SIZE(da850_freq_table); i++) {
--		if (da850_freq_table[i].frequency <= da850_max_speed) {
--			cpufreq_info.freq_table = &da850_freq_table[i];
-+		if (da850_freq_table[i].frequency > da850_max_speed) {
-+			&da850_freq_table[i].driver_data = 0;
-+			&da850_freq_table[i].frequency = CPUFREQ_TABLE_END;
- 			break;
- 		}
- 	}
--- 
-2.7.1.410.g6faf27b
+Thanks,
+Mathieu
+
+>
+> Cheers
+> Suzuki
+>
