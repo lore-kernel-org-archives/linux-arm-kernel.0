@@ -1,89 +1,51 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Thu, 2 Jun 2016 23:20:59 +0800
-Subject: [RESEND PATCH 0/8] clk: core: support clocks which requires
- parents on
-In-Reply-To: <1461144880-8724-1-git-send-email-aisheng.dong@nxp.com>
-References: <1461144880-8724-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20160602152059.GC31124@shlinux2>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  2 Jun 2016 16:27:24 +0100
+Subject: [PATCH] arm64: unistd32.h: wire up missing syscalls for compat tasks
+Message-ID: <1464881244-24513-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2016 at 05:34:32PM +0800, Dong Aisheng wrote:
-> This is a RESEND patch series.
-> The original one can be found at here:
-> http://www.spinics.net/lists/arm-kernel/msg435136.html
-> It has no functional changes but improve the commit message and
-> comments a bit.
-> 
-> This patch series adds support in clock framework for clocks which all the
-> operations like gate/ungate, set_rate, set_parent must require its parent
-> clock on.
-> 
-> This special HW requirement can be found on Freescale i.MX7D platform.
-> Besides i.MX7D, it seems lpc18xx clock has a similar requirement.
-> (see: http://www.spinics.net/lists/arm-kernel/msg439307.html)
-> And there may be other SoCs in the same situation.
-> 
-> Current clock core can not support such type of clock well.
-> 
-> This patch introduce a new flag CLK_SET_PARENT_ON to handle this special
-> case in clock core that enable its parent clock firstly for each operation
-> and disable it later after operation complete.
-> 
-> There're two special cases for handling this issue:
-> 
-> One is fixing the possible disabling clocks while its parent is already off
-> during kernel booting phase in clk_disable_unused_subtree()
-> Since this state misalign only happens during booting time,
-> so we simply enable the parent clocks before disable it if flag is set.
-> For normal clk_disable after kernel booting, there's no such issue
-> since the clock tree is already created which makes sure no such issue exist.
-> 
-> Another special case is for set_parent() operation.
-> It requires both parent, old one and new one, to be enabled at the same
-> time during the operation.
-> 
-> Patch 1~4 does this work.
-> 
-> After clk core supports mx7d type clocks, we don't have to enable all clock
-> by default anymore, then we remove the enable of all clocks code and instead
-> only enable set of minimum required clocks.
-> 
-> Patch 5~8 does this work.
-> 
-> The whole patch series is based on for-next branch of clock tree:
-> git://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git
-> 
+We're missing entries for mlock2, copy_file_range, preadv2 and pwritev2
+in our compat syscall table, so hook them up. Only the last two need
+compat wrappers.
 
-Hi Stephen,
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/unistd.h   | 2 +-
+ arch/arm64/include/asm/unistd32.h | 8 ++++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-Could you give some comments about this patch series?
-
-Regards
-Dong Aisheng
-
-> Dong Aisheng (8):
->   clk: introduce clk_core_enable_lock and clk_core_disable_lock
->     functions
->   clk: move clk_disable_unused after clk_core_disable_unprepare function
->   clk: core: support clocks which requires parents on (part 1)
->   clk: core: support clocks which requires parents on (part 2)
->   clk: imx: re-order and concentrate the same type of clk api
->   clk: imx: add clk api for supporting clk_OPS_PARENT_ON clocks
->   clk: imx7d: using api with flag CLK_OPS_PARENT_ON
->   clk: imx7d: only enable minimum required clocks
-> 
->  drivers/clk/clk.c            | 329 +++++++++++--------
->  drivers/clk/imx/clk-imx7d.c  | 732 ++++++++++++++++++++++---------------------
->  drivers/clk/imx/clk.h        |  90 ++++--
->  include/linux/clk-provider.h |   2 +
->  4 files changed, 623 insertions(+), 530 deletions(-)
-> 
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/include/asm/unistd.h b/arch/arm64/include/asm/unistd.h
+index 41e58fe3c041..e78ac26324bd 100644
+--- a/arch/arm64/include/asm/unistd.h
++++ b/arch/arm64/include/asm/unistd.h
+@@ -44,7 +44,7 @@
+ #define __ARM_NR_compat_cacheflush	(__ARM_NR_COMPAT_BASE+2)
+ #define __ARM_NR_compat_set_tls		(__ARM_NR_COMPAT_BASE+5)
+ 
+-#define __NR_compat_syscalls		390
++#define __NR_compat_syscalls		394
+ #endif
+ 
+ #define __ARCH_WANT_SYS_CLONE
+diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
+index 5b925b761a2a..b7e8ef16ff0d 100644
+--- a/arch/arm64/include/asm/unistd32.h
++++ b/arch/arm64/include/asm/unistd32.h
+@@ -801,6 +801,14 @@ __SYSCALL(__NR_execveat, compat_sys_execveat)
+ __SYSCALL(__NR_userfaultfd, sys_userfaultfd)
+ #define __NR_membarrier 389
+ __SYSCALL(__NR_membarrier, sys_membarrier)
++#define __NR_mlock2 390
++__SYSCALL(__NR_mlock2, sys_mlock2)
++#define __NR_copy_file_range 391
++__SYSCALL(__NR_copy_file_range, sys_copy_file_range)
++#define __NR_preadv2 392
++__SYSCALL(__NR_preadv2, compat_sys_preadv2)
++#define __NR_pwritev2 393
++__SYSCALL(__NR_pwritev2, compat_sys_pwritev2)
+ 
+ /*
+  * Please add new compat syscalls above this comment and update
+-- 
+2.1.4
