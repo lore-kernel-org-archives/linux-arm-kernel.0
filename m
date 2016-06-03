@@ -1,41 +1,25 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 3 Jun 2016 14:52:28 -0500
-Subject: [PATCH v2 1/3] of: add common OF-based component functionality
-In-Reply-To: <20160603153630.GE1041@n2100.armlinux.org.uk>
-References: <20160603141548.GC1041@n2100.armlinux.org.uk>
- <E1b8pyR-0005OJ-V3@rmk-PC.armlinux.org.uk>
- <CAL_JsqKaRGk6RMdDWUFYH8_J1gp3pcNeuvx-r=JSg7nc6jh_eg@mail.gmail.com>
- <20160603153630.GE1041@n2100.armlinux.org.uk>
-Message-ID: <CAL_Jsq+=iUtXXHQRe3kM-zMJUo4iTODEiSMmp7nXHaG2QdxL_Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Jun 2016 12:13:40 -0700
+Subject: [PATCH] arm64: dts: drop "arm, amba-bus" in favor of "simple-bus"
+ part 2
+In-Reply-To: <1464574353-31477-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1464574353-31477-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20160603191340.GA3761@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 3, 2016 at 10:36 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Fri, Jun 03, 2016 at 10:29:40AM -0500, Rob Herring wrote:
->> On Fri, Jun 3, 2016 at 9:21 AM, Russell King <rmk+kernel@armlinux.org.uk> wrote:
->> > Add common OF-based component functionality for matching devices by
->> > device node, and releasing the device node at the appropraite time.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
->> > ---
->> >  drivers/of/Makefile          |  2 +-
->> >  drivers/of/of_component.c    | 41 +++++++++++++++++++++++++++++++++++++++++
->> >  include/linux/of_component.h | 14 ++++++++++++++
->>
->> I'd prefer this to go into drivers/base/component.c. That's the
->> general direction we've been moving.
->
-> I'd prefer not to, I don't want to turn the component helpers into
-> something OF specific.  They aren't OF specific.
+On Mon, May 30, 2016 at 11:12:33AM +0900, Masahiro Yamada wrote:
+> Tree-wide replacement was done by commit 2ef7d5f342c1 (ARM, ARM64:
+> dts: drop "arm,amba-bus" in favor of "simple-bus"), but we have some
+> new users of "arm,amba-bus" at Linux 4.7-rc1.  Eliminate them now.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+> In order to not leave these compatible strings for the release,
+> is it OK to apply this patch for Linux 4.7 ?
 
-Fine, not enough code to argue about...
+Thanks, applied to fixes.
 
->> I'd expect this would cause some build failures unless the cases you
->> converted all depend on CONFIG_OF.
->
-> Okay, I'll stick with v1 then, and the duplication that v1 involves.
 
-Why? You don't want to add empty functions? Seems like good clean-up.
-
-Rob
+-Olof
