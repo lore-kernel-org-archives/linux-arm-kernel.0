@@ -1,69 +1,52 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 3 Jun 2016 13:39:26 +0200
-Subject: [PATCH 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy
- block
-In-Reply-To: <575167EC.8000504@ti.com>
-References: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
- <575167EC.8000504@ti.com>
-Message-ID: <e8b770aa-5642-93c3-60c8-0717e87e732e@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jun 2016 12:48:05 +0100
+Subject: [PATCH] drm: convert DT component matching to
+ component_match_add_release()
+In-Reply-To: <20160603111941.GJ23566@e106497-lin.cambridge.arm.com>
+References: <E1b8jze-00046l-K5@rmk-PC.armlinux.org.uk>
+ <20160603094048.GI23566@e106497-lin.cambridge.arm.com>
+ <20160603103633.GA1041@n2100.armlinux.org.uk>
+ <20160603111941.GJ23566@e106497-lin.cambridge.arm.com>
+Message-ID: <20160603114805.GB1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 03, 2016 at 12:19:41PM +0100, Liviu Dudau wrote:
+> On Fri, Jun 03, 2016 at 11:36:33AM +0100, Russell King - ARM Linux wrote:
+> > On Fri, Jun 03, 2016 at 10:40:48AM +0100, Liviu Dudau wrote:
+> > > On Fri, Jun 03, 2016 at 08:58:10AM +0100, Russell King wrote:
+> > > > Convert DT component matching to use component_match_add_release().
+> > > 
+> > > Hi Russell,
+> > > 
+> > > Any reason for not keeping the component_match_add() calls in the drivers?
+> > 
+> > Sorry, I don't understand your comment.
+> 
+> As in: component_match_add() already exists as a macro that calls
+> component_match_add_release(), but with a NULL release function. If it
+> were to be changed to pass a default release_of() function then most of
+> the drivers would not have to change, right? It is just one point of
+> view and I was curious if there was a reason not to choose it, as it
+> would have (probably) generated a smaller delta?
 
-On 03-06-16 13:20, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Thursday 02 June 2016 11:01 PM, Hans de Goede wrote:
->> Some SoCs have a single phy-hw-block with multiple phys, this is
->> modelled by a single phy dts node, so we end up with multiple
->> controller nodes with a phys property pointing to the phy-node
->> of the otg-phy.
->
-> Maybe we should try to model each phy with a separate dt node?
+And what should the calls that don't pass a DT node be called?
+What happens to new users who aren't passing a DT node but use
+component_match_add() ?
 
-That seems like making things unnecessarily complicated. If we want
-to be 100% sure that of_usb_get_dr_mode_by_phy finds the right
-controller, we could add an "int index" parameter to of_usb_get_dr_mode_by_phy
-and make it check that first argument specified to the phandle
-used in the controller node matches the passed in index.
+What you're suggesting sound totally insane to me: you're making
+the change a flag-day: component_match_add() currently takes anything
+as the data pointer and users can pass anything that their compare
+function can handle - and changing that to a function which can only
+take a device_node.  That means all non-DT users of that function
+need to change at the same time.
 
-And use index == -1 to skip this test.
+Flag days are really bad news in kernel development (or any
+distributed development project), and I won't generate a patch which
+causes a flag day to occur - especially not one which impacts a large
+number of users.
 
-Regards,
-
-Hans
-
-
-
->
-> Thanks
-> Kishon
->>
->> Only one of these controllers typically is an otg controller, yet we
->> were checking the first controller who uses a phy from the block and
->> then end up looking for a dr_mode property in e.g. the ehci controller.
->>
->> Instead of looking for nodes with a phy property, look for nodes
->> with a dr_mode property, so that we actually access the dr_mode property
->> in a node which has it.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->>  drivers/usb/common/common.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/usb/common/common.c b/drivers/usb/common/common.c
->> index e3d0161..9806433 100644
->> --- a/drivers/usb/common/common.c
->> +++ b/drivers/usb/common/common.c
->> @@ -145,7 +145,7 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
->>  	int err;
->>
->>  	do {
->> -		controller = of_find_node_with_property(controller, "phys");
->> +		controller = of_find_node_with_property(controller, "dr_mode");
->>  		index = 0;
->>  		do {
->>  			phy = of_parse_phandle(controller, "phys", index);
->>
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
