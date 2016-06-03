@@ -1,170 +1,145 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 2 Jun 2016 22:57:48 -0500
-Subject: [Patch v5 5/8] firmware: qcom: scm: Convert to streaming DMA APIS
-In-Reply-To: <20160602232602.GS28218@codeaurora.org>
-References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
- <1463111221-6963-6-git-send-email-andy.gross@linaro.org>
- <20160602232602.GS28218@codeaurora.org>
-Message-ID: <20160603035748.GC13357@hector.attlocal.net>
+From: dbasehore@chromium.org (dbasehore .)
+Date: Thu, 2 Jun 2016 21:07:54 -0700
+Subject: [RFC PATCH 4/4] drm/rockchip: Add dmc notifier in vop driver
+In-Reply-To: <1464773739-18152-5-git-send-email-hl@rock-chips.com>
+References: <1464773739-18152-1-git-send-email-hl@rock-chips.com>
+ <1464773739-18152-5-git-send-email-hl@rock-chips.com>
+Message-ID: <CAGAzgsrornhAYzE0q+MMZ1c7jSGzPYEL+oW-s1D+o51P-uaTWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 04:26:02PM -0700, Stephen Boyd wrote:
-> On 05/12, Andy Gross wrote:
-> > This patch converts the Qualcomm SCM driver to use the streaming DMA APIs
-> > for communication buffers.
-> 
-> Yes, but why?
+On Wed, Jun 1, 2016 at 2:35 AM, Lin Huang <hl@rock-chips.com> wrote:
+> when in ddr frequency scaling process, vop can not do
+> enable or disable operate, since dcf will base on vop vblank
+> time to do frequency scaling and need to get vop irq if there
+> have vop enabled. So need register to dmc notifier, and we can
+> get the dmc status.
+>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+>  drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 51 +++++++++++++++++++++++++++--
+>  1 file changed, 49 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 1c4d5b5..7ee0cd0 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -31,6 +31,8 @@
+>  #include <linux/reset.h>
+>  #include <linux/delay.h>
+>
+> +#include <soc/rockchip/rockchip_dmc.h>
+> +
+>  #include "rockchip_drm_drv.h"
+>  #include "rockchip_drm_gem.h"
+>  #include "rockchip_drm_fb.h"
+> @@ -116,6 +118,9 @@ struct vop {
+>
+>         const struct vop_data *data;
+>
+> +       struct notifier_block dmc_nb;
+> +       int dmc_in_process;
+> +
+>         uint32_t *regsbak;
+>         void __iomem *regs;
+>
+> @@ -426,14 +431,41 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
+>         spin_unlock_irqrestore(&vop->irq_lock, flags);
+>  }
+>
+> +static int dmc_notify(struct notifier_block *nb, unsigned long event,
+> +                     void *data)
+> +{
+> +       struct vop *vop = container_of(nb, struct vop, dmc_nb);
+> +
+> +       if (event == DMCFREQ_ADJUST)
+> +               vop->dmc_in_process = 1;
+> +       else if (event == DMCFREQ_FINISH)
+> +               vop->dmc_in_process = 0;
+> +
+> +       return NOTIFY_OK;
+> +}
+> +
+>  static void vop_enable(struct drm_crtc *crtc)
+>  {
+>         struct vop *vop = to_vop(crtc);
+>         int ret;
+> +       int timeout_count = 500;
+> +       int timeout_loop = 0;
+>
+>         if (vop->is_enabled)
+>                 return;
+>
+> +       /*
+> +        * if in dmc scaling frequency process, wait until it finish
+> +        * use 100ms as timeout time.
+> +        */
+> +       while (timeout_loop < timeout_count) {
+> +               if (vop->dmc_in_process == 0)
+> +                       break;
+> +
+> +               timeout_loop++;
+> +               usleep_range(150, 200);
+> +       }
 
-This was done so that we can remove the secure_flush mechanism, as we are the
-only consumer (that I could find).  Using the DMA APIs would match the scm-64 so
-it would be symmetric.  I'll add this to the commit message to give more reason
-why the changes are being made.
+wait_event with wake_up_all should work better here than using usleep_range.
 
-> > 
-> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > ---
-> >  drivers/firmware/qcom_scm-32.c | 189 +++++++++++------------------------------
-> >  drivers/firmware/qcom_scm.c    |   6 +-
-> >  drivers/firmware/qcom_scm.h    |  10 ++-
-> >  3 files changed, 59 insertions(+), 146 deletions(-)
-> > 
-> > diff --git a/drivers/firmware/qcom_scm-32.c b/drivers/firmware/qcom_scm-32.c
-> > index 4388d13..e92bf7a 100644
-> > --- a/drivers/firmware/qcom_scm-32.c
-> > +++ b/drivers/firmware/qcom_scm-32.c
-> > @@ -64,11 +63,11 @@ static DEFINE_MUTEX(qcom_scm_lock);
-> >   *
-> >   *	------------------- <--- struct qcom_scm_command
-> >   *	| command header  |
-> > - *	------------------- <--- qcom_scm_get_command_buffer()
-> > + *	------------------- <--- buf[0]
-> >   *	| command buffer  |
-> > - *	------------------- <--- struct qcom_scm_response and
-> > - *	| response header |      qcom_scm_command_to_response()
-> > - *	------------------- <--- qcom_scm_get_response_buffer()
-> > + *	------------------- <--- struct qcom_scm_response
-> > + *	| response header |
-> > + *	-------------------
-> 
-> You don't like my convenience functions? :) I always thought
-> qcom_scm_get_response_buffer() read better than
-> 
-> (void *)cmd->buf + le32_to_cpu(cmd->resp_hdr_offset);
-
-If it was used in more than one function, yes.  But I felt that single use
-functions were kind of a waste.  But this is in the eye of the beholder.
-
-> 
-> >   *	| response buffer |
-> >   *	-------------------
-> >   *
-> > @@ -96,79 +95,7 @@ struct qcom_scm_response {
-> >  	__le32 is_complete;
-> >  };
-> >  
-> > -
-> > -/**
-> > - * free_qcom_scm_command() - Free an SCM command
-> > - * @cmd: command to free
-> > - *
-> > - * Free an SCM command.
-> > - */
-> > -static inline void free_qcom_scm_command(struct qcom_scm_command *cmd)
-> > -{
-> > -	kfree(cmd);
-> > -}
-> > -
-> > -/**
-> > - * qcom_scm_command_to_response() - Get a pointer to a qcom_scm_response
-> > - * @cmd: command
-> > - *
-> > - * Returns a pointer to a response for a command.
-> > - */
-> > -static inline struct qcom_scm_response *qcom_scm_command_to_response(
-> > -		const struct qcom_scm_command *cmd)
-> > -{
-> > -	return (void *)cmd + le32_to_cpu(cmd->resp_hdr_offset);
-> > -}
-> > -
-> > -/**
-> > - * qcom_scm_get_command_buffer() - Get a pointer to a command buffer
-> > - * @cmd: command
-> > - *
-> > - * Returns a pointer to the command buffer of a command.
-> > - */
-> > -static inline void *qcom_scm_get_command_buffer(const struct qcom_scm_command *cmd)
-> > -{
-> > -	return (void *)cmd->buf;
-> > -}
-> > -
-> > -/**
-> > - * qcom_scm_get_response_buffer() - Get a pointer to a response buffer
-> > - * @rsp: response
-> > - *
-> > - * Returns a pointer to a response buffer of a response.
-> > - */
-> > -static inline void *qcom_scm_get_response_buffer(const struct qcom_scm_response *rsp)
-> > -{
-> > -	return (void *)rsp + le32_to_cpu(rsp->buf_offset);
-> > -}
-> 
-> At the least the diff would be more concentrated on what really
-> is happening in this patch if we left these functions as is.
-
-Ok.  I'll run that and see how it turns out.  
-
-> > -
-> > -static u32 smc(u32 cmd_addr)
-> > +static u32 smc(dma_addr_t cmd_addr)
-> 
-> Please leave this as u32, the interface doesn't support anything
-> wider here so we shouldn't let this change on LPAE.
-
-Fair point.  I hadn't considered that.  Thanks for catching that.
-
-> >  {
-> >  	int context_id;
-> >  	register u32 r0 asm("r0") = 1;
-> > @@ -192,45 +119,9 @@ static u32 smc(u32 cmd_addr)
-> >  	return r0;
-> >  }
-> >  
-> > -static int __qcom_scm_call(const struct qcom_scm_command *cmd)
-> > -{
-> > -	int ret;
-> > -	u32 cmd_addr = virt_to_phys(cmd);
-> > -
-> > -	/*
-> > -	 * Flush the command buffer so that the secure world sees
-> > -	 * the correct data.
-> > -	 */
-> > -	secure_flush_area(cmd, cmd->len);
-> 
-> Yay we should delete secure_flush_area() too.
-
-Yes I was going to do a follow on to remove that.  I opted to not add this to
-the set of patches.
-
-> > -
-> > -	ret = smc(cmd_addr);
-> > -	if (ret < 0)
-> > -		ret = qcom_scm_remap_error(ret);
-> > -
-> > -	return ret;
-> > -}
-> > -
-> > -
-> > @@ -143,7 +143,7 @@ int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
-> >  	if (ret)
-> >  		return ret;
-> >  
-> > -	ret = __qcom_scm_hdcp_req(req, req_cnt, resp);
-> > +	ret = __qcom_scm_hdcp_req(__scm->dev, req, req_cnt, resp);
-> 
-> Hmm maybe we should pass __scm instead of dev? Is there any
-> advantage to that?
-
-If we needed access to something in the scm other than the device, yes.  If we
-passed scm instead, we might be able to remove the singleton usage.  I'll look
-and see if it makes sense.  Otherwise i'd leave the passing of the device.
+> +
+>         ret = pm_runtime_get_sync(vop->dev);
+>         if (ret < 0) {
+>                 dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
+> @@ -485,6 +517,7 @@ static void vop_enable(struct drm_crtc *crtc)
+>         enable_irq(vop->irq);
+>
+>         drm_crtc_vblank_on(crtc);
+> +       rockchip_dmc_get(&vop->dmc_nb);
+>
+>         return;
+>
+> @@ -500,11 +533,25 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+>  {
+>         struct vop *vop = to_vop(crtc);
+>         int i;
+> +       int timeout_count = 500;
+> +       int timeout_loop = 0;
+>
+>         if (!vop->is_enabled)
+>                 return;
+>
+>         /*
+> +        * if in dmc scaling frequency process, wait until it finish
+> +        * use 100ms as timeout time.
+> +        */
+> +       while (timeout_loop < timeout_count) {
+> +               if (vop->dmc_in_process == 0)
+> +                       break;
+> +
+> +               timeout_loop++;
+> +               usleep_range(150, 200);
+> +       }
+> +
+> +       /*
+>          * We need to make sure that all windows are disabled before we
+>          * disable that crtc. Otherwise we might try to scan from a destroyed
+>          * buffer later.
+> @@ -517,7 +564,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
+>                 VOP_WIN_SET(vop, win, enable, 0);
+>                 spin_unlock(&vop->reg_lock);
+>         }
+> -
+> +       rockchip_dmc_put(&vop->dmc_nb);
+>         drm_crtc_vblank_off(crtc);
+>
+>         /*
+> @@ -1243,7 +1290,7 @@ static int vop_create_crtc(struct vop *vop)
+>                 ret = -ENOENT;
+>                 goto err_cleanup_crtc;
+>         }
+> -
+> +       vop->dmc_nb.notifier_call = dmc_notify;
+>         init_completion(&vop->dsp_hold_completion);
+>         init_completion(&vop->wait_update_complete);
+>         crtc->port = port;
+> --
+> 1.9.1
+>
