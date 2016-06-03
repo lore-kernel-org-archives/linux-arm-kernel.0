@@ -1,82 +1,65 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 3 Jun 2016 15:32:11 +0200
-Subject: [PATCH v2 1/2] usb: ohci-at91: Forcibly suspend ports while USB
- suspend
-In-Reply-To: <B256D81BAE5131468A838E5D7A24364101650B1491@penmbx01>
-References: <1464755400-6825-1-git-send-email-wenyou.yang@atmel.com>
- <1464755400-6825-2-git-send-email-wenyou.yang@atmel.com>
- <20160603015409.GA18051@rob-hp-laptop>
- <B256D81BAE5131468A838E5D7A24364101650B1491@penmbx01>
-Message-ID: <575186DB.6030405@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 3 Jun 2016 15:32:47 +0200
+Subject: [PATCH] ARM: imx25-pinfunc: remove SION from all modes
+In-Reply-To: <20160420085839.GI29108@pengutronix.de>
+References: <1461095114-11745-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160419211958.GD19428@n2100.arm.linux.org.uk>
+ <20160420104617.15cf8461@ipc1.ka-ro>
+ <20160420085839.GI29108@pengutronix.de>
+Message-ID: <20160603133247.GV26768@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 03/06/2016 11:22, Yang, Wenyou a ?crit :
->> -----Original Message-----
->> From: Rob Herring [mailto:robh at kernel.org]
->> Sent: 2016?6?3? 9:54
->> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
->> Cc: Alan Stern <stern@rowland.harvard.edu>; Greg Kroah-Hartman
->> <gregkh@linuxfoundation.org>; Ferre, Nicolas <Nicolas.FERRE@atmel.com>;
->> Pawel Moll <pawel.moll@arm.com>; Mark Brown <broonie@kernel.org>; Ian
->> Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
->> Alexandre Belloni <alexandre.belloni@free-electrons.com>; linux-
->> kernel at vger.kernel.org; devicetree at vger.kernel.org; linux-arm-
->> kernel at lists.infradead.org; linux-usb at vger.kernel.org
->> Subject: Re: [PATCH v2 1/2] usb: ohci-at91: Forcibly suspend ports while USB
->> suspend
->>
->> On Wed, Jun 01, 2016 at 12:29:59PM +0800, Wenyou Yang wrote:
->>> In order to the save power consumption, as a workaround, suspend
->>> forcibly the USB PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI
->>> Interrupt Configuration Register in the SFRs while OHCI USB suspend.
->>>
->>> This suspend operation must be done before the USB clock is disabled,
->>> resume after the USB clock is enabled.
->>>
->>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
->>> ---
->>>
->>> Changes in v2:
->>>  - Add compatible to support forcibly suspend the ports.
->>>  - Add soc/at91/at91_sfr.h to accommodate the defines.
->>>  - Add error checking for .sfr_regmap.
->>>  - Remove unnecessary regmap_read() statement.
->>>
->>>  .../devicetree/bindings/usb/atmel-usb.txt          |  5 +-
->>>  drivers/usb/host/ohci-at91.c                       | 80 +++++++++++++++++++++-
->>>  include/soc/at91/at91_sfr.h                        | 29 ++++++++
->>>  3 files changed, 111 insertions(+), 3 deletions(-)  create mode
->>> 100644 include/soc/at91/at91_sfr.h
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/atmel-usb.txt
->>> b/Documentation/devicetree/bindings/usb/atmel-usb.txt
->>> index 5883b73..3e3e58a 100644
->>> --- a/Documentation/devicetree/bindings/usb/atmel-usb.txt
->>> +++ b/Documentation/devicetree/bindings/usb/atmel-usb.txt
->>> @@ -3,8 +3,9 @@ Atmel SOC USB controllers  OHCI
->>>
->>>  Required properties:
->>> - - compatible: Should be "atmel,at91rm9200-ohci" for USB controllers
->>> -   used in host mode.
->>> + - compatible: Should be one of the following
->>> +	       "atmel,at91rm9200-ohci" for USB controllers used in host mode.
->>> +	       "atmel,sama5d2-ohci" for SAMA5D2 which can force to suspend.
->>
->> That may be why you need this now, but that is irrelevant to having a chip specific
->> compatible string.
+Hello,
+
+On Wed, Apr 20, 2016 at 10:58:39AM +0200, Uwe Kleine-K?nig wrote:
+> On Wed, Apr 20, 2016 at 10:46:17AM +0200, Lothar Wa?mann wrote:
+> > On Tue, 19 Apr 2016 22:19:58 +0100 Russell King - ARM Linux wrote:
+> > > On Tue, Apr 19, 2016 at 09:45:14PM +0200, Uwe Kleine-K?nig wrote:
+> > > > With the SION bit set a pin can be read as GPIO even though it's not muxed
+> > > > as GPIO. This is useful at times. The downside however is that the signal
+> > > > is not only routed to the GPIO IP but also all other IPs that can make use
+> > > > of the pin. This resulted in more than one issue for me in the past. Things
+> > > > like spi transfers that result in usb reenumeration or setting a GPIO to a
+> > > > value that triggers an RTS irq for an UART.
+> > > 
+> > > Isn't SION required for all GPIOs such that reading the value of a GPIO
+> > > pin returns the actual state of the pin, not the output value written
+> > > to it?
+> > > 
+> > > What about the ethernet pins?  I know that on iMX6, SION is required for
+> > > correct functionality of certain phy clocking modes, and I wouldn't be
+> > > surprised if this was true in earlier designs as well.
+> > > 
+> > SION essentially makes any OUTPUT pin (GPIO or other function)
+> > bidirectional.
 > 
-> Maybe a property is better.
+> Yes, and the bad thing is that the input is routed to all modules that
+> the pin can be muxed for. So if on i.MX25 you intend to set the value of
+> gpio 3.21 you also toggle UART5's RTS signal with SION set.
+> 
+> And note that SION also has an effect on input pins (i.e. it is routed
+> to all modules instead of only the muxed one).
 
-It seems that it's not an issue to the binding that Rob is talking about
-but the description that you used: "for SAMA5D2 which can force
-suspend". Don't modify it to use a property for this: a compatible sting
-makes a lot of sense.
+I found a regression of the patch under discussion (which was not
+applied, so no big problem). On the custom mx25 based hardware an
+SD-card isn't detected any more after removing SION from
+MX25_PAD_SD1_CMD__SD1_CMD. I verified the same happens on a tx25.
 
-So just listing the new compatible string is enough. If the "force
-suspend" is not needed anymore in next product, we will come back to the
-"atmel,at91rm9200-ohci" compatible string or add a new one if needed...
+Is this expected? IMHO it's unfortunate (if not a silicon bug) that you
+need the SION bit here as the SION bit has some more side effects.  If
+you ask me, muxing a certain function for a pin should enable the input
+path to the respective module if the pin is bidirectional.
 
-bye,
+Is there a list of pin/function pairs that need the SION bit set? Shawn,
+would you agree to accept this patch with the high risk that it
+introduces regressions? Or maybe we should make the SION bit more easily
+overridable for board dts files (and default to off unless known it's
+needed)?
+
+Best regards
+Uwe
+
 -- 
-Nicolas Ferre
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
