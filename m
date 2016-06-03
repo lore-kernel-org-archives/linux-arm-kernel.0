@@ -1,32 +1,48 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 03 Jun 2016 10:50:16 +0200
-Subject: [PATCH v2 5/9] arm64: Add BCM2835 support to the defconfig.
-In-Reply-To: <3299125.qWct7BqQgQ@wuerfel>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <1464934708-24769-6-git-send-email-kraxel@redhat.com>
- <3299125.qWct7BqQgQ@wuerfel>
-Message-ID: <1464943816.24775.135.camel@redhat.com>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Fri, 03 Jun 2016 09:50:11 +0100
+Subject: [PATCH 1/8] ARM: kdump: advertise boot aliased crash kernel resource
+Message-ID: <E1b8knz-0004H4-Bd@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fr, 2016-06-03 at 09:36 +0200, Arnd Bergmann wrote:
-> On Friday, June 3, 2016 8:18:24 AM CEST Gerd Hoffmann wrote:
-> > From: Eric Anholt <eric@anholt.net>
-> > 
-> > Made with make defconfig; make menuconfig (only saying Y to new
-> > entries); make savedefconfig.
-> 
-> Please try not to mix 'make savedefconfig' changes with your
-> own changes, it make it harder to review and can lead to more
-> conflicts.
+Advertise a resource which describes where the crash kernel is located
+in the boot view of RAM.  This allows kexec-tools to have this vital
+information.
 
-This is just conflicts resolved by hand after 4.6 -> 4.7-rc1 rebase,
-latest version didn't actually ran through savedefconfig.  Probably some
-unwanted changes made it in by accident this way.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/setup.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Guess I better redo this from scratch.
-
-What is the suggested procedure to generate defconfig patches?
-
-cheers,
-  Gerd
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index d9317eec1eba..19b25ad61385 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -1003,9 +1003,25 @@ static void __init reserve_crashkernel(void)
+ 		(unsigned long)(crash_base >> 20),
+ 		(unsigned long)(total_mem >> 20));
+ 
++	/* The crashk resource must always be located in normal mem */
+ 	crashk_res.start = crash_base;
+ 	crashk_res.end = crash_base + crash_size - 1;
+ 	insert_resource(&iomem_resource, &crashk_res);
++
++	if (arm_has_idmap_alias()) {
++		/*
++		 * If we have a special RAM alias for use at boot, we
++		 * need to advertise to kexec tools where the alias is.
++		 */
++		static struct resource crashk_boot_res = {
++			.name = "Crash kernel (boot alias)",
++			.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
++		};
++
++		crashk_boot_res.start = phys_to_idmap(crash_base);
++		crashk_boot_res.end = crashk_boot_res.start + crash_size - 1;
++		insert_resource(&iomem_resource, &crashk_boot_res);
++	}
+ }
+ #else
+ static inline void reserve_crashkernel(void) {}
+-- 
+2.1.0
