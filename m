@@ -1,46 +1,49 @@
-From: mgorman@techsingularity.net (Mel Gorman)
-Date: Fri, 3 Jun 2016 13:36:55 +0100
-Subject: [BUG] Page allocation failures with newest kernels
-In-Reply-To: <CAPv3WKfrgNg00M4oE3VKLYimYqN6NO6ziR7LWYXQ1d_M-bo67A@mail.gmail.com>
-References: <CAPv3WKcVsWBgHHC3UPNcbka2JUmN4CTw1Ym4BR1=1V9=B9av5Q@mail.gmail.com>
- <574D64A0.2070207@arm.com>
- <CAPv3WKdYdwpi3k5eY86qibfprMFwkYOkDwHOsNydp=0sTV3mgg@mail.gmail.com>
- <60e8df74202e40b28a4d53dbc7fd0b22@IL-EXCH02.marvell.com>
- <20160531131520.GI24936@arm.com>
- <CAPv3WKftqsEXbdU-geAcUKXBSskhA0V72N61a1a+5DfahLK_Dg@mail.gmail.com>
- <20160602135226.GX2527@techsingularity.net>
- <CAPv3WKd8Zdcv5nhr2euN7L4W5JYLex_Hmn+9AVd6reyD-Vw4kg@mail.gmail.com>
- <20160603095344.GZ2527@techsingularity.net>
- <CAPv3WKfrgNg00M4oE3VKLYimYqN6NO6ziR7LWYXQ1d_M-bo67A@mail.gmail.com>
-Message-ID: <20160603123655.GA2527@techsingularity.net>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 03 Jun 2016 14:36:53 +0200
+Subject: [RFC PATCH v1 2/6] clk: rockchip: rk3399: add SCLK_DDRCLK ID for
+ ddrc
+In-Reply-To: <9d392979-0a20-ca74-9699-2440d07dddd3@rock-chips.com>
+References: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
+ <1464947719-6245-3-git-send-email-hl@rock-chips.com>
+ <9d392979-0a20-ca74-9699-2440d07dddd3@rock-chips.com>
+Message-ID: <20637963.iQzVZfJq9f@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 01:57:06PM +0200, Marcin Wojtas wrote:
-> >> For the record: the newest kernel I was able to reproduce the dumps
-> >> was v4.6: http://pastebin.com/ekDdACn5. I've just checked v4.7-rc1,
-> >> which comprise a lot (mainly yours) changes in mm, and I'm wondering
-> >> if there may be a spot fix or rather a series of improvements. I'm
-> >> looking forward to your opinion and would be grateful for any advice.
-> >>
-> >
-> > I don't believe we want to reintroduce the reserve to cope with CMA. One
-> > option would be to widen the gap between low and min watermark by the
-> > size of the CMA region. The effect would be to wake kswapd earlier which
-> > matters considering the context of the failing allocation was
-> > GFP_ATOMIC.
-> 
-> Of course my intention is not reintroducing anything that's gone
-> forever, but just to find out way to overcome current issues. Do you
-> mean increasing CMA size?
+Hi Shawn,
 
-No. There is a gap between the low and min watermarks. At the low point,
-kswapd is woken up and at the min point allocation requests either
-either direct reclaim or fail if they are atomic. What I'm suggesting
-is that you adjust the low watermark and add the size of the CMA area
-to it so that kswapd is woken earlier. The watermarks are calculated in
-__setup_per_zone_wmarks
+Am Freitag, 3. Juni 2016, 20:34:52 schrieb Shawn Lin:
+> How about merge it into your patch#3.
 
--- 
-Mel Gorman
-SUSE Labs
+see comments from Doug and me on previous version.
+
+clock-ids should always be separate patches, as we will need them in both 
+clock and devicetree branches, so they must be in a separate branch shared 
+between clock and dts branches.
+
+
+Heiko
+
+> On 2016/6/3 17:55, Lin Huang wrote:
+> > Signed-off-by: Lin Huang <hl@rock-chips.com>
+> > ---
+> > Changes in v1:
+> > - None
+> > 
+> >  include/dt-bindings/clock/rk3399-cru.h | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/include/dt-bindings/clock/rk3399-cru.h
+> > b/include/dt-bindings/clock/rk3399-cru.h index 50a44cf..8a0f0442 100644
+> > --- a/include/dt-bindings/clock/rk3399-cru.h
+> > +++ b/include/dt-bindings/clock/rk3399-cru.h
+> > @@ -131,6 +131,7 @@
+> > 
+> >  #define SCLK_DPHY_RX0_CFG		165
+> >  #define SCLK_RMII_SRC			166
+> >  #define SCLK_PCIEPHY_REF100M		167
+> > 
+> > +#define SCLK_DDRCLK			168
+> > 
+> >  #define DCLK_VOP0			180
+> >  #define DCLK_VOP1			181
