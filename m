@@ -1,55 +1,54 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 3 Jun 2016 21:31:48 +0200
-Subject: [PATCH] ARM: imx25-pinfunc: remove SION from all modes
-In-Reply-To: <20160603140107.GA8659@tiger>
-References: <1461095114-11745-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20160419211958.GD19428@n2100.arm.linux.org.uk>
- <20160420104617.15cf8461@ipc1.ka-ro>
- <20160420085839.GI29108@pengutronix.de>
- <20160603133247.GV26768@pengutronix.de>
- <20160603140107.GA8659@tiger>
-Message-ID: <20160603193148.GW26768@pengutronix.de>
+From: slemieux.tyco@gmail.com (Sylvain Lemieux)
+Date: Fri,  3 Jun 2016 15:34:35 -0400
+Subject: [PATCH] clk: lpc32xx: allow peripheral clock selection in device tree
+Message-ID: <1464982475-24738-1-git-send-email-slemieux.tyco@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 10:01:07PM +0800, Shawn Guo wrote:
-> On Fri, Jun 03, 2016 at 03:32:47PM +0200, Uwe Kleine-K?nig wrote:
-> > I found a regression of the patch under discussion (which was not
-> > applied, so no big problem). On the custom mx25 based hardware an
-> > SD-card isn't detected any more after removing SION from
-> > MX25_PAD_SD1_CMD__SD1_CMD. I verified the same happens on a tx25.
-> > 
-> > Is this expected? IMHO it's unfortunate (if not a silicon bug) that you
-> > need the SION bit here as the SION bit has some more side effects.  If
-> > you ask me, muxing a certain function for a pin should enable the input
-> > path to the respective module if the pin is bidirectional.
-> > 
-> > Is there a list of pin/function pairs that need the SION bit set? Shawn,
-> > would you agree to accept this patch with the high risk that it
-> > introduces regressions? Or maybe we should make the SION bit more easily
-> > overridable for board dts files (and default to off unless known it's
-> > needed)?
-> 
-> I would be conservative on this.  Can we just fix the SION bits that are
-> known doing harm?
+From: Sylvain Lemieux <slemieux@tycoint.com>
 
-I didn't do any measurements, but I'd expect that every SION bit that is
-set without good reason increases current consumption. So each SION bit
-does some harm. Plus debugging a missing SION bit is much easier than a
-SION bit that is set without need.
+This patch add the support to select the peripheral clock (PERIPH)
+as a parent clock source using the "assigned-clock-parents"
+parameter in the device tree.
 
-The first problem I debugged was an UART problem and the SION bit had to
-be removed from MX25_PAD_KPP_ROW3__GPIO_3_0 (plus back then
-MX25_PAD_KPP_ROW3__UART1_RI wasn't defined). The problem I had now was a
-broken SD card and I had to add SION to MX25_PAD_SD1_CMD__SD1_CMD.
+Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
+---
+ drivers/clk/nxp/clk-lpc32xx.c             | 3 +--
+ include/dt-bindings/clock/lpc32xx-clock.h | 1 +
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-So I expect my commit to (maybe) introduce some obvious and easy to
-debug regressions and to (probably) fix some harder to debug and not so
-obvious problems. I'd say it's a net win.
-
-Best regards
-Uwe
-
+diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
+index 481b264..90d740a 100644
+--- a/drivers/clk/nxp/clk-lpc32xx.c
++++ b/drivers/clk/nxp/clk-lpc32xx.c
+@@ -87,7 +87,7 @@ enum {
+ 
+ enum {
+ 	/* Start from the last defined clock in dt bindings */
+-	LPC32XX_CLK_ADC_DIV = LPC32XX_CLK_HCLK_PLL + 1,
++	LPC32XX_CLK_ADC_DIV = LPC32XX_CLK_PERIPH + 1,
+ 	LPC32XX_CLK_ADC_RTC,
+ 	LPC32XX_CLK_TEST1,
+ 	LPC32XX_CLK_TEST2,
+@@ -99,7 +99,6 @@ enum {
+ 	LPC32XX_CLK_HCLK_DIV_PERIPH,
+ 	LPC32XX_CLK_HCLK_DIV,
+ 	LPC32XX_CLK_HCLK,
+-	LPC32XX_CLK_PERIPH,
+ 	LPC32XX_CLK_ARM,
+ 	LPC32XX_CLK_ARM_VFP,
+ 
+diff --git a/include/dt-bindings/clock/lpc32xx-clock.h b/include/dt-bindings/clock/lpc32xx-clock.h
+index d41b6fe..e624d3a 100644
+--- a/include/dt-bindings/clock/lpc32xx-clock.h
++++ b/include/dt-bindings/clock/lpc32xx-clock.h
+@@ -48,6 +48,7 @@
+ #define LPC32XX_CLK_PWM2	33
+ #define LPC32XX_CLK_ADC		34
+ #define LPC32XX_CLK_HCLK_PLL	35
++#define LPC32XX_CLK_PERIPH	36
+ 
+ /* LPC32XX USB clocks */
+ #define LPC32XX_USB_CLK_I2C	1
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.3.1
