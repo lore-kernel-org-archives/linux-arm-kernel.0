@@ -1,28 +1,24 @@
-From: dinguyen@opensource.altera.com (Dinh Nguyen)
-Date: Fri, 3 Jun 2016 11:06:55 -0500
-Subject: [PATCH 5/5] ARM: dts: Move Arria10 SDRAM as child of ECC Manager
-In-Reply-To: <1464193783-5071-6-git-send-email-tthayer@opensource.altera.com>
-References: <1464193783-5071-1-git-send-email-tthayer@opensource.altera.com>
- <1464193783-5071-6-git-send-email-tthayer@opensource.altera.com>
-Message-ID: <alpine.DEB.2.02.1606031106340.1763@linux-builds1>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 3 Jun 2016 18:15:44 +0200
+Subject: [PATCH v3 3/7] binding: mdio-mux: Add DT binding doc for
+ Broadcom MDIO bus mutiplexer
+In-Reply-To: <1464967568-27562-4-git-send-email-pramod.kumar@broadcom.com>
+References: <1464967568-27562-1-git-send-email-pramod.kumar@broadcom.com>
+ <1464967568-27562-4-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <20160603161544.GF22120@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 May 2016, tthayer at opensource.altera.com wrote:
+> +Properties for an MDIO bus mutiplexer found in Broadcom iProc based SoCs.
+> +
+> +This MDIO bus multiplexer defines buses that could be internal as well as
+> +external to SoCs and could accept MDIO transaction compatible to C-22 or
+> +C-45 Clause. When child bus is selected, one needs to select these two
+> +properties as well to generate desired MDIO trascation on appropriate bus.
+> +
 
-> From: Thor Thayer <tthayer@opensource.altera.com>
-> 
-> Changes to support ECC Manager as SDRAM IRQ parent by
-> 1) updating IRQ property values to correct child IRQs
-> 2) moving node under ECC Manager.
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> ---
->  arch/arm/boot/dts/socfpga_arria10.dtsi |   13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
->
+nit pick: transactions
 
-Applied! 
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-Thanks,
-Dinh
+	     Andrew
