@@ -1,68 +1,57 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 03 Jun 2016 12:08:47 +0100
-Subject: Applied "regulator: pwm: Drop unneeded pwm_enable() call" to the
- regulator tree
-In-Reply-To: <1464942192-25967-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <E1b8my7-0004mI-St@finisterre>
+From: a0393675@ti.com (Keerthy)
+Date: Fri, 3 Jun 2016 16:38:57 +0530
+Subject: [PATCH 3/8] mfd: tps65218: Use mfd_add_devices instead of
+ of_platform_populate
+In-Reply-To: <1462945691-904-4-git-send-email-j-keerthy@ti.com>
+References: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
+ <1462945691-904-4-git-send-email-j-keerthy@ti.com>
+Message-ID: <57516549.6040102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi Lee Jones,
 
-   regulator: pwm: Drop unneeded pwm_enable() call
+On Wednesday 11 May 2016 11:18 AM, Keerthy wrote:
+> mfd_add_devices enables parsing device tree nodes without compatibles
+> for child nodes. Replace of_platform_populate with mfd_add_devices.
+>
 
-has been applied to the regulator tree at
+A gentle ping on this patch.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/regulator.git 
+Regards,
+Keerthy
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 830583004e615a4637eacc77866b84908414d7a0 Mon Sep 17 00:00:00 2001
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
-Date: Fri, 3 Jun 2016 10:23:00 +0200
-Subject: [PATCH] regulator: pwm: Drop unneeded pwm_enable() call
-
-Now that the PWM regulator driver implements the ->enable/disable() hooks
-we can remove the pwm_enable() call from pwm_regulator_set_voltage().
-
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/regulator/pwm-regulator.c | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index fafa3488e960..ab3cc0235843 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -159,11 +159,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
- 		return ret;
- 	}
- 
--	ret = pwm_enable(drvdata->pwm);
--	if (ret) {
--		dev_err(&rdev->dev, "Failed to enable PWM: %d\n", ret);
--		return ret;
--	}
- 	drvdata->volt_uV = min_uV;
- 
- 	/* Delay required by PWM regulator to settle to the new voltage */
--- 
-2.8.1
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+>   drivers/mfd/tps65218.c | 10 ++++++++--
+>   1 file changed, 8 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
+> index f20a531..b8b3a58 100644
+> --- a/drivers/mfd/tps65218.c
+> +++ b/drivers/mfd/tps65218.c
+> @@ -33,6 +33,10 @@
+>
+>   #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
+>
+> +static const struct mfd_cell tps65218_cells[] = {
+> +	{ .name = "tps65218-regulator", },
+> +};
+> +
+>   /**
+>    * tps65218_reg_write: Write a single tps65218 register.
+>    *
+> @@ -236,8 +240,10 @@ static int tps65218_probe(struct i2c_client *client,
+>   	if (ret < 0)
+>   		return ret;
+>
+> -	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
+> -				   &client->dev);
+> +	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
+> +			      ARRAY_SIZE(tps65218_cells), NULL, 0,
+> +			      regmap_irq_get_domain(tps->irq_data));
+> +
+>   	if (ret < 0)
+>   		goto err_irq;
+>
+>
