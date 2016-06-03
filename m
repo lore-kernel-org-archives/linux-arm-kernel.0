@@ -1,86 +1,52 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri,  3 Jun 2016 18:15:36 +0100
-Subject: [PATCH v2 1/7] iommu/of: Respect disabled IOMMUs
-In-Reply-To: <cover.1464966939.git.robin.murphy@arm.com>
-References: <cover.1464966939.git.robin.murphy@arm.com>
-Message-ID: <aca0b44206c87f6cb75d156a53e08aa968981119.1464966939.git.robin.murphy@arm.com>
+Date: Fri,  3 Jun 2016 18:15:35 +0100
+Subject: [PATCH v2 0/7] Generic DT bindings for PCI IOMMUs and ARM SMMUv3
+Message-ID: <cover.1464966939.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If an IOMMU node is present in the DT but marked as disabled, we should
-avoid trying to do anything with it. We currently sort-of get away with
-this by virtue of a disabled device probably not having called
-of_iommu_set_ops(), but that is hardly safe to rely upon in general, and
-either way we don't want to treat it as an error condition with the
-resulting "Failed to initialise IOMMU" message.
+Hi all,
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+Compared to v1[1] this is more or less a repost of the core parts, although
+patch 1 is new. I still need to take the horrible SMMUv2 code out back and
+shoot it (there turned out to be some subtle nasties in v1), so in the
+meantime I picked up the SMMUv3 ticket to fill in as it was rather more
+straightforward. I'll be reworking SMMUv2 on top of these patches (modulo
+any feedback) to post in another week or so.
 
-v2: New.
+Note that patch 6 might not be plausible to queue just yet as it ends up
+looking like a regression due to deficiencies elsewhere - the virtio block
+device on the SMMUv3 Fast Model blows up because virtio doesn't use the DMA
+API appropriately on a host (although hacking vring_use_dma_api() suffices),
+and MSIs are still an open problem - I could really do with focusing on that
+with Eric, so it'd be nice to get as much of this out of the way as I can :)
 
- drivers/iommu/of_iommu.c | 29 +++++++++++++++--------------
- 1 file changed, 15 insertions(+), 14 deletions(-)
+Branch at git://linux-arm.org/linux-rm iommu/generic-v2
 
-diff --git a/drivers/iommu/of_iommu.c b/drivers/iommu/of_iommu.c
-index af499aea0a1a..662f9a600f4f 100644
---- a/drivers/iommu/of_iommu.c
-+++ b/drivers/iommu/of_iommu.c
-@@ -140,7 +140,7 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 	struct of_phandle_args iommu_spec;
- 	struct device_node *np;
- 	const struct iommu_ops *ops = NULL;
--	int idx = 0;
-+	int idx;
- 
- 	/*
- 	 * We can't do much for PCI devices without knowing how
-@@ -154,24 +154,25 @@ const struct iommu_ops *of_iommu_configure(struct device *dev,
- 	 * See the `Notes:' section of
- 	 * Documentation/devicetree/bindings/iommu/iommu.txt
- 	 */
--	while (!of_parse_phandle_with_args(master_np, "iommus",
--					   "#iommu-cells", idx,
--					   &iommu_spec)) {
-+	for (idx = 0;
-+	     !of_parse_phandle_with_args(master_np, "iommus", "#iommu-cells",
-+					 idx, &iommu_spec);
-+	     of_node_put(np), idx++) {
- 		np = iommu_spec.np;
-+		if (!of_device_is_available(np))
-+			continue;
-+
- 		ops = of_iommu_get_ops(np);
-+		if (!ops || !ops->of_xlate)
-+			continue;
- 
--		if (!ops || !ops->of_xlate || ops->of_xlate(dev, &iommu_spec))
--			goto err_put_node;
--
--		of_node_put(np);
--		idx++;
-+		if (ops->of_xlate(dev, &iommu_spec)) {
-+			of_node_put(np);
-+			return NULL;
-+		}
- 	}
- 
- 	return ops;
--
--err_put_node:
--	of_node_put(np);
--	return NULL;
- }
- 
- void __init of_iommu_init(void)
-@@ -182,7 +183,7 @@ void __init of_iommu_init(void)
- 	for_each_matching_node_and_match(np, matches, &match) {
- 		const of_iommu_init_fn init_fn = match->data;
- 
--		if (init_fn(np))
-+		if (of_device_is_available(np) && init_fn(np))
- 			pr_err("Failed to initialise IOMMU %s\n",
- 				of_node_full_name(np));
- 	}
+Robin.
+
+[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/12454
+
+Mark Rutland (1):
+  Docs: dt: add PCI IOMMU map bindings
+
+Robin Murphy (6):
+  iommu/of: Respect disabled IOMMUs
+  of/irq: Break out msi-map lookup (again)
+  iommu/of: Handle iommu-map property for PCI
+  iommu/arm-smmu: Implement of_xlate() for SMMUv3
+  iommu/arm-smmu: Finish off SMMUv3 default domain support
+  iommu/arm-smmu: Support non-PCI devices with SMMUv3
+
+ .../devicetree/bindings/pci/pci-iommu.txt          | 171 ++++++++++++
+ drivers/iommu/Kconfig                              |   2 +-
+ drivers/iommu/arm-smmu-v3.c                        | 300 +++++++++------------
+ drivers/iommu/of_iommu.c                           |  73 +++--
+ drivers/of/irq.c                                   |  70 +----
+ drivers/of/of_pci.c                                | 102 +++++++
+ include/linux/of_pci.h                             |   8 +
+ 7 files changed, 460 insertions(+), 266 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci-iommu.txt
+
 -- 
 2.8.1.dirty
