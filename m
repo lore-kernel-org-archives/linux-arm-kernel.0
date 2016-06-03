@@ -1,135 +1,46 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 3 Jun 2016 14:03:08 -0700
-Subject: [PATCH 13/14] regulator: pwm: Support extra continuous mode cases
-In-Reply-To: <1464942192-25967-14-git-send-email-boris.brezillon@free-electrons.com>
-References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464942192-25967-14-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160603210308.GK124478@google.com>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Fri,  3 Jun 2016 17:03:30 -0400
+Subject: [PATCH 0/2] qcom: add l2 cache perf events driver
+Message-ID: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+This adds a new dynamic PMU to the Perf Events framework to program
+and control the L2 cache PMUs in some Qualcomm Technologies SOCs.
 
-On Fri, Jun 03, 2016 at 10:23:11AM +0200, Boris Brezillon wrote:
-> The continuous mode allows one to declare a PWM regulator without having
-> to declare the voltage <-> dutycycle association table. It works fine as
-> long as your voltage(dutycycle) function is linear, but also has the
-> following constraints:
-> 
-> - dutycycle for min_uV = 0%
-> - dutycycle for max_uV = 100%
-> - dutycycle for min_uV < dutycycle for max_uV
-> 
-> While the linearity constraint is acceptable for now, we sometimes need to
-> restrict of the PWM range (to limit the maximum/minimum voltage for
-> example) or have a min_uV_dutycycle > max_uV_dutycycle (this could be
-> tweaked with PWM polarity, but not all PWMs support inverted polarity).
-> 
-> Add the pwm-dutycycle-range and pwm-dutycycle-unit DT properties to define
-> such constraints. If those properties are not defined, the PWM regulator
-> use the default pwm-dutycycle-range = <0 100> and
-> pwm-dutycycle-unit = <100> values (existing behavior).
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  drivers/regulator/pwm-regulator.c | 80 ++++++++++++++++++++++++++++++++++-----
->  1 file changed, 71 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-> index c39ecd1..2e70eb1 100644
-> --- a/drivers/regulator/pwm-regulator.c
-> +++ b/drivers/regulator/pwm-regulator.c
+The driver exports formatting and event information to sysfs so it can
+be used by the perf user space tools with the syntax:
+perf stat -e l2cache/event=0x42/
 
-...
+One point to note is that there are certain combinations of events
+which are invalid, and which are detected in event_add(). Simply having
+event_add() fail would result in event_sched_in() making it Inactive,
+treating it as over-allocation of counters, leading to
+repeated attempts to allocate the events and ending up with a
+statistical count.  A solution for this situation is to turn the
+conflicting event off in event_add(). This allows a single error
+message to be generated, and no recurring attempts to re-add
+the invalid event. In order for this to work, event_sched_in()
+needs to detect that event_add() changed the state, and not override it
+and force it to Inactive.
 
-> @@ -132,31 +141,67 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
->  static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
->  {
->  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-> +	unsigned int min_uV_duty = drvdata->continuous.min_uV_dutycycle;
-> +	unsigned int max_uV_duty = drvdata->continuous.max_uV_dutycycle;
-> +	unsigned int duty_unit = drvdata->continuous.dutycycle_unit;
->  	int min_uV = rdev->constraints->min_uV;
-> -	int diff = rdev->constraints->max_uV - min_uV;
-> +	int max_uV = rdev->constraints->max_uV;
-> +	int diff_uV = max_uV - min_uV;
->  	struct pwm_state pstate;
-> +	unsigned int diff_duty;
-> +	unsigned int voltage;
->  
->  	pwm_get_state(drvdata->pwm, &pstate);
->  
-> -	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
-> +	voltage = pwm_get_relative_duty_cycle(&pstate, duty_unit);
-> +
-> +	if (max_uV_duty < min_uV_duty) {
+This patchset requires:
+[PATCH] soc: qcom: provide mechanism for drivers to access L2 registers
 
-I still might have appreciated a comment above this line (and similar
-in set_voltage()) to help explain why max can be less than min -- you
-have it in the commit message, but nowhere in the code. Not a big deal,
-and the code looks otherwise good:
+Neil Leeder (2):
+  perf: allow add to change event state
+  soc: qcom: add l2 cache perf events driver
 
-Reviewed-by: Brian Norris <briannorris@chromium.org>
-Tested-by: Brian Norris <briannorris@chromium.org>
+ drivers/soc/qcom/Kconfig               |  10 +
+ drivers/soc/qcom/Makefile              |   1 +
+ drivers/soc/qcom/perf_event_l2.c       | 917 +++++++++++++++++++++++++++++++++
+ include/linux/soc/qcom/perf_event_l2.h |  82 +++
+ kernel/events/core.c                   |   3 +-
+ 5 files changed, 1012 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/soc/qcom/perf_event_l2.c
+ create mode 100644 include/linux/soc/qcom/perf_event_l2.h
 
-
-> +		voltage = min_uV_duty - voltage;
-> +		diff_duty = min_uV_duty - max_uV_duty;
-> +	} else {
-> +		voltage = voltage - min_uV_duty;
-> +		diff_duty = max_uV_duty - min_uV_duty;
-> +	}
-> +
-> +	voltage = DIV_ROUND_CLOSEST_ULL((u64)voltage * diff_uV, diff_duty);
-> +
-> +	return voltage + min_uV;
->  }
->  
->  static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
-> -					int min_uV, int max_uV,
-> -					unsigned *selector)
-> +				     int req_min_uV, int req_max_uV,
-> +				     unsigned int *selector)
->  {
->  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-> +	unsigned int min_uV_duty = drvdata->continuous.min_uV_dutycycle;
-> +	unsigned int max_uV_duty = drvdata->continuous.max_uV_dutycycle;
-> +	unsigned int duty_unit = drvdata->continuous.dutycycle_unit;
->  	unsigned int ramp_delay = rdev->constraints->ramp_delay;
-> -	unsigned int req_diff = min_uV - rdev->constraints->min_uV;
-> +	int min_uV = rdev->constraints->min_uV;
-> +	int max_uV = rdev->constraints->max_uV;
-> +	int diff_uV = max_uV - min_uV;
->  	struct pwm_state pstate;
-> -	unsigned int diff;
-> +	unsigned int diff_duty;
-> +	unsigned int dutycycle;
->  	int ret;
->  
->  	pwm_prepare_new_state(drvdata->pwm, &pstate);
-> -	diff = rdev->constraints->max_uV - rdev->constraints->min_uV;
->  
-> -	/* We pass diff as the scale to get a uV precision. */
-> -	pwm_set_relative_duty_cycle(&pstate, req_diff, diff);
-> +	if (max_uV_duty < min_uV_duty)
-> +		diff_duty = min_uV_duty - max_uV_duty;
-> +	else
-> +		diff_duty = max_uV_duty - min_uV_duty;
-> +
-> +	dutycycle = DIV_ROUND_CLOSEST_ULL((u64)(req_min_uV - min_uV) *
-> +					  diff_duty,
-> +					  diff_uV);
-> +
-> +	if (max_uV_duty < min_uV_duty)
-> +		dutycycle = min_uV_duty - dutycycle;
-> +	else
-> +		dutycycle = min_uV_duty + dutycycle;
-> +
-> +	pwm_set_relative_duty_cycle(&pstate, dutycycle, duty_unit);
->  
->  	ret = pwm_apply_state(drvdata->pwm, &pstate);
->  	if (ret) {
-
-[...]
-
-Brian
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
