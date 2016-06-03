@@ -1,74 +1,27 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 3 Jun 2016 13:55:40 -0700
-Subject: [PATCH 12/14] regulator: pwm: Retrieve correct voltage
-In-Reply-To: <1464942192-25967-13-git-send-email-boris.brezillon@free-electrons.com>
-References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464942192-25967-13-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160603205540.GJ124478@google.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 3 Jun 2016 21:56:39 +0100
+Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
+ overlapping regions
+In-Reply-To: <20160602165621.GD24938@e104818-lin.cambridge.arm.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
+ <20160602145246.GH2658@codeblueprint.co.uk>
+ <20160602165621.GD24938@e104818-lin.cambridge.arm.com>
+Message-ID: <20160603205639.GO2658@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 10:23:10AM +0200, Boris Brezillon wrote:
-> The continuous PWM voltage regulator is caching the voltage value in
-> the ->volt_uV field. While most of the time this value should reflect the
-> real voltage, sometime it can be sightly different if the PWM device
-> rounded the set_duty_cycle request.
-> Moreover, this value is not valid until someone has modified the regulator
-> output.
+On Thu, 02 Jun, at 05:56:21PM, Catalin Marinas wrote:
 > 
-> Remove the ->volt_uV field and always rely on the PWM state to calculate
-> the regulator output.
+> Ard to confirm but I think the reason is the relative offset between
+> code and data regions that must be preserved. For example, on Juno I
+> get:
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Mark,
+> [    0.000000] efi:   0x0009fff6e000-0x0009fffaefff [Runtime Code       |RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]*
+> [    0.000000] efi:   0x0009fffaf000-0x0009ffffefff [Runtime Data       |RUN|  |  |  |  |  |  |   |WB|WT|WC|UC]*
 > 
-> I know you already added your Tested-by/Acked-by tags on this patch
-> but this version has slightly change and is now making use of the
-> pwm_get_relative_duty_cycle() helper instead of manually converting
-> the absolute duty_cycle value into a relative one.
-> ---
->  drivers/regulator/pwm-regulator.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-> index 8c56e16..c39ecd1 100644
-> --- a/drivers/regulator/pwm-regulator.c
-> +++ b/drivers/regulator/pwm-regulator.c
-> @@ -35,9 +35,6 @@ struct pwm_regulator_data {
->  	struct regulator_ops ops;
->  
->  	int state;
-> -
-> -	/* Continuous voltage */
-> -	int volt_uV;
->  };
->  
->  struct pwm_voltages {
-> @@ -135,8 +132,13 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
->  static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
->  {
->  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-> +	int min_uV = rdev->constraints->min_uV;
-> +	int diff = rdev->constraints->max_uV - min_uV;
-> +	struct pwm_state pstate;
->  
-> -	return drvdata->volt_uV;
-> +	pwm_get_state(drvdata->pwm, &pstate);
-> +
-> +	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
->  }
->  
->  static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
-> @@ -162,8 +164,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
->  		return ret;
->  	}
->  
-> -	drvdata->volt_uV = min_uV;
-> -
->  	/* Delay required by PWM regulator to settle to the new voltage */
->  	usleep_range(ramp_delay, ramp_delay + 1000);
->  
+> Since the code may assume relative loads from the data section, we need
+> to preserve this offset (which doesn't seem 64KB aligned).
 
-Reviewed-by: Brian Norris <briannorris@chromium.org>
-Tested-by: Brian Norris <briannorris@chromium.org>
+Yeah, figures. Could you mention this in the changelog or in a code
+comment?
