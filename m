@@ -1,51 +1,36 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  3 Jun 2016 09:26:35 +0200
-Subject: [PATCH] drm: atmel-hlcdc: Fix OF graph parsing
-Message-ID: <1464938795-1838-1-git-send-email-boris.brezillon@free-electrons.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 3 Jun 2016 09:30:42 +0200
+Subject: [PATCH] PCI: mvebu: Don't try to add an MBus window that
+ already exists
+In-Reply-To: <57511C4E.5040501@denx.de>
+References: <20160602125247.17566-1-sr@denx.de>
+ <20160602151818.0989ee50@free-electrons.com>
+ <57511C4E.5040501@denx.de>
+Message-ID: <20160603093042.26e325d1@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-atmel_hlcdc_create_outputs() iterates over OF graph nodes and releases
-the node (using of_node_put()) after each iteration, which is wrong
-since for_each_endpoint_of_node() is already taking care of that.
+Hello,
 
-Move the of_node_put() call in the error path.
+On Fri, 3 Jun 2016 07:57:34 +0200, Stefan Roese wrote:
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Fixes: 17a8e03e7e97 ("drm: atmel-hlcdc: rework the output code to support drm bridges")
----
- drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+> > The pci-mvebu driver deletes the MBus windows for a given PCI device
+> > when invalid memory base/limits are set in the emulated PCI bridge.
+> > Shouldn't this happen over a rescan?  
+> 
+> I'm not sure what *should* happen upon rescan. But testing shows, that
+> no MBus window is removed upon rescan. I just tested what happens,
+> if the PCI devices are "removed" via sysfs. And this also does not
+> delete any of the MBus windows.
 
-diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-index 39802c0..3d34fc4 100644
---- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-+++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
-@@ -266,9 +266,10 @@ int atmel_hlcdc_create_outputs(struct drm_device *dev)
- 		if (!ret)
- 			ret = atmel_hlcdc_check_endpoint(dev, &ep);
- 
--		of_node_put(ep_np);
--		if (ret)
-+		if (ret) {
-+			of_node_put(ep_np);
- 			return ret;
-+		}
- 	}
- 
- 	for_each_endpoint_of_node(dev->dev->of_node, ep_np) {
-@@ -276,9 +277,10 @@ int atmel_hlcdc_create_outputs(struct drm_device *dev)
- 		if (!ret)
- 			ret = atmel_hlcdc_attach_endpoint(dev, &ep);
- 
--		of_node_put(ep_np);
--		if (ret)
-+		if (ret) {
-+			of_node_put(ep_np);
- 			return ret;
-+		}
- 	}
- 
- 	return 0;
+Then maybe that's a question for the PCI folks. Is it normal that when
+a PCI device gets removed, the configuration of the PCI bridge does not
+get adjusted accordingly?
+
+Thanks,
+
+Thomas
 -- 
-2.7.4
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
