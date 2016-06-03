@@ -1,73 +1,70 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 3 Jun 2016 17:20:31 +0200
-Subject: [PATCH v2 3/3] iommu: convert DT component matching to
- component_match_add_release()
-In-Reply-To: <E1b8pyc-0005OV-7X@rmk-PC.armlinux.org.uk>
-References: <20160603141548.GC1041@n2100.armlinux.org.uk>
- <E1b8pyc-0005OV-7X@rmk-PC.armlinux.org.uk>
-Message-ID: <5751A03F.9050800@gmail.com>
+From: pramod.kumar@broadcom.com (Pramod Kumar)
+Date: Fri,  3 Jun 2016 20:56:01 +0530
+Subject: [PATCH v3 0/7] Add MDIO bus multiplexer support for iProc SoCs
+Message-ID: <1464967568-27562-1-git-send-email-pramod.kumar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Broadcom iProc based SoCs use a MDIO bus multiplexer where child buses
+could be internal as well external to SoCs. These buses could supports
+MDIO transaction compatible to C-22/C-45.
 
+Broadcom MDIO bus mulitplexer is an integrated multiplexer where child bus
+selection and mdio transaction logic lies inside multiplexer itself.
+To accommodate this multiplexer in existing mux framework below changes
+were required-
 
-On 03/06/16 16:21, Russell King wrote:
-> Convert DT component matching to use component_match_add_release().
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+1. Passed MDIO parent bus via mdio_mux_init to MDIO mux framework.
 
+This patch set includes MDIO bus multiplexer driver along with above
+framework change. It includes one external bus node having Ethernet PHY
+attached and two internal bus node holding PCIe PHYs.
 
-Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+This patch series is based on v4.6.0-rc1 and is available from github-
+repo: https://github.com/Broadcom/arm64-linux.git
+branch:mdio-mux-v3
 
-> ---
->   drivers/iommu/mtk_iommu.c | 14 ++++++--------
->   1 file changed, 6 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-> index c3043d8754e3..71cf62af4e24 100644
-> --- a/drivers/iommu/mtk_iommu.c
-> +++ b/drivers/iommu/mtk_iommu.c
-> @@ -24,6 +24,7 @@
->   #include <linux/iopoll.h>
->   #include <linux/list.h>
->   #include <linux/of_address.h>
-> +#include <linux/of_component.h>
->   #include <linux/of_iommu.h>
->   #include <linux/of_irq.h>
->   #include <linux/of_platform.h>
-> @@ -552,11 +553,6 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
->   	return 0;
->   }
->
-> -static int compare_of(struct device *dev, void *data)
-> -{
-> -	return dev->of_node == data;
-> -}
-> -
->   static int mtk_iommu_bind(struct device *dev)
->   {
->   	struct mtk_iommu_data *data = dev_get_drvdata(dev);
-> @@ -630,17 +626,19 @@ static int mtk_iommu_probe(struct platform_device *pdev)
->   			continue;
->
->   		plarbdev = of_find_device_by_node(larbnode);
-> -		of_node_put(larbnode);
->   		if (!plarbdev) {
->   			plarbdev = of_platform_device_create(
->   						larbnode, NULL,
->   						platform_bus_type.dev_root);
-> -			if (!plarbdev)
-> +			if (!plarbdev) {
-> +				of_node_put(larbnode);
->   				return -EPROBE_DEFER;
-> +			}
->   		}
->   		data->smi_imu.larb_imu[i].dev = &plarbdev->dev;
->
-> -		component_match_add(dev, &match, compare_of, larbnode);
-> +		component_match_add_of(dev, &match, larbnode);
-> +		of_node_put(larbnode);
->   	}
->
->   	platform_set_drvdata(pdev, data);
->
+Changes from v2:
+-Addressed Rob's comments in this patch regarding typo/grammers.
+-Addressed David's comments regarding local variables order.
+-Removed property "mdio-integrated-mux" and used mdiobus_register()
+in place of of_mdiobus_regsiter().
+-removed usage of IS_ERR_OR_NULL to IS_ERR in PCIe PHY driver.
+
+Changes from v1:
+- stop using "brcm,is_c45" from bus node as suggested by Andrew. MDIO
+PHY driver will logically OR MII_ADDR_C45 into the address when issues
+any C45 MDIO read/write transaction.
+
+Pramod Kumar (7):
+  mdio:mux: Enhanced MDIO mux framework for integrated multiplexers
+  binding: Make "mdio-parent-bus" property from mandatory to optional
+  binding: mdio-mux: Add DT binding doc for Broadcom MDIO bus mutiplexer
+  dt:mdio-mux: Add mdio multiplexer driver node
+  net:mdio-mux: Add MDIO mux driver for iProc SoCs
+  Binding:PHY: Binding doc for NS2 PCIe PHYs.
+  phy: Add Northstar2 PCI Phy support
+
+ .../bindings/net/brcm,mdio-mux-iproc.txt           |  59 +++++
+ Documentation/devicetree/bindings/net/mdio-mux.txt |   3 +-
+ .../bindings/phy/brcm,mdio-mux-bus-pci.txt         |  27 +++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  12 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  31 +++
+ drivers/net/phy/Kconfig                            |  11 +
+ drivers/net/phy/Makefile                           |   1 +
+ drivers/net/phy/mdio-mux-bcm-iproc.c               | 246 +++++++++++++++++++++
+ drivers/net/phy/mdio-mux-gpio.c                    |   2 +-
+ drivers/net/phy/mdio-mux-mmioreg.c                 |   2 +-
+ drivers/net/phy/mdio-mux.c                         |  28 ++-
+ drivers/phy/Kconfig                                |   8 +
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-bcm-ns2-pcie.c                     | 115 ++++++++++
+ include/linux/mdio-mux.h                           |   4 +-
+ 15 files changed, 536 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,mdio-mux-bus-pci.txt
+ create mode 100644 drivers/net/phy/mdio-mux-bcm-iproc.c
+ create mode 100644 drivers/phy/phy-bcm-ns2-pcie.c
+
+-- 
+1.9.1
