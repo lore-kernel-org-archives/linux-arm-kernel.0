@@ -1,164 +1,135 @@
-From: nleeder@codeaurora.org (Neil Leeder)
-Date: Fri,  3 Jun 2016 16:59:00 -0400
-Subject: [PATCH v2] soc: qcom: provide mechanism for drivers to access L2
- registers
-Message-ID: <1464987540-14129-1-git-send-email-nleeder@codeaurora.org>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 3 Jun 2016 14:03:08 -0700
+Subject: [PATCH 13/14] regulator: pwm: Support extra continuous mode cases
+In-Reply-To: <1464942192-25967-14-git-send-email-boris.brezillon@free-electrons.com>
+References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1464942192-25967-14-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160603210308.GK124478@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-L2 registers are accessed using a select register and data
-register pair. To prevent multiple concurrent writes to the
-select register by independent drivers, the write to the
-select register and the associated access of the data register
-are protected with a lock. All drivers accessing the L2
-registers use the set and get functions provided by
-l2-accessors to ensure correct reads and writes to L2 registers.
+Hi Boris,
 
-Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
----
+On Fri, Jun 03, 2016 at 10:23:11AM +0200, Boris Brezillon wrote:
+> The continuous mode allows one to declare a PWM regulator without having
+> to declare the voltage <-> dutycycle association table. It works fine as
+> long as your voltage(dutycycle) function is linear, but also has the
+> following constraints:
+> 
+> - dutycycle for min_uV = 0%
+> - dutycycle for max_uV = 100%
+> - dutycycle for min_uV < dutycycle for max_uV
+> 
+> While the linearity constraint is acceptable for now, we sometimes need to
+> restrict of the PWM range (to limit the maximum/minimum voltage for
+> example) or have a min_uV_dutycycle > max_uV_dutycycle (this could be
+> tweaked with PWM polarity, but not all PWMs support inverted polarity).
+> 
+> Add the pwm-dutycycle-range and pwm-dutycycle-unit DT properties to define
+> such constraints. If those properties are not defined, the PWM regulator
+> use the default pwm-dutycycle-range = <0 100> and
+> pwm-dutycycle-unit = <100> values (existing behavior).
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/regulator/pwm-regulator.c | 80 ++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 71 insertions(+), 9 deletions(-)
+> 
+> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+> index c39ecd1..2e70eb1 100644
+> --- a/drivers/regulator/pwm-regulator.c
+> +++ b/drivers/regulator/pwm-regulator.c
 
- Changes since v1:
-    Add ARM64 dependency
-    Replace module.h with export.h
-    Remove unused dummy fnunctions and ifdef in header
+...
 
- drivers/soc/qcom/Kconfig              |  9 +++++
- drivers/soc/qcom/Makefile             |  1 +
- drivers/soc/qcom/l2-accessors.c       | 66 +++++++++++++++++++++++++++++++++++
- include/linux/soc/qcom/l2-accessors.h | 20 +++++++++++
- 4 files changed, 96 insertions(+)
- create mode 100644 drivers/soc/qcom/l2-accessors.c
- create mode 100644 include/linux/soc/qcom/l2-accessors.h
+> @@ -132,31 +141,67 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
+>  static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
+>  {
+>  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+> +	unsigned int min_uV_duty = drvdata->continuous.min_uV_dutycycle;
+> +	unsigned int max_uV_duty = drvdata->continuous.max_uV_dutycycle;
+> +	unsigned int duty_unit = drvdata->continuous.dutycycle_unit;
+>  	int min_uV = rdev->constraints->min_uV;
+> -	int diff = rdev->constraints->max_uV - min_uV;
+> +	int max_uV = rdev->constraints->max_uV;
+> +	int diff_uV = max_uV - min_uV;
+>  	struct pwm_state pstate;
+> +	unsigned int diff_duty;
+> +	unsigned int voltage;
+>  
+>  	pwm_get_state(drvdata->pwm, &pstate);
+>  
+> -	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
+> +	voltage = pwm_get_relative_duty_cycle(&pstate, duty_unit);
+> +
+> +	if (max_uV_duty < min_uV_duty) {
 
-diff --git a/drivers/soc/qcom/Kconfig b/drivers/soc/qcom/Kconfig
-index 461b387..21ec616 100644
---- a/drivers/soc/qcom/Kconfig
-+++ b/drivers/soc/qcom/Kconfig
-@@ -10,6 +10,15 @@ config QCOM_GSBI
-           functions for connecting the underlying serial UART, SPI, and I2C
-           devices to the output pins.
- 
-+config QCOM_L2_ACCESSORS
-+	bool "Qualcomm Technologies L2-cache accessors"
-+	depends on ARCH_QCOM && ARM64
-+	help
-+	  Say y here to enable support for the Qualcomm Technologies
-+	  L2 accessors.
-+	  Provides support for accessing registers in the L2 cache
-+	  for Qualcomm Technologies chips.
-+
- config QCOM_PM
- 	bool "Qualcomm Power Management"
- 	depends on ARCH_QCOM && !ARM64
-diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-index fdd664e..6ef29b9 100644
---- a/drivers/soc/qcom/Makefile
-+++ b/drivers/soc/qcom/Makefile
-@@ -1,4 +1,5 @@
- obj-$(CONFIG_QCOM_GSBI)	+=	qcom_gsbi.o
-+obj-$(CONFIG_QCOM_L2_ACCESSORS) += l2-accessors.o
- obj-$(CONFIG_QCOM_PM)	+=	spm.o
- obj-$(CONFIG_QCOM_SMD) +=	smd.o
- obj-$(CONFIG_QCOM_SMD_RPM)	+= smd-rpm.o
-diff --git a/drivers/soc/qcom/l2-accessors.c b/drivers/soc/qcom/l2-accessors.c
-new file mode 100644
-index 0000000..a3189ab
---- /dev/null
-+++ b/drivers/soc/qcom/l2-accessors.c
-@@ -0,0 +1,66 @@
-+/*
-+ * Copyright (c) 2014-2016 The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/spinlock.h>
-+#include <linux/export.h>
-+#include <linux/soc/qcom/l2-accessors.h>
-+#include <asm/cputype.h>
-+#include <asm/sysreg.h>
-+
-+#define	L2CPUSRSELR_EL1	S3_3_c15_c0_6
-+#define	L2CPUSRDR_EL1	S3_3_c15_c0_7
-+
-+static DEFINE_RAW_SPINLOCK(l2_access_lock);
-+
-+/**
-+ * set_l2_indirect_reg: write value to an L2 register
-+ * @reg: Address of L2 register.
-+ * @value: Value to be written to register.
-+ *
-+ * Use architecturally required barriers for ordering between system register
-+ * accesses
-+ */
-+void set_l2_indirect_reg(u64 reg, u64 val)
-+{
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&l2_access_lock, flags);
-+	write_sysreg(reg, L2CPUSRSELR_EL1);
-+	isb();
-+	write_sysreg(val, L2CPUSRDR_EL1);
-+	isb();
-+	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-+}
-+EXPORT_SYMBOL(set_l2_indirect_reg);
-+
-+/**
-+ * get_l2_indirect_reg: read an L2 register value
-+ * @reg: Address of L2 register.
-+ *
-+ * Use architecturally required barriers for ordering between system register
-+ * accesses
-+ */
-+u64 get_l2_indirect_reg(u64 reg)
-+{
-+	u64 val;
-+	unsigned long flags;
-+
-+	raw_spin_lock_irqsave(&l2_access_lock, flags);
-+	write_sysreg(reg, L2CPUSRSELR_EL1);
-+	isb();
-+	val = read_sysreg(L2CPUSRDR_EL1);
-+	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-+
-+	return val;
-+}
-+EXPORT_SYMBOL(get_l2_indirect_reg);
-diff --git a/include/linux/soc/qcom/l2-accessors.h b/include/linux/soc/qcom/l2-accessors.h
-new file mode 100644
-index 0000000..e51b72a
---- /dev/null
-+++ b/include/linux/soc/qcom/l2-accessors.h
-@@ -0,0 +1,20 @@
-+/*
-+ * Copyright (c) 2011-2016 The Linux Foundation. All rights reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#ifndef __QCOM_L2_ACCESSORS_H
-+#define __QCOM_L2_ACCESSORS_H
-+
-+void set_l2_indirect_reg(u64 reg_addr, u64 val);
-+u64 get_l2_indirect_reg(u64 reg_addr);
-+
-+#endif
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+I still might have appreciated a comment above this line (and similar
+in set_voltage()) to help explain why max can be less than min -- you
+have it in the commit message, but nowhere in the code. Not a big deal,
+and the code looks otherwise good:
+
+Reviewed-by: Brian Norris <briannorris@chromium.org>
+Tested-by: Brian Norris <briannorris@chromium.org>
+
+
+> +		voltage = min_uV_duty - voltage;
+> +		diff_duty = min_uV_duty - max_uV_duty;
+> +	} else {
+> +		voltage = voltage - min_uV_duty;
+> +		diff_duty = max_uV_duty - min_uV_duty;
+> +	}
+> +
+> +	voltage = DIV_ROUND_CLOSEST_ULL((u64)voltage * diff_uV, diff_duty);
+> +
+> +	return voltage + min_uV;
+>  }
+>  
+>  static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+> -					int min_uV, int max_uV,
+> -					unsigned *selector)
+> +				     int req_min_uV, int req_max_uV,
+> +				     unsigned int *selector)
+>  {
+>  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+> +	unsigned int min_uV_duty = drvdata->continuous.min_uV_dutycycle;
+> +	unsigned int max_uV_duty = drvdata->continuous.max_uV_dutycycle;
+> +	unsigned int duty_unit = drvdata->continuous.dutycycle_unit;
+>  	unsigned int ramp_delay = rdev->constraints->ramp_delay;
+> -	unsigned int req_diff = min_uV - rdev->constraints->min_uV;
+> +	int min_uV = rdev->constraints->min_uV;
+> +	int max_uV = rdev->constraints->max_uV;
+> +	int diff_uV = max_uV - min_uV;
+>  	struct pwm_state pstate;
+> -	unsigned int diff;
+> +	unsigned int diff_duty;
+> +	unsigned int dutycycle;
+>  	int ret;
+>  
+>  	pwm_prepare_new_state(drvdata->pwm, &pstate);
+> -	diff = rdev->constraints->max_uV - rdev->constraints->min_uV;
+>  
+> -	/* We pass diff as the scale to get a uV precision. */
+> -	pwm_set_relative_duty_cycle(&pstate, req_diff, diff);
+> +	if (max_uV_duty < min_uV_duty)
+> +		diff_duty = min_uV_duty - max_uV_duty;
+> +	else
+> +		diff_duty = max_uV_duty - min_uV_duty;
+> +
+> +	dutycycle = DIV_ROUND_CLOSEST_ULL((u64)(req_min_uV - min_uV) *
+> +					  diff_duty,
+> +					  diff_uV);
+> +
+> +	if (max_uV_duty < min_uV_duty)
+> +		dutycycle = min_uV_duty - dutycycle;
+> +	else
+> +		dutycycle = min_uV_duty + dutycycle;
+> +
+> +	pwm_set_relative_duty_cycle(&pstate, dutycycle, duty_unit);
+>  
+>  	ret = pwm_apply_state(drvdata->pwm, &pstate);
+>  	if (ret) {
+
+[...]
+
+Brian
