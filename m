@@ -1,253 +1,55 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Fri, 3 Jun 2016 11:56:40 +0100
-Subject: [PATCH] drm: convert DT component matching to
- component_match_add_release()
-In-Reply-To: <E1b8jze-00046l-K5@rmk-PC.armlinux.org.uk>
-References: <E1b8jze-00046l-K5@rmk-PC.armlinux.org.uk>
-Message-ID: <57516268.3020401@arm.com>
+From: szabolcs.nagy@arm.com (Szabolcs Nagy)
+Date: Fri, 3 Jun 2016 12:02:50 +0100
+Subject: [PATCH v6 00/21] ILP32 for ARM64
+In-Reply-To: <20160602190344.GA24533@yury-N73SV>
+References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+ <20160602190344.GA24533@yury-N73SV>
+Message-ID: <575163DA.3060502@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 02/06/16 20:03, Yury Norov wrote:
+> On Tue, May 24, 2016 at 03:04:29AM +0300, Yury Norov wrote:
+>> ILP32 glibc branch is available here:
+>> https://github.com/norov/glibc/tree/ilp32-2.23
+>>
+> 
+> So for AARCH64/ILP32 we turn next types to 64-bit in glibc:
+> #define __INO_T_TYPE            __UQUAD_TYPE
+> #define __OFF_T_TYPE            __SQUAD_TYPE
+> #define __BLKCNT_T_TYPE         __SQUAD_TYPE
+> #define __FSBLKCNT_T_TYPE       __UQUAD_TYPE
+> #define __FSFILCNT_T_TYPE       __UQUAD_TYPE
+> 
+> And define:
+> # define __INO_T_MATCHES_INO64_T                1
+> # define __OFF_T_MATCHES_OFF64_T                1
+> # define __BLKCNT_T_MATCHES_BLKCNT64_T          1
+> # define __FSBLKCNT_T_MATCHES_FSBLKCNT64_T      1
+> # define __FSFILCNT_T_MATCHES_FSFILCNT_T        1
+> 
+> If so, stat and statfs  structures for ilp32 are turning the same as
+> for lp64. And so we'd handle related syscalls with native lp64
+> handlers (wrapped, to zero top halves) in kernel. 
+> 
+> And we don't need stat64 for ilp32.
+> 
+> Did I miss something? Is everything correct?
+> 
+> OFF_T is turned to 64-bit quite smoothly, others make applications
+> crash with segfault. Now I'm in deep debugging.
+> 
 
-On 03/06/16 08:58, Russell King wrote:
-> Convert DT component matching to use component_match_add_release().
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
->   drivers/gpu/drm/arm/hdlcd_drv.c             | 10 ++++++++--
->   drivers/gpu/drm/armada/armada_drv.c         |  9 +++++++--
->   drivers/gpu/drm/drm_of.c                    | 13 +++++++++----
->   drivers/gpu/drm/msm/msm_drv.c               |  8 +++++++-
->   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 13 ++++++++++---
->   drivers/gpu/drm/sti/sti_drv.c               |  9 +++++++--
->   drivers/gpu/drm/tilcdc/tilcdc_external.c    |  9 +++++++--
->   7 files changed, 55 insertions(+), 16 deletions(-)
->
-> diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
-> index b987c63ba8d6..bbde48c4f550 100644
-> --- a/drivers/gpu/drm/arm/hdlcd_drv.c
-> +++ b/drivers/gpu/drm/arm/hdlcd_drv.c
-> @@ -443,11 +443,16 @@ static const struct component_master_ops hdlcd_master_ops = {
->   	.unbind		= hdlcd_drm_unbind,
->   };
->
-> -static int compare_dev(struct device *dev, void *data)
-> +static int compare_of(struct device *dev, void *data)
->   {
->   	return dev->of_node == data;
->   }
->
-> +static void release_of(struct device *dev, void *data)
-> +{
-> +	of_node_put(data);
-> +}
+based on previous discussions, non-trivial glibc changes may
+be needed to make 64bit fs apis the default on a 32bit abi.
+http://sourceware.org/ml/libc-alpha/2016-05/msg00337.html
+http://sourceware.org/ml/libc-alpha/2016-05/msg00356.html
 
-Considering that there's 7 identical copies of this function in this 
-patch alone, perhaps there's some mileage in defining it commonly as a 
-static __maybe_unused default_release_of() in component.h or drm_of.h 
-(and maybe default_compare_of() similarly)?
+but i guess if you consistently fix the 32bit assumptions
+then it should work.
 
-(Apologies if there's already been some strong argument against that 
-which I've not seen, but it seems like a reasonable thing to do.)
-
-Robin.
-
-> +
->   static int hdlcd_probe(struct platform_device *pdev)
->   {
->   	struct device_node *port, *ep;
-> @@ -474,7 +479,8 @@ static int hdlcd_probe(struct platform_device *pdev)
->   		return -EAGAIN;
->   	}
->
-> -	component_match_add(&pdev->dev, &match, compare_dev, port);
-> +	component_match_add_release(&pdev->dev, &match, release_of,
-> +				    compare_of, port);
->
->   	return component_master_add_with_match(&pdev->dev, &hdlcd_master_ops,
->   					       match);
-> diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-> index 439824a61aa5..6ca2aa36515e 100644
-> --- a/drivers/gpu/drm/armada/armada_drv.c
-> +++ b/drivers/gpu/drm/armada/armada_drv.c
-> @@ -232,6 +232,11 @@ static int compare_of(struct device *dev, void *data)
->   	return dev->of_node == data;
->   }
->
-> +static void release_of(struct device *dev, void *data)
-> +{
-> +	of_node_put(data);
-> +}
-> +
->   static int compare_dev_name(struct device *dev, void *data)
->   {
->   	const char *name = data;
-> @@ -255,8 +260,8 @@ static void armada_add_endpoints(struct device *dev,
->   			continue;
->   		}
->
-> -		component_match_add(dev, match, compare_of, remote);
-> -		of_node_put(remote);
-> +		component_match_add_release(dev, match, release_of,
-> +					    compare_of, remote);
->   	}
->   }
->
-> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> index bc98bb94264d..5d183479d7d6 100644
-> --- a/drivers/gpu/drm/drm_of.c
-> +++ b/drivers/gpu/drm/drm_of.c
-> @@ -6,6 +6,11 @@
->   #include <drm/drm_crtc.h>
->   #include <drm/drm_of.h>
->
-> +static void drm_release_of(struct device *dev, void *data)
-> +{
-> +	of_node_put(data);
-> +}
-> +
->   /**
->    * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
->    * @dev: DRM device
-> @@ -101,8 +106,8 @@ int drm_of_component_probe(struct device *dev,
->   			continue;
->   		}
->
-> -		component_match_add(dev, &match, compare_of, port);
-> -		of_node_put(port);
-> +		component_match_add_release(dev, &match, drm_release_of,
-> +					    compare_of, port);
->   	}
->
->   	if (i == 0) {
-> @@ -140,8 +145,8 @@ int drm_of_component_probe(struct device *dev,
->   				continue;
->   			}
->
-> -			component_match_add(dev, &match, compare_of, remote);
-> -			of_node_put(remote);
-> +			component_match_add_release(dev, &match, drm_release_of,
-> +						    compare_of, remote);
->   		}
->   		of_node_put(port);
->   	}
-> diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
-> index 9c654092ef78..1f7de47d817e 100644
-> --- a/drivers/gpu/drm/msm/msm_drv.c
-> +++ b/drivers/gpu/drm/msm/msm_drv.c
-> @@ -805,6 +805,11 @@ static int compare_of(struct device *dev, void *data)
->   	return dev->of_node == data;
->   }
->
-> +static void release_of(struct device *dev, void *data)
-> +{
-> +	of_node_put(data);
-> +}
-> +
->   static int add_components(struct device *dev, struct component_match **matchptr,
->   		const char *name)
->   {
-> @@ -818,7 +823,8 @@ static int add_components(struct device *dev, struct component_match **matchptr,
->   		if (!node)
->   			break;
->
-> -		component_match_add(dev, matchptr, compare_of, node);
-> +		component_match_add_release(dev, matchptr, release_of,
-> +					    compare_of, node);
->   	}
->
->   	return 0;
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> index a409d1f703cb..f5a68fc031ed 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -421,6 +421,11 @@ static int compare_of(struct device *dev, void *data)
->   	return dev->of_node == np;
->   }
->
-> +static void release_of(struct device *dev, void *data)
-> +{
-> +	of_node_put(data);
-> +}
-> +
->   static void rockchip_add_endpoints(struct device *dev,
->   				   struct component_match **match,
->   				   struct device_node *port)
-> @@ -439,8 +444,8 @@ static void rockchip_add_endpoints(struct device *dev,
->   			continue;
->   		}
->
-> -		component_match_add(dev, match, compare_of, remote);
-> -		of_node_put(remote);
-> +		component_match_add_release(dev, match, release_of,
-> +					    compare_of, remote);
->   	}
->   }
->
-> @@ -518,7 +523,9 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
->   			is_support_iommu = false;
->   		}
->
-> -		component_match_add(dev, &match, compare_of, port->parent);
-> +		of_node_get(port->parent);
-> +		component_match_add_release(dev, &match, release_of,
-> +					    compare_of, port->parent);
->   		of_node_put(port);
->   	}
->
-> diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
-> index 872495e72294..4ee6fa4f1beb 100644
-> --- a/drivers/gpu/drm/sti/sti_drv.c
-> +++ b/drivers/gpu/drm/sti/sti_drv.c
-> @@ -346,6 +346,11 @@ static int compare_of(struct device *dev, void *data)
->   	return dev->of_node == data;
->   }
->
-> +static void release_of(struct device *dev, void *data)
-> +{
-> +	of_node_put(data);
-> +}
-> +
->   static int sti_bind(struct device *dev)
->   {
->   	return drm_platform_init(&sti_driver, to_platform_device(dev));
-> @@ -375,8 +380,8 @@ static int sti_platform_probe(struct platform_device *pdev)
->   	child_np = of_get_next_available_child(node, NULL);
->
->   	while (child_np) {
-> -		component_match_add(dev, &match, compare_of, child_np);
-> -		of_node_put(child_np);
-> +		component_match_add_release(dev, &match, release_of,
-> +					    compare_of, child_np);
->   		child_np = of_get_next_available_child(node, child_np);
->   	}
->
-> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_external.c b/drivers/gpu/drm/tilcdc/tilcdc_external.c
-> index 03acb4f99982..7e11b5ecdd4a 100644
-> --- a/drivers/gpu/drm/tilcdc/tilcdc_external.c
-> +++ b/drivers/gpu/drm/tilcdc/tilcdc_external.c
-> @@ -135,6 +135,11 @@ static int dev_match_of(struct device *dev, void *data)
->   	return dev->of_node == data;
->   }
->
-> +static void dev_release_of(struct device *dev, void *data)
-> +{
-> +	of_node_put(data);
-> +}
-> +
->   int tilcdc_get_external_components(struct device *dev,
->   				   struct component_match **match)
->   {
-> @@ -152,8 +157,8 @@ int tilcdc_get_external_components(struct device *dev,
->
->   		dev_dbg(dev, "Subdevice node '%s' found\n", node->name);
->   		if (match)
-> -			component_match_add(dev, match, dev_match_of, node);
-> -		of_node_put(node);
-> +			component_match_add_release(dev, match, dev_release_of,
-> +						    dev_match_of, node);
->   		count++;
->   	}
->
->
+> https://github.com/norov/glibc/commits/ilp32-dev
+> https://github.com/norov/linux/commits/ilp32
+> 
+> Yury.
+> 
