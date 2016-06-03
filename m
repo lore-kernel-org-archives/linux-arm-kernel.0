@@ -1,29 +1,38 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  3 Jun 2016 10:46:58 +0200
-Subject: [PATCH 0/3] hw_random: Add Amlogic Meson SoCs Random Genenerator
- driver
-Message-ID: <1464943621-18278-1-git-send-email-narmstrong@baylibre.com>
+Date: Fri,  3 Jun 2016 10:47:00 +0200
+Subject: [PATCH 2/3] dt-bindings: hwrng: Add Amlogic Meson Hardware Random
+ Generator bindings
+In-Reply-To: <1464943621-18278-1-git-send-email-narmstrong@baylibre.com>
+References: <1464943621-18278-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1464943621-18278-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Amlogic Meson SoCs Hardware Random generator as a hw_random char driver.
-The generator is a single 32bit wide register.
-Also adds the Meson GXBB SoC DTSI node and corresponding DT bindings.
-
-Neil Armstrong (3):
-  char: hw_random: Add Amlogic Meson Hardware Random Generator
-  dt-bindings: hwrng: Add Amlogic Meson Hardware Random Generator
-    bindings
-  ARM64: dts: meson-gxbb: Add Hardware Random Generator node
-
- .../devicetree/bindings/rng/amlogic,meson-rng.txt  |  14 +++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |   5 +
- drivers/char/hw_random/Kconfig                     |  13 +++
- drivers/char/hw_random/Makefile                    |   1 +
- drivers/char/hw_random/meson-rng.c                 | 128 +++++++++++++++++++++
- 5 files changed, 161 insertions(+)
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ .../devicetree/bindings/rng/amlogic,meson-rng.txt          | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
- create mode 100644 drivers/char/hw_random/meson-rng.c
 
+diff --git a/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt b/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
+new file mode 100644
+index 0000000..202f2d0
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rng/amlogic,meson-rng.txt
+@@ -0,0 +1,14 @@
++Amlogic Meson Random number generator
++=====================================
++
++Required properties:
++
++- compatible : should be "amlogic,meson-rng"
++- reg : Specifies base physical address and size of the registers.
++
++Example:
++
++rng {
++        compatible = "amlogic,meson-rng";
++        reg = <0x0 0xc8834000 0x0 0x4>;
++};
 -- 
 2.7.0
