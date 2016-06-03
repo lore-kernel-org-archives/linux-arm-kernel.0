@@ -1,125 +1,189 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri, 3 Jun 2016 15:34:04 +0200
-Subject: [PATCH v2,3/5] dt-bindings: mtu3: add devicetree bindings
-In-Reply-To: <1464673962-11506-4-git-send-email-chunfeng.yun@mediatek.com>
-References: <1464673962-11506-1-git-send-email-chunfeng.yun@mediatek.com>
- <1464673962-11506-4-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <5751874C.9070100@gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri,  3 Jun 2016 19:05:07 +0530
+Subject: [PATCH V3 1/9] cpufreq: Use policy->freq_table in ->target_index()
+In-Reply-To: <cover.1464960877.git.viresh.kumar@linaro.org>
+References: <cover.1464960877.git.viresh.kumar@linaro.org>
+Message-ID: <c6b8e13cb2084abc5ec220d4b7dcba7e2749450c.1464960877.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The 'policy' already contains a pointer to the freq table, use that
+instead of using driver specific tables name.
 
+This is done in order to make sure that the 'index' passed to the
+->target_index() callback is used *only* to index into the
+policy->freq_table and nothing else.
 
-On 31/05/16 07:52, Chunfeng Yun wrote:
-> add a DT binding doc for MediaTek USB3 DRD driver
->
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->   Documentation/devicetree/bindings/usb/mtu3.txt |   85 ++++++++++++++++++++++++
->   1 file changed, 85 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/usb/mtu3.txt
->
-> diff --git a/Documentation/devicetree/bindings/usb/mtu3.txt b/Documentation/devicetree/bindings/usb/mtu3.txt
-> new file mode 100644
-> index 0000000..571ae8b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/mtu3.txt
+Later patches would make changes in cpufreq core, after which
+policy->freq_table may be reordered by cpufreq core and it wouldn't be
+safe anymore to use 'index' for any other local array.
 
-The file should be called mt8173-mtu3.txt to be in line with mt8173-xhci.txt
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ drivers/cpufreq/arm_big_little.c       | 2 +-
+ drivers/cpufreq/at32ap-cpufreq.c       | 2 +-
+ drivers/cpufreq/blackfin-cpufreq.c     | 2 +-
+ drivers/cpufreq/cris-artpec3-cpufreq.c | 2 +-
+ drivers/cpufreq/cris-etraxfs-cpufreq.c | 2 +-
+ drivers/cpufreq/dbx500-cpufreq.c       | 3 ++-
+ drivers/cpufreq/e_powersaver.c         | 2 +-
+ drivers/cpufreq/exynos5440-cpufreq.c   | 3 +--
+ drivers/cpufreq/imx6q-cpufreq.c        | 2 +-
+ drivers/cpufreq/kirkwood-cpufreq.c     | 2 +-
+ drivers/cpufreq/loongson2_cpufreq.c    | 5 ++---
+ 11 files changed, 13 insertions(+), 14 deletions(-)
 
-> @@ -0,0 +1,85 @@
-> +The device node for Mediatek USB3.0 DRD controller
-> +
-> +Required properties:
-> + - compatible : should be "mediatek,mt8173-mtu3"
-> + - reg : specifies physical base address and size of the registers
-> + - reg-names: should be "mac" for device IP and "ippc" for IP port control
-> + - interrupts : interrupt used by the device IP
-> + - power-domains : a phandle to USB power domain node to control USB's
-> +	mtcmos
-> + - vusb33-supply : regulator of USB avdd3.3v
-> + - clocks : a list of phandle + clock-specifier pairs, one for each
-> +	entry in clock-names
-> + - clock-names : must contain "sys_ck" for clock of controller;
-> +	"wakeup_deb_p0" and "wakeup_deb_p1" are optional, they are
-> +	depends on "mediatek,enable-wakeup"
-> + - phys : a list of phandle + phy specifier pairs
-> + - dr_mode : should be one of "host", "peripheral" or "otg",
-> +	refer to usb/generic.txt
-> +
-> +Optional properties:
-> + - #address-cells, #size-cells : should be '2' if the device has sub-nodes
-> +	with 'reg' property
-> + - ranges : allows valid 1:1 translation between child's address space and
-> +	parent's address space
-> + - extcon : external connector for vbus and idpin changes detection, needed
-> +	when supports dual-role mode.
-> + - vbus-supply : reference to the VBUS regulator, needed when supports
-> +	dual-role mode.
-> + - pinctl-names : a pinctrl state named "default" must be defined,
-> +	"id_float" and "id_ground" are optinal which depends on
-> +	"mediatek,enable-manual-drd"
-
-So pinctrl is optional, but if you put it, you need at least "default"?
-
-Apart from that, DT maintainers prefer to have the binding patches at 
-the beginning of a series, so it's easier for them to not oversee any.
-
-Regards,
-Matthias
-
-> + - pinctrl-0 : pin control group
-> +	See: Documentation/devicetree/bindings/pinctrl/pinctrl-binding.txt
-> +
-> + - maximum-speed : valid arguments are "super-speed", "high-speed" and
-> +	"full-speed"; refer to usb/generic.txt
-> + - enable-manual-drd : supports manual dual-role switch via sysfs; only used
-> +	when receptacle is TYPE-A and also wants to support dual-role mode.
-> + - mediatek,enable-wakeup : supports ip sleep wakeup used by host mode
-> + - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-> +	control register, it depends on "mediatek,enable-wakeup".
-> +
-> +Sub-nodes:
-> +The xhci should be added as subnode to mtu3 as shown in the following example
-> +if host mode is enabled. The DT binding details of xhci can be found in:
-> +Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> +
-> +Example:
-> +ssusb: usb at 11271000 {
-> +	compatible = "mediatek,mt8173-mtu3";
-> +	reg = <0 0x11271000 0 0x3000>,
-> +	      <0 0x11280700 0 0x0100>;
-> +	reg-names = "mac", "ippc";
-> +	interrupts = <GIC_SPI 64 IRQ_TYPE_LEVEL_LOW>;
-> +	phys = <&phy_port0 PHY_TYPE_USB3>,
-> +	       <&phy_port1 PHY_TYPE_USB2>;
-> +	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-> +	clocks = <&topckgen CLK_TOP_USB30_SEL>,
-> +		 <&pericfg CLK_PERI_USB0>,
-> +		 <&pericfg CLK_PERI_USB1>;
-> +	clock-names = "sys_ck",
-> +		      "wakeup_deb_p0",
-> +		      "wakeup_deb_p1";
-> +	vusb33-supply = <&mt6397_vusb_reg>;
-> +	vbus-supply = <&usb_p0_vbus>;
-> +	extcon = <&extcon_usb>;
-> +	dr_mode = "otg";
-> +	mediatek,enable-wakeup;
-> +	mediatek,syscon-wakeup = <&pericfg>;
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +	ranges;
-> +	status = "disabled";
-> +
-> +	usb_host: xhci at 11270000 {
-> +		compatible = "mediatek,mt8173-xhci";
-> +		reg = <0 0x11270000 0 0x1000>;
-> +		interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
-> +		power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
-> +		clocks = <&topckgen CLK_TOP_USB30_SEL>;
-> +		clock-names = "sys_ck";
-> +		vusb33-supply = <&mt6397_vusb_reg>;
-> +		status = "disabled";
-> +	};
-> +};
->
+diff --git a/drivers/cpufreq/arm_big_little.c b/drivers/cpufreq/arm_big_little.c
+index 418042201e6d..fc9e863e39d6 100644
+--- a/drivers/cpufreq/arm_big_little.c
++++ b/drivers/cpufreq/arm_big_little.c
+@@ -217,7 +217,7 @@ static int bL_cpufreq_set_target(struct cpufreq_policy *policy,
+ 	cur_cluster = cpu_to_cluster(cpu);
+ 	new_cluster = actual_cluster = per_cpu(physical_cluster, cpu);
+ 
+-	freqs_new = freq_table[cur_cluster][index].frequency;
++	freqs_new = policy->freq_table[index].frequency;
+ 
+ 	if (is_bL_switching_enabled()) {
+ 		if ((actual_cluster == A15_CLUSTER) &&
+diff --git a/drivers/cpufreq/at32ap-cpufreq.c b/drivers/cpufreq/at32ap-cpufreq.c
+index 7b612c8bb09e..9231b1efb70d 100644
+--- a/drivers/cpufreq/at32ap-cpufreq.c
++++ b/drivers/cpufreq/at32ap-cpufreq.c
+@@ -31,7 +31,7 @@ static int at32_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	unsigned int old_freq, new_freq;
+ 
+ 	old_freq = policy->cur;
+-	new_freq = freq_table[index].frequency;
++	new_freq = policy->freq_table[index].frequency;
+ 
+ 	if (!ref_freq) {
+ 		ref_freq = old_freq;
+diff --git a/drivers/cpufreq/blackfin-cpufreq.c b/drivers/cpufreq/blackfin-cpufreq.c
+index 12e97d8a9db0..1650c213f465 100644
+--- a/drivers/cpufreq/blackfin-cpufreq.c
++++ b/drivers/cpufreq/blackfin-cpufreq.c
+@@ -142,7 +142,7 @@ static int bfin_target(struct cpufreq_policy *policy, unsigned int index)
+ #endif
+ 
+ 	old_freq = bfin_getfreq_khz(0);
+-	new_freq = bfin_freq_table[index].frequency;
++	new_freq = policy->freq_table[index].frequency;
+ 
+ #ifndef CONFIG_BF60x
+ 	plldiv = (bfin_read_PLL_DIV() & SSEL) | dpm_state_table[index].csel;
+diff --git a/drivers/cpufreq/cris-artpec3-cpufreq.c b/drivers/cpufreq/cris-artpec3-cpufreq.c
+index 601b88c490cf..4e7dc8f1e619 100644
+--- a/drivers/cpufreq/cris-artpec3-cpufreq.c
++++ b/drivers/cpufreq/cris-artpec3-cpufreq.c
+@@ -36,7 +36,7 @@ static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
+ 
+ 	/* Even though we may be SMP they will share the same clock
+ 	 * so all settings are made on CPU0. */
+-	if (cris_freq_table[state].frequency == 200000)
++	if (policy->freq_table[state].frequency == 200000)
+ 		clk_ctrl.pll = 1;
+ 	else
+ 		clk_ctrl.pll = 0;
+diff --git a/drivers/cpufreq/cris-etraxfs-cpufreq.c b/drivers/cpufreq/cris-etraxfs-cpufreq.c
+index 22b2cdde74d9..6ee434a54cae 100644
+--- a/drivers/cpufreq/cris-etraxfs-cpufreq.c
++++ b/drivers/cpufreq/cris-etraxfs-cpufreq.c
+@@ -36,7 +36,7 @@ static int cris_freq_target(struct cpufreq_policy *policy, unsigned int state)
+ 
+ 	/* Even though we may be SMP they will share the same clock
+ 	 * so all settings are made on CPU0. */
+-	if (cris_freq_table[state].frequency == 200000)
++	if (policy->freq_table[state].frequency == 200000)
+ 		clk_ctrl.pll = 1;
+ 	else
+ 		clk_ctrl.pll = 0;
+diff --git a/drivers/cpufreq/dbx500-cpufreq.c b/drivers/cpufreq/dbx500-cpufreq.c
+index 5c3ec1dd4921..84968889ab29 100644
+--- a/drivers/cpufreq/dbx500-cpufreq.c
++++ b/drivers/cpufreq/dbx500-cpufreq.c
+@@ -23,7 +23,8 @@ static int dbx500_cpufreq_target(struct cpufreq_policy *policy,
+ 				unsigned int index)
+ {
+ 	/* update armss clk frequency */
+-	return clk_set_rate(armss_clk, freq_table[index].frequency * 1000);
++	return clk_set_rate(armss_clk,
++			    policy->freq_table[index].frequency * 1000);
+ }
+ 
+ static int dbx500_cpufreq_init(struct cpufreq_policy *policy)
+diff --git a/drivers/cpufreq/e_powersaver.c b/drivers/cpufreq/e_powersaver.c
+index cdf097b29862..a284bddfb067 100644
+--- a/drivers/cpufreq/e_powersaver.c
++++ b/drivers/cpufreq/e_powersaver.c
+@@ -163,7 +163,7 @@ static int eps_target(struct cpufreq_policy *policy, unsigned int index)
+ 	centaur = eps_cpu[cpu];
+ 
+ 	/* Make frequency transition */
+-	dest_state = centaur->freq_table[index].driver_data & 0xffff;
++	dest_state = policy->freq_table[index].driver_data & 0xffff;
+ 	ret = eps_set_state(centaur, policy, dest_state);
+ 	if (ret)
+ 		pr_err("Timeout!\n");
+diff --git a/drivers/cpufreq/exynos5440-cpufreq.c b/drivers/cpufreq/exynos5440-cpufreq.c
+index c0f3373706f4..085f07d31ef0 100644
+--- a/drivers/cpufreq/exynos5440-cpufreq.c
++++ b/drivers/cpufreq/exynos5440-cpufreq.c
+@@ -212,12 +212,11 @@ static int exynos_target(struct cpufreq_policy *policy, unsigned int index)
+ {
+ 	unsigned int tmp;
+ 	int i;
+-	struct cpufreq_frequency_table *freq_table = dvfs_info->freq_table;
+ 
+ 	mutex_lock(&cpufreq_lock);
+ 
+ 	freqs.old = policy->cur;
+-	freqs.new = freq_table[index].frequency;
++	freqs.new = policy->freq_table[index].frequency;
+ 
+ 	cpufreq_freq_transition_begin(policy, &freqs);
+ 
+diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+index ef1fa8145419..3858dc7e617b 100644
+--- a/drivers/cpufreq/imx6q-cpufreq.c
++++ b/drivers/cpufreq/imx6q-cpufreq.c
+@@ -49,7 +49,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+ 	unsigned int old_freq, new_freq;
+ 	int ret;
+ 
+-	new_freq = freq_table[index].frequency;
++	new_freq = policy->freq_table[index].frequency;
+ 	freq_hz = new_freq * 1000;
+ 	old_freq = clk_get_rate(arm_clk) / 1000;
+ 
+diff --git a/drivers/cpufreq/kirkwood-cpufreq.c b/drivers/cpufreq/kirkwood-cpufreq.c
+index be42f103db60..f63bf4fcb6fe 100644
+--- a/drivers/cpufreq/kirkwood-cpufreq.c
++++ b/drivers/cpufreq/kirkwood-cpufreq.c
+@@ -54,7 +54,7 @@ static unsigned int kirkwood_cpufreq_get_cpu_frequency(unsigned int cpu)
+ static int kirkwood_cpufreq_target(struct cpufreq_policy *policy,
+ 			    unsigned int index)
+ {
+-	unsigned int state = kirkwood_freq_table[index].driver_data;
++	unsigned int state = policy->freq_table[index].driver_data;
+ 	unsigned long reg;
+ 
+ 	local_irq_disable();
+diff --git a/drivers/cpufreq/loongson2_cpufreq.c b/drivers/cpufreq/loongson2_cpufreq.c
+index 6bbdac1065ff..e96c98f9245a 100644
+--- a/drivers/cpufreq/loongson2_cpufreq.c
++++ b/drivers/cpufreq/loongson2_cpufreq.c
+@@ -58,9 +58,8 @@ static int loongson2_cpufreq_target(struct cpufreq_policy *policy,
+ 	cpus_allowed = current->cpus_allowed;
+ 	set_cpus_allowed_ptr(current, cpumask_of(cpu));
+ 
+-	freq =
+-	    ((cpu_clock_freq / 1000) *
+-	     loongson2_clockmod_table[index].driver_data) / 8;
++	freq = (cpu_clock_freq / 1000) * policy->freq_table[index].driver_data;
++	freq /= 8;
+ 
+ 	set_cpus_allowed_ptr(current, &cpus_allowed);
+ 
+-- 
+2.7.1.410.g6faf27b
