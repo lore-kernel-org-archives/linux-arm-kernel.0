@@ -1,49 +1,63 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Fri, 3 Jun 2016 08:12:13 -0500
-Subject: [PATCH 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy
- block
-In-Reply-To: <e8b770aa-5642-93c3-60c8-0717e87e732e@redhat.com>
-References: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
- <575167EC.8000504@ti.com>
- <e8b770aa-5642-93c3-60c8-0717e87e732e@redhat.com>
-Message-ID: <20160603131213.GB3778@uda0271908>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 3 Jun 2016 15:13:00 +0200
+Subject: [PATCH] iommu: convert DT component matching to
+ component_match_add_release()
+In-Reply-To: <E1b8jzj-00046r-Pd@rmk-PC.armlinux.org.uk>
+References: <E1b8jzj-00046r-Pd@rmk-PC.armlinux.org.uk>
+Message-ID: <5751825C.40703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On Fri, Jun 03, 2016 at 01:39:26PM +0200, Hans de Goede wrote:
-> Hi,
-> 
-> On 03-06-16 13:20, Kishon Vijay Abraham I wrote:
-> >Hi,
-> >
-> >On Thursday 02 June 2016 11:01 PM, Hans de Goede wrote:
-> >>Some SoCs have a single phy-hw-block with multiple phys, this is
-> >>modelled by a single phy dts node, so we end up with multiple
-> >>controller nodes with a phys property pointing to the phy-node
-> >>of the otg-phy.
-> >
-> >Maybe we should try to model each phy with a separate dt node?
-> 
-> That seems like making things unnecessarily complicated. If we want
-> to be 100% sure that of_usb_get_dr_mode_by_phy finds the right
 
-I believe we have to.
+On 03/06/16 09:58, Russell King wrote:
+> Convert DT component matching to use component_match_add_release().
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
 
-> controller, we could add an "int index" parameter to of_usb_get_dr_mode_by_phy
-> and make it check that first argument specified to the phandle
-> used in the controller node matches the passed in index.
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
 
-Why we need the 'index'? Once the dt has seperate nodes for the phys,
-'phy_np' passed in is the uniqe id of the phy node.
-
-> 
-> And use index == -1 to skip this test.
-> 
-> Regards,
-> 
-> Hans
-
-Regards,
--Bin.
+>   drivers/iommu/mtk_iommu.c | 13 ++++++++++---
+>   1 file changed, 10 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+> index c3043d8754e3..c036df1c49ca 100644
+> --- a/drivers/iommu/mtk_iommu.c
+> +++ b/drivers/iommu/mtk_iommu.c
+> @@ -557,6 +557,11 @@ static int compare_of(struct device *dev, void *data)
+>   	return dev->of_node == data;
+>   }
+>
+> +static void release_of(struct device *dev, void *data)
+> +{
+> +	of_node_put(data);
+> +}
+> +
+>   static int mtk_iommu_bind(struct device *dev)
+>   {
+>   	struct mtk_iommu_data *data = dev_get_drvdata(dev);
+> @@ -630,17 +635,19 @@ static int mtk_iommu_probe(struct platform_device *pdev)
+>   			continue;
+>
+>   		plarbdev = of_find_device_by_node(larbnode);
+> -		of_node_put(larbnode);
+>   		if (!plarbdev) {
+>   			plarbdev = of_platform_device_create(
+>   						larbnode, NULL,
+>   						platform_bus_type.dev_root);
+> -			if (!plarbdev)
+> +			if (!plarbdev) {
+> +				of_node_put(larbnode);
+>   				return -EPROBE_DEFER;
+> +			}
+>   		}
+>   		data->smi_imu.larb_imu[i].dev = &plarbdev->dev;
+>
+> -		component_match_add(dev, &match, compare_of, larbnode);
+> +		component_match_add_release(dev, &match, release_of,
+> +					    compare_of, larbnode);
+>   	}
+>
+>   	platform_set_drvdata(pdev, data);
+>
