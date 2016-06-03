@@ -1,105 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 2 Jun 2016 20:43:23 -0500
-Subject: [PATCH v2 3/7] binding: mdio-mux: Add DT binding doc for
- Broadcom MDIO bus mutiplexer
-In-Reply-To: <1464701801-17243-4-git-send-email-pramod.kumar@broadcom.com>
+Date: Thu, 2 Jun 2016 20:44:45 -0500
+Subject: [PATCH v2 6/7] Binding:PHY: Binding doc for NS2 PCIe PHYs.
+In-Reply-To: <1464701801-17243-7-git-send-email-pramod.kumar@broadcom.com>
 References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
- <1464701801-17243-4-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <20160603014323.GA12365@rob-hp-laptop>
+ <1464701801-17243-7-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <20160603014445.GA13873@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 07:06:37PM +0530, Pramod Kumar wrote:
-> Add DT binding doc for Broadcom MDIO bus mutiplexer driver.
+On Tue, May 31, 2016 at 07:06:40PM +0530, Pramod Kumar wrote:
+> Binding doc for NS2 PCIe PHYs.
 > 
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
 > Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
 > ---
->  .../bindings/net/brcm,mdio-mux-iproc.txt           | 60 ++++++++++++++++++++++
->  1 file changed, 60 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-> new file mode 100644
-> index 0000000..f270b41
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-> @@ -0,0 +1,60 @@
-> +Properties for an MDIO bus mutiplexer found in Broadcom iProc based SoCs.
-> +
-> +This MDIO bus multiplexer defines buses that could be internal as well as
-> +external to SoCs and could accept MDIO transaction compatible to C-22 or
-> +C-45 Clause. When Child bus is selected, one need to select these two
+>  .../bindings/phy/brcm,mdio-mux-bus-pci.txt         | 27 ++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/brcm,mdio-mux-bus-pci.txt
 
-s/Child/child/
-
-s/need/needs/
-
-> +properties as well to generate desired MDIO trascation on appropriate bus.
-> +
-> +Required properties in addition to the generic multiplexer properties:
-> +
-> +MDIO multiplexer node:
-> +- complatible: brcm,mdio-mux-iproc.
-
-typo
-
-> +
-> +Every non-ethernet PHY requires a compatible so that it could be probed based
-> +on this compatible string.
-> +
-> +Additional information regarding generic multiplexer properties could be found
-
-s/could/can/
-
-> +at- Documentation/devicetree/bindings/net/mdio-mux.txt
-> +
-> +
-> +for example:
-> +		mdio_mux_iproc: mdio_mux_iproc at 6602023c {
-
-No '_' in node names.
-
-mdio-mux at ...
-
-> +			compatible = "brcm,mdio-mux-iproc";
-> +			reg = <0x6602023c 0x14>;
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			mdio-integrated-mux;
-> +
-> +			mdio at 0 {
-> +				reg = <0x0>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				pci_phy0: pci-phy at 0 {
-> +					compatible = "brcm,ns2-pcie-phy";
-> +					reg = <0x0>;
-> +					#phy-cells = <0>;
-> +				};
-> +			};
-> +
-> +			mdio at 7 {
-> +				reg = <0x7>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				pci_phy1: pci-phy at 0 {
-> +					compatible = "brcm,ns2-pcie-phy";
-> +					reg = <0x0>;
-> +					#phy-cells = <0>;
-> +				};
-> +			};
-> +			mdio at 10 {
-> +				reg = <0x10>;
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +
-> +				gphy0: eth-phy at 10 {
-> +					reg = <0x10>;
-> +				};
-> +			};
-> +		};
-> -- 
-> 1.9.1
-> 
+Acked-by: Rob Herring <robh@kernel.org>
