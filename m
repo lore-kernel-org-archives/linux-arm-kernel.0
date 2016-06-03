@@ -1,17 +1,435 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 3 Jun 2016 18:32:47 +0200
-Subject: [PATCH v3 RESEND 0/7] Add MDIO bus multiplexer support for iProc
- SoCs
-In-Reply-To: <1464969786-22742-1-git-send-email-pramod.kumar@broadcom.com>
-References: <1464969786-22742-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <20160603163247.GI22120@lunn.ch>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri,  3 Jun 2016 18:40:29 +0200
+Subject: [PATCH v2] ARM: dts: imx6: add support for Auvidea H100 board
+Message-ID: <1464972029-12949-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Reason for resend:
-> -Rebased on v4.7-rc1
+The Auvidea H100 is a baseboard for the SolidRun MicroSOM.
+Its primary feature is a Toshiba TC358743 HDMI to CSI decoder,
+allowing the board to work as HDMI passthrough and framegrabber.
 
-How do you see this getting merged? Via netdev? If so, you should be
-based on net-next/master, not v4.7-rc1.
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+v2: Correct regulator GPIO flags.
+---
+ arch/arm/boot/dts/Makefile       |   1 +
+ arch/arm/boot/dts/imx6q-h100.dts | 395 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 396 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-h100.dts
 
-      Andrew
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 06b6c2d695bf..4f936106f696 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -356,6 +356,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-gw54xx.dtb \
+ 	imx6q-gw551x.dtb \
+ 	imx6q-gw552x.dtb \
++	imx6q-h100.dtb \
+ 	imx6q-hummingboard.dtb \
+ 	imx6q-icore-rqs.dtb \
+ 	imx6q-marsboard.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
+new file mode 100644
+index 000000000000..3fa044df81b5
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-h100.dts
+@@ -0,0 +1,395 @@
++/*
++ * Copyright (C) 2015 Lucas Stach <kernel@pengutronix.de>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++ 
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-microsom-ar8035.dtsi"
++
++/ {
++	model = "Auvidea H100";
++	compatible = "auvidea,h100", "fsl,imx6q";
++
++	aliases {
++		rtc0 = &rtc;
++		rtc1 = &snvs_rtc;
++	};
++
++	chosen {
++		stdout-path = &uart2;
++	};
++
++	hdmi_osc: hdmi-osc {
++		compatible = "fixed-clock";
++		clock-output-names = "hdmi-osc";
++		clock-frequency = <27000000>;
++		#clock-cells = <0>;
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_h100_leds>;
++
++		led0: power {
++			label = "power";
++			gpios = <&gpio3 0 GPIO_ACTIVE_LOW>;
++			default-state = "on";
++		};
++
++		led1: stream {
++			label = "stream";
++			gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
++			default-state = "off";
++		};
++
++		led2: rec {
++			label = "rec";
++			gpios = <&gpio2 28 GPIO_ACTIVE_LOW>;
++			default-state = "off";
++		};
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++
++	reg_hdmi: regulator-hdmi {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_h100_reg_hdmi>;
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio2 20 GPIO_ACTIVE_HIGH>;
++		regulator-name = "V_HDMI";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++
++	reg_nvcc_sd2: regulator-nvcc-sd2 {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_h100_reg_nvcc_sd2>;
++		compatible = "regulator-gpio";
++		regulator-name = "NVCC_SD2";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-type = "voltage";
++		regulator-boot-on;
++		regulator-always-on;
++		gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>;
++		states = <1800000 0x1
++			  3300000 0x0>;
++	};
++
++	reg_usbh1_vbus: regulator-usb-h1-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_h100_usbh1_vbus>;
++		regulator-name = "USB_H1_VBUS";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	reg_usbotg_vbus: regulator-usb-otg-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_h100_usbotg_vbus>;
++		regulator-name = "USB_OTG_VBUS";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	sound-sgtl5000 {
++		compatible = "fsl,imx-audio-sgtl5000";
++		model = "H100 on-board codec";
++		audio-codec = <&sgtl5000>;
++		audio-routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
++			"Headphone Jack", "HP_OUT";
++		mux-ext-port = <5>;
++		mux-int-port = <1>;
++		ssi-controller = <&ssi1>;
++	};
++};
++
++&audmux {
++	status = "okay";
++};
++
++&hdmi {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_h100_hdmi>;
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_h100_i2c1>;
++	status = "okay";
++	
++	eeprom: 24c02 at 51 {
++		compatible = "microchip,24c02", "at24";
++		reg = <0x51>;
++	};
++
++	rtc: pcf8523 at 68 {
++		compatible = "nxp,pcf8523";
++		reg = <0x68>;
++	};
++
++	sgtl5000: sgtl5000 at 0a {
++		compatible = "fsl,sgtl5000";
++		reg = <0x0a>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_h100_sgtl5000>;
++		clocks = <&clks IMX6QDL_CLK_CKO>;
++		VDDA-supply = <&reg_3p3v>;
++		VDDIO-supply = <&reg_3p3v>;
++	};
++
++	tc358743: tc358743 at 0f {
++		compatible = "toshiba,tc358743";
++		reg = <0x0f>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_h100_tc358743>;
++		clocks = <&hdmi_osc>;
++		clock-names = "refclk";
++		reset-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
++		/* IRQ has a wrong pull resistor which renders it useless  */
++
++		port at 0 {
++			tc358743_out: endpoint {
++				remote-endpoint = <&mipi_csi2_in>;
++				data-lanes = <1 2 3 4>;
++				clock-lanes = <0>;
++				clock-noncontinuous;
++				link-frequencies = /bits/ 64 <297000000>;
++			};
++		};
++	};
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_h100_i2c2>;
++	status = "okay";
++};
++
++&iomuxc {
++	h100 {
++		pinctrl_h100_hdmi: h100-hdmi {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE	0x1f8b0
++			>;
++		};
++
++		pinctrl_h100_i2c1: h100-i2c1 {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
++				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_h100_i2c2: h100-i2c2 {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
++			>;
++		};
++
++		pinctrl_h100_leds: pinctrl-h100-leds {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_DA0__GPIO3_IO00		0x1b0b0
++				MX6QDL_PAD_EIM_EB1__GPIO2_IO29		0x1b0b0
++				MX6QDL_PAD_EIM_EB0__GPIO2_IO28		0x1b0b0
++			>;
++		};
++
++		pinctrl_h100_reg_hdmi: h100-reg-hdmi {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_A18__GPIO2_IO20		0x1b0b0
++			>;
++		};
++
++		pinctrl_h100_reg_nvcc_sd2: h100-reg-nvcc-sd2 {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_ROW1__GPIO4_IO09		0x1b0b0
++			>;
++		};
++
++		pinctrl_h100_sgtl5000: h100-sgtl5000 {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
++				MX6QDL_PAD_KEY_COL0__AUD5_TXC		0x130b0
++				MX6QDL_PAD_KEY_ROW0__AUD5_TXD		0x110b0
++				MX6QDL_PAD_KEY_COL1__AUD5_TXFS		0x130b0
++				MX6QDL_PAD_GPIO_5__CCM_CLKO1		0x130b0
++			>;
++		};
++
++		pinctrl_h100_tc358743: h100-tc358743 {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x1b0b0
++			>;
++		};
++
++		pinctrl_h100_uart2: h100-uart2 {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
++				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
++			>;
++		};
++
++		pinctrl_h100_usbh1_vbus: hummingboard-usbh1-vbus {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_0__GPIO1_IO00		0x1b0b0
++			>;
++		};
++
++		pinctrl_h100_usbotg_id: hummingboard-usbotg-id {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x13059
++			>;
++		};
++
++		pinctrl_h100_usbotg_vbus: hummingboard-usbotg-vbus {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x1b0b0
++			>;
++		};
++
++		pinctrl_h100_usdhc2: h100-usdhc2 {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1f071
++				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
++				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
++				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
++				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
++				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
++				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x13059
++			>;
++		};
++
++		pinctrl_h100_usdhc2_100mhz: h100-usdhc2-100mhz {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1f071
++				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x170b9
++				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x100b9
++				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x170b9
++				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x170b9
++				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x170b9
++				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x170b9
++			>;
++		};
++
++		pinctrl_h100_usdhc2_200mhz: h100-usdhc2-200mhz {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1f071
++				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x170f9
++				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x100f9
++				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x170f9
++				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x170f9
++				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x170f9
++				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x170f9
++			>;
++		};
++	};
++};
++
++&mipi_csi {
++	status = "okay";
++
++	port at 0 {
++		mipi_csi2_in: endpoint {
++			remote-endpoint = <&tc358743_out>;
++			data-lanes = <1 2 3 4>;
++			clock-lanes = <0>;
++			clock-noncontinuous;
++			link-frequencies = /bits/ 64 <297000000>;
++		};
++	};
++};
++
++&ssi1 {
++	status = "okay";
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_h100_uart2>;
++	status = "okay";
++};
++
++&usbh1 {
++	disable-over-current;
++	vbus-supply = <&reg_usbh1_vbus>;
++	status = "okay";
++};
++
++&usbotg {
++	disable-over-current;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_h100_usbotg_id>;
++	vbus-supply = <&reg_usbotg_vbus>;
++	status = "okay";
++};
++
++&usdhc2 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_h100_usdhc2>;
++	pinctrl-1 = <&pinctrl_h100_usdhc2_100mhz>;
++	pinctrl-2 = <&pinctrl_h100_usdhc2_200mhz>;
++	vmmc-supply = <&reg_3p3v>;
++	vqmmc-supply = <&reg_nvcc_sd2>;
++	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
+-- 
+2.8.1
