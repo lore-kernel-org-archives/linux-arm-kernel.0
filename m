@@ -1,66 +1,77 @@
-From: yong.b.li@intel.com (Li, Yong B)
-Date: Fri, 3 Jun 2016 05:46:50 +0000
-Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
-In-Reply-To: <20160602175635.GG5995@atomide.com>
-References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
- <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
- <20160602173932.GF5995@atomide.com>
- <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
- <20160602175635.GG5995@atomide.com>
-Message-ID: <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FB1EC@SHSMSX101.ccr.corp.intel.com>
+From: fan.chen@mediatek.com (Fan Chen)
+Date: Fri, 3 Jun 2016 13:42:08 +0800
+Subject: [PATCH v2 1/3] regulator: DT: Add DT property for operation
+ mode configuration
+In-Reply-To: <20160603001600.GX2282@sirena.org.uk>
+References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
+ <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
+ <20160523104703.GB26992@leverpostej> <20160523112856.GR8206@sirena.org.uk>
+ <1464682835.25847.3.camel@mtksdaap41> <20160603001600.GX2282@sirena.org.uk>
+Message-ID: <1464932528.18889.12.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi Mark,
 
-I can submit a V2 version about the "disabled", or just drop this patch?
+On Fri, 2016-06-03 at 01:16 +0100, Mark Brown wrote:
+> On Tue, May 31, 2016 at 04:20:35PM +0800, Fan Chen wrote:
+> > On Mon, 2016-05-23 at 12:28 +0100, Mark Brown wrote:
 
-Thanks,
-Yong
------Original Message-----
-From: Tony Lindgren [mailto:tony at atomide.com] 
-Sent: Friday, June 3, 2016 1:57 AM
-To: Robert Nelson <robertcnelson@gmail.com>
-Cc: Li, Yong B <yong.b.li@intel.com>; Benoit Cousson <bcousson@baylibre.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Russell King <linux@arm.linux.org.uk>; linux-omap at vger.kernel.org; devicetree <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; linux kernel <linux-kernel@vger.kernel.org>; sdliyong at gmail.com
-Subject: Re: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
-
-* Robert Nelson <robertcnelson@gmail.com> [160602 10:48]:
-> On Thu, Jun 2, 2016 at 12:39 PM, Tony Lindgren <tony@atomide.com> wrote:
-> >
-> > * Robert Nelson <robertcnelson@gmail.com> [160602 10:39]:
-> > > On Thu, Jun 2, 2016 at 2:41 AM, Yong Li <yong.b.li@intel.com> wrote:
-> > >
-> > > > From: Yong Li <sdliyong@gmail.com>
-> > > >
-> > > > Without this patch, I2C-1 is missing on beaglebone black boards
-> > > >
-> > > > Signed-off-by: Yong Li <sdliyong@gmail.com>
-> > > > ---
-> > > >  arch/arm/boot/dts/am335x-boneblack.dts | 15 +++++++++++++++
-> > > >  1 file changed, 15 insertions(+)
-> > > >
-> > >
-> > >
-> > > This is also 'common' for the white/green, if your really going to 
-> > > push this, please add it to:
-> > >
-> > > am335x-bone-common.dtsi
-> >
-> > But isn't this exposed on the cape pins? So the use can be whatever 
-> > for these pins?
+> > In the case of svs[1], which Henry mentioned in cover letter, it can be
+> > regarded as a special consumer who requires very accurate voltage for
+> > calibration the hardware in its initialization stage. So, this kinds of
+> > consumers know their regulator very well and only need to switch to the
+> > modes they want in the particular conditions.
 > 
-> That is correct, "i2c1" is on the cape connector, with no primary 
-> function defined.
-> 
-> Currently on mainline, the board and cape eeprom i2c bus's are enabled.
-> 
-> i2c0 = board eeprom
-> i2c2 = 'cape' eeprom
-> 
-> personally, nak by me to add i2c1 by default, should use overlay's to enable it.
+> So what you're trying to do here is not so much set a specific mode as
+> set maximum regulation accuracy for a period of time.
 
-Yes sounds like the best we can do is define it but set it with status = "disabled" for now.
+exactly.
 
-Regards,
+> > However, IIUC, you want a proposal to provide a sort of QoS framework
+> > which can cover most of use cases who care about the regular quality in
+> > runtime, is that correct?
+> 
+> Well, we want a coherent general use case that doesn't require a user to
+> know the specific details of the regulator they're working with since we
+> need to hide that knowledge from the user.
 
-Tony
+Agreed, it is hard to control once expose too many details. But I think
+maybe there still be some parameter user has to aware to decide the
+performance/quality in the common use cases you said below.
+
+> 
+> > IMHO, some quality index can be considered, for example:
+> > Minimum Current Requirement (mA): If a user specified this constraint in
+> > runtime, it means that he cares more about the supplying quality like
+> > transient voltage drop, ripple above certain load.
+> > Maximum Current Requirement (mA): If a user specified this constraint in
+> > runtime, it means that he cares more about the power consumption under
+> > certain load.
+> > It could be a flexible way instead to tie the operation modes directly.
+> 
+> I'm not sure I really understand these distinctions to be honest,
+> and specifying minimum loads seems very tricky from a robustness point
+> of view.
+> 
+> If all you need right now is a way to maximize regulation quality that's
+> probably a lot easier than anything based on absolute loads or on
+> multiple "normal operation" modes - it takes a lot of the complexity out
+> of things as there's no need to consider things like the distinctions
+> between modes.  We just need a standard operating mode and to know the
+> highest available mode.  I'm not sure exactly how to do that as an API
+> though, let me think about it...  your use case isn't one I'd come
+> across before.
+Thanks. Please kindly give us suggestion for this case.
+> 
+> > BTW, we should encourage people here to share more use cases related to
+> > regulator quality issues, especially in runtime, so we can evaluate the
+> > most suitable index to fit the requirements.
+> 
+> More common use cases are around manually doing adaptive mode switching
+> for regulators that are poor at automatically adjusting performance and
+> handling of very low standby current situations where the adaption can
+> consume enough power to register.
+
+Best regards,
+Fan
