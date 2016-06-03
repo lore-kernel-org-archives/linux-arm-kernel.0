@@ -1,32 +1,39 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Fri, 3 Jun 2016 11:04:43 +0200
-Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry Pi
- 3.
-In-Reply-To: <1464934708-24769-8-git-send-email-kraxel@redhat.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <1464934708-24769-8-git-send-email-kraxel@redhat.com>
-Message-ID: <18208c0b-d33b-49f2-8f7e-5418954c283b@i2se.com>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Fri, 3 Jun 2016 11:07:58 +0200
+Subject: [PATCH 1/3] char: hw_random: Add Amlogic Meson Hardware Random
+ Generator
+In-Reply-To: <1464943621-18278-2-git-send-email-narmstrong@baylibre.com>
+References: <1464943621-18278-1-git-send-email-narmstrong@baylibre.com>
+ <1464943621-18278-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <20160603090758.GA7299@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello
 
-Am 03.06.2016 um 08:18 schrieb Gerd Hoffmann:
-> From: Eric Anholt <eric@anholt.net>
->
-> While this devicetree also works for booting in 32-bit mode, it's
-> placed in arm64 since it's a 64-bit CPU (as suggested by Arnd).
+I have some minor comments below
 
-i'm currently working on a patch series to fix dtc warnings like
+> +config HW_RANDOM_MESON
+> +	tristate "Amlogic Meson Random Number Generator support"
+> +	depends on HW_RANDOM && ARCH_MESON
 
-Warning (unit_address_vs_reg): Node /memory has a reg or ranges
-property, but no unit name
+Perhaps you could change to:
+depends on HW_RANDOM
+depends on ARCH_MESON || COMPILE_TEST
 
-This a copy of affected parts ( look at memory, soc and local_intc node ).
+> +
+> +static int meson_rng_read(struct hwrng *rng, void *buf, size_t max, bool wait)
+> +{
+> +	struct meson_rng_data *data =
+> +			container_of(rng, struct meson_rng_data, rng);
+> +
+> +	*(u32 *)buf = readl_relaxed(data->base + RNG_DATA);
+> +
+> +	return sizeof(u32);
+> +}
 
-So how should this be handled?
+I think you need a test for max < sizeof(u32)
 
-a) fix the issues here
-b) extend my patch series after this patch has been applied
+Regards
 
-Stefan
+LABBE Corentin
