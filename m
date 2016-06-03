@@ -1,70 +1,56 @@
-From: shawn.lin@rock-chips.com (Shawn Lin)
-Date: Fri, 3 Jun 2016 20:47:46 +0800
-Subject: [RFC PATCH v1 2/6] clk: rockchip: rk3399: add SCLK_DDRCLK ID for
- ddrc
-In-Reply-To: <20637963.iQzVZfJq9f@diego>
-References: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
- <1464947719-6245-3-git-send-email-hl@rock-chips.com>
- <9d392979-0a20-ca74-9699-2440d07dddd3@rock-chips.com>
- <20637963.iQzVZfJq9f@diego>
-Message-ID: <3d6d3147-00de-8ba4-a27a-a8f89854f4f7@rock-chips.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 3 Jun 2016 13:50:23 +0100
+Subject: [PATCH v4 17/18] ARM: STi: DT: STiH407: Add uniperif reader dt
+ nodes
+In-Reply-To: <574D56CE.5020802@st.com>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+ <1464192412-16386-19-git-send-email-peter.griffin@linaro.org>
+ <574D56CE.5020802@st.com>
+Message-ID: <20160603125023.GC9912@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2016/6/3 20:36, Heiko St?bner ??:
-> Hi Shawn,
->
-> Am Freitag, 3. Juni 2016, 20:34:52 schrieb Shawn Lin:
->> How about merge it into your patch#3.
->
-> see comments from Doug and me on previous version.
->
-> clock-ids should always be separate patches, as we will need them in both
-> clock and devicetree branches, so they must be in a separate branch shared
-> between clock and dts branches.
->
+Hi Arnaud,
 
-Ah, I missed the previous version as I think it should be from
-non-version to v2 rather than from non-version to v1, which IIRC is from
-Doug. :)
+On Tue, 31 May 2016, Arnaud Pouliquen wrote:
 
-Anyway, thanks for explaining this.
+> 
+> 
+> On 05/25/2016 06:06 PM, Peter Griffin wrote:
+> > This patch adds the DT node for the uniperif reader
+> > IP block found on STiH407 family silicon.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/stih407-family.dtsi | 28 ++++++++++++++++++++++++++++
+> >  1 file changed, 28 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+> > index 7ca149b..fb6363e1 100644
+> > --- a/arch/arm/boot/dts/stih407-family.dtsi
+> > +++ b/arch/arm/boot/dts/stih407-family.dtsi
+> > @@ -831,5 +831,33 @@
+> >  			st,version = <5>;
+> >  			st,mode = "SPDIF";
+> >  		};
+> > +
+> > +		sti_uni_reader0: sti-uni-reader at 0 {
+> > +			compatible = "st,sti-uni-reader";
+> > +			status = "disabled";
+> > +			#sound-dai-cells = <0>;
+> > +			st,syscfg = <&syscfg_core>;
+> > +			reg = <0x8D83000 0x158>;
+> > +			interrupts = <GIC_SPI 87 IRQ_TYPE_NONE>;
+> > +			dmas = <&fdma0 5 0 1>;
+> > +			dma-names = "rx";
+> > +			dai-name = "Uni Reader #0 (PCM IN)";
+> > +			st,version = <3>;
+> > +			pinctrl-names = "default";
+> > +			pinctrl-0 = <&pinctrl_i2s_8ch_in>;
+> suppress pinctrl declaration
 
->
-> Heiko
->
->> On 2016/6/3 17:55, Lin Huang wrote:
->>> Signed-off-by: Lin Huang <hl@rock-chips.com>
->>> ---
->>> Changes in v1:
->>> - None
->>>
->>>  include/dt-bindings/clock/rk3399-cru.h | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/include/dt-bindings/clock/rk3399-cru.h
->>> b/include/dt-bindings/clock/rk3399-cru.h index 50a44cf..8a0f0442 100644
->>> --- a/include/dt-bindings/clock/rk3399-cru.h
->>> +++ b/include/dt-bindings/clock/rk3399-cru.h
->>> @@ -131,6 +131,7 @@
->>>
->>>  #define SCLK_DPHY_RX0_CFG		165
->>>  #define SCLK_RMII_SRC			166
->>>  #define SCLK_PCIEPHY_REF100M		167
->>>
->>> +#define SCLK_DDRCLK			168
->>>
->>>  #define DCLK_VOP0			180
->>>  #define DCLK_VOP1			181
->
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
->
+Will fix in v5
 
+regards,
 
--- 
-Best Regards
-Shawn Lin
+Peter.
