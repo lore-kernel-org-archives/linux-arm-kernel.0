@@ -1,37 +1,75 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Thu, 02 Jun 2016 16:59:55 -0700
-Subject: [PATCH v3 09/12] EXAMPLE CODE: usb: port: Parse pwrseq phandle
- from Device Tree
-In-Reply-To: <20160602012419.GA7953@shlinux2>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
- <1464768141-25420-10-git-send-email-k.kozlowski@samsung.com>
- <146477144362.1485.3331887341591876278@sboyd-linaro>
- <20160601120520.GB16740@shlinux2>
- <146480499491.3686.4996610748316511864@sboyd-linaro>
- <20160602012419.GA7953@shlinux2>
-Message-ID: <146491199510.7580.5649614149557346848@sboyd-linaro>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 3 Jun 2016 01:16:00 +0100
+Subject: [PATCH v2 1/3] regulator: DT: Add DT property for operation mode
+ configuration
+In-Reply-To: <1464682835.25847.3.camel@mtksdaap41>
+References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
+ <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
+ <20160523104703.GB26992@leverpostej>
+ <20160523112856.GR8206@sirena.org.uk>
+ <1464682835.25847.3.camel@mtksdaap41>
+Message-ID: <20160603001600.GX2282@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter Chen (2016-06-01 18:24:19)
-> On Wed, Jun 01, 2016 at 11:16:34AM -0700, Stephen Boyd wrote:
-> > > 
-> > > No, you may need to do reset before enumeration, the general purpose of
-> > > reset is eliminate unstable hardware state, and let the controller find
-> > > the device.
-> > > 
-> > > Try to do it at bootloader to see if it works for you.
-> > > 
-> > 
-> > Sorry the bootloader doesn't do this so that doesn't work for me.
-> 
-> I mean try to see if the HUB can work if you reset it at bootloader.
-> If it works, it means you need to do reset before enumeration, and you
-> don't need to do anything after enumeration.
-> 
+On Tue, May 31, 2016 at 04:20:35PM +0800, Fan Chen wrote:
+> On Mon, 2016-05-23 at 12:28 +0100, Mark Brown wrote:
 
-Ah ok. Yes, I need to deassert the reset before enumeration. Right now I
-have a driver for the 4604 hub controller that deasserts a reset gpio
-and sends an i2c command to put the controller into "hub" mode. If I do
-this before the usb controller driver probes then everything works. If I
-do it after the controller probes it doesn't.
+> > Henry, *please* look at how the existing mode support in the bindings is
+> > done and consider how a consumer would use this given that it doesn't
+> > know anything about the regulator...
+
+> In the case of svs[1], which Henry mentioned in cover letter, it can be
+> regarded as a special consumer who requires very accurate voltage for
+> calibration the hardware in its initialization stage. So, this kinds of
+> consumers know their regulator very well and only need to switch to the
+> modes they want in the particular conditions.
+
+So what you're trying to do here is not so much set a specific mode as
+set maximum regulation accuracy for a period of time.
+
+> However, IIUC, you want a proposal to provide a sort of QoS framework
+> which can cover most of use cases who care about the regular quality in
+> runtime, is that correct?
+
+Well, we want a coherent general use case that doesn't require a user to
+know the specific details of the regulator they're working with since we
+need to hide that knowledge from the user.
+
+> IMHO, some quality index can be considered, for example:
+> Minimum Current Requirement (mA): If a user specified this constraint in
+> runtime, it means that he cares more about the supplying quality like
+> transient voltage drop, ripple above certain load.
+> Maximum Current Requirement (mA): If a user specified this constraint in
+> runtime, it means that he cares more about the power consumption under
+> certain load.
+> It could be a flexible way instead to tie the operation modes directly.
+
+I'm not sure I really understand these distinctions to be honest,
+and specifying minimum loads seems very tricky from a robustness point
+of view.
+
+If all you need right now is a way to maximize regulation quality that's
+probably a lot easier than anything based on absolute loads or on
+multiple "normal operation" modes - it takes a lot of the complexity out
+of things as there's no need to consider things like the distinctions
+between modes.  We just need a standard operating mode and to know the
+highest available mode.  I'm not sure exactly how to do that as an API
+though, let me think about it...  your use case isn't one I'd come
+across before.
+
+> BTW, we should encourage people here to share more use cases related to
+> regulator quality issues, especially in runtime, so we can evaluate the
+> most suitable index to fit the requirements.
+
+More common use cases are around manually doing adaptive mode switching
+for regulators that are poor at automatically adjusting performance and
+handling of very low standby current situations where the adaption can
+consume enough power to register.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160603/29a91d0d/attachment.sig>
