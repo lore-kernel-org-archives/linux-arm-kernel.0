@@ -1,171 +1,153 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri,  3 Jun 2016 08:18:26 +0200
-Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry Pi 3.
+Date: Fri,  3 Jun 2016 08:18:27 +0200
+Subject: [PATCH v2 8/9] ARM: bcm2835: dt: Add the ethernet to the device trees
 In-Reply-To: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
 References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1464934708-24769-8-git-send-email-kraxel@redhat.com>
+Message-ID: <1464934708-24769-9-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Anholt <eric@anholt.net>
+From: Lubomir Rintel <lkundrak@v3.sk>
 
-While this devicetree also works for booting in 32-bit mode, it's
-placed in arm64 since it's a 64-bit CPU (as suggested by Arnd).
+The hub and the ethernet in its port 1 are hardwired on the board.
 
-v2: Move to arm64/ instead of arm/
+Compared to the adapters that can be plugged into the USB ports, this
+one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
+has the MAC address for this adapter in its ROM, accessible from its
+firmware.
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org> (v1)
+U-Boot can read out the address and set the local-mac-address property of the
+node with "ethernet" alias. Let's add the node so that U-Boot can do its
+business.
 
-[ kraxel: update bcm2837-rpi-3-b.dtb path in arm(32) Makefile ]
+Model B rev2 and Model B+ entries were verified by me, the hierarchy and
+pid/vid pair for the Version 2 was provided by Peter Chen. Original
+Model B is a blind shot, though very likely correct.
 
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
 ---
- arch/arm/boot/dts/Makefile                       |  3 +-
- arch/arm64/boot/dts/broadcom/Makefile            |  1 +
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts | 29 ++++++++++
- arch/arm64/boot/dts/broadcom/bcm2837.dtsi        | 74 ++++++++++++++++++++++++
- 4 files changed, 106 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
- create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837.dtsi
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts    |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts    |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts         |  1 +
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts       |  1 +
+ arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi | 19 +++++++++++++++++++
+ arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi | 19 +++++++++++++++++++
+ arch/arm/boot/dts/bcm283x.dtsi              |  2 ++
+ 7 files changed, 44 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 06b6c2d..71e2d36 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -66,7 +66,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-b-rev2.dtb \
- 	bcm2835-rpi-b-plus.dtb \
- 	bcm2835-rpi-a-plus.dtb \
--	bcm2836-rpi-2-b.dtb
-+	bcm2836-rpi-2-b.dtb \
-+	../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-asus-rt-ac56u.dtb \
- 	bcm4708-asus-rt-ac68u.dtb \
-diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-index bec1f8b..05faf2a 100644
---- a/arch/arm64/boot/dts/broadcom/Makefile
-+++ b/arch/arm64/boot/dts/broadcom/Makefile
-@@ -1,3 +1,4 @@
-+dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
- dtb-$(CONFIG_ARCH_BCM_IPROC) += ns2-svk.dtb
- dtb-$(CONFIG_ARCH_VULCAN) += vulcan-eval.dtb
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index 57d313b..d5fdb8e 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9514.dtsi"
  
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+ / {
+ 	compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+index cf2774e..bfc4bd9 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9512.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-b-rev2", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 8b15f9c..0371bb7 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9512.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-b", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+index c4743f4..29e1cfe 100644
+--- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
++++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2836.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9514.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
+diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
 new file mode 100644
-index 0000000..223793d
+index 0000000..12c981e
 --- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-@@ -0,0 +1,29 @@
-+/dts-v1/;
-+#include "bcm2837.dtsi"
-+#include "../../../../arm/boot/dts/bcm2835-rpi.dtsi"
-+
++++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+@@ -0,0 +1,19 @@
 +/ {
-+	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
-+	model = "Raspberry Pi 3 Model B";
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+
-+	leds {
-+		act {
-+			gpios = <&gpio 47 0>;
-+		};
-+
-+		pwr {
-+			label = "PWR";
-+			gpios = <&gpio 35 0>;
-+			default-state = "keep";
-+			linux,default-trigger = "default-on";
-+		};
++	aliases {
++		ethernet = &ethernet;
 +	};
 +};
 +
-+&uart1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837.dtsi b/arch/arm64/boot/dts/broadcom/bcm2837.dtsi
-new file mode 100644
-index 0000000..2320f8d
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837.dtsi
-@@ -0,0 +1,74 @@
-+#include "../../../../arm/boot/dts/bcm283x.dtsi"
-+
-+/ {
-+	compatible = "brcm,bcm2836";
-+
-+	soc {
-+		ranges = <0x7e000000 0x3f000000 0x1000000>,
-+			 <0x40000000 0x40000000 0x00001000>;
-+		dma-ranges = <0xc0000000 0x00000000 0x3f000000>;
-+
-+		local_intc: local_intc {
-+			compatible = "brcm,bcm2836-l1-intc";
-+			reg = <0x40000000 0x100>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			interrupt-parent = <&local_intc>;
-+		};
-+	};
-+
-+	timer {
-+		compatible = "arm,armv7-timer";
-+		interrupt-parent = <&local_intc>;
-+		interrupts = <0>, // PHYS_SECURE_PPI
-+			     <1>, // PHYS_NONSECURE_PPI
-+			     <3>, // VIRT_PPI
-+			     <2>; // HYP_PPI
-+		always-on;
-+	};
-+
-+	cpus: cpus {
++&usb {
++	usb1 at 1 {
++		compatible = "usb424,9512";
++		reg = <1>;
 +		#address-cells = <1>;
 +		#size-cells = <0>;
 +
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <0>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
++		ethernet: usbether at 1 {
++			compatible = "usb424,ec00";
 +			reg = <1>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x0 0x000000e0>;
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <2>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x0 0x000000e8>;
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53";
-+			reg = <3>;
-+			enable-method = "spin-table";
-+			cpu-release-addr = <0x0 0x000000f0>;
 +		};
 +	};
 +};
-+
-+/* Make the BCM2835-style global interrupt controller be a child of the
-+ * CPU-local interrupt controller.
-+ */
-+&intc {
-+	compatible = "brcm,bcm2836-armctrl-ic";
-+	reg = <0x7e00b200 0x200>;
-+	interrupt-parent = <&local_intc>;
-+	interrupts = <8>;
+diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+new file mode 100644
+index 0000000..3f0a56e
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+@@ -0,0 +1,19 @@
++/ {
++	aliases {
++		ethernet = &ethernet;
++	};
 +};
++
++&usb {
++	usb1 at 1 {
++		compatible = "usb424,9514";
++		reg = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethernet: usbether at 1 {
++			compatible = "usb424,ec00";
++			reg = <1>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 10b27b9..b982522 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -287,6 +287,8 @@
+ 			compatible = "brcm,bcm2835-usb";
+ 			reg = <0x7e980000 0x10000>;
+ 			interrupts = <1 9>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		v3d: v3d at 7ec00000 {
 -- 
 1.8.3.1
