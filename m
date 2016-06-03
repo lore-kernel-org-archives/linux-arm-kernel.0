@@ -1,55 +1,63 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  3 Jun 2016 19:02:05 +0100
-Subject: [PATCH 2/2] arm64: spinlock: only wait for a single unlock in
- spin_unlock_wait
-In-Reply-To: <1464976925-30525-1-git-send-email-will.deacon@arm.com>
-References: <1464976925-30525-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1464976925-30525-2-git-send-email-will.deacon@arm.com>
+Date: Fri,  3 Jun 2016 19:02:04 +0100
+Subject: [PATCH 1/2] arm64: spinlock: fix spin_is_locked
+Message-ID: <1464976925-30525-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than wait until we observe the lock being free, we can also
-return from spin_unlock_wait if we observe that the lock is now held
-by somebody else, which implies that it was unlocked but we just missed
-seeing it in that state.
+spin_is_locked has grown two very different use-cases:
 
+(1) [The sane case] API functions may require a certain lock to be held
+    by the caller and can therefore use spin_is_locked as part of an
+    assert statement in order to verify that the lock is indeed held.
+    For example, usage of assert_spin_locked.
+
+(2) [The insane case] There are two locks, where a CPU takes one of the
+    locks and then checks whether or not the other one is held before
+    accessing some shared state. For example, the "optimized locking" in
+    ipc/sem.c.
+
+In the latter case, the sequence looks like:
+
+  spin_lock(&sem->lock);
+  if (!spin_is_locked(&sma->sem_perm.lock))
+    /* Access shared state */
+
+and requires that the spin_is_locked check is ordered after taking the
+sem->lock. Unfortunately, since our spinlocks are implemented using a
+LDAXR/STXR sequence, the read of &sma->sem_perm.lock can be speculated
+before the STXR and consequently return a stale value.
+
+Whilst this hasn't been seen to cause issues in practice, PowerPC fixed
+the same issue in 51d7d5205d33 ("powerpc: Add smp_mb() to
+arch_spin_is_locked()") and we did something similar for spin_unlock_wait
+in d86b8da04dfa ("arm64: spinlock: serialise spin_unlock_wait against
+concurrent lockers").
+
+This patch adds an smp_mb() to the start of our arch_spin_is_locked
+routine to ensure that the lock value is always loaded after any other
+locks have been taken by the current CPU.w
+
+Reported-by: Peter Zijlstra <peterz@infradead.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/spinlock.h | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/spinlock.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
-index 16f6913f7dbc..ad8d8e3d02d2 100644
+index fc9682bfe002..16f6913f7dbc 100644
 --- a/arch/arm64/include/asm/spinlock.h
 +++ b/arch/arm64/include/asm/spinlock.h
-@@ -30,13 +30,19 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
- {
- 	unsigned int tmp;
- 	arch_spinlock_t lockval;
-+	u32 owner = READ_ONCE(lock->owner) << 16;
+@@ -148,6 +148,11 @@ static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
  
- 	asm volatile(
- "	sevl\n"
- "1:	wfe\n"
- "2:	ldaxr	%w0, %2\n"
-+	/* Is the lock free? */
- "	eor	%w1, %w0, %w0, ror #16\n"
--"	cbnz	%w1, 1b\n"
-+"	cbz	%w1, 3f\n"
-+	/* Has there been a subsequent unlock->lock transition? */
-+"	eor	%w1, %w3, %w0, lsl #16\n"
-+"	cbz	%w1, 1b\n"
-+"3:\n"
- 	ARM64_LSE_ATOMIC_INSN(
- 	/* LL/SC */
- "	stxr	%w1, %w0, %2\n"
-@@ -45,7 +51,7 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
- "	nop\n"
- "	nop\n")
- 	: "=&r" (lockval), "=&r" (tmp), "+Q" (*lock)
--	:
-+	: "r" (owner)
- 	: "memory");
+ static inline int arch_spin_is_locked(arch_spinlock_t *lock)
+ {
++	/*
++	 * Ensure prior spin_lock operations to other locks have completed
++	 * on this CPU before we test whether "lock" is locked.
++	 */
++	smp_mb();
+ 	return !arch_spin_value_unlocked(READ_ONCE(*lock));
  }
  
 -- 
