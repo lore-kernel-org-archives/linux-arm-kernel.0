@@ -1,34 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jun 2016 12:28:53 -0700
-Subject: [GIT PULL 1/2] omap fixes for v4.7 merge window
-In-Reply-To: <57360add.8803430a.9585b.ffffa6d9SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <57360add.8803430a.9585b.ffffa6d9SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <20160603192853.GJ3761@localhost>
+Date: Fri, 3 Jun 2016 12:30:36 -0700
+Subject: [PATCH 0/2] ARM: dts: sun6i: Drop constraints on dc1sw regulator
+In-Reply-To: <20160511124344.GO3733@lukather>
+References: <1462944194-6920-1-git-send-email-wens@csie.org>
+ <20160511124344.GO3733@lukather>
+Message-ID: <20160603193036.GK3761@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2016 at 10:11:40AM -0700, Tony Lindgren wrote:
-> The following changes since commit 7472931f7f1e9d91f761dce30107ae345b61a5c3:
+On Wed, May 11, 2016 at 02:43:44PM +0200, Maxime Ripard wrote:
+> On Wed, May 11, 2016 at 01:23:12PM +0800, Chen-Yu Tsai wrote:
+> > Hi Arnd, Olof,
+> > 
+> > Here are 2 last minute fixes for 4.6. The 2 patches drop constaints on
+> > the dc1sw regulator for 2 A31s tablets. I checked with Maxime and he said
+> > to send them directly to you.
+> > 
+> > The issue was first brought up and fixed for A23/A33 Q8 tablets in commit
+> > dcf5341f0150 ("ARM: dts: sun8i-q8-common: Do not set constraints on dc1sw
+> > regulator"). It was brought up again yesterday on IRC, and I realized that
+> > 2 sun6i A31s tablet DTS files also had this setting. The setting causes
+> > PMIC regulator registration to fail, and since among other things, mmc
+> > depends on the regulators, the system will likely hang.
+> > 
+> > There seems to be a fix for this queued up for 4.7: commit 45389c47526d
+> > ("regulator: core: Add early supply resolution for regulators") in the
+> > regulator "supply" topic branch. So we should be able to revert these
+> > fixes in 4.7.
 > 
->   ARM: dts: omap5: fix range of permitted wakeup pinmux registers (2016-04-26 10:16:12 -0700)
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> are available in the git repository at:
+> For the two patches.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.7/fixes-v2
-> 
-> for you to fetch changes up to 65db875d110b8e517f81fa71c57a65fc6d0019ac:
-> 
->   ARM: OMAP2+: AM43XX: Enable fixes for Cortex-A9 errata (2016-05-12 13:47:51 -0700)
-> 
-> ----------------------------------------------------------------
-> Two fixes for omaps for v4.7 merge window, one to enable
-> ARM errata for am437x, and the other to add ARM errtum
-> workaround for dra7.
-> 
-> AFAIK these both can wait for v4.7, we can then request them
-> for stable kernels as needed.
 
-Merged to fixes.
+Looks like these weren't applied. I've applied them to fixes now and cc:d
+stable for 4.6.
+
 
 
 -Olof
