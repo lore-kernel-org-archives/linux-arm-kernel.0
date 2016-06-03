@@ -1,77 +1,63 @@
-From: fan.chen@mediatek.com (Fan Chen)
-Date: Fri, 3 Jun 2016 13:42:08 +0800
-Subject: [PATCH v2 1/3] regulator: DT: Add DT property for operation
- mode configuration
-In-Reply-To: <20160603001600.GX2282@sirena.org.uk>
-References: <1463987611-32139-1-git-send-email-henryc.chen@mediatek.com>
- <1463987611-32139-2-git-send-email-henryc.chen@mediatek.com>
- <20160523104703.GB26992@leverpostej> <20160523112856.GR8206@sirena.org.uk>
- <1464682835.25847.3.camel@mtksdaap41> <20160603001600.GX2282@sirena.org.uk>
-Message-ID: <1464932528.18889.12.camel@mtksdaap41>
+From: sr@denx.de (Stefan Roese)
+Date: Fri, 3 Jun 2016 07:57:34 +0200
+Subject: [PATCH] PCI: mvebu: Don't try to add an MBus window that already
+ exists
+In-Reply-To: <20160602151818.0989ee50@free-electrons.com>
+References: <20160602125247.17566-1-sr@denx.de>
+ <20160602151818.0989ee50@free-electrons.com>
+Message-ID: <57511C4E.5040501@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Thomas,
 
-On Fri, 2016-06-03 at 01:16 +0100, Mark Brown wrote:
-> On Tue, May 31, 2016 at 04:20:35PM +0800, Fan Chen wrote:
-> > On Mon, 2016-05-23 at 12:28 +0100, Mark Brown wrote:
+On 02.06.2016 15:18, Thomas Petazzoni wrote:
+> On Thu,  2 Jun 2016 14:52:47 +0200, Stefan Roese wrote:
+>> Add a check to mvebu_pcie_add_windows() to detect, if an MBus window is
+>> already configured. If this is the case (base address, size, target and
+>> attribute are identical), then this window is not created. This fixes
+>> a problem I'm currently seeing on a custom Armada XP based board, which
+>> generates this error upon PCI rescanning (in this case via sysfs):
+>>
+>> $ echo 1 > /sys/bus/pci/rescan
+>> mvebu_mbus: cannot add window '4:e8', conflicts with another window
+>> mvebu-pcie soc:pcie-controller: Could not create MBus window at [mem 0x9e000000-0x9e0fffff]: -22
+>
+> Thanks for the patch. I am not familiar with what happens during a PCI
+> rescan, but shouldn't the MBus windows be deleted and then re-added?
 
-> > In the case of svs[1], which Henry mentioned in cover letter, it can be
-> > regarded as a special consumer who requires very accurate voltage for
-> > calibration the hardware in its initialization stage. So, this kinds of
-> > consumers know their regulator very well and only need to switch to the
-> > modes they want in the particular conditions.
-> 
-> So what you're trying to do here is not so much set a specific mode as
-> set maximum regulation accuracy for a period of time.
+It does not happen in this rescan case.
 
-exactly.
+> The pci-mvebu driver deletes the MBus windows for a given PCI device
+> when invalid memory base/limits are set in the emulated PCI bridge.
+> Shouldn't this happen over a rescan?
 
-> > However, IIUC, you want a proposal to provide a sort of QoS framework
-> > which can cover most of use cases who care about the regular quality in
-> > runtime, is that correct?
-> 
-> Well, we want a coherent general use case that doesn't require a user to
-> know the specific details of the regulator they're working with since we
-> need to hide that knowledge from the user.
+I'm not sure what *should* happen upon rescan. But testing shows, that
+no MBus window is removed upon rescan. I just tested what happens,
+if the PCI devices are "removed" via sysfs. And this also does not
+delete any of the MBus windows.
 
-Agreed, it is hard to control once expose too many details. But I think
-maybe there still be some parameter user has to aware to decide the
-performance/quality in the common use cases you said below.
+> If it doesn't, then the other question is whether the check you're
+> adding should be done in the PCI driver or in the MBus driver.
+>
+> In commit b566e782be32145664d96ada3e389f17d32742e5, we already relaxed
+> the checks done by the MBus driver, and since this commit we allow
+> different windows to have the same target/attribute.
+>
+> Should the MBus driver also allow re-creating a	window that
+> already exists, if all its properties are the same?
 
-> 
-> > IMHO, some quality index can be considered, for example:
-> > Minimum Current Requirement (mA): If a user specified this constraint in
-> > runtime, it means that he cares more about the supplying quality like
-> > transient voltage drop, ripple above certain load.
-> > Maximum Current Requirement (mA): If a user specified this constraint in
-> > runtime, it means that he cares more about the power consumption under
-> > certain load.
-> > It could be a flexible way instead to tie the operation modes directly.
-> 
-> I'm not sure I really understand these distinctions to be honest,
-> and specifying minimum loads seems very tricky from a robustness point
-> of view.
-> 
-> If all you need right now is a way to maximize regulation quality that's
-> probably a lot easier than anything based on absolute loads or on
-> multiple "normal operation" modes - it takes a lot of the complexity out
-> of things as there's no need to consider things like the distinctions
-> between modes.  We just need a standard operating mode and to know the
-> highest available mode.  I'm not sure exactly how to do that as an API
-> though, let me think about it...  your use case isn't one I'd come
-> across before.
-Thanks. Please kindly give us suggestion for this case.
-> 
-> > BTW, we should encourage people here to share more use cases related to
-> > regulator quality issues, especially in runtime, so we can evaluate the
-> > most suitable index to fit the requirements.
-> 
-> More common use cases are around manually doing adaptive mode switching
-> for regulators that are poor at automatically adjusting performance and
-> handling of very low standby current situations where the adaption can
-> consume enough power to register.
+This sounds like a good idea to me. To move this detection / decision
+one layer up. So that it will work for other drivers using this
+MBus interface as well.
 
-Best regards,
-Fan
+> Note that I am not asking you to rework your patch in this direction
+> for the moment, I'm only opening the question. I haven't made up my
+> mind yet on which solution is the most correct one.
+
+Understood. Thanks for your comments. Just let me know, if you want
+me to rework this patch to move this check into the MBus driver
+instead. And I will try to come up with such a patch shortly.
+
+Thanks,
+Stefan
