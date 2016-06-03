@@ -1,33 +1,31 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Fri,  3 Jun 2016 18:25:28 -0500
-Subject: [Patch v6 08/10] arm64: dts: msm8916: Add SCM firmware node
+Date: Fri,  3 Jun 2016 18:25:29 -0500
+Subject: [Patch v6 09/10] dts: qcom: msm8974: Add SCM firmware node
 In-Reply-To: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
 References: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1464996330-16952-9-git-send-email-andy.gross@linaro.org>
+Message-ID: <1464996330-16952-10-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the devicetree node for the SCM firmware.
+This patch adds the Qualcomm SCM firmware node.
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 Signed-off-by: Andy Gross <andy.gross@linaro.org>
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 8 ++++++++
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 8 ++++++++
  1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 9681200..01c7b0c 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -122,6 +122,14 @@
- 		hwlocks = <&tcsr_mutex 3>;
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 6f16426..036be41 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -260,6 +260,14 @@
+ 		};
  	};
  
 +	firmware {
 +		scm {
 +			compatible = "qcom,scm";
-+			clocks = <&gcc GCC_CRYPTO_CLK>, <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
++			clocks = <&gcc GCC_CE1_CLK>, <&gcc GCC_CE1_AXI_CLK>, <&gcc GCC_CE1_AHB_CLK>;
 +			clock-names = "core", "bus", "iface";
 +		};
 +	};
