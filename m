@@ -1,131 +1,245 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 04 Jun 2016 00:07:04 +0200
-Subject: [PATCH v7 00/15] ACPI NUMA support for ARM64
-In-Reply-To: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <6187968.ZZVJRAFzpv@vostro.rjw.lan>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 3 Jun 2016 15:15:14 -0700
+Subject: [PATCH] PCI/MSI: pci-xgene-msi: Enable MSI support in ACPI boot
+ for X-Gene v1
+In-Reply-To: <20160527105238.GA25842@red-moon>
+References: <1455069384-22323-1-git-send-email-dhdang@apm.com>
+ <1456330151.5681.46.camel@redhat.com> <56CDD767.6020103@arm.com>
+ <CADaLND=mrkxOWOzcEb8os16Rb=SDHfnn_8eSgB4bQYH3UguS3w@mail.gmail.com>
+ <20160225173822.GA6349@red-moon>
+ <CADaLNDnywVPER9QhmK4C6JyCLhta_M_cVSOuSkEHnmnLPFo3JA@mail.gmail.com>
+ <20160526123459.GA23794@red-moon>
+ <CADaLNDnf8SRbUkBN9fZMvrvsnTQs+DLyqnZfVpWqVyyY8Hk=1Q@mail.gmail.com>
+ <20160527105238.GA25842@red-moon>
+Message-ID: <CADaLNDkvY_gZwWYfy1dHzBLRwH1S1h3gTN9ib5ixqG4REJuOow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 24, 2016 03:35:30 PM David Daney wrote:
-> From: David Daney <david.daney@cavium.com>
-> 
-> Rebased to Linus' master branch at commit 1d6da87a3241 ("Merge branch
-> 'drm-next' of git://people.freedesktop.org/~airlied/linux")
-> 
-> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
-> NUMA domain information from SRAT and SLIT table, so parse those two
-> tables to get mappings from cpu/mem to numa node configuration and
-> system locality.
-> 
-> v7 updates:
-> 
->  - Rebased to resolve one merge conflict.
-> 
->  - New patch 13/15 to enable use of existing MADT parsing code instead
->    of adding an additional implementation of the parser.
-> 
->  - Added some Acked-by headers to patches in arm64 arch directories.
-> 
-> v6 updates:
-> 
->  - Changed message printed in 13/14 to omit meaningless "cpu"
->    number. (noted by Dennis Chen and Hanjun Guo)
-> 
->  - New patch 7/14 to print different messages for NUMA disabled case.
->    (noted by Dennis Chen)
-> 
->  - Squashed two patches into 14/14.
-> 
->  - Added Reviewed-by to 4/14
-> 
-> v5 updates:
-> 
->  - Fixed ia64 build failure by gating some unused functions with #if
->    CONFIG_{X86,ARM64}.
-> 
->  - Fixed section mismatch errors for X86 case.
-> 
->  - Removed unneeded #include from some files.
-> 
->  - Tested to build cleanly on ARM64, X86_64, IA64
-> 
-> v4 updates:
-> 
->  - Updated from Hanjun Guo's v3 patches.
-> 
->  - Rebased on top of v16 of device-tree NUMA patches.
-> 
->  - Reordered some of the changes so that we don't introduce code and
->    then change it several times in the patch set.  New code is
->    introduced in its final form.  Code reused from x86 is first moved
->    with no change, and then a separate patch to make any needed
->    changes.
-> 
->  - code that is used only by ia64, moved to architecture specific
->    files.
-> 
-> v3 updates:
->  - Deep investigation about the ACPI_DEBUG_PRINT() and remvoe
->    that for acpi/numa.c (patch 2/12)
-> 
->  - Remove the duplicate NULL check for table print (patch 3/12)
-> 
->  - Introduce CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP to remove duplicate
->    dummy function for acpi_numa_arch_fixup()
-> 
->  - Solve the problem that the mapping from logical cpu to numa node
->    is wrong which spotted out by Lorenzo
-> 
->  - cleanups for x86 and move acpi_numa_slit_init() and some other
->    functions to common place, then reduce the duplicate of x86
->    and arm64 (patch 7-12/12).
-> 
->  - rebased on top of 4.4 and Ganapat's v9 patch set.
-> 
-> David Daney (4):
->   arm64, numa: Cleanup NUMA disabled messages.
->   acpi, numa: move bad_srat() and srat_disabled() to
->     drivers/acpi/numa.c
->   acpi, numa, srat: Improve SRAT error detection and add messages.
->   ACPI / processor: Add acpi_map_madt_entry().
-> 
-> Hanjun Guo (10):
->   acpi, numa: Use pr_fmt() instead of printk
->   acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
->   acpi, numa: remove duplicate NULL check
->   acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
->   arm64, numa: rework numa_add_memblk()
->   x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
->   acpi, numa: remove unneeded acpi_numa=1
->   acpi, numa: Move acpi_numa_memory_affinity_init() to
->     drivers/acpi/numa.c
->   arm64, acpi, numa: NUMA support based on SRAT and SLIT
->   acpi, numa: Enable ACPI based NUMA on ARM64
-> 
-> Robert Richter (1):
->   acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
-> 
->  arch/arm64/include/asm/acpi.h |   8 ++
->  arch/arm64/include/asm/numa.h |   2 +
->  arch/arm64/kernel/Makefile    |   1 +
->  arch/arm64/kernel/acpi_numa.c | 112 +++++++++++++++++++++
->  arch/arm64/kernel/smp.c       |   2 +
->  arch/arm64/mm/numa.c          |  28 ++++--
->  arch/ia64/include/asm/acpi.h  |   3 +
->  arch/ia64/kernel/acpi.c       |   2 +-
->  arch/ia64/kernel/setup.c      |   1 +
->  arch/x86/include/asm/acpi.h   |   1 -
->  arch/x86/mm/numa.c            |   2 +-
->  arch/x86/mm/srat.c            | 116 +---------------------
->  drivers/acpi/Kconfig          |   4 +-
->  drivers/acpi/numa.c           | 226 ++++++++++++++++++++++++++++++++----------
->  drivers/acpi/processor_core.c |  26 ++++-
->  drivers/of/of_numa.c          |   4 +-
->  include/acpi/acpi_numa.h      |   4 +
->  include/acpi/processor.h      |   1 +
->  include/linux/acpi.h          |  18 +++-
->  19 files changed, 369 insertions(+), 192 deletions(-)
->  create mode 100644 arch/arm64/kernel/acpi_numa.c
+On Fri, May 27, 2016 at 3:52 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+>
+> [+ Rafael]
+>
+> On Thu, May 26, 2016 at 01:49:23PM -0700, Duc Dang wrote:
+> > Hi Lorenzo,
+> >
+> > On Thu, May 26, 2016 at 5:34 AM, Lorenzo Pieralisi
+> > <lorenzo.pieralisi@arm.com> wrote:
+> > > Hi Duc,
+> > >
+> > > On Wed, May 25, 2016 at 04:13:35PM -0700, Duc Dang wrote:
+> > >> On Thu, Feb 25, 2016 at 9:38 AM, Lorenzo Pieralisi
+> > >> <lorenzo.pieralisi@arm.com> wrote:
+> > >> > On Wed, Feb 24, 2016 at 02:28:10PM -0800, Duc Dang wrote:
+> > >> >> On Wed, Feb 24, 2016 at 8:16 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > >> >> > On 24/02/16 16:09, Mark Salter wrote:
+> > >> >> >> On Tue, 2016-02-09 at 17:56 -0800, Duc Dang wrote:
+> > >> >> >>> This patch makes pci-xgene-msi driver ACPI-aware and provides
+> > >> >> >>> MSI capability for X-Gene v1 PCIe controllers in ACPI boot mode.
+> > >> >> >>>
+> > >> >> >>> Signed-off-by: Duc Dang <dhdang@apm.com>
+> > >> >> >>> ---
+> > >> >> >>>  drivers/pci/host/pci-xgene-msi.c | 35 ++++++++++++++++++++++++++++++++---
+> > >> >> >>>  1 file changed, 32 insertions(+), 3 deletions(-)
+> > >> >> >>>
+> > >> >> >>> diff --git a/drivers/pci/host/pci-xgene-msi.c b/drivers/pci/host/pci-xgene-msi.c
+> > >> >> >>> index a6456b5..466aa93 100644
+> > >> >> >>> --- a/drivers/pci/host/pci-xgene-msi.c
+> > >> >> >>> +++ b/drivers/pci/host/pci-xgene-msi.c
+> > >> >> >>> @@ -24,6 +24,7 @@
+> > >> >> >>>  #include <linux/pci.h>
+> > >> >> >>>  #include <linux/platform_device.h>
+> > >> >> >>>  #include <linux/of_pci.h>
+> > >> >> >>> +#include <linux/acpi.h>
+> > >> >> >>>
+> > >> >> >>>  #define MSI_IR0                     0x000000
+> > >> >> >>>  #define MSI_INT0            0x800000
+> > >> >> >>> @@ -39,7 +40,7 @@ struct xgene_msi_group {
+> > >> >> >>>  };
+> > >> >> >>>
+> > >> >> >>>  struct xgene_msi {
+> > >> >> >>> -    struct device_node      *node;
+> > >> >> >>> +    struct fwnode_handle    *fwnode;
+> > >> >> >>>      struct irq_domain       *inner_domain;
+> > >> >> >>>      struct irq_domain       *msi_domain;
+> > >> >> >>>      u64                     msi_addr;
+> > >> >> >>> @@ -249,6 +250,13 @@ static const struct irq_domain_ops msi_domain_ops = {
+> > >> >> >>>      .free   = xgene_irq_domain_free,
+> > >> >> >>>  };
+> > >> >> >>>
+> > >> >> >>> +#ifdef CONFIG_ACPI
+> > >> >> >>> +static struct fwnode_handle *xgene_msi_get_fwnode(struct device *dev)
+> > >> >> >>> +{
+> > >> >> >>> +    return xgene_msi_ctrl.fwnode;
+> > >> >> >>> +}
+> > >> >> >>> +#endif
+> > >> >> >>> +
+> > >> >> >>>  static int xgene_allocate_domains(struct xgene_msi *msi)
+> > >> >> >>>  {
+> > >> >> >>>      msi->inner_domain = irq_domain_add_linear(NULL, NR_MSI_VEC,
+> > >> >> >>> @@ -256,7 +264,7 @@ static int xgene_allocate_domains(struct xgene_msi *msi)
+> > >> >> >>>      if (!msi->inner_domain)
+> > >> >> >>>              return -ENOMEM;
+> > >> >> >>>
+> > >> >> >>> -    msi->msi_domain = pci_msi_create_irq_domain(of_node_to_fwnode(msi->node),
+> > >> >> >>> +    msi->msi_domain = pci_msi_create_irq_domain(msi->fwnode,
+> > >> >> >>>                                                  &xgene_msi_domain_info,
+> > >> >> >>>                                                  msi->inner_domain);
+> > >> >> >>
+> > >> >> >> This doesn't work for me (ACPI probing on Mustang) unless I change this
+> > >> >> >> to be pci_msi_create_default_irq_domain(). The problem seems to be that
+> > >> >> >> the MSI probe happens after the PCIe RC is probed so there is no MSI domain
+> > >> >> >> at the time the PCIe root is initialized by ACPI.
+> > >> >> >
+> > >> >> > pci_msi_create_default_irq_domain is the wrong thing do use, specially
+> > >> >> > if you have multiple MSI controllers in the system. I certainly wouldn't
+> > >> >> > want to see it being used on arm64.
+> > >> >> >
+> > >> >> > This is the usual dependency hell. You try moving the probing earlier,
+> > >> >> > but that may break something else in the process.
+> > >> >>
+> > >> >> Hi Mark and Marc,
+> > >> >>
+> > >> >> I have modified Tianocore firmware to have MSI node declared before
+> > >> >> PCIe node in Dsdt table. With this modification, the MSI driver will
+> > >> >> be loaded before PCIe driver and MSI domain is available at the time
+> > >> >> PCIe root is initialized.
+> > >> >
+> > >> > I am totally against this. We should not hack ACPI tables to make
+> > >> > the kernel work (on top of that with unwritten ordering rules that may
+> > >> > well require changes as kernel evolves), we should have a standard set
+> > >> > of bindings that people use to describe HW in the DSDT and the kernel(s)
+> > >> > has to cope with that. If there is a dependency problem in the description
+> > >> > we may solve it at bindings level, but I absolutely do not want to rely
+> > >> > on DSDT nodes ordering for things to work, that's fragile, no shortcuts
+> > >> > please.
+> > >>
+> > >> Hi Lorenzo, Bjorn,
+> > >>
+> > >> (Refresh this thread on this merge cycle)
+> > >>
+> > >> I tried to use _DEP method to describe the dependency of PCIe node to
+> > >> MSI node but it turns out that PCIe driver does not check for the
+> > >> dependency (only EC (ec.c) and I2C core (i2c-core.c) use
+> > >> acpi_walk_dep_device_list to check for dependency before loading
+> > >> dependent drivers)
+> > >>
+> > >> Do you have other suggestion/example about how to ensure strict
+> > >> ordering on driver loading in ACPI boot mode without changing the
+> > >> order of ACPI nodes in DSDT?
+> > >
+> > > Before doing anything else, I would like to ask you to report the code
+> > > paths leading to failures (what fails actually ?) please, and I want
+> > > to understand what "this does not work" means.
+> > >
+> > > In particular:
+> > >
+> > > - Why using pci_msi_create_default_irq_domain() works
+> > > - Why, if you change the DSDT nodes ordering, things work (please add
+> > >   some debugging to MSI allocation functions to detect the code paths
+> > >   leading to correct MSI allocation)
+> > > - What's the difference wrt the DT probe path
+> >
+> > The MSI allocation happens with following code path (I use PMC pm80xx
+> > SAS driver as an example (drivers/scsi/pm8001/pm8001_init.c)):
+> > pci_enable_msix_exact
+> >     pci_enable_msix_range
+> >         pci_enable_msix
+> >             msix_capbility_init
+> >                 pci_msi_setup_msi_irqs
+> >                     pci_msi_get_domain
+> >                         dev_get_msi_domain
+> >                         arch_get_pci_msi_domain
+> >                             return pci_msi_default_domain;
+> >
+> > In my failing case: pci_msi_get_domain return NULL, so MSI allocation
+> > function (pci_enable_msix_exact) fails.
+> >
+> > The expected MSI domain is registered when X-Gene MSI driver is
+> > initialized and is attached to each PCI bus by calling
+> > pci_set_bus_msi_domain during PCIe bus-scan:
+> > pci_scan_root_bus
+> >     pci_scan_root_bus_msi
+> >         pci_scan_child_bus
+> >             pci_scan_bridge
+> >                 pci_add_new_bus
+> >                     pci_alloc_child_bus
+> >                         pci_set_bus_msi_domain
+> >                             pci_host_bridge_msi_domain
+> >                                 pci_host_bridge_of_msi_domain
+> >                                 pci_host_bridge_acpi_msi_domain
+> >
+> > + When booting with DT: X-Gene MSI driver is initialized early
+> > (subsys_initcall level); X-Gene PCIe driver is initialized later at
+> > device_initcall level (using module_platform_driver). Because of that
+> > when PCIe enumeration happens, the X-Gene MSI domain was already
+> > registered and available. So when the driver of PCIe Endpoint devices
+> > gets loaded, the call to pci_enable_msix_exact (to allocate MSI)
+> > succeeds.
+> >
+> > + When booting with ACPI: acpi_scan_init is called at subsys_initcall
+> > level (the same level with X-Gene MSI driver):
+> > acpi_init
+> >     acpi_bus_init (GIC is initialized here)
+> >         acpi_scan_init
+> >             acpi_pci_root_init
+> >             acpi_pci_link_init
+> >             ...
+> >             acpi_bus_scan
+> >                 acpi_bus_check_add
+> >  ...
+> >
+> > Currently, in DSDT table, X-Gene MSI node is defined right after
+> > X-Gene PCIe nodes. So PCIe driver initialization and PCIe enumeration
+> > happens before MSI driver is initialized. During PCIe bus scan, the
+> > pci_set_bus_msi_domain gets a NULL  irq_domain value from
+> > pci_host_bridge_msi_domain (as MSI driver is not initialized), so
+> > there is no MSI support for PCIe bus.
+> >
+> > + Using pci_msi_create_default_irq_domain() helps MSI allocation
+> > succeed as pci_msi_get_domain (in the code path of
+> > pci_enable_msix_exact above) can fall back to get a valid domain from
+> > arch_get_pci_msi_domain (please note that PCIe endpoint driver gets
+> > called later (at device_initcall level (using module_init)), so at the
+> > time PCIe endpoint driver probe function executes, the MSI driver
+> > already register the global MSI domain with
+> > pci_msi_create_default_irq_domain)
+> >
+> > + If changing DSDT node ordering, to define MSI node before PCIe
+> > nodes, then X-Gene MSI driver will be loaded before PCIe host driver.
+> > At the time PCIe enumeration happens, X-Gene MSI driver already
+> > registered a valid MSI domain (by calling
+> > pci_msi_register_fwnode_provider to register the fwnode provider
+> > function), so all the detected PCIe buses (and PCIe endpoint devices)
+> > will have a valid MSI domain attached to them (as a result of function
+> > pci_set_bus_msi_domain)
+>
+> This still works out of sheer luck, given that relying on initcall
+> ordering at same init level is undefined (ie it works if your msi driver
+> registration call is executed before acpi_init() is called).
+>
+> I though about using a scan handler like:
+>
+> See arch/ia64/hp/common/sba_iommu.c acpi_sba_ioc_handler
+>
+> but that won't solve your problem either since, given that PNP0A03 (ie
+> PCI host bridge) is handled through a scan handler too, IIUC you will
+> still have issues related to namespace device nodes ordering.
+>
+> I suspect we will have to add a hook walking the ACPI namespace before
+> acpi_bus_scan() is called in acpi_scan_init() (aka MSI controllers must
+> be probed before any other device is, that's the gist), I CC'ed Rafael
+> to see if there is any other suitable way to sort out this issue.
 
-All [1-15/15] queued up for 4.8, thanks!
+Thanks for your input, Lorenzo.
+
+Hi Rafael,
+
+Do you have other suggestions? Otherwise, I will prepare a patch
+following Lorenzo's approach.
+
+Regards,
+Duc Dang.
+>
+> Thanks,
+> Lorenzo
