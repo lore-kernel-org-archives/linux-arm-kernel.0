@@ -1,41 +1,78 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jun 2016 12:30:36 -0700
-Subject: [PATCH 0/2] ARM: dts: sun6i: Drop constraints on dc1sw regulator
-In-Reply-To: <20160511124344.GO3733@lukather>
-References: <1462944194-6920-1-git-send-email-wens@csie.org>
- <20160511124344.GO3733@lukather>
-Message-ID: <20160603193036.GK3761@localhost>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri,  3 Jun 2016 22:00:24 +0200
+Subject: [PATCH] ARM: dts: sunxi: Add a startup delay for fixed regulator
+ enabled phys
+Message-ID: <1464984024-22669-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 02:43:44PM +0200, Maxime Ripard wrote:
-> On Wed, May 11, 2016 at 01:23:12PM +0800, Chen-Yu Tsai wrote:
-> > Hi Arnd, Olof,
-> > 
-> > Here are 2 last minute fixes for 4.6. The 2 patches drop constaints on
-> > the dc1sw regulator for 2 A31s tablets. I checked with Maxime and he said
-> > to send them directly to you.
-> > 
-> > The issue was first brought up and fixed for A23/A33 Q8 tablets in commit
-> > dcf5341f0150 ("ARM: dts: sun8i-q8-common: Do not set constraints on dc1sw
-> > regulator"). It was brought up again yesterday on IRC, and I realized that
-> > 2 sun6i A31s tablet DTS files also had this setting. The setting causes
-> > PMIC regulator registration to fail, and since among other things, mmc
-> > depends on the regulators, the system will likely hang.
-> > 
-> > There seems to be a fix for this queued up for 4.7: commit 45389c47526d
-> > ("regulator: core: Add early supply resolution for regulators") in the
-> > regulator "supply" topic branch. So we should be able to revert these
-> > fixes in 4.7.
-> 
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> For the two patches.
-> 
+It seems that recent kernels have a shorter timeout when scanning for
+ethernet phys causing us to hit a timeout on boards where the phy's
+regulator gets enabled just before scanning, which leads to non working
+ethernet.
 
-Looks like these weren't applied. I've applied them to fixes now and cc:d
-stable for 4.6.
+A 10ms startup delay seems to be enough to fix it, this commit adds a
+20ms startup delay just to be safe.
 
+This has been tested on a sun4i-a10-a1000 and sun5i-a10s-wobo-i5 board,
+both of which have non-working ethernet on recent kernels without this
+fix.
 
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun4i-a10-a1000.dts      | 1 +
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts  | 1 +
+ arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts | 1 +
+ arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts   | 1 +
+ 4 files changed, 4 insertions(+)
 
--Olof
+diff --git a/arch/arm/boot/dts/sun4i-a10-a1000.dts b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+index c92a1ae..fa70b8f 100644
+--- a/arch/arm/boot/dts/sun4i-a10-a1000.dts
++++ b/arch/arm/boot/dts/sun4i-a10-a1000.dts
+@@ -84,6 +84,7 @@
+ 		regulator-name = "emac-3v3";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <20000>;
+ 		enable-active-high;
+ 		gpio = <&pio 7 15 GPIO_ACTIVE_HIGH>;
+ 	};
+diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+index 2b17c51..6de83a6 100644
+--- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
++++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+@@ -66,6 +66,7 @@
+ 		regulator-name = "emac-3v3";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <20000>;
+ 		enable-active-high;
+ 		gpio = <&pio 7 19 GPIO_ACTIVE_HIGH>;
+ 	};
+diff --git a/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts b/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
+index 7afc7a6..e28f080 100644
+--- a/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
++++ b/arch/arm/boot/dts/sun4i-a10-jesurun-q5.dts
+@@ -80,6 +80,7 @@
+ 		regulator-name = "emac-3v3";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <20000>;
+ 		enable-active-high;
+ 		gpio = <&pio 7 19 GPIO_ACTIVE_HIGH>;   /* PH19 */
+ 	};
+diff --git a/arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts b/arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts
+index 52d18ca..b5de75f 100644
+--- a/arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts
++++ b/arch/arm/boot/dts/sun5i-a10s-wobo-i5.dts
+@@ -79,6 +79,7 @@
+ 		regulator-name = "emac-3v3";
+ 		regulator-min-microvolt = <3300000>;
+ 		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <20000>;
+ 		enable-active-high;
+ 		gpio = <&pio 0 2 GPIO_ACTIVE_HIGH>;
+ 	};
+-- 
+2.7.4
