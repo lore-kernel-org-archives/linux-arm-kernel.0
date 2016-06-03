@@ -1,50 +1,49 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 3 Jun 2016 16:50:12 +0530
-Subject: [PATCH 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy
- block
-In-Reply-To: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
-References: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <575167EC.8000504@ti.com>
+From: pramod.kumar@broadcom.com (Pramod Kumar)
+Date: Fri, 3 Jun 2016 16:53:51 +0530
+Subject: [PATCH v2 7/7] phy: Add Northstar2 PCI Phy support
+In-Reply-To: <20160601131228.GF31982@lunn.ch>
+References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
+ <1464701801-17243-8-git-send-email-pramod.kumar@broadcom.com>
+ <20160601131228.GF31982@lunn.ch>
+Message-ID: <a8b5b6ef2c80b534eca1812caeacde57@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Andrew,
 
-On Thursday 02 June 2016 11:01 PM, Hans de Goede wrote:
-> Some SoCs have a single phy-hw-block with multiple phys, this is
-> modelled by a single phy dts node, so we end up with multiple
-> controller nodes with a phys property pointing to the phy-node
-> of the otg-phy.
+> -----Original Message-----
+> From: Andrew Lunn [mailto:andrew at lunn.ch]
+> Sent: 01 June 2016 18:42
+> To: Pramod Kumar
+> Cc: Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala;
+Catalin
+> Marinas; Will Deacon; Kishon Vijay Abraham I; David S. Miller;
+> devicetree at vger.kernel.org; Jon Mason; netdev at vger.kernel.org; linux-
+> kernel at vger.kernel.org; bcm-kernel-feedback-list at broadcom.com;
+linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 7/7] phy: Add Northstar2 PCI Phy support
+>
+> > +static int ns2_pci_phy_probe(struct mdio_device *mdiodev) {
+> > +	struct device *dev = &mdiodev->dev;
+> > +	struct phy_provider *provider;
+> > +	struct ns2_pci_phy *p;
+> > +	struct phy *phy;
+> > +
+> > +	phy = devm_phy_create(dev, dev->of_node, &ns2_pci_phy_ops);
+> > +	if (IS_ERR_OR_NULL(phy)) {
+> > +		dev_err(dev, "failed to create Phy\n");
+> > +		return PTR_ERR(phy);
+> > +	}
+>
+> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg78030.html
+>
 
-Maybe we should try to model each phy with a separate dt node?
+I've explored inside this API and see it never returning NULL. I'll
+replace IS_ERR_OR_NULL to IS_ERR.
+Thanks for pointing this out.
 
-Thanks
-Kishon
-> 
-> Only one of these controllers typically is an otg controller, yet we
-> were checking the first controller who uses a phy from the block and
-> then end up looking for a dr_mode property in e.g. the ehci controller.
-> 
-> Instead of looking for nodes with a phy property, look for nodes
-> with a dr_mode property, so that we actually access the dr_mode property
-> in a node which has it.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/usb/common/common.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/usb/common/common.c b/drivers/usb/common/common.c
-> index e3d0161..9806433 100644
-> --- a/drivers/usb/common/common.c
-> +++ b/drivers/usb/common/common.c
-> @@ -145,7 +145,7 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
->  	int err;
->  
->  	do {
-> -		controller = of_find_node_with_property(controller, "phys");
-> +		controller = of_find_node_with_property(controller, "dr_mode");
->  		index = 0;
->  		do {
->  			phy = of_parse_phandle(controller, "phys", index);
-> 
+> 	Andrew
+
+Regards,
+Pramod
