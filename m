@@ -1,57 +1,34 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Fri, 3 Jun 2016 19:17:38 +0530
-Subject: [PATCH v2 5/7] net:mdio-mux: Add MDIO mux driver for iProc SoCs
-In-Reply-To: <20160601.161805.1142999841225463527.davem@davemloft.net>
-References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
- <1464701801-17243-6-git-send-email-pramod.kumar@broadcom.com>
- <20160601.161805.1142999841225463527.davem@davemloft.net>
-Message-ID: <373fd6e55d940c4cfd45951dc5bedce7@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Fri, 3 Jun 2016 22:01:07 +0800
+Subject: [PATCH] ARM: imx25-pinfunc: remove SION from all modes
+In-Reply-To: <20160603133247.GV26768@pengutronix.de>
+References: <1461095114-11745-1-git-send-email-u.kleine-koenig@pengutronix.de>
+ <20160419211958.GD19428@n2100.arm.linux.org.uk>
+ <20160420104617.15cf8461@ipc1.ka-ro>
+ <20160420085839.GI29108@pengutronix.de>
+ <20160603133247.GV26768@pengutronix.de>
+Message-ID: <20160603140107.GA8659@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+On Fri, Jun 03, 2016 at 03:32:47PM +0200, Uwe Kleine-K?nig wrote:
+> I found a regression of the patch under discussion (which was not
+> applied, so no big problem). On the custom mx25 based hardware an
+> SD-card isn't detected any more after removing SION from
+> MX25_PAD_SD1_CMD__SD1_CMD. I verified the same happens on a tx25.
+> 
+> Is this expected? IMHO it's unfortunate (if not a silicon bug) that you
+> need the SION bit here as the SION bit has some more side effects.  If
+> you ask me, muxing a certain function for a pin should enable the input
+> path to the respective module if the pin is bidirectional.
+> 
+> Is there a list of pin/function pairs that need the SION bit set? Shawn,
+> would you agree to accept this patch with the high risk that it
+> introduces regressions? Or maybe we should make the SION bit more easily
+> overridable for board dts files (and default to off unless known it's
+> needed)?
 
-> -----Original Message-----
-> From: David Miller [mailto:davem at davemloft.net]
-> Sent: 02 June 2016 04:48
-> To: pramod.kumar at broadcom.com
-> Cc: robh+dt at kernel.org; pawel.moll at arm.com; mark.rutland at arm.com;
-> ijc+devicetree at hellion.org.uk; galak at codeaurora.org;
-> catalin.marinas at arm.com; will.deacon at arm.com; kishon at ti.com;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-bcm-kernel-
-> feedback-list at broadcom.com; linux-kernel at vger.kernel.org;
-> netdev at vger.kernel.org
-> Subject: Re: [PATCH v2 5/7] net:mdio-mux: Add MDIO mux driver for iProc
-SoCs
->
-> From: Pramod Kumar <pramod.kumar@broadcom.com>
-> Date: Tue, 31 May 2016 19:06:39 +0530
->
-> > +static int iproc_mdio_wait_for_idle(void __iomem *base, bool result)
-> > +{
-> > +	u32 val;
-> > +	unsigned int timeout = 1000; /* loop for 1s */
->
-> Please order your local variable declarations from longest to shortest
-line.
->
-> > +static int start_miim_ops(void __iomem *base,
-> > +			  u16 phyid, u32 reg, u16 val, u32 op) {
-> > +	int ret;
-> > +	u32 param;
->
-> Likewise.
->
-Sure. I'll take care of this in next patch for all places.
+I would be conservative on this.  Can we just fix the SION bits that are
+known doing harm?
 
-> > +static int iproc_mdiomux_read(struct mii_bus *bus, int phyid, int
-> > +reg) {
-> > +	int ret;
-> > +	struct iproc_mdiomux_desc *md = bus->priv;
->
-> Likewise.
-Sure. I'll take care of this in next patch for all places.
-
-Regards,
-Pramod
+Shawn
