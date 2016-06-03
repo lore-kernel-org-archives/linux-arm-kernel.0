@@ -1,44 +1,63 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 03 Jun 2016 09:50:43 +0100
-Subject: [PATCH 7/8] ARM: keystone: dts: add psci command definition
-Message-ID: <E1b8koV-0004Hf-2j@rmk-PC.armlinux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 03 Jun 2016 10:55:17 +0200
+Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry Pi
+ 3.
+In-Reply-To: <1464943546.24775.131.camel@redhat.com>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <5490184.9quKRk1Imx@wuerfel> <1464943546.24775.131.camel@redhat.com>
+Message-ID: <3885625.kWfxlR3OJi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vitaly Andrianov <vitalya@ti.com>
+On Friday, June 3, 2016 10:45:46 AM CEST Gerd Hoffmann wrote:
+> On Fr, 2016-06-03 at 09:38 +0200, Arnd Bergmann wrote:
+> > On Friday, June 3, 2016 8:18:26 AM CEST Gerd Hoffmann wrote:
+> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > > index 06b6c2d..71e2d36 100644
+> > > --- a/arch/arm/boot/dts/Makefile
+> > > +++ b/arch/arm/boot/dts/Makefile
+> > > @@ -66,7 +66,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+> > >         bcm2835-rpi-b-rev2.dtb \
+> > >         bcm2835-rpi-b-plus.dtb \
+> > >         bcm2835-rpi-a-plus.dtb \
+> > > -       bcm2836-rpi-2-b.dtb
+> > > +       bcm2836-rpi-2-b.dtb \
+> > > +       ../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
+> > >  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+> > >         bcm4708-asus-rt-ac56u.dtb \
+> > >         bcm4708-asus-rt-ac68u.dtb \
+> > 
+> > Let's make this hunk a separate patch so we can discuss it on its
+> > own.
+> 
+> Hmm, I through we where in agreement to do it this way ...
 
-This commit adds definition for cpu_on, cpu_off and cpu_suspend commands.
-These definitions must match the corresponding PSCI definitions in
-boot monitor.
+I think it's ok in principle, this is about the specific syntax.
 
-Having those command and corresponding PSCI support in boot monitor allows
-run time CPU hot plugin.
+> > I'm not really happy about the way it looks (in general, using ../../../
+> > anywhere in the kernel looks hacky.
+> > 
+> > How about a separate
+> > 
+> > dtb-$(CONFIG_ARCH_BCM2835) +=
+> >       ../../../arm64/boot/dts/broadcom/
+> 
+> Not working.
+> 
+> Tried "subdir-$(CONFIG_ARCH_BCM) += ...".  Didn't work either.
+> Same for "dts-dirs += ...".
+> 
+> Running out of ideas.  Guess I have to leave this to someone who knows
+> kbuild better than me.
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
-Signed-off-by: Vitaly Andrianov <vitalya@ti.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/boot/dts/keystone.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+I tried
 
-diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
-index 3f272826f537..007648971744 100644
---- a/arch/arm/boot/dts/keystone.dtsi
-+++ b/arch/arm/boot/dts/keystone.dtsi
-@@ -59,6 +59,14 @@
- 			     <GIC_SPI 23 IRQ_TYPE_EDGE_RISING>;
- 	};
- 
-+	psci {
-+		compatible	= "arm,psci";
-+		method		= "smc";
-+		cpu_suspend	= <0x84000001>;
-+		cpu_off		= <0x84000002>;
-+		cpu_on		= <0x84000003>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-2.1.0
+subdir-y += ../../../arm64/boot/dts/broadcom
+
+and it seemed to work fine, I got
+
+  DTC     arch/arm/boot/dts/../../../arm64/boot/dts/broadcom/ns2-svk.dtb
+
+in an allmodconfig build, which also includes CONFIG_ARCH_BCM_IPROC.
+
+	Arnd
