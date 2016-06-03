@@ -1,135 +1,55 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri,  3 Jun 2016 08:18:24 +0200
-Subject: [PATCH v2 5/9] arm64: Add BCM2835 support to the defconfig.
+Date: Fri,  3 Jun 2016 08:18:21 +0200
+Subject: [PATCH v2 2/9] irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ.
 In-Reply-To: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
 References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1464934708-24769-6-git-send-email-kraxel@redhat.com>
+Message-ID: <1464934708-24769-3-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Eric Anholt <eric@anholt.net>
 
-Made with make defconfig; make menuconfig (only saying Y to new
-entries); make savedefconfig.
+This is equivalent and works for arm64 as well.
 
 Signed-off-by: Eric Anholt <eric@anholt.net>
-
-[ kraxel: quick+dirty rebase to 4.7 ]
-
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 ---
- arch/arm64/configs/defconfig | 23 ++++++++++++++++++++---
- 1 file changed, 20 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-bcm2835.c | 3 +--
+ drivers/irqchip/irq-bcm2836.c | 2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d..03f246a 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_ALPINE=y
-+CONFIG_ARCH_BCM2835=y
- CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS=y
-@@ -140,6 +141,9 @@ CONFIG_USB_NET_PLUSB=m
- CONFIG_USB_NET_MCS7830=m
- CONFIG_WL18XX=m
- CONFIG_WLCORE_SDIO=m
-+CONFIG_USB_USBNET=y
-+CONFIG_USB_NET_SMSC95XX=y
-+# CONFIG_WLAN is not set
- CONFIG_INPUT_EVDEV=y
- CONFIG_KEYBOARD_GPIO=y
- # CONFIG_SERIO_SERPORT is not set
-@@ -147,6 +151,9 @@ CONFIG_SERIO_AMBAKMI=y
- CONFIG_LEGACY_PTY_COUNT=16
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
-+CONFIG_SERIAL_8250_EXTENDED=y
-+CONFIG_SERIAL_8250_SHARE_IRQ=y
-+CONFIG_SERIAL_8250_BCM2835AUX=y
- CONFIG_SERIAL_8250_DW=y
- CONFIG_SERIAL_8250_MT6577=y
- CONFIG_SERIAL_8250_UNIPHIER=y
-@@ -173,6 +180,7 @@ CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_IMX=y
-+CONFIG_I2C_BCM2835=y
- CONFIG_I2C_MV64XXX=y
- CONFIG_I2C_QUP=y
- CONFIG_I2C_TEGRA=y
-@@ -180,6 +188,8 @@ CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
- CONFIG_SPI_ORION=y
-+CONFIG_SPI_BCM2835=y
-+CONFIG_SPI_BCM2835AUX=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_QUP=y
- CONFIG_SPI_SPIDEV=m
-@@ -206,20 +216,24 @@ CONFIG_MFD_SPMI_PMIC=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_HI655X_PMIC=y
- CONFIG_REGULATOR=y
-+CONFIG_BCM2835_WDT=y
-+CONFIG_MFD_SPMI_PMIC=y
-+CONFIG_MFD_SEC_CORE=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_HI655X=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
- CONFIG_REGULATOR_QCOM_SPMI=y
- CONFIG_REGULATOR_S2MPS11=y
--CONFIG_FB=y
-+CONFIG_DRM=y
-+CONFIG_DRM_VC4=y
- CONFIG_FB_ARMCLCD=y
--CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_LOGO=y
- # CONFIG_LOGO_LINUX_MONO is not set
- # CONFIG_LOGO_LINUX_VGA16 is not set
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-+CONFIG_SND_BCM2835_SOC_I2S=y
- CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_AK4613=y
- CONFIG_USB=y
-@@ -270,6 +284,7 @@ CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_XGENE=y
- CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
-+CONFIG_DMA_BCM2835=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_QCOM_BAM_DMA=y
- CONFIG_RCAR_DMAC=y
-@@ -289,7 +304,9 @@ CONFIG_HWSPINLOCK_QCOM=y
- CONFIG_MAILBOX=y
- CONFIG_ARM_MHU=y
- CONFIG_HI6220_MBOX=y
-+CONFIG_BCM2835_MBOX=y
- CONFIG_ARM_SMMU=y
-+CONFIG_RASPBERRYPI_POWER=y
- CONFIG_QCOM_SMEM=y
- CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
-@@ -302,6 +319,7 @@ CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_XGENE=y
- CONFIG_ARM_SCPI_PROTOCOL=y
- CONFIG_ACPI=y
-+CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_FANOTIFY=y
-@@ -311,7 +329,6 @@ CONFIG_AUTOFS4_FS=y
- CONFIG_FUSE_FS=y
- CONFIG_CUSE=y
- CONFIG_VFAT_FS=y
--CONFIG_TMPFS=y
- CONFIG_HUGETLBFS=y
- CONFIG_CONFIGFS_FS=y
- CONFIG_EFIVAR_FS=y
+diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+index bf9cc5f..44d7c38 100644
+--- a/drivers/irqchip/irq-bcm2835.c
++++ b/drivers/irqchip/irq-bcm2835.c
+@@ -52,7 +52,6 @@
+ #include <linux/irqdomain.h>
+ 
+ #include <asm/exception.h>
+-#include <asm/mach/irq.h>
+ 
+ /* Put the bank and irq (32 bits) into the hwirq */
+ #define MAKE_HWIRQ(b, n)	((b << 5) | (n))
+@@ -242,7 +241,7 @@ static void __exception_irq_entry bcm2835_handle_irq(
+ 	u32 hwirq;
+ 
+ 	while ((hwirq = get_next_armctrl_hwirq()) != ~0)
+-		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
++		handle_domain_irq(intc.domain, hwirq, regs);
+ }
+ 
+ static void bcm2836_chained_handle_irq(struct irq_desc *desc)
+diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+index 72ff1d5..2787598 100644
+--- a/drivers/irqchip/irq-bcm2836.c
++++ b/drivers/irqchip/irq-bcm2836.c
+@@ -180,7 +180,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
+ 	} else if (stat) {
+ 		u32 hwirq = ffs(stat) - 1;
+ 
+-		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
++		handle_domain_irq(intc.domain, hwirq, regs);
+ 	}
+ }
+ 
 -- 
 1.8.3.1
