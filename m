@@ -1,65 +1,55 @@
-From: hl@rock-chips.com (Lin Huang)
-Date: Fri,  3 Jun 2016 17:55:13 +0800
-Subject: [RFC PATCH v1 0/6] rk3399 support ddr frequency scaling
-Message-ID: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 3 Jun 2016 10:55:46 +0100
+Subject: [PATCH v3 5/5] arm64/numa: avoid inconsistent information to be
+ printed
+In-Reply-To: <1464834491-12024-6-git-send-email-thunder.leizhen@huawei.com>
+References: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
+ <1464834491-12024-6-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160603095545.GI9915@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rk3399 platform have dfi controller can monitor ddr load,
-and dcf controller to handle ddr register so we can get the
-right ddr frequency and make ddr controller happy work(which
-will implement in bl31). So we do ddr frequency scaling with
-following flow:
+On Thu, Jun 02, 2016 at 10:28:11AM +0800, Zhen Lei wrote:
+> numa_init(of_numa_init) may returned error because of numa configuration
+> error. So "No NUMA configuration found" is inaccurate. In fact, specific
+> configuration error information should be immediately printed by the
+> testing branch.
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  arch/arm64/mm/numa.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 
-	     kernel                                bl31
+Looks fine to me, but this doesn't apply against -rc1.
 
-	monitor ddr load
-		|
-		|
-	get_target_rate
-		|
-		|           pass rate to bl31
-	clk_set_rate(ddr) --------------------->run dcf flow
-		|                                   |
-		|                                   |
-	wait dcf interrupt<-------------------trigger dcf interrupt  
-		|
-		|
-	      return
+Will
 
-Lin Huang (6):
-  rockchip: rockchip: add new clock-type for the ddrclk
-  clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
-  clk: rockchip: rk3399: add ddrc clock support
-  PM / devfreq: event: support rockchip dfi controller
-  PM / devfreq: rockchip: add devfreq driver for rk3399 dmc
-  drm/rockchip: Add dmc notifier in vop driver
-
- drivers/clk/rockchip/Makefile               |   1 +
- drivers/clk/rockchip/clk-ddr.c              | 147 ++++++++++++
- drivers/clk/rockchip/clk-rk3399.c           |  20 ++
- drivers/clk/rockchip/clk.c                  |   9 +
- drivers/clk/rockchip/clk.h                  |  27 +++
- drivers/devfreq/Kconfig                     |   1 +
- drivers/devfreq/Makefile                    |   1 +
- drivers/devfreq/event/Kconfig               |   7 +
- drivers/devfreq/event/Makefile              |   1 +
- drivers/devfreq/event/rockchip-dfi.c        | 265 ++++++++++++++++++++++
- drivers/devfreq/rockchip/Kconfig            |  15 ++
- drivers/devfreq/rockchip/Makefile           |   2 +
- drivers/devfreq/rockchip/rk3399_dmc.c       | 337 ++++++++++++++++++++++++++++
- drivers/devfreq/rockchip/rockchip_dmc.c     | 143 ++++++++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  43 +++-
- include/dt-bindings/clock/rk3399-cru.h      |   1 +
- include/soc/rockchip/rockchip_dmc.h         |  45 ++++
- 17 files changed, 1063 insertions(+), 2 deletions(-)
- create mode 100644 drivers/clk/rockchip/clk-ddr.c
- create mode 100644 drivers/devfreq/event/rockchip-dfi.c
- create mode 100644 drivers/devfreq/rockchip/Kconfig
- create mode 100644 drivers/devfreq/rockchip/Makefile
- create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
- create mode 100644 drivers/devfreq/rockchip/rockchip_dmc.c
- create mode 100644 include/soc/rockchip/rockchip_dmc.h
-
--- 
-1.9.1
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index 2601660..1b9622c 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -338,8 +338,10 @@ static int __init numa_init(int (*init_func)(void))
+>  	if (ret < 0)
+>  		return ret;
+> 
+> -	if (nodes_empty(numa_nodes_parsed))
+> +	if (nodes_empty(numa_nodes_parsed)) {
+> +		pr_info("No NUMA configuration found\n");
+>  		return -EINVAL;
+> +	}
+> 
+>  	ret = numa_register_nodes();
+>  	if (ret < 0)
+> @@ -370,8 +372,6 @@ static int __init dummy_numa_init(void)
+> 
+>  	if (numa_off)
+>  		pr_info("NUMA disabled\n"); /* Forced off on command line. */
+> -	else
+> -		pr_info("No NUMA configuration found\n");
+>  	pr_info("NUMA: Faking a node at [mem %#018Lx-%#018Lx]\n",
+>  	       0LLU, PFN_PHYS(max_pfn) - 1);
+> 
+> --
+> 2.5.0
+> 
+> 
