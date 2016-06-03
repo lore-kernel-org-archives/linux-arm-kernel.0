@@ -1,32 +1,35 @@
-From: peter.chen@nxp.com (Peter Chen)
-Date: Fri, 3 Jun 2016 15:12:04 +0800
-Subject: [PATCH 1/1] ARM: imx_v6_v7_defconfig: build in usbnet to support NFS
- for non-ethernet board
-Message-ID: <1464937924-11683-1-git-send-email-peter.chen@nxp.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 03 Jun 2016 09:18:21 +0200
+Subject: [PATCH 25/34] clk: s2mps11: Migrate to clk_hw based OF and
+ registration APIs
+In-Reply-To: <20160601231533.9354-26-stephen.boyd@linaro.org>
+References: <20160601231533.9354-1-stephen.boyd@linaro.org>
+ <20160601231533.9354-26-stephen.boyd@linaro.org>
+Message-ID: <57512F3D.8090201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At some boards, it has no ethernet support. As an alternative, we can use
-USB Ethernet card to support NFS (u-boot supports it too). It supports
-AXIS cards which are used most frequently.
+On 06/02/2016 01:15 AM, Stephen Boyd wrote:
+> Now that we have clk_hw based provider APIs to register clks, we
+> can get rid of struct clk pointers while registering clks in
+> these drivers, allowing us to move closer to a clear split of
+> consumer and provider clk APIs.
+> 
+> Cc: Andi Shyti <andi.shyti@samsung.com>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+> ---
+> 
+> See commit 58657d189a2f and it's children for details on this
+> new registration API.
+> 
+>  drivers/clk/clk-s2mps11.c | 21 +++++++++------------
+>  1 file changed, 9 insertions(+), 12 deletions(-)
 
-Signed-off-by: Peter Chen <peter.chen@nxp.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Looks and works correct:
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 21339ce..eaabae2 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -146,7 +146,7 @@ CONFIG_MICREL_PHY=y
- CONFIG_USB_PEGASUS=m
- CONFIG_USB_RTL8150=m
- CONFIG_USB_RTL8152=m
--CONFIG_USB_USBNET=m
-+CONFIG_USB_USBNET=y
- CONFIG_USB_NET_CDC_EEM=m
- CONFIG_BRCMFMAC=m
- CONFIG_WL12XX=m
--- 
-1.9.1
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
