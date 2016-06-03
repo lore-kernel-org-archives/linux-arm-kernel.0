@@ -1,31 +1,74 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 3 Jun 2016 13:51:17 -0700
-Subject: [PATCH 11/14] regulator: pwm: properly initialize the ->state
- field
-In-Reply-To: <1464942192-25967-12-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri, 3 Jun 2016 13:55:40 -0700
+Subject: [PATCH 12/14] regulator: pwm: Retrieve correct voltage
+In-Reply-To: <1464942192-25967-13-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464942192-25967-12-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160603205117.GI124478@google.com>
+ <1464942192-25967-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160603205540.GJ124478@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 10:23:09AM +0200, Boris Brezillon wrote:
-> The ->state field is currently initialized to 0, thus referencing the
-> voltage selector at index 0, which might not reflect the current voltage
-> value.
-> If possible, retrieve the current voltage selector from the PWM state, else
-> return -EINVAL.
+On Fri, Jun 03, 2016 at 10:23:10AM +0200, Boris Brezillon wrote:
+> The continuous PWM voltage regulator is caching the voltage value in
+> the ->volt_uV field. While most of the time this value should reflect the
+> real voltage, sometime it can be sightly different if the PWM device
+> rounded the set_duty_cycle request.
+> Moreover, this value is not valid until someone has modified the regulator
+> output.
+> 
+> Remove the ->volt_uV field and always rely on the PWM state to calculate
+> the regulator output.
 > 
 > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
-> Heiko, Mark,
+> Mark,
 > 
 > I know you already added your Tested-by/Acked-by tags on this patch
 > but this version has slightly change and is now making use of the
 > pwm_get_relative_duty_cycle() helper instead of manually converting
 > the absolute duty_cycle value into a relative one.
 > ---
->  drivers/regulator/pwm-regulator.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+>  drivers/regulator/pwm-regulator.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+> index 8c56e16..c39ecd1 100644
+> --- a/drivers/regulator/pwm-regulator.c
+> +++ b/drivers/regulator/pwm-regulator.c
+> @@ -35,9 +35,6 @@ struct pwm_regulator_data {
+>  	struct regulator_ops ops;
+>  
+>  	int state;
+> -
+> -	/* Continuous voltage */
+> -	int volt_uV;
+>  };
+>  
+>  struct pwm_voltages {
+> @@ -135,8 +132,13 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
+>  static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
+>  {
+>  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+> +	int min_uV = rdev->constraints->min_uV;
+> +	int diff = rdev->constraints->max_uV - min_uV;
+> +	struct pwm_state pstate;
+>  
+> -	return drvdata->volt_uV;
+> +	pwm_get_state(drvdata->pwm, &pstate);
+> +
+> +	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
+>  }
+>  
+>  static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+> @@ -162,8 +164,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+>  		return ret;
+>  	}
+>  
+> -	drvdata->volt_uV = min_uV;
+> -
+>  	/* Delay required by PWM regulator to settle to the new voltage */
+>  	usleep_range(ramp_delay, ramp_delay + 1000);
+>  
 
+Reviewed-by: Brian Norris <briannorris@chromium.org>
 Tested-by: Brian Norris <briannorris@chromium.org>
