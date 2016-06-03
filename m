@@ -1,71 +1,76 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  3 Jun 2016 10:23:10 +0200
-Subject: [PATCH 12/14] regulator: pwm: Retrieve correct voltage
+Date: Fri,  3 Jun 2016 10:23:03 +0200
+Subject: [PATCH 05/14] pwm: rockchip: Avoid glitches on already running PWMs
 In-Reply-To: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1464942192-25967-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1464942192-25967-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The continuous PWM voltage regulator is caching the voltage value in
-the ->volt_uV field. While most of the time this value should reflect the
-real voltage, sometime it can be sightly different if the PWM device
-rounded the set_duty_cycle request.
-Moreover, this value is not valid until someone has modified the regulator
-output.
-
-Remove the ->volt_uV field and always rely on the PWM state to calculate
-the regulator output.
+The current logic will disable the PWM clk even if the PWM was left
+enabled by the bootloader (because it's controlling a critical device
+like a regulator for example).
+Keep the PWM clk enabled if the PWM is enabled to avoid any glitches.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Mark,
+ drivers/pwm/pwm-rockchip.c | 24 +++++++++++++++++++++++-
+ 1 file changed, 23 insertions(+), 1 deletion(-)
 
-I know you already added your Tested-by/Acked-by tags on this patch
-but this version has slightly change and is now making use of the
-pwm_get_relative_duty_cycle() helper instead of manually converting
-the absolute duty_cycle value into a relative one.
----
- drivers/regulator/pwm-regulator.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index 8c56e16..c39ecd1 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -35,9 +35,6 @@ struct pwm_regulator_data {
- 	struct regulator_ops ops;
- 
- 	int state;
--
--	/* Continuous voltage */
--	int volt_uV;
- };
- 
- struct pwm_voltages {
-@@ -135,8 +132,13 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
- static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index dfacf7d..798a787 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -299,6 +299,7 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
  {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-+	int min_uV = rdev->constraints->min_uV;
-+	int diff = rdev->constraints->max_uV - min_uV;
-+	struct pwm_state pstate;
+ 	const struct of_device_id *id;
+ 	struct rockchip_pwm_chip *pc;
++	struct pwm_state state;
+ 	struct resource *r;
+ 	int ret;
  
--	return drvdata->volt_uV;
-+	pwm_get_state(drvdata->pwm, &pstate);
-+
-+	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
- }
+@@ -319,7 +320,7 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pc->clk))
+ 		return PTR_ERR(pc->clk);
  
- static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
-@@ -162,8 +164,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+-	ret = clk_prepare(pc->clk);
++	ret = clk_prepare_enable(pc->clk);
+ 	if (ret)
  		return ret;
+ 
+@@ -342,12 +343,33 @@ static int rockchip_pwm_probe(struct platform_device *pdev)
+ 		dev_err(&pdev->dev, "pwmchip_add() failed: %d\n", ret);
  	}
  
--	drvdata->volt_uV = min_uV;
--
- 	/* Delay required by PWM regulator to settle to the new voltage */
- 	usleep_range(ramp_delay, ramp_delay + 1000);
++	/* Keep the PWM clk enabled if the PWM appears to be up and running. */
++	pwm_get_state(pc->chip.pwms, &state);
++	if (!state.enabled)
++		clk_disable(pc->clk);
++
+ 	return ret;
+ }
+ 
+ static int rockchip_pwm_remove(struct platform_device *pdev)
+ {
+ 	struct rockchip_pwm_chip *pc = platform_get_drvdata(pdev);
++	struct pwm_state state;
++
++	/*
++	 * Disable the PWM clk before unpreparing it if the PWM device is still
++	 * running. This should only happen when the last PWM user left it
++	 * enabled, or when nobody requested a PWM that was previously enabled
++	 * by the bootloader.
++	 *
++	 * FIXME: Maybe the core should disable all PWM devices in
++	 * pwmchip_remove(). In this case we'd only have to call
++	 * clk_unprepare() after pwmchip_remove().
++	 *
++	 */
++	pwm_get_state(pc->chip.pwms, &state);
++	if (state.enabled)
++		clk_disable(pc->clk);
+ 
+ 	clk_unprepare(pc->clk);
  
 -- 
 2.7.4
