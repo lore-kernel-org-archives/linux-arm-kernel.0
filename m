@@ -1,70 +1,126 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 2 Jun 2016 22:45:35 -0500
-Subject: [Patch v5 2/8] firmware: qcom: scm: Convert SCM to platform driver
-In-Reply-To: <20160602221424.GM28218@codeaurora.org>
+Date: Thu, 2 Jun 2016 22:48:48 -0500
+Subject: [Patch v5 6/8] firmware: qcom: scm: Add support for ARM64 SoCs
+In-Reply-To: <20160602222840.GP28218@codeaurora.org>
 References: <1463111221-6963-1-git-send-email-andy.gross@linaro.org>
- <1463111221-6963-3-git-send-email-andy.gross@linaro.org>
- <20160602221424.GM28218@codeaurora.org>
-Message-ID: <20160603034535.GA13357@hector.attlocal.net>
+ <1463111221-6963-7-git-send-email-andy.gross@linaro.org>
+ <20160602222840.GP28218@codeaurora.org>
+Message-ID: <20160603034848.GB13357@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 03:14:24PM -0700, Stephen Boyd wrote:
+On Thu, Jun 02, 2016 at 03:28:40PM -0700, Stephen Boyd wrote:
 > On 05/12, Andy Gross wrote:
-> > This patch converts the Qualcomm SCM firmware driver into a platform
-> > driver.
-> 
-> And introduces clk enable/disable + rate setting logic because
-> the firmware uses crypto clks during some scm calls.
-
-I'll make the commit message more descriptive of the change.
-
-> > 
 > > +
-> > +static struct platform_driver qcom_scm_driver = {
-> > +	.driver = {
-> > +		.name	= "qcom_scm",
-> > +		.of_match_table = qcom_scm_dt_match,
-> > +	},
-> > +	.probe = qcom_scm_probe,
+> > +#define MAX_QCOM_SCM_ARGS 10
+> > +#define MAX_QCOM_SCM_RETS 3
+> > +
+> > +#define QCOM_SCM_ARGS_IMPL(num, a, b, c, d, e, f, g, h, i, j, ...) (\
+> > +			   (((a) & 0x3) << 4) | \
+> > +			   (((b) & 0x3) << 6) | \
+> > +			   (((c) & 0x3) << 8) | \
+> > +			   (((d) & 0x3) << 10) | \
+> > +			   (((e) & 0x3) << 12) | \
+> > +			   (((f) & 0x3) << 14) | \
+> > +			   (((g) & 0x3) << 16) | \
+> > +			   (((h) & 0x3) << 18) | \
+> > +			   (((i) & 0x3) << 20) | \
+> > +			   (((j) & 0x3) << 22) | \
+> > +			   (num & 0xf))
+> 
+> Parenthesis around num?
+
+To be more precise, yes.
+
+
+> > +
+> > +#define QCOM_SCM_ARGS(...) QCOM_SCM_ARGS_IMPL(__VA_ARGS__, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+> > +
+> > +/**
+> > + * struct qcom_scm_desc
+> > + * @arginfo:	Metadata describing the arguments in args[]
+> > + * @args:	The array of arguments for the secure syscall
+> > + * @res:	The values returned by the secure syscall
+> > + */
+> > +struct qcom_scm_desc {
+> > +	u32 arginfo;
+> > +	u64 args[MAX_QCOM_SCM_ARGS];
+> > +	struct arm_smccc_res res;
 > > +};
+> 
+> If we split the res from the descriptor structure we could make
+> the qcom_scm_desc const in qcom_scm_call(). We would have to add
+> another argument to the function though, not sure if this is a
+> big win idea, but just an idea to keep things "safer".
+
+I like that idea.  The arginfo and args are immutable so this really locks down
+the interface.  I'll try it out and see how it turns out.
+
 > > +
-> > +static int __init qcom_scm_init(void)
+> > +static u64 qcom_smccc_convention = -1;
+> > +static DEFINE_MUTEX(qcom_scm_lock);
+> > +
+> > +#define QCOM_SCM_EBUSY_WAIT_MS 30
+> > +#define QCOM_SCM_EBUSY_MAX_RETRY 20
+> > +
+> > +#define N_EXT_QCOM_SCM_ARGS 7
+> > +#define FIRST_EXT_ARG_IDX 3
+> > +#define N_REGISTER_ARGS (MAX_QCOM_SCM_ARGS - N_EXT_QCOM_SCM_ARGS + 1)
+> > +
+> > +/**
+> > + * qcom_scm_call() - Invoke a syscall in the secure world
+> > + * @dev:	device
+> > + * @svc_id:	service identifier
+> > + * @cmd_id:	command identifier
+> > + * @desc:	Descriptor structure containing arguments and return values
+> > + *
+> > + * Sends a command to the SCM and waits for the command to finish processing.
+> > + * This should *only* be called in pre-emptible context.
+> > +*/
+> > +static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
+> > +			 struct qcom_scm_desc *desc)
 > > +{
-> > +	struct device_node *np, *parent;
-> > +	int ret;
+> > +	int arglen = desc->arginfo & 0xf;
+> > +	int retry_count = 0, i;
+> > +	u32 fn_id = QCOM_SCM_FNID(svc_id, cmd_id);
+> > +	u64 cmd, x5 = desc->args[FIRST_EXT_ARG_IDX];
+> > +	dma_addr_t args_phys = 0;
+> > +	void *args_virt = NULL;
+> > +	size_t alloc_len;
 > > +
-> > +	np = of_find_matching_node_and_match(NULL, qcom_scm_dt_match, NULL);
+> > +	if (unlikely(arglen > N_REGISTER_ARGS)) {
+> > +		alloc_len = N_EXT_QCOM_SCM_ARGS * sizeof(u64);
+> > +		args_virt = kzalloc(PAGE_ALIGN(alloc_len), GFP_KERNEL);
+> > +
+> > +		if (!args_virt)
+> > +			return qcom_scm_remap_error(-ENOMEM);
 > 
-> Why can't we find a node called "firmware" in the root of the
-> tree? That would be clearer what's going on here, and avoid the
-> need to do the of_get_next_parent() dance, which just feels
-> awkward.
+> Just return -ENOMEM here?
 
-Well I had reworked it previously to avoid calling of_platform_populate on
-anyone with a firmware node.  I guess what I can do is find the firmware node
-and then only populate if I get a match starting from the firmware node itself.
-That satisfies both comments.
+Ok.  That would make it easier to follow.
 
 > > +
-> > +	if (!np)
-> > +		return -ENODEV;
+> > +		if (qcom_smccc_convention == ARM_SMCCC_SMC_32) {
+> > +			__le32 *args = args_virt;
 > > +
-> > +	parent = of_get_next_parent(np);
-> > +	ret = of_platform_populate(parent, qcom_scm_dt_match, NULL, NULL);
+> > +			for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
+> > +				args[i] = cpu_to_le32(desc->args[i +
+> > +						      FIRST_EXT_ARG_IDX]);
+> > +		} else {
+> > +			__le64 *args = args_virt;
 > > +
-> > +	of_node_put(parent);
+> > +			for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
+> > +				args[i] = cpu_to_le64(desc->args[i +
+> > +						      FIRST_EXT_ARG_IDX]);
+> > +		}
 > > +
-> > +	if (ret)
-> > +		return ret;
+> > +		args_phys = dma_map_single(dev, args_virt, alloc_len,
+> > +					   DMA_TO_DEVICE);
 > > +
-> > +	return platform_driver_register(&qcom_scm_driver);
-> > +}
+> > +		if (dma_mapping_error(dev, args_phys)) {
+> > +			kfree(args_virt);
+> > +			return qcom_scm_remap_error(-ENOMEM);
 > 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-arm-msm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Just return -ENOMEM here?
+
+Ok.  That would make it easier to follow.
