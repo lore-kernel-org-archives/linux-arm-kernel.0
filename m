@@ -1,32 +1,32 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  3 Jun 2016 10:47:01 +0200
-Subject: [PATCH 3/3] ARM64: dts: meson-gxbb: Add Hardware Random Generator node
-In-Reply-To: <1464943621-18278-1-git-send-email-narmstrong@baylibre.com>
-References: <1464943621-18278-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1464943621-18278-4-git-send-email-narmstrong@baylibre.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Fri, 03 Jun 2016 10:50:16 +0200
+Subject: [PATCH v2 5/9] arm64: Add BCM2835 support to the defconfig.
+In-Reply-To: <3299125.qWct7BqQgQ@wuerfel>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-6-git-send-email-kraxel@redhat.com>
+ <3299125.qWct7BqQgQ@wuerfel>
+Message-ID: <1464943816.24775.135.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+On Fr, 2016-06-03 at 09:36 +0200, Arnd Bergmann wrote:
+> On Friday, June 3, 2016 8:18:24 AM CEST Gerd Hoffmann wrote:
+> > From: Eric Anholt <eric@anholt.net>
+> > 
+> > Made with make defconfig; make menuconfig (only saying Y to new
+> > entries); make savedefconfig.
+> 
+> Please try not to mix 'make savedefconfig' changes with your
+> own changes, it make it harder to review and can lead to more
+> conflicts.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-index 832815d..8353621 100644
---- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-@@ -167,6 +167,11 @@
- 			};
- 		};
- 
-+		rng {
-+			compatible = "amlogic,meson-rng";
-+			reg = <0x0 0xc8834000 0x0 0x4>;
-+		};
-+
- 		apb: apb at d0000000 {
- 			compatible = "simple-bus";
- 			reg = <0x0 0xd0000000 0x0 0x200000>;
--- 
-2.7.0
+This is just conflicts resolved by hand after 4.6 -> 4.7-rc1 rebase,
+latest version didn't actually ran through savedefconfig.  Probably some
+unwanted changes made it in by accident this way.
+
+Guess I better redo this from scratch.
+
+What is the suggested procedure to generate defconfig patches?
+
+cheers,
+  Gerd
