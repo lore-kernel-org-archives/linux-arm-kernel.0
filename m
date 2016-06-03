@@ -1,71 +1,24 @@
-From: slemieux.tyco@gmail.com (Sylvain Lemieux)
-Date: Fri,  3 Jun 2016 15:37:57 -0400
-Subject: [PATCH] pwm: lpc32xx: Set PWM_PIN_LEVEL bit in lpc32xx_pwm_disable
-Message-ID: <1464982677-24883-1-git-send-email-slemieux.tyco@gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri,  3 Jun 2016 19:47:11 +0000
+Subject: [PATCH 0/2] mmc: remove sdhci-bcm2835
+Message-ID: <1464983233-27001-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sylvain Lemieux <slemieux@tycoint.com>
+The sdhci-bcm2835 is no more needed since it has been replaced
+by sdhci-iproc.
 
-If the PWM_PIN_LEVEL bit is setup to 1 in the bootloader, when the kernel
-disable the PWM, the PWM output is always set as a logic 1.
+Stefan Wahren (2):
+  DT: bindings: remove bcm2835-sdhci
+  mmc: sdhci-bcm2835: remove driver
 
-Prior to commit 08ee77b5a5de27ad63c92262ebcb4efe0da93b58,
-the PWM_PIN_LEVEL bit was always clear when the PWM was disable
-and a 0 logic level was apply to the output.
+ .../devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt |   18 --
+ drivers/mmc/host/Kconfig                           |   11 --
+ drivers/mmc/host/Makefile                          |    1 -
+ drivers/mmc/host/sdhci-bcm2835.c                   |  204 --------------------
+ 4 files changed, 234 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
+ delete mode 100644 drivers/mmc/host/sdhci-bcm2835.c
 
-According to the LPC32x0 User Manual [1],
-the default value for bit 30 (PWM_PIN_LEVEL) is 0.
-
-This change initialize the pin level to 0 (default value) and
-update the register value accordingly during the disable process.
-
-[1] http://www.nxp.com/documents/user_manual/UM10326.pdf
-
-Signed-off-by: Sylvain Lemieux <slemieux@tycoint.com>
----
- drivers/pwm/pwm-lpc32xx.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pwm/pwm-lpc32xx.c b/drivers/pwm/pwm-lpc32xx.c
-index 4d470c1..dbf93a1 100644
---- a/drivers/pwm/pwm-lpc32xx.c
-+++ b/drivers/pwm/pwm-lpc32xx.c
-@@ -22,9 +22,11 @@ struct lpc32xx_pwm_chip {
- 	struct pwm_chip chip;
- 	struct clk *clk;
- 	void __iomem *base;
-+	unsigned int pin_state;
- };
- 
- #define PWM_ENABLE	BIT(31)
-+#define PWM_PIN_LEVEL	BIT(30)
- 
- #define to_lpc32xx_pwm_chip(_chip) \
- 	container_of(_chip, struct lpc32xx_pwm_chip, chip)
-@@ -85,7 +87,14 @@ static void lpc32xx_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
- 	u32 val;
- 
- 	val = readl(lpc32xx->base + (pwm->hwpwm << 2));
--	val &= ~PWM_ENABLE;
-+	val &= ~(PWM_ENABLE | PWM_PIN_LEVEL);
-+
-+	/*
-+	 * When the PWM is disable, we have to ensure the output is configured
-+	 * correctly:
-+	 */
-+	if(lpc32xx->pin_state)
-+		val |= PWM_PIN_LEVEL;
- 	writel(val, lpc32xx->base + (pwm->hwpwm << 2));
- 
- 	clk_disable_unprepare(lpc32xx->clk);
-@@ -121,6 +130,7 @@ static int lpc32xx_pwm_probe(struct platform_device *pdev)
- 	lpc32xx->chip.ops = &lpc32xx_pwm_ops;
- 	lpc32xx->chip.npwm = 1;
- 	lpc32xx->chip.base = -1;
-+	lpc32xx->pin_state = 0;
- 
- 	ret = pwmchip_add(&lpc32xx->chip);
- 	if (ret < 0) {
 -- 
-1.8.3.1
+1.7.9.5
