@@ -1,36 +1,70 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Fri, 3 Jun 2016 11:55:37 -0700
-Subject: [PATCH 0/5] ARM:Keystone: Add pinmuxing support
-In-Reply-To: <5cc270d6-aec9-a1a8-597b-37c8413496a9@ti.com>
-References: <1461766308-27669-1-git-send-email-fcooper@ti.com>
- <5cc270d6-aec9-a1a8-597b-37c8413496a9@ti.com>
-Message-ID: <ad9ec6ee-1228-95c3-fda5-046567ff32c2@oracle.com>
+From: fcooper@ti.com (Franklin Cooper Jr.)
+Date: Fri, 3 Jun 2016 14:00:41 -0500
+Subject: [PATCH v8 0/9] ARM: dts: DRA7: Add dt nodes for PWMSS
+In-Reply-To: <1462291015-1919-1-git-send-email-fcooper@ti.com>
+References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
+Message-ID: <47460be2-4a57-09cc-d0a0-1636988b7538@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Franklin,
+Gentle ping on this series
 
-On 6/3/2016 11:42 AM, Franklin Cooper Jr. wrote:
-> Gentle ping on this series
+On 05/03/2016 10:56 AM, Franklin S Cooper Jr wrote:
+> This patch series adds support for PWM for DRA7. The IP is the same as the
+> one present in AM33XX and AM437XX.
 >
-> On 04/27/2016 09:11 AM, Franklin S Cooper Jr wrote:
->> Unlike most Keystone 2 devices, K2G supports pinmuxing of its pins. This
->> patch series enables pinmuxing for Keystone 2 devices.
->>
->> Franklin S Cooper Jr (1):
->>   ARM: keystone: defconfig: Enable PINCTRL SINGLE for Keystone 2
->>
->> Lokesh Vutla (3):
->>   ARM: Keystone: Enable PINCTRL for Keystone ARCH
->>   ARM: dts: keystone: Header file for pinctrl constants
->>   ARM: dts: k2g-evm: Add pinmuxing for UART0
->>
->> Vitaly Andrianov (1):
->>   ARM: dts: k2g: Add pinctrl support
->>
-Can you please check if it needs to be refreshed
-against v4.7-rc1 and if yes please re-post it.
-I will apply it for 4.8
-
-Regards,
-Santosh
+> However, before doing so remove unnecessary hwmod entries for eCAP, ePWM
+> and eQEP.
+>
+> The following are the biggest changes from v7 to v8:
+> Insure DT unit address matches reg property address
+>
+> The following are the biggest changes from v6 to v7:
+> * Several patches to document previously undocumented bindings.
+> * Fix minor issues in binding documents.
+>
+> The following are the biggest changes from v5 to v6:
+> * Created two new bindings to allow ECAP and PWM to grab their functional
+> clock from DT rather than depending on PWMSS parent.
+> * Pull in a couple of patches from the "Correct PWM bindings" series. This
+> makes it a bit easier to understand.
+>
+> From the two patchsets a handful of patches have already been pulled in by
+> maintainers and have already made it to linux-next. Therefore, this
+> patch series is built ontop of the latest linux-next.
+>
+> Tested on:
+> AM335x, AM437x and X15 + lcd w/backlight
+>
+> Franklin S Cooper Jr (8):
+>   clk: ti: am335x/am4372: Add tbclk to pwm node
+>   ARM: dts: am437x: Add missing compatibles to PWM binding documents
+>   pwm: pwm-tiehrpwm: Update dt binding document to use generic node name
+>   pwm: pwm-tiecap: Update dt binding document to use proper unit address
+>   ARM: dts: am437x/am33xx/da850: Add new ECAP and EPWM bindings
+>   pwms: pwm-ti*: Get the clock from the PWMSS parent when using old
+>     bindings
+>   ARM: dts: am437x/am33xx: Remove hwmod entries for ECAP and EPWM nodes
+>   ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and eCAP hwmod entries
+>
+> Vignesh R (1):
+>   ARM: dts: DRA7: Add dt nodes for PWMSS
+>
+>  .../devicetree/bindings/pwm/pwm-tiecap.txt         | 38 ++++++---
+>  .../devicetree/bindings/pwm/pwm-tiehrpwm.txt       | 38 ++++++---
+>  .../devicetree/bindings/pwm/pwm-tipwmss.txt        | 33 +++++++-
+>  arch/arm/boot/dts/am33xx.dtsi                      | 36 ++++++---
+>  arch/arm/boot/dts/am4372.dtsi                      | 63 ++++++++++-----
+>  arch/arm/boot/dts/da850.dtsi                       | 15 ++--
+>  arch/arm/boot/dts/dra7.dtsi                        | 90 ++++++++++++++++++++++
+>  .../mach-omap2/omap_hwmod_33xx_43xx_common_data.h  | 18 -----
+>  .../omap_hwmod_33xx_43xx_interconnect_data.c       | 64 ---------------
+>  .../mach-omap2/omap_hwmod_33xx_43xx_ipblock_data.c | 84 --------------------
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c         |  9 ---
+>  arch/arm/mach-omap2/omap_hwmod_43xx_data.c         | 54 -------------
+>  drivers/clk/ti/clk-33xx.c                          |  3 +
+>  drivers/clk/ti/clk-43xx.c                          |  6 ++
+>  drivers/pwm/pwm-tiecap.c                           |  7 ++
+>  drivers/pwm/pwm-tiehrpwm.c                         |  7 ++
+>  16 files changed, 281 insertions(+), 284 deletions(-)
+>
