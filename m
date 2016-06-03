@@ -1,21 +1,126 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 3 Jun 2016 18:29:40 +0200
-Subject: [PATCH v3 7/7] phy: Add Northstar2 PCI Phy support
-In-Reply-To: <1464967568-27562-8-git-send-email-pramod.kumar@broadcom.com>
-References: <1464967568-27562-1-git-send-email-pramod.kumar@broadcom.com>
- <1464967568-27562-8-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <20160603162940.GH22120@lunn.ch>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri,  3 Jun 2016 18:31:20 +0200
+Subject: [PATCH v2 2/2] ARM: dts: imx6: tag boards that have the HW workaround
+ for ERR006687
+In-Reply-To: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
+References: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <1464971480-9203-2-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 08:56:08PM +0530, Pramod Kumar wrote:
-> Add PCI Phy support for Broadcom Northstar2 SoCs.  This driver uses the
-> interface from the iproc mdio mux driver to enable the devices
-> respective phys.
-> 
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+Add the DT property to all boards that have the hardware workaround
+for erratum ERR006687 present. This allows the CPUidle driver to use
+the deep idle states, even if the FEC is active.
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+v2: Spell out "workaround" to avoid confusion.
+---
+ arch/arm/boot/dts/imx6dl-riotboard.dts       | 1 +
+ arch/arm/boot/dts/imx6q-arm2.dts             | 1 +
+ arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi     | 1 +
+ arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi | 1 +
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi    | 1 +
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi     | 1 +
+ arch/arm/boot/dts/imx6qdl-sabrelite.dtsi     | 1 +
+ arch/arm/boot/dts/imx6qdl-wandboard.dtsi     | 1 +
+ 8 files changed, 8 insertions(+)
 
-Andrew	     
+diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
+index bfbed52ce1bd..2becd7cd6544 100644
+--- a/arch/arm/boot/dts/imx6dl-riotboard.dts
++++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
+@@ -97,6 +97,7 @@
+ 	phy-reset-gpios = <&gpio3 31 0>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6q-arm2.dts b/arch/arm/boot/dts/imx6q-arm2.dts
+index d6515f7a56c4..0c401ab8dcb0 100644
+--- a/arch/arm/boot/dts/imx6q-arm2.dts
++++ b/arch/arm/boot/dts/imx6q-arm2.dts
+@@ -185,6 +185,7 @@
+ 	phy-mode = "rgmii";
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi b/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
+index e456b5cc1b03..56c96aa82bf9 100644
+--- a/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nit6xlite.dtsi
+@@ -250,6 +250,7 @@
+ 	txd3-skew-ps = <0>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+index 657da6b6ccd2..9677bf323823 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
+@@ -385,6 +385,7 @@
+ 	txd3-skew-ps = <0>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 73915db704a0..97d9c333902b 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -287,6 +287,7 @@
+ 	txd3-skew-ps = <0>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+index d354d406954d..6aa193fb283f 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+@@ -155,6 +155,7 @@
+ 	phy-mode = "rgmii";
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+index c47fe6c79b36..f65fdfc2536d 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabrelite.dtsi
+@@ -273,6 +273,7 @@
+ 	txd3-skew-ps = <0>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+index 8e7c40e114dd..096f64129e5e 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard.dtsi
+@@ -211,6 +211,7 @@
+ 	phy-reset-gpios = <&gpio3 29 0>;
+ 	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+ 			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
++	fsl,err006687-workaround-present;
+ 	status = "okay";
+ };
+ 
+-- 
+2.8.1
