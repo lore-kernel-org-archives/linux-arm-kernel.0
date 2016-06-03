@@ -1,36 +1,89 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 3 Jun 2016 09:30:42 +0200
-Subject: [PATCH] PCI: mvebu: Don't try to add an MBus window that
- already exists
-In-Reply-To: <57511C4E.5040501@denx.de>
-References: <20160602125247.17566-1-sr@denx.de>
- <20160602151818.0989ee50@free-electrons.com>
- <57511C4E.5040501@denx.de>
-Message-ID: <20160603093042.26e325d1@free-electrons.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 3 Jun 2016 09:36:15 +0200
+Subject: [PATCH 01/20] drm/atomic: Fix remaining places where
+ !funcs->best_encoder is valid
+In-Reply-To: <8671722.LHaiaBNqfE@avalon>
+References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1464877907-27723-2-git-send-email-boris.brezillon@free-electrons.com>
+ <8671722.LHaiaBNqfE@avalon>
+Message-ID: <20160603093615.14ba5fb8@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, 03 Jun 2016 00:05:46 +0300
+Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
 
-On Fri, 3 Jun 2016 07:57:34 +0200, Stefan Roese wrote:
-
-> > The pci-mvebu driver deletes the MBus windows for a given PCI device
-> > when invalid memory base/limits are set in the emulated PCI bridge.
-> > Shouldn't this happen over a rescan?  
+> Hi Boris,
 > 
-> I'm not sure what *should* happen upon rescan. But testing shows, that
-> no MBus window is removed upon rescan. I just tested what happens,
-> if the PCI devices are "removed" via sysfs. And this also does not
-> delete any of the MBus windows.
+> Thank you for the patch.
+> 
+> On Thursday 02 Jun 2016 16:31:28 Boris Brezillon wrote:
+> > Adapt drm_pick_crtcs() and update_connector_routing() to fallback to
+> > drm_atomic_helper_best_encoder() if funcs->best_encoder() is NULL so
+> > that DRM drivers can leave this hook unassigned if they know they want
+> > to use drm_atomic_helper_best_encoder().  
+> 
+> Could you please update include/drm/drm_modeset_helper_vtables.h to document 
+> this new behaviour ?
 
-Then maybe that's a question for the PCI folks. Is it normal that when
-a PCI device gets removed, the configuration of the PCI bridge does not
-get adjusted accordingly?
+Sure.
 
-Thanks,
+> 
+> The only drawback I see in this patch is the additional object lookup 
+> performed by drm_atomic_helper_best_encoder() at runtime. I wonder if we could 
+> somehow cache the information, as the assignment can't change when there's a 
+> 1:1 correspondence between encoders and connectors.
+> 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/drm_atomic_helper.c |  4 +++-
+> >  drivers/gpu/drm/drm_fb_helper.c     | 13 ++++++++++++-
+> >  2 files changed, 15 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/drm_atomic_helper.c
+> > b/drivers/gpu/drm/drm_atomic_helper.c index f6a3350..849d029 100644
+> > --- a/drivers/gpu/drm/drm_atomic_helper.c
+> > +++ b/drivers/gpu/drm/drm_atomic_helper.c
+> > @@ -300,8 +300,10 @@ update_connector_routing(struct drm_atomic_state
+> > *state, if (funcs->atomic_best_encoder)
+> >  		new_encoder = funcs->atomic_best_encoder(connector,
+> >  							 connector_state);
+> > -	else
+> > +	else if (funcs->best_encoder)
+> >  		new_encoder = funcs->best_encoder(connector);
+> > +	else
+> > +		new_encoder = drm_atomic_helper_best_encoder(connector);
+> > 
+> >  	if (!new_encoder) {
+> >  		DRM_DEBUG_ATOMIC("No suitable encoder found for [CONNECTOR:%d:%s]\n",
+> > diff --git a/drivers/gpu/drm/drm_fb_helper.c
+> > b/drivers/gpu/drm/drm_fb_helper.c index 7c2eb75..d44389a 100644
+> > --- a/drivers/gpu/drm/drm_fb_helper.c
+> > +++ b/drivers/gpu/drm/drm_fb_helper.c
+> > @@ -2000,7 +2000,18 @@ static int drm_pick_crtcs(struct drm_fb_helper
+> > *fb_helper, my_score++;
+> > 
+> >  	connector_funcs = connector->helper_private;
+> > -	encoder = connector_funcs->best_encoder(connector);
+> > +
+> > +	/*
+> > +	 * If the DRM device implements atomic hooks and ->best_encoder() is
+> > +	 * NULL we fallback to the default drm_atomic_helper_best_encoder()
+> > +	 * helper.
+> > +	 */
+> > +	if (fb_helper->dev->mode_config.funcs->atomic_commit &&
+> > +	    !connector_funcs->best_encoder)
+> > +		encoder = drm_atomic_helper_best_encoder(connector);
+> > +	else
+> > +		encoder = connector_funcs->best_encoder(connector);
+> > +
+> >  	if (!encoder)
+> >  		goto out;  
+> 
 
-Thomas
+
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
 http://free-electrons.com
