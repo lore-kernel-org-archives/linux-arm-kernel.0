@@ -1,41 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 02 Jun 2016 17:06:55 +0200
-Subject: [PATCH 1/3] pci: introduce read_bridge/write_bridge pci ops
-In-Reply-To: <20160602140001.GB8262@localhost>
-References: <1464784332-3775650-1-git-send-email-arnd@arndb.de>
- <4967020.J4dsRYGugq@wuerfel> <20160602140001.GB8262@localhost>
-Message-ID: <3585926.N1C2xx3GaB@wuerfel>
+Date: Fri, 03 Jun 2016 09:40:40 +0200
+Subject: [PATCH v2 0/9] raspberry pi 3 patch series, part 1: essentials
+In-Reply-To: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+Message-ID: <4902178.94WeAnbxLk@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 2, 2016 9:00:01 AM CEST Bjorn Helgaas wrote:
-> > I just did a count of the implementations of pci_ops: I found 107
-> > instances of 'struct pci_ops', and 67 of them treat type0 and type1
-> > access differently in some form.
-> > 
-> > I'd estimate that about half of them, or roughly a third of the total
-> > instances would benefit from my change, if we were to do them again.
-> > Clearly there is no need to change the existing code here when it works,
-> > unless the benefit is very clear and the code is actively maintained.
-> > 
-> > In some cases, the difference is only that the root bus has a limited
-> > set of devices that are allowed to be accessed, so there would
-> > likely be no benefit of this, compared to e.g. yet another callback
-> > that checks the validity.
-> > Some other instances have type0 registers at a different memory location
-> > from type1, some use different layout inside of that space, and some
-> > are completely different.
+On Friday, June 3, 2016 8:18:19 AM CEST Gerd Hoffmann wrote:
+> Raspberry pi 3 patches, next round.  I'll go split the longish patch
+> series into smaller ones.  I'll also go include the linux-arm-kernel
+> list this time (note I'm subscribed to linux-rpi-kernel only so please
+> take care to keep me in Cc).  This is part one with just the essential
+> stuff needed to get the rpi3 boot, without wifi support.
 > 
-> The type0/type1 distinction still seems out of place to me at the call
-> site.  Is there any other reason a caller would care about the
-> difference between type0 and type1?
+> Changes:
+>  * dropped ARCH_BCM kconfig option.
+>  * drop include hack for rpi3 device tree in arm.
+>  * drop DMA offset patch, pick up the version from Alex instead.
+> 
+> Patches are also available from:
+>   git://git.kraxel.org/linux bcm2837-47-v2
+> 
+> Note that the git branch has the complete set of patches (including
+> device tree patches and rpi3 wifi).
 
-The callers really shouldn't care, but they also shouldn't call the
-pci_ops function pointer (and as we found earlier, there are only
-three such callers).
+Looks good overall, thanks for sending the more manageable series.
 
-The distinction between type0 and type1 in my mind is an implementation
-detail of the pci_{read,write}_config_{byte,word,dword} functions
-that call the low-level operations here.
+See individual replies for a couple of comments on details.
 
 	Arnd
