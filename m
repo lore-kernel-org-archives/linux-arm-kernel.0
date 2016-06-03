@@ -1,38 +1,83 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri,  3 Jun 2016 11:50:30 +0100
-Subject: [PATCH] iommu/arm-smmu: wire up map_sg for arm-smmu-v3
-Message-ID: <1464951030-14044-1-git-send-email-will.deacon@arm.com>
+From: irodriguez@cemitec.com (Iban Rodriguez)
+Date: Fri, 3 Jun 2016 14:54:41 +0200
+Subject: [PATCH] gpio: xilinx: Add support to set multiple GPIO at once
+Message-ID: <1464958481-672-1-git-send-email-irodriguez@cemitec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Add function to set multiple GPIO of the same chip at the same time
+and register it
 
-The map_sg callback is missing from arm_smmu_ops, but is required by
-iommu.h. Similarly to most other IOMMU drivers, connect it to
-default_iommu_map_sg.
-
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Iban Rodriguez <irodriguez@cemitec.com>
 ---
+ drivers/gpio/gpio-xilinx.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-Joerg -- this is the only fix I have queued, so could you pick it up
-directly, please?
-
- drivers/iommu/arm-smmu-v3.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 94b68213c50d..5f6b3bcab078 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1941,6 +1941,7 @@ static struct iommu_ops arm_smmu_ops = {
- 	.attach_dev		= arm_smmu_attach_dev,
- 	.map			= arm_smmu_map,
- 	.unmap			= arm_smmu_unmap,
-+	.map_sg			= default_iommu_map_sg,
- 	.iova_to_phys		= arm_smmu_iova_to_phys,
- 	.add_device		= arm_smmu_add_device,
- 	.remove_device		= arm_smmu_remove_device,
+diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
+index d0fbb7f..4b0cf51 100644
+--- a/drivers/gpio/gpio-xilinx.c
++++ b/drivers/gpio/gpio-xilinx.c
+@@ -133,6 +133,53 @@ static void xgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
+ }
+ 
+ /**
++ * xgpio_set_multiple - Write the specified signals of the GPIO device.
++ * @gc:     Pointer to gpio_chip device structure.
++ * @mask:   Mask of the GPIOS to modify.
++ * @bits:   Value to be wrote on each GPIO
++ *
++ * This function writes the specified values into the specified signals of the
++ * GPIO devices.
++ */
++static void xgpio_set_multiple(struct gpio_chip *gc, unsigned long *mask,
++			       unsigned long *bits)
++{
++	unsigned long flags;
++	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
++	struct xgpio_instance *chip = gpiochip_get_data(gc);
++	int index = xgpio_index(chip, 0);
++	int offset, i;
++
++	spin_lock_irqsave(&chip->gpio_lock[index], flags);
++
++	/* Write to GPIO signals */
++	for (i = 0; i < gc->ngpio; i++) {
++		if (*mask == 0)
++			break;
++		if (index !=  xgpio_index(chip, i)) {
++			xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET +
++				       xgpio_regoffset(chip, i),
++				       chip->gpio_state[index]);
++			spin_unlock_irqrestore(&chip->gpio_lock[index], flags);
++			index =  xgpio_index(chip, i);
++			spin_lock_irqsave(&chip->gpio_lock[index], flags);
++		}
++		if (__test_and_clear_bit(i, mask)) {
++			offset =  xgpio_offset(chip, i);
++			if (test_bit(i, bits))
++				chip->gpio_state[index] |= BIT(offset);
++			else
++				chip->gpio_state[index] &= ~BIT(offset);
++		}
++	}
++
++	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET +
++		       xgpio_regoffset(chip, i), chip->gpio_state[index]);
++
++	spin_unlock_irqrestore(&chip->gpio_lock[index], flags);
++}
++
++/**
+  * xgpio_dir_in - Set the direction of the specified GPIO signal as input.
+  * @gc:     Pointer to gpio_chip device structure.
+  * @gpio:   GPIO signal number.
+@@ -306,6 +353,7 @@ static int xgpio_probe(struct platform_device *pdev)
+ 	chip->mmchip.gc.direction_output = xgpio_dir_out;
+ 	chip->mmchip.gc.get = xgpio_get;
+ 	chip->mmchip.gc.set = xgpio_set;
++	chip->mmchip.gc.set_multiple = xgpio_set_multiple;
+ 
+ 	chip->mmchip.save_regs = xgpio_save_regs;
+ 
 -- 
-2.1.4
+1.9.1
