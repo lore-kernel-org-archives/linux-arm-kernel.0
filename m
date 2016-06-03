@@ -1,45 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 Jun 2016 10:42:59 +0200
-Subject: [PATCH 21/32] mmc: bcm2835-sdhost: Add new driver for the
- internal SD controller.
-In-Reply-To: <87vb1ra295.fsf@eliezer.anholt.net>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <4715245.LFBOAeJdHc@wuerfel> <87vb1ra295.fsf@eliezer.anholt.net>
-Message-ID: <5371567.ZLhe0cdM9e@wuerfel>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Fri, 03 Jun 2016 10:45:46 +0200
+Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry
+ Pi 3.
+In-Reply-To: <5490184.9quKRk1Imx@wuerfel>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-8-git-send-email-kraxel@redhat.com>
+ <5490184.9quKRk1Imx@wuerfel>
+Message-ID: <1464943546.24775.131.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 2, 2016 11:12:38 AM CEST Eric Anholt wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On Fr, 2016-06-03 at 09:38 +0200, Arnd Bergmann wrote:
+> On Friday, June 3, 2016 8:18:26 AM CEST Gerd Hoffmann wrote:
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 06b6c2d..71e2d36 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -66,7 +66,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+> >         bcm2835-rpi-b-rev2.dtb \
+> >         bcm2835-rpi-b-plus.dtb \
+> >         bcm2835-rpi-a-plus.dtb \
+> > -       bcm2836-rpi-2-b.dtb
+> > +       bcm2836-rpi-2-b.dtb \
+> > +       ../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
+> >  dtb-$(CONFIG_ARCH_BCM_5301X) += \
+> >         bcm4708-asus-rt-ac56u.dtb \
+> >         bcm4708-asus-rt-ac68u.dtb \
 > 
-> > On Wednesday, June 1, 2016 11:43:30 PM CEST Gerd Hoffmann wrote:
-> >> +    /* Parse OF address directly to get the physical address for
-> >> +     * DMA to our registers.
-> >> +     */
-> >> +    host->phys_addr = be32_to_cpup(of_get_address(pdev->dev.of_node, 0,
-> >> +                                                  NULL, NULL));
-> >
-> > This looks broken on 64-bit systems when #address-cells=<2>, or if there
-> > is an intermediate bus with a non-empty ranges property.
-> >
-> > What's wrong with platform_get_resource(pdev, IORESOURCE_MEM, 0)?
+> Let's make this hunk a separate patch so we can discuss it on its
+> own.
+
+Hmm, I through we where in agreement to do it this way ...
+
+> I'm not really happy about the way it looks (in general, using ../../../
+> anywhere in the kernel looks hacky.
 > 
-> I'll get to the rest of the review later, but this is a weird pattern
-> that we have in several bcm2835-related drivers.
+> How about a separate
 > 
-> We need the address as seen by the DMA controller, not the address from
-> the ARM's perspective (which is offset by the dma-ranges DT property).
-> This is the way that people have figured out to get that address.
+> dtb-$(CONFIG_ARCH_BCM2835) +=
+> 	../../../arm64/boot/dts/broadcom/
 
-I see. This is indeed a bit tricky, as there is no easy way to know
-how the dmaengine is wired up to the slave. A correct solution is
-probably to follow the 'dma-ranges' up from the master to the common
-parent and then follow the 'ranges' back to the slave, but that
-requires coming up with a new exported function.
+Not working.
 
-It's perhaps good enough in the meantime to read out the address from
-the slave directly, but you should not assume that the first
-cell has the complete information and instead should at least
-evaluate #address-cells.
+Tried "subdir-$(CONFIG_ARCH_BCM) += ...".  Didn't work either.
+Same for "dts-dirs += ...".
 
-	Arnd
+Running out of ideas.  Guess I have to leave this to someone who knows
+kbuild better than me.
+
+cheers,
+  Gerd
