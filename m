@@ -1,30 +1,102 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Fri, 3 Jun 2016 21:43:11 +0100
-Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
-In-Reply-To: <20160602171152.GE24938@e104818-lin.cambridge.arm.com>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
- <20160601103446.GC9280@leverpostej>
- <20160601104326.GA24749@e104818-lin.cambridge.arm.com>
- <20160602143650.GG2658@codeblueprint.co.uk>
- <20160602162925.GC24938@e104818-lin.cambridge.arm.com>
- <57505F52.3040108@arm.com>
- <20160602171152.GE24938@e104818-lin.cambridge.arm.com>
-Message-ID: <20160603204311.GN2658@codeblueprint.co.uk>
+From: briannorris@chromium.org (Brian Norris)
+Date: Fri, 3 Jun 2016 13:50:28 -0700
+Subject: [PATCH 10/14] regulator: pwm: Switch to the atomic PWM API
+In-Reply-To: <1464942192-25967-11-git-send-email-boris.brezillon@free-electrons.com>
+References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1464942192-25967-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160603205028.GH124478@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 02 Jun, at 06:11:52PM, Catalin Marinas wrote:
-> 
-> I think you should post them fairly soon so that we get a chance to
-> review them and ideally push into next around -rc4.
-> 
-> Regarding these efi/arm64 patches, I can push them to a branch (once the
-> conflicting efi/urgent patches hit upstream, I guess around -rc2) that
-> Matt can pull into the EFI tree and I can also pull in the arm64 tree
-> *if* we are to merge the Jeremy's patches.
-> 
-> Jeremy, you can base your patches on such branch (I'll follow up with
-> the details if that's ok with Matt).
++ Laxman
 
-Sure, this works for me. Thanks Catalin.
+Hi,
+
+On Fri, Jun 03, 2016 at 10:23:08AM +0200, Boris Brezillon wrote:
+> Use the atomic API wherever appropriate and get rid of pwm_apply_args()
+> call (the reference period and polarity are now explicitly set when
+> calling pwm_apply_state()).
+> 
+> We also make use of the pwm_set_relative_duty_cycle() helper to ease
+> relative to absolute duty_cycle conversion.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  drivers/regulator/pwm-regulator.c | 38 ++++++++++----------------------------
+>  1 file changed, 10 insertions(+), 28 deletions(-)
+> 
+> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+> index 524b43f..bf033fd 100644
+> --- a/drivers/regulator/pwm-regulator.c
+> +++ b/drivers/regulator/pwm-regulator.c
+> @@ -59,16 +59,14 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *rdev,
+>  					 unsigned selector)
+>  {
+>  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+> -	struct pwm_args pargs;
+> -	int dutycycle;
+> +	struct pwm_state pstate;
+>  	int ret;
+>  
+> -	pwm_get_args(drvdata->pwm, &pargs);
+> +	pwm_prepare_new_state(drvdata->pwm, &pstate);
+> +	pwm_set_relative_duty_cycle(&pstate,
+> +			drvdata->duty_cycle_table[selector].dutycycle, 100);
+>  
+> -	dutycycle = (pargs.period *
+> -		    drvdata->duty_cycle_table[selector].dutycycle) / 100;
+> -
+> -	ret = pwm_config(drvdata->pwm, dutycycle, pargs.period);
+> +	ret = pwm_apply_state(drvdata->pwm, &pstate);
+>  	if (ret) {
+>  		dev_err(&rdev->dev, "Failed to configure PWM: %d\n", ret);
+>  		return ret;
+> @@ -126,34 +124,18 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+>  {
+>  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+>  	unsigned int ramp_delay = rdev->constraints->ramp_delay;
+> -	struct pwm_args pargs;
+>  	unsigned int req_diff = min_uV - rdev->constraints->min_uV;
+> +	struct pwm_state pstate;
+>  	unsigned int diff;
+> -	unsigned int duty_pulse;
+> -	u64 req_period;
+> -	u32 rem;
+>  	int ret;
+>  
+> -	pwm_get_args(drvdata->pwm, &pargs);
+> +	pwm_prepare_new_state(drvdata->pwm, &pstate);
+>  	diff = rdev->constraints->max_uV - rdev->constraints->min_uV;
+>  
+> -	/* First try to find out if we get the iduty cycle time which is
+> -	 * factor of PWM period time. If (request_diff_to_min * pwm_period)
+> -	 * is perfect divided by voltage_range_diff then it is possible to
+> -	 * get duty cycle time which is factor of PWM period. This will help
+> -	 * to get output voltage nearer to requested value as there is no
+> -	 * calculation loss.
+> -	 */
+> -	req_period = req_diff * pargs.period;
+> -	div_u64_rem(req_period, diff, &rem);
+> -	if (!rem) {
+> -		do_div(req_period, diff);
+> -		duty_pulse = (unsigned int)req_period;
+> -	} else {
+> -		duty_pulse = (pargs.period / 100) * ((req_diff * 100) / diff);
+> -	}
+> +	/* We pass diff as the scale to get a uV precision. */
+> +	pwm_set_relative_duty_cycle(&pstate, req_diff, diff);
+
+Notably, you're dropping much of Laxman's commit fd786fb0276a ("regulator:
+pwm: Try to avoid voltage error in duty cycle calculation"), but I
+believe the DIV_ROUND_CLOSEST_ULL() in pwm_set_relative_duty_cycle()
+solves his problem better.
+
+>  
+> -	ret = pwm_config(drvdata->pwm, duty_pulse, pargs.period);
+> +	ret = pwm_apply_state(drvdata->pwm, &pstate);
+>  	if (ret) {
+>  		dev_err(&rdev->dev, "Failed to configure PWM: %d\n", ret);
+>  		return ret;
+
+Reviewed-by: Brian Norris <briannorris@chromium.org>
+Tested-by: Brian Norris <briannorris@chromium.org>
