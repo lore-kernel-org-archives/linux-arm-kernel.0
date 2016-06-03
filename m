@@ -1,62 +1,174 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 3 Jun 2016 13:39:58 +0100
-Subject: [PATCH v4 11/18] ARM: multi_v7_defconfig: Enable STi and
- simple-card drivers.
-In-Reply-To: <574D5178.5030200@st.com>
-References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
- <1464192412-16386-13-git-send-email-peter.griffin@linaro.org>
- <574D5178.5030200@st.com>
-Message-ID: <20160603123958.GA9912@griffinp-ThinkPad-X1-Carbon-2nd>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 3 Jun 2016 14:44:52 +0200
+Subject: [PATCH v3 1/2] ARM: at91/dt: at91sam9260: Remove leading zeros
+ in OHCI node.
+In-Reply-To: <1464934539-4737-1-git-send-email-raashidmuhammed@zilogic.com>
+References: <1464934539-4737-1-git-send-email-raashidmuhammed@zilogic.com>
+Message-ID: <20160603124452.GB4594@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Hi,
 
-On Tue, 31 May 2016, Arnaud Pouliquen wrote:
-
-> Hi Peter,
+On 03/06/2016 at 11:45:38 +0530, Raashid Muhammed wrote :
+> From: Raashid Muhammed <raashidmuhammed@zilogic.com>
 > 
-> On 05/25/2016 06:06 PM, Peter Griffin wrote:
-> > This patch enables the STi ALSA drivers found on STi platforms
-> > as well as the simple-card driver which is a dependency to have
-> > working sound.
-> > 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > Cc: arnaud.pouliquen at st.com
-> > Cc: broonie at kernel.org
-> > ---
-> >  arch/arm/configs/multi_v7_defconfig | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> > index 5eee45b..0ced665 100644
-> > --- a/arch/arm/configs/multi_v7_defconfig
-> > +++ b/arch/arm/configs/multi_v7_defconfig
-> > @@ -589,6 +589,9 @@ CONFIG_SND_SOC_AK4642=m
-> >  CONFIG_SND_SOC_SGTL5000=m
-> >  CONFIG_SND_SOC_SPDIF=m
-> >  CONFIG_SND_SOC_WM8978=m
-> > +CONFIG_SND_SOC_STI=m
-> > +CONFIG_SND_SOC_STI_SAS=m
-> > +CONFIG_SND_SIMPLE_CARD=m
-> Simple card config seems enabled by default, at least on 4.7 rc1.
+> Remove leading zeros in OHCI node for at91sam9260 based boards.
+> 
+> Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
+> Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
+> ---
 
-I don't think it is currently, I get the following when greping v4.7-rc1 tag
+Could you include a changelog here? It is difficult to understand why
+you are resending. Can I review it now?
 
-git grep CONFIG_SND_SIMPLE_CARD
-arch/arm/configs/exynos_defconfig:CONFIG_SND_SIMPLE_CARD=y
-arch/arm/configs/imx_v6_v7_defconfig:CONFIG_SND_SIMPLE_CARD=y
-arch/arm/configs/multi_v5_defconfig:CONFIG_SND_SIMPLE_CARD=y
-arch/arm/configs/mvebu_v5_defconfig:CONFIG_SND_SIMPLE_CARD=y
-arch/arm/configs/mvebu_v7_defconfig:CONFIG_SND_SIMPLE_CARD=y
-arch/arm/configs/omap2plus_defconfig:CONFIG_SND_SIMPLE_CARD=m
-arch/arm/configs/pxa_defconfig:CONFIG_SND_SIMPLE_CARD=m
-arch/xtensa/configs/audio_kc705_defconfig:CONFIG_SND_SIMPLE_CARD=y
-sound/soc/generic/Makefile:obj-$(CONFIG_SND_SIMPLE_CARD)        +=
-snd-soc-simple-card.o
+>  arch/arm/boot/dts/aks-cdu.dts               | 2 +-
+>  arch/arm/boot/dts/animeo_ip.dts             | 2 +-
+>  arch/arm/boot/dts/at91-foxg20.dts           | 2 +-
+>  arch/arm/boot/dts/at91-kizbox.dts           | 2 +-
+>  arch/arm/boot/dts/at91-qil_a9260.dts        | 2 +-
+>  arch/arm/boot/dts/at91sam9260.dtsi          | 2 +-
+>  arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 2 +-
+>  arch/arm/boot/dts/ethernut5.dts             | 2 +-
+>  arch/arm/boot/dts/evk-pro3.dts              | 2 +-
+>  arch/arm/boot/dts/usb_a9260_common.dtsi     | 2 +-
+>  10 files changed, 10 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/aks-cdu.dts b/arch/arm/boot/dts/aks-cdu.dts
+> index d9c50fb..5b1bf92 100644
+> --- a/arch/arm/boot/dts/aks-cdu.dts
+> +++ b/arch/arm/boot/dts/aks-cdu.dts
+> @@ -57,7 +57,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <2>;
+>  			status = "okay";
+>  		};
+> diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
+> index 0962f2f..8bcbad3 100644
+> --- a/arch/arm/boot/dts/animeo_ip.dts
+> +++ b/arch/arm/boot/dts/animeo_ip.dts
+> @@ -114,7 +114,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <2>;
+>  			atmel,vbus-gpio = <&pioB 15 GPIO_ACTIVE_LOW>;
+>  			status = "okay";
+> diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
+> index 6bf873e..42a535d 100644
+> --- a/arch/arm/boot/dts/at91-foxg20.dts
+> +++ b/arch/arm/boot/dts/at91-foxg20.dts
+> @@ -128,7 +128,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <2>;
+>  			status = "okay";
+>  		};
+> diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
+> index 229e989..0e3f34e 100644
+> --- a/arch/arm/boot/dts/at91-kizbox.dts
+> +++ b/arch/arm/boot/dts/at91-kizbox.dts
+> @@ -54,7 +54,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <1>;
+>  			status = "okay";
+>  		};
+> diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
+> index 4f2eebf..5309e19 100644
+> --- a/arch/arm/boot/dts/at91-qil_a9260.dts
+> +++ b/arch/arm/boot/dts/at91-qil_a9260.dts
+> @@ -111,7 +111,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <2>;
+>  			status = "okay";
+>  		};
+> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+> index d4884dd..af5ba31 100644
+> --- a/arch/arm/boot/dts/at91sam9260.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
+> @@ -1007,7 +1007,7 @@
+>  			status = "disabled";
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+>  			reg = <0x00500000 0x100000>;
+>  			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
+> diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+> index e9cc99b..1395b30 100644
+> --- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+> +++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+> @@ -170,7 +170,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <2>;
+>  			status = "okay";
+>  		};
+> diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
+> index 2430443..298ee2f 100644
+> --- a/arch/arm/boot/dts/ethernut5.dts
+> +++ b/arch/arm/boot/dts/ethernut5.dts
+> @@ -77,7 +77,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <2>;
+>  			status = "okay";
+>  		};
+> diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
+> index f72969e..312d3e8 100644
+> --- a/arch/arm/boot/dts/evk-pro3.dts
+> +++ b/arch/arm/boot/dts/evk-pro3.dts
+> @@ -46,7 +46,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <2>;
+>  			status = "okay";
+>  		};
+> diff --git a/arch/arm/boot/dts/usb_a9260_common.dtsi b/arch/arm/boot/dts/usb_a9260_common.dtsi
+> index 9beea89..12119b5 100644
+> --- a/arch/arm/boot/dts/usb_a9260_common.dtsi
+> +++ b/arch/arm/boot/dts/usb_a9260_common.dtsi
+> @@ -90,7 +90,7 @@
+>  			};
+>  		};
+>  
+> -		usb0: ohci at 00500000 {
+> +		usb0: ohci at 500000 {
+>  			num-ports = <2>;
+>  			status = "okay";
+>  		};
+> -- 
+> 2.1.4
+> 
 
-Although maybe it should be built-in rather than a module, like multi_v5_defconfig.
-
-regards,
-
-Peter
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
