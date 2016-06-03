@@ -1,66 +1,29 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Fri, 03 Jun 2016 15:21:30 +0100
-Subject: [PATCH v2 3/3] iommu: convert DT component matching to
- component_match_add_release()
-In-Reply-To: <20160603141548.GC1041@n2100.armlinux.org.uk>
-References: <20160603141548.GC1041@n2100.armlinux.org.uk>
-Message-ID: <E1b8pyc-0005OV-7X@rmk-PC.armlinux.org.uk>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 3 Jun 2016 15:32:01 +0100
+Subject: [PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <DB5PR04MB099754E61027226E5210C2399A590@DB5PR04MB0997.eurprd04.prod.outlook.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <DB5PR04MB099754E61027226E5210C2399A590@DB5PR04MB0997.eurprd04.prod.outlook.com>
+Message-ID: <32b86adb-cdba-89bb-3f19-e7677f39fa1f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert DT component matching to use component_match_add_release().
+Hi Bharat,
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/iommu/mtk_iommu.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+On 03/06/16 05:26, Bharat Bhushan wrote:
+> Hi Andre,
+> 
+> We are looking for these patches but seems like these needed to
+> rebased/redesigned based on new GIC emulation changes. Can you give us
+> some sense on when this will be done?
+> Also do you know if someone is working on QEMU size changes for
+> this, if not then we can help on getting that done.
 
-diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
-index c3043d8754e3..71cf62af4e24 100644
---- a/drivers/iommu/mtk_iommu.c
-+++ b/drivers/iommu/mtk_iommu.c
-@@ -24,6 +24,7 @@
- #include <linux/iopoll.h>
- #include <linux/list.h>
- #include <linux/of_address.h>
-+#include <linux/of_component.h>
- #include <linux/of_iommu.h>
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
-@@ -552,11 +553,6 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
- 	return 0;
- }
- 
--static int compare_of(struct device *dev, void *data)
--{
--	return dev->of_node == data;
--}
--
- static int mtk_iommu_bind(struct device *dev)
- {
- 	struct mtk_iommu_data *data = dev_get_drvdata(dev);
-@@ -630,17 +626,19 @@ static int mtk_iommu_probe(struct platform_device *pdev)
- 			continue;
- 
- 		plarbdev = of_find_device_by_node(larbnode);
--		of_node_put(larbnode);
- 		if (!plarbdev) {
- 			plarbdev = of_platform_device_create(
- 						larbnode, NULL,
- 						platform_bus_type.dev_root);
--			if (!plarbdev)
-+			if (!plarbdev) {
-+				of_node_put(larbnode);
- 				return -EPROBE_DEFER;
-+			}
- 		}
- 		data->smi_imu.larb_imu[i].dev = &plarbdev->dev;
- 
--		component_match_add(dev, &match, compare_of, larbnode);
-+		component_match_add_of(dev, &match, larbnode);
-+		of_node_put(larbnode);
- 	}
- 
- 	platform_set_drvdata(pdev, data);
--- 
-2.1.0
+I just pushed a new version of the patches:
+https://lists.cs.columbia.edu/pipermail/kvmarm/2016-June/020482.html
+
+I hope that answers your question about the kernel side of things.
+For QEMU I have no idea, maybe Christoffer or Peter would know.
+
+Cheers,
+Andre.
