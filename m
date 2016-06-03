@@ -1,40 +1,83 @@
 From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Fri,  3 Jun 2016 21:33:01 +0530
-Subject: [PATCH v3 RESEND 2/7] binding: Make "mdio-parent-bus" property from
- mandatory to optional
+Date: Fri,  3 Jun 2016 21:33:03 +0530
+Subject: [PATCH v3 RESEND 4/7] dt:mdio-mux: Add mdio multiplexer driver node
 In-Reply-To: <1464969786-22742-1-git-send-email-pramod.kumar@broadcom.com>
 References: <1464969786-22742-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1464969786-22742-3-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <1464969786-22742-5-git-send-email-pramod.kumar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change "mdio-parent-bus" from mandatory section to optional
-as it won't be required by integrated MDIO multiplexer
-which has bus selection and mdio transaction generation logic,
-integrated inside.
+Add integrated MDIO multiplexer driver node which contains
+two mux PCIe bus and one ethernet bus along with phys
+lying on these bus.
 
 Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
 ---
- Documentation/devicetree/bindings/net/mdio-mux.txt | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 31 +++++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/mdio-mux.txt b/Documentation/devicetree/bindings/net/mdio-mux.txt
-index 491f5bd..f58571f 100644
---- a/Documentation/devicetree/bindings/net/mdio-mux.txt
-+++ b/Documentation/devicetree/bindings/net/mdio-mux.txt
-@@ -5,11 +5,12 @@ numbered uniquely in a device dependent manner.  The nodes for an MDIO
- bus multiplexer/switch will have one child node for each child bus.
- 
- Required properties:
--- mdio-parent-bus : phandle to the parent MDIO bus.
- - #address-cells = <1>;
- - #size-cells = <0>;
- 
- Optional properties:
-+- mdio-parent-bus : phandle to the parent MDIO bus.
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index 54ca40c..71f8503 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -132,3 +132,15 @@
+ 		#size-cells = <1>;
+ 	};
+ };
 +
- - Other properties specific to the multiplexer/switch hardware.
++&mdio_mux_iproc {
++	mdio at 10 {
++		reg = <0x10>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		gphy0: eth-phy at 10 {
++			reg = <0x10>;
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index ec68ec1..9f20a66 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -263,6 +263,37 @@
+ 				      IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
  
- Required properties for child nodes:
++		mdio_mux_iproc: mdio-mux at 6602023c {
++			compatible = "brcm,mdio-mux-iproc";
++			reg = <0x6602023c 0x14>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			mdio at 0 {
++				reg = <0x0>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				pci_phy0: pci-phy at 0 {
++					compatible = "brcm,ns2-pcie-phy";
++					reg = <0x0>;
++					#phy-cells = <0>;
++				};
++			};
++
++			mdio at 7 {
++				reg = <0x7>;
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				pci_phy1: pci-phy at 0 {
++					compatible = "brcm,ns2-pcie-phy";
++					reg = <0x0>;
++					#phy-cells = <0>;
++				};
++			};
++		};
++
+ 		timer0: timer at 66030000 {
+ 			compatible = "arm,sp804", "arm,primecell";
+ 			reg = <0x66030000 0x1000>;
 -- 
 1.9.1
