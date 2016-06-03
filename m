@@ -1,58 +1,131 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Fri, 3 Jun 2016 15:01:04 -0700
-Subject: [kernel-hardening] [PATCH 2/2] arm: apply more __ro_after_init
-In-Reply-To: <20160603215404.GA1785@kroah.com>
-References: <1464979224-2085-1-git-send-email-keescook@chromium.org>
- <1464979224-2085-3-git-send-email-keescook@chromium.org>
- <20160603185106.GB17076@kroah.com>
- <CAGXu5jJr2UzsdkSv2ogkoBEx2iFNY7N4QpvX5sLzM+Vb97a=zg@mail.gmail.com>
- <20160603215404.GA1785@kroah.com>
-Message-ID: <CAGXu5jL2KpsWjkh0G9UbPpT5yFEL_8aiC64ZJUyJUtZnZiGtRg@mail.gmail.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 04 Jun 2016 00:07:04 +0200
+Subject: [PATCH v7 00/15] ACPI NUMA support for ARM64
+In-Reply-To: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
+References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <6187968.ZZVJRAFzpv@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 3, 2016 at 2:54 PM, Greg KH <gregkh@linuxfoundation.org> wrote:
-> On Fri, Jun 03, 2016 at 02:26:54PM -0700, Kees Cook wrote:
->> On Fri, Jun 3, 2016 at 11:51 AM, Greg KH <gregkh@linuxfoundation.org> wrote:
->> > On Fri, Jun 03, 2016 at 11:40:24AM -0700, Kees Cook wrote:
->> >> Guided by grsecurity's analogous __read_only markings in arch/arm,
->> >> this applies several uses of __ro_after_init to structures that are
->> >> only updated during __init.
->> >>
->> >> Signed-off-by: Kees Cook <keescook@chromium.org>
->> >> ---
->> >>  arch/arm/kernel/cpuidle.c |  2 +-
->> >>  arch/arm/kernel/setup.c   | 10 +++++-----
->> >>  arch/arm/kernel/smp.c     |  2 +-
->> >>  arch/arm/lib/delay.c      |  2 +-
->> >>  arch/arm/mm/mmu.c         |  9 ++-------
->> >>  arch/x86/mm/ioremap.c     |  3 +--
->> >
->> > I don't think this x86 file is an arm-specific one :)
->>
->> Hah, whooops. :)
->>
->> > That minor nit aside, these patches are a great step forward, are you
->> > going to take them and work to push them upstream, or do you want/need
->> > others to do this?
->>
->> I'll collect more like these and carry a tree for -next and push them for v4.8.
->
-> Sounds good!
->
-> Is there any "problem" with applying these markings to code that could
-> be built as a module?  I'm thinking of lots of buses and drivers that
-> have structures like this, but can be a module or not, depending on the
-> configuration selected.  It would be nice to get the "benefit" of
-> protection if the code is built into the kernel image.
+On Tuesday, May 24, 2016 03:35:30 PM David Daney wrote:
+> From: David Daney <david.daney@cavium.com>
+> 
+> Rebased to Linus' master branch at commit 1d6da87a3241 ("Merge branch
+> 'drm-next' of git://people.freedesktop.org/~airlied/linux")
+> 
+> ACPI 5.1 already introduced NUMA support for ARM64, which can get the
+> NUMA domain information from SRAT and SLIT table, so parse those two
+> tables to get mappings from cpu/mem to numa node configuration and
+> system locality.
+> 
+> v7 updates:
+> 
+>  - Rebased to resolve one merge conflict.
+> 
+>  - New patch 13/15 to enable use of existing MADT parsing code instead
+>    of adding an additional implementation of the parser.
+> 
+>  - Added some Acked-by headers to patches in arm64 arch directories.
+> 
+> v6 updates:
+> 
+>  - Changed message printed in 13/14 to omit meaningless "cpu"
+>    number. (noted by Dennis Chen and Hanjun Guo)
+> 
+>  - New patch 7/14 to print different messages for NUMA disabled case.
+>    (noted by Dennis Chen)
+> 
+>  - Squashed two patches into 14/14.
+> 
+>  - Added Reviewed-by to 4/14
+> 
+> v5 updates:
+> 
+>  - Fixed ia64 build failure by gating some unused functions with #if
+>    CONFIG_{X86,ARM64}.
+> 
+>  - Fixed section mismatch errors for X86 case.
+> 
+>  - Removed unneeded #include from some files.
+> 
+>  - Tested to build cleanly on ARM64, X86_64, IA64
+> 
+> v4 updates:
+> 
+>  - Updated from Hanjun Guo's v3 patches.
+> 
+>  - Rebased on top of v16 of device-tree NUMA patches.
+> 
+>  - Reordered some of the changes so that we don't introduce code and
+>    then change it several times in the patch set.  New code is
+>    introduced in its final form.  Code reused from x86 is first moved
+>    with no change, and then a separate patch to make any needed
+>    changes.
+> 
+>  - code that is used only by ia64, moved to architecture specific
+>    files.
+> 
+> v3 updates:
+>  - Deep investigation about the ACPI_DEBUG_PRINT() and remvoe
+>    that for acpi/numa.c (patch 2/12)
+> 
+>  - Remove the duplicate NULL check for table print (patch 3/12)
+> 
+>  - Introduce CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP to remove duplicate
+>    dummy function for acpi_numa_arch_fixup()
+> 
+>  - Solve the problem that the mapping from logical cpu to numa node
+>    is wrong which spotted out by Lorenzo
+> 
+>  - cleanups for x86 and move acpi_numa_slit_init() and some other
+>    functions to common place, then reduce the duplicate of x86
+>    and arm64 (patch 7-12/12).
+> 
+>  - rebased on top of 4.4 and Ganapat's v9 patch set.
+> 
+> David Daney (4):
+>   arm64, numa: Cleanup NUMA disabled messages.
+>   acpi, numa: move bad_srat() and srat_disabled() to
+>     drivers/acpi/numa.c
+>   acpi, numa, srat: Improve SRAT error detection and add messages.
+>   ACPI / processor: Add acpi_map_madt_entry().
+> 
+> Hanjun Guo (10):
+>   acpi, numa: Use pr_fmt() instead of printk
+>   acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+>   acpi, numa: remove duplicate NULL check
+>   acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
+>   arm64, numa: rework numa_add_memblk()
+>   x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
+>   acpi, numa: remove unneeded acpi_numa=1
+>   acpi, numa: Move acpi_numa_memory_affinity_init() to
+>     drivers/acpi/numa.c
+>   arm64, acpi, numa: NUMA support based on SRAT and SLIT
+>   acpi, numa: Enable ACPI based NUMA on ARM64
+> 
+> Robert Richter (1):
+>   acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
+> 
+>  arch/arm64/include/asm/acpi.h |   8 ++
+>  arch/arm64/include/asm/numa.h |   2 +
+>  arch/arm64/kernel/Makefile    |   1 +
+>  arch/arm64/kernel/acpi_numa.c | 112 +++++++++++++++++++++
+>  arch/arm64/kernel/smp.c       |   2 +
+>  arch/arm64/mm/numa.c          |  28 ++++--
+>  arch/ia64/include/asm/acpi.h  |   3 +
+>  arch/ia64/kernel/acpi.c       |   2 +-
+>  arch/ia64/kernel/setup.c      |   1 +
+>  arch/x86/include/asm/acpi.h   |   1 -
+>  arch/x86/mm/numa.c            |   2 +-
+>  arch/x86/mm/srat.c            | 116 +---------------------
+>  drivers/acpi/Kconfig          |   4 +-
+>  drivers/acpi/numa.c           | 226 ++++++++++++++++++++++++++++++++----------
+>  drivers/acpi/processor_core.c |  26 ++++-
+>  drivers/of/of_numa.c          |   4 +-
+>  include/acpi/acpi_numa.h      |   4 +
+>  include/acpi/processor.h      |   1 +
+>  include/linux/acpi.h          |  18 +++-
+>  19 files changed, 369 insertions(+), 192 deletions(-)
+>  create mode 100644 arch/arm64/kernel/acpi_numa.c
 
-There's no operational problem, it will just currently offer no
-protections, and once the module side of things HAS been fixed, if any
-got marked incorrectly, it'll be discovered then instead of when they
-were added.
-
--Kees
-
--- 
-Kees Cook
-Chrome OS & Brillo Security
+All [1-15/15] queued up for 4.8, thanks!
