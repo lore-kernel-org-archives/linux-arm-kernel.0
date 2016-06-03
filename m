@@ -1,29 +1,65 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 03 Jun 2016 11:53:53 +0200
-Subject: [PATCH v2 5/9] arm64: Add BCM2835 support to the defconfig.
-In-Reply-To: <3299125.qWct7BqQgQ@wuerfel>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <1464934708-24769-6-git-send-email-kraxel@redhat.com>
- <3299125.qWct7BqQgQ@wuerfel>
-Message-ID: <1464947633.24775.140.camel@redhat.com>
+From: hl@rock-chips.com (Lin Huang)
+Date: Fri,  3 Jun 2016 17:55:13 +0800
+Subject: [RFC PATCH v1 0/6] rk3399 support ddr frequency scaling
+Message-ID: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+rk3399 platform have dfi controller can monitor ddr load,
+and dcf controller to handle ddr register so we can get the
+right ddr frequency and make ddr controller happy work(which
+will implement in bl31). So we do ddr frequency scaling with
+following flow:
 
-> > @@ -311,7 +329,6 @@ CONFIG_AUTOFS4_FS=y
-> >  CONFIG_FUSE_FS=y
-> >  CONFIG_CUSE=y
-> >  CONFIG_VFAT_FS=y
-> > -CONFIG_TMPFS=y
-> >  CONFIG_HUGETLBFS=y
-> >  CONFIG_CONFIGFS_FS=y
-> >  CONFIG_EFIVAR_FS=y
-> 
-> Why?
+	     kernel                                bl31
 
-That seems to come from enabling drm+vc4, probably something does
-"select TMPFS".
+	monitor ddr load
+		|
+		|
+	get_target_rate
+		|
+		|           pass rate to bl31
+	clk_set_rate(ddr) --------------------->run dcf flow
+		|                                   |
+		|                                   |
+	wait dcf interrupt<-------------------trigger dcf interrupt  
+		|
+		|
+	      return
 
-cheers,
-  Gerd
+Lin Huang (6):
+  rockchip: rockchip: add new clock-type for the ddrclk
+  clk: rockchip: rk3399: add SCLK_DDRCLK ID for ddrc
+  clk: rockchip: rk3399: add ddrc clock support
+  PM / devfreq: event: support rockchip dfi controller
+  PM / devfreq: rockchip: add devfreq driver for rk3399 dmc
+  drm/rockchip: Add dmc notifier in vop driver
+
+ drivers/clk/rockchip/Makefile               |   1 +
+ drivers/clk/rockchip/clk-ddr.c              | 147 ++++++++++++
+ drivers/clk/rockchip/clk-rk3399.c           |  20 ++
+ drivers/clk/rockchip/clk.c                  |   9 +
+ drivers/clk/rockchip/clk.h                  |  27 +++
+ drivers/devfreq/Kconfig                     |   1 +
+ drivers/devfreq/Makefile                    |   1 +
+ drivers/devfreq/event/Kconfig               |   7 +
+ drivers/devfreq/event/Makefile              |   1 +
+ drivers/devfreq/event/rockchip-dfi.c        | 265 ++++++++++++++++++++++
+ drivers/devfreq/rockchip/Kconfig            |  15 ++
+ drivers/devfreq/rockchip/Makefile           |   2 +
+ drivers/devfreq/rockchip/rk3399_dmc.c       | 337 ++++++++++++++++++++++++++++
+ drivers/devfreq/rockchip/rockchip_dmc.c     | 143 ++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c |  43 +++-
+ include/dt-bindings/clock/rk3399-cru.h      |   1 +
+ include/soc/rockchip/rockchip_dmc.h         |  45 ++++
+ 17 files changed, 1063 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/rockchip/clk-ddr.c
+ create mode 100644 drivers/devfreq/event/rockchip-dfi.c
+ create mode 100644 drivers/devfreq/rockchip/Kconfig
+ create mode 100644 drivers/devfreq/rockchip/Makefile
+ create mode 100644 drivers/devfreq/rockchip/rk3399_dmc.c
+ create mode 100644 drivers/devfreq/rockchip/rockchip_dmc.c
+ create mode 100644 include/soc/rockchip/rockchip_dmc.h
+
+-- 
+1.9.1
