@@ -1,60 +1,41 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 3 Jun 2016 12:34:35 +0200
-Subject: [PATCH 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy
- block
-In-Reply-To: <20160602181648.GB28820@uda0271908>
-References: <1464888666-17728-1-git-send-email-hdegoede@redhat.com>
- <20160602181648.GB28820@uda0271908>
-Message-ID: <88cada17-af4c-9548-e734-351b6695e30f@redhat.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jun 2016 11:36:33 +0100
+Subject: [PATCH] drm: convert DT component matching to
+ component_match_add_release()
+In-Reply-To: <20160603094048.GI23566@e106497-lin.cambridge.arm.com>
+References: <E1b8jze-00046l-K5@rmk-PC.armlinux.org.uk>
+ <20160603094048.GI23566@e106497-lin.cambridge.arm.com>
+Message-ID: <20160603103633.GA1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 03, 2016 at 10:40:48AM +0100, Liviu Dudau wrote:
+> On Fri, Jun 03, 2016 at 08:58:10AM +0100, Russell King wrote:
+> > Convert DT component matching to use component_match_add_release().
+> 
+> Hi Russell,
+> 
+> Any reason for not keeping the component_match_add() calls in the drivers?
 
-On 02-06-16 20:16, Bin Liu wrote:
-> Hi,
->
-> On Thu, Jun 02, 2016 at 07:31:03PM +0200, Hans de Goede wrote:
->> Some SoCs have a single phy-hw-block with multiple phys, this is
->> modelled by a single phy dts node, so we end up with multiple
->> controller nodes with a phys property pointing to the phy-node
->> of the otg-phy.
->>
->> Only one of these controllers typically is an otg controller, yet we
->
-> Is it guaranteed that only one of them will be otg?
+Sorry, I don't understand your comment.
 
-I guess not, but if there are 2 then with my patch we are of no worse
-then today, we will then pick the first otg controller. Whereas
-of_usb_get_dr_mode_by_phy currently is broken even on setups with
-a shared phy dt-node and only 1 otg controller, which are quite
-common.
+If we kept component_match_add() in these drivers, then this patch
+would not exist, because there wouldn't be any changes to the drivers.
 
-I believe it is unlikely that there will be more then 1 otg controller,
-so I believe that we should not worry about this until we actually
-hit this problem.
+> Planning to remove it?
 
->> were checking the first controller who uses a phy from the block and>> then end up looking for a dr_mode property in e.g. the ehci controller.
->>
->> Instead of looking for nodes with a phy property, look for nodes
->> with a dr_mode property, so that we actually access the dr_mode property
->> in a node which has it.
->
-> Quote from Documentation/devicetree/bindings/usb/generic.txt:
-> "- dr_mode: ...
-> 		In case this attribute isn't
-> 		passed via DT, USB DRD controllers should default to
-> 		OTG."
->
-> So it is not mandatory to define dr_mode in DT, then you wouldn't be
-> able to find the controller in such case.
+Possibly in the longer term, but at the moment there are drivers where
+the match data that is passed does not need any release functionality
+eg, data allocated with devm_k*alloc(), or
 
-If no controller is found then of_usb_get_dr_mode_by_phy will return
-USB_DR_MODE_UNKNOWN, just like it does today for controller nodes which
-do not set dr_mode.
+	component_match_add(dev->parent, match, dss_component_compare, dev);
 
-So in this case my patch does not change anything.
+There are some new cases that need converting which have cropped up
+during the last merge window, and I expect this to be an on-going
+educational point for driver authors, so I'm not too bothered about
+capturing all existing cases in this patch.
 
-Regards,
-
-Hans
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
