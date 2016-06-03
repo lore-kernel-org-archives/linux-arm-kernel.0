@@ -1,31 +1,76 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri,  3 Jun 2016 15:38:15 -0700
-Subject: [PATCH] arm64: defconfig: enable stmmac and realtek PHY as modules
-Message-ID: <1464993495-19018-1-git-send-email-khilman@baylibre.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri,  3 Jun 2016 18:25:20 -0500
+Subject: [Patch v6 00/10] Qualcomm SCM Rework
+Message-ID: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some Amlogic GXBB boards use the stmmac ethernet driver.  Also, enable
-the realtek PHY used on meson-gxbb-odroidc2.  The micrel PHY used on the
-meson-gxbb-p20x boards is already enabled.
+The following set of patches does a bit of rework on the existing
+Qualcomm SCM firmware.  The first couple of patches deals with turning
+the current SCM into a platform driver.  The next couple are cleanups
+that make adding the 64 support a little easier.  I added in a patch to
+convert the scm-32 to use DMA streaming APIs.
 
-Signed-off-by: Kevin Hilman <khilman@baylibre.com>
----
- arch/arm64/configs/defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+I took Kumar's 64 bit support patch and modified it to use the arm_smccc
+calls.  This simplified things quite a bit.
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d0491e..987a6158c19d 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -127,6 +127,8 @@ CONFIG_SKY2=y
- CONFIG_RAVB=y
- CONFIG_SMC91X=y
- CONFIG_SMSC911X=y
-+CONFIG_STMMAC_ETH=m
-+CONFIG_REALTEK_PHY=m
- CONFIG_MICREL_PHY=y
- CONFIG_USB_PEGASUS=m
- CONFIG_USB_RTL8150=m
+Lastly, there are a few DT patches to add the firmware node for a couple of the
+supported platforms.
+
+Changes from v5:
+  * Added SCM DT nodes for APQ8064 and MSM8974
+  * Make core clk optional in probe
+  * Update commit messages to describe some of the changes in more detail
+  * Put back some of the SCM64 helper functions
+  * Fix other miscellaneous review comments
+
+Changes from v4:
+  * Fix Documentation error
+  * Fix misc review comments
+
+Changes from v3:
+  * Added compatibles for the specific platforms requiring one clock.
+  * All other platforms will use the generic binding that requires 3 clocks.
+
+Changes from v2:
+  * Added use of streaming DMA APIs for scm-32.
+  * Changed DT binding to simplify compats.
+  * Removed Kconfig.platform change that selected QCOM_SCM for ARM64
+  * Fixed misc comments
+  * Changed init function to populate the device differently.
+  * Fixed missing of_node_put
+
+Changes from v1:
+  * Changed binding to reflect proper firmware node usage
+  * Added arch_initcall to populate the firmware device, if present
+  * Fixed various review comments
+  * Removed extraneous includes from SCM 64 file.
+
+Andy Gross (9):
+  dt/bindings: firmware: Add Qualcomm SCM binding
+  firmware: qcom: scm: Convert SCM to platform driver
+  firmware: qcom: scm: Use atomic SCM for cold boot
+  firmware: qcom: scm: Generalize shared error map
+  firmware: qcom: scm: Convert to streaming DMA APIS
+  dts: qcom: apq8084: Add SCM firmware node
+  arm64: dts: msm8916: Add SCM firmware node
+  dts: qcom: msm8974: Add SCM firmware node
+  dts: qcom: apq8064: Add SCM firmware node
+
+Kumar Gala (1):
+  firmware: qcom: scm: Add support for ARM64 SoCs
+
+ .../devicetree/bindings/firmware/qcom,scm.txt      |  28 +++
+ arch/arm/boot/dts/qcom-apq8064.dtsi                |   6 +
+ arch/arm/boot/dts/qcom-apq8084.dtsi                |   8 +
+ arch/arm/boot/dts/qcom-msm8974.dtsi                |   8 +
+ arch/arm64/boot/dts/qcom/msm8916.dtsi              |   8 +
+ drivers/firmware/qcom_scm-32.c                     | 225 +++++++++------------
+ drivers/firmware/qcom_scm-64.c                     | 202 +++++++++++++++++-
+ drivers/firmware/qcom_scm.c                        | 180 ++++++++++++++++-
+ drivers/firmware/qcom_scm.h                        |  31 ++-
+ 9 files changed, 543 insertions(+), 153 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
+
 -- 
-2.7.4
+1.9.1
