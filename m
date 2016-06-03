@@ -1,36 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jun 2016 12:15:20 -0700
-Subject: [GIT PULL] ARM: exynos: Fixes for v4.7
-In-Reply-To: <1464589248-31326-1-git-send-email-k.kozlowski@samsung.com>
-References: <1464589248-31326-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20160603191520.GB3761@localhost>
+Date: Fri, 3 Jun 2016 12:18:35 -0700
+Subject: [PATCH] ARM: do away with ARCH_[WANT_OPTIONAL|REQUIRE]_GPIOLIB
+In-Reply-To: <1464869416-5642-1-git-send-email-linus.walleij@linaro.org>
+References: <1464869416-5642-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20160603191835.GC3761@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 08:20:48AM +0200, Krzysztof Kozlowski wrote:
-> Hi,
+On Thu, Jun 02, 2016 at 02:10:16PM +0200, Linus Walleij wrote:
+> This replaces:
 > 
-> A couple of fixes from Arnd for this release cycle.
+> - "select ARCH_REQUIRE_GPIOLIB" with "select GPIOLIB" as this can
+>   now be selected directly.
 > 
+> - "select ARCH_WANT_OPTIONAL_GPIOLIB" with no dependency: GPIOLIB
+>   is now selectable by everyone, so we need not declare our
+>   intent to select it.
 > 
-> Best regards,
-> Krzysztof
+> When ordering the symbols the following rationale was used:
+> if the selects were in alphabetical order, I moved select GPIOLIB
+> to be in alphabetical order, but if the selects were not
+> maintained in alphabetical order, I just replaced
+> "select ARCH_REQUIRE_GPIOLIB" with "select GPIOLIB".
 > 
-> 
-> The following changes since commit 2dcd0af568b0cf583645c8a317dd12e344b1c72a:
-> 
->   Linux 4.6 (2016-05-15 15:43:13 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.7
-> 
-> for you to fetch changes up to 8a6f71ccb6c39ca5ae442d1478d3a076e2b1361e:
-> 
->   ARM: exynos: don't select keyboard driver (2016-05-18 16:58:10 +0200)
-> 
+> Cc: Michael B??sch <m@bues.ch>
+> Cc: arm at kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC maintainers:
+> Please apply this patch directly for cleanups.
 
-Thanks, merged into fixes.
+Thanks, applied to next/cleanup for 4.8!
 
 
 -Olof
