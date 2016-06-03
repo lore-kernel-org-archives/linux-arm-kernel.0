@@ -1,143 +1,63 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Fri, 3 Jun 2016 20:20:52 +0530
-Subject: [PATCH v2 3/7] binding: mdio-mux: Add DT binding doc for Broadcom
- MDIO bus mutiplexer
-In-Reply-To: <20160603014323.GA12365@rob-hp-laptop>
-References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
- <1464701801-17243-4-git-send-email-pramod.kumar@broadcom.com>
- <20160603014323.GA12365@rob-hp-laptop>
-Message-ID: <a18d8d629426ccbca1a9da19241a6e5d@mail.gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 3 Jun 2016 17:03:53 +0200
+Subject: [PATCH 1/3] dt-bindings: pwm: Add MediaTek display PWM bindings
+In-Reply-To: <1464936349.5209.9.camel@mhfsdcap03>
+References: <1464597712-5399-1-git-send-email-weiqing.kong@mediatek.com>
+ <1464597712-5399-2-git-send-email-weiqing.kong@mediatek.com>
+ <20160602224550.GA19256@rob-hp-laptop> <1464936349.5209.9.camel@mhfsdcap03>
+Message-ID: <57519C59.5040107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh at kernel.org]
-> Sent: 03 June 2016 07:13
-> To: Pramod Kumar
-> Cc: Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Catalin Marinas;
-Will
-> Deacon; Kishon Vijay Abraham I; David S. Miller;
-devicetree at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; bcm-kernel-feedback-
-> list at broadcom.com; linux-kernel at vger.kernel.org; netdev at vger.kernel.org
-> Subject: Re: [PATCH v2 3/7] binding: mdio-mux: Add DT binding doc for
-> Broadcom MDIO bus mutiplexer
->
-> On Tue, May 31, 2016 at 07:06:37PM +0530, Pramod Kumar wrote:
-> > Add DT binding doc for Broadcom MDIO bus mutiplexer driver.
-> >
-> > Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-> > ---
-> >  .../bindings/net/brcm,mdio-mux-iproc.txt           | 60
-> ++++++++++++++++++++++
-> >  1 file changed, 60 insertions(+)
-> >  create mode 100644
-> > Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-> >
-> > diff --git
-> > a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-> > b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-> > new file mode 100644
-> > index 0000000..f270b41
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-> > @@ -0,0 +1,60 @@
-> > +Properties for an MDIO bus mutiplexer found in Broadcom iProc based
-SoCs.
-> > +
-> > +This MDIO bus multiplexer defines buses that could be internal as
-> > +well as external to SoCs and could accept MDIO transaction compatible
-> > +to C-22 or
-> > +C-45 Clause. When Child bus is selected, one need to select these two
->
-> s/Child/child/
 
-Sure. Will ensure this.
-
-> s/need/needs/
-
-Sure. Will ensure this.
-
-> > +properties as well to generate desired MDIO trascation on appropriate
-bus.
-> > +
-> > +Required properties in addition to the generic multiplexer
-properties:
-> > +
-> > +MDIO multiplexer node:
-> > +- complatible: brcm,mdio-mux-iproc.
+On 03/06/16 08:45, weiqing kong wrote:
+> On Thu, 2016-06-02 at 17:45 -0500, Rob Herring wrote:
+>> On Mon, May 30, 2016 at 04:41:50PM +0800, Weiqing Kong wrote:
+>>> Add MT2701 compatible string.
+>>>
+>>> Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
+>>> ---
+>>>   Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt | 5 +++--
+>>>   1 file changed, 3 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+>>> index f8f59ba..f2f2fa9 100644
+>>> --- a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+>>> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+>>> @@ -1,9 +1,10 @@
+>>>   MediaTek display PWM controller
+>>>
+>>>   Required properties:
+>>> - - compatible: should be "mediatek,<name>-disp-pwm":
+>>> -   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
+>>> + - compatible: should be like these:
+>>> +   - "mediatek,mt2701-disp-bls": found on mt2701 SoC.
+>>
+>> Why bls instead of pwm?
 >
-> typo
->
-Fixed.
-> > +
-> > +Every non-ethernet PHY requires a compatible so that it could be
-> > +probed based on this compatible string.
-> > +
-> > +Additional information regarding generic multiplexer properties could
-> > +be found
->
-> s/could/can/
+> In mt6595/mt8173, we have a hardware module named pwm.
+> In mt2701, we have bls hardware module which includes disp pwm function,
+> so we named it mt2701-disp-bls rather than mt2701-disp-pwm in order to
+> match with hardware spec.
+> thanks.
 >
 
-Replaced.
+ From what I understand pwm module and disp pwm in mt6589/mt8173 is 
+independent from the disp pwm. Actually the disp pwm in mt6589 is part 
+of the bls module, so this should me mediatek,mt2701-disp-pwm as well
 
-> > +at- Documentation/devicetree/bindings/net/mdio-mux.txt
-> > +
-> > +
-> > +for example:
-> > +		mdio_mux_iproc: mdio_mux_iproc at 6602023c {
->
-> No '_' in node names.
->
-> mdio-mux at ...
+Thanks,
+Matthias
 
-Yes. Will take care of this.
+>>
+>>>      - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
+>>> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
+>>>    - reg: physical base address and length of the controller's registers.
+>>>    - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
+>>>      the cell format.
+>>> --
+>>> 1.8.1.1.dirty
+>>>
 >
-> > +			compatible = "brcm,mdio-mux-iproc";
-> > +			reg = <0x6602023c 0x14>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			mdio-integrated-mux;
-> > +
-> > +			mdio at 0 {
-> > +				reg = <0x0>;
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +
-> > +				pci_phy0: pci-phy at 0 {
-> > +					compatible = "brcm,ns2-pcie-phy";
-> > +					reg = <0x0>;
-> > +					#phy-cells = <0>;
-> > +				};
-> > +			};
-> > +
-> > +			mdio at 7 {
-> > +				reg = <0x7>;
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +
-> > +				pci_phy1: pci-phy at 0 {
-> > +					compatible = "brcm,ns2-pcie-phy";
-> > +					reg = <0x0>;
-> > +					#phy-cells = <0>;
-> > +				};
-> > +			};
-> > +			mdio at 10 {
-> > +				reg = <0x10>;
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +
-> > +				gphy0: eth-phy at 10 {
-> > +					reg = <0x10>;
-> > +				};
-> > +			};
-> > +		};
-> > --
-> > 1.9.1
-> >
-
-Regards,
-Pramod
+>
