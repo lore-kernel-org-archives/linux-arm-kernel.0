@@ -1,168 +1,118 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  3 Jun 2016 15:02:51 +0100
-Subject: [PATCH v5 12/13] KVM: arm64: implement MSI injection in ITS emulation
+Date: Fri,  3 Jun 2016 15:02:48 +0100
+Subject: [PATCH v5 09/13] KVM: arm64: connect LPIs to the VGIC emulation
 In-Reply-To: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
 References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1464962572-3925-13-git-send-email-andre.przywara@arm.com>
+Message-ID: <1464962572-3925-10-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When userland wants to inject a MSI into the guest, we have to use
-our data structures to find the LPI number and the VCPU to receive
-the interrupt.
-Use the wrapper functions to iterate the linked lists and find the
-proper Interrupt Translation Table Entry. Then set the pending bit
-in this ITTE to be later picked up by the LR handling code. Kick
-the VCPU which is meant to handle this interrupt.
-We provide a VGIC emulation model specific routine for the actual
-MSI injection. The wrapper functions return an error for models not
-(yet) implementing MSIs (like the GICv2 emulation).
-We also provide the handler for the ITS "INT" command, which allows a
-guest to trigger an MSI via the ITS command queue.
+LPIs are dynamically created (mapped) at guest runtime and their
+actual numbers can be quite high, but is mostly assigned using a very
+sparse allocation scheme. So arrays are not an ideal data structure
+to hold the information. We use our equivalent of the "Interrupt
+Translation Table Entry" (ITTE) to hold the vgic_irq struct for a
+virtual LPI embedded in in the ITTE.
+Connect the VGIC core code via an accessor function to help it get the
+struct vgic_irq for a certain LPI.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 85 ++++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h     |  6 ++++
- 2 files changed, 91 insertions(+)
+ virt/kvm/arm/vgic/vgic-its.c | 34 ++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic.c     |  2 +-
+ virt/kvm/arm/vgic/vgic.h     |  6 ++++++
+ 3 files changed, 41 insertions(+), 1 deletion(-)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 72145c1..c257b08 100644
+index 3ec12ef..4f248ef 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -46,6 +46,16 @@ static struct vgic_its *find_its(struct kvm *kvm, gpa_t base_address)
- 	return NULL;
- }
+@@ -68,11 +68,29 @@ struct its_collection {
+ struct its_itte {
+ 	struct list_head itte_list;
  
-+#define ITS_DOORBELL_OFFSET (SZ_64K + 0x40)
-+static struct vgic_its *find_its_doorbell(struct kvm *kvm, gpa_t doorbell)
++	struct vgic_irq irq;
+ 	struct its_collection *collection;
+ 	u32 lpi;
+ 	u32 event_id;
+ };
+ 
++/* To be used as an iterator this macro misses the enclosing parentheses */
++#define for_each_lpi(dev, itte, its) \
++	list_for_each_entry(dev, &(its)->device_list, dev_list) \
++		list_for_each_entry(itte, &(dev)->itt, itte_list)
++
++static struct its_itte *find_itte_by_lpi(struct vgic_its *its, int lpi)
 +{
-+	/*
-+	 * The actual doorbell address is in the second page of the ITS
-+	 * frame, at offset 0x40.
-+	 */
-+	return find_its(kvm, doorbell - ITS_DOORBELL_OFFSET);
++	struct its_device *device;
++	struct its_itte *itte;
++
++	for_each_lpi(device, itte, its) {
++		if (itte->lpi == lpi)
++			return itte;
++	}
++	return NULL;
 +}
 +
- struct its_device {
- 	struct list_head dev_list;
+ #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
  
-@@ -363,6 +373,61 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
+ #define ITS_FRAME(addr) ((addr) & ~(SZ_64K - 1))
+@@ -158,6 +176,22 @@ static unsigned long vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
  	return 0;
  }
  
-+/*
-+ * Translates an incoming MSI request into the redistributor (=VCPU) and
-+ * the associated LPI number. Sets the LPI pending bit and also marks the
-+ * VCPU as having a pending interrupt.
-+ */
-+int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
++struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
 +{
 +	struct vgic_its *its;
 +	struct its_itte *itte;
-+	struct kvm_vcpu *vcpu;
-+	bool inject = false;
-+	u64 doorbell;
-+	int ret = 0;
 +
-+	if (!vgic_has_its(kvm))
-+		return -ENODEV;
++	list_for_each_entry(its, &kvm->arch.vits_list, its_list) {
++		itte = find_itte_by_lpi(its, intid);
++		if (!itte)
++			continue;
 +
-+	if (!(msi->flags & KVM_MSI_VALID_DEVID))
-+		return -EINVAL;
-+
-+	doorbell = (u64)msi->address_hi << 32 | msi->address_lo;
-+	its = find_its_doorbell(kvm, doorbell);
-+	if (!its)
-+		return -EINVAL;
-+
-+	spin_lock(&its->lock);
-+
-+	if (!its->enabled) {
-+		ret = -EAGAIN;
-+		goto out_unlock;
++		return &itte->irq;
 +	}
 +
-+	itte = find_itte(its, msi->devid, msi->data);
-+	/* Triggering an unmapped IRQ gets silently dropped. */
-+	if (!itte || !its_is_collection_mapped(itte->collection))
-+		goto out_unlock;
-+
-+	vcpu = kvm_get_vcpu(kvm, itte->collection->target_addr);
-+	if (!vcpu || !vcpu->arch.vgic_cpu.lpis_enabled)
-+		goto out_unlock;
-+
-+	inject = true;
-+
-+out_unlock:
-+	spin_unlock(&its->lock);
-+
-+	if (inject) {
-+		spin_lock(&itte->irq.irq_lock);
-+		itte->irq.pending = true;
-+		vgic_queue_irq_unlock(kvm, &itte->irq);
-+	}
-+
-+	return ret;
++	return NULL;
 +}
 +
- struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
+ static void its_free_itte(struct its_itte *itte)
  {
- 	struct vgic_its *its;
-@@ -791,6 +856,23 @@ static int vits_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
- 	return 0;
- }
+ 	list_del(&itte->itte_list);
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 69b61ab..6812ff1 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -58,7 +58,7 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
  
-+/* The INT command injects the LPI associated with that DevID/EvID pair. */
-+static int vits_cmd_handle_int(struct kvm *kvm, struct vgic_its *its,
-+			       u64 *its_cmd)
-+{
-+	u64 doorbell = its->vgic_its_base + ITS_DOORBELL_OFFSET;
-+	struct kvm_msi msi = {
-+		.address_lo = doorbell & 0xffffffff,
-+		.address_hi = doorbell >> 32,
-+		.data = its_cmd_get_id(its_cmd),
-+		.devid = its_cmd_get_deviceid(its_cmd),
-+		.flags = KVM_MSI_VALID_DEVID,
-+	};
-+
-+	vits_inject_msi(kvm, &msi);
-+	return 0;
-+}
-+
- /*
-  * This function expects the ITS lock to be dropped, so the actual command
-  * handlers must take care of proper locking when needed.
-@@ -826,6 +908,9 @@ static int vits_handle_command(struct kvm *kvm, struct vgic_its *its,
- 	case GITS_CMD_MOVALL:
- 		ret = vits_cmd_handle_movall(kvm, its, its_cmd);
- 		break;
-+	case GITS_CMD_INT:
-+		ret = vits_cmd_handle_int(kvm, its, its_cmd);
-+		break;
- 	case GITS_CMD_INV:
- 		ret = vits_cmd_handle_inv(kvm, its, its_cmd);
- 		break;
+ 	/* LPIs are not yet covered */
+ 	if (intid >= VGIC_MIN_LPI)
+-		return NULL;
++		return vgic_its_get_lpi(kvm, intid);
+ 
+ 	WARN(1, "Looking up struct vgic_irq for reserved INTID");
+ 	return NULL;
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 46c239f..5949d69 100644
+index 66578d2..6fecd70 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -81,6 +81,7 @@ void vits_destroy(struct kvm *kvm, struct vgic_its *its);
+@@ -78,6 +78,7 @@ bool vgic_has_its(struct kvm *kvm);
+ int vits_init(struct kvm *kvm, struct vgic_its *its);
+ void vits_destroy(struct kvm *kvm, struct vgic_its *its);
  int kvm_vgic_register_its_device(void);
- struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid);
- void vgic_enable_lpis(struct kvm_vcpu *vcpu);
-+int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi);
++struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid);
  #else
  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
  {
-@@ -160,6 +161,11 @@ static inline struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
- static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+@@ -148,6 +149,11 @@ static int kvm_vgic_register_its_device(void)
  {
+ 	return -ENODEV;
  }
 +
-+static inline int vits_inject_msi(struct kvm *kvm, struct kvm_msi *msi)
++static inline struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
 +{
-+	return -ENODEV;
++	return NULL;
 +}
  #endif
  
