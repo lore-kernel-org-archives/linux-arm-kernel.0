@@ -1,138 +1,80 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 3 Jun 2016 09:38:49 +0200
-Subject: [PATCH 09/20] drm: rcar-du: Rely on the default
- ->best_encoder() behavior
-In-Reply-To: <5863270.jtrd0Kruzj@avalon>
-References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464877907-27723-10-git-send-email-boris.brezillon@free-electrons.com>
- <5863270.jtrd0Kruzj@avalon>
-Message-ID: <20160603093849.136858be@bbrezillon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 03 Jun 2016 09:36:03 +0200
+Subject: [PATCH v2 5/9] arm64: Add BCM2835 support to the defconfig.
+In-Reply-To: <1464934708-24769-6-git-send-email-kraxel@redhat.com>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-6-git-send-email-kraxel@redhat.com>
+Message-ID: <3299125.qWct7BqQgQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 02 Jun 2016 23:57:14 +0300
-Laurent Pinchart <laurent.pinchart@ideasonboard.com> wrote:
+On Friday, June 3, 2016 8:18:24 AM CEST Gerd Hoffmann wrote:
+> From: Eric Anholt <eric@anholt.net>
+> 
+> Made with make defconfig; make menuconfig (only saying Y to new
+> entries); make savedefconfig.
 
-> Hi Boris,
-> 
-> Thank you for the patch.
-> 
-> On Thursday 02 Jun 2016 16:31:36 Boris Brezillon wrote:
-> > All outputs have a 1:1 relationship between connectors and encoders,
-> > and the driver is relying on the atomic helpers: we can drop the custom  
-> > ->best_encoder() implementations and let the core call  
-> > drm_atomic_helper_best_encoder() for us.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/gpu/drm/rcar-du/rcar_du_encoder.c | 12 ------------
-> >  drivers/gpu/drm/rcar-du/rcar_du_encoder.h |  3 ---
-> >  drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c |  1 -
-> >  drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c |  1 -
-> >  drivers/gpu/drm/rcar-du/rcar_du_vgacon.c  |  1 -
-> >  5 files changed, 18 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
-> > b/drivers/gpu/drm/rcar-du/rcar_du_encoder.c index 4e939e4..55149e9 100644
-> > --- a/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
-> > +++ b/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
-> > @@ -27,18 +27,6 @@
-> >  #include "rcar_du_vgacon.h"
-> > 
-> >  /*
-> > ---------------------------------------------------------------------------
-> > -- - * Common connector functions
-> > - */
-> > -
-> > -struct drm_encoder *
-> > -rcar_du_connector_best_encoder(struct drm_connector *connector)
-> > -{
-> > -	struct rcar_du_connector *rcon = to_rcar_connector(connector);
-> > -
-> > -	return rcar_encoder_to_drm_encoder(rcon->encoder);
-> > -}
-> > -
-> > -/*
-> > ---------------------------------------------------------------------------
-> > -- * Encoder
-> >   */
-> > 
-> > diff --git a/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
-> > b/drivers/gpu/drm/rcar-du/rcar_du_encoder.h index 719b6f2a..a8669c3 100644
-> > --- a/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
-> > +++ b/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
-> > @@ -49,9 +49,6 @@ struct rcar_du_connector {
-> >  #define to_rcar_connector(c) \
-> >  	container_of(c, struct rcar_du_connector, connector)
-> > 
-> > -struct drm_encoder *
-> > -rcar_du_connector_best_encoder(struct drm_connector *connector);
-> > -
-> >  int rcar_du_encoder_init(struct rcar_du_device *rcdu,
-> >  			 enum rcar_du_encoder_type type,
-> >  			 enum rcar_du_output output,
-> > diff --git a/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
-> > b/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c index 6c92714..612b4d5 100644
-> > --- a/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
-> > +++ b/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
-> > @@ -52,7 +52,6 @@ static int rcar_du_hdmi_connector_mode_valid(struct
-> > drm_connector *connector, static const struct drm_connector_helper_funcs
-> > connector_helper_funcs = { .get_modes = rcar_du_hdmi_connector_get_modes,
-> >  	.mode_valid = rcar_du_hdmi_connector_mode_valid,
-> > -	.best_encoder = rcar_du_connector_best_encoder,
-> >  };
-> > 
-> >  static enum drm_connector_status
-> > diff --git a/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
-> > b/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c index e905f5d..6afd0af 100644
-> > --- a/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
-> > +++ b/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
-> > @@ -59,7 +59,6 @@ static int rcar_du_lvds_connector_get_modes(struct
-> > drm_connector *connector)
-> > 
-> >  static const struct drm_connector_helper_funcs connector_helper_funcs = {
-> >  	.get_modes = rcar_du_lvds_connector_get_modes,
-> > -	.best_encoder = rcar_du_connector_best_encoder,
-> >  };
-> > 
-> >  static enum drm_connector_status
-> > diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
-> > b/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c index 9d7e5c9..68f7ffa 100644
-> > --- a/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
-> > +++ b/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
-> > @@ -28,7 +28,6 @@ static int rcar_du_vga_connector_get_modes(struct
-> > drm_connector *connector)
-> > 
-> >  static const struct drm_connector_helper_funcs connector_helper_funcs = {
-> >  	.get_modes = rcar_du_vga_connector_get_modes,
-> > -	.best_encoder = rcar_du_connector_best_encoder,
-> >  };
-> > 
-> >  static enum drm_connector_status  
-> 
-> You can also remove
-> 
->         rcon->encoder = renc;
-> 
-> from rcar_du_vga_connector_init(), it's not needed anymore. The same code in 
-> rcar_du_hdmi_connector_init() has to stay for now though, as it's used to 
-> locate the slave encoder in the HDMI support code. That should change when the 
-> driver will be converted to use drm_bridge.
-> 
-> I can also fix this during the conversion to drm_bridge if you don't want to 
-> resubmit. In any case,
+Please try not to mix 'make savedefconfig' changes with your
+own changes, it make it harder to review and can lead to more
+conflicts.
 
-There will be a v2 anyway, so I'll squash this change in the patch.
+> @@ -140,6 +141,9 @@ CONFIG_USB_NET_PLUSB=m
+>  CONFIG_USB_NET_MCS7830=m
+>  CONFIG_WL18XX=m
+>  CONFIG_WLCORE_SDIO=m
+> +CONFIG_USB_USBNET=y
+> +CONFIG_USB_NET_SMSC95XX=y
+> +# CONFIG_WLAN is not set
+>  CONFIG_INPUT_EVDEV=y
+>  CONFIG_KEYBOARD_GPIO=y
 
-> 
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> 
+Can this be =m like the others?
 
-Thanks,
+> -CONFIG_FB=y
+> -CONFIG_FRAMEBUFFER_CONSOLE=y
 
-Boris
+Is this intended?
 
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> +CONFIG_DRM=y
+> +CONFIG_DRM_VC4=y
+>  CONFIG_FB_ARMCLCD=y
+>  CONFIG_LOGO=y
+
+Maybe modules?
+
+
+>  # CONFIG_LOGO_LINUX_MONO is not set
+>  # CONFIG_LOGO_LINUX_VGA16 is not set
+>  CONFIG_SOUND=y
+>  CONFIG_SND=y
+>  CONFIG_SND_SOC=y
+> +CONFIG_SND_BCM2835_SOC_I2S=y
+>  CONFIG_SND_SOC_RCAR=y
+>  CONFIG_SND_SOC_AK4613=y
+>  CONFIG_USB=y
+
+We probably want CONFIG_SND=m, but that should be a separate patch.
+
+> @@ -270,6 +284,7 @@ CONFIG_RTC_DRV_SUN6I=y
+>  CONFIG_RTC_DRV_XGENE=y
+>  CONFIG_DMADEVICES=y
+>  CONFIG_PL330_DMA=y
+> +CONFIG_DMA_BCM2835=y
+>  CONFIG_TEGRA20_APB_DMA=y
+>  CONFIG_QCOM_BAM_DMA=y
+>  CONFIG_RCAR_DMAC=y
+
+Does any essential driver depend on this one?
+
+> @@ -311,7 +329,6 @@ CONFIG_AUTOFS4_FS=y
+>  CONFIG_FUSE_FS=y
+>  CONFIG_CUSE=y
+>  CONFIG_VFAT_FS=y
+> -CONFIG_TMPFS=y
+>  CONFIG_HUGETLBFS=y
+>  CONFIG_CONFIGFS_FS=y
+>  CONFIG_EFIVAR_FS=y
+
+Why?
+
+	Arnd
