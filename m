@@ -1,153 +1,41 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri,  3 Jun 2016 08:18:27 +0200
-Subject: [PATCH v2 8/9] ARM: bcm2835: dt: Add the ethernet to the device trees
-In-Reply-To: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1464934708-24769-9-git-send-email-kraxel@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 3 Jun 2016 08:19:29 +0200
+Subject: [PATCH] device tree description for AD5820 camera auto-focus coil
+In-Reply-To: <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
+References: <20160524091746.GA14536@amd>
+ <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
+ <20160527205140.GA26767@amd>
+ <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
+ <20160531213437.GA28397@amd>
+ <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+ <20160601220840.GA21946@amd>
+ <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
+ <20160602193027.GB7984@amd>
+ <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
+Message-ID: <20160603061929.GA3601@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lubomir Rintel <lkundrak@v3.sk>
+On Fri 2016-06-03 00:27:46, Sakari Ailus wrote:
+> On Thu, Jun 02, 2016 at 09:30:27PM +0200, Pavel Machek wrote:
+> > 
+> > Add documentation for ad5820 device tree binding.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@denx.de>
+> 
+> Thanks, Pavel!!
+> 
+> Can I pick the two patches (this one + the driver) or would you like to send
+> a pull request? In the latter case you can add:
 
-The hub and the ethernet in its port 1 are hardwired on the board.
+Yes please, pick up the two patches.
 
-Compared to the adapters that can be plugged into the USB ports, this
-one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
-has the MAC address for this adapter in its ROM, accessible from its
-firmware.
+Best regards,
+									Pavel
 
-U-Boot can read out the address and set the local-mac-address property of the
-node with "ethernet" alias. Let's add the node so that U-Boot can do its
-business.
+> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
+> 
 
-Model B rev2 and Model B+ entries were verified by me, the hierarchy and
-pid/vid pair for the Version 2 was provided by Peter Chen. Original
-Model B is a blind shot, though very likely correct.
-
-Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
----
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts    |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts    |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b.dts         |  1 +
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts       |  1 +
- arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi | 19 +++++++++++++++++++
- arch/arm/boot/dts/bcm283x.dtsi              |  2 ++
- 7 files changed, 44 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
- create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index 57d313b..d5fdb8e 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index cf2774e..bfc4bd9 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9512.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b-rev2", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index 8b15f9c..0371bb7 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2835.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9512.dtsi"
- 
- / {
- 	compatible = "raspberrypi,model-b", "brcm,bcm2835";
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index c4743f4..29e1cfe 100644
---- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -1,6 +1,7 @@
- /dts-v1/;
- #include "bcm2836.dtsi"
- #include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-smsc9514.dtsi"
- 
- / {
- 	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
-new file mode 100644
-index 0000000..12c981e
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
-@@ -0,0 +1,19 @@
-+/ {
-+	aliases {
-+		ethernet = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,9512";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethernet: usbether at 1 {
-+			compatible = "usb424,ec00";
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-new file mode 100644
-index 0000000..3f0a56e
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
-@@ -0,0 +1,19 @@
-+/ {
-+	aliases {
-+		ethernet = &ethernet;
-+	};
-+};
-+
-+&usb {
-+	usb1 at 1 {
-+		compatible = "usb424,9514";
-+		reg = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		ethernet: usbether at 1 {
-+			compatible = "usb424,ec00";
-+			reg = <1>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 10b27b9..b982522 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -287,6 +287,8 @@
- 			compatible = "brcm,bcm2835-usb";
- 			reg = <0x7e980000 0x10000>;
- 			interrupts = <1 9>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
- 		};
- 
- 		v3d: v3d at 7ec00000 {
 -- 
-1.8.3.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
