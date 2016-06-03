@@ -1,75 +1,20 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 03 Jun 2016 18:13:41 +0000
-Subject: [PATCH v17 12/13] arm64: kdump: update a kernel doc
-In-Reply-To: <cover.1464974516.git.geoff@infradead.org>
-References: <cover.1464974516.git.geoff@infradead.org>
-Message-ID: <3afbcc147f4f999e66d96cd23efb021b340cf9f9.1464974516.git.geoff@infradead.org>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Fri, 3 Jun 2016 20:32:05 +0200
+Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
+In-Reply-To: <HE1PR0401MB18663F72E21C5E237E0F2D2FE6590@HE1PR0401MB1866.eurprd04.prod.outlook.com>
+References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
+ <1464640806-3942-3-git-send-email-thommyj@gmail.com>
+ <DB5PR0401MB186309ACEF30FEA489C3CA97E6580@DB5PR0401MB1863.eurprd04.prod.outlook.com>
+ <CAOTQ16KS6RobKfs5MP=Bx2ad6Xipht7VO4CP5DbzQr9T60ip=A@mail.gmail.com>
+ <HE1PR0401MB18663F72E21C5E237E0F2D2FE6590@HE1PR0401MB1866.eurprd04.prod.outlook.com>
+Message-ID: <CAOTQ16LTW6s9Y9uLZs4S5+z=+-Cc5k6BH8pmxF5+t32tcSkU0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>[Gupta Nipun] I am not an expert in this, but I do not see any reason for 'of_for_each_phandle' to not work
+Did a fetch and tried again, now it works on target. Not sure if the
+fetch did magic or if I just did wrong last time.
+New patch uploaded with of_for_each_phandle instead
 
-This patch adds arch specific descriptions about kdump usage on arm64
-to kdump.txt.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- Documentation/kdump/kdump.txt | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
-index 88ff63d..5d6da09 100644
---- a/Documentation/kdump/kdump.txt
-+++ b/Documentation/kdump/kdump.txt
-@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
- a remote system.
- 
- Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
--s390x and arm architectures.
-+s390x, arm and arm64 architectures.
- 
- When the system kernel boots, it reserves a small section of memory for
- the dump-capture kernel. This ensures that ongoing Direct Memory Access
-@@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
- 
-     AUTO_ZRELADDR=y
- 
-+Dump-capture kernel config options (Arch Dependent, arm64)
-+----------------------------------------------------------
-+
-+1) Currently, kvm will not be enabled on the dump-capture kernel even
-+   if it is configured.
-+
- Extended crashkernel syntax
- ===========================
- 
-@@ -305,6 +311,8 @@ Boot into System Kernel
-    kernel will automatically locate the crash kernel image within the
-    first 512MB of RAM if X is not given.
- 
-+   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
-+   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
- 
- Load the Dump-capture Kernel
- ============================
-@@ -327,6 +335,8 @@ For s390x:
- 	- Use image or bzImage
- For arm:
- 	- Use zImage
-+For arm64:
-+	- Use vmlinux or Image
- 
- If you are using a uncompressed vmlinux image then use following command
- to load dump-capture kernel.
-@@ -370,6 +380,9 @@ For s390x:
- For arm:
- 	"1 maxcpus=1 reset_devices"
- 
-+For arm64:
-+	"1 maxcpus=1 reset_devices"
-+
- Notes on loading the dump-capture kernel:
- 
- * By default, the ELF headers are stored in ELF64 format to support
--- 
-2.5.0
+BR,
+Thommy Jakobsson
