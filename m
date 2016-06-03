@@ -1,32 +1,377 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Jun 2016 11:00:40 +0100
-Subject: [PATCH] arm64/efi: remove spurious WARN_ON for !4K kernels
-In-Reply-To: <20160530211212.GG2984@codeblueprint.co.uk>
-References: <1464189116-30898-1-git-send-email-mark.rutland@arm.com>
- <20160530211212.GG2984@codeblueprint.co.uk>
-Message-ID: <20160603100040.GJ9915@arm.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 03 Jun 2016 19:26:23 +0900
+Subject: [RFC PATCH v1 4/6] PM / devfreq: event: support rockchip dfi
+ controller
+In-Reply-To: <1464947719-6245-5-git-send-email-hl@rock-chips.com>
+References: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
+ <CGME20160603095617epcas1p2ce23b253cf48783b9ebdbbbe65907670@epcas1p2.samsung.com>
+ <1464947719-6245-5-git-send-email-hl@rock-chips.com>
+Message-ID: <57515B4F.5000309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 10:12:12PM +0100, Matt Fleming wrote:
-> On Wed, 25 May, at 04:11:56PM, Mark Rutland wrote:
-> > 
-> > No further restriction on alignment is provided in the UEFI
-> > specification, neither generically nor in a rule specific to AArch64.
+Hi Lin,
+
+I add the some comment on below. If you modify it,
+You can add my acked-by tag. Looks good to me.
+
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Also, I'd like you to add me to mail thread
+on next version because I'm supporter of devfreq-event.
+
+On 2016? 06? 03? 18:55, Lin Huang wrote:
+> on rk3399 platform, there is dfi conroller can monitor
+> ddr load, base on this result, we can do ddr freqency
+> scaling.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v1:
+> - NOne
+> 
+>  drivers/devfreq/event/Kconfig        |   7 +
+>  drivers/devfreq/event/Makefile       |   1 +
+>  drivers/devfreq/event/rockchip-dfi.c | 265 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 273 insertions(+)
+>  create mode 100644 drivers/devfreq/event/rockchip-dfi.c
+> 
+> diff --git a/drivers/devfreq/event/Kconfig b/drivers/devfreq/event/Kconfig
+> index 1e8b4f4..6ebdc13 100644
+> --- a/drivers/devfreq/event/Kconfig
+> +++ b/drivers/devfreq/event/Kconfig
+> @@ -30,4 +30,11 @@ config DEVFREQ_EVENT_EXYNOS_PPMU
+>  	  (Platform Performance Monitoring Unit) counters to estimate the
+>  	  utilization of each module.
 >  
-> This surprises me. I could have sworn the intention was to add this
-> restriction to the spec when the strict permissions were being
-> discussed in the UEFI working groups.
+> +config DEVFREQ_EVENT_ROCKCHIP_DFI
+> +	bool "ROCKCHIP DFI DEVFREQ event Driver"
+> +	depends on ARCH_ROCKCHIP
+> +	help
+> +	  This add the devfreq-event driver for Rockchip SoC. It provides DFI
+
+You better to full name of 'DFI' abbreviation as following:
+- DFI (Dxxx Fxxx Ixxx)
+
+> +	  driver to count ddr load.
+> +
+>  endif # PM_DEVFREQ_EVENT
+> diff --git a/drivers/devfreq/event/Makefile b/drivers/devfreq/event/Makefile
+> index 3d6afd3..dda7090 100644
+> --- a/drivers/devfreq/event/Makefile
+> +++ b/drivers/devfreq/event/Makefile
+> @@ -2,3 +2,4 @@
+>  
+>  obj-$(CONFIG_DEVFREQ_EVENT_EXYNOS_NOCP) += exynos-nocp.o
+>  obj-$(CONFIG_DEVFREQ_EVENT_EXYNOS_PPMU) += exynos-ppmu.o
+> +obj-$(CONFIG_DEVFREQ_EVENT_ROCKCHIP_DFI) += rockchip-dfi.o
+> diff --git a/drivers/devfreq/event/rockchip-dfi.c b/drivers/devfreq/event/rockchip-dfi.c
+> new file mode 100644
+> index 0000000..e3b020f9
+> --- /dev/null
+> +++ b/drivers/devfreq/event/rockchip-dfi.c
+> @@ -0,0 +1,265 @@
+> +/*
+> + * Copyright (c) 2016, Fuzhou Rockchip Electronics Co., Ltd
+> + * Author: Lin Huang <hl@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope it will be useful, but WITHOUT
+> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> + * more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/devfreq-event.h>
+> +#include <linux/kernel.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +#include <linux/io.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regmap.h>
+> +#include <linux/slab.h>
+> +#include <linux/list.h>
+> +#include <linux/of.h>
+> +
+> +#define RK3399_DMC_NUM_CH	2
+> +
+> +/* DDRMON_CTRL */
+> +#define DDRMON_CTRL	0x04
+> +#define CLR_DDRMON_CTRL	(0x1f0000 << 0)
+> +#define LPDDR4_EN	(0x10001 << 4)
+> +#define HARDWARE_EN	(0x10001 << 3)
+> +#define LPDDR3_EN	(0x10001 << 2)
+> +#define SOFTWARE_EN	(0x10001 << 1)
+> +#define TIME_CNT_EN	(0x10001 << 0)
+> +
+> +#define DDRMON_CH0_COUNT_NUM		0x28
+> +#define DDRMON_CH0_DFI_ACCESS_NUM	0x2c
+> +#define DDRMON_CH1_COUNT_NUM		0x3c
+> +#define DDRMON_CH1_DFI_ACCESS_NUM	0x40
+> +
+> +/* pmu grf */
+> +#define PMUGRF_OS_REG2	0x308
+> +#define DDRTYPE_SHIFT	13
+> +#define DDRTYPE_MASK	7
+> +
+> +enum {
+> +	DDR3 = 3,
+> +	LPDDR3 = 6,
+> +	LPDDR4 = 7,
+> +	UNUSED = 0xFF
+> +};
+> +
+> +struct dmc_usage {
+> +	u32 access;
+> +	u32 total;
+> +};
+> +
+> +struct rockchip_dfi {
+> +	struct devfreq_event_dev *edev;
+> +	struct devfreq_event_desc *desc;
+> +	struct dmc_usage ch_usage[RK3399_DMC_NUM_CH];
+> +	struct device *dev;
+> +	void __iomem *regs;
+> +	struct regmap *regmap_pmu;
+> +	struct clk *clk;
+> +};
+> +
+> +static void rockchip_dfi_start_hardware_counter(struct devfreq_event_dev *edev)
+> +{
+> +	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
+> +	void __iomem *dfi_regs = info->regs;
+> +	u32 val;
+> +	u32 ddr_type;
+> +
+> +	/* get ddr type */
+> +	regmap_read(info->regmap_pmu, PMUGRF_OS_REG2, &val);
+> +	ddr_type = (val >> DDRTYPE_SHIFT) & DDRTYPE_MASK;
+> +
+> +	/* clear DDRMON_CTRL setting */
+> +	writel_relaxed(CLR_DDRMON_CTRL, dfi_regs + DDRMON_CTRL);
+> +
+> +	/* set ddr type to dfi */
+> +	if (ddr_type == LPDDR3)
+> +		writel_relaxed(LPDDR3_EN, dfi_regs + DDRMON_CTRL);
+> +	else if (ddr_type == LPDDR4)
+> +		writel_relaxed(LPDDR4_EN, dfi_regs + DDRMON_CTRL);
+> +
+> +	/* enable count, use software mode */
+> +	writel_relaxed(SOFTWARE_EN, dfi_regs + DDRMON_CTRL);
+> +}
+> +
+> +static void rockchip_dfi_stop_hardware_counter(struct devfreq_event_dev *edev)
+> +{
+> +	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
+> +	void __iomem *dfi_regs = info->regs;
+> +	u32 val;
+> +
+> +	val = readl_relaxed(dfi_regs + DDRMON_CTRL);
+> +	val &= ~SOFTWARE_EN;
+> +	writel_relaxed(val, dfi_regs + DDRMON_CTRL);
+> +}
+> +
+> +static int rockchip_dfi_get_busier_ch(struct devfreq_event_dev *edev)
+> +{
+> +	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
+> +	u32 tmp, max = 0;
+> +	u32 i, busier_ch = 0;
+> +	void __iomem *dfi_regs = info->regs;
+> +
+> +	rockchip_dfi_stop_hardware_counter(edev);
+> +
+> +	/* Find out which channel is busier */
+> +	for (i = 0; i < RK3399_DMC_NUM_CH; i++) {
+> +		info->ch_usage[i].access = readl_relaxed(dfi_regs +
+> +				DDRMON_CH0_DFI_ACCESS_NUM + i * 20);
+> +		info->ch_usage[i].total = readl_relaxed(dfi_regs +
+> +				DDRMON_CH0_COUNT_NUM + i * 20);
+> +		tmp = info->ch_usage[i].access;
+> +		if (tmp > max) {
+> +			busier_ch = i;
+> +			max = tmp;
+> +		}
+> +	}
+> +	rockchip_dfi_start_hardware_counter(edev);
+> +
+> +	return busier_ch;
+> +}
+> +
+> +static int rockchip_dfi_disable(struct devfreq_event_dev *edev)
+> +{
+> +	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
+> +
+> +	rockchip_dfi_stop_hardware_counter(edev);
+> +	clk_disable(info->clk);
+
+I prefer to change the function as following. I add the comment on below in probe()
+- clk_disable -> clk_disable_unprepare()
+
+
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_dfi_enable(struct devfreq_event_dev *edev)
+> +{
+> +	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
+> +	int ret;
+> +
+> +	ret = clk_enable(info->clk);
+
+I prefer to change the function as following. I add the comment on below in probe()
+- clk_enable -> clk_prepare_enable()
+
+> +	if (ret)
+> +		return ret;
+> +
+> +	rockchip_dfi_start_hardware_counter(edev);
+> +	return 0;
+> +}
+> +
+> +static int rockchip_dfi_set_event(struct devfreq_event_dev *edev)
+> +{
+> +	return 0;
+> +}
+> +
+> +static int rockchip_dfi_get_event(struct devfreq_event_dev *edev,
+> +				  struct devfreq_event_data *edata)
+> +{
+> +	struct rockchip_dfi *info = devfreq_event_get_drvdata(edev);
+> +	int busier_ch;
+> +
+> +	busier_ch = rockchip_dfi_get_busier_ch(edev);
+> +
+> +	edata->load_count = info->ch_usage[busier_ch].access;
+> +	edata->total_count = info->ch_usage[busier_ch].total;
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct devfreq_event_ops rockchip_dfi_ops = {
+> +	.disable = rockchip_dfi_disable,
+> +	.enable = rockchip_dfi_enable,
+> +	.get_event = rockchip_dfi_get_event,
+> +	.set_event = rockchip_dfi_set_event,
+> +};
+> +
+> +static const struct of_device_id rockchip_dfi_id_match[] = {
+> +	{ .compatible = "rockchip,rk3399-dfi" },
+> +	{ },
+> +};
+> +
+> +static int rockchip_dfi_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct rockchip_dfi *data;
+> +	struct resource *res;
+> +	struct devfreq_event_desc *desc;
+> +	int ret;
+> +	struct device_node *np = pdev->dev.of_node, *node;
+> +
+> +	data = devm_kzalloc(dev, sizeof(struct rockchip_dfi), GFP_KERNEL);
+> +	if (!data)
+> +		return -ENOMEM;
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	data->regs = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(data->regs))
+> +		return PTR_ERR(data->regs);
+> +
+> +	data->clk = devm_clk_get(dev, "pclk_ddr_mon");
+> +	if (IS_ERR(data->clk)) {
+> +		dev_err(dev, "Cannot get the clk dmc_clk\n");
+> +		return PTR_ERR(data->clk);
+> +	};
+> +
+> +	/* try to find the optional reference to the pmu syscon */
+> +	node = of_parse_phandle(np, "rockchip,pmu", 0);
+> +	if (node) {
+> +		data->regmap_pmu = syscon_node_to_regmap(node);
+> +		if (IS_ERR(data->regmap_pmu))
+> +			return PTR_ERR(data->regmap_pmu);
+> +	}
+> +	data->dev = dev;
+> +
+> +	desc = devm_kzalloc(dev, sizeof(*desc), GFP_KERNEL);
+> +	if (!desc)
+> +		return -ENOMEM;
+> +
+> +	desc->ops = &rockchip_dfi_ops;
+> +	desc->driver_data = data;
+> +	desc->name = np->name;
+> +	data->desc = desc;
+> +
+> +	data->edev = devm_devfreq_event_add_edev(&pdev->dev, desc);
+> +	if (IS_ERR(data->edev)) {
+> +		ret = PTR_ERR(data->edev);
+> +		dev_err(&pdev->dev,
+> +			"failed to add devfreq-event device\n");
+> +		return ret;
+
+You can simply return the PTR_ERR(data->edev) without 'ret' variable as following:
+
+	return PTR_ERR(data->edev);
+
+
+> +	}
+> +
+> +	ret = clk_prepare_enable(data->clk);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "failed to enable clk: %d\n", ret);
+> +		clk_disable_unprepare(data->clk);
+> +		return ret;
+> +	}
+
+The following two functions handle the clock. So, rockchip_dfi_probe()
+don't need to enable the clock. Just pass the role of clock control to the following functions.
+Because of calling the twice of enable function of clock, the usage count of clock
+is mismatch when disabling the clock.
+- rockchip_dfi_enable(struct devfreq_event_dev *edev) enable the clock.
+- rockchip_dfi_disable(struct devfreq_event_dev *edev) disable the clock.
+
+
+> +
+> +	platform_set_drvdata(pdev, data);
+> +
+> +	return 0;
+> +}
+> +
+> +static int rockchip_dfi_remove(struct platform_device *pdev)
+> +{
+> +	return 0;
+> +}
+
+If the rockchip_dfi_remove() don't do anything, you can remove it
+
+> +
+> +static struct platform_driver rockchip_dfi_driver = {
+> +	.probe	= rockchip_dfi_probe,
+> +	.remove	= rockchip_dfi_remove,
+
+ditto.
+
+> +	.driver = {
+> +		.name	= "rockchip-dfi",
+> +		.of_match_table = rockchip_dfi_id_match,
+> +	},
+> +};
+> +module_platform_driver(rockchip_dfi_driver);
+> +
+> +MODULE_LICENSE("GPL v2");
+
+You need to add MODULE_AUTHOR("").
+
+> +MODULE_DESCRIPTION("Rockchip dfi driver");
 > 
-> Am I reinventing history?
-> 
-> As an aside, Mark, Jeremy, which machines did you see this warning
-> triggered on? Preproduction/development boards or also in the wild?
 
-Mark, Jeremy?
+Remove unneeded blank line
 
-I've kept this patch marked as unread, but it's not clear to me (a) how
-urgent it is (b) what tree it should go through and (c) whether it's the
-right thing to do!
-
-Will
+Regards,
+Chanwoo Choi
