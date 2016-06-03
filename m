@@ -1,63 +1,45 @@
-From: sr@denx.de (Stefan Roese)
-Date: Fri, 3 Jun 2016 07:57:34 +0200
-Subject: [PATCH] PCI: mvebu: Don't try to add an MBus window that already
- exists
-In-Reply-To: <20160602151818.0989ee50@free-electrons.com>
-References: <20160602125247.17566-1-sr@denx.de>
- <20160602151818.0989ee50@free-electrons.com>
-Message-ID: <57511C4E.5040501@denx.de>
+From: luoyi.ly@gmail.com (luoyi.ly at gmail.com)
+Date: Fri,  3 Jun 2016 14:13:36 +0800
+Subject: [linux-sunxi] [PATCH] [V2] ARM: dts: sun7i: Add dts file for
+ Bananapi M1 Plus board
+In-Reply-To: <574FF94B.3020309@web.de>
+References: <574FF94B.3020309@web.de>
+Message-ID: <20160603061336.16263-1-luoyi.ly@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+From: Luo Yi <luoyi.ly@gmail.com>
 
-On 02.06.2016 15:18, Thomas Petazzoni wrote:
-> On Thu,  2 Jun 2016 14:52:47 +0200, Stefan Roese wrote:
->> Add a check to mvebu_pcie_add_windows() to detect, if an MBus window is
->> already configured. If this is the case (base address, size, target and
->> attribute are identical), then this window is not created. This fixes
->> a problem I'm currently seeing on a custom Armada XP based board, which
->> generates this error upon PCI rescanning (in this case via sysfs):
->>
->> $ echo 1 > /sys/bus/pci/rescan
->> mvebu_mbus: cannot add window '4:e8', conflicts with another window
->> mvebu-pcie soc:pcie-controller: Could not create MBus window at [mem 0x9e000000-0x9e0fffff]: -22
->
-> Thanks for the patch. I am not familiar with what happens during a PCI
-> rescan, but shouldn't the MBus windows be deleted and then re-added?
+Remove the extra empty line and add signed off. 
 
-It does not happen in this rescan case.
+Signed-off-by: Luo Yi <luoyi.ly@gmail.com>
+---
+ arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts | 4 ----
+ 1 file changed, 4 deletions(-)
 
-> The pci-mvebu driver deletes the MBus windows for a given PCI device
-> when invalid memory base/limits are set in the emulated PCI bridge.
-> Shouldn't this happen over a rescan?
-
-I'm not sure what *should* happen upon rescan. But testing shows, that
-no MBus window is removed upon rescan. I just tested what happens,
-if the PCI devices are "removed" via sysfs. And this also does not
-delete any of the MBus windows.
-
-> If it doesn't, then the other question is whether the check you're
-> adding should be done in the PCI driver or in the MBus driver.
->
-> In commit b566e782be32145664d96ada3e389f17d32742e5, we already relaxed
-> the checks done by the MBus driver, and since this commit we allow
-> different windows to have the same target/attribute.
->
-> Should the MBus driver also allow re-creating a	window that
-> already exists, if all its properties are the same?
-
-This sounds like a good idea to me. To move this detection / decision
-one layer up. So that it will work for other drivers using this
-MBus interface as well.
-
-> Note that I am not asking you to rework your patch in this direction
-> for the moment, I'm only opening the question. I haven't made up my
-> mind yet on which solution is the most correct one.
-
-Understood. Thanks for your comments. Just let me know, if you want
-me to rework this patch to move this check into the MBus driver
-instead. And I will try to come up with such a patch shortly.
-
-Thanks,
-Stefan
+diff --git a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+index 6fd55d7..f9063ba 100644
+--- a/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
++++ b/arch/arm/boot/dts/sun7i-a20-bananapi-m1-plus.dts
+@@ -47,7 +47,6 @@
+ 	compatible = "sinovoip,bpi-m1-plus", "allwinner,sun7i-a20";
+ };
+ 
+-
+ &codec {
+ 	status = "okay";
+ };
+@@ -62,11 +61,8 @@
+ 		interrupts = <7 15 IRQ_TYPE_LEVEL_LOW>; 
+ 		interrupt-names = "host-wake";
+ 	};
+-
+ };
+ 
+ &mmc3_pins_a {
+-    /* AP6210 requires pull-up */
+ 	allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ };
+-
+-- 
+2.8.3
