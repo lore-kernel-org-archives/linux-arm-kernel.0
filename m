@@ -1,267 +1,224 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Fri, 3 Jun 2016 20:36:28 +0900
-Subject: [PATCH v13 01/10] arm64: Add HAVE_REGS_AND_STACK_ACCESS_API
- feature
-In-Reply-To: <1464924384-15269-2-git-send-email-dave.long@linaro.org>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-2-git-send-email-dave.long@linaro.org>
-Message-ID: <20160603203628.c2b6cc4b3eb3142973cb3fd8@kernel.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 3 Jun 2016 12:38:10 +0100
+Subject: [PATCH V8 7/9] acpi: Add generic MCFG table handling
+In-Reply-To: <1464621262-26770-8-git-send-email-tn@semihalf.com>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-8-git-send-email-tn@semihalf.com>
+Message-ID: <20160603113810.GA24764@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  2 Jun 2016 23:26:15 -0400
-David Long <dave.long@linaro.org> wrote:
+On Mon, May 30, 2016 at 05:14:20PM +0200, Tomasz Nowicki wrote:
+> In order to handle PCI config space regions properly in ACPI, new MCFG
+> interface is defined which does sanity checks on MCFG table and keeps its
+> root pointer. The user is able to lookup MCFG regions based on
+> host bridge root structure and domain:bus_start:bus_end touple.
+> Use pci_mmcfg_late_init old prototype to avoid another function name.
 
-> From: "David A. Long" <dave.long@linaro.org>
-> 
-> Add HAVE_REGS_AND_STACK_ACCESS_API feature for arm64, including supporting
-> functions and defines.
-> 
+"According to PCI firmware specifications, on systems booting with ACPI,
+PCI configuration for a host bridge must be set-up through the MCFG table
+regions for non-hotpluggable bridges and _CBA method for hotpluggable ones.
 
-Looks good to me.
+Current MCFG table handling code, as implemented for x86, cannot be
+easily generalized owing to x86 specific quirks handling and related
+code, which makes it hard to reuse on other architectures.
 
-Reviewed-by: Masami Hiramatsu <mhiramat@kernel.org>
+In order to implement MCFG PCI configuration handling for new platforms
+booting with ACPI (eg ARM64) this patch re-implements MCFG handling from
+scratch in a streamlined fashion and provides (through a generic
+interface available to all arches):
 
-Thanks,
+- Simplified MCFG table parsing (executed through the pci_mmcfg_late_init()
+  hook as in current x86)
+- MCFG regions look-up interface through domain:bus_start:bus_end tuple
 
-> Signed-off-by: David A. Long <dave.long@linaro.org>
+The new MCFG regions handling interface is added to generic ACPI code
+so that existing architectures (eg x86) can be moved over to it and
+architectures relying on MCFG for ACPI PCI config space can rely on it
+without having to resort to arch specific implementations."
+
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 > ---
->  arch/arm64/Kconfig              |   1 +
->  arch/arm64/include/asm/ptrace.h |  54 +++++++++++++++++-
->  arch/arm64/kernel/ptrace.c      | 118 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 172 insertions(+), 1 deletion(-)
+>  drivers/acpi/Kconfig     |  3 ++
+>  drivers/acpi/Makefile    |  1 +
+>  drivers/acpi/pci_mcfg.c  | 94 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/pci-acpi.h |  2 ++
+>  include/linux/pci.h      |  2 +-
+>  5 files changed, 101 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/acpi/pci_mcfg.c
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 76747d9..0f7a624 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -85,6 +85,7 @@ config ARM64
->  	select HAVE_PERF_EVENTS
->  	select HAVE_PERF_REGS
->  	select HAVE_PERF_USER_STACK_DUMP
-> +	select HAVE_REGS_AND_STACK_ACCESS_API
->  	select HAVE_RCU_TABLE_FREE
->  	select HAVE_SYSCALL_TRACEPOINTS
->  	select IOMMU_DMA if IOMMU_SUPPORT
-> diff --git a/arch/arm64/include/asm/ptrace.h b/arch/arm64/include/asm/ptrace.h
-> index a307eb6..c130f2b 100644
-> --- a/arch/arm64/include/asm/ptrace.h
-> +++ b/arch/arm64/include/asm/ptrace.h
-> @@ -74,6 +74,7 @@
->  #define COMPAT_PT_DATA_ADDR		0x10004
->  #define COMPAT_PT_TEXT_END_ADDR		0x10008
->  #ifndef __ASSEMBLY__
-> +#include <linux/bug.h>
+> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
+> index b7e2e77..f98c328 100644
+> --- a/drivers/acpi/Kconfig
+> +++ b/drivers/acpi/Kconfig
+> @@ -217,6 +217,9 @@ config ACPI_PROCESSOR_IDLE
+>  	bool
+>  	select CPU_IDLE
 >  
->  /* sizeof(struct user) for AArch32 */
->  #define COMPAT_USER_SZ	296
-> @@ -119,6 +120,8 @@ struct pt_regs {
->  	u64 syscallno;
->  };
->  
-> +#define MAX_REG_OFFSET offsetof(struct pt_regs, pstate)
+> +config ACPI_MCFG
+> +	bool
 > +
->  #define arch_has_single_step()	(1)
->  
->  #ifdef CONFIG_COMPAT
-> @@ -147,6 +150,55 @@ struct pt_regs {
->  #define user_stack_pointer(regs) \
->  	(!compat_user_mode(regs) ? (regs)->sp : (regs)->compat_sp)
->  
-> +extern int regs_query_register_offset(const char *name);
-> +extern const char *regs_query_register_name(unsigned int offset);
-> +extern bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr);
-> +extern unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs,
-> +					       unsigned int n);
-> +
-> +/**
-> + * regs_get_register() - get register value from its offset
-> + * @regs:	   pt_regs from which register value is gotten
-> + * @offset:    offset of the register.
+>  config ACPI_CPPC_LIB
+>  	bool
+>  	depends on ACPI_PROCESSOR
+> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
+> index 251ce85..632e81f 100644
+> --- a/drivers/acpi/Makefile
+> +++ b/drivers/acpi/Makefile
+> @@ -40,6 +40,7 @@ acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
+>  acpi-y				+= ec.o
+>  acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
+>  acpi-y				+= pci_root.o pci_link.o pci_irq.o
+> +obj-$(CONFIG_ACPI_MCFG)		+= pci_mcfg.o
+>  acpi-y				+= acpi_lpss.o acpi_apd.o
+>  acpi-y				+= acpi_platform.o
+>  acpi-y				+= acpi_pnp.o
+> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
+> new file mode 100644
+> index 0000000..1847f74
+> --- /dev/null
+> +++ b/drivers/acpi/pci_mcfg.c
+> @@ -0,0 +1,94 @@
+> +/*
+> + * Copyright (C) 2016 Broadcom
+> + *	Author: Jayachandran C <jchandra@broadcom.com>
+> + * Copyright (C) 2016 Semihalf
+> + * 	Author: Tomasz Nowicki <tn@semihalf.com>
 > + *
-> + * regs_get_register returns the value of a register whose offset from @regs.
-> + * The @offset is the offset of the register in struct pt_regs.
-> + * If @offset is bigger than MAX_REG_OFFSET, this returns 0.
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License, version 2, as
+> + * published by the Free Software Foundation (the "GPL").
+> + *
+> + * This program is distributed in the hope that it will be useful, but
+> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+> + * General Public License version 2 (GPLv2) for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * version 2 (GPLv2) along with this source code.
 > + */
-> +static inline u64 regs_get_register(struct pt_regs *regs,
-> +					      unsigned int offset)
+> +
+> +#define pr_fmt(fmt) "ACPI: " fmt
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/pci.h>
+> +#include <linux/pci-acpi.h>
+> +
+> +/* Root pointer to the mapped MCFG table */
+> +static struct acpi_table_mcfg *mcfg_table;
+> +static int mcfg_entries;
+> +
+> +int pci_mcfg_lookup(struct acpi_pci_root *root)
 > +{
-> +	u64 val = 0;
+> +	struct acpi_mcfg_allocation *mptr, *entry = NULL;
+> +	struct resource *bus_res = &root->secondary;
+> +	int i;
 > +
-> +	WARN_ON(offset & 7);
-> +
-> +	offset >>= 3;
-> +	switch (offset) {
-> +	case	0 ... 30:
-> +		val = regs->regs[offset];
-> +		break;
-> +	case offsetof(struct pt_regs, sp):
-> +		val = regs->sp;
-> +		break;
-> +	case offsetof(struct pt_regs, pc):
-> +		val = regs->pc;
-> +		break;
-> +	case offsetof(struct pt_regs, pstate):
-> +		val = regs->pstate;
-> +		break;
-> +	default:
-> +		val = 0;
+> +	if (mcfg_table) {
+> +		mptr = (struct acpi_mcfg_allocation *) &mcfg_table[1];
+> +		for (i = 0; i < mcfg_entries && !entry; i++, mptr++)
+> +			if (mptr->pci_segment == root->segment &&
+> +			    mptr->start_bus_number == bus_res->start)
+> +				entry = mptr;
 > +	}
 > +
-> +	return val;
-> +}
-> +
-> +/* Valid only for Kernel mode traps. */
-> +static inline unsigned long kernel_stack_pointer(struct pt_regs *regs)
-> +{
-> +	return regs->sp;
-> +}
-> +
->  static inline unsigned long regs_return_value(struct pt_regs *regs)
->  {
->  	return regs->regs[0];
-> @@ -156,7 +208,7 @@ static inline unsigned long regs_return_value(struct pt_regs *regs)
->  struct task_struct;
->  int valid_user_regs(struct user_pt_regs *regs, struct task_struct *task);
->  
-> -#define instruction_pointer(regs)	((unsigned long)(regs)->pc)
-> +#define instruction_pointer(regs)	((regs)->pc)
->  
->  extern unsigned long profile_pc(struct pt_regs *regs);
->  
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 3f6cd5c..2c88c33 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -48,6 +48,124 @@
->  #define CREATE_TRACE_POINTS
->  #include <trace/events/syscalls.h>
->  
-> +struct pt_regs_offset {
-> +	const char *name;
-> +	int offset;
-> +};
-> +
-> +#define REG_OFFSET_NAME(r) {.name = #r, .offset = offsetof(struct pt_regs, r)}
-> +#define REG_OFFSET_END {.name = NULL, .offset = 0}
-> +#define	GPR_OFFSET_NAME(r)	\
-> +	{.name = "x" #r, .offset = offsetof(struct pt_regs, regs[r])}
-> +
-> +static const struct pt_regs_offset regoffset_table[] = {
-> +	GPR_OFFSET_NAME(0),
-> +	GPR_OFFSET_NAME(1),
-> +	GPR_OFFSET_NAME(2),
-> +	GPR_OFFSET_NAME(3),
-> +	GPR_OFFSET_NAME(4),
-> +	GPR_OFFSET_NAME(5),
-> +	GPR_OFFSET_NAME(6),
-> +	GPR_OFFSET_NAME(7),
-> +	GPR_OFFSET_NAME(8),
-> +	GPR_OFFSET_NAME(9),
-> +	GPR_OFFSET_NAME(10),
-> +	GPR_OFFSET_NAME(11),
-> +	GPR_OFFSET_NAME(12),
-> +	GPR_OFFSET_NAME(13),
-> +	GPR_OFFSET_NAME(14),
-> +	GPR_OFFSET_NAME(15),
-> +	GPR_OFFSET_NAME(16),
-> +	GPR_OFFSET_NAME(17),
-> +	GPR_OFFSET_NAME(18),
-> +	GPR_OFFSET_NAME(19),
-> +	GPR_OFFSET_NAME(20),
-> +	GPR_OFFSET_NAME(21),
-> +	GPR_OFFSET_NAME(22),
-> +	GPR_OFFSET_NAME(23),
-> +	GPR_OFFSET_NAME(24),
-> +	GPR_OFFSET_NAME(25),
-> +	GPR_OFFSET_NAME(26),
-> +	GPR_OFFSET_NAME(27),
-> +	GPR_OFFSET_NAME(28),
-> +	GPR_OFFSET_NAME(29),
-> +	GPR_OFFSET_NAME(30),
-> +	{.name = "lr", .offset = offsetof(struct pt_regs, regs[30])},
-> +	REG_OFFSET_NAME(sp),
-> +	REG_OFFSET_NAME(pc),
-> +	REG_OFFSET_NAME(pstate),
-> +	REG_OFFSET_END,
-> +};
-> +
-> +/**
-> + * regs_query_register_offset() - query register offset from its name
-> + * @name:	the name of a register
-> + *
-> + * regs_query_register_offset() returns the offset of a register in struct
-> + * pt_regs from its name. If the name is invalid, this returns -EINVAL;
-> + */
-> +int regs_query_register_offset(const char *name)
-> +{
-> +	const struct pt_regs_offset *roff;
-> +
-> +	for (roff = regoffset_table; roff->name != NULL; roff++)
-> +		if (!strcmp(roff->name, name))
-> +			return roff->offset;
-> +	return -EINVAL;
-> +}
-> +
-> +/**
-> + * regs_query_register_name() - query register name from its offset
-> + * @offset:	the offset of a register in struct pt_regs.
-> + *
-> + * regs_query_register_name() returns the name of a register from its
-> + * offset in struct pt_regs. If the @offset is invalid, this returns NULL;
-> + */
-> +const char *regs_query_register_name(unsigned int offset)
-> +{
-> +	const struct pt_regs_offset *roff;
-> +
-> +	for (roff = regoffset_table; roff->name != NULL; roff++)
-> +		if (roff->offset == offset)
-> +			return roff->name;
-> +	return NULL;
-> +}
-> +
-> +/**
-> + * regs_within_kernel_stack() - check the address in the stack
-> + * @regs:      pt_regs which contains kernel stack pointer.
-> + * @addr:      address which is checked.
-> + *
-> + * regs_within_kernel_stack() checks @addr is within the kernel stack page(s).
-> + * If @addr is within the kernel stack, it returns true. If not, returns false.
-> + */
-> +bool regs_within_kernel_stack(struct pt_regs *regs, unsigned long addr)
-> +{
-> +	return ((addr & ~(THREAD_SIZE - 1))  ==
-> +		(kernel_stack_pointer(regs) & ~(THREAD_SIZE - 1))) ||
-> +		on_irq_stack(addr, raw_smp_processor_id());
-> +}
-> +
-> +/**
-> + * regs_get_kernel_stack_nth() - get Nth entry of the stack
-> + * @regs:	pt_regs which contains kernel stack pointer.
-> + * @n:		stack entry number.
-> + *
-> + * regs_get_kernel_stack_nth() returns @n th entry of the kernel stack which
-> + * is specified by @regs. If the @n th entry is NOT in the kernel stack,
-> + * this returns 0.
-> + */
-> +unsigned long regs_get_kernel_stack_nth(struct pt_regs *regs, unsigned int n)
-> +{
-> +	unsigned long *addr = (unsigned long *)kernel_stack_pointer(regs);
-> +
-> +	addr += n;
-> +	if (regs_within_kernel_stack(regs, (unsigned long)addr))
-> +		return *addr;
-> +	else
+> +	/* not found, use _CBA if available, else error */
+> +	if (!entry) {
+> +		if (root->mcfg_addr)
+> +			return root->mcfg_addr;
+> +		pr_err("%04x:%pR MCFG lookup failed\n", root->segment, bus_res);
+> +		return -ENOENT;
+> +	} else if (root->mcfg_addr && entry->address != root->mcfg_addr) {
+> +		pr_warn("%04x:%pR CBA %pa != MCFG %lx, using CBA\n",
+> +			root->segment, bus_res, &root->mcfg_addr,
+> +			(unsigned long)entry->address);
 > +		return 0;
+> +	}
+> +
+> +	/* found matching entry, bus range check */
+> +	if (entry->end_bus_number != bus_res->end) {
+> +		resource_size_t bus_end = min_t(resource_size_t,
+> +					entry->end_bus_number, bus_res->end);
+> +		pr_warn("%04x:%pR bus end mismatch, using %02lx\n",
+> +			root->segment, bus_res, (unsigned long)bus_end);
+> +		bus_res->end = bus_end;
+> +	}
+> +
+> +	if (!root->mcfg_addr)
+> +		root->mcfg_addr = entry->address;
+
+Let's hope that no one will ever implement a hotplug bridge with config
+space starting at physical address 0x0.
+
+Nit: You should define what the return value means. For success, once you
+return the _CBA address, once 0; this should be consistent.
+
+Anyway, this function is not easy to read but it may well be fine, I will let
+Bjorn decide what to do with corner cases:
+
+a) _CBA is != 0 and you get a MCFG entry that matches its address (I am
+    not sure that capping the _CRS bus numbers is PCI compliant in that case)
+b) bus_end capping, either you leave code as-is (that caps also _CRS) or
+   just warn and fail if the bus->end numbers mismatch
+
+Pending Bjorn's opinion on the above (and commit log update):
+
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+
+> +	return 0;
 > +}
 > +
->  /*
->   * TODO: does not yet catch signals sent when the child dies.
->   * in exit.c or in signal.c.
+> +static __init int pci_mcfg_parse(struct acpi_table_header *header)
+> +{
+> +	if (header->length < sizeof(struct acpi_table_mcfg))
+> +		return -EINVAL;
+> +
+> +	mcfg_entries = (header->length - sizeof(struct acpi_table_mcfg)) /
+> +					sizeof(struct acpi_mcfg_allocation);
+> +	if (mcfg_entries == 0) {
+> +		pr_err("MCFG has no entries\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	mcfg_table = (struct acpi_table_mcfg *)header;
+> +	pr_info("MCFG table detected, %d entries\n", mcfg_entries);
+> +	return 0;
+> +}
+> +
+> +/* Interface called by ACPI - parse and save MCFG table */
+> +void __init pci_mmcfg_late_init(void)
+> +{
+> +	int err = acpi_table_parse(ACPI_SIG_MCFG, pci_mcfg_parse);
+> +	if (err)
+> +		pr_err("Failed to parse MCFG (%d)\n", err);
+> +}
+> diff --git a/include/linux/pci-acpi.h b/include/linux/pci-acpi.h
+> index 89ab057..e0e6dfc 100644
+> --- a/include/linux/pci-acpi.h
+> +++ b/include/linux/pci-acpi.h
+> @@ -24,6 +24,8 @@ static inline acpi_status pci_acpi_remove_pm_notifier(struct acpi_device *dev)
+>  }
+>  extern phys_addr_t acpi_pci_root_get_mcfg_addr(acpi_handle handle);
+>  
+> +extern int pci_mcfg_lookup(struct acpi_pci_root *root);
+> +
+>  static inline acpi_handle acpi_find_root_bridge_handle(struct pci_dev *pdev)
+>  {
+>  	struct pci_bus *pbus = pdev->bus;
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index bba4053..9661c85 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1724,7 +1724,7 @@ void pcibios_free_irq(struct pci_dev *dev);
+>  extern struct dev_pm_ops pcibios_pm_ops;
+>  #endif
+>  
+> -#ifdef CONFIG_PCI_MMCONFIG
+> +#if defined(CONFIG_PCI_MMCONFIG) || defined(CONFIG_ACPI_MCFG)
+>  void __init pci_mmcfg_early_init(void);
+>  void __init pci_mmcfg_late_init(void);
+>  #else
 > -- 
-> 2.5.0
+> 1.9.1
 > 
-
-
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
