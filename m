@@ -1,629 +1,163 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  3 Jun 2016 15:02:50 +0100
-Subject: [PATCH v5 11/13] KVM: arm64: implement ITS command queue command
- handlers
-In-Reply-To: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
-References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1464962572-3925-12-git-send-email-andre.przywara@arm.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri,  3 Jun 2016 16:05:09 +0200
+Subject: [PATCH v2 2/4] phy-sun4i-usb: Add support for peripheral-only mode
+In-Reply-To: <1464962711-5871-1-git-send-email-hdegoede@redhat.com>
+References: <1464962711-5871-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1464962711-5871-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The connection between a device, an event ID, the LPI number and the
-allocated CPU is stored in in-memory tables in a GICv3, but their
-format is not specified by the spec. Instead software uses a command
-queue in a ring buffer to let the ITS implementation use their own
-format.
-Implement handlers for the various ITS commands and let them store
-the requested relation into our own data structures.
-To avoid kmallocs inside the ITS spinlock, we preallocate possibly
-needed memory outside of the lock and free that if it turns out to
-be not needed (mostly error handling).
-Error handling is very basic at this point, as we don't have a good
-way of communicating errors to the guest (usually a SError).
-The INT command handler is missing at this point, as we gain the
-capability of actually injecting MSIs into the guest only later on.
+Use the new of_usb_get_dr_mode_by_phy() function to get the dr_mode
+from the musb controller node instead of assuming that having an id_det
+gpio means otg mode, and not having one means host mode.
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Implement peripheral-only mode by adding a sun4i_usb_phy0_get_id_det
+helper which looks at the dr_mode, always registering our extcon and
+always monitoring vbus.
+
+If dr_mode is not specified in the dts, do not register phy0 as we then
+do not know how to treat it. This is actually a good thing as this means
+we will not be registering phy0 on devices where the otg controller is
+not enabled in the devicetree.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- include/linux/irqchip/arm-gic-v3.h |  19 +-
- virt/kvm/arm/vgic/vgic-its.c       | 513 ++++++++++++++++++++++++++++++++++++-
- 2 files changed, 530 insertions(+), 2 deletions(-)
+Changes in v2:
+-Adjust for of_usb_get_dr_mode_by_phy now taking an args0 parameter
+---
+ drivers/phy/phy-sun4i-usb.c | 62 ++++++++++++++++++++++++++++++---------------
+ 1 file changed, 42 insertions(+), 20 deletions(-)
 
-diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
-index 9e5fe01..f587d5d 100644
---- a/include/linux/irqchip/arm-gic-v3.h
-+++ b/include/linux/irqchip/arm-gic-v3.h
-@@ -254,7 +254,10 @@
-  */
- #define GITS_CMD_MAPD			0x08
- #define GITS_CMD_MAPC			0x09
--#define GITS_CMD_MAPVI			0x0a
-+#define GITS_CMD_MAPTI			0x0a
-+/* older GIC documentation used MAPVI for this command */
-+#define GITS_CMD_MAPVI			GITS_CMD_MAPTI
-+#define GITS_CMD_MAPI			0x0b
- #define GITS_CMD_MOVI			0x01
- #define GITS_CMD_DISCARD		0x0f
- #define GITS_CMD_INV			0x0c
-@@ -265,6 +268,20 @@
- #define GITS_CMD_SYNC			0x05
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index bae54f7..9196c8a 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -40,6 +40,7 @@
+ #include <linux/power_supply.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/reset.h>
++#include <linux/usb/of.h>
+ #include <linux/workqueue.h>
  
- /*
-+ * ITS error numbers
-+ */
-+#define E_ITS_MOVI_UNMAPPED_INTERRUPT           0x010107
-+#define E_ITS_MOVI_UNMAPPED_COLLECTION          0x010109
-+#define E_ITS_CLEAR_UNMAPPED_INTERRUPT          0x010507
-+#define E_ITS_MAPC_PROCNUM_OOR                  0x010902
-+#define E_ITS_MAPTI_UNMAPPED_DEVICE             0x010a04
-+#define E_ITS_MAPTI_PHYSICALID_OOR              0x010a06
-+#define E_ITS_INV_UNMAPPED_INTERRUPT            0x010c07
-+#define E_ITS_INVALL_UNMAPPED_COLLECTION        0x010d09
-+#define E_ITS_MOVALL_PROCNUM_OOR                0x010e01
-+#define E_ITS_DISCARD_UNMAPPED_INTERRUPT        0x010f07
-+
-+/*
-  * CPU interface registers
-  */
- #define ICC_CTLR_EL1_EOImode_drop_dir	(0U << 1)
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 84e6f3b..72145c1 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -22,6 +22,7 @@
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
- #include <linux/list.h>
-+#include <linux/slab.h>
- #include <linux/uaccess.h>
+ #define REG_ISCR			0x00
+@@ -109,6 +110,7 @@ struct sun4i_usb_phy_cfg {
+ struct sun4i_usb_phy_data {
+ 	void __iomem *base;
+ 	const struct sun4i_usb_phy_cfg *cfg;
++	enum usb_dr_mode dr_mode;
+ 	struct mutex mutex;
+ 	struct sun4i_usb_phy {
+ 		struct phy *phy;
+@@ -119,6 +121,7 @@ struct sun4i_usb_phy_data {
+ 		bool regulator_on;
+ 		int index;
+ 	} phys[MAX_PHYS];
++	int first_phy;
+ 	/* phy0 / otg related variables */
+ 	struct extcon_dev *extcon;
+ 	bool phy0_init;
+@@ -285,16 +288,10 @@ static int sun4i_usb_phy_init(struct phy *_phy)
+ 		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_DPDM_PULLUP_EN);
+ 		sun4i_usb_phy0_update_iscr(_phy, 0, ISCR_ID_PULLUP_EN);
  
- #include <linux/irqchip/arm-gic-v3.h>
-@@ -74,6 +75,34 @@ struct its_itte {
- 	u32 event_id;
- };
+-		if (data->id_det_gpio) {
+-			/* OTG mode, force ISCR and cable state updates */
+-			data->id_det = -1;
+-			data->vbus_det = -1;
+-			queue_delayed_work(system_wq, &data->detect, 0);
+-		} else {
+-			/* Host only mode */
+-			sun4i_usb_phy0_set_id_detect(_phy, 0);
+-			sun4i_usb_phy0_set_vbus_detect(_phy, 1);
+-		}
++		/* Force ISCR and cable state updates */
++		data->id_det = -1;
++		data->vbus_det = -1;
++		queue_delayed_work(system_wq, &data->detect, 0);
+ 	}
  
-+static struct its_device *find_its_device(struct vgic_its *its, u32 device_id)
-+{
-+	struct its_device *device;
-+
-+	list_for_each_entry(device, &its->device_list, dev_list)
-+		if (device_id == device->device_id)
-+			return device;
-+
-+	return NULL;
-+}
-+
-+static struct its_itte *find_itte(struct vgic_its *its, u32 device_id,
-+				  u32 event_id)
-+{
-+	struct its_device *device;
-+	struct its_itte *itte;
-+
-+	device = find_its_device(its, device_id);
-+	if (device == NULL)
-+		return NULL;
-+
-+	list_for_each_entry(itte, &device->itt, itte_list)
-+		if (itte->event_id == event_id)
-+			return itte;
-+
-+	return NULL;
-+}
-+
- /* To be used as an iterator this macro misses the enclosing parentheses */
- #define for_each_lpi(dev, itte, its) \
- 	list_for_each_entry(dev, &(its)->device_list, dev_list) \
-@@ -93,6 +122,18 @@ static struct its_itte *find_itte_by_lpi(struct vgic_its *its, int lpi)
- 
- #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
- 
-+static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
-+{
-+	struct its_collection *collection;
-+
-+	list_for_each_entry(collection, &its->collection_list, coll_list) {
-+		if (coll_id == collection->collection_id)
-+			return collection;
-+	}
-+
-+	return NULL;
-+}
-+
- #define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
- #define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
- 
-@@ -106,6 +147,30 @@ static void update_lpi_config(struct kvm *kvm, struct its_itte *itte, u8 prop)
- 	vgic_queue_irq_unlock(kvm, &itte->irq);
+ 	return 0;
+@@ -319,6 +316,19 @@ static int sun4i_usb_phy_exit(struct phy *_phy)
+ 	return 0;
  }
  
-+/*
-+ * Finds all LPIs which are mapped to this collection and updates the
-+ * struct irq's target_vcpu field accordingly.
-+ * Needs to be called whenever either the collection for a LPIs has
-+ * changed or the collection itself got retargetted.
-+ */
-+static void update_affinity(struct kvm *kvm, struct vgic_its *its,
-+			    struct its_collection *coll)
++static int sun4i_usb_phy0_get_id_det(struct sun4i_usb_phy_data *data)
 +{
-+	struct its_device *device;
-+	struct its_itte *itte;
-+	struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, coll->target_addr);
-+
-+	for_each_lpi(device, itte, its) {
-+		if (!itte->collection ||
-+		    coll->collection_id != itte->collection->collection_id)
-+			continue;
-+
-+		spin_lock(&itte->irq.irq_lock);
-+		itte->irq.target_vcpu = vcpu;
-+		spin_unlock(&itte->irq.irq_lock);
-+	}
-+}
-+
- #define GIC_LPI_OFFSET 8192
- 
- /* We scan the table in chunks the size of the smallest page size */
-@@ -320,6 +385,412 @@ static void its_free_itte(struct its_itte *itte)
- 	kfree(itte);
- }
- 
-+static u64 its_cmd_mask_field(u64 *its_cmd, int word, int shift, int size)
-+{
-+	return (le64_to_cpu(its_cmd[word]) >> shift) & (BIT_ULL(size) - 1);
-+}
-+
-+#define its_cmd_get_command(cmd)	its_cmd_mask_field(cmd, 0,  0,  8)
-+#define its_cmd_get_deviceid(cmd)	its_cmd_mask_field(cmd, 0, 32, 32)
-+#define its_cmd_get_id(cmd)		its_cmd_mask_field(cmd, 1,  0, 32)
-+#define its_cmd_get_physical_id(cmd)	its_cmd_mask_field(cmd, 1, 32, 32)
-+#define its_cmd_get_collection(cmd)	its_cmd_mask_field(cmd, 2,  0, 16)
-+#define its_cmd_get_target_addr(cmd)	its_cmd_mask_field(cmd, 2, 16, 32)
-+#define its_cmd_get_validbit(cmd)	its_cmd_mask_field(cmd, 2, 63,  1)
-+
-+/* The DISCARD command frees an Interrupt Translation Table Entry (ITTE). */
-+static int vits_cmd_handle_discard(struct kvm *kvm, struct vgic_its *its,
-+				   u64 *its_cmd)
-+{
-+	u32 device_id;
-+	u32 event_id;
-+	struct its_itte *itte;
-+	int ret = E_ITS_DISCARD_UNMAPPED_INTERRUPT;
-+
-+	device_id = its_cmd_get_deviceid(its_cmd);
-+	event_id = its_cmd_get_id(its_cmd);
-+
-+	spin_lock(&its->lock);
-+	itte = find_itte(its, device_id, event_id);
-+	if (itte && itte->collection) {
-+		/*
-+		 * Though the spec talks about removing the pending state, we
-+		 * don't bother here since we clear the ITTE anyway and the
-+		 * pending state is a property of the ITTE struct.
-+		 */
-+		its_free_itte(itte);
-+		ret = 0;
-+	}
-+
-+	spin_unlock(&its->lock);
-+	return ret;
-+}
-+
-+/* The MOVI command moves an ITTE to a different collection. */
-+static int vits_cmd_handle_movi(struct kvm *kvm, struct vgic_its *its,
-+				u64 *its_cmd)
-+{
-+	u32 device_id = its_cmd_get_deviceid(its_cmd);
-+	u32 event_id = its_cmd_get_id(its_cmd);
-+	u32 coll_id = its_cmd_get_collection(its_cmd);
-+	struct its_itte *itte;
-+	struct its_collection *collection;
-+	int ret = 0;
-+
-+	spin_lock(&its->lock);
-+	itte = find_itte(its, device_id, event_id);
-+	if (!itte) {
-+		ret = E_ITS_MOVI_UNMAPPED_INTERRUPT;
-+		goto out_unlock;
-+	}
-+	if (!its_is_collection_mapped(itte->collection)) {
-+		ret = E_ITS_MOVI_UNMAPPED_COLLECTION;
-+		goto out_unlock;
-+	}
-+
-+	collection = find_collection(its, coll_id);
-+	if (!its_is_collection_mapped(collection)) {
-+		ret = E_ITS_MOVI_UNMAPPED_COLLECTION;
-+		goto out_unlock;
-+	}
-+
-+	itte->collection = collection;
-+	update_affinity(kvm, its, collection);
-+
-+out_unlock:
-+	spin_unlock(&its->lock);
-+	return ret;
-+}
-+
-+static void vits_init_collection(struct vgic_its *its,
-+				 struct its_collection *collection,
-+				 u32 coll_id)
-+{
-+	collection->collection_id = coll_id;
-+	collection->target_addr = COLLECTION_NOT_MAPPED;
-+
-+	list_add_tail(&collection->coll_list, &its->collection_list);
-+}
-+
-+/* The MAPTI and MAPI commands map LPIs to ITTEs. */
-+static int vits_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
-+				u64 *its_cmd, u8 subcmd)
-+{
-+	u32 device_id = its_cmd_get_deviceid(its_cmd);
-+	u32 event_id = its_cmd_get_id(its_cmd);
-+	u32 coll_id = its_cmd_get_collection(its_cmd);
-+	struct its_itte *itte, *new_itte;
-+	struct its_device *device;
-+	struct its_collection *collection, *new_coll;
-+	int lpi_nr;
-+	int ret = 0;
-+
-+	/* Preallocate possibly needed memory here outside of the lock */
-+	new_coll = kmalloc(sizeof(struct its_collection), GFP_KERNEL);
-+	new_itte = kzalloc(sizeof(struct its_itte), GFP_KERNEL);
-+
-+	spin_lock(&its->lock);
-+
-+	device = find_its_device(its, device_id);
-+	if (!device) {
-+		ret = E_ITS_MAPTI_UNMAPPED_DEVICE;
-+		goto out_unlock;
-+	}
-+
-+	collection = find_collection(its, coll_id);
-+	if (!collection && !new_coll) {
-+		ret = -ENOMEM;
-+		goto out_unlock;
-+	}
-+
-+	if (subcmd == GITS_CMD_MAPTI)
-+		lpi_nr = its_cmd_get_physical_id(its_cmd);
-+	else
-+		lpi_nr = event_id;
-+	if (lpi_nr < GIC_LPI_OFFSET ||
-+	    lpi_nr >= max_lpis_propbaser(kvm->arch.vgic.propbaser)) {
-+		ret = E_ITS_MAPTI_PHYSICALID_OOR;
-+		goto out_unlock;
-+	}
-+
-+	itte = find_itte(its, device_id, event_id);
-+	if (!itte) {
-+		if (!new_itte) {
-+			ret = -ENOMEM;
-+			goto out_unlock;
-+		}
-+		itte = new_itte;
-+
-+		itte->event_id	= event_id;
-+		list_add_tail(&itte->itte_list, &device->itt);
-+	} else {
-+		kfree(new_itte);
-+	}
-+
-+	if (!collection) {
-+		collection = new_coll;
-+		vits_init_collection(its, collection, coll_id);
-+	} else {
-+		kfree(new_coll);
-+	}
-+
-+	itte->collection = collection;
-+	itte->lpi = lpi_nr;
-+	itte->irq.intid = lpi_nr;
-+	INIT_LIST_HEAD(&itte->irq.ap_list);
-+	spin_lock_init(&itte->irq.irq_lock);
-+	itte->irq.vcpu = NULL;
-+	update_affinity(kvm, its, collection);
-+
-+out_unlock:
-+	spin_unlock(&its->lock);
-+	if (ret) {
-+		kfree(new_coll);
-+		kfree(new_itte);
-+	}
-+	return ret;
-+}
-+
-+static void vits_unmap_device(struct kvm *kvm, struct its_device *device)
-+{
-+	struct its_itte *itte, *temp;
-+
-+	/*
-+	 * The spec says that unmapping a device with still valid
-+	 * ITTEs associated is UNPREDICTABLE. We remove all ITTEs,
-+	 * since we cannot leave the memory unreferenced.
-+	 */
-+	list_for_each_entry_safe(itte, temp, &device->itt, itte_list)
-+		its_free_itte(itte);
-+
-+	list_del(&device->dev_list);
-+	kfree(device);
-+}
-+
-+/* MAPD maps or unmaps a device ID to Interrupt Translation Tables (ITTs). */
-+static int vits_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
-+				u64 *its_cmd)
-+{
-+	bool valid = its_cmd_get_validbit(its_cmd);
-+	u32 device_id = its_cmd_get_deviceid(its_cmd);
-+	struct its_device *device, *new_device = NULL;
-+
-+	/* We preallocate memory outside of the lock here */
-+	if (valid) {
-+		new_device = kzalloc(sizeof(struct its_device), GFP_KERNEL);
-+		if (!new_device)
-+			return -ENOMEM;
-+	}
-+
-+	spin_lock(&its->lock);
-+
-+	device = find_its_device(its, device_id);
-+	if (device)
-+		vits_unmap_device(kvm, device);
-+
-+	/*
-+	 * The spec does not say whether unmapping a not-mapped device
-+	 * is an error, so we are done in any case.
-+	 */
-+	if (!valid)
-+		goto out_unlock;
-+
-+	device = new_device;
-+
-+	device->device_id = device_id;
-+	INIT_LIST_HEAD(&device->itt);
-+
-+	list_add_tail(&device->dev_list, &its->device_list);
-+
-+out_unlock:
-+	spin_unlock(&its->lock);
-+	return 0;
-+}
-+
-+/* The MAPC command maps collection IDs to redistributors. */
-+static int vits_cmd_handle_mapc(struct kvm *kvm, struct vgic_its *its,
-+				u64 *its_cmd)
-+{
-+	u16 coll_id;
-+	u32 target_addr;
-+	struct its_collection *collection, *new_coll = NULL;
-+	bool valid;
-+
-+	valid = its_cmd_get_validbit(its_cmd);
-+	coll_id = its_cmd_get_collection(its_cmd);
-+	target_addr = its_cmd_get_target_addr(its_cmd);
-+
-+	if (target_addr >= atomic_read(&kvm->online_vcpus))
-+		return E_ITS_MAPC_PROCNUM_OOR;
-+
-+	/* We preallocate memory outside of the lock here */
-+	if (valid) {
-+		new_coll = kmalloc(sizeof(struct its_collection), GFP_KERNEL);
-+		if (!new_coll)
-+			return -ENOMEM;
-+	}
-+
-+	spin_lock(&its->lock);
-+	collection = find_collection(its, coll_id);
-+
-+	if (!valid) {
-+		struct its_device *device;
-+		struct its_itte *itte;
-+		/*
-+		 * Clearing the mapping for that collection ID removes the
-+		 * entry from the list. If there wasn't any before, we can
-+		 * go home early.
-+		 */
-+		if (!collection)
-+			goto out_unlock;
-+
-+		for_each_lpi(device, itte, its)
-+			if (itte->collection &&
-+			    itte->collection->collection_id == coll_id)
-+				itte->collection = NULL;
-+
-+		list_del(&collection->coll_list);
-+		kfree(collection);
-+	} else {
-+		if (!collection)
-+			collection = new_coll;
-+		else
-+			kfree(new_coll);
-+
-+		vits_init_collection(its, collection, coll_id);
-+		collection->target_addr = target_addr;
-+		update_affinity(kvm, its, collection);
-+	}
-+
-+out_unlock:
-+	spin_unlock(&its->lock);
-+	return 0;
-+}
-+
-+/* The CLEAR command removes the pending state for a particular LPI. */
-+static int vits_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
-+				 u64 *its_cmd)
-+{
-+	u32 device_id;
-+	u32 event_id;
-+	struct its_itte *itte;
-+	int ret = 0;
-+
-+	device_id = its_cmd_get_deviceid(its_cmd);
-+	event_id = its_cmd_get_id(its_cmd);
-+
-+	spin_lock(&its->lock);
-+
-+	itte = find_itte(its, device_id, event_id);
-+	if (!itte) {
-+		ret = E_ITS_CLEAR_UNMAPPED_INTERRUPT;
-+		goto out_unlock;
-+	}
-+
-+	itte->irq.pending = false;
-+
-+out_unlock:
-+	spin_unlock(&its->lock);
-+	return ret;
-+}
-+
-+/* The INV command syncs the configuration bits from the memory tables. */
-+static int vits_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
-+			       u64 *its_cmd)
-+{
-+	struct vgic_dist *dist = &kvm->arch.vgic;
-+	u32 device_id;
-+	u32 event_id;
-+	struct its_itte *itte, *new_itte;
-+	gpa_t propbase;
-+	int ret;
-+	u8 prop;
-+
-+	device_id = its_cmd_get_deviceid(its_cmd);
-+	event_id = its_cmd_get_id(its_cmd);
-+
-+	spin_lock(&its->lock);
-+	itte = find_itte(its, device_id, event_id);
-+	spin_unlock(&its->lock);
-+	if (!itte)
-+		return E_ITS_INV_UNMAPPED_INTERRUPT;
-+
-+	/*
-+	 * We cannot read from guest memory inside the spinlock, so we
-+	 * need to re-read our tables to learn whether the LPI number we are
-+	 * using is still valid.
-+	 */
-+	do {
-+		propbase = BASER_BASE_ADDRESS(dist->propbaser);
-+		ret = kvm_read_guest(kvm, propbase + itte->lpi - GIC_LPI_OFFSET,
-+				     &prop, 1);
-+		if (ret)
-+			return ret;
-+
-+		spin_lock(&its->lock);
-+		new_itte = find_itte(its, device_id, event_id);
-+		if (new_itte->lpi != itte->lpi) {
-+			itte = new_itte;
-+			spin_unlock(&its->lock);
-+			continue;
-+		}
-+		update_lpi_config(kvm, itte, prop);
-+		spin_unlock(&its->lock);
-+	} while (0);
-+	return 0;
-+}
-+
-+/* The INVALL command requests flushing of all IRQ data in this collection. */
-+static int vits_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
-+				  u64 *its_cmd)
-+{
-+	u64 prop_base_reg, pend_base_reg;
-+	u32 coll_id = its_cmd_get_collection(its_cmd);
-+	struct its_collection *collection;
-+	struct kvm_vcpu *vcpu;
-+
-+	collection = find_collection(its, coll_id);
-+	if (!its_is_collection_mapped(collection))
-+		return E_ITS_INVALL_UNMAPPED_COLLECTION;
-+
-+	vcpu = kvm_get_vcpu(kvm, collection->target_addr);
-+
-+	pend_base_reg = vcpu->arch.vgic_cpu.pendbaser;
-+	prop_base_reg = kvm->arch.vgic.propbaser;
-+
-+	its_update_lpis_configuration(kvm, its, prop_base_reg);
-+	its_sync_lpi_pending_table(vcpu, its, pend_base_reg);
-+
-+	return 0;
-+}
-+
-+/* The MOVALL command moves all IRQs from one redistributor to another. */
-+static int vits_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
-+				  u64 *its_cmd)
-+{
-+	u32 target1_addr = its_cmd_get_target_addr(its_cmd);
-+	u32 target2_addr = its_cmd_mask_field(its_cmd, 3, 16, 32);
-+	struct its_collection *collection;
-+
-+	if (target1_addr >= atomic_read(&kvm->online_vcpus) ||
-+	    target2_addr >= atomic_read(&kvm->online_vcpus))
-+		return E_ITS_MOVALL_PROCNUM_OOR;
-+
-+	if (target1_addr == target2_addr)
++	switch (data->dr_mode) {
++	case USB_DR_MODE_OTG:
++		return gpiod_get_value_cansleep(data->id_det_gpio);
++	case USB_DR_MODE_HOST:
 +		return 0;
-+
-+	spin_lock(&its->lock);
-+	list_for_each_entry(collection, &its->collection_list,
-+			    coll_list) {
-+		if (collection && collection->target_addr == target1_addr)
-+			collection->target_addr = target2_addr;
-+		update_affinity(kvm, its, collection);
++	case USB_DR_MODE_PERIPHERAL:
++	default:
++		return 1;
 +	}
-+
-+	spin_unlock(&its->lock);
-+	return 0;
 +}
 +
- /*
-  * This function expects the ITS lock to be dropped, so the actual command
-  * handlers must take care of proper locking when needed.
-@@ -327,7 +798,47 @@ static void its_free_itte(struct its_itte *itte)
- static int vits_handle_command(struct kvm *kvm, struct vgic_its *its,
- 			       u64 *its_cmd)
+ static int sun4i_usb_phy0_get_vbus_det(struct sun4i_usb_phy_data *data)
  {
--	return -ENODEV;
-+	u8 cmd = its_cmd_get_command(its_cmd);
-+	int ret = -ENODEV;
-+
-+	switch (cmd) {
-+	case GITS_CMD_MAPD:
-+		ret = vits_cmd_handle_mapd(kvm, its, its_cmd);
-+		break;
-+	case GITS_CMD_MAPC:
-+		ret = vits_cmd_handle_mapc(kvm, its, its_cmd);
-+		break;
-+	case GITS_CMD_MAPI:
-+		ret = vits_cmd_handle_mapi(kvm, its, its_cmd, cmd);
-+		break;
-+	case GITS_CMD_MAPTI:
-+		ret = vits_cmd_handle_mapi(kvm, its, its_cmd, cmd);
-+		break;
-+	case GITS_CMD_MOVI:
-+		ret = vits_cmd_handle_movi(kvm, its, its_cmd);
-+		break;
-+	case GITS_CMD_DISCARD:
-+		ret = vits_cmd_handle_discard(kvm, its, its_cmd);
-+		break;
-+	case GITS_CMD_CLEAR:
-+		ret = vits_cmd_handle_clear(kvm, its, its_cmd);
-+		break;
-+	case GITS_CMD_MOVALL:
-+		ret = vits_cmd_handle_movall(kvm, its, its_cmd);
-+		break;
-+	case GITS_CMD_INV:
-+		ret = vits_cmd_handle_inv(kvm, its, its_cmd);
-+		break;
-+	case GITS_CMD_INVALL:
-+		ret = vits_cmd_handle_invall(kvm, its, its_cmd);
-+		break;
-+	case GITS_CMD_SYNC:
-+		/* we ignore this command: we are in sync all of the time */
-+		ret = 0;
-+		break;
-+	}
-+
-+	return ret;
- }
+ 	if (data->vbus_det_gpio)
+@@ -414,7 +424,10 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	struct phy *phy0 = data->phys[0].phy;
+ 	int id_det, vbus_det, id_notify = 0, vbus_notify = 0;
  
- static unsigned long vgic_mmio_read_its_cbaser(struct kvm_vcpu *vcpu,
+-	id_det = gpiod_get_value_cansleep(data->id_det_gpio);
++	if (phy0 == NULL)
++		return;
++
++	id_det = sun4i_usb_phy0_get_id_det(data);
+ 	vbus_det = sun4i_usb_phy0_get_vbus_det(data);
+ 
+ 	mutex_lock(&phy0->mutex);
+@@ -501,7 +514,8 @@ static struct phy *sun4i_usb_phy_xlate(struct device *dev,
+ {
+ 	struct sun4i_usb_phy_data *data = dev_get_drvdata(dev);
+ 
+-	if (args->args[0] >= data->cfg->num_phys)
++	if (args->args[0] < data->first_phy ||
++	    args->args[0] >= data->cfg->num_phys)
+ 		return ERR_PTR(-ENODEV);
+ 
+ 	return data->phys[args->args[0]].phy;
+@@ -575,13 +589,17 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 			return -EPROBE_DEFER;
+ 	}
+ 
+-	/* vbus_det without id_det makes no sense, and is not supported */
+-	if (sun4i_usb_phy0_have_vbus_det(data) && !data->id_det_gpio) {
+-		dev_err(dev, "usb0_id_det missing or invalid\n");
+-		return -ENODEV;
+-	}
+-
+-	if (data->id_det_gpio) {
++	data->dr_mode = of_usb_get_dr_mode_by_phy(np, 0);
++	switch (data->dr_mode) {
++	case USB_DR_MODE_OTG:
++		/* otg without id_det makes no sense, and is not supported */
++		if (!data->id_det_gpio) {
++			dev_err(dev, "usb0_id_det missing or invalid\n");
++			return -ENODEV;
++		}
++		/* fall through */
++	case USB_DR_MODE_HOST:
++	case USB_DR_MODE_PERIPHERAL:
+ 		data->extcon = devm_extcon_dev_allocate(dev,
+ 							sun4i_usb_phy0_cable);
+ 		if (IS_ERR(data->extcon))
+@@ -592,9 +610,13 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
+ 			dev_err(dev, "failed to register extcon: %d\n", ret);
+ 			return ret;
+ 		}
++		break;
++	default:
++		dev_info(dev, "dr_mode unknown, not registering usb phy0\n");
++		data->first_phy = 1;
+ 	}
+ 
+-	for (i = 0; i < data->cfg->num_phys; i++) {
++	for (i = data->first_phy; i < data->cfg->num_phys; i++) {
+ 		struct sun4i_usb_phy *phy = data->phys + i;
+ 		char name[16];
+ 
 -- 
-2.8.2
+2.7.4
