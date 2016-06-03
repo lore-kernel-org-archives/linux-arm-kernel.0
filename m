@@ -1,49 +1,62 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Fri, 03 Jun 2016 14:36:53 +0200
-Subject: [RFC PATCH v1 2/6] clk: rockchip: rk3399: add SCLK_DDRCLK ID for
- ddrc
-In-Reply-To: <9d392979-0a20-ca74-9699-2440d07dddd3@rock-chips.com>
-References: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
- <1464947719-6245-3-git-send-email-hl@rock-chips.com>
- <9d392979-0a20-ca74-9699-2440d07dddd3@rock-chips.com>
-Message-ID: <20637963.iQzVZfJq9f@diego>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 3 Jun 2016 13:39:58 +0100
+Subject: [PATCH v4 11/18] ARM: multi_v7_defconfig: Enable STi and
+ simple-card drivers.
+In-Reply-To: <574D5178.5030200@st.com>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+ <1464192412-16386-13-git-send-email-peter.griffin@linaro.org>
+ <574D5178.5030200@st.com>
+Message-ID: <20160603123958.GA9912@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Hi Arnaud,
 
-Am Freitag, 3. Juni 2016, 20:34:52 schrieb Shawn Lin:
-> How about merge it into your patch#3.
+On Tue, 31 May 2016, Arnaud Pouliquen wrote:
 
-see comments from Doug and me on previous version.
-
-clock-ids should always be separate patches, as we will need them in both 
-clock and devicetree branches, so they must be in a separate branch shared 
-between clock and dts branches.
-
-
-Heiko
-
-> On 2016/6/3 17:55, Lin Huang wrote:
-> > Signed-off-by: Lin Huang <hl@rock-chips.com>
+> Hi Peter,
+> 
+> On 05/25/2016 06:06 PM, Peter Griffin wrote:
+> > This patch enables the STi ALSA drivers found on STi platforms
+> > as well as the simple-card driver which is a dependency to have
+> > working sound.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > Cc: arnaud.pouliquen at st.com
+> > Cc: broonie at kernel.org
 > > ---
-> > Changes in v1:
-> > - None
+> >  arch/arm/configs/multi_v7_defconfig | 3 +++
+> >  1 file changed, 3 insertions(+)
 > > 
-> >  include/dt-bindings/clock/rk3399-cru.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/include/dt-bindings/clock/rk3399-cru.h
-> > b/include/dt-bindings/clock/rk3399-cru.h index 50a44cf..8a0f0442 100644
-> > --- a/include/dt-bindings/clock/rk3399-cru.h
-> > +++ b/include/dt-bindings/clock/rk3399-cru.h
-> > @@ -131,6 +131,7 @@
-> > 
-> >  #define SCLK_DPHY_RX0_CFG		165
-> >  #define SCLK_RMII_SRC			166
-> >  #define SCLK_PCIEPHY_REF100M		167
-> > 
-> > +#define SCLK_DDRCLK			168
-> > 
-> >  #define DCLK_VOP0			180
-> >  #define DCLK_VOP1			181
+> > diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> > index 5eee45b..0ced665 100644
+> > --- a/arch/arm/configs/multi_v7_defconfig
+> > +++ b/arch/arm/configs/multi_v7_defconfig
+> > @@ -589,6 +589,9 @@ CONFIG_SND_SOC_AK4642=m
+> >  CONFIG_SND_SOC_SGTL5000=m
+> >  CONFIG_SND_SOC_SPDIF=m
+> >  CONFIG_SND_SOC_WM8978=m
+> > +CONFIG_SND_SOC_STI=m
+> > +CONFIG_SND_SOC_STI_SAS=m
+> > +CONFIG_SND_SIMPLE_CARD=m
+> Simple card config seems enabled by default, at least on 4.7 rc1.
+
+I don't think it is currently, I get the following when greping v4.7-rc1 tag
+
+git grep CONFIG_SND_SIMPLE_CARD
+arch/arm/configs/exynos_defconfig:CONFIG_SND_SIMPLE_CARD=y
+arch/arm/configs/imx_v6_v7_defconfig:CONFIG_SND_SIMPLE_CARD=y
+arch/arm/configs/multi_v5_defconfig:CONFIG_SND_SIMPLE_CARD=y
+arch/arm/configs/mvebu_v5_defconfig:CONFIG_SND_SIMPLE_CARD=y
+arch/arm/configs/mvebu_v7_defconfig:CONFIG_SND_SIMPLE_CARD=y
+arch/arm/configs/omap2plus_defconfig:CONFIG_SND_SIMPLE_CARD=m
+arch/arm/configs/pxa_defconfig:CONFIG_SND_SIMPLE_CARD=m
+arch/xtensa/configs/audio_kc705_defconfig:CONFIG_SND_SIMPLE_CARD=y
+sound/soc/generic/Makefile:obj-$(CONFIG_SND_SIMPLE_CARD)        +=
+snd-soc-simple-card.o
+
+Although maybe it should be built-in rather than a module, like multi_v5_defconfig.
+
+regards,
+
+Peter
