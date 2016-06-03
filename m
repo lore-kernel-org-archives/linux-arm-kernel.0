@@ -1,91 +1,47 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Fri,  3 Jun 2016 11:56:28 +0200
-Subject: [PATCH 3/5] ARM: sun8i: dt: Add DT bindings documentation for
- Allwinner sun8i-emac
+Date: Fri,  3 Jun 2016 11:56:29 +0200
+Subject: [PATCH 4/5] ARM: dts: sun8i-h3: add sun8i-emac ethernet driver
 In-Reply-To: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
 References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1464947790-22991-4-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1464947790-22991-5-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds documentation for Device-Tree bindings for the
-Allwinner sun8i-emac driver.
+The sun8i-emac is an ethernet MAC hardware that support 10/100/1000
+speed.
+
+This patch enable the sun8i-emac on the Allwinner H3 SoC Device-tree.
+The SoC H3 have an internal PHY, so optionals syscon and ephy are set.
 
 Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 ---
- .../bindings/net/allwinner,sun8i-emac.txt          | 64 ++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+ arch/arm/boot/dts/sun8i-h3.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-new file mode 100644
-index 0000000..cf71a71
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-@@ -0,0 +1,64 @@
-+* Allwinner sun8i EMAC ethernet controller
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index 4a4926b..f5a95ff 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -626,6 +626,20 @@
+ 			status = "disabled";
+ 		};
+ 
++		emac: ethernet at 1c30000 {
++			compatible = "allwinner,sun8i-h3-emac";
++			reg = <0x01c30000 0x104>, <0x01c00030 0x4>;
++			reg-names = "emac", "syscon";
++			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
++			resets = <&ahb_rst 17>, <&ahb_rst 66>;
++			reset-names = "ahb", "ephy";
++			clocks = <&bus_gates 17>, <&bus_gates 128>;
++			clock-names = "ahb", "ephy";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++		};
 +
-+Required properties:
-+- compatible: "allwinner,sun8i-a83t-emac", "allwinner,sun8i-h3-emac",
-+		or "allwinner,sun50i-a64-emac"
-+- reg: address and length of the register sets for the device.
-+- reg-names: should be "emac" and "syscon", matching the register sets
-+- interrupts: interrupt for the device
-+- clocks: A phandle to the reference clock for this device
-+- clock-names: should be "ahb"
-+- resets: A phandle to the reset control for this device
-+- reset-names: should be "ahb"
-+- phy-mode: See ethernet.txt
-+- phy or phy-handle: See ethernet.txt
-+- #address-cells: shall be 1
-+- #size-cells: shall be 0
-+
-+"allwinner,sun8i-h3-emac" also requires:
-+- clocks: an extra phandle to the reference clock for the EPHY
-+- clock-names: an extra "ephy" entry matching the clocks property
-+- resets: an extra phandle to the reset control for the EPHY
-+- resets-names: an extra "ephy" entry matching the resets property
-+
-+See ethernet.txt in the same directory for generic bindings for ethernet
-+controllers.
-+
-+The device node referenced by "phy" or "phy-handle" should be a child node
-+of this node. See phy.txt for the generic PHY bindings.
-+
-+Optional properties:
-+- phy-supply: phandle to a regulator if the PHY needs one
-+- phy-io-supply: phandle to a regulator if the PHY needs a another one for I/O.
-+		 This is sometimes found with RGMII PHYs, which use a second
-+		 regulator for the lower I/O voltage.
-+- allwinner,tx-delay: The setting of the TX clock delay chain
-+- allwinner,rx-delay: The setting of the RX clock delay chain
-+
-+The TX/RX clock delay chain settings are board specific.
-+
-+Optional properties for "allwinner,sun8i-h3-emac":
-+- allwinner,use-internal-phy: Use the H3 SoC's internal E(thernet) PHY
-+- allwinner,leds-active-low: EPHY LEDs are active low
-+
-+When the internal PHY is requested, the implementation shall configure the
-+internal PHY to use the address specified in the child PHY node.
-+
-+Example:
-+
-+emac: ethernet at 01c0b000 {
-+	compatible = "allwinner,sun8i-h3-emac";
-+	reg = <0x01c0b000 0x1000>;
-+	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&bus_gates 17>, <&bus_gates 128>;
-+	clock-names = "ahb", "ephy";
-+	resets = <&ahb_rst 17>, <&ahb_rst 66>;
-+	reset-names = "ahb", "ephy";
-+	phy = <&phy1>;
-+	allwinner,use-internal-phy;
-+	allwinner,leds-active-low;
-+
-+	phy1: ethernet-phy at 1 {
-+		reg = <1>;
-+	};
-+};
+ 		gic: interrupt-controller at 01c81000 {
+ 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
+ 			reg = <0x01c81000 0x1000>,
 -- 
 2.7.3
