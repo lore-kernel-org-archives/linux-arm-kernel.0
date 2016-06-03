@@ -1,100 +1,47 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Fri, 3 Jun 2016 11:15:21 -0400
-Subject: [RFC PATCH 1/3] pci, acpi: Match PCI config space accessors
- against platfrom specific ECAM quirks.
-In-Reply-To: <1464856864-18049-2-git-send-email-tn@semihalf.com>
-References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
- <1464856864-18049-2-git-send-email-tn@semihalf.com>
-Message-ID: <57519F09.2010201@codeaurora.org>
+From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
+Date: Fri, 3 Jun 2016 20:46:08 +0530
+Subject: [PATCH v4] Axi-usb: Add support for 64-bit addressing.
+In-Reply-To: <C89496FEAE474D468F30D558A9468D9F26CEF0EF@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1464626798-1334-1-git-send-email-navam@xilinx.com>
+ <CAKfKVtF1hOn9QwiqtjqqPYtUz5PscTBs4kBC1zRH6FY-4vVoUA@mail.gmail.com>
+ <C89496FEAE474D468F30D558A9468D9F26CEF0EF@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <CAKfKVtHfGXvXeOC-vsVaRNtttO+nyG40sAxqaswXEbsEOUotbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
+On Tue, May 31, 2016 at 10:45 AM, Nava kishore Manne
+<nava.manne@xilinx.com> wrote:
+> Hi Shubhrajyoti,
+>
+>
+>         Thanks for the review...
+>
+>> >  /**
+>> > + * xudc_write64 - write 64bit value to device registers
+>> > + * @ep: pointer to the usb device endpoint structure.
+>> > + * @offset: register offset
+>> > + * @val: data to be written
+>> > + **/
+>> > +static void xudc_write64(struct xusb_ep *ep, u32 offset, u64 val) {
+>> > +       struct xusb_udc *udc = ep->udc;
+>> > +
+>> > +       udc->write_fn(udc->addr, offset, lower_32_bits(val));
+>> > +       udc->write_fn(udc->addr, offset+0x04, upper_32_bits(val));
+>>
+>> can we move this to a single 64 bit write?
+>
+> Initially I sent the patches with writeq() ,lo_hi_writeq()  later we decided to replace with write_fun().
+> The reason for this is lo_hi_writeq() always assumes a little-endian register, so it's broken if anyone builds this device with big-endian registers.
+> So replaced the 64bit calls with write_fun() as suggested by Arnd Bergmann. Hope it clears your query.
+> Please refer to the below thread
+>
+>         http://lkml.iu.edu/hypermail/linux/kernel/1604.2/02046.html
 
-Thanks for your work on this.
+missed that discurssion.
 
-On 06/02/2016 04:41 AM, Tomasz Nowicki wrote:
-> Some platforms may not be fully compliant with generic set of PCI config
-> accessors. For these cases we implement the way to overwrite accessors
-> set. Algorithm traverses available quirk list, matches against
-> <oem_id, oem_rev, domain, bus number> tuple and returns corresponding
-> PCI config ops. oem_id and oem_rev come from MCFG table standard header.
-> All quirks can be defined using DECLARE_ACPI_MCFG_FIXUP() macro and
-> kept self contained. Example:
-> 
-> /* Custom PCI config ops */
-> static struct pci_generic_ecam_ops foo_pci_ops = {
-> 	.bus_shift	= 24,
-> 	.pci_ops = {
-> 		.map_bus = pci_ecam_map_bus,
-> 		.read = foo_ecam_config_read,
-> 		.write = foo_ecam_config_write,
-> 	}
-> };
-> 
-> DECLARE_ACPI_MCFG_FIXUP(&foo_pci_ops, <oem_id_str>, <oem_rev>, <domain_nr>, <bus_nr>);
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/acpi/pci_mcfg.c           | 32 ++++++++++++++++++++++++++++++++
->  include/asm-generic/vmlinux.lds.h |  7 +++++++
->  include/linux/pci-acpi.h          | 19 +++++++++++++++++++
->  3 files changed, 58 insertions(+)
-> 
-> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-> index 1847f74..f3d4570 100644
-> --- a/drivers/acpi/pci_mcfg.c
-> +++ b/drivers/acpi/pci_mcfg.c
-> @@ -22,11 +22,43 @@
->  #include <linux/kernel.h>
->  #include <linux/pci.h>
->  #include <linux/pci-acpi.h>
-> +#include <linux/pci-ecam.h>
->  
->  /* Root pointer to the mapped MCFG table */
->  static struct acpi_table_mcfg *mcfg_table;
->  static int mcfg_entries;
->  
-> +extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
-> +extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
-> +
-> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
-> +{
-> +	int bus_num = root->secondary.start;
-> +	int domain = root->segment;
-> +	struct pci_cfg_fixup *f;
-> +
-> +	if (!mcfg_table)
-> +		return &pci_generic_ecam_ops;
-> +
-> +	/*
-> +	 * Match against platform specific quirks and return corresponding
-> +	 * CAM ops.
-> +	 *
-> +	 * First match against PCI topology <domain:bus> then use OEM ID and
-> +	 * OEM revision from MCFG table standard header.
-> +	 */
-> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups; f++) {
-> +		if ((f->domain == domain || f->domain == PCI_MCFG_DOMAIN_ANY) &&
-> +		    (f->bus_num == bus_num || f->bus_num == PCI_MCFG_BUS_ANY) &&
-> +		    (!strncmp(f->oem_id, mcfg_table->header.oem_id,
-> +			      ACPI_OEM_ID_SIZE)) &&
-> +		    (f->oem_revision == mcfg_table->header.oem_revision))
-
-Is this more likely to be updated between quirky and fixed platforms
-than oem_table_id? What do folks think about using oem_table_id instead
-of, or in addition to, oem_revision?
-
-In case these details are helpful, here was my simple prototype of an
-MCFG based approach:
-
-https://codeaurora.org/cgit/quic/server/kernel/commit/?h=cov/4.7-rc1-testing&id=c5d8bc49a198fd8f61f82c7d8f169564d6176b07
-https://codeaurora.org/cgit/quic/server/kernel/commit/?h=cov/4.7-rc1-testing&id=50bfe77ccd1639e6ce8c7c4fcca187d50e0bead4
-
-Thanks,
-Cov
-
--- 
-Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+thanks
+>
+>
+> Regards,
+> Navakishore.
+>
