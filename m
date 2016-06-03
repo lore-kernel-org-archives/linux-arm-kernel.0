@@ -1,228 +1,170 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 2 Jun 2016 23:09:52 -0500
-Subject: [PATCH 2/2] aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <575052B8.3090203@ti.com>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <20160602034828.GA10240@localhost>
- <VI1PR0401MB1709E215DCE264B2C27B3DAB92580@VI1PR0401MB1709.eurprd04.prod.outlook.com>
- <20160602135546.GA8262@localhost> <575052B8.3090203@ti.com>
-Message-ID: <20160603040952.GA17904@localhost>
+From: bharat.bhushan@nxp.com (Bharat Bhushan)
+Date: Fri, 3 Jun 2016 04:26:54 +0000
+Subject: [PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <DB5PR04MB099754E61027226E5210C2399A590@DB5PR04MB0997.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 11:37:28AM -0400, Murali Karicheri wrote:
-> On 06/02/2016 09:55 AM, Bjorn Helgaas wrote:
-> > On Thu, Jun 02, 2016 at 05:01:19AM +0000, Po Liu wrote:
-> >>>  -----Original Message-----
-> >>>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> >>>  Sent: Thursday, June 02, 2016 11:48 AM
-> >>>  To: Po Liu
-> >>>  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >>>  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Arnd Bergmann;
-> >>>  Roy Zang; Marc Zyngier; Stuart Yoder; Yang-Leo Li; Minghuan Lian; Bjorn
-> >>>  Helgaas; Shawn Guo; Mingkai Hu; Rob Herring
-> >>>  Subject: Re: [PATCH 2/2] aer: add support aer interrupt with none
-> >>>  MSI/MSI-X/INTx mode
-> >>>  
-> >>>  [+cc Rob]
-> >>>  
-> >>>  Hi Po,
-> >>>  
-> >>>  On Thu, May 26, 2016 at 02:00:06PM +0800, Po Liu wrote:
-> >>>  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-> >>>  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-> >>>  > maybe there is interrupt line for aer pme etc. Search the interrupt
-> >>>  > number in the fdt file.
-> >>>  
-> >>>  My understanding is that AER interrupt signaling can be done via INTx,
-> >>>  MSI, or MSI-X (PCIe spec r3.0, sec 6.2.4.1.2).  Apparently your device
-> >>>  doesn't support MSI or MSI-X.  Are you saying it doesn't support INTx
-> >>>  either?  How is the interrupt you're requesting here different from INTx?
-> >>
-> >> Layerscape use none of MSI or MSI-X or INTx to indicate the devices
-> >> or root error in RC mode. But use an independent SPI interrupt(arm
-> >> interrupt controller) line.  
-> > 
-> > The Root Port is a PCI device and should follow the normal PCI rules
-> > for interrupts.  As far as I understand, that means it should use MSI,
-> > MSI-X, or INTx.  If your Root Port doesn't use MSI or MSI-X, it should
-> > use INTx, the PCI_INTERRUPT_PIN register should tell us which (INTA/
-> > INTB/etc.), and PCI_COMMAND_INTX_DISABLE should work to disable it.
-> > That's all from the PCI point of view, of course.
+Hi Andre,
+
+We are looking for these patches but seems like these needed to rebased/redesigned based on new GIC emulation changes. Can you give us some sense on when this will be done?
+Also do you know if someone is working on QEMU size changes for this, if not then we can help on getting that done.
+
+Thanks
+-Bharat
+
+> -----Original Message-----
+> From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-
+> bounces at lists.cs.columbia.edu] On Behalf Of Andre Przywara
+> Sent: Saturday, March 26, 2016 7:44 AM
+> To: Christoffer Dall <christoffer.dall@linaro.org>; Marc Zyngier
+> <marc.zyngier@arm.com>; Eric Auger <eric.auger@linaro.org>
+> Cc: kvmarm at lists.cs.columbia.edu; linux-arm-kernel at lists.infradead.org;
+> kvm at vger.kernel.org
+> Subject: [PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
 > 
-> I am faced with the same issue on Keystone PCI hardware and it has been
-> on my TODO list  for quite some time. Keystone PCI hardware also doesn't
-> use MSI or MSI-X or INTx for reporting errors received at the root port,
-> but use a platform interrupt instead (not complaint to PCI standard as
-> per PCI base spec). So I would need similar change to have the error
-> interrupt passed to the aer driver. So there are hardware out there
-> like Keystone which requires to support this through platform IRQ.
-
-This is not a new area of the spec, and it's hard for me to believe
-that these two new PCIe controllers are both broken the same way
-(although I guess both are DesignWare-based, so maybe this is the same
-underlying problem in both cases?).  I think it's more likely that we
-just haven't figured out the right way to describe this in the DT.
-
-I assume you have a Root Port with an AER capability, no MSI
-capability, and no MSI-X capability, right?  What does its Interrupt
-Pin register contain?  If it's zero, it doesn't use INTx either, so
-according to the spec it should generate no interrupts.
-
-But if Interrupt Pin is non-zero, that means the Root Port should be
-able to generate virtual INTx interrupts.  Presumably the Root Complex
-connects those interrupts to something; maybe to your platform
-interrupt?
-
-PCI doesn't say anything about an interrupt after it leaves the Root
-Complex, so the fact that it's connected to a "platform interrupt" or
-"SPI interrupt" or "IOAPIC interrupt" doesn't make it non-compliant.
-Shouldn't we be able to use the interrupt-map and related DT
-properties to express the fact that Root Port virtual INTx is routed
-to platform interrupt Y, even without any special-case code in
-portdrv?
-
-> > What's on the other end of those interrupts is outside the scope of
-> > PCI.  An INTx interrupt (either a conventional PCI wire or a PCIe
-> > virtual INTx wire) might be connected to an IOAPIC, an ARM SPI, or
-> > something else.  Drivers should not care about how it is connected,
-> > and that's why I don't think this code really fits in portdrv.
-> > 
-> > Maybe your Root Port is non-compliant in some way and maybe we need a
-> > quirk or something to work around that hardware defect.  But I'm not
-> > convinced yet that we have that sort of problem.  It seems like we
-> > just don't have the correct DT description.
+> Hi,
 > 
-> Is quirk is what is suggested here to support this?
-
-No, I don't understand the problem yet, so I'm not ready to suggest a
-solution.
-
-> >> And at same time, AER capability list
-> >> in PCIe register descriptors. And also, The Root Error
-> >> Command/status register was proper to enable/disable the AER
-> >> interrupt.
-> > 
-> > I'm not sure what you're saying here.  Here's what I think you said;
-> > please correct me if I'm wrong:
-> > 
-> >   - Your Root Port has an AER capability.
-> > 
-> >   - Your Root Port does not support MSI or MSI-X.  (This would
-> >     actually be a spec violation because the PCIe spec r3.0, sec 7.7
-> >     says "All PCI Express device Functions that are capable of
-> >     generating interrupts must implement MSI or MSI-X or both.")
-> >   
-> >   - The three enable bits in the Root Error Command Register enable or
-> >     disable generation of interrupts.  These enable bits control all
-> >     interrupts, whether MSI, MSI-X, or INTx.
-> > 
-> >   - The Root Error Status Register contains an "Advanced Error
-> >     Interrupt Message Number" field, but that's only applicable if MSI
-> >     or MSI-X is enabled, and if your device doesn't support MSI or
-> >     MSI-X, this field doesn't apply.
-> > 
-> >> This hardware implementation make sense in some platforms, and this
-> >> was described in the function init_service_irqs() in the
-> >> drivers/pci/pcie/portdrv_core.c in current kernel as:
-> > 
-> >>
-> >> 241      * We're not going to use MSI-X, so try MSI and fall back to INTx.     
-> >> 242      * If neither MSI/MSI-X nor INTx available, try other interrupt.  On  
-> >> 243      * some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode
-> >> 244      */                                                                             
-> >>
-> >> So I think this was the proper place to update the irq number before aer service
-> >> driver was loaded.
-> >>
-> >>>  
-> >>>  My guess is that your device *does* support INTx, and we should use that.
-> >>>  ACPI has the generic _PRT that describes INTx routing.  There must be
-> >>>  something similar for DT, but I don't know what it is.  It seems like
-> >>>  this should be described using that DT mechanism (whatever it is), and
-> >>>  we shouldn't need special-case code in the portdrv code.
-> >>>  
-> >>>  > Signed-off-by: Po Liu <po.liu@nxp.com>
-> >>>  > ---
-> >>>  >  drivers/pci/pcie/portdrv_core.c | 31 ++++++++++++++++++++++++++++---
-> >>>  >  1 file changed, 28 insertions(+), 3 deletions(-)
-> >>>  >
-> >>>  > diff --git a/drivers/pci/pcie/portdrv_core.c
-> >>>  > b/drivers/pci/pcie/portdrv_core.c index 32d4d0a..64833e5 100644
-> >>>  > --- a/drivers/pci/pcie/portdrv_core.c
-> >>>  > +++ b/drivers/pci/pcie/portdrv_core.c
-> >>>  > @@ -15,6 +15,7 @@
-> >>>  >  #include <linux/slab.h>
-> >>>  >  #include <linux/pcieport_if.h>
-> >>>  >  #include <linux/aer.h>
-> >>>  > +#include <linux/of_irq.h>
-> >>>  >
-> >>>  >  #include "../pci.h"
-> >>>  >  #include "portdrv.h"
-> >>>  > @@ -199,6 +200,28 @@ static int pcie_port_enable_msix(struct pci_dev
-> >>>  > *dev, int *vectors, int mask)  static int init_service_irqs(struct
-> >>>  > pci_dev *dev, int *irqs, int mask)  {
-> >>>  >  	int i, irq = -1;
-> >>>  > +	int ret;
-> >>>  > +	struct device_node *np = NULL;
-> >>>  > +
-> >>>  > +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-> >>>  > +		irqs[i] = 0;
-> >>>  > +
-> >>>  > +	if (dev->bus->dev.of_node)
-> >>>  > +		np = dev->bus->dev.of_node;
-> >>>  > +
-> >>>  > +	/* If root port doesn't support MSI/MSI-X/INTx in RC mode,
-> >>>  > +	 * request irq for aer
-> >>>  > +	 */
-> >>>  > +	if (IS_ENABLED(CONFIG_OF_IRQ) && np &&
-> >>>  > +			(mask & PCIE_PORT_SERVICE_PME)) {
-> >>>  > +		ret = of_irq_get_byname(np, "aer");
-> >>>  > +		if (ret > 0) {
-> >>>  > +			irqs[PCIE_PORT_SERVICE_AER_SHIFT] = ret;
-> >>>  > +			if (dev->irq)
-> >>>  > +				irq = dev->irq;
-> >>>  > +			goto no_msi;
-> >>>  > +		}
-> >>>  > +	}
-> >>>  >
-> >>>  >  	/*
-> >>>  >  	 * If MSI cannot be used for PCIe PME or hotplug, we have to use
-> >>>  @@
-> >>>  > -224,11 +247,13 @@ static int init_service_irqs(struct pci_dev *dev,
-> >>>  int *irqs, int mask)
-> >>>  >  		irq = dev->irq;
-> >>>  >
-> >>>  >   no_msi:
-> >>>  > -	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++)
-> >>>  > -		irqs[i] = irq;
-> >>>  > +	for (i = 0; i < PCIE_PORT_DEVICE_MAXSERVICES; i++) {
-> >>>  > +		if (!irqs[i])
-> >>>  > +			irqs[i] = irq;
-> >>>  > +	}
-> >>>  >  	irqs[PCIE_PORT_SERVICE_VC_SHIFT] = -1;
-> >>>  >
-> >>>  > -	if (irq < 0)
-> >>>  > +	if (irq < 0 && irqs[PCIE_PORT_SERVICE_AER_SHIFT] < 0)
-> >>>  >  		return -ENODEV;
-> >>>  >  	return 0;
-> >>>  >  }
-> >>>  > --
-> >>>  > 2.1.0.27.g96db324
-> >>>  >
-> >>>  >
-> >>>  > _______________________________________________
-> >>>  > linux-arm-kernel mailing list
-> >>>  > linux-arm-kernel at lists.infradead.org
-> >>>  > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > 
+> this is a rebased and reworked version of the ITS emulation support.
+> It allows KVM guests which use an emulated GICv3 to use LPIs as well,
+> though in the moment this is limited to emulated PCI devices.
+> It is now based on and requires the new VGIC implementation [1].
 > 
+> You can find all of this code (and the prerequisites) in the
+> its-emul/v4 branch of my repository [2].
 > 
-> -- 
-> Murali Karicheri
-> Linux Kernel, Keystone
+> Cheers,
+> Andre.
+> 
+> Changelog v3..v4:
+> - adapting to new VGIC (changes in IRQ injection mechanism)
+> 
+> Changelog v2..v3:
+> - adapt to 4.3-rc and Christoffer's timer rework
+> - adapt spin locks on handling PROPBASER/PENDBASER registers
+> - rework locking in ITS command handling (dropping dist where needed)
+> - only clear LPI pending bit if LPI could actually be queued
+> - simplify GICR_CTLR handling
+> - properly free ITTEs (including our pending bitmap)
+> - fix corner cases with unmapped collections
+> - keep retire_lr() around
+> - rename vgic_handle_base_register to vgic_reg64_access()
+> - use kcalloc instead of kmalloc
+> - minor fixes, renames and added comments
+> 
+> Changelog v1..v2
+> - fix issues when using non-ITS GICv3 emulation
+> - streamline frame address initialization (new patch 05/15)
+> - preallocate buffer memory for reading from guest's memory
+> - move locking into the actual command handlers
+> -   preallocate memory for new structures if needed
+> - use non-atomic __set_bit() and __clear_bit() when under the lock
+> - add INT command handler to allow LPI injection from the guest
+> - rewrite CWRITER handler to align with new locking scheme
+> - remove unneeded CONFIG_HAVE_KVM_MSI #ifdefs
+> - check memory table size against our LPI limit (65536 interrupts)
+> - observe initial gap of 1024 interrupts in pending table
+> - use term "configuration table" to be in line with the spec
+> - clarify and extend documentation on API extensions
+> - introduce new KVM_CAP_MSI_DEVID capability to advertise device ID
+> requirement
+> - update, fix and add many comments
+> - minor style changes as requested by reviewers
+> 
+> ---------------
+> 
+> The GICv3 ITS (Interrupt Translation Service) is a part of the ARM GICv3
+> interrupt controller [4] used for implementing MSIs.
+> It specifies a new kind of interrupts (LPIs), which are mapped to establish a
+> connection between a device, its MSI payload value and the target processor
+> the IRQ is eventually delivered to.
+> In order to allow using MSIs in an ARM64 KVM guest, we emulate this ITS
+> widget in the kernel.
+> The ITS works by reading commands written by software (from the guest in
+> our case) into a (guest allocated) memory region and establishing the
+> mapping between a device, the MSI payload and the target CPU.
+> We parse these commands and update our internal data structures to reflect
+> those changes. On an MSI injection we iterate those structures to learn the
+> LPI number we have to inject.
+> For the time being we use simple lists to hold the data, this is good enough
+> for the small number of entries each of the components currently have.
+> Should this become a performance bottleneck in the future, those can be
+> extended to arrays or trees if needed.
+> 
+> Most of the code lives in a separate source file (its-emul.c), though there are
+> some changes necessary in the existing VGIC files.
+> 
+> For the time being this series gives us the ability to use emulated PCI devices
+> that can use MSIs in the guest. Those have to be triggered by letting the
+> userland device emulation simulate the MSI write with the
+> KVM_SIGNAL_MSI ioctl. This will be translated into the proper LPI by the ITS
+> emulation and injected into the guest in the usual way (just with a higher IRQ
+> number).
+> 
+> This series is based on 4.5 plus the KVM queue for 4.6 and the new VGIC
+> emulation code and can be found at the its-emul/v4 branch of this repository
+> [2].
+> For this to be used you need a GICv3 host machine (a fast model would do),
+> though it does not rely on any host ITS bits (neither in hardware or software).
+> 
+> To test this you can use the kvmtool patches available in the "its"
+> branch here [3].
+> Start a guest with: "$ lkvm run --irqchip=gicv3-its --force-pci"
+> and see the ITS being used for instance by the virtio devices.
+> 
+> [1]: https://lists.cs.columbia.edu/pipermail/kvmarm/2016-
+> March/019191.html
+> [2]: git://linux-arm.org/linux-ap.git
+>      http://www.linux-arm.org/git?p=linux-ap.git;a=log;h=refs/heads/its-
+> emul/v4
+> [3]: git://linux-arm.org/kvmtool.git
+>      http://www.linux-arm.org/git?p=kvmtool.git;a=log;h=refs/heads/its
+> [4]:
+> http://arminfo.emea.arm.com/help/topic/com.arm.doc.ihi0069a/IHI0069A_g
+> ic_architecture_specification.pdf
+> 
+> Andre Przywara (12):
+>   KVM: extend struct kvm_msi to hold a 32-bit device ID
+>   KVM: arm/arm64: extend arch CAP checks to allow per-VM capabilities
+>   KVM: arm64: Introduce new MMIO region for the ITS base address
+>   KVM: arm64: handle ITS related GICv3 redistributor registers
+>   KVM: arm64: introduce ITS emulation file with stub functions
+>   KVM: arm64: implement basic ITS register handlers
+>   KVM: arm64: add data structures to model ITS interrupt translation
+>   KVM: arm64: connect LPIs to the VGIC emulation
+>   KVM: arm64: sync LPI configuration and pending tables
+>   KVM: arm64: implement ITS command queue command handlers
+>   KVM: arm64: implement MSI injection in ITS emulation
+>   KVM: arm64: enable ITS emulation as a virtual MSI controller
+> 
+>  Documentation/virtual/kvm/api.txt              |   14 +-
+>  Documentation/virtual/kvm/devices/arm-vgic.txt |    9 +
+>  arch/arm/include/asm/kvm_host.h                |    2 +-
+>  arch/arm/kvm/arm.c                             |    2 +-
+>  arch/arm64/include/asm/kvm_host.h              |    2 +-
+>  arch/arm64/include/uapi/asm/kvm.h              |    2 +
+>  arch/arm64/kvm/Kconfig                         |    1 +
+>  arch/arm64/kvm/Makefile                        |    1 +
+>  arch/arm64/kvm/reset.c                         |   12 +-
+>  include/kvm/vgic/vgic.h                        |   33 +
+>  include/linux/irqchip/arm-gic-v3.h             |   28 +-
+>  include/uapi/linux/kvm.h                       |    5 +-
+>  virt/kvm/arm/vgic.c                            |    5 +
+>  virt/kvm/arm/vgic/its-emul.c                   | 1146 ++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.c                       |   18 +
+>  virt/kvm/arm/vgic/vgic.h                       |   33 +
+>  virt/kvm/arm/vgic/vgic_init.c                  |    9 +
+>  virt/kvm/arm/vgic/vgic_kvm_device.c            |    7 +
+>  virt/kvm/arm/vgic/vgic_mmio.c                  |   54 +-
+>  19 files changed, 1365 insertions(+), 18 deletions(-)  create mode 100644
+> virt/kvm/arm/vgic/its-emul.c
+> 
+> --
+> 2.7.3
+> 
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
