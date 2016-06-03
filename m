@@ -1,66 +1,17 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 04 Jun 2016 00:37:37 +0300
-Subject: [PATCH v2 11/11] ARM: dts: blanche: add Ethernet support
-In-Reply-To: <3446154.oZ24315zaL@wasted.cogentembedded.com>
-References: <3446154.oZ24315zaL@wasted.cogentembedded.com>
-Message-ID: <3446158.3RAgrIF8O1@wasted.cogentembedded.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 3 Jun 2016 23:38:29 +0200
+Subject: [PATCH 1/2] perf: allow add to change event state
+In-Reply-To: <1464987812-14360-2-git-send-email-nleeder@codeaurora.org>
+References: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
+ <1464987812-14360-2-git-send-email-nleeder@codeaurora.org>
+Message-ID: <20160603213829.GD3710@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R8A7792  SoC  doesn't have the EtherMAC core, so SMSC  LAN89218  Ethernet
-chip was used instead on the Blanche board; this chip  is compatible with
-SMSC LAN9115  for  which there's a (device tree aware) driver. Describe
-the  chip in  the  Blanche device tree;  enable DHCP and NFS root in the
-kernel command line for the kernel booting.
+On Fri, Jun 03, 2016 at 05:03:31PM -0400, Neil Leeder wrote:
+> When the platform-specific pmu->add function returns
+> an error, it may have also changed the event's state.
+> If so, do not override that new state.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-
----
-Changes in version 2:
-- added Simon's ACK.
-
- arch/arm/boot/dts/r8a7792-blanche.dts |   23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -21,7 +21,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -29,6 +29,27 @@
- 		device_type = "memory";
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
-+
-+	d3_3v: regulator-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	ethernet at 18000000 {
-+		compatible = "smsc,lan89218", "smsc,lan9115";
-+		reg = <0 0x18000000 0 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+		smsc,irq-push-pull;
-+		reg-io-width = <4>;
-+		vddvario-supply = <&d3_3v>;
-+		vdd33a-supply = <&d3_3v>;
-+	};
- };
- 
- &extal_clk {
+This is inadequate; it fails to what the problem is and why this is a
+good solution.
