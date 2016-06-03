@@ -1,64 +1,46 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 03 Jun 2016 18:13:40 +0000
-Subject: [PATCH v17 02/13] arm64: Add cpus_are_stuck_in_kernel
+Date: Fri, 03 Jun 2016 18:13:41 +0000
+Subject: [PATCH v17 10/13] arm64: kdump: add VMCOREINFO for user-space
+ coredump tools
 In-Reply-To: <cover.1464974516.git.geoff@infradead.org>
 References: <cover.1464974516.git.geoff@infradead.org>
-Message-ID: <d4f8c7961adc4b0afe733306fbc21e5bb7c8f6ee.1464974516.git.geoff@infradead.org>
+Message-ID: <9e75a7b75b38b37ded3e361498eaf1486107ce5d.1464974516.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: James Morse <james.morse@arm.com>
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-kernel/smp.c has a fancy counter that keeps track of the number of CPUs
-it marked as not-present and left in cpu_park_loop(). If there are any
-CPUs spinning in here, kexec will release them once the memory is re-used
-by the new kernel.
+For the current crash utility, we need to know, at least, a value of
+"kimage_voffset" to handle the contents of core dump file (/proc/vmcore)
+correctly due to the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
 
-We can't return an error once we reach machine_kexec(), so as a sanity check
-we forbid kexec images to be loaded if there are already cpus stuck in the
-kernel, or we have multiple cpus and no way of disabling them.
-
-Signed-off-by: James Morse <james.morse@arm.com>
-[Split off from a larger patch]
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+More VMCOREINFO may be added later for makedumpfile command.
 ---
- arch/arm64/include/asm/smp.h | 10 ++++++++++
- arch/arm64/kernel/smp.c      |  5 +++++
- 2 files changed, 15 insertions(+)
+ arch/arm64/kernel/machine_kexec.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
-index 433e504..38712f4 100644
---- a/arch/arm64/include/asm/smp.h
-+++ b/arch/arm64/include/asm/smp.h
-@@ -124,6 +124,16 @@ static inline void cpu_panic_kernel(void)
- 	cpu_park_loop();
- }
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 92e8a92..ac3655f 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -22,6 +22,7 @@
  
-+/*
-+ * If a secondary CPU fails to come online, (e.g. due to mismatched features),
-+ * it will try to call cpu_die(). If this fails, it updates
-+ * cpus_stuck_in_kernel and sits in cpu_park_loop().
-+ *
-+ * Kexec checks this counter and refuses to load/kexec if it is non-zero, as
-+ * cpu_park_loop() would be overwritten releasing the parked cpus.
-+ */
-+bool cpus_are_stuck_in_kernel(void);
-+
- #endif /* ifndef __ASSEMBLY__ */
+ #include <asm/cacheflush.h>
+ #include <asm/cpu_ops.h>
++#include <asm/memory.h>
+ #include <asm/mmu_context.h>
+ #include <asm/system_misc.h>
  
- #endif /* ifndef __ASM_SMP_H */
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 678e084..d0bcd55 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -909,3 +909,8 @@ int setup_profiling_timer(unsigned int multiplier)
- {
- 	return -EINVAL;
+@@ -299,3 +300,10 @@ void machine_crash_shutdown(struct pt_regs *regs)
+ 
+ 	pr_info("Starting crashdump kernel...\n");
  }
 +
-+bool cpus_are_stuck_in_kernel(void)
++void arch_crash_save_vmcoreinfo(void)
 +{
-+	return !!cpus_stuck_in_kernel;
++	/* Please note VMCOREINFO_NUMBER() uses "%d", not "%x" */
++	vmcoreinfo_append_str("NUMBER(kimage_voffset)=0x%llx\n",
++						kimage_voffset);
 +}
 -- 
 2.5.0
