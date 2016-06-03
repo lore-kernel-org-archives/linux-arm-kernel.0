@@ -1,35 +1,28 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri,  3 Jun 2016 08:18:25 +0200
-Subject: [PATCH v2 6/9] dt-bindings: Add root properties for Raspberry Pi 3
+Date: Fri,  3 Jun 2016 08:18:28 +0200
+Subject: [PATCH v2 9/9] ARM: bcm2837: dt: Add the ethernet to the device trees
 In-Reply-To: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
 References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1464934708-24769-7-git-send-email-kraxel@redhat.com>
+Message-ID: <1464934708-24769-10-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Anholt <eric@anholt.net>
-
-Signed-off-by: Eric Anholt <eric@anholt.net>
-Acked-by: Stephen Warren <swarren@wwwdotorg.org>
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
 ---
- Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
-index 11d3056..6ffe087 100644
---- a/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
-+++ b/Documentation/devicetree/bindings/arm/bcm/brcm,bcm2835.txt
-@@ -30,6 +30,10 @@ Raspberry Pi 2 Model B
- Required root node properties:
- compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+index 223793d..6f47dd2 100644
+--- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
++++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2837.dtsi"
+ #include "../../../../arm/boot/dts/bcm2835-rpi.dtsi"
++#include "../../../../arm/boot/dts/bcm283x-rpi-smsc9514.dtsi"
  
-+Raspberry Pi 3 Model B
-+Required root node properties:
-+compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
-+
- Raspberry Pi Compute Module
- Required root node properties:
- compatible = "raspberrypi,compute-module", "brcm,bcm2835";
+ / {
+ 	compatible = "raspberrypi,3-model-b", "brcm,bcm2837";
 -- 
 1.8.3.1
