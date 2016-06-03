@@ -1,166 +1,125 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri,  3 Jun 2016 16:05:11 +0200
-Subject: [PATCH v2 4/4] musb: sunxi: Simplify dr_mode handling
+Date: Fri,  3 Jun 2016 16:05:10 +0200
+Subject: [PATCH v2 3/4] phy-sun4i-usb: Add workaround for missing Vbus det
+ interrupts on A31
 In-Reply-To: <1464962711-5871-1-git-send-email-hdegoede@redhat.com>
 References: <1464962711-5871-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1464962711-5871-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1464962711-5871-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-phy-sun4i-usb now has proper dr_mode handling, it always registers an
-extcon, and sends a notify with the mode (even when in peripheral- /
-host-only mode) at least once.
-
-So we can simply the sunxi musb glue by always registering its extcon
-notifier and relying on sunxi_musb_work() to enable vbus when in
-host-only mode.
-
-This also enables host- and peripheral-only mode with vbus monitoring.
+The A31 companion pmic (axp221) does not generate vbus change interrupts
+when the board is driving vbus, so we must poll when using the pmic for
+vbus-det _and_ we're driving vbus.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
 Changes in v2:
 -No changes
 ---
- drivers/usb/musb/sunxi.c | 68 ++++++++++++++++++------------------------------
- 1 file changed, 25 insertions(+), 43 deletions(-)
+ drivers/phy/phy-sun4i-usb.c | 34 ++++++++++++++++++++++++----------
+ 1 file changed, 24 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index e7d4617..b88a2f6 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -255,12 +255,10 @@ static int sunxi_musb_init(struct musb *musb)
- 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
+diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
+index 9196c8a..7f12439c 100644
+--- a/drivers/phy/phy-sun4i-usb.c
++++ b/drivers/phy/phy-sun4i-usb.c
+@@ -95,6 +95,7 @@
  
- 	/* Register notifier before calling phy_init() */
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE) {
--		ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
--					       &glue->host_nb);
--		if (ret)
--			goto error_reset_assert;
--	}
-+	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
-+				       &glue->host_nb);
-+	if (ret)
-+		goto error_reset_assert;
- 
- 	ret = phy_init(glue->phy);
- 	if (ret)
-@@ -274,9 +272,8 @@ static int sunxi_musb_init(struct musb *musb)
- 	return 0;
- 
- error_unregister_notifier:
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
--		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--					   &glue->host_nb);
-+	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-+				   &glue->host_nb);
- error_reset_assert:
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
-@@ -300,9 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
- 
- 	phy_exit(glue->phy);
- 
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
--		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--					   &glue->host_nb);
-+	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-+				   &glue->host_nb);
- 
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
-@@ -314,25 +310,6 @@ static int sunxi_musb_exit(struct musb *musb)
- 	return 0;
+ enum sun4i_usb_phy_type {
+ 	sun4i_a10_phy,
++	sun6i_a31_phy,
+ 	sun8i_a33_phy,
+ 	sun8i_h3_phy,
+ };
+@@ -125,7 +126,6 @@ struct sun4i_usb_phy_data {
+ 	/* phy0 / otg related variables */
+ 	struct extcon_dev *extcon;
+ 	bool phy0_init;
+-	bool phy0_poll;
+ 	struct gpio_desc *id_det_gpio;
+ 	struct gpio_desc *vbus_det_gpio;
+ 	struct power_supply *vbus_power_supply;
+@@ -353,6 +353,24 @@ static bool sun4i_usb_phy0_have_vbus_det(struct sun4i_usb_phy_data *data)
+ 	return data->vbus_det_gpio || data->vbus_power_supply;
  }
  
--static int sunxi_set_mode(struct musb *musb, u8 mode)
--{
--	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
--	int ret;
--
--	if (mode == MUSB_HOST) {
--		ret = phy_power_on(glue->phy);
--		if (ret)
--			return ret;
--
--		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
--		/* Stop musb work from turning vbus off again */
--		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
--		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
--	}
--
--	return 0;
--}
--
- static void sunxi_musb_enable(struct musb *musb)
++static bool sun4i_usb_phy0_poll(struct sun4i_usb_phy_data *data)
++{
++	if ((data->id_det_gpio && data->id_det_irq < 0) ||
++	    (data->vbus_det_gpio && data->vbus_det_irq < 0))
++		return true;
++
++	/*
++	 * The A31 companion pmic (axp221) does not generate vbus change
++	 * interrupts when the board is driving vbus, so we must poll
++	 * when using the pmic for vbus-det _and_ we're driving vbus.
++	 */
++	if (data->cfg->type == sun6i_a31_phy &&
++	    data->vbus_power_supply && data->phys[0].regulator_on)
++		return true;
++
++	return false;
++}
++
+ static int sun4i_usb_phy_power_on(struct phy *_phy)
  {
- 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-@@ -579,7 +556,6 @@ static const struct musb_platform_ops sunxi_musb_ops = {
- 	.exit		= sunxi_musb_exit,
- 	.enable		= sunxi_musb_enable,
- 	.disable	= sunxi_musb_disable,
--	.set_mode	= sunxi_set_mode,
- 	.fifo_offset	= sunxi_musb_fifo_offset,
- 	.ep_offset	= sunxi_musb_ep_offset,
- 	.busctl_offset	= sunxi_musb_busctl_offset,
-@@ -635,10 +611,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		return -EINVAL;
+ 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
+@@ -374,7 +392,7 @@ static int sun4i_usb_phy_power_on(struct phy *_phy)
+ 	phy->regulator_on = true;
+ 
+ 	/* We must report Vbus high within OTG_TIME_A_WAIT_VRISE msec. */
+-	if (phy->index == 0 && data->vbus_det_gpio && data->phy0_poll)
++	if (phy->index == 0 && sun4i_usb_phy0_poll(data))
+ 		mod_delayed_work(system_wq, &data->detect, DEBOUNCE_TIME);
+ 
+ 	return 0;
+@@ -395,7 +413,7 @@ static int sun4i_usb_phy_power_off(struct phy *_phy)
+ 	 * phy0 vbus typically slowly discharges, sometimes this causes the
+ 	 * Vbus gpio to not trigger an edge irq on Vbus off, so force a rescan.
+ 	 */
+-	if (phy->index == 0 && data->vbus_det_gpio && !data->phy0_poll)
++	if (phy->index == 0 && !sun4i_usb_phy0_poll(data))
+ 		mod_delayed_work(system_wq, &data->detect, POLL_TIME);
+ 
+ 	return 0;
+@@ -481,7 +499,7 @@ static void sun4i_usb_phy0_id_vbus_det_scan(struct work_struct *work)
+ 	if (vbus_notify)
+ 		extcon_set_cable_state_(data->extcon, EXTCON_USB, vbus_det);
+ 
+-	if (data->phy0_poll)
++	if (sun4i_usb_phy0_poll(data))
+ 		queue_delayed_work(system_wq, &data->detect, POLL_TIME);
+ }
+ 
+@@ -666,11 +684,6 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
  	}
  
--	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
--	if (!glue)
--		return -ENOMEM;
+ 	data->id_det_irq = gpiod_to_irq(data->id_det_gpio);
+-	data->vbus_det_irq = gpiod_to_irq(data->vbus_det_gpio);
+-	if ((data->id_det_gpio && data->id_det_irq < 0) ||
+-	    (data->vbus_det_gpio && data->vbus_det_irq < 0))
+-		data->phy0_poll = true;
 -
- 	memset(&pdata, 0, sizeof(pdata));
- 	switch (usb_get_dr_mode(&pdev->dev)) {
- #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
-@@ -646,15 +618,13 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		pdata.mode = MUSB_PORT_MODE_HOST;
- 		break;
- #endif
-+#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
-+	case USB_DR_MODE_PERIPHERAL:
-+		pdata.mode = MUSB_PORT_MODE_GADGET;
-+		break;
-+#endif
- #ifdef CONFIG_USB_MUSB_DUAL_ROLE
- 	case USB_DR_MODE_OTG:
--		glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
--		if (IS_ERR(glue->extcon)) {
--			if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
--				return -EPROBE_DEFER;
--			dev_err(&pdev->dev, "Invalid or missing extcon\n");
--			return PTR_ERR(glue->extcon);
--		}
- 		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
- 		break;
- #endif
-@@ -665,6 +635,10 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 	pdata.platform_ops	= &sunxi_musb_ops;
- 	pdata.config		= &sunxi_musb_hdrc_config;
- 
-+	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
-+	if (!glue)
-+		return -ENOMEM;
-+
- 	glue->dev = &pdev->dev;
- 	INIT_WORK(&glue->work, sunxi_musb_work);
- 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
-@@ -698,6 +672,14 @@ static int sunxi_musb_probe(struct platform_device *pdev)
+ 	if (data->id_det_irq >= 0) {
+ 		ret = devm_request_irq(dev, data->id_det_irq,
+ 				sun4i_usb_phy0_id_vbus_det_irq,
+@@ -682,6 +695,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
  		}
  	}
  
-+	glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
-+	if (IS_ERR(glue->extcon)) {
-+		if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_err(&pdev->dev, "Invalid or missing extcon\n");
-+		return PTR_ERR(glue->extcon);
-+	}
-+
- 	glue->phy = devm_phy_get(&pdev->dev, "usb");
- 	if (IS_ERR(glue->phy)) {
- 		if (PTR_ERR(glue->phy) == -EPROBE_DEFER)
++	data->vbus_det_irq = gpiod_to_irq(data->vbus_det_gpio);
+ 	if (data->vbus_det_irq >= 0) {
+ 		ret = devm_request_irq(dev, data->vbus_det_irq,
+ 				sun4i_usb_phy0_id_vbus_det_irq,
+@@ -733,7 +747,7 @@ static const struct sun4i_usb_phy_cfg sun5i_a13_cfg = {
+ 
+ static const struct sun4i_usb_phy_cfg sun6i_a31_cfg = {
+ 	.num_phys = 3,
+-	.type = sun4i_a10_phy,
++	.type = sun6i_a31_phy,
+ 	.disc_thresh = 3,
+ 	.phyctl_offset = REG_PHYCTL_A10,
+ 	.dedicated_clocks = true,
 -- 
 2.7.4
