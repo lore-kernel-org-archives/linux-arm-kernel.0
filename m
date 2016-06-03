@@ -1,121 +1,74 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  3 Jun 2016 10:22:59 +0200
-Subject: [PATCH 01/14] pwm: Add new helpers to create/manipulate PWM states
+Date: Fri,  3 Jun 2016 10:23:05 +0200
+Subject: [PATCH 07/14] pwm: sti: Add support for hardware readout
 In-Reply-To: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1464942192-25967-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1464942192-25967-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm_prepare_new_state() helper prepares a new state object
-containing the current PWM state except for the polarity and period
-fields which are set to the reference values.
-This is particurly useful for PWM users who want to apply a new
-duty-cycle expressed relatively to the reference period without
-changing the enable state.
-
-The PWM framework expect PWM users to configure the duty cycle in
-nanosecond, but most users just want to express this duty cycle
-relatively to the period value (i.e. duty_cycle = 33% of the period).
-Add pwm_{get,set}_relative_duty_cycle() helpers to ease this kind of
-conversion.
+Implement ->get_state() to provide support for initial state retrieval.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/pwm.h | 81 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
+ drivers/pwm/pwm-sti.c | 38 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 17018f3..e09babf 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -148,6 +148,87 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
+diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+index 92abbd5..6300d3e 100644
+--- a/drivers/pwm/pwm-sti.c
++++ b/drivers/pwm/pwm-sti.c
+@@ -238,6 +238,43 @@ static void sti_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	mutex_unlock(&pc->sti_pwm_lock);
  }
  
- /**
-+ * pwm_prepare_new_state() - prepare a new state to be applied with
-+ *			     pwm_apply_state()
-+ * @pwm: PWM device
-+ * @state: state to fill with the prepared PWM state
-+ *
-+ * This functions prepares a state that can later be tweaked and applied
-+ * to the PWM device with pwm_apply_state(). This is a convenient function
-+ * that first retrieves the current PWM state and the replaces the period
-+ * and polarity fields with the reference values defined in pwm->args.
-+ * Once the new state is created you can adjust the ->enable and ->duty_cycle
-+ * according to your need before calling pwm_apply_state().
-+ */
-+static inline void pwm_prepare_new_state(const struct pwm_device *pwm,
-+					 struct pwm_state *state)
++static void sti_pwm_get_state(struct pwm_chip *chip,
++			      struct pwm_device *pwm,
++			      struct pwm_state *state)
 +{
-+	struct pwm_args args;
++	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
++	unsigned int regval, prescaler;
++	int ret;
 +
-+	/* First get the current state. */
-+	pwm_get_state(pwm, state);
-+
-+	/* Then fill it with the reference config */
-+	pwm_get_args(pwm, &args);
-+
-+	state->period = args.period;
-+	state->polarity = args.polarity;
-+	state->duty_cycle = 0;
-+}
-+
-+/**
-+ * pwm_get_relative_duty_cycle() - Get a relative duty_cycle value
-+ * @state: the PWM state to extract period and duty_cycle from
-+ * @scale: the scale you want to use for you relative duty_cycle value
-+ *
-+ * This functions converts the absolute duty_cycle stored in @state
-+ * (expressed in nanosecond) into a relative value.
-+ * For example if you want to get the duty_cycle expressed in nanosecond,
-+ * call:
-+ *
-+ * pwm_get_state(pwm, &state);
-+ * duty = pwm_get_relative_duty_cycle(&state, 100);
-+ */
-+static inline unsigned int
-+pwm_get_relative_duty_cycle(const struct pwm_state *state, unsigned int scale)
-+{
-+	if (!state->period)
-+		return 0;
-+
-+	return DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * scale,
-+				     state->period);
-+}
-+
-+/**
-+ * pwm_set_relative_duty_cycle() - Set a relative duty_cycle value
-+ * @state: the PWM state to fill
-+ * @val: the relative duty_cycle value
-+ * @scale: the scale you use for you relative duty_cycle value
-+ *
-+ * This functions converts a relative duty_cycle stored into an absolute
-+ * one (expressed in nanoseconds), and put the result in state->duty_cycle.
-+ * For example if you want to change configure a 50% duty_cycle, call:
-+ *
-+ * pwm_prepare_new_state(pwm, &state);
-+ * pwm_set_relative_duty_cycle(&state, 50, 100);
-+ * pwm_apply_state(pwm, &state);
-+ */
-+static inline void
-+pwm_set_relative_duty_cycle(struct pwm_state *state, unsigned int val,
-+			    unsigned int scale)
-+{
-+	if (!scale)
++	/* The clock has to be enabled to access PWM registers */
++	ret = clk_enable(pc->clk);
++	if (ret) {
++		dev_err(chip->dev, "Failed to enable PWM clk");
 +		return;
++	}
 +
-+	/* Make sure we don't have duty_cycle > period */
-+	if (val > scale)
-+		val = scale;
++	regmap_field_read(pc->prescale_high, &regval);
++	prescaler = regval << 4;
++	regmap_field_read(pc->prescale_low, &regval);
++	prescaler |= regval;
++	state->period = DIV_ROUND_CLOSEST_ULL((u64)(prescaler + 1) *
++					      NSEC_PER_SEC *
++					      (pc->cdata->max_pwm_cnt + 1),
++					      pc->clk_rate);
 +
-+	state->duty_cycle = DIV_ROUND_CLOSEST_ULL((u64)val * state->period,
-+						  scale);
++	regmap_read(pc->regmap, STI_DS_REG(pwm->hwpwm), &regval);
++	state->duty_cycle = DIV_ROUND_CLOSEST_ULL((u64)(regval + 1) *
++						  state->period,
++						  pc->cdata->max_pwm_cnt + 1);
++
++	regmap_field_read(pc->pwm_en, &regval);
++	state->enabled = regval;
++
++	state->polarity = PWM_POLARITY_NORMAL;
++
++	clk_disable(pc->clk);
 +}
 +
-+/**
-  * struct pwm_ops - PWM controller operations
-  * @request: optional hook for requesting a PWM
-  * @free: optional hook for freeing a PWM
+ static void sti_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+ {
+ 	struct sti_pwm_chip *pc = to_sti_pwmchip(chip);
+@@ -249,6 +286,7 @@ static const struct pwm_ops sti_pwm_ops = {
+ 	.config = sti_pwm_config,
+ 	.enable = sti_pwm_enable,
+ 	.disable = sti_pwm_disable,
++	.get_state = sti_pwm_get_state,
+ 	.free = sti_pwm_free,
+ 	.owner = THIS_MODULE,
+ };
 -- 
 2.7.4
