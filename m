@@ -1,18 +1,105 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 3 Jun 2016 09:39:24 +0800
-Subject: [PATCH v2 1/4] power: axp20x_usb: Add support for usb
- power-supply on axp22x pmics
-In-Reply-To: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
-References: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v66_UMf-fccSoPoJKJmygLXU8kYOq6RrwDPiq_Q6+kTARg@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 2 Jun 2016 20:43:23 -0500
+Subject: [PATCH v2 3/7] binding: mdio-mux: Add DT binding doc for
+ Broadcom MDIO bus mutiplexer
+In-Reply-To: <1464701801-17243-4-git-send-email-pramod.kumar@broadcom.com>
+References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
+ <1464701801-17243-4-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <20160603014323.GA12365@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 3, 2016 at 1:18 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> The usb power-supply on the axp22x pmics is mostly identical to the
-> one on the axp20x pmics. One significant difference is that it cannot
-> measure / monitor the usb voltage / current.
->
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On Tue, May 31, 2016 at 07:06:37PM +0530, Pramod Kumar wrote:
+> Add DT binding doc for Broadcom MDIO bus mutiplexer driver.
+> 
+> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+> ---
+>  .../bindings/net/brcm,mdio-mux-iproc.txt           | 60 ++++++++++++++++++++++
+>  1 file changed, 60 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+> new file mode 100644
+> index 0000000..f270b41
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+> @@ -0,0 +1,60 @@
+> +Properties for an MDIO bus mutiplexer found in Broadcom iProc based SoCs.
+> +
+> +This MDIO bus multiplexer defines buses that could be internal as well as
+> +external to SoCs and could accept MDIO transaction compatible to C-22 or
+> +C-45 Clause. When Child bus is selected, one need to select these two
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+s/Child/child/
+
+s/need/needs/
+
+> +properties as well to generate desired MDIO trascation on appropriate bus.
+> +
+> +Required properties in addition to the generic multiplexer properties:
+> +
+> +MDIO multiplexer node:
+> +- complatible: brcm,mdio-mux-iproc.
+
+typo
+
+> +
+> +Every non-ethernet PHY requires a compatible so that it could be probed based
+> +on this compatible string.
+> +
+> +Additional information regarding generic multiplexer properties could be found
+
+s/could/can/
+
+> +at- Documentation/devicetree/bindings/net/mdio-mux.txt
+> +
+> +
+> +for example:
+> +		mdio_mux_iproc: mdio_mux_iproc at 6602023c {
+
+No '_' in node names.
+
+mdio-mux at ...
+
+> +			compatible = "brcm,mdio-mux-iproc";
+> +			reg = <0x6602023c 0x14>;
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			mdio-integrated-mux;
+> +
+> +			mdio at 0 {
+> +				reg = <0x0>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				pci_phy0: pci-phy at 0 {
+> +					compatible = "brcm,ns2-pcie-phy";
+> +					reg = <0x0>;
+> +					#phy-cells = <0>;
+> +				};
+> +			};
+> +
+> +			mdio at 7 {
+> +				reg = <0x7>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				pci_phy1: pci-phy at 0 {
+> +					compatible = "brcm,ns2-pcie-phy";
+> +					reg = <0x0>;
+> +					#phy-cells = <0>;
+> +				};
+> +			};
+> +			mdio at 10 {
+> +				reg = <0x10>;
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +
+> +				gphy0: eth-phy at 10 {
+> +					reg = <0x10>;
+> +				};
+> +			};
+> +		};
+> -- 
+> 1.9.1
+> 
