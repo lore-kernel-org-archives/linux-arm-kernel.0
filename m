@@ -1,35 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 Jun 2016 10:58:15 +0200
-Subject: [PATCH v2 5/9] arm64: Add BCM2835 support to the defconfig.
-In-Reply-To: <1464943816.24775.135.camel@redhat.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <3299125.qWct7BqQgQ@wuerfel> <1464943816.24775.135.camel@redhat.com>
-Message-ID: <4620705.YUQPYFzgRD@wuerfel>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Fri, 3 Jun 2016 11:02:00 +0200
+Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
+In-Reply-To: <DB5PR0401MB186309ACEF30FEA489C3CA97E6580@DB5PR0401MB1863.eurprd04.prod.outlook.com>
+References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
+ <1464640806-3942-3-git-send-email-thommyj@gmail.com>
+ <DB5PR0401MB186309ACEF30FEA489C3CA97E6580@DB5PR0401MB1863.eurprd04.prod.outlook.com>
+Message-ID: <CAOTQ16KS6RobKfs5MP=Bx2ad6Xipht7VO4CP5DbzQr9T60ip=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 3, 2016 10:50:16 AM CEST Gerd Hoffmann wrote:
-> On Fr, 2016-06-03 at 09:36 +0200, Arnd Bergmann wrote:
-> > On Friday, June 3, 2016 8:18:24 AM CEST Gerd Hoffmann wrote:
-> > > From: Eric Anholt <eric@anholt.net>
-> > > 
-> > > Made with make defconfig; make menuconfig (only saying Y to new
-> > > entries); make savedefconfig.
-> > 
-> > Please try not to mix 'make savedefconfig' changes with your
-> > own changes, it make it harder to review and can lead to more
-> > conflicts.
-> 
-> This is just conflicts resolved by hand after 4.6 -> 4.7-rc1 rebase,
-> latest version didn't actually ran through savedefconfig.  Probably some
-> unwanted changes made it in by accident this way.
-> 
-> Guess I better redo this from scratch.
-> 
-> What is the suggested procedure to generate defconfig patches?
+>>[Gupta Nipun] I should start from 0 and should be incremented in the while loop.
+>>[Gupta Nipun] Should this not be 'master->cfg.streammasks[i] = streammask
+Good catch Gupta, thanks. Merging to latest linus tree obviously went
+wrong. Should of_for_each_phandle work?
+I had problems with that so I backed out and moved back to while
+of_parse_phandle_with_args. But parsing
+of mmu-masters seems to use of_for_each_phandle
 
-I tend to just edit the files by hand, or use 'make savedefconfig' to
-create an initial version, and then use 'vimdiff' to revert the changes
-I don't want.
-
-	Arnd
+BR,
+Thommy Jakobsson
