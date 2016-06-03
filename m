@@ -1,123 +1,46 @@
 From: dave.long@linaro.org (David Long)
-Date: Thu,  2 Jun 2016 23:26:23 -0400
-Subject: [PATCH v13 09/10] arm64: Add kernel return probes support (kretprobes)
+Date: Thu,  2 Jun 2016 23:26:24 -0400
+Subject: [PATCH v13 10/10] kprobes: Add arm64 case in kprobe example module
 In-Reply-To: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
 References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1464924384-15269-10-git-send-email-dave.long@linaro.org>
+Message-ID: <1464924384-15269-11-git-send-email-dave.long@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 
-The pre-handler of this special 'trampoline' kprobe executes the return
-probe handler functions and restores original return address in ELR_EL1.
-This way the saved pt_regs still hold the original register context to be
-carried back to the probed kernel function.
+Add info prints in sample kprobe handlers for ARM64
 
 Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-Signed-off-by: David A. Long <dave.long@linaro.org>
 ---
- arch/arm64/Kconfig          |  1 +
- arch/arm64/kernel/kprobes.c | 75 ++++++++++++++++++++++++++++++++++++++++++++-
- 2 files changed, 75 insertions(+), 1 deletion(-)
+ samples/kprobes/kprobe_example.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 5496b75..47989eb 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -89,6 +89,7 @@ config ARM64
- 	select HAVE_RCU_TABLE_FREE
- 	select HAVE_SYSCALL_TRACEPOINTS
- 	select HAVE_KPROBES
-+	select HAVE_KRETPROBES if HAVE_KPROBES
- 	select IOMMU_DMA if IOMMU_SUPPORT
- 	select IRQ_DOMAIN
- 	select IRQ_FORCED_THREADING
-diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-index b35f76f..c116904 100644
---- a/arch/arm64/kernel/kprobes.c
-+++ b/arch/arm64/kernel/kprobes.c
-@@ -577,7 +577,80 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
+diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
+index ed0ca0c..aad8e6f 100644
+--- a/samples/kprobes/kprobe_example.c
++++ b/samples/kprobes/kprobe_example.c
+@@ -46,6 +46,10 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
+ 			" ex1 = 0x%lx\n",
+ 		p->symbol_name, p->addr, regs->pc, regs->ex1);
+ #endif
++#ifdef CONFIG_ARM64
++	pr_info("pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
++		p->addr, (long)regs->pc);
++#endif
  
- void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
- {
--	return NULL;
-+	struct kretprobe_instance *ri = NULL;
-+	struct hlist_head *head, empty_rp;
-+	struct hlist_node *tmp;
-+	unsigned long flags, orig_ret_addr = 0;
-+	unsigned long trampoline_address =
-+		(unsigned long)&kretprobe_trampoline;
-+
-+	INIT_HLIST_HEAD(&empty_rp);
-+	kretprobe_hash_lock(current, &head, &flags);
-+
-+	/*
-+	 * It is possible to have multiple instances associated with a given
-+	 * task either because multiple functions in the call path have
-+	 * a return probe installed on them, and/or more than one return
-+	 * probe was registered for a target function.
-+	 *
-+	 * We can handle this because:
-+	 *     - instances are always inserted at the head of the list
-+	 *     - when multiple return probes are registered for the same
-+	 *       function, the first instance's ret_addr will point to the
-+	 *       real return address, and all the rest will point to
-+	 *       kretprobe_trampoline
-+	 */
-+	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
-+		if (ri->task != current)
-+			/* another task is sharing our hash bucket */
-+			continue;
-+
-+		if (ri->rp && ri->rp->handler) {
-+			__this_cpu_write(current_kprobe, &ri->rp->kp);
-+			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
-+			ri->rp->handler(ri, regs);
-+			__this_cpu_write(current_kprobe, NULL);
-+		}
-+
-+		orig_ret_addr = (unsigned long)ri->ret_addr;
-+		recycle_rp_inst(ri, &empty_rp);
-+
-+		if (orig_ret_addr != trampoline_address)
-+			/*
-+			 * This is the real return address. Any other
-+			 * instances associated with this task are for
-+			 * other calls deeper on the call stack
-+			 */
-+			break;
-+	}
-+
-+	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
-+	/* restore the original return address */
-+	instruction_pointer(regs) = orig_ret_addr;
-+	reset_current_kprobe();
-+	kretprobe_hash_unlock(current, &flags);
-+
-+	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
-+		hlist_del(&ri->hlist);
-+		kfree(ri);
-+	}
-+
-+	/* return 1 so that post handlers not called */
-+	return (void *) orig_ret_addr;
-+}
-+
-+void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
-+				      struct pt_regs *regs)
-+{
-+	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
-+
-+	/* replace return addr (x30) with trampoline */
-+	regs->regs[30] = (long)&kretprobe_trampoline;
-+}
-+
-+int __kprobes arch_trampoline_kprobe(struct kprobe *p)
-+{
-+	return 0;
+ 	/* A dump_stack() here will give a stack backtrace */
+ 	return 0;
+@@ -71,6 +75,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
+ 	printk(KERN_INFO "<%s> post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
+ 		p->symbol_name, p->addr, regs->ex1);
+ #endif
++#ifdef CONFIG_ARM64
++	pr_info("post_handler: p->addr = 0x%p, pc = 0x%lx\n",
++		p->addr, (long)regs->pc);
++#endif
  }
  
- int __init arch_init_kprobes(void)
+ /*
 -- 
 2.5.0
