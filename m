@@ -1,25 +1,72 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 3 Jun 2016 13:37:51 -0700
-Subject: [PATCH 06/14] pwm: rockchip: Add support for atomic update
-In-Reply-To: <1464942192-25967-7-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri, 3 Jun 2016 13:38:48 -0700
+Subject: [PATCH 08/14] pwm: sti: Avoid glitches on already running PWMs
+In-Reply-To: <1464942192-25967-9-git-send-email-boris.brezillon@free-electrons.com>
 References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464942192-25967-7-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160603203751.GE124478@google.com>
+ <1464942192-25967-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160603203848.GF124478@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 10:23:04AM +0200, Boris Brezillon wrote:
-> Implement the ->apply() function to add support for atomic update.
+On Fri, Jun 03, 2016 at 10:23:06AM +0200, Boris Brezillon wrote:
+> The current logic will disable the PWM clk even if a PWM was left
+> enabled by the bootloader (because it's controlling a critical device
+> like a regulator for example).
+> Keep the PWM clk enabled if at least one PWM is enabled to avoid any
+> glitches.
 > 
 > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->  drivers/pwm/pwm-rockchip.c | 84 ++++++++++++++++++++++++----------------------
->  1 file changed, 43 insertions(+), 41 deletions(-)
+>  drivers/pwm/pwm-sti.c | 17 +++++++++++++++--
+>  1 file changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+> index 6300d3e..8232c5b 100644
+> --- a/drivers/pwm/pwm-sti.c
+> +++ b/drivers/pwm/pwm-sti.c
+> @@ -340,7 +340,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+>  	struct sti_pwm_compat_data *cdata;
+>  	struct sti_pwm_chip *pc;
+>  	struct resource *res;
+> -	int ret;
+> +	int i, ret;
+>  
+>  	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
+>  	if (!pc)
+> @@ -391,7 +391,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+>  		return -EINVAL;
+>  	}
+>  
+> -	ret = clk_prepare(pc->clk);
+> +	ret = clk_prepare_enable(pc->clk);
+>  	if (ret) {
+>  		dev_err(dev, "failed to prepare clock\n");
+>  		return ret;
+> @@ -409,6 +409,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> +	/*
+> +	 * Keep the PWM clk enabled if some PWMs appear to be up and
+> +	 * running.
+> +	 */
+> +	for (i = 0; i < pc->chip.npwm; i++) {
+> +		struct pwm_state state;
+> +
+> +		pwm_get_state(&pc->chip.pwms[i], &state);
+> +		if (state.enabled)
 
-[...]
+Similar to pwm-rockchip: you could just do if (pwm_is_enabled(...)).
 
-Looks good to me:
+Brian
 
-Reviewed-by: Brian Norris <briannorris@chromium.org>
-Tested-by: Brian Norris <briannorris@chromium.org>
+> +			clk_enable(pc->clk);
+> +	}
+> +	clk_disable(pc->clk);
+> +
+>  	platform_set_drvdata(pdev, pc);
+>  
+>  	return 0;
+> -- 
+> 2.7.4
+> 
