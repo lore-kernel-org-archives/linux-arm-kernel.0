@@ -1,83 +1,253 @@
-From: irodriguez@cemitec.com (Iban Rodriguez)
-Date: Fri, 3 Jun 2016 14:54:41 +0200
-Subject: [PATCH] gpio: xilinx: Add support to set multiple GPIO at once
-Message-ID: <1464958481-672-1-git-send-email-irodriguez@cemitec.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Fri, 3 Jun 2016 11:56:40 +0100
+Subject: [PATCH] drm: convert DT component matching to
+ component_match_add_release()
+In-Reply-To: <E1b8jze-00046l-K5@rmk-PC.armlinux.org.uk>
+References: <E1b8jze-00046l-K5@rmk-PC.armlinux.org.uk>
+Message-ID: <57516268.3020401@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add function to set multiple GPIO of the same chip at the same time
-and register it
+Hi Russell,
 
-Signed-off-by: Iban Rodriguez <irodriguez@cemitec.com>
----
- drivers/gpio/gpio-xilinx.c | 48 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+On 03/06/16 08:58, Russell King wrote:
+> Convert DT component matching to use component_match_add_release().
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>   drivers/gpu/drm/arm/hdlcd_drv.c             | 10 ++++++++--
+>   drivers/gpu/drm/armada/armada_drv.c         |  9 +++++++--
+>   drivers/gpu/drm/drm_of.c                    | 13 +++++++++----
+>   drivers/gpu/drm/msm/msm_drv.c               |  8 +++++++-
+>   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 13 ++++++++++---
+>   drivers/gpu/drm/sti/sti_drv.c               |  9 +++++++--
+>   drivers/gpu/drm/tilcdc/tilcdc_external.c    |  9 +++++++--
+>   7 files changed, 55 insertions(+), 16 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/arm/hdlcd_drv.c b/drivers/gpu/drm/arm/hdlcd_drv.c
+> index b987c63ba8d6..bbde48c4f550 100644
+> --- a/drivers/gpu/drm/arm/hdlcd_drv.c
+> +++ b/drivers/gpu/drm/arm/hdlcd_drv.c
+> @@ -443,11 +443,16 @@ static const struct component_master_ops hdlcd_master_ops = {
+>   	.unbind		= hdlcd_drm_unbind,
+>   };
+>
+> -static int compare_dev(struct device *dev, void *data)
+> +static int compare_of(struct device *dev, void *data)
+>   {
+>   	return dev->of_node == data;
+>   }
+>
+> +static void release_of(struct device *dev, void *data)
+> +{
+> +	of_node_put(data);
+> +}
 
-diff --git a/drivers/gpio/gpio-xilinx.c b/drivers/gpio/gpio-xilinx.c
-index d0fbb7f..4b0cf51 100644
---- a/drivers/gpio/gpio-xilinx.c
-+++ b/drivers/gpio/gpio-xilinx.c
-@@ -133,6 +133,53 @@ static void xgpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
- }
- 
- /**
-+ * xgpio_set_multiple - Write the specified signals of the GPIO device.
-+ * @gc:     Pointer to gpio_chip device structure.
-+ * @mask:   Mask of the GPIOS to modify.
-+ * @bits:   Value to be wrote on each GPIO
-+ *
-+ * This function writes the specified values into the specified signals of the
-+ * GPIO devices.
-+ */
-+static void xgpio_set_multiple(struct gpio_chip *gc, unsigned long *mask,
-+			       unsigned long *bits)
-+{
-+	unsigned long flags;
-+	struct of_mm_gpio_chip *mm_gc = to_of_mm_gpio_chip(gc);
-+	struct xgpio_instance *chip = gpiochip_get_data(gc);
-+	int index = xgpio_index(chip, 0);
-+	int offset, i;
-+
-+	spin_lock_irqsave(&chip->gpio_lock[index], flags);
-+
-+	/* Write to GPIO signals */
-+	for (i = 0; i < gc->ngpio; i++) {
-+		if (*mask == 0)
-+			break;
-+		if (index !=  xgpio_index(chip, i)) {
-+			xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET +
-+				       xgpio_regoffset(chip, i),
-+				       chip->gpio_state[index]);
-+			spin_unlock_irqrestore(&chip->gpio_lock[index], flags);
-+			index =  xgpio_index(chip, i);
-+			spin_lock_irqsave(&chip->gpio_lock[index], flags);
-+		}
-+		if (__test_and_clear_bit(i, mask)) {
-+			offset =  xgpio_offset(chip, i);
-+			if (test_bit(i, bits))
-+				chip->gpio_state[index] |= BIT(offset);
-+			else
-+				chip->gpio_state[index] &= ~BIT(offset);
-+		}
-+	}
-+
-+	xgpio_writereg(mm_gc->regs + XGPIO_DATA_OFFSET +
-+		       xgpio_regoffset(chip, i), chip->gpio_state[index]);
-+
-+	spin_unlock_irqrestore(&chip->gpio_lock[index], flags);
-+}
-+
-+/**
-  * xgpio_dir_in - Set the direction of the specified GPIO signal as input.
-  * @gc:     Pointer to gpio_chip device structure.
-  * @gpio:   GPIO signal number.
-@@ -306,6 +353,7 @@ static int xgpio_probe(struct platform_device *pdev)
- 	chip->mmchip.gc.direction_output = xgpio_dir_out;
- 	chip->mmchip.gc.get = xgpio_get;
- 	chip->mmchip.gc.set = xgpio_set;
-+	chip->mmchip.gc.set_multiple = xgpio_set_multiple;
- 
- 	chip->mmchip.save_regs = xgpio_save_regs;
- 
--- 
-1.9.1
+Considering that there's 7 identical copies of this function in this 
+patch alone, perhaps there's some mileage in defining it commonly as a 
+static __maybe_unused default_release_of() in component.h or drm_of.h 
+(and maybe default_compare_of() similarly)?
+
+(Apologies if there's already been some strong argument against that 
+which I've not seen, but it seems like a reasonable thing to do.)
+
+Robin.
+
+> +
+>   static int hdlcd_probe(struct platform_device *pdev)
+>   {
+>   	struct device_node *port, *ep;
+> @@ -474,7 +479,8 @@ static int hdlcd_probe(struct platform_device *pdev)
+>   		return -EAGAIN;
+>   	}
+>
+> -	component_match_add(&pdev->dev, &match, compare_dev, port);
+> +	component_match_add_release(&pdev->dev, &match, release_of,
+> +				    compare_of, port);
+>
+>   	return component_master_add_with_match(&pdev->dev, &hdlcd_master_ops,
+>   					       match);
+> diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
+> index 439824a61aa5..6ca2aa36515e 100644
+> --- a/drivers/gpu/drm/armada/armada_drv.c
+> +++ b/drivers/gpu/drm/armada/armada_drv.c
+> @@ -232,6 +232,11 @@ static int compare_of(struct device *dev, void *data)
+>   	return dev->of_node == data;
+>   }
+>
+> +static void release_of(struct device *dev, void *data)
+> +{
+> +	of_node_put(data);
+> +}
+> +
+>   static int compare_dev_name(struct device *dev, void *data)
+>   {
+>   	const char *name = data;
+> @@ -255,8 +260,8 @@ static void armada_add_endpoints(struct device *dev,
+>   			continue;
+>   		}
+>
+> -		component_match_add(dev, match, compare_of, remote);
+> -		of_node_put(remote);
+> +		component_match_add_release(dev, match, release_of,
+> +					    compare_of, remote);
+>   	}
+>   }
+>
+> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+> index bc98bb94264d..5d183479d7d6 100644
+> --- a/drivers/gpu/drm/drm_of.c
+> +++ b/drivers/gpu/drm/drm_of.c
+> @@ -6,6 +6,11 @@
+>   #include <drm/drm_crtc.h>
+>   #include <drm/drm_of.h>
+>
+> +static void drm_release_of(struct device *dev, void *data)
+> +{
+> +	of_node_put(data);
+> +}
+> +
+>   /**
+>    * drm_crtc_port_mask - find the mask of a registered CRTC by port OF node
+>    * @dev: DRM device
+> @@ -101,8 +106,8 @@ int drm_of_component_probe(struct device *dev,
+>   			continue;
+>   		}
+>
+> -		component_match_add(dev, &match, compare_of, port);
+> -		of_node_put(port);
+> +		component_match_add_release(dev, &match, drm_release_of,
+> +					    compare_of, port);
+>   	}
+>
+>   	if (i == 0) {
+> @@ -140,8 +145,8 @@ int drm_of_component_probe(struct device *dev,
+>   				continue;
+>   			}
+>
+> -			component_match_add(dev, &match, compare_of, remote);
+> -			of_node_put(remote);
+> +			component_match_add_release(dev, &match, drm_release_of,
+> +						    compare_of, remote);
+>   		}
+>   		of_node_put(port);
+>   	}
+> diff --git a/drivers/gpu/drm/msm/msm_drv.c b/drivers/gpu/drm/msm/msm_drv.c
+> index 9c654092ef78..1f7de47d817e 100644
+> --- a/drivers/gpu/drm/msm/msm_drv.c
+> +++ b/drivers/gpu/drm/msm/msm_drv.c
+> @@ -805,6 +805,11 @@ static int compare_of(struct device *dev, void *data)
+>   	return dev->of_node == data;
+>   }
+>
+> +static void release_of(struct device *dev, void *data)
+> +{
+> +	of_node_put(data);
+> +}
+> +
+>   static int add_components(struct device *dev, struct component_match **matchptr,
+>   		const char *name)
+>   {
+> @@ -818,7 +823,8 @@ static int add_components(struct device *dev, struct component_match **matchptr,
+>   		if (!node)
+>   			break;
+>
+> -		component_match_add(dev, matchptr, compare_of, node);
+> +		component_match_add_release(dev, matchptr, release_of,
+> +					    compare_of, node);
+>   	}
+>
+>   	return 0;
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> index a409d1f703cb..f5a68fc031ed 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+> @@ -421,6 +421,11 @@ static int compare_of(struct device *dev, void *data)
+>   	return dev->of_node == np;
+>   }
+>
+> +static void release_of(struct device *dev, void *data)
+> +{
+> +	of_node_put(data);
+> +}
+> +
+>   static void rockchip_add_endpoints(struct device *dev,
+>   				   struct component_match **match,
+>   				   struct device_node *port)
+> @@ -439,8 +444,8 @@ static void rockchip_add_endpoints(struct device *dev,
+>   			continue;
+>   		}
+>
+> -		component_match_add(dev, match, compare_of, remote);
+> -		of_node_put(remote);
+> +		component_match_add_release(dev, match, release_of,
+> +					    compare_of, remote);
+>   	}
+>   }
+>
+> @@ -518,7 +523,9 @@ static int rockchip_drm_platform_probe(struct platform_device *pdev)
+>   			is_support_iommu = false;
+>   		}
+>
+> -		component_match_add(dev, &match, compare_of, port->parent);
+> +		of_node_get(port->parent);
+> +		component_match_add_release(dev, &match, release_of,
+> +					    compare_of, port->parent);
+>   		of_node_put(port);
+>   	}
+>
+> diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
+> index 872495e72294..4ee6fa4f1beb 100644
+> --- a/drivers/gpu/drm/sti/sti_drv.c
+> +++ b/drivers/gpu/drm/sti/sti_drv.c
+> @@ -346,6 +346,11 @@ static int compare_of(struct device *dev, void *data)
+>   	return dev->of_node == data;
+>   }
+>
+> +static void release_of(struct device *dev, void *data)
+> +{
+> +	of_node_put(data);
+> +}
+> +
+>   static int sti_bind(struct device *dev)
+>   {
+>   	return drm_platform_init(&sti_driver, to_platform_device(dev));
+> @@ -375,8 +380,8 @@ static int sti_platform_probe(struct platform_device *pdev)
+>   	child_np = of_get_next_available_child(node, NULL);
+>
+>   	while (child_np) {
+> -		component_match_add(dev, &match, compare_of, child_np);
+> -		of_node_put(child_np);
+> +		component_match_add_release(dev, &match, release_of,
+> +					    compare_of, child_np);
+>   		child_np = of_get_next_available_child(node, child_np);
+>   	}
+>
+> diff --git a/drivers/gpu/drm/tilcdc/tilcdc_external.c b/drivers/gpu/drm/tilcdc/tilcdc_external.c
+> index 03acb4f99982..7e11b5ecdd4a 100644
+> --- a/drivers/gpu/drm/tilcdc/tilcdc_external.c
+> +++ b/drivers/gpu/drm/tilcdc/tilcdc_external.c
+> @@ -135,6 +135,11 @@ static int dev_match_of(struct device *dev, void *data)
+>   	return dev->of_node == data;
+>   }
+>
+> +static void dev_release_of(struct device *dev, void *data)
+> +{
+> +	of_node_put(data);
+> +}
+> +
+>   int tilcdc_get_external_components(struct device *dev,
+>   				   struct component_match **match)
+>   {
+> @@ -152,8 +157,8 @@ int tilcdc_get_external_components(struct device *dev,
+>
+>   		dev_dbg(dev, "Subdevice node '%s' found\n", node->name);
+>   		if (match)
+> -			component_match_add(dev, match, dev_match_of, node);
+> -		of_node_put(node);
+> +			component_match_add_release(dev, match, dev_release_of,
+> +						    dev_match_of, node);
+>   		count++;
+>   	}
+>
+>
