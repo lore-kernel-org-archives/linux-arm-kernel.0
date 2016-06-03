@@ -1,24 +1,38 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Fri, 03 Jun 2016 12:39:15 +0200
-Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry
- Pi 3.
-In-Reply-To: <3885625.kWfxlR3OJi@wuerfel>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <5490184.9quKRk1Imx@wuerfel> <1464943546.24775.131.camel@redhat.com>
- <3885625.kWfxlR3OJi@wuerfel>
-Message-ID: <1464950355.24775.143.camel@redhat.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  3 Jun 2016 11:50:30 +0100
+Subject: [PATCH] iommu/arm-smmu: wire up map_sg for arm-smmu-v3
+Message-ID: <1464951030-14044-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+From: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
 
-> I tried
-> 
-> subdir-y += ../../../arm64/boot/dts/broadcom
+The map_sg callback is missing from arm_smmu_ops, but is required by
+iommu.h. Similarly to most other IOMMU drivers, connect it to
+default_iommu_map_sg.
 
-Hmm, works for me too now, probably had a typo somewhere.
+Cc: <stable@vger.kernel.org>
+Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-But it works for "make dtbs" only, "make dtbs_install" ignores it.
+Joerg -- this is the only fix I have queued, so could you pick it up
+directly, please?
 
-cheers,
-  Gerd
+ drivers/iommu/arm-smmu-v3.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 94b68213c50d..5f6b3bcab078 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1941,6 +1941,7 @@ static struct iommu_ops arm_smmu_ops = {
+ 	.attach_dev		= arm_smmu_attach_dev,
+ 	.map			= arm_smmu_map,
+ 	.unmap			= arm_smmu_unmap,
++	.map_sg			= default_iommu_map_sg,
+ 	.iova_to_phys		= arm_smmu_iova_to_phys,
+ 	.add_device		= arm_smmu_add_device,
+ 	.remove_device		= arm_smmu_remove_device,
+-- 
+2.1.4
