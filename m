@@ -1,35 +1,51 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 03 Jun 2016 09:18:21 +0200
-Subject: [PATCH 25/34] clk: s2mps11: Migrate to clk_hw based OF and
- registration APIs
-In-Reply-To: <20160601231533.9354-26-stephen.boyd@linaro.org>
-References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-26-stephen.boyd@linaro.org>
-Message-ID: <57512F3D.8090201@samsung.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri,  3 Jun 2016 09:26:35 +0200
+Subject: [PATCH] drm: atmel-hlcdc: Fix OF graph parsing
+Message-ID: <1464938795-1838-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2016 01:15 AM, Stephen Boyd wrote:
-> Now that we have clk_hw based provider APIs to register clks, we
-> can get rid of struct clk pointers while registering clks in
-> these drivers, allowing us to move closer to a clear split of
-> consumer and provider clk APIs.
-> 
-> Cc: Andi Shyti <andi.shyti@samsung.com>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
-> ---
-> 
-> See commit 58657d189a2f and it's children for details on this
-> new registration API.
-> 
->  drivers/clk/clk-s2mps11.c | 21 +++++++++------------
->  1 file changed, 9 insertions(+), 12 deletions(-)
+atmel_hlcdc_create_outputs() iterates over OF graph nodes and releases
+the node (using of_node_put()) after each iteration, which is wrong
+since for_each_endpoint_of_node() is already taking care of that.
 
-Looks and works correct:
+Move the of_node_put() call in the error path.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Fixes: 17a8e03e7e97 ("drm: atmel-hlcdc: rework the output code to support drm bridges")
+---
+ drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+index 39802c0..3d34fc4 100644
+--- a/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
++++ b/drivers/gpu/drm/atmel-hlcdc/atmel_hlcdc_output.c
+@@ -266,9 +266,10 @@ int atmel_hlcdc_create_outputs(struct drm_device *dev)
+ 		if (!ret)
+ 			ret = atmel_hlcdc_check_endpoint(dev, &ep);
+ 
+-		of_node_put(ep_np);
+-		if (ret)
++		if (ret) {
++			of_node_put(ep_np);
+ 			return ret;
++		}
+ 	}
+ 
+ 	for_each_endpoint_of_node(dev->dev->of_node, ep_np) {
+@@ -276,9 +277,10 @@ int atmel_hlcdc_create_outputs(struct drm_device *dev)
+ 		if (!ret)
+ 			ret = atmel_hlcdc_attach_endpoint(dev, &ep);
+ 
+-		of_node_put(ep_np);
+-		if (ret)
++		if (ret) {
++			of_node_put(ep_np);
+ 			return ret;
++		}
+ 	}
+ 
+ 	return 0;
+-- 
+2.7.4
