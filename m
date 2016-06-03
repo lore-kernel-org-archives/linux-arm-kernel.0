@@ -1,82 +1,64 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 03 Jun 2016 18:13:41 +0000
-Subject: [PATCH v17 07/13] arm64: limit memory regions based on DT property,
- usable-memory
+Date: Fri, 03 Jun 2016 18:13:40 +0000
+Subject: [PATCH v17 02/13] arm64: Add cpus_are_stuck_in_kernel
 In-Reply-To: <cover.1464974516.git.geoff@infradead.org>
 References: <cover.1464974516.git.geoff@infradead.org>
-Message-ID: <a5fc5b1281cb46610d45f46fc72f84433792c4c4.1464974516.git.geoff@infradead.org>
+Message-ID: <d4f8c7961adc4b0afe733306fbc21e5bb7c8f6ee.1464974516.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+From: James Morse <james.morse@arm.com>
 
-Crash dump kernel will be run with a limited range of memory as System
-RAM.
+kernel/smp.c has a fancy counter that keeps track of the number of CPUs
+it marked as not-present and left in cpu_park_loop(). If there are any
+CPUs spinning in here, kexec will release them once the memory is re-used
+by the new kernel.
 
-On arm64, we will use a device-tree property under /chosen,
-   linux,usable-memory = <BASE SIZE>
-in order for primary kernel either on uefi or non-uefi (device tree only)
-system to hand over the information about usable memory region to crash
-dump kernel. This property will supercede entries in uefi memory map table
-and "memory" nodes in a device tree.
+We can't return an error once we reach machine_kexec(), so as a sanity check
+we forbid kexec images to be loaded if there are already cpus stuck in the
+kernel, or we have multiple cpus and no way of disabling them.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: James Morse <james.morse@arm.com>
+[Split off from a larger patch]
+Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/mm/init.c | 38 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
+ arch/arm64/include/asm/smp.h | 10 ++++++++++
+ arch/arm64/kernel/smp.c      |  5 +++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 45f1319..f679918 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -249,10 +249,48 @@ static int __init early_mem(char *p)
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index 433e504..38712f4 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -124,6 +124,16 @@ static inline void cpu_panic_kernel(void)
+ 	cpu_park_loop();
  }
- early_param("mem", early_mem);
  
-+static int __init early_init_dt_scan_usablemem(unsigned long node,
-+		const char *uname, int depth, void *data)
-+{
-+	struct memblock_region *usablemem = (struct memblock_region *)data;
-+	const __be32 *reg;
-+	int len;
++/*
++ * If a secondary CPU fails to come online, (e.g. due to mismatched features),
++ * it will try to call cpu_die(). If this fails, it updates
++ * cpus_stuck_in_kernel and sits in cpu_park_loop().
++ *
++ * Kexec checks this counter and refuses to load/kexec if it is non-zero, as
++ * cpu_park_loop() would be overwritten releasing the parked cpus.
++ */
++bool cpus_are_stuck_in_kernel(void);
 +
-+	usablemem->size = 0;
-+
-+	if (depth != 1 || strcmp(uname, "chosen") != 0)
-+		return 0;
-+
-+	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &len);
-+	if (!reg || (len < (dt_root_addr_cells + dt_root_size_cells)))
-+		return 1;
-+
-+	usablemem->base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+	usablemem->size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+
-+	return 1;
-+}
-+
-+static void __init fdt_enforce_memory_region(void)
-+{
-+	struct memblock_region reg;
-+
-+	of_scan_flat_dt(early_init_dt_scan_usablemem, &reg);
-+
-+	if (reg.size) {
-+		memblock_remove(0, PAGE_ALIGN(reg.base));
-+		memblock_remove(round_down(reg.base + reg.size, PAGE_SIZE),
-+				ULLONG_MAX);
-+	}
-+}
-+
- void __init arm64_memblock_init(void)
+ #endif /* ifndef __ASSEMBLY__ */
+ 
+ #endif /* ifndef __ASM_SMP_H */
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 678e084..d0bcd55 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -909,3 +909,8 @@ int setup_profiling_timer(unsigned int multiplier)
  {
- 	const s64 linear_region_size = -(s64)PAGE_OFFSET;
- 
-+	/* Handle linux,usable-memory property */
-+	fdt_enforce_memory_region();
+ 	return -EINVAL;
+ }
 +
- 	/*
- 	 * Ensure that the linear region takes up exactly half of the kernel
- 	 * virtual address space. This way, we can distinguish a linear address
++bool cpus_are_stuck_in_kernel(void)
++{
++	return !!cpus_stuck_in_kernel;
++}
 -- 
 2.5.0
