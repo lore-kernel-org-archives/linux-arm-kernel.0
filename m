@@ -1,25 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jun 2016 12:13:40 -0700
-Subject: [PATCH] arm64: dts: drop "arm, amba-bus" in favor of "simple-bus"
- part 2
-In-Reply-To: <1464574353-31477-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1464574353-31477-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160603191340.GA3761@localhost>
+Date: Fri, 3 Jun 2016 12:15:20 -0700
+Subject: [GIT PULL] ARM: exynos: Fixes for v4.7
+In-Reply-To: <1464589248-31326-1-git-send-email-k.kozlowski@samsung.com>
+References: <1464589248-31326-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160603191520.GB3761@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 11:12:33AM +0900, Masahiro Yamada wrote:
-> Tree-wide replacement was done by commit 2ef7d5f342c1 (ARM, ARM64:
-> dts: drop "arm,amba-bus" in favor of "simple-bus"), but we have some
-> new users of "arm,amba-bus" at Linux 4.7-rc1.  Eliminate them now.
+On Mon, May 30, 2016 at 08:20:48AM +0200, Krzysztof Kozlowski wrote:
+> Hi,
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> A couple of fixes from Arnd for this release cycle.
 > 
-> In order to not leave these compatible strings for the release,
-> is it OK to apply this patch for Linux 4.7 ?
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> The following changes since commit 2dcd0af568b0cf583645c8a317dd12e344b1c72a:
+> 
+>   Linux 4.6 (2016-05-15 15:43:13 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-fixes-4.7
+> 
+> for you to fetch changes up to 8a6f71ccb6c39ca5ae442d1478d3a076e2b1361e:
+> 
+>   ARM: exynos: don't select keyboard driver (2016-05-18 16:58:10 +0200)
+> 
 
-Thanks, applied to fixes.
+Thanks, merged into fixes.
 
 
 -Olof
