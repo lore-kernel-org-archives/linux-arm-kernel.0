@@ -1,231 +1,312 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Fri,  3 Jun 2016 18:25:22 -0500
-Subject: [Patch v6 02/10] firmware: qcom: scm: Convert SCM to platform driver
+Date: Fri,  3 Jun 2016 18:25:26 -0500
+Subject: [Patch v6 06/10] firmware: qcom: scm: Add support for ARM64 SoCs
 In-Reply-To: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
 References: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1464996330-16952-3-git-send-email-andy.gross@linaro.org>
+Message-ID: <1464996330-16952-7-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch converts the Qualcomm SCM firmware driver into a platform
-driver.  It also adds clock management for firmware calls which require
-clocks to be enabled during the duration of their execution.  Rate
-setting of the core clock is also in place for higher performance.
+From: Kumar Gala <galak@codeaurora.org>
 
+Add an implementation of the SCM interface that works on ARM64 SoCs.  This
+is used by things like determine if we have HDCP support or not on the
+system.
+
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
 Signed-off-by: Andy Gross <andy.gross@linaro.org>
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- drivers/firmware/qcom_scm.c | 174 +++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 165 insertions(+), 9 deletions(-)
+ drivers/firmware/qcom_scm-32.c |   4 +
+ drivers/firmware/qcom_scm-64.c | 202 ++++++++++++++++++++++++++++++++++++++++-
+ drivers/firmware/qcom_scm.c    |   2 +
+ drivers/firmware/qcom_scm.h    |   5 +
+ 4 files changed, 208 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-index 45c008d..c4ec60d 100644
---- a/drivers/firmware/qcom_scm.c
-+++ b/drivers/firmware/qcom_scm.c
-@@ -10,19 +10,61 @@
-  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  * GNU General Public License for more details.
-  *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
-- * 02110-1301, USA.
-  */
--
-+#include <linux/platform_device.h>
-+#include <linux/module.h>
- #include <linux/cpumask.h>
- #include <linux/export.h>
- #include <linux/types.h>
+diff --git a/drivers/firmware/qcom_scm-32.c b/drivers/firmware/qcom_scm-32.c
+index 83a9351..bbf1780 100644
+--- a/drivers/firmware/qcom_scm-32.c
++++ b/drivers/firmware/qcom_scm-32.c
+@@ -454,3 +454,7 @@ int __qcom_scm_hdcp_req(struct device *dev, struct qcom_scm_hdcp_req *req,
+ 	return qcom_scm_call(dev, QCOM_SCM_SVC_HDCP, QCOM_SCM_CMD_HDCP,
+ 		req, req_cnt * sizeof(*req), resp, sizeof(*resp));
+ }
++
++void __qcom_scm_init(void)
++{
++}
+diff --git a/drivers/firmware/qcom_scm-64.c b/drivers/firmware/qcom_scm-64.c
+index bb6555f..01949f1 100644
+--- a/drivers/firmware/qcom_scm-64.c
++++ b/drivers/firmware/qcom_scm-64.c
+@@ -12,7 +12,143 @@
+ 
+ #include <linux/io.h>
+ #include <linux/errno.h>
++#include <linux/delay.h>
++#include <linux/mutex.h>
++#include <linux/slab.h>
++#include <linux/types.h>
  #include <linux/qcom_scm.h>
-+#include <linux/of.h>
-+#include <linux/of_platform.h>
-+#include <linux/clk.h>
- 
- #include "qcom_scm.h"
- 
-+struct qcom_scm {
-+	struct device *dev;
-+	struct clk *core_clk;
-+	struct clk *iface_clk;
-+	struct clk *bus_clk;
++#include <linux/arm-smccc.h>
++#include <linux/dma-mapping.h>
++
++#include "qcom_scm.h"
++
++#define QCOM_SCM_FNID(s, c) ((((s) & 0xFF) << 8) | ((c) & 0xFF))
++
++#define MAX_QCOM_SCM_ARGS 10
++#define MAX_QCOM_SCM_RETS 3
++
++#define QCOM_SCM_ARGS_IMPL(num, a, b, c, d, e, f, g, h, i, j, ...) (\
++			   (((a) & 0x3) << 4) | \
++			   (((b) & 0x3) << 6) | \
++			   (((c) & 0x3) << 8) | \
++			   (((d) & 0x3) << 10) | \
++			   (((e) & 0x3) << 12) | \
++			   (((f) & 0x3) << 14) | \
++			   (((g) & 0x3) << 16) | \
++			   (((h) & 0x3) << 18) | \
++			   (((i) & 0x3) << 20) | \
++			   (((j) & 0x3) << 22) | \
++			   ((num) & 0xf))
++
++#define QCOM_SCM_ARGS(...) QCOM_SCM_ARGS_IMPL(__VA_ARGS__, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
++
++/**
++ * struct qcom_scm_desc
++ * @arginfo:	Metadata describing the arguments in args[]
++ * @args:	The array of arguments for the secure syscall
++ * @res:	The values returned by the secure syscall
++ */
++struct qcom_scm_desc {
++	u32 arginfo;
++	u64 args[MAX_QCOM_SCM_ARGS];
 +};
 +
-+static struct qcom_scm *__scm;
++static u64 qcom_smccc_convention = -1;
++static DEFINE_MUTEX(qcom_scm_lock);
 +
-+static int qcom_scm_clk_enable(void)
++#define QCOM_SCM_EBUSY_WAIT_MS 30
++#define QCOM_SCM_EBUSY_MAX_RETRY 20
++
++#define N_EXT_QCOM_SCM_ARGS 7
++#define FIRST_EXT_ARG_IDX 3
++#define N_REGISTER_ARGS (MAX_QCOM_SCM_ARGS - N_EXT_QCOM_SCM_ARGS + 1)
++
++/**
++ * qcom_scm_call() - Invoke a syscall in the secure world
++ * @dev:	device
++ * @svc_id:	service identifier
++ * @cmd_id:	command identifier
++ * @desc:	Descriptor structure containing arguments and return values
++ *
++ * Sends a command to the SCM and waits for the command to finish processing.
++ * This should *only* be called in pre-emptible context.
++*/
++static int qcom_scm_call(struct device *dev, u32 svc_id, u32 cmd_id,
++			 const struct qcom_scm_desc *desc,
++			 struct arm_smccc_res *res)
 +{
-+	int ret;
++	int arglen = desc->arginfo & 0xf;
++	int retry_count = 0, i;
++	u32 fn_id = QCOM_SCM_FNID(svc_id, cmd_id);
++	u64 cmd, x5 = desc->args[FIRST_EXT_ARG_IDX];
++	dma_addr_t args_phys = 0;
++	void *args_virt = NULL;
++	size_t alloc_len;
 +
-+	ret = clk_prepare_enable(__scm->core_clk);
-+	if (ret)
-+		goto bail;
++	if (unlikely(arglen > N_REGISTER_ARGS)) {
++		alloc_len = N_EXT_QCOM_SCM_ARGS * sizeof(u64);
++		args_virt = kzalloc(PAGE_ALIGN(alloc_len), GFP_KERNEL);
 +
-+	ret = clk_prepare_enable(__scm->iface_clk);
-+	if (ret)
-+		goto disable_core;
++		if (!args_virt)
++			return -ENOMEM;
 +
-+	ret = clk_prepare_enable(__scm->bus_clk);
-+	if (ret)
-+		goto disable_iface;
++		if (qcom_smccc_convention == ARM_SMCCC_SMC_32) {
++			__le32 *args = args_virt;
++
++			for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
++				args[i] = cpu_to_le32(desc->args[i +
++						      FIRST_EXT_ARG_IDX]);
++		} else {
++			__le64 *args = args_virt;
++
++			for (i = 0; i < N_EXT_QCOM_SCM_ARGS; i++)
++				args[i] = cpu_to_le64(desc->args[i +
++						      FIRST_EXT_ARG_IDX]);
++		}
++
++		args_phys = dma_map_single(dev, args_virt, alloc_len,
++					   DMA_TO_DEVICE);
++
++		if (dma_mapping_error(dev, args_phys)) {
++			kfree(args_virt);
++			return -ENOMEM;
++		}
++
++		x5 = args_phys;
++	}
++
++	do {
++		mutex_lock(&qcom_scm_lock);
++
++		cmd = ARM_SMCCC_CALL_VAL(ARM_SMCCC_STD_CALL,
++					 qcom_smccc_convention,
++					 ARM_SMCCC_OWNER_SIP, fn_id);
++
++		do {
++			arm_smccc_smc(cmd, desc->arginfo, desc->args[0],
++				      desc->args[1], desc->args[2], x5, 0, 0,
++				      res);
++		} while (res->a0 == QCOM_SCM_INTERRUPTED);
++
++		mutex_unlock(&qcom_scm_lock);
++
++		if (res->a0 == QCOM_SCM_V2_EBUSY) {
++			if (retry_count++ > QCOM_SCM_EBUSY_MAX_RETRY)
++				break;
++			msleep(QCOM_SCM_EBUSY_WAIT_MS);
++		}
++	}  while (res->a0 == QCOM_SCM_V2_EBUSY);
++
++	if (args_virt) {
++		dma_unmap_single(dev, args_phys, alloc_len, DMA_TO_DEVICE);
++		kfree(args_virt);
++	}
++
++	if (res->a0 < 0)
++		return qcom_scm_remap_error(res->a0);
 +
 +	return 0;
-+
-+disable_iface:
-+	clk_disable_unprepare(__scm->iface_clk);
-+disable_core:
-+	clk_disable_unprepare(__scm->core_clk);
-+bail:
-+	return ret;
 +}
-+
-+static void qcom_scm_clk_disable(void)
-+{
-+	clk_disable_unprepare(__scm->core_clk);
-+	clk_disable_unprepare(__scm->iface_clk);
-+	clk_disable_unprepare(__scm->bus_clk);
-+}
-+
+ 
  /**
   * qcom_scm_set_cold_boot_addr() - Set the cold boot address for cpus
+@@ -29,13 +165,15 @@ int __qcom_scm_set_cold_boot_addr(void *entry, const cpumask_t *cpus)
+ 
+ /**
+  * qcom_scm_set_warm_boot_addr() - Set the warm boot address for cpus
++ * @dev: Device pointer
   * @entry: Entry point function for the cpus
-@@ -72,12 +114,17 @@ EXPORT_SYMBOL(qcom_scm_cpu_power_down);
+  * @cpus: The cpumask of cpus that will use the entry point
+  *
+  * Set the Linux entry point for the SCM to transfer control to when coming
+  * out of a power down. CPU power down may be executed on cpuidle or hotplug.
   */
- bool qcom_scm_hdcp_available(void)
+-int __qcom_scm_set_warm_boot_addr(void *entry, const cpumask_t *cpus)
++int __qcom_scm_set_warm_boot_addr(struct device *dev, void *entry,
++				  const cpumask_t *cpus)
  {
--	int ret;
-+	int ret = qcom_scm_clk_enable();
-+
-+	if (ret)
-+		return ret;
- 
- 	ret = __qcom_scm_is_call_available(QCOM_SCM_SVC_HDCP,
--		QCOM_SCM_CMD_HDCP);
-+						QCOM_SCM_CMD_HDCP);
-+
-+	qcom_scm_clk_disable();
- 
--	return (ret > 0) ? true : false;
-+	return ret > 0 ? true : false;
+ 	return -ENOTSUPP;
  }
- EXPORT_SYMBOL(qcom_scm_hdcp_available);
- 
-@@ -91,6 +138,115 @@ EXPORT_SYMBOL(qcom_scm_hdcp_available);
-  */
- int qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
+@@ -52,12 +190,66 @@ void __qcom_scm_cpu_power_down(u32 flags)
  {
--	return __qcom_scm_hdcp_req(req, req_cnt, resp);
-+	int ret = qcom_scm_clk_enable();
+ }
+ 
+-int __qcom_scm_is_call_available(u32 svc_id, u32 cmd_id)
++int __qcom_scm_is_call_available(struct device *dev, u32 svc_id, u32 cmd_id)
+ {
+-	return -ENOTSUPP;
++	int ret;
++	struct qcom_scm_desc desc = {0};
++	struct arm_smccc_res res;
 +
-+	if (ret)
-+		return ret;
++	desc.arginfo = QCOM_SCM_ARGS(1);
++	desc.args[0] = QCOM_SCM_FNID(svc_id, cmd_id) |
++			(ARM_SMCCC_OWNER_SIP << ARM_SMCCC_OWNER_SHIFT);
 +
-+	ret = __qcom_scm_hdcp_req(req, req_cnt, resp);
-+	qcom_scm_clk_disable();
++	ret = qcom_scm_call(dev, QCOM_SCM_SVC_INFO, QCOM_IS_CALL_AVAIL_CMD,
++			    &desc, &res);
++
++	return ret ? : res.a1;
+ }
+ 
+-int __qcom_scm_hdcp_req(struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp)
++int __qcom_scm_hdcp_req(struct device *dev, struct qcom_scm_hdcp_req *req,
++			u32 req_cnt, u32 *resp)
+ {
+-	return -ENOTSUPP;
++	int ret;
++	struct qcom_scm_desc desc = {0};
++	struct arm_smccc_res res;
++
++	if (req_cnt > QCOM_SCM_HDCP_MAX_REQ_CNT)
++		return -ERANGE;
++
++	desc.args[0] = req[0].addr;
++	desc.args[1] = req[0].val;
++	desc.args[2] = req[1].addr;
++	desc.args[3] = req[1].val;
++	desc.args[4] = req[2].addr;
++	desc.args[5] = req[2].val;
++	desc.args[6] = req[3].addr;
++	desc.args[7] = req[3].val;
++	desc.args[8] = req[4].addr;
++	desc.args[9] = req[4].val;
++	desc.arginfo = QCOM_SCM_ARGS(10);
++
++	ret = qcom_scm_call(dev, QCOM_SCM_SVC_HDCP, QCOM_SCM_CMD_HDCP, &desc,
++			    &res);
++	*resp = res.a1;
++
 +	return ret;
++}
++
++void __qcom_scm_init(void)
++{
++	u64 cmd;
++	struct arm_smccc_res res;
++	u32 function = QCOM_SCM_FNID(QCOM_SCM_SVC_INFO, QCOM_IS_CALL_AVAIL_CMD);
++
++	/* First try a SMC64 call */
++	cmd = ARM_SMCCC_CALL_VAL(ARM_SMCCC_FAST_CALL, ARM_SMCCC_SMC_64,
++				 ARM_SMCCC_OWNER_SIP, function);
++
++	arm_smccc_smc(cmd, QCOM_SCM_ARGS(1), cmd & (~BIT(ARM_SMCCC_TYPE_SHIFT)),
++		      0, 0, 0, 0, 0, &res);
++
++	if (!res.a0 && res.a1)
++		qcom_smccc_convention = ARM_SMCCC_SMC_64;
++	else
++		qcom_smccc_convention = ARM_SMCCC_SMC_32;
  }
- EXPORT_SYMBOL(qcom_scm_hdcp_req);
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+index 937c64a..fca0744 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -190,6 +190,8 @@ static int qcom_scm_probe(struct platform_device *pdev)
+ 	__scm = scm;
+ 	__scm->dev = &pdev->dev;
+ 
++	__qcom_scm_init();
 +
-+static int qcom_scm_probe(struct platform_device *pdev)
-+{
-+	struct qcom_scm *scm;
-+	int ret;
+ 	return 0;
+ }
+ 
+diff --git a/drivers/firmware/qcom_scm.h b/drivers/firmware/qcom_scm.h
+index afe6676..0ea55d7 100644
+--- a/drivers/firmware/qcom_scm.h
++++ b/drivers/firmware/qcom_scm.h
+@@ -38,7 +38,10 @@ extern int __qcom_scm_is_call_available(struct device *dev, u32 svc_id,
+ extern int __qcom_scm_hdcp_req(struct device *dev,
+ 		struct qcom_scm_hdcp_req *req, u32 req_cnt, u32 *resp);
+ 
++extern void __qcom_scm_init(void);
 +
-+	scm = devm_kzalloc(&pdev->dev, sizeof(*scm), GFP_KERNEL);
-+	if (!scm)
-+		return -ENOMEM;
-+
-+	scm->core_clk = devm_clk_get(&pdev->dev, "core");
-+	if (IS_ERR(scm->core_clk)) {
-+		if (PTR_ERR(scm->core_clk) == -EPROBE_DEFER)
-+			return PTR_ERR(scm->core_clk);
-+
-+		scm->core_clk = NULL;
-+	}
-+
-+	if (of_device_is_compatible(pdev->dev.of_node, "qcom,scm")) {
-+		scm->iface_clk = devm_clk_get(&pdev->dev, "iface");
-+		if (IS_ERR(scm->iface_clk)) {
-+			if (PTR_ERR(scm->iface_clk) != -EPROBE_DEFER)
-+				dev_err(&pdev->dev, "failed to acquire iface clk\n");
-+			return PTR_ERR(scm->iface_clk);
-+		}
-+
-+		scm->bus_clk = devm_clk_get(&pdev->dev, "bus");
-+		if (IS_ERR(scm->bus_clk)) {
-+			if (PTR_ERR(scm->bus_clk) != -EPROBE_DEFER)
-+				dev_err(&pdev->dev, "failed to acquire bus clk\n");
-+			return PTR_ERR(scm->bus_clk);
-+		}
-+	}
-+
-+	/* vote for max clk rate for highest performance */
-+	ret = clk_set_rate(scm->core_clk, INT_MAX);
-+	if (ret)
-+		return ret;
-+
-+	__scm = scm;
-+	__scm->dev = &pdev->dev;
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id qcom_scm_dt_match[] = {
-+	{ .compatible = "qcom,scm-apq8064",},
-+	{ .compatible = "qcom,scm-msm8660",},
-+	{ .compatible = "qcom,scm-msm8960",},
-+	{ .compatible = "qcom,scm",},
-+	{}
-+};
-+
-+MODULE_DEVICE_TABLE(of, qcom_scm_dt_match);
-+
-+static struct platform_driver qcom_scm_driver = {
-+	.driver = {
-+		.name	= "qcom_scm",
-+		.of_match_table = qcom_scm_dt_match,
-+	},
-+	.probe = qcom_scm_probe,
-+};
-+
-+static int __init qcom_scm_init(void)
-+{
-+	struct device_node *np, *fw_np;
-+	int ret;
-+
-+	fw_np = of_find_node_by_name(NULL, "firmware");
-+
-+	if (!fw_np)
-+		return -ENODEV;
-+
-+	np = of_find_matching_node(fw_np, qcom_scm_dt_match);
-+
-+	if (!np) {
-+		of_node_put(fw_np);
-+		return -ENODEV;
-+	}
-+
-+	of_node_put(np);
-+
-+	ret = of_platform_populate(fw_np, qcom_scm_dt_match, NULL, NULL);
-+
-+	of_node_put(fw_np);
-+
-+	if (ret)
-+		return ret;
-+
-+	return platform_driver_register(&qcom_scm_driver);
-+}
-+
-+arch_initcall(qcom_scm_init);
-+
-+static void __exit qcom_scm_exit(void)
-+{
-+	platform_driver_unregister(&qcom_scm_driver);
-+}
-+module_exit(qcom_scm_exit);
-+
-+MODULE_DESCRIPTION("Qualcomm SCM driver");
-+MODULE_LICENSE("GPL v2");
+ /* common error codes */
++#define QCOM_SCM_V2_EBUSY	-12
+ #define QCOM_SCM_ENOMEM		-5
+ #define QCOM_SCM_EOPNOTSUPP	-4
+ #define QCOM_SCM_EINVAL_ADDR	-3
+@@ -58,6 +61,8 @@ static inline int qcom_scm_remap_error(int err)
+ 		return -EOPNOTSUPP;
+ 	case QCOM_SCM_ENOMEM:
+ 		return -ENOMEM;
++	case QCOM_SCM_V2_EBUSY:
++		return -EBUSY;
+ 	}
+ 	return -EINVAL;
+ }
 -- 
 1.9.1
