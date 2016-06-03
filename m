@@ -1,49 +1,36 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Fri, 3 Jun 2016 16:53:51 +0530
-Subject: [PATCH v2 7/7] phy: Add Northstar2 PCI Phy support
-In-Reply-To: <20160601131228.GF31982@lunn.ch>
-References: <1464701801-17243-1-git-send-email-pramod.kumar@broadcom.com>
- <1464701801-17243-8-git-send-email-pramod.kumar@broadcom.com>
- <20160601131228.GF31982@lunn.ch>
-Message-ID: <a8b5b6ef2c80b534eca1812caeacde57@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 3 Jun 2016 12:27:21 +0100
+Subject: [PATCH v2 4/9] arm64: Add platform selection for BCM2835.
+In-Reply-To: <1464934708-24769-5-git-send-email-kraxel@redhat.com>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-5-git-send-email-kraxel@redhat.com>
+Message-ID: <20160603112721.GC1128@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Fri, Jun 03, 2016 at 08:18:23AM +0200, Gerd Hoffmann wrote:
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 7ef1d05..ea88402 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -13,6 +13,19 @@ config ARCH_ALPINE
+>  	  This enables support for the Annapurna Labs Alpine
+>  	  Soc family.
+>  
+> +config ARCH_BCM2835
+> +	bool "Broadcom BCM2835 family"
+> +	select ARCH_REQUIRE_GPIOLIB
+> +	select CLKSRC_OF
+> +	select PINCTRL
+> +	select PINCTRL_BCM2835
+> +	select ARM_AMBA
+> +	select ARM_TIMER_SP804
+> +	select HAVE_ARM_ARCH_TIMER
+> +	help
+> +	  This enables support for the Broadcom BCM2837 SoC.
+> +	  This SoC is used in the Raspberry Pi 3 device.
 
-> -----Original Message-----
-> From: Andrew Lunn [mailto:andrew at lunn.ch]
-> Sent: 01 June 2016 18:42
-> To: Pramod Kumar
-> Cc: Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala;
+I thought we would just use ARCH_BCM, or is it too generic?
+
+-- 
 Catalin
-> Marinas; Will Deacon; Kishon Vijay Abraham I; David S. Miller;
-> devicetree at vger.kernel.org; Jon Mason; netdev at vger.kernel.org; linux-
-> kernel at vger.kernel.org; bcm-kernel-feedback-list at broadcom.com;
-linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 7/7] phy: Add Northstar2 PCI Phy support
->
-> > +static int ns2_pci_phy_probe(struct mdio_device *mdiodev) {
-> > +	struct device *dev = &mdiodev->dev;
-> > +	struct phy_provider *provider;
-> > +	struct ns2_pci_phy *p;
-> > +	struct phy *phy;
-> > +
-> > +	phy = devm_phy_create(dev, dev->of_node, &ns2_pci_phy_ops);
-> > +	if (IS_ERR_OR_NULL(phy)) {
-> > +		dev_err(dev, "failed to create Phy\n");
-> > +		return PTR_ERR(phy);
-> > +	}
->
-> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg78030.html
->
-
-I've explored inside this API and see it never returning NULL. I'll
-replace IS_ERR_OR_NULL to IS_ERR.
-Thanks for pointing this out.
-
-> 	Andrew
-
-Regards,
-Pramod
