@@ -1,130 +1,78 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Fri, 3 Jun 2016 13:56:42 +0100
-Subject: [PATCH v4 16/18] ARM: STi: DT: STiH407: Add uniperif player dt
- nodes
-In-Reply-To: <574D5608.3080800@st.com>
-References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
- <1464192412-16386-18-git-send-email-peter.griffin@linaro.org>
- <574D5608.3080800@st.com>
-Message-ID: <20160603125642.GD9912@griffinp-ThinkPad-X1-Carbon-2nd>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Fri, 03 Jun 2016 14:56:58 +0200
+Subject: [RFC PATCH v1 3/6] clk: rockchip: rk3399: add ddrc clock support
+In-Reply-To: <1464947719-6245-4-git-send-email-hl@rock-chips.com>
+References: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
+ <1464947719-6245-4-git-send-email-hl@rock-chips.com>
+Message-ID: <13084747.Amq298iRsd@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+Am Freitag, 3. Juni 2016, 17:55:16 schrieb Lin Huang:
+> add ddrc clock setting, so we can do ddr frequency
+> scaling on rk3399 platform in future.
+> 
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v1:
+> - remove ddrc source CLK_IGNORE_UNUSED flag, Suggestion by Doug
+> - move clk_ddrc and clk_ddrc_dpll_src to critical, Suggestion by Doug
+> 
+>  drivers/clk/rockchip/clk-rk3399.c | 20 ++++++++++++++++++++
+>  1 file changed, 20 insertions(+)
+> 
+> diff --git a/drivers/clk/rockchip/clk-rk3399.c
+> b/drivers/clk/rockchip/clk-rk3399.c index f1d8e44..29afb88 100644
+> --- a/drivers/clk/rockchip/clk-rk3399.c
+> +++ b/drivers/clk/rockchip/clk-rk3399.c
 
-Thanks for reviewing.
+[...]
 
-On Tue, 31 May 2016, Arnaud Pouliquen wrote:
+> @@ -1377,6 +1381,18 @@ static struct rockchip_clk_branch
+> rk3399_clk_branches[] __initdata = { COMPOSITE_NOMUX(0, "clk_test",
+> "clk_test_pre", CLK_IGNORE_UNUSED, RK3368_CLKSEL_CON(58), 0, 5, DFLAGS,
+>  			RK3368_CLKGATE_CON(13), 11, GFLAGS),
+> +
+> +	/* ddrc */
+> +	GATE(0, "clk_ddrc_lpll_src", "lpll", 0, RK3399_CLKGATE_CON(3),
+> +	     0, GFLAGS),
+> +	GATE(0, "clk_ddrc_bpll_src", "bpll", 0, RK3399_CLKGATE_CON(3),
+> +	     1, GFLAGS),
+> +	GATE(0, "clk_ddrc_dpll_src", "dpll", 0, RK3399_CLKGATE_CON(3),
+> +	     2, GFLAGS),
+> +	GATE(0, "clk_ddrc_gpll_src", "gpll", 0, RK3399_CLKGATE_CON(3),
+> +	     3, GFLAGS),
+> +	COMPOSITE_DDRC(SCLK_DDRCLK, "clk_ddrc", mux_ddrclk_p, 0,
+> +		       RK3399_CLKSEL_CON(6), 4, 2, MFLAGS, 0, 3, DFLAGS),
+>  };
+
+as said in the other patch, just make this a regular COMPOSITE_NOGATE with 
+CLK_DIVIDER_READ_ONLY | CLK_MUX_READ_ONLY until that interface to the ATF 
+exists and is approved.
+
+That way you can still read back the clock rate without anything changing the 
+clock-rate, but we don't need to add duplicate code for it.
+
 
 > 
+>  static struct rockchip_clk_branch rk3399_clk_pmu_branches[] __initdata = {
+> @@ -1487,6 +1503,10 @@ static const char *const rk3399_cru_critical_clocks[]
+> __initconst = { "gpll_hclk_perilp1_src",
+>  	"gpll_aclk_perilp0_src",
+>  	"gpll_aclk_perihp_src",
+> +
+> +	/* ddrc */
+> +	"clk_ddrc_dpll_src",
+
+Why does your clk_ddrc_dpll_src need a separate critical entry. Any code 
+changing the clk_ddrc parent should make sure the new parent is enabled. (The 
+clock-framework of course does this already).
+
+
+> +	"clk_ddrc",
+>  };
 > 
-> On 05/25/2016 06:06 PM, Peter Griffin wrote:
-> > This patch adds the DT nodes for the uniperif player
-> > IP blocks found on STiH407 family silicon.
-> > 
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> > ---
-> >  arch/arm/boot/dts/stih407-family.dtsi | 76 +++++++++++++++++++++++++++++++++++
-> >  1 file changed, 76 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-> > index 60f95b6..7ca149b 100644
-> > --- a/arch/arm/boot/dts/stih407-family.dtsi
-> > +++ b/arch/arm/boot/dts/stih407-family.dtsi
-> > @@ -755,5 +755,81 @@
-> >  			pinctrl-names = "default";
-> >  			pinctrl-0 = <&pinctrl_spdif_out >;
-> >  		};
-> > +
-> > +		sti_uni_player0: sti-uni-player at 0 {
-> > +			compatible = "st,sti-uni-player";
-> > +			status = "disabled";
-> > +			#sound-dai-cells = <0>;
-> > +			st,syscfg = <&syscfg_core>;
-> > +			clocks = <&clk_s_d0_flexgen CLK_PCM_0>;
-> > +			assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_0>;
-> > +			assigned-clock-parents = <&clk_s_d0_quadfs 0>;
-> This does not work properly. You need to declare parent like this:
-> assigned-clocks = <&clk_s_d0_quadfs 0>, <&clk_s_d0_flexgen CLK_PCM_0>;
-> assigned-clock-parents = <0>, <&clk_s_d0_quadfs 0>;
+>  static const char *const rk3399_pmucru_critical_clocks[] __initconst = {
 
-Will fix in v5
 
-> 
-> > +			assigned-clock-rates = <50000000>;
-> > +			reg = <0x8D80000 0x158>;
-> > +			interrupts = <GIC_SPI 84 IRQ_TYPE_NONE>;
-> > +			dmas = <&fdma0 2 0 1>;
-> > +			dai-name = "Uni Player #0 (HDMI)";
-> > +			dma-names = "tx";
-> > +			st,uniperiph-id = <0>;
-> > +			st,version = <5>;
-> > +			st,mode = "HDMI";
-> > +		};
-> > +
-> > +		sti_uni_player1: sti-uni-player at 1 {
-> > +			compatible = "st,sti-uni-player";
-> > +			status = "disabled";
-> > +			#sound-dai-cells = <0>;
-> > +			st,syscfg = <&syscfg_core>;
-> > +			clocks = <&clk_s_d0_flexgen CLK_PCM_1>;
-> > +			assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_1>;
-> > +			assigned-clock-parents = <&clk_s_d0_quadfs 1>;
-> assigned-clocks = <&clk_s_d0_quadfs 1>, <&clk_s_d0_flexgen CLK_PCM_1>;
-> assigned-clock-parents = <0>, <&clk_s_d0_quadfs 1>;
-
-Will fix in v5
-
-> 
-> > +			assigned-clock-rates = <50000000>;
-> > +			reg = <0x8D81000 0x158>;
-> > +			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-> > +			dmas = <&fdma0 3 0 1>;
-> > +			dai-name = "Uni Player #1 (PIO)";
-> > +			dma-names = "tx";
-> > +			st,uniperiph-id = <1>;
-> > +			st,version = <5>;
-> > +			st,mode = "PCM";
-> > +		};
-> > +
-> > +		sti_uni_player2: sti-uni-player at 2 {
-> > +			compatible = "st,sti-uni-player";
-> > +			status = "disabled";
-> > +			#sound-dai-cells = <0>;
-> > +			st,syscfg = <&syscfg_core>;
-> > +			clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
-> > +			assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
-> > +			assigned-clock-parents = <&clk_s_d0_quadfs 2>;
-> assigned-clocks = <&clk_s_d0_quadfs 2>, <&clk_s_d0_flexgen CLK_PCM_2>;
-> assigned-clock-parents = <0>, <&clk_s_d0_quadfs 2>;
-
-Will fix in v5
-
-> > +			assigned-clock-rates = <50000000>;
-> > +			reg = <0x8D82000 0x158>;
-> > +			interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
-> > +			dmas = <&fdma0 4 0 1>;
-> > +			dai-name = "Uni Player #1 (DAC)";
-> > +			dma-names = "tx";
-> > +			st,uniperiph-id = <2>;
-> > +			st,version = <5>;
-> > +			st,mode = "PCM";
-> > +		};
-> > +
-> > +		sti_uni_player3: sti-uni-player at 3 {
-> > +			compatible = "st,sti-uni-player";
-> > +			status = "disabled";
-> > +			#sound-dai-cells = <0>;
-> > +			st,syscfg = <&syscfg_core>;
-> > +			clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
-> > +			assigned-clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
-> > +			assigned-clock-parents = <&clk_s_d0_quadfs 3>;
-> > +			assigned-clock-rates = <50000000>;
-> assigned-clocks = <&clk_s_d0_quadfs 3>, <&clk_s_d0_flexgen CLK_SPDIFF>;
-> assigned-clock-parents = <0>, <&clk_s_d0_quadfs 3>;
-
-Will fix in v5
-
-Regards,
-
-Peter.
+Heiko
