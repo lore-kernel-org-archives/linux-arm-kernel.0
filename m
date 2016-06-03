@@ -1,108 +1,290 @@
-From: thommyj@gmail.com (Thommy Jakobsson)
-Date: Fri,  3 Jun 2016 14:19:15 +0200
-Subject: [PATCH v2 2/2] arm-smmu: Add possibillity to mask streamIDs
-In-Reply-To: <1464956355-2826-1-git-send-email-thommyj@gmail.com>
-References: <DB5PR0401MB186309ACEF30FEA489C3CA97E6580@DB5PR0401MB1863.eurprd04.prod.outlook.com>
- <1464956355-2826-1-git-send-email-thommyj@gmail.com>
-Message-ID: <1464956355-2826-3-git-send-email-thommyj@gmail.com>
+From: shawn.lin@rock-chips.com (Shawn Lin)
+Date: Fri, 3 Jun 2016 20:29:43 +0800
+Subject: [RFC PATCH v1 1/6] rockchip: rockchip: add new clock-type for the
+ ddrclk
+In-Reply-To: <1464947719-6245-2-git-send-email-hl@rock-chips.com>
+References: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
+ <1464947719-6245-2-git-send-email-hl@rock-chips.com>
+Message-ID: <67c0c728-389c-668f-4966-39e9966e1b42@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use DT bindings to allow masks to be added for a masters streamIDs. This
-is necessary for devices that have multiple IDs, or use dynamic signals to
-build up the ID. For example the ZynqMPSoC that mirrors 6bits from the
-AXI ID into the streamid.
+Hi Lin,
 
-Signed-off-by: Thommy Jakobsson <thommyj@gmail.com>
----
- drivers/iommu/arm-smmu.c | 52 ++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 50 insertions(+), 2 deletions(-)
+It looks good with only a few minor comments.
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 9345a3f..f325cf7 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -305,6 +305,7 @@ struct arm_smmu_smr {
- struct arm_smmu_master_cfg {
- 	int				num_streamids;
- 	u16				streamids[MAX_MASTER_STREAMIDS];
-+	u16				streammasks[MAX_MASTER_STREAMIDS];
- 	struct arm_smmu_smr		*smrs;
- };
- 
-@@ -554,6 +555,38 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
- 	return insert_smmu_master(smmu, master);
- }
- 
-+static int register_smmu_master_mask(struct arm_smmu_device *smmu,
-+				     struct device *dev,
-+				     struct arm_smmu_phandle_args *masterspec)
-+{
-+	int i;
-+	struct arm_smmu_master *master;
-+
-+	master = find_smmu_master(smmu, masterspec->np);
-+	if (!master) {
-+		dev_err(dev,
-+			"mask phandle to %s, but no ID registred\n",
-+			masterspec->np->name);
-+		return -EINVAL;
-+	}
-+
-+	if (masterspec->args_count != master->cfg.num_streamids) {
-+		dev_err(dev,
-+			"Different number of ids %d and masks %d not supported for master device %s\n",
-+			master->cfg.num_streamids,
-+			masterspec->args_count,
-+			masterspec->np->name);
-+		return -ENOSPC;
-+	}
-+
-+	for (i = 0; i < master->cfg.num_streamids; ++i) {
-+		u16 streammask = masterspec->args[i];
-+
-+		master->cfg.streammasks[i] = streammask;
-+	}
-+	return 0;
-+}
-+
- static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
- {
- 	struct arm_smmu_device *smmu;
-@@ -1106,7 +1139,7 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
- 
- 		smrs[i] = (struct arm_smmu_smr) {
- 			.idx	= idx,
--			.mask	= 0, /* We don't currently share SMRs */
-+			.mask	= cfg->streammasks[i],
- 			.id	= cfg->streamids[i],
- 		};
- 	}
-@@ -1969,9 +2002,24 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
- 
- 		i++;
- 	}
--
- 	dev_notice(dev, "registered %d master devices\n", i);
- 
-+	of_for_each_phandle(&it, err, dev->of_node,
-+			    "mmu-masters-mask", "#stream-id-cells", 0) {
-+		int count = of_phandle_iterator_args(&it, masterspec->args,
-+						     MAX_MASTER_STREAMIDS);
-+		masterspec->np		= of_node_get(it.node);
-+		masterspec->args_count	= count;
-+
-+		err = register_smmu_master_mask(smmu, dev, masterspec);
-+		if (err) {
-+			dev_err(dev, "failed to add mask for%s\n",
-+				masterspec->np->name);
-+			kfree(masterspec);
-+			goto out_put_masters;
-+		}
-+
-+	}
- 	kfree(masterspec);
- 
- 	parse_driver_options(smmu);
+On 2016/6/3 17:55, Lin Huang wrote:
+> On new rockchip platform(rk3399 etc), there have dcf controller to
+> do ddr frequency scaling, and this controller will implement in
+> arm-trust-firmware. We add a special clock-type to handle that.
+>
+> Signed-off-by: Lin Huang <hl@rock-chips.com>
+> ---
+> Changes in v1:
+> - None
+>
+>  drivers/clk/rockchip/Makefile  |   1 +
+>  drivers/clk/rockchip/clk-ddr.c | 147 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/rockchip/clk.c     |   9 +++
+>  drivers/clk/rockchip/clk.h     |  27 ++++++++
+>  4 files changed, 184 insertions(+)
+>  create mode 100644 drivers/clk/rockchip/clk-ddr.c
+>
+> diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
+> index f47a2fa..b5f2c8e 100644
+> --- a/drivers/clk/rockchip/Makefile
+> +++ b/drivers/clk/rockchip/Makefile
+> @@ -8,6 +8,7 @@ obj-y	+= clk-pll.o
+>  obj-y	+= clk-cpu.o
+>  obj-y	+= clk-inverter.o
+>  obj-y	+= clk-mmc-phase.o
+> +obj-y	+= clk-ddr.o
+>  obj-$(CONFIG_RESET_CONTROLLER)	+= softrst.o
+>
+>  obj-y	+= clk-rk3036.o
+> diff --git a/drivers/clk/rockchip/clk-ddr.c b/drivers/clk/rockchip/clk-ddr.c
+> new file mode 100644
+> index 0000000..5b6630d
+> --- /dev/null
+> +++ b/drivers/clk/rockchip/clk-ddr.c
+> @@ -0,0 +1,147 @@
+> +/*
+> + * Copyright (c) 2016 Rockchip Electronics Co. Ltd.
+> + * Author: Lin Huang <hl@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/of.h>
+> +#include <linux/slab.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-provider.h>
+> +#include "clk.h"
+> +
+
+alphabetical order would be better.
+
+> +struct rockchip_ddrclk {
+> +	struct clk_hw	hw;
+> +	void __iomem	*reg_base;
+> +	int		mux_offset;
+> +	int		mux_shift;
+> +	int		mux_width;
+> +	int		mux_flag;
+> +	int		div_shift;
+> +	int		div_width;
+> +	int		div_flag;
+> +	spinlock_t	*lock;
+> +};
+> +
+> +#define to_rockchip_ddrclk_hw(hw) container_of(hw, struct rockchip_ddrclk, hw)
+> +#define val_mask(width)	((1 << (width)) - 1)
+> +
+> +static int rockchip_ddrclk_set_rate(struct clk_hw *hw, unsigned long drate,
+> +				    unsigned long prate)
+> +{
+> +	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(ddrclk->lock, flags);
+> +
+> +	/* TODO: set ddr rate in bl31 */
+> +
+> +	spin_unlock_irqrestore(ddrclk->lock, flags);
+> +
+
+What do you wanna protect here?
+
+> +	return 0;
+> +}
+> +
+> +static unsigned long
+> +rockchip_ddrclk_recalc_rate(struct clk_hw *hw,
+> +			    unsigned long parent_rate)
+> +{
+> +	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
+> +	int val;
+> +
+> +	val = clk_readl(ddrclk->reg_base +
+> +			ddrclk->mux_offset) >> ddrclk->div_shift;
+> +	val &= val_mask(ddrclk->div_width);
+> +
+> +	return DIV_ROUND_UP_ULL((u64)parent_rate, val + 1);
+> +}
+> +
+> +static long clk_ddrclk_round_rate(struct clk_hw *hw, unsigned long rate,
+> +				  unsigned long *prate)
+> +{
+> +	return rate;
+> +}
+> +
+> +static u8 rockchip_ddrclk_get_parent(struct clk_hw *hw)
+> +{
+> +	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
+> +	int num_parents = clk_hw_get_num_parents(hw);
+> +	u32 val;
+> +
+> +	val = clk_readl(ddrclk->reg_base +
+> +			ddrclk->mux_offset) >> ddrclk->mux_shift;
+> +	val &= val_mask(ddrclk->mux_width);
+> +
+> +	if (val >= num_parents)
+> +		return -EINVAL;
+> +
+> +	return val;
+> +}
+> +
+> +static const struct clk_ops rockchip_ddrclk_ops = {
+> +	.recalc_rate = rockchip_ddrclk_recalc_rate,
+> +	.set_rate = rockchip_ddrclk_set_rate,
+> +	.round_rate = clk_ddrclk_round_rate,
+> +	.get_parent = rockchip_ddrclk_get_parent,
+> +};
+> +
+> +struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
+> +					 const char *const *parent_names,
+> +					 u8 num_parents, int mux_offset,
+> +					 int mux_shift, int mux_width,
+> +					 int mux_flag, int div_shift,
+> +					 int div_width, int div_flag,
+> +					 void __iomem *reg_base,
+> +					 spinlock_t *lock)
+> +{
+> +	struct rockchip_ddrclk *ddrclk;
+> +	struct clk_init_data init;
+> +	struct clk *clk;
+> +	int ret;
+> +
+> +	ddrclk = kzalloc(sizeof(*ddrclk), GFP_KERNEL);
+> +	if (!ddrclk)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	init.name = name;
+> +	init.parent_names = parent_names;
+> +	init.num_parents = num_parents;
+> +	init.ops = &rockchip_ddrclk_ops;
+> +
+> +	init.flags = flags;
+> +	init.flags |= CLK_SET_RATE_NO_REPARENT;
+> +	init.flags |= CLK_GET_RATE_NOCACHE;
+
+can we combine these two?
+
+> +
+> +	ddrclk->reg_base = reg_base;
+> +	ddrclk->lock = lock;
+> +	ddrclk->hw.init = &init;
+> +	ddrclk->mux_offset = mux_offset;
+> +	ddrclk->mux_shift = mux_shift;
+> +	ddrclk->mux_width = mux_width;
+> +	ddrclk->mux_flag = mux_flag;
+> +	ddrclk->div_shift = div_shift;
+> +	ddrclk->div_width = div_width;
+> +	ddrclk->div_flag = div_flag;
+> +
+> +	clk = clk_register(NULL, &ddrclk->hw);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: could not register ddrclk %s\n", __func__,	name);
+> +		ret = PTR_ERR(clk);
+
+Why do you need PTR_ERR and then convert back again.
+
+> +		goto free_ddrclk;
+> +	}
+> +
+> +	return clk;
+> +
+> +free_ddrclk:
+> +	kfree(ddrclk);
+> +	return ERR_PTR(ret);
+> +}
+> diff --git a/drivers/clk/rockchip/clk.c b/drivers/clk/rockchip/clk.c
+> index 7ffd134..6ac1aa5 100644
+> --- a/drivers/clk/rockchip/clk.c
+> +++ b/drivers/clk/rockchip/clk.c
+> @@ -484,6 +484,15 @@ void __init rockchip_clk_register_branches(
+>  				list->gate_offset, list->gate_shift,
+>  				list->gate_flags, flags, &ctx->lock);
+>  			break;
+> +		case branch_ddrc:
+> +			clk = rockchip_clk_register_ddrclk(
+> +				list->name, list->flags,
+> +				list->parent_names, list->num_parents,
+> +				list->muxdiv_offset, list->mux_shift,
+> +				list->mux_width, list->mux_flags,
+> +				list->div_shift, list->div_width,
+> +				list->div_flags, ctx->reg_base, &ctx->lock);
+> +			break;
+>  		}
+>
+>  		/* none of the cases above matched */
+> diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
+> index 2194ffa..4033fe4 100644
+> --- a/drivers/clk/rockchip/clk.h
+> +++ b/drivers/clk/rockchip/clk.h
+> @@ -281,6 +281,13 @@ struct clk *rockchip_clk_register_mmc(const char *name,
+>  				const char *const *parent_names, u8 num_parents,
+>  				void __iomem *reg, int shift);
+>
+> +struct clk *rockchip_clk_register_ddrclk(const char *name, int flags,
+> +			const char *const *parent_names, u8 num_parents,
+> +			int mux_offset, int mux_shift, int mux_width,
+> +			int mux_flag, int div_shift, int div_width,
+> +			int div_flag, void __iomem *reg_base,
+> +			spinlock_t *lock);
+> +
+>  #define ROCKCHIP_INVERTER_HIWORD_MASK	BIT(0)
+>
+>  struct clk *rockchip_clk_register_inverter(const char *name,
+> @@ -299,6 +306,7 @@ enum rockchip_clk_branch_type {
+>  	branch_mmc,
+>  	branch_inverter,
+>  	branch_factor,
+> +	branch_ddrc,
+>  };
+>
+>  struct rockchip_clk_branch {
+> @@ -488,6 +496,25 @@ struct rockchip_clk_branch {
+>  		.child		= ch,				\
+>  	}
+>
+> +#define COMPOSITE_DDRC(_id, cname, pnames, f, mo, ms, mw, mf,	\
+> +			 ds, dw, df)				\
+
+it seems a duplication exept for branch_type.
+
+> +	{							\
+> +		.id		= _id,				\
+> +		.branch_type	= branch_ddrc,			\
+> +		.name		= cname,			\
+> +		.parent_names	= pnames,			\
+> +		.num_parents	= ARRAY_SIZE(pnames),		\
+> +		.flags		= f,				\
+> +		.muxdiv_offset	= mo,				\
+> +		.mux_shift	= ms,				\
+> +		.mux_width	= mw,				\
+> +		.mux_flags	= mf,				\
+> +		.div_shift	= ds,				\
+> +		.div_width	= dw,				\
+> +		.div_flags	= df,				\
+> +		.gate_offset	= -1,				\
+> +	}
+> +
+>  #define MUX(_id, cname, pnames, f, o, s, w, mf)			\
+>  	{							\
+>  		.id		= _id,				\
+>
+
+
 -- 
-1.9.1
+Best Regards
+Shawn Lin
