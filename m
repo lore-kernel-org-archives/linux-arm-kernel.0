@@ -1,48 +1,58 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 03 Jun 2016 09:50:11 +0100
-Subject: [PATCH 1/8] ARM: kdump: advertise boot aliased crash kernel resource
-Message-ID: <E1b8knz-0004H4-Bd@rmk-PC.armlinux.org.uk>
+Date: Fri, 03 Jun 2016 09:50:16 +0100
+Subject: [PATCH 2/8] ARM: kexec: advertise location of bootable RAM
+Message-ID: <E1b8ko4-0004HA-GF@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Advertise a resource which describes where the crash kernel is located
-in the boot view of RAM.  This allows kexec-tools to have this vital
-information.
+Advertise the location of bootable RAM to kexec-tools.  kexec needs to
+know where it can place the kernel in RAM, and so be executable when
+the system needs to jump into it.
 
+Advertise these areas in /proc/iomem with a "System RAM (boot alias)"
+tag.
+
+Reviewed-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/setup.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/kernel/setup.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index d9317eec1eba..19b25ad61385 100644
+index 19b25ad61385..612740788996 100644
 --- a/arch/arm/kernel/setup.c
 +++ b/arch/arm/kernel/setup.c
-@@ -1003,9 +1003,25 @@ static void __init reserve_crashkernel(void)
- 		(unsigned long)(crash_base >> 20),
- 		(unsigned long)(total_mem >> 20));
+@@ -847,10 +847,29 @@ static void __init request_standard_resources(const struct machine_desc *mdesc)
+ 	kernel_data.end     = virt_to_phys(_end - 1);
  
-+	/* The crashk resource must always be located in normal mem */
- 	crashk_res.start = crash_base;
- 	crashk_res.end = crash_base + crash_size - 1;
- 	insert_resource(&iomem_resource, &crashk_res);
+ 	for_each_memblock(memory, region) {
++		phys_addr_t start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
++		phys_addr_t end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
++		unsigned long boot_alias_start;
 +
-+	if (arm_has_idmap_alias()) {
 +		/*
-+		 * If we have a special RAM alias for use at boot, we
-+		 * need to advertise to kexec tools where the alias is.
++		 * Some systems have a special memory alias which is only
++		 * used for booting.  We need to advertise this region to
++		 * kexec-tools so they know where bootable RAM is located.
 +		 */
-+		static struct resource crashk_boot_res = {
-+			.name = "Crash kernel (boot alias)",
-+			.flags = IORESOURCE_BUSY | IORESOURCE_MEM,
-+		};
++		boot_alias_start = phys_to_idmap(start);
++		if (arm_has_idmap_alias() && boot_alias_start != IDMAP_INVALID_ADDR) {
++			res = memblock_virt_alloc(sizeof(*res), 0);
++			res->name = "System RAM (boot alias)";
++			res->start = boot_alias_start;
++			res->end = phys_to_idmap(end);
++			res->flags = IORESOURCE_MEM | IORESOURCE_BUSY;
++			request_resource(&iomem_resource, res);
++		}
 +
-+		crashk_boot_res.start = phys_to_idmap(crash_base);
-+		crashk_boot_res.end = crashk_boot_res.start + crash_size - 1;
-+		insert_resource(&iomem_resource, &crashk_boot_res);
-+	}
- }
- #else
- static inline void reserve_crashkernel(void) {}
+ 		res = memblock_virt_alloc(sizeof(*res), 0);
+ 		res->name  = "System RAM";
+-		res->start = __pfn_to_phys(memblock_region_memory_base_pfn(region));
+-		res->end = __pfn_to_phys(memblock_region_memory_end_pfn(region)) - 1;
++		res->start = start;
++		res->end = end;
+ 		res->flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
+ 
+ 		request_resource(&iomem_resource, res);
 -- 
 2.1.0
