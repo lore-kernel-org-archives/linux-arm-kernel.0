@@ -1,46 +1,37 @@
-From: dave.long@linaro.org (David Long)
-Date: Thu,  2 Jun 2016 23:26:24 -0400
-Subject: [PATCH v13 10/10] kprobes: Add arm64 case in kprobe example module
-In-Reply-To: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
-Message-ID: <1464924384-15269-11-git-send-email-dave.long@linaro.org>
+From: hongkun.cao@mediatek.com (hongkun.cao at mediatek.com)
+Date: Fri, 3 Jun 2016 11:28:14 +0800
+Subject: [PATCH] pinctrl: mediatek: fix suspend/resume timing issue
+Message-ID: <1464924495-20375-1-git-send-email-hongkun.cao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+From: "hongkun.cao" <hongkun.cao@mediatek.com>
 
-Add info prints in sample kprobe handlers for ARM64
+An irq which is a wake up source maybe masked unexpectedly if the wake
+up source irq was triggered after pinctrl irqchip suspend and before
+suspend_device_irqs finished.
+Use *_noirq callbacks to guarantee pinctrl irqchip suspend would be
+called after suspend_devices_irqs.
 
-Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+Signed-off-by: hongkun.cao <hongkun.cao@mediatek.com>
 ---
- samples/kprobes/kprobe_example.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
-index ed0ca0c..aad8e6f 100644
---- a/samples/kprobes/kprobe_example.c
-+++ b/samples/kprobes/kprobe_example.c
-@@ -46,6 +46,10 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
- 			" ex1 = 0x%lx\n",
- 		p->symbol_name, p->addr, regs->pc, regs->ex1);
- #endif
-+#ifdef CONFIG_ARM64
-+	pr_info("pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
-+		p->addr, (long)regs->pc);
-+#endif
- 
- 	/* A dump_stack() here will give a stack backtrace */
- 	return 0;
-@@ -71,6 +75,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
- 	printk(KERN_INFO "<%s> post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
- 		p->symbol_name, p->addr, regs->ex1);
- #endif
-+#ifdef CONFIG_ARM64
-+	pr_info("post_handler: p->addr = 0x%p, pc = 0x%lx\n",
-+		p->addr, (long)regs->pc);
-+#endif
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index a607655..ce554e0 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -1183,8 +1183,8 @@ static int mtk_eint_resume(struct device *device)
  }
  
- /*
+ const struct dev_pm_ops mtk_eint_pm_ops = {
+-	.suspend = mtk_eint_suspend,
+-	.resume = mtk_eint_resume,
++	.suspend_noirq = mtk_eint_suspend,
++	.resume_noirq = mtk_eint_resume,
+ };
+ 
+ static void mtk_eint_ack(struct irq_data *d)
 -- 
-2.5.0
+1.9.1
