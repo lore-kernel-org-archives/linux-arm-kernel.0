@@ -1,21 +1,32 @@
-From: thommyj@gmail.com (Thommy Jakobsson)
-Date: Fri, 3 Jun 2016 11:02:00 +0200
-Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
-In-Reply-To: <DB5PR0401MB186309ACEF30FEA489C3CA97E6580@DB5PR0401MB1863.eurprd04.prod.outlook.com>
-References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
- <1464640806-3942-3-git-send-email-thommyj@gmail.com>
- <DB5PR0401MB186309ACEF30FEA489C3CA97E6580@DB5PR0401MB1863.eurprd04.prod.outlook.com>
-Message-ID: <CAOTQ16KS6RobKfs5MP=Bx2ad6Xipht7VO4CP5DbzQr9T60ip=A@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Fri, 3 Jun 2016 11:04:43 +0200
+Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry Pi
+ 3.
+In-Reply-To: <1464934708-24769-8-git-send-email-kraxel@redhat.com>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-8-git-send-email-kraxel@redhat.com>
+Message-ID: <18208c0b-d33b-49f2-8f7e-5418954c283b@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>[Gupta Nipun] I should start from 0 and should be incremented in the while loop.
->>[Gupta Nipun] Should this not be 'master->cfg.streammasks[i] = streammask
-Good catch Gupta, thanks. Merging to latest linus tree obviously went
-wrong. Should of_for_each_phandle work?
-I had problems with that so I backed out and moved back to while
-of_parse_phandle_with_args. But parsing
-of mmu-masters seems to use of_for_each_phandle
+Hi,
 
-BR,
-Thommy Jakobsson
+Am 03.06.2016 um 08:18 schrieb Gerd Hoffmann:
+> From: Eric Anholt <eric@anholt.net>
+>
+> While this devicetree also works for booting in 32-bit mode, it's
+> placed in arm64 since it's a 64-bit CPU (as suggested by Arnd).
+
+i'm currently working on a patch series to fix dtc warnings like
+
+Warning (unit_address_vs_reg): Node /memory has a reg or ranges
+property, but no unit name
+
+This a copy of affected parts ( look at memory, soc and local_intc node ).
+
+So how should this be handled?
+
+a) fix the issues here
+b) extend my patch series after this patch has been applied
+
+Stefan
