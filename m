@@ -1,33 +1,33 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 03 Jun 2016 09:50:21 +0100
-Subject: [PATCH 3/8] kexec: don't invoke OOM-killer for control page allocation
-Message-ID: <E1b8ko9-0004HG-R5@rmk-PC.armlinux.org.uk>
+Date: Fri, 03 Jun 2016 09:50:27 +0100
+Subject: [PATCH 4/8] kexec: ensure user memory sizes do not wrap
+Message-ID: <E1b8koF-0004HM-5x@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we are unable to find a suitable page when allocating the control
-page, do not invoke the OOM-killer: killing processes probably isn't
-going to help.
+Ensure that user memory sizes do not wrap around when validating the
+user input, which can lead to the following input validation working
+incorrectly.
 
 Acked-by: Baoquan He <bhe@redhat.com>
 Reviewed-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- include/linux/kexec.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ kernel/kexec_core.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/include/linux/kexec.h b/include/linux/kexec.h
-index 2cc643c6e870..1b32ab587f66 100644
---- a/include/linux/kexec.h
-+++ b/include/linux/kexec.h
-@@ -41,7 +41,7 @@
- #endif
+diff --git a/kernel/kexec_core.c b/kernel/kexec_core.c
+index 8d34308ea449..d719a4d0ef55 100644
+--- a/kernel/kexec_core.c
++++ b/kernel/kexec_core.c
+@@ -169,6 +169,8 @@ int sanity_check_segment_list(struct kimage *image)
  
- #ifndef KEXEC_CONTROL_MEMORY_GFP
--#define KEXEC_CONTROL_MEMORY_GFP GFP_KERNEL
-+#define KEXEC_CONTROL_MEMORY_GFP (GFP_KERNEL | __GFP_NORETRY)
- #endif
- 
- #ifndef KEXEC_CONTROL_PAGE_SIZE
+ 		mstart = image->segment[i].mem;
+ 		mend   = mstart + image->segment[i].memsz;
++		if (mstart > mend)
++			return result;
+ 		if ((mstart & ~PAGE_MASK) || (mend & ~PAGE_MASK))
+ 			return result;
+ 		if (mend >= KEXEC_DESTINATION_MEMORY_LIMIT)
 -- 
 2.1.0
