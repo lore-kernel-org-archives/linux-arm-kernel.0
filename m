@@ -1,30 +1,75 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 03 Jun 2016 18:13:41 +0000
-Subject: [PATCH v17 11/13] arm64: kdump: enable kdump in the arm64 defconfig
+Subject: [PATCH v17 12/13] arm64: kdump: update a kernel doc
 In-Reply-To: <cover.1464974516.git.geoff@infradead.org>
 References: <cover.1464974516.git.geoff@infradead.org>
-Message-ID: <e23222de12e46e84790f55665fbe8b2f6fb0eb54.1464974516.git.geoff@infradead.org>
+Message-ID: <3afbcc147f4f999e66d96cd23efb021b340cf9f9.1464974516.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
+This patch adds arch specific descriptions about kdump usage on arm64
+to kdump.txt.
+
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/kdump/kdump.txt | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 4ed4756..aa3e1dd 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -71,6 +71,7 @@ CONFIG_TRANSPARENT_HUGEPAGE=y
- CONFIG_CMA=y
- CONFIG_XEN=y
- CONFIG_KEXEC=y
-+CONFIG_CRASH_DUMP=y
- # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
- CONFIG_COMPAT=y
- CONFIG_CPU_IDLE=y
+diff --git a/Documentation/kdump/kdump.txt b/Documentation/kdump/kdump.txt
+index 88ff63d..5d6da09 100644
+--- a/Documentation/kdump/kdump.txt
++++ b/Documentation/kdump/kdump.txt
+@@ -18,7 +18,7 @@ memory image to a dump file on the local disk, or across the network to
+ a remote system.
+ 
+ Kdump and kexec are currently supported on the x86, x86_64, ppc64, ia64,
+-s390x and arm architectures.
++s390x, arm and arm64 architectures.
+ 
+ When the system kernel boots, it reserves a small section of memory for
+ the dump-capture kernel. This ensures that ongoing Direct Memory Access
+@@ -249,6 +249,12 @@ Dump-capture kernel config options (Arch Dependent, arm)
+ 
+     AUTO_ZRELADDR=y
+ 
++Dump-capture kernel config options (Arch Dependent, arm64)
++----------------------------------------------------------
++
++1) Currently, kvm will not be enabled on the dump-capture kernel even
++   if it is configured.
++
+ Extended crashkernel syntax
+ ===========================
+ 
+@@ -305,6 +311,8 @@ Boot into System Kernel
+    kernel will automatically locate the crash kernel image within the
+    first 512MB of RAM if X is not given.
+ 
++   On arm64, use "crashkernel=Y[@X]".  Note that the start address of
++   the kernel, X if explicitly specified, must be aligned to 2MiB (0x200000).
+ 
+ Load the Dump-capture Kernel
+ ============================
+@@ -327,6 +335,8 @@ For s390x:
+ 	- Use image or bzImage
+ For arm:
+ 	- Use zImage
++For arm64:
++	- Use vmlinux or Image
+ 
+ If you are using a uncompressed vmlinux image then use following command
+ to load dump-capture kernel.
+@@ -370,6 +380,9 @@ For s390x:
+ For arm:
+ 	"1 maxcpus=1 reset_devices"
+ 
++For arm64:
++	"1 maxcpus=1 reset_devices"
++
+ Notes on loading the dump-capture kernel:
+ 
+ * By default, the ELF headers are stored in ELF64 format to support
 -- 
 2.5.0
