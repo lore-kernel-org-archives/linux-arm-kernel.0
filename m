@@ -1,44 +1,28 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 3 Jun 2016 14:04:24 -0700
-Subject: [PATCH 14/14] regulator: pwm: Document pwm-dutycycle-unit and
- pwm-dutycycle-range
-In-Reply-To: <1464942192-25967-15-git-send-email-boris.brezillon@free-electrons.com>
-References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464942192-25967-15-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160603210424.GL124478@google.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 04 Jun 2016 00:09:35 +0300
+Subject: [PATCH v2 00/11] Add R8A7792/Blanche board support
+Message-ID: <3446154.oZ24315zaL@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 10:23:12AM +0200, Boris Brezillon wrote:
-> Document the pwm-dutycycle-unit and pwm-dutycycle-range properties.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->  .../devicetree/bindings/regulator/pwm-regulator.txt          | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-> index ed936f0..5303235 100644
-> --- a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-> +++ b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
-> @@ -34,6 +34,18 @@ Only required for Voltage Table Mode:
->  			    First cell is voltage in microvolts (uV)
->  			    Second cell is duty-cycle in percent (%)
->  
-> +Optional properties for Continuous mode:
-> +- pwm-dutycycle-unit:	Integer value encoding the dutycycle unit. If not
-> +			defined, <100> is assumed, meaning that
-> +			pwm-dutycycle-range contains values expressed in
-> +			percent.
-> +
-> +- pwm-dutycycle-range:	Should contain 2 entries. The first entry is encoding
-> +			the dutycycle for regulator-min-microvolt and the
-> +			second one the dutycycle for regulator-max-microvolt.
-> +			Dutycyle values are expressed in pwm-dutycycle-unit.
-> +			If not defined, <0 100> is assumed.
-> +
->  NB: To be clear, if voltage-table is provided, then the device will be used
->  in Voltage Table Mode.  If no voltage-table is provided, then the device will
->  be used in Continuous Voltage Mode.
+Hello.
 
-Acked-by: Brian Norris <briannorris@chromium.org>
+   Here's the set of 11 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160530-v4.7-rc1' tag. We add the device tree support for
+the R8A7792-based Blanche board. The R-Car 'clk' driver patch was posted last
+week separately and 2 'clk' binding patches was split from this series and just
+re-posted...
+
+[01/13] ARM: shmobile: r8a7792: add clock index macros
+[02/13] ARM: shmobile: r8a7792: add power domain index macros
+[03/13] soc: renesas: rcar-sysc: add R8A7792 support
+[04/13] ARM: shmobile: r8a7792: basic SoC support
+[05/13] ARM: dts: r8a7792: initial SoC device tree
+[06/13] ARM: dts: r8a7792: add SYS-DMAC support
+[07/13] ARM: dts: r8a7792: add [H]SCIF support
+[08/13] ARM dts: r8a7792: add IRQC support
+[09/13] DT: arm: shmobile: document Blanche board
+[10/13] ARM: dts: blanche: initial device tree
+[11/13] ARM: dts: blanche: add Ethernet support
+
+WBR, Sergei
