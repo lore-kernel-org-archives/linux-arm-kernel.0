@@ -1,30 +1,14 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 3 Jun 2016 17:44:30 +0200
-Subject: [PATCH v2 1/3] of: add common OF-based component functionality
-In-Reply-To: <E1b8pyR-0005OJ-V3@rmk-PC.armlinux.org.uk>
-References: <20160603141548.GC1041@n2100.armlinux.org.uk>
- <E1b8pyR-0005OJ-V3@rmk-PC.armlinux.org.uk>
-Message-ID: <20160603154430.GA21013@ulmo.ba.sec>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Fri, 3 Jun 2016 08:47:52 -0700
+Subject: [PATCH v2] tty:serial:msm:Do not restore Rx interrupts in DMA
+In-Reply-To: <1464952232-5778-1-git-send-email-charanya@codeaurora.org>
+References: <1462896580-11554-1>
+ <1464952232-5778-1-git-send-email-charanya@codeaurora.org>
+Message-ID: <20160603154752.GE28326@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 03:21:19PM +0100, Russell King wrote:
-[...]
-> diff --git a/drivers/of/of_component.c b/drivers/of/of_component.c
-[...]
-> +static void component_compare_of(struct device *dev, void *data)
-> +{
-> +	return dev->of_node == data;
-> +}
+On Fri, Jun 03, 2016 at 04:40:32PM +0530, Charanya Venkatraman wrote:
+> From: Charanya <charanya@codeaurora.org>
 
-The return statement here doesn't match the return value. Didn't GCC
-complain about this?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160603/196b25a6/attachment.sig>
+This name must match up with your Signed-off-by name :(
