@@ -1,32 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Jun 2016 10:50:01 +0100
-Subject: [PATCH v2 2/5] of/numa: fix a memory@ node can only contains one
- memory block
-In-Reply-To: <20160603094520.GF9915@arm.com>
-References: <1464427377-12712-1-git-send-email-thunder.leizhen@huawei.com>
- <1464427377-12712-3-git-send-email-thunder.leizhen@huawei.com>
- <CAL_JsqJO1jXpmAJWUhCW+OK2mpTvtwzCuy_--3sQNUQhTvyFdA@mail.gmail.com>
- <574F8DA8.4040503@huawei.com> <20160603094520.GF9915@arm.com>
-Message-ID: <20160603095001.GG9915@arm.com>
+Date: Fri, 3 Jun 2016 10:52:30 +0100
+Subject: [PATCH v3 3/5] arm64/numa: add nid check for memory block
+In-Reply-To: <1464834491-12024-4-git-send-email-thunder.leizhen@huawei.com>
+References: <1464834491-12024-1-git-send-email-thunder.leizhen@huawei.com>
+ <1464834491-12024-4-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <20160603095229.GH9915@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 10:45:20AM +0100, Will Deacon wrote:
-> On Thu, Jun 02, 2016 at 09:36:40AM +0800, Leizhen (ThunderTown) wrote:
-> > On 2016/6/2 4:13, Rob Herring wrote:
-> > > I believe you still need this and not the one above. You only need it
-> > > within the loop if you return. Otherwise, the last node always need to
-> > > be put.
-> > 
-> > OK. Thanks.
-> > 
-> > Addition with Matthias's suggestion, I will move "return" into this patch,
-> > so that this of_node_put(np) can be safely removed.
-> 
-> Do you want to include Kefeng's [1] patches in your series too? We don't
-> need two sets of related NUMA cleanups :)
+On Thu, Jun 02, 2016 at 10:28:09AM +0800, Zhen Lei wrote:
+> Use the same tactic to cpu and numa-distance nodes.
 
-Actually, I see you've already respun the series, do don't worry about
-doing another version just for this.
+Sorry, I don't understand... :/
 
 Will
+
+> 
+> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+> ---
+>  arch/arm64/mm/numa.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+> index c7fe3ec..2601660 100644
+> --- a/arch/arm64/mm/numa.c
+> +++ b/arch/arm64/mm/numa.c
+> @@ -141,6 +141,11 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
+>  {
+>  	int ret;
+> 
+> +	if (nid >= MAX_NUMNODES) {
+> +		pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
+> +		return -EINVAL;
+> +	}
+> +
+>  	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
+>  	if (ret < 0) {
+>  		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
+> --
+> 2.5.0
+> 
+> 
