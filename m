@@ -1,32 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 03 Jun 2016 09:40:40 +0200
-Subject: [PATCH v2 0/9] raspberry pi 3 patch series, part 1: essentials
-In-Reply-To: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
-Message-ID: <4902178.94WeAnbxLk@wuerfel>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Fri, 3 Jun 2016 09:44:43 +0200
+Subject: [PATCH 2/5] i2c: Add STM32F4 I2C driver
+In-Reply-To: <CALszF6A9m1gwTg-HeGSukqbRUUz1cPv5R_-586uKzeVkkpQ93g@mail.gmail.com>
+References: <1462980974-22091-1-git-send-email-cedric.madianga@gmail.com>
+ <1462980974-22091-3-git-send-email-cedric.madianga@gmail.com>
+ <CALszF6A-jiCBtSO1RFDdgHKTKmsonRXFVs0x2zHha1LJ3UhwtQ@mail.gmail.com>
+ <CAOAejn0Fsizp9fK1mNn3BBeL2LeoVgt5_zF5656La4G2uDPH7g@mail.gmail.com>
+ <CAOAejn1NQDJpGrTwGtpvSfVOGg3UuCkj8wLJ7B5LnW1-Z2VrQA@mail.gmail.com>
+ <CALszF6ADLuZ0wK=L68FDzy5M5_eSPRTbNOjSoQw=dWDOjsPqCA@mail.gmail.com>
+ <CAOAejn0G3JzATKME5DaMV0GEBwQVWjkB1=ei-7LOQ98vzkUeVw@mail.gmail.com>
+ <CALszF6A9m1gwTg-HeGSukqbRUUz1cPv5R_-586uKzeVkkpQ93g@mail.gmail.com>
+Message-ID: <CAOAejn06djk8h3GLmrXdfX6Y7Rj1W38gih_mgCQ5aLNZAgAvFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 3, 2016 8:18:19 AM CEST Gerd Hoffmann wrote:
-> Raspberry pi 3 patches, next round.  I'll go split the longish patch
-> series into smaller ones.  I'll also go include the linux-arm-kernel
-> list this time (note I'm subscribed to linux-rpi-kernel only so please
-> take care to keep me in Cc).  This is part one with just the essential
-> stuff needed to get the rpi3 boot, without wifi support.
-> 
-> Changes:
->  * dropped ARCH_BCM kconfig option.
->  * drop include hack for rpi3 device tree in arm.
->  * drop DMA offset patch, pick up the version from Alex instead.
-> 
-> Patches are also available from:
->   git://git.kraxel.org/linux bcm2837-47-v2
-> 
-> Note that the git branch has the complete set of patches (including
-> device tree patches and rpi3 wifi).
+Hi Maxime,
 
-Looks good overall, thanks for sending the more manageable series.
+2016-06-02 18:02 GMT+02:00 Maxime Coquelin <mcoquelin.stm32@gmail.com>:
+> Hi Cedric,
+>
+> 2016-06-02 17:35 GMT+02:00 M'boumba Cedric Madianga <cedric.madianga@gmail.com>:
+>> Hi,
+>>
+>>>> +
+>>>> +/**
+>>>> + * stm32f4_i2c_xfer() - Transfer combined I2C message
+>>>> + * @i2c_adap: Adapter pointer to the controller
+>>>> + * @msgs: Pointer to data to be written.
+>>>> + * @num: Number of messages to be executed
+>>>> + */
+>>>> +static int stm32f4_i2c_xfer(struct i2c_adapter *i2c_adap, struct i2c_msg msgs[],
+>>>> +                           int num)
+>>>> +{
+>>>> +       struct stm32f4_i2c_dev *i2c_dev = i2c_get_adapdata(i2c_adap);
+>>>> +       int ret, i;
+>>>> +
+>>>> +       i2c_dev->busy = true;
+>>>> +
+>>>> +       ret = clk_prepare_enable(i2c_dev->clk);
+>>>> +       if (ret) {
+>>>> +               dev_err(i2c_dev->dev, "Failed to prepare_enable clock\n");
+>>>> +               return ret;
+>>>> +       }
+>>>> +
+>>>> +       stm32f4_i2c_hw_config(i2c_dev);
+>>> Maybe you could call this only at probe and resume time?
+>>> You would save some register accesses.
+>> Some clarification about this point.
+>> We need to call stm32f4_i2c_hw_config before each I2C transfer as at
+>> the end of I2C communication the peripheral is automatically disabled
+>> and configuration registers are reset.
+>
+> Ok, but I wonder how the IP knows this is the last i2c message to be sent?
+When the IP is enabled we could generated a STOP at any moment by
+setting a bit in CR1 register.
+At this moment, the IP knows that this is the last byte to be sent.
+After STOP generation, I notice that all registers are automatically
+set with their reset values
 
-See individual replies for a couple of comments on details.
+> Or maybe it gets re-initialized as soon as the clk is disabled?
+Not really because they are all re-initialized before disabling the clock
 
-	Arnd
+>
+> Thanks for the inputs,
+> Maxime
