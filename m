@@ -1,76 +1,56 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Fri,  3 Jun 2016 18:25:20 -0500
-Subject: [Patch v6 00/10] Qualcomm SCM Rework
-Message-ID: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
+Date: Fri,  3 Jun 2016 18:25:21 -0500
+Subject: [Patch v6 01/10] dt/bindings: firmware: Add Qualcomm SCM binding
+In-Reply-To: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
+References: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
+Message-ID: <1464996330-16952-2-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following set of patches does a bit of rework on the existing
-Qualcomm SCM firmware.  The first couple of patches deals with turning
-the current SCM into a platform driver.  The next couple are cleanups
-that make adding the 64 support a little easier.  I added in a patch to
-convert the scm-32 to use DMA streaming APIs.
+This patch adds the device tree support for the Qualcomm SCM firmware.
 
-I took Kumar's 64 bit support patch and modified it to use the arm_smccc
-calls.  This simplified things quite a bit.
-
-Lastly, there are a few DT patches to add the firmware node for a couple of the
-supported platforms.
-
-Changes from v5:
-  * Added SCM DT nodes for APQ8064 and MSM8974
-  * Make core clk optional in probe
-  * Update commit messages to describe some of the changes in more detail
-  * Put back some of the SCM64 helper functions
-  * Fix other miscellaneous review comments
-
-Changes from v4:
-  * Fix Documentation error
-  * Fix misc review comments
-
-Changes from v3:
-  * Added compatibles for the specific platforms requiring one clock.
-  * All other platforms will use the generic binding that requires 3 clocks.
-
-Changes from v2:
-  * Added use of streaming DMA APIs for scm-32.
-  * Changed DT binding to simplify compats.
-  * Removed Kconfig.platform change that selected QCOM_SCM for ARM64
-  * Fixed misc comments
-  * Changed init function to populate the device differently.
-  * Fixed missing of_node_put
-
-Changes from v1:
-  * Changed binding to reflect proper firmware node usage
-  * Added arch_initcall to populate the firmware device, if present
-  * Fixed various review comments
-  * Removed extraneous includes from SCM 64 file.
-
-Andy Gross (9):
-  dt/bindings: firmware: Add Qualcomm SCM binding
-  firmware: qcom: scm: Convert SCM to platform driver
-  firmware: qcom: scm: Use atomic SCM for cold boot
-  firmware: qcom: scm: Generalize shared error map
-  firmware: qcom: scm: Convert to streaming DMA APIS
-  dts: qcom: apq8084: Add SCM firmware node
-  arm64: dts: msm8916: Add SCM firmware node
-  dts: qcom: msm8974: Add SCM firmware node
-  dts: qcom: apq8064: Add SCM firmware node
-
-Kumar Gala (1):
-  firmware: qcom: scm: Add support for ARM64 SoCs
-
- .../devicetree/bindings/firmware/qcom,scm.txt      |  28 +++
- arch/arm/boot/dts/qcom-apq8064.dtsi                |   6 +
- arch/arm/boot/dts/qcom-apq8084.dtsi                |   8 +
- arch/arm/boot/dts/qcom-msm8974.dtsi                |   8 +
- arch/arm64/boot/dts/qcom/msm8916.dtsi              |   8 +
- drivers/firmware/qcom_scm-32.c                     | 225 +++++++++------------
- drivers/firmware/qcom_scm-64.c                     | 202 +++++++++++++++++-
- drivers/firmware/qcom_scm.c                        | 180 ++++++++++++++++-
- drivers/firmware/qcom_scm.h                        |  31 ++-
- 9 files changed, 543 insertions(+), 153 deletions(-)
+Signed-off-by: Andy Gross <andy.gross@linaro.org>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/firmware/qcom,scm.txt      | 28 ++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/firmware/qcom,scm.txt
 
+diff --git a/Documentation/devicetree/bindings/firmware/qcom,scm.txt b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+new file mode 100644
+index 0000000..3b4436e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/firmware/qcom,scm.txt
+@@ -0,0 +1,28 @@
++QCOM Secure Channel Manager (SCM)
++
++Qualcomm processors include an interface to communicate to the secure firmware.
++This interface allows for clients to request different types of actions.  These
++can include CPU power up/down, HDCP requests, loading of firmware, and other
++assorted actions.
++
++Required properties:
++- compatible: must contain one of the following:
++ * "qcom,scm-apq8064" for APQ8064 platforms
++ * "qcom,scm-msm8660" for MSM8660 platforms
++ * "qcom,scm-msm8690" for MSM8690 platforms
++ * "qcom,scm" for later processors (MSM8916, APQ8084, MSM8974, etc)
++- clocks: One to three clocks may be required based on compatible.
++ * Only core clock required for "qcom,scm-apq8064", "qcom,scm-msm8660", and "qcom,scm-msm8960"
++ * Core, iface, and bus clocks required for "qcom,scm"
++- clock-names: Must contain "core" for the core clock, "iface" for the interface
++  clock and "bus" for the bus clock per the requirements of the compatible.
++
++Example for MSM8916:
++
++	firmware {
++		scm {
++			compatible = "qcom,scm";
++			clocks = <&gcc GCC_CRYPTO_CLK> , <&gcc GCC_CRYPTO_AXI_CLK>, <&gcc GCC_CRYPTO_AHB_CLK>;
++			clock-names = "core", "bus", "iface";
++		};
++	};
 -- 
 1.9.1
