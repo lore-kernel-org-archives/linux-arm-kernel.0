@@ -1,174 +1,67 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 3 Jun 2016 14:44:52 +0200
-Subject: [PATCH v3 1/2] ARM: at91/dt: at91sam9260: Remove leading zeros
- in OHCI node.
-In-Reply-To: <1464934539-4737-1-git-send-email-raashidmuhammed@zilogic.com>
-References: <1464934539-4737-1-git-send-email-raashidmuhammed@zilogic.com>
-Message-ID: <20160603124452.GB4594@piout.net>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Fri, 3 Jun 2016 13:47:33 +0100
+Subject: [PATCH v4 18/18] ARM: DT: STi: stihxxx-b2120: Add DT nodes for
+ STi audio card
+In-Reply-To: <574D6473.7050902@st.com>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+ <1464192412-16386-20-git-send-email-peter.griffin@linaro.org>
+ <574D6473.7050902@st.com>
+Message-ID: <20160603124733.GB9912@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnaud,
 
-On 03/06/2016 at 11:45:38 +0530, Raashid Muhammed wrote :
-> From: Raashid Muhammed <raashidmuhammed@zilogic.com>
-> 
-> Remove leading zeros in OHCI node for at91sam9260 based boards.
-> 
-> Signed-off-by: Raashid Muhammed <raashidmuhammed@zilogic.com>
-> Reviewed-by: Vijay Kumar B. <vijaykumar@bravegnu.org>
-> ---
+Thanks for reviewing.
 
-Could you include a changelog here? It is difficult to understand why
-you are resending. Can I review it now?
+On Tue, 31 May 2016, Arnaud Pouliquen wrote:
 
->  arch/arm/boot/dts/aks-cdu.dts               | 2 +-
->  arch/arm/boot/dts/animeo_ip.dts             | 2 +-
->  arch/arm/boot/dts/at91-foxg20.dts           | 2 +-
->  arch/arm/boot/dts/at91-kizbox.dts           | 2 +-
->  arch/arm/boot/dts/at91-qil_a9260.dts        | 2 +-
->  arch/arm/boot/dts/at91sam9260.dtsi          | 2 +-
->  arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 2 +-
->  arch/arm/boot/dts/ethernut5.dts             | 2 +-
->  arch/arm/boot/dts/evk-pro3.dts              | 2 +-
->  arch/arm/boot/dts/usb_a9260_common.dtsi     | 2 +-
->  10 files changed, 10 insertions(+), 10 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/aks-cdu.dts b/arch/arm/boot/dts/aks-cdu.dts
-> index d9c50fb..5b1bf92 100644
-> --- a/arch/arm/boot/dts/aks-cdu.dts
-> +++ b/arch/arm/boot/dts/aks-cdu.dts
-> @@ -57,7 +57,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <2>;
->  			status = "okay";
->  		};
-> diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-> index 0962f2f..8bcbad3 100644
-> --- a/arch/arm/boot/dts/animeo_ip.dts
-> +++ b/arch/arm/boot/dts/animeo_ip.dts
-> @@ -114,7 +114,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <2>;
->  			atmel,vbus-gpio = <&pioB 15 GPIO_ACTIVE_LOW>;
->  			status = "okay";
-> diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
-> index 6bf873e..42a535d 100644
-> --- a/arch/arm/boot/dts/at91-foxg20.dts
-> +++ b/arch/arm/boot/dts/at91-foxg20.dts
-> @@ -128,7 +128,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <2>;
->  			status = "okay";
->  		};
-> diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-> index 229e989..0e3f34e 100644
-> --- a/arch/arm/boot/dts/at91-kizbox.dts
-> +++ b/arch/arm/boot/dts/at91-kizbox.dts
-> @@ -54,7 +54,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <1>;
->  			status = "okay";
->  		};
-> diff --git a/arch/arm/boot/dts/at91-qil_a9260.dts b/arch/arm/boot/dts/at91-qil_a9260.dts
-> index 4f2eebf..5309e19 100644
-> --- a/arch/arm/boot/dts/at91-qil_a9260.dts
-> +++ b/arch/arm/boot/dts/at91-qil_a9260.dts
-> @@ -111,7 +111,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <2>;
->  			status = "okay";
->  		};
-> diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-> index d4884dd..af5ba31 100644
-> --- a/arch/arm/boot/dts/at91sam9260.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9260.dtsi
-> @@ -1007,7 +1007,7 @@
->  			status = "disabled";
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
->  			reg = <0x00500000 0x100000>;
->  			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
-> diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-> index e9cc99b..1395b30 100644
-> --- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-> +++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-> @@ -170,7 +170,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <2>;
->  			status = "okay";
->  		};
-> diff --git a/arch/arm/boot/dts/ethernut5.dts b/arch/arm/boot/dts/ethernut5.dts
-> index 2430443..298ee2f 100644
-> --- a/arch/arm/boot/dts/ethernut5.dts
-> +++ b/arch/arm/boot/dts/ethernut5.dts
-> @@ -77,7 +77,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <2>;
->  			status = "okay";
->  		};
-> diff --git a/arch/arm/boot/dts/evk-pro3.dts b/arch/arm/boot/dts/evk-pro3.dts
-> index f72969e..312d3e8 100644
-> --- a/arch/arm/boot/dts/evk-pro3.dts
-> +++ b/arch/arm/boot/dts/evk-pro3.dts
-> @@ -46,7 +46,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <2>;
->  			status = "okay";
->  		};
-> diff --git a/arch/arm/boot/dts/usb_a9260_common.dtsi b/arch/arm/boot/dts/usb_a9260_common.dtsi
-> index 9beea89..12119b5 100644
-> --- a/arch/arm/boot/dts/usb_a9260_common.dtsi
-> +++ b/arch/arm/boot/dts/usb_a9260_common.dtsi
-> @@ -90,7 +90,7 @@
->  			};
->  		};
->  
-> -		usb0: ohci at 00500000 {
-> +		usb0: ohci at 500000 {
->  			num-ports = <2>;
->  			status = "okay";
->  		};
-> -- 
-> 2.1.4
 > 
+> On 05/25/2016 06:06 PM, Peter Griffin wrote:
+> > This patch enables the uniperif players 2 & 3 for b2120 boards
+> > and also adds the "simple-audio-card" device node to interconnect
+> > the SoC sound device and the codec.
+> > 
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/stihxxx-b2120.dtsi | 40 ++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 40 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> > index 722c63f..5297f21 100644
+> > --- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> > +++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+> > @@ -131,5 +131,45 @@
+> >  				dvb-card	= <STV0367_TDA18212_NIMA_1>;
+> >  			};
+> >  		};
+> > +
+> > +		sti_uni_player2: sti-uni-player at 2 {
+> > +			status = "okay";
+> > +		};
+> > +
+> > +		sti_uni_player3: sti-uni-player at 3 {
+> > +			status = "okay";
+> > +		};
+> enable sti-sasg-codec with spdif pinctrl
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Will fix in v5
+
+> > +
+> > +		sound {
+> > +			compatible = "simple-audio-card";
+> > +			simple-audio-card,name = "sti audio card";
+> > +			status = "okay";
+> > +
+> > +			simple-audio-card,dai-link at 0 {
+> > +				/* DAC */
+> > +				format = "i2s";
+> > +				dai-tdm-slot-width = <32>;
+> clean dai-tdm-slot-width, not used.
+
+Will fix in v5
+
+regards,
+
+Peter.
