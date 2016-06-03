@@ -1,245 +1,258 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri,  3 Jun 2016 15:02:49 +0100
-Subject: [PATCH v5 10/13] KVM: arm64: sync LPI configuration and pending tables
+Date: Fri,  3 Jun 2016 15:02:45 +0100
+Subject: [PATCH v5 06/13] KVM: arm64: introduce ITS emulation file with stub
+ functions
 In-Reply-To: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
 References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1464962572-3925-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <1464962572-3925-7-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LPI configuration and pending tables of the GICv3 LPIs are held
-in tables in (guest) memory. To achieve reasonable performance, we
-cache this data in our own data structures, so we need to sync those
-two views from time to time. This behaviour is well described in the
-GICv3 spec and is also exercised by hardware, so the sync points are
-well known.
-
-Provide functions that read the guest memory and store the
-information from the configuration and pending tables in the kernel.
+The ARM GICv3 ITS emulation code goes into a separate file, but
+needs to be connected to the GICv3 emulation, of which it is an
+option.
+Introduce the skeleton with function stubs to be filled later.
+Introduce the basic ITS data structure and initialize it, but don't
+return any success yet, as we are not yet ready for the show.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- include/kvm/vgic/vgic.h      |   2 +
- virt/kvm/arm/vgic/vgic-its.c | 145 +++++++++++++++++++++++++++++++++++++++++++
- virt/kvm/arm/vgic/vgic.h     |   6 ++
- 3 files changed, 153 insertions(+)
+ arch/arm64/kvm/Makefile            |  1 +
+ include/kvm/vgic/vgic.h            |  9 ++++
+ include/linux/irqchip/arm-gic-v3.h |  1 +
+ virt/kvm/arm/vgic/vgic-its.c       | 84 ++++++++++++++++++++++++++++++++++++++
+ virt/kvm/arm/vgic/vgic-mmio-v3.c   | 38 ++++++++++++++++-
+ virt/kvm/arm/vgic/vgic.h           | 17 ++++++++
+ 6 files changed, 149 insertions(+), 1 deletion(-)
+ create mode 100644 virt/kvm/arm/vgic/vgic-its.c
 
+diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+index a7a958c..2755d17 100644
+--- a/arch/arm64/kvm/Makefile
++++ b/arch/arm64/kvm/Makefile
+@@ -30,6 +30,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-kvm-device.o
++kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-its.o
+ else
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic.o
+ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v2.o
 diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-index 77f4503..dec63f0 100644
+index 896175b..6a7f5e4 100644
 --- a/include/kvm/vgic/vgic.h
 +++ b/include/kvm/vgic/vgic.h
-@@ -131,6 +131,8 @@ struct vgic_its {
- 	u32			cwriter;
- 	struct list_head	device_list;
- 	struct list_head	collection_list;
-+	/* memory used for buffering guest's memory */
-+	void			*buffer_page;
+@@ -116,6 +116,15 @@ struct vgic_io_device {
+ 	struct kvm_io_device dev;
  };
  
++struct vgic_its {
++	/* The base address of the ITS control register frame */
++	gpa_t			vgic_its_base;
++
++	bool			enabled;
++	struct vgic_io_device	iodev;
++	spinlock_t		lock;
++};
++
  struct vgic_dist {
+ 	bool			in_kernel;
+ 	bool			ready;
+diff --git a/include/linux/irqchip/arm-gic-v3.h b/include/linux/irqchip/arm-gic-v3.h
+index bfbd707..f210dd3 100644
+--- a/include/linux/irqchip/arm-gic-v3.h
++++ b/include/linux/irqchip/arm-gic-v3.h
+@@ -175,6 +175,7 @@
+ #define GITS_CWRITER			0x0088
+ #define GITS_CREADR			0x0090
+ #define GITS_BASER			0x0100
++#define GITS_IDREGS_BASE		0xffd0
+ #define GITS_PIDR2			GICR_PIDR2
+ 
+ #define GITS_TRANSLATER			0x10040
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 4f248ef..84e6f3b 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
+new file mode 100644
+index 0000000..61f3b8e
+--- /dev/null
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -93,6 +93,128 @@ static struct its_itte *find_itte_by_lpi(struct vgic_its *its, int lpi)
- 
- #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
- 
-+#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
-+#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
-+
-+/* stores the priority and enable bit for a given LPI */
-+static void update_lpi_config(struct kvm *kvm, struct its_itte *itte, u8 prop)
-+{
-+	spin_lock(&itte->irq.irq_lock);
-+	itte->irq.priority = LPI_PROP_PRIORITY(prop);
-+	itte->irq.enabled = LPI_PROP_ENABLE_BIT(prop);
-+
-+	vgic_queue_irq_unlock(kvm, &itte->irq);
-+}
-+
-+#define GIC_LPI_OFFSET 8192
-+
-+/* We scan the table in chunks the size of the smallest page size */
-+#define CHUNK_SIZE 4096U
-+
-+static u32 max_lpis_propbaser(u64 propbaser)
-+{
-+	int nr_idbits = (propbaser & 0x1f) + 1;
-+
-+	return 1U << min(nr_idbits, INTERRUPT_ID_BITS_ITS);
-+}
-+
+@@ -0,0 +1,84 @@
 +/*
-+ * Scan the whole LPI configuration table and put the LPI configuration
-+ * data in our own data structures. This relies on the LPI being
-+ * mapped before.
++ * GICv3 ITS emulation
++ *
++ * Copyright (C) 2015,2016 ARM Ltd.
++ * Author: Andre Przywara <andre.przywara@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+static bool its_update_lpis_configuration(struct kvm *kvm, struct vgic_its *its,
-+					  u64 prop_base_reg)
++
++#include <linux/cpu.h>
++#include <linux/kvm.h>
++#include <linux/kvm_host.h>
++#include <linux/interrupt.h>
++
++#include <linux/irqchip/arm-gic-v3.h>
++
++#include <asm/kvm_emulate.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_mmu.h>
++
++#include "vgic.h"
++#include "vgic-mmio.h"
++
++struct vgic_register_region its_registers[] = {
++	REGISTER_DESC_WITH_LENGTH(GITS_CTLR,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GITS_IIDR,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
++		VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GITS_TYPER,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
++		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GITS_CBASER,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
++		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GITS_CWRITER,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
++		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GITS_CREADR,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
++		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GITS_BASER,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 0x40,
++		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
++	REGISTER_DESC_WITH_LENGTH(GITS_IDREGS_BASE,
++		vgic_mmio_read_raz, vgic_mmio_write_wi, 0x30,
++		VGIC_ACCESS_32bit),
++};
++
++int vits_init(struct kvm *kvm, struct vgic_its *its)
 +{
-+	u8 *prop = its->buffer_page;
-+	u32 tsize;
-+	gpa_t propbase;
-+	int lpi = GIC_LPI_OFFSET;
-+	struct its_itte *itte;
-+	struct its_device *device;
++	struct vgic_io_device *iodev = &its->iodev;
 +	int ret;
 +
-+	propbase = BASER_BASE_ADDRESS(prop_base_reg);
-+	tsize = max_lpis_propbaser(prop_base_reg);
++	iodev->regions = its_registers;
++	iodev->nr_regions = ARRAY_SIZE(its_registers);
++	kvm_iodevice_init(&iodev->dev, &kvm_io_gic_ops);
 +
-+	while (tsize > 0) {
-+		int chunksize = min(tsize, CHUNK_SIZE);
++	iodev->base_addr = its->vgic_its_base;
++	iodev->redist_vcpu = NULL;
++	mutex_lock(&kvm->slots_lock);
++	ret = kvm_io_bus_register_dev(kvm, KVM_MMIO_BUS, iodev->base_addr,
++				      SZ_64K, &iodev->dev);
++	mutex_unlock(&kvm->slots_lock);
 +
-+		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
-+		if (ret)
-+			return false;
-+
-+		spin_lock(&its->lock);
-+		/*
-+		 * Updating the status for all allocated LPIs. We catch
-+		 * those LPIs that get disabled. We really don't care
-+		 * about unmapped LPIs, as they need to be updated
-+		 * later manually anyway once they get mapped.
-+		 */
-+		for_each_lpi(device, itte, its) {
-+			if (itte->lpi < lpi || itte->lpi >= lpi + chunksize)
-+				continue;
-+
-+			update_lpi_config(kvm, itte, prop[itte->lpi - lpi]);
-+		}
-+		spin_unlock(&its->lock);
-+		tsize -= chunksize;
-+		lpi += chunksize;
-+		propbase += chunksize;
-+	}
-+
-+	return true;
++	return ret;
 +}
 +
-+/*
-+ * Scan the whole LPI pending table and sync the pending bit in there
-+ * with our own data structures. This relies on the LPI being
-+ * mapped before.
-+ */
-+static bool its_sync_lpi_pending_table(struct kvm_vcpu *vcpu,
-+				       struct vgic_its *its, u64 base_addr_reg)
++void vits_destroy(struct kvm *kvm, struct vgic_its *its)
 +{
-+	unsigned long *pendmask = its->buffer_page;
-+	u32 nr_lpis = 1U << INTERRUPT_ID_BITS_ITS;
-+	gpa_t pendbase;
-+	int lpi = 0;
-+	struct its_itte *itte;
-+	struct its_device *device;
-+	int ret;
-+	int lpi_bit, nr_bits;
 +
-+	pendbase = BASER_BASE_ADDRESS(base_addr_reg);
-+
-+	while (nr_lpis > 0) {
-+		nr_bits = min(nr_lpis, CHUNK_SIZE * BITS_PER_BYTE);
-+
-+		ret = kvm_read_guest(vcpu->kvm, pendbase, pendmask,
-+				     nr_bits / BITS_PER_BYTE);
-+		if (ret)
-+			return false;
-+
-+		spin_lock(&its->lock);
-+		for_each_lpi(device, itte, its) {
-+			lpi_bit = itte->lpi - lpi;
-+			if (lpi_bit < 0 || lpi_bit >= nr_bits)
-+				continue;
-+
-+			if (!test_bit(lpi_bit, pendmask))
-+				continue;
-+
-+			spin_lock(&itte->irq.irq_lock);
-+			itte->irq.pending = true;
-+			vgic_queue_irq_unlock(vcpu->kvm, &itte->irq);
-+		}
-+		spin_unlock(&its->lock);
-+		nr_lpis -= nr_bits;
-+		lpi += nr_bits;
-+		pendbase += nr_bits / BITS_PER_BYTE;
-+	}
-+
-+	return true;
++	its->enabled = false;
 +}
-+
- #define ITS_FRAME(addr) ((addr) & ~(SZ_64K - 1))
+diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+index 6293b36..2eb9f0e 100644
+--- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
++++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+@@ -39,6 +39,16 @@ static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+ 	return reg | ((u64)val << (offset * 8));
+ }
  
- static unsigned long vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
-@@ -355,6 +477,21 @@ struct vgic_register_region its_registers[] = {
- 		VGIC_ACCESS_32bit),
- };
- 
-+/* This is called on setting the LPI enable bit in the redistributor. */
-+void vgic_enable_lpis(struct kvm_vcpu *vcpu)
++bool vgic_has_its(struct kvm *kvm)
 +{
-+	u64 prop_base_reg, pend_base_reg;
-+	struct vgic_its *its;
++	struct vgic_dist *dist = &kvm->arch.vgic;
 +
-+	pend_base_reg = vcpu->arch.vgic_cpu.pendbaser;
-+	prop_base_reg = vcpu->kvm->arch.vgic.propbaser;
++	if (dist->vgic_model != KVM_DEV_TYPE_ARM_VGIC_V3)
++		return false;
 +
-+	list_for_each_entry(its, &vcpu->kvm->arch.vits_list, its_list) {
-+		its_update_lpis_configuration(vcpu->kvm, its, prop_base_reg);
-+		its_sync_lpi_pending_table(vcpu, its, pend_base_reg);
-+	}
++	return false;
 +}
 +
- int vits_init(struct kvm *kvm, struct vgic_its *its)
+ static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+ 					    gpa_t addr, unsigned int len)
  {
- 	struct vgic_io_device *iodev = &its->iodev;
-@@ -381,6 +518,8 @@ void vits_destroy(struct kvm *kvm, struct vgic_its *its)
- 	struct list_head *dev_cur, *dev_temp;
- 	struct list_head *cur, *temp;
+@@ -124,6 +134,32 @@ static void vgic_mmio_write_irouter(struct kvm_vcpu *vcpu,
+ 	spin_unlock(&irq->irq_lock);
+ }
  
-+	kfree(its->buffer_page);
++static unsigned long vgic_mmio_read_v3r_ctlr(struct kvm_vcpu *vcpu,
++					     gpa_t addr, unsigned int len)
++{
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
 +
- 	/*
- 	 * We may end up here without the lists ever having been initialized.
- 	 * Check this and bail out early to avoid dereferencing a NULL pointer.
-@@ -419,6 +558,12 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
- 	if (!its)
- 		return -ENOMEM;
- 
-+	its->buffer_page = kmalloc(CHUNK_SIZE, GFP_KERNEL);
-+	if (!its->buffer_page) {
-+		kfree(its);
-+		return -ENOMEM;
++	return vgic_cpu->lpis_enabled ? GICR_CTLR_ENABLE_LPIS : 0;
++}
++
++
++static void vgic_mmio_write_v3r_ctlr(struct kvm_vcpu *vcpu,
++				     gpa_t addr, unsigned int len,
++				     unsigned long val)
++{
++	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
++	bool was_enabled = vgic_cpu->lpis_enabled;
++
++	if (!vgic_has_its(vcpu->kvm))
++		return;
++
++	vgic_cpu->lpis_enabled = val & GICR_CTLR_ENABLE_LPIS;
++
++	if (!was_enabled && vgic_cpu->lpis_enabled) {
++		/* Eventually do something */
 +	}
++}
 +
- 	spin_lock_init(&its->lock);
+ static unsigned long vgic_mmio_read_v3r_typer(struct kvm_vcpu *vcpu,
+ 					      gpa_t addr, unsigned int len)
+ {
+@@ -272,7 +308,7 @@ static const struct vgic_register_region vgic_v3_dist_registers[] = {
  
- 	its->vgic_its_base = VGIC_ADDR_UNDEF;
+ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+ 	REGISTER_DESC_WITH_LENGTH(GICR_CTLR,
+-		vgic_mmio_read_raz, vgic_mmio_write_wi, 4,
++		vgic_mmio_read_v3r_ctlr, vgic_mmio_write_v3r_ctlr, 4,
+ 		VGIC_ACCESS_32bit),
+ 	REGISTER_DESC_WITH_LENGTH(GICR_IIDR,
+ 		vgic_mmio_read_v3r_iidr, vgic_mmio_write_wi, 4,
 diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index 6fecd70..46c239f 100644
+index c752152..0baad03 100644
 --- a/virt/kvm/arm/vgic/vgic.h
 +++ b/virt/kvm/arm/vgic/vgic.h
-@@ -25,6 +25,7 @@
- #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
- 
- #define INTERRUPT_ID_BITS_SPIS	10
-+#define INTERRUPT_ID_BITS_ITS	16
- #define VGIC_PRI_BITS		5
- 
- #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
-@@ -79,6 +80,7 @@ int vits_init(struct kvm *kvm, struct vgic_its *its);
- void vits_destroy(struct kvm *kvm, struct vgic_its *its);
- int kvm_vgic_register_its_device(void);
- struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid);
-+void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+@@ -71,6 +71,9 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu);
+ int vgic_v3_probe(const struct gic_kvm_info *info);
+ int vgic_v3_map_resources(struct kvm *kvm);
+ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t dist_base_address);
++bool vgic_has_its(struct kvm *kvm);
++int vits_init(struct kvm *kvm, struct vgic_its *its);
++void vits_destroy(struct kvm *kvm, struct vgic_its *its);
  #else
  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
  {
-@@ -154,6 +156,10 @@ static inline struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
+@@ -122,6 +125,20 @@ static inline int vgic_register_redist_iodevs(struct kvm *kvm,
  {
- 	return NULL;
+ 	return -ENODEV;
  }
 +
-+static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
++static bool vgic_has_its(struct kvm *kvm)
++{
++	return false;
++}
++
++static int vits_init(struct kvm *kvm, struct vgic_its *its)
++{
++	return -ENODEV;
++}
++
++static inline void vits_destroy(struct kvm *kvm, struct vgic_its *its)
 +{
 +}
  #endif
