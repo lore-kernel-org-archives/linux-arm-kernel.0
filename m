@@ -1,435 +1,268 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri,  3 Jun 2016 18:40:29 +0200
-Subject: [PATCH v2] ARM: dts: imx6: add support for Auvidea H100 board
-Message-ID: <1464972029-12949-1-git-send-email-l.stach@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 3 Jun 2016 17:54:08 +0100
+Subject: [PATCH v4 06/12] KVM: arm64: implement basic ITS register handlers
+In-Reply-To: <3cd7a371-8fc6-b4e7-f034-2a0d4d4719f1@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <1458958450-19662-7-git-send-email-andre.przywara@arm.com>
+ <5706704C.5060307@arm.com> <671b7144-7929-df7b-14f4-20dc6a32abdb@arm.com>
+ <5746BD87.9060206@arm.com> <3cd7a371-8fc6-b4e7-f034-2a0d4d4719f1@arm.com>
+Message-ID: <5751B630.3040207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Auvidea H100 is a baseboard for the SolidRun MicroSOM.
-Its primary feature is a Toshiba TC358743 HDMI to CSI decoder,
-allowing the board to work as HDMI passthrough and framegrabber.
+On 03/06/16 16:42, Andre Przywara wrote:
+> Hi,
+> 
+> I addressed some comments of yours in v5, just some rationale for the
+> others (sorry for the late reply on these!):
+> 
+> ...
+> 
+>>>>> +static int vgic_mmio_read_its_typer(struct kvm_vcpu *vcpu,
+>>>>> +				    struct kvm_io_device *this,
+>>>>> +				    gpa_t addr, int len, void *val)
+>>>>> +{
+>>>>> +	u64 reg = GITS_TYPER_PLPIS;
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * We use linear CPU numbers for redistributor addressing,
+>>>>> +	 * so GITS_TYPER.PTA is 0.
+>>>>> +	 * To avoid memory waste on the guest side, we keep the
+>>>>> +	 * number of IDBits and DevBits low for the time being.
+>>>>> +	 * This could later be made configurable by userland.
+>>>>> +	 * Since we have all collections in linked list, we claim
+>>>>> +	 * that we can hold all of the collection tables in our
+>>>>> +	 * own memory and that the ITT entry size is 1 byte (the
+>>>>> +	 * smallest possible one).
+>>>>
+>>>> All of this is going to bite us when we want to implement migration,
+>>>> specially the HW collection bit.
+>>>
+>>> How so? Clearly we keep the number of VCPUs constant, so everything
+>>> guest visible stays the same even upon migrating to a much different
+>>> host? Or are we talking about different things here?
+>>
+>> Let me rephrase this: How are you going to address HW collections from
+>> userspace in order to dump them? Short of having memory tables, you cannot.
+> 
+> I was just hoping for addressing first things first. Having the
+> collection table entirely in the kernel makes things easier for now.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
-v2: Correct regulator GPIO flags.
----
- arch/arm/boot/dts/Makefile       |   1 +
- arch/arm/boot/dts/imx6q-h100.dts | 395 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 396 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-h100.dts
+I can see that. Yet this is not a sustainable approach.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 06b6c2d695bf..4f936106f696 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -356,6 +356,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-gw54xx.dtb \
- 	imx6q-gw551x.dtb \
- 	imx6q-gw552x.dtb \
-+	imx6q-h100.dtb \
- 	imx6q-hummingboard.dtb \
- 	imx6q-icore-rqs.dtb \
- 	imx6q-marsboard.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
-new file mode 100644
-index 000000000000..3fa044df81b5
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-h100.dts
-@@ -0,0 +1,395 @@
-+/*
-+ * Copyright (C) 2015 Lucas Stach <kernel@pengutronix.de>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+ 
-+/dts-v1/;
-+
-+#include "imx6q.dtsi"
-+#include "imx6qdl-microsom.dtsi"
-+#include "imx6qdl-microsom-ar8035.dtsi"
-+
-+/ {
-+	model = "Auvidea H100";
-+	compatible = "auvidea,h100", "fsl,imx6q";
-+
-+	aliases {
-+		rtc0 = &rtc;
-+		rtc1 = &snvs_rtc;
-+	};
-+
-+	chosen {
-+		stdout-path = &uart2;
-+	};
-+
-+	hdmi_osc: hdmi-osc {
-+		compatible = "fixed-clock";
-+		clock-output-names = "hdmi-osc";
-+		clock-frequency = <27000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_h100_leds>;
-+
-+		led0: power {
-+			label = "power";
-+			gpios = <&gpio3 0 GPIO_ACTIVE_LOW>;
-+			default-state = "on";
-+		};
-+
-+		led1: stream {
-+			label = "stream";
-+			gpios = <&gpio2 29 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+
-+		led2: rec {
-+			label = "rec";
-+			gpios = <&gpio2 28 GPIO_ACTIVE_LOW>;
-+			default-state = "off";
-+		};
-+	};
-+
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+	};
-+
-+	reg_hdmi: regulator-hdmi {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_h100_reg_hdmi>;
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio2 20 GPIO_ACTIVE_HIGH>;
-+		regulator-name = "V_HDMI";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
-+	reg_nvcc_sd2: regulator-nvcc-sd2 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_h100_reg_nvcc_sd2>;
-+		compatible = "regulator-gpio";
-+		regulator-name = "NVCC_SD2";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-type = "voltage";
-+		regulator-boot-on;
-+		regulator-always-on;
-+		gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>;
-+		states = <1800000 0x1
-+			  3300000 0x0>;
-+	};
-+
-+	reg_usbh1_vbus: regulator-usb-h1-vbus {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_h100_usbh1_vbus>;
-+		regulator-name = "USB_H1_VBUS";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+
-+	reg_usbotg_vbus: regulator-usb-otg-vbus {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_h100_usbotg_vbus>;
-+		regulator-name = "USB_OTG_VBUS";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+
-+	sound-sgtl5000 {
-+		compatible = "fsl,imx-audio-sgtl5000";
-+		model = "H100 on-board codec";
-+		audio-codec = <&sgtl5000>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+		mux-ext-port = <5>;
-+		mux-int-port = <1>;
-+		ssi-controller = <&ssi1>;
-+	};
-+};
-+
-+&audmux {
-+	status = "okay";
-+};
-+
-+&hdmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_h100_hdmi>;
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_h100_i2c1>;
-+	status = "okay";
-+	
-+	eeprom: 24c02 at 51 {
-+		compatible = "microchip,24c02", "at24";
-+		reg = <0x51>;
-+	};
-+
-+	rtc: pcf8523 at 68 {
-+		compatible = "nxp,pcf8523";
-+		reg = <0x68>;
-+	};
-+
-+	sgtl5000: sgtl5000 at 0a {
-+		compatible = "fsl,sgtl5000";
-+		reg = <0x0a>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_h100_sgtl5000>;
-+		clocks = <&clks IMX6QDL_CLK_CKO>;
-+		VDDA-supply = <&reg_3p3v>;
-+		VDDIO-supply = <&reg_3p3v>;
-+	};
-+
-+	tc358743: tc358743 at 0f {
-+		compatible = "toshiba,tc358743";
-+		reg = <0x0f>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_h100_tc358743>;
-+		clocks = <&hdmi_osc>;
-+		clock-names = "refclk";
-+		reset-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
-+		/* IRQ has a wrong pull resistor which renders it useless  */
-+
-+		port at 0 {
-+			tc358743_out: endpoint {
-+				remote-endpoint = <&mipi_csi2_in>;
-+				data-lanes = <1 2 3 4>;
-+				clock-lanes = <0>;
-+				clock-noncontinuous;
-+				link-frequencies = /bits/ 64 <297000000>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_h100_i2c2>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	h100 {
-+		pinctrl_h100_hdmi: h100-hdmi {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE	0x1f8b0
-+			>;
-+		};
-+
-+		pinctrl_h100_i2c1: h100-i2c1 {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
-+				MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
-+			>;
-+		};
-+
-+		pinctrl_h100_i2c2: h100-i2c2 {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_COL3__I2C2_SCL		0x4001b8b1
-+				MX6QDL_PAD_KEY_ROW3__I2C2_SDA		0x4001b8b1
-+			>;
-+		};
-+
-+		pinctrl_h100_leds: pinctrl-h100-leds {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_DA0__GPIO3_IO00		0x1b0b0
-+				MX6QDL_PAD_EIM_EB1__GPIO2_IO29		0x1b0b0
-+				MX6QDL_PAD_EIM_EB0__GPIO2_IO28		0x1b0b0
-+			>;
-+		};
-+
-+		pinctrl_h100_reg_hdmi: h100-reg-hdmi {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_A18__GPIO2_IO20		0x1b0b0
-+			>;
-+		};
-+
-+		pinctrl_h100_reg_nvcc_sd2: h100-reg-nvcc-sd2 {
-+			fsl,pins = <
-+				MX6QDL_PAD_KEY_ROW1__GPIO4_IO09		0x1b0b0
-+			>;
-+		};
-+
-+		pinctrl_h100_sgtl5000: h100-sgtl5000 {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT19__AUD5_RXD	0x130b0
-+				MX6QDL_PAD_KEY_COL0__AUD5_TXC		0x130b0
-+				MX6QDL_PAD_KEY_ROW0__AUD5_TXD		0x110b0
-+				MX6QDL_PAD_KEY_COL1__AUD5_TXFS		0x130b0
-+				MX6QDL_PAD_GPIO_5__CCM_CLKO1		0x130b0
-+			>;
-+		};
-+
-+		pinctrl_h100_tc358743: h100-tc358743 {
-+			fsl,pins = <
-+				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15	0x1b0b0
-+			>;
-+		};
-+
-+		pinctrl_h100_uart2: h100-uart2 {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
-+				MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_h100_usbh1_vbus: hummingboard-usbh1-vbus {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_0__GPIO1_IO00		0x1b0b0
-+			>;
-+		};
-+
-+		pinctrl_h100_usbotg_id: hummingboard-usbotg-id {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x13059
-+			>;
-+		};
-+
-+		pinctrl_h100_usbotg_vbus: hummingboard-usbotg-vbus {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x1b0b0
-+			>;
-+		};
-+
-+		pinctrl_h100_usdhc2: h100-usdhc2 {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1f071
-+				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x17059
-+				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x10059
-+				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x17059
-+				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x17059
-+				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x17059
-+				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x13059
-+			>;
-+		};
-+
-+		pinctrl_h100_usdhc2_100mhz: h100-usdhc2-100mhz {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1f071
-+				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x170b9
-+				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x100b9
-+				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x170b9
-+				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x170b9
-+				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x170b9
-+				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x170b9
-+			>;
-+		};
-+
-+		pinctrl_h100_usdhc2_200mhz: h100-usdhc2-200mhz {
-+			fsl,pins = <
-+				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1f071
-+				MX6QDL_PAD_SD2_CMD__SD2_CMD		0x170f9
-+				MX6QDL_PAD_SD2_CLK__SD2_CLK		0x100f9
-+				MX6QDL_PAD_SD2_DAT0__SD2_DATA0		0x170f9
-+				MX6QDL_PAD_SD2_DAT1__SD2_DATA1		0x170f9
-+				MX6QDL_PAD_SD2_DAT2__SD2_DATA2		0x170f9
-+				MX6QDL_PAD_SD2_DAT3__SD2_DATA3		0x170f9
-+			>;
-+		};
-+	};
-+};
-+
-+&mipi_csi {
-+	status = "okay";
-+
-+	port at 0 {
-+		mipi_csi2_in: endpoint {
-+			remote-endpoint = <&tc358743_out>;
-+			data-lanes = <1 2 3 4>;
-+			clock-lanes = <0>;
-+			clock-noncontinuous;
-+			link-frequencies = /bits/ 64 <297000000>;
-+		};
-+	};
-+};
-+
-+&ssi1 {
-+	status = "okay";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_h100_uart2>;
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	disable-over-current;
-+	vbus-supply = <&reg_usbh1_vbus>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	disable-over-current;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_h100_usbotg_id>;
-+	vbus-supply = <&reg_usbotg_vbus>;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_h100_usdhc2>;
-+	pinctrl-1 = <&pinctrl_h100_usdhc2_100mhz>;
-+	pinctrl-2 = <&pinctrl_h100_usdhc2_200mhz>;
-+	vmmc-supply = <&reg_3p3v>;
-+	vqmmc-supply = <&reg_nvcc_sd2>;
-+	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
+> How is that save/restore story covered by a hardware ITS? Is it just
+> ignored since it's not needed/used there?
+
+The save restore story is covered by having tables in memory, and it is
+not possible to save/restore a HW collection, full stop. There is no
+register to dump it.
+
+> That being said I would be happy to change this when we get migration
+> support for the ITS register state and we have agreed on an API for
+> userland ITS save/restore.
+> 
+>>>>
+>>>>> +	 */
+>>>>> +	reg |= 0xff << GITS_TYPER_HWCOLLCNT_SHIFT;
+>>>>> +	reg |= 0x0f << GITS_TYPER_DEVBITS_SHIFT;
+>>>>> +	reg |= 0x0f << GITS_TYPER_IDBITS_SHIFT;
+>>>>> +
+>>>>> +	write_mask64(reg, addr & 7, len, val);
+>>>>> +
+>>>>> +	return 0;
+>>>>> +}
+> 
+> .....
+> 
+>>>>> +static int vgic_mmio_read_its_idregs(struct kvm_vcpu *vcpu,
+>>>>> +				     struct kvm_io_device *this,
+>>>>> +				     gpa_t addr, int len, void *val)
+>>>>> +{
+>>>>> +	struct vgic_io_device *iodev = container_of(this,
+>>>>> +						    struct vgic_io_device, dev);
+>>>>> +	u32 reg = 0;
+>>>>> +	int idreg = (addr & ~3) - iodev->base_addr + GITS_IDREGS_BASE;
+>>>>> +
+>>>>> +	switch (idreg) {
+>>>>> +	case GITS_PIDR2:
+>>>>> +		reg = GIC_PIDR2_ARCH_GICv3;
+>>>>
+>>>> Are we leaving the lowest 4 bits to zero?
+>>>
+>>> I couldn't stuff "42" in 4 bits, so: yes ;-)
+>>
+>> The 4 bottom bits are "Implementation Defined", so you could fit
+>> something in it if you wanted.
+>>
+>>>
+>>>>> +		break;
+>>>>> +	case GITS_PIDR4:
+>>>>> +		/* This is a 64K software visible page */
+>>>>> +		reg = 0x40;
+>>>>
+>>>> Same question.
+>>>>
+>>>> Also, how about all the others PIDR registers?
+>>>
+>>> I guess I was halfway undecided between going with the pure
+>>> architectural requirements (which only mandate bits 7:4 in PIDR2) and
+>>> complying with the recommendation later in the spec.
+>>> So I will just fill PIDR0, PIDR2 and the rest of PIDR2 as well.
+>>>
+>>>>> +		break;
+>>>>> +	/* Those are the ID registers for (any) GIC. */
+>>>>> +	case GITS_CIDR0:
+>>>>> +		reg = 0x0d;
+>>>>> +		break;
+>>>>> +	case GITS_CIDR1:
+>>>>> +		reg = 0xf0;
+>>>>> +		break;
+>>>>> +	case GITS_CIDR2:
+>>>>> +		reg = 0x05;
+>>>>> +		break;
+>>>>> +	case GITS_CIDR3:
+>>>>> +		reg = 0xb1;
+>>>>> +		break;
+>>>>> +	}
+>>>>
+>>>> Given that these values are directly taken from the architecture, and
+>>>> seem common to the whole GICv3 architecture when implemented by ARM, we
+>>>> could have a common handler for the whole GICv3 implementatuin. Not a
+>>>> bit deal though.
+> 
+> I tried it, but it turned out to be more involved than anticipated, so I
+> shelved it for now. I can make a patch on top later.
+> 
+>>>
+>>> Agreed.
+>>>
+>>>>> +
+>>>>> +	write_mask32(reg, addr & 3, len, val);
+>>>>> +
+>>>>> +	return 0;
+>>>>> +}
+> 
+> ....
+> 
+>>>>> +/*
+>>>>> + * By writing to CWRITER the guest announces new commands to be processed.
+>>>>> + * Since we cannot read from guest memory inside the ITS spinlock, we
+>>>>> + * iterate over the command buffer (with the lock dropped) until the read
+>>>>> + * pointer matches the write pointer. Other VCPUs writing this register in the
+>>>>> + * meantime will just update the write pointer, leaving the command
+>>>>> + * processing to the first instance of the function.
+>>>>> + */
+>>>>> +static int vgic_mmio_write_its_cwriter(struct kvm_vcpu *vcpu,
+>>>>> +				       struct kvm_io_device *this,
+>>>>> +				       gpa_t addr, int len, const void *val)
+>>>>> +{
+>>>>> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+>>>>> +	struct vgic_its *its = &dist->its;
+>>>>> +	gpa_t cbaser = its_cmd_buffer_base(vcpu->kvm);
+>>>>> +	u64 cmd_buf[4];
+>>>>> +	u32 reg;
+>>>>> +	bool finished;
+>>>>> +
+>>>>> +	reg = mask64(its->cwriter & 0xfffe0, addr & 7, len, val);
+>>>>> +	reg &= 0xfffe0;
+>>>>> +	if (reg > its_cmd_buffer_size(vcpu->kvm))
+>>>>> +		return 0;
+>>>>> +
+>>>>> +	spin_lock(&its->lock);
+>>>>> +
+>>>>> +	/*
+>>>>> +	 * If there is still another VCPU handling commands, let this
+>>>>> +	 * one pick up the new CWRITER and process "our" new commands as well.
+>>>>> +	 */
+>>>>
+>>>> How do you detect that condition? All I see is a massive race here, with
+>>>> two threads processing the queue in parallel, possibly corrupting each
+>>>> other's data.
+>>>>
+>>>> Please explain why you think this is safe.
+>>>
+>>> OK, here you go: Actually we are handling the command queue
+>>> synchronously: The first writer to CWRITER will end up here and will
+>>> iterate over all commands below. From the guests point of view it will
+>>> take some time to do the CWRITER MMIO write, but upon the writel
+>>> returning the queue is actually already empty again.
+>>> That means that any _sane_ guest will _never_ trigger the case where two
+>>> threads/VCPUs are handling the queue, because a concurrent write to
+>>> CWRITER without a lock in the guest would be broken by design.
+>>
+>> That feels very fragile, and you're relying on a well behaved guest.
+> 
+> No, I don't rely on it, as mentioned in the next sentence.
+> I just don't optimize for that case, because in reality it should never
+> happen - apart from a malicious guest. Let me think about the security
+> implications, though (whether a misbehaved guest could hog a physical CPU).
+> 
+>>> However I am not sure we can rely on this, so I added this precaution
+>>> scheme:
+> 
+>>> The first writer takes our ITS (emulation) lock and examines cwriter and
+>>> creadr to see if they are equal. If they are, then the queue is
+>>> currently empty, which means we are the first one and need to take care
+>>> of the commands. We update our copy of cwriter (now marking the queue as
+>>> non-empty) and drop the lock. As we kept the queue-was-empty status in a
+>>> local variable, we now can start iterating through the queue. We only
+>>> take the lock briefly when really needed in this process (for instance
+>>> when one command has been processed and creadr is incremented).
+>>>
+>>> If now a second VCPU writes CWRITER, we also take the lock and compare
+>>> creadr and cwriter. Now they are different, because the first thread is
+>>> still busy with handling the commands and hasn't finished yet.
+>>> So we set our local "finished" to true. Also we update cwriter to the
+>>> new value, then drop the lock. The while loop below will not be entered
+>>> in this thread and we return to the guest.
+>>> Now the first thread has handled another command, takes the lock to
+>>> increase creadr and compares it with cwriter. Without the second writer
+>>> it may have been finished already, but now cwriter has grown, so it will
+>>> just carry on with handling the commands.
+>>>
+>>> A bit like someone washing the dishes while another person adds some
+>>> more dirty plates to the pile ;-)
+>>
+>> I'm sorry, this feels incredibly complicated, and will make actual
+>> debugging/tracing a nightmare. It also penalize the first vcpu that gets
+>> to submitting a command, leading to scheduling imbalances.
+> 
+> Well, as mentioned that would never happen apart from that
+> malicious/misbehaved guest case - so I don't care so much about
+> scheduling imbalances _for the guest_. As said above I have to think
+> about how this affects the host cores, though.
+> 
+> And frankly I don't see how this is overly complicated (in the context
+> of SMP locking schemes in general) - apart from me explaining it badly
+> above. It's just a bit tricky, but guarantees a strict order of command
+> processing.
+> On another approach we could just qualify a concurrent access as illegal
+> and ignore it - on real hardware you would have no guarantee for this to
+> work either - issuing two CWRITER MMIO writes at the same time would
+> just go bonkers.
+
+There is nothing in the spec that indicates that what you're proposing
+is legal. And it is likely that the HW would simply serialize the two
+write cycles (unless you have a multi-ported register). Bear in mind
+that the ITS has been designed for multiprocessor systems (funnily enough).
+
+> 
+>> Why can't you simply turn the ITS lock into a mutex and keep it held,
+>> processing each batch in the context of the vcpu that is writing to
+>> GITC_CWRITER?
+> 
+> Frankly I spent quite some time to make this locking more fine grained
+> after some comments on earlier revisions - and I think it's better now,
+> since we don't hog all of the ITS data structures during the command
+> processing. Pessimistically one core could issue a big number of
+> commands, which would block the whole ITS.
+> Instead MSI injections happening in parallel now have a good chance of
+> iterating our lists and tables in between. This should improve scalability.
+
+I don't see how having a single "its->lock" makes it "fine-grained".
+You're releasing the lock early in order not to cause other issues by
+taking this spinlock twice. I call that papering over the issue.
+
+	M.
 -- 
-2.8.1
+Jazz is not dead. It just smells funny...
