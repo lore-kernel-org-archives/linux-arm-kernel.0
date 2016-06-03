@@ -1,29 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 3 Jun 2016 12:23:45 -0700
-Subject: [PATCH v2] ARM: uniphier: drop code for old DT binding
-In-Reply-To: <1464781066-25975-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1464781066-25975-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20160603192345.GG3761@localhost>
+Date: Fri, 3 Jun 2016 12:26:28 -0700
+Subject: [linux-sunxi] Re: [PATCH 1/1] devicetree: sunxi: Add OLinuXino
+ Lime2 eMMC to the Makefile
+In-Reply-To: <20160516144552.GH27618@lukather>
+References: <1463169436-6170-1-git-send-email-oliver@schinagl.nl>
+ <20160516144552.GH27618@lukather>
+Message-ID: <20160603192628.GH3761@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 08:37:46PM +0900, Masahiro Yamada wrote:
-> Commit 307d40c56b0c ("ARM: uniphier: rework SMP code to support new
-> System Bus binding") added a new DT binding for SMP code, but still
-> kept old code for the backward compatibility.
+On Mon, May 16, 2016 at 04:45:52PM +0200, Maxime Ripard wrote:
+> On Fri, May 13, 2016 at 09:57:16PM +0200, Olliver Schinagl wrote:
+> > commit 27dd9af6bc000ab21fd ("ARM: dts: sunxi: Add a olinuxino-lime2-emmc")
+> > added the new emmc equipped lime2 but forgot its Makefile.
+> > 
+> > This patch adds an entry to the Makefile.
+> > 
+> > Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 > 
-> Linux 4.6 was out with both bindings supported, so it should not
-> hurt to drop the old code now.  Moreover, the mainline code are
-> currently not used for any of our products, so this change has
-> no impact on our customers in any way.
+> Having the version of the patch would be nice too.
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> Changes in v2:
->   - Add more explanation in git-log
+> Arnd, Kevin, Olof, could you apply that patch directly for 4.7?
 
-Thanks, applied to next/cleanup for 4.8.
+Applied as fix now, but with the patch subject fixed up (ARM: dts: sunxi: ...).
 
 
 -Olof
+
+> 
+> Thanks,
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux, Kernel and Android engineering
+> http://free-electrons.com
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
