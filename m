@@ -1,34 +1,28 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jun 2016 17:11:29 +0100
-Subject: [PATCH v2 1/3] of: add common OF-based component functionality
-In-Reply-To: <20160603154430.GA21013@ulmo.ba.sec>
-References: <20160603141548.GC1041@n2100.armlinux.org.uk>
- <E1b8pyR-0005OJ-V3@rmk-PC.armlinux.org.uk>
- <20160603154430.GA21013@ulmo.ba.sec>
-Message-ID: <20160603161129.GF1041@n2100.armlinux.org.uk>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Fri, 3 Jun 2016 11:06:18 -0500
+Subject: [PATCH 4/5] ARM: dts: Arria10 ECC Manager IRQ controller changes
+In-Reply-To: <1464193783-5071-5-git-send-email-tthayer@opensource.altera.com>
+References: <1464193783-5071-1-git-send-email-tthayer@opensource.altera.com>
+ <1464193783-5071-5-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <alpine.DEB.2.02.1606031105540.1763@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 05:44:30PM +0200, Thierry Reding wrote:
-> On Fri, Jun 03, 2016 at 03:21:19PM +0100, Russell King wrote:
-> [...]
-> > diff --git a/drivers/of/of_component.c b/drivers/of/of_component.c
-> [...]
-> > +static void component_compare_of(struct device *dev, void *data)
-> > +{
-> > +	return dev->of_node == data;
-> > +}
+On Wed, 25 May 2016, tthayer at opensource.altera.com wrote:
+
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> The return statement here doesn't match the return value. Didn't GCC
-> complain about this?
+> Changes to support IRQ controller implementation including adding
+> new property irq-controller to eccmgr and adding IRQ property
+> to children.
+> 
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+>  arch/arm/boot/dts/socfpga_arria10.dtsi |    6 ++++++
+>  1 file changed, 6 insertions(+)
+>
 
-I didn't build-test it, because I wanted people's opinions on it first
-(building means rebuilding my entire tree...)
+Applied! 
 
-Anyway, the patch series is dead because I'm not prepared to make the
-changes which Rob mentioned, so we're back to v1 instead.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Dinh
