@@ -1,73 +1,145 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri,  3 Jun 2016 10:22:58 +0200
-Subject: [PATCH 00/14] regulator: pwm: various improvements
-Message-ID: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Fri,  3 Jun 2016 10:23:02 +0200
+Subject: [PATCH 04/14] pwm: rockchip: Add support for hardware readout
+In-Reply-To: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1464942192-25967-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Implement the ->get_state() function to expose initial state.
 
-This patch series series aims at adding two important features to the
-pwm-regulator driver.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/pwm/pwm-rockchip.c | 67 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
 
-The first one is the support for 'smooth handover' between the
-bootloader and the kernel. This is mainly solving problems we have when
-the PWM is controlling a critical regulator (like the one powering the
-DDR chip). Currently, when the PWM regulator acquire the PWM device it
-assumes it was off and it's safe to change the configuration before
-enabling it, which can generate glitches on the PWM signal which in turn
-generated glitches on the output voltage.
-To solve that we've introduced support for hardware readout to the
-PWM framework, so that the PWM regulator driver can adjust the PWM
-a probe time and avoid glitches.
-Atomic update is also helping in this regard.
-
-Patch 1 is adding convenient helpers (at the PWM level) that will be
-used by the PWM regulator driver.
-Patch 2 is just removing the pwm_enable() call from the ->set_voltage()
-implementation (pwm_enable() is already called in the reg->enable()
-hook).
-Patches 3 to 8 are preparing everything on the PWM driver side to make
-hardware readout available to all platforms using the PWM regulator
-driver (rockchip and sti).
-Patches 9 to 12 are making use of the atomic update and hardware readout
-features to implement this smooth handover.
-
-The second feature we add to the driver is the capability of using
-a sub duty_cycle range in continuous mode. By default the regulator
-is assuming that min_uV is achieved with a 0% dutycyle and max_uV
-with a 100% dutycycle, but this is not necessarily true.
-Moreover, in some cases (when the PWM device does not support
-polarity inversion), we might have min_uV at 100% and max_uV at 0%.
-Hence the addition of new properties to the existing DT bindings.
-The feature is added in patch 13 and 14.
-
-Best Regards,
-
-Boris
-
-Boris Brezillon (14):
-  pwm: Add new helpers to create/manipulate PWM states
-  regulator: pwm: Drop unneeded pwm_enable() call
-  pwm: rockchip: Fix period and duty_cycle approximation
-  pwm: rockchip: Add support for hardware readout
-  pwm: rockchip: Avoid glitches on already running PWMs
-  pwm: rockchip: Add support for atomic update
-  pwm: sti: Add support for hardware readout
-  pwm: sti: Avoid glitches on already running PWMs
-  regulator: pwm: Adjust PWM config at probe time
-  regulator: pwm: Switch to the atomic PWM API
-  regulator: pwm: properly initialize the ->state field
-  regulator: pwm: Retrieve correct voltage
-  regulator: pwm: Support extra continuous mode cases
-  regulator: pwm: Document pwm-dutycycle-unit and pwm-dutycycle-range
-
- .../bindings/regulator/pwm-regulator.txt           |  12 ++
- drivers/pwm/pwm-rockchip.c                         | 182 +++++++++++++++------
- drivers/pwm/pwm-sti.c                              |  55 ++++++-
- drivers/regulator/pwm-regulator.c                  | 159 ++++++++++++------
- include/linux/pwm.h                                |  81 +++++++++
- 5 files changed, 391 insertions(+), 98 deletions(-)
-
+diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
+index 68d72ce..dfacf7d 100644
+--- a/drivers/pwm/pwm-rockchip.c
++++ b/drivers/pwm/pwm-rockchip.c
+@@ -51,6 +51,8 @@ struct rockchip_pwm_data {
+ 
+ 	void (*set_enable)(struct pwm_chip *chip,
+ 			   struct pwm_device *pwm, bool enable);
++	void (*get_state)(struct pwm_chip *chip, struct pwm_device *pwm,
++			  struct pwm_state *state);
+ };
+ 
+ static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
+@@ -75,6 +77,19 @@ static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip,
+ 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+ }
+ 
++static void rockchip_pwm_get_state_v1(struct pwm_chip *chip,
++				      struct pwm_device *pwm,
++				      struct pwm_state *state)
++{
++	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
++	u32 val;
++
++	val = readl(pc->base + pc->data->regs.ctrl);
++	if ((val & enable_conf) == enable_conf)
++		state->enabled = true;
++}
++
+ static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
+ 				       struct pwm_device *pwm, bool enable)
+ {
+@@ -98,6 +113,53 @@ static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
+ 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+ }
+ 
++static void rockchip_pwm_get_state_v2(struct pwm_chip *chip,
++				      struct pwm_device *pwm,
++				      struct pwm_state *state)
++{
++	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
++			  PWM_CONTINUOUS;
++	u32 val;
++
++	val = readl(pc->base + pc->data->regs.ctrl);
++	if ((val & enable_conf) != enable_conf)
++		return;
++
++	state->enabled = true;
++
++	if (!(val & PWM_DUTY_POSITIVE))
++		state->polarity = PWM_POLARITY_INVERSED;
++}
++
++static void rockchip_pwm_get_state(struct pwm_chip *chip,
++				   struct pwm_device *pwm,
++				   struct pwm_state *state)
++{
++	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
++	unsigned long clk_rate;
++	u64 tmp;
++	int ret;
++
++	ret = clk_enable(pc->clk);
++	if (ret)
++		return;
++
++	clk_rate = clk_get_rate(pc->clk);
++
++	tmp = readl(pc->base + pc->data->regs.period);
++	tmp *= pc->data->prescaler * NSEC_PER_SEC;
++	state->period = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
++
++	tmp = readl(pc->base + pc->data->regs.duty);
++	tmp *= pc->data->prescaler * NSEC_PER_SEC;
++	state->duty_cycle = DIV_ROUND_CLOSEST_ULL(tmp, clk_rate);
++
++	pc->data->get_state(chip, pwm, state);
++
++	clk_disable(pc->clk);
++}
++
+ static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 			       int duty_ns, int period_ns)
+ {
+@@ -170,6 +232,7 @@ static void rockchip_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ }
+ 
+ static const struct pwm_ops rockchip_pwm_ops_v1 = {
++	.get_state = rockchip_pwm_get_state,
+ 	.config = rockchip_pwm_config,
+ 	.enable = rockchip_pwm_enable,
+ 	.disable = rockchip_pwm_disable,
+@@ -177,6 +240,7 @@ static const struct pwm_ops rockchip_pwm_ops_v1 = {
+ };
+ 
+ static const struct pwm_ops rockchip_pwm_ops_v2 = {
++	.get_state = rockchip_pwm_get_state,
+ 	.config = rockchip_pwm_config,
+ 	.set_polarity = rockchip_pwm_set_polarity,
+ 	.enable = rockchip_pwm_enable,
+@@ -194,6 +258,7 @@ static const struct rockchip_pwm_data pwm_data_v1 = {
+ 	.prescaler = 2,
+ 	.ops = &rockchip_pwm_ops_v1,
+ 	.set_enable = rockchip_pwm_set_enable_v1,
++	.get_state = rockchip_pwm_get_state_v1,
+ };
+ 
+ static const struct rockchip_pwm_data pwm_data_v2 = {
+@@ -206,6 +271,7 @@ static const struct rockchip_pwm_data pwm_data_v2 = {
+ 	.prescaler = 1,
+ 	.ops = &rockchip_pwm_ops_v2,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
++	.get_state = rockchip_pwm_get_state_v2,
+ };
+ 
+ static const struct rockchip_pwm_data pwm_data_vop = {
+@@ -218,6 +284,7 @@ static const struct rockchip_pwm_data pwm_data_vop = {
+ 	.prescaler = 1,
+ 	.ops = &rockchip_pwm_ops_v2,
+ 	.set_enable = rockchip_pwm_set_enable_v2,
++	.get_state = rockchip_pwm_get_state_v2,
+ };
+ 
+ static const struct of_device_id rockchip_pwm_dt_ids[] = {
 -- 
 2.7.4
