@@ -1,35 +1,31 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri,  3 Jun 2016 18:25:30 -0500
-Subject: [Patch v6 10/10] dts: qcom: apq8064: Add SCM firmware node
-In-Reply-To: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
-References: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <1464996330-16952-11-git-send-email-andy.gross@linaro.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 03 Jun 2016 19:41:48 -0400 (EDT)
+Subject: [PATCH] rxrpc: Use pr_<level> and pr_fmt, reduce object size a
+ few KB
+In-Reply-To: <c7437f437c30addd6dafa35b87d7c57061dc752b.1464894331.git.joe@perches.com>
+References: <c7437f437c30addd6dafa35b87d7c57061dc752b.1464894331.git.joe@perches.com>
+Message-ID: <20160603.194148.2116642486783888748.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the firmware node for the APQ8064
+From: Joe Perches <joe@perches.com>
+Date: Thu,  2 Jun 2016 12:08:52 -0700
 
-Signed-off-by: Andy Gross <andy.gross@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+> Use the more common kernel logging style and reduce object size.
+> 
+> The logging message prefix changes from a mixture of
+> "RxRPC:" and "RXRPC:" to "af_rxrpc: ".
+> 
+> $ size net/rxrpc/built-in.o*
+>    text	   data	    bss	    dec	    hex	filename
+>   64172	   1972	   8304	  74448	  122d0	net/rxrpc/built-in.o.new
+>   67512	   1972	   8304	  77788	  12fdc	net/rxrpc/built-in.o.old
+> 
+> Miscellanea:
+> 
+> o Consolidate the ASSERT macros to use a single pr_err call with
+>   decimal and hexadecimal output and a stringified #OP argument
+> 
+> Signed-off-by: Joe Perches <joe@perches.com>
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
-index df96ccd..cf37d55 100644
---- a/arch/arm/boot/dts/qcom-apq8064.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
-@@ -213,6 +213,12 @@
- 		};
- 	};
- 
-+	firmware {
-+		scm {
-+			compatible = "qcom,scm-apq8064";
-+		};
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-1.9.1
+Looks good to me, applied, thanks Joe.
