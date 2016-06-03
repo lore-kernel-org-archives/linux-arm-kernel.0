@@ -1,44 +1,30 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Fri, 3 Jun 2016 13:41:04 -0700
-Subject: [PATCH 09/14] regulator: pwm: Adjust PWM config at probe time
-In-Reply-To: <1464942192-25967-10-git-send-email-boris.brezillon@free-electrons.com>
-References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464942192-25967-10-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20160603204104.GG124478@google.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Fri, 3 Jun 2016 21:43:11 +0100
+Subject: [PATCH 1/3] efi: Introduce *_continue efi_memory_desc iterators
+In-Reply-To: <20160602171152.GE24938@e104818-lin.cambridge.arm.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-2-git-send-email-catalin.marinas@arm.com>
+ <20160601103446.GC9280@leverpostej>
+ <20160601104326.GA24749@e104818-lin.cambridge.arm.com>
+ <20160602143650.GG2658@codeblueprint.co.uk>
+ <20160602162925.GC24938@e104818-lin.cambridge.arm.com>
+ <57505F52.3040108@arm.com>
+ <20160602171152.GE24938@e104818-lin.cambridge.arm.com>
+Message-ID: <20160603204311.GN2658@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 10:23:07AM +0200, Boris Brezillon wrote:
-> The PWM attached to a PWM regulator device might have been previously
-> configured by the bootloader.
-> Make sure the bootloader and linux config are in sync, and adjust the PWM
-> config if that's not the case.
+On Thu, 02 Jun, at 06:11:52PM, Catalin Marinas wrote:
 > 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Acked-by: Mark Brown <broonie@kernel.org>
-> ---
->  drivers/regulator/pwm-regulator.c | 8 +++-----
->  1 file changed, 3 insertions(+), 5 deletions(-)
+> I think you should post them fairly soon so that we get a chance to
+> review them and ideally push into next around -rc4.
 > 
-> diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-> index ab3cc02..524b43f 100644
-> --- a/drivers/regulator/pwm-regulator.c
-> +++ b/drivers/regulator/pwm-regulator.c
-> @@ -285,11 +285,9 @@ static int pwm_regulator_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> -	/*
-> -	 * FIXME: pwm_apply_args() should be removed when switching to the
-> -	 * atomic PWM API.
-> -	 */
-> -	pwm_apply_args(drvdata->pwm);
-> +	ret = pwm_adjust_config(drvdata->pwm);
-> +	if (ret)
-> +		return ret;
->  
->  	regulator = devm_regulator_register(&pdev->dev,
->  					    &drvdata->desc, &config);
+> Regarding these efi/arm64 patches, I can push them to a branch (once the
+> conflicting efi/urgent patches hit upstream, I guess around -rc2) that
+> Matt can pull into the EFI tree and I can also pull in the arm64 tree
+> *if* we are to merge the Jeremy's patches.
+> 
+> Jeremy, you can base your patches on such branch (I'll follow up with
+> the details if that's ok with Matt).
 
-Acked-by: Brian Norris <briannorris@chromium.org>
-Tested-by: Brian Norris <briannorris@chromium.org>
+Sure, this works for me. Thanks Catalin.
