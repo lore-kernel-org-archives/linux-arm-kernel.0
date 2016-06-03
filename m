@@ -1,57 +1,66 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri,  3 Jun 2016 10:58:45 +0530
-Subject: [PATCH V3 1/8] ARM: davinci: Sort frequency table
-In-Reply-To: <cover.1464931080.git.viresh.kumar@linaro.org>
-References: <cover.1464931080.git.viresh.kumar@linaro.org>
-Message-ID: <f9a03695c321b9c0628c6ae0136adfe004f358ad.1464931080.git.viresh.kumar@linaro.org>
+From: yong.b.li@intel.com (Li, Yong B)
+Date: Fri, 3 Jun 2016 05:46:50 +0000
+Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
+In-Reply-To: <20160602175635.GG5995@atomide.com>
+References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
+ <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
+ <20160602173932.GF5995@atomide.com>
+ <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
+ <20160602175635.GG5995@atomide.com>
+Message-ID: <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FB1EC@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is required for some of the changes in cpufreq core. There was only
-one function dependent on the order of the table, that is fixed as well.
+Hi Tony,
 
-Cc: Sekhar Nori <nsekhar@ti.com>
-Cc: Kevin Hilman <khilman@kernel.org>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/mach-davinci/da850.c | 16 +++++++++-------
- 1 file changed, 9 insertions(+), 7 deletions(-)
+I can submit a V2 version about the "disabled", or just drop this patch?
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 239886299968..f683c119cfed 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1004,13 +1004,14 @@ static const struct da850_opp da850_opp_96 = {
- 		.frequency = freq * 1000, \
- 	}
- 
-+/* Table sorted in ascending order of frequencies */
- static struct cpufreq_frequency_table da850_freq_table[] = {
--	OPP(456),
--	OPP(408),
--	OPP(372),
--	OPP(300),
--	OPP(200),
- 	OPP(96),
-+	OPP(200),
-+	OPP(300),
-+	OPP(372),
-+	OPP(408),
-+	OPP(456),
- 	{
- 		.driver_data		= 0,
- 		.frequency	= CPUFREQ_TABLE_END,
-@@ -1076,8 +1077,9 @@ int da850_register_cpufreq(char *async_clk)
- 		clk_add_alias("async", da850_cpufreq_device.name,
- 							async_clk, NULL);
- 	for (i = 0; i < ARRAY_SIZE(da850_freq_table); i++) {
--		if (da850_freq_table[i].frequency <= da850_max_speed) {
--			cpufreq_info.freq_table = &da850_freq_table[i];
-+		if (da850_freq_table[i].frequency > da850_max_speed) {
-+			&da850_freq_table[i].driver_data = 0;
-+			&da850_freq_table[i].frequency = CPUFREQ_TABLE_END;
- 			break;
- 		}
- 	}
--- 
-2.7.1.410.g6faf27b
+Thanks,
+Yong
+-----Original Message-----
+From: Tony Lindgren [mailto:tony at atomide.com] 
+Sent: Friday, June 3, 2016 1:57 AM
+To: Robert Nelson <robertcnelson@gmail.com>
+Cc: Li, Yong B <yong.b.li@intel.com>; Benoit Cousson <bcousson@baylibre.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Russell King <linux@arm.linux.org.uk>; linux-omap at vger.kernel.org; devicetree <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; linux kernel <linux-kernel@vger.kernel.org>; sdliyong at gmail.com
+Subject: Re: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
+
+* Robert Nelson <robertcnelson@gmail.com> [160602 10:48]:
+> On Thu, Jun 2, 2016 at 12:39 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > * Robert Nelson <robertcnelson@gmail.com> [160602 10:39]:
+> > > On Thu, Jun 2, 2016 at 2:41 AM, Yong Li <yong.b.li@intel.com> wrote:
+> > >
+> > > > From: Yong Li <sdliyong@gmail.com>
+> > > >
+> > > > Without this patch, I2C-1 is missing on beaglebone black boards
+> > > >
+> > > > Signed-off-by: Yong Li <sdliyong@gmail.com>
+> > > > ---
+> > > >  arch/arm/boot/dts/am335x-boneblack.dts | 15 +++++++++++++++
+> > > >  1 file changed, 15 insertions(+)
+> > > >
+> > >
+> > >
+> > > This is also 'common' for the white/green, if your really going to 
+> > > push this, please add it to:
+> > >
+> > > am335x-bone-common.dtsi
+> >
+> > But isn't this exposed on the cape pins? So the use can be whatever 
+> > for these pins?
+> 
+> That is correct, "i2c1" is on the cape connector, with no primary 
+> function defined.
+> 
+> Currently on mainline, the board and cape eeprom i2c bus's are enabled.
+> 
+> i2c0 = board eeprom
+> i2c2 = 'cape' eeprom
+> 
+> personally, nak by me to add i2c1 by default, should use overlay's to enable it.
+
+Yes sounds like the best we can do is define it but set it with status = "disabled" for now.
+
+Regards,
+
+Tony
