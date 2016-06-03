@@ -1,38 +1,63 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 3 Jun 2016 04:38:53 +0200
-Subject: [PATCH v2 1/6] power: Introduce Broadcom kona reset driver
-In-Reply-To: <57409633.8060605@gmail.com>
-References: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
- <1463002582-6875-2-git-send-email-chris.brand@broadcom.com>
- <57409633.8060605@gmail.com>
-Message-ID: <20160603023853.GD8921@earth>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Fri, 3 Jun 2016 10:39:07 +0800
+Subject: [PATCH] arm64: fix the wrong comment
+In-Reply-To: <20160602180948.GE7697@arm.com>
+References: <1464574369-22618-1-git-send-email-shijie.huang@arm.com>
+ <20160602180948.GE7697@arm.com>
+Message-ID: <20160603023905.GB23297@sha-win-210.asiapac.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-On Sat, May 21, 2016 at 10:09:07AM -0700, Florian Fainelli wrote:
-> Le 11/05/2016 14:36, Chris Brand a ?crit :
-> > This driver supports reset on both BCM21664 and BCM23550.
-> > Code is being moved from arch/arm/mach-bcm/board_bcm21664.c
+On Thu, Jun 02, 2016 at 07:09:48PM +0100, Will Deacon wrote:
+> On Mon, May 30, 2016 at 10:12:49AM +0800, Huang Shijie wrote:
+> > Currently, we use the 48-bit for the kernel and user by default.
+> > The comment becomes stale. This patch fixes the wrong comment.
 > > 
-> > Signed-off-by: Chris Brand <chris.brand@broadcom.com>
+> > Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> > ---
+> >  arch/arm64/mm/proc.S | 4 ++--
+> >  1 file changed, 2 insertions(+), 2 deletions(-)
+> > 
+> > diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+> > index c431787..421386759 100644
+> > --- a/arch/arm64/mm/proc.S
+> > +++ b/arch/arm64/mm/proc.S
+> > @@ -209,8 +209,8 @@ ENTRY(__cpu_setup)
+> >  	bic	x0, x0, x5			// clear bits
+> >  	orr	x0, x0, x6			// set bits
+> >  	/*
+> > -	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
+> > -	 * both user and kernel.
+> > +	 * Set/prepare TCR. We use VA_BITS of address range for both
+> > +	 * kernel and user.
+> >  	 */
+> 
+> To be honest, all three of these comments (including the two in the
+> context) are totally useless. Can we just remove them instead?
 
-> Sebastian, Dmitry, I know we are in the merge window, let me know if you
-> would want me to take this patch and the 5 others in the next arm-soc
-> pull request, or if you prefer to take this one in your own tree.
+Do you mean we could remove the comments like this:
 
-Feel free to queue it via arm-soc with
+---
+ arch/arm64/mm/proc.S | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
 
-Acked-By: Sebastian Reichel <sre@kernel.org>
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index c431787..286d016 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -208,10 +208,7 @@ ENTRY(__cpu_setup)
+ 	mrs	x0, sctlr_el1
+ 	bic	x0, x0, x5			// clear bits
+ 	orr	x0, x0, x6			// set bits
+-	/*
+-	 * Set/prepare TCR and TTBR. We use 512GB (39-bit) address range for
+-	 * both user and kernel.
+-	 */
++
+ 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+ 			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
+ 	tcr_set_idmap_t0sz	x10, x9
+-- 
 
-If I didn't overlook it, it's missing DT documentation, though.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160603/d5acb22a/attachment.sig>
+thanks
+Huang Shijie
