@@ -1,153 +1,66 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Sat, 4 Jun 2016 08:30:09 +0200
-Subject: [PATCH 13/14] regulator: pwm: Support extra continuous mode cases
-In-Reply-To: <20160603210308.GK124478@google.com>
-References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464942192-25967-14-git-send-email-boris.brezillon@free-electrons.com>
- <20160603210308.GK124478@google.com>
-Message-ID: <20160604083009.25e7fac6@bbrezillon>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat,  4 Jun 2016 10:09:53 +0300
+Subject: [PATCH 01/22] ARM: clps711x: Reduce static map size
+In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
+References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1465024214-22120-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 3 Jun 2016 14:03:08 -0700
-Brian Norris <briannorris@chromium.org> wrote:
+Last CLPS711X CPU register is PLLR has 0xa5a8 address, so we can reduce
+the map to 48k and align the end of the static at VMALLOC_START.
 
-> Hi Boris,
-> 
-> On Fri, Jun 03, 2016 at 10:23:11AM +0200, Boris Brezillon wrote:
-> > The continuous mode allows one to declare a PWM regulator without having
-> > to declare the voltage <-> dutycycle association table. It works fine as
-> > long as your voltage(dutycycle) function is linear, but also has the
-> > following constraints:
-> > 
-> > - dutycycle for min_uV = 0%
-> > - dutycycle for max_uV = 100%
-> > - dutycycle for min_uV < dutycycle for max_uV
-> > 
-> > While the linearity constraint is acceptable for now, we sometimes need to
-> > restrict of the PWM range (to limit the maximum/minimum voltage for
-> > example) or have a min_uV_dutycycle > max_uV_dutycycle (this could be
-> > tweaked with PWM polarity, but not all PWMs support inverted polarity).
-> > 
-> > Add the pwm-dutycycle-range and pwm-dutycycle-unit DT properties to define
-> > such constraints. If those properties are not defined, the PWM regulator
-> > use the default pwm-dutycycle-range = <0 100> and
-> > pwm-dutycycle-unit = <100> values (existing behavior).
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> >  drivers/regulator/pwm-regulator.c | 80 ++++++++++++++++++++++++++++++++++-----
-> >  1 file changed, 71 insertions(+), 9 deletions(-)
-> > 
-> > diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-> > index c39ecd1..2e70eb1 100644
-> > --- a/drivers/regulator/pwm-regulator.c
-> > +++ b/drivers/regulator/pwm-regulator.c  
-> 
-> ...
-> 
-> > @@ -132,31 +141,67 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
-> >  static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
-> >  {
-> >  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-> > +	unsigned int min_uV_duty = drvdata->continuous.min_uV_dutycycle;
-> > +	unsigned int max_uV_duty = drvdata->continuous.max_uV_dutycycle;
-> > +	unsigned int duty_unit = drvdata->continuous.dutycycle_unit;
-> >  	int min_uV = rdev->constraints->min_uV;
-> > -	int diff = rdev->constraints->max_uV - min_uV;
-> > +	int max_uV = rdev->constraints->max_uV;
-> > +	int diff_uV = max_uV - min_uV;
-> >  	struct pwm_state pstate;
-> > +	unsigned int diff_duty;
-> > +	unsigned int voltage;
-> >  
-> >  	pwm_get_state(drvdata->pwm, &pstate);
-> >  
-> > -	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
-> > +	voltage = pwm_get_relative_duty_cycle(&pstate, duty_unit);
-> > +
-> > +	if (max_uV_duty < min_uV_duty) {  
-> 
-> I still might have appreciated a comment above this line (and similar
-> in set_voltage()) to help explain why max can be less than min -- you
-> have it in the commit message, but nowhere in the code. Not a big deal,
-> and the code looks otherwise good:
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/include/debug/clps711x.S              | 4 ++--
+ arch/arm/mach-clps711x/common.c                | 4 ++--
+ arch/arm/mach-clps711x/include/mach/hardware.h | 2 +-
+ 3 files changed, 5 insertions(+), 5 deletions(-)
 
-Sure, I'll add more comments in the next version.
-
-Thanks,
-
-Boris
-
-> 
-> Reviewed-by: Brian Norris <briannorris@chromium.org>
-> Tested-by: Brian Norris <briannorris@chromium.org>
-> 
-> 
-> > +		voltage = min_uV_duty - voltage;
-> > +		diff_duty = min_uV_duty - max_uV_duty;
-> > +	} else {
-> > +		voltage = voltage - min_uV_duty;
-> > +		diff_duty = max_uV_duty - min_uV_duty;
-> > +	}
-> > +
-> > +	voltage = DIV_ROUND_CLOSEST_ULL((u64)voltage * diff_uV, diff_duty);
-> > +
-> > +	return voltage + min_uV;
-> >  }
-> >  
-> >  static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
-> > -					int min_uV, int max_uV,
-> > -					unsigned *selector)
-> > +				     int req_min_uV, int req_max_uV,
-> > +				     unsigned int *selector)
-> >  {
-> >  	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-> > +	unsigned int min_uV_duty = drvdata->continuous.min_uV_dutycycle;
-> > +	unsigned int max_uV_duty = drvdata->continuous.max_uV_dutycycle;
-> > +	unsigned int duty_unit = drvdata->continuous.dutycycle_unit;
-> >  	unsigned int ramp_delay = rdev->constraints->ramp_delay;
-> > -	unsigned int req_diff = min_uV - rdev->constraints->min_uV;
-> > +	int min_uV = rdev->constraints->min_uV;
-> > +	int max_uV = rdev->constraints->max_uV;
-> > +	int diff_uV = max_uV - min_uV;
-> >  	struct pwm_state pstate;
-> > -	unsigned int diff;
-> > +	unsigned int diff_duty;
-> > +	unsigned int dutycycle;
-> >  	int ret;
-> >  
-> >  	pwm_prepare_new_state(drvdata->pwm, &pstate);
-> > -	diff = rdev->constraints->max_uV - rdev->constraints->min_uV;
-> >  
-> > -	/* We pass diff as the scale to get a uV precision. */
-> > -	pwm_set_relative_duty_cycle(&pstate, req_diff, diff);
-> > +	if (max_uV_duty < min_uV_duty)
-> > +		diff_duty = min_uV_duty - max_uV_duty;
-> > +	else
-> > +		diff_duty = max_uV_duty - min_uV_duty;
-> > +
-> > +	dutycycle = DIV_ROUND_CLOSEST_ULL((u64)(req_min_uV - min_uV) *
-> > +					  diff_duty,
-> > +					  diff_uV);
-> > +
-> > +	if (max_uV_duty < min_uV_duty)
-> > +		dutycycle = min_uV_duty - dutycycle;
-> > +	else
-> > +		dutycycle = min_uV_duty + dutycycle;
-> > +
-> > +	pwm_set_relative_duty_cycle(&pstate, dutycycle, duty_unit);
-> >  
-> >  	ret = pwm_apply_state(drvdata->pwm, &pstate);
-> >  	if (ret) {  
-> 
-> [...]
-> 
-> Brian
-
-
-
+diff --git a/arch/arm/include/debug/clps711x.S b/arch/arm/include/debug/clps711x.S
+index abe2254..c17ac5c 100644
+--- a/arch/arm/include/debug/clps711x.S
++++ b/arch/arm/include/debug/clps711x.S
+@@ -9,10 +9,10 @@
+ 
+ #ifndef CONFIG_DEBUG_CLPS711X_UART2
+ #define CLPS711X_UART_PADDR	(0x80000000 + 0x0000)
+-#define CLPS711X_UART_VADDR	(0xfeff0000 + 0x0000)
++#define CLPS711X_UART_VADDR	(0xfeff4000 + 0x0000)
+ #else
+ #define CLPS711X_UART_PADDR	(0x80000000 + 0x1000)
+-#define CLPS711X_UART_VADDR	(0xfeff0000 + 0x1000)
++#define CLPS711X_UART_VADDR	(0xfeff4000 + 0x1000)
+ #endif
+ 
+ #define SYSFLG		(0x0140)
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 671acc5a..6466da8 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -37,8 +37,8 @@ static struct map_desc clps711x_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)CLPS711X_VIRT_BASE,
+ 		.pfn		= __phys_to_pfn(CLPS711X_PHYS_BASE),
+-		.length		= SZ_64K,
+-		.type		= MT_DEVICE
++		.length		= 48 * SZ_1K,
++		.type		= MT_DEVICE,
+ 	}
+ };
+ 
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
+index 833129c..cfd0e2c 100644
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
++++ b/arch/arm/mach-clps711x/include/mach/hardware.h
+@@ -24,7 +24,7 @@
+ 
+ #include <mach/clps711x.h>
+ 
+-#define CLPS711X_VIRT_BASE	IOMEM(0xfeff0000)
++#define CLPS711X_VIRT_BASE	IOMEM(0xfeff4000)
+ 
+ #ifndef __ASSEMBLY__
+ #define clps_readb(off)		readb(CLPS711X_VIRT_BASE + (off))
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.4.9
