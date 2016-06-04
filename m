@@ -1,9 +1,9 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  4 Jun 2016 10:10:08 +0300
-Subject: [PATCH 16/22] clk: clps711x: Remove board support
+Date: Sat,  4 Jun 2016 10:10:12 +0300
+Subject: [PATCH 20/22] gpio: clps711x: Remove board support
 In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
 References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465024214-22120-17-git-send-email-shc_work@mail.ru>
+Message-ID: <1465024214-22120-21-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,48 +12,35 @@ remove the board support from the driver.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- drivers/clk/clk-clps711x.c | 25 -------------------------
- 1 file changed, 25 deletions(-)
+ drivers/gpio/gpio-clps711x.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/clk-clps711x.c b/drivers/clk/clk-clps711x.c
-index adaf109..7690a03 100644
---- a/drivers/clk/clk-clps711x.c
-+++ b/drivers/clk/clk-clps711x.c
-@@ -144,30 +144,6 @@ static struct clps711x_clk * __init _clps711x_clk_init(void __iomem *base,
- 	return clps711x_clk;
- }
+diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
+index cd3781e..52fd63f 100644
+--- a/drivers/gpio/gpio-clps711x.c
++++ b/drivers/gpio/gpio-clps711x.c
+@@ -20,8 +20,12 @@ static int clps711x_gpio_probe(struct platform_device *pdev)
+ 	void __iomem *dat, *dir;
+ 	struct gpio_chip *gc;
+ 	struct resource *res;
+-	int err, id = np ? of_alias_get_id(np, "gpio") : pdev->id;
++	int err, id;
  
--void __init clps711x_clk_init(void __iomem *base)
--{
--	struct clps711x_clk *clps711x_clk;
--
--	clps711x_clk = _clps711x_clk_init(base, 73728000);
--
--	BUG_ON(IS_ERR(clps711x_clk));
--
--	/* Clocksource */
--	clk_register_clkdev(clps711x_clk->clks[CLPS711X_CLK_TIMER1],
--			    NULL, "clps711x-timer.0");
--	clk_register_clkdev(clps711x_clk->clks[CLPS711X_CLK_TIMER2],
--			    NULL, "clps711x-timer.1");
--
--	/* Drivers */
--	clk_register_clkdev(clps711x_clk->clks[CLPS711X_CLK_PWM],
--			    NULL, "clps711x-pwm");
--	clk_register_clkdev(clps711x_clk->clks[CLPS711X_CLK_UART],
--			    NULL, "clps711x-uart.0");
--	clk_register_clkdev(clps711x_clk->clks[CLPS711X_CLK_UART],
--			    NULL, "clps711x-uart.1");
--}
--
--#ifdef CONFIG_OF
- static void __init clps711x_clk_init_dt(struct device_node *np)
- {
- 	void __iomem *base = of_iomap(np, 0);
-@@ -185,4 +161,3 @@ static void __init clps711x_clk_init_dt(struct device_node *np)
- 			    &clps711x_clk->clk_data);
- }
- CLK_OF_DECLARE(clps711x, "cirrus,ep7209-clk", clps711x_clk_init_dt);
--#endif
++	if (!np)
++		return -ENODEV;
++
++	id = of_alias_get_id(np, "gpio");
+ 	if ((id < 0) || (id > 4))
+ 		return -ENODEV;
+ 
+@@ -63,7 +67,7 @@ static int clps711x_gpio_probe(struct platform_device *pdev)
+ 		break;
+ 	}
+ 
+-	gc->base = id * 8;
++	gc->base = -1;
+ 	gc->owner = THIS_MODULE;
+ 	platform_set_drvdata(pdev, gc);
+ 
 -- 
 2.4.9
