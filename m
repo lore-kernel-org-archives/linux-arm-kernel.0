@@ -1,10 +1,10 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  4 Jun 2016 10:09:58 +0300
-Subject: [PATCH 06/22] pwm: clps711x: Changing the compatibility string to
+Date: Sat,  4 Jun 2016 10:09:57 +0300
+Subject: [PATCH 05/22] serial: clps711x: Changing the compatibility string to
  match with the smallest supported chip
 In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
 References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465024214-22120-7-git-send-email-shc_work@mail.ru>
+Message-ID: <1465024214-22120-6-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,44 +14,44 @@ announced, this change is safe.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt | 5 ++---
- drivers/pwm/pwm-clps711x.c                                    | 2 +-
- 2 files changed, 3 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt | 4 ++--
+ drivers/tty/serial/clps711x.c                                     | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt b/Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt
-index a183db4..c0b2028 100644
---- a/Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt
-+++ b/Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt
-@@ -1,15 +1,14 @@
- * Cirris Logic CLPS711X PWM controller
+diff --git a/Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt b/Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt
+index caaeb25..07013fa 100644
+--- a/Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt
++++ b/Documentation/devicetree/bindings/serial/cirrus,clps711x-uart.txt
+@@ -1,7 +1,7 @@
+ * Cirrus Logic CLPS711X Universal Asynchronous Receiver/Transmitter (UART)
  
  Required properties:
--- compatible: Shall contain "cirrus,clps711x-pwm".
-+- compatible: Shall contain "cirrus,ep7209-pwm".
- - reg: Physical base address and length of the controller's registers.
- - clocks: phandle + clock specifier pair of the PWM reference clock.
- - #pwm-cells: Should be 1. The cell specifies the index of the channel.
+-- compatible: Should be "cirrus,clps711x-uart".
++- compatible: Should be "cirrus,ep7209-uart".
+ - reg: Address and length of the register set for the device.
+ - interrupts: Should contain UART TX and RX interrupt.
+ - clocks: Should contain UART core clock number.
+@@ -20,7 +20,7 @@ Example:
+ 	};
  
- Example:
- 	pwm: pwm at 80000400 {
--		compatible = "cirrus,ep7312-pwm",
--			     "cirrus,clps711x-pwm";
-+		compatible = "cirrus,ep7312-pwm", "cirrus,ep7209-pwm";
- 		reg = <0x80000400 0x4>;
- 		clocks = <&clks 8>;
- 		#pwm-cells = <1>;
-diff --git a/drivers/pwm/pwm-clps711x.c b/drivers/pwm/pwm-clps711x.c
-index 7d33542..26ec24e 100644
---- a/drivers/pwm/pwm-clps711x.c
-+++ b/drivers/pwm/pwm-clps711x.c
-@@ -155,7 +155,7 @@ static int clps711x_pwm_remove(struct platform_device *pdev)
+ 	uart1: uart at 80000480 {
+-		compatible = "cirrus,clps711x-uart";
++		compatible = "cirrus,ep7312-uart","cirrus,ep7209-uart";
+ 		reg = <0x80000480 0x80>;
+ 		interrupts = <12 13>;
+ 		clocks = <&clks 11>;
+diff --git a/drivers/tty/serial/clps711x.c b/drivers/tty/serial/clps711x.c
+index 5beafd2..ac13286 100644
+--- a/drivers/tty/serial/clps711x.c
++++ b/drivers/tty/serial/clps711x.c
+@@ -539,7 +539,7 @@ static int uart_clps711x_remove(struct platform_device *pdev)
  }
  
- static const struct of_device_id __maybe_unused clps711x_pwm_dt_ids[] = {
--	{ .compatible = "cirrus,clps711x-pwm", },
-+	{ .compatible = "cirrus,ep7209-pwm", },
+ static const struct of_device_id __maybe_unused clps711x_uart_dt_ids[] = {
+-	{ .compatible = "cirrus,clps711x-uart", },
++	{ .compatible = "cirrus,ep7209-uart", },
  	{ }
  };
- MODULE_DEVICE_TABLE(of, clps711x_pwm_dt_ids);
+ MODULE_DEVICE_TABLE(of, clps711x_uart_dt_ids);
 -- 
 2.4.9
