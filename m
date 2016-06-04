@@ -1,26 +1,26 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 3 Jun 2016 17:04:52 -0700
-Subject: [Patch v6 05/10] firmware: qcom: scm: Convert to streaming DMA
- APIS
-In-Reply-To: <1464996330-16952-6-git-send-email-andy.gross@linaro.org>
-References: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
- <1464996330-16952-6-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160604000452.GY28218@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 03 Jun 2016 20:07:12 -0400 (EDT)
+Subject: [PATCH 1/5] ethernet: add sun8i-emac driver
+In-Reply-To: <1464947790-22991-2-git-send-email-clabbe.montjoie@gmail.com>
+References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1464947790-22991-2-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20160603.200712.1655112462975368614.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03, Andy Gross wrote:
-> This patch converts the Qualcomm SCM driver to use the streaming DMA APIs
-> for communication buffers.  This is being done so that the
-> secure_flush_area call can be removed.  Using the DMA APIs will also make
-> the SCM32 symmetric to the coming SCM64 code.
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> ---
+From: LABBE Corentin <clabbe.montjoie@gmail.com>
+Date: Fri,  3 Jun 2016 11:56:26 +0200
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> +static int nbdesc_tx = 256;
+> +module_param(nbdesc_tx, int, S_IRUGO | S_IWUSR);
+> +MODULE_PARM_DESC(nbdesc_tx, "Number of descriptors in the TX list");
+> +static int nbdesc_rx = 128;
+> +module_param(nbdesc_rx, int, S_IRUGO | S_IWUSR);
+> +MODULE_PARM_DESC(nbdesc_rx, "Number of descriptors in the RX list");
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Module parameters are not appropriate.
+
+Please use the proper ethtool configuration facilities to control
+the size of the RX and TX queues.
+
+Thanks.
