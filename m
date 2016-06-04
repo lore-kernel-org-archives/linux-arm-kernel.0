@@ -1,360 +1,375 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  4 Jun 2016 10:10:04 +0300
-Subject: [PATCH 12/22] ARM: dts: clps711x: Add DT Cirrus Logic EDB7211
- Development board
+Date: Sat,  4 Jun 2016 10:10:07 +0300
+Subject: [PATCH 15/22] video: clps711x: Remove old driver
 In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
 References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465024214-22120-13-git-send-email-shc_work@mail.ru>
+Message-ID: <1465024214-22120-16-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the Cirrus Logic EP7209,EP7211 DT templates and support for
-EDB7211 Development board.
+Since board support for the CLPS711X platform was removed,
+remove the old driver.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/Makefile           |   2 +
- arch/arm/boot/dts/ep7209.dtsi        | 191 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/ep7211-edb7211.dts | 100 ++++++++++++++++++
- arch/arm/boot/dts/ep7211.dtsi        |  12 +++
- 4 files changed, 305 insertions(+)
- create mode 100644 arch/arm/boot/dts/ep7209.dtsi
- create mode 100644 arch/arm/boot/dts/ep7211-edb7211.dts
- create mode 100644 arch/arm/boot/dts/ep7211.dtsi
+ drivers/video/fbdev/Kconfig      |   7 -
+ drivers/video/fbdev/Makefile     |   1 -
+ drivers/video/fbdev/clps711xfb.c | 314 ---------------------------------------
+ 3 files changed, 322 deletions(-)
+ delete mode 100644 drivers/video/fbdev/clps711xfb.c
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 06b6c2d..e409890 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -104,6 +104,8 @@ dtb-$(CONFIG_ARCH_BERLIN) += \
- 	berlin2q-marvell-dmp.dtb
- dtb-$(CONFIG_ARCH_BRCMSTB) += \
- 	bcm7445-bcm97445svmb.dtb
-+dtb-$(CONFIG_ARCH_CLPS711X) += \
-+	ep7211-edb7211.dtb
- dtb-$(CONFIG_ARCH_DAVINCI) += \
- 	da850-enbw-cmc.dtb \
- 	da850-evm.dtb
-diff --git a/arch/arm/boot/dts/ep7209.dtsi b/arch/arm/boot/dts/ep7209.dtsi
-new file mode 100644
-index 0000000..aaf1261
---- /dev/null
-+++ b/arch/arm/boot/dts/ep7209.dtsi
-@@ -0,0 +1,191 @@
-+/*
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ */
-+
-+/dts-v1/;
-+
-+#include "skeleton.dtsi"
-+
-+#include <dt-bindings/clock/clps711x-clock.h>
-+
-+/ {
-+	model = "Cirrus Logic EP7209";
-+	compatible = "cirrus,ep7209";
-+
-+	aliases {
-+		gpio0 = &porta;
-+		gpio1 = &portb;
-+		gpio3 = &portd;
-+		gpio4 = &porte;
-+		serial0 = &uart1;
-+		serial1 = &uart2;
-+		spi0 = &spi;
-+		timer0 = &timer1;
-+		timer1 = &timer2;
-+	};
-+
-+	cpus {
-+		#address-cells = <0>;
-+		#size-cells = <0>;
-+
-+		cpu {
-+			device_type = "cpu";
-+			compatible = "arm,arm720t";
-+		};
-+	};
-+
-+	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "simple-bus";
-+		interrupt-parent = <&intc>;
-+		ranges;
-+
-+		clks: clks at 80000000 {
-+			#clock-cells = <1>;
-+			compatible = "cirrus,ep7209-clk";
-+			reg = <0x80000000 0xc000>;
-+			startup-frequency = <73728000>;
-+		};
-+
-+		intc: intc at 80000000 {
-+			compatible = "cirrus,ep7209-intc";
-+			reg = <0x80000000 0x4000>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		porta: gpio at 80000000 {
-+			compatible = "cirrus,ep7209-gpio";
-+			reg = <0x80000000 0x1 0x80000040 0x1>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+
-+		portb: gpio at 80000001 {
-+			compatible = "cirrus,ep7209-gpio";
-+			reg = <0x80000001 0x1 0x80000041 0x1>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+
-+		portd: gpio at 80000003 {
-+			compatible = "cirrus,ep7209-gpio";
-+			reg = <0x80000003 0x1 0x80000043 0x1>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+
-+		porte: gpio at 80000083 {
-+			compatible = "cirrus,ep7209-gpio";
-+			reg = <0x80000083 0x1 0x800000c3 0x1>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+		};
-+
-+		syscon1: syscon at 80000100 {
-+			compatible = "cirrus,ep7209-syscon1", "syscon";
-+			reg = <0x80000100 0x80>;
-+		};
-+
-+		bus: bus at 80000180 {
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			compatible = "cirrus,ep7209-bus", "simple-bus";
-+			clocks = <&clks CLPS711X_CLK_BUS>;
-+			reg = <0x80000180 0x80>;
-+			ranges = <
-+				0 0 0x00000000 0x10000000
-+				1 0 0x10000000 0x10000000
-+				2 0 0x20000000 0x10000000
-+				3 0 0x30000000 0x10000000
-+				4 0 0x40000000 0x10000000
-+				5 0 0x50000000 0x10000000
-+				6 0 0x60000000 0x0000c000
-+				7 0 0x70000000 0x00000080
-+			>;
-+		};
-+
-+		fb: fb at 800002c0 {
-+			compatible = "cirrus,ep7209-fb";
-+			reg = <0x800002c0 0xd44>, <0x60000000 0xc000>;
-+			clocks = <&clks CLPS711X_CLK_BUS>;
-+			status = "disabled";
-+		};
-+
-+		timer1: timer at 80000300 {
-+			compatible = "cirrus,ep7209-timer";
-+			reg = <0x80000300 0x4>;
-+			clocks = <&clks CLPS711X_CLK_TIMER1>;
-+			interrupts = <8>;
-+		};
-+
-+		timer2: timer at 80000340 {
-+			compatible = "cirrus,ep7209-timer";
-+			reg = <0x80000340 0x4>;
-+			clocks = <&clks CLPS711X_CLK_TIMER2>;
-+			interrupts = <9>;
-+		};
-+
-+		pwm: pwm at 80000400 {
-+			compatible = "cirrus,ep7209-pwm";
-+			reg = <0x80000400 0x4>;
-+			clocks = <&clks CLPS711X_CLK_PWM>;
-+			#pwm-cells = <1>;
-+		};
-+
-+		uart1: uart at 80000480 {
-+			compatible = "cirrus,ep7209-uart";
-+			reg = <0x80000480 0x80>;
-+			interrupts = <12 13>;
-+			clocks = <&clks CLPS711X_CLK_UART>;
-+			syscon = <&syscon1>;
-+		};
-+
-+		spi: spi at 80000500 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			compatible = "cirrus,ep7209-spi";
-+			reg = <0x80000500 0x4>;
-+			interrupts = <15>;
-+			clocks = <&clks CLPS711X_CLK_SPI>;
-+			status = "disabled";
-+		};
-+
-+		syscon2: syscon at 80001100 {
-+			compatible = "cirrus,ep7209-syscon2", "syscon";
-+			reg = <0x80001100 0x80>;
-+		};
-+
-+		uart2: uart at 80001480 {
-+			compatible = "cirrus,ep7209-uart";
-+			reg = <0x80001480 0x80>;
-+			interrupts = <28 29>;
-+			clocks = <&clks CLPS711X_CLK_UART>;
-+			syscon = <&syscon2>;
-+		};
-+
-+		dai: dai at 80002000 {
-+			#sound-dai-cells = <0>;
-+			compatible = "cirrus,ep7209-dai";
-+			reg = <0x80002000 0x604>;
-+			clocks = <&clks CLPS711X_CLK_PLL>;
-+			clock-names = "pll";
-+			interrupts = <32>;
-+			status = "disabled";
-+		};
-+
-+		syscon3: syscon at 80002200 {
-+			compatible = "cirrus,ep7209-syscon3", "syscon";
-+			reg = <0x80002200 0x40>;
-+		};
-+	};
-+
-+	mctrl: mctrl {
-+		compatible = "cirrus,ep7209-mctrl-gpio";
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+	};
-+};
-diff --git a/arch/arm/boot/dts/ep7211-edb7211.dts b/arch/arm/boot/dts/ep7211-edb7211.dts
-new file mode 100644
-index 0000000..9a134ed
---- /dev/null
-+++ b/arch/arm/boot/dts/ep7211-edb7211.dts
-@@ -0,0 +1,100 @@
-+/*
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ */
-+
-+#include "ep7211.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Cirrus Logic EP7211 Development Board";
-+	compatible = "cirrus,edb7211", "cirrus,ep7211", "cirrus,ep7209";
-+
-+	memory {
-+		reg = <0xc0000000 0x02000000>;
-+	};
-+
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 0>;
-+		brightness-levels = <
-+			0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7
-+			0x8 0x9 0xa 0xb 0xc 0xd 0xe 0xf
-+		>;
-+		default-brightness-level = <0x0>;
-+		power-supply = <&blen>;
-+	};
-+
-+	display: display {
-+		model = "320x240x4";
-+		native-mode = <&timing0>;
-+		bits-per-pixel = <4>;
-+		ac-prescale = <17>;
-+
-+		display-timings {
-+			timing0: 320x240 {
-+				hactive = <320>;
-+				hback-porch = <0>;
-+				hfront-porch = <0>;
-+				hsync-len = <0>;
-+				vactive = <240>;
-+				vback-porch = <0>;
-+				vfront-porch = <0>;
-+				vsync-len = <0>;
-+				clock-frequency = <6500000>;
-+			};
-+		};
-+	};
-+
-+	i2c: i2c {
-+		compatible = "i2c-gpio";
-+		gpios = <&portd 4 GPIO_ACTIVE_HIGH>,
-+			<&portd 5 GPIO_ACTIVE_HIGH>;
-+		i2c-gpio,delay-us = <2>;
-+		i2c-gpio,scl-output-only;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-+
-+	lcddc: lcddc {
-+		compatible = "regulator-fixed";
-+		regulator-name = "BACKLIGHT ENABLE";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&portd 1 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	blen: blen {
-+		compatible = "regulator-fixed";
-+		regulator-name = "BACKLIGHT ENABLE";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&portd 3 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+&bus {
-+	flash: nor at 00000000 {
-+		compatible = "cfi-flash";
-+		reg = <0 0x00000000 0x02000000>;
-+		bank-width = <2>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+	};
-+};
-+
-+&fb {
-+	display = <&display>;
-+	lcd-supply = <&lcddc>;
-+	status = "okay";
-+};
-+
-+&portd {
-+	lcden {
-+		gpio-hog;
-+		gpios = <2 GPIO_ACTIVE_HIGH>;
-+		output-high;
-+		line-name = "LCD ENABLE";
-+	};
-+};
-diff --git a/arch/arm/boot/dts/ep7211.dtsi b/arch/arm/boot/dts/ep7211.dtsi
-new file mode 100644
-index 0000000..e438f6d
---- /dev/null
-+++ b/arch/arm/boot/dts/ep7211.dtsi
-@@ -0,0 +1,12 @@
-+/*
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ */
-+
-+#include "ep7209.dtsi"
-+
-+/ {
-+	model = "Cirrus Logic EP7211";
-+	compatible = "cirrus,ep7211", "cirrus,ep7209";
-+};
+diff --git a/drivers/video/fbdev/Kconfig b/drivers/video/fbdev/Kconfig
+index 88b008f..e050f18 100644
+--- a/drivers/video/fbdev/Kconfig
++++ b/drivers/video/fbdev/Kconfig
+@@ -317,16 +317,9 @@ config FB_ACORN
+ 	  hardware found in Acorn RISC PCs and other ARM-based machines.  If
+ 	  unsure, say N.
+ 
+-config FB_CLPS711X_OLD
+-	tristate
+-	select FB_CFB_FILLRECT
+-	select FB_CFB_COPYAREA
+-	select FB_CFB_IMAGEBLIT
+-
+ config FB_CLPS711X
+ 	tristate "CLPS711X LCD support"
+ 	depends on FB && (ARCH_CLPS711X || COMPILE_TEST)
+-	select FB_CLPS711X_OLD if ARCH_CLPS711X && !ARCH_MULTIPLATFORM
+ 	select BACKLIGHT_LCD_SUPPORT
+ 	select FB_MODE_HELPERS
+ 	select FB_SYS_FILLRECT
+diff --git a/drivers/video/fbdev/Makefile b/drivers/video/fbdev/Makefile
+index f673186..b9ec64b 100644
+--- a/drivers/video/fbdev/Makefile
++++ b/drivers/video/fbdev/Makefile
+@@ -15,7 +15,6 @@ obj-$(CONFIG_FB_WMT_GE_ROPS)   += wmt_ge_rops.o
+ obj-$(CONFIG_FB_AMIGA)            += amifb.o c2p_planar.o
+ obj-$(CONFIG_FB_ARC)              += arcfb.o
+ obj-$(CONFIG_FB_CLPS711X)	  += clps711x-fb.o
+-obj-$(CONFIG_FB_CLPS711X_OLD)	  += clps711xfb.o
+ obj-$(CONFIG_FB_CYBER2000)        += cyber2000fb.o
+ obj-$(CONFIG_FB_GRVGA)            += grvga.o
+ obj-$(CONFIG_FB_PM2)              += pm2fb.o
+diff --git a/drivers/video/fbdev/clps711xfb.c b/drivers/video/fbdev/clps711xfb.c
+deleted file mode 100644
+index 7693aea..0000000
+--- a/drivers/video/fbdev/clps711xfb.c
++++ /dev/null
+@@ -1,314 +0,0 @@
+-/*
+- *  linux/drivers/video/clps711xfb.c
+- *
+- *  Copyright (C) 2000-2001 Deep Blue Solutions Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- *
+- *  Framebuffer driver for the CLPS7111 and EP7212 processors.
+- */
+-#include <linux/mm.h>
+-#include <linux/module.h>
+-#include <linux/kernel.h>
+-#include <linux/slab.h>
+-#include <linux/fb.h>
+-#include <linux/init.h>
+-#include <linux/delay.h>
+-#include <linux/platform_device.h>
+-
+-#include <mach/hardware.h>
+-#include <asm/mach-types.h>
+-#include <linux/uaccess.h>
+-
+-struct fb_info	*cfb;
+-
+-#define CMAP_MAX_SIZE	16
+-
+-/*
+- * LCD AC Prescale.  This comes from the LCD panel manufacturers specifications.
+- * This determines how many clocks + 1 of CL1 before the M signal toggles.
+- * The number of lines on the display must not be divisible by this number.
+- */
+-static unsigned int lcd_ac_prescale = 13;
+-
+-/*
+- *    Set a single color register. Return != 0 for invalid regno.
+- */
+-static int
+-clps7111fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+-		     u_int transp, struct fb_info *info)
+-{
+-	unsigned int level, mask, shift, pal;
+-
+-	if (regno >= (1 << info->var.bits_per_pixel))
+-		return 1;
+-
+-	/* gray = 0.30*R + 0.58*G + 0.11*B */
+-	level = (red * 77 + green * 151 + blue * 28) >> 20;
+-
+-	/*
+-	 * On an LCD, a high value is dark, while a low value is light. 
+-	 * So we invert the level.
+-	 *
+-	 * This isn't true on all machines, so we only do it on EDB7211.
+-	 *  --rmk
+-	 */
+-	if (machine_is_edb7211()) {
+-		level = 15 - level;
+-	}
+-
+-	shift = 4 * (regno & 7);
+-	level <<= shift;
+-	mask  = 15 << shift;
+-	level &= mask;
+-
+-	regno = regno < 8 ? PALLSW : PALMSW;
+-
+-	pal = clps_readl(regno);
+-	pal = (pal & ~mask) | level;
+-	clps_writel(pal, regno);
+-
+-	return 0;
+-}
+-
+-/*
+- * Validate the purposed mode.
+- */	
+-static int
+-clps7111fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
+-{
+-	var->transp.msb_right	= 0;
+-	var->transp.offset	= 0;
+-	var->transp.length	= 0;
+-	var->red.msb_right	= 0;
+-	var->red.offset		= 0;
+-	var->red.length		= var->bits_per_pixel;
+-	var->green		= var->red;
+-	var->blue		= var->red;
+-
+-	if (var->bits_per_pixel > 4) 
+-		return -EINVAL;
+-
+-	return 0;
+-}
+-
+-/*
+- * Set the hardware state.
+- */ 
+-static int 
+-clps7111fb_set_par(struct fb_info *info)
+-{
+-	unsigned int lcdcon, syscon, pixclock;
+-
+-	switch (info->var.bits_per_pixel) {
+-	case 1:
+-		info->fix.visual = FB_VISUAL_MONO01;
+-		break;
+-	case 2:
+-		info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
+-		break;
+-	case 4:
+-		info->fix.visual = FB_VISUAL_PSEUDOCOLOR;
+-		break;
+-	}
+-
+-	info->fix.line_length = info->var.xres_virtual * info->var.bits_per_pixel / 8;
+-
+-	lcdcon = (info->var.xres_virtual * info->var.yres_virtual * info->var.bits_per_pixel) / 128 - 1;
+-	lcdcon |= ((info->var.xres_virtual / 16) - 1) << 13;
+-	lcdcon |= lcd_ac_prescale << 25;
+-
+-	/*
+-	 * Calculate pixel prescale value from the pixclock.  This is:
+-	 *  36.864MHz / pixclock_mhz - 1.
+-	 * However, pixclock is in picoseconds, so this ends up being:
+-	 *  36864000 * pixclock_ps / 10^12 - 1
+-	 * and this will overflow the 32-bit math.  We perform this as
+-	 * (9 * 4096000 == 36864000):
+-	 *  pixclock_ps * 9 * (4096000 / 10^12) - 1
+-	 */
+-	pixclock = 9 * info->var.pixclock / 244140 - 1;
+-	lcdcon |= pixclock << 19;
+-
+-	if (info->var.bits_per_pixel == 4)
+-		lcdcon |= LCDCON_GSMD;
+-	if (info->var.bits_per_pixel >= 2)
+-		lcdcon |= LCDCON_GSEN;
+-
+-	/*
+-	 * LCDCON must only be changed while the LCD is disabled
+-	 */
+-	syscon = clps_readl(SYSCON1);
+-	clps_writel(syscon & ~SYSCON1_LCDEN, SYSCON1);
+-	clps_writel(lcdcon, LCDCON);
+-	clps_writel(syscon | SYSCON1_LCDEN, SYSCON1);
+-	return 0;
+-}
+-
+-static int clps7111fb_blank(int blank, struct fb_info *info)
+-{
+-	/* Enable/Disable LCD controller. */
+-	if (blank)
+-		clps_writel(clps_readl(SYSCON1) & ~SYSCON1_LCDEN, SYSCON1);
+-	else
+-		clps_writel(clps_readl(SYSCON1) | SYSCON1_LCDEN, SYSCON1);
+-
+-	return 0;
+-}
+-
+-static struct fb_ops clps7111fb_ops = {
+-	.owner		= THIS_MODULE,
+-	.fb_check_var	= clps7111fb_check_var,
+-	.fb_set_par	= clps7111fb_set_par,
+-	.fb_setcolreg	= clps7111fb_setcolreg,
+-	.fb_blank	= clps7111fb_blank,
+-	.fb_fillrect	= cfb_fillrect,
+-	.fb_copyarea	= cfb_copyarea,
+-	.fb_imageblit	= cfb_imageblit,
+-};
+-
+-static void clps711x_guess_lcd_params(struct fb_info *info)
+-{
+-	unsigned int lcdcon, syscon, size;
+-	unsigned long phys_base = PAGE_OFFSET;
+-	void *virt_base = (void *)PAGE_OFFSET;
+-
+-	info->var.xres_virtual	 = 640;
+-	info->var.yres_virtual	 = 240;
+-	info->var.bits_per_pixel = 4;
+-	info->var.activate	 = FB_ACTIVATE_NOW;
+-	info->var.height	 = -1;
+-	info->var.width		 = -1;
+-	info->var.pixclock	 = 93006; /* 10.752MHz pixel clock */
+-
+-	/*
+-	 * If the LCD controller is already running, decode the values
+-	 * in LCDCON to xres/yres/bpp/pixclock/acprescale
+-	 */
+-	syscon = clps_readl(SYSCON1);
+-	if (syscon & SYSCON1_LCDEN) {
+-		lcdcon = clps_readl(LCDCON);
+-
+-		/*
+-		 * Decode GSMD and GSEN bits to bits per pixel
+-		 */
+-		switch (lcdcon & (LCDCON_GSMD | LCDCON_GSEN)) {
+-		case LCDCON_GSMD | LCDCON_GSEN:
+-			info->var.bits_per_pixel = 4;
+-			break;
+-
+-		case LCDCON_GSEN:
+-			info->var.bits_per_pixel = 2;
+-			break;
+-
+-		default:
+-			info->var.bits_per_pixel = 1;
+-			break;
+-		}
+-
+-		/*
+-		 * Decode xres/yres
+-		 */
+-		info->var.xres_virtual = (((lcdcon >> 13) & 0x3f) + 1) * 16;
+-		info->var.yres_virtual = (((lcdcon & 0x1fff) + 1) * 128) /
+-					  (info->var.xres_virtual *
+-					   info->var.bits_per_pixel);
+-
+-		/*
+-		 * Calculate pixclock
+-		 */
+-		info->var.pixclock = (((lcdcon >> 19) & 0x3f) + 1) * 244140 / 9;
+-
+-		/*
+-		 * Grab AC prescale
+-		 */
+-		lcd_ac_prescale = (lcdcon >> 25) & 0x1f;
+-	}
+-
+-	info->var.xres = info->var.xres_virtual;
+-	info->var.yres = info->var.yres_virtual;
+-	info->var.grayscale = info->var.bits_per_pixel > 1;
+-
+-	size = info->var.xres * info->var.yres * info->var.bits_per_pixel / 8;
+-
+-	/*
+-	 * Might be worth checking to see if we can use the on-board
+-	 * RAM if size here...
+-	 * CLPS7110 - no on-board SRAM
+-	 * EP7212   - 38400 bytes
+-	 */
+-	if (size <= 38400) {
+-		printk(KERN_INFO "CLPS711xFB: could use on-board SRAM?\n");
+-	}
+-
+-	if ((syscon & SYSCON1_LCDEN) == 0) {
+-		/*
+-		 * The display isn't running.  Ensure that
+-		 * the display memory is empty.
+-		 */
+-		memset(virt_base, 0, size);
+-	}
+-
+-	info->screen_base    = virt_base;
+-	info->fix.smem_start = phys_base;
+-	info->fix.smem_len   = PAGE_ALIGN(size);
+-	info->fix.type       = FB_TYPE_PACKED_PIXELS;
+-}
+-
+-static int clps711x_fb_probe(struct platform_device *pdev)
+-{
+-	int err = -ENOMEM;
+-
+-	if (fb_get_options("clps711xfb", NULL))
+-		return -ENODEV;
+-
+-	cfb = kzalloc(sizeof(*cfb), GFP_KERNEL);
+-	if (!cfb)
+-		goto out;
+-
+-	strcpy(cfb->fix.id, "clps711x");
+-
+-	cfb->fbops		= &clps7111fb_ops;
+-	cfb->flags		= FBINFO_DEFAULT;
+-
+-	clps711x_guess_lcd_params(cfb);
+-
+-	fb_alloc_cmap(&cfb->cmap, CMAP_MAX_SIZE, 0);
+-
+-	err = register_framebuffer(cfb);
+-
+-out:	return err;
+-}
+-
+-static int clps711x_fb_remove(struct platform_device *pdev)
+-{
+-	unregister_framebuffer(cfb);
+-	kfree(cfb);
+-
+-	return 0;
+-}
+-
+-static struct platform_driver clps711x_fb_driver = {
+-	.driver	= {
+-		.name	= "video-clps711x",
+-	},
+-	.probe	= clps711x_fb_probe,
+-	.remove	= clps711x_fb_remove,
+-};
+-module_platform_driver(clps711x_fb_driver);
+-
+-MODULE_AUTHOR("Russell King <rmk@arm.linux.org.uk>");
+-MODULE_DESCRIPTION("CLPS711X framebuffer driver");
+-MODULE_LICENSE("GPL");
 -- 
 2.4.9
