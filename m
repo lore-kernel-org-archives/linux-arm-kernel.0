@@ -1,55 +1,69 @@
 From: lkp@intel.com (kbuild test robot)
-Date: Sun, 5 Jun 2016 07:27:03 +0800
-Subject: [PATCHv5] support for AD5820 camera auto-focus coil
-In-Reply-To: <20160527205140.GA26767@amd>
-Message-ID: <201606050736.juGfm1Mr%fengguang.wu@intel.com>
+Date: Sun, 5 Jun 2016 07:46:46 +0800
+Subject: [PATCH net-next 1/3] arm64: bpf: implement bpf_tail_call() helper
+In-Reply-To: <1465077630-633-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <201606050700.BLJUHUk2%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.7-rc1 next-20160603]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+[auto build test ERROR on net-next/master]
 
-url:    https://github.com/0day-ci/linux/commits/Pavel-Machek/support-for-AD5820-camera-auto-focus-coil/20160528-045306
-base:   git://linuxtv.org/media_tree.git master
-config: tile-allyesconfig (attached as .config)
-compiler: tilegx-linux-gcc (GCC) 4.6.2
+url:    https://github.com/0day-ci/linux/commits/Zi-Shen-Lim/arm64-bpf-implement-bpf_tail_call-helper/20160605-060435
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
 reproduce:
         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
         chmod +x ~/bin/make.cross
         # save the attached .config to linux build tree
-        make.cross ARCH=tile 
+        make.cross ARCH=arm64 
 
 All errors (new ones prefixed by >>):
 
-   drivers/media/i2c/ad5820.c: In function 'ad5820_set_ctrl':
-   drivers/media/i2c/ad5820.c:168:7: error: 'V4L2_CID_FOCUS_AD5820_RAMP_TIME' undeclared (first use in this function)
-   drivers/media/i2c/ad5820.c:168:7: note: each undeclared identifier is reported only once for each function it appears in
->> drivers/media/i2c/ad5820.c:174:7: error: 'V4L2_CID_FOCUS_AD5820_RAMP_MODE' undeclared (first use in this function)
-   drivers/media/i2c/ad5820.c: At top level:
-   drivers/media/i2c/ad5820.c:194:10: error: 'V4L2_CID_FOCUS_AD5820_RAMP_TIME' undeclared here (not in a function)
-   drivers/media/i2c/ad5820.c:205:10: error: 'V4L2_CID_FOCUS_AD5820_RAMP_MODE' undeclared here (not in a function)
+   In file included from arch/arm64/net/bpf_jit_comp.c:21:0:
+   include/linux/bpf.h: In function 'bpf_prog_get':
+>> include/linux/bpf.h:235:9: error: implicit declaration of function 'ERR_PTR' [-Werror=implicit-function-declaration]
+     return ERR_PTR(-EOPNOTSUPP);
+            ^
+   include/linux/bpf.h:235:9: warning: return makes pointer from integer without a cast [-Wint-conversion]
+   In file included from include/linux/rwsem.h:17:0,
+                    from include/linux/mm_types.h:10,
+                    from include/linux/sched.h:27,
+                    from arch/arm64/include/asm/compat.h:25,
+                    from arch/arm64/include/asm/stat.h:23,
+                    from include/linux/stat.h:5,
+                    from include/linux/compat.h:12,
+                    from include/linux/filter.h:10,
+                    from arch/arm64/net/bpf_jit_comp.c:22:
+   include/linux/err.h: At top level:
+>> include/linux/err.h:23:35: error: conflicting types for 'ERR_PTR'
+    static inline void * __must_check ERR_PTR(long error)
+                                      ^
+   In file included from arch/arm64/net/bpf_jit_comp.c:21:0:
+   include/linux/bpf.h:235:9: note: previous implicit declaration of 'ERR_PTR' was here
+     return ERR_PTR(-EOPNOTSUPP);
+            ^
+   cc1: some warnings being treated as errors
 
-vim +/V4L2_CID_FOCUS_AD5820_RAMP_MODE +174 drivers/media/i2c/ad5820.c
+vim +/ERR_PTR +235 include/linux/bpf.h
 
-   162	
-   163		switch (ctrl->id) {
-   164		case V4L2_CID_FOCUS_ABSOLUTE:
-   165			coil->focus_absolute = ctrl->val;
-   166			return ad5820_update_hw(coil);
-   167	
- > 168		case V4L2_CID_FOCUS_AD5820_RAMP_TIME:
-   169			code = RAMP_US_TO_CODE(ctrl->val);
-   170			ctrl->val = CODE_TO_RAMP_US(code);
-   171			coil->focus_ramp_time = ctrl->val;
-   172			break;
-   173	
- > 174		case V4L2_CID_FOCUS_AD5820_RAMP_MODE:
-   175			coil->focus_ramp_mode = ctrl->val;
-   176			break;
-   177		}
+0fc174de Daniel Borkmann 2015-03-01  229  static inline void bpf_register_prog_type(struct bpf_prog_type_list *tl)
+0fc174de Daniel Borkmann 2015-03-01  230  {
+0fc174de Daniel Borkmann 2015-03-01  231  }
+0fc174de Daniel Borkmann 2015-03-01  232  
+0fc174de Daniel Borkmann 2015-03-01  233  static inline struct bpf_prog *bpf_prog_get(u32 ufd)
+0fc174de Daniel Borkmann 2015-03-01  234  {
+0fc174de Daniel Borkmann 2015-03-01 @235  	return ERR_PTR(-EOPNOTSUPP);
+0fc174de Daniel Borkmann 2015-03-01  236  }
+0fc174de Daniel Borkmann 2015-03-01  237  
+0fc174de Daniel Borkmann 2015-03-01  238  static inline void bpf_prog_put(struct bpf_prog *prog)
+
+:::::: The code at line 235 was first introduced by commit
+:::::: 0fc174dea54546e2b1146e1197da1b6d4bc48107 ebpf: make internal bpf API independent of CONFIG_BPF_SYSCALL ifdefs
+
+:::::: TO: Daniel Borkmann <daniel@iogearbox.net>
+:::::: CC: David S. Miller <davem@davemloft.net>
 
 ---
 0-DAY kernel test infrastructure                Open Source Technology Center
@@ -58,6 +72,6 @@ https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 A non-text attachment was scrubbed...
 Name: .config.gz
 Type: application/octet-stream
-Size: 43906 bytes
+Size: 25972 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160605/e107ca9e/attachment-0001.obj>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160605/5911aca3/attachment-0001.obj>
