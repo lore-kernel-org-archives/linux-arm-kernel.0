@@ -1,80 +1,152 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 4 Jun 2016 12:45:07 +0100
-Subject: [PATCH V3 1/2] irqchip/gicv3-its: split its_alloc_tables() into
- two functions
-In-Reply-To: <1462827506-23570-2-git-send-email-shankerd@codeaurora.org>
-References: <1462827506-23570-1-git-send-email-shankerd@codeaurora.org>
- <1462827506-23570-2-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20160604124507.436e5f7e@arm.com>
+Date: Sat, 4 Jun 2016 12:55:34 +0100
+Subject: [PATCH V5 5/7] irqchip, gicv3, its: Probe ITS in the ACPI way.
+In-Reply-To: <1464693584-22343-6-git-send-email-tn@semihalf.com>
+References: <1464693584-22343-1-git-send-email-tn@semihalf.com>
+ <1464693584-22343-6-git-send-email-tn@semihalf.com>
+Message-ID: <20160604125534.228e6a55@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 May 2016 15:58:25 -0500
-Shanker Donthineni <shankerd@codeaurora.org> wrote:
+On Tue, 31 May 2016 13:19:42 +0200
+Tomasz Nowicki <tn@semihalf.com> wrote:
 
-> The function is getting out of control, it has too many goto
-> statements and would be too complicated for adding a feature
-> two-level device table. So, it is time for us to cleanup and
-> move some of the logic to a separate function without affecting
-> the existing functionality.
+> ITS is prepared for being initialized different than DT,
+> therefore we can initialize it in ACPI way. We collect register base
+> address from MADT table and pass mandatory info to firmware-agnostic
+> ITS init call.
 > 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Note that we are using here IORT lib to register ITS domain which
+> then can be found and used on to build another PCI MSI domain
+> in hierarchical stack domain.
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 > ---
->  drivers/irqchip/irq-gic-v3-its.c   | 256 ++++++++++++++++++++-----------------
->  include/linux/irqchip/arm-gic-v3.h |   3 +
->  2 files changed, 144 insertions(+), 115 deletions(-)
+>  drivers/irqchip/Kconfig          |  1 +
+>  drivers/irqchip/irq-gic-v3-its.c | 60 ++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 61 insertions(+)
 > 
+> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+> index fa33c50..c6e652f 100644
+> --- a/drivers/irqchip/Kconfig
+> +++ b/drivers/irqchip/Kconfig
+> @@ -32,6 +32,7 @@ config ARM_GIC_V3
+>  config ARM_GIC_V3_ITS
+>  	bool
+>  	select PCI_MSI_IRQ_DOMAIN
+> +	select IORT_TABLE if ACPI
+>  
+>  config ARM_NVIC
+>  	bool
 > diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-> index 6bd881b..b23e00c 100644
+> index 6a97ee5..c8f36a5 100644
 > --- a/drivers/irqchip/irq-gic-v3-its.c
 > +++ b/drivers/irqchip/irq-gic-v3-its.c
-> @@ -55,13 +55,15 @@ struct its_collection {
->  };
->  
->  /*
-> - * The ITS_BASER structure - contains memory information and cached
-> - * value of BASER register configuration.
-> + * The ITS_BASER structure - contains memory information, cached value
-> + * of BASER register configuration, ioremaped address and page size.
+> @@ -15,10 +15,13 @@
+>   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 >   */
->  struct its_baser {
-> +	void __iomem	*hwreg;
->  	void		*base;
->  	u64		val;
->  	u32		order;
-> +	u32		psz;
->  };
 >  
->  /*
-> @@ -823,27 +825,135 @@ static void its_free_tables(struct its_node *its)
+> +#include <linux/acpi.h>
+>  #include <linux/bitmap.h>
+>  #include <linux/cpu.h>
+>  #include <linux/delay.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/iort.h>
+>  #include <linux/log2.h>
+>  #include <linux/mm.h>
+>  #include <linux/msi.h>
+> @@ -1312,6 +1315,11 @@ static int its_irq_gic_domain_alloc(struct irq_domain *domain,
+>  		fwspec.param[0] = GIC_IRQ_TYPE_LPI;
+>  		fwspec.param[1] = hwirq;
+>  		fwspec.param[2] = IRQ_TYPE_EDGE_RISING;
+> +	} else if (is_fwnode_irqchip(domain->parent->fwnode)) {
+> +		fwspec.fwnode = domain->parent->fwnode;
+> +		fwspec.param_count = 2;
+> +		fwspec.param[0] = hwirq;
+> +		fwspec.param[1] = IRQ_TYPE_EDGE_RISING;
+>  	} else {
+>  		return -EINVAL;
 >  	}
+> @@ -1645,6 +1653,56 @@ static int __init its_of_probe(struct device_node *node)
+>  	return 0;
 >  }
 >  
-> +static int its_baser_setup(struct its_node *its, struct its_baser *baser,
-> +				  u32 order, u64 indirect)
-> +{
-> +	u64 val = readq_relaxed(baser->hwreg);
-> +	u64 type = GITS_BASER_TYPE(val);
-> +	u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
-> +	int psz, alloc_pages;
-> +	u64 cache, shr, tmp;
-> +	void *base;
+> +#ifdef CONFIG_ACPI
 > +
-> +	/* Do first attempt with the requested attributes */
-> +	cache = baser->val & GITS_BASER_CACHEABILITY_MASK;
-> +	shr = baser->val & GITS_BASER_SHAREABILITY_MASK;
-> +	psz = baser->psz;
-> +
-> +retry_alloc_baser:
-> +	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
-> +	if (alloc_pages > GITS_BASER_PAGES_MAX) {
-> +		pr_warn("ITS@%lx: %s too large, reduce ITS pages %u->%u\n",
-> +			its->phys_base, its_base_type_string[type],
-> +			alloc_pages, GITS_BASER_PAGES_MAX);
+> +#define ACPI_GICV3_ITS_MEM_SIZE (2 * SZ_64K)
 
-By the way: as you're changing the output of various messages, please
-use %pa instead of %lx (and make sure you're passing the parameter by
-reference...).
+SZ_128k?
+
+> +
+> +static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
+> +					  const unsigned long end)
+> +{
+> +	struct acpi_madt_generic_translator *its_entry;
+> +	struct fwnode_handle *dom_handle;
+> +	struct resource res;
+> +	int err;
+> +
+> +	its_entry = (struct acpi_madt_generic_translator *)header;
+> +	res.start = its_entry->base_address;
+> +	res.end = its_entry->base_address + ACPI_GICV3_ITS_MEM_SIZE - 1;
+> +
+> +	dom_handle = irq_domain_alloc_fwnode((void *)its_entry->base_address);
+> +	if (!dom_handle) {
+> +		pr_err("ITS@%pa: Unable to allocate GICv3 ITS domain token\n",
+> +		       &res.start);
+> +		return -ENOMEM;
+> +	}
+> +
+> +	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
+> +	if (err) {
+> +		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
+> +		       &res.start, its_entry->translation_id);
+> +		goto dom_err;
+> +	}
+> +
+> +	err = its_probe_one(&res, dom_handle);
+> +	if (!err)
+> +		return 0;
+> +
+> +	iort_deregister_domain_token(its_entry->translation_id);
+> +dom_err:
+> +	irq_domain_free_fwnode(dom_handle);
+> +	return err;
+> +}
+> +
+> +void __init its_acpi_probe(void)
+
+Should be static.
+
+> +{
+> +	if (acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+> +				  gic_acpi_parse_madt_its, 0) <= 0)
+> +		pr_info("No valid GIC ITS entries exist\n");
+
+We already have a message further down, no need to shout twice.
+
+> +}
+> +#else
+> +static inline void __init its_acpi_probe(struct irq_domain *parent_domain) { }
+
+Drop the inline, the compiler can figure out that by itself.
+
+> +#endif
+> +
+>  int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+>  		    struct irq_domain *parent_domain)
+>  {
+> @@ -1654,6 +1712,8 @@ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
+>  	of_node = to_of_node(handle);
+>  	if (of_node)
+>  		its_of_probe(of_node);
+> +	else
+> +		its_acpi_probe();
+>  
+>  	if (list_empty(&its_nodes)) {
+>  		pr_warn("ITS: No ITS available, not enabling LPIs\n");
+
 
 Thanks,
 
