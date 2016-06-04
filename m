@@ -1,31 +1,27 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 03 Jun 2016 19:41:48 -0400 (EDT)
-Subject: [PATCH] rxrpc: Use pr_<level> and pr_fmt, reduce object size a
- few KB
-In-Reply-To: <c7437f437c30addd6dafa35b87d7c57061dc752b.1464894331.git.joe@perches.com>
-References: <c7437f437c30addd6dafa35b87d7c57061dc752b.1464894331.git.joe@perches.com>
-Message-ID: <20160603.194148.2116642486783888748.davem@davemloft.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 3 Jun 2016 17:01:00 -0700
+Subject: [Patch v6 06/10] firmware: qcom: scm: Add support for ARM64 SoCs
+In-Reply-To: <1464996330-16952-7-git-send-email-andy.gross@linaro.org>
+References: <1464996330-16952-1-git-send-email-andy.gross@linaro.org>
+ <1464996330-16952-7-git-send-email-andy.gross@linaro.org>
+Message-ID: <20160604000100.GT28218@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Joe Perches <joe@perches.com>
-Date: Thu,  2 Jun 2016 12:08:52 -0700
+On 06/03, Andy Gross wrote:
+> From: Kumar Gala <galak@codeaurora.org>
+> 
+> Add an implementation of the SCM interface that works on ARM64 SoCs.  This
+> is used by things like determine if we have HDCP support or not on the
+> system.
+> 
+> Signed-off-by: Kumar Gala <galak@codeaurora.org>
+> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> ---
 
-> Use the more common kernel logging style and reduce object size.
-> 
-> The logging message prefix changes from a mixture of
-> "RxRPC:" and "RXRPC:" to "af_rxrpc: ".
-> 
-> $ size net/rxrpc/built-in.o*
->    text	   data	    bss	    dec	    hex	filename
->   64172	   1972	   8304	  74448	  122d0	net/rxrpc/built-in.o.new
->   67512	   1972	   8304	  77788	  12fdc	net/rxrpc/built-in.o.old
-> 
-> Miscellanea:
-> 
-> o Consolidate the ASSERT macros to use a single pr_err call with
->   decimal and hexadecimal output and a stringified #OP argument
-> 
-> Signed-off-by: Joe Perches <joe@perches.com>
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Looks good to me, applied, thanks Joe.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
