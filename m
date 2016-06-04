@@ -1,10 +1,10 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  4 Jun 2016 10:09:56 +0300
-Subject: [PATCH 04/22] irqchip: clps711x: Changing the compatibility string to
+Date: Sat,  4 Jun 2016 10:09:58 +0300
+Subject: [PATCH 06/22] pwm: clps711x: Changing the compatibility string to
  match with the smallest supported chip
 In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
 References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465024214-22120-5-git-send-email-shc_work@mail.ru>
+Message-ID: <1465024214-22120-7-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,42 +14,44 @@ announced, this change is safe.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- .../devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt | 4 ++--
- drivers/irqchip/irq-clps711x.c                                        | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt | 5 ++---
+ drivers/pwm/pwm-clps711x.c                                    | 2 +-
+ 2 files changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-index 759339c..969b458 100644
---- a/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-+++ b/Documentation/devicetree/bindings/interrupt-controller/cirrus,clps711x-intc.txt
-@@ -2,7 +2,7 @@ Cirrus Logic CLPS711X Interrupt Controller
+diff --git a/Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt b/Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt
+index a183db4..c0b2028 100644
+--- a/Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/cirrus,clps711x-pwm.txt
+@@ -1,15 +1,14 @@
+ * Cirris Logic CLPS711X PWM controller
  
  Required properties:
- 
--- compatible: Should be "cirrus,clps711x-intc".
-+- compatible: Should be "cirrus,ep7209-intc".
- - reg: Specifies base physical address of the registers set.
- - interrupt-controller: Identifies the node as an interrupt controller.
- - #interrupt-cells: Specifies the number of cells needed to encode an
-@@ -34,7 +34,7 @@ ID	Name	Description
+-- compatible: Shall contain "cirrus,clps711x-pwm".
++- compatible: Shall contain "cirrus,ep7209-pwm".
+ - reg: Physical base address and length of the controller's registers.
+ - clocks: phandle + clock specifier pair of the PWM reference clock.
+ - #pwm-cells: Should be 1. The cell specifies the index of the channel.
  
  Example:
- 	intc: interrupt-controller {
--		compatible = "cirrus,clps711x-intc";
-+		compatible = "cirrus,ep7312-intc", "cirrus,ep7209-intc";
- 		reg = <0x80000000 0x4000>;
- 		interrupt-controller;
- 		#interrupt-cells = <1>;
-diff --git a/drivers/irqchip/irq-clps711x.c b/drivers/irqchip/irq-clps711x.c
-index 2223b3f..f913f4d 100644
---- a/drivers/irqchip/irq-clps711x.c
-+++ b/drivers/irqchip/irq-clps711x.c
-@@ -234,5 +234,5 @@ static int __init clps711x_intc_init_dt(struct device_node *np,
- 
- 	return _clps711x_intc_init(np, res.start, resource_size(&res));
+ 	pwm: pwm at 80000400 {
+-		compatible = "cirrus,ep7312-pwm",
+-			     "cirrus,clps711x-pwm";
++		compatible = "cirrus,ep7312-pwm", "cirrus,ep7209-pwm";
+ 		reg = <0x80000400 0x4>;
+ 		clocks = <&clks 8>;
+ 		#pwm-cells = <1>;
+diff --git a/drivers/pwm/pwm-clps711x.c b/drivers/pwm/pwm-clps711x.c
+index 7d33542..26ec24e 100644
+--- a/drivers/pwm/pwm-clps711x.c
++++ b/drivers/pwm/pwm-clps711x.c
+@@ -155,7 +155,7 @@ static int clps711x_pwm_remove(struct platform_device *pdev)
  }
--IRQCHIP_DECLARE(clps711x, "cirrus,clps711x-intc", clps711x_intc_init_dt);
-+IRQCHIP_DECLARE(clps711x, "cirrus,ep7209-intc", clps711x_intc_init_dt);
- #endif
+ 
+ static const struct of_device_id __maybe_unused clps711x_pwm_dt_ids[] = {
+-	{ .compatible = "cirrus,clps711x-pwm", },
++	{ .compatible = "cirrus,ep7209-pwm", },
+ 	{ }
+ };
+ MODULE_DEVICE_TABLE(of, clps711x_pwm_dt_ids);
 -- 
 2.4.9
