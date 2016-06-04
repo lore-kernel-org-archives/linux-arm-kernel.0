@@ -1,201 +1,83 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Sat, 4 Jun 2016 19:34:32 +0800
-Subject: [PATCH 21/23] arm64: ilp32: introduce ilp32-specific handlers for
- sigframe and ucontext
-In-Reply-To: <1464048292-30136-22-git-send-email-ynorov@caviumnetworks.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-22-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <5752BCC8.7080205@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 4 Jun 2016 12:45:07 +0100
+Subject: [PATCH V3 1/2] irqchip/gicv3-its: split its_alloc_tables() into
+ two functions
+In-Reply-To: <1462827506-23570-2-git-send-email-shankerd@codeaurora.org>
+References: <1462827506-23570-1-git-send-email-shankerd@codeaurora.org>
+ <1462827506-23570-2-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20160604124507.436e5f7e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 9 May 2016 15:58:25 -0500
+Shanker Donthineni <shankerd@codeaurora.org> wrote:
 
-I found an issue of unwind with the following code. The correct backtrace
-should be:
-(gdb) where
-#0 0x004004d0 in my_sig (sig=11) at test_force3.c:16
-#1 <signal handler called>
-#2 func2 (num=0) at test_force3.c:22
-#3 0x00400540 in func1 (num=1) at test_force3.c:28
-#4 0x00400574 in main (argc=1, argv=0xffd7bc04) at test_force3.c:33
+> The function is getting out of control, it has too many goto
+> statements and would be too complicated for adding a feature
+> two-level device table. So, it is time for us to cleanup and
+> move some of the logic to a separate function without affecting
+> the existing functionality.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c   | 256 ++++++++++++++++++++-----------------
+>  include/linux/irqchip/arm-gic-v3.h |   3 +
+>  2 files changed, 144 insertions(+), 115 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 6bd881b..b23e00c 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -55,13 +55,15 @@ struct its_collection {
+>  };
+>  
+>  /*
+> - * The ITS_BASER structure - contains memory information and cached
+> - * value of BASER register configuration.
+> + * The ITS_BASER structure - contains memory information, cached value
+> + * of BASER register configuration, ioremaped address and page size.
+>   */
+>  struct its_baser {
+> +	void __iomem	*hwreg;
+>  	void		*base;
+>  	u64		val;
+>  	u32		order;
+> +	u32		psz;
+>  };
+>  
+>  /*
+> @@ -823,27 +825,135 @@ static void its_free_tables(struct its_node *its)
+>  	}
+>  }
+>  
+> +static int its_baser_setup(struct its_node *its, struct its_baser *baser,
+> +				  u32 order, u64 indirect)
+> +{
+> +	u64 val = readq_relaxed(baser->hwreg);
+> +	u64 type = GITS_BASER_TYPE(val);
+> +	u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+> +	int psz, alloc_pages;
+> +	u64 cache, shr, tmp;
+> +	void *base;
+> +
+> +	/* Do first attempt with the requested attributes */
+> +	cache = baser->val & GITS_BASER_CACHEABILITY_MASK;
+> +	shr = baser->val & GITS_BASER_SHAREABILITY_MASK;
+> +	psz = baser->psz;
+> +
+> +retry_alloc_baser:
+> +	alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+> +	if (alloc_pages > GITS_BASER_PAGES_MAX) {
+> +		pr_warn("ITS@%lx: %s too large, reduce ITS pages %u->%u\n",
+> +			its->phys_base, its_base_type_string[type],
+> +			alloc_pages, GITS_BASER_PAGES_MAX);
 
-Without my patch, the backtrace is:
-(gdb) where
-#0 0x00400490 in my_sig (sig=11) at test_force3.c:16
-#1 <signal handler called>
-#2 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
+By the way: as you're changing the output of various messages, please
+use %pa instead of %lx (and make sure you're passing the parameter by
+reference...).
 
-With my patch which fix the wrong frame pointer(setup_return calculate the offset
-of fp through ilp32_sigframe instead of sigfreame), the backtrace is:
-(gdb) where
-#0 0x00400490 in my_sig (sig=11) at test_force3.c:16
-#1 <signal handler called>
-#2 func1 () at test_force3.c:28
-#3 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
+Thanks,
 
-I am not sure there is still some issue in kernel. But it seem that the gdb of ilp32
-does not work correctly when unwind without framepointer.
-
-The test code is:
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <signal.h>
-
-void my_sig(int sig)
-{
-	printf("sig=%d\n", sig);
-	*(int *)0 = 0x0;
-}
-
-
-void func2()
-{
-	*(int *)0 = 0x0;
-}
-
-void func1()
-{
-	func2();
-}
-
-int main(int argc, char **argv)
-{
-	signal(11, my_sig);
-	func1();
-	return 0;
-}
-
-
-The full patch is as follows:
-
- From 7e364a765097f57aed2d73f94c1688c2e7343e79 Mon Sep 17 00:00:00 2001
-From: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
-Date: Sat, 4 Jun 2016 14:30:05 +0800
-Subject: [PATCH] arm64: ilp32: fix for wrong fp offset when calculate the
-  new fp
-
-ILP32 define its own sigframe(ilp32_sigframe) because of the
-difference uc_context. setup_return do not use ilp32 specific
-sigframe to calculate the new offset of fp which lead to wrong
-fp in signal handler. At this circumstance, gdb backtrace will miss
-one item:
-(gdb) where
-
-It should be:
-(gdb) where
-
-The test code is as follows:
-
-void my_sig(int sig)
-{
-         printf("sig=%d\n", sig);
-         *(int *)0 = 0x0;
-}
-
-void func2(int num)
-{
-         printf("%s: %d\n", __FUNCTION__, num);
-         *(int *)0 = 0x0;
-         func2(num-1);
-}
-
-void func1(int num)
-{
-         printf("%s\n", __FUNCTION__);
-         func2(num - 1);
-}
-
-int main(int argc, char **argv)
-{
-         signal(11, my_sig);
-         func1(argc);
-         return 0;
-}
-
-This patch fix this by passing the correct offset of fp to
-setup_return.
-Test pass on both ILP32 and LP64 in aarch64 EE.
-
-Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
----
-  arch/arm64/include/asm/signal_common.h | 3 ++-
-  arch/arm64/kernel/signal.c             | 9 +++++----
-  arch/arm64/kernel/signal_ilp32.c       | 4 ++--
-  3 files changed, 9 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
-index de93c71..a5d7b63 100644
---- a/arch/arm64/include/asm/signal_common.h
-+++ b/arch/arm64/include/asm/signal_common.h
-@@ -29,6 +29,7 @@ int setup_sigcontex(struct sigcontext __user *uc_mcontext,
-  		    struct pt_regs *regs);
-  int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
-  void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
--			void __user *frame, off_t sigframe_off, int usig);
-+			void __user *frame, off_t sigframe_off, off_t fp_off,
-+			int usig);
-
-  #endif /* __ASM_SIGNAL_COMMON_H */
-diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-index 038bebe..e66a6e9 100644
---- a/arch/arm64/kernel/signal.c
-+++ b/arch/arm64/kernel/signal.c
-@@ -256,14 +256,14 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
-  }
-
-  void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
--			 void __user *frame, off_t sigframe_off, int usig)
-+			 void __user *frame, off_t sigframe_off, off_t fp_off,
-+			 int usig)
-  {
-  	__sigrestore_t sigtramp;
-
-  	regs->regs[0] = usig;
-  	regs->sp = (unsigned long)frame;
--	regs->regs[29] = regs->sp + sigframe_off +
--		offsetof(struct sigframe, fp);
-+	regs->regs[29] = regs->sp + sigframe_off + fp_off;
-  	regs->pc = (unsigned long)ka->sa.sa_handler;
-
-  	if (ka->sa.sa_flags & SA_RESTORER)
-@@ -294,7 +294,8 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
-  	err |= setup_sigframe(&frame->sig, regs, set);
-  	if (err == 0) {
-  		setup_return(regs, &ksig->ka, frame,
--			offsetof(struct rt_sigframe, sig), usig);
-+			offsetof(struct rt_sigframe, sig),
-+			offsetof(struct sigframe, fp), usig);
-  		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
-  			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
-  			regs->regs[1] = (unsigned long)&frame->info;
-diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
-index a8ea73e..9030f14 100644
---- a/arch/arm64/kernel/signal_ilp32.c
-+++ b/arch/arm64/kernel/signal_ilp32.c
-@@ -147,7 +147,6 @@ static struct ilp32_rt_sigframe __user *ilp32_get_sigframe(struct ksignal *ksig,
-  	struct ilp32_rt_sigframe __user *frame;
-
-  	sp = sp_top = sigsp(regs->sp, ksig);
--
-  	sp = (sp - sizeof(struct ilp32_rt_sigframe)) & ~15;
-  	frame = (struct ilp32_rt_sigframe __user *)sp;
-
-@@ -183,7 +182,8 @@ int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
-  	err |= setup_ilp32_sigframe(&frame->sig, regs, set);
-  	if (err == 0) {
-  		setup_return(regs, &ksig->ka, frame,
--			     offsetof(struct ilp32_rt_sigframe, sig), usig);
-+			     offsetof(struct ilp32_rt_sigframe, sig),
-+			     offsetof(struct ilp32_sigframe, fp), usig);
-  		regs->regs[1] = (unsigned long)&frame->info;
-  		regs->regs[2] = (unsigned long)&frame->sig.uc;
-  	}
+	M.
 -- 
-1.8.4.5
-
-Regards
-
-Bamvor
+Jazz is not dead. It just smells funny.
