@@ -1,46 +1,31 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Sat, 04 Jun 2016 12:55:15 -0700
-Subject: [PATCH v2 4/9] arm64: Add platform selection for BCM2835.
-In-Reply-To: <20160603112721.GC1128@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 04 Jun 2016 23:39:30 +0200
+Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry Pi
+ 3.
+In-Reply-To: <CAL_JsqL2RgTLq9R3v4LDiV6Wa7totbzJBgmzVDgUv_keoS52vA@mail.gmail.com>
 References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <1464934708-24769-5-git-send-email-kraxel@redhat.com>
- <20160603112721.GC1128@e104818-lin.cambridge.arm.com>
-Message-ID: <87bn3gu3to.fsf@eliezer.anholt.net>
+ <1464950355.24775.143.camel@redhat.com>
+ <CAL_JsqL2RgTLq9R3v4LDiV6Wa7totbzJBgmzVDgUv_keoS52vA@mail.gmail.com>
+Message-ID: <3356677.OOi30D5YDa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+On Friday, June 3, 2016 11:17:51 AM CEST Rob Herring wrote:
+> On Fri, Jun 3, 2016 at 5:39 AM, Gerd Hoffmann <kraxel@redhat.com> wrote:
+> >   Hi,
+> >
+> >> I tried
+> >>
+> >> subdir-y += ../../../arm64/boot/dts/broadcom
+> >
+> > Hmm, works for me too now, probably had a typo somewhere.
+> 
+> What directory does the dtb end up in? Because as it was, it ended up
+> in arch/arm64/boot/dts/broadcom. I'm not sure all this hackery is
+> worth it if the dtb doesn't end up in arch/arm/boot/dts/.
 
-> On Fri, Jun 03, 2016 at 08:18:23AM +0200, Gerd Hoffmann wrote:
->> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
->> index 7ef1d05..ea88402 100644
->> --- a/arch/arm64/Kconfig.platforms
->> +++ b/arch/arm64/Kconfig.platforms
->> @@ -13,6 +13,19 @@ config ARCH_ALPINE
->>  	  This enables support for the Annapurna Labs Alpine
->>  	  Soc family.
->>  
->> +config ARCH_BCM2835
->> +	bool "Broadcom BCM2835 family"
->> +	select ARCH_REQUIRE_GPIOLIB
->> +	select CLKSRC_OF
->> +	select PINCTRL
->> +	select PINCTRL_BCM2835
->> +	select ARM_AMBA
->> +	select ARM_TIMER_SP804
->> +	select HAVE_ARM_ARCH_TIMER
->> +	help
->> +	  This enables support for the Broadcom BCM2837 SoC.
->> +	  This SoC is used in the Raspberry Pi 3 device.
->
-> I thought we would just use ARCH_BCM, or is it too generic?
+I think having the dtb in $(objdir)arch/arm64/boot/dts/broadcom is fine, however
+installing the  'make dtbs_install' rule copy it to
+/boot/dts/../../../arm64/boot/dts/broadcom is not.
 
-Consensus last time around seemed to be to drop adding ARCH_BCM, in
-favor of patch 1 of the series.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160604/2f3df089/attachment.sig>
+	Arnd
