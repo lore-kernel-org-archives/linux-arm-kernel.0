@@ -1,222 +1,115 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  4 Jun 2016 10:10:06 +0300
-Subject: [PATCH 14/22] ARM: clps711x: Remove boards support
+Date: Sat,  4 Jun 2016 10:10:13 +0300
+Subject: [PATCH 21/22] ARM: clps711x: Switch to MULTIPLATFORM
 In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
 References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465024214-22120-15-git-send-email-shc_work@mail.ru>
+Message-ID: <1465024214-22120-22-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any CLPS711X-based board can be replaced with devicetree equivalent.
-Remove the board files.
+Switch CLPS711X to multiplatform.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/configs/clps711x_defconfig        |  91 -------
- arch/arm/mach-clps711x/Kconfig             |  31 ---
- arch/arm/mach-clps711x/Makefile            |  13 -
- arch/arm/mach-clps711x/Makefile.boot       |   5 -
- arch/arm/mach-clps711x/board-autcpu12.c    | 275 ---------------------
- arch/arm/mach-clps711x/board-cdb89712.c    | 147 ------------
- arch/arm/mach-clps711x/board-clep7312.c    |  45 ----
- arch/arm/mach-clps711x/board-edb7211.c     | 188 ---------------
- arch/arm/mach-clps711x/board-p720t.c       | 373 -----------------------------
- arch/arm/mach-clps711x/common.c            |  65 -----
- arch/arm/mach-clps711x/common.h            |  23 --
- arch/arm/mach-clps711x/devices.c           | 149 ------------
- arch/arm/mach-clps711x/devices.h           |  12 -
- include/linux/platform_data/spi-clps711x.h |  21 --
- 14 files changed, 1438 deletions(-)
- delete mode 100644 arch/arm/configs/clps711x_defconfig
- delete mode 100644 arch/arm/mach-clps711x/board-autcpu12.c
- delete mode 100644 arch/arm/mach-clps711x/board-cdb89712.c
- delete mode 100644 arch/arm/mach-clps711x/board-clep7312.c
- delete mode 100644 arch/arm/mach-clps711x/board-edb7211.c
- delete mode 100644 arch/arm/mach-clps711x/board-p720t.c
- delete mode 100644 arch/arm/mach-clps711x/common.c
- delete mode 100644 arch/arm/mach-clps711x/common.h
- delete mode 100644 arch/arm/mach-clps711x/devices.c
- delete mode 100644 arch/arm/mach-clps711x/devices.h
- delete mode 100644 include/linux/platform_data/spi-clps711x.h
+ arch/arm/Kconfig                                 |  14 --
+ arch/arm/Makefile                                |   1 -
+ arch/arm/mach-clps711x/Kconfig                   |  23 ++-
+ arch/arm/mach-clps711x/Makefile                  |   2 +-
+ arch/arm/mach-clps711x/include/mach/clps711x.h   | 204 -----------------------
+ arch/arm/mach-clps711x/include/mach/hardware.h   |  53 ------
+ arch/arm/mach-clps711x/include/mach/uncompress.h |  55 ------
+ 7 files changed, 12 insertions(+), 340 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/clps711x.h
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/hardware.h
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/uncompress.h
 
-diff --git a/arch/arm/configs/clps711x_defconfig b/arch/arm/configs/clps711x_defconfig
-deleted file mode 100644
-index fc105c9..0000000
---- a/arch/arm/configs/clps711x_defconfig
-+++ /dev/null
-@@ -1,91 +0,0 @@
--CONFIG_KERNEL_LZMA=y
--CONFIG_SYSVIPC=y
--CONFIG_LOG_BUF_SHIFT=14
--CONFIG_BLK_DEV_INITRD=y
--CONFIG_RD_LZMA=y
--CONFIG_EMBEDDED=y
--CONFIG_SLOB=y
--CONFIG_JUMP_LABEL=y
--# CONFIG_LBDAF is not set
--CONFIG_PARTITION_ADVANCED=y
--# CONFIG_IOSCHED_CFQ is not set
--CONFIG_ARCH_CLPS711X=y
--CONFIG_ARCH_AUTCPU12=y
--CONFIG_ARCH_CDB89712=y
--CONFIG_ARCH_CLEP7312=y
--CONFIG_ARCH_EDB7211=y
--CONFIG_ARCH_P720T=y
--CONFIG_AEABI=y
--CONFIG_ZBOOT_ROM_TEXT=0x0
--CONFIG_ZBOOT_ROM_BSS=0x0
--# CONFIG_COREDUMP is not set
--CONFIG_NET=y
--CONFIG_PACKET=y
--CONFIG_UNIX=y
--CONFIG_INET=y
--# CONFIG_IPV6 is not set
--CONFIG_IRDA=y
--CONFIG_IRTTY_SIR=y
--# CONFIG_WIRELESS is not set
--CONFIG_MTD=y
--CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_BLOCK=y
--CONFIG_MTD_CFI=y
--CONFIG_MTD_JEDECPROBE=y
--CONFIG_MTD_CFI_INTELEXT=y
--CONFIG_MTD_CFI_AMDSTD=y
--CONFIG_MTD_CFI_STAA=y
--CONFIG_MTD_PLATRAM=y
--CONFIG_MTD_NAND=y
--CONFIG_MTD_NAND_GPIO=y
--CONFIG_NETDEVICES=y
--# CONFIG_NET_CADENCE is not set
--# CONFIG_NET_VENDOR_BROADCOM is not set
--CONFIG_CS89x0=y
--CONFIG_CS89x0_PLATFORM=y
--# CONFIG_NET_VENDOR_FARADAY is not set
--# CONFIG_NET_VENDOR_INTEL is not set
--# CONFIG_NET_VENDOR_MARVELL is not set
--# CONFIG_NET_VENDOR_MICREL is not set
--# CONFIG_NET_VENDOR_NATSEMI is not set
--# CONFIG_NET_VENDOR_SEEQ is not set
--# CONFIG_NET_VENDOR_SMSC is not set
--# CONFIG_NET_VENDOR_STMICRO is not set
--# CONFIG_NET_VENDOR_WIZNET is not set
--# CONFIG_WLAN is not set
--# CONFIG_INPUT is not set
--# CONFIG_SERIO is not set
--# CONFIG_VT is not set
--CONFIG_SERIAL_CLPS711X=y
--CONFIG_SERIAL_CLPS711X_CONSOLE=y
--# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_GPIO=y
--CONFIG_SPI=y
--CONFIG_SPI_CLPS711X=y
--CONFIG_GPIO_CLPS711X=y
--CONFIG_GPIO_GENERIC_PLATFORM=y
--# CONFIG_HWMON is not set
--CONFIG_FB=y
--CONFIG_FB_CLPS711X=y
--CONFIG_LCD_PLATFORM=y
--CONFIG_BACKLIGHT_PWM=y
--# CONFIG_USB_SUPPORT is not set
--CONFIG_NEW_LEDS=y
--CONFIG_LEDS_CLASS=y
--CONFIG_LEDS_GPIO=y
--CONFIG_LEDS_TRIGGERS=y
--CONFIG_LEDS_TRIGGER_HEARTBEAT=y
--# CONFIG_IOMMU_SUPPORT is not set
--CONFIG_PWM=y
--CONFIG_PWM_CLPS711X=y
--CONFIG_EXT2_FS=y
--CONFIG_CRAMFS=y
--CONFIG_MINIX_FS=y
--# CONFIG_NETWORK_FILESYSTEMS is not set
--# CONFIG_FTRACE is not set
--CONFIG_DEBUG_USER=y
--CONFIG_DEBUG_LL=y
--CONFIG_EARLY_PRINTK=y
--# CONFIG_CRYPTO_ANSI_CPRNG is not set
--# CONFIG_CRYPTO_HW is not set
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 90542db..7a13e5a 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -353,20 +353,6 @@ config ARM_SINGLE_ARMV7M
+ 	select SPARSE_IRQ
+ 	select USE_OF
+ 
+-
+-config ARCH_CLPS711X
+-	bool "Cirrus Logic CLPS711x/EP721x/EP731x-based"
+-	select ARCH_REQUIRE_GPIOLIB
+-	select AUTO_ZRELADDR
+-	select CLKSRC_MMIO
+-	select COMMON_CLK
+-	select CPU_ARM720T
+-	select GENERIC_CLOCKEVENTS
+-	select MFD_SYSCON
+-	select SOC_BUS
+-	help
+-	  Support for Cirrus Logic 711x/721x/731x based boards.
+-
+ config ARCH_GEMINI
+ 	bool "Cortina Systems Gemini"
+ 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 274e8a6..10f16b3 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -140,7 +140,6 @@ head-y		:= arch/arm/kernel/head$(MMUEXT).o
+ # Text offset. This list is sorted numerically by address in order to
+ # provide a means to avoid/resolve conflicts in multi-arch kernels.
+ textofs-y	:= 0x00008000
+-textofs-$(CONFIG_ARCH_CLPS711X) := 0x00028000
+ # We don't want the htc bootloader to corrupt kernel during resume
+ textofs-$(CONFIG_PM_H1940)      := 0x00108000
+ # SA1111 DMA bug: we don't want the kernel to live in precious DMA-able memory
 diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
-index f21700c..0a170e1 100644
+index 0a170e1..3b56197 100644
 --- a/arch/arm/mach-clps711x/Kconfig
 +++ b/arch/arm/mach-clps711x/Kconfig
-@@ -11,37 +11,6 @@ config MACH_CLPS711X_DT
- 	  Select this if you want to experiment device-tree with
- 	  ARMv4T Cirrus Logic chips.
- 
--config ARCH_AUTCPU12
--	bool "AUTCPU12"
--	help
--	  Say Y if you intend to run the kernel on the autronix autcpu12
--	  board. This board is based on a Cirrus Logic CS89712.
+@@ -1,16 +1,15 @@
+-if ARCH_CLPS711X
 -
--config ARCH_CDB89712
--	bool "CDB89712"
--	help
--	  This is an evaluation board from Cirrus for the CS89712 processor.
--	  The board includes 2 serial ports, Ethernet, IRDA, and expansion
--	  headers.  It comes with 16 MB SDRAM and 8 MB flash ROM.
+-menu "CLPS711X/EP721X/EP731X Implementations"
 -
--config ARCH_CLEP7312
--	bool "CLEP7312"
--	help
--	  Boards based on the Cirrus Logic 7212/7312 chips.
+-config MACH_CLPS711X_DT
+-	bool "Device-tree support"
++menuconfig ARCH_CLPS711X
++	bool "Cirrus Logic EP721x/EP731x-based"
++	depends on ARCH_MULTI_V4T
++	select ARCH_REQUIRE_GPIOLIB
++	select AUTO_ZRELADDR
++	select CLKSRC_MMIO
+ 	select CLKSRC_OF
++	select COMMON_CLK
++	select CPU_ARM720T
++	select GENERIC_CLOCKEVENTS
++	select MFD_SYSCON
+ 	select OF_IRQ
+ 	select USE_OF
+ 	help
+-	  Select this if you want to experiment device-tree with
+-	  ARMv4T Cirrus Logic chips.
 -
--config ARCH_EDB7211
--	bool "EDB7211"
--	select ARCH_HAS_HOLES_MEMORYMODEL
--	help
--	  Say Y here if you intend to run this kernel on a Cirrus Logic EDB-7211
--	  evaluation board.
+-endmenu
 -
--config ARCH_P720T
--	bool "P720T"
--	help
--	  Say Y here if you intend to run this kernel on the ARM Prospector
--	  720T.
--
- endmenu
- 
- endif
+-endif
++	  Select this if you use ARMv4T Cirrus Logic chips.
 diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
-index ef6df40..d79d998 100644
+index d79d998..bd0b7b5 100644
 --- a/arch/arm/mach-clps711x/Makefile
 +++ b/arch/arm/mach-clps711x/Makefile
-@@ -1,14 +1 @@
--#
--# Makefile for the linux kernel.
--#
--
--# Object file lists.
--
--obj-y				:= common.o devices.o
--
- obj-$(CONFIG_MACH_CLPS711X_DT)	+= board-dt.o
--obj-$(CONFIG_ARCH_AUTCPU12)	+= board-autcpu12.o
--obj-$(CONFIG_ARCH_CDB89712)	+= board-cdb89712.o
--obj-$(CONFIG_ARCH_CLEP7312)	+= board-clep7312.o
--obj-$(CONFIG_ARCH_EDB7211)	+= board-edb7211.o
--obj-$(CONFIG_ARCH_P720T)	+= board-p720t.o
-diff --git a/arch/arm/mach-clps711x/Makefile.boot b/arch/arm/mach-clps711x/Makefile.boot
-index eba77d3..e69de29 100644
---- a/arch/arm/mach-clps711x/Makefile.boot
-+++ b/arch/arm/mach-clps711x/Makefile.boot
-@@ -1,5 +0,0 @@
--# The standard locations for stuff on CLPS711x type processors
--params_phys-y				:= 0xc0000100
--# Should probably have some agreement on these...
--initrd_phys-$(CONFIG_ARCH_P720T)	:= 0xc0400000
--initrd_phys-$(CONFIG_ARCH_CDB89712)	:= 0x00700000
-diff --git a/arch/arm/mach-clps711x/board-autcpu12.c b/arch/arm/mach-clps711x/board-autcpu12.c
+@@ -1 +1 @@
+-obj-$(CONFIG_MACH_CLPS711X_DT)	+= board-dt.o
++obj-y += board-dt.o
+diff --git a/arch/arm/mach-clps711x/include/mach/clps711x.h b/arch/arm/mach-clps711x/include/mach/clps711x.h
 deleted file mode 100644
-index ba3d7d1..0000000
---- a/arch/arm/mach-clps711x/board-autcpu12.c
+index eb052a1..0000000
+--- a/arch/arm/mach-clps711x/include/mach/clps711x.h
 +++ /dev/null
-@@ -1,275 +0,0 @@
+@@ -1,204 +0,0 @@
 -/*
-- *  linux/arch/arm/mach-clps711x/autcpu12.c
+- *  This file contains the hardware definitions of the Cirrus Logic
+- *  ARM7 CLPS711X internal registers.
 - *
-- * (c) 2001 Thomas Gleixner, autronix automation <gleixner@autronix.de>
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -232,272 +125,202 @@ index ba3d7d1..0000000
 - * along with this program; if not, write to the Free Software
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/types.h>
--#include <linux/string.h>
--#include <linux/mm.h>
--#include <linux/io.h>
--#include <linux/gpio.h>
--#include <linux/ioport.h>
--#include <linux/interrupt.h>
--#include <linux/mtd/physmap.h>
--#include <linux/mtd/plat-ram.h>
--#include <linux/mtd/partitions.h>
--#include <linux/mtd/nand-gpio.h>
--#include <linux/platform_device.h>
--#include <linux/gpio/driver.h>
+-#ifndef __MACH_CLPS711X_H
+-#define __MACH_CLPS711X_H
 -
--#include <mach/hardware.h>
--#include <asm/sizes.h>
--#include <asm/setup.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/pgtable.h>
--#include <asm/page.h>
+-#include <linux/mfd/syscon/clps711x.h>
 -
--#include <asm/mach/map.h>
+-#define CLPS711X_PHYS_BASE	(0x80000000)
 -
--#include "common.h"
--#include "devices.h"
+-#define PADR		(0x0000)
+-#define PBDR		(0x0001)
+-#define PCDR		(0x0002)
+-#define PDDR		(0x0003)
+-#define PADDR		(0x0040)
+-#define PBDDR		(0x0041)
+-#define PCDDR		(0x0042)
+-#define PDDDR		(0x0043)
+-#define PEDR		(0x0083)
+-#define PEDDR		(0x00c3)
+-#define SYSCON1		(0x0100)
+-#define SYSFLG1		(0x0140)
+-#define MEMCFG1		(0x0180)
+-#define MEMCFG2		(0x01c0)
+-#define DRFPR		(0x0200)
+-#define LCDCON		(0x02c0)
+-#define TC1D		(0x0300)
+-#define TC2D		(0x0340)
+-#define RTCDR		(0x0380)
+-#define RTCMR		(0x03c0)
+-#define PMPCON		(0x0400)
+-#define CODR		(0x0440)
+-#define UARTDR1		(0x0480)
+-#define UBRLCR1		(0x04c0)
+-#define SYNCIO		(0x0500)
+-#define PALLSW		(0x0540)
+-#define PALMSW		(0x0580)
+-#define STFCLR		(0x05c0)
+-#define HALT		(0x0800)
+-#define STDBY		(0x0840)
 -
--/* NOR flash */
--#define AUTCPU12_FLASH_BASE	(CS0_PHYS_BASE)
+-#define FBADDR		(0x1000)
+-#define SYSCON2		(0x1100)
+-#define SYSFLG2		(0x1140)
+-#define UARTDR2		(0x1480)
+-#define UBRLCR2		(0x14c0)
+-#define SS2DR		(0x1500)
+-#define SS2POP		(0x16c0)
 -
--/* Board specific hardware definitions */
--#define AUTCPU12_CHAR_LCD_BASE	(CS1_PHYS_BASE + 0x00000000)
--#define AUTCPU12_CSAUX1_BASE	(CS1_PHYS_BASE + 0x04000000)
--#define AUTCPU12_CAN_BASE	(CS1_PHYS_BASE + 0x08000000)
--#define AUTCPU12_TOUCH_BASE	(CS1_PHYS_BASE + 0x0a000000)
--#define AUTCPU12_IO_BASE	(CS1_PHYS_BASE + 0x0c000000)
--#define AUTCPU12_LPT_BASE	(CS1_PHYS_BASE + 0x0e000000)
+-#define DAIR		(0x2000)
+-#define DAIDR0		(0x2040)
+-#define DAIDR1		(0x2080)
+-#define DAIDR2		(0x20c0)
+-#define DAISR		(0x2100)
+-#define SYSCON3		(0x2200)
+-#define LEDFLSH		(0x22c0)
+-#define SDCONF		(0x2300)
+-#define SDRFPR		(0x2340)
+-#define UNIQID		(0x2440)
+-#define DAI64FS		(0x2600)
+-#define PLLW		(0x2610)
+-#define PLLR		(0xa5a8)
+-#define RANDID0		(0x2700)
+-#define RANDID1		(0x2704)
+-#define RANDID2		(0x2708)
+-#define RANDID3		(0x270c)
 -
--/* NVRAM */
--#define AUTCPU12_NVRAM_BASE	(CS1_PHYS_BASE + 0x02000000)
+-#define LCDCON_GSEN		(1 << 30)
+-#define LCDCON_GSMD		(1 << 31)
 -
--/* SmartMedia flash */
--#define AUTCPU12_SMC_BASE	(CS1_PHYS_BASE + 0x06000000)
--#define AUTCPU12_SMC_SEL_BASE	(AUTCPU12_SMC_BASE + 0x10)
+-/* common bits: UARTDR1 / UARTDR2 */
+-#define UARTDR_FRMERR		(1 << 8)
+-#define UARTDR_PARERR		(1 << 9)
+-#define UARTDR_OVERR		(1 << 10)
 -
--/* Ethernet */
--#define AUTCPU12_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
--#define AUTCPU12_CS8900_IRQ	(IRQ_EINT3)
+-/* common bits: UBRLCR1 / UBRLCR2 */
+-#define UBRLCR_BAUD_MASK	((1 << 12) - 1)
+-#define UBRLCR_BREAK		(1 << 12)
+-#define UBRLCR_PRTEN		(1 << 13)
+-#define UBRLCR_EVENPRT		(1 << 14)
+-#define UBRLCR_XSTOP		(1 << 15)
+-#define UBRLCR_FIFOEN		(1 << 16)
+-#define UBRLCR_WRDLEN5		(0 << 17)
+-#define UBRLCR_WRDLEN6		(1 << 17)
+-#define UBRLCR_WRDLEN7		(2 << 17)
+-#define UBRLCR_WRDLEN8		(3 << 17)
+-#define UBRLCR_WRDLEN_MASK	(3 << 17)
 -
--/* NAND flash */
--#define AUTCPU12_MMGPIO_BASE	(CLPS711X_NR_GPIO)
--#define AUTCPU12_SMC_NCE	(AUTCPU12_MMGPIO_BASE + 0) /* Bit 0 */
--#define AUTCPU12_SMC_RDY	CLPS711X_GPIO(1, 2)
--#define AUTCPU12_SMC_ALE	CLPS711X_GPIO(1, 3)
--#define AUTCPU12_SMC_CLE	CLPS711X_GPIO(1, 4)
+-#define SYNCIO_FRMLEN(x)	(((x) & 0x1f) << 8)
+-#define SYNCIO_SMCKEN		(1 << 13)
+-#define SYNCIO_TXFRMEN		(1 << 14)
 -
--/* LCD contrast digital potentiometer */
--#define AUTCPU12_DPOT_CS	CLPS711X_GPIO(4, 0)
--#define AUTCPU12_DPOT_CLK	CLPS711X_GPIO(4, 1)
--#define AUTCPU12_DPOT_UD	CLPS711X_GPIO(4, 2)
+-#define DAIR_RESERVED		(0x0404)
+-#define DAIR_DAIEN		(1 << 16)
+-#define DAIR_ECS		(1 << 17)
+-#define DAIR_LCTM		(1 << 19)
+-#define DAIR_LCRM		(1 << 20)
+-#define DAIR_RCTM		(1 << 21)
+-#define DAIR_RCRM		(1 << 22)
+-#define DAIR_LBM		(1 << 23)
 -
--static struct resource autcpu12_cs8900_resource[] __initdata = {
--	DEFINE_RES_MEM(AUTCPU12_CS8900_BASE, SZ_1K),
--	DEFINE_RES_IRQ(AUTCPU12_CS8900_IRQ),
--};
+-#define DAIDR2_FIFOEN		(1 << 15)
+-#define DAIDR2_FIFOLEFT		(0x0d << 16)
+-#define DAIDR2_FIFORIGHT	(0x11 << 16)
 -
--static struct resource autcpu12_nand_resource[] __initdata = {
--	DEFINE_RES_MEM(AUTCPU12_SMC_BASE, SZ_16),
--};
+-#define DAISR_RCTS		(1 << 0)
+-#define DAISR_RCRS		(1 << 1)
+-#define DAISR_LCTS		(1 << 2)
+-#define DAISR_LCRS		(1 << 3)
+-#define DAISR_RCTU		(1 << 4)
+-#define DAISR_RCRO		(1 << 5)
+-#define DAISR_LCTU		(1 << 6)
+-#define DAISR_LCRO		(1 << 7)
+-#define DAISR_RCNF		(1 << 8)
+-#define DAISR_RCNE		(1 << 9)
+-#define DAISR_LCNF		(1 << 10)
+-#define DAISR_LCNE		(1 << 11)
+-#define DAISR_FIFO		(1 << 12)
 -
--static struct mtd_partition autcpu12_nand_parts[] __initdata = {
--	{
--		.name	= "Flash partition 1",
--		.offset	= 0,
--		.size	= SZ_8M,
--	},
--	{
--		.name	= "Flash partition 2",
--		.offset	= MTDPART_OFS_APPEND,
--		.size	= MTDPART_SIZ_FULL,
--	},
--};
+-#define DAI64FS_I2SF64		(1 << 0)
+-#define DAI64FS_AUDIOCLKEN	(1 << 1)
+-#define DAI64FS_AUDIOCLKSRC	(1 << 2)
+-#define DAI64FS_MCLK256EN	(1 << 3)
+-#define DAI64FS_LOOPBACK	(1 << 5)
 -
--static void __init autcpu12_adjust_parts(struct gpio_nand_platdata *pdata,
--					 size_t sz)
--{
--	switch (sz) {
--	case SZ_16M:
--	case SZ_32M:
--		break;
--	case SZ_64M:
--	case SZ_128M:
--		pdata->parts[0].size = SZ_16M;
--		break;
--	default:
--		pr_warn("Unsupported SmartMedia device size %u\n", sz);
--		break;
--	}
--}
+-#define SDCONF_ACTIVE		(1 << 10)
+-#define SDCONF_CLKCTL		(1 << 9)
+-#define SDCONF_WIDTH_4		(0 << 7)
+-#define SDCONF_WIDTH_8		(1 << 7)
+-#define SDCONF_WIDTH_16		(2 << 7)
+-#define SDCONF_WIDTH_32		(3 << 7)
+-#define SDCONF_SIZE_16		(0 << 5)
+-#define SDCONF_SIZE_64		(1 << 5)
+-#define SDCONF_SIZE_128		(2 << 5)
+-#define SDCONF_SIZE_256		(3 << 5)
+-#define SDCONF_CASLAT_2		(2)
+-#define SDCONF_CASLAT_3		(3)
 -
--static struct gpio_nand_platdata autcpu12_nand_pdata __initdata = {
--	.gpio_rdy	= AUTCPU12_SMC_RDY,
--	.gpio_nce	= AUTCPU12_SMC_NCE,
--	.gpio_ale	= AUTCPU12_SMC_ALE,
--	.gpio_cle	= AUTCPU12_SMC_CLE,
--	.gpio_nwp	= -1,
--	.chip_delay	= 20,
--	.parts		= autcpu12_nand_parts,
--	.num_parts	= ARRAY_SIZE(autcpu12_nand_parts),
--	.adjust_parts	= autcpu12_adjust_parts,
--};
+-#define MEMCFG_BUS_WIDTH_32	(1)
+-#define MEMCFG_BUS_WIDTH_16	(0)
+-#define MEMCFG_BUS_WIDTH_8	(3)
 -
--static struct platform_device autcpu12_nand_pdev __initdata = {
--	.name		= "gpio-nand",
--	.id		= -1,
--	.resource	= autcpu12_nand_resource,
--	.num_resources	= ARRAY_SIZE(autcpu12_nand_resource),
--	.dev		= {
--		.platform_data = &autcpu12_nand_pdata,
--	},
--};
+-#define MEMCFG_SQAEN		(1 << 6)
+-#define MEMCFG_CLKENB		(1 << 7)
 -
--static struct resource autcpu12_mmgpio_resource[] __initdata = {
--	DEFINE_RES_MEM_NAMED(AUTCPU12_SMC_SEL_BASE, SZ_1, "dat"),
--};
+-#define MEMCFG_WAITSTATE_8_3	(0 << 2)
+-#define MEMCFG_WAITSTATE_7_3	(1 << 2)
+-#define MEMCFG_WAITSTATE_6_3	(2 << 2)
+-#define MEMCFG_WAITSTATE_5_3	(3 << 2)
+-#define MEMCFG_WAITSTATE_4_2	(4 << 2)
+-#define MEMCFG_WAITSTATE_3_2	(5 << 2)
+-#define MEMCFG_WAITSTATE_2_2	(6 << 2)
+-#define MEMCFG_WAITSTATE_1_2	(7 << 2)
+-#define MEMCFG_WAITSTATE_8_1	(8 << 2)
+-#define MEMCFG_WAITSTATE_7_1	(9 << 2)
+-#define MEMCFG_WAITSTATE_6_1	(10 << 2)
+-#define MEMCFG_WAITSTATE_5_1	(11 << 2)
+-#define MEMCFG_WAITSTATE_4_0	(12 << 2)
+-#define MEMCFG_WAITSTATE_3_0	(13 << 2)
+-#define MEMCFG_WAITSTATE_2_0	(14 << 2)
+-#define MEMCFG_WAITSTATE_1_0	(15 << 2)
 -
--static struct bgpio_pdata autcpu12_mmgpio_pdata __initdata = {
--	.base	= AUTCPU12_MMGPIO_BASE,
--	.ngpio	= 8,
--};
+-/* INTSR1 Interrupts */
+-#define IRQ_CSINT		(4)
+-#define IRQ_EINT1		(5)
+-#define IRQ_EINT2		(6)
+-#define IRQ_EINT3		(7)
+-#define IRQ_TC1OI		(8)
+-#define IRQ_TC2OI		(9)
+-#define IRQ_RTCMI		(10)
+-#define IRQ_TINT		(11)
+-#define IRQ_UTXINT1		(12)
+-#define IRQ_URXINT1		(13)
+-#define IRQ_UMSINT		(14)
+-#define IRQ_SSEOTI		(15)
 -
--static struct platform_device autcpu12_mmgpio_pdev __initdata = {
--	.name		= "basic-mmio-gpio",
--	.id		= -1,
--	.resource	= autcpu12_mmgpio_resource,
--	.num_resources	= ARRAY_SIZE(autcpu12_mmgpio_resource),
--	.dev		= {
--		.platform_data = &autcpu12_mmgpio_pdata,
--	},
--};
+-/* INTSR2 Interrupts */
+-#define IRQ_KBDINT		(16 + 0)
+-#define IRQ_SS2RX		(16 + 1)
+-#define IRQ_SS2TX		(16 + 2)
+-#define IRQ_UTXINT2		(16 + 12)
+-#define IRQ_URXINT2		(16 + 13)
 -
--static const struct gpio const autcpu12_gpios[] __initconst = {
--	{ AUTCPU12_DPOT_CS,	GPIOF_OUT_INIT_HIGH,	"DPOT CS" },
--	{ AUTCPU12_DPOT_CLK,	GPIOF_OUT_INIT_LOW,	"DPOT CLK" },
--	{ AUTCPU12_DPOT_UD,	GPIOF_OUT_INIT_LOW,	"DPOT UD" },
--};
+-/* INTSR3 Interrupts */
+-#define IRQ_DAIINT		(32 + 0)
 -
--static struct mtd_partition autcpu12_flash_partitions[] = {
--	{
--		.name	= "NOR.0",
--		.offset	= 0,
--		.size	= MTDPART_SIZ_FULL,
--	},
--};
--
--static struct physmap_flash_data autcpu12_flash_pdata = {
--	.width		= 4,
--	.parts		= autcpu12_flash_partitions,
--	.nr_parts	= ARRAY_SIZE(autcpu12_flash_partitions),
--};
--
--static struct resource autcpu12_flash_resources[] __initdata = {
--	DEFINE_RES_MEM(AUTCPU12_FLASH_BASE, SZ_8M),
--};
--
--static struct platform_device autcpu12_flash_pdev __initdata = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.resource	= autcpu12_flash_resources,
--	.num_resources	= ARRAY_SIZE(autcpu12_flash_resources),
--	.dev		= {
--		.platform_data	= &autcpu12_flash_pdata,
--	},
--};
--
--static struct resource autcpu12_nvram_resource[] __initdata = {
--	DEFINE_RES_MEM(AUTCPU12_NVRAM_BASE, 0),
--};
--
--static struct platdata_mtd_ram autcpu12_nvram_pdata = {
--	.bankwidth	= 4,
--};
--
--static struct platform_device autcpu12_nvram_pdev __initdata = {
--	.name		= "mtd-ram",
--	.id		= 0,
--	.resource	= autcpu12_nvram_resource,
--	.num_resources	= ARRAY_SIZE(autcpu12_nvram_resource),
--	.dev		= {
--		.platform_data	= &autcpu12_nvram_pdata,
--	},
--};
--
--static void __init autcpu12_nvram_init(void)
--{
--	void __iomem *nvram;
--	unsigned int save[2];
--	resource_size_t nvram_size = SZ_128K;
--
--	/*
--	 * Check for 32K/128K
--	 * Read ofs 0K
--	 * Read ofs 64K
--	 * Write complement to ofs 64K
--	 * Read and check result on ofs 0K
--	 * Restore contents
--	 */
--	nvram = ioremap(autcpu12_nvram_resource[0].start, SZ_128K);
--	if (nvram) {
--		save[0] = readl(nvram + 0);
--		save[1] = readl(nvram + SZ_64K);
--		writel(~save[0], nvram + SZ_64K);
--		if (readl(nvram + 0) != save[0]) {
--			writel(save[0], nvram + 0);
--			nvram_size = SZ_32K;
--		} else
--			writel(save[1], nvram + SZ_64K);
--		iounmap(nvram);
--
--		autcpu12_nvram_resource[0].end =
--			autcpu12_nvram_resource[0].start + nvram_size - 1;
--		platform_device_register(&autcpu12_nvram_pdev);
--	} else
--		pr_err("Failed to remap NVRAM resource\n");
--}
--
--static void __init autcpu12_init(void)
--{
--	clps711x_devices_init();
--	platform_device_register(&autcpu12_flash_pdev);
--	platform_device_register_simple("video-clps711x", 0, NULL, 0);
--	platform_device_register_simple("cs89x0", 0, autcpu12_cs8900_resource,
--					ARRAY_SIZE(autcpu12_cs8900_resource));
--	platform_device_register(&autcpu12_mmgpio_pdev);
--	autcpu12_nvram_init();
--}
--
--static void __init autcpu12_init_late(void)
--{
--	gpio_request_array(autcpu12_gpios, ARRAY_SIZE(autcpu12_gpios));
--	platform_device_register(&autcpu12_nand_pdev);
--}
--
--MACHINE_START(AUTCPU12, "autronix autcpu12")
--	/* Maintainer: Thomas Gleixner */
--	.atag_offset	= 0x20000,
--	.map_io		= clps711x_map_io,
--	.init_irq	= clps711x_init_irq,
--	.init_time	= clps711x_timer_init,
--	.init_machine	= autcpu12_init,
--	.init_late	= autcpu12_init_late,
--	.restart	= clps711x_restart,
--MACHINE_END
--
-diff --git a/arch/arm/mach-clps711x/board-cdb89712.c b/arch/arm/mach-clps711x/board-cdb89712.c
+-#endif /* __MACH_CLPS711X_H */
+diff --git a/arch/arm/mach-clps711x/include/mach/hardware.h b/arch/arm/mach-clps711x/include/mach/hardware.h
 deleted file mode 100644
-index 972abdb..0000000
---- a/arch/arm/mach-clps711x/board-cdb89712.c
+index cfd0e2c..0000000
+--- a/arch/arm/mach-clps711x/include/mach/hardware.h
 +++ /dev/null
-@@ -1,147 +0,0 @@
+@@ -1,53 +0,0 @@
 -/*
-- *  linux/arch/arm/mach-clps711x/cdb89712.c
+- *  arch/arm/mach-clps711x/include/mach/hardware.h
 - *
-- *  Copyright (C) 2000-2001 Deep Blue Solutions Ltd
+- *  This file contains the hardware definitions of the Prospector P720T.
+- *
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -513,1057 +336,98 @@ index 972abdb..0000000
 - * along with this program; if not, write to the Free Software
 - * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 - */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/types.h>
--#include <linux/string.h>
--#include <linux/mm.h>
--#include <linux/io.h>
--#include <linux/interrupt.h>
--#include <linux/platform_device.h>
--
--#include <linux/mtd/physmap.h>
--#include <linux/mtd/plat-ram.h>
--#include <linux/mtd/partitions.h>
--
--#include <mach/hardware.h>
--#include <asm/pgtable.h>
--#include <asm/page.h>
--#include <asm/setup.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--
--#include "common.h"
--#include "devices.h"
--
--#define CDB89712_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
--#define CDB89712_CS8900_IRQ	(IRQ_EINT3)
--
--static struct resource cdb89712_cs8900_resource[] __initdata = {
--	DEFINE_RES_MEM(CDB89712_CS8900_BASE, SZ_1K),
--	DEFINE_RES_IRQ(CDB89712_CS8900_IRQ),
--};
--
--static struct mtd_partition cdb89712_flash_partitions[] __initdata = {
--	{
--		.name	= "Flash",
--		.offset	= 0,
--		.size	= MTDPART_SIZ_FULL,
--	},
--};
--
--static struct physmap_flash_data cdb89712_flash_pdata __initdata = {
--	.width		= 4,
--	.probe_type	= "map_rom",
--	.parts		= cdb89712_flash_partitions,
--	.nr_parts	= ARRAY_SIZE(cdb89712_flash_partitions),
--};
--
--static struct resource cdb89712_flash_resources[] __initdata = {
--	DEFINE_RES_MEM(CS0_PHYS_BASE, SZ_8M),
--};
--
--static struct platform_device cdb89712_flash_pdev __initdata = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.resource	= cdb89712_flash_resources,
--	.num_resources	= ARRAY_SIZE(cdb89712_flash_resources),
--	.dev	= {
--		.platform_data	= &cdb89712_flash_pdata,
--	},
--};
--
--static struct mtd_partition cdb89712_bootrom_partitions[] __initdata = {
--	{
--		.name	= "BootROM",
--		.offset	= 0,
--		.size	= MTDPART_SIZ_FULL,
--	},
--};
--
--static struct physmap_flash_data cdb89712_bootrom_pdata __initdata = {
--	.width		= 4,
--	.probe_type	= "map_rom",
--	.parts		= cdb89712_bootrom_partitions,
--	.nr_parts	= ARRAY_SIZE(cdb89712_bootrom_partitions),
--};
--
--static struct resource cdb89712_bootrom_resources[] __initdata = {
--	DEFINE_RES_NAMED(CS7_PHYS_BASE, SZ_128, "BOOTROM", IORESOURCE_MEM |
--			 IORESOURCE_READONLY),
--};
--
--static struct platform_device cdb89712_bootrom_pdev __initdata = {
--	.name		= "physmap-flash",
--	.id		= 1,
--	.resource	= cdb89712_bootrom_resources,
--	.num_resources	= ARRAY_SIZE(cdb89712_bootrom_resources),
--	.dev	= {
--		.platform_data	= &cdb89712_bootrom_pdata,
--	},
--};
--
--static struct platdata_mtd_ram cdb89712_sram_pdata __initdata = {
--	.bankwidth	= 4,
--};
--
--static struct resource cdb89712_sram_resources[] __initdata = {
--	DEFINE_RES_MEM(CLPS711X_SRAM_BASE, CLPS711X_SRAM_SIZE),
--};
--
--static struct platform_device cdb89712_sram_pdev __initdata = {
--	.name		= "mtd-ram",
--	.id		= 0,
--	.resource	= cdb89712_sram_resources,
--	.num_resources	= ARRAY_SIZE(cdb89712_sram_resources),
--	.dev	= {
--		.platform_data	= &cdb89712_sram_pdata,
--	},
--};
--
--static void __init cdb89712_init(void)
--{
--	clps711x_devices_init();
--	platform_device_register(&cdb89712_flash_pdev);
--	platform_device_register(&cdb89712_bootrom_pdev);
--	platform_device_register(&cdb89712_sram_pdev);
--	platform_device_register_simple("cs89x0", 0, cdb89712_cs8900_resource,
--					ARRAY_SIZE(cdb89712_cs8900_resource));
--}
--
--MACHINE_START(CDB89712, "Cirrus-CDB89712")
--	/* Maintainer: Ray Lehtiniemi */
--	.atag_offset	= 0x100,
--	.map_io		= clps711x_map_io,
--	.init_irq	= clps711x_init_irq,
--	.init_time	= clps711x_timer_init,
--	.init_machine	= cdb89712_init,
--	.restart	= clps711x_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-clps711x/board-clep7312.c b/arch/arm/mach-clps711x/board-clep7312.c
-deleted file mode 100644
-index f9ca22b..0000000
---- a/arch/arm/mach-clps711x/board-clep7312.c
-+++ /dev/null
-@@ -1,45 +0,0 @@
--/*
-- *  linux/arch/arm/mach-clps711x/clep7312.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#include <linux/init.h>
--#include <linux/types.h>
--#include <linux/string.h>
--#include <linux/memblock.h>
--
--#include <asm/setup.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--
--#include "common.h"
--#include "devices.h"
--
--static void __init
--fixup_clep7312(struct tag *tags, char **cmdline)
--{
--	memblock_add(0xc0000000, 0x01000000);
--}
--
--MACHINE_START(CLEP7212, "Cirrus Logic 7212/7312")
--	/* Maintainer: Nobody */
--	.atag_offset	= 0x0100,
--	.fixup		= fixup_clep7312,
--	.map_io		= clps711x_map_io,
--	.init_irq	= clps711x_init_irq,
--	.init_time	= clps711x_timer_init,
--	.init_machine	= clps711x_devices_init,
--	.restart	= clps711x_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-deleted file mode 100644
-index f339797..0000000
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ /dev/null
-@@ -1,188 +0,0 @@
--/*
-- *  Copyright (C) 2000, 2001 Blue Mug, Inc.  All Rights Reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#include <linux/init.h>
--#include <linux/gpio.h>
--#include <linux/delay.h>
--#include <linux/memblock.h>
--#include <linux/types.h>
--#include <linux/i2c-gpio.h>
--#include <linux/interrupt.h>
--#include <linux/platform_device.h>
--#include <linux/pwm.h>
--#include <linux/pwm_backlight.h>
--#include <linux/memblock.h>
--
--#include <linux/mtd/physmap.h>
--#include <linux/mtd/partitions.h>
--
--#include <asm/setup.h>
--#include <asm/mach/map.h>
--#include <asm/mach/arch.h>
--#include <asm/mach-types.h>
--
--#include <video/platform_lcd.h>
--
--#include <mach/hardware.h>
--
--#include "common.h"
--#include "devices.h"
--
--#define VIDEORAM_SIZE		SZ_128K
--
--#define EDB7211_LCD_DC_DC_EN	CLPS711X_GPIO(3, 1)
--#define EDB7211_LCDEN		CLPS711X_GPIO(3, 2)
--#define EDB7211_LCDBL		CLPS711X_GPIO(3, 3)
--
--#define EDB7211_I2C_SDA		CLPS711X_GPIO(3, 4)
--#define EDB7211_I2C_SCL		CLPS711X_GPIO(3, 5)
--
--#define EDB7211_FLASH0_BASE	(CS0_PHYS_BASE)
--#define EDB7211_FLASH1_BASE	(CS1_PHYS_BASE)
--
--#define EDB7211_CS8900_BASE	(CS2_PHYS_BASE + 0x300)
--#define EDB7211_CS8900_IRQ	(IRQ_EINT3)
--
--/* The extra 8 lines of the keyboard matrix */
--#define EDB7211_EXTKBD_BASE	(CS3_PHYS_BASE)
--
--static struct i2c_gpio_platform_data edb7211_i2c_pdata __initdata = {
--	.sda_pin	= EDB7211_I2C_SDA,
--	.scl_pin	= EDB7211_I2C_SCL,
--	.scl_is_output_only = 1,
--};
--
--static struct resource edb7211_cs8900_resource[] __initdata = {
--	DEFINE_RES_MEM(EDB7211_CS8900_BASE, SZ_1K),
--	DEFINE_RES_IRQ(EDB7211_CS8900_IRQ),
--};
--
--static struct mtd_partition edb7211_flash_partitions[] __initdata = {
--	{
--		.name	= "Flash",
--		.offset	= 0,
--		.size	= MTDPART_SIZ_FULL,
--	},
--};
--
--static struct physmap_flash_data edb7211_flash_pdata __initdata = {
--	.width		= 4,
--	.parts		= edb7211_flash_partitions,
--	.nr_parts	= ARRAY_SIZE(edb7211_flash_partitions),
--};
--
--static struct resource edb7211_flash_resources[] __initdata = {
--	DEFINE_RES_MEM(EDB7211_FLASH0_BASE, SZ_8M),
--	DEFINE_RES_MEM(EDB7211_FLASH1_BASE, SZ_8M),
--};
--
--static struct platform_device edb7211_flash_pdev __initdata = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.resource	= edb7211_flash_resources,
--	.num_resources	= ARRAY_SIZE(edb7211_flash_resources),
--	.dev	= {
--		.platform_data	= &edb7211_flash_pdata,
--	},
--};
--
--static void edb7211_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
--{
--	if (power) {
--		gpio_set_value(EDB7211_LCDEN, 1);
--		udelay(100);
--		gpio_set_value(EDB7211_LCD_DC_DC_EN, 1);
--	} else {
--		gpio_set_value(EDB7211_LCD_DC_DC_EN, 0);
--		udelay(100);
--		gpio_set_value(EDB7211_LCDEN, 0);
--	}
--}
--
--static struct plat_lcd_data edb7211_lcd_power_pdata = {
--	.set_power	= edb7211_lcd_power_set,
--};
--
--static struct pwm_lookup edb7211_pwm_lookup[] = {
--	PWM_LOOKUP("clps711x-pwm", 0, "pwm-backlight.0", NULL,
--		   0, PWM_POLARITY_NORMAL),
--};
--
--static struct platform_pwm_backlight_data pwm_bl_pdata = {
--	.dft_brightness	= 0x01,
--	.max_brightness	= 0x0f,
--	.enable_gpio	= EDB7211_LCDBL,
--};
--
--static struct resource clps711x_pwm_res =
--	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + PMPCON, SZ_4);
--
--static struct gpio edb7211_gpios[] __initconst = {
--	{ EDB7211_LCD_DC_DC_EN,	GPIOF_OUT_INIT_LOW,	"LCD DC-DC" },
--	{ EDB7211_LCDEN,	GPIOF_OUT_INIT_LOW,	"LCD POWER" },
--};
--
--/* Reserve screen memory region at the start of main system memory. */
--static void __init edb7211_reserve(void)
--{
--	memblock_reserve(PHYS_OFFSET, VIDEORAM_SIZE);
--}
--
--static void __init
--fixup_edb7211(struct tag *tags, char **cmdline)
--{
--	/*
--	 * Bank start addresses are not present in the information
--	 * passed in from the boot loader.  We could potentially
--	 * detect them, but instead we hard-code them.
--	 *
--	 * Banks sizes _are_ present in the param block, but we're
--	 * not using that information yet.
--	 */
--	memblock_add(0xc0000000, SZ_8M);
--	memblock_add(0xc1000000, SZ_8M);
--}
--
--static void __init edb7211_init_late(void)
--{
--	gpio_request_array(edb7211_gpios, ARRAY_SIZE(edb7211_gpios));
--
--	platform_device_register(&edb7211_flash_pdev);
--
--	platform_device_register_data(NULL, "platform-lcd", 0,
--				      &edb7211_lcd_power_pdata,
--				      sizeof(edb7211_lcd_power_pdata));
--
--	platform_device_register_simple("clps711x-pwm", PLATFORM_DEVID_NONE,
--					&clps711x_pwm_res, 1);
--	pwm_add_table(edb7211_pwm_lookup, ARRAY_SIZE(edb7211_pwm_lookup));
--
--	platform_device_register_data(&platform_bus, "pwm-backlight", 0,
--				      &pwm_bl_pdata, sizeof(pwm_bl_pdata));
--
--	platform_device_register_simple("video-clps711x", 0, NULL, 0);
--	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
--					ARRAY_SIZE(edb7211_cs8900_resource));
--	platform_device_register_data(NULL, "i2c-gpio", 0,
--				      &edb7211_i2c_pdata,
--				      sizeof(edb7211_i2c_pdata));
--}
--
--MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
--	/* Maintainer: Jon McClintock */
--	.atag_offset	= VIDEORAM_SIZE + 0x100,
--	.fixup		= fixup_edb7211,
--	.reserve	= edb7211_reserve,
--	.map_io		= clps711x_map_io,
--	.init_irq	= clps711x_init_irq,
--	.init_time	= clps711x_timer_init,
--	.init_machine	= clps711x_devices_init,
--	.init_late	= edb7211_init_late,
--	.restart	= clps711x_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-clps711x/board-p720t.c b/arch/arm/mach-clps711x/board-p720t.c
-deleted file mode 100644
-index 80a16a8..0000000
---- a/arch/arm/mach-clps711x/board-p720t.c
-+++ /dev/null
-@@ -1,373 +0,0 @@
--/*
-- *  linux/arch/arm/mach-clps711x/p720t.c
-- *
-- *  Copyright (C) 2000-2001 Deep Blue Solutions Ltd
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/types.h>
--#include <linux/string.h>
--#include <linux/mm.h>
--#include <linux/io.h>
--#include <linux/gpio.h>
--#include <linux/slab.h>
--#include <linux/leds.h>
--#include <linux/sizes.h>
--#include <linux/backlight.h>
--#include <linux/gpio/driver.h>
--#include <linux/platform_device.h>
--#include <linux/mtd/partitions.h>
--#include <linux/mtd/nand-gpio.h>
--
--#include <mach/hardware.h>
--#include <asm/pgtable.h>
--#include <asm/page.h>
--#include <asm/setup.h>
--#include <asm/mach-types.h>
--#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--
--#include <video/platform_lcd.h>
--
--#include "common.h"
--#include "devices.h"
--
--#define P720T_USERLED		CLPS711X_GPIO(3, 0)
--#define P720T_NAND_CLE		CLPS711X_GPIO(4, 0)
--#define P720T_NAND_ALE		CLPS711X_GPIO(4, 1)
--#define P720T_NAND_NCE		CLPS711X_GPIO(4, 2)
--
--#define P720T_NAND_BASE		(CLPS711X_SDRAM1_BASE)
--
--#define P720T_MMGPIO_BASE	(CLPS711X_NR_GPIO)
--
--#define SYSPLD_PHYS_BASE	IOMEM(CS1_PHYS_BASE)
--
--#define PLD_INT			(SYSPLD_PHYS_BASE + 0x000000)
--#define PLD_INT_MMGPIO_BASE	(P720T_MMGPIO_BASE + 0)
--#define PLD_INT_PENIRQ		(PLD_INT_MMGPIO_BASE + 5)
--#define PLD_INT_UCB_IRQ		(PLD_INT_MMGPIO_BASE + 1)
--#define PLD_INT_KBD_ATN		(PLD_INT_MMGPIO_BASE + 0) /* EINT1 */
--
--#define PLD_PWR			(SYSPLD_PHYS_BASE + 0x000004)
--#define PLD_PWR_MMGPIO_BASE	(P720T_MMGPIO_BASE + 8)
--#define PLD_PWR_EXT		(PLD_PWR_MMGPIO_BASE + 5)
--#define PLD_PWR_MODE		(PLD_PWR_MMGPIO_BASE + 4) /* 1 = PWM, 0 = PFM */
--#define PLD_S4_ON		(PLD_PWR_MMGPIO_BASE + 3) /* LCD bias voltage enable */
--#define PLD_S3_ON		(PLD_PWR_MMGPIO_BASE + 2) /* LCD backlight enable */
--#define PLD_S2_ON		(PLD_PWR_MMGPIO_BASE + 1) /* LCD 3V3 supply enable */
--#define PLD_S1_ON		(PLD_PWR_MMGPIO_BASE + 0) /* LCD 3V supply enable */
--
--#define PLD_KBD			(SYSPLD_PHYS_BASE + 0x000008)
--#define PLD_KBD_MMGPIO_BASE	(P720T_MMGPIO_BASE + 16)
--#define PLD_KBD_WAKE		(PLD_KBD_MMGPIO_BASE + 1)
--#define PLD_KBD_EN		(PLD_KBD_MMGPIO_BASE + 0)
--
--#define PLD_SPI			(SYSPLD_PHYS_BASE + 0x00000c)
--#define PLD_SPI_MMGPIO_BASE	(P720T_MMGPIO_BASE + 24)
--#define PLD_SPI_EN		(PLD_SPI_MMGPIO_BASE + 0)
--
--#define PLD_IO			(SYSPLD_PHYS_BASE + 0x000010)
--#define PLD_IO_MMGPIO_BASE	(P720T_MMGPIO_BASE + 32)
--#define PLD_IO_BOOTSEL		(PLD_IO_MMGPIO_BASE + 6) /* Boot sel switch */
--#define PLD_IO_USER		(PLD_IO_MMGPIO_BASE + 5) /* User defined switch */
--#define PLD_IO_LED3		(PLD_IO_MMGPIO_BASE + 4)
--#define PLD_IO_LED2		(PLD_IO_MMGPIO_BASE + 3)
--#define PLD_IO_LED1		(PLD_IO_MMGPIO_BASE + 2)
--#define PLD_IO_LED0		(PLD_IO_MMGPIO_BASE + 1)
--#define PLD_IO_LEDEN		(PLD_IO_MMGPIO_BASE + 0)
--
--#define PLD_IRDA		(SYSPLD_PHYS_BASE + 0x000014)
--#define PLD_IRDA_MMGPIO_BASE	(P720T_MMGPIO_BASE + 40)
--#define PLD_IRDA_EN		(PLD_IRDA_MMGPIO_BASE + 0)
--
--#define PLD_COM2		(SYSPLD_PHYS_BASE + 0x000018)
--#define PLD_COM2_MMGPIO_BASE	(P720T_MMGPIO_BASE + 48)
--#define PLD_COM2_EN		(PLD_COM2_MMGPIO_BASE + 0)
--
--#define PLD_COM1		(SYSPLD_PHYS_BASE + 0x00001c)
--#define PLD_COM1_MMGPIO_BASE	(P720T_MMGPIO_BASE + 56)
--#define PLD_COM1_EN		(PLD_COM1_MMGPIO_BASE + 0)
--
--#define PLD_AUD			(SYSPLD_PHYS_BASE + 0x000020)
--#define PLD_AUD_MMGPIO_BASE	(P720T_MMGPIO_BASE + 64)
--#define PLD_AUD_DIV1		(PLD_AUD_MMGPIO_BASE + 6)
--#define PLD_AUD_DIV0		(PLD_AUD_MMGPIO_BASE + 5)
--#define PLD_AUD_CLK_SEL1	(PLD_AUD_MMGPIO_BASE + 4)
--#define PLD_AUD_CLK_SEL0	(PLD_AUD_MMGPIO_BASE + 3)
--#define PLD_AUD_MIC_PWR		(PLD_AUD_MMGPIO_BASE + 2)
--#define PLD_AUD_MIC_GAIN	(PLD_AUD_MMGPIO_BASE + 1)
--#define PLD_AUD_CODEC_EN	(PLD_AUD_MMGPIO_BASE + 0)
--
--#define PLD_CF			(SYSPLD_PHYS_BASE + 0x000024)
--#define PLD_CF_MMGPIO_BASE	(P720T_MMGPIO_BASE + 72)
--#define PLD_CF2_SLEEP		(PLD_CF_MMGPIO_BASE + 5)
--#define PLD_CF1_SLEEP		(PLD_CF_MMGPIO_BASE + 4)
--#define PLD_CF2_nPDREQ		(PLD_CF_MMGPIO_BASE + 3)
--#define PLD_CF1_nPDREQ		(PLD_CF_MMGPIO_BASE + 2)
--#define PLD_CF2_nIRQ		(PLD_CF_MMGPIO_BASE + 1)
--#define PLD_CF1_nIRQ		(PLD_CF_MMGPIO_BASE + 0)
--
--#define PLD_SDC			(SYSPLD_PHYS_BASE + 0x000028)
--#define PLD_SDC_MMGPIO_BASE	(P720T_MMGPIO_BASE + 80)
--#define PLD_SDC_INT_EN		(PLD_SDC_MMGPIO_BASE + 2)
--#define PLD_SDC_WP		(PLD_SDC_MMGPIO_BASE + 1)
--#define PLD_SDC_CD		(PLD_SDC_MMGPIO_BASE + 0)
--
--#define PLD_CODEC		(SYSPLD_PHYS_BASE + 0x400000)
--#define PLD_CODEC_MMGPIO_BASE	(P720T_MMGPIO_BASE + 88)
--#define PLD_CODEC_IRQ3		(PLD_CODEC_MMGPIO_BASE + 4)
--#define PLD_CODEC_IRQ2		(PLD_CODEC_MMGPIO_BASE + 3)
--#define PLD_CODEC_IRQ1		(PLD_CODEC_MMGPIO_BASE + 2)
--#define PLD_CODEC_EN		(PLD_CODEC_MMGPIO_BASE + 0)
--
--#define PLD_BRITE		(SYSPLD_PHYS_BASE + 0x400004)
--#define PLD_BRITE_MMGPIO_BASE	(P720T_MMGPIO_BASE + 96)
--#define PLD_BRITE_UP		(PLD_BRITE_MMGPIO_BASE + 1)
--#define PLD_BRITE_DN		(PLD_BRITE_MMGPIO_BASE + 0)
--
--#define PLD_LCDEN		(SYSPLD_PHYS_BASE + 0x400008)
--#define PLD_LCDEN_MMGPIO_BASE	(P720T_MMGPIO_BASE + 104)
--#define PLD_LCDEN_EN		(PLD_LCDEN_MMGPIO_BASE + 0)
--
--#define PLD_TCH			(SYSPLD_PHYS_BASE + 0x400010)
--#define PLD_TCH_MMGPIO_BASE	(P720T_MMGPIO_BASE + 112)
--#define PLD_TCH_PENIRQ		(PLD_TCH_MMGPIO_BASE + 1)
--#define PLD_TCH_EN		(PLD_TCH_MMGPIO_BASE + 0)
--
--#define PLD_GPIO		(SYSPLD_PHYS_BASE + 0x400014)
--#define PLD_GPIO_MMGPIO_BASE	(P720T_MMGPIO_BASE + 120)
--#define PLD_GPIO2		(PLD_GPIO_MMGPIO_BASE + 2)
--#define PLD_GPIO1		(PLD_GPIO_MMGPIO_BASE + 1)
--#define PLD_GPIO0		(PLD_GPIO_MMGPIO_BASE + 0)
--
--static struct gpio p720t_gpios[] __initconst = {
--	{ PLD_S1_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S1_ON" },
--	{ PLD_S2_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S2_ON" },
--	{ PLD_S3_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S3_ON" },
--	{ PLD_S4_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S4_ON" },
--	{ PLD_KBD_EN,	GPIOF_OUT_INIT_LOW,	"PLD_KBD_EN" },
--	{ PLD_SPI_EN,	GPIOF_OUT_INIT_LOW,	"PLD_SPI_EN" },
--	{ PLD_IO_USER,	GPIOF_OUT_INIT_LOW,	"PLD_IO_USER" },
--	{ PLD_IO_LED0,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED0" },
--	{ PLD_IO_LED1,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED1" },
--	{ PLD_IO_LED2,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED2" },
--	{ PLD_IO_LED3,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED3" },
--	{ PLD_IO_LEDEN,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LEDEN" },
--	{ PLD_IRDA_EN,	GPIOF_OUT_INIT_LOW,	"PLD_IRDA_EN" },
--	{ PLD_COM1_EN,	GPIOF_OUT_INIT_HIGH,	"PLD_COM1_EN" },
--	{ PLD_COM2_EN,	GPIOF_OUT_INIT_HIGH,	"PLD_COM2_EN" },
--	{ PLD_CODEC_EN,	GPIOF_OUT_INIT_LOW,	"PLD_CODEC_EN" },
--	{ PLD_LCDEN_EN,	GPIOF_OUT_INIT_LOW,	"PLD_LCDEN_EN" },
--	{ PLD_TCH_EN,	GPIOF_OUT_INIT_LOW,	"PLD_TCH_EN" },
--	{ P720T_USERLED,GPIOF_OUT_INIT_LOW,	"USER_LED" },
--};
--
--static struct resource p720t_mmgpio_resource[] __initdata = {
--	DEFINE_RES_MEM_NAMED(0, 4, "dat"),
--};
--
--static struct bgpio_pdata p720t_mmgpio_pdata = {
--	.ngpio	= 8,
--};
--
--static struct platform_device p720t_mmgpio __initdata = {
--	.name		= "basic-mmio-gpio",
--	.id		= -1,
--	.resource	= p720t_mmgpio_resource,
--	.num_resources	= ARRAY_SIZE(p720t_mmgpio_resource),
--	.dev		= {
--		.platform_data	= &p720t_mmgpio_pdata,
--	},
--};
--
--static void __init p720t_mmgpio_init(void __iomem *addrbase, int gpiobase)
--{
--	p720t_mmgpio_resource[0].start = (unsigned long)addrbase;
--	p720t_mmgpio_pdata.base = gpiobase;
--
--	platform_device_register(&p720t_mmgpio);
--}
--
--static struct {
--	void __iomem	*addrbase;
--	int		gpiobase;
--} mmgpios[] __initconst = {
--	{ PLD_INT,	PLD_INT_MMGPIO_BASE },
--	{ PLD_PWR,	PLD_PWR_MMGPIO_BASE },
--	{ PLD_KBD,	PLD_KBD_MMGPIO_BASE },
--	{ PLD_SPI,	PLD_SPI_MMGPIO_BASE },
--	{ PLD_IO,	PLD_IO_MMGPIO_BASE },
--	{ PLD_IRDA,	PLD_IRDA_MMGPIO_BASE },
--	{ PLD_COM2,	PLD_COM2_MMGPIO_BASE },
--	{ PLD_COM1,	PLD_COM1_MMGPIO_BASE },
--	{ PLD_AUD,	PLD_AUD_MMGPIO_BASE },
--	{ PLD_CF,	PLD_CF_MMGPIO_BASE },
--	{ PLD_SDC,	PLD_SDC_MMGPIO_BASE },
--	{ PLD_CODEC,	PLD_CODEC_MMGPIO_BASE },
--	{ PLD_BRITE,	PLD_BRITE_MMGPIO_BASE },
--	{ PLD_LCDEN,	PLD_LCDEN_MMGPIO_BASE },
--	{ PLD_TCH,	PLD_TCH_MMGPIO_BASE },
--	{ PLD_GPIO,	PLD_GPIO_MMGPIO_BASE },
--};
--
--static struct resource p720t_nand_resource[] __initdata = {
--	DEFINE_RES_MEM(P720T_NAND_BASE, SZ_4),
--};
--
--static struct mtd_partition p720t_nand_parts[] __initdata = {
--	{
--		.name	= "Flash partition 1",
--		.offset	= 0,
--		.size	= SZ_2M,
--	},
--	{
--		.name	= "Flash partition 2",
--		.offset	= MTDPART_OFS_APPEND,
--		.size	= MTDPART_SIZ_FULL,
--	},
--};
--
--static struct gpio_nand_platdata p720t_nand_pdata __initdata = {
--	.gpio_rdy	= -1,
--	.gpio_nce	= P720T_NAND_NCE,
--	.gpio_ale	= P720T_NAND_ALE,
--	.gpio_cle	= P720T_NAND_CLE,
--	.gpio_nwp	= -1,
--	.chip_delay	= 15,
--	.parts		= p720t_nand_parts,
--	.num_parts	= ARRAY_SIZE(p720t_nand_parts),
--};
--
--static struct platform_device p720t_nand_pdev __initdata = {
--	.name		= "gpio-nand",
--	.id		= -1,
--	.resource	= p720t_nand_resource,
--	.num_resources	= ARRAY_SIZE(p720t_nand_resource),
--	.dev		= {
--		.platform_data = &p720t_nand_pdata,
--	},
--};
--
--static void p720t_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
--{
--	if (power) {
--		gpio_set_value(PLD_LCDEN_EN, 1);
--		gpio_set_value(PLD_S1_ON, 1);
--		gpio_set_value(PLD_S2_ON, 1);
--		gpio_set_value(PLD_S4_ON, 1);
--	} else {
--		gpio_set_value(PLD_S1_ON, 0);
--		gpio_set_value(PLD_S2_ON, 0);
--		gpio_set_value(PLD_S4_ON, 0);
--		gpio_set_value(PLD_LCDEN_EN, 0);
--	}
--}
--
--static struct plat_lcd_data p720t_lcd_power_pdata = {
--	.set_power	= p720t_lcd_power_set,
--};
--
--static void p720t_lcd_backlight_set_intensity(int intensity)
--{
--	gpio_set_value(PLD_S3_ON, intensity);
--}
--
--static struct generic_bl_info p720t_lcd_backlight_pdata = {
--	.name			= "lcd-backlight.0",
--	.default_intensity	= 0x01,
--	.max_intensity		= 0x01,
--	.set_bl_intensity	= p720t_lcd_backlight_set_intensity,
--};
--
--static void __init
--fixup_p720t(struct tag *tag, char **cmdline)
--{
--	/*
--	 * Our bootloader doesn't setup any tags (yet).
--	 */
--	if (tag->hdr.tag != ATAG_CORE) {
--		tag->hdr.tag = ATAG_CORE;
--		tag->hdr.size = tag_size(tag_core);
--		tag->u.core.flags = 0;
--		tag->u.core.pagesize = PAGE_SIZE;
--		tag->u.core.rootdev = 0x0100;
--
--		tag = tag_next(tag);
--		tag->hdr.tag = ATAG_MEM;
--		tag->hdr.size = tag_size(tag_mem32);
--		tag->u.mem.size = 4096;
--		tag->u.mem.start = PHYS_OFFSET;
--
--		tag = tag_next(tag);
--		tag->hdr.tag = ATAG_NONE;
--		tag->hdr.size = 0;
--	}
--}
--
--static struct gpio_led p720t_gpio_leds[] = {
--	{
--		.name			= "User LED",
--		.default_trigger	= "heartbeat",
--		.gpio			= P720T_USERLED,
--	},
--};
--
--static struct gpio_led_platform_data p720t_gpio_led_pdata __initdata = {
--	.leds		= p720t_gpio_leds,
--	.num_leds	= ARRAY_SIZE(p720t_gpio_leds),
--};
--
--static void __init p720t_init(void)
--{
--	int i;
--
--	clps711x_devices_init();
--
--	for (i = 0; i < ARRAY_SIZE(mmgpios); i++)
--		p720t_mmgpio_init(mmgpios[i].addrbase, mmgpios[i].gpiobase);
--
--	platform_device_register(&p720t_nand_pdev);
--}
--
--static void __init p720t_init_late(void)
--{
--	WARN_ON(gpio_request_array(p720t_gpios, ARRAY_SIZE(p720t_gpios)));
--
--	platform_device_register_data(NULL, "platform-lcd", 0,
--				      &p720t_lcd_power_pdata,
--				      sizeof(p720t_lcd_power_pdata));
--	platform_device_register_data(NULL, "generic-bl", 0,
--				      &p720t_lcd_backlight_pdata,
--				      sizeof(p720t_lcd_backlight_pdata));
--	platform_device_register_simple("video-clps711x", 0, NULL, 0);
--	platform_device_register_data(NULL, "leds-gpio", 0,
--				      &p720t_gpio_led_pdata,
--				      sizeof(p720t_gpio_led_pdata));
--}
--
--MACHINE_START(P720T, "ARM-Prospector720T")
--	/* Maintainer: ARM Ltd/Deep Blue Solutions Ltd */
--	.atag_offset	= 0x100,
--	.fixup		= fixup_p720t,
--	.map_io		= clps711x_map_io,
--	.init_irq	= clps711x_init_irq,
--	.init_time	= clps711x_timer_init,
--	.init_machine	= p720t_init,
--	.init_late	= p720t_init_late,
--	.restart	= clps711x_restart,
--MACHINE_END
-diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
-deleted file mode 100644
-index 6466da8..0000000
---- a/arch/arm/mach-clps711x/common.c
-+++ /dev/null
-@@ -1,65 +0,0 @@
--/*
-- *  linux/arch/arm/mach-clps711x/core.c
-- *
-- *  Core support for the CLPS711x-based machines.
-- *
-- *  Copyright (C) 2001,2011 Deep Blue Solutions Ltd
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- */
--
--#include <linux/init.h>
--#include <linux/sizes.h>
--
--#include <asm/mach/map.h>
--#include <asm/system_misc.h>
--
--#include <mach/hardware.h>
--
--#include "common.h"
--
--/*
-- * This maps the generic CLPS711x registers
-- */
--static struct map_desc clps711x_io_desc[] __initdata = {
--	{
--		.virtual	= (unsigned long)CLPS711X_VIRT_BASE,
--		.pfn		= __phys_to_pfn(CLPS711X_PHYS_BASE),
--		.length		= 48 * SZ_1K,
--		.type		= MT_DEVICE,
--	}
--};
--
--void __init clps711x_map_io(void)
--{
--	iotable_init(clps711x_io_desc, ARRAY_SIZE(clps711x_io_desc));
--}
--
--void __init clps711x_init_irq(void)
--{
--	clps711x_intc_init(CLPS711X_PHYS_BASE, SZ_16K);
--}
--
--void __init clps711x_timer_init(void)
--{
--	clps711x_clk_init(CLPS711X_VIRT_BASE);
--	clps711x_clksrc_init(CLPS711X_VIRT_BASE + TC1D,
--			     CLPS711X_VIRT_BASE + TC2D, IRQ_TC2OI);
--}
--
--void clps711x_restart(enum reboot_mode mode, const char *cmd)
--{
--	soft_restart(0);
--}
-diff --git a/arch/arm/mach-clps711x/common.h b/arch/arm/mach-clps711x/common.h
-deleted file mode 100644
-index 370200b..0000000
---- a/arch/arm/mach-clps711x/common.h
-+++ /dev/null
-@@ -1,23 +0,0 @@
--/*
-- * linux/arch/arm/mach-clps711x/common.h
-- *
-- * Common bits.
-- */
--
--#include <linux/reboot.h>
--
--#define CLPS711X_NR_GPIO	(4 * 8 + 3)
--#define CLPS711X_GPIO(prt, bit)	((prt) * 8 + (bit))
--
--extern void clps711x_map_io(void);
--extern void clps711x_init_irq(void);
--extern void clps711x_timer_init(void);
--extern void clps711x_restart(enum reboot_mode mode, const char *cmd);
--
--/* drivers/irqchip/irq-clps711x.c */
--void clps711x_intc_init(phys_addr_t, resource_size_t);
--/* drivers/clk/clk-clps711x.c */
--void clps711x_clk_init(void __iomem *base);
--/* drivers/clocksource/clps711x-timer.c */
--void clps711x_clksrc_init(void __iomem *tc1_base, void __iomem *tc2_base,
--			  unsigned int irq);
-diff --git a/arch/arm/mach-clps711x/devices.c b/arch/arm/mach-clps711x/devices.c
-deleted file mode 100644
-index 77a9617..0000000
---- a/arch/arm/mach-clps711x/devices.c
-+++ /dev/null
-@@ -1,149 +0,0 @@
--/*
-- *  CLPS711X common devices definitions
-- *
-- *  Author: Alexander Shiyan <shc_work@mail.ru>, 2013-2014
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#include <linux/io.h>
--#include <linux/of_fdt.h>
--#include <linux/platform_device.h>
--#include <linux/random.h>
--#include <linux/sizes.h>
--#include <linux/slab.h>
--#include <linux/sys_soc.h>
--
--#include <asm/system_info.h>
--
--#include <mach/hardware.h>
--
--static const struct resource clps711x_cpuidle_res __initconst =
--	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + HALT, SZ_128);
--
--static void __init clps711x_add_cpuidle(void)
--{
--	platform_device_register_simple("clps711x-cpuidle", PLATFORM_DEVID_NONE,
--					&clps711x_cpuidle_res, 1);
--}
--
--static const phys_addr_t clps711x_gpios[][2] __initconst = {
--	{ PADR, PADDR },
--	{ PBDR, PBDDR },
--	{ PCDR, PCDDR },
--	{ PDDR, PDDDR },
--	{ PEDR, PEDDR },
--};
--
--static void __init clps711x_add_gpio(void)
--{
--	unsigned i;
--	struct resource gpio_res[2];
--
--	memset(gpio_res, 0, sizeof(gpio_res));
--
--	gpio_res[0].flags = IORESOURCE_MEM;
--	gpio_res[1].flags = IORESOURCE_MEM;
--
--	for (i = 0; i < ARRAY_SIZE(clps711x_gpios); i++) {
--		gpio_res[0].start = CLPS711X_PHYS_BASE + clps711x_gpios[i][0];
--		gpio_res[0].end = gpio_res[0].start;
--		gpio_res[1].start = CLPS711X_PHYS_BASE + clps711x_gpios[i][1];
--		gpio_res[1].end = gpio_res[1].start;
--
--		platform_device_register_simple("clps711x-gpio", i,
--						gpio_res, ARRAY_SIZE(gpio_res));
--	}
--}
--
--const struct resource clps711x_syscon_res[] __initconst = {
--	/* SYSCON1, SYSFLG1 */
--	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + SYSCON1, SZ_128),
--	/* SYSCON2, SYSFLG2 */
--	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + SYSCON2, SZ_128),
--	/* SYSCON3 */
--	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + SYSCON3, SZ_64),
--};
--
--static void __init clps711x_add_syscon(void)
--{
--	unsigned i;
--
--	for (i = 0; i < ARRAY_SIZE(clps711x_syscon_res); i++)
--		platform_device_register_simple("syscon", i + 1,
--						&clps711x_syscon_res[i], 1);
--}
--
--static const struct resource clps711x_uart1_res[] __initconst = {
--	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + UARTDR1, SZ_128),
--	DEFINE_RES_IRQ(IRQ_UTXINT1),
--	DEFINE_RES_IRQ(IRQ_URXINT1),
--};
--
--static const struct resource clps711x_uart2_res[] __initconst = {
--	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + UARTDR2, SZ_128),
--	DEFINE_RES_IRQ(IRQ_UTXINT2),
--	DEFINE_RES_IRQ(IRQ_URXINT2),
--};
--
--static void __init clps711x_add_uart(void)
--{
--	platform_device_register_simple("clps711x-uart", 0, clps711x_uart1_res,
--					ARRAY_SIZE(clps711x_uart1_res));
--	platform_device_register_simple("clps711x-uart", 1, clps711x_uart2_res,
--					ARRAY_SIZE(clps711x_uart2_res));
--};
--
--static void __init clps711x_soc_init(void)
--{
--	struct soc_device_attribute *soc_dev_attr;
--	struct soc_device *soc_dev;
--	void __iomem *base;
--	u32 id[5];
--
--	base = ioremap(CLPS711X_PHYS_BASE, SZ_32K);
--	if (!base)
--		return;
--
--	id[0] = readl(base + UNIQID);
--	id[1] = readl(base + RANDID0);
--	id[2] = readl(base + RANDID1);
--	id[3] = readl(base + RANDID2);
--	id[4] = readl(base + RANDID3);
--	system_rev = SYSFLG1_VERID(readl(base + SYSFLG1));
--
--	add_device_randomness(id, sizeof(id));
--
--	system_serial_low = id[0];
--
--	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
--	if (!soc_dev_attr)
--		goto out_unmap;
--
--	soc_dev_attr->machine = of_flat_dt_get_machine_name();
--	soc_dev_attr->family = "Cirrus Logic CLPS711X";
--	soc_dev_attr->revision = kasprintf(GFP_KERNEL, "%u", system_rev);
--	soc_dev_attr->soc_id = kasprintf(GFP_KERNEL, "%08x", id[0]);
--
--	soc_dev = soc_device_register(soc_dev_attr);
--	if (IS_ERR(soc_dev)) {
--		kfree(soc_dev_attr->revision);
--		kfree(soc_dev_attr->soc_id);
--		kfree(soc_dev_attr);
--	}
--
--out_unmap:
--	iounmap(base);
--}
--
--void __init clps711x_devices_init(void)
--{
--	clps711x_add_cpuidle();
--	clps711x_add_gpio();
--	clps711x_add_syscon();
--	clps711x_add_uart();
--	clps711x_soc_init();
--}
-diff --git a/arch/arm/mach-clps711x/devices.h b/arch/arm/mach-clps711x/devices.h
-deleted file mode 100644
-index a5efc17..0000000
---- a/arch/arm/mach-clps711x/devices.h
-+++ /dev/null
-@@ -1,12 +0,0 @@
--/*
-- *  CLPS711X common devices definitions
-- *
-- *  Copyright (C) 2013 Alexander Shiyan <shc_work@mail.ru>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--void clps711x_devices_init(void);
-diff --git a/include/linux/platform_data/spi-clps711x.h b/include/linux/platform_data/spi-clps711x.h
-deleted file mode 100644
-index 301956e..0000000
---- a/include/linux/platform_data/spi-clps711x.h
-+++ /dev/null
-@@ -1,21 +0,0 @@
--/*
-- *  CLPS711X SPI bus driver definitions
-- *
-- *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- */
--
--#ifndef ____LINUX_PLATFORM_DATA_SPI_CLPS711X_H
--#define ____LINUX_PLATFORM_DATA_SPI_CLPS711X_H
--
--/* Board specific platform_data */
--struct spi_clps711x_pdata {
--	int *chipselect;	/* Array of GPIO-numbers */
--	int num_chipselect;	/* Total count of GPIOs */
--};
+-#ifndef __MACH_HARDWARE_H
+-#define __MACH_HARDWARE_H
+-
+-#include <mach/clps711x.h>
+-
+-#define CLPS711X_VIRT_BASE	IOMEM(0xfeff4000)
+-
+-#ifndef __ASSEMBLY__
+-#define clps_readb(off)		readb(CLPS711X_VIRT_BASE + (off))
+-#define clps_readw(off)		readw(CLPS711X_VIRT_BASE + (off))
+-#define clps_readl(off)		readl(CLPS711X_VIRT_BASE + (off))
+-#define clps_writeb(val,off)	writeb(val, CLPS711X_VIRT_BASE + (off))
+-#define clps_writew(val,off)	writew(val, CLPS711X_VIRT_BASE + (off))
+-#define clps_writel(val,off)	writel(val, CLPS711X_VIRT_BASE + (off))
+-#endif
+-
+-#define CS0_PHYS_BASE		(0x00000000)
+-#define CS1_PHYS_BASE		(0x10000000)
+-#define CS2_PHYS_BASE		(0x20000000)
+-#define CS3_PHYS_BASE		(0x30000000)
+-#define CS4_PHYS_BASE		(0x40000000)
+-#define CS5_PHYS_BASE		(0x50000000)
+-#define CS6_PHYS_BASE		(0x60000000)
+-#define CS7_PHYS_BASE		(0x70000000)
+-
+-#define CLPS711X_SRAM_BASE	CS6_PHYS_BASE
+-#define CLPS711X_SRAM_SIZE	(48 * 1024)
+-
+-#define CLPS711X_SDRAM0_BASE	(0xc0000000)
+-#define CLPS711X_SDRAM1_BASE	(0xd0000000)
 -
 -#endif
+diff --git a/arch/arm/mach-clps711x/include/mach/uncompress.h b/arch/arm/mach-clps711x/include/mach/uncompress.h
+deleted file mode 100644
+index 5f02d06..0000000
+--- a/arch/arm/mach-clps711x/include/mach/uncompress.h
++++ /dev/null
+@@ -1,55 +0,0 @@
+-/*
+- *  arch/arm/mach-clps711x/include/mach/uncompress.h
+- *
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#include <mach/clps711x.h>
+-
+-#ifdef CONFIG_DEBUG_CLPS711X_UART2
+-#define SYSFLGx	SYSFLG2
+-#define UARTDRx	UARTDR2
+-#else
+-#define SYSFLGx	SYSFLG1
+-#define UARTDRx	UARTDR1
+-#endif
+-
+-#define phys_reg(x)	(*(volatile u32 *)(CLPS711X_PHYS_BASE + (x)))
+-
+-/*
+- * The following code assumes the serial port has already been
+- * initialized by the bootloader.  If you didn't setup a port in
+- * your bootloader then nothing will appear (which might be desired).
+- *
+- * This does not append a newline
+- */
+-static inline void putc(int c)
+-{
+-	while (phys_reg(SYSFLGx) & SYSFLG_UTXFF)
+-		barrier();
+-	phys_reg(UARTDRx) = c;
+-}
+-
+-static inline void flush(void)
+-{
+-	while (phys_reg(SYSFLGx) & SYSFLG_UBUSY)
+-		barrier();
+-}
+-
+-/*
+- * nothing to do
+- */
+-#define arch_decomp_setup()
 -- 
 2.4.9
