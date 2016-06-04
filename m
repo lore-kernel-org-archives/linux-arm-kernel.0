@@ -1,504 +1,201 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 4 Jun 2016 12:15:30 +0100
-Subject: [PATCH V5 1/7] ARM64, ACPI, PCI: I/O Remapping Table (IORT)
- initial support.
-In-Reply-To: <1464693584-22343-2-git-send-email-tn@semihalf.com>
-References: <1464693584-22343-1-git-send-email-tn@semihalf.com>
- <1464693584-22343-2-git-send-email-tn@semihalf.com>
-Message-ID: <20160604121530.62539dc6@arm.com>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Sat, 4 Jun 2016 19:34:32 +0800
+Subject: [PATCH 21/23] arm64: ilp32: introduce ilp32-specific handlers for
+ sigframe and ucontext
+In-Reply-To: <1464048292-30136-22-git-send-email-ynorov@caviumnetworks.com>
+References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+ <1464048292-30136-22-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <5752BCC8.7080205@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 May 2016 13:19:38 +0200
-Tomasz Nowicki <tn@semihalf.com> wrote:
+Hi,
 
-> IORT shows representation of IO topology for ARM based systems.
-> It describes how various components are connected together on
-> parent-child basis e.g. PCI RC -> SMMU -> ITS. Also see IORT spec.
-> 
-> Initial support allows to:
-> - register ITS MSI chip along with ITS translation ID and domain token
-> - deregister ITS MSI chip based on ITS translation ID
-> - find registered domain token based on ITS translation ID
-> - map MSI RID based on PCI device and requester ID
-> - find domain token based on PCI device and requester ID
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/acpi/Kconfig  |   3 +
->  drivers/acpi/Makefile |   1 +
->  drivers/acpi/iort.c   | 344 ++++++++++++++++++++++++++++++++++++++++++++++++++
->  include/linux/iort.h  |  38 ++++++
->  4 files changed, 386 insertions(+)
->  create mode 100644 drivers/acpi/iort.c
->  create mode 100644 include/linux/iort.h
-> 
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index b7e2e77..848471f 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -57,6 +57,9 @@ config ACPI_SYSTEM_POWER_STATES_SUPPORT
->  config ACPI_CCA_REQUIRED
->  	bool
->  
-> +config IORT_TABLE
-> +	bool
-> +
->  config ACPI_DEBUGGER
->  	bool "AML debugger interface"
->  	select ACPI_DEBUG
-> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
-> index 251ce85..c7c9b29 100644
-> --- a/drivers/acpi/Makefile
-> +++ b/drivers/acpi/Makefile
-> @@ -82,6 +82,7 @@ obj-$(CONFIG_ACPI_CUSTOM_METHOD)+= custom_method.o
->  obj-$(CONFIG_ACPI_BGRT)		+= bgrt.o
->  obj-$(CONFIG_ACPI_CPPC_LIB)	+= cppc_acpi.o
->  obj-$(CONFIG_ACPI_DEBUGGER_USER) += acpi_dbg.o
-> +obj-$(CONFIG_IORT_TABLE) 	+= iort.o
->  
->  # processor has its own "processor." module_param namespace
->  processor-y			:= processor_driver.o
-> diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
-> new file mode 100644
-> index 0000000..226eb6d
-> --- /dev/null
-> +++ b/drivers/acpi/iort.c
-> @@ -0,0 +1,344 @@
-> +/*
-> + * Copyright (C) 2016, Semihalf
-> + *	Author: Tomasz Nowicki <tn@semihalf.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * This file implements early detection/parsing of I/O mapping
-> + * reported to OS through firmware via I/O Remapping Table (IORT)
-> + * IORT document number: ARM DEN 0049A
-> + */
-> +
-> +#define pr_fmt(fmt)	"ACPI: IORT: " fmt
-> +
-> +#include <linux/export.h>
-> +#include <linux/iort.h>
-> +#include <linux/irqdomain.h>
-> +#include <linux/kernel.h>
-> +#include <linux/pci.h>
-> +
-> +struct iort_its_msi_chip {
-> +	struct list_head	list;
-> +	struct fwnode_handle	*fw_node;
-> +	u32			translation_id;
-> +};
-> +
-> +typedef acpi_status (*iort_find_node_callback)
-> +	(struct acpi_iort_node *node, void *context);
-> +
-> +/* Root pointer to the mapped IORT table */
-> +static struct acpi_table_header *iort_table;
-> +
-> +static LIST_HEAD(iort_msi_chip_list);
-> +
-> +/**
-> + * iort_register_domain_token() - register domain token and related ITS ID
-> + * 				  to the list from where we can get it back
-> + * 				  later on.
-> + * @translation_id: ITS ID
-> + * @token: domain token
-> + *
-> + * Returns: 0 on success, -ENOMEM if not memory when allocating list element.
-> + */
-> +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node)
-> +{
-> +	struct iort_its_msi_chip *its_msi_chip;
-> +
-> +	its_msi_chip = kzalloc(sizeof(*its_msi_chip), GFP_KERNEL);
-> +	if (!its_msi_chip)
-> +		return -ENOMEM;
-> +
-> +	its_msi_chip->fw_node = fw_node;
-> +	its_msi_chip->translation_id = trans_id;
-> +
-> +	list_add(&its_msi_chip->list, &iort_msi_chip_list);
+I found an issue of unwind with the following code. The correct backtrace
+should be:
+(gdb) where
+#0 0x004004d0 in my_sig (sig=11) at test_force3.c:16
+#1 <signal handler called>
+#2 func2 (num=0) at test_force3.c:22
+#3 0x00400540 in func1 (num=1) at test_force3.c:28
+#4 0x00400574 in main (argc=1, argv=0xffd7bc04) at test_force3.c:33
 
-No locking? How do you handle concurrent accesses?
+Without my patch, the backtrace is:
+(gdb) where
+#0 0x00400490 in my_sig (sig=11) at test_force3.c:16
+#1 <signal handler called>
+#2 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
 
-> +	return 0;
-> +}
-> +
-> +/**
-> + * iort_unregister_domain_token() - unregister domain token based on ITS ID.
-> + * @translation_id: ITS ID
-> + *
-> + * Returns: none.
-> + */
-> +void iort_deregister_domain_token(int trans_id)
-> +{
-> +	struct iort_its_msi_chip *its_msi_chip, *t;
-> +
-> +	list_for_each_entry_safe(its_msi_chip, t, &iort_msi_chip_list, list) {
-> +		if (its_msi_chip->translation_id == trans_id) {
-> +			list_del(&its_msi_chip->list);
-> +			kfree(its_msi_chip);
-> +			break;
-> +		}
-> +	}
-> +}
+With my patch which fix the wrong frame pointer(setup_return calculate the offset
+of fp through ilp32_sigframe instead of sigfreame), the backtrace is:
+(gdb) where
+#0 0x00400490 in my_sig (sig=11) at test_force3.c:16
+#1 <signal handler called>
+#2 func1 () at test_force3.c:28
+#3 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
 
-Same here.
+I am not sure there is still some issue in kernel. But it seem that the gdb of ilp32
+does not work correctly when unwind without framepointer.
 
-> +
-> +/**
-> + * iort_find_its_domain_token() - find domain token based on given ITS ID.
-> + * @translation_id: ITS ID
-> + *
-> + * Returns: domain token when find on the list, NULL otherwise.
-> + */
-> +struct fwnode_handle *iort_its_find_domain_token(int trans_id)
-> +{
-> +	struct iort_its_msi_chip *its_msi_chip;
-> +
-> +	list_for_each_entry(its_msi_chip, &iort_msi_chip_list, list) {
-> +		if (its_msi_chip->translation_id == trans_id)
-> +			return its_msi_chip->fw_node;
-> +	}
-> +
-> +	return NULL;
-> +}
+The test code is:
 
-Same here.
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <signal.h>
 
-> +
-> +static struct acpi_iort_node *
-> +iort_scan_node(enum acpi_iort_node_type type,
-> +	       iort_find_node_callback callback, void *context)
-> +{
-> +	struct acpi_iort_node *iort_node, *iort_end;
-> +	struct acpi_table_iort *iort;
-> +	int i;
-> +
-> +	if (!iort_table)
-> +		return NULL;
-> +
-> +	/*
-> +	 * iort_table and iort both point to the start of IORT table, but
-> +	 * have different struct types
-> +	 */
-> +	iort = (struct acpi_table_iort *)iort_table;
-> +
-> +	/* Get the first IORT node */
-> +	iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort,
-> +				 iort->node_offset);
-> +	iort_end = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-> +				iort_table->length);
-> +
-> +	for (i = 0; i < iort->node_count; i++) {
-> +		if (iort_node >= iort_end) {
-> +			pr_err("iort node pointer overflows, bad table\n");
-
-This probably deserves a WARN_ON, a TAINT_FIRMWARE_WORKAROUND and maybe
-a TAINT_CRAP as an added injury.
-
-> +			return NULL;
-> +		}
-> +
-> +		if (iort_node->type == type) {
-> +			if (ACPI_SUCCESS(callback(iort_node, context)))
-> +				return iort_node;
-> +		}
-> +
-> +		iort_node = ACPI_ADD_PTR(struct acpi_iort_node, iort_node,
-> +					 iort_node->length);
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
-> +static acpi_status
-> +iort_find_dev_callback(struct acpi_iort_node *node, void *context)
-
-This is actually trying to match a node to a given device. How about
-calling it iort_match_node_callback?
-
-> +{
-> +	struct acpi_iort_root_complex *pci_rc;
-> +	struct device *dev = context;
-> +	struct pci_bus *bus;
-> +
-> +	switch (node->type) {
-> +	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX:
-> +		bus = to_pci_bus(dev);
-> +		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
-> +
-> +		/*
-> +		 * It is assumed that PCI segment numbers maps one-to-one
-> +		 * with root complexes. Each segment number can represent only
-> +		 * one root complex.
-> +		 */
-> +		if (pci_rc->pci_segment_number == pci_domain_nr(bus))
-> +			return AE_OK;
-> +
-> +		break;
-> +	}
-> +
-> +	return AE_NOT_FOUND;
-> +}
-> +
-> +static struct acpi_iort_node *
-> +iort_dev_map_rid(struct acpi_iort_node *node, u32 rid_in,
-> +			    u32 *rid_out)
-
-Given that there is no "dev" involved in this functions, but only
-nodes, consider renaming this to iort_node_map_rid.
-
-> +{
-> +
-> +	if (!node)
-> +		goto out;
-> +
-> +	/* Go upstream */
-> +	while (node->type != ACPI_IORT_NODE_ITS_GROUP) {
-> +		struct acpi_iort_id_mapping *id;
-> +		int i, found = 0;
-> +
-> +		/* Exit when no mapping array */
-> +		if (!node->mapping_offset || !node->mapping_count)
-> +			return NULL;
-> +
-> +		id = ACPI_ADD_PTR(struct acpi_iort_id_mapping, node,
-> +				  node->mapping_offset);
-> +
-> +		for (i = 0, found = 0; i < node->mapping_count; i++, id++) {
-> +			/*
-> +			 * Single mapping is not translation rule,
-> +			 * lets move on for this case
-> +			 */
-> +			if (id->flags & ACPI_IORT_ID_SINGLE_MAPPING) {
-> +				if (node->type != ACPI_IORT_NODE_SMMU) {
-> +					rid_in = id->output_base;
-> +					found = 1;
-> +					break;
-> +				}
-> +
-> +				pr_warn(FW_BUG "[node %p type %d] SINGLE MAPPING flag not allowed for SMMU node, skipping ID map\n",
-> +					node, node->type);
-> +				continue;
-> +			}
-> +
-> +			if (rid_in < id->input_base ||
-> +			    (rid_in > id->input_base + id->id_count))
-> +				continue;
-> +
-> +			rid_in = id->output_base + (rid_in - id->input_base);
-> +			found = 1;
-> +			break;
-> +		}
-> +
-> +		if (!found)
-> +			return NULL;
-> +
-> +		/* Firmware bug! */
-> +		if (!id->output_reference) {
-> +			pr_err(FW_BUG "[node %p type %d] ID map has NULL parent reference\n",
-> +			       node, node->type);
-> +			return NULL;
-> +		}
-> +
-> +		node = ACPI_ADD_PTR(struct acpi_iort_node, iort_table,
-> +				    id->output_reference);
-> +	}
-
-Do we always want to resolve an ID from the device down to the last
-possible transformation? While this works fine for the ITS (which is
-supposed to be the last user of the RID), this may not work that well
-for intermediate remapping elements (IOMMU, for example).
-
-So I'm wondering if what we actually want is something that would say 
-iort_node_map_rid(from_node, to_node, rid_in, &rid_out)?
-
-> +
-> +out:
-> +	if (rid_out)
-> +		*rid_out = rid_in;
-> +	return node;
-> +}
-> +
-> +static struct acpi_iort_node *
-> +iort_its_find_node_and_map_rid(struct pci_dev *pdev, u32 req_id, u32 *dev_id)
-
-Does this only applies to a PCI device?
-
-> +{
-> +	struct pci_bus *pbus = pdev->bus;
-> +	struct acpi_iort_node *node;
-> +
-> +	/* Find a PCI root bus */
-> +	while (!pci_is_root_bus(pbus))
-> +		pbus = pbus->parent;
-> +
-> +
-> +	node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-> +			      iort_find_dev_callback, &pbus->dev);
-> +	if (!node) {
-> +		dev_err(&pdev->dev, "can't find related IORT node\n");
-> +		return NULL;
-> +	}
-> +
-> +	return iort_dev_map_rid(node, req_id, dev_id);
-> +}
-> +
-> +/**
-> + * iort_pci_domain_get_msi_rid() - find MSI RID based on PCI device ID
-
-This doesn't match the name of the function.
-
-> + * @pdev: The PCI device
-> + * @req_id: The PCI device requester ID
-> + *
-> + * Returns: MSI RID on success, input requester ID otherwise
-> + */
-> +u32 iort_pci_get_msi_rid(struct pci_dev *pdev, u32 req_id)
-> +{
-> +	u32 dev_id;
-> +
-> +	if (!iort_its_find_node_and_map_rid(pdev, req_id, &dev_id))
-> +		return req_id;
-> +
-> +	return dev_id;
-> +}
-> +
-> +/**
-> + * iort_pci_find_its_id() - find the ITS identifier based on specified device.
-> + * @pdev: The PCI device
-> + * @idx: Index of the ITS identifier list
-> + * @its_id: ITS identifier
-> + *
-> + * Returns: 0 on success, appropriate error value otherwise
-> + */
-> +static int
-> +iort_pci_find_its_id(struct pci_dev *pdev, u32 req_id, unsigned int idx,
-> +		     int *its_id)
-> +{
-> +	struct acpi_iort_its_group *its;
-> +	struct acpi_iort_node *node;
-> +
-> +	node = iort_its_find_node_and_map_rid(pdev, req_id, NULL);
-> +	if (!node)
-> +		return -ENXIO;
-> +
-> +	/* Move to ITS specific data */
-> +	its = (struct acpi_iort_its_group *)node->node_data;
-> +	if (idx > its->its_count) {
-> +		dev_err(&pdev->dev, "requested ITS ID index [%d] is greater than available[%d]\n",
-> +			idx, its->its_count);
-> +		return -ENXIO;
-> +	}
-> +
-> +	*its_id = its->identifiers[idx];
-> +	return 0;
-> +}
-> +
-> +/**
-> + * iort_pci_get_msi_domain_handle() - find registered domain token related to
-> + *                                    PCI device
-
-Broken comment.
-
-> + * @pdev:    The PCI device
-> + * @req_id:  The PCI device requester ID
-> + *
-> + * Returns: the MSI domain for this device, NULL otherwise
-> + */
-> +struct irq_domain *
-> +iort_pci_get_domain(struct pci_dev *pdev, u32 req_id)
-
-Again: does this have to be PCI specific?
-
-> +{
-> +	static struct fwnode_handle *handle;
-> +	int its_id;
-> +
-> +	if (iort_pci_find_its_id(pdev, req_id, 0, &its_id))
-> +		return NULL;
-> +
-> +	handle = iort_its_find_domain_token(its_id);
-> +	if (!handle)
-> +		return NULL;
-> +
-> +	return irq_find_matching_fwnode(handle, DOMAIN_BUS_PCI_MSI);
-> +}
-> +
-> +static int __init iort_table_detect(void)
-> +{
-> +	acpi_status status;
-> +
-> +	if (acpi_disabled)
-> +		return -ENODEV;
-> +
-> +	status = acpi_get_table(ACPI_SIG_IORT, 0, &iort_table);
-> +	if (ACPI_FAILURE(status)) {
-> +		const char *msg = acpi_format_exception(status);
-> +		pr_err("Failed to get table, %s\n", msg);
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +arch_initcall(iort_table_detect);
-> diff --git a/include/linux/iort.h b/include/linux/iort.h
-> new file mode 100644
-> index 0000000..490ff4d
-> --- /dev/null
-> +++ b/include/linux/iort.h
-> @@ -0,0 +1,38 @@
-> +/*
-> + * Copyright (C) 2016, Semihalf
-> + *	Author: Tomasz Nowicki <tn@semihalf.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-> + * Place - Suite 330, Boston, MA 02111-1307 USA.
-> + */
-> +
-> +#ifndef __IORT_H__
-> +#define __IORT_H__
-> +
-> +#include <linux/acpi.h>
-> +
-> +struct fwnode_handle;
-> +int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
-> +void iort_deregister_domain_token(int trans_id);
-> +struct fwnode_handle *iort_its_find_domain_token(int trans_id);
-> +#ifdef CONFIG_IORT_TABLE
-> +u32 iort_pci_get_msi_rid(struct pci_dev *pdev, u32 req_id);
-> +struct irq_domain *iort_pci_get_domain(struct pci_dev *pdev, u32 req_id);
-> +#else
-> +static inline u32 iort_pci_get_msi_rid(struct pci_dev *pdev, u32 req_id)
-> +{ return req_id; }
-> +static inline struct irq_domain *
-> +iort_pci_get_domain(struct pci_dev *pdev, u32 req_id) { return NULL; }
-> +#endif
-> +
-> +#endif /* __IORT_H__ */
+void my_sig(int sig)
+{
+	printf("sig=%d\n", sig);
+	*(int *)0 = 0x0;
+}
 
 
-Thanks,
+void func2()
+{
+	*(int *)0 = 0x0;
+}
 
-	M.
+void func1()
+{
+	func2();
+}
+
+int main(int argc, char **argv)
+{
+	signal(11, my_sig);
+	func1();
+	return 0;
+}
+
+
+The full patch is as follows:
+
+ From 7e364a765097f57aed2d73f94c1688c2e7343e79 Mon Sep 17 00:00:00 2001
+From: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
+Date: Sat, 4 Jun 2016 14:30:05 +0800
+Subject: [PATCH] arm64: ilp32: fix for wrong fp offset when calculate the
+  new fp
+
+ILP32 define its own sigframe(ilp32_sigframe) because of the
+difference uc_context. setup_return do not use ilp32 specific
+sigframe to calculate the new offset of fp which lead to wrong
+fp in signal handler. At this circumstance, gdb backtrace will miss
+one item:
+(gdb) where
+
+It should be:
+(gdb) where
+
+The test code is as follows:
+
+void my_sig(int sig)
+{
+         printf("sig=%d\n", sig);
+         *(int *)0 = 0x0;
+}
+
+void func2(int num)
+{
+         printf("%s: %d\n", __FUNCTION__, num);
+         *(int *)0 = 0x0;
+         func2(num-1);
+}
+
+void func1(int num)
+{
+         printf("%s\n", __FUNCTION__);
+         func2(num - 1);
+}
+
+int main(int argc, char **argv)
+{
+         signal(11, my_sig);
+         func1(argc);
+         return 0;
+}
+
+This patch fix this by passing the correct offset of fp to
+setup_return.
+Test pass on both ILP32 and LP64 in aarch64 EE.
+
+Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
+---
+  arch/arm64/include/asm/signal_common.h | 3 ++-
+  arch/arm64/kernel/signal.c             | 9 +++++----
+  arch/arm64/kernel/signal_ilp32.c       | 4 ++--
+  3 files changed, 9 insertions(+), 7 deletions(-)
+
+diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
+index de93c71..a5d7b63 100644
+--- a/arch/arm64/include/asm/signal_common.h
++++ b/arch/arm64/include/asm/signal_common.h
+@@ -29,6 +29,7 @@ int setup_sigcontex(struct sigcontext __user *uc_mcontext,
+  		    struct pt_regs *regs);
+  int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
+  void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+-			void __user *frame, off_t sigframe_off, int usig);
++			void __user *frame, off_t sigframe_off, off_t fp_off,
++			int usig);
+
+  #endif /* __ASM_SIGNAL_COMMON_H */
+diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+index 038bebe..e66a6e9 100644
+--- a/arch/arm64/kernel/signal.c
++++ b/arch/arm64/kernel/signal.c
+@@ -256,14 +256,14 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
+  }
+
+  void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+-			 void __user *frame, off_t sigframe_off, int usig)
++			 void __user *frame, off_t sigframe_off, off_t fp_off,
++			 int usig)
+  {
+  	__sigrestore_t sigtramp;
+
+  	regs->regs[0] = usig;
+  	regs->sp = (unsigned long)frame;
+-	regs->regs[29] = regs->sp + sigframe_off +
+-		offsetof(struct sigframe, fp);
++	regs->regs[29] = regs->sp + sigframe_off + fp_off;
+  	regs->pc = (unsigned long)ka->sa.sa_handler;
+
+  	if (ka->sa.sa_flags & SA_RESTORER)
+@@ -294,7 +294,8 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+  	err |= setup_sigframe(&frame->sig, regs, set);
+  	if (err == 0) {
+  		setup_return(regs, &ksig->ka, frame,
+-			offsetof(struct rt_sigframe, sig), usig);
++			offsetof(struct rt_sigframe, sig),
++			offsetof(struct sigframe, fp), usig);
+  		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
+  			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
+  			regs->regs[1] = (unsigned long)&frame->info;
+diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
+index a8ea73e..9030f14 100644
+--- a/arch/arm64/kernel/signal_ilp32.c
++++ b/arch/arm64/kernel/signal_ilp32.c
+@@ -147,7 +147,6 @@ static struct ilp32_rt_sigframe __user *ilp32_get_sigframe(struct ksignal *ksig,
+  	struct ilp32_rt_sigframe __user *frame;
+
+  	sp = sp_top = sigsp(regs->sp, ksig);
+-
+  	sp = (sp - sizeof(struct ilp32_rt_sigframe)) & ~15;
+  	frame = (struct ilp32_rt_sigframe __user *)sp;
+
+@@ -183,7 +182,8 @@ int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
+  	err |= setup_ilp32_sigframe(&frame->sig, regs, set);
+  	if (err == 0) {
+  		setup_return(regs, &ksig->ka, frame,
+-			     offsetof(struct ilp32_rt_sigframe, sig), usig);
++			     offsetof(struct ilp32_rt_sigframe, sig),
++			     offsetof(struct ilp32_sigframe, fp), usig);
+  		regs->regs[1] = (unsigned long)&frame->info;
+  		regs->regs[2] = (unsigned long)&frame->sig.uc;
+  	}
 -- 
-Jazz is not dead. It just smells funny.
+1.8.4.5
+
+Regards
+
+Bamvor
