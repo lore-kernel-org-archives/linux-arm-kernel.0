@@ -1,74 +1,41 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Fri,  3 Jun 2016 19:29:11 -0700
-Subject: [PATCH] dmaengine: bcm2835: Fix polling for completion of DMA with
- interrupts masked.
-Message-ID: <1465007351-5559-1-git-send-email-eric@anholt.net>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sat, 4 Jun 2016 12:40:32 +0900
+Subject: [PATCH v13 04/10] arm64: Blacklist non-kprobe-able symbol
+In-Reply-To: <1464924384-15269-5-git-send-email-dave.long@linaro.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-5-git-send-email-dave.long@linaro.org>
+Message-ID: <20160604124032.94ac1bb76fde6c661e1a47a5@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tx_status hook is supposed to be safe to call from interrupt
-context, but it wouldn't ever return completion for the last transfer,
-meaning you couldn't poll for DMA completion with interrupts masked.
+Hi David,
 
-This fixes IRQ handling for bcm2835's DSI1, which requires using the
-DMA engine to write its registers due to a bug in the AXI bridge.
+On Thu,  2 Jun 2016 23:26:18 -0400
+David Long <dave.long@linaro.org> wrote:
 
-Signed-off-by: Eric Anholt <eric@anholt.net>
----
- drivers/dma/bcm2835-dma.c | 24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+> From: Pratyush Anand <panand@redhat.com>
+> 
+> Add all function symbols which are called from do_debug_exception under
+> NOKPROBE_SYMBOL, as they can not kprobed.
 
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 6149b27c33ad..320461c578e3 100644
---- a/drivers/dma/bcm2835-dma.c
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -570,16 +570,16 @@ static enum dma_status bcm2835_dma_tx_status(struct dma_chan *chan,
- 	struct virt_dma_desc *vd;
- 	enum dma_status ret;
- 	unsigned long flags;
-+	u32 residue;
- 
- 	ret = dma_cookie_status(chan, cookie, txstate);
--	if (ret == DMA_COMPLETE || !txstate)
-+	if (ret == DMA_COMPLETE)
- 		return ret;
- 
- 	spin_lock_irqsave(&c->vc.lock, flags);
- 	vd = vchan_find_desc(&c->vc, cookie);
- 	if (vd) {
--		txstate->residue =
--			bcm2835_dma_desc_size(to_bcm2835_dma_desc(&vd->tx));
-+		residue = bcm2835_dma_desc_size(to_bcm2835_dma_desc(&vd->tx));
- 	} else if (c->desc && c->desc->vd.tx.cookie == cookie) {
- 		struct bcm2835_desc *d = c->desc;
- 		dma_addr_t pos;
-@@ -591,11 +591,25 @@ static enum dma_status bcm2835_dma_tx_status(struct dma_chan *chan,
- 		else
- 			pos = 0;
- 
--		txstate->residue = bcm2835_dma_desc_size_pos(d, pos);
-+		residue = bcm2835_dma_desc_size_pos(d, pos);
-+
-+		/*
-+		 * If our non-cyclic transfer is done, then report
-+		 * complete and trigger the next tx now.  This lets
-+		 * the dmaengine API be used synchronously from an IRQ
-+		 * handler.
-+		 */
-+		if (!d->cyclic && residue == 0) {
-+			vchan_cookie_complete(&c->desc->vd);
-+			bcm2835_dma_start_desc(c);
-+			ret = dma_cookie_status(chan, cookie, txstate);
-+		}
- 	} else {
--		txstate->residue = 0;
-+		residue = 0;
- 	}
- 
-+	dma_set_residue(txstate, residue);
-+
- 	spin_unlock_irqrestore(&c->vc.lock, flags);
- 
- 	return ret;
+I see, but this patch should be applied after kprobes
+are implemented on arm64.
+
+And also, I have a comment below.
+
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 5954881..4359ca8 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -563,6 +563,7 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
+>  	info.si_addr  = (void __user *)addr;
+>  	arm64_notify_die("Oops - SP/PC alignment exception", regs, &info, esr);
+>  }
+> +NOKPROBE_SYMBOL(do_debug_exception)
+
+This seems at wrong place. Please correct it in this patch.
+
+Thank you,
+
 -- 
-2.8.0.rc3
+Masami Hiramatsu <mhiramat@kernel.org>
