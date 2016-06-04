@@ -1,142 +1,360 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  4 Jun 2016 10:10:03 +0300
-Subject: [PATCH 11/22] ARM: clps711x: Add basic DT support
+Date: Sat,  4 Jun 2016 10:10:04 +0300
+Subject: [PATCH 12/22] ARM: dts: clps711x: Add DT Cirrus Logic EDB7211
+ Development board
 In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
 References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465024214-22120-12-git-send-email-shc_work@mail.ru>
+Message-ID: <1465024214-22120-13-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic support to run Cirrus Logic ARMv4T CPUs
-with device-tree support.
+This adds the Cirrus Logic EP7209,EP7211 DT templates and support for
+EDB7211 Development board.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/Kconfig    |  9 +++++
- arch/arm/mach-clps711x/Makefile   |  1 +
- arch/arm/mach-clps711x/board-dt.c | 82 +++++++++++++++++++++++++++++++++++++++
- 3 files changed, 92 insertions(+)
- create mode 100644 arch/arm/mach-clps711x/board-dt.c
+ arch/arm/boot/dts/Makefile           |   2 +
+ arch/arm/boot/dts/ep7209.dtsi        | 191 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ep7211-edb7211.dts | 100 ++++++++++++++++++
+ arch/arm/boot/dts/ep7211.dtsi        |  12 +++
+ 4 files changed, 305 insertions(+)
+ create mode 100644 arch/arm/boot/dts/ep7209.dtsi
+ create mode 100644 arch/arm/boot/dts/ep7211-edb7211.dts
+ create mode 100644 arch/arm/boot/dts/ep7211.dtsi
 
-diff --git a/arch/arm/mach-clps711x/Kconfig b/arch/arm/mach-clps711x/Kconfig
-index f711498..f21700c 100644
---- a/arch/arm/mach-clps711x/Kconfig
-+++ b/arch/arm/mach-clps711x/Kconfig
-@@ -2,6 +2,15 @@ if ARCH_CLPS711X
- 
- menu "CLPS711X/EP721X/EP731X Implementations"
- 
-+config MACH_CLPS711X_DT
-+	bool "Device-tree support"
-+	select CLKSRC_OF
-+	select OF_IRQ
-+	select USE_OF
-+	help
-+	  Select this if you want to experiment device-tree with
-+	  ARMv4T Cirrus Logic chips.
-+
- config ARCH_AUTCPU12
- 	bool "AUTCPU12"
- 	help
-diff --git a/arch/arm/mach-clps711x/Makefile b/arch/arm/mach-clps711x/Makefile
-index f04151e..ef6df40 100644
---- a/arch/arm/mach-clps711x/Makefile
-+++ b/arch/arm/mach-clps711x/Makefile
-@@ -6,6 +6,7 @@
- 
- obj-y				:= common.o devices.o
- 
-+obj-$(CONFIG_MACH_CLPS711X_DT)	+= board-dt.o
- obj-$(CONFIG_ARCH_AUTCPU12)	+= board-autcpu12.o
- obj-$(CONFIG_ARCH_CDB89712)	+= board-cdb89712.o
- obj-$(CONFIG_ARCH_CLEP7312)	+= board-clep7312.o
-diff --git a/arch/arm/mach-clps711x/board-dt.c b/arch/arm/mach-clps711x/board-dt.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 06b6c2d..e409890 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -104,6 +104,8 @@ dtb-$(CONFIG_ARCH_BERLIN) += \
+ 	berlin2q-marvell-dmp.dtb
+ dtb-$(CONFIG_ARCH_BRCMSTB) += \
+ 	bcm7445-bcm97445svmb.dtb
++dtb-$(CONFIG_ARCH_CLPS711X) += \
++	ep7211-edb7211.dtb
+ dtb-$(CONFIG_ARCH_DAVINCI) += \
+ 	da850-enbw-cmc.dtb \
+ 	da850-evm.dtb
+diff --git a/arch/arm/boot/dts/ep7209.dtsi b/arch/arm/boot/dts/ep7209.dtsi
 new file mode 100644
-index 0000000..ee1f83b
+index 0000000..aaf1261
 --- /dev/null
-+++ b/arch/arm/mach-clps711x/board-dt.c
-@@ -0,0 +1,82 @@
++++ b/arch/arm/boot/dts/ep7209.dtsi
+@@ -0,0 +1,191 @@
 +/*
-+ *  Author: Alexander Shiyan <shc_work@mail.ru>, 2016
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
 + */
 +
-+#include <linux/io.h>
-+#include <linux/of_fdt.h>
-+#include <linux/platform_device.h>
-+#include <linux/random.h>
-+#include <linux/sizes.h>
++/dts-v1/;
 +
-+#include <linux/mfd/syscon/clps711x.h>
++#include "skeleton.dtsi"
 +
-+#include <asm/system_info.h>
-+#include <asm/system_misc.h>
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
++#include <dt-bindings/clock/clps711x-clock.h>
 +
-+#define CLPS711X_VIRT_BASE	IOMEM(0xfeff4000)
-+#define CLPS711X_PHYS_BASE	(0x80000000)
-+# define SYSFLG1		(0x0140)
-+# define HALT			(0x0800)
-+# define UNIQID			(0x2440)
-+# define RANDID0		(0x2700)
-+# define RANDID1		(0x2704)
-+# define RANDID2		(0x2708)
-+# define RANDID3		(0x270c)
++/ {
++	model = "Cirrus Logic EP7209";
++	compatible = "cirrus,ep7209";
 +
-+static struct map_desc clps711x_io_desc __initdata = {
-+	.virtual	= (unsigned long)CLPS711X_VIRT_BASE,
-+	.pfn		= __phys_to_pfn(CLPS711X_PHYS_BASE),
-+	.length		= 48 * SZ_1K,
-+	.type		= MT_DEVICE,
++	aliases {
++		gpio0 = &porta;
++		gpio1 = &portb;
++		gpio3 = &portd;
++		gpio4 = &porte;
++		serial0 = &uart1;
++		serial1 = &uart2;
++		spi0 = &spi;
++		timer0 = &timer1;
++		timer1 = &timer2;
++	};
++
++	cpus {
++		#address-cells = <0>;
++		#size-cells = <0>;
++
++		cpu {
++			device_type = "cpu";
++			compatible = "arm,arm720t";
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "simple-bus";
++		interrupt-parent = <&intc>;
++		ranges;
++
++		clks: clks at 80000000 {
++			#clock-cells = <1>;
++			compatible = "cirrus,ep7209-clk";
++			reg = <0x80000000 0xc000>;
++			startup-frequency = <73728000>;
++		};
++
++		intc: intc at 80000000 {
++			compatible = "cirrus,ep7209-intc";
++			reg = <0x80000000 0x4000>;
++			interrupt-controller;
++			#interrupt-cells = <1>;
++		};
++
++		porta: gpio at 80000000 {
++			compatible = "cirrus,ep7209-gpio";
++			reg = <0x80000000 0x1 0x80000040 0x1>;
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
++
++		portb: gpio at 80000001 {
++			compatible = "cirrus,ep7209-gpio";
++			reg = <0x80000001 0x1 0x80000041 0x1>;
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
++
++		portd: gpio at 80000003 {
++			compatible = "cirrus,ep7209-gpio";
++			reg = <0x80000003 0x1 0x80000043 0x1>;
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
++
++		porte: gpio at 80000083 {
++			compatible = "cirrus,ep7209-gpio";
++			reg = <0x80000083 0x1 0x800000c3 0x1>;
++			gpio-controller;
++			#gpio-cells = <2>;
++		};
++
++		syscon1: syscon at 80000100 {
++			compatible = "cirrus,ep7209-syscon1", "syscon";
++			reg = <0x80000100 0x80>;
++		};
++
++		bus: bus at 80000180 {
++			#address-cells = <2>;
++			#size-cells = <1>;
++			compatible = "cirrus,ep7209-bus", "simple-bus";
++			clocks = <&clks CLPS711X_CLK_BUS>;
++			reg = <0x80000180 0x80>;
++			ranges = <
++				0 0 0x00000000 0x10000000
++				1 0 0x10000000 0x10000000
++				2 0 0x20000000 0x10000000
++				3 0 0x30000000 0x10000000
++				4 0 0x40000000 0x10000000
++				5 0 0x50000000 0x10000000
++				6 0 0x60000000 0x0000c000
++				7 0 0x70000000 0x00000080
++			>;
++		};
++
++		fb: fb at 800002c0 {
++			compatible = "cirrus,ep7209-fb";
++			reg = <0x800002c0 0xd44>, <0x60000000 0xc000>;
++			clocks = <&clks CLPS711X_CLK_BUS>;
++			status = "disabled";
++		};
++
++		timer1: timer at 80000300 {
++			compatible = "cirrus,ep7209-timer";
++			reg = <0x80000300 0x4>;
++			clocks = <&clks CLPS711X_CLK_TIMER1>;
++			interrupts = <8>;
++		};
++
++		timer2: timer at 80000340 {
++			compatible = "cirrus,ep7209-timer";
++			reg = <0x80000340 0x4>;
++			clocks = <&clks CLPS711X_CLK_TIMER2>;
++			interrupts = <9>;
++		};
++
++		pwm: pwm at 80000400 {
++			compatible = "cirrus,ep7209-pwm";
++			reg = <0x80000400 0x4>;
++			clocks = <&clks CLPS711X_CLK_PWM>;
++			#pwm-cells = <1>;
++		};
++
++		uart1: uart at 80000480 {
++			compatible = "cirrus,ep7209-uart";
++			reg = <0x80000480 0x80>;
++			interrupts = <12 13>;
++			clocks = <&clks CLPS711X_CLK_UART>;
++			syscon = <&syscon1>;
++		};
++
++		spi: spi at 80000500 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			compatible = "cirrus,ep7209-spi";
++			reg = <0x80000500 0x4>;
++			interrupts = <15>;
++			clocks = <&clks CLPS711X_CLK_SPI>;
++			status = "disabled";
++		};
++
++		syscon2: syscon at 80001100 {
++			compatible = "cirrus,ep7209-syscon2", "syscon";
++			reg = <0x80001100 0x80>;
++		};
++
++		uart2: uart at 80001480 {
++			compatible = "cirrus,ep7209-uart";
++			reg = <0x80001480 0x80>;
++			interrupts = <28 29>;
++			clocks = <&clks CLPS711X_CLK_UART>;
++			syscon = <&syscon2>;
++		};
++
++		dai: dai at 80002000 {
++			#sound-dai-cells = <0>;
++			compatible = "cirrus,ep7209-dai";
++			reg = <0x80002000 0x604>;
++			clocks = <&clks CLPS711X_CLK_PLL>;
++			clock-names = "pll";
++			interrupts = <32>;
++			status = "disabled";
++		};
++
++		syscon3: syscon at 80002200 {
++			compatible = "cirrus,ep7209-syscon3", "syscon";
++			reg = <0x80002200 0x40>;
++		};
++	};
++
++	mctrl: mctrl {
++		compatible = "cirrus,ep7209-mctrl-gpio";
++		gpio-controller;
++		#gpio-cells = <2>;
++	};
++};
+diff --git a/arch/arm/boot/dts/ep7211-edb7211.dts b/arch/arm/boot/dts/ep7211-edb7211.dts
+new file mode 100644
+index 0000000..9a134ed
+--- /dev/null
++++ b/arch/arm/boot/dts/ep7211-edb7211.dts
+@@ -0,0 +1,100 @@
++/*
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ */
++
++#include "ep7211.dtsi"
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Cirrus Logic EP7211 Development Board";
++	compatible = "cirrus,edb7211", "cirrus,ep7211", "cirrus,ep7209";
++
++	memory {
++		reg = <0xc0000000 0x02000000>;
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm 0>;
++		brightness-levels = <
++			0x0 0x1 0x2 0x3 0x4 0x5 0x6 0x7
++			0x8 0x9 0xa 0xb 0xc 0xd 0xe 0xf
++		>;
++		default-brightness-level = <0x0>;
++		power-supply = <&blen>;
++	};
++
++	display: display {
++		model = "320x240x4";
++		native-mode = <&timing0>;
++		bits-per-pixel = <4>;
++		ac-prescale = <17>;
++
++		display-timings {
++			timing0: 320x240 {
++				hactive = <320>;
++				hback-porch = <0>;
++				hfront-porch = <0>;
++				hsync-len = <0>;
++				vactive = <240>;
++				vback-porch = <0>;
++				vfront-porch = <0>;
++				vsync-len = <0>;
++				clock-frequency = <6500000>;
++			};
++		};
++	};
++
++	i2c: i2c {
++		compatible = "i2c-gpio";
++		gpios = <&portd 4 GPIO_ACTIVE_HIGH>,
++			<&portd 5 GPIO_ACTIVE_HIGH>;
++		i2c-gpio,delay-us = <2>;
++		i2c-gpio,scl-output-only;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	lcddc: lcddc {
++		compatible = "regulator-fixed";
++		regulator-name = "BACKLIGHT ENABLE";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&portd 1 GPIO_ACTIVE_HIGH>;
++	};
++
++	blen: blen {
++		compatible = "regulator-fixed";
++		regulator-name = "BACKLIGHT ENABLE";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&portd 3 GPIO_ACTIVE_HIGH>;
++	};
 +};
 +
-+static void __init clps711x_map_io(void)
-+{
-+	iotable_init(&clps711x_io_desc, 1);
-+}
-+
-+static const struct resource clps711x_cpuidle_res =
-+	DEFINE_RES_MEM(CLPS711X_PHYS_BASE + HALT, SZ_128);
-+
-+static void __init clps711x_init(void)
-+{
-+	u32 id[5];
-+
-+	id[0] = readl(CLPS711X_VIRT_BASE + UNIQID);
-+	id[1] = readl(CLPS711X_VIRT_BASE + RANDID0);
-+	id[2] = readl(CLPS711X_VIRT_BASE + RANDID1);
-+	id[3] = readl(CLPS711X_VIRT_BASE + RANDID2);
-+	id[4] = readl(CLPS711X_VIRT_BASE + RANDID3);
-+	system_rev = SYSFLG1_VERID(readl(CLPS711X_VIRT_BASE + SYSFLG1));
-+
-+	add_device_randomness(id, sizeof(id));
-+
-+	system_serial_low = id[0];
-+
-+	platform_device_register_simple("clps711x-cpuidle", PLATFORM_DEVID_NONE,
-+					&clps711x_cpuidle_res, 1);
-+}
-+
-+static void clps711x_restart(enum reboot_mode mode, const char *cmd)
-+{
-+	soft_restart(0);
-+}
-+
-+static const char *clps711x_compat[] __initconst = {
-+	"cirrus,ep7209",
-+	NULL
++&bus {
++	flash: nor at 00000000 {
++		compatible = "cfi-flash";
++		reg = <0 0x00000000 0x02000000>;
++		bank-width = <2>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++	};
 +};
 +
-+DT_MACHINE_START(CLPS711X_DT, "Cirrus Logic CLPS711X (Device Tree Support)")
-+	.dt_compat	= clps711x_compat,
-+	.map_io		= clps711x_map_io,
-+	.init_late	= clps711x_init,
-+	.restart	= clps711x_restart,
-+MACHINE_END
++&fb {
++	display = <&display>;
++	lcd-supply = <&lcddc>;
++	status = "okay";
++};
++
++&portd {
++	lcden {
++		gpio-hog;
++		gpios = <2 GPIO_ACTIVE_HIGH>;
++		output-high;
++		line-name = "LCD ENABLE";
++	};
++};
+diff --git a/arch/arm/boot/dts/ep7211.dtsi b/arch/arm/boot/dts/ep7211.dtsi
+new file mode 100644
+index 0000000..e438f6d
+--- /dev/null
++++ b/arch/arm/boot/dts/ep7211.dtsi
+@@ -0,0 +1,12 @@
++/*
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ */
++
++#include "ep7209.dtsi"
++
++/ {
++	model = "Cirrus Logic EP7211";
++	compatible = "cirrus,ep7211", "cirrus,ep7209";
++};
 -- 
 2.4.9
