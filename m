@@ -1,195 +1,98 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Fri, 3 Jun 2016 22:48:52 -0500
-Subject: [PATCH 2/2] aer: add support aer interrupt with none
- MSI/MSI-X/INTx mode
-In-Reply-To: <5751BEDF.3040300@ti.com>
-References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
- <20160602034828.GA10240@localhost>
- <VI1PR0401MB1709E215DCE264B2C27B3DAB92580@VI1PR0401MB1709.eurprd04.prod.outlook.com>
- <20160602135546.GA8262@localhost> <575052B8.3090203@ti.com>
- <20160603040952.GA17904@localhost> <5751BEDF.3040300@ti.com>
-Message-ID: <20160604034852.GA15143@localhost>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sat, 4 Jun 2016 12:53:18 +0900
+Subject: [PATCH v13 03/10] arm64: add conditional instruction simulation
+ support
+In-Reply-To: <1464924384-15269-4-git-send-email-dave.long@linaro.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-4-git-send-email-dave.long@linaro.org>
+Message-ID: <20160604125318.0f5c6fe348fec92502bef3b9@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 01:31:11PM -0400, Murali Karicheri wrote:
-> Po,
-> 
-> Sorry to hijack your discussion, but the problem seems to be same for
-> Keystone PCI controller which is also designware (old version) based.
-> 
-> On 06/03/2016 12:09 AM, Bjorn Helgaas wrote:
-> > On Thu, Jun 02, 2016 at 11:37:28AM -0400, Murali Karicheri wrote:
-> >> On 06/02/2016 09:55 AM, Bjorn Helgaas wrote:
-> >>> On Thu, Jun 02, 2016 at 05:01:19AM +0000, Po Liu wrote:
-> >>>>>  -----Original Message-----
-> >>>>>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> >>>>>  Sent: Thursday, June 02, 2016 11:48 AM
-> >>>>>  To: Po Liu
-> >>>>>  Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> >>>>>  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Arnd Bergmann;
-> >>>>>  Roy Zang; Marc Zyngier; Stuart Yoder; Yang-Leo Li; Minghuan Lian; Bjorn
-> >>>>>  Helgaas; Shawn Guo; Mingkai Hu; Rob Herring
-> >>>>>  Subject: Re: [PATCH 2/2] aer: add support aer interrupt with none
-> >>>>>  MSI/MSI-X/INTx mode
-> >>>>>  
-> >>>>>  [+cc Rob]
-> >>>>>  
-> >>>>>  Hi Po,
-> >>>>>  
-> >>>>>  On Thu, May 26, 2016 at 02:00:06PM +0800, Po Liu wrote:
-> >>>>>  > On some platforms, root port doesn't support MSI/MSI-X/INTx in RC mode.
-> >>>>>  > When chip support the aer interrupt with none MSI/MSI-X/INTx mode,
-> >>>>>  > maybe there is interrupt line for aer pme etc. Search the interrupt
-> >>>>>  > number in the fdt file.
-> >>>>>  
-> >>>>>  My understanding is that AER interrupt signaling can be done via INTx,
-> >>>>>  MSI, or MSI-X (PCIe spec r3.0, sec 6.2.4.1.2).  Apparently your device
-> >>>>>  doesn't support MSI or MSI-X.  Are you saying it doesn't support INTx
-> >>>>>  either?  How is the interrupt you're requesting here different from INTx?
-> >>>>
-> >>>> Layerscape use none of MSI or MSI-X or INTx to indicate the devices
-> >>>> or root error in RC mode. But use an independent SPI interrupt(arm
-> >>>> interrupt controller) line.  
-> >>>
-> >>> The Root Port is a PCI device and should follow the normal PCI rules
-> >>> for interrupts.  As far as I understand, that means it should use MSI,
-> >>> MSI-X, or INTx.  If your Root Port doesn't use MSI or MSI-X, it should
-> >>> use INTx, the PCI_INTERRUPT_PIN register should tell us which (INTA/
-> >>> INTB/etc.), and PCI_COMMAND_INTX_DISABLE should work to disable it.
-> >>> That's all from the PCI point of view, of course.
-> >>
-> >> I am faced with the same issue on Keystone PCI hardware and it has been
-> >> on my TODO list  for quite some time. Keystone PCI hardware also doesn't
-> >> use MSI or MSI-X or INTx for reporting errors received at the root port,
-> >> but use a platform interrupt instead (not complaint to PCI standard as
-> >> per PCI base spec). So I would need similar change to have the error
-> >> interrupt passed to the aer driver. So there are hardware out there
-> >> like Keystone which requires to support this through platform IRQ.
-> > 
-> > This is not a new area of the spec, and it's hard for me to believe
-> > that these two new PCIe controllers are both broken the same way
-> > (although I guess both are DesignWare-based, so maybe this is the same
-> > underlying problem in both cases?).  I think it's more likely that we
-> > just haven't figured out the right way to describe this in the DT.
-> 
-> Keystone is using an older version of the designware IP and it implements
-> all of the interrupts in the application register space unlike other
-> newer version of the hardware. So I assume, the version used on Layerscape
-> is also an older version and the both have same issue in terms of 
-> non standard platform interrupt used for error reporting.
-> 
-> > I assume you have a Root Port with an AER capability, no MSI
-> > capability, and no MSI-X capability, right? 
-> 
-> Has AER capability and both MSI and INTx (legacy) capability
-> 
-> > What does its Interrupt
-> > Pin register contain?  If it's zero, it doesn't use INTx either, so
-> > according to the spec it should generate no interrupts.
-> > 
-> At address offset 0x3C by default has a value of 1, but it is writable
-> by software. So default is INTx A.
+On Thu,  2 Jun 2016 23:26:17 -0400
+David Long <dave.long@linaro.org> wrote:
 
-0x3c is the Interrupt *Line*, which is read/write.  The Interrupt
-*Pin* is at 0x3d and should be read-only.
-
-Does your Keystone driver support MSI?  If so, since your Root Port
-supports MSI, I would think we would use that by default, and the INTx
-stuff wouldn't even matter.
-
-> > But if Interrupt Pin is non-zero, that means the Root Port should be
-> > able to generate virtual INTx interrupts.  Presumably the Root Complex
-> > connects those interrupts to something; maybe to your platform
-> > interrupt?
+> From: "David A. Long" <dave.long@linaro.org>
 > 
-> Probably that is what is happening. Both Power management and Error
-> interrupts are raised on platform interrupt lines.
+> Cease using the arm32 arm_check_condition() function and replace it with
+> a local version for use in deprecated instruction support on arm64. Also
+> make the function table used by this available for future use by kprobes
+> and/or uprobes.
 > 
-> 12 Error Interrupts
+> This function is dervied from code written by Sandeepa Prabhu.
 > 
-> [0] System error (OR of fatal, nonfatal, correctable errors) (RC mode only)
-> [1] PCIe fatal error (RC mode only)
-> [2] PCIe non-fatal error (RC mode only)
-> [3] PCIe correctable error (RC mode only)
-> [4] AXI Error due to fatal condition in AXI bridge (EP/RC modes)
-> [5] PCIe advanced error (RC mode only)
+
+Basically looks good to me. I have some comments;
+
+> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
+> ---
+>  arch/arm64/include/asm/insn.h        |  3 ++
+>  arch/arm64/kernel/Makefile           |  3 +-
+>  arch/arm64/kernel/armv8_deprecated.c | 19 ++++++-
+>  arch/arm64/kernel/insn.c             | 98 ++++++++++++++++++++++++++++++++++++
+>  4 files changed, 119 insertions(+), 4 deletions(-)
 > 
-> 13 Power management and reset event interrupts
-> 
-> [0] Power management turn-off message interrupt (EP mode only)
-> [1] Power management ack message interrupt (RC mode only)
-> [2] Power management event interrupt (RC mode only)
-> [3] Link request reset interrupt (hot reset or link down) (RC mode only)
->
-> > PCI doesn't say anything about an interrupt after it leaves the Root
-> > Complex, so the fact that it's connected to a "platform interrupt" or
-> > "SPI interrupt" or "IOAPIC interrupt" doesn't make it non-compliant.
-> > Shouldn't we be able to use the interrupt-map and related DT
-> > properties to express the fact that Root Port virtual INTx is routed
-> > to platform interrupt Y, even without any special-case code in
-> > portdrv?
-> 
-> My understanding is if RC also raise interrupt on INTx, then below 
-> map make sense, where either EP or RC can raise interrupt and the
-> line will be muxed for interrupt from EP or RC port.
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index 9785d10..98e4edd 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -406,6 +406,9 @@ u32 aarch64_extract_system_register(u32 insn);
+>  u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+>  u32 aarch32_insn_mcr_extract_opc2(u32 insn);
+>  u32 aarch32_insn_mcr_extract_crm(u32 insn);
+> +
+> +typedef bool (pstate_check_t)(unsigned long);
+> +extern pstate_check_t * const opcode_condition_checks[16];
 
-I'm sorry, I didn't quite catch your meaning here, so let me try to
-clarify some terminology.  Maybe we'll eventually blunder into a
-common understanding :)
+Are those condition checkers only for aarch32 opcode? or
+general for aarch64 too? If it is only for aarch32, we'd better
+add aarch32 prefix.
 
-INTx is a PCI concept and only means something in the PCI hierarchy.
-The RC would *receive* virtual INTx interrupts from the PCI hierarchy
-and turn them into some platform-specific interrupt (not INTx) on the
-upstream side.
+>  #endif /* __ASSEMBLY__ */
+>  
+>  #endif	/* __ASM_INSN_H */
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 2173149..4653aca 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -26,8 +26,7 @@ $(obj)/%.stub.o: $(obj)/%.o FORCE
+>  	$(call if_changed,objcopy)
+>  
+>  arm64-obj-$(CONFIG_COMPAT)		+= sys32.o kuser32.o signal32.o 	\
+> -					   sys_compat.o entry32.o		\
+> -					   ../../arm/kernel/opcodes.o
+> +					   sys_compat.o entry32.o
+>  arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
+>  arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+>  arm64-obj-$(CONFIG_ARM64_MODULE_PLTS)	+= module-plts.o
+> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+> index c37202c..88b9165 100644
+> --- a/arch/arm64/kernel/armv8_deprecated.c
+> +++ b/arch/arm64/kernel/armv8_deprecated.c
+> @@ -366,6 +366,21 @@ static int emulate_swpX(unsigned int address, unsigned int *data,
+>  	return res;
+>  }
+>  
+> +#define	ARM_OPCODE_CONDITION_UNCOND	0xf
+> +
+> +static unsigned int __kprobes arm32_check_condition(u32 opcode, u32 psr)
 
-So strictly speaking, the RC might raise platform-specific interrupts
-when it receives INTx interrupts, but it would not raise any INTx
-interrupts itself.
+Would you be OK for using arm32 instead of aarch32 prefix?
 
-> Here is the DT entry in PCIE keystone for Legacy interrupt mapping
-> to host interrupt. 
->                         #interrupt-cells = <1>;
->                         interrupt-map-mask = <0 0 0 7>;
->                         interrupt-map = <0 0 0 1 &pcie_intc0 0>, /* INT A */
->                                         <0 0 0 2 &pcie_intc0 1>, /* INT B */
->                                         <0 0 0 3 &pcie_intc0 2>, /* INT C */
->                                         <0 0 0 4 &pcie_intc0 3>; /* INT D */
+> +{
+> +	u32 cc_bits  = opcode >> 28;
+> +
+> +	if (cc_bits != ARM_OPCODE_CONDITION_UNCOND) {
+> +		if ((*opcode_condition_checks[cc_bits])(psr))
+> +			return ARM_OPCODE_CONDTEST_PASS;
+> +		else
+> +			return ARM_OPCODE_CONDTEST_FAIL;
+> +	}
+> +	return ARM_OPCODE_CONDTEST_UNCOND;
+> +}
 
-If I understand correctly, this is the mapping from the PCI world
-(INTA, INTB, etc.) to the platform-specific world (pcie_intc0 0, etc.)
+Thank you,
 
-If a Root Port raises a virtual INTA, the RC should turn it into the
-corresponding platform interrupt, i.e., GIC_SPI 48 from the
-description below.
-
-> And  then
-> 
->                         pcie_intc0: legacy-interrupt-controller {
->                                 interrupt-controller;
->                                 #interrupt-cells = <1>;
->                                 interrupt-parent = <&gic>;
->                                 interrupts = <GIC_SPI 48 IRQ_TYPE_EDGE_RISING>,
->                                         <GIC_SPI 49 IRQ_TYPE_EDGE_RISING>,
->                                         <GIC_SPI 50 IRQ_TYPE_EDGE_RISING>,
->                                         <GIC_SPI 51 IRQ_TYPE_EDGE_RISING>;
->                         };
-> 
-> So if RC interrupt for Power management and Error interrupt is a separate
-> line, how can software describe that using the above interrupt map?
-
-I don't know anything about interrupts the RC might generate on its
-own behalf.  A lot of the RC behavior is not specified by the PCIe
-spec because the RC is on the border between the upstream
-platform-specific stuff and the downstream PCIe stuff.  Is there
-something in the PCIe spec about the power management and error
-interrupts you're talking about?  Of maybe you can point me to a
-section of the Keystone spec that talks about interrupts generated by
-the RC?
-
-In any event, the AER interrupts we're looking for in portdrv are from
-the Root Port, not from the RC.  For INTx, my understanding is that
-the RC *transforms* virtual INTx messages from the Root Port in the
-PCIe domain into GIC transactions in the platform domain.
-
-Bjorn
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
