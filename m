@@ -1,132 +1,30 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  4 Jun 2016 10:10:14 +0300
-Subject: [PATCH 22/22] ARM: config: Add a multi_v4t_defconfig
-In-Reply-To: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465024214-22120-23-git-send-email-shc_work@mail.ru>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 4 Jun 2016 09:10:21 +0100
+Subject: [PATCH v2 3/7] of/irq: Break out msi-map lookup (again)
+In-Reply-To: <2cbffa9a341edfd10114994f6486f6b08d0c390c.1464966939.git.robin.murphy@arm.com>
+References: <cover.1464966939.git.robin.murphy@arm.com>
+ <2cbffa9a341edfd10114994f6486f6b08d0c390c.1464966939.git.robin.murphy@arm.com>
+Message-ID: <20160604091021.661c5508@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow regression build testing of multi v4t systems, add a
-multi_v4t_defconfig, similar to the multi_v5(v7)_defconfig.
+On Fri, 3 Jun 2016 18:15:38 +0100
+Robin Murphy <robin.murphy@arm.com> wrote:
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/configs/multi_v4t_defconfig | 106 +++++++++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
- create mode 100644 arch/arm/configs/multi_v4t_defconfig
+> The PCI msi-map code is already doing double-duty translating IDs and
+> retrieving MSI parents, which unsurprisingly is the same functionality
+> we need for the identically-formatted PCI iommu-map property. Drag the
+> core parsing routine up yet another layer into the general OF-PCI code,
+> and further generalise it for either kind of lookup in either flavour
+> of map property.
+> 
+> CC: Rob Herring <robh+dt@kernel.org>
+> CC: Frank Rowand <frowand.list@gmail.com>
+> CC: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 
-diff --git a/arch/arm/configs/multi_v4t_defconfig b/arch/arm/configs/multi_v4t_defconfig
-new file mode 100644
-index 0000000..433eebb
---- /dev/null
-+++ b/arch/arm/configs/multi_v4t_defconfig
-@@ -0,0 +1,106 @@
-+CONFIG_KERNEL_LZMA=y
-+CONFIG_SYSVIPC=y
-+CONFIG_LOG_BUF_SHIFT=14
-+CONFIG_BLK_DEV_INITRD=y
-+CONFIG_EMBEDDED=y
-+CONFIG_SLOB=y
-+CONFIG_JUMP_LABEL=y
-+# CONFIG_LBDAF is not set
-+CONFIG_PARTITION_ADVANCED=y
-+# CONFIG_IOSCHED_CFQ is not set
-+CONFIG_ARCH_MULTI_V4T=y
-+# CONFIG_ARCH_MULTI_V7 is not set
-+CONFIG_ARCH_AT91=y
-+CONFIG_SOC_AT91RM9200=y
-+CONFIG_ARCH_CLPS711X=y
-+CONFIG_ARCH_INTEGRATOR=y
-+CONFIG_ARCH_INTEGRATOR_AP=y
-+CONFIG_INTEGRATOR_IMPD1=y
-+CONFIG_INTEGRATOR_CM720T=y
-+CONFIG_INTEGRATOR_CM920T=y
-+CONFIG_INTEGRATOR_CM922T_XA10=y
-+CONFIG_ARCH_MXC=y
-+CONFIG_MACH_SCB9328=y
-+CONFIG_MACH_APF9328=y
-+CONFIG_MACH_IMX1_DT=y
-+CONFIG_ARCH_NSPIRE=y
-+CONFIG_AEABI=y
-+# CONFIG_ATAGS is not set
-+CONFIG_ZBOOT_ROM_TEXT=0x0
-+CONFIG_ZBOOT_ROM_BSS=0x0
-+CONFIG_CPU_IDLE=y
-+CONFIG_ARM_CPUIDLE=y
-+CONFIG_ARM_CLPS711X_CPUIDLE=y
-+# CONFIG_COREDUMP is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_CMDLINE_PARTS=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_JEDECPROBE=y
-+CONFIG_MTD_CFI_INTELEXT=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_CFI_STAA=y
-+CONFIG_MTD_PLATRAM=y
-+CONFIG_MTD_NAND=y
-+CONFIG_MTD_NAND_GPIO=y
-+# CONFIG_INPUT is not set
-+# CONFIG_SERIO is not set
-+# CONFIG_VT is not set
-+CONFIG_SERIAL_CLPS711X=y
-+CONFIG_SERIAL_CLPS711X_CONSOLE=y
-+# CONFIG_HW_RANDOM is not set
-+CONFIG_I2C=y
-+CONFIG_I2C_AT91=y
-+CONFIG_I2C_GPIO=y
-+CONFIG_I2C_IMX=y
-+CONFIG_SPI=y
-+CONFIG_SPI_ATMEL=y
-+CONFIG_SPI_CLPS711X=y
-+CONFIG_SPI_GPIO=y
-+CONFIG_SPI_IMX=y
-+CONFIG_PINCTRL_AT91PIO4=y
-+CONFIG_GPIO_74XX_MMIO=y
-+CONFIG_GPIO_CLPS711X=y
-+CONFIG_GPIO_GENERIC_PLATFORM=y
-+CONFIG_GPIO_SYSCON=y
-+CONFIG_W1=y
-+CONFIG_W1_MASTER_MXC=y
-+CONFIG_W1_MASTER_GPIO=y
-+CONFIG_POWER_RESET_AT91_POWEROFF=y
-+CONFIG_POWER_RESET_AT91_RESET=y
-+CONFIG_POWER_RESET_AT91_SAMA5D2_SHDWC=y
-+CONFIG_POWER_RESET_GPIO=y
-+CONFIG_POWER_RESET_GPIO_RESTART=y
-+CONFIG_POWER_RESET_SYSCON=y
-+CONFIG_POWER_RESET_SYSCON_POWEROFF=y
-+# CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_GPIO_WATCHDOG=y
-+CONFIG_AT91RM9200_WATCHDOG=y
-+CONFIG_REGULATOR=y
-+CONFIG_REGULATOR_FIXED_VOLTAGE=y
-+CONFIG_REGULATOR_GPIO=y
-+CONFIG_FB=y
-+CONFIG_FB_CLPS711X=y
-+CONFIG_FB_IMX=y
-+CONFIG_LCD_PLATFORM=y
-+CONFIG_BACKLIGHT_PWM=y
-+# CONFIG_USB_SUPPORT is not set
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-+# CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PWM=y
-+CONFIG_PWM_ATMEL=y
-+CONFIG_PWM_CLPS711X=y
-+CONFIG_PWM_IMX=y
-+CONFIG_EXT2_FS=y
-+CONFIG_MSDOS_FS=y
-+CONFIG_VFAT_FS=y
-+CONFIG_CRAMFS=y
-+CONFIG_MINIX_FS=y
-+# CONFIG_FTRACE is not set
-+CONFIG_DEBUG_USER=y
-+CONFIG_CRC_CCITT=y
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-2.4.9
+Jazz is not dead. It just smells funny.
