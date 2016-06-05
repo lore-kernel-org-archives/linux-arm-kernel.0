@@ -1,92 +1,65 @@
 From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Sun, 5 Jun 2016 20:26:56 +0200
-Subject: [PATCH v2 3/4] ARM: dts: imx6q: add support for the Utilite Pro
+Date: Sun, 5 Jun 2016 20:26:57 +0200
+Subject: [PATCH v2 4/4] ARM: dts: imx6q-cm-fx6: Relicense under GPLv2/X11
 In-Reply-To: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
 References: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
-Message-ID: <50a8a6e8b5c6426fb02f59d9300503e5@rwthex-s1-b.rwth-ad.de>
+Message-ID: <c2d37f17a8b049169909c7a9391fa9a3@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-The CompuLab Utilite Pro is a miniature fanless desktop pc based on
-the i.MX6 Quad powered cm-fx6 module. It features two serial ports,
-USB OTG, 4x USB, analog audio and S/PDIF, 2x Gb Ethernet, HDMI and
-DVI ports, an on-board 32GB SSD, a mmc slot, and on-board wifi/bt.
+GPLv2-only devicetrees make reuse difficult for software components
+licensed under a different license. In particular, the Utilite Pro
+devicetree file (which includes on imx6q-cm-fx5.dts) is already dual
+licensed under GPLv2/X11.
 
-Add initial support for it including USB, Ethernet (both ports), sata
-and HDMI support.
+Hence, relicense imx6q-cm-fx6.dts under GPLv2/X11 dual license.
 
 Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 Cc: Igor Grinberg <grinberg@compulab.co.il>
 ---
 
 Changes since v1:
- - use GPL/X11 dual license (in agreement with CompuLab)
- - use GPIO_ACTIVE_{LOW,HIGH} defines to specify gpios
- - use KEY_POWER define for the power key
- - replace 0x80000000 iomuxc configs by proper defaults
-   obtained from u-boot
- - remove iomuxc container node
- - iomuxc: remove hog group and move the gpio-key pins
-   to a proper gpio_keys group
- - clean up uart2 node (remove dma properties already
-   present in imx6qdl.dtsi and replace deprecated
-   fsl,uart-has-rtscts by the generic one)
+ - new patch in v2; without it the dual licensed of the imx6q-utilite-pro.dts
+   is not really useful because it includes imx6q-cm-fx6.dts.
 
- arch/arm/boot/dts/Makefile              |   1 +
- arch/arm/boot/dts/imx6q-utilite-pro.dts | 153 ++++++++++++++++++++++++++++++++
- 2 files changed, 154 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-utilite-pro.dts
+ arch/arm/boot/dts/imx6q-cm-fx6.dts | 40 +++++++++++++++++++++++++++++++++-----
+ 1 file changed, 35 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 515a428..287044c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -369,6 +369,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-tx6q-1110.dtb \
- 	imx6q-tx6q-11x0-mb7.dtb \
- 	imx6q-udoo.dtb \
-+	imx6q-utilite-pro.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6q-wandboard-revb1.dtb \
- 	imx6qp-nitrogen6_max.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-new file mode 100644
-index 0000000..7219745
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-@@ -0,0 +1,153 @@
-+/*
-+ * Copyright 2013 CompuLab Ltd.
-+ * Copyright 2016 Christopher Spinrath
-+ *
-+ * Based on the devicetree distributed with the vendor kernel for the
-+ * Utilite Pro:
-+ *	Copyright 2013 CompuLab Ltd.
-+ *	Author: Valentin Raevsky <valentin@compulab.co.il>
-+ *
+diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+index c6f0e58..fe2c868 100644
+--- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
++++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+@@ -3,12 +3,42 @@
+  *
+  * Author: Valentin Raevsky <valentin@compulab.co.il>
+  *
+- * The code contained herein is licensed under the GNU General Public
+- * License. You may obtain a copy of the GNU General Public License
+- * Version 2 or later at the following locations:
 + * This file is dual-licensed: you can use it either under the terms
 + * of the GPL or the X11 license, at your option. Note that this dual
 + * licensing only applies to this file, and not this project as a
 + * whole.
-+ *
+  *
+- * http://www.opensource.org/licenses/gpl-license.html
+- * http://www.gnu.org/copyleft/gpl.html
 + *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
 + *
-+ *     This file is distributed in the hope that it will be useful,
++ *     This file is distributed in the hope that it will be useful
 + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
 + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 + *     GNU General Public License for more details.
 + *
-+ * Or, alternatively,
++ * Or, alternatively
 + *
 + *  b) Permission is hereby granted, free of charge, to any person
 + *     obtaining a copy of this software and associated documentation
 + *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
++ *     restriction, including without limitation the rights to use
 + *     copy, modify, merge, publish, distribute, sublicense, and/or
 + *     sell copies of the Software, and to permit persons to whom the
 + *     Software is furnished to do so, subject to the following
@@ -95,120 +68,16 @@ index 0000000..7219745
 + *     The above copyright notice and this permission notice shall be
 + *     included in all copies or substantial portions of the Software.
 + *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
 + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
 + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
 + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include <dt-bindings/input/input.h>
-+#include "imx6q-cm-fx6.dts"
-+
-+/ {
-+	model = "CompuLab Utilite Pro";
-+	compatible = "compulab,utilite-pro", "compulab,cm-fx6", "fsl,imx6q";
-+
-+	aliases {
-+		ethernet1 = &eth1;
-+		rtc0 = &em3027;
-+		rtc1 = &snvs_rtc;
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_gpio_keys>;
-+
-+		power {
-+			label = "Power Button";
-+			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_POWER>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+};
-+
-+&hdmi {
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "okay";
-+
-+	eeprom at 50 {
-+		compatible = "at24,24c02";
-+		reg = <0x50>;
-+		pagesize = <16>;
-+	};
-+
-+	em3027: rtc at 56 {
-+		compatible = "emmicro,em3027";
-+		reg = <0x56>;
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+};
-+
-+&iomuxc {
-+	pinctrl_gpio_keys: gpio_keysgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
-+			MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
-+			MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_uart2: uart2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
-+			MX6QDL_PAD_GPIO_8__UART2_RX_DATA 0x1b0b1
-+			MX6QDL_PAD_SD4_DAT5__UART2_RTS_B 0x1b0b1
-+			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
-+		>;
-+	};
-+};
-+
-+&pcie {
-+	pcie at 0,0 {
-+		reg = <0x000000 0 0 0 0>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+
-+		/* non-removable i211 ethernet card */
-+		eth1: intel,i211 at pcie0,0 {
-+			reg = <0x010000 0 0 0 0>;
-+		};
-+	};
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2>;
-+	uart-has-rtscts;
-+	status = "okay";
-+};
+  */
+ 
+ /dts-v1/;
 -- 
 2.8.3
