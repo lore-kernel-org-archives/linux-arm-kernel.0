@@ -1,20 +1,20 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Sun, 5 Jun 2016 14:03:34 -0500
-Subject: [PATCH 1/3] tty: serial: msm: Move header file into driver
-In-Reply-To: <20160512010228.21548-2-sboyd@codeaurora.org>
+Date: Sun, 5 Jun 2016 14:04:29 -0500
+Subject: [PATCH 2/3] tty: serial: msm: Only configure MND registers on hw
+ that has it
+In-Reply-To: <20160512010228.21548-3-sboyd@codeaurora.org>
 References: <20160512010228.21548-1-sboyd@codeaurora.org>
- <20160512010228.21548-2-sboyd@codeaurora.org>
-Message-ID: <20160605190334.GG13357@hector.attlocal.net>
+ <20160512010228.21548-3-sboyd@codeaurora.org>
+Message-ID: <20160605190429.GH13357@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2016 at 06:02:26PM -0700, Stephen Boyd wrote:
-> This header file is only used by the driver, so let's merge the
-> two together to reduce files and make it easier to see the whole
-> driver without flipping through two files. This also makes it
-> easier to use the structures defined in msm_serial.c in the
-> functions that are defined in msm_serial.h by placing them in the
-> proper locations.
+On Wed, May 11, 2016 at 06:02:27PM -0700, Stephen Boyd wrote:
+> The registers that msm_serial_set_mnd_regs() writes only exist on
+> the non-uartdm hardware, so let's return early here if this
+> function is called on uartdm hardware. This also prevents us from
+> messing up the uartclk variable if the uartclk rate happens to be
+> 19.2 or 4.8 MHz.
 > 
 > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
