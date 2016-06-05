@@ -1,40 +1,24 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Sun, 5 Jun 2016 21:53:54 +0200
-Subject: [PATCH v2 2/4] ARM: dts: imx6q: extend support for the cm-fx6
-In-Reply-To: <db27a6f6905b4683bb256f884c25b088@rwthex-s2-b.rwth-ad.de>
-References: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
- <90e7dea7dee342cf82ccedcd463a60fc@rwthex-s1-b.rwth-ad.de>
- <db27a6f6905b4683bb256f884c25b088@rwthex-s2-b.rwth-ad.de>
-Message-ID: <2ade5c2a94f146269ece29d5761cb528@rwthex-s1-b.rwth-ad.de>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 06 Jun 2016 00:14:01 +0200
+Subject: [PATCH 0/3] arm64: dts: rockchip: add io-domain support for
+ rk3368 and rk3399
+In-Reply-To: <1463865828-14583-1-git-send-email-heiko@sntech.de>
+References: <1463865828-14583-1-git-send-email-heiko@sntech.de>
+Message-ID: <488393040.q3pmEmijvh@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-
-Thanks for your review!
-
-On 06/05/2016 09:14 PM, Fabio Estevam wrote:
-> On Sun, Jun 5, 2016 at 3:26 PM,  <christopher.spinrath@rwth-aachen.de> wrote:
+Am Samstag, 21. Mai 2016, 23:23:45 schrieb Heiko Stuebner:
+> This adds the core io-domain nodes for both the rk3368 and rk3399
+> as well as the actual supplies on the rk3368-r88 board.
 > 
->> +&pcie {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&pinctrl_pcie>;
->> +       reset-gpio = <&gpio1 26 GPIO_ACTIVE_HIGH>;
+> This of course needs
+>     PM / AVS: rockchip-io: make io-domains a child of the GRF
+> that went into mainline during the 4.7 merge window.
 > 
-> I suppose this should be active low, right?
-> 
-hmm, the vendor devicetree uses active high but does not set
-reset-gpio-active-high. In a quick test it turned out that setting this
-property keeps the pci bus in reset.
-In fact, the linux driver ignores the polarity and falls back to active
-low. This explains why specifying active high "worked" here...
+> Heiko Stuebner (3):
+>   arm64: dts: rockchip: add rk3368 io-domain core nodes
+>   arm64: dts: rockchip: add rk3368-r88 iodomains
+>   arm64: dts: rockchip: add rk3399 io-domain core nodes
 
-So you are right and it should be active low. I'll fix that.
-
-> With this fixed:
-> 
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-
-Thanks,
-Christopher
+I have all 3 in my dts64 branch now.
