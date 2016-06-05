@@ -1,63 +1,21 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Sun, 5 Jun 2016 13:57:50 -0500
-Subject: [PATCH 1/2][v3] i2c: qup: add ACPI support
-In-Reply-To: <1464291477-4705-1-git-send-email-austinwc@codeaurora.org>
-References: <1464291477-4705-1-git-send-email-austinwc@codeaurora.org>
-Message-ID: <20160605185750.GF13357@hector.attlocal.net>
+Date: Sun, 5 Jun 2016 14:03:34 -0500
+Subject: [PATCH 1/3] tty: serial: msm: Move header file into driver
+In-Reply-To: <20160512010228.21548-2-sboyd@codeaurora.org>
+References: <20160512010228.21548-1-sboyd@codeaurora.org>
+ <20160512010228.21548-2-sboyd@codeaurora.org>
+Message-ID: <20160605190334.GG13357@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2016 at 01:37:56PM -0600, Austin Christ wrote:
+On Wed, May 11, 2016 at 06:02:26PM -0700, Stephen Boyd wrote:
+> This header file is only used by the driver, so let's merge the
+> two together to reduce files and make it easier to see the whole
+> driver without flipping through two files. This also makes it
+> easier to use the structures defined in msm_serial.c in the
+> functions that are defined in msm_serial.h by placing them in the
+> proper locations.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-<snip>
-
-> @@ -1354,14 +1359,13 @@ static void qup_i2c_disable_clocks(struct qup_i2c_dev *qup)
->  static int qup_i2c_probe(struct platform_device *pdev)
->  {
->  	static const int blk_sizes[] = {4, 16, 32};
-> -	struct device_node *node = pdev->dev.of_node;
->  	struct qup_i2c_dev *qup;
->  	unsigned long one_bit_t;
->  	struct resource *res;
->  	u32 io_mode, hw_ver, size;
->  	int ret, fs_div, hs_div;
-> -	int src_clk_freq;
-> -	u32 clk_freq = 100000;
-> +	u32 src_clk_freq = 0;
-> +	u32 clk_freq = 0;
->  	int blocks;
->  
->  	qup = devm_kzalloc(&pdev->dev, sizeof(*qup), GFP_KERNEL);
-> @@ -1372,7 +1376,12 @@ static int qup_i2c_probe(struct platform_device *pdev)
->  	init_completion(&qup->xfer);
->  	platform_set_drvdata(pdev, qup);
->  
-> -	of_property_read_u32(node, "clock-frequency", &clk_freq);
-> +	ret = device_property_read_u32(qup->dev, "clock-frequency", &clk_freq);
-
-Why do we need a warning if the clock-frequency is not specified?  It is
-optional in the DT documentation, is it not in the ACPI?
-
-> +	if (ret) {
-> +		dev_warn(qup->dev, "using default clock-frequency %d",
-> +			DEFAULT_CLK_FREQ);
-> +		clk_freq = DEFAULT_CLK_FREQ;
-
-You could just assign the DEFAULT_CLK_FREQ in the variable declaration instead
-of 0.  read_property does not modify the variable unless it finds it or does the
-ACPI version modify if not found?
-
-> +	}
->  
->  	if (of_device_is_compatible(pdev->dev.of_node, "qcom,i2c-qup-v1.1.1")) {
->  		qup->adap.algo = &qup_i2c_algo;
-> @@ -1454,20 +1463,31 @@ nodma:
->  		return qup->irq;
->  	}
->  
-
-<snip>
-
-Regards,
-
-Andy
+Acked-by: Andy Gross <andy.gross@linaro.org>
