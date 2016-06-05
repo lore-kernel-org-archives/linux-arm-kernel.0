@@ -1,40 +1,22 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 5 Jun 2016 21:07:16 +0200
-Subject: [PATCH] userspace API definitions for auto-focus coil
-In-Reply-To: <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
-References: <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd>
- <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
- <20160531213437.GA28397@amd>
- <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
- <20160601220840.GA21946@amd>
- <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
- <20160602193027.GB7984@amd>
- <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
-Message-ID: <20160605190716.GA11321@amd>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 5 Jun 2016 16:14:38 -0300
+Subject: [PATCH v2 2/4] ARM: dts: imx6q: extend support for the cm-fx6
+In-Reply-To: <90e7dea7dee342cf82ccedcd463a60fc@rwthex-s1-b.rwth-ad.de>
+References: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
+ <90e7dea7dee342cf82ccedcd463a60fc@rwthex-s1-b.rwth-ad.de>
+Message-ID: <CAOMZO5DX9W4MV3gTVJdxLZ4pFy98MME9FR+qjg8VAh-1-SVK6w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add userspace API definitions.
+On Sun, Jun 5, 2016 at 3:26 PM,  <christopher.spinrath@rwth-aachen.de> wrote:
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> +&pcie {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_pcie>;
+> +       reset-gpio = <&gpio1 26 GPIO_ACTIVE_HIGH>;
 
-diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-index b6a357a..23011cc 100644
---- a/include/uapi/linux/v4l2-controls.h
-+++ b/include/uapi/linux/v4l2-controls.h
-@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
- #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
- #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
- 
-+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
-+#define V4L2_CID_FOCUS_AD5820_RAMP_TIME	(V4L2_CID_FOCUS_AD5820_BASE+0)
-+#define V4L2_CID_FOCUS_AD5820_RAMP_MODE	(V4L2_CID_FOCUS_AD5820_BASE+1)
-+
- #endif
+I suppose this should be active low, right?
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+With this fixed:
+
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
