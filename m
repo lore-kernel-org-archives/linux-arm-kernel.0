@@ -1,130 +1,214 @@
 From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Sun, 5 Jun 2016 20:26:54 +0200
-Subject: [PATCH v2 1/4] ARM: dts: imx6q-cm-fx6: remove iomuxc container node
-Message-ID: <05d1fc32889043ad9a711782bde7957a@rwthex-s1-b.rwth-ad.de>
+Date: Sun, 5 Jun 2016 20:26:56 +0200
+Subject: [PATCH v2 3/4] ARM: dts: imx6q: add support for the Utilite Pro
+In-Reply-To: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
+References: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
+Message-ID: <50a8a6e8b5c6426fb02f59d9300503e5@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-The imx6q-cm-fx6 iomuxc container node is not required. Remove it.
+The CompuLab Utilite Pro is a miniature fanless desktop pc based on
+the i.MX6 Quad powered cm-fx6 module. It features two serial ports,
+USB OTG, 4x USB, analog audio and S/PDIF, 2x Gb Ethernet, HDMI and
+DVI ports, an on-board 32GB SSD, a mmc slot, and on-board wifi/bt.
+
+Add initial support for it including USB, Ethernet (both ports), sata
+and HDMI support.
 
 Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+Cc: Igor Grinberg <grinberg@compulab.co.il>
 ---
 
 Changes since v1:
- - this is a new patch in v2 required to address the iomuxc review
-   comments of v1 (remove container nodes to reduce indentation)
+ - use GPL/X11 dual license (in agreement with CompuLab)
+ - use GPIO_ACTIVE_{LOW,HIGH} defines to specify gpios
+ - use KEY_POWER define for the power key
+ - replace 0x80000000 iomuxc configs by proper defaults
+   obtained from u-boot
+ - remove iomuxc container node
+ - iomuxc: remove hog group and move the gpio-key pins
+   to a proper gpio_keys group
+ - clean up uart2 node (remove dma properties already
+   present in imx6qdl.dtsi and replace deprecated
+   fsl,uart-has-rtscts by the generic one)
 
- arch/arm/boot/dts/imx6q-cm-fx6.dts | 94 +++++++++++++++++++-------------------
- 1 file changed, 46 insertions(+), 48 deletions(-)
+ arch/arm/boot/dts/Makefile              |   1 +
+ arch/arm/boot/dts/imx6q-utilite-pro.dts | 153 ++++++++++++++++++++++++++++++++
+ 2 files changed, 154 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-utilite-pro.dts
 
-diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-index 99b46f8..21c513f 100644
---- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-+++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-@@ -47,56 +47,54 @@
- };
- 
- &iomuxc {
--	imx6q-cm-fx6 {
--		pinctrl_enet: enetgrp {
--			fsl,pins = <
--				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
--				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
--				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
--				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
--				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
--				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
--				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
--				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
--				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
--				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
--				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
--				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
--				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
--				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
--				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
--				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
--			>;
--		};
-+	pinctrl_enet: enetgrp {
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 515a428..287044c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -369,6 +369,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-tx6q-1110.dtb \
+ 	imx6q-tx6q-11x0-mb7.dtb \
+ 	imx6q-udoo.dtb \
++	imx6q-utilite-pro.dtb \
+ 	imx6q-wandboard.dtb \
+ 	imx6q-wandboard-revb1.dtb \
+ 	imx6qp-nitrogen6_max.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+new file mode 100644
+index 0000000..7219745
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+@@ -0,0 +1,153 @@
++/*
++ * Copyright 2013 CompuLab Ltd.
++ * Copyright 2016 Christopher Spinrath
++ *
++ * Based on the devicetree distributed with the vendor kernel for the
++ * Utilite Pro:
++ *	Copyright 2013 CompuLab Ltd.
++ *	Author: Valentin Raevsky <valentin@compulab.co.il>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/input/input.h>
++#include "imx6q-cm-fx6.dts"
++
++/ {
++	model = "CompuLab Utilite Pro";
++	compatible = "compulab,utilite-pro", "compulab,cm-fx6", "fsl,imx6q";
++
++	aliases {
++		ethernet1 = &eth1;
++		rtc0 = &em3027;
++		rtc1 = &snvs_rtc;
++	};
++
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
++
++		power {
++			label = "Power Button";
++			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
++			gpio-key,wakeup;
++		};
++	};
++};
++
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1>;
++	status = "okay";
++
++	eeprom at 50 {
++		compatible = "at24,24c02";
++		reg = <0x50>;
++		pagesize = <16>;
++	};
++
++	em3027: rtc at 56 {
++		compatible = "emmicro,em3027";
++		reg = <0x56>;
++	};
++};
++
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_gpio_keys: gpio_keysgrp {
 +		fsl,pins = <
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
++			MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x1b0b0
 +		>;
 +	};
- 
--		pinctrl_gpmi_nand: gpminandgrp {
--			fsl,pins = <
--				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
--				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
--				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
--				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
--				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
--				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
--				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
--				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
--				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
--				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
--				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
--				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
--				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
--				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
--				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
--				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
--				MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
--			>;
--		};
-+	pinctrl_gpmi_nand: gpminandgrp {
++
++	pinctrl_i2c1: i2c1grp {
 +		fsl,pins = <
-+			MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
-+			MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
-+			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
-+			MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
-+			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
-+			MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
-+			MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
-+			MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
-+			MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
-+			MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
-+			MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
-+			MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
-+			MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
-+			MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
-+			MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
-+			MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
-+			MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
++			MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
++			MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
 +		>;
 +	};
- 
--		pinctrl_uart4: uart4grp {
--			fsl,pins = <
--				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
--				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
--			>;
--		};
-+	pinctrl_uart4: uart4grp {
++
++	pinctrl_i2c2: i2c2grp {
 +		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
++			MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
++			MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
 +		>;
- 	};
- };
- 
++	};
++
++	pinctrl_uart2: uart2grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
++			MX6QDL_PAD_GPIO_8__UART2_RX_DATA 0x1b0b1
++			MX6QDL_PAD_SD4_DAT5__UART2_RTS_B 0x1b0b1
++			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
++		>;
++	};
++};
++
++&pcie {
++	pcie at 0,0 {
++		reg = <0x000000 0 0 0 0>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++
++		/* non-removable i211 ethernet card */
++		eth1: intel,i211 at pcie0,0 {
++			reg = <0x010000 0 0 0 0>;
++		};
++	};
++};
++
++&uart2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart2>;
++	uart-has-rtscts;
++	status = "okay";
++};
 -- 
 2.8.3
