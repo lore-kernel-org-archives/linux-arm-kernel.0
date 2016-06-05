@@ -1,77 +1,53 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 5 Jun 2016 19:41:57 +0200
-Subject: [PATCH 07/34] clk: berlin: Migrate to clk_hw based registration
- and OF APIs
-In-Reply-To: <20160601231533.9354-8-stephen.boyd@linaro.org>
-References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-8-stephen.boyd@linaro.org>
-Message-ID: <20160605174157.GP4594@piout.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 6 Jun 2016 01:51:34 +0800
+Subject: [PATCH 7/7] thermal: qoriq: Add thermal management support
+In-Reply-To: <1464937059-19349-7-git-send-email-hongtao.jia@nxp.com>
+Message-ID: <201606060137.uvl98Wrz%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-The main drawback of those patches is that they break the alignment
-(checkpatch.pl --strict complains).
+[auto build test ERROR on v4.7-rc1]
+[also build test ERROR on next-20160603]
+[cannot apply to robh/for-next soc-thermal/next]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On 01/06/2016 at 16:15:06 -0700, Stephen Boyd wrote :
-> diff --git a/drivers/clk/berlin/berlin2-avpll.h b/drivers/clk/berlin/berlin2-avpll.h
-> index a37f5068d299..17e311153b42 100644
-> --- a/drivers/clk/berlin/berlin2-avpll.h
-> +++ b/drivers/clk/berlin/berlin2-avpll.h
-> @@ -19,17 +19,13 @@
->  #ifndef __BERLIN2_AVPLL_H
->  #define __BERLIN2_AVPLL_H
->  
-> -struct clk;
-> -
->  #define BERLIN2_AVPLL_BIT_QUIRK		BIT(0)
->  #define BERLIN2_AVPLL_SCRAMBLE_QUIRK	BIT(1)
->  
-> -struct clk * __init
-> -berlin2_avpll_vco_register(void __iomem *base, const char *name,
-> +int berlin2_avpll_vco_register(void __iomem *base, const char *name,
+url:    https://github.com/0day-ci/linux/commits/Jia-Hongtao/dt-bindings-Update-QorIQ-TMU-thermal-bindings/20160603-154428
+config: um-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=um 
 
-This is missing __init.
+All errors (new ones prefixed by >>):
 
->  	   const char *parent_name, u8 vco_flags, unsigned long flags);
->  
-> -struct clk * __init
-> -berlin2_avpll_channel_register(void __iomem *base, const char *name,
-> +int berlin2_avpll_channel_register(void __iomem *base, const char *name,
+   drivers/thermal/qoriq_thermal.c: In function 'qoriq_tmu_probe':
+>> drivers/thermal/qoriq_thermal.c:255:2: error: implicit declaration of function 'iounmap' [-Werror=implicit-function-declaration]
+     iounmap(data->regs);
+     ^~~~~~~
+   cc1: some warnings being treated as errors
 
-Ditto.
+vim +/iounmap +255 drivers/thermal/qoriq_thermal.c
 
->  		       u8 index, const char *parent_name, u8 ch_flags,
->  		       unsigned long flags);
->  
-> diff --git a/drivers/clk/berlin/berlin2-pll.h b/drivers/clk/berlin/berlin2-pll.h
-> index 8831ce27ac1e..796874facc4c 100644
-> --- a/drivers/clk/berlin/berlin2-pll.h
-> +++ b/drivers/clk/berlin/berlin2-pll.h
-> @@ -19,8 +19,6 @@
->  #ifndef __BERLIN2_PLL_H
->  #define __BERLIN2_PLL_H
->  
-> -struct clk;
-> -
->  struct berlin2_pll_map {
->  	const u8 vcodiv[16];
->  	u8 mult;
-> @@ -29,8 +27,7 @@ struct berlin2_pll_map {
->  	u8 divsel_shift;
->  };
->  
-> -struct clk * __init
-> -berlin2_pll_register(const struct berlin2_pll_map *map,
-> +int berlin2_pll_register(const struct berlin2_pll_map *map,
+   249		site |= 0x1 << (15 - data->sensor_id);
+   250		tmu_write(data, site | TMR_ME | TMR_ALPF, &data->regs->tmr);
+   251	
+   252		return 0;
+   253	
+   254	err_tmu:
+ > 255		iounmap(data->regs);
+   256	
+   257	err_iomap:
+   258		platform_set_drvdata(pdev, NULL);
 
-Ditto.
-
->  		     void __iomem *base, const char *name,
->  		     const char *parent_name, unsigned long flags);
->  
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 18145 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160606/66e2140f/attachment-0001.obj>
