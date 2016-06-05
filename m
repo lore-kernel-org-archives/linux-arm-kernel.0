@@ -1,44 +1,60 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 6 Jun 2016 01:00:07 +1000
-Subject: linux-next: request to include linux-amlogic tree
-In-Reply-To: <CAOi56cXb7TjsctpeFWqGCmEx2LG-i11qoLBGDhi1OBJpbyko4A@mail.gmail.com>
-References: <CAOi56cXb7TjsctpeFWqGCmEx2LG-i11qoLBGDhi1OBJpbyko4A@mail.gmail.com>
-Message-ID: <20160606010007.6941cc2d@canb.auug.org.au>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sun, 5 Jun 2016 23:03:44 +0800
+Subject: [PATCH] mfd: axp20x: Add a 500ms delay at the end of
+ axp20x_power_off
+In-Reply-To: <1465134648-27113-1-git-send-email-hdegoede@redhat.com>
+References: <1465134648-27113-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v67Mc9D+6BSehOYJBfyCdV-Z-YKtF=UWT8wnFXhvtDqpNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Sun, Jun 5, 2016 at 9:50 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> The kernel expects the power_off function to not return, and if it does
+> it panics. At a slight delay after the i2c write which turns off power
 
-On Fri, 3 Jun 2016 14:49:01 -0700 Kevin Hilman <khilman@baylibre.com> wrote:
+             ^^^ Add?
+
+Otherwise,
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+> through the pmic, to give capacitors etc. some time to drain.
 >
-> Please add the following tree/branch to linux-next.  This is used for
-> the kernel development of the ARM-based Amlogic SoCs:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
-> for-next
-
-Added from today.  I assume that this will be merged via the arm-soc
-tree?  I also have just you as the contact - I can add more contacts if
-that makes sense.
-
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgement of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
-
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-        Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
-
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
+> Without this the kernel lives on long enough after the poweroff to
+> print the following on the serial console on my Mele A1000G quad:
+>
+> [  248.583588] reboot: Power down
+> [  248.600490] Kernel pa
+>
+> With the delay the start of printing "Kernel panic" is gone.
+>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/mfd/axp20x.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 6364dab..fd80b09 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -17,6 +17,7 @@
+>   */
+>
+>  #include <linux/err.h>
+> +#include <linux/delay.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> @@ -677,6 +678,9 @@ static void axp20x_power_off(void)
+>
+>         regmap_write(axp20x_pm_power_off->regmap, AXP20X_OFF_CTRL,
+>                      AXP20X_OFF);
+> +
+> +       /* Give capacitors etc. time to drain to avoid kernel panic msg. */
+> +       msleep(500);
+>  }
+>
+>  int axp20x_match_device(struct axp20x_dev *axp20x)
+> --
+> 2.7.4
+>
