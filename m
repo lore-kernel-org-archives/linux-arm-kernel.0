@@ -1,54 +1,39 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun,  5 Jun 2016 17:14:37 +0200
-Subject: [PATCH v2] mfd: axp20x: Add a 500ms delay at the end of
- axp20x_power_off
-Message-ID: <1465139677-7599-1-git-send-email-hdegoede@redhat.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 5 Jun 2016 17:54:00 +0200 (CEST)
+Subject: [PATCH RFT 2/4] ARM: dts: imx28-eukrea-mbmx28lc: add missing
+ reg properties
+In-Reply-To: <CAOMZO5DqYV97M+heNaehqFCTEiYnYKRqCfiF0FMxzqEvw-gkZw@mail.gmail.com>
+References: <1465134666-13459-1-git-send-email-stefan.wahren@i2se.com>
+ <CAOMZO5DqYV97M+heNaehqFCTEiYnYKRqCfiF0FMxzqEvw-gkZw@mail.gmail.com>
+Message-ID: <1527550523.279555.c2b71a89-24ac-4970-b99e-c80b6a2e1ba0.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel expects the power_off function to not return, and if it does
-it panics. Add a slight delay after the i2c write which turns off power
-through the pmic, to give capacitors etc. some time to drain.
+Hi Fabio,
 
-Without this the kernel lives on long enough after the poweroff to
-print the following on the serial console on my Mele A1000G quad:
+> Fabio Estevam <festevam@gmail.com> hat am 5. Juni 2016 um 16:00 geschrieben:
+> 
+> 
+> On Sun, Jun 5, 2016 at 10:51 AM, Stefan Wahren <stefan.wahren@i2se.com> wrote:
+> > This patch adds the missing reg properties for the regulator nodes
+> > in order to fix the dtc warnings.
+> >
+> > Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> > ---
+> >  arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi |    4 ++++
+> >  1 file changed, 4 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi
+> > b/arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi
+> > index 8859474..581e85f 100644
+> > --- a/arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi
+> > +++ b/arch/arm/boot/dts/imx28-eukrea-mbmx28lc.dtsi
+> > @@ -84,6 +84,7 @@
+> >
+> >                 reg_3p3v: regulator at 0 {
+> >                         compatible = "regulator-fixed";
+> > +                       reg = <0>;
+> 
+> The proper fix here would be to remove "@0" instead.
 
-[  248.583588] reboot: Power down
-[  248.600490] Kernel pa
-
-With the delay the start of printing "Kernel panic" is gone.
-
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
----
-Changes in v2:
--Add Chen-Yu's Acked-by
--Fix spelling error in commit msg
----
- drivers/mfd/axp20x.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-index 6364dab..fd80b09 100644
---- a/drivers/mfd/axp20x.c
-+++ b/drivers/mfd/axp20x.c
-@@ -17,6 +17,7 @@
-  */
- 
- #include <linux/err.h>
-+#include <linux/delay.h>
- #include <linux/interrupt.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
-@@ -677,6 +678,9 @@ static void axp20x_power_off(void)
- 
- 	regmap_write(axp20x_pm_power_off->regmap, AXP20X_OFF_CTRL,
- 		     AXP20X_OFF);
-+
-+	/* Give capacitors etc. time to drain to avoid kernel panic msg. */
-+	msleep(500);
- }
- 
- int axp20x_match_device(struct axp20x_dev *axp20x)
--- 
-2.7.4
+in this case many other mxs boards are wrong.
