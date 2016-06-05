@@ -1,22 +1,23 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun,  5 Jun 2016 15:37:59 +0200
-Subject: [PATCH 1/2] ARM: dts: sun6i: Add pmic / regulator nodes to Mele
- A1000G quad dts
-Message-ID: <1465133880-22921-1-git-send-email-hdegoede@redhat.com>
+Date: Sun,  5 Jun 2016 15:38:00 +0200
+Subject: [PATCH 2/2] ARM: dts: sun6i: Add pmic / regulator nodes to Mele M9 dts
+In-Reply-To: <1465133880-22921-1-git-send-email-hdegoede@redhat.com>
+References: <1465133880-22921-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <1465133880-22921-2-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pmic / regulator nodes to Mele A1000G quad dts.
+Add pmic / regulator nodes to Mele M9 dts.
 
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts | 88 +++++++++++++++++++++++-
+ arch/arm/boot/dts/sun6i-a31-m9.dts | 88 +++++++++++++++++++++++++++++++++++++-
  1 file changed, 87 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
-index e063dab..9782113 100644
---- a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
+diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
+index 66d29b8..2d3cd9d 100644
+--- a/arch/arm/boot/dts/sun6i-a31-m9.dts
++++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
 @@ -72,6 +72,10 @@
  	};
  };
@@ -138,7 +139,7 @@ index e063dab..9782113 100644
  &reg_usb1_vbus {
  	pinctrl-names = "default";
  	pinctrl-0 = <&usb1_vbus_pin_m9>;
-@@ -151,5 +236,6 @@
+@@ -146,5 +231,6 @@
  
  &usbphy {
  	usb1_vbus-supply = <&reg_usb1_vbus>;
