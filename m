@@ -1,57 +1,77 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Sun, 5 Jun 2016 19:36:50 +0200
-Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <92298f2d0d69413abb9ba7a336f534ab@rwthex-w1-a.rwth-ad.de>
-References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
- <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
- <CAOMZO5C5goJUdHKB9a=eOv9TKDkJWxnkWWb-G7E5Kvceg6sZVg@mail.gmail.com>
- <a6cc6b85d2fa4994b3cb7e2b047f800d@rwthex-w2-b.rwth-ad.de>
- <9d7793850de942cfb578b0aeb2728f41@rwthex-s1-b.rwth-ad.de>
- <CAOMZO5C3_bd-2Nz+G956+VPOcKoFaGGJK7G1p=U0yf5OyWekZA@mail.gmail.com>
- <c7a1b8de98814b95afc43cc6df3c92df@rwthex-w2-a.rwth-ad.de>
- <fccd7d19bc774e17bccf57b0af7b99b1@rwthex-s1-b.rwth-ad.de>
- <92298f2d0d69413abb9ba7a336f534ab@rwthex-w1-a.rwth-ad.de>
-Message-ID: <fb796ef1-fb2a-b120-f009-e7947afd195f@rwth-aachen.de>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 5 Jun 2016 19:41:57 +0200
+Subject: [PATCH 07/34] clk: berlin: Migrate to clk_hw based registration
+ and OF APIs
+In-Reply-To: <20160601231533.9354-8-stephen.boyd@linaro.org>
+References: <20160601231533.9354-1-stephen.boyd@linaro.org>
+ <20160601231533.9354-8-stephen.boyd@linaro.org>
+Message-ID: <20160605174157.GP4594@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igor,
+Hi,
 
-On 06/05/2016 06:25 PM, Igor Grinberg wrote:
-> Hi Christopher,
-> 
-> Thanks for bringing this to my attention.
-> 
-> On 06/02/2016 01:47 PM, Christopher Spinrath wrote:
->> Hi Igor,
->>
->> On 05/29/2016 10:01 AM, Igor Grinberg wrote:
->>> On 05/27/2016 01:20 AM, Fabio Estevam wrote:
->>>> On Thu, May 26, 2016 at 11:26 AM, Christopher Spinrath
->>>> <christopher.spinrath@rwth-aachen.de> wrote:
->>>>
->>>>> Thanks for joining this discussion. I *guess* the rationale is to share
->>>>> the same device tree with projects that are incompatible with the GPL
->>>>> (e.g. *BSD). Even if there is no support for a particular device/board
->>>>> having all (or most) files dual licensed makes it easier to just pull
->>>>> them all in.
->>>>
->>>> Yes, that's correct.
->>>>
->>>
->>> Thanks for the explanation.
->>>
->>
->> Have you/CompuLab made a decision? Do you/CompuLab approve the dual license?
-> 
-> Yes, please use the dual license.
-> You can count this answer official.
-> 
-Thank you very much! I will send v2 later today with the dual license
-(and also changing the license of the cm-fx6 file).
+The main drawback of those patches is that they break the alignment
+(checkpatch.pl --strict complains).
 
-I would be very nice, if you could provide your Acked-By (or whatever)
-for the license changes (I will keep you in cc).
+On 01/06/2016 at 16:15:06 -0700, Stephen Boyd wrote :
+> diff --git a/drivers/clk/berlin/berlin2-avpll.h b/drivers/clk/berlin/berlin2-avpll.h
+> index a37f5068d299..17e311153b42 100644
+> --- a/drivers/clk/berlin/berlin2-avpll.h
+> +++ b/drivers/clk/berlin/berlin2-avpll.h
+> @@ -19,17 +19,13 @@
+>  #ifndef __BERLIN2_AVPLL_H
+>  #define __BERLIN2_AVPLL_H
+>  
+> -struct clk;
+> -
+>  #define BERLIN2_AVPLL_BIT_QUIRK		BIT(0)
+>  #define BERLIN2_AVPLL_SCRAMBLE_QUIRK	BIT(1)
+>  
+> -struct clk * __init
+> -berlin2_avpll_vco_register(void __iomem *base, const char *name,
+> +int berlin2_avpll_vco_register(void __iomem *base, const char *name,
 
-Cheers,
-Christopher
+This is missing __init.
+
+>  	   const char *parent_name, u8 vco_flags, unsigned long flags);
+>  
+> -struct clk * __init
+> -berlin2_avpll_channel_register(void __iomem *base, const char *name,
+> +int berlin2_avpll_channel_register(void __iomem *base, const char *name,
+
+Ditto.
+
+>  		       u8 index, const char *parent_name, u8 ch_flags,
+>  		       unsigned long flags);
+>  
+> diff --git a/drivers/clk/berlin/berlin2-pll.h b/drivers/clk/berlin/berlin2-pll.h
+> index 8831ce27ac1e..796874facc4c 100644
+> --- a/drivers/clk/berlin/berlin2-pll.h
+> +++ b/drivers/clk/berlin/berlin2-pll.h
+> @@ -19,8 +19,6 @@
+>  #ifndef __BERLIN2_PLL_H
+>  #define __BERLIN2_PLL_H
+>  
+> -struct clk;
+> -
+>  struct berlin2_pll_map {
+>  	const u8 vcodiv[16];
+>  	u8 mult;
+> @@ -29,8 +27,7 @@ struct berlin2_pll_map {
+>  	u8 divsel_shift;
+>  };
+>  
+> -struct clk * __init
+> -berlin2_pll_register(const struct berlin2_pll_map *map,
+> +int berlin2_pll_register(const struct berlin2_pll_map *map,
+
+Ditto.
+
+>  		     void __iomem *base, const char *name,
+>  		     const char *parent_name, unsigned long flags);
+>  
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
