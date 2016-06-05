@@ -1,9 +1,9 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Sat,  4 Jun 2016 17:17:46 -0700
-Subject: [PATCH 3/5] regulator: rn5t618: Add RN5T567 PMIC support
+Date: Sat,  4 Jun 2016 17:17:47 -0700
+Subject: [PATCH 3/5] regulator: rn5t618: add RN5T567 PMIC support
 In-Reply-To: <20160605001749.4062-1-stefan@agner.ch>
 References: <20160605001749.4062-1-stefan@agner.ch>
-Message-ID: <20160605001749.4062-4-stefan@agner.ch>
+Message-ID: <20160605001749.4062-5-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
