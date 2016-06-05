@@ -1,47 +1,112 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 5 Jun 2016 19:25:42 +0300
-Subject: [PATCH 2/2] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <fccd7d19bc774e17bccf57b0af7b99b1@rwthex-s1-b.rwth-ad.de>
-References: <1463957258-4893-1-git-send-email-christopher.spinrath@rwth-aachen.de>
- <c4ab0387041f42ada68296141befe332@rwthex-s1-b.rwth-ad.de>
- <CAOMZO5C5goJUdHKB9a=eOv9TKDkJWxnkWWb-G7E5Kvceg6sZVg@mail.gmail.com>
- <a6cc6b85d2fa4994b3cb7e2b047f800d@rwthex-w2-b.rwth-ad.de>
- <9d7793850de942cfb578b0aeb2728f41@rwthex-s1-b.rwth-ad.de>
- <CAOMZO5C3_bd-2Nz+G956+VPOcKoFaGGJK7G1p=U0yf5OyWekZA@mail.gmail.com>
- <c7a1b8de98814b95afc43cc6df3c92df@rwthex-w2-a.rwth-ad.de>
- <fccd7d19bc774e17bccf57b0af7b99b1@rwthex-s1-b.rwth-ad.de>
-Message-ID: <57545286.3070203@compulab.co.il>
+Date: Sun, 5 Jun 2016 19:43:51 +0300
+Subject: [PATCH 1/2] ARM: dts: imx6q: extend support for the cm-fx6
+In-Reply-To: <5746DFE2.9040903@compulab.co.il>
+References: <709d6b3d522f4fcb8112830e0426dbb3@rwthex-s1-b.rwth-ad.de>
+ <1463994191.2370.3.camel@pengutronix.de> <5746B8C4.6020406@compulab.co.il>
+ <1464256217.14453.10.camel@pengutronix.de> <5746DFE2.9040903@compulab.co.il>
+Message-ID: <575456C7.9090709@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Christopher,
 
-Thanks for bringing this to my attention.
-
-On 06/02/2016 01:47 PM, Christopher Spinrath wrote:
-> Hi Igor,
-> 
-> On 05/29/2016 10:01 AM, Igor Grinberg wrote:
->> On 05/27/2016 01:20 AM, Fabio Estevam wrote:
->>> On Thu, May 26, 2016 at 11:26 AM, Christopher Spinrath
->>> <christopher.spinrath@rwth-aachen.de> wrote:
->>>
->>>> Thanks for joining this discussion. I *guess* the rationale is to share
->>>> the same device tree with projects that are incompatible with the GPL
->>>> (e.g. *BSD). Even if there is no support for a particular device/board
->>>> having all (or most) files dual licensed makes it easier to just pull
->>>> them all in.
->>>
->>> Yes, that's correct.
->>>
+On 05/26/2016 02:37 PM, Igor Grinberg wrote:
+> On 05/26/2016 12:50 PM, Lucas Stach wrote:
+>> Hi Igor,
 >>
->> Thanks for the explanation.
+>> Am Donnerstag, den 26.05.2016, 11:50 +0300 schrieb Igor Grinberg:
+>>> Hi Lucas,
+>>>
+>>> Thanks for reviewing the patch(es).
+>>>
+>>> On 05/23/2016 12:03 PM, Lucas Stach wrote:
+>>>> Am Montag, den 23.05.2016, 00:47 +0200 schrieb
+>>>> christopher.spinrath at rwth-aachen.de:
+>>>>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>>>
+>>> [...]
+>>>
+>>>>> +&ecspi1 {
+>>>>> +	fsl,spi-num-chipselects = <2>;
+>>>>> +	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
+>>>>> +	pinctrl-names = "default";
+>>>>> +	pinctrl-0 = <&pinctrl_ecspi1>;
+>>>>> +	status = "okay";
+>>>>> +
+>>>>> +	flash: m25p80 at 0 {
+>>>>> +		#address-cells = <1>;
+>>>>> +		#size-cells = <1>;
+>>>>> +		compatible = "st,m25p", "jedec,spi-nor";
+>>>>> +		spi-max-frequency = <20000000>;
+>>>>> +		reg = <0>;
+>>>>> +
+>>>>> +		partition at 0 {
+>>>>> +			label = "uboot";
+>>>>> +			reg = <0x0 0xc0000>;
+>>>>> +		};
+>>>>> +
+>>>>> +		partition at c0000 {
+>>>>> +			label = "uboot environment";
+>>>>> +			reg = <0xc0000 0x40000>;
+>>>>> +		};
+>>>>> +
+>>>>> +		partition at 100000 {
+>>>>> +			label = "reserved";
+>>>>> +			reg = <0x100000 0x100000>;
+>>>>> +		};
+>>>>
+>>>> Partition layouts don't belong in the upstream DT, as it a device
+>>>> configuration thing. Please kep them in the bootloader/firmware and make
+>>>> this one pass the partition layout to the kernel.
+>>>
+>>> I don't completely agree with this.
+>>> We have lots of partition layouts in the upstream DT.
 >>
+>> No, we don't. At least not for the i.MX6. There are some for the earlier
+>> i.MX boards, but IMO it's wrong to put device configuration into the
+>> upstream DT. Let's not start doing this again.
 > 
-> Have you/CompuLab made a decision? Do you/CompuLab approve the dual license?
+> Why not?
+> For i.MX6 there are 2 boards that have the partitioning scheme.
+> I'm not considering this a device configuration, but rather
+> a default partitioning layout/scheme.
+> Current case is for the firmware storage device that is not likely
+> to change.
+> Moreover, a DT is not really a part of the kernel, but lays along the kernel
+> sources for convenience and simplicity (at least IIRC as it was decided
+> about 5 years ago). It is more a part of the firmware for a device, than
+> an upstream kernel source code.
+> I think it is only a meter of time when Linus will decide that he does not
+> want it inside the kernel anymore...
+> 
+>>
+>>> Moreover, this is the default layout and changing it, will
+>>> result in incompatibilities and also might result in device "bricking".
+>>> Those can be changed from the boot loader in case you need those
+>>> the other way around.
+>>> Another question of mine is, why should you?
+>>>
+>> Partition layout is device configuration, which is governed by the
+>> device firmware.
+> 
+> Yet again, DT is a part of device firmware.
+> Moreover, the firmware (in that case U-Boot), can be configured
+> using the very same DT code, so not having this in, might force
+> various w/a and hacks.
+> 
+>> By not having the partition layout in the upstream DT
+>> people are forced to set it from the firmware, which is exactly the
+>> right thing to do, weather or not you plan to change it at any time.
+> 
+> I might be ignorant, sorry for that.
+> Why? Why is it right and why would you want to force people to do that?
+> 
+> 
 
-Yes, please use the dual license.
-You can count this answer official.
+No answer?
+I think it is worth keeping this as a default firmware layout.
+
 
 -- 
 Regards,
