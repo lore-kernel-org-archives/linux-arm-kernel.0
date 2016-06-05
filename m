@@ -1,168 +1,44 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun,  5 Jun 2016 16:59:36 +0200
-Subject: [PATCH v3 4/4] musb: sunxi: Simplify dr_mode handling
-In-Reply-To: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
-References: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1465138776-6003-4-git-send-email-hdegoede@redhat.com>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Mon, 6 Jun 2016 01:00:07 +1000
+Subject: linux-next: request to include linux-amlogic tree
+In-Reply-To: <CAOi56cXb7TjsctpeFWqGCmEx2LG-i11qoLBGDhi1OBJpbyko4A@mail.gmail.com>
+References: <CAOi56cXb7TjsctpeFWqGCmEx2LG-i11qoLBGDhi1OBJpbyko4A@mail.gmail.com>
+Message-ID: <20160606010007.6941cc2d@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-phy-sun4i-usb now has proper dr_mode handling, it always registers an
-extcon, and sends a notify with the mode (even when in peripheral- /
-host-only mode) at least once.
+Hi Kevin,
 
-So we can simply the sunxi musb glue by always registering its extcon
-notifier and relying on sunxi_musb_work() to enable vbus when in
-host-only mode.
+On Fri, 3 Jun 2016 14:49:01 -0700 Kevin Hilman <khilman@baylibre.com> wrote:
+>
+> Please add the following tree/branch to linux-next.  This is used for
+> the kernel development of the ARM-based Amlogic SoCs:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
+> for-next
 
-This also enables host- and peripheral-only mode with vbus monitoring.
+Added from today.  I assume that this will be merged via the arm-soc
+tree?  I also have just you as the contact - I can add more contacts if
+that makes sense.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--No changes
-Changes in v3:
--No changes
----
- drivers/usb/musb/sunxi.c | 68 ++++++++++++++++++------------------------------
- 1 file changed, 25 insertions(+), 43 deletions(-)
+Thanks for adding your subsystem tree as a participant of linux-next.  As
+you may know, this is not a judgement of your code.  The purpose of
+linux-next is for integration testing and to lower the impact of
+conflicts between subsystems in the next merge window. 
 
-diff --git a/drivers/usb/musb/sunxi.c b/drivers/usb/musb/sunxi.c
-index e7d4617..b88a2f6 100644
---- a/drivers/usb/musb/sunxi.c
-+++ b/drivers/usb/musb/sunxi.c
-@@ -255,12 +255,10 @@ static int sunxi_musb_init(struct musb *musb)
- 	writeb(SUNXI_MUSB_VEND0_PIO_MODE, musb->mregs + SUNXI_MUSB_VEND0);
- 
- 	/* Register notifier before calling phy_init() */
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE) {
--		ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
--					       &glue->host_nb);
--		if (ret)
--			goto error_reset_assert;
--	}
-+	ret = extcon_register_notifier(glue->extcon, EXTCON_USB_HOST,
-+				       &glue->host_nb);
-+	if (ret)
-+		goto error_reset_assert;
- 
- 	ret = phy_init(glue->phy);
- 	if (ret)
-@@ -274,9 +272,8 @@ static int sunxi_musb_init(struct musb *musb)
- 	return 0;
- 
- error_unregister_notifier:
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
--		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--					   &glue->host_nb);
-+	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-+				   &glue->host_nb);
- error_reset_assert:
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
-@@ -300,9 +297,8 @@ static int sunxi_musb_exit(struct musb *musb)
- 
- 	phy_exit(glue->phy);
- 
--	if (musb->port_mode == MUSB_PORT_MODE_DUAL_ROLE)
--		extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
--					   &glue->host_nb);
-+	extcon_unregister_notifier(glue->extcon, EXTCON_USB_HOST,
-+				   &glue->host_nb);
- 
- 	if (test_bit(SUNXI_MUSB_FL_HAS_RESET, &glue->flags))
- 		reset_control_assert(glue->rst);
-@@ -314,25 +310,6 @@ static int sunxi_musb_exit(struct musb *musb)
- 	return 0;
- }
- 
--static int sunxi_set_mode(struct musb *musb, u8 mode)
--{
--	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
--	int ret;
--
--	if (mode == MUSB_HOST) {
--		ret = phy_power_on(glue->phy);
--		if (ret)
--			return ret;
--
--		set_bit(SUNXI_MUSB_FL_PHY_ON, &glue->flags);
--		/* Stop musb work from turning vbus off again */
--		set_bit(SUNXI_MUSB_FL_VBUS_ON, &glue->flags);
--		musb->xceiv->otg->state = OTG_STATE_A_WAIT_VRISE;
--	}
--
--	return 0;
--}
--
- static void sunxi_musb_enable(struct musb *musb)
- {
- 	struct sunxi_glue *glue = dev_get_drvdata(musb->controller->parent);
-@@ -579,7 +556,6 @@ static const struct musb_platform_ops sunxi_musb_ops = {
- 	.exit		= sunxi_musb_exit,
- 	.enable		= sunxi_musb_enable,
- 	.disable	= sunxi_musb_disable,
--	.set_mode	= sunxi_set_mode,
- 	.fifo_offset	= sunxi_musb_fifo_offset,
- 	.ep_offset	= sunxi_musb_ep_offset,
- 	.busctl_offset	= sunxi_musb_busctl_offset,
-@@ -635,10 +611,6 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
--	if (!glue)
--		return -ENOMEM;
--
- 	memset(&pdata, 0, sizeof(pdata));
- 	switch (usb_get_dr_mode(&pdev->dev)) {
- #if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_HOST
-@@ -646,15 +618,13 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		pdata.mode = MUSB_PORT_MODE_HOST;
- 		break;
- #endif
-+#if defined CONFIG_USB_MUSB_DUAL_ROLE || defined CONFIG_USB_MUSB_GADGET
-+	case USB_DR_MODE_PERIPHERAL:
-+		pdata.mode = MUSB_PORT_MODE_GADGET;
-+		break;
-+#endif
- #ifdef CONFIG_USB_MUSB_DUAL_ROLE
- 	case USB_DR_MODE_OTG:
--		glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
--		if (IS_ERR(glue->extcon)) {
--			if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
--				return -EPROBE_DEFER;
--			dev_err(&pdev->dev, "Invalid or missing extcon\n");
--			return PTR_ERR(glue->extcon);
--		}
- 		pdata.mode = MUSB_PORT_MODE_DUAL_ROLE;
- 		break;
- #endif
-@@ -665,6 +635,10 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 	pdata.platform_ops	= &sunxi_musb_ops;
- 	pdata.config		= &sunxi_musb_hdrc_config;
- 
-+	glue = devm_kzalloc(&pdev->dev, sizeof(*glue), GFP_KERNEL);
-+	if (!glue)
-+		return -ENOMEM;
-+
- 	glue->dev = &pdev->dev;
- 	INIT_WORK(&glue->work, sunxi_musb_work);
- 	glue->host_nb.notifier_call = sunxi_musb_host_notifier;
-@@ -698,6 +672,14 @@ static int sunxi_musb_probe(struct platform_device *pdev)
- 		}
- 	}
- 
-+	glue->extcon = extcon_get_edev_by_phandle(&pdev->dev, 0);
-+	if (IS_ERR(glue->extcon)) {
-+		if (PTR_ERR(glue->extcon) == -EPROBE_DEFER)
-+			return -EPROBE_DEFER;
-+		dev_err(&pdev->dev, "Invalid or missing extcon\n");
-+		return PTR_ERR(glue->extcon);
-+	}
-+
- 	glue->phy = devm_phy_get(&pdev->dev, "usb");
- 	if (IS_ERR(glue->phy)) {
- 		if (PTR_ERR(glue->phy) == -EPROBE_DEFER)
+You will need to ensure that the patches/commits in your tree/series have
+been:
+     * submitted under GPL v2 (or later) and include the Contributor's
+        Signed-off-by,
+     * posted to the relevant mailing list,
+     * reviewed by you (or another maintainer of your subsystem tree),
+     * successfully unit tested, and 
+     * destined for the current or next Linux merge window.
+
+Basically, this should be just what you would send to Linus (or ask him
+to fetch).  It is allowed to be rebased if you deem it necessary.
+
 -- 
-2.7.4
+Cheers,
+Stephen Rothwell 
+sfr at canb.auug.org.au
