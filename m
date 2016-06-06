@@ -1,10 +1,11 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 6 Jun 2016 15:14:37 +0800
-Subject: [PATCH 1/2] ARM: dts: sun4i: HDMI and the tv-encoder use tcon ch1
+Date: Mon, 6 Jun 2016 15:15:03 +0800
+Subject: [PATCH 2/2] ARM: dts: sun7i: HDMI and the tv-encoder use tcon ch1
  not ch0
-In-Reply-To: <1465129368-22335-1-git-send-email-hdegoede@redhat.com>
+In-Reply-To: <1465129368-22335-2-git-send-email-hdegoede@redhat.com>
 References: <1465129368-22335-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v67i3TeX298rn0yggJB1nB+_Z8CEpqJv2Ws=BLcJJg96yw@mail.gmail.com>
+ <1465129368-22335-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v66bq2O7PjjytgL_kicARocctrWDYrhumUL0Ya0HHJQrHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
