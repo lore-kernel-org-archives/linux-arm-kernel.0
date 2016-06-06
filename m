@@ -1,27 +1,27 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon,  6 Jun 2016 11:26:27 +0200
-Subject: [PATCH v2 08/13] ARM: DT: STiH418: Enable clock propagation for audio
+Date: Mon,  6 Jun 2016 11:26:26 +0200
+Subject: [PATCH v2 07/13] ARM: DT: STiH410: Enable clock propagation for audio
  clocks
 In-Reply-To: <1465205192-7888-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1465205192-7888-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1465205192-7888-9-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1465205192-7888-8-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 This patch is used in the clock driver to apply a clock propagation
-flag on the audio clocks of STiH418
+flag on the audio clocks of STiH410
 
 Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- arch/arm/boot/dts/stih418-clock.dtsi | 2 +-
+ arch/arm/boot/dts/stih410-clock.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stih418-clock.dtsi b/arch/arm/boot/dts/stih418-clock.dtsi
-index ae6d997..96b4d7b 100644
---- a/arch/arm/boot/dts/stih418-clock.dtsi
-+++ b/arch/arm/boot/dts/stih418-clock.dtsi
-@@ -229,7 +229,7 @@
+diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
+index d1f2aca..5a9a487 100644
+--- a/arch/arm/boot/dts/stih410-clock.dtsi
++++ b/arch/arm/boot/dts/stih410-clock.dtsi
+@@ -226,7 +226,7 @@
  
  			clk_s_d0_flexgen: clk-s-d0-flexgen {
  				#clock-cells = <1>;
