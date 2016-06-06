@@ -1,34 +1,61 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon,  6 Jun 2016 11:26:30 +0200
-Subject: [PATCH v2 11/13] ARM: DT: STiH418: Enable synchronous clock mode for
- video clocks
+Date: Mon,  6 Jun 2016 11:26:32 +0200
+Subject: [PATCH v2 13/13] ARM: DT: STi: STiH410: clock configuration to
+ address 720p and 1080p
 In-Reply-To: <1465205192-7888-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1465205192-7888-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1465205192-7888-12-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1465205192-7888-14-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the synchronous clock mode for video clocks
-on STiH418 board.
+It is necessary to properly configure these clocks in order
+to address 720p and 1080p HDMI resolution.
 
-Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
+Signed-off-by: Vincent Abriou <vincent.abriou@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- arch/arm/boot/dts/stih418-clock.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/stih410.dtsi | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih418-clock.dtsi b/arch/arm/boot/dts/stih418-clock.dtsi
-index 96b4d7b..2254fa5 100644
---- a/arch/arm/boot/dts/stih418-clock.dtsi
-+++ b/arch/arm/boot/dts/stih418-clock.dtsi
-@@ -271,7 +271,7 @@
+diff --git a/arch/arm/boot/dts/stih410.dtsi b/arch/arm/boot/dts/stih410.dtsi
+index 18ed1ad..7eec729 100644
+--- a/arch/arm/boot/dts/stih410.dtsi
++++ b/arch/arm/boot/dts/stih410.dtsi
+@@ -103,7 +103,10 @@
+ 			#size-cells = <1>;
  
- 			clk_s_d2_flexgen: clk-s-d2-flexgen {
- 				#clock-cells = <1>;
--				compatible = "st,flexgen";
-+				compatible = "st,flexgen-video", "st,flexgen";
+ 			assigned-clocks	= <&clk_s_d2_quadfs 0>,
+-					  <&clk_s_d2_quadfs 0>,
++					  <&clk_s_d2_quadfs 1>,
++					  <&clk_s_c0_pll1 0>,
++					  <&clk_s_c0_flexgen CLK_COMPO_DVP>,
++					  <&clk_s_c0_flexgen CLK_MAIN_DISP>,
+ 					  <&clk_s_d2_flexgen CLK_PIX_MAIN_DISP>,
+ 					  <&clk_s_d2_flexgen CLK_PIX_AUX_DISP>,
+ 					  <&clk_s_d2_flexgen CLK_PIX_GDP1>,
+@@ -113,14 +116,21 @@
  
- 				clocks = <&clk_s_d2_quadfs 0>,
- 					 <&clk_s_d2_quadfs 1>,
+ 			assigned-clock-parents = <0>,
+ 						 <0>,
++						 <0>,
++						 <&clk_s_c0_pll1 0>,
++						 <&clk_s_c0_pll1 0>,
+ 						 <&clk_s_d2_quadfs 0>,
+-						 <&clk_s_d2_quadfs 0>,
++						 <&clk_s_d2_quadfs 1>,
+ 						 <&clk_s_d2_quadfs 0>,
+ 						 <&clk_s_d2_quadfs 0>,
+ 						 <&clk_s_d2_quadfs 0>,
+ 						 <&clk_s_d2_quadfs 0>;
+ 
+-			assigned-clock-rates = <297000000>, <297000000>;
++			assigned-clock-rates = <297000000>,
++					       <108000000>,
++					       <0>,
++					       <400000000>,
++					       <400000000>;
+ 
+ 			ranges;
+ 
 -- 
 1.9.1
