@@ -1,131 +1,102 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 6 Jun 2016 13:47:21 +0100
-Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
-In-Reply-To: <1464640806-3942-3-git-send-email-thommyj@gmail.com>
-References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
- <1464640806-3942-3-git-send-email-thommyj@gmail.com>
-Message-ID: <575570D9.6030700@arm.com>
+From: wmills@ti.com (William Mills)
+Date: Mon, 6 Jun 2016 08:50:58 -0400
+Subject: [RFC v2 4/4] ARM: keystone: dma-coherent with safe fallback
+In-Reply-To: <20160606114256.GF6831@leverpostej>
+References: <1465183229-24147-1-git-send-email-wmills@ti.com>
+ <1465183229-24147-5-git-send-email-wmills@ti.com>
+ <20160606085627.GA6831@leverpostej> <5480709.cGbSehIKrE@wuerfel>
+ <20160606114256.GF6831@leverpostej>
+Message-ID: <575571B2.7090601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/16 21:40, Thommy Jakobsson wrote:
-> Use DT bindings to allow masks to be added for a masters streamIDs. This
-> is necessary for devices that have multiple IDs, or use dynamic signals to
-> build up the ID. For example the ZynqMPSoC that mirrors 6bits from the
-> AXI ID into the streamid.
 
-That rationale doesn't hold, since "necessary" is clearly untrue - 
-devices with multiple IDs work just fine even with the current behaviour 
-of the driver provided there are sufficient SMRs. The third option of 
-generating a mask dynamically from a set of IDs is also perfectly 
-possible (which reminds me I must dig up the code I prototyped a while 
-back...), although an explicitly specified mask can still be beneficial 
-for optimal allocation in certain cases (by being able to express the 
-non-existence of IDs outside the set).
 
-> Signed-off-by: Thommy Jakobsson <thommyj@gmail.com>
-> ---
->   drivers/iommu/arm-smmu.c | 46 +++++++++++++++++++++++++++++++++++++++++++++-
->   1 file changed, 45 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-> index 9345a3f..14438f8 100644
-> --- a/drivers/iommu/arm-smmu.c
-> +++ b/drivers/iommu/arm-smmu.c
-> @@ -305,6 +305,7 @@ struct arm_smmu_smr {
->   struct arm_smmu_master_cfg {
->   	int				num_streamids;
->   	u16				streamids[MAX_MASTER_STREAMIDS];
-> +	u16				streammasks[MAX_MASTER_STREAMIDS];
->   	struct arm_smmu_smr		*smrs;
->   };
->
-> @@ -554,6 +555,38 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
->   	return insert_smmu_master(smmu, master);
->   }
->
-> +static int register_smmu_master_mask(struct arm_smmu_device *smmu,
-> +				     struct device *dev,
-> +				     struct of_phandle_args *masterspec)
-> +{
-> +	int i;
-> +	struct arm_smmu_master *master;
-> +
-> +	master = find_smmu_master(smmu, masterspec->np);
-> +	if (!master) {
-> +		dev_err(dev,
-> +			"mask phandle to %s, but no ID registred\n",
-> +			masterspec->np->name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (masterspec->args_count != master->cfg.num_streamids) {
-> +		dev_err(dev,
-> +			"Different number of ids %d and masks %d not supported for master device %s\n",
+On 06/06/2016 07:42 AM, Mark Rutland wrote:
+> On Mon, Jun 06, 2016 at 11:09:07AM +0200, Arnd Bergmann wrote:
+>> On Monday, June 6, 2016 9:56:27 AM CEST Mark Rutland wrote:
+>>> [adding devicetree]
+>>>
+>>> On Sun, Jun 05, 2016 at 11:20:29PM -0400, Bill Mills wrote:
+>>>> Keystone2 can do DMA coherency but only if:
+>>>> 1) DDR3A DMA buffers are in high physical addresses (0x8_0000_0000)
+>>>>     (DDR3B does not have this constraint)
+>>>> 2) Memory is marked outer shared
+>>>> 3) DMA Master marks transactions as outer shared
+>>>>     (This is taken care of in bootloader)
+>>>>
+>>>> Use outer shared instead of inner shared.
+>>>> This choice is done at early init time and uses the attr_mod facility
+>>>>
+>>>> If the kernel is not configured for LPAE and using high PA, or if the
+>>>> switch to outer shared fails, then we fail to meet this criteria.
+>>>> Under any of these conditions we veto any dma-coherent attributes in
+>>>> the DTB.
+>>>
+>>> I very much do not like this. As I previously mentioned [1],
+>>> dma-coherent has de-facto semantics today. This series deliberately
+>>> changes that, and inverts the relationship between DT and kernel (as the
+>>> describption in the DT would now depend on the configuration of the
+>>> kernel).
+>>>
+>>> I would prefer that we have a separate property (e.g.
+>>> "dma-outer-coherent") to describe when a device can be coherent with
+>>> Normal, Outer Shareable, Inner Write-Back, Outer Write-Back memory.
+>>> Then the kernel can figure out whether or not device can be used
+>>> coherently, depending on how it is configured.
+>>
+>> I share your concern, but I don't think the dma-outer-coherent attribute
+>> would be a good solution either.
+>>
+>> The problem really is that keystone is a platform that is sometimes
+>> coherent, depending purely on what kernel we run, and not at all on
+>> anything we can describe in devicetree, and I don't see any good way
+>> to capture the behavior of the hardware in generic DT bindings.
+> 
+> I think that above doesn't quite capture the situation:
+> 
+> Some DMA masters can be cache-coherent (only) with Outer Shareable
+> transactions. That is a property we could capture inthe DT (e.g.
+> dma-outer-coherent), and is independent of the kernel configuration.
+> 
+> Whether or not the devices are coherent with the kernel's chosen memory
+> attributes certainly depends on the kernel configuration, but that is
+> not what we capture in the DT.
+> 
+>> So far, the assumption has been:
+>>
+>> - when running a non-LPAE kernel, keystone is not coherent, and we
+>>   must ignore both the dma-coherent properties in devices and the
+>>   dma-ranges properties in bus nodes.
+> 
+> I wasn't able to spot if/where that was enforced. Is it possible to boot
+> Keystone UP, !LPAE?
+> 
 
-But this directly contradicts the example in the binding doc? (Which 
-incidentally wasn't sent to the devicetree mailing list.)
+Yes ...  with the right combination of DTB, u-boot, u-boot vars, and
+kernel config.  Mismatches either fail hard or use dma-coherent ops
+without actually providing coherency. I am attempting to make this less
+fragile.
 
-> +			master->cfg.num_streamids,
-> +			masterspec->args_count,
-> +			masterspec->np->name);
-> +		return -ENOSPC;
-> +	}
-> +
-> +	for (i = 0; i < master->cfg.num_streamids; ++i) {
-> +		u16 streammask = masterspec->args[i];
-> +
-> +		master->cfg.streamids[i] = streammask;
+Mis-configured coherency can be dead-wrong and still only fail 1
+transaction in 1,000,000.  I have seen customers run for weeks or months
+w/o detecting the issue.  Thats why I wanted the veto logic.
 
-What if the DT is wrong and the SMMU doesn't support stream matching at 
-all, or the mask uses unimplemented SMR bits? Bogus stream IDs or stream 
-match conflicts are annoyingly subtle to debug.
+There are 3 cases to cover:
+LPAE w/ high PA:
+	this is the normal mode for KS2.  Uses coherent dma-ops.
+!LPAE:
+	obviously uses low PA and must use non-coherent dma-ops.
+LPAE w/ low PA:
+	This happens with an LPAE kernel but the user has passed a low
+	PA memory DTB and u-boot has not fixed it up.
+	This case must also use non-coherent dma-ops
 
-> +	}
-> +	return 0;
-> +}
-> +
->   static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
->   {
->   	struct arm_smmu_device *smmu;
-> @@ -1106,7 +1139,7 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
->
->   		smrs[i] = (struct arm_smmu_smr) {
->   			.idx	= idx,
-> -			.mask	= 0, /* We don't currently share SMRs */
-> +			.mask	= cfg->streammasks[i],
->   			.id	= cfg->streamids[i],
->   		};
->   	}
-> @@ -1972,6 +2005,17 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
->
->   	dev_notice(dev, "registered %d master devices\n", i);
->
-> +	while (!of_parse_phandle_with_args(dev->of_node, "mmu-masters-mask",
-> +					   "#stream-id-cells", i,
-> +					   &masterspec)) {
-> +		err = register_smmu_master_mask(smmu, dev, &masterspec);
-> +		if (err) {
-> +			dev_err(dev, "failed to add mask for%s\n",
-> +				masterspec.np->name);
-> +			goto out_put_masters;
-> +		}
-> +
-> +	}
->   	kfree(masterspec);
->
->   	parse_driver_options(smmu);
->
+Upstream DTS has keystone memory at the low PA.  I agree with that.
+U-boot and kernel opt-in to the use of high PA.
 
-Either way, if you insist on wanting to build on the legacy binding that 
-doesn't work for PCI, can't integrate with DMA mapping, and everyone 
-else would rather get away from in favour of the generic IOMMU 
-bindings[1], there's still no need for yet another binding to support. 
-You can easily extend "mmu-masters" to encode an SMR mask in the upper 
-halfword of a cell without ambiguity and without breaking compatibility 
-with existing DTs.
+If you give high PA to a non-LPAE kernel I believe it will fail hard and
+fast.  I can check.
 
-Robin.
-
-[1]The latest of many attempts being mine: 
-http://thread.gmane.org/gmane.linux.kernel.iommu/12454
+Thanks,
+Bill
