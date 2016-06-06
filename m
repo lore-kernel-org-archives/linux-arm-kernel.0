@@ -1,33 +1,52 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  6 Jun 2016 16:36:05 +0100
-Subject: [PATCH 2/3] firmware: arm_scpi: mark scpi_get_sensor_value as static
-In-Reply-To: <1465227366-12192-1-git-send-email-sudeep.holla@arm.com>
-References: <1465227366-12192-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1465227366-12192-2-git-send-email-sudeep.holla@arm.com>
+Date: Mon,  6 Jun 2016 16:36:04 +0100
+Subject: [PATCH 1/3] firmware: arm_scpi: remove dvfs_get packed structure
+Message-ID: <1465227366-12192-1-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-scpi_get_sensor_value like other scpi operations needs to be static.
-This patch marks it as static to be consistent with others.
+dvfs_get packed structure is used to read the DVFS/OPP index from the
+firmware. It just contains a single byte that needs no packing making
+the whole structure defination unnecessary.
+
+This patch replaces the unnecessary dvfs_get packed structure with an
+unsigned byte.
 
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scpi.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/firmware/arm_scpi.c | 10 +++-------
+ 1 file changed, 3 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 279fb84f69e1..51c6db0774cc 100644
+index 7e3e595c9f30..279fb84f69e1 100644
 --- a/drivers/firmware/arm_scpi.c
 +++ b/drivers/firmware/arm_scpi.c
-@@ -522,7 +522,7 @@ static int scpi_sensor_get_info(u16 sensor_id, struct scpi_sensor_info *info)
- 	return ret;
+@@ -210,10 +210,6 @@ struct dvfs_info {
+ 	} opps[MAX_DVFS_OPPS];
+ } __packed;
+
+-struct dvfs_get {
+-	u8 index;
+-} __packed;
+-
+ struct dvfs_set {
+ 	u8 domain;
+ 	u8 index;
+@@ -431,11 +427,11 @@ static int scpi_clk_set_val(u16 clk_id, unsigned long rate)
+ static int scpi_dvfs_get_idx(u8 domain)
+ {
+ 	int ret;
+-	struct dvfs_get dvfs;
++	u8 dvfs_idx;
+
+ 	ret = scpi_send_message(SCPI_CMD_GET_DVFS, &domain, sizeof(domain),
+-				&dvfs, sizeof(dvfs));
+-	return ret ? ret : dvfs.index;
++				&dvfs_idx, sizeof(dvfs_idx));
++	return ret ? ret : dvfs_idx;
  }
 
--int scpi_sensor_get_value(u16 sensor, u64 *val)
-+static int scpi_sensor_get_value(u16 sensor, u64 *val)
- {
- 	__le16 id = cpu_to_le16(sensor);
- 	struct sensor_value buf;
+ static int scpi_dvfs_set_idx(u8 domain, u8 index)
 --
 2.7.4
