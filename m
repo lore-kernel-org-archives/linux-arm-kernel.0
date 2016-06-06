@@ -1,36 +1,112 @@
 From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Mon,  6 Jun 2016 13:24:17 +0300
-Subject: [PATCH 0/7] dts: sunxi: Add sunxi NAND Flash Controller support
-Message-ID: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+Date: Mon,  6 Jun 2016 13:24:18 +0300
+Subject: [PATCH 1/7] ARM: dts: sun4i: Add A10 NAND controller pin definitions
+In-Reply-To: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <1465208664-9366-2-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-This series adds the sunxi NAND Flash Controller nodes to dts.
+Define the NAND controller pin configs.
 
-The first 4 patches is Boris Brezillon's patches with dtsi changes.
-The second 1 patch adds Hynix H27UBG8T2BTR-BC NAND chip definition.
-The last 2 patches enables NAND on Marsboard A10 board and Wexler TAB7200
-tablet.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 80 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
 
-Aleksei Mamlin (3):
-  mtd: nand: Add Hynix H27UBG8T2BTR-BC to nand_ids table
-  ARM: dts: sun4i: Enable NAND on Marsboard A10
-  ARM: dts: sun7i: Enable NAND on Wexler TAB7200
-
-Boris Brezillon (4):
-  ARM: dts: sun4i: Add A10 NAND controller pin definitions
-  ARM: dts: sun4i: Add NFC node to Allwinner A10 SoC
-  ARM: dts: sun7i: Add A20 NAND controller pin definitions
-  ARM: dts: sun7i: Add NFC node to Allwinner A20 SoC
-
- arch/arm/boot/dts/sun4i-a10-marsboard.dts      | 41 ++++++++++++
- arch/arm/boot/dts/sun4i-a10.dtsi               | 91 ++++++++++++++++++++++++++
- arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 41 ++++++++++++
- arch/arm/boot/dts/sun7i-a20.dtsi               | 91 ++++++++++++++++++++++++++
- drivers/mtd/nand/nand_ids.c                    |  4 ++
- 5 files changed, 268 insertions(+)
-
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index a9c3190..146a08db 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -1144,6 +1144,86 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 			};
++
++			nand_pins_a: nand_base0 at 0 {
++				allwinner,pins = "PC0", "PC1", "PC2",
++						"PC5", "PC8", "PC9", "PC10",
++						"PC11", "PC12", "PC13", "PC14",
++						"PC15", "PC16";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs0_pins_a: nand_cs at 0 {
++				allwinner,pins = "PC4";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs1_pins_a: nand_cs at 1 {
++				allwinner,pins = "PC3";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs2_pins_a: nand_cs at 2 {
++				allwinner,pins = "PC17";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs3_pins_a: nand_cs at 3 {
++				allwinner,pins = "PC18";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs4_pins_a: nand_cs at 4 {
++				allwinner,pins = "PC19";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs5_pins_a: nand_cs at 5 {
++				allwinner,pins = "PC20";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs6_pins_a: nand_cs at 6 {
++				allwinner,pins = "PC21";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs7_pins_a: nand_cs at 7 {
++				allwinner,pins = "PC22";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_rb0_pins_a: nand_rb at 0 {
++				allwinner,pins = "PC6";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_rb1_pins_a: nand_rb at 1 {
++				allwinner,pins = "PC7";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
 2.7.3
