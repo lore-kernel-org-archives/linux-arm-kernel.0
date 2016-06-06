@@ -1,112 +1,24 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Mon,  6 Jun 2016 13:24:18 +0300
-Subject: [PATCH 1/7] ARM: dts: sun4i: Add A10 NAND controller pin definitions
-In-Reply-To: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <1465208664-9366-2-git-send-email-mamlinav@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 06 Jun 2016 12:25:36 +0200
+Subject: [PATCH 0/4] serial: earlycon: keep earlycon symbols for
+ non-module and driver clean-ups
+In-Reply-To: <1465206063-1018-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1465206063-1018-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <3280512.PAaBGkzban@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Boris Brezillon <boris.brezillon@free-electrons.com>
+On Monday, June 6, 2016 6:40:59 PM CEST Masahiro Yamada wrote:
+> 1/4: keep earlycon symbols only when CONFIG_SERIAL_EARLYCON is defined
+>      and the driver is built-in.
+> 
+> 2/4 thru 4/4: driver clean-ups.
+>               (partially reverts build fixes by Arnd Bergmann)
+> 
+> 
+> 
 
-Define the NAND controller pin configs.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 80 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
+Looks good to me,
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index a9c3190..146a08db 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -1144,6 +1144,86 @@
- 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
- 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
- 			};
-+
-+			nand_pins_a: nand_base0 at 0 {
-+				allwinner,pins = "PC0", "PC1", "PC2",
-+						"PC5", "PC8", "PC9", "PC10",
-+						"PC11", "PC12", "PC13", "PC14",
-+						"PC15", "PC16";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs0_pins_a: nand_cs at 0 {
-+				allwinner,pins = "PC4";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs1_pins_a: nand_cs at 1 {
-+				allwinner,pins = "PC3";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs2_pins_a: nand_cs at 2 {
-+				allwinner,pins = "PC17";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs3_pins_a: nand_cs at 3 {
-+				allwinner,pins = "PC18";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs4_pins_a: nand_cs at 4 {
-+				allwinner,pins = "PC19";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs5_pins_a: nand_cs at 5 {
-+				allwinner,pins = "PC20";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs6_pins_a: nand_cs at 6 {
-+				allwinner,pins = "PC21";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_cs7_pins_a: nand_cs at 7 {
-+				allwinner,pins = "PC22";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_rb0_pins_a: nand_rb at 0 {
-+				allwinner,pins = "PC6";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
-+
-+			nand_rb1_pins_a: nand_rb at 1 {
-+				allwinner,pins = "PC7";
-+				allwinner,function = "nand0";
-+				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
--- 
-2.7.3
+Acked-by: Arnd Bergmann <arnd@arndb.de>
