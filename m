@@ -1,117 +1,158 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Mon, 6 Jun 2016 14:55:41 +0200
-Subject: [PATCH V8 7/9] acpi: Add generic MCFG table handling
-In-Reply-To: <20160603113810.GA24764@red-moon>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <1464621262-26770-8-git-send-email-tn@semihalf.com>
- <20160603113810.GA24764@red-moon>
-Message-ID: <575572CD.60107@semihalf.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 6 Jun 2016 13:59:52 +0100
+Subject: [PATCH V4 1/5] irqchip/gicv3-its: Introduce two helper functions
+ for accessing BASERn
+In-Reply-To: <1465191636-6823-2-git-send-email-shankerd@codeaurora.org>
+References: <1465191636-6823-1-git-send-email-shankerd@codeaurora.org>
+ <1465191636-6823-2-git-send-email-shankerd@codeaurora.org>
+Message-ID: <575573C8.6050409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.06.2016 13:38, Lorenzo Pieralisi wrote:
-> On Mon, May 30, 2016 at 05:14:20PM +0200, Tomasz Nowicki wrote:
->> In order to handle PCI config space regions properly in ACPI, new MCFG
->> interface is defined which does sanity checks on MCFG table and keeps its
->> root pointer. The user is able to lookup MCFG regions based on
->> host bridge root structure and domain:bus_start:bus_end touple.
->> Use pci_mmcfg_late_init old prototype to avoid another function name.
->
-> "According to PCI firmware specifications, on systems booting with ACPI,
-> PCI configuration for a host bridge must be set-up through the MCFG table
-> regions for non-hotpluggable bridges and _CBA method for hotpluggable ones.
->
-> Current MCFG table handling code, as implemented for x86, cannot be
-> easily generalized owing to x86 specific quirks handling and related
-> code, which makes it hard to reuse on other architectures.
->
-> In order to implement MCFG PCI configuration handling for new platforms
-> booting with ACPI (eg ARM64) this patch re-implements MCFG handling from
-> scratch in a streamlined fashion and provides (through a generic
-> interface available to all arches):
->
-> - Simplified MCFG table parsing (executed through the pci_mmcfg_late_init()
->    hook as in current x86)
-> - MCFG regions look-up interface through domain:bus_start:bus_end tuple
->
-> The new MCFG regions handling interface is added to generic ACPI code
-> so that existing architectures (eg x86) can be moved over to it and
-> architectures relying on MCFG for ACPI PCI config space can rely on it
-> without having to resort to arch specific implementations."
->
+On 06/06/16 06:40, Shanker Donthineni wrote:
+> This patch adds the two handy helper functions for reading and writing
+> ITS BASERn register.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+>  drivers/irqchip/irq-gic-v3-its.c | 32 +++++++++++++++++++++++++-------
+>  1 file changed, 25 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+> index 5eb1f9e..6392c82 100644
+> --- a/drivers/irqchip/irq-gic-v3-its.c
+> +++ b/drivers/irqchip/irq-gic-v3-its.c
+> @@ -56,13 +56,14 @@ struct its_collection {
+>  };
+>  
+>  /*
+> - * The ITS_BASER structure - contains memory information and cached
+> - * value of BASER register configuration.
+> + * The ITS_BASER structure - contains memory information, cached value
+> + * of BASER register configuration and register idx.
+>   */
+>  struct its_baser {
+>  	void		*base;
+>  	u64		val;
+>  	u32		order;
+> +	u32		idx;
+>  };
+>  
+>  /*
+> @@ -824,6 +825,17 @@ static const char *its_base_type_string[] = {
+>  	[GITS_BASER_TYPE_RESERVED7] 	= "Reserved (7)",
+>  };
+>  
+> +static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
+> +{
+> +	return readq_relaxed(its->base + GITS_BASER + (baser->idx << 3));
+> +}
+> +
+> +static void its_write_baser(struct its_node *its, struct its_baser *baser,
+> +			    u64 val)
+> +{
+> +	writeq_relaxed(val, its->base + GITS_BASER + (baser->idx << 3));
+> +}
+> +
+>  static void its_free_tables(struct its_node *its)
+>  {
+>  	int i;
+> @@ -863,14 +875,20 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+>  	its->device_ids = ids;
+>  
+>  	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
+> -		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
+> -		u64 type = GITS_BASER_TYPE(val);
+> -		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
+> +		struct its_baser *baser = its->tables + i;
+>  		int order = get_order(psz);
+> +		u64 val, type, entry_size;
+>  		int alloc_pages;
+>  		u64 tmp;
+>  		void *base;
+>  
+> +		/* Record the register index */
+> +		baser->idx = i;
+> +
+> +		val = its_read_baser(its, baser);
+> +		type = GITS_BASER_TYPE(val);
+> +		entry_size = GITS_BASER_ENTRY_SIZE(val);
+> +
+>  		if (type == GITS_BASER_TYPE_NONE)
+>  			continue;
+>  
+> @@ -939,8 +957,8 @@ retry_baser:
+>  		val |= alloc_pages - 1;
+>  		its->tables[i].val = val;
+>  
+> -		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
+> -		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
+> +		its_write_baser(its, baser, val);
+> +		tmp = its_read_baser(its, baser);
+>  
+>  		if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
+>  			/*
+> 
 
-[...]
+Thanks to this abstraction, I now realize what I really hate about this
+idea of caching stuff in the its_baser structure: you end up with
+inconsistent data: 
 
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/pci.h>
->> +#include <linux/pci-acpi.h>
->> +
->> +/* Root pointer to the mapped MCFG table */
->> +static struct acpi_table_mcfg *mcfg_table;
->> +static int mcfg_entries;
->> +
->> +int pci_mcfg_lookup(struct acpi_pci_root *root)
->> +{
->> +	struct acpi_mcfg_allocation *mptr, *entry = NULL;
->> +	struct resource *bus_res = &root->secondary;
->> +	int i;
->> +
->> +	if (mcfg_table) {
->> +		mptr = (struct acpi_mcfg_allocation *) &mcfg_table[1];
->> +		for (i = 0; i < mcfg_entries && !entry; i++, mptr++)
->> +			if (mptr->pci_segment == root->segment &&
->> +			    mptr->start_bus_number == bus_res->start)
->> +				entry = mptr;
->> +	}
->> +
->> +	/* not found, use _CBA if available, else error */
->> +	if (!entry) {
->> +		if (root->mcfg_addr)
->> +			return root->mcfg_addr;
->> +		pr_err("%04x:%pR MCFG lookup failed\n", root->segment, bus_res);
->> +		return -ENOENT;
->> +	} else if (root->mcfg_addr && entry->address != root->mcfg_addr) {
->> +		pr_warn("%04x:%pR CBA %pa != MCFG %lx, using CBA\n",
->> +			root->segment, bus_res, &root->mcfg_addr,
->> +			(unsigned long)entry->address);
->> +		return 0;
->> +	}
->> +
->> +	/* found matching entry, bus range check */
->> +	if (entry->end_bus_number != bus_res->end) {
->> +		resource_size_t bus_end = min_t(resource_size_t,
->> +					entry->end_bus_number, bus_res->end);
->> +		pr_warn("%04x:%pR bus end mismatch, using %02lx\n",
->> +			root->segment, bus_res, (unsigned long)bus_end);
->> +		bus_res->end = bus_end;
->> +	}
->> +
->> +	if (!root->mcfg_addr)
->> +		root->mcfg_addr = entry->address;
->
-> Let's hope that no one will ever implement a hotplug bridge with config
-> space starting at physical address 0x0.
->
-> Nit: You should define what the return value means. For success, once you
-> return the _CBA address, once 0; this should be consistent.
+- You store something in baser->val
+- You write something else using its_write_baser
+- You read something else using its_read_baser
 
-As we decided to return CFG start address in root->mcfg_addr we should 
-return 0 for the case (!entry) && (root->mcfg_addr). I'll fix it.
+We have 3 sets of inconsistent data, and what they mean depends on
+the context.
 
->
-> Anyway, this function is not easy to read but it may well be fine, I will let
-> Bjorn decide what to do with corner cases:
->
-> a) _CBA is != 0 and you get a MCFG entry that matches its address (I am
->      not sure that capping the _CRS bus numbers is PCI compliant in that case)
-> b) bus_end capping, either you leave code as-is (that caps also _CRS) or
->     just warn and fail if the bus->end numbers mismatch
->
-> Pending Bjorn's opinion on the above (and commit log update):
->
-> Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->
+What I'm proposing is that its_write_baser always performs a read back, 
+and stores that read in baser->val. This gives us a more consistent 
+view of what's going on (the value we wanted, and what the HW is 
+actually capable of).
+
+How about something like this, on top of my previous suggestion:
+
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 520d171..5591441 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -836,6 +836,7 @@ static void its_write_baser(struct its_node *its, struct its_baser *baser,
+ {
+ 	int idx = baser - its->tables;
+ 	writeq_relaxed(val, its->base + GITS_BASER + (idx << 3));
++	baser->val = its_read_baser(its, baser);
+ }
+ 
+ static int its_setup_baser(struct its_node *its, struct its_baser *baser,
+@@ -891,7 +892,7 @@ retry_baser:
+ 	}
+ 
+ 	its_write_baser(its, baser, val);
+-	tmp = its_read_baser(its, baser);
++	tmp = baser->val;
+ 
+ 	if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
+ 		/*
+@@ -939,7 +940,6 @@ retry_baser:
+ 	baser->order = order;
+ 	baser->base = base;
+ 	baser->psz = psz;
+-	baser->val = val;
+ 	tmp = indirect ? GITS_LVL1_ENTRY_SIZE : esz;
+ 
+ 	pr_info("ITS@%pa: allocated %d %s @%lx (%s, esz %d, psz %dK, shr %d)\n",
+@@ -968,7 +968,7 @@ static bool its_parse_baser_device(struct its_node *its, struct its_baser *baser
+ 		 * table by reading bit at offset '62' after writing '1' to it.
+ 		 */
+ 		its_write_baser(its, baser, val | GITS_BASER_INDIRECT);
+-		val = its_read_baser(its, baser);
++		val = baser->val;
+ 		indirect = !!(val & GITS_BASER_INDIRECT);
+ 
+ 		if (indirect) {
 
 Thanks,
-Tomasz
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
