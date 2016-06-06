@@ -1,59 +1,34 @@
-From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
-Date: Mon,  6 Jun 2016 09:43:50 +0200
-Subject: [PATCH 2/2] ARM: BCM5301X: Fix NAND ECC parameters for D-Link DIR-885L
-In-Reply-To: <1465199036-24366-1-git-send-email-zajec5@gmail.com>
-References: <1465199036-24366-1-git-send-email-zajec5@gmail.com>
-Message-ID: <1465199036-24366-2-git-send-email-zajec5@gmail.com>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Mon, 06 Jun 2016 09:47:25 +0200
+Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry
+ Pi 3.
+In-Reply-To: <3265668.gGTUMSyXWi@wuerfel>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <CAL_JsqL2RgTLq9R3v4LDiV6Wa7totbzJBgmzVDgUv_keoS52vA@mail.gmail.com>
+ <1465197612.24775.190.camel@redhat.com> <3265668.gGTUMSyXWi@wuerfel>
+Message-ID: <1465199245.24775.195.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This device uses BCH-1 instead of BCH-8. This fixes ECC errors and makes
-NAND usable with brcmnand.
+  Hi,
 
-Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
----
-As suggested recently, the new file uses BSD-compatible license. I was
-considering BSD [23]-clause license and Hauke said he likes ISC which is
-even simpler, so I picked this one.
----
- arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts |  2 +-
- arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi | 15 +++++++++++++++
- 2 files changed, 16 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi
+> > With the 2/7 patch at the start of this subthread the dtb ends up in
+> > arch/arm64/boot/dts/broadcom for both arm and arm64 builds.
+> > 
+> > make "dtbs_install" places it in /boot/dtbs/$version/ for arm builds and
+> > in /boot/dtbs/$version/broadcom/ for arm64 builds.
+> 
+> Ok, let's stay with that for now then, and solve it better when we
+> need to do more of the same. Are you aware of any other boards using
+> bcm2837?
 
-diff --git a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-index 50cf804..c8c0b36 100644
---- a/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-+++ b/arch/arm/boot/dts/bcm47094-dlink-dir-885l.dts
-@@ -10,7 +10,7 @@
- /dts-v1/;
- 
- #include "bcm4708.dtsi"
--#include "bcm5301x-nand-cs0-bch8.dtsi"
-+#include "bcm5301x-nand-cs0-bch1.dtsi"
- 
- / {
- 	compatible = "dlink,dir-885l", "brcm,bcm47094", "brcm,bcm4708";
-diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi
-new file mode 100644
-index 0000000..24b099c
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch1.dtsi
-@@ -0,0 +1,15 @@
-+/*
-+ * Broadcom Northstar NAND.
-+ *
-+ * Copyright (C) 2016 Rafa? Mi?ecki <rafal.milecki@gmail.com>
-+ *
-+ * Licensed under the ISC license.
-+ */
-+
-+#include "bcm5301x-nand-cs0.dtsi"
-+
-+&nandcs {
-+	nand-ecc-algo = "bch";
-+	nand-ecc-strength = <1>;
-+	nand-ecc-step-size = <512>;
-+};
--- 
-1.8.4.5
+No.
+
+As far I know it has been created specifically for the rpi foundation,
+so I expect we might see new members of the rpi family using the bcm2837
+too, but probably no other devices.
+
+Maybe Eric Anholt knows more details.
+
+cheers,
+  Gerd
