@@ -1,35 +1,33 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  6 Jun 2016 16:36:06 +0100
-Subject: [PATCH 3/3] firmware: arm_scpi: make it depend on MAILBOX instead of
- ARM_MHU
+Date: Mon,  6 Jun 2016 16:36:05 +0100
+Subject: [PATCH 2/3] firmware: arm_scpi: mark scpi_get_sensor_value as static
 In-Reply-To: <1465227366-12192-1-git-send-email-sudeep.holla@arm.com>
 References: <1465227366-12192-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1465227366-12192-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1465227366-12192-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM_SCPI_PROTOCOL can be used with any mailbox and not just ARM MHU
-mailbox controller. This patch drops it's dependency on ARM_MHU and
-make it depend on just mailbox framework.
+scpi_get_sensor_value like other scpi operations needs to be static.
+This patch marks it as static to be consistent with others.
 
 Cc: linux-arm-kernel at lists.infradead.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/Kconfig | 2 +-
+ drivers/firmware/arm_scpi.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 6664f1108c7c..41abdc54815e 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -10,7 +10,7 @@ config ARM_PSCI_FW
+diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+index 279fb84f69e1..51c6db0774cc 100644
+--- a/drivers/firmware/arm_scpi.c
++++ b/drivers/firmware/arm_scpi.c
+@@ -522,7 +522,7 @@ static int scpi_sensor_get_info(u16 sensor_id, struct scpi_sensor_info *info)
+ 	return ret;
+ }
 
- config ARM_SCPI_PROTOCOL
- 	tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
--	depends on ARM_MHU
-+	depends on MAILBOX
- 	help
- 	  System Control and Power Interface (SCPI) Message Protocol is
- 	  defined for the purpose of communication between the Application
+-int scpi_sensor_get_value(u16 sensor, u64 *val)
++static int scpi_sensor_get_value(u16 sensor, u64 *val)
+ {
+ 	__le16 id = cpu_to_le16(sensor);
+ 	struct sensor_value buf;
 --
 2.7.4
