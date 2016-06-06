@@ -1,19 +1,47 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 6 Jun 2016 16:07:59 +0800
-Subject: [PATCH V2 1/3] arm: dts: imx6qdl: add clocks property for ocotp
- node
-In-Reply-To: <1461173177-11930-1-git-send-email-van.freenix@gmail.com>
-References: <1461173177-11930-1-git-send-email-van.freenix@gmail.com>
-Message-ID: <20160606080759.GA25018@tiger>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 06 Jun 2016 10:10:37 +0200
+Subject: [Query]set clk rate must operate its coordinated clock
+In-Reply-To: <20160311165152.4103.82090@quark.deferred.io>
+References: <20160309152420.20de187a@xhacker>
+ <20160311165152.4103.82090@quark.deferred.io>
+Message-ID: <2738343.ekabfXD0fs@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 21, 2016 at 01:26:15AM +0800, Peng Fan wrote:
-> Add clocks property for ocotp node.
-> 
-> Signed-off-by: Peng Fan <van.freenix@gmail.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Rob Herring <robh+dt@kernel.org>
+Hi Mike,
 
-Applied both dts patches, thanks.
+Am Freitag, 11. M?rz 2016, 08:51:52 schrieb Michael Turquette:
+> Quoting Jisheng Zhang (2016-03-08 23:24:20)
+> > I have the following clk case which I dunno the elegant solution:
+> > 
+> > 
+> > cpuclk have two parents: cpupll and refclk. When set the cpuclk freq, we
+> > have to set its parent's freq, I.E cpupll freq. But before changing the
+> > cpupll's freq, we should set its refclk as its parent firstly.
+> > 
+> > AFAIK, this is a common case, I have seen such requirement in rockchip,
+> > samsung clk driver. They solve this by notifier, but as pointed out by
+> > Michael in
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/351565.ht
+> > ml
+> > 
+> > "This is also a hack and it points towards some missing infrastructure in
+> > the clock framework."
+> > 
+> > I also don't like the notifier solution, I believe the elegant solution
+> > could be using the coordinated clock infrastructure. So what's the status
+> > of this infrastructure? I can test, and I can even add some code to make
+> > it be ready to be merged if you guide me ;)
+> 
+> Thanks for the email. I hope to finish that feature before ELC. I have
+> Cc'd Pi-Cheng Chen from Mediatek who is also interested in coordinated
+> clock rates.
+
+pulling this up again, did this materialize yet? :-)
+
+Because it looks like on Rockchip we're getting yet another clock that needs 
+special handling (set_rate needs to go through the trusted-firmware, while 
+reading stays the same) which might profit from that as well.
+
+
+Heiko
