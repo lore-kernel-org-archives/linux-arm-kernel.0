@@ -1,32 +1,46 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 06 Jun 2016 18:05:08 -0500
-Subject: [PATCH v1 03/25] PCI: designware: Request host bridge window resources
+Date: Mon, 06 Jun 2016 18:05:15 -0500
+Subject: [PATCH v1 04/25] PCI: designware: Simplify host bridge window
+ iteration
 In-Reply-To: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20160606230508.20936.81845.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20160606230515.20936.35308.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Request host bridge window resources so they appear in ioport_resource and
-iomem_resource and are reflected in /proc/ioports and /proc/iomem.
+The switch is the only statement in the resource_list_for_each_entry()
+loop, so remove unnecessary "continue" statements in the switch.
+
+No functional change intended.
 
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/host/pcie-designware.c |    4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/pci/host/pcie-designware.c |    6 +-----
+ 1 file changed, 1 insertion(+), 5 deletions(-)
 
 diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 9ade767..8304aeb 100644
+index 8304aeb..12afce1 100644
 --- a/drivers/pci/host/pcie-designware.c
 +++ b/drivers/pci/host/pcie-designware.c
-@@ -452,6 +452,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 	if (ret)
- 		return ret;
+@@ -465,11 +465,9 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->io_size = resource_size(pp->io);
+ 			pp->io_bus_addr = pp->io->start - win->offset;
+ 			ret = pci_remap_iospace(pp->io, pp->io_base);
+-			if (ret) {
++			if (ret)
+ 				dev_warn(pp->dev, "error %d: failed to map resource %pR\n",
+ 					 ret, pp->io);
+-				continue;
+-			}
+ 			break;
+ 		case IORESOURCE_MEM:
+ 			pp->mem = win->res;
+@@ -487,8 +485,6 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 		case IORESOURCE_BUS:
+ 			pp->busn = win->res;
+ 			break;
+-		default:
+-			continue;
+ 		}
+ 	}
  
-+	ret = devm_request_pci_bus_resources(&pdev->dev, &res);
-+	if (ret)
-+		goto error;
-+
- 	/* Get the I/O and memory ranges from DT */
- 	resource_list_for_each_entry(win, &res) {
- 		switch (resource_type(win->res)) {
