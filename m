@@ -1,54 +1,24 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Mon, 6 Jun 2016 16:49:57 -0500
-Subject: [PATCH v10 3/4] tee: add OP-TEE driver
-In-Reply-To: <1464784888-19854-4-git-send-email-jens.wiklander@linaro.org>
-References: <1464784888-19854-1-git-send-email-jens.wiklander@linaro.org>
- <1464784888-19854-4-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <5755F005.3050104@ti.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 06 Jun 2016 15:08:26 -0700
+Subject: Updating Raspberry Pi trees pulled for -next
+Message-ID: <87wpm22co5.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 07:41 AM, Jens Wiklander wrote:
-[...]
-> diff --git a/drivers/tee/Makefile b/drivers/tee/Makefile
-> index 60d2dab..53f3c76 100644
-> --- a/drivers/tee/Makefile
-> +++ b/drivers/tee/Makefile
-> @@ -1,3 +1,4 @@
->  obj-y += tee.o
->  obj-y += tee_shm.o
->  obj-y += tee_shm_pool.o
-> +obj-$(CONFIG_OPTEE) += optee/
-> diff --git a/drivers/tee/optee/Kconfig b/drivers/tee/optee/Kconfig
-> new file mode 100644
-> index 0000000..a7a8b71
-> --- /dev/null
-> +++ b/drivers/tee/optee/Kconfig
-> @@ -0,0 +1,8 @@
-> +# OP-TEE Trusted Execution Environment Configuration
-> +config OPTEE
-> +	tristate "OP-TEE"
-> +	default n
-You should'nt need this.
+I was going to bother you to add a bunch more trees to pull into -next
+now that I'll be merging arm64 changes for the Raspberry Pi 3, but
+instead I've decided to start using the maint-scripts to make generating
+a single for-next branch trivial.
 
-> +	depends on HAVE_ARM_SMCCC
+So, could you replace all of my -next branches you're pulling with:
 
-HAVE_ARM_SMCCC might depend on OPTEE secure support in place, right? I
-wonder if setsup any constraints for having a single zImage for OPTEE
-and non-OPTEE systems, I think not.. just wondering.
+git://github.com/anholt/linux.git#for-next
 
-Further, at this patch, smatch[1] complains:
-> +drivers/tee/optee/core.c:488 optee_probe() error: we previously assumed 'optee' could be null (see line 444) 
-
-Checkpatch --strict complains:
-
-> +CHECK: Alignment should match open parenthesis
-> +#878: FILE: drivers/tee/optee/core.c:333:
-> ++static struct tee_shm_pool *optee_config_shm_ioremap(struct device *dev,
-> ++                      optee_invoke_fn *invoke_fn,
-
-
-[1] git://repo.or.cz/smatch.git
--- 
-Regards,
-Nishanth Menon
+Thanks!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160606/663c155a/attachment-0001.sig>
