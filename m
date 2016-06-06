@@ -1,76 +1,72 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Tue, 7 Jun 2016 00:06:45 +0300
-Subject: [PATCH 5/7] mtd: nand: Add Hynix H27UBG8T2BTR-BC to nand_ids table
-In-Reply-To: <20160606223138.3c2032ee@bbrezillon>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
- <1465208664-9366-6-git-send-email-mamlinav@gmail.com>
- <20160606205549.1ecd6fdb@bbrezillon>
- <20160606225903.264abc01647eb1528cc226bd@gmail.com>
- <20160606223138.3c2032ee@bbrezillon>
-Message-ID: <20160607000645.5d1f428b40406a5db7cbe285@gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 6 Jun 2016 23:18:14 +0200
+Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
+ overlapping regions
+In-Reply-To: <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
+ <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
+ <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
+Message-ID: <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Jun 2016 22:31:38 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+On 6 June 2016 at 19:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, Jun 06, 2016 at 06:09:50PM +0100, Catalin Marinas wrote:
+>> On Mon, Jun 06, 2016 at 11:43:01AM +0200, Ard Biesheuvel wrote:
+>> > On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+>> > > index 78f52488f9ff..0d5753c31c7f 100644
+>> > > --- a/arch/arm64/kernel/efi.c
+>> > > +++ b/arch/arm64/kernel/efi.c
+>> > > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
+>> > >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+>> > >  {
+>> > >         pteval_t prot_val = create_mapping_protection(md);
+>> > > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
+>> > > +       efi_memory_desc_t *next = md;
+>> > >
+>> > > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+>> > > -                          md->num_pages << EFI_PAGE_SHIFT,
+>> > > -                          __pgprot(prot_val | PTE_NG));
+>> > > +       /*
+>> > > +        * Search for the next EFI runtime map and check for any overlap with
+>> > > +        * the current map when aligned to PAGE_SIZE. In such case, defer
+>> > > +        * mapping the end of the current range until the next
+>> > > +        * efi_create_mapping() call.
+>> > > +        */
+>> > > +       for_each_efi_memory_desc_continue(next) {
+>> > > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
+>> > > +                       continue;
+>> > > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
+>> > > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
+>> >
+>> > This looks fishy. We could have more than two runtime regions sharing
+>> > a 64 KB page frame, for instance, and the middle regions will have
+>> > unaligned start and end addresses, and sizes smaller than 64 KB. This
+>> > subtraction may wrap in that case, producing a bogus length.
+>>
+>> I don't think I get it. This subtraction is meant to reduce the length
+>> of the current md so that it is page aligned, deferring the mapping of
+>> the last page to the next efi_create_mapping() call. Note that there is
+>> a "break" just after the hunk you quoted, so we only care about the next
+>> runtime map.
+>
+> I think I get it now. If the md we are currently mapping is within a
+> 64KB page *and* phys_addr unaligned, length can wrap through 0. I will
+> update the patch.
+>
 
-> On Mon, 6 Jun 2016 22:59:03 +0300
-> Aleksei Mamlin <mamlinav@gmail.com> wrote:
-> 
-> > On Mon, 6 Jun 2016 20:55:49 +0200
-> > Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
-> > 
-> > > On Mon,  6 Jun 2016 13:24:22 +0300
-> > > Aleksei Mamlin <mamlinav@gmail.com> wrote:
-> > >   
-> > > > Add the full description of the Hynix H27UBG8T2BTR-BC NAND chip in the
-> > > > nand_ids table so that we can later use the NAND ECC infos and ONFI timings
-> > > > mode in controller drivers.  
-> > > 
-> > > Still hoping to get this series [1] merged in 4.8, but if that's
-> > > not the case, I'll apply your patch.
-> > > 
-> > > BTW, that would be great if you could test it on your platforms.
-> > >   
-> > 
-> > It seems that Hynix-specific initialization code can't handle H27UBG8T2BTR-BC
-> > chip:
-> > 
-> > [    0.886153] nand: Could not find valid ONFI parameter page; aborting
-> > [    0.892665] nand: device found, Manufacturer ID: 0xad, Chip ID: 0xd7
-> > [    0.899025] nand: Hynix 1c03000.nand
-> > [    0.902596] nand: bus width 8 instead 16 bit
-> > [    0.906858] nand: No NAND device found
-> > [    0.910620] sunxi_nand 1c03000.nand: failed to init nand chips
-> > [    0.916528] sunxi_nand: probe of 1c03000.nand failed with error -22
-> 
-> Can you try this patch? It should fix the problem [1].
-> 
-> [1]http://code.bulix.org/6hjww1-100494
-> 
+Indeed.
 
-Yes, it fixes problem. What about ONFI parameter page? Should it be ignored?
-[    0.886068] nand: Could not find valid ONFI parameter page; aborting
-[    0.892571] nand: device found, Manufacturer ID: 0xad, Chip ID: 0xd7
-[    0.898917] nand: Hynix NAND 4GiB 3,3V 8-bit
-[    0.903198] nand: 4096 MiB, MLC, erase size: 2048 KiB, page size: 8192, OOB size: 640
-[    0.911908] Bad block table found at page 524032, version 0x01
-[    0.918534] Bad block table found at page 523776, version 0x01
-[    0.972112] 5 ofpart partitions found on MTD device 1c03000.nand
-[    0.978116] Creating 5 MTD partitions on "1c03000.nand":
-[    0.983477] 0x000000000000-0x000000200000 : "boot0"
-[    0.988803] 0x000000200000-0x000000400000 : "boot0-rescue"
-[    0.994692] 0x000000400000-0x000000600000 : "uboot"
-[    0.999944] 0x000000600000-0x000000800000 : "uboot-rescue"
-[    1.005763] 0x000000800000-0x000100000000 : "main"
+Another thing I failed to mention is that the new Memory Attributes
+table support may map all of the RuntimeServicesCode regions a second
+time, but with a higher granularity, using RO for .text and .rodata
+and NX for .data and .bss (and the PE/COFF header). Due to the higher
+granularity, regions that were mapped using the contiguous bit the
+first time around may be split into smaller regions. Your current code
+does not address that case.
 
-> 
-> -- 
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
-
--- 
-Thanks and regards,
-Aleksei Mamlin
+I wonder how the PT debug code deals with this, and whether there is
+anything we can reuse to inhibit cont and block mappings
