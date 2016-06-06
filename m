@@ -1,99 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Jun 2016 19:26:25 +0200
-Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
- overlapping regions
-In-Reply-To: <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
- <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
-Message-ID: <D48E5A37-B019-4253-9D22-7CAF44D79BAB@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Jun 2016 18:29:45 +0100
+Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene
+ SoC PMU DTS binding
+In-Reply-To: <CACgAJHxMCa2Hp_A8YnHmmVrHGd3yLhFs2k33MN6OHRUmZ7Y_Wg@mail.gmail.com>
+References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
+ <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
+ <20160418170009.GA15338@rob-hp-laptop>
+ <CACgAJHyBbO_LXwtfNVK1f=dY3v1Jfxwxq1dw98EZ0aYdhjPpAg@mail.gmail.com>
+ <20160420113121.GE2514@arm.com>
+ <20160502205648.GA7374@rob-hp-laptop>
+ <CACgAJHyT31DuVNoyRQZVKjv=zM5Fc-EY0gy=y=pHHrBTT+1Xow@mail.gmail.com>
+ <20160531165630.GE4254@leverpostej>
+ <CACgAJHwtb0hNs0JWOrpyF=_fRVvUi2QG4q7qohgCw4SjxqtX6A@mail.gmail.com>
+ <CACgAJHxMCa2Hp_A8YnHmmVrHGd3yLhFs2k33MN6OHRUmZ7Y_Wg@mail.gmail.com>
+Message-ID: <20160606172945.GE23505@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, May 31, 2016 at 06:25:56PM -0700, Tai Tri Nguyen wrote:
+> Hi Mark,
 
-> On 6 jun. 2016, at 19:09, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
->> On Mon, Jun 06, 2016 at 11:43:01AM +0200, Ard Biesheuvel wrote:
->>> On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>> Since the EFI page size is 4KB, it is possible for a !4KB page kernel to
->>> align an EFI runtime map boundaries in a way that they can overlap
->>> within the same page. This requires the current create_pgd_mapping()
->>> code to be able to split existing larger mappings when an overlapping
->>> region needs to be mapped.
->>> 
->>> With this patch, efi_create_mapping() scans the EFI memory map for
->>> overlapping regions and trims the length of the current map to avoid a
->>> large block mapping and subsequent split.
->> 
->> I remember the discussion, but IIRC this was about failure to do
->> break-before-make in general rather than a problem with splitting in
->> particular.
-> 
-> In this instance, we don't have break-before-make issue since the pgd
-> used for EFI runtime services is not active. So it's just about
-> splitting a larger block and simplifying the arch code.
-> 
->> So first of all, I would like to point out that this failure to do
->> break-before-make is not a problem in practice, given that the EFI
->> page tables are not live until much later. The reason we want to fix
->> this is because the EFI page tables routines are shared with the
->> swapper, where it /is/ a concern, and there is a desire to make those
->> routines more strict when it comes to architectural rules regarding
->> page table manipulation.
-> 
-> Exactly.
-> 
->> Also, the reference to block mappings on !4K pages kernels is a bit
->> misleading here: such block mappings are at least 32 MB in size, and
->> we never map runtime code or data regions that big.
-> 
-> Jeremy has some patches in flight to use the contiguous bit on such
-> mappings. With 64KB x 32 pages, we get a 2MB block. I want to avoid code
-> splitting such contiguous block as well (which with the contiguous bit
-> means going back and clearing it).
-> 
->>> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
->>> ---
->>> arch/arm64/kernel/efi.c | 22 +++++++++++++++++++---
->>> 1 file changed, 19 insertions(+), 3 deletions(-)
->>> 
->>> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->>> index 78f52488f9ff..0d5753c31c7f 100644
->>> --- a/arch/arm64/kernel/efi.c
->>> +++ b/arch/arm64/kernel/efi.c
->>> @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
->>> int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
->>> {
->>>        pteval_t prot_val = create_mapping_protection(md);
->>> +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
->>> +       efi_memory_desc_t *next = md;
->>> 
->>> -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
->>> -                          md->num_pages << EFI_PAGE_SHIFT,
->>> -                          __pgprot(prot_val | PTE_NG));
->>> +       /*
->>> +        * Search for the next EFI runtime map and check for any overlap with
->>> +        * the current map when aligned to PAGE_SIZE. In such case, defer
->>> +        * mapping the end of the current range until the next
->>> +        * efi_create_mapping() call.
->>> +        */
->>> +       for_each_efi_memory_desc_continue(next) {
->>> +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
->>> +                       continue;
->>> +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
->>> +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
->> 
->> This looks fishy. We could have more than two runtime regions sharing
->> a 64 KB page frame, for instance, and the middle regions will have
->> unaligned start and end addresses, and sizes smaller than 64 KB. This
->> subtraction may wrap in that case, producing a bogus length.
-> 
-> I don't think I get it. This subtraction is meant to reduce the length
-> of the current md so that it is page aligned, deferring the mapping of
-> the last page to the next efi_create_mapping() call. Note that there is
-> a "break" just after the hunk you quoted, so we only care about the next
-> runtime map.
-> 
+[...]
 
-If the current entry is only 4k in size, and starts 56k into the 64k page frame, you subtract 60k, and you end up with a length of -56k
+> I'm facing a problem after removing the index for MCU and MC sub-nodes.
+> The MCUs and MCs aren't always enabled depending on how DRAM DIMMs are
+> installed on the system.
+> I still need a way to associate the MCU with its indicator bit in the
+> enable mask retrieved from CSR.
+
+Ah, I see.
+
+Can you elaborate on how the indicator bits are laid out? From the
+example binding, I see multiple nodes with the same index property, so
+I'm a little confused.
+
+I guess that there's a CSR per class of node (e.g. all MCBs in one CSR
+register)? Or do several nodes share the same bit?
+
+Is there a single CSR register? Are there several? Is that bit index
+used in other registers?
+
+> For MC and MCB nodes only, can I introduce an "enable-mask" field?
+> For example:
+> "
+> pmucmcb at 7e710000 {
+>         compatible = "apm,xgene-pmu-mcb";
+>         reg = <0x0 0x7e710000 0x0 0x1000>;
+>         enable-mask = <0x00000001>;
+> };
+> 
+> pmucmcb at 7e730000 {
+>         compatible = "apm,xgene-pmu-mcb";
+>         reg = <0x0 0x7e730000 0x0 0x1000>;
+>         enable-mask = <0x00000002>;
+> };
+> "
+> Or can you please give a suggestion how I can fix it?
+
+Assuming it's always a single bit, a *-bit-index property may be fine,
+and probably preferable.
+
+I'm a little confused, so I'd like to understand how it's used.
+
+Thanks,
+Mark.
