@@ -1,111 +1,154 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Mon, 6 Jun 2016 11:22:40 +0800
-Subject: [PATCH v3 06/12] power: pwrseq: simple: Add support for
- regulator and generic property
-In-Reply-To: <5751797C.3020607@samsung.com>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
- <1464768141-25420-7-git-send-email-k.kozlowski@samsung.com>
- <20160603020218.GA19436@rob-hp-laptop>
- <5751797C.3020607@samsung.com>
-Message-ID: <20160606032239.GC16012@shlinux2>
+From: hl@rock-chips.com (hl)
+Date: Mon, 6 Jun 2016 11:20:13 +0800
+Subject: [RFC PATCH v1 1/6] rockchip: rockchip: add new clock-type for the
+ ddrclk
+In-Reply-To: <1663829.Hlc2xmNrOy@diego>
+References: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
+ <1464947719-6245-2-git-send-email-hl@rock-chips.com>
+ <1663829.Hlc2xmNrOy@diego>
+Message-ID: <5754EBED.5070606@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 02:35:08PM +0200, Krzysztof Kozlowski wrote:
-> On 06/03/2016 04:02 AM, Rob Herring wrote:
-> > On Wed, Jun 01, 2016 at 10:02:15AM +0200, Krzysztof Kozlowski wrote:
-> >> Some devices need real hard-reset by cutting the power.  During power
-> >> sequence turn off and on the regulator, if it is provided.
-> >>
-> >> Additionally add support for instantiating the pwrseq-simple device on a
-> >> generic property 'power-sequence'.  The device will attach itself to the
-> >> node containing the property and parse the node's properties like
-> >> reset-gpios, ext-supply etc.
-> >>
-> >> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >> ---
-> >>  .../bindings/power/pwrseq/pwrseq-simple.txt        | 29 +++++++-
-> >>  drivers/power/pwrseq/pwrseq_simple.c               | 85 +++++++++++++++++++++-
-> >>  2 files changed, 107 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
-> >> index ce0e76749671..a8c3f13ee83f 100644
-> >> --- a/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
-> >> +++ b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
-> >> @@ -1,11 +1,17 @@
-> >> -* The simple MMC power sequence provider
-> >> +* The simple power sequence provider
-> >>  
-> >> -The purpose of the simple MMC power sequence provider is to supports a set of
-> >> +The purpose of the simple power sequence provider is to supports a set of
-> >>  common properties between various SOC designs. It thus enables us to use the
-> >>  same provider for several SOC designs.
-> >>  
-> >> -Required properties:
-> >> -- compatible : contains "mmc-pwrseq-simple".
-> >> +The driver supports two types of bindings:
-> >> +1. Separate node
-> >> +   Required properties:
-> >> +   - compatible : contains "mmc-pwrseq-simple".
-> > 
-> > Please note that this is not recommended for new users.
-> 
-> Sure.
-> 
-> > 
-> >> +
-> >> +2. Property for any node
-> >> +   Required properties:
-> >> +   - power-sequence
-> >>  
-> >>  Optional properties:
-> >>  - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
-> >> @@ -16,6 +22,7 @@ Optional properties:
-> >>    See ../clocks/clock-bindings.txt for details.
-> >>  - clock-names : Must include the following entry:
-> >>    "ext_clock" (External clock provided to the card).
-> >> +- ext-supply : External regulator supply
-> > 
-> > What happens when there are 2 supplies?
-> > 
-> > I'd prefer the name not be genericish and use the real supply names. 
-> > Then the power seq code should just turn on all supplies it finds. If 
-> > the order or timing to turn on matters, then sorry, no generic sequence.
-> 
-> Understood. I'll change the code to use any supply.
-> 
-> As for the genericness of this approach, Sylwester Nawrocki pointed an
-> old thread:
-> [PATCH v6 0/4] Runtime Interpreted Power Sequences
-> https://lkml.org/lkml/2012/9/12/127
-> 
-> How do you like that approach?
-> 
+Hi Heiko,
 
-Rob, I am trying to implement the dts layout you suggested (see below),
-but I find it is very hard to it due to the device is still not created,
-without device, it is hard to manage the resources under this device (
-Eg, de-initialization for probe deferral case). So, a common driver
-is suitable for this power sequence case.
-
-&usbotg1 {
-        vbus-supply = <&reg_usb_otg1_vbus>;
-        pinctrl-names = "default";
-        pinctrl-0 = <&pinctrl_usb_otg1_id>;
-        status = "okay";
-
-        #address-cells = <1>;
-        #size-cells = <0>;
-        hub: genesys at 1 {
-                compatible = "usb5e3,608";
-                reg = <1>;
-                reset-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>; /* hub reset pin */
-                reset-duration-us = <10>;
-                clocks = <&clks IMX6SX_CLK_CKO>;
-        };
-};
+On 2016?06?03? 20:51, Heiko St?bner wrote:
+> Am Freitag, 3. Juni 2016, 17:55:14 schrieb Lin Huang:
+>> On new rockchip platform(rk3399 etc), there have dcf controller to
+>> do ddr frequency scaling, and this controller will implement in
+>> arm-trust-firmware. We add a special clock-type to handle that.
+>>
+>> Signed-off-by: Lin Huang <hl@rock-chips.com>
+>> ---
+>> Changes in v1:
+>> - None
+>>
+>>   drivers/clk/rockchip/Makefile  |   1 +
+>>   drivers/clk/rockchip/clk-ddr.c | 147
+>> +++++++++++++++++++++++++++++++++++++++++ drivers/clk/rockchip/clk.c     |
+>>   9 +++
+>>   drivers/clk/rockchip/clk.h     |  27 ++++++++
+>>   4 files changed, 184 insertions(+)
+>>   create mode 100644 drivers/clk/rockchip/clk-ddr.c
+>>
+>> diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
+>> index f47a2fa..b5f2c8e 100644
+>> --- a/drivers/clk/rockchip/Makefile
+>> +++ b/drivers/clk/rockchip/Makefile
+>> @@ -8,6 +8,7 @@ obj-y	+= clk-pll.o
+>>   obj-y	+= clk-cpu.o
+>>   obj-y	+= clk-inverter.o
+>>   obj-y	+= clk-mmc-phase.o
+>> +obj-y	+= clk-ddr.o
+>>   obj-$(CONFIG_RESET_CONTROLLER)	+= softrst.o
+>>
+>>   obj-y	+= clk-rk3036.o
+>> diff --git a/drivers/clk/rockchip/clk-ddr.c b/drivers/clk/rockchip/clk-ddr.c
+>> new file mode 100644
+>> index 0000000..5b6630d
+>> --- /dev/null
+>> +++ b/drivers/clk/rockchip/clk-ddr.c
+>> @@ -0,0 +1,147 @@
+>> +/*
+>> + * Copyright (c) 2016 Rockchip Electronics Co. Ltd.
+>> + * Author: Lin Huang <hl@rock-chips.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + */
+>> +
+>> +#include <linux/of.h>
+>> +#include <linux/slab.h>
+>> +#include <linux/io.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/clk-provider.h>
+>> +#include "clk.h"
+>> +
+>> +struct rockchip_ddrclk {
+>> +	struct clk_hw	hw;
+>> +	void __iomem	*reg_base;
+>> +	int		mux_offset;
+>> +	int		mux_shift;
+>> +	int		mux_width;
+>> +	int		mux_flag;
+>> +	int		div_shift;
+>> +	int		div_width;
+>> +	int		div_flag;
+>> +	spinlock_t	*lock;
+>> +};
+>> +
+>> +#define to_rockchip_ddrclk_hw(hw) container_of(hw, struct rockchip_ddrclk,
+>> hw)
+>> +#define val_mask(width)	((1 << (width)) - 1)
+> maybe use GENMASK?
+     Oh, yes, we can use it. Will fix next version.
+>
+>> +
+>> +static int rockchip_ddrclk_set_rate(struct clk_hw *hw, unsigned long drate,
+>> +				    unsigned long prate)
+>> +{
+>> +	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
+>> +	unsigned long flags;
+>> +
+>> +	spin_lock_irqsave(ddrclk->lock, flags);
+>> +
+>> +	/* TODO: set ddr rate in bl31 */
+> I expect this interface to be in existence and merged into the main ATF first.
+>
+> Right now the whole clock-type does nothing more than a simple COMPOSITE with
+> added CLK_DIVIDER_READ_ONLY | CLK_MUX_READ_ONLY.
+>
+> Also Mike is propably still working in the so called coordinated rate change
+> for clocks needing special handling on rate changes, which might provide a
+> second approach to this.
+     You mean there is a patch set can handle it now? Can you tell me 
+the ID,
+     I want to check it.
+>
+> So please, first of all get the ATF-interface merged and meanwhile if you need
+> to read the clock-rate, just use a regular composite, with the read-only flags.
+>
+     My colleague are wroking on ATF code now, I agree with you, We can 
+not merge
+     this patch set before ATF-interface merged. And we do not need to 
+add a new code
+     if we only want to read ddr clock rate(we can get the ddr rate to 
+read dpll), so i prefer
+     to keep this function for now, and do review first, once the ATF 
+code ready, we can merge
+     soon(i hope :-P ) .
+>> +	spin_unlock_irqrestore(ddrclk->lock, flags);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static unsigned long
+>> +rockchip_ddrclk_recalc_rate(struct clk_hw *hw,
+>> +			    unsigned long parent_rate)
+>> +{
+>> +	struct rockchip_ddrclk *ddrclk = to_rockchip_ddrclk_hw(hw);
+>> +	int val;
+>> +
+>> +	val = clk_readl(ddrclk->reg_base +
+>> +			ddrclk->mux_offset) >> ddrclk->div_shift;
+>> +	val &= val_mask(ddrclk->div_width);
+>> +
+>> +	return DIV_ROUND_UP_ULL((u64)parent_rate, val + 1);
+> return divider_recalc_rate(...)
+     got it , thank you.
+>
+>
+> Heiko
+>
+>
+>
 
 -- 
-
-Best Regards,
-Peter Chen
+Lin Huang
