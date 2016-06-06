@@ -1,68 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Jun 2016 10:00:33 +0100
-Subject: [PATCH 3/8] mfd: tps65218: Use mfd_add_devices instead of
- of_platform_populate
-In-Reply-To: <57516549.6040102@ti.com>
-References: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
- <1462945691-904-4-git-send-email-j-keerthy@ti.com>
- <57516549.6040102@ti.com>
-Message-ID: <20160606090033.GC1525@dell>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Jun 2016 10:04:16 +0100
+Subject: [PATCH 0/2] qcom: add l2 cache perf events driver
+In-Reply-To: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
+References: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
+Message-ID: <20160606090416.GB6831@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 03 Jun 2016, Keerthy wrote:
-
-> Hi Lee Jones,
+On Fri, Jun 03, 2016 at 05:03:30PM -0400, Neil Leeder wrote:
+> This adds a new dynamic PMU to the Perf Events framework to program
+> and control the L2 cache PMUs in some Qualcomm Technologies SOCs.
 > 
-> On Wednesday 11 May 2016 11:18 AM, Keerthy wrote:
-> >mfd_add_devices enables parsing device tree nodes without compatibles
-> >for child nodes. Replace of_platform_populate with mfd_add_devices.
-> >
+> The driver exports formatting and event information to sysfs so it can
+> be used by the perf user space tools with the syntax:
+> perf stat -e l2cache/event=0x42/
 > 
-> A gentle ping on this patch.
+> One point to note is that there are certain combinations of events
+> which are invalid, and which are detected in event_add().
 
-Don't do that!
+Which combinations of events are invalid?
 
-If you think it's forgotten then send a [RESEND].  However this patch
-is in my "to review" queue and will be dealt with in due course.
+Please elaborate.
 
-> >Signed-off-by: Keerthy <j-keerthy@ti.com>
-> >---
-> >  drivers/mfd/tps65218.c | 10 ++++++++--
-> >  1 file changed, 8 insertions(+), 2 deletions(-)
-> >
-> >diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
-> >index f20a531..b8b3a58 100644
-> >--- a/drivers/mfd/tps65218.c
-> >+++ b/drivers/mfd/tps65218.c
-> >@@ -33,6 +33,10 @@
-> >
-> >  #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
-> >
-> >+static const struct mfd_cell tps65218_cells[] = {
-> >+	{ .name = "tps65218-regulator", },
-> >+};
-> >+
-> >  /**
-> >   * tps65218_reg_write: Write a single tps65218 register.
-> >   *
-> >@@ -236,8 +240,10 @@ static int tps65218_probe(struct i2c_client *client,
-> >  	if (ret < 0)
-> >  		return ret;
-> >
-> >-	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
-> >-				   &client->dev);
-> >+	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
-> >+			      ARRAY_SIZE(tps65218_cells), NULL, 0,
-> >+			      regmap_irq_get_domain(tps->irq_data));
-> >+
-> >  	if (ret < 0)
-> >  		goto err_irq;
-> >
-> >
+> Simply having event_add() fail would result in event_sched_in() making
+> it Inactive, treating it as over-allocation of counters, leading to
+> repeated attempts to allocate the events and ending up with a
+> statistical count.  A solution for this situation is to turn the
+> conflicting event off in event_add(). This allows a single error
+> message to be generated, and no recurring attempts to re-add the
+> invalid event. In order for this to work, event_sched_in()
+> needs to detect that event_add() changed the state, and not override it
+> and force it to Inactive.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+For heterogeneous PMUs, we added the pmu::filter_match(event) callback
+for a similar purpose: preventing an event from being scheduled on a
+core which does not support that event, while allowing other events to
+be scheduled.
+
+So if you truly need to filter events, the infrastructure for doing so
+already exists.
+
+However, you will need to elaborate on "there are certain combinations
+of events which are invalid".
+
+> This patchset requires:
+> [PATCH] soc: qcom: provide mechanism for drivers to access L2 registers
+
+A link would be remarkably helpful.
+
+Better would be to fold that patch into this series, as it's the only
+user, and both are helpful review context for the other.
+
+Thanks,
+Mark.
