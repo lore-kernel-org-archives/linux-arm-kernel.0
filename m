@@ -1,156 +1,42 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 6 Jun 2016 09:37:31 -0700
-Subject: [v2 PATCH] arm64: kasan: instrument user memory access API
-In-Reply-To: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
-References: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <37a456bf-6976-e100-e3a2-3c64a6227fa8@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Jun 2016 17:41:29 +0100
+Subject: [PATCH kexec-tools v2 00/32] Keystone II updates for kexec tools
+Message-ID: <20160606164129.GM1041@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will & Catalin,
+Here's the latest set of kexec-tools patches to support Keystone II
+platforms, which work in conjunction with the kernel patches which
+Andrew Morton has already taken.
 
-Any comment for this patch?
+Most of the patches have been reviewed, but there are a small number
+which do not have Reviewed-by or Acked-by tags; these are due to
+comments, which I've replied to, which have yet to have further
+responses.
 
-Thanks,
-Yang
+ kdump/kdump.c                     |  27 ++++-
+ kexec/Makefile                    |   4 +
+ kexec/arch/arm/Makefile           |   5 +
+ kexec/arch/arm/crashdump-arm.c    | 247 +++++++++++++++++++-------------------
+ kexec/arch/arm/crashdump-arm.h    |   2 +-
+ kexec/arch/arm/iomem.h            |   9 ++
+ kexec/arch/arm/kexec-arm.c        |   8 +-
+ kexec/arch/arm/kexec-uImage-arm.c |   3 +-
+ kexec/arch/arm/kexec-zImage-arm.c |   6 +-
+ kexec/arch/arm/phys_to_virt.c     |   6 +-
+ kexec/arch/arm/phys_to_virt.h     |   8 ++
+ kexec/crashdump.h                 |   2 +-
+ kexec/kexec-uImage.c              |   3 +-
+ kexec/kexec.c                     |   4 +-
+ kexec/kexec.h                     |   1 +
+ kexec/mem_regions.c               | 128 ++++++++++++++++++++
+ kexec/mem_regions.h               |  15 +++
+ kexec/phys_to_virt.c              |   2 +-
+ kexec/zlib.c                      |   4 +-
+ 19 files changed, 339 insertions(+), 145 deletions(-)
 
 
-On 5/27/2016 2:01 PM, Yang Shi wrote:
-> The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
-> ("x86/kasan: instrument user memory access API") added KASAN instrument to
-> x86 user memory access API, so added such instrument to ARM64 too.
->
-> Define __copy_to/from_user in C in order to add kasan_check_read/write call,
-> rename assembly implementation to __arch_copy_to/from_user.
->
-> Tested by test_kasan module.
->
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> ---
-> v2:
->  Adopted the comment from Andrey and Mark to add kasan_check_read/write into
->  __copy_to/from_user.
->
->  arch/arm64/include/asm/uaccess.h | 25 +++++++++++++++++++++----
->  arch/arm64/kernel/arm64ksyms.c   |  4 ++--
->  arch/arm64/lib/copy_from_user.S  |  4 ++--
->  arch/arm64/lib/copy_to_user.S    |  4 ++--
->  4 files changed, 27 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 0685d74..4dc9a8f 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -23,6 +23,7 @@
->   */
->  #include <linux/string.h>
->  #include <linux/thread_info.h>
-> +#include <linux/kasan-checks.h>
->
->  #include <asm/alternative.h>
->  #include <asm/cpufeature.h>
-> @@ -269,15 +270,29 @@ do {									\
->  		-EFAULT;						\
->  })
->
-> -extern unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n);
-> -extern unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n);
-> +extern unsigned long __must_check __arch_copy_from_user(void *to, const void __user *from, unsigned long n);
-> +extern unsigned long __must_check __arch_copy_to_user(void __user *to, const void *from, unsigned long n);
->  extern unsigned long __must_check __copy_in_user(void __user *to, const void __user *from, unsigned long n);
->  extern unsigned long __must_check __clear_user(void __user *addr, unsigned long n);
->
-> +static inline unsigned long __must_check __copy_from_user(void *to, const void __user *from, unsigned long n)
-> +{
-> +	kasan_check_write(to, n);
-> +	return  __arch_copy_from_user(to, from, n);
-> +}
-> +
-> +static inline unsigned long __must_check __copy_to_user(void __user *to, const void *from, unsigned long n)
-> +{
-> +	kasan_check_read(from, n);
-> +	return  __arch_copy_to_user(to, from, n);
-> +}
-> +
->  static inline unsigned long __must_check copy_from_user(void *to, const void __user *from, unsigned long n)
->  {
-> +	kasan_check_write(to, n);
-> +
->  	if (access_ok(VERIFY_READ, from, n))
-> -		n = __copy_from_user(to, from, n);
-> +		n = __arch_copy_from_user(to, from, n);
->  	else /* security hole - plug it */
->  		memset(to, 0, n);
->  	return n;
-> @@ -285,8 +300,10 @@ static inline unsigned long __must_check copy_from_user(void *to, const void __u
->
->  static inline unsigned long __must_check copy_to_user(void __user *to, const void *from, unsigned long n)
->  {
-> +	kasan_check_read(from, n);
-> +
->  	if (access_ok(VERIFY_WRITE, to, n))
-> -		n = __copy_to_user(to, from, n);
-> +		n = __arch_copy_to_user(to, from, n);
->  	return n;
->  }
->
-> diff --git a/arch/arm64/kernel/arm64ksyms.c b/arch/arm64/kernel/arm64ksyms.c
-> index 678f30b0..2dc4440 100644
-> --- a/arch/arm64/kernel/arm64ksyms.c
-> +++ b/arch/arm64/kernel/arm64ksyms.c
-> @@ -34,8 +34,8 @@ EXPORT_SYMBOL(copy_page);
->  EXPORT_SYMBOL(clear_page);
->
->  	/* user mem (segment) */
-> -EXPORT_SYMBOL(__copy_from_user);
-> -EXPORT_SYMBOL(__copy_to_user);
-> +EXPORT_SYMBOL(__arch_copy_from_user);
-> +EXPORT_SYMBOL(__arch_copy_to_user);
->  EXPORT_SYMBOL(__clear_user);
->  EXPORT_SYMBOL(__copy_in_user);
->
-> diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
-> index 17e8306..0b90497 100644
-> --- a/arch/arm64/lib/copy_from_user.S
-> +++ b/arch/arm64/lib/copy_from_user.S
-> @@ -66,7 +66,7 @@
->  	.endm
->
->  end	.req	x5
-> -ENTRY(__copy_from_user)
-> +ENTRY(__arch_copy_from_user)
->  ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
->  	    CONFIG_ARM64_PAN)
->  	add	end, x0, x2
-> @@ -75,7 +75,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
->  	    CONFIG_ARM64_PAN)
->  	mov	x0, #0				// Nothing to copy
->  	ret
-> -ENDPROC(__copy_from_user)
-> +ENDPROC(__arch_copy_from_user)
->
->  	.section .fixup,"ax"
->  	.align	2
-> diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
-> index 21faae6..7a7efe2 100644
-> --- a/arch/arm64/lib/copy_to_user.S
-> +++ b/arch/arm64/lib/copy_to_user.S
-> @@ -65,7 +65,7 @@
->  	.endm
->
->  end	.req	x5
-> -ENTRY(__copy_to_user)
-> +ENTRY(__arch_copy_to_user)
->  ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(0)), ARM64_ALT_PAN_NOT_UAO, \
->  	    CONFIG_ARM64_PAN)
->  	add	end, x0, x2
-> @@ -74,7 +74,7 @@ ALTERNATIVE("nop", __stringify(SET_PSTATE_PAN(1)), ARM64_ALT_PAN_NOT_UAO, \
->  	    CONFIG_ARM64_PAN)
->  	mov	x0, #0
->  	ret
-> -ENDPROC(__copy_to_user)
-> +ENDPROC(__arch_copy_to_user)
->
->  	.section .fixup,"ax"
->  	.align	2
->
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
