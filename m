@@ -1,58 +1,60 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  6 Jun 2016 10:11:38 +0100
-Subject: [PATCH v2 6/9] coresight: etmv4: Fix ETMv4x peripheral ID table
-In-Reply-To: <1465204301-24184-1-git-send-email-suzuki.poulose@arm.com>
-References: <1465204301-24184-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1465204301-24184-7-git-send-email-suzuki.poulose@arm.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Mon, 6 Jun 2016 11:13:59 +0200
+Subject: [PATCH] mmc: sunxi: Add support to the Allwinner A83T
+In-Reply-To: <CAGb2v66JbDjOQdMGDnzsToiXK9ub91m0i4dbkoXtVf0MwURWOQ@mail.gmail.com>
+References: <20160604100253.7141B2DE7D@muse.csie.ntu.edu.tw>
+ <CAGb2v66JbDjOQdMGDnzsToiXK9ub91m0i4dbkoXtVf0MwURWOQ@mail.gmail.com>
+Message-ID: <20160606111359.2f5a391dfa7b1bfce2d82d70@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch cleans up the peripheral id table for different ETMv4
-implementations.
+On Sun, 5 Jun 2016 20:58:42 +0800
+Chen-Yu Tsai <wens@csie.org> wrote:
 
-As per Cortex-A53 TRM, the ETM has following id values:
+> > +static const struct sunxi_mmc_clk_delay sun8i_a83t_mmc_clk_delays[] = {
+> > +       [SDXC_CLK_400K]         = { .output = 180, .sample = 180 },
+> > +       [SDXC_CLK_25M]          = { .output = 180, .sample =  50 },
+> > +       [SDXC_CLK_50M]          = { .output =  60, .sample =  50 },
+> 
+> These 2 don't look right.
+> 
+> > +       [SDXC_CLK_50M_DDR]      = { .output =  180, .sample = 90 },
+> > +       [SDXC_CLK_50M_DDR_8BIT] = { .output =  180, .sample = 90 },
+> 
+> Nor does this one. As explained in the comment from the clock driver:
+> 
+>     We can only outphase the clocks by multiple of the PLL's period.
+> 
+>     Since the MMC clock in only a divider, and the formula to get the
+>     outphasing in degrees is deg = 360 * delta / period
+> 
+> Now, for the fishy ones I mentioned, MMC clock = card clock (or card * 2
+> for DDR 8 bit), and parent clock is PLL6 @ 600 MHz. A step would be 15,
+> 30 or 60 degrees. Thus you cannot get an outphasing of 50 degrees, or 90
+> degrees for 50M DDR 8bit.
+> 
+> Could you provide a link to the original driver? Or perhaps just the
+> original delay values?
+> 
+> The values do work better on my Cubietruck plus, giving a throughput
+> of 36 MB/s read, instead of 17 MB/s with the original values. However
+> that is still only half of what it should be capable of. I will test
+> my BPI M3 tomorrow.
 
-Peripheral ID0	0x5D	0xFE0
-Peripheral ID1	0xB9	0xFE4
-Peripheral ID2	0x4B	0xFE8
-Peripheral ID3	0x00	0xFEC
+Hi,
 
-where, PID2: has the following format:
+Yes, you are right, my values are wrong. Please, forget about this patch.
+I did not look far enough in the clock code.
 
-[7:4]   Revision
-[3]     JEDEC   0b1     res1. Indicates a JEP106 identity code is used
-[2:0]   DES_1   0b011   ARM Limited. This is bits[6:4] of JEP106 ID code
+Anyway, I had timeouts in accessing the MMC because the BPI-M3 legacy
+u-boot sets the pll-periph rate to 1.2GHz.
+Then, according to the comment in the BPI-M3 original driver
+(https://github.com/BPI-SINOVOIP/BPI-M3-bsp/blob/master/linux-sunxi/drivers/mmc/host/sunxi-mci.c),
+if "//in 1.2GHz pll_periph only [MMC_CLK-50M] is correct",
+setting the clock delays to 6 and 7 would be, for us:
 
-The existing table entry checks only the bits [1:0], which is not
-sufficient enough. Fix it to match bits [3:0], just like the other
-entries do. While at it, correct the comment for A57 and the A53 entry.
+	[SDXC_CLK_50M]          = { .output =  90, .sample =  105 },
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index 462f0dc..88947f3 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -815,12 +815,12 @@ err_arch_supported:
- }
- 
- static struct amba_id etm4_ids[] = {
--	{       /* ETM 4.0 - Qualcomm */
--		.id	= 0x0003b95d,
--		.mask	= 0x0003ffff,
-+	{       /* ETM 4.0 - Cortex-A53  */
-+		.id	= 0x000bb95d,
-+		.mask	= 0x000fffff,
- 		.data	= "ETM 4.0",
- 	},
--	{       /* ETM 4.0 - Juno board */
-+	{       /* ETM 4.0 - Cortex-A57 */
- 		.id	= 0x000bb95e,
- 		.mask	= 0x000fffff,
- 		.data	= "ETM 4.0",
 -- 
-1.9.1
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
