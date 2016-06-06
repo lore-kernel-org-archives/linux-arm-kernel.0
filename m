@@ -1,218 +1,251 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Mon, 6 Jun 2016 07:27:17 +0000
-Subject: [RFC PATCH 1/3] pci, acpi: Match PCI config space accessors
- against platfrom specific ECAM quirks.
-In-Reply-To: <470f6d93-4c83-e271-7e99-7e23f3f76e71@codeaurora.org>
-References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
- <1464856864-18049-2-git-send-email-tn@semihalf.com>
- <57519F09.2010201@codeaurora.org>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F76E9D7@lhreml507-mbx>
- <470f6d93-4c83-e271-7e99-7e23f3f76e71@codeaurora.org>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F7710AD@lhreml507-mbx>
+From: po.liu@nxp.com (Po Liu)
+Date: Mon, 6 Jun 2016 07:32:52 +0000
+Subject: [PATCH 2/2] aer: add support aer interrupt with none
+ MSI/MSI-X/INTx mode
+In-Reply-To: <20160604034852.GA15143@localhost>
+References: <1464242406-20203-1-git-send-email-po.liu@nxp.com>
+ <20160602034828.GA10240@localhost>
+ <VI1PR0401MB1709E215DCE264B2C27B3DAB92580@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+ <20160602135546.GA8262@localhost> <575052B8.3090203@ti.com>
+ <20160603040952.GA17904@localhost> <5751BEDF.3040300@ti.com>
+ <20160604034852.GA15143@localhost>
+Message-ID: <DB5PR0401MB1702AF829693255DFC347448925C0@DB5PR0401MB1702.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeffrey
+Hi Bjorn,
+I confirm we met same problem with KeyStone base on DesignWare design.
 
-> -----Original Message-----
-> From: Jeffrey Hugo [mailto:jhugo at codeaurora.org]
-> Sent: 03 June 2016 18:00
-> To: Gabriele Paoloni; Christopher Covington; Tomasz Nowicki;
-> helgaas at kernel.org; arnd at arndb.de; will.deacon at arm.com;
-> catalin.marinas at arm.com; rafael at kernel.org; hanjun.guo at linaro.org;
-> Lorenzo.Pieralisi at arm.com; okaya at codeaurora.org; jchandra at broadcom.com
-> Cc: liudongdong (C); linaro-acpi at lists.linaro.org; jcm at redhat.com;
-> dhdang at apm.com; Liviu.Dudau at arm.com; ddaney at caviumnetworks.com;
-> jeremy.linton at arm.com; linux-kernel at vger.kernel.org; linux-
-> acpi at vger.kernel.org; robert.richter at caviumnetworks.com;
-> msalter at redhat.com; Suravee.Suthikulpanit at amd.com; linux-
-> pci at vger.kernel.org; Wangyijing; mw at semihalf.com;
-> andrea.gallo at linaro.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC PATCH 1/3] pci, acpi: Match PCI config space
-> accessors against platfrom specific ECAM quirks.
-> 
-> On 6/3/2016 9:32 AM, Gabriele Paoloni wrote:
-> > Hi Cov
-> >
-> >> -----Original Message-----
-> >> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> >> owner at vger.kernel.org] On Behalf Of Christopher Covington
-> >> Sent: 03 June 2016 16:15
-> >> To: Tomasz Nowicki; helgaas at kernel.org; arnd at arndb.de;
-> >> will.deacon at arm.com; catalin.marinas at arm.com; rafael at kernel.org;
-> >> hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com;
-> okaya at codeaurora.org;
-> >> jchandra at broadcom.com
-> >> Cc: jcm at redhat.com; linaro-acpi at lists.linaro.org; linux-
-> >> pci at vger.kernel.org; dhdang at apm.com; Liviu.Dudau at arm.com;
-> >> ddaney at caviumnetworks.com; jeremy.linton at arm.com; linux-
-> >> kernel at vger.kernel.org; linux-acpi at vger.kernel.org;
-> >> robert.richter at caviumnetworks.com; Suravee.Suthikulpanit at amd.com;
-> >> msalter at redhat.com; Wangyijing; mw at semihalf.com;
-> >> andrea.gallo at linaro.org; linux-arm-kernel at lists.infradead.org;
-> >> liudongdong (C); Gabriele Paoloni
-> >> Subject: Re: [RFC PATCH 1/3] pci, acpi: Match PCI config space
-> >> accessors against platfrom specific ECAM quirks.
-> >>
-> >> Hi Tomasz,
-> >>
-> >> Thanks for your work on this.
-> >>
-> >> On 06/02/2016 04:41 AM, Tomasz Nowicki wrote:
-> >>> Some platforms may not be fully compliant with generic set of PCI
-> >> config
-> >>> accessors. For these cases we implement the way to overwrite
-> >> accessors
-> >>> set. Algorithm traverses available quirk list, matches against
-> >>> <oem_id, oem_rev, domain, bus number> tuple and returns
-> corresponding
-> >>> PCI config ops. oem_id and oem_rev come from MCFG table standard
-> >> header.
-> >>> All quirks can be defined using DECLARE_ACPI_MCFG_FIXUP() macro and
-> >>> kept self contained. Example:
-> >>>
-> >>> /* Custom PCI config ops */
-> >>> static struct pci_generic_ecam_ops foo_pci_ops = {
-> >>> 	.bus_shift	= 24,
-> >>> 	.pci_ops = {
-> >>> 		.map_bus = pci_ecam_map_bus,
-> >>> 		.read = foo_ecam_config_read,
-> >>> 		.write = foo_ecam_config_write,
-> >>> 	}
-> >>> };
-> >>>
-> >>> DECLARE_ACPI_MCFG_FIXUP(&foo_pci_ops, <oem_id_str>, <oem_rev>,
-> >> <domain_nr>, <bus_nr>);
-> >>>
-> >>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> >>> ---
-> >>>  drivers/acpi/pci_mcfg.c           | 32
-> >> ++++++++++++++++++++++++++++++++
-> >>>  include/asm-generic/vmlinux.lds.h |  7 +++++++
-> >>>  include/linux/pci-acpi.h          | 19 +++++++++++++++++++
-> >>>  3 files changed, 58 insertions(+)
-> >>>
-> >>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
-> >>> index 1847f74..f3d4570 100644
-> >>> --- a/drivers/acpi/pci_mcfg.c
-> >>> +++ b/drivers/acpi/pci_mcfg.c
-> >>> @@ -22,11 +22,43 @@
-> >>>  #include <linux/kernel.h>
-> >>>  #include <linux/pci.h>
-> >>>  #include <linux/pci-acpi.h>
-> >>> +#include <linux/pci-ecam.h>
-> >>>
-> >>>  /* Root pointer to the mapped MCFG table */
-> >>>  static struct acpi_table_mcfg *mcfg_table;
-> >>>  static int mcfg_entries;
-> >>>
-> >>> +extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
-> >>> +extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
-> >>> +
-> >>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
-> >>> +{
-> >>> +	int bus_num = root->secondary.start;
-> >>> +	int domain = root->segment;
-> >>> +	struct pci_cfg_fixup *f;
-> >>> +
-> >>> +	if (!mcfg_table)
-> >>> +		return &pci_generic_ecam_ops;
-> >>> +
-> >>> +	/*
-> >>> +	 * Match against platform specific quirks and return
-> >> corresponding
-> >>> +	 * CAM ops.
-> >>> +	 *
-> >>> +	 * First match against PCI topology <domain:bus> then use OEM ID
-> >> and
-> >>> +	 * OEM revision from MCFG table standard header.
-> >>> +	 */
-> >>> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups;
-> >> f++) {
-> >>> +		if ((f->domain == domain || f->domain ==
-> >> PCI_MCFG_DOMAIN_ANY) &&
-> >>> +		    (f->bus_num == bus_num || f->bus_num ==
-> >> PCI_MCFG_BUS_ANY) &&
-> >>> +		    (!strncmp(f->oem_id, mcfg_table->header.oem_id,
-> >>> +			      ACPI_OEM_ID_SIZE)) &&
-> >>> +		    (f->oem_revision == mcfg_table->header.oem_revision))
-> >>
-> >> Is this more likely to be updated between quirky and fixed platforms
-> >> than oem_table_id? What do folks think about using oem_table_id
-> instead
-> >> of, or in addition to, oem_revision?
-> >
-> > From my understanding we need to stick to this mechanism as
-> (otherwise)
-> > there are platforms out in the field that would need a FW update.
-> >
-> > So I don't think that using oem_table_id "instead" is possible; about
-> > "in addition" I think it is doable, but I do not see the advantage
-> much.
-> > I mean that if a platform gets fixed the oem revision should change
-> too,
-> > Right?
-> 
-> Cov and I had a discussion about this, so hopefully I can bring a
-> slightly different perspective that will make sense.
-> 
-> We forsee a situation where we have platform A that needs a quirk, and
-> platform B that does not.  The OEM id is the same for both platforms as
-> they are different platforms from the same OEM.  Using the OEM revision
-> field does not seem to be appropriate since these are different
-> platforms and the revision field appears to be for the purpose of
-> tracking differences within a single platform.  Therefore, Cov is
-> proposing using the OEM table id as a mechanism to distinguish platform
-> A (needs quirk applied) vs platform B (no quirks) from the same OEM.
 
-Ah yes I see now...
+Best regards,
+Liu Po
 
-Probably it should be ok to have a check on all three OEM fields.
+>  -----Original Message-----
+>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+>  Sent: Saturday, June 04, 2016 11:49 AM
+>  To: Murali Karicheri
+>  Cc: Po Liu; linux-pci at vger.kernel.org; linux-arm-
+>  kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+>  devicetree at vger.kernel.org; Arnd Bergmann; Roy Zang; Marc Zyngier;
+>  Stuart Yoder; Yang-Leo Li; Minghuan Lian; Bjorn Helgaas; Shawn Guo;
+>  Mingkai Hu; Rob Herring
+>  Subject: Re: [PATCH 2/2] aer: add support aer interrupt with none
+>  MSI/MSI-X/INTx mode
+>  
+>  On Fri, Jun 03, 2016 at 01:31:11PM -0400, Murali Karicheri wrote:
+>  > Po,
+>  >
+>  > Sorry to hijack your discussion, but the problem seems to be same for
+>  > Keystone PCI controller which is also designware (old version) based.
+>  >
+>  > On 06/03/2016 12:09 AM, Bjorn Helgaas wrote:
+>  > > On Thu, Jun 02, 2016 at 11:37:28AM -0400, Murali Karicheri wrote:
+>  > >> On 06/02/2016 09:55 AM, Bjorn Helgaas wrote:
+>  > >>> On Thu, Jun 02, 2016 at 05:01:19AM +0000, Po Liu wrote:
+>  > >>>>>  -----Original Message-----
+>  > >>>>>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+>  > >>>>>  Sent: Thursday, June 02, 2016 11:48 AM
+>  > >>>>>  To: Po Liu
+>  > >>>>>  Cc: linux-pci at vger.kernel.org;
+>  > >>>>> linux-arm-kernel at lists.infradead.org;
+>  > >>>>>  linux-kernel at vger.kernel.org; devicetree at vger.kernel.org; Arnd
+>  > >>>>> Bergmann;  Roy Zang; Marc Zyngier; Stuart Yoder; Yang-Leo Li;
+>  > >>>>> Minghuan Lian; Bjorn  Helgaas; Shawn Guo; Mingkai Hu; Rob
+>  > >>>>> Herring
+>  > >>>>>  Subject: Re: [PATCH 2/2] aer: add support aer interrupt with
+>  > >>>>> none  MSI/MSI-X/INTx mode
+>  > >>>>>
+>  > >>>>>  [+cc Rob]
+>  > >>>>>
+>  > >>>>>  Hi Po,
+>  > >>>>>
+>  > >>>>>  On Thu, May 26, 2016 at 02:00:06PM +0800, Po Liu wrote:
+>  > >>>>>  > On some platforms, root port doesn't support MSI/MSI-X/INTx
+>  in RC mode.
+>  > >>>>>  > When chip support the aer interrupt with none MSI/MSI-X/INTx
+>  > >>>>> mode,  > maybe there is interrupt line for aer pme etc. Search
+>  > >>>>> the interrupt  > number in the fdt file.
+>  > >>>>>
+>  > >>>>>  My understanding is that AER interrupt signaling can be done
+>  > >>>>> via INTx,  MSI, or MSI-X (PCIe spec r3.0, sec 6.2.4.1.2).
+>  > >>>>> Apparently your device  doesn't support MSI or MSI-X.  Are you
+>  > >>>>> saying it doesn't support INTx  either?  How is the interrupt
+>  you're requesting here different from INTx?
+>  > >>>>
+>  > >>>> Layerscape use none of MSI or MSI-X or INTx to indicate the
+>  > >>>> devices or root error in RC mode. But use an independent SPI
+>  > >>>> interrupt(arm interrupt controller) line.
+>  > >>>
+>  > >>> The Root Port is a PCI device and should follow the normal PCI
+>  > >>> rules for interrupts.  As far as I understand, that means it
+>  > >>> should use MSI, MSI-X, or INTx.  If your Root Port doesn't use MSI
+>  > >>> or MSI-X, it should use INTx, the PCI_INTERRUPT_PIN register
+>  > >>> should tell us which (INTA/ INTB/etc.), and
+>  PCI_COMMAND_INTX_DISABLE should work to disable it.
+>  > >>> That's all from the PCI point of view, of course.
+>  > >>
+>  > >> I am faced with the same issue on Keystone PCI hardware and it has
+>  > >> been on my TODO list  for quite some time. Keystone PCI hardware
+>  > >> also doesn't use MSI or MSI-X or INTx for reporting errors received
+>  > >> at the root port, but use a platform interrupt instead (not
+>  > >> complaint to PCI standard as per PCI base spec). So I would need
+>  > >> similar change to have the error interrupt passed to the aer
+>  > >> driver. So there are hardware out there like Keystone which
+>  requires to support this through platform IRQ.
+>  > >
+>  > > This is not a new area of the spec, and it's hard for me to believe
+>  > > that these two new PCIe controllers are both broken the same way
+>  > > (although I guess both are DesignWare-based, so maybe this is the
+>  > > same underlying problem in both cases?).  I think it's more likely
+>  > > that we just haven't figured out the right way to describe this in
+>  the DT.
+>  >
+>  > Keystone is using an older version of the designware IP and it
+>  > implements all of the interrupts in the application register space
+>  > unlike other newer version of the hardware. So I assume, the version
+>  > used on Layerscape is also an older version and the both have same
+>  > issue in terms of non standard platform interrupt used for error
+>  reporting.
+>  >
+>  > > I assume you have a Root Port with an AER capability, no MSI
+>  > > capability, and no MSI-X capability, right?
+>  >
+>  > Has AER capability and both MSI and INTx (legacy) capability
+>  >
+>  > > What does its Interrupt
+>  > > Pin register contain?  If it's zero, it doesn't use INTx either, so
+>  > > according to the spec it should generate no interrupts.
+>  > >
+>  > At address offset 0x3C by default has a value of 1, but it is writable
+>  > by software. So default is INTx A.
+>  
+>  0x3c is the Interrupt *Line*, which is read/write.  The Interrupt
+>  *Pin* is at 0x3d and should be read-only.
+>  
+>  Does your Keystone driver support MSI?  If so, since your Root Port
+>  supports MSI, I would think we would use that by default, and the INTx
+>  stuff wouldn't even matter.
 
-Thanks for explaining
+Layerscape is also shows "Both message signaled interrupts (MSI) and legacy INTx are supported."
+But both of them not work for AER interrupt when devices or root port report aer error.
+But another GIC interrupt line do.
 
-Gab 
+>  
+>  > > But if Interrupt Pin is non-zero, that means the Root Port should be
+>  > > able to generate virtual INTx interrupts.  Presumably the Root
+>  > > Complex connects those interrupts to something; maybe to your
+>  > > platform interrupt?
+>  >
+>  > Probably that is what is happening. Both Power management and Error
+>  > interrupts are raised on platform interrupt lines.
+>  >
+>  > 12 Error Interrupts
+>  >
+>  > [0] System error (OR of fatal, nonfatal, correctable errors) (RC mode
+>  > only) [1] PCIe fatal error (RC mode only) [2] PCIe non-fatal error (RC
+>  > mode only) [3] PCIe correctable error (RC mode only) [4] AXI Error due
+>  > to fatal condition in AXI bridge (EP/RC modes) [5] PCIe advanced error
+>  > (RC mode only)
+>  >
+>  > 13 Power management and reset event interrupts
+>  >
+>  > [0] Power management turn-off message interrupt (EP mode only) [1]
+>  > Power management ack message interrupt (RC mode only) [2] Power
+>  > management event interrupt (RC mode only) [3] Link request reset
+>  > interrupt (hot reset or link down) (RC mode only)
+>  >
+>  > > PCI doesn't say anything about an interrupt after it leaves the Root
+>  > > Complex, so the fact that it's connected to a "platform interrupt"
+>  > > or "SPI interrupt" or "IOAPIC interrupt" doesn't make it non-
+>  compliant.
+>  > > Shouldn't we be able to use the interrupt-map and related DT
+>  > > properties to express the fact that Root Port virtual INTx is routed
+>  > > to platform interrupt Y, even without any special-case code in
+>  > > portdrv?
+>  >
+>  > My understanding is if RC also raise interrupt on INTx, then below map
+>  > make sense, where either EP or RC can raise interrupt and the line
+>  > will be muxed for interrupt from EP or RC port.
+>  
+>  I'm sorry, I didn't quite catch your meaning here, so let me try to
+>  clarify some terminology.  Maybe we'll eventually blunder into a common
+>  understanding :)
+>  
+>  INTx is a PCI concept and only means something in the PCI hierarchy.
+>  The RC would *receive* virtual INTx interrupts from the PCI hierarchy
+>  and turn them into some platform-specific interrupt (not INTx) on the
+>  upstream side.
+>  
+>  So strictly speaking, the RC might raise platform-specific interrupts
+>  when it receives INTx interrupts, but it would not raise any INTx
+>  interrupts itself.
+>  
+>  > Here is the DT entry in PCIE keystone for Legacy interrupt mapping to
+>  > host interrupt.
+>  >                         #interrupt-cells = <1>;
+>  >                         interrupt-map-mask = <0 0 0 7>;
+>  >                         interrupt-map = <0 0 0 1 &pcie_intc0 0>, /*
+>  INT A */
+>  >                                         <0 0 0 2 &pcie_intc0 1>, /*
+>  INT B */
+>  >                                         <0 0 0 3 &pcie_intc0 2>, /*
+>  INT C */
+>  >                                         <0 0 0 4 &pcie_intc0 3>; /*
+>  > INT D */
+>  
+>  If I understand correctly, this is the mapping from the PCI world (INTA,
+>  INTB, etc.) to the platform-specific world (pcie_intc0 0, etc.)
+>  
+>  If a Root Port raises a virtual INTA, the RC should turn it into the
+>  corresponding platform interrupt, i.e., GIC_SPI 48 from the description
+>  below.
+>  
+>  > And  then
+>  >
+>  >                         pcie_intc0: legacy-interrupt-controller {
+>  >                                 interrupt-controller;
+>  >                                 #interrupt-cells = <1>;
+>  >                                 interrupt-parent = <&gic>;
+>  >                                 interrupts = <GIC_SPI 48
+>  IRQ_TYPE_EDGE_RISING>,
+>  >                                         <GIC_SPI 49
+>  IRQ_TYPE_EDGE_RISING>,
+>  >                                         <GIC_SPI 50
+>  IRQ_TYPE_EDGE_RISING>,
+>  >                                         <GIC_SPI 51
+>  IRQ_TYPE_EDGE_RISING>;
+>  >                         };
+>  >
+>  > So if RC interrupt for Power management and Error interrupt is a
+>  > separate line, how can software describe that using the above
+>  interrupt map?
+>  
+>  I don't know anything about interrupts the RC might generate on its own
+>  behalf.  A lot of the RC behavior is not specified by the PCIe spec
+>  because the RC is on the border between the upstream platform-specific
+>  stuff and the downstream PCIe stuff.  Is there something in the PCIe
+>  spec about the power management and error interrupts you're talking
+>  about?  Of maybe you can point me to a section of the Keystone spec that
+>  talks about interrupts generated by the RC?
 
-> 
-> >
-> > Thanks
-> >
-> > Gab
-> >
-> >>
-> >> In case these details are helpful, here was my simple prototype of
-> an
-> >> MCFG based approach:
-> >>
-> >> https://codeaurora.org/cgit/quic/server/kernel/commit/?h=cov/4.7-
-> rc1-
-> >> testing&id=c5d8bc49a198fd8f61f82c7d8f169564d6176b07
-> >> https://codeaurora.org/cgit/quic/server/kernel/commit/?h=cov/4.7-
-> rc1-
-> >> testing&id=50bfe77ccd1639e6ce8c7c4fcca187d50e0bead4
-> >>
-> >> Thanks,
-> >> Cov
-> >>
-> >> --
-> >> Qualcomm Innovation Center, Inc.
-> >> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> >> a Linux Foundation Collaborative Project
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> >
-> 
-> 
-> --
-> Jeffrey Hugo
-> Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-> Linux Foundation Collaborative Project
+Below is one of the PCIE controller interrupts list: 
+
+142 PEX1 INTA 
+143 PEX1 INTB 
+144 PEX1 INTC 
+145 PEX1 INTD 
+146-147 Reserved
+148 PEX1 MSI 
+149 PEX1 PME 
+150 PEX1 CFG err interrupt
+
+Only the "150 PEX1 CFG err interrupt" routing to the aer interrupt. 
+
+
+>  
+>  In any event, the AER interrupts we're looking for in portdrv are from
+>  the Root Port, not from the RC.  For INTx, my understanding is that the
+>  RC *transforms* virtual INTx messages from the Root Port in the PCIe
+>  domain into GIC transactions in the platform domain.
+>  
+>  Bjorn
