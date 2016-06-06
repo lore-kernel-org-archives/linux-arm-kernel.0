@@ -1,33 +1,136 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Mon, 6 Jun 2016 16:45:22 +0800
-Subject: [PATCH V2 3/4] ARM: mxs: dts: Add Creative X-Fi3 support
-In-Reply-To: <1462740621-7557-3-git-send-email-marex@denx.de>
-References: <1462740621-7557-1-git-send-email-marex@denx.de>
- <1462740621-7557-3-git-send-email-marex@denx.de>
-Message-ID: <20160606084521.GA25155@tiger>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Jun 2016 09:56:27 +0100
+Subject: [RFC v2 4/4] ARM: keystone: dma-coherent with safe fallback
+In-Reply-To: <1465183229-24147-5-git-send-email-wmills@ti.com>
+References: <1465183229-24147-1-git-send-email-wmills@ti.com>
+ <1465183229-24147-5-git-send-email-wmills@ti.com>
+Message-ID: <20160606085627.GA6831@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 08, 2016 at 10:50:20PM +0200, Marek Vasut wrote:
-> +	regulators {
-> +		compatible = "simple-bus";
+[adding devicetree]
+
+On Sun, Jun 05, 2016 at 11:20:29PM -0400, Bill Mills wrote:
+> Keystone2 can do DMA coherency but only if:
+> 1) DDR3A DMA buffers are in high physical addresses (0x8_0000_0000)
+>     (DDR3B does not have this constraint)
+> 2) Memory is marked outer shared
+> 3) DMA Master marks transactions as outer shared
+>     (This is taken care of in bootloader)
+> 
+> Use outer shared instead of inner shared.
+> This choice is done at early init time and uses the attr_mod facility
+> 
+> If the kernel is not configured for LPAE and using high PA, or if the
+> switch to outer shared fails, then we fail to meet this criteria.
+> Under any of these conditions we veto any dma-coherent attributes in
+> the DTB.
+
+I very much do not like this. As I previously mentioned [1],
+dma-coherent has de-facto semantics today. This series deliberately
+changes that, and inverts the relationship between DT and kernel (as the
+describption in the DT would now depend on the configuration of the
+kernel).
+
+I would prefer that we have a separate property (e.g.
+"dma-outer-coherent") to describe when a device can be coherent with
+Normal, Outer Shareable, Inner Write-Back, Outer Write-Back memory.
+Then the kernel can figure out whether or not device can be used
+coherently, depending on how it is configured.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-April/421470.html
+
+> 
+> Signed-off-by: Bill Mills <wmills@ti.com>
+> ---
+>  arch/arm/mach-keystone/keystone.c | 37 +++++++++++++++++++++++++++++++++++++
+>  1 file changed, 37 insertions(+)
+> 
+> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+> index a33a296..d10adaf 100644
+> --- a/arch/arm/mach-keystone/keystone.c
+> +++ b/arch/arm/mach-keystone/keystone.c
+> @@ -28,6 +28,7 @@
+>  #include "keystone.h"
+>  
+>  static unsigned long keystone_dma_pfn_offset __read_mostly;
+> +static bool keystone_dma_coherent;
+>  
+>  static int keystone_platform_notifier(struct notifier_block *nb,
+>  				      unsigned long event, void *data)
+> @@ -52,21 +53,53 @@ static struct notifier_block platform_nb = {
+>  	.notifier_call = keystone_platform_notifier,
+>  };
+>  
+> +void veto_dma_coherent(void)
+> +{
+> +	struct device_node	*node, *start_node;
+> +	struct property		*prop;
 > +
-> +		reg_vddio_sd0: vddio-sd0 {
-> +			compatible = "regulator-fixed";
-> +			regulator-name = "vddio-sd0";
-> +			regulator-min-microvolt = <3300000>;
-> +			regulator-max-microvolt = <3300000>;
-> +			gpio = <&gpio0 7 0>;
-> +		};
-> +	};
-
-For new dts, we suggest put fixed regulator node directly under root in
-the following naming scheme:
-
-	reg_xxx: regulator-xxx {
-		...
-	};
-
-Also, the order of subject prefix is like ARM: dts: mxs: ...
-
-Shawn
+> +	for (start_node = NULL;
+> +	     (node = of_find_node_with_property(start_node, "dma-coherent"));
+> +	     start_node = node) {
+> +		prop = of_find_property(node, "dma-coherent", NULL);
+> +		if (prop)
+> +			of_remove_property(node, prop);
+> +	}
+> +}
+> +
+>  static void __init keystone_init(void)
+>  {
+> +	/* If we are running from the high physical addresses then adjust
+> +	 * addresses we give to the device's DMA.  They will be seeing this
+> +	 * memory through the MSMC address translation which makes the first 2GB
+> +	 * of high memory appear in the low 4GB space.
+> +	 * (DMA masters on keystone2 have 32 bit address buses)
+> +	 */
+>  	if (PHYS_OFFSET >= KEYSTONE_HIGH_PHYS_START) {
+>  		keystone_dma_pfn_offset = PFN_DOWN(KEYSTONE_HIGH_PHYS_START -
+>  						   KEYSTONE_LOW_PHYS_START);
+>  		bus_register_notifier(&platform_bus_type, &platform_nb);
+>  	}
+> +
+> +	/* if the kernel has not been configured to meet the keystone
+> +	 * platform requirements to achieve DMA coherency, then ignore any
+> +	 * device tree configuration for this
+> +	 */
+> +	if (!keystone_dma_coherent)
+> +		veto_dma_coherent();
+> +
+>  	keystone_pm_runtime_init();
+>  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+>  }
+>  
+>  static long long __init keystone_pv_fixup(void)
+>  {
+> +#ifdef CONFIG_ARM_LPAE
+>  	long long offset;
+>  	phys_addr_t mem_start, mem_end;
+> +	bool dma_ok;
+> +
+> +	dma_ok = use_outer_shared();
+>  
+>  	mem_start = memblock_start_of_DRAM();
+>  	mem_end = memblock_end_of_DRAM();
+> @@ -84,11 +117,15 @@ static long long __init keystone_pv_fixup(void)
+>  	}
+>  
+>  	offset = KEYSTONE_HIGH_PHYS_START - KEYSTONE_LOW_PHYS_START;
+> +	keystone_dma_coherent = dma_ok;
+>  
+>  	/* Populate the arch idmap hook */
+>  	arch_phys_to_idmap_offset = -offset;
+>  
+>  	return offset;
+> +#else
+> +	return 0;
+> +#endif
+>  }
+>  
+>  static const char *const keystone_match[] __initconst = {
+> -- 
+> 1.9.1
+> 
