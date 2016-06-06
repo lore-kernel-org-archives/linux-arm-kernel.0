@@ -1,66 +1,41 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 6 Jun 2016 08:08:18 -0500
-Subject: [PATCH 1/4] dt-bindings: Add A10 I2S controller binding
- documentation
-In-Reply-To: <20160601175430.11625-2-maxime.ripard@free-electrons.com>
-References: <20160601175430.11625-1-maxime.ripard@free-electrons.com>
- <20160601175430.11625-2-maxime.ripard@free-electrons.com>
-Message-ID: <20160606130818.GA6952@rob-hp-laptop>
+From: marex@denx.de (Marek Vasut)
+Date: Mon, 06 Jun 2016 15:12:08 +0200
+Subject: [PATCH V2 3/4] ARM: mxs: dts: Add Creative X-Fi3 support
+In-Reply-To: <20160606084521.GA25155@tiger>
+References: <1462740621-7557-1-git-send-email-marex@denx.de>
+ <1462740621-7557-3-git-send-email-marex@denx.de>
+ <20160606084521.GA25155@tiger>
+Message-ID: <575576A8.2010208@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 07:54:27PM +0200, Maxime Ripard wrote:
-> Introduce the device tree binding for the I2S controller found in the
-> Allwinner A10 and later SoCs.
+On 06/06/2016 10:45 AM, Shawn Guo wrote:
+> On Sun, May 08, 2016 at 10:50:20PM +0200, Marek Vasut wrote:
+>> +	regulators {
+>> +		compatible = "simple-bus";
+>> +
+>> +		reg_vddio_sd0: vddio-sd0 {
+>> +			compatible = "regulator-fixed";
+>> +			regulator-name = "vddio-sd0";
+>> +			regulator-min-microvolt = <3300000>;
+>> +			regulator-max-microvolt = <3300000>;
+>> +			gpio = <&gpio0 7 0>;
+>> +		};
+>> +	};
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  .../devicetree/bindings/sound/sun4i-i2s.txt        | 33 ++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+> For new dts, we suggest put fixed regulator node directly under root in
+> the following naming scheme:
 > 
-> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-> new file mode 100644
-> index 000000000000..365ca4eede5f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-> @@ -0,0 +1,33 @@
-> +* Allwinner A10 I2S controller
-> +
-> +The I2S bus (Inter-IC sound bus) is a serial link for digital
-> +audio data transfer between devices in the system.
-> +
-> +Required properties:
-> +
-> +- compatible: should be one of the followings
-> +   - "allwinner,sun4i-a10-i2s"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- interrupts: should contain the I2S interrupt.
-> +- dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
-> +	Documentation/devicetree/bindings/dma/dma.txt
-> +- dma-names: should include "tx" and "rx".
-> +- clocks: a list of phandle + clock-specifer pairs, one for each entry in clock-names.
-> +- clock-names: should contain followings:
-> +   - "apb" : clock for the I2S bus interface
-> +   - "mod" : module clock for the I2S controller
-> +
-> +Example:
-> +
-> +i2s0: i2s at 01c22400 {
-> +	#sound-dai-cells = <0>;
+> 	reg_xxx: regulator-xxx {
+> 		...
+> 	};
+> 
+> Also, the order of subject prefix is like ARM: dts: mxs: ...
 
-This is missing from the property list.
+I see, can you do this trivial fix while applying ?
 
-> +	compatible = "allwinner,sun4i-a10-i2s";
-> +	reg = <0x01c22400 0x400>;
-> +	interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&apb0_gates 3>, <&i2s0_clk>;
-> +	clock-names = "apb", "mod";
-> +	dmas = <&dma SUN4I_DMA_NORMAL 3>,
-> +	       <&dma SUN4I_DMA_NORMAL 3>;
-> +	dma-names = "rx", "tx";
-> +};
-> -- 
-> 2.8.3
-> 
+Thanks
+
+-- 
+Best regards,
+Marek Vasut
