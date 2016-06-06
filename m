@@ -1,84 +1,73 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Sun, 5 Jun 2016 21:56:00 -0700
-Subject: [PATCH net-next 1/3] arm64: bpf: implement bpf_tail_call() helper
-In-Reply-To: <5753DA61.3000505@iogearbox.net>
-References: <201606050700.BLJUHUk2%fengguang.wu@intel.com>
- <5753DA61.3000505@iogearbox.net>
-Message-ID: <CABg9mcv0kYvk7-wsfVR3fg0nBBDVbs0QtTiWZfGRDqq7kGeFPQ@mail.gmail.com>
+From: a0393675@ti.com (Keerthy)
+Date: Mon, 6 Jun 2016 10:26:00 +0530
+Subject: [PATCH 3/3] ARM: configs: keystone: Enable PINCTRL_SINGLE Config
+In-Reply-To: <5754F00C.108@ti.com>
+References: <1464006547-19569-1-git-send-email-j-keerthy@ti.com>
+ <1464006547-19569-4-git-send-email-j-keerthy@ti.com>
+ <5743CC80.4070404@ti.com> <5743D0FD.5070804@ti.com>
+ <6325832e-24d2-43c7-09b4-a73b6549ee2c@oracle.com> <57451A36.8050809@ti.com>
+ <5754F00C.108@ti.com>
+Message-ID: <57550260.6030902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
 
-On Sun, Jun 5, 2016 at 12:53 AM, Daniel Borkmann <daniel@iogearbox.net> wrote:
-> On 06/05/2016 01:46 AM, kbuild test robot wrote:
->>
->> Hi,
->>
->> [auto build test ERROR on net-next/master]
->>
->> url:
->> https://github.com/0day-ci/linux/commits/Zi-Shen-Lim/arm64-bpf-implement-bpf_tail_call-helper/20160605-060435
->> config: arm64-defconfig (attached as .config)
->> compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
->> reproduce:
->>          wget
->> https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross
->> -O ~/bin/make.cross
->>          chmod +x ~/bin/make.cross
->>          # save the attached .config to linux build tree
->>          make.cross ARCH=arm64
->>
->> All errors (new ones prefixed by >>):
->>
->>     In file included from arch/arm64/net/bpf_jit_comp.c:21:0:
->>     include/linux/bpf.h: In function 'bpf_prog_get':
->>>>
->>>> include/linux/bpf.h:235:9: error: implicit declaration of function
->>>> 'ERR_PTR' [-Werror=implicit-function-declaration]
->>
->>       return ERR_PTR(-EOPNOTSUPP);
->>              ^
->>     include/linux/bpf.h:235:9: warning: return makes pointer from integer
->> without a cast [-Wint-conversion]
->>     In file included from include/linux/rwsem.h:17:0,
->>                      from include/linux/mm_types.h:10,
->>                      from include/linux/sched.h:27,
->>                      from arch/arm64/include/asm/compat.h:25,
->>                      from arch/arm64/include/asm/stat.h:23,
->>                      from include/linux/stat.h:5,
->>                      from include/linux/compat.h:12,
->>                      from include/linux/filter.h:10,
->>                      from arch/arm64/net/bpf_jit_comp.c:22:
->>     include/linux/err.h: At top level:
->>>>
->>>> include/linux/err.h:23:35: error: conflicting types for 'ERR_PTR'
->>
->>      static inline void * __must_check ERR_PTR(long error)
->>                                        ^
->>     In file included from arch/arm64/net/bpf_jit_comp.c:21:0:
->>     include/linux/bpf.h:235:9: note: previous implicit declaration of
->> 'ERR_PTR' was here
->>       return ERR_PTR(-EOPNOTSUPP);
->>              ^
->>     cc1: some warnings being treated as errors
+
+On Monday 06 June 2016 09:07 AM, Keerthy wrote:
 >
 >
-> Looks like including linux/bpf.h at the very beginning causes issues when
-> bpf
-> syscall is disabled. We should probably just include linux/err.h from bpf.h.
+> On Wednesday 25 May 2016 08:51 AM, Keerthy wrote:
+>> Hi Santosh,
+>>
+>> On Tuesday 24 May 2016 09:59 PM, Santosh Shilimkar wrote:
+>>> Hi Keerthy,
+>>>
+>>> On 5/23/2016 8:56 PM, Keerthy wrote:
+>>>>
+>>>>
+>>>> On Tuesday 24 May 2016 09:07 AM, Lokesh Vutla wrote:
+>>>>>
+>>>>>
+>>>>> On Monday 23 May 2016 05:59 PM, Keerthy wrote:
+>>>>>> keystone-k2l devices use pinmux and are compliant with
+>>>>>> PINCTRL_SINGLE.
+>>>>>> Hence enable the config option.
+>>>>>>
+>>>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>>>>
+>>>>> A similar patch[1] is already posted.
+>>>>>
+>>>>> [1]https://patchwork.kernel.org/patch/8958091/
+>>>>
+>>>> Ah I had not seen them. If they are already reviewed and closer to be
+>>>> merged then Patch 2 and Patch 3 of this series can be dropped.
+>>>>
+>>> Once the 4.7-rc2 is out, please rebase these floating patches
+>>> against it and post a consolidated patches. I will line them
+>>> up for 4.8
+>>
+>> Thanks for the quick response. I will wait for 4.7-rc2 and send the
+>> re-based series.
+>
+> Now the 4.7-rc2 is tagged i will be sending a consolidated series.
 
-How about the attached patch? Fixes compilation error on build
-!CONFIG_BPF_SYSCALL.
+Santosh,
 
-Also, should this patch be sent to net or net-next (along with this series)?
+I posted a consolidated series for k2l.
 
-Thanks,
-z
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-bpf-fix-missing-header-inclusion.patch
-Type: text/x-patch
-Size: 2223 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160605/2f62d91c/attachment.bin>
+Franklin,
+
+Could you re-post k2g series on top of the series i posted today.
+
+Regards,
+Keerthy
+
+
+>
+>>
+>> Regards,
+>> Keerthy
+>>
+>>>
+>>> Regards,
+>>> Santosh
