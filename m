@@ -1,28 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 6 Jun 2016 18:12:48 +0100
-Subject: [RFC PATCH 0/4] arm64: vdso: check whether the params is invalid
- address
-In-Reply-To: <1464750362-14188-1-git-send-email-yangyingliang@huawei.com>
-References: <1464750362-14188-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <20160606171248.GL669@arm.com>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Mon, 06 Jun 2016 17:59:50 +0100
+Subject: [PATCH kexec-tools v2 13/32] arm: fix pointer signedness warning in
+ kexec-uImage-arm.c
+In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
+References: <20160606164129.GM1041@n2100.armlinux.org.uk>
+Message-ID: <E1b9xsU-0003sg-4H@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 11:05:58AM +0800, Yang Yingliang wrote:
-> The params of gettimeofday(), clock_gettime() and clock_getres()
-> is not checked. This will cause segment faults when the address is
-> invalid. 
-> E.g. gettimeofday(-1, -1);
->      clock_gettime(0, -1);
->      clock_getres(0, -1);
-> This patchset add a macro and use it to check the validation of these
-> pointer params.
+kexec/arch/arm/kexec-uImage-arm.c: In function 'uImage_arm_probe':
+kexec/arch/arm/kexec-uImage-arm.c:14:2: warning: pointer targets in passing argument 1 of 'uImage_probe_kernel' differ in signedness [-Wpointer-sign]
 
-Is this really necessary? It doesn't look to me like other architectures
-bother with this, and you're just adding code to the fastpath to handle
-cases that shouldn't happen to start with.
+Reviewed-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+---
+ kexec/arch/arm/kexec-uImage-arm.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Also, I think I remember seeing SEGVs from libc wrappers for other syscalls
-in the past, so this just isn't compelling to me.
-
-Will
+diff --git a/kexec/arch/arm/kexec-uImage-arm.c b/kexec/arch/arm/kexec-uImage-arm.c
+index 03c2f4d..8e0a9ac 100644
+--- a/kexec/arch/arm/kexec-uImage-arm.c
++++ b/kexec/arch/arm/kexec-uImage-arm.c
+@@ -11,7 +11,8 @@
+ 
+ int uImage_arm_probe(const char *buf, off_t len)
+ {
+-	return uImage_probe_kernel(buf, len, IH_ARCH_ARM);
++	return uImage_probe_kernel((const unsigned char *)buf, len,
++				   IH_ARCH_ARM);
+ }
+ 
+ int uImage_arm_load(int argc, char **argv, const char *buf, off_t len,
+-- 
+1.9.1
