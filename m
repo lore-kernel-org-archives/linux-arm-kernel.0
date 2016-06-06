@@ -1,97 +1,63 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 6 Jun 2016 15:20:03 +0200 (CEST)
-Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
-In-Reply-To: <20160602145915.GA31124@shlinux2>
-References: <1454107764-19876-1-git-send-email-stefan@agner.ch>
- <20160421034520.GA19965@shlinux2.ap.freescale.net>
- <20160426012341.GB8870@tiger>
- <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
- <1461663072.7839.17.camel@pengutronix.de>
- <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
- <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
- <20160427015835.GE30692@tiger>
- <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
- <alpine.DEB.2.11.1604271212290.3941@nanos> <20160602145915.GA31124@shlinux2>
-Message-ID: <alpine.DEB.2.11.1606061448010.28031@nanos>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Mon, 6 Jun 2016 14:19:56 +0100
+Subject: [RFC PATCH 0/8] PM / Domains: Add support for removing PM domains
+In-Reply-To: <56F925D9.3080703@nvidia.com>
+References: <1457090634-14785-1-git-send-email-jonathanh@nvidia.com>
+ <CAPDyKFq3hNARzjSOoP+-NmcgfSWzG6GDmh7qVX6yx6QPgN9Arw@mail.gmail.com>
+ <56F925D9.3080703@nvidia.com>
+Message-ID: <5755787C.2050807@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Jun 2016, Dong Aisheng wrote:
-> On Wed, Apr 27, 2016 at 12:15:00PM +0200, Thomas Gleixner wrote:
-> > Calling a function which might sleep _BEFORE_ kernel_init() is wrong. Don't
-> > try to work around such an issue by doing magic irq_disabled() checks and busy
-> > loops. Fix the call site and be done with it.
-> > 
+Hi Ulf,
+
+On 28/03/16 13:38, Jon Hunter wrote:
+> Hi Uffe,
 > 
-> IRQ chip and clocksource are also initialised before kernel_init()
-> which may call clk APIs like clk_prepare_enable().
-> We may not be able to guarantee those clocks are unsleepable.
+> On 04/03/16 12:33, Ulf Hansson wrote:
+>> On 4 March 2016 at 12:23, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>> In order to safely remove PM domains there are a few changes that need to be
+>>> made to ensure that no one is holding an external reference to a PM domain
+>>> after it has been removed. One solution, implemented here, solves this by
+>>> eliminating external references to PM domain. Another alternative would be
+>>> to employ some reference counting for the PM domains, however, I did not see
+>>> a good reason for allowing external references in the first place (as always
+>>> there could be something that I have over-looked!).
+>>>
+>>> Jon Hunter (8):
+>>>   PM / Domains: Add new helper functions for device-tree
+>>>   ARM: EXYNOS: Remove calls to of_genpd_get_from_provider()
+>>>   staging: board: Remove calls to of_genpd_get_from_provider()
+>>>   PM / Domains: Don't expose generic_pm_domain structure
+>>>   PM / Domains: Verify the PM domain is present when adding a provider
+>>>   PM / Domains: Remove a provider by referencing the data pointer
+>>>   PM / Domains: Prepare for adding support to remove PM domains
+>>>   PM / Domains: Add support for removing PM domains
+>>>
+>>>  arch/arm/mach-exynos/pm_domains.c |  23 +--
+>>>  drivers/base/power/domain.c       | 324 +++++++++++++++++++++++++++++++++++---
+>>>  drivers/staging/board/board.c     |   9 +-
+>>>  include/linux/pm_domain.h         |  55 ++++---
+>>>  4 files changed, 348 insertions(+), 63 deletions(-)
+>>>
+>>> --
+>>> 2.1.4
+>>>
+>>
+>> Jon, thanks for posting this!
+>> My initial impressions is the I like the ideas for where you moves this.
+>>
+>> I will review it in more details as soon as I can (travelling next week).
 > 
-> e.g.
-> For IRQ chip, the arm,gic documents the optional clocks property in
-> Documentation/devicetree/bindings/interrupt-controller/arm,gic.txt.
-> Although there seems no user currently, not sure there might be
-> a exception in the future.
-> 
-> For clocksource driver, it's quite common to call clk APIs to
-> enable and get clock rate which may also cause sleep.
-> e.g. ARM twd clock in arch/arm/kernel/smp_twd.c.
-> 
-> If we have to avoid the possible sleep caused by these clocks,
-> we may need to manually check it and change the related clocks
-> (e.g PLLs) from sleepable to busy loops.
-> But that is not a good solution and may also not stable when
-> clock varies.
-> 
-> It looks like not easy to find a generic solution for them.
-> What's your suggestion?
+> Just wanted to see if you have had chance to look at this yet? Not urgent.
 
-I think we should split the prepare callbacks up and move the handling logic
-into the core.
+Any feedback on this?
 
-clk_ops.prepare()	Legacy callback
-clk_ops.prepare_hw()	Callback which writes to the hardware
-clk_ops.prepare_done()	Callback which checks whether the prepare is completed
+FYI, patch #2 does not apply cleanly on the latest -next but the others
+should.
 
-So now the core can do:
+Cheers
+Jon
 
-clk_prepare()
-{
-	/* Legacy code should go away */
-	if (ops->prepare) {
-	      ops->prepare();
-	      return;
-	}
-
-	if (ops->prepare_hw)
-	      ops->prepare_hw();
-
-   	if (!ops->prepare_done())
-		return;
-
-	if (early_boot_or_suspend_resume()) {
-		/*
-		 * Busy loop when we can't schedule in early boot,
-		 * suspend and resume.
-		 */
-		while (!ops->prepare_done())
-		      ;
-	} else {
-		while (!ops->prepare_done())
-		      usleep(clk->prepare_delay);
-	}
-}
-
-As a side effect that allows us to remove the gazillion of
-
-     	    while (!hw_ready)
-	    	  usleep();
-
-copies all over the place and we have a single point of control where we allow
-the clocks to busy loop.
-
-Toughts?
-
-Thanks,
-
-	tglx
+-- 
+nvpublic
