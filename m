@@ -1,93 +1,92 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  6 Jun 2016 16:53:57 +0100
-Subject: [PATCH 1/3] firmware: arm_scpi: add support for device power state
- management
+Date: Mon,  6 Jun 2016 16:53:58 +0100
+Subject: [PATCH 2/3] Documentation: add DT bindings for ARM SCPI power domains
 In-Reply-To: <1465228439-13457-1-git-send-email-sudeep.holla@arm.com>
 References: <1465228439-13457-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1465228439-13457-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1465228439-13457-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-SCPI protocol supports device power state management. This deals with
-power states of various peripheral devices in the system other than the
-core compute subsystem.
+The System Control Processor (SCP) provides peripheral devices with
+power domains that can be enabled and disabled viathe System Control
+and Power Interface (SCPI) Message Protocol. Add bindings to allow
+probing of these device power domians.
 
-This patch adds support for the power state management of those
-peripheral devices.
-
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scpi.c   | 29 +++++++++++++++++++++++++++++
- include/linux/scpi_protocol.h |  2 ++
- 2 files changed, 31 insertions(+)
+ Documentation/devicetree/bindings/arm/arm,scpi.txt | 34 ++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 51c6db0774cc..ca6afd2217a8 100644
---- a/drivers/firmware/arm_scpi.c
-+++ b/drivers/firmware/arm_scpi.c
-@@ -231,6 +231,11 @@ struct sensor_value {
- 	__le32 hi_val;
- } __packed;
+diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+index 313dabdc14f9..7141670d649b 100644
+--- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
++++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+@@ -87,10 +87,33 @@ SCPI provides an API to access the various sensors on the SoC.
+ 			 implementation for the IDs to use. For Juno
+ 			 R0 and Juno R1 refer to [3].
 
-+struct dev_pstate_set {
-+	u16 dev_id;
-+	u8 pstate;
-+} __packed;
++Power domain bindings for the power domains based on SCPI Message Protocol
++------------------------------------------------------------
 +
- static struct scpi_drvinfo *scpi_info;
-
- static int scpi_linux_errmap[SCPI_ERR_MAX] = {
-@@ -537,6 +542,28 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
- 	return ret;
- }
-
-+static int scpi_device_get_power_state(u16 dev_id)
-+{
-+	int ret;
-+	u8 pstate;
++This binding uses the generic power domain binding[4].
 +
-+	ret = scpi_send_message(SCPI_CMD_GET_DEVICE_PWR_STATE, &dev_id,
-+				sizeof(dev_id), &pstate, sizeof(pstate));
-+	return ret ? ret : pstate;
-+}
++PM domain providers
++===================
 +
-+static int scpi_device_set_power_state(u16 dev_id, u8 pstate)
-+{
-+	int stat;
-+	struct dev_pstate_set dev_set = {
-+		.dev_id = cpu_to_le16(dev_id),
-+		.pstate = pstate,
++Required properties:
++ - #power-domain-cells : Should be 1. Contains the device or the power
++			 domain ID value used by SCPI commands.
++ - num-domains: Total number of power domains provided by SCPI. This is
++		needed as the SCPI message protocol lacks a mechanism to
++		query this information runtime.
++
++PM domain consumers
++===================
++
++Required properties:
++ - power-domains : A phandle and PM domain specifier as defined by bindings of
++                   the power controller specified by phandle.
++
+ [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+ [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+ [2] Documentation/devicetree/bindings/thermal/thermal.txt
+ [3] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/apas03s22.html
++[4] Documentation/devicetree/bindings/power/power_domain.txt
+
+ Example:
+
+@@ -144,6 +167,12 @@ scpi_protocol: scpi at 2e000000 {
+ 		compatible = "arm,scpi-sensors";
+ 		#thermal-sensor-cells = <1>;
+ 	};
++
++	scpi_devpd: scpi-power-domains {
++		compatible = "arm,scpi-power-domains";
++		num-domains = <2>;
++		#power-domain-cells = <1>;
 +	};
-+
-+	return scpi_send_message(SCPI_CMD_SET_DEVICE_PWR_STATE, &dev_set,
-+				 sizeof(dev_set), &stat, sizeof(stat));
-+}
-+
- static struct scpi_ops scpi_ops = {
- 	.get_version = scpi_get_version,
- 	.clk_get_range = scpi_clk_get_range,
-@@ -548,6 +575,8 @@ static struct scpi_ops scpi_ops = {
- 	.sensor_get_capability = scpi_sensor_get_capability,
- 	.sensor_get_info = scpi_sensor_get_info,
- 	.sensor_get_value = scpi_sensor_get_value,
-+	.device_get_power_state = scpi_device_get_power_state,
-+	.device_set_power_state = scpi_device_set_power_state,
  };
 
- struct scpi_ops *get_scpi_ops(void)
-diff --git a/include/linux/scpi_protocol.h b/include/linux/scpi_protocol.h
-index 35de50a65665..dc5f989be226 100644
---- a/include/linux/scpi_protocol.h
-+++ b/include/linux/scpi_protocol.h
-@@ -70,6 +70,8 @@ struct scpi_ops {
- 	int (*sensor_get_capability)(u16 *sensors);
- 	int (*sensor_get_info)(u16 sensor_id, struct scpi_sensor_info *);
- 	int (*sensor_get_value)(u16, u64 *);
-+	int (*device_get_power_state)(u16);
-+	int (*device_set_power_state)(u16, u8);
+ cpu at 0 {
+@@ -156,6 +185,7 @@ hdlcd at 7ff60000 {
+ 	...
+ 	reg = <0 0x7ff60000 0 0x1000>;
+ 	clocks = <&scpi_clk 4>;
++	power-domains = <&scpi_devpd 1>;
  };
 
- #if IS_REACHABLE(CONFIG_ARM_SCPI_PROTOCOL)
+ thermal-zones {
+@@ -186,3 +216,7 @@ The thermal-sensors property in the soc_thermal node uses the
+ temperature sensor provided by SCP firmware to setup a thermal
+ zone. The ID "3" is the sensor identifier for the temperature sensor
+ as used by the firmware.
++
++The num-domains property in scpi-power-domains domain specifies that
++SCPI provides 2 power domains. The hdlcd node uses the power domain with
++domain ID 1.
 --
 2.7.4
