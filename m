@@ -1,142 +1,29 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 6 Jun 2016 15:54:08 +0800
-Subject: [RFC PATCH 1/3] pci, acpi: Match PCI config space accessors
- against platfrom specific ECAM quirks.
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1F7710AD@lhreml507-mbx>
-References: <1464856864-18049-1-git-send-email-tn@semihalf.com>
- <1464856864-18049-2-git-send-email-tn@semihalf.com>
- <57519F09.2010201@codeaurora.org>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F76E9D7@lhreml507-mbx>
- <470f6d93-4c83-e271-7e99-7e23f3f76e71@codeaurora.org>
- <EE11001F9E5DDD47B7634E2F8A612F2E1F7710AD@lhreml507-mbx>
-Message-ID: <8e00d6fa-7ed6-e69f-d41c-c114375c98ae@linaro.org>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 6 Jun 2016 10:55:55 +0300
+Subject: [PATCH v2 3/4] ARM: dts: imx6q: add support for the Utilite Pro
+In-Reply-To: <50a8a6e8b5c6426fb02f59d9300503e5@rwthex-s1-b.rwth-ad.de>
+References: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
+ <50a8a6e8b5c6426fb02f59d9300503e5@rwthex-s1-b.rwth-ad.de>
+Message-ID: <57552C8B.80207@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/6/6 15:27, Gabriele Paoloni wrote:
-> Hi Jeffrey
->> On 6/3/2016 9:32 AM, Gabriele Paoloni wrote:
->>> Hi Cov
->>>
->>>> Hi Tomasz,
->>>>
->>>> Thanks for your work on this.
->>>>
->>>> On 06/02/2016 04:41 AM, Tomasz Nowicki wrote:
->>>>> Some platforms may not be fully compliant with generic set of PCI
->>>> config
->>>>> accessors. For these cases we implement the way to overwrite
->>>> accessors
->>>>> set. Algorithm traverses available quirk list, matches against
->>>>> <oem_id, oem_rev, domain, bus number> tuple and returns
->> corresponding
->>>>> PCI config ops. oem_id and oem_rev come from MCFG table standard
->>>> header.
->>>>> All quirks can be defined using DECLARE_ACPI_MCFG_FIXUP() macro and
->>>>> kept self contained. Example:
->>>>>
->>>>> /* Custom PCI config ops */
->>>>> static struct pci_generic_ecam_ops foo_pci_ops = {
->>>>> 	.bus_shift	= 24,
->>>>> 	.pci_ops = {
->>>>> 		.map_bus = pci_ecam_map_bus,
->>>>> 		.read = foo_ecam_config_read,
->>>>> 		.write = foo_ecam_config_write,
->>>>> 	}
->>>>> };
->>>>>
->>>>> DECLARE_ACPI_MCFG_FIXUP(&foo_pci_ops, <oem_id_str>, <oem_rev>,
->>>> <domain_nr>, <bus_nr>);
->>>>>
->>>>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->>>>> ---
->>>>>  drivers/acpi/pci_mcfg.c           | 32
->>>> ++++++++++++++++++++++++++++++++
->>>>>  include/asm-generic/vmlinux.lds.h |  7 +++++++
->>>>>  include/linux/pci-acpi.h          | 19 +++++++++++++++++++
->>>>>  3 files changed, 58 insertions(+)
->>>>>
->>>>> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->>>>> index 1847f74..f3d4570 100644
->>>>> --- a/drivers/acpi/pci_mcfg.c
->>>>> +++ b/drivers/acpi/pci_mcfg.c
->>>>> @@ -22,11 +22,43 @@
->>>>>  #include <linux/kernel.h>
->>>>>  #include <linux/pci.h>
->>>>>  #include <linux/pci-acpi.h>
->>>>> +#include <linux/pci-ecam.h>
->>>>>
->>>>>  /* Root pointer to the mapped MCFG table */
->>>>>  static struct acpi_table_mcfg *mcfg_table;
->>>>>  static int mcfg_entries;
->>>>>
->>>>> +extern struct pci_cfg_fixup __start_acpi_mcfg_fixups[];
->>>>> +extern struct pci_cfg_fixup __end_acpi_mcfg_fixups[];
->>>>> +
->>>>> +struct pci_ecam_ops *pci_mcfg_get_ops(struct acpi_pci_root *root)
->>>>> +{
->>>>> +	int bus_num = root->secondary.start;
->>>>> +	int domain = root->segment;
->>>>> +	struct pci_cfg_fixup *f;
->>>>> +
->>>>> +	if (!mcfg_table)
->>>>> +		return &pci_generic_ecam_ops;
->>>>> +
->>>>> +	/*
->>>>> +	 * Match against platform specific quirks and return
->>>> corresponding
->>>>> +	 * CAM ops.
->>>>> +	 *
->>>>> +	 * First match against PCI topology <domain:bus> then use OEM ID
->>>> and
->>>>> +	 * OEM revision from MCFG table standard header.
->>>>> +	 */
->>>>> +	for (f = __start_acpi_mcfg_fixups; f < __end_acpi_mcfg_fixups;
->>>> f++) {
->>>>> +		if ((f->domain == domain || f->domain ==
->>>> PCI_MCFG_DOMAIN_ANY) &&
->>>>> +		    (f->bus_num == bus_num || f->bus_num ==
->>>> PCI_MCFG_BUS_ANY) &&
->>>>> +		    (!strncmp(f->oem_id, mcfg_table->header.oem_id,
->>>>> +			      ACPI_OEM_ID_SIZE)) &&
->>>>> +		    (f->oem_revision == mcfg_table->header.oem_revision))
->>>>
->>>> Is this more likely to be updated between quirky and fixed platforms
->>>> than oem_table_id? What do folks think about using oem_table_id
->> instead
->>>> of, or in addition to, oem_revision?
->>>
->>> From my understanding we need to stick to this mechanism as
->> (otherwise)
->>> there are platforms out in the field that would need a FW update.
->>>
->>> So I don't think that using oem_table_id "instead" is possible; about
->>> "in addition" I think it is doable, but I do not see the advantage
->> much.
->>> I mean that if a platform gets fixed the oem revision should change
->> too,
->>> Right?
->>
->> Cov and I had a discussion about this, so hopefully I can bring a
->> slightly different perspective that will make sense.
->>
->> We forsee a situation where we have platform A that needs a quirk, and
->> platform B that does not.  The OEM id is the same for both platforms as
->> they are different platforms from the same OEM.  Using the OEM revision
->> field does not seem to be appropriate since these are different
->> platforms and the revision field appears to be for the purpose of
->> tracking differences within a single platform.  Therefore, Cov is
->> proposing using the OEM table id as a mechanism to distinguish platform
->> A (needs quirk applied) vs platform B (no quirks) from the same OEM.
->
-> Ah yes I see now...
->
-> Probably it should be ok to have a check on all three OEM fields.
+On 06/05/2016 09:26 PM, christopher.spinrath at rwth-aachen.de wrote:
+> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> 
+> The CompuLab Utilite Pro is a miniature fanless desktop pc based on
+> the i.MX6 Quad powered cm-fx6 module. It features two serial ports,
+> USB OTG, 4x USB, analog audio and S/PDIF, 2x Gb Ethernet, HDMI and
+> DVI ports, an on-board 32GB SSD, a mmc slot, and on-board wifi/bt.
+> 
+> Add initial support for it including USB, Ethernet (both ports), sata
+> and HDMI support.
+> 
+> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
 
-Just for reference, x86 and IA64 use oem_id and oem_table_id to make a
-difference between different platforms, see
-acpi_madt_oem_check(char *oem_id, char *oem_table_id) for x86 and ia64,
-that can apply to ARM64 on MCFG too.
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 
-Thanks
-Hanjun
+-- 
+Regards,
+Igor.
