@@ -1,40 +1,35 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 6 Jun 2016 16:32:31 +0100
-Subject: [PATCH v2 00/11] pwm: Add support for PWM Capture
-In-Reply-To: <20160429094010.6bfb131c@bbrezillon>
-References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
- <20160429094010.6bfb131c@bbrezillon>
-Message-ID: <20160606153231.GE1525@dell>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon,  6 Jun 2016 16:36:06 +0100
+Subject: [PATCH 3/3] firmware: arm_scpi: make it depend on MAILBOX instead of
+ ARM_MHU
+In-Reply-To: <1465227366-12192-1-git-send-email-sudeep.holla@arm.com>
+References: <1465227366-12192-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1465227366-12192-3-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Apr 2016, Boris Brezillon wrote:
+ARM_SCPI_PROTOCOL can be used with any mailbox and not just ARM MHU
+mailbox controller. This patch drops it's dependency on ARM_MHU and
+make it depend on just mailbox framework.
 
-> Hi Lee,
-> 
-> On Fri, 22 Apr 2016 11:18:04 +0100
-> Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> > The first part of this set extends the current PWM API to allow external
-> > code to request a PWM Capture.  Subsequent patches then make use of the
-> > new API by providing a userspace offering via /sysfs.  The final part of
-> > the set supplies PWM Capture functionality into the already existing STi
-> > PWM driver.
-> 
-> Is there a reason you decided to not put this driver in IIO? IMHO, it
-> would be more appropriate to make your PWM device an MFD that can either
-> bind to the PWM or the capture driver.
-> And BTW, IIO already has a sysfs interface (you may have to extend the
-> API to support your type of capture though).
+Cc: linux-arm-kernel at lists.infradead.org
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+---
+ drivers/firmware/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Multi-Function Device drivers can only be justified if the IP
-contained does not and can not live in a single subsystem.  The IP
-which controls both PWM-in and PWM-out in this device is the same.  I
-can't fathom a sane reason why you would wish to separate this
-functionality over multiple subsystems.
+diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+index 6664f1108c7c..41abdc54815e 100644
+--- a/drivers/firmware/Kconfig
++++ b/drivers/firmware/Kconfig
+@@ -10,7 +10,7 @@ config ARM_PSCI_FW
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+ config ARM_SCPI_PROTOCOL
+ 	tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
+-	depends on ARM_MHU
++	depends on MAILBOX
+ 	help
+ 	  System Control and Power Interface (SCPI) Message Protocol is
+ 	  defined for the purpose of communication between the Application
+--
+2.7.4
