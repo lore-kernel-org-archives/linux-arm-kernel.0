@@ -1,68 +1,78 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Jun 2016 13:32:10 +0100
-Subject: [RFC v2 4/4] ARM: keystone: dma-coherent with safe fallback
-In-Reply-To: <20160606115918.GG6831@leverpostej>
-References: <1465183229-24147-1-git-send-email-wmills@ti.com>
- <1465183229-24147-5-git-send-email-wmills@ti.com>
- <20160606085627.GA6831@leverpostej>
- <20160606114321.GJ1041@n2100.armlinux.org.uk>
- <20160606115918.GG6831@leverpostej>
-Message-ID: <20160606123210.GL1041@n2100.armlinux.org.uk>
+From: pramod.kumar@broadcom.com (Pramod Kumar)
+Date: Mon,  6 Jun 2016 18:11:33 +0530
+Subject: [PATCH v4 0/7] Add MDIO bus multiplexer support for iProc SoCs
+Message-ID: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2016 at 12:59:18PM +0100, Mark Rutland wrote:
-> I agree that whether or not devices are coherent in practice depends on
-> the kernel's configuration. The flip side, as you point out, is that
-> devices are coherent when a specific set of attributes are used.
-> 
-> i.e. that if you read dma-coherent as meaning "coherent iff Normal,
-> Inner Shareable, Inner WB Cacheable, Outer WB Cacheable", then
-> dma-coherent consistently describes the same thing, rather than
-> depending on the configuration of the OS.
-> 
-> DT is a datastructure provided to the kernel, potentially without deep
-> internal knowledge of that kernel configuration. Having a consistent
-> rule that is independent of the kernel configuration seems worth aiming
-> for.
+Broadcom iProc based SoCs use a MDIO bus multiplexer where child buses
+could be internal as well external to SoCs. These buses could supports
+MDIO transaction compatible to C-22/C-45.
 
-I think you've missed the point.  dma-coherent is _already_ dependent on
-the kernel configuration.  "Having a consistent rule that is independent
-of the kernel configuration" is already an impossibility, as I illustrated
-in my previous message concerning Marvell Armada SoCs, and you also said
-in your preceding paragraph!
+Broadcom MDIO bus multiplexer is an integrated multiplexer where child bus
+selection and mdio transaction logic lies inside multiplexer itself.
+To accommodate this multiplexer in existing mux framework below changes
+were required-
 
-For example, if you clear the shared bit in the page tables on non-LPAE
-SoCs, devices are no longer coherent.
+1. Passed MDIO parent bus via mdio_mux_init to MDIO mux framework.
 
-DMA coherence on ARM _is_ already tightly linked with the kernel
-configuration.  You already can't get away from that, so I think you
-should give up trying to argue that point. :)
+This patch set includes MDIO bus multiplexer driver along with above
+framework change. It includes one external bus node having Ethernet PHY
+attached and two internal bus node holding PCIe PHYs.
 
-Whether devices are DMA coherent is a combination of two things:
- * is the device connected to a coherent bus.
- * is the system setup to allow coherency on that bus to work.
+This patch series is based on v4.7-rc1 and is available from github-
+repo: https://github.com/Broadcom/arm64-linux.git
+branch:mdio-mux-v4
 
-We capture the first through the dma-coherent property, which is clearly
-a per-device property.  We ignore the second because we assume everyone
-is going to configure the CPU side correctly.  That's untrue today, and
-it's untrue not only because of Keystone II, but also because of other
-SoCs as well which pre-date Keystone II.  We currently miss out on
-considering that, because if we ignore it, we get something that works
-for most platforms.
+-Changes from v3:
+- Unregister and free the parent MDIO bus.
+- rebased on net-next/master branch.
 
-I don't see that adding a dma-outer-coherent property helps this - it's
-muddying the waters somewhat - and it's also forcing additional complexity
-into places where we shouldn't have it.  We would need to parse two
-properties in the DMA API code, and then combine it with knowledge as
-to how the system page tables have been setup.  If they've been setup
-as inner sharable, then dma-coherent identifies whether the device is
-coherent.  If they've been setup as outer sharable, then
-dma-outer-coherent specifies that and dma-coherent is meaningless.
+Reason for resend:
+-Rebased on v4.7-rc1
 
-Sounds like a recipe for confusion.
+Changes from v2:
+-Addressed Rob's comments in this patch regarding typo/grammers.
+-Addressed David's comments regarding local variables order.
+-Removed property "mdio-integrated-mux" and used mdiobus_register()
+in place of of_mdiobus_regsiter().
+-removed usage of IS_ERR_OR_NULL to IS_ERR in PCIe PHY driver.
+
+Changes from v1:
+- stop using "brcm,is_c45" from bus node as suggested by Andrew. MDIO
+PHY driver will logically OR MII_ADDR_C45 into the address when issues
+any C45 MDIO read/write transaction.
+
+Pramod Kumar (7):
+  mdio: mux: Enhanced MDIO mux framework for integrated multiplexers
+  binding: Make "mdio-parent-bus" property from mandatory to optional
+  binding: mdio-mux: Add DT binding doc for Broadcom MDIO bus
+    multiplexer
+  dt: mdio-mux: Add mdio multiplexer driver node
+  net: mdio-mux: Add MDIO mux driver for iProc SoCs
+  binding: PHY: Binding doc for NS2 PCIe PHYs.
+  phy: Add Northstar2 PCI Phy support
+
+ .../bindings/net/brcm,mdio-mux-iproc.txt           |  59 +++++
+ Documentation/devicetree/bindings/net/mdio-mux.txt |   3 +-
+ .../bindings/phy/brcm,mdio-mux-bus-pci.txt         |  27 +++
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts           |  12 +
+ arch/arm64/boot/dts/broadcom/ns2.dtsi              |  31 +++
+ drivers/net/phy/Kconfig                            |  11 +
+ drivers/net/phy/Makefile                           |   1 +
+ drivers/net/phy/mdio-mux-bcm-iproc.c               | 248 +++++++++++++++++++++
+ drivers/net/phy/mdio-mux-gpio.c                    |   2 +-
+ drivers/net/phy/mdio-mux-mmioreg.c                 |   2 +-
+ drivers/net/phy/mdio-mux.c                         |  28 ++-
+ drivers/phy/Kconfig                                |   8 +
+ drivers/phy/Makefile                               |   2 +-
+ drivers/phy/phy-bcm-ns2-pcie.c                     | 115 ++++++++++
+ include/linux/mdio-mux.h                           |   4 +-
+ 15 files changed, 538 insertions(+), 15 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,mdio-mux-bus-pci.txt
+ create mode 100644 drivers/net/phy/mdio-mux-bcm-iproc.c
+ create mode 100644 drivers/phy/phy-bcm-ns2-pcie.c
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.9.1
