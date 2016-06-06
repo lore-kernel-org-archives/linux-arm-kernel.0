@@ -1,53 +1,80 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 6 Jun 2016 20:46:03 +0200
-Subject: [PATCH v2 00/11] pwm: Add support for PWM Capture
-In-Reply-To: <20160606153231.GE1525@dell>
-References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
- <20160429094010.6bfb131c@bbrezillon> <20160606153231.GE1525@dell>
-Message-ID: <20160606204603.09a8d2cf@bbrezillon>
+Date: Mon, 6 Jun 2016 20:50:54 +0200
+Subject: [PATCH 6/7] ARM: dts: sun4i: Enable NAND on Marsboard A10
+In-Reply-To: <1465208664-9366-7-git-send-email-mamlinav@gmail.com>
+References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+ <1465208664-9366-7-git-send-email-mamlinav@gmail.com>
+Message-ID: <20160606205054.0f7f02b5@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Jun 2016 16:32:31 +0100
-Lee Jones <lee.jones@linaro.org> wrote:
+On Mon,  6 Jun 2016 13:24:23 +0300
+Aleksei Mamlin <mamlinav@gmail.com> wrote:
 
-> On Fri, 29 Apr 2016, Boris Brezillon wrote:
+> Enable the NFC and describe the NAND flash connected to this controller.
 > 
-> > Hi Lee,
-> > 
-> > On Fri, 22 Apr 2016 11:18:04 +0100
-> > Lee Jones <lee.jones@linaro.org> wrote:
-> >   
-> > > The first part of this set extends the current PWM API to allow external
-> > > code to request a PWM Capture.  Subsequent patches then make use of the
-> > > new API by providing a userspace offering via /sysfs.  The final part of
-> > > the set supplies PWM Capture functionality into the already existing STi
-> > > PWM driver.  
-> > 
-> > Is there a reason you decided to not put this driver in IIO? IMHO, it
-> > would be more appropriate to make your PWM device an MFD that can either
-> > bind to the PWM or the capture driver.
-> > And BTW, IIO already has a sysfs interface (you may have to extend the
-> > API to support your type of capture though).  
+> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+
+> ---
+>  arch/arm/boot/dts/sun4i-a10-marsboard.dts | 41 +++++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
 > 
-> Multi-Function Device drivers can only be justified if the IP
-> contained does not and can not live in a single subsystem.  The IP
-> which controls both PWM-in and PWM-out in this device is the same.  I
-> can't fathom a sane reason why you would wish to separate this
-> functionality over multiple subsystems.
-> 
+> diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+> index 8e50723..ea6e2d5 100644
+> --- a/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+> +++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+> @@ -150,6 +150,47 @@
+>  	status = "okay";
+>  };
+>  
+> +&nfc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&nand_pins_a>, <&nand_cs0_pins_a>, <&nand_rb0_pins_a>;
+> +	status = "okay";
+> +
+> +	nand at 0 {
+> +		#address-cells = <2>;
+> +		#size-cells = <2>;
+> +		reg = <0>;
+> +		allwinner,rb = <0>;
+> +
+> +		nand-ecc-mode = "hw";
+> +		nand-on-flash-bbt;
+> +
+> +		boot0 at 0 {
+> +			label = "boot0";
+> +			reg = /bits/ 64 <0x0 0x200000>;
+> +		};
+> +
+> +		boot0-rescue at 200000 {
+> +			label = "boot0-rescue";
+> +			reg = /bits/ 64 <0x200000 0x200000>;
+> +		};
+> +
+> +		uboot at 400000 {
+> +			label = "uboot";
+> +			reg = /bits/ 64 <0x400000 0x200000>;
+> +		};
+> +
+> +		uboot-rescue at 600000 {
+> +			label = "uboot-rescue";
+> +			reg = /bits/ 64 <0x600000 0x200000>;
+> +		};
+> +
+> +		main at 800000 {
+> +			label = "main";
+> +			reg = /bits/ 64 <0x800000 0xff800000>;
+> +		};
+> +	};
+> +};
+> +
+>  &ohci0 {
+>  	status = "okay";
+>  };
 
-Well, I still think what you describe as PWM-in is actually a capture
-device that would perfectly fit in the IIO subsystem, and I guess you
-can't use the PWM IP as a capture and waveform generator device as the
-same time, which is why I suggested the MFD approach to select the mode.
 
-Anyway, I'm not the PWM or the IIO maintainer, so I'm just sharing my
-opinion here.
-
-Regards,
-
-Boris
 
 -- 
 Boris Brezillon, Free Electrons
