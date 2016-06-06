@@ -1,73 +1,54 @@
-From: a0393675@ti.com (Keerthy)
-Date: Mon, 6 Jun 2016 10:26:00 +0530
-Subject: [PATCH 3/3] ARM: configs: keystone: Enable PINCTRL_SINGLE Config
-In-Reply-To: <5754F00C.108@ti.com>
-References: <1464006547-19569-1-git-send-email-j-keerthy@ti.com>
- <1464006547-19569-4-git-send-email-j-keerthy@ti.com>
- <5743CC80.4070404@ti.com> <5743D0FD.5070804@ti.com>
- <6325832e-24d2-43c7-09b4-a73b6549ee2c@oracle.com> <57451A36.8050809@ti.com>
- <5754F00C.108@ti.com>
-Message-ID: <57550260.6030902@ti.com>
+From: bharat.bhushan@nxp.com (Bharat Bhushan)
+Date: Mon, 6 Jun 2016 05:29:46 +0000
+Subject: [PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
+In-Reply-To: <32b86adb-cdba-89bb-3f19-e7677f39fa1f@arm.com>
+References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
+ <DB5PR04MB099754E61027226E5210C2399A590@DB5PR04MB0997.eurprd04.prod.outlook.com>
+ <32b86adb-cdba-89bb-3f19-e7677f39fa1f@arm.com>
+Message-ID: <DB5PR04MB09977DF578DFB03A582745869A5C0@DB5PR04MB0997.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Andre,
 
+On clarification, are V5 version of patches are based on new-GIC emulation patches? How are you testing these patches, kvm-tool?
 
-On Monday 06 June 2016 09:07 AM, Keerthy wrote:
->
->
-> On Wednesday 25 May 2016 08:51 AM, Keerthy wrote:
->> Hi Santosh,
->>
->> On Tuesday 24 May 2016 09:59 PM, Santosh Shilimkar wrote:
->>> Hi Keerthy,
->>>
->>> On 5/23/2016 8:56 PM, Keerthy wrote:
->>>>
->>>>
->>>> On Tuesday 24 May 2016 09:07 AM, Lokesh Vutla wrote:
->>>>>
->>>>>
->>>>> On Monday 23 May 2016 05:59 PM, Keerthy wrote:
->>>>>> keystone-k2l devices use pinmux and are compliant with
->>>>>> PINCTRL_SINGLE.
->>>>>> Hence enable the config option.
->>>>>>
->>>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
->>>>>
->>>>> A similar patch[1] is already posted.
->>>>>
->>>>> [1]https://patchwork.kernel.org/patch/8958091/
->>>>
->>>> Ah I had not seen them. If they are already reviewed and closer to be
->>>> merged then Patch 2 and Patch 3 of this series can be dropped.
->>>>
->>> Once the 4.7-rc2 is out, please rebase these floating patches
->>> against it and post a consolidated patches. I will line them
->>> up for 4.8
->>
->> Thanks for the quick response. I will wait for 4.7-rc2 and send the
->> re-based series.
->
-> Now the 4.7-rc2 is tagged i will be sending a consolidated series.
+Hi Christoffer/Peter,
 
-Santosh,
+Is someone working on QEMU side patches? We need this feature a bit urgently so if no one is working then we can start working on this.
 
-I posted a consolidated series for k2l.
+Thanks
+-Bharat
 
-Franklin,
-
-Could you re-post k2g series on top of the series i posted today.
-
-Regards,
-Keerthy
-
-
->
->>
->> Regards,
->> Keerthy
->>
->>>
->>> Regards,
->>> Santosh
+> -----Original Message-----
+> From: kvmarm-bounces at lists.cs.columbia.edu [mailto:kvmarm-
+> bounces at lists.cs.columbia.edu] On Behalf Of Andre Przywara
+> Sent: Friday, June 03, 2016 8:02 PM
+> To: Bharat Bhushan <bharat.bhushan@nxp.com>
+> Cc: kvm at vger.kernel.org; Marc Zyngier <marc.zyngier@arm.com>;
+> kvmarm at lists.cs.columbia.edu; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
+> 
+> Hi Bharat,
+> 
+> On 03/06/16 05:26, Bharat Bhushan wrote:
+> > Hi Andre,
+> >
+> > We are looking for these patches but seems like these needed to
+> > rebased/redesigned based on new GIC emulation changes. Can you give us
+> > some sense on when this will be done?
+> > Also do you know if someone is working on QEMU size changes for this,
+> > if not then we can help on getting that done.
+> 
+> I just pushed a new version of the patches:
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2016-June/020482.html
+> 
+> I hope that answers your question about the kernel side of things.
+> For QEMU I have no idea, maybe Christoffer or Peter would know.
+> 
+> Cheers,
+> Andre.
+> _______________________________________________
+> kvmarm mailing list
+> kvmarm at lists.cs.columbia.edu
+> https://lists.cs.columbia.edu/mailman/listinfo/kvmarm
