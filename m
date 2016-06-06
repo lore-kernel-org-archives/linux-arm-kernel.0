@@ -1,38 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 06 Jun 2016 09:28:55 +0200
-Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry Pi
- 3.
-In-Reply-To: <1465197612.24775.190.camel@redhat.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <CAL_JsqL2RgTLq9R3v4LDiV6Wa7totbzJBgmzVDgUv_keoS52vA@mail.gmail.com>
- <1465197612.24775.190.camel@redhat.com>
-Message-ID: <3265668.gGTUMSyXWi@wuerfel>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Mon,  6 Jun 2016 09:43:49 +0200
+Subject: [PATCH 1/2] ARM: BCM5301X: Specify NAND chip select and ECC in
+ separated files
+Message-ID: <1465199036-24366-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 6, 2016 9:20:12 AM CEST Gerd Hoffmann wrote:
-> On Fr, 2016-06-03 at 11:17 -0500, Rob Herring wrote:
-> > On Fri, Jun 3, 2016 at 5:39 AM, Gerd Hoffmann <kraxel@redhat.com> wrote:
-> > >   Hi,
-> > >
-> > >> I tried
-> > >>
-> > >> subdir-y += ../../../arm64/boot/dts/broadcom
-> > >
-> > > Hmm, works for me too now, probably had a typo somewhere.
-> > 
-> > What directory does the dtb end up in? Because as it was, it ended up
-> > in arch/arm64/boot/dts/broadcom. I'm not sure all this hackery is
-> > worth it if the dtb doesn't end up in arch/arm/boot/dts/.
-> 
-> With the 2/7 patch at the start of this subthread the dtb ends up in
-> arch/arm64/boot/dts/broadcom for both arm and arm64 builds.
-> 
-> make "dtbs_install" places it in /boot/dtbs/$version/ for arm builds and
-> in /boot/dtbs/$version/broadcom/ for arm64 builds.
+Using separated file with common chip select parameters will allow us
+adding other ECC setups without code duplication.
 
-Ok, let's stay with that for now then, and solve it better when we
-need to do more of the same. Are you aware of any other boards using
-bcm2837?
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi | 16 +++++-----------
+ arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi      | 18 ++++++++++++++++++
+ 2 files changed, 23 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
 
-	Arnd
+diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi
+index d10781e..9a9630d 100644
+--- a/arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi
++++ b/arch/arm/boot/dts/bcm5301x-nand-cs0-bch8.dtsi
+@@ -9,16 +9,10 @@
+  * Licensed under the GNU/GPL. See COPYING for details.
+  */
+ 
+-/ {
+-	nand at 18028000 {
+-		nandcs at 0 {
+-			compatible = "brcm,nandcs";
+-			reg = <0>;
+-			#address-cells = <1>;
+-			#size-cells = <1>;
++#include "bcm5301x-nand-cs0.dtsi"
+ 
+-			nand-ecc-strength = <8>;
+-			nand-ecc-step-size = <512>;
+-		};
+-	};
++&nandcs {
++	nand-ecc-algo = "bch";
++	nand-ecc-strength = <8>;
++	nand-ecc-step-size = <512>;
+ };
+diff --git a/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi b/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
+new file mode 100644
+index 0000000..1684951
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm5301x-nand-cs0.dtsi
+@@ -0,0 +1,18 @@
++/*
++ * Broadcom Northstar NAND.
++ *
++ * Copyright (C) 2015 Hauke Mehrtens <hauke@hauke-m.de>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++/ {
++	nand at 18028000 {
++		nandcs: nandcs at 0 {
++			compatible = "brcm,nandcs";
++			reg = <0>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++		};
++	};
++};
+-- 
+1.8.4.5
