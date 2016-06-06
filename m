@@ -1,54 +1,46 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 18:00:36 +0100
-Subject: [PATCH kexec-tools v2 22/32] arm: use generic mem_region sorting
- implementation
+Date: Mon, 06 Jun 2016 18:01:24 +0100
+Subject: [PATCH kexec-tools v2 31/32] arm: clean up phys/page offset debug
 In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
 References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xtE-0003tY-W5@e0050434b2927.dyn.armlinux.org.uk>
+Message-ID: <E1b9xu0-0003uQ-0Y@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic mem_region sorting implementation.
+Clean up the physical and page offset debug prints.
 
 Reviewed-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kexec/arch/arm/crashdump-arm.c | 16 +---------------
- 1 file changed, 1 insertion(+), 15 deletions(-)
+ kexec/arch/arm/crashdump-arm.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
 diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index 85afd9f..d6db566 100644
+index 2589582..3b71267 100644
 --- a/kexec/arch/arm/crashdump-arm.c
 +++ b/kexec/arch/arm/crashdump-arm.c
-@@ -202,19 +202,6 @@ static void crash_exclude_range(void)
+@@ -136,7 +136,6 @@ static int get_kernel_page_offset(struct kexec_info *info,
+ 				user_page_offset);
  	}
- }
- 
--static int range_cmp(const void *a1, const void *a2)
--{
--	const struct memory_range *r1 = a1;
--	const struct memory_range *r2 = a2;
--
--	if (r1->start > r2->start)
--		return 1;
--	if (r1->start < r2->start)
--		return -1;
--
--	return 0;
--}
--
- /**
-  * crash_get_memory_ranges() - read system physical memory
-  *
-@@ -246,8 +233,7 @@ static int crash_get_memory_ranges(void)
- 	/*
- 	 * Make sure that the memory regions are sorted.
- 	 */
--	qsort(usablemem_rgns.ranges, usablemem_rgns.size,
--	      sizeof(*usablemem_rgns.ranges), range_cmp);
-+	mem_regions_sort(&usablemem_rgns);
- 
+ 	elf_info->page_offset = stext_sym_addr & (~KVBASE_MASK);
+-	dbgprintf("page_offset is set to %llx\n", elf_info->page_offset);
  	return 0;
  }
+ 
+@@ -293,11 +292,13 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 	 * region as PHYS_OFFSET.
+ 	 */
+ 	phys_offset = usablemem_rgns.ranges->start;
+-	dbgprintf("phys_offset: %#llx\n", phys_offset);
+ 
+ 	if (get_kernel_page_offset(info, &elf_info))
+ 		return -1;
+ 
++	dbgprintf("phys offset = %#llx, page offset = %llx\n",
++		  phys_offset, elf_info.page_offset);
++
+ 	/*
+ 	 * Ensure that the crash kernel memory range is sane. The crash kernel
+ 	 * must be located within memory which is visible during booting.
 -- 
 1.9.1
