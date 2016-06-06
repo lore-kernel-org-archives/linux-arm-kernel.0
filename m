@@ -1,35 +1,75 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Mon, 06 Jun 2016 09:20:12 +0200
-Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry
- Pi 3.
-In-Reply-To: <CAL_JsqL2RgTLq9R3v4LDiV6Wa7totbzJBgmzVDgUv_keoS52vA@mail.gmail.com>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <5490184.9quKRk1Imx@wuerfel> <1464943546.24775.131.camel@redhat.com>
- <3885625.kWfxlR3OJi@wuerfel> <1464950355.24775.143.camel@redhat.com>
- <CAL_JsqL2RgTLq9R3v4LDiV6Wa7totbzJBgmzVDgUv_keoS52vA@mail.gmail.com>
-Message-ID: <1465197612.24775.190.camel@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 6 Jun 2016 09:21:03 +0200
+Subject: [PATCH] userspace API definitions for auto-focus coil
+In-Reply-To: <575512E5.5030000@gmail.com>
+References: <20160527205140.GA26767@amd>
+ <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
+ <20160531213437.GA28397@amd>
+ <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+ <20160601220840.GA21946@amd>
+ <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
+ <20160602193027.GB7984@amd>
+ <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
+ <20160605190716.GA11321@amd> <575512E5.5030000@gmail.com>
+Message-ID: <20160606072103.GA7445@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fr, 2016-06-03 at 11:17 -0500, Rob Herring wrote:
-> On Fri, Jun 3, 2016 at 5:39 AM, Gerd Hoffmann <kraxel@redhat.com> wrote:
-> >   Hi,
+Hi!
+
+> On  5.06.2016 22:07, Pavel Machek wrote:
+> >Add userspace API definitions.
 > >
-> >> I tried
-> >>
-> >> subdir-y += ../../../arm64/boot/dts/broadcom
+> >Signed-off-by: Pavel Machek <pavel@ucw.cz>
 > >
-> > Hmm, works for me too now, probably had a typo somewhere.
+> >diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> >index b6a357a..23011cc 100644
+> >--- a/include/uapi/linux/v4l2-controls.h
+> >+++ b/include/uapi/linux/v4l2-controls.h
+> >@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
+> >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
+> >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
+> >
+> >+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
+> >+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
+> >+#define V4L2_CID_FOCUS_AD5820_RAMP_TIME	(V4L2_CID_FOCUS_AD5820_BASE+0)
+> >+#define V4L2_CID_FOCUS_AD5820_RAMP_MODE	(V4L2_CID_FOCUS_AD5820_BASE+1)
+> >+
+> >  #endif
+> >
 > 
-> What directory does the dtb end up in? Because as it was, it ended up
-> in arch/arm64/boot/dts/broadcom. I'm not sure all this hackery is
-> worth it if the dtb doesn't end up in arch/arm/boot/dts/.
+> Sakari, what about adding those as standard camera controls? It seems ad5820
+> is not the only VCM driver to implement "antiringing" controls, http://rohmfs.rohm.com/en/products/databook/datasheet/ic/motor/mobile_module/bu64241gwz-e.pdf
+> is another example I found by quick search.
 
-With the 2/7 patch at the start of this subthread the dtb ends up in
-arch/arm64/boot/dts/broadcom for both arm and arm64 builds.
+Well, standartized API may be good idea... but I'd really like the
+driver to go in, and it looks like camera application needs to know
+quite a lot of details about the autofocus subsystem. 
 
-make "dtbs_install" places it in /boot/dtbs/$version/ for arm builds and
-in /boot/dtbs/$version/broadcom/ for arm64 builds.
+> 
+> What about:
+> 
+> #define V4L2_CID_FOCUS_STEP_MODE xxx
+> enum v4l2_cid_focus_step_mode {
+> V4L2_CID_FOCUS_STEP_MODE_DIRECT,
+> V4L2_CID_FOCUS_STEP_MODE_LINEAR,
+> V4L2_CID_FOCUS_STEP_MODE_AUTO
+> };
+> #define V4L2_CID_FOCUS_STEP_TIME xxx+1
+> 
+> Also, how the userspace(or the kernel) is notified by v4l that there is an
+> event? The point is - I think it is a good idea to notify when VCM has
+> completed its movement, we can start a timer based on the current
+> position,
 
-cheers,
-  Gerd
+Why? Look at how fcam-dev/ works. It is not interested when movement
+is "done". It sets the focus to one distance, then says it to slowly
+refocus to another distance, and watches the stream for
+sharpness. When it is sharp, it computes likely lens position at the
+time of sharpness, and asks hardware to go back there.
+
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
