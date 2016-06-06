@@ -1,34 +1,34 @@
 From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
-Date: Mon,  6 Jun 2016 11:26:26 +0200
-Subject: [PATCH v2 07/13] ARM: DT: STiH410: Enable clock propagation for audio
- clocks
+Date: Mon,  6 Jun 2016 11:26:28 +0200
+Subject: [PATCH v2 09/13] ARM: DT: STiH407: Enable synchronous clock mode for
+ video clocks
 In-Reply-To: <1465205192-7888-1-git-send-email-gabriel.fernandez@linaro.org>
 References: <1465205192-7888-1-git-send-email-gabriel.fernandez@linaro.org>
-Message-ID: <1465205192-7888-8-git-send-email-gabriel.fernandez@linaro.org>
+Message-ID: <1465205192-7888-10-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is used in the clock driver to apply a clock propagation
-flag on the audio clocks of STiH410
+This patch enables the synchronous clock mode for video clocks
+on STiH407 board.
 
 Signed-off-by: Olivier Bideau <olivier.bideau@st.com>
 Signed-off-by: Gabriel Fernandez <gabriel.fernandez@linaro.org>
 ---
- arch/arm/boot/dts/stih410-clock.dtsi | 2 +-
+ arch/arm/boot/dts/stih407-clock.dtsi | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
-index d1f2aca..5a9a487 100644
---- a/arch/arm/boot/dts/stih410-clock.dtsi
-+++ b/arch/arm/boot/dts/stih410-clock.dtsi
-@@ -226,7 +226,7 @@
+diff --git a/arch/arm/boot/dts/stih407-clock.dtsi b/arch/arm/boot/dts/stih407-clock.dtsi
+index 86c91cd..bc0d9a2 100644
+--- a/arch/arm/boot/dts/stih407-clock.dtsi
++++ b/arch/arm/boot/dts/stih407-clock.dtsi
+@@ -256,7 +256,7 @@
  
- 			clk_s_d0_flexgen: clk-s-d0-flexgen {
+ 			clk_s_d2_flexgen: clk-s-d2-flexgen {
  				#clock-cells = <1>;
 -				compatible = "st,flexgen";
-+				compatible = "st,flexgen-audio", "st,flexgen";
++				compatible = "st,flexgen-video", "st,flexgen";
  
- 				clocks = <&clk_s_d0_quadfs 0>,
- 					 <&clk_s_d0_quadfs 1>,
+ 				clocks = <&clk_s_d2_quadfs 0>,
+ 					 <&clk_s_d2_quadfs 1>,
 -- 
 1.9.1
