@@ -1,29 +1,30 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon, 6 Jun 2016 10:55:55 +0300
-Subject: [PATCH v2 3/4] ARM: dts: imx6q: add support for the Utilite Pro
-In-Reply-To: <50a8a6e8b5c6426fb02f59d9300503e5@rwthex-s1-b.rwth-ad.de>
-References: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
- <50a8a6e8b5c6426fb02f59d9300503e5@rwthex-s1-b.rwth-ad.de>
-Message-ID: <57552C8B.80207@compulab.co.il>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon,  6 Jun 2016 15:58:32 +0800
+Subject: [PATCH 1/2] drm/rockchip: vop: add uv_vir register field for RK3036
+ VOP
+Message-ID: <1465199912-20932-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2016 09:26 PM, christopher.spinrath at rwth-aachen.de wrote:
-> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-> 
-> The CompuLab Utilite Pro is a miniature fanless desktop pc based on
-> the i.MX6 Quad powered cm-fx6 module. It features two serial ports,
-> USB OTG, 4x USB, analog audio and S/PDIF, 2x Gb Ethernet, HDMI and
-> DVI ports, an on-board 32GB SSD, a mmc slot, and on-board wifi/bt.
-> 
-> Add initial support for it including USB, Ethernet (both ports), sata
-> and HDMI support.
-> 
-> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-> Cc: Igor Grinberg <grinberg@compulab.co.il>
+The WIN0 of RK3036 VOP could support YUV data format, but driver
+forget to add the uv_vir register field for it.
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 1 +
+ 1 file changed, 1 insertion(+)
 
+diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+index 3166b46..7da2311 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
++++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+@@ -210,6 +210,7 @@ static const struct vop_win_phy rk3036_win0_data = {
+ 	.yrgb_mst = VOP_REG(RK3036_WIN0_YRGB_MST, 0xffffffff, 0),
+ 	.uv_mst = VOP_REG(RK3036_WIN0_CBR_MST, 0xffffffff, 0),
+ 	.yrgb_vir = VOP_REG(RK3036_WIN0_VIR, 0xffff, 0),
++	.uv_vir = VOP_REG(RK3036_WIN0_VIR, 0x1fff, 16),
+ };
+ 
+ static const struct vop_win_phy rk3036_win1_data = {
 -- 
-Regards,
-Igor.
+1.9.1
