@@ -1,35 +1,71 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 17:59:13 +0100
-Subject: [PATCH kexec-tools v2 06/32] kdump: print mmap() offset in hex
+Date: Mon, 06 Jun 2016 17:59:18 +0100
+Subject: [PATCH kexec-tools v2 07/32] kexec: fix warnings caused by selecting
+ 64-bit file IO on 32-bit platforms
 In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
 References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xrt-0003rz-JE@e0050434b2927.dyn.armlinux.org.uk>
+Message-ID: <E1b9xry-0003s5-Qd@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When mmap() fails, printing a large decimal number is mostly
-meaningless - it's not obvious what it means.  Printing a hex number
-is more obvious, because we can see whether it's over 32-bit, or not
-page aligned.
+Fix warnings caused by selecting 64-bit file IO on 32-bit platforms.
 
-Reviewed-by: Pratyush Anand <panand@redhat.com>
+kexec/kexec.c:710:2: warning: format '%lx' expects argument of type 'long unsigned int', but argument 4 has type 'off_t' [-Wformat]
+kexec/zlib.c:63:4: warning: format '%ld' expects argument of type 'long int', but argument 4 has type 'off_t' [-Wformat]
+kexec/kexec-uImage.c:85:3: warning: format '%ld' expects argument of type 'long
+int', but argument 2 has type 'off_t' [-Wformat]
+
+Acked-by: Baoquan He <bhe@redhat.com>
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kdump/kdump.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ kexec/kexec-uImage.c | 3 ++-
+ kexec/kexec.c        | 4 ++--
+ kexec/zlib.c         | 4 ++--
+ 3 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/kdump/kdump.c b/kdump/kdump.c
-index 34d2149..f34727f 100644
---- a/kdump/kdump.c
-+++ b/kdump/kdump.c
-@@ -37,7 +37,7 @@ static void *map_addr(int fd, unsigned long size, off_t offset)
- 
- 	result = mmap(0, len, PROT_READ, MAP_SHARED, fd, offset - map_offset);
- 	if (result == MAP_FAILED) {
--		fprintf(stderr, "Cannot mmap " DEV_MEM " offset: %llu size: %lu: %s\n",
-+		fprintf(stderr, "Cannot mmap " DEV_MEM " offset: %#llx size: %lu: %s\n",
- 			(unsigned long long)offset, size, strerror(errno));
- 		exit(5);
+diff --git a/kexec/kexec-uImage.c b/kexec/kexec-uImage.c
+index 9df601b..5e24629 100644
+--- a/kexec/kexec-uImage.c
++++ b/kexec/kexec-uImage.c
+@@ -82,7 +82,8 @@ int uImage_probe(const unsigned char *buf, off_t len, unsigned int arch)
+ 	if (be32_to_cpu(header.ih_size) > len - sizeof(header)) {
+ 		printf("uImage header claims that image has %d bytes\n",
+ 				be32_to_cpu(header.ih_size));
+-		printf("we read only %ld bytes.\n", len - sizeof(header));
++		printf("we read only %lld bytes.\n",
++		       (long long)len - sizeof(header));
+ 		return -1;
  	}
+ #ifdef HAVE_LIBZ
+diff --git a/kexec/kexec.c b/kexec/kexec.c
+index f0bd527..500e5a9 100644
+--- a/kexec/kexec.c
++++ b/kexec/kexec.c
+@@ -707,8 +707,8 @@ static int my_load(const char *type, int fileind, int argc, char **argv,
+ 	/* slurp in the input kernel */
+ 	kernel_buf = slurp_decompress_file(kernel, &kernel_size);
+ 
+-	dbgprintf("kernel: %p kernel_size: 0x%lx\n",
+-		  kernel_buf, kernel_size);
++	dbgprintf("kernel: %p kernel_size: %#llx\n",
++		  kernel_buf, (unsigned long long)kernel_size);
+ 
+ 	if (get_memory_ranges(&info.memory_range, &info.memory_ranges,
+ 		info.kexec_flags) < 0 || info.memory_ranges == 0) {
+diff --git a/kexec/zlib.c b/kexec/zlib.c
+index 7170ac3..95b6080 100644
+--- a/kexec/zlib.c
++++ b/kexec/zlib.c
+@@ -60,8 +60,8 @@ char *zlib_decompress_file(const char *filename, off_t *r_size)
+ 			if ((errno == EINTR) || (errno == EAGAIN))
+ 				continue;
+ 			_gzerror(fp, &errnum, &msg);
+-			dbgprintf("Read on %s of %ld bytes failed: %s\n",
+-					filename, (allocated - size) + 0UL, msg);
++			dbgprintf("Read on %s of %d bytes failed: %s\n",
++				  filename, (int)(allocated - size), msg);
+ 			size = 0;
+ 			goto fail;
+ 		}
 -- 
 1.9.1
