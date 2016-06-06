@@ -1,193 +1,159 @@
-From: songjun.wu@atmel.com (Wu, Songjun)
-Date: Mon, 6 Jun 2016 14:44:24 +0800
-Subject: [PATCH v3 2/2] [media] atmel-isc: DT binding for Image Sensor
- Controller driver
-In-Reply-To: <20160603131009.456dc101@bbrezillon>
-References: <1464677903-28412-1-git-send-email-songjun.wu@atmel.com>
- <1464677903-28412-3-git-send-email-songjun.wu@atmel.com>
- <20160602231609.GA24529@rob-hp-laptop> <20160603131009.456dc101@bbrezillon>
-Message-ID: <d2ed7bb8-905b-2c6a-2e52-e35b3b70ee93@atmel.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 6 Jun 2016 09:49:26 +0300
+Subject: [PATCH 1/2] ARM: dts: imx6q: extend support for the cm-fx6
+In-Reply-To: <d0329c33bee14d6e8be8abef607dce3e@rwthex-s1-b.rwth-ad.de>
+References: <709d6b3d522f4fcb8112830e0426dbb3@rwthex-s1-b.rwth-ad.de>
+ <1463994191.2370.3.camel@pengutronix.de> <5746B8C4.6020406@compulab.co.il>
+ <1464256217.14453.10.camel@pengutronix.de> <5746DFE2.9040903@compulab.co.il>
+ <d083d0308abd48efbd4b6042e1f9c470@rwthex-s2-a.rwth-ad.de>
+ <d0329c33bee14d6e8be8abef607dce3e@rwthex-s1-b.rwth-ad.de>
+Message-ID: <57551CF6.2020602@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Christopher,
+
+On 06/05/2016 08:32 PM, Christopher Spinrath wrote:
+> Hi Igor,
+> 
+> On 06/05/2016 06:43 PM, Igor Grinberg wrote:
+>> Hi Christopher,
+>>
+>> On 05/26/2016 02:37 PM, Igor Grinberg wrote:
+>>> On 05/26/2016 12:50 PM, Lucas Stach wrote:
+>>>> Hi Igor,
+>>>>
+>>>> Am Donnerstag, den 26.05.2016, 11:50 +0300 schrieb Igor Grinberg:
+>>>>> Hi Lucas,
+>>>>>
+>>>>> Thanks for reviewing the patch(es).
+>>>>>
+>>>>> On 05/23/2016 12:03 PM, Lucas Stach wrote:
+>>>>>> Am Montag, den 23.05.2016, 00:47 +0200 schrieb
+>>>>>> christopher.spinrath at rwth-aachen.de:
+>>>>>>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+>>>>>
+>>>>> [...]
+>>>>>
+>>>>>>> +&ecspi1 {
+>>>>>>> +	fsl,spi-num-chipselects = <2>;
+>>>>>>> +	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
+>>>>>>> +	pinctrl-names = "default";
+>>>>>>> +	pinctrl-0 = <&pinctrl_ecspi1>;
+>>>>>>> +	status = "okay";
+>>>>>>> +
+>>>>>>> +	flash: m25p80 at 0 {
+>>>>>>> +		#address-cells = <1>;
+>>>>>>> +		#size-cells = <1>;
+>>>>>>> +		compatible = "st,m25p", "jedec,spi-nor";
+>>>>>>> +		spi-max-frequency = <20000000>;
+>>>>>>> +		reg = <0>;
+>>>>>>> +
+>>>>>>> +		partition at 0 {
+>>>>>>> +			label = "uboot";
+>>>>>>> +			reg = <0x0 0xc0000>;
+>>>>>>> +		};
+>>>>>>> +
+>>>>>>> +		partition at c0000 {
+>>>>>>> +			label = "uboot environment";
+>>>>>>> +			reg = <0xc0000 0x40000>;
+>>>>>>> +		};
+>>>>>>> +
+>>>>>>> +		partition at 100000 {
+>>>>>>> +			label = "reserved";
+>>>>>>> +			reg = <0x100000 0x100000>;
+>>>>>>> +		};
+>>>>>>
+>>>>>> Partition layouts don't belong in the upstream DT, as it a device
+>>>>>> configuration thing. Please kep them in the bootloader/firmware and make
+>>>>>> this one pass the partition layout to the kernel.
+>>>>>
+>>>>> I don't completely agree with this.
+>>>>> We have lots of partition layouts in the upstream DT.
+>>>>
+>>>> No, we don't. At least not for the i.MX6. There are some for the earlier
+>>>> i.MX boards, but IMO it's wrong to put device configuration into the
+>>>> upstream DT. Let's not start doing this again.
+>>>
+>>> Why not?
+>>> For i.MX6 there are 2 boards that have the partitioning scheme.
+>>> I'm not considering this a device configuration, but rather
+>>> a default partitioning layout/scheme.
+>>> Current case is for the firmware storage device that is not likely
+>>> to change.
+>>> Moreover, a DT is not really a part of the kernel, but lays along the kernel
+>>> sources for convenience and simplicity (at least IIRC as it was decided
+>>> about 5 years ago). It is more a part of the firmware for a device, than
+>>> an upstream kernel source code.
+>>> I think it is only a meter of time when Linus will decide that he does not
+>>> want it inside the kernel anymore...
+>>>
+>>>>
+>>>>> Moreover, this is the default layout and changing it, will
+>>>>> result in incompatibilities and also might result in device "bricking".
+>>>>> Those can be changed from the boot loader in case you need those
+>>>>> the other way around.
+>>>>> Another question of mine is, why should you?
+>>>>>
+>>>> Partition layout is device configuration, which is governed by the
+>>>> device firmware.
+>>>
+>>> Yet again, DT is a part of device firmware.
+>>> Moreover, the firmware (in that case U-Boot), can be configured
+>>> using the very same DT code, so not having this in, might force
+>>> various w/a and hacks.
+>>>
+>>>> By not having the partition layout in the upstream DT
+>>>> people are forced to set it from the firmware, which is exactly the
+>>>> right thing to do, weather or not you plan to change it at any time.
+>>>
+>>> I might be ignorant, sorry for that.
+>>> Why? Why is it right and why would you want to force people to do that?
+>>>
+>>>
+>>
+>> No answer?
+>> I think it is worth keeping this as a default firmware layout.
+>>
+> 
+> I was not happy removing the layout at first, too. However, they are
+> added rarely (at least recently) and the binding documentation [1]
+> states that they shall only be added if there are "strong conventions".
+
+Well, not exactly, it says:
+
+"Partitions can be represented by sub-nodes of an mtd device. This can be used
+on platforms which have strong conventions about which portions of a flash are
+used for what purposes, but which don't use an on-flash partition table such
+as RedBoot."
+
+In my understanding, "can" is _not_ exactly "shall only".
+
+> 
+> Moreover, it is really easy to pass the layout via firmware/u-boot.
+> Unfortunately, the u-boot provided by CompuLab does not have the
+> mtdparts commands built-in but the layout can be passed via cmdline as
+> well. This seems more flexible to me (and I consider this to be good).
+
+That means you need a different version of U-Boot if you want to use
+an upstream kernel, or you need to play the bootargs games, or just leave
+it a "black box".
+So currently, from the three options above, the "black box" is chosen, right?
+That's a pity, because I'd like things to be open...
+
+> 
+> Even if we want to have the layout in the devicetree one day (e.g. to
+> use the same file for u-boot) we can send another follow-up patch adding
+> them (and discuss this matter in more detail). But let's not prevent the
+> remaining part of this patch series to enter mainline if there is a
+> good, easy and flexible alternative.
+
+That's a valid point from my POV.
+I have never had an intent to prevent things going upstream.
+This is something Compulab should have done years ago, but
+unfortunately, due to some circumstances it haven't happened for cm-fx6...
 
 
-On 6/3/2016 19:10, Boris Brezillon wrote:
-> On Thu, 2 Jun 2016 18:16:09 -0500
-> Rob Herring <robh@kernel.org> wrote:
->
->> On Tue, May 31, 2016 at 02:58:23PM +0800, Songjun Wu wrote:
->>> DT binding documentation for ISC driver.
->>>
->>> Signed-off-by: Songjun Wu <songjun.wu@atmel.com>
->>> ---
->>>
->>> Changes in v3:
->>> - Remove the 'atmel,sensor-preferred'.
->>> - Modify the isc clock node according to the Rob's remarks.
->>>
->>> Changes in v2:
->>> - Remove the unit address of the endpoint.
->>> - Add the unit address to the clock node.
->>> - Avoid using underscores in node names.
->>> - Drop the "0x" in the unit address of the i2c node.
->>> - Modify the description of 'atmel,sensor-preferred'.
->>> - Add the description for the ISC internal clock.
->>>
->>>  .../devicetree/bindings/media/atmel-isc.txt        | 88 ++++++++++++++++++++++
->>>  1 file changed, 88 insertions(+)
->>>  create mode 100644 Documentation/devicetree/bindings/media/atmel-isc.txt
->>>
->>> diff --git a/Documentation/devicetree/bindings/media/atmel-isc.txt b/Documentation/devicetree/bindings/media/atmel-isc.txt
->>> new file mode 100644
->>> index 0000000..2ae1d60
->>> --- /dev/null
->>> +++ b/Documentation/devicetree/bindings/media/atmel-isc.txt
->>> @@ -0,0 +1,88 @@
->>> +Atmel Image Sensor Controller (ISC)
->>> +----------------------------------------------
->>> +
->>> +Required properties for ISC:
->>> +- compatible
->>> +	Must be "atmel,sama5d2-isc"
->>> +- reg
->>> +	Physical base address and length of the registers set for the device;
->>> +- interrupts
->>> +	Should contain IRQ line for the ISI;
->>> +- clocks
->>> +	List of clock specifiers, corresponding to entries in
->>> +	the clock-names property;
->>> +	Please refer to clock-bindings.txt.
->>> +- clock-names
->>> +	Required elements: "hclock", "ispck".
->>> +- pinctrl-names, pinctrl-0
->>> +	Please refer to pinctrl-bindings.txt.
->>> +- isc-ispck
->>> +	The clock for the ISC digital pipeline.
->>> +	- compatible
->>> +		Must be "atmel,sama5d2-isc-ispck".
->>> +	- clock-cells
->>> +		From common clock binding; should be set to 0.
->>> +	- clocks
->>> +		The clock source phandles.
->>> +- isc-mck
->>> +	The clock for the image sensor.
->>> +	- compatible
->>> +		Must be "atmel,sama5d2-isc-mck".
->>> +	- clock-cells
->>> +		From common clock binding; should be set to 0.
->>> +	- clocks
->>> +		The clock source phandles.
->>> +
->>> +ISC supports a single port node with parallel bus. It should contain one
->>> +'port' child node with child 'endpoint' node. Please refer to the bindings
->>> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
->>> +
->>> +Example:
->>> +isc: isc at f0008000 {
->>> +	compatible = "atmel,sama5d2-isc";
->>> +	reg = <0xf0008000 0x4000>;
->>> +	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
->>> +	clocks = <&isc_clk>, <&isc_ispck>;
->>> +	clock-names = "hclock", "ispck";
->>> +
->>> +	port {
->>> +		#address-cells = <1>;
->>> +		#size-cells = <0>;
->>> +
->>> +		isc_0: endpoint {
->>> +			remote-endpoint = <&ov7740_0>;
->>> +			hsync-active = <1>;
->>> +			vsync-active = <0>;
->>> +			pclk-sample = <1>;
->>> +		};
->>> +	};
->>> +
->>> +	isc_ispck: isc-ispck at 0 {
->>
->> Drop the unit-address. You should only have one if you have a reg
->> property.
->>
->>> +		compatible = "atmel,sama5d2-isc-ispck";
->>> +		#clock-cells = <0>;
->>> +		clocks = <&isc_clk>, <&iscck>;
->>> +	};
->>> +
->>> +	isc_mck: isc-mck at 1 {
->>
->> ditto.
->>
->> I still think these should be implied by atmel,sama5d2-isc and not in
->> DT. The fact that you don't have any registers for them pretty much
->> indicates that. It is also strange that isc-ispck is used by isc. If
->> that is the only user, there is certainly no need to put it in DT.
->
-> I had a look at the block diagram, and it seems you are partially right.
-> The only clock that is really exported by the ISC is isc_mck (isc_pck is
-> not).
-> So I'd suggest dropping these clk sub-nodes, putting the #clock-cells,
-> and clock-names properties in the isc node, and then referencing the
-> isc node in you i2c device.
->
-> isc: isc at f0008000 {
-> 	compatible = "atmel,sama5d2-isc";
-> 	reg = <0xf0008000 0x4000>;
-> 	interrupts = <46 IRQ_TYPE_LEVEL_HIGH 5>;
-> 	clocks = <&isc_clk>, <&isc_ispck>;
-> 	clock-names = "hclock", "ispck";
-> 	#clock-cells = <0>;
-> 	clock-output-names = "isc-mck";
-> };
->
-> i2c1: i2c at fc028000 {
-> 	/* ... */
-> 	ov7740: camera at 21 {
-> 		/* ... */
-> 		clocks = <&isc>;
-> 		clock-names = "xvclk";
-> 	}
-> };
->
-> If I'm wrong and the ISC IP is really exposing several clks, you just
-> have to change #clock-cells to 1, and use clocks = <&isc X>; in the i2c
-> device node.
->
-> Rob, Songjun, would you agree on this representation?
->
-Agree, I think it's a good solution.
-Thank you for your comments.
->>
->>
->>> +		compatible = "atmel,sama5d2-isc-mck";
->>> +		#clock-cells = <0>;
->>> +		clocks = <&isc_clk>, <&iscck>, <&isc_gclk>;
->>> +	};
->>> +};
->>> +
->>> +i2c1: i2c at fc028000 {
->>> +	ov7740: camera at 21 {
->>> +	compatible = "ovti,ov7740";
->>> +	reg = <0x21>;
->>> +
->>> +	clocks = <&isc_mck>;
->>> +	clock-names = "xvclk";
->>> +	assigned-clocks = <&isc_mck>;
->>> +	assigned-clock-rates = <24000000>;
->>> +
->>> +	port {
->>> +		ov7740_0: endpoint {
->>> +			remote-endpoint = <&isc_0>;
->>> +		};
->>> +	};
->>> +};
->>> --
->>> 2.7.4
->>>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
+-- 
+Regards,
+Igor.
