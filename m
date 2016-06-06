@@ -1,34 +1,81 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Mon, 06 Jun 2016 09:47:25 +0200
-Subject: [PATCH v2 7/9] ARM: bcm2835: Add devicetree for the Raspberry
- Pi 3.
-In-Reply-To: <3265668.gGTUMSyXWi@wuerfel>
-References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
- <CAL_JsqL2RgTLq9R3v4LDiV6Wa7totbzJBgmzVDgUv_keoS52vA@mail.gmail.com>
- <1465197612.24775.190.camel@redhat.com> <3265668.gGTUMSyXWi@wuerfel>
-Message-ID: <1465199245.24775.195.camel@redhat.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 6 Jun 2016 09:48:41 +0200
+Subject: [PATCH v2 1/3] watchdog: Add Meson GXBB Watchdog Driver
+In-Reply-To: <575316A6.9080403@roeck-us.net>
+References: <1464943007-18000-1-git-send-email-narmstrong@baylibre.com>
+ <1464943007-18000-2-git-send-email-narmstrong@baylibre.com>
+ <575316A6.9080403@roeck-us.net>
+Message-ID: <57552AD9.7040903@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+Hi Guenter,
 
-> > With the 2/7 patch at the start of this subthread the dtb ends up in
-> > arch/arm64/boot/dts/broadcom for both arm and arm64 builds.
-> > 
-> > make "dtbs_install" places it in /boot/dtbs/$version/ for arm builds and
-> > in /boot/dtbs/$version/broadcom/ for arm64 builds.
+On 06/04/2016 07:57 PM, Guenter Roeck wrote:
+> On 06/03/2016 01:36 AM, Neil Armstrong wrote:
+[...]
+>> +++ b/drivers/watchdog/meson_gxbb_wdt.c
+>> @@ -0,0 +1,268 @@
+>> +/*
+>> + * This file is provided under a dual BSD/GPLv2 license.  When using or
+>> + * redistributing this file, you may do so under either license.
+>> + *
+>> + * GPL LICENSE SUMMARY
+>> + *
+>> + * Copyright (c) 2016 BayLibre, SAS.
+>> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of version 2 of the GNU General Public License as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful, but
+>> + * WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+>> + * General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
+>> + * The full GNU General Public License is included in this distribution
+>> + * in the file called COPYING.
+>> + *
+>> + * BSD LICENSE
+>> + *
+>> + * Copyright (c) 2016 BayLibre, SAS.
+>> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+>> + *
+> Nitpick, but you don't really need the copyright and author lines twice.
+
+Sorry, but I was asked to use this particular header format since I am not
+the copyright holder of this file.
+
 > 
-> Ok, let's stay with that for now then, and solve it better when we
-> need to do more of the same. Are you aware of any other boards using
-> bcm2837?
+>> + * Redistribution and use in source and binary forms, with or without
+>> + * modification, are permitted provided that the following conditions
+>> + * are met:
+>> + *
+>> + *   * Redistributions of source code must retain the above copyright
+>> + *     notice, this list of conditions and the following disclaimer.
+>> + *   * Redistributions in binary form must reproduce the above copyright
+>> + *     notice, this list of conditions and the following disclaimer in
+>> + *     the documentation and/or other materials provided with the
+>> + *     distribution.
+>> + *   * Neither the name of Intel Corporation nor the names of its
+>> + *     contributors may be used to endorse or promote products derived
+>> + *     from this software without specific prior written permission.
+>> + *
+>> + * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+>> + * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+>> + * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+>> + * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+>> + * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+>> + * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+>> + * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+>> + * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+>> + * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+>> + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+>> + * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+>> + */
 
-No.
-
-As far I know it has been created specifically for the rpi foundation,
-so I expect we might see new members of the rpi family using the bcm2837
-too, but probably no other devices.
-
-Maybe Eric Anholt knows more details.
-
-cheers,
-  Gerd
+Thanks,
+Neil
