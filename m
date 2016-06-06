@@ -1,35 +1,36 @@
 From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Mon,  6 Jun 2016 13:24:22 +0300
-Subject: [PATCH 5/7] mtd: nand: Add Hynix H27UBG8T2BTR-BC to nand_ids table
-In-Reply-To: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <1465208664-9366-6-git-send-email-mamlinav@gmail.com>
+Date: Mon,  6 Jun 2016 13:24:17 +0300
+Subject: [PATCH 0/7] dts: sunxi: Add sunxi NAND Flash Controller support
+Message-ID: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the full description of the Hynix H27UBG8T2BTR-BC NAND chip in the
-nand_ids table so that we can later use the NAND ECC infos and ONFI timings
-mode in controller drivers.
+Hello,
 
-Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
----
- drivers/mtd/nand/nand_ids.c | 4 ++++
- 1 file changed, 4 insertions(+)
+This series adds the sunxi NAND Flash Controller nodes to dts.
 
-diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
-index ccc05f5..ccdc773 100644
---- a/drivers/mtd/nand/nand_ids.c
-+++ b/drivers/mtd/nand/nand_ids.c
-@@ -52,6 +52,10 @@ struct nand_flash_dev nand_flash_ids[] = {
- 		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
- 		  SZ_8K, SZ_8K, SZ_2M, NAND_NEED_SCRAMBLING, 6, 640,
- 		  NAND_ECC_INFO(40, SZ_1K), 4 },
-+	{"H27UBG8T2BTR-BC 32G 3.3V 8-bit",
-+		{ .id = {0xad, 0xd7, 0x94, 0xda, 0x74, 0xc3} },
-+		  SZ_8K, SZ_4K, SZ_2M, NAND_NEED_SCRAMBLING, 6, 640,
-+		  NAND_ECC_INFO(40, SZ_1K), 0 },
- 
- 	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
- 	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
+The first 4 patches is Boris Brezillon's patches with dtsi changes.
+The second 1 patch adds Hynix H27UBG8T2BTR-BC NAND chip definition.
+The last 2 patches enables NAND on Marsboard A10 board and Wexler TAB7200
+tablet.
+
+Aleksei Mamlin (3):
+  mtd: nand: Add Hynix H27UBG8T2BTR-BC to nand_ids table
+  ARM: dts: sun4i: Enable NAND on Marsboard A10
+  ARM: dts: sun7i: Enable NAND on Wexler TAB7200
+
+Boris Brezillon (4):
+  ARM: dts: sun4i: Add A10 NAND controller pin definitions
+  ARM: dts: sun4i: Add NFC node to Allwinner A10 SoC
+  ARM: dts: sun7i: Add A20 NAND controller pin definitions
+  ARM: dts: sun7i: Add NFC node to Allwinner A20 SoC
+
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts      | 41 ++++++++++++
+ arch/arm/boot/dts/sun4i-a10.dtsi               | 91 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 41 ++++++++++++
+ arch/arm/boot/dts/sun7i-a20.dtsi               | 91 ++++++++++++++++++++++++++
+ drivers/mtd/nand/nand_ids.c                    |  4 ++
+ 5 files changed, 268 insertions(+)
+
 -- 
 2.7.3
