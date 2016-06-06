@@ -1,47 +1,46 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Mon,  6 Jun 2016 15:58:46 +0800
-Subject: [PATCH 2/2] drm/rockchip: vop: correct the source size of uv scale
- factor setting
-In-Reply-To: <1465199912-20932-1-git-send-email-ykk@rock-chips.com>
-References: <1465199912-20932-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1465199926-20991-1-git-send-email-ykk@rock-chips.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 6 Jun 2016 16:03:27 +0800
+Subject: [PATCH v2 2/5] of/numa: fix a memory@ node can only contains one
+ memory block
+In-Reply-To: <5754D0E8.8070009@huawei.com>
+References: <1464427377-12712-1-git-send-email-thunder.leizhen@huawei.com>
+ <1464427377-12712-3-git-send-email-thunder.leizhen@huawei.com>
+ <CAL_JsqJO1jXpmAJWUhCW+OK2mpTvtwzCuy_--3sQNUQhTvyFdA@mail.gmail.com>
+ <574F8DA8.4040503@huawei.com> <20160603094520.GF9915@arm.com>
+ <5754D0E8.8070009@huawei.com>
+Message-ID: <5b29216c-e059-2a17-b3a4-6f17934e1d71@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Yao <mark.yao@rock-chips.com>
+Hi Leizhen,
 
-When the input color format is YUV, we need to do some external scale
-for CBCR. Like,
- * In YUV420 data format:
-     cbcr_xscale = dst_w / src_w * 2;
-     cbcr_yscale = dst_h / src_h * 2;
- * In YUV422 data format:
-     cbcr_xscale = dst_w / src_w * 2;
-     cbcr_yscale = dst_h / src_h;
- * In YUV444 data format
-     cbcr_xscale = dst_w / src_w;
-     cbcr_yscale = dst_h / src_h;
+On 2016/6/6 9:24, Leizhen (ThunderTown) wrote:
+>
+>
+> On 2016/6/3 17:45, Will Deacon wrote:
+>> On Thu, Jun 02, 2016 at 09:36:40AM +0800, Leizhen (ThunderTown) wrote:
+>>> On 2016/6/2 4:13, Rob Herring wrote:
+>>>> I believe you still need this and not the one above. You only need it
+>>>> within the loop if you return. Otherwise, the last node always need to
+>>>> be put.
+>>>
+>>> OK. Thanks.
+>>>
+>>> Addition with Matthias's suggestion, I will move "return" into this patch,
+>>> so that this of_node_put(np) can be safely removed.
+>>
+>> Do you want to include Kefeng's [1] patches in your series too? We don't
+>> need two sets of related NUMA cleanups :)
+>
+> Yes, It's originally suggested by Joe Perches.
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I think Will suggested us to add Kefeng's NUMA cleanup patches into
+yours and send a new version, just see comments from Will,
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 1c4d5b5..b28cda7 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -324,9 +324,9 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
- 			    scl_cal_scale2(src_h, dst_h));
- 		if (is_yuv) {
- 			VOP_SCL_SET(vop, win, scale_cbcr_x,
--				    scl_cal_scale2(src_w, dst_w));
-+				    scl_cal_scale2(cbcr_src_w, dst_w));
- 			VOP_SCL_SET(vop, win, scale_cbcr_y,
--				    scl_cal_scale2(src_h, dst_h));
-+				    scl_cal_scale2(cbcr_src_h, dst_h));
- 		}
- 		return;
- 	}
--- 
-1.9.1
+ > Actually, I see you've already respun the series, do don't worry about
+ > doing another version just for this.
+
+Will, correct me if I'm wrong.
+
+Thanks
+Hanjun
