@@ -1,144 +1,283 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  6 Jun 2016 18:36:33 +0200
-Subject: [PATCH 4/8] arm64: tegra: Add DSI panel on Jetson TX1
-In-Reply-To: <20160606163637.14234-1-thierry.reding@gmail.com>
-References: <20160606163637.14234-1-thierry.reding@gmail.com>
-Message-ID: <20160606163637.14234-4-thierry.reding@gmail.com>
+Date: Mon,  6 Jun 2016 18:36:30 +0200
+Subject: [PATCH 1/8] arm64: tegra: p2180: Add PMIC support
+Message-ID: <20160606163637.14234-1-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
-Some variants of the Jetson TX1 ship with a 8.0" WUXGA TFT LCD panel
-connected via four DSI lanes.
-
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts | 45 +++++++++++++++++++
- arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi     | 50 ++++++++++++++++++++++
- 2 files changed, 95 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi | 245 +++++++++++++++++++++++++
+ 1 file changed, 245 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts b/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
-index 683b339a980c..983775e637a4 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-p2371-2180.dts
-@@ -6,4 +6,49 @@
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+index 316c92c03821..8335bbe3ab6c 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2180.dtsi
+@@ -1,3 +1,5 @@
++#include <dt-bindings/mfd/max77620.h>
++
+ #include "tegra210.dtsi"
+ 
  / {
- 	model = "NVIDIA Jetson TX1 Developer Kit";
- 	compatible = "nvidia,p2371-2180", "nvidia,tegra210";
-+
-+	host1x at 50000000 {
-+		dsi at 54300000 {
-+			status = "okay";
-+
-+			avdd-dsi-csi-supply = <&vdd_dsi_csi>;
-+
-+			panel at 0 {
-+				compatible = "auo,b080uan01";
-+				reg = <0>;
-+
-+				enable-gpios = <&gpio TEGRA_GPIO(V, 2)
-+						GPIO_ACTIVE_HIGH>;
-+				power-supply = <&vdd_5v0_io>;
-+				backlight = <&backlight>;
-+			};
-+		};
-+	};
-+
-+	i2c at 7000c400 {
-+		backlight: backlight at 2c {
-+			compatible = "ti,lp8557";
-+			reg = <0x2c>;
-+
-+			dev-ctrl = /bits/ 8 <0x80>;
-+			init-brt = /bits/ 8 <0xff>;
-+
-+			pwm-period = <29334>;
-+
-+			pwms = <&pwm 0 29334>;
-+			pwm-names = "lp8557";
-+
-+			/* 3 LED string */
-+			rom_14h {
-+				rom-addr = /bits/ 8 <0x14>;
-+				rom-val = /bits/ 8 <0x87>;
-+			};
-+
-+			/* boost frequency 1 MHz */
-+			rom_13h {
-+				rom-addr = /bits/ 8 <0x13>;
-+				rom-val = /bits/ 8 <0x01>;
-+			};
-+		};
-+	};
- };
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-index b28aff5e104d..78a16a57fec7 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-@@ -1261,6 +1261,23 @@
- 		};
+@@ -5,6 +7,7 @@
+ 	compatible = "nvidia,p2180", "nvidia,tegra210";
+ 
+ 	aliases {
++		rtc0 = "/i2c at 7000d000/pmic at 3c";
+ 		rtc1 = "/rtc at 7000e000";
+ 		serial0 = &uarta;
+ 	};
+@@ -19,6 +22,248 @@
+ 		status = "okay";
  	};
  
-+	pwm at 7000a000 {
++	i2c at 7000d000 {
 +		status = "okay";
-+	};
++		clock-frequency = <400000>;
 +
-+	i2c at 7000c400 {
-+		status = "okay";
-+		clock-frequency = <100000>;
++		pmic: pmic at 3c {
++			compatible = "maxim,max77620";
++			reg = <0x3c>;
++			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
 +
-+		exp1: gpio at 74 {
-+			compatible = "ti,tca9539";
-+			reg = <0x74>;
++			#interrupt-cells = <2>;
++			interrupt-controller;
 +
 +			#gpio-cells = <2>;
 +			gpio-controller;
++
++			pinctrl-names = "default";
++			pinctrl-0 = <&max77620_default>;
++
++			max77620_default: pinmux {
++				gpio0 {
++					pins = "gpio0";
++					function = "gpio";
++				};
++
++				gpio1 {
++					pins = "gpio1";
++					function = "fps-out";
++					drive-push-pull = <1>;
++					maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
++					maxim,active-fps-power-up-slot = <7>;
++					maxim,active-fps-power-down-slot = <0>;
++				};
++
++				gpio2_3 {
++					pins = "gpio2", "gpio3";
++					function = "fps-out";
++					drive-open-drain = <1>;
++					maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
++				};
++
++				gpio4 {
++					pins = "gpio4";
++					function = "32k-out1";
++				};
++
++				gpio5_6_7 {
++					pins = "gpio5", "gpio6", "gpio7";
++					function = "gpio";
++					drive-push-pull = <1>;
++				};
++			};
++
++			fps {
++				fps0 {
++					maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
++					maxim,suspend-fps-time-period-us = <1280>;
++				};
++
++				fps1 {
++					maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN1>;
++					maxim,suspend-fps-time-period-us = <1280>;
++				};
++
++				fps2 {
++					maxim,fps-event-source = <MAX77620_FPS_EVENT_SRC_EN0>;
++				};
++			};
++
++			regulators {
++				in-ldo0-1-supply = <&vdd_pre>;
++				in-ldo7-8-supply = <&vdd_pre>;
++				in-sd3-supply = <&vdd_5v0_sys>;
++
++				vdd_soc: sd0 {
++					regulator-name = "VDD_SOC";
++					regulator-min-microvolt = <600000>;
++					regulator-max-microvolt = <1400000>;
++					regulator-always-on;
++					regulator-boot-on;
++
++					regulator-enable-ramp-delay = <146>;
++					regulator-ramp-delay = <27500>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++				};
++
++				vdd_ddr: sd1 {
++					regulator-name = "VDD_DDR_1V1_PMIC";
++					regulator-always-on;
++					regulator-boot-on;
++
++					regulator-enable-ramp-delay = <130>;
++					regulator-ramp-delay = <27500>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
++				};
++
++				vdd_pre: sd2 {
++					regulator-name = "VDD_PRE_REG_1V35";
++					regulator-min-microvolt = <1350000>;
++					regulator-max-microvolt = <1350000>;
++
++					regulator-enable-ramp-delay = <176>;
++					regulator-ramp-delay = <27500>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++				};
++
++				vdd_1v8: sd3 {
++					regulator-name = "VDD_1V8";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					regulator-always-on;
++					regulator-boot-on;
++
++					regulator-enable-ramp-delay = <242>;
++					regulator-ramp-delay = <27500>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
++				};
++
++				vdd_sys_1v2: ldo0 {
++					regulator-name = "AVDD_SYS_1V2";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1200000>;
++					regulator-always-on;
++					regulator-boot-on;
++
++					regulator-enable-ramp-delay = <26>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_NONE>;
++				};
++
++				vdd_pex_1v05: ldo1 {
++					regulator-name = "VDD_PEX_1V05";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++
++					regulator-enable-ramp-delay = <22>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++				};
++
++				vddio_sdmmc: ldo2 {
++					regulator-name = "VDDIO_SDMMC";
++					/*
++					 * Technically this supply should have
++					 * a supported range from 1.8 - 3.3 V.
++					 * However, that would cause the SDHCI
++					 * driver to request 2.7 V upon access
++					 * and that in turn will cause traffic
++					 * to be broken. Leave it at 3.3 V for
++					 * now.
++					 */
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++					regulator-always-on;
++					regulator-boot-on;
++
++					regulator-enable-ramp-delay = <62>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_NONE>;
++				};
++
++				vdd_cam_hv: ldo3 {
++					regulator-name = "VDD_CAM_HV";
++					regulator-min-microvolt = <2800000>;
++					regulator-max-microvolt = <2800000>;
++
++					regulator-enable-ramp-delay = <50>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_NONE>;
++				};
++
++				vdd_rtc: ldo4 {
++					regulator-name = "VDD_RTC";
++					regulator-min-microvolt = <850000>;
++					regulator-max-microvolt = <850000>;
++					regulator-always-on;
++					regulator-boot-on;
++
++					regulator-enable-ramp-delay = <22>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
++				};
++
++				vdd_ts_hv: ldo5 {
++					regulator-name = "VDD_TS_HV";
++					regulator-min-microvolt = <3300000>;
++					regulator-max-microvolt = <3300000>;
++
++					regulator-enable-ramp-delay = <62>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_NONE>;
++				};
++
++				vdd_ts: ldo6 {
++					regulator-name = "VDD_TS_1V8";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++
++					regulator-enable-ramp-delay = <36>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_0>;
++					maxim,active-fps-power-up-slot = <7>;
++					maxim,active-fps-power-down-slot = <0>;
++				};
++
++				avdd_1v05_pll: ldo7 {
++					regulator-name = "AVDD_1V05_PLL";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++					regulator-always-on;
++					regulator-boot-on;
++
++					regulator-enable-ramp-delay = <24>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++				};
++
++				avdd_1v05: ldo8 {
++					regulator-name = "AVDD_SATA_HDMI_DP_1V05";
++					regulator-min-microvolt = <1050000>;
++					regulator-max-microvolt = <1050000>;
++
++					regulator-enable-ramp-delay = <22>;
++					regulator-ramp-delay = <100000>;
++
++					maxim,active-fps-source = <MAX77620_FPS_SRC_1>;
++				};
++			};
 +		};
 +	};
 +
- 	/* MMC/SD */
- 	sdhci at 700b0000 {
- 		status = "okay";
-@@ -1340,6 +1357,39 @@
- 			regulator-enable-ramp-delay = <472>;
- 			regulator-disable-ramp-delay = <4880>;
- 		};
-+
-+		vdd_dsi_csi: regulator at 5 {
-+			compatible = "regulator-fixed";
-+			reg = <5>;
-+			regulator-name = "AVDD_DSI_CSI_1V2";
-+			regulator-min-microvolt = <1200000>;
-+			regulator-max-microvolt = <1200000>;
-+			vin-supply = <&vdd_sys_1v2>;
-+		};
-+
-+		vdd_3v3_dis: regulator at 6 {
-+			compatible = "regulator-fixed";
-+			reg = <6>;
-+			regulator-name = "VDD_DIS_3V3_LCD";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+			gpio = <&exp1 3 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&vdd_3v3_sys>;
-+		};
-+
-+		vdd_1v8_dis: regulator at 7 {
-+			compatible = "regulator-fixed";
-+			reg = <7>;
-+			regulator-name = "VDD_LCD_1V8_DIS";
-+			regulator-min-microvolt = <1800000>;
-+			regulator-max-microvolt = <1800000>;
-+			regulator-always-on;
-+			gpio = <&exp1 14 GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&vdd_1v8>;
-+		};
+ 	pmc at 7000e400 {
+ 		nvidia,invert-interrupt;
  	};
- 
- 	gpio-keys {
 -- 
 2.8.3
