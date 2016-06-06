@@ -1,75 +1,476 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 6 Jun 2016 09:21:03 +0200
-Subject: [PATCH] userspace API definitions for auto-focus coil
-In-Reply-To: <575512E5.5030000@gmail.com>
-References: <20160527205140.GA26767@amd>
- <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
- <20160531213437.GA28397@amd>
- <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
- <20160601220840.GA21946@amd>
- <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
- <20160602193027.GB7984@amd>
- <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
- <20160605190716.GA11321@amd> <575512E5.5030000@gmail.com>
-Message-ID: <20160606072103.GA7445@amd>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 6 Jun 2016 08:22:25 +0100
+Subject: [PATCH v4 01/18] remoteproc: st_xp70_rproc: add a xp70 slimcore
+ rproc driver
+In-Reply-To: <20160525171043.GT1256@tuxbot>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+ <1464192412-16386-3-git-send-email-peter.griffin@linaro.org>
+ <20160525171043.GT1256@tuxbot>
+Message-ID: <20160606072225.GG9912@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi Bjorn,
 
-> On  5.06.2016 22:07, Pavel Machek wrote:
-> >Add userspace API definitions.
-> >
-> >Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> >
-> >diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> >index b6a357a..23011cc 100644
-> >--- a/include/uapi/linux/v4l2-controls.h
-> >+++ b/include/uapi/linux/v4l2-controls.h
-> >@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
-> >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
-> >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
-> >
-> >+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> >+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
-> >+#define V4L2_CID_FOCUS_AD5820_RAMP_TIME	(V4L2_CID_FOCUS_AD5820_BASE+0)
-> >+#define V4L2_CID_FOCUS_AD5820_RAMP_MODE	(V4L2_CID_FOCUS_AD5820_BASE+1)
-> >+
-> >  #endif
-> >
+Thanks for reviewing.
+
+On Wed, 25 May 2016, Bjorn Andersson wrote:
+
+> On Wed 25 May 09:06 PDT 2016, Peter Griffin wrote:
 > 
-> Sakari, what about adding those as standard camera controls? It seems ad5820
-> is not the only VCM driver to implement "antiringing" controls, http://rohmfs.rohm.com/en/products/databook/datasheet/ic/motor/mobile_module/bu64241gwz-e.pdf
-> is another example I found by quick search.
+> > XP70 slim core is used as a basis for many IPs in the STi
+> > chipsets such as fdma, display, and demux. To avoid
+> > duplicating the elf loading code in each device driver
+> > an xp70 rproc driver has been created.
+> > 
+> I like this approach.
+> 
+> [..]
+> 
+> > diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
+> [..]
+> >  
+> > +config ST_XP70_REMOTEPROC
+> > +	tristate "XP70 slim remoteproc support"
+> 
+> As this "driver" in itself doesn't do anything I don't think it makes
+> sense to have it user selectable. Please make the "clients" select it
+> instead.
 
-Well, standartized API may be good idea... but I'd really like the
-driver to go in, and it looks like camera application needs to know
-quite a lot of details about the autofocus subsystem. 
+Good point, will fix in v5.
 
 > 
-> What about:
+> > +	depends on ARCH_STI
+> > +	select REMOTEPROC
+> > +	help
+> > +	  Say y here to support xp70 slim core.
+> > +	  If unsure say N.
+> > +
+> >  endmenu
+> > diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
+> [..]
+> > +#include <linux/clk.h>
+> > +#include <linux/elf.h>
 > 
-> #define V4L2_CID_FOCUS_STEP_MODE xxx
-> enum v4l2_cid_focus_step_mode {
-> V4L2_CID_FOCUS_STEP_MODE_DIRECT,
-> V4L2_CID_FOCUS_STEP_MODE_LINEAR,
-> V4L2_CID_FOCUS_STEP_MODE_AUTO
-> };
-> #define V4L2_CID_FOCUS_STEP_TIME xxx+1
+> You should be able to drop inclusion of elf.h now.
+
+Will fix in v5.
+
 > 
-> Also, how the userspace(or the kernel) is notified by v4l that there is an
-> event? The point is - I think it is a good idea to notify when VCM has
-> completed its movement, we can start a timer based on the current
-> position,
+> [..]
+> > +static int xp70_clk_get(struct st_xp70_rproc *xp70_rproc, struct device *dev)
+> > +{
+> > +	int clk, err = 0;
+> 
+> No need to initialize err.
 
-Why? Look at how fcam-dev/ works. It is not interested when movement
-is "done". It sets the focus to one distance, then says it to slowly
-refocus to another distance, and watches the stream for
-sharpness. When it is sharp, it computes likely lens position at the
-time of sharpness, and asks hardware to go back there.
+Will fix in v5.
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> 
+> > +
+> > +	for (clk = 0; clk < XP70_MAX_CLK; clk++) {
+> > +		xp70_rproc->clks[clk] = of_clk_get(dev->of_node, clk);
+> > +		if (IS_ERR(xp70_rproc->clks[clk])) {
+> > +			err = PTR_ERR(xp70_rproc->clks[clk]);
+> > +			if (err == -EPROBE_DEFER)
+> > +				goto err_put_clks;
+> > +			xp70_rproc->clks[clk] = NULL;
+> > +			break;
+> > +		}
+> > +	}
+> > +
+> > +	return 0;
+> > +
+> > +err_put_clks:
+> > +	while (--clk >= 0)
+> > +		clk_put(xp70_rproc->clks[clk]);
+> > +
+> > +	return err;
+> > +}
+> > +
+> [..]
+> > +/**
+> > + * Remoteproc xp70 specific device handlers
+> > + */
+> > +static int xp70_rproc_start(struct rproc *rproc)
+> > +{
+> > +	struct device *dev = &rproc->dev;
+> > +	struct st_xp70_rproc *xp70_rproc = rproc->priv;
+> > +	unsigned long hw_id, hw_ver, fw_rev;
+> > +	u32 val, ret = 0;
+> 
+> ret should be signed and there's no need to initialize it.
+
+Will fix in v5.
+
+> 
+> > +
+> > +	ret = xp70_clk_enable(xp70_rproc);
+> > +	if (ret) {
+> > +		dev_err(dev, "Failed to enable clocks\n");
+> > +		goto err_clk;
+> > +	}
+> [..]
+> > +
+> > +	dev_dbg(dev, "XP70 started\n");
+> > +
+> > +err_clk:
+> > +	return ret;
+> > +}
+> > +
+> > +static int xp70_rproc_stop(struct rproc *rproc)
+> > +{
+> > +	struct st_xp70_rproc *xp70_rproc = rproc->priv;
+> > +	u32 val;
+> > +
+> > +	/* mask all (cmd & int) channels */
+> > +	writel_relaxed(0UL, xp70_rproc->peri + XP70_INT_MASK_OFST);
+> > +	writel_relaxed(0UL, xp70_rproc->peri + XP70_CMD_MASK_OFST);
+> > +
+> > +	/* disable cpu pipeline clock */
+> > +	writel_relaxed(XP70_CLK_GATE_DIS
+> > +		, xp70_rproc->slimcore + XP70_CLK_GATE_OFST);
+> > +
+> > +	writel_relaxed(!XP70_EN_RUN, xp70_rproc->slimcore + XP70_EN_OFST);
+> 
+> Don't you want to ensure ordering of these writes? Perhaps making this
+> last one a writel()?
+
+That is a good point. In the past these writes were all part of the same
+mapping. But now it is split between several mappings
+(slimcore, peri, dmem) ordering of the writes could be an issue.
+
+Will change to writel / readl in v5.
+
+> 
+> > +
+> > +	val = readl_relaxed(xp70_rproc->slimcore + XP70_EN_OFST);
+> > +	if (val & XP70_EN_RUN)
+> > +		dev_warn(&rproc->dev, "Failed to disable XP70");
+> > +
+> > +	xp70_clk_disable(xp70_rproc);
+> > +
+> > +	dev_dbg(&rproc->dev, "xp70 stopped\n");
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static void *xp70_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
+> > +{
+> > +	struct st_xp70_rproc *xp70_rproc = rproc->priv;
+> > +	void *va = NULL;
+> > +	int i;
+> > +
+> > +	for (i = 0; i < XP70_MEM_MAX; i++) {
+> > +
+> > +		if (da != xp70_rproc->mem[i].bus_addr)
+> > +			continue;
+> > +
+> > +		va = xp70_rproc->mem[i].cpu_addr;
+> > +			break;
+> > +	}
+> 
+> Please clean up the indentation and drop the extra newline at the
+> beginning in this loop.
+
+Will fix in v5
+
+> 
+> > +
+> > +	dev_dbg(&rproc->dev, "%s: da = 0x%llx len = 0x%x va = 0x%p\n"
+> > +		, __func__, da, len, va);
+> > +
+> > +	return va;
+> > +}
+> > +
+> > +static struct rproc_ops xp70_rproc_ops = {
+> > +	.start		= xp70_rproc_start,
+> > +	.stop		= xp70_rproc_stop,
+> > +	.da_to_va       = xp70_rproc_da_to_va,
+> > +};
+> > +
+> > +/**
+> > + * Firmware handler operations: sanity, boot address, load ...
+> > + */
+> > +
+> > +static struct resource_table empty_rsc_tbl = {
+> > +	.ver = 1,
+> > +	.num = 0,
+> > +};
+> 
+> 
+> I'm looking at making the resource table optional, good to see another
+> vote for that. Looks good for now though.
+> 
+> [..]
+> 
+> > +
+> > +/**
+> > +  * xp70_rproc_alloc - allocate and initialise xp70 rproc
+> 
+> Drop one of the two spaces indenting this block and add () after then
+> function name.
+
+Will fix in v5
+
+> 
+> > +  * @pdev: Pointer to the platform_device struct
+> > +  * @fw_name: Name of firmware for rproc to use
+> > +  *
+> > +  * Function for allocating and initialising a xp70 rproc for use by
+> > +  * device drivers whose IP is based around the xp70 slim core. It
+> > +  * obtains and enables any clocks required by the xp70 core and also
+> > +  * ioremaps the various IO.
+> > +  *
+> > +  * Returns rproc pointer or PTR_ERR() on error.
+> > +  */
+> > +
+> > +struct rproc *xp70_rproc_alloc(struct platform_device *pdev, char *fw_name)
+> > +{
+> > +	struct device *dev = &pdev->dev;
+> > +	struct st_xp70_rproc *xp70_rproc;
+> > +	struct device_node *np = dev->of_node;
+> > +	struct rproc *rproc;
+> > +	struct resource *res;
+> > +	int err, i;
+> > +	const struct rproc_fw_ops *elf_ops;
+> > +
+> > +	if (!np || !fw_name)
+> > +		return ERR_PTR(-EINVAL);
+> 
+> This should, I believe, only ever happen in development. So if you want
+> to keep it to aid developers feel free to throw in a WARN_ON() in the
+> condition.
+
+Will add WARN_ON in v5.
+
+> 
+> > +
+> > +	if (!of_device_is_compatible(np, "st,xp70-rproc"))
+> > +		return ERR_PTR(-EINVAL);
+> > +
+> > +	rproc = rproc_alloc(dev, np->name, &xp70_rproc_ops,
+> > +			fw_name, sizeof(*xp70_rproc));
+> > +	if (!rproc)
+> > +		return ERR_PTR(-ENOMEM);
+> > +
+> > +	rproc->has_iommu = false;
+> > +
+> > +	xp70_rproc = rproc->priv;
+> > +	xp70_rproc->rproc = rproc;
+> > +
+> > +	/* Get standard ELF ops */
+> > +	elf_ops = rproc_get_elf_ops();
+> > +
+> > +	/* Use some generic elf ops */
+> > +	xp70_rproc_fw_ops.load = elf_ops->load;
+> > +	xp70_rproc_fw_ops.sanity_check = elf_ops->sanity_check;
+> > +
+> > +	rproc->fw_ops = &xp70_rproc_fw_ops;
+> > +
+> > +	/* get imem and dmem */
+> > +	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
+> > +		res = xp70_rproc->mem[i].io_res;
+> > +
+> 
+> io_res is NULL here, and res is directly assigned again. So drop this
+> and io_res from the struct.
+
+Good point. Will fix in v5.
+
+> 
+> > +		res = platform_get_resource_byname
+> > +			(pdev, IORESOURCE_MEM, mem_names[i]);
+> > +
+> > +		xp70_rproc->mem[i].cpu_addr = devm_ioremap_resource(dev, res);
+> > +		if (IS_ERR(xp70_rproc->mem[i].cpu_addr)) {
+> > +			dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
+> > +			err = PTR_ERR(xp70_rproc->mem[i].cpu_addr);
+> > +			goto err;
+> > +		}
+> > +		xp70_rproc->mem[i].bus_addr = res->start;
+> > +		xp70_rproc->mem[i].size = resource_size(res);
+> > +	}
+> > +
+> > +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "slimcore");
+> > +
+> > +	xp70_rproc->slimcore = devm_ioremap_resource(dev, res);
+> > +	if (IS_ERR(xp70_rproc->slimcore)) {
+> > +		dev_err(&pdev->dev, "devm_ioremap_resource failed for slimcore\n");
+> > +		err = PTR_ERR(xp70_rproc->slimcore);
+> > +		goto err;
+> > +	}
+> > +
+> > +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "peripherals");
+> > +
+> > +	xp70_rproc->peri = devm_ioremap_resource(dev, res);
+> > +	if (IS_ERR(xp70_rproc->peri)) {
+> > +		dev_err(&pdev->dev, "devm_ioremap_resource failed for peri\n");
+> > +		err = PTR_ERR(xp70_rproc->peri);
+> > +		goto err;
+> > +	}
+> > +
+> > +	err = xp70_clk_get(xp70_rproc, dev);
+> > +	if (err)
+> > +		goto err;
+> > +
+> > +	/* Register as a remoteproc device */
+> > +	err = rproc_add(rproc);
+> > +	if (err) {
+> > +		dev_err(dev, "registration of xp70 remoteproc failed\n");
+> > +		goto err;
+> 
+> In this case you should also put the clocks.
+
+Will fix in v5.
+
+> 
+> > +	}
+> > +
+> > +	dev_dbg(dev, "XP70 rproc init successful\n");
+> > +	return rproc;
+> > +
+> > +err:
+> > +	rproc_put(rproc);
+> > +	return ERR_PTR(err);
+> > +}
+> > +EXPORT_SYMBOL(xp70_rproc_alloc);
+> > +
+> > +/**
+> > +  * xp70_rproc_put - put xp70 rproc resources
+> > +  * @xp70_rproc: Pointer to the st_xp70_rproc struct
+> > +  *
+> > +  * Function for calling respective _put() functions on
+> > +  * xp70_rproc resources.
+> > +  *
+> > +  * Returns rproc pointer or PTR_ERR() on error.
+> > +  */
+> > +void xp70_rproc_put(struct st_xp70_rproc *xp70_rproc)
+> > +{
+> > +	int clk;
+> > +
+> > +	if (!xp70_rproc)
+> > +		return;
+> > +
+> > +	rproc_put(xp70_rproc->rproc);
+> > +
+> > +	for (clk = 0; clk < XP70_MAX_CLK && xp70_rproc->clks[clk]; clk++)
+> > +		clk_put(xp70_rproc->clks[clk]);
+> 
+> rproc_put() will free your private data, i.e. xp70_rproc, so you must
+> put your clocks before that.
+
+Good spot. Will fix in v5.
+
+> 
+> > +
+> > +}
+> > +EXPORT_SYMBOL(xp70_rproc_put);
+> > +
+> > +MODULE_AUTHOR("Peter Griffin");
+> > +MODULE_DESCRIPTION("STMicroelectronics XP70 rproc driver");
+> > +MODULE_LICENSE("GPL v2");
+> > diff --git a/include/linux/remoteproc/st_xp70_rproc.h b/include/linux/remoteproc/st_xp70_rproc.h
+> [..]
+> > +
+> > +#define XP70_MEM_MAX 2
+> > +#define XP70_MAX_CLK 4
+> > +#define NAME_SZ 10
+> 
+> NAME_SZ seems unused and would be too generic.
+
+Will fix in v5.
+
+> 
+> > +
+> > +enum {
+> > +	DMEM,
+> > +	IMEM,
+> 
+> These are too generic for a header file.
+
+Changed to XP70_DMEM in v5.
+
+> 
+> > +};
+> > +
+> > +/**
+> > + * struct xp70_mem - xp70 internal memory structure
+> > + * @cpu_addr: MPU virtual address of the memory region
+> > + * @bus_addr: Bus address used to access the memory region
+> > + * @dev_addr: Device address from Wakeup M3 view
+> > + * @size: Size of the memory region
+> > + */
+> > +struct xp70_mem {
+> > +	void __iomem *cpu_addr;
+> > +	phys_addr_t bus_addr;
+> > +	u32 dev_addr;
+> 
+> dev_addr is unused.
+
+Will fix in v5.
+
+
+> 
+> > +	size_t size;
+> > +	struct resource *io_res;
+> 
+> io_res is unused.
+
+Will fix in v5.
+
+> 
+> > +};
+> > +
+> > +/**
+> > + * struct st_xp70_rproc - XP70 slim core
+> > + * @rproc: rproc handle
+> > + * @pdev: pointer to platform device
+> > + * @mem: xp70 memory information
+> > + * @slimcore: xp70 slimcore regs
+> > + * @peri: xp70 peripheral regs
+> > + * @clks: xp70 clocks
+> > + */
+> > +struct st_xp70_rproc {
+> > +	struct rproc *rproc;
+> > +	struct platform_device *pdev;
+> 
+> pdev is unused.
+
+Will fix in v5.
+
+> 
+> > +	struct xp70_mem mem[XP70_MEM_MAX];
+> > +	void __iomem *slimcore;
+> > +	void __iomem *peri;
+> > +	struct clk *clks[XP70_MAX_CLK];
+> > +};
+> 
+> I generally don't like sharing a struct like this between two
+> implementations, but I don't think it's worth working around it in this
+> case.
+> 
+> Perhaps you can group the members into a section of "public" and a
+> section of "private" members; with a /* st_xp70_rproc private */ heading
+> the latter?
+
+Heading added in v5.
+
+> 
+> > +
+> > +struct rproc *xp70_rproc_alloc(struct platform_device *pdev, char *fw_name);
+> 
+> For consistency I think xp70_rproc_alloc() should return a st_xp70_rproc
+> reference, rather than forcing the clients pull that pointer out of
+> rproc->priv.
+
+Good idea, have changed like you suggest in v5.
+
+> 
+> > +void xp70_rproc_put(struct st_xp70_rproc *xp70_rproc);
+> > +
+> > +#endif
+
+Regards,
+
+Peter.
