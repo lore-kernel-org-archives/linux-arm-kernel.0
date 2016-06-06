@@ -1,9 +1,9 @@
 From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Mon,  6 Jun 2016 13:24:24 +0300
-Subject: [PATCH 7/7] ARM: dts: sun7i: Enable NAND on Wexler TAB7200
+Date: Mon,  6 Jun 2016 13:24:23 +0300
+Subject: [PATCH 6/7] ARM: dts: sun4i: Enable NAND on Marsboard A10
 In-Reply-To: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
 References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <1465208664-9366-8-git-send-email-mamlinav@gmail.com>
+Message-ID: <1465208664-9366-7-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,14 +11,14 @@ Enable the NFC and describe the NAND flash connected to this controller.
 
 Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 ---
- arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 41 ++++++++++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts | 41 +++++++++++++++++++++++++++++++
  1 file changed, 41 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-index 2f6b21a..42aff91 100644
---- a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-@@ -159,6 +159,47 @@
+diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+index 8e50723..ea6e2d5 100644
+--- a/arch/arm/boot/dts/sun4i-a10-marsboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
+@@ -150,6 +150,47 @@
  	status = "okay";
  };
  
