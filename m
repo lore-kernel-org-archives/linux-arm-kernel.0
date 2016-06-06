@@ -1,51 +1,121 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 6 Jun 2016 22:31:38 +0200
-Subject: [PATCH 5/7] mtd: nand: Add Hynix H27UBG8T2BTR-BC to nand_ids table
-In-Reply-To: <20160606225903.264abc01647eb1528cc226bd@gmail.com>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
- <1465208664-9366-6-git-send-email-mamlinav@gmail.com>
- <20160606205549.1ecd6fdb@bbrezillon>
- <20160606225903.264abc01647eb1528cc226bd@gmail.com>
-Message-ID: <20160606223138.3c2032ee@bbrezillon>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 06 Jun 2016 22:43:30 +0200
+Subject: [PATCH v3 00/12] usb/mmc/power: Generic power sequence (and fix
+ USB/LAN when TFTP booting)
+In-Reply-To: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
+References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <2034186.JKeBi87zYl@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Jun 2016 22:59:03 +0300
-Aleksei Mamlin <mamlinav@gmail.com> wrote:
+Hi,
 
-> On Mon, 6 Jun 2016 20:55:49 +0200
-> Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Am Mittwoch, 1. Juni 2016, 10:02:09 schrieb Krzysztof Kozlowski:
+> My third approach for a USB power sequence which fixes usb3503+lan
+> on Odroid U3 board if it was initialized by bootloader
+> (e.g. for TFTP boot).
+
+I was just tackling a similar bringup problem regarding an embedded usb hub 
+and usb-sata bridge and stumbled upon this series.
+
+While on my (rockchip-)boards it's always "just" a reset pin that needs 
+handling, this series looks like it would solve exactly that problem in a very 
+nice way.
+
+So while I cannot provide any meaningful insight right now, it would be cool 
+if you could keep me in the loop, as I'm really looking forward to this series 
+progressing.
+
+
+Thanks
+Heiko
+
+
+> Changes since v2
+> ================
+> 1. Add Javier's reviewed-by tags. Address some comments.
+> 2. Re-use existing properties for GPIOs etc by pwrseq-simple
+>    driver.  New property is still added: "power-sequence".
+>    I tried to address and do according to Rob's comments.
 > 
-> > On Mon,  6 Jun 2016 13:24:22 +0300
-> > Aleksei Mamlin <mamlinav@gmail.com> wrote:
-> >   
-> > > Add the full description of the Hynix H27UBG8T2BTR-BC NAND chip in the
-> > > nand_ids table so that we can later use the NAND ECC infos and ONFI timings
-> > > mode in controller drivers.  
-> > 
-> > Still hoping to get this series [1] merged in 4.8, but if that's
-> > not the case, I'll apply your patch.
-> > 
-> > BTW, that would be great if you could test it on your platforms.
-> >   
+>    Please look at patch 6/12 ("power: pwrseq: simple: Add support
+>    for regulator and generic property") for bindings and the
+>    new code around matching "power-sequence" property.
 > 
-> It seems that Hynix-specific initialization code can't handle H27UBG8T2BTR-BC
-> chip:
+> 3. I marked the usb code as "EXAMPLE" because that part
+>    is left to Peter Chen.
 > 
-> [    0.886153] nand: Could not find valid ONFI parameter page; aborting
-> [    0.892665] nand: device found, Manufacturer ID: 0xad, Chip ID: 0xd7
-> [    0.899025] nand: Hynix 1c03000.nand
-> [    0.902596] nand: bus width 8 instead 16 bit
-> [    0.906858] nand: No NAND device found
-> [    0.910620] sunxi_nand 1c03000.nand: failed to init nand chips
-> [    0.916528] sunxi_nand: probe of 1c03000.nand failed with error -22
-
-Can you try this patch? It should fix the problem [1].
-
-[1]http://code.bulix.org/6hjww1-100494
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> 
+> Problem
+> =======
+> When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
+> the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
+> is required, e.g. by suspend to RAM. The actual TFTP boot does
+> not have to happen. Just "usb start" from U-Boot is sufficient.
+> 
+> From the schematics, the regulator is a supply only to LAN, however
+> without toggling it off/on, the usb3503 hub won appear neither.
+> 
+> 
+> Solution
+> ========
+> This is very similar to the MMC pwrseq behavior so the idea is to:
+> 1. Move MMC pwrseq drivers to generic place,
+> 2. Extend the pwrseq-simple with regulator toggling,
+> 3. Add support to USB hub and port core for pwrseq,
+> 4. Toggle the regulator when needed.
+> 
+> Best regards,
+> Krzysztof
+> 
+> Krzysztof Kozlowski (12):
+>   power/mmc: Move pwrseq drivers to power/pwrseq
+>   MAINTAINERS: Retain Ulf Hansson as the same maintainer of pwrseq
+>   power: pwrseq: Enable COMPILE_TEST for drivers
+>   power: pwrseq: Remove mmc prefix from mmc_pwrseq
+>   power: pwrseq: Generalize mmc_pwrseq operations by removing mmc prefix
+>   power: pwrseq: simple: Add support for regulator and generic property
+>   power: pwrseq: Add support for USB hubs with external power
+>   usb: hub: Handle deferred probe
+>   EXAMPLE CODE: usb: port: Parse pwrseq phandle from Device Tree
+>   EXAMPLE CODE: usb: hub: Power sequence the ports on activation
+>   ARM: dts: exynos: Switch the buck8 to GPIO mode on Odroid U3
+>   ARM: dts: exynos: Fix LAN and HUB after bootloader initialization on
+>     Odroid U3
+> 
+>  .../pwrseq/pwrseq-emmc.txt}                        |   0
+>  .../pwrseq/pwrseq-simple.txt}                      |  29 +++-
+>  MAINTAINERS                                        |   9 ++
+>  arch/arm/boot/dts/exynos4412-odroidu3.dts          |   5 +
+>  drivers/mmc/Kconfig                                |   2 -
+>  drivers/mmc/core/Makefile                          |   3 -
+>  drivers/mmc/core/core.c                            |   8 +-
+>  drivers/mmc/core/host.c                            |   2 +-
+>  drivers/mmc/core/pwrseq.c                          | 110 ---------------
+>  drivers/mmc/core/pwrseq.h                          |  52 -------
+>  drivers/power/Kconfig                              |   1 +
+>  drivers/power/Makefile                             |   1 +
+>  drivers/{mmc/core => power/pwrseq}/Kconfig         |  22 ++-
+>  drivers/power/pwrseq/Makefile                      |   3 +
+>  drivers/power/pwrseq/pwrseq.c                      | 153
+> +++++++++++++++++++++ drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c   | 
+> 17 +--
+>  drivers/{mmc/core => power/pwrseq}/pwrseq_simple.c | 110 ++++++++++++---
+>  drivers/usb/core/hub.c                             |  16 ++-
+>  drivers/usb/core/hub.h                             |   3 +
+>  drivers/usb/core/port.c                            |  15 ++
+>  include/linux/mmc/host.h                           |   4 +-
+>  include/linux/pwrseq.h                             |  63 +++++++++
+>  22 files changed, 414 insertions(+), 214 deletions(-)
+>  rename Documentation/devicetree/bindings/{mmc/mmc-pwrseq-emmc.txt =>
+> power/pwrseq/pwrseq-emmc.txt} (100%) rename
+> Documentation/devicetree/bindings/{mmc/mmc-pwrseq-simple.txt =>
+> power/pwrseq/pwrseq-simple.txt} (53%) delete mode 100644
+> drivers/mmc/core/pwrseq.c
+>  delete mode 100644 drivers/mmc/core/pwrseq.h
+>  rename drivers/{mmc/core => power/pwrseq}/Kconfig (60%)
+>  create mode 100644 drivers/power/pwrseq/Makefile
+>  create mode 100644 drivers/power/pwrseq/pwrseq.c
+>  rename drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c (88%)
+>  rename drivers/{mmc/core => power/pwrseq}/pwrseq_simple.c (52%)
+>  create mode 100644 include/linux/pwrseq.h
