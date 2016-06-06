@@ -1,93 +1,116 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 18:01:18 +0100
-Subject: [PATCH kexec-tools v2 30/32] arm: fix type of phys_offset
+Date: Mon, 06 Jun 2016 18:00:57 +0100
+Subject: [PATCH kexec-tools v2 26/32] arm: rename crash_reserved_mem to
+ crash_kernel_mem
 In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
 References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xtu-0003uK-QP@e0050434b2927.dyn.armlinux.org.uk>
+Message-ID: <E1b9xtZ-0003tw-VT@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some LPAE systems may have phys_offset above the 4GB mark.  Hence, we
-need phys_offset to be a 64-bit integer.
+Rename crash_reserved_mem to crash_kernel_mem as we want to support
+multiple reserved memory ranges.
 
 Reviewed-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kexec/arch/arm/crashdump-arm.c | 4 ++--
- kexec/arch/arm/crashdump-arm.h | 1 -
- kexec/arch/arm/phys_to_virt.c  | 4 +++-
- kexec/arch/arm/phys_to_virt.h  | 8 ++++++++
- 4 files changed, 13 insertions(+), 4 deletions(-)
- create mode 100644 kexec/arch/arm/phys_to_virt.h
+ kexec/arch/arm/crashdump-arm.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
 diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index 2dc8846..2589582 100644
+index f2e6a0d..1a6ab88 100644
 --- a/kexec/arch/arm/crashdump-arm.c
 +++ b/kexec/arch/arm/crashdump-arm.c
-@@ -33,6 +33,7 @@
- #include "../../mem_regions.h"
- #include "crashdump-arm.h"
- #include "iomem.h"
-+#include "phys_to_virt.h"
- 
- #if __BYTE_ORDER == __LITTLE_ENDIAN
- #define ELFDATANATIVE ELFDATA2LSB
-@@ -70,7 +71,6 @@ static struct crash_elf_info elf_info = {
- 	.page_offset	= DEFAULT_PAGE_OFFSET,
+@@ -53,7 +53,7 @@ struct memory_ranges usablemem_rgns = {
  };
  
--unsigned long phys_offset;
- extern unsigned long long user_page_offset;
+ /* memory range reserved for crashkernel */
+-static struct memory_range crash_reserved_mem;
++static struct memory_range crash_kernel_mem;
  
- /* Retrieve kernel _stext symbol virtual address from /proc/kallsyms */
-@@ -293,7 +293,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
- 	 * region as PHYS_OFFSET.
+ static struct crash_elf_info elf_info = {
+ 	.class		= ELFCLASS32,
+@@ -140,7 +140,7 @@ static int get_kernel_page_offset(struct kexec_info *info,
+  */
+ static void crash_exclude_range(void)
+ {
+-	const struct memory_range *range = &crash_reserved_mem;
++	const struct memory_range *range = &crash_kernel_mem;
+ 	int i;
+ 
+ 	for (i = 0; i < usablemem_rgns.size; i++) {
+@@ -262,8 +262,8 @@ static void dump_memory_ranges(void)
+ 		return;
+ 
+ 	dbgprintf("crashkernel: [%#llx - %#llx] (%ldM)\n",
+-		  crash_reserved_mem.start, crash_reserved_mem.end,
+-		  (unsigned long)range_size(&crash_reserved_mem) >> 20);
++		  crash_kernel_mem.start, crash_kernel_mem.end,
++		  (unsigned long)range_size(&crash_kernel_mem) >> 20);
+ 
+ 	for (i = 0; i < usablemem_rgns.size; i++) {
+ 		struct memory_range *r = usablemem_rgns.ranges + i;
+@@ -313,10 +313,10 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 	 * Ensure that the crash kernel memory range is sane. The crash kernel
+ 	 * must be located within memory which is visible during booting.
  	 */
- 	phys_offset = usablemem_rgns.ranges->start;
--	dbgprintf("phys_offset: %#lx\n", phys_offset);
-+	dbgprintf("phys_offset: %#llx\n", phys_offset);
- 
- 	if (get_kernel_page_offset(info, &elf_info))
+-	if (crash_reserved_mem.end > ARM_MAX_VIRTUAL) {
++	if (crash_kernel_mem.end > ARM_MAX_VIRTUAL) {
+ 		fprintf(stderr,
+ 			"Crash kernel memory [0x%llx-0x%llx] is inaccessible at boot - unable to load crash kernel\n",
+-			crash_reserved_mem.start, crash_reserved_mem.end);
++			crash_kernel_mem.start, crash_kernel_mem.end);
  		return -1;
-diff --git a/kexec/arch/arm/crashdump-arm.h b/kexec/arch/arm/crashdump-arm.h
-index 7314960..6e87b13 100644
---- a/kexec/arch/arm/crashdump-arm.h
-+++ b/kexec/arch/arm/crashdump-arm.h
-@@ -16,7 +16,6 @@ extern struct memory_ranges usablemem_rgns;
+ 	}
  
- struct kexec_info;
+@@ -349,8 +349,8 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 	 * regions to be aligned to SECTION_SIZE.
+ 	 */
+ 	elfcorehdr = add_buffer_phys_virt(info, buf, bufsz, bufsz, 1 << 20,
+-					  crash_reserved_mem.start,
+-					  crash_reserved_mem.end, -1, 0);
++					  crash_kernel_mem.start,
++					  crash_kernel_mem.end, -1, 0);
  
--extern unsigned long phys_offset;
- extern int load_crashdump_segments(struct kexec_info *, char *);
+ 	dbgprintf("elfcorehdr: %#lx\n", elfcorehdr);
+ 	cmdline_add_elfcorehdr(mod_cmdline, elfcorehdr);
+@@ -360,7 +360,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 	 * prevents the dump capture kernel from using any other memory regions
+ 	 * which belong to the primary kernel.
+ 	 */
+-	cmdline_add_mem(mod_cmdline, elfcorehdr - crash_reserved_mem.start);
++	cmdline_add_mem(mod_cmdline, elfcorehdr - crash_kernel_mem.start);
  
- #ifdef __cplusplus
-diff --git a/kexec/arch/arm/phys_to_virt.c b/kexec/arch/arm/phys_to_virt.c
-index c2fe2ea..46a4f68 100644
---- a/kexec/arch/arm/phys_to_virt.c
-+++ b/kexec/arch/arm/phys_to_virt.c
-@@ -1,6 +1,8 @@
- #include "../../kexec.h"
- #include "../../crashdump.h"
--#include "crashdump-arm.h"
-+#include "phys_to_virt.h"
-+
-+uint64_t phys_offset;
+ 	dump_memory_ranges();
+ 	dbgprintf("kernel command line: \"%s\"\n", mod_cmdline);
+@@ -377,7 +377,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+  * @length: size of the memory region
+  *
+  * This function is called for each memory range in /proc/iomem, stores
+- * the location of the crash kernel range into @crash_reserved_mem, and
++ * the location of the crash kernel range into @crash_kernel_mem, and
+  * stores the system RAM into @usablemem_rgns.
+  */
+ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
+@@ -385,9 +385,9 @@ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
+ 				unsigned long long length)
+ {
+ 	if (strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) == 0) {
+-		crash_reserved_mem.start = base;
+-		crash_reserved_mem.end = base + length - 1;
+-		crash_reserved_mem.type = RANGE_RAM;
++		crash_kernel_mem.start = base;
++		crash_kernel_mem.end = base + length - 1;
++		crash_kernel_mem.type = RANGE_RAM;
+ 	}
+ 	else if (strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) == 0) {
+ 		return mem_regions_add(&usablemem_rgns,
+@@ -407,5 +407,5 @@ int is_crashkernel_mem_reserved(void)
+ {
+ 	kexec_iomem_for_each_line(NULL, iomem_range_callback, NULL);
  
- /**
-  * phys_to_virt() - translate physical address to virtual address
-diff --git a/kexec/arch/arm/phys_to_virt.h b/kexec/arch/arm/phys_to_virt.h
-new file mode 100644
-index 0000000..b3147dd
---- /dev/null
-+++ b/kexec/arch/arm/phys_to_virt.h
-@@ -0,0 +1,8 @@
-+#ifndef PHYS_TO_VIRT_H
-+#define PHYS_TO_VIRT_H
-+
-+#include <stdint.h>
-+
-+extern uint64_t phys_offset;
-+
-+#endif
+-	return crash_reserved_mem.start != crash_reserved_mem.end;
++	return crash_kernel_mem.start != crash_kernel_mem.end;
+ }
 -- 
 1.9.1
