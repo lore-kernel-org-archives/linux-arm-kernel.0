@@ -1,90 +1,28 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 17:59:34 +0100
-Subject: [PATCH kexec-tools v2 10/32] kexec: add generic helper to add to
- memory_regions
-In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xsE-0003sO-FZ@e0050434b2927.dyn.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 6 Jun 2016 18:12:48 +0100
+Subject: [RFC PATCH 0/4] arm64: vdso: check whether the params is invalid
+ address
+In-Reply-To: <1464750362-14188-1-git-send-email-yangyingliang@huawei.com>
+References: <1464750362-14188-1-git-send-email-yangyingliang@huawei.com>
+Message-ID: <20160606171248.GL669@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a helper to add a memory range to a memory_regions array.
+On Wed, Jun 01, 2016 at 11:05:58AM +0800, Yang Yingliang wrote:
+> The params of gettimeofday(), clock_gettime() and clock_getres()
+> is not checked. This will cause segment faults when the address is
+> invalid. 
+> E.g. gettimeofday(-1, -1);
+>      clock_gettime(0, -1);
+>      clock_getres(0, -1);
+> This patchset add a macro and use it to check the validation of these
+> pointer params.
 
-Reviewed-by: Pratyush Anand <panand@redhat.com>
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
----
- kexec/Makefile      |  4 ++++
- kexec/mem_regions.c | 30 ++++++++++++++++++++++++++++++
- kexec/mem_regions.h |  9 +++++++++
- 3 files changed, 43 insertions(+)
- create mode 100644 kexec/mem_regions.c
- create mode 100644 kexec/mem_regions.h
+Is this really necessary? It doesn't look to me like other architectures
+bother with this, and you're just adding code to the fastpath to handle
+cases that shouldn't happen to start with.
 
-diff --git a/kexec/Makefile b/kexec/Makefile
-index a758b4a..e2aee84 100644
---- a/kexec/Makefile
-+++ b/kexec/Makefile
-@@ -69,6 +69,10 @@ dist				+= kexec/fs2dt.c kexec/fs2dt.h
- $(ARCH)_FS2DT			=
- KEXEC_SRCS			+= $($(ARCH)_FS2DT)
- 
-+dist				+= kexec/mem_regions.c kexec/mem_regions.h
-+$(ARCH)_MEM_REGIONS		=
-+KEXEC_SRCS			+= $($(ARCH)_MEM_REGIONS)
-+
- include $(srcdir)/kexec/arch/alpha/Makefile
- include $(srcdir)/kexec/arch/arm/Makefile
- include $(srcdir)/kexec/arch/i386/Makefile
-diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
-new file mode 100644
-index 0000000..a4952ff
---- /dev/null
-+++ b/kexec/mem_regions.c
-@@ -0,0 +1,30 @@
-+#include "kexec.h"
-+#include "mem_regions.h"
-+
-+/**
-+ * mem_regions_add() - add a memory region to a set of ranges
-+ * @ranges: ranges to add the memory region to
-+ * @max: maximum number of entries in memory region
-+ * @base: base address of memory region
-+ * @length: length of memory region in bytes
-+ * @type: type of memory region
-+ *
-+ * Add the memory region to the set of ranges, and return %0 if successful,
-+ * or %-1 if we ran out of space.
-+ */
-+int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
-+                    unsigned long long length, int type)
-+{
-+	struct memory_range *range;
-+
-+	if (ranges->size >= ranges->max_size)
-+		return -1;
-+
-+	range = ranges->ranges + ranges->size++;
-+	range->start = base;
-+	range->end = base + length - 1;
-+	range->type = type;
-+
-+	return 0;
-+}
-+
-diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
-new file mode 100644
-index 0000000..b9cfba1
---- /dev/null
-+++ b/kexec/mem_regions.h
-@@ -0,0 +1,9 @@
-+#ifndef MEM_REGIONS_H
-+#define MEM_REGIONS_H
-+
-+struct memory_ranges;
-+
-+int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
-+                    unsigned long long length, int type);
-+
-+#endif
--- 
-1.9.1
+Also, I think I remember seeing SEGVs from libc wrappers for other syscalls
+in the past, so this just isn't compelling to me.
+
+Will
