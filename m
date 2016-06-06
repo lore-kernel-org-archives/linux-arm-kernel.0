@@ -1,78 +1,33 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Mon, 6 Jun 2016 22:59:03 +0300
-Subject: [PATCH 5/7] mtd: nand: Add Hynix H27UBG8T2BTR-BC to nand_ids table
-In-Reply-To: <20160606205549.1ecd6fdb@bbrezillon>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
- <1465208664-9366-6-git-send-email-mamlinav@gmail.com>
- <20160606205549.1ecd6fdb@bbrezillon>
-Message-ID: <20160606225903.264abc01647eb1528cc226bd@gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon,  6 Jun 2016 16:24:42 -0400
+Subject: [PATCH 0/2] ARM: dts: exynos: Fix port nodes names for Snow and Peach
+ Pit DTS
+Message-ID: <1465244684-23612-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Jun 2016 20:55:49 +0200
-Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
+Hello Krzysztof,
 
-> On Mon,  6 Jun 2016 13:24:22 +0300
-> Aleksei Mamlin <mamlinav@gmail.com> wrote:
-> 
-> > Add the full description of the Hynix H27UBG8T2BTR-BC NAND chip in the
-> > nand_ids table so that we can later use the NAND ECC infos and ONFI timings
-> > mode in controller drivers.
-> 
-> Still hoping to get this series [1] merged in 4.8, but if that's
-> not the case, I'll apply your patch.
-> 
-> BTW, that would be great if you could test it on your platforms.
-> 
+This small series fixes the lookup for the lvds-to-eDP bridge found in
+the Exynos5250 Snow and Exynos5420 Peach Pit Chromebooks. The problem
+was introduced by the commits that fixed the recent DTC warnings and
+it was that the OF graph logic expects the nodes to always be called
+'port'.
 
-It seems that Hynix-specific initialization code can't handle H27UBG8T2BTR-BC
-chip:
+So the correct fix for the DTC warnings is to add a '#address-cells',
+'#size-cells' and 'reg' properties when there is more than one port.
 
-[    0.886153] nand: Could not find valid ONFI parameter page; aborting
-[    0.892665] nand: device found, Manufacturer ID: 0xad, Chip ID: 0xd7
-[    0.899025] nand: Hynix 1c03000.nand
-[    0.902596] nand: bus width 8 instead 16 bit
-[    0.906858] nand: No NAND device found
-[    0.910620] sunxi_nand 1c03000.nand: failed to init nand chips
-[    0.916528] sunxi_nand: probe of 1c03000.nand failed with error -22
+Best regards,
+Javier
 
-> 
-> Regards,
-> 
-> Boris
-> 
-> [1]https://lkml.org/lkml/2016/5/27/264
-> 
-> > 
-> > Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
-> > ---
-> >  drivers/mtd/nand/nand_ids.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/drivers/mtd/nand/nand_ids.c b/drivers/mtd/nand/nand_ids.c
-> > index ccc05f5..ccdc773 100644
-> > --- a/drivers/mtd/nand/nand_ids.c
-> > +++ b/drivers/mtd/nand/nand_ids.c
-> > @@ -52,6 +52,10 @@ struct nand_flash_dev nand_flash_ids[] = {
-> >  		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
-> >  		  SZ_8K, SZ_8K, SZ_2M, NAND_NEED_SCRAMBLING, 6, 640,
-> >  		  NAND_ECC_INFO(40, SZ_1K), 4 },
-> > +	{"H27UBG8T2BTR-BC 32G 3.3V 8-bit",
-> > +		{ .id = {0xad, 0xd7, 0x94, 0xda, 0x74, 0xc3} },
-> > +		  SZ_8K, SZ_4K, SZ_2M, NAND_NEED_SCRAMBLING, 6, 640,
-> > +		  NAND_ECC_INFO(40, SZ_1K), 0 },
-> >  
-> >  	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
-> >  	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
-> 
-> 
-> 
-> -- 
-> Boris Brezillon, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
 
+Javier Martinez Canillas (2):
+  ARM: dts: exynos: Fix port nodes names for Exynos5250 Snow board
+  ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board
+
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi | 13 ++++++++++---
+ arch/arm/boot/dts/exynos5420-peach-pit.dts    | 13 ++++++++++---
+ 2 files changed, 20 insertions(+), 6 deletions(-)
 
 -- 
-Thanks and regards,
-Aleksei Mamlin
+2.5.5
