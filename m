@@ -1,144 +1,36 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 06 Jun 2016 12:51:56 +0200
-Subject: [PATCH 5/9] clocksource/drivers/exynos_mct: Convert init function
- to return error
-In-Reply-To: <1464770093-12667-6-git-send-email-daniel.lezcano@linaro.org>
-References: <1464770093-12667-1-git-send-email-daniel.lezcano@linaro.org>
- <1464770093-12667-6-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <575555CC.1020906@samsung.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Jun 2016 11:59:42 +0100
+Subject: [PATCH 0/3] arm64: Kill ESR_LNX_EXEC
+In-Reply-To: <20160602182146.GG7697@arm.com>
+References: <1464694383-31700-1-git-send-email-mark.rutland@arm.com>
+ <20160531165311.GD11321@e104818-lin.cambridge.arm.com>
+ <20160602182146.GG7697@arm.com>
+Message-ID: <20160606105942.GD6831@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 10:34 AM, Daniel Lezcano wrote:
-> The init functions do not return any error. They behave as the following:
+On Thu, Jun 02, 2016 at 07:21:47PM +0100, Will Deacon wrote:
+> On Tue, May 31, 2016 at 05:53:11PM +0100, Catalin Marinas wrote:
+> > On Tue, May 31, 2016 at 12:33:00PM +0100, Mark Rutland wrote:
+> > > Mark Rutland (3):
+> > >   arm64: add macro to extract ESR_ELx.EC
+> > >   arm64/kvm: use ESR_ELx_EC to extract EC
+> > >   arm64: kill ESR_LNX_EXEC
+> > 
+> > For the series:
+> > 
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 > 
->  - panic, thus leading to a kernel crash while another timer may work and
->    make the system boot up correctly
-> 
->  or
-> 
->  - print an error and let the caller unaware if the state of the system
-> 
-> Change that by converting the init functions to return an error conforming
-> to the CLOCKSOURCE_OF_RET prototype.
-> 
-> Proper error handling (rollback, errno value) will be changed later case
-> by case, thus this change just return back an error or success in the init
-> function.
+> You may as well queue this for 4.8 when you start picking up patches.
+> I don't think it warrants going in for 4.7, since it doesn't actually
+> fix anything.
 
-I don't see the benefits of this change alone. You are replacing one
-non-return code to another always-return-success code. The effect is
-exactly the same. It would make sense to change it to CLOCKSOURCE_OF_RET
-along with proper error handling.
+Makes sense to me.
 
-Best regards,
-Krzysztof
+Catalin, I've dropped this in my git repo for the moment [1], and can
+rebase/repost as/when required. Please give me a poke if so.
 
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> ---
->  drivers/clocksource/exynos_mct.c | 36 ++++++++++++++++++++++++------------
->  1 file changed, 24 insertions(+), 12 deletions(-)
-> 
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index be09bc0..f6caed0 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -232,7 +232,7 @@ static cycles_t exynos4_read_current_timer(void)
->  	return exynos4_read_count_32();
->  }
->  
-> -static void __init exynos4_clocksource_init(void)
-> +static int __init exynos4_clocksource_init(void)
->  {
->  	exynos4_mct_frc_start();
->  
-> @@ -244,6 +244,8 @@ static void __init exynos4_clocksource_init(void)
->  		panic("%s: can't register clocksource\n", mct_frc.name);
->  
->  	sched_clock_register(exynos4_read_sched_clock, 32, clk_rate);
-> +
-> +	return 0;
->  }
->  
->  static void exynos4_mct_comp0_stop(void)
-> @@ -335,12 +337,14 @@ static struct irqaction mct_comp_event_irq = {
->  	.dev_id		= &mct_comp_device,
->  };
->  
-> -static void exynos4_clockevent_init(void)
-> +static int exynos4_clockevent_init(void)
->  {
->  	mct_comp_device.cpumask = cpumask_of(0);
->  	clockevents_config_and_register(&mct_comp_device, clk_rate,
->  					0xf, 0xffffffff);
->  	setup_irq(mct_irqs[MCT_G0_IRQ], &mct_comp_event_irq);
-> +
-> +	return 0;
->  }
->  
->  static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
-> @@ -516,7 +520,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
->  	.notifier_call = exynos4_mct_cpu_notify,
->  };
->  
-> -static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
-> +static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
->  {
->  	int err, cpu;
->  	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
-> @@ -572,15 +576,17 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
->  
->  	/* Immediately configure the timer on the boot CPU */
->  	exynos4_local_timer_setup(mevt);
-> -	return;
-> +	return 0;
->  
->  out_irq:
->  	free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
-> +	return err;
->  }
->  
-> -static void __init mct_init_dt(struct device_node *np, unsigned int int_type)
-> +static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
->  {
->  	u32 nr_irqs, i;
-> +	int ret;
->  
->  	mct_int_type = int_type;
->  
-> @@ -600,20 +606,26 @@ static void __init mct_init_dt(struct device_node *np, unsigned int int_type)
->  	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
->  		mct_irqs[i] = irq_of_parse_and_map(np, i);
->  
-> -	exynos4_timer_resources(np, of_iomap(np, 0));
-> -	exynos4_clocksource_init();
-> -	exynos4_clockevent_init();
-> +	ret = exynos4_timer_resources(np, of_iomap(np, 0));
-> +	if (ret)
-> +		return ret;
-> +
-> +	ret = exynos4_clocksource_init();
-> +	if (ret)
-> +		return ret;
-> +
-> +	return exynos4_clockevent_init();
->  }
->  
->  
-> -static void __init mct_init_spi(struct device_node *np)
-> +static int __init mct_init_spi(struct device_node *np)
->  {
->  	return mct_init_dt(np, MCT_INT_SPI);
->  }
->  
-> -static void __init mct_init_ppi(struct device_node *np)
-> +static int __init mct_init_ppi(struct device_node *np)
->  {
->  	return mct_init_dt(np, MCT_INT_PPI);
->  }
-> -CLOCKSOURCE_OF_DECLARE(exynos4210, "samsung,exynos4210-mct", mct_init_spi);
-> -CLOCKSOURCE_OF_DECLARE(exynos4412, "samsung,exynos4412-mct", mct_init_ppi);
-> +CLOCKSOURCE_OF_DECLARE_RET(exynos4210, "samsung,exynos4210-mct", mct_init_spi);
-> +CLOCKSOURCE_OF_DECLARE_RET(exynos4412, "samsung,exynos4412-mct", mct_init_ppi);
-> 
+Thanks,
+Mark.
+
+[1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git arm64/kill-esr-lnx-exec
