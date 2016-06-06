@@ -1,101 +1,24 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 6 Jun 2016 09:14:38 -0500
-Subject: [PATCH 3/5] ARM: sun8i: dt: Add DT bindings documentation for
- Allwinner sun8i-emac
-In-Reply-To: <1464947790-22991-4-git-send-email-clabbe.montjoie@gmail.com>
-References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
- <1464947790-22991-4-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20160606141438.GA9510@rob-hp-laptop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 6 Jun 2016 16:15:24 +0200
+Subject: [PATCH v4 5/7] net: mdio-mux: Add MDIO mux driver for iProc SoCs
+In-Reply-To: <1465216900-11755-6-git-send-email-pramod.kumar@broadcom.com>
+References: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
+ <1465216900-11755-6-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <20160606141524.GL2063@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 11:56:28AM +0200, LABBE Corentin wrote:
-> This patch adds documentation for Device-Tree bindings for the
-> Allwinner sun8i-emac driver.
+On Mon, Jun 06, 2016 at 06:11:38PM +0530, Pramod Kumar wrote:
+> iProc based SoCs supports the integrated mdio multiplexer which
+> has the bus selection as well as mdio transaction generation logic
+> inside.
 > 
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
-> ---
->  .../bindings/net/allwinner,sun8i-emac.txt          | 64 ++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+> This multiplexer has child buses for PCIe, SATA, USB and ETH. These
+> buses could be internal or external to SOC where PHYs are attached.
+> These buses could use C-45 or C-22 mdio transaction.
 > 
-> diff --git a/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> new file mode 100644
-> index 0000000..cf71a71
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
-> @@ -0,0 +1,64 @@
-> +* Allwinner sun8i EMAC ethernet controller
-> +
-> +Required properties:
-> +- compatible: "allwinner,sun8i-a83t-emac", "allwinner,sun8i-h3-emac",
-> +		or "allwinner,sun50i-a64-emac"
-> +- reg: address and length of the register sets for the device.
-> +- reg-names: should be "emac" and "syscon", matching the register sets
+> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
 
-Is syscon shared with other devices? Your example only has 1 reg 
-address.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-> +- interrupts: interrupt for the device
-> +- clocks: A phandle to the reference clock for this device
-> +- clock-names: should be "ahb"
-> +- resets: A phandle to the reset control for this device
-> +- reset-names: should be "ahb"
-> +- phy-mode: See ethernet.txt
-> +- phy or phy-handle: See ethernet.txt
-> +- #address-cells: shall be 1
-> +- #size-cells: shall be 0
-> +
-> +"allwinner,sun8i-h3-emac" also requires:
-> +- clocks: an extra phandle to the reference clock for the EPHY
-> +- clock-names: an extra "ephy" entry matching the clocks property
-> +- resets: an extra phandle to the reset control for the EPHY
-> +- resets-names: an extra "ephy" entry matching the resets property
-> +
-> +See ethernet.txt in the same directory for generic bindings for ethernet
-> +controllers.
-> +
-> +The device node referenced by "phy" or "phy-handle" should be a child node
-> +of this node. See phy.txt for the generic PHY bindings.
-> +
-> +Optional properties:
-> +- phy-supply: phandle to a regulator if the PHY needs one
-> +- phy-io-supply: phandle to a regulator if the PHY needs a another one for I/O.
-> +		 This is sometimes found with RGMII PHYs, which use a second
-> +		 regulator for the lower I/O voltage.
-
-These should go in the phy's node.
-
-> +- allwinner,tx-delay: The setting of the TX clock delay chain
-> +- allwinner,rx-delay: The setting of the RX clock delay chain
-> +
-> +The TX/RX clock delay chain settings are board specific.
-> +
-> +Optional properties for "allwinner,sun8i-h3-emac":
-> +- allwinner,use-internal-phy: Use the H3 SoC's internal E(thernet) PHY
-> +- allwinner,leds-active-low: EPHY LEDs are active low
-> +
-> +When the internal PHY is requested, the implementation shall configure the
-> +internal PHY to use the address specified in the child PHY node.
-> +
-> +Example:
-> +
-> +emac: ethernet at 01c0b000 {
-> +	compatible = "allwinner,sun8i-h3-emac";
-> +	reg = <0x01c0b000 0x1000>;
-> +	interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&bus_gates 17>, <&bus_gates 128>;
-> +	clock-names = "ahb", "ephy";
-> +	resets = <&ahb_rst 17>, <&ahb_rst 66>;
-> +	reset-names = "ahb", "ephy";
-> +	phy = <&phy1>;
-> +	allwinner,use-internal-phy;
-> +	allwinner,leds-active-low;
-> +
-> +	phy1: ethernet-phy at 1 {
-> +		reg = <1>;
-> +	};
-> +};
-> -- 
-> 2.7.3
-> 
+     Andrew
