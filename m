@@ -1,35 +1,140 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 17:59:50 +0100
-Subject: [PATCH kexec-tools v2 13/32] arm: fix pointer signedness warning in
- kexec-uImage-arm.c
-In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xsU-0003sg-4H@e0050434b2927.dyn.armlinux.org.uk>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 6 Jun 2016 18:22:41 +0100
+Subject: [PATCH v2 6/7] iommu/arm-smmu: Finish off SMMUv3 default domain
+ support
+In-Reply-To: <20160606154712.GA9864@e106794-lin.localdomain>
+References: <cover.1464966939.git.robin.murphy@arm.com>
+ <aabcdd814b93b2b6a902b189f6911f929a29b64f.1464966939.git.robin.murphy@arm.com>
+ <20160606154712.GA9864@e106794-lin.localdomain>
+Message-ID: <5755B161.3090109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kexec/arch/arm/kexec-uImage-arm.c: In function 'uImage_arm_probe':
-kexec/arch/arm/kexec-uImage-arm.c:14:2: warning: pointer targets in passing argument 1 of 'uImage_probe_kernel' differ in signedness [-Wpointer-sign]
+On 06/06/16 16:47, Jean-Philippe Brucker wrote:
+> Hi Robin,
+>
+> I quite like this change, the result looks pretty clean. I rebased my
+> current work and didn't notice any major issue. Some nits below.
 
-Reviewed-by: Pratyush Anand <panand@redhat.com>
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
----
- kexec/arch/arm/kexec-uImage-arm.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Thanks for looking!
 
-diff --git a/kexec/arch/arm/kexec-uImage-arm.c b/kexec/arch/arm/kexec-uImage-arm.c
-index 03c2f4d..8e0a9ac 100644
---- a/kexec/arch/arm/kexec-uImage-arm.c
-+++ b/kexec/arch/arm/kexec-uImage-arm.c
-@@ -11,7 +11,8 @@
- 
- int uImage_arm_probe(const char *buf, off_t len)
- {
--	return uImage_probe_kernel(buf, len, IH_ARCH_ARM);
-+	return uImage_probe_kernel((const unsigned char *)buf, len,
-+				   IH_ARCH_ARM);
- }
- 
- int uImage_arm_load(int argc, char **argv, const char *buf, off_t len,
--- 
-1.9.1
+> On Fri, Jun 03, 2016 at 06:15:41PM +0100, Robin Murphy wrote:
+>> The driver's current reliance on attaching/detaching an entire group
+>> for the first device it sees is at odds with the IOMMU core's initial
+>> construction of a group by adding each device and attaching it to the
+>> default domain in turn. As it turns out, we can happily do away with the
+>> whole palaver by simply letting each device be in charge of its own
+>> stream ID/stream table entry, and reducing the problem of tracking
+>> duplicate IDs and domains down to "Is the STE already associated with
+>> the appropriate context?", which is easily done by just looking at the
+>> stream table itself.
+>>
+>> With an of_xlate() callback in place, devices attached to default
+>> domains will now get appropriate DMA ops installed, so make sure we
+>> enable translation again to stop them getting horribly confused - this
+>> reverts the SMMUv3 portion of cbf8277ef456 ("iommu/arm-smmu: Treat
+>> IOMMU_DOMAIN_DMA as bypass for now")
+>>
+>> Signed-off-by: Robin Murphy <robin.murphy@arm.com>
+>> ---
+> ...
+>>
+>> -static int arm_smmu_install_ste_for_group(struct arm_smmu_group *smmu_group)
+>> +static void arm_smmu_install_ste(struct arm_smmu_master_data *master,
+>> +				struct arm_smmu_domain *smmu_domain)
+>
+> (Second line is misaligned here)
+
+Fixed.
+
+>>   {
+>> -	int i;
+>> -	struct arm_smmu_domain *smmu_domain = smmu_group->domain;
+>> -	struct arm_smmu_strtab_ent *ste = &smmu_group->ste;
+>> -	struct arm_smmu_device *smmu = smmu_group->smmu;
+>> +	struct arm_smmu_device *smmu = master->smmu;
+>> +	struct arm_smmu_strtab_ent *ste = &master->ste;
+>> +	__le64 *step = arm_smmu_get_step_for_sid(smmu, master->sid);
+>>
+>>   	if (smmu_domain->stage == ARM_SMMU_DOMAIN_S1) {
+>>   		ste->s1_cfg = &smmu_domain->s1_cfg;
+>> @@ -1634,42 +1628,16 @@ static int arm_smmu_install_ste_for_group(struct arm_smmu_group *smmu_group)
+>>   		ste->s2_cfg = &smmu_domain->s2_cfg;
+>>   	}
+>>
+>> -	for (i = 0; i < smmu_group->num_sids; ++i) {
+>> -		u32 sid = smmu_group->sids[i];
+>> -		__le64 *step = arm_smmu_get_step_for_sid(smmu, sid);
+>> -
+>> -		arm_smmu_write_strtab_ent(smmu, sid, step, ste);
+>> -	}
+>> -
+>> -	return 0;
+>> -}
+>> -
+>> -static void arm_smmu_detach_dev(struct device *dev)
+>> -{
+>> -	struct arm_smmu_group *smmu_group = arm_smmu_group_get(dev);
+>> -
+>> -	smmu_group->ste.bypass = true;
+>> -	if (arm_smmu_install_ste_for_group(smmu_group) < 0)
+>> -		dev_warn(dev, "failed to install bypass STE\n");
+>> -
+>> -	smmu_group->domain = NULL;
+>> +	arm_smmu_write_strtab_ent(smmu, master->sid, step, ste);
+>>   }
+>>
+>>   static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>>   {
+>>   	int ret = 0;
+>> -	struct arm_smmu_device *smmu;
+>>   	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>> -	struct arm_smmu_group *smmu_group = arm_smmu_group_get(dev);
+>> +	struct arm_smmu_master_data *master = dev->archdata.iommu;
+>
+> (calling this member 'master' or 'smmu_master' consistently, instead of
+> 'data', would make the driver easier to grep)
+
+Good point; it's now called "master" everywhere.
+
+>> +	struct arm_smmu_device *smmu = master->smmu;
+>>
+>> -	if (!smmu_group)
+>> -		return -ENOENT;
+>> -
+>> -	/* Already attached to a different domain? */
+>> -	if (smmu_group->domain && smmu_group->domain != smmu_domain)
+>> -		arm_smmu_detach_dev(dev);
+>> -
+>> -	smmu = smmu_group->smmu;
+>>   	mutex_lock(&smmu_domain->init_mutex);
+>>
+>>   	if (!smmu_domain->smmu) {
+>> @@ -1688,21 +1656,9 @@ static int arm_smmu_attach_dev(struct iommu_domain *domain, struct device *dev)
+>>   		goto out_unlock;
+>>   	}
+>>
+>> -	/* Group already attached to this domain? */
+>> -	if (smmu_group->domain)
+>> -		goto out_unlock;
+>> +	master->ste.bypass = false;
+>
+> Should also set master->ste.valid = true. It worked out of the box
+> during my first test, because master is allocated with kmalloc and
+> initialised with garbage. Could we also use kzalloc, in the of_xlate
+> patch?
+
+Yikes! I think this is the of_xlate directly cherry-picked from a more 
+aggressive attempt to remove arm_smmu_strtab_ent along with 
+arm_smmu_group, and those bits of initialisation never got added back; 
+both fixed.
+
+Thanks for catching all those - I've recreated the unversioned 
+iommu/generic branch with a fixup patch on top for the time being.
+
+Robin.
+
+>
+> Thanks,
+> Jean-Philippe
+>
