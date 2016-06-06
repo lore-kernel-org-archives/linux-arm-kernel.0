@@ -1,44 +1,55 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 6 Jun 2016 11:42:12 -0700
-Subject: [PATCH v4 7/7] phy: Add Northstar2 PCI Phy support
-In-Reply-To: <1465216900-11755-8-git-send-email-pramod.kumar@broadcom.com>
-References: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
- <1465216900-11755-8-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <5755C404.3080502@gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 6 Jun 2016 20:46:03 +0200
+Subject: [PATCH v2 00/11] pwm: Add support for PWM Capture
+In-Reply-To: <20160606153231.GE1525@dell>
+References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
+ <20160429094010.6bfb131c@bbrezillon> <20160606153231.GE1525@dell>
+Message-ID: <20160606204603.09a8d2cf@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2016 05:41 AM, Pramod Kumar wrote:
-> Add PCI Phy support for Broadcom Northstar2 SoCs.  This driver uses the
-> interface from the iproc mdio mux driver to enable the devices
-> respective phys.
-> 
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-> ---
->  drivers/phy/Kconfig            |   8 +++
->  drivers/phy/Makefile           |   2 +-
->  drivers/phy/phy-bcm-ns2-pcie.c | 115 +++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 124 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/phy/phy-bcm-ns2-pcie.c
-> 
-> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-> index b869b98..01fb93b 100644
-> --- a/drivers/phy/Kconfig
-> +++ b/drivers/phy/Kconfig
-> @@ -434,4 +434,12 @@ config PHY_CYGNUS_PCIE
->  
->  source "drivers/phy/tegra/Kconfig"
->  
-> +config PHY_NS2_PCIE
-> +	tristate "Broadcom Northstar2 PCIe PHY driver"
-> +	depends on OF && MDIO_BUS_MUX_BCM_IPROC
-> +	select GENERIC_PHY
-> +	default ARCH_BCM_IPROC
+On Mon, 6 Jun 2016 16:32:31 +0100
+Lee Jones <lee.jones@linaro.org> wrote:
 
-Are not you missing a dependency on PHYLIB too to provide
-mdio_module_register() etc. (at least make it build)?
+> On Fri, 29 Apr 2016, Boris Brezillon wrote:
+> 
+> > Hi Lee,
+> > 
+> > On Fri, 22 Apr 2016 11:18:04 +0100
+> > Lee Jones <lee.jones@linaro.org> wrote:
+> >   
+> > > The first part of this set extends the current PWM API to allow external
+> > > code to request a PWM Capture.  Subsequent patches then make use of the
+> > > new API by providing a userspace offering via /sysfs.  The final part of
+> > > the set supplies PWM Capture functionality into the already existing STi
+> > > PWM driver.  
+> > 
+> > Is there a reason you decided to not put this driver in IIO? IMHO, it
+> > would be more appropriate to make your PWM device an MFD that can either
+> > bind to the PWM or the capture driver.
+> > And BTW, IIO already has a sysfs interface (you may have to extend the
+> > API to support your type of capture though).  
+> 
+> Multi-Function Device drivers can only be justified if the IP
+> contained does not and can not live in a single subsystem.  The IP
+> which controls both PWM-in and PWM-out in this device is the same.  I
+> can't fathom a sane reason why you would wish to separate this
+> functionality over multiple subsystems.
+> 
+
+Well, I still think what you describe as PWM-in is actually a capture
+device that would perfectly fit in the IIO subsystem, and I guess you
+can't use the PWM IP as a capture and waveform generator device as the
+same time, which is why I suggested the MFD approach to select the mode.
+
+Anyway, I'm not the PWM or the IIO maintainer, so I'm just sharing my
+opinion here.
+
+Regards,
+
+Boris
 
 -- 
-Florian
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
