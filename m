@@ -1,126 +1,62 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 18:01:03 +0100
-Subject: [PATCH kexec-tools v2 27/32] arm: add support for multiple reserved
- regions
-In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xtf-0003u2-5t@e0050434b2927.dyn.armlinux.org.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 6 Jun 2016 18:10:16 +0100
+Subject: [RFC PATCH 0/2] scpi: Add SCPI framework to handle vendors
+ variants
+In-Reply-To: <574BFA13.40009@baylibre.com>
+References: <1464255491-18503-1-git-send-email-narmstrong@baylibre.com>
+ <57472450.4000709@arm.com> <574802AF.2080909@baylibre.com>
+ <574BFA13.40009@baylibre.com>
+Message-ID: <5755AE78.4030104@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for reserving multiple memory regions rather than just a
-single region.
 
-Reviewed-by: Pratyush Anand <panand@redhat.com>
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
----
- kexec/arch/arm/crashdump-arm.c | 66 ++++++++++++++++--------------------------
- 1 file changed, 25 insertions(+), 41 deletions(-)
 
-diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index 1a6ab88..9113f5e 100644
---- a/kexec/arch/arm/crashdump-arm.c
-+++ b/kexec/arch/arm/crashdump-arm.c
-@@ -55,6 +55,14 @@ struct memory_ranges usablemem_rgns = {
- /* memory range reserved for crashkernel */
- static struct memory_range crash_kernel_mem;
- 
-+/* reserved regions */
-+#define CRASH_MAX_RESERVED_RANGES 2
-+static struct memory_range crash_reserved_ranges[CRASH_MAX_RESERVED_RANGES];
-+static struct memory_ranges crash_reserved_rgns = {
-+	.max_size = CRASH_MAX_RESERVED_RANGES,
-+	.ranges = crash_reserved_ranges,
-+};
-+
- static struct crash_elf_info elf_info = {
- 	.class		= ELFCLASS32,
- 	.data		= ELFDATANATIVE,
-@@ -133,44 +141,6 @@ static int get_kernel_page_offset(struct kexec_info *info,
- }
- 
- /**
-- * crash_exclude_range() - excludes memory region reserved for crashkernel
-- *
-- * Function locates where crashkernel reserved memory is and removes that region
-- * from the available memory regions.
-- */
--static void crash_exclude_range(void)
--{
--	const struct memory_range *range = &crash_kernel_mem;
--	int i;
--
--	for (i = 0; i < usablemem_rgns.size; i++) {
--		struct memory_range *r = usablemem_rgns.ranges + i;
--
--		/*
--		 * We assume that crash area is fully contained in
--		 * some larger memory area.
--		 */
--		if (r->start <= range->start && r->end >= range->end) {
--			struct memory_range *new;
--			/*
--			 * Let's split this area into 2 smaller ones and
--			 * remove excluded range from between. First create
--			 * new entry for the remaining area.
--			 */
--			new = usablemem_rgns.ranges + usablemem_rgns.size;
--			new->start = range->end + 1;
--			new->end = r->end;
--			usablemem_rgns.size++;
--			/*
--			 * Next update this area to end before excluded range.
--			 */
--			r->end = range->start - 1;
--			break;
--		}
--	}
--}
--
--/**
-  * crash_get_memory_ranges() - read system physical memory
-  *
-  * Function reads through system physical memory and stores found memory regions
-@@ -181,16 +151,28 @@ static void crash_exclude_range(void)
-  */
- static int crash_get_memory_ranges(void)
- {
-+	int i;
-+
- 	if (usablemem_rgns.size < 1) {
- 		errno = EINVAL;
- 		return -1;
- 	}
- 
- 	/*
--	 * Exclude memory reserved for crashkernel (this may result a split memory
--	 * region).
-+	 * Exclude all reserved memory from the usable memory regions.
-+	 * We want to avoid dumping the crashkernel region itself.  Note
-+	 * that this may result memory regions in usablemem_rgns being
-+	 * split.
- 	 */
--	crash_exclude_range();
-+	for (i = 0; i < crash_reserved_rgns.size; i++) {
-+		if (mem_regions_exclude(&usablemem_rgns,
-+					&crash_reserved_rgns.ranges[i])) {
-+			fprintf(stderr,
-+				"Error: Number of crash memory ranges excedeed the max limit\n");
-+			errno = ENOMEM;
-+			return -1;
-+		}
-+	}
- 
- 	/*
- 	 * Make sure that the memory regions are sorted.
-@@ -388,6 +370,8 @@ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
- 		crash_kernel_mem.start = base;
- 		crash_kernel_mem.end = base + length - 1;
- 		crash_kernel_mem.type = RANGE_RAM;
-+		return mem_regions_add(&crash_reserved_rgns,
-+				       base, length, RANGE_RAM);
- 	}
- 	else if (strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) == 0) {
- 		return mem_regions_add(&usablemem_rgns,
+On 30/05/16 09:30, Neil Armstrong wrote:
+> On 05/27/2016 10:17 AM, Neil Armstrong wrote:
+
+>
+> While looking for other ARMv8 based platform, I found that the RK3368
+> platform has the same SCPI implementation as Amlogic.
+>
+> They extended it with DDR, system and thermal commands.
+>
+> Look at :
+> https://github.com/geekboxzone/mmallow_kernel/blob/geekbox/drivers/mailbox/scpi_cmd.h
+>
+>https://github.com/geekboxzone/mmallow_kernel/blob/geekbox/driver/mailbox/scpi_protocol.c
+>
+> So the SCPI must have a framework to allow different protocol
+> versions, and must allow command extension. Grouping Rockchip and
+> Amlogic should be done, thus needing a generic name like vendor_scpi
+> or with a version.
+>
+> Sudeep, could you somehow find out which version of the protocol
+> AmLogic and Rockchip based their SCPI development ?
+>
+>
+
+As Caesar Wang replied, they had a previous version of SCPI and I
+suggested on how to extend the command set previously in private.
+Not sure whats the progress on that
+
+Anyways I had a look at geekbox driver and it looks mostly based on the
+initial driver I wrote for initial SCPI versions. I am worried that your
+extension might help people to develop their own protocol instead of
+following the existing standards. SCPI is published now, so I vendors
+use that rather than making up their own. Also ARM is trying to
+standardize something in this area like PSCI, but that may take little
+more time as it's under discussion with vendors.
+
+Though this initial version of SCPI is not published, I am sure it is
+almost same as v1.0 except that the CMD is not part of payload like
+v1.0. In v1.0 it's part of payload and the mailbox is used just for
+doorbell mechanism.
+
+IMO, we can add some compatible to indicate the pre v1.0 protocol
+and add the support to the existing driver itself. Let me know your
+thoughts.
+
 -- 
-1.9.1
+Regards,
+Sudeep
