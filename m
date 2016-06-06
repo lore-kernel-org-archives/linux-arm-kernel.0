@@ -1,36 +1,32 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon,  6 Jun 2016 18:41:01 +0900
-Subject: [PATCH 2/4] serial: 8250_uniphier: drop !defined(MODULE) conditional
-In-Reply-To: <1465206063-1018-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1465206063-1018-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1465206063-1018-3-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon,  6 Jun 2016 18:40:59 +0900
+Subject: [PATCH 0/4] serial: earlycon: keep earlycon symbols for non-module
+ and driver clean-ups
+Message-ID: <1465206063-1018-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The !defined(MODULE) conditional has been added to the
-OF_EARLYCON_DECLARE() define.
 
-Now we can revert commit a2d3ea2f2399 ("serial: 8250/uniphier:
-fix modular build").
+1/4: keep earlycon symbols only when CONFIG_SERIAL_EARLYCON is defined
+     and the driver is built-in.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+2/4 thru 4/4: driver clean-ups.
+              (partially reverts build fixes by Arnd Bergmann)
 
+
+
+Masahiro Yamada (4):
+  earlycon: mark earlycon code as __used iif the caller is built-in
+  serial: 8250_uniphier: drop !defined(MODULE) conditional
+  serial: 8250_mtk: drop !defined(MODULE) conditional
+  serial: 8250_ingenic: drop #if conditional surrounding earlycon code
+
+ drivers/tty/serial/8250/8250_ingenic.c  | 2 --
+ drivers/tty/serial/8250/8250_mtk.c      | 2 +-
  drivers/tty/serial/8250/8250_uniphier.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/tty/serial/8250/Kconfig         | 2 +-
+ include/linux/serial_core.h             | 8 +++++++-
+ 5 files changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index efd1f9c..b8d9c8c 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -35,7 +35,7 @@ struct uniphier8250_priv {
- 	spinlock_t atomic_write_lock;
- };
- 
--#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
-+#ifdef CONFIG_SERIAL_8250_CONSOLE
- static int __init uniphier_early_console_setup(struct earlycon_device *device,
- 					       const char *options)
- {
 -- 
 1.9.1
