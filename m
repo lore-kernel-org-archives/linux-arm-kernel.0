@@ -1,56 +1,35 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon,  6 Jun 2016 16:53:33 +0200
-Subject: [PATCH 2/2] drm/rockchip: Resume DP early
-In-Reply-To: <1465224813-7359-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1465224813-7359-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1465224813-7359-2-git-send-email-tomeu.vizoso@collabora.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Mon, 6 Jun 2016 16:09:01 +0100
+Subject: [PATCH 00/18]  Add support for FDMA DMA controller and xp70
+ rproc found on STi chipsets
+In-Reply-To: <20160606050148.GX16910@localhost>
+References: <1464192412-16386-1-git-send-email-peter.griffin@linaro.org>
+ <20160606050148.GX16910@localhost>
+Message-ID: <20160606150901.GH9912@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DP needs to have resumed once the DRM driver calls
-drm_atomic_helper_resume, otherwise the DP clock is still disabled when
-the DRM core enables the DP bridge.
+Hi Vinod,
 
-Would be nice to use device_pm_wait_for_dev to synchronize these
-devices, but the DRM device doesn't know what specific implementation
-this bridge has.
+On Mon, 06 Jun 2016, Vinod Koul wrote:
 
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Cc: Caesar Wang <wxt@rock-chips.com>
-Cc: Douglas Anderson <dianders@chromium.org>
-Cc: Heiko Stuebner <heiko@sntech.de>
-Cc: Yakir Yang <ykk@rock-chips.com>
----
- drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+> On Wed, May 25, 2016 at 05:06:33PM +0100, Peter Griffin wrote:
+> > 
+> > Peter Griffin (18):
+> >   dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
+> >     documentation
+> >   dmaengine: st_fdma:  Add STMicroelectronics FDMA driver header file
+> >   dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
+> >   dmaengine: st_fdma: Add xp70 firmware loading mechanism.
+> >   dmaengine: st_fdma: Add fdma suspend and resume callbacks.
+> 
+> I do not see the latter two patches in this series. Something is missed here
+> from cover to actual patches which is bit bizarre as one tends to generate
+> patches and cover together
 
-diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-index 7f6a55cae27a..c120172add5c 100644
---- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-+++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
-@@ -349,20 +349,11 @@ static int rockchip_dp_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct dev_pm_ops rockchip_dp_pm_ops = {
- #ifdef CONFIG_PM_SLEEP
--static int rockchip_dp_suspend(struct device *dev)
--{
--	return analogix_dp_suspend(dev);
--}
--
--static int rockchip_dp_resume(struct device *dev)
--{
--	return analogix_dp_resume(dev);
--}
-+	.suspend = analogix_dp_suspend,
-+	.resume_early = analogix_dp_resume,
- #endif
--
--static const struct dev_pm_ops rockchip_dp_pm_ops = {
--	SET_SYSTEM_SLEEP_PM_OPS(rockchip_dp_suspend, rockchip_dp_resume)
- };
- 
- static const struct of_device_id rockchip_dp_dt_ids[] = {
--- 
-2.5.5
+Sorry I accidentally sent two cover letters as part of this series. The v4
+one is here https://lkml.org/lkml/2016/5/25/451.
+
+regards,
+
+Peter.
