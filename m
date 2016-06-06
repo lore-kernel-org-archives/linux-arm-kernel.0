@@ -1,54 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 6 Jun 2016 08:19:55 -0500
-Subject: [PATCH v5 2/3] documentation: Add secure monitor binding
- documentation
-In-Reply-To: <20160603092517.GA18149@mephisto>
-References: <1464520323-19531-1-git-send-email-carlo@caione.org>
- <1464520323-19531-3-git-send-email-carlo@caione.org>
- <20160602171422.GA17166@rob-hp-laptop>
- <20160603092517.GA18149@mephisto>
-Message-ID: <CAL_Jsq+JqWjd9VBS_Wxbnada46k+cK0p9dVARCCJnqT1EajHbA@mail.gmail.com>
+Date: Mon, 6 Jun 2016 08:21:48 -0500
+Subject: [PATCH v2 1/5] dt-bindings: Document the STM32 I2C bindings
+In-Reply-To: <1464877568-21897-2-git-send-email-cedric.madianga@gmail.com>
+References: <1464877568-21897-1-git-send-email-cedric.madianga@gmail.com>
+ <1464877568-21897-2-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <20160606132148.GA14169@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 3, 2016 at 4:25 AM, Carlo Caione <carlo@caione.org> wrote:
-> On 02/06/16 12:14, Rob Herring wrote:
->> On Sun, May 29, 2016 at 01:12:02PM +0200, Carlo Caione wrote:
->> > From: Carlo Caione <carlo@endlessm.com>
->> >
->> > Add the binding documentation for the Amlogic secure monitor driver.
->> >
->> > Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> > ---
->> >  .../bindings/firmware/meson/meson_sm.txt           | 33 ++++++++++++++++++++++
->> >  1 file changed, 33 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
->> > new file mode 100644
->> > index 0000000..6f0b5bc
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
->> > @@ -0,0 +1,33 @@
->> > +* Amlogic Secure Monitor
->> > +
->> > +In the Amlogic SoCs the Secure Monitor code is used to provide access to the
->> > +NVMEM, enable JTAG, set USB boot, etc...
->> > +
->> > +Required properties for the secure monitor node:
->> > +- compatible: Should be "amlogic,meson-gxbb-sm"
->> > +
->> > +Example:
->> > +
->> > +   firmware {
->> > +           compatible = "simple-bus";
->>
->> Drop this. Sorry, but no abusing simple-bus to get automagic creation of
->> your platform device.
->
-> Sounds reasonable. I can hook this up to some *_initcall. What about
-> introducing a new FIRMWARE_OF_DECLARE() ?
+On Thu, Jun 02, 2016 at 04:26:04PM +0200, M'boumba Cedric Madianga wrote:
+> This patch adds documentation of device tree bindings for the STM32 I2C
+> controller.
+> 
+> Signed-off-by: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+> ---
+>  .../devicetree/bindings/i2c/i2c-stm32.txt          | 33 ++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-stm32.txt
 
-Please don't add FIRMWARE_OF_DECLARE unless it needs to be early.
-
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
