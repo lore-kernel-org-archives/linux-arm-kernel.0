@@ -1,40 +1,83 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Mon,  6 Jun 2016 10:11:35 +0100
-Subject: [PATCH v2 3/9] coresight: Remove erroneous dma_free_coherent in
- tmc_probe
+Date: Mon,  6 Jun 2016 10:11:36 +0100
+Subject: [PATCH v2 4/9] coresight: Fix csdev connections initialisation
 In-Reply-To: <1465204301-24184-1-git-send-email-suzuki.poulose@arm.com>
 References: <1465204301-24184-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1465204301-24184-4-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1465204301-24184-5-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
-removed the static allocation of buffer for the trace data in ETR mode in
-tmc_probe. However it failed to remove the "devm_free_coherent" in
-tmc_probe when the probe fails due to other reasons. This patch gets
-rid of the incorrect dma_free_coherent() call. Also consolidates the
-error return paths.
+This is a cleanup patch.
 
-Fixes: commit de5461970b3e9e194 ("coresight: tmc: allocating memory when needed")
+coresight_device->conns holds an array to point to the devices
+connected to the OUT ports of a component. Sinks, e.g ETR, do not
+have an OUT port (nr_outport = 0), as it streams the trace to
+memory via AXI.
+
+At coresight_register() we do :
+
+	conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+	if (!conns) {
+		ret = -ENOMEM;
+		goto err_kzalloc_conns;
+	}
+
+For ETR, since the total size requested for kcalloc is zero, the return
+value is, ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR
+which cannot be verified later to contain a valid pointer. The code which
+accesses the csdev->conns is bounded by the csdev->nr_outport check,
+hence we don't try to dereference the ZERO_SIZE_PTR. This patch cleans
+up the csdev->conns and csdev->refcnt, initialisation to make sure we
+initialise it properly(i.e, either NULL or valid conns array).
+
 Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/hwtracing/coresight/coresight-tmc.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/hwtracing/coresight/coresight.c | 24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 9e02ac9..3978cbb 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -388,9 +388,6 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
- err_misc_register:
- 	coresight_unregister(drvdata->csdev);
- err_devm_kzalloc:
--	if (drvdata->config_type == TMC_CONFIG_TYPE_ETR)
--		dma_free_coherent(dev, drvdata->size,
--				drvdata->vaddr, drvdata->paddr);
- 	return ret;
- }
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index 0fdaaf4..49eb749 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -890,7 +890,7 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 	int nr_refcnts = 1;
+ 	atomic_t *refcnts = NULL;
+ 	struct coresight_device *csdev;
+-	struct coresight_connection *conns;
++	struct coresight_connection *conns = NULL;
  
+ 	csdev = kzalloc(sizeof(*csdev), GFP_KERNEL);
+ 	if (!csdev) {
+@@ -918,16 +918,20 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 
+ 	csdev->nr_inport = desc->pdata->nr_inport;
+ 	csdev->nr_outport = desc->pdata->nr_outport;
+-	conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+-	if (!conns) {
+-		ret = -ENOMEM;
+-		goto err_kzalloc_conns;
+-	}
+ 
+-	for (i = 0; i < csdev->nr_outport; i++) {
+-		conns[i].outport = desc->pdata->outports[i];
+-		conns[i].child_name = desc->pdata->child_names[i];
+-		conns[i].child_port = desc->pdata->child_ports[i];
++	/* Initialise connections if there is at least one outport */
++	if (csdev->nr_outport) {
++		conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
++		if (!conns) {
++			ret = -ENOMEM;
++			goto err_kzalloc_conns;
++		}
++
++		for (i = 0; i < csdev->nr_outport; i++) {
++			conns[i].outport = desc->pdata->outports[i];
++			conns[i].child_name = desc->pdata->child_names[i];
++			conns[i].child_port = desc->pdata->child_ports[i];
++		}
+ 	}
+ 
+ 	csdev->conns = conns;
 -- 
 1.9.1
