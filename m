@@ -1,38 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 6 Jun 2016 18:05:15 +0100
-Subject: [PATCH net-next 2/3] arm64: bpf: optimize JMP_CALL
-In-Reply-To: <1465077630-633-2-git-send-email-zlim.lnx@gmail.com>
-References: <1465077630-633-1-git-send-email-zlim.lnx@gmail.com>
- <1465077630-633-2-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <20160606170515.GK669@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 6 Jun 2016 18:07:39 +0100
+Subject: [v2 PATCH] arm64: kasan: instrument user memory access API
+In-Reply-To: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
+References: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20160606170738.GD23505@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 04, 2016 at 03:00:29PM -0700, Zi Shen Lim wrote:
-> Remove superfluous stack frame, saving us 3 instructions for
-> every JMP_CALL.
+On Fri, May 27, 2016 at 02:01:03PM -0700, Yang Shi wrote:
+> The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
+> ("x86/kasan: instrument user memory access API") added KASAN instrument to
+> x86 user memory access API, so added such instrument to ARM64 too.
 > 
-> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> Define __copy_to/from_user in C in order to add kasan_check_read/write call,
+> rename assembly implementation to __arch_copy_to/from_user.
+> 
+> Tested by test_kasan module.
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
 > ---
->  arch/arm64/net/bpf_jit_comp.c | 3 ---
->  1 file changed, 3 deletions(-)
+> v2:
+>  Adopted the comment from Andrey and Mark to add kasan_check_read/write into
+>  __copy_to/from_user.
 > 
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index 51abc97..7ae304e 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -578,11 +578,8 @@ emit_cond_jmp:
->  		const u64 func = (u64)__bpf_call_base + imm;
->  
->  		emit_a64_mov_i64(tmp, func, ctx);
-> -		emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
-> -		emit(A64_MOV(1, A64_FP, A64_SP), ctx);
->  		emit(A64_BLR(tmp), ctx);
->  		emit(A64_MOV(1, r0, A64_R(0)), ctx);
-> -		emit(A64_POP(A64_FP, A64_LR, A64_SP), ctx);
->  		break;
->  	}
+>  arch/arm64/include/asm/uaccess.h | 25 +++++++++++++++++++++----
+>  arch/arm64/kernel/arm64ksyms.c   |  4 ++--
+>  arch/arm64/lib/copy_from_user.S  |  4 ++--
+>  arch/arm64/lib/copy_to_user.S    |  4 ++--
+>  4 files changed, 27 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+> index 0685d74..4dc9a8f 100644
+> --- a/arch/arm64/include/asm/uaccess.h
+> +++ b/arch/arm64/include/asm/uaccess.h
+> @@ -23,6 +23,7 @@
+>   */
+>  #include <linux/string.h>
+>  #include <linux/thread_info.h>
+> +#include <linux/kasan-checks.h>
 
-Is the jitted code intended to be unwindable by standard tools?
+Nit: please move this before the other includes, to keep these ordered
+alphabetically.
 
-Will
+Other than that, this looks correct to me, and seems to have addressed
+the issue from v1. I've given this a spin on v4.7-rc2, with and without
+CONFIG_UBSAN enabled. So FWIW, with the minor fix above:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+As this isn't a fix, I assume that this is for Catalin to pick for v4.8.
+
+Thanks,
+Mark.
