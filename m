@@ -1,96 +1,37 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Mon,  6 Jun 2016 00:40:32 -0500
-Subject: [PATCH V4 1/5] irqchip/gicv3-its: Introduce two helper functions for
- accessing BASERn
-In-Reply-To: <1465191636-6823-1-git-send-email-shankerd@codeaurora.org>
-References: <1465191636-6823-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <1465191636-6823-2-git-send-email-shankerd@codeaurora.org>
+Date: Mon,  6 Jun 2016 00:40:31 -0500
+Subject: [PATCH V4 0/5] Add two-level support for ITS device table
+Message-ID: <1465191636-6823-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the two handy helper functions for reading and writing
-ITS BASERn register.
+This patchset contains necessary code changes to support two-level
+(Indirection) table walk feature for device table.
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
- drivers/irqchip/irq-gic-v3-its.c | 32 +++++++++++++++++++++++++-------
- 1 file changed, 25 insertions(+), 7 deletions(-)
+Shanker Donthineni (5):
+  irqchip/gicv3-its: Introduce two helper functions for accessing BASERn
+  irqchip/gicv3-its: Add a new function for parsing device table BASERn
+  irqchip/gicv3-its: Split its_alloc_tables() into two functions
+  irqchip/gicv3-its: Remove an unused argument 'node_name'
+  irqchip/gicv3-its: Implement two-level(indirect) device table support
 
-diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
-index 5eb1f9e..6392c82 100644
---- a/drivers/irqchip/irq-gic-v3-its.c
-+++ b/drivers/irqchip/irq-gic-v3-its.c
-@@ -56,13 +56,14 @@ struct its_collection {
- };
- 
- /*
-- * The ITS_BASER structure - contains memory information and cached
-- * value of BASER register configuration.
-+ * The ITS_BASER structure - contains memory information, cached value
-+ * of BASER register configuration and register idx.
-  */
- struct its_baser {
- 	void		*base;
- 	u64		val;
- 	u32		order;
-+	u32		idx;
- };
- 
- /*
-@@ -824,6 +825,17 @@ static const char *its_base_type_string[] = {
- 	[GITS_BASER_TYPE_RESERVED7] 	= "Reserved (7)",
- };
- 
-+static u64 its_read_baser(struct its_node *its, struct its_baser *baser)
-+{
-+	return readq_relaxed(its->base + GITS_BASER + (baser->idx << 3));
-+}
-+
-+static void its_write_baser(struct its_node *its, struct its_baser *baser,
-+			    u64 val)
-+{
-+	writeq_relaxed(val, its->base + GITS_BASER + (baser->idx << 3));
-+}
-+
- static void its_free_tables(struct its_node *its)
- {
- 	int i;
-@@ -863,14 +875,20 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
- 	its->device_ids = ids;
- 
- 	for (i = 0; i < GITS_BASER_NR_REGS; i++) {
--		u64 val = readq_relaxed(its->base + GITS_BASER + i * 8);
--		u64 type = GITS_BASER_TYPE(val);
--		u64 entry_size = GITS_BASER_ENTRY_SIZE(val);
-+		struct its_baser *baser = its->tables + i;
- 		int order = get_order(psz);
-+		u64 val, type, entry_size;
- 		int alloc_pages;
- 		u64 tmp;
- 		void *base;
- 
-+		/* Record the register index */
-+		baser->idx = i;
-+
-+		val = its_read_baser(its, baser);
-+		type = GITS_BASER_TYPE(val);
-+		entry_size = GITS_BASER_ENTRY_SIZE(val);
-+
- 		if (type == GITS_BASER_TYPE_NONE)
- 			continue;
- 
-@@ -939,8 +957,8 @@ retry_baser:
- 		val |= alloc_pages - 1;
- 		its->tables[i].val = val;
- 
--		writeq_relaxed(val, its->base + GITS_BASER + i * 8);
--		tmp = readq_relaxed(its->base + GITS_BASER + i * 8);
-+		its_write_baser(its, baser, val);
-+		tmp = its_read_baser(its, baser);
- 
- 		if ((val ^ tmp) & GITS_BASER_SHAREABILITY_MASK) {
- 			/*
+ drivers/irqchip/irq-gic-v3-its.c   | 414 +++++++++++++++++++++++--------------
+ include/linux/irqchip/arm-gic-v3.h |   4 +
+ 2 files changed, 266 insertions(+), 152 deletions(-)
+
 -- 
+This patchset created on top of Marc Zyngier's branch https://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git/log/?h=irq/irqchip-4.7-rc1
+
+I have tested the Indirection feature on Qualcomm Technologies QDF2XXX server platform. See the below ITS driver log mesaages.
+[    0.000000] GICv3: GIC: Using split EOI/Deactivate mode
+[    0.000000] ITS at 0x00000000397e0000
+[    0.000000] ITS at 0x00000000397e0000: allocated 524288 Devices @47c0400000 (indirect, esz 8, psz 64K, shr 1)
+[    0.000000] ITS at 0x00000000397e0000: allocated 8192 Interrupt Collections @47c0050000 (flat, esz 8, psz 64K, shr 1)
+[    0.000000] ITS at 0x00000000397e0000: allocated 8192 Virtual CPUs @47c0060000 (flat, esz 8, psz 64K, shr 1)
+
+Changes since v3:
+  Added pathces 1/5, 2/5 and 4/5.
+
 Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
 a Linux Foundation Collaborative Project
