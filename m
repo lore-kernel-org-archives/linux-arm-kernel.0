@@ -1,35 +1,67 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon,  6 Jun 2016 13:59:13 +0200
-Subject: [PATCH 2/3] mtd: nand: sunxi: check ecc->size values
+Date: Mon,  6 Jun 2016 13:59:14 +0200
+Subject: [PATCH 3/3] mtd: nand: sunxi: fix subpage write
 In-Reply-To: <1465214354-31493-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465214354-31493-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465214354-31493-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465214354-31493-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Verify that the ecc->size value is either 512 or 1024 bytes.
-This should always be the case if this field was assigned to the
-nand->ecc_step_size_ds value, but can be wrong when the user overloaded
-this value with the nand-ecc-step-size DT property.
-
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/sunxi_nand.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/mtd/nand/sunxi_nand.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index 4f5b4ad..252cbbf 100644
+index 252cbbf..409acbe 100644
 --- a/drivers/mtd/nand/sunxi_nand.c
 +++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -1784,6 +1784,9 @@ static int sunxi_nand_hw_common_ecc_ctrl_init(struct mtd_info *mtd,
- 	if (!data)
- 		return -ENOMEM;
+@@ -1350,6 +1350,36 @@ static int sunxi_nfc_hw_ecc_write_page(struct mtd_info *mtd,
+ 	return 0;
+ }
  
-+	if (ecc->size != 512 && ecc->size != 1024)
-+		return -EINVAL;
++static int sunxi_nfc_hw_ecc_write_subpage(struct mtd_info *mtd,
++					  struct nand_chip *chip,
++					  u32 data_offs, u32 data_len,
++					  const u8 *buf, int oob_required,
++					  int page)
++{
++	struct nand_ecc_ctrl *ecc = &chip->ecc;
++	int ret, i, cur_off = 0;
 +
- 	/* Prefer 1k ECC chunk over 512 ones */
- 	if (ecc->size == 512 && mtd->writesize > 512) {
- 		ecc->size = 1024;
++	sunxi_nfc_hw_ecc_enable(mtd);
++
++	for (i = data_offs / ecc->size;
++	     i < DIV_ROUND_UP(data_offs + data_len, ecc->size); i++) {
++		int data_off = i * ecc->size;
++		int oob_off = i * (ecc->bytes + 4);
++		const u8 *data = buf + data_off;
++		const u8 *oob = chip->oob_poi + oob_off;
++
++		ret = sunxi_nfc_hw_ecc_write_chunk(mtd, data, data_off, oob,
++						   oob_off + mtd->writesize,
++						   &cur_off, !i, page);
++		if (ret)
++			return ret;
++	}
++
++	sunxi_nfc_hw_ecc_disable(mtd);
++
++	return 0;
++}
++
+ static int sunxi_nfc_hw_ecc_write_page_dma(struct mtd_info *mtd,
+ 					   struct nand_chip *chip,
+ 					   const u8 *buf,
+@@ -1862,7 +1892,8 @@ static int sunxi_nand_hw_ecc_ctrl_init(struct mtd_info *mtd,
+ 		ecc->write_page = sunxi_nfc_hw_ecc_write_page;
+ 	}
+ 
+-	/* TODO: support DMA for raw accesses */
++	/* TODO: support DMA for raw accesses and subpage write */
++	ecc->write_subpage = sunxi_nfc_hw_ecc_write_subpage;
+ 	ecc->read_oob_raw = nand_read_oob_std;
+ 	ecc->write_oob_raw = nand_write_oob_std;
+ 	ecc->read_subpage = sunxi_nfc_hw_ecc_read_subpage;
 -- 
 2.7.4
