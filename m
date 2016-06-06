@@ -1,108 +1,153 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Jun 2016 12:42:56 +0100
-Subject: [RFC v2 4/4] ARM: keystone: dma-coherent with safe fallback
-In-Reply-To: <5480709.cGbSehIKrE@wuerfel>
-References: <1465183229-24147-1-git-send-email-wmills@ti.com>
- <1465183229-24147-5-git-send-email-wmills@ti.com>
- <20160606085627.GA6831@leverpostej> <5480709.cGbSehIKrE@wuerfel>
-Message-ID: <20160606114256.GF6831@leverpostej>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon,  6 Jun 2016 19:44:44 +0800
+Subject: [PATCH v5 0/5] Thermal: Support for hardware-tracked trip points
+Message-ID: <1465213489-14898-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2016 at 11:09:07AM +0200, Arnd Bergmann wrote:
-> On Monday, June 6, 2016 9:56:27 AM CEST Mark Rutland wrote:
-> > [adding devicetree]
-> > 
-> > On Sun, Jun 05, 2016 at 11:20:29PM -0400, Bill Mills wrote:
-> > > Keystone2 can do DMA coherency but only if:
-> > > 1) DDR3A DMA buffers are in high physical addresses (0x8_0000_0000)
-> > >     (DDR3B does not have this constraint)
-> > > 2) Memory is marked outer shared
-> > > 3) DMA Master marks transactions as outer shared
-> > >     (This is taken care of in bootloader)
-> > > 
-> > > Use outer shared instead of inner shared.
-> > > This choice is done at early init time and uses the attr_mod facility
-> > > 
-> > > If the kernel is not configured for LPAE and using high PA, or if the
-> > > switch to outer shared fails, then we fail to meet this criteria.
-> > > Under any of these conditions we veto any dma-coherent attributes in
-> > > the DTB.
-> > 
-> > I very much do not like this. As I previously mentioned [1],
-> > dma-coherent has de-facto semantics today. This series deliberately
-> > changes that, and inverts the relationship between DT and kernel (as the
-> > describption in the DT would now depend on the configuration of the
-> > kernel).
-> > 
-> > I would prefer that we have a separate property (e.g.
-> > "dma-outer-coherent") to describe when a device can be coherent with
-> > Normal, Outer Shareable, Inner Write-Back, Outer Write-Back memory.
-> > Then the kernel can figure out whether or not device can be used
-> > coherently, depending on how it is configured.
-> 
-> I share your concern, but I don't think the dma-outer-coherent attribute
-> would be a good solution either.
-> 
-> The problem really is that keystone is a platform that is sometimes
-> coherent, depending purely on what kernel we run, and not at all on
-> anything we can describe in devicetree, and I don't see any good way
-> to capture the behavior of the hardware in generic DT bindings.
+Thank you all for providing inputs and comments on previous versions of
+this patchset.
+Especially thanks to the (Mikko,Sascha,Eduardo,Javi,Steve....).
 
-I think that above doesn't quite capture the situation:
+The history patches come from Mikko and Sascha.
+    http://thread.gmane.org/gmane.linux.power-management.general/59451
 
-Some DMA masters can be cache-coherent (only) with Outer Shareable
-transactions. That is a property we could capture inthe DT (e.g.
-dma-outer-coherent), and is independent of the kernel configuration.
+Now, I pick them up to continue upstream.
+Nevermind!
 
-Whether or not the devices are coherent with the kernel's chosen memory
-attributes certainly depends on the kernel configuration, but that is
-not what we capture in the DT.
+This series history patches:
+v4: https://lkml.org/lkml/2016/5/27/122
+v3: https://lkml.org/lkml/2016/5/24/797
+v2: https://lkml.org/lkml/2016/5/3/220
+v1: https://lkml.org/lkml/2016/4/24/227
 
-> So far, the assumption has been:
-> 
-> - when running a non-LPAE kernel, keystone is not coherent, and we
->   must ignore both the dma-coherent properties in devices and the
->   dma-ranges properties in bus nodes.
+This series adds support for hardware trip points. It picks up earlier
+work from Mikko Perttunen. Mikko implemented hardware trip points as part
+of the device tree support. It was suggested back then to move the
+functionality to the thermal core instead of putting more code into the
+device tree support. This series does exactly that.
 
-I wasn't able to spot if/where that was enforced. Is it possible to boot
-Keystone UP, !LPAE?
+This series patches rebase the conflicts with the lastest next kernel.
+Note that the hardware-tracked trip points are very well tested currently.
 
-> - when running an LPAE kernel, keystone is coherent, and we must
->   respect both of those.
+Verified and tested on https://github.com/Caesar-github/rockchip/tree/wip/fixes-thermal-0606
+That's based on the next kernel (4.7-rc2).
+localhost / # cat /proc/version
+Linux version 4.7.0-rc2-next-20160606-02546-g534926d (wxt at nb)
+---
+There are five pathes in this series.
+thermal: Add support for hardware-tracked trip point
+thermal: of: implement .set_trips for device tree thermal zones
+thermal: streamline get_trend callbacks
+thermal: bang-bang governor: act on lower trip boundary
+thermal: rockchip: add the set_trips function
 
-Similarly this has not been enforced either way. Currently I cannot see
-how devices with dma-coherent could possibly work with Keystone.
+Note: the hardware-tracked trip points that the similar patches were verified
+on ChromoeOs platform.
+e.g.:
+https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.14
+https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.18
+https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
+---
 
-I think we also need to be clear as to what we mean by "keystone is
-coherent". With LPAE, CPUs can be coherent with each other, so long as
-the appropriate physical addresses are used (with the magic to handle
-that).
+Anyway, I take the lastest thermal change to test from next kernel,
 
-Devices being cache-coherent with CPUs is already something we manage
-per-device.
+Tested on RK3399 SoCs on https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-4.4
+And
+Tested on RK3288 SoCs with chromebook on next kernel.
+localhost / # while true; do grep "" /sys/class/thermal/thermal_zone[0-1]/temp; sleep .5; done
+/sys/class/thermal/thermal_zone1/temp:45454
+/sys/class/thermal/thermal_zone2/temp:44090
+/sys/class/thermal/thermal_zone1/temp:44545
+/sys/class/thermal/thermal_zone2/temp:44545
+/sys/class/thermal/thermal_zone1/temp:45454
+/sys/class/thermal/thermal_zone2/temp:44545
+/sys/class/thermal/thermal_zone1/temp:45000
+...
+Then add the loading,
+localhost / # md5sum /dev/zero &
+[3] 8354
+..
+The Set trips trigger the hardware-tracked points.
 
-> My interpretation of Bill's description above is that we now have
-> an additional requirement that at least I was not aware of before,
-> regarding the outer-sharable attribute. I don't think there is
-> much value in making this a boot-time option, since everyone would
-> want to run this platform in a cache-coherent way if at all possible.
->
-> We already have special hacks to detect the case of keystone running
-> in LPAE mode, in order to do the special rewrite-all-page-tables
-> hack at boot time for relocating the physical address, and we could
-> use the same hack to change the page table attributes.
-> 
-> The question is how to communicate the requirement for outer-sharable
-> for a platform. If we think it's a safe assumption that there will
-> not be future 32-bit platforms with this requirement (or maybe one
-> or two more at most), we could leave it in the special keystone hack.
-> Alternatively, a DT property in an appropriate node could indicate
-> that a particular platform requires it.
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 68461, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 2 - temp: 64166, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70000, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
+rockchip-thermal ff280000.tsadc: sensor 2 - temp: 66153, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69230, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 70000
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 68076, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 2 - temp: 65384, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69615, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70000, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
+rockchip-thermal ff280000.tsadc: sensor 2 - temp: 65384, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69615, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 70000
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69615, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69230, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70833, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
+rockchip-thermal ff280000.tsadc: sensor 2 - temp: 66153, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69230, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 70000
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70416, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70000, retval: 0
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 69615, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 70000
+rockchip-thermal ff280000.tsadc: sensor 1 - temp: 70000, retval: 0
+rockchip-thermal ff280000.tsadc: rockchip_thermal_set_trips: sensor 1: low: 68000, high 75000
+..
+---
+Anyway, the series patches are verified on rockchip platform.
 
-As above, I think this must be specified per-device, following the usual
-manner in which we describe Inner Shareable coherency using
-dma-coherent.
+Thanks someone are reviewing and testing for it.
 
-Thanks,
-Mark.
+-Caesar
+
+
+Changes in v5:
+- add the lock for thermal_zone_set_trips function.
+- change based on next kernel.
+- add the tested by Steve.
+
+Changes in v4:
+- Missing the lock added in v3.
+- as the Javi comments, %s/implemnets/implements.
+
+Changes in v3:
+- as Javi comments on https://patchwork.kernel.org/patch/9001281/.
+- add the lock for preventing the called from multi placce
+- add the note for pre_low/high_trip.
+- as the Javi comments on https://patchwork.kernel.org/patch/9001311/.
+- add the select if they set the option for devicetree.
+- Add the peter's ACK.
+
+Changes in v2:
+- update the sysfs-api.txt for set_trips.
+- add the commit in patch[v2 2/5].
+- Update the commit for patch[v2 4/5].
+
+Caesar Wang (1):
+  thermal: rockchip: add the set_trips function
+
+Sascha Hauer (4):
+  thermal: Add support for hardware-tracked trip points
+  thermal: of: implement .set_trips for device tree thermal zones
+  thermal: streamline get_trend callbacks
+  thermal: bang-bang governor: act on lower trip boundary
+
+ Documentation/thermal/sysfs-api.txt                |  7 +++
+ drivers/thermal/gov_bang_bang.c                    |  2 +-
+ drivers/thermal/of-thermal.c                       | 30 ++++++++----
+ drivers/thermal/rockchip_thermal.c                 | 39 ++++++++++++++++
+ drivers/thermal/thermal_core.c                     | 54 ++++++++++++++++++++++
+ drivers/thermal/thermal_sysfs.c                    |  3 ++
+ drivers/thermal/ti-soc-thermal/ti-thermal-common.c | 25 ++++------
+ include/linux/thermal.h                            | 16 ++++++-
+ 8 files changed, 147 insertions(+), 29 deletions(-)
+
+-- 
+1.9.1
