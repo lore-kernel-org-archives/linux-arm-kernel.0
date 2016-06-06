@@ -1,188 +1,144 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Mon, 6 Jun 2016 12:37:28 +0200
-Subject: [PATCH 1/2] ARM: dts: imx6q: extend support for the cm-fx6
-In-Reply-To: <57551CF6.2020602@compulab.co.il>
-References: <709d6b3d522f4fcb8112830e0426dbb3@rwthex-s1-b.rwth-ad.de>
- <1463994191.2370.3.camel@pengutronix.de> <5746B8C4.6020406@compulab.co.il>
- <1464256217.14453.10.camel@pengutronix.de> <5746DFE2.9040903@compulab.co.il>
- <d083d0308abd48efbd4b6042e1f9c470@rwthex-s2-a.rwth-ad.de>
- <d0329c33bee14d6e8be8abef607dce3e@rwthex-s1-b.rwth-ad.de>
- <57551CF6.2020602@compulab.co.il>
-Message-ID: <b73122716e714ea0b853cc2f3d19664c@rwthex-s1-b.rwth-ad.de>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 06 Jun 2016 12:51:56 +0200
+Subject: [PATCH 5/9] clocksource/drivers/exynos_mct: Convert init function
+ to return error
+In-Reply-To: <1464770093-12667-6-git-send-email-daniel.lezcano@linaro.org>
+References: <1464770093-12667-1-git-send-email-daniel.lezcano@linaro.org>
+ <1464770093-12667-6-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <575555CC.1020906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Igor,
-
-On 06/06/2016 08:49 AM, Igor Grinberg wrote:
-> Hi Christopher,
+On 06/01/2016 10:34 AM, Daniel Lezcano wrote:
+> The init functions do not return any error. They behave as the following:
 > 
-> On 06/05/2016 08:32 PM, Christopher Spinrath wrote:
->> Hi Igor,
->>
->> On 06/05/2016 06:43 PM, Igor Grinberg wrote:
->>> Hi Christopher,
->>>
->>> On 05/26/2016 02:37 PM, Igor Grinberg wrote:
->>>> On 05/26/2016 12:50 PM, Lucas Stach wrote:
->>>>> Hi Igor,
->>>>>
->>>>> Am Donnerstag, den 26.05.2016, 11:50 +0300 schrieb Igor Grinberg:
->>>>>> Hi Lucas,
->>>>>>
->>>>>> Thanks for reviewing the patch(es).
->>>>>>
->>>>>> On 05/23/2016 12:03 PM, Lucas Stach wrote:
->>>>>>> Am Montag, den 23.05.2016, 00:47 +0200 schrieb
->>>>>>> christopher.spinrath at rwth-aachen.de:
->>>>>>>> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
->>>>>>
->>>>>> [...]
->>>>>>
->>>>>>>> +&ecspi1 {
->>>>>>>> +	fsl,spi-num-chipselects = <2>;
->>>>>>>> +	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
->>>>>>>> +	pinctrl-names = "default";
->>>>>>>> +	pinctrl-0 = <&pinctrl_ecspi1>;
->>>>>>>> +	status = "okay";
->>>>>>>> +
->>>>>>>> +	flash: m25p80 at 0 {
->>>>>>>> +		#address-cells = <1>;
->>>>>>>> +		#size-cells = <1>;
->>>>>>>> +		compatible = "st,m25p", "jedec,spi-nor";
->>>>>>>> +		spi-max-frequency = <20000000>;
->>>>>>>> +		reg = <0>;
->>>>>>>> +
->>>>>>>> +		partition at 0 {
->>>>>>>> +			label = "uboot";
->>>>>>>> +			reg = <0x0 0xc0000>;
->>>>>>>> +		};
->>>>>>>> +
->>>>>>>> +		partition at c0000 {
->>>>>>>> +			label = "uboot environment";
->>>>>>>> +			reg = <0xc0000 0x40000>;
->>>>>>>> +		};
->>>>>>>> +
->>>>>>>> +		partition at 100000 {
->>>>>>>> +			label = "reserved";
->>>>>>>> +			reg = <0x100000 0x100000>;
->>>>>>>> +		};
->>>>>>>
->>>>>>> Partition layouts don't belong in the upstream DT, as it a device
->>>>>>> configuration thing. Please kep them in the bootloader/firmware and make
->>>>>>> this one pass the partition layout to the kernel.
->>>>>>
->>>>>> I don't completely agree with this.
->>>>>> We have lots of partition layouts in the upstream DT.
->>>>>
->>>>> No, we don't. At least not for the i.MX6. There are some for the earlier
->>>>> i.MX boards, but IMO it's wrong to put device configuration into the
->>>>> upstream DT. Let's not start doing this again.
->>>>
->>>> Why not?
->>>> For i.MX6 there are 2 boards that have the partitioning scheme.
->>>> I'm not considering this a device configuration, but rather
->>>> a default partitioning layout/scheme.
->>>> Current case is for the firmware storage device that is not likely
->>>> to change.
->>>> Moreover, a DT is not really a part of the kernel, but lays along the kernel
->>>> sources for convenience and simplicity (at least IIRC as it was decided
->>>> about 5 years ago). It is more a part of the firmware for a device, than
->>>> an upstream kernel source code.
->>>> I think it is only a meter of time when Linus will decide that he does not
->>>> want it inside the kernel anymore...
->>>>
->>>>>
->>>>>> Moreover, this is the default layout and changing it, will
->>>>>> result in incompatibilities and also might result in device "bricking".
->>>>>> Those can be changed from the boot loader in case you need those
->>>>>> the other way around.
->>>>>> Another question of mine is, why should you?
->>>>>>
->>>>> Partition layout is device configuration, which is governed by the
->>>>> device firmware.
->>>>
->>>> Yet again, DT is a part of device firmware.
->>>> Moreover, the firmware (in that case U-Boot), can be configured
->>>> using the very same DT code, so not having this in, might force
->>>> various w/a and hacks.
->>>>
->>>>> By not having the partition layout in the upstream DT
->>>>> people are forced to set it from the firmware, which is exactly the
->>>>> right thing to do, weather or not you plan to change it at any time.
->>>>
->>>> I might be ignorant, sorry for that.
->>>> Why? Why is it right and why would you want to force people to do that?
->>>>
->>>>
->>>
->>> No answer?
->>> I think it is worth keeping this as a default firmware layout.
->>>
->>
->> I was not happy removing the layout at first, too. However, they are
->> added rarely (at least recently) and the binding documentation [1]
->> states that they shall only be added if there are "strong conventions".
+>  - panic, thus leading to a kernel crash while another timer may work and
+>    make the system boot up correctly
 > 
-> Well, not exactly, it says:
+>  or
 > 
-> "Partitions can be represented by sub-nodes of an mtd device. This can be used
-> on platforms which have strong conventions about which portions of a flash are
-> used for what purposes, but which don't use an on-flash partition table such
-> as RedBoot."
+>  - print an error and let the caller unaware if the state of the system
 > 
-> In my understanding, "can" is _not_ exactly "shall only".
+> Change that by converting the init functions to return an error conforming
+> to the CLOCKSOURCE_OF_RET prototype.
 > 
+> Proper error handling (rollback, errno value) will be changed later case
+> by case, thus this change just return back an error or success in the init
+> function.
 
-Definitely, "state" was the wrong word here - sorry about that. But it's
-how I interpret the documentation. It is the only one I have seen that
-specifies an allowed use case. So for me it is more like "deny all,
-allow ...".
+I don't see the benefits of this change alone. You are replacing one
+non-return code to another always-return-success code. The effect is
+exactly the same. It would make sense to change it to CLOCKSOURCE_OF_RET
+along with proper error handling.
 
->>
->> Moreover, it is really easy to pass the layout via firmware/u-boot.
->> Unfortunately, the u-boot provided by CompuLab does not have the
->> mtdparts commands built-in but the layout can be passed via cmdline as
->> well. This seems more flexible to me (and I consider this to be good).
+Best regards,
+Krzysztof
+
 > 
-> That means you need a different version of U-Boot if you want to use
-> an upstream kernel, or you need to play the bootargs games, or just leave
-> it a "black box".
-> So currently, from the three options above, the "black box" is chosen, right?
-> That's a pity, because I'd like things to be open...
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  drivers/clocksource/exynos_mct.c | 36 ++++++++++++++++++++++++------------
+>  1 file changed, 24 insertions(+), 12 deletions(-)
 > 
-
-Well, It wouldn't be the first ARM device where the newest/upstream
-u-boot is required. Actually, you already have to use the newest version
-if you want to use the igb ethernet.
-
-Currently, IMO the most convenient way (for distributions) would be to
-ship a boot.scr file changing the bootargs (which is not a "black box"
-but a configuration file people are used to). If you don't want to mess
-with bootargs/cmdline it is also possible to add the partition table via
-boot.scr (or on-flash environment) with the fdt command; in this case it
-wouldn't even be hidden in the u-boot binary (and no u-boot upgrade is
-required to implement this).
-
-But yes, if someone wants to use the upstream kernel the boot.scr has to
-be there; but IMO this is something distributions/people providing
-binary files have to take care about. People using their own kernel
-should take into account that they have to provide a bootloader config.
-
->>
->> Even if we want to have the layout in the devicetree one day (e.g. to
->> use the same file for u-boot) we can send another follow-up patch adding
->> them (and discuss this matter in more detail). But let's not prevent the
->> remaining part of this patch series to enter mainline if there is a
->> good, easy and flexible alternative.
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index be09bc0..f6caed0 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -232,7 +232,7 @@ static cycles_t exynos4_read_current_timer(void)
+>  	return exynos4_read_count_32();
+>  }
+>  
+> -static void __init exynos4_clocksource_init(void)
+> +static int __init exynos4_clocksource_init(void)
+>  {
+>  	exynos4_mct_frc_start();
+>  
+> @@ -244,6 +244,8 @@ static void __init exynos4_clocksource_init(void)
+>  		panic("%s: can't register clocksource\n", mct_frc.name);
+>  
+>  	sched_clock_register(exynos4_read_sched_clock, 32, clk_rate);
+> +
+> +	return 0;
+>  }
+>  
+>  static void exynos4_mct_comp0_stop(void)
+> @@ -335,12 +337,14 @@ static struct irqaction mct_comp_event_irq = {
+>  	.dev_id		= &mct_comp_device,
+>  };
+>  
+> -static void exynos4_clockevent_init(void)
+> +static int exynos4_clockevent_init(void)
+>  {
+>  	mct_comp_device.cpumask = cpumask_of(0);
+>  	clockevents_config_and_register(&mct_comp_device, clk_rate,
+>  					0xf, 0xffffffff);
+>  	setup_irq(mct_irqs[MCT_G0_IRQ], &mct_comp_event_irq);
+> +
+> +	return 0;
+>  }
+>  
+>  static DEFINE_PER_CPU(struct mct_clock_event_device, percpu_mct_tick);
+> @@ -516,7 +520,7 @@ static struct notifier_block exynos4_mct_cpu_nb = {
+>  	.notifier_call = exynos4_mct_cpu_notify,
+>  };
+>  
+> -static void __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+> +static int __init exynos4_timer_resources(struct device_node *np, void __iomem *base)
+>  {
+>  	int err, cpu;
+>  	struct mct_clock_event_device *mevt = this_cpu_ptr(&percpu_mct_tick);
+> @@ -572,15 +576,17 @@ static void __init exynos4_timer_resources(struct device_node *np, void __iomem
+>  
+>  	/* Immediately configure the timer on the boot CPU */
+>  	exynos4_local_timer_setup(mevt);
+> -	return;
+> +	return 0;
+>  
+>  out_irq:
+>  	free_percpu_irq(mct_irqs[MCT_L0_IRQ], &percpu_mct_tick);
+> +	return err;
+>  }
+>  
+> -static void __init mct_init_dt(struct device_node *np, unsigned int int_type)
+> +static int __init mct_init_dt(struct device_node *np, unsigned int int_type)
+>  {
+>  	u32 nr_irqs, i;
+> +	int ret;
+>  
+>  	mct_int_type = int_type;
+>  
+> @@ -600,20 +606,26 @@ static void __init mct_init_dt(struct device_node *np, unsigned int int_type)
+>  	for (i = MCT_L0_IRQ; i < nr_irqs; i++)
+>  		mct_irqs[i] = irq_of_parse_and_map(np, i);
+>  
+> -	exynos4_timer_resources(np, of_iomap(np, 0));
+> -	exynos4_clocksource_init();
+> -	exynos4_clockevent_init();
+> +	ret = exynos4_timer_resources(np, of_iomap(np, 0));
+> +	if (ret)
+> +		return ret;
+> +
+> +	ret = exynos4_clocksource_init();
+> +	if (ret)
+> +		return ret;
+> +
+> +	return exynos4_clockevent_init();
+>  }
+>  
+>  
+> -static void __init mct_init_spi(struct device_node *np)
+> +static int __init mct_init_spi(struct device_node *np)
+>  {
+>  	return mct_init_dt(np, MCT_INT_SPI);
+>  }
+>  
+> -static void __init mct_init_ppi(struct device_node *np)
+> +static int __init mct_init_ppi(struct device_node *np)
+>  {
+>  	return mct_init_dt(np, MCT_INT_PPI);
+>  }
+> -CLOCKSOURCE_OF_DECLARE(exynos4210, "samsung,exynos4210-mct", mct_init_spi);
+> -CLOCKSOURCE_OF_DECLARE(exynos4412, "samsung,exynos4412-mct", mct_init_ppi);
+> +CLOCKSOURCE_OF_DECLARE_RET(exynos4210, "samsung,exynos4210-mct", mct_init_spi);
+> +CLOCKSOURCE_OF_DECLARE_RET(exynos4412, "samsung,exynos4412-mct", mct_init_ppi);
 > 
-> That's a valid point from my POV.
-> I have never had an intent to prevent things going upstream.
-I never thought so :-).
-
-> This is something Compulab should have done years ago, but
-> unfortunately, due to some circumstances it haven't happened for cm-fx6...
-> 
-
-Cheers,
-Christopher
