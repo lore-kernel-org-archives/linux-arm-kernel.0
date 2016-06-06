@@ -1,72 +1,218 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 6 Jun 2016 23:18:14 +0200
-Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
- overlapping regions
-In-Reply-To: <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
-References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
- <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
- <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
- <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
- <20160606174207.GH29910@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu_3uKgFtvMryROwTMeGs=uXYU-OPrUC6LaNQiAKP=PZ3Q@mail.gmail.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 6 Jun 2016 16:44:42 -0500
+Subject: [PATCH v10 2/4] tee: generic TEE subsystem
+In-Reply-To: <1464784888-19854-3-git-send-email-jens.wiklander@linaro.org>
+References: <1464784888-19854-1-git-send-email-jens.wiklander@linaro.org>
+ <1464784888-19854-3-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <5755EECA.6040606@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 June 2016 at 19:42, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Jun 06, 2016 at 06:09:50PM +0100, Catalin Marinas wrote:
->> On Mon, Jun 06, 2016 at 11:43:01AM +0200, Ard Biesheuvel wrote:
->> > On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> > > index 78f52488f9ff..0d5753c31c7f 100644
->> > > --- a/arch/arm64/kernel/efi.c
->> > > +++ b/arch/arm64/kernel/efi.c
->> > > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
->> > >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
->> > >  {
->> > >         pteval_t prot_val = create_mapping_protection(md);
->> > > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
->> > > +       efi_memory_desc_t *next = md;
->> > >
->> > > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
->> > > -                          md->num_pages << EFI_PAGE_SHIFT,
->> > > -                          __pgprot(prot_val | PTE_NG));
->> > > +       /*
->> > > +        * Search for the next EFI runtime map and check for any overlap with
->> > > +        * the current map when aligned to PAGE_SIZE. In such case, defer
->> > > +        * mapping the end of the current range until the next
->> > > +        * efi_create_mapping() call.
->> > > +        */
->> > > +       for_each_efi_memory_desc_continue(next) {
->> > > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
->> > > +                       continue;
->> > > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
->> > > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
->> >
->> > This looks fishy. We could have more than two runtime regions sharing
->> > a 64 KB page frame, for instance, and the middle regions will have
->> > unaligned start and end addresses, and sizes smaller than 64 KB. This
->> > subtraction may wrap in that case, producing a bogus length.
->>
->> I don't think I get it. This subtraction is meant to reduce the length
->> of the current md so that it is page aligned, deferring the mapping of
->> the last page to the next efi_create_mapping() call. Note that there is
->> a "break" just after the hunk you quoted, so we only care about the next
->> runtime map.
->
-> I think I get it now. If the md we are currently mapping is within a
-> 64KB page *and* phys_addr unaligned, length can wrap through 0. I will
-> update the patch.
->
+On 06/01/2016 07:41 AM, Jens Wiklander wrote:
+few minor comments below.
 
-Indeed.
+I see the patch generated (with --strict):
+> CHECK: Alignment should match open parenthesis
+> #512: FILE: drivers/tee/tee.c:375:
+> +static int tee_ioctl_close_session(struct tee_context *ctx,
+> +              struct tee_ioctl_close_session_arg __user *uarg)
+> CHECK: Alignment should match open parenthesis
+> #1607: FILE: drivers/tee/tee_shm_pool.c:103:
+> +struct tee_shm_pool *tee_shm_pool_alloc_res_mem(struct device *dev,
+> +                      struct tee_shm_pool_mem_info *priv_info,
+> CHECK: Alignment should match open parenthesis
+> #1789: FILE: include/linux/tee_drv.h:124:
+> +struct tee_device *tee_device_alloc(const struct tee_desc *teedesc,
+> +                      struct device *dev, struct tee_shm_pool *pool,
+> WARNING: line over 80 characters
+> #1814: FILE: include/linux/tee_drv.h:149:
+> + * struct tee_shm_pool_mem_info - holds information needed to create a shared memory pool  
+> WARNING: line over 80 characters
+> #1826: FILE: include/linux/tee_drv.h:161:
+> + * tee_shm_pool_alloc_res_mem() - Create a shared memory pool from reserved memory range  
+> CHECK: Alignment should match open parenthesis
+> #1839: FILE: include/linux/tee_drv.h:174:
+> +struct tee_shm_pool *tee_shm_pool_alloc_res_mem(struct device *dev,                        
+> +                      struct tee_shm_pool_mem_info *priv_info,
+> CHECK: Prefer using the BIT macro
+> #1995: FILE: include/uapi/linux/tee.h:51:
+> +#define TEE_GEN_CAP_GP                (1 << 0)/* GlobalPlatform compliant TEE */ 
+> CHECK: Prefer using the BIT macro
+> #2005: FILE: include/uapi/linux/tee.h:61:
+> +#define TEE_OPTEE_CAP_TZ      (1 << 0)
+> WARNING: line over 80 characters
+> #2205: FILE: include/uapi/linux/tee.h:261:
+> + * struct tee_ioctl_invoke_func_arg - Invokes a function in a Trusted Application 
+>       mechanically convert to the typical style using --fix or --fix-inplace.
+>       them to the maintainer, see CHECKPATCH in MAINTAINERS.
 
-Another thing I failed to mention is that the new Memory Attributes
-table support may map all of the RuntimeServicesCode regions a second
-time, but with a higher granularity, using RO for .text and .rodata
-and NX for .data and .bss (and the PE/COFF header). Due to the higher
-granularity, regions that were mapped using the contiguous bit the
-first time around may be split into smaller regions. Your current code
-does not address that case.
+Might be nice to fix them up.
 
-I wonder how the PT debug code deals with this, and whether there is
-anything we can reuse to inhibit cont and block mappings
+[...]
+
+> diff --git a/drivers/tee/Kconfig b/drivers/tee/Kconfig
+> new file mode 100644
+> index 0000000..f3ba154
+> --- /dev/null
+> +++ b/drivers/tee/Kconfig
+> @@ -0,0 +1,9 @@
+> +# Generic Trusted Execution Environment Configuration
+> +config TEE
+> +	bool "Trusted Execution Environment support"
+
+Why could not this be tristate? we would like to enforce subsystem init?
+
+> +	default n
+
+You should not need this. (default is n)
+
+> +	select DMA_SHARED_BUFFER
+> +	select GENERIC_ALLOCATOR
+
+select or depends?
+
+> +	help
+> +	  This implements a generic interface towards a Trusted Execution
+> +	  Environment (TEE).
+> diff --git a/drivers/tee/Makefile b/drivers/tee/Makefile
+> new file mode 100644
+> index 0000000..60d2dab
+> --- /dev/null
+> +++ b/drivers/tee/Makefile
+> @@ -0,0 +1,3 @@
+> +obj-y += tee.o
+> +obj-y += tee_shm.o
+> +obj-y += tee_shm_pool.o
+> diff --git a/drivers/tee/tee.c b/drivers/tee/tee.c
+> new file mode 100644
+> index 0000000..119e18e
+> --- /dev/null
+> +++ b/drivers/tee/tee.c
+> @@ -0,0 +1,877 @@
+> +/*
+> + * Copyright (c) 2015-2016, Linaro Limited
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+Adding a
+#define pr_fmt(fmt) "%s: " fmt, __func__ might help
+might help give reasonable errors where pr_* is used.
+
+> +#include <linux/cdev.h>
+> +#include <linux/device.h>
+> +#include <linux/fs.h>
+> +#include <linux/idr.h>
+> +#include <linux/slab.h>
+> +#include <linux/tee_drv.h>
+> +#include <linux/uaccess.h>
+> +#include "tee_private.h"
+> +
+> +#define TEE_NUM_DEVICES	32
+
+I have a personal allergy to MAX_* macros, so I wonder if idr can help
+us get rid of fixed size tables? I wonder if the use should be limited
+to tee_shm.c ?
+
+static DEFINE_IDR(tee_id);
+....
+
+teedev->id =  idr_alloc(&tee_id, teedev, 0, 0, GFP_KERNEL);
+or something similar?
+
+> +
+> +#define TEE_IOCTL_PARAM_SIZE(x) (sizeof(struct tee_param) * (x))
+> +
+> +/*
+> + * Unprivileged devices in the in the lower half range and privileged
+> + * devices in the upper half range.
+> + */
+> +static DECLARE_BITMAP(dev_mask, TEE_NUM_DEVICES);
+> +static DEFINE_SPINLOCK(driver_lock);
+
+I think you might be able to get rid of the above two with idr usage.
+
+> +
+> +static struct class *tee_class;
+> +static dev_t tee_devt;
+> +
+> +static int tee_open(struct inode *inode, struct file *filp)
+> +{
+> +	int rc;
+> +	struct tee_device *teedev;
+> +	struct tee_context *ctx;
+> +
+> +	teedev = container_of(inode->i_cdev, struct tee_device, cdev);
+> +	if (!tee_device_get(teedev))
+> +		return -EINVAL;
+> +
+> +	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+> +	if (!ctx) {
+> +		rc = -ENOMEM;
+> +		goto err;
+> +	}
+> +
+> +	ctx->teedev = teedev;
+> +	filp->private_data = ctx;
+
+I wonder if the teedev was a module, could it be removed /
+unregistered after tee_open was invoked?
+
+> +static int tee_ioctl_invoke(struct tee_context *ctx,
+> +			    struct tee_ioctl_buf_data __user *ubuf)
+> +{
+> +	int rc;
+> +	size_t n;
+> +	struct tee_ioctl_buf_data buf;
+> +	struct tee_ioctl_invoke_arg __user *uarg;
+> +	struct tee_ioctl_invoke_arg arg;
+> +	struct tee_ioctl_param __user *uparams = NULL;
+> +	struct tee_param *params = NULL;
+> +
+> +	if (!ctx->teedev->desc->ops->invoke_func)
+> +		return -EINVAL;
+> +
+> +	rc = copy_from_user(&buf, ubuf, sizeof(buf));
+> +	if (rc)
+> +		return rc;
+> +
+> +	if (buf.buf_len > TEE_MAX_ARG_SIZE ||
+> +	    buf.buf_len < sizeof(struct tee_ioctl_invoke_arg))
+> +		return -EINVAL;
+> +
+> +	uarg = (struct tee_ioctl_invoke_arg __user *)(unsigned long)buf.buf_ptr;
+> +	if (copy_from_user(&arg, uarg, sizeof(arg)))
+> +		return -EFAULT;
+> +
+> +	if (sizeof(arg) + TEE_IOCTL_PARAM_SIZE(arg.num_params) != buf.buf_len)
+> +		return -EINVAL;
+> +
+> +	if (arg.num_params) {
+> +		params = kcalloc(arg.num_params, sizeof(struct tee_param),
+> +				 GFP_KERNEL);
+> +		if (!params)
+> +			return -ENOMEM;
+> +		uparams = (struct tee_ioctl_param __user *)(uarg + 1);
+> +		rc = params_from_user(ctx, params, arg.num_params, uparams);
+> +		if (rc)
+> +			goto out;
+> +	}
+> +
+> +	rc = ctx->teedev->desc->ops->invoke_func(ctx, &arg, params);
+> +	if (rc)
+> +		goto out;
+
+Hmm.. I wonder if the teedev drivers should get subsystem level lock
+protection for ops invocation or should they implement locking themselves?
+
+[...]
+-- 
+Regards,
+Nishanth Menon
