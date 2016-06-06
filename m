@@ -1,45 +1,90 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 18:01:13 +0100
-Subject: [PATCH kexec-tools v2 29/32] arm: add debug of reserved and coredump
- memory ranges
+Date: Mon, 06 Jun 2016 17:59:34 +0100
+Subject: [PATCH kexec-tools v2 10/32] kexec: add generic helper to add to
+ memory_regions
 In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
 References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xtp-0003uE-KF@e0050434b2927.dyn.armlinux.org.uk>
+Message-ID: <E1b9xsE-0003sO-FZ@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add debug of the reserved and coredump memory ranges for validation.
+Add a helper to add a memory range to a memory_regions array.
 
 Reviewed-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kexec/arch/arm/crashdump-arm.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ kexec/Makefile      |  4 ++++
+ kexec/mem_regions.c | 30 ++++++++++++++++++++++++++++++
+ kexec/mem_regions.h |  9 +++++++++
+ 3 files changed, 43 insertions(+)
+ create mode 100644 kexec/mem_regions.c
+ create mode 100644 kexec/mem_regions.h
 
-diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index 25fdbe9..2dc8846 100644
---- a/kexec/arch/arm/crashdump-arm.c
-+++ b/kexec/arch/arm/crashdump-arm.c
-@@ -158,6 +158,10 @@ static int crash_get_memory_ranges(void)
- 		return -1;
- 	}
+diff --git a/kexec/Makefile b/kexec/Makefile
+index a758b4a..e2aee84 100644
+--- a/kexec/Makefile
++++ b/kexec/Makefile
+@@ -69,6 +69,10 @@ dist				+= kexec/fs2dt.c kexec/fs2dt.h
+ $(ARCH)_FS2DT			=
+ KEXEC_SRCS			+= $($(ARCH)_FS2DT)
  
-+	dbgprint_mem_range("Reserved memory ranges",
-+			   crash_reserved_rgns.ranges,
-+			   crash_reserved_rgns.size);
++dist				+= kexec/mem_regions.c kexec/mem_regions.h
++$(ARCH)_MEM_REGIONS		=
++KEXEC_SRCS			+= $($(ARCH)_MEM_REGIONS)
 +
- 	/*
- 	 * Exclude all reserved memory from the usable memory regions.
- 	 * We want to avoid dumping the crashkernel region itself.  Note
-@@ -179,6 +183,9 @@ static int crash_get_memory_ranges(void)
- 	 */
- 	mem_regions_sort(&usablemem_rgns);
- 
-+	dbgprint_mem_range("Coredump memory ranges",
-+			   usablemem_rgns.ranges, usablemem_rgns.size);
+ include $(srcdir)/kexec/arch/alpha/Makefile
+ include $(srcdir)/kexec/arch/arm/Makefile
+ include $(srcdir)/kexec/arch/i386/Makefile
+diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
+new file mode 100644
+index 0000000..a4952ff
+--- /dev/null
++++ b/kexec/mem_regions.c
+@@ -0,0 +1,30 @@
++#include "kexec.h"
++#include "mem_regions.h"
 +
- 	return 0;
- }
- 
++/**
++ * mem_regions_add() - add a memory region to a set of ranges
++ * @ranges: ranges to add the memory region to
++ * @max: maximum number of entries in memory region
++ * @base: base address of memory region
++ * @length: length of memory region in bytes
++ * @type: type of memory region
++ *
++ * Add the memory region to the set of ranges, and return %0 if successful,
++ * or %-1 if we ran out of space.
++ */
++int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
++                    unsigned long long length, int type)
++{
++	struct memory_range *range;
++
++	if (ranges->size >= ranges->max_size)
++		return -1;
++
++	range = ranges->ranges + ranges->size++;
++	range->start = base;
++	range->end = base + length - 1;
++	range->type = type;
++
++	return 0;
++}
++
+diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
+new file mode 100644
+index 0000000..b9cfba1
+--- /dev/null
++++ b/kexec/mem_regions.h
+@@ -0,0 +1,9 @@
++#ifndef MEM_REGIONS_H
++#define MEM_REGIONS_H
++
++struct memory_ranges;
++
++int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
++                    unsigned long long length, int type);
++
++#endif
 -- 
 1.9.1
