@@ -1,167 +1,76 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Mon, 6 Jun 2016 15:34:32 +0200
-Subject: [linux-sunxi] [PATCH 1/5] ethernet: add sun8i-emac driver
-In-Reply-To: <5754A86B.6050607@arm.com>
-References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
- <1464947790-22991-2-git-send-email-clabbe.montjoie@gmail.com>
- <5754A86B.6050607@arm.com>
-Message-ID: <20160606133432.GA29281@Red>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 6 Jun 2016 08:47:08 -0500
+Subject: [PATCH 1/7] dt-bindings: Update QorIQ TMU thermal bindings
+In-Reply-To: <1464937059-19349-1-git-send-email-hongtao.jia@nxp.com>
+References: <1464937059-19349-1-git-send-email-hongtao.jia@nxp.com>
+Message-ID: <20160606134708.GA27357@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 05, 2016 at 11:32:11PM +0100, Andr? Przywara wrote:
-> On 03/06/16 10:56, LABBE Corentin wrote:
+On Fri, Jun 03, 2016 at 02:57:33PM +0800, Jia Hongtao wrote:
+> For different types of SoC the sensor id and endianness may vary.
+> "#thermal-sensor-cells" is used to provide sensor id information.
+> "little-endian" property is to tell the endianness of TMU.
 > 
-> Hi,
+> Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
+> ---
+>  .../devicetree/bindings/thermal/qoriq-thermal.txt     | 19 +++++++++++++------
+>  1 file changed, 13 insertions(+), 6 deletions(-)
 > 
-> first: thanks for posting this and the time and work that you spent on
-> it. With the respective DT nodes this works for me on the Pine64 and
-> turns this board eventually into something useful.
-> 
-> Some comments below:
-> 
-> > This patch add support for sun8i-emac ethernet MAC hardware.
-> > It could be found in Allwinner H3/A83T/A64 SoCs.
-> > 
-> > It supports 10/100/1000 Mbit/s speed with half/full duplex.
-> > It can use an internal PHY (MII 10/100) or an external PHY
-> > via RGMII/RMII.
-> > 
-> > Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
-> > ---
-> >  drivers/net/ethernet/allwinner/Kconfig      |   13 +
-> >  drivers/net/ethernet/allwinner/Makefile     |    1 +
-> >  drivers/net/ethernet/allwinner/sun8i-emac.c | 1943 +++++++++++++++++++++++++++
-> >  3 files changed, 1957 insertions(+)
-> >  create mode 100644 drivers/net/ethernet/allwinner/sun8i-emac.c
-> > 
-> > diff --git a/drivers/net/ethernet/allwinner/Kconfig b/drivers/net/ethernet/allwinner/Kconfig
-> > index 47da7e7..226499d 100644
-> > --- a/drivers/net/ethernet/allwinner/Kconfig
-> > +++ b/drivers/net/ethernet/allwinner/Kconfig
-> > @@ -33,4 +33,17 @@ config SUN4I_EMAC
-> >            To compile this driver as a module, choose M here.  The module
-> >            will be called sun4i-emac.
-> >  
-> > +config SUN8I_EMAC
-> > +        tristate "Allwinner sun8i EMAC support"
-> 
-> nit: w/s error
-> 
-ok
+> diff --git a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> index 66223d5..8eeef80 100644
+> --- a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> @@ -1,22 +1,28 @@
+>  * Thermal Monitoring Unit (TMU) on Freescale QorIQ SoCs
+>  
+>  Required properties:
+> -- compatible : Must include "fsl,qoriq-tmu". The version of the device is
+> +- compatible: Must include "fsl,qoriq-tmu". The version of the device is
 
-> > +
-> > +#define SUN8I_EMAC_BASIC_CTL0 0x00
-> > +#define SUN8I_EMAC_BASIC_CTL1 0x04
-> > +
-> > +#define SUN8I_EMAC_MDIO_CMD 0x48
-> > +#define SUN8I_EMAC_MDIO_DATA 0x4C
-> 
-> Can you align all these register offsets with tabs, so that the actual
-> offset values are below each other?
-> Also ordering them by address seems useful to me.
-> 
+Please split functional changes from formatting changes. This one seems 
+pretty pointless.
 
-ok
-
-> > +/* Structure of DMA descriptor used by the hardware  */
-> > +struct dma_desc {
-> > +	u32 status; /* status of the descriptor */
-> > +	u32 st; /* Information on the frame */
-> > +	u32 buf_addr; /* physical address of the frame data */
-> > +	u32 next; /* physical address of next dma_desc */
-> > +} __packed __aligned(4);
+>  	determined by the TMU IP Block Revision Register (IPBRR0) at
+>  	offset 0x0BF8.
+> -	Table of correspondences between IPBRR0 values and example  chips:
+> +	Table of correspondences between IPBRR0 values and example chips:
+>  		Value           Device
+>  		----------      -----
+>  		0x01900102      T1040
+> -- reg : Address range of TMU registers.
+> -- interrupts : Contains the interrupt for TMU.
+> -- fsl,tmu-range : The values to be programmed into TTRnCR, as specified by
+> +- reg: Address range of TMU registers.
+> +- interrupts: Contains the interrupt for TMU.
+> +- fsl,tmu-range: The values to be programmed into TTRnCR, as specified by
+>  	the SoC reference manual. The first cell is TTR0CR, the second is
+>  	TTR1CR, etc.
+> -- fsl,tmu-calibration : A list of cell pairs containing temperature
+> +- fsl,tmu-calibration: A list of cell pairs containing temperature
+>  	calibration data, as specified by the SoC reference manual.
+>  	The first cell of each pair is the value to be written to TTCFGR,
+>  	and the second is the value to be written to TSCFGR.
+> +- #thermal-sensor-cells: Must be 1. The sensor specifier is the monitoring
+> +	site ID, and represents the "n" in TRITSRn and TRATSRn.
+> +
+> +Optional property:
+> +- little-endian: If present, the TMU registers are little endian.  If absent,
+> +	the default is big endian.
+>  
+>  Example:
+>  
+> @@ -60,4 +66,5 @@ tmu at f0000 {
+>  
+>  			       0x00030000 0x00000012
+>  			       0x00030001 0x0000001d>;
+> +	#thermal-sensor-cells = <1>;
+>  };
+> -- 
+> 2.1.0.27.g96db324
 > 
-> I don't think we need this alignment attribute here:
-> 1) The structure will be 4-byte aligned anyway, because the first member
-> is naturally 4 bytes aligned.
-> 2) The alignment requirement is on the physical DMA side. I don't see
-> how the compiler should be able to guarantee this. So technically you
-> have to tell the DMA allocation code about your alignment requirement.
-> But due to 1), I think this is a moot discussion.
 > 
-
-ok, I have removed all __aligned
-
-> 
-> ....
-> 
-> > +
-> > +
-> > +	priv->rx_sk = kcalloc(nbdesc_rx, sizeof(struct sk_buff *), GFP_KERNEL);
-> > +	if (!priv->rx_sk) {
-> > +		err = -ENOMEM;
-> > +		goto rx_sk_error;
-> > +	}
-> > +	priv->tx_sk = kcalloc(nbdesc_tx, sizeof(struct sk_buff *), GFP_KERNEL);
-> > +	if (!priv->tx_sk) {
-> > +		err = -ENOMEM;
-> > +		goto tx_sk_error;
-> > +	}
-> > +	priv->tx_map = kcalloc(nbdesc_tx, sizeof(int), GFP_KERNEL);
-> > +	if (!priv->tx_map) {
-> > +		err = -ENOMEM;
-> > +		goto tx_map_error;
-> > +	}
-> > +
-> > +	priv->dd_rx = dma_alloc_coherent(priv->dev,
-> > +			nbdesc_rx * sizeof(struct dma_desc),
-> > +			&priv->dd_rx_phy,
-> > +			GFP_KERNEL);
-> 
-> You need to be sure here to allocate 32-bit DMA memory only, since the
-> hardware holds only 32 bits worth of addresses. If I am not mistaken,
-> the following snippet (preferrably in the probe function below) should
-> take care of this:
-> 
-> 	if (dma_set_mask_and_coherent(&priv->dev, DMA_BIT_MASK(32))) {
-> 		dev_err(&priv->dev, "No suitable DMA available\n");
-> 		return -ENOMEM;
-> 	}
-> 
-> This isn't an issue for the SoCs we know of (they have a 32-bit bus
-> anyway), but future SoCs could support more memory (the A80 does
-> already!), so you have to allocate it from the low 4GB. This is a
-> limitation of that particular _device_ (and not the platform), since it
-> does the DMA itself and this engine is limited to 32-bit physical addresses.
-> 
-
-ok
-
-> > +	if (!priv->dd_rx) {
-> > +		dev_err(priv->dev, "ERROR: cannot DMA RX");
-> > +		err = -ENOMEM;
-> > +		goto dma_rx_error;
-> > +	}
-> 
-> ....
-> 
-> > +
-> > +static const struct of_device_id sun8i_emac_of_match_table[] = {
-> > +	{ .compatible = "allwinner,sun8i-a83t-emac",
-> > +	  .data = (void *)A83T_EMAC },
-> > +	{ .compatible = "allwinner,sun8i-h3-emac",
-> > +	  .data = (void *)H3_EMAC },
-> > +	{ .compatible = "allwinner,sun50i-a64-emac",
-> > +	  .data = (void *)A64_EMAC },
-> > +	{}
-> > +};
-> 
-> I am not sure this is the proper way to model the different variants of
-> the device. I see two differing features here:
-> 1) the H3 has an internal PHY
-> 2) the A83T does not support RMII
-> 
-> So wouldn't it be wiser to put those two options as properties into the
-> DT node? This way any future EMAC version could pick the matching
-> features and we wouldn't need to add a new compatible string for each
-> and every new SoC which carries this device and thus hardcode it's
-> properties in this driver.
-> 
-
-Since Wens already have answered that, I have nothing more to say
-
-Thanks for your review.
-
-Regards
-LABBE Corentin
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
