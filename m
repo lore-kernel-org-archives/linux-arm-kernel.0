@@ -1,68 +1,34 @@
-From: ivo.g.dimitrov.75@gmail.com (Ivaylo Dimitrov)
-Date: Mon, 6 Jun 2016 09:06:29 +0300
-Subject: [PATCH] userspace API definitions for auto-focus coil
-In-Reply-To: <20160605190716.GA11321@amd>
-References: <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd>
- <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
- <20160531213437.GA28397@amd>
- <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
- <20160601220840.GA21946@amd>
- <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
- <20160602193027.GB7984@amd>
- <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
- <20160605190716.GA11321@amd>
-Message-ID: <575512E5.5030000@gmail.com>
+From: hl@rock-chips.com (hl)
+Date: Mon, 6 Jun 2016 14:19:12 +0800
+Subject: [RFC PATCH v1 4/6] PM / devfreq: event: support rockchip dfi
+ controller
+In-Reply-To: <20160603165426.GC21013@ulmo.ba.sec>
+References: <1464947719-6245-1-git-send-email-hl@rock-chips.com>
+ <1464947719-6245-5-git-send-email-hl@rock-chips.com>
+ <20160603165426.GC21013@ulmo.ba.sec>
+Message-ID: <575515E0.8080108@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Thierry,
 
-On  5.06.2016 22:07, Pavel Machek wrote:
-> Add userspace API definitions.
+On 2016?06?04? 00:54, Thierry Reding wrote:
+> On Fri, Jun 03, 2016 at 05:55:17PM +0800, Lin Huang wrote:
+> [...]
+>> +	ret = clk_prepare_enable(data->clk);
+>> +	if (ret) {
+>> +		dev_err(&pdev->dev, "failed to enable clk: %d\n", ret);
+>> +		clk_disable_unprepare(data->clk);
+>> +		return ret;
+>> +	}
+> This is going to give you a large WARN. clk_prepare_enable() already
+> leaves the clock in a proper state when it fails (i.e. it calls
+> clk_unprepare() if the clk_enable() part failed), so calling
+> clk_disable_unprepare() upon failure is going to unbalance the
+> reference counts.
+Thanks for reminding, i will fix it next version.
 >
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
->
-> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> index b6a357a..23011cc 100644
-> --- a/include/uapi/linux/v4l2-controls.h
-> +++ b/include/uapi/linux/v4l2-controls.h
-> @@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
->   #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
->   #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
->
-> +/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> +#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
-> +#define V4L2_CID_FOCUS_AD5820_RAMP_TIME	(V4L2_CID_FOCUS_AD5820_BASE+0)
-> +#define V4L2_CID_FOCUS_AD5820_RAMP_MODE	(V4L2_CID_FOCUS_AD5820_BASE+1)
-> +
->   #endif
->
+> Thierry
 
-Sakari, what about adding those as standard camera controls? It seems 
-ad5820 is not the only VCM driver to implement "antiringing" controls, 
-http://rohmfs.rohm.com/en/products/databook/datasheet/ic/motor/mobile_module/bu64241gwz-e.pdf 
-is another example I found by quick search.
-
-What about:
-
-#define V4L2_CID_FOCUS_STEP_MODE xxx
-enum v4l2_cid_focus_step_mode {
-V4L2_CID_FOCUS_STEP_MODE_DIRECT,
-V4L2_CID_FOCUS_STEP_MODE_LINEAR,
-V4L2_CID_FOCUS_STEP_MODE_AUTO
-};
-#define V4L2_CID_FOCUS_STEP_TIME xxx+1
-
-Also, how the userspace(or the kernel) is notified by v4l that there is 
-an event? The point is - I think it is a good idea to notify when VCM 
-has completed its movement, we can start a timer based on the current 
-position, mode, step time etc and notify after the pre-calculated 
-movement time.
-
-Here ftp://ftp.analog.com/pub/evalcd/AD5820_v1_0/AD5820_Quickstart.pdf 
-can be found the modes/timings description for ad5820 along with the 
-equations needed to calculate timings etc.
-
-Ivo
+-- 
+Lin Huang
