@@ -1,139 +1,112 @@
-From: hl@rock-chips.com (Lin Huang)
-Date: Mon,  6 Jun 2016 18:13:06 +0800
-Subject: [RFC PATCH v2 6/6] drm/rockchip: Add dmc notifier in vop driver
-In-Reply-To: <1465207986-17888-1-git-send-email-hl@rock-chips.com>
-References: <1465207986-17888-1-git-send-email-hl@rock-chips.com>
-Message-ID: <1465207986-17888-7-git-send-email-hl@rock-chips.com>
+From: mamlinav@gmail.com (Aleksei Mamlin)
+Date: Mon,  6 Jun 2016 13:24:20 +0300
+Subject: [PATCH 3/7] ARM: dts: sun7i: Add A20 NAND controller pin definitions
+In-Reply-To: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <1465208664-9366-4-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-when in ddr frequency scaling process, vop can not do
-enable or disable operate, since dcf will base on vop vblank
-time to do frequency scaling and need to get vop irq if there
-have vop enabled. So need register to dmc notifier, and we can
-get the dmc status.
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Signed-off-by: Lin Huang <hl@rock-chips.com>
+Define the NAND controller pin configs.
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 ---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 80 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 80 insertions(+)
 
-Changes in v2:
-- None
-
-Changes in v1:
-- use wait_event instead usleep
-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 43 +++++++++++++++++++++++++++--
- 1 file changed, 41 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 1c4d5b5..8286048 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -31,6 +31,8 @@
- #include <linux/reset.h>
- #include <linux/delay.h>
- 
-+#include <soc/rockchip/rockchip_dmc.h>
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 82e28c3..915979f 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -1328,6 +1328,86 @@
+ 				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+ 				allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+ 			};
 +
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_gem.h"
- #include "rockchip_drm_fb.h"
-@@ -116,6 +118,10 @@ struct vop {
- 
- 	const struct vop_data *data;
- 
-+	struct notifier_block dmc_nb;
-+	int dmc_in_process;
-+	wait_queue_head_t	wait_dmc_queue;
++			nand_pins_a: nand_base0 at 0 {
++				allwinner,pins = "PC0", "PC1", "PC2",
++						"PC5", "PC8", "PC9", "PC10",
++						"PC11", "PC12", "PC13", "PC14",
++						"PC15", "PC16";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
- 	uint32_t *regsbak;
- 	void __iomem *regs;
- 
-@@ -426,6 +432,21 @@ static void vop_dsp_hold_valid_irq_disable(struct vop *vop)
- 	spin_unlock_irqrestore(&vop->irq_lock, flags);
- }
- 
-+static int dmc_notify(struct notifier_block *nb, unsigned long event,
-+		      void *data)
-+{
-+	struct vop *vop = container_of(nb, struct vop, dmc_nb);
++			nand_cs0_pins_a: nand_cs at 0 {
++				allwinner,pins = "PC4";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
-+	if (event == DMCFREQ_ADJUST) {
-+		vop->dmc_in_process = 1;
-+	} else if (event == DMCFREQ_FINISH) {
-+		vop->dmc_in_process = 0;
-+		wake_up(&vop->wait_dmc_queue);
-+	}
++			nand_cs1_pins_a: nand_cs at 1 {
++				allwinner,pins = "PC3";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
-+	return NOTIFY_OK;
-+}
++			nand_cs2_pins_a: nand_cs at 2 {
++				allwinner,pins = "PC17";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
- static void vop_enable(struct drm_crtc *crtc)
- {
- 	struct vop *vop = to_vop(crtc);
-@@ -434,6 +455,13 @@ static void vop_enable(struct drm_crtc *crtc)
- 	if (vop->is_enabled)
- 		return;
- 
-+	/*
-+	 * if in dmc scaling frequency process, wait until it finish
-+	 * use 100ms as timeout time.
-+	 */
-+	wait_event_timeout(vop->wait_dmc_queue,
-+			   !vop->dmc_in_process, HZ / 10);
++			nand_cs3_pins_a: nand_cs at 3 {
++				allwinner,pins = "PC18";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
- 	ret = pm_runtime_get_sync(vop->dev);
- 	if (ret < 0) {
- 		dev_err(vop->dev, "failed to get pm runtime: %d\n", ret);
-@@ -485,6 +513,7 @@ static void vop_enable(struct drm_crtc *crtc)
- 	enable_irq(vop->irq);
- 
- 	drm_crtc_vblank_on(crtc);
-+	rockchip_dmc_get(&vop->dmc_nb);
- 
- 	return;
- 
-@@ -505,6 +534,13 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
- 		return;
- 
- 	/*
-+	 * if in dmc scaling frequency process, wait until it finish
-+	 * use 100ms as timeout time.
-+	 */
-+	wait_event_timeout(vop->wait_dmc_queue,
-+			   !vop->dmc_in_process, HZ / 10);
++			nand_cs4_pins_a: nand_cs at 4 {
++				allwinner,pins = "PC19";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
-+	/*
- 	 * We need to make sure that all windows are disabled before we
- 	 * disable that crtc. Otherwise we might try to scan from a destroyed
- 	 * buffer later.
-@@ -517,7 +553,7 @@ static void vop_crtc_disable(struct drm_crtc *crtc)
- 		VOP_WIN_SET(vop, win, enable, 0);
- 		spin_unlock(&vop->reg_lock);
- 	}
--
-+	rockchip_dmc_put(&vop->dmc_nb);
- 	drm_crtc_vblank_off(crtc);
- 
- 	/*
-@@ -1243,7 +1279,7 @@ static int vop_create_crtc(struct vop *vop)
- 		ret = -ENOENT;
- 		goto err_cleanup_crtc;
- 	}
--
-+	vop->dmc_nb.notifier_call = dmc_notify;
- 	init_completion(&vop->dsp_hold_completion);
- 	init_completion(&vop->wait_update_complete);
- 	crtc->port = port;
-@@ -1465,6 +1501,9 @@ static int vop_bind(struct device *dev, struct device *master, void *data)
- 	/* IRQ is initially disabled; it gets enabled in power_on */
- 	disable_irq(vop->irq);
- 
-+	init_waitqueue_head(&vop->wait_dmc_queue);
-+	vop->dmc_in_process = 0;
++			nand_cs5_pins_a: nand_cs at 5 {
++				allwinner,pins = "PC20";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
 +
- 	ret = vop_create_crtc(vop);
- 	if (ret)
- 		return ret;
++			nand_cs6_pins_a: nand_cs at 6 {
++				allwinner,pins = "PC21";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_cs7_pins_a: nand_cs at 7 {
++				allwinner,pins = "PC22";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_rb0_pins_a: nand_rb at 0 {
++				allwinner,pins = "PC6";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
++
++			nand_rb1_pins_a: nand_rb at 1 {
++				allwinner,pins = "PC7";
++				allwinner,function = "nand0";
++				allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++				allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++			};
+ 		};
+ 
+ 		timer at 01c20c00 {
 -- 
-1.9.1
+2.7.3
