@@ -1,89 +1,100 @@
-From: wmills@ti.com (William Mills)
-Date: Mon, 6 Jun 2016 08:19:05 -0400
-Subject: [RFC v2 4/4] ARM: keystone: dma-coherent with safe fallback
-In-Reply-To: <20160606115918.GG6831@leverpostej>
-References: <1465183229-24147-1-git-send-email-wmills@ti.com>
- <1465183229-24147-5-git-send-email-wmills@ti.com>
- <20160606085627.GA6831@leverpostej>
- <20160606114321.GJ1041@n2100.armlinux.org.uk>
- <20160606115918.GG6831@leverpostej>
-Message-ID: <57556A39.2000505@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 06 Jun 2016 14:25:25 +0200
+Subject: [GIT PULL 0/8] ARM: exynos: Early stuff for v4.8
+Message-ID: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Dear all,
 
 
-On 06/06/2016 07:59 AM, Mark Rutland wrote:
-> On Mon, Jun 06, 2016 at 12:43:21PM +0100, Russell King - ARM Linux wrote:
->> On Mon, Jun 06, 2016 at 09:56:27AM +0100, Mark Rutland wrote:
->>> I very much do not like this. As I previously mentioned [1],
->>> dma-coherent has de-facto semantics today. This series deliberately
->>> changes that, and inverts the relationship between DT and kernel (as the
->>> describption in the DT would now depend on the configuration of the
->>> kernel).
->>
->> dma-coherent's semantics are not very well defined - just grep for it
->> in Documention/devicetree/ and you'll find several different wordings
->> for what this property means.
-> 
-> Indeed. This is the tip of the iceberg w.r.t. under-specification of
-> memory attribute usage.
-> 
->> Anyway, my point here is that all of these merely say that the hardware
->> is coherent in _some regard_ - it doesn't specify under what conditions
->> DMA coherency is guaranteed by the hardware.  It happens that on ARM,
->> most platforms give that guarantee when using inner shared mappings.  If
->> we were to use some other sharing, or disable sharing altogether (eg, by
->> disabling SMP support) then all these platforms would immediately break.
->>
->> In other words, DMA coherence today already depends on the kernel's setup
->> of the page tables corresponding to the requirements of the hardware.
-> 
-> I agree that whether or not devices are coherent in practice depends on
-> the kernel's configuration. The flip side, as you point out, is that
-> devices are coherent when a specific set of attributes are used.
-> 
-> i.e. that if you read dma-coherent as meaning "coherent iff Normal,
-> Inner Shareable, Inner WB Cacheable, Outer WB Cacheable", then
-> dma-coherent consistently describes the same thing, rather than
-> depending on the configuration of the OS.
->
+This time I am sending a very early pull request because:
+1. I already have a lot of stuff.
+2. There are some conflicts, including annoying re-indent one (see below).
+3. I am going for holidays soon.  After this weekend, my availability
+   will be reduced.
 
-Even w/o inner / outer it seems to me it is under specified.
-What about a system where main DDR memory is DMA coherent but an on chip
-SRAM needs manual flush/invalidate?  Right now dma coherency is all or
-nothing.  In the above case you would need to ensure that the device
-never tried to use that SRAM for dma transactions even though the device
-is perfectly capable with the right hand-holding.  Alternatively you
-could use the SRAM but penalize the normal case of DDR.
 
-> DT is a datastructure provided to the kernel, potentially without deep
-> internal knowledge of that kernel configuration. Having a consistent
-> rule that is independent of the kernel configuration seems worth aiming
-> for.
-> 
-> A dma-outer-coherent property would allow us to accurately describe the
-> keystone case in the same way, independent of kernel configuration.
-> 
->> Keystone II is just slightly different - and as I understand it, TI
->> followed one of the early specifications that ARM Ltd produced.  That
->> specification may have contained errors, but unfortunately, we now have
->> a situation where there is hardware out there which followed in good
->> faith.
-> 
-> To be clear, I am not arguing against supporting keystone. I just wish
-> to avoid muddying the waters further w.r.t. the semantics of
-> dma-coherent, which I believe can be salvaged and made consistent.
-> 
-> Clearly, those semantics are the point of contention here.
->
+There is no specific order of branches to pull (no inter-dependencies).
+External dependencies (from Samsung clk and media) are pulled in.
 
-To me this seems like a choice between embracing outer-shared or
-treating it like a quirk of some early armv7 devices.  With ARM's
-current recommendations to use inner-shared for everything in many
-contexts (like ARM servers etc), I was assuming you would want the latter.
 
-Thanks for looking.  This is not the patch that I expected to generate
-the most discussion.  :)
+Expected conflicts:
 
--- Bill
+1. arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+   samsung-drivers-exynos-mfc-4.8 with samsung-dt-4.8
+
+   Just include both changes:
+--- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+@@@ -18,6 -16,8 +18,7 @@@
+  #include <dt-bindings/sound/samsung-i2s.h>
+  #include "exynos5800.dtsi"
+  #include "exynos5422-cpus.dtsi"
+ -#include "exynos5422-cpu-thermal.dtsi"
++ #include "exynos-mfc-reserved-memory.dtsi"
+
+  / {
+        memory {
+
+
+2. arch/arm/configs/exynos_defconfig
+   samsung-defconfig-4.8 with current fixes
+
+   Just include both changes:
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@@ -80,11 -79,10 +79,11 @@@ CONFIG_TOUCHSCREEN_MMS114=
+  CONFIG_INPUT_MISC=y
+  CONFIG_INPUT_MAX77693_HAPTIC=y
+  CONFIG_INPUT_MAX8997_HAPTIC=y
+ +CONFIG_KEYBOARD_SAMSUNG=y
+  CONFIG_SERIAL_8250=y
++ CONFIG_SERIAL_OF_PLATFORM=y
+  CONFIG_SERIAL_SAMSUNG=y
+  CONFIG_SERIAL_SAMSUNG_CONSOLE=y
+- CONFIG_SERIAL_OF_PLATFORM=y
+  CONFIG_HW_RANDOM=y
+  CONFIG_TCG_TPM=y
+  CONFIG_TCG_TIS_I2C_INFINEON=y
+
+
+3. arch/arm/boot/dts/exynos5420.dtsi
+   samsung-dt-4.8 with samsung-dt-odroid-xu-4.8
+
+   This is non-trivial.  One branch added clocks and second changed
+   the indentation.  Manual fix-up is needed by re-indenting the
+   change with three clocks, like this:
+--- a/arch/arm/boot/dts/exynos5420.dtsi
++++ b/arch/arm/boot/dts/exynos5420.dtsi
++               mfc_pd: power-domain at 10044060 {
++                       compatible = "samsung,exynos4210-pd";
++                       reg = <0x10044060 0x20>;
+ -                      clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_USER_ACLK333>;
+ -                      clock-names = "oscclk", "clk0";
+++                      clocks = <&clock CLK_FIN_PLL>, <&clock CLK_MOUT_USER_ACLK333>,
+++                               <&clock CLK_ACLK333>;
+++                      clock-names = "oscclk", "clk0","asb0";
++                       #power-domain-cells = <0>;
++               };
+
+
+4. arch/arm/mach-exynos/Kconfig
+   arm-soc with tags/samsung-drivers
+
+   Trivial:
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@@ -18,7 -19,7 +18,8 @@@ menuconfig ARCH_EXYNO
+        select EXYNOS_THERMAL
+        select EXYNOS_PMU
+        select EXYNOS_SROM
++       select EXYNOS_PM_DOMAINS if PM_GENERIC_DOMAINS
+ +      select GPIOLIB
+        select HAVE_ARM_SCU if SMP
+        select HAVE_S3C2410_I2C if I2C
+        select HAVE_S3C2410_WATCHDOG if WATCHDOG
+
+
+Best regards,
+Krzysztof
