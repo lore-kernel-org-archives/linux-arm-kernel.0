@@ -1,44 +1,117 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  6 Jun 2016 18:08:53 +0100
-Subject: [PATCH 9/10] usb: host: ehci-st: Inform the reset framework that our
- reset line may be shared
-In-Reply-To: <20160606170854.12407-1-lee.jones@linaro.org>
-References: <20160606155655.10860-8-lee.jones@linaro.org>
- <20160606170854.12407-1-lee.jones@linaro.org>
-Message-ID: <20160606170854.12407-2-lee.jones@linaro.org>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Mon, 06 Jun 2016 17:59:44 +0100
+Subject: [PATCH kexec-tools v2 12/32] kexec: add helper to exlude a region
+ from a set of memory ranges
+In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
+References: <20160606164129.GM1041@n2100.armlinux.org.uk>
+Message-ID: <E1b9xsO-0003sa-Sr@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On the STiH410 B2120 development board the ST EHCI IP shares its reset
-line with the OHCI IP.  New functionality in the reset subsystems forces
-consumers to be explicit when requesting shared/exclusive reset lines.
+Add a helper to exclude a region from a set of memory ranges.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- drivers/usb/host/ehci-st.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ kexec/mem_regions.c | 71 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+ kexec/mem_regions.h |  4 +++
+ 2 files changed, 75 insertions(+)
 
-diff --git a/drivers/usb/host/ehci-st.c b/drivers/usb/host/ehci-st.c
-index a94ed67..6cfce6f 100644
---- a/drivers/usb/host/ehci-st.c
-+++ b/drivers/usb/host/ehci-st.c
-@@ -206,7 +206,7 @@ static int st_ehci_platform_probe(struct platform_device *dev)
- 		priv->clk48 = NULL;
- 	}
+diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
+index 804984a..b01a5c8 100644
+--- a/kexec/mem_regions.c
++++ b/kexec/mem_regions.c
+@@ -55,3 +55,74 @@ int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
+ 	return 0;
+ }
  
--	priv->pwr = devm_reset_control_get_optional(&dev->dev, "power");
-+	priv->pwr = devm_reset_control_get_optional_shared(&dev->dev, "power");
- 	if (IS_ERR(priv->pwr)) {
- 		err = PTR_ERR(priv->pwr);
- 		if (err == -EPROBE_DEFER)
-@@ -214,7 +214,7 @@ static int st_ehci_platform_probe(struct platform_device *dev)
- 		priv->pwr = NULL;
- 	}
++static void mem_regions_remove(struct memory_ranges *ranges, int index)
++{
++	int tail_entries;
++
++	/* we are assured to have at least one entry */
++	ranges->size -= 1;
++
++	/* if we have following entries, shuffle them down one place */
++	tail_entries = ranges->size - index;
++	if (tail_entries)
++		memmove(ranges->ranges + index, ranges->ranges + index + 1,
++			tail_entries * sizeof(*ranges->ranges));
++
++	/* zero the new tail entry */
++	memset(ranges->ranges + ranges->size, 0, sizeof(*ranges->ranges));
++}
++
++/**
++ * mem_regions_exclude() - excludes a memory region from a set of memory ranges
++ * @ranges: memory ranges to exclude the region from
++ * @range: memory range to exclude
++ *
++ * Exclude a memory region from a set of memory ranges.  We assume that
++ * the region to be excluded is either wholely located within one of the
++ * memory ranges, or not at all.
++ */
++int mem_regions_exclude(struct memory_ranges *ranges,
++			const struct memory_range *range)
++{
++	int i, ret;
++
++	for (i = 0; i < ranges->size; i++) {
++		struct memory_range *r = ranges->ranges + i;
++
++		/*
++		 * We assume that crash area is fully contained in
++		 * some larger memory area.
++		 */
++		if (r->start <= range->start && r->end >= range->end) {
++			if (r->start == range->start) {
++				if (r->end == range->end)
++					/* Remove this entry */
++					mem_regions_remove(ranges, i);
++				else
++					/* Shrink the start of this memory range */
++					r->start = range->end + 1;
++			} else if (r->end == range->end) {
++				/* Shrink the end of this memory range */
++				r->end = range->start - 1;
++			} else {
++				/*
++				 * Split this area into 2 smaller ones and
++				 * remove excluded range from between. First
++				 * create new entry for the remaining area.
++				 */
++				ret = mem_regions_add(ranges, range->end + 1,
++						      r->end - range->end, 0);
++				if (ret < 0)
++					return ret;
++
++				/*
++				 * Update this area to end before excluded
++				 * range.
++				 */
++				r->end = range->start - 1;
++				break;
++			}
++		}
++	}
++	return 0;
++}
+diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
+index da7b5e8..ae9e972 100644
+--- a/kexec/mem_regions.h
++++ b/kexec/mem_regions.h
+@@ -2,9 +2,13 @@
+ #define MEM_REGIONS_H
  
--	priv->rst = devm_reset_control_get_optional(&dev->dev, "softreset");
-+	priv->rst = devm_reset_control_get_optional_shared(&dev->dev, "softreset");
- 	if (IS_ERR(priv->rst)) {
- 		err = PTR_ERR(priv->rst);
- 		if (err == -EPROBE_DEFER)
+ struct memory_ranges;
++struct memory_range;
+ 
+ void mem_regions_sort(struct memory_ranges *ranges);
+ 
++int mem_regions_exclude(struct memory_ranges *ranges,
++			const struct memory_range *range);
++
+ int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
+                     unsigned long long length, int type);
+ 
 -- 
-2.8.3
+1.9.1
