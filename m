@@ -1,35 +1,38 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 18:00:05 +0100
-Subject: [PATCH kexec-tools v2 16/32] arm: fix ELF32/ELF64 check
-In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xsj-0003sy-Nx@e0050434b2927.dyn.armlinux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 6 Jun 2016 18:05:15 +0100
+Subject: [PATCH net-next 2/3] arm64: bpf: optimize JMP_CALL
+In-Reply-To: <1465077630-633-2-git-send-email-zlim.lnx@gmail.com>
+References: <1465077630-633-1-git-send-email-zlim.lnx@gmail.com>
+ <1465077630-633-2-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <20160606170515.GK669@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than using ULONG_MAX to decide whether to use the ELF64 or ELF32
-core dump format, use UINT32_MAX instead - we include stdint.h, so we
-might as well use a constant which is meaningful for the limits of
-the 32-bit ELF format.
+On Sat, Jun 04, 2016 at 03:00:29PM -0700, Zi Shen Lim wrote:
+> Remove superfluous stack frame, saving us 3 instructions for
+> every JMP_CALL.
+> 
+> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> ---
+>  arch/arm64/net/bpf_jit_comp.c | 3 ---
+>  1 file changed, 3 deletions(-)
+> 
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index 51abc97..7ae304e 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -578,11 +578,8 @@ emit_cond_jmp:
+>  		const u64 func = (u64)__bpf_call_base + imm;
+>  
+>  		emit_a64_mov_i64(tmp, func, ctx);
+> -		emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
+> -		emit(A64_MOV(1, A64_FP, A64_SP), ctx);
+>  		emit(A64_BLR(tmp), ctx);
+>  		emit(A64_MOV(1, r0, A64_R(0)), ctx);
+> -		emit(A64_POP(A64_FP, A64_LR, A64_SP), ctx);
+>  		break;
+>  	}
 
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
----
- kexec/arch/arm/crashdump-arm.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+Is the jitted code intended to be unwindable by standard tools?
 
-diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index a390187..fcc4d42 100644
---- a/kexec/arch/arm/crashdump-arm.c
-+++ b/kexec/arch/arm/crashdump-arm.c
-@@ -369,8 +369,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
- 	if (last_ranges < 0)
- 		last_ranges = 0;
- 
--	if (crash_memory_ranges[last_ranges].end > ULONG_MAX) {
--
-+	if (crash_memory_ranges[last_ranges].end > UINT32_MAX) {
- 		/* for support LPAE enabled kernel*/
- 		elf_info.class = ELFCLASS64;
- 
--- 
-1.9.1
+Will
