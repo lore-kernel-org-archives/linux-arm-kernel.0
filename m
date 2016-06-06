@@ -1,90 +1,84 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 6 Jun 2016 09:28:28 -0700
-Subject: [RFC v2 4/4] ARM: keystone: dma-coherent with safe fallback
-In-Reply-To: <20160606123210.GL1041@n2100.armlinux.org.uk>
-References: <1465183229-24147-1-git-send-email-wmills@ti.com>
- <1465183229-24147-5-git-send-email-wmills@ti.com>
- <20160606085627.GA6831@leverpostej>
- <20160606114321.GJ1041@n2100.armlinux.org.uk>
- <20160606115918.GG6831@leverpostej>
- <20160606123210.GL1041@n2100.armlinux.org.uk>
-Message-ID: <8e695a44-04a7-6ab5-41a3-ab316eeb49de@oracle.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon,  6 Jun 2016 18:36:31 +0200
+Subject: [PATCH 2/8] arm64: tegra: p2597: Add basic power supplies
+In-Reply-To: <20160606163637.14234-1-thierry.reding@gmail.com>
+References: <20160606163637.14234-1-thierry.reding@gmail.com>
+Message-ID: <20160606163637.14234-2-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Joining discussion late since only this thread showed up in my
-inbox)
+From: Thierry Reding <treding@nvidia.com>
 
-On 6/6/2016 5:32 AM, Russell King - ARM Linux wrote:
-> On Mon, Jun 06, 2016 at 12:59:18PM +0100, Mark Rutland wrote:
->> I agree that whether or not devices are coherent in practice depends on
->> the kernel's configuration. The flip side, as you point out, is that
->> devices are coherent when a specific set of attributes are used.
->>
->> i.e. that if you read dma-coherent as meaning "coherent iff Normal,
->> Inner Shareable, Inner WB Cacheable, Outer WB Cacheable", then
->> dma-coherent consistently describes the same thing, rather than
->> depending on the configuration of the OS.
->>
-I think there is a bit of miss-understanding with 'dma-coherent'
-DT property and as RMK pointed out "dma-coherent-outer" isn't
-right direction either.
+Signed-off-by: Thierry Reding <treding@nvidia.com>
+---
+ arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi | 55 ++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
 
->> DT is a datastructure provided to the kernel, potentially without deep
->> internal knowledge of that kernel configuration. Having a consistent
->> rule that is independent of the kernel configuration seems worth aiming
->> for.
->
-> I think you've missed the point.  dma-coherent is _already_ dependent on
-> the kernel configuration.  "Having a consistent rule that is independent
-> of the kernel configuration" is already an impossibility, as I illustrated
-> in my previous message concerning Marvell Armada SoCs, and you also said
-> in your preceding paragraph!
->
-> For example, if you clear the shared bit in the page tables on non-LPAE
-> SoCs, devices are no longer coherent.
->
-> DMA coherence on ARM _is_ already tightly linked with the kernel
-> configuration.  You already can't get away from that, so I think you
-> should give up trying to argue that point. :)
->
-> Whether devices are DMA coherent is a combination of two things:
->  * is the device connected to a coherent bus.
->  * is the system setup to allow coherency on that bus to work.
->
-> We capture the first through the dma-coherent property, which is clearly
-> a per-device property.  We ignore the second because we assume everyone
-> is going to configure the CPU side correctly.  That's untrue today, and
-> it's untrue not only because of Keystone II, but also because of other
-> SoCs as well which pre-date Keystone II.  We currently miss out on
-> considering that, because if we ignore it, we get something that works
-> for most platforms.
->
-I agree with Russell. When I added "dma-coherent" per device DT
-property, the intention was to distinguish certain devices which may
-not be coherent sitting on coherent fabric for some hardware reasons.
-
-> I don't see that adding a dma-outer-coherent property helps this - it's
-> muddying the waters somewhat - and it's also forcing additional complexity
-> into places where we shouldn't have it.  We would need to parse two
-> properties in the DMA API code, and then combine it with knowledge as
-> to how the system page tables have been setup.  If they've been setup
-> as inner sharable, then dma-coherent identifies whether the device is
-> coherent.  If they've been setup as outer sharable, then
-> dma-outer-coherent specifies that and dma-coherent is meaningless.
->
-> Sounds like a recipe for confusion.
->
-Exactly. We should leave the "dma-coherent" property to mark coherent
-vs non coherent device(s).
-
-The inner vs outer is really page table ARCH setup issue and should
-be handled exactly the way it was done first place to handle the
-special memory view(outside 4 GB).
-
-Keystone needs outer shared bit set while setting up MMU pages
-which is best done in MMU off mode while recreating the new
-page tables.
-
-Regards,
-Santosh
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
+index a2480c0c7e72..27bb835d6bcb 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
+@@ -1270,6 +1270,61 @@
+ 		cd-gpios = <&gpio TEGRA_GPIO(Z, 1) GPIO_ACTIVE_LOW>;
+ 	};
+ 
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vdd_sys_mux: regulator at 0 {
++			compatible = "regulator-fixed";
++			reg = <0>;
++			regulator-name = "VDD_SYS_MUX";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++
++		vdd_5v0_sys: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "VDD_5V0_SYS";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&pmic 1 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++			vin-supply = <&vdd_sys_mux>;
++		};
++
++		vdd_3v3_sys: regulator at 2 {
++			compatible = "regulator-fixed";
++			reg = <2>;
++			regulator-name = "VDD_3V3_SYS";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&pmic 3 GPIO_ACTIVE_HIGH>;
++			enable-active-high;
++			vin-supply = <&vdd_sys_mux>;
++
++			regulator-enable-ramp-delay = <160>;
++			regulator-disable-ramp-delay = <10000>;
++		};
++
++		vdd_5v0_io: regulator at 3 {
++			compatible = "regulator-fixed";
++			reg = <3>;
++			regulator-name = "VDD_5V0_IO_SYS";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			regulator-always-on;
++			regulator-boot-on;
++		};
++	};
++
+ 	gpio-keys {
+ 		compatible = "gpio-keys";
+ 		label = "gpio-keys";
+-- 
+2.8.3
