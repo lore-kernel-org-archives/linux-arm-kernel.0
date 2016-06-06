@@ -1,10 +1,11 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 6 Jun 2016 15:01:28 +0800
-Subject: [PATCH 1/3] ARM: dts: sun4i: The blue led on the Mele A1000 is a
- power led
-In-Reply-To: <1465129393-22379-1-git-send-email-hdegoede@redhat.com>
+Date: Mon, 6 Jun 2016 15:01:52 +0800
+Subject: [PATCH 2/3] ARM: dts: sun6i: The blue led on the Mele A1000G quad
+ is a power led
+In-Reply-To: <1465129393-22379-2-git-send-email-hdegoede@redhat.com>
 References: <1465129393-22379-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v66iYcOCSbX6Q9OLFYaaCpzqRC94v+OXfd8gcD7GG1eZRg@mail.gmail.com>
+ <1465129393-22379-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v67fSH=d8Aw=Pk2zMd=wmiBpaO2hbRiMxqCAUfmisGB6ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,8 +18,9 @@ On Sun, Jun 5, 2016 at 8:23 PM, Hans de Goede <hdegoede@redhat.com> wrote:
 > means that when you plug power into the top-set box, the power-led lights
 > and then turns off as soon as the kernel loads, which looks wrong.
 >
-> This renames the led from a1000:blue:usr to a1000:blue:pwr and marks
-> it as default on, fixing this.
+> This renames the led from m9:blue:usr to a1000g:blue:pwr (fixing a copy
+> and paste error in the prefix while at it) and marks it as default on,
+> fixing this.
 >
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
