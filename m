@@ -1,32 +1,36 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon,  6 Jun 2016 18:40:59 +0900
-Subject: [PATCH 0/4] serial: earlycon: keep earlycon symbols for non-module
- and driver clean-ups
-Message-ID: <1465206063-1018-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Mon,  6 Jun 2016 18:41:02 +0900
+Subject: [PATCH 3/4] serial: 8250_mtk: drop !defined(MODULE) conditional
+In-Reply-To: <1465206063-1018-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1465206063-1018-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1465206063-1018-4-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The !defined(MODULE) conditional has been added to the
+OF_EARLYCON_DECLARE() define.
 
-1/4: keep earlycon symbols only when CONFIG_SERIAL_EARLYCON is defined
-     and the driver is built-in.
+This commit partially reverts commit 3f5921a60f74 ("serial:
+8250/mediatek: fix building with SERIAL_8250=m").
 
-2/4 thru 4/4: driver clean-ups.
-              (partially reverts build fixes by Arnd Bergmann)
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
+ drivers/tty/serial/8250/8250_mtk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-
-Masahiro Yamada (4):
-  earlycon: mark earlycon code as __used iif the caller is built-in
-  serial: 8250_uniphier: drop !defined(MODULE) conditional
-  serial: 8250_mtk: drop !defined(MODULE) conditional
-  serial: 8250_ingenic: drop #if conditional surrounding earlycon code
-
- drivers/tty/serial/8250/8250_ingenic.c  | 2 --
- drivers/tty/serial/8250/8250_mtk.c      | 2 +-
- drivers/tty/serial/8250/8250_uniphier.c | 2 +-
- drivers/tty/serial/8250/Kconfig         | 2 +-
- include/linux/serial_core.h             | 8 +++++++-
- 5 files changed, 10 insertions(+), 6 deletions(-)
-
+diff --git a/drivers/tty/serial/8250/8250_mtk.c b/drivers/tty/serial/8250/8250_mtk.c
+index 3489fbc..3611ec9 100644
+--- a/drivers/tty/serial/8250/8250_mtk.c
++++ b/drivers/tty/serial/8250/8250_mtk.c
+@@ -301,7 +301,7 @@ static struct platform_driver mtk8250_platform_driver = {
+ };
+ module_platform_driver(mtk8250_platform_driver);
+ 
+-#if defined(CONFIG_SERIAL_8250_CONSOLE) && !defined(MODULE)
++#ifdef CONFIG_SERIAL_8250_CONSOLE
+ static int __init early_mtk8250_setup(struct earlycon_device *device,
+ 					const char *options)
+ {
 -- 
 1.9.1
