@@ -1,41 +1,81 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 06 Jun 2016 15:12:08 +0200
-Subject: [PATCH V2 3/4] ARM: mxs: dts: Add Creative X-Fi3 support
-In-Reply-To: <20160606084521.GA25155@tiger>
-References: <1462740621-7557-1-git-send-email-marex@denx.de>
- <1462740621-7557-3-git-send-email-marex@denx.de>
- <20160606084521.GA25155@tiger>
-Message-ID: <575576A8.2010208@denx.de>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 6 Jun 2016 08:12:43 -0500
+Subject: [PATCH 20/32] dt-bindings: Add binding for brcm,bcm2835-sdhost.
+In-Reply-To: <1464817421-8519-21-git-send-email-kraxel@redhat.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-21-git-send-email-kraxel@redhat.com>
+Message-ID: <20160606131243.GA8629@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2016 10:45 AM, Shawn Guo wrote:
-> On Sun, May 08, 2016 at 10:50:20PM +0200, Marek Vasut wrote:
->> +	regulators {
->> +		compatible = "simple-bus";
->> +
->> +		reg_vddio_sd0: vddio-sd0 {
->> +			compatible = "regulator-fixed";
->> +			regulator-name = "vddio-sd0";
->> +			regulator-min-microvolt = <3300000>;
->> +			regulator-max-microvolt = <3300000>;
->> +			gpio = <&gpio0 7 0>;
->> +		};
->> +	};
+On Wed, Jun 01, 2016 at 11:43:29PM +0200, Gerd Hoffmann wrote:
+> From: Eric Anholt <eric@anholt.net>
 > 
-> For new dts, we suggest put fixed regulator node directly under root in
-> the following naming scheme:
+> This is the other SD controller on the platform, which can be swapped
+> to the role of SD card host using pin muxing.
 > 
-> 	reg_xxx: regulator-xxx {
-> 		...
-> 	};
+> Signed-off-by: Eric Anholt <eric@anholt.net>
+> ---
+>  .../devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt |  3 +++
+>  .../bindings/mmc/brcm,bcm2835-sdhost.txt           | 24 ++++++++++++++++++++++
+>  2 files changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
 > 
-> Also, the order of subject prefix is like ARM: dts: mxs: ...
+> diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
+> index 59476fb..3cc74e2 100644
+> --- a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
+> +++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
+> @@ -15,4 +15,7 @@ sdhci: sdhci {
+>  	interrupts = <2 30>;
+>  	clocks = <&clk_mmc>;
+>  	bus-width = <4>;
+> +	dmas = <&dma 13>,
+> +	       <&dma 13>;
+> +	dma-names = "tx", "rx";
 
-I see, can you do this trivial fix while applying ?
+This looks unrelated. Plus SDHCI implies internal DMA master generally, 
+so is external DMA really supported?
 
-Thanks
+>  };
+> diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
+> new file mode 100644
+> index 0000000..074992c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
+> @@ -0,0 +1,24 @@
+> +Broadcom BCM2835 SDHOST controller
+> +
+> +This file documents differences between the core properties described
+> +by mmc.txt and the properties that represent the BCM2835 controller.
+> +
+> +Required properties:
+> +- compatible: Should be "brcm,bcm2835-sdhci".
 
--- 
-Best regards,
-Marek Vasut
+sdhost?
+
+> +- clocks: The clock feeding the SDHOST controller.
+
+reg, interrupts missing.
+
+> +
+> +Optional properties:
+> +- dmas: DMA channels for read and write.
+> +          See Documentation/devicetree/bindings/dma/dma.txt for details
+
+dma-names?
+
+> +
+> +Example:
+> +
+> +sdhost: sdhost at 7e202000 {
+> +	compatible = "brcm,bcm2835-sdhost";
+> +	reg = <0x7e202000 0x100>;
+> +	interrupts = <2 24>;
+> +	clocks = <&clocks BCM2835_CLOCK_VPU>;
+> +	dmas = <&dma 13>,
+> +	       <&dma 13>;
+> +	dma-names = "tx", "rx";
+> +};
+> -- 
+> 1.8.3.1
+> 
