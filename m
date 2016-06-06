@@ -1,34 +1,52 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 6 Jun 2016 09:33:11 -0500
-Subject: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC is
- active w/o HW workaround
-In-Reply-To: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
-References: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20160606143311.GA21103@rob-hp-laptop>
+Date: Mon, 6 Jun 2016 09:35:30 -0500
+Subject: [PATCH v3] regulator: axp20x: Add support for the (external)
+ drivebus regulator
+In-Reply-To: <1464973184-17244-1-git-send-email-hdegoede@redhat.com>
+References: <1464973184-17244-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160606143530.GA21766@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 06:31:19PM +0200, Lucas Stach wrote:
-> The i.MX6 Q/DL has an erratum (ERR006687) that prevents the FEC from
-> waking the CPUs when they are in wait(unclocked) state. As the hardware
-> workaround isn't applicable to all boards, disable the deeper idle state
-> when the workaround isn't present and the FEC is in use.
+On Fri, Jun 03, 2016 at 06:59:44PM +0200, Hans de Goede wrote:
+> The axp20x pmics have 2 power inputs, one called ACIN which is intended
+> for to be supplied via a powerbarrel on the board and one called VBUS
+> which is intended to be supplied via an otg connector.
 > 
-> This allows to safely run a kernel with CPUidle enabled on all i.MX6
-> boards.
+> In the VBUS case the pmic needs to know if the board is supplying power
+> to the otg connector, because then it should not take any power from
+> its VBUS pin. The axp209 pmic has a N_VBUSEN input pin via which the
+> board can signal to the pmic whether the board is supplying power to the
+> otg connector or not.
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Acked-by: David S. Miller <davem@davemloft.net> (for network changes)
+> On the axp221/axp223 this pin can alternatively be used as an output
+> which controls an external regulator which (optionally) supplies
+> power to the otg connector from the board. When the pin is used as
+> output it is called DRIVEVBUS in the datasheet.
+> 
+> This commit adds support for the DRIVEVBUS pin as an extra pmic
+> controlled regulator. Since this is optional a new x-powers,drivebus dt
+> property is added. When this is present the misc-control register is
+> written to change the N_VBUSEN input pin to DRIVEVBUS output pin mode and
+> the extra drivebus regulator is registered with the regulator subsystem.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > ---
-> v2: Spell out "workaround" to avoid confusion.
+> Changes in v2:
+> -Set supply_name to just drivebus instead of drivevbus-supply
+> -Fix some whitespace errors in the docs
+> 
+> Changes in v2:
+> -Rename the dt property to drive-vbus-en
+> -s/drivebus/drivevbus/
+> -Add a line describing the drivevbus regulator to the table in
+>  Documentation/devicetree/bindings/mfd/axp20x.txt
+> -Set supply_name to drivevbus-supply
 > ---
->  Documentation/devicetree/bindings/net/fsl-fec.txt |  3 +++
+>  Documentation/devicetree/bindings/mfd/axp20x.txt |  6 +++++
 
 Acked-by: Rob Herring <robh@kernel.org>
 
->  arch/arm/mach-imx/cpuidle-imx6q.c                 | 16 +++++++++++++++
->  drivers/net/ethernet/freescale/fec.h              |  2 ++
->  drivers/net/ethernet/freescale/fec_main.c         | 12 +++++++++++
->  include/soc/imx/cpuidle.h                         | 25 +++++++++++++++++++++++
->  5 files changed, 58 insertions(+)
->  create mode 100644 include/soc/imx/cpuidle.h
+>  drivers/regulator/axp20x-regulator.c             | 30 ++++++++++++++++++++++++
+>  2 files changed, 36 insertions(+)
