@@ -1,174 +1,131 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Mon,  6 Jun 2016 18:11:40 +0530
-Subject: [PATCH v4 7/7] phy: Add Northstar2 PCI Phy support
-In-Reply-To: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
-References: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1465216900-11755-8-git-send-email-pramod.kumar@broadcom.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 6 Jun 2016 13:47:21 +0100
+Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
+In-Reply-To: <1464640806-3942-3-git-send-email-thommyj@gmail.com>
+References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
+ <1464640806-3942-3-git-send-email-thommyj@gmail.com>
+Message-ID: <575570D9.6030700@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add PCI Phy support for Broadcom Northstar2 SoCs.  This driver uses the
-interface from the iproc mdio mux driver to enable the devices
-respective phys.
+On 30/05/16 21:40, Thommy Jakobsson wrote:
+> Use DT bindings to allow masks to be added for a masters streamIDs. This
+> is necessary for devices that have multiple IDs, or use dynamic signals to
+> build up the ID. For example the ZynqMPSoC that mirrors 6bits from the
+> AXI ID into the streamid.
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
-Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
----
- drivers/phy/Kconfig            |   8 +++
- drivers/phy/Makefile           |   2 +-
- drivers/phy/phy-bcm-ns2-pcie.c | 115 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 124 insertions(+), 1 deletion(-)
- create mode 100644 drivers/phy/phy-bcm-ns2-pcie.c
+That rationale doesn't hold, since "necessary" is clearly untrue - 
+devices with multiple IDs work just fine even with the current behaviour 
+of the driver provided there are sufficient SMRs. The third option of 
+generating a mask dynamically from a set of IDs is also perfectly 
+possible (which reminds me I must dig up the code I prototyped a while 
+back...), although an explicitly specified mask can still be beneficial 
+for optimal allocation in certain cases (by being able to express the 
+non-existence of IDs outside the set).
 
-diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
-index b869b98..01fb93b 100644
---- a/drivers/phy/Kconfig
-+++ b/drivers/phy/Kconfig
-@@ -434,4 +434,12 @@ config PHY_CYGNUS_PCIE
- 
- source "drivers/phy/tegra/Kconfig"
- 
-+config PHY_NS2_PCIE
-+	tristate "Broadcom Northstar2 PCIe PHY driver"
-+	depends on OF && MDIO_BUS_MUX_BCM_IPROC
-+	select GENERIC_PHY
-+	default ARCH_BCM_IPROC
-+	help
-+	  Enable this to support the Broadcom Northstar2 PCIe PHY.
-+	  If unsure, say N.
- endmenu
-diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
-index 9c3e73c..7aea094 100644
---- a/drivers/phy/Makefile
-+++ b/drivers/phy/Makefile
-@@ -53,5 +53,5 @@ obj-$(CONFIG_PHY_TUSB1210)		+= phy-tusb1210.o
- obj-$(CONFIG_PHY_BRCM_SATA)		+= phy-brcm-sata.o
- obj-$(CONFIG_PHY_PISTACHIO_USB)		+= phy-pistachio-usb.o
- obj-$(CONFIG_PHY_CYGNUS_PCIE)		+= phy-bcm-cygnus-pcie.o
--
- obj-$(CONFIG_ARCH_TEGRA) += tegra/
-+obj-$(CONFIG_PHY_NS2_PCIE)		+= phy-bcm-ns2-pcie.o
-diff --git a/drivers/phy/phy-bcm-ns2-pcie.c b/drivers/phy/phy-bcm-ns2-pcie.c
-new file mode 100644
-index 0000000..9513f7a
---- /dev/null
-+++ b/drivers/phy/phy-bcm-ns2-pcie.c
-@@ -0,0 +1,115 @@
-+/*
-+ * Copyright (C) 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation version 2.
-+ *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/device.h>
-+#include <linux/module.h>
-+#include <linux/of_mdio.h>
-+#include <linux/mdio.h>
-+#include <linux/phy.h>
-+#include <linux/phy/phy.h>
-+
-+struct ns2_pci_phy {
-+	struct mdio_device *mdiodev;
-+	struct phy *phy;
-+};
-+
-+#define BLK_ADDR_REG_OFFSET	0x1f
-+#define PLL_AFE1_100MHZ_BLK	0x2100
-+#define PLL_CLK_AMP_OFFSET	0x03
-+#define PLL_CLK_AMP_2P05V	0x2b18
-+
-+static int ns2_pci_phy_init(struct phy *p)
-+{
-+	struct ns2_pci_phy *phy = phy_get_drvdata(p);
-+	int rc;
-+
-+	/* select the AFE 100MHz block page */
-+	rc = mdiobus_write(phy->mdiodev->bus, phy->mdiodev->addr,
-+			   BLK_ADDR_REG_OFFSET, PLL_AFE1_100MHZ_BLK);
-+	if (rc)
-+		goto err;
-+
-+	/* set the 100 MHz reference clock amplitude to 2.05 v */
-+	rc = mdiobus_write(phy->mdiodev->bus, phy->mdiodev->addr,
-+			   PLL_CLK_AMP_OFFSET, PLL_CLK_AMP_2P05V);
-+	if (rc)
-+		goto err;
-+
-+	return 0;
-+
-+err:
-+	dev_err(&phy->mdiodev->dev, "Error %d writing to phy\n", rc);
-+	return rc;
-+}
-+
-+static struct phy_ops ns2_pci_phy_ops = {
-+	.init = ns2_pci_phy_init,
-+};
-+
-+static int ns2_pci_phy_probe(struct mdio_device *mdiodev)
-+{
-+	struct device *dev = &mdiodev->dev;
-+	struct phy_provider *provider;
-+	struct ns2_pci_phy *p;
-+	struct phy *phy;
-+
-+	phy = devm_phy_create(dev, dev->of_node, &ns2_pci_phy_ops);
-+	if (IS_ERR(phy)) {
-+		dev_err(dev, "failed to create Phy\n");
-+		return PTR_ERR(phy);
-+	}
-+
-+	p = devm_kmalloc(dev, sizeof(struct ns2_pci_phy),
-+			 GFP_KERNEL);
-+	if (!p)
-+		return -ENOMEM;
-+
-+	p->mdiodev = mdiodev;
-+	dev_set_drvdata(dev, p);
-+
-+	p->phy = phy;
-+	phy_set_drvdata(phy, p);
-+
-+	provider = devm_of_phy_provider_register(&phy->dev,
-+						 of_phy_simple_xlate);
-+	if (IS_ERR(provider)) {
-+		dev_err(dev, "failed to register Phy provider\n");
-+		return PTR_ERR(provider);
-+	}
-+
-+	dev_info(dev, "%s PHY registered\n", dev_name(dev));
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id ns2_pci_phy_of_match[] = {
-+	{ .compatible = "brcm,ns2-pcie-phy", },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, ns2_pci_phy_of_match);
-+
-+static struct mdio_driver ns2_pci_phy_driver = {
-+	.mdiodrv = {
-+		.driver = {
-+			.name = "phy-bcm-ns2-pci",
-+			.of_match_table = ns2_pci_phy_of_match,
-+		},
-+	},
-+	.probe = ns2_pci_phy_probe,
-+};
-+mdio_module_driver(ns2_pci_phy_driver);
-+
-+MODULE_AUTHOR("Broadcom");
-+MODULE_DESCRIPTION("Broadcom Northstar2 PCI Phy driver");
-+MODULE_LICENSE("GPL v2");
-+MODULE_ALIAS("platform:phy-bcm-ns2-pci");
--- 
-1.9.1
+> Signed-off-by: Thommy Jakobsson <thommyj@gmail.com>
+> ---
+>   drivers/iommu/arm-smmu.c | 46 +++++++++++++++++++++++++++++++++++++++++++++-
+>   1 file changed, 45 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+> index 9345a3f..14438f8 100644
+> --- a/drivers/iommu/arm-smmu.c
+> +++ b/drivers/iommu/arm-smmu.c
+> @@ -305,6 +305,7 @@ struct arm_smmu_smr {
+>   struct arm_smmu_master_cfg {
+>   	int				num_streamids;
+>   	u16				streamids[MAX_MASTER_STREAMIDS];
+> +	u16				streammasks[MAX_MASTER_STREAMIDS];
+>   	struct arm_smmu_smr		*smrs;
+>   };
+>
+> @@ -554,6 +555,38 @@ static int register_smmu_master(struct arm_smmu_device *smmu,
+>   	return insert_smmu_master(smmu, master);
+>   }
+>
+> +static int register_smmu_master_mask(struct arm_smmu_device *smmu,
+> +				     struct device *dev,
+> +				     struct of_phandle_args *masterspec)
+> +{
+> +	int i;
+> +	struct arm_smmu_master *master;
+> +
+> +	master = find_smmu_master(smmu, masterspec->np);
+> +	if (!master) {
+> +		dev_err(dev,
+> +			"mask phandle to %s, but no ID registred\n",
+> +			masterspec->np->name);
+> +		return -EINVAL;
+> +	}
+> +
+> +	if (masterspec->args_count != master->cfg.num_streamids) {
+> +		dev_err(dev,
+> +			"Different number of ids %d and masks %d not supported for master device %s\n",
+
+But this directly contradicts the example in the binding doc? (Which 
+incidentally wasn't sent to the devicetree mailing list.)
+
+> +			master->cfg.num_streamids,
+> +			masterspec->args_count,
+> +			masterspec->np->name);
+> +		return -ENOSPC;
+> +	}
+> +
+> +	for (i = 0; i < master->cfg.num_streamids; ++i) {
+> +		u16 streammask = masterspec->args[i];
+> +
+> +		master->cfg.streamids[i] = streammask;
+
+What if the DT is wrong and the SMMU doesn't support stream matching at 
+all, or the mask uses unimplemented SMR bits? Bogus stream IDs or stream 
+match conflicts are annoyingly subtle to debug.
+
+> +	}
+> +	return 0;
+> +}
+> +
+>   static struct arm_smmu_device *find_smmu_for_device(struct device *dev)
+>   {
+>   	struct arm_smmu_device *smmu;
+> @@ -1106,7 +1139,7 @@ static int arm_smmu_master_configure_smrs(struct arm_smmu_device *smmu,
+>
+>   		smrs[i] = (struct arm_smmu_smr) {
+>   			.idx	= idx,
+> -			.mask	= 0, /* We don't currently share SMRs */
+> +			.mask	= cfg->streammasks[i],
+>   			.id	= cfg->streamids[i],
+>   		};
+>   	}
+> @@ -1972,6 +2005,17 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+>
+>   	dev_notice(dev, "registered %d master devices\n", i);
+>
+> +	while (!of_parse_phandle_with_args(dev->of_node, "mmu-masters-mask",
+> +					   "#stream-id-cells", i,
+> +					   &masterspec)) {
+> +		err = register_smmu_master_mask(smmu, dev, &masterspec);
+> +		if (err) {
+> +			dev_err(dev, "failed to add mask for%s\n",
+> +				masterspec.np->name);
+> +			goto out_put_masters;
+> +		}
+> +
+> +	}
+>   	kfree(masterspec);
+>
+>   	parse_driver_options(smmu);
+>
+
+Either way, if you insist on wanting to build on the legacy binding that 
+doesn't work for PCI, can't integrate with DMA mapping, and everyone 
+else would rather get away from in favour of the generic IOMMU 
+bindings[1], there's still no need for yet another binding to support. 
+You can easily extend "mmu-masters" to encode an SMR mask in the upper 
+halfword of a cell without ambiguity and without breaking compatibility 
+with existing DTs.
+
+Robin.
+
+[1]The latest of many attempts being mine: 
+http://thread.gmane.org/gmane.linux.kernel.iommu/12454
