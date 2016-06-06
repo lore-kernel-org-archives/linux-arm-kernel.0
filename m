@@ -1,63 +1,45 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 17:59:29 +0100
-Subject: [PATCH kexec-tools v2 09/32] kexec: phys_to_virt() must take unsigned
- long long
+Date: Mon, 06 Jun 2016 18:01:13 +0100
+Subject: [PATCH kexec-tools v2 29/32] arm: add debug of reserved and coredump
+ memory ranges
 In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
 References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xs9-0003sI-95@e0050434b2927.dyn.armlinux.org.uk>
+Message-ID: <E1b9xtp-0003uE-KF@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-crashdump-elf.c passes unsigned long long addresses into phys_to_virt()
-so make phys_to_virt() accept such addresses without truncating them.
-This is important for ARM LPAE systems.
+Add debug of the reserved and coredump memory ranges for validation.
 
 Reviewed-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kexec/arch/arm/phys_to_virt.c | 2 +-
- kexec/crashdump.h             | 2 +-
- kexec/phys_to_virt.c          | 2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ kexec/arch/arm/crashdump-arm.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/kexec/arch/arm/phys_to_virt.c b/kexec/arch/arm/phys_to_virt.c
-index bcced52..c2fe2ea 100644
---- a/kexec/arch/arm/phys_to_virt.c
-+++ b/kexec/arch/arm/phys_to_virt.c
-@@ -14,7 +14,7 @@
-  * http://lists.arm.linux.org.uk/lurker/message/20010723.185051.94ce743c.en.html
-  */
- unsigned long
--phys_to_virt(struct crash_elf_info *elf_info, unsigned long paddr)
-+phys_to_virt(struct crash_elf_info *elf_info, unsigned long long paddr)
- {
- 	return paddr + elf_info->page_offset - phys_offset;
- }
-diff --git a/kexec/crashdump.h b/kexec/crashdump.h
-index 95f1f0c..96219a8 100644
---- a/kexec/crashdump.h
-+++ b/kexec/crashdump.h
-@@ -55,7 +55,7 @@ int crash_create_elf64_headers(struct kexec_info *info,
- unsigned long crash_architecture(struct crash_elf_info *elf_info);
+diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
+index 25fdbe9..2dc8846 100644
+--- a/kexec/arch/arm/crashdump-arm.c
++++ b/kexec/arch/arm/crashdump-arm.c
+@@ -158,6 +158,10 @@ static int crash_get_memory_ranges(void)
+ 		return -1;
+ 	}
  
- unsigned long phys_to_virt(struct crash_elf_info *elf_info,
--			   unsigned long paddr);
-+			   unsigned long long paddr);
++	dbgprint_mem_range("Reserved memory ranges",
++			   crash_reserved_rgns.ranges,
++			   crash_reserved_rgns.size);
++
+ 	/*
+ 	 * Exclude all reserved memory from the usable memory regions.
+ 	 * We want to avoid dumping the crashkernel region itself.  Note
+@@ -179,6 +183,9 @@ static int crash_get_memory_ranges(void)
+ 	 */
+ 	mem_regions_sort(&usablemem_rgns);
  
- unsigned long xen_architecture(struct crash_elf_info *elf_info);
- int xen_get_nr_phys_cpus(void);
-diff --git a/kexec/phys_to_virt.c b/kexec/phys_to_virt.c
-index 91b6d01..5e8c4e3 100644
---- a/kexec/phys_to_virt.c
-+++ b/kexec/phys_to_virt.c
-@@ -10,7 +10,7 @@
-  * their own implementation.
-  */
- unsigned long
--phys_to_virt(struct crash_elf_info *elf_info, unsigned long paddr)
-+phys_to_virt(struct crash_elf_info *elf_info, unsigned long long paddr)
- {
- 	return paddr + elf_info->page_offset;
++	dbgprint_mem_range("Coredump memory ranges",
++			   usablemem_rgns.ranges, usablemem_rgns.size);
++
+ 	return 0;
  }
+ 
 -- 
 1.9.1
