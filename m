@@ -1,102 +1,34 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 6 Jun 2016 09:28:42 -0500
-Subject: [v1 PATCH 3/4] Documentation: bindings: add dt documentation for
- cdn DP controller
-In-Reply-To: <1464966911-18949-4-git-send-email-zyw@rock-chips.com>
-References: <1464966911-18949-1-git-send-email-zyw@rock-chips.com>
- <1464966911-18949-4-git-send-email-zyw@rock-chips.com>
-Message-ID: <20160606142842.GA18768@rob-hp-laptop>
+Date: Mon, 6 Jun 2016 09:33:11 -0500
+Subject: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC is
+ active w/o HW workaround
+In-Reply-To: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
+References: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <20160606143311.GA21103@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 11:15:10PM +0800, Chris Zhong wrote:
-> This patch adds a binding that describes the cdn DP controller for
-> rk3399.
+On Fri, Jun 03, 2016 at 06:31:19PM +0200, Lucas Stach wrote:
+> The i.MX6 Q/DL has an erratum (ERR006687) that prevents the FEC from
+> waking the CPUs when they are in wait(unclocked) state. As the hardware
+> workaround isn't applicable to all boards, disable the deeper idle state
+> when the workaround isn't present and the FEC is in use.
 > 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> This allows to safely run a kernel with CPUidle enabled on all i.MX6
+> boards.
 > 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Acked-by: David S. Miller <davem@davemloft.net> (for network changes)
 > ---
-> 
-> Changes in v1:
-> - add extcon node description
-> - add #sound-dai-cells description
-> 
->  .../bindings/display/rockchip/cdn-dp-rockchip.txt  | 62 ++++++++++++++++++++++
->  1 file changed, 62 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
+> v2: Spell out "workaround" to avoid confusion.
+> ---
+>  Documentation/devicetree/bindings/net/fsl-fec.txt |  3 +++
 
 Acked-by: Rob Herring <robh@kernel.org>
 
-> 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
-> new file mode 100644
-> index 0000000..4a66fc3
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
-> @@ -0,0 +1,62 @@
-> +Rockchip RK3399 specific extensions to the cdn Display Port
-> +================================
-> +
-> +Required properties:
-> +- compatible: must be "rockchip,cdn-dp"
-> +
-> +- reg: physical base address of the controller and length
-> +
-> +- clocks: from common clock binding: handle to dp clock.
-> +
-> +- clock-names: from common clock binding:
-> +	       Required elements: "core_clk" "pclk" "spdif"
-> +
-> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
-> +
-> +- ports: contain a port nodes with endpoint definitions as defined in
-> +	 Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +	 contained 2 endpoints, connecting to the output of vop.
-> +
-> +- phys: from general PHY binding: the phandle for the PHY device.
-> +
-> +- extcon: extcon specifier for the Power Delivery
-> +
-> +- #sound-dai-cells = it must be 1 if your system is using 2 DAIs: I2S, SPDIF
-> +
-> +-------------------------------------------------------------------------------
-> +
-> +Example:
-> +	cdn_dp: dp at fec00000 {
-> +		compatible = "rockchip,cdn-dp";
-> +		reg = <0x0 0xfec00000 0x0 0x100000>;
-> +		interrupts = <GIC_SPI 9 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_DP_CORE>, <&cru PCLK_DP_CTRL>,
-> +			 <&cru SCLK_SPDIF_REC_DPTX>;
-> +		clock-names = "core_clk", "pclk", "spdif";
-> +		phys = <&tcphy0>;
-> +		extcon = <&fusb1>;
-> +		rockchip,grf = <&grf>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		#sound-dai-cells = <1>;
-> +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <1>;
-> +
-> +			dp_in: port {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				dp_in_vopb: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&vopb_out_dp>;
-> +				};
-> +
-> +				dp_in_vopl: endpoint at 1 {
-> +					reg = <1>;
-> +					remote-endpoint = <&vopl_out_dp>;
-> +				};
-> +			};
-> +		};
-> +	};
-> -- 
-> 2.6.3
-> 
-> 
+>  arch/arm/mach-imx/cpuidle-imx6q.c                 | 16 +++++++++++++++
+>  drivers/net/ethernet/freescale/fec.h              |  2 ++
+>  drivers/net/ethernet/freescale/fec_main.c         | 12 +++++++++++
+>  include/soc/imx/cpuidle.h                         | 25 +++++++++++++++++++++++
+>  5 files changed, 58 insertions(+)
+>  create mode 100644 include/soc/imx/cpuidle.h
