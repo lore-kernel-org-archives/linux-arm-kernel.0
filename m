@@ -1,32 +1,31 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 6 Jun 2016 15:05:51 +0800
-Subject: [PATCH 1/3] ARM: dts: sun4i: The blue led on the Mele A1000 is a
- power led
-In-Reply-To: <CAGb2v66iYcOCSbX6Q9OLFYaaCpzqRC94v+OXfd8gcD7GG1eZRg@mail.gmail.com>
-References: <1465129393-22379-1-git-send-email-hdegoede@redhat.com>
- <CAGb2v66iYcOCSbX6Q9OLFYaaCpzqRC94v+OXfd8gcD7GG1eZRg@mail.gmail.com>
-Message-ID: <CAGb2v66nnStG-JUwgPpiSsde0kbfeL5m-OfpmDNornhiMrhm7A@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 06 Jun 2016 09:07:48 +0200
+Subject: [PATCH V3 4/9] cpufreq: exynos: Use 'index' only to index into
+ policy->freq_table
+In-Reply-To: <e6621408b2a7748d6b984eb6c97d8ee13be96ad5.1464960877.git.viresh.kumar@linaro.org>
+References: <cover.1464960877.git.viresh.kumar@linaro.org>
+ <e6621408b2a7748d6b984eb6c97d8ee13be96ad5.1464960877.git.viresh.kumar@linaro.org>
+Message-ID: <57552144.10300@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 6, 2016 at 3:01 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Sun, Jun 5, 2016 at 8:23 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->> The blue led on the Mele A1000 is wired to light up as soon as the board
->> has powered (it will be on while the gpio is still in input / floating
->> mode), also its location on the top-set box clearly signals "power led".
->>
->> Until now we've been treating this as a generic usr function led, which
->> means that when you plug power into the top-set box, the power-led lights
->> and then turns off as soon as the kernel loads, which looks wrong.
->>
->> This renames the led from a1000:blue:usr to a1000:blue:pwr and marks
->> it as default on, fixing this.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+On 06/03/2016 03:35 PM, Viresh Kumar wrote:
+> Later patches would make changes in cpufreq core, after which
+> policy->freq_table may be reordered by cpufreq core and it wouldn't be
+> safe anymore to use 'index' for any other local arrays.
+> 
+> To prepare for that, use policy->freq_table[index].driver_data for other
+> driver specific usage of 'index'. The 'driver_data' fields are already
+> set properly by the driver.
+> 
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/cpufreq/exynos5440-cpufreq.c | 10 ++++++++--
+>  1 file changed, 8 insertions(+), 2 deletions(-)
 
-BTW, the kernel now supports using an LED as a panic indicator.
-Would it be useful to use the power LED for this?
+Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-ChenYu
+Best regards,
+Krzysztof
