@@ -1,53 +1,186 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon,  6 Jun 2016 18:36:32 +0200
-Subject: [PATCH 3/8] arm64: tegra: p2597: Add SDMMC power supplies
+Date: Mon,  6 Jun 2016 18:36:34 +0200
+Subject: [PATCH 5/8] arm64: tegra: Add Tegra210 XUSB pad controller
 In-Reply-To: <20160606163637.14234-1-thierry.reding@gmail.com>
 References: <20160606163637.14234-1-thierry.reding@gmail.com>
-Message-ID: <20160606163637.14234-3-thierry.reding@gmail.com>
+Message-ID: <20160606163637.14234-5-thierry.reding@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Thierry Reding <treding@nvidia.com>
 
+Add a device tree node for the XUSB pad controller found on Tegra210.
+
 Signed-off-by: Thierry Reding <treding@nvidia.com>
 ---
- arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm64/boot/dts/nvidia/tegra210.dtsi | 155 +++++++++++++++++++++++++++++++
+ 1 file changed, 155 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-index 27bb835d6bcb..b28aff5e104d 100644
---- a/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-+++ b/arch/arm64/boot/dts/nvidia/tegra210-p2597.dtsi
-@@ -1268,6 +1268,9 @@
- 		no-1-8-v;
- 
- 		cd-gpios = <&gpio TEGRA_GPIO(Z, 1) GPIO_ACTIVE_LOW>;
-+
-+		vqmmc-supply = <&vddio_sdmmc>;
-+		vmmc-supply = <&vdd_3v3_sd>;
+diff --git a/arch/arm64/boot/dts/nvidia/tegra210.dtsi b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+index 76fe31faa1a5..694228b9cdf4 100644
+--- a/arch/arm64/boot/dts/nvidia/tegra210.dtsi
++++ b/arch/arm64/boot/dts/nvidia/tegra210.dtsi
+@@ -621,6 +621,161 @@
+ 		status = "disabled";
  	};
  
- 	regulators {
-@@ -1323,6 +1326,20 @@
- 			regulator-always-on;
- 			regulator-boot-on;
- 		};
++	padctl: padctl at 7009f000 {
++		compatible = "nvidia,tegra210-xusb-padctl";
++		reg = <0x0 0x7009f000 0x0 0x1000>;
++		resets = <&tegra_car 142>;
++		reset-names = "padctl";
 +
-+		vdd_3v3_sd: regulator at 4 {
-+			compatible = "regulator-fixed";
-+			reg = <4>;
-+			regulator-name = "VDD_3V3_SD";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio TEGRA_GPIO(Z, 4) GPIO_ACTIVE_HIGH>;
-+			enable-active-high;
-+			vin-supply = <&vdd_3v3_sys>;
++		status = "disabled";
 +
-+			regulator-enable-ramp-delay = <472>;
-+			regulator-disable-ramp-delay = <4880>;
++		pads {
++			usb2 {
++				clocks = <&tegra_car TEGRA210_CLK_USB2_TRK>;
++				clock-names = "trk";
++				status = "disabled";
++
++				lanes {
++					usb2-0 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					usb2-1 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					usb2-2 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					usb2-3 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++				};
++			};
++
++			hsic {
++				clocks = <&tegra_car TEGRA210_CLK_HSIC_TRK>;
++				clock-names = "trk";
++				status = "disabled";
++
++				lanes {
++					hsic-0 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					hsic-1 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++				};
++			};
++
++			pcie {
++				clocks = <&tegra_car TEGRA210_CLK_PLL_E>;
++				clock-names = "pll";
++				resets = <&tegra_car 205>;
++				reset-names = "phy";
++				status = "disabled";
++
++				lanes {
++					pcie-0 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					pcie-1 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					pcie-2 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					pcie-3 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					pcie-4 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					pcie-5 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++
++					pcie-6 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++				};
++			};
++
++			sata {
++				clocks = <&tegra_car TEGRA210_CLK_PLL_E>;
++				clock-names = "pll";
++				resets = <&tegra_car 204>;
++				reset-names = "phy";
++				status = "disabled";
++
++				lanes {
++					sata-0 {
++						status = "disabled";
++						#phy-cells = <0>;
++					};
++				};
++			};
 +		};
- 	};
- 
- 	gpio-keys {
++
++		ports {
++			usb2-0 {
++				status = "disabled";
++			};
++
++			usb2-1 {
++				status = "disabled";
++			};
++
++			usb2-2 {
++				status = "disabled";
++			};
++
++			usb2-3 {
++				status = "disabled";
++			};
++
++			hsic-0 {
++				status = "disabled";
++			};
++
++			usb3-0 {
++				status = "disabled";
++			};
++
++			usb3-1 {
++				status = "disabled";
++			};
++
++			usb3-2 {
++				status = "disabled";
++			};
++
++			usb3-3 {
++				status = "disabled";
++			};
++		};
++	};
++
+ 	sdhci at 700b0000 {
+ 		compatible = "nvidia,tegra210-sdhci", "nvidia,tegra124-sdhci";
+ 		reg = <0x0 0x700b0000 0x0 0x200>;
 -- 
 2.8.3
