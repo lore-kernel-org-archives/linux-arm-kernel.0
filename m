@@ -1,125 +1,90 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 06 Jun 2016 18:07:28 -0500
-Subject: [PATCH v1 22/25] PCI: tegra: Remove top-level resource from hierarchy
-In-Reply-To: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <20160606230728.20936.53648.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon,  6 Jun 2016 18:17:29 -0500
+Subject: [PATCH V5 2/5] irqchip/gicv3-its: Add a new function for parsing
+ device table BASERn
+In-Reply-To: <1465255052-28045-1-git-send-email-shankerd@codeaurora.org>
+References: <1465255052-28045-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <1465255052-28045-2-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-41534e53786d ("PCI: tegra: Implement a proper resource hierarchy") did two
-things:
+Only the device table BASERn needs to be handled differently as
+compared to all other tables. So, adding a separate function for
+easy code maintenance and improved code readability.
 
-  1) It added a top-level resource that encloses all resources declared in
-     the DT description, including registers and bridge apertures, and
-
-  2) It requested the bridge apertures, which means the PCI core can track
-     the resources used by PCI devices below the bridge.
-
-The latter is necessary, but the former is questionable because there's no
-guarantee that the bridge registers and the apertures are contiguous.  In
-this example:
-
-  # cat /proc/iomem
-  00000000-3fffffff : /pcie-controller at 00003000
-    00000000-00000fff : /pcie-controller at 00003000/pci at 1,0
-    00003000-000037ff : pads
-    00003800-000039ff : afi
-    10000000-1fffffff : cs
-
-the resource tree claims that [mem 0x00003a00-0x0fffffff] is consumed by
-/pcie-controller at 00003000, but it's not mentioned in the DT, and it might
-actually be used by other devices.
-
-Remove the top-level resource so we don't claim more than the device
-actually consumes.
-
-This reintroduces the problem that we can't match the resources, e.g.,
-"pads", "afi", "cs", etc., to the DT device.  I think this should be solved
-by having the DT core request all resources of all devices in the DT (it
-does not do that today).  If a driver claims the device, it can request the
-resources it uses.  For example:
-
-  # cat /proc/iomem
-  00000000-00000fff : /pcie-controller at 00003000
-    00000000-00000fff : /pcie-controller at 00003000/pci at 1,0
-  00003000-000037ff : /pcie-controller at 00003000
-    00003000-000037ff : pads
-  00003800-000039ff : /pcie-controller at 00003000
-    00003800-000039ff : afi
-  10000000-1fffffff : /pcie-controller at 00003000
-    10000000-1fffffff : cs
-  ...
-
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
- drivers/pci/host/pci-tegra.c |   23 +++--------------------
- 1 file changed, 3 insertions(+), 20 deletions(-)
+ drivers/irqchip/irq-gic-v3-its.c | 49 +++++++++++++++++++++-------------------
+ 1 file changed, 26 insertions(+), 23 deletions(-)
 
-diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
-index c388468..920a899 100644
---- a/drivers/pci/host/pci-tegra.c
-+++ b/drivers/pci/host/pci-tegra.c
-@@ -274,7 +274,6 @@ struct tegra_pcie {
- 	struct list_head buses;
- 	struct resource *cs;
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 69ede4a..b4637ad 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -846,6 +846,30 @@ static void its_write_baser_cache(struct its_node *its, struct its_baser *baser,
+ 	baser->val = its_read_baser(its, baser);
+ }
  
--	struct resource all;
- 	struct resource io;
- 	struct resource pio;
- 	struct resource mem;
-@@ -623,7 +622,7 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
- 	sys->mem_offset = pcie->offset.mem;
- 	sys->io_offset = pcie->offset.io;
++static void its_parse_baser_device(struct its_node *its, struct its_baser *baser,
++				   u32 *order)
++{
++	u64 esz = GITS_BASER_ENTRY_SIZE(its_read_baser(its, baser));
++	u32 ids = its->device_ids;
++	u32 new_order = *order;
++
++	/*
++	 * Allocate as many entries as required to fit the
++	 * range of device IDs that the ITS can grok... The ID
++	 * space being incredibly sparse, this results in a
++	 * massive waste of memory.
++	 */
++	new_order = max_t(u32, get_order(esz << ids), new_order);
++	if (new_order >= MAX_ORDER) {
++		new_order = MAX_ORDER - 1;
++		ids = ilog2(PAGE_ORDER_TO_SIZE(new_order) / esz);
++		pr_warn("ITS@%pa: Device Table too large, reduce ids %u->%u\n",
++			&its->phys_base, its->device_ids, ids);
++	}
++
++	*order = new_order;
++}
++
+ static void its_free_tables(struct its_node *its)
+ {
+ 	int i;
+@@ -897,29 +921,8 @@ static int its_alloc_tables(const char *node_name, struct its_node *its)
+ 		if (type == GITS_BASER_TYPE_NONE)
+ 			continue;
  
--	err = devm_request_resource(pcie->dev, &pcie->all, &pcie->io);
-+	err = devm_request_resource(pcie->dev, &iomem_resource, &pcie->io);
- 	if (err < 0)
- 		return err;
+-		/*
+-		 * Allocate as many entries as required to fit the
+-		 * range of device IDs that the ITS can grok... The ID
+-		 * space being incredibly sparse, this results in a
+-		 * massive waste of memory.
+-		 *
+-		 * For other tables, only allocate a single page.
+-		 */
+-		if (type == GITS_BASER_TYPE_DEVICE) {
+-			/*
+-			 * 'order' was initialized earlier to the default page
+-			 * granule of the the ITS.  We can't have an allocation
+-			 * smaller than that.  If the requested allocation
+-			 * is smaller, round up to the default page granule.
+-			 */
+-			order = max(get_order((1UL << ids) * entry_size),
+-				    order);
+-			if (order >= MAX_ORDER) {
+-				order = MAX_ORDER - 1;
+-				pr_warn("%s: Device Table too large, reduce its page order to %u\n",
+-					node_name, order);
+-			}
+-		}
++		if (type == GITS_BASER_TYPE_DEVICE)
++			its_parse_baser_device(its, baser, &order);
  
-@@ -631,11 +630,11 @@ static int tegra_pcie_setup(int nr, struct pci_sys_data *sys)
- 	if (err < 0)
- 		return err;
- 
--	err = devm_request_resource(pcie->dev, &pcie->all, &pcie->mem);
-+	err = devm_request_resource(pcie->dev, &iomem_resource, &pcie->mem);
- 	if (err < 0)
- 		return err;
- 
--	err = devm_request_resource(pcie->dev, &pcie->all, &pcie->prefetch);
-+	err = devm_request_resource(pcie->dev, &iomem_resource, &pcie->prefetch);
- 	if (err)
- 		return err;
- 
-@@ -1822,12 +1821,6 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
- 	struct resource res;
- 	int err;
- 
--	memset(&pcie->all, 0, sizeof(pcie->all));
--	pcie->all.flags = IORESOURCE_MEM;
--	pcie->all.name = np->full_name;
--	pcie->all.start = ~0;
--	pcie->all.end = 0;
--
- 	if (of_pci_range_parser_init(&parser, np)) {
- 		dev_err(pcie->dev, "missing \"ranges\" property\n");
- 		return -EINVAL;
-@@ -1880,18 +1873,8 @@ static int tegra_pcie_parse_dt(struct tegra_pcie *pcie)
- 			}
- 			break;
- 		}
--
--		if (res.start <= pcie->all.start)
--			pcie->all.start = res.start;
--
--		if (res.end >= pcie->all.end)
--			pcie->all.end = res.end;
- 	}
- 
--	err = devm_request_resource(pcie->dev, &iomem_resource, &pcie->all);
--	if (err < 0)
--		return err;
--
- 	err = of_pci_parse_bus_range(np, &pcie->busn);
- 	if (err < 0) {
- 		dev_err(pcie->dev, "failed to parse ranges property: %d\n",
+ retry_alloc_baser:
+ 		alloc_pages = (PAGE_ORDER_TO_SIZE(order) / psz);
+-- 
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc. 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, 
+a Linux Foundation Collaborative Project
