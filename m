@@ -1,66 +1,63 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Jun 2016 18:29:45 +0100
-Subject: [PATCH v2 2/4] Documentation: Add documentation for APM X-Gene
- SoC PMU DTS binding
-In-Reply-To: <CACgAJHxMCa2Hp_A8YnHmmVrHGd3yLhFs2k33MN6OHRUmZ7Y_Wg@mail.gmail.com>
-References: <1460510547-17611-1-git-send-email-ttnguyen@apm.com>
- <1460510547-17611-3-git-send-email-ttnguyen@apm.com>
- <20160418170009.GA15338@rob-hp-laptop>
- <CACgAJHyBbO_LXwtfNVK1f=dY3v1Jfxwxq1dw98EZ0aYdhjPpAg@mail.gmail.com>
- <20160420113121.GE2514@arm.com>
- <20160502205648.GA7374@rob-hp-laptop>
- <CACgAJHyT31DuVNoyRQZVKjv=zM5Fc-EY0gy=y=pHHrBTT+1Xow@mail.gmail.com>
- <20160531165630.GE4254@leverpostej>
- <CACgAJHwtb0hNs0JWOrpyF=_fRVvUi2QG4q7qohgCw4SjxqtX6A@mail.gmail.com>
- <CACgAJHxMCa2Hp_A8YnHmmVrHGd3yLhFs2k33MN6OHRUmZ7Y_Wg@mail.gmail.com>
-Message-ID: <20160606172945.GE23505@leverpostej>
+From: eric@anholt.net (Eric Anholt)
+Date: Mon, 06 Jun 2016 10:33:18 -0700
+Subject: [PATCH] dmaengine: bcm2835: Fix polling for completion of DMA
+ with interrupts masked.
+In-Reply-To: <20160606042635.GU16910@localhost>
+References: <1465007351-5559-1-git-send-email-eric@anholt.net>
+ <20160606042635.GU16910@localhost>
+Message-ID: <87a8iy6x41.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 06:25:56PM -0700, Tai Tri Nguyen wrote:
-> Hi Mark,
+Vinod Koul <vinod.koul@intel.com> writes:
 
-[...]
+> On Fri, Jun 03, 2016 at 07:29:11PM -0700, Eric Anholt wrote:
+>> The tx_status hook is supposed to be safe to call from interrupt
+>> context, but it wouldn't ever return completion for the last transfer,
+>> meaning you couldn't poll for DMA completion with interrupts masked.
+>
+> and why is that?
 
-> I'm facing a problem after removing the index for MCU and MC sub-nodes.
-> The MCUs and MCs aren't always enabled depending on how DRAM DIMMs are
-> installed on the system.
-> I still need a way to associate the MCU with its indicator bit in the
-> enable mask retrieved from CSR.
+Maybe this was poorly worded.  How about:
 
-Ah, I see.
+The tx_status hook is supposed to be safe to call from interrupt
+context.  However, the current transfer currently only gets marked
+complete by the IRQ handler, so if interrupts were masked then polling
+for completion would never finish.
 
-Can you elaborate on how the indicator bits are laid out? From the
-example binding, I see multiple nodes with the same index property, so
-I'm a little confused.
+>> This fixes IRQ handling for bcm2835's DSI1, which requires using the
+>> DMA engine to write its registers due to a bug in the AXI bridge.
+>> 
+>> Signed-off-by: Eric Anholt <eric@anholt.net>
+>> ---
+>>  drivers/dma/bcm2835-dma.c | 24 +++++++++++++++++++-----
+>>  1 file changed, 19 insertions(+), 5 deletions(-)
+>> 
+>> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+>> index 6149b27c33ad..320461c578e3 100644
+>> --- a/drivers/dma/bcm2835-dma.c
+>> +++ b/drivers/dma/bcm2835-dma.c
+>> @@ -570,16 +570,16 @@ static enum dma_status bcm2835_dma_tx_status(struct dma_chan *chan,
+>>  	struct virt_dma_desc *vd;
+>>  	enum dma_status ret;
+>>  	unsigned long flags;
+>> +	u32 residue;
+>>  
+>>  	ret = dma_cookie_status(chan, cookie, txstate);
+>> -	if (ret == DMA_COMPLETE || !txstate)
+>> +	if (ret == DMA_COMPLETE)
+>
+> Why do you change this? txstate can be NULL, so no point calculating reside
+> for those cases
 
-I guess that there's a CSR per class of node (e.g. all MCBs in one CSR
-register)? Or do several nodes share the same bit?
-
-Is there a single CSR register? Are there several? Is that bit index
-used in other registers?
-
-> For MC and MCB nodes only, can I introduce an "enable-mask" field?
-> For example:
-> "
-> pmucmcb at 7e710000 {
->         compatible = "apm,xgene-pmu-mcb";
->         reg = <0x0 0x7e710000 0x0 0x1000>;
->         enable-mask = <0x00000001>;
-> };
-> 
-> pmucmcb at 7e730000 {
->         compatible = "apm,xgene-pmu-mcb";
->         reg = <0x0 0x7e730000 0x0 0x1000>;
->         enable-mask = <0x00000002>;
-> };
-> "
-> Or can you please give a suggestion how I can fix it?
-
-Assuming it's always a single bit, a *-bit-index property may be fine,
-and probably preferable.
-
-I'm a little confused, so I'd like to understand how it's used.
-
-Thanks,
-Mark.
+The point was to go into the "Calculate where we're at in our current
+DMA (if the current DMA is the one we're asking about status for)" path,
+so that we could note when the DMA is complete even when there's no
+txstate passed in.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160606/dfd1d825/attachment.sig>
