@@ -1,29 +1,29 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon,  6 Jun 2016 16:59:24 +0100
-Subject: [PATCH 2/3] arm64: dts: juno: add arm,primecell-periphid override
+Date: Mon,  6 Jun 2016 16:59:23 +0100
+Subject: [PATCH 1/3] arm64: dts: juno: add coresight support
 In-Reply-To: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
 References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1465228765-14038-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Linux AMBA framework probes the peripheral ids when adding the amba
-devices very early on the boot. Generally they are on APB bus and just
-require APB clocks to be on even when most of the core logic of the IP
-is powered down.
+Most of the debug-related components on Juno are located in the coreSight
+subsystem while others are located in the Cortex-Axx clusters, the SCP
+subsystem, and in the main system.
 
-However on Juno, the entire debugsys domain needs to be ON to access
-those CID/PID registers and hence broken by design. Accessing those
-while debugsys power domain is off will lead to the bridge stalling the
-transactions instead of returning the slave error.
+Each core in the two processor clusters contain an Embedded Trace
+Macrocell(ETM) which generates real-time trace information that trace
+tools can use and an ATB trace output that is sent to a funnel before
+going to the CoreSight subsystem.
 
-Since keeping the power domain on by default affects the core power(by
-preventing cores entering deeper idle states), it's not feasible
-solution. Instead we can provide arm,primecell-periphid override in the
-device tree that prevents accessing the device early in the boot.
+The trace output signals combine with two trace expansions using another
+funnel and fed into the Embedded Trace FIFO(ETF0).
 
-However the power domains can be enabled whenever required using runtime
-PM and associated power domains.
+The output trace data stream of the funnel is then replicated before it
+is sent to either the:
+- Trace Port Interface Unit(TPIU), that sends it out using the trace port.
+- ETR that can write the trace data to memory located in the application
+  memory space
 
 Cc: Liviu Dudau <liviu.dudau@arm.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
@@ -31,175 +31,414 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: devicetree at vger.kernel.org
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm64/boot/dts/arm/juno-base.dtsi | 13 +++++++++++++
- arch/arm64/boot/dts/arm/juno-r1.dts    |  6 ++++++
- arch/arm64/boot/dts/arm/juno-r2.dts    |  6 ++++++
- arch/arm64/boot/dts/arm/juno.dts       |  6 ++++++
- 4 files changed, 31 insertions(+)
+ arch/arm64/boot/dts/arm/juno-base.dtsi | 296 +++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/arm/juno-r1.dts    |  24 +++
+ arch/arm64/boot/dts/arm/juno-r2.dts    |  24 +++
+ arch/arm64/boot/dts/arm/juno.dts       |  24 +++
+ 4 files changed, 368 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
-index 90a8710f7032..49fa55cdc977 100644
+index dee2386d3b9b..90a8710f7032 100644
 --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
 +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
-@@ -63,6 +63,14 @@
- 	 */
- 	etf at 20010000 {
- 		compatible = "arm,coresight-tmc", "arm,primecell";
-+		/*
-+		 * The primecell peripheral id is explicitly specified here with
-+		 * the actual hardware value. It's not any override. It's
-+		 * required to workaround an errata to avoid bus stalls early
-+		 * in the boot when AMBA primecell ids are probed before the
-+		 * actual power domain can be enabled using SCPI.
+@@ -56,6 +56,302 @@
+ 			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+ 	};
+
++	/*
++	 * Juno TRMs specify the size for these coresight components as 64K.
++	 * The actual size is just 4K though 64K is reserved. Access to the
++	 * unmapped reserved region results in a DECERR response.
++	 */
++	etf at 20010000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0 0x20010000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* input port */
++			port at 0 {
++				reg = <0>;
++				etf_in_port: endpoint {
++					slave-mode;
++					remote-endpoint = <&main_funnel_out_port>;
++				};
++			};
++
++			/* output port */
++			port at 1 {
++				reg = <0>;
++				etf_out_port: endpoint {
++					remote-endpoint = <&replicator_in_port0>;
++				};
++			};
++		};
++	};
++
++	tpiu at 20030000 {
++		compatible = "arm,coresight-tpiu", "arm,primecell";
++		reg = <0 0x20030000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			tpiu_in_port: endpoint {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port0>;
++			};
++		};
++	};
++
++	main_funnel at 20040000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x20040000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				main_funnel_out_port: endpoint {
++					remote-endpoint = <&etf_in_port>;
++				};
++			};
++
++			port at 1 {
++				reg = <0>;
++				main_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&cluster0_funnel_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				main_funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&cluster1_funnel_out_port>;
++				};
++			};
++
++		};
++	};
++
++	etr at 20070000 {
++		compatible = "arm,coresight-tmc", "arm,primecell";
++		reg = <0 0x20070000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			etr_in_port: endpoint {
++				slave-mode;
++				remote-endpoint = <&replicator_out_port1>;
++			};
++		};
++	};
++
++	coresight-replicator {
++		/* non-configurable replicators don't show up on the
++		 * AMBA bus.  As such no need to add "arm,primecell".
 +		 */
-+		arm,primecell-periphid = <0x001bb961>;
- 		reg = <0 0x20010000 0 0x1000>;
-
- 		clocks = <&soc_smc50mhz>;
-@@ -92,6 +100,7 @@
-
- 	tpiu at 20030000 {
- 		compatible = "arm,coresight-tpiu", "arm,primecell";
-+		arm,primecell-periphid = <0x004bb912>;
- 		reg = <0 0x20030000 0 0x1000>;
-
- 		clocks = <&soc_smc50mhz>;
-@@ -106,6 +115,7 @@
-
- 	main_funnel at 20040000 {
- 		compatible = "arm,coresight-funnel", "arm,primecell";
-+		arm,primecell-periphid = <0x002bb908>;
- 		reg = <0 0x20040000 0 0x1000>;
-
- 		clocks = <&soc_smc50mhz>;
-@@ -142,6 +152,7 @@
-
- 	etr at 20070000 {
- 		compatible = "arm,coresight-tmc", "arm,primecell";
-+		arm,primecell-periphid = <0x001bb961>;
- 		reg = <0 0x20070000 0 0x1000>;
-
- 		clocks = <&soc_smc50mhz>;
-@@ -192,6 +203,7 @@
-
- 	cluster0_funnel at 220c0000 {
- 		compatible = "arm,coresight-funnel", "arm,primecell";
-+		arm,primecell-periphid = <0x002bb908>;
- 		reg = <0 0x220c0000 0 0x1000>;
-
- 		clocks = <&soc_smc50mhz>;
-@@ -227,6 +239,7 @@
-
- 	cluster1_funnel at 230c0000 {
- 		compatible = "arm,coresight-funnel", "arm,primecell";
-+		arm,primecell-periphid = <0x002bb908>;
- 		reg = <0 0x230c0000 0 0x1000>;
-
- 		clocks = <&soc_smc50mhz>;
++		compatible = "arm,coresight-replicator";
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			/* replicator output ports */
++			port at 0 {
++				reg = <0>;
++				replicator_out_port0: endpoint {
++					remote-endpoint = <&tpiu_in_port>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++				replicator_out_port1: endpoint {
++					remote-endpoint = <&etr_in_port>;
++				};
++			};
++
++			/* replicator input port */
++			port at 2 {
++				reg = <0>;
++				replicator_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&etf_out_port>;
++				};
++			};
++		};
++	};
++
++	cluster0_funnel at 220c0000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x220c0000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				cluster0_funnel_out_port: endpoint {
++					remote-endpoint = <&main_funnel_in_port0>;
++				};
++			};
++
++			port at 1 {
++				reg = <0>;
++				cluster0_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&cluster0_etm0_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				cluster0_funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&cluster0_etm1_out_port>;
++				};
++			};
++		};
++	};
++
++	cluster1_funnel at 230c0000 {
++		compatible = "arm,coresight-funnel", "arm,primecell";
++		reg = <0 0x230c0000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			port at 0 {
++				reg = <0>;
++				cluster1_funnel_out_port: endpoint {
++					remote-endpoint = <&main_funnel_in_port1>;
++				};
++			};
++
++			port at 1 {
++				reg = <0>;
++				cluster1_funnel_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&cluster1_etm0_out_port>;
++				};
++			};
++
++			port at 2 {
++				reg = <1>;
++				cluster1_funnel_in_port1: endpoint {
++					slave-mode;
++					remote-endpoint = <&cluster1_etm1_out_port>;
++				};
++			};
++			port at 3 {
++				reg = <2>;
++				cluster1_funnel_in_port2: endpoint {
++					slave-mode;
++					remote-endpoint = <&cluster1_etm2_out_port>;
++				};
++			};
++			port at 4 {
++				reg = <3>;
++				cluster1_funnel_in_port3: endpoint {
++					slave-mode;
++					remote-endpoint = <&cluster1_etm3_out_port>;
++				};
++			};
++		};
++	};
++
++	etm0: etm at 22040000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x22040000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			cluster0_etm0_out_port: endpoint {
++				remote-endpoint = <&cluster0_funnel_in_port0>;
++			};
++		};
++	};
++
++	etm1: etm at 22140000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x22140000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			cluster0_etm1_out_port: endpoint {
++				remote-endpoint = <&cluster0_funnel_in_port1>;
++			};
++		};
++	};
++
++	etm2: etm at 23040000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x23040000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			cluster1_etm0_out_port: endpoint {
++				remote-endpoint = <&cluster1_funnel_in_port0>;
++			};
++		};
++	};
++
++	etm3: etm at 23140000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x23140000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			cluster1_etm1_out_port: endpoint {
++				remote-endpoint = <&cluster1_funnel_in_port1>;
++			};
++		};
++	};
++
++	etm4: etm at 23240000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x23240000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			cluster1_etm2_out_port: endpoint {
++				remote-endpoint = <&cluster1_funnel_in_port2>;
++			};
++		};
++	};
++
++	etm5: etm at 23340000 {
++		compatible = "arm,coresight-etm4x", "arm,primecell";
++		reg = <0 0x23340000 0 0x1000>;
++
++		clocks = <&soc_smc50mhz>;
++		clock-names = "apb_pclk";
++		port {
++			cluster1_etm3_out_port: endpoint {
++				remote-endpoint = <&cluster1_funnel_in_port3>;
++			};
++		};
++	};
++
+ 	sram: sram at 2e000000 {
+ 		compatible = "arm,juno-sram-ns", "mmio-sram";
+ 		reg = <0x0 0x2e000000 0x0 0x8000>;
 diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
-index f4f8f54f8b85..c3c9fdff49bf 100644
+index d95d9e7e2dc0..f4f8f54f8b85 100644
 --- a/arch/arm64/boot/dts/arm/juno-r1.dts
 +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
-@@ -184,24 +184,30 @@
-
- &etm0 {
- 	cpu = <&A57_0>;
-+	arm,primecell-periphid = <0x002bb95e>;
+@@ -181,3 +181,27 @@
+ &pcie_ctlr {
+ 	status = "okay";
  };
-
- &etm1 {
- 	cpu = <&A57_1>;
-+	arm,primecell-periphid = <0x002bb95e>;
- };
-
- &etm2 {
- 	cpu = <&A53_0>;
-+	arm,primecell-periphid = <0x003bb95d>;
- };
-
- &etm3 {
- 	cpu = <&A53_1>;
-+	arm,primecell-periphid = <0x003bb95d>;
- };
-
- &etm4 {
- 	cpu = <&A53_2>;
-+	arm,primecell-periphid = <0x003bb95d>;
- };
-
- &etm5 {
- 	cpu = <&A53_3>;
-+	arm,primecell-periphid = <0x003bb95d>;
- };
++
++&etm0 {
++	cpu = <&A57_0>;
++};
++
++&etm1 {
++	cpu = <&A57_1>;
++};
++
++&etm2 {
++	cpu = <&A53_0>;
++};
++
++&etm3 {
++	cpu = <&A53_1>;
++};
++
++&etm4 {
++	cpu = <&A53_2>;
++};
++
++&etm5 {
++	cpu = <&A53_3>;
++};
 diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
-index d903e545b64c..c672c978f89d 100644
+index 88ecd6182b67..d903e545b64c 100644
 --- a/arch/arm64/boot/dts/arm/juno-r2.dts
 +++ b/arch/arm64/boot/dts/arm/juno-r2.dts
-@@ -184,24 +184,30 @@
-
- &etm0 {
- 	cpu = <&A72_0>;
-+	arm,primecell-periphid = <0x000bb95a>;
+@@ -181,3 +181,27 @@
+ &pcie_ctlr {
+ 	status = "okay";
  };
-
- &etm1 {
- 	cpu = <&A72_1>;
-+	arm,primecell-periphid = <0x000bb95a>;
- };
-
- &etm2 {
- 	cpu = <&A53_0>;
-+	arm,primecell-periphid = <0x003bb95d>;
- };
-
- &etm3 {
- 	cpu = <&A53_1>;
-+	arm,primecell-periphid = <0x003bb95d>;
- };
-
- &etm4 {
- 	cpu = <&A53_2>;
-+	arm,primecell-periphid = <0x003bb95d>;
- };
-
- &etm5 {
- 	cpu = <&A53_3>;
-+	arm,primecell-periphid = <0x003bb95d>;
- };
++
++&etm0 {
++	cpu = <&A72_0>;
++};
++
++&etm1 {
++	cpu = <&A72_1>;
++};
++
++&etm2 {
++	cpu = <&A53_0>;
++};
++
++&etm3 {
++	cpu = <&A53_1>;
++};
++
++&etm4 {
++	cpu = <&A53_2>;
++};
++
++&etm5 {
++	cpu = <&A53_3>;
++};
 diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-index a7270eff6939..0528e47e66d1 100644
+index dcfcf15a17f5..a7270eff6939 100644
 --- a/arch/arm64/boot/dts/arm/juno.dts
 +++ b/arch/arm64/boot/dts/arm/juno.dts
-@@ -176,24 +176,30 @@
+@@ -173,3 +173,27 @@
 
- &etm0 {
- 	cpu = <&A57_0>;
-+	arm,primecell-periphid = <0x000bb95e>;
+ 	#include "juno-base.dtsi"
  };
-
- &etm1 {
- 	cpu = <&A57_1>;
-+	arm,primecell-periphid = <0x000bb95e>;
- };
-
- &etm2 {
- 	cpu = <&A53_0>;
-+	arm,primecell-periphid = <0x000bb95d>;
- };
-
- &etm3 {
- 	cpu = <&A53_1>;
-+	arm,primecell-periphid = <0x000bb95d>;
- };
-
- &etm4 {
- 	cpu = <&A53_2>;
-+	arm,primecell-periphid = <0x000bb95d>;
- };
-
- &etm5 {
- 	cpu = <&A53_3>;
-+	arm,primecell-periphid = <0x000bb95d>;
- };
++
++&etm0 {
++	cpu = <&A57_0>;
++};
++
++&etm1 {
++	cpu = <&A57_1>;
++};
++
++&etm2 {
++	cpu = <&A53_0>;
++};
++
++&etm3 {
++	cpu = <&A53_1>;
++};
++
++&etm4 {
++	cpu = <&A53_2>;
++};
++
++&etm5 {
++	cpu = <&A53_3>;
++};
 --
 2.7.4
