@@ -1,36 +1,35 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 6 Jun 2016 21:59:23 +0300
-Subject: [PATCH 04/13] ARM: shmobile: r8a7792: basic SoC support
-In-Reply-To: <2352834.cNFKgiQiVO@wasted.cogentembedded.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2352834.cNFKgiQiVO@wasted.cogentembedded.com>
-Message-ID: <8b7f03a3-b15e-e7b3-4bca-63d18c19b80e@cogentembedded.com>
+Date: Mon, 6 Jun 2016 22:03:07 +0300
+Subject: [PATCH v2 10/11] ARM: dts: blanche: initial device tree
+In-Reply-To: <13571934.l66Gg7Cpm9@wasted.cogentembedded.com>
+References: <3446154.oZ24315zaL@wasted.cogentembedded.com>
+ <13571934.l66Gg7Cpm9@wasted.cogentembedded.com>
+Message-ID: <4fe5c4ec-11a0-7e8a-cad1-91c0c30702df@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 06/04/2016 12:35 AM, Sergei Shtylyov wrote:
 
-On 06/01/2016 01:18 AM, Sergei Shtylyov wrote:
-
-> Add minimal support for the R-Car V2H (R8A7792) SoC.
+> Add the initial device  tree for the R8A7792 SoC based Blanche board.
+> The board has 2 debug serial ports: SCIF0 and SCIF3; include support for
+> them,  so that  the serial console  can  work.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-[...]
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-> Index: renesas/arch/arm/mach-shmobile/setup-r8a7792.c
+[...]
+> Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
 > ===================================================================
 > --- /dev/null
-> +++ renesas/arch/arm/mach-shmobile/setup-r8a7792.c
-> @@ -0,0 +1,34 @@
+> +++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
+> @@ -0,0 +1,44 @@
 > +/*
-> + * r8a7792 processor support
+> + * Device Tree Source for the Blanche board
 > + *
-> + * Copyright (C) 2014  Renesas Electronics Corporation
+> + * Copyright (C) 2016 Cogent Embedded, Inc.
 
-    Hm, I thought I'd stamped Cogent's copyright here... Please hold on with 
-merging this patch.
-
-[...]
+    Looks like I need to add the Renesas Electronics copyright here. Pleae 
+hold one merging this patch as well.
 
 MBR, Sergei
