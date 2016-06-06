@@ -1,46 +1,42 @@
 From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 18:01:24 +0100
-Subject: [PATCH kexec-tools v2 31/32] arm: clean up phys/page offset debug
+Date: Mon, 06 Jun 2016 18:01:29 +0100
+Subject: [PATCH kexec-tools v2 32/32] arm: report which ELF core format we
+ will use
 In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
 References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xu0-0003uQ-0Y@e0050434b2927.dyn.armlinux.org.uk>
+Message-ID: <E1b9xu5-0003uW-6y@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clean up the physical and page offset debug prints.
+Report which ELF core format will be used to create the template ELF
+core dump in the debug information.
 
 Reviewed-by: Pratyush Anand <panand@redhat.com>
 Signed-off-by: Russell King <rmk@arm.linux.org.uk>
 ---
- kexec/arch/arm/crashdump-arm.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ kexec/arch/arm/crashdump-arm.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
 diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index 2589582..3b71267 100644
+index 3b71267..4a89b5e 100644
 --- a/kexec/arch/arm/crashdump-arm.c
 +++ b/kexec/arch/arm/crashdump-arm.c
-@@ -136,7 +136,6 @@ static int get_kernel_page_offset(struct kexec_info *info,
- 				user_page_offset);
- 	}
- 	elf_info->page_offset = stext_sym_addr & (~KVBASE_MASK);
--	dbgprintf("page_offset is set to %llx\n", elf_info->page_offset);
- 	return 0;
- }
+@@ -315,6 +315,8 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 		last_ranges = 0;
  
-@@ -293,11 +292,13 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
- 	 * region as PHYS_OFFSET.
- 	 */
- 	phys_offset = usablemem_rgns.ranges->start;
--	dbgprintf("phys_offset: %#llx\n", phys_offset);
- 
- 	if (get_kernel_page_offset(info, &elf_info))
- 		return -1;
- 
-+	dbgprintf("phys offset = %#llx, page offset = %llx\n",
-+		  phys_offset, elf_info.page_offset);
+ 	if (crash_memory_ranges[last_ranges].end > UINT32_MAX) {
++		dbgprintf("Using 64-bit ELF core format\n");
 +
- 	/*
- 	 * Ensure that the crash kernel memory range is sane. The crash kernel
- 	 * must be located within memory which is visible during booting.
+ 		/* for support LPAE enabled kernel*/
+ 		elf_info.class = ELFCLASS64;
+ 
+@@ -323,6 +325,7 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
+ 					 usablemem_rgns.size, &buf, &bufsz,
+ 					 ELF_CORE_HEADER_ALIGN);
+ 	} else {
++		dbgprintf("Using 32-bit ELF core format\n");
+ 		err = crash_create_elf32_headers(info, &elf_info,
+ 					 usablemem_rgns.ranges,
+ 					 usablemem_rgns.size, &buf, &bufsz,
 -- 
 1.9.1
