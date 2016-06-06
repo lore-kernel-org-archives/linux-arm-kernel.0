@@ -1,34 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 06 Jun 2016 14:37:24 +0200
-Subject: [RFC v2 4/4] ARM: keystone: dma-coherent with safe fallback
-In-Reply-To: <20160606114256.GF6831@leverpostej>
-References: <1465183229-24147-1-git-send-email-wmills@ti.com>
- <5480709.cGbSehIKrE@wuerfel> <20160606114256.GF6831@leverpostej>
-Message-ID: <4810162.vDdHVxWF0U@wuerfel>
+Date: Mon, 06 Jun 2016 15:06:18 +0200
+Subject: [PATCH] drm: sun4i: fix LPAE warnings
+In-Reply-To: <1464973051-20432-1-git-send-email-andre.przywara@arm.com>
+References: <1464973051-20432-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <4683820.tGQACgnbJT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 6, 2016 12:42:56 PM CEST Mark Rutland wrote:
-> On Mon, Jun 06, 2016 at 11:09:07AM +0200, Arnd Bergmann wrote:
-> > On Monday, June 6, 2016 9:56:27 AM CEST Mark Rutland wrote:
-> >
-> > So far, the assumption has been:
-> > 
-> > - when running a non-LPAE kernel, keystone is not coherent, and we
-> >   must ignore both the dma-coherent properties in devices and the
-> >   dma-ranges properties in bus nodes.
+On Friday, June 3, 2016 5:57:31 PM CEST Andre Przywara wrote:
+> When the sun4i DRM driver is compiled with LPAE enabled, dma_addr_t turns
+> into a 64-bit type, which causes warnings with some debug printks:
+> =================
+> In file included from
+> drivers/gpu/drm/sun4i/sun4i_backend.c:13::
+> drivers/gpu/drm/sun4i/sun4i_backend.c: In function 'sun4i_backend_update_layer_buffer':
+> drivers/gpu/drm/sun4i/sun4i_backend.c:193:19: warning:
+> format '%x' expects argument of type 'unsigned int', but argument 3 has
+> type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+>   DRM_DEBUG_DRIVER("Using GEM @ 0x%x\n", gem->paddr);
+>                    ^
+> include/drm/drmP.h:207:34: note: in definition of macro
+> 'DRM_DEBUG_DRIVER'
+>     drm_ut_debug_printk(__func__, fmt, ##args); \
+> .....
 > 
-> I wasn't able to spot if/where that was enforced. Is it possible to boot
-> Keystone UP, !LPAE?
+> Use the proper printk format specifier [1] for dma_addr_t which takes
+> care of those differences.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> 
 
-With !LPAE, no devices are coherent, so that should work with both
-SMP and and UP. Not sure about LPAE with coherent devices on UP,
-IIRC we had a bug in that configuration on Armada XP, as the memory
-was not marked as sharable at all there, and ended up not being
-coherent with DMA masters.
+I submitted the same patch a month ago, and it's already in linux-next,
+I assume it will show up in mainline soon.
 
-My first guess is that uniprocessor mode on keystone has not been
-tested at all (TI's QA seems to test only a very limited number of
-configurations), so it may or may not work.
-
-	Arnd
+	arnd
