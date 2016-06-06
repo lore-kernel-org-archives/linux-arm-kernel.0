@@ -1,24 +1,19 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Mon, 06 Jun 2016 10:11:25 +0200
-Subject: [PATCH net-next 1/3] arm64: bpf: implement bpf_tail_call() helper
-In-Reply-To: <CABg9mcv0kYvk7-wsfVR3fg0nBBDVbs0QtTiWZfGRDqq7kGeFPQ@mail.gmail.com>
-References: <201606050700.BLJUHUk2%fengguang.wu@intel.com>
- <5753DA61.3000505@iogearbox.net>
- <CABg9mcv0kYvk7-wsfVR3fg0nBBDVbs0QtTiWZfGRDqq7kGeFPQ@mail.gmail.com>
-Message-ID: <5755302D.1000708@iogearbox.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Mon, 6 Jun 2016 16:19:05 +0800
+Subject: [PATCH] ARM: dts: imx: Remove unneeded unit-addresses
+In-Reply-To: <1462283851-10820-1-git-send-email-fabio.estevam@nxp.com>
+References: <1462283851-10820-1-git-send-email-fabio.estevam@nxp.com>
+Message-ID: <20160606081905.GB25018@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2016 06:56 AM, Z Lim wrote:
-[...]
-> How about the attached patch? Fixes compilation error on build
-> !CONFIG_BPF_SYSCALL.
->
-> Also, should this patch be sent to net or net-next (along with this series)?
+On Tue, May 03, 2016 at 10:57:31AM -0300, Fabio Estevam wrote:
+> Building with W=1 option leads to several warnings like:
+> 
+> Warning (unit_address_vs_reg): Node /soc/aips-bus at 02000000/anatop at 020c8000/regulator-1p1 at 110 has a unit name, but no reg property
+> 
+> Fix them by removing the unneeded unit-addresses.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Looks good, feel free to add:
-
-Acked-by: Daniel Borkmann <daniel@iogearbox.net>
-
-I think net-next along with your series should be fine since the issue
-first appeared there. Thanks, Zi!
+Applied, thanks.
