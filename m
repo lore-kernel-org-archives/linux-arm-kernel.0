@@ -1,55 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 6 Jun 2016 18:07:39 +0100
-Subject: [v2 PATCH] arm64: kasan: instrument user memory access API
-In-Reply-To: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
-References: <1464382863-11879-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <20160606170738.GD23505@leverpostej>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Mon, 06 Jun 2016 18:01:08 +0100
+Subject: [PATCH kexec-tools v2 28/32] arm: add support for boot-time crash
+ kernel resource
+In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
+References: <20160606164129.GM1041@n2100.armlinux.org.uk>
+Message-ID: <E1b9xtk-0003u8-CQ@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2016 at 02:01:03PM -0700, Yang Shi wrote:
-> The upstream commit 1771c6e1a567ea0ba2cccc0a4ffe68a1419fd8ef
-> ("x86/kasan: instrument user memory access API") added KASAN instrument to
-> x86 user memory access API, so added such instrument to ARM64 too.
-> 
-> Define __copy_to/from_user in C in order to add kasan_check_read/write call,
-> rename assembly implementation to __arch_copy_to/from_user.
-> 
-> Tested by test_kasan module.
-> 
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> ---
-> v2:
->  Adopted the comment from Andrey and Mark to add kasan_check_read/write into
->  __copy_to/from_user.
-> 
->  arch/arm64/include/asm/uaccess.h | 25 +++++++++++++++++++++----
->  arch/arm64/kernel/arm64ksyms.c   |  4 ++--
->  arch/arm64/lib/copy_from_user.S  |  4 ++--
->  arch/arm64/lib/copy_to_user.S    |  4 ++--
->  4 files changed, 27 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index 0685d74..4dc9a8f 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -23,6 +23,7 @@
->   */
->  #include <linux/string.h>
->  #include <linux/thread_info.h>
-> +#include <linux/kasan-checks.h>
+Add support for detecting and using the boot-time crash kernel
+resource, which is needed for systems which have special boot-time
+memory views, such as Keystone 2.
 
-Nit: please move this before the other includes, to keep these ordered
-alphabetically.
+Reviewed-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+---
+ kexec/arch/arm/crashdump-arm.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-Other than that, this looks correct to me, and seems to have addressed
-the issue from v1. I've given this a spin on v4.7-rc2, with and without
-CONFIG_UBSAN enabled. So FWIW, with the minor fix above:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-Tested-by: Mark Rutland <mark.rutland@arm.com>
-
-As this isn't a fix, I assume that this is for Catalin to pick for v4.8.
-
-Thanks,
-Mark.
+diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
+index 9113f5e..25fdbe9 100644
+--- a/kexec/arch/arm/crashdump-arm.c
++++ b/kexec/arch/arm/crashdump-arm.c
+@@ -52,7 +52,7 @@ struct memory_ranges usablemem_rgns = {
+ 	.ranges = crash_memory_ranges,
+ };
+ 
+-/* memory range reserved for crashkernel */
++/* The boot-time physical memory range reserved for crashkernel region */
+ static struct memory_range crash_kernel_mem;
+ 
+ /* reserved regions */
+@@ -366,13 +366,22 @@ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
+ 				char *str, unsigned long long base,
+ 				unsigned long long length)
+ {
+-	if (strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) == 0) {
++	if (strncmp(str, CRASH_KERNEL_BOOT, strlen(CRASH_KERNEL_BOOT)) == 0) {
+ 		crash_kernel_mem.start = base;
+ 		crash_kernel_mem.end = base + length - 1;
+ 		crash_kernel_mem.type = RANGE_RAM;
+ 		return mem_regions_add(&crash_reserved_rgns,
+ 				       base, length, RANGE_RAM);
+ 	}
++	else if (strncmp(str, CRASH_KERNEL, strlen(CRASH_KERNEL)) == 0) {
++		if (crash_kernel_mem.start == crash_kernel_mem.end) {
++			crash_kernel_mem.start = base;
++			crash_kernel_mem.end = base + length - 1;
++			crash_kernel_mem.type = RANGE_RAM;
++		}
++		return mem_regions_add(&crash_reserved_rgns,
++				       base, length, RANGE_RAM);
++	}
+ 	else if (strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) == 0) {
+ 		return mem_regions_add(&usablemem_rgns,
+ 				       base, length, RANGE_RAM);
+-- 
+1.9.1
