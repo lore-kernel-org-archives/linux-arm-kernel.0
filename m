@@ -1,81 +1,101 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 6 Jun 2016 09:48:41 +0200
-Subject: [PATCH v2 1/3] watchdog: Add Meson GXBB Watchdog Driver
-In-Reply-To: <575316A6.9080403@roeck-us.net>
-References: <1464943007-18000-1-git-send-email-narmstrong@baylibre.com>
- <1464943007-18000-2-git-send-email-narmstrong@baylibre.com>
- <575316A6.9080403@roeck-us.net>
-Message-ID: <57552AD9.7040903@baylibre.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 6 Jun 2016 10:53:26 +0300
+Subject: [PATCH v2 4/4] ARM: dts: imx6q-cm-fx6: Relicense under GPLv2/X11
+In-Reply-To: <c2d37f17a8b049169909c7a9391fa9a3@rwthex-s1-b.rwth-ad.de>
+References: <20160605182657.1706-1-christopher.spinrath@rwth-aachen.de>
+ <c2d37f17a8b049169909c7a9391fa9a3@rwthex-s1-b.rwth-ad.de>
+Message-ID: <57552BF6.6040807@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+Hi Christopher,
 
-On 06/04/2016 07:57 PM, Guenter Roeck wrote:
-> On 06/03/2016 01:36 AM, Neil Armstrong wrote:
-[...]
->> +++ b/drivers/watchdog/meson_gxbb_wdt.c
->> @@ -0,0 +1,268 @@
->> +/*
->> + * This file is provided under a dual BSD/GPLv2 license.  When using or
->> + * redistributing this file, you may do so under either license.
->> + *
->> + * GPL LICENSE SUMMARY
->> + *
->> + * Copyright (c) 2016 BayLibre, SAS.
->> + * Author: Neil Armstrong <narmstrong@baylibre.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of version 2 of the GNU General Public License as
->> + * published by the Free Software Foundation.
->> + *
->> + * This program is distributed in the hope that it will be useful, but
->> + * WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * along with this program; if not, see <http://www.gnu.org/licenses/>.
->> + * The full GNU General Public License is included in this distribution
->> + * in the file called COPYING.
->> + *
->> + * BSD LICENSE
->> + *
->> + * Copyright (c) 2016 BayLibre, SAS.
->> + * Author: Neil Armstrong <narmstrong@baylibre.com>
->> + *
-> Nitpick, but you don't really need the copyright and author lines twice.
+On 06/05/2016 09:26 PM, christopher.spinrath at rwth-aachen.de wrote:
+> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> 
+> GPLv2-only devicetrees make reuse difficult for software components
+> licensed under a different license. In particular, the Utilite Pro
+> devicetree file (which includes on imx6q-cm-fx5.dts) is already dual
+                                               ^^^
+That's a downgrade ;-)
+With the above fixed, please add my ack below.
 
-Sorry, but I was asked to use this particular header format since I am not
-the copyright holder of this file.
+> licensed under GPLv2/X11.
+> 
+> Hence, relicense imx6q-cm-fx6.dts under GPLv2/X11 dual license.
+
+Off topic of this patch, I think SPDX works much better than having
+this huge license "hat" in each file.
 
 > 
->> + * Redistribution and use in source and binary forms, with or without
->> + * modification, are permitted provided that the following conditions
->> + * are met:
->> + *
->> + *   * Redistributions of source code must retain the above copyright
->> + *     notice, this list of conditions and the following disclaimer.
->> + *   * Redistributions in binary form must reproduce the above copyright
->> + *     notice, this list of conditions and the following disclaimer in
->> + *     the documentation and/or other materials provided with the
->> + *     distribution.
->> + *   * Neither the name of Intel Corporation nor the names of its
->> + *     contributors may be used to endorse or promote products derived
->> + *     from this software without specific prior written permission.
->> + *
->> + * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
->> + * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
->> + * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
->> + * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
->> + * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
->> + * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
->> + * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
->> + * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
->> + * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
->> + * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
->> + * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
->> + */
+> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+> Cc: Igor Grinberg <grinberg@compulab.co.il>
 
-Thanks,
-Neil
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+
+> ---
+> 
+> Changes since v1:
+>  - new patch in v2; without it the dual licensed of the imx6q-utilite-pro.dts
+>    is not really useful because it includes imx6q-cm-fx6.dts.
+> 
+>  arch/arm/boot/dts/imx6q-cm-fx6.dts | 40 +++++++++++++++++++++++++++++++++-----
+>  1 file changed, 35 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> index c6f0e58..fe2c868 100644
+> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> @@ -3,12 +3,42 @@
+>   *
+>   * Author: Valentin Raevsky <valentin@compulab.co.il>
+>   *
+> - * The code contained herein is licensed under the GNU General Public
+> - * License. You may obtain a copy of the GNU General Public License
+> - * Version 2 or later at the following locations:
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+>   *
+> - * http://www.opensource.org/licenses/gpl-license.html
+> - * http://www.gnu.org/copyleft/gpl.html
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License
+> + *     version 2 as published by the Free Software Foundation.
+> + *
+> + *     This file is distributed in the hope that it will be useful
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+>   */
+>  
+>  /dts-v1/;
+> 
+
+-- 
+Regards,
+Igor.
