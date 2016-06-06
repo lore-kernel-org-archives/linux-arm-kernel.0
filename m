@@ -1,36 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 06 Jun 2016 15:06:18 +0200
-Subject: [PATCH] drm: sun4i: fix LPAE warnings
-In-Reply-To: <1464973051-20432-1-git-send-email-andre.przywara@arm.com>
-References: <1464973051-20432-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <4683820.tGQACgnbJT@wuerfel>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 06 Jun 2016 18:04:44 -0500
+Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
+Message-ID: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 3, 2016 5:57:31 PM CEST Andre Przywara wrote:
-> When the sun4i DRM driver is compiled with LPAE enabled, dma_addr_t turns
-> into a 64-bit type, which causes warnings with some debug printks:
-> =================
-> In file included from
-> drivers/gpu/drm/sun4i/sun4i_backend.c:13::
-> drivers/gpu/drm/sun4i/sun4i_backend.c: In function 'sun4i_backend_update_layer_buffer':
-> drivers/gpu/drm/sun4i/sun4i_backend.c:193:19: warning:
-> format '%x' expects argument of type 'unsigned int', but argument 3 has
-> type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
->   DRM_DEBUG_DRIVER("Using GEM @ 0x%x\n", gem->paddr);
->                    ^
-> include/drm/drmP.h:207:34: note: in definition of macro
-> 'DRM_DEBUG_DRIVER'
->     drm_ut_debug_printk(__func__, fmt, ##args); \
-> .....
-> 
-> Use the proper printk format specifier [1] for dma_addr_t which takes
-> care of those differences.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> 
+Several host bridge drivers (designware and all derivatives, iproc,
+xgene, xilinx, and xilinx-nwl) don't request the MMIO and I/O port
+windows they forward downstream to the PCI bus.
 
-I submitted the same patch a month ago, and it's already in linux-next,
-I assume it will show up in mainline soon.
+That means the PCI core can't request resources for PCI bridge
+windows and PCI BARs.
 
-	arnd
+Several other drivers (altera, generic, mvebu, rcar, tegra) do request
+the windows, but use some duplicated code to do it.
+
+This adds a new devm_request_pci_bus_resources() interface and changes
+these drivers to use it.  It also fixes several error paths where we failed
+to free the resource list allocated by of_pci_get_host_bridge_resources().
+
+Tegra guys, please take a look at "PCI: tegra: Remove top-level resource
+from hierarchy" in particular.  Removing the top-level resource definitely
+makes /proc/iomem look uglier (although it will look more like that of
+other drivers).  A short-term fix could be to include device information in
+the resource name.  I think a better long-term fix would be to make the DT
+or platform device core request all the resources from the DT.
+
+Comments welcome.  I expect we'll trip over something here, so I marked
+this "v1" and I don't plan to put it into -next for a while.
+
+This is on my pci/host-request-windows branch, which you can pull or view
+at https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-request-windows
+
+---
+
+Bjorn Helgaas (25):
+      PCI: Add devm_request_pci_bus_resources()
+      PCI: designware: Free bridge resource list on failure
+      PCI: designware: Request host bridge window resources
+      PCI: designware: Simplify host bridge window iteration
+      PCI: iproc: Request host bridge window resources
+      PCI: xgene: Free bridge resource list on failure
+      PCI: xgene: Request host bridge window resources
+      PCI: xilinx: Free bridge resource list on failure
+      PCI: xilinx: Request host bridge window resources
+      PCI: xilinx-nwl: Free bridge resource list on failure
+      PCI: xilinx-nwl: Request host bridge window resources
+      PCI: xilinx-nwl: Use dev_printk() when possible
+      PCI: altera: Request host bridge window resources with core function
+      PCI: altera: Simplify host bridge window iteration
+      PCI: generic: Free resource list close to where it's allocated
+      PCI: generic: Request host bridge window resources with core function
+      PCI: generic: Simplify host bridge window iteration
+      PCI: mvebu: Request host bridge window resources with core function
+      PCI: rcar Gen2: Request host bridge window resources
+      PCI: rcar: Request host bridge window resources with core function
+      PCI: rcar: Simplify host bridge window iteration
+      PCI: tegra: Remove top-level resource from hierarchy
+      PCI: tegra: Request host bridge window resources with core function
+      PCI: versatile: Request host bridge window resources with core function
+      PCI: versatile: Simplify host bridge window iteration
+
+
+ drivers/pci/bus.c                  |   29 +++++++++++++++++
+ drivers/pci/host/pci-host-common.c |   61 +++++++++++++++---------------------
+ drivers/pci/host/pci-mvebu.c       |   17 ++++------
+ drivers/pci/host/pci-rcar-gen2.c   |    4 ++
+ drivers/pci/host/pci-tegra.c       |   35 +++------------------
+ drivers/pci/host/pci-versatile.c   |   29 ++++++-----------
+ drivers/pci/host/pci-xgene.c       |   16 ++++++++-
+ drivers/pci/host/pcie-altera.c     |   35 ++++++---------------
+ drivers/pci/host/pcie-designware.c |   34 +++++++++++++-------
+ drivers/pci/host/pcie-iproc.c      |    4 ++
+ drivers/pci/host/pcie-rcar.c       |   33 +++++--------------
+ drivers/pci/host/pcie-xilinx-nwl.c |   20 +++++++++---
+ drivers/pci/host/pcie-xilinx.c     |   16 ++++++++-
+ include/linux/pci.h                |    5 ++-
+ 14 files changed, 170 insertions(+), 168 deletions(-)
