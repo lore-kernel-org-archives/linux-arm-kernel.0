@@ -1,47 +1,88 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon,  6 Jun 2016 18:56:29 +0100
-Subject: [PATCH v3 0/2] arm/arm64: Fix architected timer interrupt trigger
-Message-ID: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+Date: Mon,  6 Jun 2016 18:56:30 +0100
+Subject: [PATCH v3 1/2] clocksource/arm_arch_timer: Force per-CPU interrupt to
+ be level-triggered
+In-Reply-To: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1465235791-7064-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've noticed a while ago that we had a pretty creative approach to the
-arch timer trigger, with some platform describing as edge-triggered
-something that is architecturally a level interrupt.
+The ARM architected timer produces level-triggered interrupts (this
+is mandated by the architecture). Unfortunately, most device-trees
+get this wrong, and expose an edge-triggered interrupt.
 
-This short patch series tries to address it in two ways:
+Until now, this wasn't too much an issue, as the programming of the
+trigger would fail (the corresponding PPI cannot be reconfigured),
+and the kernel would be happy with this. But we're about to change
+this, and trust DT a lot if the driver doesn't provide its own
+trigger information. In that context, the timer breaks badly.
 
-- Enforce the level aspect of the interrupt in the timer driver (and
-  shout at the user if the firmware describes it as edge)
-- Repaint all the in-tree platforms that are obviously doing the wrong
-  thing.
+While we do need to fix the DTs, there is also some userspace out
+there (kvmtool) that generates the same kind of broken DT on the
+fly, and that will completely break with newer kernels.
 
-Hopefully, this will stop DTs that are wrong from being blindly
-copy/pasted.
+As a safety measure, and to keep buggy software alive as well as
+buying us some time to fix DTs all over the place, let's check
+what trigger configuration has been given us by the firmware.
+If this is not a level configuration, then we know that the
+DT/ACPI configuration is bust, and we pick some defaults which
+won't be worse than the existing setup.
 
-Thanks,
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/clocksource/arm_arch_timer.c | 27 ++++++++++++++++++++++++---
+ 1 file changed, 24 insertions(+), 3 deletions(-)
 
-	M.
-
-- From v2: Fix all in-tree device-trees.
-
-Marc Zyngier (2):
-  clocksource/arm_arch_timer: Force per-CPU interrupt to be
-    level-triggered
-  arm64: dts: Fix broken architected timer interrupt trigger
-
- arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi  |  8 +++----
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi        |  8 +++----
- arch/arm64/boot/dts/apm/apm-storm.dtsi             |  8 +++----
- arch/arm64/boot/dts/broadcom/ns2.dtsi              |  8 +++----
- arch/arm64/boot/dts/cavium/thunder-88xx.dtsi       |  8 +++----
- arch/arm64/boot/dts/exynos/exynos7.dtsi            |  8 +++----
- arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi     |  8 +++----
- arch/arm64/boot/dts/marvell/armada-ap806.dtsi      |  8 +++----
- .../boot/dts/socionext/uniphier-ph1-ld20.dtsi      |  8 +++----
- arch/arm64/boot/dts/xilinx/zynqmp.dtsi             |  8 +++----
- drivers/clocksource/arm_arch_timer.c               | 27 +++++++++++++++++++---
- 11 files changed, 64 insertions(+), 43 deletions(-)
-
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 3628ac8..1310641 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -8,6 +8,9 @@
+  * it under the terms of the GNU General Public License version 2 as
+  * published by the Free Software Foundation.
+  */
++
++#define pr_fmt(fmt)	"arm_arch_timer: " fmt
++
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+ #include <linux/device.h>
+@@ -462,14 +465,32 @@ static bool arch_timer_has_nonsecure_ppi(void)
+ 		arch_timer_ppi[PHYS_NONSECURE_PPI]);
+ }
+ 
++static u32 check_ppi_trigger(int irq)
++{
++	u32 flags = irq_get_trigger_type(irq);
++
++	if (flags != IRQF_TRIGGER_HIGH && flags != IRQF_TRIGGER_LOW) {
++		pr_warn("WARNING: Invalid trigger for IRQ%d, assuming level low\n", irq);
++		pr_warn("WARNING: Please fix your firmware\n");
++		flags = IRQF_TRIGGER_LOW;
++	}
++
++	return flags;
++}
++
+ static int arch_timer_setup(struct clock_event_device *clk)
+ {
++	u32 flags;
++
+ 	__arch_timer_setup(ARCH_CP15_TIMER, clk);
+ 
+-	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], 0);
++	flags = check_ppi_trigger(arch_timer_ppi[arch_timer_uses_ppi]);
++	enable_percpu_irq(arch_timer_ppi[arch_timer_uses_ppi], flags);
+ 
+-	if (arch_timer_has_nonsecure_ppi())
+-		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
++	if (arch_timer_has_nonsecure_ppi()) {
++		flags = check_ppi_trigger(arch_timer_ppi[PHYS_NONSECURE_PPI]);
++		enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], flags);
++	}
+ 
+ 	arch_counter_set_user_access();
+ 	if (IS_ENABLED(CONFIG_ARM_ARCH_TIMER_EVTSTREAM))
 -- 
 2.1.4
