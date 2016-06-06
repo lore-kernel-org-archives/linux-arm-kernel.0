@@ -1,23 +1,65 @@
-From: chris.brand@broadcom.com (Chris Brand)
-Date: Mon, 6 Jun 2016 09:42:03 -0700
-Subject: [PATCH v2 1/6] power: Introduce Broadcom kona reset driver
-In-Reply-To: <20160603023853.GD8921@earth>
-References: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
- <1463002582-6875-2-git-send-email-chris.brand@broadcom.com>
- <57409633.8060605@gmail.com> <20160603023853.GD8921@earth>
-Message-ID: <CAMsMSK8ZX=nmJs9d2txRsk2gLa0duy3Qpp805ztYzow=OiTB8w@mail.gmail.com>
+From: rmk@arm.linux.org.uk (Russell King)
+Date: Mon, 06 Jun 2016 17:58:47 +0100
+Subject: [PATCH kexec-tools v2 01/32] kdump: mmap() and munmap() only work on
+ page-aligned quantites
+In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
+References: <20160606164129.GM1041@n2100.armlinux.org.uk>
+Message-ID: <E1b9xrT-0003rV-HE@e0050434b2927.dyn.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 2, 2016 at 7:38 PM, Sebastian Reichel <sre@kernel.org> wrote:
-> Feel free to queue it via arm-soc with
->
-> Acked-By: Sebastian Reichel <sre@kernel.org>
->
-> If I didn't overlook it, it's missing DT documentation, though.
+The man page for mmap() and munmap() says that mmap() and munmap()
+only works for page-aligned addresses, sizes and offsets.  Arrange
+to give these interfaces what they want.
 
-Thanks, Sebastian. Because this is effectively a move of code from
-arch/arm rather than new code, there's already dt documentation in
-Documentation/devicetree/bindings/reset/brcm,bcm21664-resetmgr.txt
+Reviewed-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+---
+ kdump/kdump.c | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
 
-Chris
+diff --git a/kdump/kdump.c b/kdump/kdump.c
+index 821ee7c..3247a54 100644
+--- a/kdump/kdump.c
++++ b/kdump/kdump.c
+@@ -25,22 +25,35 @@
+ #define MAP_WINDOW_SIZE (64*1024*1024)
+ #define DEV_MEM "/dev/mem"
+ 
++#define ALIGN_MASK(x,y) (((x) + (y)) & ~(y))
++#define ALIGN(x,y)	ALIGN_MASK(x, (y) - 1)
++
+ static void *map_addr(int fd, unsigned long size, off_t offset)
+ {
++	unsigned long page_size = getpagesize();
++	unsigned long map_offset = offset & (page_size - 1);
++	size_t len = ALIGN(size + map_offset, page_size);
+ 	void *result;
+-	result = mmap(0, size, PROT_READ, MAP_SHARED, fd, offset);
++
++	result = mmap(0, len, PROT_READ, MAP_SHARED, fd, offset - map_offset);
+ 	if (result == MAP_FAILED) {
+ 		fprintf(stderr, "Cannot mmap " DEV_MEM " offset: %llu size: %lu: %s\n",
+ 			(unsigned long long)offset, size, strerror(errno));
+ 		exit(5);
+ 	}
+-	return result;
++	return result + map_offset;
+ }
+ 
+ static void unmap_addr(void *addr, unsigned long size)
+ {
++	unsigned long page_size = getpagesize();
++	unsigned long map_offset = (uintptr_t)addr & (page_size - 1);
++	size_t len = ALIGN(size + map_offset, page_size);
+ 	int ret;
+-	ret = munmap(addr, size);
++
++	addr -= map_offset;
++
++	ret = munmap(addr, len);
+ 	if (ret < 0) {
+ 		fprintf(stderr, "munmap failed: %s\n",
+ 			strerror(errno));
+-- 
+1.9.1
