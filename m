@@ -1,20 +1,26 @@
-From: shhuiw@foxmail.com (=?ISO-8859-1?B?V2FuZyBTaGVuZy1IdWk=?=)
-Date: Mon, 6 Jun 2016 12:36:56 +0800
-Subject: No HAVE_PCI_MMAP defined for ARM64
-Message-ID: <tencent_57130504654449F86744D3FD@qq.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Mon, 6 Jun 2016 10:15:03 +0530
+Subject: [PATCH 0/3] ARM: keystone-k2l: Enable pinctrl support
+Message-ID: <1465188306-32556-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+The series enables pinctrl support for k2l devices.
+Tested on keystone-k2l-evm board.
 
-I see "HAVE_PCI_MMAP" is not defined in ARM64. That prevents me from running 
-some nvme-cli commands on arm64 platform.
+Franklin S Cooper Jr (1):
+  ARM: configs: keystone: Enable PINCTRL_SINGLE Config
 
-I googled and saw some patches have been submitted:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/358906.html
-http://lists.infradead.org/pipermail/linux-arm-kernel/2014-July/269206.html
+Keerthy (1):
+  ARM: dts: keystone-k2l: Add pinctrl node
 
-But they are not accepted into mainline. Any updated patches are available?
+Lokesh Vutla (1):
+  arm: mach-keystone: Enable PINCTRL config
 
-Thanks,
-Sheng-Hui
+ arch/arm/boot/dts/keystone-k2l.dtsi | 149 ++++++++++++++++++++++++++++++++++++
+ arch/arm/configs/keystone_defconfig |   1 +
+ arch/arm/mach-keystone/Kconfig      |   1 +
+ 3 files changed, 151 insertions(+)
+
+-- 
+1.9.1
