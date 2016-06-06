@@ -1,81 +1,54 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 6 Jun 2016 08:12:43 -0500
-Subject: [PATCH 20/32] dt-bindings: Add binding for brcm,bcm2835-sdhost.
-In-Reply-To: <1464817421-8519-21-git-send-email-kraxel@redhat.com>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-21-git-send-email-kraxel@redhat.com>
-Message-ID: <20160606131243.GA8629@rob-hp-laptop>
+Date: Mon, 6 Jun 2016 08:19:55 -0500
+Subject: [PATCH v5 2/3] documentation: Add secure monitor binding
+ documentation
+In-Reply-To: <20160603092517.GA18149@mephisto>
+References: <1464520323-19531-1-git-send-email-carlo@caione.org>
+ <1464520323-19531-3-git-send-email-carlo@caione.org>
+ <20160602171422.GA17166@rob-hp-laptop>
+ <20160603092517.GA18149@mephisto>
+Message-ID: <CAL_Jsq+JqWjd9VBS_Wxbnada46k+cK0p9dVARCCJnqT1EajHbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 11:43:29PM +0200, Gerd Hoffmann wrote:
-> From: Eric Anholt <eric@anholt.net>
-> 
-> This is the other SD controller on the platform, which can be swapped
-> to the role of SD card host using pin muxing.
-> 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> ---
->  .../devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt |  3 +++
->  .../bindings/mmc/brcm,bcm2835-sdhost.txt           | 24 ++++++++++++++++++++++
->  2 files changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
-> index 59476fb..3cc74e2 100644
-> --- a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
-> +++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhci.txt
-> @@ -15,4 +15,7 @@ sdhci: sdhci {
->  	interrupts = <2 30>;
->  	clocks = <&clk_mmc>;
->  	bus-width = <4>;
-> +	dmas = <&dma 13>,
-> +	       <&dma 13>;
-> +	dma-names = "tx", "rx";
+On Fri, Jun 3, 2016 at 4:25 AM, Carlo Caione <carlo@caione.org> wrote:
+> On 02/06/16 12:14, Rob Herring wrote:
+>> On Sun, May 29, 2016 at 01:12:02PM +0200, Carlo Caione wrote:
+>> > From: Carlo Caione <carlo@endlessm.com>
+>> >
+>> > Add the binding documentation for the Amlogic secure monitor driver.
+>> >
+>> > Signed-off-by: Carlo Caione <carlo@endlessm.com>
+>> > ---
+>> >  .../bindings/firmware/meson/meson_sm.txt           | 33 ++++++++++++++++++++++
+>> >  1 file changed, 33 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+>> > new file mode 100644
+>> > index 0000000..6f0b5bc
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/firmware/meson/meson_sm.txt
+>> > @@ -0,0 +1,33 @@
+>> > +* Amlogic Secure Monitor
+>> > +
+>> > +In the Amlogic SoCs the Secure Monitor code is used to provide access to the
+>> > +NVMEM, enable JTAG, set USB boot, etc...
+>> > +
+>> > +Required properties for the secure monitor node:
+>> > +- compatible: Should be "amlogic,meson-gxbb-sm"
+>> > +
+>> > +Example:
+>> > +
+>> > +   firmware {
+>> > +           compatible = "simple-bus";
+>>
+>> Drop this. Sorry, but no abusing simple-bus to get automagic creation of
+>> your platform device.
+>
+> Sounds reasonable. I can hook this up to some *_initcall. What about
+> introducing a new FIRMWARE_OF_DECLARE() ?
 
-This looks unrelated. Plus SDHCI implies internal DMA master generally, 
-so is external DMA really supported?
+Please don't add FIRMWARE_OF_DECLARE unless it needs to be early.
 
->  };
-> diff --git a/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-> new file mode 100644
-> index 0000000..074992c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/brcm,bcm2835-sdhost.txt
-> @@ -0,0 +1,24 @@
-> +Broadcom BCM2835 SDHOST controller
-> +
-> +This file documents differences between the core properties described
-> +by mmc.txt and the properties that represent the BCM2835 controller.
-> +
-> +Required properties:
-> +- compatible: Should be "brcm,bcm2835-sdhci".
-
-sdhost?
-
-> +- clocks: The clock feeding the SDHOST controller.
-
-reg, interrupts missing.
-
-> +
-> +Optional properties:
-> +- dmas: DMA channels for read and write.
-> +          See Documentation/devicetree/bindings/dma/dma.txt for details
-
-dma-names?
-
-> +
-> +Example:
-> +
-> +sdhost: sdhost at 7e202000 {
-> +	compatible = "brcm,bcm2835-sdhost";
-> +	reg = <0x7e202000 0x100>;
-> +	interrupts = <2 24>;
-> +	clocks = <&clocks BCM2835_CLOCK_VPU>;
-> +	dmas = <&dma 13>,
-> +	       <&dma 13>;
-> +	dma-names = "tx", "rx";
-> +};
-> -- 
-> 1.8.3.1
-> 
+Rob
