@@ -1,52 +1,50 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 06 Jun 2016 14:25:33 +0200
-Subject: [GIT PULL 8/8] ARM: defconfig: exynos: Defconfig for v4.8
-In-Reply-To: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
-References: <1465215933-22709-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465215933-22709-9-git-send-email-k.kozlowski@samsung.com>
+From: wmills@ti.com (William Mills)
+Date: Mon, 6 Jun 2016 08:31:53 -0400
+Subject: [RFC v2 1/4] ARM: mm: add early page table attribute modification
+ ability
+In-Reply-To: <20160606121812.GK1041@n2100.armlinux.org.uk>
+References: <1465183229-24147-1-git-send-email-wmills@ti.com>
+ <1465183229-24147-2-git-send-email-wmills@ti.com>
+ <20160606121812.GK1041@n2100.armlinux.org.uk>
+Message-ID: <57556D39.7050701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+On 06/06/2016 08:18 AM, Russell King - ARM Linux wrote:
+> On Sun, Jun 05, 2016 at 11:20:26PM -0400, Bill Mills wrote:
+>> Allow early-init to specify modifications to be made to the boot time page
+>> table. Any modifications specified will be done with MMU off at the same
+>> time that any Phy<->Virt fixup is done.
+> 
+> I think this is rather over-engineered - do we need to support multiple
+> different fixups to the page tables like this?
 
-are available in the git repository at:
+Yes I was expecting this comment but thought I would give you the choice. :)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/krzk/linux.git tags/samsung-defconfig-4.8
+> 
+> Given how this has grown, I think it would be better to duplicate the
+> existing swapper_pg_dir, modify the new copy, and then have the
+> pv-fixup-asm code merely copy the new to the old with the MMU off.
+> That way, the only two things that the assembly code has to do is to
+> deal with the page table update, and updating the TTBR registers.
+> Most of the complexity can then be kept in the C code.
+> 
 
-for you to fetch changes up to 4b388071a2235ed8f05d05d069f5a5a29782a8c5:
+I really like this.  I can just do the outer shared fixup and not worry
+about a generalized mechanism.  *If* someone needs to do another fixup
+they can just code it in C.
 
-  ARM: exynos_defconfig: Save defconfig on current linux-next (2016-06-06 08:36:55 +0200)
+The new patch #1 will just rework the PV_FIXUP for the new asm/C split.
 
-----------------------------------------------------------------
-Samsung defconfig update for v4.8:
-1. Disable big.LITTLE switcher so the cpufreq-dt could be enabled.
-2. Enable Samsung media platform drivers.
-3. Enable some board-specific drivers for boards: Trats2, Universal C210.
-4. Few more minor additions.
+You want the off-line table to copy over the early table in place w/ MMU
+off, correct? (Not update the HW to point to a new spot.)
 
-----------------------------------------------------------------
-Andrzej Hajda (1):
-      ARM: multi_v7_defconfig: Enable Exynos DRM Mixer driver
+> I think we also need to modify the TTBCR to match the sharability of
+> memory - currently, TTB walks will be inner sharable, but my
+> understanding is that if we switch memory to be outer sharable, we
+> also need to update the TTB walks to match.
+> 
 
-Bartlomiej Zolnierkiewicz (1):
-      ARM: exynos_defconfig: Disable big.LITTLE switcher
-
-Javier Martinez Canillas (4):
-      ARM: exynos_defconfig: Enable Samsung media platform drivers as modules
-      ARM: multi_v7_defconfig: Enable Samsung media platform drivers as modules
-      ARM: exynos_defconfig: Enable MFC driver as module
-      ARM: multi_v7_defconfig: Enable Exynos MFC driver as module
-
-Krzysztof Kozlowski (5):
-      ARM: multi_v7_defconfig: Switch max77693 to module
-      ARM: multi_v7_defconfig: Enable Trats2 audio codec, touchscreen and sensors
-      ARM: multi_v7_defconfig: Enable drivers for Exynos4210 Universal C210 board
-      ARM: multi_v7_defconfig: Enable s5p-secss driver
-      ARM: exynos_defconfig: Save defconfig on current linux-next
-
- arch/arm/configs/exynos_defconfig   | 27 +++++++++++++++------------
- arch/arm/configs/multi_v7_defconfig | 30 +++++++++++++++++++++++++-----
- 2 files changed, 40 insertions(+), 17 deletions(-)
+Good point, Thanks.  I don't think our internal hack has been doing that.
