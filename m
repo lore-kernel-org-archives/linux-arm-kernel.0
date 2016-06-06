@@ -1,72 +1,42 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 17:59:39 +0100
-Subject: [PATCH kexec-tools v2 11/32] kexec: add mem_regions sorting
- implementation
-In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xsJ-0003sU-LJ@e0050434b2927.dyn.armlinux.org.uk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon,  6 Jun 2016 18:08:54 +0100
+Subject: [PATCH 10/10] usb: host: ohci-st: Inform the reset framework that our
+ reset line may be shared
+In-Reply-To: <20160606170854.12407-1-lee.jones@linaro.org>
+References: <20160606155655.10860-8-lee.jones@linaro.org>
+ <20160606170854.12407-1-lee.jones@linaro.org>
+Message-ID: <20160606170854.12407-3-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a mem_regions sorting implementation taken from the arm code.
+On the STiH410 B2120 development board the ST EHCI IP shares its reset
+line with the OHCI IP.  New functionality in the reset subsystems forces
+consumers to be explicit when requesting shared/exclusive reset lines.
 
-Reviewed-by: Pratyush Anand <panand@redhat.com>
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- kexec/mem_regions.c | 27 +++++++++++++++++++++++++++
- kexec/mem_regions.h |  2 ++
- 2 files changed, 29 insertions(+)
+ drivers/usb/host/ohci-st.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
-index a4952ff..804984a 100644
---- a/kexec/mem_regions.c
-+++ b/kexec/mem_regions.c
-@@ -1,6 +1,33 @@
-+#include <stdlib.h>
-+
- #include "kexec.h"
- #include "mem_regions.h"
+diff --git a/drivers/usb/host/ohci-st.c b/drivers/usb/host/ohci-st.c
+index acf2eb2..1f1f23c 100644
+--- a/drivers/usb/host/ohci-st.c
++++ b/drivers/usb/host/ohci-st.c
+@@ -188,13 +188,13 @@ static int st_ohci_platform_probe(struct platform_device *dev)
+ 		priv->clk48 = NULL;
+ 	}
  
-+static int mem_range_cmp(const void *a1, const void *a2)
-+{
-+	const struct memory_range *r1 = a1;
-+	const struct memory_range *r2 = a2;
-+
-+	if (r1->start > r2->start)
-+		return 1;
-+	if (r1->start < r2->start)
-+		return -1;
-+
-+	return 0;
-+}
-+
-+/**
-+ * mem_regions_sort() - sort ranges into ascending address order
-+ * @ranges: ranges to sort
-+ *
-+ * Sort the memory regions into ascending address order.
-+ */
-+void mem_regions_sort(struct memory_ranges *ranges)
-+{
-+	qsort(ranges->ranges, ranges->size, sizeof(ranges->ranges),
-+	      mem_range_cmp);
-+}
-+
- /**
-  * mem_regions_add() - add a memory region to a set of ranges
-  * @ranges: ranges to add the memory region to
-diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
-index b9cfba1..da7b5e8 100644
---- a/kexec/mem_regions.h
-+++ b/kexec/mem_regions.h
-@@ -3,6 +3,8 @@
+-	priv->pwr = devm_reset_control_get_optional(&dev->dev, "power");
++	priv->pwr = devm_reset_control_get_optional_shared(&dev->dev, "power");
+ 	if (IS_ERR(priv->pwr)) {
+ 		err = PTR_ERR(priv->pwr);
+ 		goto err_put_clks;
+ 	}
  
- struct memory_ranges;
- 
-+void mem_regions_sort(struct memory_ranges *ranges);
-+
- int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
-                     unsigned long long length, int type);
- 
+-	priv->rst = devm_reset_control_get_optional(&dev->dev, "softreset");
++	priv->rst = devm_reset_control_get_optional_shared(&dev->dev, "softreset");
+ 	if (IS_ERR(priv->rst)) {
+ 		err = PTR_ERR(priv->rst);
+ 		goto err_put_clks;
 -- 
-1.9.1
+2.8.3
