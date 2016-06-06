@@ -1,70 +1,43 @@
 From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Mon,  6 Jun 2016 13:24:23 +0300
-Subject: [PATCH 6/7] ARM: dts: sun4i: Enable NAND on Marsboard A10
+Date: Mon,  6 Jun 2016 13:24:19 +0300
+Subject: [PATCH 2/7] ARM: dts: sun4i: Add NFC node to Allwinner A10 SoC
 In-Reply-To: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
 References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
-Message-ID: <1465208664-9366-7-git-send-email-mamlinav@gmail.com>
+Message-ID: <1465208664-9366-3-git-send-email-mamlinav@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the NFC and describe the NAND flash connected to this controller.
+From: Boris Brezillon <boris.brezillon@free-electrons.com>
 
+Add NAND Flash controller node definition to the A10 SoC.
+
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10-marsboard.dts | 41 +++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ arch/arm/boot/dts/sun4i-a10.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-marsboard.dts b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-index 8e50723..ea6e2d5 100644
---- a/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-marsboard.dts
-@@ -150,6 +150,47 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index 146a08db..22950d8 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -747,6 +747,17 @@
+ 			#size-cells = <0>;
+ 		};
  
-+&nfc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&nand_pins_a>, <&nand_cs0_pins_a>, <&nand_rb0_pins_a>;
-+	status = "okay";
-+
-+	nand at 0 {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		reg = <0>;
-+		allwinner,rb = <0>;
-+
-+		nand-ecc-mode = "hw";
-+		nand-on-flash-bbt;
-+
-+		boot0 at 0 {
-+			label = "boot0";
-+			reg = /bits/ 64 <0x0 0x200000>;
++		nfc: nand at 01c03000 {
++			compatible = "allwinner,sun4i-a10-nand";
++			reg = <0x01c03000 0x1000>;
++			interrupts = <37>;
++			clocks = <&ahb_gates 13>, <&nand_clk>;
++			clock-names = "ahb", "mod";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
 +		};
 +
-+		boot0-rescue at 200000 {
-+			label = "boot0-rescue";
-+			reg = /bits/ 64 <0x200000 0x200000>;
-+		};
-+
-+		uboot at 400000 {
-+			label = "uboot";
-+			reg = /bits/ 64 <0x400000 0x200000>;
-+		};
-+
-+		uboot-rescue at 600000 {
-+			label = "uboot-rescue";
-+			reg = /bits/ 64 <0x600000 0x200000>;
-+		};
-+
-+		main at 800000 {
-+			label = "main";
-+			reg = /bits/ 64 <0x800000 0xff800000>;
-+		};
-+	};
-+};
-+
- &ohci0 {
- 	status = "okay";
- };
+ 		emac: ethernet at 01c0b000 {
+ 			compatible = "allwinner,sun4i-a10-emac";
+ 			reg = <0x01c0b000 0x1000>;
 -- 
 2.7.3
