@@ -1,52 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  6 Jun 2016 16:56:52 +0100
-Subject: [PATCH 4/7] reset: Supply *_shared variant calls when using
- *_optional APIs
+Date: Mon,  6 Jun 2016 16:56:54 +0100
+Subject: [PATCH 6/7] phy: miphy28lp: Inform the reset framework that our reset
+ line may be shared
 In-Reply-To: <20160606155655.10860-1-lee.jones@linaro.org>
 References: <20160606155655.10860-1-lee.jones@linaro.org>
-Message-ID: <20160606155655.10860-5-lee.jones@linaro.org>
+Message-ID: <20160606155655.10860-7-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Consumers need to be able to specify whether they are requesting an
-'exclusive' or 'shared' reset line no matter which API (of_*, devm_*,
-etc) they are using.  This change allows users of the optional_* API
-in particular to specify that their request is for a 'shared' line.
+On the STiH410 B2120 development board the MiPHY28lp shares its reset
+line with the Synopsys DWC3 SuperSpeed (SS) USB 3.0 Dual-Role-Device
+(DRD).  New functionality in the reset subsystems forces consumers to
+be explicit when requesting shared/exclusive reset lines.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/linux/reset.h | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ drivers/phy/phy-miphy28lp.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-index fd69240..c358106 100644
---- a/include/linux/reset.h
-+++ b/include/linux/reset.h
-@@ -141,6 +141,12 @@ static inline struct reset_control *reset_control_get_optional_exclusive(
- 	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 0);
- }
+diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+index 3acd2a1..213e2e1 100644
+--- a/drivers/phy/phy-miphy28lp.c
++++ b/drivers/phy/phy-miphy28lp.c
+@@ -1143,7 +1143,8 @@ static int miphy28lp_probe_resets(struct device_node *node,
+ 	struct miphy28lp_dev *miphy_dev = miphy_phy->phydev;
+ 	int err;
  
-+static inline struct reset_control *reset_control_get_optional_shared(
-+					struct device *dev, const char *id)
-+{
-+	return __of_reset_control_get(dev ? dev->of_node : NULL, id, 0, 1);
-+}
-+
- /**
-  * of_reset_control_get_exclusive - Lookup and obtain an exclusive reference
-  *                                  to a reset controller.
-@@ -270,6 +276,12 @@ static inline struct reset_control *devm_reset_control_get_optional_exclusive(
- 	return __devm_reset_control_get(dev, id, 0, 0);
- }
+-	miphy_phy->miphy_rst = of_reset_control_get(node, "miphy-sw-rst");
++	miphy_phy->miphy_rst =
++		of_reset_control_get_shared(node, "miphy-sw-rst");
  
-+static inline struct reset_control *devm_reset_control_get_optional_shared(
-+					struct device *dev, const char *id)
-+{
-+	return __devm_reset_control_get(dev, id, 0, 1);
-+}
-+
- /**
-  * devm_reset_control_get_exclusive_by_index - resource managed
-  *                                             reset_control_get_exclusive()
+ 	if (IS_ERR(miphy_phy->miphy_rst)) {
+ 		dev_err(miphy_dev->dev,
 -- 
 2.8.3
