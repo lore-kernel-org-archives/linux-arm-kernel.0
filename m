@@ -1,60 +1,56 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Mon, 6 Jun 2016 11:13:59 +0200
-Subject: [PATCH] mmc: sunxi: Add support to the Allwinner A83T
-In-Reply-To: <CAGb2v66JbDjOQdMGDnzsToiXK9ub91m0i4dbkoXtVf0MwURWOQ@mail.gmail.com>
-References: <20160604100253.7141B2DE7D@muse.csie.ntu.edu.tw>
- <CAGb2v66JbDjOQdMGDnzsToiXK9ub91m0i4dbkoXtVf0MwURWOQ@mail.gmail.com>
-Message-ID: <20160606111359.2f5a391dfa7b1bfce2d82d70@free.fr>
+From: gabriel.fernandez@linaro.org (Gabriel Fernandez)
+Date: Mon,  6 Jun 2016 11:26:19 +0200
+Subject: [PATCH v2 00/13] Clock improvement for video playback
+Message-ID: <1465205192-7888-1-git-send-email-gabriel.fernandez@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 5 Jun 2016 20:58:42 +0800
-Chen-Yu Tsai <wens@csie.org> wrote:
+v2:
+  - Simpliflication of clock binding
+    remark from Rob https://lkml.org/lkml/2016/5/25/492
+  - Suppression of stih415-416 support for the clocks (in order
+	to help simplification of clock binding)
+    (others patchs for the machine and drivers will come)
 
-> > +static const struct sunxi_mmc_clk_delay sun8i_a83t_mmc_clk_delays[] = {
-> > +       [SDXC_CLK_400K]         = { .output = 180, .sample = 180 },
-> > +       [SDXC_CLK_25M]          = { .output = 180, .sample =  50 },
-> > +       [SDXC_CLK_50M]          = { .output =  60, .sample =  50 },
-> 
-> These 2 don't look right.
-> 
-> > +       [SDXC_CLK_50M_DDR]      = { .output =  180, .sample = 90 },
-> > +       [SDXC_CLK_50M_DDR_8BIT] = { .output =  180, .sample = 90 },
-> 
-> Nor does this one. As explained in the comment from the clock driver:
-> 
->     We can only outphase the clocks by multiple of the PLL's period.
-> 
->     Since the MMC clock in only a divider, and the formula to get the
->     outphasing in degrees is deg = 360 * delta / period
-> 
-> Now, for the fishy ones I mentioned, MMC clock = card clock (or card * 2
-> for DDR 8 bit), and parent clock is PLL6 @ 600 MHz. A step would be 15,
-> 30 or 60 degrees. Thus you cannot get an outphasing of 50 degrees, or 90
-> degrees for 50M DDR 8bit.
-> 
-> Could you provide a link to the original driver? Or perhaps just the
-> original delay values?
-> 
-> The values do work better on my Cubietruck plus, giving a throughput
-> of 36 MB/s read, instead of 17 MB/s with the original values. However
-> that is still only half of what it should be capable of. I will test
-> my BPI M3 tomorrow.
+This serie allows to increase video resolutions and make audio
+adjustment during a video playback.
 
-Hi,
+Gabriel Fernandez (13):
+  drivers: clk: st: Remove stih415-416 clock support
+  drivers: clk: st: Simplify clock binding of STiH4xx platforms
+  drivers: clk: st: Add fs660c32 synthesizer algorithm
+  drivers: clk: st: Add clock propagation for audio clocks
+  drivers: clk: st: Handle clk synchronous mode for video clocks
+  ARM: DT: STiH407: Enable clock propagation for audio clocks
+  ARM: DT: STiH410: Enable clock propagation for audio clocks
+  ARM: DT: STiH418: Enable clock propagation for audio clocks
+  ARM: DT: STiH407: Enable synchronous clock mode for video clocks
+  ARM: DT: STiH410: Enable synchronous clock mode for video clocks
+  ARM: DT: STiH418: Enable synchronous clock mode for video clocks
+  ARM: DT: STi: STiH407: clock configuration to address 720p and 1080p
+  ARM: DT: STi: STiH410: clock configuration to address 720p and 1080p
 
-Yes, you are right, my values are wrong. Please, forget about this patch.
-I did not look far enough in the clock code.
-
-Anyway, I had timeouts in accessing the MMC because the BPI-M3 legacy
-u-boot sets the pll-periph rate to 1.2GHz.
-Then, according to the comment in the BPI-M3 original driver
-(https://github.com/BPI-SINOVOIP/BPI-M3-bsp/blob/master/linux-sunxi/drivers/mmc/host/sunxi-mci.c),
-if "//in 1.2GHz pll_periph only [MMC_CLK-50M] is correct",
-setting the clock delays to 6 and 7 would be, for us:
-
-	[SDXC_CLK_50M]          = { .output =  90, .sample =  105 },
+ .../bindings/clock/st/st,clkgen-divmux.txt         |  49 --
+ .../devicetree/bindings/clock/st/st,clkgen-mux.txt |  20 +-
+ .../devicetree/bindings/clock/st/st,clkgen-pll.txt |  35 +-
+ .../bindings/clock/st/st,clkgen-prediv.txt         |  36 -
+ .../devicetree/bindings/clock/st/st,clkgen-vcc.txt |  61 --
+ .../devicetree/bindings/clock/st/st,clkgen.txt     |  54 +-
+ .../devicetree/bindings/clock/st/st,flexgen.txt    |   4 +
+ .../devicetree/bindings/clock/st/st,quadfs.txt     |  31 +-
+ arch/arm/boot/dts/stih407-clock.dtsi               |   4 +-
+ arch/arm/boot/dts/stih407.dtsi                     |  16 +-
+ arch/arm/boot/dts/stih410-clock.dtsi               |   4 +-
+ arch/arm/boot/dts/stih410.dtsi                     |  16 +-
+ arch/arm/boot/dts/stih418-clock.dtsi               |   4 +-
+ drivers/clk/st/clk-flexgen.c                       |  61 +-
+ drivers/clk/st/clkgen-fsyn.c                       | 481 ++++---------
+ drivers/clk/st/clkgen-mux.c                        | 748 +--------------------
+ drivers/clk/st/clkgen-pll.c                        | 470 +------------
+ 17 files changed, 297 insertions(+), 1797 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-divmux.txt
+ delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-prediv.txt
+ delete mode 100644 Documentation/devicetree/bindings/clock/st/st,clkgen-vcc.txt
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+1.9.1
