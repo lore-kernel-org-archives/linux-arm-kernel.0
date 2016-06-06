@@ -1,129 +1,95 @@
-From: rmk@arm.linux.org.uk (Russell King)
-Date: Mon, 06 Jun 2016 18:00:42 +0100
-Subject: [PATCH kexec-tools v2 23/32] arm: move crash system RAM parsing
- earlier
-In-Reply-To: <20160606164129.GM1041@n2100.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
-Message-ID: <E1b9xtK-0003te-8s@e0050434b2927.dyn.armlinux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 6 Jun 2016 18:09:50 +0100
+Subject: [PATCH 2/3] arm64: efi: Ensure efi_create_mapping() does not map
+ overlapping regions
+In-Reply-To: <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
+References: <1464707672-21882-1-git-send-email-catalin.marinas@arm.com>
+ <1464707672-21882-3-git-send-email-catalin.marinas@arm.com>
+ <CAKv+Gu-Kiq30-BtQ_aYamLyTB6d8WWmnBM6bOM-+c+WciUnUwA@mail.gmail.com>
+Message-ID: <20160606170950.GD29910@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Pratyush Anand <panand@redhat.com>
-Signed-off-by: Russell King <rmk@arm.linux.org.uk>
----
- kexec/arch/arm/Makefile        |  2 ++
- kexec/arch/arm/crashdump-arm.c | 51 ++++++++----------------------------------
- 2 files changed, 11 insertions(+), 42 deletions(-)
+On Mon, Jun 06, 2016 at 11:43:01AM +0200, Ard Biesheuvel wrote:
+> On 31 May 2016 at 17:14, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > Since the EFI page size is 4KB, it is possible for a !4KB page kernel to
+> > align an EFI runtime map boundaries in a way that they can overlap
+> > within the same page. This requires the current create_pgd_mapping()
+> > code to be able to split existing larger mappings when an overlapping
+> > region needs to be mapped.
+> >
+> > With this patch, efi_create_mapping() scans the EFI memory map for
+> > overlapping regions and trims the length of the current map to avoid a
+> > large block mapping and subsequent split.
+> 
+> I remember the discussion, but IIRC this was about failure to do
+> break-before-make in general rather than a problem with splitting in
+> particular.
 
-diff --git a/kexec/arch/arm/Makefile b/kexec/arch/arm/Makefile
-index 60e433a..71db8c3 100644
---- a/kexec/arch/arm/Makefile
-+++ b/kexec/arch/arm/Makefile
-@@ -7,6 +7,8 @@ arm_FS2DT              = kexec/fs2dt.c
- arm_FS2DT_INCLUDE      = -include $(srcdir)/kexec/arch/arm/crashdump-arm.h \
-                          -include $(srcdir)/kexec/arch/arm/kexec-arm.h
- 
-+arm_MEM_REGIONS        = kexec/mem_regions.c
-+
- arm_KEXEC_SRCS=  kexec/arch/arm/kexec-elf-rel-arm.c
- arm_KEXEC_SRCS+= kexec/arch/arm/kexec-zImage-arm.c
- arm_KEXEC_SRCS+= kexec/arch/arm/kexec-uImage-arm.c
-diff --git a/kexec/arch/arm/crashdump-arm.c b/kexec/arch/arm/crashdump-arm.c
-index d6db566..f2e6a0d 100644
---- a/kexec/arch/arm/crashdump-arm.c
-+++ b/kexec/arch/arm/crashdump-arm.c
-@@ -30,6 +30,7 @@
- #include "../../kexec.h"
- #include "../../kexec-elf.h"
- #include "../../crashdump.h"
-+#include "../../mem_regions.h"
- #include "crashdump-arm.h"
- #include "iomem.h"
- 
-@@ -132,39 +133,6 @@ static int get_kernel_page_offset(struct kexec_info *info,
- }
- 
- /**
-- * crash_range_callback() - callback called for each iomem region
-- * @data: not used
-- * @nr: not used
-- * @str: name of the memory region
-- * @base: start address of the memory region
-- * @length: size of the memory region
-- *
-- * This function is called once for each memory region found in /proc/iomem. It
-- * locates system RAM and places these into @crash_memory_ranges. Number of
-- * memory regions is placed in @crash_memory_nr_ranges.
-- */
--static int crash_range_callback(void *UNUSED(data), int UNUSED(nr),
--				char *str, unsigned long long base,
--				unsigned long long length)
--{
--	struct memory_range *range;
--
--	if (usablemem_rgns.size >= CRASH_MAX_MEMORY_RANGES)
--		return 1;
--
--	range = usablemem_rgns.ranges + usablemem_rgns.size;
--
--	if (strncmp(str, "System RAM\n", 11) == 0) {
--		range->start = base;
--		range->end = base + length - 1;
--		range->type = RANGE_RAM;
--		usablemem_rgns.size++;
--	}
--
--	return 0;
--}
--
--/**
-  * crash_exclude_range() - excludes memory region reserved for crashkernel
-  *
-  * Function locates where crashkernel reserved memory is and removes that region
-@@ -213,12 +181,6 @@ static void crash_exclude_range(void)
-  */
- static int crash_get_memory_ranges(void)
- {
--	/*
--	 * First read all memory regions that can be considered as
--	 * system memory including the crash area.
--	 */
--	kexec_iomem_for_each_line(NULL, crash_range_callback, NULL);
--
- 	if (usablemem_rgns.size < 1) {
- 		errno = EINVAL;
- 		return -1;
-@@ -414,8 +376,9 @@ int load_crashdump_segments(struct kexec_info *info, char *mod_cmdline)
-  * @base: start address of the memory region
-  * @length: size of the memory region
-  *
-- * This function is called for each memory range in /proc/iomem, and stores
-- * the location of the crash kernel range into @crash_reserved_mem.
-+ * This function is called for each memory range in /proc/iomem, stores
-+ * the location of the crash kernel range into @crash_reserved_mem, and
-+ * stores the system RAM into @usablemem_rgns.
-  */
- static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
- 				char *str, unsigned long long base,
-@@ -426,6 +389,10 @@ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
- 		crash_reserved_mem.end = base + length - 1;
- 		crash_reserved_mem.type = RANGE_RAM;
- 	}
-+	else if (strncmp(str, SYSTEM_RAM, strlen(SYSTEM_RAM)) == 0) {
-+		return mem_regions_add(&usablemem_rgns,
-+				       base, length, RANGE_RAM);
-+	}
- 	return 0;
- }
- 
-@@ -434,7 +401,7 @@ static int iomem_range_callback(void *UNUSED(data), int UNUSED(nr),
-  *
-  * Check for the crashkernel reserved region in /proc/iomem, and return
-  * true if it is present, or false otherwise. We use this to store the
-- * location of this region.
-+ * location of this region, and system RAM regions.
-  */
- int is_crashkernel_mem_reserved(void)
- {
+In this instance, we don't have break-before-make issue since the pgd
+used for EFI runtime services is not active. So it's just about
+splitting a larger block and simplifying the arch code.
+
+> So first of all, I would like to point out that this failure to do
+> break-before-make is not a problem in practice, given that the EFI
+> page tables are not live until much later. The reason we want to fix
+> this is because the EFI page tables routines are shared with the
+> swapper, where it /is/ a concern, and there is a desire to make those
+> routines more strict when it comes to architectural rules regarding
+> page table manipulation.
+
+Exactly.
+
+> Also, the reference to block mappings on !4K pages kernels is a bit
+> misleading here: such block mappings are at least 32 MB in size, and
+> we never map runtime code or data regions that big.
+
+Jeremy has some patches in flight to use the contiguous bit on such
+mappings. With 64KB x 32 pages, we get a 2MB block. I want to avoid code
+splitting such contiguous block as well (which with the contiguous bit
+means going back and clearing it).
+
+> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+> > ---
+> >  arch/arm64/kernel/efi.c | 22 +++++++++++++++++++---
+> >  1 file changed, 19 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> > index 78f52488f9ff..0d5753c31c7f 100644
+> > --- a/arch/arm64/kernel/efi.c
+> > +++ b/arch/arm64/kernel/efi.c
+> > @@ -62,10 +62,26 @@ struct screen_info screen_info __section(.data);
+> >  int __init efi_create_mapping(struct mm_struct *mm, efi_memory_desc_t *md)
+> >  {
+> >         pteval_t prot_val = create_mapping_protection(md);
+> > +       phys_addr_t length = md->num_pages << EFI_PAGE_SHIFT;
+> > +       efi_memory_desc_t *next = md;
+> >
+> > -       create_pgd_mapping(mm, md->phys_addr, md->virt_addr,
+> > -                          md->num_pages << EFI_PAGE_SHIFT,
+> > -                          __pgprot(prot_val | PTE_NG));
+> > +       /*
+> > +        * Search for the next EFI runtime map and check for any overlap with
+> > +        * the current map when aligned to PAGE_SIZE. In such case, defer
+> > +        * mapping the end of the current range until the next
+> > +        * efi_create_mapping() call.
+> > +        */
+> > +       for_each_efi_memory_desc_continue(next) {
+> > +               if (!(next->attribute & EFI_MEMORY_RUNTIME))
+> > +                       continue;
+> > +               if (next->phys_addr < PAGE_ALIGN(md->phys_addr + length))
+> > +                       length -= (md->phys_addr + length) & ~PAGE_MASK;
+> 
+> This looks fishy. We could have more than two runtime regions sharing
+> a 64 KB page frame, for instance, and the middle regions will have
+> unaligned start and end addresses, and sizes smaller than 64 KB. This
+> subtraction may wrap in that case, producing a bogus length.
+
+I don't think I get it. This subtraction is meant to reduce the length
+of the current md so that it is page aligned, deferring the mapping of
+the last page to the next efi_create_mapping() call. Note that there is
+a "break" just after the hunk you quoted, so we only care about the next
+runtime map.
+
 -- 
-1.9.1
+Catalin
