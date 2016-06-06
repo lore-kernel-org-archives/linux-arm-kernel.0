@@ -1,69 +1,82 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 06 Jun 2016 13:28:57 +0200
-Subject: [PATCH 5/9] clocksource/drivers/exynos_mct: Convert init function
- to return error
-In-Reply-To: <57555D4A.8010001@linaro.org>
-References: <1464770093-12667-1-git-send-email-daniel.lezcano@linaro.org>
- <1464770093-12667-6-git-send-email-daniel.lezcano@linaro.org>
- <575555CC.1020906@samsung.com> <57555D4A.8010001@linaro.org>
-Message-ID: <57555E79.80606@samsung.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 6 Jun 2016 12:36:00 +0100
+Subject: [linux-sunxi] Re: [PATCH 5/5] RFC spi: sun4i: add DMA support
+In-Reply-To: <CAOMqctQwFif=yFF1snfZJc7+sGS7wcC-6oNTCfjW_MSUWHw+xQ@mail.gmail.com>
+References: <20160530112610.GJ29837@sirena.org.uk>
+ <CAMuHMdVThvtqgFnyqoqypwwf1d81uu9NBo6-heTZBcvBxRevNw@mail.gmail.com>
+ <20160530150343.GL29837@sirena.org.uk>
+ <CAOMqctQb-YYprA7H5qCcYo2hxXiUhjW2z3JbZ3-FhbfcjFzBpw@mail.gmail.com>
+ <20160530155016.GO29837@sirena.org.uk>
+ <20160601180056.GA4908@lukather>
+ <1464842546.23881.3.camel@plaes.org>
+ <CAOMqctRMi8Zuwqvakka8LkgvecWVAfzUcER9+ui9WBYS78fWtQ@mail.gmail.com>
+ <20160602142649.GJ2282@sirena.org.uk>
+ <CAOMqctQwFif=yFF1snfZJc7+sGS7wcC-6oNTCfjW_MSUWHw+xQ@mail.gmail.com>
+Message-ID: <20160606113600.GB7510@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2016 01:23 PM, Daniel Lezcano wrote:
-> On 06/06/2016 12:51 PM, Krzysztof Kozlowski wrote:
->> On 06/01/2016 10:34 AM, Daniel Lezcano wrote:
->>> The init functions do not return any error. They behave as the
->>> following:
->>>
->>>   - panic, thus leading to a kernel crash while another timer may
->>> work and
->>>     make the system boot up correctly
->>>
->>>   or
->>>
->>>   - print an error and let the caller unaware if the state of the system
->>>
->>> Change that by converting the init functions to return an error
->>> conforming
->>> to the CLOCKSOURCE_OF_RET prototype.
->>>
->>> Proper error handling (rollback, errno value) will be changed later case
->>> by case, thus this change just return back an error or success in the
->>> init
->>> function.
->>
->> I don't see the benefits of this change alone. You are replacing one
->> non-return code to another always-return-success code. The effect is
->> exactly the same. It would make sense to change it to CLOCKSOURCE_OF_RET
->> along with proper error handling.
->>
-> 
-> Hi Krzysztof,
-> 
-> I can understand you expect an error handling but, as stated in the
-> changelog, proper error handling will be done later. Currently, there
-> are roughly 80 drivers to changes the init function to return a value in
-> order change the CLOCKSOURCE_OF_DECLARE macro. That is a quite important
-> number and changing also the internals will introduce bugs.
-> 
-> So the series (and there is a huge one coming right after this one),
-> will focus only on changing the init function to return a value, so we
-> can swap the clocksource table and rename CLOCKSOURCE_OF_DECLARE_RET
-> without the '_RET'. I want this to be done before the next PR in order
-> to prevent to have a double clksrc table.
-> 
-> If error handling is already taken into account and is trivial, I try to
-> do the change, otherwise I let the function to return a success value.
-> 
-> Regarding the important number of drivers, if you have time to change
-> the init function in the exynos_mct, that will be more than welcome :)
+On Sun, Jun 05, 2016 at 01:27:11PM +0200, Michal Suchanek wrote:
+> On 2 June 2016 at 16:26, Mark Brown <broonie@kernel.org> wrote:
+> > On Thu, Jun 02, 2016 at 02:14:26PM +0200, Michal Suchanek wrote:
 
-Ah, okay, you are planning to get rid of CLOCKSOURCE_OF_DECLARE. I
-didn't receive the cover letter so the big picture remained hidden. Now
-it looks good:
+> >> And the code added in that patch will never run unless you
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> >> 1) use long spi transfers
+> >> 2) compile in/load SPI without DMA support
 
-Best regards,
-Krzysztof
+> >> There is no reason for doing 2) since we have do DMA support for sunxi.
+
+> > Well, presumably such code exists and is being worked on?
+
+> Which code are you referring to?
+
+> This is a reply to patch which adds DMA support to the SPI driver so
+> that it can work for arbitrarily long transfers.
+
+It sounded like there might be a missing DMA driver?  Though I think I
+was misreading the above.
+
+> > Oh, come on.  You might not want to use it yourself but the chances are
+> > that someone will want to use it just like the situation with all the
+> > other SPI drivers.  It's a perfectly reasonable and sensible feature to
+> > support upstream.
+
+> Is it?
+
+> Once we have *one* driver that works for arbitrarily long transfers
+> and it works out of the box with the board defconfig 99% of people who
+> will use the SPI driver for anything will use this driver. Any other
+> variant will go untested.
+
+We don't want multiple drivers for this and general maintainability
+reasons, I'm not sure where the idea that we might want multiple drivers
+came from?
+
+> And for the driver to also work without DMA you have to *tell* it to
+> probe without DMA because it cannot know you are not going to load a
+> DMA driver later.
+
+Yes.  This puts the cost on the special snowflake systems that
+absolutely cannot have any DMA support in their systems for some reason
+while keeping the driver featureful by default, and keeps that cost
+fairly small.
+
+> > I really do not understand why there is such a strong desire to have
+> > these devices be a special snowflake here, the worst that's likely to
+> > happen here is that you're going to end up having to either remove the
+> > DMA controller from the DT or load the driver for it neither of which
+> > seem like the end of the world.
+
+> Why would you do that?
+
+Like I say I really don't understand why this is.  I'm just saying there
+are ways to do this fairly simply if people really want it on their
+systems.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160606/c5b03fc2/attachment.sig>
