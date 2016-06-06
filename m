@@ -1,79 +1,84 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 06 Jun 2016 18:04:44 -0500
-Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
-Message-ID: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Date: Mon, 06 Jun 2016 18:04:52 -0500
+Subject: [PATCH v1 01/25] PCI: Add devm_request_pci_bus_resources()
+In-Reply-To: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <20160606230452.20936.28937.stgit@bhelgaas-glaptop2.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Several host bridge drivers (designware and all derivatives, iproc,
-xgene, xilinx, and xilinx-nwl) don't request the MMIO and I/O port
-windows they forward downstream to the PCI bus.
+Several host bridge drivers iterate through the list of bridge windows to
+request resources.  Several others don't request the window resources at
+all.
 
-That means the PCI core can't request resources for PCI bridge
-windows and PCI BARs.
+Add a devm_request_pci_bus_resources() interface to make it easier for
+drivers to request all the window resources.
 
-Several other drivers (altera, generic, mvebu, rcar, tegra) do request
-the windows, but use some duplicated code to do it.
-
-This adds a new devm_request_pci_bus_resources() interface and changes
-these drivers to use it.  It also fixes several error paths where we failed
-to free the resource list allocated by of_pci_get_host_bridge_resources().
-
-Tegra guys, please take a look at "PCI: tegra: Remove top-level resource
-from hierarchy" in particular.  Removing the top-level resource definitely
-makes /proc/iomem look uglier (although it will look more like that of
-other drivers).  A short-term fix could be to include device information in
-the resource name.  I think a better long-term fix would be to make the DT
-or platform device core request all the resources from the DT.
-
-Comments welcome.  I expect we'll trip over something here, so I marked
-this "v1" and I don't plan to put it into -next for a while.
-
-This is on my pci/host-request-windows branch, which you can pull or view
-at https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-request-windows
-
+Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
+ drivers/pci/bus.c   |   29 ++++++++++++++++++++++++++++-
+ include/linux/pci.h |    5 ++++-
+ 2 files changed, 32 insertions(+), 2 deletions(-)
 
-Bjorn Helgaas (25):
-      PCI: Add devm_request_pci_bus_resources()
-      PCI: designware: Free bridge resource list on failure
-      PCI: designware: Request host bridge window resources
-      PCI: designware: Simplify host bridge window iteration
-      PCI: iproc: Request host bridge window resources
-      PCI: xgene: Free bridge resource list on failure
-      PCI: xgene: Request host bridge window resources
-      PCI: xilinx: Free bridge resource list on failure
-      PCI: xilinx: Request host bridge window resources
-      PCI: xilinx-nwl: Free bridge resource list on failure
-      PCI: xilinx-nwl: Request host bridge window resources
-      PCI: xilinx-nwl: Use dev_printk() when possible
-      PCI: altera: Request host bridge window resources with core function
-      PCI: altera: Simplify host bridge window iteration
-      PCI: generic: Free resource list close to where it's allocated
-      PCI: generic: Request host bridge window resources with core function
-      PCI: generic: Simplify host bridge window iteration
-      PCI: mvebu: Request host bridge window resources with core function
-      PCI: rcar Gen2: Request host bridge window resources
-      PCI: rcar: Request host bridge window resources with core function
-      PCI: rcar: Simplify host bridge window iteration
-      PCI: tegra: Remove top-level resource from hierarchy
-      PCI: tegra: Request host bridge window resources with core function
-      PCI: versatile: Request host bridge window resources with core function
-      PCI: versatile: Simplify host bridge window iteration
-
-
- drivers/pci/bus.c                  |   29 +++++++++++++++++
- drivers/pci/host/pci-host-common.c |   61 +++++++++++++++---------------------
- drivers/pci/host/pci-mvebu.c       |   17 ++++------
- drivers/pci/host/pci-rcar-gen2.c   |    4 ++
- drivers/pci/host/pci-tegra.c       |   35 +++------------------
- drivers/pci/host/pci-versatile.c   |   29 ++++++-----------
- drivers/pci/host/pci-xgene.c       |   16 ++++++++-
- drivers/pci/host/pcie-altera.c     |   35 ++++++---------------
- drivers/pci/host/pcie-designware.c |   34 +++++++++++++-------
- drivers/pci/host/pcie-iproc.c      |    4 ++
- drivers/pci/host/pcie-rcar.c       |   33 +++++--------------
- drivers/pci/host/pcie-xilinx-nwl.c |   20 +++++++++---
- drivers/pci/host/pcie-xilinx.c     |   16 ++++++++-
- include/linux/pci.h                |    5 ++-
- 14 files changed, 170 insertions(+), 168 deletions(-)
+diff --git a/drivers/pci/bus.c b/drivers/pci/bus.c
+index dd7cdbe..78b90c7 100644
+--- a/drivers/pci/bus.c
++++ b/drivers/pci/bus.c
+@@ -91,6 +91,34 @@ void pci_bus_remove_resources(struct pci_bus *bus)
+ 	}
+ }
+ 
++int devm_request_pci_bus_resources(struct device *dev,
++				   struct list_head *resources)
++{
++	struct resource_entry *win;
++	struct resource *parent, *res;
++	int err;
++
++	resource_list_for_each_entry(win, resources) {
++		res = win->res;
++		switch (resource_type(res)) {
++		case IORESOURCE_IO:
++			parent = &ioport_resource;
++			break;
++		case IORESOURCE_MEM:
++			parent = &iomem_resource;
++			break;
++		default:
++			continue;
++		}
++
++		err = devm_request_resource(dev, parent, res);
++		if (err)
++			return err;
++	}
++
++	return 0;
++}
++
+ static struct pci_bus_region pci_32_bit = {0, 0xffffffffULL};
+ #ifdef CONFIG_PCI_BUS_ADDR_T_64BIT
+ static struct pci_bus_region pci_64_bit = {0,
+@@ -397,4 +425,3 @@ void pci_bus_put(struct pci_bus *bus)
+ 		put_device(&bus->dev);
+ }
+ EXPORT_SYMBOL(pci_bus_put);
+-
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index b67e4df..6ac8360 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1143,9 +1143,12 @@ void pci_add_resource(struct list_head *resources, struct resource *res);
+ void pci_add_resource_offset(struct list_head *resources, struct resource *res,
+ 			     resource_size_t offset);
+ void pci_free_resource_list(struct list_head *resources);
+-void pci_bus_add_resource(struct pci_bus *bus, struct resource *res, unsigned int flags);
++void pci_bus_add_resource(struct pci_bus *bus, struct resource *res,
++			  unsigned int flags);
+ struct resource *pci_bus_resource_n(const struct pci_bus *bus, int n);
+ void pci_bus_remove_resources(struct pci_bus *bus);
++int devm_request_pci_bus_resources(struct device *dev,
++				   struct list_head *resources);
+ 
+ #define pci_bus_for_each_resource(bus, res, i)				\
+ 	for (i = 0;							\
