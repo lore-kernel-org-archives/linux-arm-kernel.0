@@ -1,208 +1,217 @@
 From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Tue, 7 Jun 2016 19:14:16 +0200
-Subject: [PATCH v3 2/4] ARM: dts: imx6q: extend support for the cm-fx6
+Date: Tue, 7 Jun 2016 19:14:17 +0200
+Subject: [PATCH v3 3/4] ARM: dts: imx6q: add support for the Utilite Pro
 In-Reply-To: <20160607171418.1703-1-christopher.spinrath@rwth-aachen.de>
 References: <20160607171418.1703-1-christopher.spinrath@rwth-aachen.de>
-Message-ID: <1bf474715cdf430a811ba16c82ce6f25@rwthex-s1-b.rwth-ad.de>
+Message-ID: <9983d3c88de240538080d567e56e63c4@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-The cm-fx6 module has an on-board spi-flash chip for its firmware, an
-eeprom (containing e.g. the mac address of the on-board Ethernet),
-a sata port, a pcie controller, an USB hub, and an USB otg port.
-Enable support for them. In addition, enable syscon poweroff support.
+The CompuLab Utilite Pro is a miniature fanless desktop pc based on
+the i.MX6 Quad powered cm-fx6 module. It features two serial ports,
+USB OTG, 4x USB, analog audio and S/PDIF, 2x Gb Ethernet, HDMI and
+DVI ports, an on-board 32GB SSD, a mmc slot, and on-board wifi/bt.
+
+Add initial support for it including USB, Ethernet (both ports), sata
+and HDMI support.
 
 Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
 
 Notes:
     Changes since v2:
-     - fix pcie reset gpio polarity
-     - add Fabio's Reviewed-By
+     - add Igor's Acked-By (replaces the Cc)
     
     Changes since v1:
-     - remove regulator pseudo-bus
-     - remove partition layout from spi flash node
-     - remove unneeded label of the spi flash node
-     - convert downstream power-on-gpio property of pcie node to a proper
-       regulator
-     - sort usb* related nodes alphabetically
-     - make use of GPIO_ACTIVE_{LOW,HIGH} defines
-     - replace 0x80000000 iomuxc configs by proper defaults obtained from
-       u-boot
+     - use GPL/X11 dual license (in agreement with CompuLab)
+     - use GPIO_ACTIVE_{LOW,HIGH} defines to specify gpios
+     - use KEY_POWER define for the power key
+     - replace 0x80000000 iomuxc configs by proper defaults
+       obtained from u-boot
+     - remove iomuxc container node
+     - iomuxc: remove hog group and move the gpio-key pins
+       to a proper gpio_keys group
+     - clean up uart2 node (remove dma properties already
+       present in imx6qdl.dtsi and replace deprecated
+       fsl,uart-has-rtscts by the generic one)
 
- arch/arm/boot/dts/imx6q-cm-fx6.dts | 125 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 125 insertions(+)
+ arch/arm/boot/dts/Makefile              |   1 +
+ arch/arm/boot/dts/imx6q-utilite-pro.dts | 153 ++++++++++++++++++++++++++++++++
+ 2 files changed, 154 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-utilite-pro.dts
 
-diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-index 21c513f..1ec3186 100644
---- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-+++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-@@ -12,6 +12,7 @@
-  */
- 
- /dts-v1/;
-+#include <dt-bindings/gpio/gpio.h>
- #include "imx6q.dtsi"
- 
- / {
-@@ -31,6 +32,49 @@
- 			linux,default-trigger = "heartbeat";
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 515a428..287044c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -369,6 +369,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-tx6q-1110.dtb \
+ 	imx6q-tx6q-11x0-mb7.dtb \
+ 	imx6q-udoo.dtb \
++	imx6q-utilite-pro.dtb \
+ 	imx6q-wandboard.dtb \
+ 	imx6q-wandboard-revb1.dtb \
+ 	imx6qp-nitrogen6_max.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+new file mode 100644
+index 0000000..7219745
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+@@ -0,0 +1,153 @@
++/*
++ * Copyright 2013 CompuLab Ltd.
++ * Copyright 2016 Christopher Spinrath
++ *
++ * Based on the devicetree distributed with the vendor kernel for the
++ * Utilite Pro:
++ *	Copyright 2013 CompuLab Ltd.
++ *	Author: Valentin Raevsky <valentin@compulab.co.il>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	reg_pcie_power_on_gpio: regulator-pcie-power-on-gpio {
-+		compatible = "regulator-fixed";
-+		regulator-name = "regulator-pcie-power-on-gpio";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 24 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
++#include <dt-bindings/input/input.h>
++#include "imx6q-cm-fx6.dts"
++
++/ {
++	model = "CompuLab Utilite Pro";
++	compatible = "compulab,utilite-pro", "compulab,cm-fx6", "fsl,imx6q";
++
++	aliases {
++		ethernet1 = &eth1;
++		rtc0 = &em3027;
++		rtc1 = &snvs_rtc;
 +	};
 +
-+	reg_usb_h1_vbus: usb_h1_vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio7 8 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
++	gpio-keys {
++		compatible = "gpio-keys";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_gpio_keys>;
 +
-+	reg_usb_otg_vbus: usb_otg_vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
++		power {
++			label = "Power Button";
++			gpios = <&gpio1 29 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_POWER>;
++			gpio-key,wakeup;
++		};
 +	};
 +};
 +
-+&ecspi1 {
-+	fsl,spi-num-chipselects = <2>;
-+	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio3 19 GPIO_ACTIVE_HIGH>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1>;
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
 +	status = "okay";
++};
 +
-+	m25p80 at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p", "jedec,spi-nor";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
- };
- 
- &fec {
-@@ -46,7 +90,30 @@
- 	status = "okay";
- };
- 
-+&i2c3 {
++&i2c1 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
++	pinctrl-0 = <&pinctrl_i2c1>;
 +	status = "okay";
-+	clock-frequency = <100000>;
 +
 +	eeprom at 50 {
 +		compatible = "at24,24c02";
 +		reg = <0x50>;
 +		pagesize = <16>;
 +	};
++
++	em3027: rtc at 56 {
++		compatible = "emmicro,em3027";
++		reg = <0x56>;
++	};
 +};
 +
- &iomuxc {
-+	pinctrl_ecspi1: ecspi1grp {
++&i2c2 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2>;
++	status = "okay";
++};
++
++&iomuxc {
++	pinctrl_gpio_keys: gpio_keysgrp {
 +		fsl,pins = <
-+			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK	0x100b1
-+			MX6QDL_PAD_EIM_D17__ECSPI1_MISO	0x100b1
-+			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI	0x100b1
-+			MX6QDL_PAD_EIM_EB2__GPIO2_IO30	0x100b1
-+			MX6QDL_PAD_EIM_D19__GPIO3_IO19	0x100b1
++			MX6QDL_PAD_ENET_TXD1__GPIO1_IO29 0x1b0b0
 +		>;
 +	};
 +
- 	pinctrl_enet: enetgrp {
- 		fsl,pins = <
- 			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-@@ -90,12 +157,55 @@
- 		>;
- 	};
- 
-+	pinctrl_i2c3: i2c3grp {
++	pinctrl_i2c1: i2c1grp {
 +		fsl,pins = <
-+			MX6QDL_PAD_GPIO_3__I2C3_SCL	0x4001b8b1
-+			MX6QDL_PAD_GPIO_6__I2C3_SDA	0x4001b8b1
++			MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
++			MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
 +		>;
 +	};
 +
-+	pinctrl_pcie: pciegrp {
++	pinctrl_i2c2: i2c2grp {
 +		fsl,pins = <
-+			MX6QDL_PAD_ENET_RXD1__GPIO1_IO26	0x1b0b1
-+			MX6QDL_PAD_EIM_CS1__GPIO2_IO24	0x1b0b1
++			MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
++			MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
 +		>;
 +	};
 +
- 	pinctrl_uart4: uart4grp {
- 		fsl,pins = <
- 			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
- 			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
- 		>;
- 	};
-+
-+	pinctrl_usbh1: usbh1grp {
++	pinctrl_uart2: uart2grp {
 +		fsl,pins = <
-+			MX6QDL_PAD_SD3_RST__GPIO7_IO08	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usbotg: usbotggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
-+			MX6QDL_PAD_EIM_D22__GPIO3_IO22	0x130b0
++			MX6QDL_PAD_GPIO_7__UART2_TX_DATA 0x1b0b1
++			MX6QDL_PAD_GPIO_8__UART2_RX_DATA 0x1b0b1
++			MX6QDL_PAD_SD4_DAT5__UART2_RTS_B 0x1b0b1
++			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
 +		>;
 +	};
 +};
 +
 +&pcie {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pcie>;
-+	reset-gpio = <&gpio1 26 GPIO_ACTIVE_LOW>;
-+	vdd-supply = <&reg_pcie_power_on_gpio>;
-+	status = "okay";
++	pcie at 0,0 {
++		reg = <0x000000 0 0 0 0>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++
++		/* non-removable i211 ethernet card */
++		eth1: intel,i211 at pcie0,0 {
++			reg = <0x010000 0 0 0 0>;
++		};
++	};
 +};
 +
-+&sata {
-+	status = "okay";
-+};
-+
-+&snvs_poweroff {
-+	status = "okay";
- };
- 
- &uart4 {
-@@ -103,3 +213,18 @@
- 	pinctrl-0 = <&pinctrl_uart4>;
- 	status = "okay";
- };
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usb_h1_vbus>;
++&uart2 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbh1>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	dr_mode = "otg";
++	pinctrl-0 = <&pinctrl_uart2>;
++	uart-has-rtscts;
 +	status = "okay";
 +};
 -- 
