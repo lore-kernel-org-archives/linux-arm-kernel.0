@@ -1,61 +1,57 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Mon, 6 Jun 2016 21:36:03 -0700
-Subject: [PATCH net-next 2/3] arm64: bpf: optimize JMP_CALL
-In-Reply-To: <20160606170515.GK669@arm.com>
-References: <1465077630-633-1-git-send-email-zlim.lnx@gmail.com>
- <1465077630-633-2-git-send-email-zlim.lnx@gmail.com>
- <20160606170515.GK669@arm.com>
-Message-ID: <CABg9mcvXxAvWxuXJbBbQEy5_nsgPjT6Y20CFNKMkOYJp4NrnFQ@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Tue,  7 Jun 2016 12:54:29 +0800
+Subject: [PATCH v2 0/4] clocksource: rockchip/timer: Support rktimer for rk3399
+Message-ID: <1465275273-22076-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+This series patches had been tested on rockchip inside kernel.
+In order to support the rk3399 SoC timer and turn off interrupts and IPIs to
+save power in idle.
+Okay, it still works bootup on rk3288/other SoCs, even though many socs hasn't used
+the broadcast timer.
 
-On Mon, Jun 6, 2016 at 10:05 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Sat, Jun 04, 2016 at 03:00:29PM -0700, Zi Shen Lim wrote:
->> Remove superfluous stack frame, saving us 3 instructions for
->> every JMP_CALL.
->>
->> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
->> ---
->>  arch/arm64/net/bpf_jit_comp.c | 3 ---
->>  1 file changed, 3 deletions(-)
->>
->> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
->> index 51abc97..7ae304e 100644
->> --- a/arch/arm64/net/bpf_jit_comp.c
->> +++ b/arch/arm64/net/bpf_jit_comp.c
->> @@ -578,11 +578,8 @@ emit_cond_jmp:
->>               const u64 func = (u64)__bpf_call_base + imm;
->>
->>               emit_a64_mov_i64(tmp, func, ctx);
->> -             emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
->> -             emit(A64_MOV(1, A64_FP, A64_SP), ctx);
->>               emit(A64_BLR(tmp), ctx);
->>               emit(A64_MOV(1, r0, A64_R(0)), ctx);
->> -             emit(A64_POP(A64_FP, A64_LR, A64_SP), ctx);
->>               break;
->>       }
->
-> Is the jitted code intended to be unwindable by standard tools?
+History version:
+v1:
+https://lkml.org/lkml/2016/5/25/186
 
-Before this patch:
-    bpf_prologue => push stack frame
-    ...
-    jmp_call => push stack frame, call bpf_helper*, pop stack frame
-    ...
-    bpf_epilogue => pop stack frame, ret
+Easy to test for my borad.
+localhost / # cat /proc/interrupts
+CPU0       CPU1       CPU2       CPU3       CPU4       CPU5
+1:          0          0          0          0          0          0     GICv3  29 Edge      arch_timer
+...
+5:          0          0          0          0          0          0     GICv3 113 Level     rk_timer
+..
 
-Now:
-    bpf_prologue => push stack frame
-    ...
-    jmp_call => call bpf_helper*
-    ...
-    bpf_epilogue => pop stack frame, ret
+localhost / # cat /proc/timer_list | grep event_handler
+get "event_handler:  hrtimer_interrupt"
+event_handler:  tick_handle_oneshot_broadcast
+event_handler:  hrtimer_interrupt
 
-*Note: bpf_helpers in kernel/bpf/helper.c
+That should work for my board.
 
-So yes, it's still unwindable.
 
->
-> Will
+Changes in v2:
+- Add the Rob' Ack.
+- s/cpu_all_mask/cpu_possible_mask/, As Daniel comments on
+  https://patchwork.kernel.org/patch/9135053/.
+- As the Daniel suggests on https://patchwork.kernel.org/patch/9135061/,
+  That will be better for the rockchip timer driver.
+- %s/ARM64/arm64.
+
+Huang Tao (2):
+  dt-bindings: document rk3399 rk-timer bindings
+  arm64: dts: rockchip: add rktimer device node for rk3399
+
+Huang, Tao (2):
+  clocksource: rockchip: add dynamic irq flag to the timer
+  clocksource: rockchip: add support for rk3399 SoC
+
+ ...chip,rk3288-timer.txt => rockchip,rk-timer.txt} |  6 ++--
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |  8 +++++
+ drivers/clocksource/rockchip_timer.c               | 36 +++++++++++++++++-----
+ 3 files changed, 41 insertions(+), 9 deletions(-)
+ rename Documentation/devicetree/bindings/timer/{rockchip,rk3288-timer.txt => rockchip,rk-timer.txt} (75%)
+
+-- 
+1.9.1
