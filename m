@@ -1,59 +1,40 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jun 2016 10:24:56 +0100
-Subject: [STLinux Kernel] [PATCH 0/7] reset: Consumers to explicitly
- request 'exclusive' or 'shared' lines
-In-Reply-To: <20160607091543.GC18047@dell>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160607084208.GB22960@griffinp-ThinkPad-X1-Carbon-2nd>
- <20160607091543.GC18047@dell>
-Message-ID: <20160607092456.GE18047@dell>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 07 Jun 2016 11:29:02 +0200
+Subject: [PATCH v3 06/12] power: pwrseq: simple: Add support for regulator
+ and generic property
+In-Reply-To: <20160603020218.GA19436@rob-hp-laptop>
+References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
+ <1464768141-25420-7-git-send-email-k.kozlowski@samsung.com>
+ <20160603020218.GA19436@rob-hp-laptop>
+Message-ID: <575693DE.2010603@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jun 2016, Lee Jones wrote:
-
-> On Tue, 07 Jun 2016, Peter Griffin wrote:
+On 06/03/2016 04:02 AM, Rob Herring wrote:
+>>  Optional properties:
+>>  - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+>> @@ -16,6 +22,7 @@ Optional properties:
+>>    See ../clocks/clock-bindings.txt for details.
+>>  - clock-names : Must include the following entry:
+>>    "ext_clock" (External clock provided to the card).
+>> +- ext-supply : External regulator supply
 > 
-> > Hi,
-> > 
-> > On Mon, 06 Jun 2016, Lee Jones wrote:
-> > 
-> > > Phasing out generic reset line requests enables us to make some better
-> > > decisions on when and how to (de)assert said lines.  If an 'exclusive'
-> > > line is requested, we know a device *requires* a reset and that it's
-> > > preferable to act upon a request right away.  However, if a 'shared'
-> > > reset line is requested, we can reasonably assume sure that placing a
-> > > device into reset isn't a hard requirement, but probably a measure to
-> > > save power and is thus able to cope with not being asserted if another
-> > > device is still in use.
-> > > 
-> > > In order allow gentle adoption and not to forcing all consumers to
-> > > move to the API immediately, causing administration headache between
-> > > subsystems, this patch adds some temporary stand-in shim-calls.  This
-> > > will ease the burden at merge time and allow subsystems to migrate over
-> > > to the new API in a more realistic time-frame.
-> > 
-> > Is the intention that this series will be taken into the next -rc?
-> > 
-> > As the introduction of shared resets in reset subsystem has caused regressions
-> > on STi platforms.
+> What happens when there are 2 supplies?
 > 
-> Yes, which is why it has a Fixes: tag.
+> I'd prefer the name not be genericish and use the real supply names. 
+> Then the power seq code should just turn on all supplies it finds. If 
+> the order or timing to turn on matters, then sorry, no generic sequence.
 
-Ah wait.  I thought this was the shared-memory patch.
+I think the generic part for regulators might be a problem. Regulator
+API requires a name for the supply... it cannot get "something" or
+"everything".
 
-More haste, less speed and all that.
+The driver could attach itself to any kind of node (where power-sequence
+property exists) so the supply name depends on the bindings of device
+(not bindings of power sequence driver).
 
-I guess it should really go into the -rcs, yes.  Since Hans' patch
-actually breaks a lot of devices.  I'm pretty surprised a patch
-capable of this much damage was actually accepted to be honest.  A
-better approach would have been to issue a warning, but keep the
-semantics the same for at least a couple of releases.  However, I
-guess the damage has been done now, so let's do what we can do fix
-it.
+The power sequence driver could however iterate over child properties
+and get the names of all supplies. It is a little bit ugly...
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Best regards,
+Krzysztof
