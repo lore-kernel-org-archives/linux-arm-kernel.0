@@ -1,44 +1,73 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jun 2016 16:08:10 +0800
-Subject: [PATCH v4 06/14] of_numa: Use of_get_next_parent to simplify code
+Date: Tue, 7 Jun 2016 16:08:17 +0800
+Subject: [PATCH v4 13/14] of/numa: remove the constraint on the distances of
+ node pairs
 In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1465286898-13828-7-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1465286898-13828-14-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kefeng Wang <wangkefeng.wang@huawei.com>
+At present, the distances must equal in both direction for each node
+pairs. For example: the distance of node B->A must the same to A->B.
+But we really don't have to do this.
 
-Use of_get_next_parent() instead of open-code.
+End up fill default distances as below:
+1. If both direction specified, keep no change.
+2. If only one direction specified, assign it to the other direction.
+3. If none of the two direction specified, both are assigned to
+   REMOTE_DISTANCE.
 
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/of/of_numa.c | 6 +-----
- 1 file changed, 1 insertion(+), 5 deletions(-)
+ drivers/of/of_numa.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index 3157130..ed7bd22 100644
+index 019738f..ce782f9 100644
 --- a/drivers/of/of_numa.c
 +++ b/drivers/of/of_numa.c
-@@ -153,8 +153,6 @@ int of_node_to_nid(struct device_node *device)
- 	np = of_node_get(device);
-
- 	while (np) {
--		struct device_node *parent;
+@@ -122,15 +122,25 @@ static int __init of_numa_parse_distance_map_v1(struct device_node *map)
+ 		numa_set_distance(nodea, nodeb, distance);
+ 		pr_debug("distance[node%d -> node%d] = %d\n",
+ 			 nodea, nodeb, distance);
 -
- 		r = of_property_read_u32(np, "numa-node-id", &nid);
- 		/*
- 		 * -EINVAL indicates the property was not found, and
-@@ -165,9 +163,7 @@ int of_node_to_nid(struct device_node *device)
- 		if (r != -EINVAL)
- 			break;
-
--		parent = of_get_parent(np);
--		of_node_put(np);
--		np = parent;
-+		np = of_get_next_parent(np);
+-		/* Set default distance of node B->A same as A->B */
+-		if (nodeb > nodea)
+-			numa_set_distance(nodeb, nodea, distance);
  	}
- 	if (np && r)
- 		pr_warn("NUMA: Invalid \"numa-node-id\" property in node %s\n",
+
+ 	return 0;
+ }
+
++static void __init fill_default_distances(void)
++{
++	int i, j;
++
++	for (i = 0; i < nr_node_ids; i++)
++		for (j = 0; j < nr_node_ids; j++)
++			if (i == j)
++				numa_set_distance(i, j, LOCAL_DISTANCE);
++			else if (!node_distance(i, j))
++				numa_set_distance(i, j,
++				    node_distance(j, i) ? : REMOTE_DISTANCE);
++
++}
++
+ static int __init of_numa_parse_distance_map(void)
+ {
+ 	int ret = 0;
+@@ -140,8 +150,10 @@ static int __init of_numa_parse_distance_map(void)
+ 				     "numa-distance-map-v1");
+ 	if (np)
+ 		ret = of_numa_parse_distance_map_v1(np);
+-
+ 	of_node_put(np);
++
++	fill_default_distances();
++
+ 	return ret;
+ }
+
 --
 2.5.0
