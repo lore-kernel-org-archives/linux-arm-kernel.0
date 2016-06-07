@@ -1,58 +1,61 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 7 Jun 2016 11:03:05 +0100
-Subject: [PATCH] PCI: layerscape: Add 'dma-coherent' property
-In-Reply-To: <1465282546-28256-1-git-send-email-Gang.Liu@nxp.com>
-References: <1465282546-28256-1-git-send-email-Gang.Liu@nxp.com>
-Message-ID: <57569BD9.2060701@arm.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Tue, 07 Jun 2016 13:04:41 +0300
+Subject: [RFC PATCH 2/4] trace: Introduce an output interface from ftrace
+ to STM
+In-Reply-To: <1464779939-24986-3-git-send-email-zhang.chunyan@linaro.org>
+References: <1464779939-24986-1-git-send-email-zhang.chunyan@linaro.org>
+ <1464779939-24986-3-git-send-email-zhang.chunyan@linaro.org>
+Message-ID: <87inxlqpqe.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/16 07:55, Liu Gang wrote:
-> Add 'dma-coherent' description for PCI nodes.
->
-> The 'dma-coherent' indicates that the hardware IP block can ensure
-> the coherency of the data transferred from/to the IP block. This
-> can avoid the software cache flush/invalid actions, and improve
-> the performance significantly.
+Chunyan Zhang <zhang.chunyan@linaro.org> writes:
 
-Note that depending on the exact details it may actually be *necessary* 
-for correctness - if the properties of the system are such that 
-cacheable writes from the root complex might allocate directly into some 
-level of cache without going to RAM, then having the CPU think the 
-device is non-coherent and thus invalidate the cache before reading back 
-from the buffer will result in data loss. But yeah, the performance is 
-the most visible aspect ;)
+> This patch is introducing a new function to print Ftrace messages
+> to STM buffer when the traces happen.  In order to reduce the
+> effect on timing overhead as much as possible, only the current
+> function and its parent ip address will be recorded into STM in
+> this patch.  This idea was first introduced by Philippe Langlais
+> at ST-Microelectronics a long time ago[1].
 
-Robin.
+So why is this useful? The value of trace points is in their payload.
 
-> The PCI IP block of ls1043a has this capability, so adding
-> this feature to improve the PCI performance.
->
-> Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
-> ---
->   Documentation/devicetree/bindings/pci/layerscape-pci.txt | 4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index ef683b2..41e9f55 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -24,6 +24,9 @@ Required properties:
->     The first entry must be a link to the SCFG device node
->     The second entry must be '0' or '1' based on physical PCIe controller index.
->     This is used to get SCFG PEXN registers
-> +- dma-coherent: Indicates that the hardware IP block can ensure the coherency
-> +  of the data transferred from/to the IP block. This can avoid the software
-> +  cache flush/invalid actions, and improve the performance significantly.
->
->   Example:
->
-> @@ -38,6 +41,7 @@ Example:
->   		#address-cells = <3>;
->   		#size-cells = <2>;
->   		device_type = "pci";
-> +		dma-coherent;
->   		num-lanes = <4>;
->   		bus-range = <0x0 0xff>;
->   		ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
->
+> +#define STM_FTRACE_CHAN 0
+
+This is why we have the stm master/channel allocation policy, which
+should already assign a channel to your stm_source device when it is
+linked to an stm device.
+
+Also, why is this a separate compilation unit from the stm_ftrace.o?
+
+> +
+> +void ftrace_stm_func(unsigned long ip, unsigned long parent_ip)
+> +{
+> +	unsigned long ip_array[2] = {ip, parent_ip};
+> +
+> +	stm_ftrace_write((char *)ip_array, sizeof(unsigned long) * 2,
+> +			 STM_FTRACE_CHAN);
+> +}
+> +EXPORT_SYMBOL_GPL(ftrace_stm_func);
+> diff --git a/kernel/trace/trace_output_stm.h b/kernel/trace/trace_output_stm.h
+> new file mode 100644
+> index 0000000..fc3f989
+> --- /dev/null
+> +++ b/kernel/trace/trace_output_stm.h
+> @@ -0,0 +1,14 @@
+> +#ifndef __TRACE_OUTPUT_STM_H
+> +#define __TRACE_OUTPUT_STM_H
+> +
+> +#include <linux/module.h>
+> +
+> +#ifdef CONFIG_STM_FTRACE
+> +extern void stm_ftrace_write(const char *buf, unsigned int len,
+> +			     unsigned int chan);
+> +extern void ftrace_stm_func(unsigned long ip, unsigned long parent_ip);
+> +#else
+> +static inline void ftrace_stm_func(unsigned long ip, unsigned long parent_ip) {}
+> +#endif
+> +
+> +#endif /* __TRACE_OUTPUT_STM_H */
+> -- 
+> 1.9.1
