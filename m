@@ -1,102 +1,42 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  7 Jun 2016 12:19:30 +0100
-Subject: [PATCH 6/6] spi: st-ssc4: Remove 'no clocking' hack
-In-Reply-To: <20160607111930.10375-1-lee.jones@linaro.org>
-References: <20160607111930.10375-1-lee.jones@linaro.org>
-Message-ID: <20160607111930.10375-7-lee.jones@linaro.org>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue,  7 Jun 2016 12:30:13 +0100
+Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
+Message-ID: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Due to the newly upstreamed 'critical clocks' API we can now
-safely handle clocking in the SPI and I2C drivers without fear
-of catastrophically crippling the running platform.
+Fix the use of 0 instead of NULL to clk_get() call. This stops the
+following warning:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- drivers/spi/spi-st-ssc4.c | 36 +++++-------------------------------
- 1 file changed, 5 insertions(+), 31 deletions(-)
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-kernel at lists.codethink.co.uk
+---
+ drivers/cpufreq/mvebu-cpufreq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/spi/spi-st-ssc4.c b/drivers/spi/spi-st-ssc4.c
-index d5adf9f..a56eca0 100644
---- a/drivers/spi/spi-st-ssc4.c
-+++ b/drivers/spi/spi-st-ssc4.c
-@@ -68,32 +68,6 @@ struct spi_st {
- 	struct completion	done;
- };
+diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
+index e920889..ed915ee 100644
+--- a/drivers/cpufreq/mvebu-cpufreq.c
++++ b/drivers/cpufreq/mvebu-cpufreq.c
+@@ -70,7 +70,7 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
+ 			continue;
+ 		}
  
--static int spi_st_clk_enable(struct spi_st *spi_st)
--{
--	/*
--	 * Current platforms use one of the core clocks for SPI and I2C.
--	 * If we attempt to disable the clock, the system will hang.
--	 *
--	 * TODO: Remove this when platform supports power domains.
--	 */
--	return 0;
--
--	return clk_prepare_enable(spi_st->clk);
--}
--
--static void spi_st_clk_disable(struct spi_st *spi_st)
--{
--	/*
--	 * Current platforms use one of the core clocks for SPI and I2C.
--	 * If we attempt to disable the clock, the system will hang.
--	 *
--	 * TODO: Remove this when platform supports power domains.
--	 */
--	return;
--
--	clk_disable_unprepare(spi_st->clk);
--}
--
- /* Load the TX FIFO */
- static void ssc_write_tx_fifo(struct spi_st *spi_st)
- {
-@@ -349,7 +323,7 @@ static int spi_st_probe(struct platform_device *pdev)
- 		goto put_master;
- 	}
- 
--	ret = spi_st_clk_enable(spi_st);
-+	ret = clk_prepare_enable(spi_st->clk);
- 	if (ret)
- 		goto put_master;
- 
-@@ -408,7 +382,7 @@ static int spi_st_probe(struct platform_device *pdev)
- 	return 0;
- 
- clk_disable:
--	spi_st_clk_disable(spi_st);
-+	clk_disable_unprepare(spi_st->clk);
- put_master:
- 	spi_master_put(master);
- 	return ret;
-@@ -419,7 +393,7 @@ static int spi_st_remove(struct platform_device *pdev)
- 	struct spi_master *master = platform_get_drvdata(pdev);
- 	struct spi_st *spi_st = spi_master_get_devdata(master);
- 
--	spi_st_clk_disable(spi_st);
-+	clk_disable_unprepare(spi_st->clk);
- 
- 	pinctrl_pm_select_sleep_state(&pdev->dev);
- 
-@@ -435,7 +409,7 @@ static int spi_st_runtime_suspend(struct device *dev)
- 	writel_relaxed(0, spi_st->base + SSC_IEN);
- 	pinctrl_pm_select_sleep_state(dev);
- 
--	spi_st_clk_disable(spi_st);
-+	clk_disable_unprepare(spi_st->clk);
- 
- 	return 0;
- }
-@@ -446,7 +420,7 @@ static int spi_st_runtime_resume(struct device *dev)
- 	struct spi_st *spi_st = spi_master_get_devdata(master);
- 	int ret;
- 
--	ret = spi_st_clk_enable(spi_st);
-+	ret = clk_prepare_enable(spi_st->clk);
- 	pinctrl_pm_select_default_state(dev);
- 
- 	return ret;
+-		clk = clk_get(cpu_dev, 0);
++		clk = clk_get(cpu_dev, NULL);
+ 		if (IS_ERR(clk)) {
+ 			pr_err("Cannot get clock for CPU %d\n", cpu);
+ 			return PTR_ERR(clk);
 -- 
-2.8.3
+2.8.1
