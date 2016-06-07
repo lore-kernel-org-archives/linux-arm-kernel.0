@@ -1,76 +1,65 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 16:01:24 +0000
-Subject: [PATCH v10 5/9] genirq/msi-doorbell: msi_doorbell_safe
+Date: Tue,  7 Jun 2016 16:01:26 +0000
+Subject: [PATCH v10 7/9] irqchip/gicv3-its: register the MSI global doorbell
 In-Reply-To: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
 References: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315288-5931-6-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315288-5931-8-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-msi_doorbell_safe returns whether all the registered doorbells
-implement irq_remapping.
+This patch adds the registration of the MSI global doorbell in
+gicv3-its driver.
 
-When assigning a PCIe device whose host controller is upstream to
-an IOMMU, we currently do not know whether the MSI controller is
-upstream or downstream to the IOMMU.
+This will allow the msi layer to iommu_map this doorbell when
+requested.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 ---
- include/linux/msi-doorbell.h | 12 ++++++++++++
- kernel/irq/msi-doorbell.c    | 14 ++++++++++++++
- 2 files changed, 26 insertions(+)
+ drivers/irqchip/irq-gic-v3-its.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/include/linux/msi-doorbell.h b/include/linux/msi-doorbell.h
-index abdaaa0..648f239 100644
---- a/include/linux/msi-doorbell.h
-+++ b/include/linux/msi-doorbell.h
-@@ -65,6 +65,13 @@ msi_doorbell_lookup(void *chip_data);
-  */
- int msi_doorbell_pages(unsigned int order);
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index 5eb1f9e..ed9dfce 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -29,6 +29,8 @@
+ #include <linux/of_platform.h>
+ #include <linux/percpu.h>
+ #include <linux/slab.h>
++#include <linux/iommu.h>
++#include <linux/msi-doorbell.h>
  
-+/**
-+ * msi_doorbell_safe: return whether all registered doorbells
-+ * do implement irq_remapping and are safe to assign (coarse safety
-+ * assessment)
-+ */
-+bool msi_doorbell_safe(void);
+ #include <linux/irqchip.h>
+ #include <linux/irqchip/arm-gic-v3.h>
+@@ -1607,6 +1609,7 @@ static int __init its_probe(struct device_node *node,
+ 
+ 	if (of_property_read_bool(node, "msi-controller")) {
+ 		struct msi_domain_info *info;
++		phys_addr_t translater;
+ 
+ 		info = kzalloc(sizeof(*info), GFP_KERNEL);
+ 		if (!info) {
+@@ -1614,10 +1617,21 @@ static int __init its_probe(struct device_node *node,
+ 			goto out_free_tables;
+ 		}
+ 
++		translater = its->phys_base + GITS_TRANSLATER;
++		err = msi_doorbell_register_global(its, translater,
++						sizeof(u32),
++						IOMMU_WRITE | IOMMU_MMIO, true);
++		if (err)  {
++			kfree(info);
++			goto out_free_tables;
++		}
 +
- #else
- 
- static inline int
-@@ -88,6 +95,11 @@ msi_doorbell_pages(unsigned int order)
- 	return 0;
- }
- 
-+static inline bool
-+msi_doorbell_safe(void)
-+{
-+	return true;
-+}
- #endif /* CONFIG_MSI_DOORBELL */
- 
- #endif
-diff --git a/kernel/irq/msi-doorbell.c b/kernel/irq/msi-doorbell.c
-index 65ca9292..69121c8 100644
---- a/kernel/irq/msi-doorbell.c
-+++ b/kernel/irq/msi-doorbell.c
-@@ -132,3 +132,17 @@ int msi_doorbell_pages(unsigned int order)
- }
- EXPORT_SYMBOL_GPL(msi_doorbell_pages);
- 
-+bool msi_doorbell_safe(void)
-+{
-+	struct irqchip_doorbell *db;
-+	bool irq_remapping = true;
 +
-+	mutex_lock(&irqchip_doorbell_mutex);
-+	list_for_each_entry(db, &irqchip_doorbell_list, next) {
-+		irq_remapping &= db->info.irq_remapping;
-+	}
-+	mutex_unlock(&irqchip_doorbell_mutex);
-+
-+	return irq_remapping;
-+}
-+EXPORT_SYMBOL_GPL(msi_doorbell_safe);
+ 		inner_domain = irq_domain_add_tree(node, &its_domain_ops, its);
+ 		if (!inner_domain) {
+ 			err = -ENOMEM;
+ 			kfree(info);
++			msi_doorbell_unregister(its);
+ 			goto out_free_tables;
+ 		}
+ 
 -- 
 1.9.1
