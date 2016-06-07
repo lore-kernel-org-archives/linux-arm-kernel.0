@@ -1,47 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  7 Jun 2016 22:41:51 +0200
-Subject: [PATCH v2 12/15] clk: sunxi-ng: Add N-K-M Factor clock
+Date: Tue,  7 Jun 2016 22:41:44 +0200
+Subject: [PATCH v2 05/15] clk: sunxi-ng: Add gate clock support
 In-Reply-To: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
 References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160607204154.31967-13-maxime.ripard@free-electrons.com>
+Message-ID: <20160607204154.31967-6-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce support for clocks that multiply and divide using two linear
-multipliers and one linear divider.
+Some clocks in the Allwinner SoCs clocks unit are just simple gates. Add
+support for those clocks.
+
+Since it's a feature that can also be found in more complex clocks, provide
+a bunch of helpers that can be reused later on.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
 ---
-Changes from v1:
-  - Declared the find_best function static
-  - Fixed the set_rate function that was always writing the various factors
-    at the same offset
----
- drivers/clk/sunxi-ng/Makefile  |   1 +
- drivers/clk/sunxi-ng/ccu_nkm.c | 153 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_nkm.h |  70 +++++++++++++++++++
- 3 files changed, 224 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_nkm.h
+ drivers/clk/sunxi-ng/Makefile   |  1 +
+ drivers/clk/sunxi-ng/ccu_gate.c | 82 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_gate.h | 53 ++++++++++++++++++++++++++
+ 3 files changed, 136 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_gate.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_gate.h
 
 diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 5c7ae1ad1082..f157efe076fa 100644
+index c59cf2ea509b..608b332e0b1f 100644
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
-@@ -9,5 +9,6 @@ obj-y += ccu_gate.o
- obj-y += ccu_mp.o
- obj-y += ccu_mux.o
- obj-y += ccu_nk.o
-+obj-y += ccu_nkm.o
- obj-y += ccu_nm.o
- obj-y += ccu_phase.o
-diff --git a/drivers/clk/sunxi-ng/ccu_nkm.c b/drivers/clk/sunxi-ng/ccu_nkm.c
+@@ -4,3 +4,4 @@ obj-y += ccu_reset.o
+ obj-y += ccu_frac.o
+ 
+ obj-y += ccu_fixed_factor.o
++obj-y += ccu_gate.o
+diff --git a/drivers/clk/sunxi-ng/ccu_gate.c b/drivers/clk/sunxi-ng/ccu_gate.c
 new file mode 100644
-index 000000000000..2071822b1e9c
+index 000000000000..1e98f8a33ac3
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_nkm.c
-@@ -0,0 +1,153 @@
++++ b/drivers/clk/sunxi-ng/ccu_gate.c
+@@ -0,0 +1,82 @@
 +/*
 + * Copyright (C) 2016 Maxime Ripard
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -53,154 +48,83 @@ index 000000000000..2071822b1e9c
 + */
 +
 +#include <linux/clk-provider.h>
-+#include <linux/rational.h>
 +
 +#include "ccu_gate.h"
-+#include "ccu_nkm.h"
 +
-+struct _ccu_nkm {
-+	unsigned long	n, max_n;
-+	unsigned long	k, max_k;
-+	unsigned long	m, max_m;
-+};
-+
-+static void ccu_nkm_find_best(unsigned long parent, unsigned long rate,
-+			      struct _ccu_nkm *nkm)
++void ccu_gate_helper_disable(struct ccu_common *common, u32 gate)
 +{
-+	unsigned long best_rate = 0;
-+	unsigned long best_n = 0, best_k = 0, best_m = 0;
-+	unsigned long _n, _k, _m;
-+
-+	for (_k = 1; _k <= nkm->max_k; _k++) {
-+		unsigned long tmp_rate;
-+
-+		rational_best_approximation(rate / _k, parent,
-+					    nkm->max_n, nkm->max_m, &_n, &_m);
-+
-+		tmp_rate = parent * _n * _k / _m;
-+
-+		if (tmp_rate > rate)
-+			continue;
-+
-+		if ((rate - tmp_rate) < (rate - best_rate)) {
-+			best_rate = tmp_rate;
-+			best_n = _n;
-+			best_k = _k;
-+			best_m = _m;
-+		}
-+	}
-+
-+	nkm->n = best_n;
-+	nkm->k = best_k;
-+	nkm->m = best_m;
-+}
-+
-+static void ccu_nkm_disable(struct clk_hw *hw)
-+{
-+	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-+
-+	return ccu_gate_helper_disable(&nkm->common, nkm->enable);
-+}
-+
-+static int ccu_nkm_enable(struct clk_hw *hw)
-+{
-+	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-+
-+	return ccu_gate_helper_enable(&nkm->common, nkm->enable);
-+}
-+
-+static int ccu_nkm_is_enabled(struct clk_hw *hw)
-+{
-+	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-+
-+	return ccu_gate_helper_is_enabled(&nkm->common, nkm->enable);
-+}
-+
-+static unsigned long ccu_nkm_recalc_rate(struct clk_hw *hw,
-+					unsigned long parent_rate)
-+{
-+	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-+	unsigned long n, m, k;
-+	u32 reg;
-+
-+	reg = readl(nkm->common.base + nkm->common.reg);
-+
-+	n = reg >> nkm->n.shift;
-+	n &= (1 << nkm->n.width) - 1;
-+
-+	k = reg >> nkm->k.shift;
-+	k &= (1 << nkm->k.width) - 1;
-+
-+	m = reg >> nkm->m.shift;
-+	m &= (1 << nkm->m.width) - 1;
-+
-+	return parent_rate * (n + 1) * (k + 1) / (m + 1);
-+}
-+
-+static long ccu_nkm_round_rate(struct clk_hw *hw, unsigned long rate,
-+			      unsigned long *parent_rate)
-+{
-+	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-+	struct _ccu_nkm _nkm;
-+
-+	_nkm.max_n = 1 << nkm->n.width;
-+	_nkm.max_k = 1 << nkm->k.width;
-+	_nkm.max_m = 1 << nkm->m.width;
-+
-+	ccu_nkm_find_best(*parent_rate, rate, &_nkm);
-+
-+	return *parent_rate * _nkm.n * _nkm.k / _nkm.m;
-+}
-+
-+static int ccu_nkm_set_rate(struct clk_hw *hw, unsigned long rate,
-+			   unsigned long parent_rate)
-+{
-+	struct ccu_nkm *nkm = hw_to_ccu_nkm(hw);
-+	struct _ccu_nkm _nkm;
 +	unsigned long flags;
 +	u32 reg;
 +
-+	_nkm.max_n = 1 << nkm->n.width;
-+	_nkm.max_k = 1 << nkm->k.width;
-+	_nkm.max_m = 1 << nkm->m.width;
++	if (!(common->features & CCU_FEATURE_GATE))
++		return;
 +
-+	ccu_nkm_find_best(parent_rate, rate, &_nkm);
++	spin_lock_irqsave(common->lock, flags);
 +
-+	spin_lock_irqsave(nkm->common.lock, flags);
++	reg = readl(common->base + common->reg);
++	writel(reg & ~gate, common->base + common->reg);
 +
-+	reg = readl(nkm->common.base + nkm->common.reg);
-+	reg &= ~GENMASK(nkm->n.width + nkm->n.shift - 1, nkm->n.shift);
-+	reg &= ~GENMASK(nkm->k.width + nkm->k.shift - 1, nkm->k.shift);
-+	reg &= ~GENMASK(nkm->m.width + nkm->m.shift - 1, nkm->m.shift);
++	spin_unlock_irqrestore(common->lock, flags);
++}
 +
-+	reg |= (_nkm.n - 1) << nkm->n.shift;
-+	reg |= (_nkm.k - 1) << nkm->k.shift;
-+	reg |= (_nkm.m - 1) << nkm->m.shift;
++static void ccu_gate_disable(struct clk_hw *hw)
++{
++	struct ccu_gate *cg = hw_to_ccu_gate(hw);
 +
-+	writel(reg, nkm->common.base + nkm->common.reg);
++	return ccu_gate_helper_disable(&cg->common, cg->enable);
++}
 +
-+	spin_unlock_irqrestore(nkm->common.lock, flags);
++int ccu_gate_helper_enable(struct ccu_common *common, u32 gate)
++{
++	unsigned long flags;
++	u32 reg;
 +
-+	ccu_helper_wait_for_lock(&nkm->common, nkm->lock);
++	if (!(common->features & CCU_FEATURE_GATE))
++		return 0;
++
++	spin_lock_irqsave(common->lock, flags);
++
++	reg = readl(common->base + common->reg);
++	writel(reg | gate, common->base + common->reg);
++
++	spin_unlock_irqrestore(common->lock, flags);
 +
 +	return 0;
 +}
 +
-+const struct clk_ops ccu_nkm_ops = {
-+	.disable	= ccu_nkm_disable,
-+	.enable		= ccu_nkm_enable,
-+	.is_enabled	= ccu_nkm_is_enabled,
++static int ccu_gate_enable(struct clk_hw *hw)
++{
++	struct ccu_gate *cg = hw_to_ccu_gate(hw);
 +
-+	.recalc_rate	= ccu_nkm_recalc_rate,
-+	.round_rate	= ccu_nkm_round_rate,
-+	.set_rate	= ccu_nkm_set_rate,
++	return ccu_gate_helper_enable(&cg->common, cg->enable);
++}
++
++int ccu_gate_helper_is_enabled(struct ccu_common *common, u32 gate)
++{
++	if (!(common->features & CCU_FEATURE_GATE))
++		return 1;
++
++	return readl(common->base + common->reg) & gate;
++}
++
++static int ccu_gate_is_enabled(struct clk_hw *hw)
++{
++	struct ccu_gate *cg = hw_to_ccu_gate(hw);
++
++	return ccu_gate_helper_is_enabled(&cg->common, cg->enable);
++}
++
++const struct clk_ops ccu_gate_ops = {
++	.disable	= ccu_gate_disable,
++	.enable		= ccu_gate_enable,
++	.is_enabled	= ccu_gate_is_enabled,
 +};
-diff --git a/drivers/clk/sunxi-ng/ccu_nkm.h b/drivers/clk/sunxi-ng/ccu_nkm.h
+diff --git a/drivers/clk/sunxi-ng/ccu_gate.h b/drivers/clk/sunxi-ng/ccu_gate.h
 new file mode 100644
-index 000000000000..b2b7a2a6c90e
+index 000000000000..8e15fa17bcc1
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_nkm.h
-@@ -0,0 +1,70 @@
++++ b/drivers/clk/sunxi-ng/ccu_gate.h
+@@ -0,0 +1,53 @@
 +/*
 + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
 + *
@@ -214,62 +138,45 @@ index 000000000000..b2b7a2a6c90e
 + * GNU General Public License for more details.
 + */
 +
-+#ifndef _CCU_NKM_H_
-+#define _CCU_NKM_H_
++#ifndef _CCU_GATE_H_
++#define _CCU_GATE_H_
 +
 +#include <linux/clk-provider.h>
 +
 +#include "ccu_common.h"
-+#include "ccu_div.h"
-+#include "ccu_mult.h"
 +
-+/*
-+ * struct ccu_nkm - Definition of an N-K-M clock
-+ *
-+ * Clocks based on the formula parent * N * K / M
-+ */
-+struct ccu_nkm {
++struct ccu_gate {
 +	u32			enable;
-+	u32			lock;
-+
-+	struct _ccu_mult	n;
-+	struct _ccu_mult	k;
-+	struct _ccu_div		m;
 +
 +	struct ccu_common	common;
 +};
 +
-+#define SUNXI_CCU_NKM_WITH_GATE_LOCK(_struct, _name, _parent, _reg,	\
-+				     _nshift, _nwidth,			\
-+				     _kshift, _kwidth,			\
-+				     _mshift, _mwidth,			\
-+				     _gate, _lock, _flags)		\
-+	struct ccu_nkm _struct = {					\
-+		.enable		= _gate,				\
-+		.lock		= _lock,				\
-+		.k		= _SUNXI_CCU_MULT(_kshift, _kwidth),	\
-+		.n		= _SUNXI_CCU_MULT(_nshift, _nwidth),	\
-+		.m		= _SUNXI_CCU_DIV(_mshift, _mwidth),	\
-+		.common		= {					\
++#define SUNXI_CCU_GATE(_struct, _name, _parent, _reg, _gate, _flags)	\
++	struct ccu_gate _struct = {					\
++		.enable	= _gate,					\
++		.common	= {						\
 +			.reg		= _reg,				\
-+			.features	= (CCU_FEATURE_GATE |		\
-+					   CCU_FEATURE_PLL_LOCK),	\
++			.features	= CCU_FEATURE_GATE,		\
 +			.hw.init	= SUNXI_HW_INIT(_name,		\
 +							_parent,	\
-+							&ccu_nkm_ops,	\
++							&ccu_gate_ops,	\
 +							_flags),	\
-+		},							\
++		}							\
 +	}
 +
-+static inline struct ccu_nkm *hw_to_ccu_nkm(struct clk_hw *hw)
++static inline struct ccu_gate *hw_to_ccu_gate(struct clk_hw *hw)
 +{
 +	struct ccu_common *common = hw_to_ccu_common(hw);
 +
-+	return container_of(common, struct ccu_nkm, common);
++	return container_of(common, struct ccu_gate, common);
 +}
 +
-+extern const struct clk_ops ccu_nkm_ops;
++void ccu_gate_helper_disable(struct ccu_common *common, u32 gate);
++int ccu_gate_helper_enable(struct ccu_common *common, u32 gate);
++int ccu_gate_helper_is_enabled(struct ccu_common *common, u32 gate);
 +
-+#endif /* _CCU_NKM_H_ */
++extern const struct clk_ops ccu_gate_ops;
++
++#endif /* _CCU_GATE_H_ */
 -- 
 2.8.3
