@@ -1,68 +1,57 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Tue, 7 Jun 2016 22:50:12 +0530
-Subject: [PATCH 1/3] Documentation: dtb: xgene: Add hwmon dts binding
- documentation
-In-Reply-To: <CAFHUOYyYt8pE6sggezCR=TFcsimcjakbYmcWFtpLyQ3Et_gZaA@mail.gmail.com>
-References: <1463415447-29903-1-git-send-email-hotran@apm.com>
- <1463415447-29903-2-git-send-email-hotran@apm.com>
- <20160523203044.GA17450@rob-hp-laptop>
- <CAFHUOYyYt8pE6sggezCR=TFcsimcjakbYmcWFtpLyQ3Et_gZaA@mail.gmail.com>
-Message-ID: <CABb+yY3uFrknEU65aBCw7G+dfnDdqGTZ_sctktx03GM9b86xaA@mail.gmail.com>
+From: mamlinav@gmail.com (Aleksei Mamlin)
+Date: Tue, 7 Jun 2016 20:21:55 +0300
+Subject: [PATCH 4/7] ARM: dts: sun7i: Add NFC node to Allwinner A20 SoC
+In-Reply-To: <1465208664-9366-5-git-send-email-mamlinav@gmail.com>
+References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
+ <1465208664-9366-5-git-send-email-mamlinav@gmail.com>
+Message-ID: <20160607202155.a86cec11c48fc6c89b280eda@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2016 at 6:31 AM, Hoan Tran <hotran@apm.com> wrote:
-> Hi Rob,
->
-> Thanks for your review !
->
-> On Mon, May 23, 2016 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
->>
->> On Mon, May 16, 2016 at 09:17:25AM -0700, Hoan Tran wrote:
->> > This patch adds the APM X-Gene hwmon device tree node documentation.
->> >
->> > Signed-off-by: Hoan Tran <hotran@apm.com>
->> > ---
->> >  .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt          | 14 ++++++++++++++
->> >  1 file changed, 14 insertions(+)
->> >  create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
->> >
->> > diff --git a/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
->> > new file mode 100644
->> > index 0000000..49a482e
->> > --- /dev/null
->> > +++ b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
->> > @@ -0,0 +1,14 @@
->> > +APM X-Gene hwmon driver
->> > +
->> > +Hwmon driver accesses sensors over the "SLIMpro" mailbox.
->>
->> DT bindings describe h/w, not driver data.
-> How about this description: "APM X-Gene SOC sensors are accessed over
-> the "SLIMpro" mailbox" ?
->> I'm not sure this belongs in
->> DT and perhaps the devices for the mailbox should be created by the
->> mailbox driver.
-> I don't think the current mailbox supports it.
->>
->> > +
->> > +Required properties :
->> > + - compatible : should be "apm,xgene-slimpro-hwmon"
->> > + - mboxes : use the label reference for the mailbox as the first parameter.
->> > +         The second parameter is the channel number.
->>
->> When do you expect this to be different mailbox numbers?
-> No, this number is not changed. This "mboxes" property is used and
-> required by mailbox.c when hwmon driver requests a mailbox channel
->
-I think that's inaccurate.
+On Mon,  6 Jun 2016 13:24:21 +0300
+Aleksei Mamlin <mamlinav@gmail.com> wrote:
 
-The h/w and the firmware combined is the "platform" from Linux POV.
-Channels are physical resources provided by a mailbox controller.
-Currently the firmware listens on Channel-7 but some future revision
-might switch to, say, Channel-9.  Or say the same firmware on next
-revision of h/w may have to switch to Channel-3 because it has only 4
-channels. So I see the mailbox channel number as a hardware property
-just like an IRQ (which very often change with SoC iterations).
+> From: Boris Brezillon <boris.brezillon@free-electrons.com>
+> 
+> Add NAND Flash controller node definition to the A20 SoC.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 11 +++++++++++
+>  1 file changed, 11 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 915979f..e473570 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -826,6 +826,17 @@
+>  			#size-cells = <0>;
+>  		};
+>  
+> +		nfc: nand at 01c03000 {
+> +			compatible = "allwinner,sun4i-a10-nand";
+> +			reg = <0x01c03000 0x1000>;
+> +			interrupts = <37>;
 
-Cheers.
+Should be
+			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
+
+> +			clocks = <&ahb_gates 13>, <&nand_clk>;
+> +			clock-names = "ahb", "mod";
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			status = "disabled";
+> +		};
+> +
+>  		emac: ethernet at 01c0b000 {
+>  			compatible = "allwinner,sun4i-a10-emac";
+>  			reg = <0x01c0b000 0x1000>;
+> -- 
+> 2.7.3
+> 
+
+
+-- 
+Thanks and regards,
+Aleksei Mamlin
