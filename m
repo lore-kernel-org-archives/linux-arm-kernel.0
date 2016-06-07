@@ -1,44 +1,48 @@
-From: hongtao.jia@nxp.com (Jia Hongtao)
-Date: Tue, 7 Jun 2016 11:27:34 +0800
-Subject: [PATCH V2 1/7] dt-bindings: Update QorIQ TMU thermal bindings
-Message-ID: <1465270054-31512-1-git-send-email-hongtao.jia@nxp.com>
+From: dave.long@linaro.org (David Long)
+Date: Mon, 6 Jun 2016 23:52:35 -0400
+Subject: [PATCH v13 04/10] arm64: Blacklist non-kprobe-able symbol
+In-Reply-To: <20160604124032.94ac1bb76fde6c661e1a47a5@kernel.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-5-git-send-email-dave.long@linaro.org>
+ <20160604124032.94ac1bb76fde6c661e1a47a5@kernel.org>
+Message-ID: <57564503.8080304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For different types of SoC the sensor id and endianness may vary.
-"#thermal-sensor-cells" is used to provide sensor id information.
-"little-endian" property is to tell the endianness of TMU.
+On 06/03/2016 11:40 PM, Masami Hiramatsu wrote:
+> Hi David,
+>
+> On Thu,  2 Jun 2016 23:26:18 -0400
+> David Long <dave.long@linaro.org> wrote:
+>
+>> From: Pratyush Anand <panand@redhat.com>
+>>
+>> Add all function symbols which are called from do_debug_exception under
+>> NOKPROBE_SYMBOL, as they can not kprobed.
+>
+> I see, but this patch should be applied after kprobes
+> are implemented on arm64.
+>
+> And also, I have a comment below.
+>
+>> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+>> index 5954881..4359ca8 100644
+>> --- a/arch/arm64/mm/fault.c
+>> +++ b/arch/arm64/mm/fault.c
+>> @@ -563,6 +563,7 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
+>>   	info.si_addr  = (void __user *)addr;
+>>   	arm64_notify_die("Oops - SP/PC alignment exception", regs, &info, esr);
+>>   }
+>> +NOKPROBE_SYMBOL(do_debug_exception)
+>
+> This seems at wrong place. Please correct it in this patch.
+>
+> Thank you,
+>
 
-Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
----
-Changes for V2:
-* Remove formatting chnages.
 
- Documentation/devicetree/bindings/thermal/qoriq-thermal.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+Hmm, yeah not sure how that happened.  It gets fixed in the next patch 
+but it shouldn't be like this.
 
-diff --git a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
-index 66223d5..20ca4ef 100644
---- a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
-@@ -17,6 +17,12 @@ Required properties:
- 	calibration data, as specified by the SoC reference manual.
- 	The first cell of each pair is the value to be written to TTCFGR,
- 	and the second is the value to be written to TSCFGR.
-+- #thermal-sensor-cells : Must be 1. The sensor specifier is the monitoring
-+	site ID, and represents the "n" in TRITSRn and TRATSRn.
-+
-+Optional property:
-+- little-endian : If present, the TMU registers are little endian. If absent,
-+	the default is big endian.
-
- Example:
-
-@@ -60,4 +66,5 @@ tmu at f0000 {
-
- 			       0x00030000 0x00000012
- 			       0x00030001 0x0000001d>;
-+	#thermal-sensor-cells = <1>;
- };
---
-2.1.0.27.g96db324
+Thanks,
+-dl
