@@ -1,56 +1,15 @@
-From: jesper.nilsson@axis.com (Jesper Nilsson)
-Date: Tue, 7 Jun 2016 10:04:30 +0200
-Subject: [PATCH v12 01/15] PCI: Let pci_mmap_page_range() take extra
- resource pointer
-In-Reply-To: <20160604000642.28162-2-yinghai@kernel.org>
-References: <20160604000642.28162-1-yinghai@kernel.org>
- <20160604000642.28162-2-yinghai@kernel.org>
-Message-ID: <20160607080430.GI3183@axis.com>
+From: itaru.kitayama@riken.jp (Itaru Kitayama)
+Date: Tue, 7 Jun 2016 17:06:39 +0900
+Subject: v4.7-rc2 kernel fails to boot when acpi=force
+Message-ID: <125b057c-647b-9db7-11b4-4b7123e4b80a@riken.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 05:06:28PM -0700, Yinghai Lu wrote:
-> This one is preparing patch for next one:
->   PCI: Let pci_mmap_page_range() take resource addr
-> 
-> We need to pass extra resource pointer to avoid searching that again
-> for powerpc and microblaze prot set operation.
-> 
-> Signed-off-by: Yinghai Lu <yinghai@kernel.org>
-> Cc: linux-arm-kernel at lists.infradead.org
+Upstream v4.7-rc2 kernel does not boot if parameter acpi is set to force
+on Overdrive. (acpi=off gets to the prompt)
+When set to force it doesn't get to the Linux boot process and stalls.
 
-For the CRIS part:
+Here's the BIOS info:
 
-Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
-
-> diff --git a/arch/cris/arch-v32/drivers/pci/bios.c b/arch/cris/arch-v32/drivers/pci/bios.c
-> index 64a5fb9..082efb9 100644
-> --- a/arch/cris/arch-v32/drivers/pci/bios.c
-> +++ b/arch/cris/arch-v32/drivers/pci/bios.c
-> @@ -14,7 +14,8 @@ void pcibios_set_master(struct pci_dev *dev)
->  	pci_write_config_byte(dev, PCI_LATENCY_TIMER, lat);
->  }
->  
-> -int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> +int pci_mmap_page_range(struct pci_dev *dev, struct resource *res,
-> +			struct vm_area_struct *vma,
->  			enum pci_mmap_state mmap_state, int write_combine)
->  {
->  	unsigned long prot;
-> diff --git a/arch/cris/include/asm/pci.h b/arch/cris/include/asm/pci.h
-> index b1b289d..65198cb 100644
-> --- a/arch/cris/include/asm/pci.h
-> +++ b/arch/cris/include/asm/pci.h
-> @@ -42,9 +42,6 @@ struct pci_dev;
->  #define PCI_DMA_BUS_IS_PHYS	(1)
->  
->  #define HAVE_PCI_MMAP
-> -extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
-> -			       enum pci_mmap_state mmap_state, int write_combine);
-> -
->  
->  #endif /* __KERNEL__ */
-
-/^JN - Jesper Nilsson
--- 
-               Jesper Nilsson -- jesper.nilsson at axis.com
+Version 2.17.1249. Copyright (C) 2015 American Megatrends, Inc.
+BIOS Date: 09/03/2015 13:52:32 Ver: ROD0084E00
