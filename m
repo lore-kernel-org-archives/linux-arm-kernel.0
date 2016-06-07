@@ -1,75 +1,40 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 16:03:49 +0000
-Subject: [PATCH v10 4/8] vfio/type1: handle unmap/unpin and replay for
- VFIO_IOVA_RESERVED slots
-In-Reply-To: <1465315433-5974-1-git-send-email-eric.auger@redhat.com>
-References: <1465315433-5974-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315433-5974-5-git-send-email-eric.auger@redhat.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue,  7 Jun 2016 18:04:10 +0200
+Subject: [PATCH v2 0/2] clocksource: Add support for Oxford Semiconductor RPS
+ Dual Timer
+Message-ID: <1465315452-20599-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before allowing the end-user to create VFIO_IOVA_RESERVED dma slots,
-let's implement the expected behavior for removal and replay.
+Adds driver for the Oxford Semiconductor RPS Dual Timer as base of the OX810SE
+clock tick event and sched clock source.
 
-As opposed to user dma slots, reserved IOVAs are not systematically bound
-to PAs and PAs are not pinned. VFIO just initializes the IOVA "aperture".
-IOVAs are allocated outside of the VFIO framework, by the MSI layer which
-is responsible to free and unmap them. The MSI mapping resources are freeed
-by the IOMMU driver on domain destruction.
+This driver was posted with the initial OX810SE platform patchset at :
+http://lkml.kernel.org/r/1457005210-18485-5-git-send-email-narmstrong at baylibre.com
+and
+http://lkml.kernel.org/r/1457005210-18485-6-git-send-email-narmstrong at baylibre.com
 
-On the creation of a new domain, the "replay" of a reserved slot simply
-needs to set the MSI aperture on the new domain.
+But since the SP804 was very similar, I decided to adapt it for OX810SE usage.
+For some reasons, the SP804 has a lot of legacy code for non-dt, non-multiarch
+platforms and needs a complete rewrite.
+For now, this adds a dedicated driver with the same bindings as intended for SP804.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Changes since v1 at http://lkml.kernel.org/r/1464688198-9655-1-git-send-email-narmstrong at baylibre.com :
+- fix timer_shutdown behaviour
+- clean up period calculation
 
----
+Neil Armstrong (2):
+  clocksource: Add Oxford Semiconductor RPS Dual Timer
+  dt-bindings: clocksource: Add Add Oxford Semiconductor RPS Timer
+    bindings
 
-v9 -> v10:
-- replay of a reserved slot sets the MSI aperture on the new domain
-- use VFIO_IOVA_RESERVED_MSI enum value instead of VFIO_IOVA_RESERVED
+ .../devicetree/bindings/timer/oxsemi,rps-timer.txt |  17 ++
+ drivers/clocksource/Kconfig                        |   6 +
+ drivers/clocksource/Makefile                       |   1 +
+ drivers/clocksource/timer-oxnas-rps.c              | 270 +++++++++++++++++++++
+ 4 files changed, 294 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/timer/oxsemi,rps-timer.txt
+ create mode 100644 drivers/clocksource/timer-oxnas-rps.c
 
-v7 -> v8:
-- do no destroy anything anymore, just bypass unmap/unpin and iommu_map
-  on replay
----
- drivers/vfio/vfio_iommu_type1.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 65a4038..69c775e 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -36,6 +36,7 @@
- #include <linux/uaccess.h>
- #include <linux/vfio.h>
- #include <linux/workqueue.h>
-+#include <linux/msi-iommu.h>
- 
- #define DRIVER_VERSION  "0.2"
- #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-@@ -387,7 +388,7 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
- 	struct vfio_domain *domain, *d;
- 	long unlocked = 0;
- 
--	if (!dma->size)
-+	if (!dma->size || dma->type != VFIO_IOVA_USER)
- 		return;
- 	/*
- 	 * We use the IOMMU to track the physical addresses, otherwise we'd
-@@ -724,6 +725,14 @@ static int vfio_iommu_replay(struct vfio_iommu *iommu,
- 		dma = rb_entry(n, struct vfio_dma, node);
- 		iova = dma->iova;
- 
-+		if (dma->type == VFIO_IOVA_RESERVED_MSI) {
-+			ret = iommu_msi_set_aperture(domain->domain,
-+						     dma->iova,
-+						     iova + dma->size - 1);
-+			WARN_ON(ret);
-+			continue;
-+		}
-+
- 		while (iova < dma->iova + dma->size) {
- 			phys_addr_t phys = iommu_iova_to_phys(d->domain, iova);
- 			size_t size;
 -- 
 1.9.1
