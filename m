@@ -1,61 +1,41 @@
 From: briannorris@chromium.org (Brian Norris)
-Date: Tue, 7 Jun 2016 10:25:22 -0700
-Subject: [PATCH 03/14] pwm: rockchip: Fix period and duty_cycle
- approximation
-In-Reply-To: <20160604081955.47393878@bbrezillon>
+Date: Tue, 7 Jun 2016 10:26:19 -0700
+Subject: [PATCH 04/14] pwm: rockchip: Add support for hardware readout
+In-Reply-To: <20160604082426.493b220d@bbrezillon>
 References: <1464942192-25967-1-git-send-email-boris.brezillon@free-electrons.com>
- <1464942192-25967-4-git-send-email-boris.brezillon@free-electrons.com>
- <20160603200326.GA124478@google.com>
- <20160604081955.47393878@bbrezillon>
-Message-ID: <20160607172522.GA130037@google.com>
+ <1464942192-25967-5-git-send-email-boris.brezillon@free-electrons.com>
+ <20160603202006.GC124478@google.com>
+ <20160604082426.493b220d@bbrezillon>
+Message-ID: <20160607172619.GB130037@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 04, 2016 at 08:19:55AM +0200, Boris Brezillon wrote:
-> On Fri, 3 Jun 2016 13:03:26 -0700
-> Brian Norris <briannorris@chromium.org> wrote:
+On Sat, Jun 04, 2016 at 08:24:26AM +0200, Boris Brezillon wrote:
+> On Fri, 3 Jun 2016 13:20:06 -0700 Brian Norris <briannorris@chromium.org> wrote:
+> > On Fri, Jun 03, 2016 at 10:23:02AM +0200, Boris Brezillon wrote:
+> > > @@ -75,6 +77,19 @@ static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip,
+> > >  	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+> > >  }
+> > >  
+> > > +static void rockchip_pwm_get_state_v1(struct pwm_chip *chip,
+> > > +				      struct pwm_device *pwm,
+> > > +				      struct pwm_state *state)
+> > > +{
+> > > +	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
+> > > +	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
+> > > +	u32 val;
+> > > +
+> > > +	val = readl(pc->base + pc->data->regs.ctrl);  
+> > 
+> > Nit: I just noticed you've been starting to use readl()/writel() in this
+> > series, where previously {readl,writel}_relaxed() were being used. Any
+> > reason?
 > 
-> > On Fri, Jun 03, 2016 at 10:23:01AM +0200, Boris Brezillon wrote:
-> > > The current implementation always round down the duty and period
-> > > values, while it would be better to round them to the closest integer.  
-> > 
-> > Agreed. As I noted to you elsewhere, not having this change can cause
-> > problems where doing a series of pwm_get_state() / modify /
-> > pwm_apply_state() will propagate rounding errors, which will change the
-> > period unexpectedly. e.g., I have an expected period of 3.333 us and a
-> > clk rate of 112.666667 MHz -- the clock frequency doesn't divide evenly,
-> > so the period (stashed in nanoseconds) shrinks when we convert to the
-> > register value and back, as follows:
-> > 
-> >  pwm_apply_state(): register = period * 112666667 / 1000000000;
-> >  pwm_get_state(): period = register * 1000000000 / 112666667;
-> > 
-> > or in other words:
-> > 
-> >  period = period * 112666667 / 1000000000 * 1000000000 / 112666667;
-> > 
-> > which yields a sequence like:
-> > 
-> >  3333 -> 3328
-> >  3328 -> 3319
-> >  3319 -> 3310
-> >  3310 -> 3301
-> >  3301 -> 3292
-> >  3292 -> ... (etc) ...
-> > 
-> > With this patch, we'd see instead:
-> > 
-> >  period = div_round_closest(period * 112666667, 1000000000) * 1000000000 / 112666667;
-> > 
-> > which yields a stable sequence:
-> > 
-> >  3333 -> 3337
-> >  3337 -> 3337
-> >  3337 -> ... (etc) ...
-> 
-> Woh! Thanks for the detailed explanation. Do you want me to put that in
-> a comment explaining why we're using DIV_ROUND_CLOSEST_ULL()?
+> Because I'm lazy and usually don't take the time to think whether it's
+> safe of not to use the _relaxed() versions :-). Not sure you'll have a
+> noticeable improvement by using _relaxed() for a PWM device by the
+> way, but I can change that ;-).
 
-If you'd like, feel free to add some of this to your v2 description.
+I just figured consistency would be nice.
 
 Brian
