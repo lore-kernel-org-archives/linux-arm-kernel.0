@@ -1,113 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Jun 2016 14:22:24 +0100
-Subject: [PATCH 2/3] Documentation: add DT bindings for ARM SCPI power
- domains
-In-Reply-To: <1465228439-13457-3-git-send-email-sudeep.holla@arm.com>
-References: <1465228439-13457-1-git-send-email-sudeep.holla@arm.com>
- <1465228439-13457-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160607132223.GG2633@leverpostej>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 07 Jun 2016 15:22:58 +0200
+Subject: next-20160607 build: 2 failures 9 warnings (next-20160607)
+In-Reply-To: <20160607105823.GT7510@sirena.org.uk>
+References: <E1bABXS-0001YX-Cz@optimist> <20160607105823.GT7510@sirena.org.uk>
+Message-ID: <5756CAB2.5030701@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2016 at 04:53:58PM +0100, Sudeep Holla wrote:
-> The System Control Processor (SCP) provides peripheral devices with
-> power domains that can be enabled and disabled viathe System Control
-> and Power Interface (SCPI) Message Protocol. Add bindings to allow
-> probing of these device power domians.
+On 06/07/2016 12:58 PM, Mark Brown wrote:
+> On Tue, Jun 07, 2016 at 08:35:02AM +0100, Build bot for Mark Brown wrote:
 > 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/arm,scpi.txt | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
+> Today's -next fails to build an arm64 allmodconfig due to:
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> index 313dabdc14f9..7141670d649b 100644
-> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> @@ -87,10 +87,33 @@ SCPI provides an API to access the various sensors on the SoC.
->  			 implementation for the IDs to use. For Juno
->  			 R0 and Juno R1 refer to [3].
+>> 	arm64-allmodconfig
+>> ../drivers/media/platform/s5p-mfc/s5p_mfc_iommu.h:19:27: fatal error: asm/dma-iommu.h: No such file or directory
 > 
-> +Power domain bindings for the power domains based on SCPI Message Protocol
-> +------------------------------------------------------------
-> +
-> +This binding uses the generic power domain binding[4].
-> +
-> +PM domain providers
-> +===================
-> +
-> +Required properties:
-> + - #power-domain-cells : Should be 1. Contains the device or the power
-> +			 domain ID value used by SCPI commands.
-> + - num-domains: Total number of power domains provided by SCPI. This is
-> +		needed as the SCPI message protocol lacks a mechanism to
-> +		query this information runtime.
-                                      ^
-I guess there should be an 'at' here.
+> introduced by 04f776734c4e (media: s5p-mfc: add iommu support) which
+> relies on a header which is only available on 32 bit ARM.  I suspect the
+> driver should be using linux/dma-iommu.h instead.
 
-Are domain IDs zero-based and definitely non-sparse?
+Since the mfc topic branch got already pulled to the samsung-soc tree,
+as discussed in other thread [1], there is a build break in -next.
+There is a patch to fix this issue and to include it in next, as we
+agreed  on irc, could you please pull this branch into your "for-next"
+tree:
 
-What exactly does this matter for? Just for validation at parsing time,
-or is this strictly required for correctness?
+git://linuxtv.org/snawrocki/samsung.git for-v4.8/media/exynos-mfc
 
-If we send a command with an invalid domain ID, would the FW reliably
-report an error that we can recover from?
+and then apply that patch [2] ?
+"media: s5p-mfc: fix compilation issue on archs other than ARM (32bit)"
 
-Otherwise, this looks ok. I'd just like to make sure I've understood
-correctly.
-
+-- 
 Thanks,
-Mark.
+Sylwester
 
-> +
-> +PM domain consumers
-> +===================
-> +
-> +Required properties:
-> + - power-domains : A phandle and PM domain specifier as defined by bindings of
-> +                   the power controller specified by phandle.
-> +
->  [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
->  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
->  [2] Documentation/devicetree/bindings/thermal/thermal.txt
->  [3] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/apas03s22.html
-> +[4] Documentation/devicetree/bindings/power/power_domain.txt
-> 
->  Example:
-> 
-> @@ -144,6 +167,12 @@ scpi_protocol: scpi at 2e000000 {
->  		compatible = "arm,scpi-sensors";
->  		#thermal-sensor-cells = <1>;
->  	};
-> +
-> +	scpi_devpd: scpi-power-domains {
-> +		compatible = "arm,scpi-power-domains";
-> +		num-domains = <2>;
-> +		#power-domain-cells = <1>;
-> +	};
->  };
-> 
->  cpu at 0 {
-> @@ -156,6 +185,7 @@ hdlcd at 7ff60000 {
->  	...
->  	reg = <0 0x7ff60000 0 0x1000>;
->  	clocks = <&scpi_clk 4>;
-> +	power-domains = <&scpi_devpd 1>;
->  };
-> 
->  thermal-zones {
-> @@ -186,3 +216,7 @@ The thermal-sensors property in the soc_thermal node uses the
->  temperature sensor provided by SCP firmware to setup a thermal
->  zone. The ID "3" is the sensor identifier for the temperature sensor
->  as used by the firmware.
-> +
-> +The num-domains property in scpi-power-domains domain specifies that
-> +SCPI provides 2 power domains. The hdlcd node uses the power domain with
-> +domain ID 1.
-> --
-> 2.7.4
-> 
+[1] https://patchwork.linuxtv.org/patch/34495
+[2] https://patchwork.linuxtv.org/patch/34515
