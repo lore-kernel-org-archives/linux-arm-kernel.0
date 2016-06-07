@@ -1,33 +1,156 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Jun 2016 23:24:19 +0200
-Subject: [PATCH 1/3] ARM: dts: sun4i: The blue led on the Mele A1000 is a
- power led
-In-Reply-To: <1465129393-22379-1-git-send-email-hdegoede@redhat.com>
-References: <1465129393-22379-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160607212419.GE14179@lukather>
+Date: Tue, 7 Jun 2016 23:25:45 +0200
+Subject: [PATCH 1/2] ARM: dts: sun6i: Add pmic / regulator nodes to Mele
+ A1000G quad dts
+In-Reply-To: <0a42bc82-83f2-80ce-93d4-a85c5ce69e24@redhat.com>
+References: <1465133880-22921-1-git-send-email-hdegoede@redhat.com>
+ <CAGb2v67Jo6MO7bp4JdV4hXrB4T60z4=ROkvAvE1i7dhAXk_UtQ@mail.gmail.com>
+ <0a42bc82-83f2-80ce-93d4-a85c5ce69e24@redhat.com>
+Message-ID: <20160607212545.GF14179@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 05, 2016 at 02:23:11PM +0200, Hans de Goede wrote:
-> The blue led on the Mele A1000 is wired to light up as soon as the board
-> has powered (it will be on while the gpio is still in input / floating
-> mode), also its location on the top-set box clearly signals "power led".
+On Mon, Jun 06, 2016 at 09:23:36AM +0200, Hans de Goede wrote:
+> Hi,
 > 
-> Until now we've been treating this as a generic usr function led, which
-> means that when you plug power into the top-set box, the power-led lights
-> and then turns off as soon as the kernel loads, which looks wrong.
+> On 06-06-16 09:12, Chen-Yu Tsai wrote:
+> >On Sun, Jun 5, 2016 at 9:37 PM, Hans de Goede <hdegoede@redhat.com> wrote:
+> >>Add pmic / regulator nodes to Mele A1000G quad dts.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >> arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts | 88 +++++++++++++++++++++++-
+> >> 1 file changed, 87 insertions(+), 1 deletion(-)
+> >>
+> >>diff --git a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
+> >>index e063dab..9782113 100644
+> >>--- a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
+> >>+++ b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
+> >>@@ -72,6 +72,10 @@
+> >>        };
+> >> };
+> >>
+> >>+&cpu0 {
+> >>+       cpu-supply = <&reg_dcdc3>;
+> >>+};
+> >>+
+> >> &ehci0 {
+> >>        status = "okay";
+> >> };
+> >>@@ -85,6 +89,7 @@
+> >>        pinctrl-0 = <&gmac_pins_mii_a>;
+> >>        phy = <&phy1>;
+> >>        phy-mode = "mii";
+> >>+       phy-supply = <&reg_dldo1>;
+> >>        status = "okay";
+> >>
+> >>        phy1: ethernet-phy at 1 {
+> >>@@ -101,13 +106,26 @@
+> >> &mmc0 {
+> >>        pinctrl-names = "default";
+> >>        pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
+> >>-       vmmc-supply = <&reg_vcc3v3>;
+> >>+       vmmc-supply = <&reg_dcdc1>;
+> >>        bus-width = <4>;
+> >>        cd-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
+> >>        cd-inverted;
+> >>        status = "okay";
+> >> };
+> >>
+> >>+&p2wi {
+> >>+       status = "okay";
+> >>+
+> >>+       axp22x: pmic at 68 {
+> >>+               compatible = "x-powers,axp221";
+> >>+               reg = <0x68>;
+> >>+               interrupt-parent = <&nmi_intc>;
+> >>+               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+> >>+       };
+> >>+};
+> >>+
+> >>+#include "axp22x.dtsi"
+> >>+
+> >> &pio {
+> >>        led_pins_m9: led_pins at 0 {
+> >>                allwinner,pins = "PH13";
+> >>@@ -131,6 +149,73 @@
+> >>        };
+> >> };
+> >>
+> >>+&reg_aldo1 {
+> >>+       regulator-min-microvolt = <3300000>;
+> >>+       regulator-max-microvolt = <3300000>;
+> >>+       regulator-name = "vcc-wifi";
+> >>+};
+> >>+
+> >>+&reg_aldo3 {
+> >>+       regulator-always-on;
+> >>+       regulator-min-microvolt = <2700000>;
+> >>+       regulator-max-microvolt = <3300000>;
+> >>+       regulator-name = "avcc";
+> >>+};
+> >>+
+> >>+&reg_dc5ldo {
+> >>+       regulator-always-on;
+> >>+       regulator-min-microvolt = <700000>;
+> >>+       regulator-max-microvolt = <1320000>;
+> >>+       regulator-name = "vdd-cpus"; /* This is an educated guess */
+> >>+};
+> >>+
+> >>+&reg_dcdc1 {
+> >>+       regulator-always-on;
+> >>+       regulator-min-microvolt = <3300000>;
+> >>+       regulator-max-microvolt = <3300000>;
+> >>+       regulator-name = "vcc-3v3";
+> >>+};
+> >>+
+> >>+&reg_dcdc2 {
+> >>+       regulator-min-microvolt = <700000>;
+> >>+       regulator-max-microvolt = <1320000>;
+> >>+       regulator-name = "vdd-gpu";
+> >>+};
+> >>+
+> >>+&reg_dcdc3 {
+> >>+       regulator-always-on;
+> >>+       regulator-min-microvolt = <700000>;
+> >>+       regulator-max-microvolt = <1320000>;
+> >>+       regulator-name = "vdd-cpu";
+> >>+};
+> >>+
+> >>+&reg_dcdc4 {
+> >>+       regulator-always-on;
+> >>+       regulator-min-microvolt = <700000>;
+> >>+       regulator-max-microvolt = <1320000>;
+> >>+       regulator-name = "vdd-sys-dll";
+> >>+};
+> >>+
+> >>+&reg_dcdc5 {
+> >>+       regulator-always-on;
+> >>+       regulator-min-microvolt = <1500000>;
+> >>+       regulator-max-microvolt = <1500000>;
+> >>+       regulator-name = "vcc-dram";
+> >>+};
+> >>+
+> >>+&reg_dldo1 {
+> >>+       regulator-min-microvolt = <3300000>;
+> >>+       regulator-max-microvolt = <3300000>;
+> >>+       regulator-name = "vcc-ethernet-phy";
+> >>+};
+> >>+
+> >>+&reg_dldo4 {
+> >>+       regulator-always-on;
+> >
+> >Why not tie this to the usbphy? Same for the other patch.
+> 
+> Because both reg_usb1_vbus and reg_dldo4 need to be on
+> for the hub attached to usb1 to work, and I can list
+> only one usb1_vbus-supply.
 
-I'm not sure I understand the relationship between usr vs pwr led and
-the fact that it's disabled.
+Adding a comment stating that would be great :)
 
-> This renames the led from a1000:blue:usr to a1000:blue:pwr and marks
-> it as default on, fixing this.
-
-however, the default on might. Is it just a confusing commit log, or
-am I overlooking something?
-
-thanks,
+Thanks!
 Maxime
+
 
 -- 
 Maxime Ripard, Free Electrons
@@ -39,4 +162,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/a71af183/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/06c25ecb/attachment.sig>
