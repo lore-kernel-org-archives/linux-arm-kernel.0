@@ -1,40 +1,70 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Tue, 7 Jun 2016 11:22:35 -0300
-Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
-In-Reply-To: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
-References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <20160607112235.475c2e4c@recife.lan>
+From: vincent.abriou@st.com (Vincent ABRIOU)
+Date: Tue, 7 Jun 2016 16:26:13 +0200
+Subject: [PATCH v2 2/3] drm: convert DT component matching to
+ component_match_add_release()
+In-Reply-To: <E1b8pyX-0005OP-2s@rmk-PC.armlinux.org.uk>
+References: <20160603141548.GC1041@n2100.armlinux.org.uk>
+ <E1b8pyX-0005OP-2s@rmk-PC.armlinux.org.uk>
+Message-ID: <5756D985.80107@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 30 May 2016 20:29:14 +0800
-Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
 
-> ==============
->  Introduction
-> ==============
-> 
-> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
-> Mediatek Video Codec is able to handle video decoding of in a range of formats.
-> 
-> This patch series add Mediatek block format V4L2_PIX_FMT_MT21, the decoder driver will decoded bitstream to
-> V4L2_PIX_FMT_MT21 format.
-> 
-> This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1]
-> and patch "CHROMIUM: v4l: Add V4L2_PIX_FMT_VP9 definition"[2] for VP9 support.
-> Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
-> 
-> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
-> 
-> [1]https://patchwork.linuxtv.org/patch/33734/
-> [2]https://chromium-review.googlesource.com/#/c/245241/
 
-Hmm... I'm not seeing the firmware for this driver at the
-linux-firmware tree:
-	https://git.kernel.org/cgit/linux/kernel/git/firmware/linux-firmware.git/log/
+On 06/03/2016 04:21 PM, Russell King wrote:
+> Convert DT component matching to use component_match_add_release().
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>   drivers/gpu/drm/arm/hdlcd_drv.c             |  9 +++------
+>   drivers/gpu/drm/armada/armada_drv.c         |  8 ++------
+>   drivers/gpu/drm/drm_of.c                    |  6 ++++--
+>   drivers/gpu/drm/etnaviv/etnaviv_drv.c       | 11 ++---------
+>   drivers/gpu/drm/msm/msm_drv.c               |  8 ++------
+>   drivers/gpu/drm/msm/msm_drv.h               |  1 +
+>   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 12 +++---------
+>   drivers/gpu/drm/sti/sti_drv.c               |  9 ++-------
+>   drivers/gpu/drm/tilcdc/tilcdc_external.c    |  8 ++------
+>   9 files changed, 21 insertions(+), 51 deletions(-)
+>
+>
+> diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
+> index 872495e72294..aeb2787c9bd4 100644
+> --- a/drivers/gpu/drm/sti/sti_drv.c
+> +++ b/drivers/gpu/drm/sti/sti_drv.c
+> @@ -10,6 +10,7 @@
+>   #include <linux/debugfs.h>
+>   #include <linux/kernel.h>
+>   #include <linux/module.h>
+> +#include <linux/of_component.h>
+>   #include <linux/of_platform.h>
+>
+>   #include <drm/drm_atomic.h>
+> @@ -341,11 +342,6 @@ static struct drm_driver sti_driver = {
+>   	.minor = DRIVER_MINOR,
+>   };
+>
+> -static int compare_of(struct device *dev, void *data)
+> -{
+> -	return dev->of_node == data;
+> -}
+> -
+>   static int sti_bind(struct device *dev)
+>   {
+>   	return drm_platform_init(&sti_driver, to_platform_device(dev));
+> @@ -375,8 +371,7 @@ static int sti_platform_probe(struct platform_device *pdev)
+>   	child_np = of_get_next_available_child(node, NULL);
+>
+>   	while (child_np) {
+> -		component_match_add(dev, &match, compare_of, child_np);
+> -		of_node_put(child_np);
+> +		component_match_add_of(dev, &match, child_np);
+>   		child_np = of_get_next_available_child(node, child_np);
+>   	}
+>
 
-Nor I'm seeing any pull request for them. Did you send it?
-I'll only merge the driver upstream after seeing such pull request.
+Hi Russel,
 
-Regards,
-Mauro
+Ok for the sti driver.
+
+Acked-by: Vincent Abriou <vincent.abriou@st.com>
