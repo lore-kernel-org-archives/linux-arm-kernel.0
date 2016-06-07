@@ -1,37 +1,56 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 7 Jun 2016 10:02:37 +0200
-Subject: [PATCH v4 00/12] KVM: arm64: GICv3 ITS emulation
-In-Reply-To: <DB5PR04MB09977DF578DFB03A582745869A5C0@DB5PR04MB0997.eurprd04.prod.outlook.com>
-References: <1458958450-19662-1-git-send-email-andre.przywara@arm.com>
- <DB5PR04MB099754E61027226E5210C2399A590@DB5PR04MB0997.eurprd04.prod.outlook.com>
- <32b86adb-cdba-89bb-3f19-e7677f39fa1f@arm.com>
- <DB5PR04MB09977DF578DFB03A582745869A5C0@DB5PR04MB0997.eurprd04.prod.outlook.com>
-Message-ID: <CAMJs5B8h6wj16AMXVmuUa00TRzBJRq3_xMJfMEH67F1GMFJ2AA@mail.gmail.com>
+From: jesper.nilsson@axis.com (Jesper Nilsson)
+Date: Tue, 7 Jun 2016 10:04:30 +0200
+Subject: [PATCH v12 01/15] PCI: Let pci_mmap_page_range() take extra
+ resource pointer
+In-Reply-To: <20160604000642.28162-2-yinghai@kernel.org>
+References: <20160604000642.28162-1-yinghai@kernel.org>
+ <20160604000642.28162-2-yinghai@kernel.org>
+Message-ID: <20160607080430.GI3183@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bharat,
+On Fri, Jun 03, 2016 at 05:06:28PM -0700, Yinghai Lu wrote:
+> This one is preparing patch for next one:
+>   PCI: Let pci_mmap_page_range() take resource addr
+> 
+> We need to pass extra resource pointer to avoid searching that again
+> for powerpc and microblaze prot set operation.
+> 
+> Signed-off-by: Yinghai Lu <yinghai@kernel.org>
+> Cc: linux-arm-kernel at lists.infradead.org
 
+For the CRIS part:
 
+Acked-by: Jesper Nilsson <jesper.nilsson@axis.com>
 
-On Mon, Jun 6, 2016 at 7:29 AM, Bharat Bhushan <bharat.bhushan@nxp.com> wrote:
-> Hi Andre,
->
-> On clarification, are V5 version of patches are based on new-GIC emulation patches? How are you testing these patches, kvm-tool?
->
-> Hi Christoffer/Peter,
->
-> Is someone working on QEMU side patches? We need this feature a bit urgently so if no one is working then we can start working on this.
->
-Eric Auger (now with Red Hat) was planning to pick up Pavel's series
-and do a respin:
+> diff --git a/arch/cris/arch-v32/drivers/pci/bios.c b/arch/cris/arch-v32/drivers/pci/bios.c
+> index 64a5fb9..082efb9 100644
+> --- a/arch/cris/arch-v32/drivers/pci/bios.c
+> +++ b/arch/cris/arch-v32/drivers/pci/bios.c
+> @@ -14,7 +14,8 @@ void pcibios_set_master(struct pci_dev *dev)
+>  	pci_write_config_byte(dev, PCI_LATENCY_TIMER, lat);
+>  }
+>  
+> -int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> +int pci_mmap_page_range(struct pci_dev *dev, struct resource *res,
+> +			struct vm_area_struct *vma,
+>  			enum pci_mmap_state mmap_state, int write_combine)
+>  {
+>  	unsigned long prot;
+> diff --git a/arch/cris/include/asm/pci.h b/arch/cris/include/asm/pci.h
+> index b1b289d..65198cb 100644
+> --- a/arch/cris/include/asm/pci.h
+> +++ b/arch/cris/include/asm/pci.h
+> @@ -42,9 +42,6 @@ struct pci_dev;
+>  #define PCI_DMA_BUS_IS_PHYS	(1)
+>  
+>  #define HAVE_PCI_MMAP
+> -extern int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
+> -			       enum pci_mmap_state mmap_state, int write_combine);
+> -
+>  
+>  #endif /* __KERNEL__ */
 
-https://lists.gnu.org/archive/html/qemu-devel/2015-11/msg05197.html
-
-If you are ready to commit resources to this *immediately* and if Eric
-agrees then it would be good for you to pick up this series, but
-should you choose to do so please make sure you can actually commit
-resources to the work and to keep up with revisions this time around.
-
-Thanks,
--Christoffer
+/^JN - Jesper Nilsson
+-- 
+               Jesper Nilsson -- jesper.nilsson at axis.com
