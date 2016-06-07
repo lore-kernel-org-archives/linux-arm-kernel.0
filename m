@@ -1,42 +1,61 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 7 Jun 2016 23:58:45 +0300
-Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
- <20160601005751.GG20527@verge.net.au>
- <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
- <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
-Message-ID: <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Tue,  7 Jun 2016 17:08:32 -0400
+Subject: [RFC 0/1] ARM: print MHz in /proc/cpuinfo
+Message-ID: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2016 10:13 AM, Geert Uytterhoeven wrote:
+Many users (and some applications) are expecting the CPU clock speed to
+be output in /proc/cpuinfo (as is done in x86, avr32, c6x, tile, parisc,
+ia64, and xtensa).  This can be trivially added by simply querying the
+clock described in the CPU node of the device tree.  It appears that
+many of the DTSI files in arch/arm/boot/dts already have this defined.
+So, this will add this desired functionality for many boards with
+already existing information.  For those that do not have this defined,
+it will simply not output the string in question (thus keeping
+everything the same as before).
 
-[...]
+The output was modeled after x86 (based on number of significant digits
+and location in the output), but is similar to other architectures.  For
+example, the output on my local board looks like:
 
->>> And that the system behaves sanely on suspend/resume.
->>
->>    I'd be thankful if you told me how to test that. :-)
->
-> System suspend:
->
->     echo mem > /sys/power/state
+# cat /proc/cpuinfo 
+processor	: 0
+model name	: ARMv7 Processor rev 0 (v7l)
+cpu MHz		: 1200.000
+BogoMIPS	: 1200.00
+Features	: half thumb fastmult vfp edsp thumbee neon vfpv3 tls vfpd32 
+CPU implementer	: 0x41
+CPU architecture: 7
+CPU variant	: 0x3
+CPU part	: 0xc09
+CPU revision	: 0
 
-    Oh. I know that one! :-)
+processor	: 1
+model name	: ARMv7 Processor rev 0 (v7l)
+cpu MHz		: 1200.000
+BogoMIPS	: 1200.00
+Features	: half thumb fastmult vfp edsp thumbee neon vfpv3 tls vfpd32 
+CPU implementer	: 0x41
+CPU architecture: 7
+CPU variant	: 0x3
+CPU part	: 0xc09
+CPU revision	: 0
 
-> System resume: You're gonna need a "wakeup-source" in your DTS, e.g. gpio-keys.
-> Serial should work too, echo "enabled" to the corresponding wakeup
-> file in /sys first.
+Hardware	: Broadcom Northstar Plus SoC
+Revision	: 0000
+Serial		: 0000000000000000
 
-    I'm afraid I couldn't find that file. All I saw were RPM controls...
+Thanks,
+Jon
 
-> In case of issues, try "echo 0 > /sys/module/printk/parameters/console_suspend".
 
-    There's no problems suspending, it's the resuming that's a problem for me.
 
-> Good luck!
+Jon Mason (1):
+  ARM: print MHz in /proc/cpuinfo
 
-    As usual, there was no luck. :-)
+ arch/arm/kernel/setup.c | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-WBR, Sergei
+-- 
+1.9.1
