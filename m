@@ -1,40 +1,35 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 18:49:33 +0100
-Subject: [PATCH] ARM: bcm2835: remove unused __packet
-Message-ID: <1465321773-21519-1-git-send-email-ben.dooks@codethink.co.uk>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue,  7 Jun 2016 18:50:09 +0100
+Subject: [PATCH 1/2] phy: phy-qcom-ufs-qmp-14nm: Remove site specific OOM
+ error message
+Message-ID: <1465321810-22470-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver defines a variable called __packet but then never
-uses it, and does not export it for others to use either. Fix
-the warning about undeclared variable by removing it.
+kzalloc will issue its own error message including a dump_stack()
+so remote the site specific message.
 
-drivers/soc/bcm/raspberrypi-power.c:48:3: warning: symbol '__packet' was not declared. Should it be static?
-
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
-Cc: Eric Anholt <eric@anholt.net>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Alexander Aring <alex.aring@gmail.com>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/soc/bcm/raspberrypi-power.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/phy/phy-qcom-ufs-qmp-14nm.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/drivers/soc/bcm/raspberrypi-power.c b/drivers/soc/bcm/raspberrypi-power.c
-index fe96a8b..f7ed118 100644
---- a/drivers/soc/bcm/raspberrypi-power.c
-+++ b/drivers/soc/bcm/raspberrypi-power.c
-@@ -45,7 +45,7 @@ struct rpi_power_domains {
- struct rpi_power_domain_packet {
- 	u32 domain;
- 	u32 on;
--} __packet;
-+};
+diff --git a/drivers/phy/phy-qcom-ufs-qmp-14nm.c b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+index 56631e7..958e9cc 100644
+--- a/drivers/phy/phy-qcom-ufs-qmp-14nm.c
++++ b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+@@ -139,11 +139,9 @@ static int ufs_qcom_phy_qmp_14nm_probe(struct platform_device *pdev)
+ 	int err = 0;
  
- /*
-  * Asks the firmware to enable or disable power on a specific power
+ 	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+-	if (!phy) {
+-		dev_err(dev, "%s: failed to allocate phy\n", __func__);
++	if (!phy)
+ 		err = -ENOMEM;
+ 		goto out;
+-	}
+ 
+ 	generic_phy = ufs_qcom_phy_generic_probe(pdev, &phy->common_cfg,
+ 				&ufs_qcom_phy_qmp_14nm_phy_ops, &phy_14nm_ops);
 -- 
-2.8.1
+1.9.1
