@@ -1,34 +1,148 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 7 Jun 2016 12:56:17 -0700
-Subject: [PATCH v5 01/18] remoteproc: make rsc table support optional
-In-Reply-To: <1465316352-20691-2-git-send-email-peter.griffin@linaro.org>
-References: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
- <1465316352-20691-2-git-send-email-peter.griffin@linaro.org>
-Message-ID: <20160607195617.GI1256@tuxbot>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 7 Jun 2016 21:59:56 +0200
+Subject: [PATCH V6 6/8] vfio, platform: make reset driver a requirement by
+ default
+In-Reply-To: <1464472878-27176-7-git-send-email-okaya@codeaurora.org>
+References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
+ <1464472878-27176-7-git-send-email-okaya@codeaurora.org>
+Message-ID: <c3538f11-d206-1ffc-35e0-ff5a7672c7d9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 07 Jun 09:18 PDT 2016, Peter Griffin wrote:
 
-> Some firmware and rproc drivers such as slim core don't have a
-> resource table. To avoid having to fudge an empty table
-> in the rproc driver this patch introduces a new has_rsctable
-> flag. rproc drivers which don't require a rsc table can set
-> this flag to false, and it avoids doing the initial async
-> firmware load in rproc_add_virtio_devices() to parse the
-> rsc table during rproc_add(), and also optimises rproc_fw_boot()
-> code path to avoid unnecessary rsc table processing of an
-> empty table.
+
+Le 29/05/2016 ? 00:01, Sinan Kaya a ?crit :
+> The code was allowing platform devices to be used without a supporting
+> VFIO reset driver. The hardware can be left in some inconsistent state
+> after a guest machine abort.
 > 
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> The reset driver will put the hardware back to safe state and disable
+> interrupts before returning the control back to the host machine.
+> 
+> Adding a new reset_required kernel module option to AMBA and platform
+> VFIO drivers with a default value of true.
+> 
+> New requirements are:
+> 1. A reset function needs to be implemented by the corresponding driver
+> via DT/ACPI.
+> 2. The reset function needs to be discovered via DT/ACPI.
+> 
+> The probe of the driver will fail if any of the above conditions are
+> not satisfied.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/vfio/platform/vfio_amba.c             |  5 +++++
+>  drivers/vfio/platform/vfio_platform.c         |  5 +++++
+>  drivers/vfio/platform/vfio_platform_common.c  | 14 +++++++++++---
+>  drivers/vfio/platform/vfio_platform_private.h |  1 +
+>  4 files changed, 22 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/vfio/platform/vfio_amba.c b/drivers/vfio/platform/vfio_amba.c
+> index a66479b..7585902 100644
+> --- a/drivers/vfio/platform/vfio_amba.c
+> +++ b/drivers/vfio/platform/vfio_amba.c
+> @@ -23,6 +23,10 @@
+>  #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
+>  #define DRIVER_DESC     "VFIO for AMBA devices - User Level meta-driver"
+>  
+> +static bool reset_required = true;
+> +module_param(reset_required, bool, 0644);
+> +MODULE_PARM_DESC(reset_required, "override reset requirement (default: 1)");
+> +
+>  /* probing devices from the AMBA bus */
+>  
+>  static struct resource *get_amba_resource(struct vfio_platform_device *vdev,
+> @@ -68,6 +72,7 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
+>  	vdev->get_resource = get_amba_resource;
+>  	vdev->get_irq = get_amba_irq;
+>  	vdev->parent_module = THIS_MODULE;
+> +	vdev->reset_required = reset_required;
+>  
+>  	ret = vfio_platform_probe_common(vdev, &adev->dev);
+>  	if (ret) {
+> diff --git a/drivers/vfio/platform/vfio_platform.c b/drivers/vfio/platform/vfio_platform.c
+> index b1cc3a7..ef89146 100644
+> --- a/drivers/vfio/platform/vfio_platform.c
+> +++ b/drivers/vfio/platform/vfio_platform.c
+> @@ -23,6 +23,10 @@
+>  #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
+>  #define DRIVER_DESC     "VFIO for platform devices - User Level meta-driver"
+>  
+> +static bool reset_required = true;
+> +module_param(reset_required, bool, 0644);
+> +MODULE_PARM_DESC(reset_required, "override reset requirement (default: 1)");
+> +
+>  /* probing devices from the linux platform bus */
+>  
+>  static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
+> @@ -66,6 +70,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
+>  	vdev->get_resource = get_platform_resource;
+>  	vdev->get_irq = get_platform_irq;
+>  	vdev->parent_module = THIS_MODULE;
+> +	vdev->reset_required = reset_required;
+>  
+>  	ret = vfio_platform_probe_common(vdev, &pdev->dev);
+>  	if (ret)
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index 0ea8c26..e87ceab 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -128,10 +128,10 @@ static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
+>  	return vdev->of_reset ? true : false;
+>  }
+>  
+> -static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+> +static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  {
+>  	if (vdev->acpihid)
+> -		return;
+> +		return vfio_platform_acpi_has_reset(vdev) ? 0 : -ENOENT;
+>  
+>  	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+>  						    &vdev->reset_module);
+> @@ -140,6 +140,8 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  		vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+>  							&vdev->reset_module);
+>  	}
+> +
+> +	return vdev->of_reset ? 0 : -ENOENT;
+>  }
+>  
+>  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+> @@ -675,7 +677,13 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+>  		return ret;
+>  	}
+>  
+> -	vfio_platform_get_reset(vdev);
+> +	ret = vfio_platform_get_reset(vdev);
+> +	if (ret && vdev->reset_required) {
+> +		pr_err("vfio: no reset function found for device %s\n",
+> +		       vdev->name);
+> +		iommu_group_put(group);
+> +		return ret;
+nit: in case you respin you can factorize the group put and return ret in a goto label
+(since also used above).
 
-Hi Peter,
+Besides Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-Thanks for the patch. I do however dislike the amount of conditionals
-already in these code paths, so I'm not in favour of adding more.
+Thanks
 
-Please revert back to providing a dummy table from your driver and let's
-handle this topic separate of this series.
-
-Regards,
-Bjorn
+Eric
+> +	}
+>  
+>  	mutex_init(&vdev->igate);
+>  
+> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+> index ba9e4f8..68fbc00 100644
+> --- a/drivers/vfio/platform/vfio_platform_private.h
+> +++ b/drivers/vfio/platform/vfio_platform_private.h
+> @@ -50,6 +50,7 @@ struct vfio_platform_region {
+>  };
+>  
+>  struct vfio_platform_device {
+> +	bool				reset_required;
+>  	struct vfio_platform_region	*regions;
+>  	u32				num_regions;
+>  	struct vfio_platform_irq	*irqs;
+> 
