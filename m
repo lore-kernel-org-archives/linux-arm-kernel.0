@@ -1,94 +1,49 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  7 Jun 2016 13:47:56 +0200
-Subject: [PATCH v2 01/20] drm/atomic: Fix remaining places where
- !funcs->best_encoder is valid
+Date: Tue,  7 Jun 2016 13:48:02 +0200
+Subject: [PATCH v2 07/20] drm: mediatek: Rely on the default ->best_encoder()
+ behavior
 In-Reply-To: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465300095-16971-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465300095-16971-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt drm_pick_crtcs() and update_connector_routing() to fallback to
-drm_atomic_helper_best_encoder() if funcs->best_encoder() is NULL so
-that DRM drivers can leave this hook unassigned if they know they want
-to use drm_atomic_helper_best_encoder().
-
-Update the vtables documentation accordingly.
+We have a 1:1 relationship between connectors and encoders and the
+driver is relying on the atomic helpers: we can drop the custom
+->best_encoder() implementation and let the core call
+drm_atomic_helper_best_encoder() for us.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/drm_atomic_helper.c      |  4 +++-
- drivers/gpu/drm/drm_fb_helper.c          | 13 ++++++++++++-
- include/drm/drm_modeset_helper_vtables.h | 10 ++++++++--
- 3 files changed, 23 insertions(+), 4 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_dsi.c | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/drivers/gpu/drm/drm_atomic_helper.c b/drivers/gpu/drm/drm_atomic_helper.c
-index f6a3350..849d029 100644
---- a/drivers/gpu/drm/drm_atomic_helper.c
-+++ b/drivers/gpu/drm/drm_atomic_helper.c
-@@ -300,8 +300,10 @@ update_connector_routing(struct drm_atomic_state *state,
- 	if (funcs->atomic_best_encoder)
- 		new_encoder = funcs->atomic_best_encoder(connector,
- 							 connector_state);
--	else
-+	else if (funcs->best_encoder)
- 		new_encoder = funcs->best_encoder(connector);
-+	else
-+		new_encoder = drm_atomic_helper_best_encoder(connector);
+diff --git a/drivers/gpu/drm/mediatek/mtk_dsi.c b/drivers/gpu/drm/mediatek/mtk_dsi.c
+index 2d808e5..7343ffc 100644
+--- a/drivers/gpu/drm/mediatek/mtk_dsi.c
++++ b/drivers/gpu/drm/mediatek/mtk_dsi.c
+@@ -575,14 +575,6 @@ static int mtk_dsi_connector_get_modes(struct drm_connector *connector)
+ 	return drm_panel_get_modes(dsi->panel);
+ }
  
- 	if (!new_encoder) {
- 		DRM_DEBUG_ATOMIC("No suitable encoder found for [CONNECTOR:%d:%s]\n",
-diff --git a/drivers/gpu/drm/drm_fb_helper.c b/drivers/gpu/drm/drm_fb_helper.c
-index 7c2eb75..d44389a 100644
---- a/drivers/gpu/drm/drm_fb_helper.c
-+++ b/drivers/gpu/drm/drm_fb_helper.c
-@@ -2000,7 +2000,18 @@ static int drm_pick_crtcs(struct drm_fb_helper *fb_helper,
- 		my_score++;
+-static struct drm_encoder *mtk_dsi_connector_best_encoder(
+-		struct drm_connector *connector)
+-{
+-	struct mtk_dsi *dsi = connector_to_dsi(connector);
+-
+-	return &dsi->encoder;
+-}
+-
+ static const struct drm_encoder_helper_funcs mtk_dsi_encoder_helper_funcs = {
+ 	.mode_fixup = mtk_dsi_encoder_mode_fixup,
+ 	.mode_set = mtk_dsi_encoder_mode_set,
+@@ -603,7 +595,6 @@ static const struct drm_connector_funcs mtk_dsi_connector_funcs = {
+ static const struct drm_connector_helper_funcs
+ 	mtk_dsi_connector_helper_funcs = {
+ 	.get_modes = mtk_dsi_connector_get_modes,
+-	.best_encoder = mtk_dsi_connector_best_encoder,
+ };
  
- 	connector_funcs = connector->helper_private;
--	encoder = connector_funcs->best_encoder(connector);
-+
-+	/*
-+	 * If the DRM device implements atomic hooks and ->best_encoder() is
-+	 * NULL we fallback to the default drm_atomic_helper_best_encoder()
-+	 * helper.
-+	 */
-+	if (fb_helper->dev->mode_config.funcs->atomic_commit &&
-+	    !connector_funcs->best_encoder)
-+		encoder = drm_atomic_helper_best_encoder(connector);
-+	else
-+		encoder = connector_funcs->best_encoder(connector);
-+
- 	if (!encoder)
- 		goto out;
- 
-diff --git a/include/drm/drm_modeset_helper_vtables.h b/include/drm/drm_modeset_helper_vtables.h
-index d4619dc..4e7a53b 100644
---- a/include/drm/drm_modeset_helper_vtables.h
-+++ b/include/drm/drm_modeset_helper_vtables.h
-@@ -736,6 +736,11 @@ struct drm_connector_helper_funcs {
- 	 * inspect dynamic configuration state should instead use
- 	 * @atomic_best_encoder.
- 	 *
-+	 * You can leave this function to NULL if the connector is only
-+	 * attached to a single encoder and you are using the atomic helpers.
-+	 * In this case, the core will call drm_atomic_helper_best_encoder()
-+	 * for you.
-+	 *
- 	 * RETURNS:
- 	 *
- 	 * Encoder that should be used for the given connector and connector
-@@ -752,8 +757,9 @@ struct drm_connector_helper_funcs {
- 	 * need to select the best encoder depending upon the desired
- 	 * configuration and can't select it statically.
- 	 *
--	 * This function is used by drm_atomic_helper_check_modeset() and either
--	 * this or @best_encoder is required.
-+	 * This function is used by drm_atomic_helper_check_modeset().
-+	 * If it is not implemented, the core will fallback to @best_encoder
-+	 * (or drm_atomic_helper_best_encoder() if @best_encoder is NULL).
- 	 *
- 	 * NOTE:
- 	 *
+ static int mtk_drm_attach_bridge(struct drm_bridge *bridge,
 -- 
 2.7.4
