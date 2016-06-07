@@ -1,41 +1,50 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Tue, 07 Jun 2016 15:08:38 -0700
-Subject: [PATCH v2] arm64: Allow for different DMA and CPU bus offsets
-In-Reply-To: <20160601084228.GB23375@e104818-lin.cambridge.arm.com>
-References: <1463576010-115428-1-git-send-email-agraf@suse.de>
- <20160518132741.GE22378@e104818-lin.cambridge.arm.com>
- <20160601084228.GB23375@e104818-lin.cambridge.arm.com>
-Message-ID: <87y46g4pp5.fsf@eliezer.anholt.net>
+From: hansverk@cisco.com (Hans Verkuil)
+Date: Wed, 8 Jun 2016 07:13:02 +0900
+Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <20160607112235.475c2e4c@recife.lan>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+ <20160607112235.475c2e4c@recife.lan>
+Message-ID: <575746EE.3030706@cisco.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
 
-> On Wed, May 18, 2016 at 02:27:41PM +0100, Catalin Marinas wrote:
->> On Wed, May 18, 2016 at 02:53:30PM +0200, Alexander Graf wrote:
->> > On arm64, all SoCs we supported so far either have an IOMMU or have bus
->> > addresses equal to CPU addresses.
->> > 
->> > However, with the Raspberry Pi 3 coming up, this is no longer true. To
->> > allow DMA to work with an AArch64 kernel on those devices, let's allow
->> > devices to have DMA offsets again.
->> > 
->> > Signed-off-by: Alexander Graf <agraf@suse.de>
->> 
->> We were aware about this issue but we've been waiting for an actual use
->> case. I'll queue this for 4.8 (given that RPi3 is not supported by the
->> arm64 kernel, I don't see the rush to merge it earlier).
->
-> In case this patch goes in via the arm-soc tree (together with other
-> RPi3 patches):
->
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Thanks!  I've pulled this into my for-next branch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/2c4ab37a/attachment-0001.sig>
+On 06/07/2016 11:22 PM, Mauro Carvalho Chehab wrote:
+> Em Mon, 30 May 2016 20:29:14 +0800
+> Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
+>
+>> ==============
+>>   Introduction
+>> ==============
+>>
+>> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+>> Mediatek Video Codec is able to handle video decoding of in a range of formats.
+>>
+>> This patch series add Mediatek block format V4L2_PIX_FMT_MT21, the decoder driver will decoded bitstream to
+>> V4L2_PIX_FMT_MT21 format.
+>>
+>> This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1]
+>> and patch "CHROMIUM: v4l: Add V4L2_PIX_FMT_VP9 definition"[2] for VP9 support.
+>> Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
+>>
+>> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
+>>
+>> [1]https://patchwork.linuxtv.org/patch/33734/
+>> [2]https://chromium-review.googlesource.com/#/c/245241/
+>
+> Hmm... I'm not seeing the firmware for this driver at the
+> linux-firmware tree:
+> 	https://git.kernel.org/cgit/linux/kernel/git/firmware/linux-firmware.git/log/
+>
+> Nor I'm seeing any pull request for them. Did you send it?
+> I'll only merge the driver upstream after seeing such pull request.
+
+Mauro, are you confusing the decoder and encoder driver? I haven't thoroughly reviewed the decoder driver
+yet, so there is no pull request for the decoder driver.
+
+The only pull request I made was for the encoder driver.
+
+Regards,
+
+	Hans
