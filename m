@@ -1,50 +1,54 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Jun 2016 22:37:56 +0200
-Subject: [PATCH V6 0/8] vfio, platform: add ACPI support
-In-Reply-To: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
-References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <48fe5e46-af9d-79e4-e298-6ba0f2a1d3c1@redhat.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 7 Jun 2016 15:38:17 -0500
+Subject: [PATCH v4 00/14] fix some type infos and bugs for arm64/of numa
+In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <CAL_JsqLprcqYiXWE9+27cAqBLVEkNOht+puQVkzpfs=BGHCztg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
-Le 29/05/2016 ? 00:01, Sinan Kaya a ?crit :
-> The device tree code checks for the presence of a reset driver and calls
-> the of_reset function pointer by looking up the reset driver as a module.
-> 
-> ACPI defines _RST method to perform device level reset. After the _RST
-> method is executed, the OS can resume using the device.
-> 
-> This patch checks the presence of _RST method and calls the _RST
-> method when reset is requested.
-> 
-> Changes from V5:
-> 1. Handle reset function call failures in open and release (new patch).
-> 2. Bring out extra debug information when failure happens (new patch).
-> 3. Address review comments from Eric in ACPI _RST patch.
+On Tue, Jun 7, 2016 at 3:08 AM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
+> v3 -> v4:
+> 1. Packed three patches of Kefeng Wang, patch6-8.
+> 2. Add 6 new patches(9-15) to enhance the numa on arm64.
+>
+> v2 -> v3:
+> 1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
+>    patches looks more well. The final code have no change.
+>
+> v1 -> v2:
+> 1. Base on https://lkml.org/lkml/2016/5/24/679
+> 2. Rewrote of_numa_parse_memory_nodes according to Rob Herring's advice. So that it looks more clear.
+> 3. Rewrote patch 5 because some scenes were not considered before.
+>
+> Kefeng Wang (3):
+>   of_numa: Use of_get_next_parent to simplify code
+>   of_numa: Use pr_fmt()
+>   arm64: numa: Use pr_fmt()
+>
+> Zhen Lei (11):
+>   of/numa: remove a duplicated pr_debug information
+>   of/numa: fix a memory@ node can only contains one memory block
+>   arm64/numa: add nid check for memory block
+>   of/numa: remove a duplicated warning
+>   arm64/numa: avoid inconsistent information to be printed
+>   arm64/numa: support HAVE_SETUP_PER_CPU_AREA
+>   arm64/numa: define numa_distance as array to simplify code
+>   arm64/numa: support HAVE_MEMORYLESS_NODES
+>   arm64/numa: remove some useless code
+>   of/numa: remove the constraint on the distances of node pairs
+>   Documentation: remove the constraint on the distances of node pairs
+>
+>  Documentation/devicetree/bindings/numa.txt |   1 -
+>  arch/arm64/Kconfig                         |  12 ++
+>  arch/arm64/include/asm/numa.h              |   1 -
+>  arch/arm64/kernel/smp.c                    |   1 +
+>  arch/arm64/mm/numa.c                       | 228 ++++++++++++++++-------------
+>  drivers/of/of_numa.c                       |  87 +++++------
+>  6 files changed, 180 insertions(+), 150 deletions(-)
 
-I think you need a respin to fix the deallocation issue in 7/8 + 1st patch missing.
-Afterwards I don't have any other comments at that point. I will test the
-dt non-regression tomorrow.
+For patches 1, 2, 4, 6, 7, and 13:
 
-Thanks
+Acked-by: Rob Herring <robh@kernel.org>
 
-Eric
-
-
-> Sinan Kaya (8):
->   vfio: platform: move reset call to a common function
->   vfio: platform: determine reset capability
->   vfio: platform: add support for ACPI probe
->   vfio: platform: add extra debug info argument to call reset
->   vfio: platform: call _RST method when using ACPI
->   vfio, platform: make reset driver a requirement by default
->   vfio: platform: check reset call return code during open
->   vfio: platform: check reset call return code during release
-> 
->  drivers/vfio/platform/vfio_amba.c             |   5 +
->  drivers/vfio/platform/vfio_platform.c         |   5 +
->  drivers/vfio/platform/vfio_platform_common.c  | 169 ++++++++++++++++++++++----
->  drivers/vfio/platform/vfio_platform_private.h |   2 +
->  4 files changed, 159 insertions(+), 22 deletions(-)
-> 
+Rob
