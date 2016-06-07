@@ -1,64 +1,113 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jun 2016 11:58:26 +0100
-Subject: [PATCH 06/15] arm/arm64: KVM: Export __hyp_text_start/end symbols
+Date: Tue,  7 Jun 2016 11:58:33 +0100
+Subject: [PATCH 13/15] arm: KVM: Allow hyp teardown
 In-Reply-To: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
 References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1465297115-13091-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1465297115-13091-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declare the __hyp_text_start/end symbols in asm/virt.h so that
-they can be reused without having to declare them locally.
+So far, KVM was getting in the way of kexec on 32bit (and the arm64
+kexec hackers couldn't be bothered to fix it on 32bit...).
+
+With simpler page tables, tearing KVM down becomes very easy, so
+let's just do it.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/virt.h   | 4 ++++
- arch/arm/kvm/mmu.c            | 2 --
- arch/arm64/include/asm/virt.h | 4 ++++
- 3 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_asm.h    |  2 ++
+ arch/arm/include/asm/kvm_host.h   |  8 +++-----
+ arch/arm/kvm/arm.c                |  3 ++-
+ arch/arm/kvm/init.S               | 15 +++++++++++++++
+ arch/arm64/include/asm/kvm_host.h |  3 ++-
+ 5 files changed, 24 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
-index d4ceaf5..a2e75b8 100644
---- a/arch/arm/include/asm/virt.h
-+++ b/arch/arm/include/asm/virt.h
-@@ -80,6 +80,10 @@ static inline bool is_kernel_in_hyp_mode(void)
- 	return false;
- }
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 3d5a5cd..58faff5 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -66,6 +66,8 @@ extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+ extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
  
-+/* The section containing the hypervisor idmap text */
-+extern char __hyp_idmap_text_start[];
-+extern char __hyp_idmap_text_end[];
+ extern void __init_stage2_translation(void);
 +
- /* The section containing the hypervisor text */
- extern char __hyp_text_start[];
- extern char __hyp_text_end[];
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 45c43ae..d6ecbf1 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -32,8 +32,6 @@
- 
- #include "trace.h"
- 
--extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
--
- static pgd_t *boot_hyp_pgd;
- static pgd_t *hyp_pgd;
- static pgd_t *merged_hyp_pgd;
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index dcbcf8d..88aa8ec 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -82,6 +82,10 @@ extern void verify_cpu_run_el(void);
- static inline void verify_cpu_run_el(void) {}
++extern void __kvm_hyp_reset(unsigned long);
  #endif
  
-+/* The section containing the hypervisor idmap text */
-+extern char __hyp_idmap_text_start[];
-+extern char __hyp_idmap_text_end[];
+ #endif /* __ARM_KVM_ASM_H__ */
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index eafbfd5..58d0b69 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -266,12 +266,10 @@ static inline void __cpu_init_stage2(void)
+ 	kvm_call_hyp(__init_stage2_translation);
+ }
+ 
+-static inline void __cpu_reset_hyp_mode(phys_addr_t phys_idmap_start)
++static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
++					phys_addr_t phys_idmap_start)
+ {
+-	/*
+-	 * TODO
+-	 * kvm_call_reset(phys_idmap_start);
+-	 */
++	kvm_call_hyp((void *)virt_to_idmap(__kvm_hyp_reset), vector_ptr);
+ }
+ 
+ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index ca5ac1a..fe20532 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -1074,7 +1074,8 @@ static void cpu_hyp_reinit(void)
+ static void cpu_hyp_reset(void)
+ {
+ 	if (!is_kernel_in_hyp_mode())
+-		__cpu_reset_hyp_mode(kvm_get_idmap_start());
++		__cpu_reset_hyp_mode(hyp_default_vectors,
++				     kvm_get_idmap_start());
+ }
+ 
+ static void _kvm_arch_hardware_enable(void *discard)
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+index b82a99d..bf89c91 100644
+--- a/arch/arm/kvm/init.S
++++ b/arch/arm/kvm/init.S
+@@ -112,6 +112,21 @@ __do_hyp_init:
+ 
+ 	eret
+ 
++	@ r0 : stub vectors address
++ENTRY(__kvm_hyp_reset)
++	/* We're now in idmap, disable MMU */
++	mrc	p15, 4, r1, c1, c0, 0	@ HSCTLR
++	ldr	r2, =(HSCTLR_M | HSCTLR_A | HSCTLR_C | HSCTLR_I)
++	bic	r1, r1, r2
++	mcr	p15, 4, r1, c1, c0, 0	@ HSCTLR
 +
- /* The section containing the hypervisor text */
- extern char __hyp_text_start[];
- extern char __hyp_text_end[];
++	/* Install stub vectors */
++	mcr	p15, 4, r0, c12, c0, 0	@ HVBAR
++	isb
++
++	eret
++ENDPROC(__kvm_hyp_reset)
++
+ 	.ltorg
+ 
+ 	.globl __kvm_hyp_init_end
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 6731d4e..69d5cc2d 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -359,7 +359,8 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+ }
+ 
+ void __kvm_hyp_teardown(void);
+-static inline void __cpu_reset_hyp_mode(phys_addr_t phys_idmap_start)
++static inline void __cpu_reset_hyp_mode(unsigned long vector_ptr,
++					phys_addr_t phys_idmap_start)
+ {
+ 	kvm_call_hyp(__kvm_hyp_teardown, phys_idmap_start);
+ }
 -- 
 2.1.4
