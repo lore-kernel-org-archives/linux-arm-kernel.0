@@ -1,31 +1,34 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jun 2016 16:08:18 +0800
-Subject: [PATCH v4 14/14] Documentation: remove the constraint on the
- distances of node pairs
+Date: Tue, 7 Jun 2016 16:08:07 +0800
+Subject: [PATCH v4 03/14] arm64/numa: add nid check for memory block
 In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1465286898-13828-15-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1465286898-13828-4-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update documentation. This limit is unneccessary.
+Use the same tactic to cpu and numa-distance nodes.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- Documentation/devicetree/bindings/numa.txt | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm64/mm/numa.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/numa.txt b/Documentation/devicetree/bindings/numa.txt
-index 21b3505..c0ea4a7 100644
---- a/Documentation/devicetree/bindings/numa.txt
-+++ b/Documentation/devicetree/bindings/numa.txt
-@@ -48,7 +48,6 @@ distance (memory latency) between all numa nodes.
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index c7fe3ec..2601660 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -141,6 +141,11 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
+ {
+ 	int ret;
 
-   Note:
- 	1. Each entry represents distance from first node to second node.
--	The distances are equal in either direction.
- 	2. The distance from a node to self (local distance) is represented
- 	with value 10 and all internode distance should be represented with
- 	a value greater than 10.
++	if (nid >= MAX_NUMNODES) {
++		pr_warn("NUMA: Node id %u exceeds maximum value\n", nid);
++		return -EINVAL;
++	}
++
+ 	ret = memblock_set_node(start, (end - start), &memblock.memory, nid);
+ 	if (ret < 0) {
+ 		pr_err("NUMA: memblock [0x%llx - 0x%llx] failed to add on node %d\n",
 --
 2.5.0
