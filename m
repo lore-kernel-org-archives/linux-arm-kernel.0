@@ -1,44 +1,96 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 7 Jun 2016 07:35:50 +0530
-Subject: [PATCH kexec-tools v2 04/32] kdump: fix kdump mapping
-In-Reply-To: <E1b9xrj-0003rn-3S@e0050434b2927.dyn.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
- <E1b9xrj-0003rn-3S@e0050434b2927.dyn.armlinux.org.uk>
-Message-ID: <20160607020550.GA9722@dhcppc6>
+From: hongtao.jia@nxp.com (Hongtao Jia)
+Date: Tue, 7 Jun 2016 02:26:51 +0000
+Subject: =?gb2312?B?tPC4tDogW1BBVENIIDEvN10gZHQtYmluZGluZ3M6IFVwZGF0ZSBRb3JJUSBU?=
+ =?gb2312?Q?MU_thermal_bindings?=
+In-Reply-To: <20160606134708.GA27357@rob-hp-laptop>
+References: <1464937059-19349-1-git-send-email-hongtao.jia@nxp.com>
+ <20160606134708.GA27357@rob-hp-laptop>
+Message-ID: <AM4PR0401MB1843CB326ACB958AA8FE64F8EB5D0@AM4PR0401MB1843.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2016:05:59:03 PM, Russell King wrote:
-> When kdump tries to map the program header, it fails to take account
-> of ehdr->e_phoff being an offset from the start of the ELF "file",
-> which causes:
+
+> -----????-----
+> ???: Rob Herring [mailto:robh at kernel.org]
+> ????: Monday, June 06, 2016 9:47 PM
+> ???: Hongtao Jia <hongtao.jia@nxp.com>
+> ??: edubezval at gmail.com; rui.zhang at intel.com; galak at codeaurora.org;
+> Scott Wood <scott.wood@nxp.com>; shawnguo at kernel.org;
+> devicetree at vger.kernel.org; linux-pm at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; linux-arm-
+> kernel at lists.infradead.org
+> ??: Re: [PATCH 1/7] dt-bindings: Update QorIQ TMU thermal bindings
 > 
-> Cannot mmap /dev/mem offset: 64 size: 392: Invalid argument
-> 
-> Ensure that we take account of the start address when mapping this.
-> 
-> This fix has been extracted from a larger patch by Vitaly Andrianov
-> adding support for Keystone 2.
-> 
-> Signed-off-by: Russell King <rmk@arm.linux.org.uk>
-Reviewed-by: Pratyush Anand <panand@redhat.com>
+> On Fri, Jun 03, 2016 at 02:57:33PM +0800, Jia Hongtao wrote:
+> > For different types of SoC the sensor id and endianness may vary.
+> > "#thermal-sensor-cells" is used to provide sensor id information.
+> > "little-endian" property is to tell the endianness of TMU.
+> >
+> > Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
+> > ---
+> >  .../devicetree/bindings/thermal/qoriq-thermal.txt     | 19 +++++++++++++---
 > ---
->  kdump/kdump.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> >  1 file changed, 13 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> > index 66223d5..8eeef80 100644
+> > --- a/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> > +++ b/Documentation/devicetree/bindings/thermal/qoriq-thermal.txt
+> > @@ -1,22 +1,28 @@
+> >  * Thermal Monitoring Unit (TMU) on Freescale QorIQ SoCs
+> >
+> >  Required properties:
+> > -- compatible : Must include "fsl,qoriq-tmu". The version of the device is
+> > +- compatible: Must include "fsl,qoriq-tmu". The version of the device is
 > 
-> diff --git a/kdump/kdump.c b/kdump/kdump.c
-> index 1f5b984..34d2149 100644
-> --- a/kdump/kdump.c
-> +++ b/kdump/kdump.c
-> @@ -284,7 +284,8 @@ int main(int argc, char **argv)
->  	}
->  	
->  	/* Get the program header */
-> -	phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum), ehdr->e_phoff);
-> +	phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum), 
-> +			start_addr + ehdr->e_phoff);
->  
->  	/* Collect up the notes */
->  	note_bytes = 0;
-> -- 
-> 1.9.1
+> Please split functional changes from formatting changes. This one seems
+> pretty pointless.
+
+I will remove formatting changes in the next version.
+Thanks.
+
+> 
+> >  	determined by the TMU IP Block Revision Register (IPBRR0) at
+> >  	offset 0x0BF8.
+> > -	Table of correspondences between IPBRR0 values and example  chips:
+> > +	Table of correspondences between IPBRR0 values and example chips:
+> >  		Value           Device
+> >  		----------      -----
+> >  		0x01900102      T1040
+> > -- reg : Address range of TMU registers.
+> > -- interrupts : Contains the interrupt for TMU.
+> > -- fsl,tmu-range : The values to be programmed into TTRnCR, as specified by
+> > +- reg: Address range of TMU registers.
+> > +- interrupts: Contains the interrupt for TMU.
+> > +- fsl,tmu-range: The values to be programmed into TTRnCR, as specified by
+> >  	the SoC reference manual. The first cell is TTR0CR, the second is
+> >  	TTR1CR, etc.
+> > -- fsl,tmu-calibration : A list of cell pairs containing temperature
+> > +- fsl,tmu-calibration: A list of cell pairs containing temperature
+> >  	calibration data, as specified by the SoC reference manual.
+> >  	The first cell of each pair is the value to be written to TTCFGR,
+> >  	and the second is the value to be written to TSCFGR.
+> > +- #thermal-sensor-cells: Must be 1. The sensor specifier is the monitoring
+> > +	site ID, and represents the "n" in TRITSRn and TRATSRn.
+> > +
+> > +Optional property:
+> > +- little-endian: If present, the TMU registers are little endian.  If absent,
+> > +	the default is big endian.
+> >
+> >  Example:
+> >
+> > @@ -60,4 +66,5 @@ tmu at f0000 {
+> >
+> >  			       0x00030000 0x00000012
+> >  			       0x00030001 0x0000001d>;
+> > +	#thermal-sensor-cells = <1>;
+> >  };
+> > --
+> > 2.1.0.27.g96db324
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
