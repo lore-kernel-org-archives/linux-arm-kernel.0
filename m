@@ -1,33 +1,129 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  7 Jun 2016 12:19:24 +0100
-Subject: [PATCH 0/6] clk: sti: Add support for critical clocks
-Message-ID: <20160607111930.10375-1-lee.jones@linaro.org>
+Date: Tue,  7 Jun 2016 12:19:27 +0100
+Subject: [PATCH 3/6] clk: st: clkgen-pll: Detect critical clocks
+In-Reply-To: <20160607111930.10375-1-lee.jones@linaro.org>
+References: <20160607111930.10375-1-lee.jones@linaro.org>
+Message-ID: <20160607111930.10375-4-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe the platform's critical clocks in DT, then search for them
-from the framework.  This set allows us to remove the clk_ignore_unused
-kernel command line flag which has been required to achieve a successful
-boot to prompt until this point.
+Utilise the new Critical Clock infrastructure to mark clocks which
+much not be disabled as CRITICAL.
 
-This may not be the definitive list.  There may be other clocks which
-need to be marked as critical, but we can add those as we go along.
+Clocks are marked as CRITICAL using clk flags.  This patch also
+ensures flags are peculated through the framework in the correct
+manner.
 
-Lee Jones (6):
-  clk: st: clk-flexgen: Detect critical clocks
-  clk: st: clkgen-fsyn: Detect critical clocks
-  clk: st: clkgen-pll: Detect critical clocks
-  ARM: sti: stih407-family: Supply defines for CLOCKGEN A0
-  ARM: sti: stih410-clocks: Identify critical clocks
-  spi: st-ssc4: Remove 'no clocking' hack
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/clk/st/clkgen-pll.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
- arch/arm/boot/dts/stih410-clock.dtsi     |  9 ++++++++
- drivers/clk/st/clk-flexgen.c             |  4 +++-
- drivers/clk/st/clkgen-fsyn.c             | 10 ++++++---
- drivers/clk/st/clkgen-pll.c              | 27 +++++++++++++++---------
- drivers/spi/spi-st-ssc4.c                | 36 +++++---------------------------
- include/dt-bindings/clock/stih407-clks.h |  4 ++++
- 6 files changed, 45 insertions(+), 45 deletions(-)
-
+diff --git a/drivers/clk/st/clkgen-pll.c b/drivers/clk/st/clkgen-pll.c
+index 38f6f3a..0b5990e 100644
+--- a/drivers/clk/st/clkgen-pll.c
++++ b/drivers/clk/st/clkgen-pll.c
+@@ -840,7 +840,7 @@ static const struct clk_ops stm_pll4600c28_ops = {
+ 
+ static struct clk * __init clkgen_pll_register(const char *parent_name,
+ 				struct clkgen_pll_data	*pll_data,
+-				void __iomem *reg,
++				void __iomem *reg, unsigned long pll_flags,
+ 				const char *clk_name, spinlock_t *lock)
+ {
+ 	struct clkgen_pll *pll;
+@@ -854,7 +854,7 @@ static struct clk * __init clkgen_pll_register(const char *parent_name,
+ 	init.name = clk_name;
+ 	init.ops = pll_data->ops;
+ 
+-	init.flags = CLK_IS_BASIC | CLK_GET_RATE_NOCACHE;
++	init.flags = pll_flags | CLK_IS_BASIC | CLK_GET_RATE_NOCACHE;
+ 	init.parent_names = &parent_name;
+ 	init.num_parents  = 1;
+ 
+@@ -948,7 +948,7 @@ static void __init clkgena_c65_pll_setup(struct device_node *np)
+ 	 */
+ 	clk_data->clks[0] = clkgen_pll_register(parent_name,
+ 			(struct clkgen_pll_data *) &st_pll1600c65_ax,
+-			reg + CLKGENAx_PLL0_OFFSET, clk_name, NULL);
++			reg + CLKGENAx_PLL0_OFFSET, 0, clk_name, NULL);
+ 
+ 	if (IS_ERR(clk_data->clks[0]))
+ 		goto err;
+@@ -977,7 +977,7 @@ static void __init clkgena_c65_pll_setup(struct device_node *np)
+ 	 */
+ 	clk_data->clks[2] = clkgen_pll_register(parent_name,
+ 			(struct clkgen_pll_data *) &st_pll800c65_ax,
+-			reg + CLKGENAx_PLL1_OFFSET, clk_name, NULL);
++			reg + CLKGENAx_PLL1_OFFSET, 0, clk_name, NULL);
+ 
+ 	if (IS_ERR(clk_data->clks[2]))
+ 		goto err;
+@@ -995,7 +995,7 @@ CLK_OF_DECLARE(clkgena_c65_plls,
+ static struct clk * __init clkgen_odf_register(const char *parent_name,
+ 					       void __iomem *reg,
+ 					       struct clkgen_pll_data *pll_data,
+-					       int odf,
++					       unsigned long pll_flags, int odf,
+ 					       spinlock_t *odf_lock,
+ 					       const char *odf_name)
+ {
+@@ -1004,7 +1004,7 @@ static struct clk * __init clkgen_odf_register(const char *parent_name,
+ 	struct clk_gate *gate;
+ 	struct clk_divider *div;
+ 
+-	flags = CLK_GET_RATE_NOCACHE | CLK_SET_RATE_PARENT;
++	flags = pll_flags | CLK_GET_RATE_NOCACHE | CLK_SET_RATE_PARENT;
+ 
+ 	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
+ 	if (!gate)
+@@ -1099,6 +1099,7 @@ static void __init clkgen_c32_pll_setup(struct device_node *np)
+ 	int num_odfs, odf;
+ 	struct clk_onecell_data *clk_data;
+ 	struct clkgen_pll_data	*data;
++	unsigned long pll_flags = 0;
+ 
+ 	match = of_match_node(c32_pll_of_match, np);
+ 	if (!match) {
+@@ -1116,8 +1117,10 @@ static void __init clkgen_c32_pll_setup(struct device_node *np)
+ 	if (!pll_base)
+ 		return;
+ 
+-	clk = clkgen_pll_register(parent_name, data, pll_base, np->name,
+-				  data->lock);
++	of_clk_detect_critical(np, 0, &pll_flags);
++
++	clk = clkgen_pll_register(parent_name, data, pll_base, pll_flags,
++				  np->name, data->lock);
+ 	if (IS_ERR(clk))
+ 		return;
+ 
+@@ -1139,12 +1142,15 @@ static void __init clkgen_c32_pll_setup(struct device_node *np)
+ 	for (odf = 0; odf < num_odfs; odf++) {
+ 		struct clk *clk;
+ 		const char *clk_name;
++		unsigned long odf_flags = 0;
+ 
+ 		if (of_property_read_string_index(np, "clock-output-names",
+ 						  odf, &clk_name))
+ 			return;
+ 
+-		clk = clkgen_odf_register(pll_name, pll_base, data,
++		of_clk_detect_critical(np, odf, &odf_flags);
++
++		clk = clkgen_odf_register(pll_name, pll_base, data, odf_flags,
+ 				odf, &clkgena_c32_odf_lock, clk_name);
+ 		if (IS_ERR(clk))
+ 			goto err;
+@@ -1206,7 +1212,8 @@ static void __init clkgengpu_c32_pll_setup(struct device_node *np)
+ 	/*
+ 	 * PLL 1200MHz output
+ 	 */
+-	clk = clkgen_pll_register(parent_name, data, reg, clk_name, data->lock);
++	clk = clkgen_pll_register(parent_name, data, reg,
++				  0, clk_name, data->lock);
+ 
+ 	if (!IS_ERR(clk))
+ 		of_clk_add_provider(np, of_clk_src_simple_get, clk);
 -- 
 2.8.3
