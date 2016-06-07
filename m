@@ -1,37 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jun 2016 14:32:47 +0100
-Subject: [PATCH v3] ASoC: rockchip: Add machine driver for
- MAX98357A/RT5514/DA7219
-In-Reply-To: <5756C245.7010001@rock-chips.com>
-References: <1464267742-15312-1-git-send-email-zhengxing@rock-chips.com>
- <20160601144542.GA3835@rob-hp-laptop>
- <5751912C.6080904@rock-chips.com>
- <20160606235026.GP7510@sirena.org.uk>
- <5756363F.40208@rock-chips.com>
- <20160607104711.GR7510@sirena.org.uk>
- <5756B22F.9000105@rock-chips.com>
- <20160607120647.GV7510@sirena.org.uk>
- <5756C245.7010001@rock-chips.com>
-Message-ID: <20160607133247.GY7510@sirena.org.uk>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 7 Jun 2016 10:33:09 -0300
+Subject: next-20160607 build: 2 failures 9 warnings (next-20160607)
+In-Reply-To: <5756CAB2.5030701@samsung.com>
+References: <E1bABXS-0001YX-Cz@optimist> <20160607105823.GT7510@sirena.org.uk>
+ <5756CAB2.5030701@samsung.com>
+Message-ID: <20160607103309.0b9a48fc@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 08:47:01PM +0800, Xing Zheng wrote:
-> On 2016?06?07? 20:06, Mark Brown wrote:
+Em Tue, 07 Jun 2016 15:22:58 +0200
+Sylwester Nawrocki <s.nawrocki@samsung.com> escreveu:
 
-> > OK, then the original name probably makes some sense though really
-> > that's such an unusual design that just naming it after the specific
-> > board might be better, it's not likely to see any reuse I'd guess.
+> On 06/07/2016 12:58 PM, Mark Brown wrote:
+> > On Tue, Jun 07, 2016 at 08:35:02AM +0100, Build bot for Mark Brown wrote:
+> > 
+> > Today's -next fails to build an arm64 allmodconfig due to:
+> >   
+> >> 	arm64-allmodconfig
+> >> ../drivers/media/platform/s5p-mfc/s5p_mfc_iommu.h:19:27: fatal error: asm/dma-iommu.h: No such file or directory  
+> > 
+> > introduced by 04f776734c4e (media: s5p-mfc: add iommu support) which
+> > relies on a header which is only available on 32 bit ARM.  I suspect the
+> > driver should be using linux/dma-iommu.h instead.  
+> 
+> Since the mfc topic branch got already pulled to the samsung-soc tree,
+> as discussed in other thread [1], there is a build break in -next.
+> There is a patch to fix this issue and to include it in next, as we
+> agreed  on irc, could you please pull this branch into your "for-next"
+> tree:
+> 
+> git://linuxtv.org/snawrocki/samsung.git for-v4.8/media/exynos-mfc
+> 
+> and then apply that patch [2] ?
+> "media: s5p-mfc: fix compilation issue on archs other than ARM (32bit)"
 
-> There are not only one type of board with this audio connection, so I think
-> we don't need to add specific board name.
+Sure. Applied, thanks!
 
-I imagine they're all variants on a single reference design though?  The
-name is unweildy.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/5e7b555c/attachment.sig>
+Mauro
