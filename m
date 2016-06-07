@@ -1,73 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  7 Jun 2016 12:19:29 +0100
-Subject: [PATCH 5/6] ARM: sti: stih410-clocks: Identify critical clocks
-In-Reply-To: <20160607111930.10375-1-lee.jones@linaro.org>
-References: <20160607111930.10375-1-lee.jones@linaro.org>
-Message-ID: <20160607111930.10375-6-lee.jones@linaro.org>
+From: kraxel@redhat.com (Gerd Hoffmann)
+Date: Tue,  7 Jun 2016 13:05:40 +0200
+Subject: [PATCH v3 02/10] irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ.
+In-Reply-To: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
+References: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
+Message-ID: <1465297548-17182-3-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Lots of platforms contain clocks which if turned off would prove fatal.
-The only way to recover is to restart the board(s).  This driver takes
-references to clocks which are required to be always-on.  The Common
-Clk Framework will then take references to them.  This way they will
-not be turned off during the clk_disabled_unused() procedure.
+From: Eric Anholt <eric@anholt.net>
 
-In this patch we are identifying clocks, which if gated would render
-the STiH410 development board unserviceable.
+This is equivalent and works for arm64 as well.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Eric Anholt <eric@anholt.net>
 ---
- arch/arm/boot/dts/stih410-clock.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/irqchip/irq-bcm2835.c | 3 +--
+ drivers/irqchip/irq-bcm2836.c | 2 +-
+ 2 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih410-clock.dtsi b/arch/arm/boot/dts/stih410-clock.dtsi
-index d1f2aca..fd50496 100644
---- a/arch/arm/boot/dts/stih410-clock.dtsi
-+++ b/arch/arm/boot/dts/stih410-clock.dtsi
-@@ -103,6 +103,7 @@
- 				clocks = <&clk_sysin>;
+diff --git a/drivers/irqchip/irq-bcm2835.c b/drivers/irqchip/irq-bcm2835.c
+index bf9cc5f..44d7c38 100644
+--- a/drivers/irqchip/irq-bcm2835.c
++++ b/drivers/irqchip/irq-bcm2835.c
+@@ -52,7 +52,6 @@
+ #include <linux/irqdomain.h>
  
- 				clock-output-names = "clk-s-a0-pll-ofd-0";
-+				clock-critical = <0>; /* clk-s-a0-pll-ofd-0 */
- 			};
+ #include <asm/exception.h>
+-#include <asm/mach/irq.h>
  
- 			clk_s_a0_flexgen: clk-s-a0-flexgen {
-@@ -115,6 +116,7 @@
+ /* Put the bank and irq (32 bits) into the hwirq */
+ #define MAKE_HWIRQ(b, n)	((b << 5) | (n))
+@@ -242,7 +241,7 @@ static void __exception_irq_entry bcm2835_handle_irq(
+ 	u32 hwirq;
  
- 				clock-output-names = "clk-ic-lmi0",
- 						     "clk-ic-lmi1";
-+				clock-critical = <CLK_IC_LMI0>;
- 			};
- 		};
+ 	while ((hwirq = get_next_armctrl_hwirq()) != ~0)
+-		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
++		handle_domain_irq(intc.domain, hwirq, regs);
+ }
  
-@@ -129,6 +131,7 @@
- 					     "clk-s-c0-fs0-ch1",
- 					     "clk-s-c0-fs0-ch2",
- 					     "clk-s-c0-fs0-ch3";
-+			clock-critical = <0>; /* clk-s-c0-fs0-ch0 */
- 		};
+ static void bcm2836_chained_handle_irq(struct irq_desc *desc)
+diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
+index 72ff1d5..2787598 100644
+--- a/drivers/irqchip/irq-bcm2836.c
++++ b/drivers/irqchip/irq-bcm2836.c
+@@ -180,7 +180,7 @@ __exception_irq_entry bcm2836_arm_irqchip_handle_irq(struct pt_regs *regs)
+ 	} else if (stat) {
+ 		u32 hwirq = ffs(stat) - 1;
  
- 		clk_s_c0: clockgen-c at 09103000 {
-@@ -142,6 +145,7 @@
- 				clocks = <&clk_sysin>;
- 
- 				clock-output-names = "clk-s-c0-pll0-odf-0";
-+				clock-critical = <0>; /* clk-s-c0-pll0-odf-0 */
- 			};
- 
- 			clk_s_c0_pll1: clk-s-c0-pll1 {
-@@ -204,6 +208,11 @@
- 						     "clk-clust-hades",
- 						     "clk-hwpe-hades",
- 						     "clk-fc-hades";
-+				clock-critical = <CLK_ICN_CPU>,
-+						 <CLK_TX_ICN_DMU>,
-+						 <CLK_EXT2F_A9>,
-+						 <CLK_ICN_LMI>,
-+						 <CLK_ICN_SBC>;
- 			};
- 		};
+-		handle_IRQ(irq_linear_revmap(intc.domain, hwirq), regs);
++		handle_domain_irq(intc.domain, hwirq, regs);
+ 	}
+ }
  
 -- 
-2.8.3
+1.8.3.1
