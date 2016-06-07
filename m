@@ -1,30 +1,139 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 7 Jun 2016 15:57:13 +0530
-Subject: [PATCH V4 1/8] ARM: davinci: Sort frequency table
-In-Reply-To: <3a395ec9a3cfec21f227a1ad92df237b1dda9f2d.1465184522.git.viresh.kumar@linaro.org>
-References: <f9a03695c321b9c0628c6ae0136adfe004f358ad.1464931080.git.viresh.kumar@linaro.org>
- <3a395ec9a3cfec21f227a1ad92df237b1dda9f2d.1465184522.git.viresh.kumar@linaro.org>
-Message-ID: <20160607102713.GD21466@vireshk-i7>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Tue, 7 Jun 2016 19:28:36 +0900
+Subject: [PATCH v13 09/10] arm64: Add kernel return probes support
+ (kretprobes)
+In-Reply-To: <1464924384-15269-10-git-send-email-dave.long@linaro.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-10-git-send-email-dave.long@linaro.org>
+Message-ID: <20160607192836.20d94e0838ef72ebc729a054@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06-06-16, 09:14, Viresh Kumar wrote:
-> This is required for some of the changes in cpufreq core. There was only
-> one function dependent on the order of the table, that is fixed as well.
+On Thu,  2 Jun 2016 23:26:23 -0400
+David Long <dave.long@linaro.org> wrote:
+
+> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 > 
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> The pre-handler of this special 'trampoline' kprobe executes the return
+> probe handler functions and restores original return address in ELR_EL1.
+> This way the saved pt_regs still hold the original register context to be
+> carried back to the probed kernel function.
+> 
+> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> Signed-off-by: David A. Long <dave.long@linaro.org>
 > ---
-> V3->V4:
-> - Fixed an error reported by buildbot, by removing '&' before
->   usage of da850_freq_table.
+>  arch/arm64/Kconfig          |  1 +
+>  arch/arm64/kernel/kprobes.c | 75 ++++++++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 75 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 5496b75..47989eb 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -89,6 +89,7 @@ config ARM64
+>  	select HAVE_RCU_TABLE_FREE
+>  	select HAVE_SYSCALL_TRACEPOINTS
+>  	select HAVE_KPROBES
+> +	select HAVE_KRETPROBES if HAVE_KPROBES
+>  	select IOMMU_DMA if IOMMU_SUPPORT
+>  	select IRQ_DOMAIN
+>  	select IRQ_FORCED_THREADING
+> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
+> index b35f76f..c116904 100644
+> --- a/arch/arm64/kernel/kprobes.c
+> +++ b/arch/arm64/kernel/kprobes.c
+> @@ -577,7 +577,80 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
+>  
+>  void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
+>  {
+> -	return NULL;
+> +	struct kretprobe_instance *ri = NULL;
+> +	struct hlist_head *head, empty_rp;
+> +	struct hlist_node *tmp;
+> +	unsigned long flags, orig_ret_addr = 0;
+> +	unsigned long trampoline_address =
+> +		(unsigned long)&kretprobe_trampoline;
+> +
+> +	INIT_HLIST_HEAD(&empty_rp);
+> +	kretprobe_hash_lock(current, &head, &flags);
+> +
+> +	/*
+> +	 * It is possible to have multiple instances associated with a given
+> +	 * task either because multiple functions in the call path have
+> +	 * a return probe installed on them, and/or more than one return
+> +	 * probe was registered for a target function.
+> +	 *
+> +	 * We can handle this because:
+> +	 *     - instances are always inserted at the head of the list
+> +	 *     - when multiple return probes are registered for the same
+> +	 *       function, the first instance's ret_addr will point to the
+> +	 *       real return address, and all the rest will point to
+> +	 *       kretprobe_trampoline
+> +	 */
+> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
+> +		if (ri->task != current)
+> +			/* another task is sharing our hash bucket */
+> +			continue;
+> +
+> +		if (ri->rp && ri->rp->handler) {
+> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
+> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
+> +			ri->rp->handler(ri, regs);
+> +			__this_cpu_write(current_kprobe, NULL);
+> +		}
+> +
+> +		orig_ret_addr = (unsigned long)ri->ret_addr;
+> +		recycle_rp_inst(ri, &empty_rp);
+> +
+> +		if (orig_ret_addr != trampoline_address)
+> +			/*
+> +			 * This is the real return address. Any other
+> +			 * instances associated with this task are for
+> +			 * other calls deeper on the call stack
+> +			 */
+> +			break;
+> +	}
 
-@Rafael,
+This looks not included an improvement done by Syuhei, see
+commit 737480a0d525 ("kprobes/x86: Fix the return address of multiple kretprobes")
 
-If you are going to apply the V4 of the other series that adds new
-helpers for sorted freq-tables, then this patch wouldn't be required
-anymore. The other 7 shall be applied though.
+Thank you!
+
+> +
+> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
+> +	/* restore the original return address */
+> +	instruction_pointer(regs) = orig_ret_addr;
+> +	reset_current_kprobe();
+> +	kretprobe_hash_unlock(current, &flags);
+> +
+> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
+> +		hlist_del(&ri->hlist);
+> +		kfree(ri);
+> +	}
+> +
+> +	/* return 1 so that post handlers not called */
+> +	return (void *) orig_ret_addr;
+> +}
+> +
+> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
+> +				      struct pt_regs *regs)
+> +{
+> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
+> +
+> +	/* replace return addr (x30) with trampoline */
+> +	regs->regs[30] = (long)&kretprobe_trampoline;
+> +}
+> +
+> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
+> +{
+> +	return 0;
+>  }
+>  
+>  int __init arch_init_kprobes(void)
+> -- 
+> 2.5.0
+> 
+
 
 -- 
-viresh
+Masami Hiramatsu <mhiramat@kernel.org>
