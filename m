@@ -1,68 +1,53 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 7 Jun 2016 18:38:47 +0200
-Subject: [PATCH] arm64: Implement ptep_set_access_flags() for hardware
- AF/DBM
-In-Reply-To: <20160607163024.GB20477@arm.com>
-References: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
- <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
- <20160607163024.GB20477@arm.com>
-Message-ID: <af67c8bc-996a-26bb-d506-fbcc1a6e7d6e@suse.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 8 Jun 2016 00:44:29 +0800
+Subject: [PATCH v10 4/8] vfio/type1: handle unmap/unpin and replay for
+ VFIO_IOVA_RESERVED slots
+In-Reply-To: <1465315433-5974-5-git-send-email-eric.auger@redhat.com>
+Message-ID: <201606080053.GBblobZp%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+[auto build test ERROR on vfio/next]
+[also build test ERROR on v4.7-rc2 next-20160607]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-On 07.06.16 18:30, Will Deacon wrote:
-> Hi Alex,
-> 
-> Thanks for the bug report.
-> 
-> On Tue, Jun 07, 2016 at 04:13:03PM +0200, Alexander Graf wrote:
->> On 13.04.16 17:01, Catalin Marinas wrote:
->>> When hardware updates of the access and dirty states are enabled, the
->>> default ptep_set_access_flags() implementation based on calling
->>> set_pte_at() directly is potentially racy. This triggers the "racy dirty
->>> state clearing" warning in set_pte_at() because an existing writable PTE
->>> is overridden with a clean entry.
-> 
-> [...]
-> 
->> This patch breaks swapping for me.
->>
->> I've hit weird issues where systems stopped working half-way, with the
->> kernel still being fine and user space applications just stopping to
->> respond.
->>
->> After some debugging we found out that it always happens when swapping
->> (to anything, backing storage doesn't matter). A quick bisect points to
->> this commit as culprit and indeed, if I disable CONFIG_ARM64_HW_AFDBM
->> the system works as expected.
-> 
-> [...]
-> 
->> The back traces indicate that the page fault handler goes through and
->> the process just keeps banging on the same page fault over and over
->> again. I have not yet figured out what *exactly* is going wrong or why
->> this patch would actually give us that effect.
->>
->> I was able to fully reproduce the issue with current Linus tree (4.7-rc2+).
-> 
-> It looks like the following happens:
-> 
->   1. We put down a PTE_WRITE | PTE_DIRTY | PTE_AF pte
->   2. Memory pressure -> pte_mkold(pte) -> clear PTE_AF
->   3. A read faults due to the missing access flag
->   4. ptep_set_access_flags is called with dirty = 0, due to the read fault
->   5. pte is then made PTE_WRITE | PTE_DIRTY | PTE_AF | PTE_RDONLY (!)
->   6. A write faults, but pte_write is true so we get stuck
-> 
-> Does the diff below fix the issue for you? If so, I'll write a proper
-> patch.
+url:    https://github.com/0day-ci/linux/commits/Eric-Auger/KVM-PCIe-MSI-passthrough-on-ARM-ARM64-kernel-part-3-3-vfio-changes/20160608-001148
+base:   https://github.com/awilliam/linux-vfio.git next
+config: x86_64-rhel (attached as .config)
+compiler: gcc-4.9 (Debian 4.9.3-14) 4.9.3
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-With that patch on top of Linus master I don't see the issue anymore,
-yes :).
+All errors (new ones prefixed by >>):
 
+>> drivers/vfio/vfio_iommu_type1.c:39:29: fatal error: linux/msi-iommu.h: No such file or directory
+    #include <linux/msi-iommu.h>
+                                ^
+   compilation terminated.
 
-Thanks for the quick reply!
+vim +39 drivers/vfio/vfio_iommu_type1.c
 
-Alex
+    33	#include <linux/rbtree.h>
+    34	#include <linux/sched.h>
+    35	#include <linux/slab.h>
+    36	#include <linux/uaccess.h>
+    37	#include <linux/vfio.h>
+    38	#include <linux/workqueue.h>
+  > 39	#include <linux/msi-iommu.h>
+    40	
+    41	#define DRIVER_VERSION  "0.2"
+    42	#define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 36891 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160608/6edda2fa/attachment-0001.obj>
