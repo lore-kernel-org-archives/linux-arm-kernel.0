@@ -1,31 +1,50 @@
-From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Tue,  7 Jun 2016 13:05:46 +0200
-Subject: [PATCH v3 08/10] ARM: bcm2835: Add devicetree for the Raspberry Pi 3,
- for arm (32)
-In-Reply-To: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
-References: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1465297548-17182-9-git-send-email-kraxel@redhat.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  7 Jun 2016 12:19:25 +0100
+Subject: [PATCH 1/6] clk: st: clk-flexgen: Detect critical clocks
+In-Reply-To: <20160607111930.10375-1-lee.jones@linaro.org>
+References: <20160607111930.10375-1-lee.jones@linaro.org>
+Message-ID: <20160607111930.10375-2-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
----
- arch/arm/boot/dts/Makefile | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+Utilise the new Critical Clock infrastructure to mark clocks which
+much not be disabled as CRITICAL.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 06b6c2d..71e2d36 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -66,7 +66,8 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-b-rev2.dtb \
- 	bcm2835-rpi-b-plus.dtb \
- 	bcm2835-rpi-a-plus.dtb \
--	bcm2836-rpi-2-b.dtb
-+	bcm2836-rpi-2-b.dtb \
-+	../../../arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
- 	bcm4708-asus-rt-ac56u.dtb \
- 	bcm4708-asus-rt-ac68u.dtb \
+While we're at it, reduce the coverage of the flex_flags variable,
+since it's only really used in a single for() loop.
+
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/clk/st/clk-flexgen.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/st/clk-flexgen.c b/drivers/clk/st/clk-flexgen.c
+index 627267c..546bd79 100644
+--- a/drivers/clk/st/clk-flexgen.c
++++ b/drivers/clk/st/clk-flexgen.c
+@@ -267,7 +267,6 @@ static void __init st_of_flexgen_setup(struct device_node *np)
+ 	const char **parents;
+ 	int num_parents, i;
+ 	spinlock_t *rlock = NULL;
+-	unsigned long flex_flags = 0;
+ 	int ret;
+ 
+ 	pnode = of_get_parent(np);
+@@ -308,12 +307,15 @@ static void __init st_of_flexgen_setup(struct device_node *np)
+ 	for (i = 0; i < clk_data->clk_num; i++) {
+ 		struct clk *clk;
+ 		const char *clk_name;
++		unsigned long flex_flags = 0;
+ 
+ 		if (of_property_read_string_index(np, "clock-output-names",
+ 						  i, &clk_name)) {
+ 			break;
+ 		}
+ 
++		of_clk_detect_critical(np, i, &flex_flags);
++
+ 		/*
+ 		 * If we read an empty clock name then the output is unused
+ 		 */
 -- 
-1.8.3.1
+2.8.3
