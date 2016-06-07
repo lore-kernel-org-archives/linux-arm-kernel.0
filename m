@@ -1,89 +1,158 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 7 Jun 2016 09:12:51 +0100
-Subject: [STLinux Kernel] [[PATCH v2] 07/11] pwm: sti: Supply PWM Capture
- clock handling
-In-Reply-To: <1461320295-20414-8-git-send-email-lee.jones@linaro.org>
-References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
- <1461320295-20414-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160607081251.GA22744@griffinp-ThinkPad-X1-Carbon-2nd>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Tue, 7 Jun 2016 16:08:14 +0800
+Subject: [PATCH v4 10/14] arm64/numa: define numa_distance as array to
+ simplify code
+In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1465286898-13828-11-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+1. MAX_NUMNODES is base on CONFIG_NODES_SHIFT, the default value of the
+   latter is very small now.
+2. Suppose the default value of MAX_NUMNODES is enlarged to 64, so the
+   size of numa_distance is 4K, it's still acceptable if run the Image
+   on other processors.
+3. It will make function __node_distance quicker than before.
 
-On Fri, 22 Apr 2016, Lee Jones wrote:
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ arch/arm64/include/asm/numa.h |  1 -
+ arch/arm64/mm/numa.c          | 74 +++----------------------------------------
+ 2 files changed, 5 insertions(+), 70 deletions(-)
 
-> ST's PWM IP is supplied by 2 different clocks.  One for PWM
-> Output and the other for Capture.  This patch provides clock
-> handling for the latter.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/pwm/pwm-sti.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
-> 
-> diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-> index 2f61e1e..78979d0 100644
-> --- a/drivers/pwm/pwm-sti.c
-> +++ b/drivers/pwm/pwm-sti.c
-> @@ -74,6 +74,7 @@ struct sti_pwm_compat_data {
->  struct sti_pwm_chip {
->  	struct device *dev;
->  	struct clk *pwm_clk;
-> +	struct clk *cpt_clk;
->  	struct regmap *regmap;
->  	struct sti_pwm_compat_data *cdata;
->  	struct regmap_field *prescale_low;
-> @@ -183,6 +184,10 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  		if (ret)
->  			return ret;
->  
-> +		ret = clk_enable(pc->cpt_clk);
-> +		if (ret)
-> +			return ret;
-> +
->  		if (!period_same) {
->  			ret = sti_pwm_get_prescale(pc, period_ns, &prescale);
->  			if (ret)
-> @@ -227,6 +232,7 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
->  
->  clk_dis:
->  	clk_disable(pc->pwm_clk);
-> +	clk_disable(pc->cpt_clk);
->  	return ret;
->  }
->  
-> @@ -246,6 +252,10 @@ static int sti_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
->  		if (ret)
->  			goto out;
->  
-> +		ret = clk_enable(pc->cpt_clk);
-> +		if (ret)
-> +			goto out;
-> +
->  		ret = regmap_field_write(pc->pwm_out_en, 1);
->  		if (ret) {
->  			dev_err(dev, "failed to enable PWM device:%d\n",
-> @@ -271,6 +281,7 @@ static void sti_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
->  	regmap_field_write(pc->pwm_out_en, 0);
->  
->  	clk_disable(pc->pwm_clk);
-> +	clk_disable(pc->cpt_clk);
->  	mutex_unlock(&pc->sti_pwm_lock);
->  }
->  
-> @@ -390,6 +401,18 @@ static int sti_pwm_probe(struct platform_device *pdev)
->  		return ret;
->  	}
->  
-> +	pc->cpt_clk = of_clk_get_by_name(dev->of_node, "capture");
-> +	if (IS_ERR(pc->cpt_clk)) {
-> +		dev_err(dev, "failed to get PWM capture clock\n");
-> +		return PTR_ERR(pc->cpt_clk);
-> +	}
+diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
+index 600887e..9b6cc38 100644
+--- a/arch/arm64/include/asm/numa.h
++++ b/arch/arm64/include/asm/numa.h
+@@ -32,7 +32,6 @@ static inline const struct cpumask *cpumask_of_node(int node)
+ void __init arm64_numa_init(void);
+ int __init numa_add_memblk(int nodeid, u64 start, u64 end);
+ void __init numa_set_distance(int from, int to, int distance);
+-void __init numa_free_distance(void);
+ void __init early_map_cpu_to_node(unsigned int cpu, int nid);
+ void numa_store_cpu_info(unsigned int cpu);
 
-The dt binding document pwm-st.txt also needs updating for this extra clock.
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 99401aa..df5c842 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -32,8 +32,7 @@ EXPORT_SYMBOL(node_data);
+ nodemask_t numa_nodes_parsed __initdata;
+ static int cpu_to_node_map[NR_CPUS] = { [0 ... NR_CPUS-1] = NUMA_NO_NODE };
 
-regards,
+-static int numa_distance_cnt;
+-static u8 *numa_distance;
++static u8 numa_distance[MAX_NUMNODES][MAX_NUMNODES];
+ static bool numa_off;
 
-Peter.
+ static __init int numa_parse_early_param(char *opt)
+@@ -247,59 +246,6 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+ }
+
+ /**
+- * numa_free_distance
+- *
+- * The current table is freed.
+- */
+-void __init numa_free_distance(void)
+-{
+-	size_t size;
+-
+-	if (!numa_distance)
+-		return;
+-
+-	size = numa_distance_cnt * numa_distance_cnt *
+-		sizeof(numa_distance[0]);
+-
+-	memblock_free(__pa(numa_distance), size);
+-	numa_distance_cnt = 0;
+-	numa_distance = NULL;
+-}
+-
+-/**
+- *
+- * Create a new NUMA distance table.
+- *
+- */
+-static int __init numa_alloc_distance(void)
+-{
+-	size_t size;
+-	u64 phys;
+-	int i, j;
+-
+-	size = nr_node_ids * nr_node_ids * sizeof(numa_distance[0]);
+-	phys = memblock_find_in_range(0, PFN_PHYS(max_pfn),
+-				      size, PAGE_SIZE);
+-	if (WARN_ON(!phys))
+-		return -ENOMEM;
+-
+-	memblock_reserve(phys, size);
+-
+-	numa_distance = __va(phys);
+-	numa_distance_cnt = nr_node_ids;
+-
+-	/* fill with the default distances */
+-	for (i = 0; i < numa_distance_cnt; i++)
+-		for (j = 0; j < numa_distance_cnt; j++)
+-			numa_distance[i * numa_distance_cnt + j] = i == j ?
+-				LOCAL_DISTANCE : REMOTE_DISTANCE;
+-
+-	pr_debug("Initialized distance table, cnt=%d\n", numa_distance_cnt);
+-
+-	return 0;
+-}
+-
+-/**
+  * numa_set_distance - Set inter node NUMA distance from node to node.
+  * @from: the 'from' node to set distance
+  * @to: the 'to'  node to set distance
+@@ -314,12 +260,7 @@ static int __init numa_alloc_distance(void)
+  */
+ void __init numa_set_distance(int from, int to, int distance)
+ {
+-	if (!numa_distance) {
+-		pr_warn_once("Warning: distance table not allocated yet\n");
+-		return;
+-	}
+-
+-	if (from >= numa_distance_cnt || to >= numa_distance_cnt ||
++	if (from >= MAX_NUMNODES || to >= MAX_NUMNODES ||
+ 			from < 0 || to < 0) {
+ 		pr_warn_once("Warning: node ids are out of bound, from=%d to=%d distance=%d\n",
+ 			    from, to, distance);
+@@ -333,7 +274,7 @@ void __init numa_set_distance(int from, int to, int distance)
+ 		return;
+ 	}
+
+-	numa_distance[from * numa_distance_cnt + to] = distance;
++	numa_distance[from][to] = distance;
+ }
+
+ /**
+@@ -341,9 +282,9 @@ void __init numa_set_distance(int from, int to, int distance)
+  */
+ int __node_distance(int from, int to)
+ {
+-	if (from >= numa_distance_cnt || to >= numa_distance_cnt)
++	if (from >= MAX_NUMNODES || to >= MAX_NUMNODES)
+ 		return from == to ? LOCAL_DISTANCE : REMOTE_DISTANCE;
+-	return numa_distance[from * numa_distance_cnt + to];
++	return numa_distance[from][to];
+ }
+ EXPORT_SYMBOL(__node_distance);
+
+@@ -383,11 +324,6 @@ static int __init numa_init(int (*init_func)(void))
+ 	nodes_clear(numa_nodes_parsed);
+ 	nodes_clear(node_possible_map);
+ 	nodes_clear(node_online_map);
+-	numa_free_distance();
+-
+-	ret = numa_alloc_distance();
+-	if (ret < 0)
+-		return ret;
+
+ 	ret = init_func();
+ 	if (ret < 0)
+--
+2.5.0
