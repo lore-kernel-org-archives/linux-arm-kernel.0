@@ -1,32 +1,21 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Jun 2016 22:49:27 +0200
-Subject: [PATCH v3 0/2] ARM: dts: sun9i: drop sunxi-common-regulators.dtsi
-In-Reply-To: <1464936651-25911-1-git-send-email-wens@csie.org>
-References: <1464936651-25911-1-git-send-email-wens@csie.org>
-Message-ID: <20160607204927.GD14179@lukather>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue, 7 Jun 2016 13:53:58 -0700
+Subject: [PATCH] soc: brcmstb: fix warning from missing include
+In-Reply-To: <1465322094-25692-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465322094-25692-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <57573466.3040607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 02:50:49PM +0800, Chen-Yu Tsai wrote:
-> Hi Maxime,
+On 06/07/2016 10:54 AM, Ben Dooks wrote:
+> The brcmstb_biuctrl_init() is defined in the soc specific header
+> file, but wasn't included in the driver file. Fix the following
+> warning by including <linux/soc/brcmstb/brcmstb.h> in the driver:
 > 
-> These are the remaining 2 patches from the AXP809 series.
+> drivers/soc/brcmstb/biuctrl.c:101:13: warning: symbol 'brcmstb_biuctrl_init' was not declared. Should it be static?
 > 
-> Changes since v2:
-> 
->   - Drop sunxi-common-regulators.dtsi instead of disabling dummy regulators.
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Applied both, thanks!
-Maxime
-
+Applied, thanks Ben!
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/856e0899/attachment-0001.sig>
+Florian
