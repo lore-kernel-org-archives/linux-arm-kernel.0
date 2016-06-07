@@ -1,44 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 7 Jun 2016 10:15:43 +0100
-Subject: [STLinux Kernel] [PATCH 0/7] reset: Consumers to explicitly
- request 'exclusive' or 'shared' lines
-In-Reply-To: <20160607084208.GB22960@griffinp-ThinkPad-X1-Carbon-2nd>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
- <20160607084208.GB22960@griffinp-ThinkPad-X1-Carbon-2nd>
-Message-ID: <20160607091543.GC18047@dell>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 7 Jun 2016 10:15:55 +0100
+Subject: [PATCH] arm64: Implement arch_setup_pdev_archdata hook
+In-Reply-To: <b4645ade4a4d4150e76594f5bf04a3ad5e7d5221.1465287808.git.baolin.wang@linaro.org>
+References: <b4645ade4a4d4150e76594f5bf04a3ad5e7d5221.1465287808.git.baolin.wang@linaro.org>
+Message-ID: <575690CB.5080501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jun 2016, Peter Griffin wrote:
+On 07/06/16 09:29, Baolin Wang wrote:
+> Now on ARM64 platform, it will set 'dummy_dma_ops' for device dma_ops if
+> it did not call 'arch_setup_dma_ops' at device creation time by issuing
+> platform_device_alloc() function, that will cause failure when setting
+> the dma mask for device.
 
-> Hi,
-> 
-> On Mon, 06 Jun 2016, Lee Jones wrote:
-> 
-> > Phasing out generic reset line requests enables us to make some better
-> > decisions on when and how to (de)assert said lines.  If an 'exclusive'
-> > line is requested, we know a device *requires* a reset and that it's
-> > preferable to act upon a request right away.  However, if a 'shared'
-> > reset line is requested, we can reasonably assume sure that placing a
-> > device into reset isn't a hard requirement, but probably a measure to
-> > save power and is thus able to cope with not being asserted if another
-> > device is still in use.
-> > 
-> > In order allow gentle adoption and not to forcing all consumers to
-> > move to the API immediately, causing administration headache between
-> > subsystems, this patch adds some temporary stand-in shim-calls.  This
-> > will ease the burden at merge time and allow subsystems to migrate over
-> > to the new API in a more realistic time-frame.
-> 
-> Is the intention that this series will be taken into the next -rc?
-> 
-> As the introduction of shared resets in reset subsystem has caused regressions
-> on STi platforms.
+Yes, that's rather the whole point. DMA-capable devices are real 
+hardware, therefore don't spring out of thin air without being described 
+in DT or ACPI.
 
-Yes, which is why it has a Fixes: tag.
+Please elaborate on the situation that you're attempting to address here 
+(please don't let it be the ongoing Designware USB catastrophe ;))
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Robin.
+
+> Hence We need to hook the archdata to setup proper dma_ops for these devices.
+>
+> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+> ---
+>   arch/arm64/mm/dma-mapping.c |   21 +++++++++++++++++++++
+>   1 file changed, 21 insertions(+)
+>
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index c566ec8..04e057b 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -26,6 +26,7 @@
+>   #include <linux/dma-contiguous.h>
+>   #include <linux/vmalloc.h>
+>   #include <linux/swiotlb.h>
+> +#include <linux/platform_device.h>
+>
+>   #include <asm/cacheflush.h>
+>
+> @@ -961,3 +962,23 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>   	dev->archdata.dma_coherent = coherent;
+>   	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+>   }
+> +
+> +void arch_setup_pdev_archdata(struct platform_device *pdev)
+> +{
+> +	if (!pdev->dev.archdata.dma_ops)
+> +		pdev->dev.archdata.dma_ops = &swiotlb_dma_ops;
+> +
+> +	/*
+> +	 * Set default coherent_dma_mask to 32 bit. Drivers are expected to
+> +	 * setup the correct supported mask.
+> +	 */
+> +	if (!pdev->dev.coherent_dma_mask)
+> +		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> +
+> +	/*
+> +	 * Set it to coherent_dma_mask by default if the architecture
+> +	 * code has not set it.
+> +	 */
+> +	if (!pdev->dev.dma_mask)
+> +		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> +}
+>
