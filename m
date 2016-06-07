@@ -1,166 +1,134 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jun 2016 11:58:30 +0100
-Subject: [PATCH 10/15] arm/arm64: KVM: Drop boot_pgd
+Date: Tue,  7 Jun 2016 11:58:25 +0100
+Subject: [PATCH 05/15] arm64: KVM: Refactor kern_hyp_va/hyp_kern_va to deal
+ with multiple offsets
 In-Reply-To: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
 References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1465297115-13091-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1465297115-13091-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since we now only have one set of page tables, the concept of
-boot_pgd is useless and can be removed. We still keep it as
-an element of the "extended idmap" thing.
+As we move towards a selectable HYP VA range, it is obvious that
+we don't want to test a variable to find out if we need to use
+the bottom VA range, the top VA range, or use the address as is
+(for VHE).
+
+Instead, we can expand our current helpers to generate the right
+mask or nop with code patching. We default to using the top VA
+space, with alternatives to switch to the bottom one or to nop
+out the instructions.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_host.h   |  8 +++-----
- arch/arm/include/asm/kvm_mmu.h    |  1 -
- arch/arm/kvm/arm.c                | 15 +++------------
- arch/arm/kvm/mmu.c                |  8 --------
- arch/arm64/include/asm/kvm_host.h |  6 ++----
- arch/arm64/include/asm/kvm_mmu.h  |  1 -
- 6 files changed, 8 insertions(+), 31 deletions(-)
+ arch/arm64/include/asm/kvm_hyp.h | 27 ++++++++++++--------------
+ arch/arm64/include/asm/kvm_mmu.h | 42 +++++++++++++++++++++++++++++++++++++---
+ 2 files changed, 51 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 96387d4..020f4eb 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -241,8 +241,7 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
- int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		int exception_index);
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 61d01a9..dd4904b 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -25,24 +25,21 @@
  
--static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
--				       phys_addr_t pgd_ptr,
-+static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
- 				       unsigned long vector_ptr)
- {
-@@ -272,12 +271,11 @@ static inline void __cpu_init_stage2(void)
- 	kvm_call_hyp(__init_stage2_translation);
- }
+ #define __hyp_text __section(.hyp.text) notrace
  
--static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
--					phys_addr_t phys_idmap_start)
-+static inline void __cpu_reset_hyp_mode(phys_addr_t phys_idmap_start)
- {
- 	/*
- 	 * TODO
--	 * kvm_call_reset(boot_pgd_ptr, phys_idmap_start);
-+	 * kvm_call_reset(phys_idmap_start);
- 	 */
- }
- 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index f9a6506..898e7c8 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -65,7 +65,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
- void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
- 
- phys_addr_t kvm_mmu_get_httbr(void);
--phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
- phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
-diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-index 893941e..7f424fc 100644
---- a/arch/arm/kvm/arm.c
-+++ b/arch/arm/kvm/arm.c
-@@ -1038,7 +1038,6 @@ long kvm_arch_vm_ioctl(struct file *filp,
- 
- static void cpu_init_hyp_mode(void *dummy)
- {
--	phys_addr_t boot_pgd_ptr;
- 	phys_addr_t pgd_ptr;
- 	unsigned long hyp_stack_ptr;
- 	unsigned long stack_page;
-@@ -1047,13 +1046,12 @@ static void cpu_init_hyp_mode(void *dummy)
- 	/* Switch from the HYP stub to our own HYP init vector */
- 	__hyp_set_vectors(kvm_get_idmap_vector());
- 
--	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
- 	pgd_ptr = kvm_mmu_get_httbr();
- 	stack_page = __this_cpu_read(kvm_arm_hyp_stack_page);
- 	hyp_stack_ptr = stack_page + PAGE_SIZE;
- 	vector_ptr = (unsigned long)kvm_ksym_ref(__kvm_hyp_vector);
- 
--	__cpu_init_hyp_mode(boot_pgd_ptr, pgd_ptr, hyp_stack_ptr, vector_ptr);
-+	__cpu_init_hyp_mode(pgd_ptr, hyp_stack_ptr, vector_ptr);
- 	__cpu_init_stage2();
- 
- 	kvm_arm_init_debug();
-@@ -1075,15 +1073,8 @@ static void cpu_hyp_reinit(void)
- 
- static void cpu_hyp_reset(void)
- {
--	phys_addr_t boot_pgd_ptr;
--	phys_addr_t phys_idmap_start;
--
--	if (!is_kernel_in_hyp_mode()) {
--		boot_pgd_ptr = kvm_mmu_get_boot_httbr();
--		phys_idmap_start = kvm_get_idmap_start();
--
--		__cpu_reset_hyp_mode(boot_pgd_ptr, phys_idmap_start);
--	}
-+	if (!is_kernel_in_hyp_mode())
-+		__cpu_reset_hyp_mode(kvm_get_idmap_start());
- }
- 
- static void _kvm_arch_hardware_enable(void *discard)
-diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-index 9a17e14..647dbb2 100644
---- a/arch/arm/kvm/mmu.c
-+++ b/arch/arm/kvm/mmu.c
-@@ -1684,14 +1684,6 @@ phys_addr_t kvm_mmu_get_httbr(void)
- 		return virt_to_phys(hyp_pgd);
- }
- 
--phys_addr_t kvm_mmu_get_boot_httbr(void)
+-static inline unsigned long __kern_hyp_va(unsigned long v)
 -{
--	if (__kvm_cpu_uses_extended_idmap())
--		return virt_to_phys(merged_hyp_pgd);
--	else
--		return virt_to_phys(hyp_pgd);
+-	asm volatile(ALTERNATIVE("and %0, %0, %1",
+-				 "nop",
+-				 ARM64_HAS_VIRT_HOST_EXTN)
+-		     : "+r" (v) : "i" (HYP_PAGE_OFFSET_MASK));
+-	return v;
 -}
 -
- phys_addr_t kvm_get_idmap_vector(void)
+-#define kern_hyp_va(v) (typeof(v))(__kern_hyp_va((unsigned long)(v)))
+-
+ static inline unsigned long __hyp_kern_va(unsigned long v)
  {
- 	return hyp_idmap_vector;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 88462c3..6731d4e 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -347,8 +347,7 @@ int kvm_perf_teardown(void);
- 
- struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
- 
--static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
--				       phys_addr_t pgd_ptr,
-+static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
- 				       unsigned long hyp_stack_ptr,
- 				       unsigned long vector_ptr)
- {
-@@ -360,8 +359,7 @@ static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
+-	asm volatile(ALTERNATIVE("orr %0, %0, %1",
+-				 "nop",
++	u64 mask;
++
++	asm volatile(ALTERNATIVE("mov %0, %1",
++				 "mov %0, %2",
++				 ARM64_HYP_OFFSET_LOW)
++		     : "=r" (mask)
++		     : "i" (~HYP_PAGE_OFFSET_HIGH_MASK),
++		       "i" (~HYP_PAGE_OFFSET_LOW_MASK));
++	asm volatile(ALTERNATIVE("nop",
++				 "mov %0, xzr",
+ 				 ARM64_HAS_VIRT_HOST_EXTN)
+-		     : "+r" (v) : "i" (~HYP_PAGE_OFFSET_MASK));
+-	return v;
++		     : "+r" (mask));
++	return v | mask;
  }
  
- void __kvm_hyp_teardown(void);
--static inline void __cpu_reset_hyp_mode(phys_addr_t boot_pgd_ptr,
--					phys_addr_t phys_idmap_start)
-+static inline void __cpu_reset_hyp_mode(phys_addr_t phys_idmap_start)
- {
- 	kvm_call_hyp(__kvm_hyp_teardown, phys_idmap_start);
- }
+ #define hyp_kern_va(v) (typeof(v))(__hyp_kern_va((unsigned long)(v)))
 diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 889330b..7a23e18 100644
+index e45df1b..889330b 100644
 --- a/arch/arm64/include/asm/kvm_mmu.h
 +++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -175,7 +175,6 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run);
- void kvm_mmu_free_memory_caches(struct kvm_vcpu *vcpu);
+@@ -95,13 +95,33 @@
+ /*
+  * Convert a kernel VA into a HYP VA.
+  * reg: VA to be converted.
++ *
++ * This generates the following sequences:
++ * - High mask:
++ *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
++ *		nop
++ * - Low mask:
++ *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
++ *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
++ * - VHE:
++ *		nop
++ *		nop
++ *
++ * The "low mask" version works because the mask is a strict subset of
++ * the "high mask", hence performing the first mask for nothing.
++ * Should be completely invisible on any viable CPU.
+  */
+ .macro kern_hyp_va	reg
+-alternative_if_not ARM64_HAS_VIRT_HOST_EXTN	
+-	and	\reg, \reg, #HYP_PAGE_OFFSET_MASK
++alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
++	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
+ alternative_else
+ 	nop
+ alternative_endif
++alternative_if_not ARM64_HYP_OFFSET_LOW
++	nop
++alternative_else
++	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
++alternative_endif
+ .endm
  
- phys_addr_t kvm_mmu_get_httbr(void);
--phys_addr_t kvm_mmu_get_boot_httbr(void);
- phys_addr_t kvm_get_idmap_vector(void);
- phys_addr_t kvm_get_idmap_start(void);
- int kvm_mmu_init(void);
+ #else
+@@ -112,7 +132,23 @@ alternative_endif
+ #include <asm/mmu_context.h>
+ #include <asm/pgtable.h>
+ 
+-#define KERN_TO_HYP(kva)	((unsigned long)kva & HYP_PAGE_OFFSET_MASK)
++static inline unsigned long __kern_hyp_va(unsigned long v)
++{
++	asm volatile(ALTERNATIVE("and %0, %0, %1",
++				 "nop",
++				 ARM64_HAS_VIRT_HOST_EXTN)
++		     : "+r" (v)
++		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
++	asm volatile(ALTERNATIVE("nop",
++				 "and %0, %0, %1",
++				 ARM64_HYP_OFFSET_LOW)
++		     : "+r" (v)
++		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
++	return v;
++}
++
++#define kern_hyp_va(v) 	(typeof(v))(__kern_hyp_va((unsigned long)(v)))
++#define KERN_TO_HYP(v)	kern_hyp_va(v)
+ 
+ /*
+  * We currently only support a 40bit IPA.
 -- 
 2.1.4
