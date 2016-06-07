@@ -1,58 +1,46 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  7 Jun 2016 14:30:58 +0100
-Subject: [RFC PATCH v2 03/15] arm64: mm: change IOMMU notifier action to
- attach DMA ops
+Date: Tue,  7 Jun 2016 14:30:57 +0100
+Subject: [RFC PATCH v2 02/15] drivers: irqchip: its: fix its_acpi_probe()
+ prototype
 In-Reply-To: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1465306270-27076-4-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1465306270-27076-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current bus notifier in ARM64 (__iommu_attach_notifier)
-attempts to attach dma_ops to a device on BUS_NOTIFY_ADD_DEVICE
-action notification.
+The empty stub for its_acpi_probe() on !CONFIG_ACPI systems has
+a wrong prototype, which causes compilation errors:
 
-This causes issues on ACPI based systems, where PCI devices
-can be added before the IOMMUs the devices are attached to
-had a chance to be probed, causing failures on attempts to
-attach dma_ops in that the domain for the respective IOMMU
-may not be set-up yet by the time the bus notifier is run.
+drivers/irqchip/irq-gic-v3-its.c: In function 'its_init':
+drivers/irqchip/irq-gic-v3-its.c:1762:3: error: too few arguments to
+function 'its_acpi_probe'
+   its_acpi_probe();
+   ^
+drivers/irqchip/irq-gic-v3-its.c:1749:27: note: declared here
+ static inline void __init its_acpi_probe(struct irq_domain
+*parent_domain) { }
 
-Devices dma_ops do not require to be set-up till the matching
-device drivers are probed. This means that instead of running
-the notifier attaching dma_ops to devices (__iommu_attach_notifier)
-on BUS_NOTIFY_ADD_DEVICE action, it can be run just before the
-device driver is bound to the device in question (on action
-BUS_NOTIFY_BIND_DRIVER) so that it is certain that its IOMMU
-group and domain are set-up accordingly at the time the
-notifier is triggered.
-
-This patch changes the notifier action upon which dma_ops
-are attached to devices and defer it to driver binding time,
-so that IOMMU devices have a chance to be probed and to register
-their bus notifiers before the dma_ops attach sequence for a
-device is actually carried out.
+This patch fixes the prototype and the corresponding compilation
+errors.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
 ---
- arch/arm64/mm/dma-mapping.c | 2 +-
+ drivers/irqchip/irq-gic-v3-its.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index c566ec8..79b0882 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -848,7 +848,7 @@ static int __iommu_attach_notifier(struct notifier_block *nb,
- {
- 	struct iommu_dma_notifier_data *master, *tmp;
+diff --git a/drivers/irqchip/irq-gic-v3-its.c b/drivers/irqchip/irq-gic-v3-its.c
+index c8f36a5..1846800 100644
+--- a/drivers/irqchip/irq-gic-v3-its.c
++++ b/drivers/irqchip/irq-gic-v3-its.c
+@@ -1700,7 +1700,7 @@ void __init its_acpi_probe(void)
+ 		pr_info("No valid GIC ITS entries exist\n");
+ }
+ #else
+-static inline void __init its_acpi_probe(struct irq_domain *parent_domain) { }
++static inline void __init its_acpi_probe(void) { }
+ #endif
  
--	if (action != BUS_NOTIFY_ADD_DEVICE)
-+	if (action != BUS_NOTIFY_BIND_DRIVER)
- 		return 0;
- 
- 	mutex_lock(&iommu_dma_notifier_lock);
+ int __init its_init(struct fwnode_handle *handle, struct rdists *rdists,
 -- 
 2.6.4
