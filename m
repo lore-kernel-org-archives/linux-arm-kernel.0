@@ -1,151 +1,86 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 15:59:21 +0000
-Subject: [PATCH v10 7/8] iommu/msi-iommu: iommu_msi_msg_pa_to_va
+Date: Tue,  7 Jun 2016 15:59:20 +0000
+Subject: [PATCH v10 6/8] iommu/msi-iommu: iommu_msi_domain
 In-Reply-To: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
 References: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315162-5888-8-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315162-5888-7-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce iommu_msi_msg_pa_to_va whose role consists in
-detecting whether the device's MSIs must to be mapped into an IOMMU.
-It case it must, the function overrides the MSI msg originally composed
-and replaces the doorbell's PA by a pre-allocated and pre-mapped reserved
-IOVA. In case the corresponding PA region is not found, the function
-returns an error.
+This function checks whether
+- the device belongs to a non default iommu domain
+- this iommu domain requires the MSI address to be mapped.
 
-This function is likely to be called in some code that cannot sleep. This
-is the reason why the allocation/mapping is done separately.
+If those conditions are met, the function returns the iommu domain
+to be used for mapping the MSI doorbell; else it returns NULL.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
-v7 -> v8:
-- renamed from iommu_msi_mapping_translate_msg to iommu_msi_msg_pa_to_va
-  and now takes a struct device * as parameter
+v8 -> v9:
+- use iommu_msi_supported
 
-v7: creation
+v7 -> v8:
+- renamed  iommu_msi_mapping_desc_to_domain to iommu_msi_domain
+- the function now takes a struct device *
+- use DOMAIN_ATTR_MSI_GEOMETRY attribute
 ---
- drivers/iommu/msi-iommu.c | 55 +++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/msi-iommu.h | 26 ++++++++++++++++++++++
- 2 files changed, 81 insertions(+)
+ drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
+ include/linux/msi-iommu.h | 14 ++++++++++++++
+ 2 files changed, 31 insertions(+)
 
 diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
-index 41a5823..4525956 100644
+index 57017cb..41a5823 100644
 --- a/drivers/iommu/msi-iommu.c
 +++ b/drivers/iommu/msi-iommu.c
-@@ -20,6 +20,14 @@
- #include <linux/msi-iommu.h>
- #include <linux/spinlock.h>
- #include <linux/iova.h>
-+#include <linux/msi.h>
-+
-+#ifdef CONFIG_PHYS_ADDR_T_64BIT
-+#define msg_to_phys_addr(msg) \
-+	(((phys_addr_t)((msg)->address_hi) << 32) | (msg)->address_lo)
-+#else
-+#define msg_to_phys_addr(msg)	((msg)->address_lo)
-+#endif
- 
- struct doorbell_mapping {
- 	struct kref		kref;
-@@ -265,3 +273,50 @@ struct iommu_domain *iommu_msi_domain(struct device *dev)
+@@ -248,3 +248,20 @@ unlock:
+ 	}
  }
- EXPORT_SYMBOL_GPL(iommu_msi_domain);
- 
-+static dma_addr_t iommu_msi_find_iova(struct iommu_domain *domain,
-+				      phys_addr_t addr, size_t size)
+ EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
++
++struct iommu_domain *iommu_msi_domain(struct device *dev)
 +{
-+	struct doorbell_mapping_info *dmi = domain->msi_cookie;
-+	struct iova_domain *iovad = domain->iova_cookie;
-+	struct doorbell_mapping *mapping;
-+	dma_addr_t iova = DMA_ERROR_CODE;
-+	phys_addr_t aligned_base, offset;
-+	size_t binding_size;
++	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
++	struct iommu_domain_msi_geometry msi_geometry;
 +
-+	if (!iovad || !dmi)
-+		return iova;
++	if (!d || (d->type == IOMMU_DOMAIN_DMA))
++		return NULL;
 +
-+	offset = iova_offset(iovad, addr);
-+	aligned_base = addr - offset;
-+	binding_size = iova_align(iovad, size + offset);
++	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
++	if (!msi_geometry.iommu_msi_supported)
++		return NULL;
 +
-+	spin_lock(&dmi->lock);
-+
-+	mapping = search_msi_doorbell_mapping(dmi, addr, size);
-+	if (mapping)
-+		iova = mapping->iova + offset + aligned_base - mapping->addr;
-+
-+	spin_unlock(&dmi->lock);
-+	return iova;
++	return d;
 +}
-+
-+int iommu_msi_msg_pa_to_va(struct device *dev, struct msi_msg *msg)
-+{
-+	struct iommu_domain *d = iommu_msi_domain(dev);
-+	dma_addr_t iova;
-+
-+	if (!d)
-+		return 0;
-+
-+	iova = iommu_msi_find_iova(d, msg_to_phys_addr(msg),
-+				   sizeof(phys_addr_t));
-+
-+	if (iova == DMA_ERROR_CODE)
-+		return -EINVAL;
-+
-+	msg->address_lo = lower_32_bits(iova);
-+	msg->address_hi = upper_32_bits(iova);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(iommu_msi_msg_pa_to_va);
++EXPORT_SYMBOL_GPL(iommu_msi_domain);
 +
 diff --git a/include/linux/msi-iommu.h b/include/linux/msi-iommu.h
-index 114bd69..c1c9bd5 100644
+index 1cd115f..114bd69 100644
 --- a/include/linux/msi-iommu.h
 +++ b/include/linux/msi-iommu.h
-@@ -19,6 +19,7 @@
- #include <linux/kernel.h>
- 
- struct iommu_domain;
-+struct msi_msg;
- 
- #ifdef CONFIG_IOMMU_MSI
- 
-@@ -90,6 +91,25 @@ void iommu_msi_put_doorbell_iova(struct iommu_domain *domain, phys_addr_t addr);
+@@ -81,6 +81,15 @@ int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
   */
- struct iommu_domain *iommu_msi_domain(struct device *dev);
+ void iommu_msi_put_doorbell_iova(struct iommu_domain *domain, phys_addr_t addr);
  
 +/**
-+ * iommu_msi_msg_pa_to_va: in case a device's MSI transaction is translated
-+ * by an IOMMU, the msg address must be an IOVA instead of a physical address.
-+ * This function overwrites the original MSI message containing the doorbell's
-+ * physical address with the doorbell's pre-allocated IOVA, if any.
++ * iommu_msi_domain: in case the device is upstream to an IOMMU and this IOMMU
++ * translates the MSI transaction, returns the iommu domain the MSI doorbell
++ * address must be mapped in; else returns NULL.
 + *
-+ * The doorbell physical address must be bound previously to an IOVA using
-+ * iommu_msi_get_doorbell_iova
-+ *
-+ * @dev: device emitting the MSI
-+ * @msg: original MSI message containing the PA to be overwritten with the IOVA
-+ *
-+ * return 0 if the MSI does not need to be mapped or when the PA/IOVA
-+ * were successfully swapped; return -EINVAL if the addresses need
-+ * to be swapped but not IOMMU binding is found
++ * @dev: device handle
 + */
-+int iommu_msi_msg_pa_to_va(struct device *dev, struct msi_msg *msg);
-+
++struct iommu_domain *iommu_msi_domain(struct device *dev);
 +
  #else
  
  static inline int
-@@ -114,5 +134,11 @@ static inline struct iommu_domain *iommu_msi_domain(struct device *dev)
- 	return NULL;
- }
+@@ -100,5 +109,10 @@ static inline int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
+ static inline void iommu_msi_put_doorbell_iova(struct iommu_domain *domain,
+ 					       phys_addr_t addr) {}
  
-+static inline int iommu_msi_msg_pa_to_va(struct device *dev,
-+					 struct msi_msg *msg)
++static inline struct iommu_domain *iommu_msi_domain(struct device *dev)
 +{
-+	return 0;
++	return NULL;
 +}
 +
  #endif	/* CONFIG_IOMMU_MSI */
