@@ -1,38 +1,32 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 07 Jun 2016 15:22:58 +0200
-Subject: next-20160607 build: 2 failures 9 warnings (next-20160607)
-In-Reply-To: <20160607105823.GT7510@sirena.org.uk>
-References: <E1bABXS-0001YX-Cz@optimist> <20160607105823.GT7510@sirena.org.uk>
-Message-ID: <5756CAB2.5030701@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 7 Jun 2016 06:22:35 -0700
+Subject: [PATCH] watchdog: sirf: fix __iomem * warnings
+In-Reply-To: <1465300387-20629-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465300387-20629-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <5756CA9B.8090200@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2016 12:58 PM, Mark Brown wrote:
-> On Tue, Jun 07, 2016 at 08:35:02AM +0100, Build bot for Mark Brown wrote:
-> 
-> Today's -next fails to build an arm64 allmodconfig due to:
-> 
->> 	arm64-allmodconfig
->> ../drivers/media/platform/s5p-mfc/s5p_mfc_iommu.h:19:27: fatal error: asm/dma-iommu.h: No such file or directory
-> 
-> introduced by 04f776734c4e (media: s5p-mfc: add iommu support) which
-> relies on a header which is only available on 32 bit ARM.  I suspect the
-> driver should be using linux/dma-iommu.h instead.
+On 06/07/2016 04:53 AM, Ben Dooks wrote:
+> Fix the following warnings from sparse due to casting to/from an __iomem
+> annotated variable:
+>
+> drivers/watchdog/sirfsoc_wdt.c:48:18: warning: incorrect type in assignment (different address spaces)
+> drivers/watchdog/sirfsoc_wdt.c:48:18:    expected void [noderef] <asn:2>*wdt_base
+> drivers/watchdog/sirfsoc_wdt.c:48:18:    got void *
+> drivers/watchdog/sirfsoc_wdt.c:64:18: warning: incorrect type in assignment (different address spaces)
+> drivers/watchdog/sirfsoc_wdt.c:64:18:    expected void [noderef] <asn:2>*wdt_base
+> drivers/watchdog/sirfsoc_wdt.c:64:18:    got void *
+> drivers/watchdog/sirfsoc_wdt.c:82:54: warning: incorrect type in initializer (different address spaces)
+> drivers/watchdog/sirfsoc_wdt.c:82:54:    expected void [noderef] <asn:2>*wdt_base
+> drivers/watchdog/sirfsoc_wdt.c:82:54:    got void *
+> drivers/watchdog/sirfsoc_wdt.c:99:54: warning: incorrect type in initializer (different address spaces)
+> drivers/watchdog/sirfsoc_wdt.c:99:54:    expected void [noderef] <asn:2>*wdt_base
+> drivers/watchdog/sirfsoc_wdt.c:99:54:    got void *
+> drivers/watchdog/sirfsoc_wdt.c:153:44: warning: incorrect type in argument 2 (different address spaces)
+> drivers/watchdog/sirfsoc_wdt.c:153:44:    expected void *data
+> drivers/watchdog/sirfsoc_wdt.c:153:44:    got void [noderef] <asn:2>*[assigned] base
+>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Since the mfc topic branch got already pulled to the samsung-soc tree,
-as discussed in other thread [1], there is a build break in -next.
-There is a patch to fix this issue and to include it in next, as we
-agreed  on irc, could you please pull this branch into your "for-next"
-tree:
-
-git://linuxtv.org/snawrocki/samsung.git for-v4.8/media/exynos-mfc
-
-and then apply that patch [2] ?
-"media: s5p-mfc: fix compilation issue on archs other than ARM (32bit)"
-
--- 
-Thanks,
-Sylwester
-
-[1] https://patchwork.linuxtv.org/patch/34495
-[2] https://patchwork.linuxtv.org/patch/34515
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
