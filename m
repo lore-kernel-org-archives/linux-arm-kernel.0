@@ -1,40 +1,83 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 7 Jun 2016 09:37:36 +0900
-Subject: [PATCH v3 0/6] Add R8A7794/SILK sound DT support
-In-Reply-To: <b77ad169-c9d1-4d67-0973-fc9639ddb613@cogentembedded.com>
-References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
- <7d19e749-8264-9004-64f4-aefabda699c6@cogentembedded.com>
- <b77ad169-c9d1-4d67-0973-fc9639ddb613@cogentembedded.com>
-Message-ID: <20160607003736.GB20591@verge.net.au>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 7 Jun 2016 08:51:54 +0800
+Subject: [PATCH 10/20] drm: rockchip: Rely on the default ->best_encoder()
+ behavior
+In-Reply-To: <1464877907-27723-11-git-send-email-boris.brezillon@free-electrons.com>
+References: <1464877907-27723-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1464877907-27723-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <57561AAA.5060500@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2016 at 09:11:17PM +0300, Sergei Shtylyov wrote:
-> Hello.
-> 
-> On 05/13/2016 12:16 AM, Sergei Shtylyov wrote:
-> 
-> >>   Here's the set of 6 patches against Simon Horman's 'renesas.git' repo,
-> >>'renesas-devel-20160509-v4.6-rc7' tag. I'm adding the sound device tree support
-> >>for the R8A7794 SoC based SILK board.
-> >>
-> >>[1/6] ARM: dts: r8a7794: add audio clocks
-> >>[2/6] ARM: dts: r8a7794: add MSTP5 clocks
-> >>[3/6] ARM: dts: r8a7794: add MSTP10 clocks
-> >>[4/6] ARM: dts: r8a7794: add Audio-DMAC support
-> >>[5/6] ARM: dts: r8a7794: add sound support
-> >>[6/6] ARM: dts: silk: add sound support
-> >
-> >   Oops, forgot to mention that patch #5 depends on the R-Car sound patch
-> >posted yesterday in order to get interpreted as intended (it uses a disabled
-> >SRC node).
-> 
->   Simon, that patch has already hit Linus' tree but this series seems to be
-> stuck. Please merge!
+On 2016?06?02? 22:31, Boris Brezillon wrote:
+> All outputss have a 1:1 relationship between connectors and encoders
+> and the driver is relying on the atomic helpers: we can drop the custom
+> ->best_encoder() implementations  and let the core call
+> drm_atomic_helper_best_encoder() for us.
 
-Hi Sergei,
+Good, All connectors and encoders is 1:1 relationship on rockchip 
+outputs, so
 
-there seem to be some outstanding review comments for v3 of this patchset.
-Could you address them and repost?
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-Thanks!
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>   drivers/gpu/drm/rockchip/dw-mipi-dsi.c | 9 ---------
+>   drivers/gpu/drm/rockchip/inno_hdmi.c   | 9 ---------
+>   2 files changed, 18 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> index dedc65b..ca22e5e 100644
+> --- a/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> +++ b/drivers/gpu/drm/rockchip/dw-mipi-dsi.c
+> @@ -964,18 +964,9 @@ static enum drm_mode_status dw_mipi_dsi_mode_valid(
+>   	return mode_status;
+>   }
+>   
+> -static struct drm_encoder *dw_mipi_dsi_connector_best_encoder(
+> -					struct drm_connector *connector)
+> -{
+> -	struct dw_mipi_dsi *dsi = con_to_dsi(connector);
+> -
+> -	return &dsi->encoder;
+> -}
+> -
+>   static struct drm_connector_helper_funcs dw_mipi_dsi_connector_helper_funcs = {
+>   	.get_modes = dw_mipi_dsi_connector_get_modes,
+>   	.mode_valid = dw_mipi_dsi_mode_valid,
+> -	.best_encoder = dw_mipi_dsi_connector_best_encoder,
+>   };
+>   
+>   static enum drm_connector_status
+> diff --git a/drivers/gpu/drm/rockchip/inno_hdmi.c b/drivers/gpu/drm/rockchip/inno_hdmi.c
+> index f8b4feb..006260d 100644
+> --- a/drivers/gpu/drm/rockchip/inno_hdmi.c
+> +++ b/drivers/gpu/drm/rockchip/inno_hdmi.c
+> @@ -579,14 +579,6 @@ inno_hdmi_connector_mode_valid(struct drm_connector *connector,
+>   	return MODE_OK;
+>   }
+>   
+> -static struct drm_encoder *
+> -inno_hdmi_connector_best_encoder(struct drm_connector *connector)
+> -{
+> -	struct inno_hdmi *hdmi = to_inno_hdmi(connector);
+> -
+> -	return &hdmi->encoder;
+> -}
+> -
+>   static int
+>   inno_hdmi_probe_single_connector_modes(struct drm_connector *connector,
+>   				       uint32_t maxX, uint32_t maxY)
+> @@ -613,7 +605,6 @@ static struct drm_connector_funcs inno_hdmi_connector_funcs = {
+>   static struct drm_connector_helper_funcs inno_hdmi_connector_helper_funcs = {
+>   	.get_modes = inno_hdmi_connector_get_modes,
+>   	.mode_valid = inno_hdmi_connector_mode_valid,
+> -	.best_encoder = inno_hdmi_connector_best_encoder,
+>   };
+>   
+>   static int inno_hdmi_register(struct drm_device *drm, struct inno_hdmi *hdmi)
+
+
+-- 
+?ark Yao
