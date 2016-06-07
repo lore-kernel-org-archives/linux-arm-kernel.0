@@ -1,38 +1,53 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jun 2016 16:08:08 +0800
-Subject: [PATCH v4 04/14] of/numa: remove a duplicated warning
+Date: Tue, 7 Jun 2016 16:08:16 +0800
+Subject: [PATCH v4 12/14] arm64/numa: remove some useless code
 In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
 References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1465286898-13828-5-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1465286898-13828-13-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This warning has been printed in of_numa_parse_cpu_nodes before.
+1. Currently only cpu0 set on cpu_possible_mask and percpu areas have not
+   been initialized.
+2. No reason to limit cpu0 must belongs to node0.
 
 Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
 ---
- drivers/of/of_numa.c | 9 ++-------
- 1 file changed, 2 insertions(+), 7 deletions(-)
+ arch/arm64/mm/numa.c | 8 --------
+ 1 file changed, 8 deletions(-)
 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index 7b3fbdc..3157130 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -174,13 +174,8 @@ int of_node_to_nid(struct device_node *device)
- 			np->name);
- 	of_node_put(np);
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index d73b0a0..92b1692 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -93,7 +93,6 @@ void numa_clear_node(unsigned int cpu)
+  */
+ static void __init setup_node_to_cpumask_map(void)
+ {
+-	unsigned int cpu;
+ 	int node;
 
--	if (!r) {
--		if (nid >= MAX_NUMNODES)
--			pr_warn("NUMA: Node id %u exceeds maximum value\n",
--				nid);
--		else
--			return nid;
--	}
-+	if (!r)
-+		return nid;
+ 	/* setup nr_node_ids if not done yet */
+@@ -106,9 +105,6 @@ static void __init setup_node_to_cpumask_map(void)
+ 		cpumask_clear(node_to_cpumask_map[node]);
+ 	}
 
- 	return NUMA_NO_NODE;
+-	for_each_possible_cpu(cpu)
+-		set_cpu_numa_node(cpu, NUMA_NO_NODE);
+-
+ 	/* cpumask_of_node() will now work */
+ 	pr_debug("Node to cpumask map for %d nodes\n", nr_node_ids);
  }
+@@ -379,10 +375,6 @@ static int __init numa_init(int (*init_func)(void))
+
+ 	setup_node_to_cpumask_map();
+
+-	/* init boot processor */
+-	cpu_to_node_map[0] = 0;
+-	map_cpu_to_node(0, 0);
+-
+ 	return 0;
+ }
+
 --
 2.5.0
