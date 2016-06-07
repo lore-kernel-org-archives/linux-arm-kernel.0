@@ -1,121 +1,77 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 7 Jun 2016 10:25:15 +0530
-Subject: [PATCH kexec-tools v2 12/32] kexec: add helper to exlude a
- region from a set of memory ranges
-In-Reply-To: <E1b9xsO-0003sa-Sr@e0050434b2927.dyn.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
- <E1b9xsO-0003sa-Sr@e0050434b2927.dyn.armlinux.org.uk>
-Message-ID: <20160607045515.GA13643@dhcppc6>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 7 Jun 2016 10:54:05 +0530
+Subject: [PATCH] dmaengine: bcm2835: Fix polling for completion of DMA
+ with interrupts masked.
+In-Reply-To: <87a8iy6x41.fsf@eliezer.anholt.net>
+References: <1465007351-5559-1-git-send-email-eric@anholt.net>
+ <20160606042635.GU16910@localhost>
+ <87a8iy6x41.fsf@eliezer.anholt.net>
+Message-ID: <20160607052405.GC16910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2016:05:59:44 PM, Russell King wrote:
-> Add a helper to exclude a region from a set of memory ranges.
+On Mon, Jun 06, 2016 at 10:33:18AM -0700, Eric Anholt wrote:
+> Vinod Koul <vinod.koul@intel.com> writes:
 > 
-> Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+> > On Fri, Jun 03, 2016 at 07:29:11PM -0700, Eric Anholt wrote:
+> >> The tx_status hook is supposed to be safe to call from interrupt
+> >> context, but it wouldn't ever return completion for the last transfer,
+> >> meaning you couldn't poll for DMA completion with interrupts masked.
+> >
+> > and why is that?
+> 
+> Maybe this was poorly worded.  How about:
+> 
+> The tx_status hook is supposed to be safe to call from interrupt
+> context.  However, the current transfer currently only gets marked
+> complete by the IRQ handler, so if interrupts were masked then polling
+> for completion would never finish.
 
-Reviewed-by: Pratyush Anand <panand@redhat.com>
-> ---
->  kexec/mem_regions.c | 71 +++++++++++++++++++++++++++++++++++++++++++++++++++++
->  kexec/mem_regions.h |  4 +++
->  2 files changed, 75 insertions(+)
+Sound better :)
+
 > 
-> diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
-> index 804984a..b01a5c8 100644
-> --- a/kexec/mem_regions.c
-> +++ b/kexec/mem_regions.c
-> @@ -55,3 +55,74 @@ int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
->  	return 0;
->  }
->  
-> +static void mem_regions_remove(struct memory_ranges *ranges, int index)
-> +{
-> +	int tail_entries;
-> +
-> +	/* we are assured to have at least one entry */
-> +	ranges->size -= 1;
-> +
-> +	/* if we have following entries, shuffle them down one place */
-> +	tail_entries = ranges->size - index;
-> +	if (tail_entries)
-> +		memmove(ranges->ranges + index, ranges->ranges + index + 1,
-> +			tail_entries * sizeof(*ranges->ranges));
-> +
-> +	/* zero the new tail entry */
-> +	memset(ranges->ranges + ranges->size, 0, sizeof(*ranges->ranges));
-> +}
-> +
-> +/**
-> + * mem_regions_exclude() - excludes a memory region from a set of memory ranges
-> + * @ranges: memory ranges to exclude the region from
-> + * @range: memory range to exclude
-> + *
-> + * Exclude a memory region from a set of memory ranges.  We assume that
-> + * the region to be excluded is either wholely located within one of the
-> + * memory ranges, or not at all.
-> + */
-> +int mem_regions_exclude(struct memory_ranges *ranges,
-> +			const struct memory_range *range)
-> +{
-> +	int i, ret;
-> +
-> +	for (i = 0; i < ranges->size; i++) {
-> +		struct memory_range *r = ranges->ranges + i;
-> +
-> +		/*
-> +		 * We assume that crash area is fully contained in
-> +		 * some larger memory area.
-> +		 */
-> +		if (r->start <= range->start && r->end >= range->end) {
-> +			if (r->start == range->start) {
-> +				if (r->end == range->end)
-> +					/* Remove this entry */
-> +					mem_regions_remove(ranges, i);
-> +				else
-> +					/* Shrink the start of this memory range */
-> +					r->start = range->end + 1;
-> +			} else if (r->end == range->end) {
-> +				/* Shrink the end of this memory range */
-> +				r->end = range->start - 1;
-> +			} else {
-> +				/*
-> +				 * Split this area into 2 smaller ones and
-> +				 * remove excluded range from between. First
-> +				 * create new entry for the remaining area.
-> +				 */
-> +				ret = mem_regions_add(ranges, range->end + 1,
-> +						      r->end - range->end, 0);
-> +				if (ret < 0)
-> +					return ret;
-> +
-> +				/*
-> +				 * Update this area to end before excluded
-> +				 * range.
-> +				 */
-> +				r->end = range->start - 1;
-> +				break;
-> +			}
-> +		}
-> +	}
-> +	return 0;
-> +}
-> diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
-> index da7b5e8..ae9e972 100644
-> --- a/kexec/mem_regions.h
-> +++ b/kexec/mem_regions.h
-> @@ -2,9 +2,13 @@
->  #define MEM_REGIONS_H
->  
->  struct memory_ranges;
-> +struct memory_range;
->  
->  void mem_regions_sort(struct memory_ranges *ranges);
->  
-> +int mem_regions_exclude(struct memory_ranges *ranges,
-> +			const struct memory_range *range);
-> +
->  int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
->                      unsigned long long length, int type);
->  
-> -- 
-> 1.9.1
+> >> This fixes IRQ handling for bcm2835's DSI1, which requires using the
+> >> DMA engine to write its registers due to a bug in the AXI bridge.
+> >> 
+> >> Signed-off-by: Eric Anholt <eric@anholt.net>
+> >> ---
+> >>  drivers/dma/bcm2835-dma.c | 24 +++++++++++++++++++-----
+> >>  1 file changed, 19 insertions(+), 5 deletions(-)
+> >> 
+> >> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
+> >> index 6149b27c33ad..320461c578e3 100644
+> >> --- a/drivers/dma/bcm2835-dma.c
+> >> +++ b/drivers/dma/bcm2835-dma.c
+> >> @@ -570,16 +570,16 @@ static enum dma_status bcm2835_dma_tx_status(struct dma_chan *chan,
+> >>  	struct virt_dma_desc *vd;
+> >>  	enum dma_status ret;
+> >>  	unsigned long flags;
+> >> +	u32 residue;
+> >>  
+> >>  	ret = dma_cookie_status(chan, cookie, txstate);
+> >> -	if (ret == DMA_COMPLETE || !txstate)
+> >> +	if (ret == DMA_COMPLETE)
+> >
+> > Why do you change this? txstate can be NULL, so no point calculating reside
+> > for those cases
+> 
+> The point was to go into the "Calculate where we're at in our current
+> DMA (if the current DMA is the one we're asking about status for)" path,
+> so that we could note when the DMA is complete even when there's no
+> txstate passed in.
+
+Can you explain what you mean by current DMA!
+
+The claulation is always done for 'descriptor' represnted by the cookie. So
+it doesnt not matter...!
+
+Thanks
+-- 
+~Vinod
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/a6b87432/attachment.sig>
