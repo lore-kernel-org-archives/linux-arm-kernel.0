@@ -1,165 +1,143 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  7 Jun 2016 14:31:06 +0100
-Subject: [RFC PATCH v2 11/15] drivers: iommu: arm-smmu-v3: add IORT iommu
- configuration
+Date: Tue,  7 Jun 2016 14:31:07 +0100
+Subject: [RFC PATCH v2 12/15] drivers: acpi: implement acpi_dma_configure
 In-Reply-To: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1465306270-27076-12-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1465306270-27076-13-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In ACPI bases systems, in order to be able to create platform
-devices and initialize them for arm-smmu-v3 components, the IORT
-infrastructure requires ARM SMMU drivers to initialize a set of
-operations that are used by the IORT kernel layer to configure platform
-devices for ARM SMMU components in turn.
+On DT based systems, the of_dma_configure() API implements DMA configuration
+for a given device. On ACPI systems an API equivalent to of_dma_configure()
+is missing which implies that it is currently not possible to set-up DMA
+operations for devices through the ACPI generic kernel layer.
 
-This patch adds the IORT IOMMU configuration for the ARM SMMU v3 kernel
-driver.
+This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+calls that for now are just wrappers around arch_setup_dma_ops() and
+arch_teardown_dma_ops() and also updates ACPI and PCI core code to use
+the newly introduced acpi_dma_configure/acpi_dma_deconfigure functions.
+
+The DMA range size passed to arch_setup_dma_ops() is sized according
+to the device coherent_dma_mask (starting at address 0x0), mirroring the
+DT probing path behaviour when a dma-ranges property is not provided
+for the device being probed; this changes the current arch_setup_dma_ops()
+call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+is a NOP on all architectures but ARM/ARM64 this patch does not change
+the current kernel behaviour on them.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
 Cc: Robin Murphy <robin.murphy@arm.com>
+Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: Joerg Roedel <joro@8bytes.org>
+Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/iommu/arm-smmu-v3.c | 101 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/iort.h        |  12 +++++-
- 2 files changed, 112 insertions(+), 1 deletion(-)
+ drivers/acpi/glue.c     |  4 ++--
+ drivers/acpi/scan.c     | 24 ++++++++++++++++++++++++
+ drivers/pci/probe.c     |  3 +--
+ include/acpi/acpi_bus.h |  2 ++
+ include/linux/acpi.h    |  5 +++++
+ 5 files changed, 34 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 90745a8..7acb6b5 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -2687,6 +2687,107 @@ static int __init arm_smmu_of_init(struct device_node *np)
- }
- IOMMU_OF_DECLARE(arm_smmuv3, "arm,smmu-v3", arm_smmu_of_init);
+diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+index 5ea5dc2..f8d6564 100644
+--- a/drivers/acpi/glue.c
++++ b/drivers/acpi/glue.c
+@@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
  
-+#ifdef CONFIG_ACPI
-+static int acpi_smmu_init(struct acpi_iort_node *node)
+ 	attr = acpi_get_dma_attr(acpi_dev);
+ 	if (attr != DEV_DMA_NOT_SUPPORTED)
+-		arch_setup_dma_ops(dev, 0, 0, NULL,
+-				   attr == DEV_DMA_COHERENT);
++		acpi_dma_configure(dev, attr);
+ 
+ 	acpi_physnode_link_name(physical_node_name, node_id);
+ 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+@@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+ 	return 0;
+ 
+  err:
++	acpi_dma_deconfigure(dev);
+ 	ACPI_COMPANION_SET(dev, NULL);
+ 	put_device(dev);
+ 	put_device(&acpi_dev->dev);
+diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+index 5f28cf7..b4b9064 100644
+--- a/drivers/acpi/scan.c
++++ b/drivers/acpi/scan.c
+@@ -1358,6 +1358,30 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 		return DEV_DMA_NON_COHERENT;
+ }
+ 
++/**
++ * acpi_dma_configure - Set-up DMA configuration for the device.
++ * @dev: The pointer to the device
++ * @attr: device dma attributes
++ */
++void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
 +{
-+	iort_smmu_set_ops(node, &arm_smmu_ops, NULL);
-+
-+	return 0;
++	/*
++	 * Assume dma valid range starts at 0 and covers the whole
++	 * coherent_dma_mask.
++	 */
++	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
++			   attr == DEV_DMA_COHERENT);
 +}
 +
-+static void acpi_smmu_register_irq(int hwirq, const char *name,
-+				   struct resource *res)
++/**
++ * acpi_dma_deconfigure - Tear-down DMA configuration for the device.
++ * @dev: The pointer to the device
++ */
++void acpi_dma_deconfigure(struct device *dev)
 +{
-+	int irq = acpi_register_gsi(NULL, hwirq, ACPI_EDGE_SENSITIVE,
-+				    ACPI_ACTIVE_HIGH);
-+
-+	if (irq < 0) {
-+		pr_err("could not register gsi hwirq %d name [%s]\n", hwirq,
-+								      name);
-+		return;
-+	}
-+
-+	res->start = irq;
-+	res->end = irq;
-+	res->flags = IORESOURCE_IRQ;
-+	res->name = name;
++	arch_teardown_dma_ops(dev);
 +}
 +
-+static int arm_smmu_count_resources(struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu_v3 *smmu;
-+	/* Always present mem resource */
-+	int num_res = 1;
-+
-+	/* Retrieve SMMUv3 specific data */
-+	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-+
-+	if (smmu->event_gsiv)
-+		num_res++;
-+
-+	if (smmu->pri_gsiv)
-+		num_res++;
-+
-+	if (smmu->gerr_gsiv)
-+		num_res++;
-+
-+	if (smmu->sync_gsiv)
-+		num_res++;
-+
-+	return num_res;
-+}
-+
-+static void arm_smmu_init_resources(struct resource *res,
-+				    struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu_v3 *smmu;
-+	int num_res = 0;
-+
-+	/* Retrieve SMMUv3 specific data */
-+	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-+
-+	res[num_res].start = smmu->base_address;
-+	res[num_res].end = smmu->base_address + SZ_128K - 1;
-+	res[num_res].flags = IORESOURCE_MEM;
-+
-+	num_res++;
-+
-+	if (smmu->event_gsiv)
-+		acpi_smmu_register_irq(smmu->event_gsiv, "eventq",
-+				       &res[num_res++]);
-+
-+	if (smmu->pri_gsiv)
-+		acpi_smmu_register_irq(smmu->pri_gsiv, "priq",
-+				       &res[num_res++]);
-+
-+	if (smmu->gerr_gsiv)
-+		acpi_smmu_register_irq(smmu->gerr_gsiv, "gerror",
-+				       &res[num_res++]);
-+
-+	if (smmu->sync_gsiv)
-+		acpi_smmu_register_irq(smmu->sync_gsiv, "cmdq-sync",
-+				       &res[num_res++]);
-+}
-+
-+static bool arm_smmu_is_coherent(struct acpi_iort_node *node)
-+{
-+	struct acpi_iort_smmu_v3 *smmu;
-+
-+	/* Retrieve SMMUv3 specific data */
-+	smmu = (struct acpi_iort_smmu_v3 *)node->node_data;
-+
-+	return smmu->flags & ACPI_IORT_SMMU_V3_COHACC_OVERRIDE;
-+}
-+
-+const struct iort_iommu_config iort_arm_smmu_v3_cfg = {
-+	.name = "arm-smmu-v3",
-+	.iommu_init = acpi_smmu_init,
-+	.iommu_is_coherent = arm_smmu_is_coherent,
-+	.iommu_count_resources = arm_smmu_count_resources,
-+	.iommu_init_resources = arm_smmu_init_resources
-+};
-+#endif
-+
- MODULE_DESCRIPTION("IOMMU API for ARM architected SMMUv3 implementations");
- MODULE_AUTHOR("Will Deacon <will.deacon@arm.com>");
- MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/iort.h b/include/linux/iort.h
-index ced3054..5dcfa09 100644
---- a/include/linux/iort.h
-+++ b/include/linux/iort.h
-@@ -55,7 +55,17 @@ struct iort_iommu_config {
- static inline const struct iort_iommu_config *
- iort_get_iommu_config(struct acpi_iort_node *node)
+ static void acpi_init_coherency(struct acpi_device *adev)
  {
--	return NULL;
-+	switch (node->type) {
-+#if IS_ENABLED(CONFIG_ARM_SMMU_V3)
-+	case ACPI_IORT_NODE_SMMU_V3: {
-+		extern const struct iort_iommu_config iort_arm_smmu_v3_cfg;
-+
-+		return &iort_arm_smmu_v3_cfg;
-+	}
-+#endif
-+	default:
-+		return NULL;
-+	}
+ 	unsigned long long cca = 0;
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 8e3ef72..01dd369 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1725,8 +1725,7 @@ static void pci_dma_configure(struct pci_dev *dev)
+ 		if (attr == DEV_DMA_NOT_SUPPORTED)
+ 			dev_warn(&dev->dev, "DMA not supported.\n");
+ 		else
+-			arch_setup_dma_ops(&dev->dev, 0, 0, NULL,
+-					   attr == DEV_DMA_COHERENT);
++			acpi_dma_configure(&dev->dev, attr);
+ 	}
+ 
+ 	pci_put_host_bridge_device(bridge);
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 788c6c35..8b5039a 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -566,6 +566,8 @@ struct acpi_pci_root {
+ 
+ bool acpi_dma_supported(struct acpi_device *adev);
+ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
++void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
++void acpi_dma_deconfigure(struct device *dev);
+ 
+ struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
+ 					   u64 address, bool check_children);
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 288fac5..135a452 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -676,6 +676,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+ 	return DEV_DMA_NOT_SUPPORTED;
  }
  
- #endif /* __IORT_H__ */
++static inline void acpi_dma_configure(struct device *dev,
++				      enum dev_dma_attr attr) { }
++
++static inline void acpi_dma_deconfigure(struct device *dev) { }
++
+ #define ACPI_PTR(_ptr)	(NULL)
+ 
+ #endif	/* !CONFIG_ACPI */
 -- 
 2.6.4
