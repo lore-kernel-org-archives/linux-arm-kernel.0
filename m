@@ -1,63 +1,135 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Tue, 07 Jun 2016 10:06:24 -0700
-Subject: shared resources in AMP between Cortex-A9 and Cortex-M4
-In-Reply-To: <5756FB64.6060207@arm.com>
-References: <20160607162545.GX26768@pengutronix.de> <5756FB64.6060207@arm.com>
-Message-ID: <3c51425927c13aed01026d2ab8a50551@agner.ch>
+From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
+Date: Tue, 7 Jun 2016 19:14:15 +0200
+Subject: [PATCH v3 1/4] ARM: dts: imx6q-cm-fx6: remove iomuxc container node
+Message-ID: <3b1f9cd8f7804e7da7e093b4661441d4@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe, Hi Sudeep,
+From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-On 2016-06-07 09:50, Sudeep Holla wrote:
-> On 07/06/16 17:25, Uwe Kleine-K?nig wrote:
->> Hello Stefan,
->>
->> I'm currently trying to get Linux running on the M4 of an i.MX6 Solo X
->> and found you describing doing this on the Vybrid already[1].
->>
->> I see the problem that clk and pinmux must be used by both cores. Did
->> you solve this for your Vybrid experiments? And if so, how did it work?
+The imx6q-cm-fx6 iomuxc container node is not required. Remove it.
 
-No, it is basically unsolved. I just used "clk_ignore_unused" on both
-sides to avoid stuff getting disabled. It works surprisingly well :-)
+Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+---
 
+Notes:
+    Changes since v2:
+     - add Igor's Acked-By
+    
+    Changes since v1:
+     - this is a new patch in v2 required to address the iomuxc review
+       comments of v1 (remove container nodes to reduce indentation)
 
->>
->> Having two drivers on the same IP is racy at best and using some kind of
->> inter cpu communication to let (say) the A9 enable the clks for the M4
->> sounds like overkill.
->>
+ arch/arm/boot/dts/imx6q-cm-fx6.dts | 94 +++++++++++++++++++-------------------
+ 1 file changed, 46 insertions(+), 48 deletions(-)
 
-On a high level there are these two options:
-
-1) One core takes care of the IP, hence needs to know the other cores
-needs and provide it
-2) Both cores access the IP (with some kind of mutual exclusion to avoid
-races and conflicts of shared resources)
-
-Especially for the clock stuff I fell that 1 is probably easier.
-
-> 
-> IMO it should be other way around. In-fact few latest platforms(with
-> performant Cortex-A cores) have dedicated Cortex-M core to do such
-> system control and power management as it are low power and mostly
-> always on.
-
-Whether that is the M4 or the A-class CPU is probably application
-specific. If it is used for system control/power management, I agree
-with Sudeep, however, the NXP's new AMP designs mainly target user
-applications, e.g. to fulfill real-time requirements. In those
-applications I feel that the A-class CPU being the master is probably
-more common. Usually you only want to solve a small subset of your
-application on the M4.
-
-I thought about device trees which describe the other cores needs,
-basically a massively enhanced version of this:
-http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
-
-I mean, we could assign lets say a UART to the remote proc, and then let
-the master core handle pinmux, clocks etc...
-
---
-Stefan
+diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+index 99b46f8..21c513f 100644
+--- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
++++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+@@ -47,56 +47,54 @@
+ };
+ 
+ &iomuxc {
+-	imx6q-cm-fx6 {
+-		pinctrl_enet: enetgrp {
+-			fsl,pins = <
+-				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
+-				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
+-				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
+-				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
+-				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
+-				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
+-				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
+-				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
+-				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
+-				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
+-			>;
+-		};
++	pinctrl_enet: enetgrp {
++		fsl,pins = <
++			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
++			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
++			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
++			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
++			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
++			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
++			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
++			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
++			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
++			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
++			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
++			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
++			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
++			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
++			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
++			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
++		>;
++	};
+ 
+-		pinctrl_gpmi_nand: gpminandgrp {
+-			fsl,pins = <
+-				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
+-				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
+-				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
+-				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
+-				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
+-				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
+-				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
+-				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
+-				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
+-				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
+-				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
+-				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
+-				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
+-				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
+-				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
+-				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
+-				MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
+-			>;
+-		};
++	pinctrl_gpmi_nand: gpminandgrp {
++		fsl,pins = <
++			MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
++			MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
++			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
++			MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
++			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
++			MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
++			MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
++			MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
++			MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
++			MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
++			MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
++			MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
++			MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
++			MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
++			MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
++			MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
++			MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
++		>;
++	};
+ 
+-		pinctrl_uart4: uart4grp {
+-			fsl,pins = <
+-				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
+-				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
+-			>;
+-		};
++	pinctrl_uart4: uart4grp {
++		fsl,pins = <
++			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
++			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
++		>;
+ 	};
+ };
+ 
+-- 
+2.8.3
