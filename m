@@ -1,42 +1,33 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 12:30:13 +0100
-Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
-Message-ID: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 07 Jun 2016 13:32:16 +0200
+Subject: [PATCH] media: s5p-mfc: fix compilation issue on archs other than ARM
+ (32bit)
+In-Reply-To: <20160607105823.GT7510@sirena.org.uk>
+References: <20160607105823.GT7510@sirena.org.uk>
+Message-ID: <1465299136-8596-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the use of 0 instead of NULL to clk_get() call. This stops the
-following warning:
+This patch fixes build break caused by lack of dma-iommu API on ARM64
+(this API is specific to ARM 32bit architecture).
 
-drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
-
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 ---
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-pm at vger.kernel.org
-Cc: linux-kernel at lists.codethink.co.uk
----
- drivers/cpufreq/mvebu-cpufreq.c | 2 +-
+ drivers/media/platform/s5p-mfc/s5p_mfc_iommu.h | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/cpufreq/mvebu-cpufreq.c b/drivers/cpufreq/mvebu-cpufreq.c
-index e920889..ed915ee 100644
---- a/drivers/cpufreq/mvebu-cpufreq.c
-+++ b/drivers/cpufreq/mvebu-cpufreq.c
-@@ -70,7 +70,7 @@ static int __init armada_xp_pmsu_cpufreq_init(void)
- 			continue;
- 		}
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_iommu.h b/drivers/media/platform/s5p-mfc/s5p_mfc_iommu.h
+index 5d1d1c2..6962132 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_iommu.h
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_iommu.h
+@@ -14,7 +14,7 @@
+ #define S5P_MFC_IOMMU_DMA_BASE	0x20000000lu
+ #define S5P_MFC_IOMMU_DMA_SIZE	SZ_256M
  
--		clk = clk_get(cpu_dev, 0);
-+		clk = clk_get(cpu_dev, NULL);
- 		if (IS_ERR(clk)) {
- 			pr_err("Cannot get clock for CPU %d\n", cpu);
- 			return PTR_ERR(clk);
+-#ifdef CONFIG_EXYNOS_IOMMU
++#if defined(CONFIG_EXYNOS_IOMMU) && defined(CONFIG_ARM_DMA_USE_IOMMU)
+ 
+ #include <asm/dma-iommu.h>
+ 
 -- 
-2.8.1
+1.9.2
