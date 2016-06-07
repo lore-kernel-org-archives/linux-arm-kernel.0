@@ -1,82 +1,57 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Tue, 7 Jun 2016 13:58:18 +0530
-Subject: [PATCH v4 12/14] arm64/numa: remove some useless code
-In-Reply-To: <1465286898-13828-13-git-send-email-thunder.leizhen@huawei.com>
-References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
- <1465286898-13828-13-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <CAFpQJXU+YFCkEawQZYFWSayYgi4c5=N2H8mxzz2XhVbSbTeBMQ@mail.gmail.com>
+From: baolin.wang@linaro.org (Baolin Wang)
+Date: Tue,  7 Jun 2016 16:29:21 +0800
+Subject: [PATCH] arm64: Implement arch_setup_pdev_archdata hook
+Message-ID: <b4645ade4a4d4150e76594f5bf04a3ad5e7d5221.1465287808.git.baolin.wang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 1:38 PM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
-> 1. Currently only cpu0 set on cpu_possible_mask and percpu areas have not
->    been initialized.
-> 2. No reason to limit cpu0 must belongs to node0.
+Now on ARM64 platform, it will set 'dummy_dma_ops' for device dma_ops if
+it did not call 'arch_setup_dma_ops' at device creation time by issuing
+platform_device_alloc() function, that will cause failure when setting
+the dma mask for device.
 
-even smp init assumes cpu0/boot processor.
-is this patch tested on any hardware?
-can you describe your testing hardware?
->
-> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
-> ---
->  arch/arm64/mm/numa.c | 8 --------
->  1 file changed, 8 deletions(-)
->
-> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-> index d73b0a0..92b1692 100644
-> --- a/arch/arm64/mm/numa.c
-> +++ b/arch/arm64/mm/numa.c
-> @@ -93,7 +93,6 @@ void numa_clear_node(unsigned int cpu)
->   */
->  static void __init setup_node_to_cpumask_map(void)
->  {
-> -       unsigned int cpu;
->         int node;
->
->         /* setup nr_node_ids if not done yet */
-> @@ -106,9 +105,6 @@ static void __init setup_node_to_cpumask_map(void)
->                 cpumask_clear(node_to_cpumask_map[node]);
->         }
->
-> -       for_each_possible_cpu(cpu)
-> -               set_cpu_numa_node(cpu, NUMA_NO_NODE);
-> -
+Hence We need to hook the archdata to setup proper dma_ops for these devices.
 
-do you see this init of setting node id to NUMA_NO_NODE  for each cpu
-happening any where else?
-otherwise, better to have initialised node id/NUMA_NO_NODE to every
-cpu otherwise default  node id will be shown as zero
-which is not correct.
+Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+---
+ arch/arm64/mm/dma-mapping.c |   21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
->         /* cpumask_of_node() will now work */
->         pr_debug("Node to cpumask map for %d nodes\n", nr_node_ids);
->  }
-> @@ -379,10 +375,6 @@ static int __init numa_init(int (*init_func)(void))
->
->         setup_node_to_cpumask_map();
->
-> -       /* init boot processor */
-> -       cpu_to_node_map[0] = 0;
-> -       map_cpu_to_node(0, 0);
-> -
-
-otherwise, how you set numa info for cpu0/boot-processor?
-
-thanks
-Ganapat
->         return 0;
->  }
->
-> --
-> 2.5.0
->
->
->
-
-thanks
-ganapat
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index c566ec8..04e057b 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -26,6 +26,7 @@
+ #include <linux/dma-contiguous.h>
+ #include <linux/vmalloc.h>
+ #include <linux/swiotlb.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/cacheflush.h>
+ 
+@@ -961,3 +962,23 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 	dev->archdata.dma_coherent = coherent;
+ 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+ }
++
++void arch_setup_pdev_archdata(struct platform_device *pdev)
++{
++	if (!pdev->dev.archdata.dma_ops)
++		pdev->dev.archdata.dma_ops = &swiotlb_dma_ops;
++
++	/*
++	 * Set default coherent_dma_mask to 32 bit. Drivers are expected to
++	 * setup the correct supported mask.
++	 */
++	if (!pdev->dev.coherent_dma_mask)
++		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
++
++	/*
++	 * Set it to coherent_dma_mask by default if the architecture
++	 * code has not set it.
++	 */
++	if (!pdev->dev.dma_mask)
++		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
++}
+-- 
+1.7.9.5
