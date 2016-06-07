@@ -1,75 +1,154 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Tue,  7 Jun 2016 13:05:38 +0200
-Subject: [PATCH v3 00/10] raspberry pi 3 patch series, part 1: essentials
-Message-ID: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
+Date: Tue,  7 Jun 2016 13:05:47 +0200
+Subject: [PATCH v3 09/10] ARM: bcm2835: dt: Add the ethernet to the device
+ trees
+In-Reply-To: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
+References: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
+Message-ID: <1465297548-17182-10-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi,
+From: Lubomir Rintel <lkundrak@v3.sk>
 
-Raspberry pi 3 patches, next round.  Should be pretty much ready
-to go now.
+The hub and the ethernet in its port 1 are hardwired on the board.
 
-Changes v3:
- * redo defconfig update, drop DRM_VC4=y for now (not working for me).
- * split rpi3 device tree patch into two again (arm64 + arm).
+Compared to the adapters that can be plugged into the USB ports, this
+one has no serial EEPROM to store its MAC. Nevertheless, the Raspberry Pi
+has the MAC address for this adapter in its ROM, accessible from its
+firmware.
 
-Changes v2:
- * send essential patches only
- * dropped ARCH_BCM kconfig option.
- * drop include hack for rpi3 device tree in arm.
- * drop DMA offset patch, pick up the version from Alex instead.
+U-Boot can read out the address and set the local-mac-address property of the
+node with "ethernet" alias. Let's add the node so that U-Boot can do its
+business.
 
-Patches are also available from:
-  git://git.kraxel.org/linux bcm2837-47-v3
+Model B rev2 and Model B+ entries were verified by me, the hierarchy and
+pid/vid pair for the Version 2 was provided by Peter Chen. Original
+Model B is a blind shot, though very likely correct.
 
-Note that the git branch has the complete set of patches (including
-device tree patches and rpi3 wifi).
-
-cheers,
-  Gerd
-
-Alexander Graf (1):
-  arm64: Allow for different DMA and CPU bus offsets
-
-Eric Anholt (4):
-  irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ.
-  arm64: Add platform selection for BCM2835.
-  dt-bindings: Add root properties for Raspberry Pi 3
-  ARM: bcm2835: Add devicetree for the Raspberry Pi 3.
-
-Gerd Hoffmann (4):
-  pinctrl: walk into bcm subdir unconditionally
-  arm64: Add BCM2835 support to the defconfig.
-  ARM: bcm2835: Add devicetree for the Raspberry Pi 3, for arm (32)
-  ARM: bcm2837: dt: Add the ethernet to the device trees
-
-Lubomir Rintel (1):
-  ARM: bcm2835: dt: Add the ethernet to the device trees
-
- .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |  4 ++
- arch/arm/boot/dts/Makefile                         |  3 +-
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |  1 +
- arch/arm/boot/dts/bcm2835-rpi-b.dts                |  1 +
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |  1 +
- arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi        | 19 ++++++
- arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi        | 19 ++++++
- arch/arm/boot/dts/bcm283x.dtsi                     |  2 +
- arch/arm64/Kconfig.platforms                       | 13 ++++
- arch/arm64/boot/dts/broadcom/Makefile              |  1 +
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   | 30 +++++++++
- arch/arm64/boot/dts/broadcom/bcm2837.dtsi          | 74 ++++++++++++++++++++++
- arch/arm64/configs/defconfig                       | 12 ++++
- arch/arm64/include/asm/dma-mapping.h               | 17 ++++-
- drivers/irqchip/irq-bcm2835.c                      |  3 +-
- drivers/irqchip/irq-bcm2836.c                      |  2 +-
- drivers/pinctrl/Makefile                           |  2 +-
- 18 files changed, 198 insertions(+), 7 deletions(-)
+Signed-off-by: Lubomir Rintel <lkundrak@v3.sk>
+Acked-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts    |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts    |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts         |  1 +
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts       |  1 +
+ arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi | 19 +++++++++++++++++++
+ arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi | 19 +++++++++++++++++++
+ arch/arm/boot/dts/bcm283x.dtsi              |  2 ++
+ 7 files changed, 44 insertions(+)
  create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
  create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
- create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
- create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837.dtsi
 
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index 57d313b..d5fdb8e 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9514.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-b-plus", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+index cf2774e..bfc4bd9 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9512.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-b-rev2", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index 8b15f9c..0371bb7 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2835.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9512.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,model-b", "brcm,bcm2835";
+diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+index c4743f4..29e1cfe 100644
+--- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
++++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+@@ -1,6 +1,7 @@
+ /dts-v1/;
+ #include "bcm2836.dtsi"
+ #include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-smsc9514.dtsi"
+ 
+ / {
+ 	compatible = "raspberrypi,2-model-b", "brcm,bcm2836";
+diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+new file mode 100644
+index 0000000..12c981e
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+@@ -0,0 +1,19 @@
++/ {
++	aliases {
++		ethernet = &ethernet;
++	};
++};
++
++&usb {
++	usb1 at 1 {
++		compatible = "usb424,9512";
++		reg = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethernet: usbether at 1 {
++			compatible = "usb424,ec00";
++			reg = <1>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+new file mode 100644
+index 0000000..3f0a56e
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+@@ -0,0 +1,19 @@
++/ {
++	aliases {
++		ethernet = &ethernet;
++	};
++};
++
++&usb {
++	usb1 at 1 {
++		compatible = "usb424,9514";
++		reg = <1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		ethernet: usbether at 1 {
++			compatible = "usb424,ec00";
++			reg = <1>;
++		};
++	};
++};
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 10b27b9..b982522 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -287,6 +287,8 @@
+ 			compatible = "brcm,bcm2835-usb";
+ 			reg = <0x7e980000 0x10000>;
+ 			interrupts = <1 9>;
++			#address-cells = <1>;
++			#size-cells = <0>;
+ 		};
+ 
+ 		v3d: v3d at 7ec00000 {
 -- 
 1.8.3.1
