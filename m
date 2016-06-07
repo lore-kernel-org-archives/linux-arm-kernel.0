@@ -1,39 +1,68 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 17:38:09 +0100
-Subject: [PATCH] clk: at91: make of_sama5d2_clk_generated_setup() static
-Message-ID: <1465317489-14920-1-git-send-email-ben.dooks@codethink.co.uk>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 7 Jun 2016 18:38:47 +0200
+Subject: [PATCH] arm64: Implement ptep_set_access_flags() for hardware
+ AF/DBM
+In-Reply-To: <20160607163024.GB20477@arm.com>
+References: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
+ <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
+ <20160607163024.GB20477@arm.com>
+Message-ID: <af67c8bc-996a-26bb-d506-fbcc1a6e7d6e@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The of_sama5d2_clk_generated_setup() is not exported outside
-of the driver, so make it static to fix the warning about it
-being not static:
 
-drivers/clk/at91/clk-generated.c:270:13: warning: symbol 'of_sama5d2_clk_generated_setup' was not declared. Should it be static?
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: Michael Turquette <mturquette@baylibre.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: linux-clk at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/clk/at91/clk-generated.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On 07.06.16 18:30, Will Deacon wrote:
+> Hi Alex,
+> 
+> Thanks for the bug report.
+> 
+> On Tue, Jun 07, 2016 at 04:13:03PM +0200, Alexander Graf wrote:
+>> On 13.04.16 17:01, Catalin Marinas wrote:
+>>> When hardware updates of the access and dirty states are enabled, the
+>>> default ptep_set_access_flags() implementation based on calling
+>>> set_pte_at() directly is potentially racy. This triggers the "racy dirty
+>>> state clearing" warning in set_pte_at() because an existing writable PTE
+>>> is overridden with a clean entry.
+> 
+> [...]
+> 
+>> This patch breaks swapping for me.
+>>
+>> I've hit weird issues where systems stopped working half-way, with the
+>> kernel still being fine and user space applications just stopping to
+>> respond.
+>>
+>> After some debugging we found out that it always happens when swapping
+>> (to anything, backing storage doesn't matter). A quick bisect points to
+>> this commit as culprit and indeed, if I disable CONFIG_ARM64_HW_AFDBM
+>> the system works as expected.
+> 
+> [...]
+> 
+>> The back traces indicate that the page fault handler goes through and
+>> the process just keeps banging on the same page fault over and over
+>> again. I have not yet figured out what *exactly* is going wrong or why
+>> this patch would actually give us that effect.
+>>
+>> I was able to fully reproduce the issue with current Linus tree (4.7-rc2+).
+> 
+> It looks like the following happens:
+> 
+>   1. We put down a PTE_WRITE | PTE_DIRTY | PTE_AF pte
+>   2. Memory pressure -> pte_mkold(pte) -> clear PTE_AF
+>   3. A read faults due to the missing access flag
+>   4. ptep_set_access_flags is called with dirty = 0, due to the read fault
+>   5. pte is then made PTE_WRITE | PTE_DIRTY | PTE_AF | PTE_RDONLY (!)
+>   6. A write faults, but pte_write is true so we get stuck
+> 
+> Does the diff below fix the issue for you? If so, I'll write a proper
+> patch.
 
-diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-index e1aa210..7f6bec8 100644
---- a/drivers/clk/at91/clk-generated.c
-+++ b/drivers/clk/at91/clk-generated.c
-@@ -267,7 +267,7 @@ at91_clk_register_generated(struct regmap *regmap,  spinlock_t *lock, const char
- 	return clk;
- }
- 
--void __init of_sama5d2_clk_generated_setup(struct device_node *np)
-+static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
- {
- 	int num;
- 	u32 id;
--- 
-2.8.1
+With that patch on top of Linus master I don't see the issue anymore,
+yes :).
+
+
+Thanks for the quick reply!
+
+Alex
