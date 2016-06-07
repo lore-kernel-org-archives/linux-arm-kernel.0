@@ -1,50 +1,57 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Tue, 7 Jun 2016 13:21:00 -0700
-Subject: [RESEND/PATCHv4 v4 1/3] firmware: Consolidate kmap/read/write
- logic
-In-Reply-To: <20160607164741.31849-2-stephen.boyd@linaro.org>
-References: <20160607164741.31849-1-stephen.boyd@linaro.org>
- <20160607164741.31849-2-stephen.boyd@linaro.org>
-Message-ID: <20160607132100.dcc052bdf5affaab7cdc29ce@linux-foundation.org>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 7 Jun 2016 22:21:13 +0200
+Subject: [PATCH V6 7/8] vfio: platform: check reset call return code
+ during open
+In-Reply-To: <1464472878-27176-8-git-send-email-okaya@codeaurora.org>
+References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
+ <1464472878-27176-8-git-send-email-okaya@codeaurora.org>
+Message-ID: <5ae51f93-d141-00bf-f58f-40fbf7b1307d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 Jun 2016 09:47:39 -0700 Stephen Boyd <stephen.boyd@linaro.org> wrote:
-
-> We use similar structured code to read and write the kmapped
-> firmware pages. The only difference is read copies from the kmap
-> region and write copies to it. Consolidate this into one function
-> to reduce duplication.
+Hi Sinan,
+Le 29/05/2016 ? 00:01, Sinan Kaya a ?crit :
+> Open call is ignoring the return code from reset call and can
+> potentially continue even though reset call failed.
 > 
-> ...
->
-> --- a/drivers/base/firmware_class.c
-> +++ b/drivers/base/firmware_class.c
-> @@ -691,6 +691,29 @@ out:
+> If reset_required module parameter is set, this patch is going
+> to validate the return code and will abort open if reset fails.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/vfio/platform/vfio_platform_common.c | 9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index e87ceab..962cfb1 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -264,6 +264,8 @@ static int vfio_platform_open(void *device_data)
+>  	mutex_lock(&driver_lock);
 >  
->  static DEVICE_ATTR(loading, 0644, firmware_loading_show, firmware_loading_store);
+>  	if (!vdev->refcnt) {
+> +		const char *extra_dbg = NULL;
+> +
+>  		ret = vfio_platform_regions_init(vdev);
+>  		if (ret)
+>  			goto err_reg;
+> @@ -272,7 +274,12 @@ static int vfio_platform_open(void *device_data)
+>  		if (ret)
+>  			goto err_irq;
 >  
-> +static void firmware_rw(struct firmware_buf *buf, char *buffer,
-> +			loff_t offset, size_t count, bool read)
-> +{
-> +	while (count) {
-> +		void *page_data;
-> +		int page_nr = offset >> PAGE_SHIFT;
-> +		int page_ofs = offset & (PAGE_SIZE-1);
-> +		int page_cnt = min_t(size_t, PAGE_SIZE - page_ofs, count);
-> +
-> +		page_data = kmap(buf->pages[page_nr]);
+> -		vfio_platform_call_reset(vdev, NULL);
+> +		ret = vfio_platform_call_reset(vdev, &extra_dbg);
+> +		if (ret && vdev->reset_required) {
+> +			dev_warn(vdev->device, "reset driver is required and reset call failed in open (%d) %s\n",
+> +				 ret, extra_dbg ? extra_dbg : "");
+> +			goto err_irq;
+I am afraid you need to tear down the resources allocated by vfio_platform_irq_init. 
 
-fwiw, we could switch the code to kmap_atomic() here.  It is faster.
+Best Regards
 
-> +		if (read)
-> +			memcpy(buffer, page_data + page_ofs, page_cnt);
-> +		else
-> +			memcpy(page_data + page_ofs, buffer, page_cnt);
-> +
-> +		kunmap(buf->pages[page_nr]);
-> +		buffer += page_cnt;
-> +		offset += page_cnt;
-> +		count -= page_cnt;
-> +	}
-> +}
+Eric
+> +		}
+>  	}
+>  
+>  	vdev->refcnt++;
+> 
