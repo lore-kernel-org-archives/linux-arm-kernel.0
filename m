@@ -1,35 +1,51 @@
 From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 7 Jun 2016 08:57:30 +0800
-Subject: [PATCH 1/2] drm/rockchip: vop: add uv_vir register field for
- RK3036 VOP
-In-Reply-To: <1465199912-20932-1-git-send-email-ykk@rock-chips.com>
+Date: Tue, 7 Jun 2016 08:57:48 +0800
+Subject: [PATCH 2/2] drm/rockchip: vop: correct the source size of uv
+ scale factor setting
+In-Reply-To: <1465199926-20991-1-git-send-email-ykk@rock-chips.com>
 References: <1465199912-20932-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <57561BFA.5030000@rock-chips.com>
+ <1465199926-20991-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <57561C0C.2040507@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2016?06?06? 15:58, Yakir Yang wrote:
-> The WIN0 of RK3036 VOP could support YUV data format, but driver
-> forget to add the uv_vir register field for it.
+> From: Mark Yao <mark.yao@rock-chips.com>
+>
+> When the input color format is YUV, we need to do some external scale
+> for CBCR. Like,
+>   * In YUV420 data format:
+>       cbcr_xscale = dst_w / src_w * 2;
+>       cbcr_yscale = dst_h / src_h * 2;
+>   * In YUV422 data format:
+>       cbcr_xscale = dst_w / src_w * 2;
+>       cbcr_yscale = dst_h / src_h;
+>   * In YUV444 data format
+>       cbcr_xscale = dst_w / src_w;
+>       cbcr_yscale = dst_h / src_h;
 >
 > Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 > ---
->   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 1 +
->   1 file changed, 1 insertion(+)
+>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 >
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> index 3166b46..7da2311 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
-> @@ -210,6 +210,7 @@ static const struct vop_win_phy rk3036_win0_data = {
->   	.yrgb_mst = VOP_REG(RK3036_WIN0_YRGB_MST, 0xffffffff, 0),
->   	.uv_mst = VOP_REG(RK3036_WIN0_CBR_MST, 0xffffffff, 0),
->   	.yrgb_vir = VOP_REG(RK3036_WIN0_VIR, 0xffff, 0),
-> +	.uv_vir = VOP_REG(RK3036_WIN0_VIR, 0x1fff, 16),
->   };
->   
->   static const struct vop_win_phy rk3036_win1_data = {
-
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> index 1c4d5b5..b28cda7 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+> @@ -324,9 +324,9 @@ static void scl_vop_cal_scl_fac(struct vop *vop, const struct vop_win_data *win,
+>   			    scl_cal_scale2(src_h, dst_h));
+>   		if (is_yuv) {
+>   			VOP_SCL_SET(vop, win, scale_cbcr_x,
+> -				    scl_cal_scale2(src_w, dst_w));
+> +				    scl_cal_scale2(cbcr_src_w, dst_w));
+>   			VOP_SCL_SET(vop, win, scale_cbcr_y,
+> -				    scl_cal_scale2(src_h, dst_h));
+> +				    scl_cal_scale2(cbcr_src_h, dst_h));
+>   		}
+>   		return;
+>   	}
 Thanks for this fix, Applied to my drm-fixes.
 
--- ?ark Yao
+-- 
+?ark Yao
