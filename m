@@ -1,128 +1,63 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jun 2016 16:08:15 +0800
-Subject: [PATCH v4 11/14] arm64/numa: support HAVE_MEMORYLESS_NODES
-In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1465286898-13828-12-git-send-email-thunder.leizhen@huawei.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 7 Jun 2016 09:10:43 +0100
+Subject: [PATCH net-next 2/3] arm64: bpf: optimize JMP_CALL
+In-Reply-To: <CABg9mcvXxAvWxuXJbBbQEy5_nsgPjT6Y20CFNKMkOYJp4NrnFQ@mail.gmail.com>
+References: <1465077630-633-1-git-send-email-zlim.lnx@gmail.com>
+ <1465077630-633-2-git-send-email-zlim.lnx@gmail.com>
+ <20160606170515.GK669@arm.com>
+ <CABg9mcvXxAvWxuXJbBbQEy5_nsgPjT6Y20CFNKMkOYJp4NrnFQ@mail.gmail.com>
+Message-ID: <20160607081042.GA9951@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some numa nodes may have no memory. For example:
-1. cpu0 on node0
-2. cpu1 on node1
-3. device0 access the momory from node0 and node1 take the same time.
+On Mon, Jun 06, 2016 at 09:36:03PM -0700, Z Lim wrote:
+> On Mon, Jun 6, 2016 at 10:05 AM, Will Deacon <will.deacon@arm.com> wrote:
+> > On Sat, Jun 04, 2016 at 03:00:29PM -0700, Zi Shen Lim wrote:
+> >> Remove superfluous stack frame, saving us 3 instructions for
+> >> every JMP_CALL.
+> >>
+> >> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> >> ---
+> >>  arch/arm64/net/bpf_jit_comp.c | 3 ---
+> >>  1 file changed, 3 deletions(-)
+> >>
+> >> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> >> index 51abc97..7ae304e 100644
+> >> --- a/arch/arm64/net/bpf_jit_comp.c
+> >> +++ b/arch/arm64/net/bpf_jit_comp.c
+> >> @@ -578,11 +578,8 @@ emit_cond_jmp:
+> >>               const u64 func = (u64)__bpf_call_base + imm;
+> >>
+> >>               emit_a64_mov_i64(tmp, func, ctx);
+> >> -             emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
+> >> -             emit(A64_MOV(1, A64_FP, A64_SP), ctx);
+> >>               emit(A64_BLR(tmp), ctx);
+> >>               emit(A64_MOV(1, r0, A64_R(0)), ctx);
+> >> -             emit(A64_POP(A64_FP, A64_LR, A64_SP), ctx);
+> >>               break;
+> >>       }
+> >
+> > Is the jitted code intended to be unwindable by standard tools?
+> 
+> Before this patch:
+>     bpf_prologue => push stack frame
+>     ...
+>     jmp_call => push stack frame, call bpf_helper*, pop stack frame
+>     ...
+>     bpf_epilogue => pop stack frame, ret
+> 
+> Now:
+>     bpf_prologue => push stack frame
+>     ...
+>     jmp_call => call bpf_helper*
+>     ...
+>     bpf_epilogue => pop stack frame, ret
+> 
+> *Note: bpf_helpers in kernel/bpf/helper.c
+> 
+> So yes, it's still unwindable.
 
-So, we can not simply classify device0 to node0 or node1, but we can
-define a node2 which distances to node0 and node1 are the same.
+Sure, I'm not disputing that. I just wondered whether or not it needs to
+be unwindable at all...
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- arch/arm64/Kconfig      |  4 ++++
- arch/arm64/kernel/smp.c |  1 +
- arch/arm64/mm/numa.c    | 43 +++++++++++++++++++++++++++++++++++++++++--
- 3 files changed, 46 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 05c1bf1..5904a62 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -581,6 +581,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
- 	def_bool y
- 	depends on NUMA
-
-+config HAVE_MEMORYLESS_NODES
-+	def_bool y
-+	depends on NUMA
-+
- source kernel/Kconfig.preempt
- source kernel/Kconfig.hz
-
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d099306..9e15297 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -620,6 +620,7 @@ static void __init of_parse_and_init_cpus(void)
- 			}
-
- 			bootcpu_valid = true;
-+			early_map_cpu_to_node(0, of_node_to_nid(dn));
-
- 			/*
- 			 * cpu_logical_map has already been
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index df5c842..d73b0a0 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -128,6 +128,14 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
- 		nid = 0;
-
- 	cpu_to_node_map[cpu] = nid;
-+
-+	/*
-+	 * We should set the numa node of cpu0 as soon as possible, because it
-+	 * has already been set up online before. cpu_to_node(0) will soon be
-+	 * called.
-+	 */
-+	if (!cpu)
-+		set_cpu_numa_node(cpu, nid);
- }
-
- #ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
-@@ -215,6 +223,35 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
- 	return ret;
- }
-
-+static u64 __init alloc_node_data_from_nearest_node(int nid, const size_t size)
-+{
-+	int i, best_nid, distance;
-+	u64 pa;
-+	DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
-+
-+	bitmap_zero(nodes_map, MAX_NUMNODES);
-+	bitmap_set(nodes_map, nid, 1);
-+
-+find_nearest_node:
-+	best_nid = NUMA_NO_NODE;
-+	distance = INT_MAX;
-+
-+	for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
-+		if (numa_distance[nid][i] < distance) {
-+			best_nid = i;
-+			distance = numa_distance[nid][i];
-+		}
-+
-+	pa = memblock_alloc_nid(size, SMP_CACHE_BYTES, best_nid);
-+	if (!pa) {
-+		BUG_ON(best_nid == NUMA_NO_NODE);
-+		bitmap_set(nodes_map, best_nid, 1);
-+		goto find_nearest_node;
-+	}
-+
-+	return pa;
-+}
-+
- /**
-  * Initialize NODE_DATA for a node on the local memory
-  */
-@@ -228,7 +265,9 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
- 	pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
- 		nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
-
--	nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
-+	nd_pa = memblock_alloc_nid(nd_size, SMP_CACHE_BYTES, nid);
-+	if (!nd_pa)
-+		nd_pa = alloc_node_data_from_nearest_node(nid, nd_size);
- 	nd = __va(nd_pa);
-
- 	/* report and initialize */
-@@ -238,7 +277,7 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
- 	if (tnid != nid)
- 		pr_info("    NODE_DATA(%d) on node %d\n", nid, tnid);
-
--	node_data[nid] = nd;
-+	NODE_DATA(nid) = nd;
- 	memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
- 	NODE_DATA(nid)->node_id = nid;
- 	NODE_DATA(nid)->node_start_pfn = start_pfn;
---
-2.5.0
+Will
