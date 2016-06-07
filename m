@@ -1,62 +1,132 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 16:03:52 +0000
-Subject: [PATCH v10 7/8] iommu/arm-smmu: do not advertise IOMMU_CAP_INTR_REMAP
+Date: Tue,  7 Jun 2016 16:03:47 +0000
+Subject: [PATCH v10 2/8] vfio/type1: vfio_find_dma accepting a type argument
 In-Reply-To: <1465315433-5974-1-git-send-email-eric.auger@redhat.com>
 References: <1465315433-5974-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315433-5974-8-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315433-5974-3-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do not advertise IOMMU_CAP_INTR_REMAP for arm-smmu(-v3). Indeed the
-irq_remapping capability is abstracted on irqchip side for ARM as
-opposed to Intel IOMMU featuring IRQ remapping HW.
+In our RB-tree we get prepared to insert slots of different types
+(USER and RESERVED). It becomes useful to be able to search for dma
+slots of a specific type or any type.
 
-So to check IRQ remapping capability, the msi domain needs to be
-checked instead.
+This patch introduces vfio_find_dma_from_node which starts the
+search from a given node and stops on the first node that matches
+the @start and @size parameters. If this node also matches the
+@type parameter, the node is returned else NULL is returned.
 
-This commit affects platform and PCIe device assignment use cases
-on any platform featuring an unsafe MSI controller (currently the
-ARM GICv2m). For those platforms the VFIO module must be loaded with
-allow_unsafe_interrupts set to 1.
+At the moment we only have USER SLOTS so the type will always match.
+
+In a separate patch, this function will be enhanced to pursue the
+search recursively in case a node with a different type is
+encountered.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-
 ---
+ drivers/vfio/vfio_iommu_type1.c | 53 +++++++++++++++++++++++++++++++++--------
+ 1 file changed, 43 insertions(+), 10 deletions(-)
 
-v9 -> v10:
-- reword the commit message (allow_unsafe_interrupts)
----
- drivers/iommu/arm-smmu-v3.c | 3 ++-
- drivers/iommu/arm-smmu.c    | 3 ++-
- 2 files changed, 4 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 17a20a7..fe3fa6f 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1387,7 +1387,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 	case IOMMU_CAP_CACHE_COHERENCY:
- 		return true;
- 	case IOMMU_CAP_INTR_REMAP:
--		return true; /* MSIs are just memory writes */
-+		/* interrupt translation handled at MSI controller level */
-+		return false;
- 	case IOMMU_CAP_NOEXEC:
- 		return true;
- 	default:
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 867910b..b03a89b 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1380,7 +1380,8 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- 		 */
- 		return true;
- 	case IOMMU_CAP_INTR_REMAP:
--		return true; /* MSIs are just memory writes */
-+		/* interrupt translation handled at MSI controller level */
-+		return false;
- 	case IOMMU_CAP_NOEXEC:
- 		return true;
- 	default:
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index a9f8b93..cb7267a 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -94,25 +94,56 @@ struct vfio_group {
+  * into DMA'ble space using the IOMMU
+  */
+ 
+-static struct vfio_dma *vfio_find_dma(struct vfio_iommu *iommu,
+-				      dma_addr_t start, size_t size)
++/**
++ * vfio_find_dma_from_node: looks for a dma slot intersecting a window
++ * from a given rb tree node
++ * @top: top rb tree node where the search starts (including this node)
++ * @start: window start
++ * @size: window size
++ * @type: window type
++ */
++static struct vfio_dma *vfio_find_dma_from_node(struct rb_node *top,
++						dma_addr_t start, size_t size,
++						enum vfio_iova_type type)
+ {
+-	struct rb_node *node = iommu->dma_list.rb_node;
++	struct rb_node *node = top;
++	struct vfio_dma *dma;
+ 
+ 	while (node) {
+-		struct vfio_dma *dma = rb_entry(node, struct vfio_dma, node);
+-
++		dma = rb_entry(node, struct vfio_dma, node);
+ 		if (start + size <= dma->iova)
+ 			node = node->rb_left;
+ 		else if (start >= dma->iova + dma->size)
+ 			node = node->rb_right;
+ 		else
+-			return dma;
++			break;
+ 	}
++	if (!node)
++		return NULL;
++
++	/* a dma slot intersects our window, check the type also matches */
++	if (type == VFIO_IOVA_ANY || dma->type == type)
++		return dma;
+ 
+ 	return NULL;
+ }
+ 
++/**
++ * vfio_find_dma: find a dma slot intersecting a given window
++ * @iommu: vfio iommu handle
++ * @start: window base iova
++ * @size: window size
++ * @type: window type
++ */
++static struct vfio_dma *vfio_find_dma(struct vfio_iommu *iommu,
++				      dma_addr_t start, size_t size,
++				      enum vfio_iova_type type)
++{
++	struct rb_node *top_node = iommu->dma_list.rb_node;
++
++	return vfio_find_dma_from_node(top_node, start, size, type);
++}
++
+ static void vfio_link_dma(struct vfio_iommu *iommu, struct vfio_dma *new)
+ {
+ 	struct rb_node **link = &iommu->dma_list.rb_node, *parent = NULL;
+@@ -484,19 +515,21 @@ static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
+ 	 * mappings within the range.
+ 	 */
+ 	if (iommu->v2) {
+-		dma = vfio_find_dma(iommu, unmap->iova, 0);
++		dma = vfio_find_dma(iommu, unmap->iova, 0, VFIO_IOVA_USER);
+ 		if (dma && dma->iova != unmap->iova) {
+ 			ret = -EINVAL;
+ 			goto unlock;
+ 		}
+-		dma = vfio_find_dma(iommu, unmap->iova + unmap->size - 1, 0);
++		dma = vfio_find_dma(iommu, unmap->iova + unmap->size - 1, 0,
++				    VFIO_IOVA_USER);
+ 		if (dma && dma->iova + dma->size != unmap->iova + unmap->size) {
+ 			ret = -EINVAL;
+ 			goto unlock;
+ 		}
+ 	}
+ 
+-	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size))) {
++	while ((dma = vfio_find_dma(iommu, unmap->iova, unmap->size,
++				    VFIO_IOVA_USER))) {
+ 		if (!iommu->v2 && unmap->iova > dma->iova)
+ 			break;
+ 		unmapped += dma->size;
+@@ -600,7 +633,7 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+ 
+ 	mutex_lock(&iommu->lock);
+ 
+-	if (vfio_find_dma(iommu, iova, size)) {
++	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
+ 		mutex_unlock(&iommu->lock);
+ 		return -EEXIST;
+ 	}
 -- 
 1.9.1
