@@ -1,48 +1,42 @@
-From: dave.long@linaro.org (David Long)
-Date: Mon, 6 Jun 2016 23:52:35 -0400
-Subject: [PATCH v13 04/10] arm64: Blacklist non-kprobe-able symbol
-In-Reply-To: <20160604124032.94ac1bb76fde6c661e1a47a5@kernel.org>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-5-git-send-email-dave.long@linaro.org>
- <20160604124032.94ac1bb76fde6c661e1a47a5@kernel.org>
-Message-ID: <57564503.8080304@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 Jun 2016 21:28:54 -0700
+Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
+ typical Keystone features
+In-Reply-To: <574F6674.3010100@ti.com>
+References: <1464816714-3900-1-git-send-email-nm@ti.com>
+ <3593753.UuDg5ybrvm@wuerfel> <574F6674.3010100@ti.com>
+Message-ID: <20160607042853.GA22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2016 11:40 PM, Masami Hiramatsu wrote:
-> Hi David,
->
-> On Thu,  2 Jun 2016 23:26:18 -0400
-> David Long <dave.long@linaro.org> wrote:
->
->> From: Pratyush Anand <panand@redhat.com>
->>
->> Add all function symbols which are called from do_debug_exception under
->> NOKPROBE_SYMBOL, as they can not kprobed.
->
-> I see, but this patch should be applied after kprobes
-> are implemented on arm64.
->
-> And also, I have a comment below.
->
->> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
->> index 5954881..4359ca8 100644
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -563,6 +563,7 @@ asmlinkage void __exception do_sp_pc_abort(unsigned long addr,
->>   	info.si_addr  = (void __user *)addr;
->>   	arm64_notify_die("Oops - SP/PC alignment exception", regs, &info, esr);
->>   }
->> +NOKPROBE_SYMBOL(do_debug_exception)
->
-> This seems at wrong place. Please correct it in this patch.
->
-> Thank you,
->
+* Nishanth Menon <nm@ti.com> [160601 15:51]:
+> On 06/01/2016 05:31 PM, Arnd Bergmann wrote:
+> > On Wednesday, June 1, 2016 4:31:54 PM CEST Nishanth Menon wrote:
+> >>
+> >> Hence the "KEYSTONE_TYPICAL" option is designed similar to commit 8d9166b519fd
+> >> ("omap2/3/4: Add Kconfig option to compile in typical omap features")
+> >> that can be enabled for most boards keystone platforms
+> >> without needing to rediscover these in defconfig all over again -
+> >> examples include multi_v7_defconfig base and optimizations done on top
+> >> of them for keystone platform.
+> > 
+> > I'd rather remove the option for OMAP as well, it doesn't really fit in with
+> > how we do things for other platforms, and selecting a lot of other Kconfig
+> > symbols tends to cause circular dependencies.
+> 
+> Hmm, fair enough -> adding Tony as well if he sees an problem with
+> dropping ARCH_OMAP2PLUS_TYPICAL.
 
+Yes there's a problem. Removing that is going to make all the custom
+.config files unbootable almost certainly. Just search around on
+issues related to not having REGULATOR_FIXED_VOLTAGE selected.
 
-Hmm, yeah not sure how that happened.  It gets fixed in the next patch 
-but it shouldn't be like this.
+I agree we should not force select things though. And the I2C selection
+at least is wrong, we can have PMICs that are not on I2C bus.
 
-Thanks,
--dl
+Anybody got better ideas what we should do to make the configuration
+options more intuitive?
+
+Regards,
+
+Tony
