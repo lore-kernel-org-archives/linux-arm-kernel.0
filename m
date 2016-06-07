@@ -1,76 +1,67 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Jun 2016 17:30:25 +0100
-Subject: [PATCH] arm64: Implement ptep_set_access_flags() for hardware
- AF/DBM
-In-Reply-To: <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
-References: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
- <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
-Message-ID: <20160607163024.GB20477@arm.com>
+From: hotran@apm.com (Hoan Tran)
+Date: Tue, 7 Jun 2016 09:31:07 -0700
+Subject: [PATCH 1/3] Documentation: dtb: xgene: Add hwmon dts binding
+ documentation
+In-Reply-To: <20160525170912.GA24382@rob-hp-laptop>
+References: <1463415447-29903-1-git-send-email-hotran@apm.com>
+ <1463415447-29903-2-git-send-email-hotran@apm.com>
+ <20160523203044.GA17450@rob-hp-laptop>
+ <CAFHUOYyYt8pE6sggezCR=TFcsimcjakbYmcWFtpLyQ3Et_gZaA@mail.gmail.com>
+ <20160525170912.GA24382@rob-hp-laptop>
+Message-ID: <CAFHUOYwrpc=ad_iEjx2LYdTQPGkzu76sfXcnp+-cpUZAvFvcag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+Hi Rob,
 
-Thanks for the bug report.
+On Wed, May 25, 2016 at 10:09 AM, Rob Herring <robh@kernel.org> wrote:
+>
+> On Mon, May 23, 2016 at 06:01:14PM -0700, Hoan Tran wrote:
+> > Hi Rob,
+> >
+> > Thanks for your review !
+> >
+> > On Mon, May 23, 2016 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
+> > >
+> > > On Mon, May 16, 2016 at 09:17:25AM -0700, Hoan Tran wrote:
+> > > > This patch adds the APM X-Gene hwmon device tree node documentation.
+> > > >
+> > > > Signed-off-by: Hoan Tran <hotran@apm.com>
+> > > > ---
+> > > >  .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt          | 14 ++++++++++++++
+> > > >  1 file changed, 14 insertions(+)
+> > > >  create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+> > > >
+> > > > diff --git a/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+> > > > new file mode 100644
+> > > > index 0000000..49a482e
+> > > > --- /dev/null
+> > > > +++ b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+> > > > @@ -0,0 +1,14 @@
+> > > > +APM X-Gene hwmon driver
+> > > > +
+> > > > +Hwmon driver accesses sensors over the "SLIMpro" mailbox.
+> > >
+> > > DT bindings describe h/w, not driver data.
+> > How about this description: "APM X-Gene SOC sensors are accessed over
+> > the "SLIMpro" mailbox" ?
+> > > I'm not sure this belongs in
+> > > DT and perhaps the devices for the mailbox should be created by the
+> > > mailbox driver.
+> > I don't think the current mailbox supports it.
+>
+> Then add it. The mailbox binding is really only needed when other h/w
+> blocks use a mailbox. As this is purely a firmware interface then the
+> mailbox driver can create any devices it needs. The devices don't have
+> to be in DT to be created.
 
-On Tue, Jun 07, 2016 at 04:13:03PM +0200, Alexander Graf wrote:
-> On 13.04.16 17:01, Catalin Marinas wrote:
-> > When hardware updates of the access and dirty states are enabled, the
-> > default ptep_set_access_flags() implementation based on calling
-> > set_pte_at() directly is potentially racy. This triggers the "racy dirty
-> > state clearing" warning in set_pte_at() because an existing writable PTE
-> > is overridden with a clean entry.
+Yes, I'll create a function inside mailbox. It allows client request a
+channel by mailbox name and index without DT node.
 
-[...]
+Thanks
+Hoan
 
-> This patch breaks swapping for me.
-> 
-> I've hit weird issues where systems stopped working half-way, with the
-> kernel still being fine and user space applications just stopping to
-> respond.
-> 
-> After some debugging we found out that it always happens when swapping
-> (to anything, backing storage doesn't matter). A quick bisect points to
-> this commit as culprit and indeed, if I disable CONFIG_ARM64_HW_AFDBM
-> the system works as expected.
 
-[...]
-
-> The back traces indicate that the page fault handler goes through and
-> the process just keeps banging on the same page fault over and over
-> again. I have not yet figured out what *exactly* is going wrong or why
-> this patch would actually give us that effect.
-> 
-> I was able to fully reproduce the issue with current Linus tree (4.7-rc2+).
-
-It looks like the following happens:
-
-  1. We put down a PTE_WRITE | PTE_DIRTY | PTE_AF pte
-  2. Memory pressure -> pte_mkold(pte) -> clear PTE_AF
-  3. A read faults due to the missing access flag
-  4. ptep_set_access_flags is called with dirty = 0, due to the read fault
-  5. pte is then made PTE_WRITE | PTE_DIRTY | PTE_AF | PTE_RDONLY (!)
-  6. A write faults, but pte_write is true so we get stuck
-
-Does the diff below fix the issue for you? If so, I'll write a proper
-patch.
-
-Cheers,
-
-Will
-
---->8
-
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 5954881a35ac..ba3fc12bd272 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -109,7 +109,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
- 	 * PTE_RDONLY is cleared by default in the asm below, so set it in
- 	 * back if necessary (read-only or clean PTE).
- 	 */
--	if (!pte_write(entry) || !dirty)
-+	if (!pte_write(entry) || !pte_sw_dirty(entry))
- 		pte_val(entry) |= PTE_RDONLY;
- 
- 	/*
+>
+>
+> Rob
