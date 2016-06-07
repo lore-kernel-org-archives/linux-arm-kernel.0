@@ -1,56 +1,68 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Tue, 7 Jun 2016 12:14:57 -0500
-Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
-In-Reply-To: <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FD673@SHSMSX101.ccr.corp.intel.com>
-References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
- <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
- <20160602173932.GF5995@atomide.com>
- <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
- <20160602175635.GG5995@atomide.com>
- <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FB1EC@SHSMSX101.ccr.corp.intel.com>
- <20160607060004.GD22406@atomide.com>
- <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FD673@SHSMSX101.ccr.corp.intel.com>
-Message-ID: <CAOCHtYhBSS+D-BQH28FO+RxyzvDg-yeX+6nvLu11G3TNkF7ELg@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Tue, 7 Jun 2016 22:50:12 +0530
+Subject: [PATCH 1/3] Documentation: dtb: xgene: Add hwmon dts binding
+ documentation
+In-Reply-To: <CAFHUOYyYt8pE6sggezCR=TFcsimcjakbYmcWFtpLyQ3Et_gZaA@mail.gmail.com>
+References: <1463415447-29903-1-git-send-email-hotran@apm.com>
+ <1463415447-29903-2-git-send-email-hotran@apm.com>
+ <20160523203044.GA17450@rob-hp-laptop>
+ <CAFHUOYyYt8pE6sggezCR=TFcsimcjakbYmcWFtpLyQ3Et_gZaA@mail.gmail.com>
+Message-ID: <CABb+yY3uFrknEU65aBCw7G+dfnDdqGTZ_sctktx03GM9b86xaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 1:14 AM, Li, Yong B <yong.b.li@intel.com> wrote:
-> Thanks Tony.
+On Tue, May 24, 2016 at 6:31 AM, Hoan Tran <hotran@apm.com> wrote:
+> Hi Rob,
 >
-> I checked the DTS/overlays using linux-yocto-4.1 kernel(Ostro OS). It seems to me that the kernel/u-boot do not include the latest overlay support patch. And I also tested the latest Debian 8.4 using BBB boards, the I2C1 does not work too. This patch is the simplest solution for I2C1/I2C2 in linux-yocto-4.1.
+> Thanks for your review !
+>
+> On Mon, May 23, 2016 at 1:30 PM, Rob Herring <robh@kernel.org> wrote:
+>>
+>> On Mon, May 16, 2016 at 09:17:25AM -0700, Hoan Tran wrote:
+>> > This patch adds the APM X-Gene hwmon device tree node documentation.
+>> >
+>> > Signed-off-by: Hoan Tran <hotran@apm.com>
+>> > ---
+>> >  .../devicetree/bindings/hwmon/apm-xgene-hwmon.txt          | 14 ++++++++++++++
+>> >  1 file changed, 14 insertions(+)
+>> >  create mode 100644 Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+>> > new file mode 100644
+>> > index 0000000..49a482e
+>> > --- /dev/null
+>> > +++ b/Documentation/devicetree/bindings/hwmon/apm-xgene-hwmon.txt
+>> > @@ -0,0 +1,14 @@
+>> > +APM X-Gene hwmon driver
+>> > +
+>> > +Hwmon driver accesses sensors over the "SLIMpro" mailbox.
+>>
+>> DT bindings describe h/w, not driver data.
+> How about this description: "APM X-Gene SOC sensors are accessed over
+> the "SLIMpro" mailbox" ?
+>> I'm not sure this belongs in
+>> DT and perhaps the devices for the mailbox should be created by the
+>> mailbox driver.
+> I don't think the current mailbox supports it.
+>>
+>> > +
+>> > +Required properties :
+>> > + - compatible : should be "apm,xgene-slimpro-hwmon"
+>> > + - mboxes : use the label reference for the mailbox as the first parameter.
+>> > +         The second parameter is the channel number.
+>>
+>> When do you expect this to be different mailbox numbers?
+> No, this number is not changed. This "mboxes" property is used and
+> required by mailbox.c when hwmon driver requests a mailbox channel
+>
+I think that's inaccurate.
 
-ps, your patch is also broken, you didn't even mux the pins, so i2c1
-doesn't work for you anyways. ;)
+The h/w and the firmware combined is the "platform" from Linux POV.
+Channels are physical resources provided by a mailbox controller.
+Currently the firmware listens on Channel-7 but some future revision
+might switch to, say, Channel-9.  Or say the same firmware on next
+revision of h/w may have to switch to Channel-3 because it has only 4
+channels. So I see the mailbox channel number as a hardware property
+just like an IRQ (which very often change with SoC iterations).
 
-pinctrl-0 = <&i2c2_pins>; -> pinctrl-0 = <&i2c1_pins>;
-
-Option 1:
-
-With the latest BBB image's, we utilize "cape_universal", thus you can
-enable I2C1 via:
-
-root at beaglebone:~# config-pin -l P9.17
-default gpio gpio_pu gpio_pd spi i2c pwm
-
-root at beaglebone:~# config-pin -l P9.18
-default gpio gpio_pu gpio_pd spi i2c pwm
-
-root at beaglebone:~# config-pin P9.17 i2c
-
-root at beaglebone:~# config-pin P9.18 i2c
-
-Option 2, for the BB-I2C1 overlay:
-
-add
-
-cape_enable=bone_capemgr.enable_partno=BB-I2C1
-
-Option 3, wait for Pantelis's solution... ;)
-
-http://comments.gmane.org/gmane.linux.kernel/2234662
-
-Regards,
-
--- 
-Robert Nelson
-https://rcn-ee.com/
+Cheers.
