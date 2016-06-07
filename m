@@ -1,79 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 7 Jun 2016 17:34:45 +0100
-Subject: [PATCH] arm64: Implement ptep_set_access_flags() for hardware
- AF/DBM
-In-Reply-To: <20160607163024.GB20477@arm.com>
-References: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
- <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
- <20160607163024.GB20477@arm.com>
-Message-ID: <20160607163445.GC10075@e104818-lin.cambridge.arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue,  7 Jun 2016 17:19:07 +0100
+Subject: [PATCH v5 13/18] ARM: DT: STiH407: Add i2s_in pinctrl configuration
+In-Reply-To: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
+References: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1465316352-20691-14-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 05:30:25PM +0100, Will Deacon wrote:
-> On Tue, Jun 07, 2016 at 04:13:03PM +0200, Alexander Graf wrote:
-> > On 13.04.16 17:01, Catalin Marinas wrote:
-> > > When hardware updates of the access and dirty states are enabled, the
-> > > default ptep_set_access_flags() implementation based on calling
-> > > set_pte_at() directly is potentially racy. This triggers the "racy dirty
-> > > state clearing" warning in set_pte_at() because an existing writable PTE
-> > > is overridden with a clean entry.
-> 
-> [...]
-> 
-> > This patch breaks swapping for me.
-> > 
-> > I've hit weird issues where systems stopped working half-way, with the
-> > kernel still being fine and user space applications just stopping to
-> > respond.
-> > 
-> > After some debugging we found out that it always happens when swapping
-> > (to anything, backing storage doesn't matter). A quick bisect points to
-> > this commit as culprit and indeed, if I disable CONFIG_ARM64_HW_AFDBM
-> > the system works as expected.
-> 
-> [...]
-> 
-> > The back traces indicate that the page fault handler goes through and
-> > the process just keeps banging on the same page fault over and over
-> > again. I have not yet figured out what *exactly* is going wrong or why
-> > this patch would actually give us that effect.
-> > 
-> > I was able to fully reproduce the issue with current Linus tree (4.7-rc2+).
-> 
-> It looks like the following happens:
-> 
->   1. We put down a PTE_WRITE | PTE_DIRTY | PTE_AF pte
->   2. Memory pressure -> pte_mkold(pte) -> clear PTE_AF
->   3. A read faults due to the missing access flag
->   4. ptep_set_access_flags is called with dirty = 0, due to the read fault
->   5. pte is then made PTE_WRITE | PTE_DIRTY | PTE_AF | PTE_RDONLY (!)
->   6. A write faults, but pte_write is true so we get stuck
-> 
-> Does the diff below fix the issue for you? If so, I'll write a proper
-> patch.
-> 
-> Cheers,
-> 
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-> index 5954881a35ac..ba3fc12bd272 100644
-> --- a/arch/arm64/mm/fault.c
-> +++ b/arch/arm64/mm/fault.c
-> @@ -109,7 +109,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
->  	 * PTE_RDONLY is cleared by default in the asm below, so set it in
->  	 * back if necessary (read-only or clean PTE).
->  	 */
-> -	if (!pte_write(entry) || !dirty)
-> +	if (!pte_write(entry) || !pte_sw_dirty(entry))
->  		pte_val(entry) |= PTE_RDONLY;
->  
->  	/*
+This patch adds the pinctrl config for the i2s_in pins
+used by the uniperif reader IP.
 
-Whether it fixes this particular case or not, I think this patch is
-still valid. So feel free to add:
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ arch/arm/boot/dts/stih407-pinctrl.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index 0fb5c8a..537db7e 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -1090,6 +1090,30 @@
+ 				};
+ 			};
+ 
++			i2s_in {
++				pinctrl_i2s_8ch_in: i2s_8ch_in{
++					st,pins {
++						mclk = <&pio32 5 ALT1 IN>;
++						lrclk = <&pio32 7 ALT1 IN>;
++						sclk = <&pio32 6 ALT1 IN>;
++						data0 = <&pio32 4 ALT1 IN>;
++						data1 = <&pio33 0 ALT1 IN>;
++						data2 = <&pio33 1 ALT1 IN>;
++						data3 = <&pio33 2 ALT1 IN>;
++						data4 = <&pio33 3 ALT1 IN>;
++					};
++				};
++
++				pinctrl_i2s_2ch_in: i2s_2ch_in{
++					st,pins {
++						mclk = <&pio32 5 ALT1 IN>;
++						lrclk = <&pio32 7 ALT1 IN>;
++						sclk = <&pio32 6 ALT1 IN>;
++						data0 = <&pio32 4 ALT1 IN>;
++					};
++				};
++			};
++
+ 			serial3 {
+ 				pinctrl_serial3: serial3-0 {
+ 					st,pins {
+-- 
+1.9.1
