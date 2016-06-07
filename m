@@ -1,94 +1,49 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 7 Jun 2016 18:07:31 +0200
-Subject: [PATCH V5 5/7] irqchip, gicv3, its: Probe ITS in the ACPI way.
-In-Reply-To: <20160604125534.228e6a55@arm.com>
-References: <1464693584-22343-1-git-send-email-tn@semihalf.com>
- <1464693584-22343-6-git-send-email-tn@semihalf.com>
- <20160604125534.228e6a55@arm.com>
-Message-ID: <5756F143.9050801@semihalf.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue,  7 Jun 2016 17:09:15 +0100
+Subject: [PATCH] dmaengine: at_xdmac: fix un-exported functions
+Message-ID: <1465315755-3645-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04.06.2016 13:55, Marc Zyngier wrote:
-> On Tue, 31 May 2016 13:19:42 +0200
-> Tomasz Nowicki <tn@semihalf.com> wrote:
->
->> ITS is prepared for being initialized different than DT,
->> therefore we can initialize it in ACPI way. We collect register base
->> address from MADT table and pass mandatory info to firmware-agnostic
->> ITS init call.
->>
->> Note that we are using here IORT lib to register ITS domain which
->> then can be found and used on to build another PCI MSI domain
->> in hierarchical stack domain.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+The at_xdmac_init_used_desc() and at_xdmac_prep_dma_memset()
+functions are not exported outside the driver, so make them
+static to avoid the following warnings:
 
-[...]
+drivers/dma/at_xdmac.c:459:6: warning: symbol 'at_xdmac_init_used_desc' was not declared. Should it be static?
+drivers/dma/at_xdmac.c:1205:32: warning: symbol 'at_xdmac_prep_dma_memset' was not declared. Should it be static?
 
->>   }
->>
->> +#ifdef CONFIG_ACPI
->> +
->> +#define ACPI_GICV3_ITS_MEM_SIZE (2 * SZ_64K)
->
-> SZ_128k?
->
->> +
->> +static int __init gic_acpi_parse_madt_its(struct acpi_subtable_header *header,
->> +					  const unsigned long end)
->> +{
->> +	struct acpi_madt_generic_translator *its_entry;
->> +	struct fwnode_handle *dom_handle;
->> +	struct resource res;
->> +	int err;
->> +
->> +	its_entry = (struct acpi_madt_generic_translator *)header;
->> +	res.start = its_entry->base_address;
->> +	res.end = its_entry->base_address + ACPI_GICV3_ITS_MEM_SIZE - 1;
->> +
->> +	dom_handle = irq_domain_alloc_fwnode((void *)its_entry->base_address);
->> +	if (!dom_handle) {
->> +		pr_err("ITS@%pa: Unable to allocate GICv3 ITS domain token\n",
->> +		       &res.start);
->> +		return -ENOMEM;
->> +	}
->> +
->> +	err = iort_register_domain_token(its_entry->translation_id, dom_handle);
->> +	if (err) {
->> +		pr_err("ITS@%pa: Unable to register GICv3 ITS domain token (ITS ID %d) to IORT\n",
->> +		       &res.start, its_entry->translation_id);
->> +		goto dom_err;
->> +	}
->> +
->> +	err = its_probe_one(&res, dom_handle);
->> +	if (!err)
->> +		return 0;
->> +
->> +	iort_deregister_domain_token(its_entry->translation_id);
->> +dom_err:
->> +	irq_domain_free_fwnode(dom_handle);
->> +	return err;
->> +}
->> +
->> +void __init its_acpi_probe(void)
->
-> Should be static.
->
->> +{
->> +	if (acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
->> +				  gic_acpi_parse_madt_its, 0) <= 0)
->> +		pr_info("No valid GIC ITS entries exist\n");
->
-> We already have a message further down, no need to shout twice.
->
->> +}
->> +#else
->> +static inline void __init its_acpi_probe(struct irq_domain *parent_domain) { }
->
-> Drop the inline, the compiler can figure out that by itself.
->
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: dmaengine at vger.kernel.org
+---
+ drivers/dma/at_xdmac.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I will address all above comments in next series.
-
-Tomasz
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index 8e304b1..2503b40 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -456,7 +456,7 @@ static struct at_xdmac_desc *at_xdmac_alloc_desc(struct dma_chan *chan,
+ 	return desc;
+ }
+ 
+-void at_xdmac_init_used_desc(struct at_xdmac_desc *desc)
++static void at_xdmac_init_used_desc(struct at_xdmac_desc *desc)
+ {
+ 	memset(&desc->lld, 0, sizeof(desc->lld));
+ 	INIT_LIST_HEAD(&desc->descs_list);
+@@ -1202,7 +1202,7 @@ static struct at_xdmac_desc *at_xdmac_memset_create_desc(struct dma_chan *chan,
+ 	return desc;
+ }
+ 
+-struct dma_async_tx_descriptor *
++static struct dma_async_tx_descriptor *
+ at_xdmac_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
+ 			 size_t len, unsigned long flags)
+ {
+-- 
+2.8.1
