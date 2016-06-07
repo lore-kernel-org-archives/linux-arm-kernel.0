@@ -1,50 +1,63 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 18:07:45 +0100
-Subject: [PATCH] pinctrl: at91-pio4: fix non-exported functions
-Message-ID: <1465319265-27630-1-git-send-email-ben.dooks@codethink.co.uk>
+From: stefan@agner.ch (Stefan Agner)
+Date: Tue, 07 Jun 2016 10:06:24 -0700
+Subject: shared resources in AMP between Cortex-A9 and Cortex-M4
+In-Reply-To: <5756FB64.6060207@arm.com>
+References: <20160607162545.GX26768@pengutronix.de> <5756FB64.6060207@arm.com>
+Message-ID: <3c51425927c13aed01026d2ab8a50551@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atmel_pctl_find_group_by_pin() and the atmel_pinctrl_remove()
-functions are not exported, so fix the warnings about these
-being exported without definitions by making them static.
+Hi Uwe, Hi Sudeep,
 
-drivers/pinctrl/pinctrl-at91-pio4.c:424:20: warning: symbol 'atmel_pctl_find_group_by_pin' was not declared. Should it be static?
-drivers/pinctrl/pinctrl-at91-pio4.c:1077:5: warning: symbol 'atmel_pinctrl_remove' was not declared. Should it be static?
+On 2016-06-07 09:50, Sudeep Holla wrote:
+> On 07/06/16 17:25, Uwe Kleine-K?nig wrote:
+>> Hello Stefan,
+>>
+>> I'm currently trying to get Linux running on the M4 of an i.MX6 Solo X
+>> and found you describing doing this on the Vybrid already[1].
+>>
+>> I see the problem that clk and pinmux must be used by both cores. Did
+>> you solve this for your Vybrid experiments? And if so, how did it work?
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-gpio at vger.kernel.org
----
- drivers/pinctrl/pinctrl-at91-pio4.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+No, it is basically unsolved. I just used "clk_ignore_unused" on both
+sides to avoid stuff getting disabled. It works surprisingly well :-)
 
-diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-index a025b40..22c6ad0 100644
---- a/drivers/pinctrl/pinctrl-at91-pio4.c
-+++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-@@ -421,8 +421,8 @@ static int atmel_pctl_get_group_pins(struct pinctrl_dev *pctldev,
- 	return 0;
- }
- 
--struct atmel_group *atmel_pctl_find_group_by_pin(struct pinctrl_dev *pctldev,
--						 unsigned pin)
-+static struct atmel_group *
-+atmel_pctl_find_group_by_pin(struct pinctrl_dev *pctldev, unsigned pin)
- {
- 	struct atmel_pioctrl *atmel_pioctrl = pinctrl_dev_get_drvdata(pctldev);
- 	int i;
-@@ -1074,7 +1074,7 @@ clk_prepare_enable_error:
- 	return ret;
- }
- 
--int atmel_pinctrl_remove(struct platform_device *pdev)
-+static int atmel_pinctrl_remove(struct platform_device *pdev)
- {
- 	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
- 
--- 
-2.8.1
+
+>>
+>> Having two drivers on the same IP is racy at best and using some kind of
+>> inter cpu communication to let (say) the A9 enable the clks for the M4
+>> sounds like overkill.
+>>
+
+On a high level there are these two options:
+
+1) One core takes care of the IP, hence needs to know the other cores
+needs and provide it
+2) Both cores access the IP (with some kind of mutual exclusion to avoid
+races and conflicts of shared resources)
+
+Especially for the clock stuff I fell that 1 is probably easier.
+
+> 
+> IMO it should be other way around. In-fact few latest platforms(with
+> performant Cortex-A cores) have dedicated Cortex-M core to do such
+> system control and power management as it are low power and mostly
+> always on.
+
+Whether that is the M4 or the A-class CPU is probably application
+specific. If it is used for system control/power management, I agree
+with Sudeep, however, the NXP's new AMP designs mainly target user
+applications, e.g. to fulfill real-time requirements. In those
+applications I feel that the A-class CPU being the master is probably
+more common. Usually you only want to solve a small subset of your
+application on the M4.
+
+I thought about device trees which describe the other cores needs,
+basically a massively enhanced version of this:
+http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/remoteproc/wkup_m3_rproc.txt
+
+I mean, we could assign lets say a UART to the remote proc, and then let
+the master core handle pinmux, clocks etc...
+
+--
+Stefan
