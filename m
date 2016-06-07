@@ -1,77 +1,64 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jun 2016 11:58:20 +0100
-Subject: [PATCH 00/15] arm/arm64: KVM: Merge boot and runtime page tables
-Message-ID: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+Date: Tue,  7 Jun 2016 11:58:34 +0100
+Subject: [PATCH 14/15] arm/arm64: KVM: Prune unused #defines
+In-Reply-To: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1465297115-13091-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Until now, we've been setting up KVM using two sets of page tables:
-one for the "boot" where we perform the basic MMU setup, and one for
-the runtime.
+We can now remove a number of dead #defines, thanks to the trampoline
+code being gone.
 
-Switching between the two was though to be safe, but we've recently
-realized that it is not: it is not enough to ensure that the VA->PA
-mapping is consistent when switching TTBR0_EL2, but we also have to
-ensure that the intermediate translations are the same as well. If the
-TLB can return two different values for intermediate translations,
-we're screwed (TLB conflicts).
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_mmu.h   |  9 ---------
+ arch/arm64/include/asm/kvm_mmu.h | 10 ----------
+ 2 files changed, 19 deletions(-)
 
-At that point, the only safe thing to do is to never change TTBR0_EL2,
-which means that we need to make the idmap page part of the runtime
-page tables.
-
-The series starts with a bit of brain dumping explaining what we're
-trying to do. This might not be useful as a merge candidate, but it
-was useful for me to put this somewhere. It goes on revamping the
-whole notion of HYP VA range, making it runtime patchable. It then
-always merge idmap and runtime page table into one set, leading to
-quite a lot of simplification in the init/teardown code. In the
-process, 32bit KVM gains the ability to teardown the HYP page-tables
-and vectors, which makes kexec a bit closer.
-
-This has been tested on Seattle, Juno, the FVP model (both v8.0 and
-v8.1), Cubietruck and Midway, and is based on 4.7-rc2.
-
-Thanks,
-
-	M.
-
-Marc Zyngier (15):
-  arm64: KVM: Merged page tables documentation
-  arm64: KVM: Kill HYP_PAGE_OFFSET
-  arm64: Add ARM64_HYP_OFFSET_LOW capability
-  arm64: KVM: Define HYP offset masks
-  arm64: KVM: Refactor kern_hyp_va/hyp_kern_va to deal with multiple
-    offsets
-  arm/arm64: KVM: Export __hyp_text_start/end symbols
-  arm64: KVM: Runtime detection of lower HYP offset
-  arm/arm64: KVM: Always have merged page tables
-  arm64: KVM: Simplify HYP init/teardown
-  arm/arm64: KVM: Drop boot_pgd
-  arm/arm64: KVM: Kill free_boot_hyp_pgd
-  arm: KVM: Simplify HYP init
-  arm: KVM: Allow hyp teardown
-  arm/arm64: KVM: Prune unused #defines
-  arm/arm64: KVM: Check that IDMAP doesn't intersect with VA range
-
- arch/arm/include/asm/kvm_asm.h      |   2 +
- arch/arm/include/asm/kvm_host.h     |  25 +++-----
- arch/arm/include/asm/kvm_mmu.h      |  11 ----
- arch/arm/include/asm/virt.h         |   4 ++
- arch/arm/kvm/arm.c                  |  20 ++----
- arch/arm/kvm/init.S                 |  56 ++++++----------
- arch/arm/kvm/mmu.c                  | 125 ++++++++++++++++--------------------
- arch/arm64/include/asm/cpufeature.h |   3 +-
- arch/arm64/include/asm/kvm_host.h   |  17 ++---
- arch/arm64/include/asm/kvm_hyp.h    |  28 ++++----
- arch/arm64/include/asm/kvm_mmu.h    | 100 ++++++++++++++++++++++++-----
- arch/arm64/include/asm/virt.h       |   4 ++
- arch/arm64/kernel/cpufeature.c      |  19 ++++++
- arch/arm64/kvm/hyp-init.S           |  61 +++---------------
- arch/arm64/kvm/hyp/entry.S          |  19 ------
- arch/arm64/kvm/hyp/hyp-entry.S      |  15 +++++
- arch/arm64/kvm/reset.c              |  28 --------
- 17 files changed, 240 insertions(+), 297 deletions(-)
-
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index ea32d39..a0c6cf4 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -26,18 +26,9 @@
+  * We directly use the kernel VA for the HYP, as we can directly share
+  * the mapping (HTTBR "covers" TTBR1).
+  */
+-#define HYP_PAGE_OFFSET_MASK	UL(~0)
+-#define HYP_PAGE_OFFSET		PAGE_OFFSET
+ #define KERN_TO_HYP(kva)	(kva)
+ 
+ /*
+- * Our virtual mapping for the boot-time MMU-enable code. Must be
+- * shared across all the page-tables. Conveniently, we use the vectors
+- * page, where no kernel data will ever be shared with HYP.
+- */
+-#define TRAMPOLINE_VA		UL(CONFIG_VECTORS_BASE)
+-
+-/*
+  * KVM_MMU_CACHE_MIN_PAGES is the number of stage2 page table translation levels.
+  */
+ #define KVM_MMU_CACHE_MIN_PAGES	2
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 3c4dd4e..5b8a5622 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -77,16 +77,6 @@
+ #define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
+ #define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
+ 
+-/* Temporary compat define */
+-#define HYP_PAGE_OFFSET_MASK		HYP_PAGE_OFFSET_HIGH_MASK
+-
+-/*
+- * Our virtual mapping for the idmap-ed MMU-enable code. Must be
+- * shared across all the page-tables. Conveniently, we use the last
+- * possible page, where no kernel mapping will ever exist.
+- */
+-#define TRAMPOLINE_VA		(HYP_PAGE_OFFSET_MASK & PAGE_MASK)
+-
+ #ifdef __ASSEMBLY__
+ 
+ #include <asm/alternative.h>
 -- 
 2.1.4
