@@ -1,55 +1,69 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 17:22:17 +0100
-Subject: [PATCH] gpio: bcm-kona: fix bcm_kona_gpio_reset() warnings
-Message-ID: <1465316537-8403-1-git-send-email-ben.dooks@codethink.co.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 7 Jun 2016 18:23:01 +0200
+Subject: [PATCH] ARM: at91: debug: use DEBUG_UART_VIRT
+In-Reply-To: <5756ECC5.6020908@atmel.com>
+References: <1465313079-6307-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <5756ECC5.6020908@atmel.com>
+Message-ID: <20160607162301.GL3363@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bcm_kona_gpio_reset() calls bcm_kona_gpio_write_lock_regs()
-with what looks like the wrong parameter. The write_lock_regs
-function takes a pointer to the registers, not the bcm_kona_gpio
-structure.
+On 07/06/2016 at 17:48:21 +0200, Nicolas Ferre wrote :
+> Le 07/06/2016 17:24, Alexandre Belloni a ?crit :
+> > AT91 still uses an offset (0x0100 0000) from the physical address to map
+> > the debug UART. This is unfortunate as for some platforms (sama5d3 and
+> > earlier), it ends up in the PCI zone and PCI is enabled in multi_v7.
+> > Switch to DEBUG_UART_VIRT to solve that.
+> > 
+> > Tested on sama5d3 and 9g20.
+> > 
+> > Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> People using their old defconfigs must pay attention to this change...
+> but it's true that it's a debug configuration anyway...
+> 
 
-Fix the warning, and probably bug by changing the function to
-pass reg_base instead of kona_gpio, fixing the following warning:
+I really doubt people are letting DEBUG_LL enabled in a production
+kernel...
 
-drivers/gpio/gpio-bcm-kona.c:550:47: warning: incorrect type in argument 1 (different address spaces)
-drivers/gpio/gpio-bcm-kona.c:550:47:    expected void [noderef] <asn:2>*reg_base
-drivers/gpio/gpio-bcm-kona.c:550:47:    got struct bcm_kona_gpio *kona_gpio
-drivers/gpio/gpio-bcm-kona.c:554:47: warning: incorrect type in argument 1 (different address spaces)
-drivers/gpio/gpio-bcm-kona.c:554:47:    expected void [noderef] <asn:2>*reg_base
-drivers/gpio/gpio-bcm-kona.c:554:47:    got struct bcm_kona_gpio *kona_gpio
+> > diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
+> > index d4ae3b8e2426..0098401e5aeb 100644
+> > --- a/arch/arm/include/debug/at91.S
+> > +++ b/arch/arm/include/debug/at91.S
+> > @@ -9,14 +9,6 @@
+> >   *
+> >  */
+> >  
+> > -#ifdef CONFIG_MMU
+> > -#define AT91_IO_P2V(x) ((x) - 0x01000000)
+> > -#else
+> > -#define AT91_IO_P2V(x) (x)
+> > -#endif
+> > -
+> > -#define AT91_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
+> > -
+> >  #define AT91_DBGU_SR		(0x14)	/* Status Register */
+> >  #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
+> >  #define AT91_DBGU_TXRDY		(1 << 1)	/* Transmitter Ready */
+> > @@ -24,7 +16,7 @@
+> >  
+> >  	.macro	addruart, rp, rv, tmp
+> >  	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ System peripherals (phys address)
+> > -	ldr	\rv, =AT91_DEBUG_UART_VIRT		@ System peripherals (virt address)
+> > +	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ System peripherals (virt address)
+> 
+> Shouldn't we protect the use of this defined value with some
+> #warning "Beware the value CONFIG_DEBUG_UART_VIRT haven't been defined:
+> is it intentional"
+> or even #error?
+> 
+> or something like that?
+> 
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Markus Mayer <mmayer@broadcom.com>
-Cc: Ray Jui <rjui@broadcom.com>
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: bcm-kernel-feedback-list at broadcom.com
-Cc: linux-gpio at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/gpio/gpio-bcm-kona.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Well, those that are using this feature are supposed to know what they
+are doing. There is now protection for CONFIG_DEBUG_UART_PHYS anyway.
 
-diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-index 9aabc48..953e4b8 100644
---- a/drivers/gpio/gpio-bcm-kona.c
-+++ b/drivers/gpio/gpio-bcm-kona.c
-@@ -547,11 +547,11 @@ static void bcm_kona_gpio_reset(struct bcm_kona_gpio *kona_gpio)
- 	/* disable interrupts and clear status */
- 	for (i = 0; i < kona_gpio->num_bank; i++) {
- 		/* Unlock the entire bank first */
--		bcm_kona_gpio_write_lock_regs(kona_gpio, i, UNLOCK_CODE);
-+		bcm_kona_gpio_write_lock_regs(reg_base, i, UNLOCK_CODE);
- 		writel(0xffffffff, reg_base + GPIO_INT_MASK(i));
- 		writel(0xffffffff, reg_base + GPIO_INT_STATUS(i));
- 		/* Now re-lock the bank */
--		bcm_kona_gpio_write_lock_regs(kona_gpio, i, LOCK_CODE);
-+		bcm_kona_gpio_write_lock_regs(reg_base, i, LOCK_CODE);
- 	}
- }
- 
 -- 
-2.8.1
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
