@@ -1,75 +1,48 @@
 From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jun 2016 16:08:06 +0800
-Subject: [PATCH v4 02/14] of/numa: fix a memory@ node can only contains one
- memory block
-In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
-References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
-Message-ID: <1465286898-13828-3-git-send-email-thunder.leizhen@huawei.com>
+Date: Tue, 7 Jun 2016 16:08:04 +0800
+Subject: [PATCH v4 00/14] fix some type infos and bugs for arm64/of numa
+Message-ID: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For a normal memory@ devicetree node, its reg property can contains more
-memory blocks.
+v3 -> v4:
+1. Packed three patches of Kefeng Wang, patch6-8.
+2. Add 6 new patches(9-15) to enhance the numa on arm64.
 
-Because we don't known how many memory blocks maybe contained, so we try
-from index=0, increase 1 until error returned(the end).
+v2 -> v3:
+1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
+   patches looks more well. The final code have no change. 
 
-Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
----
- drivers/of/of_numa.c | 29 ++++++++++-------------------
- 1 file changed, 10 insertions(+), 19 deletions(-)
+v1 -> v2:
+1. Base on https://lkml.org/lkml/2016/5/24/679
+2. Rewrote of_numa_parse_memory_nodes according to Rob Herring's advice. So that it looks more clear.
+3. Rewrote patch 5 because some scenes were not considered before.
 
-diff --git a/drivers/of/of_numa.c b/drivers/of/of_numa.c
-index fb71b4e..7b3fbdc 100644
---- a/drivers/of/of_numa.c
-+++ b/drivers/of/of_numa.c
-@@ -63,13 +63,9 @@ static int __init of_numa_parse_memory_nodes(void)
- 	struct device_node *np = NULL;
- 	struct resource rsrc;
- 	u32 nid;
--	int r = 0;
--
--	for (;;) {
--		np = of_find_node_by_type(np, "memory");
--		if (!np)
--			break;
-+	int i, r;
+Kefeng Wang (3):
+  of_numa: Use of_get_next_parent to simplify code
+  of_numa: Use pr_fmt()
+  arm64: numa: Use pr_fmt()
 
-+	for_each_node_by_type(np, "memory") {
- 		r = of_property_read_u32(np, "numa-node-id", &nid);
- 		if (r == -EINVAL)
- 			/*
-@@ -78,23 +74,18 @@ static int __init of_numa_parse_memory_nodes(void)
- 			 * "numa-node-id" property
- 			 */
- 			continue;
--		else if (r)
--			/* some other error */
--			break;
+Zhen Lei (11):
+  of/numa: remove a duplicated pr_debug information
+  of/numa: fix a memory@ node can only contains one memory block
+  arm64/numa: add nid check for memory block
+  of/numa: remove a duplicated warning
+  arm64/numa: avoid inconsistent information to be printed
+  arm64/numa: support HAVE_SETUP_PER_CPU_AREA
+  arm64/numa: define numa_distance as array to simplify code
+  arm64/numa: support HAVE_MEMORYLESS_NODES
+  arm64/numa: remove some useless code
+  of/numa: remove the constraint on the distances of node pairs
+  Documentation: remove the constraint on the distances of node pairs
 
--		r = of_address_to_resource(np, 0, &rsrc);
--		if (r) {
--			pr_err("NUMA: bad reg property in memory node\n");
--			break;
--		}
-+		for (i = 0; !r && !of_address_to_resource(np, i, &rsrc); i++)
-+			r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
+ Documentation/devicetree/bindings/numa.txt |   1 -
+ arch/arm64/Kconfig                         |  12 ++
+ arch/arm64/include/asm/numa.h              |   1 -
+ arch/arm64/kernel/smp.c                    |   1 +
+ arch/arm64/mm/numa.c                       | 228 ++++++++++++++++-------------
+ drivers/of/of_numa.c                       |  87 +++++------
+ 6 files changed, 180 insertions(+), 150 deletions(-)
 
--		r = numa_add_memblk(nid, rsrc.start, rsrc.end + 1);
--		if (r)
--			break;
-+		if (!i || r) {
-+			of_node_put(np);
-+			pr_err("NUMA: bad property in memory node\n");
-+			return r ? : -EINVAL;
-+		}
- 	}
--	of_node_put(np);
-
--	return r;
-+	return 0;
- }
-
- static int __init of_numa_parse_distance_map_v1(struct device_node *map)
 --
 2.5.0
