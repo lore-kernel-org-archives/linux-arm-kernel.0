@@ -1,60 +1,50 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 7 Jun 2016 19:36:57 +0200
-Subject: [BUG] Page allocation failures with newest kernels
-In-Reply-To: <20160603123655.GA2527@techsingularity.net>
-References: <CAPv3WKcVsWBgHHC3UPNcbka2JUmN4CTw1Ym4BR1=1V9=B9av5Q@mail.gmail.com>
- <574D64A0.2070207@arm.com>
- <CAPv3WKdYdwpi3k5eY86qibfprMFwkYOkDwHOsNydp=0sTV3mgg@mail.gmail.com>
- <60e8df74202e40b28a4d53dbc7fd0b22@IL-EXCH02.marvell.com>
- <20160531131520.GI24936@arm.com>
- <CAPv3WKftqsEXbdU-geAcUKXBSskhA0V72N61a1a+5DfahLK_Dg@mail.gmail.com>
- <20160602135226.GX2527@techsingularity.net>
- <CAPv3WKd8Zdcv5nhr2euN7L4W5JYLex_Hmn+9AVd6reyD-Vw4kg@mail.gmail.com>
- <20160603095344.GZ2527@techsingularity.net>
- <CAPv3WKfrgNg00M4oE3VKLYimYqN6NO6ziR7LWYXQ1d_M-bo67A@mail.gmail.com>
- <20160603123655.GA2527@techsingularity.net>
-Message-ID: <CAPv3WKfEQCeR++uqaUVhhsNe0WFsKq1Sn9uo==9NxtQe=GV7zw@mail.gmail.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue,  7 Jun 2016 18:38:33 +0100
+Subject: [PATCH 0/8]  Various dmaengine cleanups
+Message-ID: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mel,
+Hi Vinod,
 
+This series is a bunch of cleanup updates to various
+dmaengine drivers, based on some of the review feeback to my fdma series.
 
+regards,
 
-2016-06-03 14:36 GMT+02:00 Mel Gorman <mgorman@techsingularity.net>:
-> On Fri, Jun 03, 2016 at 01:57:06PM +0200, Marcin Wojtas wrote:
->> >> For the record: the newest kernel I was able to reproduce the dumps
->> >> was v4.6: http://pastebin.com/ekDdACn5. I've just checked v4.7-rc1,
->> >> which comprise a lot (mainly yours) changes in mm, and I'm wondering
->> >> if there may be a spot fix or rather a series of improvements. I'm
->> >> looking forward to your opinion and would be grateful for any advice.
->> >>
->> >
->> > I don't believe we want to reintroduce the reserve to cope with CMA. One
->> > option would be to widen the gap between low and min watermark by the
->> > size of the CMA region. The effect would be to wake kswapd earlier which
->> > matters considering the context of the failing allocation was
->> > GFP_ATOMIC.
->>
->> Of course my intention is not reintroducing anything that's gone
->> forever, but just to find out way to overcome current issues. Do you
->> mean increasing CMA size?
->
-> No. There is a gap between the low and min watermarks. At the low point,
-> kswapd is woken up and at the min point allocation requests either
-> either direct reclaim or fail if they are atomic. What I'm suggesting
-> is that you adjust the low watermark and add the size of the CMA area
-> to it so that kswapd is woken earlier. The watermarks are calculated in
-> __setup_per_zone_wmarks
->
+Peter.
 
-I printed all zones' settings, whose watermarks are configured within
-__setup_per_zone_wmarks(). There are three DMA, Normal and Movable -
-only first one's watermarks have non-zero values. Increasing DMA min
-watermark didn't help. I also played with increasing
-/proc/sys/vm/min_free_kbytes from ~2560 to 16000
-(__setup_per_zone_wmarks() recalculates watermarks after that) - no
-effect either.
+Peter Griffin (8):
+  dmaengine: fsl-edma: Fix clock handling error paths
+  dmaengine: fsl-edma: print error code in error messages.
+  dmaengine: coh901318: Only calculate residue if txstate exists.
+  dmaengine: s3c24xx: Simplify code in s3c24xx_dma_tx_status()
+  dmaengine: ste_dma40: Only calculate residue if txstate exists.
+  dmaengine: sun6i-dma: Only calculate residue if state exists.
+  dmaengine: tegra20-apb-dma: Only calculate residue if txstate exists.
+  dmaengine: Remove site specific OOM error messages on kzalloc
 
-Best regards,
-Marcin
+ drivers/dma/amba-pl08x.c        | 10 +---------
+ drivers/dma/bestcomm/bestcomm.c |  2 --
+ drivers/dma/coh901318.c         |  2 +-
+ drivers/dma/edma.c              | 16 ++++------------
+ drivers/dma/fsl-edma.c          | 25 +++++++++++++++++++------
+ drivers/dma/fsldma.c            |  2 --
+ drivers/dma/k3dma.c             | 10 ++++------
+ drivers/dma/mmp_tdma.c          |  5 ++---
+ drivers/dma/moxart-dma.c        |  4 +---
+ drivers/dma/nbpfaxi.c           |  5 ++---
+ drivers/dma/pl330.c             |  5 +----
+ drivers/dma/ppc4xx/adma.c       |  2 --
+ drivers/dma/s3c24xx-dma.c       | 11 ++---------
+ drivers/dma/sh/shdmac.c         |  9 ++-------
+ drivers/dma/sh/sudmac.c         |  9 ++-------
+ drivers/dma/sirf-dma.c          |  5 ++---
+ drivers/dma/ste_dma40.c         |  6 ++----
+ drivers/dma/sun6i-dma.c         |  2 +-
+ drivers/dma/tegra20-apb-dma.c   | 13 ++++---------
+ drivers/dma/timb_dma.c          |  8 ++------
+ 20 files changed, 52 insertions(+), 99 deletions(-)
+
+-- 
+1.9.1
