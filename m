@@ -1,103 +1,75 @@
 From: kraxel@redhat.com (Gerd Hoffmann)
-Date: Tue,  7 Jun 2016 13:05:43 +0200
-Subject: [PATCH v3 05/10] arm64: Add BCM2835 support to the defconfig.
-In-Reply-To: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
-References: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
-Message-ID: <1465297548-17182-6-git-send-email-kraxel@redhat.com>
+Date: Tue,  7 Jun 2016 13:05:38 +0200
+Subject: [PATCH v3 00/10] raspberry pi 3 patch series, part 1: essentials
+Message-ID: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
----
- arch/arm64/configs/defconfig | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+  Hi,
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index fd2d74d..50e5afc 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -31,6 +31,7 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_ALPINE=y
-+CONFIG_ARCH_BCM2835=y
- CONFIG_ARCH_BCM_IPROC=y
- CONFIG_ARCH_BERLIN=y
- CONFIG_ARCH_EXYNOS=y
-@@ -171,6 +172,7 @@ CONFIG_VIRTIO_CONSOLE=y
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
- CONFIG_I2C_MUX_PCA954x=y
-+CONFIG_I2C_BCM2835=y
- CONFIG_I2C_DESIGNWARE_PLATFORM=y
- CONFIG_I2C_IMX=y
- CONFIG_I2C_MV64XXX=y
-@@ -179,6 +181,8 @@ CONFIG_I2C_TEGRA=y
- CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_RCAR=y
- CONFIG_SPI=y
-+CONFIG_SPI_BCM2835=y
-+CONFIG_SPI_BCM2835AUX=y
- CONFIG_SPI_ORION=y
- CONFIG_SPI_PL022=y
- CONFIG_SPI_QUP=y
-@@ -202,6 +206,7 @@ CONFIG_THERMAL_EMULATION=y
- CONFIG_EXYNOS_THERMAL=y
- CONFIG_WATCHDOG=y
- CONFIG_RENESAS_WDT=y
-+CONFIG_BCM2835_WDT=y
- CONFIG_MFD_SPMI_PMIC=y
- CONFIG_MFD_SEC_CORE=y
- CONFIG_MFD_HI655X_PMIC=y
-@@ -220,6 +225,7 @@ CONFIG_LOGO=y
- CONFIG_SOUND=y
- CONFIG_SND=y
- CONFIG_SND_SOC=y
-+CONFIG_SND_BCM2835_SOC_I2S=y
- CONFIG_SND_SOC_RCAR=y
- CONFIG_SND_SOC_AK4613=y
- CONFIG_USB=y
-@@ -248,12 +254,14 @@ CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_OF_ESDHC=y
- CONFIG_MMC_SDHCI_TEGRA=y
-+CONFIG_MMC_SDHCI_BCM2835=y
- CONFIG_MMC_SDHCI_MSM=y
- CONFIG_MMC_SPI=y
- CONFIG_MMC_DW=y
- CONFIG_MMC_DW_EXYNOS=y
- CONFIG_MMC_DW_K3=y
- CONFIG_MMC_SUNXI=y
-+CONFIG_MMC_BCM2835_SDHOST=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-@@ -269,6 +277,7 @@ CONFIG_RTC_DRV_PL031=y
- CONFIG_RTC_DRV_SUN6I=y
- CONFIG_RTC_DRV_XGENE=y
- CONFIG_DMADEVICES=y
-+CONFIG_DMA_BCM2835=y
- CONFIG_PL330_DMA=y
- CONFIG_TEGRA20_APB_DMA=y
- CONFIG_QCOM_BAM_DMA=y
-@@ -288,8 +297,10 @@ CONFIG_MSM_GCC_8916=y
- CONFIG_HWSPINLOCK_QCOM=y
- CONFIG_MAILBOX=y
- CONFIG_ARM_MHU=y
-+CONFIG_BCM2835_MBOX=y
- CONFIG_HI6220_MBOX=y
- CONFIG_ARM_SMMU=y
-+CONFIG_RASPBERRYPI_POWER=y
- CONFIG_QCOM_SMEM=y
- CONFIG_QCOM_SMD=y
- CONFIG_QCOM_SMD_RPM=y
-@@ -301,6 +312,7 @@ CONFIG_PHY_RCAR_GEN3_USB2=y
- CONFIG_PHY_HI6220_USB=y
- CONFIG_PHY_XGENE=y
- CONFIG_ARM_SCPI_PROTOCOL=y
-+CONFIG_RASPBERRYPI_FIRMWARE=y
- CONFIG_ACPI=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
+Raspberry pi 3 patches, next round.  Should be pretty much ready
+to go now.
+
+Changes v3:
+ * redo defconfig update, drop DRM_VC4=y for now (not working for me).
+ * split rpi3 device tree patch into two again (arm64 + arm).
+
+Changes v2:
+ * send essential patches only
+ * dropped ARCH_BCM kconfig option.
+ * drop include hack for rpi3 device tree in arm.
+ * drop DMA offset patch, pick up the version from Alex instead.
+
+Patches are also available from:
+  git://git.kraxel.org/linux bcm2837-47-v3
+
+Note that the git branch has the complete set of patches (including
+device tree patches and rpi3 wifi).
+
+cheers,
+  Gerd
+
+Alexander Graf (1):
+  arm64: Allow for different DMA and CPU bus offsets
+
+Eric Anholt (4):
+  irqchip: bcm2835: Avoid arch/arm-specific handle_IRQ.
+  arm64: Add platform selection for BCM2835.
+  dt-bindings: Add root properties for Raspberry Pi 3
+  ARM: bcm2835: Add devicetree for the Raspberry Pi 3.
+
+Gerd Hoffmann (4):
+  pinctrl: walk into bcm subdir unconditionally
+  arm64: Add BCM2835 support to the defconfig.
+  ARM: bcm2835: Add devicetree for the Raspberry Pi 3, for arm (32)
+  ARM: bcm2837: dt: Add the ethernet to the device trees
+
+Lubomir Rintel (1):
+  ARM: bcm2835: dt: Add the ethernet to the device trees
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm2835.txt   |  4 ++
+ arch/arm/boot/dts/Makefile                         |  3 +-
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts           |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts           |  1 +
+ arch/arm/boot/dts/bcm2835-rpi-b.dts                |  1 +
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts              |  1 +
+ arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi        | 19 ++++++
+ arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi        | 19 ++++++
+ arch/arm/boot/dts/bcm283x.dtsi                     |  2 +
+ arch/arm64/Kconfig.platforms                       | 13 ++++
+ arch/arm64/boot/dts/broadcom/Makefile              |  1 +
+ arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts   | 30 +++++++++
+ arch/arm64/boot/dts/broadcom/bcm2837.dtsi          | 74 ++++++++++++++++++++++
+ arch/arm64/configs/defconfig                       | 12 ++++
+ arch/arm64/include/asm/dma-mapping.h               | 17 ++++-
+ drivers/irqchip/irq-bcm2835.c                      |  3 +-
+ drivers/irqchip/irq-bcm2836.c                      |  2 +-
+ drivers/pinctrl/Makefile                           |  2 +-
+ 18 files changed, 198 insertions(+), 7 deletions(-)
+ create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9512.dtsi
+ create mode 100644 arch/arm/boot/dts/bcm283x-rpi-smsc9514.dtsi
+ create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837.dtsi
+
 -- 
 1.8.3.1
