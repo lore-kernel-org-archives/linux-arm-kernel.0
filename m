@@ -1,52 +1,34 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 7 Jun 2016 18:41:39 +0200
-Subject: [PATCH] clk: at91: make of_sama5d2_clk_generated_setup() static
-In-Reply-To: <1465317489-14920-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465317489-14920-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160607184139.69411eef@bbrezillon>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 7 Jun 2016 17:42:18 +0100
+Subject: HDLCD crashes with 6d910bfa809e
+In-Reply-To: <20160607144058.GB3363@phenom.ffwll.local>
+References: <5756B8A8.8000902@arm.com>
+ <20160607144058.GB3363@phenom.ffwll.local>
+Message-ID: <5756F96A.4010208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 Jun 2016 17:38:09 +0100
-Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+On 07/06/16 15:40, Daniel Vetter wrote:
+> On Tue, Jun 07, 2016 at 01:06:00PM +0100, Robin Murphy wrote:
+>> Hi Daniel, Liviu,
+>>
+>> Having just inadvertently merged -next into my working branch, I find
+>> dev6d910bfa809e ("drm/hlcd: Use lockless gem BO free callback") adversely
+>> affecting my board's ability to boot ;)
+>>
+>> Since I (intentionally) don't have sufficient CMA to create a framebuffer,
+>> drm_gem_cma_create() fails, unconditionally calls the now-NULL
+>> drm->driver->gem_free_object() in its cleanup path, and fiery death
+>> ensues...
+>
+> Please make sure you have the drm fixes from 4.7-rc2 included, this issue
+> is fixed there.
 
-> The of_sama5d2_clk_generated_setup() is not exported outside
-> of the driver, so make it static to fix the warning about it
-> being not static:
-> 
-> drivers/clk/at91/clk-generated.c:270:13: warning: symbol 'of_sama5d2_clk_generated_setup' was not declared. Should it be static?
-> 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Ah, right you are, thanks - the fact that that the newer branches I 
+tried crashed or otherwise failed due to unrelated TDA998x problems 
+threw me off. I see Chris' fix there now.
 
-Acked-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Robin.
 
-> ---
-> Cc: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: linux-clk at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/clk/at91/clk-generated.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/at91/clk-generated.c b/drivers/clk/at91/clk-generated.c
-> index e1aa210..7f6bec8 100644
-> --- a/drivers/clk/at91/clk-generated.c
-> +++ b/drivers/clk/at91/clk-generated.c
-> @@ -267,7 +267,7 @@ at91_clk_register_generated(struct regmap *regmap,  spinlock_t *lock, const char
->  	return clk;
->  }
->  
-> -void __init of_sama5d2_clk_generated_setup(struct device_node *np)
-> +static void __init of_sama5d2_clk_generated_setup(struct device_node *np)
->  {
->  	int num;
->  	u32 id;
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> -Daniel
+>
