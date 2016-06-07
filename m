@@ -1,110 +1,35 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Mon,  6 Jun 2016 17:57:23 -0700
-Subject: [PATCH] ARM: dts: msm8916: Add smsm and smp2p nodes
-Message-ID: <1465261044-2762-1-git-send-email-bjorn.andersson@linaro.org>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 7 Jun 2016 08:57:30 +0800
+Subject: [PATCH 1/2] drm/rockchip: vop: add uv_vir register field for
+ RK3036 VOP
+In-Reply-To: <1465199912-20932-1-git-send-email-ykk@rock-chips.com>
+References: <1465199912-20932-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <57561BFA.5030000@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the smsm and smp2p nodes for the hexagon and wcnss
-cores.
+On 2016?06?06? 15:58, Yakir Yang wrote:
+> The WIN0 of RK3036 VOP could support YUV data format, but driver
+> forget to add the uv_vir register field for it.
+>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
+>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> index 3166b46..7da2311 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_vop_reg.c
+> @@ -210,6 +210,7 @@ static const struct vop_win_phy rk3036_win0_data = {
+>   	.yrgb_mst = VOP_REG(RK3036_WIN0_YRGB_MST, 0xffffffff, 0),
+>   	.uv_mst = VOP_REG(RK3036_WIN0_CBR_MST, 0xffffffff, 0),
+>   	.yrgb_vir = VOP_REG(RK3036_WIN0_VIR, 0xffff, 0),
+> +	.uv_vir = VOP_REG(RK3036_WIN0_VIR, 0x1fff, 16),
+>   };
+>   
+>   static const struct vop_win_phy rk3036_win1_data = {
 
-Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
----
- arch/arm64/boot/dts/qcom/msm8916.dtsi | 82 +++++++++++++++++++++++++++++++++++
- 1 file changed, 82 insertions(+)
+Thanks for this fix, Applied to my drm-fixes.
 
-diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 3ca609a11648..30c448909727 100644
---- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-+++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -620,6 +620,88 @@
- 			};
- 		};
- 	};
-+
-+	hexagon-smp2p {
-+		compatible = "qcom,smp2p";
-+		qcom,smem = <435>, <428>;
-+
-+		interrupts = <0 27 IRQ_TYPE_EDGE_RISING>;
-+
-+		qcom,ipc = <&apcs 8 14>;
-+
-+		qcom,local-pid = <0>;
-+		qcom,remote-pid = <1>;
-+
-+		hexagon_smp2p_out: master-kernel {
-+			qcom,entry-name = "master-kernel";
-+
-+			#qcom,state-cells = <1>;
-+		};
-+
-+		hexagon_smp2p_in: slave-kernel {
-+			qcom,entry-name = "slave-kernel";
-+
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+	};
-+
-+	wcnss-smp2p {
-+		compatible = "qcom,smp2p";
-+		qcom,smem = <451>, <431>;
-+
-+		interrupts = <0 143 IRQ_TYPE_EDGE_RISING>;
-+
-+		qcom,ipc = <&apcs 8 18>;
-+
-+		qcom,local-pid = <0>;
-+		qcom,remote-pid = <4>;
-+
-+		wcnss_smp2p_out: master-kernel {
-+			qcom,entry-name = "master-kernel";
-+
-+			#qcom,state-cells = <1>;
-+		};
-+
-+		wcnss_smp2p_in: slave-kernel {
-+			qcom,entry-name = "slave-kernel";
-+
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+	};
-+
-+	smsm {
-+		compatible = "qcom,smsm";
-+
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		qcom,ipc-1 = <&apcs 0 13>;
-+		qcom,ipc-6 = <&apcs 0 19>;
-+
-+		apps_smsm: apps at 0 {
-+			reg = <0>;
-+
-+			#qcom,state-cells = <1>;
-+		};
-+
-+		hexagon_smsm: hexagon at 1 {
-+			reg = <1>;
-+			interrupts = <0 26 IRQ_TYPE_EDGE_RISING>;
-+
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		wcnss_smsm: wcnss at 6 {
-+			reg = <6>;
-+			interrupts = <0 144 IRQ_TYPE_EDGE_RISING>;
-+
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+	};
- };
- 
- #include "msm8916-pins.dtsi"
--- 
-2.5.0
+-- ?ark Yao
