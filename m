@@ -1,108 +1,74 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  7 Jun 2016 13:48:04 +0200
-Subject: [PATCH v2 09/20] drm: rcar-du: Rely on the default ->best_encoder()
- behavior
-In-Reply-To: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465300095-16971-10-git-send-email-boris.brezillon@free-electrons.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 7 Jun 2016 14:52:36 +0300
+Subject: [PATCH 02/28] crypto: omap-sham: Don't idle/start SHA device
+ between Encrypt operations
+In-Reply-To: <20160607100837.GA30875@gondor.apana.org.au>
+References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
+ <1464771389-10640-3-git-send-email-t-kristo@ti.com> <574EB091.6040001@ti.com>
+ <574F69D8.1010809@ti.com> <20160607100837.GA30875@gondor.apana.org.au>
+Message-ID: <5756B584.2000900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All outputs have a 1:1 relationship between connectors and encoders,
-and the driver is relying on the atomic helpers: we can drop the custom
-->best_encoder() implementations and let the core call
-drm_atomic_helper_best_encoder() for us.
+On 07/06/16 13:08, Herbert Xu wrote:
+> On Wed, Jun 01, 2016 at 06:03:52PM -0500, Dave Gerlach wrote:
+>> On 06/01/2016 04:53 AM, Grygorii Strashko wrote:
+>>> On 06/01/2016 11:56 AM, Tero Kristo wrote:
+>>>> From: Lokesh Vutla <lokeshvutla@ti.com>
+>>>>
+>>>> Calling runtime PM API for every block causes serious perf hit to
+>>>> crypto operations that are done on a long buffer.
+>>>> As crypto is performed on a page boundary, encrypting large buffers can
+>>>> cause a series of crypto operations divided by page. The runtime PM API
+>>>> is also called those many times.
+>>>>
+>>>> We call runtime_pm_get_sync only at beginning on the session (cra_init)
+>>>> and runtime_pm_put at the end. This result in upto a 50% speedup.
+>>>> This doesn't make the driver to keep the system awake as runtime get/put
+>>>> is only called during a crypto session which completes usually quickly.
+>>>>
+>>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+>>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+>>>> ---
+>>>>   drivers/crypto/omap-sham.c | 27 +++++++++++++++++----------
+>>>>   1 file changed, 17 insertions(+), 10 deletions(-)
+>>>>
+>>>> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
+>>>> index 6eefaa2..bd0258f 100644
+>>>> --- a/drivers/crypto/omap-sham.c
+>>>> +++ b/drivers/crypto/omap-sham.c
+>>>> @@ -360,14 +360,6 @@ static void omap_sham_copy_ready_hash(struct
+>>>> ahash_request *req)
+>>>>
+>>>>   static int omap_sham_hw_init(struct omap_sham_dev *dd)
+>>>>   {
+>>>> -    int err;
+>>>> -
+>>>> -    err = pm_runtime_get_sync(dd->dev);
+>>>> -    if (err < 0) {
+>>>> -        dev_err(dd->dev, "failed to get sync: %d\n", err);
+>>>> -        return err;
+>>>> -    }
+>>>> -
+>>
+>> Would it be worth it to investigate a pm_runtime autosuspend
+>> approach rather than knocking runtime PM out here completely? I am
+>> not clear if the overhead is coming from the pm_runtime calls
+>> themselves or the actual idling of the IP, but if it's the idling of
+>> the IP causing the slowdown, with a large enough autosuspend_delay
+>> we don't actually sleep between each block but after a long enough
+>> period of idle time we would actually suspend.
+>
+> Indeed, I think this patch is bogus.  cra_init is associated
+> with the tfm object which is usually long-lived.  So doing power
+> management there makes no sense.
+>
+> Cheers,
+>
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
----
- drivers/gpu/drm/rcar-du/rcar_du_encoder.c | 12 ------------
- drivers/gpu/drm/rcar-du/rcar_du_encoder.h |  3 ---
- drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c |  1 -
- drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c |  1 -
- drivers/gpu/drm/rcar-du/rcar_du_vgacon.c  |  3 ---
- 5 files changed, 20 deletions(-)
+I can investigate this further, but I believe this patch itself gave a 
+noticeable performance boost.
 
-diff --git a/drivers/gpu/drm/rcar-du/rcar_du_encoder.c b/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
-index 4e939e4..55149e9 100644
---- a/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
-+++ b/drivers/gpu/drm/rcar-du/rcar_du_encoder.c
-@@ -27,18 +27,6 @@
- #include "rcar_du_vgacon.h"
- 
- /* -----------------------------------------------------------------------------
-- * Common connector functions
-- */
--
--struct drm_encoder *
--rcar_du_connector_best_encoder(struct drm_connector *connector)
--{
--	struct rcar_du_connector *rcon = to_rcar_connector(connector);
--
--	return rcar_encoder_to_drm_encoder(rcon->encoder);
--}
--
--/* -----------------------------------------------------------------------------
-  * Encoder
-  */
- 
-diff --git a/drivers/gpu/drm/rcar-du/rcar_du_encoder.h b/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
-index 719b6f2a..a8669c3 100644
---- a/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
-+++ b/drivers/gpu/drm/rcar-du/rcar_du_encoder.h
-@@ -49,9 +49,6 @@ struct rcar_du_connector {
- #define to_rcar_connector(c) \
- 	container_of(c, struct rcar_du_connector, connector)
- 
--struct drm_encoder *
--rcar_du_connector_best_encoder(struct drm_connector *connector);
--
- int rcar_du_encoder_init(struct rcar_du_device *rcdu,
- 			 enum rcar_du_encoder_type type,
- 			 enum rcar_du_output output,
-diff --git a/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c b/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
-index 6c92714..612b4d5 100644
---- a/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
-+++ b/drivers/gpu/drm/rcar-du/rcar_du_hdmicon.c
-@@ -52,7 +52,6 @@ static int rcar_du_hdmi_connector_mode_valid(struct drm_connector *connector,
- static const struct drm_connector_helper_funcs connector_helper_funcs = {
- 	.get_modes = rcar_du_hdmi_connector_get_modes,
- 	.mode_valid = rcar_du_hdmi_connector_mode_valid,
--	.best_encoder = rcar_du_connector_best_encoder,
- };
- 
- static enum drm_connector_status
-diff --git a/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c b/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
-index e905f5d..6afd0af 100644
---- a/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
-+++ b/drivers/gpu/drm/rcar-du/rcar_du_lvdscon.c
-@@ -59,7 +59,6 @@ static int rcar_du_lvds_connector_get_modes(struct drm_connector *connector)
- 
- static const struct drm_connector_helper_funcs connector_helper_funcs = {
- 	.get_modes = rcar_du_lvds_connector_get_modes,
--	.best_encoder = rcar_du_connector_best_encoder,
- };
- 
- static enum drm_connector_status
-diff --git a/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c b/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
-index 9d7e5c9..8d6125c 100644
---- a/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
-+++ b/drivers/gpu/drm/rcar-du/rcar_du_vgacon.c
-@@ -28,7 +28,6 @@ static int rcar_du_vga_connector_get_modes(struct drm_connector *connector)
- 
- static const struct drm_connector_helper_funcs connector_helper_funcs = {
- 	.get_modes = rcar_du_vga_connector_get_modes,
--	.best_encoder = rcar_du_connector_best_encoder,
- };
- 
- static enum drm_connector_status
-@@ -79,7 +78,5 @@ int rcar_du_vga_connector_init(struct rcar_du_device *rcdu,
- 	if (ret < 0)
- 		return ret;
- 
--	rcon->encoder = renc;
--
- 	return 0;
- }
--- 
-2.7.4
+This is an optimization anyway, and not critical for functionality.
+
+-Tero
