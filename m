@@ -1,157 +1,70 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Tue, 7 Jun 2016 20:57:42 +0800
-Subject: [PATCH v4 11/14] arm64/numa: support HAVE_MEMORYLESS_NODES
-In-Reply-To: <CAFpQJXVaYT5N3GUCFDnUL8OYOuuSSV4QfC8cXL2ecB=1TN57jQ@mail.gmail.com>
-References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
- <1465286898-13828-12-git-send-email-thunder.leizhen@huawei.com>
- <CAFpQJXVaYT5N3GUCFDnUL8OYOuuSSV4QfC8cXL2ecB=1TN57jQ@mail.gmail.com>
-Message-ID: <5756C4C6.7060706@huawei.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 7 Jun 2016 14:00:55 +0100
+Subject: [PATCH 1/3] firmware: arm_scpi: add support for device power
+ state management
+In-Reply-To: <1465304305.2833.13.camel@linaro.org>
+References: <1465228439-13457-1-git-send-email-sudeep.holla@arm.com>
+ <1465228439-13457-2-git-send-email-sudeep.holla@arm.com>
+ <1465304305.2833.13.camel@linaro.org>
+Message-ID: <5756C587.7090105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 2016/6/7 16:31, Ganapatrao Kulkarni wrote:
-> On Tue, Jun 7, 2016 at 1:38 PM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
->> Some numa nodes may have no memory. For example:
->> 1. cpu0 on node0
->> 2. cpu1 on node1
->> 3. device0 access the momory from node0 and node1 take the same time.
-> 
-> i am wondering, if access to both nodes is same, then why you need numa.
-> the example you are quoting is against the basic principle of "numa"
-> what is device0 here? cpu?
-The device0 can also be a cpu. I drew a simple diagram:
-
-  cpu0     cpu1        cpu2/device0
-    |        |              |
-    |        |              |
-   DDR0     DDR1    No DIMM slots or no DIMM plugged
- (node0)  (node1)         (node2)
-
+On 07/06/16 13:58, Jon Medhurst (Tixy) wrote:
+> On Mon, 2016-06-06 at 16:53 +0100, Sudeep Holla wrote:
+>> SCPI protocol supports device power state management. This deals with
+>> power states of various peripheral devices in the system other than the
+>> core compute subsystem.
 >>
->> So, we can not simply classify device0 to node0 or node1, but we can
->> define a node2 which distances to node0 and node1 are the same.
+>> This patch adds support for the power state management of those
+>> peripheral devices.
 >>
->> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 >> ---
->>  arch/arm64/Kconfig      |  4 ++++
->>  arch/arm64/kernel/smp.c |  1 +
->>  arch/arm64/mm/numa.c    | 43 +++++++++++++++++++++++++++++++++++++++++--
->>  3 files changed, 46 insertions(+), 2 deletions(-)
+>>   drivers/firmware/arm_scpi.c   | 29 +++++++++++++++++++++++++++++
+>>   include/linux/scpi_protocol.h |  2 ++
+>>   2 files changed, 31 insertions(+)
 >>
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 05c1bf1..5904a62 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -581,6 +581,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
->>         def_bool y
->>         depends on NUMA
+>> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
+>> index 51c6db0774cc..ca6afd2217a8 100644
+>> --- a/drivers/firmware/arm_scpi.c
+>> +++ b/drivers/firmware/arm_scpi.c
+>> @@ -231,6 +231,11 @@ struct sensor_value {
+>>   	__le32 hi_val;
+>>   } __packed;
 >>
->> +config HAVE_MEMORYLESS_NODES
->> +       def_bool y
->> +       depends on NUMA
+>> +struct dev_pstate_set {
+>> +	u16 dev_id;
+>> +	u8 pstate;
+>> +} __packed;
 >> +
->>  source kernel/Kconfig.preempt
->>  source kernel/Kconfig.hz
+>>   static struct scpi_drvinfo *scpi_info;
 >>
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index d099306..9e15297 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -620,6 +620,7 @@ static void __init of_parse_and_init_cpus(void)
->>                         }
+>>   static int scpi_linux_errmap[SCPI_ERR_MAX] = {
+>> @@ -537,6 +542,28 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
+>>   	return ret;
+>>   }
 >>
->>                         bootcpu_valid = true;
->> +                       early_map_cpu_to_node(0, of_node_to_nid(dn));
->>
->>                         /*
->>                          * cpu_logical_map has already been
->> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
->> index df5c842..d73b0a0 100644
->> --- a/arch/arm64/mm/numa.c
->> +++ b/arch/arm64/mm/numa.c
->> @@ -128,6 +128,14 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
->>                 nid = 0;
->>
->>         cpu_to_node_map[cpu] = nid;
->> +
->> +       /*
->> +        * We should set the numa node of cpu0 as soon as possible, because it
->> +        * has already been set up online before. cpu_to_node(0) will soon be
->> +        * called.
->> +        */
->> +       if (!cpu)
->> +               set_cpu_numa_node(cpu, nid);
->>  }
->>
->>  #ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
->> @@ -215,6 +223,35 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
->>         return ret;
->>  }
->>
->> +static u64 __init alloc_node_data_from_nearest_node(int nid, const size_t size)
+>> +static int scpi_device_get_power_state(u16 dev_id)
 >> +{
->> +       int i, best_nid, distance;
->> +       u64 pa;
->> +       DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
+>> +	int ret;
+>> +	u8 pstate;
 >> +
->> +       bitmap_zero(nodes_map, MAX_NUMNODES);
->> +       bitmap_set(nodes_map, nid, 1);
->> +
->> +find_nearest_node:
->> +       best_nid = NUMA_NO_NODE;
->> +       distance = INT_MAX;
->> +
->> +       for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
->> +               if (numa_distance[nid][i] < distance) {
->> +                       best_nid = i;
->> +                       distance = numa_distance[nid][i];
->> +               }
->> +
->> +       pa = memblock_alloc_nid(size, SMP_CACHE_BYTES, best_nid);
->> +       if (!pa) {
->> +               BUG_ON(best_nid == NUMA_NO_NODE);
->> +               bitmap_set(nodes_map, best_nid, 1);
->> +               goto find_nearest_node;
->> +       }
->> +
->> +       return pa;
->> +}
->> +
->>  /**
->>   * Initialize NODE_DATA for a node on the local memory
->>   */
->> @@ -228,7 +265,9 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
->>         pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
->>                 nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
->>
->> -       nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
->> +       nd_pa = memblock_alloc_nid(nd_size, SMP_CACHE_BYTES, nid);
->> +       if (!nd_pa)
->> +               nd_pa = alloc_node_data_from_nearest_node(nid, nd_size);
->>         nd = __va(nd_pa);
->>
->>         /* report and initialize */
->> @@ -238,7 +277,7 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
->>         if (tnid != nid)
->>                 pr_info("    NODE_DATA(%d) on node %d\n", nid, tnid);
->>
->> -       node_data[nid] = nd;
->> +       NODE_DATA(nid) = nd;
->>         memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
->>         NODE_DATA(nid)->node_id = nid;
->>         NODE_DATA(nid)->node_start_pfn = start_pfn;
->> --
->> 2.5.0
->>
->>
-> Ganapat
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> .
-> 
+>> +	ret = scpi_send_message(SCPI_CMD_GET_DEVICE_PWR_STATE, &dev_id,
+>> +				sizeof(dev_id), &pstate, sizeof(pstate));
+>
+> Don't you need to run translate dev_id to little-endian before sending
+> it? You remembered to do that next function...
+>
+
+Good catch, that's the reason I added the get_power_state call in
+scpi_genpd code to cover testing but still I failed.
+
+Thanks for catching this.
+
+-- 
+Regards,
+Sudeep
