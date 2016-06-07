@@ -1,65 +1,71 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Tue, 7 Jun 2016 17:27:29 +0530
-Subject: [PATCH v4 3/7] binding: mdio-mux: Add DT binding doc for Broadcom
- MDIO bus multiplexer
-In-Reply-To: <5755C290.2020704@gmail.com>
-References: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
- <1465216900-11755-4-git-send-email-pramod.kumar@broadcom.com>
- <5755C290.2020704@gmail.com>
-Message-ID: <f6cd5df22ef8ea070d7b35e628b6d25a@mail.gmail.com>
+From: ldewangan@nvidia.com (Laxman Dewangan)
+Date: Tue, 7 Jun 2016 17:14:56 +0530
+Subject: [PATCH V2 1/2] ARM64: config: Enable PMIC MAX77620 for Tegra 2180
+ platform
+Message-ID: <1465299897-2491-1-git-send-email-ldewangan@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+NVIDIA's Tegra210 Jetson platform (P2180) uses the following
+components:
+	MAX77620 as system PMIC.
+	PCA9539 as I2C GPIO bus expander
 
-> -----Original Message-----
-> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
-> Sent: 07 June 2016 00:06
-> To: Pramod Kumar; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell;
-> Kumar Gala; Catalin Marinas; Will Deacon; Kishon Vijay Abraham I; David S.
-> Miller
-> Cc: devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-
-> kernel at vger.kernel.org; bcm-kernel-feedback-list at broadcom.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v4 3/7] binding: mdio-mux: Add DT binding doc for
-> Broadcom MDIO bus multiplexer
->
-> On 06/06/2016 05:41 AM, Pramod Kumar wrote:
-> > Add DT binding doc for Broadcom MDIO bus multiplexer driver.
-> >
-> > Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-> > Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
->
-> Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
->
->
-> > +for example:
-> > +		mdio_mux_iproc: mdio-mux at 6602023c {
->
-> I think Rob wanted you to drop the underscores here in favor of dashes,
-> there
-> are more below, not critical imho.
->
+Enable the configs for PCA9539 GPIOs and Interrupt support and
+MAX77620 MFD/GPIO/Pincontrol/Regulators.
 
-I'd changed node name in favor of dashes. I don't think Label could be
-written with hyphens,"-".  "-" in label provides DT parsing error.
+Signed-off-by: Laxman Dewangan <ldewangan@nvidia.com>
+---
+Changes from V1:
+- Rebase change and added PCA also in the enable list.
 
+ arch/arm64/configs/defconfig | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-> > +			compatible = "brcm,mdio-mux-iproc";
-> > +			reg = <0x6602023c 0x14>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +
-> > +			mdio at 0 {
-> > +				reg = <0x0>;
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +
-> > +				pci_phy0: pci-phy at 0 {
->
->
-> --
-> Florian
-
-Regards,
-Pramod
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 0bd559a..f634ccb 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -185,6 +185,7 @@ CONFIG_SPI_QUP=y
+ CONFIG_SPI_SPIDEV=m
+ CONFIG_SPMI=y
+ CONFIG_PINCTRL_SINGLE=y
++CONFIG_PINCTRL_MAX77620=y
+ CONFIG_PINCTRL_MSM8916=y
+ CONFIG_PINCTRL_QCOM_SPMI_PMIC=y
+ CONFIG_GPIO_SYSFS=y
+@@ -192,6 +193,9 @@ CONFIG_GPIO_DWAPB=y
+ CONFIG_GPIO_PL061=y
+ CONFIG_GPIO_RCAR=y
+ CONFIG_GPIO_XGENE=y
++CONFIG_GPIO_PCA953X=y
++CONFIG_GPIO_PCA953X_IRQ=y
++CONFIG_GPIO_MAX77620=y
+ CONFIG_POWER_RESET_MSM=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
+@@ -202,12 +206,14 @@ CONFIG_THERMAL_EMULATION=y
+ CONFIG_EXYNOS_THERMAL=y
+ CONFIG_WATCHDOG=y
+ CONFIG_RENESAS_WDT=y
++CONFIG_MFD_MAX77620=y
+ CONFIG_MFD_SPMI_PMIC=y
+ CONFIG_MFD_SEC_CORE=y
+ CONFIG_MFD_HI655X_PMIC=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_HI655X=y
++CONFIG_REGULATOR_MAX77620=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
+ CONFIG_REGULATOR_QCOM_SPMI=y
+ CONFIG_REGULATOR_S2MPS11=y
+@@ -262,6 +268,7 @@ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_MAX77686=y
+ CONFIG_RTC_DRV_S5M=y
+ CONFIG_RTC_DRV_DS3232=y
+ CONFIG_RTC_DRV_EFI=y
+-- 
+2.1.4
