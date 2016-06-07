@@ -1,139 +1,58 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Tue, 7 Jun 2016 19:28:36 +0900
-Subject: [PATCH v13 09/10] arm64: Add kernel return probes support
- (kretprobes)
-In-Reply-To: <1464924384-15269-10-git-send-email-dave.long@linaro.org>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-10-git-send-email-dave.long@linaro.org>
-Message-ID: <20160607192836.20d94e0838ef72ebc729a054@kernel.org>
+From: charanya@codeaurora.org (Charanya Venkatraman)
+Date: Tue,  7 Jun 2016 15:58:41 +0530
+Subject: [PATCH v3] tty:serial:msm:Do not restore Rx interrupts in DMA
+In-Reply-To: <1462896580-11554-1>
+References: <1462896580-11554-1>
+Message-ID: <1465295321-10506-1-git-send-email-charanya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  2 Jun 2016 23:26:23 -0400
-David Long <dave.long@linaro.org> wrote:
+Avoid data corruption issues that result in CRC errors during file
+transfers over serial ports at higher baud rates.
 
-> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> 
-> The pre-handler of this special 'trampoline' kprobe executes the return
-> probe handler functions and restores original return address in ELR_EL1.
-> This way the saved pt_regs still hold the original register context to be
-> carried back to the probed kernel function.
-> 
-> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
-> Signed-off-by: David A. Long <dave.long@linaro.org>
-> ---
->  arch/arm64/Kconfig          |  1 +
->  arch/arm64/kernel/kprobes.c | 75 ++++++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 75 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 5496b75..47989eb 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -89,6 +89,7 @@ config ARM64
->  	select HAVE_RCU_TABLE_FREE
->  	select HAVE_SYSCALL_TRACEPOINTS
->  	select HAVE_KPROBES
-> +	select HAVE_KRETPROBES if HAVE_KPROBES
->  	select IOMMU_DMA if IOMMU_SUPPORT
->  	select IRQ_DOMAIN
->  	select IRQ_FORCED_THREADING
-> diff --git a/arch/arm64/kernel/kprobes.c b/arch/arm64/kernel/kprobes.c
-> index b35f76f..c116904 100644
-> --- a/arch/arm64/kernel/kprobes.c
-> +++ b/arch/arm64/kernel/kprobes.c
-> @@ -577,7 +577,80 @@ bool arch_within_kprobe_blacklist(unsigned long addr)
->  
->  void __kprobes __used *trampoline_probe_handler(struct pt_regs *regs)
->  {
-> -	return NULL;
-> +	struct kretprobe_instance *ri = NULL;
-> +	struct hlist_head *head, empty_rp;
-> +	struct hlist_node *tmp;
-> +	unsigned long flags, orig_ret_addr = 0;
-> +	unsigned long trampoline_address =
-> +		(unsigned long)&kretprobe_trampoline;
-> +
-> +	INIT_HLIST_HEAD(&empty_rp);
-> +	kretprobe_hash_lock(current, &head, &flags);
-> +
-> +	/*
-> +	 * It is possible to have multiple instances associated with a given
-> +	 * task either because multiple functions in the call path have
-> +	 * a return probe installed on them, and/or more than one return
-> +	 * probe was registered for a target function.
-> +	 *
-> +	 * We can handle this because:
-> +	 *     - instances are always inserted at the head of the list
-> +	 *     - when multiple return probes are registered for the same
-> +	 *       function, the first instance's ret_addr will point to the
-> +	 *       real return address, and all the rest will point to
-> +	 *       kretprobe_trampoline
-> +	 */
-> +	hlist_for_each_entry_safe(ri, tmp, head, hlist) {
-> +		if (ri->task != current)
-> +			/* another task is sharing our hash bucket */
-> +			continue;
-> +
-> +		if (ri->rp && ri->rp->handler) {
-> +			__this_cpu_write(current_kprobe, &ri->rp->kp);
-> +			get_kprobe_ctlblk()->kprobe_status = KPROBE_HIT_ACTIVE;
-> +			ri->rp->handler(ri, regs);
-> +			__this_cpu_write(current_kprobe, NULL);
-> +		}
-> +
-> +		orig_ret_addr = (unsigned long)ri->ret_addr;
-> +		recycle_rp_inst(ri, &empty_rp);
-> +
-> +		if (orig_ret_addr != trampoline_address)
-> +			/*
-> +			 * This is the real return address. Any other
-> +			 * instances associated with this task are for
-> +			 * other calls deeper on the call stack
-> +			 */
-> +			break;
-> +	}
+The current msm_serial driver masks the FIFO Rx interrupts in
+msm_start_rx_dma() since Rx FIFO interrupts are not required in DMA
+mode. However, msm_complete_rx_dma() re-enables the Rx FIFO interrupts
+which could cause RXSTALE event to be processed when a TXLEV interrupt
+occurs.
 
-This looks not included an improvement done by Syuhei, see
-commit 737480a0d525 ("kprobes/x86: Fix the return address of multiple kretprobes")
+The following is the sequence of events that could occur resulting in
+data corruption.
 
-Thank you!
+msm_start_rx_dma -> msm_complete_rx_dma -->
+spin_unlock_irqrestore(&port->lock) -->
+msm_uart_irq()(For TXLEV interrupt) -->  msm_handle_rx_dm() (Read from
+FIFO resulting in data corruption)
 
-> +
-> +	kretprobe_assert(ri, orig_ret_addr, trampoline_address);
-> +	/* restore the original return address */
-> +	instruction_pointer(regs) = orig_ret_addr;
-> +	reset_current_kprobe();
-> +	kretprobe_hash_unlock(current, &flags);
-> +
-> +	hlist_for_each_entry_safe(ri, tmp, &empty_rp, hlist) {
-> +		hlist_del(&ri->hlist);
-> +		kfree(ri);
-> +	}
-> +
-> +	/* return 1 so that post handlers not called */
-> +	return (void *) orig_ret_addr;
-> +}
-> +
-> +void __kprobes arch_prepare_kretprobe(struct kretprobe_instance *ri,
-> +				      struct pt_regs *regs)
-> +{
-> +	ri->ret_addr = (kprobe_opcode_t *)regs->regs[30];
-> +
-> +	/* replace return addr (x30) with trampoline */
-> +	regs->regs[30] = (long)&kretprobe_trampoline;
-> +}
-> +
-> +int __kprobes arch_trampoline_kprobe(struct kprobe *p)
-> +{
-> +	return 0;
->  }
->  
->  int __init arch_init_kprobes(void)
-> -- 
-> 2.5.0
-> 
+The patch fixes the issue by not restoring the RXLEV and RXSTALE
+interrupts in msm_complete_rx_dma(). These interrupts are required only
+in FIFO mode.
 
+Signed-off-by: Charanya Venkatraman <charanya@codeaurora.org>
+---
+Changes in v2:
+	- Make commit message more clearer.
+Changes in v3:
+	- Fix typos in commit message.
 
+ drivers/tty/serial/msm_serial.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index b7d80bd..646aa3f 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -388,10 +388,6 @@ static void msm_complete_rx_dma(void *args)
+ 	val &= ~dma->enable_bit;
+ 	msm_write(port, val, UARTDM_DMEN);
+ 
+-	/* Restore interrupts */
+-	msm_port->imr |= UART_IMR_RXLEV | UART_IMR_RXSTALE;
+-	msm_write(port, msm_port->imr, UART_IMR);
+-
+ 	if (msm_read(port, UART_SR) & UART_SR_OVERRUN) {
+ 		port->icount.overrun++;
+ 		tty_insert_flip_char(tport, 0, TTY_OVERRUN);
 -- 
-Masami Hiramatsu <mhiramat@kernel.org>
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
