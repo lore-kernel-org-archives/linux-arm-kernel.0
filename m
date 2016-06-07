@@ -1,114 +1,34 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 15:59:22 +0000
-Subject: [PATCH v10 8/8] iommu/arm-smmu: get/put the msi cookie
-In-Reply-To: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
-References: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315162-5888-9-git-send-email-eric.auger@redhat.com>
+Date: Tue,  7 Jun 2016 16:01:20 +0000
+Subject: [PATCH v10 1/9] genirq/msi: export msi_get_domain_info
+In-Reply-To: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
+References: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315288-5931-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For IOMMU_DOMAIN_UNMANAGED type we now also get the msi
-cookie in both arm-smmu and arm-smmu-v3. This initializes
-resources for MSI doorbell mapping.
+We plan to use msi_get_domain_info in VFIO module so let's export it.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
----
- drivers/iommu/arm-smmu-v3.c | 16 ++++++++++++----
- drivers/iommu/arm-smmu.c    | 15 +++++++++++----
- 2 files changed, 23 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 8eb002e..17a20a7 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -22,6 +22,7 @@
- 
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
-+#include <linux/msi-iommu.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
- #include <linux/iommu.h>
-@@ -1412,15 +1413,21 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
- 
- 	if (type == IOMMU_DOMAIN_DMA &&
--	    iommu_get_dma_cookie(&smmu_domain->domain)) {
--		kfree(smmu_domain);
--		return NULL;
--	}
-+	    iommu_get_dma_cookie(&smmu_domain->domain))
-+		goto err;
-+
-+	if (type == IOMMU_DOMAIN_UNMANAGED &&
-+		iommu_get_msi_cookie(&smmu_domain->domain))
-+		goto err;
-+
- 	smmu_domain->domain.msi_geometry = msi_geometry;
- 
- 	mutex_init(&smmu_domain->init_mutex);
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 	return &smmu_domain->domain;
-+err:
-+	kfree(smmu_domain);
-+	return NULL;
+---
+
+v2 -> v3:
+- remove static implementation in case CONFIG_PCI_MSI_IRQ_DOMAIN is not set
+---
+ kernel/irq/msi.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
+index 38e89ce..9b0ba4a 100644
+--- a/kernel/irq/msi.c
++++ b/kernel/irq/msi.c
+@@ -400,5 +400,6 @@ struct msi_domain_info *msi_get_domain_info(struct irq_domain *domain)
+ {
+ 	return (struct msi_domain_info *)domain->host_data;
  }
++EXPORT_SYMBOL_GPL(msi_get_domain_info);
  
- static int arm_smmu_bitmap_alloc(unsigned long *map, int span)
-@@ -1446,6 +1453,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
- 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
- 	struct arm_smmu_device *smmu = smmu_domain->smmu;
- 
-+	iommu_put_msi_cookie(domain);
- 	iommu_put_dma_cookie(domain);
- 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
- 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 9755a1b..867910b 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -30,6 +30,7 @@
- 
- #include <linux/delay.h>
- #include <linux/dma-iommu.h>
-+#include <linux/msi-iommu.h>
- #include <linux/dma-mapping.h>
- #include <linux/err.h>
- #include <linux/interrupt.h>
-@@ -1052,10 +1053,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
- 
- 	if (type == IOMMU_DOMAIN_DMA &&
--	    iommu_get_dma_cookie(&smmu_domain->domain)) {
--		kfree(smmu_domain);
--		return NULL;
--	}
-+	    iommu_get_dma_cookie(&smmu_domain->domain))
-+		goto err;
-+
-+	if (type == IOMMU_DOMAIN_UNMANAGED &&
-+		iommu_get_msi_cookie(&smmu_domain->domain))
-+		goto err;
- 
- 	smmu_domain->domain.msi_geometry = msi_geometry;
- 
-@@ -1063,6 +1066,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 
- 	return &smmu_domain->domain;
-+err:
-+	kfree(smmu_domain);
-+	return NULL;
- }
- 
- static void arm_smmu_domain_free(struct iommu_domain *domain)
-@@ -1073,6 +1079,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
- 	 * Free the domain resources. We assume that all devices have
- 	 * already been detached.
- 	 */
-+	iommu_put_msi_cookie(domain);
- 	iommu_put_dma_cookie(domain);
- 	arm_smmu_destroy_domain_context(domain);
- 	kfree(smmu_domain);
+ #endif /* CONFIG_GENERIC_MSI_IRQ_DOMAIN */
 -- 
 1.9.1
