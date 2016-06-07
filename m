@@ -1,156 +1,244 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 16:01:19 +0000
-Subject: [PATCH v10 0/9] KVM PCIe/MSI passthrough on ARM/ARM64: kernel part
- 2/3: msi changes
-Message-ID: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
+Date: Tue,  7 Jun 2016 16:01:22 +0000
+Subject: [PATCH v10 3/9] genirq/msi-doorbell: creation
+In-Reply-To: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
+References: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315288-5931-4-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series implements the MSI address mapping/unmapping in the MSI layer.
-IOMMU binding happens on pci_enable_msi since this function can sleep and
-return errors. On msi_domain_set_affinity, msi_domain_(de)activate, which
-are not allowed to sleep, we simply look for the already existing binding.
+This new API aims at managing MSI doorbells likely to be iommu
+mapped. The API is bound to be used at least by irqchip drivers,
+the MSI layer and the VFIO sub-system.
 
-Irqchips likely to be downstream to iommus (not bypassing MSIs) are supposed
-to register their MSI doorbells. This make possible to retrieve their
-characteristics, detect whether MSI assignment is safe and report to the
-userspace the size/alignment of the guest PA window to provision for MSI
-mapping.
+Irqchips likely to be downstream to IOMMUs (that do not bypass MSI
+transactions) need to register their MSI doorbells so that the MSI
+layer can look them up and iommu map then when needed.
 
-A new MSI domain info flag value is introduced to report whether the msi
-domain implements IRQ remapping. GIC v3 ITS is the first MSI controller
-advertising it. This flag value will be used by VFIO subsystem to
-determine whether MSI forwarding is safe.
+We currently introduce the irq_chip_msi_doorbell_info struct that
+contains all the info characterizing a doorbell plus 3 functions that
+allows to (un)register, and lookup MSI doorbells stored in a global
+list.
 
-More details & context can be found at:
-http://www.linaro.org/blog/core-dump/kvm-pciemsi-passthrough-armarm64/
-
-Best Regards
-
-Eric
-
-Git: complete series available at
-https://github.com/eauger/linux/tree/v4.7-rc2-passthrough-v10
-
-History:
-
-v9 -> v10:
-- was forced to introduce important changes on parts that were reviewed
-  already :-( I took the initiative to replace the irqchip's
-  get_doorbell_info callback by a new API, msi-doorbell).
-  the new API makes possible to register, lookup doorbells and also compute
-  the total requirements and IRQ safety flag used by VFIO.
-- also added code in GICv3 ITS to register a global doorbell.
-
-v8 -> v9:
-- use a union in irq_chip_msi_doorbell_info + boolean telling whether the
-  doorbell is percpu
-- decouple irq_data parsing from the actual mapping/unmapping in
-  msi_handle_doorbell_mappings
-- fix misc style issues
-
-v7 -> v8:
-take into account Marc's comments:
-- use iommu_msi_msg_pa_to_va with new proto
-- change in irq_chip_msi_doorbell_info struct definition:
-  prot and size became shared between all doorbells and phys_addr_t __percpu
-- cleanups in v2m irqchip
-- eventually did not touch MSI_FLAG_IRQ_REMAPPING naming
-- On msi_handle_doorbell_mappings, stop on the first irqchip where doorbells
-  can be found
-- fix resource deallocation on mapping failure in msi_domain_alloc_irqs
-
-v6 -> v7:
-- do alloc/map handling on pci_enable_msi and search on msi_(de)domain_activate
-- add msi_doorbell_info callback in irq-chip to retrieve the characteristics
-  of doorbells
-
-RFC v5 -> patch v6:
-- split to ease the review process
-- rebase on default iommu domain code (irq_data_to_msi_mapping_domain
-  checks IOMMU_DOMAIN_DMA type)
-- fix unmap sequence on msi_domain_set_affinity (reported by Marc):
-  unmap the previous doorbell when the new one has been mapped & written to
-  the device, ie. irq_chip_write_msi_msg.
-- "msi: msi_compose wrapper removed" following change above
-- add size parameter to iommu_get_reserved_iova API following Marc's request
-
-RFC v4 -> RFC v5:
-- take into account Thomas' comments on MSI related patches
-  - split "msi: IOMMU map the doorbell address when needed"
-  - increase readability and add comments
-  - fix style issues
- - split "iommu: Add DOMAIN_ATTR_MSI_MAPPING attribute"
- - platform ITS now advertises IOMMU_CAP_INTR_REMAP
- - fix compilation issue with CONFIG_IOMMU API unset
- - arm-smmu-v3 now advertises DOMAIN_ATTR_MSI_MAPPING
-
-RFC v3 -> v4:
-- Move doorbell mapping/unmapping in msi.c
-- fix ref count issue on set_affinity: in case of a change in the address
-  the previous address is decremented
-- doorbell map/unmap now is done on msi composition. Should allow the use
-  case for platform MSI controllers
-- create dma-reserved-iommu.h/c exposing/implementing a new API dedicated
-  to reserved IOVA management (looking like dma-iommu glue)
-- series reordering to ease the review:
-  - first part is related to IOMMU
-  - second related to MSI sub-system
-  - third related to VFIO (except arm-smmu IOMMU_CAP_INTR_REMAP removal)
-- expose the number of requested IOVA pages through VFIO_IOMMU_GET_INFO
-  [this partially addresses Marc's comments on iommu_get/put_single_reserved
-   size/alignment problematic - which I did not ignore - but I don't know
-   how much I can do at the moment]
-
-RFC v2 -> RFC v3:
-- should fix wrong handling of some CONFIG combinations:
-  CONFIG_IOVA, CONFIG_IOMMU_API, CONFIG_PCI_MSI_IRQ_DOMAIN
-- fix MSI_FLAG_IRQ_REMAPPING setting in GICv3 ITS (although not tested)
-
-PATCH v1 -> RFC v2:
-- reverted to RFC since it looks more reasonable ;-) the code is split
-  between VFIO, IOMMU, MSI controller and I am not sure I did the right
-  choices. Also API need to be further discussed.
-- iova API usage in arm-smmu.c.
-- MSI controller natively programs the MSI addr with either the PA or IOVA.
-  This is not done anymore in vfio-pci driver as suggested by Alex.
-- check irq remapping capability of the group
-
-RFC v1 [2] -> PATCH v1:
-- use the existing dma map/unmap ioctl interface with a flag to register a
-  reserved IOVA range. Use the legacy Rb to store this special vfio_dma.
-- a single reserved IOVA contiguous region now is allowed
-- use of an RB tree indexed by PA to store allocated reserved slots
-- use of a vfio_domain iova_domain to manage iova allocation within the
-  window provided by the userspace
-- vfio alloc_map/unmap_free take a vfio_group handle
-- vfio_group handle is cached in vfio_pci_device
-- add ref counting to bindings
-- user modality enabled at the end of the series
-
-
-Eric Auger (9):
-  genirq/msi: export msi_get_domain_info
-  genirq/msi: msi_compose wrapper
-  genirq/msi-doorbell: creation
-  genirq/msi-doorbell: msi_doorbell_pages
-  genirq/msi-doorbell: msi_doorbell_safe
-  irqchip/gicv2m: register the MSI global doorbell
-  irqchip/gicv3-its: register the MSI global doorbell
-  genirq/msi: map/unmap the MSI doorbells on msi_domain_alloc/free_irqs
-  genirq/msi: use the MSI doorbell's IOVA when requested
-
- drivers/iommu/Kconfig            |   1 +
- drivers/irqchip/irq-gic-v2m.c    |  10 ++-
- drivers/irqchip/irq-gic-v3-its.c |  14 ++++
- include/linux/msi-doorbell.h     | 105 +++++++++++++++++++++++++++
- kernel/irq/Kconfig               |   4 ++
- kernel/irq/Makefile              |   1 +
- kernel/irq/msi-doorbell.c        | 148 +++++++++++++++++++++++++++++++++++++++
- kernel/irq/msi.c                 | 134 ++++++++++++++++++++++++++++++++---
- 8 files changed, 405 insertions(+), 12 deletions(-)
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+---
+ drivers/iommu/Kconfig        |  1 +
+ include/linux/msi-doorbell.h | 79 ++++++++++++++++++++++++++++++++++++++++++
+ kernel/irq/Kconfig           |  4 +++
+ kernel/irq/Makefile          |  1 +
+ kernel/irq/msi-doorbell.c    | 82 ++++++++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 167 insertions(+)
  create mode 100644 include/linux/msi-doorbell.h
  create mode 100644 kernel/irq/msi-doorbell.c
 
+diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
+index 5ea1610..ba54146 100644
+--- a/drivers/iommu/Kconfig
++++ b/drivers/iommu/Kconfig
+@@ -78,6 +78,7 @@ config IOMMU_DMA
+ config IOMMU_MSI
+ 	bool
+ 	select IOMMU_DMA
++	select MSI_DOORBELL
+ 
+ config FSL_PAMU
+ 	bool "Freescale IOMMU support"
+diff --git a/include/linux/msi-doorbell.h b/include/linux/msi-doorbell.h
+new file mode 100644
+index 0000000..bbc7321
+--- /dev/null
++++ b/include/linux/msi-doorbell.h
+@@ -0,0 +1,79 @@
++/*
++ * Copyright (C) 2016 Eric Auger
++ *
++ * Eric Auger <eric.auger@linaro.org>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#ifndef _LINUX_MSI_DOORBELL_H
++#define _LINUX_MSI_DOORBELL_H
++
++#include <linux/irq.h>
++
++/* Describe all the MSI doorbell regions for an irqchip */
++struct irq_chip_msi_doorbell_info {
++	union {
++		phys_addr_t __percpu *percpu_doorbells;
++		phys_addr_t global_doorbell;
++	};
++	bool doorbell_is_percpu;
++	bool irq_remapping;	/* is irq_remapping implemented? */
++	size_t size;		/* size of a each doorbell */
++	int prot;		/* iommu protection flag */
++};
++
++#ifdef CONFIG_MSI_DOORBELL
++
++/**
++ * msi_doorbell_register_global: allocate and register a global doorbell
++ *
++ * @chip_data: chip_data pointer
++ * @addr: physical address of the global doorbell
++ * @size: size of the global doorbell
++ * @prot: protection/memory attributes
++ * @irq_remapping: is irq_remapping implemented for this doorbell
++ */
++int msi_doorbell_register_global(void *chip_data, phys_addr_t addr,
++				 size_t size, int prot, bool irq_remapping);
++
++/**
++ * msi_doorbell_unregister: remove a doorbell from the list of registered
++ * doorbells
++ * @chip_data: chip_data pointer
++ */
++void msi_doorbell_unregister(void *chip_data);
++
++/**
++ * msi_doorbell_lookup: return the doorbell info associated to @chip_data
++ * doorbell info
++ *
++ * @chip_data: chip_data pointer
++ * return NULL if no registered doorbell for that chip_data, or the actual
++ * doorbell info pointer upon success
++ */
++struct irq_chip_msi_doorbell_info *
++msi_doorbell_lookup(void *chip_data);
++
++#else
++
++static inline int
++msi_doorbell_register_global(void *chip_data, phys_addr_t addr,
++			     size_t size, int prot, bool irq_remapping)
++{
++	return -ENOENT;
++}
++
++static inline void msi_doorbell_unregister(void *chip_data);
++
++static inline struct irq_chip_msi_doorbell_info *
++msi_doorbell_lookup(void *chip_data)
++{
++	return NULL;
++}
++
++#endif /* CONFIG_MSI_DOORBELL */
++
++#endif
+diff --git a/kernel/irq/Kconfig b/kernel/irq/Kconfig
+index 3bbfd6a..d4faaaa 100644
+--- a/kernel/irq/Kconfig
++++ b/kernel/irq/Kconfig
+@@ -72,6 +72,10 @@ config GENERIC_IRQ_IPI
+ config GENERIC_MSI_IRQ
+ 	bool
+ 
++# MSI doorbell support (for doorbell IOMMU mapping)
++config MSI_DOORBELL
++	bool
++
+ # Generic MSI hierarchical interrupt domain support
+ config GENERIC_MSI_IRQ_DOMAIN
+ 	bool
+diff --git a/kernel/irq/Makefile b/kernel/irq/Makefile
+index 2ee42e9..be02dfd 100644
+--- a/kernel/irq/Makefile
++++ b/kernel/irq/Makefile
+@@ -9,3 +9,4 @@ obj-$(CONFIG_GENERIC_IRQ_MIGRATION) += cpuhotplug.o
+ obj-$(CONFIG_PM_SLEEP) += pm.o
+ obj-$(CONFIG_GENERIC_MSI_IRQ) += msi.o
+ obj-$(CONFIG_GENERIC_IRQ_IPI) += ipi.o
++obj-$(CONFIG_MSI_DOORBELL) += msi-doorbell.o
+diff --git a/kernel/irq/msi-doorbell.c b/kernel/irq/msi-doorbell.c
+new file mode 100644
+index 0000000..84ecca1
+--- /dev/null
++++ b/kernel/irq/msi-doorbell.c
+@@ -0,0 +1,82 @@
++/*
++ * linux/kernel/irq/msi-doorbell.c
++ *
++ * Copyright (C) 2016 Linaro
++ * Author: Eric Auger <eric.auger@linaro.org>
++ *
++ * This file is licensed under GPLv2.
++ *
++ * This file contains common code to manage MSI doorbells likely
++ * to be iommu mapped. Typically meaningful on ARM.
++ */
++
++#include <linux/slab.h>
++#include <linux/irq.h>
++#include <linux/msi-doorbell.h>
++
++struct irqchip_doorbell {
++	struct irq_chip_msi_doorbell_info info;
++	void *chip_data;
++	struct list_head next;
++};
++
++static LIST_HEAD(irqchip_doorbell_list);
++static DEFINE_MUTEX(irqchip_doorbell_mutex);
++
++int msi_doorbell_register_global(void *chip_data, phys_addr_t addr,
++				 size_t size, int prot, bool irq_remapping)
++{
++	struct irqchip_doorbell *db;
++
++	db = kmalloc(sizeof(*db), GFP_KERNEL);
++	if (!db)
++		return -ENOMEM;
++
++	db->chip_data = chip_data;
++	db->info.doorbell_is_percpu = false;
++	db->info.global_doorbell = addr;
++	db->info.size = size;
++	db->info.prot = prot;
++	db->info.irq_remapping = irq_remapping;
++
++	mutex_lock(&irqchip_doorbell_mutex);
++	list_add(&db->next, &irqchip_doorbell_list);
++	mutex_unlock(&irqchip_doorbell_mutex);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(msi_doorbell_register_global);
++
++void msi_doorbell_unregister(void *chip_data)
++{
++	struct irqchip_doorbell *db, *tmp;
++
++	mutex_lock(&irqchip_doorbell_mutex);
++	list_for_each_entry_safe(db, tmp, &irqchip_doorbell_list, next) {
++		if (db->chip_data == chip_data) {
++			list_del(&db->next);
++			kfree(db);
++			break;
++		}
++	}
++	mutex_unlock(&irqchip_doorbell_mutex);
++}
++EXPORT_SYMBOL_GPL(msi_doorbell_unregister);
++
++struct irq_chip_msi_doorbell_info *
++msi_doorbell_lookup(void *chip_data)
++{
++	struct irqchip_doorbell *db;
++	struct irq_chip_msi_doorbell_info *dbinfo = NULL;
++
++	mutex_lock(&irqchip_doorbell_mutex);
++	list_for_each_entry(db, &irqchip_doorbell_list, next) {
++		if (db->chip_data == chip_data) {
++			dbinfo = &db->info;
++			break;
++		}
++	}
++	mutex_unlock(&irqchip_doorbell_mutex);
++	return dbinfo;
++}
++EXPORT_SYMBOL_GPL(msi_doorbell_lookup);
++
 -- 
 1.9.1
