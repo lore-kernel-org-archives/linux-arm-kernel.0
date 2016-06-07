@@ -1,79 +1,71 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue,  7 Jun 2016 14:31:00 +0100
-Subject: [RFC PATCH v2 05/15] drivers: acpi: iort: add support for named
- component look-up
+Date: Tue,  7 Jun 2016 14:31:02 +0100
+Subject: [RFC PATCH v2 07/15] drivers: acpi: iort: add node match function
 In-Reply-To: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1465306270-27076-6-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1465306270-27076-8-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ACPI IORT table allows ids translations for PCI devices (through
-their respective root complex) and name components (ie components
-identified through their ACPI namespace path).
+Device drivers (eg ARM SMMU) need to know if a specific component
+is part of the IORT table, so that kernel data structures are not
+initialized at initcalls time if the respective component is not
+part of the IORT table.
 
-Current IORT code only allows look-up and retrieval of IORT nodes
-corresponding to PCI root complexes components; this patch fills
-the gap by adding support for named components IORT node look-ups.
+To this end, this patch adds a trivial function that allows detecting
+if a given IORT node type is present or not in the ACPI table, providing
+an ACPI IORT equivalent for of_find_matching_node().
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: Hanjun Guo <hanjun.guo@linaro.org>
 Cc: Tomasz Nowicki <tn@semihalf.com>
 Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
 ---
- drivers/acpi/iort.c | 30 +++++++++++++++++++++++++++---
- 1 file changed, 27 insertions(+), 3 deletions(-)
+ drivers/acpi/iort.c  | 15 +++++++++++++++
+ include/linux/iort.h |  2 ++
+ 2 files changed, 17 insertions(+)
 
 diff --git a/drivers/acpi/iort.c b/drivers/acpi/iort.c
-index 7cc9880..cfdde71 100644
+index 0ba6c8a..875edde 100644
 --- a/drivers/acpi/iort.c
 +++ b/drivers/acpi/iort.c
-@@ -215,12 +215,35 @@ iort_scan_node(enum acpi_iort_node_type type,
+@@ -213,6 +213,21 @@ iort_scan_node(enum acpi_iort_node_type type,
+ }
+ 
  static acpi_status
++iort_match_callback(struct acpi_iort_node *node, void *context)
++{
++	return AE_OK;
++}
++
++bool iort_node_match(u8 type)
++{
++	struct acpi_iort_node *node;
++
++	node = iort_scan_node(type, iort_match_callback, NULL);
++
++	return node != NULL;
++}
++
++static acpi_status
  iort_find_dev_callback(struct acpi_iort_node *node, void *context)
  {
--	struct acpi_iort_root_complex *pci_rc;
  	struct device *dev = context;
--	struct pci_bus *bus;
- 
- 	switch (node->type) {
--	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX:
-+	case ACPI_IORT_NODE_NAMED_COMPONENT: {
-+		struct acpi_buffer buffer = { ACPI_ALLOCATE_BUFFER, NULL };
-+		struct acpi_iort_named_component *ncomp;
-+		struct acpi_device *adev = to_acpi_device_node(dev->fwnode);
-+
-+		if (!adev)
-+			break;
-+
-+		ncomp = (struct acpi_iort_named_component *)node->node_data;
-+
-+		if (ACPI_FAILURE(acpi_get_name(adev->handle,
-+					       ACPI_FULL_PATHNAME, &buffer))) {
-+			pr_warn("Can't get device full path name\n");
-+			break;
-+		}
-+
-+		if (!strcmp(ncomp->device_name, (char *)buffer.pointer))
-+			return AE_OK;
-+
-+		break;
-+	}
-+
-+	case ACPI_IORT_NODE_PCI_ROOT_COMPLEX: {
-+		struct acpi_iort_root_complex *pci_rc;
-+		struct pci_bus *bus;
-+
- 		bus = to_pci_bus(dev);
- 		pci_rc = (struct acpi_iort_root_complex *)node->node_data;
- 
-@@ -234,6 +257,7 @@ iort_find_dev_callback(struct acpi_iort_node *node, void *context)
- 
- 		break;
- 	}
-+	}
- 
- 	return AE_NOT_FOUND;
- }
+diff --git a/include/linux/iort.h b/include/linux/iort.h
+index 5053cc3..5ebe7e5 100644
+--- a/include/linux/iort.h
++++ b/include/linux/iort.h
+@@ -27,9 +27,11 @@ int iort_register_domain_token(int trans_id, struct fwnode_handle *fw_node);
+ void iort_deregister_domain_token(int trans_id);
+ struct fwnode_handle *iort_its_find_domain_token(int trans_id);
+ #ifdef CONFIG_IORT_TABLE
++bool iort_node_match(u8 type);
+ u32 iort_pci_get_msi_rid(struct pci_dev *pdev, u32 req_id);
+ struct irq_domain *iort_pci_get_domain(struct pci_dev *pdev, u32 req_id);
+ #else
++static inline bool iort_node_match(u8 type) { return false; }
+ static inline u32 iort_pci_get_msi_rid(struct pci_dev *pdev, u32 req_id)
+ { return req_id; }
+ static inline struct irq_domain *
 -- 
 2.6.4
