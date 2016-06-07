@@ -1,34 +1,71 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 9 Jun 2016 14:36:21 +0200
-Subject: [PATCH 2/3] PCI: host: new PCI host controller driver for
- Marvell Armada 3700
-In-Reply-To: <11140978.npsCNQs782@wuerfel>
-References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <3112077.0RPfokLCAs@wuerfel>
- <20160609111921.11975627@free-electrons.com>
- <11140978.npsCNQs782@wuerfel>
-Message-ID: <20160609143621.5291dda5@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Jun 2016 10:43:08 +0200
+Subject: [PATCH] arm64: Implement arch_setup_pdev_archdata hook
+In-Reply-To: <b4645ade4a4d4150e76594f5bf04a3ad5e7d5221.1465287808.git.baolin.wang@linaro.org>
+References: <b4645ade4a4d4150e76594f5bf04a3ad5e7d5221.1465287808.git.baolin.wang@linaro.org>
+Message-ID: <3369300.0KEI34cGsj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, 09 Jun 2016 14:19:07 +0200, Arnd Bergmann wrote:
-
-> > There is a GIC-500, but Marcin told me that attempts to use MSI with it
-> > have not been successful so far. There will be investigation on this
-> > topic in the future, but for the moment, we'd like to have the MSI
-> > functionality built into the PCIe driver supported. We can migrate
-> > later to GIC-500 powered MSIs once working.  
+On Tuesday, June 7, 2016 4:29:21 PM CEST Baolin Wang wrote:
+> Now on ARM64 platform, it will set 'dummy_dma_ops' for device dma_ops if
+> it did not call 'arch_setup_dma_ops' at device creation time by issuing
+> platform_device_alloc() function, that will cause failure when setting
+> the dma mask for device.
 > 
-> I think you should still add the msi-parent or msi-map properties then,
-> just have them point at the PCI host node instead of the GIC-500,
-> and evaluate that to get the built-in controller.
+> Hence We need to hook the archdata to setup proper dma_ops for these devices.
+> 
+> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
+> ---
+>  arch/arm64/mm/dma-mapping.c |   21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index c566ec8..04e057b 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -26,6 +26,7 @@
+>  #include <linux/dma-contiguous.h>
+>  #include <linux/vmalloc.h>
+>  #include <linux/swiotlb.h>
+> +#include <linux/platform_device.h>
+>  
+>  #include <asm/cacheflush.h>
+>  
+> @@ -961,3 +962,23 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+>  	dev->archdata.dma_coherent = coherent;
+>  	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+>  }
+> +
+> +void arch_setup_pdev_archdata(struct platform_device *pdev)
+> +{
+> +	if (!pdev->dev.archdata.dma_ops)
+> +		pdev->dev.archdata.dma_ops = &swiotlb_dma_ops;
 
-Sure, I'll have a look at doing that.
+You need to check the DT here to see if these are the right ops,
+or if you have to go through an IOMMU. Also, you have to set up the
+other fields that are controlled by arch_setup_dma_ops: whether
+it's coherent and what the offset is.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> +	/*
+> +	 * Set default coherent_dma_mask to 32 bit. Drivers are expected to
+> +	 * setup the correct supported mask.
+> +	 */
+> +	if (!pdev->dev.coherent_dma_mask)
+> +		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
+> +
+> +	/*
+> +	 * Set it to coherent_dma_mask by default if the architecture
+> +	 * code has not set it.
+> +	 */
+> +	if (!pdev->dev.dma_mask)
+> +		pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
+> +}
+
+We still have an open bug about the dma_set_mask() function on ARM64:
+we have to check the dma-ranges property to ensure that no device can
+set a mask wider than what its parent bus can support.
+
+What is your plan for this in case of these devices?
+
+	Arnd
