@@ -1,78 +1,20 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 06 Jun 2016 23:10:38 -0700
-Subject: [PATCH] dmaengine: bcm2835: Fix polling for completion of DMA
- with interrupts masked.
-In-Reply-To: <20160607052405.GC16910@localhost>
-References: <1465007351-5559-1-git-send-email-eric@anholt.net>
- <20160606042635.GU16910@localhost> <87a8iy6x41.fsf@eliezer.anholt.net>
- <20160607052405.GC16910@localhost>
-Message-ID: <87k2i1leap.fsf@eliezer.anholt.net>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 7 Jun 2016 11:48:49 +0530
+Subject: [PATCH v2 1/4] dmaengine: vdma: Add support for cyclic dma mode
+In-Reply-To: <1463557653-1687-2-git-send-email-appanad@xilinx.com>
+References: <1463557653-1687-1-git-send-email-appanad@xilinx.com>
+ <1463557653-1687-2-git-send-email-appanad@xilinx.com>
+Message-ID: <20160607061848.GH16910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod Koul <vinod.koul@intel.com> writes:
+On Wed, May 18, 2016 at 01:17:30PM +0530, Kedareswara rao Appana wrote:
+> This patch adds support for AXI DMA cyclic dma mode.
+> In cyclic mode, DMA fetches and processes the same
+> BDs without interruption. The DMA continues to fetch and process
+> until it is stopped or reset.
 
-> On Mon, Jun 06, 2016 at 10:33:18AM -0700, Eric Anholt wrote:
->> Vinod Koul <vinod.koul@intel.com> writes:
->> 
->> > On Fri, Jun 03, 2016 at 07:29:11PM -0700, Eric Anholt wrote:
->> >> The tx_status hook is supposed to be safe to call from interrupt
->> >> context, but it wouldn't ever return completion for the last transfer,
->> >> meaning you couldn't poll for DMA completion with interrupts masked.
->> >
->> > and why is that?
->> 
->> Maybe this was poorly worded.  How about:
->> 
->> The tx_status hook is supposed to be safe to call from interrupt
->> context.  However, the current transfer currently only gets marked
->> complete by the IRQ handler, so if interrupts were masked then polling
->> for completion would never finish.
->
-> Sound better :)
->
->> 
->> >> This fixes IRQ handling for bcm2835's DSI1, which requires using the
->> >> DMA engine to write its registers due to a bug in the AXI bridge.
->> >> 
->> >> Signed-off-by: Eric Anholt <eric@anholt.net>
->> >> ---
->> >>  drivers/dma/bcm2835-dma.c | 24 +++++++++++++++++++-----
->> >>  1 file changed, 19 insertions(+), 5 deletions(-)
->> >> 
->> >> diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
->> >> index 6149b27c33ad..320461c578e3 100644
->> >> --- a/drivers/dma/bcm2835-dma.c
->> >> +++ b/drivers/dma/bcm2835-dma.c
->> >> @@ -570,16 +570,16 @@ static enum dma_status bcm2835_dma_tx_status(struct dma_chan *chan,
->> >>  	struct virt_dma_desc *vd;
->> >>  	enum dma_status ret;
->> >>  	unsigned long flags;
->> >> +	u32 residue;
->> >>  
->> >>  	ret = dma_cookie_status(chan, cookie, txstate);
->> >> -	if (ret == DMA_COMPLETE || !txstate)
->> >> +	if (ret == DMA_COMPLETE)
->> >
->> > Why do you change this? txstate can be NULL, so no point calculating reside
->> > for those cases
->> 
->> The point was to go into the "Calculate where we're at in our current
->> DMA (if the current DMA is the one we're asking about status for)" path,
->> so that we could note when the DMA is complete even when there's no
->> txstate passed in.
->
-> Can you explain what you mean by current DMA!
->
-> The claulation is always done for 'descriptor' represnted by the cookie. So
-> it doesnt not matter...!
+Applied, thanks
 
-By current I mean the current descriptor that has been submitted to the
-hardware, in bcm2835_chan->desc.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160606/8dc60835/attachment-0001.sig>
+-- 
+~Vinod
