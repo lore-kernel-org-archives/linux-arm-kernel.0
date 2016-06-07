@@ -1,52 +1,109 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 16:54:48 +0100
-Subject: [PATCH] dmaengine: sirf: fix un-exported struct warnings
-Message-ID: <1465314888-31107-1-git-send-email-ben.dooks@codethink.co.uk>
+From: eric.auger@redhat.com (Eric Auger)
+Date: Tue,  7 Jun 2016 15:59:15 +0000
+Subject: [PATCH v10 1/8] iommu: Add iommu_domain_msi_geometry and
+ DOMAIN_ATTR_MSI_GEOMETRY
+In-Reply-To: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
+References: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315162-5888-2-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sirfsoc_dmadata structs are not used outside the driver, so
-remove build warnings by making them static. Fixes:
+Introduce a new DOMAIN_ATTR_MSI_GEOMETRY domain attribute. It enables
+to query the aperture of the IOVA window dedicated to MSIs and
+test whether the MSIs must be mapped with the IOMMU-MSI API.
 
-drivers/dma/sirf-dma.c:1129:24: warning: symbol 'sirfsoc_dmadata_a6' was not declared. Should it be static?
-drivers/dma/sirf-dma.c:1134:24: warning: symbol 'sirfsoc_dmadata_a7v1' was not declared. Should it be static?
-drivers/dma/sirf-dma.c:1139:24: warning: symbol 'sirfsoc_dmadata_a7v2' was not declared. Should it be static?
+x86 IOMMUs will typically expose an MSI aperture matching the 1MB
+region [FEE0_0000h - FEF0_000h] corresponding to the the APIC
+configuration space and no support of the IOMMU-MSI API.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+On ARM, the support of the IOMMU-MSI API will be advertised. Aperture
+will refect the setting performed with the IOMMU-MSI API.
+
+A helper function is added to allow testing if the aperture is valid.
+
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Suggested-by: Alex Williamson <alex.williamson@redhat.com>
+
 ---
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Barry Song <baohua@kernel.org>
-Cc: dmaengine at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/dma/sirf-dma.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+v8 -> v9:
+- rename programmable into iommu_msi_supported
+- add iommu_domain_msi_aperture_valid
 
-diff --git a/drivers/dma/sirf-dma.c b/drivers/dma/sirf-dma.c
-index e48350e..dde392d 100644
---- a/drivers/dma/sirf-dma.c
-+++ b/drivers/dma/sirf-dma.c
-@@ -1126,17 +1126,17 @@ static const struct dev_pm_ops sirfsoc_dma_pm_ops = {
- 	SET_SYSTEM_SLEEP_PM_OPS(sirfsoc_dma_pm_suspend, sirfsoc_dma_pm_resume)
+v8: creation
+- deprecates DOMAIN_ATTR_MSI_MAPPING flag
+---
+ drivers/iommu/iommu.c |  5 +++++
+ include/linux/iommu.h | 14 ++++++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/drivers/iommu/iommu.c b/drivers/iommu/iommu.c
+index 3000051..feab3cc 100644
+--- a/drivers/iommu/iommu.c
++++ b/drivers/iommu/iommu.c
+@@ -1496,6 +1496,7 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+ 			  enum iommu_attr attr, void *data)
+ {
+ 	struct iommu_domain_geometry *geometry;
++	struct iommu_domain_msi_geometry *msi_geometry;
+ 	bool *paging;
+ 	int ret = 0;
+ 	u32 *count;
+@@ -1506,6 +1507,10 @@ int iommu_domain_get_attr(struct iommu_domain *domain,
+ 		*geometry = domain->geometry;
+ 
+ 		break;
++	case DOMAIN_ATTR_MSI_GEOMETRY:
++		msi_geometry  = data;
++		*msi_geometry = domain->msi_geometry;
++		break;
+ 	case DOMAIN_ATTR_PAGING:
+ 		paging  = data;
+ 		*paging = (domain->pgsize_bitmap != 0UL);
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 664683a..1b553ee 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -52,6 +52,12 @@ struct iommu_domain_geometry {
+ 	bool force_aperture;       /* DMA only allowed in mappable range? */
  };
  
--struct sirfsoc_dmadata sirfsoc_dmadata_a6 = {
-+static struct sirfsoc_dmadata sirfsoc_dmadata_a6 = {
- 	.exec = sirfsoc_dma_execute_hw_a6,
- 	.type = SIRFSOC_DMA_VER_A6,
++struct iommu_domain_msi_geometry {
++	dma_addr_t aperture_start; /* First address used for MSI IOVA    */
++	dma_addr_t aperture_end;   /* Last address used for MSI IOVA     */
++	bool iommu_msi_supported;  /* Is MSI mapping supported?		 */
++};
++
+ /* Domain feature flags */
+ #define __IOMMU_DOMAIN_PAGING	(1U << 0)  /* Support for iommu_map/unmap */
+ #define __IOMMU_DOMAIN_DMA_API	(1U << 1)  /* Domain for use in DMA-API
+@@ -83,6 +89,7 @@ struct iommu_domain {
+ 	iommu_fault_handler_t handler;
+ 	void *handler_token;
+ 	struct iommu_domain_geometry geometry;
++	struct iommu_domain_msi_geometry msi_geometry;
+ 	void *iova_cookie;
  };
  
--struct sirfsoc_dmadata sirfsoc_dmadata_a7v1 = {
-+static struct sirfsoc_dmadata sirfsoc_dmadata_a7v1 = {
- 	.exec = sirfsoc_dma_execute_hw_a7v1,
- 	.type = SIRFSOC_DMA_VER_A7V1,
- };
+@@ -108,6 +115,7 @@ enum iommu_cap {
  
--struct sirfsoc_dmadata sirfsoc_dmadata_a7v2 = {
-+static struct sirfsoc_dmadata sirfsoc_dmadata_a7v2 = {
- 	.exec = sirfsoc_dma_execute_hw_a7v2,
- 	.type = SIRFSOC_DMA_VER_A7V2,
- };
+ enum iommu_attr {
+ 	DOMAIN_ATTR_GEOMETRY,
++	DOMAIN_ATTR_MSI_GEOMETRY,
+ 	DOMAIN_ATTR_PAGING,
+ 	DOMAIN_ATTR_WINDOWS,
+ 	DOMAIN_ATTR_FSL_PAMU_STASH,
+@@ -328,6 +336,12 @@ extern struct iommu_group *pci_device_group(struct device *dev);
+ /* Generic device grouping function */
+ extern struct iommu_group *generic_device_group(struct device *dev);
+ 
++static inline bool iommu_domain_msi_aperture_valid(struct iommu_domain *domain)
++{
++	return (domain->msi_geometry.aperture_end >
++		domain->msi_geometry.aperture_start);
++}
++
+ #else /* CONFIG_IOMMU_API */
+ 
+ struct iommu_ops {};
 -- 
-2.8.1
+1.9.1
