@@ -1,71 +1,130 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 7 Jun 2016 10:56:40 +0200
-Subject: Platform-specific suspend/resume code in drivers
-Message-ID: <57568C48.709@free.fr>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 Jun 2016 09:58:14 +0100
+Subject: [STLinux Kernel] [[PATCH v2] 08/11] pwm: sti: Initialise PWM
+ Capture device data
+In-Reply-To: <20160607082807.GC22744@griffinp-ThinkPad-X1-Carbon-2nd>
+References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
+ <1461320295-20414-9-git-send-email-lee.jones@linaro.org>
+ <20160607082807.GC22744@griffinp-ThinkPad-X1-Carbon-2nd>
+Message-ID: <20160607085814.GA18047@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello everyone,
+On Tue, 07 Jun 2016, Peter Griffin wrote:
+> On Fri, 22 Apr 2016, Lee Jones wrote:
+> 
+> > Each PWM Capture device is allocated a structure to hold its own
+> > state.  During a capture the device may be partaking in one of 3
+> > phases.  Initial (rising) phase change, a subsequent (falling)
+> > phase change indicating end of the duty-cycle phase and finally
+> > a final (rising) phase change indicating the end of the period.
+> > The timer value snapshot each event is held in a variable of the
+> > same name, and the phase number (0, 1, 2) is contained in the
+> > index variable.  Other device specific information, such as GPIO
+> > pin, the IRQ wait queue and locking is also contained in the
+> > structure.  This patch initialises this structure for each of
+> > the available devices.
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  drivers/pwm/pwm-sti.c | 45 ++++++++++++++++++++++++++++++++++++++-------
+> >  1 file changed, 38 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+> > index 78979d0..9d597bb 100644
+> > --- a/drivers/pwm/pwm-sti.c
+> > +++ b/drivers/pwm/pwm-sti.c
 
-I want to implement system-wide suspend-to-RAM on my platform
-(an ARM Cortex A9 based SoC).
+[...]
 
-I'm hoping some of you can clear some of my confusion :-(
+> > @@ -307,10 +318,15 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+> >  	struct device_node *np = dev->of_node;
+> >  	struct sti_pwm_compat_data *cdata = pc->cdata;
+> >  	u32 num_devs;
+> > +	int ret;
+> >  
+> > -	of_property_read_u32(np, "st,pwm-num-devs", &num_devs);
+> > -	if (num_devs)
+> > -		cdata->num_devs = num_devs;
+> > +	ret = of_property_read_u32(np, "st,pwm-num-devs", &num_devs);
+> > +	if (!ret)
+> > +		cdata->pwm_num_devs = num_devs;
+> 
+> dt binding document documents this as st,pwm-num-chan currently.
 
-AFAIU, what happens to the hardware in the suspended state is
-very board/platform specific. The SoC may stop some clocks;
-it may even cut the power to some parts of the chip.
+It does, but see PATCH 2.
 
-AFAIU, once power is cut, the value of internal and visible
-registers (called "state" or "context" IIUC) is lost.
+> Why do you need
+> this  binding anyway? Why can't you determine how many channels you have based on
+> the number of pinctrl groups you are given?
 
-Therefore, each driver is supposed to either
+That sounds like a horrible idea; a) I'm not even sure if that's
+possible with the Pinctrl Consumer API and b) even if is it physically
+possible, it sounds messy.  It's much better for code to be clear and
+simple.  Code attempting to use clever inference techniques is usually
+pretty hard to understand and maintain.  We use num-<stuff> a lot in
+DT, and for good reason.  Besides, not every PWM channel is capable of
+capture.
 
-1) save context on suspend & restore it on resume, or
-2) re-initialize the device on resume (if context is unimportant)
+> Also with this series I don't currently understand how the driver is configured to be
+> pwm-in or pwm-out. Can you explain how that decision is made?
 
-Is that correct?
+This patch-set does not concern itself with the platform specific
+side.  I have a subsequent patch-set for that.  Perhaps it might be
+nice to move the documentation update into this set though.
 
-(Note: Kevin Hilman mentioned using a feature called "regmap" to
-help in saving/restoring context.)
+> For example at the moment I can't see any code in this series for handling the different
+> pinctrl groups which presumably are required to have this working.
 
-Documentation/power/devices.txt mentions putting such save/restore
-code in suspend_late/resume_early callbacks. Is that the preferred
-solution today?
+To ease your curiosity, here is the patch which does that for the 407:
 
-Should these routines be guarded by #ifdef CONFIG_PM or #ifdef CONFIG_SUSPEND ?
+Author: Lee Jones <lee.jones@linaro.org>
+Date:   Wed Feb 3 14:24:01 2016 +0000
 
-Another point of confusion for me is this: drivers are supposed to
-be shared among platforms, right? So my platform-specific suspend
-code should be enabled only if my platform is detected at run-time?
+    ARM: dts: STiH407: Declare PWM Capture data lines via Pinctrl
+    
+    Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-So this means I need to add in the probe function, for every driver
-my platform uses:
+diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+index a538ae5..bc22122 100644
+--- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
++++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
+@@ -289,10 +289,12 @@
+ 			pinctrl_pwm1_chan0_default: pwm1-0-default {
+ 				st,pins {
+ 					pwm-out = <&pio3 0 ALT1 OUT>;
++					pwm-capturein = <&pio3 2 ALT1 IN>;
+ 				};
+ 			};
+ 			pinctrl_pwm1_chan1_default: pwm1-1-default {
+ 				st,pins {
++					pwm-capturein = <&pio4 3 ALT1 IN>;
+ 					pwm-out = <&pio4 4 ALT1 OUT>;
+ 				};
+ 			};
+@@ -1030,6 +1032,7 @@
+ 		pwm0 {
+ 			pinctrl_pwm0_chan0_default: pwm0-0-default {
+ 				st,pins {
++					pwm-capturein = <&pio31 0 ALT1 IN>;
+ 					pwm-out = <&pio31 1 ALT1 OUT>;
+ 				};
+ 			};
+				
+> If I look at pinctrl_pwm1_chan0_default and friends declared in
+> stih407-pinctrl.dtsi all are currently named pwm-out, and declared as outputs. For
+> pwm-in functionality I was expecting to see another set of pinctrl definitions,
+> declaring these pins as inputs, and something in the driver selecting the
+> correct pin config depending on how the device has been configured?
 
-  if (platform == MY_PLATFORM) {
-    ops.suspend = my_suspend;
-    ops.resume  = my_resume;
-  }
+See above.
 
-Is that correct?
+> Maybe an updated dt example / bindings would make this clearer.
 
+Happy to provide the DT documentation in this patch-set.
 
-While I'm listing the points I don't understand... It seems Linux
-handles suspend/resume "transparently". I mean the CPU calls all
-the functions leading to the suspend action, then when the system
-comes back online, it continues at the next instruction, as if
-nothing had happened. So the stack and registers need to be exactly
-in the same state.
-
-But on my system, the firmware expects a return address for *where*
-to return on resume. Should I pass it the next instruction pointer?
-The address of the resume function?
-
-I see arch/arm/kernel/psci_smp.c seems to have the same notion.
-=> drivers/firmware/psci.c
-
-References:
-arch/arm/kernel/suspend.c
-kernel/power/suspend.c
-
-Regards.
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
