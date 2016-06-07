@@ -1,59 +1,79 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 7 Jun 2016 18:33:36 +0200
-Subject: [PATCH 07/34] clk: berlin: Migrate to clk_hw based registration
- and OF APIs
-In-Reply-To: <146528884761.28742.8093002152658120585@sboyd-linaro>
-References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-8-stephen.boyd@linaro.org>
- <20160605174157.GP4594@piout.net>
- <146528884761.28742.8093002152658120585@sboyd-linaro>
-Message-ID: <20160607163336.GM3363@piout.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 7 Jun 2016 17:34:45 +0100
+Subject: [PATCH] arm64: Implement ptep_set_access_flags() for hardware
+ AF/DBM
+In-Reply-To: <20160607163024.GB20477@arm.com>
+References: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
+ <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
+ <20160607163024.GB20477@arm.com>
+Message-ID: <20160607163445.GC10075@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2016 at 01:40:47 -0700, Stephen Boyd wrote :
-> Quoting Alexandre Belloni (2016-06-05 10:41:57)
-> > Hi,
-> > 
-> > The main drawback of those patches is that they break the alignment
-> > (checkpatch.pl --strict complains).
+On Tue, Jun 07, 2016 at 05:30:25PM +0100, Will Deacon wrote:
+> On Tue, Jun 07, 2016 at 04:13:03PM +0200, Alexander Graf wrote:
+> > On 13.04.16 17:01, Catalin Marinas wrote:
+> > > When hardware updates of the access and dirty states are enabled, the
+> > > default ptep_set_access_flags() implementation based on calling
+> > > set_pte_at() directly is potentially racy. This triggers the "racy dirty
+> > > state clearing" warning in set_pte_at() because an existing writable PTE
+> > > is overridden with a clean entry.
 > 
-> Didn't checkpatch --strict already warn on these files though? I'm not
-> sure I've done anything to break the alignment style here.
+> [...]
 > 
-
-As you change the function return value, the function arguments are no
-longer aligned with the opening parenthesis.
-I would agree that keeping the alignment will make the change quit
-bigger though.
-
+> > This patch breaks swapping for me.
 > > 
-> > On 01/06/2016 at 16:15:06 -0700, Stephen Boyd wrote :
-> > > diff --git a/drivers/clk/berlin/berlin2-avpll.h b/drivers/clk/berlin/berlin2-avpll.h
-> > > index a37f5068d299..17e311153b42 100644
-> > > --- a/drivers/clk/berlin/berlin2-avpll.h
-> > > +++ b/drivers/clk/berlin/berlin2-avpll.h
-> > > @@ -19,17 +19,13 @@
-> > >  #ifndef __BERLIN2_AVPLL_H
-> > >  #define __BERLIN2_AVPLL_H
-> > >  
-> > > -struct clk;
-> > > -
-> > >  #define BERLIN2_AVPLL_BIT_QUIRK              BIT(0)
-> > >  #define BERLIN2_AVPLL_SCRAMBLE_QUIRK BIT(1)
-> > >  
-> > > -struct clk * __init
-> > > -berlin2_avpll_vco_register(void __iomem *base, const char *name,
-> > > +int berlin2_avpll_vco_register(void __iomem *base, const char *name,
+> > I've hit weird issues where systems stopped working half-way, with the
+> > kernel still being fine and user space applications just stopping to
+> > respond.
 > > 
-> > This is missing __init.
+> > After some debugging we found out that it always happens when swapping
+> > (to anything, backing storage doesn't matter). A quick bisect points to
+> > this commit as culprit and indeed, if I disable CONFIG_ARM64_HW_AFDBM
+> > the system works as expected.
 > 
-> Ah I also removed __init in the header file here because it doesn't do
-> anything. I guess I should mention that in the commit text.
+> [...]
+> 
+> > The back traces indicate that the page fault handler goes through and
+> > the process just keeps banging on the same page fault over and over
+> > again. I have not yet figured out what *exactly* is going wrong or why
+> > this patch would actually give us that effect.
+> > 
+> > I was able to fully reproduce the issue with current Linus tree (4.7-rc2+).
+> 
+> It looks like the following happens:
+> 
+>   1. We put down a PTE_WRITE | PTE_DIRTY | PTE_AF pte
+>   2. Memory pressure -> pte_mkold(pte) -> clear PTE_AF
+>   3. A read faults due to the missing access flag
+>   4. ptep_set_access_flags is called with dirty = 0, due to the read fault
+>   5. pte is then made PTE_WRITE | PTE_DIRTY | PTE_AF | PTE_RDONLY (!)
+>   6. A write faults, but pte_write is true so we get stuck
+> 
+> Does the diff below fix the issue for you? If so, I'll write a proper
+> patch.
+> 
+> Cheers,
+> 
+> Will
+> 
+> --->8
+> 
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index 5954881a35ac..ba3fc12bd272 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -109,7 +109,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+>  	 * PTE_RDONLY is cleared by default in the asm below, so set it in
+>  	 * back if necessary (read-only or clean PTE).
+>  	 */
+> -	if (!pte_write(entry) || !dirty)
+> +	if (!pte_write(entry) || !pte_sw_dirty(entry))
+>  		pte_val(entry) |= PTE_RDONLY;
+>  
+>  	/*
 
-Indeed, you are right.
+Whether it fixes this particular case or not, I think this patch is
+still valid. So feel free to add:
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
