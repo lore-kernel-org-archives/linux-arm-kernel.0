@@ -1,91 +1,59 @@
-From: baolin.wang@linaro.org (Baolin Wang)
-Date: Tue, 7 Jun 2016 17:22:25 +0800
-Subject: [PATCH] arm64: Implement arch_setup_pdev_archdata hook
-In-Reply-To: <575690CB.5080501@arm.com>
-References: <b4645ade4a4d4150e76594f5bf04a3ad5e7d5221.1465287808.git.baolin.wang@linaro.org>
- <575690CB.5080501@arm.com>
-Message-ID: <CAMz4kuJbqdmO=Uk07kWSnpg0+yGkzsZMWwNZdyMPH_-7svDdnQ@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 7 Jun 2016 10:24:56 +0100
+Subject: [STLinux Kernel] [PATCH 0/7] reset: Consumers to explicitly
+ request 'exclusive' or 'shared' lines
+In-Reply-To: <20160607091543.GC18047@dell>
+References: <20160606155655.10860-1-lee.jones@linaro.org>
+ <20160607084208.GB22960@griffinp-ThinkPad-X1-Carbon-2nd>
+ <20160607091543.GC18047@dell>
+Message-ID: <20160607092456.GE18047@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2016 at 17:15, Robin Murphy <robin.murphy@arm.com> wrote:
-> On 07/06/16 09:29, Baolin Wang wrote:
->>
->> Now on ARM64 platform, it will set 'dummy_dma_ops' for device dma_ops if
->> it did not call 'arch_setup_dma_ops' at device creation time by issuing
->> platform_device_alloc() function, that will cause failure when setting
->> the dma mask for device.
->
->
-> Yes, that's rather the whole point. DMA-capable devices are real hardware,
-> therefore don't spring out of thin air without being described in DT or
-> ACPI.
+On Tue, 07 Jun 2016, Lee Jones wrote:
 
-OK.
+> On Tue, 07 Jun 2016, Peter Griffin wrote:
+> 
+> > Hi,
+> > 
+> > On Mon, 06 Jun 2016, Lee Jones wrote:
+> > 
+> > > Phasing out generic reset line requests enables us to make some better
+> > > decisions on when and how to (de)assert said lines.  If an 'exclusive'
+> > > line is requested, we know a device *requires* a reset and that it's
+> > > preferable to act upon a request right away.  However, if a 'shared'
+> > > reset line is requested, we can reasonably assume sure that placing a
+> > > device into reset isn't a hard requirement, but probably a measure to
+> > > save power and is thus able to cope with not being asserted if another
+> > > device is still in use.
+> > > 
+> > > In order allow gentle adoption and not to forcing all consumers to
+> > > move to the API immediately, causing administration headache between
+> > > subsystems, this patch adds some temporary stand-in shim-calls.  This
+> > > will ease the burden at merge time and allow subsystems to migrate over
+> > > to the new API in a more realistic time-frame.
+> > 
+> > Is the intention that this series will be taken into the next -rc?
+> > 
+> > As the introduction of shared resets in reset subsystem has caused regressions
+> > on STi platforms.
+> 
+> Yes, which is why it has a Fixes: tag.
 
->
-> Please elaborate on the situation that you're attempting to address here
-> (please don't let it be the ongoing Designware USB catastrophe ;))
+Ah wait.  I thought this was the shared-memory patch.
 
-Yes, like you mentioned, we met problems at DesignWare USB3 controller
-host glue, do you have any better solutions to solve this problem?
-Thanks.
+More haste, less speed and all that.
 
->
-> Robin.
->
->
->> Hence We need to hook the archdata to setup proper dma_ops for these
->> devices.
->>
->> Signed-off-by: Baolin Wang <baolin.wang@linaro.org>
->> ---
->>   arch/arm64/mm/dma-mapping.c |   21 +++++++++++++++++++++
->>   1 file changed, 21 insertions(+)
->>
->> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
->> index c566ec8..04e057b 100644
->> --- a/arch/arm64/mm/dma-mapping.c
->> +++ b/arch/arm64/mm/dma-mapping.c
->> @@ -26,6 +26,7 @@
->>   #include <linux/dma-contiguous.h>
->>   #include <linux/vmalloc.h>
->>   #include <linux/swiotlb.h>
->> +#include <linux/platform_device.h>
->>
->>   #include <asm/cacheflush.h>
->>
->> @@ -961,3 +962,23 @@ void arch_setup_dma_ops(struct device *dev, u64
->> dma_base, u64 size,
->>         dev->archdata.dma_coherent = coherent;
->>         __iommu_setup_dma_ops(dev, dma_base, size, iommu);
->>   }
->> +
->> +void arch_setup_pdev_archdata(struct platform_device *pdev)
->> +{
->> +       if (!pdev->dev.archdata.dma_ops)
->> +               pdev->dev.archdata.dma_ops = &swiotlb_dma_ops;
->> +
->> +       /*
->> +        * Set default coherent_dma_mask to 32 bit. Drivers are expected
->> to
->> +        * setup the correct supported mask.
->> +        */
->> +       if (!pdev->dev.coherent_dma_mask)
->> +               pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->> +
->> +       /*
->> +        * Set it to coherent_dma_mask by default if the architecture
->> +        * code has not set it.
->> +        */
->> +       if (!pdev->dev.dma_mask)
->> +               pdev->dev.dma_mask = &pdev->dev.coherent_dma_mask;
->> +}
->>
->
-
-
+I guess it should really go into the -rcs, yes.  Since Hans' patch
+actually breaks a lot of devices.  I'm pretty surprised a patch
+capable of this much damage was actually accepted to be honest.  A
+better approach would have been to issue a warning, but keep the
+semantics the same for at least a couple of releases.  However, I
+guess the damage has been done now, so let's do what we can do fix
+it.
 
 -- 
-Baolin.wang
-Best Regards
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
