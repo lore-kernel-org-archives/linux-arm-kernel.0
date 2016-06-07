@@ -1,96 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Jun 2016 10:09:46 +0200
-Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
- typical Keystone features
-In-Reply-To: <20160607042853.GA22406@atomide.com>
-References: <1464816714-3900-1-git-send-email-nm@ti.com>
- <574F6674.3010100@ti.com> <20160607042853.GA22406@atomide.com>
-Message-ID: <10295246.2MDnqWQbb8@wuerfel>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Tue, 7 Jun 2016 16:08:09 +0800
+Subject: [PATCH v4 05/14] arm64/numa: avoid inconsistent information to be
+ printed
+In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1465286898-13828-6-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 6, 2016 9:28:54 PM CEST Tony Lindgren wrote:
-> * Nishanth Menon <nm@ti.com> [160601 15:51]:
-> > On 06/01/2016 05:31 PM, Arnd Bergmann wrote:
-> > > On Wednesday, June 1, 2016 4:31:54 PM CEST Nishanth Menon wrote:
-> > >>
-> > >> Hence the "KEYSTONE_TYPICAL" option is designed similar to commit 8d9166b519fd
-> > >> ("omap2/3/4: Add Kconfig option to compile in typical omap features")
-> > >> that can be enabled for most boards keystone platforms
-> > >> without needing to rediscover these in defconfig all over again -
-> > >> examples include multi_v7_defconfig base and optimizations done on top
-> > >> of them for keystone platform.
-> > > 
-> > > I'd rather remove the option for OMAP as well, it doesn't really fit in with
-> > > how we do things for other platforms, and selecting a lot of other Kconfig
-> > > symbols tends to cause circular dependencies.
-> > 
-> > Hmm, fair enough -> adding Tony as well if he sees an problem with
-> > dropping ARCH_OMAP2PLUS_TYPICAL.
-> 
-> Yes there's a problem. Removing that is going to make all the custom
-> .config files unbootable almost certainly. Just search around on
-> issues related to not having REGULATOR_FIXED_VOLTAGE selected.
-> 
-> I agree we should not force select things though. And the I2C selection
-> at least is wrong, we can have PMICs that are not on I2C bus.
-> 
-> Anybody got better ideas what we should do to make the configuration
-> options more intuitive?
+numa_init(of_numa_init) may returned error because of numa configuration
+error. So "No NUMA configuration found" is inaccurate. In fact, specific
+configuration error information should be immediately printed by the
+testing branch.
 
-Let's have a look at what we actually select:
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ arch/arm64/mm/numa.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-config ARCH_OMAP2PLUS_TYPICAL
-        bool "Typical OMAP configuration"
-        default y
-        select AEABI
-        select HIGHMEM
-        select I2C
-        select I2C_OMAP
-        select MENELAUS if ARCH_OMAP2
-        select NEON if CPU_V7
-        select PM
-        select REGULATOR
-        select REGULATOR_FIXED_VOLTAGE
-        select TWL4030_CORE if ARCH_OMAP3 || ARCH_OMAP4
-        select TWL4030_POWER if ARCH_OMAP3 || ARCH_OMAP4
-        select VFP
-        help
-          Compile a kernel suitable for booting most boards
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 2601660..1b9622c 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -338,8 +338,10 @@ static int __init numa_init(int (*init_func)(void))
+ 	if (ret < 0)
+ 		return ret;
 
-A lot of these options are typical for all ARMv7 machines: AEABI, I2C, NEON,
-PM, REGULATOR and VFP are things that we probably want to default to enabled
-whenever we build a MULTI_V7 kernel, some also for V5 or V6, we just
-need to come up with a good way to do that while (probably for most of
-them) still allowing them to be disabled with CONFIG_EXPERT. I would
-feel more comfortable with having an ARCH_MULTIPLATFORM_TYPICAL
-Kconfig symbol than with the ARCH_OMAP2PLUS_TYPICAL one that ends up
-turning things on unconditionally whenever you add ARCH_OMAP2PLUS
-to some other configuration.
+-	if (nodes_empty(numa_nodes_parsed))
++	if (nodes_empty(numa_nodes_parsed)) {
++		pr_info("No NUMA configuration found\n");
+ 		return -EINVAL;
++	}
 
-For I2C_OMAP, MENELAUS and TWL4030, we could just add a
-'default ARCH_OMAP3 || ARCH_OMAP4' or whatever is appropriate for
-each of them. I assume we want to handle TWL6040 the same way, though
-we currently don't do that. MENELAUS seems to be only needed for
-omap2420-n8x0.
+ 	ret = numa_register_nodes();
+ 	if (ret < 0)
+@@ -370,8 +372,6 @@ static int __init dummy_numa_init(void)
 
-REGULATOR_FIXED_VOLTAGE is needed by a lot of platforms that usually
-don't select it, so it might be good to add a 'default y' to its Kconfig
-symbol, or we could add 'select REGULATOR_FIXED_VOLTAGE if REGULATOR'
-to all platforms that need it. The driver is about 1.5KB in size, compared
-to about 50KB for the regulator core.
+ 	if (numa_off)
+ 		pr_info("NUMA disabled\n"); /* Forced off on command line. */
+-	else
+-		pr_info("No NUMA configuration found\n");
+ 	pr_info("NUMA: Faking a node@[mem %#018Lx-%#018Lx]\n",
+ 	       0LLU, PFN_PHYS(max_pfn) - 1);
 
-HIGHMEM is a bit odd here, because there are a couple of boards that
-really really want it to access all of their memory, while most other
-boards (anything with <=768MB RAM) are better off not enabling it,
-so I can't see a good strategy for when to enable it or not across
-multiplatform builds. If we wanted to apply crude heuristics, we could
-make it default-enabled for SMP configurations, and default-disabled
-for UP, or we could default-enable it for ARMv7VE (Cortex-A7/A15/A17,
-Krait-400, PJ4B-MP) and default-disable for ARMv7 (Cortex-A5/A8/A9,
-Scorpion, Krait, PJ4, PJ4B) and older. This would get us the right
-setting in most cases, but it would also be rather confusing as it gets
-flipped based on options that it doesn't really have anything to
-do with in the strict sense.
-
-	Arnd
+--
+2.5.0
