@@ -1,65 +1,76 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 7 Jun 2016 09:27:48 -0700
-Subject: [PATCH] gpio: bcm-kona: fix bcm_kona_gpio_reset() warnings
-In-Reply-To: <1465316537-8403-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465316537-8403-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <b9bdbc1e-30cd-3a51-f281-6fae297d1f0a@broadcom.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 7 Jun 2016 17:30:25 +0100
+Subject: [PATCH] arm64: Implement ptep_set_access_flags() for hardware
+ AF/DBM
+In-Reply-To: <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
+References: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
+ <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
+Message-ID: <20160607163024.GB20477@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Hi Alex,
 
-On 6/7/2016 9:22 AM, Ben Dooks wrote:
-> The bcm_kona_gpio_reset() calls bcm_kona_gpio_write_lock_regs()
-> with what looks like the wrong parameter. The write_lock_regs
-> function takes a pointer to the registers, not the bcm_kona_gpio
-> structure.
->
-> Fix the warning, and probably bug by changing the function to
-> pass reg_base instead of kona_gpio, fixing the following warning:
->
-> drivers/gpio/gpio-bcm-kona.c:550:47: warning: incorrect type in argument 1 (different address spaces)
-> drivers/gpio/gpio-bcm-kona.c:550:47:    expected void [noderef] <asn:2>*reg_base
-> drivers/gpio/gpio-bcm-kona.c:550:47:    got struct bcm_kona_gpio *kona_gpio
-> drivers/gpio/gpio-bcm-kona.c:554:47: warning: incorrect type in argument 1 (different address spaces)
-> drivers/gpio/gpio-bcm-kona.c:554:47:    expected void [noderef] <asn:2>*reg_base
-> drivers/gpio/gpio-bcm-kona.c:554:47:    got struct bcm_kona_gpio *kona_gpio
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-> Cc: Markus Mayer <mmayer@broadcom.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/gpio/gpio-bcm-kona.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-> index 9aabc48..953e4b8 100644
-> --- a/drivers/gpio/gpio-bcm-kona.c
-> +++ b/drivers/gpio/gpio-bcm-kona.c
-> @@ -547,11 +547,11 @@ static void bcm_kona_gpio_reset(struct bcm_kona_gpio *kona_gpio)
->  	/* disable interrupts and clear status */
->  	for (i = 0; i < kona_gpio->num_bank; i++) {
->  		/* Unlock the entire bank first */
-> -		bcm_kona_gpio_write_lock_regs(kona_gpio, i, UNLOCK_CODE);
-> +		bcm_kona_gpio_write_lock_regs(reg_base, i, UNLOCK_CODE);
->  		writel(0xffffffff, reg_base + GPIO_INT_MASK(i));
->  		writel(0xffffffff, reg_base + GPIO_INT_STATUS(i));
->  		/* Now re-lock the bank */
-> -		bcm_kona_gpio_write_lock_regs(kona_gpio, i, LOCK_CODE);
-> +		bcm_kona_gpio_write_lock_regs(reg_base, i, LOCK_CODE);
->  	}
->  }
->
->
+Thanks for the bug report.
 
-This fix looks good. The original code shouldn't even have worked.
+On Tue, Jun 07, 2016 at 04:13:03PM +0200, Alexander Graf wrote:
+> On 13.04.16 17:01, Catalin Marinas wrote:
+> > When hardware updates of the access and dirty states are enabled, the
+> > default ptep_set_access_flags() implementation based on calling
+> > set_pte_at() directly is potentially racy. This triggers the "racy dirty
+> > state clearing" warning in set_pte_at() because an existing writable PTE
+> > is overridden with a clean entry.
 
-Thanks.
+[...]
 
-Acked-by: Ray Jui <ray.jui@broadcom.com>
+> This patch breaks swapping for me.
+> 
+> I've hit weird issues where systems stopped working half-way, with the
+> kernel still being fine and user space applications just stopping to
+> respond.
+> 
+> After some debugging we found out that it always happens when swapping
+> (to anything, backing storage doesn't matter). A quick bisect points to
+> this commit as culprit and indeed, if I disable CONFIG_ARM64_HW_AFDBM
+> the system works as expected.
+
+[...]
+
+> The back traces indicate that the page fault handler goes through and
+> the process just keeps banging on the same page fault over and over
+> again. I have not yet figured out what *exactly* is going wrong or why
+> this patch would actually give us that effect.
+> 
+> I was able to fully reproduce the issue with current Linus tree (4.7-rc2+).
+
+It looks like the following happens:
+
+  1. We put down a PTE_WRITE | PTE_DIRTY | PTE_AF pte
+  2. Memory pressure -> pte_mkold(pte) -> clear PTE_AF
+  3. A read faults due to the missing access flag
+  4. ptep_set_access_flags is called with dirty = 0, due to the read fault
+  5. pte is then made PTE_WRITE | PTE_DIRTY | PTE_AF | PTE_RDONLY (!)
+  6. A write faults, but pte_write is true so we get stuck
+
+Does the diff below fix the issue for you? If so, I'll write a proper
+patch.
+
+Cheers,
+
+Will
+
+--->8
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 5954881a35ac..ba3fc12bd272 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -109,7 +109,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ 	 * PTE_RDONLY is cleared by default in the asm below, so set it in
+ 	 * back if necessary (read-only or clean PTE).
+ 	 */
+-	if (!pte_write(entry) || !dirty)
++	if (!pte_write(entry) || !pte_sw_dirty(entry))
+ 		pte_val(entry) |= PTE_RDONLY;
+ 
+ 	/*
