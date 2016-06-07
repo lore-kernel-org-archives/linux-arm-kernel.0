@@ -1,37 +1,60 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 7 Jun 2016 09:42:08 +0100
-Subject: [STLinux Kernel] [PATCH 0/7] reset: Consumers to explicitly
- request 'exclusive' or 'shared' lines
-In-Reply-To: <20160606155655.10860-1-lee.jones@linaro.org>
-References: <20160606155655.10860-1-lee.jones@linaro.org>
-Message-ID: <20160607084208.GB22960@griffinp-ThinkPad-X1-Carbon-2nd>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 07 Jun 2016 10:21:36 +0200
+Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
+In-Reply-To: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
+Message-ID: <3416214.BpvATlfaN7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, 06 Jun 2016, Lee Jones wrote:
-
-> Phasing out generic reset line requests enables us to make some better
-> decisions on when and how to (de)assert said lines.  If an 'exclusive'
-> line is requested, we know a device *requires* a reset and that it's
-> preferable to act upon a request right away.  However, if a 'shared'
-> reset line is requested, we can reasonably assume sure that placing a
-> device into reset isn't a hard requirement, but probably a measure to
-> save power and is thus able to cope with not being asserted if another
-> device is still in use.
+On Monday, June 6, 2016 6:04:44 PM CEST Bjorn Helgaas wrote:
+> Several host bridge drivers (designware and all derivatives, iproc,
+> xgene, xilinx, and xilinx-nwl) don't request the MMIO and I/O port
+> windows they forward downstream to the PCI bus.
 > 
-> In order allow gentle adoption and not to forcing all consumers to
-> move to the API immediately, causing administration headache between
-> subsystems, this patch adds some temporary stand-in shim-calls.  This
-> will ease the burden at merge time and allow subsystems to migrate over
-> to the new API in a more realistic time-frame.
+> That means the PCI core can't request resources for PCI bridge
+> windows and PCI BARs.
+> 
+> Several other drivers (altera, generic, mvebu, rcar, tegra) do request
+> the windows, but use some duplicated code to do it.
+> 
+> This adds a new devm_request_pci_bus_resources() interface and changes
+> these drivers to use it.  It also fixes several error paths where we failed
+> to free the resource list allocated by of_pci_get_host_bridge_resources().
+> 
+> Tegra guys, please take a look at "PCI: tegra: Remove top-level resource
+> from hierarchy" in particular.  Removing the top-level resource definitely
+> makes /proc/iomem look uglier (although it will look more like that of
+> other drivers).  A short-term fix could be to include device information in
+> the resource name.  I think a better long-term fix would be to make the DT
+> or platform device core request all the resources from the DT.
+> 
+> Comments welcome.  I expect we'll trip over something here, so I marked
+> this "v1" and I don't plan to put it into -next for a while.
+> 
+> This is on my pci/host-request-windows branch, which you can pull or view
+> at https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-request-windows
 
-Is the intention that this series will be taken into the next -rc?
+This looks very nice. There is one related aspect that I have been
+grumbling about for a while, but I don't know what the driver is
+actually supposed to do there:
 
-As the introduction of shared resets in reset subsystem has caused regressions
-on STi platforms.
+For the IORESOURCE_IO resources, some drivers request the MMIO address
+that the window is mapped into, some drivers request the PIO range, and
+some of them request both. I also believe the resource that gets put
+into the bridge resources list is not always the same one (or maybe
+that got fixed by now).
 
-regards,
+What do you think is the correct behavior here, should the driver only
+request the PIO range with parent=ioport_resource, or should it also
+request the MMIO window for the I/O ports with parent=iomem_resource?
+In the latter case, any idea how that can be generalized?
 
-Peter.
+Another aspect is that we already have the
+gen_pci_parse_request_of_pci_ranges() function that does the same as your
+new devm_request_pci_bus_resources() and then a few other things. I
+have been wondering whether we could move that function into common
+code convert drivers to use that wherever possible, but I guess we can
+always do that as a follow-up after this series.
+
+	Arnd
