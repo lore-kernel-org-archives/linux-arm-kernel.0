@@ -1,66 +1,67 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 16:01:28 +0000
-Subject: [PATCH v10 9/9] genirq/msi: use the MSI doorbell's IOVA when requested
+Date: Tue,  7 Jun 2016 16:01:25 +0000
+Subject: [PATCH v10 6/9] irqchip/gicv2m: register the MSI global doorbell
 In-Reply-To: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
 References: <1465315288-5931-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315288-5931-10-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315288-5931-7-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On MSI message composition we now use the MSI doorbell's IOVA in
-place of the doorbell's PA in case the device is upstream to an
-IOMMU that requires MSI addresses to be mapped. The doorbell's
-allocation and mapping happened on an early stage (pci_enable_msi).
+Use the msi-doorbell API to register the global doorbell.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
+
+v9 -> v10:
+- introduce the registration concept in place of msi_doorbell_info
+  callback
+
 v8 -> v9:
-- Braces on both sides of the 'else' in msi_compose
+- use global_doorbell instead of percpu_doorbells
 
 v7 -> v8:
-- use iommu_msi_msg_pa_to_va
-- add WARN_ON
+- gicv2m_msi_doorbell_info does not return a pointer to const
+- remove spurious !v2m check
+- add IOMMU_MMIO flag
 
-v6 -> v7:
-- allocation/mapping is done at an earlier stage. We now just perform
-  the iova lookup. So it is safe now to be called in a code that cannot
-  sleep. iommu_msi_set_doorbell_iova is moved in the dma-reserved-iommu
-  API: I think it cleans things up with respect to various #ifdef CONFIGS.
-
-v5:
-- use macros to increase the readability
-- add comments
-- fix a typo that caused a compilation error if CONFIG_IOMMU_API
-  is not set
+v7: creation
 ---
- kernel/irq/msi.c | 12 ++++++++++--
- 1 file changed, 10 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-v2m.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/kernel/irq/msi.c b/kernel/irq/msi.c
-index a78db5f..e731949 100644
---- a/kernel/irq/msi.c
-+++ b/kernel/irq/msi.c
-@@ -63,10 +63,18 @@ static int msi_compose(struct irq_data *irq_data,
- {
- 	int ret = 0;
+diff --git a/drivers/irqchip/irq-gic-v2m.c b/drivers/irqchip/irq-gic-v2m.c
+index ad0d296..11e039b 100644
+--- a/drivers/irqchip/irq-gic-v2m.c
++++ b/drivers/irqchip/irq-gic-v2m.c
+@@ -24,6 +24,8 @@
+ #include <linux/of_pci.h>
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
++#include <linux/iommu.h>
++#include <linux/msi-doorbell.h>
  
--	if (erase)
-+	if (erase) {
- 		memset(msg, 0, sizeof(*msg));
--	else
-+	} else {
-+		struct device *dev;
-+
- 		ret = irq_chip_compose_msi_msg(irq_data, msg);
-+		if (ret)
-+			return ret;
-+
-+		dev = msi_desc_to_dev(irq_data_get_msi_desc(irq_data));
-+		WARN_ON(iommu_msi_msg_pa_to_va(dev, msg));
-+	}
+ /*
+ * MSI_TYPER:
+@@ -366,12 +368,18 @@ static int __init gicv2m_init_one(struct fwnode_handle *fwnode,
+ 		goto err_iounmap;
+ 	}
  
- 	return ret;
- }
++	ret = msi_doorbell_register_global(v2m, v2m->res.start, sizeof(u32),
++					   IOMMU_WRITE | IOMMU_MMIO, false);
++	if (ret)
++		goto err_free_bm;
++
+ 	list_add_tail(&v2m->entry, &v2m_nodes);
+ 
+ 	pr_info("range%pR, SPI[%d:%d]\n", res,
+ 		v2m->spi_start, (v2m->spi_start + v2m->nr_spis - 1));
+ 	return 0;
+-
++err_free_bm:
++	kfree(v2m->bm);
+ err_iounmap:
+ 	iounmap(v2m->base);
+ err_free_v2m:
 -- 
 1.9.1
