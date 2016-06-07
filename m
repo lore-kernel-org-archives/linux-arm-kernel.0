@@ -1,61 +1,59 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Tue, 7 Jun 2016 10:00:57 -0700
-Subject: [PATCH] pinctrl: nsp-gpio: fix non-static functions
-In-Reply-To: <1465318695-23348-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465318695-23348-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <ae0144a6-5cf9-1de5-a3af-4534594a9353@broadcom.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 7 Jun 2016 19:04:27 +0200
+Subject: [PATCH v8 2/3] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
+References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
+ <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
+Message-ID: <5756FE9B.6020107@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
 
-On 6/7/2016 9:58 AM, Ben Dooks wrote:
-> Fixup warnings from functions that are not exported and
-> therefore should be marked static. Fixes:
+
+On 30/05/16 05:19, HS Liao wrote:
+> This patch is first version of Mediatek Command Queue(CMDQ) driver. The
+> CMDQ is used to help read/write registers with critical time limitation,
+> such as updating display configuration during the vblank. It controls
+> Global Command Engine (GCE) hardware to achieve this requirement.
+> Currently, CMDQ only supports display related hardwares, but we expect
+> it can be extended to other hardwares for future requirements.
 >
-> drivers/pinctrl/bcm/pinctrl-nsp-gpio.c:461:5: warning: symbol 'nsp_pin_config_group_get' was not declared. Should it be static?
-> drivers/pinctrl/bcm/pinctrl-nsp-gpio.c:467:5: warning: symbol 'nsp_pin_config_group_set' was not declared. Should it be static?
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Signed-off-by: HS Liao <hs.liao@mediatek.com>
+> Signed-off-by: CK Hu <ck.hu@mediatek.com>
 > ---
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> Cc: Jon Mason <jonmason@broadcom.com>
-> Cc: Yendapally Reddy Dhananjaya Reddy <yrdreddy@broadcom.com>
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> ---
->  drivers/pinctrl/bcm/pinctrl-nsp-gpio.c | 6 ++++--
->  1 file changed, 4 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> index a8b37a9..35783db 100644
-> --- a/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> +++ b/drivers/pinctrl/bcm/pinctrl-nsp-gpio.c
-> @@ -458,13 +458,15 @@ static int nsp_gpio_get_strength(struct nsp_gpio *chip, unsigned gpio,
->  	return 0;
->  }
->
-> -int nsp_pin_config_group_get(struct pinctrl_dev *pctldev, unsigned selector,
-> +static int nsp_pin_config_group_get(struct pinctrl_dev *pctldev,
-> +				    unsigned selector,
->  			     unsigned long *config)
->  {
->  	return 0;
->  }
->
-> -int nsp_pin_config_group_set(struct pinctrl_dev *pctldev, unsigned selector,
-> +static int nsp_pin_config_group_set(struct pinctrl_dev *pctldev,
-> +				    unsigned selector,
->  			     unsigned long *configs, unsigned num_configs)
->  {
->  	return 0;
->
 
-Looks good!
+[...]
 
-Thanks,
+> +static void cmdq_handle_error_done(struct cmdq *cmdq,
+> +				   struct cmdq_thread *thread, u32 irq_flag)
+> +{
+> +	struct cmdq_task *task, *tmp, *curr_task = NULL;
+> +	u32 curr_pa;
+> +	struct cmdq_cb_data cmdq_cb_data;
+> +	bool err;
+> +
+> +	if (irq_flag & CMDQ_THR_IRQ_ERROR)
+> +		err = true;
+> +	else if (irq_flag & CMDQ_THR_IRQ_DONE)
+> +		err = false;
+> +	else
+> +		return;
+> +
+> +	curr_pa = cmdq_thread_readl(thread, CMDQ_THR_CURR_ADDR);
+> +
+> +	list_for_each_entry_safe(task, tmp, &thread->task_busy_list,
+> +				 list_entry) {
+> +		if (curr_pa >= task->pa_base &&
+> +		    curr_pa < (task->pa_base + task->command_size))
+> +			curr_task = task;
+> +		if (task->cb.cb) {
+> +			cmdq_cb_data.err = curr_task ? err : false;
+> +			cmdq_cb_data.data = task->cb.data;
+> +			task->cb.cb(cmdq_cb_data);
+> +		}
 
-Acked-by: Ray Jui <ray.jui@broadcom.com>
+I think this is not right. If we got an IRQ_DONE, then the current task 
+is in execution, we should not call the callback until it has finished.
+
+Regards,
+Matthias
