@@ -1,70 +1,60 @@
-From: vincent.abriou@st.com (Vincent ABRIOU)
-Date: Tue, 7 Jun 2016 16:26:13 +0200
-Subject: [PATCH v2 2/3] drm: convert DT component matching to
- component_match_add_release()
-In-Reply-To: <E1b8pyX-0005OP-2s@rmk-PC.armlinux.org.uk>
-References: <20160603141548.GC1041@n2100.armlinux.org.uk>
- <E1b8pyX-0005OP-2s@rmk-PC.armlinux.org.uk>
-Message-ID: <5756D985.80107@st.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 07 Jun 2016 16:28:39 +0200
+Subject: [PATCH] clocksource/drivers/armada-370-xp: make syscore_ops static
+In-Reply-To: <1465309073-20584-1-git-send-email-ben.dooks@codethink.co.uk>
+ (Ben Dooks's message of "Tue, 7 Jun 2016 15:17:53 +0100")
+References: <1465309073-20584-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <87k2i1oyy0.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ben,
+ 
+ On mar., juin 07 2016, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
 
-
-On 06/03/2016 04:21 PM, Russell King wrote:
-> Convert DT component matching to use component_match_add_release().
+> The driver does not export armada_370_xp_timer_syscore_ops so
+> make it static to fix the following warning:
 >
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> drivers/clocksource/time-armada-370-xp.c:249:20: warning: symbol 'armada_370_xp_timer_syscore_ops' was not declared. Should it be static?
+>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+
+Thanks,
+
+Gregory
+
+
 > ---
->   drivers/gpu/drm/arm/hdlcd_drv.c             |  9 +++------
->   drivers/gpu/drm/armada/armada_drv.c         |  8 ++------
->   drivers/gpu/drm/drm_of.c                    |  6 ++++--
->   drivers/gpu/drm/etnaviv/etnaviv_drv.c       | 11 ++---------
->   drivers/gpu/drm/msm/msm_drv.c               |  8 ++------
->   drivers/gpu/drm/msm/msm_drv.h               |  1 +
->   drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 12 +++---------
->   drivers/gpu/drm/sti/sti_drv.c               |  9 ++-------
->   drivers/gpu/drm/tilcdc/tilcdc_external.c    |  8 ++------
->   9 files changed, 21 insertions(+), 51 deletions(-)
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/clocksource/time-armada-370-xp.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
->
-> diff --git a/drivers/gpu/drm/sti/sti_drv.c b/drivers/gpu/drm/sti/sti_drv.c
-> index 872495e72294..aeb2787c9bd4 100644
-> --- a/drivers/gpu/drm/sti/sti_drv.c
-> +++ b/drivers/gpu/drm/sti/sti_drv.c
-> @@ -10,6 +10,7 @@
->   #include <linux/debugfs.h>
->   #include <linux/kernel.h>
->   #include <linux/module.h>
-> +#include <linux/of_component.h>
->   #include <linux/of_platform.h>
->
->   #include <drm/drm_atomic.h>
-> @@ -341,11 +342,6 @@ static struct drm_driver sti_driver = {
->   	.minor = DRIVER_MINOR,
->   };
->
-> -static int compare_of(struct device *dev, void *data)
-> -{
-> -	return dev->of_node == data;
-> -}
-> -
->   static int sti_bind(struct device *dev)
->   {
->   	return drm_platform_init(&sti_driver, to_platform_device(dev));
-> @@ -375,8 +371,7 @@ static int sti_platform_probe(struct platform_device *pdev)
->   	child_np = of_get_next_available_child(node, NULL);
->
->   	while (child_np) {
-> -		component_match_add(dev, &match, compare_of, child_np);
-> -		of_node_put(child_np);
-> +		component_match_add_of(dev, &match, child_np);
->   		child_np = of_get_next_available_child(node, child_np);
->   	}
+> diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
+> index d93ec3c..601dbf74 100644
+> --- a/drivers/clocksource/time-armada-370-xp.c
+> +++ b/drivers/clocksource/time-armada-370-xp.c
+> @@ -246,7 +246,7 @@ static void armada_370_xp_timer_resume(void)
+>  	writel(timer0_local_ctrl_reg, local_base + TIMER_CTRL_OFF);
+>  }
+>  
+> -struct syscore_ops armada_370_xp_timer_syscore_ops = {
+> +static struct syscore_ops armada_370_xp_timer_syscore_ops = {
+>  	.suspend	= armada_370_xp_timer_suspend,
+>  	.resume		= armada_370_xp_timer_resume,
+>  };
+> -- 
+> 2.8.1
 >
 
-Hi Russel,
-
-Ok for the sti driver.
-
-Acked-by: Vincent Abriou <vincent.abriou@st.com>
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
