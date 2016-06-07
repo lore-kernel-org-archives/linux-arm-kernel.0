@@ -1,38 +1,38 @@
-From: yong.b.li@intel.com (Li, Yong B)
-Date: Tue, 7 Jun 2016 06:14:33 +0000
-Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
-In-Reply-To: <20160607060004.GD22406@atomide.com>
-References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
- <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
- <20160602173932.GF5995@atomide.com>
- <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
- <20160602175635.GG5995@atomide.com>
- <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FB1EC@SHSMSX101.ccr.corp.intel.com>
- <20160607060004.GD22406@atomide.com>
-Message-ID: <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FD673@SHSMSX101.ccr.corp.intel.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 07 Jun 2016 08:16:11 +0200
+Subject: [PATCH 0/2] ARM: dts: exynos: Fix port nodes names for Snow and
+ Peach Pit DTS
+In-Reply-To: <1465244684-23612-1-git-send-email-javier@osg.samsung.com>
+References: <1465244684-23612-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <575666AB.8080304@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Tony.
-
-I checked the DTS/overlays using linux-yocto-4.1 kernel(Ostro OS). It seems to me that the kernel/u-boot do not include the latest overlay support patch. And I also tested the latest Debian 8.4 using BBB boards, the I2C1 does not work too. This patch is the simplest solution for I2C1/I2C2 in linux-yocto-4.1.
-
-Thanks,
-Yong
------Original Message-----
-From: Tony Lindgren [mailto:tony at atomide.com] 
-Sent: Tuesday, June 7, 2016 2:00 PM
-To: Li, Yong B <yong.b.li@intel.com>
-Cc: Robert Nelson <robertcnelson@gmail.com>; Benoit Cousson <bcousson@baylibre.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Russell King <linux@arm.linux.org.uk>; linux-omap at vger.kernel.org; devicetree <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; linux kernel <linux-kernel@vger.kernel.org>; sdliyong at gmail.com
-Subject: Re: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
-
-* Li, Yong B <yong.b.li@intel.com> [160602 22:49]:
-> Hi Tony,
+On 06/06/2016 10:24 PM, Javier Martinez Canillas wrote:
+> Hello Krzysztof,
 > 
-> I can submit a V2 version about the "disabled", or just drop this patch?
+> This small series fixes the lookup for the lvds-to-eDP bridge found in
+> the Exynos5250 Snow and Exynos5420 Peach Pit Chromebooks. The problem
+> was introduced by the commits that fixed the recent DTC warnings and
+> it was that the OF graph logic expects the nodes to always be called
+> 'port'.
+> 
+> So the correct fix for the DTC warnings is to add a '#address-cells',
+> '#size-cells' and 'reg' properties when there is more than one port.
+> 
+> Best regards,
+> Javier
+> 
+> 
+> Javier Martinez Canillas (2):
+>   ARM: dts: exynos: Fix port nodes names for Exynos5250 Snow board
+>   ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board
+> 
+>  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 13 ++++++++++---
+>  arch/arm/boot/dts/exynos5420-peach-pit.dts    | 13 ++++++++++---
+>  2 files changed, 20 insertions(+), 6 deletions(-)
 
-Probably best to wait on this one until we know how it can be enabled without manually editing the dts file. I'm still hoping u-boot could enable it based on some environment variable..
+Thanks for fixes. Applied both for v4.7.
 
-Regards,
-
-Tony
+Best regards,
+Krzysztof
