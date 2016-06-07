@@ -1,41 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 7 Jun 2016 09:49:33 +0100
-Subject: [PATCH 1/2] ARM: dts: exynos: Fix port nodes names for Exynos5250
- Snow board
-In-Reply-To: <1465244684-23612-2-git-send-email-javier@osg.samsung.com>
-References: <1465244684-23612-1-git-send-email-javier@osg.samsung.com>
- <1465244684-23612-2-git-send-email-javier@osg.samsung.com>
-Message-ID: <57568A9D.7080804@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 7 Jun 2016 09:50:45 +0100
+Subject: [STLinux Kernel] [PATCH] ARM: dts: STi: stih407-family: Disable
+ reserved-memory co-processor nodes
+In-Reply-To: <20160607083724.18599-1-lee.jones@linaro.org>
+References: <20160607083724.18599-1-lee.jones@linaro.org>
+Message-ID: <20160607085045.GA23181@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/16 21:24, Javier Martinez Canillas wrote:
-> Commit 5c9cbade0629 ("ARM: dts: exynos: Fix DTC unit name warnings in
-> Exynos5250") fixed all the DTC warnings about mismatchs between unit
-> names and reg properties in Exynos5250 boards DTS.
+On Tue, 07 Jun 2016, Lee Jones wrote:
+
+> This patch fixes a non-booting issue in Mainline.
 > 
-> But unfortunately it also added a regression on the Exynos5250 Snow
-> Chromebook when changing the port node names since the OF graph logic
-> expects the port nodes to be always named 'port'.
+> When booting with a compressed kernel, we need to be careful how we
+> populate memory close to DDR start.  AUTO_ZRELADDR is enabled by default
+> in multi-arch enabled configurations, which place some restrictions on
+> where the kernel is placed and where it will be uncompressed to on boot.
 > 
-> The Documentation/devicetree/bindings/graph.txt binding document says
-> that when there is more than one port, '#address-cells', '#size-cells'
-> and 'reg' properties should be used to number the port nodes.
+> AUTO_ZRELADDR takes the decompressor code's start address and masks out
+> the bottom 28 bits to obtain an address to uncompress the kernel to
+> (thus a load address of 0x42000000 means that the kernel will be
+> uncompressed to 0x40000000 i.e. DDR START on this platform).
 > 
-> Fixes: 5c9cbade0629 ("ARM: dts: exynos: Fix DTC unit name warnings in Exynos5250")
-> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Even changing the load address to after the co-processor's shared memory
+> won't render a booting platform, since the AUTO_ZRELADDR algorithm still
+> ensures the kernel is uncompressed into memory shared with the first
+> co-processor (0x40000000).
+> 
+> Another option would be to move loading to 0x4A000000, since this will
+> mean the decompressor will decompress the kernel to 0x48000000. However,
+> this would mean a large chunk (0x44000000 => 0x48000000 (64MB)) of
+> memory would essentially be wasted for no good reason.
+> 
+> Until we can work with ST to find a suitable memory location to
+> relocate co-processor shared memory, let's disable the shared memory
+> nodes.  This will ensure a working platform in the mean time.
+> 
+> NB: The more observant of you will notice that we're leaving the DMU
+> shared memory node enabled; this is because a) it is the only one in
+> active use at the time of this writing and b) it is not affected by
+> the current default behaviour which is causing issues.
+> 
+> Fixes: fe135c6 (ARM: dts: STiH407: Move over to using the 'reserved-memory' API for obtaining DMA memory)
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/boot/dts/stih407-family.dtsi | 3 +++
+>  1 file changed, 3 insertions(+)
 
-I've tested this on top of -rc1, and it indeed fixes the display
-initialization I was seeing. It then dies in a horrible way, but that's
-a separate bug.
-
-So for this patch:
-
-Tested-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Reviewed-by Peter Griffin <peter.griffin@linaro.org>
