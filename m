@@ -1,36 +1,44 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 07 Jun 2016 08:03:55 +0200
-Subject: [PATCH v3 00/12] usb/mmc/power: Generic power sequence (and fix
- USB/LAN when TFTP booting)
-In-Reply-To: <2034186.JKeBi87zYl@diego>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
- <2034186.JKeBi87zYl@diego>
-Message-ID: <575663CB.3070600@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 7 Jun 2016 11:47:01 +0530
+Subject: [PATCH v2 3/4] dmaengine: vdma: Add 64 bit addressing support
+ for the axi dma
+In-Reply-To: <1463557653-1687-4-git-send-email-appanad@xilinx.com>
+References: <1463557653-1687-1-git-send-email-appanad@xilinx.com>
+ <1463557653-1687-4-git-send-email-appanad@xilinx.com>
+Message-ID: <20160607061701.GG16910@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2016 10:43 PM, Heiko St?bner wrote:
-> Hi,
-> 
-> Am Mittwoch, 1. Juni 2016, 10:02:09 schrieb Krzysztof Kozlowski:
->> My third approach for a USB power sequence which fixes usb3503+lan
->> on Odroid U3 board if it was initialized by bootloader
->> (e.g. for TFTP boot).
-> 
-> I was just tackling a similar bringup problem regarding an embedded usb hub 
-> and usb-sata bridge and stumbled upon this series.
-> 
-> While on my (rockchip-)boards it's always "just" a reset pin that needs 
-> handling, this series looks like it would solve exactly that problem in a very 
-> nice way.
-> 
-> So while I cannot provide any meaningful insight right now, it would be cool 
-> if you could keep me in the loop, as I'm really looking forward to this series 
-> progressing.
-> 
+On Wed, May 18, 2016 at 01:17:32PM +0530, Kedareswara rao Appana wrote:
+> +		if (chan->cyclic) {
+> +			if (chan->ext_addr)
+> +				dma_writeq(chan, XILINX_DMA_REG_TAILDESC,
+> +					   chan->cyclic_seg_v->phys);
+> +			else
+> +				dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+> +					       chan->cyclic_seg_v->phys);
+> +		} else {
+> +			if (chan->ext_addr)
+> +				dma_writeq(chan, XILINX_DMA_REG_TAILDESC,
+> +					   tail_segment->phys);
+> +			else
+> +				dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+> +					       tail_segment->phys);
 
-Sure, good to know that this problem affects more people. I do not feel
-such alone anymore. ;)
+this looks ugly and repeated few times. Why not have xilinx_write() which
+does either dma_writeq or dma_ctrl_write based on channel..
 
-Best regards,
-Krzysztof
+> +			if (chan->ext_addr) {
+> +				hw->buf_addr = lower_32_bits(buf_addr +
+> +						sg_used + (period_len * i));
+> +				hw->buf_addr_msb = upper_32_bits(buf_addr +
+> +						sg_used + (period_len * i));
+> +			} else {
+> +				hw->buf_addr = buf_addr + sg_used +
+> +					       (period_len * i);
+> +			}
+
+similar wrapper here would make code more readable
+
+-- 
+~Vinod
