@@ -1,89 +1,114 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 15:59:20 +0000
-Subject: [PATCH v10 6/8] iommu/msi-iommu: iommu_msi_domain
+Date: Tue,  7 Jun 2016 15:59:22 +0000
+Subject: [PATCH v10 8/8] iommu/arm-smmu: get/put the msi cookie
 In-Reply-To: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
 References: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315162-5888-7-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315162-5888-9-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This function checks whether
-- the device belongs to a non default iommu domain
-- this iommu domain requires the MSI address to be mapped.
-
-If those conditions are met, the function returns the iommu domain
-to be used for mapping the MSI doorbell; else it returns NULL.
+For IOMMU_DOMAIN_UNMANAGED type we now also get the msi
+cookie in both arm-smmu and arm-smmu-v3. This initializes
+resources for MSI doorbell mapping.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
-
 ---
-v8 -> v9:
-- use iommu_msi_supported
+ drivers/iommu/arm-smmu-v3.c | 16 ++++++++++++----
+ drivers/iommu/arm-smmu.c    | 15 +++++++++++----
+ 2 files changed, 23 insertions(+), 8 deletions(-)
 
-v7 -> v8:
-- renamed  iommu_msi_mapping_desc_to_domain to iommu_msi_domain
-- the function now takes a struct device *
-- use DOMAIN_ATTR_MSI_GEOMETRY attribute
----
- drivers/iommu/msi-iommu.c | 17 +++++++++++++++++
- include/linux/msi-iommu.h | 14 ++++++++++++++
- 2 files changed, 31 insertions(+)
-
-diff --git a/drivers/iommu/msi-iommu.c b/drivers/iommu/msi-iommu.c
-index 57017cb..41a5823 100644
---- a/drivers/iommu/msi-iommu.c
-+++ b/drivers/iommu/msi-iommu.c
-@@ -248,3 +248,20 @@ unlock:
- 	}
- }
- EXPORT_SYMBOL_GPL(iommu_msi_put_doorbell_iova);
-+
-+struct iommu_domain *iommu_msi_domain(struct device *dev)
-+{
-+	struct iommu_domain *d = iommu_get_domain_for_dev(dev);
-+	struct iommu_domain_msi_geometry msi_geometry;
-+
-+	if (!d || (d->type == IOMMU_DOMAIN_DMA))
-+		return NULL;
-+
-+	iommu_domain_get_attr(d, DOMAIN_ATTR_MSI_GEOMETRY, &msi_geometry);
-+	if (!msi_geometry.iommu_msi_supported)
-+		return NULL;
-+
-+	return d;
-+}
-+EXPORT_SYMBOL_GPL(iommu_msi_domain);
-+
-diff --git a/include/linux/msi-iommu.h b/include/linux/msi-iommu.h
-index 1cd115f..114bd69 100644
---- a/include/linux/msi-iommu.h
-+++ b/include/linux/msi-iommu.h
-@@ -81,6 +81,15 @@ int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
-  */
- void iommu_msi_put_doorbell_iova(struct iommu_domain *domain, phys_addr_t addr);
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 8eb002e..17a20a7 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -22,6 +22,7 @@
  
-+/**
-+ * iommu_msi_domain: in case the device is upstream to an IOMMU and this IOMMU
-+ * translates the MSI transaction, returns the iommu domain the MSI doorbell
-+ * address must be mapped in; else returns NULL.
-+ *
-+ * @dev: device handle
-+ */
-+struct iommu_domain *iommu_msi_domain(struct device *dev);
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
++#include <linux/msi-iommu.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+ #include <linux/iommu.h>
+@@ -1412,15 +1413,21 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 		return NULL;
+ 
+ 	if (type == IOMMU_DOMAIN_DMA &&
+-	    iommu_get_dma_cookie(&smmu_domain->domain)) {
+-		kfree(smmu_domain);
+-		return NULL;
+-	}
++	    iommu_get_dma_cookie(&smmu_domain->domain))
++		goto err;
 +
- #else
++	if (type == IOMMU_DOMAIN_UNMANAGED &&
++		iommu_get_msi_cookie(&smmu_domain->domain))
++		goto err;
++
+ 	smmu_domain->domain.msi_geometry = msi_geometry;
  
- static inline int
-@@ -100,5 +109,10 @@ static inline int iommu_msi_get_doorbell_iova(struct iommu_domain *domain,
- static inline void iommu_msi_put_doorbell_iova(struct iommu_domain *domain,
- 					       phys_addr_t addr) {}
- 
-+static inline struct iommu_domain *iommu_msi_domain(struct device *dev)
-+{
+ 	mutex_init(&smmu_domain->init_mutex);
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
+ 	return &smmu_domain->domain;
++err:
++	kfree(smmu_domain);
 +	return NULL;
-+}
+ }
+ 
+ static int arm_smmu_bitmap_alloc(unsigned long *map, int span)
+@@ -1446,6 +1453,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+ 	struct arm_smmu_device *smmu = smmu_domain->smmu;
+ 
++	iommu_put_msi_cookie(domain);
+ 	iommu_put_dma_cookie(domain);
+ 	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
+ 
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 9755a1b..867910b 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -30,6 +30,7 @@
+ 
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
++#include <linux/msi-iommu.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+@@ -1052,10 +1053,12 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 		return NULL;
+ 
+ 	if (type == IOMMU_DOMAIN_DMA &&
+-	    iommu_get_dma_cookie(&smmu_domain->domain)) {
+-		kfree(smmu_domain);
+-		return NULL;
+-	}
++	    iommu_get_dma_cookie(&smmu_domain->domain))
++		goto err;
 +
- #endif	/* CONFIG_IOMMU_MSI */
- #endif	/* __MSI_IOMMU_H */
++	if (type == IOMMU_DOMAIN_UNMANAGED &&
++		iommu_get_msi_cookie(&smmu_domain->domain))
++		goto err;
+ 
+ 	smmu_domain->domain.msi_geometry = msi_geometry;
+ 
+@@ -1063,6 +1066,9 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
+ 	spin_lock_init(&smmu_domain->pgtbl_lock);
+ 
+ 	return &smmu_domain->domain;
++err:
++	kfree(smmu_domain);
++	return NULL;
+ }
+ 
+ static void arm_smmu_domain_free(struct iommu_domain *domain)
+@@ -1073,6 +1079,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 	 * Free the domain resources. We assume that all devices have
+ 	 * already been detached.
+ 	 */
++	iommu_put_msi_cookie(domain);
+ 	iommu_put_dma_cookie(domain);
+ 	arm_smmu_destroy_domain_context(domain);
+ 	kfree(smmu_domain);
 -- 
 1.9.1
