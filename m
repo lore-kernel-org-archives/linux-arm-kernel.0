@@ -1,202 +1,226 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue,  7 Jun 2016 21:53:03 +0300
-Subject: [PATCH 2/4] ARM: i.MX: Remove i.MX1 Synertronixx SCB9328 board support
+Date: Tue,  7 Jun 2016 21:53:05 +0300
+Subject: [PATCH 4/4] ARM: i.MX: Move SOC_IMX1 into 'Device tree only'
 In-Reply-To: <1465325585-1598-1-git-send-email-shc_work@mail.ru>
 References: <1465325585-1598-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465325585-1598-2-git-send-email-shc_work@mail.ru>
+Message-ID: <1465325585-1598-4-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Synertronixx SCB9328 board is very similar to Armadeus APF9328,
-so it can be easily reimplemented in DT way.
-This patch removes support for non-DT support for this board.
+This patch moves SOC_IMX1 into 'Device tree only' category and renames
+imx1-dt.c to mach-imx1.c to align with the name schema of other
+i.MX DT only platforms.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-imx/Kconfig        |   7 --
- arch/arm/mach-imx/Makefile       |   1 -
- arch/arm/mach-imx/mach-scb9328.c | 143 ---------------------------------------
- 3 files changed, 151 deletions(-)
- delete mode 100644 arch/arm/mach-imx/mach-scb9328.c
+ arch/arm/configs/imx_v4_v5_defconfig |  8 ++-----
+ arch/arm/mach-imx/Kconfig            | 31 ++++++++++---------------
+ arch/arm/mach-imx/Makefile           |  4 +---
+ arch/arm/mach-imx/imx1-dt.c          | 45 ------------------------------------
+ arch/arm/mach-imx/mach-imx1.c        | 45 ++++++++++++++++++++++++++++++++++++
+ 5 files changed, 60 insertions(+), 73 deletions(-)
+ delete mode 100644 arch/arm/mach-imx/imx1-dt.c
+ create mode 100644 arch/arm/mach-imx/mach-imx1.c
 
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 9083399..72199de 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -22,14 +21,13 @@ CONFIG_ARCH_MULTI_V4T=y
+ CONFIG_ARCH_MULTI_V5=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_MXC=y
+-CONFIG_MACH_SCB9328=y
+-CONFIG_MACH_APF9328=y
+ CONFIG_MACH_MX21ADS=y
+ CONFIG_MACH_MX27ADS=y
+ CONFIG_MACH_MX27_3DS=y
+ CONFIG_MACH_IMX27_VISSTRIM_M10=y
+ CONFIG_MACH_PCA100=y
+ CONFIG_MACH_IMX27_DT=y
++CONFIG_SOC_IMX1=y
+ CONFIG_SOC_IMX25=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
 diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 37447fb..1b7905a 100644
+index 22d06f7..376c9f5 100644
 --- a/arch/arm/mach-imx/Kconfig
 +++ b/arch/arm/mach-imx/Kconfig
-@@ -106,13 +106,6 @@ if ARCH_MULTI_V4T
+@@ -67,12 +67,6 @@ config IMX_HAVE_IOMUX_V1
+ config ARCH_MXC_IOMUX_V3
+ 	bool
  
- comment "MX1 platforms:"
+-config SOC_IMX1
+-	bool
+-	select CPU_ARM920T
+-	select MXC_AVIC
+-	select PINCTRL_IMX1
+-
+ config SOC_IMX21
+ 	bool
+ 	select CPU_ARM926T
+@@ -101,19 +95,6 @@ config SOC_IMX35
+ 	select PINCTRL_IMX35
+ 	select SMP_ON_UP if SMP
  
--config MACH_SCB9328
--	bool "Synertronixx scb9328"
--	select IMX_HAVE_PLATFORM_IMX_UART
+-if ARCH_MULTI_V4T
+-
+-comment "MX1 platforms:"
+-
+-config MACH_IMX1_DT
+-	bool "Support i.MX1 platforms from device tree"
 -	select SOC_IMX1
 -	help
--	  Say Y here if you are using a Synertronixx scb9328 board
+-	  Include support for Freescale i.MX1 based platforms
+-	  using the device tree for discovery.
 -
- config MACH_IMX1_DT
- 	bool "Support i.MX1 platforms from device tree"
- 	select SOC_IMX1
+-endif
+-
+ if ARCH_MULTI_V5
+ 
+ comment "MX21 platforms:"
+@@ -449,6 +430,18 @@ endif
+ 
+ comment "Device tree only"
+ 
++if ARCH_MULTI_V4T
++
++config SOC_IMX1
++	bool "i.MX1 support"
++	select CPU_ARM920T
++	select MXC_AVIC
++	select PINCTRL_IMX1
++	help
++	  This enables support for Freescale i.MX1 processor
++
++endif
++
+ if ARCH_MULTI_V5
+ 
+ config SOC_IMX25
 diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 7abfe49..28d8d73 100644
+index d50689d..15c25ed 100644
 --- a/arch/arm/mach-imx/Makefile
 +++ b/arch/arm/mach-imx/Makefile
-@@ -36,7 +36,6 @@ obj-y += ssi-fiq-ksym.o
+@@ -34,9 +34,6 @@ obj-y += ssi-fiq.o
+ obj-y += ssi-fiq-ksym.o
  endif
  
- # i.MX1 based machines
--obj-$(CONFIG_MACH_SCB9328) += mach-scb9328.o
- obj-$(CONFIG_MACH_IMX1_DT) += imx1-dt.o
- 
+-# i.MX1 based machines
+-obj-$(CONFIG_MACH_IMX1_DT) += imx1-dt.o
+-
  # i.MX21 based machines
-diff --git a/arch/arm/mach-imx/mach-scb9328.c b/arch/arm/mach-imx/mach-scb9328.c
+ obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
+ 
+@@ -90,6 +87,7 @@ obj-$(CONFIG_SOC_IMX53) += suspend-imx53.o
+ endif
+ obj-$(CONFIG_SOC_IMX6) += pm-imx6.o
+ 
++obj-$(CONFIG_SOC_IMX1) += mach-imx1.o
+ obj-$(CONFIG_SOC_IMX50) += mach-imx50.o
+ obj-$(CONFIG_SOC_IMX51) += mach-imx51.o
+ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+diff --git a/arch/arm/mach-imx/imx1-dt.c b/arch/arm/mach-imx/imx1-dt.c
 deleted file mode 100644
-index 1f6bc3f..0000000
---- a/arch/arm/mach-imx/mach-scb9328.c
+index de5ab8d..0000000
+--- a/arch/arm/mach-imx/imx1-dt.c
 +++ /dev/null
-@@ -1,143 +0,0 @@
+@@ -1,45 +0,0 @@
 -/*
-- * linux/arch/arm/mach-mx1/mach-scb9328.c
-- *
-- * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
-- * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
+- *  Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
 - *
 - * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
 - */
 -
--#include <linux/platform_device.h>
--#include <linux/mtd/physmap.h>
--#include <linux/interrupt.h>
--#include <linux/dm9000.h>
--#include <linux/gpio.h>
--
--#include <asm/mach-types.h>
+-#include <linux/of_platform.h>
 -#include <asm/mach/arch.h>
--#include <asm/mach/time.h>
+-#include <asm/mach/map.h>
 -
 -#include "common.h"
--#include "devices-imx1.h"
 -#include "hardware.h"
--#include "iomux-mx1.h"
 -
--/*
-- * This scb9328 has a 32MiB flash
-- */
--static struct resource flash_resource = {
--	.start	= MX1_CS0_PHYS,
--	.end	= MX1_CS0_PHYS + (32 * 1024 * 1024) - 1,
--	.flags	= IORESOURCE_MEM,
--};
+-#define MX1_AVIC_ADDR	0x00223000
 -
--static struct physmap_flash_data scb_flash_data = {
--	.width  = 2,
--};
--
--static struct platform_device scb_flash_device = {
--	.name		= "physmap-flash",
--	.id		= 0,
--	.dev = {
--		.platform_data = &scb_flash_data,
--	},
--	.resource = &flash_resource,
--	.num_resources = 1,
--};
--
--/*
-- * scb9328 has a DM9000 network controller
-- * connected to CS5, with 16 bit data path
-- * and interrupt connected to GPIO 3
-- */
--
--/*
-- * internal datapath is fixed 16 bit
-- */
--static struct dm9000_plat_data dm9000_platdata = {
--	.flags	= DM9000_PLATF_16BITONLY,
--};
--
--/*
-- * the DM9000 drivers wants two defined address spaces
-- * to gain access to address latch registers and the data path.
-- */
--static struct resource dm9000x_resources[] = {
--	{
--		.name	= "address area",
--		.start	= MX1_CS5_PHYS,
--		.end	= MX1_CS5_PHYS + 1,
--		.flags	= IORESOURCE_MEM,	/* address access */
--	}, {
--		.name	= "data area",
--		.start	= MX1_CS5_PHYS + 4,
--		.end	= MX1_CS5_PHYS + 5,
--		.flags	= IORESOURCE_MEM,	/* data access */
--	}, {
--		/* irq number is run-time assigned */
--		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
--	},
--};
--
--static struct platform_device dm9000x_device = {
--	.name		= "dm9000",
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(dm9000x_resources),
--	.resource	= dm9000x_resources,
--	.dev		= {
--		.platform_data = &dm9000_platdata,
--	}
--};
--
--static const int mxc_uart1_pins[] = {
--	PC9_PF_UART1_CTS,
--	PC10_PF_UART1_RTS,
--	PC11_PF_UART1_TXD,
--	PC12_PF_UART1_RXD,
--};
--
--static const struct imxuart_platform_data uart_pdata __initconst = {
--	.flags = IMXUART_HAVE_RTSCTS,
--};
--
--static struct platform_device *devices[] __initdata = {
--	&scb_flash_device,
--	&dm9000x_device,
--};
--
--/*
-- * scb9328_init - Init the CPU card itself
-- */
--static void __init scb9328_init(void)
+-static void __init imx1_init_early(void)
 -{
--	imx1_soc_init();
--
--	mxc_gpio_setup_multiple_pins(mxc_uart1_pins,
--			ARRAY_SIZE(mxc_uart1_pins), "UART1");
--
--	imx1_add_imx_uart0(&uart_pdata);
--
--	printk(KERN_INFO"Scb9328: Adding devices\n");
--	dm9000x_resources[2].start = gpio_to_irq(IMX_GPIO_NR(3, 3));
--	dm9000x_resources[2].end = gpio_to_irq(IMX_GPIO_NR(3, 3));
--	platform_add_devices(devices, ARRAY_SIZE(devices));
+-	mxc_set_cpu_type(MXC_CPU_MX1);
 -}
 -
--static void __init scb9328_timer_init(void)
+-static void __init imx1_init_irq(void)
 -{
--	mx1_clocks_init(32000);
+-	void __iomem *avic_addr;
+-
+-	avic_addr = ioremap(MX1_AVIC_ADDR, SZ_4K);
+-	WARN_ON(!avic_addr);
+-
+-	mxc_init_irq(avic_addr);
 -}
 -
--MACHINE_START(SCB9328, "Synertronixx scb9328")
--	/* Sascha Hauer */
--	.atag_offset = 100,
--	.map_io = mx1_map_io,
--	.init_early = imx1_init_early,
--	.init_irq = mx1_init_irq,
--	.init_time	= scb9328_timer_init,
--	.init_machine = scb9328_init,
+-static const char * const imx1_dt_board_compat[] __initconst = {
+-	"fsl,imx1",
+-	NULL
+-};
+-
+-DT_MACHINE_START(IMX1_DT, "Freescale i.MX1 (Device Tree Support)")
+-	.map_io		= debug_ll_io_init,
+-	.init_early	= imx1_init_early,
+-	.init_irq	= imx1_init_irq,
+-	.dt_compat	= imx1_dt_board_compat,
 -	.restart	= mxc_restart,
 -MACHINE_END
+diff --git a/arch/arm/mach-imx/mach-imx1.c b/arch/arm/mach-imx/mach-imx1.c
+new file mode 100644
+index 0000000..de5ab8d
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-imx1.c
+@@ -0,0 +1,45 @@
++/*
++ *  Copyright (C) 2014 Alexander Shiyan <shc_work@mail.ru>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/of_platform.h>
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++#include "common.h"
++#include "hardware.h"
++
++#define MX1_AVIC_ADDR	0x00223000
++
++static void __init imx1_init_early(void)
++{
++	mxc_set_cpu_type(MXC_CPU_MX1);
++}
++
++static void __init imx1_init_irq(void)
++{
++	void __iomem *avic_addr;
++
++	avic_addr = ioremap(MX1_AVIC_ADDR, SZ_4K);
++	WARN_ON(!avic_addr);
++
++	mxc_init_irq(avic_addr);
++}
++
++static const char * const imx1_dt_board_compat[] __initconst = {
++	"fsl,imx1",
++	NULL
++};
++
++DT_MACHINE_START(IMX1_DT, "Freescale i.MX1 (Device Tree Support)")
++	.map_io		= debug_ll_io_init,
++	.init_early	= imx1_init_early,
++	.init_irq	= imx1_init_irq,
++	.dt_compat	= imx1_dt_board_compat,
++	.restart	= mxc_restart,
++MACHINE_END
 -- 
 2.4.9
