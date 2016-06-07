@@ -1,92 +1,113 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 7 Jun 2016 08:11:05 -0500
-Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
-In-Reply-To: <3416214.BpvATlfaN7@wuerfel>
-References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
- <3416214.BpvATlfaN7@wuerfel>
-Message-ID: <20160607131105.GA2543@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 7 Jun 2016 14:22:24 +0100
+Subject: [PATCH 2/3] Documentation: add DT bindings for ARM SCPI power
+ domains
+In-Reply-To: <1465228439-13457-3-git-send-email-sudeep.holla@arm.com>
+References: <1465228439-13457-1-git-send-email-sudeep.holla@arm.com>
+ <1465228439-13457-3-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20160607132223.GG2633@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 10:21:36AM +0200, Arnd Bergmann wrote:
-> On Monday, June 6, 2016 6:04:44 PM CEST Bjorn Helgaas wrote:
-> > Several host bridge drivers (designware and all derivatives, iproc,
-> > xgene, xilinx, and xilinx-nwl) don't request the MMIO and I/O port
-> > windows they forward downstream to the PCI bus.
-> > 
-> > That means the PCI core can't request resources for PCI bridge
-> > windows and PCI BARs.
-> > 
-> > Several other drivers (altera, generic, mvebu, rcar, tegra) do request
-> > the windows, but use some duplicated code to do it.
-> > 
-> > This adds a new devm_request_pci_bus_resources() interface and changes
-> > these drivers to use it.  It also fixes several error paths where we failed
-> > to free the resource list allocated by of_pci_get_host_bridge_resources().
-> > 
-> > Tegra guys, please take a look at "PCI: tegra: Remove top-level resource
-> > from hierarchy" in particular.  Removing the top-level resource definitely
-> > makes /proc/iomem look uglier (although it will look more like that of
-> > other drivers).  A short-term fix could be to include device information in
-> > the resource name.  I think a better long-term fix would be to make the DT
-> > or platform device core request all the resources from the DT.
-> > 
-> > Comments welcome.  I expect we'll trip over something here, so I marked
-> > this "v1" and I don't plan to put it into -next for a while.
-> > 
-> > This is on my pci/host-request-windows branch, which you can pull or view
-> > at https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-request-windows
+On Mon, Jun 06, 2016 at 04:53:58PM +0100, Sudeep Holla wrote:
+> The System Control Processor (SCP) provides peripheral devices with
+> power domains that can be enabled and disabled viathe System Control
+> and Power Interface (SCPI) Message Protocol. Add bindings to allow
+> probing of these device power domians.
 > 
-> This looks very nice. There is one related aspect that I have been
-> grumbling about for a while, but I don't know what the driver is
-> actually supposed to do there:
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 34 ++++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
 > 
-> For the IORESOURCE_IO resources, some drivers request the MMIO address
-> that the window is mapped into, some drivers request the PIO range, and
-> some of them request both. I also believe the resource that gets put
-> into the bridge resources list is not always the same one (or maybe
-> that got fixed by now).
+> diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> index 313dabdc14f9..7141670d649b 100644
+> --- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> +++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
+> @@ -87,10 +87,33 @@ SCPI provides an API to access the various sensors on the SoC.
+>  			 implementation for the IDs to use. For Juno
+>  			 R0 and Juno R1 refer to [3].
 > 
-> What do you think is the correct behavior here, should the driver only
-> request the PIO range with parent=ioport_resource, or should it also
-> request the MMIO window for the I/O ports with parent=iomem_resource?
-> In the latter case, any idea how that can be generalized?
+> +Power domain bindings for the power domains based on SCPI Message Protocol
+> +------------------------------------------------------------
+> +
+> +This binding uses the generic power domain binding[4].
+> +
+> +PM domain providers
+> +===================
+> +
+> +Required properties:
+> + - #power-domain-cells : Should be 1. Contains the device or the power
+> +			 domain ID value used by SCPI commands.
+> + - num-domains: Total number of power domains provided by SCPI. This is
+> +		needed as the SCPI message protocol lacks a mechanism to
+> +		query this information runtime.
+                                      ^
+I guess there should be an 'at' here.
 
-I think it should request both because I think iomem_resource should
-contain everything in the memory map.  This would be required if we ever
-did any significant reassignment of top-level devices, e.g., ACPI devices.
-For example, on ia64, we do this:
+Are domain IDs zero-based and definitely non-sparse?
 
-  /proc/ioports:
-  00000000-00003fff : PCI Bus 0000:00
-  00004000-00009fff : PCI Bus 0000:80
-  0000a000-0000bfff : PCI Bus 0000:a0
-  0000c000-0000ffff : PCI Bus 0000:c0
+What exactly does this matter for? Just for validation at parsing time,
+or is this strictly required for correctness?
 
-  /proc/iomem:
-  80000000-9fffffff : PCI Bus 0000:00
-  a0000000-cfffffff : PCI Bus 0000:80
-  d0000000-dfffffff : PCI Bus 0000:a0
-  e0000000-fdffffff : PCI Bus 0000:c0
-  80004000000-80103fffffe : PCI Bus 0000:00
-  c0004000000-c0103fffffe : PCI Bus 0000:80
-  d0004000000-d0103fffffe : PCI Bus 0000:a0
-  e0004000000-e0103fffffe : PCI Bus 0000:c0
-  3fffffc000000-3fffffcffffff : PCI Bus 0000:00 I/O Ports 00000000-00003fff
-  3fffffd000000-3fffffe7fffff : PCI Bus 0000:80 I/O Ports 00004000-00009fff
-  3fffffe800000-3fffffeffffff : PCI Bus 0000:a0 I/O Ports 0000a000-0000bfff
-  3ffffff000000-3ffffffffffff : PCI Bus 0000:c0 I/O Ports 0000c000-0000ffff
+If we send a command with an invalid domain ID, would the FW reliably
+report an error that we can recover from?
 
-> Another aspect is that we already have the
-> gen_pci_parse_request_of_pci_ranges() function that does the same as your
-> new devm_request_pci_bus_resources() and then a few other things. I
-> have been wondering whether we could move that function into common
-> code convert drivers to use that wherever possible, but I guess we can
-> always do that as a follow-up after this series.
+Otherwise, this looks ok. I'd just like to make sure I've understood
+correctly.
 
-Oh, I didn't notice that; thanks for pointing it out.  That should be
-consolidated somehow.  It also checks to be sure there is a
-non-prefetchable memory resource.  A few other drivers also do that, but
-most don't.  I suppose that will mostly catch DT errors.
+Thanks,
+Mark.
 
-Bjorn
+> +
+> +PM domain consumers
+> +===================
+> +
+> +Required properties:
+> + - power-domains : A phandle and PM domain specifier as defined by bindings of
+> +                   the power controller specified by phandle.
+> +
+>  [0] http://infocenter.arm.com/help/topic/com.arm.doc.dui0922b/index.html
+>  [1] Documentation/devicetree/bindings/clock/clock-bindings.txt
+>  [2] Documentation/devicetree/bindings/thermal/thermal.txt
+>  [3] http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.dui0922b/apas03s22.html
+> +[4] Documentation/devicetree/bindings/power/power_domain.txt
+> 
+>  Example:
+> 
+> @@ -144,6 +167,12 @@ scpi_protocol: scpi at 2e000000 {
+>  		compatible = "arm,scpi-sensors";
+>  		#thermal-sensor-cells = <1>;
+>  	};
+> +
+> +	scpi_devpd: scpi-power-domains {
+> +		compatible = "arm,scpi-power-domains";
+> +		num-domains = <2>;
+> +		#power-domain-cells = <1>;
+> +	};
+>  };
+> 
+>  cpu at 0 {
+> @@ -156,6 +185,7 @@ hdlcd at 7ff60000 {
+>  	...
+>  	reg = <0 0x7ff60000 0 0x1000>;
+>  	clocks = <&scpi_clk 4>;
+> +	power-domains = <&scpi_devpd 1>;
+>  };
+> 
+>  thermal-zones {
+> @@ -186,3 +216,7 @@ The thermal-sensors property in the soc_thermal node uses the
+>  temperature sensor provided by SCP firmware to setup a thermal
+>  zone. The ID "3" is the sensor identifier for the temperature sensor
+>  as used by the firmware.
+> +
+> +The num-domains property in scpi-power-domains domain specifies that
+> +SCPI provides 2 power domains. The hdlcd node uses the power domain with
+> +domain ID 1.
+> --
+> 2.7.4
+> 
