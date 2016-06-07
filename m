@@ -1,77 +1,60 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 8 Jun 2016 01:20:48 +0800
-Subject: [PATCH v5 02/18] remoteproc: st_slim_rproc: add a slimcore rproc
- driver
-In-Reply-To: <1465316352-20691-3-git-send-email-peter.griffin@linaro.org>
-Message-ID: <201606080142.ujZMSAIX%fengguang.wu@intel.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Tue, 7 Jun 2016 19:36:57 +0200
+Subject: [BUG] Page allocation failures with newest kernels
+In-Reply-To: <20160603123655.GA2527@techsingularity.net>
+References: <CAPv3WKcVsWBgHHC3UPNcbka2JUmN4CTw1Ym4BR1=1V9=B9av5Q@mail.gmail.com>
+ <574D64A0.2070207@arm.com>
+ <CAPv3WKdYdwpi3k5eY86qibfprMFwkYOkDwHOsNydp=0sTV3mgg@mail.gmail.com>
+ <60e8df74202e40b28a4d53dbc7fd0b22@IL-EXCH02.marvell.com>
+ <20160531131520.GI24936@arm.com>
+ <CAPv3WKftqsEXbdU-geAcUKXBSskhA0V72N61a1a+5DfahLK_Dg@mail.gmail.com>
+ <20160602135226.GX2527@techsingularity.net>
+ <CAPv3WKd8Zdcv5nhr2euN7L4W5JYLex_Hmn+9AVd6reyD-Vw4kg@mail.gmail.com>
+ <20160603095344.GZ2527@techsingularity.net>
+ <CAPv3WKfrgNg00M4oE3VKLYimYqN6NO6ziR7LWYXQ1d_M-bo67A@mail.gmail.com>
+ <20160603123655.GA2527@techsingularity.net>
+Message-ID: <CAPv3WKfEQCeR++uqaUVhhsNe0WFsKq1Sn9uo==9NxtQe=GV7zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Mel,
 
-[auto build test WARNING on robh/for-next]
-[also build test WARNING on v4.7-rc2 next-20160607]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Peter-Griffin/Add-support-for-FDMA-DMA-controller-and-slim-core-rproc-found-on-STi-chipsets/20160608-002710
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: x86_64-allmodconfig (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
 
-All warnings (new ones prefixed by >>):
+2016-06-03 14:36 GMT+02:00 Mel Gorman <mgorman@techsingularity.net>:
+> On Fri, Jun 03, 2016 at 01:57:06PM +0200, Marcin Wojtas wrote:
+>> >> For the record: the newest kernel I was able to reproduce the dumps
+>> >> was v4.6: http://pastebin.com/ekDdACn5. I've just checked v4.7-rc1,
+>> >> which comprise a lot (mainly yours) changes in mm, and I'm wondering
+>> >> if there may be a spot fix or rather a series of improvements. I'm
+>> >> looking forward to your opinion and would be grateful for any advice.
+>> >>
+>> >
+>> > I don't believe we want to reintroduce the reserve to cope with CMA. One
+>> > option would be to widen the gap between low and min watermark by the
+>> > size of the CMA region. The effect would be to wake kswapd earlier which
+>> > matters considering the context of the failing allocation was
+>> > GFP_ATOMIC.
+>>
+>> Of course my intention is not reintroducing anything that's gone
+>> forever, but just to find out way to overcome current issues. Do you
+>> mean increasing CMA size?
+>
+> No. There is a gap between the low and min watermarks. At the low point,
+> kswapd is woken up and at the min point allocation requests either
+> either direct reclaim or fail if they are atomic. What I'm suggesting
+> is that you adjust the low watermark and add the size of the CMA area
+> to it so that kswapd is woken earlier. The watermarks are calculated in
+> __setup_per_zone_wmarks
+>
 
-   drivers/remoteproc/st_slim_rproc.c: In function 'slim_rproc_start':
->> drivers/remoteproc/st_slim_rproc.c:137:9: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-     writel(~0UL, slim_rproc->peri + SLIM_INT_CLR_OFST);
-            ^
-   drivers/remoteproc/st_slim_rproc.c:138:9: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-     writel(~0UL, slim_rproc->peri + SLIM_CMD_CLR_OFST);
-            ^
-   drivers/remoteproc/st_slim_rproc.c:141:9: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-     writel(~0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
-            ^
-   drivers/remoteproc/st_slim_rproc.c:142:9: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-     writel(~0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
-            ^
+I printed all zones' settings, whose watermarks are configured within
+__setup_per_zone_wmarks(). There are three DMA, Normal and Movable -
+only first one's watermarks have non-zero values. Increasing DMA min
+watermark didn't help. I also played with increasing
+/proc/sys/vm/min_free_kbytes from ~2560 to 16000
+(__setup_per_zone_wmarks() recalculates watermarks after that) - no
+effect either.
 
-vim +137 drivers/remoteproc/st_slim_rproc.c
-
-   121			dev_err(dev, "Failed to enable clocks\n");
-   122			goto err_clk;
-   123		}
-   124	
-   125		/* disable CPU pipeline clock & reset cpu pipeline */
-   126		val = SLIM_CLK_GATE_DIS | SLIM_CLK_GATE_RESET;
-   127		writel(val, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-   128	
-   129		/* disable SLIM core STBus sync */
-   130		writel(SLIM_STBUS_SYNC_DIS, slim_rproc->peri + SLIM_STBUS_SYNC_OFST);
-   131	
-   132		/* enable cpu pipeline clock */
-   133		writel(!SLIM_CLK_GATE_DIS,
-   134			slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-   135	
-   136		/* clear int & cmd mailbox */
- > 137		writel(~0UL, slim_rproc->peri + SLIM_INT_CLR_OFST);
-   138		writel(~0UL, slim_rproc->peri + SLIM_CMD_CLR_OFST);
-   139	
-   140		/* enable all channels cmd & int */
-   141		writel(~0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
-   142		writel(~0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
-   143	
-   144		/* enable cpu */
-   145		writel(SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 54766 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160608/f2d860ee/attachment-0001.obj>
+Best regards,
+Marcin
