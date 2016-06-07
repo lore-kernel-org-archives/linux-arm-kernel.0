@@ -1,475 +1,116 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue,  7 Jun 2016 17:18:56 +0100
-Subject: [PATCH v5 02/18] remoteproc: st_slim_rproc: add a slimcore rproc
- driver
+Date: Tue,  7 Jun 2016 17:18:58 +0100
+Subject: [PATCH v5 04/18] dmaengine: st_fdma: Add STMicroelectronics FDMA DT
+ binding documentation
 In-Reply-To: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
 References: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1465316352-20691-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1465316352-20691-5-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-slim core is used as a basis for many IPs in the STi
-chipsets such as fdma and demux. To avoid duplicating
-the elf loading code in each device driver a slim
-rproc driver has been created.
+This patch adds the DT binding documentation for the FDMA constroller
+found on STi based chipsets from STMicroelectronics.
 
-This driver is designed to be used by other device drivers
-such as fdma, or demux whose IP is based around a slim core.
-The device driver can call slim_rproc_alloc() to allocate
-a slim rproc and slim_rproc_put() when finished.
-
-This driver takes care of ioremapping the slim
-registers (dmem, imem, slimcore, peripherals), whose offsets
-and sizes can change between IP's. It also obtains and enables
-any clocks used by the device. This approach avoids having
-a double mapping of the registers as slim_rproc does not register
-its own platform device. It also maps well to device tree
-abstraction as it allows us to have one dt node for the whole
-device.
-
-All of the generic rproc elf loading code can be reused, and
-we provide start() stop() hooks to start and stop the slim
-core once the firmware has been loaded. This has been tested
-successfully with fdma driver.
-
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/remoteproc/Kconfig               |   8 +
- drivers/remoteproc/Makefile              |   1 +
- drivers/remoteproc/st_slim_rproc.c       | 338 +++++++++++++++++++++++++++++++
- include/linux/remoteproc/st_slim_rproc.h |  53 +++++
- 4 files changed, 400 insertions(+)
- create mode 100644 drivers/remoteproc/st_slim_rproc.c
- create mode 100644 include/linux/remoteproc/st_slim_rproc.h
+ Documentation/devicetree/bindings/dma/st_fdma.txt | 87 +++++++++++++++++++++++
+ 1 file changed, 87 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
 
-diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-index 72e97d7..9bb13b6 100644
---- a/drivers/remoteproc/Kconfig
-+++ b/drivers/remoteproc/Kconfig
-@@ -86,4 +86,12 @@ config ST_REMOTEPROC
- 	  processor framework.
- 	  This can be either built-in or a loadable module.
- 
-+config ST_SLIM_REMOTEPROC
-+	tristate "ST Slim remoteproc support"
-+	select REMOTEPROC
-+	help
-+	  Say y here to support firmware loading on IP based around
-+	  the Slim core.
-+	  If unsure say N.
-+
- endmenu
-diff --git a/drivers/remoteproc/Makefile b/drivers/remoteproc/Makefile
-index 279cb2e..37bb39a 100644
---- a/drivers/remoteproc/Makefile
-+++ b/drivers/remoteproc/Makefile
-@@ -12,3 +12,4 @@ obj-$(CONFIG_STE_MODEM_RPROC)	 	+= ste_modem_rproc.o
- obj-$(CONFIG_WKUP_M3_RPROC)		+= wkup_m3_rproc.o
- obj-$(CONFIG_DA8XX_REMOTEPROC)		+= da8xx_remoteproc.o
- obj-$(CONFIG_ST_REMOTEPROC)		+= st_remoteproc.o
-+obj-$(CONFIG_ST_SLIM_REMOTEPROC)	+= st_slim_rproc.o
-diff --git a/drivers/remoteproc/st_slim_rproc.c b/drivers/remoteproc/st_slim_rproc.c
+diff --git a/Documentation/devicetree/bindings/dma/st_fdma.txt b/Documentation/devicetree/bindings/dma/st_fdma.txt
 new file mode 100644
-index 0000000..934f490
+index 0000000..495d853
 --- /dev/null
-+++ b/drivers/remoteproc/st_slim_rproc.c
-@@ -0,0 +1,338 @@
-+/*
-+ * st_slim_rproc.c
-+ *
-+ * Copyright (C) 2016 STMicroelectronics
-+ * Author: Peter Griffin <peter.griffin@linaro.org>
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/err.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/platform_device.h>
-+#include <linux/remoteproc.h>
-+#include <linux/remoteproc/st_slim_rproc.h>
-+#include "remoteproc_internal.h"
-+
-+/* slimcore registers */
-+#define SLIM_ID_OFST		0x0
-+#define SLIM_VER_OFST		0x4
-+
-+#define SLIM_EN_OFST		0x8
-+#define SLIM_EN_RUN			BIT(0)
-+
-+#define SLIM_CLK_GATE_OFST	0xC
-+#define SLIM_CLK_GATE_DIS		BIT(0)
-+#define SLIM_CLK_GATE_RESET		BIT(2)
-+
-+#define SLIM_SLIM_PC_OFST	0x20
-+
-+/* dmem registers */
-+#define SLIM_REV_ID_OFST	0x0
-+#define SLIM_REV_ID_MIN_MASK		GENMASK(15, 8)
-+#define SLIM_REV_ID_MIN(id)		((id & SLIM_REV_ID_MIN_MASK) >> 8)
-+#define SLIM_REV_ID_MAJ_MASK		GENMASK(23, 16)
-+#define SLIM_REV_ID_MAJ(id)		((id & SLIM_REV_ID_MAJ_MASK) >> 16)
-+
-+
-+/* peripherals registers */
-+#define SLIM_STBUS_SYNC_OFST	0xF88
-+#define SLIM_STBUS_SYNC_DIS		BIT(0)
-+
-+#define SLIM_INT_SET_OFST	0xFD4
-+#define SLIM_INT_CLR_OFST	0xFD8
-+#define SLIM_INT_MASK_OFST	0xFDC
-+
-+#define SLIM_CMD_CLR_OFST	0xFC8
-+#define SLIM_CMD_MASK_OFST	0xFCC
-+
-+const char *mem_names[SLIM_MEM_MAX] = {
-+	[SLIM_DMEM]	= "dmem",
-+	[SLIM_IMEM]	= "imem",
-+};
-+
-+static int slim_clk_get(struct st_slim_rproc *slim_rproc, struct device *dev)
-+{
-+	int clk, err;
-+
-+	for (clk = 0; clk < SLIM_MAX_CLK; clk++) {
-+		slim_rproc->clks[clk] = of_clk_get(dev->of_node, clk);
-+		if (IS_ERR(slim_rproc->clks[clk])) {
-+			err = PTR_ERR(slim_rproc->clks[clk]);
-+			if (err == -EPROBE_DEFER)
-+				goto err_put_clks;
-+			slim_rproc->clks[clk] = NULL;
-+			break;
-+		}
-+	}
-+
-+	return 0;
-+
-+err_put_clks:
-+	while (--clk >= 0)
-+		clk_put(slim_rproc->clks[clk]);
-+
-+	return err;
-+}
-+
-+static void slim_clk_disable(struct st_slim_rproc *slim_rproc)
-+{
-+	int clk;
-+
-+	for (clk = 0; clk < SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++)
-+		clk_disable_unprepare(slim_rproc->clks[clk]);
-+}
-+
-+static int slim_clk_enable(struct st_slim_rproc *slim_rproc)
-+{
-+	int clk, ret;
-+
-+	for (clk = 0; clk < SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++) {
-+		ret = clk_prepare_enable(slim_rproc->clks[clk]);
-+		if (ret)
-+			goto err_disable_clks;
-+	}
-+
-+	return 0;
-+
-+err_disable_clks:
-+	while (--clk >= 0)
-+		clk_disable_unprepare(slim_rproc->clks[clk]);
-+
-+	return ret;
-+}
-+
-+/**
-+ * Remoteproc slim specific device handlers
-+ */
-+static int slim_rproc_start(struct rproc *rproc)
-+{
-+	struct device *dev = &rproc->dev;
-+	struct st_slim_rproc *slim_rproc = rproc->priv;
-+	unsigned long hw_id, hw_ver, fw_rev;
-+	u32 val;
-+	int ret;
-+
-+	ret = slim_clk_enable(slim_rproc);
-+	if (ret) {
-+		dev_err(dev, "Failed to enable clocks\n");
-+		goto err_clk;
-+	}
-+
-+	/* disable CPU pipeline clock & reset cpu pipeline */
-+	val = SLIM_CLK_GATE_DIS | SLIM_CLK_GATE_RESET;
-+	writel(val, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-+
-+	/* disable SLIM core STBus sync */
-+	writel(SLIM_STBUS_SYNC_DIS, slim_rproc->peri + SLIM_STBUS_SYNC_OFST);
-+
-+	/* enable cpu pipeline clock */
-+	writel(!SLIM_CLK_GATE_DIS,
-+		slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-+
-+	/* clear int & cmd mailbox */
-+	writel(~0UL, slim_rproc->peri + SLIM_INT_CLR_OFST);
-+	writel(~0UL, slim_rproc->peri + SLIM_CMD_CLR_OFST);
-+
-+	/* enable all channels cmd & int */
-+	writel(~0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
-+	writel(~0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
-+
-+	/* enable cpu */
-+	writel(SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
-+
-+	hw_id = readl_relaxed(slim_rproc->slimcore + SLIM_ID_OFST);
-+	hw_ver = readl_relaxed(slim_rproc->slimcore + SLIM_VER_OFST);
-+
-+	fw_rev = readl(slim_rproc->mem[SLIM_DMEM].cpu_addr +
-+			SLIM_REV_ID_OFST);
-+
-+	dev_info(dev, "fw rev:%ld.%ld on SLIM %ld.%ld\n",
-+		 SLIM_REV_ID_MAJ(fw_rev), SLIM_REV_ID_MIN(fw_rev),
-+		 hw_id, hw_ver);
-+
-+err_clk:
-+	return ret;
-+}
-+
-+static int slim_rproc_stop(struct rproc *rproc)
-+{
-+	struct st_slim_rproc *slim_rproc = rproc->priv;
-+	u32 val;
-+
-+	/* mask all (cmd & int) channels */
-+	writel(0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
-+	writel(0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
-+
-+	/* disable cpu pipeline clock */
-+	writel(SLIM_CLK_GATE_DIS
-+		, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
-+
-+	writel(!SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
-+
-+	val = readl(slim_rproc->slimcore + SLIM_EN_OFST);
-+	if (val & SLIM_EN_RUN)
-+		dev_warn(&rproc->dev, "Failed to disable SLIM");
-+
-+	slim_clk_disable(slim_rproc);
-+
-+	dev_dbg(&rproc->dev, "slim stopped\n");
-+
-+	return 0;
-+}
-+
-+static void *slim_rproc_da_to_va(struct rproc *rproc, u64 da, int len)
-+{
-+	struct st_slim_rproc *slim_rproc = rproc->priv;
-+	void *va = NULL;
-+	int i;
-+
-+	for (i = 0; i < SLIM_MEM_MAX; i++) {
-+		if (da != slim_rproc->mem[i].bus_addr)
-+			continue;
-+
-+		va = slim_rproc->mem[i].cpu_addr;
-+		break;
-+	}
-+
-+	dev_dbg(&rproc->dev, "%s: da = 0x%llx len = 0x%x va = 0x%p\n",
-+		__func__, da, len, va);
-+
-+	return va;
-+}
-+
-+static struct rproc_ops slim_rproc_ops = {
-+	.start		= slim_rproc_start,
-+	.stop		= slim_rproc_stop,
-+	.da_to_va       = slim_rproc_da_to_va,
-+};
-+
-+/**
-+ * Firmware handler operations: sanity, boot address, load ...
-+ */
-+
-+/**
-+ * slim_rproc_alloc() - allocate and initialise slim rproc
-+ * @pdev: Pointer to the platform_device struct
-+ * @fw_name: Name of firmware for rproc to use
-+ *
-+ * Function for allocating and initialising a slim rproc for use by
-+ * device drivers whose IP is based around the slim slim core. It
-+ * obtains and enables any clocks required by the slim core and also
-+ * ioremaps the various IO.
-+ *
-+ * Returns st_slim_rproc pointer or PTR_ERR() on error.
-+ */
-+
-+struct st_slim_rproc *slim_rproc_alloc(struct platform_device *pdev,
-+				char *fw_name)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct st_slim_rproc *slim_rproc;
-+	struct device_node *np = dev->of_node;
-+	struct rproc *rproc;
-+	struct resource *res;
-+	int err, i;
-+
-+	if (WARN_ON(!np || !fw_name))
-+		return ERR_PTR(-EINVAL);
-+
-+	if (!of_device_is_compatible(np, "st,slim-rproc"))
-+		return ERR_PTR(-EINVAL);
-+
-+	rproc = rproc_alloc(dev, np->name, &slim_rproc_ops,
-+			fw_name, sizeof(*slim_rproc));
-+	if (!rproc)
-+		return ERR_PTR(-ENOMEM);
-+
-+	rproc->has_iommu = false;
-+	rproc->has_rsctable = false;
-+
-+	slim_rproc = rproc->priv;
-+	slim_rproc->rproc = rproc;
-+
-+	/* get imem and dmem */
-+	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
-+
-+		res = platform_get_resource_byname
-+			(pdev, IORESOURCE_MEM, mem_names[i]);
-+
-+		slim_rproc->mem[i].cpu_addr = devm_ioremap_resource(dev, res);
-+		if (IS_ERR(slim_rproc->mem[i].cpu_addr)) {
-+			dev_err(&pdev->dev, "devm_ioremap_resource failed\n");
-+			err = PTR_ERR(slim_rproc->mem[i].cpu_addr);
-+			goto err;
-+		}
-+		slim_rproc->mem[i].bus_addr = res->start;
-+		slim_rproc->mem[i].size = resource_size(res);
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "slimcore");
-+
-+	slim_rproc->slimcore = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(slim_rproc->slimcore)) {
-+		dev_err(&pdev->dev,
-+			"devm_ioremap_resource failed for slimcore\n");
-+		err = PTR_ERR(slim_rproc->slimcore);
-+		goto err;
-+	}
-+
-+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "peripherals");
-+
-+	slim_rproc->peri = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(slim_rproc->peri)) {
-+		dev_err(&pdev->dev, "devm_ioremap_resource failed for peri\n");
-+		err = PTR_ERR(slim_rproc->peri);
-+		goto err;
-+	}
-+
-+	err = slim_clk_get(slim_rproc, dev);
-+	if (err)
-+		goto err;
-+
-+	/* Register as a remoteproc device */
-+	err = rproc_add(rproc);
-+	if (err) {
-+		dev_err(dev, "registration of slim remoteproc failed\n");
-+		goto err_clk;
-+	}
-+
-+	return slim_rproc;
-+
-+err_clk:
-+	for (i = 0; i < SLIM_MAX_CLK && slim_rproc->clks[i]; i++)
-+		clk_put(slim_rproc->clks[i]);
-+err:
-+	rproc_put(rproc);
-+	return ERR_PTR(err);
-+}
-+EXPORT_SYMBOL(slim_rproc_alloc);
-+
-+/**
-+  * slim_rproc_put() - put slim rproc resources
-+  * @slim_rproc: Pointer to the st_slim_rproc struct
-+  *
-+  * Function for calling respective _put() functions on
-+  * slim_rproc resources.
-+  *
-+  */
-+void slim_rproc_put(struct st_slim_rproc *slim_rproc)
-+{
-+	int clk;
-+
-+	if (!slim_rproc)
-+		return;
-+
-+	for (clk = 0; clk < SLIM_MAX_CLK && slim_rproc->clks[clk]; clk++)
-+		clk_put(slim_rproc->clks[clk]);
-+
-+	rproc_put(slim_rproc->rproc);
-+}
-+EXPORT_SYMBOL(slim_rproc_put);
-+
-+MODULE_AUTHOR("Peter Griffin");
-+MODULE_DESCRIPTION("STMicroelectronics SLIM rproc driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/remoteproc/st_slim_rproc.h b/include/linux/remoteproc/st_slim_rproc.h
-new file mode 100644
-index 0000000..c300b3e
---- /dev/null
-+++ b/include/linux/remoteproc/st_slim_rproc.h
-@@ -0,0 +1,53 @@
-+/*
-+ * st_slim_rproc.h
-+ *
-+ * Copyright (C) 2016 STMicroelectronics
-+ * Author: Peter Griffin <peter.griffin@linaro.org>
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+#ifndef _ST_SLIM_H
-+#define _ST_SLIM_H
-+
-+#define SLIM_MEM_MAX 2
-+#define SLIM_MAX_CLK 4
-+
-+enum {
-+	SLIM_DMEM,
-+	SLIM_IMEM,
-+};
-+
-+/**
-+ * struct slim_mem - slim internal memory structure
-+ * @cpu_addr: MPU virtual address of the memory region
-+ * @bus_addr: Bus address used to access the memory region
-+ * @size: Size of the memory region
-+ */
-+struct slim_mem {
-+	void __iomem *cpu_addr;
-+	phys_addr_t bus_addr;
-+	size_t size;
-+};
-+
-+/**
-+ * struct st_slim_rproc - SLIM slim core
-+ * @rproc: rproc handle
-+ * @mem: slim memory information
-+ * @slimcore: slim slimcore regs
-+ * @peri: slim peripheral regs
-+ * @clks: slim clocks
-+ */
-+struct st_slim_rproc {
-+	struct rproc *rproc;
-+	struct slim_mem mem[SLIM_MEM_MAX];
-+	void __iomem *slimcore;
-+	void __iomem *peri;
-+
-+	/* st_slim_rproc private */
-+	struct clk *clks[SLIM_MAX_CLK];
-+};
-+
-+struct st_slim_rproc *slim_rproc_alloc(struct platform_device *pdev,
-+					char *fw_name);
-+void slim_rproc_put(struct st_slim_rproc *slim_rproc);
-+
-+#endif
++++ b/Documentation/devicetree/bindings/dma/st_fdma.txt
+@@ -0,0 +1,87 @@
++* STMicroelectronics Flexible Direct Memory Access Device Tree bindings
++
++The FDMA is a general-purpose direct memory access controller capable of
++supporting 16 independent DMA channels. It accepts up to 32 DMA requests.
++The FDMA is based on a Slim processor which requires a firmware.
++
++* FDMA Controller
++
++Required properties:
++- compatible	: Should be one of
++		 - st,stih407-fdma-mpe31-11, "st,slim-rproc";
++		 - st,stih407-fdma-mpe31-12, "st,slim-rproc";
++		 - st,stih407-fdma-mpe31-13, "st,slim-rproc";
++- reg		: Should contain an entry for each name in reg-names
++- reg-names	: Must contain "slimcore", "dmem", "peripherals", "imem" entries
++- interrupts	: Should contain one interrupt shared by all channels
++- dma-channels	: Number of channels supported by the controller
++- #dma-cells	: Must be <3>. See DMA client section below
++- clocks	: Must contain an entry for each clock
++See: Documentation/devicetree/bindings/clock/clock-bindings.txt
++
++
++Example:
++
++	fdma0: dma-controller at 8e20000 {
++		compatible = "st,stih407-fdma-mpe31-11", "st,slim-rproc";
++		reg = <0x8e20000 0x8000>,
++		      <0x8e30000 0x3000>,
++		      <0x8e37000 0x1000>,
++		      <0x8e38000 0x8000>;
++		reg-names = "slimcore", "dmem", "peripherals", "imem";
++		clocks = <&clk_s_c0_flexgen CLK_FDMA>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>,
++			 <&clk_s_c0_flexgen CLK_EXT2F_A9>;
++		interrupts = <GIC_SPI 5 IRQ_TYPE_NONE>;
++		dma-channels = <16>;
++		#dma-cells = <3>;
++	};
++
++* DMA client
++
++Required properties:
++- dmas: Comma separated list of dma channel requests
++- dma-names: Names of the aforementioned requested channels
++
++Each dmas request consists of 4 cells:
++1. A phandle pointing to the FDMA controller
++2. The request line number
++3. A 32bit mask specifying (see include/linux/platform_data/dma-st-fdma.h)
++ -bit 2-0: Holdoff value, dreq will be masked for
++	0x0: 0-0.5us
++	0x1: 0.5-1us
++	0x2: 1-1.5us
++ -bit 17: data swap
++	0x0: disabled
++	0x1: enabled
++ -bit 21: Increment Address
++	0x0: no address increment between transfers
++	0x1: increment address between transfers
++ -bit 22: 2 STBus Initiator Coprocessor interface
++	0x0: high priority port
++	0x1: low priority port
++4. transfers type
++ 0 free running
++ 1 paced
++
++Example:
++
++	sti_uni_player2: sti-uni-player at 2 {
++		compatible = "st,sti-uni-player";
++		status = "disabled";
++		#sound-dai-cells = <0>;
++		st,syscfg = <&syscfg_core>;
++		clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
++		assigned-clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
++		assigned-clock-parents = <&clk_s_d0_quadfs 2>;
++		assigned-clock-rates = <50000000>;
++		reg = <0x8D82000 0x158>;
++		interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
++		dmas = <&fdma0 4 0 1>;
++		dai-name = "Uni Player #1 (DAC)";
++		dma-names = "tx";
++		st,uniperiph-id = <2>;
++		st,version = <5>;
++		st,mode = "PCM";
++	};
 -- 
 1.9.1
