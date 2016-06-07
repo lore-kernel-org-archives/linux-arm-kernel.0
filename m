@@ -1,38 +1,40 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 15:17:53 +0100
-Subject: [PATCH] clocksource/drivers/armada-370-xp: make syscore_ops static
-Message-ID: <1465309073-20584-1-git-send-email-ben.dooks@codethink.co.uk>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 7 Jun 2016 11:22:35 -0300
+Subject: [PATCH v3 0/9] Add MT8173 Video Decoder Driver
+In-Reply-To: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+References: <1464611363-14936-1-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <20160607112235.475c2e4c@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver does not export armada_370_xp_timer_syscore_ops so
-make it static to fix the following warning:
+Em Mon, 30 May 2016 20:29:14 +0800
+Tiffany Lin <tiffany.lin@mediatek.com> escreveu:
 
-drivers/clocksource/time-armada-370-xp.c:249:20: warning: symbol 'armada_370_xp_timer_syscore_ops' was not declared. Should it be static?
+> ==============
+>  Introduction
+> ==============
+> 
+> The purpose of this series is to add the driver for video codec hw embedded in the Mediatek's MT8173 SoCs.
+> Mediatek Video Codec is able to handle video decoding of in a range of formats.
+> 
+> This patch series add Mediatek block format V4L2_PIX_FMT_MT21, the decoder driver will decoded bitstream to
+> V4L2_PIX_FMT_MT21 format.
+> 
+> This patch series rely on MTK VPU driver in patch series "Add MT8173 Video Encoder Driver and VPU Driver"[1]
+> and patch "CHROMIUM: v4l: Add V4L2_PIX_FMT_VP9 definition"[2] for VP9 support.
+> Mediatek Video Decoder driver rely on VPU driver to load, communicate with VPU.
+> 
+> Internally the driver uses videobuf2 framework and MTK IOMMU and MTK SMI both have been merged in v4.6-rc1.
+> 
+> [1]https://patchwork.linuxtv.org/patch/33734/
+> [2]https://chromium-review.googlesource.com/#/c/245241/
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- drivers/clocksource/time-armada-370-xp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hmm... I'm not seeing the firmware for this driver at the
+linux-firmware tree:
+	https://git.kernel.org/cgit/linux/kernel/git/firmware/linux-firmware.git/log/
 
-diff --git a/drivers/clocksource/time-armada-370-xp.c b/drivers/clocksource/time-armada-370-xp.c
-index d93ec3c..601dbf74 100644
---- a/drivers/clocksource/time-armada-370-xp.c
-+++ b/drivers/clocksource/time-armada-370-xp.c
-@@ -246,7 +246,7 @@ static void armada_370_xp_timer_resume(void)
- 	writel(timer0_local_ctrl_reg, local_base + TIMER_CTRL_OFF);
- }
- 
--struct syscore_ops armada_370_xp_timer_syscore_ops = {
-+static struct syscore_ops armada_370_xp_timer_syscore_ops = {
- 	.suspend	= armada_370_xp_timer_suspend,
- 	.resume		= armada_370_xp_timer_resume,
- };
--- 
-2.8.1
+Nor I'm seeing any pull request for them. Did you send it?
+I'll only merge the driver upstream after seeing such pull request.
+
+Regards,
+Mauro
