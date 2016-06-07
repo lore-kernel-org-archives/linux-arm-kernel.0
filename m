@@ -1,70 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 7 Jun 2016 15:45:44 +0100
-Subject: [PATCH 2/3] Documentation: add DT bindings for ARM SCPI power
- domains
-In-Reply-To: <5756CE8D.6040704@arm.com>
-References: <1465228439-13457-1-git-send-email-sudeep.holla@arm.com>
- <1465228439-13457-3-git-send-email-sudeep.holla@arm.com>
- <20160607132223.GG2633@leverpostej> <5756CE8D.6040704@arm.com>
-Message-ID: <20160607144544.GC26981@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Jun 2016 15:54:34 +0100
+Subject: [PATCH v3] ASoC: rockchip: Add machine driver for
+ MAX98357A/RT5514/DA7219
+In-Reply-To: <5756D0BA.7060702@rock-chips.com>
+References: <20160601144542.GA3835@rob-hp-laptop>
+ <5751912C.6080904@rock-chips.com>
+ <20160606235026.GP7510@sirena.org.uk>
+ <5756363F.40208@rock-chips.com>
+ <20160607104711.GR7510@sirena.org.uk>
+ <5756B22F.9000105@rock-chips.com>
+ <20160607120647.GV7510@sirena.org.uk>
+ <5756C245.7010001@rock-chips.com>
+ <20160607133247.GY7510@sirena.org.uk>
+ <5756D0BA.7060702@rock-chips.com>
+Message-ID: <20160607145434.GZ7510@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 02:39:25PM +0100, Sudeep Holla wrote:
-> 
-> 
-> On 07/06/16 14:22, Mark Rutland wrote:
-> >On Mon, Jun 06, 2016 at 04:53:58PM +0100, Sudeep Holla wrote:
-> >>The System Control Processor (SCP) provides peripheral devices with
-> >>power domains that can be enabled and disabled viathe System Control
-> >>and Power Interface (SCPI) Message Protocol. Add bindings to allow
-> >>probing of these device power domians.
-> >>
-> >>Cc: Rob Herring <robh+dt@kernel.org>
-> >>Cc: Mark Rutland <mark.rutland@arm.com>
-> >>Cc: linux-arm-kernel at lists.infradead.org
-> >>Cc: devicetree at vger.kernel.org
-> >>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>---
-> >>  Documentation/devicetree/bindings/arm/arm,scpi.txt | 34 ++++++++++++++++++++++
-> >>  1 file changed, 34 insertions(+)
-> >>
-> >>diff --git a/Documentation/devicetree/bindings/arm/arm,scpi.txt b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> >>index 313dabdc14f9..7141670d649b 100644
-> >>--- a/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> >>+++ b/Documentation/devicetree/bindings/arm/arm,scpi.txt
-> >>@@ -87,10 +87,33 @@ SCPI provides an API to access the various sensors on the SoC.
-> >>  			 implementation for the IDs to use. For Juno
-> >>  			 R0 and Juno R1 refer to [3].
-> >>
-> >>+Power domain bindings for the power domains based on SCPI Message Protocol
-> >>+------------------------------------------------------------
-> >>+
-> >>+This binding uses the generic power domain binding[4].
-> >>+
-> >>+PM domain providers
-> >>+===================
-> >>+
-> >>+Required properties:
-> >>+ - #power-domain-cells : Should be 1. Contains the device or the power
-> >>+			 domain ID value used by SCPI commands.
-> >>+ - num-domains: Total number of power domains provided by SCPI. This is
-> >>+		needed as the SCPI message protocol lacks a mechanism to
-> >>+		query this information runtime.
-> >                                       ^
-> >I guess there should be an 'at' here.
-> >
-> 
-> Will fix.
-> 
-> >Are domain IDs zero-based and definitely non-sparse?
-> >
-> 
-> Yes
+On Tue, Jun 07, 2016 at 09:48:42PM +0800, Xing Zheng wrote:
+> On 2016?06?07? 21:32, Mark Brown wrote:
 
-Ok. So FWIW, with the fix above:
+> > I imagine they're all variants on a single reference design though?  The
+> > name is unweildy.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+> Yes, they are based on a single reference design which is called gru, so
+> could I use the name "rk3399-gru-sound"?
 
-Thanks,
-Mark.
+That looks reasonable.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/b1b0ca33/attachment.sig>
