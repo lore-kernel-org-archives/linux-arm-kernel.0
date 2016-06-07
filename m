@@ -1,90 +1,79 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 7 Jun 2016 16:13:03 +0200
-Subject: [PATCH] arm64: Implement ptep_set_access_flags() for hardware
- AF/DBM
-In-Reply-To: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
-References: <1460559682-31267-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <4c2b3cff-d4a7-f3b8-ef0d-f6caa21f412e@suse.de>
+From: liviu.dudau@arm.com (liviu.dudau at arm.com)
+Date: Tue, 7 Jun 2016 15:14:04 +0100
+Subject: HDLCD crashes with 6d910bfa809e
+In-Reply-To: <5756D602.4090305@arm.com>
+References: <5756B8A8.8000902@arm.com>
+ <20160607133535.GA1165@e106497-lin.cambridge.arm.com>
+ <5756D602.4090305@arm.com>
+Message-ID: <20160607141404.GC1165@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.04.16 17:01, Catalin Marinas wrote:
-> When hardware updates of the access and dirty states are enabled, the
-> default ptep_set_access_flags() implementation based on calling
-> set_pte_at() directly is potentially racy. This triggers the "racy dirty
-> state clearing" warning in set_pte_at() because an existing writable PTE
-> is overridden with a clean entry.
+On Tue, Jun 07, 2016 at 03:11:14PM +0100, Robin Murphy wrote:
+> Hi Liviu,
 > 
-> There are two main scenarios for this situation:
+> On 07/06/16 14:35, liviu.dudau at arm.com wrote:
+> >On Tue, Jun 07, 2016 at 01:06:00PM +0100, Robin Murphy wrote:
+> >>Having just inadvertently merged -next into my working branch, I find
+> >>dev6d910bfa809e ("drm/hlcd: Use lockless gem BO free callback") adversely
+> >>affecting my board's ability to boot ;)
+> >>
+> >>Since I (intentionally) don't have sufficient CMA to create a framebuffer,
+> >>drm_gem_cma_create() fails, unconditionally calls the now-NULL
+> >>drm->driver->gem_free_object() in its cleanup path, and fiery death
+> >>ensues...
+> >
+> >Thanks for reporting this. What other changes other than reducing the CMA
+> >allocation size do you have that I might need in order to reproduce this?
 > 
-> 1. The CPU getting an access fault does not support hardware updates of
->    the access/dirty flags. However, a different agent in the system
->    (e.g. SMMU) can do this, therefore overriding a writable entry with a
->    clean one could potentially lose the automatically updated dirty
->    status
+> I've just confirmed a plain checkout of next-20160602, using arm64 defconfig
+> + DRM + HDLCD + TDA998X and CMA_SIZE_MBYTES=1, booted on a Juno, does the
+> job:
 > 
-> 2. A more complex situation is possible when all CPUs support hardware
->    AF/DBM:
+> [    3.032402] hdlcd 7ff60000.hdlcd: bound 0-0070 (ops tda998x_ops)
+> [    3.038388] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+> [    3.044970] [drm] No driver support for vblank timestamp query.
+> [    3.076973] hdlcd 7ff60000.hdlcd: failed to allocate buffer with size
+> 7680000
+> [    3.084081] Bad mode in Synchronous Abort handler detected, code
+> 0x86000004 -- IABT (current EL)
+> [    3.092815] CPU: 3 PID: 6 Comm: kworker/u12:0 Not tainted
+> 4.7.0-rc1-next-20160602 #686
+> [    3.100682] Hardware name: ARM Juno development board (r1) (DT)
+> [    3.106567] Workqueue: deferwq deferred_probe_work_func
+> [    3.111761] task: ffff8009768a3e80 ti: ffff8009768e8000 task.ti:
+> ffff8009768e8000
+> [    3.119198] PC is at 0x0
+> [    3.121720] LR is at drm_gem_cma_create+0x128/0x130
+> ...and so on.
 > 
->    a) Initial state: shareable + writable vma and pte_none(pte)
->    b) Read fault taken by two threads of the same process on different
->       CPUs
->    c) CPU0 takes the mmap_sem and proceeds to handling the fault. It
->       eventually reaches do_set_pte() which sets a writable + clean pte.
->       CPU0 releases the mmap_sem
->    d) CPU1 acquires the mmap_sem and proceeds to handle_pte_fault(). The
->       pte entry it reads is present, writable and clean and it continues
->       to pte_mkyoung()
->    e) CPU1 calls ptep_set_access_flags()
+> Today's -next, on the other hand, dodges the bullet entirely:
 > 
->    If between (d) and (e) the hardware (another CPU) updates the dirty
->    state (clears PTE_RDONLY), CPU1 will override the PTR_RDONLY bit
->    marking the entry clean again.
+> [    2.903645] [drm] found ARM HDLCD version r0p0
+> [    2.908122] hdlcd 7ff60000.hdlcd: master bind failed: -22
+> [    2.913505] tda998x: probe of 0-0070 failed with error -22
+> [    2.919141] [drm] found ARM HDLCD version r0p0
+> [    2.923609] hdlcd 7ff50000.hdlcd: master bind failed: -22
+> [    2.928991] tda998x: probe of 0-0071 failed with error -22
+
+Yes, if fails in of_reserved_mem_device_init(). Tracking now to see
+which of the conditions at line 311 are the culprits.
+
+Best regards,
+Liviu
+
 > 
-> This patch implements an arm64-specific ptep_set_access_flags() function
-> to perform an atomic update of the PTE flags.
+> Oh well...
 > 
-> Fixes: 2f4b829c625e ("arm64: Add support for hardware updates of the access and dirty pte bits")
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: Ming Lei <tom.leiming@gmail.com>
-> Tested-by: Julien Grall <julien.grall@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: <stable@vger.kernel.org> # 4.3+
+> Robin.
+> 
 
-This patch breaks swapping for me.
-
-I've hit weird issues where systems stopped working half-way, with the
-kernel still being fine and user space applications just stopping to
-respond.
-
-After some debugging we found out that it always happens when swapping
-(to anything, backing storage doesn't matter). A quick bisect points to
-this commit as culprit and indeed, if I disable CONFIG_ARM64_HW_AFDBM
-the system works as expected.
-
-For reference, here's my test case:
-
-  $ qemu-system-aarch64 -nographic -M virt -cpu host -m 800M -kernel
-Image  -initrd initrd.test -enable-kvm -append rd.break=pre-mount\
-loglevel=9
-
-Inside the VM:
-
-  $ modprobe zram; echo $(( 256 * 1024 * 1024 )) >
-/sys/block/zram0/disksize; mkswap /dev/zram0; swapon /dev/zram0
-  $ dd if=/dev/zero of=/dev/null bs=700M &
-  $ top
-
-In the broken case, you'll see either systemd cpu time spike (because
-it's stuck in a page fault loop) or the system hang (because the
-application owning the screen is stuck in a page fault loop).
-
-The back traces indicate that the page fault handler goes through and
-the process just keeps banging on the same page fault over and over
-again. I have not yet figured out what *exactly* is going wrong or why
-this patch would actually give us that effect.
-
-I was able to fully reproduce the issue with current Linus tree (4.7-rc2+).
-
-
-Alex
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
