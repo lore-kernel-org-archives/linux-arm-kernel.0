@@ -1,42 +1,33 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue,  7 Jun 2016 18:38:35 +0100
-Subject: [PATCH 2/8] dmaengine: fsl-edma: print error code in error messages.
+Date: Tue,  7 Jun 2016 18:38:40 +0100
+Subject: [PATCH 7/8] dmaengine: tegra20-apb-dma: Only calculate residue if
+ txstate exists.
 In-Reply-To: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
 References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1465321121-22238-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1465321121-22238-8-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is useful to print the error code as part of the error
-message.
+There is no point calculating the residue if there is
+no txstate to store the value.
 
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- drivers/dma/fsl-edma.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/dma/tegra20-apb-dma.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/dma/fsl-edma.c b/drivers/dma/fsl-edma.c
-index 7208fc9..cc06eea 100644
---- a/drivers/dma/fsl-edma.c
-+++ b/drivers/dma/fsl-edma.c
-@@ -963,14 +963,16 @@ static int fsl_edma_probe(struct platform_device *pdev)
+diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+index 01e316f..7f4af8c 100644
+--- a/drivers/dma/tegra20-apb-dma.c
++++ b/drivers/dma/tegra20-apb-dma.c
+@@ -814,7 +814,7 @@ static enum dma_status tegra_dma_tx_status(struct dma_chan *dc,
+ 	unsigned int residual;
  
- 	ret = dma_async_device_register(&fsl_edma->dma_dev);
- 	if (ret) {
--		dev_err(&pdev->dev, "Can't register Freescale eDMA engine.\n");
-+		dev_err(&pdev->dev,
-+			"Can't register Freescale eDMA engine. (%d)\n", ret);
- 		fsl_disable_clocks(fsl_edma);
+ 	ret = dma_cookie_status(dc, cookie, txstate);
+-	if (ret == DMA_COMPLETE)
++	if (ret == DMA_COMPLETE || !txstate)
  		return ret;
- 	}
  
- 	ret = of_dma_controller_register(np, fsl_edma_xlate, fsl_edma);
- 	if (ret) {
--		dev_err(&pdev->dev, "Can't register Freescale eDMA of_dma.\n");
-+		dev_err(&pdev->dev,
-+			"Can't register Freescale eDMA of_dma. (%d)\n", ret);
- 		dma_async_device_unregister(&fsl_edma->dma_dev);
- 		fsl_disable_clocks(fsl_edma);
- 		return ret;
+ 	spin_lock_irqsave(&tdc->lock, flags);
 -- 
 1.9.1
