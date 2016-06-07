@@ -1,102 +1,38 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 7 Jun 2016 17:48:21 +0200
-Subject: [PATCH] ARM: at91: debug: use DEBUG_UART_VIRT
-In-Reply-To: <1465313079-6307-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1465313079-6307-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <5756ECC5.6020908@atmel.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue,  7 Jun 2016 16:50:03 +0100
+Subject: [PATCH] dmaengine: ste_dma40_ll: make d40_width_to_bits static
+Message-ID: <1465314603-28909-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 07/06/2016 17:24, Alexandre Belloni a ?crit :
-> AT91 still uses an offset (0x0100 0000) from the physical address to map
-> the debug UART. This is unfortunate as for some platforms (sama5d3 and
-> earlier), it ends up in the PCI zone and PCI is enabled in multi_v7.
-> Switch to DEBUG_UART_VIRT to solve that.
-> 
-> Tested on sama5d3 and 9g20.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Fix warning due to d40_width_to_bits() not being used outside
+this file. Fixes:
 
-People using their old defconfigs must pay attention to this change...
-but it's true that it's a debug configuration anyway...
+drivers/dma/ste_dma40_ll.c:13:4: warning: symbol 'd40_width_to_bits' was not declared. Should it be static?
 
-> ---
->  arch/arm/Kconfig.debug        | 11 ++++++-----
->  arch/arm/include/debug/at91.S | 10 +---------
->  2 files changed, 7 insertions(+), 14 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 19a3dcf5eb2e..2609491f4ab1 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -117,15 +117,15 @@ choice
->  		  their output to the serial port on atmel devices.
->  
->  		  SOC                  DEBUG_UART_PHYS   DEBUG_UART_VIRT  PORT
-> -		  rm9200, 9260/9g20,   0xfffff200        0xfefff200       DBGU
-> +		  rm9200, 9260/9g20,   0xfffff200        0xf8fff200       DBGU
->  		  9261/9g10, 9rl
-> -		  9263, 9g45, sama5d3  0xffffee00        0xfeffee00       DBGU
-> +		  9263, 9g45, sama5d3  0xffffee00        0xf8ffee00       DBGU
->  		  sama5d4              0xfc00c000        0xfb00c000       USART3
->  		  sama5d4              0xfc069000        0xfb069000       DBGU
->  		  sama5d2              0xf8020000        0xf7020000       UART1
->  
-> -		  Please adjust DEBUG_UART_PHYS configuration options based on
-> -		  your needs.
-> +		  Please adjust DEBUG_UART_PHYS and DEBUG_UART_VIRT
-> +		  configuration options based on your needs.
->  
->  	config DEBUG_BCM2835
->  		bool "Kernel low-level debugging on BCM2835 PL011 UART"
-> @@ -1627,7 +1627,8 @@ config DEBUG_UART_VIRT
->  		DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
->  		DEBUG_S3C64XX_UART || \
->  		DEBUG_BCM63XX_UART || DEBUG_ASM9260_UART || \
-> -		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0
-> +		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
-> +		DEBUG_AT91_UART
->  
->  config DEBUG_UART_8250_SHIFT
->  	int "Register offset shift for the 8250 debug UART"
-> diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
-> index d4ae3b8e2426..0098401e5aeb 100644
-> --- a/arch/arm/include/debug/at91.S
-> +++ b/arch/arm/include/debug/at91.S
-> @@ -9,14 +9,6 @@
->   *
->  */
->  
-> -#ifdef CONFIG_MMU
-> -#define AT91_IO_P2V(x) ((x) - 0x01000000)
-> -#else
-> -#define AT91_IO_P2V(x) (x)
-> -#endif
-> -
-> -#define AT91_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
-> -
->  #define AT91_DBGU_SR		(0x14)	/* Status Register */
->  #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
->  #define AT91_DBGU_TXRDY		(1 << 1)	/* Transmitter Ready */
-> @@ -24,7 +16,7 @@
->  
->  	.macro	addruart, rp, rv, tmp
->  	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ System peripherals (phys address)
-> -	ldr	\rv, =AT91_DEBUG_UART_VIRT		@ System peripherals (virt address)
-> +	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ System peripherals (virt address)
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Dan Williams <dan.j.williams@intel.com>
+Cc: Vinod Koul <vinod.koul@intel.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: dmaengine at vger.kernel.org
+---
+ drivers/dma/ste_dma40_ll.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Shouldn't we protect the use of this defined value with some
-#warning "Beware the value CONFIG_DEBUG_UART_VIRT haven't been defined:
-is it intentional"
-or even #error?
-
-or something like that?
-
->  	.endm
->  
->  	.macro	senduart,rd,rx
-> 
-
-
+diff --git a/drivers/dma/ste_dma40_ll.c b/drivers/dma/ste_dma40_ll.c
+index 27b818d..13b42dd 100644
+--- a/drivers/dma/ste_dma40_ll.c
++++ b/drivers/dma/ste_dma40_ll.c
+@@ -10,7 +10,7 @@
+ 
+ #include "ste_dma40_ll.h"
+ 
+-u8 d40_width_to_bits(enum dma_slave_buswidth width)
++static u8 d40_width_to_bits(enum dma_slave_buswidth width)
+ {
+ 	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
+ 		return STEDMA40_ESIZE_8_BIT;
 -- 
-Nicolas Ferre
+2.8.1
