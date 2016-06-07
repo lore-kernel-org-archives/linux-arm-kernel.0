@@ -1,163 +1,114 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 7 Jun 2016 09:14:55 +0100
-Subject: [STLinux Kernel] [[PATCH v2] 09/11] pwm: sti: Add support for
- PWM Capture IRQs
-In-Reply-To: <1461320295-20414-10-git-send-email-lee.jones@linaro.org>
-References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
- <1461320295-20414-10-git-send-email-lee.jones@linaro.org>
-Message-ID: <20160607081455.GB22744@griffinp-ThinkPad-X1-Carbon-2nd>
+From: thunder.leizhen@huawei.com (Zhen Lei)
+Date: Tue, 7 Jun 2016 16:08:13 +0800
+Subject: [PATCH v4 09/14] arm64/numa: support HAVE_SETUP_PER_CPU_AREA
+In-Reply-To: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+Message-ID: <1465286898-13828-10-git-send-email-thunder.leizhen@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
+To make each percpu area allocated from its local numa node. Without this
+patch, all percpu areas will be allocated from the node which cpu0 belongs
+to.
 
-On Fri, 22 Apr 2016, Lee Jones wrote:
+Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+---
+ arch/arm64/Kconfig   |  8 ++++++++
+ arch/arm64/mm/numa.c | 56 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 64 insertions(+)
 
-> Here we're requesting the PWM Capture IRQ and supplying the
-> handler which will be called in the event of an IRQ fire to
-> handle it.
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  drivers/pwm/pwm-sti.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 91 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-> index 9d597bb..2230afb 100644
-> --- a/drivers/pwm/pwm-sti.c
-> +++ b/drivers/pwm/pwm-sti.c
-> @@ -91,7 +91,9 @@ struct sti_pwm_chip {
->  	struct regmap_field *prescale_low;
->  	struct regmap_field *prescale_high;
->  	struct regmap_field *pwm_out_en;
-> +	struct regmap_field *pwm_cpt_en;
->  	struct regmap_field *pwm_cpt_int_en;
-> +	struct regmap_field *pwm_cpt_int_stat;
->  	struct pwm_chip chip;
->  	struct pwm_device *cur;
->  	unsigned long configured;
-> @@ -311,6 +313,76 @@ static const struct pwm_ops sti_pwm_ops = {
->  	.owner = THIS_MODULE,
->  };
->  
-> +static irqreturn_t sti_pwm_interrupt(int irq, void *data)
-> +{
-> +	struct sti_pwm_chip *pc = data;
-> +	struct device *dev = pc->dev;
-> +	struct sti_cpt_ddata *ddata;
-> +	int devicenum;
-> +	unsigned int cpt_int_stat;
-> +	unsigned int reg;
-> +	int ret = IRQ_NONE;
-> +
-> +	ret = regmap_field_read(pc->pwm_cpt_int_stat, &cpt_int_stat);
-> +	if (ret)
-> +		return ret;
-> +
-> +	while (cpt_int_stat) {
-> +		devicenum = ffs(cpt_int_stat) - 1;
-> +
-> +		ddata = pwm_get_chip_data(&pc->chip.pwms[devicenum]);
-> +
-> +		/*
-> +		 * Capture input:
-> +		 *    _______                   _______
-> +		 *   |       |                 |       |
-> +		 * __|       |_________________|       |________
-> +		 *   ^0      ^1                ^2
-> +		 *
-> +		 * Capture start by the first available rising edge
-> +		 * When a capture event occurs, capture value (CPT_VALx)
-> +		 * is stored, index incremented, capture edge changed.
-> +		 *
-> +		 * After the capture, if the index > 1, we have collected
-> +		 * the necessary data so we signal the thread waiting for it
-> +		 * and disable the capture by setting capture edge to none
-> +		 *
-> +		 */
-> +
-> +		regmap_read(pc->regmap,
-> +			    PWM_CPT_VAL(devicenum),
-> +			    &ddata->snapshot[ddata->index]);
-> +
-> +		switch (ddata->index) {
-> +		case 0:
-> +		case 1:
-> +			regmap_read(pc->regmap, PWM_CPT_EDGE(devicenum), &reg);
-> +			reg ^= PWM_CPT_EDGE_MASK;
-> +			regmap_write(pc->regmap, PWM_CPT_EDGE(devicenum), reg);
-> +
-> +			ddata->index++;
-> +			break;
-> +		case 2:
-> +			regmap_write(pc->regmap,
-> +				     PWM_CPT_EDGE(devicenum),
-> +				     CPT_EDGE_DISABLED);
-> +			wake_up(&ddata->wait);
-> +			break;
-> +		default:
-> +			dev_err(dev, "Internal error\n");
-> +		}
-> +
-> +		cpt_int_stat &= ~BIT_MASK(devicenum);
-> +
-> +		ret = IRQ_HANDLED;
-> +	}
-> +
-> +	/* Just ACK everything */
-> +	regmap_write(pc->regmap, PWM_INT_ACK, PWM_INT_ACK_MASK);
-> +
-> +	return ret;
-> +}
-> +
->  static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
->  {
->  	struct device *dev = pc->dev;
-> @@ -351,6 +423,11 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
->  	if (IS_ERR(pc->pwm_cpt_int_en))
->  		return PTR_ERR(pc->pwm_cpt_int_en);
->  
-> +	pc->pwm_cpt_int_stat = devm_regmap_field_alloc(dev, pc->regmap,
-> +						reg_fields[PWM_CPT_INT_STAT]);
-> +	if (PTR_ERR_OR_ZERO(pc->pwm_cpt_int_stat))
-> +		return PTR_ERR(pc->pwm_cpt_int_stat);
-> +
->  	return 0;
->  }
->  
-> @@ -367,7 +444,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
->  	struct sti_pwm_chip *pc;
->  	struct resource *res;
->  	unsigned int devnum;
-> -	int ret;
-> +	int irq, ret;
->  
->  	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
->  	if (!pc)
-> @@ -388,6 +465,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
->  	if (IS_ERR(pc->regmap))
->  		return PTR_ERR(pc->regmap);
->  
-> +	irq = platform_get_irq(pdev, 0);
-> +	if (irq < 0) {
-> +		dev_err(&pdev->dev, "Failed to obtain IRQ\n");
-> +		return irq;
-> +	}
-> +
-> +	ret = devm_request_irq(&pdev->dev, irq, sti_pwm_interrupt,
-> +			       0, pdev->name, pc);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "Failed to request IRQ\n");
-> +		return ret;
-> +	}
-> +
->  	/*
->  	 * Setup PWM data with default values: some values could be replaced
->  	 * with specific ones provided from Device Tree.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 76747d9..05c1bf1 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -573,6 +573,14 @@ config USE_PERCPU_NUMA_NODE_ID
+ 	def_bool y
+ 	depends on NUMA
 
-pwm-st.txt dt binding document and pwm example needs updating to document this
-irq.
++config HAVE_SETUP_PER_CPU_AREA
++	def_bool y
++	depends on NUMA
++
++config NEED_PER_CPU_EMBED_FIRST_CHUNK
++	def_bool y
++	depends on NUMA
++
+ source kernel/Kconfig.preempt
+ source kernel/Kconfig.hz
 
-regards,
+diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+index 8be5ba3..99401aa 100644
+--- a/arch/arm64/mm/numa.c
++++ b/arch/arm64/mm/numa.c
+@@ -25,6 +25,8 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
 
-Peter
++#include <asm/sections.h>
++
+ struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
+ EXPORT_SYMBOL(node_data);
+ nodemask_t numa_nodes_parsed __initdata;
+@@ -129,6 +131,60 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+ 	cpu_to_node_map[cpu] = nid;
+ }
+
++#ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
++unsigned long __per_cpu_offset[NR_CPUS] __read_mostly;
++EXPORT_SYMBOL(__per_cpu_offset);
++
++static int __init early_cpu_to_node(int cpu)
++{
++	return cpu_to_node_map[cpu];
++}
++
++static int __init pcpu_cpu_distance(unsigned int from, unsigned int to)
++{
++	if (early_cpu_to_node(from) == early_cpu_to_node(to))
++		return LOCAL_DISTANCE;
++	else
++		return REMOTE_DISTANCE;
++}
++
++static void * __init pcpu_fc_alloc(unsigned int cpu, size_t size,
++				       size_t align)
++{
++	int nid = early_cpu_to_node(cpu);
++
++	return  memblock_virt_alloc_try_nid(size, align,
++			__pa(MAX_DMA_ADDRESS), MEMBLOCK_ALLOC_ACCESSIBLE, nid);
++}
++
++static void __init pcpu_fc_free(void *ptr, size_t size)
++{
++	memblock_free_early(__pa(ptr), size);
++}
++
++void __init setup_per_cpu_areas(void)
++{
++	unsigned long delta;
++	unsigned int cpu;
++	int rc;
++
++	/*
++	 * Always reserve area for module percpu variables.  That's
++	 * what the legacy allocator did.
++	 */
++	rc = pcpu_embed_first_chunk(PERCPU_MODULE_RESERVE,
++				    PERCPU_DYNAMIC_RESERVE, PAGE_SIZE,
++				    pcpu_cpu_distance,
++				    pcpu_fc_alloc, pcpu_fc_free);
++	if (rc < 0)
++		panic("Failed to initialize percpu areas.");
++
++	delta = (unsigned long)pcpu_base_addr - (unsigned long)__per_cpu_start;
++	for_each_possible_cpu(cpu)
++		__per_cpu_offset[cpu] = delta + pcpu_unit_offsets[cpu];
++}
++#endif
++
+ /**
+  * numa_add_memblk - Set node id to memblk
+  * @nid: NUMA node ID of the new memblk
+--
+2.5.0
