@@ -1,34 +1,53 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 7 Jun 2016 17:42:18 +0100
-Subject: HDLCD crashes with 6d910bfa809e
-In-Reply-To: <20160607144058.GB3363@phenom.ffwll.local>
-References: <5756B8A8.8000902@arm.com>
- <20160607144058.GB3363@phenom.ffwll.local>
-Message-ID: <5756F96A.4010208@arm.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 7 Jun 2016 19:42:21 +0300
+Subject: [PATCH] clocksource/drivers/digicolor: fix warning of non-static
+ function
+In-Reply-To: <1465308710-18297-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465308710-18297-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20160607164221.GI2425@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/16 15:40, Daniel Vetter wrote:
-> On Tue, Jun 07, 2016 at 01:06:00PM +0100, Robin Murphy wrote:
->> Hi Daniel, Liviu,
->>
->> Having just inadvertently merged -next into my working branch, I find
->> dev6d910bfa809e ("drm/hlcd: Use lockless gem BO free callback") adversely
->> affecting my board's ability to boot ;)
->>
->> Since I (intentionally) don't have sufficient CMA to create a framebuffer,
->> drm_gem_cma_create() fails, unconditionally calls the now-NULL
->> drm->driver->gem_free_object() in its cleanup path, and fiery death
->> ensues...
->
-> Please make sure you have the drm fixes from 4.7-rc2 included, this issue
-> is fixed there.
+Hi Ben,
 
-Ah, right you are, thanks - the fact that that the newer branches I 
-tried crashed or otherwise failed due to unrelated TDA998x problems 
-threw me off. I see Chris' fix there now.
+On Tue, Jun 07, 2016 at 03:11:50PM +0100, Ben Dooks wrote:
+> Change the dc_timer function to be static as it is not used outside
+> this driver. This fixes the following warning:
+> 
+> drivers/clocksource/timer-digicolor.c:66:24: warning: symbol 'dc_timer' was not declared. Should it be static?
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Robin.
+Acked-by: Baruch Siach <baruch@tkos.co.il>
 
-> -Daniel
->
+Thanks,
+baruch
+
+> ---
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Baruch Siach <baruch@tkos.co.il>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  drivers/clocksource/timer-digicolor.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/clocksource/timer-digicolor.c b/drivers/clocksource/timer-digicolor.c
+> index a536eeb..96bb222 100644
+> --- a/drivers/clocksource/timer-digicolor.c
+> +++ b/drivers/clocksource/timer-digicolor.c
+> @@ -63,7 +63,7 @@ struct digicolor_timer {
+>  	int timer_id; /* one of TIMER_* */
+>  };
+>  
+> -struct digicolor_timer *dc_timer(struct clock_event_device *ce)
+> +static struct digicolor_timer *dc_timer(struct clock_event_device *ce)
+>  {
+>  	return container_of(ce, struct digicolor_timer, ce);
+>  }
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
