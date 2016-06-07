@@ -1,43 +1,147 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  7 Jun 2016 22:41:40 +0200
-Subject: [PATCH v2 01/15] dt-bindings: sunxi: Add CCU binding documentation
+Date: Tue,  7 Jun 2016 22:41:43 +0200
+Subject: [PATCH v2 04/15] clk: sunxi-ng: Add fixed factor clock support
 In-Reply-To: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
 References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160607204154.31967-2-maxime.ripard@free-electrons.com>
+Message-ID: <20160607204154.31967-5-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new binding with its documentation for the brand new clock
-sub-framework.
+Some clocks in the Allwinner SoCs clock units are direct, fixed,
+multipliers or dividers from their parent.
+
+Add support for such clocks.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+ drivers/clk/sunxi-ng/Makefile           |  2 ++
+ drivers/clk/sunxi-ng/ccu_fixed_factor.c | 50 +++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_fixed_factor.h | 50 +++++++++++++++++++++++++++++++++
+ 3 files changed, 102 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_fixed_factor.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_fixed_factor.h
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+index 4585443b3771..c59cf2ea509b 100644
+--- a/drivers/clk/sunxi-ng/Makefile
++++ b/drivers/clk/sunxi-ng/Makefile
+@@ -2,3 +2,5 @@ obj-y += ccu_common.o
+ obj-y += ccu_reset.o
+ 
+ obj-y += ccu_frac.o
++
++obj-y += ccu_fixed_factor.o
+diff --git a/drivers/clk/sunxi-ng/ccu_fixed_factor.c b/drivers/clk/sunxi-ng/ccu_fixed_factor.c
 new file mode 100644
-index 000000000000..2c66046a1342
+index 000000000000..0498dc5340ea
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
-@@ -0,0 +1,17 @@
-+Allwinner Clock Control Unit Binding
-+------------------------------------
++++ b/drivers/clk/sunxi-ng/ccu_fixed_factor.c
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (C) 2016 Maxime Ripard
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
 +
-+Required properties :
-+- compatible: must contain one of the following compatible:
-+		- "allwinner,sun8i-h3-ccu"
++#include <linux/clk-provider.h>
 +
-+- reg: Must contain the registers base address and length
-+- clocks: phandle to the oscillators feeding the SPI controller. Two are
-+          needed:
-+  - "hosc": the high frequency oscillator (usually at 24MHz)
-+  - "losc": the low frequency oscillator (usually at 32kHz)
-+- clock-names: Must contain the clock names described just above
-+- #clock-cells : must contain 1
-+- #reset-cells : must contain 1
++#include "ccu_fixed_factor.h"
 +
-+Example:
++static unsigned long ccu_fixed_factor_recalc_rate(struct clk_hw *hw,
++						  unsigned long parent_rate)
++{
++	struct ccu_fixed_factor *fix = hw_to_ccu_fixed_factor(hw);
++
++	return parent_rate / fix->div * fix->mult;
++}
++
++static long ccu_fixed_factor_round_rate(struct clk_hw *hw,
++					unsigned long rate,
++					unsigned long *parent_rate)
++{
++	struct ccu_fixed_factor *fix = hw_to_ccu_fixed_factor(hw);
++
++	if (clk_hw_get_flags(hw) & CLK_SET_RATE_PARENT) {
++		unsigned long best_parent;
++
++		best_parent = (rate / fix->mult) * fix->div;
++		*parent_rate = clk_hw_round_rate(clk_hw_get_parent(hw),
++						 best_parent);
++	}
++
++	return *parent_rate / fix->div * fix->mult;
++}
++
++static int ccu_fixed_factor_set_rate(struct clk_hw *hw, unsigned long rate,
++				     unsigned long parent_rate)
++{
++	return 0;
++}
++
++const struct clk_ops ccu_fixed_factor_ops = {
++	.recalc_rate	= ccu_fixed_factor_recalc_rate,
++	.round_rate	= ccu_fixed_factor_round_rate,
++	.set_rate	= ccu_fixed_factor_set_rate,
++};
+diff --git a/drivers/clk/sunxi-ng/ccu_fixed_factor.h b/drivers/clk/sunxi-ng/ccu_fixed_factor.h
+new file mode 100644
+index 000000000000..4e53dbc9d10b
+--- /dev/null
++++ b/drivers/clk/sunxi-ng/ccu_fixed_factor.h
+@@ -0,0 +1,50 @@
++/*
++ * Copyright (c) 2016 Maxime Ripard. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _CCU_FIXED_FACTOR_H_
++#define _CCU_FIXED_FACTOR_H_
++
++#include <linux/clk-provider.h>
++
++#include "ccu_common.h"
++
++struct ccu_fixed_factor {
++	u16			div;
++	u16			mult;
++
++	struct ccu_common	common;
++};
++
++#define SUNXI_CCU_FIXED_FACTOR(_struct, _name, _parent,			\
++			       _div, _mult, _flags)			\
++	struct ccu_fixed_factor _struct = {				\
++		.div	= _div,						\
++		.mult	= _mult,					\
++		.common	= {						\
++			.hw.init	= SUNXI_HW_INIT(_name,		\
++							_parent,	\
++							&ccu_fixed_factor_ops, \
++							_flags),	\
++		},							\
++	}
++
++static inline struct ccu_fixed_factor *hw_to_ccu_fixed_factor(struct clk_hw *hw)
++{
++	struct ccu_common *common = hw_to_ccu_common(hw);
++
++	return container_of(common, struct ccu_fixed_factor, common);
++}
++
++extern const struct clk_ops ccu_fixed_factor_ops;
++
++#endif /* _CCU_FIXED_FACTOR_H_ */
 -- 
 2.8.3
