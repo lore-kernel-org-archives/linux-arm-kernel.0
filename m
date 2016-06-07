@@ -1,70 +1,56 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 16:03:51 +0000
-Subject: [PATCH v10 6/8] vfio/type1: check doorbell safety
-In-Reply-To: <1465315433-5974-1-git-send-email-eric.auger@redhat.com>
-References: <1465315433-5974-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315433-5974-7-git-send-email-eric.auger@redhat.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue,  7 Jun 2016 17:19:11 +0100
+Subject: [PATCH v5 17/18] ARM: STi: DT: STiH407: Add uniperif reader dt nodes
+In-Reply-To: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
+References: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1465316352-20691-18-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On x86 IRQ remapping is abstracted by the IOMMU. On ARM this is abstracted
-by the msi controller.
+This patch adds the DT node for the uniperif reader
+IP block found on STiH407 family silicon.
 
-Since we currently have no way to detect whether the MSI controller is
-upstream or downstream to the IOMMU we rely on the MSI doorbell information
-registered by the interrupt controllers. In case at least one doorbell
-does not implement proper isolation, we state the assignment is unsafe
-with regard to interrupts. This is a coase assessment but should allow to
-wait for a better system description.
-
-At this point ARM sMMU still advertises IOMMU_CAP_INTR_REMAP. This is
-removed in next patch.
-
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
+ arch/arm/boot/dts/stih407-family.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-v9 -> v10:
-- coarse safety assessment based on MSI doorbell info
-
-v3 -> v4:
-- rename vfio_msi_parent_irq_remapping_capable into vfio_safe_irq_domain
-  and irq_remapping into safe_irq_domains
-
-v2 -> v3:
-- protect vfio_msi_parent_irq_remapping_capable with
-  CONFIG_GENERIC_MSI_IRQ_DOMAIN
----
- drivers/vfio/vfio_iommu_type1.c | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 14dc9ef..7daab53 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -37,6 +37,7 @@
- #include <linux/vfio.h>
- #include <linux/workqueue.h>
- #include <linux/msi-iommu.h>
-+#include <linux/msi-doorbell.h>
- 
- #define DRIVER_VERSION  "0.2"
- #define DRIVER_AUTHOR   "Alex Williamson <alex.williamson@redhat.com>"
-@@ -922,8 +923,14 @@ static int vfio_iommu_type1_attach_group(void *iommu_data,
- 	INIT_LIST_HEAD(&domain->group_list);
- 	list_add(&group->next, &domain->group_list);
- 
-+	/*
-+	 * to advertise safe interrupts either the IOMMU or the MSI controllers
-+	 * must support IRQ remapping (aka. interrupt translation), property
-+	 * exposed by their registered doorbells
-+	 */
- 	if (!allow_unsafe_interrupts &&
--	    !iommu_capable(bus, IOMMU_CAP_INTR_REMAP)) {
-+	    (!iommu_capable(bus, IOMMU_CAP_INTR_REMAP) &&
-+	     !msi_doorbell_safe())) {
- 		pr_warn("%s: No interrupt remapping support.  Use the module param \"allow_unsafe_interrupts\" to enable VFIO IOMMU support on this platform\n",
- 		       __func__);
- 		ret = -EPERM;
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 850b180..a7e6fc3 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -957,5 +957,31 @@
+ 			st,version = <5>;
+ 			st,mode = "SPDIF";
+ 		};
++
++		sti_uni_reader0: sti-uni-reader at 0 {
++			compatible = "st,sti-uni-reader";
++			status = "disabled";
++			#sound-dai-cells = <0>;
++			st,syscfg = <&syscfg_core>;
++			reg = <0x8D83000 0x158>;
++			interrupts = <GIC_SPI 87 IRQ_TYPE_NONE>;
++			dmas = <&fdma0 5 0 1>;
++			dma-names = "rx";
++			dai-name = "Uni Reader #0 (PCM IN)";
++			st,version = <3>;
++		};
++
++		sti_uni_reader1: sti-uni-reader at 1 {
++			compatible = "st,sti-uni-reader";
++			status = "disabled";
++			#sound-dai-cells = <0>;
++			st,syscfg = <&syscfg_core>;
++			reg = <0x8D84000 0x158>;
++			interrupts = <GIC_SPI 88 IRQ_TYPE_NONE>;
++			dmas = <&fdma0 6 0 1>;
++			dma-names = "rx";
++			dai-name = "Uni Reader #1 (HDMI RX)";
++			st,version = <3>;
++		};
+ 	};
+ };
 -- 
 1.9.1
