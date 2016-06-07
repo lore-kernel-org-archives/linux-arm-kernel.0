@@ -1,42 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Jun 2016 21:28:54 -0700
-Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
- typical Keystone features
-In-Reply-To: <574F6674.3010100@ti.com>
-References: <1464816714-3900-1-git-send-email-nm@ti.com>
- <3593753.UuDg5ybrvm@wuerfel> <574F6674.3010100@ti.com>
-Message-ID: <20160607042853.GA22406@atomide.com>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Mon, 6 Jun 2016 21:36:03 -0700
+Subject: [PATCH net-next 2/3] arm64: bpf: optimize JMP_CALL
+In-Reply-To: <20160606170515.GK669@arm.com>
+References: <1465077630-633-1-git-send-email-zlim.lnx@gmail.com>
+ <1465077630-633-2-git-send-email-zlim.lnx@gmail.com>
+ <20160606170515.GK669@arm.com>
+Message-ID: <CABg9mcvXxAvWxuXJbBbQEy5_nsgPjT6Y20CFNKMkOYJp4NrnFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nishanth Menon <nm@ti.com> [160601 15:51]:
-> On 06/01/2016 05:31 PM, Arnd Bergmann wrote:
-> > On Wednesday, June 1, 2016 4:31:54 PM CEST Nishanth Menon wrote:
-> >>
-> >> Hence the "KEYSTONE_TYPICAL" option is designed similar to commit 8d9166b519fd
-> >> ("omap2/3/4: Add Kconfig option to compile in typical omap features")
-> >> that can be enabled for most boards keystone platforms
-> >> without needing to rediscover these in defconfig all over again -
-> >> examples include multi_v7_defconfig base and optimizations done on top
-> >> of them for keystone platform.
-> > 
-> > I'd rather remove the option for OMAP as well, it doesn't really fit in with
-> > how we do things for other platforms, and selecting a lot of other Kconfig
-> > symbols tends to cause circular dependencies.
-> 
-> Hmm, fair enough -> adding Tony as well if he sees an problem with
-> dropping ARCH_OMAP2PLUS_TYPICAL.
+Hi Will,
 
-Yes there's a problem. Removing that is going to make all the custom
-.config files unbootable almost certainly. Just search around on
-issues related to not having REGULATOR_FIXED_VOLTAGE selected.
+On Mon, Jun 6, 2016 at 10:05 AM, Will Deacon <will.deacon@arm.com> wrote:
+> On Sat, Jun 04, 2016 at 03:00:29PM -0700, Zi Shen Lim wrote:
+>> Remove superfluous stack frame, saving us 3 instructions for
+>> every JMP_CALL.
+>>
+>> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+>> ---
+>>  arch/arm64/net/bpf_jit_comp.c | 3 ---
+>>  1 file changed, 3 deletions(-)
+>>
+>> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+>> index 51abc97..7ae304e 100644
+>> --- a/arch/arm64/net/bpf_jit_comp.c
+>> +++ b/arch/arm64/net/bpf_jit_comp.c
+>> @@ -578,11 +578,8 @@ emit_cond_jmp:
+>>               const u64 func = (u64)__bpf_call_base + imm;
+>>
+>>               emit_a64_mov_i64(tmp, func, ctx);
+>> -             emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
+>> -             emit(A64_MOV(1, A64_FP, A64_SP), ctx);
+>>               emit(A64_BLR(tmp), ctx);
+>>               emit(A64_MOV(1, r0, A64_R(0)), ctx);
+>> -             emit(A64_POP(A64_FP, A64_LR, A64_SP), ctx);
+>>               break;
+>>       }
+>
+> Is the jitted code intended to be unwindable by standard tools?
 
-I agree we should not force select things though. And the I2C selection
-at least is wrong, we can have PMICs that are not on I2C bus.
+Before this patch:
+    bpf_prologue => push stack frame
+    ...
+    jmp_call => push stack frame, call bpf_helper*, pop stack frame
+    ...
+    bpf_epilogue => pop stack frame, ret
 
-Anybody got better ideas what we should do to make the configuration
-options more intuitive?
+Now:
+    bpf_prologue => push stack frame
+    ...
+    jmp_call => call bpf_helper*
+    ...
+    bpf_epilogue => pop stack frame, ret
 
-Regards,
+*Note: bpf_helpers in kernel/bpf/helper.c
 
-Tony
+So yes, it's still unwindable.
+
+>
+> Will
