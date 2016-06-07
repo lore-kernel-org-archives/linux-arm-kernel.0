@@ -1,19 +1,24 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 07 Jun 2016 01:37:51 -0700
-Subject: [PATCH 30/34] clk: stm32f3: Migrate to clk_hw based OF and
- registration APIs
-In-Reply-To: <8dcaca11-b193-64d2-8fa6-7f3f031b328b@linaro.org>
-References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-31-stephen.boyd@linaro.org>
- <8dcaca11-b193-64d2-8fa6-7f3f031b328b@linaro.org>
-Message-ID: <146528867149.28742.13230988204794474162@sboyd-linaro>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 7 Jun 2016 09:37:59 +0100
+Subject: [STLinux Kernel] [PATCH 6/7] phy: miphy28lp: Inform the reset
+ framework that our reset line may be shared
+In-Reply-To: <20160606155655.10860-7-lee.jones@linaro.org>
+References: <20160606155655.10860-1-lee.jones@linaro.org>
+ <20160606155655.10860-7-lee.jones@linaro.org>
+Message-ID: <20160607083759.GA22960@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Daniel Thompson (2016-06-06 06:48:01)
-> On 02/06/16 00:15, Stephen Boyd wrote:
-> 
-> Minor nit but the subject is wrong [IIRC stm32f3 cannot run Linux ;-)].
-> 
+On Mon, 06 Jun 2016, Lee Jones wrote:
 
-Heh thanks. I'll fix it to be stm32f4 when applying.
+> On the STiH410 B2120 development board the MiPHY28lp shares its reset
+> line with the Synopsys DWC3 SuperSpeed (SS) USB 3.0 Dual-Role-Device
+> (DRD).  New functionality in the reset subsystems forces consumers to
+> be explicit when requesting shared/exclusive reset lines.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/phy/phy-miphy28lp.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+
+Acked-by: Peter Griffin <peter.griffin@linaro.org>
