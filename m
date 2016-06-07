@@ -1,63 +1,59 @@
-From: markus.mayer@broadcom.com (Markus Mayer)
-Date: Tue, 7 Jun 2016 09:33:36 -0700
-Subject: [PATCH] gpio: bcm-kona: fix bcm_kona_gpio_reset() warnings
-In-Reply-To: <1465316537-8403-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465316537-8403-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <CAGt4E5tg_e7QD-9X+eCeHhLxovcrs3htWa+Uvb_RXRY7VhAC3Q@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 7 Jun 2016 18:33:36 +0200
+Subject: [PATCH 07/34] clk: berlin: Migrate to clk_hw based registration
+ and OF APIs
+In-Reply-To: <146528884761.28742.8093002152658120585@sboyd-linaro>
+References: <20160601231533.9354-1-stephen.boyd@linaro.org>
+ <20160601231533.9354-8-stephen.boyd@linaro.org>
+ <20160605174157.GP4594@piout.net>
+ <146528884761.28742.8093002152658120585@sboyd-linaro>
+Message-ID: <20160607163336.GM3363@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2016 at 09:22, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> The bcm_kona_gpio_reset() calls bcm_kona_gpio_write_lock_regs()
-> with what looks like the wrong parameter. The write_lock_regs
-> function takes a pointer to the registers, not the bcm_kona_gpio
-> structure.
->
-> Fix the warning, and probably bug by changing the function to
-> pass reg_base instead of kona_gpio, fixing the following warning:
->
-> drivers/gpio/gpio-bcm-kona.c:550:47: warning: incorrect type in argument 1 (different address spaces)
-> drivers/gpio/gpio-bcm-kona.c:550:47:    expected void [noderef] <asn:2>*reg_base
-> drivers/gpio/gpio-bcm-kona.c:550:47:    got struct bcm_kona_gpio *kona_gpio
-> drivers/gpio/gpio-bcm-kona.c:554:47: warning: incorrect type in argument 1 (different address spaces)
-> drivers/gpio/gpio-bcm-kona.c:554:47:    expected void [noderef] <asn:2>*reg_base
-> drivers/gpio/gpio-bcm-kona.c:554:47:    got struct bcm_kona_gpio *kona_gpio
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-> Cc: Markus Mayer <mmayer@broadcom.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Alexandre Courbot <gnurou@gmail.com>
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Cc: linux-gpio at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/gpio/gpio-bcm-kona.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
-> index 9aabc48..953e4b8 100644
-> --- a/drivers/gpio/gpio-bcm-kona.c
-> +++ b/drivers/gpio/gpio-bcm-kona.c
-> @@ -547,11 +547,11 @@ static void bcm_kona_gpio_reset(struct bcm_kona_gpio *kona_gpio)
->         /* disable interrupts and clear status */
->         for (i = 0; i < kona_gpio->num_bank; i++) {
->                 /* Unlock the entire bank first */
-> -               bcm_kona_gpio_write_lock_regs(kona_gpio, i, UNLOCK_CODE);
-> +               bcm_kona_gpio_write_lock_regs(reg_base, i, UNLOCK_CODE);
->                 writel(0xffffffff, reg_base + GPIO_INT_MASK(i));
->                 writel(0xffffffff, reg_base + GPIO_INT_STATUS(i));
->                 /* Now re-lock the bank */
-> -               bcm_kona_gpio_write_lock_regs(kona_gpio, i, LOCK_CODE);
-> +               bcm_kona_gpio_write_lock_regs(reg_base, i, LOCK_CODE);
->         }
->  }
->
-> --
-> 2.8.1
->
+On 07/06/2016 at 01:40:47 -0700, Stephen Boyd wrote :
+> Quoting Alexandre Belloni (2016-06-05 10:41:57)
+> > Hi,
+> > 
+> > The main drawback of those patches is that they break the alignment
+> > (checkpatch.pl --strict complains).
+> 
+> Didn't checkpatch --strict already warn on these files though? I'm not
+> sure I've done anything to break the alignment style here.
+> 
 
-Looks good. Thanks for fixing this.
+As you change the function return value, the function arguments are no
+longer aligned with the opening parenthesis.
+I would agree that keeping the alignment will make the change quit
+bigger though.
 
-Reviewed-by: Markus Mayer <mmayer@broadcom.com>
+> > 
+> > On 01/06/2016 at 16:15:06 -0700, Stephen Boyd wrote :
+> > > diff --git a/drivers/clk/berlin/berlin2-avpll.h b/drivers/clk/berlin/berlin2-avpll.h
+> > > index a37f5068d299..17e311153b42 100644
+> > > --- a/drivers/clk/berlin/berlin2-avpll.h
+> > > +++ b/drivers/clk/berlin/berlin2-avpll.h
+> > > @@ -19,17 +19,13 @@
+> > >  #ifndef __BERLIN2_AVPLL_H
+> > >  #define __BERLIN2_AVPLL_H
+> > >  
+> > > -struct clk;
+> > > -
+> > >  #define BERLIN2_AVPLL_BIT_QUIRK              BIT(0)
+> > >  #define BERLIN2_AVPLL_SCRAMBLE_QUIRK BIT(1)
+> > >  
+> > > -struct clk * __init
+> > > -berlin2_avpll_vco_register(void __iomem *base, const char *name,
+> > > +int berlin2_avpll_vco_register(void __iomem *base, const char *name,
+> > 
+> > This is missing __init.
+> 
+> Ah I also removed __init in the header file here because it doesn't do
+> anything. I guess I should mention that in the commit text.
+
+Indeed, you are right.
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
