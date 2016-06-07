@@ -1,148 +1,57 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Jun 2016 21:59:56 +0200
-Subject: [PATCH V6 6/8] vfio, platform: make reset driver a requirement by
- default
-In-Reply-To: <1464472878-27176-7-git-send-email-okaya@codeaurora.org>
-References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
- <1464472878-27176-7-git-send-email-okaya@codeaurora.org>
-Message-ID: <c3538f11-d206-1ffc-35e0-ff5a7672c7d9@redhat.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 7 Jun 2016 13:00:41 -0700
+Subject: [PATCH] tty: serial: msm: fix definition of msm_stop_dma
+In-Reply-To: <1465323112-32366-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465323112-32366-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20160607200041.GJ1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue 07 Jun 11:11 PDT 2016, Ben Dooks wrote:
 
+> The msm_stop_dma() is not exported from the driver, so make
+> it static to stop the following warning:
+> 
+> drivers/tty/serial/msm_serial.c:84:6: warning: symbol 'msm_stop_dma' was not declared. Should it be static?
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Le 29/05/2016 ? 00:01, Sinan Kaya a ?crit :
-> The code was allowing platform devices to be used without a supporting
-> VFIO reset driver. The hardware can be left in some inconsistent state
-> after a guest machine abort.
-> 
-> The reset driver will put the hardware back to safe state and disable
-> interrupts before returning the control back to the host machine.
-> 
-> Adding a new reset_required kernel module option to AMBA and platform
-> VFIO drivers with a default value of true.
-> 
-> New requirements are:
-> 1. A reset function needs to be implemented by the corresponding driver
-> via DT/ACPI.
-> 2. The reset function needs to be discovered via DT/ACPI.
-> 
-> The probe of the driver will fail if any of the above conditions are
-> not satisfied.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+
+Regards,
+Bjorn
+
 > ---
->  drivers/vfio/platform/vfio_amba.c             |  5 +++++
->  drivers/vfio/platform/vfio_platform.c         |  5 +++++
->  drivers/vfio/platform/vfio_platform_common.c  | 14 +++++++++++---
->  drivers/vfio/platform/vfio_platform_private.h |  1 +
->  4 files changed, 22 insertions(+), 3 deletions(-)
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: David Brown <david.brown@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.com>
+> Cc: linux-arm-msm at vger.kernel.org
+> Cc: linux-soc at vger.kernel.org
+> Cc: linux-serial at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/tty/serial/msm_serial.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/vfio/platform/vfio_amba.c b/drivers/vfio/platform/vfio_amba.c
-> index a66479b..7585902 100644
-> --- a/drivers/vfio/platform/vfio_amba.c
-> +++ b/drivers/vfio/platform/vfio_amba.c
-> @@ -23,6 +23,10 @@
->  #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
->  #define DRIVER_DESC     "VFIO for AMBA devices - User Level meta-driver"
+> diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+> index b7d80bd..187f2c0 100644
+> --- a/drivers/tty/serial/msm_serial.c
+> +++ b/drivers/tty/serial/msm_serial.c
+> @@ -81,7 +81,7 @@ struct msm_port {
+>  static void msm_handle_tx(struct uart_port *port);
+>  static void msm_start_rx_dma(struct msm_port *msm_port);
 >  
-> +static bool reset_required = true;
-> +module_param(reset_required, bool, 0644);
-> +MODULE_PARM_DESC(reset_required, "override reset requirement (default: 1)");
-> +
->  /* probing devices from the AMBA bus */
->  
->  static struct resource *get_amba_resource(struct vfio_platform_device *vdev,
-> @@ -68,6 +72,7 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
->  	vdev->get_resource = get_amba_resource;
->  	vdev->get_irq = get_amba_irq;
->  	vdev->parent_module = THIS_MODULE;
-> +	vdev->reset_required = reset_required;
->  
->  	ret = vfio_platform_probe_common(vdev, &adev->dev);
->  	if (ret) {
-> diff --git a/drivers/vfio/platform/vfio_platform.c b/drivers/vfio/platform/vfio_platform.c
-> index b1cc3a7..ef89146 100644
-> --- a/drivers/vfio/platform/vfio_platform.c
-> +++ b/drivers/vfio/platform/vfio_platform.c
-> @@ -23,6 +23,10 @@
->  #define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
->  #define DRIVER_DESC     "VFIO for platform devices - User Level meta-driver"
->  
-> +static bool reset_required = true;
-> +module_param(reset_required, bool, 0644);
-> +MODULE_PARM_DESC(reset_required, "override reset requirement (default: 1)");
-> +
->  /* probing devices from the linux platform bus */
->  
->  static struct resource *get_platform_resource(struct vfio_platform_device *vdev,
-> @@ -66,6 +70,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
->  	vdev->get_resource = get_platform_resource;
->  	vdev->get_irq = get_platform_irq;
->  	vdev->parent_module = THIS_MODULE;
-> +	vdev->reset_required = reset_required;
->  
->  	ret = vfio_platform_probe_common(vdev, &pdev->dev);
->  	if (ret)
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index 0ea8c26..e87ceab 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -128,10 +128,10 @@ static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
->  	return vdev->of_reset ? true : false;
->  }
->  
-> -static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
-> +static int vfio_platform_get_reset(struct vfio_platform_device *vdev)
+> -void msm_stop_dma(struct uart_port *port, struct msm_dma *dma)
+> +static void msm_stop_dma(struct uart_port *port, struct msm_dma *dma)
 >  {
->  	if (vdev->acpihid)
-> -		return;
-> +		return vfio_platform_acpi_has_reset(vdev) ? 0 : -ENOENT;
->  
->  	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
->  						    &vdev->reset_module);
-> @@ -140,6 +140,8 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
->  		vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
->  							&vdev->reset_module);
->  	}
-> +
-> +	return vdev->of_reset ? 0 : -ENOENT;
->  }
->  
->  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
-> @@ -675,7 +677,13 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->  		return ret;
->  	}
->  
-> -	vfio_platform_get_reset(vdev);
-> +	ret = vfio_platform_get_reset(vdev);
-> +	if (ret && vdev->reset_required) {
-> +		pr_err("vfio: no reset function found for device %s\n",
-> +		       vdev->name);
-> +		iommu_group_put(group);
-> +		return ret;
-nit: in case you respin you can factorize the group put and return ret in a goto label
-(since also used above).
-
-Besides Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Thanks
-
-Eric
-> +	}
->  
->  	mutex_init(&vdev->igate);
->  
-> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-> index ba9e4f8..68fbc00 100644
-> --- a/drivers/vfio/platform/vfio_platform_private.h
-> +++ b/drivers/vfio/platform/vfio_platform_private.h
-> @@ -50,6 +50,7 @@ struct vfio_platform_region {
->  };
->  
->  struct vfio_platform_device {
-> +	bool				reset_required;
->  	struct vfio_platform_region	*regions;
->  	u32				num_regions;
->  	struct vfio_platform_irq	*irqs;
+>  	struct device *dev = port->dev;
+>  	unsigned int mapped;
+> -- 
+> 2.8.1
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
