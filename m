@@ -1,117 +1,38 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Tue, 7 Jun 2016 19:21:16 +0530
-Subject: [PATCH v3 2/2] dmaengine: vdma: Add 64 bit addressing support for the
- axi cdma
-In-Reply-To: <1465307476-15936-1-git-send-email-appanad@xilinx.com>
-References: <1465307476-15936-1-git-send-email-appanad@xilinx.com>
-Message-ID: <1465307476-15936-2-git-send-email-appanad@xilinx.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue,  7 Jun 2016 14:54:08 +0100
+Subject: [PATCH] clk: hi6220: fix missing clk.h include
+Message-ID: <1465307648-15660-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXI CDMA is a soft ip, which can be programmed to support
-32 bit addressing or greater than 32 bit addressing.
+Fix the warning from missing "clk.h" include which
+defines hi6220_register_clkdiv() function.
 
-When the AXI CDMA ip is configured for 32 bit address space
-in simple dma mode the source/destination buffer address is
-specified by a single register(18h for Source buffer address and
-20h for Destination buffer address). When configured in SG mode
-the current descriptor and tail descriptor are specified by a
-Single register(08h for curdesc 10h for tail desc).
+drivers/clk/hisilicon/clkdivider-hi6220.c:102:12: warning: symbol 'hi6220_register_clkdiv' was not declared. Should it be static?
 
-When the  AXI CDMA core is configured for an address space greater
-than 32 then each buffer address or descriptor address is specified by
-a combination of two registers.
-
-The first register specifies the LSB 32 bits of address,
-while the next register specifies the MSB 32 bits of address.
-
-For example, 08h will specify the LSB 32 bits while 0Ch will
-specify the MSB 32 bits of the first start address.
-So we need to program two registers at a time.
-
-This patch adds the 64 bit addressing support to the axicdma
-IP in the driver.
-
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
-Changes for v3:
---> Removed repeated code and used wrappers as suggested by vinod.
-Changes for v2:
---> New patch.
+Cc: Bintian Wang <bintian.wang@huawei.com>
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: linux-clk at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/clk/hisilicon/clkdivider-hi6220.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
- drivers/dma/xilinx/xilinx_vdma.c |   28 ++++++++++++++++------------
- 1 files changed, 16 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
-index dd990fc..cbcf595 100644
---- a/drivers/dma/xilinx/xilinx_vdma.c
-+++ b/drivers/dma/xilinx/xilinx_vdma.c
-@@ -220,21 +220,21 @@ struct xilinx_axidma_desc_hw {
+diff --git a/drivers/clk/hisilicon/clkdivider-hi6220.c b/drivers/clk/hisilicon/clkdivider-hi6220.c
+index 113eee8..a1c1f68 100644
+--- a/drivers/clk/hisilicon/clkdivider-hi6220.c
++++ b/drivers/clk/hisilicon/clkdivider-hi6220.c
+@@ -18,6 +18,8 @@
+ #include <linux/err.h>
+ #include <linux/spinlock.h>
+ 
++#include "clk.h"
++
+ #define div_mask(width)	((1 << (width)) - 1)
+ 
  /**
-  * struct xilinx_cdma_desc_hw - Hardware Descriptor
-  * @next_desc: Next Descriptor Pointer @0x00
-- * @pad1: Reserved @0x04
-+ * @next_descmsb: Next Descriptor Pointer MSB @0x04
-  * @src_addr: Source address @0x08
-- * @pad2: Reserved @0x0C
-+ * @src_addrmsb: Source address MSB @0x0C
-  * @dest_addr: Destination address @0x10
-- * @pad3: Reserved @0x14
-+ * @dest_addrmsb: Destination address MSB @0x14
-  * @control: Control field @0x18
-  * @status: Status field @0x1C
-  */
- struct xilinx_cdma_desc_hw {
- 	u32 next_desc;
--	u32 pad1;
-+	u32 next_desc_msb;
- 	u32 src_addr;
--	u32 pad2;
-+	u32 src_addr_msb;
- 	u32 dest_addr;
--	u32 pad3;
-+	u32 dest_addr_msb;
- 	u32 control;
- 	u32 status;
- } __aligned(64);
-@@ -1137,12 +1137,12 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
- 	}
- 
- 	if (chan->has_sg) {
--		dma_ctrl_write(chan, XILINX_DMA_REG_CURDESC,
--			   head_desc->async_tx.phys);
-+		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
-+			     head_desc->async_tx.phys);
- 
- 		/* Update tail ptr register which will start the transfer */
--		dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
--			       tail_segment->phys);
-+		xilinx_write(chan, XILINX_DMA_REG_TAILDESC,
-+			     tail_segment->phys);
- 	} else {
- 		/* In simple mode */
- 		struct xilinx_cdma_tx_segment *segment;
-@@ -1154,8 +1154,8 @@ static void xilinx_cdma_start_transfer(struct xilinx_dma_chan *chan)
- 
- 		hw = &segment->hw;
- 
--		dma_ctrl_write(chan, XILINX_CDMA_REG_SRCADDR, hw->src_addr);
--		dma_ctrl_write(chan, XILINX_CDMA_REG_DSTADDR, hw->dest_addr);
-+		xilinx_write(chan, XILINX_CDMA_REG_SRCADDR, hw->src_addr);
-+		xilinx_write(chan, XILINX_CDMA_REG_DSTADDR, hw->dest_addr);
- 
- 		/* Start the transfer */
- 		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
-@@ -1626,6 +1626,10 @@ xilinx_cdma_prep_memcpy(struct dma_chan *dchan, dma_addr_t dma_dst,
- 	hw->control = len;
- 	hw->src_addr = dma_src;
- 	hw->dest_addr = dma_dst;
-+	if (chan->ext_addr) {
-+		hw->src_addr_msb = upper_32_bits(dma_src);
-+		hw->dest_addr_msb = upper_32_bits(dma_dst);
-+	}
- 
- 	/* Fill the previous next descriptor with current */
- 	prev = list_last_entry(&desc->segments,
 -- 
-1.7.1
+2.8.1
