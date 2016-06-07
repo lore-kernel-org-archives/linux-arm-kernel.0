@@ -1,104 +1,75 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue,  7 Jun 2016 17:19:10 +0100
-Subject: [PATCH v5 16/18] ARM: STi: DT: STiH407: Add uniperif player dt nodes
+Date: Tue,  7 Jun 2016 17:19:12 +0100
+Subject: [PATCH v5 18/18] ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi
+ audio card
 In-Reply-To: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
 References: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1465316352-20691-17-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1465316352-20691-19-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the DT nodes for the uniperif player
-IP blocks found on STiH407 family silicon.
+This patch enables the uniperif players 2 & 3 for b2120 boards
+and also adds the "simple-audio-card" device node to interconnect
+the SoC sound device and the codec.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 ---
- arch/arm/boot/dts/stih407-family.dtsi | 76 +++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+ arch/arm/boot/dts/stihxxx-b2120.dtsi | 45 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 45 insertions(+)
 
-diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
-index 3d74bc2..850b180 100644
---- a/arch/arm/boot/dts/stih407-family.dtsi
-+++ b/arch/arm/boot/dts/stih407-family.dtsi
-@@ -881,5 +881,81 @@
- 			status = "disabled";
- 			st,syscfg = <&syscfg_core>;
+diff --git a/arch/arm/boot/dts/stihxxx-b2120.dtsi b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+index 722c63f..1f64bb6 100644
+--- a/arch/arm/boot/dts/stihxxx-b2120.dtsi
++++ b/arch/arm/boot/dts/stihxxx-b2120.dtsi
+@@ -131,5 +131,50 @@
+ 				dvb-card	= <STV0367_TDA18212_NIMA_1>;
+ 			};
  		};
 +
-+		sti_uni_player0: sti-uni-player at 0 {
-+			compatible = "st,sti-uni-player";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			clocks = <&clk_s_d0_flexgen CLK_PCM_0>;
-+			assigned-clocks = <&clk_s_d0_quadfs 0>, <&clk_s_d0_flexgen CLK_PCM_0>;
-+			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 0>;
-+			assigned-clock-rates = <50000000>;
-+			reg = <0x8D80000 0x158>;
-+			interrupts = <GIC_SPI 84 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 2 0 1>;
-+			dai-name = "Uni Player #0 (HDMI)";
-+			dma-names = "tx";
-+			st,uniperiph-id = <0>;
-+			st,version = <5>;
-+			st,mode = "HDMI";
-+		};
-+
-+		sti_uni_player1: sti-uni-player at 1 {
-+			compatible = "st,sti-uni-player";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			clocks = <&clk_s_d0_flexgen CLK_PCM_1>;
-+			assigned-clocks = <&clk_s_d0_quadfs 1>, <&clk_s_d0_flexgen CLK_PCM_1>;
-+			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 1>;
-+			assigned-clock-rates = <50000000>;
-+			reg = <0x8D81000 0x158>;
-+			interrupts = <GIC_SPI 85 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 3 0 1>;
-+			dai-name = "Uni Player #1 (PIO)";
-+			dma-names = "tx";
-+			st,uniperiph-id = <1>;
-+			st,version = <5>;
-+			st,mode = "PCM";
-+		};
-+
 +		sti_uni_player2: sti-uni-player at 2 {
-+			compatible = "st,sti-uni-player";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			clocks = <&clk_s_d0_flexgen CLK_PCM_2>;
-+			assigned-clocks = <&clk_s_d0_quadfs 2>, <&clk_s_d0_flexgen CLK_PCM_2>;
-+			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 2>;
-+			assigned-clock-rates = <50000000>;
-+			reg = <0x8D82000 0x158>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 4 0 1>;
-+			dai-name = "Uni Player #1 (DAC)";
-+			dma-names = "tx";
-+			st,uniperiph-id = <2>;
-+			st,version = <5>;
-+			st,mode = "PCM";
++			status = "okay";
 +		};
 +
 +		sti_uni_player3: sti-uni-player at 3 {
-+			compatible = "st,sti-uni-player";
-+			status = "disabled";
-+			#sound-dai-cells = <0>;
-+			st,syscfg = <&syscfg_core>;
-+			clocks = <&clk_s_d0_flexgen CLK_SPDIFF>;
-+			assigned-clocks = <&clk_s_d0_quadfs 3>, <&clk_s_d0_flexgen CLK_SPDIFF>;
-+			assigned-clock-parents = <0>, <&clk_s_d0_quadfs 3>;
-+			assigned-clock-rates = <50000000>;
-+			reg = <0x8D85000 0x158>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
-+			dmas = <&fdma0 7 0 1>;
-+			dma-names = "tx";
-+			dai-name = "Uni Player #1 (PIO)";
-+			st,uniperiph-id = <3>;
-+			st,version = <5>;
-+			st,mode = "SPDIF";
++			status = "okay";
++		};
++
++		sti_sasg_codec: sti-sasg-codec {
++			status = "okay";
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_spdif_out>;
++		};
++
++		sound {
++			compatible = "simple-audio-card";
++			simple-audio-card,name = "sti audio card";
++			status = "okay";
++
++			simple-audio-card,dai-link at 0 {
++				/* DAC */
++				format = "i2s";
++				mclk-fs = <256>;
++				cpu {
++					sound-dai = <&sti_uni_player2>;
++				};
++
++				codec {
++					sound-dai = <&sti_sasg_codec 1>;
++				};
++			};
++			simple-audio-card,dai-link at 1 {
++				/* SPDIF */
++				format = "left_j";
++				mclk-fs = <128>;
++				cpu {
++					sound-dai = <&sti_uni_player3>;
++				};
++
++				codec {
++					sound-dai = <&sti_sasg_codec 0>;
++				};
++			};
 +		};
  	};
  };
