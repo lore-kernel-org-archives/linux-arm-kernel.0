@@ -1,10 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  7 Jun 2016 13:48:07 +0200
-Subject: [PATCH v2 12/20] drm: sun4i: Rely on the default ->best_encoder()
+Date: Tue,  7 Jun 2016 13:48:06 +0200
+Subject: [PATCH v2 11/20] drm: sti: Rely on the default ->best_encoder()
  behavior
 In-Reply-To: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465300095-16971-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465300095-16971-12-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,56 +15,85 @@ drm_atomic_helper_best_encoder() for us.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_rgb.c | 10 ----------
- drivers/gpu/drm/sun4i/sun4i_tv.c  |  9 ---------
- 2 files changed, 19 deletions(-)
+ drivers/gpu/drm/sti/sti_dvo.c  | 10 ----------
+ drivers/gpu/drm/sti/sti_hda.c  | 10 ----------
+ drivers/gpu/drm/sti/sti_hdmi.c | 10 ----------
+ 3 files changed, 30 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_rgb.c b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-index ab64948..442cfe2 100644
---- a/drivers/gpu/drm/sun4i/sun4i_rgb.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_rgb.c
-@@ -90,19 +90,9 @@ static int sun4i_rgb_mode_valid(struct drm_connector *connector,
+diff --git a/drivers/gpu/drm/sti/sti_dvo.c b/drivers/gpu/drm/sti/sti_dvo.c
+index 25f7663..d5627d1 100644
+--- a/drivers/gpu/drm/sti/sti_dvo.c
++++ b/drivers/gpu/drm/sti/sti_dvo.c
+@@ -384,20 +384,10 @@ static int sti_dvo_connector_mode_valid(struct drm_connector *connector,
  	return MODE_OK;
  }
  
--static struct drm_encoder *
--sun4i_rgb_best_encoder(struct drm_connector *connector)
+-struct drm_encoder *sti_dvo_best_encoder(struct drm_connector *connector)
 -{
--	struct sun4i_rgb *rgb =
--		drm_connector_to_sun4i_rgb(connector);
+-	struct sti_dvo_connector *dvo_connector
+-		= to_sti_dvo_connector(connector);
 -
--	return &rgb->encoder;
+-	/* Best encoder is the one associated during connector creation */
+-	return dvo_connector->encoder;
 -}
 -
- static struct drm_connector_helper_funcs sun4i_rgb_con_helper_funcs = {
- 	.get_modes	= sun4i_rgb_get_modes,
- 	.mode_valid	= sun4i_rgb_mode_valid,
--	.best_encoder	= sun4i_rgb_best_encoder,
+ static const
+ struct drm_connector_helper_funcs sti_dvo_connector_helper_funcs = {
+ 	.get_modes = sti_dvo_connector_get_modes,
+ 	.mode_valid = sti_dvo_connector_mode_valid,
+-	.best_encoder = sti_dvo_best_encoder,
  };
  
  static enum drm_connector_status
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index bc047f9..b841478 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -526,18 +526,9 @@ static int sun4i_tv_comp_mode_valid(struct drm_connector *connector,
+diff --git a/drivers/gpu/drm/sti/sti_hda.c b/drivers/gpu/drm/sti/sti_hda.c
+index f7d3464..c4649f5 100644
+--- a/drivers/gpu/drm/sti/sti_hda.c
++++ b/drivers/gpu/drm/sti/sti_hda.c
+@@ -676,20 +676,10 @@ static int sti_hda_connector_mode_valid(struct drm_connector *connector,
  	return MODE_OK;
  }
  
--static struct drm_encoder *
--sun4i_tv_comp_best_encoder(struct drm_connector *connector)
+-struct drm_encoder *sti_hda_best_encoder(struct drm_connector *connector)
 -{
--	struct sun4i_tv *tv = drm_connector_to_sun4i_tv(connector);
+-	struct sti_hda_connector *hda_connector
+-		= to_sti_hda_connector(connector);
 -
--	return &tv->encoder;
+-	/* Best encoder is the one associated during connector creation */
+-	return hda_connector->encoder;
 -}
 -
- static struct drm_connector_helper_funcs sun4i_tv_comp_connector_helper_funcs = {
- 	.get_modes	= sun4i_tv_comp_get_modes,
- 	.mode_valid	= sun4i_tv_comp_mode_valid,
--	.best_encoder	= sun4i_tv_comp_best_encoder,
+ static const
+ struct drm_connector_helper_funcs sti_hda_connector_helper_funcs = {
+ 	.get_modes = sti_hda_connector_get_modes,
+ 	.mode_valid = sti_hda_connector_mode_valid,
+-	.best_encoder = sti_hda_best_encoder,
  };
  
  static enum drm_connector_status
+diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
+index 6ef0715..dc9ab6e 100644
+--- a/drivers/gpu/drm/sti/sti_hdmi.c
++++ b/drivers/gpu/drm/sti/sti_hdmi.c
+@@ -897,20 +897,10 @@ static int sti_hdmi_connector_mode_valid(struct drm_connector *connector,
+ 	return MODE_OK;
+ }
+ 
+-struct drm_encoder *sti_hdmi_best_encoder(struct drm_connector *connector)
+-{
+-	struct sti_hdmi_connector *hdmi_connector
+-		= to_sti_hdmi_connector(connector);
+-
+-	/* Best encoder is the one associated during connector creation */
+-	return hdmi_connector->encoder;
+-}
+-
+ static const
+ struct drm_connector_helper_funcs sti_hdmi_connector_helper_funcs = {
+ 	.get_modes = sti_hdmi_connector_get_modes,
+ 	.mode_valid = sti_hdmi_connector_mode_valid,
+-	.best_encoder = sti_hdmi_best_encoder,
+ };
+ 
+ /* get detection status of display device */
 -- 
 2.7.4
