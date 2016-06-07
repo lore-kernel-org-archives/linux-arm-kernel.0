@@ -1,44 +1,37 @@
-From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue, 07 Jun 2016 01:40:47 -0700
-Subject: [PATCH 07/34] clk: berlin: Migrate to clk_hw based registration
- and OF APIs
-In-Reply-To: <20160605174157.GP4594@piout.net>
-References: <20160601231533.9354-1-stephen.boyd@linaro.org>
- <20160601231533.9354-8-stephen.boyd@linaro.org>
- <20160605174157.GP4594@piout.net>
-Message-ID: <146528884761.28742.8093002152658120585@sboyd-linaro>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 7 Jun 2016 09:42:08 +0100
+Subject: [STLinux Kernel] [PATCH 0/7] reset: Consumers to explicitly
+ request 'exclusive' or 'shared' lines
+In-Reply-To: <20160606155655.10860-1-lee.jones@linaro.org>
+References: <20160606155655.10860-1-lee.jones@linaro.org>
+Message-ID: <20160607084208.GB22960@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Alexandre Belloni (2016-06-05 10:41:57)
-> Hi,
-> 
-> The main drawback of those patches is that they break the alignment
-> (checkpatch.pl --strict complains).
+Hi,
 
-Didn't checkpatch --strict already warn on these files though? I'm not
-sure I've done anything to break the alignment style here.
+On Mon, 06 Jun 2016, Lee Jones wrote:
 
+> Phasing out generic reset line requests enables us to make some better
+> decisions on when and how to (de)assert said lines.  If an 'exclusive'
+> line is requested, we know a device *requires* a reset and that it's
+> preferable to act upon a request right away.  However, if a 'shared'
+> reset line is requested, we can reasonably assume sure that placing a
+> device into reset isn't a hard requirement, but probably a measure to
+> save power and is thus able to cope with not being asserted if another
+> device is still in use.
 > 
-> On 01/06/2016 at 16:15:06 -0700, Stephen Boyd wrote :
-> > diff --git a/drivers/clk/berlin/berlin2-avpll.h b/drivers/clk/berlin/berlin2-avpll.h
-> > index a37f5068d299..17e311153b42 100644
-> > --- a/drivers/clk/berlin/berlin2-avpll.h
-> > +++ b/drivers/clk/berlin/berlin2-avpll.h
-> > @@ -19,17 +19,13 @@
-> >  #ifndef __BERLIN2_AVPLL_H
-> >  #define __BERLIN2_AVPLL_H
-> >  
-> > -struct clk;
-> > -
-> >  #define BERLIN2_AVPLL_BIT_QUIRK              BIT(0)
-> >  #define BERLIN2_AVPLL_SCRAMBLE_QUIRK BIT(1)
-> >  
-> > -struct clk * __init
-> > -berlin2_avpll_vco_register(void __iomem *base, const char *name,
-> > +int berlin2_avpll_vco_register(void __iomem *base, const char *name,
-> 
-> This is missing __init.
+> In order allow gentle adoption and not to forcing all consumers to
+> move to the API immediately, causing administration headache between
+> subsystems, this patch adds some temporary stand-in shim-calls.  This
+> will ease the burden at merge time and allow subsystems to migrate over
+> to the new API in a more realistic time-frame.
 
-Ah I also removed __init in the header file here because it doesn't do
-anything. I guess I should mention that in the commit text.
+Is the intention that this series will be taken into the next -rc?
+
+As the introduction of shared resets in reset subsystem has caused regressions
+on STi platforms.
+
+regards,
+
+Peter.
