@@ -1,56 +1,38 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 7 Jun 2016 06:13:49 +0000
-Subject: [PATCH v2 3/4] dmaengine: vdma: Add 64 bit addressing support
- for the axi dma
-In-Reply-To: <20160607061701.GG16910@localhost>
-References: <1463557653-1687-1-git-send-email-appanad@xilinx.com>
- <1463557653-1687-4-git-send-email-appanad@xilinx.com>
- <20160607061701.GG16910@localhost>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A5B4A40@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: yong.b.li@intel.com (Li, Yong B)
+Date: Tue, 7 Jun 2016 06:14:33 +0000
+Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
+In-Reply-To: <20160607060004.GD22406@atomide.com>
+References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
+ <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
+ <20160602173932.GF5995@atomide.com>
+ <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
+ <20160602175635.GG5995@atomide.com>
+ <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FB1EC@SHSMSX101.ccr.corp.intel.com>
+ <20160607060004.GD22406@atomide.com>
+Message-ID: <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FD673@SHSMSX101.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Thanks Tony.
 
-> On Wed, May 18, 2016 at 01:17:32PM +0530, Kedareswara rao Appana wrote:
-> > +		if (chan->cyclic) {
-> > +			if (chan->ext_addr)
-> > +				dma_writeq(chan,
-> XILINX_DMA_REG_TAILDESC,
-> > +					   chan->cyclic_seg_v->phys);
-> > +			else
-> > +				dma_ctrl_write(chan,
-> XILINX_DMA_REG_TAILDESC,
-> > +					       chan->cyclic_seg_v->phys);
-> > +		} else {
-> > +			if (chan->ext_addr)
-> > +				dma_writeq(chan,
-> XILINX_DMA_REG_TAILDESC,
-> > +					   tail_segment->phys);
-> > +			else
-> > +				dma_ctrl_write(chan,
-> XILINX_DMA_REG_TAILDESC,
-> > +					       tail_segment->phys);
-> 
-> this looks ugly and repeated few times. Why not have xilinx_write() which does
-> either dma_writeq or dma_ctrl_write based on channel..
-
-Ok sure will fix in the next version...
-
-> 
-> > +			if (chan->ext_addr) {
-> > +				hw->buf_addr = lower_32_bits(buf_addr +
-> > +						sg_used + (period_len * i));
-> > +				hw->buf_addr_msb = upper_32_bits(buf_addr +
-> > +						sg_used + (period_len * i));
-> > +			} else {
-> > +				hw->buf_addr = buf_addr + sg_used +
-> > +					       (period_len * i);
-> > +			}
-> 
-> similar wrapper here would make code more readable
-
-Ok Sure will fix in the next version...
+I checked the DTS/overlays using linux-yocto-4.1 kernel(Ostro OS). It seems to me that the kernel/u-boot do not include the latest overlay support patch. And I also tested the latest Debian 8.4 using BBB boards, the I2C1 does not work too. This patch is the simplest solution for I2C1/I2C2 in linux-yocto-4.1.
 
 Thanks,
-Kedar.
+Yong
+-----Original Message-----
+From: Tony Lindgren [mailto:tony at atomide.com] 
+Sent: Tuesday, June 7, 2016 2:00 PM
+To: Li, Yong B <yong.b.li@intel.com>
+Cc: Robert Nelson <robertcnelson@gmail.com>; Benoit Cousson <bcousson@baylibre.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Russell King <linux@arm.linux.org.uk>; linux-omap at vger.kernel.org; devicetree <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; linux kernel <linux-kernel@vger.kernel.org>; sdliyong at gmail.com
+Subject: Re: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
+
+* Li, Yong B <yong.b.li@intel.com> [160602 22:49]:
+> Hi Tony,
+> 
+> I can submit a V2 version about the "disabled", or just drop this patch?
+
+Probably best to wait on this one until we know how it can be enabled without manually editing the dts file. I'm still hoping u-boot could enable it based on some environment variable..
+
+Regards,
+
+Tony
