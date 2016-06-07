@@ -1,55 +1,64 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue,  7 Jun 2016 11:58:27 +0100
-Subject: [PATCH 07/15] arm64: KVM: Runtime detection of lower HYP offset
+Date: Tue,  7 Jun 2016 11:58:26 +0100
+Subject: [PATCH 06/15] arm/arm64: KVM: Export __hyp_text_start/end symbols
 In-Reply-To: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
 References: <1465297115-13091-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1465297115-13091-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1465297115-13091-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the code that enables the switch to the lower HYP VA range.
+Declare the __hyp_text_start/end symbols in asm/virt.h so that
+they can be reused without having to declare them locally.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/cpufeature.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ arch/arm/include/asm/virt.h   | 4 ++++
+ arch/arm/kvm/mmu.c            | 2 --
+ arch/arm64/include/asm/virt.h | 4 ++++
+ 3 files changed, 8 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 811773d..ffb3e14d 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -726,6 +726,19 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
- 	return is_kernel_in_hyp_mode();
+diff --git a/arch/arm/include/asm/virt.h b/arch/arm/include/asm/virt.h
+index d4ceaf5..a2e75b8 100644
+--- a/arch/arm/include/asm/virt.h
++++ b/arch/arm/include/asm/virt.h
+@@ -80,6 +80,10 @@ static inline bool is_kernel_in_hyp_mode(void)
+ 	return false;
  }
  
-+static bool hyp_offset_low(const struct arm64_cpu_capabilities *entry,
-+			   int __unused)
-+{
-+	phys_addr_t idmap_addr = virt_to_phys(__hyp_idmap_text_start);
++/* The section containing the hypervisor idmap text */
++extern char __hyp_idmap_text_start[];
++extern char __hyp_idmap_text_end[];
 +
-+	/*
-+	 * Activate the lower HYP offset only if:
-+	 * - the idmap doesn't clash with it,
-+	 * - the kernel is not running at EL2.
-+	 */
-+	return idmap_addr > GENMASK(VA_BITS - 2, 0) && !is_kernel_in_hyp_mode();
-+}
-+
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
-@@ -803,6 +816,12 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.field_pos = ID_AA64PFR0_EL0_SHIFT,
- 		.min_field_value = ID_AA64PFR0_EL0_32BIT_64BIT,
- 	},
-+	{
-+		.desc = "Reduced HYP mapping offset",
-+		.capability = ARM64_HYP_OFFSET_LOW,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = hyp_offset_low,
-+	},
- 	{},
- };
+ /* The section containing the hypervisor text */
+ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 45c43ae..d6ecbf1 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -32,8 +32,6 @@
  
+ #include "trace.h"
+ 
+-extern char  __hyp_idmap_text_start[], __hyp_idmap_text_end[];
+-
+ static pgd_t *boot_hyp_pgd;
+ static pgd_t *hyp_pgd;
+ static pgd_t *merged_hyp_pgd;
+diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
+index dcbcf8d..88aa8ec 100644
+--- a/arch/arm64/include/asm/virt.h
++++ b/arch/arm64/include/asm/virt.h
+@@ -82,6 +82,10 @@ extern void verify_cpu_run_el(void);
+ static inline void verify_cpu_run_el(void) {}
+ #endif
+ 
++/* The section containing the hypervisor idmap text */
++extern char __hyp_idmap_text_start[];
++extern char __hyp_idmap_text_end[];
++
+ /* The section containing the hypervisor text */
+ extern char __hyp_text_start[];
+ extern char __hyp_text_end[];
 -- 
 2.1.4
