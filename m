@@ -1,58 +1,47 @@
-From: charanya@codeaurora.org (Charanya Venkatraman)
-Date: Tue,  7 Jun 2016 15:58:41 +0530
-Subject: [PATCH v3] tty:serial:msm:Do not restore Rx interrupts in DMA
-In-Reply-To: <1462896580-11554-1>
-References: <1462896580-11554-1>
-Message-ID: <1465295321-10506-1-git-send-email-charanya@codeaurora.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 7 Jun 2016 13:31:07 +0300
+Subject: [PATCH v3 0/6] Add R8A7794/SILK sound DT support
+In-Reply-To: <20160607003736.GB20591@verge.net.au>
+References: <2378837.cigT3tNQPe@wasted.cogentembedded.com>
+ <7d19e749-8264-9004-64f4-aefabda699c6@cogentembedded.com>
+ <b77ad169-c9d1-4d67-0973-fc9639ddb613@cogentembedded.com>
+ <20160607003736.GB20591@verge.net.au>
+Message-ID: <56af1dfd-45cc-fc55-0d8f-8a01a98a9499@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid data corruption issues that result in CRC errors during file
-transfers over serial ports at higher baud rates.
+Hello.
 
-The current msm_serial driver masks the FIFO Rx interrupts in
-msm_start_rx_dma() since Rx FIFO interrupts are not required in DMA
-mode. However, msm_complete_rx_dma() re-enables the Rx FIFO interrupts
-which could cause RXSTALE event to be processed when a TXLEV interrupt
-occurs.
+On 6/7/2016 3:37 AM, Simon Horman wrote:
 
-The following is the sequence of events that could occur resulting in
-data corruption.
+>>>>   Here's the set of 6 patches against Simon Horman's 'renesas.git' repo,
+>>>> 'renesas-devel-20160509-v4.6-rc7' tag. I'm adding the sound device tree support
+>>>> for the R8A7794 SoC based SILK board.
+>>>>
+>>>> [1/6] ARM: dts: r8a7794: add audio clocks
+>>>> [2/6] ARM: dts: r8a7794: add MSTP5 clocks
+>>>> [3/6] ARM: dts: r8a7794: add MSTP10 clocks
+>>>> [4/6] ARM: dts: r8a7794: add Audio-DMAC support
+>>>> [5/6] ARM: dts: r8a7794: add sound support
+>>>> [6/6] ARM: dts: silk: add sound support
+>>>
+>>>   Oops, forgot to mention that patch #5 depends on the R-Car sound patch
+>>> posted yesterday in order to get interpreted as intended (it uses a disabled
+>>> SRC node).
+>>
+>>   Simon, that patch has already hit Linus' tree but this series seems to be
+>> stuck. Please merge!
+>
+> Hi Sergei,
+>
+> there seem to be some outstanding review comments for v3 of this patchset.
 
-msm_start_rx_dma -> msm_complete_rx_dma -->
-spin_unlock_irqrestore(&port->lock) -->
-msm_uart_irq()(For TXLEV interrupt) -->  msm_handle_rx_dm() (Read from
-FIFO resulting in data corruption)
+    Indeed, seeing them now. Sorry for bothering you...
 
-The patch fixes the issue by not restoring the RXLEV and RXSTALE
-interrupts in msm_complete_rx_dma(). These interrupts are required only
-in FIFO mode.
+> Could you address them and repost?
 
-Signed-off-by: Charanya Venkatraman <charanya@codeaurora.org>
----
-Changes in v2:
-	- Make commit message more clearer.
-Changes in v3:
-	- Fix typos in commit message.
+    I will. :-)
 
- drivers/tty/serial/msm_serial.c | 4 ----
- 1 file changed, 4 deletions(-)
+> Thanks!
 
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index b7d80bd..646aa3f 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -388,10 +388,6 @@ static void msm_complete_rx_dma(void *args)
- 	val &= ~dma->enable_bit;
- 	msm_write(port, val, UARTDM_DMEN);
- 
--	/* Restore interrupts */
--	msm_port->imr |= UART_IMR_RXLEV | UART_IMR_RXSTALE;
--	msm_write(port, msm_port->imr, UART_IMR);
--
- 	if (msm_read(port, UART_SR) & UART_SR_OVERRUN) {
- 		port->icount.overrun++;
- 		tty_insert_flip_char(tport, 0, TTY_OVERRUN);
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+MBR, Sergei
