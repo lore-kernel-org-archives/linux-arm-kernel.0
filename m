@@ -1,49 +1,134 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 17:09:15 +0100
-Subject: [PATCH] dmaengine: at_xdmac: fix un-exported functions
-Message-ID: <1465315755-3645-1-git-send-email-ben.dooks@codethink.co.uk>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Tue, 7 Jun 2016 18:12:20 +0200
+Subject: [PATCH V5 7/7] acpi, gicv3, its: Use MADT ITS subtable to do
+ PCI/MSI domain initialization.
+In-Reply-To: <20160604130715.2297c87d@arm.com>
+References: <1464693584-22343-1-git-send-email-tn@semihalf.com>
+ <1464693584-22343-8-git-send-email-tn@semihalf.com>
+ <20160604130715.2297c87d@arm.com>
+Message-ID: <5756F264.6060405@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The at_xdmac_init_used_desc() and at_xdmac_prep_dma_memset()
-functions are not exported outside the driver, so make them
-static to avoid the following warnings:
+On 04.06.2016 14:07, Marc Zyngier wrote:
+> On Tue, 31 May 2016 13:19:44 +0200
+> Tomasz Nowicki <tn@semihalf.com> wrote:
+>
+>> Let ACPI build ITS PCI MSI domain. ACPI is responsible for retrieving
+>> inner domain token and passing it on to its_pci_msi_init_one generic
+>> init call.
+>>
+>> We have now full PCI MSI domain stack, thus we can enable ITS initialization
+>> from GICv3 core driver for ACPI scenario.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   drivers/irqchip/irq-gic-v3-its-pci-msi.c | 42 +++++++++++++++++++++++++++++++-
+>>   drivers/irqchip/irq-gic-v3.c             |  3 +--
+>>   2 files changed, 42 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> index 23679ae..985f5d9 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> @@ -15,6 +15,7 @@
+>>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>    */
+>>
+>> +#include <linux/iort.h>
+>>   #include <linux/msi.h>
+>>   #include <linux/of.h>
+>>   #include <linux/of_irq.h>
+>> @@ -144,10 +145,49 @@ static int __init its_pci_of_msi_init(void)
+>>   	return 0;
+>>   }
+>>
+>> +#ifdef CONFIG_ACPI
+>> +
+>> +static int __init
+>> +its_pci_msi_parse_madt(struct acpi_subtable_header *header,
+>> +		       const unsigned long end)
+>> +{
+>> +	struct acpi_madt_generic_translator *its_entry;
+>> +	struct fwnode_handle *dom_handle;
+>> +	char node_name[6 + 16 + 1]; // ITS identification name
+>
+> Jeezus... Where is that coming from? Is that the size of "ITS at 0x"+16
+> hex digits and a final NUL? For the sake of keeping things
+> maintainable/readable, please use kasprintf/kfree.
 
-drivers/dma/at_xdmac.c:459:6: warning: symbol 'at_xdmac_init_used_desc' was not declared. Should it be static?
-drivers/dma/at_xdmac.c:1205:32: warning: symbol 'at_xdmac_prep_dma_memset' was not declared. Should it be static?
+kasprintf/kfree will be used here.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: dmaengine at vger.kernel.org
----
- drivers/dma/at_xdmac.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+>
+>> +
+>> +	its_entry = (struct acpi_madt_generic_translator *)header;
+>> +	snprintf(node_name, 23, "ITS at 0x%lx", (long)its_entry->base_address);
+>> +	dom_handle = iort_its_find_domain_token(its_entry->translation_id);
+>> +	if (!dom_handle) {
+>> +		pr_err("%s: Unable to locate ITS domain handle\n", node_name);
+>> +		return 0;
+>
+> return 0? not even a slap on the wrist? Hum...
+>
+>> +	}
+>> +
+>> +	if (its_pci_msi_init_one(dom_handle, node_name))
+>> +		return 0;
+>
+> Same here.
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index 8e304b1..2503b40 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -456,7 +456,7 @@ static struct at_xdmac_desc *at_xdmac_alloc_desc(struct dma_chan *chan,
- 	return desc;
- }
- 
--void at_xdmac_init_used_desc(struct at_xdmac_desc *desc)
-+static void at_xdmac_init_used_desc(struct at_xdmac_desc *desc)
- {
- 	memset(&desc->lld, 0, sizeof(desc->lld));
- 	INIT_LIST_HEAD(&desc->descs_list);
-@@ -1202,7 +1202,7 @@ static struct at_xdmac_desc *at_xdmac_memset_create_desc(struct dma_chan *chan,
- 	return desc;
- }
- 
--struct dma_async_tx_descriptor *
-+static struct dma_async_tx_descriptor *
- at_xdmac_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
- 			 size_t len, unsigned long flags)
- {
--- 
-2.8.1
+Yeah, decent error code are needed here.
+
+>
+>> +
+>> +	pr_info("PCI/MSI: %s domain created\n", node_name);
+>> +	return 0;
+>> +}
+>> +
+>> +static int __init its_pci_acpi_msi_init(void)
+>> +{
+>> +	acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_TRANSLATOR,
+>> +			      its_pci_msi_parse_madt, 0);
+>> +	return 0;
+>> +}
+>> +#else
+>> +inline static int __init its_pci_acpi_msi_init(void)
+>
+> static only.
+
+OK
+
+>
+>> +{
+>> +	return 0;
+>> +}
+>> +#endif
+>> +
+>>   static int __init its_pci_msi_init(void)
+>>   {
+>>   	its_pci_of_msi_init();
+>> +	its_pci_acpi_msi_init();
+>> +
+>>   	return 0;
+>>   }
+>> -
+>>   early_initcall(its_pci_msi_init);
+>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>> index cee8296..41c1cda 100644
+>> --- a/drivers/irqchip/irq-gic-v3.c
+>> +++ b/drivers/irqchip/irq-gic-v3.c
+>> @@ -951,8 +951,7 @@ static int __init gic_init_bases(void __iomem *dist_base,
+>>
+>>   	set_handle_irq(gic_handle_irq);
+>>
+>> -	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis() &&
+>> -	    to_of_node(handle)) /* Temp hack to prevent ITS init for ACPI */
+>> +	if (IS_ENABLED(CONFIG_ARM_GIC_V3_ITS) && gic_dist_supports_lpis())
+>>   		its_init(handle, &gic_data.rdists, gic_data.domain);
+>>
+>>   	gic_smp_init();
+>
+
+Thanks for review.
+
+Tomasz
