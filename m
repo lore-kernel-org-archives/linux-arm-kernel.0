@@ -1,57 +1,127 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Tue, 7 Jun 2016 13:00:41 -0700
-Subject: [PATCH] tty: serial: msm: fix definition of msm_stop_dma
-In-Reply-To: <1465323112-32366-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465323112-32366-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160607200041.GJ1256@tuxbot>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 7 Jun 2016 22:14:56 +0200
+Subject: [PATCH V6 5/8] vfio: platform: call _RST method when using ACPI
+In-Reply-To: <1464472878-27176-6-git-send-email-okaya@codeaurora.org>
+References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
+ <1464472878-27176-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <d2640403-776d-9af2-9014-638453403446@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 07 Jun 11:11 PDT 2016, Ben Dooks wrote:
-
-> The msm_stop_dma() is not exported from the driver, so make
-> it static to stop the following warning:
+Hi Sinan,
+Le 29/05/2016 ? 00:01, Sinan Kaya a ?crit :
+> The device tree code checks for the presence of a reset driver and calls
+> the of_reset function pointer by looking up the reset driver as a module.
 > 
-> drivers/tty/serial/msm_serial.c:84:6: warning: symbol 'msm_stop_dma' was not declared. Should it be static?
+> ACPI defines _RST method to perform device level reset. After the _RST
+> method is executed, the OS can resume using the device. _RST method is
+> expected to stop DMA transfers and IRQs.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> This patch checks the presence of _RST method and calls the _RST
+> method when reset is requested.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> Reviewed-by: Eric Auger <eric.auger@linaro.org>
+code has changed compared to previous version and the R-b. In the future, please add change logs.
+Besides it looks ok to me.
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+Best Regards
 
-Regards,
-Bjorn
+Eric
 
 > ---
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.com>
-> Cc: linux-arm-msm at vger.kernel.org
-> Cc: linux-soc at vger.kernel.org
-> Cc: linux-serial at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/tty/serial/msm_serial.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/vfio/platform/vfio_platform_common.c | 51 ++++++++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
 > 
-> diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-> index b7d80bd..187f2c0 100644
-> --- a/drivers/tty/serial/msm_serial.c
-> +++ b/drivers/tty/serial/msm_serial.c
-> @@ -81,7 +81,7 @@ struct msm_port {
->  static void msm_handle_tx(struct uart_port *port);
->  static void msm_start_rx_dma(struct msm_port *msm_port);
->  
-> -void msm_stop_dma(struct uart_port *port, struct msm_dma *dma)
-> +static void msm_stop_dma(struct uart_port *port, struct msm_dma *dma)
+> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+> index e7ce2c2..0ea8c26 100644
+> --- a/drivers/vfio/platform/vfio_platform_common.c
+> +++ b/drivers/vfio/platform/vfio_platform_common.c
+> @@ -73,21 +73,66 @@ static int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+>  	}
+>  	return 0;
+>  }
+> +
+> +static int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
+> +					 const char **extra_dbg)
+> +{
+> +	struct device *dev = vdev->device;
+> +	acpi_handle handle = ACPI_HANDLE(dev);
+> +	acpi_status acpi_ret;
+> +	unsigned long long val;
+> +
+> +	acpi_ret = acpi_evaluate_integer(handle, "_RST", NULL, &val);
+> +	if (ACPI_FAILURE(acpi_ret)) {
+> +		if (extra_dbg)
+> +			*extra_dbg = acpi_format_exception(acpi_ret);
+> +		return -EINVAL;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+> +{
+> +	struct device *dev = vdev->device;
+> +	acpi_handle handle = ACPI_HANDLE(dev);
+> +
+> +	return acpi_has_method(handle, "_RST");
+> +}
+>  #else
+>  static inline int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
+>  					   struct device *dev)
 >  {
->  	struct device *dev = port->dev;
->  	unsigned int mapped;
-> -- 
-> 2.8.1
+>  	return -ENOENT;
+>  }
+> +
+> +static inline
+> +int vfio_platform_acpi_call_reset(struct vfio_platform_device *vdev,
+> +				  const char **extra_dbg)
+> +{
+> +	return -ENOENT;
+> +}
+> +
+> +static inline
+> +bool vfio_platform_acpi_has_reset(struct vfio_platform_device *vdev)
+> +{
+> +	return false;
+> +}
+>  #endif
+>  
+>  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (vdev->acpihid)
+> +		return vfio_platform_acpi_has_reset(vdev);
+> +
+>  	return vdev->of_reset ? true : false;
+>  }
+>  
+>  static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (vdev->acpihid)
+> +		return;
+> +
+>  	vdev->of_reset = vfio_platform_lookup_reset(vdev->compat,
+>  						    &vdev->reset_module);
+>  	if (!vdev->of_reset) {
+> @@ -99,6 +144,9 @@ static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
+>  
+>  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
+>  {
+> +	if (vdev->acpihid)
+> +		return;
+> +
+>  	if (vdev->of_reset)
+>  		module_put(vdev->reset_module);
+>  }
+> @@ -177,6 +225,9 @@ static int vfio_platform_call_reset(struct vfio_platform_device *vdev,
+>  	if (vdev->of_reset) {
+>  		dev_info(vdev->device, "reset\n");
+>  		return vdev->of_reset(vdev);
+> +	} else if (vdev->acpihid) {
+> +		dev_info(vdev->device, "reset\n");
+> +		return vfio_platform_acpi_call_reset(vdev, extra_dbg);
+>  	}
+>  
+>  	dev_warn(vdev->device, "no reset function found!\n");
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
