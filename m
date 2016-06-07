@@ -1,41 +1,48 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 19:11:52 +0100
-Subject: [PATCH] tty: serial: msm: fix definition of msm_stop_dma
-Message-ID: <1465323112-32366-1-git-send-email-ben.dooks@codethink.co.uk>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Tue, 7 Jun 2016 21:35:05 +0300
+Subject: [PATCH 1/2] phy: phy-qcom-ufs-qmp-14nm: Remove site specific OOM
+ error message
+In-Reply-To: <1465321810-22470-1-git-send-email-peter.griffin@linaro.org>
+References: <1465321810-22470-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160607183505.GJ2425@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The msm_stop_dma() is not exported from the driver, so make
-it static to stop the following warning:
+Hi Peter,
 
-drivers/tty/serial/msm_serial.c:84:6: warning: symbol 'msm_stop_dma' was not declared. Should it be static?
+On Tue, Jun 07, 2016 at 06:50:09PM +0100, Peter Griffin wrote:
+> kzalloc will issue its own error message including a dump_stack()
+> so remote the site specific message.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  drivers/phy/phy-qcom-ufs-qmp-14nm.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/drivers/phy/phy-qcom-ufs-qmp-14nm.c b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> index 56631e7..958e9cc 100644
+> --- a/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> +++ b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
+> @@ -139,11 +139,9 @@ static int ufs_qcom_phy_qmp_14nm_probe(struct platform_device *pdev)
+>  	int err = 0;
+>  
+>  	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
+> -	if (!phy) {
+> -		dev_err(dev, "%s: failed to allocate phy\n", __func__);
+> +	if (!phy)
+>  		err = -ENOMEM;
+>  		goto out;
+> -	}
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: David Brown <david.brown@linaro.org>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: linux-arm-msm at vger.kernel.org
-Cc: linux-soc at vger.kernel.org
-Cc: linux-serial at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/tty/serial/msm_serial.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Are you sure? The 'goto' is now unconditional.
 
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index b7d80bd..187f2c0 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -81,7 +81,7 @@ struct msm_port {
- static void msm_handle_tx(struct uart_port *port);
- static void msm_start_rx_dma(struct msm_port *msm_port);
- 
--void msm_stop_dma(struct uart_port *port, struct msm_dma *dma)
-+static void msm_stop_dma(struct uart_port *port, struct msm_dma *dma)
- {
- 	struct device *dev = port->dev;
- 	unsigned int mapped;
+>  
+>  	generic_phy = ufs_qcom_phy_generic_probe(pdev, &phy->common_cfg,
+>  				&ufs_qcom_phy_qmp_14nm_phy_ops, &phy_14nm_ops);
+
+baruch
+
 -- 
-2.8.1
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
