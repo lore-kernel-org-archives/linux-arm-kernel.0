@@ -1,74 +1,99 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 7 Jun 2016 14:52:36 +0300
-Subject: [PATCH 02/28] crypto: omap-sham: Don't idle/start SHA device
- between Encrypt operations
-In-Reply-To: <20160607100837.GA30875@gondor.apana.org.au>
-References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
- <1464771389-10640-3-git-send-email-t-kristo@ti.com> <574EB091.6040001@ti.com>
- <574F69D8.1010809@ti.com> <20160607100837.GA30875@gondor.apana.org.au>
-Message-ID: <5756B584.2000900@ti.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue,  7 Jun 2016 12:53:07 +0100
+Subject: [PATCH] watchdog: sirf: fix __iomem * warnings
+Message-ID: <1465300387-20629-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/16 13:08, Herbert Xu wrote:
-> On Wed, Jun 01, 2016 at 06:03:52PM -0500, Dave Gerlach wrote:
->> On 06/01/2016 04:53 AM, Grygorii Strashko wrote:
->>> On 06/01/2016 11:56 AM, Tero Kristo wrote:
->>>> From: Lokesh Vutla <lokeshvutla@ti.com>
->>>>
->>>> Calling runtime PM API for every block causes serious perf hit to
->>>> crypto operations that are done on a long buffer.
->>>> As crypto is performed on a page boundary, encrypting large buffers can
->>>> cause a series of crypto operations divided by page. The runtime PM API
->>>> is also called those many times.
->>>>
->>>> We call runtime_pm_get_sync only at beginning on the session (cra_init)
->>>> and runtime_pm_put at the end. This result in upto a 50% speedup.
->>>> This doesn't make the driver to keep the system awake as runtime get/put
->>>> is only called during a crypto session which completes usually quickly.
->>>>
->>>> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
->>>> Signed-off-by: Tero Kristo <t-kristo@ti.com>
->>>> ---
->>>>   drivers/crypto/omap-sham.c | 27 +++++++++++++++++----------
->>>>   1 file changed, 17 insertions(+), 10 deletions(-)
->>>>
->>>> diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
->>>> index 6eefaa2..bd0258f 100644
->>>> --- a/drivers/crypto/omap-sham.c
->>>> +++ b/drivers/crypto/omap-sham.c
->>>> @@ -360,14 +360,6 @@ static void omap_sham_copy_ready_hash(struct
->>>> ahash_request *req)
->>>>
->>>>   static int omap_sham_hw_init(struct omap_sham_dev *dd)
->>>>   {
->>>> -    int err;
->>>> -
->>>> -    err = pm_runtime_get_sync(dd->dev);
->>>> -    if (err < 0) {
->>>> -        dev_err(dd->dev, "failed to get sync: %d\n", err);
->>>> -        return err;
->>>> -    }
->>>> -
->>
->> Would it be worth it to investigate a pm_runtime autosuspend
->> approach rather than knocking runtime PM out here completely? I am
->> not clear if the overhead is coming from the pm_runtime calls
->> themselves or the actual idling of the IP, but if it's the idling of
->> the IP causing the slowdown, with a large enough autosuspend_delay
->> we don't actually sleep between each block but after a long enough
->> period of idle time we would actually suspend.
->
-> Indeed, I think this patch is bogus.  cra_init is associated
-> with the tfm object which is usually long-lived.  So doing power
-> management there makes no sense.
->
-> Cheers,
->
+Fix the following warnings from sparse due to casting to/from an __iomem
+annotated variable:
 
-I can investigate this further, but I believe this patch itself gave a 
-noticeable performance boost.
+drivers/watchdog/sirfsoc_wdt.c:48:18: warning: incorrect type in assignment (different address spaces)
+drivers/watchdog/sirfsoc_wdt.c:48:18:    expected void [noderef] <asn:2>*wdt_base
+drivers/watchdog/sirfsoc_wdt.c:48:18:    got void *
+drivers/watchdog/sirfsoc_wdt.c:64:18: warning: incorrect type in assignment (different address spaces)
+drivers/watchdog/sirfsoc_wdt.c:64:18:    expected void [noderef] <asn:2>*wdt_base
+drivers/watchdog/sirfsoc_wdt.c:64:18:    got void *
+drivers/watchdog/sirfsoc_wdt.c:82:54: warning: incorrect type in initializer (different address spaces)
+drivers/watchdog/sirfsoc_wdt.c:82:54:    expected void [noderef] <asn:2>*wdt_base
+drivers/watchdog/sirfsoc_wdt.c:82:54:    got void *
+drivers/watchdog/sirfsoc_wdt.c:99:54: warning: incorrect type in initializer (different address spaces)
+drivers/watchdog/sirfsoc_wdt.c:99:54:    expected void [noderef] <asn:2>*wdt_base
+drivers/watchdog/sirfsoc_wdt.c:99:54:    got void *
+drivers/watchdog/sirfsoc_wdt.c:153:44: warning: incorrect type in argument 2 (different address spaces)
+drivers/watchdog/sirfsoc_wdt.c:153:44:    expected void *data
+drivers/watchdog/sirfsoc_wdt.c:153:44:    got void [noderef] <asn:2>*[assigned] base
 
-This is an optimization anyway, and not critical for functionality.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Wim Van Sebroeck <wim@iguana.be>
+Cc: Guenter Roeck <linux@roeck-us.net>
+Cc: Barry Song <baohua@kernel.org>
+Cc: linux-watchdog at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/watchdog/sirfsoc_wdt.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
 
--Tero
+diff --git a/drivers/watchdog/sirfsoc_wdt.c b/drivers/watchdog/sirfsoc_wdt.c
+index d0578ab..3050a00 100644
+--- a/drivers/watchdog/sirfsoc_wdt.c
++++ b/drivers/watchdog/sirfsoc_wdt.c
+@@ -39,13 +39,18 @@ MODULE_PARM_DESC(timeout, "Default watchdog timeout (in seconds)");
+ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default="
+ 			__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+ 
++static void __iomem *sirfsoc_wdt_base(struct watchdog_device *wdd)
++{
++	return (void __iomem __force *)watchdog_get_drvdata(wdd);
++}
++
+ static unsigned int sirfsoc_wdt_gettimeleft(struct watchdog_device *wdd)
+ {
+ 	u32 counter, match;
+ 	void __iomem *wdt_base;
+ 	int time_left;
+ 
+-	wdt_base = watchdog_get_drvdata(wdd);
++	wdt_base = sirfsoc_wdt_base(wdd);
+ 	counter = readl(wdt_base + SIRFSOC_TIMER_COUNTER_LO);
+ 	match = readl(wdt_base +
+ 		SIRFSOC_TIMER_MATCH_0 + (SIRFSOC_TIMER_WDT_INDEX << 2));
+@@ -61,7 +66,7 @@ static int sirfsoc_wdt_updatetimeout(struct watchdog_device *wdd)
+ 	void __iomem *wdt_base;
+ 
+ 	timeout_ticks = wdd->timeout * CLOCK_FREQ;
+-	wdt_base = watchdog_get_drvdata(wdd);
++	wdt_base = sirfsoc_wdt_base(wdd);
+ 
+ 	/* Enable the latch before reading the LATCH_LO register */
+ 	writel(1, wdt_base + SIRFSOC_TIMER_LATCH);
+@@ -79,7 +84,7 @@ static int sirfsoc_wdt_updatetimeout(struct watchdog_device *wdd)
+ 
+ static int sirfsoc_wdt_enable(struct watchdog_device *wdd)
+ {
+-	void __iomem *wdt_base = watchdog_get_drvdata(wdd);
++	void __iomem *wdt_base = sirfsoc_wdt_base(wdd);
+ 	sirfsoc_wdt_updatetimeout(wdd);
+ 
+ 	/*
+@@ -96,7 +101,7 @@ static int sirfsoc_wdt_enable(struct watchdog_device *wdd)
+ 
+ static int sirfsoc_wdt_disable(struct watchdog_device *wdd)
+ {
+-	void __iomem *wdt_base = watchdog_get_drvdata(wdd);
++	void __iomem *wdt_base = sirfsoc_wdt_base(wdd);
+ 
+ 	writel(0, wdt_base + SIRFSOC_TIMER_WATCHDOG_EN);
+ 	writel(readl(wdt_base + SIRFSOC_TIMER_INT_EN)
+@@ -150,7 +155,7 @@ static int sirfsoc_wdt_probe(struct platform_device *pdev)
+ 	if (IS_ERR(base))
+ 		return PTR_ERR(base);
+ 
+-	watchdog_set_drvdata(&sirfsoc_wdd, base);
++	watchdog_set_drvdata(&sirfsoc_wdd, (__force void *)base);
+ 
+ 	watchdog_init_timeout(&sirfsoc_wdd, timeout, &pdev->dev);
+ 	watchdog_set_nowayout(&sirfsoc_wdd, nowayout);
+-- 
+2.8.1
