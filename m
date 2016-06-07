@@ -1,39 +1,44 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Tue, 7 Jun 2016 03:50:17 +0200
-Subject: [PATCH v2 1/6] power: Introduce Broadcom kona reset driver
-In-Reply-To: <CAMsMSK8ZX=nmJs9d2txRsk2gLa0duy3Qpp805ztYzow=OiTB8w@mail.gmail.com>
-References: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
- <1463002582-6875-2-git-send-email-chris.brand@broadcom.com>
- <57409633.8060605@gmail.com> <20160603023853.GD8921@earth>
- <CAMsMSK8ZX=nmJs9d2txRsk2gLa0duy3Qpp805ztYzow=OiTB8w@mail.gmail.com>
-Message-ID: <20160607015017.GA25073@earth>
+From: panand@redhat.com (Pratyush Anand)
+Date: Tue, 7 Jun 2016 07:35:50 +0530
+Subject: [PATCH kexec-tools v2 04/32] kdump: fix kdump mapping
+In-Reply-To: <E1b9xrj-0003rn-3S@e0050434b2927.dyn.armlinux.org.uk>
+References: <20160606164129.GM1041@n2100.armlinux.org.uk>
+ <E1b9xrj-0003rn-3S@e0050434b2927.dyn.armlinux.org.uk>
+Message-ID: <20160607020550.GA9722@dhcppc6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Jun 06, 2016 at 09:42:03AM -0700, Chris Brand wrote:
-> On Thu, Jun 2, 2016 at 7:38 PM, Sebastian Reichel <sre@kernel.org> wrote:
-> > Feel free to queue it via arm-soc with
-> >
-> > Acked-By: Sebastian Reichel <sre@kernel.org>
-> >
-> > If I didn't overlook it, it's missing DT documentation, though.
+On 06/06/2016:05:59:03 PM, Russell King wrote:
+> When kdump tries to map the program header, it fails to take account
+> of ehdr->e_phoff being an offset from the start of the ELF "file",
+> which causes:
 > 
-> Thanks, Sebastian. Because this is effectively a move of code from
-> arch/arm rather than new code, there's already dt documentation in
-> Documentation/devicetree/bindings/reset/brcm,bcm21664-resetmgr.txt
-
-Ok. That directory is usually used for periphal reset controller.
-Board/System reset controllers are usually documented in
-.../bindings/power/reset (following kernel strucuture
-[drivers/reset and drivers/power/reset]).
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/c9f3bfd4/attachment-0001.sig>
+> Cannot mmap /dev/mem offset: 64 size: 392: Invalid argument
+> 
+> Ensure that we take account of the start address when mapping this.
+> 
+> This fix has been extracted from a larger patch by Vitaly Andrianov
+> adding support for Keystone 2.
+> 
+> Signed-off-by: Russell King <rmk@arm.linux.org.uk>
+Reviewed-by: Pratyush Anand <panand@redhat.com>
+> ---
+>  kdump/kdump.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/kdump/kdump.c b/kdump/kdump.c
+> index 1f5b984..34d2149 100644
+> --- a/kdump/kdump.c
+> +++ b/kdump/kdump.c
+> @@ -284,7 +284,8 @@ int main(int argc, char **argv)
+>  	}
+>  	
+>  	/* Get the program header */
+> -	phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum), ehdr->e_phoff);
+> +	phdr = map_addr(fd, sizeof(*phdr)*(ehdr->e_phnum), 
+> +			start_addr + ehdr->e_phoff);
+>  
+>  	/* Collect up the notes */
+>  	note_bytes = 0;
+> -- 
+> 1.9.1
