@@ -1,49 +1,42 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  7 Jun 2016 22:41:45 +0200
-Subject: [PATCH v2 06/15] clk: sunxi-ng: Add mux clock support
+Date: Tue,  7 Jun 2016 22:41:47 +0200
+Subject: [PATCH v2 08/15] clk: sunxi-ng: Add divider
 In-Reply-To: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
 References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
-Message-ID: <20160607204154.31967-7-maxime.ripard@free-electrons.com>
+Message-ID: <20160607204154.31967-9-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks in the Allwinner SoCs clocks unit are just muxes.
-
-However, those muxes might also be found in some other complicated clocks
-that would benefit from the code in there to deal with "advanced" features,
-like pre-dividers.
-
-Introduce a set of helpers to reduce the code duplication in such cases.
+Add support for the various dividers (linear, table or pow-of-two based)
+found in the CCU.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
----
-Changes from v1:
-  - Moved the ccu_mux.h header introduction from the first patch to this
-    one
 ---
  drivers/clk/sunxi-ng/Makefile  |   1 +
- drivers/clk/sunxi-ng/ccu_mux.c | 187 +++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_mux.h |  92 ++++++++++++++++++++
- 3 files changed, 280 insertions(+)
- create mode 100644 drivers/clk/sunxi-ng/ccu_mux.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_mux.h
+ drivers/clk/sunxi-ng/ccu_div.c | 136 +++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_div.h | 135 ++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 272 insertions(+)
+ create mode 100644 drivers/clk/sunxi-ng/ccu_div.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_div.h
 
 diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-index 608b332e0b1f..99133df3f7ab 100644
+index c47cbd309d59..67a2559fe283 100644
 --- a/drivers/clk/sunxi-ng/Makefile
 +++ b/drivers/clk/sunxi-ng/Makefile
-@@ -5,3 +5,4 @@ obj-y += ccu_frac.o
+@@ -3,6 +3,7 @@ obj-y += ccu_reset.o
  
+ obj-y += ccu_frac.o
+ 
++obj-y += ccu_div.o
  obj-y += ccu_fixed_factor.o
  obj-y += ccu_gate.o
-+obj-y += ccu_mux.o
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.c b/drivers/clk/sunxi-ng/ccu_mux.c
+ obj-y += ccu_mux.o
+diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
 new file mode 100644
-index 000000000000..58fc36e7dcce
+index 000000000000..8659b4cb6c20
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_mux.c
-@@ -0,0 +1,187 @@
++++ b/drivers/clk/sunxi-ng/ccu_div.c
+@@ -0,0 +1,136 @@
 +/*
 + * Copyright (C) 2016 Maxime Ripard
 + * Maxime Ripard <maxime.ripard@free-electrons.com>
@@ -57,277 +50,269 @@ index 000000000000..58fc36e7dcce
 +#include <linux/clk-provider.h>
 +
 +#include "ccu_gate.h"
-+#include "ccu_mux.h"
++#include "ccu_div.h"
 +
-+void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
-+					     struct ccu_mux_internal *cm,
-+					     int parent_index,
-+					     unsigned long *parent_rate)
++static unsigned long ccu_div_round_rate(struct ccu_mux_internal *mux,
++					unsigned long parent_rate,
++					unsigned long rate,
++					void *data)
 +{
-+	u8 prediv = 1;
++	struct ccu_div *cd = data;
++	unsigned long val;
++
++	/*
++	 * We can't use divider_round_rate that assumes that there's
++	 * several parents, while we might be called to evaluate
++	 * several different parents.
++	 */
++	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
++			      cd->div.flags);
++
++	return divider_recalc_rate(&cd->common.hw, parent_rate, val,
++				   cd->div.table, cd->div.flags);
++}
++
++static void ccu_div_disable(struct clk_hw *hw)
++{
++	struct ccu_div *cd = hw_to_ccu_div(hw);
++
++	return ccu_gate_helper_disable(&cd->common, cd->enable);
++}
++
++static int ccu_div_enable(struct clk_hw *hw)
++{
++	struct ccu_div *cd = hw_to_ccu_div(hw);
++
++	return ccu_gate_helper_enable(&cd->common, cd->enable);
++}
++
++static int ccu_div_is_enabled(struct clk_hw *hw)
++{
++	struct ccu_div *cd = hw_to_ccu_div(hw);
++
++	return ccu_gate_helper_is_enabled(&cd->common, cd->enable);
++}
++
++static unsigned long ccu_div_recalc_rate(struct clk_hw *hw,
++					unsigned long parent_rate)
++{
++	struct ccu_div *cd = hw_to_ccu_div(hw);
++	unsigned long val;
 +	u32 reg;
 +
-+	if (!((common->features & CCU_FEATURE_FIXED_PREDIV) ||
-+	      (common->features & CCU_FEATURE_VARIABLE_PREDIV)))
-+		return;
++	reg = readl(cd->common.base + cd->common.reg);
++	val = reg >> cd->div.shift;
++	val &= (1 << cd->div.width) - 1;
 +
-+	reg = readl(common->base + common->reg);
-+	if (parent_index < 0) {
-+		parent_index = reg >> cm->shift;
-+		parent_index &= (1 << cm->width) - 1;
-+	}
-+
-+	if (common->features & CCU_FEATURE_FIXED_PREDIV)
-+		if (parent_index == cm->fixed_prediv.index)
-+			prediv = cm->fixed_prediv.div;
-+
-+	if (common->features & CCU_FEATURE_VARIABLE_PREDIV)
-+		if (parent_index == cm->variable_prediv.index) {
-+			u8 div;
-+
-+			div = reg >> cm->variable_prediv.shift;
-+			div &= (1 << cm->variable_prediv.width) - 1;
-+			prediv = div + 1;
-+		}
-+
-+	*parent_rate = *parent_rate / prediv;
-+}
-+
-+int ccu_mux_helper_determine_rate(struct ccu_common *common,
-+				  struct ccu_mux_internal *cm,
-+				  struct clk_rate_request *req,
-+				  unsigned long (*round)(struct ccu_mux_internal *,
-+							 unsigned long,
-+							 unsigned long,
-+							 void *),
-+				  void *data)
-+{
-+	unsigned long best_parent_rate = 0, best_rate = 0;
-+	struct clk_hw *best_parent, *hw = &common->hw;
-+	unsigned int i;
-+
-+	for (i = 0; i < clk_hw_get_num_parents(hw); i++) {
-+		unsigned long tmp_rate, parent_rate;
-+		struct clk_hw *parent;
-+
-+		parent = clk_hw_get_parent_by_index(hw, i);
-+		if (!parent)
-+			continue;
-+
-+		parent_rate = clk_hw_get_rate(parent);
-+		ccu_mux_helper_adjust_parent_for_prediv(common, cm, i,
-+							&parent_rate);
-+
-+		tmp_rate = round(cm, clk_hw_get_rate(parent), req->rate, data);
-+		if (tmp_rate == req->rate) {
-+			best_parent = parent;
-+			best_parent_rate = parent_rate;
-+			best_rate = tmp_rate;
-+			goto out;
-+		}
-+
-+		if ((req->rate - tmp_rate) < (req->rate - best_rate)) {
-+			best_rate = tmp_rate;
-+			best_parent_rate = parent_rate;
-+			best_parent = parent;
-+		}
-+	}
-+
-+	if (best_rate == 0)
-+		return -EINVAL;
-+
-+out:
-+	req->best_parent_hw = best_parent;
-+	req->best_parent_rate = best_parent_rate;
-+	req->rate = best_rate;
-+	return 0;
-+}
-+
-+u8 ccu_mux_helper_get_parent(struct ccu_common *common,
-+			     struct ccu_mux_internal *cm)
-+{
-+	u32 reg;
-+	u8 parent;
-+
-+	reg = readl(common->base + common->reg);
-+	parent = reg >> cm->shift;
-+	parent &= (1 << cm->width) - 1;
-+
-+	return parent;
-+}
-+
-+int ccu_mux_helper_set_parent(struct ccu_common *common,
-+			      struct ccu_mux_internal *cm,
-+			      u8 index)
-+{
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(common->lock, flags);
-+
-+	reg = readl(common->base + common->reg);
-+	reg &= ~GENMASK(cm->width + cm->shift - 1, cm->shift);
-+	writel(reg | (index << cm->shift), common->base + common->reg);
-+
-+	spin_unlock_irqrestore(common->lock, flags);
-+
-+	return 0;
-+}
-+
-+static void ccu_mux_disable(struct clk_hw *hw)
-+{
-+	struct ccu_mux *cm = hw_to_ccu_mux(hw);
-+
-+	return ccu_gate_helper_disable(&cm->common, cm->enable);
-+}
-+
-+static int ccu_mux_enable(struct clk_hw *hw)
-+{
-+	struct ccu_mux *cm = hw_to_ccu_mux(hw);
-+
-+	return ccu_gate_helper_enable(&cm->common, cm->enable);
-+}
-+
-+static int ccu_mux_is_enabled(struct clk_hw *hw)
-+{
-+	struct ccu_mux *cm = hw_to_ccu_mux(hw);
-+
-+	return ccu_gate_helper_is_enabled(&cm->common, cm->enable);
-+}
-+
-+static u8 ccu_mux_get_parent(struct clk_hw *hw)
-+{
-+	struct ccu_mux *cm = hw_to_ccu_mux(hw);
-+
-+	return ccu_mux_helper_get_parent(&cm->common, &cm->mux);
-+}
-+
-+static int ccu_mux_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct ccu_mux *cm = hw_to_ccu_mux(hw);
-+
-+	return ccu_mux_helper_set_parent(&cm->common, &cm->mux, index);
-+}
-+
-+static unsigned long ccu_mux_recalc_rate(struct clk_hw *hw,
-+					 unsigned long parent_rate)
-+{
-+	struct ccu_mux *cm = hw_to_ccu_mux(hw);
-+
-+	ccu_mux_helper_adjust_parent_for_prediv(&cm->common, &cm->mux, -1,
++	ccu_mux_helper_adjust_parent_for_prediv(&cd->common, &cd->mux, -1,
 +						&parent_rate);
 +
-+	return parent_rate;
++	return divider_recalc_rate(hw, parent_rate, val, cd->div.table,
++				   cd->div.flags);
 +}
 +
-+const struct clk_ops ccu_mux_ops = {
-+	.disable	= ccu_mux_disable,
-+	.enable		= ccu_mux_enable,
-+	.is_enabled	= ccu_mux_is_enabled,
++static int ccu_div_determine_rate(struct clk_hw *hw,
++				struct clk_rate_request *req)
++{
++	struct ccu_div *cd = hw_to_ccu_div(hw);
 +
-+	.get_parent	= ccu_mux_get_parent,
-+	.set_parent	= ccu_mux_set_parent,
++	return ccu_mux_helper_determine_rate(&cd->common, &cd->mux,
++					     req, ccu_div_round_rate, cd);
++}
 +
-+	.determine_rate	= __clk_mux_determine_rate,
-+	.recalc_rate	= ccu_mux_recalc_rate,
++static int ccu_div_set_rate(struct clk_hw *hw, unsigned long rate,
++			   unsigned long parent_rate)
++{
++	struct ccu_div *cd = hw_to_ccu_div(hw);
++	unsigned long flags;
++	unsigned long val;
++	u32 reg;
++
++	ccu_mux_helper_adjust_parent_for_prediv(&cd->common, &cd->mux, -1,
++						&parent_rate);
++
++	val = divider_get_val(rate, parent_rate, cd->div.table, cd->div.width,
++			      cd->div.flags);
++
++	spin_lock_irqsave(cd->common.lock, flags);
++
++	reg = readl(cd->common.base + cd->common.reg);
++	reg &= ~GENMASK(cd->div.width + cd->div.shift - 1, cd->div.shift);
++
++	writel(reg | (val << cd->div.shift),
++	       cd->common.base + cd->common.reg);
++
++	spin_unlock_irqrestore(cd->common.lock, flags);
++
++	return 0;
++}
++
++static u8 ccu_div_get_parent(struct clk_hw *hw)
++{
++	struct ccu_div *cd = hw_to_ccu_div(hw);
++
++	return ccu_mux_helper_get_parent(&cd->common, &cd->mux);
++}
++
++static int ccu_div_set_parent(struct clk_hw *hw, u8 index)
++{
++	struct ccu_div *cd = hw_to_ccu_div(hw);
++
++	return ccu_mux_helper_set_parent(&cd->common, &cd->mux, index);
++}
++
++const struct clk_ops ccu_div_ops = {
++	.disable	= ccu_div_disable,
++	.enable		= ccu_div_enable,
++	.is_enabled	= ccu_div_is_enabled,
++
++	.get_parent	= ccu_div_get_parent,
++	.set_parent	= ccu_div_set_parent,
++
++	.determine_rate	= ccu_div_determine_rate,
++	.recalc_rate	= ccu_div_recalc_rate,
++	.set_rate	= ccu_div_set_rate,
 +};
-diff --git a/drivers/clk/sunxi-ng/ccu_mux.h b/drivers/clk/sunxi-ng/ccu_mux.h
+diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
 new file mode 100644
-index 000000000000..c85707f80f68
+index 000000000000..5edbdc1a98c8
 --- /dev/null
-+++ b/drivers/clk/sunxi-ng/ccu_mux.h
-@@ -0,0 +1,92 @@
-+#ifndef _CCU_MUX_H_
-+#define _CCU_MUX_H_
++++ b/drivers/clk/sunxi-ng/ccu_div.h
+@@ -0,0 +1,135 @@
++/*
++ * Copyright (c) 2016 Maxime Ripard. All rights reserved.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _CCU_DIV_H_
++#define _CCU_DIV_H_
 +
 +#include <linux/clk-provider.h>
 +
 +#include "ccu_common.h"
++#include "ccu_mux.h"
 +
-+struct ccu_mux_internal {
-+	u8	shift;
-+	u8	width;
++struct _ccu_div {
++	u8			shift;
++	u8			width;
 +
-+	struct {
-+		u8	index;
-+		u8	div;
-+	} fixed_prediv;
++	u32			flags;
 +
-+	struct {
-+		u8	index;
-+		u8	shift;
-+		u8	width;
-+	} variable_prediv;
++	struct clk_div_table	*table;
 +};
 +
-+#define SUNXI_CLK_MUX(_shift, _width)	\
-+	{					\
-+		.shift	= _shift,		\
-+		.width	= _width,		\
++#define _SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, _flags)	\
++	{								\
++		.shift	= _shift,					\
++		.width	= _width,					\
++		.flags	= _flags,					\
++		.table	= _table,					\
 +	}
 +
-+struct ccu_mux {
-+	u16			reg;
++#define _SUNXI_CCU_DIV_FLAGS(_shift, _width, _flags)			\
++	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, _flags)
++
++#define _SUNXI_CCU_DIV_TABLE(_shift, _width, _table)			\
++	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, 0)
++
++#define _SUNXI_CCU_DIV(_shift, _width)					\
++	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, 0)
++
++struct ccu_div {
 +	u32			enable;
 +
++	struct _ccu_div		div;
 +	struct ccu_mux_internal	mux;
 +	struct ccu_common	common;
 +};
 +
-+#define SUNXI_CCU_MUX(_struct, _name, _parents, _reg, _shift, _width, _flags) \
-+	struct ccu_mux _struct = {					\
-+		.mux	= SUNXI_CLK_MUX(_shift, _width),		\
++#define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
++				      _shift, _width,			\
++				      _table, _gate, _flags)		\
++	struct ccu_div _struct = {					\
++		.div		= _SUNXI_CCU_DIV_TABLE(_shift, _width,	\
++						       _table),		\
 +		.common	= {						\
 +			.reg		= _reg,				\
-+			.hw.init	= SUNXI_HW_INIT_PARENTS(_name,	\
-+								_parents, \
-+								&ccu_mux_ops, \
-+								_flags), \
++			.features	= CCU_FEATURE_GATE,		\
++			.hw.init	= SUNXI_HW_INIT(_name,		\
++							_parent,	\
++							&ccu_div_ops,	\
++							_flags),	\
 +		}							\
 +	}
 +
-+#define SUNXI_CCU_MUX_WITH_GATE(_struct, _name, _parents, _reg,		\
-+				_shift, _width, _gate, _flags)		\
-+	struct ccu_mux _struct = {					\
++
++#define SUNXI_CCU_DIV_TABLE(_struct, _name, _parent, _reg,		\
++			    _shift, _width,				\
++			    _table, _flags)				\
++	SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
++				      _shift, _width, _table, 0,	\
++				      _flags)
++
++#define SUNXI_CCU_M_WITH_MUX_GATE(_struct, _name, _parents, _reg,	\
++				  _mshift, _mwidth, _muxshift, _muxwidth, \
++				  _gate, _flags)			\
++	struct ccu_div _struct = {					\
 +		.enable	= _gate,					\
-+		.mux	= SUNXI_CLK_MUX(_shift, _width),		\
++		.div	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
++		.mux	= SUNXI_CLK_MUX(_muxshift, _muxwidth),		\
 +		.common	= {						\
 +			.reg		= _reg,				\
 +			.features	= CCU_FEATURE_GATE,		\
 +			.hw.init	= SUNXI_HW_INIT_PARENTS(_name,	\
 +								_parents, \
-+								&ccu_mux_ops, \
++								&ccu_div_ops, \
 +								_flags), \
-+		}							\
++		},							\
 +	}
 +
-+static inline struct ccu_mux *hw_to_ccu_mux(struct clk_hw *hw)
++#define SUNXI_CCU_M_WITH_MUX(_struct, _name, _parents, _reg,		\
++			     _mshift, _mwidth, _muxshift, _muxwidth,	\
++			     _flags)					\
++	SUNXI_CCU_M_WITH_MUX_GATE(_struct, _name, _parents, _reg,	\
++				  _mshift, _mwidth, _muxshift, _muxwidth, \
++				  0, _flags)
++
++
++#define SUNXI_CCU_M_WITH_GATE(_struct, _name, _parent, _reg,		\
++			      _mshift, _mwidth,	_gate,			\
++			      _flags)					\
++	struct ccu_div _struct = {					\
++		.enable	= _gate,					\
++		.div	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
++		.common	= {						\
++			.reg		= _reg,				\
++			.features	= CCU_FEATURE_GATE,		\
++			.hw.init	= SUNXI_HW_INIT(_name,		\
++							_parent,	\
++							&ccu_div_ops,	\
++							_flags),	\
++		},							\
++	}
++
++#define SUNXI_CCU_M(_struct, _name, _parent, _reg, _mshift, _mwidth,	\
++		    _flags)						\
++	SUNXI_CCU_M_WITH_GATE(_struct, _name, _parent, _reg,		\
++			      _mshift, _mwidth, 0, _flags)
++
++static inline struct ccu_div *hw_to_ccu_div(struct clk_hw *hw)
 +{
 +	struct ccu_common *common = hw_to_ccu_common(hw);
 +
-+	return container_of(common, struct ccu_mux, common);
++	return container_of(common, struct ccu_div, common);
 +}
 +
-+extern const struct clk_ops ccu_mux_ops;
++extern const struct clk_ops ccu_div_ops;
 +
-+void ccu_mux_helper_adjust_parent_for_prediv(struct ccu_common *common,
-+					     struct ccu_mux_internal *cm,
-+					     int parent_index,
-+					     unsigned long *parent_rate);
-+int ccu_mux_helper_determine_rate(struct ccu_common *common,
-+				  struct ccu_mux_internal *cm,
-+				  struct clk_rate_request *req,
-+				  unsigned long (*round)(struct ccu_mux_internal *,
-+							 unsigned long,
-+							 unsigned long,
-+							 void *),
-+				  void *data);
-+u8 ccu_mux_helper_get_parent(struct ccu_common *common,
-+			     struct ccu_mux_internal *cm);
-+int ccu_mux_helper_set_parent(struct ccu_common *common,
-+			      struct ccu_mux_internal *cm,
-+			      u8 index);
-+
-+#endif /* _CCU_MUX_H_ */
++#endif /* _CCU_DIV_H_ */
 -- 
 2.8.3
