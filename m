@@ -1,32 +1,39 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Tue, 7 Jun 2016 01:40:31 +0000
-Subject: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC is
- active w/o HW workaround
-In-Reply-To: <87a8iypoib.fsf@gmail.com>
-References: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
- <VI1PR0401MB1855AA40FA576AF677A68E6FFF5C0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
- <87a8iypoib.fsf@gmail.com>
-Message-ID: <VI1PR0401MB1855A6AE5F80BB73579D7093FF5D0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 7 Jun 2016 03:50:17 +0200
+Subject: [PATCH v2 1/6] power: Introduce Broadcom kona reset driver
+In-Reply-To: <CAMsMSK8ZX=nmJs9d2txRsk2gLa0duy3Qpp805ztYzow=OiTB8w@mail.gmail.com>
+References: <1463002582-6875-1-git-send-email-chris.brand@broadcom.com>
+ <1463002582-6875-2-git-send-email-chris.brand@broadcom.com>
+ <57409633.8060605@gmail.com> <20160603023853.GD8921@earth>
+ <CAMsMSK8ZX=nmJs9d2txRsk2gLa0duy3Qpp805ztYzow=OiTB8w@mail.gmail.com>
+Message-ID: <20160607015017.GA25073@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Holger Schurig <holgerschurig@gmail.com> Sent: Monday, June 06, 2016 7:04 PM
-> To: Fugang Duan <fugang.duan@nxp.com>; Lucas Stach
-> <l.stach@pengutronix.de>; Shawn Guo <shawnguo@kernel.org>
-> Cc: devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; kernel at pengutronix.de; patchwork-
-> lst at pengutronix.de
-> Subject: RE: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC is
-> active w/o HW workaround
-> 
-> > You just config the gpio irq like below patches:
-> > bc20a5d6da71 (ARM: dts: imx6qdl-sabreauto: use GPIO_6 for FEC
-> > interrupt.) 6261c4c8f13e (ARM: dts: imx6qdl-sabrelite: use GPIO_6 for
-> > FEC interrupt.)
-> 
-> But this is per-board, e.g. not board-agnostic??!?!   Some board might
-> have uses GPIO6 for other things and rendered it unusable for this ...
+Hi,
 
-NXP HW reference design guide include this that reserve GPIO6 for FEC.  
+On Mon, Jun 06, 2016 at 09:42:03AM -0700, Chris Brand wrote:
+> On Thu, Jun 2, 2016 at 7:38 PM, Sebastian Reichel <sre@kernel.org> wrote:
+> > Feel free to queue it via arm-soc with
+> >
+> > Acked-By: Sebastian Reichel <sre@kernel.org>
+> >
+> > If I didn't overlook it, it's missing DT documentation, though.
+> 
+> Thanks, Sebastian. Because this is effectively a move of code from
+> arch/arm rather than new code, there's already dt documentation in
+> Documentation/devicetree/bindings/reset/brcm,bcm21664-resetmgr.txt
 
-The patch is fine for me, but I think it is unnecessary. 
+Ok. That directory is usually used for periphal reset controller.
+Board/System reset controllers are usually documented in
+.../bindings/power/reset (following kernel strucuture
+[drivers/reset and drivers/power/reset]).
+
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/c9f3bfd4/attachment-0001.sig>
