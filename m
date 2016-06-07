@@ -1,106 +1,59 @@
 From: stephen.boyd@linaro.org (Stephen Boyd)
-Date: Tue,  7 Jun 2016 09:47:39 -0700
-Subject: [RESEND/PATCHv4 v4 1/3] firmware: Consolidate kmap/read/write logic
+Date: Tue,  7 Jun 2016 09:47:40 -0700
+Subject: [RESEND/PATCHv4 v4 2/3] firmware: Provide infrastructure to make fw
+ caching optional
 In-Reply-To: <20160607164741.31849-1-stephen.boyd@linaro.org>
 References: <20160607164741.31849-1-stephen.boyd@linaro.org>
-Message-ID: <20160607164741.31849-2-stephen.boyd@linaro.org>
+Message-ID: <20160607164741.31849-3-stephen.boyd@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We use similar structured code to read and write the kmapped
-firmware pages. The only difference is read copies from the kmap
-region and write copies to it. Consolidate this into one function
-to reduce duplication.
+From: Vikram Mulukutla <markivx@codeaurora.org>
 
-Cc: Vikram Mulukutla <markivx@codeaurora.org>
+Some low memory systems with complex peripherals cannot afford to
+have the relatively large firmware images taking up valuable
+memory during suspend and resume. Change the internal
+implementation of firmware_class to disallow caching based on a
+configurable option. In the near future, variants of
+request_firmware will take advantage of this feature.
+
+Signed-off-by: Vikram Mulukutla <markivx@codeaurora.org>
+[stephen.boyd at linaro.org: Drop firmware_desc design and use flags]
 Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
 ---
- drivers/base/firmware_class.c | 57 ++++++++++++++++++++-----------------------
- 1 file changed, 26 insertions(+), 31 deletions(-)
+ drivers/base/firmware_class.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/base/firmware_class.c b/drivers/base/firmware_class.c
-index 773fc3099769..01d55723d82c 100644
+index 01d55723d82c..45ed20cefa10 100644
 --- a/drivers/base/firmware_class.c
 +++ b/drivers/base/firmware_class.c
-@@ -691,6 +691,29 @@ out:
+@@ -112,6 +112,7 @@ static inline long firmware_loading_timeout(void)
+ #define FW_OPT_FALLBACK		0
+ #endif
+ #define FW_OPT_NO_WARN	(1U << 3)
++#define FW_OPT_NOCACHE	(1U << 4)
  
- static DEVICE_ATTR(loading, 0644, firmware_loading_show, firmware_loading_store);
+ struct firmware_cache {
+ 	/* firmware_buf instance will be added into the below list */
+@@ -1065,14 +1066,16 @@ static int assign_firmware_buf(struct firmware *fw, struct device *device,
+ 	 * should be fixed in devres or driver core.
+ 	 */
+ 	/* don't cache firmware handled without uevent */
+-	if (device && (opt_flags & FW_OPT_UEVENT))
++	if (device && (opt_flags & FW_OPT_UEVENT) &&
++	    !(opt_flags & FW_OPT_NOCACHE))
+ 		fw_add_devm_name(device, buf->fw_id);
  
-+static void firmware_rw(struct firmware_buf *buf, char *buffer,
-+			loff_t offset, size_t count, bool read)
-+{
-+	while (count) {
-+		void *page_data;
-+		int page_nr = offset >> PAGE_SHIFT;
-+		int page_ofs = offset & (PAGE_SIZE-1);
-+		int page_cnt = min_t(size_t, PAGE_SIZE - page_ofs, count);
-+
-+		page_data = kmap(buf->pages[page_nr]);
-+
-+		if (read)
-+			memcpy(buffer, page_data + page_ofs, page_cnt);
-+		else
-+			memcpy(page_data + page_ofs, buffer, page_cnt);
-+
-+		kunmap(buf->pages[page_nr]);
-+		buffer += page_cnt;
-+		offset += page_cnt;
-+		count -= page_cnt;
-+	}
-+}
-+
- static ssize_t firmware_data_read(struct file *filp, struct kobject *kobj,
- 				  struct bin_attribute *bin_attr,
- 				  char *buffer, loff_t offset, size_t count)
-@@ -715,21 +738,8 @@ static ssize_t firmware_data_read(struct file *filp, struct kobject *kobj,
- 
- 	ret_count = count;
- 
--	while (count) {
--		void *page_data;
--		int page_nr = offset >> PAGE_SHIFT;
--		int page_ofs = offset & (PAGE_SIZE-1);
--		int page_cnt = min_t(size_t, PAGE_SIZE - page_ofs, count);
--
--		page_data = kmap(buf->pages[page_nr]);
--
--		memcpy(buffer, page_data + page_ofs, page_cnt);
-+	firmware_rw(buf, buffer, offset, count, true);
- 
--		kunmap(buf->pages[page_nr]);
--		buffer += page_cnt;
--		offset += page_cnt;
--		count -= page_cnt;
--	}
- out:
- 	mutex_unlock(&fw_lock);
- 	return ret_count;
-@@ -809,24 +819,9 @@ static ssize_t firmware_data_write(struct file *filp, struct kobject *kobj,
- 		goto out;
- 
- 	retval = count;
-+	firmware_rw(buf, buffer, offset, count, false);
- 
--	while (count) {
--		void *page_data;
--		int page_nr = offset >> PAGE_SHIFT;
--		int page_ofs = offset & (PAGE_SIZE - 1);
--		int page_cnt = min_t(size_t, PAGE_SIZE - page_ofs, count);
--
--		page_data = kmap(buf->pages[page_nr]);
--
--		memcpy(page_data + page_ofs, buffer, page_cnt);
--
--		kunmap(buf->pages[page_nr]);
--		buffer += page_cnt;
--		offset += page_cnt;
--		count -= page_cnt;
--	}
--
--	buf->size = max_t(size_t, offset, buf->size);
-+	buf->size = max_t(size_t, offset + count, buf->size);
- out:
- 	mutex_unlock(&fw_lock);
- 	return retval;
+ 	/*
+ 	 * After caching firmware image is started, let it piggyback
+ 	 * on request firmware.
+ 	 */
+-	if (buf->fwc->state == FW_LOADER_START_CACHE) {
++	if (!(opt_flags & FW_OPT_NOCACHE) &&
++	    buf->fwc->state == FW_LOADER_START_CACHE) {
+ 		if (fw_cache_piggyback_on_request(buf->fw_id))
+ 			kref_get(&buf->ref);
+ 	}
 -- 
 2.9.0-rc1
