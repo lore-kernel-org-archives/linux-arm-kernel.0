@@ -1,70 +1,56 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 7 Jun 2016 14:00:55 +0100
-Subject: [PATCH 1/3] firmware: arm_scpi: add support for device power
- state management
-In-Reply-To: <1465304305.2833.13.camel@linaro.org>
-References: <1465228439-13457-1-git-send-email-sudeep.holla@arm.com>
- <1465228439-13457-2-git-send-email-sudeep.holla@arm.com>
- <1465304305.2833.13.camel@linaro.org>
-Message-ID: <5756C587.7090105@arm.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue,  7 Jun 2016 14:02:23 +0100
+Subject: [PATCH] mmc: core: Fix mmc_select_hs200() regression in v4.7-rc.
+Message-ID: <1465304543-23988-1-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+mmc_select_bus_width() returns bus width (4 or 8) on success or
+zero if unsupported. If bus width is set successfully we then wish
+to switch to HS200 mode.
 
+This avoids the following error message in v4.70-rc2
 
-On 07/06/16 13:58, Jon Medhurst (Tixy) wrote:
-> On Mon, 2016-06-06 at 16:53 +0100, Sudeep Holla wrote:
->> SCPI protocol supports device power state management. This deals with
->> power states of various peripheral devices in the system other than the
->> core compute subsystem.
->>
->> This patch adds support for the power state management of those
->> peripheral devices.
->>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->> ---
->>   drivers/firmware/arm_scpi.c   | 29 +++++++++++++++++++++++++++++
->>   include/linux/scpi_protocol.h |  2 ++
->>   2 files changed, 31 insertions(+)
->>
->> diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
->> index 51c6db0774cc..ca6afd2217a8 100644
->> --- a/drivers/firmware/arm_scpi.c
->> +++ b/drivers/firmware/arm_scpi.c
->> @@ -231,6 +231,11 @@ struct sensor_value {
->>   	__le32 hi_val;
->>   } __packed;
->>
->> +struct dev_pstate_set {
->> +	u16 dev_id;
->> +	u8 pstate;
->> +} __packed;
->> +
->>   static struct scpi_drvinfo *scpi_info;
->>
->>   static int scpi_linux_errmap[SCPI_ERR_MAX] = {
->> @@ -537,6 +542,28 @@ static int scpi_sensor_get_value(u16 sensor, u64 *val)
->>   	return ret;
->>   }
->>
->> +static int scpi_device_get_power_state(u16 dev_id)
->> +{
->> +	int ret;
->> +	u8 pstate;
->> +
->> +	ret = scpi_send_message(SCPI_CMD_GET_DEVICE_PWR_STATE, &dev_id,
->> +				sizeof(dev_id), &pstate, sizeof(pstate));
->
-> Don't you need to run translate dev_id to little-endian before sending
-> it? You remembered to do that next function...
->
+[    2.523674] mmc0: mmc_select_hs200 failed, error 3
+[    2.528516] mmc0: error 3 whilst initialising MMC card
 
-Good catch, that's the reason I added the get_power_state call in
-scpi_genpd code to cover testing but still I failed.
+With this patch card is enumerated correctly
 
-Thanks for catching this.
+[    2.468065] mmc0: new HS200 MMC card at address 0001
+[    2.468335] mmcblk0: mmc0:0001 P1XXXX 7.20 GiB
+[    2.468441] mmcblk0boot0: mmc0:0001 P1XXXX partition 1 2.00 MiB
+[    2.468552] mmcblk0boot1: mmc0:0001 P1XXXX partition 2 2.00 MiB
+[    2.468651] mmcblk0rpmb: mmc0:0001 P1XXXX partition 3 128 KiB
+[    2.469269]  mmcblk0: p1
 
+Fixes: 287980e (remove lots of IS_ERR_VALUE abuses)
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/mmc/core/mmc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
+index c984321..aafb73d 100644
+--- a/drivers/mmc/core/mmc.c
++++ b/drivers/mmc/core/mmc.c
+@@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
+ 	 * switch to HS200 mode if bus width is set successfully.
+ 	 */
+ 	err = mmc_select_bus_width(card);
+-	if (!err) {
++	if (err > 0) {
+ 		val = EXT_CSD_TIMING_HS200 |
+ 		      card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
+ 		err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+@@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
+ 	} else if (mmc_card_hs(card)) {
+ 		/* Select the desired bus width optionally */
+ 		err = mmc_select_bus_width(card);
+-		if (!err) {
++		if (err > 0) {
+ 			err = mmc_select_hs_ddr(card);
+ 			if (err)
+ 				goto free_card;
 -- 
-Regards,
-Sudeep
+1.9.1
