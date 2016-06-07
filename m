@@ -1,38 +1,69 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 16:50:03 +0100
-Subject: [PATCH] dmaengine: ste_dma40_ll: make d40_width_to_bits static
-Message-ID: <1465314603-28909-1-git-send-email-ben.dooks@codethink.co.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Jun 2016 16:54:27 +0100
+Subject: [alsa-devel] [PATCH v2 2/9] ASoC: mediatek: implement mediatek
+ common structure
+In-Reply-To: <1464929784-5489-3-git-send-email-garlic.tseng@mediatek.com>
+References: <1464929784-5489-1-git-send-email-garlic.tseng@mediatek.com>
+ <1464929784-5489-3-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <20160607155427.GB7510@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix warning due to d40_width_to_bits() not being used outside
-this file. Fixes:
+On Fri, Jun 03, 2016 at 12:56:17PM +0800, Garlic Tseng wrote:
 
-drivers/dma/ste_dma40_ll.c:13:4: warning: symbol 'd40_width_to_bits' was not declared. Should it be static?
+> +	/*enable agent*/
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Dan Williams <dan.j.williams@intel.com>
-Cc: Vinod Koul <vinod.koul@intel.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: dmaengine at vger.kernel.org
----
- drivers/dma/ste_dma40_ll.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Lots of comments with missing spaces in them, there's quite a few
+examples of that in here.
 
-diff --git a/drivers/dma/ste_dma40_ll.c b/drivers/dma/ste_dma40_ll.c
-index 27b818d..13b42dd 100644
---- a/drivers/dma/ste_dma40_ll.c
-+++ b/drivers/dma/ste_dma40_ll.c
-@@ -10,7 +10,7 @@
- 
- #include "ste_dma40_ll.h"
- 
--u8 d40_width_to_bits(enum dma_slave_buswidth width)
-+static u8 d40_width_to_bits(enum dma_slave_buswidth width)
- {
- 	if (width == DMA_SLAVE_BUSWIDTH_1_BYTE)
- 		return STEDMA40_ESIZE_8_BIT;
--- 
-2.8.1
+> +EXPORT_SYMBOL(mtk_afe_fe_startup);
+
+All the ASoC and regmap APIs are _GPL(), you really shouldn't export new
+interfaces based on them without it - the point with the _GPL() is that
+non-GPL code shouldn't be able to use the APIs.
+
+> +EXPORT_SYMBOL(mtk_afe_fe_hw_params);
+
+Do you need to export the individual ops rather than just the ops
+structure?
+
+> +int mtk_afe_fe_trigger(struct snd_pcm_substream *substream, int cmd,
+> +		       struct snd_soc_dai *dai)
+> +{
+> +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+> +	struct snd_pcm_runtime * const runtime = substream->runtime;
+> +	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
+> +	struct mtk_base_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
+> +	struct mtk_base_afe_irq *irqs = &afe->irqs[memif->irq_usage];
+> +	const struct mtk_base_irq_data *irq_data = irqs->irq_data;
+> +	unsigned int counter = runtime->period_size;
+> +	int fs;
+> +
+> +	dev_info(afe->dev, "%s %s cmd=%d\n", __func__, memif->data->name, cmd);
+
+That's way too noisy, dev_dbg() at most.
+
+> +static DEFINE_MUTEX(irqs_lock);
+> +int mtk_dynamic_irq_acquire(struct mtk_base_afe *afe)
+> +{
+> +	int i;
+> +
+> +	mutex_lock(&irqs_lock);
+> +	for (i = 0; i < afe->irqs_size; ++i) {
+
+Why is the lock global and not part of the AFE struct?
+
+> +void mtk_simple_isr(struct mtk_base_afe *afe, struct mtk_base_afe_memif *memif)
+> +{
+> +	snd_pcm_period_elapsed(memif->substream);
+> +}
+> +EXPORT_SYMBOL(mtk_simple_isr);
+
+Is this really worth it over just calling _period_elapsed() directly?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/82eeab5e/attachment.sig>
