@@ -1,33 +1,40 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 7 Jun 2016 17:31:12 +0100
-Subject: [alsa-devel] [PATCH v2 6/9] ASoC: mediatek: add mt2701 platform
- driver implementation.
-In-Reply-To: <1464929784-5489-7-git-send-email-garlic.tseng@mediatek.com>
-References: <1464929784-5489-1-git-send-email-garlic.tseng@mediatek.com>
- <1464929784-5489-7-git-send-email-garlic.tseng@mediatek.com>
-Message-ID: <20160607163112.GD7510@sirena.org.uk>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Tue,  7 Jun 2016 17:32:30 +0100
+Subject: [PATCH] clk: iproc: fix missing include of clk-iproc.h
+Message-ID: <1465317150-12704-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 12:56:21PM +0800, Garlic Tseng wrote:
+Fix the implicit declaration of iproc_armpll_setup() by
+including clk-iproc.h which defines it. Fixes the warning:
 
-> +	if (val < 0 || val > MT2701_I2S_NUM) {
-> +		dev_err(afe->dev, "%s, num not available, num %d, val %d\n",
-> +			__func__, num, val);
-> +		return -1;
+drivers/clk/bcm/clk-iproc-armpll.c:242:13: warning: symbol 'iproc_armpll_setup' was not declared. Should it be static?
 
-Real error codes please.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Michael Turquette <mturquette@baylibre.com>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Ray Jui <rjui@broadcom.com>
+Cc: Jon Mason <jonmason@broadcom.com>
+Cc: linux-clk at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: bcm-kernel-feedback-list at broadcom.com
+---
+ drivers/clk/bcm/clk-iproc-armpll.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> +static const struct snd_kcontrol_new mt2701_afe_multi_ch_out_asrc3[] = {
-> +	SOC_DAPM_SINGLE_AUTODISABLE("Multi ch asrc out3", PWR2_TOP_CON, 7, 1,
-> +				    1),
-> +};
-
-On/off controls should end in Switch.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/23b0b2bb/attachment.sig>
+diff --git a/drivers/clk/bcm/clk-iproc-armpll.c b/drivers/clk/bcm/clk-iproc-armpll.c
+index a196ee2..698c507 100644
+--- a/drivers/clk/bcm/clk-iproc-armpll.c
++++ b/drivers/clk/bcm/clk-iproc-armpll.c
+@@ -20,6 +20,8 @@
+ #include <linux/clkdev.h>
+ #include <linux/of_address.h>
+ 
++#include "clk-iproc.h"
++
+ #define IPROC_CLK_MAX_FREQ_POLICY                    0x3
+ #define IPROC_CLK_POLICY_FREQ_OFFSET                 0x008
+ #define IPROC_CLK_POLICY_FREQ_POLICY_FREQ_SHIFT      8
+-- 
+2.8.1
