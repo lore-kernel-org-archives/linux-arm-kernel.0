@@ -1,87 +1,84 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Tue, 7 Jun 2016 20:47:22 +0530
-Subject: Support for unaligned watchpoints in arm/arm64
-In-Reply-To: <20160607065520.GD13643@dhcppc6>
-References: <CAJt8pk8FBbTVMMM45SaEs86MZOp0o6xChAsMT1sO+_Xy-GENyw@mail.gmail.com>
- <20160531123827.GF24936@arm.com> <20160607065520.GD13643@dhcppc6>
-Message-ID: <20160607151722.GH13643@dhcppc6>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue,  7 Jun 2016 17:24:39 +0200
+Subject: [PATCH] ARM: at91: debug: use DEBUG_UART_VIRT
+Message-ID: <1465313079-6307-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2016:12:25:20 PM, Pratyush Anand wrote:
-> On 31/05/2016:01:38:27 PM, Will Deacon wrote:
-> > On Thu, May 26, 2016 at 05:04:46PM +0100, Pavel Labath wrote:
-> > > Hello all,
-> > 
-> > Hi Pavel,
-> > 
-> > > I've been wondering if there are any plans about adding support for
-> > > unaligned watchpoints to the kernel. It seems quite a shame that
-> > > applications are not able not use them, even though the hardware
-> > > should support that feature.
-> > 
-> > I'm actually coming round to the idea of ditching the perf hw_breakpoint
-> > mechanism entirely and simply writing a ptrace back-end that can expose
-> > the hardware features directly to userspace. The two issues with this
-> > are:
-> > 
-> >   (1) It's a fair amount of work
-> 
-> So, by the time this new interface would come, probably we can consider a fixup
-> like following to resolve this issue at hand. Probably, things should work by
-> just allowing hw_breakpoint.c to pass checks for unaligned offset when it is a
-> WATCHPOINT, no?
+AT91 still uses an offset (0x0100 0000) from the physical address to map
+the debug UART. This is unfortunate as for some platforms (sama5d3 and
+earlier), it ends up in the PCI zone and PCI is enabled in multi_v7.
+Switch to DEBUG_UART_VIRT to solve that.
 
-Sorry, this is not going to work.
-There could be some BAS values where few consecutive LSBs are 0s.
+Tested on sama5d3 and 9g20.
 
-~Pratyush
-> 
-> diff --git a/arch/arm64/kernel/hw_breakpoint.c b/arch/arm64/kernel/hw_breakpoint.c
-> index 26a6bf77d272..c803347c1413 100644
-> --- a/arch/arm64/kernel/hw_breakpoint.c
-> +++ b/arch/arm64/kernel/hw_breakpoint.c
-> @@ -384,7 +384,12 @@ int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
->                 *gen_len = HW_BREAKPOINT_LEN_8;
-> @@ -384,7 +384,12 @@ int arch_bp_generic_fields(struct arch_hw_breakpoint_ctrl ctrl,
->                 *gen_len = HW_BREAKPOINT_LEN_8;
->                 break;
->         default:
-> -               return -EINVAL;
-> +               if (ctrl.type == ARM_BREAKPOINT_EXECUTE
-> +                               || ctrl.len & (ctrl.len + 1)
-> +                               || ctrl.len < ARM_BREAKPOINT_LEN_1
-> +                               || ctrl.len > ARM_BREAKPOINT_LEN_8)
-> +                       return -EINVAL;
-> +               *gen_len = ffs(ctrl.len + 1) - 1;
->         }
-> 
->         return 0;
-> @@ -430,7 +435,11 @@ static int arch_build_bp_info(struct perf_event *bp)
->                 info->ctrl.len = ARM_BREAKPOINT_LEN_8;
->                 break;
->         default:
-> -               return -EINVAL;
-> +               if (info->ctrl.type == ARM_BREAKPOINT_EXECUTE
-> +                               || bp->attr.bp_len < HW_BREAKPOINT_LEN_1
-> +                               || bp->attr.bp_len > HW_BREAKPOINT_LEN_8)
-> +                       return -EINVAL;
-> +               info->ctrl.len = (1 << bp->attr.bp_len) - 1;
->         }
-> 
->         /*
-> 
-> @Pavel, does above patch helps to resolve the issue.
-> 
-> ~Pratyush
-> 
-> >   (2) We might already have users of the perf interface (including compat)
-> > 
-> > I'm really not happy with the way hw_breakpoint worked out :(
-> > 
-> > Will
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/Kconfig.debug        | 11 ++++++-----
+ arch/arm/include/debug/at91.S | 10 +---------
+ 2 files changed, 7 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 19a3dcf5eb2e..2609491f4ab1 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -117,15 +117,15 @@ choice
+ 		  their output to the serial port on atmel devices.
+ 
+ 		  SOC                  DEBUG_UART_PHYS   DEBUG_UART_VIRT  PORT
+-		  rm9200, 9260/9g20,   0xfffff200        0xfefff200       DBGU
++		  rm9200, 9260/9g20,   0xfffff200        0xf8fff200       DBGU
+ 		  9261/9g10, 9rl
+-		  9263, 9g45, sama5d3  0xffffee00        0xfeffee00       DBGU
++		  9263, 9g45, sama5d3  0xffffee00        0xf8ffee00       DBGU
+ 		  sama5d4              0xfc00c000        0xfb00c000       USART3
+ 		  sama5d4              0xfc069000        0xfb069000       DBGU
+ 		  sama5d2              0xf8020000        0xf7020000       UART1
+ 
+-		  Please adjust DEBUG_UART_PHYS configuration options based on
+-		  your needs.
++		  Please adjust DEBUG_UART_PHYS and DEBUG_UART_VIRT
++		  configuration options based on your needs.
+ 
+ 	config DEBUG_BCM2835
+ 		bool "Kernel low-level debugging on BCM2835 PL011 UART"
+@@ -1627,7 +1627,8 @@ config DEBUG_UART_VIRT
+ 		DEBUG_QCOM_UARTDM || DEBUG_S3C24XX_UART || \
+ 		DEBUG_S3C64XX_UART || \
+ 		DEBUG_BCM63XX_UART || DEBUG_ASM9260_UART || \
+-		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0
++		DEBUG_SIRFSOC_UART || DEBUG_DIGICOLOR_UA0 || \
++		DEBUG_AT91_UART
+ 
+ config DEBUG_UART_8250_SHIFT
+ 	int "Register offset shift for the 8250 debug UART"
+diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
+index d4ae3b8e2426..0098401e5aeb 100644
+--- a/arch/arm/include/debug/at91.S
++++ b/arch/arm/include/debug/at91.S
+@@ -9,14 +9,6 @@
+  *
+ */
+ 
+-#ifdef CONFIG_MMU
+-#define AT91_IO_P2V(x) ((x) - 0x01000000)
+-#else
+-#define AT91_IO_P2V(x) (x)
+-#endif
+-
+-#define AT91_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
+-
+ #define AT91_DBGU_SR		(0x14)	/* Status Register */
+ #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
+ #define AT91_DBGU_TXRDY		(1 << 1)	/* Transmitter Ready */
+@@ -24,7 +16,7 @@
+ 
+ 	.macro	addruart, rp, rv, tmp
+ 	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ System peripherals (phys address)
+-	ldr	\rv, =AT91_DEBUG_UART_VIRT		@ System peripherals (virt address)
++	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ System peripherals (virt address)
+ 	.endm
+ 
+ 	.macro	senduart,rd,rx
+-- 
+2.8.1
