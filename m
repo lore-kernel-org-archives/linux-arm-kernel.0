@@ -1,143 +1,63 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Jun 2016 18:33:24 +0200
-Subject: [PATCH V5 4/6] vfio: platform: add support for ACPI probe
-In-Reply-To: <5743031B.5000208@linaro.org>
-References: <1463364819-477-1-git-send-email-okaya@codeaurora.org>
- <1463364819-477-5-git-send-email-okaya@codeaurora.org>
- <5743031B.5000208@linaro.org>
-Message-ID: <430f1c0a-c2ac-211d-8c1b-421b6f450d30@redhat.com>
+From: markus.mayer@broadcom.com (Markus Mayer)
+Date: Tue, 7 Jun 2016 09:33:36 -0700
+Subject: [PATCH] gpio: bcm-kona: fix bcm_kona_gpio_reset() warnings
+In-Reply-To: <1465316537-8403-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465316537-8403-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <CAGt4E5tg_e7QD-9X+eCeHhLxovcrs3htWa+Uvb_RXRY7VhAC3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
-Le 23/05/2016 ? 15:18, Eric Auger a ?crit :
-> On 05/16/2016 04:13 AM, Sinan Kaya wrote:
->> The code is using the compatible DT string to associate a reset driver
->> with the actual device itself. The compatible string does not exist on
->> ACPI based systems. HID is the unique identifier for a device driver
->> instead.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/vfio/platform/vfio_platform_common.c  | 58 ++++++++++++++++++++++++---
->>  drivers/vfio/platform/vfio_platform_private.h |  1 +
->>  2 files changed, 54 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
->> index 25378bd..d859d3b 100644
->> --- a/drivers/vfio/platform/vfio_platform_common.c
->> +++ b/drivers/vfio/platform/vfio_platform_common.c
->> @@ -13,6 +13,7 @@
->>   */
->>  
->>  #include <linux/device.h>
->> +#include <linux/acpi.h>
->>  #include <linux/iommu.h>
->>  #include <linux/module.h>
->>  #include <linux/mutex.h>
->> @@ -49,6 +50,37 @@ static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
->>  	return reset_fn;
->>  }
->>  
->> +#ifdef CONFIG_ACPI
->> +int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
->> +			     struct device *dev)
-> should be static
->> +{
->> +	struct acpi_device *adev = ACPI_COMPANION(dev);
->> +
->> +	if (acpi_disabled)
->> +		return -ENODEV;
->> +
->> +	if (!adev) {
->> +		pr_err("VFIO: ACPI companion device not found for %s\n",
->> +			vdev->name);
->> +		return -ENODEV;
->> +	}
->> +
->> +	vdev->acpihid = acpi_device_hid(adev);
->> +	if (!vdev->acpihid) {
->> +		pr_err("VFIO: cannot find ACPI HID for %s\n",
->> +		       vdev->name);
->> +		return -ENODEV;
->> +	}
->> +	return 0;
->> +}
->> +#else
->> +int vfio_platform_acpi_probe(struct vfio_platform_device *vdev,
->> +			     struct device *dev)
-> static inline?
->> +{
->> +	return -EINVAL;
-> nit: -ENOENT ?
->> +}
->> +#endif
->> +
->>  static bool vfio_platform_has_reset(struct vfio_platform_device *vdev)
->>  {
->>  	return vdev->of_reset ? true : false;
->> @@ -548,6 +580,21 @@ static const struct vfio_device_ops vfio_platform_ops = {
->>  	.mmap		= vfio_platform_mmap,
->>  };
->>  
->> +int vfio_platform_of_probe(struct vfio_platform_device *vdev,
->> +			   struct device *dev)
->> +{
->> +	int ret;
->> +
->> +	ret = device_property_read_string(dev, "compatible",
->> +					  &vdev->compat);
->> +	if (ret) {
->> +		pr_err("VFIO: cannot retrieve compat for %s\n",
->> +			vdev->name);
->> +		return ret;
->> +	}
->> +	return 0;
-> nit: can be simplified by returning ret in any case.
-> 
-> Best Regards
-> 
-> Eric
-> 
->> +}
->> +
->>  int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->>  			       struct device *dev)
->>  {
->> @@ -557,11 +604,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
->>  	if (!vdev)
->>  		return -EINVAL;
->>  
->> -	ret = device_property_read_string(dev, "compatible", &vdev->compat);
->> -	if (ret) {
->> -		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
->> -		return -EINVAL;
->> -	}
->> +	ret = vfio_platform_acpi_probe(vdev, dev);
->> +	if (ret)
->> +		ret = vfio_platform_of_probe(vdev, dev);
->> +
->> +	if (ret)
->> +		return ret;
->>  
->>  	vdev->device = dev;
->>  
->> diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
->> index 71ed7d1..ba9e4f8 100644
->> --- a/drivers/vfio/platform/vfio_platform_private.h
->> +++ b/drivers/vfio/platform/vfio_platform_private.h
->> @@ -58,6 +58,7 @@ struct vfio_platform_device {
->>  	struct mutex			igate;
->>  	struct module			*parent_module;
->>  	const char			*compat;
->> +	const char			*acpihid;
->>  	struct module			*reset_module;
->>  	struct device			*device;
->>  
->>
-> 
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+On 7 June 2016 at 09:22, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+> The bcm_kona_gpio_reset() calls bcm_kona_gpio_write_lock_regs()
+> with what looks like the wrong parameter. The write_lock_regs
+> function takes a pointer to the registers, not the bcm_kona_gpio
+> structure.
+>
+> Fix the warning, and probably bug by changing the function to
+> pass reg_base instead of kona_gpio, fixing the following warning:
+>
+> drivers/gpio/gpio-bcm-kona.c:550:47: warning: incorrect type in argument 1 (different address spaces)
+> drivers/gpio/gpio-bcm-kona.c:550:47:    expected void [noderef] <asn:2>*reg_base
+> drivers/gpio/gpio-bcm-kona.c:550:47:    got struct bcm_kona_gpio *kona_gpio
+> drivers/gpio/gpio-bcm-kona.c:554:47: warning: incorrect type in argument 1 (different address spaces)
+> drivers/gpio/gpio-bcm-kona.c:554:47:    expected void [noderef] <asn:2>*reg_base
+> drivers/gpio/gpio-bcm-kona.c:554:47:    got struct bcm_kona_gpio *kona_gpio
+>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+> Cc: Markus Mayer <mmayer@broadcom.com>
+> Cc: Ray Jui <rjui@broadcom.com>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: bcm-kernel-feedback-list at broadcom.com
+> Cc: linux-gpio at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/gpio/gpio-bcm-kona.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/gpio/gpio-bcm-kona.c b/drivers/gpio/gpio-bcm-kona.c
+> index 9aabc48..953e4b8 100644
+> --- a/drivers/gpio/gpio-bcm-kona.c
+> +++ b/drivers/gpio/gpio-bcm-kona.c
+> @@ -547,11 +547,11 @@ static void bcm_kona_gpio_reset(struct bcm_kona_gpio *kona_gpio)
+>         /* disable interrupts and clear status */
+>         for (i = 0; i < kona_gpio->num_bank; i++) {
+>                 /* Unlock the entire bank first */
+> -               bcm_kona_gpio_write_lock_regs(kona_gpio, i, UNLOCK_CODE);
+> +               bcm_kona_gpio_write_lock_regs(reg_base, i, UNLOCK_CODE);
+>                 writel(0xffffffff, reg_base + GPIO_INT_MASK(i));
+>                 writel(0xffffffff, reg_base + GPIO_INT_STATUS(i));
+>                 /* Now re-lock the bank */
+> -               bcm_kona_gpio_write_lock_regs(kona_gpio, i, LOCK_CODE);
+> +               bcm_kona_gpio_write_lock_regs(reg_base, i, LOCK_CODE);
+>         }
+>  }
+>
+> --
+> 2.8.1
+>
 
-Best Regards
+Looks good. Thanks for fixing this.
 
-Eric
+Reviewed-by: Markus Mayer <mmayer@broadcom.com>
