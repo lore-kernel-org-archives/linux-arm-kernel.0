@@ -1,66 +1,35 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Tue, 7 Jun 2016 17:55:55 +0530
-Subject: [PATCH v4 7/7] phy: Add Northstar2 PCI Phy support
-In-Reply-To: <5755C404.3080502@gmail.com>
-References: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
- <1465216900-11755-8-git-send-email-pramod.kumar@broadcom.com>
- <5755C404.3080502@gmail.com>
-Message-ID: <6ed8bf6ba5de670588715d55ca42d631@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue,  7 Jun 2016 13:25:02 +0100
+Subject: [PATCH 1/1] clk: Remove unused variable
+Message-ID: <20160607122502.32168-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ drivers/clk/clk.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-> -----Original Message-----
-> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
-> Sent: 07 June 2016 00:12
-> To: Pramod Kumar; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell;
-> Kumar Gala; Catalin Marinas; Will Deacon; Kishon Vijay Abraham I; David S.
-> Miller
-> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; bcm-
-> kernel-feedback-list at broadcom.com; linux-kernel at vger.kernel.org;
-> netdev at vger.kernel.org; Jon Mason
-> Subject: Re: [PATCH v4 7/7] phy: Add Northstar2 PCI Phy support
->
-> On 06/06/2016 05:41 AM, Pramod Kumar wrote:
-> > Add PCI Phy support for Broadcom Northstar2 SoCs.  This driver uses
-> > the interface from the iproc mdio mux driver to enable the devices
-> > respective phys.
-> >
-> > Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-> > Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> > Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-> > ---
-> >  drivers/phy/Kconfig            |   8 +++
-> >  drivers/phy/Makefile           |   2 +-
-> >  drivers/phy/phy-bcm-ns2-pcie.c | 115
-> > +++++++++++++++++++++++++++++++++++++++++
-> >  3 files changed, 124 insertions(+), 1 deletion(-)  create mode 100644
-> > drivers/phy/phy-bcm-ns2-pcie.c
-> >
-> > diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig index
-> > b869b98..01fb93b 100644
-> > --- a/drivers/phy/Kconfig
-> > +++ b/drivers/phy/Kconfig
-> > @@ -434,4 +434,12 @@ config PHY_CYGNUS_PCIE
-> >
-> >  source "drivers/phy/tegra/Kconfig"
-> >
-> > +config PHY_NS2_PCIE
-> > +	tristate "Broadcom Northstar2 PCIe PHY driver"
-> > +	depends on OF && MDIO_BUS_MUX_BCM_IPROC
-> > +	select GENERIC_PHY
-> > +	default ARCH_BCM_IPROC
->
-> Are not you missing a dependency on PHYLIB too to provide
-> mdio_module_register() etc. (at least make it build)?
->
-
-This depends on MDIO_BUS_MUX_BCM_IPROC which itself depends on PHYLIB. Hence
-I don't think We need to take care of this here.
-
-> --
-> Florian
-
-Regards,
-Pramod
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index d584004..8a815a1 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1501,7 +1501,6 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
+ {
+ 	struct clk_core *top, *fail_clk;
+ 	unsigned long rate = req_rate;
+-	int ret = 0;
+ 
+ 	if (!core)
+ 		return 0;
+@@ -1532,7 +1531,7 @@ static int clk_core_set_rate_nolock(struct clk_core *core,
+ 
+ 	core->req_rate = req_rate;
+ 
+-	return ret;
++	return 0;
+ }
+ 
+ /**
+-- 
+2.8.3
