@@ -1,60 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 07 Jun 2016 10:21:36 +0200
-Subject: [PATCH v1 00/25] PCI: Request host bridge window resources
-In-Reply-To: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-References: <20160606225630.20936.77349.stgit@bhelgaas-glaptop2.roam.corp.google.com>
-Message-ID: <3416214.BpvATlfaN7@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 7 Jun 2016 09:49:33 +0100
+Subject: [PATCH 1/2] ARM: dts: exynos: Fix port nodes names for Exynos5250
+ Snow board
+In-Reply-To: <1465244684-23612-2-git-send-email-javier@osg.samsung.com>
+References: <1465244684-23612-1-git-send-email-javier@osg.samsung.com>
+ <1465244684-23612-2-git-send-email-javier@osg.samsung.com>
+Message-ID: <57568A9D.7080804@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 6, 2016 6:04:44 PM CEST Bjorn Helgaas wrote:
-> Several host bridge drivers (designware and all derivatives, iproc,
-> xgene, xilinx, and xilinx-nwl) don't request the MMIO and I/O port
-> windows they forward downstream to the PCI bus.
+On 06/06/16 21:24, Javier Martinez Canillas wrote:
+> Commit 5c9cbade0629 ("ARM: dts: exynos: Fix DTC unit name warnings in
+> Exynos5250") fixed all the DTC warnings about mismatchs between unit
+> names and reg properties in Exynos5250 boards DTS.
 > 
-> That means the PCI core can't request resources for PCI bridge
-> windows and PCI BARs.
+> But unfortunately it also added a regression on the Exynos5250 Snow
+> Chromebook when changing the port node names since the OF graph logic
+> expects the port nodes to be always named 'port'.
 > 
-> Several other drivers (altera, generic, mvebu, rcar, tegra) do request
-> the windows, but use some duplicated code to do it.
+> The Documentation/devicetree/bindings/graph.txt binding document says
+> that when there is more than one port, '#address-cells', '#size-cells'
+> and 'reg' properties should be used to number the port nodes.
 > 
-> This adds a new devm_request_pci_bus_resources() interface and changes
-> these drivers to use it.  It also fixes several error paths where we failed
-> to free the resource list allocated by of_pci_get_host_bridge_resources().
-> 
-> Tegra guys, please take a look at "PCI: tegra: Remove top-level resource
-> from hierarchy" in particular.  Removing the top-level resource definitely
-> makes /proc/iomem look uglier (although it will look more like that of
-> other drivers).  A short-term fix could be to include device information in
-> the resource name.  I think a better long-term fix would be to make the DT
-> or platform device core request all the resources from the DT.
-> 
-> Comments welcome.  I expect we'll trip over something here, so I marked
-> this "v1" and I don't plan to put it into -next for a while.
-> 
-> This is on my pci/host-request-windows branch, which you can pull or view
-> at https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/log/?h=pci/host-request-windows
+> Fixes: 5c9cbade0629 ("ARM: dts: exynos: Fix DTC unit name warnings in Exynos5250")
+> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-This looks very nice. There is one related aspect that I have been
-grumbling about for a while, but I don't know what the driver is
-actually supposed to do there:
+I've tested this on top of -rc1, and it indeed fixes the display
+initialization I was seeing. It then dies in a horrible way, but that's
+a separate bug.
 
-For the IORESOURCE_IO resources, some drivers request the MMIO address
-that the window is mapped into, some drivers request the PIO range, and
-some of them request both. I also believe the resource that gets put
-into the bridge resources list is not always the same one (or maybe
-that got fixed by now).
+So for this patch:
 
-What do you think is the correct behavior here, should the driver only
-request the PIO range with parent=ioport_resource, or should it also
-request the MMIO window for the I/O ports with parent=iomem_resource?
-In the latter case, any idea how that can be generalized?
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Another aspect is that we already have the
-gen_pci_parse_request_of_pci_ranges() function that does the same as your
-new devm_request_pci_bus_resources() and then a few other things. I
-have been wondering whether we could move that function into common
-code convert drivers to use that wherever possible, but I guess we can
-always do that as a follow-up after this series.
+Thanks,
 
-	Arnd
+	M.
+-- 
+Jazz is not dead. It just smells funny...
