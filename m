@@ -1,44 +1,32 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue,  7 Jun 2016 10:36:05 +0900
-Subject: [PATCH] pinctrl: uniphier: fix NAND pin-mux settings for PH1-LD11/LD20
-Message-ID: <1465263365-13966-1-git-send-email-yamada.masahiro@socionext.com>
+From: fugang.duan@nxp.com (Fugang Duan)
+Date: Tue, 7 Jun 2016 01:40:31 +0000
+Subject: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC is
+ active w/o HW workaround
+In-Reply-To: <87a8iypoib.fsf@gmail.com>
+References: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
+ <VI1PR0401MB1855AA40FA576AF677A68E6FFF5C0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+ <87a8iypoib.fsf@gmail.com>
+Message-ID: <VI1PR0401MB1855A6AE5F80BB73579D7093FF5D0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-My mistake in the initial support patches.
+From: Holger Schurig <holgerschurig@gmail.com> Sent: Monday, June 06, 2016 7:04 PM
+> To: Fugang Duan <fugang.duan@nxp.com>; Lucas Stach
+> <l.stach@pengutronix.de>; Shawn Guo <shawnguo@kernel.org>
+> Cc: devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; kernel at pengutronix.de; patchwork-
+> lst at pengutronix.de
+> Subject: RE: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC is
+> active w/o HW workaround
+> 
+> > You just config the gpio irq like below patches:
+> > bc20a5d6da71 (ARM: dts: imx6qdl-sabreauto: use GPIO_6 for FEC
+> > interrupt.) 6261c4c8f13e (ARM: dts: imx6qdl-sabrelite: use GPIO_6 for
+> > FEC interrupt.)
+> 
+> But this is per-board, e.g. not board-agnostic??!?!   Some board might
+> have uses GPIO6 for other things and rendered it unusable for this ...
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+NXP HW reference design guide include this that reserve GPIO6 for FEC.  
 
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c | 2 +-
- drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-index 418ccd6..150942f 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld11.c
-@@ -484,7 +484,7 @@ static const unsigned i2c4_pins[] = {61, 62};
- static const int i2c4_muxvals[] = {1, 1};
- static const unsigned nand_pins[] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
- 				     15, 16, 17};
--static const int nand_muxvals[] = {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
-+static const int nand_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
- static const unsigned sd_pins[] = {10, 11, 12, 13, 14, 15, 16, 17};
- static const int sd_muxvals[] = {3, 3, 3, 3, 3, 3, 3, 3};  /* No SDVOLC */
- static const unsigned system_bus_pins[] = {1, 2, 6, 7, 8, 9, 10, 11, 12, 13,
-diff --git a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-index 2cb26b7..7311453 100644
---- a/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-+++ b/drivers/pinctrl/uniphier/pinctrl-uniphier-ld20.c
-@@ -565,7 +565,7 @@ static const unsigned i2c4_pins[] = {61, 62};
- static const int i2c4_muxvals[] = {1, 1};
- static const unsigned nand_pins[] = {3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14,
- 				     15, 16, 17};
--static const int nand_muxvals[] = {2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2};
-+static const int nand_muxvals[] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
- static const unsigned sd_pins[] = {10, 11, 12, 13, 14, 15, 16, 17};
- static const int sd_muxvals[] = {3, 3, 3, 3, 3, 3, 3, 3};  /* No SDVOLC */
- static const unsigned system_bus_pins[] = {1, 2, 6, 7, 8, 9, 10, 11, 12, 13,
--- 
-1.9.1
+The patch is fine for me, but I think it is unnecessary. 
