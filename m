@@ -1,45 +1,34 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Tue, 7 Jun 2016 12:46:50 -0700
-Subject: [PATCH 2/2] ARM: dts: imx6: tag boards that have the HW
- workaround for ERR006687
-In-Reply-To: <1464855906.9501.1.camel@pengutronix.de>
-References: <1464794983-31484-1-git-send-email-l.stach@pengutronix.de>
- <1464794983-31484-3-git-send-email-l.stach@pengutronix.de>
- <20160601161729.GB19428@n2100.arm.linux.org.uk>
- <1464855906.9501.1.camel@pengutronix.de>
-Message-ID: <20160607124650.1e69c658@jclayton-pc>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Tue, 7 Jun 2016 12:56:17 -0700
+Subject: [PATCH v5 01/18] remoteproc: make rsc table support optional
+In-Reply-To: <1465316352-20691-2-git-send-email-peter.griffin@linaro.org>
+References: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
+ <1465316352-20691-2-git-send-email-peter.griffin@linaro.org>
+Message-ID: <20160607195617.GI1256@tuxbot>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 02 Jun 2016 10:25:06 +0200
-Lucas Stach <l.stach@pengutronix.de> wrote:
+On Tue 07 Jun 09:18 PDT 2016, Peter Griffin wrote:
 
-> Am Mittwoch, den 01.06.2016, 17:17 +0100 schrieb Russell King - ARM
-> Linux:
-> > On Wed, Jun 01, 2016 at 05:29:43PM +0200, Lucas Stach wrote:  
-> > > @@ -97,6 +97,7 @@
-> > >  	phy-reset-gpios = <&gpio3 31 0>;
-> > >  	interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-> > >  			      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
-> > > +	fsl,err006687-war-present;  
-> > 
+> Some firmware and rproc drivers such as slim core don't have a
+> resource table. To avoid having to fudge an empty table
+> in the rproc driver this patch introduces a new has_rsctable
+> flag. rproc drivers which don't require a rsc table can set
+> this flag to false, and it avoids doing the initial async
+> firmware load in rproc_add_virtio_devices() to parse the
+> rsc table during rproc_add(), and also optimises rproc_fw_boot()
+> code path to avoid unnecessary rsc table processing of an
+> empty table.
+> 
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
-Why can't we just have the quirk detect the interrupts-extended
-property, which is not present on boards without the workaround.
-Wouldn't that be better? No dts change needed.
+Hi Peter,
 
-> > war?  Any reason not to spell it out, or use the more natural
-> > abbreviation "wa"?
-> >   
-> Apparently I've read too many documents where WAR is the abbreviation
-> for workaround, so it felt completely natural to me. I agree that it
-> would make sense to just spell it out to avoid any confusion.
-> 
-> Regards,
-> Lucas
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks for the patch. I do however dislike the amount of conditionals
+already in these code paths, so I'm not in favour of adding more.
+
+Please revert back to providing a dummy table from your driver and let's
+handle this topic separate of this series.
+
+Regards,
+Bjorn
