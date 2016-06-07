@@ -1,135 +1,209 @@
 From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Tue, 7 Jun 2016 19:14:15 +0200
-Subject: [PATCH v3 1/4] ARM: dts: imx6q-cm-fx6: remove iomuxc container node
-Message-ID: <3b1f9cd8f7804e7da7e093b4661441d4@rwthex-s1-b.rwth-ad.de>
+Date: Tue, 7 Jun 2016 19:14:16 +0200
+Subject: [PATCH v3 2/4] ARM: dts: imx6q: extend support for the cm-fx6
+In-Reply-To: <20160607171418.1703-1-christopher.spinrath@rwth-aachen.de>
+References: <20160607171418.1703-1-christopher.spinrath@rwth-aachen.de>
+Message-ID: <1bf474715cdf430a811ba16c82ce6f25@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-The imx6q-cm-fx6 iomuxc container node is not required. Remove it.
+The cm-fx6 module has an on-board spi-flash chip for its firmware, an
+eeprom (containing e.g. the mac address of the on-board Ethernet),
+a sata port, a pcie controller, an USB hub, and an USB otg port.
+Enable support for them. In addition, enable syscon poweroff support.
 
 Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
 
 Notes:
     Changes since v2:
-     - add Igor's Acked-By
+     - fix pcie reset gpio polarity
+     - add Fabio's Reviewed-By
     
     Changes since v1:
-     - this is a new patch in v2 required to address the iomuxc review
-       comments of v1 (remove container nodes to reduce indentation)
+     - remove regulator pseudo-bus
+     - remove partition layout from spi flash node
+     - remove unneeded label of the spi flash node
+     - convert downstream power-on-gpio property of pcie node to a proper
+       regulator
+     - sort usb* related nodes alphabetically
+     - make use of GPIO_ACTIVE_{LOW,HIGH} defines
+     - replace 0x80000000 iomuxc configs by proper defaults obtained from
+       u-boot
 
- arch/arm/boot/dts/imx6q-cm-fx6.dts | 94 +++++++++++++++++++-------------------
- 1 file changed, 46 insertions(+), 48 deletions(-)
+ arch/arm/boot/dts/imx6q-cm-fx6.dts | 125 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 125 insertions(+)
 
 diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-index 99b46f8..21c513f 100644
+index 21c513f..1ec3186 100644
 --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
 +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-@@ -47,56 +47,54 @@
- };
+@@ -12,6 +12,7 @@
+  */
  
- &iomuxc {
--	imx6q-cm-fx6 {
--		pinctrl_enet: enetgrp {
--			fsl,pins = <
--				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
--				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
--				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
--				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
--				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
--				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
--				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
--				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
--				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
--				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
--				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
--				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
--				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
--				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
--				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
--				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
--			>;
--		};
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b0b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b0b0
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b0b0
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b0b0
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x1b0b0
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b0b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+			MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
-+		>;
-+	};
+ /dts-v1/;
++#include <dt-bindings/gpio/gpio.h>
+ #include "imx6q.dtsi"
  
--		pinctrl_gpmi_nand: gpminandgrp {
--			fsl,pins = <
--				MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
--				MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
--				MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
--				MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
--				MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
--				MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
--				MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
--				MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
--				MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
--				MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
--				MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
--				MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
--				MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
--				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
--				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
--				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
--				MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
--			>;
--		};
-+	pinctrl_gpmi_nand: gpminandgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_NANDF_CLE__NAND_CLE		0xb0b1
-+			MX6QDL_PAD_NANDF_ALE__NAND_ALE		0xb0b1
-+			MX6QDL_PAD_NANDF_WP_B__NAND_WP_B	0xb0b1
-+			MX6QDL_PAD_NANDF_RB0__NAND_READY_B	0xb000
-+			MX6QDL_PAD_NANDF_CS0__NAND_CE0_B	0xb0b1
-+			MX6QDL_PAD_NANDF_CS1__NAND_CE1_B	0xb0b1
-+			MX6QDL_PAD_SD4_CMD__NAND_RE_B		0xb0b1
-+			MX6QDL_PAD_SD4_CLK__NAND_WE_B		0xb0b1
-+			MX6QDL_PAD_NANDF_D0__NAND_DATA00	0xb0b1
-+			MX6QDL_PAD_NANDF_D1__NAND_DATA01	0xb0b1
-+			MX6QDL_PAD_NANDF_D2__NAND_DATA02	0xb0b1
-+			MX6QDL_PAD_NANDF_D3__NAND_DATA03	0xb0b1
-+			MX6QDL_PAD_NANDF_D4__NAND_DATA04	0xb0b1
-+			MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
-+			MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
-+			MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
-+			MX6QDL_PAD_SD4_DAT0__NAND_DQS		0x00b1
-+		>;
-+	};
- 
--		pinctrl_uart4: uart4grp {
--			fsl,pins = <
--				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
--				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
--			>;
--		};
-+	pinctrl_uart4: uart4grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
-+		>;
+ / {
+@@ -31,6 +32,49 @@
+ 			linux,default-trigger = "heartbeat";
+ 		};
  	};
++
++	reg_pcie_power_on_gpio: regulator-pcie-power-on-gpio {
++		compatible = "regulator-fixed";
++		regulator-name = "regulator-pcie-power-on-gpio";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio2 24 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usb_h1_vbus: usb_h1_vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio7 8 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usb_otg_vbus: usb_otg_vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&ecspi1 {
++	fsl,spi-num-chipselects = <2>;
++	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio3 19 GPIO_ACTIVE_HIGH>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi1>;
++	status = "okay";
++
++	m25p80 at 0 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		compatible = "st,m25p", "jedec,spi-nor";
++		spi-max-frequency = <20000000>;
++		reg = <0>;
++	};
  };
  
+ &fec {
+@@ -46,7 +90,30 @@
+ 	status = "okay";
+ };
+ 
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3>;
++	status = "okay";
++	clock-frequency = <100000>;
++
++	eeprom at 50 {
++		compatible = "at24,24c02";
++		reg = <0x50>;
++		pagesize = <16>;
++	};
++};
++
+ &iomuxc {
++	pinctrl_ecspi1: ecspi1grp {
++		fsl,pins = <
++			MX6QDL_PAD_EIM_D16__ECSPI1_SCLK	0x100b1
++			MX6QDL_PAD_EIM_D17__ECSPI1_MISO	0x100b1
++			MX6QDL_PAD_EIM_D18__ECSPI1_MOSI	0x100b1
++			MX6QDL_PAD_EIM_EB2__GPIO2_IO30	0x100b1
++			MX6QDL_PAD_EIM_D19__GPIO3_IO19	0x100b1
++		>;
++	};
++
+ 	pinctrl_enet: enetgrp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b0b0
+@@ -90,12 +157,55 @@
+ 		>;
+ 	};
+ 
++	pinctrl_i2c3: i2c3grp {
++		fsl,pins = <
++			MX6QDL_PAD_GPIO_3__I2C3_SCL	0x4001b8b1
++			MX6QDL_PAD_GPIO_6__I2C3_SDA	0x4001b8b1
++		>;
++	};
++
++	pinctrl_pcie: pciegrp {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_RXD1__GPIO1_IO26	0x1b0b1
++			MX6QDL_PAD_EIM_CS1__GPIO2_IO24	0x1b0b1
++		>;
++	};
++
+ 	pinctrl_uart4: uart4grp {
+ 		fsl,pins = <
+ 			MX6QDL_PAD_KEY_COL0__UART4_TX_DATA	0x1b0b1
+ 			MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA	0x1b0b1
+ 		>;
+ 	};
++
++	pinctrl_usbh1: usbh1grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_RST__GPIO7_IO08	0x1b0b1
++		>;
++	};
++
++	pinctrl_usbotg: usbotggrp {
++		fsl,pins = <
++			MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID	0x17059
++			MX6QDL_PAD_EIM_D22__GPIO3_IO22	0x130b0
++		>;
++	};
++};
++
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	reset-gpio = <&gpio1 26 GPIO_ACTIVE_LOW>;
++	vdd-supply = <&reg_pcie_power_on_gpio>;
++	status = "okay";
++};
++
++&sata {
++	status = "okay";
++};
++
++&snvs_poweroff {
++	status = "okay";
+ };
+ 
+ &uart4 {
+@@ -103,3 +213,18 @@
+ 	pinctrl-0 = <&pinctrl_uart4>;
+ 	status = "okay";
+ };
++
++&usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbh1>;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg>;
++	dr_mode = "otg";
++	status = "okay";
++};
 -- 
 2.8.3
