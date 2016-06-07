@@ -1,94 +1,61 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 6 Jun 2016 17:02:29 -0700
-Subject: [PATCH 27/32] gpio: Add support for the FXL6408 GPIO expander.
-In-Reply-To: <1464817421-8519-28-git-send-email-kraxel@redhat.com>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-28-git-send-email-kraxel@redhat.com>
-Message-ID: <57560F15.6020006@gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 6 Jun 2016 19:28:22 -0500
+Subject: [PATCH 1/3] pci: introduce read_bridge/write_bridge pci ops
+In-Reply-To: <3585926.N1C2xx3GaB@wuerfel>
+References: <1464784332-3775650-1-git-send-email-arnd@arndb.de>
+ <4967020.J4dsRYGugq@wuerfel> <20160602140001.GB8262@localhost>
+ <3585926.N1C2xx3GaB@wuerfel>
+Message-ID: <20160607002822.GA1391@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2016 02:43 PM, Gerd Hoffmann wrote:
-> From: Eric Anholt <eric@anholt.net>
+On Thu, Jun 02, 2016 at 05:06:55PM +0200, Arnd Bergmann wrote:
+> On Thursday, June 2, 2016 9:00:01 AM CEST Bjorn Helgaas wrote:
+> > > I just did a count of the implementations of pci_ops: I found 107
+> > > instances of 'struct pci_ops', and 67 of them treat type0 and type1
+> > > access differently in some form.
+> > > 
+> > > I'd estimate that about half of them, or roughly a third of the total
+> > > instances would benefit from my change, if we were to do them again.
+> > > Clearly there is no need to change the existing code here when it works,
+> > > unless the benefit is very clear and the code is actively maintained.
+> > > 
+> > > In some cases, the difference is only that the root bus has a limited
+> > > set of devices that are allowed to be accessed, so there would
+> > > likely be no benefit of this, compared to e.g. yet another callback
+> > > that checks the validity.
+> > > Some other instances have type0 registers at a different memory location
+> > > from type1, some use different layout inside of that space, and some
+> > > are completely different.
+> > 
+> > The type0/type1 distinction still seems out of place to me at the call
+> > site.  Is there any other reason a caller would care about the
+> > difference between type0 and type1?
 > 
-> This commit needs to be split up and cleaned up.  Also we should add
-> interrupt support before pushing upstream.
+> The callers really shouldn't care, but they also shouldn't call the
+> pci_ops function pointer (and as we found earlier, there are only
+> three such callers).
 > 
-> Signed-off-by: Eric Anholt <eric@anholt.net>
-> 
-> Conflicts:
-> 	arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-> ---
->  arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts |  16 ++
->  drivers/gpio/Kconfig                             |   6 +
->  drivers/gpio/Makefile                            |   1 +
->  drivers/gpio/gpio-fxl6408.c                      | 244 +++++++++++++++++++++++
->  4 files changed, 267 insertions(+)
->  create mode 100644 drivers/gpio/gpio-fxl6408.c
-> 
-> diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-> index 099dd48d..4bc191e 100644
-> --- a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-> +++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dts
-> @@ -39,3 +39,19 @@
->  &hdmi {
->  	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
->  };
-> +
-> +/* Connect the GPIO expander to I2C1 */
-> +&i2c0 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&i2c0_gpio44>;
-> +
-> +	gpio_expander: gpio at 43 {
-> +		gpio-controller;
-> +		#gpio-cells = <2>;
-> +		reg = <0x43>;
-> +		compatible = "fcs,fxl6408";
-> +	};
-> +};
-> +
-> +bt {
-> +};
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index 48da857..34056cd 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -665,6 +665,12 @@ config GPIO_ADNP
->  	  enough to represent all pins, but the driver will assume a
->  	  register layout for 64 pins (8 registers).
->  
-> +config GPIO_FXL6408
-> +	tristate "FXL6408 I2C GPIO expander"
-> +	help
-> +	  This option enables support for 8 GPIOs found
-> +	  on the Fairchild Semiconductor FXL6408.
-> +
->  config GPIO_MAX7300
->  	tristate "Maxim MAX7300 GPIO expander"
->  	select GPIO_MAX730X
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index 991598e..59a25ef 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -43,6 +43,7 @@ obj-$(CONFIG_GPIO_EM)		+= gpio-em.o
->  obj-$(CONFIG_GPIO_EP93XX)	+= gpio-ep93xx.o
->  obj-$(CONFIG_GPIO_ETRAXFS)	+= gpio-etraxfs.o
->  obj-$(CONFIG_GPIO_F7188X)	+= gpio-f7188x.o
-> +obj-$(CONFIG_GPIO_FXL6408)	+= gpio-fxl6408.o
->  obj-$(CONFIG_GPIO_GE_FPGA)	+= gpio-ge.o
->  obj-$(CONFIG_GPIO_GRGPIO)	+= gpio-grgpio.o
->  obj-$(CONFIG_GPIO_ICH)		+= gpio-ich.o
-> diff --git a/drivers/gpio/gpio-fxl6408.c b/drivers/gpio/gpio-fxl6408.c
-> new file mode 100644
-> index 0000000..02b2816
-> --- /dev/null
-> +++ b/drivers/gpio/gpio-fxl6408.c
-> @@ -0,0 +1,244 @@
-> +/*
-> + *  Copyright (C) 2016 Broadcom Limited.
+> The distinction between type0 and type1 in my mind is an implementation
+> detail of the pci_{read,write}_config_{byte,word,dword} functions
+> that call the low-level operations here.
 
-BTW, since you need to resubmit that, the new Copyright should be
-without the "Limited", just Broadcom, which covers all entities.
--- 
-Florian
+The caller is performing one abstract operation: reading or writing
+config space of a PCI device.  In the caller's context, it makes no
+difference whether it's a type0 or type1 access.
+
+Moving the test from the host bridge driver to pci_read_config_byte()
+does move a little code from the callee to the caller, and there are
+more callees than callers, so in that sense it does remove code
+overall.  If you consider a single driver by itself, I'm not sure it
+makes much difference.
+
+The pcie-designware.c patch is a net removal of 17 lines, but that's
+not all from moving the type0/type1 test: restructuring along the same
+lines but keeping the original type0/type1 test removes about 9 lines.
+
+Anyway, I think I'd rather work first on your RFC patches to make
+pci_host_bridge the primary structure for probing PCI.  I think
+there will be a *lot* of benefit there.
+
+Bjorn
