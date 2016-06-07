@@ -1,38 +1,31 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 18:54:54 +0100
-Subject: [PATCH] soc: brcmstb: fix warning from missing include
-Message-ID: <1465322094-25692-1-git-send-email-ben.dooks@codethink.co.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue,  7 Jun 2016 19:59:10 +0200
+Subject: [PATCH] ARM: dts: at91: usb_a9g20: use stdout-path
+Message-ID: <1465322350-14079-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The brcmstb_biuctrl_init() is defined in the soc specific header
-file, but wasn't included in the driver file. Fix the following
-warning by including <linux/soc/brcmstb/brcmstb.h> in the driver:
+Use stdout-path to specify the console and remove the console argument from
+the kernel command line.
 
-drivers/soc/brcmstb/biuctrl.c:101:13: warning: symbol 'brcmstb_biuctrl_init' was not declared. Should it be static?
-
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
-Cc: Brian Norris <computersforpeace@gmail.com>
-Cc: Gregory Fong <gregory.0xf0@gmail.com>
-Cc: Florian Fainelli <f.fainelli@gmail.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: bcm-kernel-feedback-list at broadcom.com
----
- drivers/soc/brcmstb/biuctrl.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/usb_a9g20_common.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/brcmstb/biuctrl.c b/drivers/soc/brcmstb/biuctrl.c
-index 9049c076f..3c39415 100644
---- a/drivers/soc/brcmstb/biuctrl.c
-+++ b/drivers/soc/brcmstb/biuctrl.c
-@@ -19,6 +19,7 @@
- #include <linux/io.h>
- #include <linux/of_address.h>
- #include <linux/syscore_ops.h>
-+#include <linux/soc/brcmstb/brcmstb.h>
+diff --git a/arch/arm/boot/dts/usb_a9g20_common.dtsi b/arch/arm/boot/dts/usb_a9g20_common.dtsi
+index 0b3b36182fe5..6156ee878345 100644
+--- a/arch/arm/boot/dts/usb_a9g20_common.dtsi
++++ b/arch/arm/boot/dts/usb_a9g20_common.dtsi
+@@ -11,7 +11,8 @@
  
- #define CPU_CREDIT_REG_OFFSET			0x184
- #define  CPU_CREDIT_REG_MCPx_WR_PAIRING_EN_MASK	0x70000000
+ / {
+ 	chosen {
+-		bootargs = "mem=64M console=ttyS0,115200 root=/dev/mtdblock5 rw rootfstype=ubifs";
++		bootargs = "mem=64M root=/dev/mtdblock5 rw rootfstype=ubifs";
++		stdout-path = "serial0:115200n8";
+ 	};
+ 
+ 	memory {
 -- 
 2.8.1
