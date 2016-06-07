@@ -1,38 +1,48 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 07 Jun 2016 08:16:11 +0200
-Subject: [PATCH 0/2] ARM: dts: exynos: Fix port nodes names for Snow and
- Peach Pit DTS
-In-Reply-To: <1465244684-23612-1-git-send-email-javier@osg.samsung.com>
-References: <1465244684-23612-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <575666AB.8080304@samsung.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 7 Jun 2016 09:31:38 +0300
+Subject: [PATCH] ARM: dts: DRA74x: fix DSS PLL2 addresses
+In-Reply-To: <1463739213-31540-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1463739213-31540-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <57566A4A.4020102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2016 10:24 PM, Javier Martinez Canillas wrote:
-> Hello Krzysztof,
-> 
-> This small series fixes the lookup for the lvds-to-eDP bridge found in
-> the Exynos5250 Snow and Exynos5420 Peach Pit Chromebooks. The problem
-> was introduced by the commits that fixed the recent DTC warnings and
-> it was that the OF graph logic expects the nodes to always be called
-> 'port'.
-> 
-> So the correct fix for the DTC warnings is to add a '#address-cells',
-> '#size-cells' and 'reg' properties when there is more than one port.
-> 
-> Best regards,
-> Javier
-> 
-> 
-> Javier Martinez Canillas (2):
->   ARM: dts: exynos: Fix port nodes names for Exynos5250 Snow board
->   ARM: dts: exynos: Fix port nodes names for Exynos5420 Peach Pit board
-> 
->  arch/arm/boot/dts/exynos5250-snow-common.dtsi | 13 ++++++++++---
->  arch/arm/boot/dts/exynos5420-peach-pit.dts    | 13 ++++++++++---
->  2 files changed, 20 insertions(+), 6 deletions(-)
+Hi Tony,
 
-Thanks for fixes. Applied both for v4.7.
+On 20/05/16 13:13, Tomi Valkeinen wrote:
+> DSS's 'pll2_clkctrl' and 'pll2' have wrong addresses in the dra74x.dtsi
+> file. Video PLL2 has not been used so wrong addresses went unnoticed.
+> 
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> ---
+>  arch/arm/boot/dts/dra74x.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/dra74x.dtsi b/arch/arm/boot/dts/dra74x.dtsi
+> index 4220eeffc65a..5e06020f450b 100644
+> --- a/arch/arm/boot/dts/dra74x.dtsi
+> +++ b/arch/arm/boot/dts/dra74x.dtsi
+> @@ -107,8 +107,8 @@
+>  	reg = <0x58000000 0x80>,
+>  	      <0x58004054 0x4>,
+>  	      <0x58004300 0x20>,
+> -	      <0x58005054 0x4>,
+> -	      <0x58005300 0x20>;
+> +	      <0x58009054 0x4>,
+> +	      <0x58009300 0x20>;
+>  	reg-names = "dss", "pll1_clkctrl", "pll1",
+>  		    "pll2_clkctrl", "pll2";
+>  
+> 
 
-Best regards,
-Krzysztof
+Ping on this.
+
+ Tomi
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/401dfa30/attachment-0001.sig>
