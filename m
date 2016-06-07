@@ -1,75 +1,39 @@
 From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 15:59:16 +0000
-Subject: [PATCH v10 2/8] iommu/arm-smmu: initialize the msi geometry and
- advertise iommu-msi support
+Date: Tue,  7 Jun 2016 15:59:17 +0000
+Subject: [PATCH v10 3/8] iommu: introduce an msi cookie
 In-Reply-To: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
 References: <1465315162-5888-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315162-5888-3-git-send-email-eric.auger@redhat.com>
+Message-ID: <1465315162-5888-4-git-send-email-eric.auger@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM, MSI write transactions from device upstream to the smmu
-are conveyed through the iommu. Therefore target physical addresses
-must be mapped and DOMAIN_ATTR_MSI_GEOMETRY advertises the support of
-the IOMMU-MSI API.
+This opaque pointer will enable to store information about msi
+iommu mappings.
 
 Signed-off-by: Eric Auger <eric.auger@redhat.com>
 
 ---
-v8 -> v9:
-- reword the title and patch description
-
 v7 -> v8:
-- use DOMAIN_ATTR_MSI_GEOMETRY
+remove spinlock and RB tree
 
-v4 -> v5:
-- don't handle fsl_pamu_domain anymore
-- handle arm-smmu-v3
+v5 -> v6:
+- initialize reserved_binding_list
+- use a spinlock instead of a mutex
 ---
- drivers/iommu/arm-smmu-v3.c | 2 ++
- drivers/iommu/arm-smmu.c    | 3 +++
- 2 files changed, 5 insertions(+)
+ include/linux/iommu.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 94b6821..8eb002e 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1397,6 +1397,7 @@ static bool arm_smmu_capable(enum iommu_cap cap)
- static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- {
- 	struct arm_smmu_domain *smmu_domain;
-+	struct iommu_domain_msi_geometry msi_geometry = {0, 0, true};
+diff --git a/include/linux/iommu.h b/include/linux/iommu.h
+index 1b553ee..f7a5d13 100644
+--- a/include/linux/iommu.h
++++ b/include/linux/iommu.h
+@@ -91,6 +91,7 @@ struct iommu_domain {
+ 	struct iommu_domain_geometry geometry;
+ 	struct iommu_domain_msi_geometry msi_geometry;
+ 	void *iova_cookie;
++	void *msi_cookie;
+ };
  
- 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
- 		return NULL;
-@@ -1415,6 +1416,7 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		kfree(smmu_domain);
- 		return NULL;
- 	}
-+	smmu_domain->domain.msi_geometry = msi_geometry;
- 
- 	mutex_init(&smmu_domain->init_mutex);
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 9345a3f..9755a1b 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1038,6 +1038,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- {
- 	struct arm_smmu_domain *smmu_domain;
-+	struct iommu_domain_msi_geometry msi_geometry = {0, 0, true};
- 
- 	if (type != IOMMU_DOMAIN_UNMANAGED && type != IOMMU_DOMAIN_DMA)
- 		return NULL;
-@@ -1056,6 +1057,8 @@ static struct iommu_domain *arm_smmu_domain_alloc(unsigned type)
- 		return NULL;
- 	}
- 
-+	smmu_domain->domain.msi_geometry = msi_geometry;
-+
- 	mutex_init(&smmu_domain->init_mutex);
- 	spin_lock_init(&smmu_domain->pgtbl_lock);
- 
+ enum iommu_cap {
 -- 
 1.9.1
