@@ -1,34 +1,48 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 20:03:46 +0100
-Subject: [PATCH 2/5] mvebu: fix missing include of common.h in pm.c
-In-Reply-To: <1465326229-24787-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465326229-24787-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <1465326229-24787-3-git-send-email-ben.dooks@codethink.co.uk>
+From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
+Date: Wed, 8 Jun 2016 00:48:38 +0530
+Subject: [PATCH] dmaengine: xilinx_vdma: Use dma_pool_zalloc
+Message-ID: <20160607191838.GA26841@amitoj-Inspiron-3542>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mvebu_pm_suspend_init() is missing a definition, so
-include common.h which defines this function into pm.c to
-fix the following warning:
+Dma_pool_zalloc combines dma_pool_alloc and memset 0.
 
-arch/arm/mach-mvebu/pm.c:235:12: warning: symbol 'mvebu_pm_suspend_init' was not declared. Should it be static?
+The Coccinelle semantic patch used to make this change is as follows:
+@@
+type T;
+T *d;
+expression e;
+statement S;
+@@
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+        d =
+-            dma_pool_alloc
++            dma_pool_zalloc
+             (...);
+        if (!d) S
+-       memset(d, 0, sizeof(T));
+
+Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
 ---
- arch/arm/mach-mvebu/pm.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/dma/xilinx/xilinx_vdma.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-mvebu/pm.c b/arch/arm/mach-mvebu/pm.c
-index 8d32bf7..2990c52 100644
---- a/arch/arm/mach-mvebu/pm.c
-+++ b/arch/arm/mach-mvebu/pm.c
-@@ -23,6 +23,7 @@
- #include <asm/suspend.h>
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index ef67f27..d35317f 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -315,11 +315,10 @@ xilinx_vdma_alloc_tx_segment(struct xilinx_vdma_chan *chan)
+ 	struct xilinx_vdma_tx_segment *segment;
+ 	dma_addr_t phys;
  
- #include "coherency.h"
-+#include "common.h"
- #include "pmsu.h"
+-	segment = dma_pool_alloc(chan->desc_pool, GFP_ATOMIC, &phys);
++	segment = dma_pool_zalloc(chan->desc_pool, GFP_ATOMIC, &phys);
+ 	if (!segment)
+ 		return NULL;
  
- #define SDRAM_CONFIG_OFFS                  0x0
+-	memset(segment, 0, sizeof(*segment));
+ 	segment->phys = phys;
+ 
+ 	return segment;
 -- 
-2.8.1
+1.9.1
