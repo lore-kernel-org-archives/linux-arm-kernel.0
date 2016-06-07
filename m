@@ -1,48 +1,89 @@
-From: thunder.leizhen@huawei.com (Zhen Lei)
-Date: Tue, 7 Jun 2016 16:08:04 +0800
-Subject: [PATCH v4 00/14] fix some type infos and bugs for arm64/of numa
-Message-ID: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+From: peter.griffin@linaro.org (Peter Griffin)
+Date: Tue, 7 Jun 2016 09:12:51 +0100
+Subject: [STLinux Kernel] [[PATCH v2] 07/11] pwm: sti: Supply PWM Capture
+ clock handling
+In-Reply-To: <1461320295-20414-8-git-send-email-lee.jones@linaro.org>
+References: <1461320295-20414-1-git-send-email-lee.jones@linaro.org>
+ <1461320295-20414-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20160607081251.GA22744@griffinp-ThinkPad-X1-Carbon-2nd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v3 -> v4:
-1. Packed three patches of Kefeng Wang, patch6-8.
-2. Add 6 new patches(9-15) to enhance the numa on arm64.
+Hi Lee,
 
-v2 -> v3:
-1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
-   patches looks more well. The final code have no change. 
+On Fri, 22 Apr 2016, Lee Jones wrote:
 
-v1 -> v2:
-1. Base on https://lkml.org/lkml/2016/5/24/679
-2. Rewrote of_numa_parse_memory_nodes according to Rob Herring's advice. So that it looks more clear.
-3. Rewrote patch 5 because some scenes were not considered before.
+> ST's PWM IP is supplied by 2 different clocks.  One for PWM
+> Output and the other for Capture.  This patch provides clock
+> handling for the latter.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/pwm/pwm-sti.c | 25 +++++++++++++++++++++++++
+>  1 file changed, 25 insertions(+)
+> 
+> diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+> index 2f61e1e..78979d0 100644
+> --- a/drivers/pwm/pwm-sti.c
+> +++ b/drivers/pwm/pwm-sti.c
+> @@ -74,6 +74,7 @@ struct sti_pwm_compat_data {
+>  struct sti_pwm_chip {
+>  	struct device *dev;
+>  	struct clk *pwm_clk;
+> +	struct clk *cpt_clk;
+>  	struct regmap *regmap;
+>  	struct sti_pwm_compat_data *cdata;
+>  	struct regmap_field *prescale_low;
+> @@ -183,6 +184,10 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  		if (ret)
+>  			return ret;
+>  
+> +		ret = clk_enable(pc->cpt_clk);
+> +		if (ret)
+> +			return ret;
+> +
+>  		if (!period_same) {
+>  			ret = sti_pwm_get_prescale(pc, period_ns, &prescale);
+>  			if (ret)
+> @@ -227,6 +232,7 @@ static int sti_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+>  
+>  clk_dis:
+>  	clk_disable(pc->pwm_clk);
+> +	clk_disable(pc->cpt_clk);
+>  	return ret;
+>  }
+>  
+> @@ -246,6 +252,10 @@ static int sti_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  		if (ret)
+>  			goto out;
+>  
+> +		ret = clk_enable(pc->cpt_clk);
+> +		if (ret)
+> +			goto out;
+> +
+>  		ret = regmap_field_write(pc->pwm_out_en, 1);
+>  		if (ret) {
+>  			dev_err(dev, "failed to enable PWM device:%d\n",
+> @@ -271,6 +281,7 @@ static void sti_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+>  	regmap_field_write(pc->pwm_out_en, 0);
+>  
+>  	clk_disable(pc->pwm_clk);
+> +	clk_disable(pc->cpt_clk);
+>  	mutex_unlock(&pc->sti_pwm_lock);
+>  }
+>  
+> @@ -390,6 +401,18 @@ static int sti_pwm_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> +	pc->cpt_clk = of_clk_get_by_name(dev->of_node, "capture");
+> +	if (IS_ERR(pc->cpt_clk)) {
+> +		dev_err(dev, "failed to get PWM capture clock\n");
+> +		return PTR_ERR(pc->cpt_clk);
+> +	}
 
-Kefeng Wang (3):
-  of_numa: Use of_get_next_parent to simplify code
-  of_numa: Use pr_fmt()
-  arm64: numa: Use pr_fmt()
+The dt binding document pwm-st.txt also needs updating for this extra clock.
 
-Zhen Lei (11):
-  of/numa: remove a duplicated pr_debug information
-  of/numa: fix a memory@ node can only contains one memory block
-  arm64/numa: add nid check for memory block
-  of/numa: remove a duplicated warning
-  arm64/numa: avoid inconsistent information to be printed
-  arm64/numa: support HAVE_SETUP_PER_CPU_AREA
-  arm64/numa: define numa_distance as array to simplify code
-  arm64/numa: support HAVE_MEMORYLESS_NODES
-  arm64/numa: remove some useless code
-  of/numa: remove the constraint on the distances of node pairs
-  Documentation: remove the constraint on the distances of node pairs
+regards,
 
- Documentation/devicetree/bindings/numa.txt |   1 -
- arch/arm64/Kconfig                         |  12 ++
- arch/arm64/include/asm/numa.h              |   1 -
- arch/arm64/kernel/smp.c                    |   1 +
- arch/arm64/mm/numa.c                       | 228 ++++++++++++++++-------------
- drivers/of/of_numa.c                       |  87 +++++------
- 6 files changed, 180 insertions(+), 150 deletions(-)
-
---
-2.5.0
+Peter.
