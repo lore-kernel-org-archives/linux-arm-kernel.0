@@ -1,34 +1,177 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Tue, 07 Jun 2016 21:48:42 +0800
-Subject: [PATCH v3] ASoC: rockchip: Add machine driver for
- MAX98357A/RT5514/DA7219
-In-Reply-To: <20160607133247.GY7510@sirena.org.uk>
-References: <1464267742-15312-1-git-send-email-zhengxing@rock-chips.com>
- <20160601144542.GA3835@rob-hp-laptop> <5751912C.6080904@rock-chips.com>
- <20160606235026.GP7510@sirena.org.uk> <5756363F.40208@rock-chips.com>
- <20160607104711.GR7510@sirena.org.uk> <5756B22F.9000105@rock-chips.com>
- <20160607120647.GV7510@sirena.org.uk> <5756C245.7010001@rock-chips.com>
- <20160607133247.GY7510@sirena.org.uk>
-Message-ID: <5756D0BA.7060702@rock-chips.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Tue, 7 Jun 2016 19:21:15 +0530
+Subject: [PATCH v3 1/2] dmaengine: vdma: Add 64 bit addressing support for the
+ axi dma
+Message-ID: <1465307476-15936-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+The AXI DMA is a soft ip, which can be programmed to support
+32 bit addressing or greater than 32 bit addressing.
 
-On 2016?06?07? 21:32, Mark Brown wrote:
-> On Tue, Jun 07, 2016 at 08:47:01PM +0800, Xing Zheng wrote:
->> On 2016?06?07? 20:06, Mark Brown wrote:
->>> OK, then the original name probably makes some sense though really
->>> that's such an unusual design that just naming it after the specific
->>> board might be better, it's not likely to see any reuse I'd guess.
->> There are not only one type of board with this audio connection, so I think
->> we don't need to add specific board name.
-> I imagine they're all variants on a single reference design though?  The
-> name is unweildy.
-Yes, they are based on a single reference design which is called gru, so 
-could I use the name "rk3399-gru-sound"?
+When the AXI DMA ip is configured for 32 bit address space
+in simple dma mode the buffer address is specified by a single register
+(18h for MM2S channel and 48h for S2MM channel). When configured in SG mode
+The current descriptor and tail descriptor are specified by a single
+Register(08h for curdesc 10h for tail desc for MM2S channel and 38h for
+Curdesc and 40h for tail desc for S2MM).
 
-Thanks.
+When the  AXI DMA core is configured for an address space greater
+than 32 then each buffer address or descriptor address is specified by
+a combination of two registers.
 
+The first register specifies the LSB 32 bits of address,
+while the next register specifies the MSB 32 bits of address.
+
+For example, 48h will specify the LSB 32 bits while 4Ch will
+specify the MSB 32 bits of the first start address.
+So we need to program two registers at a time.
+
+This patch adds the 64 bit addressing support for the axidma
+IP in the driver.
+
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes for v3:
+--> Removed repeated code and used wrappers as suggested by vinod.
+Changes for v2:
+--> New patch. 
+
+ drivers/dma/xilinx/xilinx_vdma.c |   63 ++++++++++++++++++++++++++++---------
+ 1 files changed, 47 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index 0f5b38a..dd990fc 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -45,6 +45,7 @@
+ #include <linux/of_irq.h>
+ #include <linux/slab.h>
+ #include <linux/clk.h>
++#include <linux/io-64-nonatomic-lo-hi.h>
+ 
+ #include "../dmaengine.h"
+ 
+@@ -195,22 +196,22 @@ struct xilinx_vdma_desc_hw {
+ /**
+  * struct xilinx_axidma_desc_hw - Hardware Descriptor for AXI DMA
+  * @next_desc: Next Descriptor Pointer @0x00
+- * @pad1: Reserved @0x04
++ * @next_desc_msb: MSB of Next Descriptor Pointer @0x04
+  * @buf_addr: Buffer address @0x08
+- * @pad2: Reserved @0x0C
+- * @pad3: Reserved @0x10
+- * @pad4: Reserved @0x14
++ * @buf_addr_msb: MSB of Buffer address @0x0C
++ * @pad1: Reserved @0x10
++ * @pad2: Reserved @0x14
+  * @control: Control field @0x18
+  * @status: Status field @0x1C
+  * @app: APP Fields @0x20 - 0x30
+  */
+ struct xilinx_axidma_desc_hw {
+ 	u32 next_desc;
+-	u32 pad1;
++	u32 next_desc_msb;
+ 	u32 buf_addr;
++	u32 buf_addr_msb;
++	u32 pad1;
+ 	u32 pad2;
+-	u32 pad3;
+-	u32 pad4;
+ 	u32 control;
+ 	u32 status;
+ 	u32 app[XILINX_DMA_NUM_APP_WORDS];
+@@ -461,6 +462,34 @@ static inline void vdma_desc_write_64(struct xilinx_dma_chan *chan, u32 reg,
+ 	writel(value_msb, chan->xdev->regs + chan->desc_offset + reg + 4);
+ }
+ 
++static inline void dma_writeq(struct xilinx_dma_chan *chan, u32 reg, u64 value)
++{
++	lo_hi_writeq(value, chan->xdev->regs + chan->ctrl_offset + reg);
++}
++
++static inline void xilinx_write(struct xilinx_dma_chan *chan, u32 reg,
++				dma_addr_t addr)
++{
++	if (chan->ext_addr)
++		dma_writeq(chan, reg, addr);
++	else
++		dma_ctrl_write(chan, reg, addr);
++}
++
++static inline void xilinx_axidma_buf(struct xilinx_dma_chan *chan,
++				     struct xilinx_axidma_desc_hw *hw,
++				     dma_addr_t buf_addr, size_t sg_used,
++				     size_t period_len)
++{
++	if (chan->ext_addr) {
++		hw->buf_addr = lower_32_bits(buf_addr + sg_used + period_len);
++		hw->buf_addr_msb = upper_32_bits(buf_addr + sg_used +
++						 period_len);
++	} else {
++		hw->buf_addr = buf_addr + sg_used + period_len;
++	}
++}
++
+ /* -----------------------------------------------------------------------------
+  * Descriptors and segments alloc and free
+  */
+@@ -1190,8 +1219,8 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 	}
+ 
+ 	if (chan->has_sg)
+-		dma_ctrl_write(chan, XILINX_DMA_REG_CURDESC,
+-			       head_desc->async_tx.phys);
++		xilinx_write(chan, XILINX_DMA_REG_CURDESC,
++			     head_desc->async_tx.phys);
+ 
+ 	xilinx_dma_start(chan);
+ 
+@@ -1201,11 +1230,11 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 	/* Start the transfer */
+ 	if (chan->has_sg) {
+ 		if (chan->cyclic)
+-			dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+-				       chan->cyclic_seg_v->phys);
++			xilinx_write(chan, XILINX_DMA_REG_TAILDESC,
++				     chan->cyclic_seg_v->phys);
+ 		else
+-			dma_ctrl_write(chan, XILINX_DMA_REG_TAILDESC,
+-				       tail_segment->phys);
++			xilinx_write(chan, XILINX_DMA_REG_TAILDESC,
++				     tail_segment->phys);
+ 	} else {
+ 		struct xilinx_axidma_tx_segment *segment;
+ 		struct xilinx_axidma_desc_hw *hw;
+@@ -1215,7 +1244,7 @@ static void xilinx_dma_start_transfer(struct xilinx_dma_chan *chan)
+ 					   node);
+ 		hw = &segment->hw;
+ 
+-		dma_ctrl_write(chan, XILINX_DMA_REG_SRCDSTADDR, hw->buf_addr);
++		xilinx_write(chan, XILINX_DMA_REG_SRCDSTADDR, hw->buf_addr);
+ 
+ 		/* Start the transfer */
+ 		dma_ctrl_write(chan, XILINX_DMA_REG_BTT,
+@@ -1679,7 +1708,8 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_slave_sg(
+ 			hw = &segment->hw;
+ 
+ 			/* Fill in the descriptor */
+-			hw->buf_addr = sg_dma_address(sg) + sg_used;
++			xilinx_axidma_buf(chan, hw, sg_dma_address(sg),
++					  sg_used, 0);
+ 
+ 			hw->control = copy;
+ 
+@@ -1777,7 +1807,8 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
+ 			copy = min_t(size_t, period_len - sg_used,
+ 				     XILINX_DMA_MAX_TRANS_LEN);
+ 			hw = &segment->hw;
+-			hw->buf_addr = buf_addr + sg_used + (period_len * i);
++			xilinx_axidma_buf(chan, hw, buf_addr, sg_used,
++					  period_len * i);
+ 			hw->control = copy;
+ 
+ 			if (prev)
 -- 
-- Xing Zheng
+1.7.1
