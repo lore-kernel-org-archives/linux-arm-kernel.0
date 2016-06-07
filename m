@@ -1,105 +1,65 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue,  7 Jun 2016 13:48:03 +0200
-Subject: [PATCH v2 08/20] drm: msm: Rely on the default ->best_encoder()
- behavior where appropriate
+Date: Tue,  7 Jun 2016 13:48:11 +0200
+Subject: [PATCH v2 16/20] drm: omap: Rely on the default ->best_encoder()
+ behavior
 In-Reply-To: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465300095-16971-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465300095-16971-17-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For all outputs except DSI we have a 1:1 relationship between connectors
-and encoders and the driver is relying on the atomic helpers: we can
-drop the custom ->best_encoder() and let the core call
+We have a 1:1 relationship between connectors and encoders and the
+driver is relying on the atomic helpers: we can drop the custom
+->best_encoder() implementation and let the core call
 drm_atomic_helper_best_encoder() for us.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- drivers/gpu/drm/msm/edp/edp_connector.c            | 10 ----------
- drivers/gpu/drm/msm/hdmi/hdmi_connector.c          |  8 --------
- drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c |  9 ---------
- 3 files changed, 27 deletions(-)
+ drivers/gpu/drm/omapdrm/omap_connector.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-diff --git a/drivers/gpu/drm/msm/edp/edp_connector.c b/drivers/gpu/drm/msm/edp/edp_connector.c
-index 72360cd..5960628 100644
---- a/drivers/gpu/drm/msm/edp/edp_connector.c
-+++ b/drivers/gpu/drm/msm/edp/edp_connector.c
-@@ -91,15 +91,6 @@ static int edp_connector_mode_valid(struct drm_connector *connector,
- 	return MODE_OK;
+diff --git a/drivers/gpu/drm/omapdrm/omap_connector.c b/drivers/gpu/drm/omapdrm/omap_connector.c
+index ce2d67b..137fe69 100644
+--- a/drivers/gpu/drm/omapdrm/omap_connector.c
++++ b/drivers/gpu/drm/omapdrm/omap_connector.c
+@@ -32,7 +32,6 @@
+ struct omap_connector {
+ 	struct drm_connector base;
+ 	struct omap_dss_device *dssdev;
+-	struct drm_encoder *encoder;
+ 	bool hdmi_mode;
+ };
+ 
+@@ -256,13 +255,6 @@ static int omap_connector_mode_valid(struct drm_connector *connector,
+ 	return ret;
  }
  
--static struct drm_encoder *
--edp_connector_best_encoder(struct drm_connector *connector)
+-struct drm_encoder *omap_connector_attached_encoder(
+-		struct drm_connector *connector)
 -{
--	struct edp_connector *edp_connector = to_edp_connector(connector);
--
--	DBG("");
--	return edp_connector->edp->encoder;
+-	struct omap_connector *omap_connector = to_omap_connector(connector);
+-	return omap_connector->encoder;
 -}
 -
- static const struct drm_connector_funcs edp_connector_funcs = {
+ static const struct drm_connector_funcs omap_connector_funcs = {
  	.dpms = drm_atomic_helper_connector_dpms,
- 	.detect = edp_connector_detect,
-@@ -113,7 +104,6 @@ static const struct drm_connector_funcs edp_connector_funcs = {
- static const struct drm_connector_helper_funcs edp_connector_helper_funcs = {
- 	.get_modes = edp_connector_get_modes,
- 	.mode_valid = edp_connector_mode_valid,
--	.best_encoder = edp_connector_best_encoder,
+ 	.reset = drm_atomic_helper_connector_reset,
+@@ -276,7 +268,6 @@ static const struct drm_connector_funcs omap_connector_funcs = {
+ static const struct drm_connector_helper_funcs omap_connector_helper_funcs = {
+ 	.get_modes = omap_connector_get_modes,
+ 	.mode_valid = omap_connector_mode_valid,
+-	.best_encoder = omap_connector_attached_encoder,
  };
  
  /* initialize connector */
-diff --git a/drivers/gpu/drm/msm/hdmi/hdmi_connector.c b/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
-index b15d726..a2515b4 100644
---- a/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
-+++ b/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
-@@ -406,13 +406,6 @@ static int msm_hdmi_connector_mode_valid(struct drm_connector *connector,
- 	return 0;
- }
+@@ -296,7 +287,6 @@ struct drm_connector *omap_connector_init(struct drm_device *dev,
+ 		goto fail;
  
--static struct drm_encoder *
--msm_hdmi_connector_best_encoder(struct drm_connector *connector)
--{
--	struct hdmi_connector *hdmi_connector = to_hdmi_connector(connector);
--	return hdmi_connector->hdmi->encoder;
--}
--
- static const struct drm_connector_funcs hdmi_connector_funcs = {
- 	.dpms = drm_atomic_helper_connector_dpms,
- 	.detect = hdmi_connector_detect,
-@@ -426,7 +419,6 @@ static const struct drm_connector_funcs hdmi_connector_funcs = {
- static const struct drm_connector_helper_funcs msm_hdmi_connector_helper_funcs = {
- 	.get_modes = msm_hdmi_connector_get_modes,
- 	.mode_valid = msm_hdmi_connector_mode_valid,
--	.best_encoder = msm_hdmi_connector_best_encoder,
- };
+ 	omap_connector->dssdev = dssdev;
+-	omap_connector->encoder = encoder;
  
- /* initialize connector */
-diff --git a/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c b/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
-index 2648cd7..353429b 100644
---- a/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
-+++ b/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
-@@ -90,14 +90,6 @@ static int mdp4_lvds_connector_mode_valid(struct drm_connector *connector,
- 	return MODE_OK;
- }
+ 	connector = &omap_connector->base;
  
--static struct drm_encoder *
--mdp4_lvds_connector_best_encoder(struct drm_connector *connector)
--{
--	struct mdp4_lvds_connector *mdp4_lvds_connector =
--			to_mdp4_lvds_connector(connector);
--	return mdp4_lvds_connector->encoder;
--}
--
- static const struct drm_connector_funcs mdp4_lvds_connector_funcs = {
- 	.dpms = drm_atomic_helper_connector_dpms,
- 	.detect = mdp4_lvds_connector_detect,
-@@ -111,7 +103,6 @@ static const struct drm_connector_funcs mdp4_lvds_connector_funcs = {
- static const struct drm_connector_helper_funcs mdp4_lvds_connector_helper_funcs = {
- 	.get_modes = mdp4_lvds_connector_get_modes,
- 	.mode_valid = mdp4_lvds_connector_mode_valid,
--	.best_encoder = mdp4_lvds_connector_best_encoder,
- };
- 
- /* initialize connector */
 -- 
 2.7.4
