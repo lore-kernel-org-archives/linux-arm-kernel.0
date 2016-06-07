@@ -1,50 +1,71 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue, 7 Jun 2016 09:50:45 +0100
-Subject: [STLinux Kernel] [PATCH] ARM: dts: STi: stih407-family: Disable
- reserved-memory co-processor nodes
-In-Reply-To: <20160607083724.18599-1-lee.jones@linaro.org>
-References: <20160607083724.18599-1-lee.jones@linaro.org>
-Message-ID: <20160607085045.GA23181@griffinp-ThinkPad-X1-Carbon-2nd>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 7 Jun 2016 10:56:40 +0200
+Subject: Platform-specific suspend/resume code in drivers
+Message-ID: <57568C48.709@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Jun 2016, Lee Jones wrote:
+Hello everyone,
 
-> This patch fixes a non-booting issue in Mainline.
-> 
-> When booting with a compressed kernel, we need to be careful how we
-> populate memory close to DDR start.  AUTO_ZRELADDR is enabled by default
-> in multi-arch enabled configurations, which place some restrictions on
-> where the kernel is placed and where it will be uncompressed to on boot.
-> 
-> AUTO_ZRELADDR takes the decompressor code's start address and masks out
-> the bottom 28 bits to obtain an address to uncompress the kernel to
-> (thus a load address of 0x42000000 means that the kernel will be
-> uncompressed to 0x40000000 i.e. DDR START on this platform).
-> 
-> Even changing the load address to after the co-processor's shared memory
-> won't render a booting platform, since the AUTO_ZRELADDR algorithm still
-> ensures the kernel is uncompressed into memory shared with the first
-> co-processor (0x40000000).
-> 
-> Another option would be to move loading to 0x4A000000, since this will
-> mean the decompressor will decompress the kernel to 0x48000000. However,
-> this would mean a large chunk (0x44000000 => 0x48000000 (64MB)) of
-> memory would essentially be wasted for no good reason.
-> 
-> Until we can work with ST to find a suitable memory location to
-> relocate co-processor shared memory, let's disable the shared memory
-> nodes.  This will ensure a working platform in the mean time.
-> 
-> NB: The more observant of you will notice that we're leaving the DMU
-> shared memory node enabled; this is because a) it is the only one in
-> active use at the time of this writing and b) it is not affected by
-> the current default behaviour which is causing issues.
-> 
-> Fixes: fe135c6 (ARM: dts: STiH407: Move over to using the 'reserved-memory' API for obtaining DMA memory)
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/boot/dts/stih407-family.dtsi | 3 +++
->  1 file changed, 3 insertions(+)
+I want to implement system-wide suspend-to-RAM on my platform
+(an ARM Cortex A9 based SoC).
 
-Reviewed-by Peter Griffin <peter.griffin@linaro.org>
+I'm hoping some of you can clear some of my confusion :-(
+
+AFAIU, what happens to the hardware in the suspended state is
+very board/platform specific. The SoC may stop some clocks;
+it may even cut the power to some parts of the chip.
+
+AFAIU, once power is cut, the value of internal and visible
+registers (called "state" or "context" IIUC) is lost.
+
+Therefore, each driver is supposed to either
+
+1) save context on suspend & restore it on resume, or
+2) re-initialize the device on resume (if context is unimportant)
+
+Is that correct?
+
+(Note: Kevin Hilman mentioned using a feature called "regmap" to
+help in saving/restoring context.)
+
+Documentation/power/devices.txt mentions putting such save/restore
+code in suspend_late/resume_early callbacks. Is that the preferred
+solution today?
+
+Should these routines be guarded by #ifdef CONFIG_PM or #ifdef CONFIG_SUSPEND ?
+
+Another point of confusion for me is this: drivers are supposed to
+be shared among platforms, right? So my platform-specific suspend
+code should be enabled only if my platform is detected at run-time?
+
+So this means I need to add in the probe function, for every driver
+my platform uses:
+
+  if (platform == MY_PLATFORM) {
+    ops.suspend = my_suspend;
+    ops.resume  = my_resume;
+  }
+
+Is that correct?
+
+
+While I'm listing the points I don't understand... It seems Linux
+handles suspend/resume "transparently". I mean the CPU calls all
+the functions leading to the suspend action, then when the system
+comes back online, it continues at the next instruction, as if
+nothing had happened. So the stack and registers need to be exactly
+in the same state.
+
+But on my system, the firmware expects a return address for *where*
+to return on resume. Should I pass it the next instruction pointer?
+The address of the resume function?
+
+I see arch/arm/kernel/psci_smp.c seems to have the same notion.
+=> drivers/firmware/psci.c
+
+References:
+arch/arm/kernel/suspend.c
+kernel/power/suspend.c
+
+Regards.
