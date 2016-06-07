@@ -1,87 +1,42 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Tue, 7 Jun 2016 15:34:25 +0100
-Subject: HDLCD crashes with 6d910bfa809e
-In-Reply-To: <5756D602.4090305@arm.com>
-References: <5756B8A8.8000902@arm.com>
- <20160607133535.GA1165@e106497-lin.cambridge.arm.com>
- <5756D602.4090305@arm.com>
-Message-ID: <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 07 Jun 2016 07:35:56 -0700
+Subject: [PATCH v10 2/4] tee: generic TEE subsystem
+In-Reply-To: <20160607105015.GA18132@ermac>
+References: <1464784888-19854-1-git-send-email-jens.wiklander@linaro.org>
+ <1464784888-19854-3-git-send-email-jens.wiklander@linaro.org>
+ <5755EECA.6040606@ti.com> <20160607105015.GA18132@ermac>
+Message-ID: <1465310156.25087.19.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 03:11:14PM +0100, Robin Murphy wrote:
-> Hi Liviu,
-> 
-> On 07/06/16 14:35, liviu.dudau at arm.com wrote:
-> >On Tue, Jun 07, 2016 at 01:06:00PM +0100, Robin Murphy wrote:
-> >>Having just inadvertently merged -next into my working branch, I find
-> >>dev6d910bfa809e ("drm/hlcd: Use lockless gem BO free callback") adversely
-> >>affecting my board's ability to boot ;)
-> >>
-> >>Since I (intentionally) don't have sufficient CMA to create a framebuffer,
-> >>drm_gem_cma_create() fails, unconditionally calls the now-NULL
-> >>drm->driver->gem_free_object() in its cleanup path, and fiery death
-> >>ensues...
-> >
-> >Thanks for reporting this. What other changes other than reducing the CMA
-> >allocation size do you have that I might need in order to reproduce this?
-> 
-> I've just confirmed a plain checkout of next-20160602, using arm64 defconfig
-> + DRM + HDLCD + TDA998X and CMA_SIZE_MBYTES=1, booted on a Juno, does the
-> job:
-> 
-> [    3.032402] hdlcd 7ff60000.hdlcd: bound 0-0070 (ops tda998x_ops)
-> [    3.038388] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
-> [    3.044970] [drm] No driver support for vblank timestamp query.
-> [    3.076973] hdlcd 7ff60000.hdlcd: failed to allocate buffer with size
-> 7680000
-> [    3.084081] Bad mode in Synchronous Abort handler detected, code
-> 0x86000004 -- IABT (current EL)
-> [    3.092815] CPU: 3 PID: 6 Comm: kworker/u12:0 Not tainted
-> 4.7.0-rc1-next-20160602 #686
-> [    3.100682] Hardware name: ARM Juno development board (r1) (DT)
-> [    3.106567] Workqueue: deferwq deferred_probe_work_func
-> [    3.111761] task: ffff8009768a3e80 ti: ffff8009768e8000 task.ti:
-> ffff8009768e8000
-> [    3.119198] PC is at 0x0
-> [    3.121720] LR is at drm_gem_cma_create+0x128/0x130
-> ...and so on.
-> 
-> Today's -next, on the other hand, dodges the bullet entirely:
-> 
-> [    2.903645] [drm] found ARM HDLCD version r0p0
-> [    2.908122] hdlcd 7ff60000.hdlcd: master bind failed: -22
-> [    2.913505] tda998x: probe of 0-0070 failed with error -22
-> [    2.919141] [drm] found ARM HDLCD version r0p0
-> [    2.923609] hdlcd 7ff50000.hdlcd: master bind failed: -22
-> [    2.928991] tda998x: probe of 0-0071 failed with error -22
+On Tue, 2016-06-07 at 12:50 +0200, Jens Wiklander wrote:
+> On Mon, Jun 06, 2016 at 04:44:42PM -0500, Nishanth Menon wrote:
+> > 
+> > On 06/01/2016 07:41 AM, Jens Wiklander wrote:
+> > few minor comments below.
+> > 
+> > I see the patch generated (with --strict):
+> > > 
+> > > CHECK: Alignment should match open parenthesis
+> > > #512: FILE: drivers/tee/tee.c:375:
+> > > +static int tee_ioctl_close_session(struct tee_context *ctx,
+> > > +??????????????struct tee_ioctl_close_session_arg __user *uarg)
+> > > CHECK: Alignment should match open parenthesis
+> > > #1607: FILE: drivers/tee/tee_shm_pool.c:103:
+> > > +struct tee_shm_pool *tee_shm_pool_alloc_res_mem(struct device *dev,
+> > > +??????????????????????struct tee_shm_pool_mem_info *priv_info,
+> > > CHECK: Alignment should match open parenthesis
+> The alternative is to format it as:
+> struct tee_shm_pool *tee_shm_pool_alloc_res_mem(struct device *dev,
+> ????????????????????????????????????????????????struct tee_shm_pool_mem_info
+> ????????????????????????????????????????????????????????*priv_info,
+> ????????????????????????????????????????????????struct tee_shm_pool_mem_info
+> ????????????????????????????????????????????????????????*dmabuf_info)
+> But that is a bit awkward. I'd like to keep it as it is if you don't mind.
 
-OK, the problem is that commit 59ce4039727ef40 has changed the behaviour from when
-there is no "memory-region" phandle in the DT: before it used to return -ENODEV, now
-it returns -EINVAL.
+another style uses a separate line for the return type
 
-Marek, I quite liked the old behaviour to detect if the DT had the optional (from
-my driver's point of view) "memory-region" phandle. Plus the check for dev is superfluous
-when using of_reserved_mem_device_init() as that uses dev->of_node for np so it would
-crash before the check anyway. Maybe move the check there?
-
-Until then I suggest reverting the 59ce4039727ef40 commit.
-
-Best regards,
-Liviu
-
-> 
-> Oh well...
-> 
-> Robin.
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+struct tee_shm_pool *
+tee_shm_pool_alloc_res_mem(struct device *dev,
+			? ?struct tee_shm_pool_mem_info *priv_info,
+			? ?struct tee_shm_pool_mem_info *dmabuf_info)
