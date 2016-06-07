@@ -1,41 +1,33 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 17:49:09 +0100
-Subject: [PATCH] ata: sata_mv: fix mis-conversion in mv_write_cached_reg()
-Message-ID: <1465318149-21029-1-git-send-email-ben.dooks@codethink.co.uk>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 7 Jun 2016 17:50:44 +0100
+Subject: shared resources in AMP between Cortex-A9 and Cortex-M4
+In-Reply-To: <20160607162545.GX26768@pengutronix.de>
+References: <20160607162545.GX26768@pengutronix.de>
+Message-ID: <5756FB64.6060207@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the signed issue in mv_write_cached_reg() where the laddr
-is assigned from a (long)addr instead of (unsigned long)addr.
 
-Fixes the following warnings:
 
-drivers/ata/sata_mv.c:989:26: warning: cast removes address space of expression
-drivers/ata/sata_mv.c:989:26: warning: cast removes address space of expression
-drivers/ata/sata_mv.c:989:26: warning: cast removes address space of expression
-drivers/ata/sata_mv.c:989:26: warning: cast removes address space of expression
+On 07/06/16 17:25, Uwe Kleine-K?nig wrote:
+> Hello Stefan,
+>
+> I'm currently trying to get Linux running on the M4 of an i.MX6 Solo X
+> and found you describing doing this on the Vybrid already[1].
+>
+> I see the problem that clk and pinmux must be used by both cores. Did
+> you solve this for your Vybrid experiments? And if so, how did it work?
+>
+> Having two drivers on the same IP is racy at best and using some kind of
+> inter cpu communication to let (say) the A9 enable the clks for the M4
+> sounds like overkill.
+>
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Tejun Heo <tj@kernel.org>
-Cc: linux-ide at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/ata/sata_mv.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+IMO it should be other way around. In-fact few latest platforms(with
+performant Cortex-A cores) have dedicated Cortex-M core to do such
+system control and power management as it are low power and mostly
+always on.
 
-diff --git a/drivers/ata/sata_mv.c b/drivers/ata/sata_mv.c
-index bd74ee5..745489a 100644
---- a/drivers/ata/sata_mv.c
-+++ b/drivers/ata/sata_mv.c
-@@ -986,7 +986,7 @@ static inline void mv_write_cached_reg(void __iomem *addr, u32 *old, u32 new)
- 		 * Looks like a lot of fuss, but it avoids an unnecessary
- 		 * +1 usec read-after-write delay for unaffected registers.
- 		 */
--		laddr = (long)addr & 0xffff;
-+		laddr = (unsigned long)addr & 0xffff;
- 		if (laddr >= 0x300 && laddr <= 0x33c) {
- 			laddr &= 0x000f;
- 			if (laddr == 0x4 || laddr == 0xc) {
 -- 
-2.8.1
+Regards,
+Sudeep
