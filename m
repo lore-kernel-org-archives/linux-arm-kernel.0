@@ -1,795 +1,414 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue,  7 Jun 2016 21:53:04 +0300
-Subject: [PATCH 3/4] ARM: i.MX: Remove i.MX1 non-DT support
-In-Reply-To: <1465325585-1598-1-git-send-email-shc_work@mail.ru>
-References: <1465325585-1598-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465325585-1598-3-git-send-email-shc_work@mail.ru>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 7 Jun 2016 14:55:32 -0400
+Subject: [PATCH 17/34] clk: maxgen: Migrate to clk_hw based OF and
+ registration APIs
+In-Reply-To: <CABxcv=mWdwPrGRrP7ay=2FBxzoew6yBdfjZNvgFeDGACnQZdcQ@mail.gmail.com>
+References: <20160601231533.9354-1-stephen.boyd@linaro.org>
+ <20160601231533.9354-18-stephen.boyd@linaro.org>
+ <CABxcv=mWdwPrGRrP7ay=2FBxzoew6yBdfjZNvgFeDGACnQZdcQ@mail.gmail.com>
+Message-ID: <665a9824-b0c5-9eb3-d4b6-4821204d5db0@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes registration helpers and support files,
-used for non-DT i.MX1 targets.
+On 06/07/2016 02:50 PM, Javier Martinez Canillas wrote:
+> Hello Stephen,
+> 
+> On Wed, Jun 1, 2016 at 7:15 PM, Stephen Boyd <stephen.boyd@linaro.org> wrote:
+>> Now that we have clk_hw based provider APIs to register clks, we
+>> can get rid of struct clk pointers while registering clks in
+>> these drivers, allowing us to move closer to a clear split of
+>> consumer and provider clk APIs.
+>>
+>> Cc: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> 
+> This email address doesn't exist anymore, you can use
+> javier at osg.samsung.com instead.
+> 
+>> Signed-off-by: Stephen Boyd <stephen.boyd@linaro.org>
+>> ---
+>>
+>> See commit 58657d189a2f and it's children for details on this
+>> new registration API.
+>>
+> 
+> I tried this patch on top of linux-next and my Peach Pi Chromebook
+> (that has a max77802 chip) failed to boot. Following is the relevant
+> parts from the boot log:
+> 
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/mach-imx/Kconfig                     |   1 -
- arch/arm/mach-imx/Makefile                    |   1 -
- arch/arm/mach-imx/common.h                    |   5 -
- arch/arm/mach-imx/devices-imx1.h              |  30 -----
- arch/arm/mach-imx/devices/devices-common.h    |  12 --
- arch/arm/mach-imx/devices/platform-imx-fb.c   |   5 -
- arch/arm/mach-imx/devices/platform-imx-i2c.c  |   5 -
- arch/arm/mach-imx/devices/platform-imx-uart.c |  37 ------
- arch/arm/mach-imx/devices/platform-spi_imx.c  |   9 --
- arch/arm/mach-imx/hardware.h                  |   1 -
- arch/arm/mach-imx/imx1-dt.c                   |  23 +++-
- arch/arm/mach-imx/iomux-mx1.h                 | 155 -----------------------
- arch/arm/mach-imx/mm-imx1.c                   |  67 ----------
- arch/arm/mach-imx/mx1.h                       | 172 --------------------------
- drivers/clk/imx/clk-imx1.c                    |  46 +------
- 15 files changed, 26 insertions(+), 543 deletions(-)
- delete mode 100644 arch/arm/mach-imx/devices-imx1.h
- delete mode 100644 arch/arm/mach-imx/iomux-mx1.h
- delete mode 100644 arch/arm/mach-imx/mm-imx1.c
- delete mode 100644 arch/arm/mach-imx/mx1.h
+It seems the mailer did a mess with the line wrapping so here's another attempt:
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 1b7905a..22d06f7 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -70,7 +70,6 @@ config ARCH_MXC_IOMUX_V3
- config SOC_IMX1
- 	bool
- 	select CPU_ARM920T
--	select IMX_HAVE_IOMUX_V1
- 	select MXC_AVIC
- 	select PINCTRL_IMX1
- 
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 28d8d73..d50689d 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -1,6 +1,5 @@
- obj-y := cpu.o system.o irq-common.o
- 
--obj-$(CONFIG_SOC_IMX1) += mm-imx1.o
- obj-$(CONFIG_SOC_IMX21) += mm-imx21.o
- 
- obj-$(CONFIG_SOC_IMX25) += cpu-imx25.o mach-imx25.o pm-imx25.o
-diff --git a/arch/arm/mach-imx/common.h b/arch/arm/mach-imx/common.h
-index 58a3846..75bd71a 100644
---- a/arch/arm/mach-imx/common.h
-+++ b/arch/arm/mach-imx/common.h
-@@ -21,30 +21,25 @@ struct device_node;
- enum mxc_cpu_pwr_mode;
- struct of_device_id;
- 
--void mx1_map_io(void);
- void mx21_map_io(void);
- void mx27_map_io(void);
- void mx31_map_io(void);
- void mx35_map_io(void);
--void imx1_init_early(void);
- void imx21_init_early(void);
- void imx27_init_early(void);
- void imx31_init_early(void);
- void imx35_init_early(void);
- void mxc_init_irq(void __iomem *);
- void tzic_init_irq(void);
--void mx1_init_irq(void);
- void mx21_init_irq(void);
- void mx27_init_irq(void);
- void mx31_init_irq(void);
- void mx35_init_irq(void);
--void imx1_soc_init(void);
- void imx21_soc_init(void);
- void imx27_soc_init(void);
- void imx31_soc_init(void);
- void imx35_soc_init(void);
- void epit_timer_init(void __iomem *base, int irq);
--int mx1_clocks_init(unsigned long fref);
- int mx21_clocks_init(unsigned long lref, unsigned long fref);
- int mx27_clocks_init(unsigned long fref);
- int mx31_clocks_init(unsigned long fref);
-diff --git a/arch/arm/mach-imx/devices-imx1.h b/arch/arm/mach-imx/devices-imx1.h
-deleted file mode 100644
-index f9b5afc..0000000
---- a/arch/arm/mach-imx/devices-imx1.h
-+++ /dev/null
-@@ -1,30 +0,0 @@
--/*
-- * Copyright (C) 2010 Pengutronix
-- * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or modify it under
-- * the terms of the GNU General Public License version 2 as published by the
-- * Free Software Foundation.
-- */
--#include "devices/devices-common.h"
--
--extern const struct imx_imx_fb_data imx1_imx_fb_data;
--#define imx1_add_imx_fb(pdata) \
--    imx_add_imx_fb(&imx1_imx_fb_data, pdata)
--
--extern const struct imx_imx_i2c_data imx1_imx_i2c_data;
--#define imx1_add_imx_i2c(pdata)		\
--	imx_add_imx_i2c(&imx1_imx_i2c_data, pdata)
--
--extern const struct imx_imx_uart_3irq_data imx1_imx_uart_data[];
--#define imx1_add_imx_uart(id, pdata)	\
--	imx_add_imx_uart_3irq(&imx1_imx_uart_data[id], pdata)
--#define imx1_add_imx_uart0(pdata)	imx1_add_imx_uart(0, pdata)
--#define imx1_add_imx_uart1(pdata)	imx1_add_imx_uart(1, pdata)
--
--extern const struct imx_spi_imx_data imx1_cspi_data[];
--#define imx1_add_cspi(id, pdata)   \
--	imx_add_spi_imx(&imx1_cspi_data[id], pdata)
--
--#define imx1_add_spi_imx0(pdata) imx1_add_cspi(0, pdata)
--#define imx1_add_spi_imx1(pdata) imx1_add_cspi(1, pdata)
-diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
-index 09cebd8..6920e35 100644
---- a/arch/arm/mach-imx/devices/devices-common.h
-+++ b/arch/arm/mach-imx/devices/devices-common.h
-@@ -154,18 +154,6 @@ struct platform_device *__init imx_add_imx_ssi(
- 		const struct imx_ssi_platform_data *pdata);
- 
- #include <linux/platform_data/serial-imx.h>
--struct imx_imx_uart_3irq_data {
--	int id;
--	resource_size_t iobase;
--	resource_size_t iosize;
--	resource_size_t irqrx;
--	resource_size_t irqtx;
--	resource_size_t irqrts;
--};
--struct platform_device *__init imx_add_imx_uart_3irq(
--		const struct imx_imx_uart_3irq_data *data,
--		const struct imxuart_platform_data *pdata);
--
- struct imx_imx_uart_1irq_data {
- 	int id;
- 	resource_size_t iobase;
-diff --git a/arch/arm/mach-imx/devices/platform-imx-fb.c b/arch/arm/mach-imx/devices/platform-imx-fb.c
-index 7df6328..aa00272 100644
---- a/arch/arm/mach-imx/devices/platform-imx-fb.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-fb.c
-@@ -19,11 +19,6 @@
- 		.irq = soc ## _INT_LCDC,				\
- 	}
- 
--#ifdef CONFIG_SOC_IMX1
--const struct imx_imx_fb_data imx1_imx_fb_data __initconst =
--	imx_imx_fb_data_entry_single(MX1, "imx1-fb", SZ_4K);
--#endif /* ifdef CONFIG_SOC_IMX1 */
--
- #ifdef CONFIG_SOC_IMX21
- const struct imx_imx_fb_data imx21_imx_fb_data __initconst =
- 	imx_imx_fb_data_entry_single(MX21, "imx21-fb", SZ_4K);
-diff --git a/arch/arm/mach-imx/devices/platform-imx-i2c.c b/arch/arm/mach-imx/devices/platform-imx-i2c.c
-index ae97915..9822bed 100644
---- a/arch/arm/mach-imx/devices/platform-imx-i2c.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-i2c.c
-@@ -21,11 +21,6 @@
- #define imx_imx_i2c_data_entry(soc, _devid, _id, _hwid, _size)		\
- 	[_id] = imx_imx_i2c_data_entry_single(soc, _devid, _id, _hwid, _size)
- 
--#ifdef CONFIG_SOC_IMX1
--const struct imx_imx_i2c_data imx1_imx_i2c_data __initconst =
--	imx_imx_i2c_data_entry_single(MX1, "imx1-i2c", 0, , SZ_4K);
--#endif /* ifdef CONFIG_SOC_IMX1 */
--
- #ifdef CONFIG_SOC_IMX21
- const struct imx_imx_i2c_data imx21_imx_i2c_data __initconst =
- 	imx_imx_i2c_data_entry_single(MX21, "imx21-i2c", 0, , SZ_4K);
-diff --git a/arch/arm/mach-imx/devices/platform-imx-uart.c b/arch/arm/mach-imx/devices/platform-imx-uart.c
-index 6962cff..e3c89e9 100644
---- a/arch/arm/mach-imx/devices/platform-imx-uart.c
-+++ b/arch/arm/mach-imx/devices/platform-imx-uart.c
-@@ -27,15 +27,6 @@
- 		.irq = soc ## _INT_UART ## _hwid,			\
- 	}
- 
--#ifdef CONFIG_SOC_IMX1
--const struct imx_imx_uart_3irq_data imx1_imx_uart_data[] __initconst = {
--#define imx1_imx_uart_data_entry(_id, _hwid)				\
--	imx_imx_uart_3irq_data_entry(MX1, _id, _hwid, 0xd0)
--	imx1_imx_uart_data_entry(0, 1),
--	imx1_imx_uart_data_entry(1, 2),
--};
--#endif /* ifdef CONFIG_SOC_IMX1 */
--
- #ifdef CONFIG_SOC_IMX21
- const struct imx_imx_uart_1irq_data imx21_imx_uart_data[] __initconst = {
- #define imx21_imx_uart_data_entry(_id, _hwid)				\
-@@ -82,34 +73,6 @@ const struct imx_imx_uart_1irq_data imx35_imx_uart_data[] __initconst = {
- };
- #endif /* ifdef CONFIG_SOC_IMX35 */
- 
--struct platform_device *__init imx_add_imx_uart_3irq(
--		const struct imx_imx_uart_3irq_data *data,
--		const struct imxuart_platform_data *pdata)
--{
--	struct resource res[] = {
--		{
--			.start = data->iobase,
--			.end = data->iobase + data->iosize - 1,
--			.flags = IORESOURCE_MEM,
--		}, {
--			.start = data->irqrx,
--			.end = data->irqrx,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->irqtx,
--			.end = data->irqtx,
--			.flags = IORESOURCE_IRQ,
--		}, {
--			.start = data->irqrts,
--			.end = data->irqrx,
--			.flags = IORESOURCE_IRQ,
--		},
--	};
--
--	return imx_add_platform_device("imx1-uart", data->id, res,
--			ARRAY_SIZE(res), pdata, sizeof(*pdata));
--}
--
- struct platform_device *__init imx_add_imx_uart_1irq(
- 		const struct imx_imx_uart_1irq_data *data,
- 		const struct imxuart_platform_data *pdata)
-diff --git a/arch/arm/mach-imx/devices/platform-spi_imx.c b/arch/arm/mach-imx/devices/platform-spi_imx.c
-index 5e9707b..d93c446 100644
---- a/arch/arm/mach-imx/devices/platform-spi_imx.c
-+++ b/arch/arm/mach-imx/devices/platform-spi_imx.c
-@@ -21,15 +21,6 @@
- #define imx_spi_imx_data_entry(soc, type, devid, id, hwid, size)	\
- 	[id] = imx_spi_imx_data_entry_single(soc, type, devid, id, hwid, size)
- 
--#ifdef CONFIG_SOC_IMX1
--const struct imx_spi_imx_data imx1_cspi_data[] __initconst = {
--#define imx1_cspi_data_entry(_id, _hwid) \
--	imx_spi_imx_data_entry(MX1, CSPI, "imx1-cspi", _id, _hwid, SZ_4K)
--	imx1_cspi_data_entry(0, 1),
--	imx1_cspi_data_entry(1, 2),
--};
--#endif
--
- #ifdef CONFIG_SOC_IMX21
- const struct imx_spi_imx_data imx21_cspi_data[] __initconst = {
- #define imx21_cspi_data_entry(_id, _hwid)                            \
-diff --git a/arch/arm/mach-imx/hardware.h b/arch/arm/mach-imx/hardware.h
-index d737f95..a42a6df 100644
---- a/arch/arm/mach-imx/hardware.h
-+++ b/arch/arm/mach-imx/hardware.h
-@@ -112,7 +112,6 @@
- #include "mx2x.h"
- #include "mx21.h"
- #include "mx27.h"
--#include "mx1.h"
- 
- #define imx_map_entry(soc, name, _type)	{				\
- 	.virtual = soc ## _IO_P2V(soc ## _ ## name ## _BASE_ADDR),	\
-diff --git a/arch/arm/mach-imx/imx1-dt.c b/arch/arm/mach-imx/imx1-dt.c
-index 6f915b0..de5ab8d 100644
---- a/arch/arm/mach-imx/imx1-dt.c
-+++ b/arch/arm/mach-imx/imx1-dt.c
-@@ -9,8 +9,27 @@
- 
- #include <linux/of_platform.h>
- #include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
- 
- #include "common.h"
-+#include "hardware.h"
-+
-+#define MX1_AVIC_ADDR	0x00223000
-+
-+static void __init imx1_init_early(void)
-+{
-+	mxc_set_cpu_type(MXC_CPU_MX1);
-+}
-+
-+static void __init imx1_init_irq(void)
-+{
-+	void __iomem *avic_addr;
-+
-+	avic_addr = ioremap(MX1_AVIC_ADDR, SZ_4K);
-+	WARN_ON(!avic_addr);
-+
-+	mxc_init_irq(avic_addr);
-+}
- 
- static const char * const imx1_dt_board_compat[] __initconst = {
- 	"fsl,imx1",
-@@ -18,9 +37,9 @@ static const char * const imx1_dt_board_compat[] __initconst = {
- };
- 
- DT_MACHINE_START(IMX1_DT, "Freescale i.MX1 (Device Tree Support)")
--	.map_io		= mx1_map_io,
-+	.map_io		= debug_ll_io_init,
- 	.init_early	= imx1_init_early,
--	.init_irq	= mx1_init_irq,
-+	.init_irq	= imx1_init_irq,
- 	.dt_compat	= imx1_dt_board_compat,
- 	.restart	= mxc_restart,
- MACHINE_END
-diff --git a/arch/arm/mach-imx/iomux-mx1.h b/arch/arm/mach-imx/iomux-mx1.h
-deleted file mode 100644
-index 95f4681..0000000
---- a/arch/arm/mach-imx/iomux-mx1.h
-+++ /dev/null
-@@ -1,155 +0,0 @@
--/*
-- * Copyright (C) 2008 by Sascha Hauer <kernel@pengutronix.de>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA 02110-1301, USA.
-- */
--#ifndef __MACH_IOMUX_MX1_H__
--#define __MACH_IOMUX_MX1_H__
--
--#include "iomux-v1.h"
--
--#define PA0_AIN_SPI2_CLK	(GPIO_PORTA | GPIO_AIN | GPIO_OUT | 0)
--#define PA0_AF_ETMTRACESYNC	(GPIO_PORTA | GPIO_AF | 0)
--#define PA1_AOUT_SPI2_RXD	(GPIO_PORTA | GPIO_AOUT | GPIO_IN | 1)
--#define PA1_PF_TIN		(GPIO_PORTA | GPIO_PF | 1)
--#define PA2_PF_PWM0		(GPIO_PORTA | GPIO_PF | GPIO_OUT | 2)
--#define PA3_PF_CSI_MCLK		(GPIO_PORTA | GPIO_PF | 3)
--#define PA4_PF_CSI_D0		(GPIO_PORTA | GPIO_PF | 4)
--#define PA5_PF_CSI_D1		(GPIO_PORTA | GPIO_PF | 5)
--#define PA6_PF_CSI_D2		(GPIO_PORTA | GPIO_PF | 6)
--#define PA7_PF_CSI_D3		(GPIO_PORTA | GPIO_PF | 7)
--#define PA8_PF_CSI_D4		(GPIO_PORTA | GPIO_PF | 8)
--#define PA9_PF_CSI_D5		(GPIO_PORTA | GPIO_PF | 9)
--#define PA10_PF_CSI_D6		(GPIO_PORTA | GPIO_PF | 10)
--#define PA11_PF_CSI_D7		(GPIO_PORTA | GPIO_PF | 11)
--#define PA12_PF_CSI_VSYNC	(GPIO_PORTA | GPIO_PF | 12)
--#define PA13_PF_CSI_HSYNC	(GPIO_PORTA | GPIO_PF | 13)
--#define PA14_PF_CSI_PIXCLK	(GPIO_PORTA | GPIO_PF | 14)
--#define PA15_PF_I2C_SDA		(GPIO_PORTA | GPIO_PF | GPIO_OUT | 15)
--#define PA16_PF_I2C_SCL		(GPIO_PORTA | GPIO_PF | GPIO_OUT | 16)
--#define PA17_AF_ETMTRACEPKT4	(GPIO_PORTA | GPIO_AF | 17)
--#define PA17_AIN_SPI2_SS	(GPIO_PORTA | GPIO_AIN | GPIO_OUT | 17)
--#define PA18_AF_ETMTRACEPKT5	(GPIO_PORTA | GPIO_AF | 18)
--#define PA19_AF_ETMTRACEPKT6	(GPIO_PORTA | GPIO_AF | 19)
--#define PA20_AF_ETMTRACEPKT7	(GPIO_PORTA | GPIO_AF | 20)
--#define PA21_PF_A0		(GPIO_PORTA | GPIO_PF | 21)
--#define PA22_PF_CS4		(GPIO_PORTA | GPIO_PF | 22)
--#define PA23_PF_CS5		(GPIO_PORTA | GPIO_PF | 23)
--#define PA24_PF_A16		(GPIO_PORTA | GPIO_PF | 24)
--#define PA24_AF_ETMTRACEPKT0	(GPIO_PORTA | GPIO_AF | 24)
--#define PA25_PF_A17		(GPIO_PORTA | GPIO_PF | 25)
--#define PA25_AF_ETMTRACEPKT1	(GPIO_PORTA | GPIO_AF | 25)
--#define PA26_PF_A18		(GPIO_PORTA | GPIO_PF | 26)
--#define PA26_AF_ETMTRACEPKT2	(GPIO_PORTA | GPIO_AF | 26)
--#define PA27_PF_A19		(GPIO_PORTA | GPIO_PF | 27)
--#define PA27_AF_ETMTRACEPKT3	(GPIO_PORTA | GPIO_AF | 27)
--#define PA28_PF_A20		(GPIO_PORTA | GPIO_PF | 28)
--#define PA28_AF_ETMPIPESTAT0	(GPIO_PORTA | GPIO_AF | 28)
--#define PA29_PF_A21		(GPIO_PORTA | GPIO_PF | 29)
--#define PA29_AF_ETMPIPESTAT1	(GPIO_PORTA | GPIO_AF | 29)
--#define PA30_PF_A22		(GPIO_PORTA | GPIO_PF | 30)
--#define PA30_AF_ETMPIPESTAT2	(GPIO_PORTA | GPIO_AF | 30)
--#define PA31_PF_A23		(GPIO_PORTA | GPIO_PF | 31)
--#define PA31_AF_ETMTRACECLK	(GPIO_PORTA | GPIO_AF | 31)
--#define PB8_PF_SD_DAT0		(GPIO_PORTB | GPIO_PF | GPIO_PUEN | 8)
--#define PB8_AF_MS_PIO		(GPIO_PORTB | GPIO_AF | 8)
--#define PB9_PF_SD_DAT1		(GPIO_PORTB | GPIO_PF | GPIO_PUEN | 9)
--#define PB9_AF_MS_PI1		(GPIO_PORTB | GPIO_AF | 9)
--#define PB10_PF_SD_DAT2		(GPIO_PORTB | GPIO_PF | GPIO_PUEN | 10)
--#define PB10_AF_MS_SCLKI	(GPIO_PORTB | GPIO_AF | 10)
--#define PB11_PF_SD_DAT3		(GPIO_PORTB | GPIO_PF | 11)
--#define PB11_AF_MS_SDIO		(GPIO_PORTB | GPIO_AF | 11)
--#define PB12_PF_SD_CLK		(GPIO_PORTB | GPIO_PF | 12)
--#define PB12_AF_MS_SCLK0	(GPIO_PORTB | GPIO_AF | 12)
--#define PB13_PF_SD_CMD		(GPIO_PORTB | GPIO_PF | GPIO_PUEN | 13)
--#define PB13_AF_MS_BS		(GPIO_PORTB | GPIO_AF | 13)
--#define PB14_AF_SSI_RXFS	(GPIO_PORTB | GPIO_AF | 14)
--#define PB15_AF_SSI_RXCLK	(GPIO_PORTB | GPIO_AF | 15)
--#define PB16_AF_SSI_RXDAT	(GPIO_PORTB | GPIO_AF | GPIO_IN | 16)
--#define PB17_AF_SSI_TXDAT	(GPIO_PORTB | GPIO_AF | GPIO_OUT | 17)
--#define PB18_AF_SSI_TXFS	(GPIO_PORTB | GPIO_AF | 18)
--#define PB19_AF_SSI_TXCLK	(GPIO_PORTB | GPIO_AF | 19)
--#define PB20_PF_USBD_AFE	(GPIO_PORTB | GPIO_PF | 20)
--#define PB21_PF_USBD_OE		(GPIO_PORTB | GPIO_PF | 21)
--#define PB22_PF_USBD_RCV	(GPIO_PORTB | GPIO_PF | 22)
--#define PB23_PF_USBD_SUSPND	(GPIO_PORTB | GPIO_PF | 23)
--#define PB24_PF_USBD_VP		(GPIO_PORTB | GPIO_PF | 24)
--#define PB25_PF_USBD_VM		(GPIO_PORTB | GPIO_PF | 25)
--#define PB26_PF_USBD_VPO	(GPIO_PORTB | GPIO_PF | 26)
--#define PB27_PF_USBD_VMO	(GPIO_PORTB | GPIO_PF | 27)
--#define PB28_PF_UART2_CTS	(GPIO_PORTB | GPIO_PF | GPIO_OUT | 28)
--#define PB29_PF_UART2_RTS	(GPIO_PORTB | GPIO_PF | GPIO_IN | 29)
--#define PB30_PF_UART2_TXD	(GPIO_PORTB | GPIO_PF | GPIO_OUT | 30)
--#define PB31_PF_UART2_RXD	(GPIO_PORTB | GPIO_PF | GPIO_IN | 31)
--#define PC3_PF_SSI_RXFS		(GPIO_PORTC | GPIO_PF | 3)
--#define PC4_PF_SSI_RXCLK	(GPIO_PORTC | GPIO_PF | 4)
--#define PC5_PF_SSI_RXDAT	(GPIO_PORTC | GPIO_PF | GPIO_IN | 5)
--#define PC6_PF_SSI_TXDAT	(GPIO_PORTC | GPIO_PF | GPIO_OUT | 6)
--#define PC7_PF_SSI_TXFS		(GPIO_PORTC | GPIO_PF | 7)
--#define PC8_PF_SSI_TXCLK	(GPIO_PORTC | GPIO_PF | 8)
--#define PC9_PF_UART1_CTS	(GPIO_PORTC | GPIO_PF | GPIO_OUT | 9)
--#define PC10_PF_UART1_RTS	(GPIO_PORTC | GPIO_PF | GPIO_IN | 10)
--#define PC11_PF_UART1_TXD	(GPIO_PORTC | GPIO_PF | GPIO_OUT | 11)
--#define PC12_PF_UART1_RXD	(GPIO_PORTC | GPIO_PF | GPIO_IN | 12)
--#define PC13_PF_SPI1_SPI_RDY	(GPIO_PORTC | GPIO_PF | 13)
--#define PC14_PF_SPI1_SCLK	(GPIO_PORTC | GPIO_PF | 14)
--#define PC15_PF_SPI1_SS		(GPIO_PORTC | GPIO_PF | 15)
--#define PC16_PF_SPI1_MISO	(GPIO_PORTC | GPIO_PF | 16)
--#define PC17_PF_SPI1_MOSI	(GPIO_PORTC | GPIO_PF | 17)
--#define PC24_BIN_UART3_RI	(GPIO_PORTC | GPIO_BIN | GPIO_OUT | 24)
--#define PC25_BIN_UART3_DSR	(GPIO_PORTC | GPIO_BIN | GPIO_OUT | 25)
--#define PC26_AOUT_UART3_DTR	(GPIO_PORTC | GPIO_AOUT | GPIO_IN | 26)
--#define PC27_BIN_UART3_DCD	(GPIO_PORTC | GPIO_BIN | GPIO_OUT | 27)
--#define PC28_BIN_UART3_CTS	(GPIO_PORTC | GPIO_BIN | GPIO_OUT | 28)
--#define PC29_AOUT_UART3_RTS	(GPIO_PORTC | GPIO_AOUT | GPIO_IN | 29)
--#define PC30_BIN_UART3_TX	(GPIO_PORTC | GPIO_BIN | 30)
--#define PC31_AOUT_UART3_RX	(GPIO_PORTC | GPIO_AOUT | GPIO_IN | 31)
--#define PD6_PF_LSCLK		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 6)
--#define PD7_PF_REV		(GPIO_PORTD | GPIO_PF | 7)
--#define PD7_AF_UART2_DTR	(GPIO_PORTD | GPIO_AF | GPIO_IN | 7)
--#define PD7_AIN_SPI2_SCLK	(GPIO_PORTD | GPIO_AIN | 7)
--#define PD8_PF_CLS		(GPIO_PORTD | GPIO_PF | 8)
--#define PD8_AF_UART2_DCD	(GPIO_PORTD | GPIO_AF | GPIO_OUT | 8)
--#define PD8_AIN_SPI2_SS		(GPIO_PORTD | GPIO_AIN | 8)
--#define PD9_PF_PS		(GPIO_PORTD | GPIO_PF | 9)
--#define PD9_AF_UART2_RI		(GPIO_PORTD | GPIO_AF | GPIO_OUT | 9)
--#define PD9_AOUT_SPI2_RXD	(GPIO_PORTD | GPIO_AOUT | GPIO_IN | 9)
--#define PD10_PF_SPL_SPR		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 10)
--#define PD10_AF_UART2_DSR	(GPIO_PORTD | GPIO_AF | GPIO_OUT | 10)
--#define PD10_AIN_SPI2_TXD	(GPIO_PORTD | GPIO_AIN | GPIO_OUT | 10)
--#define PD11_PF_CONTRAST	(GPIO_PORTD | GPIO_PF | GPIO_OUT | 11)
--#define PD12_PF_ACD_OE		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 12)
--#define PD13_PF_LP_HSYNC	(GPIO_PORTD | GPIO_PF | GPIO_OUT | 13)
--#define PD14_PF_FLM_VSYNC	(GPIO_PORTD | GPIO_PF | GPIO_OUT | 14)
--#define PD15_PF_LD0		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 15)
--#define PD16_PF_LD1		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 16)
--#define PD17_PF_LD2		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 17)
--#define PD18_PF_LD3		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 18)
--#define PD19_PF_LD4		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 19)
--#define PD20_PF_LD5		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 20)
--#define PD21_PF_LD6		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 21)
--#define PD22_PF_LD7		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 22)
--#define PD23_PF_LD8		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 23)
--#define PD24_PF_LD9		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 24)
--#define PD25_PF_LD10		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 25)
--#define PD26_PF_LD11		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 26)
--#define PD27_PF_LD12		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 27)
--#define PD28_PF_LD13		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 28)
--#define PD29_PF_LD14		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 29)
--#define PD30_PF_LD15		(GPIO_PORTD | GPIO_PF | GPIO_OUT | 30)
--#define PD31_PF_TMR2OUT		(GPIO_PORTD | GPIO_PF | 31)
--#define PD31_BIN_SPI2_TXD	(GPIO_PORTD | GPIO_BIN | 31)
--
--#endif /* ifndef __MACH_IOMUX_MX1_H__ */
-diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-deleted file mode 100644
-index e065fed..0000000
---- a/arch/arm/mach-imx/mm-imx1.c
-+++ /dev/null
-@@ -1,67 +0,0 @@
--/*
-- *  author: Sascha Hauer
-- *  Created: april 20th, 2004
-- *  Copyright: Synertronixx GmbH
-- *
-- *  Common code for i.MX1 machines
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--#include <linux/kernel.h>
--#include <linux/init.h>
--#include <linux/io.h>
--#include <linux/pinctrl/machine.h>
--
--#include <asm/mach/map.h>
--
--#include "common.h"
--#include "devices/devices-common.h"
--#include "hardware.h"
--#include "iomux-v1.h"
--
--static struct map_desc imx_io_desc[] __initdata = {
--	imx_map_entry(MX1, IO, MT_DEVICE),
--};
--
--void __init mx1_map_io(void)
--{
--	iotable_init(imx_io_desc, ARRAY_SIZE(imx_io_desc));
--}
--
--void __init imx1_init_early(void)
--{
--	mxc_set_cpu_type(MXC_CPU_MX1);
--	imx_iomuxv1_init(MX1_IO_ADDRESS(MX1_GPIO_BASE_ADDR),
--			MX1_NUM_GPIO_PORT);
--}
--
--void __init mx1_init_irq(void)
--{
--	mxc_init_irq(MX1_IO_ADDRESS(MX1_AVIC_BASE_ADDR));
--}
--
--void __init imx1_soc_init(void)
--{
--	mxc_arch_reset_init(MX1_IO_ADDRESS(MX1_WDT_BASE_ADDR));
--	mxc_device_init();
--
--	mxc_register_gpio("imx1-gpio", 0, MX1_GPIO1_BASE_ADDR, SZ_256,
--						MX1_GPIO_INT_PORTA, 0);
--	mxc_register_gpio("imx1-gpio", 1, MX1_GPIO2_BASE_ADDR, SZ_256,
--						MX1_GPIO_INT_PORTB, 0);
--	mxc_register_gpio("imx1-gpio", 2, MX1_GPIO3_BASE_ADDR, SZ_256,
--						MX1_GPIO_INT_PORTC, 0);
--	mxc_register_gpio("imx1-gpio", 3, MX1_GPIO4_BASE_ADDR, SZ_256,
--						MX1_GPIO_INT_PORTD, 0);
--	imx_add_imx_dma("imx1-dma", MX1_DMA_BASE_ADDR,
--			MX1_DMA_INT, MX1_DMA_ERR);
--	pinctrl_provide_dummies();
--}
-diff --git a/arch/arm/mach-imx/mx1.h b/arch/arm/mach-imx/mx1.h
-deleted file mode 100644
-index 45bd31c..0000000
---- a/arch/arm/mach-imx/mx1.h
-+++ /dev/null
-@@ -1,172 +0,0 @@
--/*
-- * Copyright (C) 1997,1998 Russell King
-- * Copyright (C) 1999 ARM Limited
-- * Copyright 2004-2007 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright (c) 2008 Paulius Zaleckas <paulius.zaleckas@teltonika.lt>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __MACH_MX1_H__
--#define __MACH_MX1_H__
--
--/*
-- * Memory map
-- */
--#define MX1_IO_BASE_ADDR	0x00200000
--#define MX1_IO_SIZE		SZ_1M
--
--#define MX1_CS0_PHYS		0x10000000
--#define MX1_CS0_SIZE		0x02000000
--
--#define MX1_CS1_PHYS		0x12000000
--#define MX1_CS1_SIZE		0x01000000
--
--#define MX1_CS2_PHYS		0x13000000
--#define MX1_CS2_SIZE		0x01000000
--
--#define MX1_CS3_PHYS		0x14000000
--#define MX1_CS3_SIZE		0x01000000
--
--#define MX1_CS4_PHYS		0x15000000
--#define MX1_CS4_SIZE		0x01000000
--
--#define MX1_CS5_PHYS		0x16000000
--#define MX1_CS5_SIZE		0x01000000
--
--/*
-- *  Register BASEs, based on OFFSETs
-- */
--#define MX1_AIPI1_BASE_ADDR		(0x00000 + MX1_IO_BASE_ADDR)
--#define MX1_WDT_BASE_ADDR		(0x01000 + MX1_IO_BASE_ADDR)
--#define MX1_TIM1_BASE_ADDR		(0x02000 + MX1_IO_BASE_ADDR)
--#define MX1_TIM2_BASE_ADDR		(0x03000 + MX1_IO_BASE_ADDR)
--#define MX1_RTC_BASE_ADDR		(0x04000 + MX1_IO_BASE_ADDR)
--#define MX1_LCDC_BASE_ADDR		(0x05000 + MX1_IO_BASE_ADDR)
--#define MX1_UART1_BASE_ADDR		(0x06000 + MX1_IO_BASE_ADDR)
--#define MX1_UART2_BASE_ADDR		(0x07000 + MX1_IO_BASE_ADDR)
--#define MX1_PWM_BASE_ADDR		(0x08000 + MX1_IO_BASE_ADDR)
--#define MX1_DMA_BASE_ADDR		(0x09000 + MX1_IO_BASE_ADDR)
--#define MX1_AIPI2_BASE_ADDR		(0x10000 + MX1_IO_BASE_ADDR)
--#define MX1_SIM_BASE_ADDR		(0x11000 + MX1_IO_BASE_ADDR)
--#define MX1_USBD_BASE_ADDR		(0x12000 + MX1_IO_BASE_ADDR)
--#define MX1_CSPI1_BASE_ADDR		(0x13000 + MX1_IO_BASE_ADDR)
--#define MX1_MMC_BASE_ADDR		(0x14000 + MX1_IO_BASE_ADDR)
--#define MX1_ASP_BASE_ADDR		(0x15000 + MX1_IO_BASE_ADDR)
--#define MX1_BTA_BASE_ADDR		(0x16000 + MX1_IO_BASE_ADDR)
--#define MX1_I2C_BASE_ADDR		(0x17000 + MX1_IO_BASE_ADDR)
--#define MX1_SSI_BASE_ADDR		(0x18000 + MX1_IO_BASE_ADDR)
--#define MX1_CSPI2_BASE_ADDR		(0x19000 + MX1_IO_BASE_ADDR)
--#define MX1_MSHC_BASE_ADDR		(0x1A000 + MX1_IO_BASE_ADDR)
--#define MX1_CCM_BASE_ADDR		(0x1B000 + MX1_IO_BASE_ADDR)
--#define MX1_SCM_BASE_ADDR		(0x1B804 + MX1_IO_BASE_ADDR)
--#define MX1_GPIO_BASE_ADDR		(0x1C000 + MX1_IO_BASE_ADDR)
--#define MX1_GPIO1_BASE_ADDR		(0x1C000 + MX1_IO_BASE_ADDR)
--#define MX1_GPIO2_BASE_ADDR		(0x1C100 + MX1_IO_BASE_ADDR)
--#define MX1_GPIO3_BASE_ADDR		(0x1C200 + MX1_IO_BASE_ADDR)
--#define MX1_GPIO4_BASE_ADDR		(0x1C300 + MX1_IO_BASE_ADDR)
--#define MX1_EIM_BASE_ADDR		(0x20000 + MX1_IO_BASE_ADDR)
--#define MX1_SDRAMC_BASE_ADDR		(0x21000 + MX1_IO_BASE_ADDR)
--#define MX1_MMA_BASE_ADDR		(0x22000 + MX1_IO_BASE_ADDR)
--#define MX1_AVIC_BASE_ADDR		(0x23000 + MX1_IO_BASE_ADDR)
--#define MX1_CSI_BASE_ADDR		(0x24000 + MX1_IO_BASE_ADDR)
--
--/* macro to get at IO space when running virtually */
--#define MX1_IO_P2V(x)			IMX_IO_P2V(x)
--#define MX1_IO_ADDRESS(x)		IOMEM(MX1_IO_P2V(x))
--
--/* fixed interrput numbers */
--#include <asm/irq.h>
--#define MX1_INT_SOFTINT		(NR_IRQS_LEGACY + 0)
--#define MX1_INT_CSI		(NR_IRQS_LEGACY + 6)
--#define MX1_DSPA_MAC_INT	(NR_IRQS_LEGACY + 7)
--#define MX1_DSPA_INT		(NR_IRQS_LEGACY + 8)
--#define MX1_COMP_INT		(NR_IRQS_LEGACY + 9)
--#define MX1_MSHC_XINT		(NR_IRQS_LEGACY + 10)
--#define MX1_GPIO_INT_PORTA	(NR_IRQS_LEGACY + 11)
--#define MX1_GPIO_INT_PORTB	(NR_IRQS_LEGACY + 12)
--#define MX1_GPIO_INT_PORTC	(NR_IRQS_LEGACY + 13)
--#define MX1_INT_LCDC		(NR_IRQS_LEGACY + 14)
--#define MX1_SIM_INT		(NR_IRQS_LEGACY + 15)
--#define MX1_SIM_DATA_INT	(NR_IRQS_LEGACY + 16)
--#define MX1_RTC_INT		(NR_IRQS_LEGACY + 17)
--#define MX1_RTC_SAMINT		(NR_IRQS_LEGACY + 18)
--#define MX1_INT_UART2PFERR	(NR_IRQS_LEGACY + 19)
--#define MX1_INT_UART2RTS	(NR_IRQS_LEGACY + 20)
--#define MX1_INT_UART2DTR	(NR_IRQS_LEGACY + 21)
--#define MX1_INT_UART2UARTC	(NR_IRQS_LEGACY + 22)
--#define MX1_INT_UART2TX		(NR_IRQS_LEGACY + 23)
--#define MX1_INT_UART2RX		(NR_IRQS_LEGACY + 24)
--#define MX1_INT_UART1PFERR	(NR_IRQS_LEGACY + 25)
--#define MX1_INT_UART1RTS	(NR_IRQS_LEGACY + 26)
--#define MX1_INT_UART1DTR	(NR_IRQS_LEGACY + 27)
--#define MX1_INT_UART1UARTC	(NR_IRQS_LEGACY + 28)
--#define MX1_INT_UART1TX		(NR_IRQS_LEGACY + 29)
--#define MX1_INT_UART1RX		(NR_IRQS_LEGACY + 30)
--#define MX1_VOICE_DAC_INT	(NR_IRQS_LEGACY + 31)
--#define MX1_VOICE_ADC_INT	(NR_IRQS_LEGACY + 32)
--#define MX1_PEN_DATA_INT	(NR_IRQS_LEGACY + 33)
--#define MX1_PWM_INT		(NR_IRQS_LEGACY + 34)
--#define MX1_SDHC_INT		(NR_IRQS_LEGACY + 35)
--#define MX1_INT_I2C		(NR_IRQS_LEGACY + 39)
--#define MX1_INT_CSPI2		(NR_IRQS_LEGACY + 40)
--#define MX1_INT_CSPI1		(NR_IRQS_LEGACY + 41)
--#define MX1_SSI_TX_INT		(NR_IRQS_LEGACY + 42)
--#define MX1_SSI_TX_ERR_INT	(NR_IRQS_LEGACY + 43)
--#define MX1_SSI_RX_INT		(NR_IRQS_LEGACY + 44)
--#define MX1_SSI_RX_ERR_INT	(NR_IRQS_LEGACY + 45)
--#define MX1_TOUCH_INT		(NR_IRQS_LEGACY + 46)
--#define MX1_INT_USBD0		(NR_IRQS_LEGACY + 47)
--#define MX1_INT_USBD1		(NR_IRQS_LEGACY + 48)
--#define MX1_INT_USBD2		(NR_IRQS_LEGACY + 49)
--#define MX1_INT_USBD3		(NR_IRQS_LEGACY + 50)
--#define MX1_INT_USBD4		(NR_IRQS_LEGACY + 51)
--#define MX1_INT_USBD5		(NR_IRQS_LEGACY + 52)
--#define MX1_INT_USBD6		(NR_IRQS_LEGACY + 53)
--#define MX1_BTSYS_INT		(NR_IRQS_LEGACY + 55)
--#define MX1_BTTIM_INT		(NR_IRQS_LEGACY + 56)
--#define MX1_BTWUI_INT		(NR_IRQS_LEGACY + 57)
--#define MX1_TIM2_INT		(NR_IRQS_LEGACY + 58)
--#define MX1_TIM1_INT		(NR_IRQS_LEGACY + 59)
--#define MX1_DMA_ERR		(NR_IRQS_LEGACY + 60)
--#define MX1_DMA_INT		(NR_IRQS_LEGACY + 61)
--#define MX1_GPIO_INT_PORTD	(NR_IRQS_LEGACY + 62)
--#define MX1_WDT_INT		(NR_IRQS_LEGACY + 63)
--
--/* DMA */
--#define MX1_DMA_REQ_UART3_T		2
--#define MX1_DMA_REQ_UART3_R		3
--#define MX1_DMA_REQ_SSI2_T		4
--#define MX1_DMA_REQ_SSI2_R		5
--#define MX1_DMA_REQ_CSI_STAT		6
--#define MX1_DMA_REQ_CSI_R		7
--#define MX1_DMA_REQ_MSHC		8
--#define MX1_DMA_REQ_DSPA_DCT_DOUT	9
--#define MX1_DMA_REQ_DSPA_DCT_DIN	10
--#define MX1_DMA_REQ_DSPA_MAC		11
--#define MX1_DMA_REQ_EXT			12
--#define MX1_DMA_REQ_SDHC		13
--#define MX1_DMA_REQ_SPI1_R		14
--#define MX1_DMA_REQ_SPI1_T		15
--#define MX1_DMA_REQ_SSI_T		16
--#define MX1_DMA_REQ_SSI_R		17
--#define MX1_DMA_REQ_ASP_DAC		18
--#define MX1_DMA_REQ_ASP_ADC		19
--#define MX1_DMA_REQ_USP_EP(x)		(20 + (x))
--#define MX1_DMA_REQ_SPI2_R		26
--#define MX1_DMA_REQ_SPI2_T		27
--#define MX1_DMA_REQ_UART2_T		28
--#define MX1_DMA_REQ_UART2_R		29
--#define MX1_DMA_REQ_UART1_T		30
--#define MX1_DMA_REQ_UART1_R		31
--
--/*
-- * This doesn't depend on IMX_NEEDS_DEPRECATED_SYMBOLS
-- * to not break drivers/usb/gadget/imx_udc.  Should go
-- * away after this driver uses the new name.
-- */
--#define USBD_INT0		MX1_INT_USBD0
--
--#endif /* ifndef __MACH_MX1_H__ */
-diff --git a/drivers/clk/imx/clk-imx1.c b/drivers/clk/imx/clk-imx1.c
-index 99cf802..eaa462a 100644
---- a/drivers/clk/imx/clk-imx1.c
-+++ b/drivers/clk/imx/clk-imx1.c
-@@ -45,10 +45,13 @@ static void __iomem *ccm __initdata;
- #define CCM_PCDR	(ccm + 0x0020)
- #define SCM_GCCR	(ccm + 0x0810)
- 
--static void __init _mx1_clocks_init(unsigned long fref)
-+static void __init mx1_clocks_init_dt(struct device_node *np)
- {
-+	ccm = of_iomap(np, 0);
-+	BUG_ON(!ccm);
-+
- 	clk[IMX1_CLK_DUMMY] = imx_clk_fixed("dummy", 0);
--	clk[IMX1_CLK_CLK32] = imx_obtain_fixed_clock("clk32", fref);
-+	clk[IMX1_CLK_CLK32] = imx_obtain_fixed_clock("clk32", 32768);
- 	clk[IMX1_CLK_CLK16M_EXT] = imx_clk_fixed("clk16m_ext", 16000000);
- 	clk[IMX1_CLK_CLK16M] = imx_clk_gate("clk16m", "clk16m_ext", CCM_CSCR, 17);
- 	clk[IMX1_CLK_CLK32_PREMULT] = imx_clk_fixed_factor("clk32_premult", "clk32", 512, 1);
-@@ -74,45 +77,6 @@ static void __init _mx1_clocks_init(unsigned long fref)
- 	clk[IMX1_CLK_USBD_GATE] = imx_clk_gate("usbd_gate", "clk48m", SCM_GCCR, 0);
- 
- 	imx_check_clocks(clk, ARRAY_SIZE(clk));
--}
--
--int __init mx1_clocks_init(unsigned long fref)
--{
--	ccm = ioremap(MX1_CCM_BASE_ADDR, SZ_4K);
--	BUG_ON(!ccm);
--
--	_mx1_clocks_init(fref);
--
--	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx-gpt.0");
--	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx-gpt.0");
--	clk_register_clkdev(clk[IMX1_CLK_DMA_GATE], "ahb", "imx1-dma");
--	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-dma");
--	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.0");
--	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-uart.0");
--	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.1");
--	clk_register_clkdev(clk[IMX1_CLK_HCLK], "ipg", "imx1-uart.1");
--	clk_register_clkdev(clk[IMX1_CLK_PER1], "per", "imx1-uart.2");
--	clk_register_clkdev(clk[IMX1_CLK_UART3_GATE], "ipg", "imx1-uart.2");
--	clk_register_clkdev(clk[IMX1_CLK_HCLK], NULL, "imx1-i2c.0");
--	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-cspi.0");
--	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-cspi.0");
--	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-cspi.1");
--	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-cspi.1");
--	clk_register_clkdev(clk[IMX1_CLK_PER2], "per", "imx1-fb.0");
--	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ipg", "imx1-fb.0");
--	clk_register_clkdev(clk[IMX1_CLK_DUMMY], "ahb", "imx1-fb.0");
--
--	mxc_timer_init(MX1_TIM1_BASE_ADDR, MX1_TIM1_INT, GPT_TYPE_IMX1);
--
--	return 0;
--}
--
--static void __init mx1_clocks_init_dt(struct device_node *np)
--{
--	ccm = of_iomap(np, 0);
--	BUG_ON(!ccm);
--
--	_mx1_clocks_init(32768);
- 
- 	clk_data.clks = clk;
- 	clk_data.clk_num = ARRAY_SIZE(clk);
--- 
-2.4.9
+[    3.096860] WARNING: CPU: 1 PID: 121 at include/linux/kref.h:46 __clk_get+0x90/0x98
+[    3.096882] Modules linked in:
+[    3.096896] CPU: 1 PID: 121 Comm: kworker/u16:2 Not tainted 4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[    3.096905] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[    3.096926] Workqueue: deferwq deferred_probe_work_func
+[    3.096956] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[    3.096971] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[    3.096986] [<c032479c>] (dump_stack) from [<c011a82c>] (__warn+0xe8/0x100)
+[    3.096997] [<c011a82c>] (__warn) from [<c011a8f4>] (warn_slowpath_null+0x20/0x28)
+[    3.097009] [<c011a8f4>] (warn_slowpath_null) from [<c05528dc>] (__clk_get+0x90/0x98)
+[    3.097024] [<c05528dc>] (__clk_get) from [<c0552a40>] (__of_clk_get_from_provider+0x70/0x10c)
+[    3.097041] [<c0552a40>] (__of_clk_get_from_provider) from [<c054f160>] (__of_clk_get_by_name+0xf0/0x108)
+[    3.097055] [<c054f160>] (__of_clk_get_by_name) from [<c054f1c0>] (clk_get+0x2c/0x5c)
+[    3.097070] [<c054f1c0>] (clk_get) from [<c054ed54>] (devm_clk_get+0x3c/0x78)
+[    3.097086] [<c054ed54>] (devm_clk_get) from [<c04e4798>] (s3c_rtc_probe+0x2bc/0x438)
+[    3.097101] [<c04e4798>] (s3c_rtc_probe) from [<c03fc040>] (platform_drv_probe+0x4c/0xb0)
+[    3.097115] [<c03fc040>] (platform_drv_probe) from [<c03fa794>] (driver_probe_device+0x214/0x2c0)
+[    3.097136] [<c03fa794>] (driver_probe_device) from [<c03f8bb4>] (bus_for_each_drv+0x60/0x94)
+[    3.097149] [<c03f8bb4>] (bus_for_each_drv) from [<c03fa4a0>] (__device_attach+0xb0/0x114)
+[    3.097163] [<c03fa4a0>] (__device_attach) from [<c03f9adc>] (bus_probe_device+0x84/0x8c)
+[    3.097174] [<c03f9adc>] (bus_probe_device) from [<c03f9f6c>] (deferred_probe_work_func+0x68/0x98)
+[    3.097193] [<c03f9f6c>] (deferred_probe_work_func) from [<c012ff2c>] (process_one_work+0x124/0x338)
+[    3.097208] [<c012ff2c>] (process_one_work) from [<c0130178>] (worker_thread+0x38/0x4d4)
+[    3.097224] [<c0130178>] (worker_thread) from [<c0135454>] (kthread+0xdc/0xf4)
+[    3.097239] [<c0135454>] (kthread) from [<c0107978>] (ret_from_fork+0x14/0x3c)
+[    3.097251] ---[ end trace c79e2db53b5a7881 ]---
+[    3.097286] Unable to handle kernel NULL pointer dereference at virtual address 0000003f
+[    3.097293] pgd = c0004000
+[    3.097312] [0000003f] *pgd=00000000
+[    3.097324] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+[    3.097342] Modules linked in:
+[    3.097354] CPU: 1 PID: 121 Comm: kworker/u16:2 Tainted: G        W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[    3.097364] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[    3.097384] Workqueue: deferwq deferred_probe_work_func
+[    3.097394] task: ed22b200 ti: c3b9c000 task.ti: c3b9c000
+[    3.097408] PC is at clk_core_enable+0x10/0x98
+[    3.097420] LR is at clk_core_enable+0x40/0x98
+[    3.097430] pc : [<c054fc84>]    lr : [<c054fcb4>]    psr: a0000093
+[    3.097430] sp : c3b9dde8  ip : 00000000  fp : c3abed80
+[    3.097442] r10: edc1a800  r9 : 00000004  r8 : 00000000
+[    3.097453] r7 : edd72734  r6 : ede32a10  r5 : a0000013  r4 : ffffffff
+[    3.097462] r3 : 00000000  r2 : 00000001  r1 : 00000001  r0 : ffffffff
+[    3.097474] Flags: NzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[    3.097484] Control: 10c5387d  Table: 2000406a  DAC: 00000051
+[    3.097495] Process kworker/u16:2 (pid: 121, stack limit = 0xc3b9c210)
+[    3.097508] Stack: (0xc3b9dde8 to 0xc3b9e000)
+[    3.097520] dde0:                   c3894340 a0000013 ede32a10 c054fcb4 edd75a40 a0000013
+[    3.097532] de00: ede32a10 c0550720 edd72710 edd75a40 ede32a10 c04e48bc ede1f550 00000001
+[    3.097546] de20: c089ff18 00000004 ede1f550 c3a88d70 00000000 ede1f550 00000001 c089ff18
+[    3.097558] de40: edd74d70 ede32a10 ede32a10 ede32a10 ede32a10 ede32a10 ede32a10 c0b2a504
+[    3.097570] de60: fffffdfb c03fc040 ede32a10 c0b8308c c0b83094 c0b2a504 00000000 c03fa794
+[    3.097582] de80: 00000000 c3b9deb8 c03fa924 00000001 00000000 00000000 edc1a800 c03f8bb4
+[    3.097594] dea0: edc05894 c3a69644 ede32a10 ede32a44 c0b211f0 c03fa4a0 ede32a10 00000001
+[    3.097603] dec0: c0b473a8 ede32a10 ede32a10 c0b211f0 c3b5ad00 c03f9adc ede32a10 c0b20f9c
+[    3.097615] dee0: c0b20fc8 c03f9f6c c3abed80 c0b20fe8 edc1a800 c012ff2c c3abed80 edc1a824
+[    3.097628] df00: edc1a800 c3abed98 00000088 edc1a824 c0b02100 c3b9c000 edc1a800 c0130178
+[    3.097638] df20: c3b9c000 c3ac26c0 c3abed80 00000000 c3ac26c0 c3abed80 c0130140 00000000
+[    3.097649] df40: 00000000 00000000 00000000 c0135454 e7fddef0 00000000 e7fddef0 c3abed80
+[    3.097663] df60: 00000000 00000000 dead4ead ffffffff ffffffff c3b9df74 c3b9df74 00000000
+[    3.097675] df80: 00000000 dead4ead ffffffff ffffffff c3b9df90 c3b9df90 c3b9dfac c3ac26c0
+[    3.097688] dfa0: c0135378 00000000 00000000 c0107978 00000000 00000000 00000000 00000000
+[    3.097700] dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    3.097710] dfe0: 00000000 00000000 00000000 00000000 00000013 00000000 e7fddef0 e7fddef0
+[    3.097725] [<c054fc84>] (clk_core_enable) from [<c054fcb4>] (clk_core_enable+0x40/0x98)
+[    3.097741] [<c054fcb4>] (clk_core_enable) from [<c0550720>] (clk_enable+0x20/0x34)
+[    3.097754] [<c0550720>] (clk_enable) from [<c04e48bc>] (s3c_rtc_probe+0x3e0/0x438)
+[    3.097767] [<c04e48bc>] (s3c_rtc_probe) from [<c03fc040>] (platform_drv_probe+0x4c/0xb0)
+[    3.097781] [<c03fc040>] (platform_drv_probe) from [<c03fa794>] (driver_probe_device+0x214/0x2c0)
+[    3.097792] [<c03fa794>] (driver_probe_device) from [<c03f8bb4>] (bus_for_each_drv+0x60/0x94)
+[    3.097802] [<c03f8bb4>] (bus_for_each_drv) from [<c03fa4a0>] (__device_attach+0xb0/0x114)
+[    3.097815] [<c03fa4a0>] (__device_attach) from [<c03f9adc>] (bus_probe_device+0x84/0x8c)
+[    3.097827] [<c03f9adc>] (bus_probe_device) from [<c03f9f6c>] (deferred_probe_work_func+0x68/0x98)
+[    3.097841] [<c03f9f6c>] (deferred_probe_work_func) from [<c012ff2c>] (process_one_work+0x124/0x338)
+[    3.097857] [<c012ff2c>] (process_one_work) from [<c0130178>] (worker_thread+0x38/0x4d4)
+[    3.097870] [<c0130178>] (worker_thread) from [<c0135454>] (kthread+0xdc/0xf4)
+[    3.097882] [<c0135454>] (kthread) from [<c0107978>] (ret_from_fork+0x14/0x3c)
+[    3.097897] Code: e3500000 012fff1e e92d4070 e1a04000 (e5903040) 
+[    3.097915] ---[ end trace c79e2db53b5a7882 ]---
+[    3.097929] note: kworker/u16:2[121] exited with preempt_count 1
+[    3.098019] Unable to handle kernel paging request at virtual address ffffffe0
+[    3.098029] pgd = c0004000
+[    3.098064] [ffffffe0] *pgd=4fffd861, *pte=00000000, *ppte=00000000
+[    3.098075] Internal error: Oops: 37 [#2] PREEMPT SMP ARM
+[    3.098094] Modules linked in:
+[    3.098107] CPU: 1 PID: 121 Comm: kworker/u16:2 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[    3.098117] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[    3.098133] task: ed22b200 ti: c3b9c000 task.ti: c3b9c000
+[    3.098143] PC is at kthread_data+0x4/0xc
+[    3.098155] LR is at wq_worker_sleeping+0x8/0xc8
+[    3.098166] pc : [<c0135a58>]    lr : [<c0130dbc>]    psr: 00000193
+[    3.098166] sp : c3b9dc20  ip : 00000400  fp : c3b9dc4c
+[    3.098175] r10: ed22b200  r9 : 00000000  r8 : c0b0261c
+[    3.098185] r7 : ed22b54c  r6 : ed22b200  r5 : ee34c000  r4 : c0a64000
+[    3.098195] r3 : 00000000  r2 : 00000000  r1 : ed22b200  r0 : ed22b200
+[    3.098205] Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[    3.098214] Control: 10c5387d  Table: 2000406a  DAC: 00000051
+[    3.098224] Process kworker/u16:2 (pid: 121, stack limit = 0xc3b9c210)
+[    3.098234] Stack: (0xc3b9dc20 to 0xc3b9e000)
+[    3.098246] dc20: c0a64000 c06cf400 ed22b200 ee34c640 c3b9c000 c3b9d98c 00000001 edc88000
+[    3.098260] dc40: c3b9dc60 ed22b4b8 c3b9dc5c c06cf61c ed22b200 c3b9d98c c3abed80 c011cf54
+[    3.098270] dc60: c3b9dc60 c3b9dc60 c3b9c000 c0b45404 0000000b c0878584 00000005 60000193
+[    3.098282] dc80: c0b0680c ed22b200 c3abed80 c010b168 c3b9c210 0000000b 0000003f c3b9dd98
+[    3.098296] dca0: 00000005 00000000 0000003f 00000004 edc1a800 c0114f58 00000005 c0110a08
+[    3.098308] dcc0: 00000000 00000000 60000013 00000000 ffffffff c0b06a4c 00000005 c0110aa4
+[    3.098318] dce0: 0000003f c3b9dd98 00000004 edc1a800 c3abed80 c0101334 c087ac10 c3b9dd24
+[    3.098329] dd00: c3abed80 c01955b8 c3abed80 c3b9dd24 00000000 00000000 00000000 c011a7e4
+[    3.098343] dd20: c087ac10 ffde7db5 3b5a7881 c79e2db5 0000002e c05528dc 00000001 00000001
+[    3.098354] dd40: c0b2ff84 c3b9dd50 c0b473a8 c06d1f70 00000001 c3b9dd50 00000000 edd75a40
+[    3.098366] dd60: c38944c0 c3b9dd90 ede1e380 c0552a50 ede1e380 c08c57a8 ee3a74a8 00000001
+[    3.098378] dd80: c054fc84 a0000093 ffffffff c3b9ddcc 00000000 c010b960 ffffffff 00000001
+[    3.098391] dda0: 00000001 00000000 ffffffff a0000013 ede32a10 edd72734 00000000 00000004
+[    3.098401] ddc0: edc1a800 c3abed80 00000000 c3b9dde8 c054fcb4 c054fc84 a0000093 ffffffff
+[    3.098414] dde0: 00000051 a0000013 c3894340 a0000013 ede32a10 c054fcb4 edd75a40 a0000013
+[    3.098426] de00: ede32a10 c0550720 edd72710 edd75a40 ede32a10 c04e48bc ede1f550 00000001
+[    3.098436] de20: c089ff18 00000004 ede1f550 c3a88d70 00000000 ede1f550 00000001 c089ff18
+[    3.098450] de40: edd74d70 ede32a10 ede32a10 ede32a10 ede32a10 ede32a10 ede32a10 c0b2a504
+[    3.098465] de60: fffffdfb c03fc040 ede32a10 c0b8308c c0b83094 c0b2a504 00000000 c03fa794
+[    3.098478] de80: 00000000 c3b9deb8 c03fa924 00000001 00000000 00000000 edc1a800 c03f8bb4
+[    3.098488] dea0: edc05894 c3a69644 ede32a10 ede32a44 c0b211f0 c03fa4a0 ede32a10 00000001
+[    3.098501] dec0: c0b473a8 ede32a10 ede32a10 c0b211f0 c3b5ad00 c03f9adc ede32a10 c0b20f9c
+[    3.098513] dee0: c0b20fc8 c03f9f6c c3abed80 c0b20fe8 edc1a800 c012ff2c c3abed80 edc1a824
+[    3.098526] df00: edc1a800 c3abed98 00000088 edc1a824 c0b02100 c3b9c000 edc1a800 c0130178
+[    3.098538] df20: c3b9c000 c3ac26c0 c3abed80 00000000 c3ac26c0 c3abed80 c0130140 00000000
+[    3.098549] df40: 00000000 00000000 00000000 c0135454 e7fddef0 00000000 e7fddef0 c3abed80
+[    3.098562] df60: 00000000 00000000 dead4ead ffffffff ffffffff c3b9df74 c3b9df74 00000001
+[    3.098574] df80: 00010001 dead4ead ffffffff ffffffff c3b9df90 c3b9df90 c3b9dfac c3ac26c0
+[    3.098580] dfa0: c0135378 00000000 00000000 c0107978 00000000 00000000 00000000 00000000
+[    3.098588] dfc0: 00000000 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+[    3.098593] dfe0: 00000000 00000000 00000000 00000000 00000013 00000000 e7fddef0 e7fddef0
+[    3.098602] [<c0135a58>] (kthread_data) from [<c0130dbc>] (wq_worker_sleeping+0x8/0xc8)
+[    3.098619] [<c0130dbc>] (wq_worker_sleeping) from [<c06cf400>] (__schedule+0x2d4/0x4a4)
+[    3.098629] [<c06cf400>] (__schedule) from [<c06cf61c>] (schedule+0x4c/0xac)
+[    3.098641] [<c06cf61c>] (schedule) from [<c011cf54>] (do_exit+0x66c/0xa44)
+[    3.098655] [<c011cf54>] (do_exit) from [<c010b168>] (die+0x22c/0x2ec)
+[    3.098669] [<c010b168>] (die) from [<c0114f58>] (__do_kernel_fault.part.0+0x64/0x1e4)
+[    3.098687] [<c0114f58>] (__do_kernel_fault.part.0) from [<c0110a08>] (do_bad_area+0x0/0x8c)
+[    3.098702] [<c0110a08>] (do_bad_area) from [<c0110aa4>] (do_translation_fault+0x0/0xac)
+[    3.098712] [<c0110aa4>] (do_translation_fault) from [<edc1a800>] (0xedc1a800)
+[    3.098725] Code: e3a02002 e0431101 eaffff8e e5903310 (e5130020) 
+[    3.098744] ---[ end trace c79e2db53b5a7883 ]---
+[    3.098754] Fixing recursive fault but reboot is needed!
+[    3.104585] smsc95xx 5-1.1:1.0 eth0: register 'smsc95xx' at usb-xhci-hcd.6.auto-1.1, smsc95xx USB 2.0 Ethernet, 94:eb:2c:00:03:c0
+[   43.484379] BUG: spinlock lockup suspected on CPU#1, kworker/u16:2/121
+[   43.489456]  lock: 0xee34c000, .magic: dead4ead, .owner: kworker/u16:2/121, .owner_cpu: 1
+[   43.497614] CPU: 1 PID: 121 Comm: kworker/u16:2 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   43.508631] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   43.514707] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   43.522425] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   43.529627] [<c032479c>] (dump_stack) from [<c01582a4>] (do_raw_spin_lock+0xfc/0x1b0)
+[   43.537435] [<c01582a4>] (do_raw_spin_lock) from [<c06cf1b0>] (__schedule+0x84/0x4a4)
+[   43.545243] [<c06cf1b0>] (__schedule) from [<c06cf61c>] (schedule+0x4c/0xac)
+[   43.552263] [<c06cf61c>] (schedule) from [<c011d16c>] (do_exit+0x884/0xa44)
+[   43.559205] [<c011d16c>] (do_exit) from [<c010b168>] (die+0x22c/0x2ec)
+[   43.565709] [<c010b168>] (die) from [<c0114f58>] (__do_kernel_fault.part.0+0x64/0x1e4)
+[   43.573607] [<c0114f58>] (__do_kernel_fault.part.0) from [<c0110a08>] (do_bad_area+0x0/0x8c)
+[   43.582023] [<c0110a08>] (do_bad_area) from [<c0110764>] (do_page_fault+0x0/0x2a4)
+[   43.589569] [<c0110764>] (do_page_fault) from [<00000030>] (0x30)
+[   43.595635] Sending NMI to all CPUs:
+[   43.599187] NMI backtrace for cpu 1
+[   43.602663] CPU: 1 PID: 121 Comm: kworker/u16:2 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   43.613686] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   43.619759] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   43.627482] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   43.634683] [<c032479c>] (dump_stack) from [<c03280f0>] (nmi_cpu_backtrace+0x78/0x7c)
+[   43.642487] [<c03280f0>] (nmi_cpu_backtrace) from [<c010cb4c>] (raise_nmi+0x60/0x64)
+[   43.650208] [<c010cb4c>] (raise_nmi) from [<c0328064>] (nmi_trigger_all_cpu_backtrace+0x118/0x12c)
+[   43.659144] [<c0328064>] (nmi_trigger_all_cpu_backtrace) from [<c01582ac>] (do_raw_spin_lock+0x104/0x1b0)
+[   43.668688] [<c01582ac>] (do_raw_spin_lock) from [<c06cf1b0>] (__schedule+0x84/0x4a4)
+[   43.676494] [<c06cf1b0>] (__schedule) from [<c06cf61c>] (schedule+0x4c/0xac)
+[   43.683517] [<c06cf61c>] (schedule) from [<c011d16c>] (do_exit+0x884/0xa44)
+[   43.690456] [<c011d16c>] (do_exit) from [<c010b168>] (die+0x22c/0x2ec)
+[   43.696963] [<c010b168>] (die) from [<c0114f58>] (__do_kernel_fault.part.0+0x64/0x1e4)
+[   43.704861] [<c0114f58>] (__do_kernel_fault.part.0) from [<c0110a08>] (do_bad_area+0x0/0x8c)
+[   43.713277] [<c0110a08>] (do_bad_area) from [<c0110764>] (do_page_fault+0x0/0x2a4)
+[   43.720821] [<c0110764>] (do_page_fault) from [<00000030>] (0x30)
+[   43.727331] NMI backtrace for cpu 3
+[   43.730399] CPU: 3 PID: 0 Comm: swapper/3 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   43.740901] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   43.746960] task: edc8c600 ti: edcc4000 task.ti: edcc4000
+[   43.752343] PC is at arch_cpu_idle+0x38/0x3c
+[   43.756592] LR is at arch_cpu_idle+0x34/0x3c
+[   43.760844] pc : [<c01083bc>]    lr : [<c01083b8>]    psr: 60000113
+[   43.767090] sp : edcc5fd8  ip : ee363f74  fp : c0b024b8
+[   43.772296] r10: c0b024c0  r9 : c0a633f8  r8 : 00000000
+[   43.777499] r7 : 00000000  r6 : 00000008  r5 : c0b02454  r4 : edcc4000
+[   43.784007] r3 : c0113e40  r2 : 00000000  r1 : 00000000  r0 : 00000001
+[   43.790515] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[   43.797628] Control: 10c5387d  Table: 2000406a  DAC: 00000051
+[   43.803354] CPU: 3 PID: 0 Comm: swapper/3 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   43.813858] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   43.819924] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   43.827647] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   43.834848] [<c032479c>] (dump_stack) from [<c03280d4>] (nmi_cpu_backtrace+0x5c/0x7c)
+[   43.842655] [<c03280d4>] (nmi_cpu_backtrace) from [<c010d398>] (handle_IPI+0xd8/0x1ac)
+[   43.850552] [<c010d398>] (handle_IPI) from [<c01014e4>] (gic_handle_irq+0x94/0x98)
+[   43.858096] [<c01014e4>] (gic_handle_irq) from [<c010b9d4>] (__irq_svc+0x54/0x90)
+[   43.865558] Exception stack(0xedcc5f88 to 0xedcc5fd0)
+[   43.870583] 5f80:                   00000001 00000000 00000000 c0113e40 edcc4000 c0b02454
+[   43.878744] 5fa0: 00000008 00000000 00000000 c0a633f8 c0b024c0 c0b024b8 ee363f74 edcc5fd8
+[   43.886900] 5fc0: c01083b8 c01083bc 60000113 ffffffff
+[   43.891923] [<c010b9d4>] (__irq_svc) from [<c01083bc>] (arch_cpu_idle+0x38/0x3c)
+[   43.899301] [<c01083bc>] (arch_cpu_idle) from [<c0151900>] (cpu_startup_entry+0x1cc/0x250)
+[   43.907546] [<c0151900>] (cpu_startup_entry) from [<2010158c>] (0x2010158c)
+[   43.914488] NMI backtrace for cpu 4
+[   43.917940] CPU: 4 PID: 0 Comm: swapper/4 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   43.928436] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   43.934492] task: edc8cb00 ti: edcc6000 task.ti: edcc6000
+[   43.939869] PC is at arch_cpu_idle+0x38/0x3c
+[   43.944117] LR is at arch_cpu_idle+0x34/0x3c
+[   43.948369] pc : [<c01083bc>]    lr : [<c01083b8>]    psr: 60000013
+[   43.954617] sp : edcc7fd8  ip : 0000abe0  fp : c0b024b8
+[   43.959821] r10: c0b024c0  r9 : c0a633f8  r8 : 00000000
+[   43.965028] r7 : 00000000  r6 : 00000010  r5 : c0b02454  r4 : edcc6000
+[   43.971537] r3 : c0113e40  r2 : 00000000  r1 : 00000000  r0 : 00000001
+[   43.978041] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[   43.985154] Control: 10c5387d  Table: 2000406a  DAC: 00000051
+[   43.990880] CPU: 4 PID: 0 Comm: swapper/4 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   44.001390] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   44.007450] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   44.015180] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   44.022380] [<c032479c>] (dump_stack) from [<c03280d4>] (nmi_cpu_backtrace+0x5c/0x7c)
+[   44.030189] [<c03280d4>] (nmi_cpu_backtrace) from [<c010d398>] (handle_IPI+0xd8/0x1ac)
+[   44.038083] [<c010d398>] (handle_IPI) from [<c01014e4>] (gic_handle_irq+0x94/0x98)
+[   44.045630] [<c01014e4>] (gic_handle_irq) from [<c010b9d4>] (__irq_svc+0x54/0x90)
+[   44.053090] Exception stack(0xedcc7f88 to 0xedcc7fd0)
+[   44.058109] 7f80:                   00000001 00000000 00000000 c0113e40 edcc6000 c0b02454
+[   44.066277] 7fa0: 00000010 00000000 00000000 c0a633f8 c0b024c0 c0b024b8 0000abe0 edcc7fd8
+[   44.074432] 7fc0: c01083b8 c01083bc 60000013 ffffffff
+[   44.079450] [<c010b9d4>] (__irq_svc) from [<c01083bc>] (arch_cpu_idle+0x38/0x3c)
+[   44.086835] [<c01083bc>] (arch_cpu_idle) from [<c0151900>] (cpu_startup_entry+0x1cc/0x250)
+[   44.095079] [<c0151900>] (cpu_startup_entry) from [<2010158c>] (0x2010158c)
+[   44.102013] NMI backtrace for cpu 6
+[   44.105473] CPU: 6 PID: 0 Comm: swapper/6 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   44.115985] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   44.122040] task: edc8d500 ti: edcca000 task.ti: edcca000
+[   44.127418] PC is at arch_cpu_idle+0x38/0x3c
+[   44.131665] LR is at arch_cpu_idle+0x34/0x3c
+[   44.135918] pc : [<c01083bc>]    lr : [<c01083b8>]    psr: 60000013
+[   44.142168] sp : edccbfd8  ip : 0000abe0  fp : c0b024b8
+[   44.147369] r10: c0b024c0  r9 : c0a633f8  r8 : 00000000
+[   44.152575] r7 : 00000000  r6 : 00000040  r5 : c0b02454  r4 : edcca000
+[   44.159080] r3 : c0113e40  r2 : 00000000  r1 : 00000000  r0 : 00000001
+[   44.165589] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[   44.172705] Control: 10c5387d  Table: 2000406a  DAC: 00000051
+[   44.178429] CPU: 6 PID: 0 Comm: swapper/6 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   44.188942] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   44.194997] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   44.202729] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   44.209929] [<c032479c>] (dump_stack) from [<c03280d4>] (nmi_cpu_backtrace+0x5c/0x7c)
+[   44.217742] [<c03280d4>] (nmi_cpu_backtrace) from [<c010d398>] (handle_IPI+0xd8/0x1ac)
+[   44.225633] [<c010d398>] (handle_IPI) from [<c01014e4>] (gic_handle_irq+0x94/0x98)
+[   44.233179] [<c01014e4>] (gic_handle_irq) from [<c010b9d4>] (__irq_svc+0x54/0x90)
+[   44.240639] Exception stack(0xedccbf88 to 0xedccbfd0)
+[   44.245656] bf80:                   00000001 00000000 00000000 c0113e40 edcca000 c0b02454
+[   44.253827] bfa0: 00000040 00000000 00000000 c0a633f8 c0b024c0 c0b024b8 0000abe0 edccbfd8
+[   44.261982] bfc0: c01083b8 c01083bc 60000013 ffffffff
+[   44.266998] [<c010b9d4>] (__irq_svc) from [<c01083bc>] (arch_cpu_idle+0x38/0x3c)
+[   44.274387] [<c01083bc>] (arch_cpu_idle) from [<c0151900>] (cpu_startup_entry+0x1cc/0x250)
+[   44.282629] [<c0151900>] (cpu_startup_entry) from [<2010158c>] (0x2010158c)
+[   81.055964] BUG: spinlock lockup suspected on CPU#0, kworker/0:0/4
+[   81.060688]  lock: enable_lock+0x0/0x10, .magic: dead4ead, .owner: kworker/u16:2/121, .owner_cpu: 1
+[   81.069700] CPU: 0 PID: 4 Comm: kworker/0:0 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   81.070847] BUG: spinlock lockup suspected on CPU#2, kworker/2:1/108
+[   81.070861]  lock: enable_lock+0x0/0x10, .magic: dead4ead, .owner: kworker/u16:2/121, .owner_cpu: 1
+[   81.095720] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   81.101790] Workqueue: events dbs_work_handler
+[   81.106215] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   81.113942] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   81.121141] [<c032479c>] (dump_stack) from [<c01582a4>] (do_raw_spin_lock+0xfc/0x1b0)
+[   81.128951] [<c01582a4>] (do_raw_spin_lock) from [<c06d3fdc>] (_raw_spin_lock_irqsave+0x20/0x28)
+[   81.137713] [<c06d3fdc>] (_raw_spin_lock_irqsave) from [<c054fdd4>] (clk_enable_lock+0x58/0x110)
+[   81.146474] [<c054fdd4>] (clk_enable_lock) from [<c0550714>] (clk_enable+0x14/0x34)
+[   81.154113] [<c0550714>] (clk_enable) from [<c04eb04c>] (exynos5_i2c_xfer+0x28/0x2f4)
+[   81.161915] [<c04eb04c>] (exynos5_i2c_xfer) from [<c04e6bc8>] (__i2c_transfer+0x13c/0x278)
+[   81.170156] [<c04e6bc8>] (__i2c_transfer) from [<c04e6d70>] (i2c_transfer+0x6c/0xa8)
+[   81.177876] [<c04e6d70>] (i2c_transfer) from [<c04e6de8>] (i2c_master_send+0x3c/0x4c)
+[   81.185685] [<c04e6de8>] (i2c_master_send) from [<c0415d30>] (regmap_i2c_write+0x10/0x2c)
+[   81.193847] [<c0415d30>] (regmap_i2c_write) from [<c0411dd0>] (_regmap_raw_write+0x514/0x5f0)
+[   81.202342] [<c0411dd0>] (_regmap_raw_write) from [<c0411154>] (_regmap_update_bits+0xc0/0xc4)
+[   81.210929] [<c0411154>] (_regmap_update_bits) from [<c04120c0>] (regmap_update_bits_base+0x50/0x74)
+[   81.220047] [<c04120c0>] (regmap_update_bits_base) from [<c037d910>] (regulator_set_voltage_sel_regmap+0x4c/0x9c)
+[   81.230277] [<c037d910>] (regulator_set_voltage_sel_regmap) from [<c03799e4>] (_regulator_do_set_voltage+0x288/0x358)
+[   81.240859] [<c03799e4>] (_regulator_do_set_voltage) from [<c037a624>] (regulator_set_voltage_unlocked+0x1d8/0x22c)
+[   81.251268] [<c037a624>] (regulator_set_voltage_unlocked) from [<c037a6a0>] (regulator_set_voltage+0x28/0x54)
+[   81.261166] [<c037a6a0>] (regulator_set_voltage) from [<c0408868>] (_set_opp_voltage+0x30/0x98)
+[   81.269834] [<c0408868>] (_set_opp_voltage) from [<c0408fa8>] (dev_pm_opp_set_rate+0x10c/0x2b4)
+[   81.278513] [<c0408fa8>] (dev_pm_opp_set_rate) from [<c050dbdc>] (__cpufreq_driver_target+0x170/0x2d4)
+[   81.287792] [<c050dbdc>] (__cpufreq_driver_target) from [<c0510ec8>] (od_dbs_timer+0x9c/0x168)
+[   81.296377] [<c0510ec8>] (od_dbs_timer) from [<c0511474>] (dbs_work_handler+0x2c/0x60)
+[   81.304271] [<c0511474>] (dbs_work_handler) from [<c012ff2c>] (process_one_work+0x124/0x338)
+[   81.312686] [<c012ff2c>] (process_one_work) from [<c0130178>] (worker_thread+0x38/0x4d4)
+[   81.320755] [<c0130178>] (worker_thread) from [<c0135454>] (kthread+0xdc/0xf4)
+[   81.327954] [<c0135454>] (kthread) from [<c0107978>] (ret_from_fork+0x14/0x3c)
+[   81.335151] Sending NMI to all CPUs:
+[   81.335155] CPU: 2 PID: 108 Comm: kworker/2:1 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   81.335160] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   81.335178] Workqueue: pm pm_runtime_work
+[   81.335192] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   81.335203] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   81.335213] [<c032479c>] (dump_stack) from [<c01582a4>] (do_raw_spin_lock+0xfc/0x1b0)
+[   81.335224] [<c01582a4>] (do_raw_spin_lock) from [<c06d3fdc>] (_raw_spin_lock_irqsave+0x20/0x28)
+[   81.335235] [<c06d3fdc>] (_raw_spin_lock_irqsave) from [<c054fdd4>] (clk_enable_lock+0x58/0x110)
+[   81.335246] [<c054fdd4>] (clk_enable_lock) from [<c05507e4>] (clk_disable+0x1c/0x34)
+[   81.335257] [<c05507e4>] (clk_disable) from [<c0372774>] (amba_pm_runtime_suspend+0x50/0x58)
+[   81.335268] [<c0372774>] (amba_pm_runtime_suspend) from [<c0402d18>] (__rpm_callback+0x2c/0x60)
+[   81.335278] [<c0402d18>] (__rpm_callback) from [<c0402d6c>] (rpm_callback+0x20/0x80)
+[   81.335289] [<c0402d6c>] (rpm_callback) from [<c0403234>] (rpm_suspend+0xdc/0x4c0)
+[   81.335299] [<c0403234>] (rpm_suspend) from [<c040453c>] (pm_runtime_work+0x74/0xa8)
+[   81.335311] [<c040453c>] (pm_runtime_work) from [<c012ff2c>] (process_one_work+0x124/0x338)
+[   81.335323] [<c012ff2c>] (process_one_work) from [<c0130178>] (worker_thread+0x38/0x4d4)
+[   81.335334] [<c0130178>] (worker_thread) from [<c0135454>] (kthread+0xdc/0xf4)
+[   81.335345] [<c0135454>] (kthread) from [<c0107978>] (ret_from_fork+0x14/0x3c)
+[   81.478460] NMI backtrace for cpu 0
+[   81.481925] CPU: 0 PID: 4 Comm: kworker/0:0 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   81.492602] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   81.498669] Workqueue: events dbs_work_handler
+[   81.503094] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   81.510822] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   81.518022] [<c032479c>] (dump_stack) from [<c03280f0>] (nmi_cpu_backtrace+0x78/0x7c)
+[   81.525829] [<c03280f0>] (nmi_cpu_backtrace) from [<c010cb4c>] (raise_nmi+0x60/0x64)
+[   81.533551] [<c010cb4c>] (raise_nmi) from [<c0328064>] (nmi_trigger_all_cpu_backtrace+0x118/0x12c)
+[   81.542487] [<c0328064>] (nmi_trigger_all_cpu_backtrace) from [<c01582ac>] (do_raw_spin_lock+0x104/0x1b0)
+[   81.552029] [<c01582ac>] (do_raw_spin_lock) from [<c06d3fdc>] (_raw_spin_lock_irqsave+0x20/0x28)
+[   81.560791] [<c06d3fdc>] (_raw_spin_lock_irqsave) from [<c054fdd4>] (clk_enable_lock+0x58/0x110)
+[   81.569553] [<c054fdd4>] (clk_enable_lock) from [<c0550714>] (clk_enable+0x14/0x34)
+[   81.577187] [<c0550714>] (clk_enable) from [<c04eb04c>] (exynos5_i2c_xfer+0x28/0x2f4)
+[   81.584994] [<c04eb04c>] (exynos5_i2c_xfer) from [<c04e6bc8>] (__i2c_transfer+0x13c/0x278)
+[   81.593234] [<c04e6bc8>] (__i2c_transfer) from [<c04e6d70>] (i2c_transfer+0x6c/0xa8)
+[   81.600955] [<c04e6d70>] (i2c_transfer) from [<c04e6de8>] (i2c_master_send+0x3c/0x4c)
+[   81.608762] [<c04e6de8>] (i2c_master_send) from [<c0415d30>] (regmap_i2c_write+0x10/0x2c)
+[   81.616918] [<c0415d30>] (regmap_i2c_write) from [<c0411dd0>] (_regmap_raw_write+0x514/0x5f0)
+[   81.625420] [<c0411dd0>] (_regmap_raw_write) from [<c0411154>] (_regmap_update_bits+0xc0/0xc4)
+[   81.634008] [<c0411154>] (_regmap_update_bits) from [<c04120c0>] (regmap_update_bits_base+0x50/0x74)
+[   81.643118] [<c04120c0>] (regmap_update_bits_base) from [<c037d910>] (regulator_set_voltage_sel_regmap+0x4c/0x9c)
+[   81.653355] [<c037d910>] (regulator_set_voltage_sel_regmap) from [<c03799e4>] (_regulator_do_set_voltage+0x288/0x358)
+[   81.663937] [<c03799e4>] (_regulator_do_set_voltage) from [<c037a624>] (regulator_set_voltage_unlocked+0x1d8/0x22c)
+[   81.674348] [<c037a624>] (regulator_set_voltage_unlocked) from [<c037a6a0>] (regulator_set_voltage+0x28/0x54)
+[   81.684238] [<c037a6a0>] (regulator_set_voltage) from [<c0408868>] (_set_opp_voltage+0x30/0x98)
+[   81.692912] [<c0408868>] (_set_opp_voltage) from [<c0408fa8>] (dev_pm_opp_set_rate+0x10c/0x2b4)
+[   81.701587] [<c0408fa8>] (dev_pm_opp_set_rate) from [<c050dbdc>] (__cpufreq_driver_target+0x170/0x2d4)
+[   81.710870] [<c050dbdc>] (__cpufreq_driver_target) from [<c0510ec8>] (od_dbs_timer+0x9c/0x168)
+[   81.719456] [<c0510ec8>] (od_dbs_timer) from [<c0511474>] (dbs_work_handler+0x2c/0x60)
+[   81.727350] [<c0511474>] (dbs_work_handler) from [<c012ff2c>] (process_one_work+0x124/0x338)
+[   81.735766] [<c012ff2c>] (process_one_work) from [<c0130178>] (worker_thread+0x38/0x4d4)
+[   81.743834] [<c0130178>] (worker_thread) from [<c0135454>] (kthread+0xdc/0xf4)
+[   81.751033] [<c0135454>] (kthread) from [<c0107978>] (ret_from_fork+0x14/0x3c)
+[   81.758426] NMI backtrace for cpu 3
+[   81.761710] CPU: 3 PID: 0 Comm: swapper/3 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   81.772212] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   81.778277] task: edc8c600 ti: edcc4000 task.ti: edcc4000
+[   81.783655] PC is at arch_cpu_idle+0x38/0x3c
+[   81.787905] LR is at arch_cpu_idle+0x34/0x3c
+[   81.792155] pc : [<c01083bc>]    lr : [<c01083b8>]    psr: 60000113
+[   81.798403] sp : edcc5fd8  ip : ee363f74  fp : c0b024b8
+[   81.803608] r10: c0b024c0  r9 : c0a633f8  r8 : 00000000
+[   81.808813] r7 : 00000000  r6 : 00000008  r5 : c0b02454  r4 : edcc4000
+[   81.815320] r3 : c0113e40  r2 : 00000000  r1 : 00000000  r0 : 00000001
+[   81.821826] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment none
+[   81.828940] Control: 10c5387d  Table: 2000406a  DAC: 00000051
+[   81.834666] CPU: 3 PID: 0 Comm: swapper/3 Tainted: G      D W       4.7.0-rc2-next-20160606-00009-g897c9c5cd3cf #117
+[   81.845168] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
+[   81.851233] [<c010e1ac>] (unwind_backtrace) from [<c010af38>] (show_stack+0x10/0x14)
+[   81.858960] [<c010af38>] (show_stack) from [<c032479c>] (dump_stack+0x88/0x9c)
+[   81.866160] [<c032479c>] (dump_stack) from [<c03280d4>] (nmi_cpu_backtrace+0x5c/0x7c)
+[   81.873967] [<c03280d4>] (nmi_cpu_backtrace) from [<c010d398>] (handle_IPI+0xd8/0x1ac)
+[   81.881861] [<c010d398>] (handle_IPI) from [<c01014e4>] (gic_handle_irq+0x94/0x98)
+[   81.889409] [<c01014e4>] (gic_handle_irq) from [<c010b9d4>] (__irq_svc+0x54/0x90)
+[   81.896869] Exception stack(0xedcc5f88 to 0xedcc5fd0)
+[   81.901895] 5f80:                   00000001 00000000 00000000 c0113e40 edcc4000 c0b02454
+[   81.910056] 5fa0: 00000008 00000000 00000000 c0a633f8 c0b024c0 c0b024b8 ee363f74 edcc5fd8
+[   81.918210] 5fc0: c01083b8 c01083bc 60000113 ffffffff
+[   81.923236] [<c010b9d4>] (__irq_svc) from [<c01083bc>] (arch_cpu_idle+0x38/0x3c)
+[   81.930615] [<c01083bc>] (arch_cpu_idle) from [<c0151900>] (cpu_startup_entry+0x1cc/0x250)
+[   81.938857] [<c0151900>] (cpu_startup_entry) from [<2010158c>] (0x2010158c)
