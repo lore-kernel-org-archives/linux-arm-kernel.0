@@ -1,30 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Jun 2016 22:44:26 +0200
-Subject: [PATCH 3/3] ARM: dts: sun8i-h3: Add dts file for Sinovoip BPI-M2+
-In-Reply-To: <1464853811-15233-4-git-send-email-wens@csie.org>
-References: <1464853811-15233-1-git-send-email-wens@csie.org>
- <1464853811-15233-4-git-send-email-wens@csie.org>
-Message-ID: <20160607204426.GB14179@lukather>
+Date: Tue, 7 Jun 2016 22:44:51 +0200
+Subject: [PATCH] ARM: dts: sun5i-a10s-wobo-i5: Enable ldo4 too
+In-Reply-To: <1464977440-23441-1-git-send-email-hdegoede@redhat.com>
+References: <1464977440-23441-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160607204451.GC14179@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2016 at 03:50:11PM +0800, Chen-Yu Tsai wrote:
-> The BPI-M2+ is an H3 development board. It is a smaller form factor than
-> the original BPI-M2, with the new H3 SoC.
+On Fri, Jun 03, 2016 at 08:10:40PM +0200, Hans de Goede wrote:
+> It seems that the wifi chip is powered by both ldo3 and ldo4 tied
+> together and that using only one results in the wifi-chip dropping of
+> the USB bus sometimes.
 > 
-> It has 1GB DRAM, 8GB eMMC, a micro SD card slot, HDMI output, 2 USB
-> host connector and 1 USB OTG connector, an IR receiver, WiFi+BT based
-> on Ampak AP6212.
+> Ideally we would have a proper way of modelling this (this is being
+> worked on), but currently we do not. This is not an issue since we need
+> to keep these regulators always-on anyways, due to these boards
+> crashing when ldo3/4 get turned back on after having been turned off.
 > 
-> The board also has a 3 pin header for (debug) UART, a 40 pin GPIO header
-> based on the Raspberry Pi B+, but the peripheral signals are not the
-> same, and an FPC connector for connecting BPI's camera.
-> 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-I fixed the whitespace error, and applied all three.
-
-Thanks!
+Applied, thanks!
 Maxime
 
 -- 
@@ -37,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/20e19201/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/2a4c5755/attachment.sig>
