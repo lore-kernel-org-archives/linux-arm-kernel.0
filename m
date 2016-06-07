@@ -1,165 +1,266 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Tue,  7 Jun 2016 17:18:54 +0100
-Subject: [PATCH v5 00/18] Add support for FDMA DMA controller and slim core
- rproc found on STi chipsets
-Message-ID: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
+Date: Tue,  7 Jun 2016 17:18:55 +0100
+Subject: [PATCH v5 01/18] remoteproc: make rsc table support optional
+In-Reply-To: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
+References: <1465316352-20691-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1465316352-20691-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod, Bjorn, Maxime, Patrice,
+Some firmware and rproc drivers such as slim core don't have a
+resource table. To avoid having to fudge an empty table
+in the rproc driver this patch introduces a new has_rsctable
+flag. rproc drivers which don't require a rsc table can set
+this flag to false, and it avoids doing the initial async
+firmware load in rproc_add_virtio_devices() to parse the
+rsc table during rproc_add(), and also optimises rproc_fw_boot()
+code path to avoid unnecessary rsc table processing of an
+empty table.
 
-This patchset adds support for the Flexible Direct Memory Access (FDMA) core
-found on STi chipsets from STMicroelectronics. The FDMA is a slim core CPU
-with a dedicated firmware. It is a general purpose DMA controller supporting
-16 independent channels and data can be moved from memory to memory or between
-memory and paced latency critical real time targets.
+Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+---
+ drivers/remoteproc/da8xx_remoteproc.c |  1 +
+ drivers/remoteproc/remoteproc_core.c  | 87 ++++++++++++++++++++++-------------
+ drivers/remoteproc/st_remoteproc.c    |  2 +
+ drivers/remoteproc/ste_modem_rproc.c  |  2 +
+ drivers/remoteproc/wkup_m3_rproc.c    |  1 +
+ include/linux/remoteproc.h            |  1 +
+ 6 files changed, 61 insertions(+), 33 deletions(-)
 
-After some discussion with the DT maintainers I've removed the firmware
-name from DT, and now generate the name based on the compatible string.
-This is in keeping with how most other kernel drivers request firmware, and avoids
-a new DT firmware name or fdma id binding.
-
-I've also dropped the dma xbar support for the moment, as I believe it should be
-re-worked based on some of the xbar API's that TI recently added. As requested
-I've also split it into smaller patches to help with a faster review.
-
-V3 also included some updates to the ASoC st,sti-asoc-card.txt DT documentation
-to make the doc align with the driver code. This is kept as part of this series
-for completeness and so any further changes to the ASoC dt nodes in this series
-move in lockstep with the documentation. However these is no strict dependency
-on this update with the rest of the series. It also includes DT patches for
-Maximes/ Patrices STi DT tree to enable ASoC on STiH407/10 based platforms using
-the fdma driver.
-
-v4 includes a new slim core rproc driver for loading the slim elf firmware. This
-enables us to use the generic rproc elf loading code. This has deliberately not
-been implemented as a platform_driver, to avoid having to have double mappings of
-I/O memory from two device drivers, and also to ensure that the DT node reflects
-the actual hardware rather than Linux subsystems. The slim core is the basis
-for various pieces of IP in STi chipsets and the intention is that other drivers
-(e.g. demux) can also be migrated over to using the slim rproc for their
-elf firmware loading and start/stop control.
-
-v5 includes various updates from Bjorn related to the slim rproc implementation.
-It also includes a patch to make rsc_table optional in remoteproc_core and various
-other cleanups and review feedback from Vinod to do with the actual fdma
-implementation. It also fixes a regression introduced in v4 when all drivers are
-built-in spotted by Aranud.
-
-regards,
-
-Peter.
-
-Changes since v4:
- - Make rsc table optional in remoteproc (Peter)
- - Various fixups to STi audio DT nodes (Arnaud)
- - Bulk rename of xp70 to slim (Peter)
- - Update my email to @linaro.org (Lee)
- - rebase on v4.7-rc2 (Peter)
- - Don't make ST_SLIM_REMOTEPROC user selectable (Bjorn)
- - -EPROBE_DEFER if rproc_boot fails when allocating DMA channel (Arnaud / Peter)
- - Drop some unnecessary headers (Vinod / Bjorn)
- - Change to writel now we have several mappings (Bjorn)
- - Remove io_res, rproc, and some unused structure fields / #define (Bjorn)
- - put clks in error path, also put clks before rproc_put() (Bjorn)
- - Make enum less generic (Bjorn)
- - Make slim_rproc_alloc() return a st_slim_rproc reference (Bjorn)
- - Alphabetical naming in Kconfig & Makefile (Vinod)
- - Add FDMA prefix to REQ_CTRL* (Vinod)
- - Print ret on some error paths (Vinod)
- - Add some acked-by (Peter)
-
-Changes since v3:
- - Remove elf loading code from fdma driver (Vinod)
- - Remove fdma_ prefix for clock names (Arnd)
- - Make _xlate use dma_get_any_channel rather than request_channel (Arnd)
- - Make a common function for _prep_ routines (Vinod)
- - Make driver depend on COMPILE_TEST (Arnd)
- - Remove unnecessary st_fdma_filter_fn (Arnd)
- - Enable FDMA as a module (Arnd)
- - Drop fdma_ clock prefix (Arnd)
- - Fix description as well as example for st, prefix (Arnd)
- - Remove string concatenation from fdma register macros to ease grep'ability (Arnd)
- - Add a XP70 rproc driver for ELF firmware loading and start/stop control (Peter)
- - Add myself as a author of the driver (Peter)
-
-Changes since v2:
- - Change to dma-controller (Arnd)
- - Remove platform data header file and simplifiy code (Arnd)
- - Remove FW_LOADER_USER_HELPER_FALLBACK and rework firmware loading to device config (Vinod)
- - Use SET_RUNTIME_PM_OPS helpers (Vinod)
- - Remove fdma-id dt prop and use compatibles to generate different fdma firmware names (Arnd / Lee)
- - Add sti-asoc-card DT nodes and pinmux config for uniperif player & reader (Peter)
- - Update sti-asoc-card DT binding documentation (Peter)
- - Enable STi audio drivers in multi_v7_defconfig (Peter)
-
-Changes since v1:
- - split into smaller patches for easier / faster review (Vinod)
- - new fill_hw_mode() with common code (Vinod)
- - new config_reqctrl() called from *_prep() instead of device_config cb (Vinod)
- - fdma-xbar support removed (Peter)
- - rework firmware name mechanism so fwname isn't in DT (Peter / Lee)
- - st_fdma_seg_to_mem can be static (Paul)
- - EXPORT_SYMBOL st_fdma_filter_fn not required (Paul)
- - s/channel/channels (vinod)
- - better describe "Must be <3>" (vinod)
- - sizeof(*ehdr) (vinod)
- - print values on error debug (vinod)
- - empty line (Vinod)
- - Update to -EIO (Vinod)
- - Make st_fdma tristate (Paul)
- - Remove __exit tag from .remove (Maxime)
- - Update MAINTAINERS rule to fdma* (Lee)
- - Unit address should match reg property (Lee)
-
-Peter Griffin (18):
-  remoteproc: make rsc table support optional
-  remoteproc: st_slim_rproc: add a slimcore rproc driver
-  MAINTAINERS: Add st slim core rproc driver to STi section.
-  dmaengine: st_fdma: Add STMicroelectronics FDMA DT binding
-    documentation
-  dmaengine: st_fdma: Add STMicroelectronics FDMA driver header file
-  dmaengine: st_fdma: Add STMicroelectronics FDMA engine driver support
-  ARM: STi: DT: STiH407: Add FDMA driver dt nodes.
-  MAINTAINERS: Add FDMA driver files to STi section.
-  ARM: multi_v7_defconfig: Enable STi FDMA driver
-  ASoC: sti: Update DT example to match the driver code
-  ARM: multi_v7_defconfig: Enable STi and simple-card drivers.
-  ARM: DT: STiH407: Add i2s_out pinctrl configuration
-  ARM: DT: STiH407: Add i2s_in pinctrl configuration
-  ARM: DT: STiH407: Add spdif_out pinctrl config
-  ARM: STi: DT: STiH407: Add sti-sasg-codec dt node
-  ARM: STi: DT: STiH407: Add uniperif player dt nodes
-  ARM: STi: DT: STiH407: Add uniperif reader dt nodes
-  ARM: DT: STi: stihxxx-b2120: Add DT nodes for STi audio card
-
- Documentation/devicetree/bindings/dma/st_fdma.txt  |  87 ++
- .../devicetree/bindings/sound/st,sti-asoc-card.txt |  20 +-
- MAINTAINERS                                        |   3 +
- arch/arm/boot/dts/stih407-family.dtsi              | 161 ++++
- arch/arm/boot/dts/stih407-pinctrl.dtsi             |  55 ++
- arch/arm/boot/dts/stihxxx-b2120.dtsi               |  45 ++
- arch/arm/configs/multi_v7_defconfig                |   4 +
- drivers/dma/Kconfig                                |  14 +-
- drivers/dma/Makefile                               |   1 +
- drivers/dma/st_fdma.c                              | 880 +++++++++++++++++++++
- drivers/dma/st_fdma.h                              | 244 ++++++
- drivers/remoteproc/Kconfig                         |   8 +
- drivers/remoteproc/Makefile                        |   1 +
- drivers/remoteproc/da8xx_remoteproc.c              |   1 +
- drivers/remoteproc/remoteproc_core.c               |  87 +-
- drivers/remoteproc/st_remoteproc.c                 |   2 +
- drivers/remoteproc/st_slim_rproc.c                 | 338 ++++++++
- drivers/remoteproc/ste_modem_rproc.c               |   2 +
- drivers/remoteproc/wkup_m3_rproc.c                 |   1 +
- include/linux/remoteproc.h                         |   1 +
- include/linux/remoteproc/st_slim_rproc.h           |  53 ++
- 21 files changed, 1964 insertions(+), 44 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/st_fdma.txt
- create mode 100644 drivers/dma/st_fdma.c
- create mode 100644 drivers/dma/st_fdma.h
- create mode 100644 drivers/remoteproc/st_slim_rproc.c
- create mode 100644 include/linux/remoteproc/st_slim_rproc.h
-
+diff --git a/drivers/remoteproc/da8xx_remoteproc.c b/drivers/remoteproc/da8xx_remoteproc.c
+index 009e56f..6e1d9be 100644
+--- a/drivers/remoteproc/da8xx_remoteproc.c
++++ b/drivers/remoteproc/da8xx_remoteproc.c
+@@ -224,6 +224,7 @@ static int da8xx_rproc_probe(struct platform_device *pdev)
+ 	drproc = rproc->priv;
+ 	drproc->rproc = rproc;
+ 	rproc->has_iommu = false;
++	rproc->has_rsctable = true;
+ 
+ 	platform_set_drvdata(pdev, rproc);
+ 
+diff --git a/drivers/remoteproc/remoteproc_core.c b/drivers/remoteproc/remoteproc_core.c
+index db3958b..bef85fb 100644
+--- a/drivers/remoteproc/remoteproc_core.c
++++ b/drivers/remoteproc/remoteproc_core.c
+@@ -716,6 +716,8 @@ static int rproc_handle_resources(struct rproc *rproc, int len,
+ 	rproc_handle_resource_t handler;
+ 	int ret = 0, i;
+ 
++	WARN_ON(!rproc->has_rsctable);
++
+ 	for (i = 0; i < rproc->table_ptr->num; i++) {
+ 		int offset = rproc->table_ptr->offset[i];
+ 		struct fw_rsc_hdr *hdr = (void *)rproc->table_ptr + offset;
+@@ -801,7 +803,7 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+ 	struct resource_table *table, *loaded_table;
+ 	int ret, tablesz;
+ 
+-	if (!rproc->table_ptr)
++	if (!rproc->table_ptr && rproc->has_rsctable)
+ 		return -ENOMEM;
+ 
+ 	ret = rproc_fw_sanity_check(rproc, fw);
+@@ -823,24 +825,27 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+ 	rproc->bootaddr = rproc_get_boot_addr(rproc, fw);
+ 	ret = -EINVAL;
+ 
+-	/* look for the resource table */
+-	table = rproc_find_rsc_table(rproc, fw, &tablesz);
+-	if (!table) {
+-		dev_err(dev, "Failed to find resource table\n");
+-		goto clean_up;
+-	}
++	if (rproc->has_rsctable) {
++		/* look for the resource table */
++		table = rproc_find_rsc_table(rproc, fw, &tablesz);
++		if (!table) {
++			dev_err(dev, "Failed to find resource table\n");
++			goto clean_up;
++		}
+ 
+-	/* Verify that resource table in loaded fw is unchanged */
+-	if (rproc->table_csum != crc32(0, table, tablesz)) {
+-		dev_err(dev, "resource checksum failed, fw changed?\n");
+-		goto clean_up;
+-	}
++		/* Verify that resource table in loaded fw is unchanged */
++		if (rproc->table_csum != crc32(0, table, tablesz)) {
++			dev_err(dev, "resource checksum failed, fw changed?\n");
++			goto clean_up;
++		}
+ 
+-	/* handle fw resources which are required to boot rproc */
+-	ret = rproc_handle_resources(rproc, tablesz, rproc_loading_handlers);
+-	if (ret) {
+-		dev_err(dev, "Failed to process resources: %d\n", ret);
+-		goto clean_up;
++		/* handle fw resources which are required to boot rproc */
++		ret = rproc_handle_resources(rproc, tablesz,
++					rproc_loading_handlers);
++		if (ret) {
++			dev_err(dev, "Failed to process resources: %d\n", ret);
++			goto clean_up;
++		}
+ 	}
+ 
+ 	/* load the ELF segments to memory */
+@@ -850,16 +855,20 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+ 		goto clean_up;
+ 	}
+ 
+-	/*
+-	 * The starting device has been given the rproc->cached_table as the
+-	 * resource table. The address of the vring along with the other
+-	 * allocated resources (carveouts etc) is stored in cached_table.
+-	 * In order to pass this information to the remote device we must
+-	 * copy this information to device memory.
+-	 */
+-	loaded_table = rproc_find_loaded_rsc_table(rproc, fw);
+-	if (loaded_table)
+-		memcpy(loaded_table, rproc->cached_table, tablesz);
++	if (rproc->has_rsctable) {
++		/*
++		 * The starting device has been given the rproc->cached_table as
++		 * the resource table. The address of the vring along with the
++		 * other allocated resources (carveouts etc) is stored in
++		 * cached_table. In order to pass this information to the remote
++		 * device we must copy this information to device memory.
++		 */
++
++		loaded_table = rproc_find_loaded_rsc_table(rproc, fw);
++		if (loaded_table)
++			memcpy(loaded_table, rproc->cached_table, tablesz);
++
++	}
+ 
+ 	/* power up the remote processor */
+ 	ret = rproc->ops->start(rproc);
+@@ -868,12 +877,14 @@ static int rproc_fw_boot(struct rproc *rproc, const struct firmware *fw)
+ 		goto clean_up;
+ 	}
+ 
++
+ 	/*
+ 	 * Update table_ptr so that all subsequent vring allocations and
+ 	 * virtio fields manipulation update the actual loaded resource table
+ 	 * in device memory.
+ 	 */
+-	rproc->table_ptr = loaded_table;
++	if (rproc->has_rsctable)
++		rproc->table_ptr = loaded_table;
+ 
+ 	rproc->state = RPROC_RUNNING;
+ 
+@@ -978,6 +989,7 @@ static int rproc_add_virtio_devices(struct rproc *rproc)
+ int rproc_trigger_recovery(struct rproc *rproc)
+ {
+ 	struct rproc_vdev *rvdev, *rvtmp;
++	int ret;
+ 
+ 	dev_err(&rproc->dev, "recovering %s\n", rproc->name);
+ 
+@@ -992,8 +1004,12 @@ int rproc_trigger_recovery(struct rproc *rproc)
+ 
+ 	/* Free the copy of the resource table */
+ 	kfree(rproc->cached_table);
++	rproc->cached_table = NULL;
+ 
+-	return rproc_add_virtio_devices(rproc);
++	if (rproc->has_rsctable)
++		ret = rproc_add_virtio_devices(rproc);
++
++	return ret;
+ }
+ 
+ /**
+@@ -1088,7 +1104,7 @@ static int __rproc_boot(struct rproc *rproc, bool wait)
+ 	}
+ 
+ 	/* if rproc virtio is not yet configured, wait */
+-	if (wait)
++	if (wait && rproc->has_rsctable)
+ 		wait_for_completion(&rproc->firmware_loading_complete);
+ 
+ 	ret = rproc_fw_boot(rproc, firmware_p);
+@@ -1169,12 +1185,14 @@ void rproc_shutdown(struct rproc *rproc)
+ 	}
+ 
+ 	/* clean up all acquired resources */
+-	rproc_resource_cleanup(rproc);
++	if (rproc->has_rsctable)
++		rproc_resource_cleanup(rproc);
+ 
+ 	rproc_disable_iommu(rproc);
+ 
+ 	/* Give the next start a clean resource table */
+-	rproc->table_ptr = rproc->cached_table;
++	if (rproc->has_rsctable)
++		rproc->table_ptr = rproc->cached_table;
+ 
+ 	/* if in crash state, unlock crash handler */
+ 	if (rproc->state == RPROC_CRASHED)
+@@ -1277,7 +1295,10 @@ int rproc_add(struct rproc *rproc)
+ 	/* create debugfs entries */
+ 	rproc_create_debug_dir(rproc);
+ 
+-	return rproc_add_virtio_devices(rproc);
++	if (rproc->has_rsctable)
++		ret = rproc_add_virtio_devices(rproc);
++
++	return ret;
+ }
+ EXPORT_SYMBOL(rproc_add);
+ 
+diff --git a/drivers/remoteproc/st_remoteproc.c b/drivers/remoteproc/st_remoteproc.c
+index 6f056ca..2aaf0f8 100644
+--- a/drivers/remoteproc/st_remoteproc.c
++++ b/drivers/remoteproc/st_remoteproc.c
+@@ -235,6 +235,8 @@ static int st_rproc_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	rproc->has_iommu = false;
++	rproc->has_rsctable = true;
++
+ 	ddata = rproc->priv;
+ 	ddata->config = (struct st_rproc_config *)match->data;
+ 
+diff --git a/drivers/remoteproc/ste_modem_rproc.c b/drivers/remoteproc/ste_modem_rproc.c
+index 53dc17b..0256dff 100644
+--- a/drivers/remoteproc/ste_modem_rproc.c
++++ b/drivers/remoteproc/ste_modem_rproc.c
+@@ -290,6 +290,8 @@ static int sproc_probe(struct platform_device *pdev)
+ 	sproc->mdev = mdev;
+ 	sproc->rproc = rproc;
+ 	rproc->has_iommu = false;
++	rproc->has_rsctable = true;
++
+ 	mdev->drv_data = sproc;
+ 
+ 	/* Provide callback functions to modem device */
+diff --git a/drivers/remoteproc/wkup_m3_rproc.c b/drivers/remoteproc/wkup_m3_rproc.c
+index 02d271d..27e808a 100644
+--- a/drivers/remoteproc/wkup_m3_rproc.c
++++ b/drivers/remoteproc/wkup_m3_rproc.c
+@@ -170,6 +170,7 @@ static int wkup_m3_rproc_probe(struct platform_device *pdev)
+ 	wkupm3 = rproc->priv;
+ 	wkupm3->rproc = rproc;
+ 	wkupm3->pdev = pdev;
++	rproc->has_rsctable = true;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(mem_names); i++) {
+ 		res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
+diff --git a/include/linux/remoteproc.h b/include/linux/remoteproc.h
+index 1c457a8..cfa180d 100644
+--- a/include/linux/remoteproc.h
++++ b/include/linux/remoteproc.h
+@@ -443,6 +443,7 @@ struct rproc {
+ 	struct resource_table *cached_table;
+ 	u32 table_csum;
+ 	bool has_iommu;
++	bool has_rsctable;
+ };
+ 
+ /* we currently support only two vrings per rvdev */
 -- 
 1.9.1
