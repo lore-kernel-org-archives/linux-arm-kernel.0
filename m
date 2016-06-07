@@ -1,67 +1,56 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 18:14:56 +0100
-Subject: [PATCH] phy-sun4i-usb: fix missing __iomem *
-Message-ID: <1465319696-1275-1-git-send-email-ben.dooks@codethink.co.uk>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Tue, 7 Jun 2016 12:14:57 -0500
+Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
+In-Reply-To: <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FD673@SHSMSX101.ccr.corp.intel.com>
+References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
+ <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
+ <20160602173932.GF5995@atomide.com>
+ <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
+ <20160602175635.GG5995@atomide.com>
+ <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FB1EC@SHSMSX101.ccr.corp.intel.com>
+ <20160607060004.GD22406@atomide.com>
+ <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FD673@SHSMSX101.ccr.corp.intel.com>
+Message-ID: <CAOCHtYhBSS+D-BQH28FO+RxyzvDg-yeX+6nvLu11G3TNkF7ELg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the missing __iomem attribute in sun4i_usb_phy_write()
-function. This fixes the following sparse warnings:
+On Tue, Jun 7, 2016 at 1:14 AM, Li, Yong B <yong.b.li@intel.com> wrote:
+> Thanks Tony.
+>
+> I checked the DTS/overlays using linux-yocto-4.1 kernel(Ostro OS). It seems to me that the kernel/u-boot do not include the latest overlay support patch. And I also tested the latest Debian 8.4 using BBB boards, the I2C1 does not work too. This patch is the simplest solution for I2C1/I2C2 in linux-yocto-4.1.
 
-drivers/phy/phy-sun4i-usb.c:178:39: warning: incorrect type in initializer (different address spaces)
-drivers/phy/phy-sun4i-usb.c:178:39:    expected void *phyctl
-drivers/phy/phy-sun4i-usb.c:178:39:    got void [noderef] <asn:2>*
-drivers/phy/phy-sun4i-usb.c:185:17: warning: incorrect type in argument 2 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:185:17:    expected void volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:185:17:    got void *phyctl
-drivers/phy/phy-sun4i-usb.c:189:24: warning: incorrect type in argument 1 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:189:24:    expected void const volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:189:24:    got void *phyctl
-drivers/phy/phy-sun4i-usb.c:196:17: warning: incorrect type in argument 2 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:196:17:    expected void volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:196:17:    got void *phyctl
-drivers/phy/phy-sun4i-usb.c:199:24: warning: incorrect type in argument 1 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:199:24:    expected void const volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:199:24:    got void *phyctl
-drivers/phy/phy-sun4i-usb.c:205:17: warning: incorrect type in argument 2 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:205:17:    expected void volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:205:17:    got void *phyctl
-drivers/phy/phy-sun4i-usb.c:208:24: warning: incorrect type in argument 1 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:208:24:    expected void const volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:208:24:    got void *phyctl
-drivers/phy/phy-sun4i-usb.c:210:17: warning: incorrect type in argument 2 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:210:17:    expected void volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:210:17:    got void *phyctl
-drivers/phy/phy-sun4i-usb.c:212:24: warning: incorrect type in argument 1 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:212:24:    expected void const volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:212:24:    got void *phyctl
-drivers/phy/phy-sun4i-usb.c:214:17: warning: incorrect type in argument 2 (different address spaces)
-drivers/phy/phy-sun4i-usb.c:214:17:    expected void volatile [noderef] <asn:2>*addr
-drivers/phy/phy-sun4i-usb.c:214:17:    got void *phyctl
+ps, your patch is also broken, you didn't even mux the pins, so i2c1
+doesn't work for you anyways. ;)
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Kishon Vijay Abraham I <kishon@ti.com>
-Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-Cc: Chen-Yu Tsai <wens@csie.org>
-Cc: Hans de Goede <hdegoede@redhat.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/phy/phy-sun4i-usb.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+pinctrl-0 = <&i2c2_pins>; -> pinctrl-0 = <&i2c1_pins>;
 
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index bae54f7..9de9991 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -175,7 +175,7 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
- {
- 	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
- 	u32 temp, usbc_bit = BIT(phy->index * 2);
--	void *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
-+	void __iomem *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
- 	int i;
- 
- 	mutex_lock(&phy_data->mutex);
+Option 1:
+
+With the latest BBB image's, we utilize "cape_universal", thus you can
+enable I2C1 via:
+
+root at beaglebone:~# config-pin -l P9.17
+default gpio gpio_pu gpio_pd spi i2c pwm
+
+root at beaglebone:~# config-pin -l P9.18
+default gpio gpio_pu gpio_pd spi i2c pwm
+
+root at beaglebone:~# config-pin P9.17 i2c
+
+root at beaglebone:~# config-pin P9.18 i2c
+
+Option 2, for the BB-I2C1 overlay:
+
+add
+
+cape_enable=bone_capemgr.enable_partno=BB-I2C1
+
+Option 3, wait for Pantelis's solution... ;)
+
+http://comments.gmane.org/gmane.linux.kernel/2234662
+
+Regards,
+
 -- 
-2.8.1
+Robert Nelson
+https://rcn-ee.com/
