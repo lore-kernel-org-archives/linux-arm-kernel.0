@@ -1,69 +1,62 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 7 Jun 2016 18:08:37 +0800
-Subject: [PATCH 02/28] crypto: omap-sham: Don't idle/start SHA device
- between Encrypt operations
-In-Reply-To: <574F69D8.1010809@ti.com>
-References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
- <1464771389-10640-3-git-send-email-t-kristo@ti.com>
- <574EB091.6040001@ti.com> <574F69D8.1010809@ti.com>
-Message-ID: <20160607100837.GA30875@gondor.apana.org.au>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Tue, 7 Jun 2016 19:12:57 +0900
+Subject: [PATCH v13 10/10] kprobes: Add arm64 case in kprobe example module
+In-Reply-To: <1464924384-15269-11-git-send-email-dave.long@linaro.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-11-git-send-email-dave.long@linaro.org>
+Message-ID: <20160607191257.cecd4ef5790851aaa956ffc1@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2016 at 06:03:52PM -0500, Dave Gerlach wrote:
-> On 06/01/2016 04:53 AM, Grygorii Strashko wrote:
-> >On 06/01/2016 11:56 AM, Tero Kristo wrote:
-> >>From: Lokesh Vutla <lokeshvutla@ti.com>
-> >>
-> >>Calling runtime PM API for every block causes serious perf hit to
-> >>crypto operations that are done on a long buffer.
-> >>As crypto is performed on a page boundary, encrypting large buffers can
-> >>cause a series of crypto operations divided by page. The runtime PM API
-> >>is also called those many times.
-> >>
-> >>We call runtime_pm_get_sync only at beginning on the session (cra_init)
-> >>and runtime_pm_put at the end. This result in upto a 50% speedup.
-> >>This doesn't make the driver to keep the system awake as runtime get/put
-> >>is only called during a crypto session which completes usually quickly.
-> >>
-> >>Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-> >>Signed-off-by: Tero Kristo <t-kristo@ti.com>
-> >>---
-> >>  drivers/crypto/omap-sham.c | 27 +++++++++++++++++----------
-> >>  1 file changed, 17 insertions(+), 10 deletions(-)
-> >>
-> >>diff --git a/drivers/crypto/omap-sham.c b/drivers/crypto/omap-sham.c
-> >>index 6eefaa2..bd0258f 100644
-> >>--- a/drivers/crypto/omap-sham.c
-> >>+++ b/drivers/crypto/omap-sham.c
-> >>@@ -360,14 +360,6 @@ static void omap_sham_copy_ready_hash(struct
-> >>ahash_request *req)
-> >>
-> >>  static int omap_sham_hw_init(struct omap_sham_dev *dd)
-> >>  {
-> >>-    int err;
-> >>-
-> >>-    err = pm_runtime_get_sync(dd->dev);
-> >>-    if (err < 0) {
-> >>-        dev_err(dd->dev, "failed to get sync: %d\n", err);
-> >>-        return err;
-> >>-    }
-> >>-
+On Thu,  2 Jun 2016 23:26:24 -0400
+David Long <dave.long@linaro.org> wrote:
+
+> From: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
 > 
-> Would it be worth it to investigate a pm_runtime autosuspend
-> approach rather than knocking runtime PM out here completely? I am
-> not clear if the overhead is coming from the pm_runtime calls
-> themselves or the actual idling of the IP, but if it's the idling of
-> the IP causing the slowdown, with a large enough autosuspend_delay
-> we don't actually sleep between each block but after a long enough
-> period of idle time we would actually suspend.
+> Add info prints in sample kprobe handlers for ARM64
+> 
 
-Indeed, I think this patch is bogus.  cra_init is associated
-with the tfm object which is usually long-lived.  So doing power
-management there makes no sense.
+Looks good to me.
 
-Cheers,
+Acked-by: Masami Hiramatsu <mhiramat@kernel.org>
+
+Thanks!
+
+> Signed-off-by: Sandeepa Prabhu <sandeepa.s.prabhu@gmail.com>
+> ---
+>  samples/kprobes/kprobe_example.c | 8 ++++++++
+>  1 file changed, 8 insertions(+)
+> 
+> diff --git a/samples/kprobes/kprobe_example.c b/samples/kprobes/kprobe_example.c
+> index ed0ca0c..aad8e6f 100644
+> --- a/samples/kprobes/kprobe_example.c
+> +++ b/samples/kprobes/kprobe_example.c
+> @@ -46,6 +46,10 @@ static int handler_pre(struct kprobe *p, struct pt_regs *regs)
+>  			" ex1 = 0x%lx\n",
+>  		p->symbol_name, p->addr, regs->pc, regs->ex1);
+>  #endif
+> +#ifdef CONFIG_ARM64
+> +	pr_info("pre_handler: p->addr = 0x%p, pc = 0x%lx\n",
+> +		p->addr, (long)regs->pc);
+> +#endif
+>  
+>  	/* A dump_stack() here will give a stack backtrace */
+>  	return 0;
+> @@ -71,6 +75,10 @@ static void handler_post(struct kprobe *p, struct pt_regs *regs,
+>  	printk(KERN_INFO "<%s> post_handler: p->addr = 0x%p, ex1 = 0x%lx\n",
+>  		p->symbol_name, p->addr, regs->ex1);
+>  #endif
+> +#ifdef CONFIG_ARM64
+> +	pr_info("post_handler: p->addr = 0x%p, pc = 0x%lx\n",
+> +		p->addr, (long)regs->pc);
+> +#endif
+>  }
+>  
+>  /*
+> -- 
+> 2.5.0
+> 
+
+
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Masami Hiramatsu <mhiramat@kernel.org>
