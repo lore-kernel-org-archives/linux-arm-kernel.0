@@ -1,66 +1,167 @@
 From: dianders@chromium.org (Douglas Anderson)
-Date: Tue,  7 Jun 2016 15:44:41 -0700
-Subject: [PATCH 08/11] Documentation: phy: Let the rockchip eMMC PHY get an
- exported card clock
+Date: Tue,  7 Jun 2016 15:44:42 -0700
+Subject: [PATCH 09/11] phy: rockchip-emmc: Set phyctrl_frqsel based on card
+ clock
 In-Reply-To: <1465339484-969-1-git-send-email-dianders@chromium.org>
 References: <1465339484-969-1-git-send-email-dianders@chromium.org>
-Message-ID: <1465339484-969-9-git-send-email-dianders@chromium.org>
+Message-ID: <1465339484-969-10-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As of an earlier change in this series ("Documentation: mmc:
-sdhci-of-arasan: Add ability to export card clock") the SDHCI driver
-used on Rockchip SoCs can now expose its clock.  Let's now specify that
-the PHY can use it.
+The "phyctrl_frqsel" is described in the Arasan datasheet [1] as "the
+frequency range of DLL operation".  Although the Rockchip variant of
+this PHY has different ranges than the reference Arasan PHY it appears
+as if the functionality is similar.  We should set this phyctrl field
+properly.
 
-Letting the PHY get access to this clock means it can adjust
-phyctrl_frqsel field appropriately.  Although the Rockchip PHY appears
-slightly different than the reference Arasan one, you can see that the
-Arasan datasheet [1] had it defined as:
-  Select the frequency range of DLL operation:
-  3b'000 => 200MHz to 170 MHz
-  3b'001 => 170MHz to 140 MHz
-  3b'010 => 140MHz to 110 MHz
-  3b'011 => 110MHz to 80MHz
-  3b'100 => 80MHz to 50 MHz
-  3b'101 => 275Mhz to 250MHz
-  3b'110 => 250MHz to 225MHz
-  3b'111 => 225MHz to 200MHz
+Note: as per Rockchip engineers, apparently the "phyctrl_frqsel" is
+actually only useful in HS200 / HS400 modes even though the DLL itself
+it used for some purposes in all modes.  See the discussion in the
+earlier change in this series: ("mmc: sdhci-of-arasan: Always power the
+PHY off/on when clock changes").  In any case, it shouldn't hurt to set
+this always.
 
-On the Rockchip version of the PHY we have less granularity but the idea
-is the same.
+Note that this change should allow boards to run at HS200 / HS400 speed
+modes while running at 100 MHz or 150 MHz.  In fact, running HS400 at
+150 MHz (giving 300 MB/s) is the main motivation of this series, since
+performance is still good but signal integrity problems are less
+prevelant at 150 MHz.
 
 [1]: https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
 
 Signed-off-by: Douglas Anderson <dianders@chromium.org>
 ---
- Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt | 7 +++++++
- 1 file changed, 7 insertions(+)
+ drivers/phy/phy-rockchip-emmc.c | 74 +++++++++++++++++++++++++++++++----------
+ 1 file changed, 57 insertions(+), 17 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-index 555cb0f40690..fd118b071e5e 100644
---- a/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-@@ -7,6 +7,11 @@ Required properties:
-  - reg: PHY register address offset and length in "general
-    register files"
+diff --git a/drivers/phy/phy-rockchip-emmc.c b/drivers/phy/phy-rockchip-emmc.c
+index 8336053aea5c..0fce7359d468 100644
+--- a/drivers/phy/phy-rockchip-emmc.c
++++ b/drivers/phy/phy-rockchip-emmc.c
+@@ -14,6 +14,7 @@
+  * GNU General Public License for more details.
+  */
  
-+Optional clocks (see ../clock/clock-bindings.txt), specified by name:
-+ - emmcclk: The card clock exported by the SDHCI driver.  Although this is
-+	    listed as optional (because most boards can get basic functionality
-+	    without having access to it), it is strongly suggested.
-+
- Example:
- 
- 
-@@ -20,6 +25,8 @@ grf: syscon at ff770000 {
- 	emmcphy: phy at f780 {
- 		compatible = "rockchip,rk3399-emmc-phy";
- 		reg = <0xf780 0x20>;
-+		clocks = <&sdhci>;
-+		clock-names = "emmcclk";
- 		#phy-cells = <0>;
- 	};
++#include <linux/clk.h>
+ #include <linux/delay.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/module.h>
+@@ -78,16 +79,61 @@
+ struct rockchip_emmc_phy {
+ 	unsigned int	reg_offset;
+ 	struct regmap	*reg_base;
++	struct clk	*emmcclk;
  };
+ 
+-static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+-				   bool on_off)
++static int rockchip_emmc_phy_power(struct phy *phy, bool on_off)
+ {
++	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
+ 	unsigned int caldone;
+ 	unsigned int dllrdy;
++	unsigned int freqsel = PHYCTRL_FREQSEL_200M;
+ 	unsigned long timeout;
+ 
+ 	/*
++	 * We purposely get the clock here and not in probe to avoid the
++	 * circular dependency problem.  We expect:
++	 * - PHY driver to probe
++	 * - USB driver to start probe
++	 * - USB driver to register it's clock
++	 * - USB driver to get the PHY
++	 * - USB driver to power on the PHY
++	 */
++	if (!rk_phy->emmcclk) {
++		rk_phy->emmcclk = devm_clk_get(&phy->dev, "emmcclk");
++
++		/* Don't expect defer at this point; try next time */
++		if (PTR_ERR(rk_phy->emmcclk) == -EPROBE_DEFER) {
++			dev_warn(&phy->dev, "Unexpected emmcclk defer\n");
++			rk_phy->emmcclk = NULL;
++		}
++	}
++
++	if (!IS_ERR_OR_NULL(rk_phy->emmcclk)) {
++		unsigned long rate = clk_get_rate(rk_phy->emmcclk);
++
++		switch (rate) {
++		case 0 ... 74999999:
++			/* Nominal  50 MHz */
++			freqsel = PHYCTRL_FREQSEL_50M;
++			break;
++		case 75000000 ... 124999999:
++			/* Nominal 100 MHz */
++			freqsel = PHYCTRL_FREQSEL_100M;
++			break;
++		case 125000000 ... 174999999:
++			/* Nominal 150 MHz */
++			freqsel = PHYCTRL_FREQSEL_150M;
++			break;
++		default:
++			if (rate > 200000000)
++				dev_warn(&phy->dev, "Unsupported rate: %lu\n",
++					 rate);
++			break;
++		};
++	}
++
++	/*
+ 	 * Keep phyctrl_pdb and phyctrl_endll low to allow
+ 	 * initialization of CALIO state M/C DFFs
+ 	 */
+@@ -132,6 +178,13 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+ 		return -ETIMEDOUT;
+ 	}
+ 
++	/* Set the frequency of the DLL operation */
++	regmap_write(rk_phy->reg_base,
++		     rk_phy->reg_offset + GRF_EMMCPHY_CON0,
++		     HIWORD_UPDATE(freqsel, PHYCTRL_FREQSEL_MASK,
++				   PHYCTRL_FREQSEL_SHIFT));
++
++	/* Turn on the DLL */
+ 	regmap_write(rk_phy->reg_base,
+ 		     rk_phy->reg_offset + GRF_EMMCPHY_CON6,
+ 		     HIWORD_UPDATE(PHYCTRL_ENDLL_ENABLE,
+@@ -167,15 +220,8 @@ static int rockchip_emmc_phy_power(struct rockchip_emmc_phy *rk_phy,
+ 
+ static int rockchip_emmc_phy_power_off(struct phy *phy)
+ {
+-	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
+-	int ret = 0;
+-
+ 	/* Power down emmc phy analog blocks */
+-	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_OFF);
+-	if (ret)
+-		return ret;
+-
+-	return 0;
++	return rockchip_emmc_phy_power(phy, PHYCTRL_PDB_PWR_OFF);
+ }
+ 
+ static int rockchip_emmc_phy_power_on(struct phy *phy)
+@@ -183,12 +229,6 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
+ 	struct rockchip_emmc_phy *rk_phy = phy_get_drvdata(phy);
+ 	int ret = 0;
+ 
+-	/* DLL operation: 200 MHz */
+-	regmap_write(rk_phy->reg_base,
+-		     rk_phy->reg_offset + GRF_EMMCPHY_CON0,
+-		     HIWORD_UPDATE(PHYCTRL_FREQSEL_200M,
+-				   PHYCTRL_FREQSEL_MASK,
+-				   PHYCTRL_FREQSEL_SHIFT));
+ 
+ 	/* Drive impedance: 50 Ohm */
+ 	regmap_write(rk_phy->reg_base,
+@@ -212,7 +252,7 @@ static int rockchip_emmc_phy_power_on(struct phy *phy)
+ 				   PHYCTRL_OTAPDLYSEL_SHIFT));
+ 
+ 	/* Power up emmc phy analog blocks */
+-	ret = rockchip_emmc_phy_power(rk_phy, PHYCTRL_PDB_PWR_ON);
++	ret = rockchip_emmc_phy_power(phy, PHYCTRL_PDB_PWR_ON);
+ 	if (ret)
+ 		return ret;
+ 
 -- 
 2.8.0.rc3.226.g39d4020
