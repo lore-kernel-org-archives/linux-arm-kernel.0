@@ -1,48 +1,57 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue,  7 Jun 2016 18:28:07 -0400
-Subject: [PATCH 2/2] ARM: dts: NSP: Add PL330 support
-In-Reply-To: <1465338487-14932-1-git-send-email-jon.mason@broadcom.com>
-References: <1465338487-14932-1-git-send-email-jon.mason@broadcom.com>
-Message-ID: <1465338487-14932-3-git-send-email-jon.mason@broadcom.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Tue, 07 Jun 2016 15:42:20 -0700
+Subject: [PATCH v3 00/10] raspberry pi 3 patch series, part 1: essentials
+In-Reply-To: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
+References: <1465297548-17182-1-git-send-email-kraxel@redhat.com>
+Message-ID: <87shwo4o4z.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jon Mason <jonmason@broadcom.com>
+Gerd Hoffmann <kraxel@redhat.com> writes:
 
-Add PL330 support to the the Broadcom Northstar Plus device tree.
+>   Hi,
+>
+> Raspberry pi 3 patches, next round.  Should be pretty much ready
+> to go now.
+>
+> Changes v3:
+>  * redo defconfig update, drop DRM_VC4=y for now (not working for me).
+>  * split rpi3 device tree patch into two again (arm64 + arm).
+>
+> Changes v2:
+>  * send essential patches only
+>  * dropped ARCH_BCM kconfig option.
+>  * drop include hack for rpi3 device tree in arm.
+>  * drop DMA offset patch, pick up the version from Alex instead.
+>
+> Patches are also available from:
+>   git://git.kraxel.org/linux bcm2837-47-v3
+>
+> Note that the git branch has the complete set of patches (including
+> device tree patches and rpi3 wifi).
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+Patches 2, 3, and 9 were queued for -next as of last night.  Hopefully Gerd
+can do any future submissions against -next so we don't see duplicate
+patches.
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 1759e65..8d7b35a 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -192,6 +192,23 @@
- 			status = "disabled";
- 		};
- 
-+		dma at 20000 {
-+			compatible = "arm,pl330", "arm,primecell";
-+			reg = <0x20000 0x1000>;
-+			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&iprocslow>;
-+			clock-names = "apb_pclk";
-+			#dma-cells = <1>;
-+		};
-+
- 		nand: nand at 26000 {
- 			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
- 			reg = <0x026000 0x600>,
--- 
-1.9.1
+I've pulled patches 6, 7 (folding in a feedback fix from a previous
+round), and 10.
+
+That leaves the following that I'm hoping arm/arm64 maintainers can ack
+since they've had a bunch of discussion:
+
+Patch 4, 1: Can we keep ARCH_BCM2835 being the platform select?  All the
+platform's drivers have been under ARCH_BCM2835, that select has covered
+the rest of the chips in the family on the 32-bit side, and we have two
+other families like this for BCM already (IPROC, VULCAN)
+
+Patch 5: I expect we'll have some =m changes still.
+
+Patch 8: I think this one is ready.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/acffc59f/attachment.sig>
