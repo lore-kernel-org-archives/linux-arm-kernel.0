@@ -1,55 +1,77 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Tue,  7 Jun 2016 18:33:06 +0100
-Subject: [PATCH] pinctrl: sh-pfc: fix warnings by include core.h
-Message-ID: <1465320786-10333-1-git-send-email-ben.dooks@codethink.co.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 8 Jun 2016 01:20:48 +0800
+Subject: [PATCH v5 02/18] remoteproc: st_slim_rproc: add a slimcore rproc
+ driver
+In-Reply-To: <1465316352-20691-3-git-send-email-peter.griffin@linaro.org>
+Message-ID: <201606080142.ujZMSAIX%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix warnings about emev2_pinmux_info and r8a7779_pinmux_info
-by using core.h instead of sh_pfc.h in these files. This gives
-the declarations of the two structures and removes the following
-warnings:
+Hi,
 
-drivers/pinctrl/sh-pfc/pfc-emev2.c:1695:30: warning: symbol 'emev2_pinmux_info' was not declared. Should it be static?
-drivers/pinctrl/sh-pfc/pfc-r8a7779.c:3888:30: warning: symbol 'r8a7779_pinmux_info' was not declared. Should it be static?
+[auto build test WARNING on robh/for-next]
+[also build test WARNING on v4.7-rc2 next-20160607]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+url:    https://github.com/0day-ci/linux/commits/Peter-Griffin/Add-support-for-FDMA-DMA-controller-and-slim-core-rproc-found-on-STi-chipsets/20160608-002710
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: x86_64-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
+
+All warnings (new ones prefixed by >>):
+
+   drivers/remoteproc/st_slim_rproc.c: In function 'slim_rproc_start':
+>> drivers/remoteproc/st_slim_rproc.c:137:9: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+     writel(~0UL, slim_rproc->peri + SLIM_INT_CLR_OFST);
+            ^
+   drivers/remoteproc/st_slim_rproc.c:138:9: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+     writel(~0UL, slim_rproc->peri + SLIM_CMD_CLR_OFST);
+            ^
+   drivers/remoteproc/st_slim_rproc.c:141:9: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+     writel(~0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
+            ^
+   drivers/remoteproc/st_slim_rproc.c:142:9: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+     writel(~0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
+            ^
+
+vim +137 drivers/remoteproc/st_slim_rproc.c
+
+   121			dev_err(dev, "Failed to enable clocks\n");
+   122			goto err_clk;
+   123		}
+   124	
+   125		/* disable CPU pipeline clock & reset cpu pipeline */
+   126		val = SLIM_CLK_GATE_DIS | SLIM_CLK_GATE_RESET;
+   127		writel(val, slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
+   128	
+   129		/* disable SLIM core STBus sync */
+   130		writel(SLIM_STBUS_SYNC_DIS, slim_rproc->peri + SLIM_STBUS_SYNC_OFST);
+   131	
+   132		/* enable cpu pipeline clock */
+   133		writel(!SLIM_CLK_GATE_DIS,
+   134			slim_rproc->slimcore + SLIM_CLK_GATE_OFST);
+   135	
+   136		/* clear int & cmd mailbox */
+ > 137		writel(~0UL, slim_rproc->peri + SLIM_INT_CLR_OFST);
+   138		writel(~0UL, slim_rproc->peri + SLIM_CMD_CLR_OFST);
+   139	
+   140		/* enable all channels cmd & int */
+   141		writel(~0UL, slim_rproc->peri + SLIM_INT_MASK_OFST);
+   142		writel(~0UL, slim_rproc->peri + SLIM_CMD_MASK_OFST);
+   143	
+   144		/* enable cpu */
+   145		writel(SLIM_EN_RUN, slim_rproc->slimcore + SLIM_EN_OFST);
+
 ---
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Cc: Alessandro Rubini <rubini@unipv.it>
-Cc: linux-renesas-soc at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-gpio at vger.kernel.org
----
- drivers/pinctrl/sh-pfc/pfc-emev2.c   | 2 +-
- drivers/pinctrl/sh-pfc/pfc-r8a7779.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/pinctrl/sh-pfc/pfc-emev2.c b/drivers/pinctrl/sh-pfc/pfc-emev2.c
-index 1cbbe04..f943854 100644
---- a/drivers/pinctrl/sh-pfc/pfc-emev2.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-emev2.c
-@@ -10,7 +10,7 @@
- #include <linux/init.h>
- #include <linux/kernel.h>
- 
--#include "sh_pfc.h"
-+#include "core.h"
- 
- #define CPU_ALL_PORT(fn, pfx, sfx)					\
- 	PORT_10(0,  fn, pfx, sfx),	PORT_90(0,  fn, pfx, sfx),	\
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-index 5bef934..098d01e 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
-@@ -21,7 +21,7 @@
- 
- #include <linux/kernel.h>
- 
--#include "sh_pfc.h"
-+#include "core.h"
- 
- #define CPU_ALL_PORT(fn, sfx)						\
- 	PORT_GP_32(0, fn, sfx),						\
--- 
-2.8.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 54766 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160608/f2d860ee/attachment-0001.obj>
