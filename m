@@ -1,201 +1,332 @@
-From: eric.auger@redhat.com (Eric Auger)
-Date: Tue,  7 Jun 2016 16:03:50 +0000
-Subject: [PATCH v10 5/8] vfio: allow reserved msi iova registration
-In-Reply-To: <1465315433-5974-1-git-send-email-eric.auger@redhat.com>
-References: <1465315433-5974-1-git-send-email-eric.auger@redhat.com>
-Message-ID: <1465315433-5974-6-git-send-email-eric.auger@redhat.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue,  7 Jun 2016 18:04:11 +0200
+Subject: [PATCH v2 1/2] clocksource: Add Oxford Semiconductor RPS Dual Timer
+In-Reply-To: <1465315452-20599-1-git-send-email-narmstrong@baylibre.com>
+References: <1465315452-20599-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1465315452-20599-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The user is allowed to register a reserved MSI IOVA range by using the
-DMA MAP API and setting the new flag: VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA.
-This region is stored in the vfio_dma rb tree. At that point the iova
-range is not mapped to any target address yet. The host kernel will use
-those iova when needed, typically when MSIs are allocated.
+Add clocksource and clockevent driver from dual RPS timer.
+The HW provides a dual one-shot or periodic 24bit timers,
+the drivers set the first one as tick event source and the
+second as a continuous scheduler clock source.
+The timer can use 1, 16 or 256 as pre-dividers, thus the
+clocksource uses 16 by default.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@freescale.com>
-
+CC: Ma Haijun <mahaijuns@gmail.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
-v9 -> v10
-- use VFIO_IOVA_RESERVED_MSI enum value
+ drivers/clocksource/Kconfig           |   6 +
+ drivers/clocksource/Makefile          |   1 +
+ drivers/clocksource/timer-oxnas-rps.c | 270 ++++++++++++++++++++++++++++++++++
+ 3 files changed, 277 insertions(+)
+ create mode 100644 drivers/clocksource/timer-oxnas-rps.c
 
-v7 -> v8:
-- use iommu_msi_set_aperture function. There is no notion of
-  unregistration anymore since the reserved msi slot remains
-  until the container gets closed.
-
-v6 -> v7:
-- use iommu_free_reserved_iova_domain
-- convey prot attributes downto dma-reserved-iommu iova domain creation
-- reserved bindings teardown now performed on iommu domain destruction
-- rename VFIO_DMA_MAP_FLAG_MSI_RESERVED_IOVA into
-         VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA
-- change title
-- pass the protection attribute to dma-reserved-iommu API
-
-v3 -> v4:
-- use iommu_alloc/free_reserved_iova_domain exported by dma-reserved-iommu
-- protect vfio_register_reserved_iova_range implementation with
-  CONFIG_IOMMU_DMA_RESERVED
-- handle unregistration by user-space and on vfio_iommu_type1 release
-
-v1 -> v2:
-- set returned value according to alloc_reserved_iova_domain result
-- free the iova domains in case any error occurs
-
-RFC v1 -> v1:
-- takes into account Alex comments, based on
-  [RFC PATCH 1/6] vfio: Add interface for add/del reserved iova region:
-- use the existing dma map/unmap ioctl interface with a flag to register
-  a reserved IOVA range. A single reserved iova region is allowed.
----
- drivers/vfio/vfio_iommu_type1.c | 77 ++++++++++++++++++++++++++++++++++++++++-
- include/uapi/linux/vfio.h       | 10 +++++-
- 2 files changed, 85 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 69c775e..14dc9ef 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -442,6 +442,20 @@ static void vfio_unmap_unpin(struct vfio_iommu *iommu, struct vfio_dma *dma)
- 	vfio_lock_acct(-unlocked);
- }
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 47352d2..7e382c5 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -293,6 +293,12 @@ config VF_PIT_TIMER
+ 	help
+ 	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
  
-+static int vfio_set_msi_aperture(struct vfio_iommu *iommu,
-+				dma_addr_t iova, size_t size)
-+{
-+	struct vfio_domain *d;
-+	int ret = 0;
++config OXNAS_RPS_TIMER
++	bool
++	select CLKSRC_MMIO
++	help
++	  This enables support for the Oxford Semiconductor OXNAS RPS timers.
 +
-+	list_for_each_entry(d, &iommu->domain_list, next) {
-+		ret = iommu_msi_set_aperture(d->domain, iova, iova + size - 1);
-+		if (ret)
-+			break;
-+	}
-+	return ret;
-+}
-+
- static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
- {
- 	vfio_unmap_unpin(iommu, dma);
-@@ -691,6 +705,63 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
- 	return ret;
- }
+ config SYS_SUPPORTS_SH_CMT
+         bool
  
-+static int vfio_register_msi_range(struct vfio_iommu *iommu,
-+				   struct vfio_iommu_type1_dma_map *map)
-+{
-+	dma_addr_t iova = map->iova;
-+	size_t size = map->size;
-+	int ret = 0;
-+	struct vfio_dma *dma;
-+	unsigned long order;
-+	uint64_t mask;
-+
-+	/* Verify that none of our __u64 fields overflow */
-+	if (map->size != size || map->iova != iova)
-+		return -EINVAL;
-+
-+	order =  __ffs(vfio_pgsize_bitmap(iommu));
-+	mask = ((uint64_t)1 << order) - 1;
-+
-+	WARN_ON(mask & PAGE_MASK);
-+
-+	if (!size || (size | iova) & mask)
-+		return -EINVAL;
-+
-+	/* Don't allow IOVA address wrap */
-+	if (iova + size - 1 < iova)
-+		return -EINVAL;
-+
-+	mutex_lock(&iommu->lock);
-+
-+	if (vfio_find_dma(iommu, iova, size, VFIO_IOVA_ANY)) {
-+		ret =  -EEXIST;
-+		goto unlock;
-+	}
-+
-+	dma = kzalloc(sizeof(*dma), GFP_KERNEL);
-+	if (!dma) {
-+		ret = -ENOMEM;
-+		goto unlock;
-+	}
-+
-+	dma->iova = iova;
-+	dma->size = size;
-+	dma->type = VFIO_IOVA_RESERVED_MSI;
-+
-+	ret = vfio_set_msi_aperture(iommu, iova, size);
-+	if (ret)
-+		goto free_unlock;
-+
-+	vfio_link_dma(iommu, dma);
-+	goto unlock;
-+
-+free_unlock:
-+	kfree(dma);
-+unlock:
-+	mutex_unlock(&iommu->lock);
-+	return ret;
-+}
-+
- static int vfio_bus_type(struct device *dev, void *data)
- {
- 	struct bus_type **bus = data;
-@@ -1065,7 +1136,8 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 	} else if (cmd == VFIO_IOMMU_MAP_DMA) {
- 		struct vfio_iommu_type1_dma_map map;
- 		uint32_t mask = VFIO_DMA_MAP_FLAG_READ |
--				VFIO_DMA_MAP_FLAG_WRITE;
-+				VFIO_DMA_MAP_FLAG_WRITE |
-+				VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA;
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 473974f..bc66981 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -48,6 +48,7 @@ obj-$(CONFIG_MTK_TIMER)		+= mtk_timer.o
+ obj-$(CONFIG_CLKSRC_PISTACHIO)	+= time-pistachio.o
+ obj-$(CONFIG_CLKSRC_TI_32K)	+= timer-ti-32k.o
+ obj-$(CONFIG_CLKSRC_NPS)	+= timer-nps.o
++obj-$(CONFIG_OXNAS_RPS_TIMER)	+= timer-oxnas-rps.o
  
- 		minsz = offsetofend(struct vfio_iommu_type1_dma_map, size);
- 
-@@ -1075,6 +1147,9 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
- 		if (map.argsz < minsz || map.flags & ~mask)
- 			return -EINVAL;
- 
-+		if (map.flags & VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA)
-+			return vfio_register_msi_range(iommu, &map);
-+
- 		return vfio_dma_do_map(iommu, &map);
- 
- 	} else if (cmd == VFIO_IOMMU_UNMAP_DMA) {
-diff --git a/include/uapi/linux/vfio.h b/include/uapi/linux/vfio.h
-index 255a211..4a9dbc2 100644
---- a/include/uapi/linux/vfio.h
-+++ b/include/uapi/linux/vfio.h
-@@ -498,12 +498,19 @@ struct vfio_iommu_type1_info {
-  *
-  * Map process virtual addresses to IO virtual addresses using the
-  * provided struct vfio_dma_map. Caller sets argsz. READ &/ WRITE required.
+ obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
+ obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
+diff --git a/drivers/clocksource/timer-oxnas-rps.c b/drivers/clocksource/timer-oxnas-rps.c
+new file mode 100644
+index 0000000..c9b613b
+--- /dev/null
++++ b/drivers/clocksource/timer-oxnas-rps.c
+@@ -0,0 +1,270 @@
++/*
++ * drivers/clocksource/timer-oxnas-rps.c
 + *
-+ * In case RESERVED_MSI_IOVA flag is set, the API only aims@registering an
-+ * IOVA region that will be used on some platforms to map the host MSI frames.
-+ * In that specific case, vaddr is ignored. Once registered, an MSI reserved
-+ * IOVA region stays until the container is closed.
-  */
- struct vfio_iommu_type1_dma_map {
- 	__u32	argsz;
- 	__u32	flags;
- #define VFIO_DMA_MAP_FLAG_READ (1 << 0)		/* readable from device */
- #define VFIO_DMA_MAP_FLAG_WRITE (1 << 1)	/* writable from device */
-+/* reserved iova for MSI vectors*/
-+#define VFIO_DMA_MAP_FLAG_RESERVED_MSI_IOVA (1 << 2)
- 	__u64	vaddr;				/* Process virtual address */
- 	__u64	iova;				/* IO virtual address */
- 	__u64	size;				/* Size of mapping (bytes) */
-@@ -519,7 +526,8 @@ struct vfio_iommu_type1_dma_map {
-  * Caller sets argsz.  The actual unmapped size is returned in the size
-  * field.  No guarantee is made to the user that arbitrary unmaps of iova
-  * or size different from those used in the original mapping call will
-- * succeed.
-+ * succeed. Once registered, an MSI region cannot be unmapped and stays
-+ * until the container is closed.
-  */
- struct vfio_iommu_type1_dma_unmap {
- 	__u32	argsz;
++ * Copyright (C) 2009 Oxford Semiconductor Ltd
++ * Copyright (C) 2013 Ma Haijun <mahaijuns@gmail.com>
++ * Copyright (C) 2016 Neil Armstrong <narmstrong@baylibre.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
++
++#include <linux/init.h>
++#include <linux/irq.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/slab.h>
++#include <linux/interrupt.h>
++#include <linux/of_irq.h>
++#include <linux/of_address.h>
++#include <linux/clockchips.h>
++#include <linux/sched_clock.h>
++
++/* TIMER1 used as tick
++ * TIMER2 used as clocksource
++ */
++
++/* Registers definitions */
++
++#define TIMER_LOAD_REG		0x0
++#define TIMER_CURR_REG		0x4
++#define TIMER_CTRL_REG		0x8
++#define TIMER_CLRINT_REG	0xC
++
++#define TIMER_BITS		24
++
++#define TIMER_MAX_VAL		(BIT(TIMER_BITS) - 1)
++
++#define TIMER_PERIODIC		BIT(6)
++#define TIMER_ENABLE		BIT(7)
++
++#define TIMER_DIV1		(0)
++#define TIMER_DIV16		(1 << 2)
++#define TIMER_DIV256		(2 << 2)
++
++#define TIMER1_REG_OFFSET	0
++#define TIMER2_REG_OFFSET	0x20
++
++/* Clockevent & Clocksource data */
++
++struct oxnas_rps_timer {
++	struct clock_event_device clkevent;
++	void __iomem *clksrc_base;
++	void __iomem *clkevt_base;
++	unsigned long timer_period;
++	unsigned int timer_prescaler;
++	struct clk *clk;
++	int irq;
++};
++
++static irqreturn_t oxnas_rps_timer_irq(int irq, void *dev_id)
++{
++	struct oxnas_rps_timer *rps = dev_id;
++
++	writel_relaxed(0, rps->clkevt_base + TIMER_CLRINT_REG);
++
++	rps->clkevent.event_handler(&rps->clkevent);
++
++	return IRQ_HANDLED;
++}
++
++static void oxnas_rps_timer_config(struct oxnas_rps_timer *rps,
++				   unsigned long period,
++				   unsigned int periodic)
++{
++	uint32_t cfg = rps->timer_prescaler;
++
++	if (period)
++		cfg |= TIMER_ENABLE;
++
++	if (periodic)
++		cfg |= TIMER_PERIODIC;
++
++	writel_relaxed(period, rps->clkevt_base + TIMER_LOAD_REG);
++	writel_relaxed(cfg, rps->clkevt_base + TIMER_CTRL_REG);
++}
++
++static int oxnas_rps_timer_shutdown(struct clock_event_device *evt)
++{
++	struct oxnas_rps_timer *rps =
++		container_of(evt, struct oxnas_rps_timer, clkevent);
++
++	oxnas_rps_timer_config(rps, 0, 0);
++
++	return 0;
++}
++
++static int oxnas_rps_timer_set_periodic(struct clock_event_device *evt)
++{
++	struct oxnas_rps_timer *rps =
++		container_of(evt, struct oxnas_rps_timer, clkevent);
++
++	oxnas_rps_timer_config(rps, rps->timer_period, 1);
++
++	return 0;
++}
++
++static int oxnas_rps_timer_set_oneshot(struct clock_event_device *evt)
++{
++	struct oxnas_rps_timer *rps =
++		container_of(evt, struct oxnas_rps_timer, clkevent);
++
++	oxnas_rps_timer_config(rps, rps->timer_period, 0);
++
++	return 0;
++}
++
++static int oxnas_rps_timer_next_event(unsigned long delta,
++				struct clock_event_device *evt)
++{
++	struct oxnas_rps_timer *rps =
++		container_of(evt, struct oxnas_rps_timer, clkevent);
++
++	oxnas_rps_timer_config(rps, delta, 0);
++
++	return 0;
++}
++
++static void __init oxnas_rps_clockevent_init(struct oxnas_rps_timer *rps)
++{
++	ulong clk_rate = clk_get_rate(rps->clk);
++	ulong timer_rate;
++
++	/* Start with prescaler 1 */
++	rps->timer_prescaler = TIMER_DIV1;
++	rps->timer_period = DIV_ROUND_UP(clk_rate, HZ);
++	timer_rate = clk_rate;
++
++	if (rps->timer_period > TIMER_MAX_VAL) {
++		rps->timer_prescaler = TIMER_DIV16;
++		timer_rate = clk_rate / 16;
++		rps->timer_period = DIV_ROUND_UP(timer_rate, HZ);
++	}
++	if (rps->timer_period > TIMER_MAX_VAL) {
++		rps->timer_prescaler = TIMER_DIV256;
++		timer_rate = clk_rate / 256;
++		rps->timer_period = DIV_ROUND_UP(timer_rate, HZ);
++	}
++
++	rps->clkevent.name = "oxnas-rps";
++	rps->clkevent.features = CLOCK_EVT_FEAT_PERIODIC |
++				 CLOCK_EVT_FEAT_ONESHOT |
++				 CLOCK_EVT_FEAT_DYNIRQ;
++	rps->clkevent.tick_resume = oxnas_rps_timer_shutdown;
++	rps->clkevent.set_state_shutdown = oxnas_rps_timer_shutdown;
++	rps->clkevent.set_state_periodic = oxnas_rps_timer_set_periodic;
++	rps->clkevent.set_state_oneshot = oxnas_rps_timer_set_oneshot;
++	rps->clkevent.set_next_event = oxnas_rps_timer_next_event;
++	rps->clkevent.rating = 200;
++	rps->clkevent.cpumask = cpu_possible_mask;
++	rps->clkevent.irq = rps->irq;
++	clockevents_config_and_register(&rps->clkevent,
++					timer_rate,
++					1,
++					TIMER_MAX_VAL);
++
++	pr_info("Registered clock event rate %luHz prescaler %x period %lu\n",
++			clk_rate,
++			rps->timer_prescaler,
++			rps->timer_period);
++}
++
++/* Clocksource */
++
++static void __iomem *timer_sched_base;
++
++static u64 notrace oxnas_rps_read_sched_clock(void)
++{
++	return ~readl_relaxed(timer_sched_base);
++}
++
++static void __init oxnas_rps_clocksource_init(struct oxnas_rps_timer *rps)
++{
++	ulong clk_rate = clk_get_rate(rps->clk);
++	int ret;
++
++	/* use prescale 16 */
++	clk_rate = clk_rate / 16;
++
++	writel_relaxed(TIMER_MAX_VAL, rps->clksrc_base + TIMER_LOAD_REG);
++	writel_relaxed(TIMER_PERIODIC | TIMER_ENABLE | TIMER_DIV16,
++			rps->clksrc_base + TIMER_CTRL_REG);
++
++	timer_sched_base = rps->clksrc_base + TIMER_CURR_REG;
++	sched_clock_register(oxnas_rps_read_sched_clock,
++			     TIMER_BITS, clk_rate);
++	ret = clocksource_mmio_init(timer_sched_base,
++				    "oxnas_rps_clocksource_timer",
++				    clk_rate, 250, TIMER_BITS,
++				    clocksource_mmio_readl_down);
++	if (WARN_ON(ret))
++		pr_err("can't register clocksource\n");
++
++	pr_info("Registered clocksource rate %luHz\n", clk_rate);
++}
++
++static void __init oxnas_rps_timer_init(struct device_node *np)
++{
++	struct oxnas_rps_timer *rps;
++	void __iomem *base;
++	int ret;
++
++	rps = kzalloc(sizeof(*rps), GFP_KERNEL);
++	if (WARN_ON(!rps))
++		return;
++
++	rps->clk = of_clk_get(np, 0);
++	if (WARN_ON(IS_ERR(rps->clk)))
++		return;
++
++	if (WARN_ON(clk_prepare_enable(rps->clk)))
++		goto err;
++
++	base = of_iomap(np, 0);
++	if (WARN_ON(!base))
++		goto err;
++
++
++	rps->irq = irq_of_parse_and_map(np, 0);
++	if (WARN_ON(rps->irq < 0))
++		goto err;
++
++	rps->clkevt_base = base + TIMER1_REG_OFFSET;
++	rps->clksrc_base = base + TIMER2_REG_OFFSET;
++
++	/* Disable timers */
++	writel_relaxed(0, rps->clkevt_base + TIMER_CTRL_REG);
++	writel_relaxed(0, rps->clksrc_base + TIMER_CTRL_REG);
++	writel_relaxed(0, rps->clkevt_base + TIMER_LOAD_REG);
++	writel_relaxed(0, rps->clksrc_base + TIMER_LOAD_REG);
++	writel_relaxed(0, rps->clkevt_base + TIMER_CLRINT_REG);
++	writel_relaxed(0, rps->clksrc_base + TIMER_CLRINT_REG);
++
++	ret = request_irq(rps->irq, oxnas_rps_timer_irq,
++			  IRQF_TIMER | IRQF_IRQPOLL,
++			  "rps-timer", rps);
++	if (WARN_ON(ret))
++		goto err;
++
++	oxnas_rps_clockevent_init(rps);
++	oxnas_rps_clocksource_init(rps);
++
++	return;
++err:
++	clk_put(rps->clk);
++	kfree(rps);
++}
++
++CLOCKSOURCE_OF_DECLARE(ox810se_rps,
++		       "oxsemi,ox810se-rps-timer", oxnas_rps_timer_init);
 -- 
 1.9.1
