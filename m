@@ -1,56 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Jun 2016 17:13:26 +0100
-Subject: [PATCH] clk: ti: fapll: fix address space warnings
-In-Reply-To: <1465308337-18047-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465308337-18047-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160607161326.GZ5783@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Jun 2016 17:15:08 +0100
+Subject: [alsa-devel] [PATCH v2 5/9] ASoC: mediatek: add structure define
+ and clock control for 2701
+In-Reply-To: <1464929784-5489-6-git-send-email-garlic.tseng@mediatek.com>
+References: <1464929784-5489-1-git-send-email-garlic.tseng@mediatek.com>
+ <1464929784-5489-6-git-send-email-garlic.tseng@mediatek.com>
+Message-ID: <20160607161508.GC7510@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 03:05:37PM +0100, Ben Dooks wrote:
-> Fix the following warnings from casting "void __iomem *" pointers
-> to u32 when using sparse:
-> 
-> drivers/clk/ti/fapll.c:583:13: warning: cast removes address space of expression
-> drivers/clk/ti/fapll.c:623:21: warning: cast removes address space of expression
+On Fri, Jun 03, 2016 at 12:56:20PM +0800, Garlic Tseng wrote:
 
-As a note of general principle, adding __force to casts is not the correct
-way to solve these sparse warnings.
+> +void mt2701_init_clock(struct mtk_base_afe *afe)
+> +{
+> +	struct mt2701_afe_private *afe_priv = afe->platform_priv;
+> +	int i = 0;
+> +
+> +	for (i = 0; i < MT2701_CLOCK_NUM; i++) {
+> +		afe_priv->clocks[i] = devm_clk_get(afe->dev, aud_clks[i]);
+> +		if (IS_ERR(aud_clks[i]))
+> +			dev_warn(afe->dev, "%s devm_clk_get %s fail\n",
+> +				 __func__, aud_clks[i]);
+> +	}
+> +}
 
-__force is supposed to be used in places which know that the cast is 100%
-legitimate - in other words, architecture code removing the __iomem-ness
-of the pointer so it can be dereferenced.  Sprinking the code with __force
-to shut these warnings up doesn't actually help the cause.
-
-> diff --git a/drivers/clk/ti/fapll.c b/drivers/clk/ti/fapll.c
-> index 66a0d0e..d765f4a 100644
-> --- a/drivers/clk/ti/fapll.c
-> +++ b/drivers/clk/ti/fapll.c
-> @@ -43,14 +43,14 @@
->  #define to_synth(_hw)		container_of(_hw, struct fapll_synth, hw)
->  
->  /* The bypass bit is inverted on the ddr_pll.. */
-> -#define fapll_is_ddr_pll(va)	(((u32)(va) & 0xffff) == 0x0440)
-> +#define fapll_is_ddr_pll(va)	(((u32 __force)(va) & 0xffff) == 0x0440)
-
-This should be a cast to unsigned long, not u32.
-
->  
->  /*
->   * The audio_pll_clk1 input is hard wired to the 27MHz bypass clock,
->   * and the audio_pll_clk1 synthesizer is hardwared to 32KiHz output.
->   */
-> -#define is_ddr_pll_clk1(va)	(((u32)(va) & 0xffff) == 0x044c)
-> -#define is_audio_pll_clk1(va)	(((u32)(va) & 0xffff) == 0x04a8)
-> +#define is_ddr_pll_clk1(va)	(((u32 __force)(va) & 0xffff) == 0x044c)
-> +#define is_audio_pll_clk1(va)	(((u32 __force)(va) & 0xffff) == 0x04a8)
-
-Ditto.
-
-A cast from an __iomem pointer to unsigned long is permitted - no need
-to use __force.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+This looks like we just ignore the error but I'm not seeing anything
+that stops us trying to use the clocks or handle deferred probe?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160607/e066cb30/attachment.sig>
