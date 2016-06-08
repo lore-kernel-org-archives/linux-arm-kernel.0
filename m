@@ -1,121 +1,57 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  8 Jun 2016 18:34:36 +0200
-Subject: [PATCH v2 01/13] pwm: Add new helpers to create/manipulate PWM states
+Date: Wed,  8 Jun 2016 18:34:48 +0200
+Subject: [PATCH v2 13/13] regulator: pwm: Document pwm-dutycycle-unit and
+ pwm-dutycycle-range
 In-Reply-To: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465403688-17098-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465403688-17098-14-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pwm_prepare_new_state() helper prepares a new state object
-containing the current PWM state except for the polarity and period
-fields which are set to the reference values.
-This is particurly useful for PWM users who want to apply a new
-duty-cycle expressed relatively to the reference period without
-changing the enable state.
-
-The PWM framework expect PWM users to configure the duty cycle in
-nanosecond, but most users just want to express this duty cycle
-relatively to the period value (i.e. duty_cycle = 33% of the period).
-Add pwm_{get,set}_relative_duty_cycle() helpers to ease this kind of
-conversion.
+Document the pwm-dutycycle-unit and pwm-dutycycle-range properties.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Brian Norris <briannorris@chromium.org>
 ---
- include/linux/pwm.h | 81 +++++++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 81 insertions(+)
+ .../devicetree/bindings/regulator/pwm-regulator.txt   | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index 17018f3..e09babf 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -148,6 +148,87 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
- }
+diff --git a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+index ed936f0..9fbc7b1 100644
+--- a/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
++++ b/Documentation/devicetree/bindings/regulator/pwm-regulator.txt
+@@ -34,6 +34,18 @@ Only required for Voltage Table Mode:
+ 			    First cell is voltage in microvolts (uV)
+ 			    Second cell is duty-cycle in percent (%)
  
- /**
-+ * pwm_prepare_new_state() - prepare a new state to be applied with
-+ *			     pwm_apply_state()
-+ * @pwm: PWM device
-+ * @state: state to fill with the prepared PWM state
-+ *
-+ * This functions prepares a state that can later be tweaked and applied
-+ * to the PWM device with pwm_apply_state(). This is a convenient function
-+ * that first retrieves the current PWM state and the replaces the period
-+ * and polarity fields with the reference values defined in pwm->args.
-+ * Once the new state is created you can adjust the ->enable and ->duty_cycle
-+ * according to your need before calling pwm_apply_state().
-+ */
-+static inline void pwm_prepare_new_state(const struct pwm_device *pwm,
-+					 struct pwm_state *state)
-+{
-+	struct pwm_args args;
++Optional properties for Continuous mode:
++- pwm-dutycycle-unit:	Integer value encoding the duty cycle unit. If not
++			defined, <100> is assumed, meaning that
++			pwm-dutycycle-range contains values expressed in
++			percent.
 +
-+	/* First get the current state. */
-+	pwm_get_state(pwm, state);
++- pwm-dutycycle-range:	Should contain 2 entries. The first entry is encoding
++			the dutycycle for regulator-min-microvolt and the
++			second one the dutycycle for regulator-max-microvolt.
++			Duty cycle values are expressed in pwm-dutycycle-unit.
++			If not defined, <0 100> is assumed.
 +
-+	/* Then fill it with the reference config */
-+	pwm_get_args(pwm, &args);
-+
-+	state->period = args.period;
-+	state->polarity = args.polarity;
-+	state->duty_cycle = 0;
-+}
-+
-+/**
-+ * pwm_get_relative_duty_cycle() - Get a relative duty_cycle value
-+ * @state: the PWM state to extract period and duty_cycle from
-+ * @scale: the scale you want to use for you relative duty_cycle value
-+ *
-+ * This functions converts the absolute duty_cycle stored in @state
-+ * (expressed in nanosecond) into a relative value.
-+ * For example if you want to get the duty_cycle expressed in nanosecond,
-+ * call:
-+ *
-+ * pwm_get_state(pwm, &state);
-+ * duty = pwm_get_relative_duty_cycle(&state, 100);
-+ */
-+static inline unsigned int
-+pwm_get_relative_duty_cycle(const struct pwm_state *state, unsigned int scale)
-+{
-+	if (!state->period)
-+		return 0;
-+
-+	return DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * scale,
-+				     state->period);
-+}
-+
-+/**
-+ * pwm_set_relative_duty_cycle() - Set a relative duty_cycle value
-+ * @state: the PWM state to fill
-+ * @val: the relative duty_cycle value
-+ * @scale: the scale you use for you relative duty_cycle value
-+ *
-+ * This functions converts a relative duty_cycle stored into an absolute
-+ * one (expressed in nanoseconds), and put the result in state->duty_cycle.
-+ * For example if you want to change configure a 50% duty_cycle, call:
-+ *
-+ * pwm_prepare_new_state(pwm, &state);
-+ * pwm_set_relative_duty_cycle(&state, 50, 100);
-+ * pwm_apply_state(pwm, &state);
-+ */
-+static inline void
-+pwm_set_relative_duty_cycle(struct pwm_state *state, unsigned int val,
-+			    unsigned int scale)
-+{
-+	if (!scale)
-+		return;
-+
-+	/* Make sure we don't have duty_cycle > period */
-+	if (val > scale)
-+		val = scale;
-+
-+	state->duty_cycle = DIV_ROUND_CLOSEST_ULL((u64)val * state->period,
-+						  scale);
-+}
-+
-+/**
-  * struct pwm_ops - PWM controller operations
-  * @request: optional hook for requesting a PWM
-  * @free: optional hook for freeing a PWM
+ NB: To be clear, if voltage-table is provided, then the device will be used
+ in Voltage Table Mode.  If no voltage-table is provided, then the device will
+ be used in Continuous Voltage Mode.
+@@ -48,6 +60,13 @@ Continuous Voltage Example:
+ 		regulator-min-microvolt = <1016000>;
+ 		regulator-max-microvolt = <1114000>;
+ 		regulator-name = "vdd_logic";
++		/* unit == per-mille */
++		pwm-dutycycle-unit = <1000>;
++		/*
++		 * Inverted PWM logic, and the duty cycle range is limited
++		 * to 30%-70%.
++		 */
++		pwm-dutycycle-range <700 300>; /* */
+ 	};
+ 
+ Voltage Table Example:
 -- 
 2.7.4
