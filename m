@@ -1,43 +1,71 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jun 2016 10:00:19 +0900
-Subject: [PATCH 1/2] ARM: shmobile: pm-rmobile: Postpone call to
- pm_genpd_init()
+Date: Wed,  8 Jun 2016 10:00:20 +0900
+Subject: [PATCH 2/2] ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all
+ SoCs
 In-Reply-To: <cover.1465347025.git.horms+renesas@verge.net.au>
 References: <cover.1465347025.git.horms+renesas@verge.net.au>
-Message-ID: <85d9bf152bdaa7e98a05cc460aa6880efdf0b433.1465347025.git.horms+renesas@verge.net.au>
+Message-ID: <c94bc815f3c757df402d6f6a3e8d855b9168e6af.1465347025.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-All local setup of the generic_pm_domain structure should have been
-completed before calling pm_genpd_init().
+Currently the different SoCs in the R-Car Gen2 family use different
+types of on-chip RAM for the jump stub:
+  - R-Car H2 uses Media RAM,
+  - R-Car M2-W uses another type of optional On-chip RAM, as it doesn't
+    have Media RAM,
+  - R-Car M2-N uses Inter Connect RAM in Magnus Damm's "ARM: shmobile:
+    r8a7793 boot address update".
+
+As all R-Car Gen2 SoCs have 4 KiB of Inter Connect RAM, consolidate the
+code by always using that.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/pm-rmobile.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/pm-rcar-gen2.c | 13 ++++---------
+ 1 file changed, 4 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
-index c0b05e9e6442..45a195501b78 100644
---- a/arch/arm/mach-shmobile/pm-rmobile.c
-+++ b/arch/arm/mach-shmobile/pm-rmobile.c
-@@ -131,13 +131,13 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
- 	struct dev_power_governor *gov = rmobile_pd->gov;
+diff --git a/arch/arm/mach-shmobile/pm-rcar-gen2.c b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+index 691ac166a277..61361dac6068 100644
+--- a/arch/arm/mach-shmobile/pm-rcar-gen2.c
++++ b/arch/arm/mach-shmobile/pm-rcar-gen2.c
+@@ -26,8 +26,7 @@
+ #define CA7RESCNT	0x0044
  
- 	genpd->flags = GENPD_FLAG_PM_CLK;
--	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
- 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
- 	genpd->power_off		= rmobile_pd_power_down;
- 	genpd->power_on			= rmobile_pd_power_up;
- 	genpd->attach_dev		= cpg_mstp_attach_dev;
- 	genpd->detach_dev		= cpg_mstp_detach_dev;
- 	__rmobile_pd_power_up(rmobile_pd, false);
-+	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
- }
+ /* On-chip RAM */
+-#define MERAM		0xe8080000
+-#define RAM		0xe6300000
++#define ICRAM1		0xe63c0000	/* Inter Connect RAM1 (4 KiB) */
  
- static int rmobile_pd_suspend_busy(void)
+ /* SYSC */
+ #define SYSCIER 0x0c
+@@ -58,7 +57,7 @@ void __init rcar_gen2_pm_init(void)
+ 	struct device_node *np, *cpus;
+ 	bool has_a7 = false;
+ 	bool has_a15 = false;
+-	phys_addr_t boot_vector_addr = 0;
++	phys_addr_t boot_vector_addr = ICRAM1;
+ 	u32 syscier = 0;
+ 
+ 	if (once++)
+@@ -75,14 +74,10 @@ void __init rcar_gen2_pm_init(void)
+ 			has_a7 = true;
+ 	}
+ 
+-	if (of_machine_is_compatible("renesas,r8a7790")) {
+-		boot_vector_addr = MERAM;
++	if (of_machine_is_compatible("renesas,r8a7790"))
+ 		syscier = 0x013111ef;
+-
+-	} else if (of_machine_is_compatible("renesas,r8a7791")) {
+-		boot_vector_addr = RAM;
++	else if (of_machine_is_compatible("renesas,r8a7791"))
+ 		syscier = 0x00111003;
+-	}
+ 
+ 	/* RAM for jump stub, because BAR requires 256KB aligned address */
+ 	p = ioremap_nocache(boot_vector_addr, shmobile_boot_size);
 -- 
 2.1.4
