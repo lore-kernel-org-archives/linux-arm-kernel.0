@@ -1,87 +1,50 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 8 Jun 2016 15:44:19 +0200
-Subject: [PATCH V8 7/9] acpi: Add generic MCFG table handling
-In-Reply-To: <20160608131709.GB16764@localhost>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <1464621262-26770-8-git-send-email-tn@semihalf.com>
- <20160608015631.GE4759@localhost> <57580DCA.7000703@semihalf.com>
- <20160608131709.GB16764@localhost>
-Message-ID: <57582133.8060402@semihalf.com>
+From: tthayer@opensource.altera.com (Thor Thayer)
+Date: Wed, 8 Jun 2016 08:49:45 -0500
+Subject: [PATCHv2 2/5] EDAC, altera: ECC Manager IRQ controller support
+In-Reply-To: <20160608090005.GB26590@pd.tnic>
+References: <1464193783-5071-3-git-send-email-tthayer@opensource.altera.com>
+ <1465331757-10227-1-git-send-email-tthayer@opensource.altera.com>
+ <20160608090005.GB26590@pd.tnic>
+Message-ID: <57582279.60400@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.06.2016 15:17, Bjorn Helgaas wrote:
-> On Wed, Jun 08, 2016 at 02:21:30PM +0200, Tomasz Nowicki wrote:
->> On 08.06.2016 03:56, Bjorn Helgaas wrote:
->>> On Mon, May 30, 2016 at 05:14:20PM +0200, Tomasz Nowicki wrote:
->>>> In order to handle PCI config space regions properly in ACPI, new MCFG
->>>> interface is defined which does sanity checks on MCFG table and keeps its
->>>> root pointer. The user is able to lookup MCFG regions based on
->>>> host bridge root structure and domain:bus_start:bus_end touple.
->>>> Use pci_mmcfg_late_init old prototype to avoid another function name.
->
->>>> +	/* found matching entry, bus range check */
->>>> +	if (entry->end_bus_number != bus_res->end) {
->>>> +		resource_size_t bus_end = min_t(resource_size_t,
->>>> +					entry->end_bus_number, bus_res->end);
->>>> +		pr_warn("%04x:%pR bus end mismatch, using %02lx\n",
->>>> +			root->segment, bus_res, (unsigned long)bus_end);
->>>> +		bus_res->end = bus_end;
->>>> +	}
->>
->> What about bus end mismatch case? Should we trim the host bridge bus
->> range or expect MCFG entry covers that range? Sometimes we get
->> _BBN-0xFF bus range, not from _CRS.
->
-> Lack of a bus range in _CRS is a firmware defect.  There's a comment
-> about this in acpi_pci_root_add().  On x86, we probably had to live
-> with firmware in the field that had this defect.  I think we should
-> expect all ARM64 systems to provide a bus number range in _CRS, and
-> fail the attach if it's not there.
->
-> I don't think we should warn about an MCFG entry that covers more than
-> the _CRS bus range.  On x86, it's common to have something like:
->
->    ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-7f])
->    ACPI: PCI Root Bridge [PCI1] (domain 0000 [bus 80-ff])
->
-> with a single MCFG entry that covers [bus 00-ff].  That seems
-> reasonable and I don't think it's worth warning about it.
->
-> If the MCFG entry doesn't cover all of a _CRS bus range, we should
-> just fail so we can find and fix broken firmware.
 
-Make sense to me.
 
->
->>>> +/* Interface called by ACPI - parse and save MCFG table */
->>>
->>> I think we save a *pointer* to the MCFG table, not the table itself.
+On 06/08/2016 04:00 AM, Borislav Petkov wrote:
+> On Tue, Jun 07, 2016 at 03:35:57PM -0500, tthayer at opensource.altera.com wrote:
+>> From: Thor Thayer <tthayer@opensource.altera.com>
 >>
->> Right, the comment is broken.
+>> To better support child devices, the ECC manager needs to be
+>> implemented as an IRQ controller.
 >>
->>> And acpi_table_parse() calls early_acpi_os_unmap_memory() immediately
->>> after it calls pci_mcfg_parse(), so I'm doubtful that the pointer
->>> remains valid.
->>
->> At this stage early_acpi_os_unmap_memory() is doing nothing since
->> acpi_early_init() set acpi_gbl_permanent_mmap to 1 way before. The
->> pointer is fine then.
->
-> Hmmm...  I see your argument, but this is a problem waiting to happen.
-> We should not depend on the internal implementation of
-> early_acpi_os_unmap_memory().  The pattern of:
->
->    y = x;
->    unmap(x);
->    z = *y;
->
-> is just broken and we shouldn't expect readers to recognize that "oh,
-> unmap() isn't really unmapping anything in this special case, so this
-> looks wrong but is really fine."
->
+>> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+>> ---
+>> v2  Update with cleanup/improvements from maintainer.
+>> ---
 
-Right, so we are back to MCFG cache.
+<snip>
 
-Thanks,
-Tomasz
+>> +	} else {
+>> +		WARN_ON(1);
+>>   	}
+>> -	return IRQ_HANDLED;
+>> +	return IRQ_NONE;
+>>   }
+>
+> Simplified a bit more while applying. Ok?
+>
+>
+Yes, yours is cleaner, Thanks!
+
+<snip>
+
+> +		return IRQ_HANDLED;
+>   	}
+> -	return IRQ_HANDLED;
+> +
+> +	WARN_ON(1);
+> +
+> +	return IRQ_NONE;
+>   }
+<snip>
