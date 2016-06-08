@@ -1,62 +1,47 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Wed, 8 Jun 2016 15:31:53 -0400
-Subject: [RFC 1/1] ARM: print MHz in /proc/cpuinfo
-In-Reply-To: <5757D87E.2080508@arm.com>
-References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
- <1465333713-14339-2-git-send-email-jon.mason@broadcom.com>
- <5757D87E.2080508@arm.com>
-Message-ID: <20160608193003.GA17688@broadcom.com>
+From: dinguyen@kernel.org (Dinh Nguyen)
+Date: Wed,  8 Jun 2016 14:33:06 -0500
+Subject: [GIT PULL] SoCFPGA DTS updates for v4.8
+Message-ID: <1465414387-20171-1-git-send-email-dinguyen@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 09:34:06AM +0100, Sudeep Holla wrote:
-> 
-> 
-> On 07/06/16 22:08, Jon Mason wrote:
-> >Query the CPU core clock in the device tree to determine the core clock
-> >speed.
-> 
-> How do guarantee that it's the current frequency of the CPU ?
+Hi Arnd, Kevin, and Olof:
 
-I am basing it on the assumption (perhaps incorrect) that the clock in
-the CPU DT corresponds to the one determining the CPU clock rate.  And,
-that this clock rate is accurate in describing the speed at which the
-CPU is currently running.
-
-> It doesn't even represent the mix or max frequency, so it's incorrect.
-> Some DTs have boot frequency in that entry.
-> 
-> >Output this clock rate in /proc/cpuinfo to match the output
-> >from other architectures.  The output is intentionally patterned after
-> >the x86 output, to match existing (and possibly expected) convention.
-> >
-> >If any errors are encountered in querying the clock (or the speed is
-> >erroneously zero), nothing will be printed out.  Thus any existing
-> >devices that do not have CPU clocks defined in the device tree will
-> >work as before.
-> >
-> 
-> What if they just don't have in DT but have DVFS support ?
-
-This can be extended to cover DVFS or SMC calls or anything else.
-This was simply a first step to cover what appeared to be the most
-prevalent case.
-
-> Also whey do we need this support when the user-space can query the
-> CPUFreq sysfs which is more accurate and maintains the current running
-> frequency ?
-
-This is exactly what x86 is doing to provide its value in
-/proc/cpuinfo.  I could easily augment this patch to call
-cpufreq_quick_get(), if it returns 0, then call clk_get_rate().  If
-both return 0, then simply not print out anything (which would cover
-all of the possibilities).  Or, I could have it just call
-cpufreq_quick_get() to get the value.
+Please pull in these updates for v4.8.
 
 Thanks,
-Jon
+Dinh
 
-> 
-> -- 
-> Regards,
-> Sudeep
+
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_updates_v4.8
+
+for you to fetch changes up to b65c0efa3508c01116c3ee24a6c37a158f2cb03a:
+
+  ARM: dts: socfpga: fix definitions of serial console (2016-06-08 14:09:11 -0500)
+
+----------------------------------------------------------------
+SoCFPGA DTS updates for v4.8
+- Update Arria10 ECC manager
+- Add ethernet alias for Arria10
+- Update serial alias for Arria10
+
+----------------------------------------------------------------
+Dinh Nguyen (1):
+      ARM: dts: socfpga: add ethernet alias on Arria10
+
+Matthew Gerlach (1):
+      ARM: dts: socfpga: fix definitions of serial console
+
+Thor Thayer (2):
+      ARM: dts: Arria10 ECC Manager IRQ controller changes
+      ARM: dts: Move Arria10 SDRAM as child of ECC Manager
+
+ arch/arm/boot/dts/socfpga_arria10.dtsi       | 24 +++++++++++++-----------
+ arch/arm/boot/dts/socfpga_arria10_socdk.dtsi |  7 ++++++-
+ 2 files changed, 19 insertions(+), 12 deletions(-)
