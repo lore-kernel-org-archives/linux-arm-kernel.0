@@ -1,42 +1,63 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jun 2016 10:21:18 +0100
-Subject: [PATCH v3 03/20] ARM: dts: STiH407: Declare PWM Capture data lines
- via Pinctrl
+Date: Wed,  8 Jun 2016 10:21:16 +0100
+Subject: [PATCH v3 01/20] ARM: dts: STi: Rename properites in line with PWM
+ naming conventions
 In-Reply-To: <20160608092135.21184-1-lee.jones@linaro.org>
 References: <20160608092135.21184-1-lee.jones@linaro.org>
-Message-ID: <20160608092135.21184-4-lee.jones@linaro.org>
+Message-ID: <20160608092135.21184-2-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/stih407-pinctrl.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/stih407-family.dtsi | 4 ++--
+ arch/arm/boot/dts/stih416.dtsi        | 5 +++--
+ 2 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stih407-pinctrl.dtsi b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-index a538ae5..bc22122 100644
---- a/arch/arm/boot/dts/stih407-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/stih407-pinctrl.dtsi
-@@ -289,10 +289,12 @@
- 				pinctrl_pwm1_chan0_default: pwm1-0-default {
- 					st,pins {
- 						pwm-out = <&pio3 0 ALT1 OUT>;
-+						pwm-capturein = <&pio3 2 ALT1 IN>;
- 					};
- 				};
- 				pinctrl_pwm1_chan1_default: pwm1-1-default {
- 					st,pins {
-+						pwm-capturein = <&pio4 3 ALT1 IN>;
- 						pwm-out = <&pio4 4 ALT1 OUT>;
- 					};
- 				};
-@@ -1030,6 +1032,7 @@
- 			pwm0 {
- 				pinctrl_pwm0_chan0_default: pwm0-0-default {
- 					st,pins {
-+						pwm-capturein = <&pio31 0 ALT1 IN>;
- 						pwm-out = <&pio31 1 ALT1 OUT>;
- 					};
- 				};
+diff --git a/arch/arm/boot/dts/stih407-family.dtsi b/arch/arm/boot/dts/stih407-family.dtsi
+index 5947878..0723900 100644
+--- a/arch/arm/boot/dts/stih407-family.dtsi
++++ b/arch/arm/boot/dts/stih407-family.dtsi
+@@ -668,7 +668,7 @@
+ 			pinctrl-0	= <&pinctrl_pwm0_chan0_default>;
+ 			clock-names	= "pwm";
+ 			clocks		= <&clk_sysin>;
+-			st,pwm-num-chan = <1>;
++			st,pwm-num-devs	= <1>;
+ 
+ 			status		= "okay";
+ 		};
+@@ -685,7 +685,7 @@
+ 					&pinctrl_pwm1_chan3_default>;
+ 			clock-names	= "pwm";
+ 			clocks		= <&clk_sysin>;
+-			st,pwm-num-chan = <4>;
++			st,pwm-num-devs	= <4>;
+ 
+ 			status		= "disabled";
+ 		};
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 0afb4f7..82091072 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -484,7 +484,8 @@
+ 
+ 			clock-names	= "pwm";
+ 			clocks		= <&clk_sysin>;
+-			st,pwm-num-chan = <4>;
++
++			st,pwm-num-devs = <4>;
+ 		};
+ 
+ 		/* SBC PWM Module */
+@@ -508,7 +509,7 @@
+ 
+ 			clock-names	= "pwm";
+ 			clocks		= <&clk_sysin>;
+-			st,pwm-num-chan = <3>;
++			st,pwm-num-devs = <3>;
+ 		};
+ 	};
+ };
 -- 
 2.8.3
