@@ -1,59 +1,152 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jun 2016 10:21:35 +0100
-Subject: [PATCH v3 20/20] dt-bindings: pwm: sti: Update DT bindings with
- recent changes
+Date: Wed,  8 Jun 2016 10:21:31 +0100
+Subject: [PATCH v3 16/20] pwm: sti: Add support for PWM Capture IRQs
 In-Reply-To: <20160608092135.21184-1-lee.jones@linaro.org>
 References: <20160608092135.21184-1-lee.jones@linaro.org>
-Message-ID: <20160608092135.21184-21-lee.jones@linaro.org>
+Message-ID: <20160608092135.21184-17-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're renaming the 'st,pwm-num-chan' binding to 'st,pwm-num-devs' to
-be more inline with the naming conventions of the subsystem.  Where
-we used to treat each line as a channel, the PWM convention is to
-describe them as devices.
-
-The second documentation adaption entails adding support for PWM
-capture devices.  A new clock is required as well as an IRQ line.
-We're also adding a new property similar to the one described
-above, but for capture channels.  Typically, there will be less
-capture channels than PWM-out, since all channels have the latter
-capability, but only some have capture support.
+Here we're requesting the PWM Capture IRQ and supplying the
+handler which will be called in the event of an IRQ fire to
+handle it.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- Documentation/devicetree/bindings/pwm/pwm-st.txt | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+ drivers/pwm/pwm-sti.c | 92 ++++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 91 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-st.txt b/Documentation/devicetree/bindings/pwm/pwm-st.txt
-index 84d2fb8..b09f3a4 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-st.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-st.txt
-@@ -13,13 +13,14 @@ Required parameters:
- - pinctrl-0: 		List of phandles pointing to pin configuration nodes
- 			for PWM module.
- 			For Pinctrl properties, please refer to [1].
--- clock-names: 		Set to "pwm".
-+- clock-names: 		Valid entries are "pwm" and/or "capture".
- - clocks: 		phandle of the clock used by the PWM module.
- 			For Clk properties, please refer to [2].
-+- interrupts:		IRQ for the Capture device
- 
- Optional properties:
--- st,pwm-num-chan:	Number of available channels. If not passed, the driver
--			will consider single channel by default.
-+- st,pwm-num-devs:	Number of available PWM channels.  Default is 0.
-+- st,capture-num-devs:	Number of available Capture channels.  Default is 0.
- 
- [1] Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
- [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
-@@ -37,5 +38,6 @@ pwm1: pwm at fe510000 {
- 		     &pinctrl_pwm1_chan3_default>;
- 	clocks = <&clk_sysin>;
- 	clock-names = "pwm";
--	st,pwm-num-chan = <4>;
-+	st,pwm-num-devs = <4>;
-+	st,capture-num-devs = <2>;
+diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+index 9d597bb..2230afb 100644
+--- a/drivers/pwm/pwm-sti.c
++++ b/drivers/pwm/pwm-sti.c
+@@ -91,7 +91,9 @@ struct sti_pwm_chip {
+ 	struct regmap_field *prescale_low;
+ 	struct regmap_field *prescale_high;
+ 	struct regmap_field *pwm_out_en;
++	struct regmap_field *pwm_cpt_en;
+ 	struct regmap_field *pwm_cpt_int_en;
++	struct regmap_field *pwm_cpt_int_stat;
+ 	struct pwm_chip chip;
+ 	struct pwm_device *cur;
+ 	unsigned long configured;
+@@ -311,6 +313,76 @@ static const struct pwm_ops sti_pwm_ops = {
+ 	.owner = THIS_MODULE,
  };
+ 
++static irqreturn_t sti_pwm_interrupt(int irq, void *data)
++{
++	struct sti_pwm_chip *pc = data;
++	struct device *dev = pc->dev;
++	struct sti_cpt_ddata *ddata;
++	int devicenum;
++	unsigned int cpt_int_stat;
++	unsigned int reg;
++	int ret = IRQ_NONE;
++
++	ret = regmap_field_read(pc->pwm_cpt_int_stat, &cpt_int_stat);
++	if (ret)
++		return ret;
++
++	while (cpt_int_stat) {
++		devicenum = ffs(cpt_int_stat) - 1;
++
++		ddata = pwm_get_chip_data(&pc->chip.pwms[devicenum]);
++
++		/*
++		 * Capture input:
++		 *    _______                   _______
++		 *   |       |                 |       |
++		 * __|       |_________________|       |________
++		 *   ^0      ^1                ^2
++		 *
++		 * Capture start by the first available rising edge
++		 * When a capture event occurs, capture value (CPT_VALx)
++		 * is stored, index incremented, capture edge changed.
++		 *
++		 * After the capture, if the index > 1, we have collected
++		 * the necessary data so we signal the thread waiting for it
++		 * and disable the capture by setting capture edge to none
++		 *
++		 */
++
++		regmap_read(pc->regmap,
++			    PWM_CPT_VAL(devicenum),
++			    &ddata->snapshot[ddata->index]);
++
++		switch (ddata->index) {
++		case 0:
++		case 1:
++			regmap_read(pc->regmap, PWM_CPT_EDGE(devicenum), &reg);
++			reg ^= PWM_CPT_EDGE_MASK;
++			regmap_write(pc->regmap, PWM_CPT_EDGE(devicenum), reg);
++
++			ddata->index++;
++			break;
++		case 2:
++			regmap_write(pc->regmap,
++				     PWM_CPT_EDGE(devicenum),
++				     CPT_EDGE_DISABLED);
++			wake_up(&ddata->wait);
++			break;
++		default:
++			dev_err(dev, "Internal error\n");
++		}
++
++		cpt_int_stat &= ~BIT_MASK(devicenum);
++
++		ret = IRQ_HANDLED;
++	}
++
++	/* Just ACK everything */
++	regmap_write(pc->regmap, PWM_INT_ACK, PWM_INT_ACK_MASK);
++
++	return ret;
++}
++
+ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+ {
+ 	struct device *dev = pc->dev;
+@@ -351,6 +423,11 @@ static int sti_pwm_probe_dt(struct sti_pwm_chip *pc)
+ 	if (IS_ERR(pc->pwm_cpt_int_en))
+ 		return PTR_ERR(pc->pwm_cpt_int_en);
+ 
++	pc->pwm_cpt_int_stat = devm_regmap_field_alloc(dev, pc->regmap,
++						reg_fields[PWM_CPT_INT_STAT]);
++	if (PTR_ERR_OR_ZERO(pc->pwm_cpt_int_stat))
++		return PTR_ERR(pc->pwm_cpt_int_stat);
++
+ 	return 0;
+ }
+ 
+@@ -367,7 +444,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 	struct sti_pwm_chip *pc;
+ 	struct resource *res;
+ 	unsigned int devnum;
+-	int ret;
++	int irq, ret;
+ 
+ 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
+ 	if (!pc)
+@@ -388,6 +465,19 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pc->regmap))
+ 		return PTR_ERR(pc->regmap);
+ 
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0) {
++		dev_err(&pdev->dev, "Failed to obtain IRQ\n");
++		return irq;
++	}
++
++	ret = devm_request_irq(&pdev->dev, irq, sti_pwm_interrupt,
++			       0, pdev->name, pc);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "Failed to request IRQ\n");
++		return ret;
++	}
++
+ 	/*
+ 	 * Setup PWM data with default values: some values could be replaced
+ 	 * with specific ones provided from Device Tree.
 -- 
 2.8.3
