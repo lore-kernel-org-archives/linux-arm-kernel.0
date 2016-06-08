@@ -1,214 +1,131 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 8 Jun 2016 16:03:22 -0500
-Subject: [PATCH v12 01/15] PCI: Let pci_mmap_page_range() take extra
- resource pointer
-In-Reply-To: <20160604000642.28162-2-yinghai@kernel.org>
-References: <20160604000642.28162-1-yinghai@kernel.org>
- <20160604000642.28162-2-yinghai@kernel.org>
-Message-ID: <20160608210322.GA4248@localhost>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 8 Jun 2016 15:06:09 -0600
+Subject: [PATCH v9 0/7] KVM PCIe/MSI passthrough on ARM/ARM64: kernel
+ part 3/3: vfio changes
+In-Reply-To: <875b5791-f7c9-97ca-46de-4b1474fe65e0@linaro.org>
+References: <1462362858-2925-1-git-send-email-eric.auger@linaro.org>
+ <573F34CA.5080308@linaro.org>
+ <875b5791-f7c9-97ca-46de-4b1474fe65e0@linaro.org>
+Message-ID: <20160608150609.7e28d63d@ul30vt.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 05:06:28PM -0700, Yinghai Lu wrote:
-> This one is preparing patch for next one:
->   PCI: Let pci_mmap_page_range() take resource addr
+On Wed, 8 Jun 2016 10:29:35 +0200
+Auger Eric <eric.auger@linaro.org> wrote:
+
+> Dear all,
+> Le 20/05/2016 ? 18:01, Eric Auger a ?crit :
+> > Alex, Robin,
+> > 
+> > While my 3 part series primarily addresses the problematic of mapping
+> > MSI doorbells into arm-smmu, it fails in :
+> > 
+> > 1) determining whether the MSI controller is downstream or upstream to
+> > the IOMMU,  
+> > 	=> indicates whether the MSI doorbell must be mapped
+> > 	=> participates in the decision about 2)  
+> > 
+> > 2) determining whether it is safe to assign a PCIe device.
+> > 
+> > I think we share this understanding with Robin. All above of course
+> > stands for ARM.
+> > 
+> > I get stuck with those 2 issues and I have few questions about iommu
+> > group setup, PCIe, iommu dt/ACPI description. I would be grateful to you
+> > if you could answer part of those questions and advise about the
+> > strategy to fix those.  
 > 
-> We need to pass extra resource pointer to avoid searching that again
-> for powerpc and microblaze prot set operation.
+> gentle reminder about the questions below; hope I did not miss any reply.
+> If anybody has some time to spent on this topic...
+> 
+> > 
+> > Best Regards
+> > 
+> > Eric
+> > 
+> > QUESTIONS:
+> > 
+> > 1) Robin, you pointed some host controllers which also are MSI
+> > controllers
+> > (http://thread.gmane.org/gmane.linux.kernel.pci/47174/focus=47268). In
+> > that case MSIs never reach the IOMMU. I failed in finding anything about
+> > MSIs in PCIe ACS spec. What should be the iommu groups in that
+> > situation. Isn't the upstreamed code able to see some DMA transfers are
+> > not properly isolated and alias devices in the same group? According to
+> > your security warning, Alex, I would think the code does not recognize
+> > it, can you confirm please?  
+> my current understanding is end points would be in separate groups (assuming
+> ACS support) although MSI controller frame is not properly protected.
 
-I'm not convinced yet that the extra resource pointer is necessary.
-
-Microblaze does look up the resource in pci_mmap_page_range(), but it
-never actually uses it.  It *looks* like it uses it, but that code is
-actually dead and I think we should apply the first patch below.
-
-That leaves powerpc as the only arch that would use this extra
-resource pointer.  It uses it in __pci_mmap_set_pgprot() to help
-decide whether to make a normal uncacheable mapping or a write-
-combining one.  There's nothing here that's specific to the powerpc
-architecture, and I don't think we should add this parameter just to
-cater to powerpc.
-
-There are two cases where __pci_mmap_set_pgprot() on powerpc does
-something based on the resource:
-
-  1) We're using procfs to mmap I/O port space after we requested
-     write-combining, e.g., we did this:
-
-       ioctl(fd, PCIIOC_MMAP_IS_IO);           # request I/O port space
-       ioctl(fd, PCIIOC_WRITE_COMBINE, 1);     # request write-combining
-       mmap(fd, ...)
-
-     On powerpc, we ignore the write-combining request in this case.
-
-     I think we can handle this case by applying the second patch
-     below to ignore write-combining on I/O space for all arches, not
-     just powerpc.
-
-  2) We're using sysfs to mmap resourceN (not resourceN_wc), and
-     the resource is prefetchable.  On powerpc, we turn *on*
-     write-combining, even though the user didn't ask for it.
-
-     I'm not sure this case is actually safe, because it changes the
-     ordering properties.  If it *is* safe, we could enable write-
-     combining in pci_mmap_resource(), where we already have the
-     resource and it could be done for all arches.
-
-     This case is not strictly necessary, except to avoid a
-     performance regression, because the user could have mapped
-     resourceN_wc to explicitly request write-combining.
-
-> diff --git a/drivers/pci/pci-sysfs.c b/drivers/pci/pci-sysfs.c
-> index d319a9c..5bbe20c 100644
-> --- a/drivers/pci/pci-sysfs.c
-> +++ b/drivers/pci/pci-sysfs.c
-> @@ -1027,7 +1027,7 @@ static int pci_mmap_resource(struct kobject *kobj, struct bin_attribute *attr,
->  	pci_resource_to_user(pdev, i, res, &start, &end);
->  	vma->vm_pgoff += start >> PAGE_SHIFT;
->  	mmap_type = res->flags & IORESOURCE_MEM ? pci_mmap_mem : pci_mmap_io;
-> -	return pci_mmap_page_range(pdev, vma, mmap_type, write_combine);
-> +	return pci_mmap_page_range(pdev, res, vma, mmap_type, write_combine);
->  }
->  
->  static int pci_mmap_resource_uc(struct file *filp, struct kobject *kobj,
-> diff --git a/drivers/pci/proc.c b/drivers/pci/proc.c
-> index 3f155e7..f19ee2a 100644
-> --- a/drivers/pci/proc.c
-> +++ b/drivers/pci/proc.c
-> @@ -245,7 +245,7 @@ static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
->  	if (i >= PCI_ROM_RESOURCE)
->  		return -ENODEV;
->  
-> -	ret = pci_mmap_page_range(dev, vma,
-> +	ret = pci_mmap_page_range(dev, &dev->resource[i], vma,
->  				  fpriv->mmap_state,
->  				  fpriv->write_combine);
->  	if (ret < 0)
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index b67e4df..3c1a0f4 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -70,6 +70,12 @@ enum pci_mmap_state {
->  	pci_mmap_mem
->  };
->  
-> +struct vm_area_struct;
-> +/* Map a range of PCI memory or I/O space for a device into user space */
-> +int pci_mmap_page_range(struct pci_dev *dev, struct resource *res,
-> +			struct vm_area_struct *vma,
-> +			enum pci_mmap_state mmap_state, int write_combine);
-> +
->  /*
->   *  For PCI devices, the region numbers are assigned this way:
->   */
-
-
-commit 4e712b691abc5b579e3e4327f56b0b7988bdd1cb
-Author: Bjorn Helgaas <bhelgaas@google.com>
-Date:   Wed Jun 8 14:00:14 2016 -0500
-
-    microblaze/PCI: Remove useless __pci_mmap_set_pgprot()
-    
-    The microblaze __pci_mmap_set_pgprot() was apparently copied from powerpc,
-    where it computes either an uncacheable pgprot_t or a write-combining one.
-    But on microblaze, we always use the regular uncacheable pgprot_t.
-    
-    Remove the useless code in __pci_mmap_set_pgprot() and inline the
-    pgprot_noncached() at the only caller.
-    
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-
-diff --git a/arch/microblaze/pci/pci-common.c b/arch/microblaze/pci/pci-common.c
-index 14cba60..1974567 100644
---- a/arch/microblaze/pci/pci-common.c
-+++ b/arch/microblaze/pci/pci-common.c
-@@ -219,33 +219,6 @@ static struct resource *__pci_mmap_make_offset(struct pci_dev *dev,
- }
+We don't currently consider MSI differently from other DMA and we don't
+currently have any sort of concept of a device within the intermediate
+fabric as being a DMA target.  We expect fabric devices to only be
+transaction routers.  We use ACS to determine whether there's any
+possibility of DMA being redirected before it reaches the IOMMU, but it
+seems that a DMA being consumed by an interrupt controller before it
+reaches the IOMMU would be another cause for an isolation breach.
  
- /*
-- * Set vm_page_prot of VMA, as appropriate for this architecture, for a pci
-- * device mapping.
-- */
--static pgprot_t __pci_mmap_set_pgprot(struct pci_dev *dev, struct resource *rp,
--				      pgprot_t protection,
--				      enum pci_mmap_state mmap_state,
--				      int write_combine)
--{
--	pgprot_t prot = protection;
--
--	/* Write combine is always 0 on non-memory space mappings. On
--	 * memory space, if the user didn't pass 1, we check for a
--	 * "prefetchable" resource. This is a bit hackish, but we use
--	 * this to workaround the inability of /sysfs to provide a write
--	 * combine bit
--	 */
--	if (mmap_state != pci_mmap_mem)
--		write_combine = 0;
--	else if (write_combine == 0) {
--		if (rp->flags & IORESOURCE_PREFETCH)
--			write_combine = 1;
--	}
--
--	return pgprot_noncached(prot);
--}
--
--/*
-  * This one is used by /dev/mem and fbdev who have no clue about the
-  * PCI device, it tries to find the PCI device first and calls the
-  * above routine
-@@ -317,9 +290,7 @@ int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
- 		return -EINVAL;
+> > 2) can other PCIe components be MSI controllers?
+
+I'm not even entirely sure what this means.  Would a DMA write from an
+endpoint target the MMIO space of an intermediate, fabric device?
  
- 	vma->vm_pgoff = offset >> PAGE_SHIFT;
--	vma->vm_page_prot = __pci_mmap_set_pgprot(dev, rp,
--						  vma->vm_page_prot,
--						  mmap_state, write_combine);
-+	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
+> > 3) Am I obliged to consider arbitrary topologies where an MSI controller
+> > stands between the PCIe host and the iommu? in the PCIe space or
+> > platform space? If this only relates to PCIe couldn' I check if an MSI
+> > controller exists in the PCIe tree?  
+> In my last series, I consider the assignment of platform device unsafe as
+> soon as there is a GICv2m. This is a change in the user experience compared to
+> what we have before.
+
+If the MSI controller is downstream of our DMA translation, it doesn't
+seem like we have much choice but to mark it unsafe.  The endpoint is
+fully able to attempt to exploit it.
  
- 	ret = remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
- 			       vma->vm_end - vma->vm_start, vma->vm_page_prot);
+> > 4) Robin suggested in a private thread to enumerate through a list of
+> > "registered" doorbells and if any belongs to an unsafe MSI controller,
+> > consider the assignment is unsafe. This would be a first step before
+> > doing something more complex. Alex, would that be acceptable to you for
+> > issue #2?  
+> I implemented this technique in my last series waiting for more discussion
+> on 4, 5.
 
-
-
-commit 962972ee5e0ba6ceb680cb182bad65f8886586a6
-Author: Bjorn Helgaas <bhelgaas@google.com>
-Date:   Wed Jun 8 14:46:54 2016 -0500
-
-    PCI: Ignore write-combining when mapping I/O port space
-    
-    PCI exposes files like /proc/bus/pci/00/00.0 in procfs.  These files
-    support operations like this:
-    
-      ioctl(fd, PCIIOC_MMAP_IS_IO);           # request I/O port space
-      ioctl(fd, PCIIOC_WRITE_COMBINE, 1);     # request write-combining
-      mmap(fd, ...)
-    
-    Many architectures don't allow mmap of I/O port space at all, but I don't
-    think it makes sense to do a write-combining mapping on the ones that do.
-    We could change proc_bus_pci_ioctl() so the user could never enable write-
-    combining for I/O port space, but that would break the following sequence,
-    which is currently legal:
-    
-      mmap(fd, ...)                           # default is I/O, non-combining
-      ioctl(fd, PCIIOC_WRITE_COMBINE, 1);     # request write-combining
-      ioctl(fd, PCIIOC_MMAP_IS_MEM);          # request memory space
-      mmap(fd, ...)
-    
-    Ignore the write-combining flag when mapping I/O port space.
-    
-    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-
-diff --git a/drivers/pci/proc.c b/drivers/pci/proc.c
-index 3f155e7..21f8d613 100644
---- a/drivers/pci/proc.c
-+++ b/drivers/pci/proc.c
-@@ -247,7 +247,8 @@ static int proc_bus_pci_mmap(struct file *file, struct vm_area_struct *vma)
+Seems sufficient.  I don't mind taking a broad swing versus all the
+extra complexity of defining which devices are safe vs unsafe.
  
- 	ret = pci_mmap_page_range(dev, vma,
- 				  fpriv->mmap_state,
--				  fpriv->write_combine);
-+				  (fpriv->mmap_state == pci_mmap_mem) ?
-+					fpriv->write_combine : 0);
- 	if (ret < 0)
- 		return ret;
+> > 5) About issue #1: don't we miss tools in dt/ACPI to describe the
+> > location of the iommu on ARM? This is not needed on x86 because
+> > irq_remapping and IOMMU are at the same place but my understanding is
+> > that it is on ARM where
+> > - there is no connection between the MSI controller - which implements
+> > irq remapping - and the iommu
+> > - MSI are conveyed on the same address space as standard memory
+> > transactions.
+
+It seems pretty dubious to me to have fixed address, unprotected MSI
+controllers sitting in the DMA space of a device before IOMMU
+translation.  Seems like you not only need to mark interrupts as
+unsafe, but exclude the address space of the MSI controller from the
+available IOVA space to the user.
  
+> > 6)  can't we live with iommu/MSI controller respective location uncertainty?
+> > 
+> > - in my current series, with the above Xilinx MSI controller, I would
+> > see there is an arm-smmu requiring mapping behind the PCI host, would
+> > query the characteristics of the MSI doorbell (not implemented by that
+> > controller), so no mapping would be done. So it would work I think.
+> > - However in case we have this topology: PCIe host -> MSI controller
+> > generally used behind an IOMMU (so registering a doorbell) -> IOMMU,
+> > this wouldn't work since the doorbell would be mapped.  
+
+I'm a little confused which direction "behind" is here, but it seems
+like any time the MSI controller lives in the DMA address space of the
+endpoint, both interfering with the available IOVA space to the user
+and potentially an attack vector for the user, we need to call it out
+as unsafe.  Maybe some of them are for exclusive use of the device and
+the attack vector is relatively contained, but they still affect the
+IOVA space of the user.  Such a configuration might be safe, but as I
+said I'm not opposed to being pretty liberal in applying the unsafe
+requirement if the platform has done something unfriendly.  Thanks,
+
+Alex
