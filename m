@@ -1,99 +1,48 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 8 Jun 2016 22:07:57 +0200
-Subject: [PATCH] ehci-platform: Add support for shared reset controllers
-In-Reply-To: <Pine.LNX.4.44L0.1606081346340.2191-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1606081346340.2191-100000@iolanthe.rowland.org>
-Message-ID: <2aef5d1f-6bc8-3acd-543a-8bb0f87702a2@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 8 Jun 2016 15:22:57 -0500
+Subject: [PATCH v2 2/5] mfd: add Ricoh RN5T567 PMIC support
+In-Reply-To: <20160608010429.19618-3-stefan@agner.ch>
+References: <20160608010429.19618-1-stefan@agner.ch>
+ <20160608010429.19618-3-stefan@agner.ch>
+Message-ID: <20160608202257.GA22463@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jun 07, 2016 at 06:04:26PM -0700, Stefan Agner wrote:
+> The Ricoh RN5T567 is from the same family as the Ricoh RN5T618 is,
+> the differences are:
+> 
+> + DCDC4
+> + Slightly different output voltage/currents
+> + 32kHz Output
+> - ADC/Charger capabilities
+> 
+> Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  Documentation/devicetree/bindings/mfd/rn5t618.txt | 19 ++++++++++-------
+>  drivers/mfd/Kconfig                               |  7 +++---
+>  drivers/mfd/rn5t618.c                             | 26 +++++++++++++++++------
+>  include/linux/mfd/rn5t618.h                       | 12 +++++++++++
+>  4 files changed, 46 insertions(+), 18 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/rn5t618.txt b/Documentation/devicetree/bindings/mfd/rn5t618.txt
+> index 937785a..5b493ed 100644
+> --- a/Documentation/devicetree/bindings/mfd/rn5t618.txt
+> +++ b/Documentation/devicetree/bindings/mfd/rn5t618.txt
+> @@ -1,18 +1,21 @@
+> -* Ricoh RN5T618 PMIC
+> +* Ricoh RN5T567/RN5T618 PMIC
+>  
+> -Ricoh RN5T618 is a power management IC which integrates 3 step-down
+> -DCDC converters, 7 low-dropout regulators, a Li-ion battery charger,
+> -fuel gauge, ADC, GPIOs and a watchdog timer. It can be controlled
+> -through a I2C interface.
+> +Ricoh RN5T567/RN5T618 is a power management IC family which integrates
+> +3 to 5 step-down DCDC converters, 7 low-dropout regulators, GPIOs and
 
-On 08-06-16 19:47, Alan Stern wrote:
-> On Wed, 8 Jun 2016, Hans de Goede wrote:
->
->> Add support for shared platform controllers by using
->> devm_reset_control_get_shared_by_index instead of
->> of_reset_control_get_by_index.
->>
->> Note we use the devm function because there is no
->> of_reset_control_get_shared_by_index, this also leads
->> to a nice cleanup of the cleanup code.
->>
->> This brings the ehci-platform reset handling code inline
->> with ohci-platform.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->
-> This is just the difference between what Greg has merged and what you
-> wanted to add, right?  If so, then
+I count 4?
 
-Right.
+Otherwise, for the binding:
 
-Regards,
-
-Hans
-
-
->
-> Acked-by: Alan Stern <stern@rowland.harvard.edu>
->
-> Alan Stern
->
->>  drivers/usb/host/ehci-platform.c | 16 +++++-----------
->>  1 file changed, 5 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
->> index bc33f45..6816b8c 100644
->> --- a/drivers/usb/host/ehci-platform.c
->> +++ b/drivers/usb/host/ehci-platform.c
->> @@ -236,8 +236,8 @@ static int ehci_platform_probe(struct platform_device *dev)
->>  	}
->>
->>  	for (rst = 0; rst < EHCI_MAX_RSTS; rst++) {
->> -		priv->rsts[rst] = of_reset_control_get_by_index(
->> -					dev->dev.of_node, rst);
->> +		priv->rsts[rst] = devm_reset_control_get_shared_by_index(
->> +					&dev->dev, rst);
->>  		if (IS_ERR(priv->rsts[rst])) {
->>  			err = PTR_ERR(priv->rsts[rst]);
->>  			if (err == -EPROBE_DEFER)
->> @@ -247,10 +247,8 @@ static int ehci_platform_probe(struct platform_device *dev)
->>  		}
->>
->>  		err = reset_control_deassert(priv->rsts[rst]);
->> -		if (err) {
->> -			reset_control_put(priv->rsts[rst]);
->> +		if (err)
->>  			goto err_reset;
->> -		}
->>  	}
->>
->>  	if (pdata->big_endian_desc)
->> @@ -307,10 +305,8 @@ err_power:
->>  	if (pdata->power_off)
->>  		pdata->power_off(dev);
->>  err_reset:
->> -	while (--rst >= 0) {
->> +	while (--rst >= 0)
->>  		reset_control_assert(priv->rsts[rst]);
->> -		reset_control_put(priv->rsts[rst]);
->> -	}
->>  err_put_clks:
->>  	while (--clk >= 0)
->>  		clk_put(priv->clks[clk]);
->> @@ -335,10 +331,8 @@ static int ehci_platform_remove(struct platform_device *dev)
->>  	if (pdata->power_off)
->>  		pdata->power_off(dev);
->>
->> -	for (rst = 0; rst < EHCI_MAX_RSTS && priv->rsts[rst]; rst++) {
->> +	for (rst = 0; rst < EHCI_MAX_RSTS && priv->rsts[rst]; rst++)
->>  		reset_control_assert(priv->rsts[rst]);
->> -		reset_control_put(priv->rsts[rst]);
->> -	}
->>
->>  	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
->>  		clk_put(priv->clks[clk]);
->>
->
+Acked-by: Rob Herring <robh@kernel.org>
