@@ -1,182 +1,61 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  8 Jun 2016 18:34:47 +0200
-Subject: [PATCH v2 12/13] regulator: pwm: Support extra continuous mode cases
+Date: Wed,  8 Jun 2016 18:34:42 +0200
+Subject: [PATCH v2 07/13] pwm: sti: Avoid glitches on already running PWMs
 In-Reply-To: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465403688-17098-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465403688-17098-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The continuous mode allows one to declare a PWM regulator without having
-to declare the voltage <-> dutycycle association table. It works fine as
-long as your voltage(dutycycle) function is linear, but also has the
-following constraints:
-
-- dutycycle for min_uV = 0%
-- dutycycle for max_uV = 100%
-- dutycycle for min_uV < dutycycle for max_uV
-
-While the linearity constraint is acceptable for now, we sometimes need to
-restrict of the PWM range (to limit the maximum/minimum voltage for
-example) or have a min_uV_dutycycle > max_uV_dutycycle (this could be
-tweaked with PWM polarity, but not all PWMs support inverted polarity).
-
-Add the pwm-dutycycle-range and pwm-dutycycle-unit DT properties to define
-such constraints. If those properties are not defined, the PWM regulator
-use the default pwm-dutycycle-range = <0 100> and
-pwm-dutycycle-unit = <100> values (existing behavior).
+The current logic will disable the PWM clk even if a PWM was left
+enabled by the bootloader (because it's controlling a critical device
+like a regulator for example).
+Keep the PWM clk enabled if at least one PWM is enabled to avoid any
+glitches.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Reviewed-by: Brian Norris <briannorris@chromium.org>
-Tested-by: Brian Norris <briannorris@chromium.org>
 ---
- drivers/regulator/pwm-regulator.c | 92 +++++++++++++++++++++++++++++++++++----
- 1 file changed, 83 insertions(+), 9 deletions(-)
+ drivers/pwm/pwm-sti.c | 14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index c39ecd1..3e8680a 100644
---- a/drivers/regulator/pwm-regulator.c
-+++ b/drivers/regulator/pwm-regulator.c
-@@ -21,6 +21,12 @@
- #include <linux/of_device.h>
- #include <linux/pwm.h>
+diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
+index 6300d3e..5bda51d 100644
+--- a/drivers/pwm/pwm-sti.c
++++ b/drivers/pwm/pwm-sti.c
+@@ -340,7 +340,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 	struct sti_pwm_compat_data *cdata;
+ 	struct sti_pwm_chip *pc;
+ 	struct resource *res;
+-	int ret;
++	int i, ret;
  
-+struct pwm_continuous_reg_data {
-+	unsigned int min_uV_dutycycle;
-+	unsigned int max_uV_dutycycle;
-+	unsigned int dutycycle_unit;
-+};
-+
- struct pwm_regulator_data {
- 	/*  Shared */
- 	struct pwm_device *pwm;
-@@ -28,6 +34,9 @@ struct pwm_regulator_data {
- 	/* Voltage table */
- 	struct pwm_voltages *duty_cycle_table;
+ 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
+ 	if (!pc)
+@@ -391,7 +391,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
  
-+	/* Continuous mode info */
-+	struct pwm_continuous_reg_data continuous;
-+
- 	/* regulator descriptor */
- 	struct regulator_desc desc;
- 
-@@ -132,31 +141,79 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
- static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-+	unsigned int min_uV_duty = drvdata->continuous.min_uV_dutycycle;
-+	unsigned int max_uV_duty = drvdata->continuous.max_uV_dutycycle;
-+	unsigned int duty_unit = drvdata->continuous.dutycycle_unit;
- 	int min_uV = rdev->constraints->min_uV;
--	int diff = rdev->constraints->max_uV - min_uV;
-+	int max_uV = rdev->constraints->max_uV;
-+	int diff_uV = max_uV - min_uV;
- 	struct pwm_state pstate;
-+	unsigned int diff_duty;
-+	unsigned int voltage;
- 
- 	pwm_get_state(drvdata->pwm, &pstate);
- 
--	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
-+	voltage = pwm_get_relative_duty_cycle(&pstate, duty_unit);
-+
-+	/*
-+	 * The dutycycle for the min_uV voltage might be greater than the
-+	 * one for the max_uV. This is happening when the user needs an
-+	 * inversed polarity, but the PWM device does not support inversing
-+	 * it in hardware.
-+	 */
-+	if (max_uV_duty < min_uV_duty) {
-+		voltage = min_uV_duty - voltage;
-+		diff_duty = min_uV_duty - max_uV_duty;
-+	} else {
-+		voltage = voltage - min_uV_duty;
-+		diff_duty = max_uV_duty - min_uV_duty;
-+	}
-+
-+	voltage = DIV_ROUND_CLOSEST_ULL((u64)voltage * diff_uV, diff_duty);
-+
-+	return voltage + min_uV;
- }
- 
- static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
--					int min_uV, int max_uV,
--					unsigned *selector)
-+				     int req_min_uV, int req_max_uV,
-+				     unsigned int *selector)
- {
- 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
-+	unsigned int min_uV_duty = drvdata->continuous.min_uV_dutycycle;
-+	unsigned int max_uV_duty = drvdata->continuous.max_uV_dutycycle;
-+	unsigned int duty_unit = drvdata->continuous.dutycycle_unit;
- 	unsigned int ramp_delay = rdev->constraints->ramp_delay;
--	unsigned int req_diff = min_uV - rdev->constraints->min_uV;
-+	int min_uV = rdev->constraints->min_uV;
-+	int max_uV = rdev->constraints->max_uV;
-+	int diff_uV = max_uV - min_uV;
- 	struct pwm_state pstate;
--	unsigned int diff;
-+	unsigned int diff_duty;
-+	unsigned int dutycycle;
- 	int ret;
- 
- 	pwm_prepare_new_state(drvdata->pwm, &pstate);
--	diff = rdev->constraints->max_uV - rdev->constraints->min_uV;
- 
--	/* We pass diff as the scale to get a uV precision. */
--	pwm_set_relative_duty_cycle(&pstate, req_diff, diff);
-+	/*
-+	 * The dutycycle for the min_uV voltage might be greater than the
-+	 * one for the max_uV. This is happening when the user needs an
-+	 * inversed polarity, but the PWM device does not support inversing
-+	 * it in hardware.
-+	 */
-+	if (max_uV_duty < min_uV_duty)
-+		diff_duty = min_uV_duty - max_uV_duty;
-+	else
-+		diff_duty = max_uV_duty - min_uV_duty;
-+
-+	dutycycle = DIV_ROUND_CLOSEST_ULL((u64)(req_min_uV - min_uV) *
-+					  diff_duty,
-+					  diff_uV);
-+
-+	if (max_uV_duty < min_uV_duty)
-+		dutycycle = min_uV_duty - dutycycle;
-+	else
-+		dutycycle = min_uV_duty + dutycycle;
-+
-+	pwm_set_relative_duty_cycle(&pstate, dutycycle, duty_unit);
- 
- 	ret = pwm_apply_state(drvdata->pwm, &pstate);
+-	ret = clk_prepare(pc->clk);
++	ret = clk_prepare_enable(pc->clk);
  	if (ret) {
-@@ -237,11 +294,28 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
- static int pwm_regulator_init_continuous(struct platform_device *pdev,
- 					 struct pwm_regulator_data *drvdata)
- {
-+	u32 dutycycle_range[2] = { 0, 100 };
-+	u32 dutycycle_unit = 100;
-+
- 	memcpy(&drvdata->ops, &pwm_regulator_voltage_continuous_ops,
- 	       sizeof(drvdata->ops));
- 	drvdata->desc.ops = &drvdata->ops;
- 	drvdata->desc.continuous_voltage_range = true;
+ 		dev_err(dev, "failed to prepare clock\n");
+ 		return ret;
+@@ -409,6 +409,16 @@ static int sti_pwm_probe(struct platform_device *pdev)
+ 		return ret;
+ 	}
  
-+	of_property_read_u32_array(pdev->dev.of_node,
-+				   "pwm-dutycycle-range",
-+				   dutycycle_range, 2);
-+	of_property_read_u32(pdev->dev.of_node, "pwm-dutycycle-unit",
-+			     &dutycycle_unit);
++	/*
++	 * Keep the PWM clk enabled if some PWMs appear to be up and
++	 * running.
++	 */
++	for (i = 0; i < pc->chip.npwm; i++) {
++		if (pwm_is_enabled(&pc->chip.pwms[i]))
++			clk_enable(pc->clk);
++	}
++	clk_disable(pc->clk);
 +
-+	if (dutycycle_range[0] > dutycycle_unit ||
-+	    dutycycle_range[1] > dutycycle_unit)
-+		return -EINVAL;
-+
-+	drvdata->continuous.dutycycle_unit = dutycycle_unit;
-+	drvdata->continuous.min_uV_dutycycle = dutycycle_range[0];
-+	drvdata->continuous.max_uV_dutycycle = dutycycle_range[1];
-+
+ 	platform_set_drvdata(pdev, pc);
+ 
  	return 0;
- }
- 
 -- 
 2.7.4
