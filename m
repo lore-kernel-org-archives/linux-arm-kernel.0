@@ -1,44 +1,70 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Wed, 8 Jun 2016 17:18:26 +0800
-Subject: [RFC PATCH 0/4] arm64: vdso: check whether the params is invalid
- address
-In-Reply-To: <20160606171248.GL669@arm.com>
-References: <1464750362-14188-1-git-send-email-yangyingliang@huawei.com>
- <20160606171248.GL669@arm.com>
-Message-ID: <5757E2E2.3010609@huawei.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed,  8 Jun 2016 10:21:15 +0100
+Subject: [PATCH v3 00/20] pwm: Add support for PWM Capture
+Message-ID: <20160608092135.21184-1-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The first part of this set extends the current PWM API to allow external
+code to request a PWM Capture.  Subsequent patches then make use of the
+new API by providing a userspace offering via /sysfs.  The final part of
+the set supplies PWM Capture functionality into the already existing STi
+PWM driver.
 
+This patch-set has been tested end to end via /sysfs.
 
-On 2016/6/7 1:12, Will Deacon wrote:
-> On Wed, Jun 01, 2016 at 11:05:58AM +0800, Yang Yingliang wrote:
->> The params of gettimeofday(), clock_gettime() and clock_getres()
->> is not checked. This will cause segment faults when the address is
->> invalid.
->> E.g. gettimeofday(-1, -1);
->>       clock_gettime(0, -1);
->>       clock_getres(0, -1);
->> This patchset add a macro and use it to check the validation of these
->> pointer params.
->
-> Is this really necessary? It doesn't look to me like other architectures
-> bother with this, and you're just adding code to the fastpath to handle
-> cases that shouldn't happen to start with.
-I agree.
+v2 => v3:
+- Supply DT documentation changes
+- Submit DTS additions as part of this set
+- Default Capture and PWM-out number of channels to 0
+  - Do additional checking, to ensure at least one channel is requested
+- Use global locking, instead of lock in device data
 
-I find clock_gettime() don't check if tp is NULL. I think it need a
-checking like clock_getres().
+v1 => v2:
+- API change
+- Use a struct to carry the result back to the caller
+- Use 'struct pwm' to store device specific data
+- Make timeout configurable
+- Don't use clear_bit(), instead use raw bit logic
+- Propagate return value of platform_get_irq()
+- Don't cast to (void *)
+- Move to subsystem terminology (channels => devices)
+- Remove channel select feature
+- Enable Capture IP during capture
 
-What's your suggestion ?
+Lee Jones (20):
+  ARM: dts: STi: Rename properites in line with PWM naming conventions
+  ARM: dts: STiH407: Supply PWM Capture IRQ
+  ARM: dts: STiH407: Declare PWM Capture data lines via Pinctrl
+  ARM: dts: STiH416: Supply PWM Capture IRQs
+  ARM: dts: STiH416: Declare PWM Capture data lines via Pinctrl
+  ARM: dts: STiH416: Define PWM Capture clock
+  ARM: dts: STiH416: Define the number of PWM Capture channels
+  pwm: Add PWM Capture support
+  pwm: sti: Rename channel => device
+  pwm: sysfs: Add PWM Capture support
+  pwm: sti: Reorganise register names in preparation for new
+    functionality
+  pwm: sti: Only request clock rate when you need to
+  pwm: sti: Supply PWM Capture register addresses and bit locations
+  pwm: sti: Supply PWM Capture clock handling
+  pwm: sti: Initialise PWM Capture device data
+  pwm: sti: Add support for PWM Capture IRQs
+  pwm: sti: Add PWM Capture call-back
+  pwm: sti: It's now valid for number of PWM channels to be zero
+  pwm: sti: Take the opportunity to conduct a little house keeping
+  dt-bindings: pwm: sti: Update DT bindings with recent changes
 
-Thanks,
-Yang
->
-> Also, I think I remember seeing SEGVs from libc wrappers for other syscalls
-> in the past, so this just isn't compelling to me.
->
-> Will
->
-> .
->
+ Documentation/devicetree/bindings/pwm/pwm-st.txt |  10 +-
+ arch/arm/boot/dts/stih407-family.dtsi            |   5 +-
+ arch/arm/boot/dts/stih407-pinctrl.dtsi           |   3 +
+ arch/arm/boot/dts/stih416-pinctrl.dtsi           |   5 +
+ arch/arm/boot/dts/stih416.dtsi                   |  12 +-
+ drivers/pwm/core.c                               |  27 ++
+ drivers/pwm/pwm-sti.c                            | 424 +++++++++++++++++++----
+ drivers/pwm/sysfs.c                              |  17 +
+ include/linux/pwm.h                              |  25 ++
+ 9 files changed, 447 insertions(+), 81 deletions(-)
+
+-- 
+2.8.3
