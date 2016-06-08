@@ -1,71 +1,460 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jun 2016 18:04:19 +0200
-Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
- typical Keystone features
-In-Reply-To: <20160608094747.GG22406@atomide.com>
-References: <1464816714-3900-1-git-send-email-nm@ti.com>
- <10295246.2MDnqWQbb8@wuerfel> <20160608094747.GG22406@atomide.com>
-Message-ID: <8052110.nPS5mbu3uO@wuerfel>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Wed, 8 Jun 2016 17:04:49 +0100
+Subject: [PATCH 1/3] arm64: dts: juno: add coresight support
+In-Reply-To: <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
+References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
+ <1465228765-14038-2-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20160608160449.GP1165@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 8, 2016 2:47:48 AM CEST Tony Lindgren wrote:
+On Mon, Jun 06, 2016 at 04:59:23PM +0100, Sudeep Holla wrote:
+> Most of the debug-related components on Juno are located in the coreSight
+> subsystem while others are located in the Cortex-Axx clusters, the SCP
+> subsystem, and in the main system.
 > 
-> * Arnd Bergmann <arnd@arndb.de> [160607 01:11]:
-> > A lot of these options are typical for all ARMv7 machines: AEABI, I2C, NEON,
-> > PM, REGULATOR and VFP are things that we probably want to default to enabled
-> > whenever we build a MULTI_V7 kernel, some also for V5 or V6, we just
-> > need to come up with a good way to do that while (probably for most of
-> > them) still allowing them to be disabled with CONFIG_EXPERT. I would
-> > feel more comfortable with having an ARCH_MULTIPLATFORM_TYPICAL
-> > Kconfig symbol than with the ARCH_OMAP2PLUS_TYPICAL one that ends up
-> > turning things on unconditionally whenever you add ARCH_OMAP2PLUS
-> > to some other configuration.
+> Each core in the two processor clusters contain an Embedded Trace
+> Macrocell(ETM) which generates real-time trace information that trace
+> tools can use and an ATB trace output that is sent to a funnel before
+> going to the CoreSight subsystem.
 > 
-> We still need to be careful about not changing the Kconfig option
-> name for something like this as it will cause the custom .config files
-> to fail unless the default is y. But yeah I agree, it would be nice
-> to have some multiarch sane default selects, then also do the platform
-> specific selects as needed. Naturally this needs to be kept down to
-> minimum ideally limited to silent options.
+> The trace output signals combine with two trace expansions using another
+> funnel and fed into the Embedded Trace FIFO(ETF0).
 > 
-> So we could have ARCH_MULTIPLATFORM_TYPICAL, then have the old
-> ARCH_OMAP2PLUS_TYPICAL select that one. That should keep things
-> behaving just fine if the old .config had ARCH_OMAP2PLUS_TYPICAL.
-
-If we make ARCH_MULTIPLATFORM_TYPICAL 'default y', it will be always
-enabled in this case, and I think we can drop ARCH_OMAP2PLUS_TYPICAL.
-
-The downside would be any users that want the options we enable there
-turned off and have them silently enabled when upgrading the kernel.
-
-> > For I2C_OMAP, MENELAUS and TWL4030, we could just add a
-> > 'default ARCH_OMAP3 || ARCH_OMAP4' or whatever is appropriate for
-> > each of them. I assume we want to handle TWL6040 the same way, though
-> > we currently don't do that. MENELAUS seems to be only needed for
-> > omap2420-n8x0.
+> The output trace data stream of the funnel is then replicated before it
+> is sent to either the:
+> - Trace Port Interface Unit(TPIU), that sends it out using the trace port.
+> - ETR that can write the trace data to memory located in the application
+>   memory space
 > 
-> We could yeah. TWL4030 is omap2430 to omap3, I don't think we currently
-> have any omap3 based ones not using twl4030.. But there certainly
-> are tons of usable devices with the Motorola CPCAP PMIC instead.
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
 
-So should we enable both then?
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-> Then REGULATOR_FIXED_VOLTAGE we can have platform select like Mark
-> seems to prefer. 
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 296 +++++++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/arm/juno-r1.dts    |  24 +++
+>  arch/arm64/boot/dts/arm/juno-r2.dts    |  24 +++
+>  arch/arm64/boot/dts/arm/juno.dts       |  24 +++
+>  4 files changed, 368 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index dee2386d3b9b..90a8710f7032 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -56,6 +56,302 @@
+>  			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(6) | IRQ_TYPE_LEVEL_LOW)>;
+>  	};
+> 
+> +	/*
+> +	 * Juno TRMs specify the size for these coresight components as 64K.
+> +	 * The actual size is just 4K though 64K is reserved. Access to the
+> +	 * unmapped reserved region results in a DECERR response.
+> +	 */
+> +	etf at 20010000 {
+> +		compatible = "arm,coresight-tmc", "arm,primecell";
+> +		reg = <0 0x20010000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			/* input port */
+> +			port at 0 {
+> +				reg = <0>;
+> +				etf_in_port: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&main_funnel_out_port>;
+> +				};
+> +			};
+> +
+> +			/* output port */
+> +			port at 1 {
+> +				reg = <0>;
+> +				etf_out_port: endpoint {
+> +					remote-endpoint = <&replicator_in_port0>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	tpiu at 20030000 {
+> +		compatible = "arm,coresight-tpiu", "arm,primecell";
+> +		reg = <0 0x20030000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			tpiu_in_port: endpoint {
+> +				slave-mode;
+> +				remote-endpoint = <&replicator_out_port0>;
+> +			};
+> +		};
+> +	};
+> +
+> +	main_funnel at 20040000 {
+> +		compatible = "arm,coresight-funnel", "arm,primecell";
+> +		reg = <0 0x20040000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				main_funnel_out_port: endpoint {
+> +					remote-endpoint = <&etf_in_port>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <0>;
+> +				main_funnel_in_port0: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&cluster0_funnel_out_port>;
+> +				};
+> +			};
+> +
+> +			port at 2 {
+> +				reg = <1>;
+> +				main_funnel_in_port1: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&cluster1_funnel_out_port>;
+> +				};
+> +			};
+> +
+> +		};
+> +	};
+> +
+> +	etr at 20070000 {
+> +		compatible = "arm,coresight-tmc", "arm,primecell";
+> +		reg = <0 0x20070000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			etr_in_port: endpoint {
+> +				slave-mode;
+> +				remote-endpoint = <&replicator_out_port1>;
+> +			};
+> +		};
+> +	};
+> +
+> +	coresight-replicator {
+> +		/* non-configurable replicators don't show up on the
+> +		 * AMBA bus.  As such no need to add "arm,primecell".
+> +		 */
+> +		compatible = "arm,coresight-replicator";
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			/* replicator output ports */
+> +			port at 0 {
+> +				reg = <0>;
+> +				replicator_out_port0: endpoint {
+> +					remote-endpoint = <&tpiu_in_port>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <1>;
+> +				replicator_out_port1: endpoint {
+> +					remote-endpoint = <&etr_in_port>;
+> +				};
+> +			};
+> +
+> +			/* replicator input port */
+> +			port at 2 {
+> +				reg = <0>;
+> +				replicator_in_port0: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&etf_out_port>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	cluster0_funnel at 220c0000 {
+> +		compatible = "arm,coresight-funnel", "arm,primecell";
+> +		reg = <0 0x220c0000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				cluster0_funnel_out_port: endpoint {
+> +					remote-endpoint = <&main_funnel_in_port0>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <0>;
+> +				cluster0_funnel_in_port0: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&cluster0_etm0_out_port>;
+> +				};
+> +			};
+> +
+> +			port at 2 {
+> +				reg = <1>;
+> +				cluster0_funnel_in_port1: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&cluster0_etm1_out_port>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	cluster1_funnel at 230c0000 {
+> +		compatible = "arm,coresight-funnel", "arm,primecell";
+> +		reg = <0 0x230c0000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			port at 0 {
+> +				reg = <0>;
+> +				cluster1_funnel_out_port: endpoint {
+> +					remote-endpoint = <&main_funnel_in_port1>;
+> +				};
+> +			};
+> +
+> +			port at 1 {
+> +				reg = <0>;
+> +				cluster1_funnel_in_port0: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&cluster1_etm0_out_port>;
+> +				};
+> +			};
+> +
+> +			port at 2 {
+> +				reg = <1>;
+> +				cluster1_funnel_in_port1: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&cluster1_etm1_out_port>;
+> +				};
+> +			};
+> +			port at 3 {
+> +				reg = <2>;
+> +				cluster1_funnel_in_port2: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&cluster1_etm2_out_port>;
+> +				};
+> +			};
+> +			port at 4 {
+> +				reg = <3>;
+> +				cluster1_funnel_in_port3: endpoint {
+> +					slave-mode;
+> +					remote-endpoint = <&cluster1_etm3_out_port>;
+> +				};
+> +			};
+> +		};
+> +	};
+> +
+> +	etm0: etm at 22040000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0 0x22040000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			cluster0_etm0_out_port: endpoint {
+> +				remote-endpoint = <&cluster0_funnel_in_port0>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm1: etm at 22140000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0 0x22140000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			cluster0_etm1_out_port: endpoint {
+> +				remote-endpoint = <&cluster0_funnel_in_port1>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm2: etm at 23040000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0 0x23040000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			cluster1_etm0_out_port: endpoint {
+> +				remote-endpoint = <&cluster1_funnel_in_port0>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm3: etm at 23140000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0 0x23140000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			cluster1_etm1_out_port: endpoint {
+> +				remote-endpoint = <&cluster1_funnel_in_port1>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm4: etm at 23240000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0 0x23240000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			cluster1_etm2_out_port: endpoint {
+> +				remote-endpoint = <&cluster1_funnel_in_port2>;
+> +			};
+> +		};
+> +	};
+> +
+> +	etm5: etm at 23340000 {
+> +		compatible = "arm,coresight-etm4x", "arm,primecell";
+> +		reg = <0 0x23340000 0 0x1000>;
+> +
+> +		clocks = <&soc_smc50mhz>;
+> +		clock-names = "apb_pclk";
+> +		port {
+> +			cluster1_etm3_out_port: endpoint {
+> +				remote-endpoint = <&cluster1_funnel_in_port3>;
+> +			};
+> +		};
+> +	};
+> +
+>  	sram: sram at 2e000000 {
+>  		compatible = "arm,juno-sram-ns", "mmio-sram";
+>  		reg = <0x0 0x2e000000 0x0 0x8000>;
+> diff --git a/arch/arm64/boot/dts/arm/juno-r1.dts b/arch/arm64/boot/dts/arm/juno-r1.dts
+> index d95d9e7e2dc0..f4f8f54f8b85 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r1.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r1.dts
+> @@ -181,3 +181,27 @@
+>  &pcie_ctlr {
+>  	status = "okay";
+>  };
+> +
+> +&etm0 {
+> +	cpu = <&A57_0>;
+> +};
+> +
+> +&etm1 {
+> +	cpu = <&A57_1>;
+> +};
+> +
+> +&etm2 {
+> +	cpu = <&A53_0>;
+> +};
+> +
+> +&etm3 {
+> +	cpu = <&A53_1>;
+> +};
+> +
+> +&etm4 {
+> +	cpu = <&A53_2>;
+> +};
+> +
+> +&etm5 {
+> +	cpu = <&A53_3>;
+> +};
+> diff --git a/arch/arm64/boot/dts/arm/juno-r2.dts b/arch/arm64/boot/dts/arm/juno-r2.dts
+> index 88ecd6182b67..d903e545b64c 100644
+> --- a/arch/arm64/boot/dts/arm/juno-r2.dts
+> +++ b/arch/arm64/boot/dts/arm/juno-r2.dts
+> @@ -181,3 +181,27 @@
+>  &pcie_ctlr {
+>  	status = "okay";
+>  };
+> +
+> +&etm0 {
+> +	cpu = <&A72_0>;
+> +};
+> +
+> +&etm1 {
+> +	cpu = <&A72_1>;
+> +};
+> +
+> +&etm2 {
+> +	cpu = <&A53_0>;
+> +};
+> +
+> +&etm3 {
+> +	cpu = <&A53_1>;
+> +};
+> +
+> +&etm4 {
+> +	cpu = <&A53_2>;
+> +};
+> +
+> +&etm5 {
+> +	cpu = <&A53_3>;
+> +};
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index dcfcf15a17f5..a7270eff6939 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -173,3 +173,27 @@
+> 
+>  	#include "juno-base.dtsi"
+>  };
+> +
+> +&etm0 {
+> +	cpu = <&A57_0>;
+> +};
+> +
+> +&etm1 {
+> +	cpu = <&A57_1>;
+> +};
+> +
+> +&etm2 {
+> +	cpu = <&A53_0>;
+> +};
+> +
+> +&etm3 {
+> +	cpu = <&A53_1>;
+> +};
+> +
+> +&etm4 {
+> +	cpu = <&A53_2>;
+> +};
+> +
+> +&etm5 {
+> +	cpu = <&A53_3>;
+> +};
+> --
+> 2.7.4
+> 
 
-Ok
-
-> HIGHMEM too should be platform specific.
-
-I still don't see a good way to handle that, we should certainly not
-just 'select' it, because we often want to leave it disabled.
-
-> The original reason for ARCH_OMAP2PLUS_TYPICAL was that if omap2plus
-> is selected with that you actually get a bootable system.
-
-I understand. It's just not very scalable to have every platform do
-this, in particular if they want to select conflicting options (none
-of the ones you select should conflict, but we'd get there eventually).
-
-	Arnd
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
