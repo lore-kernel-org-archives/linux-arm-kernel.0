@@ -1,32 +1,125 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 8 Jun 2016 11:11:30 +0100
-Subject: [PATCH] mmc: dw_mmc: fix 32bit little-endian access of des1 field
-In-Reply-To: <0f6eee92-1bf3-7bea-86d7-6da1c7a0051c@rock-chips.com>
-References: <1465306639-9537-1-git-send-email-ben.dooks@codethink.co.uk>
- <0f6eee92-1bf3-7bea-86d7-6da1c7a0051c@rock-chips.com>
-Message-ID: <1b110c6b-6a2b-61c3-dcbb-fb86eec7dcd2@codethink.co.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 8 Jun 2016 11:12:09 +0100
+Subject: [PATCH v5 01/13] KVM: arm/arm64: move redistributor kvm_io_devices
+In-Reply-To: <1464962572-3925-2-git-send-email-andre.przywara@arm.com>
+References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
+ <1464962572-3925-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <5757EF79.8090001@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/16 10:55, Shawn Lin wrote:
-> Hi Ben,
+On 03/06/16 15:02, Andre Przywara wrote:
+> Logically a GICv3 redistributor is assigned to a (v)CPU, so we should
+> aim to keep redistributor related variables out of our struct vgic_dist.
 > 
-> On 2016-6-7 21:37, Ben Dooks wrote:
->> The IDMAC_SET_BUFFER1_SIZE() macro modifies des1, but does
->> not check if the value being passed is big or little endian
->> desptire the des1 field being marked as __le32.
+> Let's start by replacing the redistributor related kvm_io_device array
+> with two members in our existing struct vgic_cpu, which are naturally
+> per-VCPU and thus don't require any allocation / freeing.
+> So apart from the better fit with the redistributor design this saves
+> some code as well.
 > 
-> Looks good.
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/vgic/vgic.h          |  8 +++++++-
+>  virt/kvm/arm/vgic/vgic-init.c    |  1 -
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 22 ++++++++--------------
+>  3 files changed, 15 insertions(+), 16 deletions(-)
 > 
-> Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
-> 
-> Test on Rockchip platform, so
-> 
-> Tested-by: Shawn Lin <shawn.lin@rock-chips.com>
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index 3fbd175..2f26f37 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -145,7 +145,6 @@ struct vgic_dist {
+>  	struct vgic_irq		*spis;
+>  
+>  	struct vgic_io_device	dist_iodev;
+> -	struct vgic_io_device	*redist_iodevs;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> @@ -193,6 +192,13 @@ struct vgic_cpu {
+>  	struct list_head ap_list_head;
+>  
+>  	u64 live_lrs;
+> +
+> +	/*
+> +	 * Members below are used with GICv3 emulation only and represent
+> +	 * parts of the redistributor.
+> +	 */
+> +	struct vgic_io_device	rd_iodev;
+> +	struct vgic_io_device	sgi_iodev;
 
-Thanks, I'lkl prod matt to add his tested line.
+Since we don't have GICv3 support on 32bit (yet), it'd make sense to
+make this conditional on CONFIG_KVM_ARM_VGIC_V3.
 
+>  };
+>  
+>  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index a1442f7..90cae48 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -271,7 +271,6 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+>  	dist->initialized = false;
+>  
+>  	kfree(dist->spis);
+> -	kfree(dist->redist_iodevs);
+>  	dist->nr_spis = 0;
+>  
+>  	mutex_unlock(&kvm->lock);
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index a0c515a..fc7b6c9 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -285,21 +285,14 @@ unsigned int vgic_v3_init_dist_iodev(struct vgic_io_device *dev)
+>  
+>  int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+>  {
+> -	int nr_vcpus = atomic_read(&kvm->online_vcpus);
+>  	struct kvm_vcpu *vcpu;
+> -	struct vgic_io_device *devices;
+>  	int c, ret = 0;
+>  
+> -	devices = kmalloc(sizeof(struct vgic_io_device) * nr_vcpus * 2,
+> -			  GFP_KERNEL);
+> -	if (!devices)
+> -		return -ENOMEM;
+> -
+>  	kvm_for_each_vcpu(c, vcpu, kvm) {
+>  		gpa_t rd_base = redist_base_address + c * SZ_64K * 2;
+>  		gpa_t sgi_base = rd_base + SZ_64K;
+> -		struct vgic_io_device *rd_dev = &devices[c * 2];
+> -		struct vgic_io_device *sgi_dev = &devices[c * 2 + 1];
+> +		struct vgic_io_device *rd_dev = &vcpu->arch.vgic_cpu.rd_iodev;
+> +		struct vgic_io_device *sgi_dev = &vcpu->arch.vgic_cpu.sgi_iodev;
+>  
+>  		kvm_iodevice_init(&rd_dev->dev, &kvm_io_gic_ops);
+>  		rd_dev->base_addr = rd_base;
+> @@ -335,14 +328,15 @@ int vgic_register_redist_iodevs(struct kvm *kvm, gpa_t redist_base_address)
+>  	if (ret) {
+>  		/* The current c failed, so we start with the previous one. */
+>  		for (c--; c >= 0; c--) {
+> +			struct vgic_cpu *vgic_cpu;
+> +
+> +			vcpu = kvm_get_vcpu(kvm, c);
+> +			vgic_cpu = &vcpu->arch.vgic_cpu;
+>  			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> -						  &devices[c * 2].dev);
+> +						  &vgic_cpu->rd_iodev.dev);
+>  			kvm_io_bus_unregister_dev(kvm, KVM_MMIO_BUS,
+> -						  &devices[c * 2 + 1].dev);
+> +						  &vgic_cpu->sgi_iodev.dev);
+>  		}
+> -		kfree(devices);
+> -	} else {
+> -		kvm->arch.vgic.redist_iodevs = devices;
+>  	}
+>  
+>  	return ret;
+> 
 
+Thanks,
+
+	M.
 -- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Jazz is not dead. It just smells funny...
