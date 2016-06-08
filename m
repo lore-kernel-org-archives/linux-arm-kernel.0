@@ -1,55 +1,45 @@
 From: matthew@mattleach.net (Matthew Leach)
-Date: Wed,  8 Jun 2016 19:31:10 +0100
-Subject: [RFC PATCH 15/15] iommu/exynos: update to use iommu big-endian
+Date: Wed,  8 Jun 2016 19:31:08 +0100
+Subject: [RFC PATCH 13/15] memory: samsung: endian fixes for IO
 In-Reply-To: <20160608183110.13851-1-matthew@mattleach.net>
 References: <20160608183110.13851-1-matthew@mattleach.net>
-Message-ID: <20160608183110.13851-16-matthew@mattleach.net>
+Message-ID: <20160608183110.13851-14-matthew@mattleach.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Add initial support for big endian by always writing the pte
-in le32. Note, revisit if hardware capable of doing big endian
-fetches.
+Use the relaxed versions of the IO accessors to avoid any issues
+if running in big endian.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Joerg Roedel <joro@8bytes.org>
-Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Pavel Fedin <p.fedin@samsung.com>
 Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Cc: iommu at lists.linux-foundation.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-samsung-soc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org (open list)
+Cc: Pankaj Dubey <pankaj.dubey@samsung.com>
+Cc: linux-arm-kernel at lists.codethink.co.uk
 ---
- drivers/iommu/exynos-iommu.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+ drivers/memory/samsung/exynos-srom.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-index 5ecc86c..dd8b3b3 100644
---- a/drivers/iommu/exynos-iommu.c
-+++ b/drivers/iommu/exynos-iommu.c
-@@ -54,6 +54,10 @@ typedef u32 sysmmu_pte_t;
- #define lv2ent_small(pent) ((*(pent) & 2) == 2)
- #define lv2ent_large(pent) ((*(pent) & 3) == 1)
+diff --git a/drivers/memory/samsung/exynos-srom.c b/drivers/memory/samsung/exynos-srom.c
+index 96756fb..ac8f79c 100644
+--- a/drivers/memory/samsung/exynos-srom.c
++++ b/drivers/memory/samsung/exynos-srom.c
+@@ -91,11 +91,11 @@ static int exynos_srom_configure_bank(struct exynos_srom *srom,
+ 	if (width == 2)
+ 		cs |= 1 << EXYNOS_SROM_BW__DATAWIDTH__SHIFT;
  
-+#ifdef CONFIG_BIG_ENDIAN
-+#warning "revisit driver if we can enable big-endian ptes"
-+#endif
-+
- /*
-  * v1.x - v3.x SYSMMU supports 32bit physical and 32bit virtual address spaces
-  * v5.0 introduced support for 36bit physical address space by shifting
-@@ -716,7 +720,7 @@ static inline void update_pte(sysmmu_pte_t *ent, sysmmu_pte_t val)
- {
- 	dma_sync_single_for_cpu(dma_dev, virt_to_phys(ent), sizeof(*ent),
- 				DMA_TO_DEVICE);
--	*ent = val;
-+	*ent = cpu_to_le32(val);
- 	dma_sync_single_for_device(dma_dev, virt_to_phys(ent), sizeof(*ent),
- 				   DMA_TO_DEVICE);
- }
+-	bw = __raw_readl(srom->reg_base + EXYNOS_SROM_BW);
++	bw = readl_relaxed(srom->reg_base + EXYNOS_SROM_BW);
+ 	bw = (bw & ~(EXYNOS_SROM_BW__CS_MASK << bank)) | (cs << bank);
+-	__raw_writel(bw, srom->reg_base + EXYNOS_SROM_BW);
++	writel_relaxed(bw, srom->reg_base + EXYNOS_SROM_BW);
+ 
+-	__raw_writel(pmc | (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
++	writel_relaxed(pmc | (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
+ 		    (timing[1] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
+ 		    (timing[2] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
+ 		    (timing[3] << EXYNOS_SROM_BCX__TACC__SHIFT) |
 -- 
 2.8.3
