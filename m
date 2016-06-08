@@ -1,80 +1,67 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 8 Jun 2016 22:33:34 +0800
-Subject: [PATCH 05/11] clk: imx: refine the powerup_set bit of clk-pllv3
+Date: Wed, 8 Jun 2016 22:33:31 +0800
+Subject: [PATCH 02/11] clk: imx: correct AV PLL rate formula
 In-Reply-To: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
 References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1465396420-27064-2-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a powerdown bit already, so let's change the name of
-powerup_set bit to power_invert to reflects the power polarity
-to make it less confusing.
+From: Anson Huang <b20788@freescale.com>
 
+The audio/video PLL's rate calculation is as below in RM:
+
+Fref * (DIV_SELECT + NUM / DENOM), in origin clk-pllv3's
+code, below code is used:
+
+(parent_rate * div) + ((parent_rate / mfd) * mfn
+
+as it does NOT consider the float data using div, so below
+formula should be used as a decent method:
+
+(parent_rate * div) + ((parent_rate * mfn) / mfd)
+
+and we also need to consider parent_rate * mfd may overflow
+a 32 bit value, 64 bit value should be used.
+
+After updating this formula, the dram PLL's rate is
+1066MHz, which is correct, while the old formula gets
+1056MHz.
+
+[Aisheng: fix clk_pllv3_av_round_rate too]
+
+Signed-off-by: Anson Huang <b20788@freescale.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/imx/clk-pllv3.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/clk/imx/clk-pllv3.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-index eea2b1b3791e..3fdfb6d2cc71 100644
+index 44d294a336f0..eea2b1b3791e 100644
 --- a/drivers/clk/imx/clk-pllv3.c
 +++ b/drivers/clk/imx/clk-pllv3.c
-@@ -29,8 +29,8 @@
-  * struct clk_pllv3 - IMX PLL clock version 3
-  * @clk_hw:	 clock source
-  * @base:	 base address of PLL registers
-- * @powerup_set: set POWER bit to power up the PLL
-- * @powerdown:   pll powerdown offset bit
-+ * @powerdown:	 pll powerdown bit offset
-+ * @power_invert: set powerdown bit to power up the PLL
-  * @div_mask:	 mask of divider bits
-  * @div_shift:	 shift of divider bits
-  *
-@@ -40,7 +40,7 @@
- struct clk_pllv3 {
- 	struct clk_hw	hw;
- 	void __iomem	*base;
--	bool		powerup_set;
-+	bool		power_invert;
- 	u32		powerdown;
- 	u32		div_mask;
- 	u32		div_shift;
-@@ -55,7 +55,7 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
- 	u32 val = readl_relaxed(pll->base) & pll->powerdown;
+@@ -218,8 +218,12 @@ static unsigned long clk_pllv3_av_recalc_rate(struct clk_hw *hw,
+ 	u32 mfn = readl_relaxed(pll->base + PLL_NUM_OFFSET);
+ 	u32 mfd = readl_relaxed(pll->base + PLL_DENOM_OFFSET);
+ 	u32 div = readl_relaxed(pll->base) & pll->div_mask;
++	u64 temp64 = (u64)parent_rate;
  
- 	/* No need to wait for lock when pll is not powered up */
--	if ((pll->powerup_set && !val) || (!pll->powerup_set && val))
-+	if ((pll->power_invert && !val) || (!pll->power_invert && val))
- 		return 0;
+-	return (parent_rate * div) + ((parent_rate / mfd) * mfn);
++	temp64 *= mfn;
++	do_div(temp64, mfd);
++
++	return (parent_rate * div) + (u32)temp64;
+ }
  
- 	/* Wait for PLL to lock */
-@@ -76,7 +76,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
- 	u32 val;
+ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+@@ -243,7 +247,7 @@ static long clk_pllv3_av_round_rate(struct clk_hw *hw, unsigned long rate,
+ 	do_div(temp64, parent_rate);
+ 	mfn = temp64;
  
- 	val = readl_relaxed(pll->base);
--	if (pll->powerup_set)
-+	if (pll->power_invert)
- 		val |= pll->powerdown;
- 	else
- 		val &= ~pll->powerdown;
-@@ -91,7 +91,7 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
- 	u32 val;
+-	return parent_rate * div + parent_rate / mfd * mfn;
++	return parent_rate * div + parent_rate * mfn / mfd;
+ }
  
- 	val = readl_relaxed(pll->base);
--	if (pll->powerup_set)
-+	if (pll->power_invert)
- 		val &= ~pll->powerdown;
- 	else
- 		val |= pll->powerdown;
-@@ -326,7 +326,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
- 		pll->div_shift = 1;
- 	case IMX_PLLV3_USB:
- 		ops = &clk_pllv3_ops;
--		pll->powerup_set = true;
-+		pll->power_invert = true;
- 		break;
- 	case IMX_PLLV3_AV:
- 		ops = &clk_pllv3_av_ops;
+ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
 -- 
 1.9.1
