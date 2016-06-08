@@ -1,56 +1,75 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  8 Jun 2016 17:20:42 +0100
-Subject: [PATCH] ARM: make unexported functions static
-Message-ID: <1465402842-26798-1-git-send-email-ben.dooks@codethink.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  8 Jun 2016 17:25:37 +0100
+Subject: [PATCH v2 1/3] arm64: spinlock: order spin_{is_locked,
+ unlock_wait} against local locks
+Message-ID: <1465403139-21054-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are three functions that do not get exported from the
-psci_smp.c file that if we make static then the following
-warnings get squashed:
+spin_is_locked has grown two very different use-cases:
 
-arch/arm/kernel/psci_smp.c:61:5: warning: symbol 'psci_cpu_disable' was not declared. Should it be static?
-arch/arm/kernel/psci_smp.c:74:6: warning: symbol 'psci_cpu_die' was not declared. Should it be static?
-arch/arm/kernel/psci_smp.c:86:5: warning: symbol 'psci_cpu_kill' was not declared. Should it be static?
+(1) [The sane case] API functions may require a certain lock to be held
+    by the caller and can therefore use spin_is_locked as part of an
+    assert statement in order to verify that the lock is indeed held.
+    For example, usage of assert_spin_locked.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+(2) [The insane case] There are two locks, where a CPU takes one of the
+    locks and then checks whether or not the other one is held before
+    accessing some shared state. For example, the "optimized locking" in
+    ipc/sem.c.
+
+In the latter case, the sequence looks like:
+
+  spin_lock(&sem->lock);
+  if (!spin_is_locked(&sma->sem_perm.lock))
+    /* Access shared state */
+
+and requires that the spin_is_locked check is ordered after taking the
+sem->lock. Unfortunately, since our spinlocks are implemented using a
+LDAXR/STXR sequence, the read of &sma->sem_perm.lock can be speculated
+before the STXR and consequently return a stale value.
+
+Whilst this hasn't been seen to cause issues in practice, PowerPC fixed
+the same issue in 51d7d5205d33 ("powerpc: Add smp_mb() to
+arch_spin_is_locked()") and, although we did something similar for
+spin_unlock_wait in d86b8da04dfa ("arm64: spinlock: serialise
+spin_unlock_wait against concurrent lockers") that doesn't actually take
+care of ordering against local acquisition of a different lock.
+
+This patch adds an smp_mb() to the start of our arch_spin_is_locked and
+arch_spin_unlock_wait routines to ensure that the lock value is always
+loaded after any other locks have been taken by the current CPU.
+
+Reported-by: Peter Zijlstra <peterz@infradead.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: Russell King <linux@armlinux.org.uk>
----
- arch/arm/kernel/psci_smp.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/spinlock.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-index cb3fcae..20d6343 100644
---- a/arch/arm/kernel/psci_smp.c
-+++ b/arch/arm/kernel/psci_smp.c
-@@ -58,7 +58,7 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
- }
+diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+index fc9682bfe002..aac64d55cb22 100644
+--- a/arch/arm64/include/asm/spinlock.h
++++ b/arch/arm64/include/asm/spinlock.h
+@@ -31,6 +31,12 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
+ 	unsigned int tmp;
+ 	arch_spinlock_t lockval;
  
- #ifdef CONFIG_HOTPLUG_CPU
--int psci_cpu_disable(unsigned int cpu)
-+static int psci_cpu_disable(unsigned int cpu)
- {
- 	/* Fail early if we don't have CPU_OFF support */
- 	if (!psci_ops.cpu_off)
-@@ -71,7 +71,7 @@ int psci_cpu_disable(unsigned int cpu)
- 	return 0;
- }
++	/*
++	 * Ensure prior spin_lock operations to other locks have completed
++	 * on this CPU before we test whether "lock" is locked.
++	 */
++	smp_mb();
++
+ 	asm volatile(
+ "	sevl\n"
+ "1:	wfe\n"
+@@ -148,6 +154,7 @@ static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
  
--void psci_cpu_die(unsigned int cpu)
-+static void psci_cpu_die(unsigned int cpu)
+ static inline int arch_spin_is_locked(arch_spinlock_t *lock)
  {
- 	u32 state = PSCI_POWER_STATE_TYPE_POWER_DOWN <<
- 		    PSCI_0_2_POWER_STATE_TYPE_SHIFT;
-@@ -83,7 +83,7 @@ void psci_cpu_die(unsigned int cpu)
- 	panic("psci: cpu %d failed to shutdown\n", cpu);
++	smp_mb(); /* See arch_spin_unlock_wait */
+ 	return !arch_spin_value_unlocked(READ_ONCE(*lock));
  }
- 
--int psci_cpu_kill(unsigned int cpu)
-+static int psci_cpu_kill(unsigned int cpu)
- {
- 	int err, i;
  
 -- 
-2.8.1
+2.1.4
