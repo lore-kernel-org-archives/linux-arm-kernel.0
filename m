@@ -1,28 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jun 2016 14:08:28 +0200
-Subject: [PATCH] pinctrl: sh-pfc: fix warnings by include core.h
-In-Reply-To: <1465320786-10333-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465320786-10333-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <CACRpkdaq8jzBT8o8RVnnA6xQ1YVqFoYf+wgmrWciJx0qbDLs=g@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 8 Jun 2016 13:08:29 +0100
+Subject: [PATCH] arm64: mm: only initialize swiotlb when necessary
+In-Reply-To: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
+References: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160608120829.GB16322@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 7:33 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+On Wed, Jun 08, 2016 at 03:53:46PM +0800, Jisheng Zhang wrote:
+>  static int __init arm64_dma_init(void)
+>  {
+> +	if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
+> +		swiotlb = 1;
+> +
+>  	return atomic_pool_init();
+>  }
 
-> Fix warnings about emev2_pinmux_info and r8a7779_pinmux_info
-> by using core.h instead of sh_pfc.h in these files. This gives
-> the declarations of the two structures and removes the following
-> warnings:
->
-> drivers/pinctrl/sh-pfc/pfc-emev2.c:1695:30: warning: symbol 'emev2_pinmux_info' was not declared. Should it be static?
-> drivers/pinctrl/sh-pfc/pfc-r8a7779.c:3888:30: warning: symbol 'r8a7779_pinmux_info' was not declared. Should it be static?
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+So any platform with RAM larger than 4GB would still initialise swiotlb.
+I wouldn't say it's an issue, 64MB is not a significant loss on such
+systems.
 
-Geert/Laurent:
+An alternative would be to defer the freeing until we are aware of all
+possible dma masks for the populated devices (e.g. from DT), though I'm
+not sure that's enough, drivers may try to change such masks when
+probed.
 
-- take a look at this patch
-- shall I apply this directly?
-
-Yours,
-Linus Walleij
+-- 
+Catalin
