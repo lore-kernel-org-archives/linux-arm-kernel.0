@@ -1,46 +1,53 @@
-From: matthew@mattleach.net (Matthew Leach)
-Date: Wed,  8 Jun 2016 19:31:09 +0100
-Subject: [RFC PATCH 14/15] hwrng: exynos - fixup IO accesors
-In-Reply-To: <20160608183110.13851-1-matthew@mattleach.net>
-References: <20160608183110.13851-1-matthew@mattleach.net>
-Message-ID: <20160608183110.13851-15-matthew@mattleach.net>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 8 Jun 2016 14:03:33 -0500
+Subject: [PATCH v3 06/12] power: pwrseq: simple: Add support for
+ regulator and generic property
+In-Reply-To: <575693DE.2010603@samsung.com>
+References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
+ <1464768141-25420-7-git-send-email-k.kozlowski@samsung.com>
+ <20160603020218.GA19436@rob-hp-laptop>
+ <575693DE.2010603@samsung.com>
+Message-ID: <20160608190333.GA5126@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ben Dooks <ben.dooks@codethink.co.uk>
+On Tue, Jun 07, 2016 at 11:29:02AM +0200, Krzysztof Kozlowski wrote:
+> On 06/03/2016 04:02 AM, Rob Herring wrote:
+> >>  Optional properties:
+> >>  - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+> >> @@ -16,6 +22,7 @@ Optional properties:
+> >>    See ../clocks/clock-bindings.txt for details.
+> >>  - clock-names : Must include the following entry:
+> >>    "ext_clock" (External clock provided to the card).
+> >> +- ext-supply : External regulator supply
+> > 
+> > What happens when there are 2 supplies?
+> > 
+> > I'd prefer the name not be genericish and use the real supply names. 
+> > Then the power seq code should just turn on all supplies it finds. If 
+> > the order or timing to turn on matters, then sorry, no generic sequence.
+> 
+> I think the generic part for regulators might be a problem. Regulator
+> API requires a name for the supply... it cannot get "something" or
+> "everything".
 
-The __raw IO functions are not endian safe, so use the readl_relaxed
-and writel_relaxed versions of these.
+That's the downside of variable property names...
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-CC: Matt Mackall <mpm@selenic.com>
-CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-CC: linux-crypto at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-samsung-soc at vger.kernel.org
----
- drivers/char/hw_random/exynos-rng.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> The driver could attach itself to any kind of node (where power-sequence
+> property exists) so the supply name depends on the bindings of device
+> (not bindings of power sequence driver).
+> 
+> The power sequence driver could however iterate over child properties
+> and get the names of all supplies. It is a little bit ugly...
 
-diff --git a/drivers/char/hw_random/exynos-rng.c b/drivers/char/hw_random/exynos-rng.c
-index ed44561..23d3585 100644
---- a/drivers/char/hw_random/exynos-rng.c
-+++ b/drivers/char/hw_random/exynos-rng.c
-@@ -45,12 +45,12 @@ struct exynos_rng {
- 
- static u32 exynos_rng_readl(struct exynos_rng *rng, u32 offset)
- {
--	return	__raw_readl(rng->mem + offset);
-+	return	readl_relaxed(rng->mem + offset);
- }
- 
- static void exynos_rng_writel(struct exynos_rng *rng, u32 val, u32 offset)
- {
--	__raw_writel(val, rng->mem + offset);
-+	writel_relaxed(val, rng->mem + offset);
- }
- 
- static int exynos_rng_configure(struct exynos_rng *exynos_rng)
--- 
-2.8.3
+Yes. Like this, right?
+
+for_each_property_of_node(np, pp) {
+	if (!strstr(pp->name, "-supply"))
+		continue;
+	// found supply
+}
+
+The uglyness can always be improved with a function to do this parsing.
+
+Rob
