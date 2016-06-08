@@ -1,56 +1,111 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed,  8 Jun 2016 11:38:55 +0100
-Subject: [PATCH] arm64: KVM: fix build with CONFIG_ARM_PMU disabled
-Message-ID: <1465382335-5024-1-git-send-email-sudeep.holla@arm.com>
+From: liviu.dudau@arm.com (liviu.dudau at arm.com)
+Date: Wed, 8 Jun 2016 11:42:09 +0100
+Subject: HDLCD crashes with 6d910bfa809e
+In-Reply-To: <69f6ce7f-2c60-319a-fa65-b52a74db5460@samsung.com>
+References: <5756B8A8.8000902@arm.com>
+ <20160607133535.GA1165@e106497-lin.cambridge.arm.com>
+ <5756D602.4090305@arm.com>
+ <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
+ <3c4d34f5-a924-587e-5956-c21d528f24bf@samsung.com>
+ <20160608090507.GG1165@e106497-lin.cambridge.arm.com>
+ <69f6ce7f-2c60-319a-fa65-b52a74db5460@samsung.com>
+Message-ID: <20160608104209.GH1165@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM_PMU is disabled, we get the following build error:
+On Wed, Jun 08, 2016 at 12:01:20PM +0200, Marek Szyprowski wrote:
+> Hi Liviu,
 
-arch/arm64/kvm/sys_regs.c: In function 'pmu_counter_idx_valid':
-arch/arm64/kvm/sys_regs.c:564:27: error: 'ARMV8_PMU_CYCLE_IDX' undeclared (first use in this function)
-  if (idx >= val && idx != ARMV8_PMU_CYCLE_IDX)
-                           ^
-arch/arm64/kvm/sys_regs.c:564:27: note: each undeclared identifier is reported only once for each function it appears in
-arch/arm64/kvm/sys_regs.c: In function 'access_pmu_evcntr':
-arch/arm64/kvm/sys_regs.c:592:10: error: 'ARMV8_PMU_CYCLE_IDX' undeclared (first use in this function)
-    idx = ARMV8_PMU_CYCLE_IDX;
-          ^
-arch/arm64/kvm/sys_regs.c: In function 'access_pmu_evtyper':
-arch/arm64/kvm/sys_regs.c:638:14: error: 'ARMV8_PMU_CYCLE_IDX' undeclared (first use in this function)
-   if (idx == ARMV8_PMU_CYCLE_IDX)
-              ^
-arch/arm64/kvm/hyp/switch.c:86:15: error: 'ARMV8_PMU_USERENR_MASK' undeclared (first use in this function)
-  write_sysreg(ARMV8_PMU_USERENR_MASK, pmuserenr_el0);
+Hi Marek,
 
-This patch fixes the build with CONFIG_ARM_PMU disabled.
+[HDLCD bug report content removed]
 
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- include/kvm/arm_pmu.h | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+> >>>OK, the problem is that commit 59ce4039727ef40 has changed the behaviour from when
+> >>>there is no "memory-region" phandle in the DT: before it used to return -ENODEV, now
+> >>>it returns -EINVAL.
+> >>>
+> >>>Marek, I quite liked the old behaviour to detect if the DT had the optional (from
+> >>>my driver's point of view) "memory-region" phandle. Plus the check for dev is superfluous
+> >>>when using of_reserved_mem_device_init() as that uses dev->of_node for np so it would
+> >>>crash before the check anyway. Maybe move the check there?
+> >>>
+> >>>Until then I suggest reverting the 59ce4039727ef40 commit.
+> >>I've just send a fix for this issue. I'm sorry for the regression. I hope
+> >>the fix fill
+> >>quickly get into next to solve your problem.
+> >Thanks for the patch, however I have some comments to it.
+> >
+> >>The additional check for null dev make sense, because the new function
+> >>of_reserved_mem_device_init_by_idx can be called with any device and node
+> >>pointer not
+> >>embedded with it, so I would like to keep it safe.
+> >And I have to admit I find that scary. Why do you accept any node that is *not* related to
+> >the device? If you want just the ability to parse multiple "memory-region" phandles (where
+> >are the bindings defined for that?) I would have modified of_reserved_mem_device_init() to
+> >the the parsing and accept either the single entry style or a node with multiple
+> >"memory-region" phandles in it. Otherwise I can steal the "memory-region" of another device
+> >and that device would have no idea that I have done this.
+> 
+> The idea is not to steal memory region from another device, but to let
+> driver to use multiple
+> regions assigned to the supported device with dma-mapping api. To use them
+> with dma-mapping
+> subsystem, one needs separate struct device for each reserved region. The
+> idea is to create
+> child devices of the device, which has memory-region property. Then for each
+> such child
+> device, driver can call of_reserved_mem_device_init_by_idx() to enable usage
+> of dma-mapping
+> api based on the selected reserved region. Such approach was already used
+> for long time in
+> the media/platform/s5p-mfc driver and now it has been converted to use
+> generic reserved
+> memory regions.
+> 
+> If you feel scary about this approach, maybe a check if the device provided
+> to
+> of_reserved_mem_device_init_by_idx() function is one of the successors of
+> the device hidden
+> behind the provided node pointer (or points to the same device)?
 
-diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-index fe389ac31489..92e7e97ca8ff 100644
---- a/include/kvm/arm_pmu.h
-+++ b/include/kvm/arm_pmu.h
-@@ -18,13 +18,13 @@
- #ifndef __ASM_ARM_KVM_PMU_H
- #define __ASM_ARM_KVM_PMU_H
- 
--#ifdef CONFIG_KVM_ARM_PMU
--
- #include <linux/perf_event.h>
- #include <asm/perf_event.h>
- 
- #define ARMV8_PMU_CYCLE_IDX		(ARMV8_PMU_MAX_COUNTERS - 1)
- 
-+#ifdef CONFIG_KVM_ARM_PMU
-+
- struct kvm_pmc {
- 	u8 idx;	/* index into the pmu->pmc array */
- 	struct perf_event *perf_event;
+That would not hurt to have.
+
+> 
+> >Can you point me to the latest thread where this patch has been discussed?
+> 
+> This patch is a part of "Exynos: MFC driver: reserved memory cleanup and
+> IOMMU support" thread
+> and has been around for a while:
+> https://www.mail-archive.com/linux-media at vger.kernel.org/msg97645.html
+
+Thanks! I'm not subscribed to linux-media and way behind a lot of other MLs, so
+I have not noticed it.
+
+I've had a look at the patchset, found one case where you might leak some memory.
+
+I also think you could've had an of_reserved_mem_device_init_list() function
+that inits all the "memory-region" nodes and returns a list struct reserved_mem*
+that the driver can then assign to whatever internal variables it has. That
+way you can validate that all the "memory-region" phandles are used by the same
+parent device.
+
+Best regards,
+Liviu
+
+
+> 
+> Best regards
+> -- 
+> Marek Szyprowski, PhD
+> Samsung R&D Institute Poland
+> 
+
 -- 
-2.7.4
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
