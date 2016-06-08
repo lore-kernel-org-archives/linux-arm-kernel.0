@@ -1,49 +1,49 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jun 2016 16:30:55 +0200
-Subject: [PATCH v7 1/6] mfd: max8997: Use regmap to access registers
-In-Reply-To: <20160608142621.GG14888@dell>
-References: <1464773339-756-1-git-send-email-k.kozlowski@samsung.com>
- <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
- <20160608142621.GG14888@dell>
-Message-ID: <57582C1F.5040306@samsung.com>
+From: aisheng.dong@nxp.com (Dong Aisheng)
+Date: Wed, 8 Jun 2016 22:33:30 +0800
+Subject: [PATCH 01/11] clk: imx: clk-pllv3: fix incorrect handle of enet
+ powerdown bit
+Message-ID: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2016 04:26 PM, Lee Jones wrote:
-> On Wed, 01 Jun 2016, Krzysztof Kozlowski wrote:
-> 
->> From: Robert Baldyga <r.baldyga@samsung.com>
->>
->> This patch modifies max8997 driver and each associated function driver,
->> to use regmap instead of operating directly on i2c bus. It will allow to
->> simplify IRQ handling using regmap-irq.
->>
->> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
->> Acked-by: Bryan Wu <cooloney@gmail.com>
->> Acked-by: Lee Jones <lee.jones@linaro.org>
->> Acked-by: Sebastian Reichel <sre@kernel.org>
->> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->> [k.kozlowski: Collect acks, rebase on v4.6-rc6]
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->> Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
->> ---
->>  drivers/extcon/extcon-max8997.c       |  31 ++++----
->>  drivers/input/misc/max8997_haptic.c   |  34 ++++----
->>  drivers/leds/leds-max8997.c           |  13 ++--
->>  drivers/mfd/Kconfig                   |   1 +
->>  drivers/mfd/max8997-irq.c             |  64 ++++++---------
->>  drivers/mfd/max8997.c                 | 141 +++++++++++++++-------------------
->>  drivers/power/max8997_charger.c       |  33 ++++----
->>  drivers/regulator/max8997-regulator.c |  87 ++++++++++-----------
-> 
-> Is it just Mark's Ack you require?
+After commit f53947456f98 ("ARM: clk: imx: update pllv3 to support imx7"),
+the former used BM_PLL_POWER bit is not correct anymore for IMX7 ENET.
+Instead, pll->powerdown holds the correct bit, so using powerdown bit
+in clk_pllv3_{prepare | unprepare} functions.
 
-Yes, only Mark's is missing here. All other patches got everything they
-need.
+Fixes: f53947456f98 ("ARM: clk: imx: update pllv3 to support imx7")
+Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+---
+ drivers/clk/imx/clk-pllv3.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Best regards,
-Krzysztof
+diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+index 4826b3c9e19e..44d294a336f0 100644
+--- a/drivers/clk/imx/clk-pllv3.c
++++ b/drivers/clk/imx/clk-pllv3.c
+@@ -77,9 +77,9 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+ 
+ 	val = readl_relaxed(pll->base);
+ 	if (pll->powerup_set)
+-		val |= BM_PLL_POWER;
++		val |= pll->powerdown;
+ 	else
+-		val &= ~BM_PLL_POWER;
++		val &= ~pll->powerdown;
+ 	writel_relaxed(val, pll->base);
+ 
+ 	return clk_pllv3_wait_lock(pll);
+@@ -92,9 +92,9 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+ 
+ 	val = readl_relaxed(pll->base);
+ 	if (pll->powerup_set)
+-		val &= ~BM_PLL_POWER;
++		val &= ~pll->powerdown;
+ 	else
+-		val |= BM_PLL_POWER;
++		val |= pll->powerdown;
+ 	writel_relaxed(val, pll->base);
+ }
+ 
+-- 
+1.9.1
