@@ -1,133 +1,69 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  8 Jun 2016 12:04:47 +0100
-Subject: [PATCH v3 1/4] PCI: add generic code to claim bus resources
+Date: Wed,  8 Jun 2016 12:04:49 +0100
+Subject: [PATCH v3 3/4] ARM64/PCI: remove arch specific pcibios_enable_device()
 In-Reply-To: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1465383890-13538-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1465383890-13538-4-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI core code contains a set of functions, eg:
+The arm64 pcibios_enable_device() implementation exists solely
+to prevent enabling PCI resources on PCI_PROBE_ONLY systems, since
+on those systems the PCI resources are currently not claimed (ie
+inserted in the PCI resource tree - which means their parent
+pointer is not correctly set-up) therefore they can not be enabled
+since this would trigger PCI set-ups failures.
 
-pci_assign_unassigned_bus_resources()
+By introducing resources claiming in the PCI host controllers set-ups
+that have PCI_PROBE_ONLY as a probe option, there is no need for arch
+specific pcibios_enable_device() implementations anymore in that the
+kernel can rely on the generic pcibios_enable_device() implementation
+without resorting to arch specific code to work around the missing
+resources claiming enumeration step.
 
-that allow to assign the PCI resources for a given bus after
-enumeration.
+On !PCI_PROBE_ONLY PCI bus set-ups, resources are always assigned
+in the PCI host controllers drivers; since the PCI resource assignment
+API takes care of inserting the assigned resources in the resource tree,
+the resources parent pointer is correctly set-up, which means that this
+patch leaves behaviour unchanged for all arm64 PCI set-ups that do not
+set the PCI_PROBE_ONLY flag.
 
-On systems where the PCI BARs are immutable (ie they must not and can
-not be assigned), PCI bus resources should still be inserted in the PCI
-resources tree (even if they are not (re)-assigned), but there is
-no generic PCI kernel function for that purpose. Currently the PCI bus
-resources insertion in the resources tree is implemented in an arch
-specific fashion through arch specific callbacks that rely on the PCI
-resources claiming API (for bridges and devices) which resulted in arches
-implementations that contain duplicated code to claim resources for a
-given PCI bus hierarchy.
-
-Based on the x86/ia64 resources claiming arch implementations, implement
-a set of functions in core PCI code that provides a PCI core interface
-for resources claiming for a given PCI bus hierarchy, paving the way for
-further resource claiming consolidation across architectures.
+Remove the pcibios_enable_device() function from the arm64 arch
+back-end so that the kernel now uses its generic implementation.
 
 Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Yinghai Lu <yinghai@kernel.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
 ---
- drivers/pci/setup-bus.c | 68 +++++++++++++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h     |  1 +
- 2 files changed, 69 insertions(+)
+ arch/arm64/kernel/pci.c | 13 -------------
+ 1 file changed, 13 deletions(-)
 
-diff --git a/drivers/pci/setup-bus.c b/drivers/pci/setup-bus.c
-index 55641a3..1d1a2c9 100644
---- a/drivers/pci/setup-bus.c
-+++ b/drivers/pci/setup-bus.c
-@@ -1423,6 +1423,74 @@ void pci_bus_assign_resources(const struct pci_bus *bus)
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index 3c4e308..39cfa03 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -36,19 +36,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
+ 	return res->start;
  }
- EXPORT_SYMBOL(pci_bus_assign_resources);
  
-+static void pci_claim_device_resources(struct pci_dev *dev)
-+{
-+	int i;
-+
-+	for (i = 0; i < PCI_BRIDGE_RESOURCES; i++) {
-+		struct resource *r = &dev->resource[i];
-+
-+		if (!r->flags || r->parent)
-+			continue;
-+
-+		pci_claim_resource(dev, i);
-+	}
-+}
-+
-+static void pci_claim_bridge_resources(struct pci_dev *dev)
-+{
-+	int i;
-+
-+	for (i = PCI_BRIDGE_RESOURCES; i < PCI_NUM_RESOURCES; i++) {
-+		struct resource *r = &dev->resource[i];
-+
-+		if (!r->flags || r->parent)
-+			continue;
-+
-+		pci_claim_bridge_resource(dev, i);
-+	}
-+}
-+
-+static void pci_bus_allocate_dev_resources(struct pci_bus *b)
-+{
-+	struct pci_dev *dev;
-+	struct pci_bus *child;
-+
-+	list_for_each_entry(dev, &b->devices, bus_list) {
-+		pci_claim_device_resources(dev);
-+
-+		child = dev->subordinate;
-+		if (child)
-+			pci_bus_allocate_dev_resources(child);
-+	}
-+}
-+
-+static void pci_bus_allocate_resources(struct pci_bus *b)
-+{
-+	struct pci_bus *child;
-+
-+	/*
-+	 * Carry out a depth-first search on the PCI bus
-+	 * tree to allocate bridge apertures. Read the
-+	 * programmed bridge bases and recursively claim
-+	 * the respective bridge resources.
-+	 */
-+	if (b->self) {
-+		pci_read_bridge_bases(b);
-+		pci_claim_bridge_resources(b->self);
-+	}
-+
-+	list_for_each_entry(child, &b->children, node)
-+		pci_bus_allocate_resources(child);
-+}
-+
-+void pci_bus_claim_resources(struct pci_bus *b)
-+{
-+	pci_bus_allocate_resources(b);
-+	pci_bus_allocate_dev_resources(b);
-+}
-+EXPORT_SYMBOL(pci_bus_claim_resources);
-+
- static void __pci_bridge_assign_resources(const struct pci_dev *bridge,
- 					  struct list_head *add_head,
- 					  struct list_head *fail_head)
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index b67e4df..cea1a66 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1114,6 +1114,7 @@ int pci_set_vpd_size(struct pci_dev *dev, size_t len);
- /* Helper functions for low-level code (drivers/pci/setup-[bus,res].c) */
- resource_size_t pcibios_retrieve_fw_addr(struct pci_dev *dev, int idx);
- void pci_bus_assign_resources(const struct pci_bus *bus);
-+void pci_bus_claim_resources(struct pci_bus *bus);
- void pci_bus_size_bridges(struct pci_bus *bus);
- int pci_claim_resource(struct pci_dev *, int);
- int pci_claim_bridge_resource(struct pci_dev *bridge, int i);
+-/**
+- * pcibios_enable_device - Enable I/O and memory.
+- * @dev: PCI device to be enabled
+- * @mask: bitmask of BARs to enable
+- */
+-int pcibios_enable_device(struct pci_dev *dev, int mask)
+-{
+-	if (pci_has_flag(PCI_PROBE_ONLY))
+-		return 0;
+-
+-	return pci_enable_resources(dev, mask);
+-}
+-
+ /*
+  * Try to assign the IRQ number from DT when adding a new device
+  */
 -- 
 2.6.4
