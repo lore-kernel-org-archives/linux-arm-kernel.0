@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jun 2016 09:59:50 +0900
-Subject: [PATCH 20/30] ARM: dts: armadillo800eva: Fix W=1 dtc warnings
+Date: Wed,  8 Jun 2016 09:59:56 +0900
+Subject: [PATCH 26/30] ARM: dts: kzm9g: Fix W=1 dtc warnings
 In-Reply-To: <cover.1465346599.git.horms+renesas@verge.net.au>
 References: <cover.1465346599.git.horms+renesas@verge.net.au>
-Message-ID: <c9c3b7c3029d501402b5ac4817659d6e0a6f11f4.1465346599.git.horms+renesas@verge.net.au>
+Message-ID: <8788b2c4f45aa1f4b333970c3dbc915da58d2326.1465346599.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,20 +14,19 @@ Warning (unit_address_vs_reg): Node /regulator at 0 has a unit name, but no reg 
 Warning (unit_address_vs_reg): Node /regulator at 1 has a unit name, but no reg property
 Warning (unit_address_vs_reg): Node /regulator at 2 has a unit name, but no reg property
 Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /i2c at 2 has a unit name, but no reg property
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva.dts | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/boot/dts/sh73a0-kzm9g.dts | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-index 2c82dab2b6f4..162049516685 100644
---- a/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-+++ b/arch/arm/boot/dts/r8a7740-armadillo800eva.dts
-@@ -28,12 +28,12 @@
- 		stdout-path = &scifa1;
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g.dts b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+index 9881adf1734e..36567cbf2e1c 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g.dts
+@@ -43,12 +43,12 @@
+ 		stdout-path = &scifa4;
  	};
  
 -	memory {
@@ -36,46 +35,37 @@ index 2c82dab2b6f4..162049516685 100644
  		reg = <0x40000000 0x20000000>;
  	};
  
--	reg_3p3v: regulator at 0 {
+-	reg_1p8v: regulator at 0 {
++	reg_1p8v: regulator-1p8v {
+ 		compatible = "regulator-fixed";
+ 		regulator-name = "fixed-1.8V";
+ 		regulator-min-microvolt = <1800000>;
+@@ -57,7 +57,7 @@
+ 		regulator-boot-on;
+ 	};
+ 
+-	reg_3p3v: regulator at 1 {
 +	reg_3p3v: regulator-3p3v {
  		compatible = "regulator-fixed";
  		regulator-name = "fixed-3.3V";
  		regulator-min-microvolt = <3300000>;
-@@ -42,7 +42,7 @@
+@@ -66,7 +66,7 @@
  		regulator-boot-on;
  	};
  
--	vcc_sdhi0: regulator at 1 {
-+	vcc_sdhi0: regulator-vcc-sdhi0 {
+-	vmmc_sdhi0: regulator at 2 {
++	vmmc_sdhi0: regulator-vmmc-sdhi0 {
  		compatible = "regulator-fixed";
- 
  		regulator-name = "SDHI0 Vcc";
-@@ -53,7 +53,7 @@
+ 		regulator-min-microvolt = <3300000>;
+@@ -75,7 +75,7 @@
  		enable-active-high;
  	};
  
--	vccq_sdhi0: regulator at 2 {
-+	vccq_sdhi0: regulator-vccq-sdhi0 {
- 		compatible = "regulator-gpio";
- 
- 		regulator-name = "SDHI0 VccQ";
-@@ -69,7 +69,7 @@
- 		enable-active-high;
- 	};
- 
--	reg_5p0v: regulator at 3 {
-+	reg_5p0v: regulator-5p0v {
+-	vmmc_sdhi2: regulator at 3 {
++	vmmc_sdhi2: regulator-vmmc-sdhi2 {
  		compatible = "regulator-fixed";
- 		regulator-name = "fixed-5.0V";
- 		regulator-min-microvolt = <5000000>;
-@@ -127,7 +127,7 @@
- 		};
- 	};
- 
--	i2c2: i2c at 2 {
-+	i2c2: i2c-2 {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		compatible = "i2c-gpio";
+ 		regulator-name = "SDHI2 Vcc";
+ 		regulator-min-microvolt = <3300000>;
 -- 
 2.1.4
