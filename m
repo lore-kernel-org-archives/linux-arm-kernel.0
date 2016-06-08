@@ -1,47 +1,156 @@
-From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 8 Jun 2016 22:33:40 +0800
-Subject: [PATCH 11/11] clk: imx7d: fix pll clock parents
-In-Reply-To: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
-References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1465396420-27064-11-git-send-email-aisheng.dong@nxp.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 8 Jun 2016 15:56:36 +0100
+Subject: [PATCH v5 05/13] KVM: arm64: handle ITS related GICv3
+ redistributor registers
+In-Reply-To: <1464962572-3925-6-git-send-email-andre.przywara@arm.com>
+References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
+ <1464962572-3925-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <57583224.2020205@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pllx_bypass_src mux shouldn't be the parent of pllx clock
-since it's only valid when when pllx BYPASS bit is set.
-Thus it is actually one parent of pllx_bypass only.
+On top of the issues I already outlined:
 
-Instead, pllx parent should be fixed to osc according to
-reference manual.
-Other plls have the same issue.
+On 03/06/16 15:02, Andre Przywara wrote:
+> In the GICv3 redistributor there are the PENDBASER and PROPBASER
+> registers which we did not emulate so far, as they only make sense
+> when having an ITS. In preparation for that emulate those MMIO
+> accesses by storing the 64-bit data written into it into a variable
+> which we later read in the ITS emulation.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/vgic/vgic.h          | 13 +++++++++
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 58 ++++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 69 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index 2f26f37..896175b 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -145,6 +145,14 @@ struct vgic_dist {
+>  	struct vgic_irq		*spis;
+>  
+>  	struct vgic_io_device	dist_iodev;
+> +
+> +	/*
+> +	 * Contains the address of the LPI configuration table.
+> +	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
+> +	 * one address across all redistributors.
+> +	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
+> +	 */
+> +	u64			propbaser;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> @@ -199,6 +207,11 @@ struct vgic_cpu {
+>  	 */
+>  	struct vgic_io_device	rd_iodev;
+>  	struct vgic_io_device	sgi_iodev;
+> +
+> +	/* Points to the LPI pending tables for the redistributor */
+> +	u64 pendbaser;
+> +
+> +	bool lpis_enabled;
+>  };
+>  
+>  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index fc7b6c9..6293b36 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -29,6 +29,16 @@ static unsigned long extract_bytes(unsigned long data, unsigned int offset,
+>  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
+>  }
+>  
+> +/* allows updates of any half of a 64-bit register (or the whole thing) */
+> +static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+> +			    unsigned long val)
+> +{
+> +	offset &= 4;
+> +	reg &= GENMASK_ULL(len * 8 - 1, 0) << ((len - offset) * 8);
+> +
+> +	return reg | ((u64)val << (offset * 8));
+> +}
+> +
+>  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+>  					    gpa_t addr, unsigned int len)
+>  {
+> @@ -147,6 +157,50 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
+>  	return 0;
+>  }
+>  
+> +static unsigned long vgic_mmio_read_propbase(struct kvm_vcpu *vcpu,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +
+> +	return extract_bytes(dist->propbaser, addr & 7, len);
+> +}
+> +
+> +static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len,
+> +				     unsigned long val)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	/* Storing a value with LPIs already enabled is undefined */
+> +	if (vgic_cpu->lpis_enabled)
+> +		return;
+> +
+> +	dist->propbaser = update_64bit_reg(dist->propbaser, addr & 4, len, val);
 
-Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
----
- drivers/clk/imx/clk-imx7d.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+How about sanitizing the register? RES0 bits and co? What do you do for
+cacheability, shareabitily?
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index dc8c3355a66d..738a5289b378 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -394,12 +394,12 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_PLL_AUDIO_MAIN_SRC] = imx_clk_mux("pll_audio_main_src", base + 0xf0, 14, 2, pll_bypass_src_sel, ARRAY_SIZE(pll_bypass_src_sel));
- 	clks[IMX7D_PLL_VIDEO_MAIN_SRC] = imx_clk_mux("pll_video_main_src", base + 0x130, 14, 2, pll_bypass_src_sel, ARRAY_SIZE(pll_bypass_src_sel));
- 
--	clks[IMX7D_PLL_ARM_MAIN]  = imx_clk_pllv3(IMX_PLLV3_SYS, "pll_arm_main", "pll_arm_main_src", base + 0x60, 0x7f);
--	clks[IMX7D_PLL_DRAM_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_dram_main", "pll_dram_main_src", base + 0x70, 0x7f);
--	clks[IMX7D_PLL_SYS_MAIN]  = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll_sys_main", "pll_sys_main_src", base + 0xb0, 0x1);
--	clks[IMX7D_PLL_ENET_MAIN] = imx_clk_pllv3(IMX_PLLV3_ENET_IMX7, "pll_enet_main", "pll_enet_main_src", base + 0xe0, 0x0);
--	clks[IMX7D_PLL_AUDIO_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_audio_main", "pll_audio_main_src", base + 0xf0, 0x7f);
--	clks[IMX7D_PLL_VIDEO_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_video_main", "pll_video_main_src", base + 0x130, 0x7f);
-+	clks[IMX7D_PLL_ARM_MAIN]  = imx_clk_pllv3(IMX_PLLV3_SYS, "pll_arm_main", "osc", base + 0x60, 0x7f);
-+	clks[IMX7D_PLL_DRAM_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_dram_main", "osc", base + 0x70, 0x7f);
-+	clks[IMX7D_PLL_SYS_MAIN]  = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll_sys_main", "osc", base + 0xb0, 0x1);
-+	clks[IMX7D_PLL_ENET_MAIN] = imx_clk_pllv3(IMX_PLLV3_ENET_IMX7, "pll_enet_main", "osc", base + 0xe0, 0x0);
-+	clks[IMX7D_PLL_AUDIO_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_audio_main", "osc", base + 0xf0, 0x7f);
-+	clks[IMX7D_PLL_VIDEO_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_video_main", "osc", base + 0x130, 0x7f);
- 
- 	clks[IMX7D_PLL_ARM_MAIN_BYPASS]  = imx_clk_mux_flags("pll_arm_main_bypass", base + 0x60, 16, 1, pll_arm_bypass_sel, ARRAY_SIZE(pll_arm_bypass_sel), CLK_SET_RATE_PARENT);
- 	clks[IMX7D_PLL_DRAM_MAIN_BYPASS] = imx_clk_mux_flags("pll_dram_main_bypass", base + 0x70, 16, 1, pll_dram_bypass_sel, ARRAY_SIZE(pll_dram_bypass_sel), CLK_SET_RATE_PARENT);
+> +}
+> +
+> +static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	return extract_bytes(vgic_cpu->pendbaser, addr & 7, len);
+> +}
+> +
+> +static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len,
+> +				     unsigned long val)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	/* Storing a value with LPIs already enabled is undefined */
+> +	if (vgic_cpu->lpis_enabled)
+> +		return;
+> +
+> +	vgic_cpu->pendbaser = update_64bit_reg(vgic_cpu->pendbaser,
+> +					       addr & 4, len, val);
+
+Same issue about sanitizing the register.
+
+> +}
+> +
+>  /*
+>   * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+>   * redistributors, while SPIs are covered by registers in the distributor
+> @@ -227,10 +281,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+> +		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+> +		vgic_mmio_read_pendbase, vgic_mmio_write_pendbase, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
+>  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+> 
+
+Thanks,
+
+	M.
 -- 
-1.9.1
+Jazz is not dead. It just smells funny...
