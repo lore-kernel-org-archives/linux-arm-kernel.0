@@ -1,26 +1,78 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 8 Jun 2016 08:05:56 -0500
-Subject: [PATCH] of: reserved_mem: restore old behavior when no region is
- defined
-In-Reply-To: <1465368713-17866-1-git-send-email-m.szyprowski@samsung.com>
-References: <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
- <1465368713-17866-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <CAL_JsqKNpx09UFkGB0n9W0GkAv8OVUdRN8cYriau83SdD6xnuw@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 8 Jun 2016 08:17:09 -0500
+Subject: [PATCH V8 7/9] acpi: Add generic MCFG table handling
+In-Reply-To: <57580DCA.7000703@semihalf.com>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-8-git-send-email-tn@semihalf.com>
+ <20160608015631.GE4759@localhost> <57580DCA.7000703@semihalf.com>
+Message-ID: <20160608131709.GB16764@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 8, 2016 at 1:51 AM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Change return value back to -ENODEV when no region is defined for given
-> device. This restores old behavior of this function, as some drivers rely
-> on such error code.
->
-> Reported-by: Liviu Dudau <liviu.dudau@arm.com>
-> Fixes: 59ce4039727ef40 ("of: reserved_mem: add support for using more than
->        one region for given device")
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  drivers/of/of_reserved_mem.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+On Wed, Jun 08, 2016 at 02:21:30PM +0200, Tomasz Nowicki wrote:
+> On 08.06.2016 03:56, Bjorn Helgaas wrote:
+> >On Mon, May 30, 2016 at 05:14:20PM +0200, Tomasz Nowicki wrote:
+> >>In order to handle PCI config space regions properly in ACPI, new MCFG
+> >>interface is defined which does sanity checks on MCFG table and keeps its
+> >>root pointer. The user is able to lookup MCFG regions based on
+> >>host bridge root structure and domain:bus_start:bus_end touple.
+> >>Use pci_mmcfg_late_init old prototype to avoid another function name.
 
-Acked-by: Rob Herring <robh@kernel.org>
+> >>+	/* found matching entry, bus range check */
+> >>+	if (entry->end_bus_number != bus_res->end) {
+> >>+		resource_size_t bus_end = min_t(resource_size_t,
+> >>+					entry->end_bus_number, bus_res->end);
+> >>+		pr_warn("%04x:%pR bus end mismatch, using %02lx\n",
+> >>+			root->segment, bus_res, (unsigned long)bus_end);
+> >>+		bus_res->end = bus_end;
+> >>+	}
+> 
+> What about bus end mismatch case? Should we trim the host bridge bus
+> range or expect MCFG entry covers that range? Sometimes we get
+> _BBN-0xFF bus range, not from _CRS.
+
+Lack of a bus range in _CRS is a firmware defect.  There's a comment
+about this in acpi_pci_root_add().  On x86, we probably had to live
+with firmware in the field that had this defect.  I think we should
+expect all ARM64 systems to provide a bus number range in _CRS, and
+fail the attach if it's not there.
+
+I don't think we should warn about an MCFG entry that covers more than
+the _CRS bus range.  On x86, it's common to have something like:
+
+  ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-7f])
+  ACPI: PCI Root Bridge [PCI1] (domain 0000 [bus 80-ff])
+
+with a single MCFG entry that covers [bus 00-ff].  That seems
+reasonable and I don't think it's worth warning about it.
+
+If the MCFG entry doesn't cover all of a _CRS bus range, we should
+just fail so we can find and fix broken firmware.
+
+> >>+/* Interface called by ACPI - parse and save MCFG table */
+> >
+> >I think we save a *pointer* to the MCFG table, not the table itself.
+> 
+> Right, the comment is broken.
+> 
+> >And acpi_table_parse() calls early_acpi_os_unmap_memory() immediately
+> >after it calls pci_mcfg_parse(), so I'm doubtful that the pointer
+> >remains valid.
+> 
+> At this stage early_acpi_os_unmap_memory() is doing nothing since
+> acpi_early_init() set acpi_gbl_permanent_mmap to 1 way before. The
+> pointer is fine then.
+
+Hmmm...  I see your argument, but this is a problem waiting to happen.
+We should not depend on the internal implementation of
+early_acpi_os_unmap_memory().  The pattern of:
+
+  y = x;
+  unmap(x);
+  z = *y;
+
+is just broken and we shouldn't expect readers to recognize that "oh,
+unmap() isn't really unmapping anything in this special case, so this
+looks wrong but is really fine."
+
+Bjorn
