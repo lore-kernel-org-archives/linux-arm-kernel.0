@@ -1,69 +1,56 @@
-From: bhe@redhat.com (Baoquan He)
-Date: Wed, 8 Jun 2016 09:13:44 +0800
-Subject: [PATCH kexec-tools v2 10/32] kexec: add generic helper to add to
- memory_regions
-In-Reply-To: <E1b9xsE-0003sO-FZ@e0050434b2927.dyn.armlinux.org.uk>
-References: <20160606164129.GM1041@n2100.armlinux.org.uk>
- <E1b9xsE-0003sO-FZ@e0050434b2927.dyn.armlinux.org.uk>
-Message-ID: <20160608011344.GA3321@x1.redhat.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Wed, 8 Jun 2016 10:14:01 +0900
+Subject: [PATCH v13 02/10] arm64: Add more test functions to insn.c
+In-Reply-To: <1464924384-15269-3-git-send-email-dave.long@linaro.org>
+References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
+ <1464924384-15269-3-git-send-email-dave.long@linaro.org>
+Message-ID: <20160608101401.7296820ea6ac082ef1c917cb@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/16 at 05:59pm, Russell King wrote:
-> diff --git a/kexec/mem_regions.c b/kexec/mem_regions.c
-> new file mode 100644
-> index 0000000..a4952ff
-> --- /dev/null
-> +++ b/kexec/mem_regions.c
-> @@ -0,0 +1,30 @@
-> +#include "kexec.h"
-> +#include "mem_regions.h"
-> +
-> +/**
-> + * mem_regions_add() - add a memory region to a set of ranges
-> + * @ranges: ranges to add the memory region to
-> + * @max: maximum number of entries in memory region
+On Thu,  2 Jun 2016 23:26:16 -0400
+David Long <dave.long@linaro.org> wrote:
+> @@ -367,6 +402,7 @@ bool aarch32_insn_is_wide(u32 insn);
+>  #define A32_RT_OFFSET	12
+>  #define A32_RT2_OFFSET	 0
+>  
+> +u32 aarch64_extract_system_register(u32 insn);
 
-This need be removed. It should be a remnant of intermediate attempt.
+This exported symbol is incorrect (see below)
 
-> + * @base: base address of memory region
-> + * @length: length of memory region in bytes
-> + * @type: type of memory region
-> + *
-> + * Add the memory region to the set of ranges, and return %0 if successful,
-> + * or %-1 if we ran out of space.
+>  u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+>  u32 aarch32_insn_mcr_extract_opc2(u32 insn);
+>  u32 aarch32_insn_mcr_extract_crm(u32 insn);
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index 368c082..28c6110f 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+[..]
+> @@ -1175,6 +1201,14 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
+>  	BUG();
+>  }
+>  
+> +/*
+> + * Extract the Op/CR data from a msr/mrs instruction.
 > + */
-> +int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
-> +                    unsigned long long length, int type)
+> +u32 aarch64_insn_extract_system_reg(u32 insn)
 > +{
-> +	struct memory_range *range;
-> +
-> +	if (ranges->size >= ranges->max_size)
-> +		return -1;
-> +
-> +	range = ranges->ranges + ranges->size++;
-> +	range->start = base;
-> +	range->end = base + length - 1;
-> +	range->type = type;
-> +
-> +	return 0;
+> +	return (insn & 0x1FFFE0) >> 5;
 > +}
 > +
-> diff --git a/kexec/mem_regions.h b/kexec/mem_regions.h
-> new file mode 100644
-> index 0000000..b9cfba1
-> --- /dev/null
-> +++ b/kexec/mem_regions.h
-> @@ -0,0 +1,9 @@
-> +#ifndef MEM_REGIONS_H
-> +#define MEM_REGIONS_H
-> +
-> +struct memory_ranges;
-> +
-> +int mem_regions_add(struct memory_ranges *ranges, unsigned long long base,
-> +                    unsigned long long length, int type);
-> +
-> +#endif
+
+aarch64_insn_extract_system_reg() is the right name :)
+
+Thank you,
+
+
+>  bool aarch32_insn_is_wide(u32 insn)
+>  {
+>  	return insn >= 0xe800;
 > -- 
-> 1.9.1
+> 2.5.0
 > 
+
+
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
