@@ -1,98 +1,26 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Wed, 8 Jun 2016 16:01:40 +0800
-Subject: [PATCH] arm64: mm: only initialize swiotlb when necessary
-In-Reply-To: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
-References: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20160608160140.11eb0342@xhacker>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 8 Jun 2016 10:10:19 +0200
+Subject: [PATCH] pinctrl: mediatek: fix suspend/resume timing issue
+In-Reply-To: <1464924495-20375-1-git-send-email-hongkun.cao@mediatek.com>
+References: <1464924495-20375-1-git-send-email-hongkun.cao@mediatek.com>
+Message-ID: <CACRpkdZ18pvNBLp1L4wBh2BnwODaju4mTwCjuK-Bnp-Rc5feqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+On Fri, Jun 3, 2016 at 5:28 AM,  <hongkun.cao@mediatek.com> wrote:
 
-On Wed, 8 Jun 2016 15:53:46 +0800 Jisheng Zhang wrote:
+> From: "hongkun.cao" <hongkun.cao@mediatek.com>
+>
+> An irq which is a wake up source maybe masked unexpectedly if the wake
+> up source irq was triggered after pinctrl irqchip suspend and before
+> suspend_device_irqs finished.
+> Use *_noirq callbacks to guarantee pinctrl irqchip suspend would be
+> called after suspend_devices_irqs.
+>
+> Signed-off-by: hongkun.cao <hongkun.cao@mediatek.com>
 
-> we only initialize swiotlb when swiotlb_force is true or not all system
-> memory is DMA-able, this trivial optimization saves us 64MB when
-> swiotlb is not necessary.
+No rreaction from the other maintainers but it looks correct to me
+so patch applied.
 
-another solution is to call swiotlb_free() as ppc does. Either solution can
-solve my problem. If maintainers prefer that solution, I can send a v2 patch.
-
-Thanks,
-Jisheng
-
-> 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->  arch/arm64/mm/dma-mapping.c | 15 ++++++++++++++-
->  arch/arm64/mm/init.c        |  3 ++-
->  2 files changed, 16 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-> index c566ec8..46a4157 100644
-> --- a/arch/arm64/mm/dma-mapping.c
-> +++ b/arch/arm64/mm/dma-mapping.c
-> @@ -19,6 +19,7 @@
->  
->  #include <linux/gfp.h>
->  #include <linux/acpi.h>
-> +#include <linux/bootmem.h>
->  #include <linux/export.h>
->  #include <linux/slab.h>
->  #include <linux/genalloc.h>
-> @@ -29,6 +30,8 @@
->  
->  #include <asm/cacheflush.h>
->  
-> +static int swiotlb __read_mostly;
-> +
->  static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
->  				 bool coherent)
->  {
-> @@ -341,6 +344,13 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
->  	return ret;
->  }
->  
-> +static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
-> +{
-> +	if (swiotlb)
-> +		return swiotlb_dma_supported(hwdev, mask);
-> +	return 1;
-> +}
-> +
->  static struct dma_map_ops swiotlb_dma_ops = {
->  	.alloc = __dma_alloc,
->  	.free = __dma_free,
-> @@ -354,7 +364,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
->  	.sync_single_for_device = __swiotlb_sync_single_for_device,
->  	.sync_sg_for_cpu = __swiotlb_sync_sg_for_cpu,
->  	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
-> -	.dma_supported = swiotlb_dma_supported,
-> +	.dma_supported = __swiotlb_dma_supported,
->  	.mapping_error = swiotlb_dma_mapping_error,
->  };
->  
-> @@ -513,6 +523,9 @@ EXPORT_SYMBOL(dummy_dma_ops);
->  
->  static int __init arm64_dma_init(void)
->  {
-> +	if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
-> +		swiotlb = 1;
-> +
->  	return atomic_pool_init();
->  }
->  arch_initcall(arm64_dma_init);
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index d45f862..7d25b4d 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -403,7 +403,8 @@ static void __init free_unused_memmap(void)
->   */
->  void __init mem_init(void)
->  {
-> -	swiotlb_init(1);
-> +	if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
-> +		swiotlb_init(1);
->  
->  	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
->  
+Yours,
+Linus Walleij
