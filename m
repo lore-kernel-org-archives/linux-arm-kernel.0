@@ -1,23 +1,53 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 8 Jun 2016 14:52:41 -0500
-Subject: [PATCH V2 1/7] dt-bindings: Update QorIQ TMU thermal bindings
-In-Reply-To: <1465270054-31512-1-git-send-email-hongtao.jia@nxp.com>
-References: <1465270054-31512-1-git-send-email-hongtao.jia@nxp.com>
-Message-ID: <20160608195241.GA6805@rob-hp-laptop>
+Date: Wed, 8 Jun 2016 14:54:43 -0500
+Subject: [PATCH] PCI: layerscape: Add 'dma-coherent' property
+In-Reply-To: <1465282546-28256-1-git-send-email-Gang.Liu@nxp.com>
+References: <1465282546-28256-1-git-send-email-Gang.Liu@nxp.com>
+Message-ID: <20160608195443.GA7766@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 11:27:34AM +0800, Jia Hongtao wrote:
-> For different types of SoC the sensor id and endianness may vary.
-> "#thermal-sensor-cells" is used to provide sensor id information.
-> "little-endian" property is to tell the endianness of TMU.
+On Tue, Jun 07, 2016 at 02:55:45PM +0800, Liu Gang wrote:
+> Add 'dma-coherent' description for PCI nodes.
 > 
-> Signed-off-by: Jia Hongtao <hongtao.jia@nxp.com>
+> The 'dma-coherent' indicates that the hardware IP block can ensure
+> the coherency of the data transferred from/to the IP block. This
+> can avoid the software cache flush/invalid actions, and improve
+> the performance significantly.
+> 
+> The PCI IP block of ls1043a has this capability, so adding
+> this feature to improve the PCI performance.
+> 
+> Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
 > ---
-> Changes for V2:
-> * Remove formatting chnages.
-> 
->  Documentation/devicetree/bindings/thermal/qoriq-thermal.txt | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 4 ++++
+>  1 file changed, 4 insertions(+)
 
 Acked-by: Rob Herring <robh@kernel.org>
+
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> index ef683b2..41e9f55 100644
+> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> @@ -24,6 +24,9 @@ Required properties:
+>    The first entry must be a link to the SCFG device node
+>    The second entry must be '0' or '1' based on physical PCIe controller index.
+>    This is used to get SCFG PEXN registers
+> +- dma-coherent: Indicates that the hardware IP block can ensure the coherency
+> +  of the data transferred from/to the IP block. This can avoid the software
+> +  cache flush/invalid actions, and improve the performance significantly.
+>  
+>  Example:
+>  
+> @@ -38,6 +41,7 @@ Example:
+>  		#address-cells = <3>;
+>  		#size-cells = <2>;
+>  		device_type = "pci";
+> +		dma-coherent;
+>  		num-lanes = <4>;
+>  		bus-range = <0x0 0xff>;
+>  		ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
+> -- 
+> 2.1.0.27.g96db324
+> 
