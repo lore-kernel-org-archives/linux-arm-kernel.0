@@ -1,33 +1,31 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed,  8 Jun 2016 21:26:23 +0900
-Subject: [PATCH] arm64: defconfig: enable CONFIG_LOCALVERSION_AUTO
-Message-ID: <1465388783-18541-1-git-send-email-yamada.masahiro@socionext.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 08 Jun 2016 14:26:51 +0200
+Subject: [PATCH] spi: rockchip: Signal unfinished DMA transfers
+In-Reply-To: <1465371171-20810-1-git-send-email-tomeu.vizoso@collabora.com>
+References: <1465371171-20810-1-git-send-email-tomeu.vizoso@collabora.com>
+Message-ID: <3685265.1KrVuCJFto@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_LOCALVERSION_AUTO is disabled, the version string is
-just a tag name (or with a '+' appended if HEAD is not a tagged
-commit).
+Am Mittwoch, 8. Juni 2016, 09:32:51 schrieb Tomeu Vizoso:
+> When using DMA, the transfer_one callback should return 1 because the
+> transfer hasn't finished yet.
+> 
+> A previous commit changed the function to return 0 when the DMA channels
+> were correctly prepared.
+> 
+> This manifested in Veyron boards with this message:
+> 
+> [ 1.983605] cros-ec-spi spi0.0: EC failed to respond in time
+> 
+> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> Fixes: ea9849113343 ("spi: rockchip: check return value of
+> dmaengine_prep_slave_sg")
+> Cc: Shawn Lin <shawn.lin@rock-chips.com>
+> Cc: Heiko Stuebner <heiko@sntech.de>
+> Cc: Javier Martinez Canillas <javier@osg.samsung.com>
 
-During the development (and especially when git-bisecting), longer
-version string would be helpful to identify the commit we are running.
+looks like Mark already applied it, but nevertheless I was able to verify that 
+this patch fixes the issue on my veyron jerry chromebook as well, so
 
-This is a default y option, so drop the unset to enable it.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- arch/arm64/configs/defconfig | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index c8f287f..1e76fc2 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -1,4 +1,3 @@
--# CONFIG_LOCALVERSION_AUTO is not set
- CONFIG_SYSVIPC=y
- CONFIG_POSIX_MQUEUE=y
- CONFIG_AUDIT=y
--- 
-1.9.1
+Tested-by: Heiko Stuebner <heiko@sntech.de>
