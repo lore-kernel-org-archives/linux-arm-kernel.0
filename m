@@ -1,84 +1,75 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  8 Jun 2016 12:04:46 +0100
-Subject: [PATCH v3 0/4] ARM/ARM64: PCI: PCI_PROBE_ONLY clean-up
-Message-ID: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Wed,  8 Jun 2016 12:04:48 +0100
+Subject: [PATCH v3 2/4] PCI: host-generic: claim bus resources on
+ PCI_PROBE_ONLY set-ups
+In-Reply-To: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1465383890-13538-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current arm/arm64 code prevents enabling resources in the respective
-pcibios_enable_device() callbacks if the PCI_PROBE_ONLY flag is set,
-in that on those platforms the resources tree was not validated properly
-since PCI resources are not currently claimed on arm/arm64 PCI_PROBE_ONLY
-systems.
+The PCI host generic driver does not reassign bus resources on systems
+that require the BARs set-up to be immutable (ie PCI_PROBE_ONLY) since
+that would trigger system failures. Nonetheless, PCI bus resources
+allocated to PCI bridge and devices must be claimed in order to be
+validated and inserted in the kernel resource tree, but the current
+driver omits the resources claiming and relies on arch specific kludges
+to prevent probing failure (ie preventing resources enablement on
+PCI_PROBE_ONLY systems).
 
-This is a temporary kludge, in that PCI_PROBE_ONLY flag is used to
-describe systems with fixed resources, that can nonetheless be enabled
-through the standard pci_enable_resources() call present in PCI core code,
-(ie via the generic pcibios_enable_device() call).
+Add code to the PCI host generic driver that correctly claims bus
+resources upon probe on systems that are required to prevent
+reassignment after bus enumeration, so that the allocated resources
+can be enabled successfully upon PCI device drivers probing, without
+resorting to arch back-ends workarounds.
 
-To remove the PCI_PROBE_ONLY flag in arm/arm64 pcibios_enable_device()
-callbacks, the PCI host controllers that can be used with
-PCI_PROBE_ONLY configurations must make sure that devices resources are
-validated and inserted in the kernel resource tree even on PCI_PROBE_ONLY
-systems so that the generic pcibios_enable_device() generic code, while
-enabling resources (pci_enable_resources()), does not find dangling
-resources pointers (ie missing parent pointers) that are omens of
-an incomplete resource tree, causing failures in resources enablement.
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: David Daney <david.daney@cavium.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Bjorn Helgaas <bhelgaas@google.com>
+---
+ drivers/pci/host/pci-host-common.c | 27 +++++++++++++++++++++++++--
+ 1 file changed, 25 insertions(+), 2 deletions(-)
 
-PCI core code provides interfaces to assign/reassign/reallocate PCI
-bus resources but it is currently lacking an interface to claim
-resources for a specific bus. Arches implement resources claiming through
-ad-hoc code built on top of pci_claim_resource() API, but that code
-cannot be leveraged on architectures like arm/arm64 that rely on the
-generic PCI infrastructure to carry out resources claiming/assignment.
-
-Therefore, to clean up the arm/arm64 resources enablement on
-PCI_PROBE_ONLY systems this patchset implements four patches:
-
-PATCH 1: Create PCI core code infrastructure to claim bus resources
-PATCH 2: Leverage the infrastructure in PATCH 1 to claim resources in
-         the PCI generic host controller on PCI_PROBE_ONLY systems
-
-PATCH 3: Remove the PCI_PROBE_ONLY kludge from the arm64 PCI back-end to
-         complete the clean-up and leverage the PCI generic
-         pcibios_enable_device() implementation
-
-PATCH 4: Remove the PCI_PROBE_ONLY kludge from the arm PCI back-end to
-         complete the clean-up and leverage the PCI generic
-         pcibios_enable_device() implementation
-
-Tested on arm/arm64 systems with kvmtool and PCI host generic.
-
-v2 -> v3
-
-- Split patch 3 in two patches so that arm and arm64 are handled
-  in different patches
-- Improved commits logs, clarified resource parent assignment
-- Rebased against v4.7-rc2
-
-v2: https://patchwork.ozlabs.org/patch/590556/
-
-v1 -> v2
-
-- Rewrote patch 1 to recursively claim resources for the whole PCI bus
-  hierarchy
-- Updated commits logs/tags
-- Rebased against v4.5-rc6
-
-v1: https://patchwork.ozlabs.org/patch/545669/
-
-Lorenzo Pieralisi (4):
-  PCI: add generic code to claim bus resources
-  PCI: host-generic: claim bus resources on PCI_PROBE_ONLY set-ups
-  ARM64/PCI: remove arch specific pcibios_enable_device()
-  ARM/PCI: remove arch specific pcibios_enable_device()
-
- arch/arm/kernel/bios32.c           | 12 -------
- arch/arm64/kernel/pci.c            | 13 --------
- drivers/pci/host/pci-host-common.c | 27 +++++++++++++--
- drivers/pci/setup-bus.c            | 68 ++++++++++++++++++++++++++++++++++++++
- include/linux/pci.h                |  1 +
- 5 files changed, 94 insertions(+), 27 deletions(-)
-
+diff --git a/drivers/pci/host/pci-host-common.c b/drivers/pci/host/pci-host-common.c
+index 8cba7ab..1684882 100644
+--- a/drivers/pci/host/pci-host-common.c
++++ b/drivers/pci/host/pci-host-common.c
+@@ -154,8 +154,31 @@ int pci_host_common_probe(struct platform_device *pdev,
+ 	}
+ 
+ 	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+-
+-	if (!pci_has_flag(PCI_PROBE_ONLY)) {
++	/*
++	 * For PCI bridges and PCI devices to be fully set-up, their
++	 * resources must be initialized and inserted in the kernel
++	 * resource tree, which implicitly means that the resources
++	 * are correctly inserted in the kernel resource tree and are
++	 * assigned a parent pointer to create the resource hierarchy.
++	 *
++	 * On PCI_PROBE_ONLY systems, the pci_bus_claim_resource()
++	 * API claims the resources as set-up by firmware, which takes
++	 * care of inserting them in the resource tree and setting their
++	 * parent pointers accordingly.
++	 *
++	 * On !PCI_PROBE_ONLY systems, the firmware set-up is discarded,
++	 * and resource assignment and insertion in the resource tree is
++	 * carried out through the PCI resources API:
++	 *
++	 * (ie pci_bus_size_bridges() and pci_bus_assign_resources())
++	 *
++	 * that sizes the bridges and assigns and inserts resources in the
++	 * kernel resource tree (which also implies setting up their parent
++	 * pointers), completing the resources set-up.
++	 */
++	if (pci_has_flag(PCI_PROBE_ONLY)) {
++		pci_bus_claim_resources(bus);
++	} else {
+ 		pci_bus_size_bridges(bus);
+ 		pci_bus_assign_resources(bus);
+ 
 -- 
 2.6.4
