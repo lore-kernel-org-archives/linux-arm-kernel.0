@@ -1,96 +1,439 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 8 Jun 2016 12:11:30 +0100
-Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
-In-Reply-To: <CAOTQ16KCKw3UiN+oFC8PH=1YYw7xfNhoJgM2ozTCf8RGYvEbpw@mail.gmail.com>
-References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
- <1464640806-3942-3-git-send-email-thommyj@gmail.com>
- <575570D9.6030700@arm.com>
- <CAOTQ16KCKw3UiN+oFC8PH=1YYw7xfNhoJgM2ozTCf8RGYvEbpw@mail.gmail.com>
-Message-ID: <5757FD62.2010403@arm.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Wed,  8 Jun 2016 19:14:24 +0800
+Subject: [PATCH v4] ASoC: rockchip: Add machine driver for RK3399 GRU Boards
+Message-ID: <1465384464-22395-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/16 08:47, Thommy Jakobsson wrote:
-> On 6 June 2016 at 14:47, Robin Murphy <robin.murphy@arm.com> wrote:
->> That rationale doesn't hold, since "necessary" is clearly untrue - devices
->> with multiple IDs work just fine even with the current behaviour of the
->> driver provided there are sufficient SMRs. The third option of generating a
->> mask dynamically from a set of IDs is also perfectly possible (which reminds
->> me I must dig up the code I prototyped a while back...), although an
->> explicitly specified mask can still be beneficial for optimal allocation in
->> certain cases (by being able to express the non-existence of IDs outside the
->> set).
-> Thanks for your time Robin. I was probably unclear in my comment. You're
-> right and devices with multiple IDs do work already today. Its more the second
-> part that you talk about that limits me, "provided there are
-> sufficient SMRs". In
-> the ZynqMPSoC, 6 of the AXI ID bits are copied into the stream id for FPGA
-> IPs, so I have 2^6 IDs per master and there is 6 masters. Besides the FPGA
-> there is also ethernet and dma masters (also gpu and sata, but I don't use
-> those). The SMMU implementation only has 48 register groups to play with, so
-> without mask I'm screwed =)
+Because we need to support the multiple codecs (MAX98357A/RT5514/DA7219)
+on the RK3399 GRU boards, this patch can help us to support these codecs.
 
-Indeed, I wasn't implying you don't need it, merely nitpicking that the 
-justification was worded badly.
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+---
 
->> But this directly contradicts the example in the binding doc? (Which
->> incidentally wasn't sent to the devicetree mailing list.)
-> Not sure that I follow, what contradicts? My intention was that for masters that
-> explicitly is configured with a mask, all of its IDs should have a mask. Without
-> specifying a mask it should be same behavior as before. The doc example
-> shows a master, dma2, with one ID and one mask.
+Changes in v4:
+- the compatible name needs to be based on a single reference design,
+  and the name of the board is called "GRU"
+- use one i2sX card "rockchip,cpu = <&i2s0>" instead of array that is
+  based on GRU
+- rename DOC to rockchip,rk3399-gru-sound.txt
+- rename compatible to rockchip,rk3399-gru-sound
+- rename source code to rk3399_gru_sound.c
 
-Oh, wait, it's only comparing the number of arguments to each phandle, 
-not the whole property length, my mistake - sorry!
+Changes in v3:
+- rename DOC to rockchip,rk3399-max98357a-rt5514-da7219.txt
+- rename compatible to rockchip,rk3399-max98357a-rt5514-da7219
+- rename source code to rk3399_max98357a_rt5514_da7219.c
 
->> What if the DT is wrong and the SMMU doesn't support stream matching at all,
->> or the mask uses unimplemented SMR bits? Bogus stream IDs or stream match
->> conflicts are annoyingly subtle to debug.
-> Point taken.
->
->> Either way, if you insist on wanting to build on the legacy binding that
->> doesn't work for PCI, can't integrate with DMA mapping, and everyone else
->> would rather get away from in favour of the generic IOMMU bindings[1],
-> Generic IOMMU bindings would be great, but I'm not sure that it solves
-> my problem
-> with too many IDs vs SMRs. For a smaller
+Changes in v2:
+- use the FS 256 to set mclks of the max98357a and rt5514 danamically
+- add more sample rate for da7219
 
-My point was that the generic bindings are also trivially easy to extend 
-arbitrarily by simply increasing "#iommu-cells". In that patch series 
-I'm very deliberately laying the groundwork for supporting an SMR mask 
-in the second cell ;)
+ .../bindings/sound/rockchip,rk3399-gru-sound.txt   |   15 +
+ sound/soc/rockchip/Kconfig                         |   11 +
+ sound/soc/rockchip/Makefile                        |    2 +
+ sound/soc/rockchip/rk3399_gru_sound.c              |  339 ++++++++++++++++++++
+ 4 files changed, 367 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+ create mode 100644 sound/soc/rockchip/rk3399_gru_sound.c
 
->> there's still no need for yet another binding to support. You can easily
->> extend "mmu-masters" to encode an SMR mask in the upper halfword of a cell
->> without ambiguity and without breaking compatibility with existing DTs.
-> How do you mean breaking compatibility with existing DTs? It was my
-> intention not
-> to do so but instead adding an optional mask for cases when actually needed.
-
-I didn't mean that your proposal would break anything - it clearly won't 
-- but that if we were to redefine "mmu-masters" such that for for 
-stream-matching SMMUs each cell represents an SMR to match rather than 
-just an ID, it wouldn't actually make any difference to the behaviour on 
-existing systems.
-
->  From a user perspective I would personally consider it a bit easier to
-> understand
-> with separate bindings for mask and ID, but to be honest I haven't worked that
-> much with DT bindings before (which is also why I missed sending it to the DT
-> mailinglist). So if you see a problem with an increasing mass of
-> bindings to support,
-> and consider using the upper halfword of the ID-cell a better way,
-> then sure I'll buy
-> that.
-
-Either way, I'm currently in the process of reworking the SMMUv2 generic 
-bindings series, having got the SMMUv3 patches out of the way, so I'll 
-make sure that at least basic masking support actually makes the cut 
-this time round.
-
-Robin.
-
->
-> BR,
-> Thommy Jakobsson
->
+diff --git a/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+new file mode 100644
+index 0000000..f19b6c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/rockchip,rk3399-gru-sound.txt
+@@ -0,0 +1,15 @@
++ROCKCHIP with MAX98357A/RT5514/DA7219 codecs on GRU boards
++
++Required properties:
++- compatible: "rockchip,rk3399-gru-sound"
++- rockchip,cpu: The phandle of the Rockchip I2S controller that's
++  connected to the codecs
++- rockchip,codec: The phandle of the MAX98357A/RT5514/DA7219 codecs
++
++Example:
++
++sound {
++	compatible = "rockchip,rk3399-gru-sound";
++	rockchip,cpu = <&i2s0>;
++	rockchip,codec = <&max98357a &rt5514 &da7219>;
++};
+diff --git a/sound/soc/rockchip/Kconfig b/sound/soc/rockchip/Kconfig
+index f1e0c70..c15dcc8 100644
+--- a/sound/soc/rockchip/Kconfig
++++ b/sound/soc/rockchip/Kconfig
+@@ -41,3 +41,14 @@ config SND_SOC_ROCKCHIP_RT5645
+ 	help
+ 	  Say Y or M here if you want to add support for SoC audio on Rockchip
+ 	  boards using the RT5645/RT5650 codec, such as Veyron.
++
++config SND_SOC_RK3399_GRU_SOUND
++	tristate "ASoC support multiple codecs for Rockchip RK3399 GRU boards"
++	depends on SND_SOC_ROCKCHIP && GPIOLIB
++	select SND_SOC_ROCKCHIP_I2S
++	select SND_SOC_MAX98357A
++	select SND_SOC_RT5514
++	select SND_SOC_DA7219
++	help
++	  Say Y or M here if you want to add support multiple codecs for SoC
++	  audio on Rockchip RK3399 GRU boards.
+diff --git a/sound/soc/rockchip/Makefile b/sound/soc/rockchip/Makefile
+index c0bf560..84e5c7c 100644
+--- a/sound/soc/rockchip/Makefile
++++ b/sound/soc/rockchip/Makefile
+@@ -7,6 +7,8 @@ obj-$(CONFIG_SND_SOC_ROCKCHIP_SPDIF) += snd-soc-rockchip-spdif.o
+ 
+ snd-soc-rockchip-max98090-objs := rockchip_max98090.o
+ snd-soc-rockchip-rt5645-objs := rockchip_rt5645.o
++snd-soc-rk3399-gru-sound-objs := rk3399_gru_sound.o
+ 
+ obj-$(CONFIG_SND_SOC_ROCKCHIP_MAX98090) += snd-soc-rockchip-max98090.o
+ obj-$(CONFIG_SND_SOC_ROCKCHIP_RT5645) += snd-soc-rockchip-rt5645.o
++obj-$(CONFIG_SND_SOC_RK3399_GRU_SOUND) += snd-soc-rk3399-gru-sound.o
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+new file mode 100644
+index 0000000..cc9b943
+--- /dev/null
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -0,0 +1,339 @@
++/*
++ * Rockchip machine ASoC driver for boards using MAX98357A/RT5514/DA7219
++ *
++ * Copyright (c) 2016, ROCKCHIP CORPORATION.  All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/gpio.h>
++#include <linux/of_gpio.h>
++#include <linux/delay.h>
++#include <linux/spi/spi.h>
++#include <sound/core.h>
++#include <sound/jack.h>
++#include <sound/pcm.h>
++#include <sound/pcm_params.h>
++#include <sound/soc.h>
++#include "rockchip_i2s.h"
++#include "../codecs/da7219.h"
++#include "../codecs/da7219-aad.h"
++#include "../codecs/rt5514.h"
++
++#define DRV_NAME "rk3399-gru-sound"
++
++#define SOUND_FS	256
++
++static struct snd_soc_jack rockchip_sound_jack;
++
++static const struct snd_soc_dapm_widget rockchip_dapm_widgets[] = {
++	SND_SOC_DAPM_HP("Headphones", NULL),
++	SND_SOC_DAPM_SPK("Speakers", NULL),
++	SND_SOC_DAPM_MIC("Headset Mic", NULL),
++	SND_SOC_DAPM_MIC("Int Mic", NULL),
++};
++
++static const struct snd_soc_dapm_route rockchip_dapm_routes[] = {
++	/* Input Lines */
++	{"MIC", NULL, "Headset Mic"},
++	{"DMIC1L", NULL, "Int Mic"},
++	{"DMIC1R", NULL, "Int Mic"},
++
++	/* Output Lines */
++	{"Headphones", NULL, "HPL"},
++	{"Headphones", NULL, "HPR"},
++	{"Speakers", NULL, "Speakers"},
++};
++
++static const struct snd_kcontrol_new rockchip_controls[] = {
++	SOC_DAPM_PIN_SWITCH("Headphones"),
++	SOC_DAPM_PIN_SWITCH("Speakers"),
++	SOC_DAPM_PIN_SWITCH("Headset Mic"),
++	SOC_DAPM_PIN_SWITCH("Int Mic"),
++};
++
++static int rockchip_sound_max98357a_hw_params(struct snd_pcm_substream *substream,
++			     struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dapm_context *dapm = &rtd->card->dapm;
++	unsigned int mclk;
++	int ret;
++
++	snd_soc_dapm_disable_pin(dapm, "Headphones");
++	snd_soc_dapm_enable_pin(dapm, "Speakers");
++	snd_soc_dapm_sync(dapm);
++
++	/* max98357a supports these sample rates */
++	switch (params_rate(params)) {
++	case 8000:
++	case 16000:
++	case 48000:
++	case 96000:
++		mclk = params_rate(params) * SOUND_FS;
++		break;
++	default:
++		dev_err(rtd->card->dev, "%s() doesn't support this sample rate: %d\n",
++				__func__, params_rate(params));
++		return -EINVAL;
++	}
++
++	ret = snd_soc_dai_set_sysclk(rtd->cpu_dai, 0, mclk, 0);
++	if (ret) {
++		dev_err(rtd->card->dev, "%s() error setting sysclk to %u: %d\n",
++				__func__, mclk, ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int rockchip_sound_rt5514_hw_params(struct snd_pcm_substream *substream,
++			     struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
++	struct snd_soc_dai *codec_dai = rtd->codec_dai;
++	struct snd_soc_dapm_context *dapm = &rtd->card->dapm;
++	unsigned int mclk;
++	int ret;
++
++	snd_soc_dapm_disable_pin(dapm, "Headset Mic");
++	snd_soc_dapm_enable_pin(dapm, "Int Mic");
++	snd_soc_dapm_sync(dapm);
++
++	mclk = params_rate(params) * SOUND_FS;
++
++	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
++				     SND_SOC_CLOCK_OUT);
++	if (ret < 0) {
++		dev_err(rtd->card->dev, "Can't set cpu clock out %d\n", ret);
++		return ret;
++	}
++
++	ret = snd_soc_dai_set_sysclk(codec_dai, RT5514_SCLK_S_MCLK,
++				     mclk, SND_SOC_CLOCK_IN);
++	if (ret) {
++		dev_err(rtd->card->dev, "%s() error setting sysclk to %u: %d\n",
++				__func__, params_rate(params) * 512, ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int rockchip_sound_da7219_hw_params(struct snd_pcm_substream *substream,
++			     struct snd_pcm_hw_params *params)
++{
++	struct snd_soc_pcm_runtime *rtd = substream->private_data;
++	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
++	struct snd_soc_dai *codec_dai = rtd->codec_dai;
++	struct snd_soc_dapm_context *dapm = &rtd->card->dapm;
++	int mclk, ret;
++
++	snd_soc_dapm_disable_pin(dapm, "Speakers");
++	snd_soc_dapm_disable_pin(dapm, "Int Mic");
++	snd_soc_dapm_enable_pin(dapm, "Headphones");
++	snd_soc_dapm_enable_pin(dapm, "Headset Mic");
++	snd_soc_dapm_sync(dapm);
++
++	/* in bypass mode, the mclk has to be one of the frequencies below */
++	switch (params_rate(params)) {
++	case 8000:
++	case 16000:
++	case 24000:
++	case 32000:
++	case 48000:
++	case 64000:
++	case 96000:
++		mclk = 12288000;
++		break;
++	case 11025:
++	case 22050:
++	case 44100:
++	case 88200:
++		mclk = 11289600;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	ret = snd_soc_dai_set_sysclk(cpu_dai, 0, mclk,
++				     SND_SOC_CLOCK_OUT);
++	if (ret < 0) {
++		dev_err(codec_dai->dev, "Can't set cpu clock out %d\n", ret);
++		return ret;
++	}
++
++	ret = snd_soc_dai_set_sysclk(codec_dai, 0, mclk,
++				     SND_SOC_CLOCK_IN);
++	if (ret < 0) {
++		dev_err(codec_dai->dev, "Can't set codec clock in %d\n", ret);
++		return ret;
++	}
++
++	ret = snd_soc_dai_set_pll(codec_dai, 0, DA7219_SYSCLK_MCLK, 0, 0);
++	if (ret < 0) {
++		dev_err(codec_dai->dev, "Can't set pll sysclk mclk %d\n", ret);
++		return ret;
++	}
++
++	return 0;
++}
++
++static int rockchip_sound_da7219_init(struct snd_soc_pcm_runtime *rtd)
++{
++	struct snd_soc_codec *codec = rtd->codec_dais[0]->codec;
++	int ret;
++
++	/* Enable Headset and 4 Buttons Jack detection */
++	ret = snd_soc_card_jack_new(rtd->card, "Headset Jack",
++				    SND_JACK_HEADSET |
++				    SND_JACK_BTN_0 | SND_JACK_BTN_1 |
++				    SND_JACK_BTN_2 | SND_JACK_BTN_3,
++				    &rockchip_sound_jack, NULL, 0);
++
++	if (ret) {
++		dev_err(rtd->card->dev, "New Headset Jack failed! (%d)\n", ret);
++		return ret;
++	}
++
++	da7219_aad_jack_det(codec, &rockchip_sound_jack);
++
++	return 0;
++}
++
++static struct snd_soc_ops rockchip_sound_max98357a_ops = {
++	.hw_params = rockchip_sound_max98357a_hw_params,
++};
++
++static struct snd_soc_ops rockchip_sound_rt5514_ops = {
++	.hw_params = rockchip_sound_rt5514_hw_params,
++};
++
++static struct snd_soc_ops rockchip_sound_da7219_ops = {
++	.hw_params = rockchip_sound_da7219_hw_params,
++};
++
++enum {
++	DAILINK_MAX98357A,
++	DAILINK_RT5514,
++	DAILINK_DA7219,
++};
++
++static struct snd_soc_dai_link rockchip_dailinks[] = {
++	[DAILINK_MAX98357A] = {
++		.name = "MAX98357A",
++		.stream_name = "MAX98357A PCM",
++		.codec_dai_name = "HiFi",
++		.ops = &rockchip_sound_max98357a_ops,
++		/* set max98357a as slave */
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++			SND_SOC_DAIFMT_CBS_CFS,
++	},
++	[DAILINK_RT5514] = {
++		.name = "RT5514",
++		.stream_name = "RT5514 PCM",
++		.codec_dai_name = "rt5514-aif1",
++		.ops = &rockchip_sound_rt5514_ops,
++		/* set rt5514 as slave */
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++			SND_SOC_DAIFMT_CBS_CFS,
++	},
++	[DAILINK_DA7219] = {
++		.name = "DA7219",
++		.stream_name = "DA7219 PCM",
++		.codec_dai_name = "da7219-hifi",
++		.init = rockchip_sound_da7219_init,
++		.ops = &rockchip_sound_da7219_ops,
++		/* set da7219 as slave */
++		.dai_fmt = SND_SOC_DAIFMT_I2S | SND_SOC_DAIFMT_NB_NF |
++			SND_SOC_DAIFMT_CBS_CFS,
++	},
++};
++
++static struct snd_soc_card rockchip_sound_card = {
++	.name = "rk3399-gru-sound",
++	.owner = THIS_MODULE,
++	.dai_link = rockchip_dailinks,
++	.num_links =  ARRAY_SIZE(rockchip_dailinks),
++	.dapm_widgets = rockchip_dapm_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(rockchip_dapm_widgets),
++	.dapm_routes = rockchip_dapm_routes,
++	.num_dapm_routes = ARRAY_SIZE(rockchip_dapm_routes),
++	.controls = rockchip_controls,
++	.num_controls = ARRAY_SIZE(rockchip_controls),
++};
++
++static int rockchip_sound_probe(struct platform_device *pdev)
++{
++	struct snd_soc_card *card = &rockchip_sound_card;
++	struct device_node *cpu_node;
++	int i, ret;
++
++	cpu_node = of_parse_phandle(pdev->dev.of_node, "rockchip,cpu", 0);
++	if (!cpu_node) {
++		dev_err(&pdev->dev, "Property 'rockchip,cpu' missing or invalid\n");
++		return -EINVAL;
++	}
++
++	for (i = 0; i < card->num_links; i++) {
++		rockchip_dailinks[i].platform_of_node = cpu_node;
++		rockchip_dailinks[i].cpu_of_node = cpu_node;
++
++		rockchip_dailinks[i].codec_of_node =
++			of_parse_phandle(pdev->dev.of_node, "rockchip,codec", i);
++		if (!rockchip_dailinks[i].codec_of_node) {
++			dev_err(&pdev->dev,
++				"Property[%d] 'rockchip,codec' missing or invalid\n", i);
++			return -EINVAL;
++		}
++	}
++
++	card->dev = &pdev->dev;
++	platform_set_drvdata(pdev, card);
++
++	ret = devm_snd_soc_register_card(&pdev->dev, card);
++	if (ret)
++		dev_err(&pdev->dev, "%s snd_soc_register_card fail %d\n",
++			__func__, ret);
++
++	return ret;
++}
++
++static const struct of_device_id rockchip_sound_of_match[] = {
++	{ .compatible = "rockchip,rk3399-gru-sound", },
++	{},
++};
++
++static struct platform_driver rockchip_sound_driver = {
++	.probe = rockchip_sound_probe,
++	.driver = {
++		.name = DRV_NAME,
++		.of_match_table = rockchip_sound_of_match,
++#ifdef CONFIG_PM
++		.pm = &snd_soc_pm_ops,
++#endif
++	},
++};
++
++module_platform_driver(rockchip_sound_driver);
++
++MODULE_AUTHOR("Xing Zheng <zhengxing@rock-chips.com>");
++MODULE_DESCRIPTION("Rockchip ASoC Machine Driver");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:" DRV_NAME);
++MODULE_DEVICE_TABLE(of, rockchip_sound_of_match);
+-- 
+1.7.9.5
