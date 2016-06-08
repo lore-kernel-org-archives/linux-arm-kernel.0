@@ -1,54 +1,49 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jun 2016 10:00:00 +0900
-Subject: [PATCH 30/30] ARM: dts: silk: Fix W=1 dtc warnings
-In-Reply-To: <cover.1465346599.git.horms+renesas@verge.net.au>
-References: <cover.1465346599.git.horms+renesas@verge.net.au>
-Message-ID: <b6960f19676e19f37a5e5a8af059fdf3b435d2f4.1465346599.git.horms+renesas@verge.net.au>
+Date: Wed,  8 Jun 2016 10:00:12 +0900
+Subject: [GIT PULL] Renesas ARM Based SoC R-Car SYSC Updates for v4.8
+Message-ID: <cover.1465347345.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi Olof, Hi Kevin, Hi Arnd,
 
-Warning (unit_address_vs_reg): Node /regulator at 0 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
-Warning (unit_address_vs_reg): Node /regulator at 4 has a unit name, but no reg property
+Please consider these Renesas ARM based SoC R-Car SYSC updates for v4.8.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7794-silk.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+There are follow-up DT changes that depend on this driver which I hope
+will be ready to send to you in the v4.8 development cycle.
 
-diff --git a/arch/arm/boot/dts/r8a7794-silk.dts b/arch/arm/boot/dts/r8a7794-silk.dts
-index 56d98d5b2185..b8c7a63c5ec4 100644
---- a/arch/arm/boot/dts/r8a7794-silk.dts
-+++ b/arch/arm/boot/dts/r8a7794-silk.dts
-@@ -32,7 +32,7 @@
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
- 
--	d3_3v: regulator at 0 {
-+	d3_3v: regulator-d3-3v {
- 		compatible = "regulator-fixed";
- 		regulator-name = "D3.3V";
- 		regulator-min-microvolt = <3300000>;
-@@ -41,7 +41,7 @@
- 		regulator-always-on;
- 	};
- 
--	vcc_sdhi1: regulator at 3 {
-+	vcc_sdhi1: regulator-vcc-sdhi1 {
- 		compatible = "regulator-fixed";
- 
- 		regulator-name = "SDHI1 Vcc";
-@@ -52,7 +52,7 @@
- 		enable-active-high;
- 	};
- 
--	vccq_sdhi1: regulator at 4 {
-+	vccq_sdhi1: regulator-vccq-sdhi1 {
- 		compatible = "regulator-gpio";
- 
- 		regulator-name = "SDHI1 VccQ";
--- 
-2.1.4
+
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-rcar-sysc-for-v4.8
+
+for you to fetch changes up to e0c98b9171eecf1745eda08de86081db8ec41d51:
+
+  soc: renesas: rcar-sysc: Add support for R-Car M3-W power areas (2016-06-06 10:14:21 +0900)
+
+----------------------------------------------------------------
+Renesas ARM Based SoC R-Car SYSC Updates for v4.8
+
+e0c98b9171ee soc: renesas: rcar-sysc: Add support for R-Car M3-W power areas
+74699228b99d soc: renesas: Add r8a7796 SYSC PM Domain Binding Definitions
+2ff1bf77e4d4 soc: renesas: rcar-sysc: Document r8a7796 support
+
+----------------------------------------------------------------
+Geert Uytterhoeven (3):
+      soc: renesas: rcar-sysc: Document r8a7796 support
+      soc: renesas: Add r8a7796 SYSC PM Domain Binding Definitions
+      soc: renesas: rcar-sysc: Add support for R-Car M3-W power areas
+
+ .../bindings/power/renesas,rcar-sysc.txt           |  1 +
+ drivers/soc/renesas/Makefile                       |  1 +
+ drivers/soc/renesas/r8a7796-sysc.c                 | 48 ++++++++++++++++++++++
+ drivers/soc/renesas/rcar-sysc.c                    |  3 ++
+ drivers/soc/renesas/rcar-sysc.h                    |  1 +
+ include/dt-bindings/power/r8a7796-sysc.h           | 36 ++++++++++++++++
+ 6 files changed, 90 insertions(+)
+ create mode 100644 drivers/soc/renesas/r8a7796-sysc.c
+ create mode 100644 include/dt-bindings/power/r8a7796-sysc.h
