@@ -1,37 +1,68 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed,  8 Jun 2016 20:42:46 +0000
-Subject: [PATCH net-next RFT] net: fec: handle small PHY reset durations more
- precisely
-Message-ID: <1465418567-2694-1-git-send-email-stefan.wahren@i2se.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 8 Jun 2016 15:51:52 -0500
+Subject: [PATCH v3 20/20] dt-bindings: pwm: sti: Update DT bindings with
+ recent changes
+In-Reply-To: <20160608092135.21184-21-lee.jones@linaro.org>
+References: <20160608092135.21184-1-lee.jones@linaro.org>
+ <20160608092135.21184-21-lee.jones@linaro.org>
+Message-ID: <20160608205152.GA5511@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since msleep is based on jiffies the PHY reset could take longer
-than expected. So use msleep for values greater than 20 msec otherwise
-usleep_range.
+On Wed, Jun 08, 2016 at 10:21:35AM +0100, Lee Jones wrote:
+> We're renaming the 'st,pwm-num-chan' binding to 'st,pwm-num-devs' to
+> be more inline with the naming conventions of the subsystem.  Where
+> we used to treat each line as a channel, the PWM convention is to
+> describe them as devices.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- drivers/net/ethernet/freescale/fec_main.c |    7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+That's all linux implementation details and you are breaking 
+compatibility.
 
-diff --git a/drivers/net/ethernet/freescale/fec_main.c b/drivers/net/ethernet/freescale/fec_main.c
-index 3c0255e..49f8055 100644
---- a/drivers/net/ethernet/freescale/fec_main.c
-+++ b/drivers/net/ethernet/freescale/fec_main.c
-@@ -3191,7 +3191,12 @@ static void fec_reset_phy(struct platform_device *pdev)
- 		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %d\n", err);
- 		return;
- 	}
--	msleep(msec);
-+
-+	if (msec > 20)
-+		msleep(msec);
-+	else
-+		usleep_range(msec * 1000, msec * 1000 + 1000);
-+
- 	gpio_set_value_cansleep(phy_reset, !active_high);
- }
- #else /* CONFIG_OF */
--- 
-1.7.9.5
+> The second documentation adaption entails adding support for PWM
+> capture devices.  A new clock is required as well as an IRQ line.
+> We're also adding a new property similar to the one described
+> above, but for capture channels.  Typically, there will be less
+> capture channels than PWM-out, since all channels have the latter
+> capability, but only some have capture support.
+
+Humm, sounds like all of this should be implied from compatible strings.
+
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-st.txt | 10 ++++++----
+>  1 file changed, 6 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-st.txt b/Documentation/devicetree/bindings/pwm/pwm-st.txt
+> index 84d2fb8..b09f3a4 100644
+> --- a/Documentation/devicetree/bindings/pwm/pwm-st.txt
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-st.txt
+> @@ -13,13 +13,14 @@ Required parameters:
+>  - pinctrl-0: 		List of phandles pointing to pin configuration nodes
+>  			for PWM module.
+>  			For Pinctrl properties, please refer to [1].
+> -- clock-names: 		Set to "pwm".
+> +- clock-names: 		Valid entries are "pwm" and/or "capture".
+>  - clocks: 		phandle of the clock used by the PWM module.
+>  			For Clk properties, please refer to [2].
+> +- interrupts:		IRQ for the Capture device
+>  
+>  Optional properties:
+> -- st,pwm-num-chan:	Number of available channels. If not passed, the driver
+> -			will consider single channel by default.
+> +- st,pwm-num-devs:	Number of available PWM channels.  Default is 0.
+> +- st,capture-num-devs:	Number of available Capture channels.  Default is 0.
+>  
+>  [1] Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+>  [2] Documentation/devicetree/bindings/clock/clock-bindings.txt
+> @@ -37,5 +38,6 @@ pwm1: pwm at fe510000 {
+>  		     &pinctrl_pwm1_chan3_default>;
+>  	clocks = <&clk_sysin>;
+>  	clock-names = "pwm";
+> -	st,pwm-num-chan = <4>;
+> +	st,pwm-num-devs = <4>;
+> +	st,capture-num-devs = <2>;
+>  };
+> -- 
+> 2.8.3
+> 
