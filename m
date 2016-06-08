@@ -1,37 +1,76 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  8 Jun 2016 18:10:03 +0100
-Subject: [PATCH] ARM: vexpress: fix missing core.h include
-Message-ID: <1465405803-22718-1-git-send-email-ben.dooks@codethink.co.uk>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed,  8 Jun 2016 18:54:40 +0200
+Subject: [PATCH] ehci-platform: Add support for shared reset controllers
+Message-ID: <1465404880-28374-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the missing declaration of vexpress_cpu_die() by
-including core.h where it is defined. Fixes:
+Add support for shared platform controllers by using
+devm_reset_control_get_shared_by_index instead of
+of_reset_control_get_by_index.
 
-arch/arm/mach-vexpress/hotplug.c:88:6: warning: symbol 'vexpress_cpu_die' was not declared. Should it be static?
+Note we use the devm function because there is no
+of_reset_control_get_shared_by_index, this also leads
+to a nice cleanup of the cleanup code.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+This brings the ehci-platform reset handling code inline
+with ohci-platform.
+
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/mach-vexpress/hotplug.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/usb/host/ehci-platform.c | 16 +++++-----------
+ 1 file changed, 5 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
-index f2fafc1..d8f1a05 100644
---- a/arch/arm/mach-vexpress/hotplug.c
-+++ b/arch/arm/mach-vexpress/hotplug.c
-@@ -15,6 +15,8 @@
- #include <asm/smp_plat.h>
- #include <asm/cp15.h>
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index bc33f45..6816b8c 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -236,8 +236,8 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 	}
  
-+#include "core.h"
-+
- static inline void cpu_enter_lowpower(void)
- {
- 	unsigned int v;
+ 	for (rst = 0; rst < EHCI_MAX_RSTS; rst++) {
+-		priv->rsts[rst] = of_reset_control_get_by_index(
+-					dev->dev.of_node, rst);
++		priv->rsts[rst] = devm_reset_control_get_shared_by_index(
++					&dev->dev, rst);
+ 		if (IS_ERR(priv->rsts[rst])) {
+ 			err = PTR_ERR(priv->rsts[rst]);
+ 			if (err == -EPROBE_DEFER)
+@@ -247,10 +247,8 @@ static int ehci_platform_probe(struct platform_device *dev)
+ 		}
+ 
+ 		err = reset_control_deassert(priv->rsts[rst]);
+-		if (err) {
+-			reset_control_put(priv->rsts[rst]);
++		if (err)
+ 			goto err_reset;
+-		}
+ 	}
+ 
+ 	if (pdata->big_endian_desc)
+@@ -307,10 +305,8 @@ err_power:
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ err_reset:
+-	while (--rst >= 0) {
++	while (--rst >= 0)
+ 		reset_control_assert(priv->rsts[rst]);
+-		reset_control_put(priv->rsts[rst]);
+-	}
+ err_put_clks:
+ 	while (--clk >= 0)
+ 		clk_put(priv->clks[clk]);
+@@ -335,10 +331,8 @@ static int ehci_platform_remove(struct platform_device *dev)
+ 	if (pdata->power_off)
+ 		pdata->power_off(dev);
+ 
+-	for (rst = 0; rst < EHCI_MAX_RSTS && priv->rsts[rst]; rst++) {
++	for (rst = 0; rst < EHCI_MAX_RSTS && priv->rsts[rst]; rst++)
+ 		reset_control_assert(priv->rsts[rst]);
+-		reset_control_put(priv->rsts[rst]);
+-	}
+ 
+ 	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
+ 		clk_put(priv->clks[clk]);
 -- 
-2.8.1
+2.7.4
