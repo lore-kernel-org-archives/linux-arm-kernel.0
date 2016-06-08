@@ -1,36 +1,29 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  8 Jun 2016 10:10:03 +0100
-Subject: [PATCH v2 2/2] phy: phy-qcom-ufs-qmp-20nm: Remove site specific OOM
- error message
-In-Reply-To: <1465377003-25660-1-git-send-email-peter.griffin@linaro.org>
-References: <1465377003-25660-1-git-send-email-peter.griffin@linaro.org>
-Message-ID: <1465377003-25660-2-git-send-email-peter.griffin@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 8 Jun 2016 11:10:58 +0200
+Subject: [PATCH 27/32] gpio: Add support for the FXL6408 GPIO expander.
+In-Reply-To: <1464817421-8519-28-git-send-email-kraxel@redhat.com>
+References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
+ <1464817421-8519-28-git-send-email-kraxel@redhat.com>
+Message-ID: <CACRpkdax3AmnprT48zL7J92ddMvLYeRXi9OrQK_JrBT8_zZQoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kzalloc will issue its own error message including a dump_stack()
-so remote the site specific message.
+On Wed, Jun 1, 2016 at 11:43 PM, Gerd Hoffmann <kraxel@redhat.com> wrote:
 
-Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> +#define FXL6408_OUTPUT                 0x05
+> +/* Bits here make the output High-Z, instead of the OUTPUT value. */
+> +#define FXL6408_OUTPUT_HIGH_Z          0x07
+(...)
+> +       /* Disable High-Z of outputs, so that our OUTPUT updates
+> +        * actually take effect.
+> +        */
+> +       i2c_smbus_write_byte_data(client, FXL6408_OUTPUT_HIGH_Z, 0);
 
----
+High-Z is probably the same as open drain right? And if not open drain,
+it is push-pull.
 
-v2: Add brackets, so goto is not executed unconditionally (Baruch)
----
- drivers/phy/phy-qcom-ufs-qmp-20nm.c | 1 -
- 1 file changed, 1 deletion(-)
+So you want to implement .set_single_ended() for configuring the lines in
+"high-z", i.e. open drain output mode.
 
-diff --git a/drivers/phy/phy-qcom-ufs-qmp-20nm.c b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
-index b16ea77..770087a 100644
---- a/drivers/phy/phy-qcom-ufs-qmp-20nm.c
-+++ b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
-@@ -196,7 +196,6 @@ static int ufs_qcom_phy_qmp_20nm_probe(struct platform_device *pdev)
- 
- 	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
- 	if (!phy) {
--		dev_err(dev, "%s: failed to allocate phy\n", __func__);
- 		err = -ENOMEM;
- 		goto out;
- 	}
--- 
-1.9.1
+Yours,
+Linus Walleij
