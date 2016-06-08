@@ -1,67 +1,87 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Wed, 8 Jun 2016 15:33:50 +0200
-Subject: [GIT PULL arm] Use _rcuidle tracepoints to allow tracing from idle
-In-Reply-To: <20160526162727.GA21784@linux.vnet.ibm.com>
-References: <20160526162606.GA20023@linux.vnet.ibm.com>
- <20160526162727.GA21784@linux.vnet.ibm.com>
-Message-ID: <20160608133350.GA18357@gmail.com>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 8 Jun 2016 15:44:19 +0200
+Subject: [PATCH V8 7/9] acpi: Add generic MCFG table handling
+In-Reply-To: <20160608131709.GB16764@localhost>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-8-git-send-email-tn@semihalf.com>
+ <20160608015631.GE4759@localhost> <57580DCA.7000703@semihalf.com>
+ <20160608131709.GB16764@localhost>
+Message-ID: <57582133.8060402@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 08.06.2016 15:17, Bjorn Helgaas wrote:
+> On Wed, Jun 08, 2016 at 02:21:30PM +0200, Tomasz Nowicki wrote:
+>> On 08.06.2016 03:56, Bjorn Helgaas wrote:
+>>> On Mon, May 30, 2016 at 05:14:20PM +0200, Tomasz Nowicki wrote:
+>>>> In order to handle PCI config space regions properly in ACPI, new MCFG
+>>>> interface is defined which does sanity checks on MCFG table and keeps its
+>>>> root pointer. The user is able to lookup MCFG regions based on
+>>>> host bridge root structure and domain:bus_start:bus_end touple.
+>>>> Use pci_mmcfg_late_init old prototype to avoid another function name.
+>
+>>>> +	/* found matching entry, bus range check */
+>>>> +	if (entry->end_bus_number != bus_res->end) {
+>>>> +		resource_size_t bus_end = min_t(resource_size_t,
+>>>> +					entry->end_bus_number, bus_res->end);
+>>>> +		pr_warn("%04x:%pR bus end mismatch, using %02lx\n",
+>>>> +			root->segment, bus_res, (unsigned long)bus_end);
+>>>> +		bus_res->end = bus_end;
+>>>> +	}
+>>
+>> What about bus end mismatch case? Should we trim the host bridge bus
+>> range or expect MCFG entry covers that range? Sometimes we get
+>> _BBN-0xFF bus range, not from _CRS.
+>
+> Lack of a bus range in _CRS is a firmware defect.  There's a comment
+> about this in acpi_pci_root_add().  On x86, we probably had to live
+> with firmware in the field that had this defect.  I think we should
+> expect all ARM64 systems to provide a bus number range in _CRS, and
+> fail the attach if it's not there.
+>
+> I don't think we should warn about an MCFG entry that covers more than
+> the _CRS bus range.  On x86, it's common to have something like:
+>
+>    ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-7f])
+>    ACPI: PCI Root Bridge [PCI1] (domain 0000 [bus 80-ff])
+>
+> with a single MCFG entry that covers [bus 00-ff].  That seems
+> reasonable and I don't think it's worth warning about it.
+>
+> If the MCFG entry doesn't cover all of a _CRS bus range, we should
+> just fail so we can find and fix broken firmware.
 
-* Paul E. McKenney <paulmck@linux.vnet.ibm.com> wrote:
+Make sense to me.
 
-> On Thu, May 26, 2016 at 09:26:06AM -0700, Paul E. McKenney wrote:
-> > Hello, Ingo,
-> > 
-> > This series changes a number of event tracepoints to their _rcuidle() form
-> > to allow use from idle without lockdep-RCU complaints, a straightforward
-> > modification that has been successfully applied many times.  These splats
-> > were found in testing by Guenter Roeck and Tony Lindgren, who have
-> > both successfully tested the full series.  Tony asked that I carry these
-> > in -rcu:
-> > 
-> > 	http://lkml.kernel.org/g/20160426213630.GV5995 at atomide.com
-> > 
-> > These have been posted to LKML, CCing relevant maintainers, who have
-> > not objected to the proposed changes:
-> > 
-> > 	http://lkml.kernel.org/g/20160516184844.GA20144 at linux.vnet.ibm.com
-> > 
-> > These maintainers are also CCed on this pull request.
-> > 
-> > They have also been subjected to 0day Test Robot and -next testing.
-> 
-> And this time actually including the pull request...  :-/
-> 
-> 							Thanx, Paul
-> 
-> These changes are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/paulmck/linux-rcu.git for-mingo
-> 
-> for you to fetch changes up to e7c38dda94b23965a3eb46ef4656bb8cb921933d:
-> 
->   arm: Use _rcuidle suffix to allow clk_core_enable() to used from idle (2016-05-18 11:55:29 -0700)
-> 
-> ----------------------------------------------------------------
-> Paul E. McKenney (6):
->       arm: Use _rcuidle tracepoint to allow use from idle
->       arm: Use _rcuidle for suspend/resume tracepoints
->       arm: Add _rcuidle tracepoints to allow clk_core_disable() use from idle
->       arm: Add _rcuidle suffix to allow rpm_idle() use from idle
->       arm: Add _rcuidle suffix to allow rpm_resume() to be called from idle
->       arm: Use _rcuidle suffix to allow clk_core_enable() to used from idle
-> 
->  arch/arm/kernel/smp.c             |  2 +-
->  arch/arm/mach-omap2/powerdomain.c |  9 +++++----
->  drivers/base/power/runtime.c      | 14 +++++++-------
->  drivers/clk/clk.c                 |  8 ++++----
->  4 files changed, 17 insertions(+), 16 deletions(-)
+>
+>>>> +/* Interface called by ACPI - parse and save MCFG table */
+>>>
+>>> I think we save a *pointer* to the MCFG table, not the table itself.
+>>
+>> Right, the comment is broken.
+>>
+>>> And acpi_table_parse() calls early_acpi_os_unmap_memory() immediately
+>>> after it calls pci_mcfg_parse(), so I'm doubtful that the pointer
+>>> remains valid.
+>>
+>> At this stage early_acpi_os_unmap_memory() is doing nothing since
+>> acpi_early_init() set acpi_gbl_permanent_mmap to 1 way before. The
+>> pointer is fine then.
+>
+> Hmmm...  I see your argument, but this is a problem waiting to happen.
+> We should not depend on the internal implementation of
+> early_acpi_os_unmap_memory().  The pattern of:
+>
+>    y = x;
+>    unmap(x);
+>    z = *y;
+>
+> is just broken and we shouldn't expect readers to recognize that "oh,
+> unmap() isn't really unmapping anything in this special case, so this
+> looks wrong but is really fine."
+>
 
-Just wondering, wouldn't it be better for Russell to pull/apply, as it appears to 
-be a mostly ARM patch-set?
+Right, so we are back to MCFG cache.
 
 Thanks,
-
-	Ingo
+Tomasz
