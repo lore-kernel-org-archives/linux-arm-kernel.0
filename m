@@ -1,82 +1,198 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jun 2016 16:14:24 +0900
-Subject: [PATCH v2 2/4] ARM: dts: r8a7790: lager: use demuxer for IIC1/I2C1
+Date: Wed,  8 Jun 2016 16:14:25 +0900
+Subject: [PATCH v2 3/4] ARM: dts: r8a7790: lager: use demuxer for IIC2/I2C2
 In-Reply-To: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
 References: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1465370066-8450-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1465370066-8450-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make it possible to select which I2C1 IP core you want to run on the
-EXIO-A connector.
+Create a separate bus for HDMI related I2C slaves.
 
-This is based on reference work for the I2C0 core of the lager by Wolfram Sang.
+Based on work by Wolfram Sang.
 
 Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 26 ++++++++++++++++++++++++--
- 1 file changed, 24 insertions(+), 2 deletions(-)
+v2
+* Include GPIO fallback
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 138 ++++++++++++++++++++++--------------
+ 1 file changed, 85 insertions(+), 53 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 71d62ca282ea..20abb1470f91 100644
+index 20abb1470f91..80b0eaa93607 100644
 --- a/arch/arm/boot/dts/r8a7790-lager.dts
 +++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -51,6 +51,7 @@
- 		serial0 = &scif0;
+@@ -52,6 +52,8 @@
  		serial1 = &scifa1;
  		i2c8 = "i2cexio0";
-+		i2c9 = "i2cexio1";
+ 		i2c9 = "i2cexio1";
++		i2c10 = "i2chdmi";
++		i2c11 = "gpioi2c";
  	};
  
  	chosen {
-@@ -270,6 +271,18 @@
+@@ -283,6 +285,76 @@
  		#address-cells = <1>;
  		#size-cells = <0>;
  	};
 +
-+	/*
-+	 * IIC1/I2C1 is routed to EXIO connector A, pins 78 (SCL) + 80 (SDA).
-+	 * For further notes see i2cexio0.
-+	 */
-+	i2cexio1: i2c-9 {
++	i2chdmi: i2c-10 {
 +		compatible = "i2c-demux-pinctrl";
-+		i2c-parent = <&iic1>, <&i2c1>;
-+		i2c-bus-name = "i2c-exio1";
++		i2c-parent = <&iic2>, <&i2c2>, <&gpioi2c>;
++		i2c-bus-name = "i2c-hdmi";
 +		#address-cells = <1>;
 +		#size-cells = <0>;
++
++		ak4643: codec at 12 {
++			compatible = "asahi-kasei,ak4643";
++			#sound-dai-cells = <0>;
++			reg = <0x12>;
++		};
++
++		composite-in at 20 {
++			compatible = "adi,adv7180";
++			reg = <0x20>;
++			remote = <&vin1>;
++
++			port {
++				adv7180: endpoint {
++					bus-width = <8>;
++					remote-endpoint = <&vin1ep0>;
++				};
++			};
++		};
++
++		hdmi at 39 {
++			compatible = "adi,adv7511w";
++			reg = <0x39>;
++			interrupt-parent = <&gpio1>;
++			interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
++
++			adi,input-depth = <8>;
++			adi,input-colorspace = "rgb";
++			adi,input-clock = "1x";
++			adi,input-style = <1>;
++			adi,input-justification = "evenly";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				port at 0 {
++					reg = <0>;
++					adv7511_in: endpoint {
++						remote-endpoint = <&du_out_lvds0>;
++					};
++				};
++
++				port at 1 {
++					reg = <1>;
++					adv7511_out: endpoint {
++						remote-endpoint = <&hdmi_con>;
++					};
++				};
++			};
++		};
++	};
++
++	gpioi2c: i2c-11 {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "i2c-gpio";
++		status = "disabled";
++		gpios = <&gpio5 6 GPIO_ACTIVE_HIGH /* sda */
++			 &gpio5 5 GPIO_ACTIVE_HIGH /* scl */
++			>;
++		i2c-gpio,delay-us = <5>;
 +	};
  };
  
  &du {
-@@ -392,6 +405,11 @@
- 		function = "iic0";
+@@ -415,6 +487,11 @@
+ 		function = "iic1";
  	};
  
-+	i2c1_pins: i2c1 {
-+		groups = "i2c1";
-+		function = "i2c1";
++	i2c2_pins: i2c2 {
++		groups = "i2c2";
++		function = "i2c2";
 +	};
 +
- 	iic1_pins: iic1 {
- 		groups = "iic1";
- 		function = "iic1";
-@@ -588,10 +606,14 @@
- 	pinctrl-names = "i2c-exio0";
+ 	iic2_pins: iic2 {
+ 		groups = "iic2";
+ 		function = "iic2";
+@@ -616,63 +693,18 @@
+ 	pinctrl-names = "i2c-exio1";
  };
  
-+&i2c1	{
-+	pinctrl-0 = <&i2c1_pins>;
-+	pinctrl-names = "i2c-exio1";
-+};
-+
- &iic1	{
+-&iic2	{
 -	status = "okay";
- 	pinctrl-0 = <&iic1_pins>;
+-	pinctrl-0 = <&iic2_pins>;
 -	pinctrl-names = "default";
-+	pinctrl-names = "i2c-exio1";
++&i2c2	{
++	pinctrl-0 = <&i2c2_pins>;
++	pinctrl-names = "i2c-hdmi";
+ 
+ 	clock-frequency = <100000>;
++};
+ 
+-	ak4643: codec at 12 {
+-		compatible = "asahi-kasei,ak4643";
+-		#sound-dai-cells = <0>;
+-		reg = <0x12>;
+-	};
+-
+-	composite-in at 20 {
+-		compatible = "adi,adv7180";
+-		reg = <0x20>;
+-		remote = <&vin1>;
+-
+-		port {
+-			adv7180: endpoint {
+-				bus-width = <8>;
+-				remote-endpoint = <&vin1ep0>;
+-			};
+-		};
+-	};
+-
+-	hdmi at 39 {
+-		compatible = "adi,adv7511w";
+-		reg = <0x39>;
+-		interrupt-parent = <&gpio1>;
+-		interrupts = <15 IRQ_TYPE_LEVEL_LOW>;
+-
+-		adi,input-depth = <8>;
+-		adi,input-colorspace = "rgb";
+-		adi,input-clock = "1x";
+-		adi,input-style = <1>;
+-		adi,input-justification = "evenly";
+-
+-		ports {
+-			#address-cells = <1>;
+-			#size-cells = <0>;
+-
+-			port at 0 {
+-				reg = <0>;
+-				adv7511_in: endpoint {
+-					remote-endpoint = <&du_out_lvds0>;
+-				};
+-			};
++&iic2	{
++	pinctrl-0 = <&iic2_pins>;
++	pinctrl-names = "i2c-hdmi";
+ 
+-			port at 1 {
+-				reg = <1>;
+-				adv7511_out: endpoint {
+-					remote-endpoint = <&hdmi_con>;
+-				};
+-			};
+-		};
+-	};
++	clock-frequency = <100000>;
  };
  
- &iic2	{
+ &iic3 {
 -- 
 2.1.4
