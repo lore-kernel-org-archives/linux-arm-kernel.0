@@ -1,38 +1,42 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  8 Jun 2016 18:01:49 +0100
-Subject: [PATCH] ARM: tegra: fix missing common.h include
-Message-ID: <1465405309-19011-1-git-send-email-ben.dooks@codethink.co.uk>
+Date: Wed,  8 Jun 2016 18:06:14 +0100
+Subject: [PATCH] vexpress/spc: fix missing include of spc.h
+Message-ID: <1465405574-20498-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix two missing function protoypes by including common.h
-where they are defined. Fixes:
+Fix missing function prototypes found in spc.h by including
+the file to remove the following warnings:
 
-arch/arm/mach-tegra/hotplug.c:24:5: warning: symbol 'tegra_cpu_kill' was not declared. Should it be static?
-arch/arm/mach-tegra/hotplug.c:40:6: warning: symbol 'tegra_cpu_die' was not declared. Should it be static?
+arch/arm/mach-vexpress/spc.c:131:6: warning: symbol 've_spc_global_wakeup_irq' was not declared. Should it be static?
+arch/arm/mach-vexpress/spc.c:156:6: warning: symbol 've_spc_cpu_wakeup_irq' was not declared. Should it be static?
+arch/arm/mach-vexpress/spc.c:185:6: warning: symbol 've_spc_set_resume_addr' was not declared. Should it be static?
+arch/arm/mach-vexpress/spc.c:210:6: warning: symbol 've_spc_powerdown' was not declared. Should it be static?
+arch/arm/mach-vexpress/spc.c:240:5: warning: symbol 've_spc_cpu_in_wfi' was not declared. Should it be static?
+arch/arm/mach-vexpress/spc.c:450:12: warning: symbol 've_spc_init' was not declared. Should it be static?
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Alexandre Courbot <gnurou@gmail.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-tegra at vger.kernel.org
 ---
- arch/arm/mach-tegra/hotplug.c | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-vexpress/spc.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-index 1b12989..8ec7078 100644
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -17,6 +17,7 @@
+diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
+index 8409cab..7d2d997 100644
+--- a/arch/arm/mach-vexpress/spc.c
++++ b/arch/arm/mach-vexpress/spc.c
+@@ -31,6 +31,8 @@
  
- #include <asm/smp_plat.h>
+ #include <asm/cacheflush.h>
  
-+#include "common.h"
- #include "sleep.h"
++#include "spc.h"
++
+ #define SPCLOG "vexpress-spc: "
  
- static void (*tegra_hotplug_shutdown)(void);
+ #define PERF_LVL_A15		0x00
 -- 
 2.8.1
