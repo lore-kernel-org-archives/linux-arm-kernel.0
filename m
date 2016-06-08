@@ -1,26 +1,49 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 8 Jun 2016 10:49:39 +0300
-Subject: [PATCH v3 2/4] ARM: dts: imx6q: extend support for the cm-fx6
-In-Reply-To: <1bf474715cdf430a811ba16c82ce6f25@rwthex-s1-b.rwth-ad.de>
-References: <20160607171418.1703-1-christopher.spinrath@rwth-aachen.de>
- <1bf474715cdf430a811ba16c82ce6f25@rwthex-s1-b.rwth-ad.de>
-Message-ID: <5757CE13.7040005@compulab.co.il>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 8 Jun 2016 09:49:59 +0200
+Subject: [GIT PULL] Ux500 DT updates for v4.8
+Message-ID: <CACRpkdZ_HPAXVc9Gd3oy5CVb=w76krcb3_Ney-rBb7Hn-YvAKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2016 08:14 PM, christopher.spinrath at rwth-aachen.de wrote:
-> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-> 
-> The cm-fx6 module has an on-board spi-flash chip for its firmware, an
-> eeprom (containing e.g. the mac address of the on-board Ethernet),
-> a sata port, a pcie controller, an USB hub, and an USB otg port.
-> Enable support for them. In addition, enable syscon poweroff support.
-> 
-> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Hi ARM SoC folks,
 
-Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+here is a bunch of DT updates to the Ux500 platforms that I'd like to get into
+the ARM SoC tree.
 
--- 
-Regards,
-Igor.
+Please pull it in!
+
+Yours,
+Linus Walleij
+
+
+The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+
+  Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-dt-asoc-1
+
+for you to fetch changes up to ac07a4e02899b332350b95ee190014c88271eaaa:
+
+  ARM: dts: UX500: name the GPIO lines on HREFv60plus (2016-06-08
+09:42:41 +0200)
+
+----------------------------------------------------------------
+Ux500 devicetree patches:
+- Move the ab8500 compatible string from the board to the
+  chipset.
+- Define GPIO line names for the boards.
+
+----------------------------------------------------------------
+Linus Walleij (3):
+      ARM: dts: Ux500: move compatible string to chipset
+      ARM: dts: Ux500: name the GPIO lines on Snowball
+      ARM: dts: UX500: name the GPIO lines on HREFv60plus
+
+ arch/arm/boot/dts/ste-dbx5x0.dtsi      |   1 +
+ arch/arm/boot/dts/ste-href.dtsi        |   1 -
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi | 120 +++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/ste-snowball.dts     |  84 ++++++++++++++++++++++-
+ 4 files changed, 204 insertions(+), 2 deletions(-)
