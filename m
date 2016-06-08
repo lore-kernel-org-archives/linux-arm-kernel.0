@@ -1,34 +1,51 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 08 Jun 2016 00:30:33 -0700 (PDT)
-Subject: [PATCH net-next v2 0/4] arm64 BPF JIT updates
-In-Reply-To: <1465276979-10147-1-git-send-email-zlim.lnx@gmail.com>
-References: <1465276979-10147-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <20160608.003033.955646634448015492.davem@davemloft.net>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed,  8 Jun 2016 09:32:51 +0200
+Subject: [PATCH] spi: rockchip: Signal unfinished DMA transfers
+Message-ID: <1465371171-20810-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Zi Shen Lim <zlim.lnx@gmail.com>
-Date: Mon,  6 Jun 2016 22:22:55 -0700
+When using DMA, the transfer_one callback should return 1 because the
+transfer hasn't finished yet.
 
-> Updates for arm64 eBPF JIT.
-> The main addition here is implementation of bpf_tail_call.
-> 
-> #1: Fix missing header inclusion in linux/bpf.h.
-> #2: Add bpf_tail_call for arm64.
-> #3,4: Optimizations to reduce instruction count for jitted code.
-> 
-> Changes since v1:
->  - Added patch #1 to address build error due to missing header inclusion
->    in linux/bpf.h. (Thanks to suggestion and ack by Daniel Borkmann)
->    Ordered it ahead of bpf_tail_call patch #2 so build error is not
->    triggered.
-> 
-> Zi Shen Lim (4):
->   bpf: fix missing header inclusion
->   arm64: bpf: implement bpf_tail_call() helper
->   arm64: bpf: optimize JMP_CALL
->   arm64: bpf: optimize LD_ABS, LD_IND
+A previous commit changed the function to return 0 when the DMA channels
+were correctly prepared.
 
-I only see patches 1, 3, and 4 on the list.
+This manifested in Veyron boards with this message:
 
-Please resubmit.
+[ 1.983605] cros-ec-spi spi0.0: EC failed to respond in time
+
+Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Fixes: ea9849113343 ("spi: rockchip: check return value of
+dmaengine_prep_slave_sg")
+Cc: Shawn Lin <shawn.lin@rock-chips.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+---
+ drivers/spi/spi-rockchip.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-rockchip.c b/drivers/spi/spi-rockchip.c
+index cd89682065b9..1026e180eed7 100644
+--- a/drivers/spi/spi-rockchip.c
++++ b/drivers/spi/spi-rockchip.c
+@@ -578,7 +578,7 @@ static int rockchip_spi_transfer_one(
+ 		struct spi_device *spi,
+ 		struct spi_transfer *xfer)
+ {
+-	int ret = 1;
++	int ret = 0;
+ 	struct rockchip_spi *rs = spi_master_get_devdata(master);
+ 
+ 	WARN_ON(readl_relaxed(rs->regs + ROCKCHIP_SPI_SSIENR) &&
+@@ -627,6 +627,8 @@ static int rockchip_spi_transfer_one(
+ 			spi_enable_chip(rs, 1);
+ 			ret = rockchip_spi_prepare_dma(rs);
+ 		}
++		/* successful DMA prepare means the transfer is in progress */
++		ret = ret ? ret : 1;
+ 	} else {
+ 		spi_enable_chip(rs, 1);
+ 		ret = rockchip_spi_pio_transfer(rs);
+-- 
+2.5.5
