@@ -1,121 +1,256 @@
-From: garlic.tseng@mediatek.com (Garlic Tseng)
-Date: Wed, 8 Jun 2016 10:06:12 +0800
-Subject: [alsa-devel] [PATCH v2 2/9] ASoC: mediatek: implement mediatek
- common structure
-In-Reply-To: <20160607155427.GB7510@sirena.org.uk>
-References: <1464929784-5489-1-git-send-email-garlic.tseng@mediatek.com>
- <1464929784-5489-3-git-send-email-garlic.tseng@mediatek.com>
- <20160607155427.GB7510@sirena.org.uk>
-Message-ID: <1465351572.4197.17.camel@mtksdaap41>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 7 Jun 2016 21:14:21 -0500
+Subject: [PATCH V8 9/9] pci, acpi: ARM64 support for ACPI based generic
+ PCI host controller
+In-Reply-To: <1464621262-26770-10-git-send-email-tn@semihalf.com>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-10-git-send-email-tn@semihalf.com>
+Message-ID: <20160608021421.GF4759@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, thank for comment.
-
-On Tue, 2016-06-07 at 16:54 +0100, Mark Brown wrote:
-> On Fri, Jun 03, 2016 at 12:56:17PM +0800, Garlic Tseng wrote:
+On Mon, May 30, 2016 at 05:14:22PM +0200, Tomasz Nowicki wrote:
+> This patch implements pci_acpi_scan_root call so that ARM64 can start
+> using ACPI to setup and enumerate PCI buses.
 > 
-> > +	/*enable agent*/
+> The implementation of pci_acpi_scan_root() looks up config space regions
+> through MCFG interface. Then ECAM library is doing a new mapping
+> and attach generic ECAM ops which are used for accessing config space.
 > 
-> Lots of comments with missing spaces in them, there's quite a few
-> examples of that in here.
-
-I'll check all the code and fix them. 
-
+> On ARM64, ACPI and DT can be enabled together, and in that case
+> we need to use generic domains. In order to do that we implement
+> ARM64 specific way of retrieving domain number from pci_config_window
+> structure.
 > 
-> > +EXPORT_SYMBOL(mtk_afe_fe_startup);
+> Since we enable PCI for ACPI we need to implement raw_pci_{read|write}
+> at the same time. ARM64 provides RAW accessors as long as there is
+> correlated valid pci_bus structure, but not before.
+
+I think this is important and needs to be spelled out a little more
+explicitly using the terms from the ACPI spec so it will make sense to
+people like BIOS writers who might be bitten by this.
+
+"raw_pci_read()" is a Linux term that won't mean anything to them.
+But they might expect that AML can access PCI config space before the
+Linux driver claims the host bridge, and I think you're saying that
+will not work.
+
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+> ---
+>  arch/arm64/Kconfig      |   2 +
+>  arch/arm64/kernel/pci.c | 120 ++++++++++++++++++++++++++++++++++++++++++++++--
+>  include/linux/pci.h     |   5 ++
+>  3 files changed, 122 insertions(+), 5 deletions(-)
 > 
-> All the ASoC and regmap APIs are _GPL(), you really shouldn't export new
-> interfaces based on them without it - the point with the _GPL() is that
-> non-GPL code shouldn't be able to use the APIs.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 76747d9..87c48ad 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -3,6 +3,7 @@ config ARM64
+>  	select ACPI_CCA_REQUIRED if ACPI
+>  	select ACPI_GENERIC_GSI if ACPI
+>  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
+> +	select ACPI_MCFG if ACPI
+>  	select ARCH_HAS_DEVMEM_IS_ALLOWED
+>  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
+>  	select ARCH_HAS_ELF_RANDOMIZE
+> @@ -96,6 +97,7 @@ config ARM64
+>  	select OF_EARLY_FLATTREE
+>  	select OF_NUMA if NUMA && OF
+>  	select OF_RESERVED_MEM
+> +	select PCI_ECAM if ACPI
+>  	select PERF_USE_VMALLOC
+>  	select POWER_RESET
+>  	select POWER_SUPPLY
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index 3663be1..39f2a40 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -17,7 +17,9 @@
+>  #include <linux/mm.h>
+>  #include <linux/of_pci.h>
+>  #include <linux/of_platform.h>
+> +#include <linux/pci.h>
+>  #include <linux/pci-acpi.h>
+> +#include <linux/pci-ecam.h>
+>  #include <linux/slab.h>
+>  
+>  /*
+> @@ -71,13 +73,21 @@ int pcibios_alloc_irq(struct pci_dev *dev)
+>  int raw_pci_read(unsigned int domain, unsigned int bus,
+>  		  unsigned int devfn, int reg, int len, u32 *val)
+>  {
+> -	return -ENXIO;
+> +	struct pci_bus *b = pci_find_bus(domain, bus);
+> +
+> +	if (!b)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	return b->ops->read(b, devfn, reg, len, val);
+>  }
+>  
+>  int raw_pci_write(unsigned int domain, unsigned int bus,
+>  		unsigned int devfn, int reg, int len, u32 val)
+>  {
+> -	return -ENXIO;
+> +	struct pci_bus *b = pci_find_bus(domain, bus);
+> +
+> +	if (!b)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	return b->ops->write(b, devfn, reg, len, val);
+>  }
 
-Thanks for comment, I'll fix them.
+I think these functions could be under #ifdef ACPI, couldn't they?
+I see x86 and ia64 don't do that, and they do call them from non-ACPI
+places.  So maybe there'd be no point in doing it differently here.
 
+You could split this out into a separate patch, though, which would be
+a nice way to highlight the issue of AML access before pci_root.c
+claims the bridge.
 
+>  #ifdef CONFIG_NUMA
+> @@ -91,11 +101,111 @@ EXPORT_SYMBOL(pcibus_to_node);
+>  #endif
+>  
+>  #ifdef CONFIG_ACPI
+> -/* Root bridge scanning */
+> +
+> +struct acpi_pci_generic_root_info {
+> +	struct acpi_pci_root_info	common;
+> +	struct pci_config_window	*cfg;	/* config space mapping */
+> +};
+> +
+> +int acpi_pci_bus_domain_nr(struct pci_bus *bus)
+> +{
+> +	struct pci_config_window *cfg = bus->sysdata;
+> +	struct acpi_device *adev = to_acpi_device(cfg->parent);
+> +	struct acpi_pci_root *root = acpi_driver_data(adev);
+> +
+> +	return root->segment;
+> +}
+> +
+> +int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
+> +{
+> +	if (!acpi_disabled) {
+> +		struct pci_config_window *cfg = bridge->bus->sysdata;
+> +		struct acpi_device *adev = to_acpi_device(cfg->parent);
+> +		ACPI_COMPANION_SET(&bridge->dev, adev);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/*
+> + * Lookup the bus range for the domain in MCFG, and set up config space
+> + * mapping.
+> + */
+> +static int pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root,
+> +				       struct acpi_pci_generic_root_info *ri)
+
+Maybe return the "struct pci_config_window *" and do the assignment in
+the caller?  Then I don't think you'd have to pass in "ri".
+
+> +{
+> +	struct resource *bus_res = &root->secondary;
+> +	u16 seg = root->segment;
+> +	struct pci_config_window *cfg;
+> +	struct resource cfgres;
+> +	unsigned int bsz;
+> +	int err;
+> +
+> +	err = pci_mcfg_lookup(root);
+> +	if (err) {
+> +		pr_err("%04x:%pR MCFG region not found\n", seg, bus_res);
+
+dev_err()
+
+> +		return err;
+> +	}
+> +
+> +	bsz = 1 << pci_generic_ecam_ops.bus_shift;
+> +	cfgres.start = root->mcfg_addr + bus_res->start * bsz;
+> +	cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
+> +	cfgres.flags = IORESOURCE_MEM;
+> +	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
+> +			      &pci_generic_ecam_ops);
+> +	if (IS_ERR(cfg)) {
+> +		pr_err("%04x:%pR error %ld mapping CAM\n", seg, bus_res,
+> +		       PTR_ERR(cfg));
+
+dev_err()
+
+> +		return PTR_ERR(cfg);
+> +	}
+> +
+> +	ri->cfg = cfg;
+> +	return 0;
+> +}
+> +
+> +/* release_info: free resrouces allocated by init_info */
+> +static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
+> +{
+> +	struct acpi_pci_generic_root_info *ri;
+> +
+> +	ri = container_of(ci, struct acpi_pci_generic_root_info, common);
+> +	pci_ecam_free(ri->cfg);
+> +	kfree(ri);
+> +}
+> +
+> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
+> +	.release_info = pci_acpi_generic_release_info,
+> +};
+> +
+> +/* Interface called from ACPI code to setup PCI host controller */
+>  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
+>  {
+> -	/* TODO: Should be revisited when implementing PCI on ACPI */
+> -	return NULL;
+> +	int node = acpi_get_node(root->device->handle);
+> +	struct acpi_pci_generic_root_info *ri;
+> +	struct pci_bus *bus, *child;
+> +	int err;
+> +
+> +	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
+> +	if (!ri)
+> +		return NULL;
+> +
+> +	err = pci_acpi_setup_ecam_mapping(root, ri);
+> +	if (err)
+> +		return NULL;
+> +
+> +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
+> +	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
+> +				   ri->cfg);
+> +	if (!bus)
+> +		return NULL;
+> +
+> +	pci_bus_size_bridges(bus);
+> +	pci_bus_assign_resources(bus);
+> +
+> +	list_for_each_entry(child, &bus->children, node)
+> +		pcie_bus_configure_settings(child);
+> +
+> +	return bus;
+>  }
+>  
+>  void pcibios_add_bus(struct pci_bus *bus)
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 9661c85..f66d188 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -1390,7 +1390,12 @@ static inline int pci_domain_nr(struct pci_bus *bus)
+>  {
+>  	return bus->domain_nr;
+>  }
+> +/* Arch specific ACPI hook to set-up domain number */
+> +#ifdef CONFIG_ACPI
+> +int acpi_pci_bus_domain_nr(struct pci_bus *bus);
+> +#else
+>  static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus) { return -1; }
+> +#endif
+>  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
+>  #else
+>  static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
+> -- 
+> 1.9.1
 > 
-> > +EXPORT_SYMBOL(mtk_afe_fe_hw_params);
-> 
-> Do you need to export the individual ops rather than just the ops
-> structure?
-> 
-
-Yes, in 2701 driver we modify some ops.
-
-
-+/* FE DAIs */
-+static const struct snd_soc_dai_ops mt2701_single_memif_dai_ops = {
-+	.startup	= mt2701_simple_fe_startup,
-+	.shutdown	= mtk_afe_fe_shutdown,
-+	.hw_params	= mt2701_simple_fe_hw_params,
-+	.hw_free	= mtk_afe_fe_hw_free,
-+	.prepare	= mtk_afe_fe_prepare,
-+	.trigger	= mtk_afe_fe_trigger,
-+
-+};
-
-And here is one of them. Here MT2701 need one more reg control.
-
-+static int mt2701_simple_fe_hw_params(struct snd_pcm_substream
-*substream,
-+				      struct snd_pcm_hw_params *params,
-+				      struct snd_soc_dai *dai)
-+{
-+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-+	struct mtk_base_afe *afe =
-snd_soc_platform_get_drvdata(rtd->platform);
-+	int stream_dir = substream->stream;
-+
-+	/*single DL use PAIR_INTERLEAVE*/
-+	if (stream_dir == SNDRV_PCM_STREAM_PLAYBACK) {
-+		regmap_update_bits(afe->regmap,
-+				   AFE_MEMIF_PBUF_SIZE,
-+				   AFE_MEMIF_PBUF_SIZE_DLM_MASK,
-+				   AFE_MEMIF_PBUF_SIZE_PAIR_INTERLEAVE);
-+	}
-+	return mtk_afe_fe_hw_params(substream, params, dai);
-+}
-
-MT2701 need some specific reg controls. If the control is
-platform-specific I tend not to put them in the common ops structure.
-
-
-> > +int mtk_afe_fe_trigger(struct snd_pcm_substream *substream, int cmd,
-> > +		       struct snd_soc_dai *dai)
-> > +{
-> > +	struct snd_soc_pcm_runtime *rtd = substream->private_data;
-> > +	struct snd_pcm_runtime * const runtime = substream->runtime;
-> > +	struct mtk_base_afe *afe = snd_soc_platform_get_drvdata(rtd->platform);
-> > +	struct mtk_base_afe_memif *memif = &afe->memif[rtd->cpu_dai->id];
-> > +	struct mtk_base_afe_irq *irqs = &afe->irqs[memif->irq_usage];
-> > +	const struct mtk_base_irq_data *irq_data = irqs->irq_data;
-> > +	unsigned int counter = runtime->period_size;
-> > +	int fs;
-> > +
-> > +	dev_info(afe->dev, "%s %s cmd=%d\n", __func__, memif->data->name, cmd);
-> 
-> That's way too noisy, dev_dbg() at most.
-
-OK. I'll fix it.
-
-> > +static DEFINE_MUTEX(irqs_lock);
-> > +int mtk_dynamic_irq_acquire(struct mtk_base_afe *afe)
-> > +{
-> > +	int i;
-> > +
-> > +	mutex_lock(&irqs_lock);
-> > +	for (i = 0; i < afe->irqs_size; ++i) {
-> 
-> Why is the lock global and not part of the AFE struct?
-
-I'll put it in AFE struct. Thanks.
-
-> 
-> > +void mtk_simple_isr(struct mtk_base_afe *afe, struct mtk_base_afe_memif *memif)
-> > +{
-> > +	snd_pcm_period_elapsed(memif->substream);
-> > +}
-> > +EXPORT_SYMBOL(mtk_simple_isr);
-> 
-> Is this really worth it over just calling _period_elapsed() directly?
-
-I'll remove the function and just calling period_elapsed() directly.
