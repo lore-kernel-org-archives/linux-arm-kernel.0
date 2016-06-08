@@ -1,224 +1,173 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Wed, 8 Jun 2016 14:21:30 +0200
-Subject: [PATCH V8 7/9] acpi: Add generic MCFG table handling
-In-Reply-To: <20160608015631.GE4759@localhost>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <1464621262-26770-8-git-send-email-tn@semihalf.com>
- <20160608015631.GE4759@localhost>
-Message-ID: <57580DCA.7000703@semihalf.com>
+From: hs.liao@mediatek.com (Horng-Shyang Liao)
+Date: Wed, 8 Jun 2016 20:25:27 +0800
+Subject: [PATCH v8 2/3] CMDQ: Mediatek CMDQ driver
+In-Reply-To: <5757F762.4020908@gmail.com>
+References: <1464578397-29743-1-git-send-email-hs.liao@mediatek.com>
+ <1464578397-29743-3-git-send-email-hs.liao@mediatek.com>
+ <574C5CBF.7060002@gmail.com> <1464683762.14604.59.camel@mtksdaap41>
+ <574DEE40.9010008@gmail.com> <1464775020.11122.40.camel@mtksdaap41>
+ <574FF264.7050209@gmail.com> <1464934356.15175.31.camel@mtksdaap41>
+ <57516774.5080008@gmail.com> <1464956037.16029.8.camel@mtksdaap41>
+ <575181E5.6090603@gmail.com> <5756FD73.3050607@gmail.com>
+ <1465364427.9963.13.camel@mtksdaap41> <5757F762.4020908@gmail.com>
+Message-ID: <1465388727.21326.8.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08.06.2016 03:56, Bjorn Helgaas wrote:
-> On Mon, May 30, 2016 at 05:14:20PM +0200, Tomasz Nowicki wrote:
->> In order to handle PCI config space regions properly in ACPI, new MCFG
->> interface is defined which does sanity checks on MCFG table and keeps its
->> root pointer. The user is able to lookup MCFG regions based on
->> host bridge root structure and domain:bus_start:bus_end touple.
->> Use pci_mmcfg_late_init old prototype to avoid another function name.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
->> ---
->>   drivers/acpi/Kconfig     |  3 ++
->>   drivers/acpi/Makefile    |  1 +
->>   drivers/acpi/pci_mcfg.c  | 94 ++++++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/pci-acpi.h |  2 ++
->>   include/linux/pci.h      |  2 +-
->>   5 files changed, 101 insertions(+), 1 deletion(-)
->>   create mode 100644 drivers/acpi/pci_mcfg.c
->>
->> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
->> index b7e2e77..f98c328 100644
->> --- a/drivers/acpi/Kconfig
->> +++ b/drivers/acpi/Kconfig
->> @@ -217,6 +217,9 @@ config ACPI_PROCESSOR_IDLE
->>   	bool
->>   	select CPU_IDLE
->>
->> +config ACPI_MCFG
->> +	bool
->> +
->>   config ACPI_CPPC_LIB
->>   	bool
->>   	depends on ACPI_PROCESSOR
->> diff --git a/drivers/acpi/Makefile b/drivers/acpi/Makefile
->> index 251ce85..632e81f 100644
->> --- a/drivers/acpi/Makefile
->> +++ b/drivers/acpi/Makefile
->> @@ -40,6 +40,7 @@ acpi-$(CONFIG_ARCH_MIGHT_HAVE_ACPI_PDC) += processor_pdc.o
->>   acpi-y				+= ec.o
->>   acpi-$(CONFIG_ACPI_DOCK)	+= dock.o
->>   acpi-y				+= pci_root.o pci_link.o pci_irq.o
->> +obj-$(CONFIG_ACPI_MCFG)		+= pci_mcfg.o
->>   acpi-y				+= acpi_lpss.o acpi_apd.o
->>   acpi-y				+= acpi_platform.o
->>   acpi-y				+= acpi_pnp.o
->> diff --git a/drivers/acpi/pci_mcfg.c b/drivers/acpi/pci_mcfg.c
->> new file mode 100644
->> index 0000000..1847f74
->> --- /dev/null
->> +++ b/drivers/acpi/pci_mcfg.c
->> @@ -0,0 +1,94 @@
->> +/*
->> + * Copyright (C) 2016 Broadcom
->> + *	Author: Jayachandran C <jchandra@broadcom.com>
->> + * Copyright (C) 2016 Semihalf
->> + * 	Author: Tomasz Nowicki <tn@semihalf.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License, version 2, as
->> + * published by the Free Software Foundation (the "GPL").
->> + *
->> + * This program is distributed in the hope that it will be useful, but
->> + * WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->> + * General Public License version 2 (GPLv2) for more details.
->> + *
->> + * You should have received a copy of the GNU General Public License
->> + * version 2 (GPLv2) along with this source code.
->> + */
->> +
->> +#define pr_fmt(fmt) "ACPI: " fmt
->> +
->> +#include <linux/kernel.h>
->> +#include <linux/pci.h>
->> +#include <linux/pci-acpi.h>
->> +
->> +/* Root pointer to the mapped MCFG table */
->> +static struct acpi_table_mcfg *mcfg_table;
->> +static int mcfg_entries;
->> +
->> +int pci_mcfg_lookup(struct acpi_pci_root *root)
->
-> I think this would be better if we passed in the domain and a pointer
-> to the bus range resource and returned the ECAM base address.  I don't
-> think we need to be connected to struct acpi_pci_root.
+Hi Matthias,
 
-I will use domain and bus range resource as you suggested.
+On Wed, 2016-06-08 at 12:45 +0200, Matthias Brugger wrote:
+> 
+> On 08/06/16 07:40, Horng-Shyang Liao wrote:
+> > Hi Matthias,
+> >
+> > On Tue, 2016-06-07 at 18:59 +0200, Matthias Brugger wrote:
+> >>
+> >> On 03/06/16 15:11, Matthias Brugger wrote:
+> >>>
+> >>>
+> >> [...]
+> >>
+> >>>>>>>>>>>> +
+> >>>>>>>>>>>> +            smp_mb(); /* modify jump before enable thread */
+> >>>>>>>>>>>> +        }
+> >>>>>>>>>>>> +
+> >>>>>>>>>>>> +        cmdq_thread_writel(thread, task->pa_base +
+> >>>>>>>>>>>> task->command_size,
+> >>>>>>>>>>>> +                   CMDQ_THR_END_ADDR);
+> >>>>>>>>>>>> +        cmdq_thread_resume(thread);
+> >>>>>>>>>>>> +    }
+> >>>>>>>>>>>> +    list_move_tail(&task->list_entry, &thread->task_busy_list);
+> >>>>>>>>>>>> +    spin_unlock_irqrestore(&cmdq->exec_lock, flags);
+> >>>>>>>>>>>> +}
+> >>>>>>>>>>>> +
+> >>>>>>>>>>>> +static void cmdq_handle_error_done(struct cmdq *cmdq,
+> >>>>>>>>>>>> +                   struct cmdq_thread *thread, u32 irq_flag)
+> >>>>>>>>>>>> +{
+> >>>>>>>>>>>> +    struct cmdq_task *task, *tmp, *curr_task = NULL;
+> >>>>>>>>>>>> +    u32 curr_pa;
+> >>>>>>>>>>>> +    struct cmdq_cb_data cmdq_cb_data;
+> >>>>>>>>>>>> +    bool err;
+> >>>>>>>>>>>> +
+> >>>>>>>>>>>> +    if (irq_flag & CMDQ_THR_IRQ_ERROR)
+> >>>>>>>>>>>> +        err = true;
+> >>>>>>>>>>>> +    else if (irq_flag & CMDQ_THR_IRQ_DONE)
+> >>>>>>>>>>>> +        err = false;
+> >>>>>>>>>>>> +    else
+> >>>>>>>>>>>> +        return;
+> >>>>>>>>>>>> +
+> >>>>>>>>>>>> +    curr_pa = cmdq_thread_readl(thread, CMDQ_THR_CURR_ADDR);
+> >>>>>>>>>>>> +
+> >>>>>>>>>>>> +    list_for_each_entry_safe(task, tmp, &thread->task_busy_list,
+> >>>>>>>>>>>> +                 list_entry) {
+> >>>>>>>>>>>> +        if (curr_pa >= task->pa_base &&
+> >>>>>>>>>>>> +            curr_pa < (task->pa_base + task->command_size))
+> >>>>>>>>>>>
+> >>>>>>>>>>> What are you checking here? It seems as if you make some implcit
+> >>>>>>>>>>> assumptions about pa_base and the order of execution of
+> >>>>>>>>>>> commands in the
+> >>>>>>>>>>> thread. Is it save to do so? Does dma_alloc_coherent give any
+> >>>>>>>>>>> guarantees
+> >>>>>>>>>>> about dma_handle?
+> >>>>>>>>>>
+> >>>>>>>>>> 1. Check what is the current running task in this GCE thread.
+> >>>>>>>>>> 2. Yes.
+> >>>>>>>>>> 3. Yes, CMDQ doesn't use iommu, so physical address is continuous.
+> >>>>>>>>>>
+> >>>>>>>>>
+> >>>>>>>>> Yes, physical addresses might be continous, but AFAIK there is no
+> >>>>>>>>> guarantee that the dma_handle address is steadily growing, when
+> >>>>>>>>> calling
+> >>>>>>>>> dma_alloc_coherent. And if I understand the code correctly, you
+> >>>>>>>>> use this
+> >>>>>>>>> assumption to decide if the task picked from task_busy_list is
+> >>>>>>>>> currently
+> >>>>>>>>> executing. So I think this mecanism is not working.
+> >>>>>>>>
+> >>>>>>>> I don't use dma_handle address, and just use physical addresses.
+> >>>>>>>>     From CPU's point of view, tasks are linked by the busy list.
+> >>>>>>>>     From GCE's point of view, tasks are linked by the JUMP command.
+> >>>>>>>>
+> >>>>>>>>> In which cases does the HW thread raise an interrupt.
+> >>>>>>>>> In case of error. When does CMDQ_THR_IRQ_DONE get raised?
+> >>>>>>>>
+> >>>>>>>> GCE will raise interrupt if any task is done or error.
+> >>>>>>>> However, GCE is fast, so CPU may get multiple done tasks
+> >>>>>>>> when it is running ISR.
+> >>>>>>>>
+> >>>>>>>> In case of error, that GCE thread will pause and raise interrupt.
+> >>>>>>>> So, CPU may get multiple done tasks and one error task.
+> >>>>>>>>
+> >>>>>>>
+> >>>>>>> I think we should reimplement the ISR mechanism. Can't we just read
+> >>>>>>> CURR_IRQ_STATUS and THR_IRQ_STATUS in the handler and leave
+> >>>>>>> cmdq_handle_error_done to the thread_fn? You will need to pass
+> >>>>>>> information from the handler to thread_fn, but that shouldn't be an
+> >>>>>>> issue. AFAIK interrupts are disabled in the handler, so we should stay
+> >>>>>>> there as short as possible. Traversing task_busy_list is expensive, so
+> >>>>>>> we need to do it in a thread context.
+> >>>>>>
+> >>>>>> Actually, our initial implementation is similar to your suggestion,
+> >>>>>> but display needs CMDQ to return callback function very precisely,
+> >>>>>> else display will drop frame.
+> >>>>>> For display, CMDQ interrupt will be raised every 16 ~ 17 ms,
+> >>>>>> and CMDQ needs to call callback function in ISR.
+> >>>>>> If we defer callback to workqueue, the time interval may be larger than
+> >>>>>> 32 ms.sometimes.
+> >>>>>>
+> >>>>>
+> >>>>> I think the problem is, that you implemented the workqueue as a ordered
+> >>>>> workqueue, so there is no parallel processing. I'm still not sure why
+> >>>>> you need the workqueue to be ordered. Can you please explain.
+> >>>>
+> >>>> The order should be kept.
+> >>>> Let me use mouse cursor as an example.
+> >>>> If task 1 means move mouse cursor to point A, task 2 means point B,
+> >>>> and task 3 means point C, our expected result is A -> B -> C.
+> >>>> If the order is not kept, the result could become A -> C -> B.
+> >>>>
+> >>>
+> >>> Got it, thanks for the clarification.
+> >>>
+> >>
+> >> I think a way to get rid of the workqueue is to use a timer, which gets
+> >> programmed to the time a timeout in the first task in the busy list
+> >> would happen. Everytime we update the busy list (e.g. because of task
+> >> got finished by the thread), we update the timer. When the timer
+> >> triggers, which hopefully won't happen too often, we return timeout on
+> >> the busy list elements, until the time is lower then the actual time.
+> >>
+> >> At least with this we can reduce the data structures in this driver and
+> >> make it more lightweight.
+> >
+> >  From my understanding, your proposed method can handle timeout case.
+> >
+> > However, the workqueue is also in charge of releasing tasks.
+> > Do you take releasing tasks into consideration by using the proposed
+> > timer method?
+> > Furthermore, I think the code will become more complex if we also use
+> > timer to implement releasing tasks.
+> >
+> 
+> Can't we call
+>          clk_disable_unprepare(cmdq->clock);
+>          cmdq_task_release(task);
+> after invoking the callback?
 
->
->> +{
->> +	struct acpi_mcfg_allocation *mptr, *entry = NULL;
->> +	struct resource *bus_res = &root->secondary;
->> +	int i;
->> +
->> +	if (mcfg_table) {
->> +		mptr = (struct acpi_mcfg_allocation *) &mcfg_table[1];
->> +		for (i = 0; i < mcfg_entries && !entry; i++, mptr++)
->> +			if (mptr->pci_segment == root->segment &&
->> +			    mptr->start_bus_number == bus_res->start)
->> +				entry = mptr;
->> +	}
->> +
->> +	/* not found, use _CBA if available, else error */
->> +	if (!entry) {
->> +		if (root->mcfg_addr)
->> +			return root->mcfg_addr;
->> +		pr_err("%04x:%pR MCFG lookup failed\n", root->segment, bus_res);
->> +		return -ENOENT;
->> +	} else if (root->mcfg_addr && entry->address != root->mcfg_addr) {
->> +		pr_warn("%04x:%pR CBA %pa != MCFG %lx, using CBA\n",
->> +			root->segment, bus_res, &root->mcfg_addr,
->> +			(unsigned long)entry->address);
->> +		return 0;
->> +	}
->
-> I keep looking at this code, trying to find where we "use _CBA", but I
-> can't find it.  Oh, I see, acpi_pci_root_add() calls
-> acpi_pci_root_get_mcfg_addr() (which evaluates _CBA), and sets
-> root->mcfg_addr to the result.
->
-> "root->mcfg_addr" is sort of an unfortunate name because "MCFG" is the
-> ACPI table name, we've used "ECAM" for the memory-mapped config space,
-> and this address can come from either the MCFG table or the _CBA
-> method.
->
-> In the case where we have both _CBA and an MCFG entry, I think we
-> should prefer _CBA, and I'm not sure it's even worth warning about it.
-> So I think you could simplify this function if you made
-> pci_acpi_setup_ecam_mapping() look like this:
->
->    ... pci_acpi_setup_ecam_mapping(...)
->    {
->      ...
->      if (!root->mcfg_addr)
->        root->mcfg_addr = pci_mcfg_lookup(root);
->
->      if (!root->mcfg_addr) {
->        dev_err(..., "no ECAM region found\n");
->        return -EINVAL;
->      }
+Do you mean just call these two functions in ISR?
+My major concern is dma_free_coherent() and kfree() in
+cmdq_task_release(task).
+Therefore, your suggestion is to use GFP_ATOMIC for both
+dma_alloc_coherent() and kzalloc(). Right?
+If so, I can try to implement timeout by timer, and discuss with you
+if I have further questions.
 
-OK
-
->
->> +
->> +	/* found matching entry, bus range check */
->> +	if (entry->end_bus_number != bus_res->end) {
->> +		resource_size_t bus_end = min_t(resource_size_t,
->> +					entry->end_bus_number, bus_res->end);
->> +		pr_warn("%04x:%pR bus end mismatch, using %02lx\n",
->> +			root->segment, bus_res, (unsigned long)bus_end);
->> +		bus_res->end = bus_end;
->> +	}
-
-What about bus end mismatch case? Should we trim the host bridge bus 
-range or expect MCFG entry covers that range? Sometimes we get _BBN-0xFF 
-bus range, not from _CRS.
-
->> +
->> +	if (!root->mcfg_addr)
->> +		root->mcfg_addr = entry->address;
->
-> Please move the assignment to the caller (I think Lorenzo pointed this
-> out already).
->
->> +	return 0;
->> +}
->> +
->> +static __init int pci_mcfg_parse(struct acpi_table_header *header)
->> +{
->> +	if (header->length < sizeof(struct acpi_table_mcfg))
->> +		return -EINVAL;
->> +
->> +	mcfg_entries = (header->length - sizeof(struct acpi_table_mcfg)) /
->> +					sizeof(struct acpi_mcfg_allocation);
->> +	if (mcfg_entries == 0) {
->> +		pr_err("MCFG has no entries\n");
->
-> Include an address here?  I'm not really sure either of the messages
-> here is necessary.  Users (callers of pci_mcfg_lookup()) will notice
-> if we can't find any ECAM space and will probably complain there,
-> where the message can include more information, e.g., the affected
-> device.
-
-I would keep message about how many entries we found here. It would be 
-valuable information IMO.
-
->
->> +		return -EINVAL;
->> +	}
->> +
->> +	mcfg_table = (struct acpi_table_mcfg *)header;
->> +	pr_info("MCFG table detected, %d entries\n", mcfg_entries);
->> +	return 0;
->> +}
->> +
->> +/* Interface called by ACPI - parse and save MCFG table */
->
-> I think we save a *pointer* to the MCFG table, not the table itself.
-
-Right, the comment is broken.
-
->
-> And acpi_table_parse() calls early_acpi_os_unmap_memory() immediately
-> after it calls pci_mcfg_parse(), so I'm doubtful that the pointer
-> remains valid.
-
-At this stage early_acpi_os_unmap_memory() is doing nothing since 
-acpi_early_init() set acpi_gbl_permanent_mmap to 1 way before. The 
-pointer is fine then.
+> Regrading the clock, wouldn't it be easier to handle the clock 
+> enable/disable depending on the state of task_busy_list? I suppose we 
+> can't as we would need to check the task_busy_list of all threads, right?
+> 
+> Regards,
+> Matthias
 
 Thanks,
-Tomasz
+HS
