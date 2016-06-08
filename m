@@ -1,256 +1,222 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 7 Jun 2016 21:14:21 -0500
-Subject: [PATCH V8 9/9] pci, acpi: ARM64 support for ACPI based generic
- PCI host controller
-In-Reply-To: <1464621262-26770-10-git-send-email-tn@semihalf.com>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <1464621262-26770-10-git-send-email-tn@semihalf.com>
-Message-ID: <20160608021421.GF4759@localhost>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 8 Jun 2016 10:16:36 +0800
+Subject: [PATCH v4 11/14] arm64/numa: support HAVE_MEMORYLESS_NODES
+In-Reply-To: <CAFpQJXUe_eBBR5dBXOGXMCKmbd3n3TUYzFpDNewjVom-iu+3yg@mail.gmail.com>
+References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+ <1465286898-13828-12-git-send-email-thunder.leizhen@huawei.com>
+ <CAFpQJXVaYT5N3GUCFDnUL8OYOuuSSV4QfC8cXL2ecB=1TN57jQ@mail.gmail.com>
+ <5756C4C6.7060706@huawei.com>
+ <CAFpQJXUe_eBBR5dBXOGXMCKmbd3n3TUYzFpDNewjVom-iu+3yg@mail.gmail.com>
+Message-ID: <57578004.4050203@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2016 at 05:14:22PM +0200, Tomasz Nowicki wrote:
-> This patch implements pci_acpi_scan_root call so that ARM64 can start
-> using ACPI to setup and enumerate PCI buses.
+
+
+On 2016/6/7 22:01, Ganapatrao Kulkarni wrote:
+> On Tue, Jun 7, 2016 at 6:27 PM, Leizhen (ThunderTown)
+> <thunder.leizhen@huawei.com> wrote:
+>>
+>>
+>> On 2016/6/7 16:31, Ganapatrao Kulkarni wrote:
+>>> On Tue, Jun 7, 2016 at 1:38 PM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
+>>>> Some numa nodes may have no memory. For example:
+>>>> 1. cpu0 on node0
+>>>> 2. cpu1 on node1
+>>>> 3. device0 access the momory from node0 and node1 take the same time.
+>>>
+>>> i am wondering, if access to both nodes is same, then why you need numa.
+>>> the example you are quoting is against the basic principle of "numa"
+>>> what is device0 here? cpu?
+>> The device0 can also be a cpu. I drew a simple diagram:
+>>
+>>   cpu0     cpu1        cpu2/device0
+>>     |        |              |
+>>     |        |              |
+>>    DDR0     DDR1    No DIMM slots or no DIMM plugged
+>>  (node0)  (node1)         (node2)
+>>
 > 
-> The implementation of pci_acpi_scan_root() looks up config space regions
-> through MCFG interface. Then ECAM library is doing a new mapping
-> and attach generic ECAM ops which are used for accessing config space.
+> thanks for the clarification. your example is for 3 node system, where
+> third node is memory less node.
+> do you see any issue in supporting this topology with existing code?
+If opened HAVE_MEMORYLESS_NODES, it will pick the nearest node for the cpus on
+memoryless node.
+
+For example, in include/linux/topology.h
+#ifdef CONFIG_HAVE_MEMORYLESS_NODES
+...
+static inline int cpu_to_mem(int cpu)
+{
+	return per_cpu(_numa_mem_, cpu);
+}
+...
+#else
+...
+static inline int cpu_to_mem(int cpu)
+{
+	return cpu_to_node(cpu);
+}
+...
+#endif
+
+> I think, this use case should be supported with present code.
 > 
-> On ARM64, ACPI and DT can be enabled together, and in that case
-> we need to use generic domains. In order to do that we implement
-> ARM64 specific way of retrieving domain number from pci_config_window
-> structure.
+>>>>
+>>>> So, we can not simply classify device0 to node0 or node1, but we can
+>>>> define a node2 which distances to node0 and node1 are the same.
+>>>>
+>>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
+>>>> ---
+>>>>  arch/arm64/Kconfig      |  4 ++++
+>>>>  arch/arm64/kernel/smp.c |  1 +
+>>>>  arch/arm64/mm/numa.c    | 43 +++++++++++++++++++++++++++++++++++++++++--
+>>>>  3 files changed, 46 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>> index 05c1bf1..5904a62 100644
+>>>> --- a/arch/arm64/Kconfig
+>>>> +++ b/arch/arm64/Kconfig
+>>>> @@ -581,6 +581,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
+>>>>         def_bool y
+>>>>         depends on NUMA
+>>>>
+>>>> +config HAVE_MEMORYLESS_NODES
+>>>> +       def_bool y
+>>>> +       depends on NUMA
+>>>> +
+>>>>  source kernel/Kconfig.preempt
+>>>>  source kernel/Kconfig.hz
+>>>>
+>>>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+>>>> index d099306..9e15297 100644
+>>>> --- a/arch/arm64/kernel/smp.c
+>>>> +++ b/arch/arm64/kernel/smp.c
+>>>> @@ -620,6 +620,7 @@ static void __init of_parse_and_init_cpus(void)
+>>>>                         }
+>>>>
+>>>>                         bootcpu_valid = true;
+>>>> +                       early_map_cpu_to_node(0, of_node_to_nid(dn));
+>>>>
+>>>>                         /*
+>>>>                          * cpu_logical_map has already been
+>>>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
+>>>> index df5c842..d73b0a0 100644
+>>>> --- a/arch/arm64/mm/numa.c
+>>>> +++ b/arch/arm64/mm/numa.c
+>>>> @@ -128,6 +128,14 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
+>>>>                 nid = 0;
+>>>>
+>>>>         cpu_to_node_map[cpu] = nid;
+>>>> +
+>>>> +       /*
+>>>> +        * We should set the numa node of cpu0 as soon as possible, because it
+>>>> +        * has already been set up online before. cpu_to_node(0) will soon be
+>>>> +        * called.
+>>>> +        */
+>>>> +       if (!cpu)
+>>>> +               set_cpu_numa_node(cpu, nid);
+>>>>  }
+>>>>
+>>>>  #ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
+>>>> @@ -215,6 +223,35 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
+>>>>         return ret;
+>>>>  }
+>>>>
+>>>> +static u64 __init alloc_node_data_from_nearest_node(int nid, const size_t size)
+>>>> +{
+>>>> +       int i, best_nid, distance;
+>>>> +       u64 pa;
+>>>> +       DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
+>>>> +
+>>>> +       bitmap_zero(nodes_map, MAX_NUMNODES);
+>>>> +       bitmap_set(nodes_map, nid, 1);
+>>>> +
+>>>> +find_nearest_node:
+>>>> +       best_nid = NUMA_NO_NODE;
+>>>> +       distance = INT_MAX;
+>>>> +
+>>>> +       for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
+>>>> +               if (numa_distance[nid][i] < distance) {
+>>>> +                       best_nid = i;
+>>>> +                       distance = numa_distance[nid][i];
+>>>> +               }
+>>>> +
+>>>> +       pa = memblock_alloc_nid(size, SMP_CACHE_BYTES, best_nid);
+>>>> +       if (!pa) {
+>>>> +               BUG_ON(best_nid == NUMA_NO_NODE);
+>>>> +               bitmap_set(nodes_map, best_nid, 1);
+>>>> +               goto find_nearest_node;
+>>>> +       }
+>>>> +
+>>>> +       return pa;
+>>>> +}
+>>>> +
 > 
-> Since we enable PCI for ACPI we need to implement raw_pci_{read|write}
-> at the same time. ARM64 provides RAW accessors as long as there is
-> correlated valid pci_bus structure, but not before.
+> why do we need this function in arch specific code.
+I also considered put these code(include HAVE_SETUP_PER_CPU_AREA) into drivers/of/of_numa.c,
+but if I do that, it will make acpi numa dependent on of numa.
 
-I think this is important and needs to be spelled out a little more
-explicitly using the terms from the ACPI spec so it will make sense to
-people like BIOS writers who might be bitten by this.
+> dont you think common code will take care of this? when you define
+> HAVE_MEMORYLESS_NODES
 
-"raw_pci_read()" is a Linux term that won't mean anything to them.
-But they might expect that AML can access PCI config space before the
-Linux driver claims the host bridge, and I think you're saying that
-will not work.
+I have searched CONFIG_HAVE_MEMORYLESS_NODES in *.c, but did not find the relevant content.
+So maybe other ARCHs also missed this.
 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-> ---
->  arch/arm64/Kconfig      |   2 +
->  arch/arm64/kernel/pci.c | 120 ++++++++++++++++++++++++++++++++++++++++++++++--
->  include/linux/pci.h     |   5 ++
->  3 files changed, 122 insertions(+), 5 deletions(-)
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 76747d9..87c48ad 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -3,6 +3,7 @@ config ARM64
->  	select ACPI_CCA_REQUIRED if ACPI
->  	select ACPI_GENERIC_GSI if ACPI
->  	select ACPI_REDUCED_HARDWARE_ONLY if ACPI
-> +	select ACPI_MCFG if ACPI
->  	select ARCH_HAS_DEVMEM_IS_ALLOWED
->  	select ARCH_HAS_ATOMIC64_DEC_IF_POSITIVE
->  	select ARCH_HAS_ELF_RANDOMIZE
-> @@ -96,6 +97,7 @@ config ARM64
->  	select OF_EARLY_FLATTREE
->  	select OF_NUMA if NUMA && OF
->  	select OF_RESERVED_MEM
-> +	select PCI_ECAM if ACPI
->  	select PERF_USE_VMALLOC
->  	select POWER_RESET
->  	select POWER_SUPPLY
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index 3663be1..39f2a40 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -17,7 +17,9 @@
->  #include <linux/mm.h>
->  #include <linux/of_pci.h>
->  #include <linux/of_platform.h>
-> +#include <linux/pci.h>
->  #include <linux/pci-acpi.h>
-> +#include <linux/pci-ecam.h>
->  #include <linux/slab.h>
->  
->  /*
-> @@ -71,13 +73,21 @@ int pcibios_alloc_irq(struct pci_dev *dev)
->  int raw_pci_read(unsigned int domain, unsigned int bus,
->  		  unsigned int devfn, int reg, int len, u32 *val)
->  {
-> -	return -ENXIO;
-> +	struct pci_bus *b = pci_find_bus(domain, bus);
-> +
-> +	if (!b)
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
-> +	return b->ops->read(b, devfn, reg, len, val);
->  }
->  
->  int raw_pci_write(unsigned int domain, unsigned int bus,
->  		unsigned int devfn, int reg, int len, u32 val)
->  {
-> -	return -ENXIO;
-> +	struct pci_bus *b = pci_find_bus(domain, bus);
-> +
-> +	if (!b)
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
-> +	return b->ops->write(b, devfn, reg, len, val);
->  }
+>>>>  /**
+>>>>   * Initialize NODE_DATA for a node on the local memory
+>>>>   */
+>>>> @@ -228,7 +265,9 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+>>>>         pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
+>>>>                 nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
+>>>>
+>>>> -       nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
+> 
+> this function try to allocate from a nid, if fails, it allocates from
+> node 0(local node).
+> this is ok for memory less node i guess.
+Yes, the function is OK, but the performance is not.
 
-I think these functions could be under #ifdef ACPI, couldn't they?
-I see x86 and ia64 don't do that, and they do call them from non-ACPI
-places.  So maybe there'd be no point in doing it differently here.
+Suppose there are 3 nodes:
+1. cpu0 on node0, cpu1 on node1, cpu2 on node2.
+2. cpu2 access the memory on node1 take 1us, but access the memory on node1 take 5us.
+   That is, distance[2,1] is shorter than distance[2,0].
+3. And node2 is a memoryless node.
 
-You could split this out into a separate patch, though, which would be
-a nice way to highlight the issue of AML access before pci_root.c
-claims the bridge.
+So if NODE_DATA(2) allocated from node0, it will take more time than allocted from node1 at run time.
+Because NODE_DATA will be accessed at run time.
 
->  #ifdef CONFIG_NUMA
-> @@ -91,11 +101,111 @@ EXPORT_SYMBOL(pcibus_to_node);
->  #endif
->  
->  #ifdef CONFIG_ACPI
-> -/* Root bridge scanning */
-> +
-> +struct acpi_pci_generic_root_info {
-> +	struct acpi_pci_root_info	common;
-> +	struct pci_config_window	*cfg;	/* config space mapping */
-> +};
-> +
-> +int acpi_pci_bus_domain_nr(struct pci_bus *bus)
-> +{
-> +	struct pci_config_window *cfg = bus->sysdata;
-> +	struct acpi_device *adev = to_acpi_device(cfg->parent);
-> +	struct acpi_pci_root *root = acpi_driver_data(adev);
-> +
-> +	return root->segment;
-> +}
-> +
-> +int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-> +{
-> +	if (!acpi_disabled) {
-> +		struct pci_config_window *cfg = bridge->bus->sysdata;
-> +		struct acpi_device *adev = to_acpi_device(cfg->parent);
-> +		ACPI_COMPANION_SET(&bridge->dev, adev);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Lookup the bus range for the domain in MCFG, and set up config space
-> + * mapping.
-> + */
-> +static int pci_acpi_setup_ecam_mapping(struct acpi_pci_root *root,
-> +				       struct acpi_pci_generic_root_info *ri)
-
-Maybe return the "struct pci_config_window *" and do the assignment in
-the caller?  Then I don't think you'd have to pass in "ri".
-
-> +{
-> +	struct resource *bus_res = &root->secondary;
-> +	u16 seg = root->segment;
-> +	struct pci_config_window *cfg;
-> +	struct resource cfgres;
-> +	unsigned int bsz;
-> +	int err;
-> +
-> +	err = pci_mcfg_lookup(root);
-> +	if (err) {
-> +		pr_err("%04x:%pR MCFG region not found\n", seg, bus_res);
-
-dev_err()
-
-> +		return err;
-> +	}
-> +
-> +	bsz = 1 << pci_generic_ecam_ops.bus_shift;
-> +	cfgres.start = root->mcfg_addr + bus_res->start * bsz;
-> +	cfgres.end = cfgres.start + resource_size(bus_res) * bsz - 1;
-> +	cfgres.flags = IORESOURCE_MEM;
-> +	cfg = pci_ecam_create(&root->device->dev, &cfgres, bus_res,
-> +			      &pci_generic_ecam_ops);
-> +	if (IS_ERR(cfg)) {
-> +		pr_err("%04x:%pR error %ld mapping CAM\n", seg, bus_res,
-> +		       PTR_ERR(cfg));
-
-dev_err()
-
-> +		return PTR_ERR(cfg);
-> +	}
-> +
-> +	ri->cfg = cfg;
-> +	return 0;
-> +}
-> +
-> +/* release_info: free resrouces allocated by init_info */
-> +static void pci_acpi_generic_release_info(struct acpi_pci_root_info *ci)
-> +{
-> +	struct acpi_pci_generic_root_info *ri;
-> +
-> +	ri = container_of(ci, struct acpi_pci_generic_root_info, common);
-> +	pci_ecam_free(ri->cfg);
-> +	kfree(ri);
-> +}
-> +
-> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
-> +	.release_info = pci_acpi_generic_release_info,
-> +};
-> +
-> +/* Interface called from ACPI code to setup PCI host controller */
->  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  {
-> -	/* TODO: Should be revisited when implementing PCI on ACPI */
-> -	return NULL;
-> +	int node = acpi_get_node(root->device->handle);
-> +	struct acpi_pci_generic_root_info *ri;
-> +	struct pci_bus *bus, *child;
-> +	int err;
-> +
-> +	ri = kzalloc_node(sizeof(*ri), GFP_KERNEL, node);
-> +	if (!ri)
-> +		return NULL;
-> +
-> +	err = pci_acpi_setup_ecam_mapping(root, ri);
-> +	if (err)
-> +		return NULL;
-> +
-> +	acpi_pci_root_ops.pci_ops = &ri->cfg->ops->pci_ops;
-> +	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, &ri->common,
-> +				   ri->cfg);
-> +	if (!bus)
-> +		return NULL;
-> +
-> +	pci_bus_size_bridges(bus);
-> +	pci_bus_assign_resources(bus);
-> +
-> +	list_for_each_entry(child, &bus->children, node)
-> +		pcie_bus_configure_settings(child);
-> +
-> +	return bus;
->  }
->  
->  void pcibios_add_bus(struct pci_bus *bus)
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 9661c85..f66d188 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1390,7 +1390,12 @@ static inline int pci_domain_nr(struct pci_bus *bus)
->  {
->  	return bus->domain_nr;
->  }
-> +/* Arch specific ACPI hook to set-up domain number */
-> +#ifdef CONFIG_ACPI
-> +int acpi_pci_bus_domain_nr(struct pci_bus *bus);
-> +#else
->  static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus) { return -1; }
-> +#endif
->  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
->  #else
->  static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
-> -- 
-> 1.9.1
+> 
+>>>> +       nd_pa = memblock_alloc_nid(nd_size, SMP_CACHE_BYTES, nid);
+>>>> +       if (!nd_pa)
+>>>> +               nd_pa = alloc_node_data_from_nearest_node(nid, nd_size);
+>>>>         nd = __va(nd_pa);
+>>>>
+>>>>         /* report and initialize */
+>>>> @@ -238,7 +277,7 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
+>>>>         if (tnid != nid)
+>>>>                 pr_info("    NODE_DATA(%d) on node %d\n", nid, tnid);
+>>>>
+>>>> -       node_data[nid] = nd;
+>>>> +       NODE_DATA(nid) = nd;
+>>>>         memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
+>>>>         NODE_DATA(nid)->node_id = nid;
+>>>>         NODE_DATA(nid)->node_start_pfn = start_pfn;
+>>>> --
+>>>> 2.5.0
+>>>>
+>>>>
+>>> Ganapat
+>>>>
+>>>> _______________________________________________
+>>>> linux-arm-kernel mailing list
+>>>> linux-arm-kernel at lists.infradead.org
+>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>>> .
+>>>
+>>
+> 
+> .
 > 
