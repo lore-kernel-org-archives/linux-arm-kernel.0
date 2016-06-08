@@ -1,39 +1,38 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  8 Jun 2016 18:41:58 +0200
-Subject: [PATCH 7/8] ARM: dts: at91: pm9g45: remove leftovers clock definition
-In-Reply-To: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465404119-28177-7-git-send-email-alexandre.belloni@free-electrons.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed,  8 Jun 2016 18:16:10 +0100
+Subject: [PATCH] ARM: versatile: fix missing <plat/platsmp.h> include
+Message-ID: <1465406170-24420-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks group properties and the clock at 0 node have been obsolete for two
-years, remove them.
+Fix two missing function declarations by including the
+<plat/platsmp.h> file where they are defined. Fixes:
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+arch/arm/plat-versatile/platsmp.c:35:6: warning: symbol 'versatile_secondary_init' was not declared. Should it be static?
+arch/arm/plat-versatile/platsmp.c:50:5: warning: symbol 'versatile_boot_secondary' was not declared. Should it be static?
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/boot/dts/pm9g45.dts | 9 ---------
- 1 file changed, 9 deletions(-)
+Cc: Liviu Dudau <liviu.dudau@arm.com>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/plat-versatile/platsmp.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/pm9g45.dts b/arch/arm/boot/dts/pm9g45.dts
-index 66afcff67fde..0abd7bf17568 100644
---- a/arch/arm/boot/dts/pm9g45.dts
-+++ b/arch/arm/boot/dts/pm9g45.dts
-@@ -21,15 +21,6 @@
- 	};
+diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
+index 53feb90..c236651 100644
+--- a/arch/arm/plat-versatile/platsmp.c
++++ b/arch/arm/plat-versatile/platsmp.c
+@@ -18,6 +18,8 @@
+ #include <asm/cacheflush.h>
+ #include <asm/smp_plat.h>
  
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--
- 		slow_xtal {
- 		      clock-frequency = <32768>;
- 		};
++#include <plat/platsmp.h>
++
+ /*
+  * Write pen_release in a way that is guaranteed to be visible to all
+  * observers, irrespective of whether they're taking part in coherency
 -- 
 2.8.1
