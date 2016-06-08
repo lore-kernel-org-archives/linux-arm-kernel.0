@@ -1,69 +1,56 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 09 Jun 2016 00:36:31 +0300
-Subject: [PATCH v3 12/12] ARM: dts: blanche: add Ethernet support
-In-Reply-To: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
-References: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
-Message-ID: <1684757.OTRo8llZyo@wasted.cogentembedded.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed, 08 Jun 2016 14:47:49 -0700
+Subject: [PATCH v2 2/5] mfd: add Ricoh RN5T567 PMIC support
+In-Reply-To: <20160608202257.GA22463@rob-hp-laptop>
+References: <20160608010429.19618-1-stefan@agner.ch>
+ <20160608010429.19618-3-stefan@agner.ch>
+ <20160608202257.GA22463@rob-hp-laptop>
+Message-ID: <b4713d7dadd2572eb66ad6b836a72e82@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R8A7792  SoC  doesn't have the EtherMAC core, so SMSC  LAN89218  Ethernet
-chip was used instead on the Blanche board; this chip  is compatible with
-SMSC LAN9115  for  which there's a (device tree aware) driver. Describe
-the  chip in  the  Blanche device tree;  enable DHCP and NFS root in the
-kernel command line for the kernel booting.
+On 2016-06-08 13:22, Rob Herring wrote:
+> On Tue, Jun 07, 2016 at 06:04:26PM -0700, Stefan Agner wrote:
+>> The Ricoh RN5T567 is from the same family as the Ricoh RN5T618 is,
+>> the differences are:
+>>
+>> + DCDC4
+>> + Slightly different output voltage/currents
+>> + 32kHz Output
+>> - ADC/Charger capabilities
+>>
+>> Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+>> Signed-off-by: Stefan Agner <stefan@agner.ch>
+>> ---
+>>  Documentation/devicetree/bindings/mfd/rn5t618.txt | 19 ++++++++++-------
+>>  drivers/mfd/Kconfig                               |  7 +++---
+>>  drivers/mfd/rn5t618.c                             | 26 +++++++++++++++++------
+>>  include/linux/mfd/rn5t618.h                       | 12 +++++++++++
+>>  4 files changed, 46 insertions(+), 18 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/mfd/rn5t618.txt b/Documentation/devicetree/bindings/mfd/rn5t618.txt
+>> index 937785a..5b493ed 100644
+>> --- a/Documentation/devicetree/bindings/mfd/rn5t618.txt
+>> +++ b/Documentation/devicetree/bindings/mfd/rn5t618.txt
+>> @@ -1,18 +1,21 @@
+>> -* Ricoh RN5T618 PMIC
+>> +* Ricoh RN5T567/RN5T618 PMIC
+>>
+>> -Ricoh RN5T618 is a power management IC which integrates 3 step-down
+>> -DCDC converters, 7 low-dropout regulators, a Li-ion battery charger,
+>> -fuel gauge, ADC, GPIOs and a watchdog timer. It can be controlled
+>> -through a I2C interface.
+>> +Ricoh RN5T567/RN5T618 is a power management IC family which integrates
+>> +3 to 5 step-down DCDC converters, 7 low-dropout regulators, GPIOs and
+> 
+> I count 4?
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+There is actually a third PMIC in this family RC5T619 which has 5, that
+is where the number comes from. But that PMIC also has 12 LDO's so the
+numbers are a bit a mix and much right now...
 
----
-Changes in version 3:
-- refreshed the patch.
+If I have to amend something anyway, I will fix that. Otherwise I look
+at it as a preparation for the one which adds RC5T619 support :-)
 
-Changes in version 2:
-- added Simon's ACK.
-
- arch/arm/boot/dts/r8a7792-blanche.dts |   23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -22,7 +22,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -30,6 +30,27 @@
- 		device_type = "memory";
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
-+
-+	d3_3v: regulator-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	ethernet at 18000000 {
-+		compatible = "smsc,lan89218", "smsc,lan9115";
-+		reg = <0 0x18000000 0 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+		smsc,irq-push-pull;
-+		reg-io-width = <4>;
-+		vddvario-supply = <&d3_3v>;
-+		vdd33a-supply = <&d3_3v>;
-+	};
- };
- 
- &extal_clk {
+--
+Stefan
