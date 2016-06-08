@@ -1,76 +1,49 @@
 From: matthew@mattleach.net (Matthew Leach)
-Date: Wed,  8 Jun 2016 19:30:57 +0100
-Subject: [RFC PATCH 02/15] clocksource: samsung_pwm_timer: fix endian accessors
+Date: Wed,  8 Jun 2016 19:30:58 +0100
+Subject: [RFC PATCH 03/15] clk: samsung: exynos4: fixup reg access on be
 In-Reply-To: <20160608183110.13851-1-matthew@mattleach.net>
 References: <20160608183110.13851-1-matthew@mattleach.net>
-Message-ID: <20160608183110.13851-3-matthew@mattleach.net>
+Message-ID: <20160608183110.13851-4-matthew@mattleach.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the Samsung pwm timer access code to deal with kernels built for big
-endian operation.
+Use the byte-order aware big endian accessors, allowing for kernels
+running under big-endian.
 
 Signed-off-by: Matthew Leach <matthew@mattleach.net>
 ---
-CC: Daniel Lezcano <daniel.lezcano@linaro.org>
-CC: Thomas Gleixner <tglx@linutronix.de>
+CC: Sylwester Nawrocki <s.nawrocki@samsung.com>
+CC: Tomasz Figa <tomasz.figa@gmail.com>
+CC: Michael Turquette <mturquette@baylibre.com>
+CC: Stephen Boyd <sboyd@codeaurora.org>
+CC: Kukjin Kim <kgene@kernel.org>
+CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+CC: linux-samsung-soc at vger.kernel.org
+CC: linux-clk at vger.kernel.org
+CC: linux-arm-kernel at lists.infradead.org
 CC: linux-kernel at vger.kernel.org
 ---
- drivers/clocksource/samsung_pwm_timer.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/clk/samsung/clk-exynos4.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
-index 9502bc4..47e0515 100644
---- a/drivers/clocksource/samsung_pwm_timer.c
-+++ b/drivers/clocksource/samsung_pwm_timer.c
-@@ -130,9 +130,9 @@ static void samsung_time_stop(unsigned int channel)
+diff --git a/drivers/clk/samsung/clk-exynos4.c b/drivers/clk/samsung/clk-exynos4.c
+index 7b3d0f9..35a977d 100644
+--- a/drivers/clk/samsung/clk-exynos4.c
++++ b/drivers/clk/samsung/clk-exynos4.c
+@@ -1375,12 +1375,12 @@ static void __init exynos4x12_core_down_clock(void)
+ 	if (num_possible_cpus() == 4)
+ 		tmp |= PWR_CTRL1_USE_CORE3_WFE | PWR_CTRL1_USE_CORE2_WFE |
+ 		       PWR_CTRL1_USE_CORE3_WFI | PWR_CTRL1_USE_CORE2_WFI;
+-	__raw_writel(tmp, reg_base + PWR_CTRL1);
++	writel_relaxed(tmp, reg_base + PWR_CTRL1);
  
- 	spin_lock_irqsave(&samsung_pwm_lock, flags);
- 
--	tcon = __raw_readl(pwm.base + REG_TCON);
-+	tcon = readl_relaxed(pwm.base + REG_TCON);
- 	tcon &= ~TCON_START(channel);
--	__raw_writel(tcon, pwm.base + REG_TCON);
-+	writel_relaxed(tcon, pwm.base + REG_TCON);
- 
- 	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
+ 	/*
+ 	 * Disable the clock up feature in case it was enabled by bootloader.
+ 	 */
+-	__raw_writel(0x0, reg_base + E4X12_PWR_CTRL2);
++	writel_relaxed(0x0, reg_base + E4X12_PWR_CTRL2);
  }
-@@ -148,14 +148,14 @@ static void samsung_time_setup(unsigned int channel, unsigned long tcnt)
  
- 	spin_lock_irqsave(&samsung_pwm_lock, flags);
- 
--	tcon = __raw_readl(pwm.base + REG_TCON);
-+	tcon = readl_relaxed(pwm.base + REG_TCON);
- 
- 	tcon &= ~(TCON_START(tcon_chan) | TCON_AUTORELOAD(tcon_chan));
- 	tcon |= TCON_MANUALUPDATE(tcon_chan);
- 
--	__raw_writel(tcnt, pwm.base + REG_TCNTB(channel));
--	__raw_writel(tcnt, pwm.base + REG_TCMPB(channel));
--	__raw_writel(tcon, pwm.base + REG_TCON);
-+	writel_relaxed(tcnt, pwm.base + REG_TCNTB(channel));
-+	writel_relaxed(tcnt, pwm.base + REG_TCMPB(channel));
-+	writel_relaxed(tcon, pwm.base + REG_TCON);
- 
- 	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
- }
-@@ -170,7 +170,7 @@ static void samsung_time_start(unsigned int channel, bool periodic)
- 
- 	spin_lock_irqsave(&samsung_pwm_lock, flags);
- 
--	tcon = __raw_readl(pwm.base + REG_TCON);
-+	tcon = readl_relaxed(pwm.base + REG_TCON);
- 
- 	tcon &= ~TCON_MANUALUPDATE(channel);
- 	tcon |= TCON_START(channel);
-@@ -180,7 +180,7 @@ static void samsung_time_start(unsigned int channel, bool periodic)
- 	else
- 		tcon &= ~TCON_AUTORELOAD(channel);
- 
--	__raw_writel(tcon, pwm.base + REG_TCON);
-+	writel_relaxed(tcon, pwm.base + REG_TCON);
- 
- 	spin_unlock_irqrestore(&samsung_pwm_lock, flags);
- }
+ #define E4210_CPU_DIV0(apll, pclk_dbg, atb, periph, corem1, corem0)	\
 -- 
 2.8.3
