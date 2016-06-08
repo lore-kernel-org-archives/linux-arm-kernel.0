@@ -1,79 +1,85 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Wed, 8 Jun 2016 13:43:17 +0530
-Subject: Support for unaligned watchpoints in arm/arm64
-In-Reply-To: <CAJt8pk88RCy4s=oZ=NpkZdXCRhERB1USVdXTc9OYE-vs9chkyQ@mail.gmail.com>
-References: <CAJt8pk8FBbTVMMM45SaEs86MZOp0o6xChAsMT1sO+_Xy-GENyw@mail.gmail.com>
- <20160531123827.GF24936@arm.com> <20160607065520.GD13643@dhcppc6>
- <20160607151722.GH13643@dhcppc6>
- <CAJt8pk88RCy4s=oZ=NpkZdXCRhERB1USVdXTc9OYE-vs9chkyQ@mail.gmail.com>
-Message-ID: <20160608081317.GA24802@dhcppc6>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 8 Jun 2016 10:18:10 +0200
+Subject: [PATCH] ARM: at91: debug: use DEBUG_UART_VIRT
+In-Reply-To: <5757C67E.3000301@atmel.com>
+References: <1465313079-6307-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <5756ECC5.6020908@atmel.com> <20160607162301.GL3363@piout.net>
+ <5757C67E.3000301@atmel.com>
+Message-ID: <5757D4C2.8030805@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On 07/06/2016:05:15:03 PM, Pavel Labath wrote:
-> On 7 June 2016 at 08:17, Pratyush Anand <panand@redhat.com> wrote:
-> > On 07/06/2016:12:25:20 PM, Pratyush Anand wrote:
-> >> On 31/05/2016:01:38:27 PM, Will Deacon wrote:
-> >> > On Thu, May 26, 2016 at 05:04:46PM +0100, Pavel Labath wrote:
-> >> > > Hello all,
-> >> >
-> >> > Hi Pavel,
-> >> >
-> >> > > I've been wondering if there are any plans about adding support for
-> >> > > unaligned watchpoints to the kernel. It seems quite a shame that
-> >> > > applications are not able not use them, even though the hardware
-> >> > > should support that feature.
-> >> >
-> >> > I'm actually coming round to the idea of ditching the perf hw_breakpoint
-> >> > mechanism entirely and simply writing a ptrace back-end that can expose
-> >> > the hardware features directly to userspace. The two issues with this
-> >> > are:
-> >> >
-> >> >   (1) It's a fair amount of work
-> >>
-> >> So, by the time this new interface would come, probably we can consider a fixup
-> >> like following to resolve this issue at hand. Probably, things should work by
-> >> just allowing hw_breakpoint.c to pass checks for unaligned offset when it is a
-> >> WATCHPOINT, no?
-> >
-> > Sorry, this is not going to work.
-> > There could be some BAS values where few consecutive LSBs are 0s.
-> >
+Le 08/06/2016 09:17, Nicolas Ferre a ?crit :
+> Le 07/06/2016 18:23, Alexandre Belloni a ?crit :
+>> On 07/06/2016 at 17:48:21 +0200, Nicolas Ferre wrote :
+>>> Le 07/06/2016 17:24, Alexandre Belloni a ?crit :
+>>>> AT91 still uses an offset (0x0100 0000) from the physical address to map
+>>>> the debug UART. This is unfortunate as for some platforms (sama5d3 and
+>>>> earlier), it ends up in the PCI zone and PCI is enabled in multi_v7.
+>>>> Switch to DEBUG_UART_VIRT to solve that.
+>>>>
+>>>> Tested on sama5d3 and 9g20.
+>>>>
+>>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>>>
+>>> People using their old defconfigs must pay attention to this change...
+>>> but it's true that it's a debug configuration anyway...
+>>>
+>>
+>> I really doubt people are letting DEBUG_LL enabled in a production
+>> kernel...
+>>
+>>>> diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
+>>>> index d4ae3b8e2426..0098401e5aeb 100644
+>>>> --- a/arch/arm/include/debug/at91.S
+>>>> +++ b/arch/arm/include/debug/at91.S
+>>>> @@ -9,14 +9,6 @@
+>>>>   *
+>>>>  */
+>>>>  
+>>>> -#ifdef CONFIG_MMU
+>>>> -#define AT91_IO_P2V(x) ((x) - 0x01000000)
+>>>> -#else
+>>>> -#define AT91_IO_P2V(x) (x)
+>>>> -#endif
+>>>> -
+>>>> -#define AT91_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
+>>>> -
+>>>>  #define AT91_DBGU_SR		(0x14)	/* Status Register */
+>>>>  #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
+>>>>  #define AT91_DBGU_TXRDY		(1 << 1)	/* Transmitter Ready */
+>>>> @@ -24,7 +16,7 @@
+>>>>  
+>>>>  	.macro	addruart, rp, rv, tmp
+>>>>  	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ System peripherals (phys address)
+>>>> -	ldr	\rv, =AT91_DEBUG_UART_VIRT		@ System peripherals (virt address)
+>>>> +	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ System peripherals (virt address)
+>>>
+>>> Shouldn't we protect the use of this defined value with some
+>>> #warning "Beware the value CONFIG_DEBUG_UART_VIRT haven't been defined:
+>>> is it intentional"
+>>> or even #error?
+>>>
+>>> or something like that?
+>>>
+>>
+>> Well, those that are using this feature are supposed to know what they
+>> are doing. There is now protection for CONFIG_DEBUG_UART_PHYS anyway.
 > 
-> Thank you for the replies.
-> 
-> I would definitely welcome a more immediate fix to this issue,
-> although I can appreciate the reluctance to add ugly fixups to make
-> this work.
-> 
-> Pratyush, building on your proposed fix, I think we could extend it to
-> make it work for watching values which are not word-aligned by
-> tweaking  perf_event_attr.bp_addr field. E.g. if the BAS value is
-> 00111100 then we can set bp_addr to "aligned_addr + 2" and bp_len to
+> So, I know that developers are sensible people and know what they're
+> doing but still... what about having a protection for both anyway...
+> instead of silently crashing at runtime?
 
-I think, DBGWVR will receive only aligned address.
+After discussion with you on IRC, it seems to be not so easy to do and
+can harm the multi_v7 early debug facilities.
 
-> 4. From an interface point of view I think this would be a nice
-> solution. ptrace userspace user would set these breakpoints just like
-> it would do when programming a real register, and the contents of the
-> struct perf_event_attr will make perfect sense: "we have set a
-> watchpoint at bp_addr with length bp_len". The only problem is that
-> the code for converting between the perf_event_attr and hardware
-> register representations will be quite ugly. Also, I don't know if
+So, for this patch:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Yes, will have to adjust programming of both DBGWVR and DBGWCR  if bp_addr is
-unaligned.
+It's true anyway that putting the proper values for these config options
+is not so easy (reading the help for CONFIG_DEBUG_AT91_UART)... And
+enhancing this situation if far beyond the scope of this patch.
 
-> this will cause a problem with any other users of perf_event_attr if
-> they expect bp_addr field to be word-aligned.
-> 
-> If you would be willing to consider such a patch, I can take a stab at
-> writing it. What do you think?
-
-I am not the right person to answer this. Will Deacon is.
-
-Thanks for your willingness to help on it :-)
-
-~Pratyush
+Thanks. Bye,
+-- 
+Nicolas Ferre
