@@ -1,231 +1,55 @@
-From: zhouchengming1@huawei.com (zhouchengming)
-Date: Wed, 8 Jun 2016 09:34:09 +0800
-Subject: [PATCH 17/23] arm64: ptrace: handle ptrace_request differently
- for aarch32 and ilp32
-In-Reply-To: <1464048292-30136-18-git-send-email-ynorov@caviumnetworks.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-18-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <57577611.9000607@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 8 Jun 2016 09:37:30 +0800
+Subject: [PATCH v2 01/15] dt-bindings: sunxi: Add CCU binding documentation
+In-Reply-To: <20160607204154.31967-2-maxime.ripard@free-electrons.com>
+References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+ <20160607204154.31967-2-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v661ERE7zi9uExMtiEgG68owxT6x4jX3nCsVH8BwohJ53A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2016/5/24 8:04, Yury Norov wrote:
-> Here new aarch32 ptrace syscall handler is introsuced to avoid run-time
-> detection of the task type.
+On Wed, Jun 8, 2016 at 4:41 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Introduce a new binding with its documentation for the brand new clock
+> sub-framework.
 >
-> Signed-off-by: Yury Norov<ynorov@caviumnetworks.com>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->   arch/arm64/include/asm/unistd32.h |  2 +-
->   arch/arm64/kernel/ptrace.c        | 50 ++++++++++++++++++++++++++++++++++++++-
->   arch/arm64/kernel/sys32.c         |  1 +
->   include/linux/ptrace.h            |  6 +++++
->   kernel/ptrace.c                   | 10 ++++----
->   5 files changed, 62 insertions(+), 7 deletions(-)
+>  Documentation/devicetree/bindings/clock/sunxi-ccu.txt | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/sunxi-ccu.txt
 >
-> diff --git a/arch/arm64/include/asm/unistd32.h b/arch/arm64/include/asm/unistd32.h
-> index 5b925b7..f57bbe3 100644
-> --- a/arch/arm64/include/asm/unistd32.h
-> +++ b/arch/arm64/include/asm/unistd32.h
-> @@ -74,7 +74,7 @@ __SYSCALL(__NR_getuid, sys_getuid16)
->   			/* 25 was sys_stime */
->   __SYSCALL(25, sys_ni_syscall)
->   #define __NR_ptrace 26
-> -__SYSCALL(__NR_ptrace, compat_sys_ptrace)
-> +__SYSCALL(__NR_ptrace, compat_sys_aarch32_ptrace)
->   			/* 27 was sys_alarm */
->   __SYSCALL(27, sys_ni_syscall)
->   			/* 28 was sys_fstat */
-> diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-> index 38a09338..a861105 100644
-> --- a/arch/arm64/kernel/ptrace.c
-> +++ b/arch/arm64/kernel/ptrace.c
-> @@ -29,6 +29,7 @@
->   #include<linux/user.h>
->   #include<linux/seccomp.h>
->   #include<linux/security.h>
-> +#include<linux/syscalls.h>
->   #include<linux/init.h>
->   #include<linux/signal.h>
->   #include<linux/uaccess.h>
-> @@ -1114,7 +1115,7 @@ static int compat_ptrace_sethbpregs(struct task_struct *tsk, compat_long_t num,
->   }
->   #endif	/* CONFIG_HAVE_HW_BREAKPOINT */
->
-> -long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-> +static long compat_a32_ptrace(struct task_struct *child, compat_long_t request,
->   			compat_ulong_t caddr, compat_ulong_t cdata)
->   {
->   	unsigned long addr = caddr;
-> @@ -1191,8 +1192,55 @@ long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
->
->   	return ret;
->   }
+> diff --git a/Documentation/devicetree/bindings/clock/sunxi-ccu.txt b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> new file mode 100644
+> index 000000000000..2c66046a1342
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/sunxi-ccu.txt
+> @@ -0,0 +1,17 @@
+> +Allwinner Clock Control Unit Binding
+> +------------------------------------
 > +
-> +COMPAT_SYSCALL_DEFINE4(aarch32_ptrace, compat_long_t, request, compat_long_t, pid,
-> +		       compat_long_t, addr, compat_long_t, data)
-> +{
-> +	struct task_struct *child;
-> +	long ret;
+> +Required properties :
+> +- compatible: must contain one of the following compatible:
+> +               - "allwinner,sun8i-h3-ccu"
 > +
-> +	if (request == PTRACE_TRACEME) {
-> +		ret = ptrace_traceme();
-> +		goto out;
-> +	}
-> +
-> +	child = ptrace_get_task_struct(pid);
-> +	if (IS_ERR(child)) {
-> +		ret = PTR_ERR(child);
-> +		goto out;
-> +	}
-> +
-> +	if (request == PTRACE_ATTACH || request == PTRACE_SEIZE) {
-> +		ret = ptrace_attach(child, request, addr, data);
-> +		goto out_put_task_struct;
-> +	}
-> +
-> +	ret = ptrace_check_attach(child, request == PTRACE_KILL ||
-> +				  request == PTRACE_INTERRUPT);
-> +	if (!ret) {
-> +		ret = compat_a32_ptrace(child, request, addr, data);
-> +		if (ret || request != PTRACE_DETACH)
-> +			ptrace_unfreeze_traced(child);
-> +	}
-> +
-> + out_put_task_struct:
-> +	put_task_struct(child);
-> + out:
-> +	return ret;
-> +}
-> +
->   #endif /* CONFIG_AARCH32_EL0 */
->
-> +#ifdef CONFIG_COMPAT
-> +
-> +long compat_arch_ptrace(struct task_struct *child, compat_long_t request,
-> +			compat_ulong_t caddr, compat_ulong_t cdata)
-> +{
-> +	return compat_ptrace_request(child, request, caddr, cdata);
-> +}
-> +
-> +#endif /* CONFIG_COMPAT */
-> +
->   const struct user_regset_view *task_user_regset_view(struct task_struct *task)
->   {
->   #ifdef CONFIG_AARCH32_EL0
-> diff --git a/arch/arm64/kernel/sys32.c b/arch/arm64/kernel/sys32.c
-> index a40b134..3752443 100644
-> --- a/arch/arm64/kernel/sys32.c
-> +++ b/arch/arm64/kernel/sys32.c
-> @@ -38,6 +38,7 @@ asmlinkage long compat_sys_fadvise64_64_wrapper(void);
->   asmlinkage long compat_sys_sync_file_range2_wrapper(void);
->   asmlinkage long compat_sys_fallocate_wrapper(void);
->   asmlinkage long compat_sys_mmap2_wrapper(void);
-> +asmlinkage long compat_sys_aarch32_ptrace(void);
->
->   #undef __SYSCALL
->   #define __SYSCALL(nr, sym)	[nr] = sym,
-> diff --git a/include/linux/ptrace.h b/include/linux/ptrace.h
-> index 504c98a..75887a0 100644
-> --- a/include/linux/ptrace.h
-> +++ b/include/linux/ptrace.h
-> @@ -97,6 +97,12 @@ int generic_ptrace_peekdata(struct task_struct *tsk, unsigned long addr,
->   			    unsigned long data);
->   int generic_ptrace_pokedata(struct task_struct *tsk, unsigned long addr,
->   			    unsigned long data);
-> +int ptrace_traceme(void);
-> +struct task_struct *ptrace_get_task_struct(pid_t pid);
-> +int ptrace_attach(struct task_struct *task, long request,
-> +			 unsigned long addr, unsigned long flags);
-> +int ptrace_check_attach(struct task_struct *child, bool ignore_state);
-> +void ptrace_unfreeze_traced(struct task_struct *task);
->
->   /**
->    * ptrace_parent - return the task that is tracing the given task
-> diff --git a/kernel/ptrace.c b/kernel/ptrace.c
-> index d49bfa1..cadf24c 100644
-> --- a/kernel/ptrace.c
-> +++ b/kernel/ptrace.c
-> @@ -136,7 +136,7 @@ static bool ptrace_freeze_traced(struct task_struct *task)
->   	return ret;
->   }
->
-> -static void ptrace_unfreeze_traced(struct task_struct *task)
-> +void ptrace_unfreeze_traced(struct task_struct *task)
->   {
->   	if (task->state != __TASK_TRACED)
->   		return;
-> @@ -168,7 +168,7 @@ static void ptrace_unfreeze_traced(struct task_struct *task)
->    * RETURNS:
->    * 0 on success, -ESRCH if %child is not ready.
->    */
-> -static int ptrace_check_attach(struct task_struct *child, bool ignore_state)
-> +int ptrace_check_attach(struct task_struct *child, bool ignore_state)
->   {
->   	int ret = -ESRCH;
->
-> @@ -292,7 +292,7 @@ bool ptrace_may_access(struct task_struct *task, unsigned int mode)
->   	return !err;
->   }
->
-> -static int ptrace_attach(struct task_struct *task, long request,
-> +int ptrace_attach(struct task_struct *task, long request,
->   			 unsigned long addr,
->   			 unsigned long flags)
->   {
-> @@ -406,7 +406,7 @@ out:
->    * Performs checks and sets PT_PTRACED.
->    * Should be used by all ptrace implementations for PTRACE_TRACEME.
->    */
-> -static int ptrace_traceme(void)
-> + int ptrace_traceme(void)
->   {
->   	int ret = -EPERM;
->
-> @@ -1056,7 +1056,7 @@ int ptrace_request(struct task_struct *child, long request,
->   	return ret;
->   }
->
-> -static struct task_struct *ptrace_get_task_struct(pid_t pid)
-> +struct task_struct *ptrace_get_task_struct(pid_t pid)
->   {
->   	struct task_struct *child;
->
+> +- reg: Must contain the registers base address and length
+> +- clocks: phandle to the oscillators feeding the SPI controller. Two are
 
-Hello, I found ilp32 will use sys_ptrace, not compat_sys_ptrace. So I 
-write a little patch to see if can solve the problem correctly.
+SPI? copy paste error?
 
-Thanks.
+> +          needed:
+> +  - "hosc": the high frequency oscillator (usually at 24MHz)
+> +  - "losc": the low frequency oscillator (usually at 32kHz)
+> +- clock-names: Must contain the clock names described just above
+> +- #clock-cells : must contain 1
+> +- #reset-cells : must contain 1
+> +
+> +Example:
 
- From f6156236df578bb05c4a17e7f9776ceaf8f7afe6 Mon Sep 17 00:00:00 2001
-From: Zhou Chengming <zhouchengming1@huawei.com>
-Date: Wed, 8 Jun 2016 09:46:23 +0800
-Subject: [PATCH] ilp32: use compat_sys_ptrace instead of sys_ptrace
+No example? Maybe just remove this section then.
 
-When we analyze a testcase of ptrace that failed on ilp32, we found
-the syscall that the ilp32 uses is sys_ptrace, not compat_sys_ptrace.
-Because in include/uapi/asm-generic/unistd.h it's defined like:
-__SYSCALL(__NR_ptrace, sys_ptrace)
-So we change it to __SC_COMP(__NR_ptrace, sys_ptrace, compat_sys_ptrace),
-let compat tasks use the compat_sys_ptrace.
+ChenYu
 
-Signed-off-by: Zhou Chengming <zhouchengming1@huawei.com>
----
-  include/uapi/asm-generic/unistd.h |    2 +-
-  1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/include/uapi/asm-generic/unistd.h 
-b/include/uapi/asm-generic/unistd.h
-index 2862d2e..50ee770 100644
---- a/include/uapi/asm-generic/unistd.h
-+++ b/include/uapi/asm-generic/unistd.h
-@@ -364,7 +364,7 @@ __SC_WRAP(__NR_syslog, sys_syslog)
-
-  /* kernel/ptrace.c */
-  #define __NR_ptrace 117
--__SYSCALL(__NR_ptrace, sys_ptrace)
-+__SC_COMP(__NR_ptrace, sys_ptrace, compat_sys_ptrace)
-
-  /* kernel/sched/core.c */
-  #define __NR_sched_setparam 118
--- 
-1.7.7
+> --
+> 2.8.3
+>
