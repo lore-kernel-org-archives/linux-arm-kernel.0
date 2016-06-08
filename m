@@ -1,43 +1,74 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  8 Jun 2016 18:34:43 +0200
-Subject: [PATCH v2 08/13] regulator: pwm: Adjust PWM config at probe time
+Date: Wed,  8 Jun 2016 18:34:45 +0200
+Subject: [PATCH v2 10/13] regulator: pwm: Properly initialize the ->state field
 In-Reply-To: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465403688-17098-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465403688-17098-11-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PWM attached to a PWM regulator device might have been previously
-configured by the bootloader.
-Make sure the bootloader and linux config are in sync, and adjust the PWM
-config if that's not the case.
+The ->state field is currently initialized to 0, thus referencing the
+voltage selector at index 0, which might not reflect the current voltage
+value.
+If possible, retrieve the current voltage selector from the PWM state, else
+return -EINVAL.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Mark Brown <broonie@kernel.org>
-Acked-by: Brian Norris <briannorris@chromium.org>
 Tested-by: Brian Norris <briannorris@chromium.org>
 ---
- drivers/regulator/pwm-regulator.c | 8 +++-----
- 1 file changed, 3 insertions(+), 5 deletions(-)
+Heiko, Mark,
+
+I know you already added your Tested-by/Acked-by tags on this patch
+but this version has slightly change and is now making use of the
+pwm_get_relative_duty_cycle() helper instead of manually converting
+the absolute duty_cycle value into a relative one.
+---
+ drivers/regulator/pwm-regulator.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
 diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
-index ab3cc02..524b43f 100644
+index bf033fd..8c56e16 100644
 --- a/drivers/regulator/pwm-regulator.c
 +++ b/drivers/regulator/pwm-regulator.c
-@@ -285,11 +285,9 @@ static int pwm_regulator_probe(struct platform_device *pdev)
+@@ -48,10 +48,31 @@ struct pwm_voltages {
+ /**
+  * Voltage table call-backs
+  */
++static void pwm_regulator_init_state(struct regulator_dev *rdev)
++{
++	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
++	struct pwm_state pwm_state;
++	unsigned int dutycycle;
++	int i;
++
++	pwm_get_state(drvdata->pwm, &pwm_state);
++	dutycycle = pwm_get_relative_duty_cycle(&pwm_state, 100);
++
++	for (i = 0; i < rdev->desc->n_voltages; i++) {
++		if (dutycycle == drvdata->duty_cycle_table[i].dutycycle) {
++			drvdata->state = i;
++			return;
++		}
++	}
++}
++
+ static int pwm_regulator_get_voltage_sel(struct regulator_dev *rdev)
+ {
+ 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
+ 
++	if (drvdata->state < 0)
++		pwm_regulator_init_state(rdev);
++
+ 	return drvdata->state;
+ }
+ 
+@@ -203,6 +224,7 @@ static int pwm_regulator_init_table(struct platform_device *pdev,
  		return ret;
  	}
  
--	/*
--	 * FIXME: pwm_apply_args() should be removed when switching to the
--	 * atomic PWM API.
--	 */
--	pwm_apply_args(drvdata->pwm);
-+	ret = pwm_adjust_config(drvdata->pwm);
-+	if (ret)
-+		return ret;
- 
- 	regulator = devm_regulator_register(&pdev->dev,
- 					    &drvdata->desc, &config);
++	drvdata->state			= -EINVAL;
+ 	drvdata->duty_cycle_table	= duty_cycle_table;
+ 	memcpy(&drvdata->ops, &pwm_regulator_voltage_table_ops,
+ 	       sizeof(drvdata->ops));
 -- 
 2.7.4
