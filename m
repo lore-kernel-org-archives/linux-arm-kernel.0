@@ -1,40 +1,44 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 8 Jun 2016 15:23:31 +0200
-Subject: [PATCH 1/3] ARM: dts: sun4i: The blue led on the Mele A1000 is a
- power led
-In-Reply-To: <20160607212419.GE14179@lukather>
-References: <1465129393-22379-1-git-send-email-hdegoede@redhat.com>
- <20160607212419.GE14179@lukather>
-Message-ID: <0acb666e-3fa7-fb10-4c0d-1d7990f9eaa6@redhat.com>
+From: zhengsq@rock-chips.com (Shunqian Zheng)
+Date: Wed,  8 Jun 2016 21:26:26 +0800
+Subject: [PATCH v2 1/7] iommu/rockchip: fix devm_{request,free}_irq parameter
+In-Reply-To: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
+References: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <1465392392-2003-2-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Simon Xue <xxm@rock-chips.com>
 
-On 07-06-16 23:24, Maxime Ripard wrote:
-> On Sun, Jun 05, 2016 at 02:23:11PM +0200, Hans de Goede wrote:
->> The blue led on the Mele A1000 is wired to light up as soon as the board
->> has powered (it will be on while the gpio is still in input / floating
->> mode), also its location on the top-set box clearly signals "power led".
->>
->> Until now we've been treating this as a generic usr function led, which
->> means that when you plug power into the top-set box, the power-led lights
->> and then turns off as soon as the kernel loads, which looks wrong.
->
-> I'm not sure I understand the relationship between usr vs pwr led and
-> the fact that it's disabled.
+Even though the iommu shares irq with its master, using the *dev of iommu
+instead of master's *dev for devm_{request,free}_irq makes things clear.
 
-There is no relation, other then that pwr leds typically have
-default-state = "on"; set whereas usr leds do not.
+Signed-off-by: Simon Xue <xxm@rock-chips.com>
+Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+---
+ drivers/iommu/rockchip-iommu.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
->> This renames the led from a1000:blue:usr to a1000:blue:pwr and marks
->> it as default on, fixing this.
->
-> however, the default on might. Is it just a confusing commit log, or
-> am I overlooking something?
-
-Just a slightly confusing commit log.
-
-Regards,
-
-Hans
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index c7d6156..ec0ce62 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -807,7 +807,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+ 
+ 	iommu->domain = domain;
+ 
+-	ret = devm_request_irq(dev, iommu->irq, rk_iommu_irq,
++	ret = devm_request_irq(iommu->dev, iommu->irq, rk_iommu_irq,
+ 			       IRQF_SHARED, dev_name(dev), iommu);
+ 	if (ret)
+ 		return ret;
+@@ -860,7 +860,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+ 	}
+ 	rk_iommu_disable_stall(iommu);
+ 
+-	devm_free_irq(dev, iommu->irq, iommu);
++	devm_free_irq(iommu->dev, iommu->irq, iommu);
+ 
+ 	iommu->domain = NULL;
+ 
+-- 
+1.9.1
