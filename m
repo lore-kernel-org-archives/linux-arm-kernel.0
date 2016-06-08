@@ -1,236 +1,70 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jun 2016 15:48:03 +0200
-Subject: [RFC v4 4/7] extcon: usb-gpio: Add support for VBUS detection
-In-Reply-To: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
-References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465393686-16644-5-git-send-email-k.kozlowski@samsung.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Wed,  8 Jun 2016 10:13:27 -0400
+Subject: [PATCH] drm/exynos: dp: Fix NULL pointer dereference due
+ uninitialized connector
+Message-ID: <1465395207-14571-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add VBUS pin detection support to extcon-usb-gpio driver for boards
-which have both VBUS and ID pins, or only one of them.
+From: Yakir Yang <ykk@rock-chips.com>
 
-The logic behind reporting USB and USB-HOST extcon cables is not
-affected. The driver however will report extcon changes for USB-VBUS and
-USB-ID.
+Commit 3424e3a4f844 ("drm: bridge: analogix/dp: split exynos dp driver to
+bridge directory") split the Exynos DP core driver into a core driver and
+a bridge driver for the Analogix chip since that is also used by Rockchip.
 
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+But the change introduced a regression causing a NULL pointer dereference
+when trying to access an uninitialized connector in the driver .get_modes:
+
+Fix this by instead of having a connector struct for both the Exynos and
+Analogix drivers, just use the connector initialized in the bridge driver.
+
+Fixes: 3424e3a4f844 ("drm: bridge: analogix/dp: split exynos dp driver to bridge directory")
+Reported-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+[javier: wrote commit message]
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Tested-by: Marc Zyngier <marc.zyngier@arm.com>
 
 ---
+Hello Inki,
 
-Some parts base on old Robert's patchset.
----
- drivers/extcon/extcon-usb-gpio.c | 125 +++++++++++++++++++++++++++++++--------
- 1 file changed, 99 insertions(+), 26 deletions(-)
+This is a regression introduced in v4.7-rc1, so $SUBJECT is -rc material.
 
-diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
-index a36aab007022..85b8a0ce5731 100644
---- a/drivers/extcon/extcon-usb-gpio.c
-+++ b/drivers/extcon/extcon-usb-gpio.c
-@@ -35,7 +35,9 @@ struct usb_extcon_info {
- 	struct extcon_dev *edev;
+Best regards,
+Javier
+
+ drivers/gpu/drm/exynos/exynos_dp.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/gpu/drm/exynos/exynos_dp.c b/drivers/gpu/drm/exynos/exynos_dp.c
+index 468498e3fec1..4c1fb3f8b5a6 100644
+--- a/drivers/gpu/drm/exynos/exynos_dp.c
++++ b/drivers/gpu/drm/exynos/exynos_dp.c
+@@ -34,7 +34,7 @@
  
- 	struct gpio_desc *id_gpiod;
-+	struct gpio_desc *vbus_gpiod;
- 	int id_irq;
-+	int vbus_irq;
+ struct exynos_dp_device {
+ 	struct drm_encoder         encoder;
+-	struct drm_connector       connector;
++	struct drm_connector       *connector;
+ 	struct drm_bridge          *ptn_bridge;
+ 	struct drm_device          *drm_dev;
+ 	struct device              *dev;
+@@ -70,7 +70,7 @@ static int exynos_dp_poweroff(struct analogix_dp_plat_data *plat_data)
+ static int exynos_dp_get_modes(struct analogix_dp_plat_data *plat_data)
+ {
+ 	struct exynos_dp_device *dp = to_dp(plat_data);
+-	struct drm_connector *connector = &dp->connector;
++	struct drm_connector *connector = dp->connector;
+ 	struct drm_display_mode *mode;
+ 	int num_modes = 0;
  
- 	unsigned long debounce_jiffies;
- 	struct delayed_work wq_detcable;
-@@ -44,6 +46,8 @@ struct usb_extcon_info {
- static const unsigned int usb_extcon_cable[] = {
- 	EXTCON_USB,
- 	EXTCON_USB_HOST,
-+	EXTCON_USB_ID,
-+	EXTCON_USB_VBUS,
- 	EXTCON_NONE,
- };
+@@ -103,6 +103,7 @@ static int exynos_dp_bridge_attach(struct analogix_dp_plat_data *plat_data,
+ 	int ret;
  
-@@ -55,7 +59,8 @@ static void usb_extcon_detect_cable(struct work_struct *work)
- 						    wq_detcable);
+ 	drm_connector_register(connector);
++	dp->connector = connector;
  
- 	/* check ID and update cable state */
--	id = gpiod_get_value_cansleep(info->id_gpiod);
-+	id = info->id_gpiod ? gpiod_get_value_cansleep(info->id_gpiod) : 1;
-+
- 	if (id) {
- 		/*
- 		 * ID = 1 means USB HOST cable detached.
-@@ -73,6 +78,14 @@ static void usb_extcon_detect_cable(struct work_struct *work)
- 		extcon_set_cable_state_(info->edev, EXTCON_USB, false);
- 		extcon_set_cable_state_(info->edev, EXTCON_USB_HOST, true);
- 	}
-+
-+	if (info->id_gpiod)
-+		extcon_set_cable_state_(info->edev, EXTCON_USB_ID, id);
-+	if (info->vbus_gpiod) {
-+		int vbus = gpiod_get_value_cansleep(info->vbus_gpiod);
-+
-+		extcon_set_cable_state_(info->edev, EXTCON_USB_VBUS, vbus);
-+	}
- }
- 
- static irqreturn_t usb_irq_handler(int irq, void *dev_id)
-@@ -100,9 +113,11 @@ static int usb_extcon_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	info->dev = dev;
--	info->id_gpiod = devm_gpiod_get(&pdev->dev, "id", GPIOD_IN);
--	if (IS_ERR(info->id_gpiod)) {
--		dev_err(dev, "failed to get ID GPIO\n");
-+	info->id_gpiod = devm_gpiod_get_optional(&pdev->dev, "id", GPIOD_IN);
-+	info->vbus_gpiod = devm_gpiod_get_optional(&pdev->dev, "vbus",
-+						   GPIOD_IN);
-+	if (!info->id_gpiod && !info->vbus_gpiod) {
-+		dev_err(dev, "failed to get GPIOs\n");
- 		return PTR_ERR(info->id_gpiod);
- 	}
- 
-@@ -118,27 +133,54 @@ static int usb_extcon_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	ret = gpiod_set_debounce(info->id_gpiod,
--				 USB_GPIO_DEBOUNCE_MS * 1000);
-+	if (info->id_gpiod)
-+		ret = gpiod_set_debounce(info->id_gpiod,
-+			USB_GPIO_DEBOUNCE_MS * 1000);
-+	if (!ret && info->vbus_gpiod) {
-+		ret = gpiod_set_debounce(info->vbus_gpiod,
-+			USB_GPIO_DEBOUNCE_MS * 1000);
-+		if (ret < 0 && info->id_gpiod)
-+			gpiod_set_debounce(info->vbus_gpiod, 0);
-+	}
- 	if (ret < 0)
- 		info->debounce_jiffies = msecs_to_jiffies(USB_GPIO_DEBOUNCE_MS);
- 
- 	INIT_DELAYED_WORK(&info->wq_detcable, usb_extcon_detect_cable);
- 
--	info->id_irq = gpiod_to_irq(info->id_gpiod);
--	if (info->id_irq < 0) {
--		dev_err(dev, "failed to get ID IRQ\n");
--		return info->id_irq;
-+	if (info->id_gpiod) {
-+		info->id_irq = gpiod_to_irq(info->id_gpiod);
-+		if (info->id_irq < 0) {
-+			dev_err(dev, "failed to get ID IRQ\n");
-+			return info->id_irq;
-+		}
-+		ret = devm_request_threaded_irq(dev, info->id_irq, NULL,
-+						usb_irq_handler,
-+						IRQF_TRIGGER_RISING |
-+						IRQF_TRIGGER_FALLING |
-+						IRQF_ONESHOT,
-+						pdev->name, info);
-+		if (ret < 0) {
-+			dev_err(dev, "failed to request handler for ID IRQ\n");
-+			return ret;
-+		}
- 	}
- 
--	ret = devm_request_threaded_irq(dev, info->id_irq, NULL,
--					usb_irq_handler,
--					IRQF_TRIGGER_RISING |
--					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
--					pdev->name, info);
--	if (ret < 0) {
--		dev_err(dev, "failed to request handler for ID IRQ\n");
--		return ret;
-+	if (info->vbus_gpiod) {
-+		info->vbus_irq = gpiod_to_irq(info->vbus_gpiod);
-+		if (info->vbus_irq < 0) {
-+			dev_err(dev, "failed to get VBUS IRQ\n");
-+			return info->vbus_irq;
-+		}
-+		ret = devm_request_threaded_irq(dev, info->vbus_irq, NULL,
-+						usb_irq_handler,
-+						IRQF_TRIGGER_RISING |
-+						IRQF_TRIGGER_FALLING |
-+						IRQF_ONESHOT,
-+						pdev->name, info);
-+		if (ret < 0) {
-+			dev_err(dev, "failed to request handler for VBUS IRQ\n");
-+			return ret;
-+		}
- 	}
- 
- 	platform_set_drvdata(pdev, info);
-@@ -166,9 +208,16 @@ static int usb_extcon_suspend(struct device *dev)
- 	int ret = 0;
- 
- 	if (device_may_wakeup(dev)) {
--		ret = enable_irq_wake(info->id_irq);
--		if (ret)
--			return ret;
-+		if (info->id_gpiod) {
-+			ret = enable_irq_wake(info->id_irq);
-+			if (ret)
-+				return ret;
-+		}
-+		if (info->vbus_gpiod) {
-+			ret = enable_irq_wake(info->vbus_irq);
-+			if (ret)
-+				goto err;
-+		}
- 	}
- 
- 	/*
-@@ -176,8 +225,16 @@ static int usb_extcon_suspend(struct device *dev)
- 	 * as GPIOs used behind I2C subsystem might not be
- 	 * accessible until resume completes. So disable IRQ.
- 	 */
--	disable_irq(info->id_irq);
-+	if (info->id_gpiod)
-+		disable_irq(info->id_irq);
-+	if (info->vbus_gpiod)
-+		disable_irq(info->vbus_irq);
-+
-+	return ret;
- 
-+err:
-+	if (info->id_gpiod)
-+		disable_irq_wake(info->id_irq);
- 	return ret;
- }
- 
-@@ -187,17 +244,33 @@ static int usb_extcon_resume(struct device *dev)
- 	int ret = 0;
- 
- 	if (device_may_wakeup(dev)) {
--		ret = disable_irq_wake(info->id_irq);
--		if (ret)
--			return ret;
-+		if (info->id_gpiod) {
-+			ret = disable_irq_wake(info->id_irq);
-+			if (ret)
-+				return ret;
-+		}
-+		if (info->vbus_gpiod) {
-+			ret = disable_irq_wake(info->vbus_irq);
-+			if (ret)
-+				goto err;
-+		}
- 	}
- 
--	enable_irq(info->id_irq);
-+	if (info->id_gpiod)
-+		enable_irq(info->id_irq);
-+	if (info->vbus_gpiod)
-+		enable_irq(info->vbus_irq);
-+
- 	if (!device_may_wakeup(dev))
- 		queue_delayed_work(system_power_efficient_wq,
- 				   &info->wq_detcable, 0);
- 
- 	return ret;
-+
-+err:
-+	if (info->id_gpiod)
-+		enable_irq_wake(info->id_irq);
-+	return ret;
- }
- #endif
- 
+ 	/* Pre-empt DP connector creation if there's a bridge */
+ 	if (dp->ptn_bridge) {
 -- 
-1.9.1
+2.5.5
