@@ -1,58 +1,55 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  8 Jun 2016 10:24:39 +0100
-Subject: [PATCH] arm64: mm: always take dirty state from new pte in
- ptep_set_access_flags
-Message-ID: <1465377879-24925-1-git-send-email-will.deacon@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Jun 2016 02:47:48 -0700
+Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
+ typical Keystone features
+In-Reply-To: <10295246.2MDnqWQbb8@wuerfel>
+References: <1464816714-3900-1-git-send-email-nm@ti.com>
+ <574F6674.3010100@ti.com> <20160607042853.GA22406@atomide.com>
+ <10295246.2MDnqWQbb8@wuerfel>
+Message-ID: <20160608094747.GG22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 66dbd6e61a52 ("arm64: Implement ptep_set_access_flags() for
-hardware AF/DBM") ensured that pte flags are updated atomically in the
-face of potential concurrent, hardware-assisted updates. However, Alex
-reports that:
+Hi,
 
- | This patch breaks swapping for me.
- | In the broken case, you'll see either systemd cpu time spike (because
- | it's stuck in a page fault loop) or the system hang (because the
- | application owning the screen is stuck in a page fault loop).
+* Arnd Bergmann <arnd@arndb.de> [160607 01:11]:
+> A lot of these options are typical for all ARMv7 machines: AEABI, I2C, NEON,
+> PM, REGULATOR and VFP are things that we probably want to default to enabled
+> whenever we build a MULTI_V7 kernel, some also for V5 or V6, we just
+> need to come up with a good way to do that while (probably for most of
+> them) still allowing them to be disabled with CONFIG_EXPERT. I would
+> feel more comfortable with having an ARCH_MULTIPLATFORM_TYPICAL
+> Kconfig symbol than with the ARCH_OMAP2PLUS_TYPICAL one that ends up
+> turning things on unconditionally whenever you add ARCH_OMAP2PLUS
+> to some other configuration.
 
-It turns out that this is because the 'dirty' argument to
-ptep_set_access_flags is always 0 for read faults, and so we can't use
-it to set PTE_RDONLY. The failing sequence is:
+We still need to be careful about not changing the Kconfig option
+name for something like this as it will cause the custom .config files
+to fail unless the default is y. But yeah I agree, it would be nice
+to have some multiarch sane default selects, then also do the platform
+specific selects as needed. Naturally this needs to be kept down to
+minimum ideally limited to silent options.
 
-  1. We put down a PTE_WRITE | PTE_DIRTY | PTE_AF pte
-  2. Memory pressure -> pte_mkold(pte) -> clear PTE_AF
-  3. A read faults due to the missing access flag
-  4. ptep_set_access_flags is called with dirty = 0, due to the read fault
-  5. pte is then made PTE_WRITE | PTE_DIRTY | PTE_AF | PTE_RDONLY (!)
-  6. A write faults, but pte_write is true so we get stuck
+So we could have ARCH_MULTIPLATFORM_TYPICAL, then have the old
+ARCH_OMAP2PLUS_TYPICAL select that one. That should keep things
+behaving just fine if the old .config had ARCH_OMAP2PLUS_TYPICAL.
 
-The solution is to check the new page table entry (as would be done by
-the generic, non-atomic definition of ptep_set_access_flags that just
-calls set_pte_at) to establish the dirty state.
+> For I2C_OMAP, MENELAUS and TWL4030, we could just add a
+> 'default ARCH_OMAP3 || ARCH_OMAP4' or whatever is appropriate for
+> each of them. I assume we want to handle TWL6040 the same way, though
+> we currently don't do that. MENELAUS seems to be only needed for
+> omap2420-n8x0.
 
-Cc: <stable@vger.kernel.org> # 4.3+
-Fixes: 66dbd6e61a52 ("arm64: Implement ptep_set_access_flags() for hardware AF/DBM")
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-Reported-by: Alexander Graf <agraf@suse.de>
-Tested-by: Alexander Graf <agraf@suse.de>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/fault.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+We could yeah. TWL4030 is omap2430 to omap3, I don't think we currently
+have any omap3 based ones not using twl4030.. But there certainly
+are tons of usable devices with the Motorola CPCAP PMIC instead.
 
-diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
-index 5954881a35ac..ba3fc12bd272 100644
---- a/arch/arm64/mm/fault.c
-+++ b/arch/arm64/mm/fault.c
-@@ -109,7 +109,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
- 	 * PTE_RDONLY is cleared by default in the asm below, so set it in
- 	 * back if necessary (read-only or clean PTE).
- 	 */
--	if (!pte_write(entry) || !dirty)
-+	if (!pte_write(entry) || !pte_sw_dirty(entry))
- 		pte_val(entry) |= PTE_RDONLY;
- 
- 	/*
--- 
-2.1.4
+Then REGULATOR_FIXED_VOLTAGE we can have platform select like Mark
+seems to prefer. HIGHMEM too should be platform specific.
+
+The original reason for ARCH_OMAP2PLUS_TYPICAL was that if omap2plus
+is selected with that you actually get a bootable system.
+
+Regards,
+
+Tony
