@@ -1,29 +1,53 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Wed, 08 Jun 2016 09:35:05 +0200
-Subject: [PATCH] of: reserved_mem: restore old behavior when no region is
- defined
-In-Reply-To: <1465368713-17866-1-git-send-email-m.szyprowski@samsung.com>
-References: <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
- <1465368713-17866-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <5757CAA9.6000001@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed,  8 Jun 2016 15:36:26 +0800
+Subject: [PATCH] ARM: dts: sun8i-h3: sinovoip-bpi-m2-plus: Fix LED and switch
+ labels
+Message-ID: <1465371386-14479-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2016 08:51 AM, Marek Szyprowski wrote:
-> Change return value back to -ENODEV when no region is defined for given
-> device. This restores old behavior of this function, as some drivers rely
-> on such error code.
-> 
-> Reported-by: Liviu Dudau <liviu.dudau@arm.com>
-> Fixes: 59ce4039727ef40 ("of: reserved_mem: add support for using more than
->        one region for given device")
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+The switch is clearly labeled "power" on the board.
 
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+The LED is red, and is lit by default through an external pull up.
+Label it as "pwr" even though there is no explicit marking.
 
-I think this needs to be added to the media tree, where the original
-patch it fixes was applied.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
+Hi Maxime,
+
+This patch fixes 2 copy paste errors in the bpi-m2+ dts that slipped
+through. Can you squash it into my original patch?
+
+
+Thanks
+ChenYu
+
+---
+ arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts b/arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts
+index 8a19b4b44f1f..8387c458d615 100644
+--- a/arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-sinovoip-bpi-m2-plus.dts
+@@ -67,7 +67,7 @@
+ 		pinctrl-0 = <&pwr_led_bpi_m2p>;
+ 
+ 		pwr_led {
+-			label = "orangepi:green:pwr";
++			label = "bpi-m2+:red:pwr";
+ 			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
+ 			default-state = "on";
+ 		};
+@@ -79,7 +79,7 @@
+ 		pinctrl-0 = <&sw_r_bpi_m2p>;
+ 
+ 		sw4 {
+-			label = "sw4";
++			label = "power";
+ 			linux,code = <BTN_0>;
+ 			gpios = <&r_pio 0 3 GPIO_ACTIVE_LOW>;
+ 		};
 -- 
-Thanks,
-Sylwester
+2.8.1
