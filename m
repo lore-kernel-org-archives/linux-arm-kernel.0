@@ -1,78 +1,144 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 8 Jun 2016 08:17:09 -0500
-Subject: [PATCH V8 7/9] acpi: Add generic MCFG table handling
-In-Reply-To: <57580DCA.7000703@semihalf.com>
+Date: Wed, 8 Jun 2016 08:22:50 -0500
+Subject: [PATCH V8 5/9] pci, acpi: add acpi hook to assign domain number.
+In-Reply-To: <5757F19F.6020200@semihalf.com>
 References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <1464621262-26770-8-git-send-email-tn@semihalf.com>
- <20160608015631.GE4759@localhost> <57580DCA.7000703@semihalf.com>
-Message-ID: <20160608131709.GB16764@localhost>
+ <1464621262-26770-6-git-send-email-tn@semihalf.com>
+ <20160608001559.GD4759@localhost> <5757F19F.6020200@semihalf.com>
+Message-ID: <20160608132250.GC16764@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 02:21:30PM +0200, Tomasz Nowicki wrote:
-> On 08.06.2016 03:56, Bjorn Helgaas wrote:
-> >On Mon, May 30, 2016 at 05:14:20PM +0200, Tomasz Nowicki wrote:
-> >>In order to handle PCI config space regions properly in ACPI, new MCFG
-> >>interface is defined which does sanity checks on MCFG table and keeps its
-> >>root pointer. The user is able to lookup MCFG regions based on
-> >>host bridge root structure and domain:bus_start:bus_end touple.
-> >>Use pci_mmcfg_late_init old prototype to avoid another function name.
-
-> >>+	/* found matching entry, bus range check */
-> >>+	if (entry->end_bus_number != bus_res->end) {
-> >>+		resource_size_t bus_end = min_t(resource_size_t,
-> >>+					entry->end_bus_number, bus_res->end);
-> >>+		pr_warn("%04x:%pR bus end mismatch, using %02lx\n",
-> >>+			root->segment, bus_res, (unsigned long)bus_end);
-> >>+		bus_res->end = bus_end;
-> >>+	}
-> 
-> What about bus end mismatch case? Should we trim the host bridge bus
-> range or expect MCFG entry covers that range? Sometimes we get
-> _BBN-0xFF bus range, not from _CRS.
-
-Lack of a bus range in _CRS is a firmware defect.  There's a comment
-about this in acpi_pci_root_add().  On x86, we probably had to live
-with firmware in the field that had this defect.  I think we should
-expect all ARM64 systems to provide a bus number range in _CRS, and
-fail the attach if it's not there.
-
-I don't think we should warn about an MCFG entry that covers more than
-the _CRS bus range.  On x86, it's common to have something like:
-
-  ACPI: PCI Root Bridge [PCI0] (domain 0000 [bus 00-7f])
-  ACPI: PCI Root Bridge [PCI1] (domain 0000 [bus 80-ff])
-
-with a single MCFG entry that covers [bus 00-ff].  That seems
-reasonable and I don't think it's worth warning about it.
-
-If the MCFG entry doesn't cover all of a _CRS bus range, we should
-just fail so we can find and fix broken firmware.
-
-> >>+/* Interface called by ACPI - parse and save MCFG table */
+On Wed, Jun 08, 2016 at 12:21:19PM +0200, Tomasz Nowicki wrote:
+> On 08.06.2016 02:15, Bjorn Helgaas wrote:
+> >On Mon, May 30, 2016 at 05:14:18PM +0200, Tomasz Nowicki wrote:
+> >>PCI core code provides a config option (CONFIG_PCI_DOMAINS_GENERIC)
+> >>that allows assigning the PCI bus domain number generically by
+> >>relying on device tree bindings, and falling back to a simple counter
+> >>when the respective DT properties (ie "linux,pci-domain") are not
+> >>specified in the host bridge device tree node.
+> >>
+> >>In a similar way, when a system is booted through ACPI, architectures
+> >>that are selecting CONFIG_PCI_DOMAINS_GENERIC (ie ARM64) require kernel
+> >>hooks to retrieve the domain number so that the PCI bus domain number
+> >>set-up can be handled seamlessly with DT and ACPI in generic core code
+> >>when CONFIG_PCI_DOMAINS_GENERIC is selected.
+> >>
+> >>Since currently it is not possible to retrieve a pointer to the PCI
+> >>host bridge ACPI device backing the host bridge from core PCI code
+> >>(which would allow retrieving the domain number in an arch agnostic
+> >>way through the ACPI _SEG method), an arch specific ACPI hook has to
+> >>be declared and implemented by all arches that rely on
+> >>CONFIG_PCI_DOMAINS_GENERIC to retrieve the domain number and set it
+> >>up in core PCI code.
+> >>
+> >>For the aforementioned reasons, this patch introduces a dummy
+> >>acpi_pci_bus_domain_nr() hook in preparation for per-arch implementation
+> >>of the same to retrieve the domain number on a per-arch basis when
+> >>the system boots through ACPI.
+> >>
+> >>For the sake of code clarity the current code implementing generic
+> >>domain number assignment (ie pci_bus_assign_domain_nr(), selected by
+> >>CONFIG_PCI_DOMAINS_GENERIC) is reshuffled so that the code implementing
+> >>the DT domain assignment function is stubbed out into a corresponding
+> >>helper, so that DT and ACPI functions are clearly separated in
+> >>preparation for arches acpi_pci_bus_domain_nr() implementations.
+> >>
+> >>Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> >>Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>---
+> >>  drivers/pci/pci.c   | 11 +++++++++--
+> >>  include/linux/pci.h |  1 +
+> >>  2 files changed, 10 insertions(+), 2 deletions(-)
+> >>
+> >>diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> >>index eb431b5..2b52178 100644
+> >>--- a/drivers/pci/pci.c
+> >>+++ b/drivers/pci/pci.c
+> >>@@ -7,6 +7,7 @@
+> >>   *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+> >>   */
+> >>
+> >>+#include <linux/acpi.h>
+> >>  #include <linux/kernel.h>
+> >>  #include <linux/delay.h>
+> >>  #include <linux/init.h>
+> >>@@ -4941,7 +4942,7 @@ int pci_get_new_domain_nr(void)
+> >>  }
+> >>
+> >>  #ifdef CONFIG_PCI_DOMAINS_GENERIC
+> >>-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> >>+static int of_pci_bus_domain_nr(struct device *parent)
 > >
-> >I think we save a *pointer* to the MCFG table, not the table itself.
+> >Can we do a little cleanup before this patch?
+> >
+> >   - pci_bus_assign_domain_nr() is only used inside drivers/pci, so
+> >     maybe we move the prototype to drivers/pci/pci.h?
 > 
-> Right, the comment is broken.
+> pci_bus_assign_domain_nr() goes with pci_domain_nr() as an option
+> for CONFIG_PCI_DOMAINS_GENERIC. pci_domain_nr() is used commonly
+> outside drivers/pci so we would need to split these calls then, thus
+> personally I think it would be better to keep both in
+> inclue/linux/pci.h
+
+OK.
+
+> >   - I don't really like the style of calling a function that
+> >     internally assigns bus->domain_nr.  Could we do something like
+> >     this instead?
+> >
+> >     int pci_bus_domain_nr(...)
+> >     {
+> >       ...
+> >       return domain;
+> >     }
+> >
+> >     ... pci_create_root_bus(...)
+> >     {
+> >       ...
+> >       b->domain_nr = pci_bus_domain_nr(...);
 > 
-> >And acpi_table_parse() calls early_acpi_os_unmap_memory() immediately
-> >after it calls pci_mcfg_parse(), so I'm doubtful that the pointer
-> >remains valid.
 > 
-> At this stage early_acpi_os_unmap_memory() is doing nothing since
-> acpi_early_init() set acpi_gbl_permanent_mmap to 1 way before. The
-> pointer is fine then.
+> We can. I do not see much difference between pci_bus_domain_nr() and
+> pci_domain_nr() which we already have so how about calling it
+> pci_bus_find_domain_nr instead? Lorenzo, any strong preference for
+> it?
 
-Hmmm...  I see your argument, but this is a problem waiting to happen.
-We should not depend on the internal implementation of
-early_acpi_os_unmap_memory().  The pattern of:
+I suggested that to make them all parallel:
 
-  y = x;
-  unmap(x);
-  z = *y;
+  pci_bus_domain_nr()
+  of_pci_bus_domain_nr()
+  acpi_pci_bus_domain_nr()
 
-is just broken and we shouldn't expect readers to recognize that "oh,
-unmap() isn't really unmapping anything in this special case, so this
-looks wrong but is really fine."
+If you want to make them all *pci_bus_find_domain_nr() that would be
+OK with me, but I think it is worth keeping them the same except for
+the prefix (none/"of_"/"acpi_").  I think that's what you suggested
+below.
 
-Bjorn
+> >That would be two new patches, if this makes sense.
+> >
+> >And this patch would only rename pci_bus_assign_domain_nr() to
+> >of_pci_bus_domain_nr() and add the pci_bus_domain_nr() wrapper.
+> 
+> Giving that we would keep prototypes in inclue/linux/pci.h
+> 
+> 1. First patch would rename pci_bus_assign_domain_nr() to
+> pci_bus_find_domain_nr() and it would return domain number so that
+> we could do:
+>      ... pci_create_root_bus(...)
+>      {
+>        ...
+>        b->domain_nr = pci_bus_domain_nr(...);
+>        ...
+>      }
+> 
+> 2. Second patch would transform pci_bus_find_domain_nr() to be the
+> wrapper for of_pci_bus_domain_nr()
+> 
+> 3. Third patch would add stub definition, the ARM64 definition and
+> the new call acpi_pci_bus_domain_nr() in pci_bus_find_domain_nr()
+> wrapper.
+> 
+> Does this plan sound reasonable?
+
+Sounds perfect!
