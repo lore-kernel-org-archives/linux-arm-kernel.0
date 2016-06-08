@@ -1,22 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 08 Jun 2016 23:02:00 +0200
-Subject: [PATCH v4 1/2] i2c: qup: add ACPI support
-In-Reply-To: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
-References: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
-Message-ID: <4749471.m1cxc4jj96@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 09 Jun 2016 00:01:32 +0300
+Subject: [PATCH v3 00/12] Add R8A7792/Blanche board support
+Message-ID: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 8, 2016 12:19:44 PM CEST Austin Christ wrote:
-> +               ret = device_property_read_u32(qup->dev,
-> +                               "src-clock-hz", &src_clk_freq);
-> +               if (ret) {
-> +                       dev_warn(qup->dev, "using default src-clock-hz %d",
-> +                               DEFAULT_SRC_CLK);
-> +                       src_clk_freq = DEFAULT_SRC_CLK;
-> +               }
-> 
+Hello.
 
-Where is this property documented?
+   Here's the set of 12 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160606-v4.7-rc2' tag. We add the device tree support for
+the R8A7792-based Blanche board. Added in this version is the SMP support.
+The R-Car 'clk' driver patch was posted separately and 2 'clk' binding patches
+were split from this series...
 
-	Arnd
+[01/12] ARM: shmobile: r8a7792: add clock index macros
+[02/12] ARM: shmobile: r8a7792: add power domain index macros
+[03/12] soc: renesas: rcar-sysc: add R8A7792 support
+[04/12] ARM: shmobile: r8a7792: basic SoC support
+[05/12] ARM: shmobile: r8a7792: add SMP support
+[06/12] ARM: dts: r8a7792: initial SoC device tree
+[07/12] ARM: dts: r8a7792: add SYS-DMAC support
+[08/12] ARM: dts: r8a7792: add [H]SCIF support
+[09/12] ARM dts: r8a7792: add IRQC support
+[10/12] DT: arm: shmobile: document Blanche board
+[11/12] ARM: dts: blanche: initial device tree
+[12/12] ARM: dts: blanche: add Ethernet support
+
+WBR, Sergei
