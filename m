@@ -1,240 +1,239 @@
-From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
-Date: Wed, 8 Jun 2016 10:15:24 +0530
-Subject: [PATCH v4 11/14] arm64/numa: support HAVE_MEMORYLESS_NODES
-In-Reply-To: <57578004.4050203@huawei.com>
-References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
- <1465286898-13828-12-git-send-email-thunder.leizhen@huawei.com>
- <CAFpQJXVaYT5N3GUCFDnUL8OYOuuSSV4QfC8cXL2ecB=1TN57jQ@mail.gmail.com>
- <5756C4C6.7060706@huawei.com>
- <CAFpQJXUe_eBBR5dBXOGXMCKmbd3n3TUYzFpDNewjVom-iu+3yg@mail.gmail.com>
- <57578004.4050203@huawei.com>
-Message-ID: <CAFpQJXWjZQFFnSjygW1DYJ1NRfVbkWt+FP3tN3zsGWaaf9-g=g@mail.gmail.com>
+From: po.liu@nxp.com (Po Liu)
+Date: Wed, 8 Jun 2016 04:56:13 +0000
+Subject: [PATCH 2/2] aer: add support aer interrupt with none
+ MSI/MSI-X/INTx mode
+In-Reply-To: <20160607224634.GB2543@localhost>
+References: <VI1PR0401MB1709E215DCE264B2C27B3DAB92580@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+ <20160602135546.GA8262@localhost> <575052B8.3090203@ti.com>
+ <20160603040952.GA17904@localhost> <5751BEDF.3040300@ti.com>
+ <20160604034852.GA15143@localhost>
+ <DB5PR0401MB1702AF829693255DFC347448925C0@DB5PR0401MB1702.eurprd04.prod.outlook.com>
+ <57558248.4010502@ti.com> <20160606181049.GA15171@localhost>
+ <VI1PR0401MB17093077A7F0E3C52AC3392D925D0@VI1PR0401MB1709.eurprd04.prod.outlook.com>
+ <20160607224634.GB2543@localhost>
+Message-ID: <VI1PR0401MB1709FCE3056C7E3E785BD2B8925E0@VI1PR0401MB1709.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 8, 2016 at 7:46 AM, Leizhen (ThunderTown)
-<thunder.leizhen@huawei.com> wrote:
->
->
-> On 2016/6/7 22:01, Ganapatrao Kulkarni wrote:
->> On Tue, Jun 7, 2016 at 6:27 PM, Leizhen (ThunderTown)
->> <thunder.leizhen@huawei.com> wrote:
->>>
->>>
->>> On 2016/6/7 16:31, Ganapatrao Kulkarni wrote:
->>>> On Tue, Jun 7, 2016 at 1:38 PM, Zhen Lei <thunder.leizhen@huawei.com> wrote:
->>>>> Some numa nodes may have no memory. For example:
->>>>> 1. cpu0 on node0
->>>>> 2. cpu1 on node1
->>>>> 3. device0 access the momory from node0 and node1 take the same time.
->>>>
->>>> i am wondering, if access to both nodes is same, then why you need numa.
->>>> the example you are quoting is against the basic principle of "numa"
->>>> what is device0 here? cpu?
->>> The device0 can also be a cpu. I drew a simple diagram:
->>>
->>>   cpu0     cpu1        cpu2/device0
->>>     |        |              |
->>>     |        |              |
->>>    DDR0     DDR1    No DIMM slots or no DIMM plugged
->>>  (node0)  (node1)         (node2)
->>>
->>
->> thanks for the clarification. your example is for 3 node system, where
->> third node is memory less node.
->> do you see any issue in supporting this topology with existing code?
-> If opened HAVE_MEMORYLESS_NODES, it will pick the nearest node for the cpus on
-> memoryless node.
+Hi Bjorn,
 
-i see couple of arch enabled HAVE_MEMORYLESS_NODES, but i don't see
-any code in arch specific numa code for this.
-is that means the core code will take care of this?
+Thanks for the kindly reply. All these are helpful.
 
->
-> For example, in include/linux/topology.h
-> #ifdef CONFIG_HAVE_MEMORYLESS_NODES
-> ...
-> static inline int cpu_to_mem(int cpu)
-> {
->         return per_cpu(_numa_mem_, cpu);
-> }
-> ...
-> #else
-> ...
-> static inline int cpu_to_mem(int cpu)
-> {
->         return cpu_to_node(cpu);
-> }
-> ...
-> #endif
->
->> I think, this use case should be supported with present code.
->>
->>>>>
->>>>> So, we can not simply classify device0 to node0 or node1, but we can
->>>>> define a node2 which distances to node0 and node1 are the same.
->>>>>
->>>>> Signed-off-by: Zhen Lei <thunder.leizhen@huawei.com>
->>>>> ---
->>>>>  arch/arm64/Kconfig      |  4 ++++
->>>>>  arch/arm64/kernel/smp.c |  1 +
->>>>>  arch/arm64/mm/numa.c    | 43 +++++++++++++++++++++++++++++++++++++++++--
->>>>>  3 files changed, 46 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>>> index 05c1bf1..5904a62 100644
->>>>> --- a/arch/arm64/Kconfig
->>>>> +++ b/arch/arm64/Kconfig
->>>>> @@ -581,6 +581,10 @@ config NEED_PER_CPU_EMBED_FIRST_CHUNK
->>>>>         def_bool y
->>>>>         depends on NUMA
->>>>>
->>>>> +config HAVE_MEMORYLESS_NODES
->>>>> +       def_bool y
->>>>> +       depends on NUMA
->>>>> +
->>>>>  source kernel/Kconfig.preempt
->>>>>  source kernel/Kconfig.hz
->>>>>
->>>>> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->>>>> index d099306..9e15297 100644
->>>>> --- a/arch/arm64/kernel/smp.c
->>>>> +++ b/arch/arm64/kernel/smp.c
->>>>> @@ -620,6 +620,7 @@ static void __init of_parse_and_init_cpus(void)
->>>>>                         }
->>>>>
->>>>>                         bootcpu_valid = true;
->>>>> +                       early_map_cpu_to_node(0, of_node_to_nid(dn));
->>>>>
->>>>>                         /*
->>>>>                          * cpu_logical_map has already been
->>>>> diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
->>>>> index df5c842..d73b0a0 100644
->>>>> --- a/arch/arm64/mm/numa.c
->>>>> +++ b/arch/arm64/mm/numa.c
->>>>> @@ -128,6 +128,14 @@ void __init early_map_cpu_to_node(unsigned int cpu, int nid)
->>>>>                 nid = 0;
->>>>>
->>>>>         cpu_to_node_map[cpu] = nid;
->>>>> +
->>>>> +       /*
->>>>> +        * We should set the numa node of cpu0 as soon as possible, because it
->>>>> +        * has already been set up online before. cpu_to_node(0) will soon be
->>>>> +        * called.
->>>>> +        */
->>>>> +       if (!cpu)
->>>>> +               set_cpu_numa_node(cpu, nid);
->>>>>  }
->>>>>
->>>>>  #ifdef CONFIG_HAVE_SETUP_PER_CPU_AREA
->>>>> @@ -215,6 +223,35 @@ int __init numa_add_memblk(int nid, u64 start, u64 end)
->>>>>         return ret;
->>>>>  }
->>>>>
->>>>> +static u64 __init alloc_node_data_from_nearest_node(int nid, const size_t size)
->>>>> +{
->>>>> +       int i, best_nid, distance;
->>>>> +       u64 pa;
->>>>> +       DECLARE_BITMAP(nodes_map, MAX_NUMNODES);
->>>>> +
->>>>> +       bitmap_zero(nodes_map, MAX_NUMNODES);
->>>>> +       bitmap_set(nodes_map, nid, 1);
->>>>> +
->>>>> +find_nearest_node:
->>>>> +       best_nid = NUMA_NO_NODE;
->>>>> +       distance = INT_MAX;
->>>>> +
->>>>> +       for_each_clear_bit(i, nodes_map, MAX_NUMNODES)
->>>>> +               if (numa_distance[nid][i] < distance) {
->>>>> +                       best_nid = i;
->>>>> +                       distance = numa_distance[nid][i];
->>>>> +               }
->>>>> +
->>>>> +       pa = memblock_alloc_nid(size, SMP_CACHE_BYTES, best_nid);
->>>>> +       if (!pa) {
->>>>> +               BUG_ON(best_nid == NUMA_NO_NODE);
->>>>> +               bitmap_set(nodes_map, best_nid, 1);
->>>>> +               goto find_nearest_node;
->>>>> +       }
->>>>> +
->>>>> +       return pa;
->>>>> +}
->>>>> +
->>
->> why do we need this function in arch specific code.
-> I also considered put these code(include HAVE_SETUP_PER_CPU_AREA) into drivers/of/of_numa.c,
-> but if I do that, it will make acpi numa dependent on of numa.
+>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+>  On Wed, June 08, 2016 6:47 AM
+>  
+>  On Tue, Jun 07, 2016 at 10:07:40AM +0000, Po Liu wrote:
+>  > Hi Bjorn,
+>  >
+>  > >  -----Original Message-----
+>  > >
+>  > >  On Mon, Jun 06, 2016 at 10:01:44AM -0400, Murali Karicheri wrote:
+>  > >  > On 06/06/2016 03:32 AM, Po Liu wrote:
+>  > >  > > Hi Bjorn,
+>  > >  > > I confirm we met same problem with KeyStone base on DesignWare
+>  > > design.
+>  > >  > >
+>  > >  > >
+>  > >  > > Best regards,
+>  > >  > > Liu Po
+>  > >  > >
+>  > >  > >>  -----Original Message-----
+>  > >  > >>  From: Bjorn Helgaas [mailto:helgaas at kernel.org]  > >>  Sent:
+>  > > Saturday, June 04, 2016 11:49 AM  > >>  To: Murali Karicheri  > >>
+>  > > Cc: Po Liu; linux-pci at vger.kernel.org; linux-arm-  > >>
+>  > > kernel at lists.infradead.org; linux-kernel at vger.kernel.org;  > >>
+>  > > devicetree at vger.kernel.org; Arnd Bergmann; Roy Zang; Marc Zyngier;
+>  > > > >> Stuart Yoder; Yang-Leo Li; Minghuan Lian; Bjorn Helgaas; Shawn
+>  > > Guo;  > >> Mingkai Hu; Rob Herring  > >>  Subject: Re: [PATCH 2/2]
+>  > > aer: add support aer interrupt with none  > >> MSI/MSI-X/INTx mode
+>  > > > >>  > >>  On Fri, Jun 03, 2016 at 01:31:11PM -0400, Murali
+>  > > Karicheri wrote:
+>  > >  > >>  > Po,
+>  > >  > >>  >
+>  > >  > >>  > Sorry to hijack your discussion, but the problem seems to
+>  > > be  > >> same for  > Keystone PCI controller which is also
+>  > > designware (old
+>  > >  version) based.
+>  > >  > >>  >
+>  > >  > >>  > On 06/03/2016 12:09 AM, Bjorn Helgaas wrote:
+>  > >  > >>  > > On Thu, Jun 02, 2016 at 11:37:28AM -0400, Murali
+>  > > Karicheri
+>  > >  wrote:
+>  > >  > >>  > >> On 06/02/2016 09:55 AM, Bjorn Helgaas wrote:
+>  > >  > >>  > >>> On Thu, Jun 02, 2016 at 05:01:19AM +0000, Po Liu wrote:
+>  > >  > >>  > >>>>>  -----Original Message-----  > >>>>>  From: Bjorn
+>  > > Helgaas  > >> [mailto:helgaas at kernel.org]  > >>>>>  Sent: Thursday,
+>  > > June 02, 2016  > >> 11:48 AM  > >>>>>  To: Po Liu  > >>>>>  Cc:
+>  > >  > >> linux-pci at vger.kernel.org;  > >>>>>  > >>
+>  > > linux-arm-kernel at lists.infradead.org;
+>  > >  > >>  > >>>>>  linux-kernel at vger.kernel.org;
+>  > > devicetree at vger.kernel.org;  > >> Arnd  > >>>>> Bergmann;  Roy Zang;
+>  > > Marc Zyngier; Stuart Yoder;  > >> Yang-Leo Li;  > >>>>> Minghuan
+>  > > Lian; Bjorn  Helgaas; Shawn Guo;  > >> Mingkai Hu; Rob  > >>>>>
+>  > > Herring  > >>>>>  Subject: Re: [PATCH 2/2]  > >> aer: add support
+>  > > aer interrupt with  > >>>>> none  MSI/MSI-X/INTx  > >> mode  > >>>>>
+>  > > > >>>>>  [+cc Rob]  > >>>>>  > >>>>>  Hi Po,  >  > >> >>>>>  > >>>>>
+>  > > On Thu, May 26, 2016 at 02:00:06PM +0800, Po Liu  > >> wrote:
+>  > >  > >>  > >>>>>  > On some platforms, root port doesn't support  > >>
+>  > > MSI/MSI-X/INTx  in RC mode.
+>  > >  > >>  > >>>>>  > When chip support the aer interrupt with none  >
+>  > > >> MSI/MSI-X/INTx  > >>>>> mode,  > maybe there is interrupt line
+>  > > for  > >> aer pme etc. Search  > >>>>> the interrupt  > number in
+>  > > the fdt  file.
+>  > >  > >>  > >>>>>
+>  > >  > >>  > >>>>>  My understanding is that AER interrupt signaling can
+>  > > be  > >> done  > >>>>> via INTx,  MSI, or MSI-X (PCIe spec r3.0, sec
+>  > > 6.2.4.1.2).
+>  > >  > >>  > >>>>> Apparently your device  doesn't support MSI or MSI-X.
+>  > > Are  > >> you  > >>>>> saying it doesn't support INTx  either?  How
+>  > > is the  > >> interrupt  you're requesting here different from INTx?
+>  > >  > >>  > >>>>
+>  > >  > >>  > >>>> Layerscape use none of MSI or MSI-X or INTx to
+>  > > indicate the  > >> > >>>> devices or root error in RC mode. But use
+>  > > an independent SPI  > >> > >>>> interrupt(arm interrupt controller)
+>  line.
+>  > >  > >>  > >>>
+>  > >  > >>  > >>> The Root Port is a PCI device and should follow the
+>  > > normal  > >> PCI  > >>> rules for interrupts.  As far as I
+>  > > understand, that  > >> means it  > >>> should use MSI, MSI-X, or
+>  > > INTx.  If your Root Port  > >> doesn't use MSI  > >>> or MSI-X, it
+>  > > should use INTx, the  > >> PCI_INTERRUPT_PIN register  > >>> should
+>  > > tell us which (INTA/  > >> INTB/etc.), and  PCI_COMMAND_INTX_DISABLE
+>  should work to disable it.
+>  > >  > >>  > >>> That's all from the PCI point of view, of course.
+>  > >  > >>  > >>
+>  > >  > >>  > >> I am faced with the same issue on Keystone PCI hardware
+>  > > and  > >> it has  > >> been on my TODO list  for quite some time.
+>  > > Keystone  > >> PCI hardware  > >> also doesn't use MSI or MSI-X or
+>  > > INTx for  > >> reporting errors received  > >> at the root port, but
+>  > > use a  > >> platform interrupt instead (not  > >> complaint to PCI
+>  > > standard as  > >> per PCI base spec). So I would need  > >> similar
+>  > > change to have  > >> the error interrupt passed to the aer  > >>
+>  > > driver. So there are  > >> hardware out there like Keystone which
+>  > > requires to support this  through platform IRQ.
+>  > >  > >>  > >
+>  > >  > >>  > > This is not a new area of the spec, and it's hard for me
+>  > > to  > >> believe  > > that these two new PCIe controllers are both
+>  > > broken  > >> the same way  > > (although I guess both are
+>  > > DesignWare-based, so  > >> maybe this is the  > > same underlying
+>  > > problem in both cases?).  I  > >> think it's more likely  > > that
+>  > > we just haven't figured out the  > >> right way to describe this in
+>  the DT.
+>  > >  > >>  >
+>  > >  > >>  > Keystone is using an older version of the designware IP and
+>  > > it  > >> > implements all of the interrupts in the application
+>  > > register  > >> space  > unlike other newer version of the hardware.
+>  > > So I assume,  > >> the version  > used on Layerscape is also an
+>  > > older version and the  > >> both have same  > issue in terms of non
+>  > > standard platform interrupt  > >> used for error  reporting.
+>  > >  > >>  >
+>  > >  > >>  > > I assume you have a Root Port with an AER capability, no
+>  > > MSI  > >> > > capability, and no MSI-X capability, right?
+>  > >  > >>  >
+>  > >  > >>  > Has AER capability and both MSI and INTx (legacy)
+>  > > capability  >  > >> > > What does its Interrupt  > > Pin register
+>  > > contain?  If it's  > >> zero, it doesn't use INTx either, so  > >
+>  > > according to the spec it  > >> should generate no interrupts.
+>  > >  > >>  > >
+>  > >  > >>  > At address offset 0x3C by default has a value of 1, but it
+>  > > is  > >> writable  > by software. So default is INTx A.
+>  > >  > >>
+>  > >  > >>  0x3c is the Interrupt *Line*, which is read/write.  The
+>  > > Interrupt  > >>  *Pin* is at 0x3d and should be read-only.
+>  > >  > >>
+>  > >  >
+>  > >  > You are right. But default is 1 at this address.
+>  > >  >
+>  > >  > >>  Does your Keystone driver support MSI?  If so, since your
+>  > > Root  > >> Port  supports MSI, I would think we would use that by
+>  > > default, and  > >> the INTx  stuff wouldn't even matter.
+>  > >  > >
+>  > >  > > Layerscape is also shows "Both message signaled interrupts
+>  > > (MSI) and  legacy INTx are supported."
+>  > >  > > But both of them not work for AER interrupt when devices or
+>  > > root  port report aer error.
+>  > >  > > But another GIC interrupt line do.
+>  > >  >
+>  > >  > Same with Keystone. Even though both MSI and INTx are supported
+>  > > error  > interrupt at root port is reported on a different interrupt
+>  > > line than  > MSI/INTx. So for Power Management event interrupt is
+>  > > also different  > line.
+>  > >
+>  > >  I'm looking at the "Error Message Controls" diagram in the PCIe
+>  > > spec  r3.0, sec 6.2.6.  Does this hardware fit into the
+>  > > platform-specific  "System Error" case there?  Do the Root Control
+>  > > enable bits (in the PCIe
+>  > >  Capability) control this interrupt?  If so, maybe this makes more
+>  > > sense  than I thought.
+>  >
+>  > It supposedly not the "System Error" case. But "the Error Interrupt"
+>  case.
+>  > Which means " Root Error Command register " could control the
+>  > interrupt  line we have now. (refer PCIe spec r3.0, sec 6.2.6)
+>  
+>  Did you actually try this out and verify that the PCIe Root Control
+>  enable bits have no effect and the AER Root Error Command bits do
+>  control it?  The names are very similar, so there's lots of room for
+>  misunderstanding here :)
 
-numa core/common code is mainly in directory mm/
-drivers/of/of_numa.c implements only device tree numa binding.
+Yes, all these result were tested before reply.
 
->
->> dont you think common code will take care of this? when you define
->> HAVE_MEMORYLESS_NODES
->
-> I have searched CONFIG_HAVE_MEMORYLESS_NODES in *.c, but did not find the relevant content.
-> So maybe other ARCHs also missed this.
+>  
+>  If the AER Root Error Command does control this interrupt, I think the
+>  PCI_COMMAND_INTX_DISABLE bit in the PCI Command register should also
+>  control it (per sec 6.2.4.1.2).
 
-as mentioned above, arch code may not need any changes for this.
->
->>
->>>>>  /**
->>>>>   * Initialize NODE_DATA for a node on the local memory
->>>>>   */
->>>>> @@ -228,7 +265,9 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
->>>>>         pr_info("Initmem setup node %d [mem %#010Lx-%#010Lx]\n",
->>>>>                 nid, start_pfn << PAGE_SHIFT, (end_pfn << PAGE_SHIFT) - 1);
->>>>>
->>>>> -       nd_pa = memblock_alloc_try_nid(nd_size, SMP_CACHE_BYTES, nid);
->>
->> this function try to allocate from a nid, if fails, it allocates from
->> node 0(local node).
->> this is ok for memory less node i guess.
-> Yes, the function is OK, but the performance is not.
->
-> Suppose there are 3 nodes:
-> 1. cpu0 on node0, cpu1 on node1, cpu2 on node2.
-> 2. cpu2 access the memory on node1 take 1us, but access the memory on node1 take 5us.
->    That is, distance[2,1] is shorter than distance[2,0].
-> 3. And node2 is a memoryless node.
->
-> So if NODE_DATA(2) allocated from node0, it will take more time than allocted from node1 at run time.
-> Because NODE_DATA will be accessed at run time.
->
->>
->>>>> +       nd_pa = memblock_alloc_nid(nd_size, SMP_CACHE_BYTES, nid);
->>>>> +       if (!nd_pa)
->>>>> +               nd_pa = alloc_node_data_from_nearest_node(nid, nd_size);
->>>>>         nd = __va(nd_pa);
->>>>>
->>>>>         /* report and initialize */
->>>>> @@ -238,7 +277,7 @@ static void __init setup_node_data(int nid, u64 start_pfn, u64 end_pfn)
->>>>>         if (tnid != nid)
->>>>>                 pr_info("    NODE_DATA(%d) on node %d\n", nid, tnid);
->>>>>
->>>>> -       node_data[nid] = nd;
->>>>> +       NODE_DATA(nid) = nd;
->>>>>         memset(NODE_DATA(nid), 0, sizeof(pg_data_t));
->>>>>         NODE_DATA(nid)->node_id = nid;
->>>>>         NODE_DATA(nid)->node_start_pfn = start_pfn;
->>>>> --
->>>>> 2.5.0
->>>>>
->>>>>
->>>> Ganapat
->>>>>
->>>>> _______________________________________________
->>>>> linux-arm-kernel mailing list
->>>>> linux-arm-kernel at lists.infradead.org
->>>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>>
->>>> .
->>>>
->>>
->>
->> .
->>
->
+Yes, I am sure the PCI_COMMAND_INTX_DISABLE bit can also control this interrupt.
 
-thanks
-Ganapat
+>  
+>  > May this kind of hardware design route broken the spec?
+>  
+>  If the Reporting Enable bits in the Root Port's AER Root Error Command
+>  register control the interrupt, but the interrupt is not delivered via
+>  the Root Port's INTx or MSI/MSI-X, I think the design is not following
+>  the spec.
+>  
+>  All the information needed by the AER driver should be communicated via
+>  the config space mechanisms described in the spec (AER capability,
+>  MSI/MSI-X capabilities, Interrupt Pin, etc.)  That way the driver works
+>  without change on future spec-compliant hardware.
+>  
+>  > PME also like the AER. Hotplug is not supported. Others not known.
+>  > Po Liu
+>  
+>  Per sec 6.1.6, I think PME *should* be signaled by the Root Port's INTx
+>  or MSI/MSI-X.
+>  
+>  In particular, it says "Note that all other interrupt sources within the
+>  same Function will assert the same virtual INTx wire when requesting
+>  service."  To me, that means that if we're using INTx, it will be the
+>  same INTx for AER, PME, hotplug, etc., and it should be the one
+>  indicated by the Interrupt Pin register.
+>  
+>  But I think on your Root Port:
+>  
+>    - There is an MSI capability, but MSI doesn't actually work at all
+>    - Interrupt Pin contains 1, indicating INTA, which is routed to IRQ X
+>    - AER interrupts are routed to some different IRQ Y
+>    - PME interrupts are routed to a third IRQ Z
+>  
+
+The descriptions are all right.
+
+>  So how should we work around this?  I think you should be able to get
+>  partway there with a quirk that sets:
+>  
+>    dev->no_msi = 1;
+>    dev->irq = Y;
+>  
+>  for this device.  That should make AER work, but of course PME would not
+>  work.
+>  
+>  Is there a way to set up your interrupt controller so these three
+>  interrupts (X, Y, Z above) all map to the same Linux IRQ?  If you can do
+>  that, you could set up INTA, the AER interrupt, and the PME interrupt to
+>  all be on the same IRQ and everything should work.
+>  
+>  Bjorn
+
+We'll think about all the ways. It is really helpful, thanks!  
