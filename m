@@ -1,61 +1,73 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Wed,  8 Jun 2016 18:34:42 +0200
-Subject: [PATCH v2 07/13] pwm: sti: Avoid glitches on already running PWMs
+Date: Wed,  8 Jun 2016 18:34:46 +0200
+Subject: [PATCH v2 11/13] regulator: pwm: Retrieve correct voltage
 In-Reply-To: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1465403688-17098-8-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1465403688-17098-12-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current logic will disable the PWM clk even if a PWM was left
-enabled by the bootloader (because it's controlling a critical device
-like a regulator for example).
-Keep the PWM clk enabled if at least one PWM is enabled to avoid any
-glitches.
+The continuous PWM voltage regulator is caching the voltage value in
+the ->volt_uV field. While most of the time this value should reflect the
+real voltage, sometime it can be sightly different if the PWM device
+rounded the set_duty_cycle request.
+Moreover, this value is not valid until someone has modified the regulator
+output.
+
+Remove the ->volt_uV field and always rely on the PWM state to calculate
+the regulator output.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Reviewed-by: Brian Norris <briannorris@chromium.org>
+Tested-by: Brian Norris <briannorris@chromium.org>
 ---
- drivers/pwm/pwm-sti.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+Mark,
 
-diff --git a/drivers/pwm/pwm-sti.c b/drivers/pwm/pwm-sti.c
-index 6300d3e..5bda51d 100644
---- a/drivers/pwm/pwm-sti.c
-+++ b/drivers/pwm/pwm-sti.c
-@@ -340,7 +340,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 	struct sti_pwm_compat_data *cdata;
- 	struct sti_pwm_chip *pc;
- 	struct resource *res;
--	int ret;
-+	int i, ret;
+I know you already added your Tested-by/Acked-by tags on this patch
+but this version has slightly change and is now making use of the
+pwm_get_relative_duty_cycle() helper instead of manually converting
+the absolute duty_cycle value into a relative one.
+---
+ drivers/regulator/pwm-regulator.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/regulator/pwm-regulator.c b/drivers/regulator/pwm-regulator.c
+index 8c56e16..c39ecd1 100644
+--- a/drivers/regulator/pwm-regulator.c
++++ b/drivers/regulator/pwm-regulator.c
+@@ -35,9 +35,6 @@ struct pwm_regulator_data {
+ 	struct regulator_ops ops;
  
- 	pc = devm_kzalloc(dev, sizeof(*pc), GFP_KERNEL);
- 	if (!pc)
-@@ -391,7 +391,7 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+ 	int state;
+-
+-	/* Continuous voltage */
+-	int volt_uV;
+ };
  
--	ret = clk_prepare(pc->clk);
-+	ret = clk_prepare_enable(pc->clk);
- 	if (ret) {
- 		dev_err(dev, "failed to prepare clock\n");
- 		return ret;
-@@ -409,6 +409,16 @@ static int sti_pwm_probe(struct platform_device *pdev)
- 		return ret;
- 	}
+ struct pwm_voltages {
+@@ -135,8 +132,13 @@ static int pwm_regulator_is_enabled(struct regulator_dev *dev)
+ static int pwm_regulator_get_voltage(struct regulator_dev *rdev)
+ {
+ 	struct pwm_regulator_data *drvdata = rdev_get_drvdata(rdev);
++	int min_uV = rdev->constraints->min_uV;
++	int diff = rdev->constraints->max_uV - min_uV;
++	struct pwm_state pstate;
  
-+	/*
-+	 * Keep the PWM clk enabled if some PWMs appear to be up and
-+	 * running.
-+	 */
-+	for (i = 0; i < pc->chip.npwm; i++) {
-+		if (pwm_is_enabled(&pc->chip.pwms[i]))
-+			clk_enable(pc->clk);
-+	}
-+	clk_disable(pc->clk);
+-	return drvdata->volt_uV;
++	pwm_get_state(drvdata->pwm, &pstate);
 +
- 	platform_set_drvdata(pdev, pc);
++	return min_uV + pwm_get_relative_duty_cycle(&pstate, diff);
+ }
  
- 	return 0;
+ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+@@ -162,8 +164,6 @@ static int pwm_regulator_set_voltage(struct regulator_dev *rdev,
+ 		return ret;
+ 	}
+ 
+-	drvdata->volt_uV = min_uV;
+-
+ 	/* Delay required by PWM regulator to settle to the new voltage */
+ 	usleep_range(ramp_delay, ramp_delay + 1000);
+ 
 -- 
 2.7.4
