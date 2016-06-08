@@ -1,13 +1,13 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 09 Jun 2016 00:30:32 +0300
-Subject: [PATCH v3 08/12] ARM: dts: r8a7792: add [H]SCIF support
+Date: Thu, 09 Jun 2016 00:31:50 +0300
+Subject: [PATCH v3 09/12] ARM: dts: r8a7792: add IRQC support
 In-Reply-To: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
 References: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
-Message-ID: <1501151.qkMbIJd7GW@wasted.cogentembedded.com>
+Message-ID: <1560973.LULnaQ41Pv@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Describe [H]SCIFs in the R8A7792 device tree.
+Describe the IRQC interrupt controller in the R8A7792 device tree.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
@@ -17,110 +17,33 @@ Changes in version 3:
 - refreshed the patch.
 
 Changes in version 2:
-- resolved reject, indenting the device nodes that are now under the "soc" node;
+- resolved reject, indenting the IRQC node that is now under the "soc" node;
 - added Geert's tag.
 
- arch/arm/boot/dts/r8a7792.dtsi |   90 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 90 insertions(+)
+ arch/arm/boot/dts/r8a7792.dtsi |   13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
 Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
 ===================================================================
 --- renesas.orig/arch/arm/boot/dts/r8a7792.dtsi
 +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -152,6 +152,96 @@
- 			dma-channels = <15>;
+@@ -70,6 +70,19 @@
+ 				      IRQ_TYPE_LEVEL_HIGH)>;
  		};
  
-+		scif0: serial at e6e60000 {
-+			compatible = "renesas,scif-r8a7792",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6e60000 0 64>;
-+			interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp7_clks R8A7792_CLK_SCIF0>, <&zs_clk>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x29>, <&dmac0 0x2a>,
-+			       <&dmac1 0x29>, <&dmac1 0x2a>;
-+			dma-names = "tx", "rx", "tx", "rx";
++		irqc: interrupt-controller at e61c0000 {
++			compatible = "renesas,irqc-r8a7792", "renesas,irqc";
++			#interrupt-cells = <2>;
++			interrupt-controller;
++			reg = <0 0xe61c0000 0 0x200>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&mstp4_clks R8A7792_CLK_IRQC>;
 +			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
 +		};
 +
-+		scif1: serial at e6e68000 {
-+			compatible = "renesas,scif-r8a7792",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6e68000 0 64>;
-+			interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp7_clks R8A7792_CLK_SCIF1>, <&zs_clk>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x2d>, <&dmac0 0x2e>,
-+			       <&dmac1 0x2d>, <&dmac1 0x2e>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif2: serial at e6e58000 {
-+			compatible = "renesas,scif-r8a7792",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6e58000 0 64>;
-+			interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp7_clks R8A7792_CLK_SCIF2>, <&zs_clk>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x2b>, <&dmac0 0x2c>,
-+			       <&dmac1 0x2b>, <&dmac1 0x2c>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		scif3: serial at e6ea8000 {
-+			compatible = "renesas,scif-r8a7792",
-+				     "renesas,rcar-gen2-scif", "renesas,scif";
-+			reg = <0 0xe6ea8000 0 64>;
-+			interrupts = <GIC_SPI 23 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp7_clks R8A7792_CLK_SCIF3>, <&zs_clk>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x2f>, <&dmac0 0x30>,
-+			       <&dmac1 0x2f>, <&dmac1 0x30>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		hscif0: serial at e62c0000 {
-+			compatible = "renesas,hscif-r8a7792",
-+				     "renesas,rcar-gen2-hscif", "renesas,hscif";
-+			reg = <0 0xe62c0000 0 96>;
-+			interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp7_clks R8A7792_CLK_HSCIF0>, <&zs_clk>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x39>, <&dmac0 0x3a>,
-+			       <&dmac1 0x39>, <&dmac1 0x3a>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
-+		hscif1: serial at e62c8000 {
-+			compatible = "renesas,hscif-r8a7792",
-+				     "renesas,rcar-gen2-hscif", "renesas,hscif";
-+			reg = <0 0xe62c8000 0 96>;
-+			interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&mstp7_clks R8A7792_CLK_HSCIF1>, <&zs_clk>,
-+				 <&scif_clk>;
-+			clock-names = "fck", "brg_int", "scif_clk";
-+			dmas = <&dmac0 0x4d>, <&dmac0 0x4e>,
-+			       <&dmac1 0x4d>, <&dmac1 0x4e>;
-+			dma-names = "tx", "rx", "tx", "rx";
-+			power-domains = <&sysc R8A7792_PD_ALWAYS_ON>;
-+			status = "disabled";
-+		};
-+
- 		/* Special CPG clocks */
- 		cpg_clocks: cpg_clocks at e6150000 {
- 			compatible = "renesas,r8a7792-cpg-clocks",
+ 		timer {
+ 			compatible = "arm,armv7-timer";
+ 			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
