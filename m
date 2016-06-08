@@ -1,38 +1,27 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  8 Jun 2016 18:16:10 +0100
-Subject: [PATCH] ARM: versatile: fix missing <plat/platsmp.h> include
-Message-ID: <1465406170-24420-1-git-send-email-ben.dooks@codethink.co.uk>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 8 Jun 2016 10:17:48 -0700
+Subject: [PATCH] ARM: bcm: fix missing include of kona_l2_cache.h
+In-Reply-To: <03175266-48af-fe2c-6e36-cf977c658596@broadcom.com>
+References: <1465403758-2173-1-git-send-email-ben.dooks@codethink.co.uk>
+ <03175266-48af-fe2c-6e36-cf977c658596@broadcom.com>
+Message-ID: <5758533C.8050103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix two missing function declarations by including the
-<plat/platsmp.h> file where they are defined. Fixes:
+On 06/08/2016 09:40 AM, Ray Jui wrote:
+> Hi Ben,
+> 
+> On 6/8/2016 9:35 AM, Ben Dooks wrote:
+>> Fix a warning of kona_l2_cache_init() not being declared by
+>> including the header file kona_l2_cache.h which defines it
+>> thus fixing:
+>>
+>> arch/arm/mach-bcm/kona_l2_cache.c:21:13: warning: symbol
+>> 'kona_l2_cache_init' was not declared. Should it be static?
+>>
+>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Acked-by: Ray Jui <ray.jui@broadcom.com>
 
-arch/arm/plat-versatile/platsmp.c:35:6: warning: symbol 'versatile_secondary_init' was not declared. Should it be static?
-arch/arm/plat-versatile/platsmp.c:50:5: warning: symbol 'versatile_boot_secondary' was not declared. Should it be static?
-
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/plat-versatile/platsmp.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/plat-versatile/platsmp.c b/arch/arm/plat-versatile/platsmp.c
-index 53feb90..c236651 100644
---- a/arch/arm/plat-versatile/platsmp.c
-+++ b/arch/arm/plat-versatile/platsmp.c
-@@ -18,6 +18,8 @@
- #include <asm/cacheflush.h>
- #include <asm/smp_plat.h>
- 
-+#include <plat/platsmp.h>
-+
- /*
-  * Write pen_release in a way that is guaranteed to be visible to all
-  * observers, irrespective of whether they're taking part in coherency
+Applied, thanks!
 -- 
-2.8.1
+Florian
