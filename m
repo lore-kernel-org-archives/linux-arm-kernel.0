@@ -1,42 +1,40 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed,  8 Jun 2016 18:06:14 +0100
-Subject: [PATCH] vexpress/spc: fix missing include of spc.h
-Message-ID: <1465405574-20498-1-git-send-email-ben.dooks@codethink.co.uk>
+Date: Wed,  8 Jun 2016 19:06:20 +0100
+Subject: [PATCH] mfd: omap-usb-tll: fix include of omap-usb.h
+Message-ID: <1465409180-18634-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix missing function prototypes found in spc.h by including
-the file to remove the following warnings:
+Fix the warnings about the following functions not being
+declared by including omap-usb.h which declares them:
 
-arch/arm/mach-vexpress/spc.c:131:6: warning: symbol 've_spc_global_wakeup_irq' was not declared. Should it be static?
-arch/arm/mach-vexpress/spc.c:156:6: warning: symbol 've_spc_cpu_wakeup_irq' was not declared. Should it be static?
-arch/arm/mach-vexpress/spc.c:185:6: warning: symbol 've_spc_set_resume_addr' was not declared. Should it be static?
-arch/arm/mach-vexpress/spc.c:210:6: warning: symbol 've_spc_powerdown' was not declared. Should it be static?
-arch/arm/mach-vexpress/spc.c:240:5: warning: symbol 've_spc_cpu_in_wfi' was not declared. Should it be static?
-arch/arm/mach-vexpress/spc.c:450:12: warning: symbol 've_spc_init' was not declared. Should it be static?
+drivers/mfd/omap-usb-tll.c:333:5: warning: symbol 'omap_tll_init' was not declared. Should it be static?
+drivers/mfd/omap-usb-tll.c:408:5: warning: symbol 'omap_tll_enable' was not declared. Should it be static?
+drivers/mfd/omap-usb-tll.c:442:5: warning: symbol 'omap_tll_disable' was not declared. Should it be static?
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
-Cc: Liviu Dudau <liviu.dudau@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Cc: linux-omap at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-vexpress/spc.c | 2 ++
+ drivers/mfd/omap-usb-tll.c | 2 ++
  1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/mach-vexpress/spc.c b/arch/arm/mach-vexpress/spc.c
-index 8409cab..7d2d997 100644
---- a/arch/arm/mach-vexpress/spc.c
-+++ b/arch/arm/mach-vexpress/spc.c
-@@ -31,6 +31,8 @@
+diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
+index c30290f..1aa74c4 100644
+--- a/drivers/mfd/omap-usb-tll.c
++++ b/drivers/mfd/omap-usb-tll.c
+@@ -30,6 +30,8 @@
+ #include <linux/platform_data/usb-omap.h>
+ #include <linux/of.h>
  
- #include <asm/cacheflush.h>
- 
-+#include "spc.h"
++#include "omap-usb.h"
 +
- #define SPCLOG "vexpress-spc: "
+ #define USBTLL_DRIVER_NAME	"usbhs_tll"
  
- #define PERF_LVL_A15		0x00
+ /* TLL Register Set */
 -- 
 2.8.1
