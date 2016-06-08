@@ -1,34 +1,87 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 8 Jun 2016 09:56:11 +0200
-Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
-In-Reply-To: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <5757CF9B.3080402@free.fr>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 8 Jun 2016 15:53:46 +0800
+Subject: [PATCH] arm64: mm: only initialize swiotlb when necessary
+Message-ID: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2016 13:30, Ben Dooks wrote:
+we only initialize swiotlb when swiotlb_force is true or not all system
+memory is DMA-able, this trivial optimization saves us 64MB when
+swiotlb is not necessary.
 
-> Fix the use of 0 instead of NULL to clk_get() call. This stops the
-> following warning:
-> 
-> drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ arch/arm64/mm/dma-mapping.c | 15 ++++++++++++++-
+ arch/arm64/mm/init.c        |  3 ++-
+ 2 files changed, 16 insertions(+), 2 deletions(-)
 
-May I ask which compiler/version produced that diagnostic?
-
-
-> -		clk = clk_get(cpu_dev, 0);
-> +		clk = clk_get(cpu_dev, NULL);
-
-Quoting C99 6.3.2.3 Pointers clause 3
-
-> An integer constant expression with the value 0, or such an expression cast to type
-> void *, is called a null pointer constant. If a null pointer constant is converted to a
-> pointer type, the resulting pointer, called a null pointer, is guaranteed to compare unequal
-> to a pointer to any object or function.
-
-In fact, some implementations merely #define NULL 0
-(which, admittedly, creates problems when NULL is used as a parameter
-to variadic functions)
-
-Regards.
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index c566ec8..46a4157 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -19,6 +19,7 @@
+ 
+ #include <linux/gfp.h>
+ #include <linux/acpi.h>
++#include <linux/bootmem.h>
+ #include <linux/export.h>
+ #include <linux/slab.h>
+ #include <linux/genalloc.h>
+@@ -29,6 +30,8 @@
+ 
+ #include <asm/cacheflush.h>
+ 
++static int swiotlb __read_mostly;
++
+ static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
+ 				 bool coherent)
+ {
+@@ -341,6 +344,13 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 	return ret;
+ }
+ 
++static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
++{
++	if (swiotlb)
++		return swiotlb_dma_supported(hwdev, mask);
++	return 1;
++}
++
+ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.alloc = __dma_alloc,
+ 	.free = __dma_free,
+@@ -354,7 +364,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
+ 	.sync_single_for_device = __swiotlb_sync_single_for_device,
+ 	.sync_sg_for_cpu = __swiotlb_sync_sg_for_cpu,
+ 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
+-	.dma_supported = swiotlb_dma_supported,
++	.dma_supported = __swiotlb_dma_supported,
+ 	.mapping_error = swiotlb_dma_mapping_error,
+ };
+ 
+@@ -513,6 +523,9 @@ EXPORT_SYMBOL(dummy_dma_ops);
+ 
+ static int __init arm64_dma_init(void)
+ {
++	if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
++		swiotlb = 1;
++
+ 	return atomic_pool_init();
+ }
+ arch_initcall(arm64_dma_init);
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index d45f862..7d25b4d 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -403,7 +403,8 @@ static void __init free_unused_memmap(void)
+  */
+ void __init mem_init(void)
+ {
+-	swiotlb_init(1);
++	if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
++		swiotlb_init(1);
+ 
+ 	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
+ 
+-- 
+2.8.1
