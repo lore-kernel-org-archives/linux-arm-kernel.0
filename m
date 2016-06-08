@@ -1,46 +1,42 @@
-From: ray.jui@broadcom.com (Ray Jui)
-Date: Wed, 8 Jun 2016 09:40:08 -0700
-Subject: [PATCH] ARM: bcm: fix missing include of kona_l2_cache.h
-In-Reply-To: <1465403758-2173-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465403758-2173-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <03175266-48af-fe2c-6e36-cf977c658596@broadcom.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  8 Jun 2016 18:41:55 +0200
+Subject: [PATCH 4/8] ARM: dts: at91: at91-foxg20: remove leftovers clock
+ definition
+In-Reply-To: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465404119-28177-4-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+The clocks group properties and the clock at 0 node have been obsolete for two
+years, remove them.
 
-On 6/8/2016 9:35 AM, Ben Dooks wrote:
-> Fix a warning of kona_l2_cache_init() not being declared by
-> including the header file kona_l2_cache.h which defines it
-> thus fixing:
->
-> arch/arm/mach-bcm/kona_l2_cache.c:21:13: warning: symbol 'kona_l2_cache_init' was not declared. Should it be static?
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-> Cc: Florian Fainelli <f.fainelli@gmail.com>
-> Cc: Ray Jui <rjui@broadcom.com>
-> Cc: Scott Branden <sbranden@broadcom.com>
-> Cc: bcm-kernel-feedback-list at broadcom.com
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  arch/arm/mach-bcm/kona_l2_cache.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/mach-bcm/kona_l2_cache.c b/arch/arm/mach-bcm/kona_l2_cache.c
-> index b319703..59ad863 100644
-> --- a/arch/arm/mach-bcm/kona_l2_cache.c
-> +++ b/arch/arm/mach-bcm/kona_l2_cache.c
-> @@ -17,6 +17,7 @@
->  #include <asm/hardware/cache-l2x0.h>
->
->  #include "bcm_kona_smc.h"
-> +#include "kona_l2_cache.h"
->
->  void __init kona_l2_cache_init(void)
->  {
->
+Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
+Cc: Douglas Gilbert <dgilbert@interlog.com>
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91-foxg20.dts | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-Thanks for fixing all these.
-
-Acked-by: Ray Jui <ray.jui@broadcom.com>
+diff --git a/arch/arm/boot/dts/at91-foxg20.dts b/arch/arm/boot/dts/at91-foxg20.dts
+index 6bf873e7d96c..f053fd8781af 100644
+--- a/arch/arm/boot/dts/at91-foxg20.dts
++++ b/arch/arm/boot/dts/at91-foxg20.dts
+@@ -23,15 +23,6 @@
+ 	};
+ 
+ 	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <18432000>;
+-		};
+-
+ 		slow_xtal {
+ 			clock-frequency = <32768>;
+ 		};
+-- 
+2.8.1
