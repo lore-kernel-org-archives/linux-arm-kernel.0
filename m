@@ -1,16 +1,16 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 8 Jun 2016 22:33:32 +0800
-Subject: [PATCH 03/11] clk: imx7d: correct dram root clk parent select
+Date: Wed, 8 Jun 2016 22:33:33 +0800
+Subject: [PATCH 04/11] clk: imx: correct dram pll type
 In-Reply-To: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
 References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1465396420-27064-3-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1465396420-27064-4-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Anson Huang <b20788@freescale.com>
 
-DRAM root clk should be either from pll dram main clk
-or dram alt root clk.
+DRAM PLL is a audio/video type PLL, need to correct
+it to get correct ops of PLL.
 
 Signed-off-by: Anson Huang <b20788@freescale.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
@@ -19,17 +19,17 @@ Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
  1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 3be2e9371491..1cb866773fc0 100644
+index 1cb866773fc0..dc8c3355a66d 100644
 --- a/drivers/clk/imx/clk-imx7d.c
 +++ b/drivers/clk/imx/clk-imx7d.c
-@@ -65,7 +65,7 @@ static const char *dram_phym_sel[] = { "pll_dram_main_clk",
- 	"dram_phym_alt_clk", };
+@@ -395,7 +395,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX7D_PLL_VIDEO_MAIN_SRC] = imx_clk_mux("pll_video_main_src", base + 0x130, 14, 2, pll_bypass_src_sel, ARRAY_SIZE(pll_bypass_src_sel));
  
- static const char *dram_sel[] = { "pll_dram_main_clk",
--	"dram_alt_clk", };
-+	"dram_alt_root_clk", };
- 
- static const char *dram_phym_alt_sel[] = { "osc", "pll_dram_533m_clk",
- 	"pll_sys_main_clk", "pll_enet_500m_clk",
+ 	clks[IMX7D_PLL_ARM_MAIN]  = imx_clk_pllv3(IMX_PLLV3_SYS, "pll_arm_main", "pll_arm_main_src", base + 0x60, 0x7f);
+-	clks[IMX7D_PLL_DRAM_MAIN] = imx_clk_pllv3(IMX_PLLV3_SYS, "pll_dram_main", "pll_dram_main_src", base + 0x70, 0x7f);
++	clks[IMX7D_PLL_DRAM_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_dram_main", "pll_dram_main_src", base + 0x70, 0x7f);
+ 	clks[IMX7D_PLL_SYS_MAIN]  = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll_sys_main", "pll_sys_main_src", base + 0xb0, 0x1);
+ 	clks[IMX7D_PLL_ENET_MAIN] = imx_clk_pllv3(IMX_PLLV3_ENET_IMX7, "pll_enet_main", "pll_enet_main_src", base + 0xe0, 0x0);
+ 	clks[IMX7D_PLL_AUDIO_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_audio_main", "pll_audio_main_src", base + 0xf0, 0x7f);
 -- 
 1.9.1
