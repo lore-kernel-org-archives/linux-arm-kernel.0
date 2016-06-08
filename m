@@ -1,35 +1,49 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 8 Jun 2016 22:33:33 +0800
-Subject: [PATCH 04/11] clk: imx: correct dram pll type
+Date: Wed, 8 Jun 2016 22:33:39 +0800
+Subject: [PATCH 10/11] clk: imx6sl: fix pll clock parents
 In-Reply-To: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
 References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <1465396420-27064-4-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1465396420-27064-10-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Anson Huang <b20788@freescale.com>
+pllx_bypass_src mux shouldn't be the parent of pllx clock
+since it's only valid when when pllx BYPASS bit is set.
+Thus it is actually one parent of pllx_bypass only.
 
-DRAM PLL is a audio/video type PLL, need to correct
-it to get correct ops of PLL.
+Instead, pllx parent should be fixed to osc according to
+reference manual.
+Other plls have the same issue.
 
-Signed-off-by: Anson Huang <b20788@freescale.com>
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/imx/clk-imx7d.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/clk/imx/clk-imx6sl.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-index 1cb866773fc0..dc8c3355a66d 100644
---- a/drivers/clk/imx/clk-imx7d.c
-+++ b/drivers/clk/imx/clk-imx7d.c
-@@ -395,7 +395,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
- 	clks[IMX7D_PLL_VIDEO_MAIN_SRC] = imx_clk_mux("pll_video_main_src", base + 0x130, 14, 2, pll_bypass_src_sel, ARRAY_SIZE(pll_bypass_src_sel));
+diff --git a/drivers/clk/imx/clk-imx6sl.c b/drivers/clk/imx/clk-imx6sl.c
+index 1be6230a07af..5fd4ddac1bf1 100644
+--- a/drivers/clk/imx/clk-imx6sl.c
++++ b/drivers/clk/imx/clk-imx6sl.c
+@@ -218,13 +218,13 @@ static void __init imx6sl_clocks_init(struct device_node *ccm_node)
+ 	clks[IMX6SL_PLL7_BYPASS_SRC] = imx_clk_mux("pll7_bypass_src", base + 0x20, 14, 1, pll_bypass_src_sels, ARRAY_SIZE(pll_bypass_src_sels));
  
- 	clks[IMX7D_PLL_ARM_MAIN]  = imx_clk_pllv3(IMX_PLLV3_SYS, "pll_arm_main", "pll_arm_main_src", base + 0x60, 0x7f);
--	clks[IMX7D_PLL_DRAM_MAIN] = imx_clk_pllv3(IMX_PLLV3_SYS, "pll_dram_main", "pll_dram_main_src", base + 0x70, 0x7f);
-+	clks[IMX7D_PLL_DRAM_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_dram_main", "pll_dram_main_src", base + 0x70, 0x7f);
- 	clks[IMX7D_PLL_SYS_MAIN]  = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll_sys_main", "pll_sys_main_src", base + 0xb0, 0x1);
- 	clks[IMX7D_PLL_ENET_MAIN] = imx_clk_pllv3(IMX_PLLV3_ENET_IMX7, "pll_enet_main", "pll_enet_main_src", base + 0xe0, 0x0);
- 	clks[IMX7D_PLL_AUDIO_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_audio_main", "pll_audio_main_src", base + 0xf0, 0x7f);
+ 	/*                                    type               name    parent_name        base         div_mask */
+-	clks[IMX6SL_CLK_PLL1] = imx_clk_pllv3(IMX_PLLV3_SYS,     "pll1", "pll1_bypass_src", base + 0x00, 0x7f);
+-	clks[IMX6SL_CLK_PLL2] = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll2", "pll2_bypass_src", base + 0x30, 0x1);
+-	clks[IMX6SL_CLK_PLL3] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll3", "pll3_bypass_src", base + 0x10, 0x3);
+-	clks[IMX6SL_CLK_PLL4] = imx_clk_pllv3(IMX_PLLV3_AV,      "pll4", "pll4_bypass_src", base + 0x70, 0x7f);
+-	clks[IMX6SL_CLK_PLL5] = imx_clk_pllv3(IMX_PLLV3_AV,      "pll5", "pll5_bypass_src", base + 0xa0, 0x7f);
+-	clks[IMX6SL_CLK_PLL6] = imx_clk_pllv3(IMX_PLLV3_ENET,    "pll6", "pll6_bypass_src", base + 0xe0, 0x3);
+-	clks[IMX6SL_CLK_PLL7] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll7", "pll7_bypass_src", base + 0x20, 0x3);
++	clks[IMX6SL_CLK_PLL1] = imx_clk_pllv3(IMX_PLLV3_SYS,     "pll1", "osc", base + 0x00, 0x7f);
++	clks[IMX6SL_CLK_PLL2] = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll2", "osc", base + 0x30, 0x1);
++	clks[IMX6SL_CLK_PLL3] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll3", "osc", base + 0x10, 0x3);
++	clks[IMX6SL_CLK_PLL4] = imx_clk_pllv3(IMX_PLLV3_AV,      "pll4", "osc", base + 0x70, 0x7f);
++	clks[IMX6SL_CLK_PLL5] = imx_clk_pllv3(IMX_PLLV3_AV,      "pll5", "osc", base + 0xa0, 0x7f);
++	clks[IMX6SL_CLK_PLL6] = imx_clk_pllv3(IMX_PLLV3_ENET,    "pll6", "osc", base + 0xe0, 0x3);
++	clks[IMX6SL_CLK_PLL7] = imx_clk_pllv3(IMX_PLLV3_USB,     "pll7", "osc", base + 0x20, 0x3);
+ 
+ 	clks[IMX6SL_PLL1_BYPASS] = imx_clk_mux_flags("pll1_bypass", base + 0x00, 16, 1, pll1_bypass_sels, ARRAY_SIZE(pll1_bypass_sels), CLK_SET_RATE_PARENT);
+ 	clks[IMX6SL_PLL2_BYPASS] = imx_clk_mux_flags("pll2_bypass", base + 0x30, 16, 1, pll2_bypass_sels, ARRAY_SIZE(pll2_bypass_sels), CLK_SET_RATE_PARENT);
 -- 
 1.9.1
