@@ -1,36 +1,301 @@
-From: peter@korsgaard.com (Peter Korsgaard)
-Date: Wed, 08 Jun 2016 17:28:08 +0200
-Subject: [PATCH] ARM: dts: sun5i: Move display blocks to sun5i.dtsi
-In-Reply-To: <1465063524-4925-2-git-send-email-hdegoede@redhat.com> (Hans de
- Goede's message of "Sat, 4 Jun 2016 20:05:24 +0200")
-References: <1465063524-4925-1-git-send-email-hdegoede@redhat.com>
- <1465063524-4925-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <87oa7bd7jr.fsf@dell.be.48ers.dk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 8 Jun 2016 16:31:25 +0100
+Subject: [PATCH v5 10/13] KVM: arm64: sync LPI configuration and pending
+ tables
+In-Reply-To: <1464962572-3925-11-git-send-email-andre.przywara@arm.com>
+References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
+ <1464962572-3925-11-git-send-email-andre.przywara@arm.com>
+Message-ID: <57583A4D.2040501@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Hans" == Hans de Goede <hdegoede@redhat.com> writes:
+On 03/06/16 15:02, Andre Przywara wrote:
+> The LPI configuration and pending tables of the GICv3 LPIs are held
+> in tables in (guest) memory. To achieve reasonable performance, we
+> cache this data in our own data structures, so we need to sync those
+> two views from time to time. This behaviour is well described in the
+> GICv3 spec and is also exercised by hardware, so the sync points are
+> well known.
 
- > All sun5i models share, the same die, so the display-engine is
+Care to describe them?
 
-Drop comma after share.
+> 
+> Provide functions that read the guest memory and store the
+> information from the configuration and pending tables in the kernel.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/vgic/vgic.h      |   2 +
+>  virt/kvm/arm/vgic/vgic-its.c | 145 +++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h     |   6 ++
+>  3 files changed, 153 insertions(+)
+> 
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index 77f4503..dec63f0 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -131,6 +131,8 @@ struct vgic_its {
+>  	u32			cwriter;
+>  	struct list_head	device_list;
+>  	struct list_head	collection_list;
+> +	/* memory used for buffering guest's memory */
+> +	void			*buffer_page;
+>  };
+>  
+>  struct vgic_dist {
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 4f248ef..84e6f3b 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -93,6 +93,128 @@ static struct its_itte *find_itte_by_lpi(struct vgic_its *its, int lpi)
+>  
+>  #define BASER_BASE_ADDRESS(x) ((x) & 0xfffffffff000ULL)
+>  
+> +#define LPI_PROP_ENABLE_BIT(p)	((p) & LPI_PROP_ENABLED)
+> +#define LPI_PROP_PRIORITY(p)	((p) & 0xfc)
+> +
+> +/* stores the priority and enable bit for a given LPI */
+> +static void update_lpi_config(struct kvm *kvm, struct its_itte *itte, u8 prop)
+> +{
+> +	spin_lock(&itte->irq.irq_lock);
+> +	itte->irq.priority = LPI_PROP_PRIORITY(prop);
+> +	itte->irq.enabled = LPI_PROP_ENABLE_BIT(prop);
+> +
+> +	vgic_queue_irq_unlock(kvm, &itte->irq);
+> +}
+> +
+> +#define GIC_LPI_OFFSET 8192
+> +
+> +/* We scan the table in chunks the size of the smallest page size */
+> +#define CHUNK_SIZE 4096U
 
-> identical, except for which outputs / encoders all available.
+SZ_4K. And why 4K?
 
-s/all/are/
+> +
+> +static u32 max_lpis_propbaser(u64 propbaser)
+> +{
+> +	int nr_idbits = (propbaser & 0x1f) + 1;
+> +
+> +	return 1U << min(nr_idbits, INTERRUPT_ID_BITS_ITS);
+> +}
+> +
+> +/*
+> + * Scan the whole LPI configuration table and put the LPI configuration
+> + * data in our own data structures. This relies on the LPI being
+> + * mapped before.
+> + */
+> +static bool its_update_lpis_configuration(struct kvm *kvm, struct vgic_its *its,
+> +					  u64 prop_base_reg)
 
- > All models support parallel / lvds lcd panels, the R8 and A10s also
- > support tv-out and the A10s also supports HDMI out.
+Why do you have to pass prop_base_reg here? You already have struct kvm
+that provides it. Also, the fact that you pass an ITS here shows how
+wrong the current design is (LPIs are at the redistributor level, and
+completely independent of the ITS implementation).
 
- > This commit prepares for enabling display blocks on A10s boards,
- > but it also is a bug-fix for A10s boards, because before this commit
- > the simplefb nodes for A10s where not listing the recently added
+> +{
+> +	u8 *prop = its->buffer_page;
+> +	u32 tsize;
+> +	gpa_t propbase;
+> +	int lpi = GIC_LPI_OFFSET;
+> +	struct its_itte *itte;
+> +	struct its_device *device;
+> +	int ret;
+> +
+> +	propbase = BASER_BASE_ADDRESS(prop_base_reg);
 
-s/where/were/
+So you're extracting bits [47:12] and use that as an address. No matter
+how you look at it, this is wrong. You either use [39:12] (because
+that's what KVM implements so far as the IPA range), or you use the
+architecturally defined range [51:12]. I strongly suggest you use the
+latter (and use a specific macro for that if you really have to use one).
 
- > pll3 as clock, causing the display to go block when the kernel
+> +	tsize = max_lpis_propbaser(prop_base_reg);
+> +
+> +	while (tsize > 0) {
+> +		int chunksize = min(tsize, CHUNK_SIZE);
+> +
+> +		ret = kvm_read_guest(kvm, propbase, prop, chunksize);
+> +		if (ret)
+> +			return false;
+> +
+> +		spin_lock(&its->lock);
+> +		/*
+> +		 * Updating the status for all allocated LPIs. We catch
+> +		 * those LPIs that get disabled. We really don't care
+> +		 * about unmapped LPIs, as they need to be updated
+> +		 * later manually anyway once they get mapped.
+> +		 */
 
-s/block/black/
+So why do you have to read the whole of the property table? Just iterate
+over the existing mappings (the LPIs that are allocated in the system)
+and read the single byte that actually matters (instead of reading
+several kb of useless data).
 
+> +		for_each_lpi(device, itte, its) {
+> +			if (itte->lpi < lpi || itte->lpi >= lpi + chunksize)
+> +				continue;
+> +
+> +			update_lpi_config(kvm, itte, prop[itte->lpi - lpi]);
+> +		}
+> +		spin_unlock(&its->lock);
+> +		tsize -= chunksize;
+> +		lpi += chunksize;
+> +		propbase += chunksize;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+> +/*
+> + * Scan the whole LPI pending table and sync the pending bit in there
+> + * with our own data structures. This relies on the LPI being
+> + * mapped before.
+> + */
+> +static bool its_sync_lpi_pending_table(struct kvm_vcpu *vcpu,
+> +				       struct vgic_its *its, u64 base_addr_reg)
+
+Same thing about the pending table address.
+
+> +{
+> +	unsigned long *pendmask = its->buffer_page;
+> +	u32 nr_lpis = 1U << INTERRUPT_ID_BITS_ITS;
+> +	gpa_t pendbase;
+> +	int lpi = 0;
+> +	struct its_itte *itte;
+> +	struct its_device *device;
+> +	int ret;
+> +	int lpi_bit, nr_bits;
+> +
+> +	pendbase = BASER_BASE_ADDRESS(base_addr_reg);
+
+And now you're getting 4 bits of junk that the guest may have written.
+Great!
+
+> +
+> +	while (nr_lpis > 0) {
+> +		nr_bits = min(nr_lpis, CHUNK_SIZE * BITS_PER_BYTE);
+> +
+> +		ret = kvm_read_guest(vcpu->kvm, pendbase, pendmask,
+> +				     nr_bits / BITS_PER_BYTE);
+> +		if (ret)
+> +			return false;
+> +
+> +		spin_lock(&its->lock);
+> +		for_each_lpi(device, itte, its) {
+> +			lpi_bit = itte->lpi - lpi;
+> +			if (lpi_bit < 0 || lpi_bit >= nr_bits)
+> +				continue;
+> +
+> +			if (!test_bit(lpi_bit, pendmask))
+> +				continue;
+> +
+> +			spin_lock(&itte->irq.irq_lock);
+> +			itte->irq.pending = true;
+> +			vgic_queue_irq_unlock(vcpu->kvm, &itte->irq);
+
+Same comment about reading way too much data. You have the list of LPIs,
+use that to find out the right *bit* that actually matters. You'll need
+that functionality when being issued a MAPI/MAPVI anyway.
+
+> +		}
+> +		spin_unlock(&its->lock);
+> +		nr_lpis -= nr_bits;
+> +		lpi += nr_bits;
+> +		pendbase += nr_bits / BITS_PER_BYTE;
+> +	}
+> +
+> +	return true;
+> +}
+> +
+>  #define ITS_FRAME(addr) ((addr) & ~(SZ_64K - 1))
+>  
+>  static unsigned long vgic_mmio_read_its_ctlr(struct kvm_vcpu *vcpu,
+> @@ -355,6 +477,21 @@ struct vgic_register_region its_registers[] = {
+>  		VGIC_ACCESS_32bit),
+>  };
+>  
+> +/* This is called on setting the LPI enable bit in the redistributor. */
+> +void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> +{
+> +	u64 prop_base_reg, pend_base_reg;
+> +	struct vgic_its *its;
+> +
+> +	pend_base_reg = vcpu->arch.vgic_cpu.pendbaser;
+> +	prop_base_reg = vcpu->kvm->arch.vgic.propbaser;
+> +
+> +	list_for_each_entry(its, &vcpu->kvm->arch.vits_list, its_list) {
+> +		its_update_lpis_configuration(vcpu->kvm, its, prop_base_reg);
+> +		its_sync_lpi_pending_table(vcpu, its, pend_base_reg);
+> +	}
+> +}
+> +
+>  int vits_init(struct kvm *kvm, struct vgic_its *its)
+>  {
+>  	struct vgic_io_device *iodev = &its->iodev;
+> @@ -381,6 +518,8 @@ void vits_destroy(struct kvm *kvm, struct vgic_its *its)
+>  	struct list_head *dev_cur, *dev_temp;
+>  	struct list_head *cur, *temp;
+>  
+> +	kfree(its->buffer_page);
+> +
+>  	/*
+>  	 * We may end up here without the lists ever having been initialized.
+>  	 * Check this and bail out early to avoid dereferencing a NULL pointer.
+> @@ -419,6 +558,12 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+>  	if (!its)
+>  		return -ENOMEM;
+>  
+> +	its->buffer_page = kmalloc(CHUNK_SIZE, GFP_KERNEL);
+
+kzalloc.
+
+> +	if (!its->buffer_page) {
+> +		kfree(its);
+> +		return -ENOMEM;
+> +	}
+> +
+>  	spin_lock_init(&its->lock);
+>  
+>  	its->vgic_its_base = VGIC_ADDR_UNDEF;
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index 6fecd70..46c239f 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -25,6 +25,7 @@
+>  #define IS_VGIC_ADDR_UNDEF(_x)  ((_x) == VGIC_ADDR_UNDEF)
+>  
+>  #define INTERRUPT_ID_BITS_SPIS	10
+> +#define INTERRUPT_ID_BITS_ITS	16
+
+What provision do we have to make this configurable? I'd rather tackle
+this now than having to rev it later.
+
+>  #define VGIC_PRI_BITS		5
+>  
+>  #define vgic_irq_is_sgi(intid) ((intid) < VGIC_NR_SGIS)
+> @@ -79,6 +80,7 @@ int vits_init(struct kvm *kvm, struct vgic_its *its);
+>  void vits_destroy(struct kvm *kvm, struct vgic_its *its);
+>  int kvm_vgic_register_its_device(void);
+>  struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid);
+> +void vgic_enable_lpis(struct kvm_vcpu *vcpu);
+>  #else
+>  static inline void vgic_v3_process_maintenance(struct kvm_vcpu *vcpu)
+>  {
+> @@ -154,6 +156,10 @@ static inline struct vgic_irq *vgic_its_get_lpi(struct kvm *kvm, u32 intid)
+>  {
+>  	return NULL;
+>  }
+> +
+> +static inline void vgic_enable_lpis(struct kvm_vcpu *vcpu)
+> +{
+> +}
+>  #endif
+>  
+>  int kvm_register_vgic_device(unsigned long type);
+> 
+
+Thanks,
+
+	M.
 -- 
-Bye, Peter Korsgaard
+Jazz is not dead. It just smells funny...
