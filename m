@@ -1,24 +1,26 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jun 2016 14:10:36 +0200
-Subject: [PATCH] pinctrl: at91-pio4: fix non-exported functions
-In-Reply-To: <1465319265-27630-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465319265-27630-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <CACRpkdbrCOaz-JRmgq7E6DvF-amJkkVj22R2dyg+bubz=qshig@mail.gmail.com>
+Date: Wed, 8 Jun 2016 14:12:27 +0200
+Subject: [PATCH 8/8] dmaengine: Remove site specific OOM error messages on
+ kzalloc
+In-Reply-To: <1465321121-22238-9-git-send-email-peter.griffin@linaro.org>
+References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
+ <1465321121-22238-9-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CACRpkdaf1d8CvBmFCT+bWiXR9ddJ0Mpu5hMi2fzR6sLCXt3EqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 7:07 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+On Tue, Jun 7, 2016 at 7:38 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
 
-> The atmel_pctl_find_group_by_pin() and the atmel_pinctrl_remove()
-> functions are not exported, so fix the warnings about these
-> being exported without definitions by making them static.
+> If kzalloc() fails it will issue it's own error message including
+> a dump_stack(). So remove the site specific error messages.
 >
-> drivers/pinctrl/pinctrl-at91-pio4.c:424:20: warning: symbol 'atmel_pctl_find_group_by_pin' was not declared. Should it be static?
-> drivers/pinctrl/pinctrl-at91-pio4.c:1077:5: warning: symbol 'atmel_pinctrl_remove' was not declared. Should it be static?
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
-Patch applied with Ludovic's ACK.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+A few subsystems may use a cleanup like this...
+I wonder how many unnecessary prints I've introduced
+myself :P
 
 Yours,
 Linus Walleij
