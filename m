@@ -1,131 +1,53 @@
 From: matthew@mattleach.net (Matthew Leach)
-Date: Wed,  8 Jun 2016 19:31:01 +0100
-Subject: [RFC PATCH 06/15] tty: serial: samsung: add byte-order aware bit
- functions
+Date: Wed,  8 Jun 2016 19:31:03 +0100
+Subject: [RFC PATCH 08/15] ARM: samsung: fixup endian issues in cpu detection
 In-Reply-To: <20160608183110.13851-1-matthew@mattleach.net>
 References: <20160608183110.13851-1-matthew@mattleach.net>
-Message-ID: <20160608183110.13851-7-matthew@mattleach.net>
+Message-ID: <20160608183110.13851-9-matthew@mattleach.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver makes use of the __set_bit() and __clear_bit() functions.
-When running under big-endian, these functions don't convert the bit
-indexes when working with peripheral registers, leading to the
-incorrect bits being set and cleared when running big-endian.
+From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Add two new driver functions for setting and clearing bits that are
-byte-order aware.
+If the system is built for big endian, then the cpu identificaiton register
+will be read in the wrong order. Fix this by using readl_relaxed() on the
+register.
 
-Signed-off-by: Matthew Leach <matthew@mattleach.net>
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
-CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-CC: Jiri Slaby <jslaby@suse.com>
-CC: linux-serial at vger.kernel.org
-CC: linux-kernel at vger.kernel.org
----
- drivers/tty/serial/samsung.c | 16 +++++++---------
- drivers/tty/serial/samsung.h | 29 +++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 9 deletions(-)
+ arch/arm/plat-samsung/cpu.c | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 99bb231..e4f53d5 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -169,8 +169,7 @@ static void s3c24xx_serial_stop_tx(struct uart_port *port)
- 		return;
+diff --git a/arch/arm/plat-samsung/cpu.c b/arch/arm/plat-samsung/cpu.c
+index 71333bb..bd12a55 100644
+--- a/arch/arm/plat-samsung/cpu.c
++++ b/arch/arm/plat-samsung/cpu.c
+@@ -29,14 +29,14 @@ EXPORT_SYMBOL(samsung_rev);
  
- 	if (s3c24xx_serial_has_interrupt_mask(port))
--		__set_bit(S3C64XX_UINTM_TXD,
--			portaddrl(port, S3C64XX_UINTM));
-+		s3c24xx_set_bit(port, S3C64XX_UINTM_TXD, S3C64XX_UINTM);
- 	else
- 		disable_irq_nosync(ourport->tx_irq);
+ void __init s3c64xx_init_cpu(void)
+ {
+-	samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0x118);
++	samsung_cpu_id = readl_relaxed(S3C_VA_SYS + 0x118);
+ 	if (!samsung_cpu_id) {
+ 		/*
+ 		 * S3C6400 has the ID register in a different place,
+ 		 * and needs a write before it can be read.
+ 		 */
+-		__raw_writel(0x0, S3C_VA_SYS + 0xA1C);
+-		samsung_cpu_id = __raw_readl(S3C_VA_SYS + 0xA1C);
++		writel_relaxed(0x0, S3C_VA_SYS + 0xA1C);
++		samsung_cpu_id = readl_relaxed(S3C_VA_SYS + 0xA1C);
+ 	}
  
-@@ -235,8 +234,7 @@ static void enable_tx_dma(struct s3c24xx_uart_port *ourport)
+ 	samsung_cpu_rev = 0;
+@@ -46,7 +46,7 @@ void __init s3c64xx_init_cpu(void)
  
- 	/* Mask Tx interrupt */
- 	if (s3c24xx_serial_has_interrupt_mask(port))
--		__set_bit(S3C64XX_UINTM_TXD,
--			  portaddrl(port, S3C64XX_UINTM));
-+		s3c24xx_set_bit(port, S3C64XX_UINTM_TXD, S3C64XX_UINTM);
- 	else
- 		disable_irq_nosync(ourport->tx_irq);
+ void __init s5p_init_cpu(void __iomem *cpuid_addr)
+ {
+-	samsung_cpu_id = __raw_readl(cpuid_addr);
++	samsung_cpu_id = readl_relaxed(cpuid_addr);
+ 	samsung_cpu_rev = samsung_cpu_id & 0xFF;
  
-@@ -269,8 +267,8 @@ static void enable_tx_pio(struct s3c24xx_uart_port *ourport)
- 
- 	/* Unmask Tx interrupt */
- 	if (s3c24xx_serial_has_interrupt_mask(port))
--		__clear_bit(S3C64XX_UINTM_TXD,
--			    portaddrl(port, S3C64XX_UINTM));
-+		s3c24xx_clear_bit(port, S3C64XX_UINTM_TXD,
-+				  S3C64XX_UINTM);
- 	else
- 		enable_irq(ourport->tx_irq);
- 
-@@ -397,8 +395,8 @@ static void s3c24xx_serial_stop_rx(struct uart_port *port)
- 	if (rx_enabled(port)) {
- 		dbg("s3c24xx_serial_stop_rx: port=%p\n", port);
- 		if (s3c24xx_serial_has_interrupt_mask(port))
--			__set_bit(S3C64XX_UINTM_RXD,
--				portaddrl(port, S3C64XX_UINTM));
-+			s3c24xx_set_bit(port, S3C64XX_UINTM_RXD,
-+					S3C64XX_UINTM);
- 		else
- 			disable_irq_nosync(ourport->rx_irq);
- 		rx_enabled(port) = 0;
-@@ -1069,7 +1067,7 @@ static int s3c64xx_serial_startup(struct uart_port *port)
- 	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	/* Enable Rx Interrupt */
--	__clear_bit(S3C64XX_UINTM_RXD, portaddrl(port, S3C64XX_UINTM));
-+	s3c24xx_clear_bit(port, S3C64XX_UINTM_RXD, S3C64XX_UINTM);
- 
- 	dbg("s3c64xx_serial_startup ok\n");
- 	return ret;
-diff --git a/drivers/tty/serial/samsung.h b/drivers/tty/serial/samsung.h
-index 8818bdd..e45745a 100644
---- a/drivers/tty/serial/samsung.h
-+++ b/drivers/tty/serial/samsung.h
-@@ -111,6 +111,7 @@ struct s3c24xx_uart_port {
- 
- #define s3c24xx_dev_to_port(__dev) dev_get_drvdata(__dev)
- 
-+
- /* register access controls */
- 
- #define portaddr(port, reg) ((port)->membase + (reg))
-@@ -123,4 +124,32 @@ struct s3c24xx_uart_port {
- #define wr_regb(port, reg, val) __raw_writeb(val, portaddr(port, reg))
- #define wr_regl(port, reg, val) writel_relaxed(val, portaddr(port, reg))
- 
-+/* Byte-order aware bit setting/clearing functions. */
-+
-+static inline void s3c24xx_set_bit(struct uart_port *port, int idx,
-+				   unsigned int reg)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	local_irq_save(flags);
-+	val = rd_regl(port, reg);
-+	val |= (1 << idx);
-+	wr_regl(port, reg, val);
-+	local_irq_restore(flags);
-+}
-+
-+static inline void s3c24xx_clear_bit(struct uart_port *port, int idx,
-+				     unsigned int reg)
-+{
-+	unsigned long flags;
-+	u32 val;
-+
-+	local_irq_save(flags);
-+	val = rd_regl(port, reg);
-+	val &= ~(1 << idx);
-+	wr_regl(port, reg, val);
-+	local_irq_restore(flags);
-+}
-+
- #endif
+ 	pr_info("Samsung CPU ID: 0x%08lx\n", samsung_cpu_id);
 -- 
 2.8.3
