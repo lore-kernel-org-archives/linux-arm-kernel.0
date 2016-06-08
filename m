@@ -1,96 +1,153 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Thu, 9 Jun 2016 00:03:41 +0800
-Subject: [RFC v3 1/5] drm/mediatek: rename macros, add chip prefix
-In-Reply-To: <1465401825-43642-1-git-send-email-yt.shen@mediatek.com>
-References: <1465401825-43642-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1465401825-43642-2-git-send-email-yt.shen@mediatek.com>
+From: liviu.dudau@arm.com (Liviu Dudau)
+Date: Wed, 8 Jun 2016 17:05:33 +0100
+Subject: [PATCH 3/3] arm64: dts: juno: add SCPI power domains for device
+ power management
+In-Reply-To: <1465228765-14038-4-git-send-email-sudeep.holla@arm.com>
+References: <1465228765-14038-1-git-send-email-sudeep.holla@arm.com>
+ <1465228765-14038-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20160608160532.GR1165@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MT8173 prefix for hardware related macros.
+On Mon, Jun 06, 2016 at 04:59:25PM +0100, Sudeep Holla wrote:
+> This patch adds power domain information to coresight devices using
+> SCPI power domains.
+> 
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
----
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c |   60 ++++++++++++++++----------------
- 1 file changed, 30 insertions(+), 30 deletions(-)
+Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 17ba935..2fc4321 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -36,21 +36,21 @@
- #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
- #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
- 
--#define MUTEX_MOD_DISP_OVL0		BIT(11)
--#define MUTEX_MOD_DISP_OVL1		BIT(12)
--#define MUTEX_MOD_DISP_RDMA0		BIT(13)
--#define MUTEX_MOD_DISP_RDMA1		BIT(14)
--#define MUTEX_MOD_DISP_RDMA2		BIT(15)
--#define MUTEX_MOD_DISP_WDMA0		BIT(16)
--#define MUTEX_MOD_DISP_WDMA1		BIT(17)
--#define MUTEX_MOD_DISP_COLOR0		BIT(18)
--#define MUTEX_MOD_DISP_COLOR1		BIT(19)
--#define MUTEX_MOD_DISP_AAL		BIT(20)
--#define MUTEX_MOD_DISP_GAMMA		BIT(21)
--#define MUTEX_MOD_DISP_UFOE		BIT(22)
--#define MUTEX_MOD_DISP_PWM0		BIT(23)
--#define MUTEX_MOD_DISP_PWM1		BIT(24)
--#define MUTEX_MOD_DISP_OD		BIT(25)
-+#define MT8173_MUTEX_MOD_DISP_OVL0		BIT(11)
-+#define MT8173_MUTEX_MOD_DISP_OVL1		BIT(12)
-+#define MT8173_MUTEX_MOD_DISP_RDMA0		BIT(13)
-+#define MT8173_MUTEX_MOD_DISP_RDMA1		BIT(14)
-+#define MT8173_MUTEX_MOD_DISP_RDMA2		BIT(15)
-+#define MT8173_MUTEX_MOD_DISP_WDMA0		BIT(16)
-+#define MT8173_MUTEX_MOD_DISP_WDMA1		BIT(17)
-+#define MT8173_MUTEX_MOD_DISP_COLOR0		BIT(18)
-+#define MT8173_MUTEX_MOD_DISP_COLOR1		BIT(19)
-+#define MT8173_MUTEX_MOD_DISP_AAL		BIT(20)
-+#define MT8173_MUTEX_MOD_DISP_GAMMA		BIT(21)
-+#define MT8173_MUTEX_MOD_DISP_UFOE		BIT(22)
-+#define MT8173_MUTEX_MOD_DISP_PWM0		BIT(23)
-+#define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
-+#define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
- 
- #define MUTEX_SOF_SINGLE_MODE		0
- #define MUTEX_SOF_DSI0			1
-@@ -80,21 +80,21 @@ struct mtk_ddp {
- };
- 
- static const unsigned int mutex_mod[DDP_COMPONENT_ID_MAX] = {
--	[DDP_COMPONENT_AAL] = MUTEX_MOD_DISP_AAL,
--	[DDP_COMPONENT_COLOR0] = MUTEX_MOD_DISP_COLOR0,
--	[DDP_COMPONENT_COLOR1] = MUTEX_MOD_DISP_COLOR1,
--	[DDP_COMPONENT_GAMMA] = MUTEX_MOD_DISP_GAMMA,
--	[DDP_COMPONENT_OD] = MUTEX_MOD_DISP_OD,
--	[DDP_COMPONENT_OVL0] = MUTEX_MOD_DISP_OVL0,
--	[DDP_COMPONENT_OVL1] = MUTEX_MOD_DISP_OVL1,
--	[DDP_COMPONENT_PWM0] = MUTEX_MOD_DISP_PWM0,
--	[DDP_COMPONENT_PWM1] = MUTEX_MOD_DISP_PWM1,
--	[DDP_COMPONENT_RDMA0] = MUTEX_MOD_DISP_RDMA0,
--	[DDP_COMPONENT_RDMA1] = MUTEX_MOD_DISP_RDMA1,
--	[DDP_COMPONENT_RDMA2] = MUTEX_MOD_DISP_RDMA2,
--	[DDP_COMPONENT_UFOE] = MUTEX_MOD_DISP_UFOE,
--	[DDP_COMPONENT_WDMA0] = MUTEX_MOD_DISP_WDMA0,
--	[DDP_COMPONENT_WDMA1] = MUTEX_MOD_DISP_WDMA1,
-+	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
-+	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
-+	[DDP_COMPONENT_COLOR1] = MT8173_MUTEX_MOD_DISP_COLOR1,
-+	[DDP_COMPONENT_GAMMA] = MT8173_MUTEX_MOD_DISP_GAMMA,
-+	[DDP_COMPONENT_OD] = MT8173_MUTEX_MOD_DISP_OD,
-+	[DDP_COMPONENT_OVL0] = MT8173_MUTEX_MOD_DISP_OVL0,
-+	[DDP_COMPONENT_OVL1] = MT8173_MUTEX_MOD_DISP_OVL1,
-+	[DDP_COMPONENT_PWM0] = MT8173_MUTEX_MOD_DISP_PWM0,
-+	[DDP_COMPONENT_PWM1] = MT8173_MUTEX_MOD_DISP_PWM1,
-+	[DDP_COMPONENT_RDMA0] = MT8173_MUTEX_MOD_DISP_RDMA0,
-+	[DDP_COMPONENT_RDMA1] = MT8173_MUTEX_MOD_DISP_RDMA1,
-+	[DDP_COMPONENT_RDMA2] = MT8173_MUTEX_MOD_DISP_RDMA2,
-+	[DDP_COMPONENT_UFOE] = MT8173_MUTEX_MOD_DISP_UFOE,
-+	[DDP_COMPONENT_WDMA0] = MT8173_MUTEX_MOD_DISP_WDMA0,
-+	[DDP_COMPONENT_WDMA1] = MT8173_MUTEX_MOD_DISP_WDMA1,
- };
- 
- static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm64/boot/dts/arm/juno-base.dtsi | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/arm/juno-base.dtsi b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> index 49fa55cdc977..ef054094d5a8 100644
+> --- a/arch/arm64/boot/dts/arm/juno-base.dtsi
+> +++ b/arch/arm64/boot/dts/arm/juno-base.dtsi
+> @@ -75,6 +75,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		ports {
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> @@ -105,6 +106,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			tpiu_in_port: endpoint {
+>  				slave-mode;
+> @@ -120,6 +122,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		ports {
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> @@ -157,6 +160,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			etr_in_port: endpoint {
+>  				slave-mode;
+> @@ -208,6 +212,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		ports {
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> @@ -244,6 +249,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		ports {
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+> @@ -293,6 +299,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			cluster0_etm0_out_port: endpoint {
+>  				remote-endpoint = <&cluster0_funnel_in_port0>;
+> @@ -306,6 +313,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			cluster0_etm1_out_port: endpoint {
+>  				remote-endpoint = <&cluster0_funnel_in_port1>;
+> @@ -319,6 +327,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			cluster1_etm0_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port0>;
+> @@ -332,6 +341,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			cluster1_etm1_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port1>;
+> @@ -345,6 +355,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			cluster1_etm2_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port2>;
+> @@ -358,6 +369,7 @@
+> 
+>  		clocks = <&soc_smc50mhz>;
+>  		clock-names = "apb_pclk";
+> +		power-domains = <&scpi_devpd 0>;
+>  		port {
+>  			cluster1_etm3_out_port: endpoint {
+>  				remote-endpoint = <&cluster1_funnel_in_port3>;
+> @@ -428,6 +440,12 @@
+>  			};
+>  		};
+> 
+> +		scpi_devpd: scpi-power-domains {
+> +			compatible = "arm,scpi-power-domains";
+> +			num-domains = <2>;
+> +			#power-domain-cells = <1>;
+> +		};
+> +
+>  		scpi_sensors0: sensors {
+>  			compatible = "arm,scpi-sensors";
+>  			#thermal-sensor-cells = <1>;
+> --
+> 2.7.4
+> 
+
 -- 
-1.7.9.5
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
