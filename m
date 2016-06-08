@@ -1,28 +1,98 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 8 Jun 2016 10:05:16 +0200
-Subject: [PATCH v2 4/4] ARM: dts: r8a7790: lager: use demuxer for IIC3/I2C3
-In-Reply-To: <1465370066-8450-5-git-send-email-horms+renesas@verge.net.au>
-References: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
- <1465370066-8450-5-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20160608080516.GI1521@katana>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Wed, 8 Jun 2016 16:01:40 +0800
+Subject: [PATCH] arm64: mm: only initialize swiotlb when necessary
+In-Reply-To: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
+References: <1465372426-4077-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20160608160140.11eb0342@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 04:14:26PM +0900, Simon Horman wrote:
-> Create a separate bus for dla98063 PMIC and da9210 regulator
-> related I2C slaves.
-> 
-> Based on similar work for HDMI by Wolfram Sang.
-> 
-> Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Dear all,
 
-Maybe add a word that PFC doesn't allow I2C0/I2C3 to be muxed as GPIO?
+On Wed, 8 Jun 2016 15:53:46 +0800 Jisheng Zhang wrote:
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160608/122eef7c/attachment.sig>
+> we only initialize swiotlb when swiotlb_force is true or not all system
+> memory is DMA-able, this trivial optimization saves us 64MB when
+> swiotlb is not necessary.
+
+another solution is to call swiotlb_free() as ppc does. Either solution can
+solve my problem. If maintainers prefer that solution, I can send a v2 patch.
+
+Thanks,
+Jisheng
+
+> 
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> ---
+>  arch/arm64/mm/dma-mapping.c | 15 ++++++++++++++-
+>  arch/arm64/mm/init.c        |  3 ++-
+>  2 files changed, 16 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+> index c566ec8..46a4157 100644
+> --- a/arch/arm64/mm/dma-mapping.c
+> +++ b/arch/arm64/mm/dma-mapping.c
+> @@ -19,6 +19,7 @@
+>  
+>  #include <linux/gfp.h>
+>  #include <linux/acpi.h>
+> +#include <linux/bootmem.h>
+>  #include <linux/export.h>
+>  #include <linux/slab.h>
+>  #include <linux/genalloc.h>
+> @@ -29,6 +30,8 @@
+>  
+>  #include <asm/cacheflush.h>
+>  
+> +static int swiotlb __read_mostly;
+> +
+>  static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
+>  				 bool coherent)
+>  {
+> @@ -341,6 +344,13 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
+>  	return ret;
+>  }
+>  
+> +static int __swiotlb_dma_supported(struct device *hwdev, u64 mask)
+> +{
+> +	if (swiotlb)
+> +		return swiotlb_dma_supported(hwdev, mask);
+> +	return 1;
+> +}
+> +
+>  static struct dma_map_ops swiotlb_dma_ops = {
+>  	.alloc = __dma_alloc,
+>  	.free = __dma_free,
+> @@ -354,7 +364,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
+>  	.sync_single_for_device = __swiotlb_sync_single_for_device,
+>  	.sync_sg_for_cpu = __swiotlb_sync_sg_for_cpu,
+>  	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
+> -	.dma_supported = swiotlb_dma_supported,
+> +	.dma_supported = __swiotlb_dma_supported,
+>  	.mapping_error = swiotlb_dma_mapping_error,
+>  };
+>  
+> @@ -513,6 +523,9 @@ EXPORT_SYMBOL(dummy_dma_ops);
+>  
+>  static int __init arm64_dma_init(void)
+>  {
+> +	if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
+> +		swiotlb = 1;
+> +
+>  	return atomic_pool_init();
+>  }
+>  arch_initcall(arm64_dma_init);
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index d45f862..7d25b4d 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -403,7 +403,8 @@ static void __init free_unused_memmap(void)
+>   */
+>  void __init mem_init(void)
+>  {
+> -	swiotlb_init(1);
+> +	if (swiotlb_force || max_pfn > (arm64_dma_phys_limit >> PAGE_SHIFT))
+> +		swiotlb_init(1);
+>  
+>  	set_max_mapnr(pfn_to_page(max_pfn) - mem_map);
+>  
