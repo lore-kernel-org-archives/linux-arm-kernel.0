@@ -1,88 +1,40 @@
 From: matthew@mattleach.net (Matthew Leach)
-Date: Wed,  8 Jun 2016 19:30:59 +0100
-Subject: [RFC PATCH 04/15] irqchip: exynos_combiner: fixup reg access on be
+Date: Wed,  8 Jun 2016 19:31:00 +0100
+Subject: [RFC PATCH 05/15] tty: serial: samsung: fixup accessors for endian
 In-Reply-To: <20160608183110.13851-1-matthew@mattleach.net>
 References: <20160608183110.13851-1-matthew@mattleach.net>
-Message-ID: <20160608183110.13851-5-matthew@mattleach.net>
+Message-ID: <20160608183110.13851-6-matthew@mattleach.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the byte-order aware big endian accessors, allowing for kernels
-running under big-endian.
+Fix the serial access code to deal with kernels built for big endian
+operation.
 
 Signed-off-by: Matthew Leach <matthew@mattleach.net>
 ---
-CC: Thomas Gleixner <tglx@linutronix.de>
-CC: Jason Cooper <jason@lakedaemon.net>
-CC: Marc Zyngier <marc.zyngier@arm.com>
-CC: Kukjin Kim <kgene@kernel.org>
-CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+CC: Jiri Slaby <jslaby@suse.com>
+CC: linux-serial at vger.kernel.org
 CC: linux-kernel at vger.kernel.org
-CC: linux-arm-kernel at lists.infradead.org
-CC: linux-samsung-soc at vger.kernel.org
 ---
- drivers/irqchip/exynos-combiner.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ drivers/tty/serial/samsung.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
-index ead15be..b78a169 100644
---- a/drivers/irqchip/exynos-combiner.c
-+++ b/drivers/irqchip/exynos-combiner.c
-@@ -55,14 +55,14 @@ static void combiner_mask_irq(struct irq_data *data)
- {
- 	u32 mask = 1 << (data->hwirq % 32);
+diff --git a/drivers/tty/serial/samsung.h b/drivers/tty/serial/samsung.h
+index fc5deaa..8818bdd 100644
+--- a/drivers/tty/serial/samsung.h
++++ b/drivers/tty/serial/samsung.h
+@@ -118,9 +118,9 @@ struct s3c24xx_uart_port {
+ 	((unsigned long *)(unsigned long)((port)->membase + (reg)))
  
--	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
-+	writel_relaxed(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
- }
+ #define rd_regb(port, reg) (__raw_readb(portaddr(port, reg)))
+-#define rd_regl(port, reg) (__raw_readl(portaddr(port, reg)))
++#define rd_regl(port, reg) (readl_relaxed(portaddr(port, reg)))
  
- static void combiner_unmask_irq(struct irq_data *data)
- {
- 	u32 mask = 1 << (data->hwirq % 32);
+ #define wr_regb(port, reg, val) __raw_writeb(val, portaddr(port, reg))
+-#define wr_regl(port, reg, val) __raw_writel(val, portaddr(port, reg))
++#define wr_regl(port, reg, val) writel_relaxed(val, portaddr(port, reg))
  
--	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_SET);
-+	writel_relaxed(mask, combiner_base(data) + COMBINER_ENABLE_SET);
- }
- 
- static void combiner_handle_cascade_irq(struct irq_desc *desc)
-@@ -75,7 +75,7 @@ static void combiner_handle_cascade_irq(struct irq_desc *desc)
- 	chained_irq_enter(chip, desc);
- 
- 	spin_lock(&irq_controller_lock);
--	status = __raw_readl(chip_data->base + COMBINER_INT_STATUS);
-+	status = readl_relaxed(chip_data->base + COMBINER_INT_STATUS);
- 	spin_unlock(&irq_controller_lock);
- 	status &= chip_data->irq_mask;
- 
-@@ -135,7 +135,7 @@ static void __init combiner_init_one(struct combiner_chip_data *combiner_data,
- 	combiner_data->parent_irq = irq;
- 
- 	/* Disable all interrupts */
--	__raw_writel(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
-+	writel_relaxed(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
- }
- 
- static int combiner_irq_domain_xlate(struct irq_domain *d,
-@@ -218,7 +218,7 @@ static int combiner_suspend(void)
- 
- 	for (i = 0; i < max_nr; i++)
- 		combiner_data[i].pm_save =
--			__raw_readl(combiner_data[i].base + COMBINER_ENABLE_SET);
-+			readl_relaxed(combiner_data[i].base + COMBINER_ENABLE_SET);
- 
- 	return 0;
- }
-@@ -235,9 +235,9 @@ static void combiner_resume(void)
- 	int i;
- 
- 	for (i = 0; i < max_nr; i++) {
--		__raw_writel(combiner_data[i].irq_mask,
-+		writel_relaxed(combiner_data[i].irq_mask,
- 			     combiner_data[i].base + COMBINER_ENABLE_CLEAR);
--		__raw_writel(combiner_data[i].pm_save,
-+		writel_relaxed(combiner_data[i].pm_save,
- 			     combiner_data[i].base + COMBINER_ENABLE_SET);
- 	}
- }
+ #endif
 -- 
 2.8.3
