@@ -1,48 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 8 Jun 2016 18:52:16 +0200
-Subject: [PATCH 1/8] ARM: dts: at91: animeo_ip: remove leftovers clock
- definition
-In-Reply-To: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <57584D40.8080606@atmel.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 8 Jun 2016 18:52:30 +0200
+Subject: [PATCH v5 resend 1/2] ehci-platform: Add support for controllers
+ with multiple reset lines
+In-Reply-To: <20160608052216.GA7766@kroah.com>
+References: <1464880446-5919-1-git-send-email-hdegoede@redhat.com>
+ <1464880446-5919-2-git-send-email-hdegoede@redhat.com>
+ <20160608052216.GA7766@kroah.com>
+Message-ID: <20236f14-549e-5acc-3f95-90db44b1f49d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/06/2016 18:41, Alexandre Belloni a ?crit :
-> The clocks group properties and the clock at 0 node have been obsolete for two
-> years, remove them.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Hi,
 
-On the whole series:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On 08-06-16 07:22, Greg Kroah-Hartman wrote:
+> On Thu, Jun 02, 2016 at 05:14:05PM +0200, Hans de Goede wrote:
+>> From: Reinder de Haan <patchesrdh@mveas.com>
+>>
+>> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
+>> reset lines, the controller will not initialize while the reset for
+>> its companion is still asserted, which means we need to de-assert
+>> 2 resets for the controller to work.
+>>
+>> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -Use the new reset_control_[de]assert_shared reset-controller functions
+>> ---
+>>  Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
+>>  drivers/usb/host/ehci-platform.c                   | 41 ++++++++++++----------
+>>  2 files changed, 24 insertions(+), 19 deletions(-)
+>
+> This patch doesn't apply to my usb-testing branch at all, what went
+> wrong?
 
-> ---
->  arch/arm/boot/dts/animeo_ip.dts | 9 ---------
->  1 file changed, 9 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-> index 0962f2fa3f6e..419dd3981edf 100644
-> --- a/arch/arm/boot/dts/animeo_ip.dts
-> +++ b/arch/arm/boot/dts/animeo_ip.dts
-> @@ -32,15 +32,6 @@
->  	};
->  
->  	clocks {
-> -		#address-cells = <1>;
-> -		#size-cells = <1>;
-> -		ranges;
-> -
-> -		main_clock: clock at 0 {
-> -			compatible = "atmel,osc", "fixed-clock";
-> -			clock-frequency = <18432000>;
-> -		};
-> -
->  		slow_xtal {
->  			clock-frequency = <32768>;
->  		};
-> 
+You merged this patch:
 
+https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/?id=d0e08b0077f49e209bc90305ddf1ca434ac6cc0e
 
--- 
-Nicolas Ferre
+Which does almost the same, except that it only supports dedicated reset
+controllers and not shared reset controllers.
+
+I'll send a new patch which changes things to add support for shared
+reset controllers.
+
+This will also bring the ehci-platform reset handling code inline
+with ohci-platform again.
+
+Regards,
+
+Hans
