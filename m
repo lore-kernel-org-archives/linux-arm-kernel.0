@@ -1,49 +1,44 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 8 Jun 2016 16:11:58 -0700
-Subject: [PATCH] ARM: mm: fix location of _etext
-Message-ID: <20160608231158.GA12159@www.outflux.net>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Wed, 8 Jun 2016 16:16:49 -0700
+Subject: [PATCH 3/3] ARM: configs: keystone: Enable PINCTRL_SINGLE Config
+In-Reply-To: <1ae3ae50-3eae-e598-7489-177adf8844ae@oracle.com>
+References: <1464006547-19569-1-git-send-email-j-keerthy@ti.com>
+ <1464006547-19569-4-git-send-email-j-keerthy@ti.com>
+ <5743CC80.4070404@ti.com> <5743D0FD.5070804@ti.com>
+ <6325832e-24d2-43c7-09b4-a73b6549ee2c@oracle.com> <57451A36.8050809@ti.com>
+ <5754F00C.108@ti.com> <57550260.6030902@ti.com>
+ <1ae3ae50-3eae-e598-7489-177adf8844ae@oracle.com>
+Message-ID: <535988a6-3701-3168-ad50-ad2fe61bbbdf@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The _etext position is defined to be the end of the kernel text code,
-and should not include any part of the data segments. This interferes
-with things that might check memory ranges and expect executable code
-up to _etext.
+Franklin,
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
----
-arm64 needs this fixed too, but it has other assumptions built onto
-_etext that should be using different markers.
----
- arch/arm/kernel/vmlinux.lds.S | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 6/6/2016 9:00 AM, Santosh Shilimkar wrote:
+> On 6/5/2016 9:56 PM, Keerthy wrote:
+>>
+> [...]
+>
+>> Santosh,
+>>
+>> I posted a consolidated series for k2l.
+>>
+> Thanks. Will pick that up.
+>
+>> Franklin,
+>>
+>> Could you re-post k2g series on top of the series i posted today.
+>>
+I have update the keystone 4.8 branches and linux-next branch.
 
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index e2c6da096cef..99420fc1f066 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -125,6 +125,8 @@ SECTIONS
- #ifdef CONFIG_DEBUG_ALIGN_RODATA
- 	. = ALIGN(1<<SECTION_SHIFT);
- #endif
-+	_etext = .;			/* End of text section */
-+
- 	RO_DATA(PAGE_SIZE)
- 
- 	. = ALIGN(4);
-@@ -155,8 +157,6 @@ SECTIONS
- 
- 	NOTES
- 
--	_etext = .;			/* End of text and rodata section */
--
- #ifdef CONFIG_DEBUG_RODATA
- 	. = ALIGN(1<<SECTION_SHIFT);
- #else
--- 
-2.7.4
+Please refresh your DTS patches against [1] and post the same.
 
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+
+
+Regards,
+Santosh
+
+[1] 
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git 
+for_4.8/keystone_dts
