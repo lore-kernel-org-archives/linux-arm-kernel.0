@@ -1,8 +1,10 @@
 From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed,  8 Jun 2016 10:10:02 +0100
-Subject: [PATCH v2 1/2] phy: phy-qcom-ufs-qmp-14nm: Remove site specific OOM
+Date: Wed,  8 Jun 2016 10:10:03 +0100
+Subject: [PATCH v2 2/2] phy: phy-qcom-ufs-qmp-20nm: Remove site specific OOM
  error message
-Message-ID: <1465377003-25660-1-git-send-email-peter.griffin@linaro.org>
+In-Reply-To: <1465377003-25660-1-git-send-email-peter.griffin@linaro.org>
+References: <1465377003-25660-1-git-send-email-peter.griffin@linaro.org>
+Message-ID: <1465377003-25660-2-git-send-email-peter.griffin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,16 +15,16 @@ Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
 ---
 
-v2: Add brackets so goto is not executed unconditionally (Baruch)
+v2: Add brackets, so goto is not executed unconditionally (Baruch)
 ---
- drivers/phy/phy-qcom-ufs-qmp-14nm.c | 1 -
+ drivers/phy/phy-qcom-ufs-qmp-20nm.c | 1 -
  1 file changed, 1 deletion(-)
 
-diff --git a/drivers/phy/phy-qcom-ufs-qmp-14nm.c b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
-index 56631e7..6ee5149 100644
---- a/drivers/phy/phy-qcom-ufs-qmp-14nm.c
-+++ b/drivers/phy/phy-qcom-ufs-qmp-14nm.c
-@@ -140,7 +140,6 @@ static int ufs_qcom_phy_qmp_14nm_probe(struct platform_device *pdev)
+diff --git a/drivers/phy/phy-qcom-ufs-qmp-20nm.c b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+index b16ea77..770087a 100644
+--- a/drivers/phy/phy-qcom-ufs-qmp-20nm.c
++++ b/drivers/phy/phy-qcom-ufs-qmp-20nm.c
+@@ -196,7 +196,6 @@ static int ufs_qcom_phy_qmp_20nm_probe(struct platform_device *pdev)
  
  	phy = devm_kzalloc(dev, sizeof(*phy), GFP_KERNEL);
  	if (!phy) {
