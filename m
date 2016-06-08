@@ -1,156 +1,247 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 8 Jun 2016 15:56:36 +0100
-Subject: [PATCH v5 05/13] KVM: arm64: handle ITS related GICv3
- redistributor registers
-In-Reply-To: <1464962572-3925-6-git-send-email-andre.przywara@arm.com>
-References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
- <1464962572-3925-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <57583224.2020205@arm.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Wed, 8 Jun 2016 17:15:08 +0200
+Subject: [PATCH 2/3] PCI: host: new PCI host controller driver for Marvell
+ Armada 3700
+In-Reply-To: <1464858585-10963-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1464858585-10963-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <CAPv3WKcznGD4p-YO3QLLYw+y+7w4ha-d_Nt6FHue7d2_SiyK0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On top of the issues I already outlined:
+Hi Thomas,
 
-On 03/06/16 15:02, Andre Przywara wrote:
-> In the GICv3 redistributor there are the PENDBASER and PROPBASER
-> registers which we did not emulate so far, as they only make sense
-> when having an ITS. In preparation for that emulate those MMIO
-> accesses by storing the 64-bit data written into it into a variable
-> which we later read in the ITS emulation.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/vgic/vgic.h          | 13 +++++++++
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 58 ++++++++++++++++++++++++++++++++++++++--
->  2 files changed, 69 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 2f26f37..896175b 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -145,6 +145,14 @@ struct vgic_dist {
->  	struct vgic_irq		*spis;
->  
->  	struct vgic_io_device	dist_iodev;
+
+> +static const struct irq_domain_ops advk_pcie_msi_irq_ops = {
+> +       .map = advk_pcie_msi_map,
+> +};
 > +
-> +	/*
-> +	 * Contains the address of the LPI configuration table.
-> +	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
-> +	 * one address across all redistributors.
-> +	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
-> +	 */
-> +	u64			propbaser;
->  };
->  
->  struct vgic_v2_cpu_if {
-> @@ -199,6 +207,11 @@ struct vgic_cpu {
->  	 */
->  	struct vgic_io_device	rd_iodev;
->  	struct vgic_io_device	sgi_iodev;
-> +
-> +	/* Points to the LPI pending tables for the redistributor */
-> +	u64 pendbaser;
-> +
-> +	bool lpis_enabled;
->  };
->  
->  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index fc7b6c9..6293b36 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -29,6 +29,16 @@ static unsigned long extract_bytes(unsigned long data, unsigned int offset,
->  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
->  }
->  
-> +/* allows updates of any half of a 64-bit register (or the whole thing) */
-> +static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
-> +			    unsigned long val)
+> +static void advk_pcie_irq_mask(struct irq_data *d)
 > +{
-> +	offset &= 4;
-> +	reg &= GENMASK_ULL(len * 8 - 1, 0) << ((len - offset) * 8);
+> +       struct advk_pcie *pcie = d->domain->host_data;
+> +       irq_hw_number_t hwirq = irqd_to_hwirq(d);
+> +       u32 mask;
 > +
-> +	return reg | ((u64)val << (offset * 8));
+> +       mask = advk_readl(pcie, PCIE_ISR0_MASK_REG);
+> +       mask |= PCIE_ISR0_INTX_ASSERT(hwirq) |
+> +               PCIE_ISR0_INTX_DEASSERT(hwirq);
+> +       advk_writel(pcie, mask, PCIE_ISR0_MASK_REG);
 > +}
 > +
->  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->  					    gpa_t addr, unsigned int len)
->  {
-> @@ -147,6 +157,50 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
->  
-> +static unsigned long vgic_mmio_read_propbase(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
+> +static void advk_pcie_irq_unmask(struct irq_data *d)
 > +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +       struct advk_pcie *pcie = d->domain->host_data;
+> +       irq_hw_number_t hwirq = irqd_to_hwirq(d);
+> +       u32 mask;
 > +
-> +	return extract_bytes(dist->propbaser, addr & 7, len);
+> +       mask = advk_readl(pcie, PCIE_ISR0_MASK_REG);
+> +       mask &= ~(PCIE_ISR0_INTX_ASSERT(hwirq) |
+> +                 PCIE_ISR0_INTX_DEASSERT(hwirq));
+
+Have you checked my latest improvements of interrupt handling in this
+controller? As DEASSERT is polled in advk_pcie_handle_int() I don't
+think it should be able to trigger root complex interrupt at all.
+Hence I think it shouldn't be unmasked.
+
+> +       advk_writel(pcie, mask, PCIE_ISR0_MASK_REG);
 > +}
 > +
-> +static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
-> +				     gpa_t addr, unsigned int len,
-> +				     unsigned long val)
+> +static int advk_pcie_irq_map(struct irq_domain *h,
+> +                            unsigned int virq, irq_hw_number_t hwirq)
 > +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +       struct advk_pcie *pcie = h->host_data;
 > +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	if (vgic_cpu->lpis_enabled)
-> +		return;
+> +       advk_pcie_irq_mask(irq_get_irq_data(virq));
+> +       irq_set_status_flags(virq, IRQ_LEVEL);
+> +       irq_set_chip_and_handler(virq, &pcie->irq_chip,
+> +                                handle_level_irq);
+> +       irq_set_chip_data(virq, pcie);
 > +
-> +	dist->propbaser = update_64bit_reg(dist->propbaser, addr & 4, len, val);
-
-How about sanitizing the register? RES0 bits and co? What do you do for
-cacheability, shareabitily?
-
+> +       return 0;
 > +}
 > +
-> +static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +static const struct irq_domain_ops advk_pcie_irq_domain_ops = {
+> +       .map = advk_pcie_irq_map,
+> +       .xlate = irq_domain_xlate_onecell,
+> +};
 > +
-> +	return extract_bytes(vgic_cpu->pendbaser, addr & 7, len);
+> +static int advk_pcie_init_irq(struct advk_pcie *pcie)
+> +{
+> +       struct device *dev = &pcie->pdev->dev;
+> +       struct device_node *node = dev->of_node;
+> +       struct device_node *pcie_intc_node;
+> +       struct irq_chip *irq_chip, *msi_irq_chip;
+> +       struct msi_controller *msi;
+> +       phys_addr_t msi_msg_phys;
+> +
+> +       pcie_intc_node =  of_get_next_child(node, NULL);
+> +       if (!pcie_intc_node) {
+> +               dev_err(dev, "No PCIe Intc node found\n");
+> +               return PTR_ERR(pcie_intc_node);
+> +       }
+> +
+> +       irq_chip = &pcie->irq_chip;
+> +
+> +       irq_chip->name = devm_kasprintf(dev, GFP_KERNEL, "%s-irq",
+> +                                       dev_name(dev));
+> +       if (!irq_chip->name)
+> +               return -ENOMEM;
+> +       irq_chip->irq_mask = advk_pcie_irq_mask;
+> +       irq_chip->irq_mask_ack = advk_pcie_irq_mask;
+> +       irq_chip->irq_unmask = advk_pcie_irq_unmask;
+> +
+> +       pcie->irq_domain =
+> +               irq_domain_add_linear(pcie_intc_node, LEGACY_IRQ_NUM,
+> +                                     &advk_pcie_irq_domain_ops, pcie);
+> +       if (!pcie->irq_domain) {
+> +               dev_err(dev, "Failed to get a INTx IRQ domain\n");
+> +               return PTR_ERR(pcie->irq_domain);
+> +       }
+> +
+> +       msi_irq_chip = &pcie->msi_irq_chip;
+> +
+> +       msi_irq_chip->name = devm_kasprintf(dev, GFP_KERNEL, "%s-msi",
+> +                                                dev_name(dev));
+> +       if (!msi_irq_chip->name) {
+> +               irq_domain_remove(pcie->irq_domain);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       msi_irq_chip->irq_enable = pci_msi_unmask_irq;
+> +       msi_irq_chip->irq_disable = pci_msi_mask_irq;
+> +       msi_irq_chip->irq_mask = pci_msi_mask_irq;
+> +       msi_irq_chip->irq_unmask = pci_msi_unmask_irq;
+> +
+> +       msi = &pcie->msi;
+
+Do we consciously resign from CONFIG_MSI dependency? I know it should
+always be enabled, but just making sure.
+
+> +
+> +       msi->setup_irq = advk_pcie_setup_msi_irq;
+> +       msi->teardown_irq = advk_pcie_teardown_msi_irq;
+> +       msi->of_node = node;
+> +
+> +       mutex_init(&pcie->msi_used_lock);
+> +
+> +       msi_msg_phys = virt_to_phys(&pcie->msi_msg);
+> +
+> +       advk_writel(pcie, lower_32_bits(msi_msg_phys),
+> +                   PCIE_MSI_ADDR_LOW_REG);
+> +       advk_writel(pcie, upper_32_bits(msi_msg_phys),
+> +                   PCIE_MSI_ADDR_HIGH_REG);
+> +
+> +       pcie->msi_domain =
+> +               irq_domain_add_linear(NULL, MSI_IRQ_NUM,
+> +                                     &advk_pcie_msi_irq_ops, pcie);
+> +       if (!pcie->msi_domain) {
+> +               irq_domain_remove(pcie->irq_domain);
+> +               return -ENOMEM;
+> +       }
+> +
+> +       return 0;
 > +}
 > +
-> +static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
-> +				     gpa_t addr, unsigned int len,
-> +				     unsigned long val)
+> +static void advk_pcie_handle_msi(struct advk_pcie *pcie)
 > +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +       u32 msi_val, msi_mask, msi_status, msi_idx;
+> +       u16 msi_data;
 > +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	if (vgic_cpu->lpis_enabled)
-> +		return;
+> +       msi_mask = advk_readl(pcie, PCIE_MSI_MASK_REG);
+> +       msi_val = advk_readl(pcie, PCIE_MSI_STATUS_REG);
+> +       msi_status = msi_val & ~msi_mask;
 > +
-> +	vgic_cpu->pendbaser = update_64bit_reg(vgic_cpu->pendbaser,
-> +					       addr & 4, len, val);
-
-Same issue about sanitizing the register.
-
+> +       for (msi_idx = 0; msi_idx < MSI_IRQ_NUM; msi_idx++) {
+> +               if (!(BIT(msi_idx) & msi_status))
+> +                       continue;
+> +
+> +               advk_writel(pcie, BIT(msi_idx), PCIE_MSI_STATUS_REG);
+> +               msi_data = advk_readl(pcie, PCIE_MSI_PAYLOAD_REG) & 0xFF;
+> +               generic_handle_irq(msi_data);
+> +       }
+> +
+> +       advk_writel(pcie, PCIE_ISR0_MSI_INT_PENDING,
+> +                   PCIE_ISR0_REG);
 > +}
 > +
->  /*
->   * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
->   * redistributors, while SPIs are covered by registers in the distributor
-> @@ -227,10 +281,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
->  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> +		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> +		vgic_mmio_read_pendbase, vgic_mmio_write_pendbase, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
->  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
-> 
+> +static void advk_pcie_handle_int(struct advk_pcie *pcie)
+> +{
+> +       u32 val, mask, status;
+> +
+> +       val = advk_readl(pcie, PCIE_ISR0_REG);
+> +       mask = advk_readl(pcie, PCIE_ISR0_MASK_REG);
+> +       status = val & ((~mask) & PCIE_ISR0_ALL_MASK);
+> +
+> +       if (!status) {
+> +               advk_writel(pcie, val, PCIE_ISR0_REG);
+> +               return;
+> +       }
+> +
+> +       /* Process MSI interrupts */
+> +       if (status & PCIE_ISR0_MSI_INT_PENDING)
+> +               advk_pcie_handle_msi(pcie);
+> +
+> +       /* Process legacy interrupts */
+> +       do {
+> +               int i;
+> +
+> +               /*
+> +                * As documented in the datasheet, we need to raise an
+> +                * interrupt for each ASSERT(i) bit that is set, and
+> +                * continue to deliver the interrupt until the
+> +                * DEASSERT(i) bit gets set
+> +                */
 
-Thanks,
+Below code will result in spurious interrupt flood (I can provide test
+details with SATA3.0 card). I know this part of specs very well, but
+expected EP operation flow should look like this:
+a. EP interrupt
+b. INTX_ASSERT signal
+c. root complex interrupt
+d. clear INTX_ASSERT bit
+e. execute EP handler
+f. INTX_DEASSERT signal
+g. clear INTX_DEASSERT bit
+h. exit interrupt
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Now between d. and f., in case of any shortest delay we will force
+executing EP handler numerous of times, which IMO is not desired. All
+of them for e.g. the SATA3.0 card are registered as spurious
+interrupts, pretty quickly resulting in "switching to irq poll"
+failure after 100k of such happenings. Actually I think that after
+executing generic_handle_irq(virq); we should leave root complex isr
+asap, the polling for DEASSERT in such case is not resulting in any
+benefits. In my code I ignored DEASSERT signal existence - it neither
+triggers interrupt nor we don't poll for it. Under big stress nothing
+wrong happens. We rely only on interrupts triggered by INTX_ASSERT
+signal, so we care only for its status.
+
+> +               for (i = 0; i < LEGACY_IRQ_NUM; i++) {
+> +                       if (!(status & PCIE_ISR0_INTX_ASSERT(i)))
+> +                               continue;
+> +
+> +                       do {
+> +                               int virq;
+> +
+> +                               advk_writel(pcie, PCIE_ISR0_INTX_ASSERT(i),
+> +                                           PCIE_ISR0_REG);
+> +                               virq = irq_find_mapping(pcie->irq_domain, i);
+> +                               generic_handle_irq(virq);
+> +                               status = advk_readl(pcie, PCIE_ISR0_REG);
+> +                       } while (!(status & PCIE_ISR0_INTX_DEASSERT(i)));
+> +
+> +                       advk_writel(pcie, PCIE_ISR0_INTX_DEASSERT(i),
+> +                                   PCIE_ISR0_REG);
+> +               }
+> +
+> +               status = advk_readl(pcie, PCIE_ISR0_REG);
+> +       } while (status & PCIE_ISR0_INTX_MASK);
+
+How about simplifying code a bit and remove this do-while loop? IMO
+it's enough to do single iterating through INTA/B/C/D and exit - in
+such case we wouldn't spent too much time in single top half handler.
+
+I'm looking forward to your feedback.
+
+Best regards,
+Marcin
