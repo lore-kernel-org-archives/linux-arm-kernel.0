@@ -1,33 +1,55 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jun 2016 10:00:11 +0900
-Subject: [PATCH 1/3] soc: renesas: rcar-sysc: Document r8a7796 support
-In-Reply-To: <cover.1465347345.git.horms+renesas@verge.net.au>
-References: <cover.1465347345.git.horms+renesas@verge.net.au>
-Message-ID: <2ff1bf77e4d437be502b79443906fcb23e09b81b.1465347345.git.horms+renesas@verge.net.au>
+From: bruherrera@gmail.com (Bruno Herrera)
+Date: Tue,  7 Jun 2016 22:01:48 -0300
+Subject: [PATCH] ARM: dts: stm32f429: Add missing USART3 pin config to
+ STM32F469I-DISCO board
+Message-ID: <1465347708-65658-1-git-send-email-bruherrera@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch adds USART3 pin configuration on PB10/PA11 pins 
+for STM32F469I-DISCO board.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Bruno Herrera <bruherrera@gmail.com>
 ---
- Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/stm32f429.dtsi      | 13 +++++++++++++
+ arch/arm/boot/dts/stm32f469-disco.dts |  2 ++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt b/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
-index b74e4d4785ab..0725fb37a973 100644
---- a/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
-+++ b/Documentation/devicetree/bindings/power/renesas,rcar-sysc.txt
-@@ -14,6 +14,7 @@ Required properties:
-       - "renesas,r8a7793-sysc" (R-Car M2-N)
-       - "renesas,r8a7794-sysc" (R-Car E2)
-       - "renesas,r8a7795-sysc" (R-Car H3)
-+      - "renesas,r8a7796-sysc" (R-Car M3-W)
-   - reg: Address start and address range for the device.
-   - #power-domain-cells: Must be 1.
+diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
+index 35df462..1d94eba 100644
+--- a/arch/arm/boot/dts/stm32f429.dtsi
++++ b/arch/arm/boot/dts/stm32f429.dtsi
+@@ -284,6 +284,19 @@
+ 				};
+ 			};
  
++			usart3_pins_a: usart3 at 0 {
++				pins1 {
++					pinmux = <STM32F429_PB10_FUNC_USART3_TX>;
++					bias-disable;
++					drive-push-pull;
++					slew-rate = <0>;
++				};
++				pins2 {
++					pinmux = <STM32F429_PB11_FUNC_USART3_RX>;
++					bias-disable;
++				};
++			};
++
+ 			usbotg_hs_pins_a: usbotg_hs at 0 {
+ 				pins {
+ 					pinmux = <STM32F429_PH4_FUNC_OTG_HS_ULPI_NXT>,
+diff --git a/arch/arm/boot/dts/stm32f469-disco.dts b/arch/arm/boot/dts/stm32f469-disco.dts
+index e911af8..eb3e638 100644
+--- a/arch/arm/boot/dts/stm32f469-disco.dts
++++ b/arch/arm/boot/dts/stm32f469-disco.dts
+@@ -71,5 +71,7 @@
+ };
+ 
+ &usart3 {
++	pinctrl-0 = <&usart3_pins_a>;
++	pinctrl-names = "default";
+ 	status = "okay";
+ };
 -- 
-2.1.4
+2.7.4 (Apple Git-66)
