@@ -1,103 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Jun 2016 17:12:52 +0100
-Subject: [PATCH 0/2] qcom: add l2 cache perf events driver
-In-Reply-To: <f4fc5806-7cf0-28ea-08d5-9bb26dbd576a@codeaurora.org>
-References: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
- <20160606090416.GB6831@leverpostej>
- <f4fc5806-7cf0-28ea-08d5-9bb26dbd576a@codeaurora.org>
-Message-ID: <20160608161251.GC13355@leverpostej>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed,  8 Jun 2016 17:20:42 +0100
+Subject: [PATCH] ARM: make unexported functions static
+Message-ID: <1465402842-26798-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 11:21:16AM -0400, Neil Leeder wrote:
-> 
-> 
-> On 6/6/2016 05:04 AM, Mark Rutland wrote:
-> > On Fri, Jun 03, 2016 at 05:03:30PM -0400, Neil Leeder wrote:
-> >> This adds a new dynamic PMU to the Perf Events framework to program
-> >> and control the L2 cache PMUs in some Qualcomm Technologies SOCs.
-> >>
-> >> The driver exports formatting and event information to sysfs so it can
-> >> be used by the perf user space tools with the syntax:
-> >> perf stat -e l2cache/event=0x42/
-> >>
-> >> One point to note is that there are certain combinations of events
-> >> which are invalid, and which are detected in event_add().
-> > 
-> > Which combinations of events are invalid?
-> > 
-> > Please elaborate.
-> > 
-> >> Simply having event_add() fail would result in event_sched_in() making
-> >> it Inactive, treating it as over-allocation of counters, leading to
-> >> repeated attempts to allocate the events and ending up with a
-> >> statistical count.  A solution for this situation is to turn the
-> >> conflicting event off in event_add(). This allows a single error
-> >> message to be generated, and no recurring attempts to re-add the
-> >> invalid event. In order for this to work, event_sched_in()
-> >> needs to detect that event_add() changed the state, and not override it
-> >> and force it to Inactive.
-> > 
-> > For heterogeneous PMUs, we added the pmu::filter_match(event) callback
-> > for a similar purpose: preventing an event from being scheduled on a
-> > core which does not support that event, while allowing other events to
-> > be scheduled.
-> > 
-> > So if you truly need to filter events, the infrastructure for doing so
-> > already exists.
-> > 
-> > However, you will need to elaborate on "there are certain combinations
-> > of events which are invalid".
-> > 
-> 
-> Qualcomm PMUs have events arranged in a matrix of rows and columns.
-> Only one event can be enabled from each column at once. So this isn't a
-> heterogeneous CPU issue, and it doesn't seem to fit into filter_match()
-> because it is not an absolute restriction that this event can't be
-> enabled on this cpu, it's related to the other events which have 
-> already been enabled.
+There are three functions that do not get exported from the
+psci_smp.c file that if we make static then the following
+warnings get squashed:
 
-The above is useful context. Please add (something like) it to the cover
-and relevant patches in future postings!
+arch/arm/kernel/psci_smp.c:61:5: warning: symbol 'psci_cpu_disable' was not declared. Should it be static?
+arch/arm/kernel/psci_smp.c:74:6: warning: symbol 'psci_cpu_die' was not declared. Should it be static?
+arch/arm/kernel/psci_smp.c:86:5: warning: symbol 'psci_cpu_kill' was not declared. Should it be static?
 
-Ok. So if I understand correctly, each counter can only count certain
-events (and therefore each event can only go into some counters), rather
-than all counters being identical?
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Russell King <linux@armlinux.org.uk>
+---
+ arch/arm/kernel/psci_smp.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-So the issue is that there is no _suitable_ counter available for an
-event, but there are still counters available for events in general.
-
-This case is somewhat different to the heterogeneous PMU case.
-
-Unfortunately, trying to filter events in this manner can be very
-expensive, and allows a malicious user to DoS the system, as Peter
-pointed out when I tried to do similar things in this area. Take a look
-at [1] and associated replies.
-
-If you can test the availability of a relevant counter very cheaply,
-then having a specific return code for the case of no relevant counter
-may be more palatable.
-
-> >> This patchset requires:
-> >> [PATCH] soc: qcom: provide mechanism for drivers to access L2 registers
-> > 
-> > A link would be remarkably helpful.
-> 
-> http://archive.arm.linux.org.uk/lurker/message/20160603.205900.1970f20d.en.html
-> 
-> > 
-> > Better would be to fold that patch into this series, as it's the only
-> > user, and both are helpful review context for the other.
-> > 
-> 
-> The L2 PMU driver is the first user of the L2-accessors patch
-> but it won't be the only one, which is why I kept it separate.
-
-If other users aren't going to appear in the same merge window, IMO it
-would be better to place them in the same series for now. Otherwise,
-please have a link in the cover in future postings.
-
-Thanks,
-Mark.
-
-[1] http://lkml.kernel.org/r/1392054264-23570-5-git-send-email-mark.rutland at arm.com
+diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+index cb3fcae..20d6343 100644
+--- a/arch/arm/kernel/psci_smp.c
++++ b/arch/arm/kernel/psci_smp.c
+@@ -58,7 +58,7 @@ static int psci_boot_secondary(unsigned int cpu, struct task_struct *idle)
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-int psci_cpu_disable(unsigned int cpu)
++static int psci_cpu_disable(unsigned int cpu)
+ {
+ 	/* Fail early if we don't have CPU_OFF support */
+ 	if (!psci_ops.cpu_off)
+@@ -71,7 +71,7 @@ int psci_cpu_disable(unsigned int cpu)
+ 	return 0;
+ }
+ 
+-void psci_cpu_die(unsigned int cpu)
++static void psci_cpu_die(unsigned int cpu)
+ {
+ 	u32 state = PSCI_POWER_STATE_TYPE_POWER_DOWN <<
+ 		    PSCI_0_2_POWER_STATE_TYPE_SHIFT;
+@@ -83,7 +83,7 @@ void psci_cpu_die(unsigned int cpu)
+ 	panic("psci: cpu %d failed to shutdown\n", cpu);
+ }
+ 
+-int psci_cpu_kill(unsigned int cpu)
++static int psci_cpu_kill(unsigned int cpu)
+ {
+ 	int err, i;
+ 
+-- 
+2.8.1
