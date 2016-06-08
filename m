@@ -1,82 +1,36 @@
-From: nleeder@codeaurora.org (Neil Leeder)
-Date: Wed, 8 Jun 2016 11:21:16 -0400
-Subject: [PATCH 0/2] qcom: add l2 cache perf events driver
-In-Reply-To: <20160606090416.GB6831@leverpostej>
-References: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
- <20160606090416.GB6831@leverpostej>
-Message-ID: <f4fc5806-7cf0-28ea-08d5-9bb26dbd576a@codeaurora.org>
+From: peter@korsgaard.com (Peter Korsgaard)
+Date: Wed, 08 Jun 2016 17:28:08 +0200
+Subject: [PATCH] ARM: dts: sun5i: Move display blocks to sun5i.dtsi
+In-Reply-To: <1465063524-4925-2-git-send-email-hdegoede@redhat.com> (Hans de
+ Goede's message of "Sat, 4 Jun 2016 20:05:24 +0200")
+References: <1465063524-4925-1-git-send-email-hdegoede@redhat.com>
+ <1465063524-4925-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <87oa7bd7jr.fsf@dell.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+>>>>> "Hans" == Hans de Goede <hdegoede@redhat.com> writes:
 
+ > All sun5i models share, the same die, so the display-engine is
 
-On 6/6/2016 05:04 AM, Mark Rutland wrote:
-> On Fri, Jun 03, 2016 at 05:03:30PM -0400, Neil Leeder wrote:
->> This adds a new dynamic PMU to the Perf Events framework to program
->> and control the L2 cache PMUs in some Qualcomm Technologies SOCs.
->>
->> The driver exports formatting and event information to sysfs so it can
->> be used by the perf user space tools with the syntax:
->> perf stat -e l2cache/event=0x42/
->>
->> One point to note is that there are certain combinations of events
->> which are invalid, and which are detected in event_add().
-> 
-> Which combinations of events are invalid?
-> 
-> Please elaborate.
-> 
->> Simply having event_add() fail would result in event_sched_in() making
->> it Inactive, treating it as over-allocation of counters, leading to
->> repeated attempts to allocate the events and ending up with a
->> statistical count.  A solution for this situation is to turn the
->> conflicting event off in event_add(). This allows a single error
->> message to be generated, and no recurring attempts to re-add the
->> invalid event. In order for this to work, event_sched_in()
->> needs to detect that event_add() changed the state, and not override it
->> and force it to Inactive.
-> 
-> For heterogeneous PMUs, we added the pmu::filter_match(event) callback
-> for a similar purpose: preventing an event from being scheduled on a
-> core which does not support that event, while allowing other events to
-> be scheduled.
-> 
-> So if you truly need to filter events, the infrastructure for doing so
-> already exists.
-> 
-> However, you will need to elaborate on "there are certain combinations
-> of events which are invalid".
-> 
+Drop comma after share.
 
-Qualcomm PMUs have events arranged in a matrix of rows and columns.
-Only one event can be enabled from each column at once. So this isn't a
-heterogeneous CPU issue, and it doesn't seem to fit into filter_match()
-because it is not an absolute restriction that this event can't be
-enabled on this cpu, it's related to the other events which have 
-already been enabled.
+> identical, except for which outputs / encoders all available.
 
->> This patchset requires:
->> [PATCH] soc: qcom: provide mechanism for drivers to access L2 registers
-> 
-> A link would be remarkably helpful.
+s/all/are/
 
-http://archive.arm.linux.org.uk/lurker/message/20160603.205900.1970f20d.en.html
+ > All models support parallel / lvds lcd panels, the R8 and A10s also
+ > support tv-out and the A10s also supports HDMI out.
 
-> 
-> Better would be to fold that patch into this series, as it's the only
-> user, and both are helpful review context for the other.
-> 
+ > This commit prepares for enabling display blocks on A10s boards,
+ > but it also is a bug-fix for A10s boards, because before this commit
+ > the simplefb nodes for A10s where not listing the recently added
 
-The L2 PMU driver is the first user of the L2-accessors patch
-but it won't be the only one, which is why I kept it separate.
+s/where/were/
 
-> Thanks,
-> Mark.
-> 
+ > pll3 as clock, causing the display to go block when the kernel
 
-Neil
+s/block/black/
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Bye, Peter Korsgaard
