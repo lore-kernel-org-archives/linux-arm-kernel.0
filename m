@@ -1,34 +1,55 @@
 From: matthew@mattleach.net (Matthew Leach)
-Date: Wed,  8 Jun 2016 19:31:06 +0100
-Subject: [RFC PATCH 11/15] ARM: EXYNOS: Enable ARCH_SUPPORTS_BIG_ENDIAN
- explicitly
+Date: Wed,  8 Jun 2016 19:31:10 +0100
+Subject: [RFC PATCH 15/15] iommu/exynos: update to use iommu big-endian
 In-Reply-To: <20160608183110.13851-1-matthew@mattleach.net>
 References: <20160608183110.13851-1-matthew@mattleach.net>
-Message-ID: <20160608183110.13851-12-matthew@mattleach.net>
+Message-ID: <20160608183110.13851-16-matthew@mattleach.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Now the initial fixes have the big-endian code working on EXYNOS, make sure
-we explicitly mark our arch as being big endian capable.
+Add initial support for big endian by always writing the pte
+in le32. Note, revisit if hardware capable of doing big endian
+fetches.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mach-exynos/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: iommu at lists.linux-foundation.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-samsung-soc at vger.kernel.org
+Cc: linux-kernel at vger.kernel.org (open list)
+---
+ drivers/iommu/exynos-iommu.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index e65aa7d..14906bf 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -13,6 +13,7 @@ menuconfig ARCH_EXYNOS
- 	select ARCH_HAS_BANDGAP
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ARCH_SUPPORTS_BIG_ENDIAN
- 	select ARM_AMBA
- 	select ARM_GIC
- 	select COMMON_CLK_SAMSUNG
+diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+index 5ecc86c..dd8b3b3 100644
+--- a/drivers/iommu/exynos-iommu.c
++++ b/drivers/iommu/exynos-iommu.c
+@@ -54,6 +54,10 @@ typedef u32 sysmmu_pte_t;
+ #define lv2ent_small(pent) ((*(pent) & 2) == 2)
+ #define lv2ent_large(pent) ((*(pent) & 3) == 1)
+ 
++#ifdef CONFIG_BIG_ENDIAN
++#warning "revisit driver if we can enable big-endian ptes"
++#endif
++
+ /*
+  * v1.x - v3.x SYSMMU supports 32bit physical and 32bit virtual address spaces
+  * v5.0 introduced support for 36bit physical address space by shifting
+@@ -716,7 +720,7 @@ static inline void update_pte(sysmmu_pte_t *ent, sysmmu_pte_t val)
+ {
+ 	dma_sync_single_for_cpu(dma_dev, virt_to_phys(ent), sizeof(*ent),
+ 				DMA_TO_DEVICE);
+-	*ent = val;
++	*ent = cpu_to_le32(val);
+ 	dma_sync_single_for_device(dma_dev, virt_to_phys(ent), sizeof(*ent),
+ 				   DMA_TO_DEVICE);
+ }
 -- 
 2.8.3
