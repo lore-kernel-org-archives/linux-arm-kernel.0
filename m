@@ -1,34 +1,35 @@
 From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Wed,  8 Jun 2016 21:26:25 +0800
-Subject: [PATCH v2 0/7] fix bugs; enable iommu for ARM64
-Message-ID: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
+Date: Wed,  8 Jun 2016 21:26:27 +0800
+Subject: [PATCH v2 2/7] iommu/rockchip: add map_sg callback for rk_iommu_ops
+In-Reply-To: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
+References: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <1465392392-2003-3-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series patches mainly for ARM64 supporting.
-To do this, it first add virtual iommu slave device which DRM can attach to,
-convert DRM driver to use common iommu API instead of the ARM32
-functions, and then use DMA API in iommu driver to map, to flush cache.
+From: Simon Xue <xxm@rock-chips.com>
 
-The v2 patches make a lot changes vs v1, so please forget the v1.
+The iommu_dma_alloc() in iommu/dma-iommu.c calls iommu_map_sg()
+that requires the callback iommu_ops .map_sg(). Adding the
+default_iommu_map_sg() to rockchip iommu accordingly.
 
-Shunqian Zheng (4):
-  iommu/rockchip: support virtual iommu slave device
-  ARM: dts: rockchip: add virtual iommu for display
-  drm: rockchip: use common iommu api to attach iommu
-  iommu/rockchip: use DMA API to map, to flush cache
+Signed-off-by: Simon Xue <xxm@rock-chips.com>
+Signed-off-by: Shunqian Zheng <xxm@rock-chips.com>
+---
+ drivers/iommu/rockchip-iommu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Simon Xue (3):
-  iommu/rockchip: fix devm_{request,free}_irq parameter
-  iommu/rockchip: add map_sg callback for rk_iommu_ops
-  iommu/rockchip: enable rockchip iommu on ARM64 platform
-
- arch/arm/boot/dts/rk3288.dtsi               |   6 ++
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 130 ++++++++++++++++--------
- drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   1 +
- drivers/iommu/Kconfig                       |   2 +-
- drivers/iommu/rockchip-iommu.c              | 151 ++++++++++++++++++----------
- 5 files changed, 193 insertions(+), 97 deletions(-)
-
+diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+index ec0ce62..3c16ec3 100644
+--- a/drivers/iommu/rockchip-iommu.c
++++ b/drivers/iommu/rockchip-iommu.c
+@@ -1022,6 +1022,7 @@ static const struct iommu_ops rk_iommu_ops = {
+ 	.detach_dev = rk_iommu_detach_device,
+ 	.map = rk_iommu_map,
+ 	.unmap = rk_iommu_unmap,
++	.map_sg = default_iommu_map_sg,
+ 	.add_device = rk_iommu_add_device,
+ 	.remove_device = rk_iommu_remove_device,
+ 	.iova_to_phys = rk_iommu_iova_to_phys,
 -- 
 1.9.1
