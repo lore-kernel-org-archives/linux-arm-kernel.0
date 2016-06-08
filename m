@@ -1,86 +1,34 @@
 From: matthew@mattleach.net (Matthew Leach)
-Date: Wed,  8 Jun 2016 19:31:05 +0100
-Subject: [RFC PATCH 10/15] ARM: EXYNOS: fixup endian in pm/pmu
+Date: Wed,  8 Jun 2016 19:31:06 +0100
+Subject: [RFC PATCH 11/15] ARM: EXYNOS: Enable ARCH_SUPPORTS_BIG_ENDIAN
+ explicitly
 In-Reply-To: <20160608183110.13851-1-matthew@mattleach.net>
 References: <20160608183110.13851-1-matthew@mattleach.net>
-Message-ID: <20160608183110.13851-11-matthew@mattleach.net>
+Message-ID: <20160608183110.13851-12-matthew@mattleach.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ben Dooks <ben.dooks@codethink.co.uk>
 
-Fix the PMU code endian access code to deal with kernels built for big endian
-operation.
+Now the initial fixes have the big-endian code working on EXYNOS, make sure
+we explicitly mark our arch as being big endian capable.
 
 Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/mach-exynos/common.h     | 4 ++--
- arch/arm/mach-exynos/pm.c         | 4 ++--
- arch/arm/mach-exynos/pm_domains.c | 6 +++---
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/mach-exynos/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
-index 5365bf1..19e9d25 100644
---- a/arch/arm/mach-exynos/common.h
-+++ b/arch/arm/mach-exynos/common.h
-@@ -174,12 +174,12 @@ extern int exynos_get_boot_addr(u32 core_id, unsigned long *boot_addr);
- 
- static inline void pmu_raw_writel(u32 val, u32 offset)
- {
--	__raw_writel(val, pmu_base_addr + offset);
-+	writel_relaxed(val, pmu_base_addr + offset);
- }
- 
- static inline u32 pmu_raw_readl(u32 offset)
- {
--	return __raw_readl(pmu_base_addr + offset);
-+	return readl_relaxed(pmu_base_addr + offset);
- }
- 
- #endif /* __ARCH_ARM_MACH_EXYNOS_COMMON_H */
-diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-index c43b776..52d78eb 100644
---- a/arch/arm/mach-exynos/pm.c
-+++ b/arch/arm/mach-exynos/pm.c
-@@ -132,9 +132,9 @@ static void exynos_set_wakeupmask(long mask)
- 
- static void exynos_cpu_set_boot_vector(long flags)
- {
--	__raw_writel(virt_to_phys(exynos_cpu_resume),
-+	writel_relaxed(virt_to_phys(exynos_cpu_resume),
- 		     exynos_boot_vector_addr());
--	__raw_writel(flags, exynos_boot_vector_flag());
-+	writel_relaxed(flags, exynos_boot_vector_flag());
- }
- 
- static int exynos_aftr_finisher(unsigned long flags)
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index 875a2ba..0e075d9 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -70,12 +70,12 @@ static int exynos_pd_power(struct generic_pm_domain *domain, bool power_on)
- 	}
- 
- 	pwr = power_on ? INT_LOCAL_PWR_EN : 0;
--	__raw_writel(pwr, base);
-+	writel_relaxed(pwr, base);
- 
- 	/* Wait max 1ms */
- 	timeout = 10;
- 
--	while ((__raw_readl(base + 0x4) & INT_LOCAL_PWR_EN) != pwr) {
-+	while ((readl_relaxed(base + 0x4) & INT_LOCAL_PWR_EN) != pwr) {
- 		if (!timeout) {
- 			op = (power_on) ? "enable" : "disable";
- 			pr_err("Power domain %s %s failed\n", domain->name, op);
-@@ -185,7 +185,7 @@ static __init int exynos4_pm_init_power_domain(void)
- 			clk_put(pd->oscclk);
- 
- no_clk:
--		on = __raw_readl(pd->base + 0x4) & INT_LOCAL_PWR_EN;
-+		on = readl_relaxed(pd->base + 0x4) & INT_LOCAL_PWR_EN;
- 
- 		pm_genpd_init(&pd->pd, NULL, !on);
- 		of_genpd_add_provider_simple(np, &pd->pd);
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index e65aa7d..14906bf 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -13,6 +13,7 @@ menuconfig ARCH_EXYNOS
+ 	select ARCH_HAS_BANDGAP
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ARCH_SUPPORTS_BIG_ENDIAN
+ 	select ARM_AMBA
+ 	select ARM_GIC
+ 	select COMMON_CLK_SAMSUNG
 -- 
 2.8.3
