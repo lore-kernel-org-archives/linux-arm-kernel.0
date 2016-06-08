@@ -1,60 +1,103 @@
-From: a0393675@ti.com (Keerthy)
-Date: Wed, 8 Jun 2016 21:39:45 +0530
-Subject: [PATCH 3/8] mfd: tps65218: Use mfd_add_devices instead of
- of_platform_populate
-In-Reply-To: <20160608155025.GB14888@dell>
-References: <1462945691-904-1-git-send-email-j-keerthy@ti.com>
- <1462945691-904-4-git-send-email-j-keerthy@ti.com>
- <20160608155025.GB14888@dell>
-Message-ID: <57584349.7000906@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 8 Jun 2016 17:12:52 +0100
+Subject: [PATCH 0/2] qcom: add l2 cache perf events driver
+In-Reply-To: <f4fc5806-7cf0-28ea-08d5-9bb26dbd576a@codeaurora.org>
+References: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
+ <20160606090416.GB6831@leverpostej>
+ <f4fc5806-7cf0-28ea-08d5-9bb26dbd576a@codeaurora.org>
+Message-ID: <20160608161251.GC13355@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 08, 2016 at 11:21:16AM -0400, Neil Leeder wrote:
+> 
+> 
+> On 6/6/2016 05:04 AM, Mark Rutland wrote:
+> > On Fri, Jun 03, 2016 at 05:03:30PM -0400, Neil Leeder wrote:
+> >> This adds a new dynamic PMU to the Perf Events framework to program
+> >> and control the L2 cache PMUs in some Qualcomm Technologies SOCs.
+> >>
+> >> The driver exports formatting and event information to sysfs so it can
+> >> be used by the perf user space tools with the syntax:
+> >> perf stat -e l2cache/event=0x42/
+> >>
+> >> One point to note is that there are certain combinations of events
+> >> which are invalid, and which are detected in event_add().
+> > 
+> > Which combinations of events are invalid?
+> > 
+> > Please elaborate.
+> > 
+> >> Simply having event_add() fail would result in event_sched_in() making
+> >> it Inactive, treating it as over-allocation of counters, leading to
+> >> repeated attempts to allocate the events and ending up with a
+> >> statistical count.  A solution for this situation is to turn the
+> >> conflicting event off in event_add(). This allows a single error
+> >> message to be generated, and no recurring attempts to re-add the
+> >> invalid event. In order for this to work, event_sched_in()
+> >> needs to detect that event_add() changed the state, and not override it
+> >> and force it to Inactive.
+> > 
+> > For heterogeneous PMUs, we added the pmu::filter_match(event) callback
+> > for a similar purpose: preventing an event from being scheduled on a
+> > core which does not support that event, while allowing other events to
+> > be scheduled.
+> > 
+> > So if you truly need to filter events, the infrastructure for doing so
+> > already exists.
+> > 
+> > However, you will need to elaborate on "there are certain combinations
+> > of events which are invalid".
+> > 
+> 
+> Qualcomm PMUs have events arranged in a matrix of rows and columns.
+> Only one event can be enabled from each column at once. So this isn't a
+> heterogeneous CPU issue, and it doesn't seem to fit into filter_match()
+> because it is not an absolute restriction that this event can't be
+> enabled on this cpu, it's related to the other events which have 
+> already been enabled.
 
+The above is useful context. Please add (something like) it to the cover
+and relevant patches in future postings!
 
-On Wednesday 08 June 2016 09:20 PM, Lee Jones wrote:
-> On Wed, 11 May 2016, Keerthy wrote:
->
->> mfd_add_devices enables parsing device tree nodes without compatibles
->> for child nodes. Replace of_platform_populate with mfd_add_devices.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>   drivers/mfd/tps65218.c | 10 ++++++++--
->>   1 file changed, 8 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/mfd/tps65218.c b/drivers/mfd/tps65218.c
->> index f20a531..b8b3a58 100644
->> --- a/drivers/mfd/tps65218.c
->> +++ b/drivers/mfd/tps65218.c
->> @@ -33,6 +33,10 @@
->>
->>   #define TPS65218_PASSWORD_REGS_UNLOCK   0x7D
->>
->> +static const struct mfd_cell tps65218_cells[] = {
->> +	{ .name = "tps65218-regulator", },
->> +};
->
-> What other devices does the TPS65218 consist of?
+Ok. So if I understand correctly, each counter can only count certain
+events (and therefore each event can only go into some counters), rather
+than all counters being identical?
 
-As of now only regulators driver is in kernel. The PMIC contains
-a bunch of GPIOs, Over temperature warning / shutdown unit.
+So the issue is that there is no _suitable_ counter available for an
+event, but there are still counters available for events in general.
 
->
->>   /**
->>    * tps65218_reg_write: Write a single tps65218 register.
->>    *
->> @@ -236,8 +240,10 @@ static int tps65218_probe(struct i2c_client *client,
->>   	if (ret < 0)
->>   		return ret;
->>
->> -	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
->> -				   &client->dev);
->> +	ret = mfd_add_devices(tps->dev, PLATFORM_DEVID_AUTO, tps65218_cells,
->> +			      ARRAY_SIZE(tps65218_cells), NULL, 0,
->> +			      regmap_irq_get_domain(tps->irq_data));
->> +
->>   	if (ret < 0)
->>   		goto err_irq;
->>
->
+This case is somewhat different to the heterogeneous PMU case.
+
+Unfortunately, trying to filter events in this manner can be very
+expensive, and allows a malicious user to DoS the system, as Peter
+pointed out when I tried to do similar things in this area. Take a look
+at [1] and associated replies.
+
+If you can test the availability of a relevant counter very cheaply,
+then having a specific return code for the case of no relevant counter
+may be more palatable.
+
+> >> This patchset requires:
+> >> [PATCH] soc: qcom: provide mechanism for drivers to access L2 registers
+> > 
+> > A link would be remarkably helpful.
+> 
+> http://archive.arm.linux.org.uk/lurker/message/20160603.205900.1970f20d.en.html
+> 
+> > 
+> > Better would be to fold that patch into this series, as it's the only
+> > user, and both are helpful review context for the other.
+> > 
+> 
+> The L2 PMU driver is the first user of the L2-accessors patch
+> but it won't be the only one, which is why I kept it separate.
+
+If other users aren't going to appear in the same merge window, IMO it
+would be better to place them in the same series for now. Otherwise,
+please have a link in the cover in future postings.
+
+Thanks,
+Mark.
+
+[1] http://lkml.kernel.org/r/1392054264-23570-5-git-send-email-mark.rutland at arm.com
