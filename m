@@ -1,81 +1,120 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 8 Jun 2016 12:09:03 +0200
-Subject: [PATCH] phy-sun4i-usb: fix missing __iomem *
-In-Reply-To: <1465319696-1275-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465319696-1275-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <651219bb-fbab-18f8-fe89-bacd86c15e0d@redhat.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 8 Jun 2016 15:39:03 +0530
+Subject: [PATCH v2 08/20] drm: msm: Rely on the default ->best_encoder()
+ behavior where appropriate
+In-Reply-To: <1465300095-16971-9-git-send-email-boris.brezillon@free-electrons.com>
+References: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1465300095-16971-9-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <5757EEBF.1010501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 07-06-16 19:14, Ben Dooks wrote:
-> Fix the missing __iomem attribute in sun4i_usb_phy_write()
-> function. This fixes the following sparse warnings:
+On 06/07/2016 05:18 PM, Boris Brezillon wrote:
+> For all outputs except DSI we have a 1:1 relationship between connectors
+> and encoders and the driver is relying on the atomic helpers: we can
+> drop the custom ->best_encoder() and let the core call
+> drm_atomic_helper_best_encoder() for us.
+
+Works fine with msm.
+
+Tested-by: Archit Taneja <architt@codeaurora.org>
+
+Thanks,
+Archit
+
 >
-> drivers/phy/phy-sun4i-usb.c:178:39: warning: incorrect type in initializer (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:178:39:    expected void *phyctl
-> drivers/phy/phy-sun4i-usb.c:178:39:    got void [noderef] <asn:2>*
-> drivers/phy/phy-sun4i-usb.c:185:17: warning: incorrect type in argument 2 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:185:17:    expected void volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:185:17:    got void *phyctl
-> drivers/phy/phy-sun4i-usb.c:189:24: warning: incorrect type in argument 1 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:189:24:    expected void const volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:189:24:    got void *phyctl
-> drivers/phy/phy-sun4i-usb.c:196:17: warning: incorrect type in argument 2 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:196:17:    expected void volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:196:17:    got void *phyctl
-> drivers/phy/phy-sun4i-usb.c:199:24: warning: incorrect type in argument 1 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:199:24:    expected void const volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:199:24:    got void *phyctl
-> drivers/phy/phy-sun4i-usb.c:205:17: warning: incorrect type in argument 2 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:205:17:    expected void volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:205:17:    got void *phyctl
-> drivers/phy/phy-sun4i-usb.c:208:24: warning: incorrect type in argument 1 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:208:24:    expected void const volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:208:24:    got void *phyctl
-> drivers/phy/phy-sun4i-usb.c:210:17: warning: incorrect type in argument 2 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:210:17:    expected void volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:210:17:    got void *phyctl
-> drivers/phy/phy-sun4i-usb.c:212:24: warning: incorrect type in argument 1 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:212:24:    expected void const volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:212:24:    got void *phyctl
-> drivers/phy/phy-sun4i-usb.c:214:17: warning: incorrect type in argument 2 (different address spaces)
-> drivers/phy/phy-sun4i-usb.c:214:17:    expected void volatile [noderef] <asn:2>*addr
-> drivers/phy/phy-sun4i-usb.c:214:17:    got void *phyctl
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-
-Thanks for catching this:
-
-Acked-by: Hans de Goede <hdegoede@redhat.com>
-
-Regards,
-
-Hans
-
-
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
-> Cc: Kishon Vijay Abraham I <kishon@ti.com>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Cc: Chen-Yu Tsai <wens@csie.org>
-> Cc: Hans de Goede <hdegoede@redhat.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> ---
->  drivers/phy/phy-sun4i-usb.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>   drivers/gpu/drm/msm/edp/edp_connector.c            | 10 ----------
+>   drivers/gpu/drm/msm/hdmi/hdmi_connector.c          |  8 --------
+>   drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c |  9 ---------
+>   3 files changed, 27 deletions(-)
 >
-> diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-> index bae54f7..9de9991 100644
-> --- a/drivers/phy/phy-sun4i-usb.c
-> +++ b/drivers/phy/phy-sun4i-usb.c
-> @@ -175,7 +175,7 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
->  {
->  	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
->  	u32 temp, usbc_bit = BIT(phy->index * 2);
-> -	void *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
-> +	void __iomem *phyctl = phy_data->base + phy_data->cfg->phyctl_offset;
->  	int i;
+> diff --git a/drivers/gpu/drm/msm/edp/edp_connector.c b/drivers/gpu/drm/msm/edp/edp_connector.c
+> index 72360cd..5960628 100644
+> --- a/drivers/gpu/drm/msm/edp/edp_connector.c
+> +++ b/drivers/gpu/drm/msm/edp/edp_connector.c
+> @@ -91,15 +91,6 @@ static int edp_connector_mode_valid(struct drm_connector *connector,
+>   	return MODE_OK;
+>   }
 >
->  	mutex_lock(&phy_data->mutex);
+> -static struct drm_encoder *
+> -edp_connector_best_encoder(struct drm_connector *connector)
+> -{
+> -	struct edp_connector *edp_connector = to_edp_connector(connector);
+> -
+> -	DBG("");
+> -	return edp_connector->edp->encoder;
+> -}
+> -
+>   static const struct drm_connector_funcs edp_connector_funcs = {
+>   	.dpms = drm_atomic_helper_connector_dpms,
+>   	.detect = edp_connector_detect,
+> @@ -113,7 +104,6 @@ static const struct drm_connector_funcs edp_connector_funcs = {
+>   static const struct drm_connector_helper_funcs edp_connector_helper_funcs = {
+>   	.get_modes = edp_connector_get_modes,
+>   	.mode_valid = edp_connector_mode_valid,
+> -	.best_encoder = edp_connector_best_encoder,
+>   };
 >
+>   /* initialize connector */
+> diff --git a/drivers/gpu/drm/msm/hdmi/hdmi_connector.c b/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
+> index b15d726..a2515b4 100644
+> --- a/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
+> +++ b/drivers/gpu/drm/msm/hdmi/hdmi_connector.c
+> @@ -406,13 +406,6 @@ static int msm_hdmi_connector_mode_valid(struct drm_connector *connector,
+>   	return 0;
+>   }
+>
+> -static struct drm_encoder *
+> -msm_hdmi_connector_best_encoder(struct drm_connector *connector)
+> -{
+> -	struct hdmi_connector *hdmi_connector = to_hdmi_connector(connector);
+> -	return hdmi_connector->hdmi->encoder;
+> -}
+> -
+>   static const struct drm_connector_funcs hdmi_connector_funcs = {
+>   	.dpms = drm_atomic_helper_connector_dpms,
+>   	.detect = hdmi_connector_detect,
+> @@ -426,7 +419,6 @@ static const struct drm_connector_funcs hdmi_connector_funcs = {
+>   static const struct drm_connector_helper_funcs msm_hdmi_connector_helper_funcs = {
+>   	.get_modes = msm_hdmi_connector_get_modes,
+>   	.mode_valid = msm_hdmi_connector_mode_valid,
+> -	.best_encoder = msm_hdmi_connector_best_encoder,
+>   };
+>
+>   /* initialize connector */
+> diff --git a/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c b/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
+> index 2648cd7..353429b 100644
+> --- a/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
+> +++ b/drivers/gpu/drm/msm/mdp/mdp4/mdp4_lvds_connector.c
+> @@ -90,14 +90,6 @@ static int mdp4_lvds_connector_mode_valid(struct drm_connector *connector,
+>   	return MODE_OK;
+>   }
+>
+> -static struct drm_encoder *
+> -mdp4_lvds_connector_best_encoder(struct drm_connector *connector)
+> -{
+> -	struct mdp4_lvds_connector *mdp4_lvds_connector =
+> -			to_mdp4_lvds_connector(connector);
+> -	return mdp4_lvds_connector->encoder;
+> -}
+> -
+>   static const struct drm_connector_funcs mdp4_lvds_connector_funcs = {
+>   	.dpms = drm_atomic_helper_connector_dpms,
+>   	.detect = mdp4_lvds_connector_detect,
+> @@ -111,7 +103,6 @@ static const struct drm_connector_funcs mdp4_lvds_connector_funcs = {
+>   static const struct drm_connector_helper_funcs mdp4_lvds_connector_helper_funcs = {
+>   	.get_modes = mdp4_lvds_connector_get_modes,
+>   	.mode_valid = mdp4_lvds_connector_mode_valid,
+> -	.best_encoder = mdp4_lvds_connector_best_encoder,
+>   };
+>
+>   /* initialize connector */
+>
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum, hosted by The Linux Foundation
