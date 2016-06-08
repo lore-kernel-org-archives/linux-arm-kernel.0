@@ -1,71 +1,77 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jun 2016 15:48:00 +0200
-Subject: [RFC v4 1/7] Documentation: extcon: usb-gpio: update usb-gpio binding
- description
+Date: Wed, 08 Jun 2016 15:48:01 +0200
+Subject: [RFC v4 2/7] Revert "extcon: usb-gpio: switch to use pm wakeirq apis"
 In-Reply-To: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
 References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465393686-16644-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465393686-16644-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Robert Baldyga <r.baldyga@samsung.com>
+This reverts commit 8106e404174253639731cc30a44f5b3ab764c5b7.
 
-Add information about VBUS pin detection support, 'debounce' property
-and some other details.
-
-Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
-Acked-by: Roger Quadros <rogerq@ti.com>
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+When using PM wakeirq API only one wakeup IRQ can be set. However the
+driver will support also VBUS GPIO so we need two wakeup interrupts.
 ---
- .../devicetree/bindings/extcon/extcon-usb-gpio.txt | 28 ++++++++++++++++++++--
- 1 file changed, 26 insertions(+), 2 deletions(-)
+ drivers/extcon/extcon-usb-gpio.c | 19 +++++++++++++------
+ 1 file changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/extcon/extcon-usb-gpio.txt b/Documentation/devicetree/bindings/extcon/extcon-usb-gpio.txt
-index af0b903de293..7096f399b771 100644
---- a/Documentation/devicetree/bindings/extcon/extcon-usb-gpio.txt
-+++ b/Documentation/devicetree/bindings/extcon/extcon-usb-gpio.txt
-@@ -1,16 +1,40 @@
- USB GPIO Extcon device
- 
--This is a virtual device used to generate USB cable states from the USB ID pin
--connected to a GPIO pin.
-+This is a virtual device used to generate USB cable states from the USB
-+ID and VBUS signals connected to GPIO pins.
-+
-+The extcon cable states USB and USB_HOST are actually VBUS and !ID
-+pin states and do not indicate what mode the USB needs to operate in.
-+That decision is done by the USB stack.
-+
-+Some devices have only one of these GPIO pins, so we support cases when
-+only one of them is present. Hence properties 'id-gpio' and 'vbus-gpio'
-+are described as optional, but at least one of them has to be present
-+in extcon-usb-gpio node.
-+
-+In general we have three cases:
-+1. If VBUS and ID gpios are present we pass them as is
-+	USB-HOST = !ID, USB = VBUS
-+2. If only VBUS gpio is present we assume that ID pin is always High.
-+	USB-HOST = false, USB = VBUS.
-+3. If only ID pin is available we infer the VBUS pin states based on ID.
-+	USB-HOST = !ID, USB = ID
- 
- Required properties:
- - compatible: Should be "linux,extcon-usb-gpio"
-+
-+Optional properties
- - id-gpio: gpio for USB ID pin. See gpio binding.
-+- vbus-gpio: gpio for USB VBUS pin. See gpio binding.
-+- debounce: gpio debounce time in milliseconds (u32).
-+
- 
- Example: Examples of extcon-usb-gpio node in dra7-evm.dts as listed below:
- 	extcon_usb1 {
- 		compatible = "linux,extcon-usb-gpio";
- 		id-gpio = <&gpio6 1 GPIO_ACTIVE_HIGH>;
-+		vbus-gpio = <&gpio6 2 GPIO_ACTIVE_HIGH>;
-+		debounce = <25>;
+diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
+index 2512660dc4b9..a36aab007022 100644
+--- a/drivers/extcon/extcon-usb-gpio.c
++++ b/drivers/extcon/extcon-usb-gpio.c
+@@ -24,7 +24,6 @@
+ #include <linux/module.h>
+ #include <linux/of_gpio.h>
+ #include <linux/platform_device.h>
+-#include <linux/pm_wakeirq.h>
+ #include <linux/slab.h>
+ #include <linux/workqueue.h>
+ #include <linux/acpi.h>
+@@ -143,8 +142,7 @@ static int usb_extcon_probe(struct platform_device *pdev)
  	}
  
- 	&omap_dwc3_1 {
+ 	platform_set_drvdata(pdev, info);
+-	device_init_wakeup(dev, true);
+-	dev_pm_set_wake_irq(dev, info->id_irq);
++	device_init_wakeup(dev, 1);
+ 
+ 	/* Perform initial detection */
+ 	usb_extcon_detect_cable(&info->wq_detcable.work);
+@@ -158,9 +156,6 @@ static int usb_extcon_remove(struct platform_device *pdev)
+ 
+ 	cancel_delayed_work_sync(&info->wq_detcable);
+ 
+-	dev_pm_clear_wake_irq(&pdev->dev);
+-	device_init_wakeup(&pdev->dev, false);
+-
+ 	return 0;
+ }
+ 
+@@ -170,6 +165,12 @@ static int usb_extcon_suspend(struct device *dev)
+ 	struct usb_extcon_info *info = dev_get_drvdata(dev);
+ 	int ret = 0;
+ 
++	if (device_may_wakeup(dev)) {
++		ret = enable_irq_wake(info->id_irq);
++		if (ret)
++			return ret;
++	}
++
+ 	/*
+ 	 * We don't want to process any IRQs after this point
+ 	 * as GPIOs used behind I2C subsystem might not be
+@@ -185,6 +186,12 @@ static int usb_extcon_resume(struct device *dev)
+ 	struct usb_extcon_info *info = dev_get_drvdata(dev);
+ 	int ret = 0;
+ 
++	if (device_may_wakeup(dev)) {
++		ret = disable_irq_wake(info->id_irq);
++		if (ret)
++			return ret;
++	}
++
+ 	enable_irq(info->id_irq);
+ 	if (!device_may_wakeup(dev))
+ 		queue_delayed_work(system_power_efficient_wq,
 -- 
 1.9.1
