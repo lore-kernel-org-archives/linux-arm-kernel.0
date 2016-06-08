@@ -1,44 +1,34 @@
 From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Wed,  8 Jun 2016 21:26:26 +0800
-Subject: [PATCH v2 1/7] iommu/rockchip: fix devm_{request,free}_irq parameter
-In-Reply-To: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
-References: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1465392392-2003-2-git-send-email-zhengsq@rock-chips.com>
+Date: Wed,  8 Jun 2016 21:26:25 +0800
+Subject: [PATCH v2 0/7] fix bugs; enable iommu for ARM64
+Message-ID: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Xue <xxm@rock-chips.com>
+This series patches mainly for ARM64 supporting.
+To do this, it first add virtual iommu slave device which DRM can attach to,
+convert DRM driver to use common iommu API instead of the ARM32
+functions, and then use DMA API in iommu driver to map, to flush cache.
 
-Even though the iommu shares irq with its master, using the *dev of iommu
-instead of master's *dev for devm_{request,free}_irq makes things clear.
+The v2 patches make a lot changes vs v1, so please forget the v1.
 
-Signed-off-by: Simon Xue <xxm@rock-chips.com>
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
----
- drivers/iommu/rockchip-iommu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Shunqian Zheng (4):
+  iommu/rockchip: support virtual iommu slave device
+  ARM: dts: rockchip: add virtual iommu for display
+  drm: rockchip: use common iommu api to attach iommu
+  iommu/rockchip: use DMA API to map, to flush cache
 
-diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
-index c7d6156..ec0ce62 100644
---- a/drivers/iommu/rockchip-iommu.c
-+++ b/drivers/iommu/rockchip-iommu.c
-@@ -807,7 +807,7 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
- 
- 	iommu->domain = domain;
- 
--	ret = devm_request_irq(dev, iommu->irq, rk_iommu_irq,
-+	ret = devm_request_irq(iommu->dev, iommu->irq, rk_iommu_irq,
- 			       IRQF_SHARED, dev_name(dev), iommu);
- 	if (ret)
- 		return ret;
-@@ -860,7 +860,7 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
- 	}
- 	rk_iommu_disable_stall(iommu);
- 
--	devm_free_irq(dev, iommu->irq, iommu);
-+	devm_free_irq(iommu->dev, iommu->irq, iommu);
- 
- 	iommu->domain = NULL;
- 
+Simon Xue (3):
+  iommu/rockchip: fix devm_{request,free}_irq parameter
+  iommu/rockchip: add map_sg callback for rk_iommu_ops
+  iommu/rockchip: enable rockchip iommu on ARM64 platform
+
+ arch/arm/boot/dts/rk3288.dtsi               |   6 ++
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 130 ++++++++++++++++--------
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h |   1 +
+ drivers/iommu/Kconfig                       |   2 +-
+ drivers/iommu/rockchip-iommu.c              | 151 ++++++++++++++++++----------
+ 5 files changed, 193 insertions(+), 97 deletions(-)
+
 -- 
 1.9.1
