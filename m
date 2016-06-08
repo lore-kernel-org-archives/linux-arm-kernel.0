@@ -1,43 +1,59 @@
-From: sumit.semwal@linaro.org (Sumit Semwal)
-Date: Wed, 8 Jun 2016 21:05:22 +0530
-Subject: [PATCH] of: reserved_mem: restore old behavior when no region is
- defined
-In-Reply-To: <CAL_JsqKNpx09UFkGB0n9W0GkAv8OVUdRN8cYriau83SdD6xnuw@mail.gmail.com>
-References: <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
- <1465368713-17866-1-git-send-email-m.szyprowski@samsung.com>
- <CAL_JsqKNpx09UFkGB0n9W0GkAv8OVUdRN8cYriau83SdD6xnuw@mail.gmail.com>
-Message-ID: <CAO_48GFTbqQ0jRj93+cuax=F3Lf0DCnCnnuk8_pxkPKoXZwU4w@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 8 Jun 2016 16:42:06 +0100
+Subject: [PATCH] mfd: axp20x: Add a 500ms delay at the end of
+ axp20x_power_off
+In-Reply-To: <1465134648-27113-1-git-send-email-hdegoede@redhat.com>
+References: <1465134648-27113-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160608154206.GA14888@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2016 at 18:35, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Jun 8, 2016 at 1:51 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> Change return value back to -ENODEV when no region is defined for given
->> device. This restores old behavior of this function, as some drivers rely
->> on such error code.
->>
->> Reported-by: Liviu Dudau <liviu.dudau@arm.com>
->> Fixes: 59ce4039727ef40 ("of: reserved_mem: add support for using more than
->>        one region for given device")
->> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
->> ---
->>  drivers/of/of_reserved_mem.c | 2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->
-Looks reasonable; FWIW
-Reviewed-by: Sumit Semwal <sumit.semwal@linaro.org>
-> Acked-by: Rob Herring <robh@kernel.org>
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+On Sun, 05 Jun 2016, Hans de Goede wrote:
 
+> The kernel expects the power_off function to not return, and if it does
+> it panics. At a slight delay after the i2c write which turns off power
+> through the pmic, to give capacitors etc. some time to drain.
+> 
+> Without this the kernel lives on long enough after the poweroff to
+> print the following on the serial console on my Mele A1000G quad:
+> 
+> [  248.583588] reboot: Power down
+> [  248.600490] Kernel pa
+> 
+> With the delay the start of printing "Kernel panic" is gone.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  drivers/mfd/axp20x.c | 4 ++++
+>  1 file changed, 4 insertions(+)
 
+Applied, thanks.
+
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index 6364dab..fd80b09 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -17,6 +17,7 @@
+>   */
+>  
+>  #include <linux/err.h>
+> +#include <linux/delay.h>
+>  #include <linux/interrupt.h>
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+> @@ -677,6 +678,9 @@ static void axp20x_power_off(void)
+>  
+>  	regmap_write(axp20x_pm_power_off->regmap, AXP20X_OFF_CTRL,
+>  		     AXP20X_OFF);
+> +
+> +	/* Give capacitors etc. time to drain to avoid kernel panic msg. */
+> +	msleep(500);
+>  }
+>  
+>  int axp20x_match_device(struct axp20x_dev *axp20x)
 
 -- 
-Thanks and regards,
-
-Sumit Semwal
-Linaro Mobile Group - Kernel Team Lead
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
 Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
