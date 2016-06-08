@@ -1,55 +1,71 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jun 2016 15:47:59 +0200
-Subject: [RFC v4 0/7] extcon: usb-gpio: fixes and improvements
-Message-ID: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
+Date: Wed, 08 Jun 2016 15:48:00 +0200
+Subject: [RFC v4 1/7] Documentation: extcon: usb-gpio: update usb-gpio binding
+ description
+In-Reply-To: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
+References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465393686-16644-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Robert Baldyga <r.baldyga@samsung.com>
 
+Add information about VBUS pin detection support, 'debounce' property
+and some other details.
 
-Some time ago, Robert tried to add VBUS detection to extcon-usb-gpio
-driver [1].  There was a discussion about patch #2 ("extcon: usb-gpio:
-add support for VBUS detection").
+Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+Acked-by: Roger Quadros <rogerq@ti.com>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ .../devicetree/bindings/extcon/extcon-usb-gpio.txt | 28 ++++++++++++++++++++--
+ 1 file changed, 26 insertions(+), 2 deletions(-)
 
-The final conclusion was that Chanwoo will add VBUS/ID notifiers [2].
-That unfortunately never happened so this patchset is a follow up.
-
-1. Add VBUS/ID cable state notifiers to extcon, so USB controllers
-   could use it.
-2. Add VBUS detection to extcon-usb-gpio driver.
-
-Some parts are based on old Robert's work, some are new, some are
-reworked.
-
-
-Best regards,
-Krzysztof
-
-
-[1] http://thread.gmane.org/gmane.linux.kernel/1923192/focus=1923193
-[2] http://thread.gmane.org/gmane.linux.kernel/1923192/focus=1941152
-
-
-Krzysztof Kozlowski (5):
-  Revert "extcon: usb-gpio: switch to use pm wakeirq apis"
-  extcon: Add raw VBUS and ID cable states
-  extcon: usb-gpio: Add support for VBUS detection
-  ARM: exynos_defconfig: Enable EXTCON_USB_GPIO for Odroid XU3 USB OTG
-  ARM: dts: exynos: Add extcon-usb-gpio node for Odroid XU3
-
-Robert Baldyga (2):
-  Documentation: extcon: usb-gpio: update usb-gpio binding description
-  extcon: usb-gpio: make debounce value configurable in devicetree
-
- .../devicetree/bindings/extcon/extcon-usb-gpio.txt |  28 ++++-
- arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |  21 ++++
- arch/arm/boot/dts/exynos5422-odroidxu3.dts         |  21 ++++
- arch/arm/configs/exynos_defconfig                  |   1 +
- drivers/extcon/extcon-usb-gpio.c                   | 138 +++++++++++++++++----
- drivers/extcon/extcon.c                            |   3 +
- include/linux/extcon.h                             |   8 +-
- 7 files changed, 190 insertions(+), 30 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/extcon/extcon-usb-gpio.txt b/Documentation/devicetree/bindings/extcon/extcon-usb-gpio.txt
+index af0b903de293..7096f399b771 100644
+--- a/Documentation/devicetree/bindings/extcon/extcon-usb-gpio.txt
++++ b/Documentation/devicetree/bindings/extcon/extcon-usb-gpio.txt
+@@ -1,16 +1,40 @@
+ USB GPIO Extcon device
+ 
+-This is a virtual device used to generate USB cable states from the USB ID pin
+-connected to a GPIO pin.
++This is a virtual device used to generate USB cable states from the USB
++ID and VBUS signals connected to GPIO pins.
++
++The extcon cable states USB and USB_HOST are actually VBUS and !ID
++pin states and do not indicate what mode the USB needs to operate in.
++That decision is done by the USB stack.
++
++Some devices have only one of these GPIO pins, so we support cases when
++only one of them is present. Hence properties 'id-gpio' and 'vbus-gpio'
++are described as optional, but at least one of them has to be present
++in extcon-usb-gpio node.
++
++In general we have three cases:
++1. If VBUS and ID gpios are present we pass them as is
++	USB-HOST = !ID, USB = VBUS
++2. If only VBUS gpio is present we assume that ID pin is always High.
++	USB-HOST = false, USB = VBUS.
++3. If only ID pin is available we infer the VBUS pin states based on ID.
++	USB-HOST = !ID, USB = ID
+ 
+ Required properties:
+ - compatible: Should be "linux,extcon-usb-gpio"
++
++Optional properties
+ - id-gpio: gpio for USB ID pin. See gpio binding.
++- vbus-gpio: gpio for USB VBUS pin. See gpio binding.
++- debounce: gpio debounce time in milliseconds (u32).
++
+ 
+ Example: Examples of extcon-usb-gpio node in dra7-evm.dts as listed below:
+ 	extcon_usb1 {
+ 		compatible = "linux,extcon-usb-gpio";
+ 		id-gpio = <&gpio6 1 GPIO_ACTIVE_HIGH>;
++		vbus-gpio = <&gpio6 2 GPIO_ACTIVE_HIGH>;
++		debounce = <25>;
+ 	}
+ 
+ 	&omap_dwc3_1 {
 -- 
 1.9.1
