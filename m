@@ -1,43 +1,26 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 8 Jun 2016 13:49:20 +0100
-Subject: [PATCH v5 08/13] KVM: arm64: implement basic ITS register handlers
-In-Reply-To: <1464962572-3925-9-git-send-email-andre.przywara@arm.com>
-References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
- <1464962572-3925-9-git-send-email-andre.przywara@arm.com>
-Message-ID: <57581450.1000402@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 8 Jun 2016 08:05:56 -0500
+Subject: [PATCH] of: reserved_mem: restore old behavior when no region is
+ defined
+In-Reply-To: <1465368713-17866-1-git-send-email-m.szyprowski@samsung.com>
+References: <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
+ <1465368713-17866-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <CAL_JsqKNpx09UFkGB0n9W0GkAv8OVUdRN8cYriau83SdD6xnuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/16 15:02, Andre Przywara wrote:
-> Add emulation for some basic MMIO registers used in the ITS emulation.
-> This includes:
-> - GITS_{CTLR,TYPER,IIDR}
-> - ID registers
-> - GITS_{CBASER,CREADR,CWRITER}
->   (which implement the ITS command buffer handling)
-> 
-> Most of the handlers are pretty straight forward, but CWRITER goes
-> some extra miles to allow fine grained locking. The idea here
-> is to let only the first instance iterate through the command ring
-> buffer, CWRITER accesses on other VCPUs meanwhile will be picked up
-> by that first instance and handled as well. The ITS lock is thus only
-> held for very small periods of time and is dropped before the actual
-> command handler is called.
+On Wed, Jun 8, 2016 at 1:51 AM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+> Change return value back to -ENODEV when no region is defined for given
+> device. This restores old behavior of this function, as some drivers rely
+> on such error code.
+>
+> Reported-by: Liviu Dudau <liviu.dudau@arm.com>
+> Fixes: 59ce4039727ef40 ("of: reserved_mem: add support for using more than
+>        one region for given device")
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
+>  drivers/of/of_reserved_mem.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-On top of the comment I've already given on this patch:
-
-You've completely ignored the GITS_BASERn registers. While they are not
-strictly necessary for your emulation, we need them for save/restore. I
-expect the next version of this patch to at least expose:
-- Device table
-- Collection table
-
-Also, consider advertising the Indirect bit in the GITS_BASERn
-describing the Device table, the guest will thank you for it (if the
-support it).
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Acked-by: Rob Herring <robh@kernel.org>
