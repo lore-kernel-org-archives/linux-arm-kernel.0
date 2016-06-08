@@ -1,41 +1,38 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  8 Jun 2016 18:41:56 +0200
-Subject: [PATCH 5/8] ARM: dts: at91: ge863-pro3: remove leftovers clock
- definition
-In-Reply-To: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465404119-28177-5-git-send-email-alexandre.belloni@free-electrons.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed,  8 Jun 2016 17:54:57 +0100
+Subject: [PATCH] ARM: tegra: fix missing include <soc/tegra/cpuidle.h>
+Message-ID: <1465404897-16654-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks group properties and the clock at 0 node have been obsolete for two
-years, remove them.
+The prototype of tegra_cpuidle_pcie_irqs_in_use() is missing
+from the cpuidle.c file, it is defined in <soc/tegra/cpuidle.h>
+so add that include to avoid the following warning:
 
-Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+arch/arm/mach-tegra/cpuidle.c:51:6: warning: symbol 'tegra_cpuidle_pcie_irqs_in_use' was not declared. Should it be static?
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/boot/dts/ge863-pro3.dtsi | 9 ---------
- 1 file changed, 9 deletions(-)
+Cc: Stephen Warren <swarren@wwwdotorg.org>
+Cc: Alexandre Courbot <gnurou@gmail.com>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-tegra at vger.kernel.org
+---
+ arch/arm/mach-tegra/cpuidle.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
-index 0d0e62489d93..4aee5cc75fa4 100644
---- a/arch/arm/boot/dts/ge863-pro3.dtsi
-+++ b/arch/arm/boot/dts/ge863-pro3.dtsi
-@@ -11,15 +11,6 @@
+diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
+index 3165631..b8e4568 100644
+--- a/arch/arm/mach-tegra/cpuidle.c
++++ b/arch/arm/mach-tegra/cpuidle.c
+@@ -25,6 +25,7 @@
+ #include <linux/module.h>
  
- / {
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <6000000>;
--		};
--
- 		main_xtal {
- 			clock-frequency = <6000000>;
- 		};
+ #include <soc/tegra/fuse.h>
++#include <soc/tegra/cpuidle.h>
+ 
+ #include "cpuidle.h"
+ 
 -- 
 2.8.1
