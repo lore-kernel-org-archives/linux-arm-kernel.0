@@ -1,215 +1,310 @@
 From: yt.shen@mediatek.com (YT Shen)
-Date: Thu, 9 Jun 2016 00:03:43 +0800
-Subject: [RFC v3 3/5] drm/mediatek: add shadow register support
+Date: Thu, 9 Jun 2016 00:03:44 +0800
+Subject: [RFC v3 4/5] drm/mediatek: add support for Mediatek SoC MT2701
 In-Reply-To: <1465401825-43642-1-git-send-email-yt.shen@mediatek.com>
 References: <1465401825-43642-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1465401825-43642-4-git-send-email-yt.shen@mediatek.com>
+Message-ID: <1465401825-43642-5-git-send-email-yt.shen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to acquire mutex before using the resources,
-and need to release it after finished.
-So we don't need to write registers in the blanking period.
+This patch add support for the Mediatek MT2701 DISP subsystem.
+There is only one OVL engine in MT2701.
 
 Signed-off-by: YT Shen <yt.shen@mediatek.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   75 +++++++++++++++++++------------
- drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |   22 +++++++++
- drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |    2 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.c  |    1 +
- drivers/gpu/drm/mediatek/mtk_drm_drv.h  |    1 +
- 5 files changed, 72 insertions(+), 29 deletions(-)
+ drivers/gpu/drm/mediatek/mtk_disp_ovl.c     |    6 ++++
+ drivers/gpu/drm/mediatek/mtk_disp_rdma.c    |    6 ++++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c      |   42 +++++++++++++++++++++++++++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c |    8 +++++
+ drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h |    2 ++
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c      |   31 ++++++++++++++++++++
+ 6 files changed, 95 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-index 24aa3ba..80d9641 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-@@ -315,6 +315,42 @@ static void mtk_crtc_ddp_hw_fini(struct mtk_drm_crtc *mtk_crtc)
- 	pm_runtime_put(drm->dev);
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+index eb5c05e..1da0a71 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_ovl.c
+@@ -286,11 +286,17 @@ static int mtk_disp_ovl_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
-+static void mtk_crtc_ddp_config(struct drm_crtc *crtc)
-+{
-+	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-+	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
-+	struct mtk_ddp_comp *ovl = mtk_crtc->ddp_comp[0];
-+	unsigned int i;
++static const struct mtk_ddp_comp_driver_data mt2701_ovl_driver_data = {
++	.ovl = {0x0040, 1 << 12, 0}
++};
 +
-+	/*
-+	 * TODO: instead of updating the registers here, we should prepare
-+	 * working registers in atomic_commit and let the hardware command
-+	 * queue update module registers on vblank.
-+	 */
-+	if (state->pending_config) {
-+		mtk_ddp_comp_config(ovl, state->pending_width,
-+				    state->pending_height,
-+				    state->pending_vrefresh);
-+
-+		state->pending_config = false;
-+	}
-+
-+	if (mtk_crtc->pending_planes) {
-+		for (i = 0; i < OVL_LAYER_NR; i++) {
-+			struct drm_plane *plane = &mtk_crtc->planes[i].base;
-+			struct mtk_plane_state *plane_state;
-+
-+			plane_state = to_mtk_plane_state(plane->state);
-+
-+			if (plane_state->pending.config) {
-+				mtk_ddp_comp_layer_config(ovl, i, plane_state);
-+				plane_state->pending.config = false;
-+			}
-+		}
-+		mtk_crtc->pending_planes = false;
-+	}
-+}
-+
- static void mtk_drm_crtc_enable(struct drm_crtc *crtc)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-@@ -391,6 +427,7 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
- 				      struct drm_crtc_state *old_crtc_state)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
-+	struct mtk_drm_private *priv = crtc->dev->dev_private;
- 	unsigned int pending_planes = 0;
- 	int i;
+ static const struct mtk_ddp_comp_driver_data mt8173_ovl_driver_data = {
+ 	.ovl = {0x0f40, 0, 1 << 12}
+ };
  
-@@ -409,6 +446,12 @@ static void mtk_drm_crtc_atomic_flush(struct drm_crtc *crtc,
- 	}
- 	if (pending_planes)
- 		mtk_crtc->pending_planes = true;
-+
-+	if (priv->data->shadow_register) {
-+		mtk_disp_mutex_acquire(mtk_crtc->mutex);
-+		mtk_crtc_ddp_config(crtc);
-+		mtk_disp_mutex_release(mtk_crtc->mutex);
-+	}
+ static const struct of_device_id mtk_disp_ovl_driver_dt_match[] = {
++	{ .compatible = "mediatek,mt2701-disp-ovl",
++	  .data = &mt2701_ovl_driver_data},
+ 	{ .compatible = "mediatek,mt8173-disp-ovl",
+ 	  .data = &mt8173_ovl_driver_data},
+ 	{},
+diff --git a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+index fb0db50..506a353 100644
+--- a/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
++++ b/drivers/gpu/drm/mediatek/mtk_disp_rdma.c
+@@ -225,11 +225,17 @@ static int mtk_disp_rdma_remove(struct platform_device *pdev)
+ 	return 0;
  }
  
- static const struct drm_crtc_funcs mtk_crtc_funcs = {
-@@ -453,36 +496,10 @@ err_cleanup_crtc:
- void mtk_crtc_ddp_irq(struct drm_crtc *crtc, struct mtk_ddp_comp *ovl)
- {
- 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
--	struct mtk_crtc_state *state = to_mtk_crtc_state(mtk_crtc->base.state);
--	unsigned int i;
-+	struct mtk_drm_private *priv = crtc->dev->dev_private;
++static const struct mtk_ddp_comp_driver_data mt2701_rdma_driver_data = {
++	.rdma_fifo_pseudo_size = SZ_4K,
++};
++
+ static const struct mtk_ddp_comp_driver_data mt8173_rdma_driver_data = {
+ 	.rdma_fifo_pseudo_size = SZ_8K,
+ };
  
--	/*
--	 * TODO: instead of updating the registers here, we should prepare
--	 * working registers in atomic_commit and let the hardware command
--	 * queue update module registers on vblank.
--	 */
--	if (state->pending_config) {
--		mtk_ddp_comp_config(ovl, state->pending_width,
--				    state->pending_height,
--				    state->pending_vrefresh);
--
--		state->pending_config = false;
--	}
--
--	if (mtk_crtc->pending_planes) {
--		for (i = 0; i < OVL_LAYER_NR; i++) {
--			struct drm_plane *plane = &mtk_crtc->planes[i].base;
--			struct mtk_plane_state *plane_state;
--
--			plane_state = to_mtk_plane_state(plane->state);
--
--			if (plane_state->pending.config) {
--				mtk_ddp_comp_layer_config(ovl, i, plane_state);
--				plane_state->pending.config = false;
--			}
--		}
--		mtk_crtc->pending_planes = false;
--	}
-+	if (!priv->data->shadow_register)
-+		mtk_crtc_ddp_config(crtc);
- 
- 	mtk_drm_finish_page_flip(mtk_crtc);
- }
+ static const struct of_device_id mtk_disp_rdma_driver_dt_match[] = {
++	{ .compatible = "mediatek,mt2701-disp-rdma",
++	  .data = &mt2701_rdma_driver_data},
+ 	{ .compatible = "mediatek,mt8173-disp-rdma",
+ 	  .data = &mt8173_rdma_driver_data},
+ 	{},
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-index 8030769..fa53806 100644
+index fa53806..7ab6986 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-@@ -12,6 +12,7 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/iopoll.h>
- #include <linux/module.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-@@ -32,6 +33,7 @@
+@@ -32,6 +32,10 @@
+ #define DISP_REG_CONFIG_DISP_RDMA1_MOUT_EN	0x0c8
  #define DISP_REG_CONFIG_MMSYS_CG_CON0		0x100
  
++#define DISP_REG_CONFIG_DISP_OVL_MOUT_EN	0x030
++#define DISP_REG_CONFIG_OUT_SEL			0x04c
++#define DISP_REG_CONFIG_DSI_SEL			0x050
++
  #define DISP_REG_MUTEX_EN(n)	(0x20 + 0x20 * (n))
-+#define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
+ #define DISP_REG_MUTEX(n)	(0x24 + 0x20 * (n))
  #define DISP_REG_MUTEX_RST(n)	(0x28 + 0x20 * (n))
- #define DISP_REG_MUTEX_MOD(n)	(0x2c + 0x20 * (n))
- #define DISP_REG_MUTEX_SOF(n)	(0x30 + 0x20 * (n))
-@@ -300,6 +302,26 @@ void mtk_disp_mutex_disable(struct mtk_disp_mutex *mutex)
- 	writel(0, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
+@@ -54,6 +58,13 @@
+ #define MT8173_MUTEX_MOD_DISP_PWM1		BIT(24)
+ #define MT8173_MUTEX_MOD_DISP_OD		BIT(25)
+ 
++#define MT2701_MUTEX_MOD_DISP_OVL		BIT(3)
++#define MT2701_MUTEX_MOD_DISP_WDMA		BIT(6)
++#define MT2701_MUTEX_MOD_DISP_COLOR		BIT(7)
++#define MT2701_MUTEX_MOD_DISP_BLS		BIT(9)
++#define MT2701_MUTEX_MOD_DISP_RDMA0		BIT(10)
++#define MT2701_MUTEX_MOD_DISP_RDMA1		BIT(12)
++
+ #define MUTEX_SOF_SINGLE_MODE		0
+ #define MUTEX_SOF_DSI0			1
+ #define MUTEX_SOF_DSI1			2
+@@ -69,6 +80,10 @@
+ #define DPI0_SEL_IN_RDMA1		0x1
+ #define COLOR1_SEL_IN_OVL1		0x1
+ 
++#define OVL_MOUT_EN_RDMA		0x1
++#define BLS_TO_DSI_RDMA1_TO_DPI1	0x8
++#define DSI_SEL_IN_BLS			0x0
++
+ struct mtk_disp_mutex {
+ 	int id;
+ 	bool claimed;
+@@ -82,6 +97,15 @@ struct mtk_ddp {
+ 	const unsigned int		*mutex_mod;
+ };
+ 
++static const unsigned int mt2701_mutex_mod[DDP_COMPONENT_ID_MAX] = {
++	[DDP_COMPONENT_BLS] = MT2701_MUTEX_MOD_DISP_BLS,
++	[DDP_COMPONENT_COLOR0] = MT2701_MUTEX_MOD_DISP_COLOR,
++	[DDP_COMPONENT_OVL0] = MT2701_MUTEX_MOD_DISP_OVL,
++	[DDP_COMPONENT_RDMA0] = MT2701_MUTEX_MOD_DISP_RDMA0,
++	[DDP_COMPONENT_RDMA1] = MT2701_MUTEX_MOD_DISP_RDMA1,
++	[DDP_COMPONENT_WDMA0] = MT2701_MUTEX_MOD_DISP_WDMA,
++};
++
+ static const unsigned int mt8173_mutex_mod[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_AAL] = MT8173_MUTEX_MOD_DISP_AAL,
+ 	[DDP_COMPONENT_COLOR0] = MT8173_MUTEX_MOD_DISP_COLOR0,
+@@ -109,6 +133,9 @@ static unsigned int mtk_ddp_mout_en(enum mtk_ddp_comp_id cur,
+ 	if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_COLOR0) {
+ 		*addr = DISP_REG_CONFIG_DISP_OVL0_MOUT_EN;
+ 		value = OVL0_MOUT_EN_COLOR0;
++	} else if (cur == DDP_COMPONENT_OVL0 && next == DDP_COMPONENT_RDMA0) {
++		*addr = DISP_REG_CONFIG_DISP_OVL_MOUT_EN;
++		value = OVL_MOUT_EN_RDMA;
+ 	} else if (cur == DDP_COMPONENT_OD && next == DDP_COMPONENT_RDMA0) {
+ 		*addr = DISP_REG_CONFIG_DISP_OD_MOUT_EN;
+ 		value = OD_MOUT_EN_RDMA0;
+@@ -146,6 +173,9 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+ 	} else if (cur == DDP_COMPONENT_OVL1 && next == DDP_COMPONENT_COLOR1) {
+ 		*addr = DISP_REG_CONFIG_DISP_COLOR1_SEL_IN;
+ 		value = COLOR1_SEL_IN_OVL1;
++	} else if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
++		*addr = DISP_REG_CONFIG_DSI_SEL;
++		value = DSI_SEL_IN_BLS;
+ 	} else {
+ 		value = 0;
+ 	}
+@@ -153,6 +183,15 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+ 	return value;
  }
  
-+void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex)
++static void mtk_ddp_sout_sel(void __iomem *config_regs,
++			    enum mtk_ddp_comp_id cur, enum mtk_ddp_comp_id next)
 +{
-+	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
-+					   mutex[mutex->id]);
-+	u32 tmp;
-+
-+	writel(1, ddp->regs + DISP_REG_MUTEX_EN(mutex->id));
-+	writel(1, ddp->regs + DISP_REG_MUTEX(mutex->id));
-+	readl_poll_timeout_atomic(ddp->regs + DISP_REG_MUTEX(mutex->id), tmp,
-+				  tmp & 0x2, 1, 10000);
++	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0) {
++		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
++			       config_regs + DISP_REG_CONFIG_OUT_SEL);
++	}
 +}
 +
-+void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex)
-+{
-+	struct mtk_ddp *ddp = container_of(mutex, struct mtk_ddp,
-+					   mutex[mutex->id]);
-+
-+	writel(0, ddp->regs + DISP_REG_MUTEX(mutex->id));
-+}
-+
- static int mtk_ddp_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-index 92c1175..f9a7991 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-@@ -37,5 +37,7 @@ void mtk_disp_mutex_remove_comp(struct mtk_disp_mutex *mutex,
- 				enum mtk_ddp_comp_id id);
- void mtk_disp_mutex_unprepare(struct mtk_disp_mutex *mutex);
- void mtk_disp_mutex_put(struct mtk_disp_mutex *mutex);
-+void mtk_disp_mutex_acquire(struct mtk_disp_mutex *mutex);
-+void mtk_disp_mutex_release(struct mtk_disp_mutex *mutex);
+ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
+ 			      enum mtk_ddp_comp_id cur,
+ 			      enum mtk_ddp_comp_id next)
+@@ -165,6 +204,8 @@ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
+ 		writel_relaxed(reg, config_regs + addr);
+ 	}
  
- #endif /* MTK_DRM_DDP_H */
++	mtk_ddp_sout_sel(config_regs, cur, next);
++
+ 	value = mtk_ddp_sel_in(cur, next, &addr);
+ 	if (value) {
+ 		reg = readl_relaxed(config_regs + addr) | value;
+@@ -362,6 +403,7 @@ static int mtk_ddp_remove(struct platform_device *pdev)
+ }
+ 
+ static const struct of_device_id ddp_driver_dt_match[] = {
++	{ .compatible = "mediatek,mt2701-disp-mutex", .data = mt2701_mutex_mod},
+ 	{ .compatible = "mediatek,mt8173-disp-mutex", .data = mt8173_mutex_mod},
+ 	{},
+ };
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+index 4b4e449..87e0436 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.c
+@@ -102,6 +102,7 @@ static const char * const mtk_ddp_comp_stem[MTK_DDP_COMP_TYPE_MAX] = {
+ 	[MTK_DISP_PWM] = "pwm",
+ 	[MTK_DISP_MUTEX] = "mutex",
+ 	[MTK_DISP_OD] = "od",
++	[MTK_DISP_BLS] = "bls",
+ };
+ 
+ struct mtk_ddp_comp_match {
+@@ -112,6 +113,7 @@ struct mtk_ddp_comp_match {
+ 
+ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_AAL]	= { MTK_DISP_AAL,	0, NULL },
++	[DDP_COMPONENT_BLS]	= { MTK_DISP_BLS,	0, NULL },
+ 	[DDP_COMPONENT_COLOR0]	= { MTK_DISP_COLOR,	0, &ddp_color },
+ 	[DDP_COMPONENT_COLOR1]	= { MTK_DISP_COLOR,	1, &ddp_color },
+ 	[DDP_COMPONENT_DPI0]	= { MTK_DPI,		0, NULL },
+@@ -130,11 +132,17 @@ static const struct mtk_ddp_comp_match mtk_ddp_matches[DDP_COMPONENT_ID_MAX] = {
+ 	[DDP_COMPONENT_WDMA1]	= { MTK_DISP_WDMA,	1, NULL },
+ };
+ 
++static const struct mtk_ddp_comp_driver_data mt2701_color_driver_data = {
++	.color_offset = 0x0f00,
++};
++
+ static const struct mtk_ddp_comp_driver_data mt8173_color_driver_data = {
+ 	.color_offset = 0x0c00,
+ };
+ 
+ static const struct of_device_id mtk_disp_color_driver_dt_match[] = {
++	{ .compatible = "mediatek,mt2701-disp-color",
++	  .data = &mt2701_color_driver_data},
+ 	{ .compatible = "mediatek,mt8173-disp-color",
+ 	  .data = &mt8173_color_driver_data},
+ 	{},
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+index 53065c7..6e2d918 100644
+--- a/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
++++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp_comp.h
+@@ -35,6 +35,7 @@ enum mtk_ddp_comp_type {
+ 	MTK_DISP_PWM,
+ 	MTK_DISP_MUTEX,
+ 	MTK_DISP_OD,
++	MTK_DISP_BLS,
+ 	MTK_DDP_COMP_TYPE_MAX,
+ };
+ 
+@@ -57,6 +58,7 @@ enum mtk_ddp_comp_id {
+ 	DDP_COMPONENT_UFOE,
+ 	DDP_COMPONENT_WDMA0,
+ 	DDP_COMPONENT_WDMA1,
++	DDP_COMPONENT_BLS,
+ 	DDP_COMPONENT_ID_MAX,
+ };
+ 
 diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index 80b4f54..e9eb535 100644
+index e9eb535..b4b66a7 100644
 --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
 +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-@@ -133,6 +133,7 @@ static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+@@ -109,6 +109,19 @@ static const struct drm_mode_config_funcs mtk_drm_mode_config_funcs = {
+ 	.atomic_commit = mtk_atomic_commit,
+ };
+ 
++static const enum mtk_ddp_comp_id mt2701_mtk_ddp_main[] = {
++	DDP_COMPONENT_OVL0,
++	DDP_COMPONENT_RDMA0,
++	DDP_COMPONENT_COLOR0,
++	DDP_COMPONENT_BLS,
++	DDP_COMPONENT_DSI0,
++};
++
++static const enum mtk_ddp_comp_id mt2701_mtk_ddp_ext[] = {
++	DDP_COMPONENT_RDMA1,
++	DDP_COMPONENT_DPI0,
++};
++
+ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_main[] = {
+ 	DDP_COMPONENT_OVL0,
+ 	DDP_COMPONENT_COLOR0,
+@@ -128,6 +141,14 @@ static const enum mtk_ddp_comp_id mt8173_mtk_ddp_ext[] = {
+ 	DDP_COMPONENT_DPI0,
+ };
+ 
++static const struct mtk_mmsys_driver_data mt2701_mmsys_driver_data = {
++	.main_path = mt2701_mtk_ddp_main,
++	.main_len = ARRAY_SIZE(mt2701_mtk_ddp_main),
++	.ext_path = mt2701_mtk_ddp_ext,
++	.ext_len = ARRAY_SIZE(mt2701_mtk_ddp_ext),
++	.shadow_register = true,
++};
++
+ static const struct mtk_mmsys_driver_data mt8173_mmsys_driver_data = {
+ 	.main_path = mt8173_mtk_ddp_main,
  	.main_len = ARRAY_SIZE(mt8173_mtk_ddp_main),
- 	.ext_path = mt8173_mtk_ddp_ext,
- 	.ext_len = ARRAY_SIZE(mt8173_mtk_ddp_ext),
-+	.shadow_register = false,
+@@ -332,18 +353,26 @@ static const struct component_master_ops mtk_drm_ops = {
  };
  
- static int mtk_drm_kms_init(struct drm_device *drm)
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-index fa0b106..94f8b66 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-@@ -33,6 +33,7 @@ struct mtk_mmsys_driver_data {
- 	unsigned int main_len;
- 	const enum mtk_ddp_comp_id *ext_path;
- 	unsigned int ext_len;
-+	bool shadow_register;
+ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
++	{ .compatible = "mediatek,mt2701-disp-ovl",   .data = (void *)MTK_DISP_OVL },
+ 	{ .compatible = "mediatek,mt8173-disp-ovl",   .data = (void *)MTK_DISP_OVL },
++	{ .compatible = "mediatek,mt2701-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
+ 	{ .compatible = "mediatek,mt8173-disp-rdma",  .data = (void *)MTK_DISP_RDMA },
++	{ .compatible = "mediatek,mt2701-disp-wdma",  .data = (void *)MTK_DISP_WDMA },
+ 	{ .compatible = "mediatek,mt8173-disp-wdma",  .data = (void *)MTK_DISP_WDMA },
++	{ .compatible = "mediatek,mt2701-disp-color", .data = (void *)MTK_DISP_COLOR },
+ 	{ .compatible = "mediatek,mt8173-disp-color", .data = (void *)MTK_DISP_COLOR },
+ 	{ .compatible = "mediatek,mt8173-disp-aal",   .data = (void *)MTK_DISP_AAL},
+ 	{ .compatible = "mediatek,mt8173-disp-gamma", .data = (void *)MTK_DISP_GAMMA, },
+ 	{ .compatible = "mediatek,mt8173-disp-ufoe",  .data = (void *)MTK_DISP_UFOE },
++	{ .compatible = "mediatek,mt2701-dsi",	      .data = (void *)MTK_DSI },
+ 	{ .compatible = "mediatek,mt8173-dsi",        .data = (void *)MTK_DSI },
++	{ .compatible = "mediatek,mt2701-dpi",	      .data = (void *)MTK_DPI },
+ 	{ .compatible = "mediatek,mt8173-dpi",        .data = (void *)MTK_DPI },
++	{ .compatible = "mediatek,mt2701-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+ 	{ .compatible = "mediatek,mt8173-disp-mutex", .data = (void *)MTK_DISP_MUTEX },
+ 	{ .compatible = "mediatek,mt8173-disp-pwm",   .data = (void *)MTK_DISP_PWM },
+ 	{ .compatible = "mediatek,mt8173-disp-od",    .data = (void *)MTK_DISP_OD },
++	{ .compatible = "mediatek,mt2701-disp-bls",   .data = (void *)MTK_DISP_BLS },
+ 	{ }
  };
  
- struct mtk_drm_private {
+@@ -515,6 +544,8 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
+ 			 mtk_drm_sys_resume);
+ 
+ static const struct of_device_id mtk_drm_of_ids[] = {
++	{ .compatible = "mediatek,mt2701-mmsys",
++	  .data = &mt2701_mmsys_driver_data},
+ 	{ .compatible = "mediatek,mt8173-mmsys",
+ 	  .data = &mt8173_mmsys_driver_data},
+ 	{ }
 -- 
 1.7.9.5
