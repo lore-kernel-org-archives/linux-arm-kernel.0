@@ -1,28 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 8 Jun 2016 16:28:27 +0200
-Subject: [PATCH 1/3] dt-bindings: add DT binding for the Aardvark PCIe
- controller
-In-Reply-To: <8313817.cgODJZVrao@wuerfel>
-References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1464858585-10963-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20160602122405.GG17343@lunn.ch> <8313817.cgODJZVrao@wuerfel>
-Message-ID: <20160608162827.31116113@free-electrons.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 08 Jun 2016 16:30:55 +0200
+Subject: [PATCH v7 1/6] mfd: max8997: Use regmap to access registers
+In-Reply-To: <20160608142621.GG14888@dell>
+References: <1464773339-756-1-git-send-email-k.kozlowski@samsung.com>
+ <1464774841-1439-1-git-send-email-k.kozlowski@samsung.com>
+ <20160608142621.GG14888@dell>
+Message-ID: <57582C1F.5040306@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 06/08/2016 04:26 PM, Lee Jones wrote:
+> On Wed, 01 Jun 2016, Krzysztof Kozlowski wrote:
+> 
+>> From: Robert Baldyga <r.baldyga@samsung.com>
+>>
+>> This patch modifies max8997 driver and each associated function driver,
+>> to use regmap instead of operating directly on i2c bus. It will allow to
+>> simplify IRQ handling using regmap-irq.
+>>
+>> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
+>> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>>
+>> Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
+>> Acked-by: Bryan Wu <cooloney@gmail.com>
+>> Acked-by: Lee Jones <lee.jones@linaro.org>
+>> Acked-by: Sebastian Reichel <sre@kernel.org>
+>> Acked-by: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+>> [k.kozlowski: Collect acks, rebase on v4.6-rc6]
+>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>> Acked-by: Jacek Anaszewski <j.anaszewski@samsung.com>
+>> ---
+>>  drivers/extcon/extcon-max8997.c       |  31 ++++----
+>>  drivers/input/misc/max8997_haptic.c   |  34 ++++----
+>>  drivers/leds/leds-max8997.c           |  13 ++--
+>>  drivers/mfd/Kconfig                   |   1 +
+>>  drivers/mfd/max8997-irq.c             |  64 ++++++---------
+>>  drivers/mfd/max8997.c                 | 141 +++++++++++++++-------------------
+>>  drivers/power/max8997_charger.c       |  33 ++++----
+>>  drivers/regulator/max8997-regulator.c |  87 ++++++++++-----------
+> 
+> Is it just Mark's Ack you require?
 
-On Thu, 02 Jun 2016 14:34:14 +0200, Arnd Bergmann wrote:
+Yes, only Mark's is missing here. All other patches got everything they
+need.
 
-> I think some other PCI hosts just move the interrupt-controller
-> and #interrupt-cells properties into the PCI host node itself,
-> which avoids the ambiguity here.
-
-I've tried that, and it works fine. Makes the code simpler, the binding
-simpler, so: adopted! Thanks for suggesting!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best regards,
+Krzysztof
