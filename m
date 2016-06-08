@@ -1,37 +1,84 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 08 Jun 2016 08:51:53 +0200
-Subject: [PATCH] of: reserved_mem: restore old behavior when no region is
- defined
+Date: Wed, 08 Jun 2016 08:58:33 +0200
+Subject: HDLCD crashes with 6d910bfa809e
 In-Reply-To: <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
-References: <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
-Message-ID: <1465368713-17866-1-git-send-email-m.szyprowski@samsung.com>
+References: <5756B8A8.8000902@arm.com>
+ <20160607133535.GA1165@e106497-lin.cambridge.arm.com>
+ <5756D602.4090305@arm.com>
+ <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
+Message-ID: <3c4d34f5-a924-587e-5956-c21d528f24bf@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change return value back to -ENODEV when no region is defined for given
-device. This restores old behavior of this function, as some drivers rely
-on such error code.
+Hi All,
 
-Reported-by: Liviu Dudau <liviu.dudau@arm.com>
-Fixes: 59ce4039727ef40 ("of: reserved_mem: add support for using more than
-       one region for given device")
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
- drivers/of/of_reserved_mem.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 3cf129f..06af99f 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -334,7 +334,7 @@ int of_reserved_mem_device_init_by_idx(struct device *dev,
- 
- 	target = of_parse_phandle(np, "memory-region", idx);
- 	if (!target)
--		return -EINVAL;
-+		return -ENODEV;
- 
- 	rmem = __find_rmem(target);
- 	of_node_put(target);
+On 2016-06-07 16:34, liviu.dudau at arm.com wrote:
+> On Tue, Jun 07, 2016 at 03:11:14PM +0100, Robin Murphy wrote:
+>> Hi Liviu,
+>>
+>> On 07/06/16 14:35, liviu.dudau at arm.com wrote:
+>>> On Tue, Jun 07, 2016 at 01:06:00PM +0100, Robin Murphy wrote:
+>>>> Having just inadvertently merged -next into my working branch, I find
+>>>> dev6d910bfa809e ("drm/hlcd: Use lockless gem BO free callback") adversely
+>>>> affecting my board's ability to boot ;)
+>>>>
+>>>> Since I (intentionally) don't have sufficient CMA to create a framebuffer,
+>>>> drm_gem_cma_create() fails, unconditionally calls the now-NULL
+>>>> drm->driver->gem_free_object() in its cleanup path, and fiery death
+>>>> ensues...
+>>> Thanks for reporting this. What other changes other than reducing the CMA
+>>> allocation size do you have that I might need in order to reproduce this?
+>> I've just confirmed a plain checkout of next-20160602, using arm64 defconfig
+>> + DRM + HDLCD + TDA998X and CMA_SIZE_MBYTES=1, booted on a Juno, does the
+>> job:
+>>
+>> [    3.032402] hdlcd 7ff60000.hdlcd: bound 0-0070 (ops tda998x_ops)
+>> [    3.038388] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>> [    3.044970] [drm] No driver support for vblank timestamp query.
+>> [    3.076973] hdlcd 7ff60000.hdlcd: failed to allocate buffer with size
+>> 7680000
+>> [    3.084081] Bad mode in Synchronous Abort handler detected, code
+>> 0x86000004 -- IABT (current EL)
+>> [    3.092815] CPU: 3 PID: 6 Comm: kworker/u12:0 Not tainted
+>> 4.7.0-rc1-next-20160602 #686
+>> [    3.100682] Hardware name: ARM Juno development board (r1) (DT)
+>> [    3.106567] Workqueue: deferwq deferred_probe_work_func
+>> [    3.111761] task: ffff8009768a3e80 ti: ffff8009768e8000 task.ti:
+>> ffff8009768e8000
+>> [    3.119198] PC is at 0x0
+>> [    3.121720] LR is at drm_gem_cma_create+0x128/0x130
+>> ...and so on.
+>>
+>> Today's -next, on the other hand, dodges the bullet entirely:
+>>
+>> [    2.903645] [drm] found ARM HDLCD version r0p0
+>> [    2.908122] hdlcd 7ff60000.hdlcd: master bind failed: -22
+>> [    2.913505] tda998x: probe of 0-0070 failed with error -22
+>> [    2.919141] [drm] found ARM HDLCD version r0p0
+>> [    2.923609] hdlcd 7ff50000.hdlcd: master bind failed: -22
+>> [    2.928991] tda998x: probe of 0-0071 failed with error -22
+> OK, the problem is that commit 59ce4039727ef40 has changed the behaviour from when
+> there is no "memory-region" phandle in the DT: before it used to return -ENODEV, now
+> it returns -EINVAL.
+>
+> Marek, I quite liked the old behaviour to detect if the DT had the optional (from
+> my driver's point of view) "memory-region" phandle. Plus the check for dev is superfluous
+> when using of_reserved_mem_device_init() as that uses dev->of_node for np so it would
+> crash before the check anyway. Maybe move the check there?
+>
+> Until then I suggest reverting the 59ce4039727ef40 commit.
+
+I've just send a fix for this issue. I'm sorry for the regression. I 
+hope the fix fill
+quickly get into next to solve your problem.
+
+The additional check for null dev make sense, because the new function
+of_reserved_mem_device_init_by_idx can be called with any device and 
+node pointer not
+embedded with it, so I would like to keep it safe.
+
+Best regards
 -- 
-1.9.2
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
