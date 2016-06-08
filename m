@@ -1,85 +1,87 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 8 Jun 2016 10:18:10 +0200
-Subject: [PATCH] ARM: at91: debug: use DEBUG_UART_VIRT
-In-Reply-To: <5757C67E.3000301@atmel.com>
-References: <1465313079-6307-1-git-send-email-alexandre.belloni@free-electrons.com>
- <5756ECC5.6020908@atmel.com> <20160607162301.GL3363@piout.net>
- <5757C67E.3000301@atmel.com>
-Message-ID: <5757D4C2.8030805@atmel.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 8 Jun 2016 09:22:51 +0100
+Subject: [PATCH 8/8] dmaengine: Remove site specific OOM error messages on
+ kzalloc
+In-Reply-To: <1465321121-22238-9-git-send-email-peter.griffin@linaro.org>
+References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
+ <1465321121-22238-9-git-send-email-peter.griffin@linaro.org>
+Message-ID: <5757D5DB.5030401@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 08/06/2016 09:17, Nicolas Ferre a ?crit :
-> Le 07/06/2016 18:23, Alexandre Belloni a ?crit :
->> On 07/06/2016 at 17:48:21 +0200, Nicolas Ferre wrote :
->>> Le 07/06/2016 17:24, Alexandre Belloni a ?crit :
->>>> AT91 still uses an offset (0x0100 0000) from the physical address to map
->>>> the debug UART. This is unfortunate as for some platforms (sama5d3 and
->>>> earlier), it ends up in the PCI zone and PCI is enabled in multi_v7.
->>>> Switch to DEBUG_UART_VIRT to solve that.
->>>>
->>>> Tested on sama5d3 and 9g20.
->>>>
->>>> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
->>>
->>> People using their old defconfigs must pay attention to this change...
->>> but it's true that it's a debug configuration anyway...
->>>
->>
->> I really doubt people are letting DEBUG_LL enabled in a production
->> kernel...
->>
->>>> diff --git a/arch/arm/include/debug/at91.S b/arch/arm/include/debug/at91.S
->>>> index d4ae3b8e2426..0098401e5aeb 100644
->>>> --- a/arch/arm/include/debug/at91.S
->>>> +++ b/arch/arm/include/debug/at91.S
->>>> @@ -9,14 +9,6 @@
->>>>   *
->>>>  */
->>>>  
->>>> -#ifdef CONFIG_MMU
->>>> -#define AT91_IO_P2V(x) ((x) - 0x01000000)
->>>> -#else
->>>> -#define AT91_IO_P2V(x) (x)
->>>> -#endif
->>>> -
->>>> -#define AT91_DEBUG_UART_VIRT AT91_IO_P2V(CONFIG_DEBUG_UART_PHYS)
->>>> -
->>>>  #define AT91_DBGU_SR		(0x14)	/* Status Register */
->>>>  #define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
->>>>  #define AT91_DBGU_TXRDY		(1 << 1)	/* Transmitter Ready */
->>>> @@ -24,7 +16,7 @@
->>>>  
->>>>  	.macro	addruart, rp, rv, tmp
->>>>  	ldr	\rp, =CONFIG_DEBUG_UART_PHYS		@ System peripherals (phys address)
->>>> -	ldr	\rv, =AT91_DEBUG_UART_VIRT		@ System peripherals (virt address)
->>>> +	ldr	\rv, =CONFIG_DEBUG_UART_VIRT		@ System peripherals (virt address)
->>>
->>> Shouldn't we protect the use of this defined value with some
->>> #warning "Beware the value CONFIG_DEBUG_UART_VIRT haven't been defined:
->>> is it intentional"
->>> or even #error?
->>>
->>> or something like that?
->>>
->>
->> Well, those that are using this feature are supposed to know what they
->> are doing. There is now protection for CONFIG_DEBUG_UART_PHYS anyway.
+
+On 07/06/16 18:38, Peter Griffin wrote:
+> If kzalloc() fails it will issue it's own error message including
+> a dump_stack(). So remove the site specific error messages.
 > 
-> So, I know that developers are sensible people and know what they're
-> doing but still... what about having a protection for both anyway...
-> instead of silently crashing at runtime?
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> ---
+>  drivers/dma/amba-pl08x.c        | 10 +---------
+>  drivers/dma/bestcomm/bestcomm.c |  2 --
+>  drivers/dma/edma.c              | 16 ++++------------
+>  drivers/dma/fsldma.c            |  2 --
+>  drivers/dma/k3dma.c             | 10 ++++------
+>  drivers/dma/mmp_tdma.c          |  5 ++---
+>  drivers/dma/moxart-dma.c        |  4 +---
+>  drivers/dma/nbpfaxi.c           |  5 ++---
+>  drivers/dma/pl330.c             |  5 +----
+>  drivers/dma/ppc4xx/adma.c       |  2 --
+>  drivers/dma/s3c24xx-dma.c       |  5 +----
+>  drivers/dma/sh/shdmac.c         |  9 ++-------
+>  drivers/dma/sh/sudmac.c         |  9 ++-------
+>  drivers/dma/sirf-dma.c          |  5 ++---
+>  drivers/dma/ste_dma40.c         |  4 +---
+>  drivers/dma/tegra20-apb-dma.c   | 11 +++--------
+>  drivers/dma/timb_dma.c          |  8 ++------
+>  17 files changed, 28 insertions(+), 84 deletions(-)
 
-After discussion with you on IRC, it seems to be not so easy to do and
-can harm the multi_v7 early debug facilities.
+[snip]
 
-So, for this patch:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> diff --git a/drivers/dma/tegra20-apb-dma.c b/drivers/dma/tegra20-apb-dma.c
+> index 7f4af8c..032884f 100644
+> --- a/drivers/dma/tegra20-apb-dma.c
+> +++ b/drivers/dma/tegra20-apb-dma.c
+> @@ -300,10 +300,8 @@ static struct tegra_dma_desc *tegra_dma_desc_get(
+>  
+>  	/* Allocate DMA desc */
+>  	dma_desc = kzalloc(sizeof(*dma_desc), GFP_NOWAIT);
+> -	if (!dma_desc) {
+> -		dev_err(tdc2dev(tdc), "dma_desc alloc failed\n");
+> +	if (!dma_desc)
+>  		return NULL;
+> -	}
+>  
+>  	dma_async_tx_descriptor_init(&dma_desc->txd, &tdc->dma_chan);
+>  	dma_desc->txd.tx_submit = tegra_dma_tx_submit;
+> @@ -340,8 +338,7 @@ static struct tegra_dma_sg_req *tegra_dma_sg_req_get(
+>  	spin_unlock_irqrestore(&tdc->lock, flags);
+>  
+>  	sg_req = kzalloc(sizeof(struct tegra_dma_sg_req), GFP_NOWAIT);
+> -	if (!sg_req)
+> -		dev_err(tdc2dev(tdc), "sg_req alloc failed\n");
+> +
+>  	return sg_req;
+>  }
+>  
+> @@ -1319,10 +1316,8 @@ static int tegra_dma_probe(struct platform_device *pdev)
+>  
+>  	tdma = devm_kzalloc(&pdev->dev, sizeof(*tdma) + cdata->nr_channels *
+>  			sizeof(struct tegra_dma_channel), GFP_KERNEL);
+> -	if (!tdma) {
+> -		dev_err(&pdev->dev, "Error: memory allocation failed\n");
+> +	if (!tdma)
+>  		return -ENOMEM;
+> -	}
+>  
+>  	tdma->dev = &pdev->dev;
+>  	tdma->chip_data = cdata;
 
-It's true anyway that putting the proper values for these config options
-is not so easy (reading the help for CONFIG_DEBUG_AT91_UART)... And
-enhancing this situation if far beyond the scope of this patch.
+For the tegra portion ...
 
-Thanks. Bye,
+Acked-by: Jon Hunter <jonathanh@nvidia.com>
+
+Cheers
+Jon
+
 -- 
-Nicolas Ferre
+nvpublic
