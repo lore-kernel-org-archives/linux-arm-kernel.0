@@ -1,44 +1,70 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  7 Jun 2016 19:37:06 -0700
-Subject: [PATCH 0/3] ARM: dts: imx7d: add i.MX 7Solo and Colibri iMX7S/D dts
-Message-ID: <20160608023709.32090-1-stefan@agner.ch>
+Date: Tue,  7 Jun 2016 19:37:08 -0700
+Subject: [PATCH 2/3] ARM: dts: imx7d: move input header into base device tree
+In-Reply-To: <20160608023709.32090-1-stefan@agner.ch>
+References: <20160608023709.32090-1-stefan@agner.ch>
+Message-ID: <20160608023709.32090-3-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The two SoC's i.MX 7Solo and i.MX 7Dual are very similar, but there
-are some differences worth dividing the current i.MX 7Dual base device
-tree. This patchset adds new base device tree imx7s.dtsi which is meant
-to be used for i.MX 7Solo boards. Note that the SoC _family_ is called
-imx7d/IMX7D throughout the kernel.
+The base device tree uses KEY_POWER in the snvs-powerkey node,
+hence include the input.h header file in the base device tree.
 
-The third patch uses the new PMIC device tree binding (merge pending):
-http://thread.gmane.org/gmane.linux.kernel/2238118
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 1 -
+ arch/arm/boot/dts/imx7d-nitrogen7.dts   | 1 -
+ arch/arm/boot/dts/imx7d-sdb.dts         | 1 -
+ arch/arm/boot/dts/imx7s.dtsi            | 1 +
+ 4 files changed, 1 insertion(+), 3 deletions(-)
 
-Stefan Agner (3):
-  ARM: dts: imx7d: create i.MX 7Solo base device tree
-  ARM: dts: imx7d: move input header into base device tree
-  ARM: dts: imx7: add Toradex Colibri iMX7S/iMX7D support
-
- arch/arm/boot/dts/Makefile                  |   4 +-
- arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 149 +++++
- arch/arm/boot/dts/imx7-colibri.dtsi         | 568 +++++++++++++++++
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts     |   1 -
- arch/arm/boot/dts/imx7d-colibri-eval-v3.dts |  66 ++
- arch/arm/boot/dts/imx7d-colibri.dtsi        |  54 ++
- arch/arm/boot/dts/imx7d-nitrogen7.dts       |   1 -
- arch/arm/boot/dts/imx7d-sdb.dts             |   1 -
- arch/arm/boot/dts/imx7d.dtsi                | 923 ++--------------------------
- arch/arm/boot/dts/imx7s-colibri-eval-v3.dts |  51 ++
- arch/arm/boot/dts/imx7s-colibri.dtsi        |  50 ++
- arch/arm/boot/dts/imx7s.dtsi                | 881 ++++++++++++++++++++++++++
- 12 files changed, 1870 insertions(+), 879 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
- create mode 100644 arch/arm/boot/dts/imx7-colibri.dtsi
- create mode 100644 arch/arm/boot/dts/imx7d-colibri-eval-v3.dts
- create mode 100644 arch/arm/boot/dts/imx7d-colibri.dtsi
- create mode 100644 arch/arm/boot/dts/imx7s-colibri-eval-v3.dts
- create mode 100644 arch/arm/boot/dts/imx7s-colibri.dtsi
- create mode 100644 arch/arm/boot/dts/imx7s.dtsi
-
+diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+index 4863451..58b09bf 100644
+--- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
++++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
+@@ -12,7 +12,6 @@
+ 
+ /dts-v1/;
+ 
+-#include <dt-bindings/input/input.h>
+ #include "imx7d.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/imx7d-nitrogen7.dts b/arch/arm/boot/dts/imx7d-nitrogen7.dts
+index 1ce9780..230a00b 100644
+--- a/arch/arm/boot/dts/imx7d-nitrogen7.dts
++++ b/arch/arm/boot/dts/imx7d-nitrogen7.dts
+@@ -42,7 +42,6 @@
+ 
+ /dts-v1/;
+ 
+-#include <dt-bindings/input/input.h>
+ #include "imx7d.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
+index b267f79..a5022b3 100644
+--- a/arch/arm/boot/dts/imx7d-sdb.dts
++++ b/arch/arm/boot/dts/imx7d-sdb.dts
+@@ -42,7 +42,6 @@
+ 
+ /dts-v1/;
+ 
+-#include <dt-bindings/input/input.h>
+ #include "imx7d.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index a5fd2d7..5a99e00 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -43,6 +43,7 @@
+ 
+ #include <dt-bindings/clock/imx7d-clock.h>
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include "imx7d-pinfunc.h"
+ #include "skeleton.dtsi"
 -- 
 2.8.3
