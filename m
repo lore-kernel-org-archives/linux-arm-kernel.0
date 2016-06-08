@@ -1,52 +1,176 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Wed, 8 Jun 2016 18:52:30 +0200
-Subject: [PATCH v5 resend 1/2] ehci-platform: Add support for controllers
- with multiple reset lines
-In-Reply-To: <20160608052216.GA7766@kroah.com>
-References: <1464880446-5919-1-git-send-email-hdegoede@redhat.com>
- <1464880446-5919-2-git-send-email-hdegoede@redhat.com>
- <20160608052216.GA7766@kroah.com>
-Message-ID: <20236f14-549e-5acc-3f95-90db44b1f49d@redhat.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  8 Jun 2016 18:52:53 +0200
+Subject: [PATCH] ARM: multi_v5_defconfig: enable Atmel platforms
+Message-ID: <1465404773-29076-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Enable ARMv5 platforms in multi_v5
 
-On 08-06-16 07:22, Greg Kroah-Hartman wrote:
-> On Thu, Jun 02, 2016 at 05:14:05PM +0200, Hans de Goede wrote:
->> From: Reinder de Haan <patchesrdh@mveas.com>
->>
->> At least the EHCI/OHCI found on the Allwinnner H3 SoC needs multiple
->> reset lines, the controller will not initialize while the reset for
->> its companion is still asserted, which means we need to de-assert
->> 2 resets for the controller to work.
->>
->> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Changes in v2:
->> -Use the new reset_control_[de]assert_shared reset-controller functions
->> ---
->>  Documentation/devicetree/bindings/usb/usb-ehci.txt |  2 +-
->>  drivers/usb/host/ehci-platform.c                   | 41 ++++++++++++----------
->>  2 files changed, 24 insertions(+), 19 deletions(-)
->
-> This patch doesn't apply to my usb-testing branch at all, what went
-> wrong?
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/configs/multi_v5_defconfig | 54 ++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 53 insertions(+), 1 deletion(-)
 
-You merged this patch:
-
-https://git.kernel.org/cgit/linux/kernel/git/gregkh/usb.git/commit/?id=d0e08b0077f49e209bc90305ddf1ca434ac6cc0e
-
-Which does almost the same, except that it only supports dedicated reset
-controllers and not shared reset controllers.
-
-I'll send a new patch which changes things to add support for shared
-reset controllers.
-
-This will also bring the ehci-platform reset handling code inline
-with ohci-platform again.
-
-Regards,
-
-Hans
+diff --git a/arch/arm/configs/multi_v5_defconfig b/arch/arm/configs/multi_v5_defconfig
+index 4f82656f7ea2..2658b80fa263 100644
+--- a/arch/arm/configs/multi_v5_defconfig
++++ b/arch/arm/configs/multi_v5_defconfig
+@@ -13,6 +13,8 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_ARCH_MULTI_V7 is not set
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_KIRKWOOD=y
++CONFIG_ARCH_AT91=y
++CONFIG_SOC_AT91SAM9=y
+ CONFIG_ARCH_ASPEED=y
+ CONFIG_MACH_ASPEED_G4=y
+ CONFIG_ARCH_MXC=y
+@@ -89,8 +91,12 @@ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_STAA=y
+ CONFIG_MTD_PHYSMAP=y
+ CONFIG_MTD_NAND=y
++CONFIG_MTD_NAND_ATMEL=y
+ CONFIG_MTD_NAND_ORION=y
++CONFIG_MTD_UBI=y
+ CONFIG_BLK_DEV_LOOP=y
++CONFIG_ATMEL_TCLIB=y
++CONFIG_ATMEL_SSC=m
+ CONFIG_EEPROM_AT24=y
+ # CONFIG_SCSI_PROC_FS is not set
+ CONFIG_BLK_DEV_SD=y
+@@ -102,15 +108,22 @@ CONFIG_SATA_MV=y
+ CONFIG_NETDEVICES=y
+ CONFIG_NET_DSA_MV88E6060=y
+ CONFIG_NET_DSA_MV88E6XXX=y
++CONFIG_MACB=y
++CONFIG_DM9000=y
+ CONFIG_MV643XX_ETH=y
+ CONFIG_R8169=y
+ CONFIG_MARVELL_PHY=y
++CONFIG_DAVICOM_PHY=y
++CONFIG_MICREL_PHY=y
+ CONFIG_LIBERTAS=y
+ CONFIG_LIBERTAS_SDIO=y
+ CONFIG_MWL8K=m
+ CONFIG_INPUT_EVDEV=y
++CONFIG_KEYBOARD_QT1070=m
+ CONFIG_KEYBOARD_GPIO=y
+ # CONFIG_INPUT_MOUSE is not set
++CONFIG_INPUT_TOUCHSCREEN=y
++CONFIG_TOUCHSCREEN_ADS7846=m
+ CONFIG_LEGACY_PTY_COUNT=16
+ # CONFIG_DEVKMEM is not set
+ CONFIG_SERIAL_8250=y
+@@ -120,16 +133,21 @@ CONFIG_SERIAL_8250_RUNTIME_UARTS=6
+ CONFIG_SERIAL_8250_EXTENDED=y
+ CONFIG_SERIAL_8250_MANY_PORTS=y
+ CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_ATMEL=y
++CONFIG_SERIAL_ATMEL_CONSOLE=y
++CONFIG_SERIAL_ATMEL_TTYAT=y
+ CONFIG_SERIAL_IMX=y
+ CONFIG_SERIAL_IMX_CONSOLE=y
+-# CONFIG_HW_RANDOM is not set
++CONFIG_HW_RANDOM=y
+ CONFIG_I2C=y
+ # CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
++CONFIG_I2C_AT91=y
+ CONFIG_I2C_IMX=y
+ CONFIG_I2C_MV64XXX=y
+ CONFIG_I2C_NOMADIK=y
+ CONFIG_SPI=y
++CONFIG_SPI_ATMEL=y
+ CONFIG_SPI_IMX=y
+ CONFIG_SPI_ORION=y
+ CONFIG_GPIO_SYSFS=y
+@@ -143,18 +161,36 @@ CONFIG_SENSORS_LM75=y
+ CONFIG_SENSORS_LM85=y
+ CONFIG_THERMAL=y
+ CONFIG_KIRKWOOD_THERMAL=y
++CONFIG_AT91SAM9X_WATCHDOG=y
+ CONFIG_ORION_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
++CONFIG_MFD_ATMEL_HLCDC=y
+ # CONFIG_ABX500_CORE is not set
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_MEDIA_SUPPORT=y
++CONFIG_MEDIA_CAMERA_SUPPORT=y
++CONFIG_V4L_PLATFORM_DRIVERS=y
++CONFIG_SOC_CAMERA=y
++CONFIG_VIDEO_ATMEL_ISI=m
++CONFIG_SOC_CAMERA_OV2640=m
++CONFIG_DRM=y
++CONFIG_DRM_ATMEL_HLCDC=m
++CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_FB=y
+ CONFIG_FB_IMX=y
++CONFIG_FB_ATMEL=y
++CONFIG_BACKLIGHT_ATMEL_LCDC=y
+ CONFIG_SOUND=y
+ CONFIG_SND=y
+ CONFIG_SND_SOC=y
++CONFIG_SND_ATMEL_SOC=y
++CONFIG_SND_AT91_SOC_SAM9G20_WM8731=m
++CONFIG_SND_ATMEL_SOC_WM8904=m
++CONFIG_SND_AT91_SOC_SAM9X5_WM8731=m
+ CONFIG_SND_KIRKWOOD_SOC=y
+ CONFIG_SND_SOC_ALC5623=y
++CONFIG_SND_SOC_WM8731=y
+ CONFIG_SND_SIMPLE_CARD=y
+ CONFIG_HID_DRAGONRISE=y
+ CONFIG_HID_GYRATION=y
+@@ -173,6 +209,7 @@ CONFIG_HID_ZEROPLUS=y
+ CONFIG_USB=y
+ CONFIG_USB_XHCI_HCD=y
+ CONFIG_USB_EHCI_HCD=y
++CONFIG_USB_OHCI_HCD=y
+ CONFIG_USB_PRINTER=m
+ CONFIG_USB_STORAGE=y
+ CONFIG_USB_STORAGE_DATAFAB=y
+@@ -182,8 +219,12 @@ CONFIG_USB_STORAGE_SDDR55=y
+ CONFIG_USB_STORAGE_JUMPSHOT=y
+ CONFIG_USB_CHIPIDEA=y
+ CONFIG_USB_CHIPIDEA_HOST=y
++CONFIG_USB_GADGET=y
++CONFIG_USB_AT91=m
++CONFIG_USB_ATMEL_USBA=m
+ CONFIG_MMC=y
+ CONFIG_SDIO_UART=y
++CONFIG_MMC_ATMELMCI=y
+ CONFIG_MMC_MVSDIO=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+@@ -196,11 +237,21 @@ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_RS5C372=y
+ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_S35390A=y
++CONFIG_RTC_DRV_RV3029C2=m
++CONFIG_RTC_DRV_AT91RM9200=m
++CONFIG_RTC_DRV_AT91SAM9=m
+ CONFIG_RTC_DRV_MV=y
+ CONFIG_DMADEVICES=y
++CONFIG_AT_HDMAC=y
+ CONFIG_MV_XOR=y
+ CONFIG_STAGING=y
+ CONFIG_FB_XGI=y
++CONFIG_IIO=m
++CONFIG_AT91_ADC=m
++CONFIG_PWM=y
++CONFIG_PWM_ATMEL=m
++CONFIG_PWM_ATMEL_HLCDC_PWM=m
++CONFIG_PWM_ATMEL_TCB=m
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_ISO9660_FS=m
+@@ -210,6 +261,7 @@ CONFIG_MSDOS_FS=y
+ CONFIG_VFAT_FS=y
+ CONFIG_TMPFS=y
+ CONFIG_JFFS2_FS=y
++CONFIG_UBIFS_FS=y
+ CONFIG_CRAMFS=y
+ CONFIG_NFS_FS=y
+ CONFIG_ROOT_NFS=y
+-- 
+2.8.1
