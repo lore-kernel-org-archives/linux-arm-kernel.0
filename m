@@ -1,49 +1,80 @@
 From: aisheng.dong@nxp.com (Dong Aisheng)
-Date: Wed, 8 Jun 2016 22:33:30 +0800
-Subject: [PATCH 01/11] clk: imx: clk-pllv3: fix incorrect handle of enet
- powerdown bit
-Message-ID: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
+Date: Wed, 8 Jun 2016 22:33:34 +0800
+Subject: [PATCH 05/11] clk: imx: refine the powerup_set bit of clk-pllv3
+In-Reply-To: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
+References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After commit f53947456f98 ("ARM: clk: imx: update pllv3 to support imx7"),
-the former used BM_PLL_POWER bit is not correct anymore for IMX7 ENET.
-Instead, pll->powerdown holds the correct bit, so using powerdown bit
-in clk_pllv3_{prepare | unprepare} functions.
+There's a powerdown bit already, so let's change the name of
+powerup_set bit to power_invert to reflects the power polarity
+to make it less confusing.
 
-Fixes: f53947456f98 ("ARM: clk: imx: update pllv3 to support imx7")
 Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
 ---
- drivers/clk/imx/clk-pllv3.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/clk/imx/clk-pllv3.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-index 4826b3c9e19e..44d294a336f0 100644
+index eea2b1b3791e..3fdfb6d2cc71 100644
 --- a/drivers/clk/imx/clk-pllv3.c
 +++ b/drivers/clk/imx/clk-pllv3.c
-@@ -77,9 +77,9 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+@@ -29,8 +29,8 @@
+  * struct clk_pllv3 - IMX PLL clock version 3
+  * @clk_hw:	 clock source
+  * @base:	 base address of PLL registers
+- * @powerup_set: set POWER bit to power up the PLL
+- * @powerdown:   pll powerdown offset bit
++ * @powerdown:	 pll powerdown bit offset
++ * @power_invert: set powerdown bit to power up the PLL
+  * @div_mask:	 mask of divider bits
+  * @div_shift:	 shift of divider bits
+  *
+@@ -40,7 +40,7 @@
+ struct clk_pllv3 {
+ 	struct clk_hw	hw;
+ 	void __iomem	*base;
+-	bool		powerup_set;
++	bool		power_invert;
+ 	u32		powerdown;
+ 	u32		div_mask;
+ 	u32		div_shift;
+@@ -55,7 +55,7 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
+ 	u32 val = readl_relaxed(pll->base) & pll->powerdown;
+ 
+ 	/* No need to wait for lock when pll is not powered up */
+-	if ((pll->powerup_set && !val) || (!pll->powerup_set && val))
++	if ((pll->power_invert && !val) || (!pll->power_invert && val))
+ 		return 0;
+ 
+ 	/* Wait for PLL to lock */
+@@ -76,7 +76,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+ 	u32 val;
  
  	val = readl_relaxed(pll->base);
- 	if (pll->powerup_set)
--		val |= BM_PLL_POWER;
-+		val |= pll->powerdown;
+-	if (pll->powerup_set)
++	if (pll->power_invert)
+ 		val |= pll->powerdown;
  	else
--		val &= ~BM_PLL_POWER;
-+		val &= ~pll->powerdown;
- 	writel_relaxed(val, pll->base);
- 
- 	return clk_pllv3_wait_lock(pll);
-@@ -92,9 +92,9 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+ 		val &= ~pll->powerdown;
+@@ -91,7 +91,7 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+ 	u32 val;
  
  	val = readl_relaxed(pll->base);
- 	if (pll->powerup_set)
--		val &= ~BM_PLL_POWER;
-+		val &= ~pll->powerdown;
+-	if (pll->powerup_set)
++	if (pll->power_invert)
+ 		val &= ~pll->powerdown;
  	else
--		val |= BM_PLL_POWER;
-+		val |= pll->powerdown;
- 	writel_relaxed(val, pll->base);
- }
- 
+ 		val |= pll->powerdown;
+@@ -326,7 +326,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+ 		pll->div_shift = 1;
+ 	case IMX_PLLV3_USB:
+ 		ops = &clk_pllv3_ops;
+-		pll->powerup_set = true;
++		pll->power_invert = true;
+ 		break;
+ 	case IMX_PLLV3_AV:
+ 		ops = &clk_pllv3_av_ops;
 -- 
 1.9.1
