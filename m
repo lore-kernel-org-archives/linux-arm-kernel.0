@@ -1,45 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 8 Jun 2016 12:23:25 +0200
-Subject: [PATCH v3 4/4] musb: sunxi: Simplify dr_mode handling
-In-Reply-To: <1465138776-6003-4-git-send-email-hdegoede@redhat.com>
-References: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
- <1465138776-6003-4-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160608102325.GI14179@lukather>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 08 Jun 2016 12:25:53 +0200
+Subject: [PATCH 0/3] Exynos IOMMU: proper runtime pm support
+Message-ID: <1465381556-2230-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Sun, Jun 05, 2016 at 04:59:36PM +0200, Hans de Goede wrote:
-> phy-sun4i-usb now has proper dr_mode handling, it always registers an
-> extcon, and sends a notify with the mode (even when in peripheral- /
-> host-only mode) at least once.
-> 
-> So we can simply the sunxi musb glue by always registering its extcon
-> notifier and relying on sunxi_musb_work() to enable vbus when in
-> host-only mode.
-> 
-> This also enables host- and peripheral-only mode with vbus monitoring.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+This patch series finally implements proper runtime pm support in Exynos
+IOMMU driver. This has been achieved by adding runtime pm notifiers,
+which lets SYSMMU controller to follow it's master device (the device
+which actually performs DMA transaction) runtime pm. The main idea
+behind this solution is an observation that any DMA activity from master
+device can be done only when master device is active, thus when master
+device is suspended SYSMMU controller device can also be suspended.
 
-It's been a bit painful to track all the patches needed so that it
-applies properly, but I've finally been able to test it on a Sinlinx
-SinA33 with peripheral-only mUSB, and it works like a charm.
+This patchset finally solves the situation that power domains are always
+enabled, because all SYSMMU controllers (which belongs to those domains)
+are permanently active (because existing driver was simplified and kept
+SYSMMU device active all the time after initialization).
 
-You can add my Tested-by.
+This patchset requires my previous changes to Exynos IOMMU driver
+submitted in the "Exynos IOMMU: improve clock management" thread:
+http://www.spinics.net/lists/arm-kernel/msg505695.html  
 
-Thanks!
-Maxime
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+
+Krzysztof Kozlowski (1):
+  PM / Runtime: Add notifiers for device runtime PM events
+
+Marek Szyprowski (2):
+  iommu/exynos: Remove excessive, useless debug
+  iommu/exynos: Add proper runtime pm support
+
+ drivers/base/power/generic_ops.c |   9 ++
+ drivers/base/power/power.h       |   6 ++
+ drivers/base/power/runtime.c     |  34 ++++++-
+ drivers/iommu/exynos-iommu.c     | 214 ++++++++++++++++++---------------------
+ include/linux/pm.h               |   2 +
+ include/linux/pm_runtime.h       |  51 ++++++++++
+ 6 files changed, 201 insertions(+), 115 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160608/39078255/attachment.sig>
+1.9.2
