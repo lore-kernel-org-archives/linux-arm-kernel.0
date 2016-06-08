@@ -1,74 +1,84 @@
-From: zhang.chunyan@linaro.org (Chunyan Zhang)
-Date: Wed, 8 Jun 2016 19:02:13 +0800
-Subject: [RFC PATCH 3/4] trace: Duplicate the output of the function trace
- logs to STM
-In-Reply-To: <87lh2hqpxm.fsf@ashishki-desk.ger.corp.intel.com>
-References: <1464779939-24986-1-git-send-email-zhang.chunyan@linaro.org>
- <1464779939-24986-4-git-send-email-zhang.chunyan@linaro.org>
- <87lh2hqpxm.fsf@ashishki-desk.ger.corp.intel.com>
-Message-ID: <CAG2=9p9w5qR1FH5evBu19Wp9YUJbFDvLnFpOp4PZNqZZTVJoTA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed,  8 Jun 2016 12:04:46 +0100
+Subject: [PATCH v3 0/4] ARM/ARM64: PCI: PCI_PROBE_ONLY clean-up
+Message-ID: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 6:00 PM, Alexander Shishkin
-<alexander.shishkin@linux.intel.com> wrote:
-> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
->
->> This patch adds an output from Ftrace to STM.
->
-> But does it?
->
->> That being said,
->> Function trace messages would also be duplicated to STM buffer when
->> being stored into ring buffer.
->
-> Not sure what you mean here. What's "STM buffer"?
+Current arm/arm64 code prevents enabling resources in the respective
+pcibios_enable_device() callbacks if the PCI_PROBE_ONLY flag is set,
+in that on those platforms the resources tree was not validated properly
+since PCI resources are not currently claimed on arm/arm64 PCI_PROBE_ONLY
+systems.
 
-Sorry if this is ambiguously expression, I mean the buffer which
-stores the trace data from STM, such as ETB/TMC for CoreSight.
+This is a temporary kludge, in that PCI_PROBE_ONLY flag is used to
+describe systems with fixed resources, that can nonetheless be enabled
+through the standard pci_enable_resources() call present in PCI core code,
+(ie via the generic pcibios_enable_device() call).
 
->
->>
->> Signed-off-by: Chunyan Zhang <zhang.chunyan@linaro.org>
->> ---
->>  kernel/trace/trace.c | 5 ++++-
->>  1 file changed, 4 insertions(+), 1 deletion(-)
->>
->> diff --git a/kernel/trace/trace.c b/kernel/trace/trace.c
->> index 8a4bd6b..d613053 100644
->> --- a/kernel/trace/trace.c
->> +++ b/kernel/trace/trace.c
->> @@ -44,6 +44,7 @@
->>
->>  #include "trace.h"
->>  #include "trace_output.h"
->> +#include "trace_output_stm.h"
->>
->>  /*
->>   * On boot up, the ring buffer is set to the minimum size, so that
->> @@ -1884,8 +1885,10 @@ trace_function(struct trace_array *tr,
->>       entry->ip                       = ip;
->>       entry->parent_ip                = parent_ip;
->>
->> -     if (!call_filter_check_discard(call, entry, buffer, event))
->> +     if (!call_filter_check_discard(call, entry, buffer, event)) {
->>               __buffer_unlock_commit(buffer, event);
->> +             ftrace_stm_func(ip, parent_ip);
->> +     }
->
-> So this logs instruction pointers, not the actual events. Not much is
-> duplicated like the message suggests, but it also doesn't seem very
-> useful.
+To remove the PCI_PROBE_ONLY flag in arm/arm64 pcibios_enable_device()
+callbacks, the PCI host controllers that can be used with
+PCI_PROBE_ONLY configurations must make sure that devices resources are
+validated and inserted in the kernel resource tree even on PCI_PROBE_ONLY
+systems so that the generic pcibios_enable_device() generic code, while
+enabling resources (pci_enable_resources()), does not find dangling
+resources pointers (ie missing parent pointers) that are omens of
+an incomplete resource tree, causing failures in resources enablement.
 
-Yes, only knowing function pointers may not be very useful, if doing
-in this way is acceptable I intend to add more interfaces to export
-more information to STM in the feature, I will appreciate if you can
-tell me what information you think is _absolutely_ necessary.
+PCI core code provides interfaces to assign/reassign/reallocate PCI
+bus resources but it is currently lacking an interface to claim
+resources for a specific bus. Arches implement resources claiming through
+ad-hoc code built on top of pci_claim_resource() API, but that code
+cannot be leveraged on architectures like arm/arm64 that rely on the
+generic PCI infrastructure to carry out resources claiming/assignment.
 
-Thanks,
-Chunyan
+Therefore, to clean up the arm/arm64 resources enablement on
+PCI_PROBE_ONLY systems this patchset implements four patches:
 
->
-> Regards,
-> --
-> Alex
+PATCH 1: Create PCI core code infrastructure to claim bus resources
+PATCH 2: Leverage the infrastructure in PATCH 1 to claim resources in
+         the PCI generic host controller on PCI_PROBE_ONLY systems
+
+PATCH 3: Remove the PCI_PROBE_ONLY kludge from the arm64 PCI back-end to
+         complete the clean-up and leverage the PCI generic
+         pcibios_enable_device() implementation
+
+PATCH 4: Remove the PCI_PROBE_ONLY kludge from the arm PCI back-end to
+         complete the clean-up and leverage the PCI generic
+         pcibios_enable_device() implementation
+
+Tested on arm/arm64 systems with kvmtool and PCI host generic.
+
+v2 -> v3
+
+- Split patch 3 in two patches so that arm and arm64 are handled
+  in different patches
+- Improved commits logs, clarified resource parent assignment
+- Rebased against v4.7-rc2
+
+v2: https://patchwork.ozlabs.org/patch/590556/
+
+v1 -> v2
+
+- Rewrote patch 1 to recursively claim resources for the whole PCI bus
+  hierarchy
+- Updated commits logs/tags
+- Rebased against v4.5-rc6
+
+v1: https://patchwork.ozlabs.org/patch/545669/
+
+Lorenzo Pieralisi (4):
+  PCI: add generic code to claim bus resources
+  PCI: host-generic: claim bus resources on PCI_PROBE_ONLY set-ups
+  ARM64/PCI: remove arch specific pcibios_enable_device()
+  ARM/PCI: remove arch specific pcibios_enable_device()
+
+ arch/arm/kernel/bios32.c           | 12 -------
+ arch/arm64/kernel/pci.c            | 13 --------
+ drivers/pci/host/pci-host-common.c | 27 +++++++++++++--
+ drivers/pci/setup-bus.c            | 68 ++++++++++++++++++++++++++++++++++++++
+ include/linux/pci.h                |  1 +
+ 5 files changed, 94 insertions(+), 27 deletions(-)
+
+-- 
+2.6.4
