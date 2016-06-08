@@ -1,43 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jun 2016 09:59:41 +0900
-Subject: [PATCH 4/9] arm64: dts: r8a7795: Add RWDT node
+Date: Wed,  8 Jun 2016 09:59:45 +0900
+Subject: [PATCH 8/9] arm64: dts: salvator-x: Fix W=1 dtc warnings
 In-Reply-To: <cover.1465347183.git.horms+renesas@verge.net.au>
 References: <cover.1465347183.git.horms+renesas@verge.net.au>
-Message-ID: <3114815f635782102fdd7f47cb270d7f59b3d98f.1465347183.git.horms+renesas@verge.net.au>
+Message-ID: <4a4e2138d6bb5e6b80e283df73c1acabb0b992f7.1465347183.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wolfram Sang <wsa+renesas@sang-engineering.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch adds the RWDT device node for r8a7795.
+Warning (unit_address_vs_reg): Node /regulator at 1 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /regulator at 2 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /regulator at 3 has a unit name, but no reg property
+Warning (unit_address_vs_reg): Node /regulator at 4 has a unit name, but no reg property
 
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index f8c7e331fdc6..ba87e03969ee 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -164,6 +164,14 @@
- 					(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 84082922edb2..98f02631a0f0 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -62,7 +62,7 @@
+ 		clock-frequency = <24576000>;
+ 	};
  
-+		wdt0: watchdog at e6020000 {
-+			compatible = "renesas,r8a7795-wdt", "renesas,rcar-gen3-wdt";
-+			reg = <0 0xe6020000 0 0x0c>;
-+			clocks = <&cpg CPG_MOD 402>;
-+			power-domains = <&cpg>;
-+			status = "disabled";
-+		};
-+
- 		gpio0: gpio at e6050000 {
- 			compatible = "renesas,gpio-r8a7795",
- 				     "renesas,gpio-rcar";
+-	vcc_sdhi0: regulator at 1 {
++	vcc_sdhi0: regulator-vcc-sdhi0 {
+ 		compatible = "regulator-fixed";
+ 
+ 		regulator-name = "SDHI0 Vcc";
+@@ -73,7 +73,7 @@
+ 		enable-active-high;
+ 	};
+ 
+-	vccq_sdhi0: regulator at 2 {
++	vccq_sdhi0: regulator-vccq-sdhi0 {
+ 		compatible = "regulator-gpio";
+ 
+ 		regulator-name = "SDHI0 VccQ";
+@@ -86,7 +86,7 @@
+ 			  1800000 0>;
+ 	};
+ 
+-	vcc_sdhi3: regulator at 3 {
++	vcc_sdhi3: regulator-vcc-sdhi3 {
+ 		compatible = "regulator-fixed";
+ 
+ 		regulator-name = "SDHI3 Vcc";
+@@ -97,7 +97,7 @@
+ 		enable-active-high;
+ 	};
+ 
+-	vccq_sdhi3: regulator at 4 {
++	vccq_sdhi3: regulator-vccq-sdhi3 {
+ 		compatible = "regulator-gpio";
+ 
+ 		regulator-name = "SDHI3 VccQ";
 -- 
 2.1.4
