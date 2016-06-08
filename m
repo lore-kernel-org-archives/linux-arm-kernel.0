@@ -1,53 +1,99 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 8 Jun 2016 14:54:43 -0500
-Subject: [PATCH] PCI: layerscape: Add 'dma-coherent' property
-In-Reply-To: <1465282546-28256-1-git-send-email-Gang.Liu@nxp.com>
-References: <1465282546-28256-1-git-send-email-Gang.Liu@nxp.com>
-Message-ID: <20160608195443.GA7766@rob-hp-laptop>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Wed, 8 Jun 2016 22:07:57 +0200
+Subject: [PATCH] ehci-platform: Add support for shared reset controllers
+In-Reply-To: <Pine.LNX.4.44L0.1606081346340.2191-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1606081346340.2191-100000@iolanthe.rowland.org>
+Message-ID: <2aef5d1f-6bc8-3acd-543a-8bb0f87702a2@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 02:55:45PM +0800, Liu Gang wrote:
-> Add 'dma-coherent' description for PCI nodes.
-> 
-> The 'dma-coherent' indicates that the hardware IP block can ensure
-> the coherency of the data transferred from/to the IP block. This
-> can avoid the software cache flush/invalid actions, and improve
-> the performance significantly.
-> 
-> The PCI IP block of ls1043a has this capability, so adding
-> this feature to improve the PCI performance.
-> 
-> Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
-> ---
->  Documentation/devicetree/bindings/pci/layerscape-pci.txt | 4 ++++
->  1 file changed, 4 insertions(+)
+Hi,
 
-Acked-by: Rob Herring <robh@kernel.org>
+On 08-06-16 19:47, Alan Stern wrote:
+> On Wed, 8 Jun 2016, Hans de Goede wrote:
+>
+>> Add support for shared platform controllers by using
+>> devm_reset_control_get_shared_by_index instead of
+>> of_reset_control_get_by_index.
+>>
+>> Note we use the devm function because there is no
+>> of_reset_control_get_shared_by_index, this also leads
+>> to a nice cleanup of the cleanup code.
+>>
+>> This brings the ehci-platform reset handling code inline
+>> with ohci-platform.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>
+> This is just the difference between what Greg has merged and what you
+> wanted to add, right?  If so, then
 
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index ef683b2..41e9f55 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -24,6 +24,9 @@ Required properties:
->    The first entry must be a link to the SCFG device node
->    The second entry must be '0' or '1' based on physical PCIe controller index.
->    This is used to get SCFG PEXN registers
-> +- dma-coherent: Indicates that the hardware IP block can ensure the coherency
-> +  of the data transferred from/to the IP block. This can avoid the software
-> +  cache flush/invalid actions, and improve the performance significantly.
->  
->  Example:
->  
-> @@ -38,6 +41,7 @@ Example:
->  		#address-cells = <3>;
->  		#size-cells = <2>;
->  		device_type = "pci";
-> +		dma-coherent;
->  		num-lanes = <4>;
->  		bus-range = <0x0 0xff>;
->  		ranges = <0x81000000 0x0 0x00000000 0x40 0x00010000 0x0 0x00010000   /* downstream I/O */
-> -- 
-> 2.1.0.27.g96db324
-> 
+Right.
+
+Regards,
+
+Hans
+
+
+>
+> Acked-by: Alan Stern <stern@rowland.harvard.edu>
+>
+> Alan Stern
+>
+>>  drivers/usb/host/ehci-platform.c | 16 +++++-----------
+>>  1 file changed, 5 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+>> index bc33f45..6816b8c 100644
+>> --- a/drivers/usb/host/ehci-platform.c
+>> +++ b/drivers/usb/host/ehci-platform.c
+>> @@ -236,8 +236,8 @@ static int ehci_platform_probe(struct platform_device *dev)
+>>  	}
+>>
+>>  	for (rst = 0; rst < EHCI_MAX_RSTS; rst++) {
+>> -		priv->rsts[rst] = of_reset_control_get_by_index(
+>> -					dev->dev.of_node, rst);
+>> +		priv->rsts[rst] = devm_reset_control_get_shared_by_index(
+>> +					&dev->dev, rst);
+>>  		if (IS_ERR(priv->rsts[rst])) {
+>>  			err = PTR_ERR(priv->rsts[rst]);
+>>  			if (err == -EPROBE_DEFER)
+>> @@ -247,10 +247,8 @@ static int ehci_platform_probe(struct platform_device *dev)
+>>  		}
+>>
+>>  		err = reset_control_deassert(priv->rsts[rst]);
+>> -		if (err) {
+>> -			reset_control_put(priv->rsts[rst]);
+>> +		if (err)
+>>  			goto err_reset;
+>> -		}
+>>  	}
+>>
+>>  	if (pdata->big_endian_desc)
+>> @@ -307,10 +305,8 @@ err_power:
+>>  	if (pdata->power_off)
+>>  		pdata->power_off(dev);
+>>  err_reset:
+>> -	while (--rst >= 0) {
+>> +	while (--rst >= 0)
+>>  		reset_control_assert(priv->rsts[rst]);
+>> -		reset_control_put(priv->rsts[rst]);
+>> -	}
+>>  err_put_clks:
+>>  	while (--clk >= 0)
+>>  		clk_put(priv->clks[clk]);
+>> @@ -335,10 +331,8 @@ static int ehci_platform_remove(struct platform_device *dev)
+>>  	if (pdata->power_off)
+>>  		pdata->power_off(dev);
+>>
+>> -	for (rst = 0; rst < EHCI_MAX_RSTS && priv->rsts[rst]; rst++) {
+>> +	for (rst = 0; rst < EHCI_MAX_RSTS && priv->rsts[rst]; rst++)
+>>  		reset_control_assert(priv->rsts[rst]);
+>> -		reset_control_put(priv->rsts[rst]);
+>> -	}
+>>
+>>  	for (clk = 0; clk < EHCI_MAX_CLKS && priv->clks[clk]; clk++)
+>>  		clk_put(priv->clks[clk]);
+>>
+>
