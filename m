@@ -1,117 +1,186 @@
 From: honghui.zhang@mediatek.com (honghui.zhang at mediatek.com)
-Date: Wed, 8 Jun 2016 17:51:01 +0800
-Subject: [PATCH v4 5/5] ARM: dts: mt2701: add iommu/smi dtsi node for mt2701
+Date: Wed, 8 Jun 2016 17:50:58 +0800
+Subject: [PATCH v4 2/5] iommu/mediatek: move the common struct into header file
 In-Reply-To: <1465379461-14757-1-git-send-email-honghui.zhang@mediatek.com>
 References: <1465379461-14757-1-git-send-email-honghui.zhang@mediatek.com>
-Message-ID: <1465379461-14757-6-git-send-email-honghui.zhang@mediatek.com>
+Message-ID: <1465379461-14757-3-git-send-email-honghui.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Honghui Zhang <honghui.zhang@mediatek.com>
 
-Add the dtsi node of iommu and smi for mt2701.
+Move the struct defines of mtk iommu into a new header files for
+common use.
 
 Signed-off-by: Honghui Zhang <honghui.zhang@mediatek.com>
 ---
- arch/arm/boot/dts/mt2701.dtsi | 51 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+ drivers/iommu/mtk_iommu.c | 48 +----------------------------
+ drivers/iommu/mtk_iommu.h | 77 +++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 78 insertions(+), 47 deletions(-)
+ create mode 100644 drivers/iommu/mtk_iommu.h
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 42d5a37..363de0d 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -16,6 +16,7 @@
- #include <dt-bindings/power/mt2701-power.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/memory/mt2701-larb-port.h>
- #include "skeleton64.dtsi"
- #include "mt2701-pinfunc.h"
+diff --git a/drivers/iommu/mtk_iommu.c b/drivers/iommu/mtk_iommu.c
+index c3043d8..4f18ff5 100644
+--- a/drivers/iommu/mtk_iommu.c
++++ b/drivers/iommu/mtk_iommu.c
+@@ -34,7 +34,7 @@
+ #include <dt-bindings/memory/mt8173-larb-port.h>
+ #include <soc/mediatek/smi.h>
  
-@@ -160,6 +161,16 @@
- 		clock-names = "system-clk", "rtc-clk";
- 	};
+-#include "io-pgtable.h"
++#include "mtk_iommu.h"
  
-+	smi_common: smi at 1000c000 {
-+		compatible = "mediatek,mt2701-smi-common";
-+		reg = <0 0x1000c000 0 0x1000>;
-+		clocks = <&infracfg CLK_INFRA_SMI>,
-+			 <&mmsys CLK_MM_SMI_COMMON>,
-+			 <&infracfg CLK_INFRA_SMI>;
-+		clock-names = "apb", "smi", "async";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
+ #define REG_MMU_PT_BASE_ADDR			0x000
+ 
+@@ -93,20 +93,6 @@
+ 
+ #define MTK_PROTECT_PA_ALIGN			128
+ 
+-struct mtk_iommu_suspend_reg {
+-	u32				standard_axi_mode;
+-	u32				dcm_dis;
+-	u32				ctrl_reg;
+-	u32				int_control0;
+-	u32				int_main_control;
+-};
+-
+-struct mtk_iommu_client_priv {
+-	struct list_head		client;
+-	unsigned int			mtk_m4u_id;
+-	struct device			*m4udev;
+-};
+-
+ struct mtk_iommu_domain {
+ 	spinlock_t			pgtlock; /* lock for page table */
+ 
+@@ -116,19 +102,6 @@ struct mtk_iommu_domain {
+ 	struct iommu_domain		domain;
+ };
+ 
+-struct mtk_iommu_data {
+-	void __iomem			*base;
+-	int				irq;
+-	struct device			*dev;
+-	struct clk			*bclk;
+-	phys_addr_t			protect_base; /* protect memory base */
+-	struct mtk_iommu_suspend_reg	reg;
+-	struct mtk_iommu_domain		*m4u_dom;
+-	struct iommu_group		*m4u_group;
+-	struct mtk_smi_iommu		smi_imu;      /* SMI larb iommu info */
+-	bool                            enable_4GB;
+-};
+-
+ static struct iommu_ops mtk_iommu_ops;
+ 
+ static struct mtk_iommu_domain *to_mtk_domain(struct iommu_domain *dom)
+@@ -552,25 +525,6 @@ static int mtk_iommu_hw_init(const struct mtk_iommu_data *data)
+ 	return 0;
+ }
+ 
+-static int compare_of(struct device *dev, void *data)
+-{
+-	return dev->of_node == data;
+-}
+-
+-static int mtk_iommu_bind(struct device *dev)
+-{
+-	struct mtk_iommu_data *data = dev_get_drvdata(dev);
+-
+-	return component_bind_all(dev, &data->smi_imu);
+-}
+-
+-static void mtk_iommu_unbind(struct device *dev)
+-{
+-	struct mtk_iommu_data *data = dev_get_drvdata(dev);
+-
+-	component_unbind_all(dev, &data->smi_imu);
+-}
+-
+ static const struct component_master_ops mtk_iommu_com_ops = {
+ 	.bind		= mtk_iommu_bind,
+ 	.unbind		= mtk_iommu_unbind,
+diff --git a/drivers/iommu/mtk_iommu.h b/drivers/iommu/mtk_iommu.h
+new file mode 100644
+index 0000000..9ed0a84
+--- /dev/null
++++ b/drivers/iommu/mtk_iommu.h
+@@ -0,0 +1,77 @@
++/*
++ * Copyright (c) 2015-2016 MediaTek Inc.
++ * Author: Honghui Zhang <honghui.zhang@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -169,6 +180,16 @@
- 		reg = <0 0x10200100 0 0x1c>;
- 	};
- 
-+	iommu: mmsys_iommu at 10205000 {
-+		compatible = "mediatek,mt2701-m4u";
-+		reg = <0 0x10205000 0 0x1000>;
-+		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&infracfg CLK_INFRA_M4U>;
-+		clock-names = "bclk";
-+		mediatek,larbs = <&larb0 &larb1 &larb2>;
-+		#iommu-cells = <1>;
-+	};
++#ifndef _MTK_IOMMU_H_
++#define _MTK_IOMMU_H_
 +
- 	apmixedsys: syscon at 10209000 {
- 		compatible = "mediatek,mt2701-apmixedsys", "syscon";
- 		reg = <0 0x10209000 0 0x1000>;
-@@ -234,6 +255,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb0: larb at 14010000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x14010000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&mmsys CLK_MM_SMI_LARB0>,
-+			 <&mmsys CLK_MM_SMI_LARB0>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
-+	};
++#include <linux/clk.h>
++#include <linux/component.h>
++#include <linux/device.h>
++#include <linux/io.h>
++#include <linux/iommu.h>
++#include <linux/list.h>
++#include <linux/spinlock.h>
++#include <soc/mediatek/smi.h>
 +
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
-@@ -241,6 +272,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb2: larb at 15001000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x15001000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&imgsys CLK_IMG_SMI_COMM>,
-+			 <&imgsys CLK_IMG_SMI_COMM>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_ISP>;
-+	};
++#include "io-pgtable.h"
 +
- 	vdecsys: syscon at 16000000 {
- 		compatible = "mediatek,mt2701-vdecsys", "syscon";
- 		reg = <0 0x16000000 0 0x1000>;
-@@ -248,6 +289,16 @@
- 		status = "disabled";
- 	};
- 
-+	larb1: larb at 16010000 {
-+		compatible = "mediatek,mt2701-smi-larb";
-+		reg = <0 0x16010000 0 0x1000>;
-+		mediatek,smi = <&smi_common>;
-+		clocks = <&vdecsys CLK_VDEC_CKGEN>,
-+			 <&vdecsys CLK_VDEC_LARB>;
-+		clock-names = "apb", "smi";
-+		power-domains = <&scpsys MT2701_POWER_DOMAIN_VDEC>;
-+	};
++struct mtk_iommu_suspend_reg {
++	u32				standard_axi_mode;
++	u32				dcm_dis;
++	u32				ctrl_reg;
++	u32				int_control0;
++	u32				int_main_control;
++};
 +
- 	hifsys: syscon at 1a000000 {
- 		compatible = "mediatek,mt2701-hifsys", "syscon";
- 		reg = <0 0x1a000000 0 0x1000>;
++struct mtk_iommu_client_priv {
++	struct list_head		client;
++	unsigned int			mtk_m4u_id;
++	struct device			*m4udev;
++};
++
++struct mtk_iommu_domain;
++
++struct mtk_iommu_data {
++	void __iomem			*base;
++	int				irq;
++	struct device			*dev;
++	struct clk			*bclk;
++	phys_addr_t			protect_base; /* protect memory base */
++	struct mtk_iommu_suspend_reg	reg;
++	struct mtk_iommu_domain		*m4u_dom;
++	struct iommu_group		*m4u_group;
++	struct mtk_smi_iommu		smi_imu;      /* SMI larb iommu info */
++	bool                            enable_4GB;
++};
++
++static int compare_of(struct device *dev, void *data)
++{
++	return dev->of_node == data;
++}
++
++static int mtk_iommu_bind(struct device *dev)
++{
++	struct mtk_iommu_data *data = dev_get_drvdata(dev);
++
++	return component_bind_all(dev, &data->smi_imu);
++}
++
++static void mtk_iommu_unbind(struct device *dev)
++{
++	struct mtk_iommu_data *data = dev_get_drvdata(dev);
++
++	component_unbind_all(dev, &data->smi_imu);
++}
++
++#endif
 -- 
 1.8.1.1.dirty
