@@ -1,39 +1,20 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 8 Jun 2016 09:34:06 +0100
-Subject: [RFC 1/1] ARM: print MHz in /proc/cpuinfo
-In-Reply-To: <1465333713-14339-2-git-send-email-jon.mason@broadcom.com>
-References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
- <1465333713-14339-2-git-send-email-jon.mason@broadcom.com>
-Message-ID: <5757D87E.2080508@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 8 Jun 2016 10:34:32 +0200
+Subject: [PATCH] gpio: xilinx: Add support to set multiple GPIO at once
+In-Reply-To: <1464958481-672-1-git-send-email-irodriguez@cemitec.com>
+References: <1464958481-672-1-git-send-email-irodriguez@cemitec.com>
+Message-ID: <CACRpkdYsrPzvnKLGy_Hw31gt4krBrwkHB8UA9Rv+ULAwJeqpYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jun 3, 2016 at 2:54 PM, Iban Rodriguez <irodriguez@cemitec.com> wrote:
 
-
-On 07/06/16 22:08, Jon Mason wrote:
-> Query the CPU core clock in the device tree to determine the core clock
-> speed.
-
-How do guarantee that it's the current frequency of the CPU ?
-It doesn't even represent the mix or max frequency, so it's incorrect.
-Some DTs have boot frequency in that entry.
-
-> Output this clock rate in /proc/cpuinfo to match the output
-> from other architectures.  The output is intentionally patterned after
-> the x86 output, to match existing (and possibly expected) convention.
+> Add function to set multiple GPIO of the same chip at the same time
+> and register it
 >
-> If any errors are encountered in querying the clock (or the speed is
-> erroneously zero), nothing will be printed out.  Thus any existing
-> devices that do not have CPU clocks defined in the device tree will
-> work as before.
->
+> Signed-off-by: Iban Rodriguez <irodriguez@cemitec.com>
 
-What if they just don't have in DT but have DVFS support ?
+No comments so patch applied tentatively.
 
-Also whey do we need this support when the user-space can query the
-CPUFreq sysfs which is more accurate and maintains the current running
-frequency ?
-
--- 
-Regards,
-Sudeep
+Yours,
+Linus Walleij
