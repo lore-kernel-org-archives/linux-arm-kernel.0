@@ -1,222 +1,149 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 09 Jun 2016 00:17:59 +0300
-Subject: [PATCH v3 06/12] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
-References: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
-Message-ID: <1788169.FUQDsLAmXg@wasted.cogentembedded.com>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 8 Jun 2016 23:26:24 +0200
+Subject: Platform-specific suspend/resume code in drivers
+In-Reply-To: <Pine.LNX.4.44L0.1606081340050.2191-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1606081340050.2191-100000@iolanthe.rowland.org>
+Message-ID: <57588D80.4010502@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The initial R8A7792 SoC device tree including CPU cores, GIC, timer, SYSC,
-and the required  clock descriptions.
+On 08/06/2016 19:45, Alan Stern wrote:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> On Wed, 8 Jun 2016, Mason wrote:
+> 
+>> On 07/06/2016 17:06, Alan Stern wrote:
+>>
+>>> On Tue, 7 Jun 2016, Mason wrote:
+>>>
+>>>> Another point of confusion for me is this: drivers are supposed to
+>>>> be shared among platforms, right? So my platform-specific suspend
+>>>> code should be enabled only if my platform is detected at run-time?
+>>>
+>>> Is your device platform-specific?  If it is then the driver is also
+>>> platform-specific, and so no part of the driver will be called at
+>>> runtime unless your platform is detected.
+>>
+>> Specifically, my platform uses
+>> drivers/net/ethernet/aurora/nb8800.c  => 3 entries in of_match_table.
+>> drivers/tty/serial/8250/8250_core.c (CONFIG_SERIAL_8250_RT288X variant)
+>>
+>> and also the XHCI USB3 driver, and AHCI SATA driver, wouldn't I need to
+>> save the context for these too?
+> 
+> Those drivers should already take care of their own contexts.  Is 
+> there anything platform-specific you need to do in addition?
 
----
-Changes in version 3:
-- moved the fixed factor clocks under the "soc" node;
-- added back the CPU1 node, adjusted the changelog.
+Take the eth driver, for example:
 
-Changes in version 2:
-- explicitly included the IRQ header;
-- removed the CPU1 node;
-- removed the audio and PCIe bus clocks;
-- removed the SDH, SD0, and SD1 CPG clocks;
-- added RCAN and ADSP CPG clocks;
-- removed the PLL1/2, Z2, ZS, I, B, P, CL, M2, RCLK, OSCCLK, ZB3, ZB3D2, DDR,
-  and MP fixed factor clocks;
-- fixed up the parent and divisor for the CP fixed factor clock;
-- swapped  the SYS-DMAC0/1 clocks;
-- removed  all gated clocks except the [H]SCIF, IRQC, and SYS-DMAC ones;
-- created  the "soc" subnode, moving the SoC  device  nodes there;
-- removed  the "clocks" node, moving its fixed clock  subnodes to the root and
-  the MSTP subnodes into the "soc" node.
+  http://lxr.free-electrons.com/source/drivers/net/ethernet/aurora/nb8800.c
 
- arch/arm/boot/dts/r8a7792.dtsi |  180 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 180 insertions(+)
+It doesn't have any suspend/resume callbacks.
 
-Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
-===================================================================
---- /dev/null
-+++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-@@ -0,0 +1,180 @@
-+/*
-+ * Device Tree Source for the r8a7792 SoC
-+ *
-+ * Copyright (C) 2016 Cogent Embedded Inc.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+#include <dt-bindings/clock/r8a7792-clock.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/power/r8a7792-sysc.h>
-+
-+/ {
-+	compatible = "renesas,r8a7792";
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+			clock-frequency = <1000000000>;
-+			clocks = <&cpg_clocks R8A7792_CLK_Z>;
-+			power-domains = <&sysc R8A7792_PD_CA15_CPU0>;
-+			next-level-cache = <&L2_CA15>;
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+			clock-frequency = <1000000000>;
-+			power-domains = <&sysc R8A7792_PD_CA15_CPU1>;
-+			next-level-cache = <&L2_CA15>;
-+		};
-+
-+		L2_CA15: cache-controller at 0 {
-+			compatible = "cache";
-+			reg = <0>;
-+			cache-unified;
-+			cache-level = <2>;
-+			power-domains = <&sysc R8A7792_PD_CA15_SCU>;
-+		};
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		interrupt-parent = <&gic>;
-+
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at f1001000 {
-+			compatible = "arm,gic-400";
-+			#interrupt-cells = <3>;
-+			interrupt-controller;
-+			reg = <0 0xf1001000 0 0x1000>,
-+			      <0 0xf1002000 0 0x1000>,
-+			      <0 0xf1004000 0 0x2000>,
-+			      <0 0xf1006000 0 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_HIGH)>;
-+		};
-+
-+		timer {
-+			compatible = "arm,armv7-timer";
-+			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_LOW)>,
-+				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(2) |
-+				      IRQ_TYPE_LEVEL_LOW)>;
-+		};
-+
-+		sysc: system-controller at e6180000 {
-+			compatible = "renesas,r8a7792-sysc";
-+			reg = <0 0xe6180000 0 0x0200>;
-+			#power-domain-cells = <1>;
-+		};
-+
-+		/* Special CPG clocks */
-+		cpg_clocks: cpg_clocks at e6150000 {
-+			compatible = "renesas,r8a7792-cpg-clocks",
-+				     "renesas,rcar-gen2-cpg-clocks";
-+			reg = <0 0xe6150000 0 0x1000>;
-+			clocks = <&extal_clk>;
-+			#clock-cells = <1>;
-+			clock-output-names = "main", "pll0", "pll1", "pll3",
-+					     "lb", "qspi", "z", "rcan", "adsp";
-+			#power-domain-cells = <0>;
-+		};
-+
-+		/* Fixed factor clocks */
-+		zs_clk: zs {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <6>;
-+			clock-mult = <1>;
-+		};
-+		p_clk: p {
-+		compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <24>;
-+			clock-mult = <1>;
-+		};
-+		cp_clk: cp {
-+			compatible = "fixed-factor-clock";
-+			clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-+			#clock-cells = <0>;
-+			clock-div = <3>;
-+			clock-mult = <1>;
-+		};
-+
-+		/* Gate clocks */
-+		mstp2_clks: mstp2_clks at e6150138 {
-+			compatible = "renesas,r8a7792-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150138 0 4>, <0 0xe6150040 0 4>;
-+			clocks = <&zs_clk>, <&zs_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <
-+				R8A7792_CLK_SYS_DMAC1 R8A7792_CLK_SYS_DMAC0
-+			>;
-+			clock-output-names = "sys-dmac1", "sys-dmac0";
-+		};
-+		mstp4_clks: mstp4_clks at e6150140 {
-+			compatible = "renesas,r8a7792-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe6150140 0 4>, <0 0xe615004c 0 4>;
-+			clocks = <&cp_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <R8A7792_CLK_IRQC>;
-+			clock-output-names = "irqc";
-+		};
-+		mstp7_clks: mstp7_clks at e615014c {
-+			compatible = "renesas,r8a7792-mstp-clocks",
-+				     "renesas,cpg-mstp-clocks";
-+			reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-+			clocks = <&zs_clk>, <&zs_clk>, <&p_clk>, <&p_clk>,
-+				 <&p_clk>, <&p_clk>;
-+			#clock-cells = <1>;
-+			clock-indices = <
-+				R8A7792_CLK_HSCIF1 R8A7792_CLK_HSCIF0
-+				R8A7792_CLK_SCIF3 R8A7792_CLK_SCIF2
-+				R8A7792_CLK_SCIF1 R8A7792_CLK_SCIF0
-+			>;
-+			clock-output-names = "hscif1", "hscif0", "scif3",
-+					     "scif2", "scif1", "scif0",
-+					     "du1", "du0";
-+		};
-+	};
-+
-+	/* External root clock */
-+	extal_clk: extal {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+
-+	/* External SCIF clock */
-+	scif_clk: scif {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
-+	};
-+};
+Would that make the suspend request fail?
+
+
+> Consider xHCI as an example case -- what more does it need?
+
+Lemme see...
+
+http://lxr.free-electrons.com/source/drivers/usb/host/xhci-plat.c
+
+#ifdef CONFIG_PM_SLEEP
+static int xhci_plat_suspend(struct device *dev)
+{
+	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+
+	/*
+	 * xhci_suspend() needs `do_wakeup` to know whether host is allowed
+	 * to do wakeup during suspend. Since xhci_plat_suspend is currently
+	 * only designed for system suspend, device_may_wakeup() is enough
+	 * to dertermine whether host is allowed to do wakeup. Need to
+	 * reconsider this when xhci_plat_suspend enlarges its scope, e.g.,
+	 * also applies to runtime suspend.
+	 */
+	return xhci_suspend(xhci, device_may_wakeup(dev));
+}
+
+static int xhci_plat_resume(struct device *dev)
+{
+	struct usb_hcd	*hcd = dev_get_drvdata(dev);
+	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
+
+	return xhci_resume(xhci, 0);
+}
+
+static const struct dev_pm_ops xhci_plat_pm_ops = {
+	SET_SYSTEM_SLEEP_PM_OPS(xhci_plat_suspend, xhci_plat_resume)
+};
+#define DEV_PM_OPS	(&xhci_plat_pm_ops)
+
+
+(Side note: they guarded the code with CONFIG_PM_SLEEP, rather
+than CONFIG_SUSPEND. Why?)
+
+Looking at xhci_suspend, it does call xhci_save_registers()
+so perhaps this specific driver already saves the context
+required to resume correctly after a full power-down.
+
+>>> If the device isn't platform-specific then the driver has to work on a 
+>>> bunch of different platforms.  It should be written to be 
+>>> platform-independent as much as possible.
+>>>
+>>>> So this means I need to add in the probe function, for every driver
+>>>> my platform uses:
+>>>>
+>>>>   if (platform == MY_PLATFORM) {
+>>>>     ops.suspend = my_suspend;
+>>>>     ops.resume  = my_resume;
+>>>>   }
+>>>>
+>>>> Is that correct?
+>>>
+>>> No.  For one thing, you only have to worry about the 
+>>> platform-independent drivers -- you know that the platform-specific 
+>>> ones won't get used unless your platform is present.
+>>
+>> I guess the thermal driver is platform-specific, but most devices
+>> are third-party IP blocks, so there is a "common" driver upstream.
+>> But I would need a platform-specific suspend/resume sequence,
+>> just for my platform.
+> 
+> Why?  What sort of platform-specific things do you need to do?
+
+Save the value of the MMIO registers which will be lost when the
+chip is powered down.
+
+
+>>> For another, the driver should be written in a way that doesn't require
+>>> this sort of code.  The ops pointer (not any of the structure's members
+>>> -- a pointer to the structure) should be set by the platform-dependent
+>>> part of the driver that handles initialization.
+>>
+>> I don't understand. If my platform loses context on suspend, then
+>> I must save/restore it. But this wasteful operation should not be
+>> imposed on other platforms.
+> 
+> More details, please.
+
+I'm confused. I must have misunderstood something fundamental, and my
+explanations come out wrong. Let me try again.
+
+On this SoC (as most SoCs) device registers are mapped into memory.
+When this system is suspended, it was decided that we would
+1) put the RAM in self-refresh mode
+2) power everything down, but the RAM
+
+So the contents of RAM are preserved, but the contents of the device
+registers will be lost. (And this context loss is platform specific;
+other SoCs may decide to keep some devices powered.) Anyway, when
+the chip is powered back up, some/most device registers need to be
+restored to their pre-suspend value.
+
+For example, the reset value for a CTRL register might default to
+DISABLE_DEVICE, but obviously the probe function would have toggled
+that to ENABLE_DEVICE.
+
+Am I not making sense?
+
+Regards.
