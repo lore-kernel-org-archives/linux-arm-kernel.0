@@ -1,108 +1,58 @@
-From: vincent.abriou@st.com (Vincent ABRIOU)
-Date: Wed, 8 Jun 2016 11:35:40 +0200
-Subject: [PATCH v2 11/20] drm: sti: Rely on the default ->best_encoder()
- behavior
-In-Reply-To: <1465300095-16971-12-git-send-email-boris.brezillon@free-electrons.com>
-References: <1465300095-16971-1-git-send-email-boris.brezillon@free-electrons.com>
- <1465300095-16971-12-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5757E6EC.1050802@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  8 Jun 2016 10:24:39 +0100
+Subject: [PATCH] arm64: mm: always take dirty state from new pte in
+ ptep_set_access_flags
+Message-ID: <1465377879-24925-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Commit 66dbd6e61a52 ("arm64: Implement ptep_set_access_flags() for
+hardware AF/DBM") ensured that pte flags are updated atomically in the
+face of potential concurrent, hardware-assisted updates. However, Alex
+reports that:
 
-Thanks for the patch.
+ | This patch breaks swapping for me.
+ | In the broken case, you'll see either systemd cpu time spike (because
+ | it's stuck in a page fault loop) or the system hang (because the
+ | application owning the screen is stuck in a page fault loop).
 
-Acked-by: Vincent Abriou <vincent.abriou@st.com>
+It turns out that this is because the 'dirty' argument to
+ptep_set_access_flags is always 0 for read faults, and so we can't use
+it to set PTE_RDONLY. The failing sequence is:
 
-Vincent
+  1. We put down a PTE_WRITE | PTE_DIRTY | PTE_AF pte
+  2. Memory pressure -> pte_mkold(pte) -> clear PTE_AF
+  3. A read faults due to the missing access flag
+  4. ptep_set_access_flags is called with dirty = 0, due to the read fault
+  5. pte is then made PTE_WRITE | PTE_DIRTY | PTE_AF | PTE_RDONLY (!)
+  6. A write faults, but pte_write is true so we get stuck
 
-On 06/07/2016 01:48 PM, Boris Brezillon wrote:
-> All outputs have a 1:1 relationship between connectors and encoders
-> and the driver is relying on the atomic helpers: we can drop the custom
-> ->best_encoder() implementations and let the core call
-> drm_atomic_helper_best_encoder() for us.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->   drivers/gpu/drm/sti/sti_dvo.c  | 10 ----------
->   drivers/gpu/drm/sti/sti_hda.c  | 10 ----------
->   drivers/gpu/drm/sti/sti_hdmi.c | 10 ----------
->   3 files changed, 30 deletions(-)
->
-> diff --git a/drivers/gpu/drm/sti/sti_dvo.c b/drivers/gpu/drm/sti/sti_dvo.c
-> index 25f7663..d5627d1 100644
-> --- a/drivers/gpu/drm/sti/sti_dvo.c
-> +++ b/drivers/gpu/drm/sti/sti_dvo.c
-> @@ -384,20 +384,10 @@ static int sti_dvo_connector_mode_valid(struct drm_connector *connector,
->   	return MODE_OK;
->   }
->
-> -struct drm_encoder *sti_dvo_best_encoder(struct drm_connector *connector)
-> -{
-> -	struct sti_dvo_connector *dvo_connector
-> -		= to_sti_dvo_connector(connector);
-> -
-> -	/* Best encoder is the one associated during connector creation */
-> -	return dvo_connector->encoder;
-> -}
-> -
->   static const
->   struct drm_connector_helper_funcs sti_dvo_connector_helper_funcs = {
->   	.get_modes = sti_dvo_connector_get_modes,
->   	.mode_valid = sti_dvo_connector_mode_valid,
-> -	.best_encoder = sti_dvo_best_encoder,
->   };
->
->   static enum drm_connector_status
-> diff --git a/drivers/gpu/drm/sti/sti_hda.c b/drivers/gpu/drm/sti/sti_hda.c
-> index f7d3464..c4649f5 100644
-> --- a/drivers/gpu/drm/sti/sti_hda.c
-> +++ b/drivers/gpu/drm/sti/sti_hda.c
-> @@ -676,20 +676,10 @@ static int sti_hda_connector_mode_valid(struct drm_connector *connector,
->   	return MODE_OK;
->   }
->
-> -struct drm_encoder *sti_hda_best_encoder(struct drm_connector *connector)
-> -{
-> -	struct sti_hda_connector *hda_connector
-> -		= to_sti_hda_connector(connector);
-> -
-> -	/* Best encoder is the one associated during connector creation */
-> -	return hda_connector->encoder;
-> -}
-> -
->   static const
->   struct drm_connector_helper_funcs sti_hda_connector_helper_funcs = {
->   	.get_modes = sti_hda_connector_get_modes,
->   	.mode_valid = sti_hda_connector_mode_valid,
-> -	.best_encoder = sti_hda_best_encoder,
->   };
->
->   static enum drm_connector_status
-> diff --git a/drivers/gpu/drm/sti/sti_hdmi.c b/drivers/gpu/drm/sti/sti_hdmi.c
-> index 6ef0715..dc9ab6e 100644
-> --- a/drivers/gpu/drm/sti/sti_hdmi.c
-> +++ b/drivers/gpu/drm/sti/sti_hdmi.c
-> @@ -897,20 +897,10 @@ static int sti_hdmi_connector_mode_valid(struct drm_connector *connector,
->   	return MODE_OK;
->   }
->
-> -struct drm_encoder *sti_hdmi_best_encoder(struct drm_connector *connector)
-> -{
-> -	struct sti_hdmi_connector *hdmi_connector
-> -		= to_sti_hdmi_connector(connector);
-> -
-> -	/* Best encoder is the one associated during connector creation */
-> -	return hdmi_connector->encoder;
-> -}
-> -
->   static const
->   struct drm_connector_helper_funcs sti_hdmi_connector_helper_funcs = {
->   	.get_modes = sti_hdmi_connector_get_modes,
->   	.mode_valid = sti_hdmi_connector_mode_valid,
-> -	.best_encoder = sti_hdmi_best_encoder,
->   };
->
->   /* get detection status of display device */
->
+The solution is to check the new page table entry (as would be done by
+the generic, non-atomic definition of ptep_set_access_flags that just
+calls set_pte_at) to establish the dirty state.
+
+Cc: <stable@vger.kernel.org> # 4.3+
+Fixes: 66dbd6e61a52 ("arm64: Implement ptep_set_access_flags() for hardware AF/DBM")
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Reported-by: Alexander Graf <agraf@suse.de>
+Tested-by: Alexander Graf <agraf@suse.de>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/fault.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index 5954881a35ac..ba3fc12bd272 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -109,7 +109,7 @@ int ptep_set_access_flags(struct vm_area_struct *vma,
+ 	 * PTE_RDONLY is cleared by default in the asm below, so set it in
+ 	 * back if necessary (read-only or clean PTE).
+ 	 */
+-	if (!pte_write(entry) || !dirty)
++	if (!pte_write(entry) || !pte_sw_dirty(entry))
+ 		pte_val(entry) |= PTE_RDONLY;
+ 
+ 	/*
+-- 
+2.1.4
