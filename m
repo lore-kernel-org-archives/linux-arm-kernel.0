@@ -1,20 +1,23 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jun 2016 10:34:32 +0200
-Subject: [PATCH] gpio: xilinx: Add support to set multiple GPIO at once
-In-Reply-To: <1464958481-672-1-git-send-email-irodriguez@cemitec.com>
-References: <1464958481-672-1-git-send-email-irodriguez@cemitec.com>
-Message-ID: <CACRpkdYsrPzvnKLGy_Hw31gt4krBrwkHB8UA9Rv+ULAwJeqpYg@mail.gmail.com>
+Date: Wed, 8 Jun 2016 10:44:45 +0200
+Subject: [PATCH 07/22] gpio: clps711x: Changing the compatibility string
+ to match with the smallest supported chip
+In-Reply-To: <1465024214-22120-8-git-send-email-shc_work@mail.ru>
+References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
+ <1465024214-22120-8-git-send-email-shc_work@mail.ru>
+Message-ID: <CACRpkdbeX_f_ich=9D17BgkSeRbi-TyGSuxVoszDwP0zCF8xJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 3, 2016 at 2:54 PM, Iban Rodriguez <irodriguez@cemitec.com> wrote:
+On Sat, Jun 4, 2016 at 9:09 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
 
-> Add function to set multiple GPIO of the same chip at the same time
-> and register it
+> This patch changes the compatibility string to match with the smallest
+> supported chip (EP7209). Since the DT-support for this CPU is not yet
+> announced, this change is safe.
 >
-> Signed-off-by: Iban Rodriguez <irodriguez@cemitec.com>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-No comments so patch applied tentatively.
+Patch applied to the GPIO tree.
 
 Yours,
 Linus Walleij
