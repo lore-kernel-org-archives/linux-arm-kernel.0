@@ -1,37 +1,34 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Tue,  7 Jun 2016 18:04:24 -0700
-Subject: [PATCH v2 0/5] regulator: add Ricoh RN5T567 PMIC support
-Message-ID: <20160608010429.19618-1-stefan@agner.ch>
+Date: Tue,  7 Jun 2016 18:04:25 -0700
+Subject: [PATCH v2 1/5] ARM: dts: meson: minix-neo-x8: define PMIC as power
+ controller
+In-Reply-To: <20160608010429.19618-1-stefan@agner.ch>
+References: <20160608010429.19618-1-stefan@agner.ch>
+Message-ID: <20160608010429.19618-2-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds RN5T567 PMIC support which is used on the 
-Toradex Colibri iMX7S/iMX7D modules. The existing RN5T618 is from
-the same family, hence this patchset uses the same driver and adds
-variant support.
+The PMIC driver used to register itself as poweroff controller by
+default, hence assuming that this device is using the PMIC as
+system power controller.
 
-The Colibris currently do not use the PMIC's power off capabilities,
-hence this patchset also makes the use of system-power-controller
-property mandatory if the power off capabilties are required.
+Reviewed-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/meson8-minix-neo-x8.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes since v1:
-- Removed obsolete include <asm/system_misc.h>
-
-Stefan Agner (5):
-  ARM: dts: meson: minix-neo-x8: define PMIC as power controller
-  mfd: add Ricoh RN5T567 PMIC support
-  regulator: rn5t618: add RN5T567 PMIC support
-  mfd: rn5t618: register power off callback optionally
-  mfd: rn5t618: register restart handler
-
- Documentation/devicetree/bindings/mfd/rn5t618.txt | 19 ++++---
- arch/arm/boot/dts/meson8-minix-neo-x8.dts         |  1 +
- drivers/mfd/Kconfig                               |  7 ++-
- drivers/mfd/rn5t618.c                             | 68 +++++++++++++++++++----
- drivers/regulator/Kconfig                         |  5 +-
- drivers/regulator/rn5t618-regulator.c             | 40 +++++++++++--
- include/linux/mfd/rn5t618.h                       | 13 +++++
- 7 files changed, 124 insertions(+), 29 deletions(-)
-
+diff --git a/arch/arm/boot/dts/meson8-minix-neo-x8.dts b/arch/arm/boot/dts/meson8-minix-neo-x8.dts
+index 4f536bb..8bceb8d 100644
+--- a/arch/arm/boot/dts/meson8-minix-neo-x8.dts
++++ b/arch/arm/boot/dts/meson8-minix-neo-x8.dts
+@@ -80,6 +80,7 @@
+ 	pmic at 32 {
+ 		compatible = "ricoh,rn5t618";
+ 		reg = <0x32>;
++		system-power-controller;
+ 
+ 		regulators {
+ 		};
 -- 
 2.8.3
