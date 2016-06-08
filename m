@@ -1,75 +1,170 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed,  8 Jun 2016 12:04:50 +0100
-Subject: [PATCH v3 4/4] ARM/PCI: remove arch specific pcibios_enable_device()
-In-Reply-To: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1465383890-13538-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1465383890-13538-5-git-send-email-lorenzo.pieralisi@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 8 Jun 2016 12:09:03 +0100
+Subject: [PATCH v5 05/13] KVM: arm64: handle ITS related GICv3
+ redistributor registers
+In-Reply-To: <1464962572-3925-6-git-send-email-andre.przywara@arm.com>
+References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
+ <1464962572-3925-6-git-send-email-andre.przywara@arm.com>
+Message-ID: <5757FCCF.3040602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm pcibios_enable_device() implementation exists solely
-to prevent enabling PCI resources on PCI_PROBE_ONLY systems, since
-on those systems the PCI resources are currently not claimed (ie
-inserted in the PCI resource tree - which means their parent
-pointer is not correctly set-up) therefore they can not be enabled
-since this would trigger PCI set-ups failures.
+On 03/06/16 15:02, Andre Przywara wrote:
+> In the GICv3 redistributor there are the PENDBASER and PROPBASER
+> registers which we did not emulate so far, as they only make sense
+> when having an ITS. In preparation for that emulate those MMIO
+> accesses by storing the 64-bit data written into it into a variable
+> which we later read in the ITS emulation.
+> 
+> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> ---
+>  include/kvm/vgic/vgic.h          | 13 +++++++++
+>  virt/kvm/arm/vgic/vgic-mmio-v3.c | 58 ++++++++++++++++++++++++++++++++++++++--
+>  2 files changed, 69 insertions(+), 2 deletions(-)
+> 
+> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
+> index 2f26f37..896175b 100644
+> --- a/include/kvm/vgic/vgic.h
+> +++ b/include/kvm/vgic/vgic.h
+> @@ -145,6 +145,14 @@ struct vgic_dist {
+>  	struct vgic_irq		*spis;
+>  
+>  	struct vgic_io_device	dist_iodev;
+> +
+> +	/*
+> +	 * Contains the address of the LPI configuration table.
+> +	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
+> +	 * one address across all redistributors.
+> +	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
+> +	 */
+> +	u64			propbaser;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> @@ -199,6 +207,11 @@ struct vgic_cpu {
+>  	 */
+>  	struct vgic_io_device	rd_iodev;
+>  	struct vgic_io_device	sgi_iodev;
+> +
+> +	/* Points to the LPI pending tables for the redistributor */
+> +	u64 pendbaser;
+> +
+> +	bool lpis_enabled;
+>  };
+>  
+>  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> index fc7b6c9..6293b36 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
+> @@ -29,6 +29,16 @@ static unsigned long extract_bytes(unsigned long data, unsigned int offset,
+>  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
+>  }
+>  
+> +/* allows updates of any half of a 64-bit register (or the whole thing) */
+> +static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
+> +			    unsigned long val)
+> +{
+> +	offset &= 4;
+> +	reg &= GENMASK_ULL(len * 8 - 1, 0) << ((len - offset) * 8);
+> +
+> +	return reg | ((u64)val << (offset * 8));
 
-After removing the pci=firmware command line option in:
+Feels like an OCCC entry. It is also undefined because in the 64bit
+write case, you're shifting a 64bit value by 64 places.
 
-commit 903589ca7165 ("ARM: 8554/1: kernel: pci: remove pci=firmware
-command line parameter handling")
+Please rewrite this in a readable way, such as:
 
-(that was used to set the PCI_PROBE_ONLY flag through the command line)
-and by introducing resources claiming in the PCI host controllers
-set-ups that have PCI_PROBE_ONLY as a probe option, there is no need for
-arch specific pcibios_enable_device() implementations anymore in that
-the kernel can rely on the generic pcibios_enable_device()
-implementation without resorting to arch specific code to work around
-the missing resources claiming enumeration step.
+	int low, high;
 
-On !PCI_PROBE_ONLY PCI bus set-ups, resources are always assigned
-either in pcibios initialization code or PCI host controllers drivers;
-since the PCI resource assignment API takes care of inserting the
-assigned resources in the resource tree, the resources parent pointers
-are correctly set-up, which means that this patch leaves behaviour
-unchanged for all arm PCI set-ups that do not set the PCI_PROBE_ONLY
-flag.
+	if (!offset)
+		low = 0;
+	else
+		low = 32;
 
-Remove the pcibios_enable_device() function from the arm arch back-end
-so that the kernel now uses its generic implementation.
+	if (len == 4)
+		high = low + 31;
+	else
+		high = 63;
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Russell King <linux@arm.linux.org.uk>
----
- arch/arm/kernel/bios32.c | 12 ------------
- 1 file changed, 12 deletions(-)
+	reg &= ~GENMASK_ULL(high, low);
+	return reg | ((u64)val << low);
 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 05e61a2..488545f 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -590,18 +590,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return start;
- }
- 
--/**
-- * pcibios_enable_device - Enable I/O and memory.
-- * @dev: PCI device to be enabled
-- */
--int pcibios_enable_device(struct pci_dev *dev, int mask)
--{
--	if (pci_has_flag(PCI_PROBE_ONLY))
--		return 0;
--
--	return pci_enable_resources(dev, mask);
--}
--
- int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
- 			enum pci_mmap_state mmap_state, int write_combine)
- {
+Easily understood, no undefined behaviour.
+
+> +}
+> +
+>  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
+>  					    gpa_t addr, unsigned int len)
+>  {
+> @@ -147,6 +157,50 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
+>  	return 0;
+>  }
+>  
+> +static unsigned long vgic_mmio_read_propbase(struct kvm_vcpu *vcpu,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +
+> +	return extract_bytes(dist->propbaser, addr & 7, len);
+> +}
+> +
+> +static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len,
+> +				     unsigned long val)
+> +{
+> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	/* Storing a value with LPIs already enabled is undefined */
+> +	if (vgic_cpu->lpis_enabled)
+> +		return;
+> +
+> +	dist->propbaser = update_64bit_reg(dist->propbaser, addr & 4, len, val);
+> +}
+> +
+> +static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
+> +					     gpa_t addr, unsigned int len)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	return extract_bytes(vgic_cpu->pendbaser, addr & 7, len);
+> +}
+> +
+> +static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
+> +				     gpa_t addr, unsigned int len,
+> +				     unsigned long val)
+> +{
+> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> +
+> +	/* Storing a value with LPIs already enabled is undefined */
+> +	if (vgic_cpu->lpis_enabled)
+> +		return;
+> +
+> +	vgic_cpu->pendbaser = update_64bit_reg(vgic_cpu->pendbaser,
+> +					       addr & 4, len, val);
+> +}
+> +
+>  /*
+>   * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
+>   * redistributors, while SPIs are covered by registers in the distributor
+> @@ -227,10 +281,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
+>  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+> +		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
+> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
+> +		vgic_mmio_read_pendbase, vgic_mmio_write_pendbase, 8,
+>  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
+>  	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
+>  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
+> 
+
+Thanks,
+
+	M./
 -- 
-2.6.4
+Jazz is not dead. It just smells funny...
