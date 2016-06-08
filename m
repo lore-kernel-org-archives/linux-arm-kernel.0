@@ -1,157 +1,136 @@
-From: yt.shen@mediatek.com (YT Shen)
-Date: Thu, 9 Jun 2016 00:03:45 +0800
-Subject: [RFC v3 5/5] arm: dts: mt2701: Add display subsystem related nodes
- for MT2701
-In-Reply-To: <1465401825-43642-1-git-send-email-yt.shen@mediatek.com>
-References: <1465401825-43642-1-git-send-email-yt.shen@mediatek.com>
-Message-ID: <1465401825-43642-6-git-send-email-yt.shen@mediatek.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed,  8 Jun 2016 17:07:42 +0100
+Subject: [PATCH] pinctrl: nomadik: fix warnings from unexported functions
+Message-ID: <1465402062-26122-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device nodes for the DISP function blocks for MT2701
+There are five functions in the driver that are defined but
+only used locally. Since these are not used in the current
+kernel, delete them to avoid the following warnings:
 
-Signed-off-by: YT Shen <yt.shen@mediatek.com>
+drivers/pinctrl/nomadik/pinctrl-nomadik.c:1036:6: warning: symbol 'nmk_gpio_clocks_enable' was not declared. Should it be static?
+drivers/pinctrl/nomadik/pinctrl-nomadik.c:1050:6: warning: symbol 'nmk_gpio_clocks_disable' was not declared. Should it be static?
+drivers/pinctrl/nomadik/pinctrl-nomadik.c:1073:6: warning: symbol 'nmk_gpio_wakeups_suspend' was not declared. Should it be static?
+drivers/pinctrl/nomadik/pinctrl-nomadik.c:1094:6: warning: symbol 'nmk_gpio_wakeups_resume' was not declared. Should it be static?
+drivers/pinctrl/nomadik/pinctrl-nomadik.c:1120:6: warning: symbol 'nmk_gpio_read_pull' was not declared. Should it be static?
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- arch/arm/boot/dts/mt2701.dtsi |  106 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 106 insertions(+)
+Cc: Linus Walleij <linus.walleij@linaro.org>
+Cc: Alessandro Rubini <rubini@unipv.it>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-gpio at vger.kernel.org
+---
+ drivers/pinctrl/nomadik/pinctrl-nomadik.c | 96 -------------------------------
+ 1 file changed, 96 deletions(-)
 
-diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
-index 363de0d..b9054a8 100644
---- a/arch/arm/boot/dts/mt2701.dtsi
-+++ b/arch/arm/boot/dts/mt2701.dtsi
-@@ -24,6 +24,11 @@
- 	compatible = "mediatek,mt2701";
- 	interrupt-parent = <&sysirq>;
+diff --git a/drivers/pinctrl/nomadik/pinctrl-nomadik.c b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+index 38facef..35f6218 100644
+--- a/drivers/pinctrl/nomadik/pinctrl-nomadik.c
++++ b/drivers/pinctrl/nomadik/pinctrl-nomadik.c
+@@ -1033,102 +1033,6 @@ static inline void nmk_gpio_dbg_show_one(struct seq_file *s,
+ #define nmk_gpio_dbg_show	NULL
+ #endif
  
-+	aliases {
-+		rdma0 = &rdma0;
-+		rdma1 = &rdma1;
-+	};
-+
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-@@ -171,6 +176,16 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	mipi_tx0: mipi-dphy at 10010000 {
-+		compatible = "mediatek,mt2701-mipi-tx";
-+		reg = <0 0x10010000 0 0x90>;
-+		clocks = <&clk26m>;
-+		clock-output-names = "mipi_tx0_pll";
-+		#clock-cells = <0>;
-+		#phy-cells = <0>;
-+		status = "disabled";
-+	};
-+
- 	sysirq: interrupt-controller at 10200100 {
- 		compatible = "mediatek,mt2701-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -255,6 +270,68 @@
- 		status = "disabled";
- 	};
- 
-+	ovl at 14007000 {
-+		compatible = "mediatek,mt2701-disp-ovl";
-+		reg = <0 0x14007000 0 0x1000>;
-+		interrupts = <GIC_SPI 153 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_OVL>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_OVL_0>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	rdma0: rdma at 14008000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14008000 0 0x1000>;
-+		interrupts = <GIC_SPI 152 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	wdma at 14009000 {
-+		compatible = "mediatek,mt2701-disp-wdma";
-+		reg = <0 0x14009000 0 0x1000>;
-+		interrupts = <GIC_SPI 154 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_WDMA>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_WDMA>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	bls at 1400a000 {
-+		compatible = "mediatek,mt2701-disp-bls";
-+		reg = <0 0x1400a000 0 0x1000>;
-+		interrupts = <GIC_SPI 155 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_BLS>;
-+	};
-+
-+	color at 1400b000 {
-+		compatible = "mediatek,mt2701-disp-color";
-+		reg = <0 0x1400b000 0 0x1000>;
-+		interrupts = <GIC_SPI 156 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_COLOR>;
-+	};
-+
-+	dsi0: dsi at 1400c000 {
-+		compatible = "mediatek,mt2701-dsi";
-+		reg = <0 0x1400c000 0 0x1000>;
-+		interrupts = <GIC_SPI 157 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DSI_ENGINE>, <&mmsys CLK_MM_DSI_DIG>,
-+			 <&mipi_tx0>;
-+		clock-names = "engine", "digital", "hs";
-+		phys = <&mipi_tx0>;
-+		phy-names = "dphy";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+	};
-+
-+	mutex: mutex at 1400e000 {
-+		compatible = "mediatek,mt2701-disp-mutex";
-+		reg = <0 0x1400e000 0 0x1000>;
-+		interrupts = <GIC_SPI 161 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_MUTEX_32K>;
-+	};
-+
- 	larb0: larb at 14010000 {
- 		compatible = "mediatek,mt2701-smi-larb";
- 		reg = <0 0x14010000 0 0x1000>;
-@@ -265,6 +342,35 @@
- 		power-domains = <&scpsys MT2701_POWER_DOMAIN_DISP>;
- 	};
- 
-+	rdma1: rdma at 14012000 {
-+		compatible = "mediatek,mt2701-disp-rdma";
-+		reg = <0 0x14012000 0 0x1000>;
-+		interrupts = <GIC_SPI 164 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DISP_RDMA1>;
-+		iommus = <&iommu MT2701_M4U_PORT_DISP_RDMA1>;
-+		mediatek,larb = <&larb0>;
-+	};
-+
-+	ufoe at 14013000 {
-+		compatible = "mediatek,mt2701-disp-ufoe";
-+		reg = <0 0x14013000 0 0x1000>;
-+		clocks = <&mmsys CLK_MM_DISP_UFOE>;
-+	};
-+
-+	dpi0: dpi at 14014000 {
-+		compatible = "mediatek,mt2701-dpi";
-+		reg = <0 0x14014000 0 0x1000>;
-+		interrupts = <GIC_SPI 194 IRQ_TYPE_LEVEL_LOW>;
-+		clocks = <&mmsys CLK_MM_DPI1_DIGL>,
-+			 <&mmsys CLK_MM_DPI1_ENGINE>,
-+			 <&topckgen CLK_TOP_DPI1_SEL>,
-+			 <&topckgen CLK_TOP_TVDPLL>,
-+			 <&topckgen CLK_TOP_TVDPLL_D2>,
-+			 <&topckgen CLK_TOP_TVDPLL_D4>;
-+		clock-names = "pixel", "engine", "sel","div1","div2","div4";
-+		status = "disabled";
-+	};
-+
- 	imgsys: syscon at 15000000 {
- 		compatible = "mediatek,mt2701-imgsys", "syscon";
- 		reg = <0 0x15000000 0 0x1000>;
+-void nmk_gpio_clocks_enable(void)
+-{
+-	int i;
+-
+-	for (i = 0; i < NUM_BANKS; i++) {
+-		struct nmk_gpio_chip *chip = nmk_gpio_chips[i];
+-
+-		if (!chip)
+-			continue;
+-
+-		clk_enable(chip->clk);
+-	}
+-}
+-
+-void nmk_gpio_clocks_disable(void)
+-{
+-	int i;
+-
+-	for (i = 0; i < NUM_BANKS; i++) {
+-		struct nmk_gpio_chip *chip = nmk_gpio_chips[i];
+-
+-		if (!chip)
+-			continue;
+-
+-		clk_disable(chip->clk);
+-	}
+-}
+-
+-/*
+- * Called from the suspend/resume path to only keep the real wakeup interrupts
+- * (those that have had set_irq_wake() called on them) as wakeup interrupts,
+- * and not the rest of the interrupts which we needed to have as wakeups for
+- * cpuidle.
+- *
+- * PM ops are not used since this needs to be done at the end, after all the
+- * other drivers are done with their suspend callbacks.
+- */
+-void nmk_gpio_wakeups_suspend(void)
+-{
+-	int i;
+-
+-	for (i = 0; i < NUM_BANKS; i++) {
+-		struct nmk_gpio_chip *chip = nmk_gpio_chips[i];
+-
+-		if (!chip)
+-			break;
+-
+-		clk_enable(chip->clk);
+-
+-		writel(chip->rwimsc & chip->real_wake,
+-		       chip->addr + NMK_GPIO_RWIMSC);
+-		writel(chip->fwimsc & chip->real_wake,
+-		       chip->addr + NMK_GPIO_FWIMSC);
+-
+-		clk_disable(chip->clk);
+-	}
+-}
+-
+-void nmk_gpio_wakeups_resume(void)
+-{
+-	int i;
+-
+-	for (i = 0; i < NUM_BANKS; i++) {
+-		struct nmk_gpio_chip *chip = nmk_gpio_chips[i];
+-
+-		if (!chip)
+-			break;
+-
+-		clk_enable(chip->clk);
+-
+-		writel(chip->rwimsc, chip->addr + NMK_GPIO_RWIMSC);
+-		writel(chip->fwimsc, chip->addr + NMK_GPIO_FWIMSC);
+-
+-		clk_disable(chip->clk);
+-	}
+-}
+-
+-/*
+- * Read the pull up/pull down status.
+- * A bit set in 'pull_up' means that pull up
+- * is selected if pull is enabled in PDIS register.
+- * Note: only pull up/down set via this driver can
+- * be detected due to HW limitations.
+- */
+-void nmk_gpio_read_pull(int gpio_bank, u32 *pull_up)
+-{
+-	if (gpio_bank < NUM_BANKS) {
+-		struct nmk_gpio_chip *chip = nmk_gpio_chips[gpio_bank];
+-
+-		if (!chip)
+-			return;
+-
+-		*pull_up = chip->pull_up;
+-	}
+-}
+-
+ /*
+  * We will allocate memory for the state container using devm* allocators
+  * binding to the first device reaching this point, it doesn't matter if
 -- 
-1.7.9.5
+2.8.1
