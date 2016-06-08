@@ -1,87 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 8 Jun 2016 17:47:39 +0200
-Subject: [PATCH 2/3] PCI: host: new PCI host controller driver for
- Marvell Armada 3700
-In-Reply-To: <CAPv3WKcznGD4p-YO3QLLYw+y+7w4ha-d_Nt6FHue7d2_SiyK0w@mail.gmail.com>
-References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1464858585-10963-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAPv3WKcznGD4p-YO3QLLYw+y+7w4ha-d_Nt6FHue7d2_SiyK0w@mail.gmail.com>
-Message-ID: <20160608174739.2e66943e@free-electrons.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 08 Jun 2016 17:47:38 +0200
+Subject: [PATCH v10 0/8] add i2c driver supported for rk3399
+In-Reply-To: <1463407063-41218-1-git-send-email-david.wu@rock-chips.com>
+References: <1463407063-41218-1-git-send-email-david.wu@rock-chips.com>
+Message-ID: <2239664.BKqQWGCl8U@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Wolfram,
 
-Thanks for your feedback!
+Am Montag, 16. Mai 2016, 21:57:35 schrieb David Wu:
+> There are three points differert from others:
+>  - new method to caculate i2c timings for rk3399
+>  - pclk and function clk are separated at rk3399
+>  - add fast-plus mode supported for rk3399
 
-On Wed, 8 Jun 2016 17:15:08 +0200, Marcin Wojtas wrote:
-
-> Have you checked my latest improvements of interrupt handling in this
-> controller? As DEASSERT is polled in advk_pcie_handle_int() I don't
-> think it should be able to trigger root complex interrupt at all.
-> Hence I think it shouldn't be unmasked.
-
-Correct. Makes sense. Though you are suggesting below to no longer poll
-the DEASSERT signal in the interrupt handler, but you're instead saying
-to ignore it entirely.
+this series looks pretty nice now and it seems most everybody is happy with it 
+by now. Do you still have it in your inbox to look at, or should David resend 
+it again?
 
 
-> > +       msi = &pcie->msi;  
+Heiko
+
+> David Wu (8):
+>   i2c: rk3x: add documentation to fields in "struct rk3x_i2c"
+>   i2c: rk3x: use struct "rk3x_i2c_calced_timings"
+>   i2c: rk3x: Remove redundant rk3x_i2c_clean_ipd()
+>   i2c: rk3x: Change SoC data to not use array
+>   i2c: rk3x: Move spec timing data to "static const" structs
+>   dt-bindings: i2c: rk3x: add support for rk3399
+>   i2c: rk3x: add i2c support for rk3399 soc
+>   i2c: rk3x: support fast-mode plus for rk3399
 > 
-> Do we consciously resign from CONFIG_MSI dependency? I know it should
-> always be enabled, but just making sure.
-
-Yes, I discussed this with Arnd, and we decided to simply make MSI
-support a hard dependency. You can always disable it by passing
-pci=nomsi on the kernel command line (tested to be working).
-
-
-> Below code will result in spurious interrupt flood (I can provide test
-> details with SATA3.0 card). I know this part of specs very well, but
-> expected EP operation flow should look like this:
-> a. EP interrupt
-> b. INTX_ASSERT signal
-> c. root complex interrupt
-> d. clear INTX_ASSERT bit
-> e. execute EP handler
-> f. INTX_DEASSERT signal
-> g. clear INTX_DEASSERT bit
-> h. exit interrupt
-> 
-> Now between d. and f., in case of any shortest delay we will force
-> executing EP handler numerous of times, which IMO is not desired. All
-> of them for e.g. the SATA3.0 card are registered as spurious
-> interrupts, pretty quickly resulting in "switching to irq poll"
-> failure after 100k of such happenings. Actually I think that after
-> executing generic_handle_irq(virq); we should leave root complex isr
-> asap, the polling for DEASSERT in such case is not resulting in any
-> benefits. In my code I ignored DEASSERT signal existence - it neither
-> triggers interrupt nor we don't poll for it. Under big stress nothing
-> wrong happens. We rely only on interrupts triggered by INTX_ASSERT
-> signal, so we care only for its status.
-
-Thanks for the detailed explanation. So in practice, the code should be
-just:
-
-	for (i = 0; i < LEGACY_IRQ_NUM; i++) {
-		int virq;
-
-		if (!(status & PCIE_ISR0_INTX_ASSERT(i)))
-			continue;
-
-		advk_writel(pcie, PCIE_ISR0_INTX_ASSERT(i), PCIE_ISR0_REG);
-		virq = irq_find_mapping(pcie->irq_domain, i);
-		generic_handle_irq(virq);
-	}
-
-and that's it.
-
-Is that what you suggest?
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>  Documentation/devicetree/bindings/i2c/i2c-rk3x.txt |  16 +-
+>  drivers/i2c/busses/i2c-rk3x.c                      | 498
+> +++++++++++++++++---- 2 files changed, 434 insertions(+), 80 deletions(-)
