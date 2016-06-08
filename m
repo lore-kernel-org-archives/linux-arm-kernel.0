@@ -1,26 +1,84 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jun 2016 14:12:27 +0200
-Subject: [PATCH 8/8] dmaengine: Remove site specific OOM error messages on
- kzalloc
-In-Reply-To: <1465321121-22238-9-git-send-email-peter.griffin@linaro.org>
-References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
- <1465321121-22238-9-git-send-email-peter.griffin@linaro.org>
-Message-ID: <CACRpkdaf1d8CvBmFCT+bWiXR9ddJ0Mpu5hMi2fzR6sLCXt3EqA@mail.gmail.com>
+From: alexander.shishkin@linux.intel.com (Alexander Shishkin)
+Date: Wed, 08 Jun 2016 15:13:49 +0300
+Subject: [RFC PATCH 1/4] STM Ftrace: Adding generic buffer interface driver
+In-Reply-To: <CAG2=9p9iOoWooUg_zkMVY4i70rUQOv4ZSDsjngAfLAweV+b=Qg@mail.gmail.com>
+References: <1464779939-24986-1-git-send-email-zhang.chunyan@linaro.org>
+ <1464779939-24986-2-git-send-email-zhang.chunyan@linaro.org>
+ <87fuspqosa.fsf@ashishki-desk.ger.corp.intel.com>
+ <CAG2=9p9iOoWooUg_zkMVY4i70rUQOv4ZSDsjngAfLAweV+b=Qg@mail.gmail.com>
+Message-ID: <87k2hzvpxe.fsf@ashishki-desk.ger.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 7:38 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
+Chunyan Zhang <zhang.chunyan@linaro.org> writes:
 
-> If kzalloc() fails it will issue it's own error message including
-> a dump_stack(). So remove the site specific error messages.
+> On Tue, Jun 7, 2016 at 6:25 PM, Alexander Shishkin
+> <alexander.shishkin@linux.intel.com> wrote:
+>> Chunyan Zhang <zhang.chunyan@linaro.org> writes:
+>>
+>>> This patch adds a driver that models itself as an stm_source and
+>>> who's sole purpose is to export an interface to the rest of the
+>>> kernel.  Once the stm and stm_source have been linked via sysfs,
+>>> everything that is passed to the interface will endup in the STM
+>>> trace engine.
+>>
+>> STM core already provides this exact interface to the rest of the
 >
-> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> Can you point out 'this exact interface' to me?
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Well, you're saying that this stm_source exports an interface to send
+data to STM for the rest of the kernel. Whereas, stm_source already is
+that interface.
 
-A few subsystems may use a cleanup like this...
-I wonder how many unnecessary prints I've introduced
-myself :P
+>>> +config STM_FTRACE
+>>> +     tristate "Redirect/copy the output from kernel Ftrace to STM engine"
+>>> +     help
+>>> +       This option can be used to redirect or copy the output from kernel Ftrace
+>>> +       to STM engine. Enabling this option will introduce a slight timing effect.
+>>
+>> This creates an impression that STM_FTRACE will somehow make events
+>> bypass the normal ftrace ring buffer.
+>
+> Ok, this name can be adjusted, do you have a better one for me :)
 
-Yours,
-Linus Walleij
+What I mean is: from the description it sounds like there is an option
+to bypass ftrace ring buffer, but I don't think that's the case at the
+moment. I'm also not sure if it's practical at all to do.
+
+>>> +/**
+>>> + * stm_ftrace_write() - write data to STM via 'stm_ftrace' source
+>>> + * @buf:     buffer containing the data packet
+>>> + * @len:     length of the data packet
+>>> + * @chan:    offset above the start channel number allocated to 'stm_ftrace'
+>>> + */
+>>> +void notrace stm_ftrace_write(const char *buf, unsigned int len,
+>>> +                           unsigned int chan)
+>>> +{
+>>> +     stm_source_write(&stm_ftrace_data, chan, buf, len);
+>>> +}
+>>> +EXPORT_SYMBOL_GPL(stm_ftrace_write);
+>>
+>> An extra wrapper around stm_source_write().
+>
+> Yes, I think it's not good to expose the stm_source to ftrace_stm_func().
+
+I understand, but wrapping it into an intermediary function doesn't
+really solve it either.
+
+>> So basically when ftrace is compiled in, it will pull in stm core
+>> through this.
+>
+> Sorry I cannot get you here.  Could you please explain you concern further?
+
+Well, if you plug the stm_source driver into the ftrace core (via a
+wrapper or directly), you will end up with a link dependency. In other
+words, stm_source and by association stm_core will have to be statically
+linked.
+
+Look at the way stm_console is done, for example: it registers with both
+stm_source class and the console layer dynamically, so that it can be
+dynamically loaded/unloaded.
+
+Regards,
+--
+Alex
