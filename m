@@ -1,46 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jun 2016 09:59:31 +0900
-Subject: [PATCH 01/30] ARM: dts: r8a7793: Add MMCIF0
+Date: Wed,  8 Jun 2016 09:59:32 +0900
+Subject: [PATCH 02/30] ARM: dts: bockw: SCIF0 supports RTS/CTS hardware flow
+ control
 In-Reply-To: <cover.1465346599.git.horms+renesas@verge.net.au>
 References: <cover.1465346599.git.horms+renesas@verge.net.au>
-Message-ID: <d9739aab20a147f228b883a56fa61eb4ff620419.1465346599.git.horms+renesas@verge.net.au>
+Message-ID: <388e9f592c740409ffe55740771389f946796694.1465346599.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Same as on r8a7791.
+On the BOCK-W development board, the RTS and CTS pins of the console
+SCIF0 are wired to the "product serial" connector.  Reflect this in the
+DTS by adding the "uart-has-rtscts" property to the scif0 device node.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/r8a7778-bockw.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index 1dd6d202cd4c..76c8435f283c 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -543,6 +543,19 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm/boot/dts/r8a7778-bockw.dts b/arch/arm/boot/dts/r8a7778-bockw.dts
+index e0dab1464648..982a237ea622 100644
+--- a/arch/arm/boot/dts/r8a7778-bockw.dts
++++ b/arch/arm/boot/dts/r8a7778-bockw.dts
+@@ -223,6 +223,7 @@
+ 	pinctrl-0 = <&scif0_pins>;
+ 	pinctrl-names = "default";
  
-+	mmcif0: mmc at ee200000 {
-+		compatible = "renesas,mmcif-r8a7793", "renesas,sh-mmcif";
-+		reg = <0 0xee200000 0 0x80>;
-+		interrupts = <GIC_SPI 169 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&mstp3_clks R8A7793_CLK_MMCIF0>;
-+		dmas = <&dmac0 0xd1>, <&dmac0 0xd2>;
-+		dma-names = "tx", "rx";
-+		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
-+		reg-io-width = <4>;
-+		status = "disabled";
-+		max-frequency = <97500000>;
-+	};
-+
- 	scifa0: serial at e6c40000 {
- 		compatible = "renesas,scifa-r8a7793",
- 			     "renesas,rcar-gen2-scifa", "renesas,scifa";
++	uart-has-rtscts;
+ 	status = "okay";
+ };
+ 
 -- 
 2.1.4
