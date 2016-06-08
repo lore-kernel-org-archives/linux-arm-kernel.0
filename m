@@ -1,29 +1,47 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Wed, 8 Jun 2016 09:59:26 +0100
-Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
-In-Reply-To: <5757CF9B.3080402@free.fr>
-References: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
- <5757CF9B.3080402@free.fr>
-Message-ID: <d3c117ea-2dce-63a2-7888-31ee8320a3dd@codethink.co.uk>
+From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
+Date: Wed, 8 Jun 2016 16:59:03 +0800
+Subject: [PATCH v4 00/14] fix some type infos and bugs for arm64/of numa
+In-Reply-To: <20160607135852.GA20477@arm.com>
+References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
+ <20160607135852.GA20477@arm.com>
+Message-ID: <5757DE57.10700@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/16 08:56, Mason wrote:
-> On 07/06/2016 13:30, Ben Dooks wrote:
-> 
->> Fix the use of 0 instead of NULL to clk_get() call. This stops the
->> following warning:
+
+
+On 2016/6/7 21:58, Will Deacon wrote:
+> On Tue, Jun 07, 2016 at 04:08:04PM +0800, Zhen Lei wrote:
+>> v3 -> v4:
+>> 1. Packed three patches of Kefeng Wang, patch6-8.
+>> 2. Add 6 new patches(9-15) to enhance the numa on arm64.
 >>
->> drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
+>> v2 -> v3:
+>> 1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
+>>    patches looks more well. The final code have no change. 
+>>
+>> v1 -> v2:
+>> 1. Base on https://lkml.org/lkml/2016/5/24/679
 > 
-> May I ask which compiler/version produced that diagnostic?
+> If you want bug fixes to land in 4.7, you'll need to base them on a
+> mainline kernel.
 
-I was running with "make C=2 bzImage" for ARM multi_v7_config
+I heared that David Daney's acpi numa patch series was accepted and put into next branch(Linux 4.8).
+Otherwise I will suggest him sending his patch6-7 to mainline first. So that, only a very small conflict
+will be exist.
 
-$ sparse --version
-v0.5.0
+I also tested that:
+1. git am David Daney's patch6-7, then git am all of my patches on a branch, named branch A.
+2. git am David Daney's patch6-7 on another branch, named branch B.
+3. when I git merge B into branch A, it's still conflict. So I guess git merge is based on source code, rather than patches.
 
+So at present, unless the maintainers are willing to resolve the conflict, otherwise I update my patches will not work.
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Fortunately, these patches are not particularly urgent. So I think I can wait until Linux 4.8 start, then send these patches again.
+But I'm not sure whether these patches can be merged into Linux 4.8, I really hope.
+
+> 
+> Will
+> 
+> .
+> 
