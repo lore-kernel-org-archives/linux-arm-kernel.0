@@ -1,70 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Wed,  8 Jun 2016 10:21:15 +0100
-Subject: [PATCH v3 00/20] pwm: Add support for PWM Capture
-Message-ID: <20160608092135.21184-1-lee.jones@linaro.org>
+Date: Wed,  8 Jun 2016 10:21:19 +0100
+Subject: [PATCH v3 04/20] ARM: dts: STiH416: Supply PWM Capture IRQs
+In-Reply-To: <20160608092135.21184-1-lee.jones@linaro.org>
+References: <20160608092135.21184-1-lee.jones@linaro.org>
+Message-ID: <20160608092135.21184-5-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The first part of this set extends the current PWM API to allow external
-code to request a PWM Capture.  Subsequent patches then make use of the
-new API by providing a userspace offering via /sysfs.  The final part of
-the set supplies PWM Capture functionality into the already existing STi
-PWM driver.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
+ arch/arm/boot/dts/stih416.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-This patch-set has been tested end to end via /sysfs.
-
-v2 => v3:
-- Supply DT documentation changes
-- Submit DTS additions as part of this set
-- Default Capture and PWM-out number of channels to 0
-  - Do additional checking, to ensure at least one channel is requested
-- Use global locking, instead of lock in device data
-
-v1 => v2:
-- API change
-- Use a struct to carry the result back to the caller
-- Use 'struct pwm' to store device specific data
-- Make timeout configurable
-- Don't use clear_bit(), instead use raw bit logic
-- Propagate return value of platform_get_irq()
-- Don't cast to (void *)
-- Move to subsystem terminology (channels => devices)
-- Remove channel select feature
-- Enable Capture IP during capture
-
-Lee Jones (20):
-  ARM: dts: STi: Rename properites in line with PWM naming conventions
-  ARM: dts: STiH407: Supply PWM Capture IRQ
-  ARM: dts: STiH407: Declare PWM Capture data lines via Pinctrl
-  ARM: dts: STiH416: Supply PWM Capture IRQs
-  ARM: dts: STiH416: Declare PWM Capture data lines via Pinctrl
-  ARM: dts: STiH416: Define PWM Capture clock
-  ARM: dts: STiH416: Define the number of PWM Capture channels
-  pwm: Add PWM Capture support
-  pwm: sti: Rename channel => device
-  pwm: sysfs: Add PWM Capture support
-  pwm: sti: Reorganise register names in preparation for new
-    functionality
-  pwm: sti: Only request clock rate when you need to
-  pwm: sti: Supply PWM Capture register addresses and bit locations
-  pwm: sti: Supply PWM Capture clock handling
-  pwm: sti: Initialise PWM Capture device data
-  pwm: sti: Add support for PWM Capture IRQs
-  pwm: sti: Add PWM Capture call-back
-  pwm: sti: It's now valid for number of PWM channels to be zero
-  pwm: sti: Take the opportunity to conduct a little house keeping
-  dt-bindings: pwm: sti: Update DT bindings with recent changes
-
- Documentation/devicetree/bindings/pwm/pwm-st.txt |  10 +-
- arch/arm/boot/dts/stih407-family.dtsi            |   5 +-
- arch/arm/boot/dts/stih407-pinctrl.dtsi           |   3 +
- arch/arm/boot/dts/stih416-pinctrl.dtsi           |   5 +
- arch/arm/boot/dts/stih416.dtsi                   |  12 +-
- drivers/pwm/core.c                               |  27 ++
- drivers/pwm/pwm-sti.c                            | 424 +++++++++++++++++++----
- drivers/pwm/sysfs.c                              |  17 +
- include/linux/pwm.h                              |  25 ++
- 9 files changed, 447 insertions(+), 81 deletions(-)
-
+diff --git a/arch/arm/boot/dts/stih416.dtsi b/arch/arm/boot/dts/stih416.dtsi
+index 82091072..28d84c71 100644
+--- a/arch/arm/boot/dts/stih416.dtsi
++++ b/arch/arm/boot/dts/stih416.dtsi
+@@ -475,6 +475,7 @@
+ 			status		= "okay";
+ 			#pwm-cells	= <2>;
+ 			reg		= <0xfed10000 0x68>;
++			interrupts      = <GIC_SPI 200 IRQ_TYPE_NONE>;
+ 
+ 			pinctrl-names	= "default";
+ 			pinctrl-0 = 	<&pinctrl_pwm0_chan0_default
+@@ -494,6 +495,7 @@
+ 			status		= "disabled";
+ 			#pwm-cells	= <2>;
+ 			reg		= <0xfe510000 0x68>;
++			interrupts      = <GIC_SPI 202 IRQ_TYPE_NONE>;
+ 
+ 			pinctrl-names	= "default";
+ 			pinctrl-0	= <&pinctrl_pwm1_chan0_default
 -- 
 2.8.3
