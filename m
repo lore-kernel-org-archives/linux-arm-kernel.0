@@ -1,36 +1,48 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 8 Jun 2016 17:48:15 +0100
-Subject: [PATCH v2] of: iommu: make of_iommu_init() postcore_initcall_sync
-In-Reply-To: <CAL_JsqL23AohbYhbQZyT-PRPKujttTZNNh1qdoQXv8BwyYq+mg@mail.gmail.com>
-References: <1464761175-22677-1-git-send-email-wangkefeng.wang@huawei.com>
- <CAL_JsqL23AohbYhbQZyT-PRPKujttTZNNh1qdoQXv8BwyYq+mg@mail.gmail.com>
-Message-ID: <57584C4F.6050108@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 8 Jun 2016 18:52:16 +0200
+Subject: [PATCH 1/8] ARM: dts: at91: animeo_ip: remove leftovers clock
+ definition
+In-Reply-To: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1465404119-28177-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <57584D40.8080606@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/16 16:44, Rob Herring wrote:
-> On Wed, Jun 1, 2016 at 1:06 AM, Kefeng Wang <wangkefeng.wang@huawei.com> wrote:
->> The of_iommu_init() is called multiple times by arch code,
->> make it postcore_initcall_sync, then we can drop relevant
->> calls fully.
->>
->> Note, the IOMMUs should have a chance to perform some basic
->> initialisation before we start adding masters to them. So
->> postcore_initcall_sync is good choice, it ensures of_iommu_init()
->> called before of_platform_populate.
->
-> What ever happened to doing deferred probe for IOMMUs?
+Le 08/06/2016 18:41, Alexandre Belloni a ?crit :
+> The clocks group properties and the clock at 0 node have been obsolete for two
+> years, remove them.
+> 
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Sricharan has been trying to resurrect it recently[1], although the fact 
-that we're starting to need more or less the same thing for certain 
-interrupt controllers as well (and I'm not sure how immune ACPI IORT is 
-to the problem) suggests a more general rethink might be in order. I've 
-got a big TODO item hanging over me on that one...
+On the whole series:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Robin.
+> ---
+>  arch/arm/boot/dts/animeo_ip.dts | 9 ---------
+>  1 file changed, 9 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
+> index 0962f2fa3f6e..419dd3981edf 100644
+> --- a/arch/arm/boot/dts/animeo_ip.dts
+> +++ b/arch/arm/boot/dts/animeo_ip.dts
+> @@ -32,15 +32,6 @@
+>  	};
+>  
+>  	clocks {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+> -		ranges;
+> -
+> -		main_clock: clock at 0 {
+> -			compatible = "atmel,osc", "fixed-clock";
+> -			clock-frequency = <18432000>;
+> -		};
+> -
+>  		slow_xtal {
+>  			clock-frequency = <32768>;
+>  		};
+> 
 
-[1]:http://thread.gmane.org/gmane.linux.kernel.iommu/13243
 
->
-> Rob
->
+-- 
+Nicolas Ferre
