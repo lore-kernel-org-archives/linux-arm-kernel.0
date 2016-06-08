@@ -1,64 +1,60 @@
-From: yong.b.li@intel.com (Li, Yong B)
-Date: Wed, 8 Jun 2016 07:11:03 +0000
-Subject: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
-In-Reply-To: <CAOCHtYhBSS+D-BQH28FO+RxyzvDg-yeX+6nvLu11G3TNkF7ELg@mail.gmail.com>
-References: <1464853310-8738-1-git-send-email-yong.b.li@intel.com>
- <CAOCHtYib9YxckneM-j0Gk1YE=MnvAwAhvDjEDEuFJbH6W3EcWA@mail.gmail.com>
- <20160602173932.GF5995@atomide.com>
- <CAOCHtYiWYrwSidHnKv4siFT-wU=tt5-YeDTwbM022ZTxdPFYYA@mail.gmail.com>
- <20160602175635.GG5995@atomide.com>
- <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FB1EC@SHSMSX101.ccr.corp.intel.com>
- <20160607060004.GD22406@atomide.com>
- <BCE6BEBCDDF4B84E891D2320CBF96F1D3F9FD673@SHSMSX101.ccr.corp.intel.com>
- <CAOCHtYhBSS+D-BQH28FO+RxyzvDg-yeX+6nvLu11G3TNkF7ELg@mail.gmail.com>
-Message-ID: <BCE6BEBCDDF4B84E891D2320CBF96F1D3FA02917@SHSMSX101.ccr.corp.intel.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  8 Jun 2016 16:14:23 +0900
+Subject: [PATCH v2 1/4] ARM: dts: r8a7790: lager: rename i2cexio as i2cexio0
+In-Reply-To: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
+References: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1465370066-8450-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Robert!
+This is in preparation for adding i2cexio1 which will use the
+dmuxer for IIC1/I2C0.
 
------Original Message-----
-From: Robert Nelson [mailto:robertcnelson at gmail.com] 
-Sent: Wednesday, June 8, 2016 1:15 AM
-To: Li, Yong B <yong.b.li@intel.com>
-Cc: Tony Lindgren <tony@atomide.com>; Benoit Cousson <bcousson@baylibre.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll <pawel.moll@arm.com>; Mark Rutland <mark.rutland@arm.com>; Ian Campbell <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>; Russell King <linux@arm.linux.org.uk>; linux-omap at vger.kernel.org; devicetree <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; linux kernel <linux-kernel@vger.kernel.org>; sdliyong at gmail.com; Pantelis Antoniou <pantelis.antoniou@konsulko.com>
-Subject: Re: [PATCH] ARM: dts: am335x-boneblack: add i2c1 DT entry
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-On Tue, Jun 7, 2016 at 1:14 AM, Li, Yong B <yong.b.li@intel.com> wrote:
-> Thanks Tony.
->
-> I checked the DTS/overlays using linux-yocto-4.1 kernel(Ostro OS). It seems to me that the kernel/u-boot do not include the latest overlay support patch. And I also tested the latest Debian 8.4 using BBB boards, the I2C1 does not work too. This patch is the simplest solution for I2C1/I2C2 in linux-yocto-4.1.
-
-ps, your patch is also broken, you didn't even mux the pins, so i2c1 doesn't work for you anyways. ;)
-
-pinctrl-0 = <&i2c2_pins>; -> pinctrl-0 = <&i2c1_pins>;
-
-Option 1:
-
-With the latest BBB image's, we utilize "cape_universal", thus you can enable I2C1 via:
-
-root at beaglebone:~# config-pin -l P9.17
-default gpio gpio_pu gpio_pd spi i2c pwm
-
-root at beaglebone:~# config-pin -l P9.18
-default gpio gpio_pu gpio_pd spi i2c pwm
-
-root at beaglebone:~# config-pin P9.17 i2c
-
-root at beaglebone:~# config-pin P9.18 i2c
-
-Option 2, for the BB-I2C1 overlay:
-
-add
-
-cape_enable=bone_capemgr.enable_partno=BB-I2C1
-
-Option 3, wait for Pantelis's solution... ;)
-
-http://comments.gmane.org/gmane.linux.kernel/2234662
-
-Regards,
-
---
-Robert Nelson
-https://rcn-ee.com/
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index 9d20ace33b01..71d62ca282ea 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -50,7 +50,7 @@
+ 	aliases {
+ 		serial0 = &scif0;
+ 		serial1 = &scifa1;
+-		i2c8 = "i2cexio";
++		i2c8 = "i2cexio0";
+ 	};
+ 
+ 	chosen {
+@@ -263,10 +263,10 @@
+ 	 * instantiate the slave device at runtime according to the documentation.
+ 	 * You can then communicate with the slave via IIC3.
+ 	 */
+-	i2cexio: i2c-8 {
++	i2cexio0: i2c-8 {
+ 		compatible = "i2c-demux-pinctrl";
+ 		i2c-parent = <&iic0>, <&i2c0>;
+-		i2c-bus-name = "i2c-exio";
++		i2c-bus-name = "i2c-exio0";
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 	};
+@@ -580,12 +580,12 @@
+ 
+ &i2c0	{
+ 	pinctrl-0 = <&i2c0_pins>;
+-	pinctrl-names = "i2c-exio";
++	pinctrl-names = "i2c-exio0";
+ };
+ 
+ &iic0	{
+ 	pinctrl-0 = <&iic0_pins>;
+-	pinctrl-names = "i2c-exio";
++	pinctrl-names = "i2c-exio0";
+ };
+ 
+ &iic1	{
+-- 
+2.1.4
