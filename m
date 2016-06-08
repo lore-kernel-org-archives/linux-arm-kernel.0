@@ -1,111 +1,87 @@
-From: liviu.dudau@arm.com (liviu.dudau at arm.com)
-Date: Wed, 8 Jun 2016 11:42:09 +0100
-Subject: HDLCD crashes with 6d910bfa809e
-In-Reply-To: <69f6ce7f-2c60-319a-fa65-b52a74db5460@samsung.com>
-References: <5756B8A8.8000902@arm.com>
- <20160607133535.GA1165@e106497-lin.cambridge.arm.com>
- <5756D602.4090305@arm.com>
- <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
- <3c4d34f5-a924-587e-5956-c21d528f24bf@samsung.com>
- <20160608090507.GG1165@e106497-lin.cambridge.arm.com>
- <69f6ce7f-2c60-319a-fa65-b52a74db5460@samsung.com>
-Message-ID: <20160608104209.GH1165@e106497-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 8 Jun 2016 12:45:39 +0200
+Subject: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
+ suspend
+In-Reply-To: <5757EDB4.3020806@atmel.com>
+References: <1465359311-14544-1-git-send-email-wenyou.yang@atmel.com>
+ <1465359311-14544-2-git-send-email-wenyou.yang@atmel.com>
+ <5757EDB4.3020806@atmel.com>
+Message-ID: <5757F753.8010408@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 12:01:20PM +0200, Marek Szyprowski wrote:
-> Hi Liviu,
-
-Hi Marek,
-
-[HDLCD bug report content removed]
-
-> >>>OK, the problem is that commit 59ce4039727ef40 has changed the behaviour from when
-> >>>there is no "memory-region" phandle in the DT: before it used to return -ENODEV, now
-> >>>it returns -EINVAL.
-> >>>
-> >>>Marek, I quite liked the old behaviour to detect if the DT had the optional (from
-> >>>my driver's point of view) "memory-region" phandle. Plus the check for dev is superfluous
-> >>>when using of_reserved_mem_device_init() as that uses dev->of_node for np so it would
-> >>>crash before the check anyway. Maybe move the check there?
-> >>>
-> >>>Until then I suggest reverting the 59ce4039727ef40 commit.
-> >>I've just send a fix for this issue. I'm sorry for the regression. I hope
-> >>the fix fill
-> >>quickly get into next to solve your problem.
-> >Thanks for the patch, however I have some comments to it.
-> >
-> >>The additional check for null dev make sense, because the new function
-> >>of_reserved_mem_device_init_by_idx can be called with any device and node
-> >>pointer not
-> >>embedded with it, so I would like to keep it safe.
-> >And I have to admit I find that scary. Why do you accept any node that is *not* related to
-> >the device? If you want just the ability to parse multiple "memory-region" phandles (where
-> >are the bindings defined for that?) I would have modified of_reserved_mem_device_init() to
-> >the the parsing and accept either the single entry style or a node with multiple
-> >"memory-region" phandles in it. Otherwise I can steal the "memory-region" of another device
-> >and that device would have no idea that I have done this.
+Le 08/06/2016 12:04, Nicolas Ferre a ?crit :
+> Le 08/06/2016 06:15, Wenyou Yang a ?crit :
+>> In order to the save power consumption, as a workaround, suspend
+>> forcibly the USB PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI
+>> Interrupt Configuration Register in the SFRs while OHCI USB suspend.
+>>
+>> This suspend operation must be done before the USB clock is disabled,
+>> resume after the USB clock is enabled.
+>>
+>> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 > 
-> The idea is not to steal memory region from another device, but to let
-> driver to use multiple
-> regions assigned to the supported device with dma-mapping api. To use them
-> with dma-mapping
-> subsystem, one needs separate struct device for each reserved region. The
-> idea is to create
-> child devices of the device, which has memory-region property. Then for each
-> such child
-> device, driver can call of_reserved_mem_device_init_by_idx() to enable usage
-> of dma-mapping
-> api based on the selected reserved region. Such approach was already used
-> for long time in
-> the media/platform/s5p-mfc driver and now it has been converted to use
-> generic reserved
-> memory regions.
+> Little nitpicking below...
 > 
-> If you feel scary about this approach, maybe a check if the device provided
-> to
-> of_reserved_mem_device_init_by_idx() function is one of the successors of
-> the device hidden
-> behind the provided node pointer (or points to the same device)?
+>> ---
+>>
+>> Changes in v3:
+>>  - Change the compatible description for more precise.
+>>
+>> Changes in v2:
+>>  - Add compatible to support forcibly suspend the ports.
+>>  - Add soc/at91/at91_sfr.h to accommodate the defines.
+>>  - Add error checking for .sfr_regmap.
+>>  - Remove unnecessary regmap_read() statement.
+>>
+>>  .../devicetree/bindings/usb/atmel-usb.txt          |  6 +-
+>>  drivers/usb/host/ohci-at91.c                       | 80 +++++++++++++++++++++-
+>>  include/soc/at91/at91_sfr.h                        | 29 ++++++++
 
-That would not hurt to have.
+Oops sorry, additional comment which is not nitpicking, this one:
 
-> 
-> >Can you point me to the latest thread where this patch has been discussed?
-> 
-> This patch is a part of "Exynos: MFC driver: reserved memory cleanup and
-> IOMMU support" thread
-> and has been around for a while:
-> https://www.mail-archive.com/linux-media at vger.kernel.org/msg97645.html
+We already have SFR header file in this patch:
 
-Thanks! I'm not subscribed to linux-media and way behind a lot of other MLs, so
-I have not noticed it.
+Author: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Date:   Thu Mar 17 17:04:00 2016 +0100
 
-I've had a look at the patchset, found one case where you might leak some memory.
+    ARM: dts: at91: sama5d2: add SFR node
 
-I also think you could've had an of_reserved_mem_device_init_list() function
-that inits all the "memory-region" nodes and returns a list struct reserved_mem*
-that the driver can then assign to whatever internal variables it has. That
-way you can validate that all the "memory-region" phandles are used by the same
-parent device.
+    This SFR node is looked up by the I2S controller driver to tune the
+    SFR_I2SCLKSEL register.
 
-Best regards,
-Liviu
+    Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+    Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+    Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+    Acked-by: Rob Herring <robh@kernel.org>
+    Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
+Which is already accepted by arm-soc guys for 4.7... So my ack
+transforms into a nack, sorry...
+
+We will have to coordinate the effort and maybe take the whole series
+with us. But for sure, you'll have to use the existing
+include/soc/at91/atmel-sfr.h file and build on top of it...
+
+Bye,
+
+>>  3 files changed, 112 insertions(+), 3 deletions(-)
+>>  create mode 100644 include/soc/at91/at91_sfr.h
+
+[..]
 
 > 
-> Best regards
-> -- 
-> Marek Szyprowski, PhD
-> Samsung R&D Institute Poland
+> But you can take my:
 > 
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> with the little corrections listed.
+> 
+> Alan, We plan to take the second patch of this series with AT91 git tree
+> through arm-soc. Do you agree to take this one through yours?
 
+Alan, forget this request, we'll have to coordinate differently.
+
+Sorry for the noise. Bye,
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Nicolas Ferre
