@@ -1,84 +1,70 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 08 Jun 2016 08:58:33 +0200
-Subject: HDLCD crashes with 6d910bfa809e
-In-Reply-To: <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
-References: <5756B8A8.8000902@arm.com>
- <20160607133535.GA1165@e106497-lin.cambridge.arm.com>
- <5756D602.4090305@arm.com>
- <20160607143425.GE1165@e106497-lin.cambridge.arm.com>
-Message-ID: <3c4d34f5-a924-587e-5956-c21d528f24bf@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 8 Jun 2016 09:05:54 +0200
+Subject: [PATCH v2 05/11] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <2268000.l71DRbJSRE@wasted.cogentembedded.com>
+References: <3446154.oZ24315zaL@wasted.cogentembedded.com>
+ <2268000.l71DRbJSRE@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdUMQZGg_hy0WOgwJMZhDCsKt-XJvnX0tq6i=92qubOAUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
+Hi Sergei,
 
-
-On 2016-06-07 16:34, liviu.dudau at arm.com wrote:
-> On Tue, Jun 07, 2016 at 03:11:14PM +0100, Robin Murphy wrote:
->> Hi Liviu,
->>
->> On 07/06/16 14:35, liviu.dudau at arm.com wrote:
->>> On Tue, Jun 07, 2016 at 01:06:00PM +0100, Robin Murphy wrote:
->>>> Having just inadvertently merged -next into my working branch, I find
->>>> dev6d910bfa809e ("drm/hlcd: Use lockless gem BO free callback") adversely
->>>> affecting my board's ability to boot ;)
->>>>
->>>> Since I (intentionally) don't have sufficient CMA to create a framebuffer,
->>>> drm_gem_cma_create() fails, unconditionally calls the now-NULL
->>>> drm->driver->gem_free_object() in its cleanup path, and fiery death
->>>> ensues...
->>> Thanks for reporting this. What other changes other than reducing the CMA
->>> allocation size do you have that I might need in order to reproduce this?
->> I've just confirmed a plain checkout of next-20160602, using arm64 defconfig
->> + DRM + HDLCD + TDA998X and CMA_SIZE_MBYTES=1, booted on a Juno, does the
->> job:
->>
->> [    3.032402] hdlcd 7ff60000.hdlcd: bound 0-0070 (ops tda998x_ops)
->> [    3.038388] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
->> [    3.044970] [drm] No driver support for vblank timestamp query.
->> [    3.076973] hdlcd 7ff60000.hdlcd: failed to allocate buffer with size
->> 7680000
->> [    3.084081] Bad mode in Synchronous Abort handler detected, code
->> 0x86000004 -- IABT (current EL)
->> [    3.092815] CPU: 3 PID: 6 Comm: kworker/u12:0 Not tainted
->> 4.7.0-rc1-next-20160602 #686
->> [    3.100682] Hardware name: ARM Juno development board (r1) (DT)
->> [    3.106567] Workqueue: deferwq deferred_probe_work_func
->> [    3.111761] task: ffff8009768a3e80 ti: ffff8009768e8000 task.ti:
->> ffff8009768e8000
->> [    3.119198] PC is at 0x0
->> [    3.121720] LR is at drm_gem_cma_create+0x128/0x130
->> ...and so on.
->>
->> Today's -next, on the other hand, dodges the bullet entirely:
->>
->> [    2.903645] [drm] found ARM HDLCD version r0p0
->> [    2.908122] hdlcd 7ff60000.hdlcd: master bind failed: -22
->> [    2.913505] tda998x: probe of 0-0070 failed with error -22
->> [    2.919141] [drm] found ARM HDLCD version r0p0
->> [    2.923609] hdlcd 7ff50000.hdlcd: master bind failed: -22
->> [    2.928991] tda998x: probe of 0-0071 failed with error -22
-> OK, the problem is that commit 59ce4039727ef40 has changed the behaviour from when
-> there is no "memory-region" phandle in the DT: before it used to return -ENODEV, now
-> it returns -EINVAL.
+On Fri, Jun 3, 2016 at 11:26 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> The initial R8A7792 SoC device tree including CPU core, GIC, timer, SYSC,
+> and the required  clock descriptions.
 >
-> Marek, I quite liked the old behaviour to detect if the DT had the optional (from
-> my driver's point of view) "memory-region" phandle. Plus the check for dev is superfluous
-> when using of_reserved_mem_device_init() as that uses dev->of_node for np so it would
-> crash before the check anyway. Maybe move the check there?
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 >
-> Until then I suggest reverting the 59ce4039727ef40 commit.
+> ---
+> Changes in version 2:
 
-I've just send a fix for this issue. I'm sorry for the regression. I 
-hope the fix fill
-quickly get into next to solve your problem.
+> - created  the "soc" subnode, moving the SoC  device  nodes there;
+> - removed  the "clocks" node, moving its fixed clock  subnodes to the root and
+>   the MSTP subnodes into the "soc" node.
+>
+>  arch/arm/boot/dts/r8a7792.dtsi |  171 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 171 insertions(+)
+>
+> Index: renesas/arch/arm/boot/dts/r8a7792.dtsi
+> ===================================================================
+> --- /dev/null
+> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
 
-The additional check for null dev make sense, because the new function
-of_reserved_mem_device_init_by_idx can be called with any device and 
-node pointer not
-embedded with it, so I would like to keep it safe.
+> +       /* Fixed factor clocks */
+> +       zs_clk: zs {
+> +               compatible = "fixed-factor-clock";
+> +               clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
+> +               #clock-cells = <0>;
+> +               clock-div = <6>;
+> +               clock-mult = <1>;
+> +       };
+> +       p_clk: p {
+> +               compatible = "fixed-factor-clock";
+> +               clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
+> +               #clock-cells = <0>;
+> +               clock-div = <24>;
+> +               clock-mult = <1>;
+> +       };
+> +       cp_clk: cp {
+> +               compatible = "fixed-factor-clock";
+> +               clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
+> +               #clock-cells = <0>;
+> +               clock-div = <3>;
+> +               clock-mult = <1>;
+> +       };
 
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+I think the above 3 fixed factor clocks should be children of the "soc" node,
+as they're generated on-SoC.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
