@@ -1,29 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jun 2016 11:10:58 +0200
-Subject: [PATCH 27/32] gpio: Add support for the FXL6408 GPIO expander.
-In-Reply-To: <1464817421-8519-28-git-send-email-kraxel@redhat.com>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-28-git-send-email-kraxel@redhat.com>
-Message-ID: <CACRpkdax3AmnprT48zL7J92ddMvLYeRXi9OrQK_JrBT8_zZQoA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 8 Jun 2016 10:12:19 +0100
+Subject: [PATCH v2 4/9] arm64: Add platform selection for BCM2835.
+In-Reply-To: <87bn3gu3to.fsf@eliezer.anholt.net>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-5-git-send-email-kraxel@redhat.com>
+ <20160603112721.GC1128@e104818-lin.cambridge.arm.com>
+ <87bn3gu3to.fsf@eliezer.anholt.net>
+Message-ID: <20160608091219.GA16322@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2016 at 11:43 PM, Gerd Hoffmann <kraxel@redhat.com> wrote:
+On Sat, Jun 04, 2016 at 12:55:15PM -0700, Eric Anholt wrote:
+> Catalin Marinas <catalin.marinas@arm.com> writes:
+> > On Fri, Jun 03, 2016 at 08:18:23AM +0200, Gerd Hoffmann wrote:
+> >> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> >> index 7ef1d05..ea88402 100644
+> >> --- a/arch/arm64/Kconfig.platforms
+> >> +++ b/arch/arm64/Kconfig.platforms
+> >> @@ -13,6 +13,19 @@ config ARCH_ALPINE
+> >>  	  This enables support for the Annapurna Labs Alpine
+> >>  	  Soc family.
+> >>  
+> >> +config ARCH_BCM2835
+> >> +	bool "Broadcom BCM2835 family"
+> >> +	select ARCH_REQUIRE_GPIOLIB
+> >> +	select CLKSRC_OF
+> >> +	select PINCTRL
+> >> +	select PINCTRL_BCM2835
+> >> +	select ARM_AMBA
+> >> +	select ARM_TIMER_SP804
+> >> +	select HAVE_ARM_ARCH_TIMER
+> >> +	help
+> >> +	  This enables support for the Broadcom BCM2837 SoC.
 
-> +#define FXL6408_OUTPUT                 0x05
-> +/* Bits here make the output High-Z, instead of the OUTPUT value. */
-> +#define FXL6408_OUTPUT_HIGH_Z          0x07
-(...)
-> +       /* Disable High-Z of outputs, so that our OUTPUT updates
-> +        * actually take effect.
-> +        */
-> +       i2c_smbus_write_byte_data(client, FXL6408_OUTPUT_HIGH_Z, 0);
+Even the BCM number is inconsistent here.
 
-High-Z is probably the same as open drain right? And if not open drain,
-it is push-pull.
+> >> +	  This SoC is used in the Raspberry Pi 3 device.
+> >
+> > I thought we would just use ARCH_BCM, or is it too generic?
+> 
+> Consensus last time around seemed to be to drop adding ARCH_BCM, in
+> favor of patch 1 of the series.
 
-So you want to implement .set_single_ended() for configuring the lines in
-"high-z", i.e. open drain output mode.
+I may have missed that discussion. My point was about consistency with
+existing ARCH_* definitions in the arm64 Kconfig.platforms. I can see
+why it's easier for you since some drivers are built based on
+ARCH_BCM2835. Looking at drivers/clk/bcm/Makefile, there is an
+inconsistent mix of CLK_BCM_* and ARCH_BCM_*. I would rather have a new
+CLK_BCM2835 that's selected/enabled accordingly (maybe simply depending
+on ARCH_BCM).
 
-Yours,
-Linus Walleij
+-- 
+Catalin
