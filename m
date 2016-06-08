@@ -1,135 +1,60 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  8 Jun 2016 16:14:26 +0900
-Subject: [PATCH v2 4/4] ARM: dts: r8a7790: lager: use demuxer for IIC3/I2C3
-In-Reply-To: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
-References: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1465370066-8450-5-git-send-email-horms+renesas@verge.net.au>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Wed, 8 Jun 2016 07:13:13 +0000
+Subject: [PATCH 14/30] ARM: dts: r8a7790: Fix W=1 dtc warnings
+In-Reply-To: <2c3de36700d4f3a5da1eb67e9340bfccfce19fdb.1465346599.git.horms+renesas@verge.net.au>
+References: <cover.1465346599.git.horms+renesas@verge.net.au>
+ <2c3de36700d4f3a5da1eb67e9340bfccfce19fdb.1465346599.git.horms+renesas@verge.net.au>
+Message-ID: <871t48jh1e.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a separate bus for dla98063 PMIC and da9210 regulator
-related I2C slaves.
 
-Based on similar work for HDMI by Wolfram Sang.
+Hi Simon
 
-Cc: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7790-lager.dts | 80 +++++++++++++++++++++++--------------
- 1 file changed, 49 insertions(+), 31 deletions(-)
+> From: Geert Uytterhoeven <geert+renesas@glider.be>
+> 
+> Warning (unit_address_vs_reg): Node /cache-controller at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /cache-controller at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,dvc/dvc at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,dvc/dvc at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,mix/mix at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,mix/mix at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 2 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 3 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 4 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 5 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 6 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ctu/ctu at 7 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 2 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 3 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 4 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 5 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 6 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 7 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 8 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,src/src at 9 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 0 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 1 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 2 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 3 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 4 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 5 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 6 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 7 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 8 has a unit name, but no reg property
+> Warning (unit_address_vs_reg): Node /sound at ec500000/rcar_sound,ssi/ssi at 9 has a unit name, but no reg property
+> 
+> Move the cache-controller nodes under the cpus node, and make their unit
+> names and reg properties match the MPIDR values.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index 80b0eaa93607..b75501e4c56d 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -54,6 +54,7 @@
- 		i2c9 = "i2cexio1";
- 		i2c10 = "i2chdmi";
- 		i2c11 = "gpioi2c";
-+		i2c12 = "i2cpwr";
- 	};
- 
- 	chosen {
-@@ -355,6 +356,42 @@
- 			>;
- 		i2c-gpio,delay-us = <5>;
- 	};
-+
-+	i2cpwr: i2c-12 {
-+		compatible = "i2c-demux-pinctrl";
-+		i2c-parent = <&iic3>, <&i2c3>;
-+		i2c-bus-name = "i2c-pwr";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		pmic at 58 {
-+			compatible = "dlg,da9063";
-+			reg = <0x58>;
-+			interrupt-parent = <&irqc0>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+			interrupt-controller;
-+
-+			rtc {
-+				compatible = "dlg,da9063-rtc";
-+			};
-+
-+			wdt {
-+				compatible = "dlg,da9063-watchdog";
-+			};
-+		};
-+
-+		vdd_dvfs: regulator at 68 {
-+			compatible = "dlg,da9210";
-+			reg = <0x68>;
-+			interrupt-parent = <&irqc0>;
-+			interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+
-+			regulator-min-microvolt = <1000000>;
-+			regulator-max-microvolt = <1000000>;
-+			regulator-boot-on;
-+			regulator-always-on;
-+		};
-+	};
- };
- 
- &du {
-@@ -497,6 +534,11 @@
- 		function = "iic2";
- 	};
- 
-+	i2c3_pins: i2c3 {
-+		groups = "i2c3";
-+		function = "i2c3";
-+	};
-+
- 	iic3_pins: iic3 {
- 		groups = "iic3";
- 		function = "iic3";
-@@ -707,38 +749,14 @@
- 	clock-frequency = <100000>;
- };
- 
--&iic3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&iic3_pins>;
--	status = "okay";
--
--	pmic at 58 {
--		compatible = "dlg,da9063";
--		reg = <0x58>;
--		interrupt-parent = <&irqc0>;
--		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
--		interrupt-controller;
--
--		rtc {
--			compatible = "dlg,da9063-rtc";
--		};
--
--		wdt {
--			compatible = "dlg,da9063-watchdog";
--		};
--	};
--
--	vdd_dvfs: regulator at 68 {
--		compatible = "dlg,da9210";
--		reg = <0x68>;
--		interrupt-parent = <&irqc0>;
--		interrupts = <2 IRQ_TYPE_LEVEL_LOW>;
-+&i2c3	{
-+	pinctrl-0 = <&i2c3_pins>;
-+	pinctrl-names = "i2c-pwr";
-+};
- 
--		regulator-min-microvolt = <1000000>;
--		regulator-max-microvolt = <1000000>;
--		regulator-boot-on;
--		regulator-always-on;
--	};
-+&iic3	{
-+	pinctrl-0 = <&iic3_pins>;
-+	pinctrl-names = "i2c-pwr";
- };
- 
- &pci0 {
--- 
-2.1.4
+For sound portion.
+
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
