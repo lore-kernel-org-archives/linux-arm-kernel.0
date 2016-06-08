@@ -1,26 +1,29 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jun 2016 10:51:14 +0200
-Subject: [PATCH 20/22] gpio: clps711x: Remove board support
-In-Reply-To: <1465024214-22120-21-git-send-email-shc_work@mail.ru>
-References: <1465024214-22120-1-git-send-email-shc_work@mail.ru>
- <1465024214-22120-21-git-send-email-shc_work@mail.ru>
-Message-ID: <CACRpkdZcNoXbgRfM=eFkXtOeHnfAdJAY7G-gc5JrQJeaVM_y6g@mail.gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Wed, 8 Jun 2016 09:59:26 +0100
+Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
+In-Reply-To: <5757CF9B.3080402@free.fr>
+References: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
+ <5757CF9B.3080402@free.fr>
+Message-ID: <d3c117ea-2dce-63a2-7888-31ee8320a3dd@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 4, 2016 at 9:10 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+On 08/06/16 08:56, Mason wrote:
+> On 07/06/2016 13:30, Ben Dooks wrote:
+> 
+>> Fix the use of 0 instead of NULL to clk_get() call. This stops the
+>> following warning:
+>>
+>> drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
+> 
+> May I ask which compiler/version produced that diagnostic?
 
-> Since board support for the CLPS711X platform was removed,
-> remove the board support from the driver.
->
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+I was running with "make C=2 bzImage" for ARM multi_v7_config
 
-Patch applied to the GPIO tree.
+$ sparse --version
+v0.5.0
 
-BTW I hope it's OK to take these three patches and apply
-separately, else tell me and I'll take them out again and you
-can have my Acked-by if you want to take them through ARM
-SoC instead.
 
-Yours,
-Linus Walleij
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
