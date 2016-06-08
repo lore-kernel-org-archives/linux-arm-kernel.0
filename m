@@ -1,170 +1,96 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 8 Jun 2016 12:09:03 +0100
-Subject: [PATCH v5 05/13] KVM: arm64: handle ITS related GICv3
- redistributor registers
-In-Reply-To: <1464962572-3925-6-git-send-email-andre.przywara@arm.com>
-References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
- <1464962572-3925-6-git-send-email-andre.przywara@arm.com>
-Message-ID: <5757FCCF.3040602@arm.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 8 Jun 2016 12:11:30 +0100
+Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
+In-Reply-To: <CAOTQ16KCKw3UiN+oFC8PH=1YYw7xfNhoJgM2ozTCf8RGYvEbpw@mail.gmail.com>
+References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
+ <1464640806-3942-3-git-send-email-thommyj@gmail.com>
+ <575570D9.6030700@arm.com>
+ <CAOTQ16KCKw3UiN+oFC8PH=1YYw7xfNhoJgM2ozTCf8RGYvEbpw@mail.gmail.com>
+Message-ID: <5757FD62.2010403@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/16 15:02, Andre Przywara wrote:
-> In the GICv3 redistributor there are the PENDBASER and PROPBASER
-> registers which we did not emulate so far, as they only make sense
-> when having an ITS. In preparation for that emulate those MMIO
-> accesses by storing the 64-bit data written into it into a variable
-> which we later read in the ITS emulation.
-> 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> ---
->  include/kvm/vgic/vgic.h          | 13 +++++++++
->  virt/kvm/arm/vgic/vgic-mmio-v3.c | 58 ++++++++++++++++++++++++++++++++++++++--
->  2 files changed, 69 insertions(+), 2 deletions(-)
-> 
-> diff --git a/include/kvm/vgic/vgic.h b/include/kvm/vgic/vgic.h
-> index 2f26f37..896175b 100644
-> --- a/include/kvm/vgic/vgic.h
-> +++ b/include/kvm/vgic/vgic.h
-> @@ -145,6 +145,14 @@ struct vgic_dist {
->  	struct vgic_irq		*spis;
->  
->  	struct vgic_io_device	dist_iodev;
-> +
-> +	/*
-> +	 * Contains the address of the LPI configuration table.
-> +	 * Since we report GICR_TYPER.CommonLPIAff as 0b00, we can share
-> +	 * one address across all redistributors.
-> +	 * GICv3 spec: 6.1.2 "LPI Configuration tables"
-> +	 */
-> +	u64			propbaser;
->  };
->  
->  struct vgic_v2_cpu_if {
-> @@ -199,6 +207,11 @@ struct vgic_cpu {
->  	 */
->  	struct vgic_io_device	rd_iodev;
->  	struct vgic_io_device	sgi_iodev;
-> +
-> +	/* Points to the LPI pending tables for the redistributor */
-> +	u64 pendbaser;
-> +
-> +	bool lpis_enabled;
->  };
->  
->  int kvm_vgic_addr(struct kvm *kvm, unsigned long type, u64 *addr, bool write);
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio-v3.c b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> index fc7b6c9..6293b36 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio-v3.c
-> @@ -29,6 +29,16 @@ static unsigned long extract_bytes(unsigned long data, unsigned int offset,
->  	return (data >> (offset * 8)) & GENMASK_ULL(num * 8 - 1, 0);
->  }
->  
-> +/* allows updates of any half of a 64-bit register (or the whole thing) */
-> +static u64 update_64bit_reg(u64 reg, unsigned int offset, unsigned int len,
-> +			    unsigned long val)
-> +{
-> +	offset &= 4;
-> +	reg &= GENMASK_ULL(len * 8 - 1, 0) << ((len - offset) * 8);
-> +
-> +	return reg | ((u64)val << (offset * 8));
+On 08/06/16 08:47, Thommy Jakobsson wrote:
+> On 6 June 2016 at 14:47, Robin Murphy <robin.murphy@arm.com> wrote:
+>> That rationale doesn't hold, since "necessary" is clearly untrue - devices
+>> with multiple IDs work just fine even with the current behaviour of the
+>> driver provided there are sufficient SMRs. The third option of generating a
+>> mask dynamically from a set of IDs is also perfectly possible (which reminds
+>> me I must dig up the code I prototyped a while back...), although an
+>> explicitly specified mask can still be beneficial for optimal allocation in
+>> certain cases (by being able to express the non-existence of IDs outside the
+>> set).
+> Thanks for your time Robin. I was probably unclear in my comment. You're
+> right and devices with multiple IDs do work already today. Its more the second
+> part that you talk about that limits me, "provided there are
+> sufficient SMRs". In
+> the ZynqMPSoC, 6 of the AXI ID bits are copied into the stream id for FPGA
+> IPs, so I have 2^6 IDs per master and there is 6 masters. Besides the FPGA
+> there is also ethernet and dma masters (also gpu and sata, but I don't use
+> those). The SMMU implementation only has 48 register groups to play with, so
+> without mask I'm screwed =)
 
-Feels like an OCCC entry. It is also undefined because in the 64bit
-write case, you're shifting a 64bit value by 64 places.
+Indeed, I wasn't implying you don't need it, merely nitpicking that the 
+justification was worded badly.
 
-Please rewrite this in a readable way, such as:
+>> But this directly contradicts the example in the binding doc? (Which
+>> incidentally wasn't sent to the devicetree mailing list.)
+> Not sure that I follow, what contradicts? My intention was that for masters that
+> explicitly is configured with a mask, all of its IDs should have a mask. Without
+> specifying a mask it should be same behavior as before. The doc example
+> shows a master, dma2, with one ID and one mask.
 
-	int low, high;
+Oh, wait, it's only comparing the number of arguments to each phandle, 
+not the whole property length, my mistake - sorry!
 
-	if (!offset)
-		low = 0;
-	else
-		low = 32;
+>> What if the DT is wrong and the SMMU doesn't support stream matching at all,
+>> or the mask uses unimplemented SMR bits? Bogus stream IDs or stream match
+>> conflicts are annoyingly subtle to debug.
+> Point taken.
+>
+>> Either way, if you insist on wanting to build on the legacy binding that
+>> doesn't work for PCI, can't integrate with DMA mapping, and everyone else
+>> would rather get away from in favour of the generic IOMMU bindings[1],
+> Generic IOMMU bindings would be great, but I'm not sure that it solves
+> my problem
+> with too many IDs vs SMRs. For a smaller
 
-	if (len == 4)
-		high = low + 31;
-	else
-		high = 63;
+My point was that the generic bindings are also trivially easy to extend 
+arbitrarily by simply increasing "#iommu-cells". In that patch series 
+I'm very deliberately laying the groundwork for supporting an SMR mask 
+in the second cell ;)
 
-	reg &= ~GENMASK_ULL(high, low);
-	return reg | ((u64)val << low);
+>> there's still no need for yet another binding to support. You can easily
+>> extend "mmu-masters" to encode an SMR mask in the upper halfword of a cell
+>> without ambiguity and without breaking compatibility with existing DTs.
+> How do you mean breaking compatibility with existing DTs? It was my
+> intention not
+> to do so but instead adding an optional mask for cases when actually needed.
 
-Easily understood, no undefined behaviour.
+I didn't mean that your proposal would break anything - it clearly won't 
+- but that if we were to redefine "mmu-masters" such that for for 
+stream-matching SMMUs each cell represents an SMR to match rather than 
+just an ID, it wouldn't actually make any difference to the behaviour on 
+existing systems.
 
-> +}
-> +
->  static unsigned long vgic_mmio_read_v3_misc(struct kvm_vcpu *vcpu,
->  					    gpa_t addr, unsigned int len)
->  {
-> @@ -147,6 +157,50 @@ static unsigned long vgic_mmio_read_v3_idregs(struct kvm_vcpu *vcpu,
->  	return 0;
->  }
->  
-> +static unsigned long vgic_mmio_read_propbase(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +
-> +	return extract_bytes(dist->propbaser, addr & 7, len);
-> +}
-> +
-> +static void vgic_mmio_write_propbase(struct kvm_vcpu *vcpu,
-> +				     gpa_t addr, unsigned int len,
-> +				     unsigned long val)
-> +{
-> +	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	if (vgic_cpu->lpis_enabled)
-> +		return;
-> +
-> +	dist->propbaser = update_64bit_reg(dist->propbaser, addr & 4, len, val);
-> +}
-> +
-> +static unsigned long vgic_mmio_read_pendbase(struct kvm_vcpu *vcpu,
-> +					     gpa_t addr, unsigned int len)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	return extract_bytes(vgic_cpu->pendbaser, addr & 7, len);
-> +}
-> +
-> +static void vgic_mmio_write_pendbase(struct kvm_vcpu *vcpu,
-> +				     gpa_t addr, unsigned int len,
-> +				     unsigned long val)
-> +{
-> +	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-> +
-> +	/* Storing a value with LPIs already enabled is undefined */
-> +	if (vgic_cpu->lpis_enabled)
-> +		return;
-> +
-> +	vgic_cpu->pendbaser = update_64bit_reg(vgic_cpu->pendbaser,
-> +					       addr & 4, len, val);
-> +}
-> +
->  /*
->   * The GICv3 per-IRQ registers are split to control PPIs and SGIs in the
->   * redistributors, while SPIs are covered by registers in the distributor
-> @@ -227,10 +281,10 @@ static const struct vgic_register_region vgic_v3_rdbase_registers[] = {
->  		vgic_mmio_read_v3r_typer, vgic_mmio_write_wi, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_PROPBASER,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> +		vgic_mmio_read_propbase, vgic_mmio_write_propbase, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_PENDBASER,
-> -		vgic_mmio_read_raz, vgic_mmio_write_wi, 8,
-> +		vgic_mmio_read_pendbase, vgic_mmio_write_pendbase, 8,
->  		VGIC_ACCESS_64bit | VGIC_ACCESS_32bit),
->  	REGISTER_DESC_WITH_LENGTH(GICR_IDREGS,
->  		vgic_mmio_read_v3_idregs, vgic_mmio_write_wi, 48,
-> 
+>  From a user perspective I would personally consider it a bit easier to
+> understand
+> with separate bindings for mask and ID, but to be honest I haven't worked that
+> much with DT bindings before (which is also why I missed sending it to the DT
+> mailinglist). So if you see a problem with an increasing mass of
+> bindings to support,
+> and consider using the upper halfword of the ID-cell a better way,
+> then sure I'll buy
+> that.
 
-Thanks,
+Either way, I'm currently in the process of reworking the SMMUv2 generic 
+bindings series, having got the SMMUv3 patches out of the way, so I'll 
+make sure that at least basic masking support actually makes the cut 
+this time round.
 
-	M./
--- 
-Jazz is not dead. It just smells funny...
+Robin.
+
+>
+> BR,
+> Thommy Jakobsson
+>
