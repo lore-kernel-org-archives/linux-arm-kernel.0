@@ -1,61 +1,67 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 8 Jun 2016 08:33:01 +0200
-Subject: [PATCH] pinctrl: at91-pio4: fix non-exported functions
-In-Reply-To: <1465319265-27630-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465319265-27630-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160608063301.GG373@odux.rfo.atmel.com>
+From: weiqing.kong@mediatek.com (weiqing kong)
+Date: Wed, 8 Jun 2016 14:48:52 +0800
+Subject: [PATCH 1/3] dt-bindings: pwm: Add MediaTek display PWM bindings
+In-Reply-To: <57519C59.5040107@gmail.com>
+References: <1464597712-5399-1-git-send-email-weiqing.kong@mediatek.com>
+ <1464597712-5399-2-git-send-email-weiqing.kong@mediatek.com>
+ <20160602224550.GA19256@rob-hp-laptop> <1464936349.5209.9.camel@mhfsdcap03>
+ <57519C59.5040107@gmail.com>
+Message-ID: <1465368532.5209.15.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 06:07:45PM +0100, Ben Dooks wrote:
-> The atmel_pctl_find_group_by_pin() and the atmel_pinctrl_remove()
-> functions are not exported, so fix the warnings about these
-> being exported without definitions by making them static.
+On Fri, 2016-06-03 at 17:03 +0200, Matthias Brugger wrote:
 > 
-> drivers/pinctrl/pinctrl-at91-pio4.c:424:20: warning: symbol 'atmel_pctl_find_group_by_pin' was not declared. Should it be static?
-> drivers/pinctrl/pinctrl-at91-pio4.c:1077:5: warning: symbol 'atmel_pinctrl_remove' was not declared. Should it be static?
+> On 03/06/16 08:45, weiqing kong wrote:
+> > On Thu, 2016-06-02 at 17:45 -0500, Rob Herring wrote:
+> >> On Mon, May 30, 2016 at 04:41:50PM +0800, Weiqing Kong wrote:
+> >>> Add MT2701 compatible string.
+> >>>
+> >>> Signed-off-by: Weiqing Kong <weiqing.kong@mediatek.com>
+> >>> ---
+> >>>   Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt | 5 +++--
+> >>>   1 file changed, 3 insertions(+), 2 deletions(-)
+> >>>
+> >>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> >>> index f8f59ba..f2f2fa9 100644
+> >>> --- a/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> >>> +++ b/Documentation/devicetree/bindings/pwm/pwm-mtk-disp.txt
+> >>> @@ -1,9 +1,10 @@
+> >>>   MediaTek display PWM controller
+> >>>
+> >>>   Required properties:
+> >>> - - compatible: should be "mediatek,<name>-disp-pwm":
+> >>> -   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
+> >>> + - compatible: should be like these:
+> >>> +   - "mediatek,mt2701-disp-bls": found on mt2701 SoC.
+> >>
+> >> Why bls instead of pwm?
+> >
+> > In mt6595/mt8173, we have a hardware module named pwm.
+> > In mt2701, we have bls hardware module which includes disp pwm function,
+> > so we named it mt2701-disp-bls rather than mt2701-disp-pwm in order to
+> > match with hardware spec.
+> > thanks.
+> >
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-gpio at vger.kernel.org
+>  From what I understand pwm module and disp pwm in mt6589/mt8173 is 
+> independent from the disp pwm. Actually the disp pwm in mt6589 is part 
+> of the bls module, so this should me mediatek,mt2701-disp-pwm as well
+> 
+> Thanks,
+> Matthias
+> 
 
-Thanks for fixing this. It conflicts with 'pinctrl: make non-modular
-drivers really non modular' patches because of atmel_pinctrl_remove
-removal.
+ok, I will modify it into mediatek,mt2701-disp-pwm. 
 
-Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-
-> ---
->  drivers/pinctrl/pinctrl-at91-pio4.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-> index a025b40..22c6ad0 100644
-> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
-> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-> @@ -421,8 +421,8 @@ static int atmel_pctl_get_group_pins(struct pinctrl_dev *pctldev,
->  	return 0;
->  }
->  
-> -struct atmel_group *atmel_pctl_find_group_by_pin(struct pinctrl_dev *pctldev,
-> -						 unsigned pin)
-> +static struct atmel_group *
-> +atmel_pctl_find_group_by_pin(struct pinctrl_dev *pctldev, unsigned pin)
->  {
->  	struct atmel_pioctrl *atmel_pioctrl = pinctrl_dev_get_drvdata(pctldev);
->  	int i;
-> @@ -1074,7 +1074,7 @@ clk_prepare_enable_error:
->  	return ret;
->  }
->  
-> -int atmel_pinctrl_remove(struct platform_device *pdev)
-> +static int atmel_pinctrl_remove(struct platform_device *pdev)
->  {
->  	struct atmel_pioctrl *atmel_pioctrl = platform_get_drvdata(pdev);
->  
-> -- 
-> 2.8.1
-> 
+> >>
+> >>>      - "mediatek,mt6595-disp-pwm": found on mt6595 SoC.
+> >>> +   - "mediatek,mt8173-disp-pwm": found on mt8173 SoC.
+> >>>    - reg: physical base address and length of the controller's registers.
+> >>>    - #pwm-cells: must be 2. See pwm.txt in this directory for a description of
+> >>>      the cell format.
+> >>> --
+> >>> 1.8.1.1.dirty
+> >>>
+> >
+> >
