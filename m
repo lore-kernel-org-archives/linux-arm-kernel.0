@@ -1,47 +1,390 @@
-From: thunder.leizhen@huawei.com (Leizhen (ThunderTown))
-Date: Wed, 8 Jun 2016 16:59:03 +0800
-Subject: [PATCH v4 00/14] fix some type infos and bugs for arm64/of numa
-In-Reply-To: <20160607135852.GA20477@arm.com>
-References: <1465286898-13828-1-git-send-email-thunder.leizhen@huawei.com>
- <20160607135852.GA20477@arm.com>
-Message-ID: <5757DE57.10700@huawei.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Wed, 8 Jun 2016 11:00:05 +0200
+Subject: [PATCHv2 2/5] EDAC, altera: ECC Manager IRQ controller support
+In-Reply-To: <1465331757-10227-1-git-send-email-tthayer@opensource.altera.com>
+References: <1464193783-5071-3-git-send-email-tthayer@opensource.altera.com>
+ <1465331757-10227-1-git-send-email-tthayer@opensource.altera.com>
+Message-ID: <20160608090005.GB26590@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2016/6/7 21:58, Will Deacon wrote:
-> On Tue, Jun 07, 2016 at 04:08:04PM +0800, Zhen Lei wrote:
->> v3 -> v4:
->> 1. Packed three patches of Kefeng Wang, patch6-8.
->> 2. Add 6 new patches(9-15) to enhance the numa on arm64.
->>
->> v2 -> v3:
->> 1. Adjust patch2 and patch5 according to Matthias Brugger's advice, to make the
->>    patches looks more well. The final code have no change. 
->>
->> v1 -> v2:
->> 1. Base on https://lkml.org/lkml/2016/5/24/679
+On Tue, Jun 07, 2016 at 03:35:57PM -0500, tthayer at opensource.altera.com wrote:
+> From: Thor Thayer <tthayer@opensource.altera.com>
 > 
-> If you want bug fixes to land in 4.7, you'll need to base them on a
-> mainline kernel.
-
-I heared that David Daney's acpi numa patch series was accepted and put into next branch(Linux 4.8).
-Otherwise I will suggest him sending his patch6-7 to mainline first. So that, only a very small conflict
-will be exist.
-
-I also tested that:
-1. git am David Daney's patch6-7, then git am all of my patches on a branch, named branch A.
-2. git am David Daney's patch6-7 on another branch, named branch B.
-3. when I git merge B into branch A, it's still conflict. So I guess git merge is based on source code, rather than patches.
-
-So at present, unless the maintainers are willing to resolve the conflict, otherwise I update my patches will not work.
-
-Fortunately, these patches are not particularly urgent. So I think I can wait until Linux 4.8 start, then send these patches again.
-But I'm not sure whether these patches can be merged into Linux 4.8, I really hope.
-
+> To better support child devices, the ECC manager needs to be
+> implemented as an IRQ controller.
 > 
-> Will
+> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+> ---
+> v2  Update with cleanup/improvements from maintainer.
+> ---
+>  drivers/edac/altera_edac.c |  161 +++++++++++++++++++++++++++++++++-----------
+>  drivers/edac/altera_edac.h |    5 +-
+>  2 files changed, 124 insertions(+), 42 deletions(-)
 > 
-> .
-> 
+> diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+> index 5b4d223..573c68d 100644
+> --- a/drivers/edac/altera_edac.c
+> +++ b/drivers/edac/altera_edac.c
+> @@ -22,9 +22,11 @@
+>  #include <linux/edac.h>
+>  #include <linux/genalloc.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/irqchip/chained_irq.h>
+>  #include <linux/kernel.h>
+>  #include <linux/mfd/syscon.h>
+>  #include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/regmap.h>
+> @@ -882,22 +884,26 @@ static void ocram_free_mem(void *p, size_t size, void *other)
+>  	gen_pool_free((struct gen_pool *)other, (u32)p, size);
+>  }
+>  
+> -static irqreturn_t altr_edac_a10_ecc_irq(struct altr_edac_device_dev *dci,
+> -					 bool sberr)
+> +static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
+>  {
+> +	struct altr_edac_device_dev *dci = dev_id;
+>  	void __iomem  *base = dci->base;
+>  
+> -	if (sberr) {
+> +	if (irq == dci->sb_irq) {
+>  		writel(ALTR_A10_ECC_SERRPENA,
+>  		       base + ALTR_A10_ECC_INTSTAT_OFST);
+>  		edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
+> -	} else {
+> +		return IRQ_HANDLED;
+> +	} else if (irq == dci->db_irq) {
+>  		writel(ALTR_A10_ECC_DERRPENA,
+>  		       base + ALTR_A10_ECC_INTSTAT_OFST);
+>  		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
+>  		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
+> +		return IRQ_HANDLED;
+> +	} else {
+> +		WARN_ON(1);
+>  	}
+> -	return IRQ_HANDLED;
+> +	return IRQ_NONE;
+>  }
+
+Simplified a bit more while applying. Ok?
+
+
+---
+From: Thor Thayer <tthayer@opensource.altera.com>
+Date: Tue, 7 Jun 2016 15:35:57 -0500
+Subject: [PATCH] EDAC, altera: ECC Manager IRQ controller support
+
+To better support child devices, the ECC manager needs to be
+implemented as an IRQ controller.
+
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-edac <linux-edac@vger.kernel.org>
+Link: http://lkml.kernel.org/r/1465331757-10227-1-git-send-email-tthayer at opensource.altera.com
+Signed-off-by: Borislav Petkov <bp@suse.de>
+---
+ drivers/edac/altera_edac.c | 167 ++++++++++++++++++++++++++++++++++-----------
+ drivers/edac/altera_edac.h |   5 +-
+ 2 files changed, 130 insertions(+), 42 deletions(-)
+
+diff --git a/drivers/edac/altera_edac.c b/drivers/edac/altera_edac.c
+index ff74c5b7781a..6f5d586fa0a0 100644
+--- a/drivers/edac/altera_edac.c
++++ b/drivers/edac/altera_edac.c
+@@ -22,9 +22,11 @@
+ #include <linux/edac.h>
+ #include <linux/genalloc.h>
+ #include <linux/interrupt.h>
++#include <linux/irqchip/chained_irq.h>
+ #include <linux/kernel.h>
+ #include <linux/mfd/syscon.h>
+ #include <linux/of_address.h>
++#include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/regmap.h>
+@@ -880,22 +882,29 @@ static void ocram_free_mem(void *p, size_t size, void *other)
+ 	gen_pool_free((struct gen_pool *)other, (u32)p, size);
+ }
+ 
+-static irqreturn_t altr_edac_a10_ecc_irq(struct altr_edac_device_dev *dci,
+-					 bool sberr)
++static irqreturn_t altr_edac_a10_ecc_irq(int irq, void *dev_id)
+ {
++	struct altr_edac_device_dev *dci = dev_id;
+ 	void __iomem  *base = dci->base;
+ 
+-	if (sberr) {
++	if (irq == dci->sb_irq) {
+ 		writel(ALTR_A10_ECC_SERRPENA,
+ 		       base + ALTR_A10_ECC_INTSTAT_OFST);
+ 		edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
+-	} else {
++
++		return IRQ_HANDLED;
++	} else if (irq == dci->db_irq) {
+ 		writel(ALTR_A10_ECC_DERRPENA,
+ 		       base + ALTR_A10_ECC_INTSTAT_OFST);
+ 		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
+ 		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
++
++		return IRQ_HANDLED;
+ 	}
+-	return IRQ_HANDLED;
++
++	WARN_ON(1);
++
++	return IRQ_NONE;
+ }
+ 
+ const struct edac_device_prv_data ocramecc_data = {
+@@ -986,22 +995,30 @@ static int altr_l2_check_deps(struct altr_edac_device_dev *device)
+ 	return -ENODEV;
+ }
+ 
+-static irqreturn_t altr_edac_a10_l2_irq(struct altr_edac_device_dev *dci,
+-					bool sberr)
++static irqreturn_t altr_edac_a10_l2_irq(int irq, void *dev_id)
+ {
+-	if (sberr) {
++	struct altr_edac_device_dev *dci = dev_id;
++
++	if (irq == dci->sb_irq) {
+ 		regmap_write(dci->edac->ecc_mgr_map,
+ 			     A10_SYSGMR_MPU_CLEAR_L2_ECC_OFST,
+ 			     A10_SYSGMR_MPU_CLEAR_L2_ECC_SB);
+ 		edac_device_handle_ce(dci->edac_dev, 0, 0, dci->edac_dev_name);
+-	} else {
++
++		return IRQ_HANDLED;
++	} else if (irq == dci->db_irq) {
+ 		regmap_write(dci->edac->ecc_mgr_map,
+ 			     A10_SYSGMR_MPU_CLEAR_L2_ECC_OFST,
+ 			     A10_SYSGMR_MPU_CLEAR_L2_ECC_MB);
+ 		edac_device_handle_ue(dci->edac_dev, 0, 0, dci->edac_dev_name);
+ 		panic("\nEDAC:ECC_DEVICE[Uncorrectable errors]\n");
++
++		return IRQ_HANDLED;
+ 	}
+-	return IRQ_HANDLED;
++
++	WARN_ON(1);
++
++	return IRQ_NONE;
+ }
+ 
+ const struct edac_device_prv_data l2ecc_data = {
+@@ -1084,28 +1101,28 @@ static ssize_t altr_edac_a10_device_trig(struct file *file,
+ 	return count;
+ }
+ 
+-static irqreturn_t altr_edac_a10_irq_handler(int irq, void *dev_id)
++static void altr_edac_a10_irq_handler(struct irq_desc *desc)
+ {
+-	irqreturn_t rc = IRQ_NONE;
+-	struct altr_arria10_edac *edac = dev_id;
+-	struct altr_edac_device_dev *dci;
+-	int irq_status;
+-	bool sberr = (irq == edac->sb_irq) ? 1 : 0;
+-	int sm_offset = sberr ? A10_SYSMGR_ECC_INTSTAT_SERR_OFST :
+-				A10_SYSMGR_ECC_INTSTAT_DERR_OFST;
++	int dberr, bit, sm_offset, irq_status;
++	struct altr_arria10_edac *edac = irq_desc_get_handler_data(desc);
++	struct irq_chip *chip = irq_desc_get_chip(desc);
++	int irq = irq_desc_get_irq(desc);
++
++	dberr = (irq == edac->db_irq) ? 1 : 0;
++	sm_offset = dberr ? A10_SYSMGR_ECC_INTSTAT_DERR_OFST :
++			    A10_SYSMGR_ECC_INTSTAT_SERR_OFST;
++
++	chained_irq_enter(chip, desc);
+ 
+ 	regmap_read(edac->ecc_mgr_map, sm_offset, &irq_status);
+ 
+-	if ((irq != edac->sb_irq) && (irq != edac->db_irq)) {
+-		WARN_ON(1);
+-	} else {
+-		list_for_each_entry(dci, &edac->a10_ecc_devices, next) {
+-			if (irq_status & dci->data->irq_status_mask)
+-				rc = dci->data->ecc_irq_handler(dci, sberr);
+-		}
++	for_each_set_bit(bit, (unsigned long *)&irq_status, 32) {
++		irq = irq_linear_revmap(edac->domain, dberr * 32 + bit);
++		if (irq)
++			generic_handle_irq(irq);
+ 	}
+ 
+-	return rc;
++	chained_irq_exit(chip, desc);
+ }
+ 
+ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
+@@ -1177,6 +1194,34 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
+ 			goto err_release_group1;
+ 	}
+ 
++	altdev->sb_irq = irq_of_parse_and_map(np, 0);
++	if (!altdev->sb_irq) {
++		edac_printk(KERN_ERR, EDAC_DEVICE, "Error allocating SBIRQ\n");
++		rc = -ENODEV;
++		goto err_release_group1;
++	}
++	rc = devm_request_irq(edac->dev, altdev->sb_irq,
++			      prv->ecc_irq_handler,
++			      IRQF_SHARED, ecc_name, altdev);
++	if (rc) {
++		edac_printk(KERN_ERR, EDAC_DEVICE, "No DBERR IRQ resource\n");
++		goto err_release_group1;
++	}
++
++	altdev->db_irq = irq_of_parse_and_map(np, 1);
++	if (!altdev->db_irq) {
++		edac_printk(KERN_ERR, EDAC_DEVICE, "Error allocating DBIRQ\n");
++		rc = -ENODEV;
++		goto err_release_group1;
++	}
++	rc = devm_request_irq(edac->dev, altdev->db_irq,
++			      prv->ecc_irq_handler,
++			      IRQF_SHARED, ecc_name, altdev);
++	if (rc) {
++		edac_printk(KERN_ERR, EDAC_DEVICE, "No DBERR IRQ resource\n");
++		goto err_release_group1;
++	}
++
+ 	rc = edac_device_add_device(dci);
+ 	if (rc) {
+ 		dev_err(edac->dev, "edac_device_add_device failed\n");
+@@ -1195,7 +1240,6 @@ static int altr_edac_a10_device_add(struct altr_arria10_edac *edac,
+ err_release_group1:
+ 	edac_device_free_ctl_info(dci);
+ err_release_group:
+-	edac_printk(KERN_ALERT, EDAC_DEVICE, "%s: %d\n", __func__, __LINE__);
+ 	devres_release_group(edac->dev, NULL);
+ 	edac_printk(KERN_ERR, EDAC_DEVICE,
+ 		    "%s:Error setting up EDAC device: %d\n", ecc_name, rc);
+@@ -1203,11 +1247,43 @@ err_release_group:
+ 	return rc;
+ }
+ 
++static void a10_eccmgr_irq_mask(struct irq_data *d)
++{
++	struct altr_arria10_edac *edac = irq_data_get_irq_chip_data(d);
++
++	regmap_write(edac->ecc_mgr_map,	A10_SYSMGR_ECC_INTMASK_SET_OFST,
++		     BIT(d->hwirq));
++}
++
++static void a10_eccmgr_irq_unmask(struct irq_data *d)
++{
++	struct altr_arria10_edac *edac = irq_data_get_irq_chip_data(d);
++
++	regmap_write(edac->ecc_mgr_map,	A10_SYSMGR_ECC_INTMASK_CLR_OFST,
++		     BIT(d->hwirq));
++}
++
++static int a10_eccmgr_irqdomain_map(struct irq_domain *d, unsigned int irq,
++				    irq_hw_number_t hwirq)
++{
++	struct altr_arria10_edac *edac = d->host_data;
++
++	irq_set_chip_and_handler(irq, &edac->irq_chip, handle_simple_irq);
++	irq_set_chip_data(irq, edac);
++	irq_set_noprobe(irq);
++
++	return 0;
++}
++
++struct irq_domain_ops a10_eccmgr_ic_ops = {
++	.map = a10_eccmgr_irqdomain_map,
++	.xlate = irq_domain_xlate_twocell,
++};
++
+ static int altr_edac_a10_probe(struct platform_device *pdev)
+ {
+ 	struct altr_arria10_edac *edac;
+ 	struct device_node *child;
+-	int rc;
+ 
+ 	edac = devm_kzalloc(&pdev->dev, sizeof(*edac), GFP_KERNEL);
+ 	if (!edac)
+@@ -1225,23 +1301,34 @@ static int altr_edac_a10_probe(struct platform_device *pdev)
+ 		return PTR_ERR(edac->ecc_mgr_map);
+ 	}
+ 
++	edac->irq_chip.name = pdev->dev.of_node->name;
++	edac->irq_chip.irq_mask = a10_eccmgr_irq_mask;
++	edac->irq_chip.irq_unmask = a10_eccmgr_irq_unmask;
++	edac->domain = irq_domain_add_linear(pdev->dev.of_node, 64,
++					     &a10_eccmgr_ic_ops, edac);
++	if (!edac->domain) {
++		dev_err(&pdev->dev, "Error adding IRQ domain\n");
++		return -ENOMEM;
++	}
++
+ 	edac->sb_irq = platform_get_irq(pdev, 0);
+-	rc = devm_request_irq(&pdev->dev, edac->sb_irq,
+-			      altr_edac_a10_irq_handler,
+-			      IRQF_SHARED, dev_name(&pdev->dev), edac);
+-	if (rc) {
+-		edac_printk(KERN_ERR, EDAC_DEVICE, "No SBERR IRQ resource\n");
+-		return rc;
++	if (edac->sb_irq < 0) {
++		dev_err(&pdev->dev, "No SBERR IRQ resource\n");
++		return edac->sb_irq;
+ 	}
+ 
++	irq_set_chained_handler_and_data(edac->sb_irq,
++					 altr_edac_a10_irq_handler,
++					 edac);
++
+ 	edac->db_irq = platform_get_irq(pdev, 1);
+-	rc = devm_request_irq(&pdev->dev, edac->db_irq,
+-			      altr_edac_a10_irq_handler,
+-			      IRQF_SHARED, dev_name(&pdev->dev), edac);
+-	if (rc) {
+-		edac_printk(KERN_ERR, EDAC_DEVICE, "No DBERR IRQ resource\n");
+-		return rc;
++	if (edac->db_irq < 0) {
++		dev_err(&pdev->dev, "No DBERR IRQ resource\n");
++		return edac->db_irq;
+ 	}
++	irq_set_chained_handler_and_data(edac->db_irq,
++					 altr_edac_a10_irq_handler,
++					 edac);
+ 
+ 	for_each_child_of_node(pdev->dev.of_node, child) {
+ 		if (!of_device_is_available(child))
+diff --git a/drivers/edac/altera_edac.h b/drivers/edac/altera_edac.h
+index 42090f36ba6e..62b0fa010f95 100644
+--- a/drivers/edac/altera_edac.h
++++ b/drivers/edac/altera_edac.h
+@@ -295,8 +295,7 @@ struct edac_device_prv_data {
+ 	int ce_set_mask;
+ 	int ue_set_mask;
+ 	int set_err_ofst;
+-	irqreturn_t (*ecc_irq_handler)(struct altr_edac_device_dev *dci,
+-				       bool sb);
++	irqreturn_t (*ecc_irq_handler)(int irq, void *dev_id);
+ 	int trig_alloc_sz;
+ 	const struct file_operations *inject_fops;
+ };
+@@ -320,6 +319,8 @@ struct altr_arria10_edac {
+ 	struct regmap		*ecc_mgr_map;
+ 	int sb_irq;
+ 	int db_irq;
++	struct irq_domain	*domain;
++	struct irq_chip		irq_chip;
+ 	struct list_head	a10_ecc_devices;
+ };
+ 
+-- 
+2.7.3
+
+-- 
+Regards/Gruss,
+    Boris.
+
+ECO tip #101: Trim your mails when you reply.
