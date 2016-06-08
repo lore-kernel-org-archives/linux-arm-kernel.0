@@ -1,43 +1,43 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 8 Jun 2016 13:48:45 +0100
-Subject: [PATCH 2/3] mfd: axp20x: Extend axp22x_volatile_ranges
-In-Reply-To: <1463248289-16456-2-git-send-email-hdegoede@redhat.com>
-References: <1463248289-16456-1-git-send-email-hdegoede@redhat.com>
- <1463248289-16456-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160608124845.GC14888@dell>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 8 Jun 2016 13:49:20 +0100
+Subject: [PATCH v5 08/13] KVM: arm64: implement basic ITS register handlers
+In-Reply-To: <1464962572-3925-9-git-send-email-andre.przywara@arm.com>
+References: <1464962572-3925-1-git-send-email-andre.przywara@arm.com>
+ <1464962572-3925-9-git-send-email-andre.przywara@arm.com>
+Message-ID: <57581450.1000402@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 14 May 2016, Hans de Goede wrote:
-
-> The axp22x pmic has a bunch of volatile registers besides the interrupt
-> ones, extend axp22x_volatile_ranges with these.
+On 03/06/16 15:02, Andre Przywara wrote:
+> Add emulation for some basic MMIO registers used in the ITS emulation.
+> This includes:
+> - GITS_{CTLR,TYPER,IIDR}
+> - ID registers
+> - GITS_{CBASER,CREADR,CWRITER}
+>   (which implement the ITS command buffer handling)
 > 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
->  drivers/mfd/axp20x.c | 3 +++
->  1 file changed, 3 insertions(+)
+> Most of the handlers are pretty straight forward, but CWRITER goes
+> some extra miles to allow fine grained locking. The idea here
+> is to let only the first instance iterate through the command ring
+> buffer, CWRITER accesses on other VCPUs meanwhile will be picked up
+> by that first instance and handled as well. The ITS lock is thus only
+> held for very small periods of time and is dropped before the actual
+> command handler is called.
 
-Applied, thanks.
+On top of the comment I've already given on this patch:
 
-> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index e4e3297..ca04361 100644
-> --- a/drivers/mfd/axp20x.c
-> +++ b/drivers/mfd/axp20x.c
-> @@ -93,7 +93,10 @@ static const struct regmap_range axp22x_writeable_ranges[] = {
->  };
->  
->  static const struct regmap_range axp22x_volatile_ranges[] = {
-> +	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
->  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
-> +	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
-> +	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
->  };
->  
->  static const struct regmap_access_table axp22x_writeable_table = {
+You've completely ignored the GITS_BASERn registers. While they are not
+strictly necessary for your emulation, we need them for save/restore. I
+expect the next version of this patch to at least expose:
+- Device table
+- Collection table
 
+Also, consider advertising the Indirect bit in the GITS_BASERn
+describing the Device table, the guest will thank you for it (if the
+support it).
+
+Thanks,
+
+	M.
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Jazz is not dead. It just smells funny...
