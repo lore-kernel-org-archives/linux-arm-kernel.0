@@ -1,38 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
 Date: Wed,  8 Jun 2016 10:00:19 +0900
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.8
-Message-ID: <cover.1465347025.git.horms+renesas@verge.net.au>
+Subject: [PATCH 1/2] ARM: shmobile: pm-rmobile: Postpone call to
+ pm_genpd_init()
+In-Reply-To: <cover.1465347025.git.horms+renesas@verge.net.au>
+References: <cover.1465347025.git.horms+renesas@verge.net.au>
+Message-ID: <85d9bf152bdaa7e98a05cc460aa6880efdf0b433.1465347025.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC updates for v4.8.
+All local setup of the generic_pm_domain structure should have been
+completed before calling pm_genpd_init().
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/pm-rmobile.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.8
-
-for you to fetch changes up to c94bc815f3c757df402d6f6a3e8d855b9168e6af:
-
-  ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all SoCs (2016-05-30 09:39:43 +0900)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Updates for v4.8
-
-* Use ICRAM1 for jump stub on R-Car Gen 2 SoCs
-* Postpone call to pm_genpd_init
-
-----------------------------------------------------------------
-Geert Uytterhoeven (2):
-      ARM: shmobile: pm-rmobile: Postpone call to pm_genpd_init()
-      ARM: shmobile: rcar-gen2: Use ICRAM1 for jump stub on all SoCs
-
- arch/arm/mach-shmobile/pm-rcar-gen2.c | 13 ++++---------
- arch/arm/mach-shmobile/pm-rmobile.c   |  2 +-
- 2 files changed, 5 insertions(+), 10 deletions(-)
+diff --git a/arch/arm/mach-shmobile/pm-rmobile.c b/arch/arm/mach-shmobile/pm-rmobile.c
+index c0b05e9e6442..45a195501b78 100644
+--- a/arch/arm/mach-shmobile/pm-rmobile.c
++++ b/arch/arm/mach-shmobile/pm-rmobile.c
+@@ -131,13 +131,13 @@ static void rmobile_init_pm_domain(struct rmobile_pm_domain *rmobile_pd)
+ 	struct dev_power_governor *gov = rmobile_pd->gov;
+ 
+ 	genpd->flags = GENPD_FLAG_PM_CLK;
+-	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
+ 	genpd->dev_ops.active_wakeup	= rmobile_pd_active_wakeup;
+ 	genpd->power_off		= rmobile_pd_power_down;
+ 	genpd->power_on			= rmobile_pd_power_up;
+ 	genpd->attach_dev		= cpg_mstp_attach_dev;
+ 	genpd->detach_dev		= cpg_mstp_detach_dev;
+ 	__rmobile_pd_power_up(rmobile_pd, false);
++	pm_genpd_init(genpd, gov ? : &simple_qos_governor, false);
+ }
+ 
+ static int rmobile_pd_suspend_busy(void)
+-- 
+2.1.4
