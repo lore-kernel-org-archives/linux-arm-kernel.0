@@ -1,103 +1,56 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  8 Jun 2016 17:25:39 +0100
-Subject: [PATCH v2 3/3] arm64: spinlock: use lock->owner to optimise
- spin_unlock_wait
+Date: Wed,  8 Jun 2016 17:25:38 +0100
+Subject: [PATCH v2 2/3] arm64: spinlock: fix spin_unlock_wait for LSE atomics
 In-Reply-To: <1465403139-21054-1-git-send-email-will.deacon@arm.com>
 References: <1465403139-21054-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1465403139-21054-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1465403139-21054-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than wait until we observe the lock being free, we can also
-return from spin_unlock_wait if we observe that the lock is now held
-by somebody else, which implies that it was unlocked but we just missed
-seeing it in that state.
+Commit d86b8da04dfa ("arm64: spinlock: serialise spin_unlock_wait against
+concurrent lockers") fixed spin_unlock_wait for LL/SC-based atomics under
+the premise that the LSE atomics (in particular, the LDADDA instruction)
+are indivisible.
 
-Furthermore, in such a scenario there is no longer a need to write back
-the value that we loaded, since we know that there has been a lock
-hand-off, which is sufficient to publish any stores prior to the
-unlock_wait. The litmus test is something like:
+Unfortunately, these instructions are only indivisible when used with the
+-AL (full ordering) suffix and, consequently, the same issue can
+theoretically be observed with LSE atomics, where a later (in program
+order) load can be speculated before the write portion of the atomic
+operation.
 
-AArch64
-{
-0:X1=x; 0:X3=y;
-1:X1=y;
-2:X1=y; 2:X3=x;
-}
- P0          | P1           | P2           ;
- MOV W0,#1   | MOV W0,#1    | LDAR W0,[X1] ;
- STR W0,[X1] | STLR W0,[X1] | LDR W2,[X3]  ;
- DMB SY      |              |              ;
- LDR W2,[X3] |              |              ;
-exists
-(0:X2=0 /\ 2:X0=1 /\ 2:X2=0)
+This patch fixes the issue by performing a CAS of the lock once we've
+established that it's unlocked, in much the same way as the LL/SC code.
 
-where P0 is doing spin_unlock_wait, P1 is doing spin_unlock and P2 is
-doing spin_lock.
-
+Fixes: d86b8da04dfa ("arm64: spinlock: serialise spin_unlock_wait against concurrent lockers")
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/spinlock.h | 27 ++++++++++++++++++++++++---
- 1 file changed, 24 insertions(+), 3 deletions(-)
+ arch/arm64/include/asm/spinlock.h | 10 +++++++---
+ 1 file changed, 7 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
-index d5c894253e73..e875a5a551d7 100644
+index aac64d55cb22..d5c894253e73 100644
 --- a/arch/arm64/include/asm/spinlock.h
 +++ b/arch/arm64/include/asm/spinlock.h
-@@ -30,20 +30,39 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
- {
- 	unsigned int tmp;
- 	arch_spinlock_t lockval;
-+	u32 owner;
- 
- 	/*
- 	 * Ensure prior spin_lock operations to other locks have completed
- 	 * on this CPU before we test whether "lock" is locked.
- 	 */
- 	smp_mb();
-+	owner = READ_ONCE(lock->owner) << 16;
- 
- 	asm volatile(
- "	sevl\n"
- "1:	wfe\n"
+@@ -43,13 +43,17 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
  "2:	ldaxr	%w0, %2\n"
-+	/* Is the lock free? */
  "	eor	%w1, %w0, %w0, ror #16\n"
--"	cbnz	%w1, 1b\n"
--	/* Serialise against any concurrent lockers */
-+"	cbz	%w1, 3f\n"
-+	/* Lock taken -- has there been a subsequent unlock->lock transition? */
-+"	eor	%w1, %w3, %w0, lsl #16\n"
-+"	cbz	%w1, 1b\n"
-+	/*
-+	 * The owner has been updated, so there was an unlock->lock
-+	 * transition that we missed. That means we can rely on the
-+	 * store-release of the unlock operation paired with the
-+	 * load-acquire of the lock operation to publish any of our
-+	 * previous stores to the new lock owner and therefore don't
-+	 * need to bother with the writeback below.
-+	 */
-+"	b	4f\n"
-+"3:\n"
-+	/*
-+	 * Serialise against any concurrent lockers by writing back the
-+	 * unlocked lock value
-+	 */
+ "	cbnz	%w1, 1b\n"
++	/* Serialise against any concurrent lockers */
  	ARM64_LSE_ATOMIC_INSN(
  	/* LL/SC */
  "	stxr	%w1, %w0, %2\n"
-@@ -53,9 +72,11 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
- "	mov	%w1, %w0\n"
- "	cas	%w0, %w0, %2\n"
- "	eor	%w1, %w1, %w0\n")
-+	/* Somebody else wrote to the lock, GOTO 10 and reload the value */
- "	cbnz	%w1, 2b\n"
-+"4:"
+-"	cbnz	%w1, 2b\n", /* Serialise against any concurrent lockers */
+-	/* LSE atomics */
+ "	nop\n"
+-"	nop\n")
++"	nop\n",
++	/* LSE atomics */
++"	mov	%w1, %w0\n"
++"	cas	%w0, %w0, %2\n"
++"	eor	%w1, %w1, %w0\n")
++"	cbnz	%w1, 2b\n"
  	: "=&r" (lockval), "=&r" (tmp), "+Q" (*lock)
--	:
-+	: "r" (owner)
+ 	:
  	: "memory");
- }
- 
 -- 
 2.1.4
