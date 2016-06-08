@@ -1,77 +1,59 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jun 2016 15:48:01 +0200
-Subject: [RFC v4 2/7] Revert "extcon: usb-gpio: switch to use pm wakeirq apis"
+Date: Wed, 08 Jun 2016 15:48:02 +0200
+Subject: [RFC v4 3/7] extcon: Add raw VBUS and ID cable states
 In-Reply-To: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
 References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465393686-16644-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465393686-16644-4-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reverts commit 8106e404174253639731cc30a44f5b3ab764c5b7.
+The USB controller driver might want to receive the changes for VBUS and
+ID pins so it could properly handle USB OTG. Add new cable states for
+that purpose.
 
-When using PM wakeirq API only one wakeup IRQ can be set. However the
-driver will support also VBUS GPIO so we need two wakeup interrupts.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
 ---
- drivers/extcon/extcon-usb-gpio.c | 19 +++++++++++++------
- 1 file changed, 13 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
-index 2512660dc4b9..a36aab007022 100644
---- a/drivers/extcon/extcon-usb-gpio.c
-+++ b/drivers/extcon/extcon-usb-gpio.c
-@@ -24,7 +24,6 @@
- #include <linux/module.h>
- #include <linux/of_gpio.h>
- #include <linux/platform_device.h>
--#include <linux/pm_wakeirq.h>
- #include <linux/slab.h>
- #include <linux/workqueue.h>
- #include <linux/acpi.h>
-@@ -143,8 +142,7 @@ static int usb_extcon_probe(struct platform_device *pdev)
- 	}
+Previous discussion:
+http://lkml.kernel.org/g/<1427980385-21285-3-git-send-email-r.baldyga@samsung.com>
+---
+ drivers/extcon/extcon.c | 3 +++
+ include/linux/extcon.h  | 8 +++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/extcon/extcon.c b/drivers/extcon/extcon.c
+index 21a123cadf78..aa02d94e8a78 100644
+--- a/drivers/extcon/extcon.c
++++ b/drivers/extcon/extcon.c
+@@ -74,6 +74,9 @@ static const char *extcon_name[] =  {
+ 	[EXTCON_JIG]			= "JIG",
+ 	[EXTCON_MECHANICAL]		= "MECHANICAL",
  
- 	platform_set_drvdata(pdev, info);
--	device_init_wakeup(dev, true);
--	dev_pm_set_wake_irq(dev, info->id_irq);
-+	device_init_wakeup(dev, 1);
- 
- 	/* Perform initial detection */
- 	usb_extcon_detect_cable(&info->wq_detcable.work);
-@@ -158,9 +156,6 @@ static int usb_extcon_remove(struct platform_device *pdev)
- 
- 	cancel_delayed_work_sync(&info->wq_detcable);
- 
--	dev_pm_clear_wake_irq(&pdev->dev);
--	device_init_wakeup(&pdev->dev, false);
--
- 	return 0;
- }
- 
-@@ -170,6 +165,12 @@ static int usb_extcon_suspend(struct device *dev)
- 	struct usb_extcon_info *info = dev_get_drvdata(dev);
- 	int ret = 0;
- 
-+	if (device_may_wakeup(dev)) {
-+		ret = enable_irq_wake(info->id_irq);
-+		if (ret)
-+			return ret;
-+	}
++	[EXTCON_USB_ID]			= "USB-ID",
++	[EXTCON_USB_VBUS]		= "USB-VBUS",
 +
- 	/*
- 	 * We don't want to process any IRQs after this point
- 	 * as GPIOs used behind I2C subsystem might not be
-@@ -185,6 +186,12 @@ static int usb_extcon_resume(struct device *dev)
- 	struct usb_extcon_info *info = dev_get_drvdata(dev);
- 	int ret = 0;
+ 	NULL,
+ };
  
-+	if (device_may_wakeup(dev)) {
-+		ret = disable_irq_wake(info->id_irq);
-+		if (ret)
-+			return ret;
-+	}
+diff --git a/include/linux/extcon.h b/include/linux/extcon.h
+index 7abf674c388c..126ae41b84fd 100644
+--- a/include/linux/extcon.h
++++ b/include/linux/extcon.h
+@@ -66,7 +66,13 @@
+ #define EXTCON_JIG		61
+ #define EXTCON_MECHANICAL	62
+ 
+-#define EXTCON_NUM		63
++/* Raw status, useful for USB controllers */
++#define EXTCON_USB_ID		63
++#define EXTCON_USB_VBUS		64
 +
- 	enable_irq(info->id_irq);
- 	if (!device_may_wakeup(dev))
- 		queue_delayed_work(system_power_efficient_wq,
++#define EXTCON_NUM		65
++
++
+ 
+ struct extcon_cable;
+ 
 -- 
 1.9.1
