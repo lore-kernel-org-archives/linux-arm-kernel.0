@@ -1,36 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 8 Jun 2016 14:14:32 +0200
-Subject: [Linux-kernel] [PATCH] pinctrl: nomadik: fix warnings from
- unexported functions
-In-Reply-To: <40be947d-89f6-2552-7bd2-91d16a378b2f@codethink.co.uk>
-References: <1465320302-5770-1-git-send-email-ben.dooks@codethink.co.uk>
- <d3712327-9d20-08ae-30b1-2b6d52e30420@codethink.co.uk>
- <40be947d-89f6-2552-7bd2-91d16a378b2f@codethink.co.uk>
-Message-ID: <CACRpkdZk3gCP1D2cpYDr2H_C8B07iepdBnNnn=x5Kf48WWGRrA@mail.gmail.com>
+Date: Wed, 8 Jun 2016 14:15:19 +0200
+Subject: [PATCH 3/8] dmaengine: coh901318: Only calculate residue if
+ txstate exists.
+In-Reply-To: <1465321121-22238-4-git-send-email-peter.griffin@linaro.org>
+References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
+ <1465321121-22238-4-git-send-email-peter.griffin@linaro.org>
+Message-ID: <CACRpkdbYx_Oq5M08+rv-BAOVY+CCcamkHAYStCmzfkfDnc-Rjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 8, 2016 at 11:15 AM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
+On Tue, Jun 7, 2016 at 7:38 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
 
-> On 07/06/16 18:30, Ben Dooks wrote:
->> On 07/06/16 18:25, Ben Dooks wrote:
->>> There are five functions in the driver that are defined but
->>> only used locally. Make these static to avoid the following
->>> warnings:
->>>
->>> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1036:6: warning: symbol 'nmk_gpio_clocks_enable' was not declared. Should it be static?
->>> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1050:6: warning: symbol 'nmk_gpio_clocks_disable' was not declared. Should it be static?
->>> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1073:6: warning: symbol 'nmk_gpio_wakeups_suspend' was not declared. Should it be static?
->>> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1094:6: warning: symbol 'nmk_gpio_wakeups_resume' was not declared. Should it be static?
->>> drivers/pinctrl/nomadik/pinctrl-nomadik.c:1120:6: warning: symbol 'nmk_gpio_read_pull' was not declared. Should it be static?
->>
->> Apologies, wrong version of the patch without a typo fix in it.
+> There is no point in calculating the residue if there is no
+> txstate to store the value.
 >
-> Given these functions are not being used, should I just consider a
-> patch to remove these. If they are not being considered for future
-> development it might be a good idea?
+> Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
 
-Yeah just kill them. If I need them back, I can always revert.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
 Linus Walleij
