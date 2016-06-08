@@ -1,91 +1,32 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 08 Jun 2016 15:48:06 +0200
-Subject: [RFC v4 7/7] ARM: dts: exynos: Add extcon-usb-gpio node for Odroid XU3
+Date: Wed, 08 Jun 2016 15:48:05 +0200
+Subject: [RFC v4 6/7] ARM: exynos_defconfig: Enable EXTCON_USB_GPIO for Odroid
+ XU3 USB OTG
 In-Reply-To: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
 References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465393686-16644-8-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465393686-16644-7-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add node for extcon-usb-gpio driver which will be providing
-notifications about VBUS/ID changes to the dwc3 driver.
+The USB 3.0 OTG requires working extcon for reporting VBUS/ID changes.
+This is provided by extcon-usb-gpio driver.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts | 21 +++++++++++++++++++++
- arch/arm/boot/dts/exynos5422-odroidxu3.dts      | 21 +++++++++++++++++++++
- 2 files changed, 42 insertions(+)
+ arch/arm/configs/exynos_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-index 03fa88c45426..3d4d51bc2e3d 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts
-@@ -19,6 +19,27 @@
- / {
- 	model = "Hardkernel Odroid XU3 Lite";
- 	compatible = "hardkernel,odroid-xu3-lite", "samsung,exynos5800", "samsung,exynos5";
-+
-+	extcon_usb: extcon_usb {
-+		compatible = "linux,extcon-usb-gpio";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb_otg_id &usb_vbus>;
-+		id-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
-+		vbus-gpio = <&gpx3 4 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+&pinctrl_0 {
-+	usb_otg_id: usb-otg-id {
-+		samsung,pins = "gpx1-1";
-+		samsung,pin-pud = <0>;
-+	};
-+
-+	usb_vbus: usb-vbus {
-+		samsung,pins = "gpx3-4";
-+		samsung,pin-pud = <0>;
-+	};
- };
- 
- &pwm {
-diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3.dts b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-index 9ed6564acfb0..020eb097c9c6 100644
---- a/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-+++ b/arch/arm/boot/dts/exynos5422-odroidxu3.dts
-@@ -18,6 +18,15 @@
- / {
- 	model = "Hardkernel Odroid XU3";
- 	compatible = "hardkernel,odroid-xu3", "samsung,exynos5800", "samsung,exynos5";
-+
-+	extcon_usb: extcon_usb {
-+		compatible = "linux,extcon-usb-gpio";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&usb_otg_id &usb_vbus>;
-+		id-gpio = <&gpx1 1 GPIO_ACTIVE_HIGH>;
-+		vbus-gpio = <&gpx3 4 GPIO_ACTIVE_HIGH>;
-+	};
- };
- 
- &i2c_0 {
-@@ -52,6 +61,18 @@
- 	};
- };
- 
-+&pinctrl_0 {
-+	usb_otg_id: usb-otg-id {
-+		samsung,pins = "gpx1-1";
-+		samsung,pin-pud = <0>;
-+	};
-+
-+	usb_vbus: usb-vbus {
-+		samsung,pins = "gpx3-4";
-+		samsung,pin-pud = <0>;
-+	};
-+};
-+
- &pwm {
- 	/*
- 	 * PWM 0 -- fan
+diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
+index daf9762ec794..755c4de94eca 100644
+--- a/arch/arm/configs/exynos_defconfig
++++ b/arch/arm/configs/exynos_defconfig
+@@ -219,6 +219,7 @@ CONFIG_COMMON_CLK_MAX77686=y
+ CONFIG_COMMON_CLK_MAX77802=y
+ CONFIG_COMMON_CLK_S2MPS11=y
+ CONFIG_EXTCON=y
++CONFIG_EXTCON_USB_GPIO=y
+ CONFIG_EXTCON_MAX14577=y
+ CONFIG_EXTCON_MAX77693=y
+ CONFIG_EXTCON_MAX8997=y
 -- 
 1.9.1
