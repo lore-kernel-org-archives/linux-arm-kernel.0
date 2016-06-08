@@ -1,139 +1,170 @@
-From: peter.griffin@linaro.org (Peter Griffin)
-Date: Wed, 8 Jun 2016 11:20:44 +0100
-Subject: [PATCH] mmc: core: Fix mmc_select_hs200() regression in v4.7-rc.
-In-Reply-To: <CAPDyKFrvuDrNwUmZQw2UN+Ke-DFyW9eCNc+nhQ7cmpYWdn+rMw@mail.gmail.com>
-References: <1465304543-23988-1-git-send-email-peter.griffin@linaro.org>
- <20160607133839.GH18047@dell>
- <20160607135702.GA19771@griffinp-ThinkPad-X1-Carbon-2nd>
- <CAPDyKFrvuDrNwUmZQw2UN+Ke-DFyW9eCNc+nhQ7cmpYWdn+rMw@mail.gmail.com>
-Message-ID: <20160608102044.GB25004@griffinp-ThinkPad-X1-Carbon-2nd>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Wed, 8 Jun 2016 12:21:19 +0200
+Subject: [PATCH V8 5/9] pci, acpi: add acpi hook to assign domain number.
+In-Reply-To: <20160608001559.GD4759@localhost>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-6-git-send-email-tn@semihalf.com>
+ <20160608001559.GD4759@localhost>
+Message-ID: <5757F19F.6020200@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi Bjorn,
 
-On Tue, 07 Jun 2016, Ulf Hansson wrote:
+On 08.06.2016 02:15, Bjorn Helgaas wrote:
+> Hi Tomasz,
+>
+> On Mon, May 30, 2016 at 05:14:18PM +0200, Tomasz Nowicki wrote:
+>> PCI core code provides a config option (CONFIG_PCI_DOMAINS_GENERIC)
+>> that allows assigning the PCI bus domain number generically by
+>> relying on device tree bindings, and falling back to a simple counter
+>> when the respective DT properties (ie "linux,pci-domain") are not
+>> specified in the host bridge device tree node.
+>>
+>> In a similar way, when a system is booted through ACPI, architectures
+>> that are selecting CONFIG_PCI_DOMAINS_GENERIC (ie ARM64) require kernel
+>> hooks to retrieve the domain number so that the PCI bus domain number
+>> set-up can be handled seamlessly with DT and ACPI in generic core code
+>> when CONFIG_PCI_DOMAINS_GENERIC is selected.
+>>
+>> Since currently it is not possible to retrieve a pointer to the PCI
+>> host bridge ACPI device backing the host bridge from core PCI code
+>> (which would allow retrieving the domain number in an arch agnostic
+>> way through the ACPI _SEG method), an arch specific ACPI hook has to
+>> be declared and implemented by all arches that rely on
+>> CONFIG_PCI_DOMAINS_GENERIC to retrieve the domain number and set it
+>> up in core PCI code.
+>>
+>> For the aforementioned reasons, this patch introduces a dummy
+>> acpi_pci_bus_domain_nr() hook in preparation for per-arch implementation
+>> of the same to retrieve the domain number on a per-arch basis when
+>> the system boots through ACPI.
+>>
+>> For the sake of code clarity the current code implementing generic
+>> domain number assignment (ie pci_bus_assign_domain_nr(), selected by
+>> CONFIG_PCI_DOMAINS_GENERIC) is reshuffled so that the code implementing
+>> the DT domain assignment function is stubbed out into a corresponding
+>> helper, so that DT and ACPI functions are clearly separated in
+>> preparation for arches acpi_pci_bus_domain_nr() implementations.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> ---
+>>   drivers/pci/pci.c   | 11 +++++++++--
+>>   include/linux/pci.h |  1 +
+>>   2 files changed, 10 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index eb431b5..2b52178 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -7,6 +7,7 @@
+>>    *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+>>    */
+>>
+>> +#include <linux/acpi.h>
+>>   #include <linux/kernel.h>
+>>   #include <linux/delay.h>
+>>   #include <linux/init.h>
+>> @@ -4941,7 +4942,7 @@ int pci_get_new_domain_nr(void)
+>>   }
+>>
+>>   #ifdef CONFIG_PCI_DOMAINS_GENERIC
+>> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>> +static int of_pci_bus_domain_nr(struct device *parent)
+>
+> Can we do a little cleanup before this patch?
+>
+>    - pci_bus_assign_domain_nr() is only used inside drivers/pci, so
+>      maybe we move the prototype to drivers/pci/pci.h?
 
-> On 7 June 2016 at 15:57, Peter Griffin <peter.griffin@linaro.org> wrote:
-> > Hi Lee,
-> >
-> > On Tue, 07 Jun 2016, Lee Jones wrote:
-> >
-> >> On Tue, 07 Jun 2016, Peter Griffin wrote:
-> >>
-> >> > mmc_select_bus_width() returns bus width (4 or 8) on success or
-> >> > zero if unsupported. If bus width is set successfully we then wish
-> >> > to switch to HS200 mode.
-> >> >
-> >> > This avoids the following error message in v4.70-rc2
-> >> >
-> >> > [    2.523674] mmc0: mmc_select_hs200 failed, error 3
-> >> > [    2.528516] mmc0: error 3 whilst initialising MMC card
-> >> >
-> >> > With this patch card is enumerated correctly
-> >> >
-> >> > [    2.468065] mmc0: new HS200 MMC card at address 0001
-> >> > [    2.468335] mmcblk0: mmc0:0001 P1XXXX 7.20 GiB
-> >> > [    2.468441] mmcblk0boot0: mmc0:0001 P1XXXX partition 1 2.00 MiB
-> >> > [    2.468552] mmcblk0boot1: mmc0:0001 P1XXXX partition 2 2.00 MiB
-> >> > [    2.468651] mmcblk0rpmb: mmc0:0001 P1XXXX partition 3 128 KiB
-> >> > [    2.469269]  mmcblk0: p1
-> >> >
-> >> > Fixes: 287980e (remove lots of IS_ERR_VALUE abuses)
-> >> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> >> > Cc: Arnd Bergmann <arnd@arndb.de>
-> >> > ---
-> >> >  drivers/mmc/core/mmc.c | 4 ++--
-> >> >  1 file changed, 2 insertions(+), 2 deletions(-)
-> >> >
-> >> > diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> >> > index c984321..aafb73d 100644
-> >> > --- a/drivers/mmc/core/mmc.c
-> >> > +++ b/drivers/mmc/core/mmc.c
-> >> > @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
-> >> >      * switch to HS200 mode if bus width is set successfully.
-> >> >      */
-> >> >     err = mmc_select_bus_width(card);
-> >> > -   if (!err) {
-> >> > +   if (err > 0) {
-> >> >             val = EXT_CSD_TIMING_HS200 |
-> >> >                   card->drive_strength << EXT_CSD_DRV_STR_SHIFT;
-> >> >             err = __mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-> >> > @@ -1583,7 +1583,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
-> >> >     } else if (mmc_card_hs(card)) {
-> >> >             /* Select the desired bus width optionally */
-> >> >             err = mmc_select_bus_width(card);
-> >> > -           if (!err) {
-> >> > +           if (err > 0) {
-> >> >                     err = mmc_select_hs_ddr(card);
-> >> >                     if (err)
-> >> >                             goto free_card;
-> >>
-> >> Looks like this has already been 'fixed' in -rc2.
-> >
-> > Ah, it seems I was on -rc1, not -rc2
-> >
-> >>
-> >> Although, this patch does not work for me.
-> >>     mmc: fix mmc mode selection for HS-DDR and higher
-> >>
-> >>     When IS_ERR_VALUE was removed from the mmc core code, it was replaced
-> >>     with a simple not-zero check. This does not work, as the value checked
-> >>     is the return value for mmc_select_bus_width, which returns the set
-> >>     bit width on success. This made eMMC modes higher than HS-DDR unusable.
-> >>
-> >>     Fix this by checking for a positive return value instead.
-> >>
-> >>     Fixes: 287980e49ffc ("remove lots of IS_ERR_VALUE abuses")
-> >>     Cc: Arnd Bergmann <arnd@arndb.de>
-> >>     Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >>     Acked-by: Hans de Goede <hdegoede@redhat.com>
-> >>     Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >>     Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
-> >>     Reviewed-by: Shawn Lin <shawn.lin@rock-chips.com>
-> >>     Tested-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
-> >>     Tested-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> >>     Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
-> >>
-> >> diff --git a/drivers/mmc/core/mmc.c b/drivers/mmc/core/mmc.c
-> >> index c984321..5d438ad 100644
-> >> --- a/drivers/mmc/core/mmc.c
-> >> +++ b/drivers/mmc/core/mmc.c
-> >> @@ -1276,7 +1276,7 @@ static int mmc_select_hs200(struct mmc_card *card)
-> >>        * switch to HS200 mode if bus width is set successfully.
-> >>        */
-> >>       err = mmc_select_bus_width(card);
-> >> -     if (!err) {
-> >> +     if (err >= 0) {
-> >
-> >
-> > This patch looks wrong to me, as if zero is returned by mmc_select_bus_width() it
-> > means setting the bus width failed, and you most likely don't want to switch to
-> > hs200 mode.
-> >
-> > Ulf - what is your opinion?
-> >
-> > regards,
-> >
-> > Peter.>
-> 
-> The commit above (mmc: fix mmc mode selection for HS-DDR and higher),
-> simply restored the old behaviour and that was sufficient to solve the
-> regressions.
-> 
-> Nevertheless I agree, that if mmc_select_bus_width() returns 0, that
-> should likely mean that we shouldn't try to switch to hs200. If we
-> want to change that, let's do that in a separate patch on top.
+pci_bus_assign_domain_nr() goes with pci_domain_nr() as an option for 
+CONFIG_PCI_DOMAINS_GENERIC. pci_domain_nr() is used commonly outside 
+drivers/pci so we would need to split these calls then, thus personally 
+I think it would be better to keep both in inclue/linux/pci.h
 
-OK, I will send a v2 patch in a moment.
+>
+>    - I don't really like the style of calling a function that
+>      internally assigns bus->domain_nr.  Could we do something like
+>      this instead?
+>
+>      int pci_bus_domain_nr(...)
+>      {
+>        ...
+>        return domain;
+>      }
+>
+>      ... pci_create_root_bus(...)
+>      {
+>        ...
+>        b->domain_nr = pci_bus_domain_nr(...);
 
-> So, do you see a problem in rc2?
 
-No, despite what the commit message says, I wrote & tested the patch on
-v4.7-rc1. A stock v4.7-rc2 enumerates the card correctly on my STi platform.
+We can. I do not see much difference between pci_bus_domain_nr() and 
+pci_domain_nr() which we already have so how about calling it 
+pci_bus_find_domain_nr instead? Lorenzo, any strong preference for it?
 
-I think my patch is now only useful if setting the bus width were to fail.
+>
+> That would be two new patches, if this makes sense.
+>
+> And this patch would only rename pci_bus_assign_domain_nr() to
+> of_pci_bus_domain_nr() and add the pci_bus_domain_nr() wrapper.
 
-regards,
+Giving that we would keep prototypes in inclue/linux/pci.h
 
-Peter.
+1. First patch would rename pci_bus_assign_domain_nr() to 
+pci_bus_find_domain_nr() and it would return domain number so that we 
+could do:
+      ... pci_create_root_bus(...)
+      {
+        ...
+        b->domain_nr = pci_bus_domain_nr(...);
+        ...
+      }
+
+2. Second patch would transform pci_bus_find_domain_nr() to be the 
+wrapper for of_pci_bus_domain_nr()
+
+3. Third patch would add stub definition, the ARM64 definition and the 
+new call acpi_pci_bus_domain_nr() in pci_bus_find_domain_nr() wrapper.
+
+Does this plan sound reasonable?
+
+>
+>>   {
+>>   	static int use_dt_domains = -1;
+>>   	int domain = -1;
+>> @@ -4985,7 +4986,13 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>>   		domain = -1;
+>>   	}
+>>
+>> -	bus->domain_nr = domain;
+>> +	return domain;
+>> +}
+>> +
+>> +void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>> +{
+>> +	bus->domain_nr = acpi_disabled ? of_pci_bus_domain_nr(parent) :
+>> +					 acpi_pci_bus_domain_nr(bus);
+>>   }
+>>   #endif
+>>   #endif
+>> diff --git a/include/linux/pci.h b/include/linux/pci.h
+>> index 12349de..bba4053 100644
+>> --- a/include/linux/pci.h
+>> +++ b/include/linux/pci.h
+>> @@ -1390,6 +1390,7 @@ static inline int pci_domain_nr(struct pci_bus *bus)
+>>   {
+>>   	return bus->domain_nr;
+>>   }
+>> +static inline int acpi_pci_bus_domain_nr(struct pci_bus *bus) { return -1; }
+>
+> I would split the addition of acpi_pci_bus_domain_nr() to a separate
+> patch and include the ARM64 definition in that same patch.  That patch
+> would only add this stub definition, the ARM64 definition, and the new
+> call in pci_bus_domain_nr().
+
+OK
+
+Thanks,
+Tomasz
