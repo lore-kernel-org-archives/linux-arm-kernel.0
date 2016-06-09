@@ -1,35 +1,69 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 9 Jun 2016 14:27:19 -0500
-Subject: [PATCH v3] tty:serial:msm:Do not restore Rx interrupts in DMA
-In-Reply-To: <1465295321-10506-1-git-send-email-charanya@codeaurora.org>
-References: <1462896580-11554-1>
- <1465295321-10506-1-git-send-email-charanya@codeaurora.org>
-Message-ID: <20160609192719.GL13357@hector.attlocal.net>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 9 Jun 2016 21:41:36 +0200
+Subject: [PATCH 2/2] soc: qcom: add l2 cache perf events driver
+In-Reply-To: <20160609155615.GE12201@leverpostej>
+References: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
+ <1464987812-14360-3-git-send-email-nleeder@codeaurora.org>
+ <20160606095139.GC6831@leverpostej>
+ <be1cc820-7b9d-041b-06d8-cefeb43934d5@codeaurora.org>
+ <20160609155615.GE12201@leverpostej>
+Message-ID: <20160609194136.GZ30154@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 03:58:41PM +0530, Charanya Venkatraman wrote:
-> Avoid data corruption issues that result in CRC errors during file
-> transfers over serial ports at higher baud rates.
+On Thu, Jun 09, 2016 at 04:56:16PM +0100, Mark Rutland wrote:
+> > >> +static irqreturn_t l2_cache__handle_irq(int irq_num, void *data)
+> > >> +{
+> > >> +	struct hml2_pmu *slice = data;
+> > >> +	u32 ovsr;
+> > >> +	int idx;
+> > >> +	struct pt_regs *regs;
+> > >> +
+> > >> +	ovsr = hml2_pmu__getreset_ovsr();
+> > >> +	if (!hml2_pmu__has_overflowed(ovsr))
+> > >> +		return IRQ_NONE;
+> > >> +
+> > >> +	regs = get_irq_regs();
+> > >> +
+> > >> +	for (idx = 0; idx < l2cache_pmu.num_counters; idx++) {
+> > >> +		struct perf_event *event = slice->events[idx];
+> > >> +		struct hw_perf_event *hwc;
+> > >> +		struct perf_sample_data data;
+> > >> +
+> > >> +		if (!event)
+> > >> +			continue;
+> > >> +
+> > >> +		if (!hml2_pmu__counter_has_overflowed(ovsr, idx))
+> > >> +			continue;
+> > >> +
+> > >> +		l2_cache__event_update_from_slice(event, slice);
+> > >> +		hwc = &event->hw;
+> > >> +
+> > >> +		if (is_sampling_event(event)) {
+> > >> +			perf_sample_data_init(&data, 0, hwc->last_period);
+> > > 
+> > > I don't think sampling makes sense, given this is an uncore PMU and the
+> > > events are triggered by other CPUs.
+> > 
+> > There is origin filtering so events can be attributed to a CPU when sampling.
 > 
-> The current msm_serial driver masks the FIFO Rx interrupts in
-> msm_start_rx_dma() since Rx FIFO interrupts are not required in DMA
-> mode. However, msm_complete_rx_dma() re-enables the Rx FIFO interrupts
-> which could cause RXSTALE event to be processed when a TXLEV interrupt
-> occurs.
-> 
-> The following is the sequence of events that could occur resulting in
-> data corruption.
-> 
-> msm_start_rx_dma -> msm_complete_rx_dma -->
-> spin_unlock_irqrestore(&port->lock) -->
-> msm_uart_irq()(For TXLEV interrupt) -->  msm_handle_rx_dm() (Read from
-> FIFO resulting in data corruption)
-> 
-> The patch fixes the issue by not restoring the RXLEV and RXSTALE
-> interrupts in msm_complete_rx_dma(). These interrupts are required only
-> in FIFO mode.
-> 
-> Signed-off-by: Charanya Venkatraman <charanya@codeaurora.org>
+> Ok. I believe that's different from all other uncore PMUs we support
+> (none of the drivers support sampling, certainly), so I'm not entirely
+> sure how/if we can make use of that sanely and reliably.
 
-Acked-by: Andy Gross <andy.gross@linaro.org>
+Right; because not only do you need to know which CPU originated the
+event, the IRQ must also happen on that CPU. Simply knowing which CPU
+triggered it is not enough for sampling.
+
+> For the timebeing, I think this sampling needs to go, and the event_init
+> logic needs to reject sampling as with other uncore PMU drivers.
+
+Agreed.
+
+> One thing I forgot to mention in my earlier comments is that as an
+> uncore PMU you need to have task_ctx_nr = perf_invalid_context here
+> also.
+
+For good reasons, uncore PMUs (as is the case here) count strictly more
+than the effect of single CPUs (and thus also the current task). So
+attributing it back to a task is nonsense.
