@@ -1,28 +1,83 @@
 From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu,  9 Jun 2016 10:26:15 -0500
-Subject: [PATCH v2 0/3] ARM: Keystone: Add pinmuxing support
-Message-ID: <1465485978-27910-1-git-send-email-fcooper@ti.com>
+Date: Thu,  9 Jun 2016 10:26:17 -0500
+Subject: [PATCH v2 2/3] ARM: dts: keystone: Header file for pinctrl constants
+In-Reply-To: <1465485978-27910-1-git-send-email-fcooper@ti.com>
+References: <1465485978-27910-1-git-send-email-fcooper@ti.com>
+Message-ID: <1465485978-27910-3-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Unlike most Keystone 2 devices, K2G supports pinmuxing of its pins. This
-patch series enables pinmuxing for Keystone 2 devices.
+From: Lokesh Vutla <lokeshvutla@ti.com>
 
-Version 2 changes:
-Rebased on top of linux-next which includes Keerthy patches.
+The pinctrl IP used in some of the Keystone 2 devices differ vs other
+TI SoCs. Therefore, create a Keystone specific pinctrl header.
 
-Lokesh Vutla (2):
-  ARM: dts: keystone: Header file for pinctrl constants
-  ARM: dts: k2g-evm: Add pinmuxing for UART0
-
-Vitaly Andrianov (1):
-  ARM: dts: k2g: Add pinctrl support
-
- arch/arm/boot/dts/keystone-k2g-evm.dts | 11 ++++++++++
- arch/arm/boot/dts/keystone-k2g.dtsi    |  8 +++++++
+Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
+---
+ arch/arm/boot/dts/keystone-k2g.dtsi    |  1 +
  include/dt-bindings/pinctrl/keystone.h | 39 ++++++++++++++++++++++++++++++++++
- 3 files changed, 58 insertions(+)
+ 2 files changed, 40 insertions(+)
  create mode 100644 include/dt-bindings/pinctrl/keystone.h
 
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index b99e879..3372615 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -14,6 +14,7 @@
+  */
+ 
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pinctrl/keystone.h>
+ #include "skeleton.dtsi"
+ 
+ / {
+diff --git a/include/dt-bindings/pinctrl/keystone.h b/include/dt-bindings/pinctrl/keystone.h
+new file mode 100644
+index 0000000..7f97d77
+--- /dev/null
++++ b/include/dt-bindings/pinctrl/keystone.h
+@@ -0,0 +1,39 @@
++/*
++ * This header provides constants for Keystone pinctrl bindings.
++ *
++ * Copyright (C) 2016 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef _DT_BINDINGS_PINCTRL_KEYSTONE_H
++#define _DT_BINDINGS_PINCTRL_KEYSTONE_H
++
++#define MUX_MODE0	0
++#define MUX_MODE1	1
++#define MUX_MODE2	2
++#define MUX_MODE3	3
++#define MUX_MODE4	4
++#define MUX_MODE5	5
++
++#define BUFFER_CLASS_B	(0 << 19)
++#define BUFFER_CLASS_C	(1 << 19)
++#define BUFFER_CLASS_D	(2 << 19)
++#define BUFFER_CLASS_E	(3 << 19)
++
++#define PULL_DISABLE	(1 << 16)
++#define PIN_PULLUP	(1 << 17)
++#define PIN_PULLDOWN	(0 << 17)
++
++#define KEYSTONE_IOPAD_OFFSET(pa, offset) (((pa) & 0xffff) - (offset))
++
++#define K2G_CORE_IOPAD(pa) KEYSTONE_IOPAD_OFFSET((pa), 0x1000)
++
++#endif
 -- 
 2.7.0
