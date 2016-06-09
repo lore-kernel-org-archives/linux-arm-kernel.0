@@ -1,76 +1,63 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 09 Jun 2016 16:54:54 +0200
-Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
-In-Reply-To: <201606092223.3kHMu0m3%fengguang.wu@intel.com> (kbuild test
- robot's message of "Thu, 9 Jun 2016 22:20:45 +0800")
-References: <201606092223.3kHMu0m3%fengguang.wu@intel.com>
-Message-ID: <87r3c6mmyp.fsf@free-electrons.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 9 Jun 2016 21:51:47 +0800
+Subject: [PATCH v4 1/2] i2c: qup: add ACPI support
+In-Reply-To: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
+Message-ID: <201606092141.P9tGizvu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-I added Arnd because he seems to have a good knoweldge of the Kconfig
-stuff.
+[auto build test ERROR on wsa/i2c/for-next]
+[also build test ERROR on v4.7-rc2 next-20160609]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
- On jeu., juin 09 2016, kbuild test robot <lkp@intel.com> wrote:
+url:    https://github.com/0day-ci/linux/commits/Austin-Christ/i2c-qup-add-ACPI-support/20160609-022325
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux i2c/for-next
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-> Hi,
->
-> [auto build test ERROR on ulf.hansson-mmc/next]
-> [also build test ERROR on v4.7-rc2 next-20160609]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
->
-> url:    https://github.com/0day-ci/linux/commits/Gregory-CLEMENT/Add-SDHCI-Xenon-driver/20160609-151403
-> base:   https://git.linaro.org/people/ulf.hansson/mmc next
-> config: x86_64-allmodconfig (attached as .config)
-> compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
-> reproduce:
->         # save the attached .config to linux build tree
->         make ARCH=x86_64 
->
-> All errors (new ones prefixed by >>):
->
->    drivers/built-in.o: In function `sdhci_xenon_remove':
->>> sdhci-xenon.c:(.text+0x311234): undefined reference to `sdhci_remove_host'
->>> sdhci-xenon.c:(.text+0x31123c): undefined reference to `sdhci_pltfm_free'
->    drivers/built-in.o: In function `sdhci_xenon_delay_adj_test':
->>> sdhci-xenon.c:(.text+0x31213b): undefined reference to `card_alive'
->    drivers/built-in.o: In function `sdhci_xenon_set_uhs_signaling':
->>> sdhci-xenon.c:(.text+0x312456): undefined reference to `sdhci_set_uhs_signaling'
->    drivers/built-in.o: In function `sdhci_xenon_probe':
->>> sdhci-xenon.c:(.text+0x31258c): undefined reference to `sdhci_pltfm_init'
->>> sdhci-xenon.c:(.text+0x3125d3): undefined reference to `mmc_of_parse'
->>> sdhci-xenon.c:(.text+0x312651): undefined reference to `sdhci_get_of_property'
->>> sdhci-xenon.c:(.text+0x312840): undefined reference to `sdhci_add_host'
->    sdhci-xenon.c:(.text+0x312904): undefined reference to `sdhci_pltfm_free'
->    drivers/built-in.o: In function `sdhci_xenon_reset':
->>> sdhci-xenon.c:(.text+0x313c11): undefined reference to `sdhci_reset'
->>> drivers/built-in.o:(.data+0x1d7df0): undefined reference to `sdhci_pltfm_pmops'
->>> drivers/built-in.o:(.data+0x1d7eb0): undefined reference to `sdhci_set_clock'
->>> drivers/built-in.o:(.data+0x1d7ef0): undefined reference to `sdhci_set_bus_width'
+All errors (new ones prefixed by >>):
 
-These symbols are part of the drivers/mmc/host/sdhci.c which is build
-when CONFIG_MMC_SDHCI is enabled. However CONFIG_MMC_XENON_SDHCI depends
-on CONFIG_MMC_SDHCI_PLTFM which depends on CONFIG_MMC_SDHCI.
+   In file included from drivers/i2c/busses/i2c-qup.c:27:0:
+>> drivers/i2c/busses/i2c-qup.c:1665:27: error: 'qup_i2c_acpi_ids' undeclared here (not in a function)
+    MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_ids);
+                              ^
+   include/linux/module.h:223:21: note: in definition of macro 'MODULE_DEVICE_TABLE'
+    extern const typeof(name) __mod_##type##__##name##_device_table  \
+                        ^
+   include/linux/module.h:223:27: error: '__mod_acpi__qup_i2c_acpi_ids_device_table' aliased to undefined symbol 'qup_i2c_acpi_ids'
+    extern const typeof(name) __mod_##type##__##name##_device_table  \
+                              ^
+   drivers/i2c/busses/i2c-qup.c:1665:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
+    MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_ids);
+    ^
 
-So I wonder how we can have a sition with sdhci-xenon.c built but not
-sdhci.c.
+vim +/qup_i2c_acpi_ids +1665 drivers/i2c/busses/i2c-qup.c
 
-Any idea?
+  1659	
+  1660	#if IS_ENABLED(CONFIG_ACPI)
+  1661	static const struct acpi_device_id qup_i2c_acpi_match[] = {
+  1662		{ "QCOM8010"},
+  1663		{ },
+  1664	};
+> 1665	MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_ids);
+  1666	#endif
+  1667	
+  1668	static struct platform_driver qup_i2c_driver = {
 
-Thanks,
-
-Gregory
-
->
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
->
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 50194 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/9a6ad370/attachment-0001.obj>
