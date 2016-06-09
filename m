@@ -1,29 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 Jun 2016 11:44:44 +0100
-Subject: [alsa-devel] [PATCH v2 2/9] ASoC: mediatek: implement mediatek
- common structure
-In-Reply-To: <1465351572.4197.17.camel@mtksdaap41>
-References: <1464929784-5489-1-git-send-email-garlic.tseng@mediatek.com>
- <1464929784-5489-3-git-send-email-garlic.tseng@mediatek.com>
- <20160607155427.GB7510@sirena.org.uk>
- <1465351572.4197.17.camel@mtksdaap41>
-Message-ID: <20160609104444.GV7510@sirena.org.uk>
+From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
+Date: Thu, 9 Jun 2016 16:08:17 +0530
+Subject: [PATCH v3 4/4] soc: Add SoC driver for Freescale Vybrid platform
+In-Reply-To: <20160527100817.GA8294@Sanchayan-Arch.localdomain>
+References: <cover.1463737502.git.maitysanchayan@gmail.com>
+ <CAL_JsqKCwy=aXveTfnaQuZ5b3Ld9nzABgPfdPm1JX3CBuvzG+Q@mail.gmail.com>
+ <20160527063301.GB1554@Sanchayan-Arch.localdomain>
+ <9495361.v6aft1QR0M@wuerfel>
+ <20160527100817.GA8294@Sanchayan-Arch.localdomain>
+Message-ID: <20160609103817.GA14965@Sanchayan-Arch.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 10:06:12AM +0800, Garlic Tseng wrote:
-> On Tue, 2016-06-07 at 16:54 +0100, Mark Brown wrote:
+Hello Rob,
 
-> > Do you need to export the individual ops rather than just the ops
-> > structure?
+On 16-05-27 15:38:17, maitysanchayan at gmail.com wrote:
+> On 16-05-27 10:31:55, Arnd Bergmann wrote:
+> > On Friday, May 27, 2016 12:03:01 PM CEST maitysanchayan at gmail.com wrote:
+> > > 
+> > > So if I understand correctly, the binding at the SoC level is fine.
+> > > Keeping that but removing the additional made-up properties, viz. below
+> > > 
+> > > rom-revision: phandle to the on-chip ROM node
+> > > mscm: phandle to the MSCM CPU configuration node
+> > > nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+> > > nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+> > > 
+> > > would be fine?
+> > > 
+> > > We would have something similar to here
+> > > http://www.spinics.net/lists/devicetree/msg80655.html
+> > > 
+> > > but now with the DT binding under SoC bus.
+> > > 
+> > 
+> > 
+> > You look up the OTP device as a syscon here, which seems odd since there
+> > is already an nvmem driver for it. Shouldn't you use the nvmem API for
+> > that?
+> > 
+> > 	Arnd
+> 
+> I need the following 
+> 
+> nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+> nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+> 
+> to be able to use the NVMEM consumer API.
+> 
+> If I can put them at SoC node level then I certainly can use the NVMEM API.
+> 
 
-> Yes, in 2701 driver we modify some ops.
+Would the following be acceptable at the SoC node level
 
-OK.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/6f3c920d/attachment.sig>
+> nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
+> nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+
+Regards,
+Sanchayan.
+ 
