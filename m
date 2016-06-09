@@ -1,171 +1,59 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 09 Jun 2016 20:08:44 +0000
-Subject: [PATCH v18 01/13] arm64: Add back cpu reset routines
+Date: Thu, 09 Jun 2016 20:08:45 +0000
+Subject: [PATCH v18 13/13] Documentation: dt: usable-memory and elfcorehdr
+ nodes for arm64 kexec
 In-Reply-To: <cover.1465502767.git.geoff@infradead.org>
 References: <cover.1465502767.git.geoff@infradead.org>
-Message-ID: <c6208ed0cbcf531ea2b19b3201524368aedf5b3e.1465502767.git.geoff@infradead.org>
+Message-ID: <a02229764b36469c739e39eeaf8809e96c4e1ff6.1465502767.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
-removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
-the arm64 kexec and kdump support.  Add simplified versions of those two
-routines back with some changes needed for kexec in the new files cpu_reset.S,
-and cpu_reset.h.
+From: James Morse <james.morse@arm.com>
 
-When a CPU is reset it needs to be put into the exception level it had when it
-entered the kernel. Update cpu_soft_restart() to accept an argument which
-signals if the reset address needs to be entered at EL1 or EL2, and add a
-new hypercall HVC_SOFT_RESTART which is used for the EL2 switch.
+Add documentation for linux,usable-memory and linux,elfcorehdr chosen nodes
+used by arm64 kexec to decribe the kdump reserved area, and the elfcorehdr's
+location within it.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
-Reviewed-by: James Morse <james.morse@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/virt.h |  5 ++++
- arch/arm64/kernel/cpu-reset.S | 54 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu-reset.h | 34 +++++++++++++++++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 10 +++++++-
- 4 files changed, 102 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/cpu-reset.S
- create mode 100644 arch/arm64/kernel/cpu-reset.h
+ Documentation/devicetree/bindings/chosen.txt | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index dcbcf8d..bbc6a8c 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -34,6 +34,11 @@
-  */
- #define HVC_SET_VECTORS 1
- 
-+/*
-+ * HVC_SOFT_RESTART - CPU soft reset, used by the cpu_soft_restart routine.
-+ */
-+#define HVC_SOFT_RESTART 2
+diff --git a/Documentation/devicetree/bindings/chosen.txt b/Documentation/devicetree/bindings/chosen.txt
+index 6ae9d82..443f88b 100644
+--- a/Documentation/devicetree/bindings/chosen.txt
++++ b/Documentation/devicetree/bindings/chosen.txt
+@@ -52,3 +52,31 @@ This property is set (currently only on PowerPC, and only needed on
+ book3e) by some versions of kexec-tools to tell the new kernel that it
+ is being booted by kexec, as the booting environment may differ (e.g.
+ a different secondary CPU release mechanism)
 +
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-new file mode 100644
-index 0000000..65f42d2
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -0,0 +1,54 @@
-+/*
-+ * CPU reset routines
-+ *
-+ * Copyright (C) 2001 Deep Blue Solutions Ltd.
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
++linux,usable-memory
++-------------------
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/sysreg.h>
-+#include <asm/virt.h>
++This property is set on PowerPC and arm64 by kexec-tools during kdump
++to tell the crash kernel the base address of its reserved area of memory, and
++the size. e.g.
 +
-+.text
-+.pushsection    .idmap.text, "ax"
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++	};
++};
 +
-+/*
-+ * __cpu_soft_restart(el2_switch, entry, arg0, arg1, arg2) - Helper for
-+ * cpu_soft_restart.
-+ *
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @entry: Location to jump to for soft reset.
-+ * arg0: First argument passed to @entry.
-+ * arg1: Second argument passed to @entry.
-+ * arg2: Third argument passed to @entry.
-+ *
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
-+ */
-+ENTRY(__cpu_soft_restart)
-+	/* Clear sctlr_el1 flags. */
-+	mrs	x12, sctlr_el1
-+	ldr	x13, =SCTLR_ELx_FLAGS
-+	bic	x12, x12, x13
-+	msr	sctlr_el1, x12
-+	isb
++linux,elfcorehdr
++----------------
 +
-+	cbz	x0, 1f				// el2_switch?
-+	mov	x0, #HVC_SOFT_RESTART
-+	hvc	#0				// no return
++This property is set (currently only on arm64) by kexec-tools during kdump
++to tell the crash kernel the address and size of the elfcorehdr that describes
++the old kernel's memory as an elf file. This memory must reside within the area
++described by 'linux,usable-memory'. e.g.
 +
-+1:	mov	x18, x1				// entry
-+	mov	x0, x2				// arg0
-+	mov	x1, x3				// arg1
-+	mov	x2, x4				// arg2
-+	br	x18
-+ENDPROC(__cpu_soft_restart)
-+
-+.popsection
-diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
-new file mode 100644
-index 0000000..d4e9ecb
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.h
-@@ -0,0 +1,34 @@
-+/*
-+ * CPU reset routines
-+ *
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef _ARM64_CPU_RESET_H
-+#define _ARM64_CPU_RESET_H
-+
-+#include <asm/virt.h>
-+
-+void __cpu_soft_restart(unsigned long el2_switch, unsigned long entry,
-+	unsigned long arg0, unsigned long arg1, unsigned long arg2);
-+
-+static inline void __noreturn cpu_soft_restart(unsigned long el2_switch,
-+	unsigned long entry, unsigned long arg0, unsigned long arg1,
-+	unsigned long arg2)
-+{
-+	typeof(__cpu_soft_restart) *restart;
-+
-+	el2_switch = el2_switch && !is_kernel_in_hyp_mode() &&
-+		is_hyp_mode_available();
-+	restart = (void *)virt_to_phys(__cpu_soft_restart);
-+
-+	cpu_install_idmap();
-+	restart(el2_switch, entry, arg0, arg1, arg2);
-+	unreachable();
-+}
-+
-+#endif
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 8727f44..d3b5f75 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -71,8 +71,16 @@ el1_sync:
- 	msr	vbar_el2, x1
- 	b	9f
- 
-+2:	cmp	x0, #HVC_SOFT_RESTART
-+	b.ne	3f
-+	mov	x0, x2
-+	mov	x2, x4
-+	mov	x4, x1
-+	mov	x1, x3
-+	br	x4				// no return
-+
- 	/* Someone called kvm_call_hyp() against the hyp-stub... */
--2:	mov     x0, #ARM_EXCEPTION_HYP_GONE
-+3:	mov	x0, #ARM_EXCEPTION_HYP_GONE
- 
- 9:	eret
- ENDPROC(el1_sync)
++/ {
++	chosen {
++		linux,usable-memory = <0x9 0xf0000000 0x0 0x10000000>;
++		linux,elfcorehdr = <0x9 0xfffff000 0x0 0x800>;
++	};
++};
 -- 
 2.5.0
