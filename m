@@ -1,48 +1,75 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed,  8 Jun 2016 21:57:35 -0400
-Subject: [PATCH 2/2] [media] s5p-mfc: don't print errors on VIDIOC_REQBUFS
- unsupported mem type
-In-Reply-To: <1465437455-24110-1-git-send-email-javier@osg.samsung.com>
-References: <1465437455-24110-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1465437455-24110-2-git-send-email-javier@osg.samsung.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 9 Jun 2016 10:13:41 +0800
+Subject: [PATCH V2 4/4] ARM: mxs: dts: Add SanDisk Sansa Fuze+ support
+In-Reply-To: <5758C6A8.2060903@denx.de>
+References: <1462740621-7557-1-git-send-email-marex@denx.de>
+ <1462740621-7557-4-git-send-email-marex@denx.de>
+ <20160609012112.GA15053@tiger> <5758C6A8.2060903@denx.de>
+Message-ID: <20160609021341.GA15413@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The V4L2 documentation says that applications must call the VIDIOC_REQBUFS
-ioctl to determine if a memory mapped, user pointer or DMABUF based I/O is
-supported by the driver.
+On Thu, Jun 09, 2016 at 03:30:16AM +0200, Marek Vasut wrote:
+> On 06/09/2016 03:21 AM, Shawn Guo wrote:
+> > On Sun, May 08, 2016 at 10:50:21PM +0200, Marek Vasut wrote:
+> >> +	regulators {
+> >> +		compatible = "simple-bus";
+> >> +
+> >> +		reg_vddio_sd0: vddio-sd0 {
+> > 
+> > Put fixed regulator nodes directly under root with suggested naming
+> > scheme.
+> > 
+> >> +			compatible = "regulator-fixed";
+> >> +			regulator-name = "vddio-sd0";
+> >> +			regulator-min-microvolt = <3300000>;
+> >> +			regulator-max-microvolt = <3300000>;
+> >> +			gpio = <&gpio0 8 0>;
+> >> +		};
+> >> +
+> >> +		reg_vddio_sd1: vddio-sd1 {
+> >> +			compatible = "regulator-fixed";
+> >> +			regulator-name = "vddio-sd1";
+> >> +			regulator-min-microvolt = <3300000>;
+> >> +			regulator-max-microvolt = <3300000>;
+> >> +			gpio = <&gpio1 29 0>;
+> >> +		};
+> >> +
+> >> +		reg_vdd_touchpad: vdd-touchpad0 {
+> >> +			compatible = "regulator-fixed";
+> >> +			regulator-name = "vdd-touchpad0";
+> >> +			regulator-min-microvolt = <3300000>;
+> >> +			regulator-max-microvolt = <3300000>;
+> >> +			gpio = <&gpio0 26 0>;
+> >> +			regulator-always-on;
+> >> +			enable-active-low;
+> >> +		};
+> >> +
+> >> +		reg_vdd_tuner: vdd-tuner0 {
+> >> +			compatible = "regulator-fixed";
+> >> +			regulator-name = "vdd-tuner0";
+> >> +			regulator-min-microvolt = <3300000>;
+> >> +			regulator-max-microvolt = <3300000>;
+> >> +			gpio = <&gpio0 29 0>;
+> >> +			regulator-always-on;
+> >> +			enable-active-low;
+> >> +		};
+> >> +	};
+> >> +
+> >> +	backlight {
+> >> +		compatible = "pwm-backlight";
+> >> +		pwms = <&pwm 2 5000000>;
+> >> +		brightness-levels = <0 4 8 16 32 64 128 255>;
+> >> +		default-brightness-level = <6>;
+> >> +	};
+> >> +
+> >> +	i2c at 0 {
+> > 
+> > The @unit-address should be used for nodes with 'reg' property.
+> 
+> Can you please do such minor fixes when applying or do you expect a resend ?
 
-For example GStreamer does this by first calling VIDIOC_REQBUFS with count
-zero for all the possible streaming I/O methods and then finally doing the
-real VIDIOC_REQBUFS with count N using a known to be supported memory type.
+Such minor fixes are just too many to be fixed by myself.  Please
+resend.
 
-But the driver prints an error on VIDIOC_REQBUFS if the memory type is not
-supported which leads to the following errors that can confuse the users:
-
-[  178.704390] vidioc_reqbufs:575: Only V4L2_MEMORY_MMAP is supported
-[  178.704666] vidioc_reqbufs:575: Only V4L2_MEMORY_MMAP is supported
-[  178.714956] vidioc_reqbufs:575: Only V4L2_MEMORY_MMAP is supported
-[  178.715229] vidioc_reqbufs:575: Only V4L2_MEMORY_MMAP is supported
-
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-
----
-
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 8e2ee1a0df2b..038215c198ac 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -572,7 +572,7 @@ static int vidioc_reqbufs(struct file *file, void *priv,
- 	struct s5p_mfc_ctx *ctx = fh_to_ctx(priv);
- 
- 	if (reqbufs->memory != V4L2_MEMORY_MMAP) {
--		mfc_err("Only V4L2_MEMORY_MMAP is supported\n");
-+		mfc_debug(2, "Only V4L2_MEMORY_MMAP is supported\n");
- 		return -EINVAL;
- 	}
- 
--- 
-2.5.5
+Shawn
