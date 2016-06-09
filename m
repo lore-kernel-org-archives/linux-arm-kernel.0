@@ -1,159 +1,506 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 9 Jun 2016 12:53:52 +0200
-Subject: [PATCH 1/2] ARM: dts: sun6i: Add pmic / regulator nodes to Mele
- A1000G quad dts
-In-Reply-To: <20160607212545.GF14179@lukather>
-References: <1465133880-22921-1-git-send-email-hdegoede@redhat.com>
- <CAGb2v67Jo6MO7bp4JdV4hXrB4T60z4=ROkvAvE1i7dhAXk_UtQ@mail.gmail.com>
- <0a42bc82-83f2-80ce-93d4-a85c5ce69e24@redhat.com>
- <20160607212545.GF14179@lukather>
-Message-ID: <355dac66-46cc-c6cf-7831-e14ea394ae55@redhat.com>
+Date: Thu,  9 Jun 2016 12:54:15 +0200
+Subject: [PATCH v2] ARM: dts: sun5i: Move display blocks to sun5i.dtsi
+Message-ID: <1465469655-8046-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI,
+All sun5i models share the same die, so the display-engine is
+identical, except for which outputs / encoders are available.
 
-On 07-06-16 23:25, Maxime Ripard wrote:
-> On Mon, Jun 06, 2016 at 09:23:36AM +0200, Hans de Goede wrote:
->> Hi,
->>
->> On 06-06-16 09:12, Chen-Yu Tsai wrote:
->>> On Sun, Jun 5, 2016 at 9:37 PM, Hans de Goede <hdegoede@redhat.com> wrote:
->>>> Add pmic / regulator nodes to Mele A1000G quad dts.
->>>>
->>>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->>>> ---
->>>> arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts | 88 +++++++++++++++++++++++-
->>>> 1 file changed, 87 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
->>>> index e063dab..9782113 100644
->>>> --- a/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
->>>> +++ b/arch/arm/boot/dts/sun6i-a31-mele-a1000g-quad.dts
->>>> @@ -72,6 +72,10 @@
->>>>        };
->>>> };
->>>>
->>>> +&cpu0 {
->>>> +       cpu-supply = <&reg_dcdc3>;
->>>> +};
->>>> +
->>>> &ehci0 {
->>>>        status = "okay";
->>>> };
->>>> @@ -85,6 +89,7 @@
->>>>        pinctrl-0 = <&gmac_pins_mii_a>;
->>>>        phy = <&phy1>;
->>>>        phy-mode = "mii";
->>>> +       phy-supply = <&reg_dldo1>;
->>>>        status = "okay";
->>>>
->>>>        phy1: ethernet-phy at 1 {
->>>> @@ -101,13 +106,26 @@
->>>> &mmc0 {
->>>>        pinctrl-names = "default";
->>>>        pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
->>>> -       vmmc-supply = <&reg_vcc3v3>;
->>>> +       vmmc-supply = <&reg_dcdc1>;
->>>>        bus-width = <4>;
->>>>        cd-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
->>>>        cd-inverted;
->>>>        status = "okay";
->>>> };
->>>>
->>>> +&p2wi {
->>>> +       status = "okay";
->>>> +
->>>> +       axp22x: pmic at 68 {
->>>> +               compatible = "x-powers,axp221";
->>>> +               reg = <0x68>;
->>>> +               interrupt-parent = <&nmi_intc>;
->>>> +               interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
->>>> +       };
->>>> +};
->>>> +
->>>> +#include "axp22x.dtsi"
->>>> +
->>>> &pio {
->>>>        led_pins_m9: led_pins at 0 {
->>>>                allwinner,pins = "PH13";
->>>> @@ -131,6 +149,73 @@
->>>>        };
->>>> };
->>>>
->>>> +&reg_aldo1 {
->>>> +       regulator-min-microvolt = <3300000>;
->>>> +       regulator-max-microvolt = <3300000>;
->>>> +       regulator-name = "vcc-wifi";
->>>> +};
->>>> +
->>>> +&reg_aldo3 {
->>>> +       regulator-always-on;
->>>> +       regulator-min-microvolt = <2700000>;
->>>> +       regulator-max-microvolt = <3300000>;
->>>> +       regulator-name = "avcc";
->>>> +};
->>>> +
->>>> +&reg_dc5ldo {
->>>> +       regulator-always-on;
->>>> +       regulator-min-microvolt = <700000>;
->>>> +       regulator-max-microvolt = <1320000>;
->>>> +       regulator-name = "vdd-cpus"; /* This is an educated guess */
->>>> +};
->>>> +
->>>> +&reg_dcdc1 {
->>>> +       regulator-always-on;
->>>> +       regulator-min-microvolt = <3300000>;
->>>> +       regulator-max-microvolt = <3300000>;
->>>> +       regulator-name = "vcc-3v3";
->>>> +};
->>>> +
->>>> +&reg_dcdc2 {
->>>> +       regulator-min-microvolt = <700000>;
->>>> +       regulator-max-microvolt = <1320000>;
->>>> +       regulator-name = "vdd-gpu";
->>>> +};
->>>> +
->>>> +&reg_dcdc3 {
->>>> +       regulator-always-on;
->>>> +       regulator-min-microvolt = <700000>;
->>>> +       regulator-max-microvolt = <1320000>;
->>>> +       regulator-name = "vdd-cpu";
->>>> +};
->>>> +
->>>> +&reg_dcdc4 {
->>>> +       regulator-always-on;
->>>> +       regulator-min-microvolt = <700000>;
->>>> +       regulator-max-microvolt = <1320000>;
->>>> +       regulator-name = "vdd-sys-dll";
->>>> +};
->>>> +
->>>> +&reg_dcdc5 {
->>>> +       regulator-always-on;
->>>> +       regulator-min-microvolt = <1500000>;
->>>> +       regulator-max-microvolt = <1500000>;
->>>> +       regulator-name = "vcc-dram";
->>>> +};
->>>> +
->>>> +&reg_dldo1 {
->>>> +       regulator-min-microvolt = <3300000>;
->>>> +       regulator-max-microvolt = <3300000>;
->>>> +       regulator-name = "vcc-ethernet-phy";
->>>> +};
->>>> +
->>>> +&reg_dldo4 {
->>>> +       regulator-always-on;
->>>
->>> Why not tie this to the usbphy? Same for the other patch.
->>
->> Because both reg_usb1_vbus and reg_dldo4 need to be on
->> for the hub attached to usb1 to work, and I can list
->> only one usb1_vbus-supply.
->
-> Adding a comment stating that would be great :)
+All models support parallel / lvds lcd panels, the R8 and A10s also
+support tv-out and the A10s also supports HDMI out.
 
-Ok I'll send a v2 of both patch with an amended commit msg.
+This commit prepares for enabling display blocks on A10s boards,
+but it also is a bug-fix for A10s boards, because before this commit
+the simplefb nodes for A10s were not listing the recently added
+pll3 as clock, causing the display to go black when the kernel
+disables unused clocks at the end of boot.
 
-Regards,
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+Changes in v2:
+-Fix typos in and spelling of commit msg
+---
+ arch/arm/boot/dts/sun5i-a10s.dtsi |  24 ++---
+ arch/arm/boot/dts/sun5i-a13.dtsi  | 182 --------------------------------------
+ arch/arm/boot/dts/sun5i.dtsi      | 182 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 189 insertions(+), 199 deletions(-)
 
-Hans
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index bddd0de..507ec42 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -57,24 +57,13 @@
+ 	};
+ 
+ 	chosen {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		framebuffer at 0 {
+-			compatible = "allwinner,simple-framebuffer",
+-				     "simple-framebuffer";
+-			allwinner,pipeline = "de_be0-lcd0-hdmi";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+-				 <&ahb_gates 44>;
+-			status = "disabled";
+-		};
+-
+ 		framebuffer at 1 {
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+-			allwinner,pipeline = "de_be0-lcd0";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>;
++			allwinner,pipeline = "de_be0-lcd0-hdmi";
++			clocks = <&ahb_gates 36>, <&ahb_gates 43>,
++				 <&ahb_gates 44>, <&de_be_clk>,
++				 <&tcon_ch1_clk>, <&dram_gates 26>;
+ 			status = "disabled";
+ 		};
+ 
+@@ -82,8 +71,9 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-tve0";
+-			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
+-				 <&ahb_gates 44>;
++			clocks = <&ahb_gates 34>, <&ahb_gates 36>,
++				 <&ahb_gates 44>, <&de_be_clk>,
++				 <&tcon_ch1_clk>, <&dram_gates 26>;
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index e012890..5b6d9fc 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -52,21 +52,6 @@
+ / {
+ 	interrupt-parent = <&intc>;
+ 
+-	chosen {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		framebuffer at 0 {
+-			compatible = "allwinner,simple-framebuffer",
+-				     "simple-framebuffer";
+-			allwinner,pipeline = "de_be0-lcd0";
+-			clocks = <&ahb_gates 36>, <&ahb_gates 44>, <&de_be_clk>,
+-				 <&tcon_ch0_clk>, <&dram_gates 26>;
+-			status = "disabled";
+-		};
+-	};
+-
+ 	thermal-zones {
+ 		cpu_thermal {
+ 			/* milliseconds */
+@@ -150,107 +135,9 @@
+ 					     "apb1_i2c2", "apb1_uart1",
+ 					     "apb1_uart3";
+ 		};
+-
+-		dram_gates: clk at 01c20100 {
+-			#clock-cells = <1>;
+-			compatible = "allwinner,sun5i-a13-dram-gates-clk",
+-				     "allwinner,sun4i-a10-gates-clk";
+-			reg = <0x01c20100 0x4>;
+-			clocks = <&pll5 0>;
+-			clock-indices = <0>,
+-					<1>,
+-					<25>,
+-					<26>,
+-					<29>,
+-					<31>;
+-			clock-output-names = "dram_ve",
+-					     "dram_csi",
+-					     "dram_de_fe",
+-					     "dram_de_be",
+-					     "dram_ace",
+-					     "dram_iep";
+-		};
+-
+-		de_be_clk: clk at 01c20104 {
+-			#clock-cells = <0>;
+-			#reset-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-display-clk";
+-			reg = <0x01c20104 0x4>;
+-			clocks = <&pll3>, <&pll7>, <&pll5 1>;
+-			clock-output-names = "de-be";
+-		};
+-
+-		de_fe_clk: clk at 01c2010c {
+-			#clock-cells = <0>;
+-			#reset-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-display-clk";
+-			reg = <0x01c2010c 0x4>;
+-			clocks = <&pll3>, <&pll7>, <&pll5 1>;
+-			clock-output-names = "de-fe";
+-		};
+-
+-		tcon_ch0_clk: clk at 01c20118 {
+-			#clock-cells = <0>;
+-			#reset-cells = <1>;
+-			compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
+-			reg = <0x01c20118 0x4>;
+-			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
+-			clock-output-names = "tcon-ch0-sclk";
+-		};
+-
+-		tcon_ch1_clk: clk at 01c2012c {
+-			#clock-cells = <0>;
+-			compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
+-			reg = <0x01c2012c 0x4>;
+-			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
+-			clock-output-names = "tcon-ch1-sclk";
+-		};
+-	};
+-
+-	display-engine {
+-		compatible = "allwinner,sun5i-a13-display-engine";
+-		allwinner,pipelines = <&fe0>;
+ 	};
+ 
+ 	soc at 01c00000 {
+-		tcon0: lcd-controller at 01c0c000 {
+-			compatible = "allwinner,sun5i-a13-tcon";
+-			reg = <0x01c0c000 0x1000>;
+-			interrupts = <44>;
+-			resets = <&tcon_ch0_clk 1>;
+-			reset-names = "lcd";
+-			clocks = <&ahb_gates 36>,
+-				 <&tcon_ch0_clk>,
+-				 <&tcon_ch1_clk>;
+-			clock-names = "ahb",
+-				      "tcon-ch0",
+-				      "tcon-ch1";
+-			clock-output-names = "tcon-pixel-clock";
+-			status = "disabled";
+-
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				tcon0_in: port at 0 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <0>;
+-
+-					tcon0_in_be0: endpoint at 0 {
+-						reg = <0>;
+-						remote-endpoint = <&be0_out_tcon0>;
+-					};
+-				};
+-
+-				tcon0_out: port at 1 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <1>;
+-				};
+-			};
+-		};
+-
+ 		pwm: pwm at 01c20e00 {
+ 			compatible = "allwinner,sun5i-a13-pwm";
+ 			reg = <0x01c20e00 0xc>;
+@@ -258,75 +145,6 @@
+ 			#pwm-cells = <3>;
+ 			status = "disabled";
+ 		};
+-
+-		fe0: display-frontend at 01e00000 {
+-			compatible = "allwinner,sun5i-a13-display-frontend";
+-			reg = <0x01e00000 0x20000>;
+-			interrupts = <47>;
+-			clocks = <&ahb_gates 46>, <&de_fe_clk>,
+-				 <&dram_gates 25>;
+-			clock-names = "ahb", "mod",
+-				      "ram";
+-			resets = <&de_fe_clk>;
+-			status = "disabled";
+-
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				fe0_out: port at 1 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <1>;
+-
+-					fe0_out_be0: endpoint at 0 {
+-						reg = <0>;
+-						remote-endpoint = <&be0_in_fe0>;
+-					};
+-				};
+-			};
+-		};
+-
+-		be0: display-backend at 01e60000 {
+-			compatible = "allwinner,sun5i-a13-display-backend";
+-			reg = <0x01e60000 0x10000>;
+-			clocks = <&ahb_gates 44>, <&de_be_clk>,
+-				 <&dram_gates 26>;
+-			clock-names = "ahb", "mod",
+-				      "ram";
+-			resets = <&de_be_clk>;
+-			status = "disabled";
+-
+-			assigned-clocks = <&de_be_clk>;
+-			assigned-clock-rates = <300000000>;
+-
+-			ports {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-
+-				be0_in: port at 0 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <0>;
+-
+-					be0_in_fe0: endpoint at 0 {
+-						reg = <0>;
+-						remote-endpoint = <&fe0_out_be0>;
+-					};
+-				};
+-
+-				be0_out: port at 1 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <1>;
+-
+-					be0_out_tcon0: endpoint at 0 {
+-						reg = <0>;
+-						remote-endpoint = <&tcon0_in_be0>;
+-					};
+-				};
+-			};
+-		};
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index 0840612..3c8bab9 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -51,6 +51,21 @@
+ / {
+ 	interrupt-parent = <&intc>;
+ 
++	chosen {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		framebuffer at 0 {
++			compatible = "allwinner,simple-framebuffer",
++				     "simple-framebuffer";
++			allwinner,pipeline = "de_be0-lcd0";
++			clocks = <&ahb_gates 36>, <&ahb_gates 44>, <&de_be_clk>,
++				 <&tcon_ch0_clk>, <&dram_gates 26>;
++			status = "disabled";
++		};
++	};
++
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+@@ -338,6 +353,61 @@
+ 			clock-output-names = "usb_ohci0", "usb_phy";
+ 		};
+ 
++		dram_gates: clk at 01c20100 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun5i-a13-dram-gates-clk",
++				     "allwinner,sun4i-a10-gates-clk";
++			reg = <0x01c20100 0x4>;
++			clocks = <&pll5 0>;
++			clock-indices = <0>,
++					<1>,
++					<25>,
++					<26>,
++					<29>,
++					<31>;
++			clock-output-names = "dram_ve",
++					     "dram_csi",
++					     "dram_de_fe",
++					     "dram_de_be",
++					     "dram_ace",
++					     "dram_iep";
++		};
++
++		de_be_clk: clk at 01c20104 {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c20104 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-be";
++		};
++
++		de_fe_clk: clk at 01c2010c {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c2010c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-fe";
++		};
++
++		tcon_ch0_clk: clk at 01c20118 {
++			#clock-cells = <0>;
++			#reset-cells = <1>;
++			compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
++			reg = <0x01c20118 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon-ch0-sclk";
++		};
++
++		tcon_ch1_clk: clk at 01c2012c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
++			reg = <0x01c2012c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon-ch1-sclk";
++		};
++
+ 		codec_clk: clk at 01c20140 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-codec-clk";
+@@ -355,6 +425,11 @@
+ 		};
+ 	};
+ 
++	display-engine {
++		compatible = "allwinner,sun5i-a13-display-engine";
++		allwinner,pipelines = <&fe0>;
++	};
++
+ 	soc at 01c00000 {
+ 		compatible = "simple-bus";
+ 		#address-cells = <1>;
+@@ -427,6 +502,44 @@
+ 			#size-cells = <0>;
+ 		};
+ 
++		tcon0: lcd-controller at 01c0c000 {
++			compatible = "allwinner,sun5i-a13-tcon";
++			reg = <0x01c0c000 0x1000>;
++			interrupts = <44>;
++			resets = <&tcon_ch0_clk 1>;
++			reset-names = "lcd";
++			clocks = <&ahb_gates 36>,
++				 <&tcon_ch0_clk>,
++				 <&tcon_ch1_clk>;
++			clock-names = "ahb",
++				      "tcon-ch0",
++				      "tcon-ch1";
++			clock-output-names = "tcon-pixel-clock";
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				tcon0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					tcon0_in_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_out_tcon0>;
++					};
++				};
++
++				tcon0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++				};
++			};
++		};
++
+ 		mmc0: mmc at 01c0f000 {
+ 			compatible = "allwinner,sun5i-a13-mmc";
+ 			reg = <0x01c0f000 0x1000>;
+@@ -713,5 +826,74 @@
+ 			interrupts = <82>, <83>;
+ 			clocks = <&ahb_gates 28>;
+ 		};
++
++		fe0: display-frontend at 01e00000 {
++			compatible = "allwinner,sun5i-a13-display-frontend";
++			reg = <0x01e00000 0x20000>;
++			interrupts = <47>;
++			clocks = <&ahb_gates 46>, <&de_fe_clk>,
++				 <&dram_gates 25>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&de_fe_clk>;
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				fe0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					fe0_out_be0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&be0_in_fe0>;
++					};
++				};
++			};
++		};
++
++		be0: display-backend at 01e60000 {
++			compatible = "allwinner,sun5i-a13-display-backend";
++			reg = <0x01e60000 0x10000>;
++			clocks = <&ahb_gates 44>, <&de_be_clk>,
++				 <&dram_gates 26>;
++			clock-names = "ahb", "mod",
++				      "ram";
++			resets = <&de_be_clk>;
++			status = "disabled";
++
++			assigned-clocks = <&de_be_clk>;
++			assigned-clock-rates = <300000000>;
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++
++				be0_in: port at 0 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <0>;
++
++					be0_in_fe0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&fe0_out_be0>;
++					};
++				};
++
++				be0_out: port at 1 {
++					#address-cells = <1>;
++					#size-cells = <0>;
++					reg = <1>;
++
++					be0_out_tcon0: endpoint at 0 {
++						reg = <0>;
++						remote-endpoint = <&tcon0_in_be0>;
++					};
++				};
++			};
++		};
+ 	};
+ };
+-- 
+2.7.4
