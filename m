@@ -1,38 +1,39 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Thu, 9 Jun 2016 13:42:03 +0200
-Subject: [PATCH v5 2/3] documentation: Add secure monitor binding
- documentation
-In-Reply-To: <20160602171422.GA17166@rob-hp-laptop>
-References: <1464520323-19531-1-git-send-email-carlo@caione.org>
- <1464520323-19531-3-git-send-email-carlo@caione.org>
- <20160602171422.GA17166@rob-hp-laptop>
-Message-ID: <20160609114203.GA4671@mephisto>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu,  9 Jun 2016 12:52:25 +0100
+Subject: [PATCH] ARM: Kirkwood: make kirkwood_disable_mbus_error_propagation()
+ static
+Message-ID: <1465473145-20826-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/06/16 12:14, Rob Herring wrote:
-> On Sun, May 29, 2016 at 01:12:02PM +0200, Carlo Caione wrote:
+The kirkwood_disable_mbus_error_propagation is not exported or declared
+elsewhere, so make it static to avoid the following warning:
 
-[...]
-> > +Example of the node using the secure monitor:
-> > +
-> > +	#include <dt-bindings/firmware/meson-sm.h>
-> > +
-> > +	...
-> > +
-> > +	efuse: efuse {
-> > +		compatible = "amlogic,meson-gxbb-efuse";
-> > +		secure-monitor = <&sm>;
-> 
-> Why do you need this? Given there can only be one node, just use 
-> of_find_compatible_node();
+arch/arm/mach-mvebu/kirkwood.c:153:6: warning: symbol 'kirkwood_disable_mbus_error_propagation' was not declared. Should it be static?
 
-of_find_compatible_node() in the driver works fine if we have only one
-possible compatible property for the secure-monitor node. In this case
-we have a different compatible property for each SoC (GXBB in this case)
-so I think having the phandle in the DT is still the best thing to do.
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-mvebu/kirkwood.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Any thought on this Rob?
-
+diff --git a/arch/arm/mach-mvebu/kirkwood.c b/arch/arm/mach-mvebu/kirkwood.c
+index f9d8e1e..a3f4029 100644
+--- a/arch/arm/mach-mvebu/kirkwood.c
++++ b/arch/arm/mach-mvebu/kirkwood.c
+@@ -150,7 +150,7 @@ eth_fixup_skip:
+  * causes mbus errors (which can occur for example for PCI aborts) to
+  * throw CPU aborts, which we're not set up to deal with.
+  */
+-void kirkwood_disable_mbus_error_propagation(void)
++static void kirkwood_disable_mbus_error_propagation(void)
+ {
+ 	void __iomem *cpu_config;
+ 
 -- 
-Carlo Caione
+2.8.1
