@@ -1,32 +1,24 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 9 Jun 2016 16:12:15 +0200
-Subject: [PATCH] ARM: orion: remove unreferenced board-d2net.c
-In-Reply-To: <20160609141006.GK30205@lunn.ch>
-References: <1465466656-30002-1-git-send-email-ben.dooks@codethink.co.uk>
- <20160609133116.GH30205@lunn.ch>
- <20160609153935.44323b8e@free-electrons.com>
- <20160609141006.GK30205@lunn.ch>
-Message-ID: <20160609161215.084e06f1@free-electrons.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 09 Jun 2016 16:12:58 +0200
+Subject: [PATCH v10 0/8] add i2c driver supported for rk3399
+In-Reply-To: <20160609074752.GA3720@katana>
+References: <1463407063-41218-1-git-send-email-david.wu@rock-chips.com>
+ <2239664.BKqQWGCl8U@diego> <20160609074752.GA3720@katana>
+Message-ID: <1984217.j9J6dIjr4z@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Thu, 9 Jun 2016 16:10:06 +0200, Andrew Lunn wrote:
-
-> > That being said, this has been broken more than 2 years ago, and nobody
-> > noticed. Doesn't this mean that we could get rid of the support for
-> > this board entirely? :)  
+Am Donnerstag, 9. Juni 2016, 09:47:53 schrieb Wolfram Sang:
+> > this series looks pretty nice now and it seems most everybody is happy
+> > with it by now. Do you still have it in your inbox to look at, or should
+> > David resend it again?
 > 
-> Well, all it means is the LEDs don't blink. If the disk was not
-> spinning, or the ethernet device missing, i would agree with you. But
-> somebody could be using this device and don't notice the difference
-> with the LEDs.
+> I use patchwork (as stated in MAINTAINERS), so nothing gets lost as long
+> as it is send to the i2c-list. As long as it still applies, no need to
+> resend. This series does have priority, thanks to the tags given.
 
-True. I'm probably trying to hard to clean up the dust :)
+Just verified that everything still applies against 4.7-rc1 and present boards 
+still have working i2c with this series.
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+
+Heiko
