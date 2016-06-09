@@ -1,36 +1,103 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 9 Jun 2016 15:39:35 +0200
-Subject: [PATCH] ARM: orion: remove unreferenced board-d2net.c
-In-Reply-To: <20160609133116.GH30205@lunn.ch>
-References: <1465466656-30002-1-git-send-email-ben.dooks@codethink.co.uk>
- <20160609133116.GH30205@lunn.ch>
-Message-ID: <20160609153935.44323b8e@free-electrons.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 9 Jun 2016 21:45:59 +0800
+Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
+In-Reply-To: <1465456218-28354-10-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <201606092116.RFdPDzjC%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Thu, 9 Jun 2016 15:31:16 +0200, Andrew Lunn wrote:
-> On Thu, Jun 09, 2016 at 11:04:16AM +0100, Ben Dooks wrote:
-> > Either this has been mis-converted (and needs to be fixed) or
-> > is no longer referenced and can be safely removed.  
-> 
-> Hi Thomas
-> 
-> You added this code, which Ben is removing. It does look like you
-> forgot to call d2net_init() from orion5x_dt_init().
-> 
-> Please could you look at this.
+[auto build test ERROR on ulf.hansson-mmc/next]
+[also build test ERROR on v4.7-rc2 next-20160609]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-You are correct: d2net_init() should be called from orion5x_dt_init(),
-or called through some initcall mechanism.
+url:    https://github.com/0day-ci/linux/commits/Gregory-CLEMENT/Add-SDHCI-Xenon-driver/20160609-151403
+base:   https://git.linaro.org/people/ulf.hansson/mmc next
+config: ia64-allyesconfig (attached as .config)
+compiler: ia64-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=ia64 
 
-That being said, this has been broken more than 2 years ago, and nobody
-noticed. Doesn't this mean that we could get rid of the support for
-this board entirely? :)
+All errors (new ones prefixed by >>):
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+   In file included from drivers/mmc/host/sdhci-xenon.c:14:0:
+>> arch/ia64/include/uapi/asm/setup.h:7:2: error: unknown type name '__u64'
+     __u64 command_line;  /* physical address of command line arguments */
+     ^
+   arch/ia64/include/uapi/asm/setup.h:8:2: error: unknown type name '__u64'
+     __u64 efi_systab;  /* physical address of EFI system table */
+     ^
+   arch/ia64/include/uapi/asm/setup.h:9:2: error: unknown type name '__u64'
+     __u64 efi_memmap;  /* physical address of EFI memory map */
+     ^
+   arch/ia64/include/uapi/asm/setup.h:10:2: error: unknown type name '__u64'
+     __u64 efi_memmap_size;  /* size of EFI memory map */
+     ^
+   arch/ia64/include/uapi/asm/setup.h:11:2: error: unknown type name '__u64'
+     __u64 efi_memdesc_size;  /* size of an EFI memory map descriptor */
+     ^
+>> arch/ia64/include/uapi/asm/setup.h:12:2: error: unknown type name '__u32'
+     __u32 efi_memdesc_version; /* memory descriptor version */
+     ^
+>> arch/ia64/include/uapi/asm/setup.h:14:3: error: unknown type name '__u16'
+      __u16 num_cols; /* number of columns on console output device */
+      ^
+   arch/ia64/include/uapi/asm/setup.h:15:3: error: unknown type name '__u16'
+      __u16 num_rows; /* number of rows on console output device */
+      ^
+   arch/ia64/include/uapi/asm/setup.h:16:3: error: unknown type name '__u16'
+      __u16 orig_x; /* cursor's x position */
+      ^
+   arch/ia64/include/uapi/asm/setup.h:17:3: error: unknown type name '__u16'
+      __u16 orig_y; /* cursor's y position */
+      ^
+   arch/ia64/include/uapi/asm/setup.h:19:2: error: unknown type name '__u64'
+     __u64 fpswa;  /* physical address of the fpswa interface */
+     ^
+   arch/ia64/include/uapi/asm/setup.h:20:2: error: unknown type name '__u64'
+     __u64 initrd_start;
+     ^
+   arch/ia64/include/uapi/asm/setup.h:21:2: error: unknown type name '__u64'
+     __u64 initrd_size;
+     ^
+
+vim +/__u64 +7 arch/ia64/include/uapi/asm/setup.h
+
+^1da177e include/asm-ia64/setup.h      Linus Torvalds 2005-04-16   1  #ifndef __IA64_SETUP_H
+^1da177e include/asm-ia64/setup.h      Linus Torvalds 2005-04-16   2  #define __IA64_SETUP_H
+^1da177e include/asm-ia64/setup.h      Linus Torvalds 2005-04-16   3  
+cca97de1 include/asm-ia64/setup.h      Alon Bar-Lev   2007-02-12   4  #define COMMAND_LINE_SIZE	2048
+^1da177e include/asm-ia64/setup.h      Linus Torvalds 2005-04-16   5  
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28   6  extern struct ia64_boot_param {
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28  @7  	__u64 command_line;		/* physical address of command line arguments */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28   8  	__u64 efi_systab;		/* physical address of EFI system table */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28  @9  	__u64 efi_memmap;		/* physical address of EFI memory map */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28 @10  	__u64 efi_memmap_size;		/* size of EFI memory map */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28  11  	__u64 efi_memdesc_size;		/* size of an EFI memory map descriptor */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28 @12  	__u32 efi_memdesc_version;	/* memory descriptor version */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28  13  	struct {
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28 @14  		__u16 num_cols;	/* number of columns on console output device */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28  15  		__u16 num_rows;	/* number of rows on console output device */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28  16  		__u16 orig_x;	/* cursor's x position */
+c140d879 arch/ia64/include/asm/setup.h David Howells  2012-03-28  17  		__u16 orig_y;	/* cursor's y position */
+
+:::::: The code at line 7 was first introduced by commit
+:::::: c140d87995b68b428f70635c2e4071e4e8b3256e Disintegrate asm/system.h for IA64
+
+:::::: TO: David Howells <dhowells@redhat.com>
+:::::: CC: David Howells <dhowells@redhat.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 46356 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/5a5f3830/attachment-0001.obj>
