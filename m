@@ -1,28 +1,33 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 9 Jun 2016 14:29:14 +0900
-Subject: [PATCH V2 2/2] ARM64: tegra: Add device node for system PMIC
- MAX77620
-In-Reply-To: <1465299897-2491-2-git-send-email-ldewangan@nvidia.com>
-References: <1465299897-2491-1-git-send-email-ldewangan@nvidia.com>
- <1465299897-2491-2-git-send-email-ldewangan@nvidia.com>
-Message-ID: <CAAVeFuJeVLs7avKgs+YZn_JZ+jeJ9sScEHx6LrQ1aN0QFvhjLA@mail.gmail.com>
+From: nab@linux-iscsi.org (Nicholas A. Bellinger)
+Date: Wed, 08 Jun 2016 22:38:10 -0700
+Subject: [PATCH] target: Fix for hang of Ordered task in TCM
+In-Reply-To: <1465415022-79833-1-git-send-email-bryantly@linux.vnet.ibm.com>
+References: <1464067904.22249.53.camel@haakon3.risingtidesystems.com>
+ <1465415022-79833-1-git-send-email-bryantly@linux.vnet.ibm.com>
+Message-ID: <1465450690.5365.145.camel@haakon3.risingtidesystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 8:44 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
-> Jetson-TX1 uses the Maxim MAX77620 as system Power management IC.
-> Add device node for the MAX77620 with following details:
-> - Add device max77620 with.
->         - Add all pins configurations.
->         - Configure FPS of the device.
->         - Configure SD/DCDC and LDOs regulators.
-> - populate the bus expander on base board P2597.
-> - Populate all fixed voltage regulators controlled by GPIOs from Tegra,
->   PMIC and bus expanders.
->
-> For the different details, jetson-CV device tree files are referred from
-> downstream.
+On Wed, 2016-06-08 at 14:43 -0500, Bryant G. Ly wrote:
 
-I think Thierry posted a similar change:
+<SNIP>
 
-http://permalink.gmane.org/gmane.linux.ports.tegra/26815
+> 
+> Hi Nic,
+> 
+> So I was testing the ibmvscsi target driver and I ran into some problems
+> again with UA stuff and it looks like you didnt remove the UA checks from
+> target_setup_cmd_from_cdb? Was that intentional? I thought we agreed to move
+> it completely to target_execute_cmd and not have both?
+> 
+> Let me know.
+> 
+
+Ah yes, the version of the patch I've been using for future target-core
+developments was missing the removal in target_setup_cmd_from_cdb().
+
+Applied the proper version to target-pending/master here:
+
+https://git.kernel.org/cgit/linux/kernel/git/nab/target-pending.git/commit/?id=15ce22fa491aa3bab7acd89ac40a9fc27aeed915
+
+Thanks for the heads up!
