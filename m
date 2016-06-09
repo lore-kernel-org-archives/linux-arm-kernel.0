@@ -1,71 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 9 Jun 2016 10:44:01 +0200
-Subject: [PATCH v3 05/12] ARM: shmobile: r8a7792: add SMP support
-In-Reply-To: <7848375.HIECFST0Ua@wasted.cogentembedded.com>
-References: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
- <7848375.HIECFST0Ua@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdXe==X8x5Q2Hnm7kPp9THwvqVq95imwGoAQyDQv=8=P3g@mail.gmail.com>
+From: sf84@laposte.net (Sebastian Frias)
+Date: Thu, 9 Jun 2016 10:52:12 +0200
+Subject: Platform-specific suspend/resume code in drivers
+In-Reply-To: <Pine.LNX.4.44L0.1606081340050.2191-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1606081340050.2191-100000@iolanthe.rowland.org>
+Message-ID: <57592E3C.8020005@laposte.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Hi Alan,
 
-On Wed, Jun 8, 2016 at 11:15 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Add R8A7792 SMP support using the shared APMU code. This SoC has 2 ARM
-> Cortex-A15  CPU cores.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
-> Changes in version 3:
-> - new patch.
->
->  arch/arm/mach-shmobile/Makefile        |    1
->  arch/arm/mach-shmobile/r8a7792.h       |    6 +++
->  arch/arm/mach-shmobile/setup-r8a7792.c |    2 +
->  arch/arm/mach-shmobile/smp-r8a7792.c   |   62 +++++++++++++++++++++++++++++++++
->  4 files changed, 71 insertions(+)
->
-> Index: renesas/arch/arm/mach-shmobile/Makefile
-> ===================================================================
-> --- renesas.orig/arch/arm/mach-shmobile/Makefile
-> +++ renesas/arch/arm/mach-shmobile/Makefile
-> @@ -35,6 +35,7 @@ smp-$(CONFIG_ARCH_SH73A0)     += smp-sh73a0.
->  smp-$(CONFIG_ARCH_R8A7779)     += smp-r8a7779.o headsmp-scu.o platsmp-scu.o
->  smp-$(CONFIG_ARCH_R8A7790)     += smp-r8a7790.o
->  smp-$(CONFIG_ARCH_R8A7791)     += smp-r8a7791.o
-> +smp-$(CONFIG_ARCH_R8A7792)     += smp-r8a7792.o
->  smp-$(CONFIG_ARCH_EMEV2)       += smp-emev2.o headsmp-scu.o platsmp-scu.o
->
->  # PM objects
-> Index: renesas/arch/arm/mach-shmobile/r8a7792.h
-> ===================================================================
-> --- /dev/null
-> +++ renesas/arch/arm/mach-shmobile/r8a7792.h
-> @@ -0,0 +1,6 @@
-> +#ifndef __ASM_R8A7792_H__
-> +#define __ASM_R8A7792_H__
-> +
-> +extern const struct smp_operations r8a7792_smp_ops;
+On 06/08/2016 07:45 PM, Alan Stern wrote:
+>> I guess the thermal driver is platform-specific, but most devices
+>> are third-party IP blocks, so there is a "common" driver upstream.
+>> But I would need a platform-specific suspend/resume sequence,
+>> just for my platform.
+> 
+> Why?  What sort of platform-specific things do you need to do?
+> 
+>>> For another, the driver should be written in a way that doesn't require
+>>> this sort of code.  The ops pointer (not any of the structure's members
+>>> -- a pointer to the structure) should be set by the platform-dependent
+>>> part of the driver that handles initialization.
+>>
+>> I don't understand. If my platform loses context on suspend, then
+>> I must save/restore it. But this wasteful operation should not be
+>> imposed on other platforms.
+> 
+> More details, please.
 
-For new SMP support, you should no longer add an SoC-specific struct
-smp_operations, but rely on the DT "enable-method" property, cfr.
-"[PATCH v3 00/09] ARM: shmobile: APMU DT support via SMP Enable method V3"
-(http://www.spinics.net/lists/linux-sh/msg45229.html).
+In addition to what Marc already replied, allow me to put a small (and hopefully self-contained) example:
 
-That series will no longer apply, but I've been carrying (and rebasing) it in
-my local tree for quite a while, as it was related to SYSC cleanup (avoiding
-your r8a7792_ca15_scu). But unfortunately that depends on the SYSC node always
-be present in DT.
+- There's a SoC with a HW IP (UART, ethernet, usb or whatever else) for which a generic driver exists.
+- The generic driver only needs to know the base address of the block, and it will just work.
+- It'll just work, provided that when Linux boots the HW IP is enabled.
+- Indeed, the SoC may have other registers controlling if the HW IP is enabled/powered up.
+- Those registers are SoC specific, even if the HW IP is generic.
 
-Gr{oetje,eeting}s,
+So the question is:
+=> Does the use of a generic driver indirectly implies that any SoC specific registers are to be setup outside Linux?
+In other words, does Linux expects the HW IP to be powered up/enabled and ready to use? (ie: setup by the bootloader)
 
-                        Geert
+If that is not the case, what is the recommended way to handle those registers?
+In other words, do the generic drivers provide with an API to handle SoC specific enable/clockgating/powerup registers?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Thanks in advance,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Sebastian
