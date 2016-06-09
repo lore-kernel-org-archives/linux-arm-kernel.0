@@ -1,114 +1,311 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Thu, 09 Jun 2016 20:08:44 +0000
-Subject: [PATCH v18 04/13] arm64/kexec: Add pr_debug output
+Subject: [PATCH v18 08/13] arm64: kdump: implement machine_crash_shutdown()
 In-Reply-To: <cover.1465502767.git.geoff@infradead.org>
 References: <cover.1465502767.git.geoff@infradead.org>
-Message-ID: <cfd2d457d5f1991c82b641970ce20475bcc6c7dd.1465502767.git.geoff@infradead.org>
+Message-ID: <9bc011f03f5dd30fc66178461d303d3ec1b7ac35.1465502767.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aid in debugging kexec problems or when adding new functionality to kexec add
-a new routine kexec_image_info() and several inline pr_debug statements.
+From: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
+Primary kernel calls machine_crash_shutdown() to shut down non-boot cpus
+and save registers' status in per-cpu ELF notes before starting crash
+dump kernel. See kernel_kexec().
+Even if not all secondary cpus have shut down, we do kdump anyway.
+
+As we don't have to make non-boot(crashed) cpus offline (to preserve
+correct status of cpus at crash dump) before shutting down, this patch
+also adds a variant of smp_send_stop().
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/kernel/machine_kexec.c | 63 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ arch/arm64/include/asm/hardirq.h  |  2 +-
+ arch/arm64/include/asm/kexec.h    | 41 +++++++++++++++++++++++++-
+ arch/arm64/include/asm/smp.h      |  4 +++
+ arch/arm64/kernel/machine_kexec.c | 56 +++++++++++++++++++++++++++++++++--
+ arch/arm64/kernel/smp.c           | 61 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 159 insertions(+), 5 deletions(-)
 
+diff --git a/arch/arm64/include/asm/hardirq.h b/arch/arm64/include/asm/hardirq.h
+index 8740297..1473fc2 100644
+--- a/arch/arm64/include/asm/hardirq.h
++++ b/arch/arm64/include/asm/hardirq.h
+@@ -20,7 +20,7 @@
+ #include <linux/threads.h>
+ #include <asm/irq.h>
+ 
+-#define NR_IPI	6
++#define NR_IPI	7
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+index 04744dc..600b960 100644
+--- a/arch/arm64/include/asm/kexec.h
++++ b/arch/arm64/include/asm/kexec.h
+@@ -40,7 +40,46 @@
+ static inline void crash_setup_regs(struct pt_regs *newregs,
+ 				    struct pt_regs *oldregs)
+ {
+-	/* Empty routine needed to avoid build errors. */
++	if (oldregs) {
++		memcpy(newregs, oldregs, sizeof(*newregs));
++	} else {
++		u64 tmp1, tmp2;
++
++		__asm__ __volatile__ (
++			"stp	 x0,   x1, [%2, #16 *  0]\n"
++			"stp	 x2,   x3, [%2, #16 *  1]\n"
++			"stp	 x4,   x5, [%2, #16 *  2]\n"
++			"stp	 x6,   x7, [%2, #16 *  3]\n"
++			"stp	 x8,   x9, [%2, #16 *  4]\n"
++			"stp	x10,  x11, [%2, #16 *  5]\n"
++			"stp	x12,  x13, [%2, #16 *  6]\n"
++			"stp	x14,  x15, [%2, #16 *  7]\n"
++			"stp	x16,  x17, [%2, #16 *  8]\n"
++			"stp	x18,  x19, [%2, #16 *  9]\n"
++			"stp	x20,  x21, [%2, #16 * 10]\n"
++			"stp	x22,  x23, [%2, #16 * 11]\n"
++			"stp	x24,  x25, [%2, #16 * 12]\n"
++			"stp	x26,  x27, [%2, #16 * 13]\n"
++			"stp	x28,  x29, [%2, #16 * 14]\n"
++			"mov	 %0,  sp\n"
++			"stp	x30,  %0,  [%2, #16 * 15]\n"
++
++			"/* faked current PSTATE */\n"
++			"mrs	 %0, CurrentEL\n"
++			"mrs	 %1, DAIF\n"
++			"orr	 %0, %0, %1\n"
++			"mrs	 %1, NZCV\n"
++			"orr	 %0, %0, %1\n"
++
++			/* pc */
++			"adr	 %1, 1f\n"
++		"1:"
++			"stp	 %1, %0,   [%2, #16 * 16]\n"
++			: "=r" (tmp1), "=r" (tmp2), "+r" (newregs)
++			:
++			: "memory"
++		);
++	}
+ }
+ 
+ #endif /* __ASSEMBLY__ */
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index 38712f4..979154a 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -134,6 +134,10 @@ static inline void cpu_panic_kernel(void)
+  */
+ bool cpus_are_stuck_in_kernel(void);
+ 
++#ifdef CONFIG_KEXEC_CORE
++extern void smp_send_crash_stop(void);
++#endif
++
+ #endif /* ifndef __ASSEMBLY__ */
+ 
+ #endif /* ifndef __ASM_SMP_H */
 diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 05f7c21..0a8b04d 100644
+index 0a8b04d..93588b2 100644
 --- a/arch/arm64/kernel/machine_kexec.c
 +++ b/arch/arm64/kernel/machine_kexec.c
-@@ -11,6 +11,7 @@
+@@ -10,6 +10,9 @@
+  */
  
  #include <linux/highmem.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
++#include <linux/kernel.h>
  #include <linux/kexec.h>
-+#include <linux/libfdt_env.h>
+ #include <linux/libfdt_env.h>
  #include <linux/of_fdt.h>
- #include <linux/slab.h>
- #include <linux/smp.h>
-@@ -29,6 +30,47 @@ extern const unsigned long arm64_relocate_new_kernel_size;
+@@ -28,6 +31,7 @@
+ extern const unsigned char arm64_relocate_new_kernel[];
+ extern const unsigned long arm64_relocate_new_kernel_size;
  
++bool in_crash_kexec;
  static unsigned long kimage_start;
  
-+/**
-+ * kexec_is_dtb - Helper routine to check the device tree header signature.
-+ */
-+static bool kexec_is_dtb(const void *dtb)
+ /**
+@@ -179,7 +183,8 @@ void machine_kexec(struct kimage *kimage)
+ 	/*
+ 	 * New cpus may have become stuck_in_kernel after we loaded the image.
+ 	 */
+-	BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1));
++	BUG_ON(cpus_are_stuck_in_kernel() && (num_online_cpus() > 1) &&
++			!WARN_ON(in_crash_kexec));
+ 
+ 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+ 	reboot_code_buffer = kmap(kimage->control_code_page);
+@@ -236,13 +241,58 @@ void machine_kexec(struct kimage *kimage)
+ 	 * relocation is complete.
+ 	 */
+ 
+-	cpu_soft_restart(1, reboot_code_buffer_phys, kimage->head,
++	cpu_soft_restart(in_crash_kexec, reboot_code_buffer_phys, kimage->head,
+ 		kimage_start, 0);
+ 
+ 	BUG(); /* Should never get here. */
+ }
+ 
++static void machine_kexec_mask_interrupts(void)
 +{
-+	__be32 magic;
++	unsigned int i;
++	struct irq_desc *desc;
 +
-+	if (get_user(magic, (__be32 *)dtb))
-+		return false;
++	for_each_irq_desc(i, desc) {
++		struct irq_chip *chip;
++		int ret;
 +
-+	return fdt32_to_cpu(magic) == OF_DT_HEADER;
-+}
++		chip = irq_desc_get_chip(desc);
++		if (!chip)
++			continue;
 +
-+/**
-+ * kexec_image_info - For debugging output.
-+ */
-+#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
-+static void _kexec_image_info(const char *func, int line,
-+	const struct kimage *kimage)
-+{
-+	unsigned long i;
++		/*
++		 * First try to remove the active state. If this
++		 * fails, try to EOI the interrupt.
++		 */
++		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
 +
-+	pr_debug("%s:%d:\n", func, line);
-+	pr_debug("  kexec kimage info:\n");
-+	pr_debug("    type:        %d\n", kimage->type);
-+	pr_debug("    start:       %lx\n", kimage->start);
-+	pr_debug("    head:        %lx\n", kimage->head);
-+	pr_debug("    nr_segments: %lu\n", kimage->nr_segments);
++		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
++		    chip->irq_eoi)
++			chip->irq_eoi(&desc->irq_data);
 +
-+	for (i = 0; i < kimage->nr_segments; i++) {
-+		pr_debug("      segment[%lu]: %016lx - %016lx, 0x%lx bytes, %lu pages%s\n",
-+			i,
-+			kimage->segment[i].mem,
-+			kimage->segment[i].mem + kimage->segment[i].memsz,
-+			kimage->segment[i].memsz,
-+			kimage->segment[i].memsz /  PAGE_SIZE,
-+			(kexec_is_dtb(kimage->segment[i].buf) ?
-+				", dtb segment" : ""));
++		if (chip->irq_mask)
++			chip->irq_mask(&desc->irq_data);
++
++		if (chip->irq_disable && !irqd_irq_disabled(&desc->irq_data))
++			chip->irq_disable(&desc->irq_data);
 +	}
 +}
 +
- void machine_kexec_cleanup(struct kimage *kimage)
++/**
++ * machine_crash_shutdown - shutdown non-crashing cpus and save registers
++ */
+ void machine_crash_shutdown(struct pt_regs *regs)
  {
- 	/* Empty routine needed to avoid build errors. */
-@@ -65,6 +107,8 @@ int machine_kexec_prepare(struct kimage *kimage)
- 		}
- 	}
- 
-+	kexec_image_info(kimage);
+-	/* Empty routine needed to avoid build errors. */
++	local_irq_disable();
 +
- 	return 0;
++	in_crash_kexec = true;
++
++	/* shutdown non-crashing cpus */
++	smp_send_crash_stop();
++
++	/* for crashing cpu */
++	crash_save_cpu(regs, smp_processor_id());
++	machine_kexec_mask_interrupts();
++
++	pr_info("Starting crashdump kernel...\n");
+ }
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index d0bcd55..f6461ef 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -37,6 +37,7 @@
+ #include <linux/completion.h>
+ #include <linux/of.h>
+ #include <linux/irq_work.h>
++#include <linux/kexec.h>
+ 
+ #include <asm/alternative.h>
+ #include <asm/atomic.h>
+@@ -71,6 +72,7 @@ enum ipi_msg_type {
+ 	IPI_RESCHEDULE,
+ 	IPI_CALL_FUNC,
+ 	IPI_CPU_STOP,
++	IPI_CPU_CRASH_STOP,
+ 	IPI_TIMER,
+ 	IPI_IRQ_WORK,
+ 	IPI_WAKEUP
+@@ -726,6 +728,7 @@ static const char *ipi_types[NR_IPI] __tracepoint_string = {
+ 	S(IPI_RESCHEDULE, "Rescheduling interrupts"),
+ 	S(IPI_CALL_FUNC, "Function call interrupts"),
+ 	S(IPI_CPU_STOP, "CPU stop interrupts"),
++	S(IPI_CPU_CRASH_STOP, "CPU stop (for crash dump) interrupts"),
+ 	S(IPI_TIMER, "Timer broadcast interrupts"),
+ 	S(IPI_IRQ_WORK, "IRQ work interrupts"),
+ 	S(IPI_WAKEUP, "CPU wake-up interrupts"),
+@@ -800,6 +803,28 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 		cpu_relax();
  }
  
-@@ -140,6 +184,25 @@ void machine_kexec(struct kimage *kimage)
- 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
- 	reboot_code_buffer = kmap(kimage->control_code_page);
++#ifdef CONFIG_KEXEC_CORE
++static atomic_t waiting_for_crash_ipi;
++
++static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
++{
++	crash_save_cpu(regs, cpu);
++
++	atomic_dec(&waiting_for_crash_ipi);
++
++	local_irq_disable();
++
++#ifdef CONFIG_HOTPLUG_CPU
++	if (cpu_ops[cpu]->cpu_die)
++		cpu_ops[cpu]->cpu_die(cpu);
++#endif
++
++	/* just in case */
++	while (1)
++		wfi();
++}
++#endif
++
+ /*
+  * Main handler for inter-processor interrupts
+  */
+@@ -830,6 +855,14 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+ 		irq_exit();
+ 		break;
  
-+	kexec_image_info(kimage);
++#ifdef CONFIG_KEXEC_CORE
++	case IPI_CPU_CRASH_STOP:
++		irq_enter();
++		ipi_cpu_crash_stop(cpu, regs);
 +
-+	pr_debug("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
-+		kimage->control_code_page);
-+	pr_debug("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
-+		&reboot_code_buffer_phys);
-+	pr_debug("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
-+		reboot_code_buffer);
-+	pr_debug("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
-+		arm64_relocate_new_kernel);
-+	pr_debug("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
-+		__func__, __LINE__, arm64_relocate_new_kernel_size,
-+		arm64_relocate_new_kernel_size);
++		unreachable();
++#endif
 +
-+	pr_debug("%s:%d: kimage_head:              %lx\n", __func__, __LINE__,
-+		kimage->head);
-+	pr_debug("%s:%d: kimage_start:             %lx\n", __func__, __LINE__,
-+		kimage_start);
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ 	case IPI_TIMER:
+ 		irq_enter();
+@@ -902,6 +935,34 @@ void smp_send_stop(void)
+ 			   cpumask_pr_args(cpu_online_mask));
+ }
+ 
++#ifdef CONFIG_KEXEC_CORE
++void smp_send_crash_stop(void)
++{
++	cpumask_t mask;
++	unsigned long timeout;
 +
- 	/*
- 	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
- 	 * after the kernel is shut down.
++	if (num_online_cpus() == 1)
++		return;
++
++	cpumask_copy(&mask, cpu_online_mask);
++	cpumask_clear_cpu(smp_processor_id(), &mask);
++
++	atomic_set(&waiting_for_crash_ipi, num_online_cpus() - 1);
++
++	pr_crit("SMP: stopping secondary CPUs\n");
++	smp_cross_call(&mask, IPI_CPU_CRASH_STOP);
++
++	/* Wait up to one second for other CPUs to stop */
++	timeout = USEC_PER_SEC;
++	while ((atomic_read(&waiting_for_crash_ipi) > 0) && timeout--)
++		udelay(1);
++
++	if (atomic_read(&waiting_for_crash_ipi) > 0)
++		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
++			   cpumask_pr_args(cpu_online_mask));
++}
++#endif
++
+ /*
+  * not supported here
+  */
 -- 
 2.5.0
