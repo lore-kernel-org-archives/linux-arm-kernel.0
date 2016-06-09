@@ -1,17 +1,15 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 9 Jun 2016 11:41:43 +0300
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 09 Jun 2016 10:43:04 +0200
 Subject: [RFC v4 4/7] extcon: usb-gpio: Add support for VBUS detection
 In-Reply-To: <57592B02.2070609@ti.com>
 References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
  <1465393686-16644-5-git-send-email-k.kozlowski@samsung.com>
  <57592B02.2070609@ti.com>
-Message-ID: <57592BC7.6050502@ti.com>
+Message-ID: <57592C18.8020609@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fixed Felipe's id.
-
-On 09/06/16 11:38, Roger Quadros wrote:
+On 06/09/2016 10:38 AM, Roger Quadros wrote:
 > Hi,
 > 
 > On 08/06/16 16:48, Krzysztof Kozlowski wrote:
@@ -90,173 +88,10 @@ On 09/06/16 11:38, Roger Quadros wrote:
 > USB-HOST = !ID, USB = ID"
 > 
 > So do you want to be consistent and infer VBUS and ID states based on the other?
-> 
->>  }
->>  
->>  static irqreturn_t usb_irq_handler(int irq, void *dev_id)
->> @@ -100,9 +113,11 @@ static int usb_extcon_probe(struct platform_device *pdev)
->>  		return -ENOMEM;
->>  
->>  	info->dev = dev;
->> -	info->id_gpiod = devm_gpiod_get(&pdev->dev, "id", GPIOD_IN);
->> -	if (IS_ERR(info->id_gpiod)) {
->> -		dev_err(dev, "failed to get ID GPIO\n");
->> +	info->id_gpiod = devm_gpiod_get_optional(&pdev->dev, "id", GPIOD_IN);
->> +	info->vbus_gpiod = devm_gpiod_get_optional(&pdev->dev, "vbus",
->> +						   GPIOD_IN);
->> +	if (!info->id_gpiod && !info->vbus_gpiod) {
->> +		dev_err(dev, "failed to get GPIOs\n");
->>  		return PTR_ERR(info->id_gpiod);
->>  	}
->>  
->> @@ -118,27 +133,54 @@ static int usb_extcon_probe(struct platform_device *pdev)
->>  		return ret;
->>  	}
->>  
->> -	ret = gpiod_set_debounce(info->id_gpiod,
->> -				 USB_GPIO_DEBOUNCE_MS * 1000);
->> +	if (info->id_gpiod)
->> +		ret = gpiod_set_debounce(info->id_gpiod,
->> +			USB_GPIO_DEBOUNCE_MS * 1000);
->> +	if (!ret && info->vbus_gpiod) {
->> +		ret = gpiod_set_debounce(info->vbus_gpiod,
->> +			USB_GPIO_DEBOUNCE_MS * 1000);
->> +		if (ret < 0 && info->id_gpiod)
->> +			gpiod_set_debounce(info->vbus_gpiod, 0);
->> +	}
->>  	if (ret < 0)
->>  		info->debounce_jiffies = msecs_to_jiffies(USB_GPIO_DEBOUNCE_MS);
->>  
->>  	INIT_DELAYED_WORK(&info->wq_detcable, usb_extcon_detect_cable);
->>  
->> -	info->id_irq = gpiod_to_irq(info->id_gpiod);
->> -	if (info->id_irq < 0) {
->> -		dev_err(dev, "failed to get ID IRQ\n");
->> -		return info->id_irq;
->> +	if (info->id_gpiod) {
->> +		info->id_irq = gpiod_to_irq(info->id_gpiod);
->> +		if (info->id_irq < 0) {
->> +			dev_err(dev, "failed to get ID IRQ\n");
->> +			return info->id_irq;
->> +		}
->> +		ret = devm_request_threaded_irq(dev, info->id_irq, NULL,
->> +						usb_irq_handler,
->> +						IRQF_TRIGGER_RISING |
->> +						IRQF_TRIGGER_FALLING |
->> +						IRQF_ONESHOT,
->> +						pdev->name, info);
->> +		if (ret < 0) {
->> +			dev_err(dev, "failed to request handler for ID IRQ\n");
->> +			return ret;
->> +		}
->>  	}
->>  
->> -	ret = devm_request_threaded_irq(dev, info->id_irq, NULL,
->> -					usb_irq_handler,
->> -					IRQF_TRIGGER_RISING |
->> -					IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
->> -					pdev->name, info);
->> -	if (ret < 0) {
->> -		dev_err(dev, "failed to request handler for ID IRQ\n");
->> -		return ret;
->> +	if (info->vbus_gpiod) {
->> +		info->vbus_irq = gpiod_to_irq(info->vbus_gpiod);
->> +		if (info->vbus_irq < 0) {
->> +			dev_err(dev, "failed to get VBUS IRQ\n");
->> +			return info->vbus_irq;
->> +		}
->> +		ret = devm_request_threaded_irq(dev, info->vbus_irq, NULL,
->> +						usb_irq_handler,
->> +						IRQF_TRIGGER_RISING |
->> +						IRQF_TRIGGER_FALLING |
->> +						IRQF_ONESHOT,
->> +						pdev->name, info);
->> +		if (ret < 0) {
->> +			dev_err(dev, "failed to request handler for VBUS IRQ\n");
->> +			return ret;
->> +		}
->>  	}
->>  
->>  	platform_set_drvdata(pdev, info);
->> @@ -166,9 +208,16 @@ static int usb_extcon_suspend(struct device *dev)
->>  	int ret = 0;
->>  
->>  	if (device_may_wakeup(dev)) {
->> -		ret = enable_irq_wake(info->id_irq);
->> -		if (ret)
->> -			return ret;
->> +		if (info->id_gpiod) {
->> +			ret = enable_irq_wake(info->id_irq);
->> +			if (ret)
->> +				return ret;
->> +		}
->> +		if (info->vbus_gpiod) {
->> +			ret = enable_irq_wake(info->vbus_irq);
->> +			if (ret)
->> +				goto err;
->> +		}
->>  	}
->>  
->>  	/*
->> @@ -176,8 +225,16 @@ static int usb_extcon_suspend(struct device *dev)
->>  	 * as GPIOs used behind I2C subsystem might not be
->>  	 * accessible until resume completes. So disable IRQ.
->>  	 */
->> -	disable_irq(info->id_irq);
->> +	if (info->id_gpiod)
->> +		disable_irq(info->id_irq);
->> +	if (info->vbus_gpiod)
->> +		disable_irq(info->vbus_irq);
->> +
->> +	return ret;
->>  
->> +err:
->> +	if (info->id_gpiod)
->> +		disable_irq_wake(info->id_irq);
->>  	return ret;
->>  }
->>  
->> @@ -187,17 +244,33 @@ static int usb_extcon_resume(struct device *dev)
->>  	int ret = 0;
->>  
->>  	if (device_may_wakeup(dev)) {
->> -		ret = disable_irq_wake(info->id_irq);
->> -		if (ret)
->> -			return ret;
->> +		if (info->id_gpiod) {
->> +			ret = disable_irq_wake(info->id_irq);
->> +			if (ret)
->> +				return ret;
->> +		}
->> +		if (info->vbus_gpiod) {
->> +			ret = disable_irq_wake(info->vbus_irq);
->> +			if (ret)
->> +				goto err;
->> +		}
->>  	}
->>  
->> -	enable_irq(info->id_irq);
->> +	if (info->id_gpiod)
->> +		enable_irq(info->id_irq);
->> +	if (info->vbus_gpiod)
->> +		enable_irq(info->vbus_irq);
->> +
->>  	if (!device_may_wakeup(dev))
->>  		queue_delayed_work(system_power_efficient_wq,
->>  				   &info->wq_detcable, 0);
->>  
->>  	return ret;
->> +
->> +err:
->> +	if (info->id_gpiod)
->> +		enable_irq_wake(info->id_irq);
->> +	return ret;
->>  }
->>  #endif
->>  
->>
-> 
-> --
-> cheers,
-> -roger
-> 
+
+Right, I couldn't make up my mind whether I want to change/improve
+existing logic or just add VBUS/ID raw notifying. Finally I left
+original code for USB/USB-HOST cables alone.
+
+Best regards,
+Krzysztof
