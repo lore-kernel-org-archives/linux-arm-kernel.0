@@ -1,25 +1,27 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Thu, 9 Jun 2016 16:09:41 +0100
-Subject: [PATCH v17 10/13] arm64: kdump: add VMCOREINFO for user-space
- coredump tools
-In-Reply-To: <9e75a7b75b38b37ded3e361498eaf1486107ce5d.1464974516.git.geoff@infradead.org>
-References: <cover.1464974516.git.geoff@infradead.org>
- <9e75a7b75b38b37ded3e361498eaf1486107ce5d.1464974516.git.geoff@infradead.org>
-Message-ID: <575986B5.9000701@arm.com>
+From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
+Date: Thu, 9 Jun 2016 20:40:31 +0530
+Subject: [PATCH 0/8] Improve Rx/Tx DMA implementation
+Message-ID: <20160609151039.20817-1-bhuvanchandra.dv@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/16 19:13, Geoff Levand wrote:
-> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->
-> For the current crash utility, we need to know, at least, a value of
-> "kimage_voffset" to handle the contents of core dump file (/proc/vmcore)
-> correctly due to the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
->
-> More VMCOREINFO may be added later for makedumpfile command.
-> ---
+Bhuvanchandra DV (5):
+  tty: serial: fsl_lpuart: Fix broken 8m/s1 support
+  tty: serial: fsl-lpuart: Use cyclic DMA for Rx
+  tty: serial: fsl-lpuart: Use scatter/gather DMA for Tx Drop PIO to DMA
+    switching and use scatter/gather DMA for Tx path to improve
+    performance.
+  tty: serial: fsl-lpuart: Update suspend/resume for DMA mode
+  tty: serial: fsl_lpuart: Add support for RS-485
 
-Missing Signed-off-by: ?
+Stefan Agner (3):
+  tty: serial: fsl_lpuart: consider TX FIFO too in tx_empty
+  tty: serial: fsl_lpuart: support suspend/resume
+  tty: serial: fsl_lpuart: fix clearing of receive flag
 
-Suzuki
-IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+ drivers/clk/imx/clk-vf610.c     |  12 +-
+ drivers/tty/serial/fsl_lpuart.c | 810 +++++++++++++++++++++++-----------------
+ 2 files changed, 482 insertions(+), 340 deletions(-)
+
+-- 
+2.8.3
