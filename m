@@ -1,147 +1,158 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Jun 2016 11:44:19 +0200
-Subject: [RFC v4 02/14] simplefb: Use new devm_of_regulator_all_get helper and
- bulk API
+Date: Thu, 09 Jun 2016 11:44:18 +0200
+Subject: [RFC v4 01/14] regulator: of: Add helper for getting all supplies
 In-Reply-To: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
 References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465465471-28740-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465465471-28740-2-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch from manual way of getting all regulators to usage of
-devm_of_regulator_all_get().  Additionally use the regulator bulk API
-which changes the logic in case of failure of regulator enable.  Before
-if regulator_enable() returned error for one regulator, rest of them
-were still enabled.  The bulk API does everything atomically.
+Few drivers have a need of getting regulator supplies without knowing
+their names:
+1. The Simple Framebuffer driver works on setup provided by bootloader
+   (outside of scope of kernel);
+2. Generic power sequence driver may be attached to any device node.
+
+Add a Device Tree helper for parsing "-supply" properties and returning
+allocated bulk regulator consumers.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-
 ---
+ drivers/regulator/of_regulator.c       | 86 ++++++++++++++++++++++++++++++++++
+ include/linux/regulator/of_regulator.h | 13 +++++
+ 2 files changed, 99 insertions(+)
 
-Not tested.
----
- drivers/video/fbdev/simplefb.c | 71 +++++++++---------------------------------
- 1 file changed, 14 insertions(+), 57 deletions(-)
-
-diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-index e9cf19977285..897b95efa40d 100644
---- a/drivers/video/fbdev/simplefb.c
-+++ b/drivers/video/fbdev/simplefb.c
-@@ -32,6 +32,7 @@
- #include <linux/of_platform.h>
- #include <linux/parser.h>
- #include <linux/regulator/consumer.h>
-+#include <linux/regulator/of_regulator.h>
+diff --git a/drivers/regulator/of_regulator.c b/drivers/regulator/of_regulator.c
+index cd828dbf9d52..0d2c8dd0ebc0 100644
+--- a/drivers/regulator/of_regulator.c
++++ b/drivers/regulator/of_regulator.c
+@@ -350,3 +350,89 @@ struct regulator_init_data *regulator_of_get_init_data(struct device *dev,
  
- static struct fb_fix_screeninfo simplefb_fix = {
- 	.id		= "simple",
-@@ -178,8 +179,8 @@ struct simplefb_par {
- 	struct clk **clks;
- #endif
- #if defined CONFIG_OF && defined CONFIG_REGULATOR
--	u32 regulator_count;
--	struct regulator **regulators;
-+	unsigned int regulator_count;
-+	struct regulator_bulk_data *regulators;
- #endif
- };
- 
-@@ -278,8 +279,6 @@ static void simplefb_clocks_destroy(struct simplefb_par *par) { }
- 
- #if defined CONFIG_OF && defined CONFIG_REGULATOR
- 
--#define SUPPLY_SUFFIX "-supply"
--
- /*
-  * Regulator handling code.
-  *
-@@ -303,61 +302,23 @@ static int simplefb_regulators_init(struct simplefb_par *par,
- 	struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
--	struct property *prop;
--	struct regulator *regulator;
--	const char *p;
--	int count = 0, i = 0, ret;
-+	int ret;
- 
- 	if (dev_get_platdata(&pdev->dev) || !np)
- 		return 0;
- 
--	/* Count the number of regulator supplies */
--	for_each_property_of_node(np, prop) {
--		p = strstr(prop->name, SUPPLY_SUFFIX);
--		if (p && p != prop->name)
--			count++;
--	}
--
--	if (!count)
-+	ret = devm_of_regulator_all_get(&pdev->dev, &par->regulator_count, &par->regulators);
-+	if (ret)
-+		return ret;
-+	else if (!par->regulator_count)
- 		return 0;
- 
--	par->regulators = devm_kcalloc(&pdev->dev, count,
--				       sizeof(struct regulator *), GFP_KERNEL);
--	if (!par->regulators)
--		return -ENOMEM;
--
--	/* Get all the regulators */
--	for_each_property_of_node(np, prop) {
--		char name[32]; /* 32 is max size of property name */
--
--		p = strstr(prop->name, SUPPLY_SUFFIX);
--		if (!p || p == prop->name)
--			continue;
--
--		strlcpy(name, prop->name,
--			strlen(prop->name) - strlen(SUPPLY_SUFFIX) + 1);
--		regulator = devm_regulator_get_optional(&pdev->dev, name);
--		if (IS_ERR(regulator)) {
--			if (PTR_ERR(regulator) == -EPROBE_DEFER)
--				return -EPROBE_DEFER;
--			dev_err(&pdev->dev, "regulator %s not found: %ld\n",
--				name, PTR_ERR(regulator));
--			continue;
--		}
--		par->regulators[i++] = regulator;
--	}
--	par->regulator_count = i;
--
- 	/* Enable all the regulators */
--	for (i = 0; i < par->regulator_count; i++) {
--		ret = regulator_enable(par->regulators[i]);
--		if (ret) {
--			dev_err(&pdev->dev,
--				"failed to enable regulator %d: %d\n",
--				i, ret);
--			devm_regulator_put(par->regulators[i]);
--			par->regulators[i] = NULL;
--		}
-+	ret = regulator_bulk_enable(par->regulator_count, par->regulators);
-+	if (ret) {
-+		dev_err(&pdev->dev,
-+			"failed to enable regulators: %d\n", ret);
-+		return ret;
- 	}
- 
- 	return 0;
-@@ -365,14 +326,10 @@ static int simplefb_regulators_init(struct simplefb_par *par,
- 
- static void simplefb_regulators_destroy(struct simplefb_par *par)
- {
--	int i;
--
- 	if (!par->regulators)
- 		return;
- 
--	for (i = 0; i < par->regulator_count; i++)
--		if (par->regulators[i])
--			regulator_disable(par->regulators[i]);
-+	regulator_bulk_disable(par->regulator_count, par->regulators);
+ 	return init_data;
  }
++
++/**
++ * devm_of_regulator_all_get - get all regulator consumers
++ *
++ * @dev:           Device to supply
++ * @num_consumers  Number of consumers registered (only on success)
++ * @consumers:     Configuration of consumers; names of supplies and clients
++ *                 are stored here; allocated only on success (NULL otherwise);
++ *
++ * @return 0 on success, an errno on failure.
++ *
++ * This helper function allows drivers to get all regulator consumers
++ * for given device in one operation.  The names of regulator supplies
++ * do not have to be provided.  If any of the regulators cannot be
++ * acquired then any regulators that were allocated will be freed
++ * before returning to the caller.
++ */
++int devm_of_regulator_all_get(struct device *dev, unsigned int *num_consumers,
++			      struct regulator_bulk_data **consumers)
++{
++	struct device_node *np = dev->of_node;
++	struct regulator_bulk_data *bulk;
++	unsigned int count = 0, i = 0;
++	struct property *prop;
++	const char *p;
++	int ret;
++
++	if (!np) {
++		ret = 0;
++		goto err; /* Not really an error */
++	}
++
++	/* Count the number of regulator supplies */
++	for_each_property_of_node(np, prop) {
++		p = strstr(prop->name, "-supply");
++		if (p && p != prop->name)
++			count++;
++	}
++
++	if (!count) {
++		ret = 0;
++		goto err; /* Not really an error */
++	}
++
++	bulk = devm_kcalloc(dev, count, sizeof(**consumers), GFP_KERNEL);
++	if (!bulk) {
++		ret = -ENOMEM;
++		goto err;
++	}
++
++	/* Get all the names for supplies */
++	for_each_property_of_node(np, prop) {
++		char *name;
++		int len;
++
++		p = strstr(prop->name, "-supply");
++		if (!p || p == prop->name)
++			continue;
++
++		len = strlen(prop->name) - strlen("-supply") + 1;
++		name = devm_kzalloc(dev, len, GFP_KERNEL);
++		if (!name) {
++			ret = -ENOMEM;
++			goto err;
++		}
++
++		strlcpy(name, prop->name, len);
++		bulk[i++].supply = name;
++	}
++
++	ret = devm_regulator_bulk_get(dev, i, bulk);
++	if (ret)
++		goto err;
++
++	*consumers = bulk;
++	*num_consumers = i;
++
++	return 0;
++
++err:
++	*num_consumers = 0;
++	*consumers = NULL;
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(devm_of_regulator_all_get);
+diff --git a/include/linux/regulator/of_regulator.h b/include/linux/regulator/of_regulator.h
+index 763953f7e3b8..93a3b7fe92e8 100644
+--- a/include/linux/regulator/of_regulator.h
++++ b/include/linux/regulator/of_regulator.h
+@@ -7,6 +7,7 @@
+ #define __LINUX_OF_REG_H
+ 
+ struct regulator_desc;
++struct regulator_bulk_data;
+ 
+ struct of_regulator_match {
+ 	const char *name;
+@@ -24,6 +25,9 @@ extern struct regulator_init_data
+ extern int of_regulator_match(struct device *dev, struct device_node *node,
+ 			      struct of_regulator_match *matches,
+ 			      unsigned int num_matches);
++extern int devm_of_regulator_all_get(struct device *dev,
++				     unsigned int *num_consumers,
++				     struct regulator_bulk_data **consumers);
  #else
- static int simplefb_regulators_init(struct simplefb_par *par,
+ static inline struct regulator_init_data
+ 	*of_get_regulator_init_data(struct device *dev,
+@@ -40,6 +44,15 @@ static inline int of_regulator_match(struct device *dev,
+ {
+ 	return 0;
+ }
++static inline int devm_of_regulator_all_get(struct device *dev,
++					    unsigned int *num_consumers,
++					    struct regulator_bulk_data **consumers)
++{
++	*num_consumers = 0;
++	*consumers = NULL;
++
++	return 0;
++}
+ #endif /* CONFIG_OF */
+ 
+ #endif /* __LINUX_OF_REG_H */
 -- 
 1.9.1
