@@ -1,40 +1,83 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 09 Jun 2016 10:22:27 -0700
-Subject: [PATCH 27/32] gpio: Add support for the FXL6408 GPIO expander.
-In-Reply-To: <CACRpkdax3AmnprT48zL7J92ddMvLYeRXi9OrQK_JrBT8_zZQoA@mail.gmail.com>
-References: <1464817421-8519-1-git-send-email-kraxel@redhat.com>
- <1464817421-8519-28-git-send-email-kraxel@redhat.com>
- <CACRpkdax3AmnprT48zL7J92ddMvLYeRXi9OrQK_JrBT8_zZQoA@mail.gmail.com>
-Message-ID: <878tyexooc.fsf@eliezer.anholt.net>
+From: jon.mason@broadcom.com (Jon Mason)
+Date: Thu, 9 Jun 2016 13:36:42 -0400
+Subject: [RFC 1/1] ARM: print MHz in /proc/cpuinfo
+In-Reply-To: <57593245.5020109@arm.com>
+References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
+ <1465333713-14339-2-git-send-email-jon.mason@broadcom.com>
+ <5757D87E.2080508@arm.com> <20160608193003.GA17688@broadcom.com>
+ <57593245.5020109@arm.com>
+Message-ID: <CAC3K-4rTMy4n0u1Lo5KQKMtGAeH1uE1St3D71YwPVYCJs4+U6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On Thu, Jun 9, 2016 at 5:09 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 08/06/16 20:31, Jon Mason wrote:
+>>
+>> On Wed, Jun 08, 2016 at 09:34:06AM +0100, Sudeep Holla wrote:
+>>>
+>>>
+>>>
+>>> On 07/06/16 22:08, Jon Mason wrote:
+>>>>
+>>>> Query the CPU core clock in the device tree to determine the core clock
+>>>> speed.
+>>>
+>>>
+>>> How do guarantee that it's the current frequency of the CPU ?
+>>
+>>
+>> I am basing it on the assumption (perhaps incorrect) that the clock in
+>> the CPU DT corresponds to the one determining the CPU clock rate.  And,
+>> that this clock rate is accurate in describing the speed at which the
+>> CPU is currently running.
+>>
+>
+> As you already noticed, it's not always correct.
+>
+> [..]
+>
+>>>
+>>> What if they just don't have in DT but have DVFS support ?
+>>
+>>
+>> This can be extended to cover DVFS or SMC calls or anything else.
+>> This was simply a first step to cover what appeared to be the most
+>> prevalent case.
+>>
+>
+> Using DVFS/CPUFreq makes this DT based approach irrelevant.
+>
+>>> Also whey do we need this support when the user-space can query the
+>>> CPUFreq sysfs which is more accurate and maintains the current running
+>>> frequency ?
+>>
+>>
+>> This is exactly what x86 is doing to provide its value in
+>> /proc/cpuinfo.  I could easily augment this patch to call
+>> cpufreq_quick_get(), if it returns 0, then call clk_get_rate().  If
+>> both return 0, then simply not print out anything (which would cover
+>> all of the possibilities).  Or, I could have it just call
+>> cpufreq_quick_get() to get the value.
+>>
+>
+> Agree x86 has, may be for legacy reasons. It even has CPUFreq sysfs
+> entries which is architecture agnostic while /proc/cpuinfo is more
+> architecture based. So applications that want to be portable across
+> architectures must choose the generic CPUFreq sysfs path rather than
+> some x86 based cpuinfo.
 
-> On Wed, Jun 1, 2016 at 11:43 PM, Gerd Hoffmann <kraxel@redhat.com> wrote:
->
->> +#define FXL6408_OUTPUT                 0x05
->> +/* Bits here make the output High-Z, instead of the OUTPUT value. */
->> +#define FXL6408_OUTPUT_HIGH_Z          0x07
-> (...)
->> +       /* Disable High-Z of outputs, so that our OUTPUT updates
->> +        * actually take effect.
->> +        */
->> +       i2c_smbus_write_byte_data(client, FXL6408_OUTPUT_HIGH_Z, 0);
->
-> High-Z is probably the same as open drain right? And if not open drain,
-> it is push-pull.
->
-> So you want to implement .set_single_ended() for configuring the lines in
-> "high-z", i.e. open drain output mode.
+Thank you for educating me.  I am taking this (and RMK's comment) as
+any modification to add CPU speed to /proc/cpuinfo is not welcomed,
+anyone who wants to query this should instead look at cpufreq in
+sysfs, and any dev who wants to add such a thing should look into
+writing a driver in drivers/cpufreq/.
 
-I'll keep this in mind for whenever I end up writing my next GPIO
-driver, but this one is dead for now (not actually usable because of the
-closed firmware).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/e492d675/attachment-0001.sig>
+Thanks,
+Jon
+
+>
+> --
+> Regards,
+> Sudeep
