@@ -1,33 +1,36 @@
-From: nab@linux-iscsi.org (Nicholas A. Bellinger)
-Date: Wed, 08 Jun 2016 22:38:10 -0700
-Subject: [PATCH] target: Fix for hang of Ordered task in TCM
-In-Reply-To: <1465415022-79833-1-git-send-email-bryantly@linux.vnet.ibm.com>
-References: <1464067904.22249.53.camel@haakon3.risingtidesystems.com>
- <1465415022-79833-1-git-send-email-bryantly@linux.vnet.ibm.com>
-Message-ID: <1465450690.5365.145.camel@haakon3.risingtidesystems.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 9 Jun 2016 11:32:12 +0530
+Subject: [PATCH] dmaengine: vdma: Fix compilation warning in cyclic dma mode
+Message-ID: <1465452132-13512-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2016-06-08 at 14:43 -0500, Bryant G. Ly wrote:
+This patch fixes the below compilation warining.
+drivers/dma/xilinx/xilinx_vdma.c: In function 'xilinx_dma_prep_dma_cyclic':
+drivers/dma/xilinx/xilinx_vdma.c:1808:23: warning: 'segment' may be used
+uninitialized in this function [-Wmaybe-uninitialized]
+   segment->hw.control |= XILINX_DMA_BD_SOP;
 
-<SNIP>
+The start of packet (SOP) should be set to the first segment in the desc
+chain not for the last segment of the desc chain.
 
-> 
-> Hi Nic,
-> 
-> So I was testing the ibmvscsi target driver and I ran into some problems
-> again with UA stuff and it looks like you didnt remove the UA checks from
-> target_setup_cmd_from_cdb? Was that intentional? I thought we agreed to move
-> it completely to target_execute_cmd and not have both?
-> 
-> Let me know.
-> 
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+ drivers/dma/xilinx/xilinx_vdma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Ah yes, the version of the patch I've been using for future target-core
-developments was missing the removal in target_setup_cmd_from_cdb().
-
-Applied the proper version to target-pending/master here:
-
-https://git.kernel.org/cgit/linux/kernel/git/nab/target-pending.git/commit/?id=15ce22fa491aa3bab7acd89ac40a9fc27aeed915
-
-Thanks for the heads up!
+diff --git a/drivers/dma/xilinx/xilinx_vdma.c b/drivers/dma/xilinx/xilinx_vdma.c
+index cbcf595..20fe5ea 100644
+--- a/drivers/dma/xilinx/xilinx_vdma.c
++++ b/drivers/dma/xilinx/xilinx_vdma.c
+@@ -1840,7 +1840,7 @@ static struct dma_async_tx_descriptor *xilinx_dma_prep_dma_cyclic(
+ 
+ 	/* For the last DMA_MEM_TO_DEV transfer, set EOP */
+ 	if (direction == DMA_MEM_TO_DEV) {
+-		segment->hw.control |= XILINX_DMA_BD_SOP;
++		head_segment->hw.control |= XILINX_DMA_BD_SOP;
+ 		segment = list_last_entry(&desc->segments,
+ 					  struct xilinx_axidma_tx_segment,
+ 					  node);
+-- 
+1.7.1
