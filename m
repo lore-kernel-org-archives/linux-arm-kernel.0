@@ -1,20 +1,35 @@
 From: andy.gross@linaro.org (Andy Gross)
-Date: Thu, 9 Jun 2016 14:21:01 -0500
-Subject: [PATCH] tty: serial: msm: fix definition of msm_stop_dma
-In-Reply-To: <1465323112-32366-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465323112-32366-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160609192101.GK13357@hector.attlocal.net>
+Date: Thu, 9 Jun 2016 14:27:19 -0500
+Subject: [PATCH v3] tty:serial:msm:Do not restore Rx interrupts in DMA
+In-Reply-To: <1465295321-10506-1-git-send-email-charanya@codeaurora.org>
+References: <1462896580-11554-1>
+ <1465295321-10506-1-git-send-email-charanya@codeaurora.org>
+Message-ID: <20160609192719.GL13357@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 07:11:52PM +0100, Ben Dooks wrote:
-> The msm_stop_dma() is not exported from the driver, so make
-> it static to stop the following warning:
+On Tue, Jun 07, 2016 at 03:58:41PM +0530, Charanya Venkatraman wrote:
+> Avoid data corruption issues that result in CRC errors during file
+> transfers over serial ports at higher baud rates.
 > 
-> drivers/tty/serial/msm_serial.c:84:6: warning: symbol 'msm_stop_dma' was not declared. Should it be static?
+> The current msm_serial driver masks the FIFO Rx interrupts in
+> msm_start_rx_dma() since Rx FIFO interrupts are not required in DMA
+> mode. However, msm_complete_rx_dma() re-enables the Rx FIFO interrupts
+> which could cause RXSTALE event to be processed when a TXLEV interrupt
+> occurs.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-
-Good find.
+> The following is the sequence of events that could occur resulting in
+> data corruption.
+> 
+> msm_start_rx_dma -> msm_complete_rx_dma -->
+> spin_unlock_irqrestore(&port->lock) -->
+> msm_uart_irq()(For TXLEV interrupt) -->  msm_handle_rx_dm() (Read from
+> FIFO resulting in data corruption)
+> 
+> The patch fixes the issue by not restoring the RXLEV and RXSTALE
+> interrupts in msm_complete_rx_dma(). These interrupts are required only
+> in FIFO mode.
+> 
+> Signed-off-by: Charanya Venkatraman <charanya@codeaurora.org>
 
 Acked-by: Andy Gross <andy.gross@linaro.org>
