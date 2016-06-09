@@ -1,97 +1,71 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Jun 2016 10:43:04 +0200
-Subject: [RFC v4 4/7] extcon: usb-gpio: Add support for VBUS detection
-In-Reply-To: <57592B02.2070609@ti.com>
-References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
- <1465393686-16644-5-git-send-email-k.kozlowski@samsung.com>
- <57592B02.2070609@ti.com>
-Message-ID: <57592C18.8020609@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 9 Jun 2016 10:44:01 +0200
+Subject: [PATCH v3 05/12] ARM: shmobile: r8a7792: add SMP support
+In-Reply-To: <7848375.HIECFST0Ua@wasted.cogentembedded.com>
+References: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
+ <7848375.HIECFST0Ua@wasted.cogentembedded.com>
+Message-ID: <CAMuHMdXe==X8x5Q2Hnm7kPp9THwvqVq95imwGoAQyDQv=8=P3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2016 10:38 AM, Roger Quadros wrote:
-> Hi,
-> 
-> On 08/06/16 16:48, Krzysztof Kozlowski wrote:
->> Add VBUS pin detection support to extcon-usb-gpio driver for boards
->> which have both VBUS and ID pins, or only one of them.
->>
->> The logic behind reporting USB and USB-HOST extcon cables is not
->> affected. The driver however will report extcon changes for USB-VBUS and
->> USB-ID.
->>
->> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
->> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> ---
->>
->> Some parts base on old Robert's patchset.
->> ---
->>  drivers/extcon/extcon-usb-gpio.c | 125 +++++++++++++++++++++++++++++++--------
->>  1 file changed, 99 insertions(+), 26 deletions(-)
->>
->> diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
->> index a36aab007022..85b8a0ce5731 100644
->> --- a/drivers/extcon/extcon-usb-gpio.c
->> +++ b/drivers/extcon/extcon-usb-gpio.c
->> @@ -35,7 +35,9 @@ struct usb_extcon_info {
->>  	struct extcon_dev *edev;
->>  
->>  	struct gpio_desc *id_gpiod;
->> +	struct gpio_desc *vbus_gpiod;
->>  	int id_irq;
->> +	int vbus_irq;
->>  
->>  	unsigned long debounce_jiffies;
->>  	struct delayed_work wq_detcable;
->> @@ -44,6 +46,8 @@ struct usb_extcon_info {
->>  static const unsigned int usb_extcon_cable[] = {
->>  	EXTCON_USB,
->>  	EXTCON_USB_HOST,
->> +	EXTCON_USB_ID,
->> +	EXTCON_USB_VBUS,
->>  	EXTCON_NONE,
->>  };
->>  
->> @@ -55,7 +59,8 @@ static void usb_extcon_detect_cable(struct work_struct *work)
->>  						    wq_detcable);
->>  
->>  	/* check ID and update cable state */
->> -	id = gpiod_get_value_cansleep(info->id_gpiod);
->> +	id = info->id_gpiod ? gpiod_get_value_cansleep(info->id_gpiod) : 1;
->> +
->>  	if (id) {
->>  		/*
->>  		 * ID = 1 means USB HOST cable detached.
->> @@ -73,6 +78,14 @@ static void usb_extcon_detect_cable(struct work_struct *work)
->>  		extcon_set_cable_state_(info->edev, EXTCON_USB, false);
->>  		extcon_set_cable_state_(info->edev, EXTCON_USB_HOST, true);
->>  	}
->> +
->> +	if (info->id_gpiod)
->> +		extcon_set_cable_state_(info->edev, EXTCON_USB_ID, id);
->> +	if (info->vbus_gpiod) {
->> +		int vbus = gpiod_get_value_cansleep(info->vbus_gpiod);
->> +
->> +		extcon_set_cable_state_(info->edev, EXTCON_USB_VBUS, vbus);
->> +	}
-> 
-> What happens if either id_gpiod or vbus_gpiod is present?
-> 
-> As per the DT binding document
-> "In general we have three cases:
-> 1. If VBUS and ID gpios are present we pass them as is
-> USB-HOST = !ID, USB = VBUS
-> 2. If only VBUS gpio is present we assume that ID pin is always High.
-> USB-HOST = false, USB = VBUS.
-> 3. If only ID pin is available we infer the VBUS pin states based on ID.
-> USB-HOST = !ID, USB = ID"
-> 
-> So do you want to be consistent and infer VBUS and ID states based on the other?
+Hi Sergei,
 
-Right, I couldn't make up my mind whether I want to change/improve
-existing logic or just add VBUS/ID raw notifying. Finally I left
-original code for USB/USB-HOST cables alone.
+On Wed, Jun 8, 2016 at 11:15 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Add R8A7792 SMP support using the shared APMU code. This SoC has 2 ARM
+> Cortex-A15  CPU cores.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> ---
+> Changes in version 3:
+> - new patch.
+>
+>  arch/arm/mach-shmobile/Makefile        |    1
+>  arch/arm/mach-shmobile/r8a7792.h       |    6 +++
+>  arch/arm/mach-shmobile/setup-r8a7792.c |    2 +
+>  arch/arm/mach-shmobile/smp-r8a7792.c   |   62 +++++++++++++++++++++++++++++++++
+>  4 files changed, 71 insertions(+)
+>
+> Index: renesas/arch/arm/mach-shmobile/Makefile
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/Makefile
+> +++ renesas/arch/arm/mach-shmobile/Makefile
+> @@ -35,6 +35,7 @@ smp-$(CONFIG_ARCH_SH73A0)     += smp-sh73a0.
+>  smp-$(CONFIG_ARCH_R8A7779)     += smp-r8a7779.o headsmp-scu.o platsmp-scu.o
+>  smp-$(CONFIG_ARCH_R8A7790)     += smp-r8a7790.o
+>  smp-$(CONFIG_ARCH_R8A7791)     += smp-r8a7791.o
+> +smp-$(CONFIG_ARCH_R8A7792)     += smp-r8a7792.o
+>  smp-$(CONFIG_ARCH_EMEV2)       += smp-emev2.o headsmp-scu.o platsmp-scu.o
+>
+>  # PM objects
+> Index: renesas/arch/arm/mach-shmobile/r8a7792.h
+> ===================================================================
+> --- /dev/null
+> +++ renesas/arch/arm/mach-shmobile/r8a7792.h
+> @@ -0,0 +1,6 @@
+> +#ifndef __ASM_R8A7792_H__
+> +#define __ASM_R8A7792_H__
+> +
+> +extern const struct smp_operations r8a7792_smp_ops;
 
-Best regards,
-Krzysztof
+For new SMP support, you should no longer add an SoC-specific struct
+smp_operations, but rely on the DT "enable-method" property, cfr.
+"[PATCH v3 00/09] ARM: shmobile: APMU DT support via SMP Enable method V3"
+(http://www.spinics.net/lists/linux-sh/msg45229.html).
+
+That series will no longer apply, but I've been carrying (and rebasing) it in
+my local tree for quite a while, as it was related to SYSC cleanup (avoiding
+your r8a7792_ca15_scu). But unfortunately that depends on the SYSC node always
+be present in DT.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
