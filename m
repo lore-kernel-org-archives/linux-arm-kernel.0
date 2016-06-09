@@ -1,59 +1,57 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Jun 2016 09:10:11 +0200
-Subject: [PATCH 05/12] mmc: sdhci: add a pre voltage switch callback function
+Date: Thu,  9 Jun 2016 09:10:16 +0200
+Subject: [PATCH 10/12] arm64: dts: marvell: add eMMC support for Armada 37xx
 In-Reply-To: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1465456218-28354-6-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1465456218-28354-11-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+Add the eMMC support for Armada 37xx SoC and enable it in the Armada 3720
+DB board.
 
-Some host controller such as Xenon needs additional setting when
-switching signal voltage in eMMC mode. They also need to re-enable
-internal clock before a voltage switch.
-
-This commit adds a callback routine "voltage_switch_pre" in the struct
-sdhci_ops, which is used by some host controllers which need re-enable
-the internal clock before a voltage switch.
-
-[gregory.clement at free-electrons.com: split the initial commit and
-reformulate the log]
-
-Signed-off-by: Victor Gu <xigu@marvell.com>
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/mmc/host/sdhci.c | 4 ++++
- drivers/mmc/host/sdhci.h | 1 +
- 2 files changed, 5 insertions(+)
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts | 6 ++++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 9 +++++++++
+ 2 files changed, 15 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index b07219426d39..cad03ffa9d9b 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1729,6 +1729,10 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
- 	if (host->version < SDHCI_SPEC_300)
- 		return 0;
- 
-+	/* Some controller need to do more before switching */
-+	if (host->ops->voltage_switch_pre)
-+		host->ops->voltage_switch_pre(host);
-+
- 	ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
- 
- 	switch (ios->signal_voltage) {
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 49c6c5b0e33b..6bec1b0368d2 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -550,6 +550,7 @@ struct sdhci_ops {
- 					 unsigned int max_dtr, int host_drv,
- 					 int card_drv, int *drv_type);
- 	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
-+	void	(*voltage_switch_pre)(struct sdhci_host *host);
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 86110a6ae330..569756924e3e 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -72,6 +72,12 @@
+ 	status = "okay";
  };
  
- #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
++&sdhci0 {
++	non-removable;
++	bus-width = <8>;
++	status = "okay";
++};
++
+ /* CON31 */
+ &usb3 {
+ 	status = "okay";
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 9e2efb882983..5cc8b3f5ef51 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -126,6 +126,15 @@
+ 				};
+ 			};
+ 
++			sdhci0: sdhci at d8000 {
++				compatible = "marvell,xenon-sdhci";
++				reg = <0xd8000 0x300>;
++				interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++
++				auto-cmd12;
++				status = "disabled";
++			};
++
+ 			sata: sata at e0000 {
+ 				compatible = "marvell,armada-3700-ahci";
+ 				reg = <0xe0000 0x2000>;
 -- 
 2.5.0
