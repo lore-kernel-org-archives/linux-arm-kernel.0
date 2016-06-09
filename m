@@ -1,37 +1,115 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu,  9 Jun 2016 17:23:33 -0500
-Subject: [PATCH 8/8] MAINTAINERS: Tweak ARM PMU maintainers
+Date: Thu,  9 Jun 2016 17:23:30 -0500
+Subject: [PATCH 5/8] arm: arm64: pmu: Assign platform PMU CPU affinity
 In-Reply-To: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
 References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1465511013-10742-9-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1465511013-10742-6-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the ARM PMU file list, and add the arm mailing list.
+On systems with multiple PMU types the PMU to CPU affinity
+needs to be detected and set. The CPU to interrupt affinity
+should also be set.
 
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- MAINTAINERS | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/perf/arm_pmu.c | 52 ++++++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 42 insertions(+), 10 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index ed42cb6..cd1f9d9 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -878,12 +878,13 @@ ARM PMU PROFILING AND DEBUGGING
- M:	Will Deacon <will.deacon@arm.com>
- R:	Mark Rutland <mark.rutland@arm.com>
- S:	Maintained
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- F:	arch/arm*/kernel/perf_*
- F:	arch/arm/oprofile/common.c
- F:	arch/arm*/kernel/hw_breakpoint.c
- F:	arch/arm*/include/asm/hw_breakpoint.h
- F:	arch/arm*/include/asm/perf_event.h
--F:	drivers/perf/arm_pmu.c
-+F:	drivers/perf/arm_pmu*
- F:	include/linux/perf/arm_pmu.h
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index fee4be0e8..865a9db 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -11,6 +11,7 @@
+  */
+ #define pr_fmt(fmt) "hw perfevents: " fmt
  
- ARM PORT
++#include <linux/acpi.h>
+ #include <linux/bitmap.h>
+ #include <linux/cpumask.h>
+ #include <linux/cpu_pm.h>
+@@ -24,6 +25,7 @@
+ #include <linux/irq.h>
+ #include <linux/irqdesc.h>
+ 
++#include <asm/cpu.h>
+ #include <asm/cputype.h>
+ #include <asm/irq_regs.h>
+ 
+@@ -872,25 +874,56 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
+ }
+ 
+ /*
+- * CPU PMU identification and probing.
++ * CPU PMU identification and probing. Its possible to have
++ * multiple CPU types in an ARM machine. Assure that we are
++ * picking the right PMU types based on the CPU in question
+  */
+-static int probe_current_pmu(struct arm_pmu *pmu,
+-			     const struct pmu_probe_info *info)
++static int probe_plat_pmu(struct arm_pmu *pmu,
++			     const struct pmu_probe_info *info,
++			     unsigned int pmuid)
+ {
+-	int cpu = get_cpu();
+-	unsigned int cpuid = read_cpuid_id();
+ 	int ret = -ENODEV;
++	int cpu;
++	int aff_ctr = 0;
++	struct platform_device *pdev = pmu->plat_device;
++	int irq = platform_get_irq(pdev, 0);
+ 
+-	pr_info("probing PMU on CPU %d\n", cpu);
++	if (irq >= 0 && !irq_is_percpu(irq)) {
++		pmu->irq_affinity = kcalloc(pdev->num_resources, sizeof(int),
++					    GFP_KERNEL);
++		if (!pmu->irq_affinity)
++			return -ENOMEM;
++	}
++
++	for_each_possible_cpu(cpu) {
++		unsigned int cpuid = read_specific_cpuid(cpu);
++
++		if (cpuid == pmuid) {
++			cpumask_set_cpu(cpu, &pmu->supported_cpus);
++			pr_devel("enable pmu on cpu %d\n", cpu);
++			if (pmu->irq_affinity) {
++				pmu->irq_affinity[aff_ctr] = cpu;
++				aff_ctr++;
++			}
++		}
++	}
+ 
++	pr_debug("probing PMU %X\n", pmuid);
++	/* find the type of PMU given the CPU */
+ 	for (; info->init != NULL; info++) {
+-		if ((cpuid & info->mask) != info->cpuid)
++		if ((pmuid & info->mask) != info->cpuid)
+ 			continue;
++		pr_devel("Found PMU\n");
+ 		ret = info->init(pmu);
++		if (!info->cpuid) {
++			pmu->name = kasprintf(GFP_KERNEL, "%s_0x%x",
++					    pmu->name, ARM_PARTNUM(pmuid));
++			if (!pmu->name)
++				return -ENOMEM;
++		}
+ 		break;
+ 	}
+ 
+-	put_cpu();
+ 	return ret;
+ }
+ 
+@@ -1016,8 +1049,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		if (!ret)
+ 			ret = init_fn(pmu);
+ 	} else {
+-		cpumask_setall(&pmu->supported_cpus);
+-		ret = probe_current_pmu(pmu, probe_table);
++		ret = probe_plat_pmu(pmu, probe_table, read_cpuid_id());
+ 	}
+ 
+ 	if (ret) {
 -- 
 2.5.5
