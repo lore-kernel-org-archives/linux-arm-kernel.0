@@ -1,98 +1,98 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu,  9 Jun 2016 14:02:02 -0700
-Subject: [PATCH 12/14] powerpc/ptrace: run seccomp after ptrace
-In-Reply-To: <1465506124-21866-1-git-send-email-keescook@chromium.org>
-References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
-Message-ID: <1465506124-21866-13-git-send-email-keescook@chromium.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Jun 2016 23:05:15 +0200
+Subject: [PATCH 2/4] ASoC: sunxi: Add Allwinner A10 Digital Audio driver
+In-Reply-To: <20160602102651.GF2282@sirena.org.uk>
+References: <20160601175430.11625-1-maxime.ripard@free-electrons.com>
+ <20160601175430.11625-3-maxime.ripard@free-electrons.com>
+ <20160602102651.GF2282@sirena.org.uk>
+Message-ID: <20160609210515.GI5242@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Close the hole where ptrace can change a syscall out from under seccomp.
+Hi Mark,
 
-Signed-off-by: Kees Cook <keescook@chromium.org>
-Cc: Michael Ellerman <mpe@ellerman.id.au>
-Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-Cc: Paul Mackerras <paulus@samba.org>
-Cc: linuxppc-dev at lists.ozlabs.org
----
- arch/powerpc/kernel/ptrace.c | 44 +++++++++++++++++++++++---------------------
- 1 file changed, 23 insertions(+), 21 deletions(-)
+On Thu, Jun 02, 2016 at 11:26:51AM +0100, Mark Brown wrote:
+> > +static int sun4i_i2s_params_to_sr(struct snd_pcm_hw_params *params)
+> > +{
+> > +	switch (params_width(params)) {
+> > +	case 16:
+> > +		return 0;
+> > +	}
+> > +
+> > +	return -EINVAL;
+> > +}
+> 
+> The switch statement here and in the _wss() function look weird because
+> they don't have default cases.  Since there's only one user of both
+> functions it seems better to have the switch statements inline anyway.
 
-diff --git a/arch/powerpc/kernel/ptrace.c b/arch/powerpc/kernel/ptrace.c
-index ed799e994773..5dc47ebb3840 100644
---- a/arch/powerpc/kernel/ptrace.c
-+++ b/arch/powerpc/kernel/ptrace.c
-@@ -1788,7 +1788,7 @@ static int do_seccomp(struct pt_regs *regs)
- 
- 	/*
- 	 * The syscall was allowed by seccomp, restore the register
--	 * state to what ptrace and audit expect.
-+	 * state to what audit expects.
- 	 * Note that we use orig_gpr3, which means a seccomp tracer can
- 	 * modify the first syscall parameter (in orig_gpr3) and also
- 	 * allow the syscall to proceed.
-@@ -1822,22 +1822,25 @@ static inline int do_seccomp(struct pt_regs *regs) { return 0; }
-  */
- long do_syscall_trace_enter(struct pt_regs *regs)
- {
--	bool abort = false;
--
- 	user_exit();
- 
-+	/*
-+	 * The tracer may decide to abort the syscall, if so tracehook
-+	 * will return !0. Note that the tracer may also just change
-+	 * regs->gpr[0] to an invalid syscall number, that is handled
-+	 * below on the exit path.
-+	 */
-+	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
-+	    tracehook_report_syscall_entry(regs))
-+		goto skip;
-+
-+	/* Run seccomp after ptrace; allow it to set gpr[3]. */
- 	if (do_seccomp(regs))
- 		return -1;
- 
--	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
--		/*
--		 * The tracer may decide to abort the syscall, if so tracehook
--		 * will return !0. Note that the tracer may also just change
--		 * regs->gpr[0] to an invalid syscall number, that is handled
--		 * below on the exit path.
--		 */
--		abort = tracehook_report_syscall_entry(regs) != 0;
--	}
-+	/* Avoid trace and audit when syscall is invalid. */
-+	if (regs->gpr[0] >= NR_syscalls)
-+		goto skip;
- 
- 	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
- 		trace_sys_enter(regs, regs->gpr[0]);
-@@ -1854,17 +1857,16 @@ long do_syscall_trace_enter(struct pt_regs *regs)
- 				    regs->gpr[5] & 0xffffffff,
- 				    regs->gpr[6] & 0xffffffff);
- 
--	if (abort || regs->gpr[0] >= NR_syscalls) {
--		/*
--		 * If we are aborting explicitly, or if the syscall number is
--		 * now invalid, set the return value to -ENOSYS.
--		 */
--		regs->gpr[3] = -ENOSYS;
--		return -1;
--	}
--
- 	/* Return the possibly modified but valid syscall number */
- 	return regs->gpr[0];
-+
-+skip:
-+	/*
-+	 * If we are aborting explicitly, or if the syscall number is
-+	 * now invalid, set the return value to -ENOSYS.
-+	 */
-+	regs->gpr[3] = -ENOSYS;
-+	return -1;
- }
- 
- void do_syscall_trace_leave(struct pt_regs *regs)
+I don't know, maybe it's just me, but I really find it cleaner that
+way, and the compiler will probably inline it anyway. If you insist,
+I'll change it though.
+
+
+> > +	for (i = 0; sun4i_i2s_mclk_div[i].div; i++) {
+> > +		const struct sun4i_i2s_clk_div *mdiv = sun4i_i2s_mclk_div + i;
+> 
+> Why not just write these as normal array lookups?
+
+By normal, you mean using ARRAY_SIZE()?
+
+> > +	/* Enable the first output line */
+> > +	regmap_update_bits(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > +			   SUN4I_I2S_CTRL_SDO_EN_MASK,
+> > +			   SUN4I_I2S_CTRL_SDO_EN(0));
+> > +
+> > +	/* Enable the first two channels */
+> > +	regmap_write(i2s->regmap, SUN4I_I2S_TX_CHAN_SEL_REG,
+> > +		     SUN4I_I2S_TX_CHAN_SEL(2));
+> > +
+> > +	/* Map them to the two first samples coming in */
+> > +	regmap_write(i2s->regmap, SUN4I_I2S_TX_CHAN_MAP_REG,
+> > +		     SUN4I_I2S_TX_CHAN_MAP(0, 0) | SUN4I_I2S_TX_CHAN_MAP(1, 1));
+> 
+> We don't undo these if setup fails...  do them once on probe?
+
+Yep
+
+> > +static int sun4i_i2s_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+> > +{
+> > +        struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> > +	u32 val;
+> 
+> More tab/space damage, there seems to be quite a bit in the rest of the
+> driver.
+
+Indeed, sorry for that.
+
+> > +static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
+> > +{
+> > +	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
+> > +
+> > +	/* Enable the whole hardware block */
+> > +	regmap_write(i2s->regmap, SUN4I_I2S_CTRL_REG,
+> > +		     SUN4I_I2S_CTRL_GL_EN);
+> 
+> Runtime PM?  It also seems like this is something that ought to be
+> covered in the suspend and resume callbacks.
+
+runtime_pm is supported, and uses the regmap cache to keep those
+changes.
+
+suspend and resume is not supported for that SoC yet, so I couldn't
+test it properly (and isn't that redundant with runtime_pm?)
+
+Thanks!
+Maxime
+
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/c64d7622/attachment.sig>
