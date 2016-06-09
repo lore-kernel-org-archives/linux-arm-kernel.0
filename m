@@ -1,30 +1,63 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 9 Jun 2016 22:08:01 +0200 (CEST)
-Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
-In-Reply-To: <20160607070440.GA32573@shlinux2>
-References: <20160426012341.GB8870@tiger>
- <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
- <1461663072.7839.17.camel@pengutronix.de>
- <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
- <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
- <20160427015835.GE30692@tiger>
- <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
- <alpine.DEB.2.11.1604271212290.3941@nanos> <20160602145915.GA31124@shlinux2>
- <alpine.DEB.2.11.1606061448010.28031@nanos> <20160607070440.GA32573@shlinux2>
-Message-ID: <alpine.DEB.2.11.1606092204590.28031@nanos>
+From: geoff@infradead.org (Geoff Levand)
+Date: Thu, 09 Jun 2016 20:08:44 +0000
+Subject: [PATCH v18 02/13] arm64: Add cpus_are_stuck_in_kernel
+In-Reply-To: <cover.1465502767.git.geoff@infradead.org>
+References: <cover.1465502767.git.geoff@infradead.org>
+Message-ID: <194f9fd51174555c41472015a48f54e452c44cc3.1465502767.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Jun 2016, Dong Aisheng wrote:
-> Then it may need introduce a lot changes and increase many new core APIs.
-> Is that a problem?
+From: James Morse <james.morse@arm.com>
 
-No. That's all better than each driver having broken workarounds. It's a
-common problem so it wants to be addressed at the core level. There you have a
-central point to do this and you can still catch abusers which call stuff from
-the wrong context. The hacks in the drivers don't allow that because they look
-at the context, i.e. irq disabled, instead of checking the system state.
+kernel/smp.c has a fancy counter that keeps track of the number of CPUs
+it marked as not-present and left in cpu_park_loop(). If there are any
+CPUs spinning in here, kexec will release them once the memory is re-used
+by the new kernel.
 
-Thanks,
+Provide a function to expose whether this counter is non-zero, so we can
+use this when loading a new kexec image, and when calling machine_kexec().
 
-	tglx
+Signed-off-by: James Morse <james.morse@arm.com>
+[Split off from a larger patch]
+Signed-off-by: Geoff Levand <geoff@infradead.org>
+---
+ arch/arm64/include/asm/smp.h | 10 ++++++++++
+ arch/arm64/kernel/smp.c      |  5 +++++
+ 2 files changed, 15 insertions(+)
+
+diff --git a/arch/arm64/include/asm/smp.h b/arch/arm64/include/asm/smp.h
+index 433e504..38712f4 100644
+--- a/arch/arm64/include/asm/smp.h
++++ b/arch/arm64/include/asm/smp.h
+@@ -124,6 +124,16 @@ static inline void cpu_panic_kernel(void)
+ 	cpu_park_loop();
+ }
+ 
++/*
++ * If a secondary CPU fails to come online, (e.g. due to mismatched features),
++ * it will try to call cpu_die(). If this fails, it updates
++ * cpus_stuck_in_kernel and sits in cpu_park_loop().
++ *
++ * Kexec checks this counter and refuses to load/kexec if it is non-zero, as
++ * cpu_park_loop() would be overwritten releasing the parked cpus.
++ */
++bool cpus_are_stuck_in_kernel(void);
++
+ #endif /* ifndef __ASSEMBLY__ */
+ 
+ #endif /* ifndef __ASM_SMP_H */
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 678e084..d0bcd55 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -909,3 +909,8 @@ int setup_profiling_timer(unsigned int multiplier)
+ {
+ 	return -EINVAL;
+ }
++
++bool cpus_are_stuck_in_kernel(void)
++{
++	return !!cpus_stuck_in_kernel;
++}
+-- 
+2.5.0
