@@ -1,45 +1,57 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Thu,  9 Jun 2016 18:25:02 +0200
-Subject: [PATCH V2 2/5] dts/imx6q-b850v3: Configure IPU assignment order
-In-Reply-To: <cover.1465486875.git.peter.senna@collabora.com>
+Date: Thu,  9 Jun 2016 18:25:00 +0200
+Subject: [PATCH V2 0/5] Add driver for GE B850v3 LVDS/DP++ Bridge
+In-Reply-To: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
 References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
- <cover.1465486875.git.peter.senna@collabora.com>
-Message-ID: <b42202e66ab3a82ad134924c12c50ba64b2d92d1.1465486875.git.peter.senna@collabora.com>
+Message-ID: <cover.1465486875.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the IPU has combined limitations across multiple crtcs, and as that
-can't be communicated to userspace at the moment, reorder the crtcs to
-allow support to two Full-HD monitors by avoiding assigning two
-monitors to a single IPU.
+The series adds a driver that creates a drm_bridge and a drm_connector for the
+LVDS to DP++ display bridge of the GE B850v3.
 
-Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
----
-Changes from V1:
- - New commit message
+There are two physical bridges on the video signal pipeline: a STDP4028(LVDS to
+DP) and a STDP2690(DP to DP++).  The hardware and firmware made it complicated
+for this binding to comprise two device tree nodes, as the design goal is to
+configure both bridges based on the LVDS signal, which leave the driver
+powerless to control the video processing pipeline. The two bridges behaves as
+a single bridge, and the driver is only needed for telling the host about EDID /
+HPD, and for giving the host powers to ack interrupts. The video signal
+pipeline is as follows:
 
- arch/arm/boot/dts/imx6q-b850v3.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
 
-diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
-index 167f744..88a70de 100644
---- a/arch/arm/boot/dts/imx6q-b850v3.dts
-+++ b/arch/arm/boot/dts/imx6q-b850v3.dts
-@@ -51,6 +51,11 @@
- 	chosen {
- 		stdout-path = &uart3;
- 	};
-+
-+	display-subsystem {
-+		compatible = "fsl,imx-display-subsystem";
-+		ports = <&ipu1_di0>, <&ipu2_di0>, <&ipu1_di1>, <&ipu2_di1>;
-+	};
- };
- 
- &clks {
+The patches from the series:
+ [1/5] Change the imx-ldb driver to allow attaching a bridge and not only a LVDS
+       panel.
+
+ [2/5] Configure the mapping between IPUs and external displays on the dts file
+       of the B850v3. Needed if connect two Full-HD monitors.
+
+ [3/5] Devicetree documentation for the GE B850v3 LVDS/DP++ Bridge
+
+ [4/5] Add the driver, make changes to MAINTAINERS, Kconfig and Makefile
+
+ [5/5] Make the changes to the B850v3 dts file to enable the GE B850v3
+       LVDS/DP++ Bridge.
+
+Peter Senna Tschudin (5):
+  drm/imx-ldb: Add support to drm-bridge
+  dts/imx6q-b850v3: Configure IPU assignment order
+  Documentation/devicetree/bindings: b850v3_lvds_dp
+  drm/bridge: Add driver for GE B850v3 LVDS/DP++ Bridge
+  dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
+
+ .../devicetree/bindings/ge/b850v3_lvds_dp.txt      |  38 ++
+ MAINTAINERS                                        |   8 +
+ arch/arm/boot/dts/imx6q-b850v3.dts                 |  36 ++
+ drivers/gpu/drm/bridge/Kconfig                     |  11 +
+ drivers/gpu/drm/bridge/Makefile                    |   1 +
+ drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c         | 392 +++++++++++++++++++++
+ drivers/gpu/drm/imx/imx-ldb.c                      | 121 ++++---
+ 7 files changed, 565 insertions(+), 42 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ge/b850v3_lvds_dp.txt
+ create mode 100644 drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
+
 -- 
 2.5.5
