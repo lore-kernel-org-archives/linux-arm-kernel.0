@@ -1,36 +1,49 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 9 Jun 2016 18:36:08 +0200
-Subject: [PATCH] ARM: orion: remove unreferenced board-d2net.c
-In-Reply-To: <d521ce93-f647-0c6f-89f5-aeffd82b87e1@codethink.co.uk>
-References: <1465466656-30002-1-git-send-email-ben.dooks@codethink.co.uk>
- <20160609133116.GH30205@lunn.ch>
- <20160609153935.44323b8e@free-electrons.com>
- <20160609141006.GK30205@lunn.ch>
- <20160609161215.084e06f1@free-electrons.com>
- <d521ce93-f647-0c6f-89f5-aeffd82b87e1@codethink.co.uk>
-Message-ID: <20160609163608.GA23507@lunn.ch>
+From: kieran@bingham.xyz (Kieran Bingham)
+Date: Thu,  9 Jun 2016 17:42:48 +0100
+Subject: [PATCH 1/2] arm64: dts: r8a7795: add FCPF device nodes
+In-Reply-To: <1465490569-31177-1-git-send-email-kieran@bingham.xyz>
+References: <1465490569-31177-1-git-send-email-kieran@bingham.xyz>
+Message-ID: <1465490569-31177-2-git-send-email-kieran@bingham.xyz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 04:52:35PM +0100, Ben Dooks wrote:
-> On 09/06/16 15:12, Thomas Petazzoni wrote:
-> > Hello,
-> > 
-> > On Thu, 9 Jun 2016 16:10:06 +0200, Andrew Lunn wrote:
-> > 
-> >>> That being said, this has been broken more than 2 years ago, and nobody
-> >>> noticed. Doesn't this mean that we could get rid of the support for
-> >>> this board entirely? :)  
-> >>
-> >> Well, all it means is the LEDs don't blink. If the disk was not
-> >> spinning, or the ethernet device missing, i would agree with you. But
-> >> somebody could be using this device and don't notice the difference
-> >> with the LEDs.
-> 
-> Surely DT can manage blinking LEDs??
+Provide nodes for the FCP devices dedicated to the FDP device channels.
 
-There is an additional GPIO needed. However, i think a pin hog should
-allow this to be represented in DT. Two years ago, i don't think this
-sort of hogging existed.
+Signed-off-by: Kieran Bingham <kieran@bingham.xyz>
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
-     Andrew
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 3285a9286786..e63e5f29cceb 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1223,5 +1223,26 @@
+ 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 			status = "disabled";
+ 		};
++
++		fcpf0: fcp at fe950000 {
++			compatible = "renesas,r8a7795-fcpf", "renesas,fcpf";
++			reg = <0 0xfe950000 0 0x200>;
++			clocks = <&cpg CPG_MOD 615>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
++		};
++
++		fcpf1: fcp at fe951000 {
++			compatible = "renesas,r8a7795-fcpf", "renesas,fcpf";
++			reg = <0 0xfe951000 0 0x200>;
++			clocks = <&cpg CPG_MOD 614>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
++		};
++
++		fcpf2: fcp at fe952000 {
++			compatible = "renesas,r8a7795-fcpf", "renesas,fcpf";
++			reg = <0 0xfe952000 0 0x200>;
++			clocks = <&cpg CPG_MOD 613>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
++		};
+ 	};
+ };
+-- 
+2.7.4
