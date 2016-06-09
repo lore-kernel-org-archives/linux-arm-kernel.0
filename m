@@ -1,265 +1,64 @@
-From: moazkorena@gmail.com (moaz korena)
-Date: Thu, 9 Jun 2016 17:08:26 +0800
-Subject: FDT compatible list parsing problem (Kernel cant parse, always
- returns null)
-Message-ID: <CA+fqkcEFiFJaks0-B+NUnsK7yLgvOBtEqUm6uvVkMcU0a=AxQA@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 9 Jun 2016 10:09:25 +0100
+Subject: [RFC 1/1] ARM: print MHz in /proc/cpuinfo
+In-Reply-To: <20160608193003.GA17688@broadcom.com>
+References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
+ <1465333713-14339-2-git-send-email-jon.mason@broadcom.com>
+ <5757D87E.2080508@arm.com> <20160608193003.GA17688@broadcom.com>
+Message-ID: <57593245.5020109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
 
-I'm working on adding device tree support for an S5PV210 Samsung SoC based
-board, so I added the dts file, and configured some default values, I
-could share
-all that, but I'm hoping someone went through a similar thing and can point out
-an obvious (usual) mistake.
 
-What I've done so far:
-- Added early print statements, verified the dtb in memory is identical to the
-compiled dtb, in size and content.
-- Verified that the call to early_init_dt_verify within
-setup_machine_fdt function
- (in arch/arm/kernel/devtree.c) returns true (successful verification).
-- Traced the problem all the way to the doorsteps of the following routine
- fdt_getprop in scripts/dtc/libfdt/fdt_ro.c
-
-int of_fdt_is_compatible(const void *blob,
-                      unsigned long node, const char *compat)
-{
-        const char *cp;
-        int cplen;
-        unsigned long l, score = 0;
-
-        cp = fdt_getprop(blob, node, "compatible", &cplen);
-        if (cp == NULL)
-                return 0;
-        while (cplen > 0) {
-                score++;
-                if (of_compat_cmp(cp, compat, strlen(compat)) == 0)
-                        return score;
-                l = strlen(cp) + 1;
-                cp += l;
-                cplen -= l;
-        }
-
-        return 0;
-}
-
-
-
-cp in the above snippet is always null, blob holds the correct
-(virtual) address of the dtb,
-the same address used for successful verification of magic, size and
-version of the fdt,
-which is the problem I'm facing, this causes a panic very soon after,
-I've dumped the
-logs below, note that there are many early_print statements , so
-there's more information
-than the kernel usually gives..
-
-Here's the dts contents:
-
-
-/dts-v1/;
-#include <dt-bindings/input/input.h>
-#include "s5pv210.dtsi"
-
-/ {
-model = "FriendlyARM Tiny210v1204 based on S5PV210";
-compatible = "friendlyarm,tiny210v1204", "samsung,s5pv210";
-
-chosen {
-bootargs = "root=/dev/ram0 rw ramdisk=8192 ignore_loglevel earlyprintk
-console=ttyS0,115200n8 init=/linuxrc";
-};
-
-memory {
-device_type = "memory";
-reg = <0x20000000 0x20000000>;
-};
-};
-
-&xxti {
-clock-frequency = <24000000>;
-};
-&xusbxti {
-clock-frequency = <24000000>;
-};
-
-&uart0 {
-status = "okay";
-};
-
-&uart1 {
-status = "okay";
-};
-
-&uart2 {
-status = "okay";
-};
-
-&uart3 {
-status = "okay";
-};
-
-&rtc {
-status = "okay";
-};
-
-
-Here's the kernel panic :
-
-Uncompressing Linux... done, booting the kernel.
-
-dumping memory description variables ...
-
-PHYS_OFFSET(20000000) ...
-
-PAGE_OFFSET(80000000) ...
-
-__atags_pointer = 20000100
-
-
-
-fdt_check_header passed for DTF at 80000100
-
-flat device tree:
-
-magic: d00dfeed
-
-size: 00005c21
-
-version: 00000011
-
-size of passed DT = 23585
-
-initial_boot_params = 80000100
-
-initial_boot_params = 80000100
-
-[    0.000000] Booting Linux on physical CPU 0x0
-
-
-[    0.000000] Linux version 4.7.0-rc1-00107-g31a346f-dirty
-(korena at korena-solid) (gcc version 5.1.1 20150608 (Linaro GCC
-5.1-2015.08) )
-#18 PREEMPT Thu Jun 9 17:03:13 MYT 2016
-
-
-[    0.000000] CPU: ARMv7 Processor [412fc082] revision 2 (ARMv7), cr=10c5387d
-
-
-[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
-instruction cache
-
-
-[    0.000000] dumping memory description variables ...
-
-
-[    0.000000] PHYS_OFFSET(20000000) ...
-
-
-[    0.000000] PAGE_OFFSET(80000000) ...
-
-
-[    0.000000] __atags_pointer = 20000100
-
-
-[    0.000000]
-
-
-[    0.000000] fdt_check_header passed for DTF at 80000100
-
-
-[    0.000000] flat device tree:
-
-
-[    0.000000] magic: d00dfeed
-
-
-[    0.000000] size: 00005c21
-
-
-[    0.000000] version: 00000011
-
-
-[    0.000000] size of passed DT = 23585
-
-
-[    0.000000] initial_boot_params = 80000100
-
-
-[    0.000000] initial_boot_params = 80000100
-
-
-[    0.000000] Machine model: (null)
-
-
-[    0.000000] debug: ignoring loglevel setting.
-
-
-[    0.000000] bootconsole [earlycon0] enabled
-
-
-[    0.000000] Memory policy: Data cache writeback
-
-
-[    0.000000] Kernel panic - not syncing: ERROR: Failed to allocate
-0x2000 bytes below 0x0.
-
-
-[    0.000000]
-
-
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
-4.7.0-rc1-00107-g31a346f-dirty #18
-
-
-[    0.000000] Hardware name: Generic DT based system
-
-
-[    0.000000] [<8010c4b4>] (unwind_backtrace) from [<8010aa34>]
-(show_stack+0x10/0x14)
-
-
-[    0.000000] [<8010aa34>] (show_stack) from [<8016bb18>] (panic+0xc8/0x23c)
-
-
-[    0.000000] [<8016bb18>] (panic) from [<8050d688>]
-(memblock_alloc_base+0x34/0x3c)
-
-
-[    0.000000] [<8050d688>] (memblock_alloc_base) from [<80505a54>]
-(early_alloc_aligned+0xc/0x2c)
-
-
-[    0.000000] [<80505a54>] (early_alloc_aligned) from [<805066f4>]
-(paging_init+0x774/0x9cc)
-
-
-[    0.000000] [<805066f4>] (paging_init) from [<80504130>]
-(setup_arch+0x61c/0x84c)
-
-
-[    0.000000] [<80504130>] (setup_arch) from [<805009c8>]
-(start_kernel+0x5c/0x380)
-
-
-[    0.000000] [<805009c8>] (start_kernel) from [<20008078>] (0x20008078)
-
-
-[    0.000000] ---[ end Kernel panic - not syncing: ERROR: Failed to
-allocate 0x2000 bytes below 0x0.
-
-
-
-So where did I go wrong?
-
-Thanks
-
-Korena
-
-----------------------------------------------------------------------------------------------------------
-
-Software Consultant
-Siphyc
+On 08/06/16 20:31, Jon Mason wrote:
+> On Wed, Jun 08, 2016 at 09:34:06AM +0100, Sudeep Holla wrote:
+>>
+>>
+>> On 07/06/16 22:08, Jon Mason wrote:
+>>> Query the CPU core clock in the device tree to determine the core clock
+>>> speed.
+>>
+>> How do guarantee that it's the current frequency of the CPU ?
+>
+> I am basing it on the assumption (perhaps incorrect) that the clock in
+> the CPU DT corresponds to the one determining the CPU clock rate.  And,
+> that this clock rate is accurate in describing the speed at which the
+> CPU is currently running.
+>
+
+As you already noticed, it's not always correct.
+
+[..]
+
+>>
+>> What if they just don't have in DT but have DVFS support ?
+>
+> This can be extended to cover DVFS or SMC calls or anything else.
+> This was simply a first step to cover what appeared to be the most
+> prevalent case.
+>
+
+Using DVFS/CPUFreq makes this DT based approach irrelevant.
+
+>> Also whey do we need this support when the user-space can query the
+>> CPUFreq sysfs which is more accurate and maintains the current running
+>> frequency ?
+>
+> This is exactly what x86 is doing to provide its value in
+> /proc/cpuinfo.  I could easily augment this patch to call
+> cpufreq_quick_get(), if it returns 0, then call clk_get_rate().  If
+> both return 0, then simply not print out anything (which would cover
+> all of the possibilities).  Or, I could have it just call
+> cpufreq_quick_get() to get the value.
+>
+
+Agree x86 has, may be for legacy reasons. It even has CPUFreq sysfs
+entries which is architecture agnostic while /proc/cpuinfo is more
+architecture based. So applications that want to be portable across
+architectures must choose the generic CPUFreq sysfs path rather than
+some x86 based cpuinfo.
+
+-- 
+Regards,
+Sudeep
