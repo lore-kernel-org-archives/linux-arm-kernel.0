@@ -1,43 +1,134 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Thu, 09 Jun 2016 20:04:20 +0200
-Subject: [PATCH v2 00/13] regulator: pwm: various improvements
-In-Reply-To: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <2819222.JTKrccvLNL@diego>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Thu, 9 Jun 2016 13:09:02 -0500
+Subject: [PATCH 1/5] soc: qcom: Add suspend to idle support
+In-Reply-To: <CAPDyKFrAGVPkc=ycm-cQg6Y5NLx_d4xGeg8SaSiB-K5sxtv76A@mail.gmail.com>
+References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
+ <1463634020-17252-2-git-send-email-andy.gross@linaro.org>
+ <CAPDyKFrAGVPkc=ycm-cQg6Y5NLx_d4xGeg8SaSiB-K5sxtv76A@mail.gmail.com>
+Message-ID: <20160609180902.GJ13357@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
-
-Am Mittwoch, 8. Juni 2016, 18:34:35 schrieb Boris Brezillon:
-> This patch series series aims at adding two important features to the
-> pwm-regulator driver.
+On Thu, Jun 09, 2016 at 09:39:34AM +0200, Ulf Hansson wrote:
+> + Daniel
 > 
-> The first one is the support for 'smooth handover' between the
-> bootloader and the kernel. This is mainly solving problems we have when
-> the PWM is controlling a critical regulator (like the one powering the
-> DDR chip). Currently, when the PWM regulator acquire the PWM device it
-> assumes it was off and it's safe to change the configuration before
-> enabling it, which can generate glitches on the PWM signal which in turn
-> generated glitches on the output voltage.
-> To solve that we've introduced support for hardware readout to the
-> PWM framework, so that the PWM regulator driver can adjust the PWM
-> a probe time and avoid glitches.
-> Atomic update is also helping in this regard.
+> On 19 May 2016 at 07:00, Andy Gross <andy.gross@linaro.org> wrote:
+> > This patch adds suspend to idle support for Qualcomm processors.  While
+> > suspend to memory will be a valid state, there won't be any special
+> > handling or power savings over the suspend to idle.
+> >
+> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> > ---
+> >  drivers/soc/qcom/Makefile  |  1 +
+> >  drivers/soc/qcom/suspend.c | 77 ++++++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 78 insertions(+)
+> >  create mode 100644 drivers/soc/qcom/suspend.c
+> >
+> > diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+> > index fdd664e..7c479d3 100644
+> > --- a/drivers/soc/qcom/Makefile
+> > +++ b/drivers/soc/qcom/Makefile
+> > @@ -7,3 +7,4 @@ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+> >  obj-$(CONFIG_QCOM_SMP2P)       += smp2p.o
+> >  obj-$(CONFIG_QCOM_SMSM)        += smsm.o
+> >  obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
+> > +obj-$(CONFIG_SUSPEND)  +=      suspend.o
+> > diff --git a/drivers/soc/qcom/suspend.c b/drivers/soc/qcom/suspend.c
+> > new file mode 100644
+> > index 0000000..7d3f2dd
+> > --- /dev/null
+> > +++ b/drivers/soc/qcom/suspend.c
+> > @@ -0,0 +1,77 @@
+> > +/*
+> > + * (C) Copyright 2016 Linaro Ltd.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License
+> > + * as published by the Free Software Foundation; version 2
+> > + * of the License.
+> > + */
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/cpuidle.h>
+> > +#include <linux/suspend.h>
+> > +
+> > +
+> > +static void qcom_pm_enter_freeze(struct cpuidle_device *dev,
+> > +       struct cpuidle_driver *drv,
+> > +       int index)
+> > +{
+> > +       drv->states[index].enter(dev, drv, index);
+> > +}
+> > +
+> > +static const struct of_device_id qcom_idle_state_match[] = {
+> > +       { .compatible = "qcom,idle-state-spc", },
+> > +       { },
+> > +};
+> > +
+> > +static const struct platform_suspend_ops qcom_suspend_ops = {
+> > +       .valid          = suspend_valid_only_mem,
+> > +};
+> > +
+> > +static int __init qcom_pm_init(void)
+> > +{
+> > +       struct cpuidle_device *cpu_dev;
+> > +       struct cpuidle_driver *cpu_drv;
+> > +       int state_count;
+> > +       struct device_node *state_np, *cpu_np;
+> > +       const struct of_device_id *match;
+> > +       int i;
+> > +
+> > +       /* configure CPU enter_freeze if applicable */
+> > +       for_each_present_cpu(i) {
+> > +               cpu_np = of_get_cpu_node(i, NULL);
+> > +               cpu_dev = per_cpu_ptr(cpuidle_devices, i);
+> > +               cpu_drv = cpuidle_get_cpu_driver(cpu_dev);
+> > +
+> > +               if (!cpu_dev || !cpu_drv) {
+> > +                       of_node_put(cpu_np);
+> > +                       return -EPROBE_DEFER;
+> 
+> This isn't a driver, so returning -EPROBE_DEFER doesn't make sense.
 
-[...]
+Right.  It's not like it'll get retried.
 
-> The second feature we add to the driver is the capability of using
-> a sub duty_cycle range in continuous mode. By default the regulator
-> is assuming that min_uV is achieved with a 0% dutycyle and max_uV
-> with a 100% dutycycle, but this is not necessarily true.
-> Moreover, in some cases (when the PWM device does not support
-> polarity inversion), we might have min_uV at 100% and max_uV at 0%.
-> Hence the addition of new properties to the existing DT bindings.
-> The feature is added in patch 12 and 13.
+> > +               }
+> > +
+> > +               state_count = 0;
+> > +               state_np = of_parse_phandle(cpu_np, "cpu-idle-states",
+> > +                                                 state_count);
+> > +
+> > +               while (state_np) {
+> > +                       match = of_match_node(qcom_idle_state_match,
+> > +                                             state_np);
+> > +
+> > +                       state_count++;
+> > +                       if (match)
+> > +                               cpu_drv->states[state_count].enter_freeze =
+> > +                                               &qcom_pm_enter_freeze;
+> > +                       of_node_put(state_np);
+> > +
+> > +                       state_np = of_parse_phandle(cpu_np, "cpu-idle-states",
+> > +                                                   state_count);
+> > +               }
+> > +
+> > +               of_node_put(cpu_np);
+> > +       }
+> > +
+> > +       suspend_set_ops(&qcom_suspend_ops);
+> 
+> I don't think this will work!
+> 
+> When building a multi defconfig for ARM, you might overwrite the
+> suspend_ops (there's only one set) as here you don't know that it's
+> actually the QCOM platform that is running, right!?
+> 
+> Perhaps this code actually belongs closer to the cpuidle driver?
 
-I've tested this series on a rk3288-veyron chromebook and both the backlight-
-pwm as well as the pwm-regulator still work as expected, so for everything 
-except the STI parts:
+Hmmmm, I might have to get creative.  I originally had a DT entry for the pm,
+but that doesn't make sense as this is purely a software construct.  The db410c
+uses the arm cpuidle driver so I can't really hook it in there.  I'll have to
+come up with something else.
 
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+
+Andy
