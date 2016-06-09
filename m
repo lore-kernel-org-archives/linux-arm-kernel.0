@@ -1,42 +1,119 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Thu,  9 Jun 2016 16:25:14 -0400
-Subject: [PATCH] [media] s5p-mfc: use vb2_is_streaming() to check vb2 queue
- status
-Message-ID: <1465503914-22936-1-git-send-email-javier@osg.samsung.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 9 Jun 2016 23:36:07 +0300
+Subject: [PATCH v3 06/12] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <CAMuHMdU0e=pS+q8PmXX9gwc6bHv-YdJo4G8nc-EA3NaKMuTrqQ@mail.gmail.com>
+References: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
+ <1788169.FUQDsLAmXg@wasted.cogentembedded.com>
+ <CAMuHMdU0e=pS+q8PmXX9gwc6bHv-YdJo4G8nc-EA3NaKMuTrqQ@mail.gmail.com>
+Message-ID: <e4b85e72-e5bf-39c8-6a57-2712ba2dae51@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The streaming field in struct vb2_queue is meant to be private and should
-not be used by drivers directly, instead the vb2_is_streaming() function
-should be used to check the videobuf2 queue streaming status.
+On 06/09/2016 01:05 PM, Geert Uytterhoeven wrote:
 
-Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
----
+>> The initial R8A7792 SoC device tree including CPU cores, GIC, timer, SYSC,
+>> and the required  clock descriptions.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>> Changes in version 3:
+>
+> Thanks for the update!
+>
+>> --- /dev/null
+>> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
+>> @@ -0,0 +1,180 @@
+>> +/*
+>> + * Device Tree Source for the r8a7792 SoC
+>> + *
+>> + * Copyright (C) 2016 Cogent Embedded Inc.
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public License
+>> + * version 2.  This program is licensed "as is" without any warranty of any
+>> + * kind, whether express or implied.
+>> + */
+>> +
+>> +#include <dt-bindings/clock/r8a7792-clock.h>
+>> +#include <dt-bindings/interrupt-controller/irq.h>
+>> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+>> +#include <dt-bindings/power/r8a7792-sysc.h>
+>> +
+>> +/ {
+>> +       compatible = "renesas,r8a7792";
+>> +       #address-cells = <2>;
+>> +       #size-cells = <2>;
+>> +
+>> +       cpus {
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>
+> This is gonna need
+>
+>                 enable-method = "renesas,apmu";
+>
+> soon.
 
- drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+    When Magnus' patchset lands, we'll see...
 
-diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-index 038215c198ac..d3b01e92ee80 100644
---- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-+++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
-@@ -423,7 +423,7 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
- 	pix_mp = &f->fmt.pix_mp;
- 	if (ret)
- 		return ret;
--	if (ctx->vq_src.streaming || ctx->vq_dst.streaming) {
-+	if (vb2_is_streaming(&ctx->vq_src) || vb2_is_streaming(&ctx->vq_dst)) {
- 		v4l2_err(&dev->v4l2_dev, "%s queue busy\n", __func__);
- 		ret = -EBUSY;
- 		goto out;
-@@ -820,7 +820,7 @@ static int vidioc_decoder_cmd(struct file *file, void *priv,
- 		if (cmd->flags != 0)
- 			return -EINVAL;
- 
--		if (!ctx->vq_src.streaming)
-+		if (!vb2_is_streaming(&ctx->vq_src))
- 			return -EINVAL;
- 
- 		spin_lock_irqsave(&dev->irqlock, flags);
--- 
-2.5.5
+>> +       soc {
+>
+>> +               p_clk: p {
+>> +               compatible = "fixed-factor-clock";
+>
+> Missing TAB.
+
+    Argh!
+
+>> +                       clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
+>> +                       #clock-cells = <0>;
+>> +                       clock-div = <24>;
+>> +                       clock-mult = <1>;
+>> +               };
+>> +               cp_clk: cp {
+>> +                       compatible = "fixed-factor-clock";
+>> +                       clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
+>> +                       #clock-cells = <0>;
+>> +                       clock-div = <3>;
+>
+> 48
+
+    Thank you.
+
+>
+> (did you check /sys/kernel/debug/clk/clk_summary matches Table 7.2c?)
+
+    Now I have! Only the Z clock seem to be out of range -- 1.5 GHz vs 1 GHz max.
+
+>> +                       clock-mult = <1>;
+>> +               };
+>> +
+>> +               /* Gate clocks */
+>
+>> +               mstp7_clks: mstp7_clks at e615014c {
+>> +                       compatible = "renesas,r8a7792-mstp-clocks",
+>> +                                    "renesas,cpg-mstp-clocks";
+>> +                       reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
+>> +                       clocks = <&zs_clk>, <&zs_clk>, <&p_clk>, <&p_clk>,
+>> +                                <&p_clk>, <&p_clk>;
+>> +                       #clock-cells = <1>;
+>> +                       clock-indices = <
+>> +                               R8A7792_CLK_HSCIF1 R8A7792_CLK_HSCIF0
+>> +                               R8A7792_CLK_SCIF3 R8A7792_CLK_SCIF2
+>> +                               R8A7792_CLK_SCIF1 R8A7792_CLK_SCIF0
+>> +                       >;
+>> +                       clock-output-names = "hscif1", "hscif0", "scif3",
+>> +                                            "scif2", "scif1", "scif0",
+>> +                                            "du1", "du0";
+>
+> You forgot to drop "du1" and "du0".
+
+    Argh again...
+
+>> +               };
+>
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+
+MBR, Sergei
