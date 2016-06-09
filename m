@@ -1,39 +1,38 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Thu, 9 Jun 2016 09:43:28 +0200
-Subject: [PATCH 05/11] clk: imx: refine the powerup_set bit of clk-pllv3
-In-Reply-To: <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
-References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
- <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20160609094328.136b7bf8@ipc1.ka-ro>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Jun 2016 09:46:43 +0200
+Subject: [PATCH 0/1] ARM: dts: sunxi: Fix simplefb not working in 4.7-rc1
+In-Reply-To: <1465063524-4925-1-git-send-email-hdegoede@redhat.com>
+References: <1465063524-4925-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160609074643.GA5242@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Hans,
 
-On Wed, 8 Jun 2016 22:33:34 +0800 Dong Aisheng wrote:
-> There's a powerdown bit already, so let's change the name of
-> powerup_set bit to power_invert to reflects the power polarity
-> to make it less confusing.
+On Sat, Jun 04, 2016 at 08:05:23PM +0200, Hans de Goede wrote:
+> Hi Maxime,
 > 
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> ---
->  drivers/clk/imx/clk-pllv3.c | 14 +++++++-------
->  1 file changed, 7 insertions(+), 7 deletions(-)
+> While testing 4.7-rc1 / linux-sunxi/sunxi-next on a A10s I noticed that
+> hdmi out is no longer working (screen goes black when the kernel turns
+> of unused clocks).
 > 
-> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-> index eea2b1b3791e..3fdfb6d2cc71 100644
-> --- a/drivers/clk/imx/clk-pllv3.c
-> +++ b/drivers/clk/imx/clk-pllv3.c
-> @@ -29,8 +29,8 @@
->   * struct clk_pllv3 - IMX PLL clock version 3
->   * @clk_hw:	 clock source
->   * @base:	 base address of PLL registers
-> - * @powerup_set: set POWER bit to power up the PLL
-> - * @powerdown:   pll powerdown offset bit
-> + * @powerdown:	 pll powerdown bit offset
-> + * @power_invert: set powerdown bit to power up the PLL
-s/set/clear/ ?
+> This is caused by the dtsi for sun4i / sun5i / sun7i based boards now
+> listing pll3, without pll3 being added to the clocks list for the
+> simplefb nodes.
 
+Why not do just that then? It's more appropriate for a fix imho.
 
+Thanks! (and sorry for the breakage)
+Maxime
 
-Lothar Wa?mann
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/c47efccb/attachment-0001.sig>
