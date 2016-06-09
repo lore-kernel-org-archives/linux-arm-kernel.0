@@ -1,107 +1,129 @@
-From: mamlinav@gmail.com (Aleksei Mamlin)
-Date: Thu, 9 Jun 2016 11:11:00 +0300
-Subject: [PATCH 7/7] ARM: dts: sun7i: Enable NAND on Wexler TAB7200
-In-Reply-To: <20160608220314.GL14179@lukather>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
- <1465208664-9366-8-git-send-email-mamlinav@gmail.com>
- <20160608220314.GL14179@lukather>
-Message-ID: <20160609111100.38931fbe05fda9be7a355836@gmail.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu, 9 Jun 2016 09:11:38 +0100
+Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
+In-Reply-To: <32804824.nq0AOIbNnC@wuerfel>
+References: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
+ <5757CF9B.3080402@free.fr>
+ <d3c117ea-2dce-63a2-7888-31ee8320a3dd@codethink.co.uk>
+ <32804824.nq0AOIbNnC@wuerfel>
+Message-ID: <63e7df1a-4ddf-8de0-a600-a09983ecbce6@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jun 2016 00:03:14 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On 09/06/16 08:07, Arnd Bergmann wrote:
+> On Wednesday, June 8, 2016 9:59:26 AM CEST Ben Dooks wrote:
+>> On 08/06/16 08:56, Mason wrote:
+>>> On 07/06/2016 13:30, Ben Dooks wrote:
+>>>
+>>>> Fix the use of 0 instead of NULL to clk_get() call. This stops the
+>>>> following warning:
+>>>>
+>>>> drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
+>>>
+>>> May I ask which compiler/version produced that diagnostic?
+>>
+>> I was running with "make C=2 bzImage" for ARM multi_v7_config
+>>
+>> $ sparse --version
+>> v0.5.0
+>>
+> 
+> I believe gcc-6 will also produce a similar warning when building with
+> 'make W=1'. I've started looking into moving some of the warnings from
+> W=1 level to default, which can probably be done with relatively little
+> effort for many warnings.
 
-> Hi,
-> 
-> On Mon, Jun 06, 2016 at 01:24:24PM +0300, Aleksei Mamlin wrote:
-> > Enable the NFC and describe the NAND flash connected to this controller.
-> > 
-> > Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 41 ++++++++++++++++++++++++++
-> >  1 file changed, 41 insertions(+)
-> > 
-> > diff --git a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> > index 2f6b21a..42aff91 100644
-> > --- a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> > +++ b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> > @@ -159,6 +159,47 @@
-> >  	status = "okay";
-> >  };
-> >  
-> > +&nfc {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&nand_pins_a>, <&nand_cs0_pins_a>, <&nand_rb0_pins_a>;
-> > +	status = "okay";
-> > +
-> > +	nand at 0 {
-> > +		#address-cells = <2>;
-> > +		#size-cells = <2>;
-> > +		reg = <0>;
-> > +		allwinner,rb = <0>;
-> > +
-> > +		nand-ecc-mode = "hw";
-> > +		nand-on-flash-bbt;
-> > +
-> > +		boot0 at 0 {
-> > +			label = "boot0";
-> > +			reg = /bits/ 64 <0x0 0x200000>;
-> > +		};
-> > +
-> > +		boot0-rescue at 200000 {
-> > +			label = "boot0-rescue";
-> > +			reg = /bits/ 64 <0x200000 0x200000>;
-> > +		};
-> > +
-> > +		uboot at 400000 {
-> > +			label = "uboot";
-> > +			reg = /bits/ 64 <0x400000 0x200000>;
-> > +		};
-> > +
-> > +		uboot-rescue at 600000 {
-> > +			label = "uboot-rescue";
-> > +			reg = /bits/ 64 <0x600000 0x200000>;
-> > +		};
-> > +
-> > +		main at 800000 {
-> > +			label = "main";
-> > +			reg = /bits/ 64 <0x800000 0xff800000>;
-> > +		};
-> > +	};
-> > +};
-> 
-> This feels a bit premature. The two boards you're using have an MLC
-> NAND which is not supported yet. Until there's proper MLC support in
-> the kernel, I'm not sure we want to enable that for end-users when we
-> know that things will get wrong.
-> 
-> However, after discussing this with Boris, I appreciate that we don't
-> have any example available because of this policy for people that want
-> to opt-in anyway.
-> 
-> What we could do is to still mark the status as disabled in the DTS,
-> with a big fat warning as comment just before, so that it requires
-> user action, and that user will have been warned.
-> 
-> Would that work for you?
-> Maxime
-> 
+Would be interesting to see, I tried W=2 and W=3 and ended up with
+hundreds of MiB of logs.
 
-Let's drop this two patches with boards dts changes until we get proper MLC
-support in kernel.
+Out of interest, which other warnings do you think would make good
+next targets?
 
-As for examples - I'll update linux-sunxi wiki with how to enable NAND 
-controller and describe NAND chips in DTS. People who want to add NAND support 
-to their boards will be warned that it is risky for now.
+> I see that you are making very good progress at eliminating the
+> -Wmissing-declarations warnings, which are also at W=1 level. Do
+> you have an estimate of how many there are? Do you plan to do them
+> all, or just the ones for some subsystems? I've stayed away from
+> this one for now since there are lots of such warnings, but it
+> seems particularly worthwhile.
 
->
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+Yes, got bored so went at a lot of the warnings that sparse produces
+and may consider having a go with gcc6 now it is being packaged by
+Debian. I've been building with multi_v7_defconfig
+
+I may look at some of the other ARM configurations and build options
+in the next few days.
+
+So far i've got 61 fix patches for issues such as missing includes or
+people doing very silly things with pointers. The branch as of last
+night is now up at:
+
+git://git.codethink.co.uk/public/linux bjdooks/fixup_warnings
+
+Ben Dooks (61):
+      mmc: dw_mmc: fix 32bit little-endian access of des1 field
+      cpufreq: mvebu: fix integer to pointer cast
+      watchdog: sirf: fix __iomem * warnings
+      irqchip/sirfsoc: fix sparse warnings on __iomem
+      irqchip/tegra: fix fix sparse warnings on __iomem
+      iommu/exynos: update to use iommu big-endian
+      clk: hi6220: fix missing clk.h include
+      clk: ti: fapll: fix address space warnings
+      clocksource/drivers/digicolor: fix warning of non-static function
+      clocksource/drivers/armada-370-xp: make syscore_ops static
+      dmaengine: ste_dma40_ll: make d40_width_to_bits static
+      dmaengine: sirf: fix un-exported struct warnings
+      dmaengine: at_xdmac: fix un-exported functions
+      dmaengine: bcm2835: fix unexported function
+      gpio: bcm-kona: fix bcm_kona_gpio_reset() warnings
+      clk: iproc: fix missing include of clk-iproc.h
+      clk: at91: make of_sama5d2_clk_generated_setup() static
+      ata: sata_mv: fix mis-conversion in mv_write_cached_reg()
+      pinctrl: nsp-gpio: fix non-static functions
+      pinctrl: at91-pio4: fix non-exported functions
+      phy-sun4i-usb: fix missing __iomem *
+      pinctrl: sh-pfc: fix warnings by include core.h
+      regulator: twl: fix use of integer as pointer
+      ARM: bcm2835: remove unused __packet
+      soc: brcmstb: fix warning from missing include
+      serial: sirf: make fifo functions static
+      serial: sirf: make uart register info static
+      tty: serial: msm: fix definition of msm_stop_dma
+      USB: core: fix missing include <linux/usb/of.h>
+      net-sysfs: fix missing <linux/of_net.h>
+      mvebu: fix missing includes in pmsu.c
+      mvebu: fix missing include of common.h in pm.c
+      mvebu: fix missing include of common.h in cpu-reset.c
+      mvebu: make mvebu_armada375_smp_wa_init() static
+      mvebu: add definition for coherency_base
+      pinctrl: nomadik: fix warnings from unexported functions
+      ARM: make unexported functions static
+      arm: dma-mapping: make unexported items static
+      ARM: bcm: fix missing include of kona_l2_cache.h
+      ARM: tegra: irq: fix missing include of irq.h
+      ARM: tegra: fix missing include <soc/tegra/cpuidle.h>
+      ARM: tegra: fix missing include of cpuidle.h
+      ARM: tegra: fix missing common.h include
+      vexpress/spc: fix missing include of spc.h
+      ARM: vexpress: fix missing core.h include
+      ARM: versatile: fix missing <plat/platsmp.h> include
+      ARM: imx: fix missing includes
+      ARM: imx: fix missing include of common.h
+      ARM: imx: fix missing cpuidle.h include
+      EDAC: make dev_attr_sdram_scrub_rate static
+      irqchip/bcm2836: make bcm2836_smp_boot_secondary static
+      irqchip/omap-intc: fix missing <linux/irqchip/irq-omap-intc.h> include
+      irqchip/gic-v2m: fix missing include of <linux/irqchip/arm-gic.h>
+      irqchip/armada-370-xp: make syscore_ops static
+      irqchip/bcm7120-l2: make probe functions static
+      irqchip/brcmstb-l2: make of probe function static
+      mfd: omap-usb-tll: fix include of omap-usb.h
+      mmc: mmci: add missing include of mmci_qcom_dml.h
+      stmmac: fix parameter to dwmac4_set_umac_addr()
+      power: vexpress: make dev_attr_active static
+      power/reset: make syscon_poweroff() static
+
 
 
 -- 
-Thanks and regards,
-Aleksei Mamlin
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
