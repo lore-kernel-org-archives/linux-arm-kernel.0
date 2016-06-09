@@ -1,69 +1,68 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 9 Jun 2016 21:41:36 +0200
-Subject: [PATCH 2/2] soc: qcom: add l2 cache perf events driver
-In-Reply-To: <20160609155615.GE12201@leverpostej>
-References: <1464987812-14360-1-git-send-email-nleeder@codeaurora.org>
- <1464987812-14360-3-git-send-email-nleeder@codeaurora.org>
- <20160606095139.GC6831@leverpostej>
- <be1cc820-7b9d-041b-06d8-cefeb43934d5@codeaurora.org>
- <20160609155615.GE12201@leverpostej>
-Message-ID: <20160609194136.GZ30154@twins.programming.kicks-ass.net>
+From: marex@denx.de (Marek Vasut)
+Date: Thu,  9 Jun 2016 21:43:10 +0200
+Subject: [PATCH V3 1/4] ARM: dts: mxs: Add SSP2 SD mux
+Message-ID: <1465501393-5883-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 04:56:16PM +0100, Mark Rutland wrote:
-> > >> +static irqreturn_t l2_cache__handle_irq(int irq_num, void *data)
-> > >> +{
-> > >> +	struct hml2_pmu *slice = data;
-> > >> +	u32 ovsr;
-> > >> +	int idx;
-> > >> +	struct pt_regs *regs;
-> > >> +
-> > >> +	ovsr = hml2_pmu__getreset_ovsr();
-> > >> +	if (!hml2_pmu__has_overflowed(ovsr))
-> > >> +		return IRQ_NONE;
-> > >> +
-> > >> +	regs = get_irq_regs();
-> > >> +
-> > >> +	for (idx = 0; idx < l2cache_pmu.num_counters; idx++) {
-> > >> +		struct perf_event *event = slice->events[idx];
-> > >> +		struct hw_perf_event *hwc;
-> > >> +		struct perf_sample_data data;
-> > >> +
-> > >> +		if (!event)
-> > >> +			continue;
-> > >> +
-> > >> +		if (!hml2_pmu__counter_has_overflowed(ovsr, idx))
-> > >> +			continue;
-> > >> +
-> > >> +		l2_cache__event_update_from_slice(event, slice);
-> > >> +		hwc = &event->hw;
-> > >> +
-> > >> +		if (is_sampling_event(event)) {
-> > >> +			perf_sample_data_init(&data, 0, hwc->last_period);
-> > > 
-> > > I don't think sampling makes sense, given this is an uncore PMU and the
-> > > events are triggered by other CPUs.
-> > 
-> > There is origin filtering so events can be attributed to a CPU when sampling.
-> 
-> Ok. I believe that's different from all other uncore PMUs we support
-> (none of the drivers support sampling, certainly), so I'm not entirely
-> sure how/if we can make use of that sanely and reliably.
+From: Marek Vasut <marek.vasut@gmail.com>
 
-Right; because not only do you need to know which CPU originated the
-event, the IRQ must also happen on that CPU. Simply knowing which CPU
-triggered it is not enough for sampling.
+Add pinmux configuration for SSP2 port in SD mode, both for
+the 4-bit and 8-bit case.
 
-> For the timebeing, I think this sampling needs to go, and the event_init
-> logic needs to reject sampling as with other uncore PMU drivers.
+Signed-off-by: Marek Vasut <marek.vasut@gmail.com>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+---
+V3: Reorder the tags from ARM: mxs: dts: to ARM: dts: mxs:
+---
+ arch/arm/boot/dts/imx23.dtsi | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-Agreed.
-
-> One thing I forgot to mention in my earlier comments is that as an
-> uncore PMU you need to have task_ctx_nr = perf_invalid_context here
-> also.
-
-For good reasons, uncore PMUs (as is the case here) count strictly more
-than the effect of single CPUs (and thus also the current task). So
-attributing it back to a task is nonsense.
+diff --git a/arch/arm/boot/dts/imx23.dtsi b/arch/arm/boot/dts/imx23.dtsi
+index 302d116..c70ebef 100644
+--- a/arch/arm/boot/dts/imx23.dtsi
++++ b/arch/arm/boot/dts/imx23.dtsi
+@@ -249,6 +249,40 @@
+ 					fsl,pull-up = <MXS_PULL_DISABLE>;
+ 				};
+ 
++				mmc1_4bit_pins_a: mmc1-4bit at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX23_PAD_GPMI_D00__SSP2_DATA0
++						MX23_PAD_GPMI_D01__SSP2_DATA1
++						MX23_PAD_GPMI_D02__SSP2_DATA2
++						MX23_PAD_GPMI_D03__SSP2_DATA3
++						MX23_PAD_GPMI_RDY1__SSP2_CMD
++						MX23_PAD_GPMI_WRN__SSP2_SCK
++					>;
++					fsl,drive-strength = <MXS_DRIVE_8mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_ENABLE>;
++				};
++
++				mmc1_8bit_pins_a: mmc1-8bit at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX23_PAD_GPMI_D00__SSP2_DATA0
++						MX23_PAD_GPMI_D01__SSP2_DATA1
++						MX23_PAD_GPMI_D02__SSP2_DATA2
++						MX23_PAD_GPMI_D03__SSP2_DATA3
++						MX23_PAD_GPMI_D04__SSP2_DATA4
++						MX23_PAD_GPMI_D05__SSP2_DATA5
++						MX23_PAD_GPMI_D06__SSP2_DATA6
++						MX23_PAD_GPMI_D07__SSP2_DATA7
++						MX23_PAD_GPMI_RDY1__SSP2_CMD
++						MX23_PAD_GPMI_WRN__SSP2_SCK
++					>;
++					fsl,drive-strength = <MXS_DRIVE_8mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_ENABLE>;
++				};
++
+ 				pwm2_pins_a: pwm2 at 0 {
+ 					reg = <0>;
+ 					fsl,pinmux-ids = <
+-- 
+2.7.0
