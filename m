@@ -1,46 +1,35 @@
-From: fcooper@ti.com (Franklin S Cooper Jr)
-Date: Thu,  9 Jun 2016 10:26:18 -0500
-Subject: [PATCH v2 3/3] ARM: dts: k2g-evm: Add pinmuxing for UART0
-In-Reply-To: <1465485978-27910-1-git-send-email-fcooper@ti.com>
-References: <1465485978-27910-1-git-send-email-fcooper@ti.com>
-Message-ID: <1465485978-27910-4-git-send-email-fcooper@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 9 Jun 2016 16:30:34 +0100
+Subject: [PATCH 8/8] dmaengine: Remove site specific OOM error messages
+ on kzalloc
+In-Reply-To: <CACRpkdaf1d8CvBmFCT+bWiXR9ddJ0Mpu5hMi2fzR6sLCXt3EqA@mail.gmail.com>
+References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
+ <1465321121-22238-9-git-send-email-peter.griffin@linaro.org>
+ <CACRpkdaf1d8CvBmFCT+bWiXR9ddJ0Mpu5hMi2fzR6sLCXt3EqA@mail.gmail.com>
+Message-ID: <20160609153034.GB5438@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lokesh Vutla <lokeshvutla@ti.com>
+On Wed, 08 Jun 2016, Linus Walleij wrote:
 
-Avoid depending on the bootloader or the ROM for configuring the pinmux by
-explicitly setting the pinmux here.
+> On Tue, Jun 7, 2016 at 7:38 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
+> 
+> > If kzalloc() fails it will issue it's own error message including
+> > a dump_stack(). So remove the site specific error messages.
+> >
+> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> A few subsystems may use a cleanup like this...
+> I wonder how many unnecessary prints I've introduced
+> myself :P
 
-Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com>
-Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
----
- arch/arm/boot/dts/keystone-k2g-evm.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/arch/arm/boot/dts/keystone-k2g-evm.dts b/arch/arm/boot/dts/keystone-k2g-evm.dts
-index 5bfd9e7..692fcbb 100644
---- a/arch/arm/boot/dts/keystone-k2g-evm.dts
-+++ b/arch/arm/boot/dts/keystone-k2g-evm.dts
-@@ -27,6 +27,17 @@
+Wolfram did some analysis on this a while back.  IIRC he also
+presented on his findings at ELC(?).
  
- };
- 
-+&k2g_pinctrl {
-+	uart0_pins: pinmux_uart0_pins {
-+		pinctrl-single,pins = <
-+			K2G_CORE_IOPAD(0x11cc) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* uart0_rxd.uart0_rxd */
-+			K2G_CORE_IOPAD(0x11d0) (BUFFER_CLASS_B | PIN_PULLDOWN | MUX_MODE0)	/* uart0_txd.uart0_txd */
-+		>;
-+	};
-+};
-+
- &uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins>;
- 	status = "okay";
- };
 -- 
-2.7.0
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
