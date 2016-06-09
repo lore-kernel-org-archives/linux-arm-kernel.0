@@ -1,33 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Jun 2016 18:23:10 +0200
-Subject: [PATCH 2/2] ARM: dts: sun7i: HDMI and the tv-encoder use tcon
- ch1 not ch0
-In-Reply-To: <1465129368-22335-2-git-send-email-hdegoede@redhat.com>
-References: <1465129368-22335-1-git-send-email-hdegoede@redhat.com>
- <1465129368-22335-2-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160609162310.GD5242@lukather>
+From: peter.senna@collabora.com (Peter Senna Tschudin)
+Date: Thu,  9 Jun 2016 18:25:02 +0200
+Subject: [PATCH V2 2/5] dts/imx6q-b850v3: Configure IPU assignment order
+In-Reply-To: <cover.1465486875.git.peter.senna@collabora.com>
+References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
+ <cover.1465486875.git.peter.senna@collabora.com>
+Message-ID: <b42202e66ab3a82ad134924c12c50ba64b2d92d1.1465486875.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 05, 2016 at 02:22:48PM +0200, Hans de Goede wrote:
-> Update the simplefb nodes for hdmi / tv-encoder out to point to
-> tcon0_ch1 instead of tcon0_ch0 as tcon clock.
-> 
-> While at it fix the clocks lines being longer then 80 chars.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+As the IPU has combined limitations across multiple crtcs, and as that
+can't be communicated to userspace at the moment, reorder the crtcs to
+allow support to two Full-HD monitors by avoiding assigning two
+monitors to a single IPU.
 
-Fixed the typos (than vs then) and applied, thanks!
-Maxime
+Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
+---
+Changes from V1:
+ - New commit message
 
+ arch/arm/boot/dts/imx6q-b850v3.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+index 167f744..88a70de 100644
+--- a/arch/arm/boot/dts/imx6q-b850v3.dts
++++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+@@ -51,6 +51,11 @@
+ 	chosen {
+ 		stdout-path = &uart3;
+ 	};
++
++	display-subsystem {
++		compatible = "fsl,imx-display-subsystem";
++		ports = <&ipu1_di0>, <&ipu2_di0>, <&ipu1_di1>, <&ipu2_di1>;
++	};
+ };
+ 
+ &clks {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/99489607/attachment.sig>
+2.5.5
