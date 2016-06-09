@@ -1,35 +1,81 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 9 Jun 2016 16:30:34 +0100
-Subject: [PATCH 8/8] dmaengine: Remove site specific OOM error messages
- on kzalloc
-In-Reply-To: <CACRpkdaf1d8CvBmFCT+bWiXR9ddJ0Mpu5hMi2fzR6sLCXt3EqA@mail.gmail.com>
-References: <1465321121-22238-1-git-send-email-peter.griffin@linaro.org>
- <1465321121-22238-9-git-send-email-peter.griffin@linaro.org>
- <CACRpkdaf1d8CvBmFCT+bWiXR9ddJ0Mpu5hMi2fzR6sLCXt3EqA@mail.gmail.com>
-Message-ID: <20160609153034.GB5438@dell>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 9 Jun 2016 21:07:46 +0530
+Subject: [PATCH v11 1/2] Documentation: DT: dma: Add Xilinx zynqmp dma device
+ tree binding documentation
+Message-ID: <1465486667-30737-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 08 Jun 2016, Linus Walleij wrote:
+Device-tree binding documentation for Xilinx zynqmp dma engine
+used in Zynq UltraScale+ MPSoC.
 
-> On Tue, Jun 7, 2016 at 7:38 PM, Peter Griffin <peter.griffin@linaro.org> wrote:
-> 
-> > If kzalloc() fails it will issue it's own error message including
-> > a dump_stack(). So remove the site specific error messages.
-> >
-> > Signed-off-by: Peter Griffin <peter.griffin@linaro.org>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> A few subsystems may use a cleanup like this...
-> I wonder how many unnecessary prints I've introduced
-> myself :P
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Punnaiah Choudary Kalluri <punnaia@xilinx.com>
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+Changes in v11:
+- None.
+Changes in v10:
+- Added Rob Acked-by in the commit message.
+Changs in v9:
+- Removed include sg runtime configuration parameter
+  from the binding doc as suggested by Lars.
+Changes in v8:
+- Removed all the software runtime configuration parameters
+  from the binding doc as suggested by the Lars.
+Changes in v7:
+- None.
+Changes in v6:
+- Removed desc-axi-cache/dst-axi-cache/src-axi-cache properties
+  from the binding doc as it allow broken combinations when dma-coherent
+  is set as suggested by Rob.
+- Fixed minor comments given by Rob related coding(lower case DT node name).
+Changes in v5:
+- Use dma-coherent flag for coherent transfers as suggested by rob.
+- Removed unnecessary properties from binding doc as suggested by Rob.
+Changes in v4:
+- None
+Changes in v3:
+- None
+Changes in v2:
+- None.
 
-Wolfram did some analysis on this a while back.  IIRC he also
-presented on his findings at ELC(?).
- 
+ .../devicetree/bindings/dma/xilinx/zynqmp_dma.txt  |   27 ++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+new file mode 100644
+index 0000000..a784cdd
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/xilinx/zynqmp_dma.txt
+@@ -0,0 +1,27 @@
++Xilinx ZynqMP DMA engine, it does support memory to memory transfers,
++memory to device and device to memory transfers. It also has flow
++control and rate control support for slave/peripheral dma access.
++
++Required properties:
++- compatible		: Should be "xlnx,zynqmp-dma-1.0"
++- reg			: Memory map for gdma/adma module access.
++- interrupt-parent	: Interrupt controller the interrupt is routed through
++- interrupts		: Should contain DMA channel interrupt.
++- xlnx,bus-width	: Axi buswidth in bits. Should contain 128 or 64
++- clock-names		: List of input clocks "clk_main", "clk_apb"
++			  (see clock bindings for details)
++
++Optional properties:
++- dma-coherent		: Present if dma operations are coherent.
++
++Example:
++++++++++
++fpd_dma_chan1: dma at fd500000 {
++	compatible = "xlnx,zynqmp-dma-1.0";
++	reg = <0x0 0xFD500000 0x1000>;
++	interrupt-parent = <&gic>;
++	interrupts = <0 117 4>;
++	clock-names = "clk_main", "clk_apb";
++	xlnx,bus-width = <128>;
++	dma-coherent;
++};
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.7.1
