@@ -1,64 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Jun 2016 07:11:32 +0200
-Subject: [PATCH v3 06/12] power: pwrseq: simple: Add support for regulator
- and generic property
-In-Reply-To: <CAGb2v66OO0QJ75=hLnRukhXWdX7HgSy0LDakdZ_jxFRCHTUuJw@mail.gmail.com>
-References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
- <1464768141-25420-7-git-send-email-k.kozlowski@samsung.com>
- <20160603020218.GA19436@rob-hp-laptop> <575693DE.2010603@samsung.com>
- <20160608190333.GA5126@rob-hp-laptop>
- <CAGb2v66OO0QJ75=hLnRukhXWdX7HgSy0LDakdZ_jxFRCHTUuJw@mail.gmail.com>
-Message-ID: <5758FA84.3050909@samsung.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 9 Jun 2016 14:29:14 +0900
+Subject: [PATCH V2 2/2] ARM64: tegra: Add device node for system PMIC
+ MAX77620
+In-Reply-To: <1465299897-2491-2-git-send-email-ldewangan@nvidia.com>
+References: <1465299897-2491-1-git-send-email-ldewangan@nvidia.com>
+ <1465299897-2491-2-git-send-email-ldewangan@nvidia.com>
+Message-ID: <CAAVeFuJeVLs7avKgs+YZn_JZ+jeJ9sScEHx6LrQ1aN0QFvhjLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2016 04:34 AM, Chen-Yu Tsai wrote:
-> Hi
-> 
-> On Thu, Jun 9, 2016 at 3:03 AM, Rob Herring <robh@kernel.org> wrote:
->> On Tue, Jun 07, 2016 at 11:29:02AM +0200, Krzysztof Kozlowski wrote:
->>> On 06/03/2016 04:02 AM, Rob Herring wrote:
->>>>>  Optional properties:
->>>>>  - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
->>>>> @@ -16,6 +22,7 @@ Optional properties:
->>>>>    See ../clocks/clock-bindings.txt for details.
->>>>>  - clock-names : Must include the following entry:
->>>>>    "ext_clock" (External clock provided to the card).
->>>>> +- ext-supply : External regulator supply
->>>>
->>>> What happens when there are 2 supplies?
->>>>
->>>> I'd prefer the name not be genericish and use the real supply names.
->>>> Then the power seq code should just turn on all supplies it finds. If
->>>> the order or timing to turn on matters, then sorry, no generic sequence.
->>>
->>> I think the generic part for regulators might be a problem. Regulator
->>> API requires a name for the supply... it cannot get "something" or
->>> "everything".
->>
->> That's the downside of variable property names...
->>
->>> The driver could attach itself to any kind of node (where power-sequence
->>> property exists) so the supply name depends on the bindings of device
->>> (not bindings of power sequence driver).
->>>
->>> The power sequence driver could however iterate over child properties
->>> and get the names of all supplies. It is a little bit ugly...
->>
->> Yes. Like this, right?
->>
->> for_each_property_of_node(np, pp) {
->>         if (!strstr(pp->name, "-supply"))
->>                 continue;
->>         // found supply
->> }
->>
->> The uglyness can always be improved with a function to do this parsing.
-> 
-> There's already a version of this in simplefb. Maybe it's time to move
-> this to a common function?
+On Tue, Jun 7, 2016 at 8:44 PM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+> Jetson-TX1 uses the Maxim MAX77620 as system Power management IC.
+> Add device node for the MAX77620 with following details:
+> - Add device max77620 with.
+>         - Add all pins configurations.
+>         - Configure FPS of the device.
+>         - Configure SD/DCDC and LDOs regulators.
+> - populate the bus expander on base board P2597.
+> - Populate all fixed voltage regulators controlled by GPIOs from Tegra,
+>   PMIC and bus expanders.
+>
+> For the different details, jetson-CV device tree files are referred from
+> downstream.
 
-Thanks, I'll make a generic one and let's see how Mark will respond to it.
+I think Thierry posted a similar change:
 
-Best regards,
-Krzysztof
+http://permalink.gmane.org/gmane.linux.ports.tegra/26815
