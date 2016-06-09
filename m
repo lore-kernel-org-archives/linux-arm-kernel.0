@@ -1,72 +1,54 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 09 Jun 2016 14:27:16 +0200
-Subject: [PATCH 03/12] mmc: tegra: restrict the voltage_switch() callback
- to the 1.8V case
-In-Reply-To: <1465466097.18807.7.camel@lynxeye.de> (Lucas Stach's message of
- "Thu, 09 Jun 2016 11:54:57 +0200")
-References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
- <1465456218-28354-4-git-send-email-gregory.clement@free-electrons.com>
- <1465466097.18807.7.camel@lynxeye.de>
-Message-ID: <8737omo8d7.fsf@free-electrons.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 09 Jun 2016 21:28:30 +0900
+Subject: [PATCH] mmc: dw_mmc: fix 32bit little-endian access of des1 field
+In-Reply-To: <1465306639-9537-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <CGME20160607133726epcas1p1c3274577f12dbf456a7a6bf3efb6e1fe@epcas1p1.samsung.com>
+ <1465306639-9537-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <575960EE.8040702@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
- 
- On jeu., juin 09 2016, Lucas Stach <dev@lynxeye.de> wrote:
+Hi Ben,
 
-> Am Donnerstag, den 09.06.2016, 09:10 +0200 schrieb Gregory CLEMENT:
->> Given its name the voltage_switch() should be called for any
->> voltage. However currently it is only called for the 1.8V case.
->> 
->> That means that the current implementation of the callback could have
->> made this assumption. In order to not adding a regression when the
->> voltage_switch() function will be called for the other voltage
->> targets,
->> this patch ensure that the code of the current callback won't be
->> executed
->> for the other case than 1.8V.
->> 
-> This isn't necessary, it's fine to re-execute the pad calibration for
-> any voltage switch.
+On 06/07/2016 10:37 PM, Ben Dooks wrote:
+> The IDMAC_SET_BUFFER1_SIZE() macro modifies des1, but does
+> not check if the value being passed is big or little endian
+> desptire the des1 field being marked as __le32.
+> 
+> Fix the issue by ensuring the values are changed from the
+> cpu endian to the descriptor endian by using cpu_to_le32.
+> 
+> Spotted whilst doing big endian conversion work on Exynos,
+> and stops the mmc worker thread from stalling.
 
-Thanks for your feedback, so I can remove this patch from the series.
+Applied this patch. Thanks!
 
-Gregory
+Best Regards,
+Jaehoon Chung
 
->
-> Regards,
-> Lucas
->
->> Cc: Lucas Stach <dev@lynxeye.de>
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->> ?drivers/mmc/host/sdhci-tegra.c | 4 ++++
->> ?1 file changed, 4 insertions(+)
->> 
->> diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-
->> tegra.c
->> index bcc0de47fe7e..01f58296125e 100644
->> --- a/drivers/mmc/host/sdhci-tegra.c
->> +++ b/drivers/mmc/host/sdhci-tegra.c
->> @@ -302,6 +302,10 @@ static void tegra_sdhci_voltage_switch(struct
->> sdhci_host *host)
->> ?	struct sdhci_tegra *tegra_host =
->> sdhci_pltfm_priv(pltfm_host);
->> ?	const struct sdhci_tegra_soc_data *soc_data = tegra_host-
->> >soc_data;
->> ?
->> +	/* initially this function was called only for the 1.8V case
->> */
->> +	if (host->mmc->ios.signal_voltage != MMC_SIGNAL_VOLTAGE_180)
->> +		return;
->> +
->> ?	if (soc_data->nvquirks & NVQUIRK_HAS_PADCALIB)
->> ?		tegra_host->pad_calib_required = true;
->> ?}
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+> Cc: Matthew Leach <matt.leach@codethink.co.uk>
+> Cc: Jaehoon Chung <jh80.chung@samsung.com>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> ---
+>  drivers/mmc/host/dw_mmc.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+> index 2cc6123..544397e 100644
+> --- a/drivers/mmc/host/dw_mmc.c
+> +++ b/drivers/mmc/host/dw_mmc.c
+> @@ -92,7 +92,7 @@ struct idmac_desc {
+>  
+>  	__le32		des1;	/* Buffer sizes */
+>  #define IDMAC_SET_BUFFER1_SIZE(d, s) \
+> -	((d)->des1 = ((d)->des1 & 0x03ffe000) | ((s) & 0x1fff))
+> +	((d)->des1 = ((d)->des1 & cpu_to_le32(0x03ffe000)) | (cpu_to_le32((s) & 0x1fff)))
+>  
+>  	__le32		des2;	/* buffer 1 physical address */
+>  
+> 
