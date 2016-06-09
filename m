@@ -1,36 +1,62 @@
 From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Wed,  8 Jun 2016 21:18:46 -0700
-Subject: [PATCH net-next v3 0/4] arm64 BPF JIT updates
-Message-ID: <1465445930-3960-1-git-send-email-zlim.lnx@gmail.com>
+Date: Wed,  8 Jun 2016 21:18:47 -0700
+Subject: [PATCH net-next v3 1/4] bpf: fix missing header inclusion
+In-Reply-To: <1465445930-3960-1-git-send-email-zlim.lnx@gmail.com>
+References: <1465445930-3960-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <1465445930-3960-2-git-send-email-zlim.lnx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updates for arm64 eBPF JIT.
-The main addition here is implementation of bpf_tail_call.
+Commit 0fc174dea545 ("ebpf: make internal bpf API independent of
+CONFIG_BPF_SYSCALL ifdefs") introduced usage of ERR_PTR() in
+bpf_prog_get(), however did not include linux/err.h.
 
-#1: Fix missing header inclusion in linux/bpf.h.
-#2: Add bpf_tail_call for arm64.
-#3,4: Optimizations to reduce instruction count for jitted code.
+Without this patch, when compiling arm64 BPF without CONFIG_BPF_SYSCALL:
+...
+In file included from arch/arm64/net/bpf_jit_comp.c:21:0:
+include/linux/bpf.h: In function 'bpf_prog_get':
+include/linux/bpf.h:235:9: error: implicit declaration of function 'ERR_PTR' [-Werror=implicit-function-declaration]
+  return ERR_PTR(-EOPNOTSUPP);
+         ^
+include/linux/bpf.h:235:9: warning: return makes pointer from integer without a cast [-Wint-conversion]
+In file included from include/linux/rwsem.h:17:0,
+                 from include/linux/mm_types.h:10,
+                 from include/linux/sched.h:27,
+                 from arch/arm64/include/asm/compat.h:25,
+                 from arch/arm64/include/asm/stat.h:23,
+                 from include/linux/stat.h:5,
+                 from include/linux/compat.h:12,
+                 from include/linux/filter.h:10,
+                 from arch/arm64/net/bpf_jit_comp.c:22:
+include/linux/err.h: At top level:
+include/linux/err.h:23:35: error: conflicting types for 'ERR_PTR'
+ static inline void * __must_check ERR_PTR(long error)
+                                   ^
+In file included from arch/arm64/net/bpf_jit_comp.c:21:0:
+include/linux/bpf.h:235:9: note: previous implicit declaration of 'ERR_PTR' was here
+  return ERR_PTR(-EOPNOTSUPP);
+         ^
+...
 
-Changes since v2:
- - None. Resubmit per David Miller.
+Fixes: 0fc174dea545 ("ebpf: make internal bpf API independent of CONFIG_BPF_SYSCALL ifdefs")
+Suggested-by: Daniel Borkmann <daniel@iogearbox.net>
+Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Acked-by: Daniel Borkmann <daniel@iogearbox.net>
+---
+ include/linux/bpf.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Changes since v1:
- - Added patch #1 to address build error due to missing header inclusion
-   in linux/bpf.h. (Thanks to suggestion and ack by Daniel Borkmann)
-   Ordered it ahead of bpf_tail_call patch #2 so build error is not
-   triggered.
-
-Zi Shen Lim (4):
-  bpf: fix missing header inclusion
-  arm64: bpf: implement bpf_tail_call() helper
-  arm64: bpf: optimize JMP_CALL
-  arm64: bpf: optimize LD_ABS, LD_IND
-
- arch/arm64/net/bpf_jit.h      |   3 +-
- arch/arm64/net/bpf_jit_comp.c | 111 ++++++++++++++++++++++++++++++++++++------
- include/linux/bpf.h           |   1 +
- 3 files changed, 99 insertions(+), 16 deletions(-)
-
+diff --git a/include/linux/bpf.h b/include/linux/bpf.h
+index 8ee27b8..1bcae82 100644
+--- a/include/linux/bpf.h
++++ b/include/linux/bpf.h
+@@ -11,6 +11,7 @@
+ #include <linux/workqueue.h>
+ #include <linux/file.h>
+ #include <linux/percpu.h>
++#include <linux/err.h>
+ 
+ struct bpf_map;
+ 
 -- 
 1.9.1
