@@ -1,63 +1,42 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Jun 2016 09:10:07 +0200
-Subject: [PATCH 01/12] mmc: sdhci: add init_card callback to sdhci
+Date: Thu,  9 Jun 2016 09:10:09 +0200
+Subject: [PATCH 03/12] mmc: tegra: restrict the voltage_switch() callback to
+ the 1.8V case
 In-Reply-To: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1465456218-28354-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1465456218-28354-4-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcin Wojtas <mw@semihalf.com>
+Given its name the voltage_switch() should be called for any
+voltage. However currently it is only called for the 1.8V case.
 
-Some sdhci hosts may require handling quirks during card initialization
-at the time when its type is already known. Hence a new callback
-(init_card) is added in sdhci_ops.
+That means that the current implementation of the callback could have
+made this assumption. In order to not adding a regression when the
+voltage_switch() function will be called for the other voltage targets,
+this patch ensure that the code of the current callback won't be executed
+for the other case than 1.8V.
 
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Cc: Lucas Stach <dev@lynxeye.de>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/mmc/host/sdhci.c | 9 +++++++++
- drivers/mmc/host/sdhci.h | 1 +
- 2 files changed, 10 insertions(+)
+ drivers/mmc/host/sdhci-tegra.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 0e3d7c056cb1..fd4e9a84f739 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2117,6 +2117,14 @@ static void sdhci_card_event(struct mmc_host *mmc)
- 	spin_unlock_irqrestore(&host->lock, flags);
+diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
+index bcc0de47fe7e..01f58296125e 100644
+--- a/drivers/mmc/host/sdhci-tegra.c
++++ b/drivers/mmc/host/sdhci-tegra.c
+@@ -302,6 +302,10 @@ static void tegra_sdhci_voltage_switch(struct sdhci_host *host)
+ 	struct sdhci_tegra *tegra_host = sdhci_pltfm_priv(pltfm_host);
+ 	const struct sdhci_tegra_soc_data *soc_data = tegra_host->soc_data;
+ 
++	/* initially this function was called only for the 1.8V case */
++	if (host->mmc->ios.signal_voltage != MMC_SIGNAL_VOLTAGE_180)
++		return;
++
+ 	if (soc_data->nvquirks & NVQUIRK_HAS_PADCALIB)
+ 		tegra_host->pad_calib_required = true;
  }
- 
-+static void sdhci_init_card(struct mmc_host *mmc, struct mmc_card *card)
-+{
-+	struct sdhci_host *host = mmc_priv(mmc);
-+
-+	if (host->ops->init_card)
-+		host->ops->init_card(host, card);
-+}
-+
- static const struct mmc_host_ops sdhci_ops = {
- 	.request	= sdhci_request,
- 	.post_req	= sdhci_post_req,
-@@ -2132,6 +2140,7 @@ static const struct mmc_host_ops sdhci_ops = {
- 	.select_drive_strength		= sdhci_select_drive_strength,
- 	.card_event			= sdhci_card_event,
- 	.card_busy	= sdhci_card_busy,
-+	.init_card	= sdhci_init_card,
- };
- 
- /*****************************************************************************\
-diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
-index 609f87ca536b..49c6c5b0e33b 100644
---- a/drivers/mmc/host/sdhci.h
-+++ b/drivers/mmc/host/sdhci.h
-@@ -549,6 +549,7 @@ struct sdhci_ops {
- 					 struct mmc_card *card,
- 					 unsigned int max_dtr, int host_drv,
- 					 int card_drv, int *drv_type);
-+	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
- };
- 
- #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
 -- 
 2.5.0
