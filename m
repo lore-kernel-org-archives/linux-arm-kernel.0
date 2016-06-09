@@ -1,325 +1,316 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Jun 2016 11:44:20 +0200
-Subject: [RFC v4 03/14] power/mmc: Move pwrseq drivers to power/pwrseq
-In-Reply-To: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
-References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465465471-28740-4-git-send-email-k.kozlowski@samsung.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu,  9 Jun 2016 10:51:49 +0100
+Subject: [PATCH] ARM: mach-imx: fix undeclared symbols in mach-imx/devices
+Message-ID: <1465465909-21371-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MMC power sequence drivers are useful also outside of MMC world: for
-USB devices needed a hard-reset before probing. Before extending and
-re-using pwrseq drivers, move them to a new place.
+There are a number of variables that are not matched with their
+respective definitions as the files that declare them are not
+being included.
 
-The commit does not introduce significant changes in the pwrseq drivers
-code so still all the functions are prefixed with "mmc_pwrseq". However
-the MMC-specific pwrseq functions has to be now exported and everything
-is hidden not by CONFIG_OF but by new CONFIG_POWER_SEQ option.
+Since including either of ./devices-imx27.h or ../devices-imx21.h
+includes devices-common.h we can safely replace the definition.
+However, this does cause warnings if both includes are used as
+devices-common.h is not safe for dual inclusion. Fix this by adding
+an appropriate barrier in devices-common.h
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+This fixes the following warnings:
+
+arch/arm/mach-imx/devices/platform-fec.c:23:27: warning: symbol 'imx27_fec_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c:22:36: warning: symbol 'imx27_fsl_usb2_udc_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx27-coda.c:14:34: warning: symbol 'imx27_coda_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx2-wdt.c:24:32: warning: symbol 'imx21_imx2_wdt_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx2-wdt.c:29:32: warning: symbol 'imx27_imx2_wdt_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-fb.c:28:30: warning: symbol 'imx21_imx_fb_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-fb.c:33:30: warning: symbol 'imx27_imx_fb_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-i2c.c:30:31: warning: symbol 'imx21_imx_i2c_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-i2c.c:35:31: warning: symbol 'imx27_imx_i2c_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-keypad.c:20:34: warning: symbol 'imx21_imx_keypad_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-keypad.c:25:34: warning: symbol 'imx27_imx_keypad_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-ssi.c:25:31: warning: symbol 'imx21_imx_ssi_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-ssi.c:34:31: warning: symbol 'imx27_imx_ssi_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-uart.c:40:37: warning: symbol 'imx21_imx_uart_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-imx-uart.c:51:37: warning: symbol 'imx27_imx_uart_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mx2-camera.c:31:34: warning: symbol 'imx27_mx2_camera_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mxc-ehci.c:22:32: warning: symbol 'imx27_mxc_ehci_otg_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mxc-ehci.c:24:32: warning: symbol 'imx27_mxc_ehci_hs_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mxc-mmc.c:27:31: warning: symbol 'imx21_mxc_mmc_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mxc-mmc.c:36:31: warning: symbol 'imx27_mxc_mmc_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mxc_nand.c:33:32: warning: symbol 'imx21_mxc_nand_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mxc_nand.c:38:32: warning: symbol 'imx27_mxc_nand_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mxc_w1.c:18:30: warning: symbol 'imx21_mxc_w1_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-mxc_w1.c:23:30: warning: symbol 'imx27_mxc_w1_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-spi_imx.c:34:31: warning: symbol 'imx21_cspi_data' was not declared. Should it be static?
+arch/arm/mach-imx/devices/platform-spi_imx.c:43:31: warning: symbol 'imx27_cspi_data' was not declared. Should it be static?
+
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 ---
- .../pwrseq/pwrseq-emmc.txt}                            |  0
- .../pwrseq/pwrseq-simple.txt}                          |  0
- drivers/mmc/Kconfig                                    |  2 --
- drivers/mmc/core/Makefile                              |  3 ---
- drivers/mmc/core/core.c                                |  2 +-
- drivers/mmc/core/host.c                                |  2 +-
- drivers/power/Kconfig                                  |  1 +
- drivers/power/Makefile                                 |  1 +
- drivers/{mmc/core => power/pwrseq}/Kconfig             | 18 +++++++++++++-----
- drivers/power/pwrseq/Makefile                          |  3 +++
- drivers/{mmc/core => power/pwrseq}/pwrseq.c            |  8 ++++++--
- drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c       |  3 +--
- drivers/{mmc/core => power/pwrseq}/pwrseq_simple.c     |  3 +--
- {drivers/mmc/core => include/linux}/pwrseq.h           |  6 +++---
- 14 files changed, 31 insertions(+), 21 deletions(-)
- rename Documentation/devicetree/bindings/{mmc/mmc-pwrseq-emmc.txt => power/pwrseq/pwrseq-emmc.txt} (100%)
- rename Documentation/devicetree/bindings/{mmc/mmc-pwrseq-simple.txt => power/pwrseq/pwrseq-simple.txt} (100%)
- rename drivers/{mmc/core => power/pwrseq}/Kconfig (66%)
- create mode 100644 drivers/power/pwrseq/Makefile
- rename drivers/{mmc/core => power/pwrseq}/pwrseq.c (90%)
- rename drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c (99%)
- rename drivers/{mmc/core => power/pwrseq}/pwrseq_simple.c (99%)
- rename {drivers/mmc/core => include/linux}/pwrseq.h (94%)
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-imx/devices/devices-common.h        | 7 +++++++
+ arch/arm/mach-imx/devices/platform-fec.c          | 2 +-
+ arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c | 2 +-
+ arch/arm/mach-imx/devices/platform-imx-fb.c       | 3 ++-
+ arch/arm/mach-imx/devices/platform-imx-i2c.c      | 3 ++-
+ arch/arm/mach-imx/devices/platform-imx-keypad.c   | 3 ++-
+ arch/arm/mach-imx/devices/platform-imx-ssi.c      | 3 ++-
+ arch/arm/mach-imx/devices/platform-imx-uart.c     | 3 ++-
+ arch/arm/mach-imx/devices/platform-imx2-wdt.c     | 3 ++-
+ arch/arm/mach-imx/devices/platform-imx27-coda.c   | 2 +-
+ arch/arm/mach-imx/devices/platform-mx2-camera.c   | 3 ++-
+ arch/arm/mach-imx/devices/platform-mx2-emma.c     | 3 ++-
+ arch/arm/mach-imx/devices/platform-mxc-ehci.c     | 3 ++-
+ arch/arm/mach-imx/devices/platform-mxc-mmc.c      | 3 ++-
+ arch/arm/mach-imx/devices/platform-mxc_nand.c     | 3 ++-
+ arch/arm/mach-imx/devices/platform-mxc_w1.c       | 3 ++-
+ arch/arm/mach-imx/devices/platform-spi_imx.c      | 3 ++-
+ 17 files changed, 36 insertions(+), 16 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-emmc.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-emmc.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/mmc/mmc-pwrseq-emmc.txt
-rename to Documentation/devicetree/bindings/power/pwrseq/pwrseq-emmc.txt
-diff --git a/Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt b/Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/mmc/mmc-pwrseq-simple.txt
-rename to Documentation/devicetree/bindings/power/pwrseq/pwrseq-simple.txt
-diff --git a/drivers/mmc/Kconfig b/drivers/mmc/Kconfig
-index f2eeb38efa65..7ade379e0634 100644
---- a/drivers/mmc/Kconfig
-+++ b/drivers/mmc/Kconfig
-@@ -21,8 +21,6 @@ config MMC_DEBUG
- 
- if MMC
- 
--source "drivers/mmc/core/Kconfig"
--
- source "drivers/mmc/card/Kconfig"
- 
- source "drivers/mmc/host/Kconfig"
-diff --git a/drivers/mmc/core/Makefile b/drivers/mmc/core/Makefile
-index f007151dfdc6..a901d3cd09d3 100644
---- a/drivers/mmc/core/Makefile
-+++ b/drivers/mmc/core/Makefile
-@@ -8,7 +8,4 @@ mmc_core-y			:= core.o bus.o host.o \
- 				   sdio.o sdio_ops.o sdio_bus.o \
- 				   sdio_cis.o sdio_io.o sdio_irq.o \
- 				   quirks.o slot-gpio.o
--mmc_core-$(CONFIG_OF)		+= pwrseq.o
--obj-$(CONFIG_PWRSEQ_SIMPLE)	+= pwrseq_simple.o
--obj-$(CONFIG_PWRSEQ_EMMC)	+= pwrseq_emmc.o
- mmc_core-$(CONFIG_DEBUG_FS)	+= debugfs.o
-diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-index 8b4dfd45433b..edefc3fbebe6 100644
---- a/drivers/mmc/core/core.c
-+++ b/drivers/mmc/core/core.c
-@@ -25,6 +25,7 @@
- #include <linux/pm_runtime.h>
- #include <linux/pm_wakeup.h>
- #include <linux/suspend.h>
-+#include <linux/pwrseq.h>
- #include <linux/fault-inject.h>
- #include <linux/random.h>
- #include <linux/slab.h>
-@@ -43,7 +44,6 @@
- #include "bus.h"
- #include "host.h"
- #include "sdio_bus.h"
--#include "pwrseq.h"
- 
- #include "mmc_ops.h"
- #include "sd_ops.h"
-diff --git a/drivers/mmc/core/host.c b/drivers/mmc/core/host.c
-index 1be42fab1a30..1db7d5802adc 100644
---- a/drivers/mmc/core/host.c
-+++ b/drivers/mmc/core/host.c
-@@ -21,6 +21,7 @@
- #include <linux/export.h>
- #include <linux/leds.h>
- #include <linux/slab.h>
-+#include <linux/pwrseq.h>
- 
- #include <linux/mmc/host.h>
- #include <linux/mmc/card.h>
-@@ -29,7 +30,6 @@
- #include "core.h"
- #include "host.h"
- #include "slot-gpio.h"
--#include "pwrseq.h"
- 
- #define cls_dev_to_mmc_host(d)	container_of(d, struct mmc_host, class_dev)
- 
-diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
-index 421770ddafa3..2702aca6cd2c 100644
---- a/drivers/power/Kconfig
-+++ b/drivers/power/Kconfig
-@@ -511,5 +511,6 @@ config AXP20X_POWER
- 
- endif # POWER_SUPPLY
- 
-+source "drivers/power/pwrseq/Kconfig"
- source "drivers/power/reset/Kconfig"
- source "drivers/power/avs/Kconfig"
-diff --git a/drivers/power/Makefile b/drivers/power/Makefile
-index e46b75d448a5..02f9d5da2e76 100644
---- a/drivers/power/Makefile
-+++ b/drivers/power/Makefile
-@@ -71,6 +71,7 @@ obj-$(CONFIG_POWER_AVS)		+= avs/
- obj-$(CONFIG_CHARGER_SMB347)	+= smb347-charger.o
- obj-$(CONFIG_CHARGER_TPS65090)	+= tps65090-charger.o
- obj-$(CONFIG_CHARGER_TPS65217)	+= tps65217_charger.o
-+obj-$(CONFIG_POWER_SEQ)		+= pwrseq/
- obj-$(CONFIG_POWER_RESET)	+= reset/
- obj-$(CONFIG_AXP288_FUEL_GAUGE) += axp288_fuel_gauge.o
- obj-$(CONFIG_AXP288_CHARGER)	+= axp288_charger.o
-diff --git a/drivers/mmc/core/Kconfig b/drivers/power/pwrseq/Kconfig
-similarity index 66%
-rename from drivers/mmc/core/Kconfig
-rename to drivers/power/pwrseq/Kconfig
-index 250f223aaa80..7ecd66ab61f3 100644
---- a/drivers/mmc/core/Kconfig
-+++ b/drivers/power/pwrseq/Kconfig
-@@ -1,7 +1,13 @@
--#
--# MMC core configuration
--#
--config PWRSEQ_EMMC
-+menuconfig POWER_SEQ
-+	default y if OF
-+	bool "Hardware reset support for specific devices"
-+	help
-+	  Provides drivers that implements specific power sequences for chips,
-+	  using the generic power sequence management interface.
+diff --git a/arch/arm/mach-imx/devices/devices-common.h b/arch/arm/mach-imx/devices/devices-common.h
+index 09cebd8..b7779fc 100644
+--- a/arch/arm/mach-imx/devices/devices-common.h
++++ b/arch/arm/mach-imx/devices/devices-common.h
+@@ -6,6 +6,10 @@
+  * the terms of the GNU General Public License version 2 as published by the
+  * Free Software Foundation.
+  */
 +
-+if POWER_SEQ
++#ifndef __IMX_DEVICES_COMMON_H
++#define __IMX_DEVICES_COMMON_H
 +
-+config POWER_SEQ_EMMC
- 	tristate "HW reset support for eMMC"
- 	default y
- 	depends on OF
-@@ -12,7 +18,7 @@ config PWRSEQ_EMMC
- 	  This driver can also be built as a module. If so, the module
- 	  will be called pwrseq_emmc.
- 
--config PWRSEQ_SIMPLE
-+config POWER_SEQ_SIMPLE
- 	tristate "Simple HW reset support for MMC"
- 	default y
- 	depends on OF
-@@ -22,3 +28,5 @@ config PWRSEQ_SIMPLE
- 
- 	  This driver can also be built as a module. If so, the module
- 	  will be called pwrseq_simple.
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/init.h>
+@@ -307,3 +311,6 @@ struct platform_device *imx_add_imx_dma(char *name, resource_size_t iobase,
+ 					int irq, int irq_err);
+ struct platform_device *imx_add_imx_sdma(char *name,
+ 	resource_size_t iobase, int irq, struct sdma_platform_data *pdata);
 +
-+endif
-diff --git a/drivers/power/pwrseq/Makefile b/drivers/power/pwrseq/Makefile
-new file mode 100644
-index 000000000000..9e40e4b9068b
---- /dev/null
-+++ b/drivers/power/pwrseq/Makefile
-@@ -0,0 +1,3 @@
-+obj-$(CONFIG_POWER_SEQ)		+= pwrseq.o
-+obj-$(CONFIG_POWER_SEQ_SIMPLE)	+= pwrseq_simple.o
-+obj-$(CONFIG_POWER_SEQ_EMMC)	+= pwrseq_emmc.o
-diff --git a/drivers/mmc/core/pwrseq.c b/drivers/power/pwrseq/pwrseq.c
-similarity index 90%
-rename from drivers/mmc/core/pwrseq.c
-rename to drivers/power/pwrseq/pwrseq.c
-index 9386c4771814..66310d7643cc 100644
---- a/drivers/mmc/core/pwrseq.c
-+++ b/drivers/power/pwrseq/pwrseq.c
-@@ -11,11 +11,10 @@
- #include <linux/err.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/pwrseq.h>
++#endif /* __IMX_DEVICES_COMMON_H */
++
+diff --git a/arch/arm/mach-imx/devices/platform-fec.c b/arch/arm/mach-imx/devices/platform-fec.c
+index b403a4f..015661f 100644
+--- a/arch/arm/mach-imx/devices/platform-fec.c
++++ b/arch/arm/mach-imx/devices/platform-fec.c
+@@ -10,7 +10,7 @@
+ #include <asm/sizes.h>
  
- #include <linux/mmc/host.h>
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx27.h"
  
--#include "pwrseq.h"
--
- static DEFINE_MUTEX(pwrseq_list_mutex);
- static LIST_HEAD(pwrseq_list);
+ #define imx_fec_data_entry_single(soc, _devid)				\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+index 25e1de6..ae793e6 100644
+--- a/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
++++ b/arch/arm/mach-imx/devices/platform-fsl-usb2-udc.c
+@@ -9,7 +9,7 @@
+ #include <linux/dma-mapping.h>
  
-@@ -51,6 +50,7 @@ int mmc_pwrseq_alloc(struct mmc_host *host)
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx27.h"
  
- 	return 0;
- }
-+EXPORT_SYMBOL_GPL(mmc_pwrseq_alloc);
+ #define imx_fsl_usb2_udc_data_entry_single(soc, _devid)			\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-imx-fb.c b/arch/arm/mach-imx/devices/platform-imx-fb.c
+index 7df6328..3b3f6ca 100644
+--- a/arch/arm/mach-imx/devices/platform-imx-fb.c
++++ b/arch/arm/mach-imx/devices/platform-imx-fb.c
+@@ -9,7 +9,8 @@
+ #include <linux/dma-mapping.h>
  
- void mmc_pwrseq_pre_power_on(struct mmc_host *host)
- {
-@@ -59,6 +59,7 @@ void mmc_pwrseq_pre_power_on(struct mmc_host *host)
- 	if (pwrseq && pwrseq->ops->pre_power_on)
- 		pwrseq->ops->pre_power_on(host);
- }
-+EXPORT_SYMBOL_GPL(mmc_pwrseq_pre_power_on);
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
- void mmc_pwrseq_post_power_on(struct mmc_host *host)
- {
-@@ -67,6 +68,7 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host)
- 	if (pwrseq && pwrseq->ops->post_power_on)
- 		pwrseq->ops->post_power_on(host);
- }
-+EXPORT_SYMBOL_GPL(mmc_pwrseq_post_power_on);
+ #define imx_imx_fb_data_entry_single(soc, _devid, _size)		\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-imx-i2c.c b/arch/arm/mach-imx/devices/platform-imx-i2c.c
+index ae97915..fa0e822 100644
+--- a/arch/arm/mach-imx/devices/platform-imx-i2c.c
++++ b/arch/arm/mach-imx/devices/platform-imx-i2c.c
+@@ -7,7 +7,8 @@
+  * Free Software Foundation.
+  */
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
- void mmc_pwrseq_power_off(struct mmc_host *host)
- {
-@@ -75,6 +77,7 @@ void mmc_pwrseq_power_off(struct mmc_host *host)
- 	if (pwrseq && pwrseq->ops->power_off)
- 		pwrseq->ops->power_off(host);
- }
-+EXPORT_SYMBOL_GPL(mmc_pwrseq_power_off);
+ #define imx_imx_i2c_data_entry_single(soc, _devid, _id, _hwid, _size)	\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-imx-keypad.c b/arch/arm/mach-imx/devices/platform-imx-keypad.c
+index 479e4d7..ffab3ca 100644
+--- a/arch/arm/mach-imx/devices/platform-imx-keypad.c
++++ b/arch/arm/mach-imx/devices/platform-imx-keypad.c
+@@ -7,7 +7,8 @@
+  * Free Software Foundation.
+  */
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
- void mmc_pwrseq_free(struct mmc_host *host)
- {
-@@ -85,6 +88,7 @@ void mmc_pwrseq_free(struct mmc_host *host)
- 		host->pwrseq = NULL;
- 	}
- }
-+EXPORT_SYMBOL_GPL(mmc_pwrseq_free);
+ #define imx_imx_keypad_data_entry_single(soc, _size)			\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-imx-ssi.c b/arch/arm/mach-imx/devices/platform-imx-ssi.c
+index 6f0e94e..f09871e 100644
+--- a/arch/arm/mach-imx/devices/platform-imx-ssi.c
++++ b/arch/arm/mach-imx/devices/platform-imx-ssi.c
+@@ -7,7 +7,8 @@
+  * Free Software Foundation.
+  */
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
- int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq)
- {
-diff --git a/drivers/mmc/core/pwrseq_emmc.c b/drivers/power/pwrseq/pwrseq_emmc.c
-similarity index 99%
-rename from drivers/mmc/core/pwrseq_emmc.c
-rename to drivers/power/pwrseq/pwrseq_emmc.c
-index adc9c0c614fb..a0583ed46d7f 100644
---- a/drivers/mmc/core/pwrseq_emmc.c
-+++ b/drivers/power/pwrseq/pwrseq_emmc.c
-@@ -17,11 +17,10 @@
- #include <linux/err.h>
- #include <linux/gpio/consumer.h>
- #include <linux/reboot.h>
-+#include <linux/pwrseq.h>
+ #define imx_imx_ssi_data_entry(soc, _id, _hwid, _size)			\
+ 	[_id] = {							\
+diff --git a/arch/arm/mach-imx/devices/platform-imx-uart.c b/arch/arm/mach-imx/devices/platform-imx-uart.c
+index 6962cff..3186126 100644
+--- a/arch/arm/mach-imx/devices/platform-imx-uart.c
++++ b/arch/arm/mach-imx/devices/platform-imx-uart.c
+@@ -7,7 +7,8 @@
+  * Free Software Foundation.
+  */
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
- #include <linux/mmc/host.h>
+ #define imx_imx_uart_3irq_data_entry(soc, _id, _hwid, _size)		\
+ 	[_id] = {							\
+diff --git a/arch/arm/mach-imx/devices/platform-imx2-wdt.c b/arch/arm/mach-imx/devices/platform-imx2-wdt.c
+index 8c134c8..c37441e 100644
+--- a/arch/arm/mach-imx/devices/platform-imx2-wdt.c
++++ b/arch/arm/mach-imx/devices/platform-imx2-wdt.c
+@@ -9,7 +9,8 @@
+ #include <asm/sizes.h>
  
--#include "pwrseq.h"
--
- struct mmc_pwrseq_emmc {
- 	struct mmc_pwrseq pwrseq;
- 	struct notifier_block reset_nb;
-diff --git a/drivers/mmc/core/pwrseq_simple.c b/drivers/power/pwrseq/pwrseq_simple.c
-similarity index 99%
-rename from drivers/mmc/core/pwrseq_simple.c
-rename to drivers/power/pwrseq/pwrseq_simple.c
-index 450d907c6e6c..786f1db53a3f 100644
---- a/drivers/mmc/core/pwrseq_simple.c
-+++ b/drivers/power/pwrseq/pwrseq_simple.c
-@@ -16,11 +16,10 @@
- #include <linux/device.h>
- #include <linux/err.h>
- #include <linux/gpio/consumer.h>
-+#include <linux/pwrseq.h>
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
- #include <linux/mmc/host.h>
+ #define imx_imx2_wdt_data_entry_single(soc, _id, _hwid, _size)		\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-imx27-coda.c b/arch/arm/mach-imx/devices/platform-imx27-coda.c
+index 25bebc2..52c6d33 100644
+--- a/arch/arm/mach-imx/devices/platform-imx27-coda.c
++++ b/arch/arm/mach-imx/devices/platform-imx27-coda.c
+@@ -8,7 +8,7 @@
+  */
  
--#include "pwrseq.h"
--
- struct mmc_pwrseq_simple {
- 	struct mmc_pwrseq pwrseq;
- 	bool clk_enabled;
-diff --git a/drivers/mmc/core/pwrseq.h b/include/linux/pwrseq.h
-similarity index 94%
-rename from drivers/mmc/core/pwrseq.h
-rename to include/linux/pwrseq.h
-index d69e751f148b..e230670c1d8d 100644
---- a/drivers/mmc/core/pwrseq.h
-+++ b/include/linux/pwrseq.h
-@@ -23,7 +23,7 @@ struct mmc_pwrseq {
- 	struct module *owner;
- };
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx27.h"
  
--#ifdef CONFIG_OF
-+#ifdef CONFIG_POWER_SEQ
+ #ifdef CONFIG_SOC_IMX27
+ const struct imx_imx27_coda_data imx27_coda_data __initconst = {
+diff --git a/arch/arm/mach-imx/devices/platform-mx2-camera.c b/arch/arm/mach-imx/devices/platform-mx2-camera.c
+index 4c377c3..78efb7b 100644
+--- a/arch/arm/mach-imx/devices/platform-mx2-camera.c
++++ b/arch/arm/mach-imx/devices/platform-mx2-camera.c
+@@ -7,7 +7,8 @@
+  * Free Software Foundation.
+  */
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
- int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq);
- void mmc_pwrseq_unregister(struct mmc_pwrseq *pwrseq);
-@@ -34,7 +34,7 @@ void mmc_pwrseq_post_power_on(struct mmc_host *host);
- void mmc_pwrseq_power_off(struct mmc_host *host);
- void mmc_pwrseq_free(struct mmc_host *host);
+ #define imx_mx2_camera_data_entry_single(soc, _devid)			\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-mx2-emma.c b/arch/arm/mach-imx/devices/platform-mx2-emma.c
+index 0dc0651..64e26dd 100644
+--- a/arch/arm/mach-imx/devices/platform-mx2-emma.c
++++ b/arch/arm/mach-imx/devices/platform-mx2-emma.c
+@@ -7,7 +7,8 @@
+  * Free Software Foundation.
+  */
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
--#else
-+#else /* CONFIG_POWER_SEQ */
+ #define imx_mx2_emmaprp_data_entry_single(soc)				\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-mxc-ehci.c b/arch/arm/mach-imx/devices/platform-mxc-ehci.c
+index 4537abd..868caf2 100644
+--- a/arch/arm/mach-imx/devices/platform-mxc-ehci.c
++++ b/arch/arm/mach-imx/devices/platform-mxc-ehci.c
+@@ -9,7 +9,8 @@
+ #include <linux/dma-mapping.h>
  
- static inline int mmc_pwrseq_register(struct mmc_pwrseq *pwrseq)
- {
-@@ -47,6 +47,6 @@ static inline void mmc_pwrseq_post_power_on(struct mmc_host *host) {}
- static inline void mmc_pwrseq_power_off(struct mmc_host *host) {}
- static inline void mmc_pwrseq_free(struct mmc_host *host) {}
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
  
--#endif
-+#endif /* CONFIG_POWER_SEQ */
+ #define imx_mxc_ehci_data_entry_single(soc, _id, hs)			\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-mxc-mmc.c b/arch/arm/mach-imx/devices/platform-mxc-mmc.c
+index b8203c7..a6d0dc8 100644
+--- a/arch/arm/mach-imx/devices/platform-mxc-mmc.c
++++ b/arch/arm/mach-imx/devices/platform-mxc-mmc.c
+@@ -9,7 +9,8 @@
+ #include <linux/dma-mapping.h>
  
- #endif
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
+ 
+ #define imx_mxc_mmc_data_entry_single(soc, _devid, _id, _hwid, _size)	\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-mxc_nand.c b/arch/arm/mach-imx/devices/platform-mxc_nand.c
+index 676df49..4887cf4 100644
+--- a/arch/arm/mach-imx/devices/platform-mxc_nand.c
++++ b/arch/arm/mach-imx/devices/platform-mxc_nand.c
+@@ -9,7 +9,8 @@
+ #include <asm/sizes.h>
+ 
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
+ 
+ #define imx_mxc_nand_data_entry_single(soc, _devid, _size)		\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-mxc_w1.c b/arch/arm/mach-imx/devices/platform-mxc_w1.c
+index 88c18b7..c6846a6 100644
+--- a/arch/arm/mach-imx/devices/platform-mxc_w1.c
++++ b/arch/arm/mach-imx/devices/platform-mxc_w1.c
+@@ -7,7 +7,8 @@
+  * Free Software Foundation.
+  */
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
+ 
+ #define imx_mxc_w1_data_entry_single(soc)				\
+ 	{								\
+diff --git a/arch/arm/mach-imx/devices/platform-spi_imx.c b/arch/arm/mach-imx/devices/platform-spi_imx.c
+index 5e9707b..1c41cd6 100644
+--- a/arch/arm/mach-imx/devices/platform-spi_imx.c
++++ b/arch/arm/mach-imx/devices/platform-spi_imx.c
+@@ -7,7 +7,8 @@
+  * Free Software Foundation.
+  */
+ #include "../hardware.h"
+-#include "devices-common.h"
++#include "../devices-imx21.h"
++#include "../devices-imx27.h"
+ 
+ #define imx_spi_imx_data_entry_single(soc, type, _devid, _id, hwid, _size) \
+ 	{								\
 -- 
-1.9.1
+2.8.1
