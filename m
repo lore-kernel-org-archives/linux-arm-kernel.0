@@ -1,105 +1,148 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu, 9 Jun 2016 16:51:45 +0200
-Subject: [PATCH v3 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared
- phy block
-In-Reply-To: <20160609143004.GA2167@uda0271908>
-References: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
- <20160609143004.GA2167@uda0271908>
-Message-ID: <9a05c16a-e8a2-02b7-c093-1131e27bcdd4@redhat.com>
+From: james.morse@arm.com (James Morse)
+Date: Thu, 09 Jun 2016 15:50:36 +0100
+Subject: [PATCH v17 01/13] arm64: Add back cpu reset routines
+In-Reply-To: <78ef589316b3f538938324efcbbb0361519c3393.1464974516.git.geoff@infradead.org>
+References: <cover.1464974516.git.geoff@infradead.org>
+ <78ef589316b3f538938324efcbbb0361519c3393.1464974516.git.geoff@infradead.org>
+Message-ID: <5759823C.3070208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Geoff,
 
-On 09-06-16 16:30, Bin Liu wrote:
-> Hi,
->
-> On Sun, Jun 05, 2016 at 04:59:33PM +0200, Hans de Goede wrote:
->> Some SoCs have a single phy-hw-block with multiple phys, this is
->> modelled by a single phy dts node, so we end up with multiple
->> controller nodes with a phys property pointing to the phy-node
->> of the otg-phy.
->>
->> Only one of these controllers typically is an otg controller, yet we
->> were checking the first controller who uses a phy from the block and
->> then end up looking for a dr_mode property in e.g. the ehci controller.
->>
->> This commit fixes this by adding an arg0 parameter to
->> of_usb_get_dr_mode_by_phy and make of_usb_get_dr_mode_by_phy
->> check that this matches the phandle args[0] value when looking for
->> the otg controller.
->>
->> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
->> ---
->> Changes in v2:
->> -Add a args0 parameter instead of looking for nodes with a dr_mode property
->> Changes in v3:
->> -No changes
->> ---
->>  drivers/usb/common/common.c  | 31 ++++++++++++++++++-------------
->>  drivers/usb/phy/phy-am335x.c |  2 +-
->>  include/linux/usb/of.h       |  4 ++--
->>  3 files changed, 21 insertions(+), 16 deletions(-)
->
-> This breaks am335x.
->
-> [   17.433166] /ocp/usb at 47400000/usb at 47401000: could not get #phy-cells
-> for /ocp/usb at 47400000/usb-phy at 47401300
-> [   17.443627] /ocp/usb at 47400000/usb at 47401800: could not get #phy-cells
-> for /ocp/usb at 47400000/usb-phy at 47401b00
-> [   17.454005] am335x-phy-driver 47401300.usb-phy: dr_mode 0
-> [   17.460518] 47401300.usb-phy supply vcc not found, using dummy
-> regulator
-> [   17.469685] /ocp/usb at 47400000/usb at 47401000: could not get #phy-cells
-> for /ocp/usb at 47400000/usb-phy at 47401300
-> [   17.479998] /ocp/usb at 47400000/usb at 47401800: could not get #phy-cells
-> for /ocp/usb at 47400000/usb-phy at 47401b00
-> [   17.490342] am335x-phy-driver 47401b00.usb-phy: dr_mode 0
+On 03/06/16 19:13, Geoff Levand wrote:
+> Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
+> removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
+> the arm64 kexec and kdump support.  Add simplified versions of those two
+> routines back with some changes needed for kexec in the new files cpu_reset.S,
+> and cpu_reset.h.
+> 
+> When a CPU is reset it needs to be put into the exception level it had when it
+> entered the kernel. Update cpu_soft_restart() to accept an argument which
+> signals if the reset address needs to be entered at EL1 or EL2, and add a
+> new hypercall HVC_SOFT_RESTART which is used for the EL2 switch.
+> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
 
-That is weird, quoting: drivers/phy/phy-core.c: _of_phy_get():
 
-         ret = of_parse_phandle_with_args(np, "phys", "#phy-cells",
-                 index, &args);
-         if (ret)
-                 return ERR_PTR(-ENODEV);
+> diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+> new file mode 100644
+> index 0000000..c321957
+> --- /dev/null
+> +++ b/arch/arm64/kernel/cpu-reset.S
 
-So if #phy-cells is not defined, then the phy core should not
-be able to work with the dts files in question at all.
+> +ENTRY(__cpu_soft_restart)
+> +	/* Clear sctlr_el1 flags. */
+> +	mrs	x12, sctlr_el1
+> +	ldr	x13, =SCTLR_ELx_FLAGS
+> +	bic	x12, x12, x13
+> +	msr	sctlr_el1, x12
+> +	isb
+> +
+> +	cbz	x0, 1f				// el2_switch?
+> +	mov	x0, #HVC_SOFT_RESTART
+> +	hvc	#0				// no return
+> +
+> +1:	mov	x18, x1				// entry
+> +	mov	x0, x2				// arg0
+> +	mov	x1, x3				// arg1
+> +	mov	x2, x4				// arg2
+> +	ret	x18
 
-All my patch does is make the way of_usb_get_dr_mode_by_phy parses
-phy-handles be identical to how phy-core.c does it.
+Why ret not br?
 
-I see that the usb0_phy node in arch/arm/boot/dts/am33xx.dtsi
-indeed lacks a "#phy-cells = <0>;" line.
 
-Quoting: Documentation/devicetree/bindings/phy/phy-bindings.txt
+> +ENDPROC(__cpu_soft_restart)
+> +
+> +.popsection
+> diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
+> new file mode 100644
+> index 0000000..5a5ea0a
+> --- /dev/null
+> +++ b/arch/arm64/kernel/cpu-reset.h
+> @@ -0,0 +1,29 @@
+> +/*
+> + * CPU reset routines
+> + *
+> + * Copyright (C) 2015 Huawei Futurewei Technologies.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef _ARM64_CPU_RESET_H
+> +#define _ARM64_CPU_RESET_H
+> +
+> +#include <asm/virt.h>
+> +
+> +void __cpu_soft_restart(unsigned long el2_switch, unsigned long entry,
+> +	unsigned long arg0, unsigned long arg1, unsigned long arg2);
+> +
+> +static inline void __noreturn cpu_soft_restart(unsigned long el2_switch,
+> +	unsigned long entry, unsigned long arg0, unsigned long arg1,
+> +	unsigned long arg2)
 
-PHY device node
-===============
+What is the last arg for? machine_kexec() passes zero, but
+arm64_relocate_new_kernel() never reads this value..
 
-Required Properties:
-#phy-cells:     Number of cells in a PHY specifier;  The meaning of all those
-                 cells is defined by the binding for the phy node. The PHY
-                 provider can use the values in cells to find the appropriate
-                 PHY.
 
-So not having #phy-cells defined for a phy-node clearly is a bug.
+> +{
+> +	typeof(__cpu_soft_restart) *restart;
+> +	restart = (void *)virt_to_phys(__cpu_soft_restart);
+> +	restart(el2_switch, entry, arg0, arg1, arg2);
 
-A patch like the following should fix this:
+This confuses me each time I see it, I think it would be clearer if the
+'cpu_install_idmap()' call were moved into this function. Any other user of this
+function would need to do the same.
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 52be48b..c4ff788d 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -557,6 +557,7 @@
-  			};
+By the end of the series, the caller of this has:
+> is_kernel_in_hyp_mode() ? 0 : (in_crash_kexec ? 0 : is_hyp_mode_available())
+which is difficult to read, I had to write out the values to work it out.
 
-  			usb0_phy: usb-phy at 47401300 {
-+				#phy-cells = <0>;
-  				compatible = "ti,am335x-usb-phy";
-  				reg = <0x47401300 0x100>;
-  				reg-names = "phy";
+I thinks it makes more sense to move the hyp-aware logic into this
+cpu_soft_restart(), obviously kdump still needs a 'skip el2 jump' flag.
 
-Regards,
 
-Hans
+> +	unreachable();
+> +}
+> +
+> +#endif
+> diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
+> index 8727f44..a129e57 100644
+> --- a/arch/arm64/kernel/hyp-stub.S
+> +++ b/arch/arm64/kernel/hyp-stub.S
+> @@ -71,8 +71,17 @@ el1_sync:
+>  	msr	vbar_el2, x1
+>  	b	9f
+>  
+> +2:	cmp	x0, #HVC_SOFT_RESTART
+> +	b.ne	3f
+> +	mov	x0, x2
+> +	mov	x2, x4
+> +	mov	x4, x1
+> +	mov	x1, x3
+> +	blr	x4
+
+blr not branch? If we ever did return from here, wouldn't we run the 'entry'
+function again at EL1?
+
+
+> +	b	9f
+> +
+>  	/* Someone called kvm_call_hyp() against the hyp-stub... */
+> -2:	mov     x0, #ARM_EXCEPTION_HYP_GONE
+> +3:	mov	x0, #ARM_EXCEPTION_HYP_GONE
+>  
+>  9:	eret
+>  ENDPROC(el1_sync)
+> 
+
+For what its worth:
+
+Reviewed-by: James Morse <james.morse@arm.com>
+
+
+Thanks,
+
+James
