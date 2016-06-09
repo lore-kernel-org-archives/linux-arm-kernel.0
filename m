@@ -1,140 +1,42 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Thu, 09 Jun 2016 20:08:44 +0000
-Subject: [PATCH v18 06/13] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <cover.1465502767.git.geoff@infradead.org>
-References: <cover.1465502767.git.geoff@infradead.org>
-Message-ID: <e9e5a4a240c9a565ce77fac6fd580eb555295b9d.1465502767.git.geoff@infradead.org>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Thu,  9 Jun 2016 16:25:14 -0400
+Subject: [PATCH] [media] s5p-mfc: use vb2_is_streaming() to check vb2 queue
+ status
+Message-ID: <1465503914-22936-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+The streaming field in struct vb2_queue is meant to be private and should
+not be used by drivers directly, instead the vb2_is_streaming() function
+should be used to check the videobuf2 queue streaming status.
 
-On the startup of primary kernel, the memory region used by crash dump
-kernel must be specified by "crashkernel=" kernel parameter.
-reserve_crashkernel() will allocate and reserve the region for later use.
-
-User space tools, like kexec-tools, will be able to find that region marked
-as "Crash kernel" in /proc/iomem.
-
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: Mark Salter <msalter@redhat.com>
-Signed-off-by: Pratyush Anand <panand@redhat.com>
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- arch/arm64/kernel/setup.c |  7 +++++-
- arch/arm64/mm/init.c      | 62 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 68 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 3279def..e411957 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -31,7 +31,6 @@
- #include <linux/screen_info.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
--#include <linux/crash_dump.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -222,6 +221,12 @@ static void __init request_standard_resources(void)
- 		    kernel_data.end <= res->end)
- 			request_resource(res, &kernel_data);
- 	}
-+
-+#ifdef CONFIG_KEXEC_CORE
-+	/* User space tools will find "Crash kernel" region in /proc/iomem. */
-+	if (crashk_res.end)
-+		insert_resource(&iomem_resource, &crashk_res);
-+#endif
- }
+ drivers/media/platform/s5p-mfc/s5p_mfc_dec.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+index 038215c198ac..d3b01e92ee80 100644
+--- a/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
++++ b/drivers/media/platform/s5p-mfc/s5p_mfc_dec.c
+@@ -423,7 +423,7 @@ static int vidioc_s_fmt(struct file *file, void *priv, struct v4l2_format *f)
+ 	pix_mp = &f->fmt.pix_mp;
+ 	if (ret)
+ 		return ret;
+-	if (ctx->vq_src.streaming || ctx->vq_dst.streaming) {
++	if (vb2_is_streaming(&ctx->vq_src) || vb2_is_streaming(&ctx->vq_dst)) {
+ 		v4l2_err(&dev->v4l2_dev, "%s queue busy\n", __func__);
+ 		ret = -EBUSY;
+ 		goto out;
+@@ -820,7 +820,7 @@ static int vidioc_decoder_cmd(struct file *file, void *priv,
+ 		if (cmd->flags != 0)
+ 			return -EINVAL;
  
- u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index d45f862..45f1319 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -34,6 +34,7 @@
- #include <linux/dma-contiguous.h>
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
-+#include <linux/kexec.h>
+-		if (!ctx->vq_src.streaming)
++		if (!vb2_is_streaming(&ctx->vq_src))
+ 			return -EINVAL;
  
- #include <asm/boot.h>
- #include <asm/fixmap.h>
-@@ -76,6 +77,65 @@ static int __init early_initrd(char *p)
- early_param("initrd", early_initrd);
- #endif
- 
-+#ifdef CONFIG_KEXEC_CORE
-+/*
-+ * reserve_crashkernel() - reserves memory for crash kernel
-+ *
-+ * This function reserves memory area given in "crashkernel=" kernel command
-+ * line parameter. The memory reserved is used by dump capture kernel when
-+ * primary kernel is crashing.
-+ */
-+static void __init reserve_crashkernel(void)
-+{
-+	unsigned long long crash_size = 0, crash_base = 0;
-+	int ret;
-+
-+	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-+				&crash_size, &crash_base);
-+	/* no crashkernel= or invalid value specified */
-+	if (!crash_size)
-+		return;
-+
-+	if (crash_base == 0) {
-+		/* Current arm64 boot protocol requires 2MB alignment */
-+		crash_base = memblock_find_in_range(0,
-+				MEMBLOCK_ALLOC_ACCESSIBLE, crash_size, SZ_2M);
-+		if (crash_base == 0) {
-+			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-+				crash_size);
-+			return;
-+		}
-+		memblock_reserve(crash_base, crash_size);
-+
-+	} else {
-+		/* User specifies base address explicitly. */
-+		if (!memblock_is_region_memory(crash_base, crash_size) ||
-+			memblock_is_region_reserved(crash_base, crash_size)) {
-+			pr_warn("crashkernel has wrong address or size\n");
-+			return;
-+		}
-+
-+		if (IS_ALIGNED(crash_base, SZ_2M)) {
-+			pr_warn("crashkernel base address is not 2MB aligned\n");
-+			return;
-+		}
-+
-+		memblock_reserve(crash_base, crash_size);
-+	}
-+
-+	pr_info("Reserving %lldMB of memory at %lldMB for crashkernel\n",
-+		crash_size >> 20, crash_base >> 20);
-+
-+	crashk_res.start = crash_base;
-+	crashk_res.end = crash_base + crash_size - 1;
-+}
-+#else
-+static void __init reserve_crashkernel(void)
-+{
-+	;
-+}
-+#endif /* CONFIG_KEXEC_CORE */
-+
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -291,6 +351,8 @@ void __init arm64_memblock_init(void)
- 	}
- #endif
- 
-+	reserve_crashkernel();
-+
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
+ 		spin_lock_irqsave(&dev->irqlock, flags);
 -- 
-2.5.0
+2.5.5
