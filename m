@@ -1,48 +1,98 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Thu,  9 Jun 2016 14:01:59 -0700
-Subject: [PATCH 09/14] MIPS/ptrace: run seccomp after ptrace
+Date: Thu,  9 Jun 2016 14:02:02 -0700
+Subject: [PATCH 12/14] powerpc/ptrace: run seccomp after ptrace
 In-Reply-To: <1465506124-21866-1-git-send-email-keescook@chromium.org>
 References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
-Message-ID: <1465506124-21866-10-git-send-email-keescook@chromium.org>
+Message-ID: <1465506124-21866-13-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Close the hole where ptrace can change a syscall out from under seccomp.
 
 Signed-off-by: Kees Cook <keescook@chromium.org>
-Cc: Ralf Baechle <ralf@linux-mips.org>
-Cc: "Maciej W. Rozycki" <macro@imgtec.com>
-Cc: James Hogan <james.hogan@imgtec.com>
-Cc: linux-mips at linux-mips.org
+Cc: Michael Ellerman <mpe@ellerman.id.au>
+Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+Cc: Paul Mackerras <paulus@samba.org>
+Cc: linuxppc-dev at lists.ozlabs.org
 ---
- arch/mips/kernel/ptrace.c | 9 ++++-----
- 1 file changed, 4 insertions(+), 5 deletions(-)
+ arch/powerpc/kernel/ptrace.c | 44 +++++++++++++++++++++++---------------------
+ 1 file changed, 23 insertions(+), 21 deletions(-)
 
-diff --git a/arch/mips/kernel/ptrace.c b/arch/mips/kernel/ptrace.c
-index c50af846ecf9..6103b24d1bfc 100644
---- a/arch/mips/kernel/ptrace.c
-+++ b/arch/mips/kernel/ptrace.c
-@@ -888,17 +888,16 @@ long arch_ptrace(struct task_struct *child, long request,
+diff --git a/arch/powerpc/kernel/ptrace.c b/arch/powerpc/kernel/ptrace.c
+index ed799e994773..5dc47ebb3840 100644
+--- a/arch/powerpc/kernel/ptrace.c
++++ b/arch/powerpc/kernel/ptrace.c
+@@ -1788,7 +1788,7 @@ static int do_seccomp(struct pt_regs *regs)
+ 
+ 	/*
+ 	 * The syscall was allowed by seccomp, restore the register
+-	 * state to what ptrace and audit expect.
++	 * state to what audit expects.
+ 	 * Note that we use orig_gpr3, which means a seccomp tracer can
+ 	 * modify the first syscall parameter (in orig_gpr3) and also
+ 	 * allow the syscall to proceed.
+@@ -1822,22 +1822,25 @@ static inline int do_seccomp(struct pt_regs *regs) { return 0; }
   */
- asmlinkage long syscall_trace_enter(struct pt_regs *regs, long syscall)
+ long do_syscall_trace_enter(struct pt_regs *regs)
  {
--	long ret = 0;
+-	bool abort = false;
+-
  	user_exit();
  
- 	current_thread_info()->syscall = syscall;
- 
--	if (secure_computing(NULL) == -1)
--		return -1;
--
- 	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
- 	    tracehook_report_syscall_entry(regs))
--		ret = -1;
-+		return -1;
++	/*
++	 * The tracer may decide to abort the syscall, if so tracehook
++	 * will return !0. Note that the tracer may also just change
++	 * regs->gpr[0] to an invalid syscall number, that is handled
++	 * below on the exit path.
++	 */
++	if (test_thread_flag(TIF_SYSCALL_TRACE) &&
++	    tracehook_report_syscall_entry(regs))
++		goto skip;
 +
-+	if (secure_computing(NULL) == -1)
-+		return -1;
++	/* Run seccomp after ptrace; allow it to set gpr[3]. */
+ 	if (do_seccomp(regs))
+ 		return -1;
+ 
+-	if (test_thread_flag(TIF_SYSCALL_TRACE)) {
+-		/*
+-		 * The tracer may decide to abort the syscall, if so tracehook
+-		 * will return !0. Note that the tracer may also just change
+-		 * regs->gpr[0] to an invalid syscall number, that is handled
+-		 * below on the exit path.
+-		 */
+-		abort = tracehook_report_syscall_entry(regs) != 0;
+-	}
++	/* Avoid trace and audit when syscall is invalid. */
++	if (regs->gpr[0] >= NR_syscalls)
++		goto skip;
  
  	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
- 		trace_sys_enter(regs, regs->regs[2]);
+ 		trace_sys_enter(regs, regs->gpr[0]);
+@@ -1854,17 +1857,16 @@ long do_syscall_trace_enter(struct pt_regs *regs)
+ 				    regs->gpr[5] & 0xffffffff,
+ 				    regs->gpr[6] & 0xffffffff);
+ 
+-	if (abort || regs->gpr[0] >= NR_syscalls) {
+-		/*
+-		 * If we are aborting explicitly, or if the syscall number is
+-		 * now invalid, set the return value to -ENOSYS.
+-		 */
+-		regs->gpr[3] = -ENOSYS;
+-		return -1;
+-	}
+-
+ 	/* Return the possibly modified but valid syscall number */
+ 	return regs->gpr[0];
++
++skip:
++	/*
++	 * If we are aborting explicitly, or if the syscall number is
++	 * now invalid, set the return value to -ENOSYS.
++	 */
++	regs->gpr[3] = -ENOSYS;
++	return -1;
+ }
+ 
+ void do_syscall_trace_leave(struct pt_regs *regs)
 -- 
 2.7.4
