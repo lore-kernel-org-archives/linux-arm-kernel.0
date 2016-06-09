@@ -1,106 +1,204 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu,  9 Jun 2016 17:23:27 -0500
-Subject: [PATCH 2/8] arm64: pmu: Probe default hw/cache counters
+Date: Thu,  9 Jun 2016 17:23:28 -0500
+Subject: [PATCH 3/8] arm64: pmu: Add support for probing with ACPI
 In-Reply-To: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
 References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <1465511013-10742-3-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1465511013-10742-4-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8 machines can identify the micro/arch defined counters
-that are available on a machine. Add all these counters to the
-default armv8 perf map. At run-time disable the counters which
-are not available on the given PMU.
+From: Mark Salter <msalter@redhat.com>
 
+In the case of ACPI, the PMU IRQ information is contained in the
+MADT table. Also, since the PMU does not exist as a device in the
+ACPI DSDT table, it is necessary to create a platform device so
+that the appropriate driver probing is triggered.
+
+Signed-off-by: Mark Salter <msalter@redhat.com>
 Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm64/kernel/perf_event.c | 45 ++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 41 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 917c3e2..e1a3bce 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -190,13 +190,23 @@
- #define ARMV8_THUNDER_PERFCTR_L1I_CACHE_PREF_MISS		0xED
+ NOTE: Much of the code in pmu_acpi_init() is replaced in a later version
+       of this patch. The later version of the patch cleans up some of the
+       possible style/error handling issues that have been pointed out with
+       this version.
+
+ arch/arm64/kernel/smp.c      |  5 +++
+ drivers/perf/Kconfig         |  4 ++
+ drivers/perf/Makefile        |  1 +
+ drivers/perf/arm_pmu_acpi.c  | 97 ++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/perf/arm_pmu.h |  7 ++++
+ 5 files changed, 114 insertions(+)
+ create mode 100644 drivers/perf/arm_pmu_acpi.c
+
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 678e084..5c96d23 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -37,6 +37,7 @@
+ #include <linux/completion.h>
+ #include <linux/of.h>
+ #include <linux/irq_work.h>
++#include <linux/perf/arm_pmu.h>
  
- /* PMUv3 HW events mapping. */
-+
-+/*
-+ * ARMv8 Architectural defined events, not all of these may
-+ * be supported on any given implementation. Undefined events will
-+ * be disabled at run-time.
-+ */
- static const unsigned armv8_pmuv3_perf_map[PERF_COUNT_HW_MAX] = {
- 	PERF_MAP_ALL_UNSUPPORTED,
- 	[PERF_COUNT_HW_CPU_CYCLES]		= ARMV8_PMUV3_PERFCTR_CPU_CYCLES,
- 	[PERF_COUNT_HW_INSTRUCTIONS]		= ARMV8_PMUV3_PERFCTR_INST_RETIRED,
- 	[PERF_COUNT_HW_CACHE_REFERENCES]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE,
- 	[PERF_COUNT_HW_CACHE_MISSES]		= ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL,
-+	[PERF_COUNT_HW_BRANCH_INSTRUCTIONS]	= ARMV8_PMUV3_PERFCTR_PC_WRITE_RETIRED,
- 	[PERF_COUNT_HW_BRANCH_MISSES]		= ARMV8_PMUV3_PERFCTR_BR_MIS_PRED,
-+	[PERF_COUNT_HW_BUS_CYCLES]		= ARMV8_PMUV3_PERFCTR_BUS_CYCLES,
-+	[PERF_COUNT_HW_STALLED_CYCLES_FRONTEND]	= ARMV8_PMUV3_PERFCTR_STALL_FRONTEND,
-+	[PERF_COUNT_HW_STALLED_CYCLES_BACKEND]	= ARMV8_PMUV3_PERFCTR_STALL_BACKEND,
- };
+ #include <asm/alternative.h>
+ #include <asm/atomic.h>
+@@ -540,6 +541,7 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+ 			return;
+ 		}
+ 		bootcpu_valid = true;
++		arm_pmu_parse_acpi(0, processor);
+ 		return;
+ 	}
  
- /* ARM Cortex-A53 HW events mapping. */
-@@ -258,6 +268,15 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE,
- 	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1D_CACHE_REFILL,
+@@ -560,6 +562,9 @@ acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
+ 	 */
+ 	acpi_set_mailbox_entry(cpu_count, processor);
  
-+	[C(L1I)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE,
-+	[C(L1I)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_CACHE_REFILL,
++	/* get PMU irq info */
++	arm_pmu_parse_acpi(cpu_count, processor);
 +
-+	[C(DTLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1D_TLB_REFILL,
-+	[C(DTLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1D_TLB,
-+
-+	[C(ITLB)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1I_TLB_REFILL,
-+	[C(ITLB)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1I_TLB,
-+
- 	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_BR_PRED,
- 	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_BR_MIS_PRED,
- 	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_BR_PRED,
-@@ -905,9 +924,22 @@ static void armv8pmu_reset(void *info)
- 
- static int armv8_pmuv3_map_event(struct perf_event *event)
- {
--	return armpmu_map_event(event, &armv8_pmuv3_perf_map,
--				&armv8_pmuv3_perf_cache_map,
--				ARMV8_PMU_EVTYPE_EVENT);
-+	int hw_event_id;
-+	struct arm_pmu *armpmu = to_arm_pmu(event->pmu);
-+
-+	hw_event_id = armpmu_map_event(event, &armv8_pmuv3_perf_map,
-+				       &armv8_pmuv3_perf_cache_map,
-+				       ARMV8_PMU_EVTYPE_EVENT);
-+	if (hw_event_id < 0)
-+		return hw_event_id;
-+
-+	/* disable micro/arch events not supported by this PMU */
-+	if ((hw_event_id < ARMV8_PMUV3_MAX_COMMON_EVENTS) &&
-+		!test_bit(hw_event_id, armpmu->pmceid_bitmap)) {
-+			return -EOPNOTSUPP;
-+	}
-+
-+	return hw_event_id;
+ 	cpu_count++;
  }
  
- static int armv8_a53_map_event(struct perf_event *event)
-@@ -1044,8 +1076,13 @@ static const struct of_device_id armv8_pmu_of_device_ids[] = {
- 	{},
- };
+diff --git a/drivers/perf/Kconfig b/drivers/perf/Kconfig
+index 04e2653..818fa3b 100644
+--- a/drivers/perf/Kconfig
++++ b/drivers/perf/Kconfig
+@@ -12,4 +12,8 @@ config ARM_PMU
+ 	  Say y if you want to use CPU performance monitors on ARM-based
+ 	  systems.
  
++config ARM_PMU_ACPI
++	def_bool y
++	depends on ARM_PMU && ACPI
++
+ endmenu
+diff --git a/drivers/perf/Makefile b/drivers/perf/Makefile
+index acd2397..fd8090d 100644
+--- a/drivers/perf/Makefile
++++ b/drivers/perf/Makefile
+@@ -1 +1,2 @@
+ obj-$(CONFIG_ARM_PMU) += arm_pmu.o
++obj-$(CONFIG_ARM_PMU_ACPI) += arm_pmu_acpi.o
+diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
+new file mode 100644
+index 0000000..98c452d
+--- /dev/null
++++ b/drivers/perf/arm_pmu_acpi.c
+@@ -0,0 +1,97 @@
 +/*
-+ * Non DT systems have their micro/arch events probed at run-time.
-+ * A fairly complete list of generic events are provided and ones that
-+ * aren't supported by the current PMU are disabled.
++ * PMU support
++ *
++ * Copyright (C) 2015 Red Hat Inc.
++ * Author: Mark Salter <msalter@redhat.com>
++ *
++ * This work is licensed under the terms of the GNU GPL, version 2.  See
++ * the COPYING file in the top-level directory.
++ *
 + */
- static const struct pmu_probe_info armv8_pmu_probe_table[] = {
--	PMU_PROBE(0, 0, armv8_pmuv3_init), /* if all else fails... */
-+	PMU_PROBE(0, 0, armv8_pmuv3_init), /* enable all defined counters */
- 	{ /* sentinel value */ }
- };
++
++#include <linux/perf/arm_pmu.h>
++#include <linux/platform_device.h>
++#include <linux/acpi.h>
++#include <linux/irq.h>
++#include <linux/irqdesc.h>
++
++#define PMU_PDEV_NAME "armv8-pmu"
++
++struct pmu_irq {
++	int gsi;
++	int trigger;
++};
++
++static struct pmu_irq pmu_irqs[NR_CPUS] __initdata;
++
++void __init arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic)
++{
++	pmu_irqs[cpu].gsi = gic->performance_interrupt;
++	if (gic->flags & ACPI_MADT_PERFORMANCE_IRQ_MODE)
++		pmu_irqs[cpu].trigger = ACPI_EDGE_SENSITIVE;
++	else
++		pmu_irqs[cpu].trigger = ACPI_LEVEL_SENSITIVE;
++}
++
++static int __init pmu_acpi_init(void)
++{
++	struct platform_device *pdev;
++	struct pmu_irq *pirq = pmu_irqs;
++	struct resource	*res, *r;
++	int err = -ENOMEM;
++	int i, count, irq;
++
++	if (acpi_disabled)
++		return 0;
++
++	/* Must have irq for boot boot cpu, at least */
++	if (pirq->gsi == 0)
++		return -EINVAL;
++
++	irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
++				ACPI_ACTIVE_HIGH);
++
++	if (irq_is_percpu(irq))
++		count = 1;
++	else
++		for (i = 1, count = 1; i < NR_CPUS; i++)
++			if (pmu_irqs[i].gsi)
++				++count;
++
++	pdev = platform_device_alloc(PMU_PDEV_NAME, -1);
++	if (!pdev)
++		goto err_free_gsi;
++
++	res = kcalloc(count, sizeof(*res), GFP_KERNEL);
++	if (!res)
++		goto err_free_device;
++
++	for (i = 0, r = res; i < count; i++, pirq++, r++) {
++		if (i)
++			irq = acpi_register_gsi(NULL, pirq->gsi, pirq->trigger,
++						ACPI_ACTIVE_HIGH);
++		r->start = r->end = irq;
++		r->flags = IORESOURCE_IRQ;
++		if (pirq->trigger == ACPI_EDGE_SENSITIVE)
++			r->flags |= IORESOURCE_IRQ_HIGHEDGE;
++		else
++			r->flags |= IORESOURCE_IRQ_HIGHLEVEL;
++	}
++
++	err = platform_device_add_resources(pdev, res, count);
++	if (!err)
++		err = platform_device_add(pdev);
++	kfree(res);
++	if (!err)
++		return 0;
++
++err_free_device:
++	platform_device_put(pdev);
++
++err_free_gsi:
++	for (i = 0; i < count; i++)
++		acpi_unregister_gsi(pmu_irqs[i].gsi);
++
++	return err;
++}
++arch_initcall(pmu_acpi_init);
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index 7e814fe..9ed9fdc 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -156,4 +156,11 @@ int arm_pmu_device_probe(struct platform_device *pdev,
  
+ #endif /* CONFIG_ARM_PMU */
+ 
++#ifdef CONFIG_ARM_PMU_ACPI
++struct acpi_madt_generic_interrupt;
++void arm_pmu_parse_acpi(int cpu, struct acpi_madt_generic_interrupt *gic);
++#else
++#define arm_pmu_parse_acpi(a, b) do { } while (0)
++#endif /* CONFIG_ARM_PMU_ACPI */
++
+ #endif /* __ARM_PMU_H__ */
 -- 
 2.5.5
