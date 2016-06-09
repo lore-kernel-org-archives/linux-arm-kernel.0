@@ -1,7 +1,7 @@
 From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu,  9 Jun 2016 13:02:46 +0100
+Date: Thu,  9 Jun 2016 13:04:15 +0100
 Subject: [PATCH] ARM: imx: add mx25_revision() prototype
-Message-ID: <1465473766-30463-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <1465473855-32132-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
