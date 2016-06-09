@@ -1,76 +1,41 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 09 Jun 2016 08:51:18 +0200
-Subject: [RFC PATCH 15/15] iommu/exynos: update to use iommu big-endian
-In-Reply-To: <20160608183110.13851-16-matthew@mattleach.net>
-References: <20160608183110.13851-1-matthew@mattleach.net>
- <20160608183110.13851-16-matthew@mattleach.net>
-Message-ID: <338cbdc6-2830-813b-713e-1cc40d23d1f9@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Jun 2016 09:07:08 +0200
+Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
+In-Reply-To: <d3c117ea-2dce-63a2-7888-31ee8320a3dd@codethink.co.uk>
+References: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
+ <5757CF9B.3080402@free.fr>
+ <d3c117ea-2dce-63a2-7888-31ee8320a3dd@codethink.co.uk>
+Message-ID: <32804824.nq0AOIbNnC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Wednesday, June 8, 2016 9:59:26 AM CEST Ben Dooks wrote:
+> On 08/06/16 08:56, Mason wrote:
+> > On 07/06/2016 13:30, Ben Dooks wrote:
+> > 
+> >> Fix the use of 0 instead of NULL to clk_get() call. This stops the
+> >> following warning:
+> >>
+> >> drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
+> > 
+> > May I ask which compiler/version produced that diagnostic?
+> 
+> I was running with "make C=2 bzImage" for ARM multi_v7_config
+> 
+> $ sparse --version
+> v0.5.0
+> 
 
+I believe gcc-6 will also produce a similar warning when building with
+'make W=1'. I've started looking into moving some of the warnings from
+W=1 level to default, which can probably be done with relatively little
+effort for many warnings.
 
-On 2016-06-08 20:31, Matthew Leach wrote:
-> From: Ben Dooks <ben.dooks@codethink.co.uk>
->
-> Add initial support for big endian by always writing the pte
-> in le32. Note, revisit if hardware capable of doing big endian
-> fetches.
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+I see that you are making very good progress at eliminating the
+-Wmissing-declarations warnings, which are also at W=1 level. Do
+you have an estimate of how many there are? Do you plan to do them
+all, or just the ones for some subsystems? I've stayed away from
+this one for now since there are lots of such warnings, but it
+seems particularly worthwhile.
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-Just to keep my curiosity satisfied - what's the reason to use
-big-endian on ARM?
-
-Good luck with fixing the kernel and userspace codes, which usually
-assume little-endian is the only possible order!
-
-> ---
-> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-> Cc: Joerg Roedel <joro@8bytes.org>
-> Cc: Kukjin Kim <kgene@kernel.org>
-> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> Cc: iommu at lists.linux-foundation.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-samsung-soc at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org (open list)
-> ---
->   drivers/iommu/exynos-iommu.c | 6 +++++-
->   1 file changed, 5 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
-> index 5ecc86c..dd8b3b3 100644
-> --- a/drivers/iommu/exynos-iommu.c
-> +++ b/drivers/iommu/exynos-iommu.c
-> @@ -54,6 +54,10 @@ typedef u32 sysmmu_pte_t;
->   #define lv2ent_small(pent) ((*(pent) & 2) == 2)
->   #define lv2ent_large(pent) ((*(pent) & 3) == 1)
->   
-> +#ifdef CONFIG_BIG_ENDIAN
-> +#warning "revisit driver if we can enable big-endian ptes"
-> +#endif
-> +
-
-This warning can be removed. There is no way to force SYSMMU to operate with
-big-endian PTEs according to the datasheet.
-
->   /*
->    * v1.x - v3.x SYSMMU supports 32bit physical and 32bit virtual address spaces
->    * v5.0 introduced support for 36bit physical address space by shifting
-> @@ -716,7 +720,7 @@ static inline void update_pte(sysmmu_pte_t *ent, sysmmu_pte_t val)
->   {
->   	dma_sync_single_for_cpu(dma_dev, virt_to_phys(ent), sizeof(*ent),
->   				DMA_TO_DEVICE);
-> -	*ent = val;
-> +	*ent = cpu_to_le32(val);
->   	dma_sync_single_for_device(dma_dev, virt_to_phys(ent), sizeof(*ent),
->   				   DMA_TO_DEVICE);
->   }
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+	Arnd
