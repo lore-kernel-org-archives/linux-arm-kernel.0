@@ -1,35 +1,37 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 10 Jun 2016 01:37:02 +0300
-Subject: [PATCHv2] device tree description for AD5820 camera auto-focus
- coil
-In-Reply-To: <20160607071003.GA11796@amd>
-References: <20160524091746.GA14536@amd>
- <20160525212659.GK26360@valkosipuli.retiisi.org.uk>
- <20160527205140.GA26767@amd>
- <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
- <20160531213437.GA28397@amd>
- <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
- <20160601220840.GA21946@amd>
- <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
- <20160602193027.GB7984@amd> <20160607071003.GA11796@amd>
-Message-ID: <20160609223701.GZ26360@valkosipuli.retiisi.org.uk>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 09 Jun 2016 15:43:03 -0700
+Subject: linux-next: request to include linux-amlogic tree
+In-Reply-To: <20160606010007.6941cc2d@canb.auug.org.au> (Stephen Rothwell's
+ message of "Mon, 6 Jun 2016 01:00:07 +1000")
+References: <CAOi56cXb7TjsctpeFWqGCmEx2LG-i11qoLBGDhi1OBJpbyko4A@mail.gmail.com>
+ <20160606010007.6941cc2d@canb.auug.org.au>
+Message-ID: <7h60tidlvs.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 09:10:04AM +0200, Pavel Machek wrote:
-> 
-> Add documentation for ad5820 device tree binding.
-> 
-> Signed-off-by: Pavel Machek <pavel@denx.de>
-> Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+Stephen Rothwell <sfr@canb.auug.org.au> writes:
 
-Thanks!
+> Hi Kevin,
+>
+> On Fri, 3 Jun 2016 14:49:01 -0700 Kevin Hilman <khilman@baylibre.com> wrote:
+>>
+>> Please add the following tree/branch to linux-next.  This is used for
+>> the kernel development of the ARM-based Amlogic SoCs:
+>> 
+>>    git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
+>> for-next
+>
+> Added from today.
 
-I've replaced the patch in my tree, will send a pull req later.
+Thanks.
 
--- 
-Cheers,
+> I assume that this will be merged via the arm-soc tree?
 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
+Yes.
+
+> I also have just you as the contact - I can add more contacts if
+> that makes sense.
+
+Please also add Carlo Caione <carlo@caione.org>
+
+Kevin
