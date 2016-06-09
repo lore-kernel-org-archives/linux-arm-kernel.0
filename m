@@ -1,133 +1,110 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 9 Jun 2016 09:40:28 +0200
-Subject: [PATCH v2 08/15] clk: sunxi-ng: Add divider
-In-Reply-To: <20160607204154.31967-9-maxime.ripard@free-electrons.com>
+Date: Thu, 9 Jun 2016 09:41:01 +0200
+Subject: [PATCH v2 11/15] clk: sunxi-ng: Add N-M-factor clock support
+In-Reply-To: <20160607204154.31967-12-maxime.ripard@free-electrons.com>
 References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
- <20160607204154.31967-9-maxime.ripard@free-electrons.com>
-Message-ID: <20160609094028.490c9d38599cda31fdd069be@free.fr>
+ <20160607204154.31967-12-maxime.ripard@free-electrons.com>
+Message-ID: <20160609094101.426a13c4c61aa6cb11df16fc@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 Jun 2016 22:41:47 +0200
+On Tue,  7 Jun 2016 22:41:50 +0200
 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> Add support for the various dividers (linear, table or pow-of-two based)
-> found in the CCU.
+> Introduce support for clocks that multiply and divide using linear factors.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
 > ---
->  drivers/clk/sunxi-ng/Makefile  |   1 +
->  drivers/clk/sunxi-ng/ccu_div.c | 136 +++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu_div.h | 135 ++++++++++++++++++++++++++++++++++++++++
->  3 files changed, 272 insertions(+)
->  create mode 100644 drivers/clk/sunxi-ng/ccu_div.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu_div.h
+> Changes from v1:
+>   - Fixed the maximums for both factors passed to the rational factor
+>     computation.
+> ---
+>  drivers/clk/sunxi-ng/Makefile |   1 +
+>  drivers/clk/sunxi-ng/ccu_nm.c | 114 ++++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu_nm.h |  95 +++++++++++++++++++++++++++++++++++
+>  3 files changed, 210 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_nm.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_nm.h
 > 
 > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index c47cbd309d59..67a2559fe283 100644
+> index a201fad6b11d..5c7ae1ad1082 100644
 > --- a/drivers/clk/sunxi-ng/Makefile
 > +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -3,6 +3,7 @@ obj-y += ccu_reset.o
->  
->  obj-y += ccu_frac.o
->  
-> +obj-y += ccu_div.o
->  obj-y += ccu_fixed_factor.o
->  obj-y += ccu_gate.o
+> @@ -9,4 +9,5 @@ obj-y += ccu_gate.o
+>  obj-y += ccu_mp.o
 >  obj-y += ccu_mux.o
-> diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
+>  obj-y += ccu_nk.o
+> +obj-y += ccu_nm.o
+>  obj-y += ccu_phase.o
+> diff --git a/drivers/clk/sunxi-ng/ccu_nm.c b/drivers/clk/sunxi-ng/ccu_nm.c
 > new file mode 100644
-> index 000000000000..8659b4cb6c20
+> index 000000000000..e35ddd8eec8b
 > --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu_div.c
-	[snip]
-> diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
-> new file mode 100644
-> index 000000000000..5edbdc1a98c8
-> --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu_div.h
-> @@ -0,0 +1,135 @@
+> +++ b/drivers/clk/sunxi-ng/ccu_nm.c
+> @@ -0,0 +1,114 @@
 > +/*
-> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
+> + * Copyright (C) 2016 Maxime Ripard
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
 > + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
 > + */
 > +
-> +#ifndef _CCU_DIV_H_
-> +#define _CCU_DIV_H_
-> +
 > +#include <linux/clk-provider.h>
+> +#include <linux/rational.h>
 > +
-> +#include "ccu_common.h"
-> +#include "ccu_mux.h"
+> +#include "ccu_frac.h"
+> +#include "ccu_gate.h"
+> +#include "ccu_nm.h"
+	[snip]
+> +static unsigned long ccu_nm_recalc_rate(struct clk_hw *hw,
+> +					unsigned long parent_rate)
+> +{
+> +	struct ccu_nm *nm = hw_to_ccu_nm(hw);
+> +	unsigned long n, m;
+> +	u32 reg;
 > +
-> +struct _ccu_div {
-> +	u8			shift;
-> +	u8			width;
+> +	if (ccu_frac_helper_is_enabled(&nm->common, &nm->frac))
+> +		return ccu_frac_helper_read_rate(&nm->common, &nm->frac);
 > +
-> +	u32			flags;
+> +	reg = readl(nm->common.base + nm->common.reg);
 > +
-> +	struct clk_div_table	*table;
-> +};
+> +	n = reg >> nm->n.shift;
+> +	n &= (1 << nm->n.width) - 1;
 > +
-> +#define _SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, _flags)	\
-> +	{								\
-> +		.shift	= _shift,					\
-> +		.width	= _width,					\
-> +		.flags	= _flags,					\
-> +		.table	= _table,					\
-> +	}
+> +	m = reg >> nm->m.shift;
+> +	m &= (1 << nm->m.width) - 1;
 > +
-> +#define _SUNXI_CCU_DIV_FLAGS(_shift, _width, _flags)			\
-> +	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, _flags)
-> +
-> +#define _SUNXI_CCU_DIV_TABLE(_shift, _width, _table)			\
-> +	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, 0)
-> +
-> +#define _SUNXI_CCU_DIV(_shift, _width)					\
-> +	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, 0)
-> +
-> +struct ccu_div {
-> +	u32			enable;
-> +
-> +	struct _ccu_div		div;
-> +	struct ccu_mux_internal	mux;
-> +	struct ccu_common	common;
-> +};
-> +
-> +#define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
-> +				      _shift, _width,			\
-> +				      _table, _gate, _flags)		\
-> +	struct ccu_div _struct = {					\
+> +	return parent_rate * (n + 1) / (m + 1);
 
-The gate is missing
-		.enable = _gate,
+In the H3, 'm' is a pre-divider (audio and video PLLs):
 
-(I was really afraid when I saw 217?C as the board temperature!)
+	return parent_rate / (m + 1) * (n + 1);
 
-> +		.div		= _SUNXI_CCU_DIV_TABLE(_shift, _width,	\
-> +						       _table),		\
-> +		.common	= {						\
-> +			.reg		= _reg,				\
-> +			.features	= CCU_FEATURE_GATE,		\
-> +			.hw.init	= SUNXI_HW_INIT(_name,		\
-> +							_parent,	\
-> +							&ccu_div_ops,	\
-> +							_flags),	\
-> +		}							\
-> +	}
+> +}
 > +
+> +static long ccu_nm_round_rate(struct clk_hw *hw, unsigned long rate,
+> +			      unsigned long *parent_rate)
+> +{
+> +	struct ccu_nm *nm = hw_to_ccu_nm(hw);
+> +	unsigned long n, m;
 > +
-> +#define SUNXI_CCU_DIV_TABLE(_struct, _name, _parent, _reg,		\
-> +			    _shift, _width,				\
-> +			    _table, _flags)				\
+> +	rational_best_approximation(rate, *parent_rate,
+> +				    1 << nm->n.width, 1 << nm->m.width,
+> +				    &n, &m);
+> +
+> +	return *parent_rate * n / m;
+
+Same here.
+
+> +}
+> +
+> +static int ccu_nm_set_rate(struct clk_hw *hw, unsigned long rate,
+> +			   unsigned long parent_rate)
+> +{
 	[snip]
 
 -- 
