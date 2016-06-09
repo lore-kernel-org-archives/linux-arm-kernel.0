@@ -1,158 +1,34 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Thu,  9 Jun 2016 12:58:18 +0200
-Subject: [PATCH v2 2/2] ARM: dts: sun6i: Add pmic / regulator nodes to Mele M9
- dts
-In-Reply-To: <1465469898-8102-1-git-send-email-hdegoede@redhat.com>
-References: <1465469898-8102-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1465469898-8102-2-git-send-email-hdegoede@redhat.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 9 Jun 2016 12:12:37 +0100
+Subject: [PATCH] power: vexpress: make dev_attr_active static
+In-Reply-To: <1465410391-29475-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465410391-29475-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <57594F25.4010307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pmic / regulator nodes to Mele M9 dts.
 
-Note both reg_usb1_vbus and reg_dldo4 need to be on for the hub attached
-to usb1 to work, and we can list only one usb1_vbus-supply, so dldo4 is
-marked as regulator-always-on.
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Add a bit to the commit msg explaining why dldo4 is marked regulator-always-on
----
- arch/arm/boot/dts/sun6i-a31-m9.dts | 88 +++++++++++++++++++++++++++++++++++++-
- 1 file changed, 87 insertions(+), 1 deletion(-)
+On 08/06/16 19:26, Ben Dooks wrote:
+> The dev_attr_active is not exported or defined to be used
+> outside the driver, so make it static to avoid the following
+> warning:
+>
+> drivers/power/reset/vexpress-poweroff.c:77:1: warning: symbol 'dev_attr_active' was not declared. Should it be static?
+>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+> Cc: Sebastian Reichel <sre@kernel.org>
+> Cc: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> Cc: David Woodhouse <dwmw2@infradead.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
 
-diff --git a/arch/arm/boot/dts/sun6i-a31-m9.dts b/arch/arm/boot/dts/sun6i-a31-m9.dts
-index 66d29b8..2d3cd9d 100644
---- a/arch/arm/boot/dts/sun6i-a31-m9.dts
-+++ b/arch/arm/boot/dts/sun6i-a31-m9.dts
-@@ -72,6 +72,10 @@
- 	};
- };
- 
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc3>;
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
-@@ -85,6 +89,7 @@
- 	pinctrl-0 = <&gmac_pins_mii_a>;
- 	phy = <&phy1>;
- 	phy-mode = "mii";
-+	phy-supply = <&reg_dldo1>;
- 	status = "okay";
- 
- 	phy1: ethernet-phy at 1 {
-@@ -101,13 +106,26 @@
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_m9>;
--	vmmc-supply = <&reg_vcc3v3>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	bus-width = <4>;
- 	cd-gpios = <&pio 7 22 GPIO_ACTIVE_HIGH>; /* PH22 */
- 	cd-inverted;
- 	status = "okay";
- };
- 
-+&p2wi {
-+	status = "okay";
-+
-+	axp22x: pmic at 68 {
-+		compatible = "x-powers,axp221";
-+		reg = <0x68>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
- &pio {
- 	led_pins_m9: led_pins at 0 {
- 		allwinner,pins = "PH13";
-@@ -131,6 +149,73 @@
- 	};
- };
- 
-+&reg_aldo1 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-cpus"; /* This is an educated guess */
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-3v3";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-gpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc4 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-sys-dll";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_dldo1 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-ethernet-phy";
-+};
-+
-+&reg_dldo4 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-usb-hub";
-+};
-+
- &reg_usb1_vbus {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&usb1_vbus_pin_m9>;
-@@ -146,5 +231,6 @@
- 
- &usbphy {
- 	usb1_vbus-supply = <&reg_usb1_vbus>;
-+	usb2_vbus-supply = <&reg_aldo1>;
- 	status = "okay";
- };
+Pulled into vexpress-for-v4.8/fixes[1] along with other 3 vexpress
+related patches. Thanks.
+
 -- 
-2.7.4
+Regards,
+Sudeep
+
+[1] git.kernel.org/sudeep.holla/linux/h/vexpress-for-v4.8/fixes
