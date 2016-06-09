@@ -1,114 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 9 Jun 2016 12:05:19 +0200
-Subject: [PATCH v3 06/12] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <1788169.FUQDsLAmXg@wasted.cogentembedded.com>
-References: <12536856.AsKMEpuejQ@wasted.cogentembedded.com>
- <1788169.FUQDsLAmXg@wasted.cogentembedded.com>
-Message-ID: <CAMuHMdU0e=pS+q8PmXX9gwc6bHv-YdJo4G8nc-EA3NaKMuTrqQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 Jun 2016 11:29:25 +0100
+Subject: [RFC v4 01/14] regulator: of: Add helper for getting all supplies
+In-Reply-To: <1465465471-28740-2-git-send-email-k.kozlowski@samsung.com>
+References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
+ <1465465471-28740-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <20160609102925.GS7510@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+On Thu, Jun 09, 2016 at 11:44:18AM +0200, Krzysztof Kozlowski wrote:
+> Few drivers have a need of getting regulator supplies without knowing
+> their names:
+> 1. The Simple Framebuffer driver works on setup provided by bootloader
+>    (outside of scope of kernel);
+> 2. Generic power sequence driver may be attached to any device node.
+> 
+> Add a Device Tree helper for parsing "-supply" properties and returning
+> allocated bulk regulator consumers.
 
-On Wed, Jun 8, 2016 at 11:17 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> The initial R8A7792 SoC device tree including CPU cores, GIC, timer, SYSC,
-> and the required  clock descriptions.
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> ---
-> Changes in version 3:
+I'm still very concerned that this is just an invitation to people to
+write half baked regulator consumers and half baked DTs to go along with
+it, making it a standard API that doesn't have big red flags on it that
+will flag up when "normal" drivers use it is not good.  Right now this
+just looks like a standard API and people are going to just start using
+it.  If we are going to do this perhaps we need a separate header or
+something to help flag this up.
 
-Thanks for the update!
+In the case of power sequences I'd expect the sequences to perform
+operations on named supplies - the core shouldn't know what the supplies
+are but the thing specifying the sequence should.
 
-> --- /dev/null
-> +++ renesas/arch/arm/boot/dts/r8a7792.dtsi
-> @@ -0,0 +1,180 @@
-> +/*
-> + * Device Tree Source for the r8a7792 SoC
-> + *
-> + * Copyright (C) 2016 Cogent Embedded Inc.
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +#include <dt-bindings/clock/r8a7792-clock.h>
-> +#include <dt-bindings/interrupt-controller/irq.h>
-> +#include <dt-bindings/interrupt-controller/arm-gic.h>
-> +#include <dt-bindings/power/r8a7792-sysc.h>
-> +
-> +/ {
-> +       compatible = "renesas,r8a7792";
-> +       #address-cells = <2>;
-> +       #size-cells = <2>;
-> +
-> +       cpus {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
+>  drivers/regulator/of_regulator.c       | 86 ++++++++++++++++++++++++++++++++++
+>  include/linux/regulator/of_regulator.h | 13 +++++
+>  2 files changed, 99 insertions(+)
 
-This is gonna need
-
-                enable-method = "renesas,apmu";
-
-soon.
-
-> +       soc {
-
-> +               p_clk: p {
-> +               compatible = "fixed-factor-clock";
-
-Missing TAB.
-
-> +                       clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-> +                       #clock-cells = <0>;
-> +                       clock-div = <24>;
-> +                       clock-mult = <1>;
-> +               };
-> +               cp_clk: cp {
-> +                       compatible = "fixed-factor-clock";
-> +                       clocks = <&cpg_clocks R8A7792_CLK_PLL1>;
-> +                       #clock-cells = <0>;
-> +                       clock-div = <3>;
-
-48
-
-(did you check /sys/kernel/debug/clk/clk_summary matches Table 7.2c?)
-
-> +                       clock-mult = <1>;
-> +               };
-> +
-> +               /* Gate clocks */
-
-> +               mstp7_clks: mstp7_clks at e615014c {
-> +                       compatible = "renesas,r8a7792-mstp-clocks",
-> +                                    "renesas,cpg-mstp-clocks";
-> +                       reg = <0 0xe615014c 0 4>, <0 0xe61501c4 0 4>;
-> +                       clocks = <&zs_clk>, <&zs_clk>, <&p_clk>, <&p_clk>,
-> +                                <&p_clk>, <&p_clk>;
-> +                       #clock-cells = <1>;
-> +                       clock-indices = <
-> +                               R8A7792_CLK_HSCIF1 R8A7792_CLK_HSCIF0
-> +                               R8A7792_CLK_SCIF3 R8A7792_CLK_SCIF2
-> +                               R8A7792_CLK_SCIF1 R8A7792_CLK_SCIF0
-> +                       >;
-> +                       clock-output-names = "hscif1", "hscif0", "scif3",
-> +                                            "scif2", "scif1", "scif0",
-> +                                            "du1", "du0";
-
-You forgot to drop "du1" and "du0".
-
-> +               };
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+The external interface shouldn't be DT specific, the Intel people are
+busy importing all of DT into ACPI so they'll doubtless want an ACPI
+version.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/adf8edf5/attachment.sig>
