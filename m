@@ -1,83 +1,43 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Thu, 9 Jun 2016 13:36:42 -0400
-Subject: [RFC 1/1] ARM: print MHz in /proc/cpuinfo
-In-Reply-To: <57593245.5020109@arm.com>
-References: <1465333713-14339-1-git-send-email-jon.mason@broadcom.com>
- <1465333713-14339-2-git-send-email-jon.mason@broadcom.com>
- <5757D87E.2080508@arm.com> <20160608193003.GA17688@broadcom.com>
- <57593245.5020109@arm.com>
-Message-ID: <CAC3K-4rTMy4n0u1Lo5KQKMtGAeH1uE1St3D71YwPVYCJs4+U6g@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Thu, 09 Jun 2016 20:04:20 +0200
+Subject: [PATCH v2 00/13] regulator: pwm: various improvements
+In-Reply-To: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <2819222.JTKrccvLNL@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 9, 2016 at 5:09 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->
-> On 08/06/16 20:31, Jon Mason wrote:
->>
->> On Wed, Jun 08, 2016 at 09:34:06AM +0100, Sudeep Holla wrote:
->>>
->>>
->>>
->>> On 07/06/16 22:08, Jon Mason wrote:
->>>>
->>>> Query the CPU core clock in the device tree to determine the core clock
->>>> speed.
->>>
->>>
->>> How do guarantee that it's the current frequency of the CPU ?
->>
->>
->> I am basing it on the assumption (perhaps incorrect) that the clock in
->> the CPU DT corresponds to the one determining the CPU clock rate.  And,
->> that this clock rate is accurate in describing the speed at which the
->> CPU is currently running.
->>
->
-> As you already noticed, it's not always correct.
->
-> [..]
->
->>>
->>> What if they just don't have in DT but have DVFS support ?
->>
->>
->> This can be extended to cover DVFS or SMC calls or anything else.
->> This was simply a first step to cover what appeared to be the most
->> prevalent case.
->>
->
-> Using DVFS/CPUFreq makes this DT based approach irrelevant.
->
->>> Also whey do we need this support when the user-space can query the
->>> CPUFreq sysfs which is more accurate and maintains the current running
->>> frequency ?
->>
->>
->> This is exactly what x86 is doing to provide its value in
->> /proc/cpuinfo.  I could easily augment this patch to call
->> cpufreq_quick_get(), if it returns 0, then call clk_get_rate().  If
->> both return 0, then simply not print out anything (which would cover
->> all of the possibilities).  Or, I could have it just call
->> cpufreq_quick_get() to get the value.
->>
->
-> Agree x86 has, may be for legacy reasons. It even has CPUFreq sysfs
-> entries which is architecture agnostic while /proc/cpuinfo is more
-> architecture based. So applications that want to be portable across
-> architectures must choose the generic CPUFreq sysfs path rather than
-> some x86 based cpuinfo.
+Hi Boris,
 
-Thank you for educating me.  I am taking this (and RMK's comment) as
-any modification to add CPU speed to /proc/cpuinfo is not welcomed,
-anyone who wants to query this should instead look at cpufreq in
-sysfs, and any dev who wants to add such a thing should look into
-writing a driver in drivers/cpufreq/.
+Am Mittwoch, 8. Juni 2016, 18:34:35 schrieb Boris Brezillon:
+> This patch series series aims at adding two important features to the
+> pwm-regulator driver.
+> 
+> The first one is the support for 'smooth handover' between the
+> bootloader and the kernel. This is mainly solving problems we have when
+> the PWM is controlling a critical regulator (like the one powering the
+> DDR chip). Currently, when the PWM regulator acquire the PWM device it
+> assumes it was off and it's safe to change the configuration before
+> enabling it, which can generate glitches on the PWM signal which in turn
+> generated glitches on the output voltage.
+> To solve that we've introduced support for hardware readout to the
+> PWM framework, so that the PWM regulator driver can adjust the PWM
+> a probe time and avoid glitches.
+> Atomic update is also helping in this regard.
 
-Thanks,
-Jon
+[...]
 
->
-> --
-> Regards,
-> Sudeep
+> The second feature we add to the driver is the capability of using
+> a sub duty_cycle range in continuous mode. By default the regulator
+> is assuming that min_uV is achieved with a 0% dutycyle and max_uV
+> with a 100% dutycycle, but this is not necessarily true.
+> Moreover, in some cases (when the PWM device does not support
+> polarity inversion), we might have min_uV at 100% and max_uV at 0%.
+> Hence the addition of new properties to the existing DT bindings.
+> The feature is added in patch 12 and 13.
+
+I've tested this series on a rk3288-veyron chromebook and both the backlight-
+pwm as well as the pwm-regulator still work as expected, so for everything 
+except the STI parts:
+
+Tested-by: Heiko Stuebner <heiko@sntech.de>
