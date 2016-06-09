@@ -1,144 +1,67 @@
-From: bhuvanchandra.dv@toradex.com (Bhuvanchandra DV)
-Date: Thu, 9 Jun 2016 20:40:39 +0530
-Subject: [PATCH 8/8] tty: serial: fsl_lpuart: Add support for RS-485
-In-Reply-To: <20160609151039.20817-1-bhuvanchandra.dv@toradex.com>
-References: <20160609151039.20817-1-bhuvanchandra.dv@toradex.com>
-Message-ID: <20160609151039.20817-9-bhuvanchandra.dv@toradex.com>
+From: dinguyen@opensource.altera.com (Dinh Nguyen)
+Date: Thu, 9 Jun 2016 10:05:38 -0500
+Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer interrupt
+ trigger
+In-Reply-To: <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
+References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+ <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <575985C2.4050109@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Vybrid's build-in support for RS-485 auto RTS for controlling
-line direction of RS-485 transceiver driver.
+On 06/06/2016 12:56 PM, Marc Zyngier wrote:
+> The ARM architected timer specification mandates that the interrupt
+> associated with each timer is level triggered (which corresponds to
+> the "counter >= comparator" condition).
+> 
+> A number of DTs are being remarkably creative, declaring the interrupt
+> to be edge triggered. A quick look at the TRM for the corresponding ARM
+> CPUs clearly shows that this is wrong, and I've corrected those.
+> For non-ARM designs (and in the absence of a publicly available TRM),
+> I've made them active low as well, which can't be completely wrong
+> as the GIC cannot disinguish between level low and level high.
+> 
+> The respective maintainers are of course welcome to prove me wrong.
+> 
+> While I was at it, I took the liberty to fix a couple of related issue,
+> such as some spurious affinity bits on ThunderX, and their complete
+> absence on ls1043a (both of which seem to be related to copy-pasting
+> from other DTs).
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
+>  arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
+>  arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
+>  arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
+>  arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
+>  arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
+>  arch/arm64/boot/dts/xilinx/zynqmp.dtsi               | 8 ++++----
+>  10 files changed, 40 insertions(+), 40 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> index 445aa67..c2b9bcb 100644
+> --- a/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> +++ b/arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi
+> @@ -255,10 +255,10 @@
+>  		/* Local timer */
+>  		timer {
+>  			compatible = "arm,armv8-timer";
+> -			interrupts = <1 13 0xf01>,
+> -				     <1 14 0xf01>,
+> -				     <1 11 0xf01>,
+> -				     <1 10 0xf01>;
+> +			interrupts = <1 13 0xf08>,
+> +				     <1 14 0xf08>,
+> +				     <1 11 0xf08>,
+> +				     <1 10 0xf08>;
 
-Enable RS485 feature by either using ioctrl 'TIOCSRS485' or enable it in
-the device tree by setting 'linux,rs485-enabled-at-boot-time' property.
+For SOCFPGA:
 
-Signed-off-by: Bhuvanchandra DV <bhuvanchandra.dv@toradex.com>
----
- drivers/tty/serial/fsl_lpuart.c | 78 +++++++++++++++++++++++++++++++++++++----
- 1 file changed, 72 insertions(+), 6 deletions(-)
+Acked-by: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-diff --git a/drivers/tty/serial/fsl_lpuart.c b/drivers/tty/serial/fsl_lpuart.c
-index 134090a..4d1fca4 100644
---- a/drivers/tty/serial/fsl_lpuart.c
-+++ b/drivers/tty/serial/fsl_lpuart.c
-@@ -917,6 +917,52 @@ static void lpuart_dma_rx_free(struct uart_port *port)
- 	sport->dma_rx_cookie = -EINVAL;
- }
- 
-+static int lpuart_config_rs485(struct uart_port *port,
-+			struct serial_rs485 *rs485)
-+{
-+	struct lpuart_port *sport = container_of(port,
-+			struct lpuart_port, port);
-+
-+	u8 modem = readb(sport->port.membase + UARTMODEM) &
-+		~(UARTMODEM_TXRTSPOL | UARTMODEM_TXRTSE);
-+	writeb(modem, sport->port.membase + UARTMODEM);
-+
-+	if (rs485->flags & SER_RS485_ENABLED) {
-+		/* Enable auto RS-485 RTS mode */
-+		modem |= UARTMODEM_TXRTSE;
-+
-+		/*
-+		 * RTS needs to be logic HIGH either during transer _or_ after
-+		 * transfer, other variants are not supported by the hardware.
-+		 */
-+
-+		if (!(rs485->flags & (SER_RS485_RTS_ON_SEND |
-+				SER_RS485_RTS_AFTER_SEND)))
-+			rs485->flags |= SER_RS485_RTS_ON_SEND;
-+
-+		if (rs485->flags & SER_RS485_RTS_ON_SEND &&
-+				rs485->flags & SER_RS485_RTS_AFTER_SEND)
-+			rs485->flags &= ~SER_RS485_RTS_AFTER_SEND;
-+
-+		/*
-+		 * The hardware defaults to RTS logic HIGH while transfer.
-+		 * Switch polarity in case RTS shall be logic HIGH
-+		 * after transfer.
-+		 * Note: UART is assumed to be active high.
-+		 */
-+		if (rs485->flags & SER_RS485_RTS_ON_SEND)
-+			modem &= ~UARTMODEM_TXRTSPOL;
-+		else if (rs485->flags & SER_RS485_RTS_AFTER_SEND)
-+			modem |= UARTMODEM_TXRTSPOL;
-+	}
-+
-+	/* Store the new configuration */
-+	sport->port.rs485 = *rs485;
-+
-+	writeb(modem, sport->port.membase + UARTMODEM);
-+	return 0;
-+}
-+
- static unsigned int lpuart_get_mctrl(struct uart_port *port)
- {
- 	unsigned int temp = 0;
-@@ -950,17 +996,22 @@ static unsigned int lpuart32_get_mctrl(struct uart_port *port)
- static void lpuart_set_mctrl(struct uart_port *port, unsigned int mctrl)
- {
- 	unsigned char temp;
-+	struct lpuart_port *sport = container_of(port,
-+				struct lpuart_port, port);
- 
--	temp = readb(port->membase + UARTMODEM) &
-+	/* Make sure RXRTSE bit is not set when RS485 is enabled */
-+	if (!(sport->port.rs485.flags & SER_RS485_ENABLED)) {
-+		temp = readb(sport->port.membase + UARTMODEM) &
- 			~(UARTMODEM_RXRTSE | UARTMODEM_TXCTSE);
- 
--	if (mctrl & TIOCM_RTS)
--		temp |= UARTMODEM_RXRTSE;
-+		if (mctrl & TIOCM_RTS)
-+			temp |= UARTMODEM_RXRTSE;
- 
--	if (mctrl & TIOCM_CTS)
--		temp |= UARTMODEM_TXCTSE;
-+		if (mctrl & TIOCM_CTS)
-+			temp |= UARTMODEM_TXCTSE;
- 
--	writeb(temp, port->membase + UARTMODEM);
-+		writeb(temp, port->membase + UARTMODEM);
-+	}
- }
- 
- static void lpuart32_set_mctrl(struct uart_port *port, unsigned int mctrl)
-@@ -1256,6 +1307,13 @@ lpuart_set_termios(struct uart_port *port, struct ktermios *termios,
- 		cr1 |= UARTCR1_M;
- 	}
- 
-+	/*
-+	 * When auto RS-485 RTS mode is enabled,
-+	 * hardware flow control need to be disabled.
-+	 */
-+	if (sport->port.rs485.flags & SER_RS485_ENABLED)
-+		termios->c_cflag &= ~CRTSCTS;
-+
- 	if (termios->c_cflag & CRTSCTS) {
- 		modem |= (UARTMODEM_RXRTSE | UARTMODEM_TXCTSE);
- 	} else {
-@@ -1864,6 +1922,8 @@ static int lpuart_probe(struct platform_device *pdev)
- 		sport->port.ops = &lpuart_pops;
- 	sport->port.flags = UPF_BOOT_AUTOCONF;
- 
-+	sport->port.rs485_config = lpuart_config_rs485;
-+
- 	sport->clk = devm_clk_get(&pdev->dev, "ipg");
- 	if (IS_ERR(sport->clk)) {
- 		ret = PTR_ERR(sport->clk);
-@@ -1904,6 +1964,12 @@ static int lpuart_probe(struct platform_device *pdev)
- 		dev_info(sport->port.dev, "DMA rx channel request failed, "
- 				"operating without rx DMA\n");
- 
-+	if (of_property_read_bool(np, "linux,rs485-enabled-at-boot-time")) {
-+		sport->port.rs485.flags |= SER_RS485_ENABLED;
-+		sport->port.rs485.flags |= SER_RS485_RTS_ON_SEND;
-+		writeb(UARTMODEM_TXRTSE, sport->port.membase + UARTMODEM);
-+	}
-+
- 	return 0;
- }
- 
--- 
-2.8.3
+Thanks,
+Dinh
