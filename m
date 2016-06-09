@@ -1,38 +1,76 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 09 Jun 2016 15:51:48 +0100
-Subject: [PATCH v17 02/13] arm64: Add cpus_are_stuck_in_kernel
-In-Reply-To: <d4f8c7961adc4b0afe733306fbc21e5bb7c8f6ee.1464974516.git.geoff@infradead.org>
-References: <cover.1464974516.git.geoff@infradead.org>
- <d4f8c7961adc4b0afe733306fbc21e5bb7c8f6ee.1464974516.git.geoff@infradead.org>
-Message-ID: <57598284.3090108@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 09 Jun 2016 16:54:54 +0200
+Subject: [PATCH 09/12] mmc: sdhci-xenon: add initial Xenon eMMC driver
+In-Reply-To: <201606092223.3kHMu0m3%fengguang.wu@intel.com> (kbuild test
+ robot's message of "Thu, 9 Jun 2016 22:20:45 +0800")
+References: <201606092223.3kHMu0m3%fengguang.wu@intel.com>
+Message-ID: <87r3c6mmyp.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Geoff,
+Hi,
 
-On 03/06/16 19:13, Geoff Levand wrote:
-> From: James Morse <james.morse@arm.com>
-> 
-> kernel/smp.c has a fancy counter that keeps track of the number of CPUs
-> it marked as not-present and left in cpu_park_loop(). If there are any
-> CPUs spinning in here, kexec will release them once the memory is re-used
-> by the new kernel.
-> 
-> We can't return an error once we reach machine_kexec(), so as a sanity check
-> we forbid kexec images to be loaded if there are already cpus stuck in the
-> kernel, or we have multiple cpus and no way of disabling them.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> [Split off from a larger patch]
-> Signed-off-by: Geoff Levand <geoff@infradead.org>
+I added Arnd because he seems to have a good knoweldge of the Kconfig
+stuff.
 
-Post-split, the second paragraph of the commit message is out of place, and
-doesn't describe what the patch does. Can I suggest replacing it with:
+ On jeu., juin 09 2016, kbuild test robot <lkp@intel.com> wrote:
 
-> Provide a function to expose whether this counter is non-zero, so we can use >
-this when loading a new kexec image, and when calling machine_kexec().
+> Hi,
+>
+> [auto build test ERROR on ulf.hansson-mmc/next]
+> [also build test ERROR on v4.7-rc2 next-20160609]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+>
+> url:    https://github.com/0day-ci/linux/commits/Gregory-CLEMENT/Add-SDHCI-Xenon-driver/20160609-151403
+> base:   https://git.linaro.org/people/ulf.hansson/mmc next
+> config: x86_64-allmodconfig (attached as .config)
+> compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+> reproduce:
+>         # save the attached .config to linux build tree
+>         make ARCH=x86_64 
+>
+> All errors (new ones prefixed by >>):
+>
+>    drivers/built-in.o: In function `sdhci_xenon_remove':
+>>> sdhci-xenon.c:(.text+0x311234): undefined reference to `sdhci_remove_host'
+>>> sdhci-xenon.c:(.text+0x31123c): undefined reference to `sdhci_pltfm_free'
+>    drivers/built-in.o: In function `sdhci_xenon_delay_adj_test':
+>>> sdhci-xenon.c:(.text+0x31213b): undefined reference to `card_alive'
+>    drivers/built-in.o: In function `sdhci_xenon_set_uhs_signaling':
+>>> sdhci-xenon.c:(.text+0x312456): undefined reference to `sdhci_set_uhs_signaling'
+>    drivers/built-in.o: In function `sdhci_xenon_probe':
+>>> sdhci-xenon.c:(.text+0x31258c): undefined reference to `sdhci_pltfm_init'
+>>> sdhci-xenon.c:(.text+0x3125d3): undefined reference to `mmc_of_parse'
+>>> sdhci-xenon.c:(.text+0x312651): undefined reference to `sdhci_get_of_property'
+>>> sdhci-xenon.c:(.text+0x312840): undefined reference to `sdhci_add_host'
+>    sdhci-xenon.c:(.text+0x312904): undefined reference to `sdhci_pltfm_free'
+>    drivers/built-in.o: In function `sdhci_xenon_reset':
+>>> sdhci-xenon.c:(.text+0x313c11): undefined reference to `sdhci_reset'
+>>> drivers/built-in.o:(.data+0x1d7df0): undefined reference to `sdhci_pltfm_pmops'
+>>> drivers/built-in.o:(.data+0x1d7eb0): undefined reference to `sdhci_set_clock'
+>>> drivers/built-in.o:(.data+0x1d7ef0): undefined reference to `sdhci_set_bus_width'
 
+These symbols are part of the drivers/mmc/host/sdhci.c which is build
+when CONFIG_MMC_SDHCI is enabled. However CONFIG_MMC_XENON_SDHCI depends
+on CONFIG_MMC_SDHCI_PLTFM which depends on CONFIG_MMC_SDHCI.
+
+So I wonder how we can have a sition with sdhci-xenon.c built but not
+sdhci.c.
+
+Any idea?
 
 Thanks,
 
-James
+Gregory
+
+>
+> ---
+> 0-DAY kernel test infrastructure                Open Source Technology Center
+> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+>
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
