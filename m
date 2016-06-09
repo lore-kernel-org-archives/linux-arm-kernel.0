@@ -1,49 +1,29 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu,  9 Jun 2016 11:30:12 +0100
-Subject: [PATCH] irqchip/vic: make vic_syscore_ops and vic_of_init static
-Message-ID: <1465468212-2937-1-git-send-email-ben.dooks@codethink.co.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 Jun 2016 11:32:03 +0100
+Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
+ typical Keystone features
+In-Reply-To: <20160609065035.GJ22406@atomide.com>
+References: <1464816714-3900-1-git-send-email-nm@ti.com>
+ <10295246.2MDnqWQbb8@wuerfel> <20160608094747.GG22406@atomide.com>
+ <8052110.nPS5mbu3uO@wuerfel> <20160609065035.GJ22406@atomide.com>
+Message-ID: <20160609103203.GT7510@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The vic_syscore_ops and vic_of_init functions are not exported
-outside the driver, so make them static to remove the following
-warnings:
+On Wed, Jun 08, 2016 at 11:50:35PM -0700, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [160608 09:06]:
 
-drivers/irqchip/irq-vic.c:170:20: warning: symbol 'vic_syscore_ops' was not declared. Should it be static?
-drivers/irqchip/irq-vic.c:520:12: warning: symbol 'vic_of_init' was not declared. Should it be static?
+> > The downside would be any users that want the options we enable there
+> > turned off and have them silently enabled when upgrading the kernel.
 
-Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
----
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
----
- drivers/irqchip/irq-vic.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> I think the long term solution here might be to generate the .config
+> out of dts files..
 
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index b956dff..f811a7d 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -167,7 +167,7 @@ static int vic_suspend(void)
- 	return 0;
- }
- 
--struct syscore_ops vic_syscore_ops = {
-+static struct syscore_ops vic_syscore_ops = {
- 	.suspend	= vic_suspend,
- 	.resume		= vic_resume,
- };
-@@ -517,7 +517,8 @@ int __init vic_init_cascaded(void __iomem *base, unsigned int parent_irq,
- EXPORT_SYMBOL_GPL(vic_init_cascaded);
- 
- #ifdef CONFIG_OF
--int __init vic_of_init(struct device_node *node, struct device_node *parent)
-+static int __init vic_of_init(struct device_node *node,
-+			      struct device_node *parent)
- {
- 	void __iomem *regs;
- 	u32 interrupt_mask = ~0;
--- 
-2.8.1
+That would be cool!
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/df61448c/attachment.sig>
