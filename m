@@ -1,48 +1,47 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Jun 2016 11:44:27 +0200
-Subject: [RFC v4 10/14] usb: hub: Handle deferred probe
+Date: Thu, 09 Jun 2016 11:44:31 +0200
+Subject: [RFC v4 14/14] ARM: dts: exynos: Fix LAN and HUB after bootloader
+ initialization on Odroid U3
 In-Reply-To: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
 References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465465471-28740-11-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465465471-28740-15-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for deferred probing to the usb hub.  Currently EPROBE_DEFER
-does not exist in usb hub path but future patches will add it on the
-port level.
+On Odroid U3 (Exynos4412-based) board if USB was initialized by
+bootloader (in U-Boot "usb start" before tftpboot), the HUB (usb3503)
+and LAN (smsc95xx) after after successful probing were not visible in the
+system ("lsusb").
+
+In such case the devices had to be fully reset before configuring.
+Reset by GPIO (called RESET_N pin) and by RESET field in STCD register
+in usb3503 HUB are not sufficient. Instead full reset has to be done by
+disabling and enabling regulator.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- drivers/usb/core/hub.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/exynos4412-odroidu3.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
-index bee13517676f..c421745b84aa 100644
---- a/drivers/usb/core/hub.c
-+++ b/drivers/usb/core/hub.c
-@@ -1733,6 +1733,7 @@ static int hub_probe(struct usb_interface *intf, const struct usb_device_id *id)
- 	struct usb_endpoint_descriptor *endpoint;
- 	struct usb_device *hdev;
- 	struct usb_hub *hub;
-+	int ret;
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+index 31cdc036fda4..8fd50061d91b 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+@@ -99,11 +99,15 @@
+ 	clock-names = "refclk";
+ 	clocks = <&pmu_system_controller 0>;
+ 	refclk-frequency = <24000000>;
++
++	power-sequence;
++	vdd-supply = <&buck8_reg>;
+ };
  
- 	desc = intf->cur_altsetting;
- 	hdev = interface_to_usbdev(intf);
-@@ -1852,11 +1853,12 @@ descriptor_error:
- 	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
- 		hub->quirk_check_port_auto_suspend = 1;
- 
--	if (hub_configure(hub, endpoint) >= 0)
-+	ret = hub_configure(hub, endpoint);
-+	if (ret >= 0)
- 		return 0;
- 
- 	hub_disconnect(intf);
--	return -ENODEV;
-+	return ret;
- }
- 
- static int
+ &ehci {
+ 	port at 1 {
+ 		status = "okay";
++		usb-pwrseq = <&usb3503>;
+ 	};
+ 	port at 2 {
+ 		status = "okay";
 -- 
 1.9.1
