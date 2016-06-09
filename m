@@ -1,50 +1,95 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Thu, 9 Jun 2016 09:25:38 +0100
-Subject: [PATCH] pinctrl: sh-pfc: fix warnings by include core.h
-In-Reply-To: <CAMuHMdU6AmOi1+gDMkqKpQ2+QGrv=FtGpx21a951Vr3+F=C5UA@mail.gmail.com>
-References: <1465320786-10333-1-git-send-email-ben.dooks@codethink.co.uk>
- <CACRpkdaq8jzBT8o8RVnnA6xQ1YVqFoYf+wgmrWciJx0qbDLs=g@mail.gmail.com>
- <CAMuHMdU6AmOi1+gDMkqKpQ2+QGrv=FtGpx21a951Vr3+F=C5UA@mail.gmail.com>
-Message-ID: <bc71a41f-46bd-8c94-c761-0d90b503d52b@codethink.co.uk>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Thu, 09 Jun 2016 17:35:12 +0900
+Subject: [RFC v4 0/7] extcon: usb-gpio: fixes and improvements
+In-Reply-To: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
+References: <CGME20160608134820epcas1p4ee75a89888f2ae2adb733124a330bd2c@epcas1p4.samsung.com>
+ <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <57592A40.9080608@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/16 09:08, Geert Uytterhoeven wrote:
-> Hi Linus, Ben,
-> 
-> On Wed, Jun 8, 2016 at 2:08 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Tue, Jun 7, 2016 at 7:33 PM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
->>
->>> Fix warnings about emev2_pinmux_info and r8a7779_pinmux_info
->>> by using core.h instead of sh_pfc.h in these files. This gives
->>> the declarations of the two structures and removes the following
->>> warnings:
->>>
->>> drivers/pinctrl/sh-pfc/pfc-emev2.c:1695:30: warning: symbol 'emev2_pinmux_info' was not declared. Should it be static?
->>> drivers/pinctrl/sh-pfc/pfc-r8a7779.c:3888:30: warning: symbol 'r8a7779_pinmux_info' was not declared. Should it be static?
->>>
->>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> 
-> Ben: Thanks for your patch!
-> 
->>
->> Geert/Laurent:
->>
->> - take a look at this patch
-> 
-> These are fixes for sparse warnings, and look fine to me.
-> However, it seems "core.h" should be included by all the remaining
-> drivers/pinctrl/sh-pfc/pfc-sh* files for ARCH=sh, too.
-> At which point I start to question: why not merge core.h with sh_pfc.h?
-> 
->> - shall I apply this directly?
-> 
-> i could take it through sh-pfc-for-v4.8.
-> I expect more pfc stuff to follow soon anyway.
+Hi,
 
-Up to you what you want to do, thought these items should be fixed.
+It is good to support USB_ID and USB_VBUS by extcon.
+
+But,
+there is some issue about adding the new cable type for
+both EXTCON_USB_ID and EXTCON_USB_VBUS
+
+I think that the ID and VBUS state are not cable type
+Instead, ID and VBUS state are the property of USB cable.
+
+So, I'd like to add the following function to support
+the property of each cable as following:
+The client driver can get the state of property by using
+the extcon_get_cable_property_state().
+
+- int extcon_get_cable_property_state(struct extcon_dev *edev,
+				unsigned int id,
+				enum extcon_property property);
+- int extcon_set_cable_property_state(struct extcon_dev *edev,
+				unsigned int id,
+				enum extcon_property property,
+				unsigned int state);
+
+For example,
+In extcon-usb-gpio.c, set state of property as follwoing:
+	extcon_set_cable_property_state(edev, EXTCON_USB, EXTCON_USB_PROP_ID, 1);
+	extcon_set_cable_property_state(edev, EXTCON_USB, EXTCON_USB_PROP_VBUS, 1);
 
 
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+In the extcon client driver, get state of property as following:
+	id_state = extcon_get_cable_property_state(edev, EXTCON_USB, EXTCON_USB_PROP_ID);
+	vbus_state = extcon_get_cable_property_state(edev, EXTCON_USB, EXTCON_USB_PROP_VUBS);
+
+Regards,
+Chanwoo Choi
+
+
+On 2016? 06? 08? 22:47, Krzysztof Kozlowski wrote:
+> Hi,
+> 
+> 
+> Some time ago, Robert tried to add VBUS detection to extcon-usb-gpio
+> driver [1].  There was a discussion about patch #2 ("extcon: usb-gpio:
+> add support for VBUS detection").
+> 
+> The final conclusion was that Chanwoo will add VBUS/ID notifiers [2].
+> That unfortunately never happened so this patchset is a follow up.
+> 
+> 1. Add VBUS/ID cable state notifiers to extcon, so USB controllers
+>    could use it.
+> 2. Add VBUS detection to extcon-usb-gpio driver.
+> 
+> Some parts are based on old Robert's work, some are new, some are
+> reworked.
+> 
+> 
+> Best regards,
+> Krzysztof
+> 
+> 
+> [1] http://thread.gmane.org/gmane.linux.kernel/1923192/focus=1923193
+> [2] http://thread.gmane.org/gmane.linux.kernel/1923192/focus=1941152
+> 
+> 
+> Krzysztof Kozlowski (5):
+>   Revert "extcon: usb-gpio: switch to use pm wakeirq apis"
+>   extcon: Add raw VBUS and ID cable states
+>   extcon: usb-gpio: Add support for VBUS detection
+>   ARM: exynos_defconfig: Enable EXTCON_USB_GPIO for Odroid XU3 USB OTG
+>   ARM: dts: exynos: Add extcon-usb-gpio node for Odroid XU3
+> 
+> Robert Baldyga (2):
+>   Documentation: extcon: usb-gpio: update usb-gpio binding description
+>   extcon: usb-gpio: make debounce value configurable in devicetree
+> 
+>  .../devicetree/bindings/extcon/extcon-usb-gpio.txt |  28 ++++-
+>  arch/arm/boot/dts/exynos5422-odroidxu3-lite.dts    |  21 ++++
+>  arch/arm/boot/dts/exynos5422-odroidxu3.dts         |  21 ++++
+>  arch/arm/configs/exynos_defconfig                  |   1 +
+>  drivers/extcon/extcon-usb-gpio.c                   | 138 +++++++++++++++++----
+>  drivers/extcon/extcon.c                            |   3 +
+>  include/linux/extcon.h                             |   8 +-
+>  7 files changed, 190 insertions(+), 30 deletions(-)
+> 
