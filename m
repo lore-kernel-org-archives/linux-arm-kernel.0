@@ -1,41 +1,35 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 9 Jun 2016 22:46:55 +0200
-Subject: [PATCH V3 1/2] i2c: qup: Fix broken dma when CONFIG_DEBUG_SG is
- enabled
-In-Reply-To: <002201d1b79a$22862bc0$67928340$@codeaurora.org>
-References: <1464164212-11377-1-git-send-email-sricharan@codeaurora.org>
- <1464164212-11377-2-git-send-email-sricharan@codeaurora.org>
- <20160526184805.GC1614@katana>
- <002201d1b79a$22862bc0$67928340$@codeaurora.org>
-Message-ID: <20160609204655.GN23522@katana>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu,  9 Jun 2016 14:01:50 -0700
+Subject: [PATCH 00/14] run seccomp after ptrace
+Message-ID: <1465506124-21866-1-git-send-email-keescook@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+There has been a long-standing (and documented) issue with seccomp
+where ptrace can be used to change a syscall out from under seccomp.
+This is a problem for containers and other wider seccomp filtered
+environments where ptrace needs to remain available, as it allows
+for an escape of the seccomp filter.
 
->  The coherency is not dropped here. dma_map/unmap used
->  makes the buffer coherent before passing it to
->  dmaengine. Previously it was not required.
->  I can add this in description if its not clear.
+Since the ptrace attack surface is available for any allowed syscall,
+moving seccomp after ptrace doesn't increase the actually available
+attack surface. And this actually improves tracing since, for
+example, tracers will be notified of syscall entry before seccomp
+sends a SIGSYS, which makes debugging filters much easier.
 
-Please do.
+The per-architecture changes do make one (hopefully small)
+semantic change, which is that since ptrace comes first, it may
+request a syscall be skipped. Running seccomp after this doesn't
+make sense, so if ptrace wants to skip a syscall, it will bail
+out early similarly to how seccomp was. This means that skipped
+syscalls will not be fed through audit, though that likely means
+we're actually avoiding noise this way.
 
-> 
->  >> @@ -1268,6 +1260,8 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
-> >>  		}
-> >>  	}
-> >>
-> >> +	idx = 0;
-> >> +
-> >
-> >This looks like an unrelated change.
->     Ha, wrong. This should have been in a separate patch.
+This series first cleans up seccomp to remove the now unneeded
+two-phase entry, fixes the SECCOMP_RET_TRACE hole (same as the
+ptrace hole above), and then reorders seccomp after ptrace on
+each architecture.
 
-Exactly this is what I meant with "unrelated" :)
+Thanks,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/e8532ae9/attachment.sig>
+-Kees
