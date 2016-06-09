@@ -1,69 +1,42 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 10 Jun 2016 00:50:54 +0300
-Subject: [PATCH v4 12/12] ARM: dts: blanche: add Ethernet support
-In-Reply-To: <1879394.3zBGLpF2nv@wasted.cogentembedded.com>
-References: <1879394.3zBGLpF2nv@wasted.cogentembedded.com>
-Message-ID: <9979573.zFvjXQmUIO@wasted.cogentembedded.com>
+From: stefan@agner.ch (Stefan Agner)
+Date: Thu, 09 Jun 2016 15:14:30 -0700
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <alpine.DEB.2.11.1606092204590.28031@nanos>
+References: <20160426012341.GB8870@tiger>
+ <CAA+hA=QTNEAaMfjJoMMO5gPR8VPYBWYx=HZgjngUFJK4LxMp=g@mail.gmail.com>
+ <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+ <20160427015835.GE30692@tiger>
+ <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+ <alpine.DEB.2.11.1604271212290.3941@nanos> <20160602145915.GA31124@shlinux2>
+ <alpine.DEB.2.11.1606061448010.28031@nanos>
+ <20160607070440.GA32573@shlinux2>
+ <alpine.DEB.2.11.1606092204590.28031@nanos>
+Message-ID: <1162370a4389413d2d4ff0eb79ff13ac@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-R8A7792  SoC  doesn't have the EtherMAC core, so SMSC  LAN89218  Ethernet
-chip was used instead on the Blanche board; this chip  is compatible with
-SMSC LAN9115  for  which there's a (device tree aware) driver. Describe
-the  chip in  the  Blanche device tree;  enable DHCP and NFS root in the
-kernel command line for the kernel booting.
+On 2016-06-09 13:08, Thomas Gleixner wrote:
+> On Tue, 7 Jun 2016, Dong Aisheng wrote:
+>> Then it may need introduce a lot changes and increase many new core APIs.
+>> Is that a problem?
+> 
+> No. That's all better than each driver having broken workarounds. It's a
+> common problem so it wants to be addressed at the core level. There you have a
+> central point to do this and you can still catch abusers which call stuff from
+> the wrong context. The hacks in the drivers don't allow that because they look
+> at the context, i.e. irq disabled, instead of checking the system state.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
+IMHO, the hacky part of my patch was how I detected whether to use sleep
+or delay. That said I am ok with API extension too, I guess it is fairly
+common use case... I found at least 6 clock prepare functions with sleep
+in it (and some udelays, all between 1-100).
 
----
-Changes in version 3:
-- refreshed the patch.
+Your proposed solution uses "early_boot_or_suspend_resume" which I did
+not found as a convenient function in the wild :-)
 
-Changes in version 2:
-- added Simon's ACK.
+How would you implement that?
 
- arch/arm/boot/dts/r8a7792-blanche.dts |   23 ++++++++++++++++++++++-
- 1 file changed, 22 insertions(+), 1 deletion(-)
-
-Index: renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-===================================================================
---- renesas.orig/arch/arm/boot/dts/r8a7792-blanche.dts
-+++ renesas/arch/arm/boot/dts/r8a7792-blanche.dts
-@@ -22,7 +22,7 @@
- 	};
- 
- 	chosen {
--		bootargs = "ignore_loglevel";
-+		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-@@ -30,6 +30,27 @@
- 		device_type = "memory";
- 		reg = <0 0x40000000 0 0x40000000>;
- 	};
-+
-+	d3_3v: regulator-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "D3.3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-boot-on;
-+		regulator-always-on;
-+	};
-+
-+	ethernet at 18000000 {
-+		compatible = "smsc,lan89218", "smsc,lan9115";
-+		reg = <0 0x18000000 0 0x100>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&irqc>;
-+		interrupts = <0 IRQ_TYPE_EDGE_FALLING>;
-+		smsc,irq-push-pull;
-+		reg-io-width = <4>;
-+		vddvario-supply = <&d3_3v>;
-+		vdd33a-supply = <&d3_3v>;
-+	};
- };
- 
- &extal_clk {
+--
+Stefan
