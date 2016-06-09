@@ -1,43 +1,52 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Jun 2016 09:10:10 +0200
-Subject: [PATCH 04/12] mmc: sdhci: call voltage_switch callback also for the
- 3.3V case
+Date: Thu,  9 Jun 2016 09:10:13 +0200
+Subject: [PATCH 07/12] mmc: core: export the alive operation
 In-Reply-To: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1465456218-28354-5-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1465456218-28354-8-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Victor Gu <xigu@marvell.com>
+Depending of the type of card there is a different operation to know
+if the  car is alive. However, the access to this operation are private.
+This patch introduce a new function allowing to know if the card is alive
+by using the appropriate operation.
 
-Currently the voltage switch callback function is only called in the 1.8V
-case. However, given the name this callback should be called in the 3.3V
-case too. It is needed for the Xenon controller.
-
-[gregory.clement at free-electrons.com: split the initial commit and
-modify the log]
-
-Signed-off-by: Victor Gu <xigu@marvell.com>
-Signed-off-by: Marcin Wojtas <mw@semihalf.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/mmc/host/sdhci.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/mmc/core/core.c  | 7 +++++++
+ include/linux/mmc/card.h | 1 +
+ 2 files changed, 8 insertions(+)
 
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index fd4e9a84f739..b07219426d39 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -1749,6 +1749,10 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
- 		/* Wait for 5ms */
- 		usleep_range(5000, 5500);
+diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+index 8b4dfd45433b..3dce095c5f89 100644
+--- a/drivers/mmc/core/core.c
++++ b/drivers/mmc/core/core.c
+@@ -2464,6 +2464,13 @@ int mmc_hw_reset(struct mmc_host *host)
+ }
+ EXPORT_SYMBOL(mmc_hw_reset);
  
-+		/* Some controller need to do more when switching */
-+		if (host->ops->voltage_switch)
-+			host->ops->voltage_switch(host);
 +
- 		/* 3.3V regulator output should be stable within 5 ms */
- 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
- 		if (!(ctrl & SDHCI_CTRL_VDD_180))
++int card_alive(struct mmc_card *card)
++{
++	return card->host->bus_ops->alive(card->host);
++}
++EXPORT_SYMBOL(card_alive);
++
+ static int mmc_rescan_try_freq(struct mmc_host *host, unsigned freq)
+ {
+ 	host->f_init = freq;
+diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+index eb0151bac50c..287a0b12d8ba 100644
+--- a/include/linux/mmc/card.h
++++ b/include/linux/mmc/card.h
+@@ -526,6 +526,7 @@ struct mmc_driver {
+ 	void (*shutdown)(struct mmc_card *);
+ };
+ 
++extern int card_alive(struct mmc_card *);
+ extern int mmc_register_driver(struct mmc_driver *);
+ extern void mmc_unregister_driver(struct mmc_driver *);
+ 
 -- 
 2.5.0
