@@ -1,20 +1,67 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 9 Jun 2016 15:48:44 +0900
-Subject: [PATCH 1/8] arm64: tegra: p2180: Add PMIC support
-In-Reply-To: <20160606163637.14234-1-thierry.reding@gmail.com>
-References: <20160606163637.14234-1-thierry.reding@gmail.com>
-Message-ID: <CAAVeFu+Z48cMDjDJG_NB4MhxqcA36HLuwuiaeLSK0aBF-9Emzg@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Jun 2016 23:50:35 -0700
+Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
+ typical Keystone features
+In-Reply-To: <8052110.nPS5mbu3uO@wuerfel>
+References: <1464816714-3900-1-git-send-email-nm@ti.com>
+ <10295246.2MDnqWQbb8@wuerfel> <20160608094747.GG22406@atomide.com>
+ <8052110.nPS5mbu3uO@wuerfel>
+Message-ID: <20160609065035.GJ22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2016 at 1:36 AM, Thierry Reding <thierry.reding@gmail.com> wrote:
-> From: Thierry Reding <treding@nvidia.com>
->
-> Signed-off-by: Thierry Reding <treding@nvidia.com>
+* Arnd Bergmann <arnd@arndb.de> [160608 09:06]:
+> On Wednesday, June 8, 2016 2:47:48 AM CEST Tony Lindgren wrote:
+> > 
+> > So we could have ARCH_MULTIPLATFORM_TYPICAL, then have the old
+> > ARCH_OMAP2PLUS_TYPICAL select that one. That should keep things
+> > behaving just fine if the old .config had ARCH_OMAP2PLUS_TYPICAL.
+> 
+> If we make ARCH_MULTIPLATFORM_TYPICAL 'default y', it will be always
+> enabled in this case, and I think we can drop ARCH_OMAP2PLUS_TYPICAL.
 
-The series,
+Having "default y" there seems safe enough for me.
 
-Tested-by: Alexandre Courbot <acourbot@nvidia.com>
+> The downside would be any users that want the options we enable there
+> turned off and have them silently enabled when upgrading the kernel.
 
-Been able to enable USB (input devices + and network boot) and display
-on -next thanks to this. Awesome!
+I think the long term solution here might be to generate the .config
+out of dts files..
+
+> > > For I2C_OMAP, MENELAUS and TWL4030, we could just add a
+> > > 'default ARCH_OMAP3 || ARCH_OMAP4' or whatever is appropriate for
+> > > each of them. I assume we want to handle TWL6040 the same way, though
+> > > we currently don't do that. MENELAUS seems to be only needed for
+> > > omap2420-n8x0.
+> > 
+> > We could yeah. TWL4030 is omap2430 to omap3, I don't think we currently
+> > have any omap3 based ones not using twl4030.. But there certainly
+> > are tons of usable devices with the Motorola CPCAP PMIC instead.
+> 
+> So should we enable both then?
+
+No CPCAP support currently in mainline kernel.. And with most of
+initcall level issues out of the way, any future support should
+not be added to the TYPICAL because of all the issues discussed.
+
+> > HIGHMEM too should be platform specific.
+> 
+> I still don't see a good way to handle that, we should certainly not
+> just 'select' it, because we often want to leave it disabled.
+
+Right. Leaving it out produces a bootable kernel though that could
+produce some warning if configured memory is > 768MB.
+
+> > The original reason for ARCH_OMAP2PLUS_TYPICAL was that if omap2plus
+> > is selected with that you actually get a bootable system.
+> 
+> I understand. It's just not very scalable to have every platform do
+> this, in particular if they want to select conflicting options (none
+> of the ones you select should conflict, but we'd get there eventually).
+
+Yeah. Seems like generating the base .confing out of the dts file
+is better in the long run.
+
+Regards,
+
+Tony
