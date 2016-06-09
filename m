@@ -1,29 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 9 Jun 2016 11:32:03 +0100
-Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
- typical Keystone features
-In-Reply-To: <20160609065035.GJ22406@atomide.com>
-References: <1464816714-3900-1-git-send-email-nm@ti.com>
- <10295246.2MDnqWQbb8@wuerfel> <20160608094747.GG22406@atomide.com>
- <8052110.nPS5mbu3uO@wuerfel> <20160609065035.GJ22406@atomide.com>
-Message-ID: <20160609103203.GT7510@sirena.org.uk>
+From: thommyj@gmail.com (Thommy Jakobsson)
+Date: Thu, 9 Jun 2016 12:42:18 +0200
+Subject: [PATCH 2/2] arm-smmu: Add possibillity to mask streamIDs
+In-Reply-To: <5757FD62.2010403@arm.com>
+References: <1464640806-3942-1-git-send-email-thommyj@gmail.com>
+ <1464640806-3942-3-git-send-email-thommyj@gmail.com>
+ <575570D9.6030700@arm.com>
+ <CAOTQ16KCKw3UiN+oFC8PH=1YYw7xfNhoJgM2ozTCf8RGYvEbpw@mail.gmail.com>
+ <5757FD62.2010403@arm.com>
+Message-ID: <CAOTQ16K=ZTajOKqQaAf4mfPNv0M=TmmNWV3hTD=iSMWsg+O+3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 11:50:35PM -0700, Tony Lindgren wrote:
-> * Arnd Bergmann <arnd@arndb.de> [160608 09:06]:
+On 8 June 2016 at 13:11, Robin Murphy <robin.murphy@arm.com> wrote:
 
-> > The downside would be any users that want the options we enable there
-> > turned off and have them silently enabled when upgrading the kernel.
+> Either way, I'm currently in the process of reworking the SMMUv2 generic
+> bindings series, having got the SMMUv3 patches out of the way, so I'll make
+> sure that at least basic masking support actually makes the cut this time
+> round.
+Thanks, since I'm kind of keen of getting a mask I'll send in a patch
+with updates suggested =) If you want to use it use it, otherwise I'll
+wait for your binding series.
 
-> I think the long term solution here might be to generate the .config
-> out of dts files..
-
-That would be cool!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/df61448c/attachment.sig>
+BR,
+Thommy Jakobsson
