@@ -1,35 +1,59 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 8 Jun 2016 22:33:57 -0400
-Subject: [PATCH V6 5/8] vfio: platform: call _RST method when using ACPI
-In-Reply-To: <CAJZ5v0iHxtL3cZVymfz0BqCGjBeBAuEyMXwj5sNBvMQQXgm8rg@mail.gmail.com>
-References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
- <1464472878-27176-6-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0iHxtL3cZVymfz0BqCGjBeBAuEyMXwj5sNBvMQQXgm8rg@mail.gmail.com>
-Message-ID: <5758D595.5090006@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Jun 2016 10:34:06 +0800
+Subject: [PATCH v3 06/12] power: pwrseq: simple: Add support for regulator
+ and generic property
+In-Reply-To: <20160608190333.GA5126@rob-hp-laptop>
+References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
+ <1464768141-25420-7-git-send-email-k.kozlowski@samsung.com>
+ <20160603020218.GA19436@rob-hp-laptop> <575693DE.2010603@samsung.com>
+ <20160608190333.GA5126@rob-hp-laptop>
+Message-ID: <CAGb2v66OO0QJ75=hLnRukhXWdX7HgSy0LDakdZ_jxFRCHTUuJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/8/2016 6:31 PM, Rafael J. Wysocki wrote:
-> On Sun, May 29, 2016 at 12:01 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> The device tree code checks for the presence of a reset driver and calls
->> the of_reset function pointer by looking up the reset driver as a module.
->>
->> ACPI defines _RST method to perform device level reset. After the _RST
->> method is executed, the OS can resume using the device. _RST method is
->> expected to stop DMA transfers and IRQs.
->>
->> This patch checks the presence of _RST method and calls the _RST
->> method when reset is requested.
-> 
-> You could check if _RST is present at probe time and store the ACPI
-> handle of it instead of the HID pointer.
-> 
-> This way you wouldn't need to repeat that check every time reset is used.
-> 
+Hi
 
-Makes sense. I'll give it a shot.
+On Thu, Jun 9, 2016 at 3:03 AM, Rob Herring <robh@kernel.org> wrote:
+> On Tue, Jun 07, 2016 at 11:29:02AM +0200, Krzysztof Kozlowski wrote:
+>> On 06/03/2016 04:02 AM, Rob Herring wrote:
+>> >>  Optional properties:
+>> >>  - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+>> >> @@ -16,6 +22,7 @@ Optional properties:
+>> >>    See ../clocks/clock-bindings.txt for details.
+>> >>  - clock-names : Must include the following entry:
+>> >>    "ext_clock" (External clock provided to the card).
+>> >> +- ext-supply : External regulator supply
+>> >
+>> > What happens when there are 2 supplies?
+>> >
+>> > I'd prefer the name not be genericish and use the real supply names.
+>> > Then the power seq code should just turn on all supplies it finds. If
+>> > the order or timing to turn on matters, then sorry, no generic sequence.
+>>
+>> I think the generic part for regulators might be a problem. Regulator
+>> API requires a name for the supply... it cannot get "something" or
+>> "everything".
+>
+> That's the downside of variable property names...
+>
+>> The driver could attach itself to any kind of node (where power-sequence
+>> property exists) so the supply name depends on the bindings of device
+>> (not bindings of power sequence driver).
+>>
+>> The power sequence driver could however iterate over child properties
+>> and get the names of all supplies. It is a little bit ugly...
+>
+> Yes. Like this, right?
+>
+> for_each_property_of_node(np, pp) {
+>         if (!strstr(pp->name, "-supply"))
+>                 continue;
+>         // found supply
+> }
+>
+> The uglyness can always be improved with a function to do this parsing.
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+There's already a version of this in simplefb. Maybe it's time to move
+this to a common function?
+
+ChenYu
