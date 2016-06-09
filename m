@@ -1,40 +1,64 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Jun 2016 07:04:06 +0200
-Subject: [PATCH] ARM: exynos_defconfig add CONFIG_EXYNOS_IOMMU in not set
- mode
-In-Reply-To: <1465406523-7075-1-git-send-email-shuahkh@osg.samsung.com>
-References: <1465406523-7075-1-git-send-email-shuahkh@osg.samsung.com>
-Message-ID: <5758F8C6.2090700@samsung.com>
+Date: Thu, 09 Jun 2016 07:11:32 +0200
+Subject: [PATCH v3 06/12] power: pwrseq: simple: Add support for regulator
+ and generic property
+In-Reply-To: <CAGb2v66OO0QJ75=hLnRukhXWdX7HgSy0LDakdZ_jxFRCHTUuJw@mail.gmail.com>
+References: <1464768141-25420-1-git-send-email-k.kozlowski@samsung.com>
+ <1464768141-25420-7-git-send-email-k.kozlowski@samsung.com>
+ <20160603020218.GA19436@rob-hp-laptop> <575693DE.2010603@samsung.com>
+ <20160608190333.GA5126@rob-hp-laptop>
+ <CAGb2v66OO0QJ75=hLnRukhXWdX7HgSy0LDakdZ_jxFRCHTUuJw@mail.gmail.com>
+Message-ID: <5758FA84.3050909@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2016 07:22 PM, Shuah Khan wrote:
-> Add CONFIG_EXYNOS_IOMMU in not set mode to make it easier to enable it.
+On 06/09/2016 04:34 AM, Chen-Yu Tsai wrote:
+> Hi
+> 
+> On Thu, Jun 9, 2016 at 3:03 AM, Rob Herring <robh@kernel.org> wrote:
+>> On Tue, Jun 07, 2016 at 11:29:02AM +0200, Krzysztof Kozlowski wrote:
+>>> On 06/03/2016 04:02 AM, Rob Herring wrote:
+>>>>>  Optional properties:
+>>>>>  - reset-gpios : contains a list of GPIO specifiers. The reset GPIOs are asserted
+>>>>> @@ -16,6 +22,7 @@ Optional properties:
+>>>>>    See ../clocks/clock-bindings.txt for details.
+>>>>>  - clock-names : Must include the following entry:
+>>>>>    "ext_clock" (External clock provided to the card).
+>>>>> +- ext-supply : External regulator supply
+>>>>
+>>>> What happens when there are 2 supplies?
+>>>>
+>>>> I'd prefer the name not be genericish and use the real supply names.
+>>>> Then the power seq code should just turn on all supplies it finds. If
+>>>> the order or timing to turn on matters, then sorry, no generic sequence.
+>>>
+>>> I think the generic part for regulators might be a problem. Regulator
+>>> API requires a name for the supply... it cannot get "something" or
+>>> "everything".
+>>
+>> That's the downside of variable property names...
+>>
+>>> The driver could attach itself to any kind of node (where power-sequence
+>>> property exists) so the supply name depends on the bindings of device
+>>> (not bindings of power sequence driver).
+>>>
+>>> The power sequence driver could however iterate over child properties
+>>> and get the names of all supplies. It is a little bit ugly...
+>>
+>> Yes. Like this, right?
+>>
+>> for_each_property_of_node(np, pp) {
+>>         if (!strstr(pp->name, "-supply"))
+>>                 continue;
+>>         // found supply
+>> }
+>>
+>> The uglyness can always be improved with a function to do this parsing.
+> 
+> There's already a version of this in simplefb. Maybe it's time to move
+> this to a common function?
 
-Hmmm... How does it make it easier? Enabling such item is just adding
-new line, so what is the problem solved here?
-
-Anyway the line will disappear on first savedefconfig (because it should
-not be there...) so there is really no point of it.
+Thanks, I'll make a generic one and let's see how Mark will respond to it.
 
 Best regards,
 Krzysztof
-
-> 
-> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
-> ---
->  arch/arm/configs/exynos_defconfig | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm/configs/exynos_defconfig b/arch/arm/configs/exynos_defconfig
-> index daf9762..16c2957 100644
-> --- a/arch/arm/configs/exynos_defconfig
-> +++ b/arch/arm/configs/exynos_defconfig
-> @@ -218,6 +218,7 @@ CONFIG_CROS_EC_CHARDEV=y
->  CONFIG_COMMON_CLK_MAX77686=y
->  CONFIG_COMMON_CLK_MAX77802=y
->  CONFIG_COMMON_CLK_S2MPS11=y
-> +# CONFIG_EXYNOS_IOMMU is not set
->  CONFIG_EXTCON=y
->  CONFIG_EXTCON_MAX14577=y
->  CONFIG_EXTCON_MAX77693=y
