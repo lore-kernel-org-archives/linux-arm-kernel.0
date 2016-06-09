@@ -1,41 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 09 Jun 2016 09:07:08 +0200
-Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
-In-Reply-To: <d3c117ea-2dce-63a2-7888-31ee8320a3dd@codethink.co.uk>
-References: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
- <5757CF9B.3080402@free.fr>
- <d3c117ea-2dce-63a2-7888-31ee8320a3dd@codethink.co.uk>
-Message-ID: <32804824.nq0AOIbNnC@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  9 Jun 2016 09:10:07 +0200
+Subject: [PATCH 01/12] mmc: sdhci: add init_card callback to sdhci
+In-Reply-To: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1465456218-28354-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 8, 2016 9:59:26 AM CEST Ben Dooks wrote:
-> On 08/06/16 08:56, Mason wrote:
-> > On 07/06/2016 13:30, Ben Dooks wrote:
-> > 
-> >> Fix the use of 0 instead of NULL to clk_get() call. This stops the
-> >> following warning:
-> >>
-> >> drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
-> > 
-> > May I ask which compiler/version produced that diagnostic?
-> 
-> I was running with "make C=2 bzImage" for ARM multi_v7_config
-> 
-> $ sparse --version
-> v0.5.0
-> 
+From: Marcin Wojtas <mw@semihalf.com>
 
-I believe gcc-6 will also produce a similar warning when building with
-'make W=1'. I've started looking into moving some of the warnings from
-W=1 level to default, which can probably be done with relatively little
-effort for many warnings.
+Some sdhci hosts may require handling quirks during card initialization
+at the time when its type is already known. Hence a new callback
+(init_card) is added in sdhci_ops.
 
-I see that you are making very good progress at eliminating the
--Wmissing-declarations warnings, which are also at W=1 level. Do
-you have an estimate of how many there are? Do you plan to do them
-all, or just the ones for some subsystems? I've stayed away from
-this one for now since there are lots of such warnings, but it
-seems particularly worthwhile.
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/mmc/host/sdhci.c | 9 +++++++++
+ drivers/mmc/host/sdhci.h | 1 +
+ 2 files changed, 10 insertions(+)
 
-	Arnd
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 0e3d7c056cb1..fd4e9a84f739 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2117,6 +2117,14 @@ static void sdhci_card_event(struct mmc_host *mmc)
+ 	spin_unlock_irqrestore(&host->lock, flags);
+ }
+ 
++static void sdhci_init_card(struct mmc_host *mmc, struct mmc_card *card)
++{
++	struct sdhci_host *host = mmc_priv(mmc);
++
++	if (host->ops->init_card)
++		host->ops->init_card(host, card);
++}
++
+ static const struct mmc_host_ops sdhci_ops = {
+ 	.request	= sdhci_request,
+ 	.post_req	= sdhci_post_req,
+@@ -2132,6 +2140,7 @@ static const struct mmc_host_ops sdhci_ops = {
+ 	.select_drive_strength		= sdhci_select_drive_strength,
+ 	.card_event			= sdhci_card_event,
+ 	.card_busy	= sdhci_card_busy,
++	.init_card	= sdhci_init_card,
+ };
+ 
+ /*****************************************************************************\
+diff --git a/drivers/mmc/host/sdhci.h b/drivers/mmc/host/sdhci.h
+index 609f87ca536b..49c6c5b0e33b 100644
+--- a/drivers/mmc/host/sdhci.h
++++ b/drivers/mmc/host/sdhci.h
+@@ -549,6 +549,7 @@ struct sdhci_ops {
+ 					 struct mmc_card *card,
+ 					 unsigned int max_dtr, int host_drv,
+ 					 int card_drv, int *drv_type);
++	void	(*init_card)(struct sdhci_host *host, struct mmc_card *card);
+ };
+ 
+ #ifdef CONFIG_MMC_SDHCI_IO_ACCESSORS
+-- 
+2.5.0
