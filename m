@@ -1,21 +1,36 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 9 Jun 2016 10:37:56 -0300
-Subject: [PATCH] ARM: mx25: fix missing common.h include
-In-Reply-To: <1465473998-32261-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465473998-32261-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <CAOMZO5BF_wh8djGev+bz5v815v0ei3hc+sPD30Y7cVdnNU-WoQ@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 9 Jun 2016 15:39:35 +0200
+Subject: [PATCH] ARM: orion: remove unreferenced board-d2net.c
+In-Reply-To: <20160609133116.GH30205@lunn.ch>
+References: <1465466656-30002-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20160609133116.GH30205@lunn.ch>
+Message-ID: <20160609153935.44323b8e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 9, 2016 at 9:06 AM, Ben Dooks <ben.dooks@codethink.co.uk> wrote:
-> The prototype for imx25_pm_init() was not in any of the included
-> headers, so add common.h where it is declared to remove the
-> following warning:
->
-> arch/arm/mach-imx/pm-imx25.c:34:13: warning: symbol 'imx25_pm_init' was not declared. Should it be static?
->
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+Hello,
 
-Thanks for the patch:
+On Thu, 9 Jun 2016 15:31:16 +0200, Andrew Lunn wrote:
+> On Thu, Jun 09, 2016 at 11:04:16AM +0100, Ben Dooks wrote:
+> > Either this has been mis-converted (and needs to be fixed) or
+> > is no longer referenced and can be safely removed.  
+> 
+> Hi Thomas
+> 
+> You added this code, which Ben is removing. It does look like you
+> forgot to call d2net_init() from orion5x_dt_init().
+> 
+> Please could you look at this.
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+You are correct: d2net_init() should be called from orion5x_dt_init(),
+or called through some initcall mechanism.
+
+That being said, this has been broken more than 2 years ago, and nobody
+noticed. Doesn't this mean that we could get rid of the support for
+this board entirely? :)
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
