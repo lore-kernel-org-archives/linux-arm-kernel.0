@@ -1,67 +1,76 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Jun 2016 23:50:35 -0700
-Subject: [PATCH] ARM: Keystone: Introduce Kconfig option to compile in
- typical Keystone features
-In-Reply-To: <8052110.nPS5mbu3uO@wuerfel>
-References: <1464816714-3900-1-git-send-email-nm@ti.com>
- <10295246.2MDnqWQbb8@wuerfel> <20160608094747.GG22406@atomide.com>
- <8052110.nPS5mbu3uO@wuerfel>
-Message-ID: <20160609065035.GJ22406@atomide.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 09 Jun 2016 08:51:18 +0200
+Subject: [RFC PATCH 15/15] iommu/exynos: update to use iommu big-endian
+In-Reply-To: <20160608183110.13851-16-matthew@mattleach.net>
+References: <20160608183110.13851-1-matthew@mattleach.net>
+ <20160608183110.13851-16-matthew@mattleach.net>
+Message-ID: <338cbdc6-2830-813b-713e-1cc40d23d1f9@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [160608 09:06]:
-> On Wednesday, June 8, 2016 2:47:48 AM CEST Tony Lindgren wrote:
-> > 
-> > So we could have ARCH_MULTIPLATFORM_TYPICAL, then have the old
-> > ARCH_OMAP2PLUS_TYPICAL select that one. That should keep things
-> > behaving just fine if the old .config had ARCH_OMAP2PLUS_TYPICAL.
-> 
-> If we make ARCH_MULTIPLATFORM_TYPICAL 'default y', it will be always
-> enabled in this case, and I think we can drop ARCH_OMAP2PLUS_TYPICAL.
+Hi
 
-Having "default y" there seems safe enough for me.
 
-> The downside would be any users that want the options we enable there
-> turned off and have them silently enabled when upgrading the kernel.
+On 2016-06-08 20:31, Matthew Leach wrote:
+> From: Ben Dooks <ben.dooks@codethink.co.uk>
+>
+> Add initial support for big endian by always writing the pte
+> in le32. Note, revisit if hardware capable of doing big endian
+> fetches.
+>
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 
-I think the long term solution here might be to generate the .config
-out of dts files..
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-> > > For I2C_OMAP, MENELAUS and TWL4030, we could just add a
-> > > 'default ARCH_OMAP3 || ARCH_OMAP4' or whatever is appropriate for
-> > > each of them. I assume we want to handle TWL6040 the same way, though
-> > > we currently don't do that. MENELAUS seems to be only needed for
-> > > omap2420-n8x0.
-> > 
-> > We could yeah. TWL4030 is omap2430 to omap3, I don't think we currently
-> > have any omap3 based ones not using twl4030.. But there certainly
-> > are tons of usable devices with the Motorola CPCAP PMIC instead.
-> 
-> So should we enable both then?
+Just to keep my curiosity satisfied - what's the reason to use
+big-endian on ARM?
 
-No CPCAP support currently in mainline kernel.. And with most of
-initcall level issues out of the way, any future support should
-not be added to the TYPICAL because of all the issues discussed.
+Good luck with fixing the kernel and userspace codes, which usually
+assume little-endian is the only possible order!
 
-> > HIGHMEM too should be platform specific.
-> 
-> I still don't see a good way to handle that, we should certainly not
-> just 'select' it, because we often want to leave it disabled.
+> ---
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: Kukjin Kim <kgene@kernel.org>
+> Cc: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Cc: iommu at lists.linux-foundation.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-samsung-soc at vger.kernel.org
+> Cc: linux-kernel at vger.kernel.org (open list)
+> ---
+>   drivers/iommu/exynos-iommu.c | 6 +++++-
+>   1 file changed, 5 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/iommu/exynos-iommu.c b/drivers/iommu/exynos-iommu.c
+> index 5ecc86c..dd8b3b3 100644
+> --- a/drivers/iommu/exynos-iommu.c
+> +++ b/drivers/iommu/exynos-iommu.c
+> @@ -54,6 +54,10 @@ typedef u32 sysmmu_pte_t;
+>   #define lv2ent_small(pent) ((*(pent) & 2) == 2)
+>   #define lv2ent_large(pent) ((*(pent) & 3) == 1)
+>   
+> +#ifdef CONFIG_BIG_ENDIAN
+> +#warning "revisit driver if we can enable big-endian ptes"
+> +#endif
+> +
 
-Right. Leaving it out produces a bootable kernel though that could
-produce some warning if configured memory is > 768MB.
+This warning can be removed. There is no way to force SYSMMU to operate with
+big-endian PTEs according to the datasheet.
 
-> > The original reason for ARCH_OMAP2PLUS_TYPICAL was that if omap2plus
-> > is selected with that you actually get a bootable system.
-> 
-> I understand. It's just not very scalable to have every platform do
-> this, in particular if they want to select conflicting options (none
-> of the ones you select should conflict, but we'd get there eventually).
+>   /*
+>    * v1.x - v3.x SYSMMU supports 32bit physical and 32bit virtual address spaces
+>    * v5.0 introduced support for 36bit physical address space by shifting
+> @@ -716,7 +720,7 @@ static inline void update_pte(sysmmu_pte_t *ent, sysmmu_pte_t val)
+>   {
+>   	dma_sync_single_for_cpu(dma_dev, virt_to_phys(ent), sizeof(*ent),
+>   				DMA_TO_DEVICE);
+> -	*ent = val;
+> +	*ent = cpu_to_le32(val);
+>   	dma_sync_single_for_device(dma_dev, virt_to_phys(ent), sizeof(*ent),
+>   				   DMA_TO_DEVICE);
+>   }
 
-Yeah. Seems like generating the base .confing out of the dts file
-is better in the long run.
-
-Regards,
-
-Tony
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
