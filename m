@@ -1,47 +1,49 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Jun 2016 11:44:31 +0200
-Subject: [RFC v4 14/14] ARM: dts: exynos: Fix LAN and HUB after bootloader
- initialization on Odroid U3
+Date: Thu, 09 Jun 2016 11:44:29 +0200
+Subject: [RFC v4 12/14] EXAMPLE CODE: usb: hub: Power sequence the ports on
+ activation
 In-Reply-To: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
 References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465465471-28740-15-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465465471-28740-13-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Odroid U3 (Exynos4412-based) board if USB was initialized by
-bootloader (in U-Boot "usb start" before tftpboot), the HUB (usb3503)
-and LAN (smsc95xx) after after successful probing were not visible in the
-system ("lsusb").
-
-In such case the devices had to be fully reset before configuring.
-Reset by GPIO (called RESET_N pin) and by RESET field in STCD register
-in usb3503 HUB are not sufficient. Instead full reset has to be done by
-disabling and enabling regulator.
+The autodetection of attached USB device might not work on certain
+boards where the power is delivered externally.  These devices also might
+require a hard reset.  Use pwrseq for that in USB hub.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
- arch/arm/boot/dts/exynos4412-odroidu3.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/usb/core/hub.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-index 31cdc036fda4..8fd50061d91b 100644
---- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
-+++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
-@@ -99,11 +99,15 @@
- 	clock-names = "refclk";
- 	clocks = <&pmu_system_controller 0>;
- 	refclk-frequency = <24000000>;
-+
-+	power-sequence;
-+	vdd-supply = <&buck8_reg>;
- };
+diff --git a/drivers/usb/core/hub.c b/drivers/usb/core/hub.c
+index c421745b84aa..46d9f9aedacc 100644
+--- a/drivers/usb/core/hub.c
++++ b/drivers/usb/core/hub.c
+@@ -26,6 +26,7 @@
+ #include <linux/mutex.h>
+ #include <linux/random.h>
+ #include <linux/pm_qos.h>
++#include <linux/pwrseq.h>
  
- &ehci {
- 	port at 1 {
- 		status = "okay";
-+		usb-pwrseq = <&usb3503>;
- 	};
- 	port at 2 {
- 		status = "okay";
+ #include <asm/uaccess.h>
+ #include <asm/byteorder.h>
+@@ -1663,6 +1664,15 @@ static int hub_configure(struct usb_hub *hub,
+ 
+ 	usb_hub_adjust_deviceremovable(hdev, hub->descriptor);
+ 
++	/* FIXME: When do the pre-power-on? */
++	/*
++	for (i = 0; i < maxchild; i++)
++		pwrseq_pre_power_on(hub->ports[i]->pwrseq);
++	*/
++
++	for (i = 0; i < maxchild; i++)
++		pwrseq_post_power_on(hub->ports[i]->pwrseq);
++
+ 	hub_activate(hub, HUB_INIT);
+ 	return 0;
+ 
 -- 
 1.9.1
