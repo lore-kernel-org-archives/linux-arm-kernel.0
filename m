@@ -1,73 +1,36 @@
-From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Thu,  9 Jun 2016 18:25:05 +0200
-Subject: [PATCH V2 5/5] dts/imx6q-b850v3: Use GE B850v3 LVDS/DP++ Bridge
-In-Reply-To: <cover.1465486875.git.peter.senna@collabora.com>
-References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
- <cover.1465486875.git.peter.senna@collabora.com>
-Message-ID: <3c492c8fcbe409536e791f5062e6eb42d06d76fa.1465486875.git.peter.senna@collabora.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 9 Jun 2016 18:36:08 +0200
+Subject: [PATCH] ARM: orion: remove unreferenced board-d2net.c
+In-Reply-To: <d521ce93-f647-0c6f-89f5-aeffd82b87e1@codethink.co.uk>
+References: <1465466656-30002-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20160609133116.GH30205@lunn.ch>
+ <20160609153935.44323b8e@free-electrons.com>
+ <20160609141006.GK30205@lunn.ch>
+ <20160609161215.084e06f1@free-electrons.com>
+ <d521ce93-f647-0c6f-89f5-aeffd82b87e1@codethink.co.uk>
+Message-ID: <20160609163608.GA23507@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configures the GE B850v3 LVDS/DP++ bridge on the dts file.
+On Thu, Jun 09, 2016 at 04:52:35PM +0100, Ben Dooks wrote:
+> On 09/06/16 15:12, Thomas Petazzoni wrote:
+> > Hello,
+> > 
+> > On Thu, 9 Jun 2016 16:10:06 +0200, Andrew Lunn wrote:
+> > 
+> >>> That being said, this has been broken more than 2 years ago, and nobody
+> >>> noticed. Doesn't this mean that we could get rid of the support for
+> >>> this board entirely? :)  
+> >>
+> >> Well, all it means is the LEDs don't blink. If the disk was not
+> >> spinning, or the ethernet device missing, i would agree with you. But
+> >> somebody could be using this device and don't notice the difference
+> >> with the LEDs.
+> 
+> Surely DT can manage blinking LEDs??
 
-Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Rob Herring <robh@kernel.org>
-Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
----
-Changes from V1:
- - Replaced '_' by '-' in node names or compatible strings
- - Added missing @73 to b850v3-lvds-dp-bridge
+There is an additional GPIO needed. However, i think a pin hog should
+allow this to be represented in DT. Two years ago, i don't think this
+sort of hogging existed.
 
- arch/arm/boot/dts/imx6q-b850v3.dts | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
-index 88a70de..a57dd5b 100644
---- a/arch/arm/boot/dts/imx6q-b850v3.dts
-+++ b/arch/arm/boot/dts/imx6q-b850v3.dts
-@@ -77,6 +77,13 @@
- 		fsl,data-mapping = "spwg";
- 		fsl,data-width = <24>;
- 		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+			lvds0_out: endpoint {
-+				remote-endpoint = <&b850v3_lvds_dp_bridge_in>;
-+			};
-+		};
- 	};
- };
- 
-@@ -147,3 +154,27 @@
- 		reg = <0x4a>;
- 	};
- };
-+
-+&mux2_i2c2 {
-+	status = "okay";
-+	clock-frequency = <100000>;
-+
-+	b850v3-lvds-dp-bridge at 73 {
-+		compatible = "ge,b850v3-lvds-dp";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg = <0x73>;
-+		interrupt-parent = <&gpio2>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		edid-reg = <0x72>;
-+
-+		port at 0 {
-+			reg = <0>;
-+			b850v3_lvds_dp_bridge_in: endpoint {
-+				remote-endpoint = <&lvds0_out>;
-+			};
-+		};
-+	};
-+};
--- 
-2.5.5
+     Andrew
