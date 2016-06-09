@@ -1,46 +1,70 @@
-From: hias@horus.com (Matthias Reichl)
-Date: Thu,  9 Jun 2016 13:41:43 +0200
-Subject: [PATCH 1/2] dmaengine: bcm2835: Fix cyclic DMA period splitting
-In-Reply-To: <1465472504-10191-1-git-send-email-hias@horus.com>
-References: <1465472504-10191-1-git-send-email-hias@horus.com>
-Message-ID: <1465472504-10191-2-git-send-email-hias@horus.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 09 Jun 2016 13:42:02 +0200
+Subject: [RFC v4 01/14] regulator: of: Add helper for getting all supplies
+In-Reply-To: <20160609102925.GS7510@sirena.org.uk>
+References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
+ <1465465471-28740-2-git-send-email-k.kozlowski@samsung.com>
+ <20160609102925.GS7510@sirena.org.uk>
+Message-ID: <5759560A.70107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The code responsible for splitting periods into chunks that
-can be handled by the DMA controller missed to update total_len,
-the number of bytes processed in the current period, when there
-are more chunks to follow.
+On 06/09/2016 12:29 PM, Mark Brown wrote:
+> On Thu, Jun 09, 2016 at 11:44:18AM +0200, Krzysztof Kozlowski wrote:
+>> Few drivers have a need of getting regulator supplies without knowing
+>> their names:
+>> 1. The Simple Framebuffer driver works on setup provided by bootloader
+>>    (outside of scope of kernel);
+>> 2. Generic power sequence driver may be attached to any device node.
+>>
+>> Add a Device Tree helper for parsing "-supply" properties and returning
+>> allocated bulk regulator consumers.
+> 
+> I'm still very concerned that this is just an invitation to people to
+> write half baked regulator consumers and half baked DTs to go along with
+> it, making it a standard API that doesn't have big red flags on it that
+> will flag up when "normal" drivers use it is not good.  Right now this
+> just looks like a standard API and people are going to just start using
+> it.  If we are going to do this perhaps we need a separate header or
+> something to help flag this up.
 
-Therefore total_len was stuck at 0 and the code didn't work at all.
-This resulted in a wrong control block layout and audio issues because
-the cyclic DMA callback wasn't executing on period boundaries.
+No problem, I can move it to a special header.  Actually, if you dislike
+this as an API, it does not have to be in header at all.  I can just
+duplicate the simplefb code.
 
-Fix this by adding the missing total_len update.
+> In the case of power sequences I'd expect the sequences to perform
+> operations on named supplies - the core shouldn't know what the supplies
+> are but the thing specifying the sequence should.
 
-Signed-off-by: Matthias Reichl <hias@horus.com>
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
-Tested-by: Clive Messer <clive.messer@digitaldreamtime.co.uk>
----
- drivers/dma/bcm2835-dma.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Hm, so maybe passing names like:
 
-diff --git a/drivers/dma/bcm2835-dma.c b/drivers/dma/bcm2835-dma.c
-index 6149b27..344bcf92 100644
---- a/drivers/dma/bcm2835-dma.c
-+++ b/drivers/dma/bcm2835-dma.c
-@@ -251,8 +251,11 @@ static void bcm2835_dma_create_cb_set_length(
- 	 */
- 
- 	/* have we filled in period_length yet? */
--	if (*total_len + control_block->length < period_len)
-+	if (*total_len + control_block->length < period_len) {
-+		/* update number of bytes in this period so far */
-+		*total_len += control_block->length;
- 		return;
-+	}
- 
- 	/* calculate the length that remains to reach period_length */
- 	control_block->length = period_len - *total_len;
--- 
-2.1.4
+usb3503 at 08 {
+	reset-gpios = <&gpx3 5 GPIO_ACTIVE_HIGH>;
+	initial-mode = <1>;
+	vdd-supply = <&buck8_reg>;
+	foo-supply = <&buck9_reg>;
+
+        power-sequence;
+	power-sequence-supplies = "vdd", "foo";
+};
+
+but this is getting against initial idea of not adding any
+power-sequence properties.
+
+> 
+>>  drivers/regulator/of_regulator.c       | 86 ++++++++++++++++++++++++++++++++++
+>>  include/linux/regulator/of_regulator.h | 13 +++++
+>>  2 files changed, 99 insertions(+)
+> 
+> The external interface shouldn't be DT specific, the Intel people are
+> busy importing all of DT into ACPI so they'll doubtless want an ACPI
+> version.
+
+Sure, I'll add it if this approach is acceptable.  At this moment this
+is not necessary to show my idea so I prefer to avoid doing work which
+might be discarded very fast by review.
+
+Thanks for feedback!
+
+Best regards,
+Krzysztof
