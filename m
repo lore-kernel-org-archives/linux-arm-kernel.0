@@ -1,157 +1,122 @@
-From: mbrugger@suse.com (Matthias Brugger)
-Date: Thu, 9 Jun 2016 21:47:12 +0200
-Subject: [PATCH v7 15/15] acpi, numa: Enable ACPI based NUMA on ARM64
-In-Reply-To: <1464129345-18985-16-git-send-email-ddaney.cavm@gmail.com>
-References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
- <1464129345-18985-16-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <5759C7C0.3050508@suse.com>
+From: b-liu@ti.com (Bin Liu)
+Date: Thu, 9 Jun 2016 14:49:36 -0500
+Subject: [PATCH v3 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared
+ phy block
+In-Reply-To: <9a05c16a-e8a2-02b7-c093-1131e27bcdd4@redhat.com>
+References: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
+ <20160609143004.GA2167@uda0271908>
+ <9a05c16a-e8a2-02b7-c093-1131e27bcdd4@redhat.com>
+Message-ID: <20160609194936.GB2167@uda0271908>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, Jun 09, 2016 at 04:51:45PM +0200, Hans de Goede wrote:
+> Hi,
+> 
+> On 09-06-16 16:30, Bin Liu wrote:
+> >Hi,
+> >
+> >On Sun, Jun 05, 2016 at 04:59:33PM +0200, Hans de Goede wrote:
+> >>Some SoCs have a single phy-hw-block with multiple phys, this is
+> >>modelled by a single phy dts node, so we end up with multiple
+> >>controller nodes with a phys property pointing to the phy-node
+> >>of the otg-phy.
+> >>
+> >>Only one of these controllers typically is an otg controller, yet we
+> >>were checking the first controller who uses a phy from the block and
+> >>then end up looking for a dr_mode property in e.g. the ehci controller.
+> >>
+> >>This commit fixes this by adding an arg0 parameter to
+> >>of_usb_get_dr_mode_by_phy and make of_usb_get_dr_mode_by_phy
+> >>check that this matches the phandle args[0] value when looking for
+> >>the otg controller.
+> >>
+> >>Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> >>---
+> >>Changes in v2:
+> >>-Add a args0 parameter instead of looking for nodes with a dr_mode property
+> >>Changes in v3:
+> >>-No changes
+> >>---
+> >> drivers/usb/common/common.c  | 31 ++++++++++++++++++-------------
+> >> drivers/usb/phy/phy-am335x.c |  2 +-
+> >> include/linux/usb/of.h       |  4 ++--
+> >> 3 files changed, 21 insertions(+), 16 deletions(-)
+> >
+> >This breaks am335x.
+> >
+> >[   17.433166] /ocp/usb at 47400000/usb at 47401000: could not get #phy-cells
+> >for /ocp/usb at 47400000/usb-phy at 47401300
+> >[   17.443627] /ocp/usb at 47400000/usb at 47401800: could not get #phy-cells
+> >for /ocp/usb at 47400000/usb-phy at 47401b00
+> >[   17.454005] am335x-phy-driver 47401300.usb-phy: dr_mode 0
+> >[   17.460518] 47401300.usb-phy supply vcc not found, using dummy
+> >regulator
+> >[   17.469685] /ocp/usb at 47400000/usb at 47401000: could not get #phy-cells
+> >for /ocp/usb at 47400000/usb-phy at 47401300
+> >[   17.479998] /ocp/usb at 47400000/usb at 47401800: could not get #phy-cells
+> >for /ocp/usb at 47400000/usb-phy at 47401b00
+> >[   17.490342] am335x-phy-driver 47401b00.usb-phy: dr_mode 0
+> 
+> That is weird, quoting: drivers/phy/phy-core.c: _of_phy_get():
+> 
+>         ret = of_parse_phandle_with_args(np, "phys", "#phy-cells",
+>                 index, &args);
+>         if (ret)
+>                 return ERR_PTR(-ENODEV);
+> 
+> So if #phy-cells is not defined, then the phy core should not
+> be able to work with the dts files in question at all.
 
-On 25/05/16 00:35, David Daney wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
->
-> Add function needed for cpu to node mapping, and enable ACPI based
-> NUMA for ARM64 in Kconfig
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> [david.daney at cavium.com added ACPI_NUMA default to y for ARM64]
-> Signed-off-by: David Daney <david.daney@cavium.com>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
->   drivers/acpi/Kconfig |  4 ++--
->   drivers/acpi/numa.c  | 37 ++++++++++++++++++++++++++++++++++++-
->   include/linux/acpi.h | 17 ++++++++++++++++-
->   3 files changed, 54 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-> index b7e2e77..dd76b36 100644
-> --- a/drivers/acpi/Kconfig
-> +++ b/drivers/acpi/Kconfig
-> @@ -291,8 +291,8 @@ config ACPI_THERMAL
->   config ACPI_NUMA
->   	bool "NUMA support"
->   	depends on NUMA
-> -	depends on (X86 || IA64)
-> -	default y if IA64_GENERIC || IA64_SGI_SN2
-> +	depends on (X86 || IA64 || ARM64)
-> +	default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
->
->   config ACPI_CUSTOM_DSDT_FILE
->   	string "Custom DSDT Table file to include"
-> diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-> index fad6d28..9b7ce40 100644
-> --- a/drivers/acpi/numa.c
-> +++ b/drivers/acpi/numa.c
-> @@ -170,6 +170,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
->   		}
->   		break;
->
-> +	case ACPI_SRAT_TYPE_GICC_AFFINITY:
-> +		{
-> +			struct acpi_srat_gicc_affinity *p =
-> +			    (struct acpi_srat_gicc_affinity *)header;
-> +			pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
-> +				 p->acpi_processor_uid,
-> +				 p->proximity_domain,
-> +				 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
-> +				 "enabled" : "disabled");
-> +		}
-> +		break;
-> +
->   	default:
->   		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
->   			header->type);
-> @@ -360,6 +372,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
->   	return 0;
->   }
->
-> +static int __init
-> +acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
-> +			 const unsigned long end)
-> +{
-> +	struct acpi_srat_gicc_affinity *processor_affinity;
-> +
-> +	processor_affinity = (struct acpi_srat_gicc_affinity *)header;
-> +	if (!processor_affinity)
-> +		return -EINVAL;
-> +
-> +	acpi_table_print_srat_entry(header);
-> +
-> +	/* let architecture-dependent part to do it */
-> +	acpi_numa_gicc_affinity_init(processor_affinity);
-> +
-> +	return 0;
-> +}
-> +
->   static int __initdata parsed_numa_memblks;
->
->   static int __init
-> @@ -404,6 +434,9 @@ int __init acpi_numa_init(void)
->   {
->   	int cnt = 0;
->
-> +	if (acpi_disabled)
-> +		return -EINVAL;
-> +
->   	/*
->   	 * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
->   	 * SRAT cpu entries could have different order with that in MADT.
-> @@ -412,13 +445,15 @@ int __init acpi_numa_init(void)
->
->   	/* SRAT: Static Resource Affinity Table */
->   	if (!acpi_table_parse(ACPI_SIG_SRAT, acpi_parse_srat)) {
-> -		struct acpi_subtable_proc srat_proc[2];
-> +		struct acpi_subtable_proc srat_proc[3];
->
->   		memset(srat_proc, 0, sizeof(srat_proc));
->   		srat_proc[0].id = ACPI_SRAT_TYPE_CPU_AFFINITY;
->   		srat_proc[0].handler = acpi_parse_processor_affinity;
->   		srat_proc[1].id = ACPI_SRAT_TYPE_X2APIC_CPU_AFFINITY;
->   		srat_proc[1].handler = acpi_parse_x2apic_affinity;
-> +		srat_proc[1].id = ACPI_SRAT_TYPE_GICC_AFFINITY;
-> +		srat_proc[1].handler = acpi_parse_gicc_affinity;
+am335x phy does not use phy framework, so those phy core api is not
+called.
 
-Should be srat_proc[2].id and srat_proc[2].handler, right?
+> 
+> All my patch does is make the way of_usb_get_dr_mode_by_phy parses
+> phy-handles be identical to how phy-core.c does it.
+> 
+> I see that the usb0_phy node in arch/arm/boot/dts/am33xx.dtsi
+> indeed lacks a "#phy-cells = <0>;" line.
+> 
+> Quoting: Documentation/devicetree/bindings/phy/phy-bindings.txt
+> 
+> PHY device node
+> ===============
+> 
+> Required Properties:
+> #phy-cells:     Number of cells in a PHY specifier;  The meaning of all those
+>                 cells is defined by the binding for the phy node. The PHY
+>                 provider can use the values in cells to find the appropriate
+>                 PHY.
+> 
+> So not having #phy-cells defined for a phy-node clearly is a bug.
+
+am335x phy does not follow the bindings in phy/, but usb/phy/.
+
+> 
+> A patch like the following should fix this:
+> 
+> diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+> index 52be48b..c4ff788d 100644
+> --- a/arch/arm/boot/dts/am33xx.dtsi
+> +++ b/arch/arm/boot/dts/am33xx.dtsi
+> @@ -557,6 +557,7 @@
+>  			};
+> 
+>  			usb0_phy: usb-phy at 47401300 {
+> +				#phy-cells = <0>;
+
+This seems to be ok, but this patch would break the dt backward compatible.
+
+>  				compatible = "ti,am335x-usb-phy";
+>  				reg = <0x47401300 0x100>;
+>  				reg-names = "phy";
+> 
+> Regards,
+> 
+> Hans
 
 Regards,
-Matthias
-
->
->   		acpi_table_parse_entries_array(ACPI_SIG_SRAT,
->   					sizeof(struct acpi_table_srat),
-> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-> index 8010b26..9515db6 100644
-> --- a/include/linux/acpi.h
-> +++ b/include/linux/acpi.h
-> @@ -232,10 +232,25 @@ int acpi_table_parse_madt(enum acpi_madt_type id,
->   int acpi_parse_mcfg (struct acpi_table_header *header);
->   void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
->
-> -/* the following four functions are architecture-dependent */
-> +/* the following numa functions are architecture-dependent */
->   void acpi_numa_slit_init (struct acpi_table_slit *slit);
-> +
-> +#if defined(CONFIG_X86) || defined(CONFIG_IA64)
->   void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
-> +#else
-> +static inline void
-> +acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa) { }
-> +#endif
-> +
->   void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
-> +
-> +#ifdef CONFIG_ARM64
-> +void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
-> +#else
-> +static inline void
-> +acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
-> +#endif
-> +
->   int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
->
->   #ifndef PHYS_CPUID_INVALID
->
+-Bin.
