@@ -1,103 +1,33 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 9 Jun 2016 15:13:41 +0300
-Subject: [RFC v4 4/7] extcon: usb-gpio: Add support for VBUS detection
-In-Reply-To: <57592C18.8020609@samsung.com>
-References: <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
- <1465393686-16644-5-git-send-email-k.kozlowski@samsung.com>
- <57592B02.2070609@ti.com> <57592C18.8020609@samsung.com>
-Message-ID: <57595D75.8090301@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Jun 2016 14:19:07 +0200
+Subject: [PATCH 2/3] PCI: host: new PCI host controller driver for Marvell
+ Armada 3700
+In-Reply-To: <20160609111921.11975627@free-electrons.com>
+References: <1464858585-10963-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <3112077.0RPfokLCAs@wuerfel> <20160609111921.11975627@free-electrons.com>
+Message-ID: <11140978.npsCNQs782@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/06/16 11:43, Krzysztof Kozlowski wrote:
-> On 06/09/2016 10:38 AM, Roger Quadros wrote:
->> Hi,
->>
->> On 08/06/16 16:48, Krzysztof Kozlowski wrote:
->>> Add VBUS pin detection support to extcon-usb-gpio driver for boards
->>> which have both VBUS and ID pins, or only one of them.
->>>
->>> The logic behind reporting USB and USB-HOST extcon cables is not
->>> affected. The driver however will report extcon changes for USB-VBUS and
->>> USB-ID.
->>>
->>> Signed-off-by: Robert Baldyga <r.baldyga@samsung.com>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>>
->>> ---
->>>
->>> Some parts base on old Robert's patchset.
->>> ---
->>>  drivers/extcon/extcon-usb-gpio.c | 125 +++++++++++++++++++++++++++++++--------
->>>  1 file changed, 99 insertions(+), 26 deletions(-)
->>>
->>> diff --git a/drivers/extcon/extcon-usb-gpio.c b/drivers/extcon/extcon-usb-gpio.c
->>> index a36aab007022..85b8a0ce5731 100644
->>> --- a/drivers/extcon/extcon-usb-gpio.c
->>> +++ b/drivers/extcon/extcon-usb-gpio.c
->>> @@ -35,7 +35,9 @@ struct usb_extcon_info {
->>>  	struct extcon_dev *edev;
->>>  
->>>  	struct gpio_desc *id_gpiod;
->>> +	struct gpio_desc *vbus_gpiod;
->>>  	int id_irq;
->>> +	int vbus_irq;
->>>  
->>>  	unsigned long debounce_jiffies;
->>>  	struct delayed_work wq_detcable;
->>> @@ -44,6 +46,8 @@ struct usb_extcon_info {
->>>  static const unsigned int usb_extcon_cable[] = {
->>>  	EXTCON_USB,
->>>  	EXTCON_USB_HOST,
->>> +	EXTCON_USB_ID,
->>> +	EXTCON_USB_VBUS,
->>>  	EXTCON_NONE,
->>>  };
->>>  
->>> @@ -55,7 +59,8 @@ static void usb_extcon_detect_cable(struct work_struct *work)
->>>  						    wq_detcable);
->>>  
->>>  	/* check ID and update cable state */
->>> -	id = gpiod_get_value_cansleep(info->id_gpiod);
->>> +	id = info->id_gpiod ? gpiod_get_value_cansleep(info->id_gpiod) : 1;
->>> +
->>>  	if (id) {
->>>  		/*
->>>  		 * ID = 1 means USB HOST cable detached.
->>> @@ -73,6 +78,14 @@ static void usb_extcon_detect_cable(struct work_struct *work)
->>>  		extcon_set_cable_state_(info->edev, EXTCON_USB, false);
->>>  		extcon_set_cable_state_(info->edev, EXTCON_USB_HOST, true);
->>>  	}
->>> +
->>> +	if (info->id_gpiod)
->>> +		extcon_set_cable_state_(info->edev, EXTCON_USB_ID, id);
->>> +	if (info->vbus_gpiod) {
->>> +		int vbus = gpiod_get_value_cansleep(info->vbus_gpiod);
->>> +
->>> +		extcon_set_cable_state_(info->edev, EXTCON_USB_VBUS, vbus);
->>> +	}
->>
->> What happens if either id_gpiod or vbus_gpiod is present?
->>
->> As per the DT binding document
->> "In general we have three cases:
->> 1. If VBUS and ID gpios are present we pass them as is
->> USB-HOST = !ID, USB = VBUS
->> 2. If only VBUS gpio is present we assume that ID pin is always High.
->> USB-HOST = false, USB = VBUS.
->> 3. If only ID pin is available we infer the VBUS pin states based on ID.
->> USB-HOST = !ID, USB = ID"
->>
->> So do you want to be consistent and infer VBUS and ID states based on the other?
+On Thursday, June 9, 2016 11:19:21 AM CEST Thomas Petazzoni wrote:
+> > What is the version of the GIC in the Armada 3700? If you have GICv3
+> > or GICv2m, could you use that instead of the built-in MSI logic?
+> > 
+> > We typically handle this using the msi-map or msi-parent properties
+> > pointing to either the gic or the PCI host, depending on which one
+> > you want to use, but either of them should work, and the GIC should
+> > be more efficient because you can distribute the interrupts of the
+> > PCI devices over all CPUs by workload, rather than having to
+> > multiplex all MSI through a single GIC interrupt.
 > 
-> Right, I couldn't make up my mind whether I want to change/improve
-> existing logic or just add VBUS/ID raw notifying. Finally I left
-> original code for USB/USB-HOST cables alone.
-> 
+> There is a GIC-500, but Marcin told me that attempts to use MSI with it
+> have not been successful so far. There will be investigation on this
+> topic in the future, but for the moment, we'd like to have the MSI
+> functionality built into the PCIe driver supported. We can migrate
+> later to GIC-500 powered MSIs once working.
 
-I think it is better to stick to raw notifying so nothing needs to be changed.
-If there is some mechanism to get the pin state and if the pin is not available
-it should return error.
+I think you should still add the msi-parent or msi-map properties then,
+just have them point at the PCI host node instead of the GIC-500,
+and evaluate that to get the built-in controller.
 
-cheers,
--roger
+	Arnd
