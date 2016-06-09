@@ -1,37 +1,38 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 9 Jun 2016 11:14:04 -0400 (EDT)
-Subject: Platform-specific suspend/resume code in drivers
-In-Reply-To: <57592E3C.8020005@laposte.net>
-Message-ID: <Pine.LNX.4.44L0.1606091105380.1697-100000@iolanthe.rowland.org>
+From: carlo@caione.org (Carlo Caione)
+Date: Thu, 9 Jun 2016 17:23:47 +0200
+Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer
+ interrupt trigger
+In-Reply-To: <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
+References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+ <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20160609152347.GA9477@mephisto>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Jun 2016, Sebastian Frias wrote:
-
-> In addition to what Marc already replied, allow me to put a small (and hopefully self-contained) example:
+On 06/06/16 18:56, Marc Zyngier wrote:
+> The ARM architected timer specification mandates that the interrupt
+> associated with each timer is level triggered (which corresponds to
+> the "counter >= comparator" condition).
 > 
-> - There's a SoC with a HW IP (UART, ethernet, usb or whatever else) for which a generic driver exists.
-> - The generic driver only needs to know the base address of the block, and it will just work.
-> - It'll just work, provided that when Linux boots the HW IP is enabled.
-> - Indeed, the SoC may have other registers controlling if the HW IP is enabled/powered up.
-> - Those registers are SoC specific, even if the HW IP is generic.
+> A number of DTs are being remarkably creative, declaring the interrupt
+> to be edge triggered. A quick look at the TRM for the corresponding ARM
+> CPUs clearly shows that this is wrong, and I've corrected those.
+> For non-ARM designs (and in the absence of a publicly available TRM),
+> I've made them active low as well, which can't be completely wrong
+> as the GIC cannot disinguish between level low and level high.
 > 
-> So the question is:
-> => Does the use of a generic driver indirectly implies that any SoC specific registers are to be setup outside Linux?
-> In other words, does Linux expects the HW IP to be powered up/enabled and ready to use? (ie: setup by the bootloader)
+> The respective maintainers are of course welcome to prove me wrong.
+> 
+> While I was at it, I took the liberty to fix a couple of related issue,
+> such as some spurious affinity bits on ThunderX, and their complete
+> absence on ls1043a (both of which seem to be related to copy-pasting
+> from other DTs).
+> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-It varies.  Some implementations do expect the platform-specific parts
-to be initialized before boot, whereas others include platform-specific
-code to take care of this.
+For meson-gxbb.dtsi:
 
-> If that is not the case, what is the recommended way to handle those registers?
-> In other words, do the generic drivers provide with an API to handle SoC specific enable/clockgating/powerup registers?
+Acked-by: Carlo Caione <carlo@endlessm.com>
 
-Frequently drivers include platform-specific parts for this purpose.  
-These parts are called through various platform-specific mechanisms at 
-runtime, such as MODULE_DEVICE_TABLE entries for OF (i.e., Device Tree) 
-or ACPI or just plain old platform devices.
-
-For an example, look near the end of drivers/usb/host/ehci-platform.c.
-
-Alan Stern
+-- 
+Carlo Caione
