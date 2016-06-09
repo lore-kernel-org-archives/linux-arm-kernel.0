@@ -1,52 +1,73 @@
 From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Thu,  9 Jun 2016 17:23:25 -0500
-Subject: [PATCH 0/8] arm64: pmu: Detect multiple PMU types in an ACPI system
-Message-ID: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+Date: Thu,  9 Jun 2016 17:23:29 -0500
+Subject: [PATCH 4/8] arm: arm64: Add routine to determine cpuid of other cpus
+In-Reply-To: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+References: <1465511013-10742-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <1465511013-10742-5-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-v5:
-Remove list of CPU types for ACPI systems. We now match a generic
-event list, and use the PMCIED[01] to select events which exist on
-the given PMU. This avoids the need to update the kernel every-time
-a new CPU is released.
-Update the maintainers list to include the new file.
+It is helpful if we can read the cpuid/midr of other CPUs
+in the system independent of arm/arm64.
 
-v4:
-Correct build issues with ARM (!ARM64) kernels.
-Add ThunderX to list of PMU types.
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm/include/asm/cputype.h   | 6 +++++-
+ arch/arm64/include/asm/cputype.h | 4 ++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-v3:
-Enable ARM performance monitoring units on ACPI/arm64 machines.
-
-This patch expands and reworks the patches published by Mark Salter
-in order to clean up a few of the previous review comments, as well as
-add support for newer CPUs and big/little configurations.
-
-Jeremy Linton (6):
-  arm64: pmu: Probe default hw/cache counters
-  arm: arm64: Add routine to determine cpuid of other cpus
-  arm: arm64: pmu: Assign platform PMU CPU affinity
-  arm64: pmu: Add routines for detecting differing PMU types in the
-  arm64: pmu: Enable multiple PMUs in an ACPI system
-  MAINTAINERS: Tweak ARM PMU maintainers
-
-Mark Salter (2):
-  arm64: pmu: add fallback probe table
-  arm64: pmu: Add support for probing with ACPI
-
- MAINTAINERS                      |   3 +-
- arch/arm/include/asm/cputype.h   |   6 +-
- arch/arm64/include/asm/cputype.h |   4 +
- arch/arm64/kernel/perf_event.c   |  51 ++++++++-
- arch/arm64/kernel/smp.c          |   5 +
- drivers/perf/Kconfig             |   4 +
- drivers/perf/Makefile            |   1 +
- drivers/perf/arm_pmu.c           |  57 +++++++++--
- drivers/perf/arm_pmu_acpi.c      | 216 +++++++++++++++++++++++++++++++++++++++
- include/linux/perf/arm_pmu.h     |  10 ++
- 10 files changed, 341 insertions(+), 16 deletions(-)
- create mode 100644 drivers/perf/arm_pmu_acpi.c
-
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index 1ee94c7..e391b67 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -81,6 +81,8 @@
+ #define ARM_CPU_XSCALE_ARCH_V2		0x4000
+ #define ARM_CPU_XSCALE_ARCH_V3		0x6000
+ 
++#define ARM_PARTNUM(cpuid_id) (cpuid_id & ARM_CPU_PART_MASK)
++
+ extern unsigned int processor_id;
+ 
+ #ifdef CONFIG_CPU_CP15
+@@ -180,7 +182,7 @@ static inline unsigned int __attribute_const__ read_cpuid_implementor(void)
+  */
+ static inline unsigned int __attribute_const__ read_cpuid_part(void)
+ {
+-	return read_cpuid_id() & ARM_CPU_PART_MASK;
++	return ARM_PARTNUM(read_cpuid_id());
+ }
+ 
+ static inline unsigned int __attribute_const__ __deprecated read_cpuid_part_number(void)
+@@ -208,6 +210,8 @@ static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
+ 	return read_cpuid(CPUID_MPIDR);
+ }
+ 
++#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->cpuid
++
+ /*
+  * Intel's XScale3 core supports some v6 features (supersections, L2)
+  * but advertises itself as v5 as it does not support the v6 ISA.  For
+diff --git a/arch/arm64/include/asm/cputype.h b/arch/arm64/include/asm/cputype.h
+index 87e1985..56fd8c1 100644
+--- a/arch/arm64/include/asm/cputype.h
++++ b/arch/arm64/include/asm/cputype.h
+@@ -38,6 +38,7 @@
+ #define MIDR_PARTNUM_MASK	(0xfff << MIDR_PARTNUM_SHIFT)
+ #define MIDR_PARTNUM(midr)	\
+ 	(((midr) & MIDR_PARTNUM_MASK) >> MIDR_PARTNUM_SHIFT)
++#define ARM_PARTNUM MIDR_PARTNUM
+ #define MIDR_ARCHITECTURE_SHIFT	16
+ #define MIDR_ARCHITECTURE_MASK	(0xf << MIDR_ARCHITECTURE_SHIFT)
+ #define MIDR_ARCHITECTURE(midr)	\
+@@ -126,6 +127,9 @@ static inline u32 __attribute_const__ read_cpuid_cachetype(void)
+ {
+ 	return read_cpuid(CTR_EL0);
+ }
++
++#define read_specific_cpuid(cpu_num) per_cpu_ptr(&cpu_data, cpu_num)->reg_midr
++
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif
 -- 
 2.5.5
