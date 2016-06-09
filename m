@@ -1,61 +1,43 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  9 Jun 2016 09:10:06 +0200
-Subject: [PATCH 00/12]  Add SDHCI Xenon driver
-Message-ID: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu,  9 Jun 2016 09:10:10 +0200
+Subject: [PATCH 04/12] mmc: sdhci: call voltage_switch callback also for the
+ 3.3V case
+In-Reply-To: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1465456218-28354-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Victor Gu <xigu@marvell.com>
 
-This series adds support for the SDHCI Xenon controller which can be
-found on the Armada 37xx and the Armada 7K/8K.
+Currently the voltage switch callback function is only called in the 1.8V
+case. However, given the name this callback should be called in the 3.3V
+case too. It is needed for the Xenon controller.
 
-This series currently only enables the support on the Armada 37xx SoCs
-and boards. More tests are needed to enable it on the A7K/A8K.
+[gregory.clement at free-electrons.com: split the initial commit and
+modify the log]
 
-Following the new trend for the MMC subsystem, instead of introducing
-new quirks for this controller we extend the mmc/sdhci framework by
-adding callbacks when needed.
+Signed-off-by: Victor Gu <xigu@marvell.com>
+Signed-off-by: Marcin Wojtas <mw@semihalf.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/mmc/host/sdhci.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (7):
-  mmc: sdhci_f_sdh30: restrict voltage_switch() callback to the 1.8V
-    case
-  mmc: tegra: restrict the voltage_switch() callback to the 1.8V case
-  mmc: core: export the alive operation
-  dt-bindings: mmc: Add Xenon description
-  arm64: dts: marvell: add eMMC support for Armada 37xx
-  arm64: dts: marvell: add SDIO support for Armada 37xx
-  arm64: defconfig: Add Xenon sdhci
-
-Marcin Wojtas (1):
-  mmc: sdhci: add init_card callback to sdhci
-
-Victor Gu (4):
-  mmc: sdhci: call voltage_switch callback also for the 3.3V case
-  mmc: sdhci: add a pre voltage switch callback function
-  mmc: sdhci: add delay adjust feature including phy reset
-  mmc: sdhci-xenon: add initial Xenon eMMC driver
-
- .../devicetree/bindings/mmc/sdhci-xenon.txt        |   27 +
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     |   12 +
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   17 +
- arch/arm64/configs/defconfig                       |    1 +
- drivers/mmc/core/core.c                            |    7 +
- drivers/mmc/host/Kconfig                           |   10 +
- drivers/mmc/host/Makefile                          |    1 +
- drivers/mmc/host/sdhci-tegra.c                     |    4 +
- drivers/mmc/host/sdhci-xenon.c                     | 1164 ++++++++++++++++++++
- drivers/mmc/host/sdhci.c                           |   20 +
- drivers/mmc/host/sdhci.h                           |    3 +
- drivers/mmc/host/sdhci_f_sdh30.c                   |    4 +
- include/linux/mmc/card.h                           |    1 +
- 13 files changed, 1271 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-xenon.txt
- create mode 100644 drivers/mmc/host/sdhci-xenon.c
-
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index fd4e9a84f739..b07219426d39 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1749,6 +1749,10 @@ static int sdhci_start_signal_voltage_switch(struct mmc_host *mmc,
+ 		/* Wait for 5ms */
+ 		usleep_range(5000, 5500);
+ 
++		/* Some controller need to do more when switching */
++		if (host->ops->voltage_switch)
++			host->ops->voltage_switch(host);
++
+ 		/* 3.3V regulator output should be stable within 5 ms */
+ 		ctrl = sdhci_readw(host, SDHCI_HOST_CONTROL2);
+ 		if (!(ctrl & SDHCI_CTRL_VDD_180))
 -- 
 2.5.0
