@@ -1,46 +1,105 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 9 Jun 2016 15:50:38 +0100
-Subject: [PATCH 4/4] mfd: db8500 stop passing around platform data
-In-Reply-To: <3648943.90TpD9e9VC@wuerfel>
-References: <1462889050-2818609-1-git-send-email-arnd@arndb.de>
- <CACRpkdZdR1rESjgD-p=79Jk3sp+Xi4ER1vYOsKcr6aAfHztpiw@mail.gmail.com>
- <3648943.90TpD9e9VC@wuerfel>
-Message-ID: <20160609145038.GM2385@dell>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 9 Jun 2016 16:51:45 +0200
+Subject: [PATCH v3 1/4] USB: Fix of_usb_get_dr_mode_by_phy with a shared
+ phy block
+In-Reply-To: <20160609143004.GA2167@uda0271908>
+References: <1465138776-6003-1-git-send-email-hdegoede@redhat.com>
+ <20160609143004.GA2167@uda0271908>
+Message-ID: <9a05c16a-e8a2-02b7-c093-1131e27bcdd4@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 08 Jun 2016, Arnd Bergmann wrote:
+Hi,
 
-> On Wednesday, June 8, 2016 1:37:12 PM CEST Linus Walleij wrote:
-> > On Tue, May 10, 2016 at 4:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > 
-> > > Except for the constant DB8500_PRCMU_FW_VERSION_OFFSET number, nothing
-> > > is ever passed through the platform data and used in a driver, so we
-> > > can simply stop passing it around.
-> > >
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> > 
-> > Do you think it's relevant for Lee to take this or do you want to
-> > have it in ARM SoC together with the other cleanups (that I
-> > haven't had time to look at...)?
-> > 
-> > In the latter case I need an ACK from Lee to apply it for a pull
-> > request to ARM SoC.
-> > 
-> > The functionality it pertains to is out-of-tree but if we want to
-> > reintroduce it, it should happen through DT anyway.
-> 
-> I think most of the changes are in mfd, so it would be appropriate
-> for Lee to take them all, but I could also put them into arm-soc
-> if he prefers.
+On 09-06-16 16:30, Bin Liu wrote:
+> Hi,
+>
+> On Sun, Jun 05, 2016 at 04:59:33PM +0200, Hans de Goede wrote:
+>> Some SoCs have a single phy-hw-block with multiple phys, this is
+>> modelled by a single phy dts node, so we end up with multiple
+>> controller nodes with a phys property pointing to the phy-node
+>> of the otg-phy.
+>>
+>> Only one of these controllers typically is an otg controller, yet we
+>> were checking the first controller who uses a phy from the block and
+>> then end up looking for a dr_mode property in e.g. the ehci controller.
+>>
+>> This commit fixes this by adding an arg0 parameter to
+>> of_usb_get_dr_mode_by_phy and make of_usb_get_dr_mode_by_phy
+>> check that this matches the phandle args[0] value when looking for
+>> the otg controller.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -Add a args0 parameter instead of looking for nodes with a dr_mode property
+>> Changes in v3:
+>> -No changes
+>> ---
+>>  drivers/usb/common/common.c  | 31 ++++++++++++++++++-------------
+>>  drivers/usb/phy/phy-am335x.c |  2 +-
+>>  include/linux/usb/of.h       |  4 ++--
+>>  3 files changed, 21 insertions(+), 16 deletions(-)
+>
+> This breaks am335x.
+>
+> [   17.433166] /ocp/usb at 47400000/usb at 47401000: could not get #phy-cells
+> for /ocp/usb at 47400000/usb-phy at 47401300
+> [   17.443627] /ocp/usb at 47400000/usb at 47401800: could not get #phy-cells
+> for /ocp/usb at 47400000/usb-phy at 47401b00
+> [   17.454005] am335x-phy-driver 47401300.usb-phy: dr_mode 0
+> [   17.460518] 47401300.usb-phy supply vcc not found, using dummy
+> regulator
+> [   17.469685] /ocp/usb at 47400000/usb at 47401000: could not get #phy-cells
+> for /ocp/usb at 47400000/usb-phy at 47401300
+> [   17.479998] /ocp/usb at 47400000/usb at 47401800: could not get #phy-cells
+> for /ocp/usb at 47400000/usb-phy at 47401b00
+> [   17.490342] am335x-phy-driver 47401b00.usb-phy: dr_mode 0
 
-Up to you.  If you want a pull-request, I can provide you with one.
-If you are happy to 'risk it', I'm good with that too.
+That is weird, quoting: drivers/phy/phy-core.c: _of_phy_get():
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+         ret = of_parse_phandle_with_args(np, "phys", "#phy-cells",
+                 index, &args);
+         if (ret)
+                 return ERR_PTR(-ENODEV);
+
+So if #phy-cells is not defined, then the phy core should not
+be able to work with the dts files in question at all.
+
+All my patch does is make the way of_usb_get_dr_mode_by_phy parses
+phy-handles be identical to how phy-core.c does it.
+
+I see that the usb0_phy node in arch/arm/boot/dts/am33xx.dtsi
+indeed lacks a "#phy-cells = <0>;" line.
+
+Quoting: Documentation/devicetree/bindings/phy/phy-bindings.txt
+
+PHY device node
+===============
+
+Required Properties:
+#phy-cells:     Number of cells in a PHY specifier;  The meaning of all those
+                 cells is defined by the binding for the phy node. The PHY
+                 provider can use the values in cells to find the appropriate
+                 PHY.
+
+So not having #phy-cells defined for a phy-node clearly is a bug.
+
+A patch like the following should fix this:
+
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 52be48b..c4ff788d 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -557,6 +557,7 @@
+  			};
+
+  			usb0_phy: usb-phy at 47401300 {
++				#phy-cells = <0>;
+  				compatible = "ti,am335x-usb-phy";
+  				reg = <0x47401300 0x100>;
+  				reg-names = "phy";
+
+Regards,
+
+Hans
