@@ -1,36 +1,33 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 9 Jun 2016 20:43:55 +0530
-Subject: [PATCH] ARM: dts: DRA7: fix unit address of second PCIe instance
-Message-ID: <f79ded6b0b41c8e13f8f396d47f9522e5471d327.1465484975.git.nsekhar@ti.com>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Thu, 9 Jun 2016 16:17:02 +0100
+Subject: [PATCH v17 10/13] arm64: kdump: add VMCOREINFO for user-space
+ coredump tools
+In-Reply-To: <575986B5.9000701@arm.com>
+References: <cover.1464974516.git.geoff@infradead.org>
+ <9e75a7b75b38b37ded3e361498eaf1486107ce5d.1464974516.git.geoff@infradead.org>
+ <575986B5.9000701@arm.com>
+Message-ID: <5759886E.1050509@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kishon Vijay Abraham I <kishon@ti.com>
+On 09/06/16 16:09, Suzuki K Poulose wrote:
+> On 03/06/16 19:13, Geoff Levand wrote:
+>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>
+>> For the current crash utility, we need to know, at least, a value of
+>> "kimage_voffset" to handle the contents of core dump file (/proc/vmcore)
+>> correctly due to the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
+>>
+>> More VMCOREINFO may be added later for makedumpfile command.
+>> ---
+>
+> Missing Signed-off-by: ?
+>
+> Suzuki
+> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
+>
 
-The unit address of the second PCIe instance
-is set to be same as that of the first instance
-(copy-paste error).
+Please ignore the disclaimer message above
 
-Fix it.
 
-Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/boot/dts/dra7.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index a26b9a01af5d..0ba791add7f6 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -330,7 +330,7 @@
- 			ranges = <0x51800000 0x51800000 0x3000
- 				  0x0	     0x30000000 0x10000000>;
- 			status = "disabled";
--			pcie at 51000000 {
-+			pcie at 51800000 {
- 				compatible = "ti,dra7-pcie";
- 				reg = <0x51800000 0x2000>, <0x51802000 0x14c>, <0x1000 0x2000>;
- 				reg-names = "rc_dbics", "ti_conf", "config";
--- 
-2.6.3
+Suzuki
