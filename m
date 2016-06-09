@@ -1,97 +1,65 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Thu, 09 Jun 2016 18:32:42 +0900
-Subject: [RFC v4 0/7] extcon: usb-gpio: fixes and improvements
-In-Reply-To: <57592B4A.4000407@samsung.com>
-References: <CGME20160608134820epcas1p4ee75a89888f2ae2adb733124a330bd2c@epcas1p4.samsung.com>
- <1465393686-16644-1-git-send-email-k.kozlowski@samsung.com>
- <57592A40.9080608@samsung.com> <57592B4A.4000407@samsung.com>
-Message-ID: <575937BA.1070609@samsung.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu, 09 Jun 2016 11:35:24 +0200
+Subject: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when FEC
+ is active w/o HW workaround
+In-Reply-To: <VI1PR0401MB1855AA40FA576AF677A68E6FFF5C0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+References: <1464971480-9203-1-git-send-email-l.stach@pengutronix.de>
+ <VI1PR0401MB1855AA40FA576AF677A68E6FFF5C0@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+Message-ID: <1465464924.18807.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Fugang,
 
-On 2016? 06? 09? 17:39, Krzysztof Kozlowski wrote:
-> 
-> Hi,
-> 
-> 
-> On 06/09/2016 10:35 AM, Chanwoo Choi wrote:
->> Hi,
->>
->> It is good to support USB_ID and USB_VBUS by extcon.
->>
->> But,
->> there is some issue about adding the new cable type for
->> both EXTCON_USB_ID and EXTCON_USB_VBUS
->>
->> I think that the ID and VBUS state are not cable type
->> Instead, ID and VBUS state are the property of USB cable.
->>
->> So, I'd like to add the following function to support
->> the property of each cable as following:
->> The client driver can get the state of property by using
->> the extcon_get_cable_property_state().
->>
->> - int extcon_get_cable_property_state(struct extcon_dev *edev,
->> 				unsigned int id,
->> 				enum extcon_property property);
->> - int extcon_set_cable_property_state(struct extcon_dev *edev,
->> 				unsigned int id,
->> 				enum extcon_property property,
->> 				unsigned int state);
->>
->> For example,
->> In extcon-usb-gpio.c, set state of property as follwoing:
->> 	extcon_set_cable_property_state(edev, EXTCON_USB, EXTCON_USB_PROP_ID, 1);
->> 	extcon_set_cable_property_state(edev, EXTCON_USB, EXTCON_USB_PROP_VBUS, 1);
->>
->>
->> In the extcon client driver, get state of property as following:
->> 	id_state = extcon_get_cable_property_state(edev, EXTCON_USB, EXTCON_USB_PROP_ID);
->> 	vbus_state = extcon_get_cable_property_state(edev, EXTCON_USB, EXTCON_USB_PROP_VUBS);
-> 
-> How one can receive notifications with this API?
+Am Montag, den 06.06.2016, 02:00 +0000 schrieb Fugang Duan:
+> From: Lucas Stach <l.stach@pengutronix.de> Sent: Saturday, June 04,
+> 2016 12:31 AM
+> > 
+> > To: Shawn Guo <shawnguo@kernel.org>; Fugang Duan <fugang.duan@nxp.c
+> > om>
+> > Cc: devicetree at vger.kernel.org; patchwork-lst at pengutronix.de;
+> > kernel at pengutronix.de; linux-arm-kernel at lists.infradead.org;
+> > netdev at vger.kernel.org
+> > Subject: [PATCH v2 1/2] ARM: imx6: disable deeper idle states when
+> > FEC is
+> > active w/o HW workaround
+> > 
+> > The i.MX6 Q/DL has an erratum (ERR006687) that prevents the FEC
+> > from waking
+> > the CPUs when they are in wait(unclocked) state. As the hardware
+> > workaround
+> > isn't applicable to all boards, disable the deeper idle state when
+> > the workaround
+> > isn't present and the FEC is in use.
+> > 
+> > This allows to safely run a kernel with CPUidle enabled on all
+> > i.MX6 boards.
+> > 
+> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> > Acked-by: David S. Miller <davem@davemloft.net> (for network
+> > changes)
+> > ---
 
-I think that the extcon don't support the notification only for property.
-When USB or USB_HOST cable state is changed, the client driver
-call the extcon_get_cable_property_state() to read the state of property.
+[...]
 
-Namely, the property depend on the specific external connector.
-
+> Hi, Lucas,
 > 
-> Last time you wrote, at the end of discussion:
-> http://thread.gmane.org/gmane.linux.kernel/1923192/focus=1923193
->> IMO, if some usb driver check both id and vbus pin at the same time,
->> the usb driver can know the both id and vbus pin state through only
-> one notifier event.
->>
->> Also,
->> If some usb driver want to know the state of id pin except of vbus state,
->> when receiving following events, id pin is low.
->> 	#define EXTCON_USB_ID_L_VBUS_L0
->> 	#define EXTCON_USB_ID_L_VBUS_H1
->> when receiving following events, id pin is high.
->> 	#define EXTCON_USB_ID_H_VBUS_L2
->> 	#define EXTCON_USB_ID_H_VBUS_H3
->> Also, some usb driver would catch the vbus pin state with same method.
->>
->> But, it is just my opinion. We may use following notifier events for
-> each pin.
->> We need to discuss it.
->> 	#define EXTCON_USB_ID_LOW
->> 	#define EXTCON_USB_ID_HIGH	
->> 	#define EXTCON_USB_VBUS_LOW
->> 	#define EXTCON_USB_VBUS_HIGH
+> FEC irq cannot wake up CPUs when system is in wait mode. But we can
+> use GPIO_6 for FEC interrupt that GPIO irq wake up CPUs.
+> No need to disable wait mode as your such patches.
 > 
-> ... all other participants agreed on that conclusion. So why change of
-> view point now?
-
-Unitl now, the extcon framework only handle the state of external connector(cable).
-- The state of external connector is either attached or detached.
-
-I think that ID and VBUS are not external connector(cable).
-The ID and VBUS are more appropriate as property than new type of external connector.
+> You just config the gpio irq like below patches:
+> bc20a5d6da71 (ARM: dts: imx6qdl-sabreauto: use GPIO_6 for FEC
+> interrupt.)
+> 6261c4c8f13e (ARM: dts: imx6qdl-sabrelite: use GPIO_6 for FEC
+> interrupt.)
+> 
+Please look at the description of this series again. The changes don't
+disable the deeper idle states on boards where the HW waorkaround is
+available. There is a large number of boards in the wild which can not
+use the HW workaround, as they use GPIO_6 for other purposes. The aim
+of this series is to have an automatic software workaround available
+for those boards.
 
 Regards,
-Chanwoo Choi
+Lucas
