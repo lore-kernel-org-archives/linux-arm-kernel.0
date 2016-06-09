@@ -1,60 +1,48 @@
-From: maitysanchayan@gmail.com (maitysanchayan at gmail.com)
-Date: Thu, 9 Jun 2016 16:08:17 +0530
-Subject: [PATCH v3 4/4] soc: Add SoC driver for Freescale Vybrid platform
-In-Reply-To: <20160527100817.GA8294@Sanchayan-Arch.localdomain>
-References: <cover.1463737502.git.maitysanchayan@gmail.com>
- <CAL_JsqKCwy=aXveTfnaQuZ5b3Ld9nzABgPfdPm1JX3CBuvzG+Q@mail.gmail.com>
- <20160527063301.GB1554@Sanchayan-Arch.localdomain>
- <9495361.v6aft1QR0M@wuerfel>
- <20160527100817.GA8294@Sanchayan-Arch.localdomain>
-Message-ID: <20160609103817.GA14965@Sanchayan-Arch.localdomain>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Thu, 9 Jun 2016 12:47:36 +0200
+Subject: [PATCH 0/1] ARM: dts: sunxi: Fix simplefb not working in 4.7-rc1
+In-Reply-To: <20160609074643.GA5242@lukather>
+References: <1465063524-4925-1-git-send-email-hdegoede@redhat.com>
+ <20160609074643.GA5242@lukather>
+Message-ID: <21258fc0-0250-951b-2ee7-d022fb3c09ac@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Rob,
+Hi,
 
-On 16-05-27 15:38:17, maitysanchayan at gmail.com wrote:
-> On 16-05-27 10:31:55, Arnd Bergmann wrote:
-> > On Friday, May 27, 2016 12:03:01 PM CEST maitysanchayan at gmail.com wrote:
-> > > 
-> > > So if I understand correctly, the binding at the SoC level is fine.
-> > > Keeping that but removing the additional made-up properties, viz. below
-> > > 
-> > > rom-revision: phandle to the on-chip ROM node
-> > > mscm: phandle to the MSCM CPU configuration node
-> > > nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
-> > > nvmem-cell-names: should contain string names "cfg0" and "cfg1"
-> > > 
-> > > would be fine?
-> > > 
-> > > We would have something similar to here
-> > > http://www.spinics.net/lists/devicetree/msg80655.html
-> > > 
-> > > but now with the DT binding under SoC bus.
-> > > 
-> > 
-> > 
-> > You look up the OTP device as a syscon here, which seems odd since there
-> > is already an nvmem driver for it. Shouldn't you use the nvmem API for
-> > that?
-> > 
-> > 	Arnd
-> 
-> I need the following 
-> 
-> nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
-> nvmem-cell-names: should contain string names "cfg0" and "cfg1"
-> 
-> to be able to use the NVMEM consumer API.
-> 
-> If I can put them at SoC node level then I certainly can use the NVMEM API.
-> 
+On 09-06-16 09:46, Maxime Ripard wrote:
+> Hi Hans,
+>
+> On Sat, Jun 04, 2016 at 08:05:23PM +0200, Hans de Goede wrote:
+>> Hi Maxime,
+>>
+>> While testing 4.7-rc1 / linux-sunxi/sunxi-next on a A10s I noticed that
+>> hdmi out is no longer working (screen goes black when the kernel turns
+>> of unused clocks).
+>>
+>> This is caused by the dtsi for sun4i / sun5i / sun7i based boards now
+>> listing pll3, without pll3 being added to the clocks list for the
+>> simplefb nodes.
+>
+> Why not do just that then? It's more appropriate for a fix imho.
 
-Would the following be acceptable at the SoC node level
+You mean just for sun5i-a10s, or for all of sun4i / sun5i-a10s and
+sun7i ?
 
-> nvmem-cells: phandles to two OCOTP child nodes ocotp_cfg0 and ocotp_cfg1
-> nvmem-cell-names: should contain string names "cfg0" and "cfg1"
+For sun4i and sun7i things are already fixed in next:
+
+https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?id=5a7f2310cc847a73852e70bc720a61ca9bf986a6
+https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/commit/?id=c79255ca4d7b67cce4eac4dd532e097ce49f3679
+
+It seems best to use those fixes, rather then come up with a separate
+fix for 4.7.
+
+My patch for fixing sun5i-a10s is inline with the 2 above patches,
+which seems best, rather then doing something special for just sun5i-a10s.
+
+I'll send a v2 of this patch with the spelling mistakes pointed out
+by Peter Korsgaard fixed.
 
 Regards,
-Sanchayan.
- 
+
+Hans
