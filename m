@@ -1,215 +1,502 @@
 From: peter.senna@collabora.com (Peter Senna Tschudin)
-Date: Thu,  9 Jun 2016 18:25:01 +0200
-Subject: [PATCH V2 1/5] drm/imx-ldb: Add support to drm-bridge
+Date: Thu,  9 Jun 2016 18:25:04 +0200
+Subject: [PATCH V2 4/5] drm/bridge: Add driver for GE B850v3 LVDS/DP++ Bridge
 In-Reply-To: <cover.1465486875.git.peter.senna@collabora.com>
 References: <1464626385-19253-1-git-send-email-peter.senna@collabora.com>
  <cover.1465486875.git.peter.senna@collabora.com>
-Message-ID: <ecdd2f66f5a4661e81b40808dffd212989d0ab15.1465486875.git.peter.senna@collabora.com>
+Message-ID: <12d7b93d6143aabec19999af84e592768adc63a0.1465486875.git.peter.senna@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support to attach a drm_bridge to imx-ldb in addition to
-existing support to attach a LVDS panel.
+Add a driver that create a drm_bridge and a drm_connector for the LVDS
+to DP++ display bridge of the GE B850v3.
 
-This patch does a simple code refactoring by moving code
-from for_each_child_of_node iterator to a new function named
-imx_ldb_panel_ddc(). This was necessary to allow the panel ddc
-code to run only when the imx_ldb is not attached to a bridge.
+There are two physical bridges on the video signal pipeline: a
+STDP4028(LVDS to DP) and a STDP2690(DP to DP++).  The hardware and
+firmware made it complicated for this binding to comprise two device
+tree nodes, as the design goal is to configure both bridges based on
+the LVDS signal, which leave the driver powerless to control the video
+processing pipeline. The two bridges behaves as a single bridge, and
+the driver is only needed for telling the host about EDID / HPD, and
+for giving the host powers to ack interrupts. The video signal pipeline
+is as follows:
+
+  Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
 
 Cc: Enric Balletbo i Serra <enric.balletbo@collabora.com>
 Cc: Philipp Zabel <p.zabel@pengutronix.de>
 Cc: Rob Herring <robh@kernel.org>
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
-Cc: David Airlie <airlied@linux.ie>
-Cc: Thierry Reding <treding@nvidia.com>
-Cc: Thierry Reding <thierry.reding@gmail.com>
+CC: David Airlie <airlied@linux.ie>
+CC: Thierry Reding <treding@nvidia.com>
+CC: Thierry Reding <thierry.reding@gmail.com>
 Signed-off-by: Peter Senna Tschudin <peter.senna@collabora.com>
 ---
 Changes from V1:
- - Reanmed ext_bridge to bridge
- - Removed empty entry point imx_ldb_encoder_enable()
- - Adapted the code to apply to the latest linux next: next-20160609
+ - New commit message
+ - Removed 3 empty entry points
+ - Removed memory leak from ge_b850v3_lvds_dp_get_modes()
+ - Added a lock for mode setting
+ - Removed a few blank lines
+ - Changed the order at Makefile and Kconfig
 
- drivers/gpu/drm/imx/imx-ldb.c | 121 +++++++++++++++++++++++++++---------------
- 1 file changed, 79 insertions(+), 42 deletions(-)
+ MAINTAINERS                                |   8 +
+ drivers/gpu/drm/bridge/Kconfig             |  11 +
+ drivers/gpu/drm/bridge/Makefile            |   1 +
+ drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c | 392 +++++++++++++++++++++++++++++
+ 4 files changed, 412 insertions(+)
+ create mode 100644 drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
 
-diff --git a/drivers/gpu/drm/imx/imx-ldb.c b/drivers/gpu/drm/imx/imx-ldb.c
-index beff793..55e94cc 100644
---- a/drivers/gpu/drm/imx/imx-ldb.c
-+++ b/drivers/gpu/drm/imx/imx-ldb.c
-@@ -58,7 +58,11 @@ struct imx_ldb_channel {
- 	struct imx_ldb *ldb;
- 	struct drm_connector connector;
- 	struct drm_encoder encoder;
-+
-+	/* Defines what is connected to the ldb, only one at a time */
- 	struct drm_panel *panel;
-+	struct drm_bridge *bridge;
-+
- 	struct device_node *child;
- 	struct i2c_adapter *ddc;
- 	int chno;
-@@ -422,16 +426,27 @@ static int imx_ldb_register(struct drm_device *drm,
- 	drm_encoder_init(drm, &imx_ldb_ch->encoder, &imx_ldb_encoder_funcs,
- 			 DRM_MODE_ENCODER_LVDS, NULL);
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2ce5e91..2dd3d7f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5010,6 +5010,14 @@ W:	https://linuxtv.org
+ S:	Maintained
+ F:	drivers/media/radio/radio-gemtek*
  
--	drm_connector_helper_add(&imx_ldb_ch->connector,
--			&imx_ldb_connector_helper_funcs);
--	drm_connector_init(drm, &imx_ldb_ch->connector,
--			   &imx_ldb_connector_funcs, DRM_MODE_CONNECTOR_LVDS);
--
--	if (imx_ldb_ch->panel)
-+	if (imx_ldb_ch->panel) {
-+		drm_connector_helper_add(&imx_ldb_ch->connector,
-+				&imx_ldb_connector_helper_funcs);
-+		drm_connector_init(drm, &imx_ldb_ch->connector,
-+				&imx_ldb_connector_funcs,
-+				DRM_MODE_CONNECTOR_LVDS);
- 		drm_panel_attach(imx_ldb_ch->panel, &imx_ldb_ch->connector);
-+		drm_mode_connector_attach_encoder(&imx_ldb_ch->connector,
-+				&imx_ldb_ch->encoder);
++GENERAL ELECTRIC B850V3 LVDS/DP++ BRIDGE
++M:	Martin Donnelly <martin.donnelly@ge.com>
++M:	Peter Senna Tschudin <peter.senna@collabora.com>
++M:	Martyn Welch <martyn.welch@collabora.co.uk>
++S:	Maintained
++F:	drivers/gpu/drm/bridge/ge_b850v3_dp2.c
++F:	Documentation/devicetree/bindings/ge/b850v3_dp2_bridge.txt
++
+ GENERIC GPIO I2C DRIVER
+ M:	Haavard Skinnemoen <hskinnemoen@gmail.com>
+ S:	Supported
+diff --git a/drivers/gpu/drm/bridge/Kconfig b/drivers/gpu/drm/bridge/Kconfig
+index 8f7423f..93dae5bd 100644
+--- a/drivers/gpu/drm/bridge/Kconfig
++++ b/drivers/gpu/drm/bridge/Kconfig
+@@ -32,6 +32,17 @@ config DRM_DW_HDMI_AHB_AUDIO
+ 	  Designware HDMI block.  This is used in conjunction with
+ 	  the i.MX6 HDMI driver.
+ 
++config DRM_GE_B850V3_LVDS_DP
++	tristate "GE B850v3 LVDS to DP++ display bridge"
++	depends on OF
++	select DRM_KMS_HELPER
++	select DRM_PANEL
++	---help---
++          This is a driver for the display bridge of
++          GE B850v3 that convert dual channel LVDS
++          to DP++. This is used with the i.MX6 imx-ldb
++          driver.
++
+ config DRM_NXP_PTN3460
+ 	tristate "NXP PTN3460 DP/LVDS bridge"
+ 	depends on OF
+diff --git a/drivers/gpu/drm/bridge/Makefile b/drivers/gpu/drm/bridge/Makefile
+index 96b13b3..47ea6c1 100644
+--- a/drivers/gpu/drm/bridge/Makefile
++++ b/drivers/gpu/drm/bridge/Makefile
+@@ -3,6 +3,7 @@ ccflags-y := -Iinclude/drm
+ obj-$(CONFIG_DRM_ANALOGIX_ANX78XX) += analogix-anx78xx.o
+ obj-$(CONFIG_DRM_DW_HDMI) += dw-hdmi.o
+ obj-$(CONFIG_DRM_DW_HDMI_AHB_AUDIO) += dw-hdmi-ahb-audio.o
++obj-$(CONFIG_DRM_GE_B850V3_LVDS_DP) += ge_b850v3_lvds_dp.o
+ obj-$(CONFIG_DRM_NXP_PTN3460) += nxp-ptn3460.o
+ obj-$(CONFIG_DRM_PARADE_PS8622) += parade-ps8622.o
+ obj-$(CONFIG_DRM_ANALOGIX_DP) += analogix/
+diff --git a/drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c b/drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
+new file mode 100644
+index 0000000..c73cd77
+--- /dev/null
++++ b/drivers/gpu/drm/bridge/ge_b850v3_lvds_dp.c
+@@ -0,0 +1,392 @@
++/*
++ * Driver for GE B850v3 DP display bridge
++
++ * Copyright (c) 2016, Collabora Ltd.
++ * Copyright (c) 2016, General Electric Company
++
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++ * This driver creates a drm_bridge and a drm_connector for the LVDS to DP++
++ * display bridge of the GE B850v3. There are two physical bridges on the video
++ * signal pipeline: a STDP4028(LVDS to DP) and a STDP2690(DP to DP++). However
++ * the physical bridges are automatically configured by the input video signal,
++ * and the driver has no access to the video processing pipeline. The driver is
++ * only needed to read EDID from the STDP2690 and to handle HPD events from the
++ * STDP4028. The driver communicates with both bridges over i2c. The video
++ * signal pipeline is as follows:
++ *
++ *   Host -> LVDS|--(STDP4028)--|DP -> DP|--(STDP2690)--|DP++ -> Video output
++
++ *
++ */
++#include <linux/gpio.h>
++#include <linux/i2c.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include "drm_crtc.h"
++#include "drm_crtc_helper.h"
++#include "drm_edid.h"
++#include "drmP.h"
++
++#define EDID_EXT_BLOCK_CNT 0x7E
++
++#define STDP4028_IRQ_OUT_CONF_REG 0x02
++#define STDP4028_DPTX_IRQ_EN_REG 0x3C
++#define STDP4028_DPTX_IRQ_STS_REG 0x3D
++#define STDP4028_DPTX_STS_REG 0x3E
++
++#define STDP4028_DPTX_DP_IRQ_EN 0x1000
++
++#define STDP4028_DPTX_HOTPLUG_IRQ_EN 0x0400
++#define STDP4028_DPTX_LINK_CH_IRQ_EN 0x2000
++#define STDP4028_DPTX_IRQ_CONFIG \
++		(STDP4028_DPTX_LINK_CH_IRQ_EN | STDP4028_DPTX_HOTPLUG_IRQ_EN)
++
++#define STDP4028_DPTX_HOTPLUG_STS 0x0200
++#define STDP4028_DPTX_LINK_STS 0x1000
++#define STDP4028_CON_STATE_CONNECTED \
++		(STDP4028_DPTX_HOTPLUG_STS | STDP4028_DPTX_LINK_STS)
++
++#define STDP4028_DPTX_HOTPLUG_CH_STS 0x0400
++#define STDP4028_DPTX_LINK_CH_STS 0x2000
++#define STDP4028_DPTX_IRQ_CLEAR \
++		(STDP4028_DPTX_LINK_CH_STS | STDP4028_DPTX_HOTPLUG_CH_STS)
++
++struct ge_b850v3_lvds_dp {
++	struct drm_connector connector;
++	struct drm_bridge bridge;
++	struct i2c_client *ge_b850v3_lvds_dp_i2c;
++	struct i2c_client *edid_i2c;
++	struct edid *edid;
++	struct mutex lock;
++};
++
++static inline struct ge_b850v3_lvds_dp *
++		bridge_to_ge_b850v3_lvds_dp(struct drm_bridge *bridge)
++{
++	return container_of(bridge, struct ge_b850v3_lvds_dp, bridge);
++}
++
++static inline struct ge_b850v3_lvds_dp *
++		connector_to_ge_b850v3_lvds_dp(struct drm_connector *connector)
++{
++	return container_of(connector, struct ge_b850v3_lvds_dp, connector);
++}
++
++static void ge_b850v3_lvds_dp_enable(struct drm_bridge *bridge)
++{
++}
++
++static void ge_b850v3_lvds_dp_disable(struct drm_bridge *bridge)
++{
++}
++
++u8 *stdp2690_get_edid(struct i2c_client *client)
++{
++	struct i2c_adapter *adapter = client->adapter;
++	unsigned char start = 0x00;
++	unsigned int total_size;
++	u8 *block = kmalloc(EDID_LENGTH, GFP_KERNEL);
++
++	struct i2c_msg msgs[] = {
++		{
++			.addr	= client->addr,
++			.flags	= 0,
++			.len	= 1,
++			.buf	= &start,
++		}, {
++			.addr	= client->addr,
++			.flags	= I2C_M_RD,
++			.len	= EDID_LENGTH,
++			.buf	= block,
++		}
++	};
++
++	if (!block)
++		return NULL;
++
++	if (i2c_transfer(adapter, msgs, 2) != 2) {
++		DRM_ERROR("Unable to read EDID.\n");
++		goto err;
 +	}
- 
--	drm_mode_connector_attach_encoder(&imx_ldb_ch->connector,
--			&imx_ldb_ch->encoder);
-+	if (imx_ldb_ch->bridge) {
-+		imx_ldb_ch->bridge->encoder = &imx_ldb_ch->encoder;
 +
-+		imx_ldb_ch->encoder.bridge = imx_ldb_ch->bridge;
-+		ret = drm_bridge_attach(drm, imx_ldb_ch->bridge);
-+		if (ret) {
-+			DRM_ERROR("Failed to initialize bridge with drm\n");
-+			return ret;
++	if (!drm_edid_block_valid(block, 0, false, NULL)) {
++		DRM_ERROR("Invalid EDID block\n");
++		goto err;
++	}
++
++	total_size = (block[EDID_EXT_BLOCK_CNT] + 1) * EDID_LENGTH;
++	if (total_size > EDID_LENGTH) {
++		kfree(block);
++		block = kmalloc(total_size, GFP_KERNEL);
++		if (!block)
++			return NULL;
++
++		/* Yes, read the entire buffer, and do not skip the first
++		 * EDID_LENGTH bytes.
++		 */
++		start = 0x00;
++		msgs[1].len = total_size;
++		msgs[1].buf = block;
++
++		if (i2c_transfer(adapter, msgs, 2) != 2) {
++			DRM_ERROR("Unable to read EDID extension blocks.\n");
++			goto err;
 +		}
 +	}
- 
- 	return 0;
- }
-@@ -501,6 +516,45 @@ static const struct of_device_id imx_ldb_dt_ids[] = {
- };
- MODULE_DEVICE_TABLE(of, imx_ldb_dt_ids);
- 
-+static int imx_ldb_panel_ddc(struct device *dev,
-+		struct imx_ldb_channel *channel, struct device_node *child)
++
++	return block;
++
++err:
++	kfree(block);
++	return NULL;
++}
++
++static int ge_b850v3_lvds_dp_get_modes(struct drm_connector *connector)
 +{
-+	struct device_node *ddc_node;
-+	const u8 *edidp;
++	struct ge_b850v3_lvds_dp *ptn_bridge;
++	struct i2c_client *client;
++	int num_modes = 0;
++
++	ptn_bridge = connector_to_ge_b850v3_lvds_dp(connector);
++	client = ptn_bridge->edid_i2c;
++
++	mutex_lock(&ptn_bridge->lock);
++
++	kfree(ptn_bridge->edid);
++	ptn_bridge->edid = (struct edid *) stdp2690_get_edid(client);
++
++	if (ptn_bridge->edid) {
++		drm_mode_connector_update_edid_property(connector,
++				ptn_bridge->edid);
++		num_modes = drm_add_edid_modes(connector, ptn_bridge->edid);
++	}
++
++	mutex_unlock(&ptn_bridge->lock);
++
++	return num_modes;
++}
++
++static struct drm_encoder
++*ge_b850v3_lvds_dp_best_encoder(struct drm_connector *connector)
++{
++	struct ge_b850v3_lvds_dp *ptn_bridge =
++		connector_to_ge_b850v3_lvds_dp(connector);
++
++	return ptn_bridge->bridge.encoder;
++}
++
++static const struct
++drm_connector_helper_funcs ge_b850v3_lvds_dp_connector_helper_funcs = {
++	.get_modes = ge_b850v3_lvds_dp_get_modes,
++	.best_encoder = ge_b850v3_lvds_dp_best_encoder,
++};
++
++static enum drm_connector_status ge_b850v3_lvds_dp_detect(
++		struct drm_connector *connector, bool force)
++{
++	struct ge_b850v3_lvds_dp *ptn_bridge =
++			connector_to_ge_b850v3_lvds_dp(connector);
++	struct i2c_client *ge_b850v3_lvds_dp_i2c =
++			ptn_bridge->ge_b850v3_lvds_dp_i2c;
++	s32 link_state;
++
++	link_state = i2c_smbus_read_word_data(ge_b850v3_lvds_dp_i2c,
++			STDP4028_DPTX_STS_REG);
++
++	if (link_state == STDP4028_CON_STATE_CONNECTED)
++		return connector_status_connected;
++
++	if (link_state == 0)
++		return connector_status_disconnected;
++
++	return connector_status_unknown;
++}
++
++static void ge_b850v3_lvds_dp_connector_destroy(struct drm_connector *connector)
++{
++	drm_connector_cleanup(connector);
++}
++
++static const struct drm_connector_funcs ge_b850v3_lvds_dp_connector_funcs = {
++	.dpms = drm_helper_connector_dpms,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	.detect = ge_b850v3_lvds_dp_detect,
++	.destroy = ge_b850v3_lvds_dp_connector_destroy,
++};
++
++static irqreturn_t ge_b850v3_lvds_dp_irq_handler(int irq, void *dev_id)
++{
++	struct ge_b850v3_lvds_dp *ptn_bridge = dev_id;
++	struct i2c_client *ge_b850v3_lvds_dp_i2c
++			= ptn_bridge->ge_b850v3_lvds_dp_i2c;
++
++	mutex_lock(&ptn_bridge->lock);
++
++	i2c_smbus_write_word_data(ge_b850v3_lvds_dp_i2c,
++			STDP4028_DPTX_IRQ_STS_REG, STDP4028_DPTX_IRQ_CLEAR);
++
++	mutex_unlock(&ptn_bridge->lock);
++
++	if (ptn_bridge->connector.dev)
++		drm_kms_helper_hotplug_event(ptn_bridge->connector.dev);
++
++	return IRQ_HANDLED;
++}
++
++static int ge_b850v3_lvds_dp_attach(struct drm_bridge *bridge)
++{
++	struct ge_b850v3_lvds_dp *ptn_bridge
++			= bridge_to_ge_b850v3_lvds_dp(bridge);
++	struct drm_connector *connector = &ptn_bridge->connector;
++	struct i2c_client *ge_b850v3_lvds_dp_i2c
++			= ptn_bridge->ge_b850v3_lvds_dp_i2c;
 +	int ret;
 +
-+	ddc_node = of_parse_phandle(child, "ddc-i2c-bus", 0);
-+	if (ddc_node) {
-+		channel->ddc = of_find_i2c_adapter_by_node(ddc_node);
-+		of_node_put(ddc_node);
-+		if (!channel->ddc) {
-+			dev_warn(dev, "failed to get ddc i2c adapter\n");
-+			return -EPROBE_DEFER;
-+		}
++	if (!bridge->encoder) {
++		DRM_ERROR("Parent encoder object not found");
++		return -ENODEV;
 +	}
 +
-+	if (!channel->ddc) {
-+		/* if no DDC available, fallback to hardcoded EDID */
-+		dev_dbg(dev, "no ddc available\n");
++	connector->polled = DRM_CONNECTOR_POLL_HPD;
 +
-+		edidp = of_get_property(child, "edid",
-+					&channel->edid_len);
-+		if (edidp) {
-+			channel->edid = kmemdup(edidp,
-+						channel->edid_len,
-+						GFP_KERNEL);
-+		} else if (!channel->panel) {
-+			/* fallback to display-timings node */
-+			ret = of_get_drm_display_mode(child,
-+						      &channel->mode,
-+						      OF_USE_NATIVE_MODE);
-+			if (!ret)
-+				channel->mode_valid = 1;
-+		}
++	drm_connector_helper_add(connector,
++			&ge_b850v3_lvds_dp_connector_helper_funcs);
++
++	ret = drm_connector_init(bridge->dev, connector,
++			&ge_b850v3_lvds_dp_connector_funcs,
++			DRM_MODE_CONNECTOR_DisplayPort);
++	if (ret) {
++		DRM_ERROR("Failed to initialize connector with drm\n");
++		return ret;
 +	}
++
++	ret = drm_mode_connector_attach_encoder(connector, bridge->encoder);
++	if (ret)
++		return ret;
++
++	drm_bridge_enable(bridge);
++	if (ge_b850v3_lvds_dp_i2c->irq) {
++		drm_helper_hpd_irq_event(connector->dev);
++
++		ret = devm_request_threaded_irq(&ge_b850v3_lvds_dp_i2c->dev,
++				ge_b850v3_lvds_dp_i2c->irq, NULL,
++				ge_b850v3_lvds_dp_irq_handler,
++				IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
++				"ge-b850v3-lvds-dp", ptn_bridge);
++		if (ret)
++			return ret;
++	}
++
 +	return 0;
 +}
 +
- static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- {
- 	struct drm_device *drm = data;
-@@ -508,7 +562,6 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- 	const struct of_device_id *of_id =
- 			of_match_device(imx_ldb_dt_ids, dev);
- 	struct device_node *child;
--	const u8 *edidp;
- 	struct imx_ldb *imx_ldb;
- 	int dual;
- 	int ret;
-@@ -558,7 +611,6 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- 
- 	for_each_child_of_node(np, child) {
- 		struct imx_ldb_channel *channel;
--		struct device_node *ddc_node;
- 		struct device_node *ep;
- 
- 		ret = of_property_read_u32(child, "reg", &i);
-@@ -590,46 +642,31 @@ static int imx_ldb_bind(struct device *dev, struct device *master, void *data)
- 
- 			remote = of_graph_get_remote_port_parent(ep);
- 			of_node_put(ep);
--			if (remote)
-+			if (remote) {
- 				channel->panel = of_drm_find_panel(remote);
--			else
-+				channel->bridge = of_drm_find_bridge(remote);
-+			} else
- 				return -EPROBE_DEFER;
++static const struct drm_bridge_funcs ge_b850v3_lvds_dp_funcs = {
++	.enable = ge_b850v3_lvds_dp_enable,
++	.disable = ge_b850v3_lvds_dp_disable,
++	.attach = ge_b850v3_lvds_dp_attach,
++};
 +
- 			of_node_put(remote);
--			if (!channel->panel) {
--				dev_err(dev, "panel not found: %s\n",
--					remote->full_name);
--				return -EPROBE_DEFER;
--			}
--		}
- 
--		ddc_node = of_parse_phandle(child, "ddc-i2c-bus", 0);
--		if (ddc_node) {
--			channel->ddc = of_find_i2c_adapter_by_node(ddc_node);
--			of_node_put(ddc_node);
--			if (!channel->ddc) {
--				dev_warn(dev, "failed to get ddc i2c adapter\n");
-+			/*
-+			 * If the bridge is compiled as a module, it may take
-+			 * some time until the bridge driver is available.
-+			 * Defer until the bridge driver is ready.
-+			 */
-+			if (!channel->panel && !channel->bridge) {
-+				dev_err(dev, "panel/bridge not found: %s\n",
-+					remote->full_name);
- 				return -EPROBE_DEFER;
- 			}
- 		}
- 
--		if (!channel->ddc) {
--			/* if no DDC available, fallback to hardcoded EDID */
--			dev_dbg(dev, "no ddc available\n");
--
--			edidp = of_get_property(child, "edid",
--						&channel->edid_len);
--			if (edidp) {
--				channel->edid = kmemdup(edidp,
--							channel->edid_len,
--							GFP_KERNEL);
--			} else if (!channel->panel) {
--				/* fallback to display-timings node */
--				ret = of_get_drm_display_mode(child,
--							      &channel->mode,
--							      OF_USE_NATIVE_MODE);
--				if (!ret)
--					channel->mode_valid = 1;
--			}
-+		/* Only does panel ddc work if there is no bridge */
-+		if (!channel->bridge) {
-+			ret = imx_ldb_panel_ddc(dev, channel, child);
-+			if (ret)
-+				return ret;
- 		}
- 
- 		channel->bus_format = of_get_bus_format(dev, child);
++static int ge_b850v3_lvds_dp_probe(struct i2c_client *ge_b850v3_lvds_dp_i2c,
++				const struct i2c_device_id *id)
++{
++	struct device *dev = &ge_b850v3_lvds_dp_i2c->dev;
++	struct ge_b850v3_lvds_dp *ptn_bridge;
++	int ret;
++	u32 edid_i2c_reg;
++
++	ptn_bridge = devm_kzalloc(dev, sizeof(*ptn_bridge), GFP_KERNEL);
++	if (!ptn_bridge)
++		return -ENOMEM;
++
++	mutex_init(&ptn_bridge->lock);
++
++	ptn_bridge->ge_b850v3_lvds_dp_i2c = ge_b850v3_lvds_dp_i2c;
++	ptn_bridge->bridge.driver_private = ptn_bridge;
++	i2c_set_clientdata(ge_b850v3_lvds_dp_i2c, ptn_bridge);
++
++	ret = of_property_read_u32(dev->of_node, "edid-reg", &edid_i2c_reg);
++	if (ret) {
++		dev_err(dev, "edid-reg not specified, aborting...\n");
++		return -ENODEV;
++	}
++
++	ptn_bridge->edid_i2c = devm_kzalloc(dev,
++			sizeof(struct i2c_client), GFP_KERNEL);
++
++	if (!ptn_bridge->edid_i2c)
++		return -ENOMEM;
++
++	memcpy(ptn_bridge->edid_i2c, ge_b850v3_lvds_dp_i2c,
++			sizeof(struct i2c_client));
++
++	ptn_bridge->edid_i2c->addr = (unsigned short) edid_i2c_reg;
++
++	/* Configures the bridge to re-enable interrupts after each ack */
++	i2c_smbus_write_word_data(ge_b850v3_lvds_dp_i2c,
++			STDP4028_IRQ_OUT_CONF_REG, STDP4028_DPTX_DP_IRQ_EN);
++	i2c_smbus_write_word_data(ge_b850v3_lvds_dp_i2c,
++			STDP4028_DPTX_IRQ_EN_REG, STDP4028_DPTX_IRQ_CONFIG);
++
++	/* Clear pending interrupts since power up. */
++	i2c_smbus_write_word_data(ge_b850v3_lvds_dp_i2c,
++			STDP4028_DPTX_IRQ_STS_REG, STDP4028_DPTX_IRQ_CLEAR);
++
++	ptn_bridge->bridge.funcs = &ge_b850v3_lvds_dp_funcs;
++	ptn_bridge->bridge.of_node = dev->of_node;
++	ret = drm_bridge_add(&ptn_bridge->bridge);
++	if (ret) {
++		DRM_ERROR("Failed to add bridge\n");
++		return ret;
++	}
++
++	return 0;
++}
++
++static int ge_b850v3_lvds_dp_remove(struct i2c_client *ge_b850v3_lvds_dp_i2c)
++{
++	struct ge_b850v3_lvds_dp *ptn_bridge =
++		i2c_get_clientdata(ge_b850v3_lvds_dp_i2c);
++
++	drm_bridge_remove(&ptn_bridge->bridge);
++
++	return 0;
++}
++
++static const struct i2c_device_id ge_b850v3_lvds_dp_i2c_table[] = {
++	{"b850v3-lvds-dp", 0},
++	{},
++};
++MODULE_DEVICE_TABLE(i2c, ge_b850v3_lvds_dp_i2c_table);
++
++static const struct of_device_id ge_b850v3_lvds_dp_match[] = {
++	{ .compatible = "ge,b850v3-lvds-dp" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, ge_b850v3_lvds_dp_match);
++
++static struct i2c_driver ge_b850v3_lvds_dp_driver = {
++	.id_table	= ge_b850v3_lvds_dp_i2c_table,
++	.probe		= ge_b850v3_lvds_dp_probe,
++	.remove		= ge_b850v3_lvds_dp_remove,
++	.driver		= {
++		.name		= "ge,b850v3-lvds-dp",
++		.of_match_table = ge_b850v3_lvds_dp_match,
++	},
++};
++module_i2c_driver(ge_b850v3_lvds_dp_driver);
++
++MODULE_AUTHOR("Peter Senna Tschudin <peter.senna@collabora.com>");
++MODULE_AUTHOR("Martyn Welch <martyn.welch@collabora.co.uk>");
++MODULE_DESCRIPTION("GE LVDS to DP++ bridge)");
++MODULE_LICENSE("GPL v2");
 -- 
 2.5.5
