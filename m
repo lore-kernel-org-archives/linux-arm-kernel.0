@@ -1,133 +1,131 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 9 Jun 2016 09:39:34 +0200
-Subject: [PATCH 1/5] soc: qcom: Add suspend to idle support
-In-Reply-To: <1463634020-17252-2-git-send-email-andy.gross@linaro.org>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-2-git-send-email-andy.gross@linaro.org>
-Message-ID: <CAPDyKFrAGVPkc=ycm-cQg6Y5NLx_d4xGeg8SaSiB-K5sxtv76A@mail.gmail.com>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Thu, 9 Jun 2016 09:39:49 +0200
+Subject: [PATCH v2 05/15] clk: sunxi-ng: Add gate clock support
+In-Reply-To: <20160607204154.31967-6-maxime.ripard@free-electrons.com>
+References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
+ <20160607204154.31967-6-maxime.ripard@free-electrons.com>
+Message-ID: <20160609093949.b1a7a89aa1448226113b8b1d@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Daniel
+On Tue,  7 Jun 2016 22:41:44 +0200
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-On 19 May 2016 at 07:00, Andy Gross <andy.gross@linaro.org> wrote:
-> This patch adds suspend to idle support for Qualcomm processors.  While
-> suspend to memory will be a valid state, there won't be any special
-> handling or power savings over the suspend to idle.
->
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> Some clocks in the Allwinner SoCs clocks unit are just simple gates. Add
+> support for those clocks.
+> 
+> Since it's a feature that can also be found in more complex clocks, provide
+> a bunch of helpers that can be reused later on.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/soc/qcom/Makefile  |  1 +
->  drivers/soc/qcom/suspend.c | 77 ++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 78 insertions(+)
->  create mode 100644 drivers/soc/qcom/suspend.c
->
-> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-> index fdd664e..7c479d3 100644
-> --- a/drivers/soc/qcom/Makefile
-> +++ b/drivers/soc/qcom/Makefile
-> @@ -7,3 +7,4 @@ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
->  obj-$(CONFIG_QCOM_SMP2P)       += smp2p.o
->  obj-$(CONFIG_QCOM_SMSM)        += smsm.o
->  obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
-> +obj-$(CONFIG_SUSPEND)  +=      suspend.o
-> diff --git a/drivers/soc/qcom/suspend.c b/drivers/soc/qcom/suspend.c
+>  drivers/clk/sunxi-ng/Makefile   |  1 +
+>  drivers/clk/sunxi-ng/ccu_gate.c | 82 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu_gate.h | 53 ++++++++++++++++++++++++++
+>  3 files changed, 136 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_gate.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_gate.h
+> 
+> diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
+> index c59cf2ea509b..608b332e0b1f 100644
+> --- a/drivers/clk/sunxi-ng/Makefile
+> +++ b/drivers/clk/sunxi-ng/Makefile
+> @@ -4,3 +4,4 @@ obj-y += ccu_reset.o
+>  obj-y += ccu_frac.o
+>  
+>  obj-y += ccu_fixed_factor.o
+> +obj-y += ccu_gate.o
+> diff --git a/drivers/clk/sunxi-ng/ccu_gate.c b/drivers/clk/sunxi-ng/ccu_gate.c
 > new file mode 100644
-> index 0000000..7d3f2dd
+> index 000000000000..1e98f8a33ac3
 > --- /dev/null
-> +++ b/drivers/soc/qcom/suspend.c
-> @@ -0,0 +1,77 @@
+> +++ b/drivers/clk/sunxi-ng/ccu_gate.c
+> @@ -0,0 +1,82 @@
 > +/*
-> + * (C) Copyright 2016 Linaro Ltd.
+> + * Copyright (C) 2016 Maxime Ripard
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
 > + *
 > + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * as published by the Free Software Foundation; version 2
-> + * of the License.
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
 > + */
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/cpuidle.h>
-> +#include <linux/suspend.h>
 > +
+> +#include <linux/clk-provider.h>
 > +
-> +static void qcom_pm_enter_freeze(struct cpuidle_device *dev,
-> +       struct cpuidle_driver *drv,
-> +       int index)
+> +#include "ccu_gate.h"
+> +
+> +void ccu_gate_helper_disable(struct ccu_common *common, u32 gate)
 > +{
-> +       drv->states[index].enter(dev, drv, index);
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	if (!(common->features & CCU_FEATURE_GATE))
+> +		return;
+
+	if (!gate)
+		return;
+
+seems simpler and permits to remove the feature flag.
+
+> +
+> +	spin_lock_irqsave(common->lock, flags);
+> +
+> +	reg = readl(common->base + common->reg);
+> +	writel(reg & ~gate, common->base + common->reg);
+> +
+> +	spin_unlock_irqrestore(common->lock, flags);
 > +}
 > +
-> +static const struct of_device_id qcom_idle_state_match[] = {
-> +       { .compatible = "qcom,idle-state-spc", },
-> +       { },
-> +};
-> +
-> +static const struct platform_suspend_ops qcom_suspend_ops = {
-> +       .valid          = suspend_valid_only_mem,
-> +};
-> +
-> +static int __init qcom_pm_init(void)
+> +static void ccu_gate_disable(struct clk_hw *hw)
 > +{
-> +       struct cpuidle_device *cpu_dev;
-> +       struct cpuidle_driver *cpu_drv;
-> +       int state_count;
-> +       struct device_node *state_np, *cpu_np;
-> +       const struct of_device_id *match;
-> +       int i;
+> +	struct ccu_gate *cg = hw_to_ccu_gate(hw);
 > +
-> +       /* configure CPU enter_freeze if applicable */
-> +       for_each_present_cpu(i) {
-> +               cpu_np = of_get_cpu_node(i, NULL);
-> +               cpu_dev = per_cpu_ptr(cpuidle_devices, i);
-> +               cpu_drv = cpuidle_get_cpu_driver(cpu_dev);
-> +
-> +               if (!cpu_dev || !cpu_drv) {
-> +                       of_node_put(cpu_np);
-> +                       return -EPROBE_DEFER;
-
-This isn't a driver, so returning -EPROBE_DEFER doesn't make sense.
-
-> +               }
-> +
-> +               state_count = 0;
-> +               state_np = of_parse_phandle(cpu_np, "cpu-idle-states",
-> +                                                 state_count);
-> +
-> +               while (state_np) {
-> +                       match = of_match_node(qcom_idle_state_match,
-> +                                             state_np);
-> +
-> +                       state_count++;
-> +                       if (match)
-> +                               cpu_drv->states[state_count].enter_freeze =
-> +                                               &qcom_pm_enter_freeze;
-> +                       of_node_put(state_np);
-> +
-> +                       state_np = of_parse_phandle(cpu_np, "cpu-idle-states",
-> +                                                   state_count);
-> +               }
-> +
-> +               of_node_put(cpu_np);
-> +       }
-> +
-> +       suspend_set_ops(&qcom_suspend_ops);
-
-I don't think this will work!
-
-When building a multi defconfig for ARM, you might overwrite the
-suspend_ops (there's only one set) as here you don't know that it's
-actually the QCOM platform that is running, right!?
-
-Perhaps this code actually belongs closer to the cpuidle driver?
-
-> +
-> +       return 0;
+> +	return ccu_gate_helper_disable(&cg->common, cg->enable);
 > +}
 > +
-> +late_initcall(qcom_pm_init);
-> --
-> 1.9.1
+> +int ccu_gate_helper_enable(struct ccu_common *common, u32 gate)
+> +{
+> +	unsigned long flags;
+> +	u32 reg;
+> +
+> +	if (!(common->features & CCU_FEATURE_GATE))
+> +		return 0;
 
-Kind regards
-Uffe
+Same as above.
+
+> +
+> +	spin_lock_irqsave(common->lock, flags);
+> +
+> +	reg = readl(common->base + common->reg);
+> +	writel(reg | gate, common->base + common->reg);
+> +
+> +	spin_unlock_irqrestore(common->lock, flags);
+> +
+> +	return 0;
+> +}
+> +
+> +static int ccu_gate_enable(struct clk_hw *hw)
+> +{
+> +	struct ccu_gate *cg = hw_to_ccu_gate(hw);
+> +
+> +	return ccu_gate_helper_enable(&cg->common, cg->enable);
+> +}
+> +
+> +int ccu_gate_helper_is_enabled(struct ccu_common *common, u32 gate)
+> +{
+> +	if (!(common->features & CCU_FEATURE_GATE))
+> +		return 1;
+
+Same.
+
+> +
+> +	return readl(common->base + common->reg) & gate;
+> +}
+> +
+> +static int ccu_gate_is_enabled(struct clk_hw *hw)
+	[snip]
+
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
