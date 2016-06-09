@@ -1,83 +1,35 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 09 Jun 2016 04:18:11 +0200
-Subject: [PATCH V2 4/4] ARM: mxs: dts: Add SanDisk Sansa Fuze+ support
-In-Reply-To: <20160609021341.GA15413@tiger>
-References: <1462740621-7557-1-git-send-email-marex@denx.de>
- <1462740621-7557-4-git-send-email-marex@denx.de>
- <20160609012112.GA15053@tiger> <5758C6A8.2060903@denx.de>
- <20160609021341.GA15413@tiger>
-Message-ID: <5758D1E3.4080203@denx.de>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 8 Jun 2016 22:33:57 -0400
+Subject: [PATCH V6 5/8] vfio: platform: call _RST method when using ACPI
+In-Reply-To: <CAJZ5v0iHxtL3cZVymfz0BqCGjBeBAuEyMXwj5sNBvMQQXgm8rg@mail.gmail.com>
+References: <1464472878-27176-1-git-send-email-okaya@codeaurora.org>
+ <1464472878-27176-6-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0iHxtL3cZVymfz0BqCGjBeBAuEyMXwj5sNBvMQQXgm8rg@mail.gmail.com>
+Message-ID: <5758D595.5090006@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2016 04:13 AM, Shawn Guo wrote:
-> On Thu, Jun 09, 2016 at 03:30:16AM +0200, Marek Vasut wrote:
->> On 06/09/2016 03:21 AM, Shawn Guo wrote:
->>> On Sun, May 08, 2016 at 10:50:21PM +0200, Marek Vasut wrote:
->>>> +	regulators {
->>>> +		compatible = "simple-bus";
->>>> +
->>>> +		reg_vddio_sd0: vddio-sd0 {
->>>
->>> Put fixed regulator nodes directly under root with suggested naming
->>> scheme.
->>>
->>>> +			compatible = "regulator-fixed";
->>>> +			regulator-name = "vddio-sd0";
->>>> +			regulator-min-microvolt = <3300000>;
->>>> +			regulator-max-microvolt = <3300000>;
->>>> +			gpio = <&gpio0 8 0>;
->>>> +		};
->>>> +
->>>> +		reg_vddio_sd1: vddio-sd1 {
->>>> +			compatible = "regulator-fixed";
->>>> +			regulator-name = "vddio-sd1";
->>>> +			regulator-min-microvolt = <3300000>;
->>>> +			regulator-max-microvolt = <3300000>;
->>>> +			gpio = <&gpio1 29 0>;
->>>> +		};
->>>> +
->>>> +		reg_vdd_touchpad: vdd-touchpad0 {
->>>> +			compatible = "regulator-fixed";
->>>> +			regulator-name = "vdd-touchpad0";
->>>> +			regulator-min-microvolt = <3300000>;
->>>> +			regulator-max-microvolt = <3300000>;
->>>> +			gpio = <&gpio0 26 0>;
->>>> +			regulator-always-on;
->>>> +			enable-active-low;
->>>> +		};
->>>> +
->>>> +		reg_vdd_tuner: vdd-tuner0 {
->>>> +			compatible = "regulator-fixed";
->>>> +			regulator-name = "vdd-tuner0";
->>>> +			regulator-min-microvolt = <3300000>;
->>>> +			regulator-max-microvolt = <3300000>;
->>>> +			gpio = <&gpio0 29 0>;
->>>> +			regulator-always-on;
->>>> +			enable-active-low;
->>>> +		};
->>>> +	};
->>>> +
->>>> +	backlight {
->>>> +		compatible = "pwm-backlight";
->>>> +		pwms = <&pwm 2 5000000>;
->>>> +		brightness-levels = <0 4 8 16 32 64 128 255>;
->>>> +		default-brightness-level = <6>;
->>>> +	};
->>>> +
->>>> +	i2c at 0 {
->>>
->>> The @unit-address should be used for nodes with 'reg' property.
+On 6/8/2016 6:31 PM, Rafael J. Wysocki wrote:
+> On Sun, May 29, 2016 at 12:01 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> The device tree code checks for the presence of a reset driver and calls
+>> the of_reset function pointer by looking up the reset driver as a module.
 >>
->> Can you please do such minor fixes when applying or do you expect a resend ?
+>> ACPI defines _RST method to perform device level reset. After the _RST
+>> method is executed, the OS can resume using the device. _RST method is
+>> expected to stop DMA transfers and IRQs.
+>>
+>> This patch checks the presence of _RST method and calls the _RST
+>> method when reset is requested.
 > 
-> Such minor fixes are just too many to be fixed by myself.  Please
-> resend.
+> You could check if _RST is present at probe time and store the ACPI
+> handle of it instead of the HID pointer.
+> 
+> This way you wouldn't need to repeat that check every time reset is used.
+> 
 
-I see. Would you be able to review them in less than one month please ?
-It is extremely demotivating to wait over a month only to get a review
-with a few nitpicks and request to resend.
+Makes sense. I'll give it a shot.
 
 -- 
-Best regards,
-Marek Vasut
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
