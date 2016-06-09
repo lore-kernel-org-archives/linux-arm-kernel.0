@@ -1,55 +1,38 @@
-From: dev@lynxeye.de (Lucas Stach)
-Date: Thu, 09 Jun 2016 11:54:57 +0200
-Subject: [PATCH 03/12] mmc: tegra: restrict the voltage_switch()
- callback to the 1.8V case
-In-Reply-To: <1465456218-28354-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
- <1465456218-28354-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1465466097.18807.7.camel@lynxeye.de>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Thu,  9 Jun 2016 10:59:05 +0100
+Subject: [PATCH] ARM: orion5x: make orion5x_legacy_handle_irq static
+Message-ID: <1465466345-29560-1-git-send-email-ben.dooks@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 09.06.2016, 09:10 +0200 schrieb Gregory CLEMENT:
-> Given its name the voltage_switch() should be called for any
-> voltage. However currently it is only called for the 1.8V case.
-> 
-> That means that the current implementation of the callback could have
-> made this assumption. In order to not adding a regression when the
-> voltage_switch() function will be called for the other voltage
-> targets,
-> this patch ensure that the code of the current callback won't be
-> executed
-> for the other case than 1.8V.
-> 
-This isn't necessary, it's fine to re-execute the pad calibration for
-any voltage switch.
+The orion5x_legacy_handle_irq() is not used or declared outside
+of irq.c so make it static to avoid the following warning:
 
-Regards,
-Lucas
+arch/arm/mach-orion5x/irq.c:30:23: warning: symbol 'orion5x_legacy_handle_irq' was not declared. Should it be static?
 
-> Cc: Lucas Stach <dev@lynxeye.de>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
-> ?drivers/mmc/host/sdhci-tegra.c | 4 ++++
-> ?1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-
-> tegra.c
-> index bcc0de47fe7e..01f58296125e 100644
-> --- a/drivers/mmc/host/sdhci-tegra.c
-> +++ b/drivers/mmc/host/sdhci-tegra.c
-> @@ -302,6 +302,10 @@ static void tegra_sdhci_voltage_switch(struct
-> sdhci_host *host)
-> ?	struct sdhci_tegra *tegra_host =
-> sdhci_pltfm_priv(pltfm_host);
-> ?	const struct sdhci_tegra_soc_data *soc_data = tegra_host-
-> >soc_data;
-> ?
-> +	/* initially this function was called only for the 1.8V case
-> */
-> +	if (host->mmc->ios.signal_voltage != MMC_SIGNAL_VOLTAGE_180)
-> +		return;
-> +
-> ?	if (soc_data->nvquirks & NVQUIRK_HAS_PADCALIB)
-> ?		tegra_host->pad_calib_required = true;
-> ?}
+Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+---
+Cc: Jason Cooper <jason@lakedaemon.net>
+Cc: Andrew Lunn <andrew@lunn.ch>
+Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: Gregory Clement <gregory.clement@free-electrons.com>
+Cc: linux-arm-kernel at lists.infradead.org
+---
+ arch/arm/mach-orion5x/irq.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-orion5x/irq.c b/arch/arm/mach-orion5x/irq.c
+index de980ef..ac4af22 100644
+--- a/arch/arm/mach-orion5x/irq.c
++++ b/arch/arm/mach-orion5x/irq.c
+@@ -26,7 +26,7 @@ static int __initdata gpio0_irqs[4] = {
+ 	IRQ_ORION5X_GPIO_24_31,
+ };
+ 
+-asmlinkage void
++static asmlinkage void
+ __exception_irq_entry orion5x_legacy_handle_irq(struct pt_regs *regs)
+ {
+ 	u32 stat;
+-- 
+2.8.1
