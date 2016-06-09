@@ -1,191 +1,129 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Thu, 9 Jun 2016 11:44:02 +0200
-Subject: [PATCH 1/5] ethernet: add sun8i-emac driver
-In-Reply-To: <5755C00B.2040203@gmail.com>
-References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
- <1464947790-22991-2-git-send-email-clabbe.montjoie@gmail.com>
- <5755C00B.2040203@gmail.com>
-Message-ID: <20160609094402.GA14315@Red>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 09 Jun 2016 11:44:17 +0200
+Subject: [RFC v4 00/14] usb/mmc/power: Generic power sequence (and fix USB/LAN
+ when TFTP booting)
+Message-ID: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello
-
-I agree to all your comments, but for some I have additionnal questions
-
-On Mon, Jun 06, 2016 at 11:25:15AM -0700, Florian Fainelli wrote:
-> On 06/03/2016 02:56 AM, LABBE Corentin wrote:
-> 
-> [snip]
-> 
-> > +
-> > +/* The datasheet said that each descriptor can transfers up to 4096bytes
-> > + * But latter, a register documentation reduce that value to 2048
-> > + * Anyway using 2048 cause strange behaviours and even BSP driver use 2047
-> > + */
-> > +#define DESC_BUF_MAX 2044
-> > +#if (DESC_BUF_MAX < (ETH_FRAME_LEN + 4))
-> > +#error "DESC_BUF_MAX must be set at minimum to ETH_FRAME_LEN + 4"
-> > +#endif
-> 
-> You can probably drop that, it would not make much sense to enable
-> fragments and a buffer size smaller than ETH_FRAME_LEN + ETH_FCS_LEN anyway.
-> 
-
-I has added this test for preventing someone who want to "optimize" DESC_BUF_MAX to doing mistake.
-But I agree that it is of low use.
-
-> > +/* Return the number of contiguous free descriptors
-> > + * starting from tx_slot
-> > + */
-> > +static int rb_tx_numfreedesc(struct net_device *ndev)
-> > +{
-> > +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
-> > +
-> > +	if (priv->tx_slot < priv->tx_dirty)
-> > +		return priv->tx_dirty - priv->tx_slot;
-> 
-> Does this work with if tx_dirty wraps around?
-> 
-
-The tx_dirty cannot wrap since I always keep an empty slot. (tx_slot cannot go equal or after tx_dirty)
-
-> > +/* Grab a frame into a skb from descriptor number i */
-> > +static int sun8i_emac_rx_from_ddesc(struct net_device *ndev, int i)
-> > +{
-> > +	struct sk_buff *skb;
-> > +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
-> > +	struct dma_desc *ddesc = priv->dd_rx + i;
-> > +	int frame_len;
-> > +	int crc_checked = 0;
-> > +
-> > +	if (ndev->features & NETIF_F_RXCSUM)
-> > +		crc_checked = 1;
-> 
-> Assuming CRC here refers to the Ethernet frame's FCS, then this is
-> absolutely not how NETIF_F_RXCSUM works. NETIF_F_RXCSUM is about your
-> Ethernet adapter supporting L3/L4 checksum offloads, while the Ethernet
-> FCS is pretty much mandatory for the frame to be properly received in
-> the first place. Can you clarify which way it is?
-> 
-
-No CRC here is RXCSUM. I understand the misnaming.
-I will rename the variable to rxcsum_done.
-
-> > +
-> > +	priv->ndev->stats.rx_packets++;
-> > +	priv->ndev->stats.rx_bytes += frame_len;
-> > +	priv->rx_sk[i] = NULL;
-> > +
-> > +	/* this frame is not the last */
-> > +	if ((ddesc->status & BIT(8)) == 0) {
-> > +		dev_warn(priv->dev, "Multi frame not implemented currlen=%d\n",
-> > +			 frame_len);
-> > +	}
-> > +
-> > +	sun8i_emac_rx_sk(ndev, i);
-> > +
-> > +	netif_rx(skb);
-> 
-> netif_receive_skb() at the very least, or if you implement NAPI, like
-> you shoud napi_gro_receive().
-> 
-
-netif_receive_skb documentation say
-"This function may only be called from softirq context and interrupts should be enabled."
-but the calling functions is in hardirq context.
-
-> > +	return 0;
-> > +}
-> > +
-> > +/* Cycle over RX DMA descriptors for finding frame to receive
-> > + */
-> > +static int sun8i_emac_receive_all(struct net_device *ndev)
-> > +{
-> > +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
-> > +	struct dma_desc *ddesc;
-> > +
-> > +	ddesc = priv->dd_rx + priv->rx_dirty;
-> > +	while (!(ddesc->status & BIT(31))) {
-> > +		sun8i_emac_rx_from_ddesc(ndev, priv->rx_dirty);
-> > +		rb_inc(&priv->rx_dirty, nbdesc_rx);
-> > +		ddesc = priv->dd_rx + priv->rx_dirty;
-> > +	};
-> 
-> So, what if we ping flood your device here, is not there a remote chance
-> that we keep the RX interrupt so busy we can't break out of this loop,
-> and we are executing from hard IRQ context, that's bad.
-> 
-
-I have added a start variable for preventing to do more than a full loop.
-
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +/* iterate over dma_desc for finding completed xmit.
-> > + * Called from interrupt context, so no need to spinlock tx
-> 
-> Humm, well it depends if what you are doing here may race with
-> ndo_start_xmit(), and usually it does.
-> 
-
-I believe that how it is designed it cannot race each over (access the same descriptor slot) since I keep a free slot between each other.
-
-> Also, you should consider completing TX packets in NAPI context (soft
-> IRQ) instead of hard IRQs like here.
-> 
-
-I wanted to finish this driver the "old" way (with hard IRQ) and implementing NAPI after as a Kconfig choice.
-Does NAPI is mandatory now ? (or really recommended)
-For resuming my understanding, NAPI is good when expecting high traffic. (so my Kconfig idea)
-If you say that NAPI is really preferable, I will do it.
-
-> > +	/* last descriptor point back to first one */
-> > +	ddesc--;
-> > +	ddesc->next = (u32)priv->dd_rx_phy;
-> 
-> So is there a limitation of this hardware that can only do DMA within
-> the first 4GB of the system?
-> 
-
-Yes, I have added all DMA stuff for handling that after apritzel review.
-
-> > +static int sun8i_emac_check_if_running(struct net_device *ndev)
-> > +{
-> > +	if (!netif_running(ndev))
-> > +		return -EBUSY;
-> 
-> This does not seem like the intended usage of a
-> 
-
-I have changed the return code after reading other drivers.
-But could you end your sentence for be sure that the problem is that.
-
-> > +
-> > +static int sun8i_emac_remove(struct platform_device *pdev)
-> > +{
-> > +	struct net_device *ndev = platform_get_drvdata(pdev);
-> > +
-> > +	unregister_netdev(ndev);
-> > +	platform_set_drvdata(pdev, NULL);
-> 
-> Missing unregister_netdevice() here.
-> 
-
-Does I need to replace unregister_netdev by it ?
-They seems to to the same job.
-
-> > +	free_netdev(ndev);
-> > +
-> > +	return 0;
-> > +}
-> -- 
-> Florian
+Hi,
 
 
-Thanks for your review
+Another version for solving a problem of power sequence on USB
+hubs and devices.  Apparently I am not the only one experiencing it.
 
-Regards
+The patchset tries to provide a framework for generic power sequence
+of USB devices but the USB part is left to Peter Chen.
 
-LABBE Corentin
+Patchset is also available here:
+repo:   https://github.com/krzk/linux
+branch: for-next/odroid-u3-usb3503-lan-boot-fixes-v4
+
+
+Changes since v3
+================
+1. Address Rob's comments.  All regulator supplies are parsed and
+   toggled during power sequence.  This comes with two new patches:
+   a. regulator,
+   b. simplefb.
+2. Minor fixes in pwrseq-simple driver - proper module removal path.
+3. Minor fixes in example USB code (pointed out by Stephen Boyd).
+
+
+Changes since v2
+================
+1. Add Javier's reviewed-by tags. Address some comments.
+2. Re-use existing properties for GPIOs etc by pwrseq-simple
+   driver.  New property is still added: "power-sequence".
+   I tried to address and do according to Rob's comments.
+
+   Please look at patch 6/12 ("power: pwrseq: simple: Add support
+   for regulator and generic property") for bindings and the
+   new code around matching "power-sequence" property.
+
+3. I marked the usb code as "EXAMPLE" because that part
+   is left to Peter Chen.
+
+
+Problem
+=======
+When Odroid U3 (usb3503 + smsc95xx + max77686) boots from network (TFTP),
+the usb3503 and LAN smsc95xx do not show up in "lsusb". Hard-reset
+is required, e.g. by suspend to RAM. The actual TFTP boot does
+not have to happen. Just "usb start" from U-Boot is sufficient.
+
+>From the schematics, the regulator is a supply only to LAN, however
+without toggling it off/on, the usb3503 hub won appear neither.
+
+
+Solution
+========
+This is very similar to the MMC pwrseq behavior so the idea is to:
+1. Move MMC pwrseq drivers to generic place,
+2. Extend the pwrseq-simple with regulator toggling,
+3. Add support to USB hub and port core for pwrseq,
+4. Toggle the regulator when needed.
+
+
+Best regards,
+Krzysztof
+
+
+Krzysztof Kozlowski (14):
+  regulator: of: Add helper for getting all supplies
+  simplefb: Use new devm_of_regulator_all_get helper and bulk API
+  power/mmc: Move pwrseq drivers to power/pwrseq
+  MAINTAINERS: Retain Ulf Hansson as the same maintainer of pwrseq
+  power: pwrseq: Enable COMPILE_TEST for drivers
+  power: pwrseq: Remove mmc prefix from mmc_pwrseq
+  power: pwrseq: Generalize mmc_pwrseq operations by removing mmc prefix
+  power: pwrseq: simple: Add support for regulators and generic property
+  power: pwrseq: Add support for USB hubs with external power
+  usb: hub: Handle deferred probe
+  EXAMPLE CODE: usb: port: Parse pwrseq phandle from Device Tree
+  EXAMPLE CODE: usb: hub: Power sequence the ports on activation
+  ARM: dts: exynos: Switch the buck8 to GPIO mode on Odroid U3
+  ARM: dts: exynos: Fix LAN and HUB after bootloader initialization on
+    Odroid U3
+
+ .../pwrseq/pwrseq-emmc.txt}                        |   0
+ .../pwrseq/pwrseq-simple.txt}                      |  30 ++-
+ MAINTAINERS                                        |   9 +
+ arch/arm/boot/dts/exynos4412-odroidu3.dts          |   5 +
+ drivers/mmc/Kconfig                                |   2 -
+ drivers/mmc/core/Makefile                          |   3 -
+ drivers/mmc/core/core.c                            |   8 +-
+ drivers/mmc/core/host.c                            |   2 +-
+ drivers/mmc/core/pwrseq.c                          | 110 ---------
+ drivers/mmc/core/pwrseq.h                          |  52 -----
+ drivers/mmc/core/pwrseq_simple.c                   | 141 ------------
+ drivers/power/Kconfig                              |   1 +
+ drivers/power/Makefile                             |   1 +
+ drivers/{mmc/core => power/pwrseq}/Kconfig         |  22 +-
+ drivers/power/pwrseq/Makefile                      |   3 +
+ drivers/power/pwrseq/pwrseq.c                      | 153 +++++++++++++
+ drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c   |  17 +-
+ drivers/power/pwrseq/pwrseq_simple.c               | 245 +++++++++++++++++++++
+ drivers/regulator/of_regulator.c                   |  86 ++++++++
+ drivers/usb/core/hub.c                             |  16 +-
+ drivers/usb/core/hub.h                             |   3 +
+ drivers/usb/core/port.c                            |  15 ++
+ drivers/video/fbdev/simplefb.c                     |  71 ++----
+ include/linux/mmc/host.h                           |   4 +-
+ include/linux/pwrseq.h                             |  63 ++++++
+ include/linux/regulator/of_regulator.h             |  13 ++
+ 26 files changed, 680 insertions(+), 395 deletions(-)
+ rename Documentation/devicetree/bindings/{mmc/mmc-pwrseq-emmc.txt => power/pwrseq/pwrseq-emmc.txt} (100%)
+ rename Documentation/devicetree/bindings/{mmc/mmc-pwrseq-simple.txt => power/pwrseq/pwrseq-simple.txt} (50%)
+ delete mode 100644 drivers/mmc/core/pwrseq.c
+ delete mode 100644 drivers/mmc/core/pwrseq.h
+ delete mode 100644 drivers/mmc/core/pwrseq_simple.c
+ rename drivers/{mmc/core => power/pwrseq}/Kconfig (60%)
+ create mode 100644 drivers/power/pwrseq/Makefile
+ create mode 100644 drivers/power/pwrseq/pwrseq.c
+ rename drivers/{mmc/core => power/pwrseq}/pwrseq_emmc.c (88%)
+ create mode 100644 drivers/power/pwrseq/pwrseq_simple.c
+ create mode 100644 include/linux/pwrseq.h
+
+-- 
+1.9.1
