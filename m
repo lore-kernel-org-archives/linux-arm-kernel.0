@@ -1,50 +1,51 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 9 Jun 2016 14:52:29 +0100
-Subject: [PATCH] mfd: omap-usb-tll: fix include of omap-usb.h
-In-Reply-To: <1465409180-18634-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465409180-18634-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160609135229.GB2385@dell>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 09 Jun 2016 15:53:49 +0200
+Subject: [PATCH] cpufreq: mvebu: fix integer to pointer cast
+In-Reply-To: <63e7df1a-4ddf-8de0-a600-a09983ecbce6@codethink.co.uk>
+References: <1465299013-32369-1-git-send-email-ben.dooks@codethink.co.uk>
+ <32804824.nq0AOIbNnC@wuerfel>
+ <63e7df1a-4ddf-8de0-a600-a09983ecbce6@codethink.co.uk>
+Message-ID: <7756626.Wd1TIA9Tg9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 08 Jun 2016, Ben Dooks wrote:
-
-> Fix the warnings about the following functions not being
-> declared by including omap-usb.h which declares them:
+On Thursday, June 9, 2016 9:11:38 AM CEST Ben Dooks wrote:
+> On 09/06/16 08:07, Arnd Bergmann wrote:
+> > On Wednesday, June 8, 2016 9:59:26 AM CEST Ben Dooks wrote:
+> >> On 08/06/16 08:56, Mason wrote:
+> >>> On 07/06/2016 13:30, Ben Dooks wrote:
+> >>>
+> >>>> Fix the use of 0 instead of NULL to clk_get() call. This stops the
+> >>>> following warning:
+> >>>>
+> >>>> drivers/cpufreq/mvebu-cpufreq.c:73:40: warning: Using plain integer as NULL pointer
+> >>>
+> >>> May I ask which compiler/version produced that diagnostic?
+> >>
+> >> I was running with "make C=2 bzImage" for ARM multi_v7_config
+> >>
+> >> $ sparse --version
+> >> v0.5.0
+> >>
+> > 
+> > I believe gcc-6 will also produce a similar warning when building with
+> > 'make W=1'. I've started looking into moving some of the warnings from
+> > W=1 level to default, which can probably be done with relatively little
+> > effort for many warnings.
 > 
-> drivers/mfd/omap-usb-tll.c:333:5: warning: symbol 'omap_tll_init' was not declared. Should it be static?
-> drivers/mfd/omap-usb-tll.c:408:5: warning: symbol 'omap_tll_enable' was not declared. Should it be static?
-> drivers/mfd/omap-usb-tll.c:442:5: warning: symbol 'omap_tll_disable' was not declared. Should it be static?
+> Would be interesting to see, I tried W=2 and W=3 and ended up with
+> hundreds of MiB of logs.
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> ---
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Lee Jones <lee.jones@linaro.org>
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/mfd/omap-usb-tll.c | 2 ++
->  1 file changed, 2 insertions(+)
+> Out of interest, which other warnings do you think would make good
+> next targets?
 
-Applied, thanks.
+I fixed all the bugs for -Wmissing-include-dirs, -Woverride-init,
+-Wold-style-declaration, -Wempty-body (not sure about submitting this
+one), -Wunused-but-set-parameter and -Wignored-qualifiers.
 
-> diff --git a/drivers/mfd/omap-usb-tll.c b/drivers/mfd/omap-usb-tll.c
-> index c30290f..1aa74c4 100644
-> --- a/drivers/mfd/omap-usb-tll.c
-> +++ b/drivers/mfd/omap-usb-tll.c
-> @@ -30,6 +30,8 @@
->  #include <linux/platform_data/usb-omap.h>
->  #include <linux/of.h>
->  
-> +#include "omap-usb.h"
-> +
->  #define USBTLL_DRIVER_NAME	"usbhs_tll"
->  
->  /* TLL Register Set */
+With the above fixed, we can enable -Wextra after disabling -Wtype-limits
+(though I fixed the files that had many occurrences of that),
+-Wno-unused-parameter, -Wsign-compare and and -Wmissing-field-initializers,
+all of which should stay in W=1 level.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+	Arnd
