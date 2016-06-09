@@ -1,129 +1,133 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 9 Jun 2016 09:39:49 +0200
-Subject: [PATCH v2 05/15] clk: sunxi-ng: Add gate clock support
-In-Reply-To: <20160607204154.31967-6-maxime.ripard@free-electrons.com>
+Date: Thu, 9 Jun 2016 09:40:28 +0200
+Subject: [PATCH v2 08/15] clk: sunxi-ng: Add divider
+In-Reply-To: <20160607204154.31967-9-maxime.ripard@free-electrons.com>
 References: <20160607204154.31967-1-maxime.ripard@free-electrons.com>
- <20160607204154.31967-6-maxime.ripard@free-electrons.com>
-Message-ID: <20160609093949.b1a7a89aa1448226113b8b1d@free.fr>
+ <20160607204154.31967-9-maxime.ripard@free-electrons.com>
+Message-ID: <20160609094028.490c9d38599cda31fdd069be@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  7 Jun 2016 22:41:44 +0200
+On Tue,  7 Jun 2016 22:41:47 +0200
 Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
-> Some clocks in the Allwinner SoCs clocks unit are just simple gates. Add
-> support for those clocks.
-> 
-> Since it's a feature that can also be found in more complex clocks, provide
-> a bunch of helpers that can be reused later on.
+> Add support for the various dividers (linear, table or pow-of-two based)
+> found in the CCU.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  drivers/clk/sunxi-ng/Makefile   |  1 +
->  drivers/clk/sunxi-ng/ccu_gate.c | 82 +++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/sunxi-ng/ccu_gate.h | 53 ++++++++++++++++++++++++++
->  3 files changed, 136 insertions(+)
->  create mode 100644 drivers/clk/sunxi-ng/ccu_gate.c
->  create mode 100644 drivers/clk/sunxi-ng/ccu_gate.h
+>  drivers/clk/sunxi-ng/Makefile  |   1 +
+>  drivers/clk/sunxi-ng/ccu_div.c | 136 +++++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/sunxi-ng/ccu_div.h | 135 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 272 insertions(+)
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_div.c
+>  create mode 100644 drivers/clk/sunxi-ng/ccu_div.h
 > 
 > diff --git a/drivers/clk/sunxi-ng/Makefile b/drivers/clk/sunxi-ng/Makefile
-> index c59cf2ea509b..608b332e0b1f 100644
+> index c47cbd309d59..67a2559fe283 100644
 > --- a/drivers/clk/sunxi-ng/Makefile
 > +++ b/drivers/clk/sunxi-ng/Makefile
-> @@ -4,3 +4,4 @@ obj-y += ccu_reset.o
+> @@ -3,6 +3,7 @@ obj-y += ccu_reset.o
+>  
 >  obj-y += ccu_frac.o
 >  
+> +obj-y += ccu_div.o
 >  obj-y += ccu_fixed_factor.o
-> +obj-y += ccu_gate.o
-> diff --git a/drivers/clk/sunxi-ng/ccu_gate.c b/drivers/clk/sunxi-ng/ccu_gate.c
+>  obj-y += ccu_gate.o
+>  obj-y += ccu_mux.o
+> diff --git a/drivers/clk/sunxi-ng/ccu_div.c b/drivers/clk/sunxi-ng/ccu_div.c
 > new file mode 100644
-> index 000000000000..1e98f8a33ac3
+> index 000000000000..8659b4cb6c20
 > --- /dev/null
-> +++ b/drivers/clk/sunxi-ng/ccu_gate.c
-> @@ -0,0 +1,82 @@
+> +++ b/drivers/clk/sunxi-ng/ccu_div.c
+	[snip]
+> diff --git a/drivers/clk/sunxi-ng/ccu_div.h b/drivers/clk/sunxi-ng/ccu_div.h
+> new file mode 100644
+> index 000000000000..5edbdc1a98c8
+> --- /dev/null
+> +++ b/drivers/clk/sunxi-ng/ccu_div.h
+> @@ -0,0 +1,135 @@
 > +/*
-> + * Copyright (C) 2016 Maxime Ripard
-> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + * Copyright (c) 2016 Maxime Ripard. All rights reserved.
 > + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation; either version 2 of
-> + * the License, or (at your option) any later version.
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 > + */
+> +
+> +#ifndef _CCU_DIV_H_
+> +#define _CCU_DIV_H_
 > +
 > +#include <linux/clk-provider.h>
 > +
-> +#include "ccu_gate.h"
+> +#include "ccu_common.h"
+> +#include "ccu_mux.h"
 > +
-> +void ccu_gate_helper_disable(struct ccu_common *common, u32 gate)
-> +{
-> +	unsigned long flags;
-> +	u32 reg;
+> +struct _ccu_div {
+> +	u8			shift;
+> +	u8			width;
 > +
-> +	if (!(common->features & CCU_FEATURE_GATE))
-> +		return;
+> +	u32			flags;
+> +
+> +	struct clk_div_table	*table;
+> +};
+> +
+> +#define _SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, _flags)	\
+> +	{								\
+> +		.shift	= _shift,					\
+> +		.width	= _width,					\
+> +		.flags	= _flags,					\
+> +		.table	= _table,					\
+> +	}
+> +
+> +#define _SUNXI_CCU_DIV_FLAGS(_shift, _width, _flags)			\
+> +	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, _flags)
+> +
+> +#define _SUNXI_CCU_DIV_TABLE(_shift, _width, _table)			\
+> +	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, _table, 0)
+> +
+> +#define _SUNXI_CCU_DIV(_shift, _width)					\
+> +	_SUNXI_CCU_DIV_TABLE_FLAGS(_shift, _width, NULL, 0)
+> +
+> +struct ccu_div {
+> +	u32			enable;
+> +
+> +	struct _ccu_div		div;
+> +	struct ccu_mux_internal	mux;
+> +	struct ccu_common	common;
+> +};
+> +
+> +#define SUNXI_CCU_DIV_TABLE_WITH_GATE(_struct, _name, _parent, _reg,	\
+> +				      _shift, _width,			\
+> +				      _table, _gate, _flags)		\
+> +	struct ccu_div _struct = {					\
 
-	if (!gate)
-		return;
+The gate is missing
+		.enable = _gate,
 
-seems simpler and permits to remove the feature flag.
+(I was really afraid when I saw 217?C as the board temperature!)
 
+> +		.div		= _SUNXI_CCU_DIV_TABLE(_shift, _width,	\
+> +						       _table),		\
+> +		.common	= {						\
+> +			.reg		= _reg,				\
+> +			.features	= CCU_FEATURE_GATE,		\
+> +			.hw.init	= SUNXI_HW_INIT(_name,		\
+> +							_parent,	\
+> +							&ccu_div_ops,	\
+> +							_flags),	\
+> +		}							\
+> +	}
 > +
-> +	spin_lock_irqsave(common->lock, flags);
 > +
-> +	reg = readl(common->base + common->reg);
-> +	writel(reg & ~gate, common->base + common->reg);
-> +
-> +	spin_unlock_irqrestore(common->lock, flags);
-> +}
-> +
-> +static void ccu_gate_disable(struct clk_hw *hw)
-> +{
-> +	struct ccu_gate *cg = hw_to_ccu_gate(hw);
-> +
-> +	return ccu_gate_helper_disable(&cg->common, cg->enable);
-> +}
-> +
-> +int ccu_gate_helper_enable(struct ccu_common *common, u32 gate)
-> +{
-> +	unsigned long flags;
-> +	u32 reg;
-> +
-> +	if (!(common->features & CCU_FEATURE_GATE))
-> +		return 0;
-
-Same as above.
-
-> +
-> +	spin_lock_irqsave(common->lock, flags);
-> +
-> +	reg = readl(common->base + common->reg);
-> +	writel(reg | gate, common->base + common->reg);
-> +
-> +	spin_unlock_irqrestore(common->lock, flags);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ccu_gate_enable(struct clk_hw *hw)
-> +{
-> +	struct ccu_gate *cg = hw_to_ccu_gate(hw);
-> +
-> +	return ccu_gate_helper_enable(&cg->common, cg->enable);
-> +}
-> +
-> +int ccu_gate_helper_is_enabled(struct ccu_common *common, u32 gate)
-> +{
-> +	if (!(common->features & CCU_FEATURE_GATE))
-> +		return 1;
-
-Same.
-
-> +
-> +	return readl(common->base + common->reg) & gate;
-> +}
-> +
-> +static int ccu_gate_is_enabled(struct clk_hw *hw)
+> +#define SUNXI_CCU_DIV_TABLE(_struct, _name, _parent, _reg,		\
+> +			    _shift, _width,				\
+> +			    _table, _flags)				\
 	[snip]
 
 -- 
