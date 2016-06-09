@@ -1,37 +1,38 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 09 Jun 2016 15:43:03 -0700
-Subject: linux-next: request to include linux-amlogic tree
-In-Reply-To: <20160606010007.6941cc2d@canb.auug.org.au> (Stephen Rothwell's
- message of "Mon, 6 Jun 2016 01:00:07 +1000")
-References: <CAOi56cXb7TjsctpeFWqGCmEx2LG-i11qoLBGDhi1OBJpbyko4A@mail.gmail.com>
- <20160606010007.6941cc2d@canb.auug.org.au>
-Message-ID: <7h60tidlvs.fsf@baylibre.com>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Thu, 9 Jun 2016 15:46:10 -0700
+Subject: [PATCH 05/14] seccomp: recheck the syscall after RET_TRACE
+In-Reply-To: <1465506124-21866-6-git-send-email-keescook@chromium.org>
+References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
+ <1465506124-21866-6-git-send-email-keescook@chromium.org>
+Message-ID: <CALCETrUsqr3YbD=5mA9mRmgYqiHeEoLpWi-teyexUo_jR1BaFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Rothwell <sfr@canb.auug.org.au> writes:
-
-> Hi Kevin,
+On Thu, Jun 9, 2016 at 2:01 PM, Kees Cook <keescook@chromium.org> wrote:
+> When RET_TRACE triggers, a tracer may change a syscall into something that
+> should be filtered by seccomp. This re-runs seccomp after a trace event
+> to make sure things continue to pass.
 >
-> On Fri, 3 Jun 2016 14:49:01 -0700 Kevin Hilman <khilman@baylibre.com> wrote:
->>
->> Please add the following tree/branch to linux-next.  This is used for
->> the kernel development of the ARM-based Amlogic SoCs:
->> 
->>    git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git
->> for-next
+> Signed-off-by: Kees Cook <keescook@chromium.org>
+> Cc: Andy Lutomirski <luto@kernel.org>
+> ---
+>  kernel/seccomp.c | 21 ++++++++++++++++++---
+>  1 file changed, 18 insertions(+), 3 deletions(-)
 >
-> Added from today.
+> diff --git a/kernel/seccomp.c b/kernel/seccomp.c
+> index 14a37d71b612..54d15eb2b701 100644
+> --- a/kernel/seccomp.c
+> +++ b/kernel/seccomp.c
+> @@ -556,7 +556,8 @@ void secure_computing_strict(int this_syscall)
+>  #else
+>
+>  #ifdef CONFIG_SECCOMP_FILTER
+> -static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd)
+> +static int __seccomp_filter(int this_syscall, const struct seccomp_data *sd,
+> +                           const bool recheck_after_trace)
 
-Thanks.
+This patch looks good with one minor nit: I read this as "pass true if
+you want to recheck after trace", which is exactly the opposite of how
+it works.
 
-> I assume that this will be merged via the arm-soc tree?
-
-Yes.
-
-> I also have just you as the contact - I can add more contacts if
-> that makes sense.
-
-Please also add Carlo Caione <carlo@caione.org>
-
-Kevin
+--Andy
