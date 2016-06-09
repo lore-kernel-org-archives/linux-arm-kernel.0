@@ -1,41 +1,34 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 09 Jun 2016 11:44:21 +0200
-Subject: [RFC v4 04/14] MAINTAINERS: Retain Ulf Hansson as the same maintainer
- of pwrseq
+Date: Thu, 09 Jun 2016 11:44:30 +0200
+Subject: [RFC v4 13/14] ARM: dts: exynos: Switch the buck8 to GPIO mode on
+ Odroid U3
 In-Reply-To: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
 References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465465471-28740-5-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465465471-28740-14-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before moving pwrseq drivers from drivers/mmc/core/ to drivers/power/,
-they were maintained by Ulf Hansson.
+Switch the control of buck8 to GPIO mode. It is faster than I2C/register
+mode and it is the easiest way to disable it (regulator state is a
+logical OR state of GPIO and register value).
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm/boot/dts/exynos4412-odroidu3.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 4f2a75ce5442..71114607502a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -9083,6 +9083,15 @@ F:	include/linux/power_supply.h
- F:	drivers/power/
- X:	drivers/power/avs/
+diff --git a/arch/arm/boot/dts/exynos4412-odroidu3.dts b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+index d73aa6c58fe3..31cdc036fda4 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidu3.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidu3.dts
+@@ -74,6 +74,7 @@
+ 	regulator-name = "BUCK8_P3V3";
+ 	regulator-min-microvolt = <3300000>;
+ 	regulator-max-microvolt = <3300000>;
++	maxim,ena-gpios = <&gpa1 1 GPIO_ACTIVE_HIGH>;
+ };
  
-+POWER SEQ CORE and DRIVERS
-+M:	Ulf Hansson <ulf.hansson@linaro.org>
-+L:	linux-mmc at vger.kernel.org
-+T:	git git://git.linaro.org/people/ulf.hansson/mmc.git
-+S:	Maintained
-+F:	drivers/power/pwrseq/
-+F:	include/linux/pwrseq.h
-+F:	Documentation/devicetree/bindings/power/pwrseq/
-+
- POWER STATE COORDINATION INTERFACE (PSCI)
- M:	Mark Rutland <mark.rutland@arm.com>
- M:	Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+ /* VDDQ for MSHC (eMMC card) */
 -- 
 1.9.1
