@@ -1,89 +1,28 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Thu, 09 Jun 2016 14:06:02 -0700
-Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer interrupt
- trigger
-In-Reply-To: <5759B143.9070503@caviumnetworks.com>
-References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
- <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
- <5759B143.9070503@caviumnetworks.com>
-Message-ID: <5759DA3A.4070905@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 10 Jun 2016 00:29:42 +0300
+Subject: [PATCH v4 00/12] Add R8A7792/Blanche board support
+Message-ID: <1879394.3zBGLpF2nv@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I spoke too soon...
+Hello.
 
-On 06/09/2016 11:11 AM, David Daney wrote:
-> On 06/06/2016 10:56 AM, Marc Zyngier wrote:
->> The ARM architected timer specification mandates that the interrupt
->> associated with each timer is level triggered (which corresponds to
->> the "counter >= comparator" condition).
->>
->> A number of DTs are being remarkably creative, declaring the interrupt
->> to be edge triggered. A quick look at the TRM for the corresponding ARM
->> CPUs clearly shows that this is wrong, and I've corrected those.
->> For non-ARM designs (and in the absence of a publicly available TRM),
->> I've made them active low as well, which can't be completely wrong
->> as the GIC cannot disinguish between level low and level high.
->>
->> The respective maintainers are of course welcome to prove me wrong.
->>
->> While I was at it, I took the liberty to fix a couple of related issue,
->> such as some spurious affinity bits on ThunderX, and their complete
->> absence on ls1043a (both of which seem to be related to copy-pasting
->> from other DTs).
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>   arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
->>   arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
->>   arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
->>   arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
->>   arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
->>   arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
->>   arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
->>   arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
->>   arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
->>   arch/arm64/boot/dts/xilinx/zynqmp.dtsi               | 8 ++++----
->>   10 files changed, 40 insertions(+), 40 deletions(-)
->>
-> [...]
->> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
->> b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
->> index 2eb9b22..382d86f 100644
->> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
->> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
->> @@ -354,10 +354,10 @@
->>
->>       timer {
->>           compatible = "arm,armv8-timer";
->> -        interrupts = <1 13 0xff01>,
->> -                     <1 14 0xff01>,
->> -                     <1 11 0xff01>,
->> -                     <1 10 0xff01>;
->> +        interrupts = <1 13 8>,
->> +                     <1 14 8>,
->> +                     <1 11 8>,
->> +                     <1 10 8>;
+   Here's the set of 12 patches against Simon Horman's 'renesas.git' repo,
+'renesas-devel-20160606-v4.7-rc2' tag. We add the device tree support for
+the R8A7792-based Blanche board. The R-Car 'clk' driver patch was posted
+separately and 2 'clk' binding patches were split from this series...
 
+[01/12] ARM: shmobile: r8a7792: add clock index macros
+[02/12] ARM: shmobile: r8a7792: add power domain index macros
+[03/12] soc: renesas: rcar-sysc: add R8A7792 support
+[04/12] ARM: shmobile: r8a7792: basic SoC support
+[05/12] ARM: shmobile: r8a7792: add SMP support
+[06/12] ARM: dts: r8a7792: initial SoC device tree
+[07/12] ARM: dts: r8a7792: add SYS-DMAC support
+[08/12] ARM: dts: r8a7792: add [H]SCIF support
+[09/12] ARM dts: r8a7792: add IRQC support
+[10/12] DT: arm: shmobile: document Blanche board
+[11/12] ARM: dts: blanche: initial device tree
+[12/12] ARM: dts: blanche: add Ethernet support
 
-NAK!
-
-According to arm,gic-v3.txt the trigger value must be either 1 or 4:
-
-   The 3rd cell is the flags, encoded as follows:
-         bits[3:0] trigger type and level flags.
-                 1 = edge triggered
-                 4 = level triggered
-
-
-
->>       };
->>
->>       pmu {
->
-> Acked-by: David Daney <david.daney@cavium.com>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+WBR, Sergei
