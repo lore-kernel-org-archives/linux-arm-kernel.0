@@ -1,63 +1,143 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 9 Jun 2016 21:51:47 +0800
-Subject: [PATCH v4 1/2] i2c: qup: add ACPI support
-In-Reply-To: <1465409985-17113-1-git-send-email-austinwc@codeaurora.org>
-Message-ID: <201606092141.P9tGizvu%fengguang.wu@intel.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 9 Jun 2016 11:05:24 -0400 (EDT)
+Subject: Platform-specific suspend/resume code in drivers
+In-Reply-To: <57588D80.4010502@free.fr>
+Message-ID: <Pine.LNX.4.44L0.1606091054140.1697-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 8 Jun 2016, Mason wrote:
 
-[auto build test ERROR on wsa/i2c/for-next]
-[also build test ERROR on v4.7-rc2 next-20160609]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> On 08/06/2016 19:45, Alan Stern wrote:
+> 
+> > On Wed, 8 Jun 2016, Mason wrote:
+> > 
+> >> On 07/06/2016 17:06, Alan Stern wrote:
+> >>
+> >>> On Tue, 7 Jun 2016, Mason wrote:
+> >>>
+> >>>> Another point of confusion for me is this: drivers are supposed to
+> >>>> be shared among platforms, right? So my platform-specific suspend
+> >>>> code should be enabled only if my platform is detected at run-time?
+> >>>
+> >>> Is your device platform-specific?  If it is then the driver is also
+> >>> platform-specific, and so no part of the driver will be called at
+> >>> runtime unless your platform is detected.
+> >>
+> >> Specifically, my platform uses
+> >> drivers/net/ethernet/aurora/nb8800.c  => 3 entries in of_match_table.
+> >> drivers/tty/serial/8250/8250_core.c (CONFIG_SERIAL_8250_RT288X variant)
+> >>
+> >> and also the XHCI USB3 driver, and AHCI SATA driver, wouldn't I need to
+> >> save the context for these too?
+> > 
+> > Those drivers should already take care of their own contexts.  Is 
+> > there anything platform-specific you need to do in addition?
+> 
+> Take the eth driver, for example:
+> 
+>   http://lxr.free-electrons.com/source/drivers/net/ethernet/aurora/nb8800.c
+> 
+> It doesn't have any suspend/resume callbacks.
+> 
+> Would that make the suspend request fail?
 
-url:    https://github.com/0day-ci/linux/commits/Austin-Christ/i2c-qup-add-ACPI-support/20160609-022325
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/wsa/linux i2c/for-next
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 5.3.1-8) 5.3.1 20160205
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+There are plenty of drivers that don't have suspend/resume callbacks.  
+(Fewer than there used to be, fortunately.)  They don't make suspend
+fail; rather, the PM core just skips over them when carrying out a
+suspend.
 
-All errors (new ones prefixed by >>):
+Of course, if a driver needs suspend support but doesn't include it, 
+then it's quite likely the driver will not work properly after the 
+system has been resumed.  But that's not a platform-specific issue.
 
-   In file included from drivers/i2c/busses/i2c-qup.c:27:0:
->> drivers/i2c/busses/i2c-qup.c:1665:27: error: 'qup_i2c_acpi_ids' undeclared here (not in a function)
-    MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_ids);
-                              ^
-   include/linux/module.h:223:21: note: in definition of macro 'MODULE_DEVICE_TABLE'
-    extern const typeof(name) __mod_##type##__##name##_device_table  \
-                        ^
-   include/linux/module.h:223:27: error: '__mod_acpi__qup_i2c_acpi_ids_device_table' aliased to undefined symbol 'qup_i2c_acpi_ids'
-    extern const typeof(name) __mod_##type##__##name##_device_table  \
-                              ^
-   drivers/i2c/busses/i2c-qup.c:1665:1: note: in expansion of macro 'MODULE_DEVICE_TABLE'
-    MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_ids);
-    ^
+> > Consider xHCI as an example case -- what more does it need?
+> 
+> Lemme see...
 
-vim +/qup_i2c_acpi_ids +1665 drivers/i2c/busses/i2c-qup.c
+...
 
-  1659	
-  1660	#if IS_ENABLED(CONFIG_ACPI)
-  1661	static const struct acpi_device_id qup_i2c_acpi_match[] = {
-  1662		{ "QCOM8010"},
-  1663		{ },
-  1664	};
-> 1665	MODULE_DEVICE_TABLE(acpi, qup_i2c_acpi_ids);
-  1666	#endif
-  1667	
-  1668	static struct platform_driver qup_i2c_driver = {
+> (Side note: they guarded the code with CONFIG_PM_SLEEP, rather
+> than CONFIG_SUSPEND. Why?)
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 50194 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/9a6ad370/attachment-0001.obj>
+CONFIG_PM_SLEEP covers both suspend (AKA suspend-to-ram) and 
+hibernation (AKA suspend-to-disk).
+
+> Looking at xhci_suspend, it does call xhci_save_registers()
+> so perhaps this specific driver already saves the context
+> required to resume correctly after a full power-down.
+> 
+> >>> If the device isn't platform-specific then the driver has to work on a 
+> >>> bunch of different platforms.  It should be written to be 
+> >>> platform-independent as much as possible.
+> >>>
+> >>>> So this means I need to add in the probe function, for every driver
+> >>>> my platform uses:
+> >>>>
+> >>>>   if (platform == MY_PLATFORM) {
+> >>>>     ops.suspend = my_suspend;
+> >>>>     ops.resume  = my_resume;
+> >>>>   }
+> >>>>
+> >>>> Is that correct?
+> >>>
+> >>> No.  For one thing, you only have to worry about the 
+> >>> platform-independent drivers -- you know that the platform-specific 
+> >>> ones won't get used unless your platform is present.
+> >>
+> >> I guess the thermal driver is platform-specific, but most devices
+> >> are third-party IP blocks, so there is a "common" driver upstream.
+> >> But I would need a platform-specific suspend/resume sequence,
+> >> just for my platform.
+> > 
+> > Why?  What sort of platform-specific things do you need to do?
+> 
+> Save the value of the MMIO registers which will be lost when the
+> chip is powered down.
+
+How did these registers get set in the first place?  Wherever the code 
+is that sets them up initially, that's where these registers should be 
+reinitialized following a resume.  If they were set up by 
+platform-specific code then they should be reinitialized by 
+platform-specific code.
+
+> >>> For another, the driver should be written in a way that doesn't require
+> >>> this sort of code.  The ops pointer (not any of the structure's members
+> >>> -- a pointer to the structure) should be set by the platform-dependent
+> >>> part of the driver that handles initialization.
+> >>
+> >> I don't understand. If my platform loses context on suspend, then
+> >> I must save/restore it. But this wasteful operation should not be
+> >> imposed on other platforms.
+> > 
+> > More details, please.
+> 
+> I'm confused. I must have misunderstood something fundamental, and my
+> explanations come out wrong. Let me try again.
+> 
+> On this SoC (as most SoCs) device registers are mapped into memory.
+> When this system is suspended, it was decided that we would
+> 1) put the RAM in self-refresh mode
+> 2) power everything down, but the RAM
+> 
+> So the contents of RAM are preserved, but the contents of the device
+> registers will be lost. (And this context loss is platform specific;
+> other SoCs may decide to keep some devices powered.) Anyway, when
+> the chip is powered back up, some/most device registers need to be
+> restored to their pre-suspend value.
+> 
+> For example, the reset value for a CTRL register might default to
+> DISABLE_DEVICE, but obviously the probe function would have toggled
+> that to ENABLE_DEVICE.
+> 
+> Am I not making sense?
+
+Sure.  A driver's resume routine is supposed to recognize when the 
+register contents have been lost due to lack of power during suspend or 
+hibernation.  It should reinitialize any registers the driver needs.
+
+During hibernation, for instance, it is nearly certain that all the 
+device context will be lost.  Drivers have to be prepared to handle 
+this.
+
+Alan Stern
