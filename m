@@ -1,48 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Jun 2016 16:48:57 +0100
-Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
-In-Reply-To: <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160610154857.GA6430@leverpostej>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Jun 2016 17:49:27 +0200
+Subject: [PATCH] irqchip/tegra: fix fix sparse warnings on __iomem
+In-Reply-To: <1465302292-4840-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465302292-4840-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20160610154927.GR27142@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Lorenzo]
-
-On Thu, May 19, 2016 at 12:00:18AM -0500, Andy Gross wrote:
-> This patch adds the qcom,idle-state-spc compatible to the SPC idle
-> state.  This compatible indicates that the state is one which supports
-> freeze.
+On Tue, Jun 07, 2016 at 01:24:52PM +0100, Ben Dooks wrote:
+> Fix the following warnings from sparse due to casting to/from __iomem
+> annotated variables:
 > 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> drivers/irqchip/irq-tegra.c:93:31: warning: incorrect type in initializer (different address spaces)
+> drivers/irqchip/irq-tegra.c:93:31:    expected void [noderef] <asn:2>*base
+> drivers/irqchip/irq-tegra.c:93:31:    got void *chip_data
+> drivers/irqchip/irq-tegra.c:93:31: warning: incorrect type in initializer (different address spaces)
+> drivers/irqchip/irq-tegra.c:93:31:    expected void [noderef] <asn:2>*base
+> drivers/irqchip/irq-tegra.c:93:31:    got void *chip_data
+> drivers/irqchip/irq-tegra.c:93:31: warning: incorrect type in initializer (different address spaces)
+> drivers/irqchip/irq-tegra.c:93:31:    expected void [noderef] <asn:2>*base
+> drivers/irqchip/irq-tegra.c:93:31:    got void *chip_data
+> drivers/irqchip/irq-tegra.c:93:31: warning: incorrect type in initializer (different address spaces)
+> drivers/irqchip/irq-tegra.c:93:31:    expected void [noderef] <asn:2>*base
+> drivers/irqchip/irq-tegra.c:93:31:    got void *chip_data
+> drivers/irqchip/irq-tegra.c:269:57: warning: incorrect type in argument 5 (different address spaces)
+> drivers/irqchip/irq-tegra.c:269:57:    expected void *chip_data
+> drivers/irqchip/irq-tegra.c:269:57:    got void [noderef] <asn:2>*<noident>
+> 
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
 > ---
->  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index 208af00..032e411 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -104,7 +104,7 @@
->  
->  		idle-states {
->  			CPU_SPC: spc {
-> -				compatible = "arm,idle-state";
-> +				compatible = "qcom,idle-state-spc", "arm,idle-state";
->  				arm,psci-suspend-param = <0x40000002>;
->  				entry-latency-us = <130>;
->  				exit-latency-us = <150>;
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: linux-kernel at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: linux-tegra at vger.kernel.org
+> ---
+>  drivers/irqchip/irq-tegra.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-This looks suspicious.
-
-This is a PSCI idle state, and we have a PSCI driver driven by the
-generic ARM cpuidle driver.
-
-Why do we need a qcom-specific compatible here?
-
-Surely we should be able to use the idle code in a generic fashion to
-driver suspend-to-idle?
-
-Thank,
-Mark.
+Acked-by: Thierry Reding <treding@nvidia.com>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/eeb4edfa/attachment.sig>
