@@ -1,155 +1,149 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Fri, 10 Jun 2016 15:51:37 +0200
-Subject: [PATCH v7 00/15] ACPI NUMA support for ARM64
-In-Reply-To: <20160610102615.GI1535@rric.localdomain>
-References: <1464129345-18985-1-git-send-email-ddaney.cavm@gmail.com>
- <20160610102005.GH1535@rric.localdomain>
- <20160610102615.GI1535@rric.localdomain>
-Message-ID: <9924676.C461dUbhRI@vostro.rjw.lan>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Jun 2016 15:53:02 +0200
+Subject: [PATCH v3 08/20] pwm: Add PWM Capture support
+In-Reply-To: <20160608092135.21184-9-lee.jones@linaro.org>
+References: <20160608092135.21184-1-lee.jones@linaro.org>
+ <20160608092135.21184-9-lee.jones@linaro.org>
+Message-ID: <20160610135302.GK27142@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 10, 2016 12:26:15 PM Robert Richter wrote:
-> On 10.06.16 12:20:05, Robert Richter wrote:
-> > On 04.06.16 00:07:04, Rafael J. Wysocki wrote:
-> > > On Tuesday, May 24, 2016 03:35:30 PM David Daney wrote:
-> > > > From: David Daney <david.daney@cavium.com>
-> > > > 
-> > > > Rebased to Linus' master branch at commit 1d6da87a3241 ("Merge branch
-> > > > 'drm-next' of git://people.freedesktop.org/~airlied/linux")
-> > > > 
-> > > > ACPI 5.1 already introduced NUMA support for ARM64, which can get the
-> > > > NUMA domain information from SRAT and SLIT table, so parse those two
-> > > > tables to get mappings from cpu/mem to numa node configuration and
-> > > > system locality.
-> > > > 
-> > > > v7 updates:
-> > > > 
-> > > >  - Rebased to resolve one merge conflict.
-> > > > 
-> > > >  - New patch 13/15 to enable use of existing MADT parsing code instead
-> > > >    of adding an additional implementation of the parser.
-> > > > 
-> > > >  - Added some Acked-by headers to patches in arm64 arch directories.
-> > > > 
-> > > > v6 updates:
-> > > > 
-> > > >  - Changed message printed in 13/14 to omit meaningless "cpu"
-> > > >    number. (noted by Dennis Chen and Hanjun Guo)
-> > > > 
-> > > >  - New patch 7/14 to print different messages for NUMA disabled case.
-> > > >    (noted by Dennis Chen)
-> > > > 
-> > > >  - Squashed two patches into 14/14.
-> > > > 
-> > > >  - Added Reviewed-by to 4/14
-> > > > 
-> > > > v5 updates:
-> > > > 
-> > > >  - Fixed ia64 build failure by gating some unused functions with #if
-> > > >    CONFIG_{X86,ARM64}.
-> > > > 
-> > > >  - Fixed section mismatch errors for X86 case.
-> > > > 
-> > > >  - Removed unneeded #include from some files.
-> > > > 
-> > > >  - Tested to build cleanly on ARM64, X86_64, IA64
-> > > > 
-> > > > v4 updates:
-> > > > 
-> > > >  - Updated from Hanjun Guo's v3 patches.
-> > > > 
-> > > >  - Rebased on top of v16 of device-tree NUMA patches.
-> > > > 
-> > > >  - Reordered some of the changes so that we don't introduce code and
-> > > >    then change it several times in the patch set.  New code is
-> > > >    introduced in its final form.  Code reused from x86 is first moved
-> > > >    with no change, and then a separate patch to make any needed
-> > > >    changes.
-> > > > 
-> > > >  - code that is used only by ia64, moved to architecture specific
-> > > >    files.
-> > > > 
-> > > > v3 updates:
-> > > >  - Deep investigation about the ACPI_DEBUG_PRINT() and remvoe
-> > > >    that for acpi/numa.c (patch 2/12)
-> > > > 
-> > > >  - Remove the duplicate NULL check for table print (patch 3/12)
-> > > > 
-> > > >  - Introduce CONFIG_ACPI_HAS_NUMA_ARCH_FIXUP to remove duplicate
-> > > >    dummy function for acpi_numa_arch_fixup()
-> > > > 
-> > > >  - Solve the problem that the mapping from logical cpu to numa node
-> > > >    is wrong which spotted out by Lorenzo
-> > > > 
-> > > >  - cleanups for x86 and move acpi_numa_slit_init() and some other
-> > > >    functions to common place, then reduce the duplicate of x86
-> > > >    and arm64 (patch 7-12/12).
-> > > > 
-> > > >  - rebased on top of 4.4 and Ganapat's v9 patch set.
-> > > > 
-> > > > David Daney (4):
-> > > >   arm64, numa: Cleanup NUMA disabled messages.
-> > > >   acpi, numa: move bad_srat() and srat_disabled() to
-> > > >     drivers/acpi/numa.c
-> > > >   acpi, numa, srat: Improve SRAT error detection and add messages.
-> > > >   ACPI / processor: Add acpi_map_madt_entry().
-> > > > 
-> > > > Hanjun Guo (10):
-> > > >   acpi, numa: Use pr_fmt() instead of printk
-> > > >   acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
-> > > >   acpi, numa: remove duplicate NULL check
-> > > >   acpi, numa: move acpi_numa_slit_init() to drivers/acpi/numa.c
-> > > >   arm64, numa: rework numa_add_memblk()
-> > > >   x86, acpi, numa: cleanup acpi_numa_processor_affinity_init()
-> > > >   acpi, numa: remove unneeded acpi_numa=1
-> > > >   acpi, numa: Move acpi_numa_memory_affinity_init() to
-> > > >     drivers/acpi/numa.c
-> > > >   arm64, acpi, numa: NUMA support based on SRAT and SLIT
-> > > >   acpi, numa: Enable ACPI based NUMA on ARM64
-> > > > 
-> > > > Robert Richter (1):
-> > > >   acpi, numa: Move acpi_numa_arch_fixup() to ia64 only
-> > > > 
-> > > >  arch/arm64/include/asm/acpi.h |   8 ++
-> > > >  arch/arm64/include/asm/numa.h |   2 +
-> > > >  arch/arm64/kernel/Makefile    |   1 +
-> > > >  arch/arm64/kernel/acpi_numa.c | 112 +++++++++++++++++++++
-> > > >  arch/arm64/kernel/smp.c       |   2 +
-> > > >  arch/arm64/mm/numa.c          |  28 ++++--
-> > > >  arch/ia64/include/asm/acpi.h  |   3 +
-> > > >  arch/ia64/kernel/acpi.c       |   2 +-
-> > > >  arch/ia64/kernel/setup.c      |   1 +
-> > > >  arch/x86/include/asm/acpi.h   |   1 -
-> > > >  arch/x86/mm/numa.c            |   2 +-
-> > > >  arch/x86/mm/srat.c            | 116 +---------------------
-> > > >  drivers/acpi/Kconfig          |   4 +-
-> > > >  drivers/acpi/numa.c           | 226 ++++++++++++++++++++++++++++++++----------
-> > > >  drivers/acpi/processor_core.c |  26 ++++-
-> > > >  drivers/of/of_numa.c          |   4 +-
-> > > >  include/acpi/acpi_numa.h      |   4 +
-> > > >  include/acpi/processor.h      |   1 +
-> > > >  include/linux/acpi.h          |  18 +++-
-> > > >  19 files changed, 369 insertions(+), 192 deletions(-)
-> > > >  create mode 100644 arch/arm64/kernel/acpi_numa.c
-> > > 
-> > > All [1-15/15] queued up for 4.8, thanks!
-> > 
-> > Rafael,
-> > 
-> > I noticed patch #15 missing in your today's tree, I only found:
-> > 
-> >  d8b47fca8c23 arm64, ACPI, NUMA: NUMA support based on SRAT and SLIT
-> > 
-> > Is this intended? It still cleanly applies.
+On Wed, Jun 08, 2016 at 10:21:23AM +0100, Lee Jones wrote:
+> Supply a PWM Capture call-back Op in order to pass back
+> information obtained by running analysis on PWM a signal.
+> This would normally (at least during testing) be called from
+> the Sysfs routines with a view to printing out PWM Capture
+> data which has been encoded into a string.
 > 
-> Ah, just seen Matthias' comment, I guess we need to resend a fixed
-> version.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  drivers/pwm/core.c  | 27 +++++++++++++++++++++++++++
+>  include/linux/pwm.h | 25 +++++++++++++++++++++++++
+>  2 files changed, 52 insertions(+)
+> 
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> index dba3843..4678de6 100644
+> --- a/drivers/pwm/core.c
+> +++ b/drivers/pwm/core.c
+> @@ -525,6 +525,33 @@ int pwm_apply_state(struct pwm_device *pwm, struct pwm_state *state)
+>  EXPORT_SYMBOL_GPL(pwm_apply_state);
+>  
+>  /**
+> + * pwm_capture() - capture and report a PWM signal
+> + * @pwm: PWM device
+> + * @result: struct to fill with capture result
+> + * @timeout_ms: time to wait, in milliseconds, before giving up on capture
+> + *
+> + * Returns: 0 on success or a negative error code on failure.
+> + */
+> +int pwm_capture(struct pwm_device *pwm, struct pwm_capture *result,
+> +		unsigned int timeout_ms)
+> +{
+> +	int err;
+> +
+> +	if (!pwm || !pwm->chip->ops)
+> +		return -EINVAL;
+> +
+> +	if (!pwm->chip->ops->capture)
+> +		return -ENOSYS;
+> +
+> +	mutex_lock(&pwm_lock);
+> +	err = pwm->chip->ops->capture(pwm->chip, pwm, result, timeout_ms);
+> +	mutex_unlock(&pwm_lock);
+> +
+> +	return err;
+> +}
+> +EXPORT_SYMBOL_GPL(pwm_capture);
+> +
+> +/**
+>   * pwm_adjust_config() - adjust the current PWM config to the PWM arguments
+>   * @pwm: PWM device
+>   *
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> index 17018f3..13cac27 100644
+> --- a/include/linux/pwm.h
+> +++ b/include/linux/pwm.h
+> @@ -5,7 +5,9 @@
+>  #include <linux/mutex.h>
+>  #include <linux/of.h>
+>  
+> +struct pwm_capture;
+>  struct seq_file;
+> +
+>  struct pwm_chip;
+>  
+>  /**
+> @@ -153,6 +155,7 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
+>   * @free: optional hook for freeing a PWM
+>   * @config: configure duty cycles and period length for this PWM
+>   * @set_polarity: configure the polarity of this PWM
+> + * @capture: capture and report PWM signal
+>   * @enable: enable PWM output toggling
+>   * @disable: disable PWM output toggling
+>   * @apply: atomically apply a new PWM config. The state argument
+> @@ -172,6 +175,8 @@ struct pwm_ops {
+>  		      int duty_ns, int period_ns);
+>  	int (*set_polarity)(struct pwm_chip *chip, struct pwm_device *pwm,
+>  			    enum pwm_polarity polarity);
+> +	int (*capture)(struct pwm_chip *chip, struct pwm_device *pwm,
+> +		       struct pwm_capture *result, unsigned int timeout_ms);
 
-Right.
+Can we please drop the _ms suffix. It's already documented to be in
+milliseconds. Also maybe make that unsigned long for consistency with
+the type of the timeout parameter elsewhere in the kernel.
 
-Sorry about the confusion, I was about to ask for an update patch later
-today.
+>  	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
+>  	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
+>  	int (*apply)(struct pwm_chip *chip, struct pwm_device *pwm,
+> @@ -212,6 +217,16 @@ struct pwm_chip {
+>  	bool can_sleep;
+>  };
+>  
+> +/**
+> + * struct pwm_capture - PWM capture data
+> + * @period: period of the PWM signal (in nanoseconds)
+> + * @duty_cycle: duty cycle of the PWM signal (in nanoseconds)
+> + */
+> +struct pwm_capture {
+> +	unsigned long long period;
+> +	unsigned long long duty_cycle;
+> +};
 
-Thanks,
-Rafael
+I'd prefer these to be unsigned int, for symmetry with the PWM output
+part of the framework. With 32 bits you get about 4.2 seconds of period
+and duty cycle, and I doubt that any reasonable signal would extend
+beyond that.
+
+> @@ -322,6 +337,9 @@ static inline void pwm_disable(struct pwm_device *pwm)
+>  
+>  
+>  /* PWM provider APIs */
+> +int pwm_capture(struct pwm_device *pwm,
+> +		struct pwm_capture *result,
+> +		unsigned int timeout_ms);
+
+This fits into 2 lines. And same comments on the timeout parameter.
+
+>  int pwm_set_chip_data(struct pwm_device *pwm, void *data);
+>  void *pwm_get_chip_data(struct pwm_device *pwm);
+>  
+> @@ -373,6 +391,13 @@ static inline int pwm_config(struct pwm_device *pwm, int duty_ns,
+>  	return -EINVAL;
+>  }
+>  
+> +static inline int pwm_capture(struct pwm_device *pwm,
+> +			      struct pwm_capture *result,
+> +			      unsigned int timeout_ms)
+
+Same here.
+
+Otherwise this looks really nice to me from an API point of view.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/a0d06dff/attachment.sig>
