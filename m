@@ -1,117 +1,100 @@
-From: rnayak@codeaurora.org (Rajendra Nayak)
-Date: Fri, 10 Jun 2016 11:32:32 +0530
-Subject: [PATCH v6 00/11] qcom: Add support for TSENS driver
-In-Reply-To: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
-References: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
-Message-ID: <575A57F8.6060004@codeaurora.org>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Fri, 10 Jun 2016 15:22:24 +0900
+Subject: [PATCH v2 3/7] iommu/rockchip: support virtual iommu slave device
+In-Reply-To: <1465392392-2003-4-git-send-email-zhengsq@rock-chips.com>
+References: <1465392392-2003-1-git-send-email-zhengsq@rock-chips.com>
+ <1465392392-2003-4-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <CAAFQd5DuAc-B17AqOg0mGcfLCGwztEOaukPL+c5jmL4a-AEeBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eduardo,
+Hi,
 
-On 05/05/2016 02:21 PM, Rajendra Nayak wrote:
-> Current set of patches apply on 4.6-rc6. Fixes for the nvmem apis
-> are now posted [1] and queued in -next [2]
-> Patches [1-6] will need to be merged via thermal tree/Eduardo.
+On Wed, Jun 8, 2016 at 10:26 PM, Shunqian Zheng <zhengsq@rock-chips.com> wrote:
+> An virtual master device like DRM need to attach to iommu
+> domain to share the domain with VOP(the one with actual
+> iommu slave). We currently check the group is NULL to indicate
+> a virtual master, which is not true since we decide to use
+> the common iommu api to attach device in DRM.
+>
+> With this patch, we can probe a virtual iommu device and
+> allow the DRM attaching to it. The virtual iommu is needed also
+> because we want convert to use DMA API for map/unmap, cache flush,
+> so that DRM buffer alloc still work even VOP is disabled.
 
-Any plans to pull these in for 4.8?
+I'm not really convinced that this is a good idea. This will require
+creating fake devices in the system and generally looks really hacky.
+Please see my alternative proposal inline.
 
-regards,
-Rajendra
+>
+> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
+> ---
+>  drivers/iommu/rockchip-iommu.c | 37 +++++++++++++++++++++++++------------
+>  1 file changed, 25 insertions(+), 12 deletions(-)
+>
+> diff --git a/drivers/iommu/rockchip-iommu.c b/drivers/iommu/rockchip-iommu.c
+> index 3c16ec3..d6c3051 100644
+> --- a/drivers/iommu/rockchip-iommu.c
+> +++ b/drivers/iommu/rockchip-iommu.c
+> @@ -75,6 +75,11 @@
+>
+>  #define IOMMU_REG_POLL_COUNT_FAST 1000
+>
+> +/* A virtual iommu in device-tree registered without reg or
+> + * interrupts, so the num_mmu is zero.
+> + */
+> +#define RK_IOMMU_IS_VIRTUAL(iommu) (iommu->num_mmu == 0)
+> +
+>  struct rk_iommu_domain {
+>         struct list_head iommus;
+>         u32 *dt; /* page directory table */
+> @@ -789,13 +794,13 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+>         int ret, i;
+>         phys_addr_t dte_addr;
+>
+> -       /*
+> -        * Allow 'virtual devices' (e.g., drm) to attach to domain.
+> -        * Such a device does not belong to an iommu group.
+> -        */
+>         iommu = rk_iommu_from_dev(dev);
+> -       if (!iommu)
 
-> Patches [7-11] will need to go via qcom-msm tree/Andy.
-> 
-> Changes since v5:
-> * Minor review fixes from Eduardo
-> 
-> Changes since v4:
-> * dropped qcom,tsens-slopes binding, used coefficients instead
-> * dropped qcom,sensor-id binding
-> * Added support for msm8996 family
-> * Other minor review fixes from v4
-> 
-> Changes since v3:
-> * Dropped 'clk: qcom: create virtual child device for TSENS' which
-> is picked up by Stephen
-> * Updated GCC bindings with optional TSENS properties
-> 
-> Changes since v2:
-> * Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
-> 
-> Changes since v1:
-> * Created virtual tsens device from gcc driver for 8960,
-> with DT having a single node for gcc and tsens
-> * Minor fixes with rebasing on 4.3-rc1
-> 
-> Changes since RFC:
-> * Added support for 8916 and 8084
-> * Based off the latest nvmem framework patches [1]
-> * Minor review fixes for comments mostly from Lina
-> 
-> This is an attempt to have a single TSENS driver for
-> the different versions of the TSENS IP that exist, on
-> different qcom msm/apq SoCs'
-> Support is added for msm8916, msm8960, msm8974 and msm8996 families.
-> 
-> A lot of the work is based of original code from Stephen Boyd
-> and Siddartha Mohanadoss. I have also picked some of what
-> Narendran Rajan did in his attempt to upstream the support
-> for 8960 family. I could not keep the original authorship on
-> any of the patches because I ended up moving the code around
-> quite a bit in an effort to have a single driver for the
-> various devices. I would be glad to change the authorship
-> for any of the patches if needed.
-> 
-> [1] https://lkml.org/lkml/2016/4/24/103
-> [2] git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git char-misc-next
-> 
-> Rajendra Nayak (11):
->   thermal: qcom: tsens: Add a skeletal TSENS drivers
->   thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
->   thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
->   thermal: core: export apis to get slope and offset
->   thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
->   thermal: qcom: tsens-8996: Add support for 8996 family of SoCs
->   arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
->   arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
->   arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
->   arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
->   arm64: dts: msm8996: Add thermal zones, tsens and qfprom nodes
-> 
->  .../devicetree/bindings/clock/qcom,gcc.txt         |  18 ++
->  .../devicetree/bindings/thermal/qcom-tsens.txt     |  21 ++
->  Documentation/thermal/sysfs-api.txt                |  12 +
->  arch/arm/boot/dts/qcom-apq8064.dtsi                | 103 ++++++++
->  arch/arm/boot/dts/qcom-apq8084.dtsi                | 103 ++++++++
->  arch/arm/boot/dts/qcom-msm8974.dtsi                | 103 ++++++++
->  arch/arm64/boot/dts/qcom/msm8916.dtsi              |  64 +++++
->  arch/arm64/boot/dts/qcom/msm8996.dtsi              |  92 +++++++
->  drivers/thermal/Kconfig                            |   5 +
->  drivers/thermal/Makefile                           |   1 +
->  drivers/thermal/qcom/Kconfig                       |  11 +
->  drivers/thermal/qcom/Makefile                      |   2 +
->  drivers/thermal/qcom/tsens-8916.c                  | 113 ++++++++
->  drivers/thermal/qcom/tsens-8960.c                  | 292 +++++++++++++++++++++
->  drivers/thermal/qcom/tsens-8974.c                  | 244 +++++++++++++++++
->  drivers/thermal/qcom/tsens-8996.c                  |  84 ++++++
->  drivers/thermal/qcom/tsens-common.c                | 141 ++++++++++
->  drivers/thermal/qcom/tsens.c                       | 200 ++++++++++++++
->  drivers/thermal/qcom/tsens.h                       |  92 +++++++
->  drivers/thermal/thermal_core.c                     |  30 +++
->  include/linux/thermal.h                            |   8 +
->  21 files changed, 1739 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
->  create mode 100644 drivers/thermal/qcom/Kconfig
->  create mode 100644 drivers/thermal/qcom/Makefile
->  create mode 100644 drivers/thermal/qcom/tsens-8916.c
->  create mode 100644 drivers/thermal/qcom/tsens-8960.c
->  create mode 100644 drivers/thermal/qcom/tsens-8974.c
->  create mode 100644 drivers/thermal/qcom/tsens-8996.c
->  create mode 100644 drivers/thermal/qcom/tsens-common.c
->  create mode 100644 drivers/thermal/qcom/tsens.c
->  create mode 100644 drivers/thermal/qcom/tsens.h
-> 
+Could we instead allocate such virtual rk_iommu struct here (dev could
+be used as iommu->dev for logging purposes and a fake group could be
+allocated too)?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> +
+> +       iommu->domain = domain;
+> +       if (RK_IOMMU_IS_VIRTUAL(iommu)) {
+> +               dev_dbg(dev, "Attach virtual device to iommu domain\n");
+>                 return 0;
+> +       }
+>
+>         ret = rk_iommu_enable_stall(iommu);
+>         if (ret)
+> @@ -805,7 +810,6 @@ static int rk_iommu_attach_device(struct iommu_domain *domain,
+>         if (ret)
+>                 return ret;
+>
+> -       iommu->domain = domain;
+>
+>         ret = devm_request_irq(iommu->dev, iommu->irq, rk_iommu_irq,
+>                                IRQF_SHARED, dev_name(dev), iommu);
+> @@ -842,10 +846,13 @@ static void rk_iommu_detach_device(struct iommu_domain *domain,
+>         unsigned long flags;
+>         int i;
+>
+> -       /* Allow 'virtual devices' (eg drm) to detach from domain */
+>         iommu = rk_iommu_from_dev(dev);
+> -       if (!iommu)
+> +
+> +       iommu->domain = NULL;
+
+I don't think it's a good idea to set the domain to NULL before
+disabling the real IOMMU. It might still trigger an interrupt at this
+point and things won't behave correctly. I guess the original line
+could be left as is and simply same assignment added under the if
+below.
+
+Best regards,
+Tomasz
