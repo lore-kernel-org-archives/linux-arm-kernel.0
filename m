@@ -1,56 +1,129 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 10 Jun 2016 12:30:56 -0500
-Subject: [RFC v4 01/14] regulator: of: Add helper for getting all supplies
-In-Reply-To: <5759560A.70107@samsung.com>
-References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
- <1465465471-28740-2-git-send-email-k.kozlowski@samsung.com>
- <20160609102925.GS7510@sirena.org.uk> <5759560A.70107@samsung.com>
-Message-ID: <20160610173056.GA16503@rob-hp-laptop>
+From: ddaney@caviumnetworks.com (David Daney)
+Date: Fri, 10 Jun 2016 10:32:24 -0700
+Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer interrupt
+ trigger
+In-Reply-To: <575AF147.40503@arm.com>
+References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+ <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
+ <5759B143.9070503@caviumnetworks.com> <5759DA3A.4070905@gmail.com>
+ <20160610082324.2a0967b0@arm.com> <575AEFC0.1070304@gmail.com>
+ <575AF147.40503@arm.com>
+Message-ID: <575AF9A8.5020406@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 01:42:02PM +0200, Krzysztof Kozlowski wrote:
-> On 06/09/2016 12:29 PM, Mark Brown wrote:
-> > On Thu, Jun 09, 2016 at 11:44:18AM +0200, Krzysztof Kozlowski wrote:
-> >> Few drivers have a need of getting regulator supplies without knowing
-> >> their names:
-> >> 1. The Simple Framebuffer driver works on setup provided by bootloader
-> >>    (outside of scope of kernel);
-> >> 2. Generic power sequence driver may be attached to any device node.
-> >>
-> >> Add a Device Tree helper for parsing "-supply" properties and returning
-> >> allocated bulk regulator consumers.
-> > 
-> > I'm still very concerned that this is just an invitation to people to
-> > write half baked regulator consumers and half baked DTs to go along with
-> > it, making it a standard API that doesn't have big red flags on it that
-> > will flag up when "normal" drivers use it is not good.  Right now this
-> > just looks like a standard API and people are going to just start using
-> > it.  If we are going to do this perhaps we need a separate header or
-> > something to help flag this up.
-> 
-> No problem, I can move it to a special header.  Actually, if you dislike
-> this as an API, it does not have to be in header at all.  I can just
-> duplicate the simplefb code.
-> 
-> > In the case of power sequences I'd expect the sequences to perform
-> > operations on named supplies - the core shouldn't know what the supplies
-> > are but the thing specifying the sequence should.
-> 
-> Hm, so maybe passing names like:
-> 
-> usb3503 at 08 {
-> 	reset-gpios = <&gpx3 5 GPIO_ACTIVE_HIGH>;
-> 	initial-mode = <1>;
-> 	vdd-supply = <&buck8_reg>;
-> 	foo-supply = <&buck9_reg>;
-> 
->         power-sequence;
-> 	power-sequence-supplies = "vdd", "foo";
+On 06/10/2016 09:56 AM, Marc Zyngier wrote:
+> On 10/06/16 17:50, David Daney wrote:
+>> On 06/10/2016 12:23 AM, Marc Zyngier wrote:
+>>> On Thu, 09 Jun 2016 14:06:02 -0700
+>>> David Daney <ddaney.cavm@gmail.com> wrote:
+>>>
+>>>> I spoke too soon...
+>>>>
+>>>> On 06/09/2016 11:11 AM, David Daney wrote:
+>>>>> On 06/06/2016 10:56 AM, Marc Zyngier wrote:
+>>>>>> The ARM architected timer specification mandates that the interrupt
+>>>>>> associated with each timer is level triggered (which corresponds to
+>>>>>> the "counter >= comparator" condition).
+>>>>>>
+>>>>>> A number of DTs are being remarkably creative, declaring the interrupt
+>>>>>> to be edge triggered. A quick look at the TRM for the corresponding ARM
+>>>>>> CPUs clearly shows that this is wrong, and I've corrected those.
+>>>>>> For non-ARM designs (and in the absence of a publicly available TRM),
+>>>>>> I've made them active low as well, which can't be completely wrong
+>>>>>> as the GIC cannot disinguish between level low and level high.
+>>>>>>
+>>>>>> The respective maintainers are of course welcome to prove me wrong.
+>>>>>>
+>>>>>> While I was at it, I took the liberty to fix a couple of related issue,
+>>>>>> such as some spurious affinity bits on ThunderX, and their complete
+>>>>>> absence on ls1043a (both of which seem to be related to copy-pasting
+>>>>>> from other DTs).
+>>>>>>
+>>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>>> ---
+>>>>>>     arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
+>>>>>>     arch/arm64/boot/dts/xilinx/zynqmp.dtsi               | 8 ++++----
+>>>>>>     10 files changed, 40 insertions(+), 40 deletions(-)
+>>>>>>
+>>>>> [...]
+>>>>>> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>>>> b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>>>> index 2eb9b22..382d86f 100644
+>>>>>> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>>>> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>>>> @@ -354,10 +354,10 @@
+>>>>>>
+>>>>>>         timer {
+>>>>>>             compatible = "arm,armv8-timer";
+>>>>>> -        interrupts = <1 13 0xff01>,
+>>>>>> -                     <1 14 0xff01>,
+>>>>>> -                     <1 11 0xff01>,
+>>>>>> -                     <1 10 0xff01>;
+>>>>>> +        interrupts = <1 13 8>,
+>>>>>> +                     <1 14 8>,
+>>>>>> +                     <1 11 8>,
+>>>>>> +                     <1 10 8>;
+>>>>
+>>>>
+>>>> NAK!
+>>>>
+>>>> According to arm,gic-v3.txt the trigger value must be either 1 or 4:
+>>>>
+>>>>      The 3rd cell is the flags, encoded as follows:
+>>>>            bits[3:0] trigger type and level flags.
+>>>>                    1 = edge triggered
+>>>>                    4 = level triggered
+>>>
+>>> Which is a bug in the binding description. PPIs can be any trigger
+>>> (just look at the TRM for CPUs that have devices connected to a PPI to
+>>> be convinced - most of them are level low).
+>>>
+>>> This doesn't mean that you can distinguish level-high from level-low
+>>> in a programmatic way. But the HW definitely can handle it.
+>>>
+>>> I'll update the GICv3 binding to reflect this.
+>>>
+>>> Now, coming back to your NAK: is level-low the right or wrong trigger
+>>> for your implementation of the architected timers?
+>>>
+>>
+>> For the Cavium Thunder implementation of GIC-v3, there is no concept of
+>> high and low.  All we have is asserted and not-asserted, we have chosen
+>> to map the concept of an asserted level-triggered source to
+>> IRQ_TYPE_LEVEL_HIGH, and the transition from not-asserted to asserted on
+>> an edge triggered source to IRQ_TYPE_EDGE_RISING.
+>
+> The GIC, no matter if it is from Cavium or not, doesn't have a notion of
+> high or low indeed *from a programming interface point of view*. What
+> matters here is the *device*, and how it is connected to the interrupt
+> controller. And I'm pretty sure your timers are *physically* one or the
+> other (unless they are simply floating? ;-)
+>
 
-This alone would be fine as it is just one property, but then what's 
-next? power-sequence-delay, power-sequence-clocks, etc. What if you 
-need to express ordering relationship of supplies, clocks, gpios? We end 
-up with a scripting language in DT and we don't want to have that.
+There is no wire.  So the concept of measuring the voltage doesn't 
+exist.  Everything is message based (with either architecturally defined 
+or implementation defined protocols).
 
-Rob
+Let's turn the question around.
+
+What bits in the GIC-v3 registers and data structures do we need to 
+program differently to account for the difference between 
+IRQ_TYPE_LEVEL_HIGH and IRQ_TYPE_LEVEL_LOW?
+
+If the answer is that there are none, then allowing both to be 
+specified, falsely implies that there is a difference and causes mental 
+effort to be expended trying to decide which to use.
+
+Unless you can tell me that there is a bit in the GIC-v3 that depends on 
+HIGH vs. LOW, I remain strongly opposed to changing the binding document.
+
+David Daney
