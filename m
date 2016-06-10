@@ -1,18 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Jun 2016 04:41:12 -0700
-Subject: [PATCH] ARM: dts: omap3-gta04: Add RFID eeprom node
-In-Reply-To: <1465041955-410-1-git-send-email-marek@goldelico.com>
-References: <1465041955-410-1-git-send-email-marek@goldelico.com>
-Message-ID: <20160610114112.GH22406@atomide.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 10 Jun 2016 13:43:29 +0200
+Subject: [RFC PATCH 02/15] clocksource: samsung_pwm_timer: fix endian
+ accessors
+In-Reply-To: <20160608183110.13851-3-matthew@mattleach.net>
+References: <20160608183110.13851-1-matthew@mattleach.net>
+ <20160608183110.13851-3-matthew@mattleach.net>
+Message-ID: <575AA7E1.9030000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Marek Belisko <marek@goldelico.com> [160604 05:08]:
-> From: "H. Nikolaus Schaller" <hns@goldelico.com>
+On 06/08/2016 08:30 PM, Matthew Leach wrote:
+> Fix the Samsung pwm timer access code to deal with kernels built for big
+> endian operation.
 > 
-> Define RFID eeprom node which is present on gta04
-> device.
+> Signed-off-by: Matthew Leach <matthew@mattleach.net>
+> ---
+> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
+> CC: Thomas Gleixner <tglx@linutronix.de>
+> CC: linux-kernel at vger.kernel.org
+> ---
+>  drivers/clocksource/samsung_pwm_timer.c | 16 ++++++++--------
+>  1 file changed, 8 insertions(+), 8 deletions(-)
 
-Applying into omap-for-v4.8/dt thanks.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Tony
+Best regards,
+Krzysztof
