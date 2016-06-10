@@ -1,46 +1,75 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 10 Jun 2016 11:35:55 -0700
-Subject: [PATCH 2/3] ARM: dts: BCM5301X: Add SRAB interrupts
-In-Reply-To: <1465583756-26740-1-git-send-email-f.fainelli@gmail.com>
-References: <1465583756-26740-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1465583756-26740-3-git-send-email-f.fainelli@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 10 Jun 2016 20:47:16 +0200
+Subject: [PATCH v2 3/4] mfd: axp20x: Add axp20x-usb-power-supply for
+ axp22x pmics
+In-Reply-To: <20160610145622.GB7351@dell>
+References: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
+ <1464887936-17020-3-git-send-email-hdegoede@redhat.com>
+ <20160610145622.GB7351@dell>
+Message-ID: <162fe714-9f40-a6c6-d94b-d82d88689b7c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add interrupt mapping for the Switch Register Access Block. Only 12
-interrupts are usable at the moment even though up to 32 are dedicated
-to the SRAB.
+Hi,
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/bcm5301x.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+On 10-06-16 16:56, Lee Jones wrote:
+> On Thu, 02 Jun 2016, Hans de Goede wrote:
+>
+>> Add axp20x-usb-power-supply for axp22x pmics.
+>>
+>> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+>> ---
+>> Changes in v2:
+>> -Change compatible string for axp22x usb-power-supply cell to match v2 of:
+>>  "power: axp20x_usb: Add support for usb power-supply on axp22x pmics"
+>> ---
+>>  drivers/mfd/axp20x.c | 10 ++++++++++
+>>  1 file changed, 10 insertions(+)
+>
+> Applied, thanks.
 
-diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
-index 9fb565841004..a20ebd2ac9a2 100644
---- a/arch/arm/boot/dts/bcm5301x.dtsi
-+++ b/arch/arm/boot/dts/bcm5301x.dtsi
-@@ -153,6 +153,21 @@
- 			/* ChipCommon */
- 			<0x00000000 0 &gic GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
- 
-+			/* Switch Register Access Block */
-+			<0x00007000 0 &gic GIC_SPI 95 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 1 &gic GIC_SPI 96 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 2 &gic GIC_SPI 97 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 3 &gic GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 4 &gic GIC_SPI 99 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 5 &gic GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 6 &gic GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 7 &gic GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 8 &gic GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 9 &gic GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 10 &gic GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 11 &gic GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>,
-+			<0x00007000 12 &gic GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>,
-+
- 			/* PCIe Controller 0 */
- 			<0x00012000 0 &gic GIC_SPI 126 IRQ_TYPE_LEVEL_HIGH>,
- 			<0x00012000 1 &gic GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>,
--- 
-2.7.4
+Thanks, any chance we can see this show up soonish in :
+
+https://git.kernel.org/cgit/linux/kernel/git/lee/mfd.git/log/?h=for-mfd-next
+
+?
+
+We keep a branch with all the foo-for-next branches relevant for
+sunxi merged in for testing and it would be good to get these in there.
+
+Regards,
+
+Hans
+
+
+
+>
+>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>> index ca04361..6364dab 100644
+>> --- a/drivers/mfd/axp20x.c
+>> +++ b/drivers/mfd/axp20x.c
+>> @@ -160,6 +160,11 @@ static struct resource axp20x_usb_power_supply_resources[] = {
+>>  	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
+>>  };
+>>
+>> +static struct resource axp22x_usb_power_supply_resources[] = {
+>> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
+>> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
+>> +};
+>> +
+>>  static struct resource axp22x_pek_resources[] = {
+>>  	{
+>>  		.name   = "PEK_DBR",
+>> @@ -527,6 +532,11 @@ static struct mfd_cell axp22x_cells[] = {
+>>  		.resources		= axp22x_pek_resources,
+>>  	}, {
+>>  		.name			= "axp20x-regulator",
+>> +	}, {
+>> +		.name		= "axp20x-usb-power-supply",
+>> +		.of_compatible	= "x-powers,axp221-usb-power-supply",
+>> +		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+>> +		.resources	= axp22x_usb_power_supply_resources,
+>>  	},
+>>  };
+>>
+>
