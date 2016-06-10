@@ -1,127 +1,97 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 10 Jun 2016 11:46:25 +0200
-Subject: [PATCH v4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy block
-Message-ID: <1465551985-3332-1-git-send-email-hdegoede@redhat.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Jun 2016 10:48:10 +0100
+Subject: [PATCH] arm64: Handle el1 synchronous instruction aborts cleanly
+In-Reply-To: <1465522928-22421-1-git-send-email-labbott@redhat.com>
+References: <1465522928-22421-1-git-send-email-labbott@redhat.com>
+Message-ID: <20160610094810.GA24528@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs have a single phy-hw-block with multiple phys, this is
-modelled by a single phy dts node, so we end up with multiple
-controller nodes with a phys property pointing to the phy-node
-of the otg-phy.
+On Thu, Jun 09, 2016 at 06:42:08PM -0700, Laura Abbott wrote:
+> Executing from a non-executable area gives an ugly message:
+> 
+> lkdtm: Performing direct entry EXEC_RODATA
+> lkdtm: attempting ok execution at ffff0000084c0e08
+> lkdtm: attempting bad execution at ffff000008880700
+> Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
+> CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
+> 
+> The 'IABT (current EL)' indicates the error but isn't as obvious as a
+> regular fault message. The increase in kernel page permissions makes
+> hitting this case more likely and bad mode should not be a common
+> ocurrence. Handle this case in the vectors to give a better message.
 
-Only one of these controllers typically is an otg controller, yet we
-were checking the first controller who uses a phy from the block and
-then end up looking for a dr_mode property in e.g. the ehci controller.
+Could you add something about why the new message will be better? e.g.
+do we get more info, is it more consistent with the behaviour of other
+architectures?
 
-This commit fixes this by adding an arg0 parameter to
-of_usb_get_dr_mode_by_phy and make of_usb_get_dr_mode_by_phy
-check that this matches the phandle args[0] value when looking for
-the otg controller.
+Bad mode is still a rare occurrence, even if triggered deliberately by a
+test, but anything that makes debugging easier is good!
 
-Signed-off-by: Hans de Goede <hdegoede@redhat.com>
----
-Changes in v2:
--Add a arg0 parameter instead of looking for nodes with a dr_mode property
-Changes in v3:
--No changes
-Changes in v4:
--When arg0 == -1, use of_parse_phandle instead of of_parse_phandle_with_args
- because using of_parse_phandle_with_args breaks phy's which use the usb-phy
- bindings instead of the generic phy bindings
----
- drivers/usb/common/common.c  | 26 ++++++++++++++++++++------
- drivers/usb/phy/phy-am335x.c |  2 +-
- include/linux/usb/of.h       |  4 ++--
- 3 files changed, 23 insertions(+), 9 deletions(-)
+> Signed-off-by: Laura Abbott <labbott@redhat.com>
+> ---
+> Came up during some lkdtm testing
+> http://article.gmane.org/gmane.linux.kernel.hardened.devel/2524
+> ---
+>  arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index 12e8d2b..37f3694 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -336,6 +336,8 @@ el1_sync:
+>  	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+>  	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+>  	b.eq	el1_da
+> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
+> +	b.eq	el1_ia
+>  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+>  	b.eq	el1_undef
+>  	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+> @@ -347,6 +349,23 @@ el1_sync:
+>  	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
+>  	b.ge	el1_dbg
+>  	b	el1_inv
+> +el1_ia:
+> +	/*
+> +	 * Instruction abort handling
+> +	 */
+> +	mrs	x0, far_el1
+> +	enable_dbg
+> +	// re-enable interrupts if they were enabled in the aborted context
+> +	tbnz	x23, #7, 1f			// PSR_I_BIT
+> +	enable_irq
+> +	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
 
-diff --git a/drivers/usb/common/common.c b/drivers/usb/common/common.c
-index e3d0161..5ef8da6 100644
---- a/drivers/usb/common/common.c
-+++ b/drivers/usb/common/common.c
-@@ -131,15 +131,17 @@ EXPORT_SYMBOL_GPL(usb_get_dr_mode);
-  * of_usb_get_dr_mode_by_phy - Get dual role mode for the controller device
-  * which is associated with the given phy device_node
-  * @np:	Pointer to the given phy device_node
-+ * @arg0: phandle args[0] for phy's with #phy-cells >= 1, or -1 for
-+ *        phys which do not have phy-cells
-  *
-  * In dts a usb controller associates with phy devices.  The function gets
-  * the string from property 'dr_mode' of the controller associated with the
-  * given phy device node, and returns the correspondig enum usb_dr_mode.
-  */
--enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
-+enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0)
- {
- 	struct device_node *controller = NULL;
--	struct device_node *phy;
-+	struct of_phandle_args args;
- 	const char *dr_mode;
- 	int index;
- 	int err;
-@@ -148,12 +150,24 @@ enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
- 		controller = of_find_node_with_property(controller, "phys");
- 		index = 0;
- 		do {
--			phy = of_parse_phandle(controller, "phys", index);
--			of_node_put(phy);
--			if (phy == phy_np)
-+			if (arg0 == -1) {
-+				args.np = of_parse_phandle(controller, "phys",
-+							index);
-+				args.args_count = 0;
-+			} else {
-+				err = of_parse_phandle_with_args(controller,
-+							"phys", "#phy-cells",
-+							index, &args);
-+				if (err)
-+					break;
-+			}
-+
-+			of_node_put(args.np);
-+			if (args.np == np && (args.args_count == 0 ||
-+					      args.args[0] == arg0))
- 				goto finish;
- 			index++;
--		} while (phy);
-+		} while (args.np);
- 	} while (controller);
- 
- finish:
-diff --git a/drivers/usb/phy/phy-am335x.c b/drivers/usb/phy/phy-am335x.c
-index a262a43..7e5aece 100644
---- a/drivers/usb/phy/phy-am335x.c
-+++ b/drivers/usb/phy/phy-am335x.c
-@@ -54,7 +54,7 @@ static int am335x_phy_probe(struct platform_device *pdev)
- 		return am_phy->id;
- 	}
- 
--	am_phy->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node);
-+	am_phy->dr_mode = of_usb_get_dr_mode_by_phy(pdev->dev.of_node, -1);
- 
- 	ret = usb_phy_gen_create_phy(dev, &am_phy->usb_phy_gen, NULL);
- 	if (ret)
-diff --git a/include/linux/usb/of.h b/include/linux/usb/of.h
-index de3237f..5ff9032 100644
---- a/include/linux/usb/of.h
-+++ b/include/linux/usb/of.h
-@@ -12,7 +12,7 @@
- #include <linux/usb/phy.h>
- 
- #if IS_ENABLED(CONFIG_OF)
--enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *phy_np);
-+enum usb_dr_mode of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0);
- bool of_usb_host_tpl_support(struct device_node *np);
- int of_usb_update_otg_caps(struct device_node *np,
- 			struct usb_otg_caps *otg_caps);
-@@ -20,7 +20,7 @@ struct device_node *usb_of_get_child_node(struct device_node *parent,
- 			int portnum);
- #else
- static inline enum usb_dr_mode
--of_usb_get_dr_mode_by_phy(struct device_node *phy_np)
-+of_usb_get_dr_mode_by_phy(struct device_node *np, int arg0)
- {
- 	return USB_DR_MODE_UNKNOWN;
- }
--- 
-2.7.4
+I'm planning to kill ESR_LNX_EXEC (the reserved ISS bit here), for v4.8
+[1,2], so we'll need to figure out how to avoid problems when merging.
+My patch only handles the ESR_ELx_EC_IABT_LOW case, but it should be
+simple to add ESR_ELx_EC_IABT_CUR.
+
+If you're happy for me to do so, I could take this into my ESR_LNX_EXEC
+series.
+
+> +1:
+> +	mov	x2, sp				// struct pt_regs
+> +	bl	do_mem_abort
+> +
+> +	// disable interrupts before pulling preserved data off the stack
+> +	disable_irq
+> +	kernel_exit 1
+>  el1_da:
+>  	/*
+>  	 * Data abort handling
+> -- 
+> 2.5.5
+> 
+
+Otherwise this looks good to me. Modulo the above:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/432107.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/433682.html
