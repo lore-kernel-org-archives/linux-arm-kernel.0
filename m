@@ -1,156 +1,139 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 10 Jun 2016 16:19:15 +0100
-Subject: [PATCH v3 20/20] dt-bindings: pwm: sti: Update DT bindings with
- recent changes
-In-Reply-To: <20160610145323.GO27142@ulmo.ba.sec>
-References: <20160608092135.21184-1-lee.jones@linaro.org>
- <20160608092135.21184-21-lee.jones@linaro.org>
- <20160608205152.GA5511@rob-hp-laptop> <20160609114107.GB1388@dell>
- <20160610131855.GG27142@ulmo.ba.sec> <20160610140635.GC1537@dell>
- <20160610145323.GO27142@ulmo.ba.sec>
-Message-ID: <20160610151915.GE7351@dell>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri, 10 Jun 2016 16:19:44 +0100
+Subject: [PATCH] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
+Message-ID: <1465571984-18776-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jun 2016, Thierry Reding wrote:
-> On Fri, Jun 10, 2016 at 03:06:35PM +0100, Lee Jones wrote:
-> > On Fri, 10 Jun 2016, Thierry Reding wrote:
-> > 
-> > > On Thu, Jun 09, 2016 at 12:41:07PM +0100, Lee Jones wrote:
-> > > > On Wed, 08 Jun 2016, Rob Herring wrote:
-> > > > 
-> > > > > On Wed, Jun 08, 2016 at 10:21:35AM +0100, Lee Jones wrote:
-> > > > > > We're renaming the 'st,pwm-num-chan' binding to 'st,pwm-num-devs' to
-> > > > > > be more inline with the naming conventions of the subsystem.  Where
-> > > > > > we used to treat each line as a channel, the PWM convention is to
-> > > > > > describe them as devices.
-> > > > > 
-> > > > > That's all linux implementation details and you are breaking 
-> > > > > compatibility.
-> > > > 
-> > > > Normally I'd agree with you, but I happen to know that a) this IP is
-> > > > currently unused and b) up until this point (and probably beyond), ST
-> > > > always ship the DTB with the kernel, so there will be no breakage.
-> > > 
-> > > Heh... I've long given up on trying to make that argument go anywhere.
-> > > The general rule is that once we support a binding in a kernel release
-> > > we have to support it indefinitely. If you really want to go ahead with
-> > > this change (I don't think you should), you'd at least have to document
-> > > both properties and support st,pwm-num-chan in the driver for backwards
-> > > compatibility.
-> > 
-> > I understand what the *general* rule is, but we have to remember why
-> > this rule was put into place and apply some common sense.  In some
-> > Enterprise user-cases where DTBs are written into ROM or where they
-> > are difficult /impossible to update, I can completely understand the
-> > requirement to support previous incarnations.  However in this, the
-> > real world, DTBs are shipped with their corresponding kernels.  We
-> > would lack a great deal of functionality if they weren't.  It is
-> > therefor, foolhardy and inappropriate to stick to this rule just
-> > 'cos.
-> 
-> I used to advocate the very same point of view a couple of years ago but
-> was repeatedly told that it's irrelevant, and everybody was to be held
-> to the same standards, irrespective of how easy it is to update the DTB
-> in lockstep with the kernel.
-> 
-> Part of me still wishes that the rules were a little less strict, but a
-> decision was made on this years ago, so I'm just repeating this here in
-> an attempt to save you from wasting your time arguing.
-> 
-> Then again, there have been occasions where decisions were undone, so
-> you might have better luck nowadays if you're willing to take this to
-> the DT bindings and ARM-SoC maintainers.
-> 
-> Bottom line: NAK on the backwards-incompatible DT binding change from me
-> based on earlier decisions made on this topic. But I may be swayed if
-> everyone else thinks ABI stability is no longer something we consider
-> important for DT.
+From: Steve Capper <steve.capper@linaro.org>
 
-I've seen properties come and go.  Both using the deprecation process
-and otherwise.  By NAKing these types of changes, you're just
-exacerbating the situation.  If you know it's the right
-(non-foolhardy) thing to do, just do it.
+It can be useful for JIT software to be aware of MIDR_EL1 and
+REVIDR_EL1 to ascertain the presence of any core errata that could
+affect codegen.
 
-Although, I feel the point is moot for this particular driver now,
-what with all of the pdata being moved into the driver.
+This patch exposes these registers through sysfs:
 
-> > > > > > The second documentation adaption entails adding support for PWM
-> > > > > > capture devices.  A new clock is required as well as an IRQ line.
-> > > > > > We're also adding a new property similar to the one described
-> > > > > > above, but for capture channels.  Typically, there will be less
-> > > > > > capture channels than PWM-out, since all channels have the latter
-> > > > > > capability, but only some have capture support.
-> > > > > 
-> > > > > Humm, sounds like all of this should be implied from compatible strings.
-> > > > 
-> > > > You mean have a bunch of of_machine_is_compatibles() scattered around?
-> > > 
-> > > I don't understand why you need this at all. Quite frankly I don't even
-> > > know why st,pwm-num-devs exists. I probably missed it back at the time.
-> > > Usually, like Rob suggests, this should be inferred from the compatible
-> > > string. One commonly used way to avoid scattering explicit checks for
-> > > the compatible string is to add this information to the of_device_id
-> > > table. See a bunch of existing drivers for reference.
-> > 
-> > Yes, I am aware of the strategy, and happy to oblige if this is your
-> > suggestion.  I'll move all platform data into the driver and eradicate
-> > the DT properties.
-> 
-> Great!
-> 
-> > > Also, why make a separation of output vs. capture channels at this
-> > > point? Could you not simply obtain the total number of PWM channels,
-> > > preferably from SoC data associated with the compatible string, and
-> > > check at ->capture() time whether or not the particular PWM supports
-> > > this?
-> > > 
-> > > As-is, you imply that you have n (output) + m (capture) channels, and
-> > > that 0..n-1 are output and n..n+m-1 are capture channels. What if that
-> > > no longer holds true, but 0 and 2 are the only ones that support
-> > > capture?
-> > 
-> > We do?  What makes you think that?
-> 
-> Because there's nothing saying otherwise? The DT binding is completely
-> silent on the matter, and the above is the most logical interpretation
-> that I came up with.
+/sys/devices/system/cpu/cpu$ID/identification/midr
+/sys/devices/system/cpu/cpu$ID/identification/revidr
 
-But you made it up. :)
+where $ID is the cpu number. For big.LITTLE systems, one can have a
+mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
+to be enumerated.
 
-It's not documented because it's irrelevant how channels are numbered.
+If the kernel does not have valid information to populate these entries
+with, an empty string is returned to userspace.
 
-Actually, looking at the docs, the IP doesn't change from one channel
-to another, so in theory they all support capture.  The only issue is
-whether they are plumbed in or not.  I'll take a  closer look at all
-the platforms we support when I move the pdata.
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Steve Capper <steve.capper@linaro.org>
+[ Return error for access to !present CPU registers ]
+Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
+---
+Changes since V2:
+  - Fix errno for failures (Spotted-by: Russell King)
+  - Roll back, if we encounter a missing cpu device
+  - Return error for access to registers of CPUs not present.
+---
+ arch/arm64/include/asm/cpu.h |  1 +
+ arch/arm64/kernel/cpuinfo.c  | 69 ++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 70 insertions(+)
 
-> Looking at the driver it seems like it's actually the other way around
-> and you have the first m channels that support both output and capture
-> functionality. But the issue remains that this isn't documented in the
-> DT binding documentation. And the current properties are also not very
-> flexible because they allow for only a single scheme of assigning the
-> capability.
-> 
-> If you move all of that knowledge into the driver, things become a lot
-> easier, in my opinion.
-
-Sure.
-
-> > > If you check for this at runtime you can avoid complicated DT parsing
-> > > code, but still get the safety check which should be enough to encourage
-> > > people to use the right channels in DT.
-> > 
-> > I'm pretty sure I can move all the data into the driver.  I did want
-> > to avoid having lots of different compatible strings, but if that's
-> > what you're suggesting, I can introduce one per supported platform.
-> 
-> That sounds like the simplest solution to me.
-
-Okay.
-
+diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
+index 13a6103..116a382 100644
+--- a/arch/arm64/include/asm/cpu.h
++++ b/arch/arm64/include/asm/cpu.h
+@@ -29,6 +29,7 @@ struct cpuinfo_arm64 {
+ 	u32		reg_cntfrq;
+ 	u32		reg_dczid;
+ 	u32		reg_midr;
++	u32		reg_revidr;
+ 
+ 	u64		reg_id_aa64dfr0;
+ 	u64		reg_id_aa64dfr1;
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index c173d32..c2d0c42 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -212,6 +212,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
+ 	info->reg_ctr = read_cpuid_cachetype();
+ 	info->reg_dczid = read_cpuid(DCZID_EL0);
+ 	info->reg_midr = read_cpuid_id();
++	info->reg_revidr = read_cpuid(REVIDR_EL1);
+ 
+ 	info->reg_id_aa64dfr0 = read_cpuid(ID_AA64DFR0_EL1);
+ 	info->reg_id_aa64dfr1 = read_cpuid(ID_AA64DFR1_EL1);
+@@ -264,3 +265,71 @@ void __init cpuinfo_store_boot_cpu(void)
+ 	boot_cpu_data = *info;
+ 	init_cpu_features(&boot_cpu_data);
+ }
++
++#define CPUINFO_ATTR_RO(_name)							\
++	static ssize_t show_##_name (struct device *dev,			\
++			struct device_attribute *attr, char *buf)		\
++	{									\
++		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
++		if (!cpu_present(dev->id))					\
++			return -ENODEV;						\
++										\
++		if (info->reg_midr)						\
++			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
++		else								\
++			return 0;						\
++	}									\
++	static DEVICE_ATTR(_name, 0444, show_##_name, NULL)
++
++CPUINFO_ATTR_RO(midr);
++CPUINFO_ATTR_RO(revidr);
++
++static struct attribute *cpuregs_attrs[] = {
++	&dev_attr_midr.attr,
++	&dev_attr_revidr.attr,
++	NULL
++};
++
++static struct attribute_group cpuregs_attr_group = {
++	.attrs = cpuregs_attrs,
++	.name = "identification"
++};
++
++static int __init cpuinfo_regs_init(void)
++{
++	int cpu, finalcpu, ret;
++	struct device *dev;
++
++	for_each_present_cpu(cpu) {
++		dev = get_cpu_device(cpu);
++
++		if (!dev) {
++			ret = -ENODEV;
++			break;
++		}
++
++		ret = sysfs_create_group(&dev->kobj, &cpuregs_attr_group);
++		if (ret)
++			break;
++	}
++
++	if (!ret)
++		return 0;
++	/*
++	 * We were unable to put down sysfs groups for all the CPUs, revert
++	 * all the groups we have placed down s.t. none are visible.
++	 * Otherwise we could give a misleading picture of what's present.
++	 */
++	finalcpu = cpu;
++	for_each_present_cpu(cpu) {
++		if (cpu == finalcpu)
++			break;
++		dev = get_cpu_device(cpu);
++		if (dev)
++			sysfs_remove_group(&dev->kobj, &cpuregs_attr_group);
++	}
++
++	return ret;
++}
++
++device_initcall(cpuinfo_regs_init);
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
