@@ -1,81 +1,226 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Jun 2016 17:25:55 +0100
-Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
-In-Reply-To: <20160610161234.GO13357@hector.attlocal.net>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
- <20160610154857.GA6430@leverpostej>
- <20160610161234.GO13357@hector.attlocal.net>
-Message-ID: <20160610162555.GB6430@leverpostej>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 10 Jun 2016 18:29:42 +0200
+Subject: [PATCH v2 01/13] pwm: Add new helpers to create/manipulate PWM
+ states
+In-Reply-To: <20160610152109.GQ27142@ulmo.ba.sec>
+References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1465403688-17098-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20160610152109.GQ27142@ulmo.ba.sec>
+Message-ID: <20160610182942.5e7485ff@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 11:12:34AM -0500, Andy Gross wrote:
-> On Fri, Jun 10, 2016 at 04:48:57PM +0100, Mark Rutland wrote:
-> > [+ Lorenzo]
+Hi Thierry,
+
+On Fri, 10 Jun 2016 17:21:09 +0200
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Wed, Jun 08, 2016 at 06:34:36PM +0200, Boris Brezillon wrote:
+> > The pwm_prepare_new_state() helper prepares a new state object
+> > containing the current PWM state except for the polarity and period
+> > fields which are set to the reference values.
+> > This is particurly useful for PWM users who want to apply a new
+> > duty-cycle expressed relatively to the reference period without
+> > changing the enable state.
 > > 
-> > On Thu, May 19, 2016 at 12:00:18AM -0500, Andy Gross wrote:
-> > > This patch adds the qcom,idle-state-spc compatible to the SPC idle
-> > > state.  This compatible indicates that the state is one which supports
-> > > freeze.
-> > > 
-> > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > > ---
-> > >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > index 208af00..032e411 100644
-> > > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > @@ -104,7 +104,7 @@
-> > >  
-> > >  		idle-states {
-> > >  			CPU_SPC: spc {
-> > > -				compatible = "arm,idle-state";
-> > > +				compatible = "qcom,idle-state-spc", "arm,idle-state";
-> > >  				arm,psci-suspend-param = <0x40000002>;
-> > >  				entry-latency-us = <130>;
-> > >  				exit-latency-us = <150>;
-> > 
-> > This looks suspicious.
-> > 
-> > This is a PSCI idle state, and we have a PSCI driver driven by the
-> > generic ARM cpuidle driver.
-> > 
-> > Why do we need a qcom-specific compatible here?
-> > 
-> > Surely we should be able to use the idle code in a generic fashion to
-> > driver suspend-to-idle?
+> > The PWM framework expect PWM users to configure the duty cycle in
+> > nanosecond, but most users just want to express this duty cycle
+> > relatively to the period value (i.e. duty_cycle = 33% of the period).
+> > Add pwm_{get,set}_relative_duty_cycle() helpers to ease this kind of
+> > conversion.  
 > 
-> We need a way to identify specific idle states that support suspend-to-idle.  In
-> addition, when we have identified the states, we may have to configure the
-> enter_freeze() function.
+> This looks pretty useful and good, though I think these could be two
+> separate patches. A couple of suggestions on wording and such below.
 
-Could you elaborate on what you mean by a state supporting
-suspend-to-idle? It was my understanding that any idle state should
-function for suspend-to-idle (and the choice of state is potentially
-subjective).
+Sure, I can split those changes.
 
-> I chose to do this outside of the arm cpuidle driver because I didn't want to
-> add any more DT information aside from the compatible, and I needed a separate
-> place for the Qualcomm specific suspend code. 
-
-Which suspend code is Qualcomm-specific? There shouldn't be anything on
-the PSCI side, so I can only imagine that device management is left.
-What am I missing?
-
-> With the compatible, this makes
-> my 32 and 64 bit processor suspend code identical, as we have our own cpuidle
-> driver for the 32 bit procs.
 > 
-> An alternative would be to add some facilities to communicate this to the arm
-> cpuidle driver and configure the enter_freeze() function at some later point.
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  include/linux/pwm.h | 81 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 81 insertions(+)
+> > 
+> > diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> > index 17018f3..e09babf 100644
+> > --- a/include/linux/pwm.h
+> > +++ b/include/linux/pwm.h
+> > @@ -148,6 +148,87 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
+> >  }
+> >  
+> >  /**
+> > + * pwm_prepare_new_state() - prepare a new state to be applied with
+> > + *			     pwm_apply_state()  
+> 
+> This is weirdly indented.
 
-I would prefer that suspend-to-idle using PSCI occurred via the generic
-PSCI and cpuidle code. I am happy to extend that code if there is
-something lacking, and I would prefer to not have platform-specific
-hooks.
+I'll fix the indentation.
 
-Thanks,
-Mark.
+> 
+> > + * @pwm: PWM device
+> > + * @state: state to fill with the prepared PWM state
+> > + *
+> > + * This functions prepares a state that can later be tweaked and applied
+> > + * to the PWM device with pwm_apply_state(). This is a convenient function
+> > + * that first retrieves the current PWM state and the replaces the period
+> > + * and polarity fields with the reference values defined in pwm->args.
+> > + * Once the new state is created you can adjust the ->enable and ->duty_cycle  
+> 
+> "created" has the connotation of allocating. Perhaps: "Once the function
+> returns, you can adjust the ->enabled and ->duty_cycle fields according
+> to your needs before calling pwm_apply_state()."?
+
+Okay.
+
+> 
+> Also note that the field is called ->enabled.
+> 
+> > + * according to your need before calling pwm_apply_state().  
+> 
+> Maybe mention that the ->duty_cycle field is explicitly zeroed. Then
+> again, do we really need it? If users are going to overwrite it anyway,
+> do we even need to bother? I suppose it makes some sense because the
+> current duty cycle is stale when the ->period gets set to the value from
+> args. I think the documentation should mention this in some way.
+
+Yes, if we keep the current duty_cycle it can exceed the period value.
+I'm fine dropping the ->duty_cycle = 0 assignment and documenting the
+behavior.
+
+> 
+> > + */
+> > +static inline void pwm_prepare_new_state(const struct pwm_device *pwm,
+> > +					 struct pwm_state *state)  
+> 
+> Perhaps choose a shorter name, such as: pwm_init_state()?
+
+Sure.
+
+> 
+> > +{
+> > +	struct pwm_args args;
+> > +
+> > +	/* First get the current state. */
+> > +	pwm_get_state(pwm, state);
+> > +
+> > +	/* Then fill it with the reference config */
+> > +	pwm_get_args(pwm, &args);
+> > +
+> > +	state->period = args.period;
+> > +	state->polarity = args.polarity;
+> > +	state->duty_cycle = 0;
+> > +}
+> > +
+> > +/**
+> > + * pwm_get_relative_duty_cycle() - Get a relative duty_cycle value
+> > + * @state: the PWM state to extract period and duty_cycle from
+> > + * @scale: the scale you want to use for you relative duty_cycle value  
+> 
+> Other kerneldoc comments in this file don't prefix the description with
+> "the".
+> 
+> Also, perhaps the following descriptions would be slightly less
+> confusing:
+> 
+> 	@state: PWM state to extract the duty cycle from
+
+Agreed.
+
+> 
+> We don't extract (i.e. return) period from the state, so it's a little
+> confusing to mention it here.
+> 
+> 	@scale: scale in which to return the relative duty cycle
+> 
+> This is slightly more explicit in that it says what the returned duty
+> cycle will be in. Perhaps as an alternative:
+> 
+> 	@scale: target scale of the relative duty cycle
+
+I'll go for this one.
+
+> 
+> > + *
+> > + * This functions converts the absolute duty_cycle stored in @state
+> > + * (expressed in nanosecond) into a relative value.  
+> 
+> Perhaps: "... into a value relative to the period."?
+
+Okay.
+
+> 
+> > + * For example if you want to get the duty_cycle expressed in nanosecond,  
+> 
+> The example below would give you the duty cycle in percent, not
+> nanoseconds, right?
+
+Absolutely. I'll fix that.
+
+> 
+> > + * call:
+> > + *
+> > + * pwm_get_state(pwm, &state);
+> > + * duty = pwm_get_relative_duty_cycle(&state, 100);
+> > + */
+> > +static inline unsigned int
+> > +pwm_get_relative_duty_cycle(const struct pwm_state *state, unsigned int scale)
+> > +{
+> > +	if (!state->period)
+> > +		return 0;
+> > +
+> > +	return DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * scale,
+> > +				     state->period);
+> > +}
+> > +
+> > +/**
+> > + * pwm_set_relative_duty_cycle() - Set a relative duty_cycle value
+> > + * @state: the PWM state to fill
+> > + * @val: the relative duty_cycle value
+> > + * @scale: the scale you use for you relative duty_cycle value  
+> 
+> "scale in which @duty_cycle is expressed"?
+
+Yep.
+
+> 
+> > + *
+> > + * This functions converts a relative duty_cycle stored into an absolute
+> > + * one (expressed in nanoseconds), and put the result in state->duty_cycle.
+> > + * For example if you want to change configure a 50% duty_cycle, call:
+> > + *
+> > + * pwm_prepare_new_state(pwm, &state);
+> > + * pwm_set_relative_duty_cycle(&state, 50, 100);
+> > + * pwm_apply_state(pwm, &state);
+> > + */
+> > +static inline void
+> > +pwm_set_relative_duty_cycle(struct pwm_state *state, unsigned int val,  
+> 
+> Any reason why we can't call "val" "duty_cycle"? That's what it is,
+> after all.
+
+Nope, I'll switch to duty_cycle.
+
+> 
+> > +			    unsigned int scale)
+> > +{
+> > +	if (!scale)
+> > +		return;
+> > +
+> > +	/* Make sure we don't have duty_cycle > period */
+> > +	if (val > scale)
+> > +		val = scale;  
+> 
+> Can we return -EINVAL for both of the above checks? I don't like
+> silently clamping the duty cycle that the user passed in.
+
+I'm fine returning -EINVAL in this case.
+
+Thanks for rewording some of my sentences and reviewing the patch.
+
+Regards,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
