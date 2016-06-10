@@ -1,34 +1,71 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 10 Jun 2016 11:35:53 -0700
-Subject: [PATCH 0/3] ARM: dts: BCM5310x switch support
-Message-ID: <1465583756-26740-1-git-send-email-f.fainelli@gmail.com>
+Date: Fri, 10 Jun 2016 11:35:54 -0700
+Subject: [PATCH 1/3] ARM: dts: Enable SRAB switch and GMACs on 5301x DTS
+In-Reply-To: <1465583756-26740-1-git-send-email-f.fainelli@gmail.com>
+References: <1465583756-26740-1-git-send-email-f.fainelli@gmail.com>
+Message-ID: <1465583756-26740-2-git-send-email-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add the Switch Register Access Block which is a special piece of
+hardware allowing us to perform indirect read/writes towards the
+integrated BCM5301X Ethernet switch.
 
-This patch series adds the Device Tree changes needed to enable the
-Switch Register Access Block found on Broadcom BCM5301x SoCs.
+We also add the 4 Gigabit MAC Device Tree nodes within the brcm,bus-axi
+bus node to get proper binding between the BCMA instantiated core and
+the Device Tree nodes. We will need that to be able to reference
+Ethernet Device Tree nodes in a future patch adding the switch ports
+layout.
 
-First patch adds the SRAB block and the GMAC as child nodes of the BCMA
-bus so we get proper device_node/struct device parenting. The second patch
-defines the SRAB interrupts, and the last one defines the switch ports layouts
-according to the new DSA binding accepted in net-next:
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ arch/arm/boot/dts/bcm5301x.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/commit/?id=8c5ad1d6179df31eea1b736c88296db6e3ffd25d
-
-The B53 driver binding is defined here:
-
-https://git.kernel.org/cgit/linux/kernel/git/davem/net-next.git/diff/Documentation/devicetree/bindings/net/dsa/b53.txt?id=967dd82ffc52e9d8ea0defde094f9a39a3f4eeed
-
-Florian Fainelli (3):
-  ARM: dts: Enable SRAB switch and GMACs on 5301x DTS
-  ARM: dts: BCM5301X: Add SRAB interrupts
-  ARM: dts: BCM5310x: Enable switch ports on SmartRG SR400AC
-
- arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts | 40 +++++++++++++++++++++++++
- arch/arm/boot/dts/bcm5301x.dtsi               | 42 +++++++++++++++++++++++++++
- 2 files changed, 82 insertions(+)
-
+diff --git a/arch/arm/boot/dts/bcm5301x.dtsi b/arch/arm/boot/dts/bcm5301x.dtsi
+index 7d4d29bf0ed3..9fb565841004 100644
+--- a/arch/arm/boot/dts/bcm5301x.dtsi
++++ b/arch/arm/boot/dts/bcm5301x.dtsi
+@@ -239,6 +239,22 @@
+ 				status = "disabled";
+ 			};
+ 		};
++
++		gmac0: ethernet at 24000 {
++			reg = <0x24000 0x800>;
++		};
++
++		gmac1: ethernet at 25000 {
++			reg = <0x25000 0x800>;
++		};
++
++		gmac2: ethernet at 26000 {
++			reg = <0x26000 0x800>;
++		};
++
++		gmac3: ethernet at 27000 {
++			reg = <0x27000 0x800>;
++		};
+ 	};
+ 
+ 	lcpll0: lcpll0 at 1800c100 {
+@@ -260,6 +276,17 @@
+ 				     "sata2";
+ 	};
+ 
++	srab: srab at 18007000 {
++		compatible = "brcm,bcm5301x-srab";
++		reg = <0x18007000 0x1000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		status = "disabled";
++
++		/* ports are defined in board DTS */
++	};
++
+ 	nand: nand at 18028000 {
+ 		compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1", "brcm,brcmnand";
+ 		reg = <0x18028000 0x600>, <0x1811a408 0x600>, <0x18028f00 0x20>;
 -- 
 2.7.4
