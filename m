@@ -1,69 +1,165 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:04 +0200
-Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
+Date: Sat, 11 Jun 2016 00:03:05 +0200
+Subject: [PATCH 02/48] ARM: at91: Document new TCB bindings
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-3-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+The current binding for the TCB is not flexible enough for some use cases
+and prevents proper utilization of all the channels.
 
-Fix the main and slow clock .prepare() implementations which used to call
-usleep() when the scheduler wasn't ready yet.
-
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: linux-clk at vger.kernel.org
-Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Thierry Reding <thierry.reding@gmail.com>
+Cc: linux-pwm at vger.kernel.org
+Cc: Rob Herring <robh+dt@kernel.org>
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- drivers/clk/at91/clk-main.c | 2 +-
- drivers/clk/at91/clk-slow.c | 6 +++---
- 2 files changed, 4 insertions(+), 4 deletions(-)
+ .../devicetree/bindings/arm/atmel-at91.txt         | 32 -----------
+ .../devicetree/bindings/mfd/atmel-tcb.txt          | 62 ++++++++++++++++++++++
+ .../devicetree/bindings/pwm/atmel-tcb-pwm.txt      | 12 +++--
+ 3 files changed, 69 insertions(+), 37 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/atmel-tcb.txt
 
-diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-index 58b5baca670c..12c5062aeb92 100644
---- a/drivers/clk/at91/clk-main.c
-+++ b/drivers/clk/at91/clk-main.c
-@@ -342,7 +342,7 @@ static int clk_main_probe_frequency(struct regmap *regmap)
- 		regmap_read(regmap, AT91_CKGR_MCFR, &mcfr);
- 		if (mcfr & AT91_PMC_MAINRDY)
- 			return 0;
--		usleep_range(MAINF_LOOP_MIN_WAIT, MAINF_LOOP_MAX_WAIT);
-+		udelay(MAINF_LOOP_MIN_WAIT);
- 	} while (time_before(prep_time, timeout));
+diff --git a/Documentation/devicetree/bindings/arm/atmel-at91.txt b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+index e1f5ad855f14..3dc758403d03 100644
+--- a/Documentation/devicetree/bindings/arm/atmel-at91.txt
++++ b/Documentation/devicetree/bindings/arm/atmel-at91.txt
+@@ -60,38 +60,6 @@ System Timer (ST) required properties:
+ Its subnodes can be:
+ - watchdog: compatible should be "atmel,at91rm9200-wdt"
  
- 	return -ETIMEDOUT;
-diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index 61090b1146cf..612e893ce994 100644
---- a/drivers/clk/at91/clk-slow.c
-+++ b/drivers/clk/at91/clk-slow.c
-@@ -76,7 +76,7 @@ static int clk_slow_osc_prepare(struct clk_hw *hw)
+-TC/TCLIB Timer required properties:
+-- compatible: Should be "atmel,<chip>-tcb".
+-  <chip> can be "at91rm9200" or "at91sam9x5"
+-- reg: Should contain registers location and length
+-- interrupts: Should contain all interrupts for the TC block
+-  Note that you can specify several interrupt cells if the TC
+-  block has one interrupt per channel.
+-- clock-names: tuple listing input clock names.
+-	Required elements: "t0_clk", "slow_clk"
+-	Optional elements: "t1_clk", "t2_clk"
+-- clocks: phandles to input clocks.
+-
+-Examples:
+-
+-One interrupt per TC block:
+-	tcb0: timer at fff7c000 {
+-		compatible = "atmel,at91rm9200-tcb";
+-		reg = <0xfff7c000 0x100>;
+-		interrupts = <18 4>;
+-		clocks = <&tcb0_clk>;
+-		clock-names = "t0_clk";
+-	};
+-
+-One interrupt per TC channel in a TC block:
+-	tcb1: timer at fffdc000 {
+-		compatible = "atmel,at91rm9200-tcb";
+-		reg = <0xfffdc000 0x100>;
+-		interrupts = <26 4 27 4 28 4>;
+-		clocks = <&tcb1_clk>;
+-		clock-names = "t0_clk";
+-	};
+-
+ RSTC Reset Controller required properties:
+ - compatible: Should be "atmel,<chip>-rstc".
+   <chip> can be "at91sam9260" or "at91sam9g45" or "sama5d3"
+diff --git a/Documentation/devicetree/bindings/mfd/atmel-tcb.txt b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
+new file mode 100644
+index 000000000000..48196752c78f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/atmel-tcb.txt
+@@ -0,0 +1,62 @@
++* Device tree bindings for Atmel Timer Counter Blocks
++- compatible: Should be "atmel,<chip>-tcb", "simple-mfd", "syscon".
++  <chip> can be "at91rm9200" or "at91sam9x5"
++- reg: Should contain registers location and length
++- #address-cells: has to be 1
++- #size-cells: has to be 0
++- interrupts: Should contain all interrupts for the TC block
++  Note that you can specify several interrupt cells if the TC
++  block has one interrupt per channel.
++- clock-names: tuple listing input clock names.
++	Required elements: "t0_clk", "slow_clk"
++	Optional elements: "t1_clk", "t2_clk"
++- clocks: phandles to input clocks.
++
++The TCB can expose multiple subdevices:
++ * a clocksource and clockevent device
++   - compatible: Should be "atmel,tcb-clksrc"
++   - reg: Should contain the TCB channels to be used. If the
++     counter width is 16 bits (at91rm9200-tcb), two consecutive
++     channels are needed. Else, only one channel will be used.
++
++ * a clockevent device
++   - compatible: Should be "atmel,tcb-clkevt"
++   - reg: Should contain the TCB channel to be used
++
++ * a PWM chip: see ../pwm/atmel-tcb-pwm.txt
++
++Examples:
++
++One interrupt per TC block:
++	tcb0: timer at fff7c000 {
++		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0xfff7c000 0x100>;
++		interrupts = <18 4>;
++		clocks = <&tcb0_clk>;
++		clock-names = "t0_clk";
++
++		timer at 0 {
++			compatible = "atmel,tcb-clksrc";
++			reg = <0>, <1>;
++		};
++
++		timer at 2 {
++			compatible = "atmel,tcb-clkevt";
++			reg = <2>;
++		};
++	};
++
++One interrupt per TC channel in a TC block:
++	tcb1: timer at fffdc000 {
++		compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		reg = <0xfffdc000 0x100>;
++		interrupts = <26 4>, <27 4>, <28 4>;
++		clocks = <&tcb1_clk>;
++		clock-names = "t0_clk";
++	};
++
++
+diff --git a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+index 8031148bcf85..ab8fbd5ba184 100644
+--- a/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
++++ b/Documentation/devicetree/bindings/pwm/atmel-tcb-pwm.txt
+@@ -2,15 +2,17 @@ Atmel TCB PWM controller
  
- 	writel(tmp | AT91_SCKC_OSC32EN, sckcr);
+ Required properties:
+ - compatible: should be "atmel,tcb-pwm"
++- reg: tcb channel to use. Each channel can export 2 PWMs
+ - #pwm-cells: should be 3. See pwm.txt in this directory for a description of
+   the cells format. The only third cell flag supported by this binding is
+   PWM_POLARITY_INVERTED.
+-- tc-block: The Timer Counter block to use as a PWM chip.
  
--	usleep_range(osc->startup_usec, osc->startup_usec + 1);
-+	udelay(osc->startup_usec);
+ Example:
  
- 	return 0;
- }
-@@ -195,7 +195,7 @@ static int clk_slow_rc_osc_prepare(struct clk_hw *hw)
- 
- 	writel(readl(sckcr) | AT91_SCKC_RCEN, sckcr);
- 
--	usleep_range(osc->startup_usec, osc->startup_usec + 1);
-+	udelay(osc->startup_usec);
- 
- 	return 0;
- }
-@@ -304,7 +304,7 @@ static int clk_sam9x5_slow_set_parent(struct clk_hw *hw, u8 index)
- 
- 	writel(tmp, sckcr);
- 
--	usleep_range(SLOWCK_SW_TIME_USEC, SLOWCK_SW_TIME_USEC + 1);
-+	udelay(SLOWCK_SW_TIME_USEC);
- 
- 	return 0;
- }
+-pwm {
+-	compatible = "atmel,tcb-pwm";
+-	#pwm-cells = <3>;
+-	tc-block = <1>;
++tcb0: timer at f800c000 {
++	pwm at 0 {
++		compatible = "atmel,tcb-pwm";
++		reg = <0>;
++		#pwm-cells = <3>;
++	};
+ };
 -- 
 2.8.1
