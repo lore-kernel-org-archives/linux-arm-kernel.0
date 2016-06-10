@@ -1,25 +1,71 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Jun 2016 11:50:15 +0200
-Subject: [PATCH 03/20] clk: sunxi: tcon-ch1: Do not return a negative
- error in get_parent
-In-Reply-To: <CAGb2v64GxTFnnx40Jy9Cz9e+c+T2j2QcbFznZ4-Lm-tdHFgcXg@mail.gmail.com>
+Date: Fri, 10 Jun 2016 11:50:31 +0200
+Subject: [PATCH 04/20] clk: sunxi: display: Add per-clock flags
+In-Reply-To: <CAGb2v66-GzV=1wrJnHBObLVPVHPk87o0PaJtNyYasp2wFsZabw@mail.gmail.com>
 References: <1463402840-17062-1-git-send-email-maxime.ripard@free-electrons.com>
- <1463402840-17062-4-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v64GxTFnnx40Jy9Cz9e+c+T2j2QcbFznZ4-Lm-tdHFgcXg@mail.gmail.com>
-Message-ID: <20160610095015.GS5242@lukather>
+ <1463402840-17062-5-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66-GzV=1wrJnHBObLVPVHPk87o0PaJtNyYasp2wFsZabw@mail.gmail.com>
+Message-ID: <20160610095031.GT5242@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2016 at 12:05:18AM +0800, Chen-Yu Tsai wrote:
+On Mon, May 16, 2016 at 11:21:41PM +0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
 > On Mon, May 16, 2016 at 8:47 PM, Maxime Ripard
 > <maxime.ripard@free-electrons.com> wrote:
-> > get_parent is supposed to return an unsigned 8 bit integer, so returning
-> > -EINVAL is a bad idea.
+> > The TCON channel 0 clock that is the parent clock of our pixel clock is
+> > expected to change its rate depending on the resolution we want to output
+> > in our display engine.
 > >
-> > Remove it.
+> > However, since it's only a mux, the only way it can do that is by changing
+> > its parents rate.
 > >
-> > Reported-by: Dan Carpenter <dan.carpenter@oracle.com>
+> > Allow to give flags in our display clocks description, and add the
+> > CLK_SET_RATE_PARENT flag for the TCON channel 0 flag.
+> >
+> > Fixes: a3b4956ee6d9 ("clk: sunxi: display: Add per-clock flags")
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi/clk-sun4i-display.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+> > index 445a7498d6df..9780fac6d029 100644
+> > --- a/drivers/clk/sunxi/clk-sun4i-display.c
+> > +++ b/drivers/clk/sunxi/clk-sun4i-display.c
+> > @@ -33,6 +33,8 @@ struct sun4i_a10_display_clk_data {
+> >
+> >         u8      width_div;
+> >         u8      width_mux;
+> > +
+> 
+> Don't really need this separator, but I'm ok either way.
+> 
+> > +       u32     flags;
+> >  };
+> >
+> >  struct reset_data {
+> > @@ -166,7 +168,7 @@ static void __init sun4i_a10_display_init(struct device_node *node,
+> >                                      data->has_div ? &div->hw : NULL,
+> >                                      data->has_div ? &clk_divider_ops : NULL,
+> >                                      &gate->hw, &clk_gate_ops,
+> > -                                    0);
+> > +                                    data->flags);
+> >         if (IS_ERR(clk)) {
+> >                 pr_err("%s: Couldn't register the clock\n", clk_name);
+> >                 goto free_div;
+> > @@ -232,6 +234,7 @@ static const struct sun4i_a10_display_clk_data sun4i_a10_tcon_ch0_data __initcon
+> >         .offset_rst     = 29,
+> >         .offset_mux     = 24,
+> >         .width_mux      = 2,
+> > +       .flags          = CLK_SET_RATE_PARENT,
+> >  };
+> >
+> >  static void __init sun4i_a10_tcon_ch0_setup(struct device_node *node)
+> > --
+> > 2.8.2
+> >
 > 
 > Acked-by: Chen-Yu Tsai <wens@csie.org>
 
@@ -37,4 +83,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/7b95d042/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/110039a6/attachment.sig>
