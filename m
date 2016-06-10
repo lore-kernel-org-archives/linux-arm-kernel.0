@@ -1,113 +1,72 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 10 Jun 2016 21:55:16 +0200
-Subject: [PATCH V9 08/11] ARM64/PCI: Add ACPI hook to assign domain number
+Date: Fri, 10 Jun 2016 21:55:18 +0200
+Subject: [PATCH V9 10/11] ARM64/PCI: Implement ACPI low-level calls to access
+ PCI_Config region from AML
 In-Reply-To: <1465588519-11334-1-git-send-email-tn@semihalf.com>
 References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
-Message-ID: <1465588519-11334-9-git-send-email-tn@semihalf.com>
+Message-ID: <1465588519-11334-11-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PCI core code provides a config option (CONFIG_PCI_DOMAINS_GENERIC)
-that allows assigning the PCI bus domain number generically by
-relying on device tree bindings, and falling back to a simple counter
-when the respective DT properties (ie "linux,pci-domain") are not
-specified in the host bridge device tree node.
+ACPI spec6.1 - chapter: 5.5.2.4 defines OperationRegion (Declare Operation
+Region). Following the spec: " [...] An Operation Region is a specific
+region of operation within an address space that is declared as a subset
+of the entire address space using a starting address (offset) and a length.
+Control methods must have exclusive access to any address accessed via
+fields declared in Operation Regions. [...]".
 
-In a similar way, when a system is booted through ACPI, architectures
-that are selecting CONFIG_PCI_DOMAINS_GENERIC (ie ARM64) require kernel
-hooks to retrieve the domain number so that the PCI bus domain number
-set-up can be handled seamlessly with DT and ACPI in generic core code
-when CONFIG_PCI_DOMAINS_GENERIC is selected.
+OperationRegion allows to declare various of operation region address space
+identifiers including PCI_Config. PCI_Config is meant to access PCI
+configuration space from the ASL. So every time ASL opcode operates
+on PCI_Config space region, ASL interpreter dispatches accesses to OS
+low-level calls - raw_pci_write() and raw_pci_read() for Linux - so-called
+ACPI RAW accessors.
 
-Since currently it is not possible to retrieve a pointer to the PCI
-host bridge ACPI device backing the host bridge from core PCI code
-(which would allow retrieving the domain number in an arch agnostic
-way through the ACPI _SEG method), an arch specific ACPI hook has to
-be declared and implemented by all arches that rely on
-CONFIG_PCI_DOMAINS_GENERIC to retrieve the domain number and set it
-up in core PCI code.
+In order to support PCI_Config operation region, implement mentioned
+raw_pci_write() and raw_pci_read() calls so they find associated bus
+and call read/write ops.
 
-For the aforementioned reasons, introduce acpi_pci_bus_find_domain_nr()
-hook to retrieve the domain number on a per-arch basis when the system
-boots through ACPI. ARM64 dummy implementation of the same is provided
-in first place in preparation for ARM64 ACPI based PCI host controller
-driver.
-
-acpi_pci_bus_find_domain_nr() is called from generic
-pci_bus_find_domain_nr() as an ACPI option to DT domain assignment.
+Waiting for clarification in the ACPI specifications in relation
+to PCI_Config space handling before PCI bus enumeration is completed,
+current code does not support PCI_Config region accesses before PCI bus
+enumeration whilst providing full AML PCI_Config access availability
+when the PCI bus enumeration is completed by the kernel so that
+RAW accessors can look-up PCI operations through the struct pci_bus
+associated with a PCI bus.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 ---
- arch/arm64/kernel/pci.c | 7 +++++++
- drivers/pci/pci.c       | 4 +++-
- include/linux/pci.h     | 7 +++++++
- 3 files changed, 17 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/pci.c | 12 ++++++++++--
+ 1 file changed, 10 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index 3c4e308..d5d3d26 100644
+index b3b8a2c..328f857 100644
 --- a/arch/arm64/kernel/pci.c
 +++ b/arch/arm64/kernel/pci.c
-@@ -17,6 +17,7 @@
- #include <linux/mm.h>
- #include <linux/of_pci.h>
- #include <linux/of_platform.h>
-+#include <linux/pci.h>
- #include <linux/slab.h>
- 
- /*
-@@ -85,6 +86,12 @@ EXPORT_SYMBOL(pcibus_to_node);
- #endif
- 
- #ifdef CONFIG_ACPI
+@@ -71,13 +71,21 @@ int pcibios_alloc_irq(struct pci_dev *dev)
+ int raw_pci_read(unsigned int domain, unsigned int bus,
+ 		  unsigned int devfn, int reg, int len, u32 *val)
+ {
+-	return -ENXIO;
++	struct pci_bus *b = pci_find_bus(domain, bus);
 +
-+int acpi_pci_bus_find_domain_nr(struct pci_bus *bus)
-+{
-+	return 0;
-+}
++	if (!b)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	return b->ops->read(b, devfn, reg, len, val);
+ }
+ 
+ int raw_pci_write(unsigned int domain, unsigned int bus,
+ 		unsigned int devfn, int reg, int len, u32 val)
+ {
+-	return -ENXIO;
++	struct pci_bus *b = pci_find_bus(domain, bus);
 +
- /* Root bridge scanning */
- struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
- {
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 327828d..4834cee 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -7,6 +7,7 @@
-  *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
-  */
- 
-+#include <linux/acpi.h>
- #include <linux/kernel.h>
- #include <linux/delay.h>
- #include <linux/init.h>
-@@ -4990,7 +4991,8 @@ static int of_pci_bus_find_domain_nr(struct device *parent)
- 
- int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
- {
--	return of_pci_bus_find_domain_nr(parent) ;
-+	return acpi_disabled ? of_pci_bus_find_domain_nr(parent) :
-+			       acpi_pci_bus_find_domain_nr(bus);
++	if (!b)
++		return PCIBIOS_DEVICE_NOT_FOUND;
++	return b->ops->write(b, devfn, reg, len, val);
  }
- #endif
- #endif
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 48839e8..49ba8af 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -1390,6 +1390,13 @@ static inline int pci_domain_nr(struct pci_bus *bus)
- {
- 	return bus->domain_nr;
- }
-+/* Arch specific ACPI hook to set-up domain number */
-+#ifdef CONFIG_ACPI
-+int acpi_pci_bus_find_domain_nr(struct pci_bus *bus);
-+#else
-+static inline int acpi_pci_bus_find_domain_nr(struct pci_bus *bus)
-+{ return 0; }
-+#endif
- int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent);
- #endif
  
+ #ifdef CONFIG_NUMA
 -- 
 1.9.1
