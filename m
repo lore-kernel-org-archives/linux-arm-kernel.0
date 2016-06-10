@@ -1,100 +1,44 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 10 Jun 2016 11:47:21 -0500
-Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
-In-Reply-To: <20160610162555.GB6430@leverpostej>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
- <20160610154857.GA6430@leverpostej>
- <20160610161234.GO13357@hector.attlocal.net>
- <20160610162555.GB6430@leverpostej>
-Message-ID: <20160610164721.GP13357@hector.attlocal.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Jun 2016 18:47:46 +0200
+Subject: [PATCH v2 01/13] pwm: Add new helpers to create/manipulate PWM
+ states
+In-Reply-To: <20160610182942.5e7485ff@bbrezillon>
+References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1465403688-17098-2-git-send-email-boris.brezillon@free-electrons.com>
+ <20160610152109.GQ27142@ulmo.ba.sec>
+ <20160610182942.5e7485ff@bbrezillon>
+Message-ID: <20160610164746.GB8696@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 05:25:55PM +0100, Mark Rutland wrote:
-> On Fri, Jun 10, 2016 at 11:12:34AM -0500, Andy Gross wrote:
-> > On Fri, Jun 10, 2016 at 04:48:57PM +0100, Mark Rutland wrote:
-> > > [+ Lorenzo]
-> > > 
-> > > On Thu, May 19, 2016 at 12:00:18AM -0500, Andy Gross wrote:
-> > > > This patch adds the qcom,idle-state-spc compatible to the SPC idle
-> > > > state.  This compatible indicates that the state is one which supports
-> > > > freeze.
-> > > > 
-> > > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > > > ---
-> > > >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > > index 208af00..032e411 100644
-> > > > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > > @@ -104,7 +104,7 @@
-> > > >  
-> > > >  		idle-states {
-> > > >  			CPU_SPC: spc {
-> > > > -				compatible = "arm,idle-state";
-> > > > +				compatible = "qcom,idle-state-spc", "arm,idle-state";
-> > > >  				arm,psci-suspend-param = <0x40000002>;
-> > > >  				entry-latency-us = <130>;
-> > > >  				exit-latency-us = <150>;
-> > > 
-> > > This looks suspicious.
-> > > 
-> > > This is a PSCI idle state, and we have a PSCI driver driven by the
-> > > generic ARM cpuidle driver.
-> > > 
-> > > Why do we need a qcom-specific compatible here?
-> > > 
-> > > Surely we should be able to use the idle code in a generic fashion to
-> > > driver suspend-to-idle?
+On Fri, Jun 10, 2016 at 06:29:42PM +0200, Boris Brezillon wrote:
+> On Fri, 10 Jun 2016 17:21:09 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
+> > On Wed, Jun 08, 2016 at 06:34:36PM +0200, Boris Brezillon wrote:
+[...]
+> > > + * according to your need before calling pwm_apply_state().  
 > > 
-> > We need a way to identify specific idle states that support suspend-to-idle.  In
-> > addition, when we have identified the states, we may have to configure the
-> > enter_freeze() function.
+> > Maybe mention that the ->duty_cycle field is explicitly zeroed. Then
+> > again, do we really need it? If users are going to overwrite it anyway,
+> > do we even need to bother? I suppose it makes some sense because the
+> > current duty cycle is stale when the ->period gets set to the value from
+> > args. I think the documentation should mention this in some way.
 > 
-> Could you elaborate on what you mean by a state supporting
-> suspend-to-idle? It was my understanding that any idle state should
-> function for suspend-to-idle (and the choice of state is potentially
-> subjective).
+> Yes, if we keep the current duty_cycle it can exceed the period value.
+> I'm fine dropping the ->duty_cycle = 0 assignment and documenting the
+> behavior.
 
-when you freeze the system, cpuidle will try to find the deepest state which
-supports freeze (by checking if a enter_freeze() exists).  If it does exist,
-then the tick is frozen and the enter_freeze is called as each cpu goes idle.
+Actually what I was trying to suggest is that we keep the code as-is but
+document the behaviour (and rationale behind it).
 
-If no enter_freeze exists, the system will suspend, but will continue to have
-interrupts occur due to the tick and other bookkeeping stuff.
+I think it's fine to zero out the value precisely because it could
+become invalid after the function (and there's no other reasonable value
+to set it to). Just wanted to make sure it's all properly documented.
 
-> 
-> > I chose to do this outside of the arm cpuidle driver because I didn't want to
-> > add any more DT information aside from the compatible, and I needed a separate
-> > place for the Qualcomm specific suspend code. 
-> 
-> Which suspend code is Qualcomm-specific? There shouldn't be anything on
-> the PSCI side, so I can only imagine that device management is left.
-> What am I missing?
-
-Qualcomm won't be supporting the psci suspend feature and will be doing their
-own thing.  As such, they need their own suspend ops.  In addition, we have
-platforms that don't use psci (32 bit).
-
-> > With the compatible, this makes
-> > my 32 and 64 bit processor suspend code identical, as we have our own cpuidle
-> > driver for the 32 bit procs.
-> > 
-> > An alternative would be to add some facilities to communicate this to the arm
-> > cpuidle driver and configure the enter_freeze() function at some later point.
-> 
-> I would prefer that suspend-to-idle using PSCI occurred via the generic
-> PSCI and cpuidle code. I am happy to extend that code if there is
-> something lacking, and I would prefer to not have platform-specific
-> hooks.
-
-Right, I briefly looked at that in the beginning and decided against it.  But if
-we can at least add some way to identify freezeable idle states and configure
-the freeze function, that'd cover all the requirements.
-
-Regards,
-
-Andy
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/8be32721/attachment.sig>
