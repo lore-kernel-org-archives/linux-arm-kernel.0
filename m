@@ -1,24 +1,98 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 10 Jun 2016 17:10:20 +0200
-Subject: [PATCH] ARM: at91: debug: add default DEBUG_LL addresses
-In-Reply-To: <1465386548-9757-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1465386548-9757-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160610151020.GE19050@piout.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Jun 2016 16:14:58 +0100
+Subject: [PATCH V8 5/9] pci, acpi: add acpi hook to assign domain number.
+In-Reply-To: <20160608001559.GD4759@localhost>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-6-git-send-email-tn@semihalf.com>
+ <20160608001559.GD4759@localhost>
+Message-ID: <20160610151458.GA23638@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2016 at 13:49:08 +0200, Alexandre Belloni wrote :
-> Add configuration options for the most commonly used UART physical and
-> virtual addresses to ease the use of DEBUG_LL and earlyprintk.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/Kconfig.debug | 58 ++++++++++++++++++++++++++++++++++++++------------
->  1 file changed, 44 insertions(+), 14 deletions(-)
-> 
-Applied now.
+Hi Bjorn, Tomasz,
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+On Tue, Jun 07, 2016 at 07:15:59PM -0500, Bjorn Helgaas wrote:
+
+[...]
+
+> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > index eb431b5..2b52178 100644
+> > --- a/drivers/pci/pci.c
+> > +++ b/drivers/pci/pci.c
+> > @@ -7,6 +7,7 @@
+> >   *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+> >   */
+> >  
+> > +#include <linux/acpi.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/delay.h>
+> >  #include <linux/init.h>
+> > @@ -4941,7 +4942,7 @@ int pci_get_new_domain_nr(void)
+> >  }
+> >  
+> >  #ifdef CONFIG_PCI_DOMAINS_GENERIC
+> > -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> > +static int of_pci_bus_domain_nr(struct device *parent)
+> 
+> Can we do a little cleanup before this patch?  
+> 
+>   - pci_bus_assign_domain_nr() is only used inside drivers/pci, so
+>     maybe we move the prototype to drivers/pci/pci.h?
+> 
+>   - I don't really like the style of calling a function that
+>     internally assigns bus->domain_nr.  Could we do something like
+>     this instead?
+> 
+>     int pci_bus_domain_nr(...)
+>     {
+>       ...
+>       return domain;
+>     }
+> 
+>     ... pci_create_root_bus(...)
+>     {
+>       ...
+>       b->domain_nr = pci_bus_domain_nr(...);
+
+We noticed while preparing v9, that this would force us to
+write an empty pci_bus_domain_nr() prototype for
+!PCI_DOMAINS_GENERIC (ie every arch but ARM/ARM64) that should
+return 0 to keep current behaviour unchanged.
+
+That's why pci_bus_assign_domain_nr() was there, so that it
+was compiled out on !PCI_DOMAINS_GENERIC.
+
+I really would like v9 to be final so let's fix it before posting it
+shortly please.
+
+For the above we have three options:
+
+1) Leave code as-is in v8
+
+2) in pci_create_root_bus():
+#ifdef CONFIG_PCI_DOMAINS_GENERIC
+       b->domain_nr = pci_bus_domain_nr(...);
+#endif
+
++ other changes requested above
+
+3) in pci_create_root_bus()
+
+b->domain_nr = pci_bus_domain_nr(...);
+
+unguarded and a stub:
+
+#ifndef CONFIG_PCI_DOMAINS_GENERIC
+static inline int pci_bus_domain_nr() { return 0; }
+#endif
+
++ other changes requested above
+
+I think it is a matter of details and frankly I am not sure (2) or (3)
+make things much cleaner than they are (given that as you know with
+Arnd's changes we will rewrite this code anyway), so please let's
+choose an option so that we can post v9 and hopefully this series is
+ready to go.
+
+Thanks !
+Lorenzo
