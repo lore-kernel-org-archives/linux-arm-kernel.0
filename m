@@ -1,44 +1,104 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 10 Jun 2016 18:47:46 +0200
-Subject: [PATCH v2 01/13] pwm: Add new helpers to create/manipulate PWM
- states
-In-Reply-To: <20160610182942.5e7485ff@bbrezillon>
-References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
- <1465403688-17098-2-git-send-email-boris.brezillon@free-electrons.com>
- <20160610152109.GQ27142@ulmo.ba.sec>
- <20160610182942.5e7485ff@bbrezillon>
-Message-ID: <20160610164746.GB8696@ulmo.ba.sec>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 10 Jun 2016 18:49:32 +0200
+Subject: [PATCH V8 5/9] pci, acpi: add acpi hook to assign domain number.
+In-Reply-To: <20160610154908.GB23638@red-moon>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-6-git-send-email-tn@semihalf.com>
+ <20160608001559.GD4759@localhost> <20160610151458.GA23638@red-moon>
+ <20160610154908.GB23638@red-moon>
+Message-ID: <575AEF9C.4090205@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 06:29:42PM +0200, Boris Brezillon wrote:
-> On Fri, 10 Jun 2016 17:21:09 +0200, Thierry Reding <thierry.reding@gmail.com> wrote:
-> > On Wed, Jun 08, 2016 at 06:34:36PM +0200, Boris Brezillon wrote:
-[...]
-> > > + * according to your need before calling pwm_apply_state().  
-> > 
-> > Maybe mention that the ->duty_cycle field is explicitly zeroed. Then
-> > again, do we really need it? If users are going to overwrite it anyway,
-> > do we even need to bother? I suppose it makes some sense because the
-> > current duty cycle is stale when the ->period gets set to the value from
-> > args. I think the documentation should mention this in some way.
-> 
-> Yes, if we keep the current duty_cycle it can exceed the period value.
-> I'm fine dropping the ->duty_cycle = 0 assignment and documenting the
-> behavior.
+On 10.06.2016 17:49, Lorenzo Pieralisi wrote:
+> On Fri, Jun 10, 2016 at 04:14:58PM +0100, Lorenzo Pieralisi wrote:
+>> Hi Bjorn, Tomasz,
+>>
+>> On Tue, Jun 07, 2016 at 07:15:59PM -0500, Bjorn Helgaas wrote:
+>>
+>> [...]
+>>
+>>>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>>>> index eb431b5..2b52178 100644
+>>>> --- a/drivers/pci/pci.c
+>>>> +++ b/drivers/pci/pci.c
+>>>> @@ -7,6 +7,7 @@
+>>>>    *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+>>>>    */
+>>>>
+>>>> +#include <linux/acpi.h>
+>>>>   #include <linux/kernel.h>
+>>>>   #include <linux/delay.h>
+>>>>   #include <linux/init.h>
+>>>> @@ -4941,7 +4942,7 @@ int pci_get_new_domain_nr(void)
+>>>>   }
+>>>>
+>>>>   #ifdef CONFIG_PCI_DOMAINS_GENERIC
+>>>> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>>>> +static int of_pci_bus_domain_nr(struct device *parent)
+>>>
+>>> Can we do a little cleanup before this patch?
+>>>
+>>>    - pci_bus_assign_domain_nr() is only used inside drivers/pci, so
+>>>      maybe we move the prototype to drivers/pci/pci.h?
+>>>
+>>>    - I don't really like the style of calling a function that
+>>>      internally assigns bus->domain_nr.  Could we do something like
+>>>      this instead?
+>>>
+>>>      int pci_bus_domain_nr(...)
+>>>      {
+>>>        ...
+>>>        return domain;
+>>>      }
+>>>
+>>>      ... pci_create_root_bus(...)
+>>>      {
+>>>        ...
+>>>        b->domain_nr = pci_bus_domain_nr(...);
+>>
+>> We noticed while preparing v9, that this would force us to
+>> write an empty pci_bus_domain_nr() prototype for
+>> !PCI_DOMAINS_GENERIC (ie every arch but ARM/ARM64) that should
+>> return 0 to keep current behaviour unchanged.
+>>
+>> That's why pci_bus_assign_domain_nr() was there, so that it
+>> was compiled out on !PCI_DOMAINS_GENERIC.
+>>
+>> I really would like v9 to be final so let's fix it before posting it
+>> shortly please.
+>>
+>> For the above we have three options:
+>>
+>> 1) Leave code as-is in v8
+>>
+>> 2) in pci_create_root_bus():
+>> #ifdef CONFIG_PCI_DOMAINS_GENERIC
+>>         b->domain_nr = pci_bus_domain_nr(...);
+>> #endif
+>>
+>> + other changes requested above
+>>
+>> 3) in pci_create_root_bus()
+>>
+>> b->domain_nr = pci_bus_domain_nr(...);
+>>
+>> unguarded and a stub:
+>>
+>> #ifndef CONFIG_PCI_DOMAINS_GENERIC
+>> static inline int pci_bus_domain_nr() { return 0; }
+>> #endif
+>>
+>> + other changes requested above
+>
+> Actually, Tomasz made me notice that pci_bus.domain_nr is
+> only declared for CONFIG_PCI_DOMAINS_GENERIC so (3) is not
+> even an option and IMO (2) is not much nicer than code in
+> v8 as-is with an ifdef in the middle of pci_create_root_bus().
+>
 
-Actually what I was trying to suggest is that we keep the code as-is but
-document the behaviour (and rationale behind it).
+To me (1) is nicer too. Bjorn what is your take on this? This is last 
+bit before sending v9.
 
-I think it's fine to zero out the value precisely because it could
-become invalid after the function (and there's no other reasonable value
-to set it to). Just wanted to make sure it's all properly documented.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/8be32721/attachment.sig>
+Thanks,
+Tomasz
