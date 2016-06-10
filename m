@@ -1,192 +1,124 @@
-From: sricharan@codeaurora.org (Sricharan)
-Date: Fri, 10 Jun 2016 23:45:52 +0530
-Subject: [PATCH V4 3/3] i2c: qup: Fix error handling
-In-Reply-To: <1465582101-19391-4-git-send-email-sricharan@codeaurora.org>
-References: <1465582101-19391-1-git-send-email-sricharan@codeaurora.org>
- <1465582101-19391-4-git-send-email-sricharan@codeaurora.org>
-Message-ID: <00b101d1c344$246ada70$6d408f50$@codeaurora.org>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 10 Jun 2016 13:18:36 -0500
+Subject: [PATCH V8 5/9] pci, acpi: add acpi hook to assign domain number.
+In-Reply-To: <575AEF9C.4090205@semihalf.com>
+References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
+ <1464621262-26770-6-git-send-email-tn@semihalf.com>
+ <20160608001559.GD4759@localhost> <20160610151458.GA23638@red-moon>
+ <20160610154908.GB23638@red-moon> <575AEF9C.4090205@semihalf.com>
+Message-ID: <20160610181836.GA7843@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Wolfram Sang
+On Fri, Jun 10, 2016 at 06:49:32PM +0200, Tomasz Nowicki wrote:
+> On 10.06.2016 17:49, Lorenzo Pieralisi wrote:
+> >On Fri, Jun 10, 2016 at 04:14:58PM +0100, Lorenzo Pieralisi wrote:
+> >>Hi Bjorn, Tomasz,
+> >>
+> >>On Tue, Jun 07, 2016 at 07:15:59PM -0500, Bjorn Helgaas wrote:
+> >>
+> >>[...]
+> >>
+> >>>>diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> >>>>index eb431b5..2b52178 100644
+> >>>>--- a/drivers/pci/pci.c
+> >>>>+++ b/drivers/pci/pci.c
+> >>>>@@ -7,6 +7,7 @@
+> >>>>   *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
+> >>>>   */
+> >>>>
+> >>>>+#include <linux/acpi.h>
+> >>>>  #include <linux/kernel.h>
+> >>>>  #include <linux/delay.h>
+> >>>>  #include <linux/init.h>
+> >>>>@@ -4941,7 +4942,7 @@ int pci_get_new_domain_nr(void)
+> >>>>  }
+> >>>>
+> >>>>  #ifdef CONFIG_PCI_DOMAINS_GENERIC
+> >>>>-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+> >>>>+static int of_pci_bus_domain_nr(struct device *parent)
+> >>>
+> >>>Can we do a little cleanup before this patch?
+> >>>
+> >>>   - pci_bus_assign_domain_nr() is only used inside drivers/pci, so
+> >>>     maybe we move the prototype to drivers/pci/pci.h?
+> >>>
+> >>>   - I don't really like the style of calling a function that
+> >>>     internally assigns bus->domain_nr.  Could we do something like
+> >>>     this instead?
+> >>>
+> >>>     int pci_bus_domain_nr(...)
+> >>>     {
+> >>>       ...
+> >>>       return domain;
+> >>>     }
+> >>>
+> >>>     ... pci_create_root_bus(...)
+> >>>     {
+> >>>       ...
+> >>>       b->domain_nr = pci_bus_domain_nr(...);
+> >>
+> >>We noticed while preparing v9, that this would force us to
+> >>write an empty pci_bus_domain_nr() prototype for
+> >>!PCI_DOMAINS_GENERIC (ie every arch but ARM/ARM64) that should
+> >>return 0 to keep current behaviour unchanged.
+> >>
+> >>That's why pci_bus_assign_domain_nr() was there, so that it
+> >>was compiled out on !PCI_DOMAINS_GENERIC.
+> >>
+> >>I really would like v9 to be final so let's fix it before posting it
+> >>shortly please.
+> >>
+> >>For the above we have three options:
+> >>
+> >>1) Leave code as-is in v8
+> >>
+> >>2) in pci_create_root_bus():
+> >>#ifdef CONFIG_PCI_DOMAINS_GENERIC
+> >>        b->domain_nr = pci_bus_domain_nr(...);
+> >>#endif
+> >>
+> >>+ other changes requested above
+> >>
+> >>3) in pci_create_root_bus()
+> >>
+> >>b->domain_nr = pci_bus_domain_nr(...);
+> >>
+> >>unguarded and a stub:
+> >>
+> >>#ifndef CONFIG_PCI_DOMAINS_GENERIC
+> >>static inline int pci_bus_domain_nr() { return 0; }
+> >>#endif
+> >>
+> >>+ other changes requested above
+> >
+> >Actually, Tomasz made me notice that pci_bus.domain_nr is
+> >only declared for CONFIG_PCI_DOMAINS_GENERIC so (3) is not
+> >even an option and IMO (2) is not much nicer than code in
+> >v8 as-is with an ifdef in the middle of pci_create_root_bus().
+> >
+> 
+> To me (1) is nicer too. Bjorn what is your take on this? This is
+> last bit before sending v9.
 
->-----Original Message-----
->From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of Sricharan R
->Sent: Friday, June 10, 2016 11:38 PM
->To: linux-arm-msm at vger.kernel.org; ntelkar at codeaurora.org; galak at codeaurora.org; linux-kernel at vger.kernel.org;
->andy.gross at linaro.org; linux-i2c at vger.kernel.org; agross at codeaurora.org; linux-arm-kernel at lists.infradead.org;
->nkaje at codeaurora.org; absahu at codeaurora.org
->Cc: sricharan at codeaurora.org
->Subject: [PATCH V4 3/3] i2c: qup: Fix error handling
->
->Among the bus errors reported from the QUP_MASTER_STATUS register
->only NACK is considered and transfer gets suspended, while
->other errors are ignored. Correct this and suspend the transfer
->for other errors as well. This avoids unnecessary 'timeouts' which
->happens when waiting for events that would never happen when there
->is already an error condition on the bus. Also the error handling
->procedure should be the same for both NACK and other bus errors in
->case of dma mode. So correct that as well.
->
->Signed-off-by: Sricharan R <sricharan@codeaurora.org>
->---
-> drivers/i2c/busses/i2c-qup.c | 76 ++++++++++++++++++++++++--------------------
-> 1 file changed, 41 insertions(+), 35 deletions(-)
->
->diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
->index b8116e5..44c80ae 100644
->--- a/drivers/i2c/busses/i2c-qup.c
->+++ b/drivers/i2c/busses/i2c-qup.c
->@@ -310,6 +310,7 @@ static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
-> 	u32 opflags;
-> 	u32 status;
-> 	u32 shift = __ffs(op);
->+	int ret = 0;
->
-> 	len *= qup->one_byte_t;
-> 	/* timeout after a wait of twice the max time */
->@@ -321,18 +322,28 @@ static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
->
-> 		if (((opflags & op) >> shift) == val) {
-> 			if ((op == QUP_OUT_NOT_EMPTY) && qup->is_last) {
->-				if (!(status & I2C_STATUS_BUS_ACTIVE))
->-					return 0;
->+				if (!(status & I2C_STATUS_BUS_ACTIVE)) {
->+					ret = 0;
->+					goto done;
->+				}
-> 			} else {
->-				return 0;
->+				ret = 0;
->+				goto done;
-> 			}
-> 		}
->
->-		if (time_after(jiffies, timeout))
->-			return -ETIMEDOUT;
->-
->+		if (time_after(jiffies, timeout)) {
->+			ret = -ETIMEDOUT;
->+			goto done;
->+		}
-> 		usleep_range(len, len * 2);
-> 	}
->+
->+done:
->+	if (qup->bus_err || qup->qup_err)
->+		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
->+
->+	return ret;
-> }
->
-> static void qup_i2c_set_write_mode_v2(struct qup_i2c_dev *qup,
->@@ -793,39 +804,35 @@ static int qup_i2c_bam_do_xfer(struct qup_i2c_dev *qup, struct i2c_msg *msg,
-> 	}
->
-> 	if (ret || qup->bus_err || qup->qup_err) {
->-		if (qup->bus_err & QUP_I2C_NACK_FLAG) {
->-			msg--;
->-			dev_err(qup->dev, "NACK from %x\n", msg->addr);
->-			ret = -EIO;
->+		if (qup_i2c_change_state(qup, QUP_RUN_STATE)) {
->+			dev_err(qup->dev, "change to run state timed out");
->+			goto desc_err;
->+		}
->
->-			if (qup_i2c_change_state(qup, QUP_RUN_STATE)) {
->-				dev_err(qup->dev, "change to run state timed out");
->-				return ret;
->-			}
->+		if (rx_nents)
->+			writel(QUP_BAM_INPUT_EOT,
->+			       qup->base + QUP_OUT_FIFO_BASE);
->
->-			if (rx_nents)
->-				writel(QUP_BAM_INPUT_EOT,
->-				       qup->base + QUP_OUT_FIFO_BASE);
->+		writel(QUP_BAM_FLUSH_STOP, qup->base + QUP_OUT_FIFO_BASE);
->
->-			writel(QUP_BAM_FLUSH_STOP,
->-			       qup->base + QUP_OUT_FIFO_BASE);
->+		qup_i2c_flush(qup);
->
->-			qup_i2c_flush(qup);
->+		/* wait for remaining interrupts to occur */
->+		if (!wait_for_completion_timeout(&qup->xfer, HZ))
->+			dev_err(qup->dev, "flush timed out\n");
->
->-			/* wait for remaining interrupts to occur */
->-			if (!wait_for_completion_timeout(&qup->xfer, HZ))
->-				dev_err(qup->dev, "flush timed out\n");
->+		qup_i2c_rel_dma(qup);
->
->-			qup_i2c_rel_dma(qup);
->-		}
->+		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
-> 	}
->
->+desc_err:
-> 	dma_unmap_sg(qup->dev, qup->btx.sg, tx_nents, DMA_TO_DEVICE);
->
-> 	if (rx_nents)
-> 		dma_unmap_sg(qup->dev, qup->brx.sg, rx_nents,
-> 			     DMA_FROM_DEVICE);
->-desc_err:
->+
-> 	return ret;
-> }
->
->@@ -841,9 +848,6 @@ static int qup_i2c_bam_xfer(struct i2c_adapter *adap, struct i2c_msg *msg,
-> 	if (ret)
-> 		goto out;
->
->-	qup->bus_err = 0;
->-	qup->qup_err = 0;
->-
-> 	writel(0, qup->base + QUP_MX_INPUT_CNT);
-> 	writel(0, qup->base + QUP_MX_OUTPUT_CNT);
->
->@@ -881,12 +885,8 @@ static int qup_i2c_wait_for_complete(struct qup_i2c_dev *qup,
-> 		ret = -ETIMEDOUT;
-> 	}
->
->-	if (qup->bus_err || qup->qup_err) {
->-		if (qup->bus_err & QUP_I2C_NACK_FLAG) {
->-			dev_err(qup->dev, "NACK from %x\n", msg->addr);
->-			ret = -EIO;
->-		}
->-	}
->+	if (qup->bus_err || qup->qup_err)
->+		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
->
-> 	return ret;
-> }
->@@ -1178,6 +1178,9 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
-> 	if (ret < 0)
-> 		goto out;
->
->+	qup->bus_err = 0;
->+	qup->qup_err = 0;
->+
-> 	writel(1, qup->base + QUP_SW_RESET);
-> 	ret = qup_i2c_poll_state(qup, QUP_RESET_STATE);
-> 	if (ret)
->@@ -1227,6 +1230,9 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
-> 	struct qup_i2c_dev *qup = i2c_get_adapdata(adap);
-> 	int ret, len, idx = 0, use_dma = 0;
->
->+	qup->bus_err = 0;
->+	qup->qup_err = 0;
->+
-> 	ret = pm_runtime_get_sync(qup->dev);
-> 	if (ret < 0)
-> 		goto out;
->--
->QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux
->Foundation
->
->
->_______________________________________________
->linux-arm-kernel mailing list
->linux-arm-kernel at lists.infradead.org
->http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+My preference is (2).  The ifdef in pci_create_root_bus() is a little
+ugly, but I like it better because it will fit nicely into Arnd's
+idea of having the native drivers allocate and fill in a host bridge
+structure before calling the PCI core.  The domain is one thing those
+drivers could fill in.  I like that model much better than having the
+PCI core make callbacks to get information that we should have passed
+in to begin with.
+
+The current code suggests that assigning the domain is the PCI core's
+responsibility, and that's not really the case -- for ACPI it's
+totally up to pci_root.c, for other drivers it comes from the DT, and
+for others it might depend on the driver's knowledge of the hardware
+(I'm thinking of parisc, where, I think we currently put all the
+bridges in the same domain, but IIRC they *could* each be in their own
+domain with a full [bus 00-ff] range for each bridge because each
+bridge has its own config space access mechanism).
+
+But it's not that big a deal either way -- we could do this bit of
+restructuring later, too.
+
+Bjorn
