@@ -1,47 +1,69 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:06 +0200
-Subject: [PATCH 03/48] ARM: dts: at91: at91rm9200: TC blocks are also
- simple-mfd and syscon devices
+Date: Sat, 11 Jun 2016 00:03:04 +0200
+Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-4-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple-mfd and syscon to the TC blocks to allow to register one of the
-channels as clocksource properly at boot time. It also allows to use
-regmap instead of tclib.
+From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 
+Fix the main and slow clock .prepare() implementations which used to call
+usleep() when the scheduler wasn't ready yet.
+
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: linux-clk at vger.kernel.org
+Signed-off-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91rm9200.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/clk/at91/clk-main.c | 2 +-
+ drivers/clk/at91/clk-slow.c | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
-index f6cb7a80a2f5..ec0a7d36ee43 100644
---- a/arch/arm/boot/dts/at91rm9200.dtsi
-+++ b/arch/arm/boot/dts/at91rm9200.dtsi
-@@ -375,7 +375,9 @@
- 			};
+diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
+index 58b5baca670c..12c5062aeb92 100644
+--- a/drivers/clk/at91/clk-main.c
++++ b/drivers/clk/at91/clk-main.c
+@@ -342,7 +342,7 @@ static int clk_main_probe_frequency(struct regmap *regmap)
+ 		regmap_read(regmap, AT91_CKGR_MCFR, &mcfr);
+ 		if (mcfr & AT91_PMC_MAINRDY)
+ 			return 0;
+-		usleep_range(MAINF_LOOP_MIN_WAIT, MAINF_LOOP_MAX_WAIT);
++		udelay(MAINF_LOOP_MIN_WAIT);
+ 	} while (time_before(prep_time, timeout));
  
- 			tcb0: timer at fffa0000 {
--				compatible = "atmel,at91rm9200-tcb";
-+				compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xfffa0000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0
- 					      18 IRQ_TYPE_LEVEL_HIGH 0
-@@ -385,7 +387,9 @@
- 			};
+ 	return -ETIMEDOUT;
+diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
+index 61090b1146cf..612e893ce994 100644
+--- a/drivers/clk/at91/clk-slow.c
++++ b/drivers/clk/at91/clk-slow.c
+@@ -76,7 +76,7 @@ static int clk_slow_osc_prepare(struct clk_hw *hw)
  
- 			tcb1: timer@fffa4000 {
--				compatible = "atmel,at91rm9200-tcb";
-+				compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xfffa4000 0x100>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0
- 					      21 IRQ_TYPE_LEVEL_HIGH 0
+ 	writel(tmp | AT91_SCKC_OSC32EN, sckcr);
+ 
+-	usleep_range(osc->startup_usec, osc->startup_usec + 1);
++	udelay(osc->startup_usec);
+ 
+ 	return 0;
+ }
+@@ -195,7 +195,7 @@ static int clk_slow_rc_osc_prepare(struct clk_hw *hw)
+ 
+ 	writel(readl(sckcr) | AT91_SCKC_RCEN, sckcr);
+ 
+-	usleep_range(osc->startup_usec, osc->startup_usec + 1);
++	udelay(osc->startup_usec);
+ 
+ 	return 0;
+ }
+@@ -304,7 +304,7 @@ static int clk_sam9x5_slow_set_parent(struct clk_hw *hw, u8 index)
+ 
+ 	writel(tmp, sckcr);
+ 
+-	usleep_range(SLOWCK_SW_TIME_USEC, SLOWCK_SW_TIME_USEC + 1);
++	udelay(SLOWCK_SW_TIME_USEC);
+ 
+ 	return 0;
+ }
 -- 
 2.8.1
