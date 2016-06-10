@@ -1,47 +1,41 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:21 +0200
-Subject: [PATCH 18/48] ARM: dts: at91: at91sam9g45: TC blocks are also
- simple-mfd and syscon devices
+Date: Sat, 11 Jun 2016 00:03:23 +0200
+Subject: [PATCH 20/48] ARM: dts: at91: pm9g45: use TCB0 as clocksource
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-19-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-21-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add simple-mfd and syscon to the TC blocks to allow to register one of the
-channels as clocksource properly at boot time. It also allows to use regmap
-instead of tclib.
+Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/pm9g45.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index 8837b7e4292c..2b95aef4da44 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -405,7 +405,9 @@
+diff --git a/arch/arm/boot/dts/pm9g45.dts b/arch/arm/boot/dts/pm9g45.dts
+index 66afcff67fde..5d5ccefa8644 100644
+--- a/arch/arm/boot/dts/pm9g45.dts
++++ b/arch/arm/boot/dts/pm9g45.dts
+@@ -63,6 +63,18 @@
+ 				};
  			};
  
- 			tcb0: timer at fff7c000 {
--				compatible = "atmel,at91rm9200-tcb";
-+				compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xfff7c000 0x100>;
- 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 0>;
- 				clocks = <&tcb0_clk>, <&tcb0_clk>, <&tcb0_clk>, <&clk32k>;
-@@ -413,7 +415,9 @@
- 			};
- 
- 			tcb1: timer at fffd4000 {
--				compatible = "atmel,at91rm9200-tcb";
-+				compatible = "atmel,at91rm9200-tcb", "simple-mfd", "syscon";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 				reg = <0xfffd4000 0x100>;
- 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 0>;
- 				clocks = <&tcb0_clk>, <&tcb0_clk>, <&tcb0_clk>, <&clk32k>;
++			tcb0: timer at fff7c000 {
++				timer at 0 {
++					compatible = "atmel,tcb-clksrc";
++					reg = <0>, <1>;
++				};
++
++				timer at 2 {
++					compatible = "atmel,tcb-clkevt";
++					reg = <2>;
++				};
++			};
++
+ 			mmc0: mmc at fff80000 {
+ 				pinctrl-0 = <
+ 					&pinctrl_board_mmc
 -- 
 2.8.1
