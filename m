@@ -1,317 +1,117 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Fri, 10 Jun 2016 11:03:49 +0530
-Subject: [PATCH v5 5/7] net: mdio-mux: Add MDIO mux driver for iProc SoCs
-In-Reply-To: <1465536831-13023-1-git-send-email-pramod.kumar@broadcom.com>
-References: <1465536831-13023-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1465536831-13023-6-git-send-email-pramod.kumar@broadcom.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Fri, 10 Jun 2016 11:32:32 +0530
+Subject: [PATCH v6 00/11] qcom: Add support for TSENS driver
+In-Reply-To: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
+References: <1462438309-11196-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <575A57F8.6060004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iProc based SoCs supports the integrated mdio multiplexer which
-has the bus selection as well as mdio transaction generation logic
-inside.
+Eduardo,
 
-This multiplexer has child buses for PCIe, SATA, USB and ETH. These
-buses could be internal or external to SOC where PHYs are attached.
-These buses could use C-45 or C-22 mdio transaction.
+On 05/05/2016 02:21 PM, Rajendra Nayak wrote:
+> Current set of patches apply on 4.6-rc6. Fixes for the nvmem apis
+> are now posted [1] and queued in -next [2]
+> Patches [1-6] will need to be merged via thermal tree/Eduardo.
 
-Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
----
- drivers/net/phy/Kconfig              |  11 ++
- drivers/net/phy/Makefile             |   1 +
- drivers/net/phy/mdio-mux-bcm-iproc.c | 248 +++++++++++++++++++++++++++++++++++
- 3 files changed, 260 insertions(+)
- create mode 100644 drivers/net/phy/mdio-mux-bcm-iproc.c
+Any plans to pull these in for 4.8?
 
-diff --git a/drivers/net/phy/Kconfig b/drivers/net/phy/Kconfig
-index 6dad9a9..94c0707 100644
---- a/drivers/net/phy/Kconfig
-+++ b/drivers/net/phy/Kconfig
-@@ -254,6 +254,17 @@ config MDIO_BUS_MUX_MMIOREG
- 
- 	  Currently, only 8-bit registers are supported.
- 
-+config MDIO_BUS_MUX_BCM_IPROC
-+	tristate "Support for iProc based MDIO bus multiplexers"
-+	depends on OF && OF_MDIO && (ARCH_BCM_IPROC || COMPILE_TEST)
-+	select MDIO_BUS_MUX
-+	default ARCH_BCM_IPROC
-+	help
-+	  This module provides a driver for MDIO bus multiplexers found in
-+	  iProc based Broadcom SoCs. This multiplexer connects one of several
-+	  child MDIO bus to a parent bus. Buses could be internal as well as
-+	  external and selection logic lies inside the same multiplexer.
-+
- config MDIO_BCM_UNIMAC
- 	tristate "Broadcom UniMAC MDIO bus controller"
- 	depends on HAS_IOMEM
-diff --git a/drivers/net/phy/Makefile b/drivers/net/phy/Makefile
-index fcdbb92..f5951d5a 100644
---- a/drivers/net/phy/Makefile
-+++ b/drivers/net/phy/Makefile
-@@ -39,6 +39,7 @@ obj-$(CONFIG_AMD_PHY)		+= amd.o
- obj-$(CONFIG_MDIO_BUS_MUX)	+= mdio-mux.o
- obj-$(CONFIG_MDIO_BUS_MUX_GPIO)	+= mdio-mux-gpio.o
- obj-$(CONFIG_MDIO_BUS_MUX_MMIOREG) += mdio-mux-mmioreg.o
-+obj-$(CONFIG_MDIO_BUS_MUX_BCM_IPROC)	+= mdio-mux-bcm-iproc.o
- obj-$(CONFIG_MDIO_SUN4I)	+= mdio-sun4i.o
- obj-$(CONFIG_MDIO_MOXART)	+= mdio-moxart.o
- obj-$(CONFIG_MDIO_BCM_UNIMAC)	+= mdio-bcm-unimac.o
-diff --git a/drivers/net/phy/mdio-mux-bcm-iproc.c b/drivers/net/phy/mdio-mux-bcm-iproc.c
-new file mode 100644
-index 0000000..0a04125
---- /dev/null
-+++ b/drivers/net/phy/mdio-mux-bcm-iproc.c
-@@ -0,0 +1,248 @@
-+/*
-+ * Copyright 2016 Broadcom
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License, version 2, as
-+ * published by the Free Software Foundation (the "GPL").
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-+ * General Public License version 2 (GPLv2) for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * version 2 (GPLv2) along with this source code.
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/device.h>
-+#include <linux/of_mdio.h>
-+#include <linux/module.h>
-+#include <linux/phy.h>
-+#include <linux/mdio-mux.h>
-+#include <linux/delay.h>
-+
-+#define MDIO_PARAM_OFFSET		0x00
-+#define MDIO_PARAM_MIIM_CYCLE		29
-+#define MDIO_PARAM_INTERNAL_SEL		25
-+#define MDIO_PARAM_BUS_ID		22
-+#define MDIO_PARAM_C45_SEL		21
-+#define MDIO_PARAM_PHY_ID		16
-+#define MDIO_PARAM_PHY_DATA		0
-+
-+#define MDIO_READ_OFFSET		0x04
-+#define MDIO_READ_DATA_MASK		0xffff
-+#define MDIO_ADDR_OFFSET		0x08
-+
-+#define MDIO_CTRL_OFFSET		0x0C
-+#define MDIO_CTRL_WRITE_OP		0x1
-+#define MDIO_CTRL_READ_OP		0x2
-+
-+#define MDIO_STAT_OFFSET		0x10
-+#define MDIO_STAT_DONE			1
-+
-+#define BUS_MAX_ADDR			32
-+#define EXT_BUS_START_ADDR		16
-+
-+struct iproc_mdiomux_desc {
-+	void *mux_handle;
-+	void __iomem *base;
-+	struct device *dev;
-+	struct mii_bus *mii_bus;
-+};
-+
-+static int iproc_mdio_wait_for_idle(void __iomem *base, bool result)
-+{
-+	unsigned int timeout = 1000; /* loop for 1s */
-+	u32 val;
-+
-+	do {
-+		val = readl(base + MDIO_STAT_OFFSET);
-+		if ((val & MDIO_STAT_DONE) == result)
-+			return 0;
-+
-+		usleep_range(1000, 2000);
-+	} while (timeout--);
-+
-+	return -ETIMEDOUT;
-+}
-+
-+/* start_miim_ops- Program and start MDIO transaction over mdio bus.
-+ * @base: Base address
-+ * @phyid: phyid of the selected bus.
-+ * @reg: register offset to be read/written.
-+ * @val :0 if read op else value to be written in @reg;
-+ * @op: Operation that need to be carried out.
-+ *      MDIO_CTRL_READ_OP: Read transaction.
-+ *      MDIO_CTRL_WRITE_OP: Write transaction.
-+ *
-+ * Return value: Successful Read operation returns read reg values and write
-+ *      operation returns 0. Failure operation returns negative error code.
-+ */
-+static int start_miim_ops(void __iomem *base,
-+			  u16 phyid, u32 reg, u16 val, u32 op)
-+{
-+	u32 param;
-+	int ret;
-+
-+	writel(0, base + MDIO_CTRL_OFFSET);
-+	ret = iproc_mdio_wait_for_idle(base, 0);
-+	if (ret)
-+		goto err;
-+
-+	param = readl(base + MDIO_PARAM_OFFSET);
-+	param |= phyid << MDIO_PARAM_PHY_ID;
-+	param |= val << MDIO_PARAM_PHY_DATA;
-+	if (reg & MII_ADDR_C45)
-+		param |= BIT(MDIO_PARAM_C45_SEL);
-+
-+	writel(param, base + MDIO_PARAM_OFFSET);
-+
-+	writel(reg, base + MDIO_ADDR_OFFSET);
-+
-+	writel(op, base + MDIO_CTRL_OFFSET);
-+
-+	ret = iproc_mdio_wait_for_idle(base, 1);
-+	if (ret)
-+		goto err;
-+
-+	if (op == MDIO_CTRL_READ_OP)
-+		ret = readl(base + MDIO_READ_OFFSET) & MDIO_READ_DATA_MASK;
-+err:
-+	return ret;
-+}
-+
-+static int iproc_mdiomux_read(struct mii_bus *bus, int phyid, int reg)
-+{
-+	struct iproc_mdiomux_desc *md = bus->priv;
-+	int ret;
-+
-+	ret = start_miim_ops(md->base, phyid, reg, 0, MDIO_CTRL_READ_OP);
-+	if (ret < 0)
-+		dev_err(&bus->dev, "mdiomux read operation failed!!!");
-+
-+	return ret;
-+}
-+
-+static int iproc_mdiomux_write(struct mii_bus *bus,
-+			       int phyid, int reg, u16 val)
-+{
-+	struct iproc_mdiomux_desc *md = bus->priv;
-+	int ret;
-+
-+	/* Write val at reg offset */
-+	ret = start_miim_ops(md->base, phyid, reg, val, MDIO_CTRL_WRITE_OP);
-+	if (ret < 0)
-+		dev_err(&bus->dev, "mdiomux write operation failed!!!");
-+
-+	return ret;
-+}
-+
-+static int mdio_mux_iproc_switch_fn(int current_child, int desired_child,
-+				    void *data)
-+{
-+	struct iproc_mdiomux_desc *md = data;
-+	u32 param, bus_id;
-+	bool bus_dir;
-+
-+	/* select bus and its properties */
-+	bus_dir = (desired_child < EXT_BUS_START_ADDR);
-+	bus_id = bus_dir ? desired_child : (desired_child - EXT_BUS_START_ADDR);
-+
-+	param = (bus_dir ? 1 : 0) << MDIO_PARAM_INTERNAL_SEL;
-+	param |= (bus_id << MDIO_PARAM_BUS_ID);
-+
-+	writel(param, md->base + MDIO_PARAM_OFFSET);
-+	return 0;
-+}
-+
-+static int mdio_mux_iproc_probe(struct platform_device *pdev)
-+{
-+	struct iproc_mdiomux_desc *md;
-+	struct mii_bus *bus;
-+	struct resource *res;
-+	int rc;
-+
-+	md = devm_kzalloc(&pdev->dev, sizeof(*md), GFP_KERNEL);
-+	if (!md)
-+		return -ENOMEM;
-+	md->dev = &pdev->dev;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	md->base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(md->base)) {
-+		dev_err(&pdev->dev, "failed to ioremap register\n");
-+		return PTR_ERR(md->base);
-+	}
-+
-+	md->mii_bus = mdiobus_alloc();
-+	if (!md->mii_bus) {
-+		dev_err(&pdev->dev, "mdiomux bus alloc failed\n");
-+		return -ENOMEM;
-+	}
-+
-+	bus = md->mii_bus;
-+	bus->priv = md;
-+	bus->name = "iProc MDIO mux bus";
-+	snprintf(bus->id, MII_BUS_ID_SIZE, "%s-%d", pdev->name, pdev->id);
-+	bus->parent = &pdev->dev;
-+	bus->read = iproc_mdiomux_read;
-+	bus->write = iproc_mdiomux_write;
-+
-+	bus->phy_mask = ~0;
-+	bus->dev.of_node = pdev->dev.of_node;
-+	rc = mdiobus_register(bus);
-+	if (rc) {
-+		dev_err(&pdev->dev, "mdiomux registration failed\n");
-+		goto out;
-+	}
-+
-+	platform_set_drvdata(pdev, md);
-+
-+	rc = mdio_mux_init(md->dev, mdio_mux_iproc_switch_fn,
-+			   &md->mux_handle, md, md->mii_bus);
-+	if (rc) {
-+		dev_info(md->dev, "mdiomux initialization failed\n");
-+		goto out;
-+	}
-+
-+	dev_info(md->dev, "iProc mdiomux registered\n");
-+	return 0;
-+out:
-+	mdiobus_free(bus);
-+	return rc;
-+}
-+
-+static int mdio_mux_iproc_remove(struct platform_device *pdev)
-+{
-+	struct iproc_mdiomux_desc *md = dev_get_platdata(&pdev->dev);
-+
-+	mdio_mux_uninit(md->mux_handle);
-+	mdiobus_unregister(md->mii_bus);
-+	mdiobus_free(md->mii_bus);
-+
-+	return 0;
-+}
-+
-+static const struct of_device_id mdio_mux_iproc_match[] = {
-+	{
-+		.compatible = "brcm,mdio-mux-iproc",
-+	},
-+	{},
-+};
-+MODULE_DEVICE_TABLE(of, mdio_mux_iproc_match);
-+
-+static struct platform_driver mdiomux_iproc_driver = {
-+	.driver = {
-+		.name		= "mdio-mux-iproc",
-+		.of_match_table = mdio_mux_iproc_match,
-+	},
-+	.probe		= mdio_mux_iproc_probe,
-+	.remove		= mdio_mux_iproc_remove,
-+};
-+
-+module_platform_driver(mdiomux_iproc_driver);
-+
-+MODULE_DESCRIPTION("iProc MDIO Mux Bus Driver");
-+MODULE_AUTHOR("Pramod Kumar <pramod.kumar@broadcom.com>");
-+MODULE_LICENSE("GPL v2");
+regards,
+Rajendra
+
+> Patches [7-11] will need to go via qcom-msm tree/Andy.
+> 
+> Changes since v5:
+> * Minor review fixes from Eduardo
+> 
+> Changes since v4:
+> * dropped qcom,tsens-slopes binding, used coefficients instead
+> * dropped qcom,sensor-id binding
+> * Added support for msm8996 family
+> * Other minor review fixes from v4
+> 
+> Changes since v3:
+> * Dropped 'clk: qcom: create virtual child device for TSENS' which
+> is picked up by Stephen
+> * Updated GCC bindings with optional TSENS properties
+> 
+> Changes since v2:
+> * Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
+> 
+> Changes since v1:
+> * Created virtual tsens device from gcc driver for 8960,
+> with DT having a single node for gcc and tsens
+> * Minor fixes with rebasing on 4.3-rc1
+> 
+> Changes since RFC:
+> * Added support for 8916 and 8084
+> * Based off the latest nvmem framework patches [1]
+> * Minor review fixes for comments mostly from Lina
+> 
+> This is an attempt to have a single TSENS driver for
+> the different versions of the TSENS IP that exist, on
+> different qcom msm/apq SoCs'
+> Support is added for msm8916, msm8960, msm8974 and msm8996 families.
+> 
+> A lot of the work is based of original code from Stephen Boyd
+> and Siddartha Mohanadoss. I have also picked some of what
+> Narendran Rajan did in his attempt to upstream the support
+> for 8960 family. I could not keep the original authorship on
+> any of the patches because I ended up moving the code around
+> quite a bit in an effort to have a single driver for the
+> various devices. I would be glad to change the authorship
+> for any of the patches if needed.
+> 
+> [1] https://lkml.org/lkml/2016/4/24/103
+> [2] git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git char-misc-next
+> 
+> Rajendra Nayak (11):
+>   thermal: qcom: tsens: Add a skeletal TSENS drivers
+>   thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+>   thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+>   thermal: core: export apis to get slope and offset
+>   thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+>   thermal: qcom: tsens-8996: Add support for 8996 family of SoCs
+>   arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+>   arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+>   arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+>   arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+>   arm64: dts: msm8996: Add thermal zones, tsens and qfprom nodes
+> 
+>  .../devicetree/bindings/clock/qcom,gcc.txt         |  18 ++
+>  .../devicetree/bindings/thermal/qcom-tsens.txt     |  21 ++
+>  Documentation/thermal/sysfs-api.txt                |  12 +
+>  arch/arm/boot/dts/qcom-apq8064.dtsi                | 103 ++++++++
+>  arch/arm/boot/dts/qcom-apq8084.dtsi                | 103 ++++++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi                | 103 ++++++++
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi              |  64 +++++
+>  arch/arm64/boot/dts/qcom/msm8996.dtsi              |  92 +++++++
+>  drivers/thermal/Kconfig                            |   5 +
+>  drivers/thermal/Makefile                           |   1 +
+>  drivers/thermal/qcom/Kconfig                       |  11 +
+>  drivers/thermal/qcom/Makefile                      |   2 +
+>  drivers/thermal/qcom/tsens-8916.c                  | 113 ++++++++
+>  drivers/thermal/qcom/tsens-8960.c                  | 292 +++++++++++++++++++++
+>  drivers/thermal/qcom/tsens-8974.c                  | 244 +++++++++++++++++
+>  drivers/thermal/qcom/tsens-8996.c                  |  84 ++++++
+>  drivers/thermal/qcom/tsens-common.c                | 141 ++++++++++
+>  drivers/thermal/qcom/tsens.c                       | 200 ++++++++++++++
+>  drivers/thermal/qcom/tsens.h                       |  92 +++++++
+>  drivers/thermal/thermal_core.c                     |  30 +++
+>  include/linux/thermal.h                            |   8 +
+>  21 files changed, 1739 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+>  create mode 100644 drivers/thermal/qcom/Kconfig
+>  create mode 100644 drivers/thermal/qcom/Makefile
+>  create mode 100644 drivers/thermal/qcom/tsens-8916.c
+>  create mode 100644 drivers/thermal/qcom/tsens-8960.c
+>  create mode 100644 drivers/thermal/qcom/tsens-8974.c
+>  create mode 100644 drivers/thermal/qcom/tsens-8996.c
+>  create mode 100644 drivers/thermal/qcom/tsens-common.c
+>  create mode 100644 drivers/thermal/qcom/tsens.c
+>  create mode 100644 drivers/thermal/qcom/tsens.h
+> 
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
