@@ -1,46 +1,18 @@
-From: ben.dooks@codethink.co.uk (Ben Dooks)
-Date: Fri, 10 Jun 2016 11:13:00 +0100
-Subject: [RFC PATCH 05/15] tty: serial: samsung: fixup accessors for endian
-In-Reply-To: <20160608183110.13851-6-matthew@mattleach.net>
-References: <20160608183110.13851-1-matthew@mattleach.net>
- <20160608183110.13851-6-matthew@mattleach.net>
-Message-ID: <71328b3d-dc2f-3eb9-b664-4d621db23131@codethink.co.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 10 Jun 2016 03:20:00 -0700
+Subject: [PATCH 7/7] ARM: dts: n900: enable lirc-rx51 driver
+In-Reply-To: <1462634508-24961-8-git-send-email-ivo.g.dimitrov.75@gmail.com>
+References: <1462634508-24961-1-git-send-email-ivo.g.dimitrov.75@gmail.com>
+ <1462634508-24961-8-git-send-email-ivo.g.dimitrov.75@gmail.com>
+Message-ID: <20160610101959.GR22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/16 19:31, Matthew Leach wrote:
-> Fix the serial access code to deal with kernels built for big endian
-> operation.
-> 
-> Signed-off-by: Matthew Leach <matthew@mattleach.net>
-> ---
-> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> CC: Jiri Slaby <jslaby@suse.com>
-> CC: linux-serial at vger.kernel.org
-> CC: linux-kernel at vger.kernel.org
-> ---
->  drivers/tty/serial/samsung.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/samsung.h b/drivers/tty/serial/samsung.h
-> index fc5deaa..8818bdd 100644
-> --- a/drivers/tty/serial/samsung.h
-> +++ b/drivers/tty/serial/samsung.h
-> @@ -118,9 +118,9 @@ struct s3c24xx_uart_port {
->  	((unsigned long *)(unsigned long)((port)->membase + (reg)))
->  
->  #define rd_regb(port, reg) (__raw_readb(portaddr(port, reg)))
-> -#define rd_regl(port, reg) (__raw_readl(portaddr(port, reg)))
-> +#define rd_regl(port, reg) (readl_relaxed(portaddr(port, reg)))
+* Ivaylo Dimitrov <ivo.g.dimitrov.75@gmail.com> [160507 08:24]:
+> Add the needed DT data to enable IR TX driver
 
-For completeness we should have changed __raw_readb to readb_relaxed
+Applying this patch into omap-for-v4.8/dt thanks.
 
->  #define wr_regb(port, reg, val) __raw_writeb(val, portaddr(port, reg))
-> -#define wr_regl(port, reg, val) __raw_writel(val, portaddr(port, reg))
-> +#define wr_regl(port, reg, val) writel_relaxed(val, portaddr(port, reg))
+Regards,
 
-Acked-by: Ben Dooks <ben.dooks@codethink.co.uk>
-
--- 
-Ben Dooks				http://www.codethink.co.uk/
-Senior Engineer				Codethink - Providing Genius
+Tony
