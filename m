@@ -1,67 +1,71 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Thu,  9 Jun 2016 18:42:08 -0700
-Subject: [PATCH] arm64: Handle el1 synchronous instruction aborts cleanly
-Message-ID: <1465522928-22421-1-git-send-email-labbott@redhat.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 9 Jun 2016 19:01:45 -0700
+Subject: [PATCH 06/14] x86/ptrace: run seccomp after ptrace
+In-Reply-To: <CALCETrVk-UauwaRtZZR0fKQO6kyAx-r=ZCurKRdhQk9nA-TqeQ@mail.gmail.com>
+References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
+ <1465506124-21866-7-git-send-email-keescook@chromium.org>
+ <CALCETrVk-UauwaRtZZR0fKQO6kyAx-r=ZCurKRdhQk9nA-TqeQ@mail.gmail.com>
+Message-ID: <CAGXu5jKzOzfzMuOqfVCpgyzXrPrKYC60-AOYQmRVQUiqFpB0JQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Executing from a non-executable area gives an ugly message:
+On Thu, Jun 9, 2016 at 3:52 PM, Andy Lutomirski <luto@amacapital.net> wrote:
+> On Thu, Jun 9, 2016 at 2:01 PM, Kees Cook <keescook@chromium.org> wrote:
+>> This moves seccomp after ptrace on x86 to that seccomp can catch changes
+>> made by ptrace. Emulation should skip the rest of processing too.
+>>
+>> We can get rid of test_thread_flag because there's no longer any
+>> opportunity for seccomp to mess with ptrace state before invoking
+>> ptrace.
+>>
+>> Suggested-by: Andy Lutomirski <luto@kernel.org>
+>> Signed-off-by: Kees Cook <keescook@chromium.org>
+>> Cc: x86 at kernel.org
+>> Cc: Andy Lutomirski <luto@kernel.org>
+>> ---
+>>  arch/x86/entry/common.c | 22 ++++++++++++----------
+>>  1 file changed, 12 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/x86/entry/common.c b/arch/x86/entry/common.c
+>> index df56ca394877..81c0e12d831c 100644
+>> --- a/arch/x86/entry/common.c
+>> +++ b/arch/x86/entry/common.c
+>> @@ -73,6 +73,7 @@ static long syscall_trace_enter(struct pt_regs *regs)
+>>
+>>         struct thread_info *ti = pt_regs_to_thread_info(regs);
+>>         unsigned long ret = 0;
+>> +       bool emulated = false;
+>>         u32 work;
+>>
+>>         if (IS_ENABLED(CONFIG_DEBUG_ENTRY))
+>> @@ -80,11 +81,19 @@ static long syscall_trace_enter(struct pt_regs *regs)
+>>
+>>         work = ACCESS_ONCE(ti->flags) & _TIF_WORK_SYSCALL_ENTRY;
+>>
+>> +       if (unlikely(work & _TIF_SYSCALL_EMU))
+>> +               emulated = true;
+>> +
+>> +       if ((emulated || (work & _TIF_SYSCALL_TRACE)) &&
+>> +           tracehook_report_syscall_entry(regs))
+>> +               return -1L;
+>> +
+>> +       if (emulated)
+>> +               return -1L;
+>> +
+>
+> I think that this code will result in ptrace-induced skips calling the
+> audit exit hook but not the audit entry hook.  I don't know whether
+> this is a problem.  It's also worth making sure that ptracing a
+> seccomp-skipped syscall calls the exit hook with the right regs.
+>
+> I suspect it's fine, but I want to think about it a little bit more.
 
-lkdtm: Performing direct entry EXEC_RODATA
-lkdtm: attempting ok execution at ffff0000084c0e08
-lkdtm: attempting bad execution at ffff000008880700
-Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
-CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
+I don't think this is true, since all architectures already needed to
+handle an immediate return from seccomp, so audit shouldn't be touched
+on the exit path either.
 
-The 'IABT (current EL)' indicates the error but isn't as obvious as a
-regular fault message. The increase in kernel page permissions makes
-hitting this case more likely and bad mode should not be a common
-ocurrence. Handle this case in the vectors to give a better message.
+-Kees
 
-Signed-off-by: Laura Abbott <labbott@redhat.com>
----
-Came up during some lkdtm testing
-http://article.gmane.org/gmane.linux.kernel.hardened.devel/2524
----
- arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 12e8d2b..37f3694 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -336,6 +336,8 @@ el1_sync:
- 	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
- 	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
- 	b.eq	el1_da
-+	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
-+	b.eq	el1_ia
- 	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
- 	b.eq	el1_undef
- 	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
-@@ -347,6 +349,23 @@ el1_sync:
- 	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
- 	b.ge	el1_dbg
- 	b	el1_inv
-+el1_ia:
-+	/*
-+	 * Instruction abort handling
-+	 */
-+	mrs	x0, far_el1
-+	enable_dbg
-+	// re-enable interrupts if they were enabled in the aborted context
-+	tbnz	x23, #7, 1f			// PSR_I_BIT
-+	enable_irq
-+	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
-+1:
-+	mov	x2, sp				// struct pt_regs
-+	bl	do_mem_abort
-+
-+	// disable interrupts before pulling preserved data off the stack
-+	disable_irq
-+	kernel_exit 1
- el1_da:
- 	/*
- 	 * Data abort handling
 -- 
-2.5.5
+Kees Cook
+Chrome OS & Brillo Security
