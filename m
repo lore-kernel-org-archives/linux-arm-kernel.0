@@ -1,33 +1,46 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 10 Jun 2016 08:19:34 +0900
-Subject: [PATCH v17 10/13] arm64: kdump: add VMCOREINFO for user-space
- coredump tools
-In-Reply-To: <575986B5.9000701@arm.com>
-References: <cover.1464974516.git.geoff@infradead.org>
- <9e75a7b75b38b37ded3e361498eaf1486107ce5d.1464974516.git.geoff@infradead.org>
- <575986B5.9000701@arm.com>
-Message-ID: <20160609231933.GE20774@linaro.org>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 09 Jun 2016 17:16:11 -0700
+Subject: [PATCH v2 1/9] pinctrl: walk into bcm subdir unconditionally
+In-Reply-To: <CACRpkdZKii2QR2TWYZdG-cdTn2UeVDcE3d39xPffWwipHcthpg@mail.gmail.com>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-2-git-send-email-kraxel@redhat.com>
+ <CACRpkdZKii2QR2TWYZdG-cdTn2UeVDcE3d39xPffWwipHcthpg@mail.gmail.com>
+Message-ID: <87mvmtx5is.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 04:09:41PM +0100, Suzuki K Poulose wrote:
-> On 03/06/16 19:13, Geoff Levand wrote:
-> >From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >
-> >For the current crash utility, we need to know, at least, a value of
-> >"kimage_voffset" to handle the contents of core dump file (/proc/vmcore)
-> >correctly due to the introduction of KASLR (CONFIG_RANDOMIZE_BASE) in v4.6.
-> >
-> >More VMCOREINFO may be added later for makedumpfile command.
-> >---
-> 
-> Missing Signed-off-by: ?
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Thank you for pointing this out.
-I didn't run checkpatch.pl for this version.
+> On Fri, Jun 3, 2016 at 8:18 AM, Gerd Hoffmann <kraxel@redhat.com> wrote:
+>
+>> There is no ARCH_BCM on arm64, and we need pinctrl-bcm2835 for the rpi3.
+>>
+>> Signed-off-by: Gerd Hoffmann <kraxel@redhat.com>
+>> ---
+>>  drivers/pinctrl/Makefile | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+>> index e4bc115..88586c0 100644
+>> --- a/drivers/pinctrl/Makefile
+>> +++ b/drivers/pinctrl/Makefile
+>> @@ -35,7 +35,7 @@ obj-$(CONFIG_PINCTRL_TB10X)   += pinctrl-tb10x.o
+>>  obj-$(CONFIG_PINCTRL_ST)       += pinctrl-st.o
+>>  obj-$(CONFIG_PINCTRL_ZYNQ)     += pinctrl-zynq.o
+>>
+>> -obj-$(CONFIG_ARCH_BCM)         += bcm/
+>> +obj-y                          += bcm/
+>
+> Looks OK to me, but would like Stephen's or Eric's ACK?
 
--Takahiro AKASHI
+It looks like this is the only instance of filtering the directory on
+CONFIG_ARCH_BCM, so regardless of the patch 4 resolution,
 
-> Suzuki
-> IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
-> 
+Acked-by: Eric Anholt <eric@anholt.net>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160609/bf187f9a/attachment.sig>
