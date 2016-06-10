@@ -1,77 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 10 Jun 2016 09:16:03 -0500
-Subject: [PATCH 08/12] dt-bindings: mmc: Add Xenon description
-In-Reply-To: <1465456218-28354-9-git-send-email-gregory.clement@free-electrons.com>
-References: <1465456218-28354-1-git-send-email-gregory.clement@free-electrons.com>
- <1465456218-28354-9-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20160610141603.GA7827@rob-hp-laptop>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 10 Jun 2016 09:18:16 -0500
+Subject: [PATCH 0/3] ARM: OMAP: DRA7: Update to latest TRM and cleanup
+In-Reply-To: <20160610093359.GQ22406@atomide.com>
+References: <1464096940-27145-1-git-send-email-nm@ti.com>
+ <20160610093359.GQ22406@atomide.com>
+Message-ID: <CAGo_u6okpNGkfYno02nCfEsryki5drrhfwnZUj=ycghh62qoTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 09:10:14AM +0200, Gregory CLEMENT wrote:
-> This patch documents the Xenon SDHCI controller that we can find in the
-> Armada 37xx and the Armada 7K and 8K SoCs.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  .../devicetree/bindings/mmc/sdhci-xenon.txt        | 27 ++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mmc/sdhci-xenon.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/sdhci-xenon.txt b/Documentation/devicetree/bindings/mmc/sdhci-xenon.txt
-> new file mode 100644
-> index 000000000000..e8d49fda5f12
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mmc/sdhci-xenon.txt
-> @@ -0,0 +1,27 @@
-> +* Marvell sdhci-xenon controller
-> +
-> +This file documents differences between the core properties in mmc.txt
-> +and the properties used by the sdhci-xenon drivers.
+On Fri, Jun 10, 2016 at 4:34 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Hi,
+>
+> * Nishanth Menon <nm@ti.com> [160524 06:37]:
+>> Hi,
+>>
+>> Here are the final(hopefully) pending patches for DRA7 based on recent
+>> TRM updates. Updates include removing retention support on L3init and
+>> L4per as per latest SoC updates.
+>>
+>> Test Log: X15 (no modules): http://pastebin.ubuntu.com/16655027/
+>>
+>> Latest TRM (rev F): http://www.ti.com/lit/pdf/spruhz6 (public on May 18)
+>>
+>> Nishanth Menon (3):
+>>   ARM: OMAP: DRA7: powerdomain data: Set L3init and L4per to ON
+>>   ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_logic_ret
+>>   ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_mem_ret
+>>
+>>  arch/arm/mach-omap2/powerdomains7xx_data.c | 76 +-----------------------------
+>>  1 file changed, 2 insertions(+), 74 deletions(-)
+>
+> Can these wait until v4.8 merge window, are this needed as fixes to
+> avoid hardware problems?
 
-Bindings don't document drivers...
+Yes - at least patch #1 is a h/w "limitation" and can result in non
+functional SoC after a duration of operation. the patches #2/3 are
+code shrinkage to remove unused data.
 
-> +
-> +Required properties:
-> +- compatible: Should be "marvell,xenon-sdhci".
-
-SoC specific compatible strings please. This one can be fallback.
-
-> +- reg:
-> +  one register area for the SDHCI registers.
-> +- interrupts-extended: interrupt number and attributes
-
-Just use interrupts unless you really have a need for 
-interrupts-extended. Really, either is valid for any binding, but I 
-prefer to just have bindings documented one way.
-
-> +- clocks: array of clocks required for SDHCI.
-
-Missing from the exmaple, and how many clocks and in what order?
-
-> +- bus-width: max bus width in unit of bit, normally should be 1 bit, 4 bits or 8 bits
-
-Isn't this one standard? Just refer back to the common binding.
-
-> +
-> +Optional properties:
-> +- non-removable: whether card is non-removable.
-> +- auto-cmd12: whether cmd12 is sent automatically.
-
-Seems strange this would be optional for a specific controller. I'd 
-expect either the xenon controller needs this or not.
-
-> +Example:
-> +
-> +sdhci0: sdhci at D8000 {
-> +	compatible = "marvell,xenon-sdhci";
-> +	reg = <0xD8000 0x300>;
-> +	interrupts-extended = <&gic GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-> +	non-removable;
-> +	bus-width = <8>;
-> +	auto-cmd12;
-> +	status = "disabled";
-> +};
-> -- 
-> 2.5.0
-> 
+-- 
+---
+Regards,
+Nishanth Menon
