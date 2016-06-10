@@ -1,66 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 10 Jun 2016 22:29:17 +0300
-Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <20160610010245.GA10152@verge.net.au>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
- <20160601005751.GG20527@verge.net.au>
- <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
- <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
- <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
- <20160610010245.GA10152@verge.net.au>
-Message-ID: <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 10 Jun 2016 21:32:59 +0200
+Subject: [PATCH 3/3] ARM: dts: BCM5310x: Enable switch ports on SmartRG
+ SR400AC
+In-Reply-To: <1465583756-26740-4-git-send-email-f.fainelli@gmail.com>
+References: <1465583756-26740-1-git-send-email-f.fainelli@gmail.com>
+ <1465583756-26740-4-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20160610193259.GI2338@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2016 04:02 AM, Simon Horman wrote:
+On Fri, Jun 10, 2016 at 11:35:56AM -0700, Florian Fainelli wrote:
+> Define the port mapping for the SmartRG SR400ACE device.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts | 40 +++++++++++++++++++++++++++
+>  1 file changed, 40 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> index 8b0c440b2e71..c219d33496cc 100644
+> --- a/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> +++ b/arch/arm/boot/dts/bcm4708-smartrg-sr400ac.dts
+> @@ -126,3 +126,43 @@
+>  &spi_nor {
+>  	status = "okay";
+>  };
+> +
+> +&srab {
+> +	status = "okay";
+> +
+> +	ports {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		switch0port0: port at 0 {
 
->> [...]
->>
->>>>> And that the system behaves sanely on suspend/resume.
->>>>
->>>>   I'd be thankful if you told me how to test that. :-)
->>>
->>> System suspend:
->>>
->>>    echo mem > /sys/power/state
->>
->>    Oh. I know that one! :-)
->>
->>> System resume: You're gonna need a "wakeup-source" in your DTS, e.g. gpio-keys.
->>> Serial should work too, echo "enabled" to the corresponding wakeup
->>> file in /sys first.
->>
->>    I'm afraid I couldn't find that file. All I saw were RPM controls...
->>
->>> In case of issues, try "echo 0 > /sys/module/printk/parameters/console_suspend".
->>
->>    There's no problems suspending, it's the resuming that's a problem for me.
->>
->>> Good luck!
->>
->>    As usual, there was no luck. :-)
->>
->> WBR, Sergei
->
-> Does resume work for UP (i.e. without SMP)?
+Hi Florian
 
-    No. My problem with resume is I can't wake up the remote system. I don't 
-see the needed 'wakeup' file in /sys/devices/platform/soc/e6e60000.serial/...
-     However, if I enable CONFIG_PM_[ADVANCED_]DEBUG and do
+You don't need the labels, since you don't have any phandles pointing
+at them.
 
-$ echo -n core /sys/.power/pm_test
+Other than that, great to see a board using the new switch driver.
 
-the system happily wakes up after a small delay (5 s), w/either SMP or UP kernel.
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 
-> How did testing CPU hotplug go? Did it work for all CPUs?
-
-    Sure!
-    The only problem I'm seeing (again) is the RCAN clock failing to register:
-
-rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
-
-    I was going to look at it yesterday but (wrongly) thought it somehow cured 
-itself... I'll look at it now.
-
-MBR, Sergei
+    Andrew
