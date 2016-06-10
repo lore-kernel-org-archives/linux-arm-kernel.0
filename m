@@ -1,47 +1,103 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Jun 2016 09:36:43 +0200
-Subject: [PATCH 2/4] ASoC: sunxi: Add Allwinner A10 Digital Audio driver
-In-Reply-To: <20160610003755.GC7510@sirena.org.uk>
-References: <20160601175430.11625-1-maxime.ripard@free-electrons.com>
- <20160601175430.11625-3-maxime.ripard@free-electrons.com>
- <20160602102651.GF2282@sirena.org.uk>
- <20160609210515.GI5242@lukather>
- <20160610003755.GC7510@sirena.org.uk>
-Message-ID: <20160610073643.GK5242@lukather>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 10 Jun 2016 15:32:40 +0800
+Subject: [PATCH v3,3/5] usb: xhci-mtk: make IPPC register optional
+In-Reply-To: <1465543962-11678-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1465543962-11678-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1465543962-11678-4-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Make IPPC register optional to support host side of dual-role mode,
+due to it is moved into common glue layer for simplification.
 
-On Fri, Jun 10, 2016 at 01:37:55AM +0100, Mark Brown wrote:
-> > > > +static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
-> > > > +{
-> > > > +	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-> 
-> > > > +	/* Enable the whole hardware block */
-> > > > +	regmap_write(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > > +		     SUN4I_I2S_CTRL_GL_EN);
-> 
-> > > Runtime PM?  It also seems like this is something that ought to be
-> > > covered in the suspend and resume callbacks.
-> 
-> > runtime_pm is supported, and uses the regmap cache to keep those
-> > changes.
-> 
-> No, my point is that I'd expect to see the block powered off on suspend.
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/usb/host/xhci-mtk.c |   32 +++++++++++++++++++++++++++-----
+ 1 file changed, 27 insertions(+), 5 deletions(-)
 
-It is. The bus clock is disabled, which also puts the IP in reset.
-
-Maxime
-
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 79959f1..dc86832 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -94,6 +94,9 @@ static int xhci_mtk_host_enable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* power on host ip */
+ 	value = readl(&ippc->ip_pw_ctr1);
+ 	value &= ~CTRL1_IP_HOST_PDN;
+@@ -139,6 +142,9 @@ static int xhci_mtk_host_disable(struct xhci_hcd_mtk *mtk)
+ 	int ret;
+ 	int i;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* power down all u3 ports */
+ 	for (i = 0; i < mtk->num_u3_ports; i++) {
+ 		value = readl(&ippc->u3_ctrl_p[i]);
+@@ -173,6 +179,9 @@ static int xhci_mtk_ssusb_config(struct xhci_hcd_mtk *mtk)
+ 	struct mu3c_ippc_regs __iomem *ippc = mtk->ippc_regs;
+ 	u32 value;
+ 
++	if (ippc == NULL)
++		return 0;
++
+ 	/* reset whole ip */
+ 	value = readl(&ippc->ip_pw_ctr0);
+ 	value |= CTRL0_IP_SW_RST;
+@@ -475,6 +484,7 @@ static void xhci_mtk_quirks(struct device *dev, struct xhci_hcd *xhci)
+ /* called during probe() after chip reset completes */
+ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ {
++	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+ 	struct xhci_hcd_mtk *mtk = hcd_to_mtk(hcd);
+ 	int ret;
+ 
+@@ -482,12 +492,21 @@ static int xhci_mtk_setup(struct usb_hcd *hcd)
+ 		ret = xhci_mtk_ssusb_config(mtk);
+ 		if (ret)
+ 			return ret;
++	}
++
++	ret = xhci_gen_setup(hcd, xhci_mtk_quirks);
++	if (ret)
++		return ret;
++
++	if (usb_hcd_is_primary_hcd(hcd)) {
++		mtk->num_u3_ports = xhci->num_usb3_ports;
++		mtk->num_u2_ports = xhci->num_usb2_ports;
+ 		ret = xhci_mtk_sch_init(mtk);
+ 		if (ret)
+ 			return ret;
+ 	}
+ 
+-	return xhci_gen_setup(hcd, xhci_mtk_quirks);
++	return ret;
+ }
+ 
+ static int xhci_mtk_probe(struct platform_device *pdev)
+@@ -595,11 +614,14 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+ 	hcd->rsrc_start = res->start;
+ 	hcd->rsrc_len = resource_size(res);
+ 
++	mtk->ippc_regs = NULL;
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	mtk->ippc_regs = devm_ioremap_resource(dev, res);
+-	if (IS_ERR(mtk->ippc_regs)) {
+-		ret = PTR_ERR(mtk->ippc_regs);
+-		goto put_usb2_hcd;
++	if (res) {	/* ippc register is optional */
++		mtk->ippc_regs = devm_ioremap_resource(dev, res);
++		if (IS_ERR(mtk->ippc_regs)) {
++			ret = PTR_ERR(mtk->ippc_regs);
++			goto put_usb2_hcd;
++		}
+ 	}
+ 
+ 	for (phy_num = 0; phy_num < mtk->num_phys; phy_num++) {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/9fe2b624/attachment.sig>
+1.7.9.5
