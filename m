@@ -1,72 +1,36 @@
-From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Fri, 10 Jun 2016 09:54:11 +0530
-Subject: [PATCH v4 4/7] dt: mdio-mux: Add mdio multiplexer driver node
-In-Reply-To: <5755C2FE.1090303@gmail.com>
-References: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
- <1465216900-11755-5-git-send-email-pramod.kumar@broadcom.com>
- <5755C2FE.1090303@gmail.com>
-Message-ID: <0581378b82179ea816fb2f8644d3fc93@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Fri, 10 Jun 2016 13:56:30 +0900
+Subject: [PATCH 1/3] clk: samsung: exynos5433: Add CLK_IGNORE_UNUSED flag for
+ AUD Uart
+In-Reply-To: <1465534592-18860-1-git-send-email-cw00.choi@samsung.com>
+References: <1465534592-18860-1-git-send-email-cw00.choi@samsung.com>
+Message-ID: <1465534592-18860-2-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
+From: Beomho Seo <beomho.seo@samsung.com>
 
-> -----Original Message-----
-> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
-> Sent: 07 June 2016 00:08
-> To: Pramod Kumar; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell;
-> Kumar Gala; Catalin Marinas; Will Deacon; Kishon Vijay Abraham I; David S.
-> Miller
-> Cc: devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-
-> kernel at vger.kernel.org; bcm-kernel-feedback-list at broadcom.com; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v4 4/7] dt: mdio-mux: Add mdio multiplexer driver node
->
-> On 06/06/2016 05:41 AM, Pramod Kumar wrote:
-> > Add integrated MDIO multiplexer driver node which contains two mux
-> > PCIe bus and one ethernet bus along with phys lying on these bus.
-> >
-> > Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-> > ---
-> > +		mdio_mux_iproc: mdio-mux at 6602023c {
-> > +			compatible = "brcm,mdio-mux-iproc";
-> > +			reg = <0x6602023c 0x14>;
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +
-> > +			mdio at 0 {
-> > +				reg = <0x0>;
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +
-> > +				pci_phy0: pci-phy at 0 {
-> > +					compatible = "brcm,ns2-pcie-phy";
-> > +					reg = <0x0>;
-> > +					#phy-cells = <0>;
-> > +				};
-> > +			};
-> > +
-> > +			mdio at 7 {
-> > +				reg = <0x7>;
-> > +				#address-cells = <1>;
-> > +				#size-cells = <0>;
-> > +
-> > +				pci_phy1: pci-phy at 0 {
-> > +					compatible = "brcm,ns2-pcie-phy";
-> > +					reg = <0x0>;
-> > +					#phy-cells = <0>;
-> > +				};
->
-> Are these two PHYs always available in the NS2 SoC, or does that depend on
-> interfaces exposed at the board level? Should not they be flagged with a
-> disabled status property by default and enabled in their respective board
-> files?
-> --
+This patch adds the CLK_IGNORE_UNUSED flag for sclk_aud_uart gate clock
+for uart3 opeation.
 
-It depends on the interfaces exposed at board level. We will disable it in
-dtsi and enable it dts file. I'll address this through next patch set.
+Signed-off-by: Beomho Seo <beomho.seo@samsung.com>
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/clk/samsung/clk-exynos5433.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> Florian
-
-Regards,
-Pramod
+diff --git a/drivers/clk/samsung/clk-exynos5433.c b/drivers/clk/samsung/clk-exynos5433.c
+index 128527b8fbeb..e1a9c24079a4 100644
+--- a/drivers/clk/samsung/clk-exynos5433.c
++++ b/drivers/clk/samsung/clk-exynos5433.c
+@@ -2976,7 +2976,7 @@ static struct samsung_gate_clock aud_gate_clks[] __initdata = {
+ 	GATE(CLK_SCLK_AUD_SLIMBUS, "sclk_aud_slimbus", "div_sclk_aud_slimbus",
+ 			ENABLE_SCLK_AUD1, 4, 0, 0),
+ 	GATE(CLK_SCLK_AUD_UART, "sclk_aud_uart", "div_sclk_aud_uart",
+-			ENABLE_SCLK_AUD1, 3, 0, 0),
++			ENABLE_SCLK_AUD1, 3, CLK_IGNORE_UNUSED, 0),
+ 	GATE(CLK_SCLK_AUD_PCM, "sclk_aud_pcm", "div_sclk_aud_pcm",
+ 			ENABLE_SCLK_AUD1, 2, 0, 0),
+ 	GATE(CLK_SCLK_I2S_BCLK, "sclk_i2s_bclk", "ioclk_i2s_bclk",
+-- 
+1.9.1
