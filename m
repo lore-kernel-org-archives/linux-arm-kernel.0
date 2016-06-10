@@ -1,30 +1,22 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Fri, 10 Jun 2016 15:11:15 -0700
-Subject: [PATCH] ARM: bcm2835: remove unused __packet
-In-Reply-To: <87shwo68su.fsf@eliezer.anholt.net> (Eric Anholt's message of
- "Tue, 07 Jun 2016 13:30:41 -0700")
-References: <1465321773-21519-1-git-send-email-ben.dooks@codethink.co.uk>
- <87shwo68su.fsf@eliezer.anholt.net>
-Message-ID: <m27fdwy9rw.fsf@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 11 Jun 2016 00:30:36 +0200
+Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
+In-Reply-To: <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <11395561.bQatt85IOg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric Anholt <eric@anholt.net> writes:
+On Saturday, June 11, 2016 12:03:04 AM CEST Alexandre Belloni wrote:
+> From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
+> 
+> Fix the main and slow clock .prepare() implementations which used to call
+> usleep() when the scheduler wasn't ready yet.
+> 
 
-> Ben Dooks <ben.dooks@codethink.co.uk> writes:
->
->> The driver defines a variable called __packet but then never
->> uses it, and does not export it for others to use either. Fix
->> the warning about undeclared variable by removing it.
->>
->> drivers/soc/bcm/raspberrypi-power.c:48:3: warning: symbol '__packet' was not declared. Should it be static?
->
-> Reviewed-by: Eric Anholt <eric@anholt.net>
->
-> PM folks: I'd be happy to see this go through your trees, but either way
-> is fine with me.
+Does this have to be called that early? It seems wasteful to always
+call udelay() here, when these are functions that are normally
+allowed to sleep.
 
-Since this is in drivers/soc, just include it in your cleanup branch for
-arm-soc.
-
-Kevin
+	Arnd
