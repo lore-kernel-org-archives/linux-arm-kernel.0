@@ -1,97 +1,82 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 10 Jun 2016 21:55:12 +0200
-Subject: [PATCH V9 04/11] ACPI/PCI: Support IO resources when parsing PCI host
- bridge resources
+Date: Fri, 10 Jun 2016 21:55:14 +0200
+Subject: [PATCH V9 06/11] PCI: Refactor generic bus domain assignment
 In-Reply-To: <1465588519-11334-1-git-send-email-tn@semihalf.com>
 References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
-Message-ID: <1465588519-11334-5-git-send-email-tn@semihalf.com>
+Message-ID: <1465588519-11334-7-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jayachandran C <jchandra@broadcom.com>
+Change the way PCI bus domain number is assigned and improve function
+name to reflect what function does. No functional changes.
 
-Platforms that have memory mapped IO port (such as ARM64) need special
-handling for PCI I/O resources. For host bridge's resource probing case
-these resources need to be fixed up with
-pci_register_io_range()/pci_remap_iospace() etc.
+Instead of assigning bus domain number inside of pci_bus_assign_domain_nr()
+simply return domain number and let pci_create_root_bus() do assignment.
+This way pci_create_root_bus() setups bus structure data in the consistent
+way. Since pci_bus_assign_domain_nr() now does not assign but retrieves
+domain number instead, rename it to pci_bus_find_domain_nr().
 
-The same I/O resources need to be released after hotplug
-removal so that it can be re-added back by the pci_remap_iospace()
-function during insertion. As a consequence unmap I/O resources
-with pci_unmap_iospace() when we release host bridge resources.
-
-Signed-off-by: Jayachandran C <jchandra@broadcom.com>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-[ Tomasz: merged in Sinan's patch to unmap IO resources properly, updated changelog]
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/acpi/pci_root.c | 39 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 39 insertions(+)
+ drivers/pci/pci.c   | 4 ++--
+ drivers/pci/probe.c | 4 +++-
+ include/linux/pci.h | 7 +------
+ 3 files changed, 6 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-index ae3fe4e..9a26dd1 100644
---- a/drivers/acpi/pci_root.c
-+++ b/drivers/acpi/pci_root.c
-@@ -720,6 +720,40 @@ next:
- 	}
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index eb431b5..b9a7833 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -4941,7 +4941,7 @@ int pci_get_new_domain_nr(void)
  }
  
-+#ifdef PCI_IOBASE
-+static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
-+{
-+	struct resource *res = entry->res;
-+	resource_size_t cpu_addr = res->start;
-+	resource_size_t pci_addr = cpu_addr - entry->offset;
-+	resource_size_t length = resource_size(res);
-+	unsigned long port;
-+
-+	if (pci_register_io_range(cpu_addr, length))
-+		goto err;
-+
-+	port = pci_address_to_pio(cpu_addr);
-+	if (port == (unsigned long)-1)
-+		goto err;
-+
-+	res->start = port;
-+	res->end = port + length - 1;
-+	entry->offset = port - pci_addr;
-+
-+	if (pci_remap_iospace(res, cpu_addr) < 0)
-+		goto err;
-+
-+	pr_info("Remapped I/O %pa to %pR\n", &cpu_addr, res);
-+	return;
-+err:
-+	res->flags |= IORESOURCE_DISABLED;
-+}
-+#else
-+static inline void acpi_pci_root_remap_iospace(struct resource_entry *entry)
-+{
-+}
-+#endif
-+
- int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+ #ifdef CONFIG_PCI_DOMAINS_GENERIC
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
++int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
  {
- 	int ret;
-@@ -740,6 +774,9 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
- 			"no IO and memory resources present in _CRS\n");
- 	else {
- 		resource_list_for_each_entry_safe(entry, tmp, list) {
-+			if (entry->res->flags & IORESOURCE_IO)
-+				acpi_pci_root_remap_iospace(entry);
-+
- 			if (entry->res->flags & IORESOURCE_DISABLED)
- 				resource_list_destroy_entry(entry);
- 			else
-@@ -811,6 +848,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
+ 	static int use_dt_domains = -1;
+ 	int domain = -1;
+@@ -4985,7 +4985,7 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+ 		domain = -1;
+ 	}
  
- 	resource_list_for_each_entry(entry, &bridge->windows) {
- 		res = entry->res;
-+		if (res->flags & IORESOURCE_IO)
-+			pci_unmap_iospace(res);
- 		if (res->parent &&
- 		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
- 			release_resource(res);
+-	bus->domain_nr = domain;
++	return domain;
+ }
+ #endif
+ #endif
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 8e3ef72..380d46d 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -2127,7 +2127,9 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
+ 	b->sysdata = sysdata;
+ 	b->ops = ops;
+ 	b->number = b->busn_res.start = bus;
+-	pci_bus_assign_domain_nr(b, parent);
++#ifdef CONFIG_PCI_DOMAINS_GENERIC
++	b->domain_nr = pci_bus_find_domain_nr(b, parent);
++#endif
+ 	b2 = pci_find_bus(pci_domain_nr(b), bus);
+ 	if (b2) {
+ 		/* If we already got to this bus through a different bridge, ignore it */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index ce03d65..48839e8 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1390,12 +1390,7 @@ static inline int pci_domain_nr(struct pci_bus *bus)
+ {
+ 	return bus->domain_nr;
+ }
+-void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
+-#else
+-static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
+-					struct device *parent)
+-{
+-}
++int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent);
+ #endif
+ 
+ /* some architectures require additional setup to direct VGA traffic */
 -- 
 1.9.1
