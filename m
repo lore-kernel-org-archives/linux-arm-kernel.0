@@ -1,144 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Jun 2016 18:02:21 +0100
-Subject: [PATCH] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-In-Reply-To: <1465571984-18776-1-git-send-email-suzuki.poulose@arm.com>
-References: <1465571984-18776-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20160610170220.GC23223@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Jun 2016 18:06:56 +0100
+Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
+In-Reply-To: <20160610165248.GQ13357@hector.attlocal.net>
+References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
+ <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
+ <20160610154857.GA6430@leverpostej>
+ <20160610161234.GO13357@hector.attlocal.net>
+ <20160610163153.GA23743@red-moon>
+ <20160610165248.GQ13357@hector.attlocal.net>
+Message-ID: <20160610170656.GA23854@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 04:19:44PM +0100, Suzuki K Poulose wrote:
-> From: Steve Capper <steve.capper@linaro.org>
-> 
-> It can be useful for JIT software to be aware of MIDR_EL1 and
-> REVIDR_EL1 to ascertain the presence of any core errata that could
-> affect codegen.
-> 
-> This patch exposes these registers through sysfs:
-> 
-> /sys/devices/system/cpu/cpu$ID/identification/midr
-> /sys/devices/system/cpu/cpu$ID/identification/revidr
-> 
-> where $ID is the cpu number. For big.LITTLE systems, one can have a
-> mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
-> to be enumerated.
-> 
-> If the kernel does not have valid information to populate these entries
-> with, an empty string is returned to userspace.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Steve Capper <steve.capper@linaro.org>
-> [ Return error for access to !present CPU registers ]
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
-> Changes since V2:
->   - Fix errno for failures (Spotted-by: Russell King)
->   - Roll back, if we encounter a missing cpu device
->   - Return error for access to registers of CPUs not present.
-> ---
->  arch/arm64/include/asm/cpu.h |  1 +
->  arch/arm64/kernel/cpuinfo.c  | 69 ++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 70 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-> index 13a6103..116a382 100644
-> --- a/arch/arm64/include/asm/cpu.h
-> +++ b/arch/arm64/include/asm/cpu.h
-> @@ -29,6 +29,7 @@ struct cpuinfo_arm64 {
->  	u32		reg_cntfrq;
->  	u32		reg_dczid;
->  	u32		reg_midr;
-> +	u32		reg_revidr;
->  
->  	u64		reg_id_aa64dfr0;
->  	u64		reg_id_aa64dfr1;
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index c173d32..c2d0c42 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -212,6 +212,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
->  	info->reg_ctr = read_cpuid_cachetype();
->  	info->reg_dczid = read_cpuid(DCZID_EL0);
->  	info->reg_midr = read_cpuid_id();
-> +	info->reg_revidr = read_cpuid(REVIDR_EL1);
->  
->  	info->reg_id_aa64dfr0 = read_cpuid(ID_AA64DFR0_EL1);
->  	info->reg_id_aa64dfr1 = read_cpuid(ID_AA64DFR1_EL1);
-> @@ -264,3 +265,71 @@ void __init cpuinfo_store_boot_cpu(void)
->  	boot_cpu_data = *info;
->  	init_cpu_features(&boot_cpu_data);
->  }
-> +
-> +#define CPUINFO_ATTR_RO(_name)							\
-> +	static ssize_t show_##_name (struct device *dev,			\
-> +			struct device_attribute *attr, char *buf)		\
-> +	{									\
-> +		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
-> +		if (!cpu_present(dev->id))					\
-> +			return -ENODEV;						\
-> +										\
-> +		if (info->reg_midr)						\
-> +			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
+On Fri, Jun 10, 2016 at 11:52:48AM -0500, Andy Gross wrote:
 
-Should this be 0x%08x, as these are 32-bit registers?
+[...]
 
-> +		else								\
-> +			return 0;						\
-> +	}									\
-> +	static DEVICE_ATTR(_name, 0444, show_##_name, NULL)
-> +
-> +CPUINFO_ATTR_RO(midr);
-> +CPUINFO_ATTR_RO(revidr);
-> +
-> +static struct attribute *cpuregs_attrs[] = {
-> +	&dev_attr_midr.attr,
-> +	&dev_attr_revidr.attr,
-> +	NULL
-> +};
-> +
-> +static struct attribute_group cpuregs_attr_group = {
-> +	.attrs = cpuregs_attrs,
-> +	.name = "identification"
-> +};
-> +
-> +static int __init cpuinfo_regs_init(void)
-> +{
-> +	int cpu, finalcpu, ret;
-> +	struct device *dev;
-> +
-> +	for_each_present_cpu(cpu) {
-> +		dev = get_cpu_device(cpu);
-> +
-> +		if (!dev) {
-> +			ret = -ENODEV;
-> +			break;
-> +		}
-> +
-> +		ret = sysfs_create_group(&dev->kobj, &cpuregs_attr_group);
-> +		if (ret)
-> +			break;
-> +	}
-> +
-> +	if (!ret)
-> +		return 0;
-> +	/*
-> +	 * We were unable to put down sysfs groups for all the CPUs, revert
-> +	 * all the groups we have placed down s.t. none are visible.
-> +	 * Otherwise we could give a misleading picture of what's present.
-> +	 */
-> +	finalcpu = cpu;
-> +	for_each_present_cpu(cpu) {
-> +		if (cpu == finalcpu)
-> +			break;
-> +		dev = get_cpu_device(cpu);
-> +		if (dev)
-> +			sysfs_remove_group(&dev->kobj, &cpuregs_attr_group);
-> +	}
+> > (1) enter_freeze() hooks are not strictly necessary to enable
+> >     suspend-to-idle (they are if we want the tick to be frozen
+> >     on suspend-to-idle, which is different)
+> 
+> I'd think that you'd want the tick frozen.  Even if you are going to
+> just call the deepest freezable idle state in your freeze_function,
+> you don't want to keep getting woken up as this costs some power usage
 
-Can CPUs be removed from underneath us using unregister_cpu? If so, I
-don't think we should assume that get_cpu_device will succeed in the
-same places for both the loops.
+As I said, that's a separate issue from these bindings.
 
-Will
+> > (2) If I understand your code correctly you have to set the suspend
+> >     ops hook to make sure suspend-to-idle is enabled. This is a core
+> >     code issue rather than anything else, given that suspend-to-idle
+> >     (hey it is based on CPUidle !) does NOT rely on suspend ops to
+> >     function.
+> 
+> It only requires having suspend_ops and a valid function.  Otherwise
+> you can never suspend and never exercise the freeze portion of the
+> cpuidle code.
+
+As I said, *currently* you have to call suspend_set_ops() to set
+up the pm_states label for PM_SUSPEND_FREEZE, suspend_ops are
+irrelevant to make suspend-to-idle work and as I said that's
+related to core code rather than platform specific suspend ops.
+
+We should solve issues, not work around them.
+
+> > So the gist is: as far as I am concerned you do not need any of this
+> > code to enable (yes you need PSCI idle states but no
+> > qcom,idle-state-spc compatible string whatsoever) suspend-to-idle
+> > on ARM64 on top of PSCI, let me know what I am missing.
+> 
+> If we had the facilities in the arm cpuidle driver then for 64 bit
+> processors, I wouldn't have to do anything except provision my
+> suspend_ops + valid function.  For 32 bit, we actually already use
+> this compat tag and I just have to add code in the spm driver (qcom
+> cpuidle) to init the suspend_ops.
+
+For 64-bit you do not have to have add any facility.
+
+1) we should change core code to make PM_SUSPEND_FREEZE independent
+   of suspend_set_ops()
+2) we should define which idle states are freezable (99% of them are
+   minus coupled idle states), through generic bindings
+
+Lorenzo
