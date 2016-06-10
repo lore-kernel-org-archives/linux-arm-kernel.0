@@ -1,104 +1,106 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 10 Jun 2016 18:49:32 +0200
-Subject: [PATCH V8 5/9] pci, acpi: add acpi hook to assign domain number.
-In-Reply-To: <20160610154908.GB23638@red-moon>
-References: <1464621262-26770-1-git-send-email-tn@semihalf.com>
- <1464621262-26770-6-git-send-email-tn@semihalf.com>
- <20160608001559.GD4759@localhost> <20160610151458.GA23638@red-moon>
- <20160610154908.GB23638@red-moon>
-Message-ID: <575AEF9C.4090205@semihalf.com>
+From: ddaney.cavm@gmail.com (David Daney)
+Date: Fri, 10 Jun 2016 09:50:08 -0700
+Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer interrupt
+ trigger
+In-Reply-To: <20160610082324.2a0967b0@arm.com>
+References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+ <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
+ <5759B143.9070503@caviumnetworks.com> <5759DA3A.4070905@gmail.com>
+ <20160610082324.2a0967b0@arm.com>
+Message-ID: <575AEFC0.1070304@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.06.2016 17:49, Lorenzo Pieralisi wrote:
-> On Fri, Jun 10, 2016 at 04:14:58PM +0100, Lorenzo Pieralisi wrote:
->> Hi Bjorn, Tomasz,
->>
->> On Tue, Jun 07, 2016 at 07:15:59PM -0500, Bjorn Helgaas wrote:
->>
->> [...]
->>
->>>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
->>>> index eb431b5..2b52178 100644
->>>> --- a/drivers/pci/pci.c
->>>> +++ b/drivers/pci/pci.c
->>>> @@ -7,6 +7,7 @@
->>>>    *	Copyright 1997 -- 2000 Martin Mares <mj@ucw.cz>
->>>>    */
->>>>
->>>> +#include <linux/acpi.h>
->>>>   #include <linux/kernel.h>
->>>>   #include <linux/delay.h>
->>>>   #include <linux/init.h>
->>>> @@ -4941,7 +4942,7 @@ int pci_get_new_domain_nr(void)
->>>>   }
->>>>
->>>>   #ifdef CONFIG_PCI_DOMAINS_GENERIC
->>>> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->>>> +static int of_pci_bus_domain_nr(struct device *parent)
->>>
->>> Can we do a little cleanup before this patch?
->>>
->>>    - pci_bus_assign_domain_nr() is only used inside drivers/pci, so
->>>      maybe we move the prototype to drivers/pci/pci.h?
->>>
->>>    - I don't really like the style of calling a function that
->>>      internally assigns bus->domain_nr.  Could we do something like
->>>      this instead?
->>>
->>>      int pci_bus_domain_nr(...)
->>>      {
->>>        ...
->>>        return domain;
->>>      }
->>>
->>>      ... pci_create_root_bus(...)
->>>      {
->>>        ...
->>>        b->domain_nr = pci_bus_domain_nr(...);
->>
->> We noticed while preparing v9, that this would force us to
->> write an empty pci_bus_domain_nr() prototype for
->> !PCI_DOMAINS_GENERIC (ie every arch but ARM/ARM64) that should
->> return 0 to keep current behaviour unchanged.
->>
->> That's why pci_bus_assign_domain_nr() was there, so that it
->> was compiled out on !PCI_DOMAINS_GENERIC.
->>
->> I really would like v9 to be final so let's fix it before posting it
->> shortly please.
->>
->> For the above we have three options:
->>
->> 1) Leave code as-is in v8
->>
->> 2) in pci_create_root_bus():
->> #ifdef CONFIG_PCI_DOMAINS_GENERIC
->>         b->domain_nr = pci_bus_domain_nr(...);
->> #endif
->>
->> + other changes requested above
->>
->> 3) in pci_create_root_bus()
->>
->> b->domain_nr = pci_bus_domain_nr(...);
->>
->> unguarded and a stub:
->>
->> #ifndef CONFIG_PCI_DOMAINS_GENERIC
->> static inline int pci_bus_domain_nr() { return 0; }
->> #endif
->>
->> + other changes requested above
+On 06/10/2016 12:23 AM, Marc Zyngier wrote:
+> On Thu, 09 Jun 2016 14:06:02 -0700
+> David Daney <ddaney.cavm@gmail.com> wrote:
 >
-> Actually, Tomasz made me notice that pci_bus.domain_nr is
-> only declared for CONFIG_PCI_DOMAINS_GENERIC so (3) is not
-> even an option and IMO (2) is not much nicer than code in
-> v8 as-is with an ifdef in the middle of pci_create_root_bus().
+>> I spoke too soon...
+>>
+>> On 06/09/2016 11:11 AM, David Daney wrote:
+>>> On 06/06/2016 10:56 AM, Marc Zyngier wrote:
+>>>> The ARM architected timer specification mandates that the interrupt
+>>>> associated with each timer is level triggered (which corresponds to
+>>>> the "counter >= comparator" condition).
+>>>>
+>>>> A number of DTs are being remarkably creative, declaring the interrupt
+>>>> to be edge triggered. A quick look at the TRM for the corresponding ARM
+>>>> CPUs clearly shows that this is wrong, and I've corrected those.
+>>>> For non-ARM designs (and in the absence of a publicly available TRM),
+>>>> I've made them active low as well, which can't be completely wrong
+>>>> as the GIC cannot disinguish between level low and level high.
+>>>>
+>>>> The respective maintainers are of course welcome to prove me wrong.
+>>>>
+>>>> While I was at it, I took the liberty to fix a couple of related issue,
+>>>> such as some spurious affinity bits on ThunderX, and their complete
+>>>> absence on ls1043a (both of which seem to be related to copy-pasting
+>>>> from other DTs).
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>    arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
+>>>>    arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
+>>>>    arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
+>>>>    arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
+>>>>    arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
+>>>>    arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
+>>>>    arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
+>>>>    arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
+>>>>    arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
+>>>>    arch/arm64/boot/dts/xilinx/zynqmp.dtsi               | 8 ++++----
+>>>>    10 files changed, 40 insertions(+), 40 deletions(-)
+>>>>
+>>> [...]
+>>>> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>> b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>> index 2eb9b22..382d86f 100644
+>>>> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>> @@ -354,10 +354,10 @@
+>>>>
+>>>>        timer {
+>>>>            compatible = "arm,armv8-timer";
+>>>> -        interrupts = <1 13 0xff01>,
+>>>> -                     <1 14 0xff01>,
+>>>> -                     <1 11 0xff01>,
+>>>> -                     <1 10 0xff01>;
+>>>> +        interrupts = <1 13 8>,
+>>>> +                     <1 14 8>,
+>>>> +                     <1 11 8>,
+>>>> +                     <1 10 8>;
+>>
+>>
+>> NAK!
+>>
+>> According to arm,gic-v3.txt the trigger value must be either 1 or 4:
+>>
+>>     The 3rd cell is the flags, encoded as follows:
+>>           bits[3:0] trigger type and level flags.
+>>                   1 = edge triggered
+>>                   4 = level triggered
+>
+> Which is a bug in the binding description. PPIs can be any trigger
+> (just look at the TRM for CPUs that have devices connected to a PPI to
+> be convinced - most of them are level low).
+>
+> This doesn't mean that you can distinguish level-high from level-low
+> in a programmatic way. But the HW definitely can handle it.
+>
+> I'll update the GICv3 binding to reflect this.
+>
+> Now, coming back to your NAK: is level-low the right or wrong trigger
+> for your implementation of the architected timers?
 >
 
-To me (1) is nicer too. Bjorn what is your take on this? This is last 
-bit before sending v9.
+For the Cavium Thunder implementation of GIC-v3, there is no concept of 
+high and low.  All we have is asserted and not-asserted, we have chosen 
+to map the concept of an asserted level-triggered source to 
+IRQ_TYPE_LEVEL_HIGH, and the transition from not-asserted to asserted on 
+an edge triggered source to IRQ_TYPE_EDGE_RISING.
 
-Thanks,
-Tomasz
+Looking and the code and specifications, I don't see in irq-gic-v3.c or 
+PRD03-GENC-010745-35 any indication that the concepts of "high" and 
+"low" exist either, although I certainly could have missed something.
+
+David Daney
