@@ -1,26 +1,25 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:29 +0200
-Subject: [PATCH 26/48] ARM: dts: at91: at91sam9x5cm: use TCB0 as clocksource
+Date: Sat, 11 Jun 2016 00:03:31 +0200
+Subject: [PATCH 28/48] ARM: dts: at91: cosino: use TCB0 as clocksource
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-27-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-29-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
 
-[tested on at91sam9x25ek and at91sam9x35ek]
-Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Rodolfo Giometti <giometti@linux.it>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9x5cm.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/at91-cosino.dtsi | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9x5cm.dtsi b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-index b098ad8cd93a..40676cc9b172 100644
---- a/arch/arm/boot/dts/at91sam9x5cm.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-@@ -24,6 +24,18 @@
+diff --git a/arch/arm/boot/dts/at91-cosino.dtsi b/arch/arm/boot/dts/at91-cosino.dtsi
+index b6ea3f4a7206..0cbab6f588b7 100644
+--- a/arch/arm/boot/dts/at91-cosino.dtsi
++++ b/arch/arm/boot/dts/at91-cosino.dtsi
+@@ -46,6 +46,18 @@
  
  	ahb {
  		apb {
@@ -36,8 +35,8 @@ index b098ad8cd93a..40676cc9b172 100644
 +				};
 +			};
 +
- 			pinctrl at fffff400 {
- 				1wire_cm {
- 					pinctrl_1wire_cm: 1wire_cm-0 {
+ 			mmc0: mmc at f0008000 {
+ 				pinctrl-0 = <
+ 					&pinctrl_board_mmc0
 -- 
 2.8.1
