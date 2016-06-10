@@ -1,65 +1,51 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 10 Jun 2016 01:37:55 +0100
-Subject: [PATCH 2/4] ASoC: sunxi: Add Allwinner A10 Digital Audio driver
-In-Reply-To: <20160609210515.GI5242@lukather>
-References: <20160601175430.11625-1-maxime.ripard@free-electrons.com>
- <20160601175430.11625-3-maxime.ripard@free-electrons.com>
- <20160602102651.GF2282@sirena.org.uk>
- <20160609210515.GI5242@lukather>
-Message-ID: <20160610003755.GC7510@sirena.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 10 Jun 2016 10:02:45 +0900
+Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
+ <20160601005751.GG20527@verge.net.au>
+ <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
+ <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
+ <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+Message-ID: <20160610010245.GA10152@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 11:05:15PM +0200, Maxime Ripard wrote:
-> On Thu, Jun 02, 2016 at 11:26:51AM +0100, Mark Brown wrote:
-> > > +static int sun4i_i2s_params_to_sr(struct snd_pcm_hw_params *params)
-> > > +{
-> > > +	switch (params_width(params)) {
-> > > +	case 16:
-> > > +		return 0;
-> > > +	}
-> > > +
-> > > +	return -EINVAL;
-> > > +}
+On Tue, Jun 07, 2016 at 11:58:45PM +0300, Sergei Shtylyov wrote:
+> On 06/07/2016 10:13 AM, Geert Uytterhoeven wrote:
+> 
+> [...]
+> 
+> >>>And that the system behaves sanely on suspend/resume.
+> >>
+> >>   I'd be thankful if you told me how to test that. :-)
+> >
+> >System suspend:
+> >
+> >    echo mem > /sys/power/state
+> 
+>    Oh. I know that one! :-)
+> 
+> >System resume: You're gonna need a "wakeup-source" in your DTS, e.g. gpio-keys.
+> >Serial should work too, echo "enabled" to the corresponding wakeup
+> >file in /sys first.
+> 
+>    I'm afraid I couldn't find that file. All I saw were RPM controls...
+> 
+> >In case of issues, try "echo 0 > /sys/module/printk/parameters/console_suspend".
+> 
+>    There's no problems suspending, it's the resuming that's a problem for me.
+> 
+> >Good luck!
+> 
+>    As usual, there was no luck. :-)
+> 
+> WBR, Sergei
 
-> > The switch statement here and in the _wss() function look weird because
-> > they don't have default cases.  Since there's only one user of both
-> > functions it seems better to have the switch statements inline anyway.
+Does resume work for UP (i.e. without SMP)?
 
-> I don't know, maybe it's just me, but I really find it cleaner that
-> way, and the compiler will probably inline it anyway. If you insist,
-> I'll change it though.
+How did testing CPU hotplug go? Did it work for all CPUs?
 
-Yes, it's really not helping here.
-
-> > > +	for (i = 0; sun4i_i2s_mclk_div[i].div; i++) {
-> > > +		const struct sun4i_i2s_clk_div *mdiv = sun4i_i2s_mclk_div + i;
-
-> > Why not just write these as normal array lookups?
-
-> By normal, you mean using ARRAY_SIZE()?
-
-array[index].
-
-> > > +static int sun4i_i2s_dai_probe(struct snd_soc_dai *dai)
-> > > +{
-> > > +	struct sun4i_i2s *i2s = snd_soc_dai_get_drvdata(dai);
-
-> > > +	/* Enable the whole hardware block */
-> > > +	regmap_write(i2s->regmap, SUN4I_I2S_CTRL_REG,
-> > > +		     SUN4I_I2S_CTRL_GL_EN);
-
-> > Runtime PM?  It also seems like this is something that ought to be
-> > covered in the suspend and resume callbacks.
-
-> runtime_pm is supported, and uses the regmap cache to keep those
-> changes.
-
-No, my point is that I'd expect to see the block powered off on suspend.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/79102099/attachment.sig>
+If things work less well for SMP than UP I am inclined to ask
+you to defer adding SMP support.
