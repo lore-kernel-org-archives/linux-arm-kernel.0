@@ -1,22 +1,17 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Jun 2016 04:38:37 -0700
-Subject: [PATCH 23/28] ARM: dts: DRA7: Add DT node for DES IP
-In-Reply-To: <1464772006-11254-4-git-send-email-t-kristo@ti.com>
-References: <1464771389-10640-1-git-send-email-t-kristo@ti.com>
- <1464772006-11254-1-git-send-email-t-kristo@ti.com>
- <1464772006-11254-4-git-send-email-t-kristo@ti.com>
-Message-ID: <20160610113836.GF22406@atomide.com>
+Date: Fri, 10 Jun 2016 04:40:03 -0700
+Subject: [PATCH 4/5] ARM: dts: omap5: add fref_xtal_ck support
+In-Reply-To: <1464802526-16372-5-git-send-email-t-kristo@ti.com>
+References: <1464802526-16372-1-git-send-email-t-kristo@ti.com>
+ <1464802526-16372-5-git-send-email-t-kristo@ti.com>
+Message-ID: <20160610114003.GG22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [160601 02:09]:
-> From: Joel Fernandes <joelf@ti.com>
-> 
-> DRA7xx SoCs have a DES3DES IP. Add DT data for the same.
+* Tero Kristo <t-kristo@ti.com> [160601 10:37]:
+> The clock is directly sourced from sys_clkin, and provides an external
+> output clock for (typically) TWL6040 chip.
 
-Are these dts changes safe to apply separately or do they
-cause issues like extra warnings during boot?
-
-Regards,
+Can this patch be applied separately without issues?
 
 Tony
