@@ -1,31 +1,30 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:30 +0200
-Subject: [PATCH 27/48] ARM: dts: at91: acme/g25: use TCB0 as clocksource
+Date: Sat, 11 Jun 2016 00:03:35 +0200
+Subject: [PATCH 32/48] ARM: dts: at91: sama5d3 Xplained: use TCB0 as
+ clocksource
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-28-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-33-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
+Use tcb0 as the clocksource like previously selected in sama5_defconfig.
 
-Cc: Sergio Tanzilli <tanzilli@acmesystems.it>
-Cc: Douglas Gilbert <dgilbert@interlog.com>
+Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-ariag25.dts    | 12 ++++++++++++
- arch/arm/boot/dts/at91-ariettag25.dts | 12 ++++++++++++
- 2 files changed, 24 insertions(+)
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-ariag25.dts b/arch/arm/boot/dts/at91-ariag25.dts
-index e9ced30159a7..b00aa7607283 100644
---- a/arch/arm/boot/dts/at91-ariag25.dts
-+++ b/arch/arm/boot/dts/at91-ariag25.dts
-@@ -67,6 +67,18 @@
- 				};
+diff --git a/arch/arm/boot/dts/at91-sama5d3_xplained.dts b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+index f3e2b96c06a3..9e9bf3caabd6 100644
+--- a/arch/arm/boot/dts/at91-sama5d3_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d3_xplained.dts
+@@ -65,6 +65,18 @@
+ 				status = "okay";
  			};
  
-+			tcb0: timer at f8008000 {
++			tcb0: timer at f0010000 {
 +				timer at 0 {
 +					compatible = "atmel,tcb-clksrc";
 +					reg = <0>;
@@ -37,31 +36,8 @@ index e9ced30159a7..b00aa7607283 100644
 +				};
 +			};
 +
- 			i2c0: i2c at f8010000 {
+ 			i2c0: i2c at f0014000 {
+ 				pinctrl-0 = <&pinctrl_i2c0_pu>;
  				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/at91-ariettag25.dts b/arch/arm/boot/dts/at91-ariettag25.dts
-index c514502081d2..58e0026157f7 100644
---- a/arch/arm/boot/dts/at91-ariettag25.dts
-+++ b/arch/arm/boot/dts/at91-ariettag25.dts
-@@ -45,6 +45,18 @@
- 				};
- 			};
- 
-+			tcb0: timer at f8008000 {
-+				timer at 0 {
-+					compatible = "atmel,tcb-clksrc";
-+					reg = <0>;
-+				};
-+
-+				timer at 1 {
-+					compatible = "atmel,tcb-clkevt";
-+					reg = <1>;
-+				};
-+			};
-+
- 			usb2: gadget at f803c000 {
- 				status = "okay";
- 			};
 -- 
 2.8.1
