@@ -1,61 +1,29 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 10 Jun 2016 16:07:32 +0100
-Subject: [PATCH] ARM: tegra: fix missing include <soc/tegra/cpuidle.h>
-In-Reply-To: <20160610145520.GP27142@ulmo.ba.sec>
-References: <1465404897-16654-1-git-send-email-ben.dooks@codethink.co.uk>
- <20160610142210.GN27142@ulmo.ba.sec> <575ACFB5.4070706@nvidia.com>
- <20160610145520.GP27142@ulmo.ba.sec>
-Message-ID: <575AD7B4.4040609@nvidia.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Fri, 10 Jun 2016 17:10:03 +0200
+Subject: [PATCH] ARM: at91: debug: use DEBUG_UART_VIRT
+In-Reply-To: <1465313079-6307-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1465313079-6307-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <20160610151003.GD19050@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 10/06/16 15:55, Thierry Reding wrote:
-> * PGP Signed by an unknown key
+On 07/06/2016 at 17:24:39 +0200, Alexandre Belloni wrote :
+> AT91 still uses an offset (0x0100 0000) from the physical address to map
+> the debug UART. This is unfortunate as for some platforms (sama5d3 and
+> earlier), it ends up in the PCI zone and PCI is enabled in multi_v7.
+> Switch to DEBUG_UART_VIRT to solve that.
 > 
-> On Fri, Jun 10, 2016 at 03:33:25PM +0100, Jon Hunter wrote:
->>
->> On 10/06/16 15:22, Thierry Reding wrote:
->>>> Old Signed by an unknown key
->>>
->>> On Wed, Jun 08, 2016 at 05:54:57PM +0100, Ben Dooks wrote:
->>>> The prototype of tegra_cpuidle_pcie_irqs_in_use() is missing
->>>> from the cpuidle.c file, it is defined in <soc/tegra/cpuidle.h>
->>>> so add that include to avoid the following warning:
->>>>
->>>> arch/arm/mach-tegra/cpuidle.c:51:6: warning: symbol 'tegra_cpuidle_pcie_irqs_in_use' was not declared. Should it be static?
->>>>
->>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->>>> ---
->>>> Cc: Stephen Warren <swarren@wwwdotorg.org>
->>>> Cc: Alexandre Courbot <gnurou@gmail.com>
->>>> Cc: Thierry Reding <thierry.reding@gmail.com>
->>>> Cc: linux-arm-kernel at lists.infradead.org
->>>> Cc: linux-tegra at vger.kernel.org
->>>> ---
->>>>  arch/arm/mach-tegra/cpuidle.c | 1 +
->>>>  1 file changed, 1 insertion(+)
->>>
->>> I've been carrying a set of patches to fix these, and a couple of other
->>> sparse warnings, in my tree locally, but never sent them out because
->>> they were so trivial. I probably should've to avoid the duplication of
->>> effort. Sorry about that.
->>
->> I think you did send them out ;-)
->>
->> http://patchwork.ozlabs.org/patch/616249/
->> http://patchwork.ozlabs.org/patch/616250/
->> http://patchwork.ozlabs.org/patch/616251/
->> http://patchwork.ozlabs.org/patch/616252/
+> Tested on sama5d3 and 9g20.
 > 
-> Hah! Excellent. No more guilty conscience for me. =)
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>  arch/arm/Kconfig.debug        | 11 ++++++-----
+>  arch/arm/include/debug/at91.S | 10 +---------
+>  2 files changed, 7 insertions(+), 14 deletions(-)
 > 
-> I've pulled those patches into the Tegra tree now.
-
-Great! I have sent you a list of some others from patchwork that I think
-we should merge as well.
-
-Jon
+Applied now.
 
 -- 
-nvpublic
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
