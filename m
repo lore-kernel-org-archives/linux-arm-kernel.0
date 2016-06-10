@@ -1,18 +1,18 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Jun 2016 04:22:06 -0700
-Subject: [PATCH] ARM: dts: dra72-evm: Rename 3.3V regulator tag
-In-Reply-To: <1464120040-28776-1-git-send-email-misael.lopez@ti.com>
-References: <1464120040-28776-1-git-send-email-misael.lopez@ti.com>
-Message-ID: <20160610112206.GA22406@atomide.com>
+Date: Fri, 10 Jun 2016 04:34:40 -0700
+Subject: [PATCH v5 1/7] ARM: dts: omap3: Add clocks to McBSP nodes
+In-Reply-To: <20160530082350.24285-2-peter.ujfalusi@ti.com>
+References: <20160530082350.24285-1-peter.ujfalusi@ti.com>
+ <20160530082350.24285-2-peter.ujfalusi@ti.com>
+Message-ID: <20160610113440.GD22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Misael Lopez Cruz <misael.lopez@ti.com> [160524 13:02]:
-> Rename the tag of the 3.3 V regulator used in the DRA72 EVM in
-> order to have a consistent tag name with the DRA7 EVM.  This
-> is useful when the regulator needs to be referenced in common
-> dtsi files (i.e. for common companion boards like JAMR3 [1]).
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160530 01:26]:
+> Add clock properties to the McBSP nodes. McBSP2 and 3 need to have ick also
+> since the Sidetone block of these modules are operating using the McBSP
+> interface clock.
 
-Applying into omap-for-v4.8/dt thanks.
+Applying this patch into omap-for-v4.8/dt thanks.
 
 Tony
