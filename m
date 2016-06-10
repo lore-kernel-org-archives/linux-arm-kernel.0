@@ -1,48 +1,34 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Fri, 10 Jun 2016 15:33:25 +0100
-Subject: [PATCH] ARM: tegra: fix missing include <soc/tegra/cpuidle.h>
-In-Reply-To: <20160610142210.GN27142@ulmo.ba.sec>
-References: <1465404897-16654-1-git-send-email-ben.dooks@codethink.co.uk>
- <20160610142210.GN27142@ulmo.ba.sec>
-Message-ID: <575ACFB5.4070706@nvidia.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 10 Jun 2016 15:36:27 +0100
+Subject: [PATCH v3 10/20] pwm: sysfs: Add PWM Capture support
+In-Reply-To: <20160610140404.GL27142@ulmo.ba.sec>
+References: <20160608092135.21184-1-lee.jones@linaro.org>
+ <20160608092135.21184-11-lee.jones@linaro.org>
+ <20160610140404.GL27142@ulmo.ba.sec>
+Message-ID: <20160610143627.GD1537@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 10 Jun 2016, Thierry Reding wrote:
 
-On 10/06/16 15:22, Thierry Reding wrote:
-> * PGP Signed by an unknown key
+> On Wed, Jun 08, 2016 at 10:21:25AM +0100, Lee Jones wrote:
+> > Allow a user to read PWM Capture results from /sysfs.
+> > 
+> > To start a capture and read the result, simply read the file:
+> > 
+> >   $ cat $PWMCHIP/capture
+> > 
+> > The output format is "<period>:<duty_cycle>".
 > 
-> On Wed, Jun 08, 2016 at 05:54:57PM +0100, Ben Dooks wrote:
->> The prototype of tegra_cpuidle_pcie_irqs_in_use() is missing
->> from the cpuidle.c file, it is defined in <soc/tegra/cpuidle.h>
->> so add that include to avoid the following warning:
->>
->> arch/arm/mach-tegra/cpuidle.c:51:6: warning: symbol 'tegra_cpuidle_pcie_irqs_in_use' was not declared. Should it be static?
->>
->> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
->> ---
->> Cc: Stephen Warren <swarren@wwwdotorg.org>
->> Cc: Alexandre Courbot <gnurou@gmail.com>
->> Cc: Thierry Reding <thierry.reding@gmail.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linux-tegra at vger.kernel.org
->> ---
->>  arch/arm/mach-tegra/cpuidle.c | 1 +
->>  1 file changed, 1 insertion(+)
+> The format below is "<period> <duty cycle>".
 > 
-> I've been carrying a set of patches to fix these, and a couple of other
-> sparse warnings, in my tree locally, but never sent them out because
-> they were so trivial. I probably should've to avoid the duplication of
-> effort. Sorry about that.
+> No need to rev the series for this, I can take patches 8 and 10 as-is
+> and make those modifications myself.
 
-I think you did send them out ;-)
-
-http://patchwork.ozlabs.org/patch/616249/
-http://patchwork.ozlabs.org/patch/616250/
-http://patchwork.ozlabs.org/patch/616251/
-http://patchwork.ozlabs.org/patch/616252/
-
-Jon
+Ideal, thanks.
 
 -- 
-nvpublic
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
