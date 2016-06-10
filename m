@@ -1,9 +1,9 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:12 +0200
-Subject: [PATCH 09/48] ARM: dts: at91: animeo_ip: use TCB0 as clocksource
+Date: Sat, 11 Jun 2016 00:03:14 +0200
+Subject: [PATCH 11/48] ARM: dts: at91: at91sam9g20ek: use TCB0 as clocksource
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-10-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-12-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,17 +11,17 @@ Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
 
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/animeo_ip.dts | 12 ++++++++++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
-index 0962f2fa3f6e..e55190d706a9 100644
---- a/arch/arm/boot/dts/animeo_ip.dts
-+++ b/arch/arm/boot/dts/animeo_ip.dts
-@@ -52,6 +52,18 @@
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index e9cc99b6353a..e13018b4df01 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -51,6 +51,18 @@
+ 				status = "okay";
+ 			};
  
- 	ahb {
- 		apb {
 +			tcb0: timer at fffa0000 {
 +				timer at 0 {
 +					compatible = "atmel,tcb-clksrc";
@@ -35,7 +35,7 @@ index 0962f2fa3f6e..e55190d706a9 100644
 +			};
 +
  			usart0: serial at fffb0000 {
- 				pinctrl-0 = <&pinctrl_usart0 &pinctrl_usart0_rts>;
- 				linux,rs485-enabled-at-boot-time;
+ 				pinctrl-0 =
+ 					<&pinctrl_usart0
 -- 
 2.8.1
