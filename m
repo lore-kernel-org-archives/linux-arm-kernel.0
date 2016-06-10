@@ -1,98 +1,113 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 10 Jun 2016 11:52:48 -0500
-Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
-In-Reply-To: <20160610163153.GA23743@red-moon>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
- <20160610154857.GA6430@leverpostej>
- <20160610161234.GO13357@hector.attlocal.net>
- <20160610163153.GA23743@red-moon>
-Message-ID: <20160610165248.GQ13357@hector.attlocal.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 10 Jun 2016 17:56:39 +0100
+Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer interrupt
+ trigger
+In-Reply-To: <575AEFC0.1070304@gmail.com>
+References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+ <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
+ <5759B143.9070503@caviumnetworks.com> <5759DA3A.4070905@gmail.com>
+ <20160610082324.2a0967b0@arm.com> <575AEFC0.1070304@gmail.com>
+Message-ID: <575AF147.40503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 05:31:53PM +0100, Lorenzo Pieralisi wrote:
-> On Fri, Jun 10, 2016 at 11:12:34AM -0500, Andy Gross wrote:
-> > On Fri, Jun 10, 2016 at 04:48:57PM +0100, Mark Rutland wrote:
-> > > [+ Lorenzo]
-> > > 
-> > > On Thu, May 19, 2016 at 12:00:18AM -0500, Andy Gross wrote:
-> > > > This patch adds the qcom,idle-state-spc compatible to the SPC idle
-> > > > state.  This compatible indicates that the state is one which supports
-> > > > freeze.
-> > > > 
-> > > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > > > ---
-> > > >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > > 
-> > > > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > > index 208af00..032e411 100644
-> > > > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > > @@ -104,7 +104,7 @@
-> > > >  
-> > > >  		idle-states {
-> > > >  			CPU_SPC: spc {
-> > > > -				compatible = "arm,idle-state";
-> > > > +				compatible = "qcom,idle-state-spc", "arm,idle-state";
-> > > >  				arm,psci-suspend-param = <0x40000002>;
-> > > >  				entry-latency-us = <130>;
-> > > >  				exit-latency-us = <150>;
-> > > 
-> > > This looks suspicious.
-> > > 
-> > > This is a PSCI idle state, and we have a PSCI driver driven by the
-> > > generic ARM cpuidle driver.
-> > > 
-> > > Why do we need a qcom-specific compatible here?
-> > > 
-> > > Surely we should be able to use the idle code in a generic fashion to
-> > > driver suspend-to-idle?
-> > 
-> > We need a way to identify specific idle states that support
-> > suspend-to-idle.  In addition, when we have identified the states, we
-> > may have to configure the enter_freeze() function.
-> > 
-> > I chose to do this outside of the arm cpuidle driver because I didn't
-> > want to add any more DT information aside from the compatible, and I
-> > needed a separate place for the Qualcomm specific suspend code.  With
-> > the compatible, this makes my 32 and 64 bit processor suspend code
-> > identical, as we have our own cpuidle driver for the 32 bit procs.
-> > 
-> > An alternative would be to add some facilities to communicate this to
-> > the arm cpuidle driver and configure the enter_freeze() function at
-> > some later point.
+On 10/06/16 17:50, David Daney wrote:
+> On 06/10/2016 12:23 AM, Marc Zyngier wrote:
+>> On Thu, 09 Jun 2016 14:06:02 -0700
+>> David Daney <ddaney.cavm@gmail.com> wrote:
+>>
+>>> I spoke too soon...
+>>>
+>>> On 06/09/2016 11:11 AM, David Daney wrote:
+>>>> On 06/06/2016 10:56 AM, Marc Zyngier wrote:
+>>>>> The ARM architected timer specification mandates that the interrupt
+>>>>> associated with each timer is level triggered (which corresponds to
+>>>>> the "counter >= comparator" condition).
+>>>>>
+>>>>> A number of DTs are being remarkably creative, declaring the interrupt
+>>>>> to be edge triggered. A quick look at the TRM for the corresponding ARM
+>>>>> CPUs clearly shows that this is wrong, and I've corrected those.
+>>>>> For non-ARM designs (and in the absence of a publicly available TRM),
+>>>>> I've made them active low as well, which can't be completely wrong
+>>>>> as the GIC cannot disinguish between level low and level high.
+>>>>>
+>>>>> The respective maintainers are of course welcome to prove me wrong.
+>>>>>
+>>>>> While I was at it, I took the liberty to fix a couple of related issue,
+>>>>> such as some spurious affinity bits on ThunderX, and their complete
+>>>>> absence on ls1043a (both of which seem to be related to copy-pasting
+>>>>> from other DTs).
+>>>>>
+>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>>> ---
+>>>>>    arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
+>>>>>    arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
+>>>>>    arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
+>>>>>    arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
+>>>>>    arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
+>>>>>    arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
+>>>>>    arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
+>>>>>    arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
+>>>>>    arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
+>>>>>    arch/arm64/boot/dts/xilinx/zynqmp.dtsi               | 8 ++++----
+>>>>>    10 files changed, 40 insertions(+), 40 deletions(-)
+>>>>>
+>>>> [...]
+>>>>> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>>> b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>>> index 2eb9b22..382d86f 100644
+>>>>> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>>> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
+>>>>> @@ -354,10 +354,10 @@
+>>>>>
+>>>>>        timer {
+>>>>>            compatible = "arm,armv8-timer";
+>>>>> -        interrupts = <1 13 0xff01>,
+>>>>> -                     <1 14 0xff01>,
+>>>>> -                     <1 11 0xff01>,
+>>>>> -                     <1 10 0xff01>;
+>>>>> +        interrupts = <1 13 8>,
+>>>>> +                     <1 14 8>,
+>>>>> +                     <1 11 8>,
+>>>>> +                     <1 10 8>;
+>>>
+>>>
+>>> NAK!
+>>>
+>>> According to arm,gic-v3.txt the trigger value must be either 1 or 4:
+>>>
+>>>     The 3rd cell is the flags, encoded as follows:
+>>>           bits[3:0] trigger type and level flags.
+>>>                   1 = edge triggered
+>>>                   4 = level triggered
+>>
+>> Which is a bug in the binding description. PPIs can be any trigger
+>> (just look at the TRM for CPUs that have devices connected to a PPI to
+>> be convinced - most of them are level low).
+>>
+>> This doesn't mean that you can distinguish level-high from level-low
+>> in a programmatic way. But the HW definitely can handle it.
+>>
+>> I'll update the GICv3 binding to reflect this.
+>>
+>> Now, coming back to your NAK: is level-low the right or wrong trigger
+>> for your implementation of the architected timers?
+>>
 > 
-> (1) enter_freeze() hooks are not strictly necessary to enable
->     suspend-to-idle (they are if we want the tick to be frozen
->     on suspend-to-idle, which is different)
+> For the Cavium Thunder implementation of GIC-v3, there is no concept of 
+> high and low.  All we have is asserted and not-asserted, we have chosen 
+> to map the concept of an asserted level-triggered source to 
+> IRQ_TYPE_LEVEL_HIGH, and the transition from not-asserted to asserted on 
+> an edge triggered source to IRQ_TYPE_EDGE_RISING.
 
-I'd think that you'd want the tick frozen.  Even if you are going to just call
-the deepest freezable idle state in your freeze_function, you don't want to keep
-getting woken up as this costs some power usage
+The GIC, no matter if it is from Cavium or not, doesn't have a notion of
+high or low indeed *from a programming interface point of view*. What
+matters here is the *device*, and how it is connected to the interrupt
+controller. And I'm pretty sure your timers are *physically* one or the
+other (unless they are simply floating? ;-)
 
+Thanks,
 
-> (2) If I understand your code correctly you have to set the suspend
->     ops hook to make sure suspend-to-idle is enabled. This is a core
->     code issue rather than anything else, given that suspend-to-idle
->     (hey it is based on CPUidle !) does NOT rely on suspend ops to
->     function.
-
-It only requires having suspend_ops and a valid function.  Otherwise you can
-never suspend and never exercise the freeze portion of the cpuidle code.
-
-> 
-> So the gist is: as far as I am concerned you do not need any of this
-> code to enable (yes you need PSCI idle states but no
-> qcom,idle-state-spc compatible string whatsoever) suspend-to-idle
-> on ARM64 on top of PSCI, let me know what I am missing.
-
-If we had the facilities in the arm cpuidle driver then for 64 bit processors, I
-wouldn't have to do anything except provision my suspend_ops + valid function.
-For 32 bit, we actually already use this compat tag and I just have to add code
-in the spm driver (qcom cpuidle) to init the suspend_ops.
-
-Regards,
-
-Andy
+	M.
+-- 
+Jazz is not dead. It just smells funny...
