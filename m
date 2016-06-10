@@ -1,27 +1,28 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:14 +0200
-Subject: [PATCH 11/48] ARM: dts: at91: at91sam9g20ek: use TCB0 as clocksource
+Date: Sat, 11 Jun 2016 00:03:13 +0200
+Subject: [PATCH 10/48] ARM: dts: at91: kizbox: use TCB0 as clocksource
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-12-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-11-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
 
+Cc: Antoine Aubert <a.aubert@overkiz.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/at91-kizbox.dts | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index e9cc99b6353a..e13018b4df01 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -51,6 +51,18 @@
- 				status = "okay";
- 			};
+diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
+index 229e989eb60d..58c5d0d3dd66 100644
+--- a/arch/arm/boot/dts/at91-kizbox.dts
++++ b/arch/arm/boot/dts/at91-kizbox.dts
+@@ -31,6 +31,18 @@
  
+ 	ahb {
+ 		apb {
 +			tcb0: timer at fffa0000 {
 +				timer at 0 {
 +					compatible = "atmel,tcb-clksrc";
@@ -34,8 +35,8 @@ index e9cc99b6353a..e13018b4df01 100644
 +				};
 +			};
 +
- 			usart0: serial at fffb0000 {
- 				pinctrl-0 =
- 					<&pinctrl_usart0
+ 			macb0: ethernet at fffc4000 {
+ 				phy-mode = "mii";
+ 				pinctrl-0 = <&pinctrl_macb_rmii
 -- 
 2.8.1
