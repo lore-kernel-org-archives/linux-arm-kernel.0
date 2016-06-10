@@ -1,96 +1,43 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 10 Jun 2016 14:36:32 +0100
-Subject: [PATCH v2 1/3] arm64: spinlock: order spin_{is_locked,
- unlock_wait} against local locks
-In-Reply-To: <1465403139-21054-1-git-send-email-will.deacon@arm.com>
-References: <1465403139-21054-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20160610133631.GC24528@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 10 Jun 2016 14:38:50 +0100
+Subject: [GIT PULL] arm64: fix for -rc3
+Message-ID: <20160610133850.GA14364@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 05:25:37PM +0100, Will Deacon wrote:
-> spin_is_locked has grown two very different use-cases:
-> 
-> (1) [The sane case] API functions may require a certain lock to be held
->     by the caller and can therefore use spin_is_locked as part of an
->     assert statement in order to verify that the lock is indeed held.
->     For example, usage of assert_spin_locked.
-> 
-> (2) [The insane case] There are two locks, where a CPU takes one of the
->     locks and then checks whether or not the other one is held before
->     accessing some shared state. For example, the "optimized locking" in
->     ipc/sem.c.
-> 
-> In the latter case, the sequence looks like:
-> 
->   spin_lock(&sem->lock);
->   if (!spin_is_locked(&sma->sem_perm.lock))
->     /* Access shared state */
-> 
-> and requires that the spin_is_locked check is ordered after taking the
-> sem->lock. Unfortunately, since our spinlocks are implemented using a
-> LDAXR/STXR sequence, the read of &sma->sem_perm.lock can be speculated
-> before the STXR and consequently return a stale value.
-> 
-> Whilst this hasn't been seen to cause issues in practice, PowerPC fixed
-> the same issue in 51d7d5205d33 ("powerpc: Add smp_mb() to
-> arch_spin_is_locked()") and, although we did something similar for
-> spin_unlock_wait in d86b8da04dfa ("arm64: spinlock: serialise
-> spin_unlock_wait against concurrent lockers") that doesn't actually take
-> care of ordering against local acquisition of a different lock.
-> 
-> This patch adds an smp_mb() to the start of our arch_spin_is_locked and
-> arch_spin_unlock_wait routines to ensure that the lock value is always
-> loaded after any other locks have been taken by the current CPU.
-> 
-> Reported-by: Peter Zijlstra <peterz@infradead.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Hi Linus,
 
-I've taken a look at the series, and the asm looks sane to me. From
-discussions at a white-board, the meat of the changes seems right.
+Please pull this arm64 fix for -rc3. It's a fix for an issue that Alex
+saw whilst swapping with hardware access/dirty bit support enabled in
+the kernel.
 
-So FWIW, for the series:
+Cheers,
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Will
 
-Thanks,
-Mark.
+--->8
 
-> ---
->  arch/arm64/include/asm/spinlock.h | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
-> index fc9682bfe002..aac64d55cb22 100644
-> --- a/arch/arm64/include/asm/spinlock.h
-> +++ b/arch/arm64/include/asm/spinlock.h
-> @@ -31,6 +31,12 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
->  	unsigned int tmp;
->  	arch_spinlock_t lockval;
->  
-> +	/*
-> +	 * Ensure prior spin_lock operations to other locks have completed
-> +	 * on this CPU before we test whether "lock" is locked.
-> +	 */
-> +	smp_mb();
-> +
->  	asm volatile(
->  "	sevl\n"
->  "1:	wfe\n"
-> @@ -148,6 +154,7 @@ static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
->  
->  static inline int arch_spin_is_locked(arch_spinlock_t *lock)
->  {
-> +	smp_mb(); /* See arch_spin_unlock_wait */
->  	return !arch_spin_value_unlocked(READ_ONCE(*lock));
->  }
->  
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+
+  Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 0106d456c4cb1770253fefc0ab23c9ca760b43f7:
+
+  arm64: mm: always take dirty state from new pte in ptep_set_access_flags (2016-06-08 10:23:44 +0100)
+
+----------------------------------------------------------------
+arm64 fix:
+
+- Fix an issue where we fail to fault in old pages on a write when
+  CONFIG_ARM64_HW_AFDBM is enabled
+
+----------------------------------------------------------------
+Will Deacon (1):
+      arm64: mm: always take dirty state from new pte in ptep_set_access_flags
+
+ arch/arm64/mm/fault.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
