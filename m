@@ -1,37 +1,150 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 10 Jun 2016 10:38:28 +0200
-Subject: [PATCH/RFC v3 02/22] soc: renesas: Add R-Car RST driver
-In-Reply-To: <CAMuHMdUX=iAe=51+8JyaKxMBOUA_jJXGK0BTKxRuTXtug_R1Tw@mail.gmail.com>
-References: <1464808880-343-1-git-send-email-geert+renesas@glider.be>
- <1464808880-343-3-git-send-email-geert+renesas@glider.be>
- <d38d97fb-5b96-0773-abf6-c737b4f2fef1@de.bosch.com>
- <CAMuHMdUX=iAe=51+8JyaKxMBOUA_jJXGK0BTKxRuTXtug_R1Tw@mail.gmail.com>
-Message-ID: <fd389ff9-7863-b848-0e14-ca7241f44f6e@de.bosch.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Fri, 10 Jun 2016 10:47:35 +0200
+Subject: [PATCH 1/5] soc: qcom: Add suspend to idle support
+In-Reply-To: <20160609180902.GJ13357@hector.attlocal.net>
+References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
+ <1463634020-17252-2-git-send-email-andy.gross@linaro.org>
+ <CAPDyKFrAGVPkc=ycm-cQg6Y5NLx_d4xGeg8SaSiB-K5sxtv76A@mail.gmail.com>
+ <20160609180902.GJ13357@hector.attlocal.net>
+Message-ID: <CAPDyKFp=qR=5q5O5RmtG0SQUma9BdgUrvGL9GyxdrpgiH24TeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.06.2016 09:58, Geert Uytterhoeven wrote:
-> Hi Dirk,
->
-> On Thu, Jun 2, 2016 at 7:42 AM, Dirk Behme <dirk.behme@de.bosch.com> wrote:
->>> +int __init rcar_rst_read_mode_pins(u32 *mode)
+On 9 June 2016 at 20:09, Andy Gross <andy.gross@linaro.org> wrote:
+> On Thu, Jun 09, 2016 at 09:39:34AM +0200, Ulf Hansson wrote:
+>> + Daniel
 >>
->> Just a style issue: Is the string 'pins' in the function name still
->> relevant? I.e. what's about just 'rcar_rst_read_mode()'?
+>> On 19 May 2016 at 07:00, Andy Gross <andy.gross@linaro.org> wrote:
+>> > This patch adds suspend to idle support for Qualcomm processors.  While
+>> > suspend to memory will be a valid state, there won't be any special
+>> > handling or power savings over the suspend to idle.
+>> >
+>> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+>> > ---
+>> >  drivers/soc/qcom/Makefile  |  1 +
+>> >  drivers/soc/qcom/suspend.c | 77 ++++++++++++++++++++++++++++++++++++++++++++++
+>> >  2 files changed, 78 insertions(+)
+>> >  create mode 100644 drivers/soc/qcom/suspend.c
+>> >
+>> > diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+>> > index fdd664e..7c479d3 100644
+>> > --- a/drivers/soc/qcom/Makefile
+>> > +++ b/drivers/soc/qcom/Makefile
+>> > @@ -7,3 +7,4 @@ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+>> >  obj-$(CONFIG_QCOM_SMP2P)       += smp2p.o
+>> >  obj-$(CONFIG_QCOM_SMSM)        += smsm.o
+>> >  obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
+>> > +obj-$(CONFIG_SUSPEND)  +=      suspend.o
+>> > diff --git a/drivers/soc/qcom/suspend.c b/drivers/soc/qcom/suspend.c
+>> > new file mode 100644
+>> > index 0000000..7d3f2dd
+>> > --- /dev/null
+>> > +++ b/drivers/soc/qcom/suspend.c
+>> > @@ -0,0 +1,77 @@
+>> > +/*
+>> > + * (C) Copyright 2016 Linaro Ltd.
+>> > + *
+>> > + * This program is free software; you can redistribute it and/or
+>> > + * modify it under the terms of the GNU General Public License
+>> > + * as published by the Free Software Foundation; version 2
+>> > + * of the License.
+>> > + */
+>> > +#include <linux/module.h>
+>> > +#include <linux/of.h>
+>> > +#include <linux/cpuidle.h>
+>> > +#include <linux/suspend.h>
+>> > +
+>> > +
+>> > +static void qcom_pm_enter_freeze(struct cpuidle_device *dev,
+>> > +       struct cpuidle_driver *drv,
+>> > +       int index)
+>> > +{
+>> > +       drv->states[index].enter(dev, drv, index);
+>> > +}
+>> > +
+>> > +static const struct of_device_id qcom_idle_state_match[] = {
+>> > +       { .compatible = "qcom,idle-state-spc", },
+>> > +       { },
+>> > +};
+>> > +
+>> > +static const struct platform_suspend_ops qcom_suspend_ops = {
+>> > +       .valid          = suspend_valid_only_mem,
+>> > +};
+>> > +
+>> > +static int __init qcom_pm_init(void)
+>> > +{
+>> > +       struct cpuidle_device *cpu_dev;
+>> > +       struct cpuidle_driver *cpu_drv;
+>> > +       int state_count;
+>> > +       struct device_node *state_np, *cpu_np;
+>> > +       const struct of_device_id *match;
+>> > +       int i;
+>> > +
+>> > +       /* configure CPU enter_freeze if applicable */
+>> > +       for_each_present_cpu(i) {
+>> > +               cpu_np = of_get_cpu_node(i, NULL);
+>> > +               cpu_dev = per_cpu_ptr(cpuidle_devices, i);
+>> > +               cpu_drv = cpuidle_get_cpu_driver(cpu_dev);
+>> > +
+>> > +               if (!cpu_dev || !cpu_drv) {
+>> > +                       of_node_put(cpu_np);
+>> > +                       return -EPROBE_DEFER;
+>>
+>> This isn't a driver, so returning -EPROBE_DEFER doesn't make sense.
 >
-> I feel "mode" is a too generic word for a public API.
-> It's used a several contexts inside the RST module (secure mode, 64-bit
-> addressing mode, free-running mode, step-up mode).
+> Right.  It's not like it'll get retried.
+>
+>> > +               }
+>> > +
+>> > +               state_count = 0;
+>> > +               state_np = of_parse_phandle(cpu_np, "cpu-idle-states",
+>> > +                                                 state_count);
+>> > +
+>> > +               while (state_np) {
+>> > +                       match = of_match_node(qcom_idle_state_match,
+>> > +                                             state_np);
+>> > +
+>> > +                       state_count++;
+>> > +                       if (match)
+>> > +                               cpu_drv->states[state_count].enter_freeze =
+>> > +                                               &qcom_pm_enter_freeze;
+>> > +                       of_node_put(state_np);
+>> > +
+>> > +                       state_np = of_parse_phandle(cpu_np, "cpu-idle-states",
+>> > +                                                   state_count);
+>> > +               }
+>> > +
+>> > +               of_node_put(cpu_np);
+>> > +       }
+>> > +
+>> > +       suspend_set_ops(&qcom_suspend_ops);
+>>
+>> I don't think this will work!
+>>
+>> When building a multi defconfig for ARM, you might overwrite the
+>> suspend_ops (there's only one set) as here you don't know that it's
+>> actually the QCOM platform that is running, right!?
+>>
+>> Perhaps this code actually belongs closer to the cpuidle driver?
+>
+> Hmmmm, I might have to get creative.  I originally had a DT entry for the pm,
+> but that doesn't make sense as this is purely a software construct.  The db410c
+> uses the arm cpuidle driver so I can't really hook it in there.  I'll have to
+> come up with something else.
 
-What's about
+I did a little research.
 
-rcar_rst_read_mode_monitor()
+I think you should be able to use the struct cpuidle_ops->init()
+callback. This is being invoked when the arm cpuidle driver is
+initialized.
 
-then?
+arm_idle_init()
+  ->arm_cpuidle_init()
+     ->cpuidle_ops->init()
 
-Taken from the manual ;)
+In the QCOM case, it's the spm driver that registers these cpuidle_ops
+(drivers/soc/qcom/spm.c). If you fold in the code from $subject patch
+in qcom_cpuidle_init(), that should work I think.
 
-
-Best regards
-
-Dirk
+Kind regards
+Uffe
