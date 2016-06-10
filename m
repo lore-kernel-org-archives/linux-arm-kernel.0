@@ -1,57 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 10 Jun 2016 15:56:22 +0100
-Subject: [PATCH v2 3/4] mfd: axp20x: Add axp20x-usb-power-supply for
- axp22x pmics
-In-Reply-To: <1464887936-17020-3-git-send-email-hdegoede@redhat.com>
+Date: Fri, 10 Jun 2016 15:57:45 +0100
+Subject: [PATCH v2 2/4] mfd: axp20x: Extend axp22x_volatile_ranges
+In-Reply-To: <1464887936-17020-2-git-send-email-hdegoede@redhat.com>
 References: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
- <1464887936-17020-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160610145622.GB7351@dell>
+ <1464887936-17020-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160610145745.GC7351@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 02 Jun 2016, Hans de Goede wrote:
 
-> Add axp20x-usb-power-supply for axp22x pmics.
+> The axp22x pmic has a bunch of volatile registers besides the interrupt
+> ones, extend axp22x_volatile_ranges with these.
 > 
 > Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > ---
 > Changes in v2:
-> -Change compatible string for axp22x usb-power-supply cell to match v2 of:
->  "power: axp20x_usb: Add support for usb power-supply on axp22x pmics"
+> -Added Chen-Yu's Acked-by
 > ---
->  drivers/mfd/axp20x.c | 10 ++++++++++
->  1 file changed, 10 insertions(+)
+>  drivers/mfd/axp20x.c | 3 +++
+>  1 file changed, 3 insertions(+)
 
 Applied, thanks.
 
 > diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
-> index ca04361..6364dab 100644
+> index e4e3297..ca04361 100644
 > --- a/drivers/mfd/axp20x.c
 > +++ b/drivers/mfd/axp20x.c
-> @@ -160,6 +160,11 @@ static struct resource axp20x_usb_power_supply_resources[] = {
->  	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
+> @@ -93,7 +93,10 @@ static const struct regmap_range axp22x_writeable_ranges[] = {
 >  };
 >  
-> +static struct resource axp22x_usb_power_supply_resources[] = {
-> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
-> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
-> +};
-> +
->  static struct resource axp22x_pek_resources[] = {
->  	{
->  		.name   = "PEK_DBR",
-> @@ -527,6 +532,11 @@ static struct mfd_cell axp22x_cells[] = {
->  		.resources		= axp22x_pek_resources,
->  	}, {
->  		.name			= "axp20x-regulator",
-> +	}, {
-> +		.name		= "axp20x-usb-power-supply",
-> +		.of_compatible	= "x-powers,axp221-usb-power-supply",
-> +		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
-> +		.resources	= axp22x_usb_power_supply_resources,
->  	},
+>  static const struct regmap_range axp22x_volatile_ranges[] = {
+> +	regmap_reg_range(AXP20X_PWR_INPUT_STATUS, AXP20X_PWR_OP_MODE),
+>  	regmap_reg_range(AXP20X_IRQ1_EN, AXP20X_IRQ5_STATE),
+> +	regmap_reg_range(AXP22X_GPIO_STATE, AXP22X_GPIO_STATE),
+> +	regmap_reg_range(AXP20X_FG_RES, AXP20X_FG_RES),
 >  };
 >  
+>  static const struct regmap_access_table axp22x_writeable_table = {
 
 -- 
 Lee Jones
