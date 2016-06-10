@@ -1,50 +1,100 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 10 Jun 2016 18:39:56 +0200
-Subject: [PATCH v3 08/20] pwm: Add PWM Capture support
-In-Reply-To: <20160610143854.GE1537@dell>
-References: <20160608092135.21184-1-lee.jones@linaro.org>
- <20160608092135.21184-9-lee.jones@linaro.org>
- <20160610135302.GK27142@ulmo.ba.sec> <20160610143854.GE1537@dell>
-Message-ID: <20160610163956.GA8696@ulmo.ba.sec>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Fri, 10 Jun 2016 11:47:21 -0500
+Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
+In-Reply-To: <20160610162555.GB6430@leverpostej>
+References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
+ <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
+ <20160610154857.GA6430@leverpostej>
+ <20160610161234.GO13357@hector.attlocal.net>
+ <20160610162555.GB6430@leverpostej>
+Message-ID: <20160610164721.GP13357@hector.attlocal.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 03:38:54PM +0100, Lee Jones wrote:
-> On Fri, 10 Jun 2016, Thierry Reding wrote:
-> 
-> > On Wed, Jun 08, 2016 at 10:21:23AM +0100, Lee Jones wrote:
-> > > Supply a PWM Capture call-back Op in order to pass back
-> > > information obtained by running analysis on PWM a signal.
-> > > This would normally (at least during testing) be called from
-> > > the Sysfs routines with a view to printing out PWM Capture
-> > > data which has been encoded into a string.
+On Fri, Jun 10, 2016 at 05:25:55PM +0100, Mark Rutland wrote:
+> On Fri, Jun 10, 2016 at 11:12:34AM -0500, Andy Gross wrote:
+> > On Fri, Jun 10, 2016 at 04:48:57PM +0100, Mark Rutland wrote:
+> > > [+ Lorenzo]
 > > > 
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/pwm/core.c  | 27 +++++++++++++++++++++++++++
-> > >  include/linux/pwm.h | 25 +++++++++++++++++++++++++
-> > >  2 files changed, 52 insertions(+)
+> > > On Thu, May 19, 2016 at 12:00:18AM -0500, Andy Gross wrote:
+> > > > This patch adds the qcom,idle-state-spc compatible to the SPC idle
+> > > > state.  This compatible indicates that the state is one which supports
+> > > > freeze.
+> > > > 
+> > > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
+> > > > ---
+> > > >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
+> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > > 
+> > > > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > > > index 208af00..032e411 100644
+> > > > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > > > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> > > > @@ -104,7 +104,7 @@
+> > > >  
+> > > >  		idle-states {
+> > > >  			CPU_SPC: spc {
+> > > > -				compatible = "arm,idle-state";
+> > > > +				compatible = "qcom,idle-state-spc", "arm,idle-state";
+> > > >  				arm,psci-suspend-param = <0x40000002>;
+> > > >  				entry-latency-us = <130>;
+> > > >  				exit-latency-us = <150>;
+> > > 
+> > > This looks suspicious.
+> > > 
+> > > This is a PSCI idle state, and we have a PSCI driver driven by the
+> > > generic ARM cpuidle driver.
+> > > 
+> > > Why do we need a qcom-specific compatible here?
+> > > 
+> > > Surely we should be able to use the idle code in a generic fashion to
+> > > driver suspend-to-idle?
+> > 
+> > We need a way to identify specific idle states that support suspend-to-idle.  In
+> > addition, when we have identified the states, we may have to configure the
+> > enter_freeze() function.
 > 
-> So do you want me to re-spin?
+> Could you elaborate on what you mean by a state supporting
+> suspend-to-idle? It was my understanding that any idle state should
+> function for suspend-to-idle (and the choice of state is potentially
+> subjective).
+
+when you freeze the system, cpuidle will try to find the deepest state which
+supports freeze (by checking if a enter_freeze() exists).  If it does exist,
+then the tick is frozen and the enter_freeze is called as each cpu goes idle.
+
+If no enter_freeze exists, the system will suspend, but will continue to have
+interrupts occur due to the tick and other bookkeeping stuff.
+
 > 
-> Before you said you'd make adjustments on patches 8 through 10, so I'm
-> a little confused.
+> > I chose to do this outside of the arm cpuidle driver because I didn't want to
+> > add any more DT information aside from the compatible, and I needed a separate
+> > place for the Qualcomm specific suspend code. 
+> 
+> Which suspend code is Qualcomm-specific? There shouldn't be anything on
+> the PSCI side, so I can only imagine that device management is left.
+> What am I missing?
 
-Yeah, I only realized that it might be quicker to make these adjustments
-myself when I had finished looking at patch 10. I've pushed the adjusted
-patches to a for-4.8/pwm-capture branch, so if you're going to re-spin
-the remainder of the patches, perhaps that could be your base?
+Qualcomm won't be supporting the psci suspend feature and will be doing their
+own thing.  As such, they need their own suspend ops.  In addition, we have
+platforms that don't use psci (32 bit).
 
-	https://git.kernel.org/cgit/linux/kernel/git/thierry.reding/linux-pwm.git/log/?h=for-4.8/pwm-capture
+> > With the compatible, this makes
+> > my 32 and 64 bit processor suspend code identical, as we have our own cpuidle
+> > driver for the 32 bit procs.
+> > 
+> > An alternative would be to add some facilities to communicate this to the arm
+> > cpuidle driver and configure the enter_freeze() function at some later point.
+> 
+> I would prefer that suspend-to-idle using PSCI occurred via the generic
+> PSCI and cpuidle code. I am happy to extend that code if there is
+> something lacking, and I would prefer to not have platform-specific
+> hooks.
 
-If you don't have any objections I can put those into linux-next early
-next week.
+Right, I briefly looked at that in the beginning and decided against it.  But if
+we can at least add some way to identify freezeable idle states and configure
+the freeze function, that'd cover all the requirements.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/8a1b8e15/attachment.sig>
+Regards,
+
+Andy
