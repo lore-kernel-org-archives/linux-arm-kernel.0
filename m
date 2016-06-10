@@ -1,25 +1,25 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:13 +0200
-Subject: [PATCH 10/48] ARM: dts: at91: kizbox: use TCB0 as clocksource
+Date: Sat, 11 Jun 2016 00:03:15 +0200
+Subject: [PATCH 12/48] ARM: dts: at91: ge863-pro3: use TCB0 as clocksource
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-11-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-13-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
 
-Cc: Antoine Aubert <a.aubert@overkiz.com>
+Cc: Fabio Porcedda <fabio.porcedda@gmail.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-kizbox.dts | 12 ++++++++++++
+ arch/arm/boot/dts/ge863-pro3.dtsi | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index 229e989eb60d..58c5d0d3dd66 100644
---- a/arch/arm/boot/dts/at91-kizbox.dts
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -31,6 +31,18 @@
+diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
+index 0d0e62489d93..6b5eb285b072 100644
+--- a/arch/arm/boot/dts/ge863-pro3.dtsi
++++ b/arch/arm/boot/dts/ge863-pro3.dtsi
+@@ -27,6 +27,18 @@
  
  	ahb {
  		apb {
@@ -35,8 +35,8 @@ index 229e989eb60d..58c5d0d3dd66 100644
 +				};
 +			};
 +
- 			macb0: ethernet at fffc4000 {
- 				phy-mode = "mii";
- 				pinctrl-0 = <&pinctrl_macb_rmii
+ 			dbgu: serial at fffff200 {
+ 				status = "okay";
+ 			};
 -- 
 2.8.1
