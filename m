@@ -1,80 +1,101 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Jun 2016 17:31:53 +0100
-Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
-In-Reply-To: <20160610161234.GO13357@hector.attlocal.net>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
- <20160610154857.GA6430@leverpostej>
- <20160610161234.GO13357@hector.attlocal.net>
-Message-ID: <20160610163153.GA23743@red-moon>
+From: stuart.yoder@nxp.com (Stuart Yoder)
+Date: Fri, 10 Jun 2016 16:34:13 +0000
+Subject: ARM physical memory map recommendation? (was RE: [RFC] arm64:
+ defconfig: enable 48-bit VA by default)
+Message-ID: <HE1PR04MB16416EEC1B49328C2C6F43FB8D500@HE1PR04MB1641.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 11:12:34AM -0500, Andy Gross wrote:
-> On Fri, Jun 10, 2016 at 04:48:57PM +0100, Mark Rutland wrote:
-> > [+ Lorenzo]
-> > 
-> > On Thu, May 19, 2016 at 12:00:18AM -0500, Andy Gross wrote:
-> > > This patch adds the qcom,idle-state-spc compatible to the SPC idle
-> > > state.  This compatible indicates that the state is one which supports
-> > > freeze.
-> > > 
-> > > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > > ---
-> > >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > 
-> > > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > index 208af00..032e411 100644
-> > > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > > @@ -104,7 +104,7 @@
-> > >  
-> > >  		idle-states {
-> > >  			CPU_SPC: spc {
-> > > -				compatible = "arm,idle-state";
-> > > +				compatible = "qcom,idle-state-spc", "arm,idle-state";
-> > >  				arm,psci-suspend-param = <0x40000002>;
-> > >  				entry-latency-us = <130>;
-> > >  				exit-latency-us = <150>;
-> > 
-> > This looks suspicious.
-> > 
-> > This is a PSCI idle state, and we have a PSCI driver driven by the
-> > generic ARM cpuidle driver.
-> > 
-> > Why do we need a qcom-specific compatible here?
-> > 
-> > Surely we should be able to use the idle code in a generic fashion to
-> > driver suspend-to-idle?
-> 
-> We need a way to identify specific idle states that support
-> suspend-to-idle.  In addition, when we have identified the states, we
-> may have to configure the enter_freeze() function.
-> 
-> I chose to do this outside of the arm cpuidle driver because I didn't
-> want to add any more DT information aside from the compatible, and I
-> needed a separate place for the Qualcomm specific suspend code.  With
-> the compatible, this makes my 32 and 64 bit processor suspend code
-> identical, as we have our own cpuidle driver for the 32 bit procs.
-> 
-> An alternative would be to add some facilities to communicate this to
-> the arm cpuidle driver and configure the enter_freeze() function at
-> some later point.
 
-(1) enter_freeze() hooks are not strictly necessary to enable
-    suspend-to-idle (they are if we want the tick to be frozen
-    on suspend-to-idle, which is different)
-(2) If I understand your code correctly you have to set the suspend
-    ops hook to make sure suspend-to-idle is enabled. This is a core
-    code issue rather than anything else, given that suspend-to-idle
-    (hey it is based on CPUidle !) does NOT rely on suspend ops to
-    function.
+> -----Original Message-----
+> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
+> Sent: Friday, July 31, 2015 8:23 AM
+> To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Mark Rutland <mark.rutland@arm.com>; Marc Zyngier <marc.zyngier@arm.com>; Will Deacon
+> <Will.Deacon@arm.com>; Stuart Yoder <stuart.yoder@freescale.com>; Peter Newton
+> <Peter.Newton@freescale.com>; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
+> 
+> On Fri, Jul 31, 2015 at 03:10:39PM +0200, Ard Biesheuvel wrote:
+> > On 31 July 2015 at 14:53, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > On Thu, Jul 30, 2015 at 09:27:03PM +0200, Ard Biesheuvel wrote:
+> > >> On 30 July 2015 at 12:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > >> > On Wed, Jul 29, 2015 at 08:49:57PM +0000, Stuart Yoder wrote:
+> > >> >> > From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
+> > >> [...]
+> > >> >> > To be honest, I think this is poorly designed, and I am not sure we
+> > >> >> > should cater for such configurations in the defconfig.
+> > >> >>
+> > >> >> Agree, if this is a one-off weird platform then we shouldn't.
+> > >> >>
+> > >> >> But, the 'Principles of ARM Memory Maps' doc proposes this:
+> > >> >> 2 GB at 0x8000_0000
+> > >> >> 30 GB at 0x8_8000_0000
+> > >> >> 480 GB at 0x88_0000_0000
+> > >> >
+> > >> > I'm not particularly recommending this layout, at least not without some
+> > >> > clarifications on DRAM aliases (I'll ping people internally about it
+> > >> > again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
+> > >> > and all the memory beyond 32-bit was highmem anyway. It was later
+> > >> > updated for AArch64 but only to allow 44/48-bit PA (a few sections
+> > >> > added).
+> > >>
+> > >> As an aside, is there any reason why the direct mapping *must* be a
+> > >> linear mapping?
+> > >> Other than the performance concerns regarding
+> > >> phys_to_virt/virt_to_phys, I mean?
+> > >
+> > > Mostly performance concerns. You could compact the physical range into a
+> > > smaller virtual one but the conversion will be costly, especially if you
+> > > want to make it multi-platform (having to look-up memory ranges,
+> > > memblock offsets). This would affect page table entry setup, code that
+> > > requires a page structure (like virt_to_page) and anything else doing
+> > > the virt/phys conversion.
+> > >
+> > > I tried something like that for RealView PBX in the past but it was
+> > > hard-coded (no multi-platform at the time). See
+> > > arch/arm/mach-realview/include/mach/memory.h.
+> >
+> > Yes, that looks vaguely like what I had in mind.
+> >
+> > IOW, we could partition the direct mapping just like the ARM
+> > recommendation, i.e.,
+> >
+> > 0 - 2 GB
+> > 2 - 32 GB
+> > 32 - 512 GB
+> >
+> > but default to 1:1 correspondence, so that
+> >
+> > PHYS_OFFSET = PHYS_OFFSET0 = memstart_addr
+> > PHYS_OFFSET1 = memstart_addr + 2 GB
+> > PHYS_OFFSET2 = memstart_addr + 32 GB
+> >
+> > and only if the ARM recommended physical memory map is detected (with
+> > memstart_addr @ 0x8000_0000), switch to
+> >
+> > PHYS_OFFSET = PHYS_OFFSET0 = memstart_addr
+> > PHYS_OFFSET1 = memstart_addr + 30 GB
+> > PHYS_OFFSET2 = memstart_addr + 480 GB
+> 
+> I don't really like such complexity when all you need on arm64 is to
+> enable 48-bit VA (though it would be interesting to benchmark it).
+> 
+> > I guess such a special case would be out of the question for one-off
+> > crazy designs like Freescale, but since this is the layout recommended
+> > by ARM itself, I suppose we could try and support it a bit better.
+> 
+> I'm trying to get the layout fixed before it spreads any further ;).
 
-So the gist is: as far as I am concerned you do not need any of this
-code to enable (yes you need PSCI idle states but no
-qcom,idle-state-spc compatible string whatsoever) suspend-to-idle
-on ARM64 on top of PSCI, let me know what I am missing.
+Hi Catalin, in this very old thread there was the intent on your side
+to revisit the physical address layout recommended in the 'Principles of ARM
+Memory Maps' whitepaper.  Has anything happened or changed in the
+last ~1 year.  Does ARM have recommendations?  SBSA doesn't 
+mandate anything as far as I can see.
+
+We have the opportunity to influences some future designs and wanted to
+see if ARM has recommendations.  In particular, what is the status of
+the recommendations in 'Principles of ARM Memory Maps'?
 
 Thanks,
-Lorenzo
+Stuart
