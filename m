@@ -1,29 +1,28 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:31 +0200
-Subject: [PATCH 28/48] ARM: dts: at91: cosino: use TCB0 as clocksource
+Date: Sat, 11 Jun 2016 00:03:34 +0200
+Subject: [PATCH 31/48] ARM: dts: at91: sama5d3xek; use TCB0 as clocksource
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-29-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-32-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
+Use tcb0 as the clocksource like previously selected in sama5_defconfig.
 
-Cc: Rodolfo Giometti <giometti@linux.it>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/boot/dts/at91-cosino.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/sama5d3xcm.dtsi | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/at91-cosino.dtsi b/arch/arm/boot/dts/at91-cosino.dtsi
-index b6ea3f4a7206..0cbab6f588b7 100644
---- a/arch/arm/boot/dts/at91-cosino.dtsi
-+++ b/arch/arm/boot/dts/at91-cosino.dtsi
-@@ -46,6 +46,18 @@
+diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+index 2cf9c3611db6..90d36b755858 100644
+--- a/arch/arm/boot/dts/sama5d3xcm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+@@ -35,6 +35,18 @@
+ 				cs-gpios = <&pioD 13 0>, <0>, <0>, <0>;
+ 			};
  
- 	ahb {
- 		apb {
-+			tcb0: timer at f8008000 {
++			tcb0: timer at f0010000 {
 +				timer at 0 {
 +					compatible = "atmel,tcb-clksrc";
 +					reg = <0>;
@@ -35,8 +34,8 @@ index b6ea3f4a7206..0cbab6f588b7 100644
 +				};
 +			};
 +
- 			mmc0: mmc at f0008000 {
- 				pinctrl-0 = <
- 					&pinctrl_board_mmc0
+ 			macb0: ethernet at f0028000 {
+ 				phy-mode = "rgmii";
+ 				#address-cells = <1>;
 -- 
 2.8.1
