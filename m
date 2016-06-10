@@ -1,115 +1,58 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 10 Jun 2016 10:56:22 +0200
-Subject: [PATCH 7/7] ARM: dts: sun7i: Enable NAND on Wexler TAB7200
-In-Reply-To: <20160609111100.38931fbe05fda9be7a355836@gmail.com>
-References: <1465208664-9366-1-git-send-email-mamlinav@gmail.com>
- <1465208664-9366-8-git-send-email-mamlinav@gmail.com>
- <20160608220314.GL14179@lukather>
- <20160609111100.38931fbe05fda9be7a355836@gmail.com>
-Message-ID: <20160610085622.GO5242@lukather>
+From: Wenyou.Yang@atmel.com (Yang, Wenyou)
+Date: Fri, 10 Jun 2016 08:58:41 +0000
+Subject: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
+ suspend
+In-Reply-To: <Pine.LNX.4.44L0.1606081352250.2191-100000@iolanthe.rowland.org>
+References: <1465359311-14544-2-git-send-email-wenyou.yang@atmel.com>
+ <Pine.LNX.4.44L0.1606081352250.2191-100000@iolanthe.rowland.org>
+Message-ID: <B256D81BAE5131468A838E5D7A24364101650BA1DB@penmbx01>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 11:11:00AM +0300, Aleksei Mamlin wrote:
-> On Thu, 9 Jun 2016 00:03:14 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > Hi,
-> > 
-> > On Mon, Jun 06, 2016 at 01:24:24PM +0300, Aleksei Mamlin wrote:
-> > > Enable the NFC and describe the NAND flash connected to this controller.
-> > > 
-> > > Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
-> > > ---
-> > >  arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts | 41 ++++++++++++++++++++++++++
-> > >  1 file changed, 41 insertions(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> > > index 2f6b21a..42aff91 100644
-> > > --- a/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> > > +++ b/arch/arm/boot/dts/sun7i-a20-wexler-tab7200.dts
-> > > @@ -159,6 +159,47 @@
-> > >  	status = "okay";
-> > >  };
-> > >  
-> > > +&nfc {
-> > > +	pinctrl-names = "default";
-> > > +	pinctrl-0 = <&nand_pins_a>, <&nand_cs0_pins_a>, <&nand_rb0_pins_a>;
-> > > +	status = "okay";
-> > > +
-> > > +	nand at 0 {
-> > > +		#address-cells = <2>;
-> > > +		#size-cells = <2>;
-> > > +		reg = <0>;
-> > > +		allwinner,rb = <0>;
-> > > +
-> > > +		nand-ecc-mode = "hw";
-> > > +		nand-on-flash-bbt;
-> > > +
-> > > +		boot0 at 0 {
-> > > +			label = "boot0";
-> > > +			reg = /bits/ 64 <0x0 0x200000>;
-> > > +		};
-> > > +
-> > > +		boot0-rescue at 200000 {
-> > > +			label = "boot0-rescue";
-> > > +			reg = /bits/ 64 <0x200000 0x200000>;
-> > > +		};
-> > > +
-> > > +		uboot at 400000 {
-> > > +			label = "uboot";
-> > > +			reg = /bits/ 64 <0x400000 0x200000>;
-> > > +		};
-> > > +
-> > > +		uboot-rescue at 600000 {
-> > > +			label = "uboot-rescue";
-> > > +			reg = /bits/ 64 <0x600000 0x200000>;
-> > > +		};
-> > > +
-> > > +		main at 800000 {
-> > > +			label = "main";
-> > > +			reg = /bits/ 64 <0x800000 0xff800000>;
-> > > +		};
-> > > +	};
-> > > +};
-> > 
-> > This feels a bit premature. The two boards you're using have an MLC
-> > NAND which is not supported yet. Until there's proper MLC support in
-> > the kernel, I'm not sure we want to enable that for end-users when we
-> > know that things will get wrong.
-> > 
-> > However, after discussing this with Boris, I appreciate that we don't
-> > have any example available because of this policy for people that want
-> > to opt-in anyway.
-> > 
-> > What we could do is to still mark the status as disabled in the DTS,
-> > with a big fat warning as comment just before, so that it requires
-> > user action, and that user will have been warned.
-> > 
-> > Would that work for you?
-> > Maxime
-> > 
-> 
-> Let's drop this two patches with boards dts changes until we get proper MLC
-> support in kernel.
-> 
-> As for examples - I'll update linux-sunxi wiki with how to enable NAND 
-> controller and describe NAND chips in DTS. People who want to add NAND support 
-> to their boards will be warned that it is risky for now.
+Hi Alan, 
 
-That works for me too.
+> -----Original Message-----
+> From: Alan Stern [mailto:stern at rowland.harvard.edu]
+> Sent: 2016?6?9? 3:14
+> To: Yang, Wenyou <Wenyou.Yang@atmel.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>; Ferre, Nicolas
+> <Nicolas.FERRE@atmel.com>; Rob Herring <robh+dt@kernel.org>; Pawel Moll
+> <pawel.moll@arm.com>; Mark Brown <broonie@kernel.org>; Ian Campbell
+> <ijc+devicetree@hellion.org.uk>; Kumar Gala <galak@codeaurora.org>;
+> Alexandre Belloni <alexandre.belloni@free-electrons.com>; Kernel development
+> list <linux-kernel@vger.kernel.org>; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; USB list <linux-usb@vger.kernel.org>
+> Subject: Re: [PATCH v3 1/2] usb: ohci-at91: Forcibly suspend ports while USB
+> suspend
+> 
+> On Wed, 8 Jun 2016, Wenyou Yang wrote:
+> 
+> > In order to the save power consumption, as a workaround, suspend
+> > forcibly the USB PORTA/B/C via set the SUSPEND_A/B/C bits of OHCI
+> > Interrupt Configuration Register in the SFRs while OHCI USB suspend.
+> >
+> > This suspend operation must be done before the USB clock is disabled,
+> > resume after the USB clock is enabled.
+> >
+> > Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
+> > ---
+> 
+> You never answered the questions I posted for the first version of this
+> patch:
+> 
+> What does this mean?  What does suspending a port do?  Is it the same as a
+> normal USB port suspend?
+> 
+> If it is the same, why doesn't the USB_PORT_FEAT_SUSPEND subcase of the
+> SetPortFeature case in ohci_hub_control() already take care of this?
 
-Thanks!
-Maxime
+I remembered I answered your questions, http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/429245.html
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/111f7567/attachment.sig>
+Maybe not very clear.
+
+> 
+> Alan Stern
+
+
+Best Regards,
+Wenyou Yang
