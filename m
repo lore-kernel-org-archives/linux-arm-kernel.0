@@ -1,139 +1,181 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 10 Jun 2016 16:19:44 +0100
-Subject: [PATCH] arm64: cpuinfo: Expose MIDR_EL1 and REVIDR_EL1 to sysfs
-Message-ID: <1465571984-18776-1-git-send-email-suzuki.poulose@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Jun 2016 17:21:09 +0200
+Subject: [PATCH v2 01/13] pwm: Add new helpers to create/manipulate PWM
+ states
+In-Reply-To: <1465403688-17098-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1465403688-17098-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1465403688-17098-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20160610152109.GQ27142@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steve Capper <steve.capper@linaro.org>
+On Wed, Jun 08, 2016 at 06:34:36PM +0200, Boris Brezillon wrote:
+> The pwm_prepare_new_state() helper prepares a new state object
+> containing the current PWM state except for the polarity and period
+> fields which are set to the reference values.
+> This is particurly useful for PWM users who want to apply a new
+> duty-cycle expressed relatively to the reference period without
+> changing the enable state.
+> 
+> The PWM framework expect PWM users to configure the duty cycle in
+> nanosecond, but most users just want to express this duty cycle
+> relatively to the period value (i.e. duty_cycle = 33% of the period).
+> Add pwm_{get,set}_relative_duty_cycle() helpers to ease this kind of
+> conversion.
 
-It can be useful for JIT software to be aware of MIDR_EL1 and
-REVIDR_EL1 to ascertain the presence of any core errata that could
-affect codegen.
+This looks pretty useful and good, though I think these could be two
+separate patches. A couple of suggestions on wording and such below.
 
-This patch exposes these registers through sysfs:
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+>  include/linux/pwm.h | 81 +++++++++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 81 insertions(+)
+> 
+> diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+> index 17018f3..e09babf 100644
+> --- a/include/linux/pwm.h
+> +++ b/include/linux/pwm.h
+> @@ -148,6 +148,87 @@ static inline void pwm_get_args(const struct pwm_device *pwm,
+>  }
+>  
+>  /**
+> + * pwm_prepare_new_state() - prepare a new state to be applied with
+> + *			     pwm_apply_state()
 
-/sys/devices/system/cpu/cpu$ID/identification/midr
-/sys/devices/system/cpu/cpu$ID/identification/revidr
+This is weirdly indented.
 
-where $ID is the cpu number. For big.LITTLE systems, one can have a
-mixture of cores (e.g. Cortex A53 and Cortex A57), thus all CPUs need
-to be enumerated.
+> + * @pwm: PWM device
+> + * @state: state to fill with the prepared PWM state
+> + *
+> + * This functions prepares a state that can later be tweaked and applied
+> + * to the PWM device with pwm_apply_state(). This is a convenient function
+> + * that first retrieves the current PWM state and the replaces the period
+> + * and polarity fields with the reference values defined in pwm->args.
+> + * Once the new state is created you can adjust the ->enable and ->duty_cycle
 
-If the kernel does not have valid information to populate these entries
-with, an empty string is returned to userspace.
+"created" has the connotation of allocating. Perhaps: "Once the function
+returns, you can adjust the ->enabled and ->duty_cycle fields according
+to your needs before calling pwm_apply_state()."?
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Steve Capper <steve.capper@linaro.org>
-[ Return error for access to !present CPU registers ]
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
-Changes since V2:
-  - Fix errno for failures (Spotted-by: Russell King)
-  - Roll back, if we encounter a missing cpu device
-  - Return error for access to registers of CPUs not present.
----
- arch/arm64/include/asm/cpu.h |  1 +
- arch/arm64/kernel/cpuinfo.c  | 69 ++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 70 insertions(+)
+Also note that the field is called ->enabled.
 
-diff --git a/arch/arm64/include/asm/cpu.h b/arch/arm64/include/asm/cpu.h
-index 13a6103..116a382 100644
---- a/arch/arm64/include/asm/cpu.h
-+++ b/arch/arm64/include/asm/cpu.h
-@@ -29,6 +29,7 @@ struct cpuinfo_arm64 {
- 	u32		reg_cntfrq;
- 	u32		reg_dczid;
- 	u32		reg_midr;
-+	u32		reg_revidr;
- 
- 	u64		reg_id_aa64dfr0;
- 	u64		reg_id_aa64dfr1;
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index c173d32..c2d0c42 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -212,6 +212,7 @@ static void __cpuinfo_store_cpu(struct cpuinfo_arm64 *info)
- 	info->reg_ctr = read_cpuid_cachetype();
- 	info->reg_dczid = read_cpuid(DCZID_EL0);
- 	info->reg_midr = read_cpuid_id();
-+	info->reg_revidr = read_cpuid(REVIDR_EL1);
- 
- 	info->reg_id_aa64dfr0 = read_cpuid(ID_AA64DFR0_EL1);
- 	info->reg_id_aa64dfr1 = read_cpuid(ID_AA64DFR1_EL1);
-@@ -264,3 +265,71 @@ void __init cpuinfo_store_boot_cpu(void)
- 	boot_cpu_data = *info;
- 	init_cpu_features(&boot_cpu_data);
- }
-+
-+#define CPUINFO_ATTR_RO(_name)							\
-+	static ssize_t show_##_name (struct device *dev,			\
-+			struct device_attribute *attr, char *buf)		\
-+	{									\
-+		struct cpuinfo_arm64 *info = &per_cpu(cpu_data, dev->id);	\
-+		if (!cpu_present(dev->id))					\
-+			return -ENODEV;						\
-+										\
-+		if (info->reg_midr)						\
-+			return sprintf(buf, "0x%016x\n", info->reg_##_name);	\
-+		else								\
-+			return 0;						\
-+	}									\
-+	static DEVICE_ATTR(_name, 0444, show_##_name, NULL)
-+
-+CPUINFO_ATTR_RO(midr);
-+CPUINFO_ATTR_RO(revidr);
-+
-+static struct attribute *cpuregs_attrs[] = {
-+	&dev_attr_midr.attr,
-+	&dev_attr_revidr.attr,
-+	NULL
-+};
-+
-+static struct attribute_group cpuregs_attr_group = {
-+	.attrs = cpuregs_attrs,
-+	.name = "identification"
-+};
-+
-+static int __init cpuinfo_regs_init(void)
-+{
-+	int cpu, finalcpu, ret;
-+	struct device *dev;
-+
-+	for_each_present_cpu(cpu) {
-+		dev = get_cpu_device(cpu);
-+
-+		if (!dev) {
-+			ret = -ENODEV;
-+			break;
-+		}
-+
-+		ret = sysfs_create_group(&dev->kobj, &cpuregs_attr_group);
-+		if (ret)
-+			break;
-+	}
-+
-+	if (!ret)
-+		return 0;
-+	/*
-+	 * We were unable to put down sysfs groups for all the CPUs, revert
-+	 * all the groups we have placed down s.t. none are visible.
-+	 * Otherwise we could give a misleading picture of what's present.
-+	 */
-+	finalcpu = cpu;
-+	for_each_present_cpu(cpu) {
-+		if (cpu == finalcpu)
-+			break;
-+		dev = get_cpu_device(cpu);
-+		if (dev)
-+			sysfs_remove_group(&dev->kobj, &cpuregs_attr_group);
-+	}
-+
-+	return ret;
-+}
-+
-+device_initcall(cpuinfo_regs_init);
--- 
-1.9.1
+> + * according to your need before calling pwm_apply_state().
+
+Maybe mention that the ->duty_cycle field is explicitly zeroed. Then
+again, do we really need it? If users are going to overwrite it anyway,
+do we even need to bother? I suppose it makes some sense because the
+current duty cycle is stale when the ->period gets set to the value from
+args. I think the documentation should mention this in some way.
+
+> + */
+> +static inline void pwm_prepare_new_state(const struct pwm_device *pwm,
+> +					 struct pwm_state *state)
+
+Perhaps choose a shorter name, such as: pwm_init_state()?
+
+> +{
+> +	struct pwm_args args;
+> +
+> +	/* First get the current state. */
+> +	pwm_get_state(pwm, state);
+> +
+> +	/* Then fill it with the reference config */
+> +	pwm_get_args(pwm, &args);
+> +
+> +	state->period = args.period;
+> +	state->polarity = args.polarity;
+> +	state->duty_cycle = 0;
+> +}
+> +
+> +/**
+> + * pwm_get_relative_duty_cycle() - Get a relative duty_cycle value
+> + * @state: the PWM state to extract period and duty_cycle from
+> + * @scale: the scale you want to use for you relative duty_cycle value
+
+Other kerneldoc comments in this file don't prefix the description with
+"the".
+
+Also, perhaps the following descriptions would be slightly less
+confusing:
+
+	@state: PWM state to extract the duty cycle from
+
+We don't extract (i.e. return) period from the state, so it's a little
+confusing to mention it here.
+
+	@scale: scale in which to return the relative duty cycle
+
+This is slightly more explicit in that it says what the returned duty
+cycle will be in. Perhaps as an alternative:
+
+	@scale: target scale of the relative duty cycle
+
+> + *
+> + * This functions converts the absolute duty_cycle stored in @state
+> + * (expressed in nanosecond) into a relative value.
+
+Perhaps: "... into a value relative to the period."?
+
+> + * For example if you want to get the duty_cycle expressed in nanosecond,
+
+The example below would give you the duty cycle in percent, not
+nanoseconds, right?
+
+> + * call:
+> + *
+> + * pwm_get_state(pwm, &state);
+> + * duty = pwm_get_relative_duty_cycle(&state, 100);
+> + */
+> +static inline unsigned int
+> +pwm_get_relative_duty_cycle(const struct pwm_state *state, unsigned int scale)
+> +{
+> +	if (!state->period)
+> +		return 0;
+> +
+> +	return DIV_ROUND_CLOSEST_ULL((u64)state->duty_cycle * scale,
+> +				     state->period);
+> +}
+> +
+> +/**
+> + * pwm_set_relative_duty_cycle() - Set a relative duty_cycle value
+> + * @state: the PWM state to fill
+> + * @val: the relative duty_cycle value
+> + * @scale: the scale you use for you relative duty_cycle value
+
+"scale in which @duty_cycle is expressed"?
+
+> + *
+> + * This functions converts a relative duty_cycle stored into an absolute
+> + * one (expressed in nanoseconds), and put the result in state->duty_cycle.
+> + * For example if you want to change configure a 50% duty_cycle, call:
+> + *
+> + * pwm_prepare_new_state(pwm, &state);
+> + * pwm_set_relative_duty_cycle(&state, 50, 100);
+> + * pwm_apply_state(pwm, &state);
+> + */
+> +static inline void
+> +pwm_set_relative_duty_cycle(struct pwm_state *state, unsigned int val,
+
+Any reason why we can't call "val" "duty_cycle"? That's what it is,
+after all.
+
+> +			    unsigned int scale)
+> +{
+> +	if (!scale)
+> +		return;
+> +
+> +	/* Make sure we don't have duty_cycle > period */
+> +	if (val > scale)
+> +		val = scale;
+
+Can we return -EINVAL for both of the above checks? I don't like
+silently clamping the duty cycle that the user passed in.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/a1491895/attachment.sig>
