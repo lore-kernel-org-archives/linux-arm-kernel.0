@@ -1,101 +1,50 @@
-From: stuart.yoder@nxp.com (Stuart Yoder)
-Date: Fri, 10 Jun 2016 16:34:13 +0000
-Subject: ARM physical memory map recommendation? (was RE: [RFC] arm64:
- defconfig: enable 48-bit VA by default)
-Message-ID: <HE1PR04MB16416EEC1B49328C2C6F43FB8D500@HE1PR04MB1641.eurprd04.prod.outlook.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Jun 2016 18:39:56 +0200
+Subject: [PATCH v3 08/20] pwm: Add PWM Capture support
+In-Reply-To: <20160610143854.GE1537@dell>
+References: <20160608092135.21184-1-lee.jones@linaro.org>
+ <20160608092135.21184-9-lee.jones@linaro.org>
+ <20160610135302.GK27142@ulmo.ba.sec> <20160610143854.GE1537@dell>
+Message-ID: <20160610163956.GA8696@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> -----Original Message-----
-> From: Catalin Marinas [mailto:catalin.marinas at arm.com]
-> Sent: Friday, July 31, 2015 8:23 AM
-> To: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>; Marc Zyngier <marc.zyngier@arm.com>; Will Deacon
-> <Will.Deacon@arm.com>; Stuart Yoder <stuart.yoder@freescale.com>; Peter Newton
-> <Peter.Newton@freescale.com>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC] arm64: defconfig: enable 48-bit VA by default
+On Fri, Jun 10, 2016 at 03:38:54PM +0100, Lee Jones wrote:
+> On Fri, 10 Jun 2016, Thierry Reding wrote:
 > 
-> On Fri, Jul 31, 2015 at 03:10:39PM +0200, Ard Biesheuvel wrote:
-> > On 31 July 2015 at 14:53, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > On Thu, Jul 30, 2015 at 09:27:03PM +0200, Ard Biesheuvel wrote:
-> > >> On 30 July 2015 at 12:13, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > >> > On Wed, Jul 29, 2015 at 08:49:57PM +0000, Stuart Yoder wrote:
-> > >> >> > From: Ard Biesheuvel [mailto:ard.biesheuvel at linaro.org]
-> > >> [...]
-> > >> >> > To be honest, I think this is poorly designed, and I am not sure we
-> > >> >> > should cater for such configurations in the defconfig.
-> > >> >>
-> > >> >> Agree, if this is a one-off weird platform then we shouldn't.
-> > >> >>
-> > >> >> But, the 'Principles of ARM Memory Maps' doc proposes this:
-> > >> >> 2 GB at 0x8000_0000
-> > >> >> 30 GB at 0x8_8000_0000
-> > >> >> 480 GB at 0x88_0000_0000
-> > >> >
-> > >> > I'm not particularly recommending this layout, at least not without some
-> > >> > clarifications on DRAM aliases (I'll ping people internally about it
-> > >> > again). The original layout pre-dates ARMv8, it was meant for ARMv7/LPAE
-> > >> > and all the memory beyond 32-bit was highmem anyway. It was later
-> > >> > updated for AArch64 but only to allow 44/48-bit PA (a few sections
-> > >> > added).
-> > >>
-> > >> As an aside, is there any reason why the direct mapping *must* be a
-> > >> linear mapping?
-> > >> Other than the performance concerns regarding
-> > >> phys_to_virt/virt_to_phys, I mean?
-> > >
-> > > Mostly performance concerns. You could compact the physical range into a
-> > > smaller virtual one but the conversion will be costly, especially if you
-> > > want to make it multi-platform (having to look-up memory ranges,
-> > > memblock offsets). This would affect page table entry setup, code that
-> > > requires a page structure (like virt_to_page) and anything else doing
-> > > the virt/phys conversion.
-> > >
-> > > I tried something like that for RealView PBX in the past but it was
-> > > hard-coded (no multi-platform at the time). See
-> > > arch/arm/mach-realview/include/mach/memory.h.
-> >
-> > Yes, that looks vaguely like what I had in mind.
-> >
-> > IOW, we could partition the direct mapping just like the ARM
-> > recommendation, i.e.,
-> >
-> > 0 - 2 GB
-> > 2 - 32 GB
-> > 32 - 512 GB
-> >
-> > but default to 1:1 correspondence, so that
-> >
-> > PHYS_OFFSET = PHYS_OFFSET0 = memstart_addr
-> > PHYS_OFFSET1 = memstart_addr + 2 GB
-> > PHYS_OFFSET2 = memstart_addr + 32 GB
-> >
-> > and only if the ARM recommended physical memory map is detected (with
-> > memstart_addr @ 0x8000_0000), switch to
-> >
-> > PHYS_OFFSET = PHYS_OFFSET0 = memstart_addr
-> > PHYS_OFFSET1 = memstart_addr + 30 GB
-> > PHYS_OFFSET2 = memstart_addr + 480 GB
+> > On Wed, Jun 08, 2016 at 10:21:23AM +0100, Lee Jones wrote:
+> > > Supply a PWM Capture call-back Op in order to pass back
+> > > information obtained by running analysis on PWM a signal.
+> > > This would normally (at least during testing) be called from
+> > > the Sysfs routines with a view to printing out PWM Capture
+> > > data which has been encoded into a string.
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > > ---
+> > >  drivers/pwm/core.c  | 27 +++++++++++++++++++++++++++
+> > >  include/linux/pwm.h | 25 +++++++++++++++++++++++++
+> > >  2 files changed, 52 insertions(+)
 > 
-> I don't really like such complexity when all you need on arm64 is to
-> enable 48-bit VA (though it would be interesting to benchmark it).
+> So do you want me to re-spin?
 > 
-> > I guess such a special case would be out of the question for one-off
-> > crazy designs like Freescale, but since this is the layout recommended
-> > by ARM itself, I suppose we could try and support it a bit better.
-> 
-> I'm trying to get the layout fixed before it spreads any further ;).
+> Before you said you'd make adjustments on patches 8 through 10, so I'm
+> a little confused.
 
-Hi Catalin, in this very old thread there was the intent on your side
-to revisit the physical address layout recommended in the 'Principles of ARM
-Memory Maps' whitepaper.  Has anything happened or changed in the
-last ~1 year.  Does ARM have recommendations?  SBSA doesn't 
-mandate anything as far as I can see.
+Yeah, I only realized that it might be quicker to make these adjustments
+myself when I had finished looking at patch 10. I've pushed the adjusted
+patches to a for-4.8/pwm-capture branch, so if you're going to re-spin
+the remainder of the patches, perhaps that could be your base?
 
-We have the opportunity to influences some future designs and wanted to
-see if ARM has recommendations.  In particular, what is the status of
-the recommendations in 'Principles of ARM Memory Maps'?
+	https://git.kernel.org/cgit/linux/kernel/git/thierry.reding/linux-pwm.git/log/?h=for-4.8/pwm-capture
 
-Thanks,
-Stuart
+If you don't have any objections I can put those into linux-next early
+next week.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/8a1b8e15/attachment.sig>
