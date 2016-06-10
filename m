@@ -1,48 +1,97 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 10 Jun 2016 21:55:15 +0200
-Subject: [PATCH V9 07/11] PCI: Factor DT specific pci_bus_find_domain_nr()
- code out
+Date: Fri, 10 Jun 2016 21:55:12 +0200
+Subject: [PATCH V9 04/11] ACPI/PCI: Support IO resources when parsing PCI host
+ bridge resources
 In-Reply-To: <1465588519-11334-1-git-send-email-tn@semihalf.com>
 References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
-Message-ID: <1465588519-11334-8-git-send-email-tn@semihalf.com>
+Message-ID: <1465588519-11334-5-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_bus_find_domain_nr() retrieves the host bridge domain number in a DT
-specific way. Factor our pci_bus_find_domain_nr() in a separate DT
-function (ie of_pci_bus_find_domain_nr()) so that DT code is self
-contained, paving the way for retrieving domain number in
-pci_bus_find_domain_nr() with additional firmware methods (ie ACPI).
+From: Jayachandran C <jchandra@broadcom.com>
 
+Platforms that have memory mapped IO port (such as ARM64) need special
+handling for PCI I/O resources. For host bridge's resource probing case
+these resources need to be fixed up with
+pci_register_io_range()/pci_remap_iospace() etc.
+
+The same I/O resources need to be released after hotplug
+removal so that it can be re-added back by the pci_remap_iospace()
+function during insertion. As a consequence unmap I/O resources
+with pci_unmap_iospace() when we release host bridge resources.
+
+Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+[ Tomasz: merged in Sinan's patch to unmap IO resources properly, updated changelog]
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/pci/pci.c | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
+ drivers/acpi/pci_root.c | 39 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 39 insertions(+)
 
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index b9a7833..327828d 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -4941,7 +4941,7 @@ int pci_get_new_domain_nr(void)
+diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+index ae3fe4e..9a26dd1 100644
+--- a/drivers/acpi/pci_root.c
++++ b/drivers/acpi/pci_root.c
+@@ -720,6 +720,40 @@ next:
+ 	}
  }
  
- #ifdef CONFIG_PCI_DOMAINS_GENERIC
--int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
-+static int of_pci_bus_find_domain_nr(struct device *parent)
- {
- 	static int use_dt_domains = -1;
- 	int domain = -1;
-@@ -4987,6 +4987,11 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
- 
- 	return domain;
- }
-+
-+int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
++#ifdef PCI_IOBASE
++static void acpi_pci_root_remap_iospace(struct resource_entry *entry)
 +{
-+	return of_pci_bus_find_domain_nr(parent);
++	struct resource *res = entry->res;
++	resource_size_t cpu_addr = res->start;
++	resource_size_t pci_addr = cpu_addr - entry->offset;
++	resource_size_t length = resource_size(res);
++	unsigned long port;
++
++	if (pci_register_io_range(cpu_addr, length))
++		goto err;
++
++	port = pci_address_to_pio(cpu_addr);
++	if (port == (unsigned long)-1)
++		goto err;
++
++	res->start = port;
++	res->end = port + length - 1;
++	entry->offset = port - pci_addr;
++
++	if (pci_remap_iospace(res, cpu_addr) < 0)
++		goto err;
++
++	pr_info("Remapped I/O %pa to %pR\n", &cpu_addr, res);
++	return;
++err:
++	res->flags |= IORESOURCE_DISABLED;
 +}
- #endif
- #endif
++#else
++static inline void acpi_pci_root_remap_iospace(struct resource_entry *entry)
++{
++}
++#endif
++
+ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+ {
+ 	int ret;
+@@ -740,6 +774,9 @@ int acpi_pci_probe_root_resources(struct acpi_pci_root_info *info)
+ 			"no IO and memory resources present in _CRS\n");
+ 	else {
+ 		resource_list_for_each_entry_safe(entry, tmp, list) {
++			if (entry->res->flags & IORESOURCE_IO)
++				acpi_pci_root_remap_iospace(entry);
++
+ 			if (entry->res->flags & IORESOURCE_DISABLED)
+ 				resource_list_destroy_entry(entry);
+ 			else
+@@ -811,6 +848,8 @@ static void acpi_pci_root_release_info(struct pci_host_bridge *bridge)
  
+ 	resource_list_for_each_entry(entry, &bridge->windows) {
+ 		res = entry->res;
++		if (res->flags & IORESOURCE_IO)
++			pci_unmap_iospace(res);
+ 		if (res->parent &&
+ 		    (res->flags & (IORESOURCE_MEM | IORESOURCE_IO)))
+ 			release_resource(res);
 -- 
 1.9.1
