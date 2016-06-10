@@ -1,71 +1,72 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 9 Jun 2016 19:01:45 -0700
-Subject: [PATCH 06/14] x86/ptrace: run seccomp after ptrace
-In-Reply-To: <CALCETrVk-UauwaRtZZR0fKQO6kyAx-r=ZCurKRdhQk9nA-TqeQ@mail.gmail.com>
-References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
- <1465506124-21866-7-git-send-email-keescook@chromium.org>
- <CALCETrVk-UauwaRtZZR0fKQO6kyAx-r=ZCurKRdhQk9nA-TqeQ@mail.gmail.com>
-Message-ID: <CAGXu5jKzOzfzMuOqfVCpgyzXrPrKYC60-AOYQmRVQUiqFpB0JQ@mail.gmail.com>
+From: pramod.kumar@broadcom.com (Pramod Kumar)
+Date: Fri, 10 Jun 2016 09:54:11 +0530
+Subject: [PATCH v4 4/7] dt: mdio-mux: Add mdio multiplexer driver node
+In-Reply-To: <5755C2FE.1090303@gmail.com>
+References: <1465216900-11755-1-git-send-email-pramod.kumar@broadcom.com>
+ <1465216900-11755-5-git-send-email-pramod.kumar@broadcom.com>
+ <5755C2FE.1090303@gmail.com>
+Message-ID: <0581378b82179ea816fb2f8644d3fc93@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 9, 2016 at 3:52 PM, Andy Lutomirski <luto@amacapital.net> wrote:
-> On Thu, Jun 9, 2016 at 2:01 PM, Kees Cook <keescook@chromium.org> wrote:
->> This moves seccomp after ptrace on x86 to that seccomp can catch changes
->> made by ptrace. Emulation should skip the rest of processing too.
->>
->> We can get rid of test_thread_flag because there's no longer any
->> opportunity for seccomp to mess with ptrace state before invoking
->> ptrace.
->>
->> Suggested-by: Andy Lutomirski <luto@kernel.org>
->> Signed-off-by: Kees Cook <keescook@chromium.org>
->> Cc: x86 at kernel.org
->> Cc: Andy Lutomirski <luto@kernel.org>
->> ---
->>  arch/x86/entry/common.c | 22 ++++++++++++----------
->>  1 file changed, 12 insertions(+), 10 deletions(-)
->>
->> diff --git a/arch/x86/entry/common.c b/arch/x86/entry/common.c
->> index df56ca394877..81c0e12d831c 100644
->> --- a/arch/x86/entry/common.c
->> +++ b/arch/x86/entry/common.c
->> @@ -73,6 +73,7 @@ static long syscall_trace_enter(struct pt_regs *regs)
->>
->>         struct thread_info *ti = pt_regs_to_thread_info(regs);
->>         unsigned long ret = 0;
->> +       bool emulated = false;
->>         u32 work;
->>
->>         if (IS_ENABLED(CONFIG_DEBUG_ENTRY))
->> @@ -80,11 +81,19 @@ static long syscall_trace_enter(struct pt_regs *regs)
->>
->>         work = ACCESS_ONCE(ti->flags) & _TIF_WORK_SYSCALL_ENTRY;
->>
->> +       if (unlikely(work & _TIF_SYSCALL_EMU))
->> +               emulated = true;
->> +
->> +       if ((emulated || (work & _TIF_SYSCALL_TRACE)) &&
->> +           tracehook_report_syscall_entry(regs))
->> +               return -1L;
->> +
->> +       if (emulated)
->> +               return -1L;
->> +
+Hi Florian,
+
+> -----Original Message-----
+> From: Florian Fainelli [mailto:f.fainelli at gmail.com]
+> Sent: 07 June 2016 00:08
+> To: Pramod Kumar; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell;
+> Kumar Gala; Catalin Marinas; Will Deacon; Kishon Vijay Abraham I; David S.
+> Miller
+> Cc: devicetree at vger.kernel.org; netdev at vger.kernel.org; linux-
+> kernel at vger.kernel.org; bcm-kernel-feedback-list at broadcom.com; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v4 4/7] dt: mdio-mux: Add mdio multiplexer driver node
 >
-> I think that this code will result in ptrace-induced skips calling the
-> audit exit hook but not the audit entry hook.  I don't know whether
-> this is a problem.  It's also worth making sure that ptracing a
-> seccomp-skipped syscall calls the exit hook with the right regs.
+> On 06/06/2016 05:41 AM, Pramod Kumar wrote:
+> > Add integrated MDIO multiplexer driver node which contains two mux
+> > PCIe bus and one ethernet bus along with phys lying on these bus.
+> >
+> > Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
+> > ---
+> > +		mdio_mux_iproc: mdio-mux at 6602023c {
+> > +			compatible = "brcm,mdio-mux-iproc";
+> > +			reg = <0x6602023c 0x14>;
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			mdio at 0 {
+> > +				reg = <0x0>;
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +
+> > +				pci_phy0: pci-phy at 0 {
+> > +					compatible = "brcm,ns2-pcie-phy";
+> > +					reg = <0x0>;
+> > +					#phy-cells = <0>;
+> > +				};
+> > +			};
+> > +
+> > +			mdio at 7 {
+> > +				reg = <0x7>;
+> > +				#address-cells = <1>;
+> > +				#size-cells = <0>;
+> > +
+> > +				pci_phy1: pci-phy at 0 {
+> > +					compatible = "brcm,ns2-pcie-phy";
+> > +					reg = <0x0>;
+> > +					#phy-cells = <0>;
+> > +				};
 >
-> I suspect it's fine, but I want to think about it a little bit more.
+> Are these two PHYs always available in the NS2 SoC, or does that depend on
+> interfaces exposed at the board level? Should not they be flagged with a
+> disabled status property by default and enabled in their respective board
+> files?
+> --
 
-I don't think this is true, since all architectures already needed to
-handle an immediate return from seccomp, so audit shouldn't be touched
-on the exit path either.
+It depends on the interfaces exposed at board level. We will disable it in
+dtsi and enable it dts file. I'll address this through next patch set.
 
--Kees
+> Florian
 
--- 
-Kees Cook
-Chrome OS & Brillo Security
+Regards,
+Pramod
