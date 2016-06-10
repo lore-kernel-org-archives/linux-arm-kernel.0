@@ -1,55 +1,70 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 10 Jun 2016 17:54:13 +0200
-Subject: [PATCH v2 0/3] Aardvark PCIe controller driver for Marvell Armada 3700
-Message-ID: <1465574056-8787-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Fri, 10 Jun 2016 17:54:16 +0200
+Subject: [PATCH v2 3/3] arm64: dts: marvell: Aardvark PCIe support for Armada
+ 3700
+In-Reply-To: <1465574056-8787-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1465574056-8787-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1465574056-8787-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit adds the SoC-level description of the PCIe controller found
+on the Marvell Armada 3700, and also enables this PCIe controller on the
+development board for this SoC.
 
-This is the second iteration of the patch series that adds a PCIe
-controller driver for the Aardvark PCI controller, which is used on
-Marvell Armada 3700.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts |  5 +++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi   | 25 +++++++++++++++++++++++++
+ 2 files changed, 30 insertions(+)
 
-Changes since v1:
-
- - Even if the MSI handling is currently done directly by the PCIe
-   controller, use a msi-parent property to indicate this
-   relationship. This way, if in the future we want to use the MSI
-   capabilities from the GIC interrupt controller rather than the MSI
-   functionality of the PCI controller, it will be possible.
-
-   Suggested by Arnd Bergmann.
-
- - Replace the number-of-retry based loops by timeout based loops,
-   using time_before().
-
-   Suggested by Arnd Bergmann.
-
- - Simplify the IRQ handling, which actually also fixes a number of
-   issues with the interrupt handling.
-
-   Suggested by Marcin Wojtas.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (3):
-  dt-bindings: add DT binding for the Aardvark PCIe controller
-  PCI: host: new PCI host controller driver for Aardvark
-  arm64: dts: marvell: Aardvark PCIe support for Armada 3700
-
- .../devicetree/bindings/pci/aardvark-pci.txt       |   56 ++
- MAINTAINERS                                        |    7 +
- arch/arm64/boot/dts/marvell/armada-3720-db.dts     |    5 +
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   25 +
- drivers/pci/host/Kconfig                           |    9 +
- drivers/pci/host/Makefile                          |    1 +
- drivers/pci/host/pci-aardvark.c                    | 1023 ++++++++++++++++++++
- 7 files changed, 1126 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/aardvark-pci.txt
- create mode 100644 drivers/pci/host/pci-aardvark.c
-
+diff --git a/arch/arm64/boot/dts/marvell/armada-3720-db.dts b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+index 86110a6..1372e9a6 100644
+--- a/arch/arm64/boot/dts/marvell/armada-3720-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-3720-db.dts
+@@ -76,3 +76,8 @@
+ &usb3 {
+ 	status = "okay";
+ };
++
++/* CON17 (PCIe) / CON12 (mini-PCIe) */
++&pcie0 {
++	status = "okay";
++};
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 9e2efb8..8a9cae9 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -141,5 +141,30 @@
+ 				      <0x1d40000 0x40000>; /* GICR */
+ 			};
+ 		};
++
++		pcie0: pcie at d0070000 {
++			compatible = "marvell,armada-3700-pcie";
++			device_type = "pci";
++			status = "disabled";
++			reg = <0 0xd0070000 0 0x20000>;
++			#address-cells = <3>;
++			#size-cells = <2>;
++			bus-range = <0x00 0xff>;
++			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
++			#interrupt-cells = <1>;
++			msi-parent = <&pcie0>;
++			msi-controller;
++			ranges = <0x82000000 0 0xe8000000   0 0xe8000000 0 0x1000000 /* Port 0 MEM */
++				  0x81000000 0 0xe9000000   0 0xe9000000 0 0x10000>; /* Port 0 IO*/
++			interrupt-map-mask = <0 0 0 7>;
++			interrupt-map = <0 0 0 1 &pcie_intc 0>,
++					<0 0 0 2 &pcie_intc 1>,
++					<0 0 0 3 &pcie_intc 2>,
++					<0 0 0 4 &pcie_intc 3>;
++			pcie_intc: interrupt-controller {
++				interrupt-controller;
++				#interrupt-cells = <1>;
++			};
++		};
+ 	};
+ };
 -- 
 2.7.4
