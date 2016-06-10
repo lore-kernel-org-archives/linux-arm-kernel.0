@@ -1,36 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Jun 2016 02:34:00 -0700
-Subject: [PATCH 0/3] ARM: OMAP: DRA7: Update to latest TRM and cleanup
-In-Reply-To: <1464096940-27145-1-git-send-email-nm@ti.com>
-References: <1464096940-27145-1-git-send-email-nm@ti.com>
-Message-ID: <20160610093359.GQ22406@atomide.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Fri, 10 Jun 2016 10:34:58 +0100
+Subject: [PATCH 2/2] ARM: dts: sd_600eval: Fix eMMC lockup issue
+In-Reply-To: <1465551298-21457-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1465551298-21457-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <1465551298-21457-2-git-send-email-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Parth Pancholi <parth.pancholi@einfochips.com>
 
-* Nishanth Menon <nm@ti.com> [160524 06:37]:
-> Hi,
-> 
-> Here are the final(hopefully) pending patches for DRA7 based on recent
-> TRM updates. Updates include removing retention support on L3init and
-> L4per as per latest SoC updates.
-> 
-> Test Log: X15 (no modules): http://pastebin.ubuntu.com/16655027/
-> 
-> Latest TRM (rev F): http://www.ti.com/lit/pdf/spruhz6 (public on May 18)
-> 
-> Nishanth Menon (3):
->   ARM: OMAP: DRA7: powerdomain data: Set L3init and L4per to ON
->   ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_logic_ret
->   ARM: OMAP: DRA7: powerdomain data: Remove unused pwrsts_mem_ret
-> 
->  arch/arm/mach-omap2/powerdomains7xx_data.c | 76 +-----------------------------
->  1 file changed, 2 insertions(+), 74 deletions(-)
+This board locks up if we stress test the eMMC, as the regulator s4 is
+unable to supply enough current for all the peripherials attached to it.
+As this supply is wired up to most of the peripherials including DDR,
+it resulted in such lockup.
 
-Can these wait until v4.8 merge window, are this needed as fixes to
-avoid hardware problems?
+This patch fixes this issue by setting s4 regulator correctly with
+Auto power mode.
 
-Regards,
+Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+[Srinivas Kandagatla: rewrote the change log]
+Tested-by: Girish Sharma <girish.sharma@einfochips.com>
+Signed-off-by: Parth Pancholi <parth.pancholi@einfochips.com>
+---
+ arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Tony
+diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+index 7df0108..39ae2bc 100644
+--- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
++++ b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
+@@ -1,6 +1,7 @@
+ #include "qcom-apq8064-v2.0.dtsi"
+ #include "qcom-apq8064-arrow-sd-600eval-pins.dtsi"
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/mfd/qcom-rpm.h>
+ 
+ / {
+ 	model = "Arrow Electronics, APQ8064 SD_600eval";
+@@ -82,7 +83,8 @@
+ 				s4 {
+ 					regulator-min-microvolt	= <1800000>;
+ 					regulator-max-microvolt	= <1800000>;
+-					qcom,switch-mode-frequency = <3200000>;
++					qcom,switch-mode-frequency = <1600000>;
++					qcom,force-mode = <QCOM_RPM_FORCE_MODE_AUTO>;
+ 					bias-pull-down;
+ 					regulator-always-on;
+ 				};
+-- 
+2.8.3
