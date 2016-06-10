@@ -1,23 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Fri, 10 Jun 2016 18:23:26 +0530
-Subject: [PATCH] ARM: davinci: da850: add clocks for mcbsp0 and 1
-In-Reply-To: <1462802410-25164-1-git-send-email-petr@barix.com>
-References: <1462802410-25164-1-git-send-email-petr@barix.com>
-Message-ID: <575AB846.4080608@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 10 Jun 2016 06:01:15 -0700
+Subject: [PATCH v8 5/9] ARM: dts: am437x/am33xx/da850: Add new ECAP and
+ EPWM bindings
+In-Reply-To: <20160610124022.GD27142@ulmo.ba.sec>
+References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
+ <1462291015-1919-6-git-send-email-fcooper@ti.com>
+ <20160610103423.GT22406@atomide.com>
+ <20160610120142.GK22406@atomide.com>
+ <20160610124022.GD27142@ulmo.ba.sec>
+Message-ID: <20160610130114.GP22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 May 2016 07:30 PM, Petr Kulhavy wrote:
-> Add clock definitions "davinci-mcbsp.0" and "davinci-mcbsp.1" in order
-> to make McBSP driver work on the DA850 platform.
+* Thierry Reding <thierry.reding@gmail.com> [160610 05:42]:
+> On Fri, Jun 10, 2016 at 05:01:43AM -0700, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [160610 03:37]:
+> > > * Franklin S Cooper Jr <fcooper@ti.com> [160503 08:58]:
+> > > > Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
+> > > > provide the various required clocks.
+> > > > 
+> > > > For AM437 and AM335x, add the required clocks explicitly to DT. The
+> > > > hwmod entries for ECAP and EPWM will be removed and this will prevent
+> > > > anything from breaking.
+> > > 
+> > > I've applying the first patch into omap-for-v4.8/soc, the rest into
+> > > omap-for-v4.8/dt. Note that this patch did not apply against d850.dtsi
+> > > so please resend that change as a separate patch to the davinci
+> > > maintainer.
+> > 
+> > And I did not apply patch "pwms: pwm-ti*: Get the clock from the PWMSS
+> > parent when using old bindings", Thierry should take that one.
 > 
-> The McBSP 0 and 1 interfaces were not defined for the DA850 platform.
-> Neither were the related clocks. In order to make the use of McBSP via
-> devicetree the clocks need to be defined.
-> 
-> Signed-off-by: Petr Kulhavy <petr@barix.com>
+> Tony, did you take patches 3 and 4 already? It's fine if yo have, just
+> wanted to know whether I should pick those up as well.
 
-Applied to v4.8/soc
+Yes looks like I also took the binding documentation patches too.
 
-Thanks,
-Sekhar
+Regards,
+
+Tony
