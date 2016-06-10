@@ -1,60 +1,58 @@
-From: dave.long@linaro.org (David Long)
-Date: Fri, 10 Jun 2016 10:54:55 -0400
-Subject: [PATCH v13 02/10] arm64: Add more test functions to insn.c
-In-Reply-To: <20160608101401.7296820ea6ac082ef1c917cb@kernel.org>
-References: <1464924384-15269-1-git-send-email-dave.long@linaro.org>
- <1464924384-15269-3-git-send-email-dave.long@linaro.org>
- <20160608101401.7296820ea6ac082ef1c917cb@kernel.org>
-Message-ID: <575AD4BF.8010000@linaro.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Jun 2016 16:55:20 +0200
+Subject: [PATCH] ARM: tegra: fix missing include <soc/tegra/cpuidle.h>
+In-Reply-To: <575ACFB5.4070706@nvidia.com>
+References: <1465404897-16654-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20160610142210.GN27142@ulmo.ba.sec> <575ACFB5.4070706@nvidia.com>
+Message-ID: <20160610145520.GP27142@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2016 09:14 PM, Masami Hiramatsu wrote:
-> On Thu,  2 Jun 2016 23:26:16 -0400
-> David Long <dave.long@linaro.org> wrote:
->> @@ -367,6 +402,7 @@ bool aarch32_insn_is_wide(u32 insn);
->>   #define A32_RT_OFFSET	12
->>   #define A32_RT2_OFFSET	 0
->>
->> +u32 aarch64_extract_system_register(u32 insn);
->
-> This exported symbol is incorrect (see below)
->
->>   u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
->>   u32 aarch32_insn_mcr_extract_opc2(u32 insn);
->>   u32 aarch32_insn_mcr_extract_crm(u32 insn);
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index 368c082..28c6110f 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
-> [..]
->> @@ -1175,6 +1201,14 @@ u32 aarch64_set_branch_offset(u32 insn, s32 offset)
->>   	BUG();
->>   }
->>
->> +/*
->> + * Extract the Op/CR data from a msr/mrs instruction.
->> + */
->> +u32 aarch64_insn_extract_system_reg(u32 insn)
->> +{
->> +	return (insn & 0x1FFFE0) >> 5;
->> +}
->> +
->
-> aarch64_insn_extract_system_reg() is the right name :)
->
-> Thank you,
->
->
->>   bool aarch32_insn_is_wide(u32 insn)
->>   {
->>   	return insn >= 0xe800;
->> --
->> 2.5.0
->>
->
->
+On Fri, Jun 10, 2016 at 03:33:25PM +0100, Jon Hunter wrote:
+> 
+> On 10/06/16 15:22, Thierry Reding wrote:
+> > * PGP Signed by an unknown key
+> > 
+> > On Wed, Jun 08, 2016 at 05:54:57PM +0100, Ben Dooks wrote:
+> >> The prototype of tegra_cpuidle_pcie_irqs_in_use() is missing
+> >> from the cpuidle.c file, it is defined in <soc/tegra/cpuidle.h>
+> >> so add that include to avoid the following warning:
+> >>
+> >> arch/arm/mach-tegra/cpuidle.c:51:6: warning: symbol 'tegra_cpuidle_pcie_irqs_in_use' was not declared. Should it be static?
+> >>
+> >> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> >> ---
+> >> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> >> Cc: Alexandre Courbot <gnurou@gmail.com>
+> >> Cc: Thierry Reding <thierry.reding@gmail.com>
+> >> Cc: linux-arm-kernel at lists.infradead.org
+> >> Cc: linux-tegra at vger.kernel.org
+> >> ---
+> >>  arch/arm/mach-tegra/cpuidle.c | 1 +
+> >>  1 file changed, 1 insertion(+)
+> > 
+> > I've been carrying a set of patches to fix these, and a couple of other
+> > sparse warnings, in my tree locally, but never sent them out because
+> > they were so trivial. I probably should've to avoid the duplication of
+> > effort. Sorry about that.
+> 
+> I think you did send them out ;-)
+> 
+> http://patchwork.ozlabs.org/patch/616249/
+> http://patchwork.ozlabs.org/patch/616250/
+> http://patchwork.ozlabs.org/patch/616251/
+> http://patchwork.ozlabs.org/patch/616252/
 
-Thanks for finding that.
+Hah! Excellent. No more guilty conscience for me. =)
 
--dl
+I've pulled those patches into the Tegra tree now.
+
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/9ea84b50/attachment.sig>
