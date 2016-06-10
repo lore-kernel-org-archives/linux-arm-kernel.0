@@ -1,81 +1,71 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Jun 2016 21:54:23 +0100
-Subject: [PATCH V9 10/11] ARM64/PCI: Implement ACPI low-level calls to
- access PCI_Config region from AML
-In-Reply-To: <1465588519-11334-11-git-send-email-tn@semihalf.com>
-References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
- <1465588519-11334-11-git-send-email-tn@semihalf.com>
-Message-ID: <20160610205423.GC24178@red-moon>
+Date: Fri, 10 Jun 2016 21:59:48 +0100
+Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
+In-Reply-To: <20160610172716.GR13357@hector.attlocal.net>
+References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
+ <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
+ <20160610154857.GA6430@leverpostej>
+ <20160610161234.GO13357@hector.attlocal.net>
+ <20160610163153.GA23743@red-moon>
+ <20160610165248.GQ13357@hector.attlocal.net>
+ <20160610170656.GA23854@red-moon>
+ <20160610172716.GR13357@hector.attlocal.net>
+Message-ID: <20160610205948.GD24178@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 09:55:18PM +0200, Tomasz Nowicki wrote:
-> ACPI spec6.1 - chapter: 5.5.2.4 defines OperationRegion (Declare Operation
-> Region). Following the spec: " [...] An Operation Region is a specific
-> region of operation within an address space that is declared as a subset
-> of the entire address space using a starting address (offset) and a length.
-> Control methods must have exclusive access to any address accessed via
-> fields declared in Operation Regions. [...]".
+On Fri, Jun 10, 2016 at 12:27:16PM -0500, Andy Gross wrote:
+> On Fri, Jun 10, 2016 at 06:06:56PM +0100, Lorenzo Pieralisi wrote:
+> > On Fri, Jun 10, 2016 at 11:52:48AM -0500, Andy Gross wrote:
+> > 
+> > [...]
+> > 
+> > > > (1) enter_freeze() hooks are not strictly necessary to enable
+> > > >     suspend-to-idle (they are if we want the tick to be frozen
+> > > >     on suspend-to-idle, which is different)
+> > > 
+> > > I'd think that you'd want the tick frozen.  Even if you are going to
+> > > just call the deepest freezable idle state in your freeze_function,
+> > > you don't want to keep getting woken up as this costs some power usage
+> > 
+> > As I said, that's a separate issue from these bindings.
 > 
-> OperationRegion allows to declare various of operation region address space
+> I kind of see that coupled with the determination that a idle state
+> supports freeze.  Or are you wanting to have something else that
+> decides whether or not to configure the enter_freeze?
 
-s/of//
+All PSCI based idle state support freeze, as long as most of the
+other idle routines for ARM 32-bit, I do not even think we should
+bother with defining DT bindings for it.
 
-> identifiers including PCI_Config. PCI_Config is meant to access PCI
-> configuration space from the ASL. So every time ASL opcode operates
-> on PCI_Config space region, ASL interpreter dispatches accesses to OS
-> low-level calls - raw_pci_write() and raw_pci_read() for Linux - so-called
-> ACPI RAW accessors.
-> 
-> In order to support PCI_Config operation region, implement mentioned
-> raw_pci_write() and raw_pci_read() calls so they find associated bus
-> and call read/write ops.
-> 
-> Waiting for clarification in the ACPI specifications in relation
-> to PCI_Config space handling before PCI bus enumeration is completed,
-> current code does not support PCI_Config region accesses before PCI bus
-> enumeration whilst providing full AML PCI_Config access availability
-> when the PCI bus enumeration is completed by the kernel so that
-> RAW accessors can look-up PCI operations through the struct pci_bus
-> associated with a PCI bus.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
+[...]
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > For 64-bit you do not have to have add any facility.
+> > 
+> > 1) we should change core code to make PM_SUSPEND_FREEZE independent
+> >    of suspend_set_ops()
+> 
+> So then, if cpuidle is active and you have idle states supporting
+> freeze, then you can always implicitly freeze the system.  This would
+> infer then that the system will always indicate it can do freeze.  I
+> am good with that.
+> 
+> For now, we can get away with just implementing the changes you are
+> suggesting.
 
-> ---
->  arch/arm64/kernel/pci.c | 12 ++++++++++--
->  1 file changed, 10 insertions(+), 2 deletions(-)
+Cracking.
+
+> > 2) we should define which idle states are freezable (99% of them are
+> >    minus coupled idle states), through generic bindings
 > 
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index b3b8a2c..328f857 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -71,13 +71,21 @@ int pcibios_alloc_irq(struct pci_dev *dev)
->  int raw_pci_read(unsigned int domain, unsigned int bus,
->  		  unsigned int devfn, int reg, int len, u32 *val)
->  {
-> -	return -ENXIO;
-> +	struct pci_bus *b = pci_find_bus(domain, bus);
-> +
-> +	if (!b)
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
-> +	return b->ops->read(b, devfn, reg, len, val);
->  }
->  
->  int raw_pci_write(unsigned int domain, unsigned int bus,
->  		unsigned int devfn, int reg, int len, u32 val)
->  {
-> -	return -ENXIO;
-> +	struct pci_bus *b = pci_find_bus(domain, bus);
-> +
-> +	if (!b)
-> +		return PCIBIOS_DEVICE_NOT_FOUND;
-> +	return b->ops->write(b, devfn, reg, len, val);
->  }
->  
->  #ifdef CONFIG_NUMA
-> -- 
-> 1.9.1
-> 
+> This would be in the form of a DT property?  And given this property
+> then we'd just assign a enter_freeze() function that calls the enter()
+> for that state.  Or would we have something else that we need to key
+> off of to decide to configure the enter_freeze?
+
+See above, I will give it more thought. I take an action to change
+core code as per discussion above.
+
+Thanks for raising the point.
+
+Lorenzo
