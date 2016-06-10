@@ -1,91 +1,43 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Fri, 10 Jun 2016 10:38:35 +0100
-Subject: [PATCH 2/2] ARM: dts: apq8064: move sdcc3 pinctrls out of baord file
-In-Reply-To: <1465551515-21622-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1465551515-21622-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <1465551515-21622-2-git-send-email-srinivas.kandagatla@linaro.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 10 Jun 2016 11:38:51 +0200
+Subject: [linux-sunxi] [PATCH] [V2] ARM: dts: sun7i: Add dts file for
+ Bananapi M1 Plus board
+In-Reply-To: <574FF94B.3020309@web.de>
+References: <20160602023623.5761-1-luoyi.ly@gmail.com>
+ <CAGRGNgUiGaxoVxtq=k8NG5mCqEXS9fd-ry1vvVJfzb+R2ATMTA@mail.gmail.com>
+ <20160602081638.GG4908@lukather> <574FF94B.3020309@web.de>
+Message-ID: <20160610093851.GQ5242@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch move sdcc3 pinctrl nodes out of board file, so that
-other boards do not duplicate the same thing.
+On Thu, Jun 02, 2016 at 11:15:55AM +0200, Bernhard Nortmann wrote:
+> Am 02.06.2016 um 10:16 schrieb Maxime Ripard:
+> >[...]
+> >Yes, everything that is shared with the banana-pro (which, judging
+> >from Bernhard, is pretty much everything but a GPIO) should be merged
+> >in the banapro DT.
+> >
+> >Maxime
+> >
+> 
+> Don't take my word for granted, as I do not own this hardware or know it
+> particularly well. There is no doubt that "BPi-M1+" and "Banana Pro" are
+> very similar, but if in doubt the information form the wiki should be
+> verified.
 
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- arch/arm/boot/dts/qcom-apq8064-pins.dtsi           | 20 ++++++++++++++++++++
- .../arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts | 22 +---------------------
- 2 files changed, 21 insertions(+), 21 deletions(-)
+Hmmmm, ok. Chen-Yu, any input on this? You know the banana-pis much
+more than I do.
 
-diff --git a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-index ca683e5..6b801e7 100644
---- a/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-+++ b/arch/arm/boot/dts/qcom-apq8064-pins.dtsi
-@@ -27,6 +27,26 @@
- 		};
- 	};
- 
-+	sdcc3_pins: sdcc3-pin-active {
-+		clk {
-+			pins = "sdc3_clk";
-+			drive-strengh = <8>;
-+			bias-disable;
-+		};
-+
-+		cmd {
-+			pins = "sdc3_cmd";
-+			drive-strengh = <8>;
-+			bias-pull-up;
-+		};
-+
-+		data {
-+			pins = "sdc3_data";
-+			drive-strengh = <8>;
-+			bias-pull-up;
-+		};
-+	};
-+
- 	ps_hold: ps_hold {
- 		mux {
- 			pins = "gpio78";
-diff --git a/arch/arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts b/arch/arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts
-index 93d08b9..ebd675c 100644
---- a/arch/arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts
-+++ b/arch/arm/boot/dts/qcom-apq8064-sony-xperia-yuga.dts
-@@ -71,26 +71,6 @@
- 			};
- 
- 
--			sdcc3_pin_a: sdcc3-pin-active {
--				clk {
--					pins = "sdc3_clk";
--					drive-strengh = <8>;
--					bias-disable;
--				};
--
--				cmd {
--					pins = "sdc3_cmd";
--					drive-strengh = <8>;
--					bias-pull-up;
--				};
--
--				data {
--					pins = "sdc3_data";
--					drive-strengh = <8>;
--					bias-pull-up;
--				};
--			};
--
- 			sdcc3_cd_pin_a: sdcc3-cd-pin-active {
- 				pins = "gpio26";
- 				function = "gpio";
-@@ -407,7 +387,7 @@
- 				cd-gpios = <&tlmm_pinmux 26 GPIO_ACTIVE_LOW>;
- 
- 				pinctrl-names = "default";
--				pinctrl-0 = <&sdcc3_pin_a>, <&sdcc3_cd_pin_a>;
-+				pinctrl-0 = <&sdcc3_pins>, <&sdcc3_cd_pin_a>;
- 			};
- 		};
- 	};
+Maxime
+
 -- 
-2.8.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/2c9da789/attachment.sig>
