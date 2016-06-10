@@ -1,218 +1,49 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Jun 2016 13:50:28 +0100
-Subject: [PATCH v5 4/5] arm64: add support for ACPI Low Power Idle(LPI)
-In-Reply-To: <1462981062-24909-5-git-send-email-sudeep.holla@arm.com>
-References: <1462981062-24909-1-git-send-email-sudeep.holla@arm.com>
- <1462981062-24909-5-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20160610125028.GA24002@red-moon>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Fri, 10 Jun 2016 14:49:36 +0200
+Subject: [PATCH] ARM: orion: remove unreferenced board-d2net.c
+In-Reply-To: <20160609163608.GA23507@lunn.ch>
+References: <1465466656-30002-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20160609133116.GH30205@lunn.ch>
+ <20160609153935.44323b8e@free-electrons.com>
+ <20160609141006.GK30205@lunn.ch>
+ <20160609161215.084e06f1@free-electrons.com>
+ <d521ce93-f647-0c6f-89f5-aeffd82b87e1@codethink.co.uk>
+ <20160609163608.GA23507@lunn.ch>
+Message-ID: <20160610124936.GD16054@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+ Daniel, Kevin]
-
-On Wed, May 11, 2016 at 04:37:41PM +0100, Sudeep Holla wrote:
-> This patch adds appropriate callbacks to support ACPI Low Power Idle
-> (LPI) on ARM64.
+On Thu, Jun 09, 2016 at 06:36:08PM +0200, Andrew Lunn wrote:
+> On Thu, Jun 09, 2016 at 04:52:35PM +0100, Ben Dooks wrote:
+> > On 09/06/16 15:12, Thomas Petazzoni wrote:
+> > > Hello,
+> > > 
+> > > On Thu, 9 Jun 2016 16:10:06 +0200, Andrew Lunn wrote:
+> > > 
+> > >>> That being said, this has been broken more than 2 years ago, and nobody
+> > >>> noticed. Doesn't this mean that we could get rid of the support for
+> > >>> this board entirely? :)  
+> > >>
+> > >> Well, all it means is the LEDs don't blink. If the disk was not
+> > >> spinning, or the ethernet device missing, i would agree with you. But
+> > >> somebody could be using this device and don't notice the difference
+> > >> with the LEDs.
+> > 
+> > Surely DT can manage blinking LEDs??
 > 
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  arch/arm64/kernel/acpi.c | 48 +++++++++++++++++++++++++++++++++++++++++
->  drivers/firmware/psci.c  | 56 ++++++++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 104 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> There is an additional GPIO needed. However, i think a pin hog should
+> allow this to be represented in DT. Two years ago, i don't think this
+> sort of hogging existed.
 
-I think we can add this to arm64/kernel/cpuidle.c so that we have all
-arch code managing idle in one place.
+I think this LED device is compatible with the leds-ns2 driver. If it is
+true, then the LED definition can be moved into the DT file. I'll look
+at that.
 
-> index d1ce8e2f98b9..bf82ce5c8fce 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -18,6 +18,7 @@
->  #include <linux/acpi.h>
->  #include <linux/bootmem.h>
->  #include <linux/cpumask.h>
-> +#include <linux/cpu_pm.h>
->  #include <linux/init.h>
->  #include <linux/irq.h>
->  #include <linux/irqdomain.h>
-> @@ -25,6 +26,9 @@
->  #include <linux/of_fdt.h>
->  #include <linux/smp.h>
->  
-> +#include <acpi/processor.h>
-> +
-> +#include <asm/cpuidle.h>
->  #include <asm/cputype.h>
->  #include <asm/cpu_ops.h>
->  #include <asm/smp_plat.h>
-> @@ -211,6 +215,50 @@ void __init acpi_boot_table_init(void)
->  	}
->  }
->  
-> +int acpi_processor_ffh_lpi_probe(unsigned int cpu)
-> +{
-> +	return arm_cpuidle_init(cpu);
-> +}
-> +
-> +#define ACPI_FFH_LPI_ARM_FLAGS_CORE_CONTEXT	BIT(0)
-> +#define ACPI_FFH_LPI_ARM_FLAGS_TRACE_CONTEXT	BIT(1)
-> +#define ACPI_FFH_LPI_ARM_FLAGS_GICR_CONTEXT	BIT(2)
-> +#define ACPI_FFH_LPI_ARM_FLAGS_GICD_CONTEXT	BIT(3)
-> +#define ACPI_FFH_LPI_ARM_FLAGS_ALL_CONTEXT	\
-> +	(ACPI_FFH_LPI_ARM_FLAGS_CORE_CONTEXT |	\
-> +	 ACPI_FFH_LPI_ARM_FLAGS_TRACE_CONTEXT |	\
-> +	 ACPI_FFH_LPI_ARM_FLAGS_GICR_CONTEXT |	\
-> +	 ACPI_FFH_LPI_ARM_FLAGS_GICD_CONTEXT)
-> +
-> +struct acpi_lpi_state *lpi;
-> +int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi, int idx)
-> +{
-> +	int ret = 0;
-> +	bool save_ctx = lpi->arch_flags & ACPI_FFH_LPI_ARM_FLAGS_ALL_CONTEXT;
-
-I am not really that keen on this, as you know. Those flags are
-there to say "save these components registers". I see the CPU PM
-notifiers as a way to save/restore CPU peripheral state, but
-they should *not* carry out any action that affects the power
-state itself, that's down to the suspend finisher (eg PSCI),
-because that's where the specific idle states are managed.
-
-I agree we have no clue whatsoever on what we *really* need
-to save/restore, but that's orthogonal to what you are solving
-here.
-
-See eg gic_cpu_if_down(). Do we call it from the GIC CPU PM notifier ?
-No. We should not handle the same problem differently.
-
-On top of that, we have no way to solve this problem for DT,
-all I am saying is that it is ill-defined and given that LPI
-is new I'd rather we got it right from the beginning.
-
-I am open to suggestions here.
-
-> +
-> +	if (!idx) {
-> +		cpu_do_idle();
-> +		return idx;
-> +	}
-> +
-> +	/* TODO cpu_pm_{enter,exit} can be done in generic code ? */
-> +	if (save_ctx)
-> +		ret = cpu_pm_enter();
-> +	if (!ret) {
-> +		/*
-> +		 * Pass idle state index to cpu_suspend which in turn will
-> +		 * call the CPU ops suspend protocol with idle index as a
-> +		 * parameter.
-> +		 */
-> +		ret = arm_cpuidle_suspend(idx);
-> +
-> +		if (save_ctx)
-> +			cpu_pm_exit();
-> +	}
-> +
-> +	return ret ? -1 : idx;
-
-The body of this function (if we remove save_ctx) is identical
-to arm_enter_idle_state(), it would be nice if we found a way
-where to put this code and share it with the ARM CPUidle driver,
-but I am not too fussed about that either.
-
-> +}
-> +
->  #ifdef CONFIG_ACPI_APEI
->  pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr)
->  {
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index fa4ea22ca12e..e06bfee68e1d 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -13,6 +13,7 @@
->  
->  #define pr_fmt(fmt) "psci: " fmt
->  
-> +#include <linux/acpi.h>
->  #include <linux/arm-smccc.h>
->  #include <linux/cpuidle.h>
->  #include <linux/errno.h>
-> @@ -310,11 +311,66 @@ static int psci_dt_cpu_init_idle(struct device_node *cpu_node, int cpu)
->  	return ret;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +#include <acpi/processor.h>
-> +
-> +static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu)
-> +{
-> +	int i, count;
-> +	u32 *psci_states;
-> +	struct acpi_processor *pr;
-> +	struct acpi_lpi_state *lpi;
-> +
-> +	pr = per_cpu(processors, cpu);
-> +	if (unlikely(!pr || !pr->flags.has_lpi))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * If the PSCI cpu_suspend function hook has not been initialized
-> +	 * idle states must not be enabled, so bail out
-> +	 */
-> +	if (!psci_ops.cpu_suspend)
-> +		return -EOPNOTSUPP;
-> +
-> +	count = pr->power.count - 1;
-
-Nit: I am not sure this can happen, but you really do not want
-count to become == -1.
-
-> +	if (!count)
-> +		return -ENODEV;
-> +
-> +	psci_states = kcalloc(count, sizeof(*psci_states), GFP_KERNEL);
-> +	if (!psci_states)
-> +		return -ENOMEM;
-> +
-> +	for (i = 0; i < count; i++) {
-> +		u32 state;
-> +
-> +		lpi = &pr->power.lpi_states[i + 1];
-> +		state = lpi->address & 0xFFFFFFFF;
-> +		if (!psci_power_state_is_valid(state)) {
-> +			pr_warn("Invalid PSCI power state %#x\n", state);
-> +			kfree(psci_states);
-> +			return -EINVAL;
-> +		}
-> +		psci_states[i] = state;
-> +	}
-> +	/* Idle states parsed correctly, initialize per-cpu pointer */
-> +	per_cpu(psci_power_state, cpu) = psci_states;
-> +	return 0;
-> +}
-> +#else
-> +static int __maybe_unused psci_acpi_cpu_init_idle(unsigned int cpu)
-> +{
-> +	return -EINVAL;
-> +}
-> +#endif
-> +
->  int psci_cpu_init_idle(unsigned int cpu)
->  {
->  	struct device_node *cpu_node;
->  	int ret;
->  
-> +	if (!acpi_disabled)
-> +		return psci_acpi_cpu_init_idle(cpu);
-> +
->  	cpu_node = of_get_cpu_node(cpu, NULL);
->  	if (!cpu_node)
->  		return -ENODEV;
-
-save_ctx notwithstanding the patch is fine, let's define what to
-do with that, remainder of the code is ok.
-
-Thanks,
-Lorenzo
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/9c5e9e8c/attachment.sig>
