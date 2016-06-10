@@ -1,41 +1,57 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 10 Jun 2016 23:50:16 +0300
-Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
-In-Reply-To: <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
-References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
- <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
- <20160601005751.GG20527@verge.net.au>
- <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
- <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
- <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
- <20160610010245.GA10152@verge.net.au>
- <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
- <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
-Message-ID: <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 10 Jun 2016 21:51:45 +0100
+Subject: [PATCH V9 07/11] PCI: Factor DT specific
+ pci_bus_find_domain_nr() code out
+In-Reply-To: <1465588519-11334-8-git-send-email-tn@semihalf.com>
+References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
+ <1465588519-11334-8-git-send-email-tn@semihalf.com>
+Message-ID: <20160610205145.GB24178@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2016 11:42 PM, Geert Uytterhoeven wrote:
+On Fri, Jun 10, 2016 at 09:55:15PM +0200, Tomasz Nowicki wrote:
+> pci_bus_find_domain_nr() retrieves the host bridge domain number in a DT
+> specific way. Factor our pci_bus_find_domain_nr() in a separate DT
 
->>    The only problem I'm seeing (again) is the RCAN clock failing to
->> register:
->>
->> rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
->>
->>    I was going to look at it yesterday but (wrongly) thought it somehow
->> cured itself... I'll look at it now.
->
-> The RCAN parent is the second clock in the CPG node's "clocks" property,
-> which you didn't provide.
+s/our/out
 
-    Actually, the things are more complex. The figure 7.1c suggests that the 
-RCAN clock has different parent on R8A7792 than on the other SoCs -- namely 
-PLL1/VCO 1/4. That may be, since there's just no USB_EXTAL signal on this SoC 
-(it doesn't seem to support any USB IPs). Which means the 'clk-rcar-gen2' 
-driver can't work with the RCAN clock in its current form.
+> function (ie of_pci_bus_find_domain_nr()) so that DT code is self
+> contained, paving the way for retrieving domain number in
+> pci_bus_find_domain_nr() with additional firmware methods (ie ACPI).
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+> ---
+>  drivers/pci/pci.c | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 
-> Gr{oetje,eeting}s,
->
->                         Geert
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-MBR, Sergei
+> 
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index b9a7833..327828d 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -4941,7 +4941,7 @@ int pci_get_new_domain_nr(void)
+>  }
+>  
+>  #ifdef CONFIG_PCI_DOMAINS_GENERIC
+> -int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
+> +static int of_pci_bus_find_domain_nr(struct device *parent)
+>  {
+>  	static int use_dt_domains = -1;
+>  	int domain = -1;
+> @@ -4987,6 +4987,11 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
+>  
+>  	return domain;
+>  }
+> +
+> +int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
+> +{
+> +	return of_pci_bus_find_domain_nr(parent);
+> +}
+>  #endif
+>  #endif
+>  
+> -- 
+> 1.9.1
+> 
