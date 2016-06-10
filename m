@@ -1,31 +1,43 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 10 Jun 2016 16:49:56 +0200
-Subject: [PATCH] ARM: dts: at91: ma5d4: properly define crystals
- frequencies
-In-Reply-To: <1465342279-9193-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1465342279-9193-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <20160610144956.GB19050@piout.net>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 10 Jun 2016 09:50:08 -0500
+Subject: [PATCH 0/8] ARM: dts: Add operating-points-v2 tables for TI
+ platforms
+In-Reply-To: <20160610110414.GX22406@atomide.com>
+References: <cover.1463606963.git.d-gerlach@ti.com>
+ <20160519044744.GE32001@vireshk-i7> <20160610110414.GX22406@atomide.com>
+Message-ID: <575AD3A0.1050203@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/06/2016 at 01:31:19 +0200, Alexandre Belloni wrote :
-> The Denx MA5D4 dts doesn't properly define the slow_xtal and main_xtal
-> frequencies, the PMC then has to fallback to using the RC oscillators whose
-> precision is not really good.
+On 06/10/2016 06:04 AM, Tony Lindgren wrote:
+> * Viresh Kumar <viresh.kumar@linaro.org> [160518 21:49]:
+>> On 18-05-16, 18:36, Dave Gerlach wrote:
+>>> Hi,
+>>> This series adds operating-points-v2 tables for am335x, am437x, dra7xx,
+>>> and am57xx based platforms along with some support patches so that we
+>>> can enable more OPPs for the CPU on these platforms.
+>>>
+>>> These patches rely on the ti-cpufreq series sent here [1] and provide
+>>> opp-supported-hw data for each OPP so that only the appropriate OPPs
+>>> for a specific piece of silicon get enabled.
+>>
+>> Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 > 
-> As both crystals are populated, define their frequencies, see p17 of
-> http://www.denx-cs.de/sites/all/files/MA5D4.HWM_.002.pdf
+> Applying all the dts changes into omap-for-v4.8/dt thanks.
 > 
-> Also, remove the obsolete main_clock definition.
+> Tony
 > 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> ---
->  arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi | 7 +++++--
->  1 file changed, 5 insertions(+), 2 deletions(-)
-> 
-Applied.
+Viresh, are we ready with the cpufreq series?
+
+https://patchwork.kernel.org/patch/9122961/
+https://patchwork.kernel.org/patch/9122921/
+
+Also current series: https://patchwork.kernel.org/patch/9123071/
+Seems to have comments pending.
+
+Dave is on vacation for another week or so, doubt he can respond in
+time -> Should we wait on this series till we get the cpufreq support in?
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Regards,
+Nishanth Menon
