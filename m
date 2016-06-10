@@ -1,102 +1,46 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jun 2016 12:11:32 +0200
-Subject: [PATCH v4 15/44] drm/rockship: dma-mapping: Use unsigned long for
- dma_attrs
-In-Reply-To: <1465553521-27303-1-git-send-email-k.kozlowski@samsung.com>
-References: <1465553521-27303-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1465553521-27303-16-git-send-email-k.kozlowski@samsung.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 10 Jun 2016 11:13:00 +0100
+Subject: [RFC PATCH 05/15] tty: serial: samsung: fixup accessors for endian
+In-Reply-To: <20160608183110.13851-6-matthew@mattleach.net>
+References: <20160608183110.13851-1-matthew@mattleach.net>
+ <20160608183110.13851-6-matthew@mattleach.net>
+Message-ID: <71328b3d-dc2f-3eb9-b664-4d621db23131@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Split out subsystem specific changes for easier reviews. This will be
-squashed with main commit.
+On 08/06/16 19:31, Matthew Leach wrote:
+> Fix the serial access code to deal with kernels built for big endian
+> operation.
+> 
+> Signed-off-by: Matthew Leach <matthew@mattleach.net>
+> ---
+> CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> CC: Jiri Slaby <jslaby@suse.com>
+> CC: linux-serial at vger.kernel.org
+> CC: linux-kernel at vger.kernel.org
+> ---
+>  drivers/tty/serial/samsung.h | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/samsung.h b/drivers/tty/serial/samsung.h
+> index fc5deaa..8818bdd 100644
+> --- a/drivers/tty/serial/samsung.h
+> +++ b/drivers/tty/serial/samsung.h
+> @@ -118,9 +118,9 @@ struct s3c24xx_uart_port {
+>  	((unsigned long *)(unsigned long)((port)->membase + (reg)))
+>  
+>  #define rd_regb(port, reg) (__raw_readb(portaddr(port, reg)))
+> -#define rd_regl(port, reg) (__raw_readl(portaddr(port, reg)))
+> +#define rd_regl(port, reg) (readl_relaxed(portaddr(port, reg)))
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 17 +++++++----------
- drivers/gpu/drm/rockchip/rockchip_drm_gem.h |  2 +-
- 2 files changed, 8 insertions(+), 11 deletions(-)
+For completeness we should have changed __raw_readb to readb_relaxed
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index 9c2d8a894093..7b1788e2a808 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -17,8 +17,6 @@
- #include <drm/drm_gem.h>
- #include <drm/drm_vma_manager.h>
- 
--#include <linux/dma-attrs.h>
--
- #include "rockchip_drm_drv.h"
- #include "rockchip_drm_gem.h"
- 
-@@ -28,15 +26,14 @@ static int rockchip_gem_alloc_buf(struct rockchip_gem_object *rk_obj,
- 	struct drm_gem_object *obj = &rk_obj->base;
- 	struct drm_device *drm = obj->dev;
- 
--	init_dma_attrs(&rk_obj->dma_attrs);
--	dma_set_attr(DMA_ATTR_WRITE_COMBINE, &rk_obj->dma_attrs);
-+	rk_obj->dma_attrs = DMA_ATTR_WRITE_COMBINE;
- 
- 	if (!alloc_kmap)
--		dma_set_attr(DMA_ATTR_NO_KERNEL_MAPPING, &rk_obj->dma_attrs);
-+		rk_obj->dma_attrs |= DMA_ATTR_NO_KERNEL_MAPPING;
- 
- 	rk_obj->kvaddr = dma_alloc_attrs(drm->dev, obj->size,
- 					 &rk_obj->dma_addr, GFP_KERNEL,
--					 &rk_obj->dma_attrs);
-+					 rk_obj->dma_attrs);
- 	if (!rk_obj->kvaddr) {
- 		DRM_ERROR("failed to allocate %#x byte dma buffer", obj->size);
- 		return -ENOMEM;
-@@ -51,7 +48,7 @@ static void rockchip_gem_free_buf(struct rockchip_gem_object *rk_obj)
- 	struct drm_device *drm = obj->dev;
- 
- 	dma_free_attrs(drm->dev, obj->size, rk_obj->kvaddr, rk_obj->dma_addr,
--		       &rk_obj->dma_attrs);
-+		       rk_obj->dma_attrs);
- }
- 
- static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
-@@ -70,7 +67,7 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
- 	vma->vm_pgoff = 0;
- 
- 	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
--			     obj->size, &rk_obj->dma_attrs);
-+			     obj->size, rk_obj->dma_attrs);
- 	if (ret)
- 		drm_gem_vm_close(vma);
- 
-@@ -262,7 +259,7 @@ struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj)
- 
- 	ret = dma_get_sgtable_attrs(drm->dev, sgt, rk_obj->kvaddr,
- 				    rk_obj->dma_addr, obj->size,
--				    &rk_obj->dma_attrs);
-+				    rk_obj->dma_attrs);
- 	if (ret) {
- 		DRM_ERROR("failed to allocate sgt, %d\n", ret);
- 		kfree(sgt);
-@@ -276,7 +273,7 @@ void *rockchip_gem_prime_vmap(struct drm_gem_object *obj)
- {
- 	struct rockchip_gem_object *rk_obj = to_rockchip_obj(obj);
- 
--	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, &rk_obj->dma_attrs))
-+	if (dma_get_attr(DMA_ATTR_NO_KERNEL_MAPPING, rk_obj->dma_attrs))
- 		return NULL;
- 
- 	return rk_obj->kvaddr;
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-index ad22618473a4..18b3488db4ec 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-@@ -23,7 +23,7 @@ struct rockchip_gem_object {
- 
- 	void *kvaddr;
- 	dma_addr_t dma_addr;
--	struct dma_attrs dma_attrs;
-+	unsigned long dma_attrs;
- };
- 
- struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj);
+>  #define wr_regb(port, reg, val) __raw_writeb(val, portaddr(port, reg))
+> -#define wr_regl(port, reg, val) __raw_writel(val, portaddr(port, reg))
+> +#define wr_regl(port, reg, val) writel_relaxed(val, portaddr(port, reg))
+
+Acked-by: Ben Dooks <ben.dooks@codethink.co.uk>
+
 -- 
-1.9.1
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
