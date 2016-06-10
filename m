@@ -1,97 +1,148 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 10 Jun 2016 15:23:37 +0200
-Subject: [PATCH 09/10] dt-bindings: clock: add DT binding for the peripheral
- clocks on Armada 3700
+Date: Fri, 10 Jun 2016 15:23:34 +0200
+Subject: [PATCH 06/10] clk: mvebu: Add the xtal clock for Armada 3700 SoC
 In-Reply-To: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1465565018-14172-10-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1465565018-14172-7-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds the DT binding documentation for the peripheral clocks
-used in the Marvell Armada 3700 SoCs.
+This clock is the parent of all the Armada 3700 clocks. It is a fixed
+rate clock which depends on the gpio configuration read when resetting
+the SoC.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- .../bindings/clock/armada3700-periph-clock.txt     | 70 ++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/armada3700-periph-clock.txt
+ drivers/clk/mvebu/Kconfig            |  3 ++
+ drivers/clk/mvebu/Makefile           |  1 +
+ drivers/clk/mvebu/armada-37xx-xtal.c | 93 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 97 insertions(+)
+ create mode 100644 drivers/clk/mvebu/armada-37xx-xtal.c
 
-diff --git a/Documentation/devicetree/bindings/clock/armada3700-periph-clock.txt b/Documentation/devicetree/bindings/clock/armada3700-periph-clock.txt
+diff --git a/drivers/clk/mvebu/Kconfig b/drivers/clk/mvebu/Kconfig
+index 3165da77d525..fddc8ac5faff 100644
+--- a/drivers/clk/mvebu/Kconfig
++++ b/drivers/clk/mvebu/Kconfig
+@@ -24,6 +24,9 @@ config ARMADA_39X_CLK
+ 	bool
+ 	select MVEBU_CLK_COMMON
+ 
++config ARMADA_37XX_CLK
++       bool
++
+ config ARMADA_XP_CLK
+ 	bool
+ 	select MVEBU_CLK_COMMON
+diff --git a/drivers/clk/mvebu/Makefile b/drivers/clk/mvebu/Makefile
+index 7172ef65693d..4257a36d0219 100644
+--- a/drivers/clk/mvebu/Makefile
++++ b/drivers/clk/mvebu/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_ARMADA_370_CLK)	+= armada-370.o
+ obj-$(CONFIG_ARMADA_375_CLK)	+= armada-375.o
+ obj-$(CONFIG_ARMADA_38X_CLK)	+= armada-38x.o
+ obj-$(CONFIG_ARMADA_39X_CLK)	+= armada-39x.o
++obj-$(CONFIG_ARMADA_37XX_CLK)	+= armada-37xx-xtal.o
+ obj-$(CONFIG_ARMADA_XP_CLK)	+= armada-xp.o
+ obj-$(CONFIG_ARMADA_AP806_SYSCON) += ap806-system-controller.o
+ obj-$(CONFIG_ARMADA_CP110_SYSCON) += cp110-system-controller.o
+diff --git a/drivers/clk/mvebu/armada-37xx-xtal.c b/drivers/clk/mvebu/armada-37xx-xtal.c
 new file mode 100644
-index 000000000000..549a5ad14031
+index 000000000000..fb051a75b2c2
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/armada3700-periph-clock.txt
-@@ -0,0 +1,70 @@
-+* Peripheral Clock bindings for Marvell Armada 37xx SoCs
++++ b/drivers/clk/mvebu/armada-37xx-xtal.c
+@@ -0,0 +1,93 @@
++/*
++ * Marvell Armada 37xx SoC xtal clocks
++ *
++ * Copyright (C) 2016 Marvell
++ *
++ * Gregory CLEMENT <gregory.clement@free-electrons.com>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+Marvell Armada 37xx SoCs provide peripheral clocks which are
-+used as clock source for the peripheral of the SoC.
++#include <linux/clk-provider.h>
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
 +
-+There are two different block associated to north bridge and south
-+bridge.
++#define NB_GPIO1_LATCH	0xC
++#define XTAL_MODE	    BIT(31)
 +
-+The peripheral clock consumer should specify the desired clock by
-+having the clock ID in its "clocks" phandle cell.
++static struct clk *xtal_clk;
 +
-+The following is a list of provided IDs for Armada 370 North bridge clocks:
-+ID	Clock name	Description
-+-----------------------------------
-+0	mmc		MMC controller
-+1	sata_host	Sata Host
-+2	sec_at		Security AT
-+3	sac_dap		Security DAP
-+4	tsecm		Security Engine
-+5	setm_tmx	Serial Embedded Trace Module
-+6	avs		Adaptive Voltage Scaling
-+7	sqf		SPI
-+8	pwm		PWM
-+9	i2c_2		I2C 2
-+10	i2c_1		I2C 1
-+11	ddr_phy		DDR PHY
-+12	ddr_fclk	DDR F clock
-+13	trace		Trace
-+14	counter		Counter
-+15	eip97		EIP 97
-+16	cpu		CPU
++static int armada_3700_xtal_clock_probe(struct platform_device *pdev)
++{
++	struct device_node *np = pdev->dev.of_node;
++	const char *xtal_name = "xtal";
++	struct device_node *parent;
++	struct regmap *regmap;
++	unsigned int rate;
++	u32 reg;
++	int ret;
 +
-+The following is a list of provided IDs for Armada 370 South bridge clocks:
-+ID	Clock name	Description
-+-----------------------------------
-+0	gbe-50		50 MHz parent clock for Gigabit Ethernet
-+1	gbe-core	parent clock for Gigabit Ethernet core
-+2	gbe-125		125 MHz parent clock for Gigabit Ethernet
-+3	gbe1-50		50 MHz clock for Gigabit Ethernet port 1
-+4	gbe0-50		50 MHz clock for Gigabit Ethernet port 0
-+5	gbe1-125	125 MHz clock for Gigabit Ethernet port 1
-+6	gbe0-125	125 MHz clock for Gigabit Ethernet port 0
-+7	gbe1-core	Gigabit Ethernet core port 1
-+8	gbe0-core	Gigabit Ethernet core port 0
-+9	gbe-bm		Gigabit Ethernet Buffer Manager
-+10	sdio		SDIO
-+11	usb32-sub2-sys	USB 2 clock
-+12	usb32-ss-sys	USB 3 clock
++	parent = np->parent;
++	if (!parent) {
++		dev_err(&pdev->dev, "no parrent\n");
++		return -ENODEV;
++	}
 +
-+Required properties:
++	regmap = syscon_node_to_regmap(parent);
++	if (IS_ERR(regmap)) {
++		dev_err(&pdev->dev, "cannot get regmap\n");
++		return PTR_ERR(regmap);
++	}
 +
-+- compatible : shall be "marvell,armada-3700-periph-clock-nb" for the
-+  north bridge block, or
-+  "marvell,armada-3700-periph-clock-sb" for the south bridge block
-+- reg : must be the register address of North/South Bridge Clock register
-+- #clock-cells : from common clock binding; shall be set to 1
++	ret = regmap_read(regmap, NB_GPIO1_LATCH, &reg);
++	if (ret) {
++		dev_err(&pdev->dev, "cannot read from regmap\n");
++		return ret;
++	}
 +
-+- clocks : list of the parent clock phandle in the following order:
-+  TBG-A P, TBG-B P, TBG-A S, TBG-B S and finally the xtal clock.
++	if (reg & XTAL_MODE)
++		rate = 40000000;
++	else
++		rate = 25000000;
 +
++	of_property_read_string_index(np, "clock-output-names", 0, &xtal_name);
++	xtal_clk = clk_register_fixed_rate(NULL, xtal_name, NULL, 0, rate);
++	if (IS_ERR(xtal_clk))
++		return PTR_ERR(xtal_clk);
++	of_clk_add_provider(np, of_clk_src_simple_get, xtal_clk);
 +
-+Example:
++	return 0;
++}
 +
-+nb_perih_clk: nb-periph-clk at 13000{
-+	compatible = "marvell,armada-3700-periph-clock-nb";
-+	reg = <0x13000 0x1000>;
-+	clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
-+	<&tbg 3>, <&xtalclk>;
-+	#clock-cells = <1>;
++static int armada_3700_xtal_clock_remove(struct platform_device *pdev)
++{
++	of_clk_del_provider(pdev->dev.of_node);
++	clk_unregister_fixed_rate(xtal_clk);
++
++	return 0;
++}
++
++static const struct of_device_id armada_3700_xtal_clock_of_match[] = {
++	{ .compatible = "marvell,armada-3700-xtal-clock", },
++	{ }
 +};
++MODULE_DEVICE_TABLE(of, armada_3700_xtal_clock_of_match);
++
++static struct platform_driver armada_3700_xtal_clock_driver = {
++	.probe = armada_3700_xtal_clock_probe,
++	.remove = armada_3700_xtal_clock_remove,
++	.driver		= {
++		.name	= "marvell-armada-3700-xtal-clock",
++		.of_match_table = armada_3700_xtal_clock_of_match,
++	},
++};
++
++module_platform_driver(armada_3700_xtal_clock_driver);
++
++MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
++MODULE_DESCRIPTION("Marvell Armada 37xx SoC xtal clocks driver");
++MODULE_LICENSE("GPL v2");
 -- 
 2.5.0
