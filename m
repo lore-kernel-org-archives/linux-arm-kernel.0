@@ -1,113 +1,125 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 10 Jun 2016 17:56:39 +0100
-Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer interrupt
- trigger
-In-Reply-To: <575AEFC0.1070304@gmail.com>
-References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
- <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
- <5759B143.9070503@caviumnetworks.com> <5759DA3A.4070905@gmail.com>
- <20160610082324.2a0967b0@arm.com> <575AEFC0.1070304@gmail.com>
-Message-ID: <575AF147.40503@arm.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 10 Jun 2016 17:57:59 +0100
+Subject: [PATCH v3 2/3] drm/arm: Add support for Mali Display Processors
+In-Reply-To: <20160610143313.GD3363@phenom.ffwll.local>
+References: <1465489099-25628-1-git-send-email-Liviu.Dudau@arm.com>
+ <1465489099-25628-3-git-send-email-Liviu.Dudau@arm.com>
+ <20160609185629.GU3363@phenom.ffwll.local>
+ <20160610085259.GB1165@e106497-lin.cambridge.arm.com>
+ <20160610143313.GD3363@phenom.ffwll.local>
+Message-ID: <20160610165759.GC1165@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/16 17:50, David Daney wrote:
-> On 06/10/2016 12:23 AM, Marc Zyngier wrote:
->> On Thu, 09 Jun 2016 14:06:02 -0700
->> David Daney <ddaney.cavm@gmail.com> wrote:
->>
->>> I spoke too soon...
->>>
->>> On 06/09/2016 11:11 AM, David Daney wrote:
->>>> On 06/06/2016 10:56 AM, Marc Zyngier wrote:
->>>>> The ARM architected timer specification mandates that the interrupt
->>>>> associated with each timer is level triggered (which corresponds to
->>>>> the "counter >= comparator" condition).
->>>>>
->>>>> A number of DTs are being remarkably creative, declaring the interrupt
->>>>> to be edge triggered. A quick look at the TRM for the corresponding ARM
->>>>> CPUs clearly shows that this is wrong, and I've corrected those.
->>>>> For non-ARM designs (and in the absence of a publicly available TRM),
->>>>> I've made them active low as well, which can't be completely wrong
->>>>> as the GIC cannot disinguish between level low and level high.
->>>>>
->>>>> The respective maintainers are of course welcome to prove me wrong.
->>>>>
->>>>> While I was at it, I took the liberty to fix a couple of related issue,
->>>>> such as some spurious affinity bits on ThunderX, and their complete
->>>>> absence on ls1043a (both of which seem to be related to copy-pasting
->>>>> from other DTs).
->>>>>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> ---
->>>>>    arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
->>>>>    arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
->>>>>    arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
->>>>>    arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
->>>>>    arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
->>>>>    arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
->>>>>    arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
->>>>>    arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
->>>>>    arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
->>>>>    arch/arm64/boot/dts/xilinx/zynqmp.dtsi               | 8 ++++----
->>>>>    10 files changed, 40 insertions(+), 40 deletions(-)
->>>>>
->>>> [...]
->>>>> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
->>>>> b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
->>>>> index 2eb9b22..382d86f 100644
->>>>> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
->>>>> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
->>>>> @@ -354,10 +354,10 @@
->>>>>
->>>>>        timer {
->>>>>            compatible = "arm,armv8-timer";
->>>>> -        interrupts = <1 13 0xff01>,
->>>>> -                     <1 14 0xff01>,
->>>>> -                     <1 11 0xff01>,
->>>>> -                     <1 10 0xff01>;
->>>>> +        interrupts = <1 13 8>,
->>>>> +                     <1 14 8>,
->>>>> +                     <1 11 8>,
->>>>> +                     <1 10 8>;
->>>
->>>
->>> NAK!
->>>
->>> According to arm,gic-v3.txt the trigger value must be either 1 or 4:
->>>
->>>     The 3rd cell is the flags, encoded as follows:
->>>           bits[3:0] trigger type and level flags.
->>>                   1 = edge triggered
->>>                   4 = level triggered
->>
->> Which is a bug in the binding description. PPIs can be any trigger
->> (just look at the TRM for CPUs that have devices connected to a PPI to
->> be convinced - most of them are level low).
->>
->> This doesn't mean that you can distinguish level-high from level-low
->> in a programmatic way. But the HW definitely can handle it.
->>
->> I'll update the GICv3 binding to reflect this.
->>
->> Now, coming back to your NAK: is level-low the right or wrong trigger
->> for your implementation of the architected timers?
->>
+On Fri, Jun 10, 2016 at 04:33:13PM +0200, Daniel Vetter wrote:
+> On Fri, Jun 10, 2016 at 09:52:59AM +0100, Liviu Dudau wrote:
+> > On Thu, Jun 09, 2016 at 08:56:29PM +0200, Daniel Vetter wrote:
+> > I'm seeing ->disable being called at HPD event time, which is soon after ->probe.
+> > 
+> > > This is the case when enabling a crtc when it is fully
+> > > disabled. Just mentioning in case ->enter_config_mode() is something that
+> > > must be called symmetrically with ->leave_config_mode().
+> > 
+> > ->leave_config_mode() should be the default mode when HW is disabled or not active,
+> > and the reset default value. Regardless of that, ->enter_config_mode() can be
+> > called at any time, even if HW is already in config mode.
+> > 
+> > > > +
+> > > > +	/* mclk needs to be set to the same or higher rate than pxlclk */
+> > > > +	clk_set_rate(hwdev->mclk, crtc->state->adjusted_mode.crtc_clock * 1000);
+> > > > +	clk_set_rate(hwdev->pxlclk, crtc->state->adjusted_mode.crtc_clock * 1000);
+> > > > +
+> > > > +	hwdev->modeset(hwdev, &vm);
+> > > > +	hwdev->leave_config_mode(hwdev);
+> > > > +}
+> > > > +
+> > > > +static void malidp_crtc_disable(struct drm_crtc *crtc)
+> > > > +{
+> > > > +	struct malidp_drm *malidp = crtc_to_malidp_device(crtc);
+> > > > +	struct malidp_hw_device *hwdev = malidp->dev;
+> > > > +
+> > > > +	/*
+> > > > +	 * avoid disabling already disabled clocks and hardware
+> > > > +	 * (as is the case at device probe time)
+> > > > +	 */
+> > > > +	if (crtc->state->active) {
+> > > 
+> > > Comment doesn't match code. Checking crtc->state->active in ->disable
+> > > looks at the _new_ state, not at the current state of the crtc. Atomic
+> > > helpers already guarantee you that ->disable is only called when the CRTC
+> > > is still on. 
+> > 
+> > Except at probe* time, when the framework calls ->disable before modeset to
+> > make sure that the hardware is in a known state. And I'm not sure how to
+> > check the _current_ state of the crtc other than by using crtc->state.
+> > 
+> > * actually, it is HPD event after probe.
 > 
-> For the Cavium Thunder implementation of GIC-v3, there is no concept of 
-> high and low.  All we have is asserted and not-asserted, we have chosen 
-> to map the concept of an asserted level-triggered source to 
-> IRQ_TYPE_LEVEL_HIGH, and the transition from not-asserted to asserted on 
-> an edge triggered source to IRQ_TYPE_EDGE_RISING.
+> Surprising. And you don't have a call to
+> drm_helper_disable_unused_functions, which is the usual culprit. Where
+> exactly do you see that ->disable call? Can you pls capture a backtrace
+> with full drm debugging enabled?
+> 
+> This shouldn't happen with atomic ...
 
-The GIC, no matter if it is from Cavium or not, doesn't have a notion of
-high or low indeed *from a programming interface point of view*. What
-matters here is the *device*, and how it is connected to the interrupt
-controller. And I'm pretty sure your timers are *physically* one or the
-other (unless they are simply floating? ;-)
+Yes, it looks like that is now true. I can no longer reproduce the WARN I was
+getting when clk_disable_unprepare() was being called in malidp_crtc_disable()
+without the crtc->state->active check :(
 
-Thanks,
+> 
+> > > > +static void malidp_unbind(struct device *dev)
+> > > > +{
+> > > > +	struct drm_device *drm = dev_get_drvdata(dev);
+> > > > +	struct malidp_drm *malidp = drm->dev_private;
+> > > > +	struct malidp_hw_device *hwdev = malidp->dev;
+> > > > +
+> > > > +	if (malidp->fbdev) {
+> > > > +		drm_fbdev_cma_fini(malidp->fbdev);
+> > > > +		malidp->fbdev = NULL;
+> > > > +	}
+> > > > +	drm_kms_helper_poll_fini(drm);
+> > > > +	malidp_se_irq_fini(drm);
+> > > > +	malidp_de_irq_fini(drm);
+> > > > +	drm_vblank_cleanup(drm);
+> > > > +	component_unbind_all(dev, drm);
+> > > > +	drm_dev_unregister(drm);
+> > > 
+> > > Unregister first, also need to unregister connectors too.
+> > 
+> > Bah, you are right. Does unregister have to come even before
+> > drm_kms_helper_poll_fini() ?
+> 
+> It's just generally the safest approach to first unregister everything,
+> and only then start cleaning up.
+> 
+> > As for the connectors, because my driver uses an encoder that
+> > is also a component slave, component_[un]bind_all() should take
+> > care of [un]registering that.
+> 
+> E.g. this sounds unsafe, because drm assume that encoder lists are static
+> over the lifetime of the driver. You should make sure no one can get at it
+> any more first before cleaning up any components.
 
-	M.
+List is static. The encoders are only taken down as part of the component
+unwinding, which is during module removal.
+
+Best regards,
+Liviu
+
+> 
+> Cheers, Daniel
+> -- 
+> Daniel Vetter
+> Software Engineer, Intel Corporation
+> http://blog.ffwll.ch
+> 
+
 -- 
-Jazz is not dead. It just smells funny...
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
