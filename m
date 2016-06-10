@@ -1,45 +1,45 @@
-From: b-liu@ti.com (Bin Liu)
-Date: Fri, 10 Jun 2016 10:00:14 -0500
-Subject: [PATCH v4] USB: Fix of_usb_get_dr_mode_by_phy with a shared phy
- block
-In-Reply-To: <1465551985-3332-1-git-send-email-hdegoede@redhat.com>
-References: <1465551985-3332-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160610150014.GF2167@uda0271908>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 10 Jun 2016 16:02:16 +0100
+Subject: [PATCH] ARM: tegra: fix missing include <soc/tegra/cpuidle.h>
+In-Reply-To: <575ACFB5.4070706@nvidia.com>
+References: <1465404897-16654-1-git-send-email-ben.dooks@codethink.co.uk>
+ <20160610142210.GN27142@ulmo.ba.sec> <575ACFB5.4070706@nvidia.com>
+Message-ID: <82f77fc8-824c-3d36-74ae-a886753286e3@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jun 10, 2016 at 11:46:25AM +0200, Hans de Goede wrote:
-> Some SoCs have a single phy-hw-block with multiple phys, this is
-> modelled by a single phy dts node, so we end up with multiple
-> controller nodes with a phys property pointing to the phy-node
-> of the otg-phy.
+On 10/06/16 15:33, Jon Hunter wrote:
 > 
-> Only one of these controllers typically is an otg controller, yet we
-> were checking the first controller who uses a phy from the block and
-> then end up looking for a dr_mode property in e.g. the ehci controller.
-> 
-> This commit fixes this by adding an arg0 parameter to
-> of_usb_get_dr_mode_by_phy and make of_usb_get_dr_mode_by_phy
-> check that this matches the phandle args[0] value when looking for
-> the otg controller.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -Add a arg0 parameter instead of looking for nodes with a dr_mode property
-> Changes in v3:
-> -No changes
-> Changes in v4:
-> -When arg0 == -1, use of_parse_phandle instead of of_parse_phandle_with_args
->  because using of_parse_phandle_with_args breaks phy's which use the usb-phy
->  bindings instead of the generic phy bindings
+> On 10/06/16 15:22, Thierry Reding wrote:
+>> * PGP Signed by an unknown key
+>>
+>> On Wed, Jun 08, 2016 at 05:54:57PM +0100, Ben Dooks wrote:
+>>> The prototype of tegra_cpuidle_pcie_irqs_in_use() is missing
+>>> from the cpuidle.c file, it is defined in <soc/tegra/cpuidle.h>
+>>> so add that include to avoid the following warning:
+>>>
+>>> arch/arm/mach-tegra/cpuidle.c:51:6: warning: symbol 'tegra_cpuidle_pcie_irqs_in_use' was not declared. Should it be static?
+>>>
+>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>>> ---
+>>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+>>> Cc: Alexandre Courbot <gnurou@gmail.com>
+>>> Cc: Thierry Reding <thierry.reding@gmail.com>
+>>> Cc: linux-arm-kernel at lists.infradead.org
+>>> Cc: linux-tegra at vger.kernel.org
+>>> ---
+>>>  arch/arm/mach-tegra/cpuidle.c | 1 +
+>>>  1 file changed, 1 insertion(+)
+>>
+>> I've been carrying a set of patches to fix these, and a couple of other
+>> sparse warnings, in my tree locally, but never sent them out because
+>> they were so trivial. I probably should've to avoid the duplication of
+>> effort. Sorry about that.
 
-I would think you'd better send this patch with --in-reply-to to the
-patch in v3, so whoever picks it can easily pick the whole patch set,
-especially in this case the set touches multiple modules, and you don't
-want to resend the other patches.
+Given it is likely that gcc warning flags will be updated
+it'd be good to get these issues sorted out.
 
-Regards,
--Bin.
+
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
