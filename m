@@ -1,167 +1,101 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Fri, 10 Jun 2016 16:57:46 +0100
-Subject: [PATCH] ARM: uaccess: remove put_user() code duplication
-Message-ID: <E1bBOoc-00038i-Sf@rmk-PC.armlinux.org.uk>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Fri, 10 Jun 2016 18:08:05 +0200
+Subject: [BUG] Page allocation failures with newest kernels
+In-Reply-To: <CAPv3WKd8TbvTPc_+5qQvZwUH-bfMx5-A1LMdT08Am0as8PXLtQ@mail.gmail.com>
+References: <CAPv3WKdYdwpi3k5eY86qibfprMFwkYOkDwHOsNydp=0sTV3mgg@mail.gmail.com>
+ <60e8df74202e40b28a4d53dbc7fd0b22@IL-EXCH02.marvell.com>
+ <20160531131520.GI24936@arm.com>
+ <CAPv3WKftqsEXbdU-geAcUKXBSskhA0V72N61a1a+5DfahLK_Dg@mail.gmail.com>
+ <20160602135226.GX2527@techsingularity.net>
+ <CAPv3WKd8Zdcv5nhr2euN7L4W5JYLex_Hmn+9AVd6reyD-Vw4kg@mail.gmail.com>
+ <20160603095344.GZ2527@techsingularity.net>
+ <CAPv3WKfrgNg00M4oE3VKLYimYqN6NO6ziR7LWYXQ1d_M-bo67A@mail.gmail.com>
+ <20160603123655.GA2527@techsingularity.net>
+ <CAPv3WKfEQCeR++uqaUVhhsNe0WFsKq1Sn9uo==9NxtQe=GV7zw@mail.gmail.com>
+ <20160608100950.GH2527@techsingularity.net>
+ <CAPv3WKd8TbvTPc_+5qQvZwUH-bfMx5-A1LMdT08Am0as8PXLtQ@mail.gmail.com>
+Message-ID: <CAPv3WKfZTGxXW71vfmLVLocxTXkdrnmTt+vsrH570V-sQjNTuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the code duplication between put_user() and __put_user().  The
-code which selected the implementation based upon the pointer size, and
-declared the local variable to hold the value to be put are common to
-both implementations.
+Hi Mel,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/include/asm/uaccess.h | 106 +++++++++++++++++++----------------------
- 1 file changed, 49 insertions(+), 57 deletions(-)
+Thanks for posting patch. I tested it on LKv4.4.8. Despite
+"mode:0x2284020" shows that __GFP_ATOMIC is now not stripped, the
+issue remains:
+http://pastebin.com/DmezUJSc
 
-diff --git a/arch/arm/include/asm/uaccess.h b/arch/arm/include/asm/uaccess.h
-index 7badc3e55109..faa47f979f04 100644
---- a/arch/arm/include/asm/uaccess.h
-+++ b/arch/arm/include/asm/uaccess.h
-@@ -230,49 +230,23 @@ extern int __put_user_2(void *, unsigned int);
- extern int __put_user_4(void *, unsigned int);
- extern int __put_user_8(void *, unsigned long long);
- 
--#define __put_user_x(__r2, __p, __e, __l, __s)				\
--	   __asm__ __volatile__ (					\
--		__asmeq("%0", "r0") __asmeq("%2", "r2")			\
--		__asmeq("%3", "r1")					\
--		"bl	__put_user_" #__s				\
--		: "=&r" (__e)						\
--		: "0" (__p), "r" (__r2), "r" (__l)			\
--		: "ip", "lr", "cc")
--
--#define __put_user_check(x, p)						\
-+#define __put_user_check(__pu_val, __ptr, __err, __s)			\
- 	({								\
- 		unsigned long __limit = current_thread_info()->addr_limit - 1; \
--		const typeof(*(p)) __user *__tmp_p = (p);		\
--		register const typeof(*(p)) __r2 asm("r2") = (x);	\
--		register const typeof(*(p)) __user *__p asm("r0") = __tmp_p; \
-+		register typeof(__pu_val) __r2 asm("r2") = __pu_val;	\
-+		register const void __user *__p asm("r0") = __ptr;	\
- 		register unsigned long __l asm("r1") = __limit;		\
- 		register int __e asm("r0");				\
--		unsigned int __ua_flags = uaccess_save_and_enable();	\
--		switch (sizeof(*(__p))) {				\
--		case 1:							\
--			__put_user_x(__r2, __p, __e, __l, 1);		\
--			break;						\
--		case 2:							\
--			__put_user_x(__r2, __p, __e, __l, 2);		\
--			break;						\
--		case 4:							\
--			__put_user_x(__r2, __p, __e, __l, 4);		\
--			break;						\
--		case 8:							\
--			__put_user_x(__r2, __p, __e, __l, 8);		\
--			break;						\
--		default: __e = __put_user_bad(); break;			\
--		}							\
--		uaccess_restore(__ua_flags);				\
--		__e;							\
-+		__asm__ __volatile__ (					\
-+			__asmeq("%0", "r0") __asmeq("%2", "r2")		\
-+			__asmeq("%3", "r1")				\
-+			"bl	__put_user_" #__s			\
-+			: "=&r" (__e)					\
-+			: "0" (__p), "r" (__r2), "r" (__l)		\
-+			: "ip", "lr", "cc");				\
-+		__err = __e;						\
- 	})
- 
--#define put_user(x, p)							\
--	({								\
--		might_fault();						\
--		__put_user_check(x, p);					\
--	 })
--
- #else /* CONFIG_MMU */
- 
- /*
-@@ -290,7 +264,7 @@ static inline void set_fs(mm_segment_t fs)
- }
- 
- #define get_user(x, p)	__get_user(x, p)
--#define put_user(x, p)	__put_user(x, p)
-+#define __put_user_nocheck __put_user_check
- 
- #endif /* CONFIG_MMU */
- 
-@@ -381,36 +355,54 @@ do {									\
- #define __get_user_asm_word(x, addr, err)			\
- 	__get_user_asm(x, addr, err, ldr)
- 
-+
-+#define __put_user_switch(x, ptr, __err, __fn)				\
-+	do {								\
-+		const __typeof__(*(ptr)) __user *__pu_ptr = (ptr);	\
-+		__typeof__(*(ptr)) __pu_val = (x);			\
-+		unsigned int __ua_flags;				\
-+		might_fault();						\
-+		__ua_flags = uaccess_save_and_enable();			\
-+		switch (sizeof(*(ptr))) {				\
-+		case 1: __fn(__pu_val, __pu_ptr, __err, 1); break;	\
-+		case 2:	__fn(__pu_val, __pu_ptr, __err, 2); break;	\
-+		case 4:	__fn(__pu_val, __pu_ptr, __err, 4); break;	\
-+		case 8:	__fn(__pu_val, __pu_ptr, __err, 8); break;	\
-+		default: __err = __put_user_bad(); break;		\
-+		}							\
-+		uaccess_restore(__ua_flags);				\
-+	} while (0)
-+
-+#define put_user(x, ptr)						\
-+({									\
-+	int __pu_err;							\
-+	__put_user_switch((x), (ptr), __pu_err, __put_user_check);	\
-+	__pu_err;							\
-+})
-+
- #define __put_user(x, ptr)						\
- ({									\
- 	long __pu_err = 0;						\
--	__put_user_err((x), (ptr), __pu_err);				\
-+	__put_user_switch((x), (ptr), __pu_err, __put_user_nocheck);	\
- 	__pu_err;							\
- })
- 
- #define __put_user_error(x, ptr, err)					\
- ({									\
--	__put_user_err((x), (ptr), err);				\
-+	__put_user_switch((x), (ptr), (err), __put_user_nocheck);	\
- 	(void) 0;							\
- })
- 
--#define __put_user_err(x, ptr, err)					\
--do {									\
--	unsigned long __pu_addr = (unsigned long)(ptr);			\
--	unsigned int __ua_flags;					\
--	__typeof__(*(ptr)) __pu_val = (x);				\
--	__chk_user_ptr(ptr);						\
--	might_fault();							\
--	__ua_flags = uaccess_save_and_enable();				\
--	switch (sizeof(*(ptr))) {					\
--	case 1: __put_user_asm_byte(__pu_val, __pu_addr, err);	break;	\
--	case 2: __put_user_asm_half(__pu_val, __pu_addr, err);	break;	\
--	case 4: __put_user_asm_word(__pu_val, __pu_addr, err);	break;	\
--	case 8:	__put_user_asm_dword(__pu_val, __pu_addr, err);	break;	\
--	default: __put_user_bad();					\
--	}								\
--	uaccess_restore(__ua_flags);					\
--} while (0)
-+#define __put_user_nocheck(x, __pu_ptr, __err, __size)			\
-+	do {								\
-+		unsigned long __pu_addr = (unsigned long)__pu_ptr;	\
-+		__put_user_nocheck_##__size(x, __pu_addr, __err);	\
-+	} while (0)
-+
-+#define __put_user_nocheck_1 __put_user_asm_byte
-+#define __put_user_nocheck_2 __put_user_asm_half
-+#define __put_user_nocheck_4 __put_user_asm_word
-+#define __put_user_nocheck_8 __put_user_asm_dword
- 
- #define __put_user_asm(x, __pu_addr, err, instr)		\
- 	__asm__ __volatile__(					\
--- 
-2.1.0
+Best regards,
+Marcin
+
+2016-06-09 20:13 GMT+02:00 Marcin Wojtas <mw@semihalf.com>:
+> Hi Mel,
+>
+> My last email got cut in half.
+>
+> 2016-06-08 12:09 GMT+02:00 Mel Gorman <mgorman@techsingularity.net>:
+>> On Tue, Jun 07, 2016 at 07:36:57PM +0200, Marcin Wojtas wrote:
+>>> Hi Mel,
+>>>
+>>>
+>>>
+>>> 2016-06-03 14:36 GMT+02:00 Mel Gorman <mgorman@techsingularity.net>:
+>>> > On Fri, Jun 03, 2016 at 01:57:06PM +0200, Marcin Wojtas wrote:
+>>> >> >> For the record: the newest kernel I was able to reproduce the dumps
+>>> >> >> was v4.6: http://pastebin.com/ekDdACn5. I've just checked v4.7-rc1,
+>>> >> >> which comprise a lot (mainly yours) changes in mm, and I'm wondering
+>>> >> >> if there may be a spot fix or rather a series of improvements. I'm
+>>> >> >> looking forward to your opinion and would be grateful for any advice.
+>>> >> >>
+>>> >> >
+>>> >> > I don't believe we want to reintroduce the reserve to cope with CMA. One
+>>> >> > option would be to widen the gap between low and min watermark by the
+>>> >> > size of the CMA region. The effect would be to wake kswapd earlier which
+>>> >> > matters considering the context of the failing allocation was
+>>> >> > GFP_ATOMIC.
+>>> >>
+>>> >> Of course my intention is not reintroducing anything that's gone
+>>> >> forever, but just to find out way to overcome current issues. Do you
+>>> >> mean increasing CMA size?
+>>> >
+>>> > No. There is a gap between the low and min watermarks. At the low point,
+>>> > kswapd is woken up and at the min point allocation requests either
+>>> > either direct reclaim or fail if they are atomic. What I'm suggesting
+>>> > is that you adjust the low watermark and add the size of the CMA area
+>>> > to it so that kswapd is woken earlier. The watermarks are calculated in
+>>> > __setup_per_zone_wmarks
+>>> >
+>>>
+>>> I printed all zones' settings, whose watermarks are configured within
+>>> __setup_per_zone_wmarks(). There are three DMA, Normal and Movable -
+>>> only first one's watermarks have non-zero values. Increasing DMA min
+>>> watermark didn't help. I also played with increasing
+>>
+>> Patch?
+>>
+>
+> I played with increasing min_free_kbytes from ~2600 to 16000. It
+> resulted in shifting watermarks levels in __setup_per_zone_wmarks(),
+> however only for zone DMA. Normal and Movable remained at 0. No
+> progress with avoiding page alloc failures - a gap between 'free' and
+> 'free_cma' was huge, so I don't think that CMA itself would be a root
+> cause.
+>
+>> Did you establish why GFP_ATOMIC (assuming that's the failing site) had
+>> not specified __GFP_ATOMIC at the time of the allocation failure?
+>>
+>
+> Yes. It happens in new_slab() in following lines:
+> return allocate_slab(s, flags & (GFP_RECLAIM_MASK | GFP_CONSTRAINT_MASK), node);
+> I added "| GFP_ATOMIC" and in such case I got same dumps but with one
+> bit set more in gfp_mask, so I don't think it's an issue.
+>
+> Latest patches in v4.7-rc1 seem to boost page alloc performance enough
+> to avoid problems observed between v4.2 and v4.6. Hence before
+> rebasing from v4.4 to another LTS >v4.7 in future, we decided as a WA
+> to return to using MIGRATE_RESERVE + adding fix for
+> early_page_nid_uninitialised(). Now operation seems stable on all our
+> SoC's during the tests.
+>
+> Best regards,
+> Marcin
