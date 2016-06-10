@@ -1,76 +1,59 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 10 Jun 2016 15:18:55 +0200
-Subject: [PATCH v3 20/20] dt-bindings: pwm: sti: Update DT bindings with
- recent changes
-In-Reply-To: <20160609114107.GB1388@dell>
-References: <20160608092135.21184-1-lee.jones@linaro.org>
- <20160608092135.21184-21-lee.jones@linaro.org>
- <20160608205152.GA5511@rob-hp-laptop> <20160609114107.GB1388@dell>
-Message-ID: <20160610131855.GG27142@ulmo.ba.sec>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 10 Jun 2016 15:23:28 +0200
+Subject: [PATCH 00/10] Add clock support for Armada 37xx SoCs
+Message-ID: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 12:41:07PM +0100, Lee Jones wrote:
-> On Wed, 08 Jun 2016, Rob Herring wrote:
-> 
-> > On Wed, Jun 08, 2016 at 10:21:35AM +0100, Lee Jones wrote:
-> > > We're renaming the 'st,pwm-num-chan' binding to 'st,pwm-num-devs' to
-> > > be more inline with the naming conventions of the subsystem.  Where
-> > > we used to treat each line as a channel, the PWM convention is to
-> > > describe them as devices.
-> > 
-> > That's all linux implementation details and you are breaking 
-> > compatibility.
-> 
-> Normally I'd agree with you, but I happen to know that a) this IP is
-> currently unused and b) up until this point (and probably beyond), ST
-> always ship the DTB with the kernel, so there will be no breakage.
+Hi,
 
-Heh... I've long given up on trying to make that argument go anywhere.
-The general rule is that once we support a binding in a kernel release
-we have to support it indefinitely. If you really want to go ahead with
-this change (I don't think you should), you'd at least have to document
-both properties and support st,pwm-num-chan in the driver for backwards
-compatibility.
+this series add clock support for the Armada 37xx SoCs.
 
-> > > The second documentation adaption entails adding support for PWM
-> > > capture devices.  A new clock is required as well as an IRQ line.
-> > > We're also adding a new property similar to the one described
-> > > above, but for capture channels.  Typically, there will be less
-> > > capture channels than PWM-out, since all channels have the latter
-> > > capability, but only some have capture support.
-> > 
-> > Humm, sounds like all of this should be implied from compatible strings.
-> 
-> You mean have a bunch of of_machine_is_compatibles() scattered around?
+The design of the drivers is as close as possible as the hardware is,
+with some clocks made of several layers: muxing, divider and gating.
 
-I don't understand why you need this at all. Quite frankly I don't even
-know why st,pwm-num-devs exists. I probably missed it back at the time.
-Usually, like Rob suggests, this should be inferred from the compatible
-string. One commonly used way to avoid scattering explicit checks for
-the compatible string is to add this information to the of_device_id
-table. See a bunch of existing drivers for reference.
+The device tree binding was written in a way that even if we discover
+some change inside the clocks, the binding should not be
+affected. Especially, there are some holes in the clocks, but we
+should be able to add them seamless.
 
-Also, why make a separation of output vs. capture channels at this
-point? Could you not simply obtain the total number of PWM channels,
-preferably from SoC data associated with the compatible string, and
-check at ->capture() time whether or not the particular PWM supports
-this?
+I tried to follow the last update made in the clock framework, I hope
+theses drivers will comply the new guidelines.
 
-As-is, you imply that you have n (output) + m (capture) channels, and
-that 0..n-1 are output and n..n+m-1 are capture channels. What if that
-no longer holds true, but 0 and 2 are the only ones that support
-capture?
+Thanks,
 
-If you check for this at runtime you can avoid complicated DT parsing
-code, but still get the safety check which should be enough to encourage
-people to use the right channels in DT.
+Gregory
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/350cffbb/attachment.sig>
+Gregory CLEMENT (10):
+  arm64: marvell: enable Armada 3700 clock drivers
+  arm64: dts: marvell: Add xtal clock support for Armada 3700
+  arm64: dts: marvell: add tbg clocks for Armada 37xx
+  arm64: dts: marvell: add peripherals clocks for Armada 37xx
+  dt-bindings: clock: add DT binding for the Xtal clock on Armada 3700
+  clk: mvebu: Add the xtal clock for Armada 3700 SoC
+  dt-bindings: clock: add DT binding for the TBG clocks on Armada 3700
+  clk: mvebu Add the time base generator clocks for Armada 3700
+  dt-bindings: clock: add DT binding for the peripheral clocks on Armada
+    3700
+  clk: mvebu: Add the peripheral clock driver for Armada 3700
+
+ .../bindings/clock/armada3700-periph-clock.txt     |  70 ++++
+ .../bindings/clock/armada3700-tbg-clock.txt        |  27 ++
+ .../bindings/clock/armada3700-xtal-clock.txt       |  28 ++
+ arch/arm64/Kconfig.platforms                       |   1 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |  35 ++
+ drivers/clk/mvebu/Kconfig                          |   3 +
+ drivers/clk/mvebu/Makefile                         |   3 +
+ drivers/clk/mvebu/armada-37xx-periph.c             | 462 +++++++++++++++++++++
+ drivers/clk/mvebu/armada-37xx-tbg.c                | 172 ++++++++
+ drivers/clk/mvebu/armada-37xx-xtal.c               |  93 +++++
+ 10 files changed, 894 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/armada3700-periph-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/armada3700-tbg-clock.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/armada3700-xtal-clock.txt
+ create mode 100644 drivers/clk/mvebu/armada-37xx-periph.c
+ create mode 100644 drivers/clk/mvebu/armada-37xx-tbg.c
+ create mode 100644 drivers/clk/mvebu/armada-37xx-xtal.c
+
+-- 
+2.5.0
