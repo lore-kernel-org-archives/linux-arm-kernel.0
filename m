@@ -1,41 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Jun 2016 06:01:15 -0700
-Subject: [PATCH v8 5/9] ARM: dts: am437x/am33xx/da850: Add new ECAP and
- EPWM bindings
-In-Reply-To: <20160610124022.GD27142@ulmo.ba.sec>
-References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
- <1462291015-1919-6-git-send-email-fcooper@ti.com>
- <20160610103423.GT22406@atomide.com>
- <20160610120142.GK22406@atomide.com>
- <20160610124022.GD27142@ulmo.ba.sec>
-Message-ID: <20160610130114.GP22406@atomide.com>
+From: ben.dooks@codethink.co.uk (Ben Dooks)
+Date: Fri, 10 Jun 2016 14:02:33 +0100
+Subject: [RFC PATCH 07/15] ARM: exynos: fixup debug macros for big-endian
+In-Reply-To: <575AA193.7040907@samsung.com>
+References: <20160608183110.13851-1-matthew@mattleach.net>
+ <20160608183110.13851-8-matthew@mattleach.net>
+ <ab51fcde-dfee-a70c-53c4-09485bfa7669@codethink.co.uk>
+ <575AA193.7040907@samsung.com>
+Message-ID: <17ac39d6-d451-ed43-1aa6-f2af462a61e0@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thierry Reding <thierry.reding@gmail.com> [160610 05:42]:
-> On Fri, Jun 10, 2016 at 05:01:43AM -0700, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [160610 03:37]:
-> > > * Franklin S Cooper Jr <fcooper@ti.com> [160503 08:58]:
-> > > > Switch to a new ECAP and EPWM bindings that doesn't depend on hwmod to
-> > > > provide the various required clocks.
-> > > > 
-> > > > For AM437 and AM335x, add the required clocks explicitly to DT. The
-> > > > hwmod entries for ECAP and EPWM will be removed and this will prevent
-> > > > anything from breaking.
-> > > 
-> > > I've applying the first patch into omap-for-v4.8/soc, the rest into
-> > > omap-for-v4.8/dt. Note that this patch did not apply against d850.dtsi
-> > > so please resend that change as a separate patch to the davinci
-> > > maintainer.
-> > 
-> > And I did not apply patch "pwms: pwm-ti*: Get the clock from the PWMSS
-> > parent when using old bindings", Thierry should take that one.
+On 10/06/16 12:16, Krzysztof Kozlowski wrote:
+> On 06/10/2016 01:12 PM, Ben Dooks wrote:
+>> On 08/06/16 19:31, Matthew Leach wrote:
+>>> From: Ben Dooks <ben.dooks@codethink.co.uk>
+>>>
+>>> The exynos low-level debug macros need to be fixed if the system is being
+>>> built big endian. Add the necessary endian swaps for accessing the registers
+>>> to get output working again
+>>>
+>>> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+>>> ---
+>>>  arch/arm/include/debug/samsung.S | 8 ++++++++
+>>>  1 file changed, 8 insertions(+)
+>>
+>> Should this go via the maintainer or to RMK?
+>>
+>> If to RMK, then shall I get it submitted (and does anyone else
+>> want to ack?)
 > 
-> Tony, did you take patches 3 and 4 already? It's fine if yo have, just
-> wanted to know whether I should pick those up as well.
+> If there are no objections, I can take it through samsung-soc with other
+> arch/arm/mach-exynos* patches.
+> 
+> What I am missing here, is Matthew's Signed-off-by.
+> 
+> Matthew, you touched and sent the patch so could you add the Sob?
 
-Yes looks like I also took the binding documentation patches too.
+I've asked Matthew to re-send the core patches with the signed-off
+sorted out. He can also put them on a public facing git server if
+that would be helpful.
 
-Regards,
-
-Tony
+-- 
+Ben Dooks				http://www.codethink.co.uk/
+Senior Engineer				Codethink - Providing Genius
