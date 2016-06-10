@@ -1,44 +1,33 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 10 Jun 2016 16:47:04 -0700
-Subject: [PATCH] ARM: dts: qcom: msm8974-honami: Set DMA as remotely
- controlled
-In-Reply-To: <1465596928-20843-1-git-send-email-andy.gross@linaro.org>
-References: <1465596928-20843-1-git-send-email-andy.gross@linaro.org>
-Message-ID: <20160610234704.GR1256@tuxbot>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 10 Jun 2016 19:50:43 -0400 (EDT)
+Subject: [PATCH V9 00/11] Support for ARM64 ACPI based PCI host controller
+In-Reply-To: <20160610234107.GC7671@localhost>
+References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
+ <20160610234107.GC7671@localhost>
+Message-ID: <66887FB8-0D7E-42A0-AC25-A0BB8045D1B9@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 10 Jun 15:15 PDT 2016, Andy Gross wrote:
+Thank you Bjorn :)
 
-> This patch adds the qcom,controlled-remotely property for the blsp2_bam
-> controller node.  This board requires this, otherwise the board fails to
-> boot due to access of protected registers during BAM initialization.
-> 
-> Fixes: 62bc81792223 dts: msm8974: Add blsp2_bam dma node
-> 
-> Signed-off-by: Andy Gross <andy.gross@linaro.org>
+Next time we are in the same place (anyone involved in this series), beer is on me.
 
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+-- 
+Computer Architect | Sent from my 64-bit #ARM Powered phone
 
-> ---
->  arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts | 4 ++++
->  1 file changed, 4 insertions(+)
+> On Jun 10, 2016, at 18:41, Bjorn Helgaas <helgaas@kernel.org> wrote:
 > 
-> diff --git a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> index a0398b6..3fb4dad 100644
-> --- a/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> +++ b/arch/arm/boot/dts/qcom-msm8974-sony-xperia-honami.dts
-> @@ -367,6 +367,10 @@
->  		};
->  
->  	};
-> +
-> +	dma-controller at f9944000 {
-> +		qcom,controlled-remotely;
-> +	};
->  };
->  
->  &spmi_bus {
-> -- 
-> 1.9.1
+>> On Fri, Jun 10, 2016 at 09:55:08PM +0200, Tomasz Nowicki wrote:
+>> From the functionality point of view this series may be split into the
+>> following logic parts:
+>> 1. Export ECAM API and add parent device to pci_config_window
+>> 2. Add IO resources handling to PCI core code
+>> 3. New MCFG driver
+>> 4. Cleanups and support for generic domain assignment based on ACPI
+>> 5. Implement ARM64 ACPI based PCI host controller driver under arch/arm64/
 > 
+> This is beautiful!  It really turned out well.
+> 
+> I applied all these to pci/arm64-acpi for v4.8.
+> 
+> Bjorn
