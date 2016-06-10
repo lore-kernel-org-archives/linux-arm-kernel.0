@@ -1,221 +1,516 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jun 2016 12:11:17 +0200
-Subject: [PATCH v4 00/44] dma-mapping: Use unsigned long for dma_attrs
-Message-ID: <1465553521-27303-1-git-send-email-k.kozlowski@samsung.com>
+Date: Fri, 10 Jun 2016 12:11:21 +0200
+Subject: [PATCH v4 04/44] ARM: dma-mapping: Use unsigned long for dma_attrs
+In-Reply-To: <1465553521-27303-1-git-send-email-k.kozlowski@samsung.com>
+References: <1465553521-27303-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1465553521-27303-5-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Split out subsystem specific changes for easier reviews. This will be
+squashed with main commit.
 
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
+ arch/arm/common/dmabounce.c              |  4 +-
+ arch/arm/include/asm/dma-mapping.h       | 13 +++--
+ arch/arm/include/asm/xen/page-coherent.h | 16 +++---
+ arch/arm/mm/dma-mapping.c                | 85 +++++++++++++++-----------------
+ arch/arm/xen/mm.c                        |  4 +-
+ 5 files changed, 57 insertions(+), 65 deletions(-)
 
-This is fourth approach for replacing struct dma_attrs with unsigned
-long.
-
-The main patch (1/44) doing the change is split into many subpatches
-for easier review (2-42).  They should be squashed together when
-applying.
-
-
-*Important:* Patchset is tested on my ARM platforms and *only* build
-tested on allyesconfigs: ARM, ARM64, i386, x86_64 and powerpc.
-Please kindly provide reviewes and tests for other platforms.
-
-Rebased on next-20160607.
-
-For easier testing the patchset is available here:
-repo:   https://github.com/krzk/linux
-branch: for-next/dma-attrs-const-v4
-
-
-Changes since v3
-================
-1. Collect some acks.
-2. Drop wrong patch 1/45 ("powerpc: dma-mapping: Don't hard-code
-   the value of DMA_ATTR_WEAK_ORDERING").
-3. Minor fix pointed out by Michael Ellerman.
-
-
-Changes since v2
-================
-1. Follow Christoph Hellwig's comments (don't use BIT add
-   documentation, remove dma_get_attr).
-
-
-Rationale
-=========
-The dma-mapping core and the implementations do not change the
-DMA attributes passed by pointer.  Thus the pointer can point to const
-data.  However the attributes do not have to be a bitfield. Instead
-unsigned long will do fine:
-
-1. This is just simpler.  Both in terms of reading the code and setting
-   attributes.  Instead of initializing local attributes on the stack
-   and passing pointer to it to dma_set_attr(), just set the bits.
-
-2. It brings safeness and checking for const correctness because the
-   attributes are passed by value.
-
-
-Best regards,
-Krzysztof
-
-
-Krzysztof Kozlowski (44):
-  dma-mapping: Use unsigned long for dma_attrs
-  alpha: dma-mapping: Use unsigned long for dma_attrs
-  arc: dma-mapping: Use unsigned long for dma_attrs
-  ARM: dma-mapping: Use unsigned long for dma_attrs
-  arm64: dma-mapping: Use unsigned long for dma_attrs
-  avr32: dma-mapping: Use unsigned long for dma_attrs
-  blackfin: dma-mapping: Use unsigned long for dma_attrs
-  c6x: dma-mapping: Use unsigned long for dma_attrs
-  cris: dma-mapping: Use unsigned long for dma_attrs
-  frv: dma-mapping: Use unsigned long for dma_attrs
-  drm/exynos: dma-mapping: Use unsigned long for dma_attrs
-  drm/mediatek: dma-mapping: Use unsigned long for dma_attrs
-  drm/msm: dma-mapping: Use unsigned long for dma_attrs
-  drm/nouveau: dma-mapping: Use unsigned long for dma_attrs
-  drm/rockship: dma-mapping: Use unsigned long for dma_attrs
-  infiniband: dma-mapping: Use unsigned long for dma_attrs
-  iommu: dma-mapping: Use unsigned long for dma_attrs
-  [media] dma-mapping: Use unsigned long for dma_attrs
-  xen: dma-mapping: Use unsigned long for dma_attrs
-  swiotlb: dma-mapping: Use unsigned long for dma_attrs
-  powerpc: dma-mapping: Use unsigned long for dma_attrs
-  video: dma-mapping: Use unsigned long for dma_attrs
-  x86: dma-mapping: Use unsigned long for dma_attrs
-  iommu: intel: dma-mapping: Use unsigned long for dma_attrs
-  h8300: dma-mapping: Use unsigned long for dma_attrs
-  hexagon: dma-mapping: Use unsigned long for dma_attrs
-  ia64: dma-mapping: Use unsigned long for dma_attrs
-  m68k: dma-mapping: Use unsigned long for dma_attrs
-  metag: dma-mapping: Use unsigned long for dma_attrs
-  microblaze: dma-mapping: Use unsigned long for dma_attrs
-  mips: dma-mapping: Use unsigned long for dma_attrs
-  mn10300: dma-mapping: Use unsigned long for dma_attrs
-  nios2: dma-mapping: Use unsigned long for dma_attrs
-  openrisc: dma-mapping: Use unsigned long for dma_attrs
-  parisc: dma-mapping: Use unsigned long for dma_attrs
-  misc: mic: dma-mapping: Use unsigned long for dma_attrs
-  s390: dma-mapping: Use unsigned long for dma_attrs
-  sh: dma-mapping: Use unsigned long for dma_attrs
-  sparc: dma-mapping: Use unsigned long for dma_attrs
-  tile: dma-mapping: Use unsigned long for dma_attrs
-  unicore32: dma-mapping: Use unsigned long for dma_attrs
-  xtensa: dma-mapping: Use unsigned long for dma_attrs
-  dma-mapping: Remove dma_get_attr
-  dma-mapping: Document the DMA attributes next to the declaration
-
- Documentation/DMA-API.txt                          |  33 +++---
- Documentation/DMA-attributes.txt                   |   2 +-
- arch/alpha/include/asm/dma-mapping.h               |   2 -
- arch/alpha/kernel/pci-noop.c                       |   2 +-
- arch/alpha/kernel/pci_iommu.c                      |  12 +-
- arch/arc/mm/dma.c                                  |  12 +-
- arch/arm/common/dmabounce.c                        |   4 +-
- arch/arm/include/asm/dma-mapping.h                 |  13 +--
- arch/arm/include/asm/xen/page-coherent.h           |  16 +--
- arch/arm/mm/dma-mapping.c                          | 121 ++++++++++---------
- arch/arm/xen/mm.c                                  |   8 +-
- arch/arm64/mm/dma-mapping.c                        |  67 +++++------
- arch/avr32/mm/dma-coherent.c                       |  12 +-
- arch/blackfin/kernel/dma-mapping.c                 |   8 +-
- arch/c6x/include/asm/dma-mapping.h                 |   4 +-
- arch/c6x/kernel/dma.c                              |   9 +-
- arch/c6x/mm/dma-coherent.c                         |   4 +-
- arch/cris/arch-v32/drivers/pci/dma.c               |   9 +-
- arch/frv/mb93090-mb00/pci-dma-nommu.c              |   8 +-
- arch/frv/mb93090-mb00/pci-dma.c                    |   9 +-
- arch/h8300/kernel/dma.c                            |   8 +-
- arch/hexagon/include/asm/dma-mapping.h             |   1 -
- arch/hexagon/kernel/dma.c                          |   8 +-
- arch/ia64/hp/common/sba_iommu.c                    |  22 ++--
- arch/ia64/include/asm/machvec.h                    |   1 -
- arch/ia64/kernel/pci-swiotlb.c                     |   4 +-
- arch/ia64/sn/pci/pci_dma.c                         |  22 ++--
- arch/m68k/kernel/dma.c                             |  12 +-
- arch/metag/kernel/dma.c                            |  16 +--
- arch/microblaze/include/asm/dma-mapping.h          |   1 -
- arch/microblaze/kernel/dma.c                       |  12 +-
- arch/mips/cavium-octeon/dma-octeon.c               |   8 +-
- arch/mips/loongson64/common/dma-swiotlb.c          |  10 +-
- arch/mips/mm/dma-default.c                         |  20 ++--
- arch/mips/netlogic/common/nlm-dma.c                |   4 +-
- arch/mn10300/mm/dma-alloc.c                        |   8 +-
- arch/nios2/mm/dma-mapping.c                        |  12 +-
- arch/openrisc/kernel/dma.c                         |  21 ++--
- arch/parisc/kernel/pci-dma.c                       |  18 +--
- arch/powerpc/include/asm/dma-mapping.h             |   7 +-
- arch/powerpc/include/asm/iommu.h                   |  10 +-
- arch/powerpc/kernel/dma-iommu.c                    |  12 +-
- arch/powerpc/kernel/dma.c                          |  18 +--
- arch/powerpc/kernel/ibmebus.c                      |  12 +-
- arch/powerpc/kernel/iommu.c                        |  12 +-
- arch/powerpc/kernel/vio.c                          |  12 +-
- arch/powerpc/platforms/cell/iommu.c                |  28 ++---
- arch/powerpc/platforms/pasemi/iommu.c              |   2 +-
- arch/powerpc/platforms/powernv/npu-dma.c           |   8 +-
- arch/powerpc/platforms/powernv/pci-ioda.c          |   4 +-
- arch/powerpc/platforms/powernv/pci.c               |   2 +-
- arch/powerpc/platforms/powernv/pci.h               |   2 +-
- arch/powerpc/platforms/ps3/system-bus.c            |  18 +--
- arch/powerpc/platforms/pseries/iommu.c             |   6 +-
- arch/powerpc/sysdev/dart_iommu.c                   |   2 +-
- arch/s390/include/asm/dma-mapping.h                |   1 -
- arch/s390/pci/pci_dma.c                            |  23 ++--
- arch/sh/include/asm/dma-mapping.h                  |   4 +-
- arch/sh/kernel/dma-nommu.c                         |   4 +-
- arch/sh/mm/consistent.c                            |   4 +-
- arch/sparc/kernel/iommu.c                          |  12 +-
- arch/sparc/kernel/ioport.c                         |  24 ++--
- arch/sparc/kernel/pci_sun4v.c                      |  12 +-
- arch/tile/kernel/pci-dma.c                         |  28 ++---
- arch/unicore32/mm/dma-swiotlb.c                    |   4 +-
- arch/x86/include/asm/dma-mapping.h                 |   5 +-
- arch/x86/include/asm/swiotlb.h                     |   4 +-
- arch/x86/include/asm/xen/page-coherent.h           |   9 +-
- arch/x86/kernel/amd_gart_64.c                      |  20 ++--
- arch/x86/kernel/pci-calgary_64.c                   |  14 +--
- arch/x86/kernel/pci-dma.c                          |   4 +-
- arch/x86/kernel/pci-nommu.c                        |   4 +-
- arch/x86/kernel/pci-swiotlb.c                      |   4 +-
- arch/x86/pci/sta2x11-fixup.c                       |   2 +-
- arch/x86/pci/vmd.c                                 |  16 +--
- arch/xtensa/kernel/pci-dma.c                       |  12 +-
- drivers/gpu/drm/exynos/exynos_drm_fbdev.c          |   2 +-
- drivers/gpu/drm/exynos/exynos_drm_g2d.c            |  12 +-
- drivers/gpu/drm/exynos/exynos_drm_gem.c            |  20 ++--
- drivers/gpu/drm/exynos/exynos_drm_gem.h            |   2 +-
- drivers/gpu/drm/mediatek/mtk_drm_gem.c             |  13 +--
- drivers/gpu/drm/mediatek/mtk_drm_gem.h             |   2 +-
- drivers/gpu/drm/msm/msm_drv.c                      |  13 +--
- .../gpu/drm/nouveau/nvkm/subdev/instmem/gk20a.c    |  13 +--
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c        |  17 ++-
- drivers/gpu/drm/rockchip/rockchip_drm_gem.h        |   2 +-
- drivers/infiniband/core/umem.c                     |   7 +-
- drivers/iommu/amd_iommu.c                          |  12 +-
- drivers/iommu/dma-iommu.c                          |   8 +-
- drivers/iommu/intel-iommu.c                        |  12 +-
- drivers/media/platform/sti/bdisp/bdisp-hw.c        |  26 ++---
- drivers/media/v4l2-core/videobuf2-dma-contig.c     |  30 ++---
- drivers/media/v4l2-core/videobuf2-dma-sg.c         |  19 +--
- drivers/misc/mic/host/mic_boot.c                   |  20 ++--
- drivers/parisc/ccio-dma.c                          |  16 +--
- drivers/parisc/sba_iommu.c                         |  16 +--
- drivers/video/fbdev/omap2/omapfb/omapfb-main.c     |  12 +-
- drivers/video/fbdev/omap2/omapfb/omapfb.h          |   3 +-
- drivers/xen/swiotlb-xen.c                          |  14 +--
- include/linux/dma-attrs.h                          |  72 ------------
- include/linux/dma-iommu.h                          |   6 +-
- include/linux/dma-mapping.h                        | 128 ++++++++++++++-------
- include/linux/swiotlb.h                            |  10 +-
- include/media/videobuf2-dma-contig.h               |   7 +-
- include/rdma/ib_verbs.h                            |   8 +-
- include/xen/swiotlb-xen.h                          |  12 +-
- lib/dma-noop.c                                     |   9 +-
- lib/swiotlb.c                                      |  13 ++-
- 108 files changed, 691 insertions(+), 793 deletions(-)
- delete mode 100644 include/linux/dma-attrs.h
-
+diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
+index 1143c4d5c567..301281645d08 100644
+--- a/arch/arm/common/dmabounce.c
++++ b/arch/arm/common/dmabounce.c
+@@ -310,7 +310,7 @@ static inline void unmap_single(struct device *dev, struct safe_buffer *buf,
+  */
+ static dma_addr_t dmabounce_map_page(struct device *dev, struct page *page,
+ 		unsigned long offset, size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
++		unsigned long attrs)
+ {
+ 	dma_addr_t dma_addr;
+ 	int ret;
+@@ -344,7 +344,7 @@ static dma_addr_t dmabounce_map_page(struct device *dev, struct page *page,
+  * should be)
+  */
+ static void dmabounce_unmap_page(struct device *dev, dma_addr_t dma_addr, size_t size,
+-		enum dma_data_direction dir, struct dma_attrs *attrs)
++		enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	struct safe_buffer *buf;
+ 
+diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+index a83570f10124..d009f7911ffc 100644
+--- a/arch/arm/include/asm/dma-mapping.h
++++ b/arch/arm/include/asm/dma-mapping.h
+@@ -5,7 +5,6 @@
+ 
+ #include <linux/mm_types.h>
+ #include <linux/scatterlist.h>
+-#include <linux/dma-attrs.h>
+ #include <linux/dma-debug.h>
+ 
+ #include <asm/memory.h>
+@@ -174,7 +173,7 @@ static inline void dma_mark_clean(void *addr, size_t size) { }
+  * to be the device-viewed address.
+  */
+ extern void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+-			   gfp_t gfp, struct dma_attrs *attrs);
++			   gfp_t gfp, unsigned long attrs);
+ 
+ /**
+  * arm_dma_free - free memory allocated by arm_dma_alloc
+@@ -191,7 +190,7 @@ extern void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+  * during and after this call executing are illegal.
+  */
+ extern void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+-			 dma_addr_t handle, struct dma_attrs *attrs);
++			 dma_addr_t handle, unsigned long attrs);
+ 
+ /**
+  * arm_dma_mmap - map a coherent DMA allocation into user space
+@@ -208,7 +207,7 @@ extern void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+  */
+ extern int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ 			void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-			struct dma_attrs *attrs);
++			unsigned long attrs);
+ 
+ /*
+  * This can be called during early boot to increase the size of the atomic
+@@ -262,16 +261,16 @@ extern void dmabounce_unregister_dev(struct device *);
+  * The scatter list versions of the above methods.
+  */
+ extern int arm_dma_map_sg(struct device *, struct scatterlist *, int,
+-		enum dma_data_direction, struct dma_attrs *attrs);
++		enum dma_data_direction, unsigned long attrs);
+ extern void arm_dma_unmap_sg(struct device *, struct scatterlist *, int,
+-		enum dma_data_direction, struct dma_attrs *attrs);
++		enum dma_data_direction, unsigned long attrs);
+ extern void arm_dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
+ 		enum dma_data_direction);
+ extern void arm_dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
+ 		enum dma_data_direction);
+ extern int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 		void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-		struct dma_attrs *attrs);
++		unsigned long attrs);
+ 
+ #endif /* __KERNEL__ */
+ #endif
+diff --git a/arch/arm/include/asm/xen/page-coherent.h b/arch/arm/include/asm/xen/page-coherent.h
+index 9408a994cc91..95ce6ac3a971 100644
+--- a/arch/arm/include/asm/xen/page-coherent.h
++++ b/arch/arm/include/asm/xen/page-coherent.h
+@@ -2,15 +2,14 @@
+ #define _ASM_ARM_XEN_PAGE_COHERENT_H
+ 
+ #include <asm/page.h>
+-#include <linux/dma-attrs.h>
+ #include <linux/dma-mapping.h>
+ 
+ void __xen_dma_map_page(struct device *hwdev, struct page *page,
+ 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+-	     enum dma_data_direction dir, struct dma_attrs *attrs);
++	     enum dma_data_direction dir, unsigned long attrs);
+ void __xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs);
++		unsigned long attrs);
+ void __xen_dma_sync_single_for_cpu(struct device *hwdev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir);
+ 
+@@ -18,22 +17,20 @@ void __xen_dma_sync_single_for_device(struct device *hwdev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir);
+ 
+ static inline void *xen_alloc_coherent_pages(struct device *hwdev, size_t size,
+-		dma_addr_t *dma_handle, gfp_t flags,
+-		struct dma_attrs *attrs)
++		dma_addr_t *dma_handle, gfp_t flags, unsigned long attrs)
+ {
+ 	return __generic_dma_ops(hwdev)->alloc(hwdev, size, dma_handle, flags, attrs);
+ }
+ 
+ static inline void xen_free_coherent_pages(struct device *hwdev, size_t size,
+-		void *cpu_addr, dma_addr_t dma_handle,
+-		struct dma_attrs *attrs)
++		void *cpu_addr, dma_addr_t dma_handle, unsigned long attrs)
+ {
+ 	__generic_dma_ops(hwdev)->free(hwdev, size, cpu_addr, dma_handle, attrs);
+ }
+ 
+ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+ 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+-	     enum dma_data_direction dir, struct dma_attrs *attrs)
++	     enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	unsigned long page_pfn = page_to_xen_pfn(page);
+ 	unsigned long dev_pfn = XEN_PFN_DOWN(dev_addr);
+@@ -58,8 +55,7 @@ static inline void xen_dma_map_page(struct device *hwdev, struct page *page,
+ }
+ 
+ static inline void xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
++		size_t size, enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	unsigned long pfn = PFN_DOWN(handle);
+ 	/*
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 4abc50952451..ebb3fde99043 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -124,7 +124,7 @@ static void __dma_page_dev_to_cpu(struct page *, unsigned long,
+  */
+ static dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+-	     struct dma_attrs *attrs)
++	     unsigned long attrs)
+ {
+ 	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_cpu_to_dev(page, offset, size, dir);
+@@ -133,7 +133,7 @@ static dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+ 
+ static dma_addr_t arm_coherent_dma_map_page(struct device *dev, struct page *page,
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+-	     struct dma_attrs *attrs)
++	     unsigned long attrs)
+ {
+ 	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+ }
+@@ -153,8 +153,7 @@ static dma_addr_t arm_coherent_dma_map_page(struct device *dev, struct page *pag
+  * whatever the device wrote there.
+  */
+ static void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
++		size_t size, enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
+@@ -194,12 +193,12 @@ struct dma_map_ops arm_dma_ops = {
+ EXPORT_SYMBOL(arm_dma_ops);
+ 
+ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+-	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs);
++	dma_addr_t *handle, gfp_t gfp, unsigned long attrs);
+ static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
+-				  dma_addr_t handle, struct dma_attrs *attrs);
++				  dma_addr_t handle, unsigned long attrs);
+ static int arm_coherent_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-		 struct dma_attrs *attrs);
++		 unsigned long attrs);
+ 
+ struct dma_map_ops arm_coherent_dma_ops = {
+ 	.alloc			= arm_coherent_dma_alloc,
+@@ -621,7 +620,7 @@ static void __free_from_contiguous(struct device *dev, struct page *page,
+ 	dma_release_from_contiguous(dev, page, size >> PAGE_SHIFT);
+ }
+ 
+-static inline pgprot_t __get_dma_pgprot(const struct dma_attrs *attrs, pgprot_t prot)
++static inline pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot)
+ {
+ 	prot = dma_get_attr(DMA_ATTR_WRITE_COMBINE, attrs) ?
+ 			    pgprot_writecombine(prot) :
+@@ -732,7 +731,7 @@ static struct arm_dma_allocator remap_allocator = {
+ 
+ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ 			 gfp_t gfp, pgprot_t prot, bool is_coherent,
+-			 const struct dma_attrs *attrs, const void *caller)
++			 unsigned long attrs, const void *caller)
+ {
+ 	u64 mask = get_coherent_dma_mask(dev);
+ 	struct page *page = NULL;
+@@ -814,7 +813,7 @@ static void *__dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+  * virtual and bus address for that space.
+  */
+ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+-		    gfp_t gfp, struct dma_attrs *attrs)
++		    gfp_t gfp, unsigned long attrs)
+ {
+ 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+ 
+@@ -823,7 +822,7 @@ void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
+ }
+ 
+ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+-	dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
++	dma_addr_t *handle, gfp_t gfp, unsigned long attrs)
+ {
+ 	return __dma_alloc(dev, size, handle, gfp, PAGE_KERNEL, true,
+ 			   attrs, __builtin_return_address(0));
+@@ -831,7 +830,7 @@ static void *arm_coherent_dma_alloc(struct device *dev, size_t size,
+ 
+ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-		 struct dma_attrs *attrs)
++		 unsigned long attrs)
+ {
+ 	int ret = -ENXIO;
+ #ifdef CONFIG_MMU
+@@ -859,14 +858,14 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+  */
+ static int arm_coherent_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-		 struct dma_attrs *attrs)
++		 unsigned long attrs)
+ {
+ 	return __arm_dma_mmap(dev, vma, cpu_addr, dma_addr, size, attrs);
+ }
+ 
+ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+ 		 void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-		 struct dma_attrs *attrs)
++		 unsigned long attrs)
+ {
+ #ifdef CONFIG_MMU
+ 	vma->vm_page_prot = __get_dma_pgprot(attrs, vma->vm_page_prot);
+@@ -878,7 +877,7 @@ int arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
+  * Free a buffer as defined by the above mapping.
+  */
+ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+-			   dma_addr_t handle, const struct dma_attrs *attrs,
++			   dma_addr_t handle, unsigned long attrs,
+ 			   bool is_coherent)
+ {
+ 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
+@@ -900,20 +899,20 @@ static void __arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+ }
+ 
+ void arm_dma_free(struct device *dev, size_t size, void *cpu_addr,
+-		  dma_addr_t handle, struct dma_attrs *attrs)
++		  dma_addr_t handle, unsigned long attrs)
+ {
+ 	__arm_dma_free(dev, size, cpu_addr, handle, attrs, false);
+ }
+ 
+ static void arm_coherent_dma_free(struct device *dev, size_t size, void *cpu_addr,
+-				  dma_addr_t handle, struct dma_attrs *attrs)
++				  dma_addr_t handle, unsigned long attrs)
+ {
+ 	__arm_dma_free(dev, size, cpu_addr, handle, attrs, true);
+ }
+ 
+ int arm_dma_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 		 void *cpu_addr, dma_addr_t handle, size_t size,
+-		 struct dma_attrs *attrs)
++		 unsigned long attrs)
+ {
+ 	struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
+ 	int ret;
+@@ -1046,7 +1045,7 @@ static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+  * here.
+  */
+ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+-		enum dma_data_direction dir, struct dma_attrs *attrs)
++		enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	struct dma_map_ops *ops = get_dma_ops(dev);
+ 	struct scatterlist *s;
+@@ -1080,7 +1079,7 @@ int arm_dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+  * rules concerning calls here are the same as for dma_unmap_single().
+  */
+ void arm_dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+-		enum dma_data_direction dir, struct dma_attrs *attrs)
++		enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	struct dma_map_ops *ops = get_dma_ops(dev);
+ 	struct scatterlist *s;
+@@ -1253,8 +1252,7 @@ static inline void __free_iova(struct dma_iommu_mapping *mapping,
+ static const int iommu_order_array[] = { 9, 8, 4, 0 };
+ 
+ static struct page **__iommu_alloc_buffer(struct device *dev, size_t size,
+-					  gfp_t gfp,
+-					  const struct dma_attrs *attrs)
++					  gfp_t gfp, unsigned long attrs)
+ {
+ 	struct page **pages;
+ 	int count = size >> PAGE_SHIFT;
+@@ -1343,7 +1341,7 @@ error:
+ }
+ 
+ static int __iommu_free_buffer(struct device *dev, struct page **pages,
+-			       size_t size, const struct dma_attrs *attrs)
++			       size_t size, unsigned long attrs)
+ {
+ 	int count = size >> PAGE_SHIFT;
+ 	int i;
+@@ -1440,8 +1438,7 @@ static struct page **__atomic_get_pages(void *addr)
+ 	return (struct page **)page;
+ }
+ 
+-static struct page **__iommu_get_pages(void *cpu_addr,
+-				       const struct dma_attrs *attrs)
++static struct page **__iommu_get_pages(void *cpu_addr, unsigned long attrs)
+ {
+ 	struct vm_struct *area;
+ 
+@@ -1486,7 +1483,7 @@ static void __iommu_free_atomic(struct device *dev, void *cpu_addr,
+ }
+ 
+ static void *arm_iommu_alloc_attrs(struct device *dev, size_t size,
+-	    dma_addr_t *handle, gfp_t gfp, struct dma_attrs *attrs)
++	    dma_addr_t *handle, gfp_t gfp, unsigned long attrs)
+ {
+ 	pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL);
+ 	struct page **pages;
+@@ -1534,7 +1531,7 @@ err_buffer:
+ 
+ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ 		    void *cpu_addr, dma_addr_t dma_addr, size_t size,
+-		    struct dma_attrs *attrs)
++		    unsigned long attrs)
+ {
+ 	unsigned long uaddr = vma->vm_start;
+ 	unsigned long usize = vma->vm_end - vma->vm_start;
+@@ -1570,7 +1567,7 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+  * Must not be called with IRQs disabled.
+  */
+ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+-			  dma_addr_t handle, struct dma_attrs *attrs)
++			  dma_addr_t handle, unsigned long attrs)
+ {
+ 	struct page **pages;
+ 	size = PAGE_ALIGN(size);
+@@ -1597,7 +1594,7 @@ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 
+ static int arm_iommu_get_sgtable(struct device *dev, struct sg_table *sgt,
+ 				 void *cpu_addr, dma_addr_t dma_addr,
+-				 size_t size, struct dma_attrs *attrs)
++				 size_t size, unsigned long attrs)
+ {
+ 	unsigned int count = PAGE_ALIGN(size) >> PAGE_SHIFT;
+ 	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
+@@ -1635,8 +1632,8 @@ static int __dma_direction_to_prot(enum dma_data_direction dir)
+  */
+ static int __map_sg_chunk(struct device *dev, struct scatterlist *sg,
+ 			  size_t size, dma_addr_t *handle,
+-			  enum dma_data_direction dir,
+-			  const struct dma_attrs *attrs, bool is_coherent)
++			  enum dma_data_direction dir, unsigned long attrs,
++			  bool is_coherent)
+ {
+ 	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+ 	dma_addr_t iova, iova_base;
+@@ -1678,8 +1675,8 @@ fail:
+ }
+ 
+ static int __iommu_map_sg(struct device *dev, struct scatterlist *sg, int nents,
+-		     enum dma_data_direction dir,
+-		     const struct dma_attrs *attrs, bool is_coherent)
++		     enum dma_data_direction dir, unsigned long attrs,
++		     bool is_coherent)
+ {
+ 	struct scatterlist *s = sg, *dma = sg, *start = sg;
+ 	int i, count = 0;
+@@ -1736,7 +1733,7 @@ bad_mapping:
+  * obtained via sg_dma_{address,length}.
+  */
+ int arm_coherent_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+-		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
++		int nents, enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	return __iommu_map_sg(dev, sg, nents, dir, attrs, true);
+ }
+@@ -1754,14 +1751,14 @@ int arm_coherent_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+  * sg_dma_{address,length}.
+  */
+ int arm_iommu_map_sg(struct device *dev, struct scatterlist *sg,
+-		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
++		int nents, enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	return __iommu_map_sg(dev, sg, nents, dir, attrs, false);
+ }
+ 
+ static void __iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+ 		int nents, enum dma_data_direction dir,
+-		const struct dma_attrs *attrs, bool is_coherent)
++		unsigned long attrs, bool is_coherent)
+ {
+ 	struct scatterlist *s;
+ 	int i;
+@@ -1788,7 +1785,8 @@ static void __iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+  * rules concerning calls here are the same as for dma_unmap_single().
+  */
+ void arm_coherent_iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+-		int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
++		int nents, enum dma_data_direction dir,
++		unsigned long attrs)
+ {
+ 	__iommu_unmap_sg(dev, sg, nents, dir, attrs, true);
+ }
+@@ -1804,7 +1802,8 @@ void arm_coherent_iommu_unmap_sg(struct device *dev, struct scatterlist *sg,
+  * rules concerning calls here are the same as for dma_unmap_single().
+  */
+ void arm_iommu_unmap_sg(struct device *dev, struct scatterlist *sg, int nents,
+-			enum dma_data_direction dir, struct dma_attrs *attrs)
++			enum dma_data_direction dir,
++			unsigned long attrs)
+ {
+ 	__iommu_unmap_sg(dev, sg, nents, dir, attrs, false);
+ }
+@@ -1857,7 +1856,7 @@ void arm_iommu_sync_sg_for_device(struct device *dev, struct scatterlist *sg,
+  */
+ static dma_addr_t arm_coherent_iommu_map_page(struct device *dev, struct page *page,
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+-	     struct dma_attrs *attrs)
++	     unsigned long attrs)
+ {
+ 	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+ 	dma_addr_t dma_addr;
+@@ -1891,7 +1890,7 @@ fail:
+  */
+ static dma_addr_t arm_iommu_map_page(struct device *dev, struct page *page,
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+-	     struct dma_attrs *attrs)
++	     unsigned long attrs)
+ {
+ 	if (!dma_get_attr(DMA_ATTR_SKIP_CPU_SYNC, attrs))
+ 		__dma_page_cpu_to_dev(page, offset, size, dir);
+@@ -1909,8 +1908,7 @@ static dma_addr_t arm_iommu_map_page(struct device *dev, struct page *page,
+  * Coherent IOMMU aware version of arm_dma_unmap_page()
+  */
+ static void arm_coherent_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
++		size_t size, enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+ 	dma_addr_t iova = handle & PAGE_MASK;
+@@ -1934,8 +1932,7 @@ static void arm_coherent_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+  * IOMMU aware version of arm_dma_unmap_page()
+  */
+ static void arm_iommu_unmap_page(struct device *dev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
++		size_t size, enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	struct dma_iommu_mapping *mapping = to_dma_iommu_mapping(dev);
+ 	dma_addr_t iova = handle & PAGE_MASK;
+diff --git a/arch/arm/xen/mm.c b/arch/arm/xen/mm.c
+index c5f9a9e3d1f3..fc67ed236a10 100644
+--- a/arch/arm/xen/mm.c
++++ b/arch/arm/xen/mm.c
+@@ -98,7 +98,7 @@ static void __xen_dma_page_cpu_to_dev(struct device *hwdev, dma_addr_t handle,
+ 
+ void __xen_dma_map_page(struct device *hwdev, struct page *page,
+ 	     dma_addr_t dev_addr, unsigned long offset, size_t size,
+-	     enum dma_data_direction dir, struct dma_attrs *attrs)
++	     enum dma_data_direction dir, unsigned long attrs)
+ {
+ 	if (is_device_dma_coherent(hwdev))
+ 		return;
+@@ -110,7 +110,7 @@ void __xen_dma_map_page(struct device *hwdev, struct page *page,
+ 
+ void __xen_dma_unmap_page(struct device *hwdev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir,
+-		struct dma_attrs *attrs)
++		unsigned long attrs)
+ 
+ {
+ 	if (is_device_dma_coherent(hwdev))
 -- 
 1.9.1
