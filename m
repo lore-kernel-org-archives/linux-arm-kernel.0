@@ -1,46 +1,51 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Fri, 10 Jun 2016 11:56:25 +0200
-Subject: [linux-sunxi] PATH[1/3] ARM: axp20x_usb_power.c add device tree
- configuration options for REG 30H: VBUS-IPSOUT
-In-Reply-To: <0f58d2b3-f3d3-45a3-a307-e54df26c1ab1@googlegroups.com>
-References: <0f58d2b3-f3d3-45a3-a307-e54df26c1ab1@googlegroups.com>
-Message-ID: <d7cc3227-e75f-6be1-61b0-cd3f8eefff10@redhat.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 10 Jun 2016 10:56:33 +0100
+Subject: [PATCH v2 4/9] arm64: Add platform selection for BCM2835.
+In-Reply-To: <87h9d1x59s.fsf@eliezer.anholt.net>
+References: <1464934708-24769-1-git-send-email-kraxel@redhat.com>
+ <1464934708-24769-5-git-send-email-kraxel@redhat.com>
+ <20160603112721.GC1128@e104818-lin.cambridge.arm.com>
+ <87bn3gu3to.fsf@eliezer.anholt.net>
+ <20160608091219.GA16322@e104818-lin.cambridge.arm.com>
+ <87h9d1x59s.fsf@eliezer.anholt.net>
+Message-ID: <20160610095633.GA14961@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 09, 2016 at 05:21:35PM -0700, Eric Anholt wrote:
+> Catalin Marinas <catalin.marinas@arm.com> writes:
+> > On Sat, Jun 04, 2016 at 12:55:15PM -0700, Eric Anholt wrote:
+> >> Catalin Marinas <catalin.marinas@arm.com> writes:
+> >> > On Fri, Jun 03, 2016 at 08:18:23AM +0200, Gerd Hoffmann wrote:
+> >> >> +	  This SoC is used in the Raspberry Pi 3 device.
+> >> >
+> >> > I thought we would just use ARCH_BCM, or is it too generic?
+> >> 
+> >> Consensus last time around seemed to be to drop adding ARCH_BCM, in
+> >> favor of patch 1 of the series.
+> >
+> > I may have missed that discussion. My point was about consistency with
+> > existing ARCH_* definitions in the arm64 Kconfig.platforms. I can see
+> > why it's easier for you since some drivers are built based on
+> > ARCH_BCM2835. Looking at drivers/clk/bcm/Makefile, there is an
+> > inconsistent mix of CLK_BCM_* and ARCH_BCM_*. I would rather have a new
+> > CLK_BCM2835 that's selected/enabled accordingly (maybe simply depending
+> > on ARCH_BCM).
+> 
+> So I introduce a new ARCH_BCM here, that selects the just the 283x
+> family's core drivers?  That seems strange, but I'm willing if that's
+> what you want.
 
-On 17-05-16 19:41, Ene Alexandru wrote:
-> The AXP20X chips have a configuration register "REG 30H: VBUS-IPSOUT Power Path Management" that provide USB power supply protection.
-> The current axp20x_usb_power.c provides support only for reading those values.
->
-> From the datasheet:
-> In order not to affect the USB communication, VBUS is always working under Voltage-Limit mode by default. In this mode, AXP209 ensures that VBUS voltage remains above a configurable reference voltage VHOLD which can meet the USB specification. The default VHOLD is 4.4V, adjustable in Reg30H [5:3] register. If the system has limit on current obtained from USB VBUS, a current-limit mode is provided (See REG30H[1] register), with 900mA/500mA/100mA (Reg30H [0]) selectable.
->
-> The following entries are added in the axp209.dtsi file: vhold-enable, vhold-set and ibus-limit
-> The chosen default values are the AXP20X reset values, as described in the data sheet.
->
-> Signed-off-by: Ene Alexandru <ene.alexandru@gmail.com>
->
->
-> ---
-> diff -uprN -X linux-sunxi-original/Documentation/dontdiff linux-sunxi-original/arch/arm/boot/dts/axp209.dtsi linux-sunxi/arch/arm/boot/dts/axp209.dtsi
-> --- linux-sunxi-original/arch/arm/boot/dts/axp209.dtsi         2016-05-11 09:21:47.470923679 +0200
-> +++ linux-sunxi/arch/arm/boot/dts/axp209.dtsi     2016-05-10 18:45:32.795158651 +0200
-> @@ -98,5 +98,8 @@
->            usb_power_supply: usb_power_supply {
->                        compatible = "x-powers,axp202-usb-power-supply";
->                        status = "disabled";
-> +                      vhold-enable = <0x01>;
-> +                      vhold-set = <0x04>;
-> +                      ibus-limit = <0x01>;
->            };
-> };
+I'll leave this decision to the arm-soc guys. What I want to avoid is
+another ARCH_BCM283[89] when some clock or other device changes in a
+future revision of this board (RPi4?). I also don't want fine-grained
+SoC configuration *within* the arch/arm64 Kconfigs but rather just a
+family ARCH_* entry with selectable individual drivers based on the SoC
+revision you target (in case you want to avoid single Image).
 
-Please do not use raw register values like this, instead make the device-tree property take
-microvolts / microamps like e.g. the regulator bindings do, and translate these in the
-driver.
+We should in general try to give drivers their own Kconfig entries
+separate from ARCH_* ones (with a "depend on ARCH_*" and default y if
+you want it enabled).
 
-Regards,
-
-Hans
+-- 
+Catalin
