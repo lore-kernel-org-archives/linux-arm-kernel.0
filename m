@@ -1,57 +1,81 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Jun 2016 21:51:45 +0100
-Subject: [PATCH V9 07/11] PCI: Factor DT specific
- pci_bus_find_domain_nr() code out
-In-Reply-To: <1465588519-11334-8-git-send-email-tn@semihalf.com>
+Date: Fri, 10 Jun 2016 21:54:23 +0100
+Subject: [PATCH V9 10/11] ARM64/PCI: Implement ACPI low-level calls to
+ access PCI_Config region from AML
+In-Reply-To: <1465588519-11334-11-git-send-email-tn@semihalf.com>
 References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
- <1465588519-11334-8-git-send-email-tn@semihalf.com>
-Message-ID: <20160610205145.GB24178@red-moon>
+ <1465588519-11334-11-git-send-email-tn@semihalf.com>
+Message-ID: <20160610205423.GC24178@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 09:55:15PM +0200, Tomasz Nowicki wrote:
-> pci_bus_find_domain_nr() retrieves the host bridge domain number in a DT
-> specific way. Factor our pci_bus_find_domain_nr() in a separate DT
+On Fri, Jun 10, 2016 at 09:55:18PM +0200, Tomasz Nowicki wrote:
+> ACPI spec6.1 - chapter: 5.5.2.4 defines OperationRegion (Declare Operation
+> Region). Following the spec: " [...] An Operation Region is a specific
+> region of operation within an address space that is declared as a subset
+> of the entire address space using a starting address (offset) and a length.
+> Control methods must have exclusive access to any address accessed via
+> fields declared in Operation Regions. [...]".
+> 
+> OperationRegion allows to declare various of operation region address space
 
-s/our/out
+s/of//
 
-> function (ie of_pci_bus_find_domain_nr()) so that DT code is self
-> contained, paving the way for retrieving domain number in
-> pci_bus_find_domain_nr() with additional firmware methods (ie ACPI).
+> identifiers including PCI_Config. PCI_Config is meant to access PCI
+> configuration space from the ASL. So every time ASL opcode operates
+> on PCI_Config space region, ASL interpreter dispatches accesses to OS
+> low-level calls - raw_pci_write() and raw_pci_read() for Linux - so-called
+> ACPI RAW accessors.
+> 
+> In order to support PCI_Config operation region, implement mentioned
+> raw_pci_write() and raw_pci_read() calls so they find associated bus
+> and call read/write ops.
+> 
+> Waiting for clarification in the ACPI specifications in relation
+> to PCI_Config space handling before PCI bus enumeration is completed,
+> current code does not support PCI_Config region accesses before PCI bus
+> enumeration whilst providing full AML PCI_Config access availability
+> when the PCI bus enumeration is completed by the kernel so that
+> RAW accessors can look-up PCI operations through the struct pci_bus
+> associated with a PCI bus.
 > 
 > Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/pci/pci.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
+> Signed-off-by: Jayachandran C <jchandra@broadcom.com>
 
 Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
+> ---
+>  arch/arm64/kernel/pci.c | 12 ++++++++++--
+>  1 file changed, 10 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index b9a7833..327828d 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4941,7 +4941,7 @@ int pci_get_new_domain_nr(void)
->  }
->  
->  #ifdef CONFIG_PCI_DOMAINS_GENERIC
-> -int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
-> +static int of_pci_bus_find_domain_nr(struct device *parent)
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index b3b8a2c..328f857 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -71,13 +71,21 @@ int pcibios_alloc_irq(struct pci_dev *dev)
+>  int raw_pci_read(unsigned int domain, unsigned int bus,
+>  		  unsigned int devfn, int reg, int len, u32 *val)
 >  {
->  	static int use_dt_domains = -1;
->  	int domain = -1;
-> @@ -4987,6 +4987,11 @@ int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
->  
->  	return domain;
->  }
+> -	return -ENXIO;
+> +	struct pci_bus *b = pci_find_bus(domain, bus);
 > +
-> +int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
-> +{
-> +	return of_pci_bus_find_domain_nr(parent);
-> +}
->  #endif
->  #endif
+> +	if (!b)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	return b->ops->read(b, devfn, reg, len, val);
+>  }
 >  
+>  int raw_pci_write(unsigned int domain, unsigned int bus,
+>  		unsigned int devfn, int reg, int len, u32 val)
+>  {
+> -	return -ENXIO;
+> +	struct pci_bus *b = pci_find_bus(domain, bus);
+> +
+> +	if (!b)
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +	return b->ops->write(b, devfn, reg, len, val);
+>  }
+>  
+>  #ifdef CONFIG_NUMA
 > -- 
 > 1.9.1
 > 
