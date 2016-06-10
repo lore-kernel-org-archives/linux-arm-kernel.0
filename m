@@ -1,432 +1,143 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri, 10 Jun 2016 21:44:09 +0200
-Subject: [PATCH v7 1/3] firmware: Amlogic: Add secure monitor driver
-In-Reply-To: <1465587851-24184-1-git-send-email-carlo@caione.org>
-References: <1465587851-24184-1-git-send-email-carlo@caione.org>
-Message-ID: <1465587851-24184-2-git-send-email-carlo@caione.org>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Fri, 10 Jun 2016 21:55:08 +0200
+Subject: [PATCH V9 00/11] Support for ARM64 ACPI based PCI host controller
+Message-ID: <1465588519-11334-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+>From the functionality point of view this series may be split into the
+following logic parts:
+1. Export ECAM API and add parent device to pci_config_window
+2. Add IO resources handling to PCI core code
+3. New MCFG driver
+4. Cleanups and support for generic domain assignment based on ACPI
+5. Implement ARM64 ACPI based PCI host controller driver under arch/arm64/
 
-Introduce a driver to provide calls into secure monitor mode.
+Patches has been built on top of 4.7-rc2 and can be found here:
+git at github.com:semihalf-nowicki-tomasz/linux.git (pci-acpi-v9)
 
-In the Amlogic SoCs these calls are used for multiple reasons: access to
-NVMEM, set USB boot, enable JTAG, etc...
+This has been tested on Cavium ThunderX server. Any help in reviewing and
+testing is very appreciated.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- drivers/firmware/Kconfig                |   1 +
- drivers/firmware/Makefile               |   1 +
- drivers/firmware/meson/Kconfig          |   8 +
- drivers/firmware/meson/Makefile         |   1 +
- drivers/firmware/meson/meson_sm.c       | 312 ++++++++++++++++++++++++++++++++
- include/linux/firmware/meson/meson_sm.h |  32 ++++
- 6 files changed, 355 insertions(+)
- create mode 100644 drivers/firmware/meson/Kconfig
- create mode 100644 drivers/firmware/meson/Makefile
- create mode 100644 drivers/firmware/meson/meson_sm.c
- create mode 100644 include/linux/firmware/meson/meson_sm.h
+v8 -> v9
+- additional cleanups around generic assignment
+- added back MCFG entries cache
+- simplified config start address lookup
+- fixed leak in pci_acpi_scan_root()
+- isolated patch with ACPI RAW accessors implementation
+- rebase against 4.7-rc2
 
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 6664f11..686e395 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -199,5 +199,6 @@ config HAVE_ARM_SMCCC
- source "drivers/firmware/broadcom/Kconfig"
- source "drivers/firmware/google/Kconfig"
- source "drivers/firmware/efi/Kconfig"
-+source "drivers/firmware/meson/Kconfig"
- 
- endmenu
-diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-index 474bada..fc4bb09 100644
---- a/drivers/firmware/Makefile
-+++ b/drivers/firmware/Makefile
-@@ -21,6 +21,7 @@ obj-$(CONFIG_QCOM_SCM_32)	+= qcom_scm-32.o
- CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch armv7-a\n.arch_extension sec,-DREQUIRES_SEC=1) -march=armv7-a
- 
- obj-y				+= broadcom/
-+obj-y				+= meson/
- obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
- obj-$(CONFIG_EFI)		+= efi/
- obj-$(CONFIG_UEFI_CPER)		+= efi/
-diff --git a/drivers/firmware/meson/Kconfig b/drivers/firmware/meson/Kconfig
-new file mode 100644
-index 0000000..fff11a3
---- /dev/null
-+++ b/drivers/firmware/meson/Kconfig
-@@ -0,0 +1,8 @@
-+#
-+# Amlogic Secure Monitor driver
-+#
-+config MESON_SM
-+	bool
-+	default ARCH_MESON
-+	help
-+	  Say y here to enable the Amlogic secure monitor driver
-diff --git a/drivers/firmware/meson/Makefile b/drivers/firmware/meson/Makefile
-new file mode 100644
-index 0000000..9ab3884
---- /dev/null
-+++ b/drivers/firmware/meson/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_MESON_SM) +=	meson_sm.o
-diff --git a/drivers/firmware/meson/meson_sm.c b/drivers/firmware/meson/meson_sm.c
-new file mode 100644
-index 0000000..ef548ad
---- /dev/null
-+++ b/drivers/firmware/meson/meson_sm.c
-@@ -0,0 +1,312 @@
-+/*
-+ * Amlogic Secure Monitor driver
-+ *
-+ * Copyright (C) 2016 Endless Mobile, Inc.
-+ * Author: Carlo Caione <carlo@endlessm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <stdarg.h>
-+#include <asm/cacheflush.h>
-+#include <asm/compiler.h>
-+#include <linux/arm-smccc.h>
-+#include <linux/io.h>
-+#include <linux/ioport.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_device.h>
-+#include <linux/smp.h>
-+#include <linux/firmware/meson/meson_sm.h>
-+
-+struct meson_sm_cmd {
-+	unsigned int index;
-+	u32 smc_id;
-+};
-+#define CMD(d, s) { .index = (d), .smc_id = (s), }
-+
-+struct meson_sm_chip {
-+	unsigned int shmem_size;
-+	u32 cmd_shmem_in_base;
-+	u32 cmd_shmem_out_base;
-+	struct meson_sm_cmd cmd[];
-+};
-+
-+struct meson_sm_firmware {
-+	struct device *dev;
-+	const struct meson_sm_chip *chip;
-+	void __iomem *sm_shmem_in_base;
-+	void __iomem *sm_shmem_out_base;
-+};
-+
-+struct meson_sm_chip gxbb_chip = {
-+	.shmem_size		= 0x1000,
-+	.cmd_shmem_in_base	= 0x82000020,
-+	.cmd_shmem_out_base	= 0x82000021,
-+	.cmd = {
-+		CMD(SM_EFUSE_READ,	0x82000030),
-+		CMD(SM_EFUSE_WRITE,	0x82000031),
-+		CMD(SM_EFUSE_USER_MAX,	0x82000033),
-+		{ /* sentinel */ },
-+	},
-+};
-+
-+static u32 meson_sm_get_cmd(const struct meson_sm_chip *chip, unsigned int cmd_index)
-+{
-+	unsigned int i;
-+
-+	for (i = 0; chip->cmd[i].smc_id; i++)
-+		if (chip->cmd[i].index == cmd_index)
-+			return chip->cmd[i].smc_id;
-+
-+	return 0;
-+}
-+
-+static u32 __meson_sm_call(u32 cmd, u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(cmd, arg0, arg1, arg2, arg3, arg4, 0, 0, &res);
-+	return res.a0;
-+}
-+
-+static void __iomem *meson_sm_map_shmem(u32 cmd_shmem, unsigned int size)
-+{
-+	u32 sm_phy_base;
-+
-+	sm_phy_base = __meson_sm_call(cmd_shmem, 0, 0, 0, 0, 0);
-+	if (!sm_phy_base)
-+		return 0;
-+
-+	return ioremap_cache(sm_phy_base, size);
-+}
-+
-+/**
-+ * meson_sm_call - generic SMC32 call to the secure-monitor
-+ *
-+ * @fw:		Meson secure-monitor firmware pointer
-+ * @cmd_index:	Index of the SMC32 function ID
-+ * @ret:	Returned value
-+ * @arg0:	SMC32 Argument 0
-+ * @arg1:	SMC32 Argument 1
-+ * @arg2:	SMC32 Argument 2
-+ * @arg3:	SMC32 Argument 3
-+ * @arg4:	SMC32 Argument 4
-+ *
-+ * Return:	0 on success, a negative value on error
-+ */
-+int meson_sm_call(struct meson_sm_firmware *fw, unsigned int cmd_index,
-+		  u32 *ret, u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-+{
-+	u32 cmd, lret;
-+
-+	if (!fw)
-+		return -EINVAL;
-+
-+	cmd = meson_sm_get_cmd(fw->chip, cmd_index);
-+	if (!cmd)
-+		return -EINVAL;
-+
-+	lret = __meson_sm_call(cmd, arg0, arg1, arg2, arg3, arg4);
-+
-+	if (ret)
-+		*ret = lret;
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(meson_sm_call);
-+
-+/**
-+ * meson_sm_call_read - retrieve data from secure-monitor
-+ *
-+ * @fw:		Meson secure-monitor firmware pointer
-+ * @buffer:	Buffer to store the retrieved data
-+ * @cmd_index:	Index of the SMC32 function ID
-+ * @arg0:	SMC32 Argument 0
-+ * @arg1:	SMC32 Argument 1
-+ * @arg2:	SMC32 Argument 2
-+ * @arg3:	SMC32 Argument 3
-+ * @arg4:	SMC32 Argument 4
-+ *
-+ * Return:	size of read data on success, a negative value on error
-+ */
-+int meson_sm_call_read(struct meson_sm_firmware *fw, void *buffer,
-+		       unsigned int cmd_index, u32 arg0, u32 arg1,
-+		       u32 arg2, u32 arg3, u32 arg4)
-+{
-+	u32 size;
-+
-+	if (!fw->chip->cmd_shmem_out_base)
-+		return -EINVAL;
-+
-+	if (meson_sm_call(fw, cmd_index, &size, arg0, arg1, arg2, arg3, arg4) < 0)
-+		return -EINVAL;
-+
-+	if (!size || size > fw->chip->shmem_size)
-+		return -EINVAL;
-+
-+	if (buffer)
-+		memcpy(buffer, fw->sm_shmem_out_base, size);
-+
-+	return size;
-+}
-+EXPORT_SYMBOL(meson_sm_call_read);
-+
-+/**
-+ * meson_sm_call_write - send data to secure-monitor
-+ *
-+ * @fw:		Meson secure-monitor firmware pointer
-+ * @buffer:	Buffer containing data to send
-+ * @b_size:	Size of the data to send
-+ * @cmd_index:	Index of the SMC32 function ID
-+ * @arg0:	SMC32 Argument 0
-+ * @arg1:	SMC32 Argument 1
-+ * @arg2:	SMC32 Argument 2
-+ * @arg3:	SMC32 Argument 3
-+ * @arg4:	SMC32 Argument 4
-+ *
-+ * Return:	size of sent data on success, a negative value on error
-+ */
-+int meson_sm_call_write(struct meson_sm_firmware *fw, void *buffer,
-+			unsigned int b_size, unsigned int cmd_index,
-+			u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4)
-+{
-+	u32 size;
-+
-+	if (b_size > fw->chip->shmem_size)
-+		return -EINVAL;
-+
-+	if (!fw->chip->cmd_shmem_in_base)
-+		return -EINVAL;
-+
-+	memcpy(fw->sm_shmem_in_base, buffer, b_size);
-+
-+	if (meson_sm_call(fw, cmd_index, &size, arg0, arg1, arg2, arg3, arg4) < 0)
-+		return -EINVAL;
-+
-+	if (!size)
-+		return -EINVAL;
-+
-+	return size;
-+}
-+EXPORT_SYMBOL(meson_sm_call_write);
-+
-+/**
-+ * meson_sm_get_fw - get Meson firmware struct
-+ *
-+ * @firmware_node:	Device node of the secure-monitor
-+ *
-+ * Return:		Meson secure-monitor firmware struct on success, NULL on error
-+ */
-+struct meson_sm_firmware *meson_sm_get_fw(struct device_node *firmware_node)
-+{
-+	struct platform_device *pdev = of_find_device_by_node(firmware_node);
-+
-+	/*
-+	 * Returns NULL is the firmware device is not ready.
-+	 */
-+	if (!pdev)
-+		return NULL;
-+
-+	return platform_get_drvdata(pdev);
-+}
-+EXPORT_SYMBOL(meson_sm_get_fw);
-+
-+static const struct of_device_id meson_sm_ids[] = {
-+	{ .compatible = "amlogic,meson-gxbb-sm", .data = &gxbb_chip },
-+	{ /* sentinel */ },
-+};
-+MODULE_DEVICE_TABLE(of, meson_sm_ids);
-+
-+static int meson_sm_probe(struct platform_device *pdev)
-+{
-+	const struct meson_sm_chip *chip;
-+	struct meson_sm_firmware *fw;
-+	struct device_node *np;
-+	const struct of_device_id *matched_np;
-+
-+	np = of_find_matching_node_and_match(NULL, meson_sm_ids, &matched_np);
-+	if (!np) {
-+		dev_err(&pdev->dev, "no matching node\n");
-+		return -EINVAL;
-+	}
-+
-+	chip = matched_np->data;
-+	if (!chip) {
-+		dev_err(&pdev->dev, "unable to setup secure-monitor data\n");
-+		return -EINVAL;
-+	}
-+
-+	fw = devm_kzalloc(&pdev->dev, sizeof(*fw), GFP_KERNEL);
-+	if (!fw)
-+		return -ENOMEM;
-+
-+	if (chip->cmd_shmem_in_base) {
-+		fw->sm_shmem_in_base = meson_sm_map_shmem(chip->cmd_shmem_in_base,
-+							  chip->shmem_size);
-+		if (WARN_ON(!fw->sm_shmem_in_base))
-+			goto out;
-+	}
-+
-+	if (chip->cmd_shmem_out_base) {
-+		fw->sm_shmem_out_base = meson_sm_map_shmem(chip->cmd_shmem_out_base,
-+							   chip->shmem_size);
-+		if (WARN_ON(!fw->sm_shmem_out_base))
-+			goto out;
-+	}
-+
-+	fw->dev = &pdev->dev;
-+	fw->chip = chip;
-+	platform_set_drvdata(pdev, fw);
-+
-+	dev_info(fw->dev, "enabled\n");
-+
-+	return 0;
-+
-+out:
-+	if (fw->sm_shmem_in_base)
-+		iounmap(fw->sm_shmem_in_base);
-+
-+	return -EINVAL;
-+}
-+
-+static struct platform_driver meson_sm_platform_driver = {
-+	.probe	= meson_sm_probe,
-+	.driver	= {
-+		.name		= "meson-sm",
-+		.of_match_table	= meson_sm_ids,
-+	},
-+};
-+
-+static int __init meson_sm_init(void)
-+{
-+	struct platform_device *meson_sm_device;
-+	int ret;
-+
-+	ret = platform_driver_register(&meson_sm_platform_driver);
-+	if (ret) {
-+		pr_err("unable to register driver\n");
-+		return ret;
-+	}
-+
-+	meson_sm_device = platform_device_register_simple("meson-sm",
-+							  -1, NULL, 0);
-+	if (IS_ERR(meson_sm_device)) {
-+		pr_err("unable to register device\n");
-+		platform_driver_unregister(&meson_sm_platform_driver);
-+		return PTR_ERR(meson_sm_device);
-+	}
-+
-+	return 0;
-+}
-+device_initcall(meson_sm_init);
-+
-+MODULE_AUTHOR("Carlo Caione <carlo@endlessm.com>");
-+MODULE_DESCRIPTION("Amlogic secure monitor driver");
-+MODULE_LICENSE("GPL");
-diff --git a/include/linux/firmware/meson/meson_sm.h b/include/linux/firmware/meson/meson_sm.h
-new file mode 100644
-index 0000000..863b231
---- /dev/null
-+++ b/include/linux/firmware/meson/meson_sm.h
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (C) 2016 Endless Mobile, Inc.
-+ * Author: Carlo Caione <carlo@endlessm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * version 2 as published by the Free Software Foundation.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#ifndef _MESON_SM_FW_H_
-+#define _MESON_SM_FW_H_
-+
-+#define SM_EFUSE_READ		0
-+#define SM_EFUSE_WRITE		1
-+#define SM_EFUSE_USER_MAX	2
-+
-+struct meson_sm_firmware;
-+
-+int meson_sm_call(struct meson_sm_firmware *fw, unsigned int cmd_index,
-+		  u32 *ret, u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4);
-+int meson_sm_call_write(struct meson_sm_firmware *fw, void *buffer,
-+			unsigned int b_size, unsigned int cmd_index,
-+			u32 arg0, u32 arg1, u32 arg2, u32 arg3, u32 arg4);
-+int meson_sm_call_read(struct meson_sm_firmware *fw, void *buffer,
-+		       unsigned int cmd_index, u32 arg0, u32 arg1,
-+		       u32 arg2, u32 arg3, u32 arg4);
-+struct meson_sm_firmware *meson_sm_get_fw(struct device_node *firmware_node);
-+
-+#endif /* _MESON_SM_FW_H_ */
+v7 -> v8
+- move code from drivers/acpi/pci_root_generic.c to arch/arm64/kernel/pci.c
+- minor changes around domain assignment
+- pci_mcfg.c improvements for parsing MCFG tables and lookup its entries
+- rebase against 4.7-rc1
+
+v6 -> v7
+- drop quirks handling
+- changes for ACPI companion and domain number assignment approach
+- implement arch pcibios_{add|remove}_bus and call acpi_pci_{add|remove}_bus from there
+- cleanups around nomenclature
+- use resources oriented API for ECAM
+- fix for based address calculation before mapping ECAM region
+- remove useless lock for MCFG lookup
+- move MCFG stuff to separated file pci_mcfg.c
+- drop MCFG entries caching
+- rebase against 4.6-rc7
+
+v5 -> v6
+- drop idea of x86 MMCONFIG code refactoring
+- integrate JC's patches which introduce new ECAM API:
+  https://lkml.org/lkml/2016/4/11/907
+  git: https://github.com/jchandra-brcm/linux/ (arm64-acpi-pci-v3)
+- integrate Sinan's fix for releasing IO resources, see patch [06/13]
+- added ACPI support for ThunderX ECAM and PEM drivers
+- rebase against 4.6-rc2
+
+v4 -> v5
+- drop MCFG refactoring group patches 1-6 from series v4 and integrate Jayachandran's patch
+  https://patchwork.ozlabs.org/patch/575525/
+- rewrite PCI legacy IRQs allocation
+- squash two patches 11 and 12 from series v4, fixed bisection issue
+- changelog improvements
+- rebase against 4.5-rc3
+
+v3 -> v4
+- drop Jiang's fix http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04318.html
+- add Lorenzo's fix patch 19/24
+- ACPI PCI bus domain number assigning cleanup
+- change resource management, we now claim and reassign resources
+- improvements for applying quirks
+- drop Matthew's http://www.spinics.net/lists/linux-pci/msg45950.html dependency
+- rebase against 4.5-rc1
+
+v2 -> v3
+- fix legacy IRQ assigning and IO ports registration
+- remove reference to arch specific companion device for ia64
+- move ACPI PCI host controller driver to pci_root.c
+- drop generic domain assignment for x86 and ia64 as I am not
+  able to run all necessary test variants
+- drop patch which cleaned legacy IRQ assignment since it belongs to
+  Mathew's series:
+  https://patchwork.ozlabs.org/patch/557504/
+- extend MCFG quirk code
+- rebase against 4.4
+
+v1 -> v2
+- move non-arch specific piece of code to dirver/acpi/ directory
+- fix IO resource handling
+- introduce PCI config accessors quirks matching
+- moved ACPI_COMPANION_SET to generic code
+
+v1 - https://lkml.org/lkml/2015/10/27/504
+v2 - https://lkml.org/lkml/2015/12/16/246
+v3 - http://lkml.iu.edu/hypermail/linux/kernel/1601.1/04308.html
+v4 - https://lkml.org/lkml/2016/2/4/646
+v5 - https://lkml.org/lkml/2016/2/16/426
+v6 - https://lkml.org/lkml/2016/4/15/594
+v7 - https://lkml.org/lkml/2016/5/10/568
+v8 - https://lkml.org/lkml/2016/5/30/468
+
+Jayachandran C (3):
+  PCI/ECAM: Move ecam.h to linux/include/pci-ecam.h
+  PCI/ECAM: Add parent device field to pci_config_window
+  ACPI/PCI: Support IO resources when parsing PCI host bridge resources
+
+Sinan Kaya (1):
+  PCI: Add new function to unmap IO resources
+
+Tomasz Nowicki (7):
+  ACPI/PCI: Add generic MCFG table handling
+  PCI: Refactor generic bus domain assignment
+  PCI: Factor DT specific pci_bus_find_domain_nr() code out
+  ARM64/PCI: Add ACPI hook to assign domain number
+  ARM64/PCI: ACPI support for legacy IRQs parsing and consolidation with
+    DT code
+  ARM64/PCI: Implement ACPI low-level calls to access PCI_Config region
+    from AML
+  ARM64/PCI: Support for ACPI based PCI host controller
+
+ arch/arm64/Kconfig                  |   2 +
+ arch/arm64/kernel/pci.c             | 146 ++++++++++++++++++++++++++++++++++--
+ drivers/acpi/Kconfig                |   3 +
+ drivers/acpi/Makefile               |   1 +
+ drivers/acpi/pci_mcfg.c             |  92 +++++++++++++++++++++++
+ drivers/acpi/pci_root.c             |  39 ++++++++++
+ drivers/pci/ecam.c                  |   6 +-
+ drivers/pci/ecam.h                  |  67 -----------------
+ drivers/pci/host/pci-host-common.c  |   3 +-
+ drivers/pci/host/pci-host-generic.c |   3 +-
+ drivers/pci/host/pci-thunder-ecam.c |   3 +-
+ drivers/pci/host/pci-thunder-pem.c  |   6 +-
+ drivers/pci/pci.c                   |  29 ++++++-
+ drivers/pci/probe.c                 |   4 +-
+ include/linux/pci-acpi.h            |   2 +
+ include/linux/pci-ecam.h            |  67 +++++++++++++++++
+ include/linux/pci.h                 |  15 ++--
+ 17 files changed, 392 insertions(+), 96 deletions(-)
+ create mode 100644 drivers/acpi/pci_mcfg.c
+ delete mode 100644 drivers/pci/ecam.h
+ create mode 100644 include/linux/pci-ecam.h
+
 -- 
-2.7.4
+1.9.1
