@@ -1,22 +1,89 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 11 Jun 2016 00:30:36 +0200
-Subject: [PATCH 01/48] clk: at91: replace usleep() by udelay() calls
-In-Reply-To: <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1465596231-21766-2-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <11395561.bQatt85IOg@wuerfel>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Fri, 10 Jun 2016 15:32:45 -0700
+Subject: Platform-specific suspend/resume code in drivers
+In-Reply-To: <575A9E93.4090508@free.fr> (Mason's message of "Fri, 10 Jun 2016
+ 13:03:47 +0200")
+References: <Pine.LNX.4.44L0.1606091054140.1697-100000@iolanthe.rowland.org>
+ <575A9E93.4090508@free.fr>
+Message-ID: <m2k2hwwu7m.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, June 11, 2016 12:03:04 AM CEST Alexandre Belloni wrote:
-> From: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> 
-> Fix the main and slow clock .prepare() implementations which used to call
-> usleep() when the scheduler wasn't ready yet.
-> 
+Mason <slash.tmp@free.fr> writes:
 
-Does this have to be called that early? It seems wasteful to always
-call udelay() here, when these are functions that are normally
-allowed to sleep.
+[...]
 
-	Arnd
+> Consider two SoCs, SoCA and SocB.
+>
+> They both have the same device D, which exposes 16 registers to interact
+> with the hardware.
+>
+> When SoCA is suspended, it stops D's clock, but keeps D powered on,
+> preserving the 16 registers. Thus when SoCA resumes, it finds the
+> 16 registers in the same state as before suspending.
+>
+> When SoCB is suspended, it powers D down. When SoCB resumes, the
+> 16 registers contain garbage/random values. Therefore, in the case
+> of SoCB, the suspend routine should save the values of the registers
+> to RAM (which is preserved by "contract") and restore them on resume.
+>
+> However, this save/restore operation is unnecessary on SoCA.
+>
+> Should the save/restore operation be added unconditionally to the
+> driver, even if some SoCs do not need it?
+
+Yes.  For starters, this is the way to go.  If the added save/restore is
+too expensive, a few things can be done...
+
+> In other words, do we consider the performance penalty from saving
+> and restoring device registers small enough that it should be done
+> systematically, even if some SoCs do not require it?
+
+The "save" part can be made to be almost no overhead by always keeping a
+"shadow" copy of the registers in memory whenever they change (not just
+at suspend time.)  This could be done "manually" by the driver for the
+needed registers, or with the aid of something like the regmap cache
+feature.  Doing that, there's no additional time for saving context
+during suspend.
+
+On resume time, on most hardware there are at least some registers that
+will have some pre-determined power-on reset value.  You could optimize
+the restore context by comparing one (or a few) of the registers from
+your saved context against the power-on reset values to determine if
+context was lost, and thus avoid doing a full restore if needed.
+
+Honestly however, the save/restore context time for most devices is
+going to be insignificant compared with the total system-wide
+suspend/resume time, so the optimizations will not likely be noticed for
+system-wide suspend/resume.
+
+However, if you would like to also implement runtime PM (and you
+should), then the save/restore context for individual devices will start
+to matter since for latency reasons, you will likely care about runtime
+suspend/resume times for individual devices.
+
+In that case however, the solution is use PM QoS constraints when there
+are specific latency requirements so that the power-off of the device is
+avoided in cases where latency constraints could not be met.
+
+> Some device tree nodes have a property called "always-on" which is
+> documented as "If present, the block is powered through an always-on
+> power domain, therefore it never loses context."
+>
+> In that case, I suppose the driver's suspend/resume routine should:
+>
+> suspend:
+> if (always-on is not present) {
+>     save device registers to RAM;
+> }
+>
+> resume:
+> if (always-on is not present) {
+>     restore device registers from RAM;
+> }
+>
+> Do you disagree?
+
+Yes.  I'm not a fan of using always-on for this.
+
+Kevin
