@@ -1,19 +1,38 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 10 Jun 2016 12:57:18 -0500
-Subject: [PATCH v3 2/4] Documentation: Add documentation for APM X-Gene
- SoC PMU DTS binding
-In-Reply-To: <1465521892-31420-3-git-send-email-ttnguyen@apm.com>
-References: <1465521892-31420-1-git-send-email-ttnguyen@apm.com>
- <1465521892-31420-3-git-send-email-ttnguyen@apm.com>
-Message-ID: <20160610175718.GA27378@rob-hp-laptop>
+From: sricharan@codeaurora.org (Sricharan R)
+Date: Fri, 10 Jun 2016 23:38:18 +0530
+Subject: [PATCH V4 0/3] i2c: qup: Some misc fixes
+Message-ID: <1465582101-19391-1-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 06:24:50PM -0700, Tai Nguyen wrote:
-> Signed-off-by: Tai Nguyen <ttnguyen@apm.com>
-> ---
->  .../devicetree/bindings/perf/apm-xgene-pmu.txt     | 112 +++++++++++++++++++++
->  1 file changed, 112 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/perf/apm-xgene-pmu.txt
+One for fixing the bug with CONFIG_DEBUG_SG enabled, another
+to suspend the transfer for all errors instead of just for NACK
+and one for correcting the wrong initial value for index variable.
 
-Acked-by: Rob Herring <robh@kernel.org>
+[V4] Added little more description to patch#1 and split a
+     change in to a new patch.
+ 
+[V3] Added more commit description. Return more appropriate
+     error codes for NACK and other bus errors. Corrected
+     other bus errors handling procedure for dma mode as well.
+     Removed the dev_err log for NACKs.
+
+[V2] Removed the use of unnecessary variable assignment.
+
+Kept the reviewed and Tested by tag for patch#1,
+as there was no code change.
+
+Depends on patch[1] for the error handling to be complete.
+
+[1] https://lkml.org/lkml/2016/5/9/447
+
+Sricharan R (3):
+  i2c: qup: Fix broken dma when CONFIG_DEBUG_SG is enabled
+  i2c: qup: Fix wrong value of index variable
+  i2c: qup: Fix error handling
+
+ drivers/i2c/busses/i2c-qup.c | 128 ++++++++++++++++++++-----------------------
+ 1 file changed, 58 insertions(+), 70 deletions(-)
+
+-- 
+QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
