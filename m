@@ -1,31 +1,47 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 10 Jun 2016 15:23:29 +0200
-Subject: [PATCH 01/10] arm64: marvell: enable Armada 3700 clock drivers
+Date: Fri, 10 Jun 2016 15:23:32 +0200
+Subject: [PATCH 04/10] arm64: dts: marvell: add peripherals clocks for Armada
+ 37xx
 In-Reply-To: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1465565018-14172-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1465565018-14172-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1465565018-14172-5-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the support for the clocks drivers used on the
-Armada 3700.
+Add two new blocks of clocks. The peripheral clocks are the source clocks
+of the peripheral of the Armada 3700 SoC.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm64/Kconfig.platforms | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-index 7ef1d05859ae..2fdadff9143d 100644
---- a/arch/arm64/Kconfig.platforms
-+++ b/arch/arm64/Kconfig.platforms
-@@ -73,6 +73,7 @@ config ARCH_MVEBU
- 	bool "Marvell EBU SoC Family"
- 	select ARMADA_AP806_SYSCON
- 	select ARMADA_CP110_SYSCON
-+	select ARMADA_37XX_CLK
- 	select MVEBU_ODMI
- 	help
- 	  This enables support for Marvell EBU familly, including:
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index e9f0b97c63d5..c55542ba0c54 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -105,6 +105,22 @@
+ 				status = "disabled";
+ 			};
+ 
++			nb_perih_clk: nb-periph-clk at 13000{
++				compatible = "marvell,armada-3700-periph-clock-nb";
++				reg = <0x13000 0x100>;
++				clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
++				<&tbg 3>, <&xtalclk>;
++				#clock-cells = <1>;
++			};
++
++			sb_perih_clk: sb-periph-clk at 13000{
++				compatible = "marvell,armada-3700-periph-clock-sb";
++				reg = <0x18000 0x100>;
++				clocks = <&tbg 0>, <&tbg 1>, <&tbg 2>,
++				<&tbg 3>, <&xtalclk>;
++				#clock-cells = <1>;
++			};
++
+ 			tbg: tbg at 13200 {
+ 				compatible = "marvell,armada-3700-tbg-clock";
+ 				reg = <0x13200 0x100>;
 -- 
 2.5.0
