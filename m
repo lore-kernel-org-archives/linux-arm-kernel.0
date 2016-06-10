@@ -1,32 +1,43 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 00:03:49 +0200
-Subject: [PATCH 46/48] ARM: at91/defconfig: at91_dt unselect ATMEL_PIT
+Date: Sat, 11 Jun 2016 00:03:22 +0200
+Subject: [PATCH 19/48] ARM: dts: at91: at91sam9m10g45ek: use TCB0 as
+ clocksource
 In-Reply-To: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
 References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <1465596231-21766-47-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1465596231-21766-20-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PIT is not required anymore to successfully boot and may actually harm
-in case preempt-rt is used because the PIT interrupt is shared.
-Disable it so the TCB clocksource is used.
+Use tcb0 as the clocksource like previously selected in at91_dt_defconfig.
 
+Tested-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 ---
- arch/arm/configs/at91_dt_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/at91sam9m10g45ek.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index e4b1be66b3f5..9d068f07b84b 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -182,6 +182,7 @@ CONFIG_RTC_DRV_AT91RM9200=y
- CONFIG_RTC_DRV_AT91SAM9=y
- CONFIG_DMADEVICES=y
- CONFIG_AT_HDMAC=y
-+# CONFIG_ATMEL_PIT is not set
- # CONFIG_IOMMU_SUPPORT is not set
- CONFIG_IIO=y
- CONFIG_AT91_ADC=y
+diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+index 2400c99134f7..132064c60863 100644
+--- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
++++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
+@@ -39,6 +39,18 @@
+ 				status = "okay";
+ 			};
+ 
++			tcb0: timer at fff7c000 {
++				timer at 0 {
++					compatible = "atmel,tcb-clksrc";
++					reg = <0>, <1>;
++				};
++
++				timer at 2 {
++					compatible = "atmel,tcb-clkevt";
++					reg = <2>;
++				};
++			};
++
+ 			usart1: serial at fff90000 {
+ 				pinctrl-0 =
+ 					<&pinctrl_usart1
 -- 
 2.8.1
