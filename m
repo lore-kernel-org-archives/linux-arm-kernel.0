@@ -1,50 +1,62 @@
 From: pramod.kumar@broadcom.com (Pramod Kumar)
-Date: Fri, 10 Jun 2016 11:03:47 +0530
-Subject: [PATCH v5 3/7] binding: mdio-mux: Add DT binding doc for Broadcom
- MDIO bus multiplexer
+Date: Fri, 10 Jun 2016 11:03:48 +0530
+Subject: [PATCH v5 4/7] dt: mdio-mux: Add mdio multiplexer driver node
 In-Reply-To: <1465536831-13023-1-git-send-email-pramod.kumar@broadcom.com>
 References: <1465536831-13023-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <1465536831-13023-4-git-send-email-pramod.kumar@broadcom.com>
+Message-ID: <1465536831-13023-5-git-send-email-pramod.kumar@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT binding doc for Broadcom MDIO bus multiplexer driver.
+Add integrated MDIO multiplexer driver node which contains
+two mux PCIe bus and one ethernet bus along with phys
+lying on these bus.
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
 Signed-off-by: Pramod Kumar <pramod.kumar@broadcom.com>
-Reviewed-by: Florian Fainelli <f.fainelli@gmail.com>
 Acked-by: Rob Herring <robh@kernel.org>
 ---
- .../bindings/net/brcm,mdio-mux-iproc.txt           | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 16 +++++++++++++
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 39 ++++++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-new file mode 100644
-index 0000000..dfe287a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/brcm,mdio-mux-iproc.txt
-@@ -0,0 +1,59 @@
-+Properties for an MDIO bus multiplexer found in Broadcom iProc based SoCs.
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index 54ca40c..ea5603f 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -52,6 +52,14 @@
+ 	};
+ };
+ 
++&pci_phy0 {
++	status = "ok";
++};
 +
-+This MDIO bus multiplexer defines buses that could be internal as well as
-+external to SoCs and could accept MDIO transaction compatible to C-22 or
-+C-45 Clause. When child bus is selected, one needs to select these two
-+properties as well to generate desired MDIO transaction on appropriate bus.
++&pci_phy1 {
++	status = "ok";
++};
 +
-+Required properties in addition to the generic multiplexer properties:
+ &pcie0 {
+ 	status = "ok";
+ };
+@@ -132,3 +140,11 @@
+ 		#size-cells = <1>;
+ 	};
+ };
 +
-+MDIO multiplexer node:
-+- compatible: brcm,mdio-mux-iproc.
-+
-+Every non-ethernet PHY requires a compatible so that it could be probed based
-+on this compatible string.
-+
-+Additional information regarding generic multiplexer properties can be found
-+at- Documentation/devicetree/bindings/net/mdio-mux.txt
-+
-+
-+for example:
++&mdio_mux_iproc {
++	mdio at 10 {
++		gphy0: eth-phy at 10 {
++			reg = <0x10>;
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index ec68ec1..46b78fa 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -263,6 +263,45 @@
+ 				      IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 
 +		mdio_mux_iproc: mdio-mux at 6602023c {
 +			compatible = "brcm,mdio-mux-iproc";
 +			reg = <0x6602023c 0x14>;
@@ -60,6 +72,7 @@ index 0000000..dfe287a
 +					compatible = "brcm,ns2-pcie-phy";
 +					reg = <0x0>;
 +					#phy-cells = <0>;
++					status = "disabled";
 +				};
 +			};
 +
@@ -72,17 +85,19 @@ index 0000000..dfe287a
 +					compatible = "brcm,ns2-pcie-phy";
 +					reg = <0x0>;
 +					#phy-cells = <0>;
++					status = "disabled";
 +				};
 +			};
++
 +			mdio at 10 {
 +				reg = <0x10>;
 +				#address-cells = <1>;
 +				#size-cells = <0>;
-+
-+				gphy0: eth-phy at 10 {
-+					reg = <0x10>;
-+				};
 +			};
 +		};
++
+ 		timer0: timer at 66030000 {
+ 			compatible = "arm,sp804", "arm,primecell";
+ 			reg = <0x66030000 0x1000>;
 -- 
 1.9.1
