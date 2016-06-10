@@ -1,64 +1,152 @@
-From: andy.gross@linaro.org (Andy Gross)
-Date: Fri, 10 Jun 2016 11:12:34 -0500
-Subject: [PATCH 3/5] arm64: dts: msm8916: Add spc compat tag
-In-Reply-To: <20160610154857.GA6430@leverpostej>
-References: <1463634020-17252-1-git-send-email-andy.gross@linaro.org>
- <1463634020-17252-4-git-send-email-andy.gross@linaro.org>
- <20160610154857.GA6430@leverpostej>
-Message-ID: <20160610161234.GO13357@hector.attlocal.net>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 10 Jun 2016 11:25:28 -0500
+Subject: [RFC PATCH v2 12/15] drivers: acpi: implement acpi_dma_configure
+In-Reply-To: <1465306270-27076-13-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1465306270-27076-13-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20160610162528.GI19309@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 04:48:57PM +0100, Mark Rutland wrote:
-> [+ Lorenzo]
+On Tue, Jun 07, 2016 at 02:31:07PM +0100, Lorenzo Pieralisi wrote:
+> On DT based systems, the of_dma_configure() API implements DMA configuration
+> for a given device. On ACPI systems an API equivalent to of_dma_configure()
+> is missing which implies that it is currently not possible to set-up DMA
+> operations for devices through the ACPI generic kernel layer.
 > 
-> On Thu, May 19, 2016 at 12:00:18AM -0500, Andy Gross wrote:
-> > This patch adds the qcom,idle-state-spc compatible to the SPC idle
-> > state.  This compatible indicates that the state is one which supports
-> > freeze.
-> > 
-> > Signed-off-by: Andy Gross <andy.gross@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/qcom/msm8916.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > index 208af00..032e411 100644
-> > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > @@ -104,7 +104,7 @@
-> >  
-> >  		idle-states {
-> >  			CPU_SPC: spc {
-> > -				compatible = "arm,idle-state";
-> > +				compatible = "qcom,idle-state-spc", "arm,idle-state";
-> >  				arm,psci-suspend-param = <0x40000002>;
-> >  				entry-latency-us = <130>;
-> >  				exit-latency-us = <150>;
+> This patch fills the gap by introducing acpi_dma_configure/deconfigure()
+> calls that for now are just wrappers around arch_setup_dma_ops() and
+> arch_teardown_dma_ops() and also updates ACPI and PCI core code to use
+> the newly introduced acpi_dma_configure/acpi_dma_deconfigure functions.
 > 
-> This looks suspicious.
+> The DMA range size passed to arch_setup_dma_ops() is sized according
+> to the device coherent_dma_mask (starting at address 0x0), mirroring the
+> DT probing path behaviour when a dma-ranges property is not provided
+> for the device being probed; this changes the current arch_setup_dma_ops()
+> call parameters in the ACPI probing case, but since arch_setup_dma_ops()
+> is a NOP on all architectures but ARM/ARM64 this patch does not change
+> the current kernel behaviour on them.
 > 
-> This is a PSCI idle state, and we have a PSCI driver driven by the
-> generic ARM cpuidle driver.
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Robin Murphy <robin.murphy@arm.com>
+> Cc: Tomasz Nowicki <tn@semihalf.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+
+Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+
+I assume this will be merged by somebody else along with the rest
+of the series.
+
+> ---
+>  drivers/acpi/glue.c     |  4 ++--
+>  drivers/acpi/scan.c     | 24 ++++++++++++++++++++++++
+>  drivers/pci/probe.c     |  3 +--
+>  include/acpi/acpi_bus.h |  2 ++
+>  include/linux/acpi.h    |  5 +++++
+>  5 files changed, 34 insertions(+), 4 deletions(-)
 > 
-> Why do we need a qcom-specific compatible here?
+> diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
+> index 5ea5dc2..f8d6564 100644
+> --- a/drivers/acpi/glue.c
+> +++ b/drivers/acpi/glue.c
+> @@ -227,8 +227,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+>  
+>  	attr = acpi_get_dma_attr(acpi_dev);
+>  	if (attr != DEV_DMA_NOT_SUPPORTED)
+> -		arch_setup_dma_ops(dev, 0, 0, NULL,
+> -				   attr == DEV_DMA_COHERENT);
+> +		acpi_dma_configure(dev, attr);
+>  
+>  	acpi_physnode_link_name(physical_node_name, node_id);
+>  	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
+> @@ -251,6 +250,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
+>  	return 0;
+>  
+>   err:
+> +	acpi_dma_deconfigure(dev);
+>  	ACPI_COMPANION_SET(dev, NULL);
+>  	put_device(dev);
+>  	put_device(&acpi_dev->dev);
+> diff --git a/drivers/acpi/scan.c b/drivers/acpi/scan.c
+> index 5f28cf7..b4b9064 100644
+> --- a/drivers/acpi/scan.c
+> +++ b/drivers/acpi/scan.c
+> @@ -1358,6 +1358,30 @@ enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+>  		return DEV_DMA_NON_COHERENT;
+>  }
+>  
+> +/**
+> + * acpi_dma_configure - Set-up DMA configuration for the device.
+> + * @dev: The pointer to the device
+> + * @attr: device dma attributes
+> + */
+> +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr)
+> +{
+> +	/*
+> +	 * Assume dma valid range starts at 0 and covers the whole
+> +	 * coherent_dma_mask.
+> +	 */
+> +	arch_setup_dma_ops(dev, 0, dev->coherent_dma_mask + 1, NULL,
+> +			   attr == DEV_DMA_COHERENT);
+> +}
+> +
+> +/**
+> + * acpi_dma_deconfigure - Tear-down DMA configuration for the device.
+> + * @dev: The pointer to the device
+> + */
+> +void acpi_dma_deconfigure(struct device *dev)
+> +{
+> +	arch_teardown_dma_ops(dev);
+> +}
+> +
+>  static void acpi_init_coherency(struct acpi_device *adev)
+>  {
+>  	unsigned long long cca = 0;
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 8e3ef72..01dd369 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -1725,8 +1725,7 @@ static void pci_dma_configure(struct pci_dev *dev)
+>  		if (attr == DEV_DMA_NOT_SUPPORTED)
+>  			dev_warn(&dev->dev, "DMA not supported.\n");
+>  		else
+> -			arch_setup_dma_ops(&dev->dev, 0, 0, NULL,
+> -					   attr == DEV_DMA_COHERENT);
+> +			acpi_dma_configure(&dev->dev, attr);
+>  	}
+>  
+>  	pci_put_host_bridge_device(bridge);
+> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+> index 788c6c35..8b5039a 100644
+> --- a/include/acpi/acpi_bus.h
+> +++ b/include/acpi/acpi_bus.h
+> @@ -566,6 +566,8 @@ struct acpi_pci_root {
+>  
+>  bool acpi_dma_supported(struct acpi_device *adev);
+>  enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev);
+> +void acpi_dma_configure(struct device *dev, enum dev_dma_attr attr);
+> +void acpi_dma_deconfigure(struct device *dev);
+>  
+>  struct acpi_device *acpi_find_child_device(struct acpi_device *parent,
+>  					   u64 address, bool check_children);
+> diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+> index 288fac5..135a452 100644
+> --- a/include/linux/acpi.h
+> +++ b/include/linux/acpi.h
+> @@ -676,6 +676,11 @@ static inline enum dev_dma_attr acpi_get_dma_attr(struct acpi_device *adev)
+>  	return DEV_DMA_NOT_SUPPORTED;
+>  }
+>  
+> +static inline void acpi_dma_configure(struct device *dev,
+> +				      enum dev_dma_attr attr) { }
+> +
+> +static inline void acpi_dma_deconfigure(struct device *dev) { }
+> +
+>  #define ACPI_PTR(_ptr)	(NULL)
+>  
+>  #endif	/* !CONFIG_ACPI */
+> -- 
+> 2.6.4
 > 
-> Surely we should be able to use the idle code in a generic fashion to
-> driver suspend-to-idle?
-
-We need a way to identify specific idle states that support suspend-to-idle.  In
-addition, when we have identified the states, we may have to configure the
-enter_freeze() function.
-
-I chose to do this outside of the arm cpuidle driver because I didn't want to
-add any more DT information aside from the compatible, and I needed a separate
-place for the Qualcomm specific suspend code.  With the compatible, this makes
-my 32 and 64 bit processor suspend code identical, as we have our own cpuidle
-driver for the 32 bit procs.
-
-An alternative would be to add some facilities to communicate this to the arm
-cpuidle driver and configure the enter_freeze() function at some later point.
-
-Regards,
-
-Andy
