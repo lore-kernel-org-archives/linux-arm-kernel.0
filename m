@@ -1,26 +1,93 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 10 Jun 2016 13:43:29 +0200
-Subject: [RFC PATCH 02/15] clocksource: samsung_pwm_timer: fix endian
- accessors
-In-Reply-To: <20160608183110.13851-3-matthew@mattleach.net>
+Date: Fri, 10 Jun 2016 13:44:40 +0200
+Subject: [RFC PATCH 04/15] irqchip: exynos_combiner: fixup reg access on be
+In-Reply-To: <20160608183110.13851-5-matthew@mattleach.net>
 References: <20160608183110.13851-1-matthew@mattleach.net>
- <20160608183110.13851-3-matthew@mattleach.net>
-Message-ID: <575AA7E1.9030000@samsung.com>
+ <20160608183110.13851-5-matthew@mattleach.net>
+Message-ID: <575AA828.3070805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 06/08/2016 08:30 PM, Matthew Leach wrote:
-> Fix the Samsung pwm timer access code to deal with kernels built for big
-> endian operation.
+> Use the byte-order aware big endian accessors, allowing for kernels
+> running under big-endian.
 > 
 > Signed-off-by: Matthew Leach <matthew@mattleach.net>
 > ---
-> CC: Daniel Lezcano <daniel.lezcano@linaro.org>
 > CC: Thomas Gleixner <tglx@linutronix.de>
+> CC: Jason Cooper <jason@lakedaemon.net>
+> CC: Marc Zyngier <marc.zyngier@arm.com>
+> CC: Kukjin Kim <kgene@kernel.org>
+> CC: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > CC: linux-kernel at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-samsung-soc at vger.kernel.org
 > ---
->  drivers/clocksource/samsung_pwm_timer.c | 16 ++++++++--------
->  1 file changed, 8 insertions(+), 8 deletions(-)
+>  drivers/irqchip/exynos-combiner.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/irqchip/exynos-combiner.c b/drivers/irqchip/exynos-combiner.c
+> index ead15be..b78a169 100644
+> --- a/drivers/irqchip/exynos-combiner.c
+> +++ b/drivers/irqchip/exynos-combiner.c
+> @@ -55,14 +55,14 @@ static void combiner_mask_irq(struct irq_data *data)
+>  {
+>  	u32 mask = 1 << (data->hwirq % 32);
+>  
+> -	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
+> +	writel_relaxed(mask, combiner_base(data) + COMBINER_ENABLE_CLEAR);
+>  }
+>  
+>  static void combiner_unmask_irq(struct irq_data *data)
+>  {
+>  	u32 mask = 1 << (data->hwirq % 32);
+>  
+> -	__raw_writel(mask, combiner_base(data) + COMBINER_ENABLE_SET);
+> +	writel_relaxed(mask, combiner_base(data) + COMBINER_ENABLE_SET);
+>  }
+>  
+>  static void combiner_handle_cascade_irq(struct irq_desc *desc)
+> @@ -75,7 +75,7 @@ static void combiner_handle_cascade_irq(struct irq_desc *desc)
+>  	chained_irq_enter(chip, desc);
+>  
+>  	spin_lock(&irq_controller_lock);
+> -	status = __raw_readl(chip_data->base + COMBINER_INT_STATUS);
+> +	status = readl_relaxed(chip_data->base + COMBINER_INT_STATUS);
+>  	spin_unlock(&irq_controller_lock);
+>  	status &= chip_data->irq_mask;
+>  
+> @@ -135,7 +135,7 @@ static void __init combiner_init_one(struct combiner_chip_data *combiner_data,
+>  	combiner_data->parent_irq = irq;
+>  
+>  	/* Disable all interrupts */
+> -	__raw_writel(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
+> +	writel_relaxed(combiner_data->irq_mask, base + COMBINER_ENABLE_CLEAR);
+>  }
+>  
+>  static int combiner_irq_domain_xlate(struct irq_domain *d,
+> @@ -218,7 +218,7 @@ static int combiner_suspend(void)
+>  
+>  	for (i = 0; i < max_nr; i++)
+>  		combiner_data[i].pm_save =
+> -			__raw_readl(combiner_data[i].base + COMBINER_ENABLE_SET);
+> +			readl_relaxed(combiner_data[i].base + COMBINER_ENABLE_SET);
+>  
+>  	return 0;
+>  }
+> @@ -235,9 +235,9 @@ static void combiner_resume(void)
+>  	int i;
+>  
+>  	for (i = 0; i < max_nr; i++) {
+> -		__raw_writel(combiner_data[i].irq_mask,
+> +		writel_relaxed(combiner_data[i].irq_mask,
+>  			     combiner_data[i].base + COMBINER_ENABLE_CLEAR);
+> -		__raw_writel(combiner_data[i].pm_save,
+> +		writel_relaxed(combiner_data[i].pm_save,
+>  			     combiner_data[i].base + COMBINER_ENABLE_SET);
+
+Indentation of arguments is broken. I think it was aligned before.
+
+Beside that:
 
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
