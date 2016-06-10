@@ -1,73 +1,96 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 10 Jun 2016 08:36:31 -0500
-Subject: [PATCH 08/11] Documentation: phy: Let the rockchip eMMC PHY get
- an exported card clock
-In-Reply-To: <1465339484-969-9-git-send-email-dianders@chromium.org>
-References: <1465339484-969-1-git-send-email-dianders@chromium.org>
- <1465339484-969-9-git-send-email-dianders@chromium.org>
-Message-ID: <20160610133631.GA10634@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 10 Jun 2016 14:36:32 +0100
+Subject: [PATCH v2 1/3] arm64: spinlock: order spin_{is_locked,
+ unlock_wait} against local locks
+In-Reply-To: <1465403139-21054-1-git-send-email-will.deacon@arm.com>
+References: <1465403139-21054-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20160610133631.GC24528@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 03:44:41PM -0700, Douglas Anderson wrote:
-> As of an earlier change in this series ("Documentation: mmc:
-> sdhci-of-arasan: Add ability to export card clock") the SDHCI driver
-> used on Rockchip SoCs can now expose its clock.  Let's now specify that
-> the PHY can use it.
+On Wed, Jun 08, 2016 at 05:25:37PM +0100, Will Deacon wrote:
+> spin_is_locked has grown two very different use-cases:
 > 
-> Letting the PHY get access to this clock means it can adjust
-> phyctrl_frqsel field appropriately.  Although the Rockchip PHY appears
-> slightly different than the reference Arasan one, you can see that the
-> Arasan datasheet [1] had it defined as:
->   Select the frequency range of DLL operation:
->   3b'000 => 200MHz to 170 MHz
->   3b'001 => 170MHz to 140 MHz
->   3b'010 => 140MHz to 110 MHz
->   3b'011 => 110MHz to 80MHz
->   3b'100 => 80MHz to 50 MHz
->   3b'101 => 275Mhz to 250MHz
->   3b'110 => 250MHz to 225MHz
->   3b'111 => 225MHz to 200MHz
+> (1) [The sane case] API functions may require a certain lock to be held
+>     by the caller and can therefore use spin_is_locked as part of an
+>     assert statement in order to verify that the lock is indeed held.
+>     For example, usage of assert_spin_locked.
 > 
-> On the Rockchip version of the PHY we have less granularity but the idea
-> is the same.
+> (2) [The insane case] There are two locks, where a CPU takes one of the
+>     locks and then checks whether or not the other one is held before
+>     accessing some shared state. For example, the "optimized locking" in
+>     ipc/sem.c.
 > 
-> [1]: https://arasan.com/wp-content/media/eMMC-5-1-Total-Solution_Rev-1-3.pdf
+> In the latter case, the sequence looks like:
 > 
-> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>   spin_lock(&sem->lock);
+>   if (!spin_is_locked(&sma->sem_perm.lock))
+>     /* Access shared state */
+> 
+> and requires that the spin_is_locked check is ordered after taking the
+> sem->lock. Unfortunately, since our spinlocks are implemented using a
+> LDAXR/STXR sequence, the read of &sma->sem_perm.lock can be speculated
+> before the STXR and consequently return a stale value.
+> 
+> Whilst this hasn't been seen to cause issues in practice, PowerPC fixed
+> the same issue in 51d7d5205d33 ("powerpc: Add smp_mb() to
+> arch_spin_is_locked()") and, although we did something similar for
+> spin_unlock_wait in d86b8da04dfa ("arm64: spinlock: serialise
+> spin_unlock_wait against concurrent lockers") that doesn't actually take
+> care of ordering against local acquisition of a different lock.
+> 
+> This patch adds an smp_mb() to the start of our arch_spin_is_locked and
+> arch_spin_unlock_wait routines to ensure that the lock value is always
+> loaded after any other locks have been taken by the current CPU.
+> 
+> Reported-by: Peter Zijlstra <peterz@infradead.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+I've taken a look at the series, and the asm looks sane to me. From
+discussions at a white-board, the meat of the changes seems right.
+
+So FWIW, for the series:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
 > ---
->  Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt | 7 +++++++
+>  arch/arm64/include/asm/spinlock.h | 7 +++++++
 >  1 file changed, 7 insertions(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-> index 555cb0f40690..fd118b071e5e 100644
-> --- a/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-> +++ b/Documentation/devicetree/bindings/phy/rockchip-emmc-phy.txt
-> @@ -7,6 +7,11 @@ Required properties:
->   - reg: PHY register address offset and length in "general
->     register files"
+> diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+> index fc9682bfe002..aac64d55cb22 100644
+> --- a/arch/arm64/include/asm/spinlock.h
+> +++ b/arch/arm64/include/asm/spinlock.h
+> @@ -31,6 +31,12 @@ static inline void arch_spin_unlock_wait(arch_spinlock_t *lock)
+>  	unsigned int tmp;
+>  	arch_spinlock_t lockval;
 >  
-> +Optional clocks (see ../clock/clock-bindings.txt), specified by name:
-> + - emmcclk: The card clock exported by the SDHCI driver.  Although this is
-
-This reads like emmcclk is the property. You need to list out clocks and 
-clock-names.
-
-> +	    listed as optional (because most boards can get basic functionality
-> +	    without having access to it), it is strongly suggested.
+> +	/*
+> +	 * Ensure prior spin_lock operations to other locks have completed
+> +	 * on this CPU before we test whether "lock" is locked.
+> +	 */
+> +	smp_mb();
 > +
->  Example:
+>  	asm volatile(
+>  "	sevl\n"
+>  "1:	wfe\n"
+> @@ -148,6 +154,7 @@ static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
 >  
+>  static inline int arch_spin_is_locked(arch_spinlock_t *lock)
+>  {
+> +	smp_mb(); /* See arch_spin_unlock_wait */
+>  	return !arch_spin_value_unlocked(READ_ONCE(*lock));
+>  }
 >  
-> @@ -20,6 +25,8 @@ grf: syscon at ff770000 {
->  	emmcphy: phy at f780 {
->  		compatible = "rockchip,rk3399-emmc-phy";
->  		reg = <0xf780 0x20>;
-> +		clocks = <&sdhci>;
-> +		clock-names = "emmcclk";
->  		#phy-cells = <0>;
->  	};
->  };
 > -- 
-> 2.8.0.rc3.226.g39d4020
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 > 
