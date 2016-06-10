@@ -1,31 +1,42 @@
 From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Fri, 10 Jun 2016 14:42:30 +0530
-Subject: [PATCH 0/4] dmaengine: vdma: AXI DMAS Enhancments
-Message-ID: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
+Date: Fri, 10 Jun 2016 14:42:31 +0530
+Subject: [PATCH 1/4] Documentation: DT: vdma: Update binding doc for
+ multi-channel dma mode
+In-Reply-To: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
+References: <1465549954-30220-1-git-send-email-appanad@xilinx.com>
+Message-ID: <1465549954-30220-2-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series does the following thing.
----> Add support for AXI DMA Multi-channel DMA mode.
----> Delete AXI DMA binding doc.
----> Rename the driver and update config options.
+This patch updates the device-tree binding doc for
+AXI DMA multi channel dma mode.
 
-This patch series is created on top of the patch series
-"dmaengine: Add Xilinx zynqmp dma engine driver support".
+Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+---
+ .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Kedareswara rao Appana (4):
-  Documentation: DT: vdma: Update binding doc for multi-channel dma
-    mode
-  dmaengine: vdma: Add support for mulit-channel dma mode
-  Documentation: DT: dma: Delete binding doc for AXI DMA
-  dmaengine: dma: Rename driver and config
-
- .../devicetree/bindings/dma/xilinx/xilinx_dma.txt  |   92 ++++++--
- .../devicetree/bindings/dma/xilinx/xilinx_vdma.txt |  107 ---------
- drivers/dma/Kconfig                                |   13 +-
- drivers/dma/xilinx/Makefile                        |    2 +-
- drivers/dma/xilinx/{xilinx_vdma.c => xilinx_dma.c} |  242 ++++++++++++++++++--
- include/linux/dma/xilinx_dma.h                     |   18 ++
- 6 files changed, 316 insertions(+), 158 deletions(-)
- delete mode 100644 Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
- rename drivers/dma/xilinx/{xilinx_vdma.c => xilinx_dma.c} (91%)
+diff --git a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+index a1f2683..0faa189 100644
+--- a/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
++++ b/Documentation/devicetree/bindings/dma/xilinx/xilinx_vdma.txt
+@@ -40,6 +40,8 @@ Required properties for VDMA:
+ Optional properties:
+ - xlnx,include-sg: Tells configured for Scatter-mode in
+ 	the hardware.
++Optional properties for AXI DMA:
++- xlnx,mcdma: Tells whether configured for multi-channel mode in the hardware.
+ Optional properties for VDMA:
+ - xlnx,flush-fsync: Tells which channel to Flush on Frame sync.
+ 	It takes following values:
+@@ -60,6 +62,8 @@ Optional child node properties:
+ Optional child node properties for VDMA:
+ - xlnx,genlock-mode: Tells Genlock synchronization is
+ 	enabled/disabled in hardware.
++Optional child node properties for AXI DMA:
++-dma-channels: Number of dma channels in child node.
+ 
+ Example:
+ ++++++++
+-- 
+1.7.1
