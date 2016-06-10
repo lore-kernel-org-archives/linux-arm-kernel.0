@@ -1,26 +1,27 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Jun 2016 05:03:32 -0700
-Subject: [PATCH v8 8/9] ARM: AM335x/AM437x: hwmod: Remove eQEP, ePWM and
- eCAP hwmod entries
-In-Reply-To: <1462291015-1919-9-git-send-email-fcooper@ti.com>
-References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
- <1462291015-1919-9-git-send-email-fcooper@ti.com>
-Message-ID: <20160610120332.GL22406@atomide.com>
+Date: Fri, 10 Jun 2016 05:08:30 -0700
+Subject: [PATCH v5 2/7] ARM: OMAP3: hwmod data: Fix McBSP2/3 sidetone data
+In-Reply-To: <20160530082350.24285-3-peter.ujfalusi@ti.com>
+References: <20160530082350.24285-1-peter.ujfalusi@ti.com>
+ <20160530082350.24285-3-peter.ujfalusi@ti.com>
+Message-ID: <20160610120830.GM22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Franklin S Cooper Jr <fcooper@ti.com> [160503 08:58]:
-> Devices that utilize the OCP registers and/or PRCM registers and
-> register bit fields should be modeled using hwmod. Since eQEP, ePWM and
-> eCAP don't fall under this category, remove their hwmod entries.
-> 
-> Instead these clocks simply use the clock that is passed through by its
-> parent PWMSS. Therefore, PWMSS handles the clock for itself and its
-> subdevices.
-> 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
-> Acked-by: Paul Walmsley <paul@pwsan.com>
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [160530 01:26]:
+> The McBSPLP's sidetone main clock is the McBSPLP's ICLK, not FCLK as the
+> sidetone only receives the ICLK from the main McBSP module.
+> Since the McBSP and sidetone is using the very same clock from PRCM level
+> the sidetone must not have the prcm section to check the clock status since
+> the sidetone is only used when McBSP is already configured.
+> If two separate hwmods looking at the same bit and they would use
+> pm_runtime in nested way (as it must happen with McBSP and it's ST module)
+> the hwmod would warn, because the idlest will not match what it is expected
+> after enable/disable of the clocks.
 
-And this one I'm applying into omap-for-v4.8/soc.
+OK thanks for fixing this. I'm applying patches 2-7 into
+omap-for-v4.8/soc.
+
+Regards,
 
 Tony
