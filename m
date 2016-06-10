@@ -1,90 +1,40 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 10 Jun 2016 10:19:37 -0400 (EDT)
-Subject: Platform-specific suspend/resume code in drivers
-In-Reply-To: <575A9E93.4090508@free.fr>
-Message-ID: <Pine.LNX.4.44L0.1606101008500.1615-100000@iolanthe.rowland.org>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Jun 2016 16:22:10 +0200
+Subject: [PATCH] ARM: tegra: fix missing include <soc/tegra/cpuidle.h>
+In-Reply-To: <1465404897-16654-1-git-send-email-ben.dooks@codethink.co.uk>
+References: <1465404897-16654-1-git-send-email-ben.dooks@codethink.co.uk>
+Message-ID: <20160610142210.GN27142@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jun 2016, Mason wrote:
-
-> Consider two SoCs, SoCA and SocB.
+On Wed, Jun 08, 2016 at 05:54:57PM +0100, Ben Dooks wrote:
+> The prototype of tegra_cpuidle_pcie_irqs_in_use() is missing
+> from the cpuidle.c file, it is defined in <soc/tegra/cpuidle.h>
+> so add that include to avoid the following warning:
 > 
-> They both have the same device D, which exposes 16 registers to interact
-> with the hardware.
+> arch/arm/mach-tegra/cpuidle.c:51:6: warning: symbol 'tegra_cpuidle_pcie_irqs_in_use' was not declared. Should it be static?
 > 
-> When SoCA is suspended, it stops D's clock, but keeps D powered on,
-> preserving the 16 registers. Thus when SoCA resumes, it finds the
-> 16 registers in the same state as before suspending.
-> 
-> When SoCB is suspended, it powers D down. When SoCB resumes, the
-> 16 registers contain garbage/random values. Therefore, in the case
-> of SoCB, the suspend routine should save the values of the registers
-> to RAM (which is preserved by "contract") and restore them on resume.
-> 
-> However, this save/restore operation is unnecessary on SoCA.
-> 
-> Should the save/restore operation be added unconditionally to the
-> driver, even if some SoCs do not need it?
+> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> ---
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Alexandre Courbot <gnurou@gmail.com>
+> Cc: Thierry Reding <thierry.reding@gmail.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-tegra at vger.kernel.org
+> ---
+>  arch/arm/mach-tegra/cpuidle.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-It certainly should be added, because otherwise SoCB won't work.  
-Whether it is unconditional is up to the programmer.  If the driver has
-some way to know that power won't be lost, it can skip saving the
-registers.
+I've been carrying a set of patches to fix these, and a couple of other
+sparse warnings, in my tree locally, but never sent them out because
+they were so trivial. I probably should've to avoid the duplication of
+effort. Sorry about that.
 
-> In other words, do we consider the performance penalty from saving
-> and restoring device registers small enough that it should be done
-> systematically, even if some SoCs do not require it?
-
-Time is not the most important consideration -- proper operation is.
-
-> Some device tree nodes have a property called "always-on" which is
-> documented as "If present, the block is powered through an always-on
-> power domain, therefore it never loses context."
-> 
-> In that case, I suppose the driver's suspend/resume routine should:
-> 
-> suspend:
-> if (always-on is not present) {
->     save device registers to RAM;
-> }
-> 
-> resume:
-> if (always-on is not present) {
->     restore device registers from RAM;
-> }
-> 
-> Do you disagree?
-
-Apart from nit-picking, no.  In the resume routine, it might be better 
-to check a flag that the suspend routine would set to indicate whether 
-or not the registers were saved, instead of retrieving the always-on 
-attribute again.
-
-
-On Fri, 10 Jun 2016, Geert Uytterhoeven wrote:
-
-> Hi Alan,
-
-Hello.
- 
-> > Of course, if a driver needs suspend support but doesn't include it,
-> > then it's quite likely the driver will not work properly after the  
-> > system has been resumed.  But that's not a platform-specific issue. 
-> 
-> It may be. The same device may be present on different SoCs. On some
-> SoCs, the device may be part of a power area, on others not.
-> When running on the former SoC, the driver needs to save/restore registers,
-> while this is not needed (but harmless, except for a small time impact)
-> on the latter SoC.
-
-Splitting hairs.  As a general principle, you have to agree that:
-
-	If a driver needs suspend support but doesn't include it, then
-	it's quite likely the driver will not work properly after the
-	system has been resumed.
-
-is true on all platforms.  On the other hand, the question of whether 
-or not the driver needs suspend support may well be platform-specific.
-
-Alan Stern
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/ffcc37ab/attachment.sig>
