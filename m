@@ -1,31 +1,22 @@
-From: schwidefsky@de.ibm.com (Martin Schwidefsky)
-Date: Fri, 10 Jun 2016 12:51:58 +0200
-Subject: [PATCH 11/14] s390/ptrace: run seccomp after ptrace
-In-Reply-To: <1465506124-21866-12-git-send-email-keescook@chromium.org>
-References: <1465506124-21866-1-git-send-email-keescook@chromium.org>
- <1465506124-21866-12-git-send-email-keescook@chromium.org>
-Message-ID: <20160610125158.16dd5497@mschwide>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 10 Jun 2016 03:53:06 -0700
+Subject: [PATCH 0/5] ARM: dts: omap3-gta04: Various updates
+In-Reply-To: <20160531181903.GB5995@atomide.com>
+References: <1463514531-7235-1-git-send-email-marek@goldelico.com>
+ <CAAfyv37NE1eogrSRCuRY-9V30FtD3u7oeFWMJk=xNX1hFJ9O-w@mail.gmail.com>
+ <20160531181903.GB5995@atomide.com>
+Message-ID: <20160610105306.GW22406@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  9 Jun 2016 14:02:01 -0700
-Kees Cook <keescook@chromium.org> wrote:
-
-> Close the hole where ptrace can change a syscall out from under seccomp.
+* Tony Lindgren <tony@atomide.com> [160531 11:22]:
+> * Belisko Marek <marek.belisko@gmail.com> [160530 23:50]:
+> > Ping? Any objections? Thanks.
 > 
-> Signed-off-by: Kees Cook <keescook@chromium.org>
-> Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
-> Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
-> Cc: linux-s390 at vger.kernel.org
-> ---
->  arch/s390/kernel/ptrace.c | 21 +++++++++------------
->  1 file changed, 9 insertions(+), 12 deletions(-)
+> Looks OK to me, with v4.7-rc1 out I'll start applying patches
+> again once the pending fixes are out of the way. So it will be
+> few more days, probably around -rc2 time.
 
-If the change in semantics in regard to the audit of skipped system calls
-is acceptable, the modified s390 arch code is ok.
+Applying all into omap-for-v4.8/dt finally thanks.
 
--- 
-blue skies,
-   Martin.
-
-"Reality continues to ruin my life." - Calvin.
+Tony
