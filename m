@@ -1,34 +1,173 @@
 From: sricharan@codeaurora.org (Sricharan R)
-Date: Fri, 10 Jun 2016 23:38:20 +0530
-Subject: [PATCH V4 2/3] i2c: qup: Fix wrong value of index variable
+Date: Fri, 10 Jun 2016 23:38:21 +0530
+Subject: [PATCH V4 3/3] i2c: qup: Fix error handling
 In-Reply-To: <1465582101-19391-1-git-send-email-sricharan@codeaurora.org>
 References: <1465582101-19391-1-git-send-email-sricharan@codeaurora.org>
-Message-ID: <1465582101-19391-3-git-send-email-sricharan@codeaurora.org>
+Message-ID: <1465582101-19391-4-git-send-email-sricharan@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-index gets incremented during check to determine if the
-messages can be transferred with dma. But not reset after
-that, resulting in wrong start value in subsequent loop,
-causing failure. Fix it.
+Among the bus errors reported from the QUP_MASTER_STATUS register
+only NACK is considered and transfer gets suspended, while
+other errors are ignored. Correct this and suspend the transfer
+for other errors as well. This avoids unnecessary 'timeouts' which
+happens when waiting for events that would never happen when there
+is already an error condition on the bus. Also the error handling
+procedure should be the same for both NACK and other bus errors in
+case of dma mode. So correct that as well.
 
 Signed-off-by: Sricharan R <sricharan@codeaurora.org>
 ---
- drivers/i2c/busses/i2c-qup.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/i2c/busses/i2c-qup.c | 76 ++++++++++++++++++++++++--------------------
+ 1 file changed, 41 insertions(+), 35 deletions(-)
 
 diff --git a/drivers/i2c/busses/i2c-qup.c b/drivers/i2c/busses/i2c-qup.c
-index 43adc2d..b8116e5 100644
+index b8116e5..44c80ae 100644
 --- a/drivers/i2c/busses/i2c-qup.c
 +++ b/drivers/i2c/busses/i2c-qup.c
-@@ -1260,6 +1260,8 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
+@@ -310,6 +310,7 @@ static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
+ 	u32 opflags;
+ 	u32 status;
+ 	u32 shift = __ffs(op);
++	int ret = 0;
+ 
+ 	len *= qup->one_byte_t;
+ 	/* timeout after a wait of twice the max time */
+@@ -321,18 +322,28 @@ static int qup_i2c_wait_ready(struct qup_i2c_dev *qup, int op, bool val,
+ 
+ 		if (((opflags & op) >> shift) == val) {
+ 			if ((op == QUP_OUT_NOT_EMPTY) && qup->is_last) {
+-				if (!(status & I2C_STATUS_BUS_ACTIVE))
+-					return 0;
++				if (!(status & I2C_STATUS_BUS_ACTIVE)) {
++					ret = 0;
++					goto done;
++				}
+ 			} else {
+-				return 0;
++				ret = 0;
++				goto done;
+ 			}
  		}
+ 
+-		if (time_after(jiffies, timeout))
+-			return -ETIMEDOUT;
+-
++		if (time_after(jiffies, timeout)) {
++			ret = -ETIMEDOUT;
++			goto done;
++		}
+ 		usleep_range(len, len * 2);
+ 	}
++
++done:
++	if (qup->bus_err || qup->qup_err)
++		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
++
++	return ret;
+ }
+ 
+ static void qup_i2c_set_write_mode_v2(struct qup_i2c_dev *qup,
+@@ -793,39 +804,35 @@ static int qup_i2c_bam_do_xfer(struct qup_i2c_dev *qup, struct i2c_msg *msg,
  	}
  
-+	idx = 0;
+ 	if (ret || qup->bus_err || qup->qup_err) {
+-		if (qup->bus_err & QUP_I2C_NACK_FLAG) {
+-			msg--;
+-			dev_err(qup->dev, "NACK from %x\n", msg->addr);
+-			ret = -EIO;
++		if (qup_i2c_change_state(qup, QUP_RUN_STATE)) {
++			dev_err(qup->dev, "change to run state timed out");
++			goto desc_err;
++		}
+ 
+-			if (qup_i2c_change_state(qup, QUP_RUN_STATE)) {
+-				dev_err(qup->dev, "change to run state timed out");
+-				return ret;
+-			}
++		if (rx_nents)
++			writel(QUP_BAM_INPUT_EOT,
++			       qup->base + QUP_OUT_FIFO_BASE);
+ 
+-			if (rx_nents)
+-				writel(QUP_BAM_INPUT_EOT,
+-				       qup->base + QUP_OUT_FIFO_BASE);
++		writel(QUP_BAM_FLUSH_STOP, qup->base + QUP_OUT_FIFO_BASE);
+ 
+-			writel(QUP_BAM_FLUSH_STOP,
+-			       qup->base + QUP_OUT_FIFO_BASE);
++		qup_i2c_flush(qup);
+ 
+-			qup_i2c_flush(qup);
++		/* wait for remaining interrupts to occur */
++		if (!wait_for_completion_timeout(&qup->xfer, HZ))
++			dev_err(qup->dev, "flush timed out\n");
+ 
+-			/* wait for remaining interrupts to occur */
+-			if (!wait_for_completion_timeout(&qup->xfer, HZ))
+-				dev_err(qup->dev, "flush timed out\n");
++		qup_i2c_rel_dma(qup);
+ 
+-			qup_i2c_rel_dma(qup);
+-		}
++		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
+ 	}
+ 
++desc_err:
+ 	dma_unmap_sg(qup->dev, qup->btx.sg, tx_nents, DMA_TO_DEVICE);
+ 
+ 	if (rx_nents)
+ 		dma_unmap_sg(qup->dev, qup->brx.sg, rx_nents,
+ 			     DMA_FROM_DEVICE);
+-desc_err:
 +
- 	do {
- 		if (msgs[idx].len == 0) {
- 			ret = -EINVAL;
+ 	return ret;
+ }
+ 
+@@ -841,9 +848,6 @@ static int qup_i2c_bam_xfer(struct i2c_adapter *adap, struct i2c_msg *msg,
+ 	if (ret)
+ 		goto out;
+ 
+-	qup->bus_err = 0;
+-	qup->qup_err = 0;
+-
+ 	writel(0, qup->base + QUP_MX_INPUT_CNT);
+ 	writel(0, qup->base + QUP_MX_OUTPUT_CNT);
+ 
+@@ -881,12 +885,8 @@ static int qup_i2c_wait_for_complete(struct qup_i2c_dev *qup,
+ 		ret = -ETIMEDOUT;
+ 	}
+ 
+-	if (qup->bus_err || qup->qup_err) {
+-		if (qup->bus_err & QUP_I2C_NACK_FLAG) {
+-			dev_err(qup->dev, "NACK from %x\n", msg->addr);
+-			ret = -EIO;
+-		}
+-	}
++	if (qup->bus_err || qup->qup_err)
++		ret =  (qup->bus_err & QUP_I2C_NACK_FLAG) ? -ENXIO : -EIO;
+ 
+ 	return ret;
+ }
+@@ -1178,6 +1178,9 @@ static int qup_i2c_xfer(struct i2c_adapter *adap,
+ 	if (ret < 0)
+ 		goto out;
+ 
++	qup->bus_err = 0;
++	qup->qup_err = 0;
++
+ 	writel(1, qup->base + QUP_SW_RESET);
+ 	ret = qup_i2c_poll_state(qup, QUP_RESET_STATE);
+ 	if (ret)
+@@ -1227,6 +1230,9 @@ static int qup_i2c_xfer_v2(struct i2c_adapter *adap,
+ 	struct qup_i2c_dev *qup = i2c_get_adapdata(adap);
+ 	int ret, len, idx = 0, use_dma = 0;
+ 
++	qup->bus_err = 0;
++	qup->qup_err = 0;
++
+ 	ret = pm_runtime_get_sync(qup->dev);
+ 	if (ret < 0)
+ 		goto out;
 -- 
 QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
