@@ -1,58 +1,60 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 10 Jun 2016 16:55:20 +0200
-Subject: [PATCH] ARM: tegra: fix missing include <soc/tegra/cpuidle.h>
-In-Reply-To: <575ACFB5.4070706@nvidia.com>
-References: <1465404897-16654-1-git-send-email-ben.dooks@codethink.co.uk>
- <20160610142210.GN27142@ulmo.ba.sec> <575ACFB5.4070706@nvidia.com>
-Message-ID: <20160610145520.GP27142@ulmo.ba.sec>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 10 Jun 2016 15:56:22 +0100
+Subject: [PATCH v2 3/4] mfd: axp20x: Add axp20x-usb-power-supply for
+ axp22x pmics
+In-Reply-To: <1464887936-17020-3-git-send-email-hdegoede@redhat.com>
+References: <1464887936-17020-1-git-send-email-hdegoede@redhat.com>
+ <1464887936-17020-3-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160610145622.GB7351@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 03:33:25PM +0100, Jon Hunter wrote:
-> 
-> On 10/06/16 15:22, Thierry Reding wrote:
-> > * PGP Signed by an unknown key
-> > 
-> > On Wed, Jun 08, 2016 at 05:54:57PM +0100, Ben Dooks wrote:
-> >> The prototype of tegra_cpuidle_pcie_irqs_in_use() is missing
-> >> from the cpuidle.c file, it is defined in <soc/tegra/cpuidle.h>
-> >> so add that include to avoid the following warning:
-> >>
-> >> arch/arm/mach-tegra/cpuidle.c:51:6: warning: symbol 'tegra_cpuidle_pcie_irqs_in_use' was not declared. Should it be static?
-> >>
-> >> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
-> >> ---
-> >> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> >> Cc: Alexandre Courbot <gnurou@gmail.com>
-> >> Cc: Thierry Reding <thierry.reding@gmail.com>
-> >> Cc: linux-arm-kernel at lists.infradead.org
-> >> Cc: linux-tegra at vger.kernel.org
-> >> ---
-> >>  arch/arm/mach-tegra/cpuidle.c | 1 +
-> >>  1 file changed, 1 insertion(+)
-> > 
-> > I've been carrying a set of patches to fix these, and a couple of other
-> > sparse warnings, in my tree locally, but never sent them out because
-> > they were so trivial. I probably should've to avoid the duplication of
-> > effort. Sorry about that.
-> 
-> I think you did send them out ;-)
-> 
-> http://patchwork.ozlabs.org/patch/616249/
-> http://patchwork.ozlabs.org/patch/616250/
-> http://patchwork.ozlabs.org/patch/616251/
-> http://patchwork.ozlabs.org/patch/616252/
+On Thu, 02 Jun 2016, Hans de Goede wrote:
 
-Hah! Excellent. No more guilty conscience for me. =)
+> Add axp20x-usb-power-supply for axp22x pmics.
+> 
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+> Changes in v2:
+> -Change compatible string for axp22x usb-power-supply cell to match v2 of:
+>  "power: axp20x_usb: Add support for usb power-supply on axp22x pmics"
+> ---
+>  drivers/mfd/axp20x.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 
-I've pulled those patches into the Tegra tree now.
+Applied, thanks.
 
-Thanks,
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/9ea84b50/attachment.sig>
+> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+> index ca04361..6364dab 100644
+> --- a/drivers/mfd/axp20x.c
+> +++ b/drivers/mfd/axp20x.c
+> @@ -160,6 +160,11 @@ static struct resource axp20x_usb_power_supply_resources[] = {
+>  	DEFINE_RES_IRQ_NAMED(AXP20X_IRQ_VBUS_NOT_VALID, "VBUS_NOT_VALID"),
+>  };
+>  
+> +static struct resource axp22x_usb_power_supply_resources[] = {
+> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_PLUGIN, "VBUS_PLUGIN"),
+> +	DEFINE_RES_IRQ_NAMED(AXP22X_IRQ_VBUS_REMOVAL, "VBUS_REMOVAL"),
+> +};
+> +
+>  static struct resource axp22x_pek_resources[] = {
+>  	{
+>  		.name   = "PEK_DBR",
+> @@ -527,6 +532,11 @@ static struct mfd_cell axp22x_cells[] = {
+>  		.resources		= axp22x_pek_resources,
+>  	}, {
+>  		.name			= "axp20x-regulator",
+> +	}, {
+> +		.name		= "axp20x-usb-power-supply",
+> +		.of_compatible	= "x-powers,axp221-usb-power-supply",
+> +		.num_resources	= ARRAY_SIZE(axp22x_usb_power_supply_resources),
+> +		.resources	= axp22x_usb_power_supply_resources,
+>  	},
+>  };
+>  
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
