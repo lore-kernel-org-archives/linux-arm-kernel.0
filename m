@@ -1,88 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 10 Jun 2016 21:50:26 +0100
-Subject: [PATCH V9 06/11] PCI: Refactor generic bus domain assignment
-In-Reply-To: <1465588519-11334-7-git-send-email-tn@semihalf.com>
-References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
- <1465588519-11334-7-git-send-email-tn@semihalf.com>
-Message-ID: <20160610205026.GA24178@red-moon>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 10 Jun 2016 23:50:16 +0300
+Subject: [PATCH 07/13] ARM: dts: r8a7792: initial SoC device tree
+In-Reply-To: <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
+References: <13205049.n7pM8utpHF@wasted.cogentembedded.com>
+ <2539026.OyU5nvpxa6@wasted.cogentembedded.com>
+ <20160601005751.GG20527@verge.net.au>
+ <fdab2628-60bd-c41b-296b-38cd71a6c5da@cogentembedded.com>
+ <CAMuHMdUkOpEp+YCbZVZppdN4C7KKpDS9_gEuXi_WKZXM9YHgEQ@mail.gmail.com>
+ <ab5e3a98-7ff2-dc8f-d255-f6da26f43527@cogentembedded.com>
+ <20160610010245.GA10152@verge.net.au>
+ <8efb1c7e-5463-2556-744c-d327886d92d4@cogentembedded.com>
+ <CAMuHMdUK=y2kZY1kA97QpCDyUZXFejpXTpO9ZVNQoBfDNoRgfg@mail.gmail.com>
+Message-ID: <1b9a4cf4-1101-ccbf-772b-49b8a689a1b6@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 09:55:14PM +0200, Tomasz Nowicki wrote:
-> Change the way PCI bus domain number is assigned and improve function
-> name to reflect what function does. No functional changes.
-> 
-> Instead of assigning bus domain number inside of pci_bus_assign_domain_nr()
-> simply return domain number and let pci_create_root_bus() do assignment.
-> This way pci_create_root_bus() setups bus structure data in the consistent
-> way. Since pci_bus_assign_domain_nr() now does not assign but retrieves
-> domain number instead, rename it to pci_bus_find_domain_nr().
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+On 06/10/2016 11:42 PM, Geert Uytterhoeven wrote:
 
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>    The only problem I'm seeing (again) is the RCAN clock failing to
+>> register:
+>>
+>> rcar_gen2_cpg_clocks_init: failed to register cpg_clocks rcan clock (-12)
+>>
+>>    I was going to look at it yesterday but (wrongly) thought it somehow
+>> cured itself... I'll look at it now.
+>
+> The RCAN parent is the second clock in the CPG node's "clocks" property,
+> which you didn't provide.
 
-> ---
->  drivers/pci/pci.c   | 4 ++--
->  drivers/pci/probe.c | 4 +++-
->  include/linux/pci.h | 7 +------
->  3 files changed, 6 insertions(+), 9 deletions(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index eb431b5..b9a7833 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -4941,7 +4941,7 @@ int pci_get_new_domain_nr(void)
->  }
->  
->  #ifdef CONFIG_PCI_DOMAINS_GENERIC
-> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
-> +int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent)
->  {
->  	static int use_dt_domains = -1;
->  	int domain = -1;
-> @@ -4985,7 +4985,7 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  		domain = -1;
->  	}
->  
-> -	bus->domain_nr = domain;
-> +	return domain;
->  }
->  #endif
->  #endif
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 8e3ef72..380d46d 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -2127,7 +2127,9 @@ struct pci_bus *pci_create_root_bus(struct device *parent, int bus,
->  	b->sysdata = sysdata;
->  	b->ops = ops;
->  	b->number = b->busn_res.start = bus;
-> -	pci_bus_assign_domain_nr(b, parent);
-> +#ifdef CONFIG_PCI_DOMAINS_GENERIC
-> +	b->domain_nr = pci_bus_find_domain_nr(b, parent);
-> +#endif
->  	b2 = pci_find_bus(pci_domain_nr(b), bus);
->  	if (b2) {
->  		/* If we already got to this bus through a different bridge, ignore it */
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index ce03d65..48839e8 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -1390,12 +1390,7 @@ static inline int pci_domain_nr(struct pci_bus *bus)
->  {
->  	return bus->domain_nr;
->  }
-> -void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent);
-> -#else
-> -static inline void pci_bus_assign_domain_nr(struct pci_bus *bus,
-> -					struct device *parent)
-> -{
-> -}
-> +int pci_bus_find_domain_nr(struct pci_bus *bus, struct device *parent);
->  #endif
->  
->  /* some architectures require additional setup to direct VGA traffic */
-> -- 
-> 1.9.1
-> 
+    Actually, the things are more complex. The figure 7.1c suggests that the 
+RCAN clock has different parent on R8A7792 than on the other SoCs -- namely 
+PLL1/VCO 1/4. That may be, since there's just no USB_EXTAL signal on this SoC 
+(it doesn't seem to support any USB IPs). Which means the 'clk-rcar-gen2' 
+driver can't work with the RCAN clock in its current form.
+
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+
+MBR, Sergei
