@@ -1,43 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 10 Jun 2016 14:38:50 +0100
-Subject: [GIT PULL] arm64: fix for -rc3
-Message-ID: <20160610133850.GA14364@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 10 Jun 2016 15:39:16 +0200
+Subject: Platform-specific suspend/resume code in drivers
+In-Reply-To: <Pine.LNX.4.44L0.1606091054140.1697-100000@iolanthe.rowland.org>
+References: <57588D80.4010502@free.fr>
+ <Pine.LNX.4.44L0.1606091054140.1697-100000@iolanthe.rowland.org>
+Message-ID: <CAMuHMdUCGamgurk+oocuvbXW_UOnoGLx+2=8Gez0s5-gowoAWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Alan,
 
-Please pull this arm64 fix for -rc3. It's a fix for an issue that Alex
-saw whilst swapping with hardware access/dirty bit support enabled in
-the kernel.
+On Thu, Jun 9, 2016 at 5:05 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Wed, 8 Jun 2016, Mason wrote:
+>> On 08/06/2016 19:45, Alan Stern wrote:
+>> > On Wed, 8 Jun 2016, Mason wrote:
+>> >> On 07/06/2016 17:06, Alan Stern wrote:
+>> >>> On Tue, 7 Jun 2016, Mason wrote:
+>> >>>> Another point of confusion for me is this: drivers are supposed to
+>> >>>> be shared among platforms, right? So my platform-specific suspend
+>> >>>> code should be enabled only if my platform is detected at run-time?
+>> >>>
+>> >>> Is your device platform-specific?  If it is then the driver is also
+>> >>> platform-specific, and so no part of the driver will be called at
+>> >>> runtime unless your platform is detected.
+>> >>
+>> >> Specifically, my platform uses
+>> >> drivers/net/ethernet/aurora/nb8800.c  => 3 entries in of_match_table.
+>> >> drivers/tty/serial/8250/8250_core.c (CONFIG_SERIAL_8250_RT288X variant)
+>> >>
+>> >> and also the XHCI USB3 driver, and AHCI SATA driver, wouldn't I need to
+>> >> save the context for these too?
+>> >
+>> > Those drivers should already take care of their own contexts.  Is
+>> > there anything platform-specific you need to do in addition?
+>>
+>> Take the eth driver, for example:
+>>
+>>   http://lxr.free-electrons.com/source/drivers/net/ethernet/aurora/nb8800.c
+>>
+>> It doesn't have any suspend/resume callbacks.
+>>
+>> Would that make the suspend request fail?
+>
+> There are plenty of drivers that don't have suspend/resume callbacks.
+> (Fewer than there used to be, fortunately.)  They don't make suspend
+> fail; rather, the PM core just skips over them when carrying out a
+> suspend.
+>
+> Of course, if a driver needs suspend support but doesn't include it,
+> then it's quite likely the driver will not work properly after the
+> system has been resumed.  But that's not a platform-specific issue.
 
-Cheers,
+It may be. The same device may be present on different SoCs. On some
+SoCs, the device may be part of a power area, on others not.
+When running on the former SoC, the driver needs to save/restore registers,
+while this is not needed (but harmless, except for a small time impact)
+on the latter SoC.
 
-Will
+Gr{oetje,eeting}s,
 
---->8
+                        Geert
 
-The following changes since commit af8c34ce6ae32addda3788d54a7e340cad22516b:
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-  Linux 4.7-rc2 (2016-06-05 14:31:26 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 0106d456c4cb1770253fefc0ab23c9ca760b43f7:
-
-  arm64: mm: always take dirty state from new pte in ptep_set_access_flags (2016-06-08 10:23:44 +0100)
-
-----------------------------------------------------------------
-arm64 fix:
-
-- Fix an issue where we fail to fault in old pages on a write when
-  CONFIG_ARM64_HW_AFDBM is enabled
-
-----------------------------------------------------------------
-Will Deacon (1):
-      arm64: mm: always take dirty state from new pte in ptep_set_access_flags
-
- arch/arm64/mm/fault.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
