@@ -1,72 +1,93 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Fri, 10 Jun 2016 14:46:56 +0200
-Subject: [RFC PATCH v2 13/15] drivers: acpi: iort: introduce
- iort_iommu_configure
-In-Reply-To: <1465306270-27076-14-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1465306270-27076-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1465306270-27076-14-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <575AB6C0.4050808@semihalf.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 10 Jun 2016 14:48:10 +0200
+Subject: [PATCH v8 6/9] pwms: pwm-ti*: Get the clock from the PWMSS
+ parent when using old bindings
+In-Reply-To: <1462291015-1919-7-git-send-email-fcooper@ti.com>
+References: <1462291015-1919-1-git-send-email-fcooper@ti.com>
+ <1462291015-1919-7-git-send-email-fcooper@ti.com>
+Message-ID: <20160610124810.GE27142@ulmo.ba.sec>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07.06.2016 15:31, Lorenzo Pieralisi wrote:
-> +static int __get_pci_rid(struct pci_dev *pdev, u16 alias, void *data)
-> +{
-> +	u32 *rid = data;
+On Tue, May 03, 2016 at 10:56:52AM -0500, Franklin S Cooper Jr wrote:
+> When using the old eCAP and ePWM bindings for AM335x and AM437x the clock
+> can be retrieved from the PWMSS parent. Newer bindings will insure that
+> this clock is provided via device tree.
+> 
+> Therefore, update this driver to support the newer and older bindings. In
+> the case of the older binding being used give a warning.
+> 
+> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> ---
+>  drivers/pwm/pwm-tiecap.c   | 7 +++++++
+>  drivers/pwm/pwm-tiehrpwm.c | 7 +++++++
+>  2 files changed, 14 insertions(+)
+> 
+> diff --git a/drivers/pwm/pwm-tiecap.c b/drivers/pwm/pwm-tiecap.c
+> index 616af76..a0833c8 100644
+> --- a/drivers/pwm/pwm-tiecap.c
+> +++ b/drivers/pwm/pwm-tiecap.c
+> @@ -195,6 +195,7 @@ static const struct pwm_ops ecap_pwm_ops = {
+>  };
+>  
+>  static const struct of_device_id ecap_of_match[] = {
+> +	{ .compatible	= "ti,am3352-ecap" },
+>  	{ .compatible	= "ti,am33xx-ecap" },
+>  	{},
+>  };
+> @@ -213,6 +214,12 @@ static int ecap_pwm_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	clk = devm_clk_get(&pdev->dev, "fck");
 > +
-> +	*rid = alias;
-> +	return 0;
-> +}
-> +
-> +/**
-> + * iort_iommu_configure - Set-up IOMMU configuration for a device.
-> + *
-> + * @dev: device to configure
-> + *
-> + * Returns: iommu_ops pointer on configuration success
-> + *          NULL on configuration failure
-> + */
-> +const struct iommu_ops *iort_iommu_configure(struct device *dev)
-> +{
-> +	struct acpi_iort_node *node, *parent;
-> +	const struct iort_ops_node *iort_ops;
-> +	u32 rid = 0, devid = 0;
-> +
-> +	if (dev_is_pci(dev)) {
-> +		struct pci_bus *bus = to_pci_dev(dev)->bus;
-> +
-> +		pci_for_each_dma_alias(to_pci_dev(dev), __get_pci_rid,
-> +				       &rid);
+> +	if (IS_ERR(clk) && of_device_is_compatible(pdev->dev.of_node, "ti,am33xx-ecap")) {
+> +		dev_warn(&pdev->dev, "Binding is obsolete.\n");
+> +		clk = devm_clk_get(pdev->dev.parent, "fck");
+> +	}
 
-I think we should find here the root bus which is connected to RC IORT node.
+I rewrote this slightly for readability:
 
+	struct device_node *np = pdev->dev.of_node;
+
+	if (IS_ERR(clk)) {
+		if (of_device_is_compatible(np, "ti,am33xx-ecap")) {
+			...
+		}
+	}
+
+>  	if (IS_ERR(clk)) {
+>  		dev_err(&pdev->dev, "failed to get clock\n");
+>  		return PTR_ERR(clk);
+> diff --git a/drivers/pwm/pwm-tiehrpwm.c b/drivers/pwm/pwm-tiehrpwm.c
+> index 6a41e66..cee29a2 100644
+> --- a/drivers/pwm/pwm-tiehrpwm.c
+> +++ b/drivers/pwm/pwm-tiehrpwm.c
+> @@ -426,6 +426,7 @@ static const struct pwm_ops ehrpwm_pwm_ops = {
+>  };
+>  
+>  static const struct of_device_id ehrpwm_of_match[] = {
+> +	{ .compatible	= "ti,am3352-ehrpwm" },
+>  	{ .compatible	= "ti,am33xx-ehrpwm" },
+>  	{},
+>  };
+> @@ -444,6 +445,12 @@ static int ehrpwm_pwm_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	clk = devm_clk_get(&pdev->dev, "fck");
 > +
-> +		node = iort_scan_node(ACPI_IORT_NODE_PCI_ROOT_COMPLEX,
-> +				      iort_find_dev_callback, &bus->dev);
-> +	} else {
-> +		node = iort_scan_node(ACPI_IORT_NODE_NAMED_COMPONENT,
-> +				      iort_find_dev_callback, dev);
+> +	if (IS_ERR(clk) && of_device_is_compatible(pdev->dev.of_node, "ti,am33xx-ecap")) {
+> +		dev_warn(&pdev->dev, "Binding is obsolete.\n");
+> +		clk = devm_clk_get(pdev->dev.parent, "fck");
 > +	}
 > +
-> +	if (!node)
-> +		return NULL;
-> +
-> +	parent = iort_find_parent_node(node);
-> +
-> +	if (!parent)
-> +		return NULL;
-> +
-> +	iort_ops = iort_smmu_get_ops_node(parent);
-> +
-> +	if (iort_ops && iort_ops->iommu_xlate) {
-> +		iort_dev_map_rid(node, rid, &devid, parent->type);
-> +		iort_ops->iommu_xlate(dev, devid, parent);
-> +		return iort_ops->ops;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +
 
-Thanks,
-Tomasz
+Same here.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160610/3e44f461/attachment.sig>
