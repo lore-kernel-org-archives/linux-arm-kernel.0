@@ -1,47 +1,21 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 11 Jun 2016 21:50:20 +0800
-Subject: [PATCH 2/4] ARM: i.MX: Remove i.MX1 Synertronixx SCB9328 board
- support
-In-Reply-To: <1465325585-1598-2-git-send-email-shc_work@mail.ru>
-References: <1465325585-1598-1-git-send-email-shc_work@mail.ru>
- <1465325585-1598-2-git-send-email-shc_work@mail.ru>
-Message-ID: <20160611135020.GQ20243@tiger>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sat, 11 Jun 2016 15:53:00 +0200
+Subject: [PATCH 0/6] ARM: dts: sunxi: Enable otg support on a23/a33 boards
+Message-ID: <1465653186-953-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 09:53:03PM +0300, Alexander Shiyan wrote:
-> Synertronixx SCB9328 board is very similar to Armadeus APF9328,
-> so it can be easily reimplemented in DT way.
-> This patch removes support for non-DT support for this board.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/mach-imx/Kconfig        |   7 --
->  arch/arm/mach-imx/Makefile       |   1 -
->  arch/arm/mach-imx/mach-scb9328.c | 143 ---------------------------------------
->  3 files changed, 151 deletions(-)
->  delete mode 100644 arch/arm/mach-imx/mach-scb9328.c
-> 
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 37447fb..1b7905a 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -106,13 +106,6 @@ if ARCH_MULTI_V4T
->  
->  comment "MX1 platforms:"
->  
-> -config MACH_SCB9328
+Hi All,
 
-Can be dropped from imx_v4_v5_defconfig?
+All the necessary bits for this have been merged in the various foo-next
+tree-s, so lets merge the dts bits and enable full otg support on these
+boards.
 
-Shawn
+Note that we cannot yet do this for a31 based boards as the axp221 pmic
+has a quirk where it will not generate interrupts for vbus state changes
+when it itself is driving vbus. I've a patch to work around this, but
+this patch is part of a larger set which still needs to be merged.
 
-> -	bool "Synertronixx scb9328"
-> -	select IMX_HAVE_PLATFORM_IMX_UART
-> -	select SOC_IMX1
-> -	help
-> -	  Say Y here if you are using a Synertronixx scb9328 board
-> -
->  config MACH_IMX1_DT
->  	bool "Support i.MX1 platforms from device tree"
->  	select SOC_IMX1
+Regards,
+
+Hans
