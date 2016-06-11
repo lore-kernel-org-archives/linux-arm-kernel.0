@@ -1,39 +1,27 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sat, 11 Jun 2016 12:25:03 +0200
-Subject: [PATCH 48/48] ARM: dts: at91: kizbox: switch to new
- pwm-atmel-tcb binding
-In-Reply-To: <201606110839.HwBLqerx%fengguang.wu@intel.com>
-References: <1465596231-21766-49-git-send-email-alexandre.belloni@free-electrons.com>
- <201606110839.HwBLqerx%fengguang.wu@intel.com>
-Message-ID: <20160611102503.GG19050@piout.net>
+Date: Sat, 11 Jun 2016 12:53:51 +0200
+Subject: [PATCH 44/48] clocksource: atmel-pit: allow unselecting ATMEL_PIT
+In-Reply-To: <alpine.DEB.2.11.1606111143330.5839@nanos>
+References: <1465596231-21766-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1465596231-21766-45-git-send-email-alexandre.belloni@free-electrons.com>
+ <alpine.DEB.2.11.1606111143330.5839@nanos>
+Message-ID: <20160611105351.GH19050@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2016 at 08:14:13 +0800, kbuild test robot wrote :
-> Hi,
+On 11/06/2016 at 11:43:54 +0200, Thomas Gleixner wrote :
+> On Sat, 11 Jun 2016, Alexandre Belloni wrote:
 > 
-> [auto build test ERROR on at91/at91-next]
-> [also build test ERROR on v4.7-rc2 next-20160609]
-> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> > With the new TCB clocksource driver, atmel platforms are now able to boot
+> > without the PIT driver. Allow unselecting it.
 > 
-> url:    https://github.com/0day-ci/linux/commits/Alexandre-Belloni/ARM-at91-rework-Atmel-TCB-drivers/20160611-062134
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git at91-next
-> config: arm-at91_dt_defconfig (attached as .config)
-> compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
-> 
-> All errors (new ones prefixed by >>):
-> 
-> >> Error: arch/arm/boot/dts/at91-kizbox.dts:54.5-15 syntax error
->    FATAL ERROR: Unable to parse input tree
+> Yay! Thanks for doing this!
 > 
 
-Ok, I'm not sure what happened, this is now fixed in my branch.
-
+Sure! Can you still check the request_irq/free_irq in
+timer-atmel-tcbclksrc? I'm not sure whether this can work reliably or
+only because we are before SYSTEM_STATE=RUNNING.
+In the latter case, I have another way of doing that.
 
 -- 
 Alexandre Belloni, Free Electrons
