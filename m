@@ -1,47 +1,81 @@
 From: moinejf@free.fr (Jean-Francois Moine)
-Date: Sat, 11 Jun 2016 19:39:48 +0200
-Subject: [PATCH v2 0/3] clk: sunxi-ng: Add the A83T clocks
-Message-ID: <cover.1465666788.git.moinejf@free.fr>
+Date: Sat, 11 Jun 2016 19:04:50 +0200
+Subject: [PATCH v2 3/3] dt: sun8i: Define the clocks of the A83T
+In-Reply-To: <cover.1465666788.git.moinejf@free.fr>
+References: <cover.1465666788.git.moinejf@free.fr>
+Message-ID: <61aeb2c338f6c1a3dc00db4ad66d285e6b7f48d2.1465666788.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds the clocks of the sunxi A83T in the "modern"
-clock framework proposed by Maxime Ripard.
-It applies on the V2 of his patch series.
+The clocks are defined by the CCU binding.
 
-It is currently being tested on a Banana Pi M3 with the legacy u-boot.
-- working:
-	mmc0
-	mmc2 (eMMC) but slow clock
-	ths
-	uart0
-	usb0
-- not working:
-	mmc1 (wifi/bt)
-	video (machine freeze on reading/writing the DE I/O memory)
-- not yet tested
-	audio
-	prcm
+Signed-off-by: Jean-Francois Moine <moinejf@free.fr>
+---
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
 
-Jean-Francois Moine (3):
-  clk: sunxi-ng: Add N-D-M-P-factor clock support
-  clk: sunxi-ng: Add the A83T clocks and resets
-  dt: sun8i: Define the clocks of the A83T
-
- arch/arm/boot/dts/sun8i-a83t.dtsi      |  18 +-
- drivers/clk/sunxi-ng/Makefile          |   3 +-
- drivers/clk/sunxi-ng/ccu-sun8i-a83t.c  | 675 +++++++++++++++++++++++++++++++++
- drivers/clk/sunxi-ng/ccu_common.h      |   1 +
- drivers/clk/sunxi-ng/ccu_ndmp.c        | 239 ++++++++++++
- drivers/clk/sunxi-ng/ccu_ndmp.h        |  96 +++++
- include/dt-bindings/clock/sun8i-a83t.h | 150 ++++++++
- include/dt-bindings/reset/sun8i-a83t.h |  94 +++++
- 8 files changed, 1270 insertions(+), 6 deletions(-)
- create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_ndmp.c
- create mode 100644 drivers/clk/sunxi-ng/ccu_ndmp.h
- create mode 100644 include/dt-bindings/clock/sun8i-a83t.h
- create mode 100644 include/dt-bindings/reset/sun8i-a83t.h
-
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index d3473f8..4fec56a 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -45,9 +45,10 @@
+ 
+ #include "skeleton.dtsi"
+ 
++#include <dt-bindings/clock/sun8i-a83t.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+-
+ #include <dt-bindings/pinctrl/sun4i-a10.h>
++#include <dt-bindings/reset/sun8i-a83t.h>
+ 
+ / {
+ 	interrupt-parent = <&gic>;
+@@ -138,13 +139,13 @@
+ 			clock-output-names = "osc16M";
+ 		};
+ 
+-		osc16Md512: osc16Md512_clk {
++		osc32k: osc32k_clk {
+ 			#clock-cells = <0>;
+ 			compatible = "fixed-factor-clock";
+ 			clock-div = <512>;
+ 			clock-mult = <1>;
+ 			clocks = <&osc16M>;
+-			clock-output-names = "osc16M-d512";
++			clock-output-names = "osc32k";
+ 		};
+ 	};
+ 
+@@ -154,13 +155,20 @@
+ 		#size-cells = <1>;
+ 		ranges;
+ 
++		ccu: clock at 01c20000 {
++			compatible = "allwinner,sun8i-a83t-ccu";
++			reg = <0x01c20000 0x400>;
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++		};
++
+ 		pio: pinctrl at 01c20800 {
+ 			compatible = "allwinner,sun8i-a83t-pinctrl";
+ 			interrupts = <GIC_SPI 15 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 17 IRQ_TYPE_LEVEL_HIGH>,
+ 				     <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg = <0x01c20800 0x400>;
+-			clocks = <&osc24M>;
++			clocks = <&ccu CLK_BUS_PIO>;
+ 			gpio-controller;
+ 			interrupt-controller;
+ 			#interrupt-cells = <3>;
+@@ -210,7 +218,7 @@
+ 			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+ 			reg-shift = <2>;
+ 			reg-io-width = <4>;
+-			clocks = <&osc24M>;
++			clocks = <&ccu CLK_BUS_UART0>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 2.8.4
