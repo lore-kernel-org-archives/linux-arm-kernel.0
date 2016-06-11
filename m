@@ -1,38 +1,47 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 11 Jun 2016 17:46:44 +0200
-Subject: [PATCH v2 1/2] ARM: dts: sun6i: Add pmic / regulator nodes to
- Mele A1000G quad dts
-In-Reply-To: <1465469898-8102-1-git-send-email-hdegoede@redhat.com>
-References: <1465469898-8102-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20160611154644.GF19854@lukather>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Sat, 11 Jun 2016 19:39:48 +0200
+Subject: [PATCH v2 0/3] clk: sunxi-ng: Add the A83T clocks
+Message-ID: <cover.1465666788.git.moinejf@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 12:58:17PM +0200, Hans de Goede wrote:
-> Add pmic / regulator nodes to Mele A1000G quad dts.
-> 
-> Note both reg_usb1_vbus and reg_dldo4 need to be on for the hub attached
-> to usb1 to work, and we can list only one usb1_vbus-supply, so dldo4 is
-> marked as regulator-always-on.
-> 
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -Add a bit to the commit msg explaining why dldo4 is marked regulator-always-on
+This patch series adds the clocks of the sunxi A83T in the "modern"
+clock framework proposed by Maxime Ripard.
+It applies on the V2 of his patch series.
 
-We should really have that as a comment in the DT.
+It is currently being tested on a Banana Pi M3 with the legacy u-boot.
+- working:
+	mmc0
+	mmc2 (eMMC) but slow clock
+	ths
+	uart0
+	usb0
+- not working:
+	mmc1 (wifi/bt)
+	video (machine freeze on reading/writing the DE I/O memory)
+- not yet tested
+	audio
+	prcm
 
-Thanks!
-Maxime
+Jean-Francois Moine (3):
+  clk: sunxi-ng: Add N-D-M-P-factor clock support
+  clk: sunxi-ng: Add the A83T clocks and resets
+  dt: sun8i: Define the clocks of the A83T
+
+ arch/arm/boot/dts/sun8i-a83t.dtsi      |  18 +-
+ drivers/clk/sunxi-ng/Makefile          |   3 +-
+ drivers/clk/sunxi-ng/ccu-sun8i-a83t.c  | 675 +++++++++++++++++++++++++++++++++
+ drivers/clk/sunxi-ng/ccu_common.h      |   1 +
+ drivers/clk/sunxi-ng/ccu_ndmp.c        | 239 ++++++++++++
+ drivers/clk/sunxi-ng/ccu_ndmp.h        |  96 +++++
+ include/dt-bindings/clock/sun8i-a83t.h | 150 ++++++++
+ include/dt-bindings/reset/sun8i-a83t.h |  94 +++++
+ 8 files changed, 1270 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_ndmp.c
+ create mode 100644 drivers/clk/sunxi-ng/ccu_ndmp.h
+ create mode 100644 include/dt-bindings/clock/sun8i-a83t.h
+ create mode 100644 include/dt-bindings/reset/sun8i-a83t.h
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160611/2ecc5757/attachment.sig>
+2.8.4
