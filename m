@@ -1,19 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 11 Jun 2016 17:34:39 +0800
-Subject: [PATCH v3 1/4] ARM: dts: imx6q-cm-fx6: remove iomuxc container
- node
-In-Reply-To: <3b1f9cd8f7804e7da7e093b4661441d4@rwthex-s1-b.rwth-ad.de>
-References: <3b1f9cd8f7804e7da7e093b4661441d4@rwthex-s1-b.rwth-ad.de>
-Message-ID: <20160611093439.GJ20243@tiger>
+Date: Sat, 11 Jun 2016 17:36:06 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Pass the correct PCI reset
+ polarity
+In-Reply-To: <1465178447-24655-1-git-send-email-festevam@gmail.com>
+References: <1465178447-24655-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160611093606.GK20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 07:14:15PM +0200, christopher.spinrath at rwth-aachen.de wrote:
-> From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+On Sun, Jun 05, 2016 at 11:00:47PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> The imx6q-cm-fx6 iomuxc container node is not required. Remove it.
+> The PCI reset GPIO is active low, so represent it with the
+> GPIO_ACTIVE_LOW flag.
 > 
-> Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-> Acked-by: Igor Grinberg <grinberg@compulab.co.il>
+> Even though the imx6 PCI driver will not take the polarity into account
+> in this case, it is better to provide a correct description in device-tree.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied all, thanks.
+Applied, thanks.
