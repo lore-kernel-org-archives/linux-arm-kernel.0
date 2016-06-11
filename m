@@ -1,53 +1,117 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 12 Jun 2016 05:08:13 +0800
-Subject: [PATCH v3,4/5] usb: Add MediaTek USB3 DRD Driver
-In-Reply-To: <1465543962-11678-5-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <201606120512.cHS58YAk%fengguang.wu@intel.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 11 Jun 2016 18:49:16 -0300
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Remove regulators under
+ 'simple-bus'
+Message-ID: <1465681756-5286-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-[auto build test ERROR on usb/usb-testing]
-[also build test ERROR on v4.7-rc2 next-20160609]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Device-tree folks do not like the idea of placing regulators nodes
+under 'simple-bus'.
 
-url:    https://github.com/0day-ci/linux/commits/Chunfeng-Yun/usb-Add-MediaTek-USB3-DRD-Driver/20160610-153559
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
-config: blackfin-allmodconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 4.6.3
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
+Move them out of 'simple-bus'.
 
-All errors (new ones prefixed by >>):
+Also use the convention: reg_xxxx: regulator-xxxx
+for the regulator names.
 
-   drivers/usb/mtu3/mtu3_dr.c: In function 'ssusb_mode_sysfs_switch':
->> drivers/usb/mtu3/mtu3_dr.c:271:3: error: implicit declaration of function 'pinctrl_select_state' [-Werror=implicit-function-declaration]
-   cc1: some warnings being treated as errors
-
-vim +/pinctrl_select_state +271 drivers/usb/mtu3/mtu3_dr.c
-
-   265		struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
-   266	
-   267		if (!otg_sx->manual_drd_enabled)
-   268			return;
-   269	
-   270		if (to_host)
- > 271			pinctrl_select_state(otg_sx->id_pinctrl, otg_sx->id_ground);
-   272		else
-   273			pinctrl_select_state(otg_sx->id_pinctrl, otg_sx->id_float);
-   274	}
-
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 40649 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/bb680ca8/attachment-0001.obj>
+ arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 78 +++++++++++++++-------------------
+ 1 file changed, 34 insertions(+), 44 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+index 5248e7b..8453721 100644
+--- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+@@ -22,53 +22,43 @@
+ 		reg = <0x10000000 0x40000000>;
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		reg_usb_otg_vbus: regulator at 0 {
+-			compatible = "regulator-fixed";
+-			reg = <0>;
+-			regulator-name = "usb_otg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio3 22 0>;
+-			enable-active-high;
+-			vin-supply = <&swbst_reg>;
+-		};
++	reg_usb_otg_vbus: regulator-usb-otg-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio3 22 0>;
++		enable-active-high;
++		vin-supply = <&swbst_reg>;
++	};
+ 
+-		reg_usb_h1_vbus: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			reg = <1>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-			gpio = <&gpio1 29 0>;
+-			enable-active-high;
+-			vin-supply = <&swbst_reg>;
+-		};
++	reg_usb_h1_vbus: regulator-usb-h1-vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 29 0>;
++		enable-active-high;
++		vin-supply = <&swbst_reg>;
++	};
+ 
+-		reg_audio: regulator at 2 {
+-			compatible = "regulator-fixed";
+-			reg = <2>;
+-			regulator-name = "wm8962-supply";
+-			gpio = <&gpio4 10 0>;
+-			enable-active-high;
+-		};
++	reg_audio: regulator-audio {
++		compatible = "regulator-fixed";
++		regulator-name = "wm8962-supply";
++		gpio = <&gpio4 10 0>;
++		enable-active-high;
++	};
+ 
+-		reg_pcie: regulator at 3 {
+-			compatible = "regulator-fixed";
+-			reg = <3>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_pcie_reg>;
+-			regulator-name = "MPCIE_3V3";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			gpio = <&gpio3 19 0>;
+-			regulator-always-on;
+-			enable-active-high;
+-		};
++	reg_pcie: regulator-pcie {
++		compatible = "regulator-fixed";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_pcie_reg>;
++		regulator-name = "MPCIE_3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio3 19 0>;
++		regulator-always-on;
++		enable-active-high;
+ 	};
+ 
+ 	gpio-keys {
+-- 
+1.9.1
