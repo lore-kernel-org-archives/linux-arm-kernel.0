@@ -1,10 +1,8 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat, 11 Jun 2016 08:02:21 +0300
-Subject: [PATCH 3/7] ARM: dts: imx53-m53evk: Switch using simple-audio-card
- for audio support
-In-Reply-To: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
-References: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1465621345-12597-3-git-send-email-shc_work@mail.ru>
+Date: Sat, 11 Jun 2016 08:02:19 +0300
+Subject: [PATCH 1/7] ARM: dts: imx25-pdk: Switch using simple-audio-card for
+ audio support
+Message-ID: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,34 +11,34 @@ use a private driver.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx53-m53evk.dts | 52 +++++++++++++++++++++++++++++++-------
- 1 file changed, 43 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/imx25-pdk.dts | 51 ++++++++++++++++++++++++++++++++++-------
+ 1 file changed, 43 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx53-m53evk.dts b/arch/arm/boot/dts/imx53-m53evk.dts
-index dcee1e0f..d04f7d7 100644
---- a/arch/arm/boot/dts/imx53-m53evk.dts
-+++ b/arch/arm/boot/dts/imx53-m53evk.dts
-@@ -10,6 +10,8 @@
-  */
- 
+diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+index 9351296..8fe2f5a 100644
+--- a/arch/arm/boot/dts/imx25-pdk.dts
++++ b/arch/arm/boot/dts/imx25-pdk.dts
+@@ -12,6 +12,8 @@
  /dts-v1/;
+ #include <dt-bindings/gpio/gpio.h>
+ #include <dt-bindings/input/input.h>
 +#include <dt-bindings/sound/fsl-imx-audmux.h>
 +
- #include "imx53-m53.dtsi"
+ #include "imx25.dtsi"
  
  / {
-@@ -96,26 +98,57 @@
+@@ -64,17 +66,29 @@
  	};
  
  	sound {
--		compatible = "fsl,imx53-m53evk-sgtl5000",
+-		compatible = "fsl,imx25-pdk-sgtl5000",
 -			     "fsl,imx-audio-sgtl5000";
--		model = "imx53-m53evk-sgtl5000";
--		ssi-controller = <&ssi2>;
--		audio-codec = <&sgtl5000>;
+-		model = "imx25-pdk-sgtl5000";
+-		ssi-controller = <&ssi1>;
+-		audio-codec = <&codec>;
 -		audio-routing =
 +		compatible = "simple-audio-card";
-+		simple-audio-card,name = "imx53-m53evk-sgtl5000";
++		simple-audio-card,name = "imx25-pdk-sgtl5000";
 +		simple-audio-card,format = "i2s";
 +		simple-audio-card,bitclock-master = <&master>;
 +		simple-audio-card,frame-master = <&master>;
@@ -53,56 +51,54 @@ index dcee1e0f..d04f7d7 100644
 +		simple-audio-card,routing =
  			"MIC_IN", "Mic Jack",
  			"Mic Jack", "Mic Bias",
- 			"LINE_IN", "Line In Jack",
- 			"Headphone Jack", "HP_OUT",
- 			"Ext Spk", "LINE_OUT";
--		mux-int-port = <2>;
+ 			"Headphone Jack", "HP_OUT";
+-		mux-int-port = <1>;
 -		mux-ext-port = <4>;
--	};
 +
 +		simple-audio-card,cpu {
-+			sound-dai = <&ssi2>;
++			sound-dai = <&ssi1>;
 +		};
 +
 +		master: simple-audio-card,codec {
-+			sound-dai = <&sgtl5000>;
++			sound-dai = <&codec>;
 +		};
- };
+ 	};
  
- &audmux {
+ 	wvga: display {
+@@ -103,6 +117,26 @@
  	pinctrl-names = "default";
  	pinctrl-0 = <&pinctrl_audmux>;
  	status = "okay";
 +
-+	audmux_ssi1 {
-+		fsl,audmux-port = <MX51_AUDMUX_PORT2_SSI1>;
++	audmux_ssi0 {
++		fsl,audmux-port = <0>;
 +		fsl,port-config = <
 +			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(MX51_AUDMUX_PORT3) |
++			IMX_AUDMUX_V2_PTCR_TFSEL(3) |
 +			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(MX51_AUDMUX_PORT3) |
++			IMX_AUDMUX_V2_PTCR_TCSEL(3) |
 +			IMX_AUDMUX_V2_PTCR_SYN)
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT3)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(3)
 +		>;
 +	};
 +
-+	audmux_aud3 {
-+		fsl,audmux-port = <MX51_AUDMUX_PORT3>;
++	audmux_aud4 {
++		fsl,audmux-port = <3>;
 +		fsl,port-config = <
 +			IMX_AUDMUX_V2_PTCR_SYN
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT2_SSI1)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
 +		>;
 +	};
  };
  
  &can1 {
-@@ -151,6 +184,7 @@
+@@ -136,6 +170,7 @@
  	status = "okay";
  
- 	sgtl5000: codec at 0a {
+ 	codec: sgtl5000 at 0a {
 +		#sound-dai-cells = <0>;
  		compatible = "fsl,sgtl5000";
  		reg = <0x0a>;
- 		VDDA-supply = <&reg_3p2v>;
+ 		clocks = <&clks 129>;
 -- 
 2.4.9
