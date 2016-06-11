@@ -1,17 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 11 Jun 2016 17:10:09 +0800
-Subject: [PATCH v2] ARM: dts: imx6: add support for Auvidea H100 board
-In-Reply-To: <1464972029-12949-1-git-send-email-l.stach@pengutronix.de>
-References: <1464972029-12949-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <20160611091009.GH20243@tiger>
+Date: Sat, 11 Jun 2016 17:21:03 +0800
+Subject: [PATCH 0/4] ARM: dts: mxs: fix dtc warnings
+In-Reply-To: <1465134490-13383-1-git-send-email-stefan.wahren@i2se.com>
+References: <1465134490-13383-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20160611092103.GI20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2016 at 06:40:29PM +0200, Lucas Stach wrote:
-> The Auvidea H100 is a baseboard for the SolidRun MicroSOM.
-> Its primary feature is a Toshiba TC358743 HDMI to CSI decoder,
-> allowing the board to work as HDMI passthrough and framegrabber.
+On Sun, Jun 05, 2016 at 01:48:10PM +0000, Stefan Wahren wrote:
+> This patch series fixes some dtc warnings for the mxs platform.
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> The first patch has been tested with real hardware. The others are
+> only compile tested.
+> 
+> Stefan Wahren (4):
+>   ARM: dts: mxs: add missing reg properties for GPIO banks
+>   ARM: dts: imx28-eukrea-mbmx28lc: add missing reg properties
+>   ARM: dts: imx28-cfa10049: fix dtc warning
+>   ARM: dts: imx28-tx28: fix dtc warning
 
-Applied, thanks.
+Applied all, thanks.
