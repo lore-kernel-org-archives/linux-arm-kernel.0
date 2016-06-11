@@ -1,117 +1,105 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 11 Jun 2016 18:49:16 -0300
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Remove regulators under
- 'simple-bus'
-Message-ID: <1465681756-5286-1-git-send-email-festevam@gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Sun, 12 Jun 2016 01:06:55 +0300
+Subject: [PATCH] userspace API definitions for auto-focus coil
+In-Reply-To: <575512E5.5030000@gmail.com>
+References: <20160527205140.GA26767@amd>
+ <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
+ <20160531213437.GA28397@amd>
+ <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+ <20160601220840.GA21946@amd>
+ <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
+ <20160602193027.GB7984@amd>
+ <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
+ <20160605190716.GA11321@amd> <575512E5.5030000@gmail.com>
+Message-ID: <20160611220654.GC26360@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Ivaylo,
 
-Device-tree folks do not like the idea of placing regulators nodes
-under 'simple-bus'.
+On Mon, Jun 06, 2016 at 09:06:29AM +0300, Ivaylo Dimitrov wrote:
+> Hi,
+> 
+> On  5.06.2016 22:07, Pavel Machek wrote:
+> >Add userspace API definitions.
+> >
+> >Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> >
+> >diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> >index b6a357a..23011cc 100644
+> >--- a/include/uapi/linux/v4l2-controls.h
+> >+++ b/include/uapi/linux/v4l2-controls.h
+> >@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
+> >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
+> >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
+> >
+> >+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
+> >+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
 
-Move them out of 'simple-bus'.
+Please check V4L2_CID_USER_*_BASE. That's how custom controls are handled
+nowadays.
 
-Also use the convention: reg_xxxx: regulator-xxxx
-for the regulator names.
+> >+#define V4L2_CID_FOCUS_AD5820_RAMP_TIME	(V4L2_CID_FOCUS_AD5820_BASE+0)
+> >+#define V4L2_CID_FOCUS_AD5820_RAMP_MODE	(V4L2_CID_FOCUS_AD5820_BASE+1)
+> >+
+> >  #endif
+> >
+> 
+> Sakari, what about adding those as standard camera controls? It seems ad5820
+> is not the only VCM driver to implement "antiringing" controls, http://rohmfs.rohm.com/en/products/databook/datasheet/ic/motor/mobile_module/bu64241gwz-e.pdf
+> is another example I found by quick search.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 78 +++++++++++++++-------------------
- 1 file changed, 34 insertions(+), 44 deletions(-)
+These controls however seem to be related to some thing else --- configuring
+the driver to drive the lens little by little to the target using a
+pre-defined step time and size. I presume it is intended for something else,
+most likely for performing a full search for a regular AF algorithm. I also
+wonder how much this functionality is used nowadays, most devices use
+continuous AF algorithm that has little or no use for such. It also provides
+no help in synchronising lens movement to exposure of the AF window.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-index 5248e7b..8453721 100644
---- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-@@ -22,53 +22,43 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
- 
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reg_usb_otg_vbus: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "usb_otg_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio3 22 0>;
--			enable-active-high;
--			vin-supply = <&swbst_reg>;
--		};
-+	reg_usb_otg_vbus: regulator-usb-otg-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio3 22 0>;
-+		enable-active-high;
-+		vin-supply = <&swbst_reg>;
-+	};
- 
--		reg_usb_h1_vbus: regulator at 1 {
--			compatible = "regulator-fixed";
--			reg = <1>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio1 29 0>;
--			enable-active-high;
--			vin-supply = <&swbst_reg>;
--		};
-+	reg_usb_h1_vbus: regulator-usb-h1-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 29 0>;
-+		enable-active-high;
-+		vin-supply = <&swbst_reg>;
-+	};
- 
--		reg_audio: regulator at 2 {
--			compatible = "regulator-fixed";
--			reg = <2>;
--			regulator-name = "wm8962-supply";
--			gpio = <&gpio4 10 0>;
--			enable-active-high;
--		};
-+	reg_audio: regulator-audio {
-+		compatible = "regulator-fixed";
-+		regulator-name = "wm8962-supply";
-+		gpio = <&gpio4 10 0>;
-+		enable-active-high;
-+	};
- 
--		reg_pcie: regulator at 3 {
--			compatible = "regulator-fixed";
--			reg = <3>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_pcie_reg>;
--			regulator-name = "MPCIE_3V3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio3 19 0>;
--			regulator-always-on;
--			enable-active-high;
--		};
-+	reg_pcie: regulator-pcie {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pcie_reg>;
-+		regulator-name = "MPCIE_3V3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio3 19 0>;
-+		regulator-always-on;
-+		enable-active-high;
- 	};
- 
- 	gpio-keys {
+Now that I think about this, the original implementation in N900 very likely
+did not use either of the two controls; the device driver was still written
+to provide access to full capabilities of the chip. And that one had no
+continuous AF.
+
+> What about:
+> 
+> #define V4L2_CID_FOCUS_STEP_MODE xxx
+> enum v4l2_cid_focus_step_mode {
+> V4L2_CID_FOCUS_STEP_MODE_DIRECT,
+> V4L2_CID_FOCUS_STEP_MODE_LINEAR,
+> V4L2_CID_FOCUS_STEP_MODE_AUTO
+> };
+> #define V4L2_CID_FOCUS_STEP_TIME xxx+1
+> 
+> Also, how the userspace(or the kernel) is notified by v4l that there is an
+> event? The point is - I think it is a good idea to notify when VCM has
+> completed its movement, we can start a timer based on the current position,
+> mode, step time etc and notify after the pre-calculated movement time.
+
+You'd have to start modelling the movement of the lens somehow. And for
+that, we'd need to know about the lens and the spring in the kernel, too. I
+presume that's already a lot of the algorithm to get the lens moving, and
+supposing this is in the kernel, what else would go to the kernel?
+
+These device provide very basic functionality for moving the lens; current
+is applied on a coil and that has the effect of moving the lens, bringing
+the focus distance closer as more current is applied but that's pretty much
+it: there's no reliable way to focus at a particular distance for example.
+
+I might as well drop the two controls, up to you. If someone ever needs them
+they can always be reintroduced. I'd be happy to get a new patch, the
+current driver patch does not compile (just tried) as the definitions of
+these controls are missing.
+
+Ringing compensation functionality present in the other chip should be far
+more useful.
+
+If there are AF experts reading this, feel free to challenge me. :-) I can't
+claim to be one.
+
 -- 
-1.9.1
+Kind regards,
+
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
