@@ -1,147 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 11 Jun 2016 11:04:23 +0100
-Subject: [PATCH v3 2/2] arm64: dts: Fix broken architected timer
- interrupt trigger
-In-Reply-To: <575AF9A8.5020406@caviumnetworks.com>
-References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
- <1465235791-7064-3-git-send-email-marc.zyngier@arm.com>
- <5759B143.9070503@caviumnetworks.com> <5759DA3A.4070905@gmail.com>
- <20160610082324.2a0967b0@arm.com> <575AEFC0.1070304@gmail.com>
- <575AF147.40503@arm.com> <575AF9A8.5020406@caviumnetworks.com>
-Message-ID: <20160611110423.0c782f47@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 11 Jun 2016 12:25:03 +0200
+Subject: [PATCH 48/48] ARM: dts: at91: kizbox: switch to new
+ pwm-atmel-tcb binding
+In-Reply-To: <201606110839.HwBLqerx%fengguang.wu@intel.com>
+References: <1465596231-21766-49-git-send-email-alexandre.belloni@free-electrons.com>
+ <201606110839.HwBLqerx%fengguang.wu@intel.com>
+Message-ID: <20160611102503.GG19050@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jun 2016 10:32:24 -0700
-David Daney <ddaney@caviumnetworks.com> wrote:
-
-> On 06/10/2016 09:56 AM, Marc Zyngier wrote:
-> > On 10/06/16 17:50, David Daney wrote:
-> >> On 06/10/2016 12:23 AM, Marc Zyngier wrote:
-> >>> On Thu, 09 Jun 2016 14:06:02 -0700
-> >>> David Daney <ddaney.cavm@gmail.com> wrote:
-> >>>
-> >>>> I spoke too soon...
-> >>>>
-> >>>> On 06/09/2016 11:11 AM, David Daney wrote:
-> >>>>> On 06/06/2016 10:56 AM, Marc Zyngier wrote:
-> >>>>>> The ARM architected timer specification mandates that the interrupt
-> >>>>>> associated with each timer is level triggered (which corresponds to
-> >>>>>> the "counter >= comparator" condition).
-> >>>>>>
-> >>>>>> A number of DTs are being remarkably creative, declaring the interrupt
-> >>>>>> to be edge triggered. A quick look at the TRM for the corresponding ARM
-> >>>>>> CPUs clearly shows that this is wrong, and I've corrected those.
-> >>>>>> For non-ARM designs (and in the absence of a publicly available TRM),
-> >>>>>> I've made them active low as well, which can't be completely wrong
-> >>>>>> as the GIC cannot disinguish between level low and level high.
-> >>>>>>
-> >>>>>> The respective maintainers are of course welcome to prove me wrong.
-> >>>>>>
-> >>>>>> While I was at it, I took the liberty to fix a couple of related issue,
-> >>>>>> such as some spurious affinity bits on ThunderX, and their complete
-> >>>>>> absence on ls1043a (both of which seem to be related to copy-pasting
-> >>>>>> from other DTs).
-> >>>>>>
-> >>>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>>>>> ---
-> >>>>>>     arch/arm64/boot/dts/altera/socfpga_stratix10.dtsi    | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/apm/apm-storm.dtsi               | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/broadcom/ns2.dtsi                | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/cavium/thunder-88xx.dtsi         | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/exynos/exynos7.dtsi              | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi       | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/marvell/armada-ap806.dtsi        | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/socionext/uniphier-ph1-ld20.dtsi | 8 ++++----
-> >>>>>>     arch/arm64/boot/dts/xilinx/zynqmp.dtsi               | 8 ++++----
-> >>>>>>     10 files changed, 40 insertions(+), 40 deletions(-)
-> >>>>>>
-> >>>>> [...]
-> >>>>>> diff --git a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> >>>>>> b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> >>>>>> index 2eb9b22..382d86f 100644
-> >>>>>> --- a/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> >>>>>> +++ b/arch/arm64/boot/dts/cavium/thunder-88xx.dtsi
-> >>>>>> @@ -354,10 +354,10 @@
-> >>>>>>
-> >>>>>>         timer {
-> >>>>>>             compatible = "arm,armv8-timer";
-> >>>>>> -        interrupts = <1 13 0xff01>,
-> >>>>>> -                     <1 14 0xff01>,
-> >>>>>> -                     <1 11 0xff01>,
-> >>>>>> -                     <1 10 0xff01>;
-> >>>>>> +        interrupts = <1 13 8>,
-> >>>>>> +                     <1 14 8>,
-> >>>>>> +                     <1 11 8>,
-> >>>>>> +                     <1 10 8>;
-> >>>>
-> >>>>
-> >>>> NAK!
-> >>>>
-> >>>> According to arm,gic-v3.txt the trigger value must be either 1 or 4:
-> >>>>
-> >>>>      The 3rd cell is the flags, encoded as follows:
-> >>>>            bits[3:0] trigger type and level flags.
-> >>>>                    1 = edge triggered
-> >>>>                    4 = level triggered
-> >>>
-> >>> Which is a bug in the binding description. PPIs can be any trigger
-> >>> (just look at the TRM for CPUs that have devices connected to a PPI to
-> >>> be convinced - most of them are level low).
-> >>>
-> >>> This doesn't mean that you can distinguish level-high from level-low
-> >>> in a programmatic way. But the HW definitely can handle it.
-> >>>
-> >>> I'll update the GICv3 binding to reflect this.
-> >>>
-> >>> Now, coming back to your NAK: is level-low the right or wrong trigger
-> >>> for your implementation of the architected timers?
-> >>>
-> >>
-> >> For the Cavium Thunder implementation of GIC-v3, there is no concept of
-> >> high and low.  All we have is asserted and not-asserted, we have chosen
-> >> to map the concept of an asserted level-triggered source to
-> >> IRQ_TYPE_LEVEL_HIGH, and the transition from not-asserted to asserted on
-> >> an edge triggered source to IRQ_TYPE_EDGE_RISING.
-> >
-> > The GIC, no matter if it is from Cavium or not, doesn't have a notion of
-> > high or low indeed *from a programming interface point of view*. What
-> > matters here is the *device*, and how it is connected to the interrupt
-> > controller. And I'm pretty sure your timers are *physically* one or the
-> > other (unless they are simply floating? ;-)
-> >
+On 11/06/2016 at 08:14:13 +0800, kbuild test robot wrote :
+> Hi,
 > 
-> There is no wire.  So the concept of measuring the voltage doesn't 
-> exist.  Everything is message based (with either architecturally defined 
-> or implementation defined protocols).
-
-That's your implementation, which cannot be generalized. PPIs can
-perfectly be wired (and definitely *are* wires in ARM implementations)
-from the device all the way to the redistributor, where it effectively
-becomes message-based in an architecturally defined way.
-
-> Let's turn the question around.
+> [auto build test ERROR on at91/at91-next]
+> [also build test ERROR on v4.7-rc2 next-20160609]
+> [if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 > 
-> What bits in the GIC-v3 registers and data structures do we need to 
-> program differently to account for the difference between 
-> IRQ_TYPE_LEVEL_HIGH and IRQ_TYPE_LEVEL_LOW?
+> url:    https://github.com/0day-ci/linux/commits/Alexandre-Belloni/ARM-at91-rework-Atmel-TCB-drivers/20160611-062134
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git at91-next
+> config: arm-at91_dt_defconfig (attached as .config)
+> compiler: arm-linux-gnueabi-gcc (Debian 5.3.1-8) 5.3.1 20160205
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm 
 > 
-> If the answer is that there are none, then allowing both to be 
-> specified, falsely implies that there is a difference and causes mental 
-> effort to be expended trying to decide which to use.
-
-They do exist at the physical level, at least in a number of non-Cavium
-implementations.
-
+> All errors (new ones prefixed by >>):
 > 
-> Unless you can tell me that there is a bit in the GIC-v3 that depends on 
-> HIGH vs. LOW, I remain strongly opposed to changing the binding document.
+> >> Error: arch/arm/boot/dts/at91-kizbox.dts:54.5-15 syntax error
+>    FATAL ERROR: Unable to parse input tree
+> 
 
-That's fine by me. I'll drop the ThunderX changes from this patch.
+Ok, I'm not sure what happened, this is now fixed in my branch.
 
-Thanks,
 
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
