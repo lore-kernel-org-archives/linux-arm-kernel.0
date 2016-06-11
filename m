@@ -1,31 +1,22 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 11 Jun 2016 22:03:41 +0800
-Subject: [PATCH 2/8] tty: serial: fsl_lpuart: support suspend/resume
-In-Reply-To: <20160609151039.20817-3-bhuvanchandra.dv@toradex.com>
-References: <20160609151039.20817-1-bhuvanchandra.dv@toradex.com>
- <20160609151039.20817-3-bhuvanchandra.dv@toradex.com>
-Message-ID: <20160611140341.GT20243@tiger>
+Date: Sat, 11 Jun 2016 22:13:54 +0800
+Subject: [PATCH 0/3] Add dis_rxdet_inp3_quirk property to USB3 node
+In-Reply-To: <1465539826-5519-1-git-send-email-rajesh.bhagat@nxp.com>
+References: <1465539826-5519-1-git-send-email-rajesh.bhagat@nxp.com>
+Message-ID: <20160611141354.GU20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 08:40:33PM +0530, Bhuvanchandra DV wrote:
-> From: Stefan Agner <stefan@agner.ch>
+On Fri, Jun 10, 2016 at 11:53:43AM +0530, Rajesh Bhagat wrote:
+> Adds dis_rxdet_inp3_quirk property to USB3 nodes of ls1021a, ls2080a
+> and ls1043a platform.
 > 
-> In order to allow wake support in STOP sleep mode, clocks are
-> needed. Use imx_clk_gate2_cgr to disable automatic clock gating
-> in low power mode STOP. This allows to enable wake by UART using:
-> echo enabled > /sys/class/tty/ttyLP0/power/wakeup
-> 
-> However, if wake is not enabled, the driver should disable the
-> clocks explicitly to save power.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/clk/imx/clk-vf610.c     | 12 ++++++------
+> Rajesh Bhagat (3):
+>   arm: dts: ls1021a: Add dis_rxdet_inp3_quirk property to USB3 node
+>   arm: dts: ls2080a: Add dis_rxdet_inp3_quirk property to USB3 node
+>   arm: dts: ls1043a: Add dis_rxdet_inp3_quirk property to USB3 node
 
-Please send clock driver changes in a separate patch.
+The last two should be prefixed 'arm64'.  I fixed them up and applied
+all 3, thanks.
 
 Shawn
-
->  drivers/tty/serial/fsl_lpuart.c | 16 ++++++++++++++--
->  2 files changed, 20 insertions(+), 8 deletions(-)
