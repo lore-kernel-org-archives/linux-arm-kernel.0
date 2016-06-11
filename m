@@ -1,18 +1,31 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 11 Jun 2016 22:01:07 +0800
-Subject: [PATCH] ARM: imx: fix missing include of common.h
-In-Reply-To: <1465406777-336-1-git-send-email-ben.dooks@codethink.co.uk>
-References: <1465406777-336-1-git-send-email-ben.dooks@codethink.co.uk>
-Message-ID: <20160611140107.GS20243@tiger>
+Date: Sat, 11 Jun 2016 22:03:41 +0800
+Subject: [PATCH 2/8] tty: serial: fsl_lpuart: support suspend/resume
+In-Reply-To: <20160609151039.20817-3-bhuvanchandra.dv@toradex.com>
+References: <20160609151039.20817-1-bhuvanchandra.dv@toradex.com>
+ <20160609151039.20817-3-bhuvanchandra.dv@toradex.com>
+Message-ID: <20160611140341.GT20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 06:26:17PM +0100, Ben Dooks wrote:
-> Fix the following warning by including ../common.h to provide
-> the protoype for mxc_register_gpio() :
+On Thu, Jun 09, 2016 at 08:40:33PM +0530, Bhuvanchandra DV wrote:
+> From: Stefan Agner <stefan@agner.ch>
 > 
-> arch/arm/mach-imx/devices/platform-gpio-mxc.c:11:24: warning: symbol 'mxc_register_gpio' was not declared. Should it be static?
+> In order to allow wake support in STOP sleep mode, clocks are
+> needed. Use imx_clk_gate2_cgr to disable automatic clock gating
+> in low power mode STOP. This allows to enable wake by UART using:
+> echo enabled > /sys/class/tty/ttyLP0/power/wakeup
 > 
-> Signed-off-by: Ben Dooks <ben.dooks@codethink.co.uk>
+> However, if wake is not enabled, the driver should disable the
+> clocks explicitly to save power.
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/clk/imx/clk-vf610.c     | 12 ++++++------
 
-Applied, thanks.
+Please send clock driver changes in a separate patch.
+
+Shawn
+
+>  drivers/tty/serial/fsl_lpuart.c | 16 ++++++++++++++--
+>  2 files changed, 20 insertions(+), 8 deletions(-)
