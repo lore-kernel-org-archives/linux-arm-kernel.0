@@ -1,25 +1,18 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 11 Jun 2016 14:48:26 +0800
-Subject: [PATCH 0/3] ARM: dts: Use generic uart-has-rtscts DT property
-In-Reply-To: <1464705112-21609-1-git-send-email-geert+renesas@glider.be>
-References: <1464705112-21609-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20160611064826.GC20243@tiger>
+Date: Sat, 11 Jun 2016 14:53:47 +0800
+Subject: [PATCH] ARM: dts: imx6ul-14x14-evk: Add LCD and backlight support
+In-Reply-To: <1464630097-23992-1-git-send-email-festevam@gmail.com>
+References: <1464630097-23992-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160611065346.GD20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2016 at 04:31:49PM +0200, Geert Uytterhoeven wrote:
-> 	Hi Shawn, Sascha, Barry,
+On Mon, May 30, 2016 at 02:41:37PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> As of v4.7-rc1, the Freescale MXS AUART and IMX UART drivers, and the
-> SiRF UART driver, recognize the generic "uart-has-rtscts" DT property,
-> deprecating the vendor-specific "<vendor>,uart-has-rtscts" DT
-> properties.  This series updates all DTS files to replace the latter by
-> the former.
+> Add support for the LCD8000-43T display and for the backlight
+> controlled via PWM1.
 > 
-> Thanks for applying!
-> 
-> Geert Uytterhoeven (3):
->   ARM: dts: imx28: Use generic uart-has-rtscts DT property
->   ARM: dts: imx: Use generic uart-has-rtscts DT property
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Applied these two, thanks.
+Applied, thanks.
