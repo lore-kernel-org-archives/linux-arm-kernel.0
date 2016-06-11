@@ -1,29 +1,25 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 10 Jun 2016 23:27:08 -0700 (PDT)
-Subject: [PATCH v5 0/7] Add MDIO bus multiplexer support for iProc SoCs
-In-Reply-To: <1465536831-13023-1-git-send-email-pramod.kumar@broadcom.com>
-References: <1465536831-13023-1-git-send-email-pramod.kumar@broadcom.com>
-Message-ID: <20160610.232708.520435980652214195.davem@davemloft.net>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sat, 11 Jun 2016 14:48:26 +0800
+Subject: [PATCH 0/3] ARM: dts: Use generic uart-has-rtscts DT property
+In-Reply-To: <1464705112-21609-1-git-send-email-geert+renesas@glider.be>
+References: <1464705112-21609-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20160611064826.GC20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pramod Kumar <pramod.kumar@broadcom.com>
-Date: Fri, 10 Jun 2016 11:03:44 +0530
+On Tue, May 31, 2016 at 04:31:49PM +0200, Geert Uytterhoeven wrote:
+> 	Hi Shawn, Sascha, Barry,
+> 
+> As of v4.7-rc1, the Freescale MXS AUART and IMX UART drivers, and the
+> SiRF UART driver, recognize the generic "uart-has-rtscts" DT property,
+> deprecating the vendor-specific "<vendor>,uart-has-rtscts" DT
+> properties.  This series updates all DTS files to replace the latter by
+> the former.
+> 
+> Thanks for applying!
+> 
+> Geert Uytterhoeven (3):
+>   ARM: dts: imx28: Use generic uart-has-rtscts DT property
+>   ARM: dts: imx: Use generic uart-has-rtscts DT property
 
-> Broadcom iProc based SoCs use a MDIO bus multiplexer where child buses
-> could be internal as well external to SoCs. These buses could supports
-> MDIO transaction compatible to C-22/C-45.
-> 
-> Broadcom MDIO bus multiplexer is an integrated multiplexer where child bus
-> selection and mdio transaction logic lies inside multiplexer itself.
-> To accommodate this multiplexer in existing mux framework below changes
-> were required-
-> 
-> 1. Passed MDIO parent bus via mdio_mux_init to MDIO mux framework.
-> 
-> This patch set includes MDIO bus multiplexer driver along with above
-> framework change. It includes one external bus node having Ethernet PHY
-> attached and two internal bus node holding PCIe PHYs.
- ...
-
-Series applied, thanks.
+Applied these two, thanks.
