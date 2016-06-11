@@ -1,34 +1,112 @@
-From: jcm@jonmasters.org (Jon Masters)
-Date: Fri, 10 Jun 2016 19:58:38 -0400
-Subject: [Linaro-acpi] [PATCH V9 00/11] Support for ARM64 ACPI based PCI
- host controller
-In-Reply-To: <20160610234107.GC7671@localhost>
-References: <1465588519-11334-1-git-send-email-tn@semihalf.com>
- <20160610234107.GC7671@localhost>
-Message-ID: <2e8ae0dc-d04e-3264-86d4-e2640060750c@jonmasters.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 10 Jun 2016 17:34:02 -0700
+Subject: [PATCH] arm64: Handle el1 synchronous instruction aborts cleanly
+In-Reply-To: <20160610094810.GA24528@leverpostej>
+References: <1465522928-22421-1-git-send-email-labbott@redhat.com>
+ <20160610094810.GA24528@leverpostej>
+Message-ID: <39620e63-c7d5-f4ed-3c8c-82f30b068a8c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2016 07:41 PM, Bjorn Helgaas wrote:
-> On Fri, Jun 10, 2016 at 09:55:08PM +0200, Tomasz Nowicki wrote:
->> From the functionality point of view this series may be split into the
->> following logic parts:
->> 1. Export ECAM API and add parent device to pci_config_window
->> 2. Add IO resources handling to PCI core code
->> 3. New MCFG driver
->> 4. Cleanups and support for generic domain assignment based on ACPI
->> 5. Implement ARM64 ACPI based PCI host controller driver under arch/arm64/
-> 
-> This is beautiful!  It really turned out well.
-> 
-> I applied all these to pci/arm64-acpi for v4.8.
+On 06/10/2016 02:48 AM, Mark Rutland wrote:
+> On Thu, Jun 09, 2016 at 06:42:08PM -0700, Laura Abbott wrote:
+>> Executing from a non-executable area gives an ugly message:
+>>
+>> lkdtm: Performing direct entry EXEC_RODATA
+>> lkdtm: attempting ok execution at ffff0000084c0e08
+>> lkdtm: attempting bad execution at ffff000008880700
+>> Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
+>> CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
+>>
+>> The 'IABT (current EL)' indicates the error but isn't as obvious as a
+>> regular fault message. The increase in kernel page permissions makes
+>> hitting this case more likely and bad mode should not be a common
+>> ocurrence. Handle this case in the vectors to give a better message.
+>
+> Could you add something about why the new message will be better? e.g.
+> do we get more info, is it more consistent with the behaviour of other
+> architectures?
+>
+> Bad mode is still a rare occurrence, even if triggered deliberately by a
+> test, but anything that makes debugging easier is good!
+>
 
-Quick followup - I've forwarded your mail to the Linaro Enterprise Group
-members and started nudging the vendors to prep any remaining pieces for
-post-merge. That includes quirks, and then any drivers that anyone has
-been sitting on until this was upstream.
+I think bad mode should be avoided where possible on principle. I'll
+clarify what more information this gives.
 
-Looking forward to F25 Server booting out of the box, and finally
-getting to a point where Fedora is once again upstream of RHEL(SA).
+>> Signed-off-by: Laura Abbott <labbott@redhat.com>
+>> ---
+>> Came up during some lkdtm testing
+>> http://article.gmane.org/gmane.linux.kernel.hardened.devel/2524
+>> ---
+>>  arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
+>>  1 file changed, 19 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+>> index 12e8d2b..37f3694 100644
+>> --- a/arch/arm64/kernel/entry.S
+>> +++ b/arch/arm64/kernel/entry.S
+>> @@ -336,6 +336,8 @@ el1_sync:
+>>  	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
+>>  	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
+>>  	b.eq	el1_da
+>> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
+>> +	b.eq	el1_ia
+>>  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+>>  	b.eq	el1_undef
+>>  	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
+>> @@ -347,6 +349,23 @@ el1_sync:
+>>  	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
+>>  	b.ge	el1_dbg
+>>  	b	el1_inv
+>> +el1_ia:
+>> +	/*
+>> +	 * Instruction abort handling
+>> +	 */
+>> +	mrs	x0, far_el1
+>> +	enable_dbg
+>> +	// re-enable interrupts if they were enabled in the aborted context
+>> +	tbnz	x23, #7, 1f			// PSR_I_BIT
+>> +	enable_irq
+>> +	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
+>
+> I'm planning to kill ESR_LNX_EXEC (the reserved ISS bit here), for v4.8
+> [1,2], so we'll need to figure out how to avoid problems when merging.
+> My patch only handles the ESR_ELx_EC_IABT_LOW case, but it should be
+> simple to add ESR_ELx_EC_IABT_CUR.
+>
+> If you're happy for me to do so, I could take this into my ESR_LNX_EXEC
+> series.
+>
 
-Jon.
+That sounds fine.
+
+>> +1:
+>> +	mov	x2, sp				// struct pt_regs
+>> +	bl	do_mem_abort
+>> +
+>> +	// disable interrupts before pulling preserved data off the stack
+>> +	disable_irq
+>> +	kernel_exit 1
+>>  el1_da:
+>>  	/*
+>>  	 * Data abort handling
+>> --
+>> 2.5.5
+>>
+>
+> Otherwise this looks good to me. Modulo the above:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
+
+Thanks!
+
+Laura
+
+> Thanks,
+> Mark.
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/432107.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/433682.html
+>
