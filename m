@@ -1,98 +1,182 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 11 Jun 2016 03:42:01 +0200
-Subject: ARM: mxs: warnings on PM resume
-In-Reply-To: <1955365225.76161.cd9a3eda-edc7-4bae-96f3-bdddccbb0478.open-xchange@email.1und1.de>
-References: <1713040590.199779.36789782-c361-4fe4-bc0d-b581fbce8069.open-xchange@email.1und1.de>
- <1955365225.76161.cd9a3eda-edc7-4bae-96f3-bdddccbb0478.open-xchange@email.1und1.de>
-Message-ID: <2607020.0FcLMf1DX6@vostro.rjw.lan>
+From: oss@buserror.net (Scott Wood)
+Date: Fri, 10 Jun 2016 20:50:53 -0500
+Subject: [PATCH 2/4] soc: fsl: add GUTS driver for QorIQ platforms
+In-Reply-To: <3435609.s5m1DCsoNb@wuerfel>
+References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
+ <5339448.D8rpq4ofAC@wuerfel> <1464832042.22191.23.camel@buserror.net>
+ <3435609.s5m1DCsoNb@wuerfel>
+Message-ID: <1465609853.22191.151.camel@buserror.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, June 11, 2016 03:01:31 AM Stefan Wahren wrote:
-> Hi,
+On Thu, 2016-06-02 at 10:43 +0200, Arnd Bergmann wrote:
+> On Wednesday, June 1, 2016 8:47:22 PM CEST Scott Wood wrote:
+> > On Mon, 2016-05-30 at 15:15 +0200, Arnd Bergmann wrote:
+> > > diff --git a/drivers/soc/fsl/guts.c b/drivers/soc/fsl/guts.c
+> > > new file mode 100644
+> > > index 000000000000..2f30698f5bcf
+> > > --- /dev/null
+> > > +++ b/drivers/soc/fsl/guts.c
+> > > @@ -0,0 +1,130 @@
+> > > +/*
+> > > + * Freescale QorIQ Platforms GUTS Driver
+> > > + *
+> > > + * Copyright (C) 2016 Freescale Semiconductor, Inc.
+> > > + *
+> > > + * This program is free software; you can redistribute it and/or modify
+> > > + * it under the terms of the GNU General Public License as published by
+> > > + * the Free Software Foundation; either version 2 of the License, or
+> > > + * (at your option) any later version.
+> > > + */
+> > > +
+> > > +#include <linux/io.h>
+> > > +#include <linux/platform_device.h>
+> > > +#include <linux/module.h>
+> > > +#include <linux/slab.h>
+> > > +#include <linux/of_address.h>
+> > > +#include <linux/of_platform.h>
+> > > +#include <linux/sys_soc.h>
+> > > +
+> > > +#define GUTS_PVR	0x0a0
+> > > +#define GUTS_SVR	0x0a4
+> > > +
+> > > +struct guts {
+> > > +	void __iomem *regs;
+> > 
+> > We already have a struct to define guts.  Why are you not using it?  Why
+> > do
+> > you consider using it to be "abuse"?  What if we want to move more guts
+> > functionality into this driver?
 > 
-> [add Rafael, J?rg and J?rgen to CC]
-> 
-> > Stefan Wahren <stefan.wahren@i2se.com> hat am 1. Juni 2016 um 22:51
-> > geschrieben:
-> > 
-> > 
-> > Hi,
-> > 
-> > i'm currently working on standby support for MXS platform. If i trigger the
-> > standby per sysfs everything works fine, but mostly on resume i get a bunch of
-> > warnings (see below for full output):
-> > 
-> > [   67.040000] Interrupts enabled before system core resume.
-> > 
-> > My current working branch [1] based on Linux 4.5 ( cmdline has
-> > no_console_suspend=1 ). The test hardware is a i.MX23 board (
-> > iMX233-OLinuXino-MAXI ).
-> > 
-> > How can i narrow down this issue to the relevant driver / interrupt ?
-> > 
-> > What is the right way to fix this issue?
-> > 
-> > I have the suspicion it's triggered by clocksource/mxs-timer.c because the
-> > vendor kernel 2.6.35 had a function call [2] to suspend the timers. 
-> > 
-> > [1] - https://github.com/lategoodbye/linux-mxs-power/tree/rebase-4.5
-> > [2] -
-> > http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/arch/arm/mach-mx23/pm.c?h=imx_2.6.35_maintain#n284
-> > 
-> > Full output in error case:
-> > 
-> > # echo standby > /sys/power/state
-> > [   65.820000] PM: Syncing filesystems ... done.
-> > [   66.890000] Freezing user space processes ... (elapsed 0.018 seconds) done.
-> > [   66.920000] Freezing remaining freezable tasks ... (elapsed 0.004 seconds)
-> > done.
-> > [   66.960000] smsc95xx 1-1.1:1.0 eth0: entering SUSPEND2 mode
-> > [   66.990000] PM: suspend of devices complete after 56.500 msecs
-> > [   67.010000] PM: late suspend of devices complete after 11.906 msecs
-> > [   67.030000] PM: noirq suspend of devices complete after 12.250 msecs
-> > [   67.040000] ------------[ cut here ]------------
-> > [   67.040000] WARNING: CPU: 0 PID: 271 at drivers/base/syscore.c:99
-> > syscore_resume+0x14c/0x1bc()
-> > [   67.040000] Interrupts enabled before system core resume.
-> > [   67.040000] Modules linked in: mxs_lradc(C) industrialio_triggered_buffer
-> > [   67.040000] CPU: 0 PID: 271 Comm: bash Tainted: G         C
-> >      4.5.0-g8b79a7d-dirty #86
-> > [   67.040000] Hardware name: Freescale MXS (Device Tree)
-> > [   67.040000] [<c000fdc4>] (unwind_backtrace) from [<c000de80>]
-> > (show_stack+0x10/0x14)
-> > [   67.040000] [<c000de80>] (show_stack) from [<c001d094>]
-> > (warn_slowpath_common+0x7c/0xb4)
-> > [   67.040000] [<c001d094>] (warn_slowpath_common) from [<c001d160>]
-> > (warn_slowpath_fmt+0x30/0x40)
-> > [   67.040000] [<c001d160>] (warn_slowpath_fmt) from [<c035c6b8>]
-> > (syscore_resume+0x14c/0x1bc)
-> > [   67.040000] [<c035c6b8>] (syscore_resume) from [<c005d37c>]
-> > (suspend_devices_and_enter+0x480/0x770)
-> > [   67.040000] [<c005d37c>] (suspend_devices_and_enter) from [<c005dad4>]
-> > (pm_suspend+0x468/0x4e4)
-> > [   67.040000] [<c005dad4>] (pm_suspend) from [<c005c324>]
-> > (state_store+0x80/0xcc)
-> > [   67.040000] [<c005c324>] (state_store) from [<c02dc0d8>]
-> > (kobj_attr_store+0x18/0x1c)
-> > [   67.040000] [<c02dc0d8>] (kobj_attr_store) from [<c0181988>]
-> > (sysfs_kf_write+0x48/0x4c)
-> > [   67.040000] [<c0181988>] (sysfs_kf_write) from [<c0180b34>]
-> > (kernfs_fop_write+0xe0/0x1a0)
-> > [   67.040000] [<c0180b34>] (kernfs_fop_write) from [<c0114b08>]
-> > (__vfs_write+0x2c/0xe8)
-> > [   67.040000] [<c0114b08>] (__vfs_write) from [<c0114c6c>]
-> > (vfs_write+0xa8/0x198)
-> > [   67.040000] [<c0114c6c>] (vfs_write) from [<c0114e30>]
-> > (SyS_write+0x44/0x88)
-> > [   67.040000] [<c0114e30>] (SyS_write) from [<c000a280>]
-> > (ret_fast_syscall+0x0/0x1c)
-> > [   67.040000] ---[ end trace 22f59f91777b0ede ]---
-> 
-> any hints or ideas to narrow down this issue are very welcome.
+> This structure was in the original patch, I left it in there, only
+> removed the inclusion of the powerpc header file, which seemed to
+> be misplaced.
 
-Interrupts should not be enabled before syscore_resume() is called, but they
-are, apparently by the platform code.
+I'm not refering "struct guts".  I'm referring to changing
+"struct ccsr_guts __iomem *regs" into "void __iomem *regs".
 
-Thanks,
-Rafael
+And it's not a powerpc header file.
+
+> > > +/*
+> > > + * Table for matching compatible strings, for device tree
+> > > + * guts node, for Freescale QorIQ SOCs.
+> > > + */
+> > > +static const struct of_device_id fsl_guts_of_match[] = {
+> > > +	/* For T4 & B4 Series SOCs */
+> > > +	{ .compatible = "fsl,qoriq-device-config-1.0", .data = "T4/B4
+> > > series" },
+> > [snip]
+> > > +	{ .compatible = "fsl,qoriq-device-config-2.0", .data = "P
+> > > series"
+> > 
+> > As noted in my comment on patch 3/4, these descriptions are reversed.
+> > 
+> > They're also incomplete.  t2080 has device config 2.0.  t1040 is described
+> > as
+> > 2.0 though it should probably be 2.1 (or better, drop the generic
+> > compatible
+> > altogether).
+> 
+> Ok. Ideally I think we'd even look up the specific SoC names from the
+> SVC rather than the compatible string. I just didn't have a good list
+> for those to put in the driver.
+
+The list is in arch/powerpc/include/asm/mpc85xx.h but I don't know why we need
+to convert it to a string in the first place.
+
+> 
+> > > +	/*
+> > > +	 * syscon devices default to little-endian, but on powerpc we
+> > > have
+> > > +	 * existing device trees with big-endian maps and an absent
+> > > endianess
+> > > +	 * "big-property"
+> > > +	 */
+> > > +	if (!IS_ENABLED(CONFIG_POWERPC) &&
+> > > +	    !of_property_read_bool(dev->of_node, "big-endian"))
+> > > +		guts->little_endian = true;
+> > 
+> > This is not a syscon device (Yangbo's patch to add a guts node on ls2080
+> > is
+> > the only guts node that says "syscon", and that was a leftover from
+> > earlier
+> > revisions and should probably be removed).  Even if it were, where is it
+> > documented that syscon defaults to little-endian?
+> 
+> Documentation/devicetree/bindings/regmap/regmap.txt
+> 
+> We had a little screwup here, basically regmap (and by consequence, syscon)
+> always defaulted to little-endian way before that was documented, so it's
+> too late to change it, 
+
+What causes a device node to fall under the jurisdiction of regmap.txt? 
+ Again, these nodes do not claim "syscon" compatibility.
+
+> although I agree it would have made sense to document
+> regmap to default to big-endian on powerpc.
+
+Please don't.  It's enough of a mess as is; no need to start throwing in
+architecture ifdefs.
+
+> > Documentation/devicetree/bindings/common-properties.txt says that the
+> > individual binding specifies the default.  The default for this node
+> > should be
+> > big-endian because that's what existed before there was a need to describe
+> > the
+> > endianness.  And we need an update to the guts binding to specify that.
+> 
+> Good point. This proably means that specifying both the "guts" and "syscon"
+> compatible strings implies having to also specify the endianess explicitly
+> both ways, because otherwise we break one of the two bindings.
+
+Yes, but the node should only specify "guts".
+
+> 
+> > > +
+> > > +	guts->regs = devm_ioremap_resource(dev, 0);
+> > > +	if (!guts->regs) {
+> > > +		ret = -ENOMEM;
+> > > +		kfree(guts);
+> > > +		goto out;
+> > > +	}
+> > > +
+> > > +	fsl_guts_init(dev, guts);
+> > > +	ret = 0;
+> > > +out:
+> > > +	return ret;
+> > > +}
+> > > +
+> > > +static struct platform_driver fsl_soc_guts = {
+> > > +	.probe = fsl_guts_probe,
+> > > +	.driver.of_match_table = fsl_guts_of_match,
+> > > +};
+> > > +
+> > > +module_platform_driver(fsl_soc_guts);
+> > 
+> > Again, this means that the information is not available during early boot,
+> > such as in the clock driver.  Thus we would not be able to convert clk
+> > -qoriq's
+> > direct mfspr(SPRN_SVR) into an soc_device_match() (or anything else that
+> > makes
+> > use of this file), nor would we be able to move its access of the guts RCW
+> > registers into this driver.
+> 
+> Correct. Do we have a reason to convert the mfspr() though? I don't really
+> see an improvement over the current state if we do that, 
+
+Then should we drop this patchset and put a similar PPC ifdef in
+ drivers/mmc/host/sdhci-of-esdhc.c?
+
+There's also the RCW access.  You said in the patch 4/4 discussion that you di
+dn't like any random driver ioremapping the registers...
+
+> and for new devices
+> that might need the erratum workaround, we could add a DT property that
+> would
+> be preferred to both.
+
+It's unlikely that we would know the erratum exists at the time the device
+tree is created.  We also generally don't have separate device trees for each
+revision of a chip (and if we did, we'd have users that use the wrong one).
+
+-Scott
