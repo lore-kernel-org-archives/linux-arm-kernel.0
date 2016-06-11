@@ -1,79 +1,67 @@
-From: oss@buserror.net (Scott Wood)
-Date: Fri, 10 Jun 2016 21:13:07 -0500
-Subject: [PATCH 4/4] Revert "powerpc/fsl: Move fsl_guts.h out of
- arch/powerpc"
-In-Reply-To: <3225846.9EJ0sHv0XK@wuerfel>
-References: <1462417950-46796-1-git-send-email-yangbo.lu@nxp.com>
- <5513501.AmZs7h1vI2@wuerfel> <1464830660.22191.6.camel@buserror.net>
- <3225846.9EJ0sHv0XK@wuerfel>
-Message-ID: <1465611186.22191.169.camel@buserror.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 11 Jun 2016 10:22:14 +0800
+Subject: [PATCH 47/48] PWM: atmel-tcb: switch to new binding
+In-Reply-To: <1465596231-21766-48-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <201606111040.p4l4J6hH%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2016-06-02 at 11:01 +0200, Arnd Bergmann wrote:
-> On Wednesday, June 1, 2016 8:24:20 PM CEST Scott Wood wrote:
-> > On Mon, 2016-05-30 at 15:18 +0200, Arnd Bergmann wrote:
-> > > All users of this driver are PowerPC specific and the header file
-> > > has no business in the global include/linux/ hierarchy, so move
-> > > it back before anyone starts using it on ARM.
-> > > 
-> > > This reverts commit 948486544713492f00ac8a9572909101ea892cb0.
-> > > 
-> > > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > > ---
-> > > This part of the series is not required for the eSDHC quirk,
-> > > but it restores the asm/fsl_guts.h header so it doesn't accidentally
-> > > get abused for this in the future. I found two drivers outside of
-> > > arch/powerpc that already accessed the registers directly, but the
-> > > functions look fairly contained, and can be easily hidden in an
-> > > #ifdef CONFIG_PPC
-> > 
-> > NACK
-> > 
-> > Besides adding ifdef pollution for no good reason, this register block is
-> > used
-> > on some ARM chips as well.  Why is it a problem if "anyone starts using it
-> > on
-> > ARM"?
-> 
-> It's just not a good interface when it's defined as "this is the layout of
-> a register area that any driver can ioremap() if they can figure out the
-> device node".
+Hi,
 
-That's why I want to move accesses into one guts driver.
+[auto build test WARNING on at91/at91-next]
+[also build test WARNING on v4.7-rc2 next-20160609]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
->  It's not uncommon to have register areas like that, but
-> normally you have at the minimum a 'syscon' device to handle locking
-> between drivers accessing the same registers and to avoid having to map
-> the same area multiple times.
+url:    https://github.com/0day-ci/linux/commits/Alexandre-Belloni/ARM-at91-rework-Atmel-TCB-drivers/20160611-062134
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git at91-next
+config: x86_64-allmodconfig (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-syscon requires device tree changes.
+All warnings (new ones prefixed by >>):
 
-I don't see read-modify-write operations in regmap -- how does locking around
-an individual, inherently-atomic load or store help?
+   drivers/pwm/pwm-atmel-tcb.c: In function 'atmel_tcb_pwm_probe':
+>> drivers/pwm/pwm-atmel-tcb.c:418:18: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+     tcbpwm->width = (int)match->data;
+                     ^
 
-> If we need to use 'guts' registers on ARM, we can find a way to abstract
-> them properly for the given use cases, using a syscon or a driver with
-> exported functions, but just making a PowerPC platform specific header
-> global to all Linux drivers by putting it into include/linux doesn't seem
-> right.
+vim +418 drivers/pwm/pwm-atmel-tcb.c
 
-Again, it's not PowerPC-specific!  It started that way but then the same
-register block got put onto some ARM chips.
+   402			dev_err(&pdev->dev, "failed to allocate memory\n");
+   403			goto err_slow_clk;
+   404		}
+   405	
+   406		tcbpwm->chip.dev = &pdev->dev;
+   407		tcbpwm->chip.ops = &atmel_tcb_pwm_ops;
+   408		tcbpwm->chip.of_xlate = of_pwm_xlate_with_flags;
+   409		tcbpwm->chip.of_pwm_n_cells = 3;
+   410		tcbpwm->chip.base = -1;
+   411		tcbpwm->chip.npwm = NPWM;
+   412		tcbpwm->channel = channel;
+   413		tcbpwm->regmap = regmap;
+   414		tcbpwm->clk = clk;
+   415		tcbpwm->slow_clk = slow_clk;
+   416	
+   417		match = of_match_node(atmel_tcb_dt_ids, np->parent);
+ > 418		tcbpwm->width = (int)match->data;
+   419	
+   420		err = clk_prepare_enable(slow_clk);
+   421		if (err)
+   422			goto err_slow_clk;
+   423	
+   424		spin_lock_init(&tcbpwm->lock);
+   425	
+   426		err = pwmchip_add(&tcbpwm->chip);
 
-It's not global to "all Linux drivers", just the ones that choose to include
-an fsl-specific header.
-
-If and when all uses of guts are moved into the guts driver, the header can be
-moved into drivers/soc/fsl.
-
-> Note that the header file uses a structure definition rather than the more
-> common macros with register offsets, which is fine for a driver that has
-> its own registers and abstracts them, but it doesn't really work with
-> the regmap interface, so if we want to use it with syscon, it also needs to
-> be rewritten.
-
-We don't want to use it with syscon.  If we did, the solution wouldn't be to
-move the header back to arch/powerpc, but to convert the struct into offsets.
-
--Scott
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 54115 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160611/97d4d8be/attachment-0001.obj>
