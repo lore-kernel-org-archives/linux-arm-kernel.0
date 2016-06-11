@@ -1,112 +1,92 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 10 Jun 2016 17:34:02 -0700
-Subject: [PATCH] arm64: Handle el1 synchronous instruction aborts cleanly
-In-Reply-To: <20160610094810.GA24528@leverpostej>
-References: <1465522928-22421-1-git-send-email-labbott@redhat.com>
- <20160610094810.GA24528@leverpostej>
-Message-ID: <39620e63-c7d5-f4ed-3c8c-82f30b068a8c@redhat.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sat, 11 Jun 2016 03:01:31 +0200 (CEST)
+Subject: ARM: mxs: warnings on PM resume
+In-Reply-To: <1713040590.199779.36789782-c361-4fe4-bc0d-b581fbce8069.open-xchange@email.1und1.de>
+References: <1713040590.199779.36789782-c361-4fe4-bc0d-b581fbce8069.open-xchange@email.1und1.de>
+Message-ID: <1955365225.76161.cd9a3eda-edc7-4bae-96f3-bdddccbb0478.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2016 02:48 AM, Mark Rutland wrote:
-> On Thu, Jun 09, 2016 at 06:42:08PM -0700, Laura Abbott wrote:
->> Executing from a non-executable area gives an ugly message:
->>
->> lkdtm: Performing direct entry EXEC_RODATA
->> lkdtm: attempting ok execution at ffff0000084c0e08
->> lkdtm: attempting bad execution at ffff000008880700
->> Bad mode in Synchronous Abort handler detected on CPU2, code 0x8400000e -- IABT (current EL)
->> CPU: 2 PID: 998 Comm: sh Not tainted 4.7.0-rc2+ #13
->>
->> The 'IABT (current EL)' indicates the error but isn't as obvious as a
->> regular fault message. The increase in kernel page permissions makes
->> hitting this case more likely and bad mode should not be a common
->> ocurrence. Handle this case in the vectors to give a better message.
->
-> Could you add something about why the new message will be better? e.g.
-> do we get more info, is it more consistent with the behaviour of other
-> architectures?
->
-> Bad mode is still a rare occurrence, even if triggered deliberately by a
-> test, but anything that makes debugging easier is good!
->
+Hi,
 
-I think bad mode should be avoided where possible on principle. I'll
-clarify what more information this gives.
+[add Rafael, J?rg and J?rgen to CC]
 
->> Signed-off-by: Laura Abbott <labbott@redhat.com>
->> ---
->> Came up during some lkdtm testing
->> http://article.gmane.org/gmane.linux.kernel.hardened.devel/2524
->> ---
->>  arch/arm64/kernel/entry.S | 19 +++++++++++++++++++
->>  1 file changed, 19 insertions(+)
->>
->> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> index 12e8d2b..37f3694 100644
->> --- a/arch/arm64/kernel/entry.S
->> +++ b/arch/arm64/kernel/entry.S
->> @@ -336,6 +336,8 @@ el1_sync:
->>  	lsr	x24, x1, #ESR_ELx_EC_SHIFT	// exception class
->>  	cmp	x24, #ESR_ELx_EC_DABT_CUR	// data abort in EL1
->>  	b.eq	el1_da
->> +	cmp	x24, #ESR_ELx_EC_IABT_CUR	// instruction abort in EL1
->> +	b.eq	el1_ia
->>  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
->>  	b.eq	el1_undef
->>  	cmp	x24, #ESR_ELx_EC_SP_ALIGN	// stack alignment exception
->> @@ -347,6 +349,23 @@ el1_sync:
->>  	cmp	x24, #ESR_ELx_EC_BREAKPT_CUR	// debug exception in EL1
->>  	b.ge	el1_dbg
->>  	b	el1_inv
->> +el1_ia:
->> +	/*
->> +	 * Instruction abort handling
->> +	 */
->> +	mrs	x0, far_el1
->> +	enable_dbg
->> +	// re-enable interrupts if they were enabled in the aborted context
->> +	tbnz	x23, #7, 1f			// PSR_I_BIT
->> +	enable_irq
->> +	orr	x1, x1, #1 << 24		// use reserved ISS bit for instruction aborts
->
-> I'm planning to kill ESR_LNX_EXEC (the reserved ISS bit here), for v4.8
-> [1,2], so we'll need to figure out how to avoid problems when merging.
-> My patch only handles the ESR_ELx_EC_IABT_LOW case, but it should be
-> simple to add ESR_ELx_EC_IABT_CUR.
->
-> If you're happy for me to do so, I could take this into my ESR_LNX_EXEC
-> series.
->
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 1. Juni 2016 um 22:51
+> geschrieben:
+> 
+> 
+> Hi,
+> 
+> i'm currently working on standby support for MXS platform. If i trigger the
+> standby per sysfs everything works fine, but mostly on resume i get a bunch of
+> warnings (see below for full output):
+> 
+> [   67.040000] Interrupts enabled before system core resume.
+> 
+> My current working branch [1] based on Linux 4.5 ( cmdline has
+> no_console_suspend=1 ). The test hardware is a i.MX23 board (
+> iMX233-OLinuXino-MAXI ).
+> 
+> How can i narrow down this issue to the relevant driver / interrupt ?
+> 
+> What is the right way to fix this issue?
+> 
+> I have the suspicion it's triggered by clocksource/mxs-timer.c because the
+> vendor kernel 2.6.35 had a function call [2] to suspend the timers. 
+> 
+> [1] - https://github.com/lategoodbye/linux-mxs-power/tree/rebase-4.5
+> [2] -
+> http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/arch/arm/mach-mx23/pm.c?h=imx_2.6.35_maintain#n284
+> 
+> Full output in error case:
+> 
+> # echo standby > /sys/power/state
+> [   65.820000] PM: Syncing filesystems ... done.
+> [   66.890000] Freezing user space processes ... (elapsed 0.018 seconds) done.
+> [   66.920000] Freezing remaining freezable tasks ... (elapsed 0.004 seconds)
+> done.
+> [   66.960000] smsc95xx 1-1.1:1.0 eth0: entering SUSPEND2 mode
+> [   66.990000] PM: suspend of devices complete after 56.500 msecs
+> [   67.010000] PM: late suspend of devices complete after 11.906 msecs
+> [   67.030000] PM: noirq suspend of devices complete after 12.250 msecs
+> [   67.040000] ------------[ cut here ]------------
+> [   67.040000] WARNING: CPU: 0 PID: 271 at drivers/base/syscore.c:99
+> syscore_resume+0x14c/0x1bc()
+> [   67.040000] Interrupts enabled before system core resume.
+> [   67.040000] Modules linked in: mxs_lradc(C) industrialio_triggered_buffer
+> [   67.040000] CPU: 0 PID: 271 Comm: bash Tainted: G         C
+>      4.5.0-g8b79a7d-dirty #86
+> [   67.040000] Hardware name: Freescale MXS (Device Tree)
+> [   67.040000] [<c000fdc4>] (unwind_backtrace) from [<c000de80>]
+> (show_stack+0x10/0x14)
+> [   67.040000] [<c000de80>] (show_stack) from [<c001d094>]
+> (warn_slowpath_common+0x7c/0xb4)
+> [   67.040000] [<c001d094>] (warn_slowpath_common) from [<c001d160>]
+> (warn_slowpath_fmt+0x30/0x40)
+> [   67.040000] [<c001d160>] (warn_slowpath_fmt) from [<c035c6b8>]
+> (syscore_resume+0x14c/0x1bc)
+> [   67.040000] [<c035c6b8>] (syscore_resume) from [<c005d37c>]
+> (suspend_devices_and_enter+0x480/0x770)
+> [   67.040000] [<c005d37c>] (suspend_devices_and_enter) from [<c005dad4>]
+> (pm_suspend+0x468/0x4e4)
+> [   67.040000] [<c005dad4>] (pm_suspend) from [<c005c324>]
+> (state_store+0x80/0xcc)
+> [   67.040000] [<c005c324>] (state_store) from [<c02dc0d8>]
+> (kobj_attr_store+0x18/0x1c)
+> [   67.040000] [<c02dc0d8>] (kobj_attr_store) from [<c0181988>]
+> (sysfs_kf_write+0x48/0x4c)
+> [   67.040000] [<c0181988>] (sysfs_kf_write) from [<c0180b34>]
+> (kernfs_fop_write+0xe0/0x1a0)
+> [   67.040000] [<c0180b34>] (kernfs_fop_write) from [<c0114b08>]
+> (__vfs_write+0x2c/0xe8)
+> [   67.040000] [<c0114b08>] (__vfs_write) from [<c0114c6c>]
+> (vfs_write+0xa8/0x198)
+> [   67.040000] [<c0114c6c>] (vfs_write) from [<c0114e30>]
+> (SyS_write+0x44/0x88)
+> [   67.040000] [<c0114e30>] (SyS_write) from [<c000a280>]
+> (ret_fast_syscall+0x0/0x1c)
+> [   67.040000] ---[ end trace 22f59f91777b0ede ]---
 
-That sounds fine.
+any hints or ideas to narrow down this issue are very welcome.
 
->> +1:
->> +	mov	x2, sp				// struct pt_regs
->> +	bl	do_mem_abort
->> +
->> +	// disable interrupts before pulling preserved data off the stack
->> +	disable_irq
->> +	kernel_exit 1
->>  el1_da:
->>  	/*
->>  	 * Data abort handling
->> --
->> 2.5.5
->>
->
-> Otherwise this looks good to me. Modulo the above:
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
->
-
-Thanks!
-
-Laura
-
-> Thanks,
-> Mark.
->
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-May/432107.html
-> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2016-June/433682.html
->
+Regards Stefan
