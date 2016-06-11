@@ -1,22 +1,35 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sat, 11 Jun 2016 22:13:54 +0800
-Subject: [PATCH 0/3] Add dis_rxdet_inp3_quirk property to USB3 node
-In-Reply-To: <1465539826-5519-1-git-send-email-rajesh.bhagat@nxp.com>
-References: <1465539826-5519-1-git-send-email-rajesh.bhagat@nxp.com>
-Message-ID: <20160611141354.GU20243@tiger>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 11 Jun 2016 16:29:50 +0200
+Subject: [PATCH 0/6] ARM: dts: sunxi: Enable otg support on a23/a33 boards
+In-Reply-To: <1465653186-953-1-git-send-email-hdegoede@redhat.com>
+References: <1465653186-953-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20160611142950.GB19854@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 11:53:43AM +0530, Rajesh Bhagat wrote:
-> Adds dis_rxdet_inp3_quirk property to USB3 nodes of ls1021a, ls2080a
-> and ls1043a platform.
+On Sat, Jun 11, 2016 at 03:53:00PM +0200, Hans de Goede wrote:
+> Hi All,
 > 
-> Rajesh Bhagat (3):
->   arm: dts: ls1021a: Add dis_rxdet_inp3_quirk property to USB3 node
->   arm: dts: ls2080a: Add dis_rxdet_inp3_quirk property to USB3 node
->   arm: dts: ls1043a: Add dis_rxdet_inp3_quirk property to USB3 node
+> All the necessary bits for this have been merged in the various foo-next
+> tree-s, so lets merge the dts bits and enable full otg support on these
+> boards.
+> 
+> Note that we cannot yet do this for a31 based boards as the axp221 pmic
+> has a quirk where it will not generate interrupts for vbus state changes
+> when it itself is driving vbus. I've a patch to work around this, but
+> this patch is part of a larger set which still needs to be merged.
 
-The last two should be prefixed 'arm64'.  I fixed them up and applied
-all 3, thanks.
+Applied all of them, thanks!
+Maxime
 
-Shawn
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160611/f46f80f2/attachment.sig>
