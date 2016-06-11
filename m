@@ -1,113 +1,53 @@
-From: matthew@mattleach.net (Matthew Leach)
-Date: Sat, 11 Jun 2016 18:54:59 +0100
-Subject: [PATCH] ARM: zImage: fix ATAG DTB conversion on big-endian
-Message-ID: <20160611175459.5080-1-matthew@mattleach.net>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 12 Jun 2016 05:08:13 +0800
+Subject: [PATCH v3,4/5] usb: Add MediaTek USB3 DRD Driver
+In-Reply-To: <1465543962-11678-5-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <201606120512.cHS58YAk%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since ATAGs are written out by the boot-loader before branching to the
-kernel, they will be written as little-endian; if the kernel has been
-built for big-endian, parsing of the ATAGs will fail.
+Hi,
 
-When reading from the ATAGs structure, swap the endianness (when
-required), allowing the DTB to be supplemented by the ATAG data.
+[auto build test ERROR on usb/usb-testing]
+[also build test ERROR on v4.7-rc2 next-20160609]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Signed-off-by: Matthew Leach <matthew@mattleach.net>
+url:    https://github.com/0day-ci/linux/commits/Chunfeng-Yun/usb-Add-MediaTek-USB3-DRD-Driver/20160610-153559
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
+config: blackfin-allmodconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 4.6.3
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
+
+All errors (new ones prefixed by >>):
+
+   drivers/usb/mtu3/mtu3_dr.c: In function 'ssusb_mode_sysfs_switch':
+>> drivers/usb/mtu3/mtu3_dr.c:271:3: error: implicit declaration of function 'pinctrl_select_state' [-Werror=implicit-function-declaration]
+   cc1: some warnings being treated as errors
+
+vim +/pinctrl_select_state +271 drivers/usb/mtu3/mtu3_dr.c
+
+   265		struct otg_switch_mtk *otg_sx = &ssusb->otg_switch;
+   266	
+   267		if (!otg_sx->manual_drd_enabled)
+   268			return;
+   269	
+   270		if (to_host)
+ > 271			pinctrl_select_state(otg_sx->id_pinctrl, otg_sx->id_ground);
+   272		else
+   273			pinctrl_select_state(otg_sx->id_pinctrl, otg_sx->id_float);
+   274	}
+
 ---
- arch/arm/boot/compressed/atags_to_fdt.c | 30 +++++++++++++++++-------------
- arch/arm/include/uapi/asm/setup.h       |  6 ++++--
- 2 files changed, 21 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index 9448aa0..c7d3e74 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -123,9 +123,9 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 	       return 0;
- 
- 	/* validate the ATAG */
--	if (atag->hdr.tag != ATAG_CORE ||
--	    (atag->hdr.size != tag_size(tag_core) &&
--	     atag->hdr.size != 2))
-+	if (le32_to_cpu(atag->hdr.tag) != ATAG_CORE ||
-+	    (le32_to_cpu(atag->hdr.size) != tag_size(tag_core) &&
-+	     le32_to_cpu(atag->hdr.size) != 2))
- 		return 1;
- 
- 	/* let's give it all the room it could need */
-@@ -134,7 +134,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 		return ret;
- 
- 	for_each_tag(atag, atag_list) {
--		if (atag->hdr.tag == ATAG_CMDLINE) {
-+		if (le32_to_cpu(atag->hdr.tag) == ATAG_CMDLINE) {
- 			/* Append the ATAGS command line to the device tree
- 			 * command line.
- 			 * NB: This means that if the same parameter is set in
-@@ -147,10 +147,10 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 			else
- 				setprop_string(fdt, "/chosen", "bootargs",
- 					       atag->u.cmdline.cmdline);
--		} else if (atag->hdr.tag == ATAG_MEM) {
-+		} else if (le32_to_cpu(atag->hdr.tag) == ATAG_MEM) {
- 			if (memcount >= sizeof(mem_reg_property)/4)
- 				continue;
--			if (!atag->u.mem.size)
-+			if (!le32_to_cpu(atag->u.mem.size))
- 				continue;
- 			memsize = get_cell_size(fdt);
- 
-@@ -161,20 +161,24 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 				uint64_t *mem_reg_prop64 =
- 					(uint64_t *)mem_reg_property;
- 				mem_reg_prop64[memcount++] =
--					cpu_to_fdt64(atag->u.mem.start);
-+					cpu_to_fdt64(
-+						le32_to_cpu(atag->u.mem.start));
- 				mem_reg_prop64[memcount++] =
--					cpu_to_fdt64(atag->u.mem.size);
-+					cpu_to_fdt64(
-+						le32_to_cpu(atag->u.mem.size));
- 			} else {
- 				mem_reg_property[memcount++] =
--					cpu_to_fdt32(atag->u.mem.start);
-+					cpu_to_fdt32(
-+						le32_to_cpu(atag->u.mem.start));
- 				mem_reg_property[memcount++] =
--					cpu_to_fdt32(atag->u.mem.size);
-+					cpu_to_fdt32(
-+						le32_to_cpu(atag->u.mem.size));
- 			}
- 
--		} else if (atag->hdr.tag == ATAG_INITRD2) {
-+		} else if (le32_to_cpu(atag->hdr.tag) == ATAG_INITRD2) {
- 			uint32_t initrd_start, initrd_size;
--			initrd_start = atag->u.initrd.start;
--			initrd_size = atag->u.initrd.size;
-+			initrd_start = le32_to_cpu(atag->u.initrd.start);
-+			initrd_size = le32_to_cpu(atag->u.initrd.size);
- 			setprop_cell(fdt, "/chosen", "linux,initrd-start",
- 					initrd_start);
- 			setprop_cell(fdt, "/chosen", "linux,initrd-end",
-diff --git a/arch/arm/include/uapi/asm/setup.h b/arch/arm/include/uapi/asm/setup.h
-index 979ff40..00df12a 100644
---- a/arch/arm/include/uapi/asm/setup.h
-+++ b/arch/arm/include/uapi/asm/setup.h
-@@ -177,11 +177,13 @@ struct tagtable {
- 	((unsigned long)(&((struct tag *)0L)->member + 1)	\
- 		<= (tag)->hdr.size * 4)
- 
--#define tag_next(t)	((struct tag *)((__u32 *)(t) + (t)->hdr.size))
-+#define tag_next(t)	((struct tag *)((__u32 *)(t) +		\
-+					le32_to_cpu((t)->hdr.size)))
-+
- #define tag_size(type)	((sizeof(struct tag_header) + sizeof(struct type)) >> 2)
- 
- #define for_each_tag(t,base)		\
--	for (t = base; t->hdr.size; t = tag_next(t))
-+	for (t = base; le32_to_cpu(t->hdr.size); t = tag_next(t))
- 
- 
- #endif /* _UAPI__ASMARM_SETUP_H */
--- 
-2.8.3
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 40649 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/bb680ca8/attachment-0001.obj>
