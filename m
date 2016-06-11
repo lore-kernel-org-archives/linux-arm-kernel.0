@@ -1,50 +1,106 @@
-From: amitoj1606@gmail.com (Amitoj Kaur Chawla)
-Date: Sat, 11 Jun 2016 09:35:20 +0530
-Subject: [PATCH] ARM: zx: Fix devm_ioremap_resource error detection code
-Message-ID: <20160611040520.GA20393@amitoj-Inspiron-3542>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Sat, 11 Jun 2016 08:02:25 +0300
+Subject: [PATCH 7/7] ARM: dts: imx53-voipac-bsb: Switch using
+ simple-audio-card for audio support
+In-Reply-To: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
+References: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1465621345-12597-7-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove unnecessary error handling after the call to
-platform_get_resource and fix error handling for devm_ioremap_resource
+The sound support can be handled by "simple-audio-card" instead of
+use a private driver.
 
-The Coccinelle semantic patch that was used to help find this is as
-follows:
-@@
-expression e,e1;
-statement S;
-@@
-
-*e = devm_ioremap_resource(...);
-if (!e1) S
-
-Signed-off-by: Amitoj Kaur Chawla <amitoj1606@gmail.com>
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-zx/zx296702-pm-domain.c | 11 ++---------
- 1 file changed, 2 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/imx53-voipac-bsb.dts | 55 ++++++++++++++++++++++++++++------
+ 1 file changed, 46 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-zx/zx296702-pm-domain.c b/arch/arm/mach-zx/zx296702-pm-domain.c
-index e08574d..17f778b 100644
---- a/arch/arm/mach-zx/zx296702-pm-domain.c
-+++ b/arch/arm/mach-zx/zx296702-pm-domain.c
-@@ -163,16 +163,9 @@ static int zx296702_pd_probe(struct platform_device *pdev)
- 	genpd_data->num_domains = ARRAY_SIZE(zx296702_pm_domains);
+diff --git a/arch/arm/boot/dts/imx53-voipac-bsb.dts b/arch/arm/boot/dts/imx53-voipac-bsb.dts
+index fc51b87..ad00e98 100644
+--- a/arch/arm/boot/dts/imx53-voipac-bsb.dts
++++ b/arch/arm/boot/dts/imx53-voipac-bsb.dts
+@@ -10,19 +10,35 @@
+  */
  
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	if (!res) {
--		dev_err(&pdev->dev, "no memory resource defined\n");
--		return -ENODEV;
--	}
--
- 	pcubase = devm_ioremap_resource(&pdev->dev, res);
--	if (!pcubase) {
--		dev_err(&pdev->dev, "ioremap fail.\n");
--		return -EIO;
--	}
-+	if (IS_ERR(pcubase))
-+		return PTR_ERR(pcubase);
+ /dts-v1/;
++#include <dt-bindings/sound/fsl-imx-audmux.h>
++
+ #include "imx53-voipac-dmm-668.dtsi"
  
- 	for (i = 0; i < ARRAY_SIZE(zx296702_pm_domains); ++i)
- 		pm_genpd_init(zx296702_pm_domains[i], NULL, false);
+ / {
+ 	sound {
+-		compatible = "fsl,imx53-voipac-sgtl5000",
+-			     "fsl,imx-audio-sgtl5000";
+-		model = "imx53-voipac-sgtl5000";
+-		ssi-controller = <&ssi2>;
+-		audio-codec = <&sgtl5000>;
+-		audio-routing =
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "imx53-voipac-sgtl5000";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&master>;
++		simple-audio-card,frame-master = <&master>;
++		simple-audio-card,widgets =
++			"Microphone", "Mic Jack",
++			"Line", "Line In Jack",
++			"Headphone", "Headphone Jack",
++			"Speaker", "Line Out Jack",
++			"Speaker", "Ext Spk";
++		simple-audio-card,routing =
++			"MIC_IN", "Mic Jack",
++			"Mic Jack", "Mic Bias",
+ 			"Headphone Jack", "HP_OUT";
+-		mux-int-port = <2>;
+-		mux-ext-port = <5>;
++
++		simple-audio-card,cpu {
++			sound-dai = <&ssi2>;
++		};
++
++		master: simple-audio-card,codec {
++			sound-dai = <&sgtl5000>;
++		};
+ 	};
+ 
+ 	leds {
+@@ -112,8 +128,28 @@
+ 
+ &audmux {
+ 	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_audmux>; /* SSI1 */
++	pinctrl-0 = <&pinctrl_audmux>;
+ 	status = "okay";
++
++	audmux_ssi1 {
++		fsl,audmux-port = <MX51_AUDMUX_PORT2_SSI1>;
++		fsl,port-config = <
++			(IMX_AUDMUX_V2_PTCR_TFSDIR |
++			IMX_AUDMUX_V2_PTCR_TFSEL(MX51_AUDMUX_PORT4) |
++			IMX_AUDMUX_V2_PTCR_TCLKDIR |
++			IMX_AUDMUX_V2_PTCR_TCSEL(MX51_AUDMUX_PORT4) |
++			IMX_AUDMUX_V2_PTCR_SYN)
++			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT4)
++		>;
++	};
++
++	audmux_aud4 {
++		fsl,audmux-port = <MX51_AUDMUX_PORT4>;
++		fsl,port-config = <
++			IMX_AUDMUX_V2_PTCR_SYN
++			IMX_AUDMUX_V2_PDCR_RXDSEL(MX51_AUDMUX_PORT2_SSI1)
++		>;
++	};
+ };
+ 
+ &esdhc2 {
+@@ -131,6 +167,7 @@
+ 	status = "okay";
+ 
+ 	sgtl5000: codec at 0a {
++		#sound-dai-cells = <0>;
+ 		compatible = "fsl,sgtl5000";
+ 		reg = <0x0a>;
+ 		VDDA-supply = <&reg_3p3v>;
 -- 
-1.9.1
+2.4.9
