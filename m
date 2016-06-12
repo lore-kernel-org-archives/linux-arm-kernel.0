@@ -1,132 +1,45 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 12 Jun 2016 10:57:35 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Remove regulators under
- 'simple-bus'
-In-Reply-To: <1465681756-5286-1-git-send-email-festevam@gmail.com>
-References: <1465681756-5286-1-git-send-email-festevam@gmail.com>
-Message-ID: <20160612025735.GY20243@tiger>
+From: gang.liu@nxp.com (Gang Liu)
+Date: Sun, 12 Jun 2016 03:00:56 +0000
+Subject: [PATCH] arm64: dts: ls1043a: Add 'dma-coherent' for ls1043a PCI
+ nodes
+In-Reply-To: <DB5PR0401MB192810622C64C85F08C281D9915E0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+References: <1465282546-28256-1-git-send-email-Gang.Liu@nxp.com>
+ <1465282546-28256-2-git-send-email-Gang.Liu@nxp.com>
+ <DB5PR0401MB192810622C64C85F08C281D9915E0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
+Message-ID: <DB4PR04MB2663122FB05EFC7BA1197D882520@DB4PR04MB266.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 11, 2016 at 06:49:16PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+> From: Scott Wood
 > 
-> Device-tree folks do not like the idea of placing regulators nodes
-> under 'simple-bus'.
+> On 06/07/2016 02:06 AM, Liu Gang wrote:
+> > The 'dma-coherent' indicates that the hardware IP block can ensure the
+> > coherency of the data transferred from/to the IP block. This can avoid
+> > the software cache flush/invalid actions, and improve the performance
+> > significantly.
+> >
+> > The PCI IP block of ls1043a has this capability, so adding this
+> > feature to improve the PCI performance.
+> >
+> > Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 3 +++
+> >  1 file changed, 3 insertions(+)
 > 
-> Move them out of 'simple-bus'.
+> Why not ls2080a as well?
+[Liu Gang] ls2080 should also include this property, we can add it after verification.
+ 
+> What about non-PCI devices?
 > 
-> Also use the convention: reg_xxxx: regulator-xxxx
-> for the regulator names.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Pretty much everything on these chips should be coherent as long as it's
+> properly configured.
+[Liu Gang] you are right. For the layerscape platforms including CCI or CCN internal bus,
+theoretically, pretty much IP blocks (PCI/non-PCI) should be coherent. But this depends
+on the properly hardware and software configurations. (ls1012a PCI devices cannot implement
+the coherent duo to hardware issue)
+So I think we'd better to add this property after each IP block's verification.
 
-If you would like to do this, please do it in a single patch to convert
-all i.MX dts files over to the new style.
-
-Shawn
-
-> ---
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 78 +++++++++++++++-------------------
->  1 file changed, 34 insertions(+), 44 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> index 5248e7b..8453721 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -22,53 +22,43 @@
->  		reg = <0x10000000 0x40000000>;
->  	};
->  
-> -	regulators {
-> -		compatible = "simple-bus";
-> -		#address-cells = <1>;
-> -		#size-cells = <0>;
-> -
-> -		reg_usb_otg_vbus: regulator at 0 {
-> -			compatible = "regulator-fixed";
-> -			reg = <0>;
-> -			regulator-name = "usb_otg_vbus";
-> -			regulator-min-microvolt = <5000000>;
-> -			regulator-max-microvolt = <5000000>;
-> -			gpio = <&gpio3 22 0>;
-> -			enable-active-high;
-> -			vin-supply = <&swbst_reg>;
-> -		};
-> +	reg_usb_otg_vbus: regulator-usb-otg-vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_otg_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio3 22 0>;
-> +		enable-active-high;
-> +		vin-supply = <&swbst_reg>;
-> +	};
->  
-> -		reg_usb_h1_vbus: regulator at 1 {
-> -			compatible = "regulator-fixed";
-> -			reg = <1>;
-> -			regulator-name = "usb_h1_vbus";
-> -			regulator-min-microvolt = <5000000>;
-> -			regulator-max-microvolt = <5000000>;
-> -			gpio = <&gpio1 29 0>;
-> -			enable-active-high;
-> -			vin-supply = <&swbst_reg>;
-> -		};
-> +	reg_usb_h1_vbus: regulator-usb-h1-vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_h1_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio1 29 0>;
-> +		enable-active-high;
-> +		vin-supply = <&swbst_reg>;
-> +	};
->  
-> -		reg_audio: regulator at 2 {
-> -			compatible = "regulator-fixed";
-> -			reg = <2>;
-> -			regulator-name = "wm8962-supply";
-> -			gpio = <&gpio4 10 0>;
-> -			enable-active-high;
-> -		};
-> +	reg_audio: regulator-audio {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "wm8962-supply";
-> +		gpio = <&gpio4 10 0>;
-> +		enable-active-high;
-> +	};
->  
-> -		reg_pcie: regulator at 3 {
-> -			compatible = "regulator-fixed";
-> -			reg = <3>;
-> -			pinctrl-names = "default";
-> -			pinctrl-0 = <&pinctrl_pcie_reg>;
-> -			regulator-name = "MPCIE_3V3";
-> -			regulator-min-microvolt = <3300000>;
-> -			regulator-max-microvolt = <3300000>;
-> -			gpio = <&gpio3 19 0>;
-> -			regulator-always-on;
-> -			enable-active-high;
-> -		};
-> +	reg_pcie: regulator-pcie {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_pcie_reg>;
-> +		regulator-name = "MPCIE_3V3";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio3 19 0>;
-> +		regulator-always-on;
-> +		enable-active-high;
->  	};
->  
->  	gpio-keys {
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks!
+Liu Gang
+>
+> -Scott
