@@ -1,88 +1,206 @@
-From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Sun, 12 Jun 2016 17:19:22 +0200
-Subject: [PATCH v2 2/2] ARM: dts: utilite-pro: add mmc card slot support
-In-Reply-To: <20160612151922.7600-1-christopher.spinrath@rwth-aachen.de>
-References: <20160612151922.7600-1-christopher.spinrath@rwth-aachen.de>
-Message-ID: <e008cb7118a345b0bea619e26731296b@rwthex-s1-b.rwth-ad.de>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sun, 12 Jun 2016 20:44:30 +0300
+Subject: [PATCH 21/23] arm64: ilp32: introduce ilp32-specific handlers
+ for sigframe and ucontext
+In-Reply-To: <5752BCC8.7080205@huawei.com>
+References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+ <1464048292-30136-22-git-send-email-ynorov@caviumnetworks.com>
+ <5752BCC8.7080205@huawei.com>
+Message-ID: <20160612174430.GA12067@yury-N73SV>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+Hi Bamvor,
 
-The Utilite Pro has a mmc card slot connected to the usdhc3
-controller. There is no card detection until hardware revision 1.3.
+Sorry, I missed this patch.
 
-Add support for it and signal the controller with the broken-cd
-property that polling has to be used to detect a card.
+On Sat, Jun 04, 2016 at 07:34:32PM +0800, Zhangjian (Bamvor) wrote:
+> Hi,
+> 
+> I found an issue of unwind with the following code. The correct backtrace
+> should be:
+> (gdb) where
+> #0 0x004004d0 in my_sig (sig=11) at test_force3.c:16
+> #1 <signal handler called>
+> #2 func2 (num=0) at test_force3.c:22
+> #3 0x00400540 in func1 (num=1) at test_force3.c:28
+> #4 0x00400574 in main (argc=1, argv=0xffd7bc04) at test_force3.c:33
+> 
+> Without my patch, the backtrace is:
+> (gdb) where
+> #0 0x00400490 in my_sig (sig=11) at test_force3.c:16
+> #1 <signal handler called>
+> #2 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
+> 
+> With my patch which fix the wrong frame pointer(setup_return calculate the offset
+> of fp through ilp32_sigframe instead of sigfreame), the backtrace is:
+> (gdb) where
+> #0 0x00400490 in my_sig (sig=11) at test_force3.c:16
+> #1 <signal handler called>
+> #2 func1 () at test_force3.c:28
+> #3 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
+> 
+> I am not sure there is still some issue in kernel. But it seem that the gdb of ilp32
+> does not work correctly when unwind without framepointer.
+> 
+> The test code is:
+> 
+> From 7e364a765097f57aed2d73f94c1688c2e7343e79 Mon Sep 17 00:00:00 2001
+> From: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
+> Date: Sat, 4 Jun 2016 14:30:05 +0800
+> Subject: [PATCH] arm64: ilp32: fix for wrong fp offset when calculate the
+>  new fp
+> 
+> ILP32 define its own sigframe(ilp32_sigframe) because of the
+> difference uc_context. setup_return do not use ilp32 specific
+> sigframe to calculate the new offset of fp which lead to wrong
+> fp in signal handler. At this circumstance, gdb backtrace will miss
+> one item:
+> (gdb) where
+> 
+> It should be:
+> (gdb) where
+> 
+> The test code is as follows:
+> 
+> void my_sig(int sig)
+> {
+>         printf("sig=%d\n", sig);
+>         *(int *)0 = 0x0;
+> }
+> 
+> void func2(int num)
+> {
+>         printf("%s: %d\n", __FUNCTION__, num);
+>         *(int *)0 = 0x0;
+>         func2(num-1);
+> }
+> 
+> void func1(int num)
+> {
+>         printf("%s\n", __FUNCTION__);
+>         func2(num - 1);
+> }
+> 
+> int main(int argc, char **argv)
+> {
+>         signal(11, my_sig);
+>         func1(argc);
+>         return 0;
+> }
+> 
+> This patch fix this by passing the correct offset of fp to
+> setup_return.
+> Test pass on both ILP32 and LP64 in aarch64 EE.
+> 
+> Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
+> ---
+>  arch/arm64/include/asm/signal_common.h | 3 ++-
+>  arch/arm64/kernel/signal.c             | 9 +++++----
+>  arch/arm64/kernel/signal_ilp32.c       | 4 ++--
+>  3 files changed, 9 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
+> index de93c71..a5d7b63 100644
+> --- a/arch/arm64/include/asm/signal_common.h
+> +++ b/arch/arm64/include/asm/signal_common.h
+> @@ -29,6 +29,7 @@ int setup_sigcontex(struct sigcontext __user *uc_mcontext,
+>  		    struct pt_regs *regs);
+>  int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
+>  void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+> -			void __user *frame, off_t sigframe_off, int usig);
+> +			void __user *frame, off_t sigframe_off, off_t fp_off,
+> +			int usig); 
+> 
+>  #endif /* __ASM_SIGNAL_COMMON_H */
+> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
+> index 038bebe..e66a6e9 100644
+> --- a/arch/arm64/kernel/signal.c
+> +++ b/arch/arm64/kernel/signal.c
+> @@ -256,14 +256,14 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
+>  }
+> 
+>  void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+> -			 void __user *frame, off_t sigframe_off, int usig)
+> +			 void __user *frame, off_t sigframe_off, off_t fp_off,
+> +			 int usig)
+>  {
+>  	__sigrestore_t sigtramp;
+> 
+>  	regs->regs[0] = usig;
+>  	regs->sp = (unsigned long)frame;
+> -	regs->regs[29] = regs->sp + sigframe_off +
+> -		offsetof(struct sigframe, fp);
+> +	regs->regs[29] = regs->sp + sigframe_off + fp_off;
 
-Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
----
+I think you are right here. The only nitpick is what for we send 2
+offsets just to add one to another inside setup_return()?
+We can do like this:
 
-Notes:
-    Changes since v1:
-     - enhance commit message to explain to the broken-cd property
+        void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
+        			 void __user *frame, off_t fp_off, int usig)
+        {
+        	__sigrestore_t sigtramp;
+        
+        	regs->regs[0] = usig;
+        	regs->sp = (unsigned long)frame;
+        	regs->regs[29] = regs->sp + fp_off;
+                [...]
+        }
 
- arch/arm/boot/dts/imx6q-utilite-pro.dts | 44 +++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
+Where fp_off calculation is done by caller. 
 
-diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-index 7219745..6199063 100644
---- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
-+++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-@@ -130,6 +130,39 @@
- 			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
- 		>;
- 	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x10059
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc3_100mhz: usdhc3grp-100mhz {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170B9
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100B9
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170B9
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170B9
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170B9
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170B9
-+		>;
-+	};
-+
-+	pinctrl_usdhc3_200mhz: usdhc3grp-200mhz {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170F9
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100F9
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170F9
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170F9
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170F9
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170F9
-+		>;
-+	};
- };
- 
- &pcie {
-@@ -151,3 +184,14 @@
- 	uart-has-rtscts;
- 	status = "okay";
- };
-+
-+&usdhc3 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-+	no-1-8-v;
-+	broken-cd;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
--- 
-2.8.3
+	setup_return(regs, &ksig->ka, frame,
+		offsetof(struct rt_sigframe, sig) + offsetof(struct sigframe, fp),
+                usig);
+
+For me it's more clear to understand what happens with this approach.
+I don't think struct rt_sigframe will grow, but we can even introduce
+some helper for it:
+        #define RT_SIGFRAME_FP_POS (offsetof(struct rt_sigframe, sig) + offsetof(struct sigframe, fp))
+
+If no objections, I'll apply your patch with my fix in next series.
+
+>  	regs->pc = (unsigned long)ka->sa.sa_handler;
+> 
+>  	if (ka->sa.sa_flags & SA_RESTORER)
+> @@ -294,7 +294,8 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
+>  	err |= setup_sigframe(&frame->sig, regs, set);
+>  	if (err == 0) {
+>  		setup_return(regs, &ksig->ka, frame,
+> -			offsetof(struct rt_sigframe, sig), usig);
+> +			offsetof(struct rt_sigframe, sig),
+> +			offsetof(struct sigframe, fp), usig);
+>  		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
+>  			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
+>  			regs->regs[1] = (unsigned long)&frame->info;
+> diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
+> index a8ea73e..9030f14 100644
+> --- a/arch/arm64/kernel/signal_ilp32.c
+> +++ b/arch/arm64/kernel/signal_ilp32.c
+> @@ -147,7 +147,6 @@ static struct ilp32_rt_sigframe __user *ilp32_get_sigframe(struct ksignal *ksig,
+>  	struct ilp32_rt_sigframe __user *frame;
+> 
+>  	sp = sp_top = sigsp(regs->sp, ksig);
+> -
+>  	sp = (sp - sizeof(struct ilp32_rt_sigframe)) & ~15;
+>  	frame = (struct ilp32_rt_sigframe __user *)sp;
+> 
+> @@ -183,7 +182,8 @@ int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
+>  	err |= setup_ilp32_sigframe(&frame->sig, regs, set);
+>  	if (err == 0) {
+>  		setup_return(regs, &ksig->ka, frame,
+> -			     offsetof(struct ilp32_rt_sigframe, sig), usig);
+> +			     offsetof(struct ilp32_rt_sigframe, sig),
+> +			     offsetof(struct ilp32_sigframe, fp), usig);
+>  		regs->regs[1] = (unsigned long)&frame->info;
+>  		regs->regs[2] = (unsigned long)&frame->sig.uc;
+>  	}
+> -- 
+> 1.8.4.5
+> 
+> Regards
+> 
+> Bamvor
+> 
+> 
