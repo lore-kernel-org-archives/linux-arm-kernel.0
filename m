@@ -1,73 +1,92 @@
 From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Mon, 13 Jun 2016 01:24:55 +0200
-Subject: [PATCH v3 1/2] ARM: dts: imx6q-cm-fx6: fix the operation points
-Message-ID: <e24c7d64dbce490fbeaa0f44b56027d0@rwthex-s1-b.rwth-ad.de>
+Date: Mon, 13 Jun 2016 01:24:56 +0200
+Subject: [PATCH v3 2/2] ARM: dts: utilite-pro: add mmc card slot support
+In-Reply-To: <20160612232456.1621-1-christopher.spinrath@rwth-aachen.de>
+References: <20160612232456.1621-1-christopher.spinrath@rwth-aachen.de>
+Message-ID: <c25d8e5d113240c5ab78771f301d901a@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Valentin Raevsky <valentin@compulab.co.il>
+From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 
-The current ldo settings of the cm-fx6 do not allow 1.2GHz cpu
-frequency. At this frequency the module behaves unstable.
+The Utilite Pro has a mmc card slot connected to the usdhc3
+controller. There is no card detection until hardware revision 1.3.
 
-But the imx6q fuse indicates that 1.2GHz operation is possible.
-Hence, remove the 1.2GHz operation point in the device tree.
+Add support for it and signal the controller with the broken-cd
+property that polling has to be used to detect a card.
 
-Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
-[christopher.spinrath at rwth-aachen.de: enhance commit message, adjust
- remaining operation points to match the ones in imx6q.dtsi and add
- a comment in the device tree]
 Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
 
 Notes:
     Changes since v2:
-     - fix comment style
      - add Fabio's Reviewed-By
     
     Changes since v1:
-     - Enhance commit message to explain that we cannot rely on the imx6q
-       fuse to restrict the frequency
-     - put the same information into a comment in the device tree
-     - fix the remaining operation points to match the ones given in
-       imx6q.dtsi
+     - enhance commit message to explain to the broken-cd property
 
- arch/arm/boot/dts/imx6q-cm-fx6.dts | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ arch/arm/boot/dts/imx6q-utilite-pro.dts | 44 +++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-index 6d8d5e9..b5de7e6 100644
---- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
-+++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
-@@ -91,6 +91,28 @@
+diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+index 7219745..6199063 100644
+--- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
++++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
+@@ -130,6 +130,39 @@
+ 			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
+ 		>;
  	};
++
++	pinctrl_usdhc3: usdhc3grp {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
++			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x10059
++			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
++			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
++			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
++			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
++		>;
++	};
++
++	pinctrl_usdhc3_100mhz: usdhc3grp-100mhz {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170B9
++			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100B9
++			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170B9
++			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170B9
++			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170B9
++			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170B9
++		>;
++	};
++
++	pinctrl_usdhc3_200mhz: usdhc3grp-200mhz {
++		fsl,pins = <
++			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170F9
++			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100F9
++			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170F9
++			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170F9
++			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170F9
++			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170F9
++		>;
++	};
  };
  
-+&cpu0 {
-+	/*
-+	 * Although the imx6q fuse indicates that 1.2GHz operation is possible,
-+	 * the module behaves unstable at this frequency. Hence, remove the
-+	 * 1.2GHz operation point here.
-+	 */
-+	operating-points = <
-+		/* kHz	uV */
-+		996000	1250000
-+		852000	1250000
-+		792000	1175000
-+		396000	975000
-+	>;
-+	fsl,soc-operating-points = <
-+		/* ARM kHz	SOC-PU uV */
-+		996000		1250000
-+		852000		1250000
-+		792000		1175000
-+		396000		1175000
-+	>;
-+};
+ &pcie {
+@@ -151,3 +184,14 @@
+ 	uart-has-rtscts;
+ 	status = "okay";
+ };
 +
- &ecspi1 {
- 	fsl,spi-num-chipselects = <2>;
- 	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio3 19 GPIO_ACTIVE_HIGH>;
++&usdhc3 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3>;
++	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
++	no-1-8-v;
++	broken-cd;
++	keep-power-in-suspend;
++	status = "okay";
++};
 -- 
 2.8.3
