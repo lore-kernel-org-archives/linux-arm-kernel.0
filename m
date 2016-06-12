@@ -1,215 +1,334 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sun, 12 Jun 2016 10:46:35 -0700
-Subject: [PATCH 1/5] ethernet: add sun8i-emac driver
-In-Reply-To: <20160609094402.GA14315@Red>
-References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
- <1464947790-22991-2-git-send-email-clabbe.montjoie@gmail.com>
- <5755C00B.2040203@gmail.com> <20160609094402.GA14315@Red>
-Message-ID: <575D9FFB.1@gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 12 Jun 2016 19:55:50 +0200
+Subject: [PATCH] ARM: dts: sun8i: Add dts file for inet86dz board
+Message-ID: <1465754150-16753-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 09/06/2016 02:44, LABBE Corentin a ?crit :
-> Hello
-> 
-> I agree to all your comments, but for some I have additionnal questions
-> 
-> On Mon, Jun 06, 2016 at 11:25:15AM -0700, Florian Fainelli wrote:
->> On 06/03/2016 02:56 AM, LABBE Corentin wrote:
->>
->> [snip]
->>
->>> +
->>> +/* The datasheet said that each descriptor can transfers up to 4096bytes
->>> + * But latter, a register documentation reduce that value to 2048
->>> + * Anyway using 2048 cause strange behaviours and even BSP driver use 2047
->>> + */
->>> +#define DESC_BUF_MAX 2044
->>> +#if (DESC_BUF_MAX < (ETH_FRAME_LEN + 4))
->>> +#error "DESC_BUF_MAX must be set at minimum to ETH_FRAME_LEN + 4"
->>> +#endif
->>
->> You can probably drop that, it would not make much sense to enable
->> fragments and a buffer size smaller than ETH_FRAME_LEN + ETH_FCS_LEN anyway.
->>
-> 
-> I has added this test for preventing someone who want to "optimize" DESC_BUF_MAX to doing mistake.
-> But I agree that it is of low use.
+The inet86dz board is a board used in 7" tablets from various oems.
 
-It's actually dangerous, and if you don't make sure that the value is
-properly rounded to whatever the DMA controller's alignment should be,
-performance could be terribel too.
+These tablets are a23 based 7" tablets featuring a 1024x600 LCD,
+512MB RAM, 4G NAND, rtl8188etv usb wifi, gsl1680 touchschreen,
+micro-sd slot, 3.5mm headphone jack and a micro-usb otg connector
+which doubles as charging port.
 
-> 
->>> +/* Return the number of contiguous free descriptors
->>> + * starting from tx_slot
->>> + */
->>> +static int rb_tx_numfreedesc(struct net_device *ndev)
->>> +{
->>> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
->>> +
->>> +	if (priv->tx_slot < priv->tx_dirty)
->>> +		return priv->tx_dirty - priv->tx_slot;
->>
->> Does this work with if tx_dirty wraps around?
->>
-> 
-> The tx_dirty cannot wrap since I always keep an empty slot. (tx_slot cannot go equal or after tx_dirty)
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/sun8i-a23-inet86dz.dts | 293 +++++++++++++++++++++++++++++++
+ 2 files changed, 294 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-a23-inet86dz.dts
 
-OK, fair enough.
-
-> 
->>> +/* Grab a frame into a skb from descriptor number i */
->>> +static int sun8i_emac_rx_from_ddesc(struct net_device *ndev, int i)
->>> +{
->>> +	struct sk_buff *skb;
->>> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
->>> +	struct dma_desc *ddesc = priv->dd_rx + i;
->>> +	int frame_len;
->>> +	int crc_checked = 0;
->>> +
->>> +	if (ndev->features & NETIF_F_RXCSUM)
->>> +		crc_checked = 1;
->>
->> Assuming CRC here refers to the Ethernet frame's FCS, then this is
->> absolutely not how NETIF_F_RXCSUM works. NETIF_F_RXCSUM is about your
->> Ethernet adapter supporting L3/L4 checksum offloads, while the Ethernet
->> FCS is pretty much mandatory for the frame to be properly received in
->> the first place. Can you clarify which way it is?
->>
-> 
-> No CRC here is RXCSUM. I understand the misnaming.
-> I will rename the variable to rxcsum_done.
-
-Thanks
-
-> 
->>> +
->>> +	priv->ndev->stats.rx_packets++;
->>> +	priv->ndev->stats.rx_bytes += frame_len;
->>> +	priv->rx_sk[i] = NULL;
->>> +
->>> +	/* this frame is not the last */
->>> +	if ((ddesc->status & BIT(8)) == 0) {
->>> +		dev_warn(priv->dev, "Multi frame not implemented currlen=%d\n",
->>> +			 frame_len);
->>> +	}
->>> +
->>> +	sun8i_emac_rx_sk(ndev, i);
->>> +
->>> +	netif_rx(skb);
->>
->> netif_receive_skb() at the very least, or if you implement NAPI, like
->> you shoud napi_gro_receive().
->>
-> 
-> netif_receive_skb documentation say
-> "This function may only be called from softirq context and interrupts should be enabled."
-> but the calling functions is in hardirq context.
-
-Well, yes, because you are not implementing NAPI, while you should, you
-execute in hard interrupt context. Once you move to NAPI, you can and
-should use netif_receive_skb().
-
-> 
->>> +	return 0;
->>> +}
->>> +
->>> +/* Cycle over RX DMA descriptors for finding frame to receive
->>> + */
->>> +static int sun8i_emac_receive_all(struct net_device *ndev)
->>> +{
->>> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
->>> +	struct dma_desc *ddesc;
->>> +
->>> +	ddesc = priv->dd_rx + priv->rx_dirty;
->>> +	while (!(ddesc->status & BIT(31))) {
->>> +		sun8i_emac_rx_from_ddesc(ndev, priv->rx_dirty);
->>> +		rb_inc(&priv->rx_dirty, nbdesc_rx);
->>> +		ddesc = priv->dd_rx + priv->rx_dirty;
->>> +	};
->>
->> So, what if we ping flood your device here, is not there a remote chance
->> that we keep the RX interrupt so busy we can't break out of this loop,
->> and we are executing from hard IRQ context, that's bad.
->>
-> 
-> I have added a start variable for preventing to do more than a full loop.
-
-Which gets you close to a proper NAPI implementation, good.
-
-> 
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +/* iterate over dma_desc for finding completed xmit.
->>> + * Called from interrupt context, so no need to spinlock tx
->>
->> Humm, well it depends if what you are doing here may race with
->> ndo_start_xmit(), and usually it does.
->>
-> 
-> I believe that how it is designed it cannot race each over (access the same descriptor slot) since I keep a free slot between each other.
-> 
->> Also, you should consider completing TX packets in NAPI context (soft
->> IRQ) instead of hard IRQs like here.
->>
-> 
-> I wanted to finish this driver the "old" way (with hard IRQ) and implementing NAPI after as a Kconfig choice.
-> Does NAPI is mandatory now ? (or really recommended)
-> For resuming my understanding, NAPI is good when expecting high traffic. (so my Kconfig idea)
-> If you say that NAPI is really preferable, I will do it.
-
-It's not preferable it's just mandatory here, no recent network driver
-does not implement it, and it works well for both low and high traffic.
-
-> 
->>> +	/* last descriptor point back to first one */
->>> +	ddesc--;
->>> +	ddesc->next = (u32)priv->dd_rx_phy;
->>
->> So is there a limitation of this hardware that can only do DMA within
->> the first 4GB of the system?
->>
-> 
-> Yes, I have added all DMA stuff for handling that after apritzel review.
-
-Is your platform_device's DMA mask properly set then, you don't seem to
-be taking any precautions in the driver probe's function to force a
-32-bits DMA mask anywhere, should not you?
-
-> 
->>> +static int sun8i_emac_check_if_running(struct net_device *ndev)
->>> +{
->>> +	if (!netif_running(ndev))
->>> +		return -EBUSY;
->>
->> This does not seem like the intended usage of a
->>
-> 
-> I have changed the return code after reading other drivers.
-> But could you end your sentence for be sure that the problem is that.
-
-Meant to say that it's not the intended usage of an ethtool_opts::begin
-function, those would usually turn on a clock (if the clock was turned
-off) in preparation for the real operation to program the HW for instance.
-
-> 
->>> +
->>> +static int sun8i_emac_remove(struct platform_device *pdev)
->>> +{
->>> +	struct net_device *ndev = platform_get_drvdata(pdev);
->>> +
->>> +	unregister_netdev(ndev);
->>> +	platform_set_drvdata(pdev, NULL);
->>
->> Missing unregister_netdevice() here.
->>
-> 
-> Does I need to replace unregister_netdev by it ?
-> They seems to to the same job.
-
-Missed the unregister_netdev(), everything's fine, my bad.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8223602..1ff5434 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -751,6 +751,7 @@ dtb-$(CONFIG_MACH_SUN7I) += \
+ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a23-evb.dtb \
+ 	sun8i-a23-gt90h-v4.dtb \
++	sun8i-a23-inet86dz.dtb \
+ 	sun8i-a23-ippo-q8h-v5.dtb \
+ 	sun8i-a23-ippo-q8h-v1.2.dtb \
+ 	sun8i-a23-polaroid-mid2407pxe03.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-a23-inet86dz.dts b/arch/arm/boot/dts/sun8i-a23-inet86dz.dts
+new file mode 100644
+index 0000000..0405258
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-a23-inet86dz.dts
+@@ -0,0 +1,293 @@
++/*
++ * Copyright 2016 Hans de Goede <hdegoede@redhat.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-a23.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++#include <dt-bindings/pwm/pwm.h>
++
++/ {
++	model = "INet-86DZ Rev 01";
++	compatible = "primux,inet86dz", "allwinner,sun8i-a23";
++
++	aliases {
++		serial0 = &r_uart;
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pinctrl-names = "default";
++		pinctrl-0 = <&bl_en_pin_inet86dz>;
++		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
++		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
++		default-brightness-level = <8>;
++		enable-gpios = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins_a>;
++	status = "okay";
++	/*
++	 * The gsl1680 is rated at 400KHz and it will not work reliable at
++	 * 100KHz, this has been confirmed on multiple different tablets.
++	 * The gsl1680 is the only device on this bus.
++	 */
++	clock-frequency = <400000>;
++
++	gsl1680: touchscreen at 40 {
++		compatible = "silead,gsl1680";
++		reg = <0x40>;
++		interrupt-parent = <&pio>;
++		interrupts = <1 5 IRQ_TYPE_EDGE_FALLING>; /* PB5 */
++		pinctrl-names = "default";
++		pinctrl-0 = <&ts_power_pin_inet86dz>;
++		power-gpios = <&pio 7 1 GPIO_ACTIVE_HIGH>; /* PH1 */
++		touchscreen-size-x = <960>;
++		touchscreen-size-y = <640>;
++		touchscreen-max-fingers = <5>;
++		touchscreen-fw-name = "silead/gsl1680-inet86dz.fw";
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins_a>;
++	status = "okay";
++};
++
++&lradc {
++	vref-supply = <&reg_vcc3v0>;
++	status = "okay";
++
++	button at 200 {
++		label = "Volume Up";
++		linux,code = <KEY_VOLUMEUP>;
++		channel = <0>;
++		voltage = <200000>;
++	};
++
++	button at 400 {
++		label = "Volume Down";
++		linux,code = <KEY_VOLUMEDOWN>;
++		channel = <0>;
++		voltage = <400000>;
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_inet86dz>;
++	vmmc-supply = <&reg_dcdc1>;
++	bus-width = <4>;
++	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
++	cd-inverted;
++	status = "okay";
++};
++
++&pio {
++	bl_en_pin_inet86dz: bl_en_pin at 0 {
++		allwinner,pins = "PH6";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	mmc0_cd_pin_inet86dz: mmc0_cd_pin at 0 {
++		allwinner,pins = "PB4";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++
++	ts_power_pin_inet86dz: ts_power_pin at 0 {
++		allwinner,pins = "PH1";
++		allwinner,function = "gpio_out";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
++	};
++
++	usb0_id_detect_pin: usb0_id_detect_pin at 0 {
++		allwinner,pins = "PH8";
++		allwinner,function = "gpio_in";
++		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
++		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
++	};
++};
++
++&pwm {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pwm0_pins>;
++	status = "okay";
++};
++
++&r_rsb {
++	status = "okay";
++
++	axp22x: pmic at 3a3 {
++		compatible = "x-powers,axp223";
++		reg = <0x3a3>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		eldoin-supply = <&reg_dcdc1>;
++		x-powers,drive-vbus-en;
++	};
++};
++
++&r_uart {
++	pinctrl-names = "default";
++	pinctrl-0 = <&r_uart_pins_a>;
++	status = "okay";
++};
++
++#include "axp22x.dtsi"
++
++&reg_aldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-io";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <2350000>;
++	regulator-max-microvolt = <2650000>;
++	regulator-name = "vdd-dll";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <2700000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dc1sw {
++	regulator-name = "vcc-lcd";
++};
++
++&reg_dc5ldo {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-3v0";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi";
++};
++
++&reg_drivevbus {
++	regulator-name = "usb0-vbus";
++	status = "okay";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
++&simplefb_lcd {
++	vcc-lcd-supply = <&reg_dc1sw>;
++};
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usb_power_supply {
++	status = "okay";
++};
++
++&usbphy {
++	pinctrl-names = "default";
++	pinctrl-0 = <&usb0_id_detect_pin>;
++	usb0_id_det-gpio = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 */
++	usb0_vbus_power-supply = <&usb_power_supply>;
++	usb0_vbus-supply = <&reg_drivevbus>;
++	usb1_vbus-supply = <&reg_dldo1>;
++	status = "okay";
++};
 -- 
-Florian
+2.7.4
