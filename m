@@ -1,206 +1,215 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun, 12 Jun 2016 20:44:30 +0300
-Subject: [PATCH 21/23] arm64: ilp32: introduce ilp32-specific handlers
- for sigframe and ucontext
-In-Reply-To: <5752BCC8.7080205@huawei.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-22-git-send-email-ynorov@caviumnetworks.com>
- <5752BCC8.7080205@huawei.com>
-Message-ID: <20160612174430.GA12067@yury-N73SV>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 12 Jun 2016 10:46:35 -0700
+Subject: [PATCH 1/5] ethernet: add sun8i-emac driver
+In-Reply-To: <20160609094402.GA14315@Red>
+References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
+ <1464947790-22991-2-git-send-email-clabbe.montjoie@gmail.com>
+ <5755C00B.2040203@gmail.com> <20160609094402.GA14315@Red>
+Message-ID: <575D9FFB.1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bamvor,
+Le 09/06/2016 02:44, LABBE Corentin a ?crit :
+> Hello
+> 
+> I agree to all your comments, but for some I have additionnal questions
+> 
+> On Mon, Jun 06, 2016 at 11:25:15AM -0700, Florian Fainelli wrote:
+>> On 06/03/2016 02:56 AM, LABBE Corentin wrote:
+>>
+>> [snip]
+>>
+>>> +
+>>> +/* The datasheet said that each descriptor can transfers up to 4096bytes
+>>> + * But latter, a register documentation reduce that value to 2048
+>>> + * Anyway using 2048 cause strange behaviours and even BSP driver use 2047
+>>> + */
+>>> +#define DESC_BUF_MAX 2044
+>>> +#if (DESC_BUF_MAX < (ETH_FRAME_LEN + 4))
+>>> +#error "DESC_BUF_MAX must be set at minimum to ETH_FRAME_LEN + 4"
+>>> +#endif
+>>
+>> You can probably drop that, it would not make much sense to enable
+>> fragments and a buffer size smaller than ETH_FRAME_LEN + ETH_FCS_LEN anyway.
+>>
+> 
+> I has added this test for preventing someone who want to "optimize" DESC_BUF_MAX to doing mistake.
+> But I agree that it is of low use.
 
-Sorry, I missed this patch.
+It's actually dangerous, and if you don't make sure that the value is
+properly rounded to whatever the DMA controller's alignment should be,
+performance could be terribel too.
 
-On Sat, Jun 04, 2016 at 07:34:32PM +0800, Zhangjian (Bamvor) wrote:
-> Hi,
 > 
-> I found an issue of unwind with the following code. The correct backtrace
-> should be:
-> (gdb) where
-> #0 0x004004d0 in my_sig (sig=11) at test_force3.c:16
-> #1 <signal handler called>
-> #2 func2 (num=0) at test_force3.c:22
-> #3 0x00400540 in func1 (num=1) at test_force3.c:28
-> #4 0x00400574 in main (argc=1, argv=0xffd7bc04) at test_force3.c:33
+>>> +/* Return the number of contiguous free descriptors
+>>> + * starting from tx_slot
+>>> + */
+>>> +static int rb_tx_numfreedesc(struct net_device *ndev)
+>>> +{
+>>> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
+>>> +
+>>> +	if (priv->tx_slot < priv->tx_dirty)
+>>> +		return priv->tx_dirty - priv->tx_slot;
+>>
+>> Does this work with if tx_dirty wraps around?
+>>
 > 
-> Without my patch, the backtrace is:
-> (gdb) where
-> #0 0x00400490 in my_sig (sig=11) at test_force3.c:16
-> #1 <signal handler called>
-> #2 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
-> 
-> With my patch which fix the wrong frame pointer(setup_return calculate the offset
-> of fp through ilp32_sigframe instead of sigfreame), the backtrace is:
-> (gdb) where
-> #0 0x00400490 in my_sig (sig=11) at test_force3.c:16
-> #1 <signal handler called>
-> #2 func1 () at test_force3.c:28
-> #3 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
-> 
-> I am not sure there is still some issue in kernel. But it seem that the gdb of ilp32
-> does not work correctly when unwind without framepointer.
-> 
-> The test code is:
-> 
-> From 7e364a765097f57aed2d73f94c1688c2e7343e79 Mon Sep 17 00:00:00 2001
-> From: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
-> Date: Sat, 4 Jun 2016 14:30:05 +0800
-> Subject: [PATCH] arm64: ilp32: fix for wrong fp offset when calculate the
->  new fp
-> 
-> ILP32 define its own sigframe(ilp32_sigframe) because of the
-> difference uc_context. setup_return do not use ilp32 specific
-> sigframe to calculate the new offset of fp which lead to wrong
-> fp in signal handler. At this circumstance, gdb backtrace will miss
-> one item:
-> (gdb) where
-> 
-> It should be:
-> (gdb) where
-> 
-> The test code is as follows:
-> 
-> void my_sig(int sig)
-> {
->         printf("sig=%d\n", sig);
->         *(int *)0 = 0x0;
-> }
-> 
-> void func2(int num)
-> {
->         printf("%s: %d\n", __FUNCTION__, num);
->         *(int *)0 = 0x0;
->         func2(num-1);
-> }
-> 
-> void func1(int num)
-> {
->         printf("%s\n", __FUNCTION__);
->         func2(num - 1);
-> }
-> 
-> int main(int argc, char **argv)
-> {
->         signal(11, my_sig);
->         func1(argc);
->         return 0;
-> }
-> 
-> This patch fix this by passing the correct offset of fp to
-> setup_return.
-> Test pass on both ILP32 and LP64 in aarch64 EE.
-> 
-> Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
-> ---
->  arch/arm64/include/asm/signal_common.h | 3 ++-
->  arch/arm64/kernel/signal.c             | 9 +++++----
->  arch/arm64/kernel/signal_ilp32.c       | 4 ++--
->  3 files changed, 9 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
-> index de93c71..a5d7b63 100644
-> --- a/arch/arm64/include/asm/signal_common.h
-> +++ b/arch/arm64/include/asm/signal_common.h
-> @@ -29,6 +29,7 @@ int setup_sigcontex(struct sigcontext __user *uc_mcontext,
->  		    struct pt_regs *regs);
->  int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
->  void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-> -			void __user *frame, off_t sigframe_off, int usig);
-> +			void __user *frame, off_t sigframe_off, off_t fp_off,
-> +			int usig); 
-> 
->  #endif /* __ASM_SIGNAL_COMMON_H */
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index 038bebe..e66a6e9 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -256,14 +256,14 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
->  }
-> 
->  void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-> -			 void __user *frame, off_t sigframe_off, int usig)
-> +			 void __user *frame, off_t sigframe_off, off_t fp_off,
-> +			 int usig)
->  {
->  	__sigrestore_t sigtramp;
-> 
->  	regs->regs[0] = usig;
->  	regs->sp = (unsigned long)frame;
-> -	regs->regs[29] = regs->sp + sigframe_off +
-> -		offsetof(struct sigframe, fp);
-> +	regs->regs[29] = regs->sp + sigframe_off + fp_off;
+> The tx_dirty cannot wrap since I always keep an empty slot. (tx_slot cannot go equal or after tx_dirty)
 
-I think you are right here. The only nitpick is what for we send 2
-offsets just to add one to another inside setup_return()?
-We can do like this:
+OK, fair enough.
 
-        void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-        			 void __user *frame, off_t fp_off, int usig)
-        {
-        	__sigrestore_t sigtramp;
-        
-        	regs->regs[0] = usig;
-        	regs->sp = (unsigned long)frame;
-        	regs->regs[29] = regs->sp + fp_off;
-                [...]
-        }
+> 
+>>> +/* Grab a frame into a skb from descriptor number i */
+>>> +static int sun8i_emac_rx_from_ddesc(struct net_device *ndev, int i)
+>>> +{
+>>> +	struct sk_buff *skb;
+>>> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
+>>> +	struct dma_desc *ddesc = priv->dd_rx + i;
+>>> +	int frame_len;
+>>> +	int crc_checked = 0;
+>>> +
+>>> +	if (ndev->features & NETIF_F_RXCSUM)
+>>> +		crc_checked = 1;
+>>
+>> Assuming CRC here refers to the Ethernet frame's FCS, then this is
+>> absolutely not how NETIF_F_RXCSUM works. NETIF_F_RXCSUM is about your
+>> Ethernet adapter supporting L3/L4 checksum offloads, while the Ethernet
+>> FCS is pretty much mandatory for the frame to be properly received in
+>> the first place. Can you clarify which way it is?
+>>
+> 
+> No CRC here is RXCSUM. I understand the misnaming.
+> I will rename the variable to rxcsum_done.
 
-Where fp_off calculation is done by caller. 
+Thanks
 
-	setup_return(regs, &ksig->ka, frame,
-		offsetof(struct rt_sigframe, sig) + offsetof(struct sigframe, fp),
-                usig);
+> 
+>>> +
+>>> +	priv->ndev->stats.rx_packets++;
+>>> +	priv->ndev->stats.rx_bytes += frame_len;
+>>> +	priv->rx_sk[i] = NULL;
+>>> +
+>>> +	/* this frame is not the last */
+>>> +	if ((ddesc->status & BIT(8)) == 0) {
+>>> +		dev_warn(priv->dev, "Multi frame not implemented currlen=%d\n",
+>>> +			 frame_len);
+>>> +	}
+>>> +
+>>> +	sun8i_emac_rx_sk(ndev, i);
+>>> +
+>>> +	netif_rx(skb);
+>>
+>> netif_receive_skb() at the very least, or if you implement NAPI, like
+>> you shoud napi_gro_receive().
+>>
+> 
+> netif_receive_skb documentation say
+> "This function may only be called from softirq context and interrupts should be enabled."
+> but the calling functions is in hardirq context.
 
-For me it's more clear to understand what happens with this approach.
-I don't think struct rt_sigframe will grow, but we can even introduce
-some helper for it:
-        #define RT_SIGFRAME_FP_POS (offsetof(struct rt_sigframe, sig) + offsetof(struct sigframe, fp))
+Well, yes, because you are not implementing NAPI, while you should, you
+execute in hard interrupt context. Once you move to NAPI, you can and
+should use netif_receive_skb().
 
-If no objections, I'll apply your patch with my fix in next series.
+> 
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +/* Cycle over RX DMA descriptors for finding frame to receive
+>>> + */
+>>> +static int sun8i_emac_receive_all(struct net_device *ndev)
+>>> +{
+>>> +	struct sun8i_emac_priv *priv = netdev_priv(ndev);
+>>> +	struct dma_desc *ddesc;
+>>> +
+>>> +	ddesc = priv->dd_rx + priv->rx_dirty;
+>>> +	while (!(ddesc->status & BIT(31))) {
+>>> +		sun8i_emac_rx_from_ddesc(ndev, priv->rx_dirty);
+>>> +		rb_inc(&priv->rx_dirty, nbdesc_rx);
+>>> +		ddesc = priv->dd_rx + priv->rx_dirty;
+>>> +	};
+>>
+>> So, what if we ping flood your device here, is not there a remote chance
+>> that we keep the RX interrupt so busy we can't break out of this loop,
+>> and we are executing from hard IRQ context, that's bad.
+>>
+> 
+> I have added a start variable for preventing to do more than a full loop.
 
->  	regs->pc = (unsigned long)ka->sa.sa_handler;
+Which gets you close to a proper NAPI implementation, good.
+
 > 
->  	if (ka->sa.sa_flags & SA_RESTORER)
-> @@ -294,7 +294,8 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
->  	err |= setup_sigframe(&frame->sig, regs, set);
->  	if (err == 0) {
->  		setup_return(regs, &ksig->ka, frame,
-> -			offsetof(struct rt_sigframe, sig), usig);
-> +			offsetof(struct rt_sigframe, sig),
-> +			offsetof(struct sigframe, fp), usig);
->  		if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
->  			err |= copy_siginfo_to_user(&frame->info, &ksig->info);
->  			regs->regs[1] = (unsigned long)&frame->info;
-> diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
-> index a8ea73e..9030f14 100644
-> --- a/arch/arm64/kernel/signal_ilp32.c
-> +++ b/arch/arm64/kernel/signal_ilp32.c
-> @@ -147,7 +147,6 @@ static struct ilp32_rt_sigframe __user *ilp32_get_sigframe(struct ksignal *ksig,
->  	struct ilp32_rt_sigframe __user *frame;
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +/* iterate over dma_desc for finding completed xmit.
+>>> + * Called from interrupt context, so no need to spinlock tx
+>>
+>> Humm, well it depends if what you are doing here may race with
+>> ndo_start_xmit(), and usually it does.
+>>
 > 
->  	sp = sp_top = sigsp(regs->sp, ksig);
-> -
->  	sp = (sp - sizeof(struct ilp32_rt_sigframe)) & ~15;
->  	frame = (struct ilp32_rt_sigframe __user *)sp;
+> I believe that how it is designed it cannot race each over (access the same descriptor slot) since I keep a free slot between each other.
 > 
-> @@ -183,7 +182,8 @@ int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
->  	err |= setup_ilp32_sigframe(&frame->sig, regs, set);
->  	if (err == 0) {
->  		setup_return(regs, &ksig->ka, frame,
-> -			     offsetof(struct ilp32_rt_sigframe, sig), usig);
-> +			     offsetof(struct ilp32_rt_sigframe, sig),
-> +			     offsetof(struct ilp32_sigframe, fp), usig);
->  		regs->regs[1] = (unsigned long)&frame->info;
->  		regs->regs[2] = (unsigned long)&frame->sig.uc;
->  	}
-> -- 
-> 1.8.4.5
+>> Also, you should consider completing TX packets in NAPI context (soft
+>> IRQ) instead of hard IRQs like here.
+>>
 > 
-> Regards
+> I wanted to finish this driver the "old" way (with hard IRQ) and implementing NAPI after as a Kconfig choice.
+> Does NAPI is mandatory now ? (or really recommended)
+> For resuming my understanding, NAPI is good when expecting high traffic. (so my Kconfig idea)
+> If you say that NAPI is really preferable, I will do it.
+
+It's not preferable it's just mandatory here, no recent network driver
+does not implement it, and it works well for both low and high traffic.
+
 > 
-> Bamvor
+>>> +	/* last descriptor point back to first one */
+>>> +	ddesc--;
+>>> +	ddesc->next = (u32)priv->dd_rx_phy;
+>>
+>> So is there a limitation of this hardware that can only do DMA within
+>> the first 4GB of the system?
+>>
 > 
+> Yes, I have added all DMA stuff for handling that after apritzel review.
+
+Is your platform_device's DMA mask properly set then, you don't seem to
+be taking any precautions in the driver probe's function to force a
+32-bits DMA mask anywhere, should not you?
+
 > 
+>>> +static int sun8i_emac_check_if_running(struct net_device *ndev)
+>>> +{
+>>> +	if (!netif_running(ndev))
+>>> +		return -EBUSY;
+>>
+>> This does not seem like the intended usage of a
+>>
+> 
+> I have changed the return code after reading other drivers.
+> But could you end your sentence for be sure that the problem is that.
+
+Meant to say that it's not the intended usage of an ethtool_opts::begin
+function, those would usually turn on a clock (if the clock was turned
+off) in preparation for the real operation to program the HW for instance.
+
+> 
+>>> +
+>>> +static int sun8i_emac_remove(struct platform_device *pdev)
+>>> +{
+>>> +	struct net_device *ndev = platform_get_drvdata(pdev);
+>>> +
+>>> +	unregister_netdev(ndev);
+>>> +	platform_set_drvdata(pdev, NULL);
+>>
+>> Missing unregister_netdevice() here.
+>>
+> 
+> Does I need to replace unregister_netdev by it ?
+> They seems to to the same job.
+
+Missed the unregister_netdev(), everything's fine, my bad.
+-- 
+Florian
