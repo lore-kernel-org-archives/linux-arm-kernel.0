@@ -1,206 +1,50 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Sun, 12 Jun 2016 21:12:06 +0800
-Subject: [PATCH 21/23] arm64: ilp32: introduce ilp32-specific handlers for
- sigframe and ucontext
-In-Reply-To: <5752BCC8.7080205@huawei.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-22-git-send-email-ynorov@caviumnetworks.com>
- <5752BCC8.7080205@huawei.com>
-Message-ID: <575D5FA6.1050702@huawei.com>
+From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
+Date: Sun, 12 Jun 2016 15:20:45 +0200
+Subject: [PATCH 1/2] ARM: dts: imx6q-cm-fx6: fix the operation points
+Message-ID: <6b48c849983548f29259b42d69c5224c@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Valentin Raevsky <valentin@compulab.co.il>
 
-On 2016/6/4 19:34, Zhangjian (Bamvor) wrote:
-> Hi,
->
-> I found an issue of unwind with the following code. The correct backtrace
-> should be:
-> (gdb) where
-> #0 0x004004d0 in my_sig (sig=11) at test_force3.c:16
-> #1 <signal handler called>
-> #2 func2 (num=0) at test_force3.c:22
-> #3 0x00400540 in func1 (num=1) at test_force3.c:28
-> #4 0x00400574 in main (argc=1, argv=0xffd7bc04) at test_force3.c:33
->
-> Without my patch, the backtrace is:
-> (gdb) where
-> #0 0x00400490 in my_sig (sig=11) at test_force3.c:16
-> #1 <signal handler called>
-> #2 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
->
-> With my patch which fix the wrong frame pointer(setup_return calculate the offset
-> of fp through ilp32_sigframe instead of sigfreame), the backtrace is:
-> (gdb) where
-> #0 0x00400490 in my_sig (sig=11) at test_force3.c:16
-> #1 <signal handler called>
-> #2 func1 () at test_force3.c:28
-> #3 0x004004e4 in main (argc=1, argv=0xffe6f8f4) at test_force3.c:33
->
-> I am not sure there is still some issue in kernel. But it seem that the gdb of ilp32
-> does not work correctly when unwind without framepointer.
-I confirm that the reason why gdb could not unwind the func2 is gdb do not get the
-correct offset of uc_mcontext.
-And it seems that the kernel part is a reasonable fix for me.
+Fix the cm-fx6 operation points. Remove settings for 1.2GHz.
+The current ldo settings do not allow 1.2GHz cpu frequency.
 
-Regards
+Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
+[christopher.spinrath at rwth-aachen.de: rebased on upstream and adapted
+ commit title]
+Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+---
+ arch/arm/boot/dts/imx6q-cm-fx6.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Bamvor
->
-> The test code is:
->
-> #include <stdio.h>
-> #include <stdlib.h>
-> #include <unistd.h>
-> #include <signal.h>
->
-> void my_sig(int sig)
-> {
->      printf("sig=%d\n", sig);
->      *(int *)0 = 0x0;
-> }
->
->
-> void func2()
-> {
->      *(int *)0 = 0x0;
-> }
->
-> void func1()
-> {
->      func2();
-> }
->
-> int main(int argc, char **argv)
-> {
->      signal(11, my_sig);
->      func1();
->      return 0;
-> }
->
->
-> The full patch is as follows:
->
->  From 7e364a765097f57aed2d73f94c1688c2e7343e79 Mon Sep 17 00:00:00 2001
-> From: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
-> Date: Sat, 4 Jun 2016 14:30:05 +0800
-> Subject: [PATCH] arm64: ilp32: fix for wrong fp offset when calculate the
->   new fp
->
-> ILP32 define its own sigframe(ilp32_sigframe) because of the
-> difference uc_context. setup_return do not use ilp32 specific
-> sigframe to calculate the new offset of fp which lead to wrong
-> fp in signal handler. At this circumstance, gdb backtrace will miss
-> one item:
-> (gdb) where
->
-> It should be:
-> (gdb) where
->
-> The test code is as follows:
->
-> void my_sig(int sig)
-> {
->          printf("sig=%d\n", sig);
->          *(int *)0 = 0x0;
-> }
->
-> void func2(int num)
-> {
->          printf("%s: %d\n", __FUNCTION__, num);
->          *(int *)0 = 0x0;
->          func2(num-1);
-> }
->
-> void func1(int num)
-> {
->          printf("%s\n", __FUNCTION__);
->          func2(num - 1);
-> }
->
-> int main(int argc, char **argv)
-> {
->          signal(11, my_sig);
->          func1(argc);
->          return 0;
-> }
->
-> This patch fix this by passing the correct offset of fp to
-> setup_return.
-> Test pass on both ILP32 and LP64 in aarch64 EE.
->
-> Signed-off-by: Bamvor Jian Zhang <bamvor.zhangjian@huawei.com>
-> ---
->   arch/arm64/include/asm/signal_common.h | 3 ++-
->   arch/arm64/kernel/signal.c             | 9 +++++----
->   arch/arm64/kernel/signal_ilp32.c       | 4 ++--
->   3 files changed, 9 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/signal_common.h b/arch/arm64/include/asm/signal_common.h
-> index de93c71..a5d7b63 100644
-> --- a/arch/arm64/include/asm/signal_common.h
-> +++ b/arch/arm64/include/asm/signal_common.h
-> @@ -29,6 +29,7 @@ int setup_sigcontex(struct sigcontext __user *uc_mcontext,
->               struct pt_regs *regs);
->   int restore_sigcontext(struct pt_regs *regs, struct sigcontext __user *sf);
->   void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-> -            void __user *frame, off_t sigframe_off, int usig);
-> +            void __user *frame, off_t sigframe_off, off_t fp_off,
-> +            int usig);
->
->   #endif /* __ASM_SIGNAL_COMMON_H */
-> diff --git a/arch/arm64/kernel/signal.c b/arch/arm64/kernel/signal.c
-> index 038bebe..e66a6e9 100644
-> --- a/arch/arm64/kernel/signal.c
-> +++ b/arch/arm64/kernel/signal.c
-> @@ -256,14 +256,14 @@ static struct rt_sigframe __user *get_sigframe(struct ksignal *ksig,
->   }
->
->   void setup_return(struct pt_regs *regs, struct k_sigaction *ka,
-> -             void __user *frame, off_t sigframe_off, int usig)
-> +             void __user *frame, off_t sigframe_off, off_t fp_off,
-> +             int usig)
->   {
->       __sigrestore_t sigtramp;
->
->       regs->regs[0] = usig;
->       regs->sp = (unsigned long)frame;
-> -    regs->regs[29] = regs->sp + sigframe_off +
-> -        offsetof(struct sigframe, fp);
-> +    regs->regs[29] = regs->sp + sigframe_off + fp_off;
->       regs->pc = (unsigned long)ka->sa.sa_handler;
->
->       if (ka->sa.sa_flags & SA_RESTORER)
-> @@ -294,7 +294,8 @@ static int setup_rt_frame(int usig, struct ksignal *ksig, sigset_t *set,
->       err |= setup_sigframe(&frame->sig, regs, set);
->       if (err == 0) {
->           setup_return(regs, &ksig->ka, frame,
-> -            offsetof(struct rt_sigframe, sig), usig);
-> +            offsetof(struct rt_sigframe, sig),
-> +            offsetof(struct sigframe, fp), usig);
->           if (ksig->ka.sa.sa_flags & SA_SIGINFO) {
->               err |= copy_siginfo_to_user(&frame->info, &ksig->info);
->               regs->regs[1] = (unsigned long)&frame->info;
-> diff --git a/arch/arm64/kernel/signal_ilp32.c b/arch/arm64/kernel/signal_ilp32.c
-> index a8ea73e..9030f14 100644
-> --- a/arch/arm64/kernel/signal_ilp32.c
-> +++ b/arch/arm64/kernel/signal_ilp32.c
-> @@ -147,7 +147,6 @@ static struct ilp32_rt_sigframe __user *ilp32_get_sigframe(struct ksignal *ksig,
->       struct ilp32_rt_sigframe __user *frame;
->
->       sp = sp_top = sigsp(regs->sp, ksig);
-> -
->       sp = (sp - sizeof(struct ilp32_rt_sigframe)) & ~15;
->       frame = (struct ilp32_rt_sigframe __user *)sp;
->
-> @@ -183,7 +182,8 @@ int ilp32_setup_rt_frame(int usig, struct ksignal *ksig,
->       err |= setup_ilp32_sigframe(&frame->sig, regs, set);
->       if (err == 0) {
->           setup_return(regs, &ksig->ka, frame,
-> -                 offsetof(struct ilp32_rt_sigframe, sig), usig);
-> +                 offsetof(struct ilp32_rt_sigframe, sig),
-> +                 offsetof(struct ilp32_sigframe, fp), usig);
->           regs->regs[1] = (unsigned long)&frame->info;
->           regs->regs[2] = (unsigned long)&frame->sig.uc;
->       }
+diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+index 6d8d5e9..c912d58 100644
+--- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
++++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+@@ -91,6 +91,23 @@
+ 	};
+ };
+ 
++&cpu0 {
++	operating-points = <
++		/* kHz	uV */
++		996000	1250000
++		852000	1250000
++		792000	1150000
++		396000	975000
++	>;
++	fsl,soc-operating-points = <
++		/* ARM kHz	SOC-PU uV */
++		996000		1250000
++		852000		1250000
++		792000		1175000
++		396000		1175000
++	>;
++};
++
+ &ecspi1 {
+ 	fsl,spi-num-chipselects = <2>;
+ 	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio3 19 GPIO_ACTIVE_HIGH>;
+-- 
+2.8.3
