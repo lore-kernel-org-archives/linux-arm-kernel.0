@@ -1,85 +1,90 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 12 Jun 2016 13:21:20 +0200
-Subject: [GIT PULL] ARM: at91: dt for 4.8 #1
-Message-ID: <20160612112120.GA25664@piout.net>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Sun, 12 Jun 2016 13:22:23 +0200
+Subject: [linux-sunxi] [PATCH 0/5] net-next: ethernet: add sun8i-emac
+ driver
+In-Reply-To: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <c8037d93-1d12-fdfb-a88b-e88ff0f72d52@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof, Kevin,
+Hi,
 
-First DT changes for 4.8 with the addition of a new board and a cleanup
-of unused clock definitions.
+On 03-06-16 11:56, LABBE Corentin wrote:
+> Hello
+>
+> This patch series add the driver for sun8i-emac which handle the Ethernet MAC
+> present on Allwinner H3/A83T/A64 SoCs.
+>
+> It supports 10/100/1000 Mbit/s speed with half/full duplex.
+> It can use an internal PHY (MII 10/100) or an external PHY
+> via RGMII/RMII.
+>
+> This patch series enable the driver only for the H3 SoC since A83T and A64
+> doesn't have the necessary clocks present in mainline.
+>
+> This patch series enable the driver only for the OrangePiPC board since other
+> board with H3 use external PHY which need optional regulators that will be
+> supported later.
+>
+> The driver have been tested on the following boards:
+> - H3 Orange PI PC, Orange PI Plus, BananaPI-M2+
+> - A64 Pine64
+> - A83T BananaPI-M3
+>
+> I would like to thanks Chen-Yu Tsai for his help on developing this driver.
 
-The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
+Awesome! Thanks for your work on this.
 
-  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
+I've tested this on a orangepi-one. You can add my:
 
-are available in the git repository at:
+Tested-by: Hans de Goede <hdegoede@redhat.com>
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-dt
+For the next version of this series.
 
-for you to fetch changes up to 64c0703e269d442f0406b34e64e23744151ea276:
+Attached is a dts patch for adding support
+for the emac one that one (to be applied on top of this patch-set).
 
-  ARM: dts: at91: calao: remove leftovers clock definition (2016-06-10 16:59:30 +0200)
+I've a Orange PI Plus and a Orange PI 2 as well, both of which use an external
+phy, I would love to test on those as well, do you've a tree with adds the
+necessary regulator bits and an example of how this would like in dts
+somewhere ?
 
-----------------------------------------------------------------
-DT Changes for 4.8:
- - New board: Olimex SAM9-L9260
- - Fix crystal definitions for Denx ma5d4
- - Remove leftover clock definitions
- - Add stdout-path for usb_a9260/a9g20
+One remark about:
+[PATCH 5/5] ARM: dts: sun8i: Enable sun8i-emac on the Orange PI PC
 
-----------------------------------------------------------------
-Alexandre Belloni (10):
-      ARM: dts: at91: usb_a9g20: use stdout-path
-      ARM: dts: at91: ma5d4: properly define crystals frequencies
-      ARM: dts: at91: animeo_ip: remove leftovers clock definition
-      ARM: dts: at91: at91-ariag25: remove leftovers clock definition
-      ARM: dts: at91: at91-cosino: remove leftovers clock definition
-      ARM: dts: at91: at91-foxg20: remove leftovers clock definition
-      ARM: dts: at91: ge863-pro3: remove leftovers clock definition
-      ARM: dts: at91: mpa1600: remove leftovers clock definition
-      ARM: dts: at91: pm9g45: remove leftovers clock definition
-      ARM: dts: at91: calao: remove leftovers clock definition
+We always keep the nodes in board.dts files sorted alphebetically,
+so the emac node should be after the ehci node rather then at the end.
 
-Raashid Muhammed (2):
-      ARM: dts: at91: at91sam9260: Remove leading zeros in OHCI node.
-      ARM: dts: at91: Add DT support for Olimex SAM9-L9260 board.
+Regards,
 
- Documentation/devicetree/bindings/arm/olimex.txt |   8 +-
- arch/arm/boot/dts/Makefile                       |   1 +
- arch/arm/boot/dts/aks-cdu.dts                    |   2 +-
- arch/arm/boot/dts/animeo_ip.dts                  |  11 +--
- arch/arm/boot/dts/at91-ariag25.dts               |   9 --
- arch/arm/boot/dts/at91-cosino.dtsi               |   9 --
- arch/arm/boot/dts/at91-foxg20.dts                |  11 +--
- arch/arm/boot/dts/at91-kizbox.dts                |   2 +-
- arch/arm/boot/dts/at91-qil_a9260.dts             |  11 +--
- arch/arm/boot/dts/at91-sam9_l9260.dts            | 115 +++++++++++++++++++++++
- arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi        |   7 +-
- arch/arm/boot/dts/at91sam9260.dtsi               |   2 +-
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi      |   2 +-
- arch/arm/boot/dts/ethernut5.dts                  |   2 +-
- arch/arm/boot/dts/evk-pro3.dts                   |   2 +-
- arch/arm/boot/dts/ge863-pro3.dtsi                |   9 --
- arch/arm/boot/dts/mpa1600.dts                    |   9 --
- arch/arm/boot/dts/pm9g45.dts                     |   9 --
- arch/arm/boot/dts/tny_a9260_common.dtsi          |   9 --
- arch/arm/boot/dts/tny_a9263.dts                  |   9 --
- arch/arm/boot/dts/usb_a9260_common.dtsi          |  11 +--
- arch/arm/boot/dts/usb_a9263.dts                  |   9 --
- arch/arm/boot/dts/usb_a9g20_common.dtsi          |   3 +-
- 23 files changed, 139 insertions(+), 123 deletions(-)
- create mode 100644 arch/arm/boot/dts/at91-sam9_l9260.dts
+Hans
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+> Regards
+>
+> LABBE Corentin (5):
+>   ethernet: add sun8i-emac driver
+>   MAINTAINERS: Add myself as maintainers of sun8i-emac
+>   ARM: sun8i: dt: Add DT bindings documentation for Allwinner sun8i-emac
+>   ARM: dts: sun8i-h3: add sun8i-emac ethernet driver
+>   ARM: dts: sun8i: Enable sun8i-emac on the Orange PI PC
+>
+>  .../bindings/net/allwinner,sun8i-emac.txt          |   64 +
+>  MAINTAINERS                                        |    6 +
+>  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |   11 +
+>  arch/arm/boot/dts/sun8i-h3.dtsi                    |   14 +
+>  drivers/net/ethernet/allwinner/Kconfig             |   13 +
+>  drivers/net/ethernet/allwinner/Makefile            |    1 +
+>  drivers/net/ethernet/allwinner/sun8i-emac.c        | 1943 ++++++++++++++++++++
+>  7 files changed, 2052 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
+>  create mode 100644 drivers/net/ethernet/allwinner/sun8i-emac.c
+>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
+Name: 0001-ARM-dts-sun8i-Enable-sun8i-emac-on-the-Orange-PI-One.patch
+Type: text/x-patch
+Size: 1061 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/2e4686cd/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/44eec570/attachment-0001.bin>
