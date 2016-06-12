@@ -1,16 +1,14 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 12 Jun 2016 13:03:57 +0200
+Date: Sun, 12 Jun 2016 13:07:03 +0200
 Subject: [GIT PULL] ARM: at91: soc for 4.8 #1
-Message-ID: <20160612110357.GA24644@piout.net>
+Message-ID: <20160612110703.GA24734@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Arnd, Olof, Kevin,
 
-This is a rework of the DEBUG_LL stuff for at91 to solve an issue with
-multi_v7.
-
-Thanks!
+We finally get a driver for the EBI. It will hopefully allow to avoid
+relying on the bootloader for the EBI configuration.
 
 The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
@@ -18,34 +16,30 @@ The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-soc
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-drivers
 
-for you to fetch changes up to 8b2f2d0356184cc7c409b2f046c550ce00ca8f70:
+for you to fetch changes up to 1fdab21d1d52a85c31f932844242fec5fb81daac:
 
-  ARM: at91: debug: add default DEBUG_LL addresses (2016-06-10 17:09:28 +0200)
-
-----------------------------------------------------------------
-SoC changes for 4.8:
- - Solve an issue with DEBUG_LL and multi_v7
- - Also make DEBUG_LL more user friendly
+  memory: atmel-ebi: add DT bindings documentation (2016-06-02 08:32:25 +0200)
 
 ----------------------------------------------------------------
-Alexandre Belloni (2):
-      ARM: at91: debug: use DEBUG_UART_VIRT
-      ARM: at91: debug: add default DEBUG_LL addresses
+Drivers for 4.8:
+ - Add a driver for the EBI
 
- arch/arm/Kconfig.debug        | 61 ++++++++++++++++++++++++++++++++-----------
- arch/arm/include/debug/at91.S | 10 +------
- 2 files changed, 47 insertions(+), 24 deletions(-)
+----------------------------------------------------------------
+Boris Brezillon (2):
+      memory: add Atmel EBI (External Bus Interface) driver
+      memory: atmel-ebi: add DT bindings documentation
+
+ .../bindings/memory-controllers/atmel,ebi.txt      | 136 ++++
+ drivers/memory/Kconfig                             |  11 +
+ drivers/memory/Makefile                            |   1 +
+ drivers/memory/atmel-ebi.c                         | 771 +++++++++++++++++++++
+ 4 files changed, 919 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/memory-controllers/atmel,ebi.txt
+ create mode 100644 drivers/memory/atmel-ebi.c
 
 -- 
 Alexandre Belloni, Free Electrons
 Embedded Linux, Kernel and Android engineering
 http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/066756ed/attachment.sig>
