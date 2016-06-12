@@ -1,123 +1,132 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 12 Jun 2016 10:54:08 +0800
-Subject: [PATCH 1/7] ARM: dts: imx25-pdk: Switch using simple-audio-card
- for audio support
-In-Reply-To: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
-References: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20160612025408.GX20243@tiger>
+Date: Sun, 12 Jun 2016 10:57:35 +0800
+Subject: [PATCH] ARM: dts: imx6qdl-sabresd: Remove regulators under
+ 'simple-bus'
+In-Reply-To: <1465681756-5286-1-git-send-email-festevam@gmail.com>
+References: <1465681756-5286-1-git-send-email-festevam@gmail.com>
+Message-ID: <20160612025735.GY20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 11, 2016 at 08:02:19AM +0300, Alexander Shiyan wrote:
-> The sound support can be handled by "simple-audio-card" instead of
-> use a private driver.
+On Sat, Jun 11, 2016 at 06:49:16PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-
-Did you get a chance to test the change on any of the boards you are
-touching here?
-
-> ---
->  arch/arm/boot/dts/imx25-pdk.dts | 51 ++++++++++++++++++++++++++++++++++-------
->  1 file changed, 43 insertions(+), 8 deletions(-)
+> Device-tree folks do not like the idea of placing regulators nodes
+> under 'simple-bus'.
 > 
-> diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
-> index 9351296..8fe2f5a 100644
-> --- a/arch/arm/boot/dts/imx25-pdk.dts
-> +++ b/arch/arm/boot/dts/imx25-pdk.dts
-> @@ -12,6 +12,8 @@
->  /dts-v1/;
->  #include <dt-bindings/gpio/gpio.h>
->  #include <dt-bindings/input/input.h>
-> +#include <dt-bindings/sound/fsl-imx-audmux.h>
-> +
->  #include "imx25.dtsi"
->  
->  / {
-> @@ -64,17 +66,29 @@
->  	};
->  
->  	sound {
-> -		compatible = "fsl,imx25-pdk-sgtl5000",
-> -			     "fsl,imx-audio-sgtl5000";
-> -		model = "imx25-pdk-sgtl5000";
-> -		ssi-controller = <&ssi1>;
-> -		audio-codec = <&codec>;
-> -		audio-routing =
-> +		compatible = "simple-audio-card";
-> +		simple-audio-card,name = "imx25-pdk-sgtl5000";
-> +		simple-audio-card,format = "i2s";
-> +		simple-audio-card,bitclock-master = <&master>;
-> +		simple-audio-card,frame-master = <&master>;
-> +		simple-audio-card,widgets =
-> +			"Microphone", "Mic Jack",
-> +			"Line", "Line In Jack",
-> +			"Headphone", "Headphone Jack",
-> +			"Speaker", "Line Out Jack",
-> +			"Speaker", "Ext Spk";
-> +		simple-audio-card,routing =
->  			"MIC_IN", "Mic Jack",
->  			"Mic Jack", "Mic Bias",
->  			"Headphone Jack", "HP_OUT";
-> -		mux-int-port = <1>;
-> -		mux-ext-port = <4>;
-> +
-> +		simple-audio-card,cpu {
-> +			sound-dai = <&ssi1>;
-> +		};
-> +
-> +		master: simple-audio-card,codec {
-> +			sound-dai = <&codec>;
-> +		};
->  	};
->  
->  	wvga: display {
-> @@ -103,6 +117,26 @@
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_audmux>;
->  	status = "okay";
-> +
-> +	audmux_ssi0 {
+> Move them out of 'simple-bus'.
+> 
+> Also use the convention: reg_xxxx: regulator-xxxx
+> for the regulator names.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-We generally use underscore in label and hyphen in node name.
+If you would like to do this, please do it in a single patch to convert
+all i.MX dts files over to the new style.
 
 Shawn
 
-> +		fsl,audmux-port = <0>;
-> +		fsl,port-config = <
-> +			(IMX_AUDMUX_V2_PTCR_TFSDIR |
-> +			IMX_AUDMUX_V2_PTCR_TFSEL(3) |
-> +			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-> +			IMX_AUDMUX_V2_PTCR_TCSEL(3) |
-> +			IMX_AUDMUX_V2_PTCR_SYN)
-> +			IMX_AUDMUX_V2_PDCR_RXDSEL(3)
-> +		>;
-> +	};
-> +
-> +	audmux_aud4 {
-> +		fsl,audmux-port = <3>;
-> +		fsl,port-config = <
-> +			IMX_AUDMUX_V2_PTCR_SYN
-> +			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
-> +		>;
-> +	};
->  };
+> ---
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi | 78 +++++++++++++++-------------------
+>  1 file changed, 34 insertions(+), 44 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index 5248e7b..8453721 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -22,53 +22,43 @@
+>  		reg = <0x10000000 0x40000000>;
+>  	};
 >  
->  &can1 {
-> @@ -136,6 +170,7 @@
->  	status = "okay";
+> -	regulators {
+> -		compatible = "simple-bus";
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -
+> -		reg_usb_otg_vbus: regulator at 0 {
+> -			compatible = "regulator-fixed";
+> -			reg = <0>;
+> -			regulator-name = "usb_otg_vbus";
+> -			regulator-min-microvolt = <5000000>;
+> -			regulator-max-microvolt = <5000000>;
+> -			gpio = <&gpio3 22 0>;
+> -			enable-active-high;
+> -			vin-supply = <&swbst_reg>;
+> -		};
+> +	reg_usb_otg_vbus: regulator-usb-otg-vbus {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb_otg_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio3 22 0>;
+> +		enable-active-high;
+> +		vin-supply = <&swbst_reg>;
+> +	};
 >  
->  	codec: sgtl5000 at 0a {
-> +		#sound-dai-cells = <0>;
->  		compatible = "fsl,sgtl5000";
->  		reg = <0x0a>;
->  		clocks = <&clks 129>;
+> -		reg_usb_h1_vbus: regulator at 1 {
+> -			compatible = "regulator-fixed";
+> -			reg = <1>;
+> -			regulator-name = "usb_h1_vbus";
+> -			regulator-min-microvolt = <5000000>;
+> -			regulator-max-microvolt = <5000000>;
+> -			gpio = <&gpio1 29 0>;
+> -			enable-active-high;
+> -			vin-supply = <&swbst_reg>;
+> -		};
+> +	reg_usb_h1_vbus: regulator-usb-h1-vbus {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "usb_h1_vbus";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio1 29 0>;
+> +		enable-active-high;
+> +		vin-supply = <&swbst_reg>;
+> +	};
+>  
+> -		reg_audio: regulator at 2 {
+> -			compatible = "regulator-fixed";
+> -			reg = <2>;
+> -			regulator-name = "wm8962-supply";
+> -			gpio = <&gpio4 10 0>;
+> -			enable-active-high;
+> -		};
+> +	reg_audio: regulator-audio {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "wm8962-supply";
+> +		gpio = <&gpio4 10 0>;
+> +		enable-active-high;
+> +	};
+>  
+> -		reg_pcie: regulator at 3 {
+> -			compatible = "regulator-fixed";
+> -			reg = <3>;
+> -			pinctrl-names = "default";
+> -			pinctrl-0 = <&pinctrl_pcie_reg>;
+> -			regulator-name = "MPCIE_3V3";
+> -			regulator-min-microvolt = <3300000>;
+> -			regulator-max-microvolt = <3300000>;
+> -			gpio = <&gpio3 19 0>;
+> -			regulator-always-on;
+> -			enable-active-high;
+> -		};
+> +	reg_pcie: regulator-pcie {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_pcie_reg>;
+> +		regulator-name = "MPCIE_3V3";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio3 19 0>;
+> +		regulator-always-on;
+> +		enable-active-high;
+>  	};
+>  
+>  	gpio-keys {
 > -- 
-> 2.4.9
+> 1.9.1
 > 
 > 
 > _______________________________________________
 > linux-arm-kernel mailing list
 > linux-arm-kernel at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
