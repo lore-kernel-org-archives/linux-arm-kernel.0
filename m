@@ -1,56 +1,51 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 12 Jun 2016 17:28:23 +0800
-Subject: [RESEND/PATCHv4 v4 3/3] firmware: Support loading into a
- pre-allocated buffer
-In-Reply-To: <20160607164741.31849-4-stephen.boyd@linaro.org>
-Message-ID: <201606121736.x3UpVTjF%fengguang.wu@intel.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Sun, 12 Jun 2016 17:48:33 +0800
+Subject: [PATCH] clk: rockchip: add pclk_vio_grf to critical clock on the
+ RK3399
+Message-ID: <1465724913-14553-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The pclk_vio_grf supply power for GRF IOs, if it is disabled, will
+cause abnormal operation of the GRF.
 
-[auto build test ERROR on driver-core/driver-core-testing]
-[also build test ERROR on v4.7-rc2]
-[cannot apply to next-20160609]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+The clock tree of the pclk_vio like this:
+             | --> pclk_vio_grf
+... pclk_vio | --> pclk_mipi_dsi1
+             | --> pclk_mipi_dsi0
 
-url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/firmware-Consolidate-kmap-read-write-logic/20160607-164005
-config: x86_64-randconfig-v0-06121632 (attached as .config)
-compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+and the pclk_mipi_dsi0 and pclk_mipi_dsi1 don't have the flag
+CLK_IGNORE_UNUSED, and they will be disabled by clk_disable_unused
+when startup:
+clk_disable_unused
+  --> clk_disable_unprepare
+    --> clk_disable
+      --> clk_core_disable(core->parent)
 
-All errors (new ones prefixed by >>):
+then, the pclk_vio_grf also is disabled. Therefore, we need to add
+pclk_vio_grf to critical clock and avoid to disable pclk_vio and
+pclk_vio_grf.
 
-   In file included from drivers/video/fbdev/metronomefb.c:33:0:
->> include/linux/firmware.h:82:1: error: expected identifier or '(' before '{' token
-    {
-    ^
-   include/linux/firmware.h:80:19: warning: 'request_firmware_into_buf' declared 'static' but never defined [-Wunused-function]
-    static inline int request_firmware_into_buf(const struct firmware **firmware_p,
-                      ^~~~~~~~~~~~~~~~~~~~~~~~~
-
-vim +82 include/linux/firmware.h
-
-    76	{
-    77		return -EINVAL;
-    78	}
-    79	
-    80	static inline int request_firmware_into_buf(const struct firmware **firmware_p,
-    81		const char *name, struct device *device, void *buf, size_t size);
-  > 82	{
-    83		return -EINVAL;
-    84	}
-    85	
-
+Tested-by: Yakir Yang <ykk@rock-chips.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 23402 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/becc8f69/attachment-0001.obj>
+
+ drivers/clk/rockchip/clk-rk3399.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+index b6742fa..7ecb12c3 100644
+--- a/drivers/clk/rockchip/clk-rk3399.c
++++ b/drivers/clk/rockchip/clk-rk3399.c
+@@ -1485,6 +1485,7 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
+ 	"gpll_hclk_perilp1_src",
+ 	"gpll_aclk_perilp0_src",
+ 	"gpll_aclk_perihp_src",
++	"pclk_vio_grf",
+ };
+ 
+ static const char *const rk3399_pmucru_critical_clocks[] __initconst = {
+-- 
+1.7.9.5
