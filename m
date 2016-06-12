@@ -1,58 +1,42 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 12 Jun 2016 20:19:47 +0800
-Subject: [PATCH 07/11] clk: imx6ul: fix pll clock parents
-In-Reply-To: <20160612115204.GB32690@shlinux2>
-References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
- <1465396420-27064-7-git-send-email-aisheng.dong@nxp.com>
- <20160612114353.GE20243@tiger> <20160612115204.GB32690@shlinux2>
-Message-ID: <20160612121947.GF32690@shlinux2>
+Date: Sun, 12 Jun 2016 20:24:25 +0800
+Subject: [PATCH 1/2] clk: imx: do not sleep if IRQ's are still disabled
+In-Reply-To: <alpine.DEB.2.11.1606092204590.28031@nanos>
+References: <1461663072.7839.17.camel@pengutronix.de>
+ <CAA+hA=SSQJPbzbhCY7O8JaxiUgMDjG2ATQXsCW-X5zc2inC6kw@mail.gmail.com>
+ <CAA+hA=Q5Un7Sib5QEvK4H2PH5qrySAkRR+=ofuaKxX_PCuT-Yw@mail.gmail.com>
+ <20160427015835.GE30692@tiger>
+ <CAA+hA=REqJ8JhmKt5_jCAaRTUy2E14ww_MqWSSLpNBKgnf=U9A@mail.gmail.com>
+ <alpine.DEB.2.11.1604271212290.3941@nanos>
+ <20160602145915.GA31124@shlinux2>
+ <alpine.DEB.2.11.1606061448010.28031@nanos>
+ <20160607070440.GA32573@shlinux2>
+ <alpine.DEB.2.11.1606092204590.28031@nanos>
+Message-ID: <20160612122425.GG32690@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2016 at 07:52:04PM +0800, Dong Aisheng wrote:
-> On Sun, Jun 12, 2016 at 07:43:53PM +0800, Shawn Guo wrote:
-> > On Wed, Jun 08, 2016 at 10:33:36PM +0800, Dong Aisheng wrote:
-> > > pllx_bypass_src mux shouldn't be the parent of pllx clock
-> > > since it's only valid when when pllx BYPASS bit is set.
-> > > Thus it is actually one parent of pllx_bypass only.
-> > > 
-> > > Instead, pllx parent should be fixed to osc according to
-> > > reference manual.
-> > > Other plls have the same issue.
-> > > 
-> > > e.g. before fix, the pll tree is:
-> > > osc                                      6            6    24000000          0 0
-> > >    pll1_bypass_src                       0            0    24000000          0 0
-> > >       pll1                               0            0   792000000          0 0
-> > >          pll1_bypass                     0            0   792000000          0 0
-> > >             pll1_sys                     0            0   792000000          0 0
-> > > 
-> > > After the fix, it's:
-> > > osc                                      6            6    24000000          0 0
-> > >    pll1                                  0            0   792000000          0 0
-> > >       pll1_bypass                        0            0   792000000          0 0
-> > >          pll1_sys                        0            0   792000000          0 0
-> > > 
-> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > 
-> > I squashed 7 ~ 11 into one patch and applied it, thanks.
-> > 
+On Thu, Jun 09, 2016 at 10:08:01PM +0200, Thomas Gleixner wrote:
+> On Tue, 7 Jun 2016, Dong Aisheng wrote:
+> > Then it may need introduce a lot changes and increase many new core APIs.
+> > Is that a problem?
 > 
-> I'm fine.
-> Thanks
+> No. That's all better than each driver having broken workarounds. It's a
+> common problem so it wants to be addressed at the core level. There you have a
+> central point to do this and you can still catch abusers which call stuff from
+> the wrong context. The hacks in the drivers don't allow that because they look
+> at the context, i.e. irq disabled, instead of checking the system state.
 > 
 
-You probably may need to change the patch title after merge.
-clk: imx: fix pll clock parents
+Okay, thanks.
+If you wouldn't mind i could send out a patch based on your
+suggestion for further discussion.
+
+Thanks
 
 Regards
 Dong Aisheng
 
-> Regards
-> Dong Aisheng
+> Thanks,
 > 
-> > Shawn
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 	tglx
