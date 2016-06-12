@@ -1,96 +1,33 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 12 Jun 2016 16:46:18 +0200 (CEST)
-Subject: ARM: mxs: warnings on PM resume
-In-Reply-To: <20160612135428.GR1041@n2100.armlinux.org.uk>
-References: <1713040590.199779.36789782-c361-4fe4-bc0d-b581fbce8069.open-xchange@email.1und1.de>
- <1955365225.76161.cd9a3eda-edc7-4bae-96f3-bdddccbb0478.open-xchange@email.1und1.de>
- <2607020.0FcLMf1DX6@vostro.rjw.lan>
- <908847370.85504.d47d66b7-356b-4e07-9e1d-807a299ea337.open-xchange@email.1und1.de>
- <20160612135428.GR1041@n2100.armlinux.org.uk>
-Message-ID: <1404923103.90724.9aa0b9cc-6e20-4fab-aeea-18352c528787.open-xchange@email.1und1.de>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sun, 12 Jun 2016 22:51:58 +0800
+Subject: [PATCH 05/11] clk: imx: refine the powerup_set bit of clk-pllv3
+In-Reply-To: <20160612132928.GG20243@tiger>
+References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
+ <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
+ <20160612113627.GC20243@tiger>
+ <20160612121303.GE32690@shlinux2> <20160612132928.GG20243@tiger>
+Message-ID: <CAA+hA=SG1OViVLeZGVBT=eteWE3t8bUYv=sqotVQkF-apNcDFA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Sun, Jun 12, 2016 at 9:29 PM, Shawn Guo <shawnguo@kernel.org> wrote:
+> On Sun, Jun 12, 2016 at 08:13:03PM +0800, Dong Aisheng wrote:
+>> I understand your point.
+>> How about using power_bit and powerup_set?
+>> * @power_bit:   pll power bit offset
+>
+> I'm fine with the name, but the comment should be fixed, since we are
+> actually using it as a bit mask instead of offset.
+>
 
-> Russell King - ARM Linux <linux@armlinux.org.uk> hat am 12. Juni 2016 um 15:54
-> geschrieben:
-> 
-> 
-> On Sun, Jun 12, 2016 at 12:27:02PM +0200, Stefan Wahren wrote:
-> > Hi Rafael,
-> > 
-> > > "Rafael J. Wysocki" <rjw@rjwysocki.net> hat am 11. Juni 2016 um 03:42
-> > > geschrieben:
-> > > 
-> > > Interrupts should not be enabled before syscore_resume() is called, but
-> > > they
-> > > are, apparently by the platform code.
-> > 
-> > sure, but it isn't that simple. I can't reproduce the warning everytime. At
-> > least i need 5 tries and more to reproduce it.
-> > 
-> > I place the following code in the suspend code, before the low level suspend
-> > code in SRAM gets executed:
-> > 
-> > if (!irqs_disabled())
-> > 	pr_info("IRQs not disabled before suspend\n");
-> > 
-> > The info message above only get printed if the warning "Interrupts enabled
-> > before system core resume." appears.
-> > 
-> > After that i dumped all enabled IRQs (at the same code place) from the
-> > interrupt
-> > collector (irqchip) and compared them with cat /proc/interrupts.
-> 
-> This isn't about the state of the interrupt controller.  It's about
-> the state of the IRQ mask bit in the CPUs CPSR.
-> 
-> irq_disabled() returns true when the I bit in CPSR is set, false
-> otherwise.
-> 
-> What it's pointing towards is some driver being unreasonable, and
-> clearing the CPUs CPSR I bit after the core PM code has set it.  Causes
-> can be using spin_lock_irq()/spin_unlock_irq()/local_irq_enable() etc
-> inappropriately, rather than using the irqsave/irqrestore versions.
-> 
-> suspend_enter() does this:
-> 
->         arch_suspend_disable_irqs();
->         BUG_ON(!irqs_disabled());
-> 
->         error = syscore_suspend();
-> 
-> So, we can be sure that if we reach syscore_suspend(), then IRQs were
-> disabled.
-> 
-> Now, syscore_suspend() calls a set of suspend callbacks, and verifies
-> that interrupts are not re-enabled after each one.  So, you should be
-> getting a complaint from the kernel if one of those does trigger, and
-> these are about the last things that happen before the ->enter
-> callback is called.  IRQs should be disabled when mxs_suspend_enter()
-> is entered.
+Yes, i can change to:
+* @power_bit:   pll power bit mask
+* @powerup_set: set power_bit to power up the PLL
 
-thanks for this explanation.
+Regards
+Dong Aisheng
 
-> 
-> I'm confused by your statement about "the low level suspend code in SRAM
-> gets executed" - from what I can see in arch/arm/mach-mxs (you said MXS
-> in the subject), there is no SRAM code that gets executed for S2RAM.
-> Since you also said MX23, that ties up with mach-mxs, so I can only
-> conclude that you're using patches on top of mainline which change the
-> platform suspend code.
-
-Yes, as i wrote in my first email i'm working on this feature and i hope to
-contribute it to mainline in the near future. My changes based on the old
-Freescale BSP and the mainline i.MX5x S2RAM code [1].
-
-Stefan
-
-[1] - https://github.com/lategoodbye/linux-mxs-power/tree/rebase-4.5
-
-> 
-> -- 
-> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> Shawn
+>
+>> * @powerup_set: set power_bit to power up the PLL
+>
