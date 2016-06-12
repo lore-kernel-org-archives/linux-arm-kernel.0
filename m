@@ -1,45 +1,51 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Sun, 12 Jun 2016 18:46:51 +0800
-Subject: [PATCH] clk: rockchip: add flag CLK_SET_RATE_PARENT for
- dclk_vop0_div on RK3399
-In-Reply-To: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
-References: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <575D3D9B.1070501@rock-chips.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 12 Jun 2016 13:03:57 +0200
+Subject: [GIT PULL] ARM: at91: soc for 4.8 #1
+Message-ID: <20160612110357.GA24644@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xing,
+Arnd, Olof, Kevin,
 
-On 06/12/2016 05:48 PM, Xing Zheng wrote:
-> The functions and features VOP0 more complete than VOP1's, we need to
-> use it dclk_vop0_div operate VPLLI, and let VOP0 as the default primary
-> screen.
->
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+This is a rework of the DEBUG_LL stuff for at91 to solve an issue with
+multi_v7.
 
-Tested on RK3399 Kevin board, after apply this patch, my eDP panel light 
-up normally. So
+Thanks!
 
-Tested-by: Yakir Yang <ykk@rock-chips.com>
+The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
 
-BR,
-- Yakir
+  Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
 
-> ---
->
->   drivers/clk/rockchip/clk-rk3399.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-> index 7ecb12c3..6affa75 100644
-> --- a/drivers/clk/rockchip/clk-rk3399.c
-> +++ b/drivers/clk/rockchip/clk-rk3399.c
-> @@ -1157,7 +1157,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
->   	GATE(HCLK_VOP0_NOC, "hclk_vop0_noc", "hclk_vop0_pre", CLK_IGNORE_UNUSED,
->   			RK3399_CLKGATE_CON(28), 0, GFLAGS),
->   
-> -	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, 0,
-> +	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, CLK_SET_RATE_PARENT,
->   			RK3399_CLKSEL_CON(49), 8, 2, MFLAGS, 0, 8, DFLAGS,
->   			RK3399_CLKGATE_CON(10), 12, GFLAGS),
->   
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-4.8-soc
+
+for you to fetch changes up to 8b2f2d0356184cc7c409b2f046c550ce00ca8f70:
+
+  ARM: at91: debug: add default DEBUG_LL addresses (2016-06-10 17:09:28 +0200)
+
+----------------------------------------------------------------
+SoC changes for 4.8:
+ - Solve an issue with DEBUG_LL and multi_v7
+ - Also make DEBUG_LL more user friendly
+
+----------------------------------------------------------------
+Alexandre Belloni (2):
+      ARM: at91: debug: use DEBUG_UART_VIRT
+      ARM: at91: debug: add default DEBUG_LL addresses
+
+ arch/arm/Kconfig.debug        | 61 ++++++++++++++++++++++++++++++++-----------
+ arch/arm/include/debug/at91.S | 10 +------
+ 2 files changed, 47 insertions(+), 24 deletions(-)
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/066756ed/attachment.sig>
