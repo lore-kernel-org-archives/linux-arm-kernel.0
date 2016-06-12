@@ -1,185 +1,36 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 12 Jun 2016 11:15:43 -0300
-Subject: [PATCH] ARM: dts: imx: Remove unneeded unit-addresses
-Message-ID: <1465740943-13876-1-git-send-email-festevam@gmail.com>
+Date: Sun, 12 Jun 2016 11:36:59 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6q-cm-fx6: fix the operation points
+In-Reply-To: <2256c64f85d847d29c2c3e0f4e095d90@rwthex-s1-b.rwth-ad.de>
+References: <6b48c849983548f29259b42d69c5224c@rwthex-s1-b.rwth-ad.de>
+ <650a7982db35484194a0be26863a89f9@rwthex-s1-a.rwth-ad.de>
+ <2256c64f85d847d29c2c3e0f4e095d90@rwthex-s1-b.rwth-ad.de>
+Message-ID: <CAOMZO5APbW8Hc_HCEyF=22T320KJ6K+E1AVpZPH4Rkzjqi-8rQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+On Sun, Jun 12, 2016 at 11:05 AM, Christopher Spinrath
+<christopher.spinrath@rwth-aachen.de> wrote:
 
-Sparse complains when a unit address is provided without a
-corresponding 'reg' field.
-   
-Fix these build warnings by removing the unneeded unit-addresses of
-the anatop regulators.
+> Well, without this patch the SoC runs at 1.2GHz so it seems like the
+> fuse indicates that it is possible. But with a fair amount of IPs
+> enabled and high load the board becomes unstable (display
+> flickering/blanks, ethernet package drops, ...). I guess CompuLab
+> allowed 1.2GHz at first and then realized that it is a bad idea (at
+> least for some boards).
+>
+> Is there any way to influence the fuse (e.g. from the
+> firmware/bootloader) or do you have another proposal on how to fix this
+> issue?
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6sl.dtsi | 12 ++++++------
- arch/arm/boot/dts/imx6sx.dtsi | 12 ++++++------
- arch/arm/boot/dts/imx6ul.dtsi |  6 +++---
- arch/arm/boot/dts/imx7d.dtsi  |  2 +-
- 4 files changed, 16 insertions(+), 16 deletions(-)
+Ok, understood. So the mx6q fuse indicates that 1.2GHz operation is
+possible on , but the board itself does not behave nicely at this
+frequency.
 
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index d12b250..224c0d0 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -461,7 +461,7 @@
- 					     <0 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 127 IRQ_TYPE_LEVEL_HIGH>;
- 
--				regulator-1p1 at 110 {
-+				regulator-1p1 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
- 					regulator-min-microvolt = <800000>;
-@@ -475,7 +475,7 @@
- 					anatop-max-voltage = <1375000>;
- 				};
- 
--				regulator-3p0 at 120 {
-+				regulator-3p0 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2800000>;
-@@ -489,7 +489,7 @@
- 					anatop-max-voltage = <3400000>;
- 				};
- 
--				regulator-2p5 at 130 {
-+				regulator-2p5 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
- 					regulator-min-microvolt = <2100000>;
-@@ -503,7 +503,7 @@
- 					anatop-max-voltage = <2850000>;
- 				};
- 
--				reg_arm: regulator-vddcore at 140 {
-+				reg_arm: regulator-vddcore {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
-@@ -520,7 +520,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_pu: regulator-vddpu at 140 {
-+				reg_pu: regulator-vddpu {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
-@@ -537,7 +537,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc at 140 {
-+				reg_soc: regulator-vddsoc {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 6a993bfda..2863c52 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -547,7 +547,7 @@
- 					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
- 
--				regulator-1p1 at 110 {
-+				regulator-1p1 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
- 					regulator-min-microvolt = <800000>;
-@@ -561,7 +561,7 @@
- 					anatop-max-voltage = <1375000>;
- 				};
- 
--				regulator-3p0 at 120 {
-+				regulator-3p0 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2800000>;
-@@ -575,7 +575,7 @@
- 					anatop-max-voltage = <3400000>;
- 				};
- 
--				regulator-2p5 at 130 {
-+				regulator-2p5 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
- 					regulator-min-microvolt = <2100000>;
-@@ -589,7 +589,7 @@
- 					anatop-max-voltage = <2875000>;
- 				};
- 
--				reg_arm: regulator-vddcore at 140 {
-+				reg_arm: regulator-vddcore {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
-@@ -606,7 +606,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_pcie: regulator-vddpcie at 140 {
-+				reg_pcie: regulator-vddpcie {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpcie";
- 					regulator-min-microvolt = <725000>;
-@@ -622,7 +622,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc at 140 {
-+				reg_soc: regulator-vddsoc {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 4356b65..b15ed37 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -512,7 +512,7 @@
- 					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
- 
--				reg_3p0: regulator-3p0 at 120 {
-+				reg_3p0: regulator-3p0 {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2625000>;
-@@ -526,7 +526,7 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_arm: regulator-vddcore at 140 {
-+				reg_arm: regulator-vddcore {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "cpu";
- 					regulator-min-microvolt = <725000>;
-@@ -543,7 +543,7 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc at 140 {
-+				reg_soc: regulator-vddsoc {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
-diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
-index 6b3faa2..d70d55d 100644
---- a/arch/arm/boot/dts/imx7d.dtsi
-+++ b/arch/arm/boot/dts/imx7d.dtsi
-@@ -522,7 +522,7 @@
- 				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
- 					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
- 
--				reg_1p0d: regulator-vdd1p0d at 210 {
-+				reg_1p0d: regulator-vdd1p0d {
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p0d";
- 					regulator-min-microvolt = <800000>;
--- 
-1.9.1
+Maybe you could send a v2 of this patch that matches the operating
+points form mx6qdl.dtsi and remove only the 1.2GHz entry and put the
+explanation you gave us here in the dts and commit log.
+
+Regards,
+
+Fabio Estevam
