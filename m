@@ -1,68 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 12 Jun 2016 14:32:39 -0700
-Subject: [PATCH] clk: rockchip: add pclk_vio_grf to critical clock on the
- RK3399
-In-Reply-To: <1465724913-14553-1-git-send-email-zhengxing@rock-chips.com>
-References: <1465724913-14553-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <CAD=FV=XSSPMOnMD3mqFyqM3wWLShbRc2cXVdN0PYcUxpaDnsTw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 12 Jun 2016 23:45:50 +0200 (CEST)
+Subject: ARM: mxs: warnings on PM resume
+In-Reply-To: <20160612135428.GR1041@n2100.armlinux.org.uk>
+References: <1713040590.199779.36789782-c361-4fe4-bc0d-b581fbce8069.open-xchange@email.1und1.de>
+ <1955365225.76161.cd9a3eda-edc7-4bae-96f3-bdddccbb0478.open-xchange@email.1und1.de>
+ <2607020.0FcLMf1DX6@vostro.rjw.lan>
+ <908847370.85504.d47d66b7-356b-4e07-9e1d-807a299ea337.open-xchange@email.1und1.de>
+ <20160612135428.GR1041@n2100.armlinux.org.uk>
+Message-ID: <1612475808.97029.eb34fc3a-2c1f-4f24-a990-897dd5df59a5.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Xing,
+Hi,
 
-On Sun, Jun 12, 2016 at 2:48 AM, Xing Zheng <zhengxing@rock-chips.com> wrote:
-> The pclk_vio_grf supply power for GRF IOs, if it is disabled, will
-> cause abnormal operation of the GRF.
->
-> The clock tree of the pclk_vio like this:
->              | --> pclk_vio_grf
-> ... pclk_vio | --> pclk_mipi_dsi1
->              | --> pclk_mipi_dsi0
->
-> and the pclk_mipi_dsi0 and pclk_mipi_dsi1 don't have the flag
-> CLK_IGNORE_UNUSED, and they will be disabled by clk_disable_unused
-> when startup:
-> clk_disable_unused
->   --> clk_disable_unprepare
->     --> clk_disable
->       --> clk_core_disable(core->parent)
->
-> then, the pclk_vio_grf also is disabled. Therefore, we need to add
-> pclk_vio_grf to critical clock and avoid to disable pclk_vio and
-> pclk_vio_grf.
->
-> Tested-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> ---
->
->  drivers/clk/rockchip/clk-rk3399.c |    1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-> index b6742fa..7ecb12c3 100644
-> --- a/drivers/clk/rockchip/clk-rk3399.c
-> +++ b/drivers/clk/rockchip/clk-rk3399.c
-> @@ -1485,6 +1485,7 @@ static const char *const rk3399_cru_critical_clocks[] __initconst = {
->         "gpll_hclk_perilp1_src",
->         "gpll_aclk_perilp0_src",
->         "gpll_aclk_perihp_src",
-> +       "pclk_vio_grf",
+> Russell King - ARM Linux <linux@armlinux.org.uk> hat am 12. Juni 2016 um 15:54
+> geschrieben:
+> 
+> 
+> On Sun, Jun 12, 2016 at 12:27:02PM +0200, Stefan Wahren wrote:
+> > Hi Rafael,
+> > 
+> > > "Rafael J. Wysocki" <rjw@rjwysocki.net> hat am 11. Juni 2016 um 03:42
+> > > geschrieben:
+> > > 
+> > > Interrupts should not be enabled before syscore_resume() is called, but
+> > > they
+> > > are, apparently by the platform code.
+> > 
+> > sure, but it isn't that simple. I can't reproduce the warning everytime. At
+> > least i need 5 tries and more to reproduce it.
+> > 
+> > I place the following code in the suspend code, before the low level suspend
+> > code in SRAM gets executed:
+> > 
+> > if (!irqs_disabled())
+> > 	pr_info("IRQs not disabled before suspend\n");
+> > 
+> > The info message above only get printed if the warning "Interrupts enabled
+> > before system core resume." appears.
+> > 
+> > After that i dumped all enabled IRQs (at the same code place) from the
+> > interrupt
+> > collector (irqchip) and compared them with cat /proc/interrupts.
+> 
+> This isn't about the state of the interrupt controller.  It's about
+> the state of the IRQ mask bit in the CPUs CPSR.
+> 
+> irq_disabled() returns true when the I bit in CPSR is set, false
+> otherwise.
+> 
+> What it's pointing towards is some driver being unreasonable, and
+> clearing the CPUs CPSR I bit after the core PM code has set it.  Causes
+> can be using spin_lock_irq()/spin_unlock_irq()/local_irq_enable() etc
+> inappropriately, rather than using the irqsave/irqrestore versions.
 
-This clock is only needed when doing video output (like eDP), right?
-That means it is not really a critical clock.  Critical clocks are
-supposed to be ones that are needed for the basic functioning of the
-system and that can never be turned off in any circumstances.  In this
-case, if someone were running a rk3399 device and didn't have any
-video output they would want this clock off.
-
-Can you figure out in exactly which circumstances this clock needs to
-be on and then add a proper consumer of this clock?  For instance, if
-this clock is needed whenever the VOP is outputting data, then the VOP
-should be a client and should turn this clock on and off when video is
-being output.  If this clock is needed whenever you access VOP
-registers, then the VOP should be a client and turn this clock on
-around register accesses.
-
--Doug
+i finally found the reason for the warning: clk_get_sys was called inside of
+mxs_suspend_enter.
+After moving it into the init function the issue disappear.
