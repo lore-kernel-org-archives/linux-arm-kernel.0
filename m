@@ -1,44 +1,89 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 12 Jun 2016 19:33:10 +0800
-Subject: [PATCH 04/11] clk: imx: correct dram pll type
-In-Reply-To: <1465396420-27064-4-git-send-email-aisheng.dong@nxp.com>
+Date: Sun, 12 Jun 2016 19:36:27 +0800
+Subject: [PATCH 05/11] clk: imx: refine the powerup_set bit of clk-pllv3
+In-Reply-To: <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
 References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
- <1465396420-27064-4-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20160612113310.GB20243@tiger>
+ <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
+Message-ID: <20160612113627.GC20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 10:33:33PM +0800, Dong Aisheng wrote:
-> From: Anson Huang <b20788@freescale.com>
+On Wed, Jun 08, 2016 at 10:33:34PM +0800, Dong Aisheng wrote:
+> There's a powerdown bit already, so let's change the name of
+> powerup_set bit to power_invert to reflects the power polarity
+> to make it less confusing.
 > 
-> DRAM PLL is a audio/video type PLL, need to correct
-> it to get correct ops of PLL.
-> 
-> Signed-off-by: Anson Huang <b20788@freescale.com>
 > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> ---
+>  drivers/clk/imx/clk-pllv3.c | 14 +++++++-------
+>  1 file changed, 7 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> index eea2b1b3791e..3fdfb6d2cc71 100644
+> --- a/drivers/clk/imx/clk-pllv3.c
+> +++ b/drivers/clk/imx/clk-pllv3.c
+> @@ -29,8 +29,8 @@
+>   * struct clk_pllv3 - IMX PLL clock version 3
+>   * @clk_hw:	 clock source
+>   * @base:	 base address of PLL registers
+> - * @powerup_set: set POWER bit to power up the PLL
+> - * @powerdown:   pll powerdown offset bit
+> + * @powerdown:	 pll powerdown bit offset
 
-'clk: imx7d: ' for patch prefix would be more clear.  Updated it and
-applied the patch.
+I think 'powerdown' is more confusing here.  I prefer to rename it to
+something like 'power_mask' and keep 'powerdown' as it is.
 
 Shawn
 
-> ---
->  drivers/clk/imx/clk-imx7d.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/imx/clk-imx7d.c b/drivers/clk/imx/clk-imx7d.c
-> index 1cb866773fc0..dc8c3355a66d 100644
-> --- a/drivers/clk/imx/clk-imx7d.c
-> +++ b/drivers/clk/imx/clk-imx7d.c
-> @@ -395,7 +395,7 @@ static void __init imx7d_clocks_init(struct device_node *ccm_node)
->  	clks[IMX7D_PLL_VIDEO_MAIN_SRC] = imx_clk_mux("pll_video_main_src", base + 0x130, 14, 2, pll_bypass_src_sel, ARRAY_SIZE(pll_bypass_src_sel));
+> + * @power_invert: set powerdown bit to power up the PLL
+>   * @div_mask:	 mask of divider bits
+>   * @div_shift:	 shift of divider bits
+>   *
+> @@ -40,7 +40,7 @@
+>  struct clk_pllv3 {
+>  	struct clk_hw	hw;
+>  	void __iomem	*base;
+> -	bool		powerup_set;
+> +	bool		power_invert;
+>  	u32		powerdown;
+>  	u32		div_mask;
+>  	u32		div_shift;
+> @@ -55,7 +55,7 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
+>  	u32 val = readl_relaxed(pll->base) & pll->powerdown;
 >  
->  	clks[IMX7D_PLL_ARM_MAIN]  = imx_clk_pllv3(IMX_PLLV3_SYS, "pll_arm_main", "pll_arm_main_src", base + 0x60, 0x7f);
-> -	clks[IMX7D_PLL_DRAM_MAIN] = imx_clk_pllv3(IMX_PLLV3_SYS, "pll_dram_main", "pll_dram_main_src", base + 0x70, 0x7f);
-> +	clks[IMX7D_PLL_DRAM_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_dram_main", "pll_dram_main_src", base + 0x70, 0x7f);
->  	clks[IMX7D_PLL_SYS_MAIN]  = imx_clk_pllv3(IMX_PLLV3_GENERIC, "pll_sys_main", "pll_sys_main_src", base + 0xb0, 0x1);
->  	clks[IMX7D_PLL_ENET_MAIN] = imx_clk_pllv3(IMX_PLLV3_ENET_IMX7, "pll_enet_main", "pll_enet_main_src", base + 0xe0, 0x0);
->  	clks[IMX7D_PLL_AUDIO_MAIN] = imx_clk_pllv3(IMX_PLLV3_AV, "pll_audio_main", "pll_audio_main_src", base + 0xf0, 0x7f);
+>  	/* No need to wait for lock when pll is not powered up */
+> -	if ((pll->powerup_set && !val) || (!pll->powerup_set && val))
+> +	if ((pll->power_invert && !val) || (!pll->power_invert && val))
+>  		return 0;
+>  
+>  	/* Wait for PLL to lock */
+> @@ -76,7 +76,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+>  	u32 val;
+>  
+>  	val = readl_relaxed(pll->base);
+> -	if (pll->powerup_set)
+> +	if (pll->power_invert)
+>  		val |= pll->powerdown;
+>  	else
+>  		val &= ~pll->powerdown;
+> @@ -91,7 +91,7 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+>  	u32 val;
+>  
+>  	val = readl_relaxed(pll->base);
+> -	if (pll->powerup_set)
+> +	if (pll->power_invert)
+>  		val &= ~pll->powerdown;
+>  	else
+>  		val |= pll->powerdown;
+> @@ -326,7 +326,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+>  		pll->div_shift = 1;
+>  	case IMX_PLLV3_USB:
+>  		ops = &clk_pllv3_ops;
+> -		pll->powerup_set = true;
+> +		pll->power_invert = true;
+>  		break;
+>  	case IMX_PLLV3_AV:
+>  		ops = &clk_pllv3_av_ops;
 > -- 
 > 1.9.1
 > 
