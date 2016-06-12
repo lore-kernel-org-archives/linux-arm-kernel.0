@@ -1,145 +1,123 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Sun, 12 Jun 2016 10:31:00 +0800
-Subject: [PATCH 3/3] ARM: dts: imx7: add Toradex Colibri iMX7S/iMX7D
- support
-In-Reply-To: <20160608023709.32090-4-stefan@agner.ch>
-References: <20160608023709.32090-1-stefan@agner.ch>
- <20160608023709.32090-4-stefan@agner.ch>
-Message-ID: <20160612023100.GW20243@tiger>
+Date: Sun, 12 Jun 2016 10:54:08 +0800
+Subject: [PATCH 1/7] ARM: dts: imx25-pdk: Switch using simple-audio-card
+ for audio support
+In-Reply-To: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
+References: <1465621345-12597-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20160612025408.GX20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2016 at 07:37:09PM -0700, Stefan Agner wrote:
-> +&lcdif {
-> +	status = "okay";
-> +	display = <&display0>;
+On Sat, Jun 11, 2016 at 08:02:19AM +0300, Alexander Shiyan wrote:
+> The sound support can be handled by "simple-audio-card" instead of
+> use a private driver.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Please put 'status' at the bottom of property list.
+Did you get a chance to test the change on any of the boards you are
+touching here?
 
+> ---
+>  arch/arm/boot/dts/imx25-pdk.dts | 51 ++++++++++++++++++++++++++++++++++-------
+>  1 file changed, 43 insertions(+), 8 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx25-pdk.dts b/arch/arm/boot/dts/imx25-pdk.dts
+> index 9351296..8fe2f5a 100644
+> --- a/arch/arm/boot/dts/imx25-pdk.dts
+> +++ b/arch/arm/boot/dts/imx25-pdk.dts
+> @@ -12,6 +12,8 @@
+>  /dts-v1/;
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/input/input.h>
+> +#include <dt-bindings/sound/fsl-imx-audmux.h>
 > +
-> +	display0: lcd-display {
-> +		bits-per-pixel = <16>;
-> +		bus-width = <18>;
+>  #include "imx25.dtsi"
+>  
+>  / {
+> @@ -64,17 +66,29 @@
+>  	};
+>  
+>  	sound {
+> -		compatible = "fsl,imx25-pdk-sgtl5000",
+> -			     "fsl,imx-audio-sgtl5000";
+> -		model = "imx25-pdk-sgtl5000";
+> -		ssi-controller = <&ssi1>;
+> -		audio-codec = <&codec>;
+> -		audio-routing =
+> +		compatible = "simple-audio-card";
+> +		simple-audio-card,name = "imx25-pdk-sgtl5000";
+> +		simple-audio-card,format = "i2s";
+> +		simple-audio-card,bitclock-master = <&master>;
+> +		simple-audio-card,frame-master = <&master>;
+> +		simple-audio-card,widgets =
+> +			"Microphone", "Mic Jack",
+> +			"Line", "Line In Jack",
+> +			"Headphone", "Headphone Jack",
+> +			"Speaker", "Line Out Jack",
+> +			"Speaker", "Ext Spk";
+> +		simple-audio-card,routing =
+>  			"MIC_IN", "Mic Jack",
+>  			"Mic Jack", "Mic Bias",
+>  			"Headphone Jack", "HP_OUT";
+> -		mux-int-port = <1>;
+> -		mux-ext-port = <4>;
 > +
-> +		display-timings {
-> +			native-mode = <&timing_vga>;
-> +
-> +			/* Standard VGA timing */
-> +			timing_vga: 640x480 {
-> +				clock-frequency = <25175000>;
-> +				hactive = <640>;
-> +				vactive = <480>;
-> +				hback-porch = <40>;
-> +				hfront-porch = <24>;
-> +				vback-porch = <32>;
-> +				vfront-porch = <11>;
-> +				hsync-len = <96>;
-> +				vsync-len = <2>;
-> +				de-active = <1>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				pixelclk-active = <0>;
-> +			};
+> +		simple-audio-card,cpu {
+> +			sound-dai = <&ssi1>;
 > +		};
-> +	};
-> +};
-
-<snip>
-
-> +&usdhc1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_cd_usdhc1>;
-> +	no-1-8-v;
-> +	cd-gpios = <&gpio1 0 0>;
-
-Use the macro in include/dt-bindings/gpio/gpio.h.
-
-> +	enable-sdio-wakeup;
-
-This is deprecated.  Please use wakeup-source instead.
-
-> +	fsl,tuning-step = <2>;
-> +	keep-power-in-suspend;
-> +	status = "okay";
-> +};
-
-<snip>
-
-> +&fec1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_enet1>;
-> +	clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
-> +		<&clks IMX7D_ENET_AXI_ROOT_CLK>,
-> +		<&clks IMX7D_ENET1_TIME_ROOT_CLK>,
-> +		<&clks IMX7D_PLL_ENET_MAIN_50M_CLK>;
-> +	clock-names = "ipg", "ahb", "ptp", "enet_clk_ref";
 > +
-
-Drop this newline.
-
-> +	assigned-clocks = <&clks IMX7D_ENET1_TIME_ROOT_SRC>,
-> +			  <&clks IMX7D_ENET1_TIME_ROOT_CLK>;
-> +	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
-> +	assigned-clock-rates = <0>, <100000000>;
-> +	phy-mode = "rmii";
-> +	phy-supply = <&reg_LDO1>;
-> +	fsl,magic-packet;
-> +};
-
-<snip>
-
-> +&uart1 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart1 &pinctrl_uart1_ctrl1 &pinctrl_uart1_ctrl2>;
-> +	assigned-clocks = <&clks IMX7D_UART1_ROOT_SRC>;
-> +	assigned-clock-parents = <&clks IMX7D_OSC_24M_CLK>;
-> +	fsl,uart-has-rtscts;
-
-Please use generic 'uart-has-rtscts' instead.
-
-> +	fsl,dte-mode;
-> +};
+> +		master: simple-audio-card,codec {
+> +			sound-dai = <&codec>;
+> +		};
+>  	};
+>  
+>  	wvga: display {
+> @@ -103,6 +117,26 @@
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_audmux>;
+>  	status = "okay";
 > +
-> +&uart2 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_uart2>;
-> +	assigned-clocks = <&clks IMX7D_UART2_ROOT_SRC>;
-> +	assigned-clock-parents = <&clks IMX7D_OSC_24M_CLK>;
-> +	fsl,uart-has-rtscts;
+> +	audmux_ssi0 {
 
-Ditto
-
-> +	fsl,dte-mode;
-> +};
-
-<snip>
-
-> +/ {
-> +	model = "Toradex Colibri iMX7D on Colibri Evaluation Board V3";
-> +	compatible = "toradex,colibri_imx7d-eval", "toradex,colibri_imx7d", \
-
-We always use hyphen than underscore in compatible string.
-
-> +		     "fsl,imx7d";
-> +
-> +	reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
-> +		compatible = "regulator-fixed";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_usbotg2_reg>;
-> +		regulator-name = "VCC_USB[1-4]";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio4 7 GPIO_ACTIVE_LOW>;
-> +	};
-> +};
-> +/ {
-> +	model = "Toradex Colibri iMX7S on Colibri Evaluation Board V3";
-> +	compatible = "toradex,colibri_imx7s-eval", "toradex,colibri_imx7s", \
-> +		     "fsl,imx7s", "fsl,imx7d";
-
-You may not want to have "fsl,imx7d" here.  Otherwise, the detection
-between  imx7s and imx7d colibri-eval-v3 board will be difficult.
+We generally use underscore in label and hyphen in node name.
 
 Shawn
 
-> +};
+> +		fsl,audmux-port = <0>;
+> +		fsl,port-config = <
+> +			(IMX_AUDMUX_V2_PTCR_TFSDIR |
+> +			IMX_AUDMUX_V2_PTCR_TFSEL(3) |
+> +			IMX_AUDMUX_V2_PTCR_TCLKDIR |
+> +			IMX_AUDMUX_V2_PTCR_TCSEL(3) |
+> +			IMX_AUDMUX_V2_PTCR_SYN)
+> +			IMX_AUDMUX_V2_PDCR_RXDSEL(3)
+> +		>;
+> +	};
+> +
+> +	audmux_aud4 {
+> +		fsl,audmux-port = <3>;
+> +		fsl,port-config = <
+> +			IMX_AUDMUX_V2_PTCR_SYN
+> +			IMX_AUDMUX_V2_PDCR_RXDSEL(0)
+> +		>;
+> +	};
+>  };
+>  
+>  &can1 {
+> @@ -136,6 +170,7 @@
+>  	status = "okay";
+>  
+>  	codec: sgtl5000 at 0a {
+> +		#sound-dai-cells = <0>;
+>  		compatible = "fsl,sgtl5000";
+>  		reg = <0x0a>;
+>  		clocks = <&clks 129>;
+> -- 
+> 2.4.9
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
