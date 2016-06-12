@@ -1,85 +1,58 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Sun, 12 Jun 2016 20:21:04 +0800
-Subject: [PATCH 13/23] arm64: introduce is_a32_task and is_a32_thread (for
- AArch32 compat)
-In-Reply-To: <1464048292-30136-14-git-send-email-ynorov@caviumnetworks.com>
-References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
- <1464048292-30136-14-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <575D53B0.5020408@huawei.com>
+From: dongas86@gmail.com (Dong Aisheng)
+Date: Sun, 12 Jun 2016 20:19:47 +0800
+Subject: [PATCH 07/11] clk: imx6ul: fix pll clock parents
+In-Reply-To: <20160612115204.GB32690@shlinux2>
+References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
+ <1465396420-27064-7-git-send-email-aisheng.dong@nxp.com>
+ <20160612114353.GE20243@tiger> <20160612115204.GB32690@shlinux2>
+Message-ID: <20160612121947.GF32690@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Yury
+On Sun, Jun 12, 2016 at 07:52:04PM +0800, Dong Aisheng wrote:
+> On Sun, Jun 12, 2016 at 07:43:53PM +0800, Shawn Guo wrote:
+> > On Wed, Jun 08, 2016 at 10:33:36PM +0800, Dong Aisheng wrote:
+> > > pllx_bypass_src mux shouldn't be the parent of pllx clock
+> > > since it's only valid when when pllx BYPASS bit is set.
+> > > Thus it is actually one parent of pllx_bypass only.
+> > > 
+> > > Instead, pllx parent should be fixed to osc according to
+> > > reference manual.
+> > > Other plls have the same issue.
+> > > 
+> > > e.g. before fix, the pll tree is:
+> > > osc                                      6            6    24000000          0 0
+> > >    pll1_bypass_src                       0            0    24000000          0 0
+> > >       pll1                               0            0   792000000          0 0
+> > >          pll1_bypass                     0            0   792000000          0 0
+> > >             pll1_sys                     0            0   792000000          0 0
+> > > 
+> > > After the fix, it's:
+> > > osc                                      6            6    24000000          0 0
+> > >    pll1                                  0            0   792000000          0 0
+> > >       pll1_bypass                        0            0   792000000          0 0
+> > >          pll1_sys                        0            0   792000000          0 0
+> > > 
+> > > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
+> > 
+> > I squashed 7 ~ 11 into one patch and applied it, thanks.
+> > 
+> 
+> I'm fine.
+> Thanks
+> 
 
-On 2016/5/24 8:04, Yury Norov wrote:
-> Based on patch of Andrew Pinski.
->
-> This patch introduces is_a32_compat_task and is_a32_thread so it is
-> easier to say this is a a32 specific thread or a generic compat thread/task.
-> Corresponding functions are located in <asm/is_compat.h> to avoid mess in
-> headers.
->
-> Some files include both <linux/compat.h> and <asm/compat.h>,
-> and this is wrong because <linux/compat.h> has <asm/compat.h> already
-> included. It was fixed too.
->
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
-> ---
->   arch/arm64/include/asm/compat.h      | 19 ++----------
->   arch/arm64/include/asm/elf.h         | 10 +++----
->   arch/arm64/include/asm/ftrace.h      |  2 +-
->   arch/arm64/include/asm/is_compat.h   | 58 ++++++++++++++++++++++++++++++++++++
->   arch/arm64/include/asm/memory.h      |  3 +-
->   arch/arm64/include/asm/processor.h   |  5 ++--
->   arch/arm64/include/asm/syscall.h     |  2 +-
->   arch/arm64/include/asm/thread_info.h |  2 +-
->   arch/arm64/kernel/hw_breakpoint.c    | 10 +++----
->   arch/arm64/kernel/perf_regs.c        |  2 +-
->   arch/arm64/kernel/process.c          |  7 ++---
->   arch/arm64/kernel/ptrace.c           | 11 ++++---
->   arch/arm64/kernel/signal.c           |  4 +--
->   arch/arm64/kernel/traps.c            |  3 +-
->   14 files changed, 91 insertions(+), 47 deletions(-)
->   create mode 100644 arch/arm64/include/asm/is_compat.h
->
-[...]
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 12f8a00..a66a0f7 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -26,6 +26,7 @@
->   #include <linux/types.h>
->   #include <asm/bug.h>
->   #include <asm/sizes.h>
-> +#include <asm/is_compat.h>
->
->   /*
->    * Allow for constants defined here to be used from assembly code
-> @@ -61,7 +62,7 @@
->
->   #ifdef CONFIG_COMPAT
->   #define TASK_SIZE_32		UL(0x100000000)
-> -#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
-> +#define TASK_SIZE		(is_compat_task() ?		\
->   				TASK_SIZE_32 : TASK_SIZE_64)
->   #define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
->   				TASK_SIZE_32 : TASK_SIZE_64)
-Should we update or delete this macro?
-  #define TASK_SIZE_OF(tsk) (is_compat_task() ? \
-TASK_SIZE_32 : TASK_SIZE_64)
-
-x86, sparc, mips, ppc, parisc, s390 define its own version. But
-"include/linux/sched.h" will define it if
-TASK_SIZE_OF does not exist:
-#ifndef TASK_SIZE_OF
-#define TASK_SIZE_OF(tsk)       TASK_SIZE
-#endif
-
+You probably may need to change the patch title after merge.
+clk: imx: fix pll clock parents
 
 Regards
+Dong Aisheng
 
-Bamvor
+> Regards
+> Dong Aisheng
+> 
+> > Shawn
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
