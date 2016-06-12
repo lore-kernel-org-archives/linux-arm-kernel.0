@@ -1,24 +1,22 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 12 Jun 2016 10:45:23 -0300
-Subject: [PATCH 2/2] ARM: dts: utilite-pro: add mmc card slot support
-In-Reply-To: <30f2c9e9b50d47d893218811f3223b3f@rwthex-s1-b.rwth-ad.de>
-References: <20160612132046.1363-1-christopher.spinrath@rwth-aachen.de>
- <30f2c9e9b50d47d893218811f3223b3f@rwthex-s1-b.rwth-ad.de>
-Message-ID: <CAOMZO5B+ervJJbxsEC66Bri3LSqQTgxjgqd8sDhu_b_-m4Xrcw@mail.gmail.com>
+Date: Sun, 12 Jun 2016 10:48:53 -0300
+Subject: [PATCH 1/2] ARM: dts: imx6sx: Fix PCIE support
+In-Reply-To: <5757CA51.1030508@compulab.co.il>
+References: <1465344626-15883-1-git-send-email-festevam@gmail.com>
+ <5757CA51.1030508@compulab.co.il>
+Message-ID: <CAOMZO5CXUHKp3yicMyDoVp-xHuOWSWaWe2oGnJUrPTv+26udYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2016 at 10:20 AM,  <christopher.spinrath@rwth-aachen.de> wrote:
+Hi Igor,
 
-> +&usdhc3 {
-> +       pinctrl-names = "default", "state_100mhz", "state_200mhz";
-> +       pinctrl-0 = <&pinctrl_usdhc3>;
-> +       pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-> +       pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-> +       no-1-8-v;
-> +       broken-cd;
+On Wed, Jun 8, 2016 at 4:33 AM, Igor Grinberg <grinberg@compulab.co.il> wrote:
 
-A comment in the commit log as to why you use the 'broken-cd' property
-would be helpful.
+> The changes in the patch, do not look too self explanatory...
+> Can you please provide more details on what and why this should be done?
 
-Thanks
+Sure, will improve it in v2.
+
+Currently discussing in the pci list what is the proper way to handle
+the LDO PCIE regulator on mx6sx. Will update this series with the
+result of that discussion.
