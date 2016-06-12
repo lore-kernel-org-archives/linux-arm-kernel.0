@@ -1,75 +1,45 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 12 Jun 2016 12:27:02 +0200 (CEST)
-Subject: ARM: mxs: warnings on PM resume
-In-Reply-To: <2607020.0FcLMf1DX6@vostro.rjw.lan>
-References: <1713040590.199779.36789782-c361-4fe4-bc0d-b581fbce8069.open-xchange@email.1und1.de>
- <1955365225.76161.cd9a3eda-edc7-4bae-96f3-bdddccbb0478.open-xchange@email.1und1.de>
- <2607020.0FcLMf1DX6@vostro.rjw.lan>
-Message-ID: <908847370.85504.d47d66b7-356b-4e07-9e1d-807a299ea337.open-xchange@email.1und1.de>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Sun, 12 Jun 2016 18:46:51 +0800
+Subject: [PATCH] clk: rockchip: add flag CLK_SET_RATE_PARENT for
+ dclk_vop0_div on RK3399
+In-Reply-To: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
+References: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <575D3D9B.1070501@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+Xing,
 
-> "Rafael J. Wysocki" <rjw@rjwysocki.net> hat am 11. Juni 2016 um 03:42
-> geschrieben:
-> 
-> 
-> On Saturday, June 11, 2016 03:01:31 AM Stefan Wahren wrote:
-> > Hi,
-> > 
-> > [add Rafael, J?rg and J?rgen to CC]
-> > 
-> > > Stefan Wahren <stefan.wahren@i2se.com> hat am 1. Juni 2016 um 22:51
-> > > geschrieben:
-> > > 
-> > > 
-> > > Hi,
-> > > 
-> > > i'm currently working on standby support for MXS platform. If i trigger
-> > > the
-> > > standby per sysfs everything works fine, but mostly on resume i get a
-> > > bunch of
-> > > warnings (see below for full output):
-> > > 
-> > > [   67.040000] Interrupts enabled before system core resume.
-> > > 
-> > > My current working branch [1] based on Linux 4.5 ( cmdline has
-> > > no_console_suspend=1 ). The test hardware is a i.MX23 board (
-> > > iMX233-OLinuXino-MAXI ).
-> > > 
-> > > How can i narrow down this issue to the relevant driver / interrupt ?
-> > > 
-> > > What is the right way to fix this issue?
-> > > 
-> > 
-> > any hints or ideas to narrow down this issue are very welcome.
-> 
-> Interrupts should not be enabled before syscore_resume() is called, but they
-> are, apparently by the platform code.
+On 06/12/2016 05:48 PM, Xing Zheng wrote:
+> The functions and features VOP0 more complete than VOP1's, we need to
+> use it dclk_vop0_div operate VPLLI, and let VOP0 as the default primary
+> screen.
+>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 
-sure, but it isn't that simple. I can't reproduce the warning everytime. At
-least i need 5 tries and more to reproduce it.
+Tested on RK3399 Kevin board, after apply this patch, my eDP panel light 
+up normally. So
 
-I place the following code in the suspend code, before the low level suspend
-code in SRAM gets executed:
+Tested-by: Yakir Yang <ykk@rock-chips.com>
 
-if (!irqs_disabled())
-	pr_info("IRQs not disabled before suspend\n");
+BR,
+- Yakir
 
-The info message above only get printed if the warning "Interrupts enabled
-before system core resume." appears.
-
-After that i dumped all enabled IRQs (at the same code place) from the interrupt
-collector (irqchip) and compared them with cat /proc/interrupts. I noticed that
-the dump contains all interrupt from /proc/interrupts plus the IRQs from the 3
-GPIO banks, which were not listed under PROC FS.
-
-So i take a look at the GPIO driver gpio-mxs.c and noticed that it seems to miss
-the flag IRQCHIP_MASK_ON_SUSPEND compared to a driver gpio-mxc.c for very
-similiar hardware. Unfortunately adding the flag in the GPIO driver doesn't fix
-the issue.
-
-So any hints about narrowing down the issue would be helpful.
-
-Stefan
+> ---
+>
+>   drivers/clk/rockchip/clk-rk3399.c |    2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
+> index 7ecb12c3..6affa75 100644
+> --- a/drivers/clk/rockchip/clk-rk3399.c
+> +++ b/drivers/clk/rockchip/clk-rk3399.c
+> @@ -1157,7 +1157,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
+>   	GATE(HCLK_VOP0_NOC, "hclk_vop0_noc", "hclk_vop0_pre", CLK_IGNORE_UNUSED,
+>   			RK3399_CLKGATE_CON(28), 0, GFLAGS),
+>   
+> -	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, 0,
+> +	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, CLK_SET_RATE_PARENT,
+>   			RK3399_CLKSEL_CON(49), 8, 2, MFLAGS, 0, 8, DFLAGS,
+>   			RK3399_CLKGATE_CON(10), 12, GFLAGS),
+>   
