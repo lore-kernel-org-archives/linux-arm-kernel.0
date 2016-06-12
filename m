@@ -1,53 +1,62 @@
-From: fugang.duan@nxp.com (Fugang Duan)
-Date: Sun, 12 Jun 2016 05:16:02 +0000
-Subject: [PATCH net-next RFT] net: fec: handle small PHY reset durations
- more precisely
-In-Reply-To: <1465418567-2694-1-git-send-email-stefan.wahren@i2se.com>
-References: <1465418567-2694-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <VI1PR0401MB1855C3B3CF0634BAE6D8063CFF520@VI1PR0401MB1855.eurprd04.prod.outlook.com>
+From: andy.gross@linaro.org (Andy Gross)
+Date: Sun, 12 Jun 2016 01:23:24 -0500
+Subject: [PATCH] arm: dts: qcom: Update smem state cells usage
+Message-ID: <1465712604-13748-1-git-send-email-andy.gross@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Wahren <stefan.wahren@i2se.com> Sent: Thursday, June 09, 2016 4:43 AM
-> To: David Miller <davem@davemloft.net>; Fugang Duan
-> <fugang.duan@nxp.com>
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>; Lucas Stach
-> <l.stach@pengutronix.de>; andrew at lunn.ch; holgerschurig at gmail.com; Troy
-> Kisky <troy.kisky@boundarydevices.com>; linux-arm-kernel at lists.infradead.org;
-> netdev at vger.kernel.org; Stefan Wahren <stefan.wahren@i2se.com>
-> Subject: [PATCH net-next RFT] net: fec: handle small PHY reset durations more
-> precisely
-> 
-> Since msleep is based on jiffies the PHY reset could take longer than expected.
-> So use msleep for values greater than 20 msec otherwise usleep_range.
-> 
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> ---
->  drivers/net/ethernet/freescale/fec_main.c |    7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/freescale/fec_main.c
-> b/drivers/net/ethernet/freescale/fec_main.c
-> index 3c0255e..49f8055 100644
-> --- a/drivers/net/ethernet/freescale/fec_main.c
-> +++ b/drivers/net/ethernet/freescale/fec_main.c
-> @@ -3191,7 +3191,12 @@ static void fec_reset_phy(struct platform_device
-> *pdev)
->  		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %d\n", err);
->  		return;
->  	}
-> -	msleep(msec);
-> +
-> +	if (msec > 20)
-> +		msleep(msec);
-> +	else
-> +		usleep_range(msec * 1000, msec * 1000 + 1000);
-> +
->  	gpio_set_value_cansleep(phy_reset, !active_high);  }  #else /*
-> CONFIG_OF */
-> --
-> 1.7.9.5
+This patch updates the qcom,state-cells to qcom,smem-state-cells to
+match recent changes to the binding.
 
-Thanks. You are correct base on Documentation/timers/timers-howto.txt.
+Signed-off-by: Andy Gross <andy.gross@linaro.org>
+---
+ arch/arm/boot/dts/qcom-apq8064.dtsi | 2 +-
+ arch/arm/boot/dts/qcom-msm8974.dtsi | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-Acked-by: Fugang Duan <fugang.duan@nxp.com>
+diff --git a/arch/arm/boot/dts/qcom-apq8064.dtsi b/arch/arm/boot/dts/qcom-apq8064.dtsi
+index df96ccd..e4437e4 100644
+--- a/arch/arm/boot/dts/qcom-apq8064.dtsi
++++ b/arch/arm/boot/dts/qcom-apq8064.dtsi
+@@ -177,7 +177,7 @@
+ 
+ 		apps_smsm: apps at 0 {
+ 			reg = <0>;
+-			#qcom,state-cells = <1>;
++			#qcom,smem-state-cells = <1>;
+ 		};
+ 
+ 		modem_smsm: modem at 1 {
+diff --git a/arch/arm/boot/dts/qcom-msm8974.dtsi b/arch/arm/boot/dts/qcom-msm8974.dtsi
+index 6f16426..3a79d3c 100644
+--- a/arch/arm/boot/dts/qcom-msm8974.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8974.dtsi
+@@ -182,7 +182,7 @@
+ 
+ 		modem_smp2p_out: master-kernel {
+ 			qcom,entry-name = "master-kernel";
+-			#qcom,state-cells = <1>;
++			#qcom,smem-state-cells = <1>;
+ 		};
+ 
+ 		modem_smp2p_in: slave-kernel {
+@@ -208,7 +208,7 @@
+ 		wcnss_smp2p_out: master-kernel {
+ 			qcom,entry-name = "master-kernel";
+ 
+-			#qcom,state-cells = <1>;
++			#qcom,smem-state-cells = <1>;
+ 		};
+ 
+ 		wcnss_smp2p_in: slave-kernel {
+@@ -232,7 +232,7 @@
+ 		apps_smsm: apps at 0 {
+ 			reg = <0>;
+ 
+-			#qcom,state-cells = <1>;
++			#qcom,smem-state-cells = <1>;
+ 		};
+ 
+ 		modem_smsm: modem at 1 {
+-- 
+1.9.1
