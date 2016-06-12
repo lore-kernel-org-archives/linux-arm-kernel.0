@@ -1,64 +1,53 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Sat, 11 Jun 2016 21:47:36 -0700
-Subject: [PATCH v2 2/2] ARM: dts: sd_600eval: Fix eMMC lockup issue
-In-Reply-To: <1465582795-30266-2-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1465582795-30266-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1465582795-30266-2-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20160612044736.GS1256@tuxbot>
+From: fugang.duan@nxp.com (Fugang Duan)
+Date: Sun, 12 Jun 2016 05:16:02 +0000
+Subject: [PATCH net-next RFT] net: fec: handle small PHY reset durations
+ more precisely
+In-Reply-To: <1465418567-2694-1-git-send-email-stefan.wahren@i2se.com>
+References: <1465418567-2694-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <VI1PR0401MB1855C3B3CF0634BAE6D8063CFF520@VI1PR0401MB1855.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 10 Jun 11:19 PDT 2016, Srinivas Kandagatla wrote:
-
-> From: Parth Pancholi <parth.pancholi@einfochips.com>
+From: Stefan Wahren <stefan.wahren@i2se.com> Sent: Thursday, June 09, 2016 4:43 AM
+> To: David Miller <davem@davemloft.net>; Fugang Duan
+> <fugang.duan@nxp.com>
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>; Lucas Stach
+> <l.stach@pengutronix.de>; andrew at lunn.ch; holgerschurig at gmail.com; Troy
+> Kisky <troy.kisky@boundarydevices.com>; linux-arm-kernel at lists.infradead.org;
+> netdev at vger.kernel.org; Stefan Wahren <stefan.wahren@i2se.com>
+> Subject: [PATCH net-next RFT] net: fec: handle small PHY reset durations more
+> precisely
 > 
-> This board locks up if we stress test the eMMC, as the regulator s4 is
-> unable to supply enough current for all the peripherials attached to it.
-> As this supply is wired up to most of the peripherials including DDR,
-> it resulted in such lockup.
+> Since msleep is based on jiffies the PHY reset could take longer than expected.
+> So use msleep for values greater than 20 msec otherwise usleep_range.
 > 
-> This patch fixes this issue by setting s4 regulator correctly with
-> Auto power mode.
-> 
-> Reported-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> [Srinivas Kandagatla: rewrote the change log]
-> Tested-by: Girish Sharma <girish.sharma@einfochips.com>
-> Signed-off-by: Parth Pancholi <parth.pancholi@einfochips.com>
-
-If I read the msm-3.4 tree correctly most (perhaps all) 8064 devices
-should have this setup.
-
-Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-
-Regards,
-Bjorn
-
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 > ---
->  arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+>  drivers/net/ethernet/freescale/fec_main.c |    7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-> index 7df0108..39ae2bc 100644
-> --- a/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-> +++ b/arch/arm/boot/dts/qcom-apq8064-arrow-sd-600eval.dts
-> @@ -1,6 +1,7 @@
->  #include "qcom-apq8064-v2.0.dtsi"
->  #include "qcom-apq8064-arrow-sd-600eval-pins.dtsi"
->  #include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/mfd/qcom-rpm.h>
->  
->  / {
->  	model = "Arrow Electronics, APQ8064 SD_600eval";
-> @@ -82,7 +83,8 @@
->  				s4 {
->  					regulator-min-microvolt	= <1800000>;
->  					regulator-max-microvolt	= <1800000>;
-> -					qcom,switch-mode-frequency = <3200000>;
-> +					qcom,switch-mode-frequency = <1600000>;
-> +					qcom,force-mode = <QCOM_RPM_FORCE_MODE_AUTO>;
->  					bias-pull-down;
->  					regulator-always-on;
->  				};
-> -- 
-> 2.8.3
-> 
+> diff --git a/drivers/net/ethernet/freescale/fec_main.c
+> b/drivers/net/ethernet/freescale/fec_main.c
+> index 3c0255e..49f8055 100644
+> --- a/drivers/net/ethernet/freescale/fec_main.c
+> +++ b/drivers/net/ethernet/freescale/fec_main.c
+> @@ -3191,7 +3191,12 @@ static void fec_reset_phy(struct platform_device
+> *pdev)
+>  		dev_err(&pdev->dev, "failed to get phy-reset-gpios: %d\n", err);
+>  		return;
+>  	}
+> -	msleep(msec);
+> +
+> +	if (msec > 20)
+> +		msleep(msec);
+> +	else
+> +		usleep_range(msec * 1000, msec * 1000 + 1000);
+> +
+>  	gpio_set_value_cansleep(phy_reset, !active_high);  }  #else /*
+> CONFIG_OF */
+> --
+> 1.7.9.5
+
+Thanks. You are correct base on Documentation/timers/timers-howto.txt.
+
+Acked-by: Fugang Duan <fugang.duan@nxp.com>
