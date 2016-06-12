@@ -1,70 +1,66 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Sun, 12 Jun 2016 15:29:01 +0800
-Subject: [RFC v4 01/14] regulator: of: Add helper for getting all supplies
-In-Reply-To: <20160610173056.GA16503@rob-hp-laptop>
-References: <1465465471-28740-1-git-send-email-k.kozlowski@samsung.com>
- <1465465471-28740-2-git-send-email-k.kozlowski@samsung.com>
- <20160609102925.GS7510@sirena.org.uk> <5759560A.70107@samsung.com>
- <20160610173056.GA16503@rob-hp-laptop>
-Message-ID: <20160612072901.GD22054@shlinux2>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 12 Jun 2016 09:54:17 +0200
+Subject: [PATCH] userspace API definitions for auto-focus coil
+In-Reply-To: <20160611220654.GC26360@valkosipuli.retiisi.org.uk>
+References: <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
+ <20160531213437.GA28397@amd>
+ <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+ <20160601220840.GA21946@amd>
+ <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
+ <20160602193027.GB7984@amd>
+ <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
+ <20160605190716.GA11321@amd> <575512E5.5030000@gmail.com>
+ <20160611220654.GC26360@valkosipuli.retiisi.org.uk>
+Message-ID: <20160612075416.GA1160@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2016 at 12:30:56PM -0500, Rob Herring wrote:
-> On Thu, Jun 09, 2016 at 01:42:02PM +0200, Krzysztof Kozlowski wrote:
-> > On 06/09/2016 12:29 PM, Mark Brown wrote:
-> > > On Thu, Jun 09, 2016 at 11:44:18AM +0200, Krzysztof Kozlowski wrote:
-> > >> Few drivers have a need of getting regulator supplies without knowing
-> > >> their names:
-> > >> 1. The Simple Framebuffer driver works on setup provided by bootloader
-> > >>    (outside of scope of kernel);
-> > >> 2. Generic power sequence driver may be attached to any device node.
-> > >>
-> > >> Add a Device Tree helper for parsing "-supply" properties and returning
-> > >> allocated bulk regulator consumers.
-> > > 
-> > > I'm still very concerned that this is just an invitation to people to
-> > > write half baked regulator consumers and half baked DTs to go along with
-> > > it, making it a standard API that doesn't have big red flags on it that
-> > > will flag up when "normal" drivers use it is not good.  Right now this
-> > > just looks like a standard API and people are going to just start using
-> > > it.  If we are going to do this perhaps we need a separate header or
-> > > something to help flag this up.
-> > 
-> > No problem, I can move it to a special header.  Actually, if you dislike
-> > this as an API, it does not have to be in header at all.  I can just
-> > duplicate the simplefb code.
-> > 
-> > > In the case of power sequences I'd expect the sequences to perform
-> > > operations on named supplies - the core shouldn't know what the supplies
-> > > are but the thing specifying the sequence should.
-> > 
-> > Hm, so maybe passing names like:
-> > 
-> > usb3503 at 08 {
-> > 	reset-gpios = <&gpx3 5 GPIO_ACTIVE_HIGH>;
-> > 	initial-mode = <1>;
-> > 	vdd-supply = <&buck8_reg>;
-> > 	foo-supply = <&buck9_reg>;
-> > 
-> >         power-sequence;
-> > 	power-sequence-supplies = "vdd", "foo";
+Hi!
+
+> > >@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
+> > >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
+> > >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
+> > >
+> > >+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
+> > >+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
 > 
-> This alone would be fine as it is just one property, but then what's 
-> next? power-sequence-delay, power-sequence-clocks, etc. What if you 
-> need to express ordering relationship of supplies, clocks, gpios? We end 
-> up with a scripting language in DT and we don't want to have that.
-> 
+> Please check V4L2_CID_USER_*_BASE. That's how custom controls are handled
+> nowadays.
 
-Can we do things like below:
+Let me see...
 
-- DT describes hardware elements (clock, gpios, etc) for power sequence, and we
-need a node for power sequence.
-- Power sequence framework handles getting hardware elements.
-- Power sequence platform driver handles special sequence for devices,
-and we can create some generic drivers for generic devices.
+> Now that I think about this, the original implementation in N900 very likely
+> did not use either of the two controls; the device driver was still written
+> to provide access to full capabilities of the chip. And that one had no
+> continuous AF.
 
+I'm not sure about the original implementation, but fcam-dev library
+(which is our best chance for usable camera) does use both:
+
+pavel at duo:~/g/fcam-dev$ grep -ri RAMP_TIME .
+./.svn/pristine/05/0574680922f59e07bd49e16a951d69421690a323.svn-base:
+int val = ioctlSet(V4L2_CID_FOCUS_AD5820_RAMP_TIME,
+1000000.0f/diopterRateToTickRate(speed));
+./src/N900/Lens.cpp:    int val =
+ioctlSet(V4L2_CID_FOCUS_AD5820_RAMP_TIME,
+1000000.0f/diopterRateToTickRate(speed));
+pavel at duo:~/g/fcam-dev$ grep -ri RAMP_MODE .
+./.svn/pristine/05/0574680922f59e07bd49e16a951d69421690a323.svn-base:
+ioctlSet(V4L2_CID_FOCUS_AD5820_RAMP_MODE, 0);
+./src/N900/Lens.cpp:    ioctlSet(V4L2_CID_FOCUS_AD5820_RAMP_MODE, 0);
+pavel at duo:~/g/fcam-dev$
+
+> I might as well drop the two controls, up to you. If someone ever needs them
+> they can always be reintroduced. I'd be happy to get a new patch, the
+> current driver patch does not compile (just tried) as the definitions of
+> these controls are missing.
+
+I'd prefer to keep the controls, as we have userspace using them. I
+got it to compile but have yet to get it to work (subdevs split, so it
+needs some modifications).
+
+Best regards,
+									Pavel
 -- 
-
-Best Regards,
-Peter Chen
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
