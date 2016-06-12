@@ -1,45 +1,38 @@
-From: gang.liu@nxp.com (Gang Liu)
-Date: Sun, 12 Jun 2016 03:00:56 +0000
-Subject: [PATCH] arm64: dts: ls1043a: Add 'dma-coherent' for ls1043a PCI
- nodes
-In-Reply-To: <DB5PR0401MB192810622C64C85F08C281D9915E0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
-References: <1465282546-28256-1-git-send-email-Gang.Liu@nxp.com>
- <1465282546-28256-2-git-send-email-Gang.Liu@nxp.com>
- <DB5PR0401MB192810622C64C85F08C281D9915E0@DB5PR0401MB1928.eurprd04.prod.outlook.com>
-Message-ID: <DB4PR04MB2663122FB05EFC7BA1197D882520@DB4PR04MB266.eurprd04.prod.outlook.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 12 Jun 2016 12:14:13 +0800
+Subject: [PATCH v3,4/5] usb: Add MediaTek USB3 DRD Driver
+In-Reply-To: <1465543962-11678-5-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <201606121211.aP7WlrOd%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Scott Wood
-> 
-> On 06/07/2016 02:06 AM, Liu Gang wrote:
-> > The 'dma-coherent' indicates that the hardware IP block can ensure the
-> > coherency of the data transferred from/to the IP block. This can avoid
-> > the software cache flush/invalid actions, and improve the performance
-> > significantly.
-> >
-> > The PCI IP block of ls1043a has this capability, so adding this
-> > feature to improve the PCI performance.
-> >
-> > Signed-off-by: Liu Gang <Gang.Liu@nxp.com>
-> > ---
-> >  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 3 +++
-> >  1 file changed, 3 insertions(+)
-> 
-> Why not ls2080a as well?
-[Liu Gang] ls2080 should also include this property, we can add it after verification.
- 
-> What about non-PCI devices?
-> 
-> Pretty much everything on these chips should be coherent as long as it's
-> properly configured.
-[Liu Gang] you are right. For the layerscape platforms including CCI or CCN internal bus,
-theoretically, pretty much IP blocks (PCI/non-PCI) should be coherent. But this depends
-on the properly hardware and software configurations. (ls1012a PCI devices cannot implement
-the coherent duo to hardware issue)
-So I think we'd better to add this property after each IP block's verification.
+Hi,
 
-Thanks!
-Liu Gang
->
-> -Scott
+[auto build test ERROR on usb/usb-testing]
+[also build test ERROR on v4.7-rc2 next-20160609]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/Chunfeng-Yun/usb-Add-MediaTek-USB3-DRD-Driver/20160610-153559
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb.git usb-testing
+config: i386-randconfig-x011-06120748 (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All error/warnings (new ones prefixed by >>):
+
+warning: (USB_MTU3) selects USB_XHCI_MTK which has unmet direct dependencies (USB_SUPPORT && USB && USB_XHCI_HCD && (ARCH_MEDIATEK || COMPILE_TEST))
+   drivers/built-in.o: In function `mtu3_probe':
+>> mtu3_plat.c:(.text+0x21471d): undefined reference to `extcon_get_edev_by_phandle'
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 27652 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/d55e8007/attachment-0001.obj>
