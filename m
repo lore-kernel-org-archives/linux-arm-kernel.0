@@ -1,62 +1,145 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Sun, 12 Jun 2016 10:18:46 +0800
-Subject: [PATCH] serial: 8250_early: Add earlycon support for Synopsys
- DesignWare ABP UART
-In-Reply-To: <20160519213516.GA12456@broadcom.com>
-References: <1462946761-11982-1-git-send-email-wangkefeng.wang@huawei.com>
- <573D1ABD.5020908@huawei.com> <20160519213516.GA12456@broadcom.com>
-Message-ID: <575CC686.8070407@huawei.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 12 Jun 2016 10:31:00 +0800
+Subject: [PATCH 3/3] ARM: dts: imx7: add Toradex Colibri iMX7S/iMX7D
+ support
+In-Reply-To: <20160608023709.32090-4-stefan@agner.ch>
+References: <20160608023709.32090-1-stefan@agner.ch>
+ <20160608023709.32090-4-stefan@agner.ch>
+Message-ID: <20160612023100.GW20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Jun 07, 2016 at 07:37:09PM -0700, Stefan Agner wrote:
+> +&lcdif {
+> +	status = "okay";
+> +	display = <&display0>;
 
+Please put 'status' at the bottom of property list.
 
-On 2016/5/20 5:35, Jon Mason wrote:
-> On Thu, May 19, 2016 at 09:45:33AM +0800, Kefeng Wang wrote:
->> +Cc Jon and arm-kernel mailist
->>
->> Any comments, thanks.
-> 
-> It works for me.  Please feel free to add
-> 
-> Tested-by: Jon Mason <jon.mason@broadcom.com>
+> +
+> +	display0: lcd-display {
+> +		bits-per-pixel = <16>;
+> +		bus-width = <18>;
+> +
+> +		display-timings {
+> +			native-mode = <&timing_vga>;
+> +
+> +			/* Standard VGA timing */
+> +			timing_vga: 640x480 {
+> +				clock-frequency = <25175000>;
+> +				hactive = <640>;
+> +				vactive = <480>;
+> +				hback-porch = <40>;
+> +				hfront-porch = <24>;
+> +				vback-porch = <32>;
+> +				vfront-porch = <11>;
+> +				hsync-len = <96>;
+> +				vsync-len = <2>;
+> +				de-active = <1>;
+> +				hsync-active = <0>;
+> +				vsync-active = <0>;
+> +				pixelclk-active = <0>;
+> +			};
+> +		};
+> +	};
+> +};
 
-Thanks Jon, hi Greg, ping...
+<snip>
 
-BRs,
-Kefeng
+> +&usdhc1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc1 &pinctrl_cd_usdhc1>;
+> +	no-1-8-v;
+> +	cd-gpios = <&gpio1 0 0>;
 
-> 
-> Thanks,
-> Jon
-> 
->>
->> Kefeng
->>
->> On 2016/5/11 14:06, Kefeng Wang wrote:
->>> Some board like Hisilicon D02 uses Synopsys DesignWare ABP UART, declare an
->>> OF early console for it, so early console device can be enabled with comand
->>> line "earlycon"(without option) via the "stdout-path" property in device-tree.
->>>
->>> Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
->>> ---
->>>  drivers/tty/serial/8250/8250_early.c | 1 +
->>>  1 file changed, 1 insertion(+)
->>>
->>> diff --git a/drivers/tty/serial/8250/8250_early.c b/drivers/tty/serial/8250/8250_early.c
->>> index 8d08ff5..85a12f0 100644
->>> --- a/drivers/tty/serial/8250/8250_early.c
->>> +++ b/drivers/tty/serial/8250/8250_early.c
->>> @@ -150,6 +150,7 @@ EARLYCON_DECLARE(uart, early_serial8250_setup);
->>>  OF_EARLYCON_DECLARE(ns16550, "ns16550", early_serial8250_setup);
->>>  OF_EARLYCON_DECLARE(ns16550a, "ns16550a", early_serial8250_setup);
->>>  OF_EARLYCON_DECLARE(uart, "nvidia,tegra20-uart", early_serial8250_setup);
->>> +OF_EARLYCON_DECLARE(uart, "snps,dw-apb-uart", early_serial8250_setup);
->>>  
->>>  #ifdef CONFIG_SERIAL_8250_OMAP
->>>  
->>>
->>
-> 
-> .
-> 
+Use the macro in include/dt-bindings/gpio/gpio.h.
+
+> +	enable-sdio-wakeup;
+
+This is deprecated.  Please use wakeup-source instead.
+
+> +	fsl,tuning-step = <2>;
+> +	keep-power-in-suspend;
+> +	status = "okay";
+> +};
+
+<snip>
+
+> +&fec1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet1>;
+> +	clocks = <&clks IMX7D_ENET_AXI_ROOT_CLK>,
+> +		<&clks IMX7D_ENET_AXI_ROOT_CLK>,
+> +		<&clks IMX7D_ENET1_TIME_ROOT_CLK>,
+> +		<&clks IMX7D_PLL_ENET_MAIN_50M_CLK>;
+> +	clock-names = "ipg", "ahb", "ptp", "enet_clk_ref";
+> +
+
+Drop this newline.
+
+> +	assigned-clocks = <&clks IMX7D_ENET1_TIME_ROOT_SRC>,
+> +			  <&clks IMX7D_ENET1_TIME_ROOT_CLK>;
+> +	assigned-clock-parents = <&clks IMX7D_PLL_ENET_MAIN_100M_CLK>;
+> +	assigned-clock-rates = <0>, <100000000>;
+> +	phy-mode = "rmii";
+> +	phy-supply = <&reg_LDO1>;
+> +	fsl,magic-packet;
+> +};
+
+<snip>
+
+> +&uart1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart1 &pinctrl_uart1_ctrl1 &pinctrl_uart1_ctrl2>;
+> +	assigned-clocks = <&clks IMX7D_UART1_ROOT_SRC>;
+> +	assigned-clock-parents = <&clks IMX7D_OSC_24M_CLK>;
+> +	fsl,uart-has-rtscts;
+
+Please use generic 'uart-has-rtscts' instead.
+
+> +	fsl,dte-mode;
+> +};
+> +
+> +&uart2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart2>;
+> +	assigned-clocks = <&clks IMX7D_UART2_ROOT_SRC>;
+> +	assigned-clock-parents = <&clks IMX7D_OSC_24M_CLK>;
+> +	fsl,uart-has-rtscts;
+
+Ditto
+
+> +	fsl,dte-mode;
+> +};
+
+<snip>
+
+> +/ {
+> +	model = "Toradex Colibri iMX7D on Colibri Evaluation Board V3";
+> +	compatible = "toradex,colibri_imx7d-eval", "toradex,colibri_imx7d", \
+
+We always use hyphen than underscore in compatible string.
+
+> +		     "fsl,imx7d";
+> +
+> +	reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
+> +		compatible = "regulator-fixed";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pinctrl_usbotg2_reg>;
+> +		regulator-name = "VCC_USB[1-4]";
+> +		regulator-min-microvolt = <5000000>;
+> +		regulator-max-microvolt = <5000000>;
+> +		gpio = <&gpio4 7 GPIO_ACTIVE_LOW>;
+> +	};
+> +};
+> +/ {
+> +	model = "Toradex Colibri iMX7S on Colibri Evaluation Board V3";
+> +	compatible = "toradex,colibri_imx7s-eval", "toradex,colibri_imx7s", \
+> +		     "fsl,imx7s", "fsl,imx7d";
+
+You may not want to have "fsl,imx7d" here.  Otherwise, the detection
+between  imx7s and imx7d colibri-eval-v3 board will be difficult.
+
+Shawn
+
+> +};
