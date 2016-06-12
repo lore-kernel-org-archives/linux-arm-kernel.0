@@ -1,33 +1,43 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Sun, 12 Jun 2016 17:48:48 +0800
-Subject: [PATCH] clk: rockchip: add flag CLK_SET_RATE_PARENT for dclk_vop0_div
- on RK3399
-Message-ID: <1465724928-14611-1-git-send-email-zhengxing@rock-chips.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sun, 12 Jun 2016 11:12:40 +0100
+Subject: [PATCH v3 1/2] clocksource/arm_arch_timer: Force per-CPU
+ interrupt to be level-triggered
+In-Reply-To: <CANe6Qb_sx8_rRHZG1PR=A+cgxqYTzreZ0rD01X-gtEDb=h1cVQ@mail.gmail.com>
+References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
+ <1465235791-7064-2-git-send-email-marc.zyngier@arm.com>
+ <5759DB58.5070906@gmail.com> <20160610082952.4f20d732@arm.com>
+ <575AFB4A.3030508@gmail.com> <20160611104100.7475689e@arm.com>
+ <CANe6Qb_sx8_rRHZG1PR=A+cgxqYTzreZ0rD01X-gtEDb=h1cVQ@mail.gmail.com>
+Message-ID: <20160612111240.7dc99322@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The functions and features VOP0 more complete than VOP1's, we need to
-use it dclk_vop0_div operate VPLLI, and let VOP0 as the default primary
-screen.
+On Sat, 11 Jun 2016 13:02:44 +0100
+Ben Dooks <bjdooks@googlemail.com> wrote:
 
-Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
----
+> out of interest, do you have a list of what the problems are?
 
- drivers/clk/rockchip/clk-rk3399.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+The trigger configuration for per-cpu interrupts silently fails
+(because set_irq_type cannot deal with them). Which means we're relying
+on whatever configuration the firmware has left in there. Also, the
+kernel defaults to considering the interrupt as edge.
 
-diff --git a/drivers/clk/rockchip/clk-rk3399.c b/drivers/clk/rockchip/clk-rk3399.c
-index 7ecb12c3..6affa75 100644
---- a/drivers/clk/rockchip/clk-rk3399.c
-+++ b/drivers/clk/rockchip/clk-rk3399.c
-@@ -1157,7 +1157,7 @@ static struct rockchip_clk_branch rk3399_clk_branches[] __initdata = {
- 	GATE(HCLK_VOP0_NOC, "hclk_vop0_noc", "hclk_vop0_pre", CLK_IGNORE_UNUSED,
- 			RK3399_CLKGATE_CON(28), 0, GFLAGS),
- 
--	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, 0,
-+	COMPOSITE(DCLK_VOP0_DIV, "dclk_vop0_div", mux_pll_src_vpll_cpll_gpll_p, CLK_SET_RATE_PARENT,
- 			RK3399_CLKSEL_CON(49), 8, 2, MFLAGS, 0, 8, DFLAGS,
- 			RK3399_CLKGATE_CON(10), 12, GFLAGS),
- 
+What saves most platforms so far is that they are using a GIC:
+1) Most GIC implementations have their PPI configuration as RO, which
+   means that we can't get it wrong.
+2) If using a fasteoi handler, there is no significant difference in the
+   flow between edge and level (we're relying on the HW dealing with it,
+   so (1) is critical).
+
+If your GIC allows PPI configuration to be written and firmware gets it
+wrong, you'll miss interrupts. If you don't have a GIC, all bets are
+off.
+
+I've queued a number of patches to solve this, which I hope to send to
+tglx tomorrow (after looking at this weekend test run).
+
+Thanks,
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny.
