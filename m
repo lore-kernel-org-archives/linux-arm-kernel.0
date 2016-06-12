@@ -1,90 +1,100 @@
-From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 12 Jun 2016 13:22:23 +0200
-Subject: [linux-sunxi] [PATCH 0/5] net-next: ethernet: add sun8i-emac
- driver
-In-Reply-To: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1464947790-22991-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <c8037d93-1d12-fdfb-a88b-e88ff0f72d52@redhat.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Sun, 12 Jun 2016 14:22:53 +0300
+Subject: [PATCH] userspace API definitions for auto-focus coil
+In-Reply-To: <20160612084811.GA27446@amd>
+References: <20160531213437.GA28397@amd>
+ <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
+ <20160601220840.GA21946@amd>
+ <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
+ <20160602193027.GB7984@amd>
+ <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
+ <20160605190716.GA11321@amd> <575512E5.5030000@gmail.com>
+ <20160611220654.GC26360@valkosipuli.retiisi.org.uk>
+ <20160612084811.GA27446@amd>
+Message-ID: <20160612112253.GD26360@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Pavel,
 
-On 03-06-16 11:56, LABBE Corentin wrote:
-> Hello
->
-> This patch series add the driver for sun8i-emac which handle the Ethernet MAC
-> present on Allwinner H3/A83T/A64 SoCs.
->
-> It supports 10/100/1000 Mbit/s speed with half/full duplex.
-> It can use an internal PHY (MII 10/100) or an external PHY
-> via RGMII/RMII.
->
-> This patch series enable the driver only for the H3 SoC since A83T and A64
-> doesn't have the necessary clocks present in mainline.
->
-> This patch series enable the driver only for the OrangePiPC board since other
-> board with H3 use external PHY which need optional regulators that will be
-> supported later.
->
-> The driver have been tested on the following boards:
-> - H3 Orange PI PC, Orange PI Plus, BananaPI-M2+
-> - A64 Pine64
-> - A83T BananaPI-M3
->
-> I would like to thanks Chen-Yu Tsai for his help on developing this driver.
+On Sun, Jun 12, 2016 at 10:48:11AM +0200, Pavel Machek wrote:
+> Hi!
+> 
+> > > >Add userspace API definitions.
+> > > >
+> > > >Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > >
+> > > >diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> > > >index b6a357a..23011cc 100644
+> > > >--- a/include/uapi/linux/v4l2-controls.h
+> > > >+++ b/include/uapi/linux/v4l2-controls.h
+> > > >@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
+> > > >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
+> > > >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
+> > > >
+> > > >+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
+> > > >+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
+> > 
+> > Please check V4L2_CID_USER_*_BASE. That's how custom controls are handled
+> > nowadays.
+> 
+> So something like this?
+> 
+> Thanks,
+> 									Pavel
+> 
+> diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
+> index 2efa5dc1..b04b471 100644
+> --- a/drivers/media/i2c/ad5820.c
+> +++ b/drivers/media/i2c/ad5820.c
+> @@ -40,6 +40,11 @@
+>  #define AD5820_RAMP_MODE_LINEAR		(0 << 3)
+>  #define AD5820_RAMP_MODE_64_16		(1 << 3)
+>  
+> +/* Control IDs specific to the AD5820 driver as defined by V4L2 */
+> +#define V4L2_CID_FOCUS_AD5820_RAMP_TIME		(V4L2_CID_USER_AD5820_BASE+0)
+> +#define V4L2_CID_FOCUS_AD5820_RAMP_MODE		(V4L2_CID_FOCUS_AD5820_BASE+1)
+> +
+> +
 
-Awesome! Thanks for your work on this.
+We could still define these in a header file that can be included by the
+user space. Please use V4L2_CID_AD5820 prefix.
 
-I've tested this on a orangepi-one. You can add my:
+A separate header file should be used, e.g. include/uapi/linux/ad5820.h.
 
-Tested-by: Hans de Goede <hdegoede@redhat.com>
+>  #define CODE_TO_RAMP_US(s)	((s) == 0 ? 0 : (1 << ((s) - 1)) * 50)
+>  #define RAMP_US_TO_CODE(c)	fls(((c) + ((c)>>1)) / 50)
+>  
+> diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
+> index 23011cc..4b24546 100644
+> --- a/include/uapi/linux/v4l2-controls.h
+> +++ b/include/uapi/linux/v4l2-controls.h
+> @@ -181,6 +181,10 @@ enum v4l2_colorfx {
+>   * We reserve 16 controls for this driver. */
+>  #define V4L2_CID_USER_TC358743_BASE		(V4L2_CID_USER_BASE + 0x1080)
+>  
+> +/* The base for the ad5820 driver controls.
+> + * We reserve 16 controls for this driver. */
+> +#define V4L2_CID_USER_AD5820_BASE		(V4L2_CID_USER_BASE + 0x1090)
+> +
+>  /* MPEG-class control IDs */
+>  /* The MPEG controls are applicable to all codec controls
+>   * and the 'MPEG' part of the define is historical */
+> @@ -986,9 +990,4 @@ enum v4l2_detect_md_mode {
+>  #define V4L2_CID_MODE_SENSITIVITY		(V4L2_CID_MODE_CLASS_BASE+6)
+>  #define V4L2_CID_MODE_OPSYSCLOCK		(V4L2_CID_MODE_CLASS_BASE+7)
+>  
+> -/* Control IDs specific to the AD5820 driver as defined by V4L2 */
+> -#define V4L2_CID_FOCUS_AD5820_BASE 		(V4L2_CTRL_CLASS_CAMERA | 0x10af)
+> -#define V4L2_CID_FOCUS_AD5820_RAMP_TIME		(V4L2_CID_FOCUS_AD5820_BASE+0)
+> -#define V4L2_CID_FOCUS_AD5820_RAMP_MODE		(V4L2_CID_FOCUS_AD5820_BASE+1)
+> -
+>  #endif
+> 
+> 
 
-For the next version of this series.
+-- 
+Kind regards,
 
-Attached is a dts patch for adding support
-for the emac one that one (to be applied on top of this patch-set).
-
-I've a Orange PI Plus and a Orange PI 2 as well, both of which use an external
-phy, I would love to test on those as well, do you've a tree with adds the
-necessary regulator bits and an example of how this would like in dts
-somewhere ?
-
-One remark about:
-[PATCH 5/5] ARM: dts: sun8i: Enable sun8i-emac on the Orange PI PC
-
-We always keep the nodes in board.dts files sorted alphebetically,
-so the emac node should be after the ehci node rather then at the end.
-
-Regards,
-
-Hans
-
->
-> Regards
->
-> LABBE Corentin (5):
->   ethernet: add sun8i-emac driver
->   MAINTAINERS: Add myself as maintainers of sun8i-emac
->   ARM: sun8i: dt: Add DT bindings documentation for Allwinner sun8i-emac
->   ARM: dts: sun8i-h3: add sun8i-emac ethernet driver
->   ARM: dts: sun8i: Enable sun8i-emac on the Orange PI PC
->
->  .../bindings/net/allwinner,sun8i-emac.txt          |   64 +
->  MAINTAINERS                                        |    6 +
->  arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts         |   11 +
->  arch/arm/boot/dts/sun8i-h3.dtsi                    |   14 +
->  drivers/net/ethernet/allwinner/Kconfig             |   13 +
->  drivers/net/ethernet/allwinner/Makefile            |    1 +
->  drivers/net/ethernet/allwinner/sun8i-emac.c        | 1943 ++++++++++++++++++++
->  7 files changed, 2052 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun8i-emac.txt
->  create mode 100644 drivers/net/ethernet/allwinner/sun8i-emac.c
->
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-ARM-dts-sun8i-Enable-sun8i-emac-on-the-Orange-PI-One.patch
-Type: text/x-patch
-Size: 1061 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/44eec570/attachment-0001.bin>
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi	XMPP: sailus at retiisi.org.uk
