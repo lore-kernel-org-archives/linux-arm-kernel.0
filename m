@@ -1,47 +1,66 @@
-From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
-Date: Sun, 12 Jun 2016 17:17:07 +0200
-Subject: [PATCH 1/2] ARM: dts: imx6q-cm-fx6: fix the operation points
-In-Reply-To: <CAOMZO5APbW8Hc_HCEyF=22T320KJ6K+E1AVpZPH4Rkzjqi-8rQ@mail.gmail.com>
-References: <6b48c849983548f29259b42d69c5224c@rwthex-s1-b.rwth-ad.de>
- <650a7982db35484194a0be26863a89f9@rwthex-s1-a.rwth-ad.de>
- <2256c64f85d847d29c2c3e0f4e095d90@rwthex-s1-b.rwth-ad.de>
- <CAOMZO5APbW8Hc_HCEyF=22T320KJ6K+E1AVpZPH4Rkzjqi-8rQ@mail.gmail.com>
-Message-ID: <c3617579fc5e4c28bdd78177aa9f493a@rwthex-s1-b.rwth-ad.de>
+From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
+Date: Sun, 12 Jun 2016 17:19:21 +0200
+Subject: [PATCH v2 1/2] ARM: dts: imx6q-cm-fx6: fix the operation points
+Message-ID: <cd3010c3a4144ec38f2cfd1bfbd1b2ad@rwthex-s1-b.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+From: Valentin Raevsky <valentin@compulab.co.il>
 
-On 06/12/2016 04:36 PM, Fabio Estevam wrote:
-> On Sun, Jun 12, 2016 at 11:05 AM, Christopher Spinrath
-> <christopher.spinrath@rwth-aachen.de> wrote:
-> 
->> Well, without this patch the SoC runs at 1.2GHz so it seems like the
->> fuse indicates that it is possible. But with a fair amount of IPs
->> enabled and high load the board becomes unstable (display
->> flickering/blanks, ethernet package drops, ...). I guess CompuLab
->> allowed 1.2GHz at first and then realized that it is a bad idea (at
->> least for some boards).
->>
->> Is there any way to influence the fuse (e.g. from the
->> firmware/bootloader) or do you have another proposal on how to fix this
->> issue?
-> 
-> Ok, understood. So the mx6q fuse indicates that 1.2GHz operation is
-> possible on , but the board itself does not behave nicely at this
-> frequency.
-> 
-> Maybe you could send a v2 of this patch that matches the operating
-> points form mx6qdl.dtsi and remove only the 1.2GHz entry and put the
-> explanation you gave us here in the dts and commit log.
-> 
+The current ldo settings of the cm-fx6 do not allow 1.2GHz cpu
+frequency. At this frequency the module behaves unstable.
 
-Will do.
+But the imx6q fuse indicates that 1.2GHz operation is possible.
+Hence, remove the 1.2GHz operation point in the device tree.
 
-Thanks,
-Christopher
+Signed-off-by: Valentin Raevsky <valentin@compulab.co.il>
+[christopher.spinrath at rwth-aachen.de: enhanced commit message and adjust
+ remaining operation points to match the ones in imx6q.dtsi]
+Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+---
 
-> Regards,
-> 
-> Fabio Estevam
-> 
+Notes:
+    Changes since v1:
+     - Enhance commit message to explain that we cannot rely on the imx6q
+       fuse to restrict the frequency
+     - put the same information into a comment in the device tree
+     - fix the remaining operation points to match the ones given in
+       imx6q.dtsi
+
+ arch/arm/boot/dts/imx6q-cm-fx6.dts | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+index 6d8d5e9..0038f0e 100644
+--- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
++++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+@@ -91,6 +91,27 @@
+ 	};
+ };
+ 
++&cpu0 {
++	/* Although the imx6q fuse indicates that 1.2GHz operation is possible,
++	 * the module behaves unstable at this frequency. Hence, remove the
++	 * 1.2GHz operation point here.
++	 */
++	operating-points = <
++		/* kHz	uV */
++		996000	1250000
++		852000	1250000
++		792000	1175000
++		396000	975000
++	>;
++	fsl,soc-operating-points = <
++		/* ARM kHz	SOC-PU uV */
++		996000		1250000
++		852000		1250000
++		792000		1175000
++		396000		1175000
++	>;
++};
++
+ &ecspi1 {
+ 	fsl,spi-num-chipselects = <2>;
+ 	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>, <&gpio3 19 GPIO_ACTIVE_HIGH>;
+-- 
+2.8.3
