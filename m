@@ -1,43 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 12 Jun 2016 11:12:40 +0100
-Subject: [PATCH v3 1/2] clocksource/arm_arch_timer: Force per-CPU
- interrupt to be level-triggered
-In-Reply-To: <CANe6Qb_sx8_rRHZG1PR=A+cgxqYTzreZ0rD01X-gtEDb=h1cVQ@mail.gmail.com>
-References: <1465235791-7064-1-git-send-email-marc.zyngier@arm.com>
- <1465235791-7064-2-git-send-email-marc.zyngier@arm.com>
- <5759DB58.5070906@gmail.com> <20160610082952.4f20d732@arm.com>
- <575AFB4A.3030508@gmail.com> <20160611104100.7475689e@arm.com>
- <CANe6Qb_sx8_rRHZG1PR=A+cgxqYTzreZ0rD01X-gtEDb=h1cVQ@mail.gmail.com>
-Message-ID: <20160612111240.7dc99322@arm.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 12 Jun 2016 12:27:02 +0200 (CEST)
+Subject: ARM: mxs: warnings on PM resume
+In-Reply-To: <2607020.0FcLMf1DX6@vostro.rjw.lan>
+References: <1713040590.199779.36789782-c361-4fe4-bc0d-b581fbce8069.open-xchange@email.1und1.de>
+ <1955365225.76161.cd9a3eda-edc7-4bae-96f3-bdddccbb0478.open-xchange@email.1und1.de>
+ <2607020.0FcLMf1DX6@vostro.rjw.lan>
+Message-ID: <908847370.85504.d47d66b7-356b-4e07-9e1d-807a299ea337.open-xchange@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Jun 2016 13:02:44 +0100
-Ben Dooks <bjdooks@googlemail.com> wrote:
+Hi Rafael,
 
-> out of interest, do you have a list of what the problems are?
+> "Rafael J. Wysocki" <rjw@rjwysocki.net> hat am 11. Juni 2016 um 03:42
+> geschrieben:
+> 
+> 
+> On Saturday, June 11, 2016 03:01:31 AM Stefan Wahren wrote:
+> > Hi,
+> > 
+> > [add Rafael, J?rg and J?rgen to CC]
+> > 
+> > > Stefan Wahren <stefan.wahren@i2se.com> hat am 1. Juni 2016 um 22:51
+> > > geschrieben:
+> > > 
+> > > 
+> > > Hi,
+> > > 
+> > > i'm currently working on standby support for MXS platform. If i trigger
+> > > the
+> > > standby per sysfs everything works fine, but mostly on resume i get a
+> > > bunch of
+> > > warnings (see below for full output):
+> > > 
+> > > [   67.040000] Interrupts enabled before system core resume.
+> > > 
+> > > My current working branch [1] based on Linux 4.5 ( cmdline has
+> > > no_console_suspend=1 ). The test hardware is a i.MX23 board (
+> > > iMX233-OLinuXino-MAXI ).
+> > > 
+> > > How can i narrow down this issue to the relevant driver / interrupt ?
+> > > 
+> > > What is the right way to fix this issue?
+> > > 
+> > 
+> > any hints or ideas to narrow down this issue are very welcome.
+> 
+> Interrupts should not be enabled before syscore_resume() is called, but they
+> are, apparently by the platform code.
 
-The trigger configuration for per-cpu interrupts silently fails
-(because set_irq_type cannot deal with them). Which means we're relying
-on whatever configuration the firmware has left in there. Also, the
-kernel defaults to considering the interrupt as edge.
+sure, but it isn't that simple. I can't reproduce the warning everytime. At
+least i need 5 tries and more to reproduce it.
 
-What saves most platforms so far is that they are using a GIC:
-1) Most GIC implementations have their PPI configuration as RO, which
-   means that we can't get it wrong.
-2) If using a fasteoi handler, there is no significant difference in the
-   flow between edge and level (we're relying on the HW dealing with it,
-   so (1) is critical).
+I place the following code in the suspend code, before the low level suspend
+code in SRAM gets executed:
 
-If your GIC allows PPI configuration to be written and firmware gets it
-wrong, you'll miss interrupts. If you don't have a GIC, all bets are
-off.
+if (!irqs_disabled())
+	pr_info("IRQs not disabled before suspend\n");
 
-I've queued a number of patches to solve this, which I hope to send to
-tglx tomorrow (after looking at this weekend test run).
+The info message above only get printed if the warning "Interrupts enabled
+before system core resume." appears.
 
-Thanks,
+After that i dumped all enabled IRQs (at the same code place) from the interrupt
+collector (irqchip) and compared them with cat /proc/interrupts. I noticed that
+the dump contains all interrupt from /proc/interrupts plus the IRQs from the 3
+GPIO banks, which were not listed under PROC FS.
 
-	M.
--- 
-Jazz is not dead. It just smells funny.
+So i take a look at the GPIO driver gpio-mxs.c and noticed that it seems to miss
+the flag IRQCHIP_MASK_ON_SUSPEND compared to a driver gpio-mxc.c for very
+similiar hardware. Unfortunately adding the flag in the GPIO driver doesn't fix
+the issue.
+
+So any hints about narrowing down the issue would be helpful.
+
+Stefan
