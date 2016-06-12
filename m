@@ -1,109 +1,85 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 12 Jun 2016 20:13:03 +0800
-Subject: [PATCH 05/11] clk: imx: refine the powerup_set bit of clk-pllv3
-In-Reply-To: <20160612113627.GC20243@tiger>
-References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
- <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
- <20160612113627.GC20243@tiger>
-Message-ID: <20160612121303.GE32690@shlinux2>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Sun, 12 Jun 2016 20:21:04 +0800
+Subject: [PATCH 13/23] arm64: introduce is_a32_task and is_a32_thread (for
+ AArch32 compat)
+In-Reply-To: <1464048292-30136-14-git-send-email-ynorov@caviumnetworks.com>
+References: <1464048292-30136-1-git-send-email-ynorov@caviumnetworks.com>
+ <1464048292-30136-14-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <575D53B0.5020408@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2016 at 07:36:27PM +0800, Shawn Guo wrote:
-> On Wed, Jun 08, 2016 at 10:33:34PM +0800, Dong Aisheng wrote:
-> > There's a powerdown bit already, so let's change the name of
-> > powerup_set bit to power_invert to reflects the power polarity
-> > to make it less confusing.
-> > 
-> > Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> > ---
-> >  drivers/clk/imx/clk-pllv3.c | 14 +++++++-------
-> >  1 file changed, 7 insertions(+), 7 deletions(-)
-> > 
-> > diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-> > index eea2b1b3791e..3fdfb6d2cc71 100644
-> > --- a/drivers/clk/imx/clk-pllv3.c
-> > +++ b/drivers/clk/imx/clk-pllv3.c
-> > @@ -29,8 +29,8 @@
-> >   * struct clk_pllv3 - IMX PLL clock version 3
-> >   * @clk_hw:	 clock source
-> >   * @base:	 base address of PLL registers
-> > - * @powerup_set: set POWER bit to power up the PLL
-> > - * @powerdown:   pll powerdown offset bit
-> > + * @powerdown:	 pll powerdown bit offset
-> 
-> I think 'powerdown' is more confusing here.  I prefer to rename it to
-> something like 'power_mask' and keep 'powerdown' as it is.
-> 
+Hi, Yury
 
-I understand your point.
-How about using power_bit and powerup_set?
-* @power_bit:   pll power bit offset
-* @powerup_set: set power_bit to power up the PLL
+On 2016/5/24 8:04, Yury Norov wrote:
+> Based on patch of Andrew Pinski.
+>
+> This patch introduces is_a32_compat_task and is_a32_thread so it is
+> easier to say this is a a32 specific thread or a generic compat thread/task.
+> Corresponding functions are located in <asm/is_compat.h> to avoid mess in
+> headers.
+>
+> Some files include both <linux/compat.h> and <asm/compat.h>,
+> and this is wrong because <linux/compat.h> has <asm/compat.h> already
+> included. It was fixed too.
+>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+> ---
+>   arch/arm64/include/asm/compat.h      | 19 ++----------
+>   arch/arm64/include/asm/elf.h         | 10 +++----
+>   arch/arm64/include/asm/ftrace.h      |  2 +-
+>   arch/arm64/include/asm/is_compat.h   | 58 ++++++++++++++++++++++++++++++++++++
+>   arch/arm64/include/asm/memory.h      |  3 +-
+>   arch/arm64/include/asm/processor.h   |  5 ++--
+>   arch/arm64/include/asm/syscall.h     |  2 +-
+>   arch/arm64/include/asm/thread_info.h |  2 +-
+>   arch/arm64/kernel/hw_breakpoint.c    | 10 +++----
+>   arch/arm64/kernel/perf_regs.c        |  2 +-
+>   arch/arm64/kernel/process.c          |  7 ++---
+>   arch/arm64/kernel/ptrace.c           | 11 ++++---
+>   arch/arm64/kernel/signal.c           |  4 +--
+>   arch/arm64/kernel/traps.c            |  3 +-
+>   14 files changed, 91 insertions(+), 47 deletions(-)
+>   create mode 100644 arch/arm64/include/asm/is_compat.h
+>
+[...]
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 12f8a00..a66a0f7 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -26,6 +26,7 @@
+>   #include <linux/types.h>
+>   #include <asm/bug.h>
+>   #include <asm/sizes.h>
+> +#include <asm/is_compat.h>
+>
+>   /*
+>    * Allow for constants defined here to be used from assembly code
+> @@ -61,7 +62,7 @@
+>
+>   #ifdef CONFIG_COMPAT
+>   #define TASK_SIZE_32		UL(0x100000000)
+> -#define TASK_SIZE		(test_thread_flag(TIF_32BIT) ? \
+> +#define TASK_SIZE		(is_compat_task() ?		\
+>   				TASK_SIZE_32 : TASK_SIZE_64)
+>   #define TASK_SIZE_OF(tsk)	(test_tsk_thread_flag(tsk, TIF_32BIT) ? \
+>   				TASK_SIZE_32 : TASK_SIZE_64)
+Should we update or delete this macro?
+  #define TASK_SIZE_OF(tsk) (is_compat_task() ? \
+TASK_SIZE_32 : TASK_SIZE_64)
+
+x86, sparc, mips, ppc, parisc, s390 define its own version. But
+"include/linux/sched.h" will define it if
+TASK_SIZE_OF does not exist:
+#ifndef TASK_SIZE_OF
+#define TASK_SIZE_OF(tsk)       TASK_SIZE
+#endif
+
 
 Regards
-Dong Aisheng
 
-> Shawn
-> 
-> > + * @power_invert: set powerdown bit to power up the PLL
-> >   * @div_mask:	 mask of divider bits
-> >   * @div_shift:	 shift of divider bits
-> >   *
-> > @@ -40,7 +40,7 @@
-> >  struct clk_pllv3 {
-> >  	struct clk_hw	hw;
-> >  	void __iomem	*base;
-> > -	bool		powerup_set;
-> > +	bool		power_invert;
-> >  	u32		powerdown;
-> >  	u32		div_mask;
-> >  	u32		div_shift;
-> > @@ -55,7 +55,7 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
-> >  	u32 val = readl_relaxed(pll->base) & pll->powerdown;
-> >  
-> >  	/* No need to wait for lock when pll is not powered up */
-> > -	if ((pll->powerup_set && !val) || (!pll->powerup_set && val))
-> > +	if ((pll->power_invert && !val) || (!pll->power_invert && val))
-> >  		return 0;
-> >  
-> >  	/* Wait for PLL to lock */
-> > @@ -76,7 +76,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
-> >  	u32 val;
-> >  
-> >  	val = readl_relaxed(pll->base);
-> > -	if (pll->powerup_set)
-> > +	if (pll->power_invert)
-> >  		val |= pll->powerdown;
-> >  	else
-> >  		val &= ~pll->powerdown;
-> > @@ -91,7 +91,7 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
-> >  	u32 val;
-> >  
-> >  	val = readl_relaxed(pll->base);
-> > -	if (pll->powerup_set)
-> > +	if (pll->power_invert)
-> >  		val &= ~pll->powerdown;
-> >  	else
-> >  		val |= pll->powerdown;
-> > @@ -326,7 +326,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
-> >  		pll->div_shift = 1;
-> >  	case IMX_PLLV3_USB:
-> >  		ops = &clk_pllv3_ops;
-> > -		pll->powerup_set = true;
-> > +		pll->power_invert = true;
-> >  		break;
-> >  	case IMX_PLLV3_AV:
-> >  		ops = &clk_pllv3_av_ops;
-> > -- 
-> > 1.9.1
-> > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Bamvor
