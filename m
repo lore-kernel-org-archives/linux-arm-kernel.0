@@ -1,96 +1,31 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 11 Jun 2016 17:14:19 -0700
-Subject: [PATCH] ARM: dts: sun7i: Add BCM53125 Device Tree nodes
-In-Reply-To: <1465690459-30751-1-git-send-email-f.fainelli@gmail.com>
-References: <1465690459-30751-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <1465690459-30751-2-git-send-email-f.fainelli@gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Sun, 12 Jun 2016 09:35:26 +0800
+Subject: [PATCH 1/3] ARM: dts: imx7d: create i.MX 7Solo base device tree
+In-Reply-To: <20160608023709.32090-2-stefan@agner.ch>
+References: <20160608023709.32090-1-stefan@agner.ch>
+ <20160608023709.32090-2-stefan@agner.ch>
+Message-ID: <20160612013526.GV20243@tiger>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a proper binding for Ethernet switches hanging off
-different buses, and a driver for the BCM53125 switch, add its Device
-Tree as a child MDIO node, at MDIO address 30 (Broadcom pseudo-PHY
-address) and describe the ports layout of the Lamobo R1 board.
+On Tue, Jun 07, 2016 at 07:37:07PM -0700, Stefan Agner wrote:
+> The i.MX 7 series currently consists of two SoCs: i.MX 7Solo and
+> 7Dual. The i.MX 7Solo implements a subset of features available on
+> i.MX 7Dual, hence create imx7s.dtsi as the base device tree. The
+> i.MX 7Dual's additional features over i.MX 7Solo are:
+> - Second Cortex-A7 core
+> - Second Gigabit Ethernet controller
+> - EPD (Electronc Paper Display, not yet part of the device tree)
+> - PCIe (not yet part of the device tree)
+> - Additional USB2.0 OTG controller
+> 
+> Signed-off-by: Stefan Agner <stefan@agner.ch>
+> ---
+>  arch/arm/boot/dts/imx7d.dtsi | 923 +++----------------------------------------
+>  arch/arm/boot/dts/imx7s.dtsi | 880 +++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 928 insertions(+), 875 deletions(-)
 
-Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
----
- arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts | 60 +++++++++++++++++++++++++++++--
- 1 file changed, 57 insertions(+), 3 deletions(-)
+We should probably have a beforehand patch to rename the file, so that
+we can avoid this dramatic diffstat.
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-index 5ee43d8bf174..697582397dcf 100644
---- a/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-lamobo-r1.dts
-@@ -110,13 +110,67 @@
- &gmac {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&gmac_pins_rgmii_a>;
--	phy = <&phy1>;
- 	phy-mode = "rgmii";
- 	phy-supply = <&reg_gmac_3v3>;
- 	status = "okay";
- 
--	phy1: ethernet-phy at 1 {
--		reg = <1>;
-+	fixed-link {
-+		speed = <1000>;
-+		full-duplex;
-+	};
-+
-+	mdio1 {
-+		compatible = "snps,dwmac-mdio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		switch: ethernet-switch at 30 {
-+			compatible = "brcm,bcm53125";
-+			reg = <30>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				port at 0 {
-+					reg = <0>;
-+					label = "lan2";
-+				};
-+
-+				port at 1 {
-+					reg = <1>;
-+					label = "lan3";
-+				};
-+
-+				port at 2 {
-+					reg = <2>;
-+					label = "lan4";
-+				};
-+
-+				port at 3 {
-+					reg = <3>;
-+					label = "wan";
-+				};
-+
-+				port at 4 {
-+					reg = <4>;
-+					label = "lan1";
-+				};
-+
-+				port at 8 {
-+					reg = <8>;
-+					label = "cpu";
-+					ethernet = <&gmac>;
-+					phy-mode = "rgmii";
-+					fixed-link {
-+						speed = <1000>;
-+						full-duplex;
-+					};
-+				};
-+			};
-+		};
- 	};
- };
- 
--- 
-2.7.4
+Shawn
