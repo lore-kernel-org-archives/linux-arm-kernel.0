@@ -1,18 +1,16 @@
 From: dongas86@gmail.com (Dong Aisheng)
-Date: Sun, 12 Jun 2016 19:56:22 +0800
+Date: Sun, 12 Jun 2016 20:13:03 +0800
 Subject: [PATCH 05/11] clk: imx: refine the powerup_set bit of clk-pllv3
-In-Reply-To: <20160609094328.136b7bf8@ipc1.ka-ro>
+In-Reply-To: <20160612113627.GC20243@tiger>
 References: <1465396420-27064-1-git-send-email-aisheng.dong@nxp.com>
  <1465396420-27064-5-git-send-email-aisheng.dong@nxp.com>
- <20160609094328.136b7bf8@ipc1.ka-ro>
-Message-ID: <20160612115622.GD32690@shlinux2>
+ <20160612113627.GC20243@tiger>
+Message-ID: <20160612121303.GE32690@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2016 at 09:43:28AM +0200, Lothar Wa??mann wrote:
-> Hi,
-> 
-> On Wed, 8 Jun 2016 22:33:34 +0800 Dong Aisheng wrote:
+On Sun, Jun 12, 2016 at 07:36:27PM +0800, Shawn Guo wrote:
+> On Wed, Jun 08, 2016 at 10:33:34PM +0800, Dong Aisheng wrote:
 > > There's a powerdown bit already, so let's change the name of
 > > powerup_set bit to power_invert to reflects the power polarity
 > > to make it less confusing.
@@ -33,24 +31,79 @@ On Thu, Jun 09, 2016 at 09:43:28AM +0200, Lothar Wa??mann wrote:
 > > - * @powerup_set: set POWER bit to power up the PLL
 > > - * @powerdown:   pll powerdown offset bit
 > > + * @powerdown:	 pll powerdown bit offset
-> > + * @power_invert: set powerdown bit to power up the PLL
-> s/set/clear/ ?
+> 
+> I think 'powerdown' is more confusing here.  I prefer to rename it to
+> something like 'power_mask' and keep 'powerdown' as it is.
 > 
 
-It is set.
-By default set the powerdown bit will powerdown the PLL according
-to spec.
-However, for IMX_PLLV3_USB, it's actually power up the PLL,
-so the power_invert reflect such using.
+I understand your point.
+How about using power_bit and powerup_set?
+* @power_bit:   pll power bit offset
+* @powerup_set: set power_bit to power up the PLL
 
 Regards
 Dong Aisheng
 
+> Shawn
 > 
-> 
-> Lothar Wa??mann
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > + * @power_invert: set powerdown bit to power up the PLL
+> >   * @div_mask:	 mask of divider bits
+> >   * @div_shift:	 shift of divider bits
+> >   *
+> > @@ -40,7 +40,7 @@
+> >  struct clk_pllv3 {
+> >  	struct clk_hw	hw;
+> >  	void __iomem	*base;
+> > -	bool		powerup_set;
+> > +	bool		power_invert;
+> >  	u32		powerdown;
+> >  	u32		div_mask;
+> >  	u32		div_shift;
+> > @@ -55,7 +55,7 @@ static int clk_pllv3_wait_lock(struct clk_pllv3 *pll)
+> >  	u32 val = readl_relaxed(pll->base) & pll->powerdown;
+> >  
+> >  	/* No need to wait for lock when pll is not powered up */
+> > -	if ((pll->powerup_set && !val) || (!pll->powerup_set && val))
+> > +	if ((pll->power_invert && !val) || (!pll->power_invert && val))
+> >  		return 0;
+> >  
+> >  	/* Wait for PLL to lock */
+> > @@ -76,7 +76,7 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+> >  	u32 val;
+> >  
+> >  	val = readl_relaxed(pll->base);
+> > -	if (pll->powerup_set)
+> > +	if (pll->power_invert)
+> >  		val |= pll->powerdown;
+> >  	else
+> >  		val &= ~pll->powerdown;
+> > @@ -91,7 +91,7 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+> >  	u32 val;
+> >  
+> >  	val = readl_relaxed(pll->base);
+> > -	if (pll->powerup_set)
+> > +	if (pll->power_invert)
+> >  		val &= ~pll->powerdown;
+> >  	else
+> >  		val |= pll->powerdown;
+> > @@ -326,7 +326,7 @@ struct clk *imx_clk_pllv3(enum imx_pllv3_type type, const char *name,
+> >  		pll->div_shift = 1;
+> >  	case IMX_PLLV3_USB:
+> >  		ops = &clk_pllv3_ops;
+> > -		pll->powerup_set = true;
+> > +		pll->power_invert = true;
+> >  		break;
+> >  	case IMX_PLLV3_AV:
+> >  		ops = &clk_pllv3_av_ops;
+> > -- 
+> > 1.9.1
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
