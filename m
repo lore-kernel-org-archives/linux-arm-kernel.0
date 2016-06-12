@@ -1,88 +1,56 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Sun, 12 Jun 2016 10:48:11 +0200
-Subject: [PATCH] userspace API definitions for auto-focus coil
-In-Reply-To: <20160611220654.GC26360@valkosipuli.retiisi.org.uk>
-References: <20160531212222.GP26360@valkosipuli.retiisi.org.uk>
- <20160531213437.GA28397@amd>
- <20160601152439.GQ26360@valkosipuli.retiisi.org.uk>
- <20160601220840.GA21946@amd>
- <20160602074544.GR26360@valkosipuli.retiisi.org.uk>
- <20160602193027.GB7984@amd>
- <20160602212746.GT26360@valkosipuli.retiisi.org.uk>
- <20160605190716.GA11321@amd> <575512E5.5030000@gmail.com>
- <20160611220654.GC26360@valkosipuli.retiisi.org.uk>
-Message-ID: <20160612084811.GA27446@amd>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 12 Jun 2016 17:28:23 +0800
+Subject: [RESEND/PATCHv4 v4 3/3] firmware: Support loading into a
+ pre-allocated buffer
+In-Reply-To: <20160607164741.31849-4-stephen.boyd@linaro.org>
+Message-ID: <201606121736.x3UpVTjF%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-> > >Add userspace API definitions.
-> > >
-> > >Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> > >
-> > >diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-> > >index b6a357a..23011cc 100644
-> > >--- a/include/uapi/linux/v4l2-controls.h
-> > >+++ b/include/uapi/linux/v4l2-controls.h
-> > >@@ -974,4 +975,9 @@ enum v4l2_detect_md_mode {
-> > >  #define V4L2_CID_DETECT_MD_THRESHOLD_GRID	(V4L2_CID_DETECT_CLASS_BASE + 3)
-> > >  #define V4L2_CID_DETECT_MD_REGION_GRID		(V4L2_CID_DETECT_CLASS_BASE + 4)
-> > >
-> > >+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-> > >+#define V4L2_CID_FOCUS_AD5820_BASE 	(V4L2_CTRL_CLASS_CAMERA | 0x10af)
-> 
-> Please check V4L2_CID_USER_*_BASE. That's how custom controls are handled
-> nowadays.
+[auto build test ERROR on driver-core/driver-core-testing]
+[also build test ERROR on v4.7-rc2]
+[cannot apply to next-20160609]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-So something like this?
+url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/firmware-Consolidate-kmap-read-write-logic/20160607-164005
+config: x86_64-randconfig-v0-06121632 (attached as .config)
+compiler: gcc-6 (Debian 6.1.1-1) 6.1.1 20160430
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-Thanks,
-									Pavel
+All errors (new ones prefixed by >>):
 
-diff --git a/drivers/media/i2c/ad5820.c b/drivers/media/i2c/ad5820.c
-index 2efa5dc1..b04b471 100644
---- a/drivers/media/i2c/ad5820.c
-+++ b/drivers/media/i2c/ad5820.c
-@@ -40,6 +40,11 @@
- #define AD5820_RAMP_MODE_LINEAR		(0 << 3)
- #define AD5820_RAMP_MODE_64_16		(1 << 3)
- 
-+/* Control IDs specific to the AD5820 driver as defined by V4L2 */
-+#define V4L2_CID_FOCUS_AD5820_RAMP_TIME		(V4L2_CID_USER_AD5820_BASE+0)
-+#define V4L2_CID_FOCUS_AD5820_RAMP_MODE		(V4L2_CID_FOCUS_AD5820_BASE+1)
-+
-+
- #define CODE_TO_RAMP_US(s)	((s) == 0 ? 0 : (1 << ((s) - 1)) * 50)
- #define RAMP_US_TO_CODE(c)	fls(((c) + ((c)>>1)) / 50)
- 
-diff --git a/include/uapi/linux/v4l2-controls.h b/include/uapi/linux/v4l2-controls.h
-index 23011cc..4b24546 100644
---- a/include/uapi/linux/v4l2-controls.h
-+++ b/include/uapi/linux/v4l2-controls.h
-@@ -181,6 +181,10 @@ enum v4l2_colorfx {
-  * We reserve 16 controls for this driver. */
- #define V4L2_CID_USER_TC358743_BASE		(V4L2_CID_USER_BASE + 0x1080)
- 
-+/* The base for the ad5820 driver controls.
-+ * We reserve 16 controls for this driver. */
-+#define V4L2_CID_USER_AD5820_BASE		(V4L2_CID_USER_BASE + 0x1090)
-+
- /* MPEG-class control IDs */
- /* The MPEG controls are applicable to all codec controls
-  * and the 'MPEG' part of the define is historical */
-@@ -986,9 +990,4 @@ enum v4l2_detect_md_mode {
- #define V4L2_CID_MODE_SENSITIVITY		(V4L2_CID_MODE_CLASS_BASE+6)
- #define V4L2_CID_MODE_OPSYSCLOCK		(V4L2_CID_MODE_CLASS_BASE+7)
- 
--/* Control IDs specific to the AD5820 driver as defined by V4L2 */
--#define V4L2_CID_FOCUS_AD5820_BASE 		(V4L2_CTRL_CLASS_CAMERA | 0x10af)
--#define V4L2_CID_FOCUS_AD5820_RAMP_TIME		(V4L2_CID_FOCUS_AD5820_BASE+0)
--#define V4L2_CID_FOCUS_AD5820_RAMP_MODE		(V4L2_CID_FOCUS_AD5820_BASE+1)
--
- #endif
+   In file included from drivers/video/fbdev/metronomefb.c:33:0:
+>> include/linux/firmware.h:82:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+   include/linux/firmware.h:80:19: warning: 'request_firmware_into_buf' declared 'static' but never defined [-Wunused-function]
+    static inline int request_firmware_into_buf(const struct firmware **firmware_p,
+                      ^~~~~~~~~~~~~~~~~~~~~~~~~
 
+vim +82 include/linux/firmware.h
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+    76	{
+    77		return -EINVAL;
+    78	}
+    79	
+    80	static inline int request_firmware_into_buf(const struct firmware **firmware_p,
+    81		const char *name, struct device *device, void *buf, size_t size);
+  > 82	{
+    83		return -EINVAL;
+    84	}
+    85	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 23402 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160612/becc8f69/attachment-0001.obj>
