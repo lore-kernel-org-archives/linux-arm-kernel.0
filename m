@@ -1,42 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 13 Jun 2016 15:49:18 -0700
-Subject: [GIT PULL] SoCFPGA DTS fix for v4.7
-In-Reply-To: <1465414387-20171-2-git-send-email-dinguyen@kernel.org>
-References: <1465414387-20171-1-git-send-email-dinguyen@kernel.org>
- <1465414387-20171-2-git-send-email-dinguyen@kernel.org>
-Message-ID: <20160613224918.GH29879@localhost>
+Date: Mon, 13 Jun 2016 15:52:39 -0700
+Subject: [PATCH] MAINTAINERS: Add myself as reviewer of ARM FSL/NXP
+In-Reply-To: <20160611093846.GL20243@tiger>
+References: <1465221100-3942-1-git-send-email-fabio.estevam@nxp.com>
+ <20160611093846.GL20243@tiger>
+Message-ID: <20160613225239.GI29879@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2016 at 02:33:07PM -0500, Dinh Nguyen wrote:
-> Hi Arnd, Kevin, and Olof:
+On Sat, Jun 11, 2016 at 05:38:46PM +0800, Shawn Guo wrote:
+> On Mon, Jun 06, 2016 at 10:51:40AM -0300, Fabio Estevam wrote:
+> > I would like to help reviewing FSL/NXP ARM architecture patches.
+> > 
+> > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Please pull in this fix for v4.7.
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
 > 
-> Thanks,
-> Dinh
+> Hi arm-soc folks,
 > 
-> The following changes since commit 1a695a905c18548062509178b98bc91e67510864:
-> 
->   Linux 4.7-rc1 (2016-05-29 09:29:24 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/dinguyen/linux.git socfpga_fix_for_v4.7
-> 
-> for you to fetch changes up to c106c21ce02e366f3dc887bff7c48f3f140c45c9:
-> 
->   ARM: dts: socfpga: Add missing PHY phandle (2016-06-08 14:12:04 -0500)
-> 
-> ----------------------------------------------------------------
-> SoCFPGA fix for v4.7
-> - Add missing PHY phandle for SoCFPGA VINING board
-> 
-> ----------------------------------------------------------------
-> Marek Vasut (1):
->       ARM: dts: socfpga: Add missing PHY phandle
+> Please help apply the patch to arm-soc tree.  I do not have a branch for
+> this one.  Thanks.
 
-Merged, thanks.
+Thanks, applied to fixes.
 
 
 -Olof
