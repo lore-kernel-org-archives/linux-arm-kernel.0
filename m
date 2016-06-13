@@ -1,29 +1,55 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 13 Jun 2016 16:35:21 +0200
-Subject: [PATCH v2 4/4] ARM: dts: r8a7790: lager: use demuxer for IIC3/I2C3
-In-Reply-To: <1465370066-8450-5-git-send-email-horms+renesas@verge.net.au>
-References: <1465370066-8450-1-git-send-email-horms+renesas@verge.net.au>
- <1465370066-8450-5-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20160613143521.GD1603@katana>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 13 Jun 2016 08:37:35 -0600
+Subject: [PATCH v2 4/9] coresight: Fix csdev connections initialisation
+In-Reply-To: <575E74C9.9010004@arm.com>
+References: <1465204301-24184-1-git-send-email-suzuki.poulose@arm.com>
+ <1465204301-24184-5-git-send-email-suzuki.poulose@arm.com>
+ <CANLsYkwGckonnLjHbOJQPZ849NQyjf+Zy=N6kjtwwo-kQbbj4Q@mail.gmail.com>
+ <575E74C9.9010004@arm.com>
+Message-ID: <CANLsYkzmVxBhf1QWmAYyFUzkRJXSuA-=myO0tc9F1H2oKPb6Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 13 June 2016 at 02:54, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 12/06/16 21:39, Mathieu Poirier wrote:
+>>
+>> On 6 June 2016 at 03:11, Suzuki K Poulose <suzuki.poulose@arm.com> wrote:
+>>>
+>>> This is a cleanup patch.
+>>>
+>>> coresight_device->conns holds an array to point to the devices
+>>> connected to the OUT ports of a component. Sinks, e.g ETR, do not
+>>> have an OUT port (nr_outport = 0), as it streams the trace to
+>>> memory via AXI.
+>>>
+>>> At coresight_register() we do :
+>>>
+>>>          conns = kcalloc(csdev->nr_outport, sizeof(*conns), GFP_KERNEL);
+>>>          if (!conns) {
+>>>                  ret = -ENOMEM;
+>>>                  goto err_kzalloc_conns;
+>>>          }
+>>>
+>>> For ETR, since the total size requested for kcalloc is zero, the return
+>>> value is, ZERO_SIZE_PTR ( != NULL). Hence, csdev->conns = ZERO_SIZE_PTR
+>>> which cannot be verified later to contain a valid pointer. The code which
+>>> accesses the csdev->conns is bounded by the csdev->nr_outport check,
+>>> hence we don't try to dereference the ZERO_SIZE_PTR. This patch cleans
+>>> up the csdev->conns and csdev->refcnt, initialisation to make sure we
+>>
+>>
+>> This patch no longer deals with csdev->refcnt.
+>
+>
+> Ok, fill fix that. Btw, do we need that check ? I am tempted to keep it
+> there,
+> just to make sure we don't end up in something similar in the future.
 
->  		i2c9 = "i2cexio1";
->  		i2c10 = "i2chdmi";
->  		i2c11 = "gpioi2c";
-> +		i2c12 = "i2cpwr";
+If it becomes an issue in the future we'll know what to do :o)
 
-To make it easier for users, we should maybe group them?
+Thanks,
+Mathieu
 
-i2c8+9: additional gpio busses
-i2c10-13: i2cexioX
-
-?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20160613/637debee/attachment-0001.sig>
+>
+> Cheers
+> Suzuki
