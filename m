@@ -1,33 +1,89 @@
-From: weiyj_lk@163.com (weiyj_lk at 163.com)
-Date: Mon, 13 Jun 2016 14:27:18 +0000
-Subject: [PATCH -next] mtd: nand: sunxi: fix return value check in
- sunxi_nfc_dma_op_prepare()
-Message-ID: <1465828038-16893-1-git-send-email-weiyj_lk@163.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 13 Jun 2016 14:29:01 +0000
+Subject: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space accessors
+ against platfrom specific ECAM quirks
+In-Reply-To: <575EBD13.8080808@codeaurora.org>
+References: <1465822923-33599-1-git-send-email-liudongdong3@huawei.com>
+ <1465822923-33599-2-git-send-email-liudongdong3@huawei.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1F782C86@lhreml507-mbx>
+ <575EBD13.8080808@codeaurora.org>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1F782E15@lhreml507-mbx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+Hi Sinan
 
-In case of error, the function dmaengine_prep_slave_sg() returns NULL
-pointer not ERR_PTR(). The IS_ERR() test in the return value check
-should be replaced with NULL test.
+> -----Original Message-----
+> From: Sinan Kaya [mailto:okaya at codeaurora.org]
+> Sent: 13 June 2016 15:03
+> To: Gabriele Paoloni; liudongdong (C); helgaas at kernel.org;
+> arnd at arndb.de; will.deacon at arm.com; catalin.marinas at arm.com;
+> rafael at kernel.org; hanjun.guo at linaro.org; Lorenzo.Pieralisi at arm.com;
+> jchandra at broadcom.com; tn at semihalf.com
+> Cc: robert.richter at caviumnetworks.com; mw at semihalf.com;
+> Liviu.Dudau at arm.com; ddaney at caviumnetworks.com; Wangyijing;
+> Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
+> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; linaro-
+> acpi at lists.linaro.org; jcm at redhat.com; andrea.gallo at linaro.org;
+> dhdang at apm.com; jeremy.linton at arm.com; cov at codeaurora.org; Chenxin
+> (Charles); Linuxarm
+> Subject: Re: [RFC PATCH V2 1/2] ACPI/PCI: Match PCI config space
+> accessors against platfrom specific ECAM quirks
+> 
+> On 6/13/2016 9:54 AM, Gabriele Paoloni wrote:
+> > As you can see here Liudongdong has replaced oem_revision with
+> > oem_table_id.
+> >
+> > Now it seems that there are some platforms that have already shipped
+> > using a matching based on the oem_revision (right Jon?)
+> >
+> > However I guess that if in FW they have defined oem_table_id properly
+> > they should be able to use this mechanism without needing to a FW
+> update.
+> >
+> > Can these vendors confirm this?
+> >
+> > Tomasz do you think this can work for Cavium Thunder?
+> >
+> > Thanks
+> >
+> > Gab
+> 
+> Why not have all three of them?
+> 
+> The initial approach was OEM id and revision id.
+> 
+> Jeff Hugo indicated that addition (not removing any other fields) of
+> table id
+> would make more sense.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
- drivers/mtd/nand/sunxi_nand.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Mmm from last email of Jeff Hugo on "[RFC PATCH 1/3] pci, acpi: Match
+PCI config space accessors against platfrom specific ECAM quirks."
 
-diff --git a/drivers/mtd/nand/sunxi_nand.c b/drivers/mtd/nand/sunxi_nand.c
-index ef7f6df..653cb3a 100644
---- a/drivers/mtd/nand/sunxi_nand.c
-+++ b/drivers/mtd/nand/sunxi_nand.c
-@@ -390,8 +390,8 @@ static int sunxi_nfc_dma_op_prepare(struct mtd_info *mtd, const void *buf,
- 		return -ENOMEM;
- 
- 	dmad = dmaengine_prep_slave_sg(nfc->dmac, sg, 1, tdir, DMA_CTRL_ACK);
--	if (IS_ERR(dmad)) {
--		ret = PTR_ERR(dmad);
-+	if (!dmad) {
-+		ret = -EINVAL;
- 		goto err_unmap_buf;
- 	}
+I quote:
+
+ "Using the OEM revision 
+ field does not seem to be appropriate since these are different 
+ platforms and the revision field appears to be for the purpose of 
+ tracking differences within a single platform.  Therefore, Cov is 
+ proposing using the OEM table id as a mechanism to distinguish
+ platform A (needs quirk applied) vs platform B (no quirks) from the
+ same OEM."
+
+So it looks to me that he pointed out that using the OEM revision field
+is wrong...and this is why I have asked if replacing it with the table
+id can work for other vendors....
+
+Thanks
+
+Gab
+
+
+> 
+> --
+> Sinan Kaya
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center,
+> Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+> Linux Foundation Collaborative Project
