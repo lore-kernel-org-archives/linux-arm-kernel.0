@@ -1,92 +1,46 @@
-From: christopher.spinrath@rwth-aachen.de (christopher.spinrath at rwth-aachen.de)
-Date: Mon, 13 Jun 2016 01:24:56 +0200
-Subject: [PATCH v3 2/2] ARM: dts: utilite-pro: add mmc card slot support
-In-Reply-To: <20160612232456.1621-1-christopher.spinrath@rwth-aachen.de>
-References: <20160612232456.1621-1-christopher.spinrath@rwth-aachen.de>
-Message-ID: <c25d8e5d113240c5ab78771f301d901a@rwthex-s1-b.rwth-ad.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 13 Jun 2016 02:32:01 +0200
+Subject: [PATCH] pinctrl: qcom-ssbi: support for pm8058
+Message-ID: <1465777921-1989-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
+The PM858 is found in connection to the APQ8060 on the APQ8060
+Dragonboard. Works the same as all others, just add the compatible
+string for this variant.
 
-The Utilite Pro has a mmc card slot connected to the usdhc3
-controller. There is no card detection until hardware revision 1.3.
-
-Add support for it and signal the controller with the broken-cd
-property that polling has to be used to detect a card.
-
-Signed-off-by: Christopher Spinrath <christopher.spinrath@rwth-aachen.de>
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Cc: Bjorn Andersson <bjorn.andersson@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
+ Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt | 1 +
+ drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c                     | 1 +
+ 2 files changed, 2 insertions(+)
 
-Notes:
-    Changes since v2:
-     - add Fabio's Reviewed-By
-    
-    Changes since v1:
-     - enhance commit message to explain to the broken-cd property
-
- arch/arm/boot/dts/imx6q-utilite-pro.dts | 44 +++++++++++++++++++++++++++++++++
- 1 file changed, 44 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6q-utilite-pro.dts b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-index 7219745..6199063 100644
---- a/arch/arm/boot/dts/imx6q-utilite-pro.dts
-+++ b/arch/arm/boot/dts/imx6q-utilite-pro.dts
-@@ -130,6 +130,39 @@
- 			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B 0x1b0b1
- 		>;
- 	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x10059
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc3_100mhz: usdhc3grp-100mhz {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170B9
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100B9
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170B9
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170B9
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170B9
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170B9
-+		>;
-+	};
-+
-+	pinctrl_usdhc3_200mhz: usdhc3grp-200mhz {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x170F9
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x100F9
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x170F9
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x170F9
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x170F9
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x170F9
-+		>;
-+	};
- };
- 
- &pcie {
-@@ -151,3 +184,14 @@
- 	uart-has-rtscts;
- 	status = "okay";
- };
-+
-+&usdhc3 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-+	no-1-8-v;
-+	broken-cd;
-+	keep-power-in-suspend;
-+	status = "okay";
-+};
+diff --git a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
+index d74e631e10da..b484ba1af78c 100644
+--- a/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
++++ b/Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt
+@@ -9,6 +9,7 @@ of PMIC's from Qualcomm.
+ 	Definition: Should contain one of:
+ 		    "qcom,pm8018-mpp",
+ 		    "qcom,pm8038-mpp",
++		    "qcom,pm8058-mpp",
+ 		    "qcom,pm8821-mpp",
+ 		    "qcom,pm8841-mpp",
+ 		    "qcom,pm8916-mpp",
+diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+index 9191727aff5e..0d1392fc32dd 100644
+--- a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
++++ b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+@@ -744,6 +744,7 @@ static int pm8xxx_pin_populate(struct pm8xxx_mpp *pctrl,
+ static const struct of_device_id pm8xxx_mpp_of_match[] = {
+ 	{ .compatible = "qcom,pm8018-mpp" },
+ 	{ .compatible = "qcom,pm8038-mpp" },
++	{ .compatible = "qcom,pm8058-mpp" },
+ 	{ .compatible = "qcom,pm8917-mpp" },
+ 	{ .compatible = "qcom,pm8821-mpp" },
+ 	{ .compatible = "qcom,pm8921-mpp" },
 -- 
-2.8.3
+2.4.11
