@@ -1,134 +1,97 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 13 Jun 2016 16:06:47 -0700
-Subject: [PATCH 02/11] mmc: sdhci-of-arasan: Always power the PHY off/on
- when clock changes
-In-Reply-To: <ae4409b0-48a5-e30f-a244-7a28bd7a9daa@rock-chips.com>
+Date: Mon, 13 Jun 2016 16:07:13 -0700
+Subject: [PATCH 01/11] phy: rockchip-emmc: Increase lock time allowance
+In-Reply-To: <3e19ff54-ee4a-c208-e137-1c0f8022f6b3@rock-chips.com>
 References: <1465339484-969-1-git-send-email-dianders@chromium.org>
- <1465339484-969-3-git-send-email-dianders@chromium.org>
- <ae4409b0-48a5-e30f-a244-7a28bd7a9daa@rock-chips.com>
-Message-ID: <CAD=FV=V8GumWP0aKQdCyXBEdUcjg7c5BKLu5smUYuZW3C5DHmA@mail.gmail.com>
+ <1465339484-969-2-git-send-email-dianders@chromium.org>
+ <3e19ff54-ee4a-c208-e137-1c0f8022f6b3@rock-chips.com>
+Message-ID: <CAD=FV=X-318tAquybtdKz6Uqs0ZCMEzP5ZB9zrFUa8qSF8+_Eg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Shawn,
 
-On Mon, Jun 13, 2016 at 1:08 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
-> ? 2016/6/8 6:44, Douglas Anderson ??:
+On Mon, Jun 13, 2016 at 12:58 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+> On 2016/6/8 6:44, Douglas Anderson wrote:
 >>
->> In commit 802ac39a5566 ("mmc: sdhci-of-arasan: fix set_clock when a phy
->> is supported") we added code to power the PHY off and on whenever the
->> clock was changed but we avoided doing the power cycle code when the
->> clock was low speed.  Let's now do it always.
+>> Previous PHY code waited a fixed amount of time for the DLL to lock at
+>> power on time.  Unfortunately, the time for the DLL to lock is actually
+>> a bit more dynamic and can be longer if the card clock is slower.
 >>
->> Although there may be other reasons for power cycling the PHY when the
->> clock changes, one of the main reasons is that we need to give the DLL a
->> chance to re-lock with the new clock.
->>
->> One of the things that the DLL is for is tuning the Receive Clock in
->> HS200 mode and STRB in HS400 mode.  Thus it is clear that we should make
->> sure we power cycle the PHY (and wait for the DLL to lock) when we know
->> we'll be in one of these two speed modes.  That's what the original code
->> did, though it used the clock rate rather than the speed mode.  However,
->> even in speed modes other than HS200,/HS400 the DLL is used for
->> something since it can be clearly observed that the PHY doesn't function
->> properly if you leave the DLL off.
->>
->> Although it appears less important to power cycle the PHY and wait for
->> the DLL to lock when not in HS200/HS400 modes (no bugs were reported),
->> it still seems wise to let the locking always happen nevertheless.
+>> Instead of waiting a fixed 30 us, let's now dynamically wait until the
+>> lock bit gets set.  We'll wait up to 10 ms which should be OK even if
+>> the card clock is at the super slow 100 kHz.
 >>
 >
-> From the design doc, there is no need to off/on phy when not in
-> HS200/400, but maybe someone will limit the clk freq by assigning
-> max-frequency in DT when in HS200/400, which will make things worse.
->
-> So your patch looks sane.
->
->
->> Note: as part of this, we make sure that we never try to turn the PHY on
->> when the clock is off (when the clock rate is 0).  The PHY cannot work
->> when the clock is off since its DLL can't lock.
+> mmc stack limit the min freq to 200k when initializing the card.
+
+Are you certain?  In "drivers/mmc/core/core.c" I see:
+
+static const unsigned freqs[] = { 400000, 300000, 200000, 100000 };
+
+In ID mode if 400kHz, 300kHz, 200kHz all fail then it will try 100kHz.
+
+
+> So 5ms is enough, but it's ok to set the max timeout to 10ms as we
+> can break out if locked.
+
+Right, it's OK to error on the long side since it is really a pretty
+serious error if the DLL doesn't lock and delaying tens of
+milliseconds in this case is not a huge deal.
+
+
+>> On its own, this change makes the PHY power on code a little more
+>> robust.  Before this change the PHY was relying on the eMMC code to make
+>> sure the PHY was only powered on when the card clock was set to at least
+>> 50 MHz before, though this reliance wasn't documented anywhere.
 >>
->> This change requires ("phy: rockchip-emmc: Increase lock time
->> allowance") and will cause problems if picked without that change.
+>> This change will be even more useful in future changes where we actually
+>> need to be able to wait for a DLL lock at slower clock speeds.
 >>
 >> Signed-off-by: Douglas Anderson <dianders@chromium.org>
 >> ---
->>  drivers/mmc/host/sdhci-of-arasan.c | 23 ++++++++---------------
->>  1 file changed, 8 insertions(+), 15 deletions(-)
+>>  drivers/phy/phy-rockchip-emmc.c | 27 +++++++++++++++++++--------
+>>  1 file changed, 19 insertions(+), 8 deletions(-)
 >>
->> diff --git a/drivers/mmc/host/sdhci-of-arasan.c
->> b/drivers/mmc/host/sdhci-of-arasan.c
->> index 533e2bcb10bc..3ff1711077c2 100644
->> --- a/drivers/mmc/host/sdhci-of-arasan.c
->> +++ b/drivers/mmc/host/sdhci-of-arasan.c
->> @@ -35,11 +35,13 @@
->>  /**
->>   * struct sdhci_arasan_data
->>   * @clk_ahb:   Pointer to the AHB clock
->> - * @phy: Pointer to the generic phy
->> + * @phy:       Pointer to the generic phy
->> + * @phy_on:    True if the PHY is turned on.
->>   */
->>  struct sdhci_arasan_data {
->>         struct clk      *clk_ahb;
->>         struct phy      *phy;
->> +       bool            phy_on;
->>  };
->>
->>  static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host
->> *host)
->> @@ -61,12 +63,10 @@ static void sdhci_arasan_set_clock(struct sdhci_host
->> *host, unsigned int clock)
+>> diff --git a/drivers/phy/phy-rockchip-emmc.c
+>> b/drivers/phy/phy-rockchip-emmc.c
+>> index a69f53630e67..8336053aea5c 100644
+>> --- a/drivers/phy/phy-rockchip-emmc.c
+>> +++ b/drivers/phy/phy-rockchip-emmc.c
+>> @@ -85,6 +85,7 @@ static int rockchip_emmc_phy_power(struct
+>> rockchip_emmc_phy *rk_phy,
 >>  {
->>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->>         struct sdhci_arasan_data *sdhci_arasan =
->> sdhci_pltfm_priv(pltfm_host);
->> -       bool ctrl_phy = false;
+>>         unsigned int caldone;
+>>         unsigned int dllrdy;
+>> +       unsigned long timeout;
 >>
->> -       if (clock > MMC_HIGH_52_MAX_DTR && (!IS_ERR(sdhci_arasan->phy)))
->> -               ctrl_phy = true;
->> +       if (sdhci_arasan->phy_on && !IS_ERR(sdhci_arasan->phy)) {
->> +               sdhci_arasan->phy_on = false;
->>
->> -       if (ctrl_phy) {
->>                 spin_unlock_irq(&host->lock);
->>                 phy_power_off(sdhci_arasan->phy);
->>                 spin_lock_irq(&host->lock);
->> @@ -74,7 +74,9 @@ static void sdhci_arasan_set_clock(struct sdhci_host
->> *host, unsigned int clock)
->>
->>         sdhci_set_clock(host, clock);
->>
->> -       if (ctrl_phy) {
->> +       if (host->mmc->actual_clock && !IS_ERR(sdhci_arasan->phy)) {
->> +               sdhci_arasan->phy_on = true;
->> +
->>                 spin_unlock_irq(&host->lock);
->>                 phy_power_on(sdhci_arasan->phy);
->>                 spin_lock_irq(&host->lock);
->> @@ -257,12 +259,6 @@ static int sdhci_arasan_probe(struct platform_device
->> *pdev)
->>                         goto clk_disable_all;
->>                 }
->>
->> -               ret = phy_power_on(sdhci_arasan->phy);
->> -               if (ret < 0) {
->> -                       dev_err(&pdev->dev, "phy_power_on err.\n");
->> -                       goto err_phy_power;
->> -               }
->> -
+>>         /*
+>>          * Keep phyctrl_pdb and phyctrl_endll low to allow
+>> @@ -137,15 +138,25 @@ static int rockchip_emmc_phy_power(struct
+>> rockchip_emmc_phy *rk_phy,
+>>                                    PHYCTRL_ENDLL_MASK,
+>>                                    PHYCTRL_ENDLL_SHIFT));
+>>         /*
+>> -        * After enable analog DLL circuits, we need an extra 10.2us
+>> -        * for dll to be ready for work. But according to testing, we
+>> -        * find some chips need more than 25us.
+>> +        * After enabling analog DLL circuits docs say that we need 10.2
+>> us if
+>> +        * our source clock is at 50 MHz and that lock time scales
+>> linearly
+>> +        * with clock speed.  If we are powering on the PHY and the card
+>> clock
+>> +        * is super slow (like 100 kHZ) this could take as long as 5.1 ms.
 >
 >
-> Because there is too much dependency between phy and controller, so
-> previous solution is to setup clk by firmware. The same case for
-> suspend and resume.
->
-> Look really good to do it more legit.
+> 5.1ms is by calculation or test?
 
-Thanks!  I don't see a Reviewed-by tag so I'm not adding it.  If you'd
-like your tag added, please let me know and I will add it if I send
-out another version.
+By calculation.
+
+>>> 10.2 us * (50000000 Hz / 100000 Hz)
+5100.0 us, or 5.1 ms
+
+I'll add clarification to the comment.
 
 
 -Doug
