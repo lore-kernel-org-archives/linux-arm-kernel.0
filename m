@@ -1,47 +1,47 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Mon, 13 Jun 2016 16:04:35 -0700
-Subject: [PATCH v2 11/11] arm64: dts: rockchip: Provide emmcclk to PHY for
- rk3399
-In-Reply-To: <1465859076-4868-1-git-send-email-dianders@chromium.org>
-References: <1465859076-4868-1-git-send-email-dianders@chromium.org>
-Message-ID: <1465859076-4868-12-git-send-email-dianders@chromium.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 13 Jun 2016 16:05:27 -0700
+Subject: [PATCH 10/11] phy: rockchip-emmc: Minor code cleanup in
+ rockchip_emmc_phy_power_off()
+In-Reply-To: <f80ba471-95dd-5cda-00a2-9006cfe15167@rock-chips.com>
+References: <1465339484-969-1-git-send-email-dianders@chromium.org>
+ <1465339484-969-11-git-send-email-dianders@chromium.org>
+ <f80ba471-95dd-5cda-00a2-9006cfe15167@rock-chips.com>
+Message-ID: <CAD=FV=U0XuOEBXsuf7cdp-mhe8=XJer9EoRJ99-2Mx_0=CFt-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Previous changes in this series allowed exposing the card clock from the
-rk3399 SDHCI device and allowed consuming the card clock in the rk3399
-eMMC PHY.  Hook things up in the main rk3399 dtsi file.
+Hi,
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
-Changes in v2: None
+On Mon, Jun 13, 2016 at 1:56 AM, Shawn Lin <shawn.lin@rock-chips.com> wrote:
+> On 2016/6/8 6:44, Douglas Anderson wrote:
+>>
+>> There's no reason to store the return value of rockchip_emmc_phy_power()
+>> in a variable nor to check it.  Just return it.
+>>
+>> Signed-off-by: Douglas Anderson <dianders@chromium.org>
+>> ---
+>>  drivers/phy/phy-rockchip-emmc.c | 8 +-------
+>>  1 file changed, 1 insertion(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/phy/phy-rockchip-emmc.c
+>> b/drivers/phy/phy-rockchip-emmc.c
+>> index 0fce7359d468..188e4c387ba8 100644
+>> --- a/drivers/phy/phy-rockchip-emmc.c
+>> +++ b/drivers/phy/phy-rockchip-emmc.c
+>> @@ -227,8 +227,6 @@ static int rockchip_emmc_phy_power_off(struct phy
+>> *phy)
+>>  static int rockchip_emmc_phy_power_on(struct phy *phy)
+>>  {
+>
+>
+> I saw the cleanup for power_off is done on [patch 9/11]
+>
+> shouldn't be in this patch? :)
 
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Yeah, I tried to, but then I realized that I couldn't split that out
+too easily because the previous patch touched the same code.
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 1b57e92e0093..004b599ca285 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -225,8 +225,10 @@
- 		assigned-clock-rates = <200000000>;
- 		clocks = <&cru SCLK_EMMC>, <&cru ACLK_EMMC>;
- 		clock-names = "clk_xin", "clk_ahb";
-+		clock-output-names = "emmc_cardclock";
- 		phys = <&emmc_phy>;
- 		phy-names = "phy_arasan";
-+		#clock-cells = <0>;
- 		status = "disabled";
- 	};
- 
-@@ -621,6 +623,8 @@
- 		emmc_phy: phy at f780 {
- 			compatible = "rockchip,rk3399-emmc-phy";
- 			reg = <0xf780 0x24>;
-+			clocks = <&sdhci>;
-+			clock-names = "emmcclk";
- 			#phy-cells = <0>;
- 			status = "disabled";
- 		};
--- 
-2.8.0.rc3.226.g39d4020
+...but actually, reordering things solves all the problems so I've done that.
+
+
+-Doug
