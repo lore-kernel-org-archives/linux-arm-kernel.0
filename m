@@ -1,120 +1,52 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Mon, 13 Jun 2016 17:39:45 +0800
-Subject: [v2 PATCH 0/4] Rockchip Type-C and DispplayPort driver
-Message-ID: <1465810789-22303-1-git-send-email-zyw@rock-chips.com>
+From: peter.chen@nxp.com (Peter Chen)
+Date: Mon, 13 Jun 2016 09:42:19 +0000
+Subject: [PATCH 1/1] ARM: dts: imx6qdl.dtsi: add "arm, shared-override"
+ for pl310
+In-Reply-To: <1465809841.2313.2.camel@pengutronix.de>
+References: <1465292365-26038-1-git-send-email-peter.chen@nxp.com>
+ <20160611115733.GM20243@tiger> <1465809841.2313.2.camel@pengutronix.de>
+Message-ID: <VI1PR04MB14558D10397904A5C33A73E88B530@VI1PR04MB1455.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ 
+>Am Samstag, den 11.06.2016, 19:57 +0800 schrieb Shawn Guo:
+>> + Lucas
+>>
+>> On Tue, Jun 07, 2016 at 05:39:25PM +0800, Peter Chen wrote:
+>> > The imx6 SMP system has the same DMA memory coherency issue [1] with
+>> > pl310 L2 controller. With this shared override bit set, the customer
+>> > reports the DMA coherency issue is gone. Besides, I have tested the
+>> > performance using USB ethernet with/without this bit, it shows no
+>> > difference.
+>> >
+>> > [1] http://patchwork.ozlabs.org/patch/469362/
+>> >
+>> > Signed-off-by: Peter Chen <peter.chen@nxp.com>
+>> > ---
+>> >  arch/arm/boot/dts/imx6qdl.dtsi | 1 +
+>> >  1 file changed, 1 insertion(+)
+>> >
+>> > diff --git a/arch/arm/boot/dts/imx6qdl.dtsi
+>> > b/arch/arm/boot/dts/imx6qdl.dtsi index ed613eb..30e21ee 100644
+>> > --- a/arch/arm/boot/dts/imx6qdl.dtsi
+>> > +++ b/arch/arm/boot/dts/imx6qdl.dtsi
+>> > @@ -185,6 +185,7 @@
+>> >  			cache-level = <2>;
+>> >  			arm,tag-latency = <4 2 3>;
+>> >  			arm,data-latency = <4 2 3>;
+>> > +			arm,shared-override;
+>>
+>> Lucas had an objection to the change [1], considering the case that
+>> kernel is booted as non-secure.
+>
+>My objection to this change still stands. Configuring the L2C to be compliant to the
+>ARMv7 ARM is at the same level as the CPU workarounds that can not be applied in
+>secure mode. Those must be done in the firmware, if your firmware doesn't do it it's
+>plain broken.
+>
 
-Hi all
+Sorry, I not understand what's your mean. We only changes L2 configuration when the
+cache is disabled, what problem will be?
 
-This series patch is for rockchip Type-C phy and DisplayPort controller
-driver.
-
-The USB Type-C PHY is designed to support the USB3 and DP applications.
-The PHY basically has two main components: USB3 and DisplyPort. USB3
-operates in SuperSpeed mode and the DP can operate at RBR, HBR and HBR2
-data rates. The Type-C cable orientation detection and Power Delivery
-(PD) is accomplished using a PD PHY or a exernal PD chip.
-
-The DP controller is compliant with DisplayPort Specification,
-Version 1.3, This IP is compatible with the rockchip type-c PHY IP.
-There is a uCPU in DP controller, it need a firmware to work, please
-put the firmware file to /lib/firmware/cdn/dptx.bin. The uCPU in charge
-of aux communication and link training, the host use mailbox to
-communicate with the ucpu.
-
-The PHY driver has register a notification with extcon API, to get the
-alt mode from PD, the PD driver need call the devm_extcon_dev_allocate
-to create a extcon device and use extcon_set_state to notify PHY and
-DP controller.
-
-About the DP audio, cdn-dp registered 2 DAIs: 0 is I2S, 1 is SPDIF.
-We can reference them in simple-card.
-
-This series is based on Mark Yao's branch:
-https://github.com/markyzq/kernel-drm-rockchip/tree/drm-rockchip-next-2016-05-23
-
-I test this patches on the rk3399-evb board, with a fusb302 driver,
-this branch has no rk3399.dtsi, so the patch about dts is not included
-in this series.
-
-
-Changes in v2:
-- add some registers description
-- select RESET_CONTROLLER
-- alphabetic order
-- modify some spelling mistakes
-- make mode cleaner
-- use bool for enable/disable
-- check all of the return value
-- return a better err number
-- use more readx_poll_timeout()
-- clk_disable_unprepare(tcphy->clk_ref);
-- remove unuse functions, rockchip_typec_phy_power_on/off
-- remove unnecessary typecast from void *
-- use dts node to distinguish between phys.
-- Alphabetic order
-- remove excess error message
-- use define clk_rate
-- check all return value
-- remove dev_set_name(dp->dev, "cdn-dp");
-- use schedule_delayed_work
-- remove never-called functions
-- remove some unnecessary ()
-
-Changes in v1:
-- add extcon node description
-- move the registers in phy driver
-- remove the suffix of reset
-- update the licence note
-- init core clock to 50MHz
-- use extcon API
-- remove unused global
-- add some comments for magic num
-- change usleep_range(1000, 2000) tousleep_range(1000, 1050)
-- remove __func__ from dev_err
-- return err number when get clk failed
-- remove ADDR_ADJ define
-- use devm_clk_get(&pdev->dev, "tcpdcore")
-- add extcon node description
-- add #sound-dai-cells description
-- use extcon API
-- use hdmi-codec for the DP Asoc
-- do not initialize the "ret"
-- printk a err log when drm_of_encoder_active_endpoint_id
-- modify the dclk pin_pol to a single line
-
-Chris Zhong (4):
-  Documentation: bindings: add dt doc for Rockchip USB Type-C PHY
-  phy: Add USB Type-C PHY driver for rk3399
-  Documentation: bindings: add dt documentation for cdn DP controller
-  drm/rockchip: cdn-dp: add cdn DP support for rk3399
-
- .../bindings/display/rockchip/cdn-dp-rockchip.txt  |  62 ++
- .../devicetree/bindings/phy/phy-rockchip-typec.txt |  77 ++
- drivers/gpu/drm/rockchip/Kconfig                   |   9 +
- drivers/gpu/drm/rockchip/Makefile                  |   1 +
- drivers/gpu/drm/rockchip/cdn-dp-core.c             | 694 +++++++++++++++
- drivers/gpu/drm/rockchip/cdn-dp-core.h             | 108 +++
- drivers/gpu/drm/rockchip/cdn-dp-reg.c              | 717 ++++++++++++++++
- drivers/gpu/drm/rockchip/cdn-dp-reg.h              | 404 +++++++++
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c        |   6 +-
- drivers/gpu/drm/rockchip/rockchip_drm_vop.h        |   2 +
- drivers/gpu/drm/rockchip/rockchip_vop_reg.c        |   2 +
- drivers/phy/Kconfig                                |   8 +
- drivers/phy/Makefile                               |   1 +
- drivers/phy/phy-rockchip-typec.c                   | 952 +++++++++++++++++++++
- include/linux/phy/phy-rockchip-typec.h             |  20 +
- 15 files changed, 3062 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/cdn-dp-rockchip.txt
- create mode 100644 Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt
- create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.c
- create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-core.h
- create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.c
- create mode 100644 drivers/gpu/drm/rockchip/cdn-dp-reg.h
- create mode 100644 drivers/phy/phy-rockchip-typec.c
- create mode 100644 include/linux/phy/phy-rockchip-typec.h
-
--- 
-2.6.3
+Peter
